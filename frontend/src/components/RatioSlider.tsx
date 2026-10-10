@@ -72,9 +72,6 @@ export function RatioSlider({
   const track = useRef<HTMLDivElement>(null);
   const [entry, setEntry] = useState<"pointer" | "keyboard" | null>(null);
   const start = useRef(value);
-  const cancelled = useRef(false);
-  /** The primary button is down on the slider. */
-  const pressed = useRef(false);
   const keyRun = useRef(false);
   const width = WIDTH - 2 * INSET;
   const shown = mixed ? 0.5 : value;
@@ -91,23 +88,10 @@ export function RatioSlider({
             radius: THUMB / 2,
           },
     onClick: (at) => onSet(valueAtPosition(at.x - INSET, width, RATIO_RANGE)),
-    onDrag: (at) => {
-      if (!cancelled.current) {
-        onPreview(valueAtPosition(at.x - INSET, width, RATIO_RANGE));
-      }
-    },
-    onDragEnd: () => {
-      const wasCancelled = cancelled.current;
-      cancelled.current = false;
-      if (!wasCancelled) {
-        onRelease();
-      }
-    },
-    onPointerCancel: () => {
-      pressed.current = false;
-      cancelled.current = false;
-      onCancel(start.current);
-    },
+    onDrag: (at) => onPreview(valueAtPosition(at.x - INSET, width, RATIO_RANGE)),
+    onDragEnd: onRelease,
+    onPointerCancel: () => onCancel(start.current),
+    onEscape: () => onCancel(start.current),
     onDoubleClick: () => setEntry("pointer"),
   });
 
@@ -115,13 +99,6 @@ export function RatioSlider({
     if (event.key === "Enter" || event.key === "F2") {
       event.preventDefault();
       setEntry("keyboard");
-      return;
-    }
-    if (event.key === "Escape" && pressed.current && !cancelled.current) {
-      // Escape in the middle of a drag drops the preview; the release writes nothing.
-      event.preventDefault();
-      cancelled.current = true;
-      onCancel(start.current);
       return;
     }
     const { min, max, step } = RATIO_RANGE;
@@ -187,15 +164,10 @@ export function RatioSlider({
         }}
         onPointerDown={(event) => {
           start.current = shown;
-          cancelled.current = false;
-          pressed.current = event.button === 0;
           pointer.onPointerDown(event);
         }}
         onPointerMove={pointer.onPointerMove}
-        onPointerUp={(event) => {
-          pressed.current = false;
-          pointer.onPointerUp(event);
-        }}
+        onPointerUp={pointer.onPointerUp}
         onPointerCancel={pointer.onPointerCancel}
         onKeyDown={onKeyDown}
         onKeyUp={(event) => {

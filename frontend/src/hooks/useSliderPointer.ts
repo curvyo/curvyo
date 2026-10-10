@@ -22,6 +22,13 @@ export interface SliderPointerOptions {
   onDragEnd: () => void;
   /** The system took the pointer away in the middle of a press. */
   onPointerCancel?: () => void;
+  /**
+   * Escape while the button is down: the press is dropped, so the release is neither a
+   * click nor the end of a drag and later moves do nothing (criterion 19). The slider
+   * puts back what it previewed; a slider whose preview is dropped elsewhere passes
+   * nothing.
+   */
+  onEscape?: () => void;
   /** A double-click, at the release of its second click. */
   onDoubleClick: () => void;
 }
@@ -45,10 +52,19 @@ export function useSliderPointer(
   const gesture = useRef(new SliderGesture());
   const grab = useRef<Point | null>(null);
   const latest = useRef(options);
+  /** Removes the Escape listener of the press in progress. */
+  const stopEscape = useRef<(() => void) | null>(null);
   // After every render, so an event handler sees the latest values.
   useEffect(() => {
     latest.current = options;
   });
+
+  const endPress = () => {
+    stopEscape.current?.();
+    stopEscape.current = null;
+  };
+  // A slider that goes away in the middle of a press leaves no listener behind.
+  useEffect(() => endPress, []);
 
   const follow = (at: Point) => {
     const offset = grab.current;
@@ -70,6 +86,21 @@ export function useSliderPointer(
       // The slider takes the focus at the press, which also closes an entry beside it.
       event.currentTarget.focus({ preventScroll: true });
       grab.current = null;
+      endPress();
+      const onEscape = (key: KeyboardEvent) => {
+        if (key.key !== "Escape") {
+          return;
+        }
+        // It never reaches the panel or the canvas.
+        key.preventDefault();
+        key.stopPropagation();
+        endPress();
+        gesture.current.cancel();
+        latest.current.onEscape?.();
+      };
+      window.addEventListener("keydown", onEscape, true);
+      stopEscape.current = () =>
+        window.removeEventListener("keydown", onEscape, true);
       gesture.current.down(
         local(event),
         event.pointerType !== "mouse",
@@ -90,6 +121,7 @@ export function useSliderPointer(
       }
     },
     onPointerUp: (event) => {
+      endPress();
       if (event.currentTarget.hasPointerCapture(event.pointerId)) {
         event.currentTarget.releasePointerCapture(event.pointerId);
       }
@@ -104,6 +136,7 @@ export function useSliderPointer(
       }
     },
     onPointerCancel: () => {
+      endPress();
       gesture.current.cancel();
       latest.current.onPointerCancel?.();
     },
