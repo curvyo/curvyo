@@ -11,7 +11,7 @@ use curvyo_document_core::{
     AnchorId, Document, Length, NewAnchor, ObjectSnapshot, Point, RectBounds, pack, unpack,
 };
 use curvyo_editor_wasm::{EscapeStep, KeyHint, KeyInput, KeyOutcome, Session, Tool};
-use curvyo_ui_core::{EntryOutcome, MoveEntryMode, object_outline_bounds};
+use curvyo_ui_core::{EntryOutcome, MoveEntryMode, ReferencePoint, object_outline_bounds};
 
 /// Screen pixels per millimetre of a fresh session (96 dpi at 100 %).
 const SCALE: f64 = 96.0 / 25.4;
@@ -110,11 +110,12 @@ fn m_opens_the_move_chip_and_a_relative_entry_is_one_commit() {
     let mut session = selected(&rect_document(), pt(40.0, 20.0));
     let before = top_left(&session);
     assert_eq!(key(&mut session, "m", false), KeyOutcome::EntryOpened);
+    session.set_move_reference(ReferencePoint::TopLeft);
     let chip = session.move_entry().expect("the move chip");
     assert!(near(chip.center, 60.0, 50.0), "the box centre");
     assert_eq!(chip.relative_prefill, ["0".to_string(), "0".to_string()]);
     assert_eq!(
-        chip.absolute_prefill,
+        chip.absolute_prefills[ReferencePoint::TopLeft.index()],
         ["10.0".to_string(), "20.0".to_string()]
     );
     assert!(session.transform_entry().is_none());
@@ -143,6 +144,7 @@ fn m_opens_the_move_chip_and_a_relative_entry_is_one_commit() {
 fn an_absolute_entry_puts_the_top_left_of_the_bounds_there() {
     let mut session = selected(&rect_document(), pt(40.0, 20.0));
     key(&mut session, "m", false);
+    session.set_move_reference(ReferencePoint::TopLeft);
     assert_eq!(
         session.commit_move_entry(
             "100",
@@ -165,6 +167,7 @@ fn invalid_and_no_op_entries_write_nothing() {
     let mut session = selected(&rect_document(), pt(40.0, 20.0));
     let before = session.pack("0.1.0").unwrap();
     key(&mut session, "m", false);
+    session.set_move_reference(ReferencePoint::TopLeft);
     assert!(matches!(
         session.commit_move_entry(
             "1,2,3",
@@ -190,6 +193,7 @@ fn invalid_and_no_op_entries_write_nothing() {
     );
     assert!(session.move_entry().is_none());
     key(&mut session, "m", false);
+    session.set_move_reference(ReferencePoint::TopLeft);
     assert_eq!(
         session.commit_move_entry(
             "10.0",
@@ -253,6 +257,7 @@ fn elsewhere_in_the_box_the_double_click_keeps_its_behaviour() {
     assert!(small.move_entry().is_none());
     // M opens it all the same, with the chip where the handle would be.
     assert_eq!(key(&mut small, "m", false), KeyOutcome::EntryOpened);
+    small.set_move_reference(ReferencePoint::TopLeft);
     assert!(near(small.move_entry().unwrap().center, 14.0, 24.0));
 }
 
@@ -476,6 +481,7 @@ fn an_open_entry_chip_shows_no_side_rotate_handle() {
     assert_ne!(plain, shifted, "Shift reveals the side rotate handles");
     session.modifiers_changed(false, false, false);
     key(&mut session, "m", false);
+    session.set_move_reference(ReferencePoint::TopLeft);
     let no_shift = session.draw_list().triangle_count();
     session.modifiers_changed(true, false, false);
     assert_eq!(

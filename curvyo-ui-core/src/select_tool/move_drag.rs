@@ -4,11 +4,15 @@
 //! [`MoveDrag::resolve`] is the one resolving function the live preview and
 //! the release both call.
 
+use std::cell::OnceCell;
+use std::collections::HashSet;
+
 use curvyo_document_core::{Document, NodeId, ObjectSnapshot, Point, Vec2};
 
 use super::{SelectDrag, SelectTool};
 use crate::anchor_id_minter::AnchorIdMinter;
 use crate::modifiers::Modifiers;
+use crate::object_bounds::object_outline_bounds;
 use crate::object_selection::ObjectSelection;
 use crate::transform_commit::{MOVE_EQUAL_EPSILON_MM, commit_move};
 use crate::transform_drag::DragOrigin;
@@ -55,6 +59,10 @@ pub(super) struct MoveDrag {
     /// The axis the lock chose on the latest pointer event: kept only to
     /// break an exact tie.
     pub(super) last_axis: Option<Axis>,
+    /// The true bounding box of the selected objects as the drag found them, read once at the
+    /// first frame past the dead zone (`specs/0047-transform-polish/` criterion 33); the
+    /// reference box is this box moved by the live offset.
+    pub(super) start_bounds: OnceCell<Option<(Point, Point)>>,
 }
 
 /// `displacement` limited to the axis on which it is larger, chosen again on every call (no
@@ -85,6 +93,7 @@ impl MoveDrag {
             pending_toggle: None,
             joins: None,
             last_axis: None,
+            start_bounds: OnceCell::new(),
         }
     }
 
@@ -159,6 +168,35 @@ impl SelectTool {
         }
     }
 
+    /// The true bounding box of the selection as the move drag in flight would leave it, for the
+    /// pale red reference box (`specs/0047-transform-polish/` criterion 33): the tight bounds
+    /// of the selected objects before the drag, moved by the live offset (the copy travels with
+    /// the same offset). `None` when no move runs, inside the dead zone, or while the offset is
+    /// zero (a drag back to its start). The bounds are read once; a frame costs a sum.
+    #[must_use]
+    pub fn live_move_box(
+        &self,
+        objects: &[ObjectSnapshot],
+        selection: &ObjectSelection,
+        pointer: Point,
+        modifiers: Modifiers,
+    ) -> Option<(Point, Point)> {
+        let SelectDrag::Moving(drag) = &self.drag else {
+            return None;
+        };
+        if !drag.origin.is_active_at(pointer) {
+            return None;
+        }
+        let offset = drag.resolve(pointer, modifiers).offset;
+        if offset.length() <= MOVE_EQUAL_EPSILON_MM {
+            return None;
+        }
+        let (min, max) = (*drag
+            .start_bounds
+            .get_or_init(|| selected_bounds(objects, selection)))?;
+        Some((min.translated(offset), max.translated(offset)))
+    }
+
     /// Whether a move (not a handle drag) is in flight, past the dead zone or
     /// not.
     #[must_use]
@@ -205,4 +243,22 @@ impl SelectTool {
             selection.set(&copies);
         }
     }
+}
+
+/// The tight bounds of the selected objects together, `None` when none is selected.
+fn selected_bounds(
+    objects: &[ObjectSnapshot],
+    selection: &ObjectSelection,
+) -> Option<(Point, Point)> {
+    let selected: HashSet<NodeId> = selection.ids().iter().copied().collect();
+    objects
+        .iter()
+        .filter(|object| selected.contains(&object.id()))
+        .map(object_outline_bounds)
+        .reduce(|(min, max), (low, high)| {
+            (
+                Point::new(min.x.min(low.x), min.y.min(low.y)),
+                Point::new(max.x.max(high.x), max.y.max(high.y)),
+            )
+        })
 }

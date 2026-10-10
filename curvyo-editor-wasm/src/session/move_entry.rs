@@ -1,12 +1,12 @@
 //! `Session`'s glue for the typed move
-//! (`specs/0010-edit-interaction-polish/specification.md`, criteria 15 to 25, 56):
-//! the move chip's view for the DOM and its commit. All rules (parsing,
-//! relative and absolute reading, the tight bounds, the coordinate limit) live
-//! in `curvyo_ui_core::MoveEntry`; the DOM holds the text, the mode switch
+//! (`specs/0010-edit-interaction-polish/specification.md`, criteria 15 to 25, 56;
+//! `specs/0047-transform-polish/` Part C): the move chip's view for the DOM and its commit. All
+//! rules (parsing, relative and absolute reading, the tight bounds, the reference point, the
+//! coordinate limit) live in `curvyo_ui_core::MoveEntry`; the DOM holds the text, the mode switch
 //! and the focus, and passes the mode with the commit.
 
 use curvyo_document_core::Point;
-use curvyo_ui_core::{EntryOutcome, MoveEntry, MoveEntryMode};
+use curvyo_ui_core::{EntryOutcome, MoveEntry, MoveEntryMode, ReferencePoint};
 
 use super::{Session, Tool};
 
@@ -18,16 +18,17 @@ pub struct MoveEntryView {
     pub center: Point,
     /// What an untouched X and Y field show in Relative mode.
     pub relative_prefill: [String; 2],
-    /// What an untouched X and Y field show in Absolute mode: the current
-    /// top-left of the object's drawn bounds.
-    pub absolute_prefill: [String; 2],
+    /// What an untouched X and Y field show in Absolute mode for each reference point, in the
+    /// order of [`ReferencePoint::ALL`]: its current position (criterion 37).
+    pub absolute_prefills: [[String; 2]; 9],
+    /// The chosen reference point: the centre until the maker chooses another.
+    pub reference: ReferencePoint,
+    /// The lower edge of the true bounding box, in document space under the box centre: the chip
+    /// is placed 16 px below it (UX notes, "Chip").
+    pub box_bottom: Point,
     /// Whether the Copy check opens on: Ctrl was held at the second press of
     /// the double-click (criterion 23).
     pub copy_preset: bool,
-    /// Whether the chip moves a multi-selection: "Absolute" then measures from
-    /// the top-left corner of the group box, and says so
-    /// (`specs/0019-multi-object-transform/` criterion 35).
-    pub selection: bool,
 }
 
 impl Session {
@@ -47,12 +48,15 @@ impl Session {
         let entry = self.open_move_entry()?;
         let box_ = entry.start_box();
         let relative = |index: usize| entry.fields()[index].prefill.clone();
+        let (min, max) = entry.bounds();
         Some(MoveEntryView {
             center: box_.to_document(box_.local_center()),
             relative_prefill: [relative(0), relative(1)],
-            absolute_prefill: entry.absolute_prefill().clone(),
+            absolute_prefills: ReferencePoint::ALL
+                .map(|reference| entry.absolute_prefill_for(reference)),
+            reference: entry.reference(),
+            box_bottom: Point::new(f64::midpoint(min.x, max.x), max.y),
             copy_preset: entry.copy_preset(),
-            selection: entry.ids().len() >= 2,
         })
     }
 

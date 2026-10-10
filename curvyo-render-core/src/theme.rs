@@ -406,3 +406,31 @@ pub const HOVER_BOX_CASING: RgbaColor = SELECTION_CASING.with_alpha(166);
 /// One side of the pivot marker's casing, screen-space pixels: the marker is
 /// a dot, not a line, so its casing is a fixed ring one pixel wide.
 pub const PIVOT_MARKER_CASING_PX: f64 = 1.0;
+
+/// `--reference-mark` (`specs/0047-transform-polish/`, `docs/design-system.md`, row "Reference
+/// mark"): the marks of the typed move's nine reference points, an alias of `--marquee-contain`.
+/// 3.2:1 on `--canvas-bg`, 3.9:1 against its own white casing.
+pub const REFERENCE_MARK: RgbaColor = MARQUEE_CONTAIN;
+
+/// `--reference-box`: the pale red true bounding box, `--reference-mark` at 55 %.
+pub const REFERENCE_BOX: RgbaColor = REFERENCE_MARK.with_alpha(140); // 55% of 255, rounded
+
+/// The reference box's casing: `--selection-casing` at the same 55 %, so the line reads on a fill.
+pub const REFERENCE_BOX_CASING: RgbaColor = SELECTION_CASING.with_alpha(140);
+
+/// A corner or edge mark: a square this many screen pixels across inside its 1 px casing; it covers
+/// the 8 px resize handle under it completely.
+pub const REFERENCE_MARK_SQUARE_PX: f64 = 10.0;
+
+/// The centre mark: a cross this many screen pixels across, with arms of
+/// [`REFERENCE_CROSS_ARM_PX`], inside its 1 px casing.
+pub const REFERENCE_CROSS_PX: f64 = 12.0;
+
+/// The width of the arms of the centre cross, screen pixels.
+pub const REFERENCE_CROSS_ARM_PX: f64 = 4.0;
+
+/// The line of a mark's outline and the width of its casing on each side, screen pixels.
+pub const REFERENCE_MARK_LINE_PX: f64 = 1.0;
+
+/// A mark under the pointer, or whose radio has the focus, is this much larger, screen pixels.
+pub const REFERENCE_MARK_HOVER_GROWTH_PX: f64 = 2.0;

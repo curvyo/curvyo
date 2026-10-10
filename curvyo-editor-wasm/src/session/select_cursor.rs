@@ -50,6 +50,10 @@ impl Session {
         if let Some(hint) = self.gesture_cursor() {
             return hint.to_string();
         }
+        // A mark of the open typed move is a button (`0047` criterion 43).
+        if self.move_mark_hover().is_some() {
+            return "pointer".to_string();
+        }
         let objects = self.objects();
         // The cursor arrows follow the box the maker sees: its direction is the
         // shown angle (`orientation()`), which is the `rotation` register for
@@ -112,12 +116,18 @@ impl Session {
     /// host's hover chip: `""` (none), `"resize-edge"`, `"resize-corner"`,
     /// `"rotate-corner"`, `"rotate-side"`, `"skew"` (top and bottom: skew x),
     /// `"skew-y"` (left and right), `"move"`,
-    /// `"param-radius"` (a rectangle's corner radius) or `"param-inner"` (a
-    /// star's inner radius). Empty while a drag runs or an entry is open.
+    /// `"param-radius"` (a rectangle's corner radius), `"param-inner"` (a
+    /// star's inner radius) or `"reference-mark"` (a mark of the typed move, whose
+    /// hint the move chip words). Empty while a drag runs or an entry other than the typed
+    /// move is open.
     #[must_use]
     pub fn handle_hint(&self) -> String {
         if self.tool != Tool::Select || self.colour_pick_target().is_some() {
             return String::new();
+        }
+        // The hint of a mark is the chip's (its second line depends on the typed text).
+        if self.move_mark_hover().is_some() {
+            return "reference-mark".to_string();
         }
         let objects = self.objects();
         if self.selection.ids().len() >= 2 {

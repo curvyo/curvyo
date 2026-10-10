@@ -52,6 +52,7 @@ mod pen_target;
 mod pen_tool;
 mod poly_star_tool;
 mod rectangle_tool;
+mod reference_point;
 mod resize_direction;
 mod ruler;
 mod segment_bend;
@@ -145,6 +146,10 @@ pub use pen_tool::{
 };
 pub use poly_star_tool::{PolyStarMode, PolygonStarTool};
 pub use rectangle_tool::RectangleTool;
+pub use reference_point::{
+    MARKS_MIN_SIDE_PX, ReferencePoint, hit_mark, mark_hit_radius_px, marks_are_shown,
+    shorter_side_px, visible_marks,
+};
 pub use resize_direction::ResizeDirection;
 pub use ruler::{RulerAxis, RulerLabel, RulerLayout, RulerMajor, ruler_layout};
 pub use segment_bend::{BendResolution, segment_is_bendable};

@@ -149,6 +149,12 @@ export function Canvas({ editor }: CanvasProps) {
           containerRef={editor.containerRef}
           onCommit={editor.commitMoveEntry}
           onCancel={editor.cancelTransformEntry}
+          onMode={editor.setMoveChipAbsolute}
+          onReference={editor.setMoveReference}
+          onRadioHover={editor.setMoveRadioHover}
+          onCommitAt={editor.commitMoveEntryAt}
+          markHover={editor.moveMarkHover}
+          onMarkClick={editor.setMarkClickHandler}
         />
       )}
       <HandleHintChip

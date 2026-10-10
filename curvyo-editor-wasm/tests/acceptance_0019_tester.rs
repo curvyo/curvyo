@@ -30,7 +30,7 @@ use curvyo_document_core::{
     Point, PointCount, RectBounds, Shape, StarFrame, Vec2, outline_of_rotated, pack, unpack,
 };
 use curvyo_editor_wasm::{EscapeStep, KeyHint, KeyInput, KeyOutcome, Session, Tool};
-use curvyo_ui_core::{EntryOutcome, MoveEntryMode};
+use curvyo_ui_core::{EntryOutcome, MoveEntryMode, ReferencePoint};
 
 // ---------------------------------------------------------------------
 // Helpers
@@ -386,8 +386,12 @@ fn ac1_group_box_of_a_rotated_rectangle_and_a_circle() {
     // Move chip, absolute prefill: the top-left corner.
     assert_eq!(key(&mut s, "m", false), KeyOutcome::EntryOpened);
     let m = s.move_entry().expect("move chip");
-    let x: f64 = m.absolute_prefill[0].parse().unwrap();
-    let y: f64 = m.absolute_prefill[1].parse().unwrap();
+    let x: f64 = m.absolute_prefills[ReferencePoint::TopLeft.index()][0]
+        .parse()
+        .unwrap();
+    let y: f64 = m.absolute_prefills[ReferencePoint::TopLeft.index()][1]
+        .parse()
+        .unwrap();
     assert!(near(x, -1.16, 0.06), "X {x}");
     assert!(near(y, -4.33, 0.06), "Y {y}");
 }
@@ -1613,8 +1617,12 @@ fn ac41_skew_and_skew_back_restores() {
     );
     let m = s.move_entry().unwrap();
     let tl = pt(
-        m.absolute_prefill[0].parse().unwrap(),
-        m.absolute_prefill[1].parse().unwrap(),
+        m.absolute_prefills[ReferencePoint::TopLeft.index()][0]
+            .parse()
+            .unwrap(),
+        m.absolute_prefills[ReferencePoint::TopLeft.index()][1]
+            .parse()
+            .unwrap(),
     );
     assert_eq!(
         key(&mut s, "Escape", false),
@@ -2532,8 +2540,8 @@ fn ac34_size_chip_reads_the_switches_when_it_opens() {
     assert!(bytes_of(&s) == before);
 }
 
-/// Criterion 35: the move chip: relative offset, absolute top-left of the group
-/// box, the Copy check copies every object and selects the copies; one commit.
+/// Criterion 35 (the top-left reference since `0047`): the move chip: relative offset,
+/// absolute top-left of the group box, the Copy check copies every object and selects the copies; one commit.
 #[test]
 fn ac35_the_move_chip() {
     let d = wide_squares();
@@ -2541,13 +2549,23 @@ fn ac35_the_move_chip() {
         let mut s = open(&d);
         select_all(&mut s);
         assert_eq!(key(&mut s, "m", false), KeyOutcome::EntryOpened);
+        s.set_move_reference(ReferencePoint::TopLeft);
         s
     };
     let mut s = fresh();
+    assert_eq!(s.selected_object_count(), 2, "the chip of a selection");
     let v = s.move_entry().unwrap();
-    assert!(v.selection);
     assert_eq!(v.relative_prefill, ["0".to_string(), "0".to_string()]);
-    assert_eq!(v.absolute_prefill, ["50.0".to_string(), "50.0".to_string()]);
+    // The default reference is the centre of the group box (`0047` criterion 37): (80, 60);
+    // `fresh` has set the top-left, whose position these examples use.
+    assert_eq!(
+        v.absolute_prefills[ReferencePoint::Centre.index()],
+        ["80.0".to_string(), "60.0".to_string()]
+    );
+    assert_eq!(
+        v.absolute_prefills[ReferencePoint::TopLeft.index()],
+        ["50.0".to_string(), "50.0".to_string()]
+    );
     let commits = change_count(&s);
     assert_eq!(
         s.commit_move_entry(
@@ -2616,8 +2634,9 @@ fn ac35_the_move_chip() {
     assert!(bytes_of(&s) == before);
 }
 
-/// Criterion 35: the absolute move of the spec's rotated rectangle and circle
-/// puts the top-left of their outline bounds at (X, Y).
+/// Criterion 35, with the top-left as the reference (`0047` criterion 37 makes the centre the
+/// default; its examples are in `transform_polish.rs`): the absolute move of the spec's rotated
+/// rectangle and circle puts the top-left of their outline bounds at (X, Y).
 #[test]
 fn ac35_absolute_move_uses_the_outline_bounds_of_a_rotated_rectangle() {
     let d = Document::new(1);
@@ -2631,6 +2650,7 @@ fn ac35_absolute_move_uses_the_outline_bounds_of_a_rotated_rectangle() {
     let mut s = open(&d);
     select_everything(&mut s);
     key(&mut s, "m", false);
+    s.set_move_reference(ReferencePoint::TopLeft);
     s.commit_move_entry(
         "100",
         "100",
@@ -2745,8 +2765,12 @@ fn ac38_hint_lines() {
     key(&mut s, "m", false);
     let m = s.move_entry().unwrap();
     let tl = pt(
-        m.absolute_prefill[0].parse().unwrap(),
-        m.absolute_prefill[1].parse().unwrap(),
+        m.absolute_prefills[ReferencePoint::TopLeft.index()][0]
+            .parse()
+            .unwrap(),
+        m.absolute_prefills[ReferencePoint::TopLeft.index()][1]
+            .parse()
+            .unwrap(),
     );
     key(&mut s, "Escape", false);
     select_everything(&mut s);
@@ -3220,8 +3244,12 @@ fn ac21_ctrl_corner_drag_is_proportional() {
     key(&mut s, "m", false);
     let m = s.move_entry().unwrap();
     let tl = pt(
-        m.absolute_prefill[0].parse().unwrap(),
-        m.absolute_prefill[1].parse().unwrap(),
+        m.absolute_prefills[ReferencePoint::TopLeft.index()][0]
+            .parse()
+            .unwrap(),
+        m.absolute_prefills[ReferencePoint::TopLeft.index()][1]
+            .parse()
+            .unwrap(),
     );
     key(&mut s, "Escape", false);
     select_everything(&mut s);
@@ -3814,8 +3842,12 @@ fn q2_object_to_path_lifts_the_restriction() {
     key(&mut s, "m", false);
     let m = s.move_entry().unwrap();
     let tl = pt(
-        m.absolute_prefill[0].parse().unwrap(),
-        m.absolute_prefill[1].parse().unwrap(),
+        m.absolute_prefills[ReferencePoint::TopLeft.index()][0]
+            .parse()
+            .unwrap(),
+        m.absolute_prefills[ReferencePoint::TopLeft.index()][1]
+            .parse()
+            .unwrap(),
     );
     key(&mut s, "Escape", false);
     key(&mut s, "s", false);

@@ -16,6 +16,7 @@ use crate::move_entry::MoveEntry;
 use crate::object_selection::ObjectSelection;
 use crate::oriented_box::oriented_bounds;
 use crate::param_entry::ParamEntry;
+use crate::reference_point::ReferencePoint;
 use crate::skew_entry::SkewEntry;
 use crate::transform_entry::{EntryOutcome, TransformEntry};
 use crate::transform_handle_layout::{EditHandle, Side, TransformHandleTolerances};
@@ -42,8 +43,8 @@ pub(super) enum OpenEntry {
 /// Copy check, both held by the DOM and passed with the commit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct MoveEntryMode {
-    /// Absolute position of the top-left of the drawn bounds, not a relative
-    /// offset.
+    /// Absolute position of the chosen reference point of the drawn bounds (the centre
+    /// unless the maker chose another), not a relative offset.
     pub absolute: bool,
     /// Copy the object instead of moving it.
     pub copy: bool,
@@ -133,6 +134,15 @@ impl SelectTool {
         }
     }
 
+    /// The open typed move, to set its view state: the chip's mode, the chosen reference point
+    /// and the radio under the pointer (`specs/0047-transform-polish/` criteria 39 and 41).
+    pub const fn move_entry_mut(&mut self) -> Option<&mut MoveEntry> {
+        match &mut self.entry {
+            Some(OpenEntry::Move(entry)) => Some(entry),
+            _ => None,
+        }
+    }
+
     /// Whether any numeric entry is open.
     #[must_use]
     pub const fn has_entry(&self) -> bool {
@@ -207,10 +217,33 @@ impl SelectTool {
         texts: [&str; 2],
         mode: MoveEntryMode,
     ) -> EntryOutcome {
+        let Some(reference) = self.move_entry().map(MoveEntry::reference) else {
+            return EntryOutcome::Unchanged;
+        };
+        self.commit_move_entry_at(document, selection, minter, texts, (mode, reference))
+    }
+
+    /// [`SelectTool::commit_move_entry`] with `reference` as the point to move instead of the
+    /// chosen one: a click on a mark executes the move with that mark's point
+    /// (`specs/0047-transform-polish/` criterion 40).
+    pub fn commit_move_entry_at(
+        &mut self,
+        document: &Document,
+        selection: &mut ObjectSelection,
+        minter: &mut AnchorIdMinter,
+        texts: [&str; 2],
+        (mode, reference): (MoveEntryMode, ReferencePoint),
+    ) -> EntryOutcome {
         let Some(OpenEntry::Move(entry)) = self.entry.as_ref() else {
             return EntryOutcome::Unchanged;
         };
-        let (outcome, copies) = entry.commit(document, texts, mode.absolute, mode.copy, minter);
+        let (outcome, copies) = entry.commit_at(
+            document,
+            texts,
+            (mode.absolute, reference),
+            mode.copy,
+            minter,
+        );
         if !matches!(outcome, EntryOutcome::Invalid { .. }) {
             self.entry = None;
         }

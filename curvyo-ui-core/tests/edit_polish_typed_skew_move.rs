@@ -460,6 +460,11 @@ fn the_move_entry_commits_through_the_tool() {
         }
     );
     assert!(rig.tool.has_entry(), "an invalid entry stays open");
+    // The top-left as the reference (`0047` criterion 37 makes the centre the default).
+    rig.tool
+        .move_entry_mut()
+        .unwrap()
+        .set_reference(curvyo_ui_core::ReferencePoint::TopLeft);
     assert_eq!(
         rig.tool.commit_move_entry(
             &rig.document,

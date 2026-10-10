@@ -199,6 +199,10 @@ const DOUBLE_CLICK_MS = 400;
  * presses land close enough to read as one double-click", independent
  * of zoom. */
 const DOUBLE_CLICK_PX = 5;
+/** A press on a mark of the typed move is a click if the pointer moves less than this before the
+ * release, px (`specs/0047-transform-polish/` criterion 40); 8 px for a touch or a pen. */
+const MARK_SLOP_PX = 3;
+const MARK_TOUCH_SLOP_PX = 8;
 
 /** How many wheel-delta pixels correspond to one print-sized "line" of
  * scroll (`deltaMode === 1`) or one "page" (`deltaMode === 2`) — most
@@ -400,16 +404,27 @@ function sameEntry<T>(a: T | null, b: T | null): boolean {
 export interface MoveEntryState {
   /** The box centre: the centre handle is there, or would be. */
   center: { x: number; y: number };
+  /** The lower edge of the true bounding box: the chip sits 16 px below it
+   * (`specs/0047-transform-polish/` UX notes, "Chip"). */
+  boxBottomY: number;
   /** What an untouched X and Y show in Relative mode. */
   relative: [string, string];
-  /** What an untouched X and Y show in Absolute mode (the current top-left). */
-  absolute: [string, string];
+  /** What an untouched X and Y show in Absolute mode for each of the nine reference points, in
+   * the order of the radios: top left, top centre, top right, left middle, centre, right
+   * middle, bottom left, bottom centre, bottom right. */
+  absolute: Array<[string, string]>;
+  /** The chosen reference point, 0 to 8: 4, the centre, on every open. */
+  reference: number;
+  /** The accessible name of each reference point's radio ("Top left", ...). */
+  referenceNames: string[];
+  /** The first line of the hint chip of each reference point's mark ("Top left corner", ...). */
+  referenceHints: string[];
   /** Whether the Copy check opens on (Ctrl at the second press). */
   copyPreset: boolean;
-  /** The chip moves a multi-selection: Absolute measures from the top-left
-   * corner of the group box (`specs/0019-multi-object-transform/` criterion 35). */
-  selection: boolean;
 }
+
+/** The nine reference points, as the index of [`MoveEntryState.absolute`]. */
+export const REFERENCE_COUNT = 9;
 
 /** Reads the wasm-bindgen `MoveEntryChip` once, immediately, so it can be
  * `free()`d rather than held onto. */
@@ -418,10 +433,13 @@ function readMoveEntry(
     | {
         center_x: number;
         center_y: number;
+        box_bottom_y: number;
         relative_prefill(axis: number): string;
-        absolute_prefill(axis: number): string;
+        absolute_prefill(reference: number, axis: number): string;
+        reference(): number;
+        reference_name(index: number): string;
+        reference_hint_name(index: number): string;
         copy_preset(): boolean;
-        selection(): boolean;
         free(): void;
       }
     | undefined,
@@ -429,12 +447,16 @@ function readMoveEntry(
   if (!raw) {
     return null;
   }
+  const points = Array.from({ length: REFERENCE_COUNT }, (_, index) => index);
   const entry: MoveEntryState = {
     center: { x: raw.center_x, y: raw.center_y },
+    boxBottomY: raw.box_bottom_y,
     relative: [raw.relative_prefill(0), raw.relative_prefill(1)],
-    absolute: [raw.absolute_prefill(0), raw.absolute_prefill(1)],
+    absolute: points.map((index) => [raw.absolute_prefill(index, 0), raw.absolute_prefill(index, 1)]),
+    reference: raw.reference(),
+    referenceNames: points.map((index) => raw.reference_name(index)),
+    referenceHints: points.map((index) => raw.reference_hint_name(index)),
     copyPreset: raw.copy_preset(),
-    selection: raw.selection(),
   };
   raw.free();
   return entry;
@@ -526,6 +548,20 @@ export interface EditorSession {
     absolute: boolean,
     copy: boolean,
   ) => string;
+  /** The typed move's Reference control and marks (`specs/0047-transform-polish/` Part C): the
+   * chip reports its mode, the point its control chose and the radio under the pointer to Rust,
+   * which draws the marks and reads the point at Enter. */
+  setMoveChipAbsolute: (absolute: boolean) => void;
+  setMoveReference: (reference: number) => void;
+  /** The radio with the pointer or the focus (0 to 8), or -1. */
+  setMoveRadioHover: (reference: number) => void;
+  /** A click on a mark: the move executes with that mark's point as the reference, with the
+   * texts of the fields and the Copy check; the codes of `commitMoveEntry` (criterion 40). */
+  commitMoveEntryAt: (first: string, second: string, copy: boolean, reference: number) => string;
+  /** The mark (0 to 8) under the pointer, or -1 (criteria 43 and 44). */
+  moveMarkHover: number;
+  /** The chip registers what a click on a mark does while it is open; `null` when it closes. */
+  setMarkClickHandler: (handler: ((mark: number) => void) | null) => void;
   /** Enter in the entry chip: `"committed"`, `"unchanged"` (both close it)
    * or `"invalid:<field>:number|positive|negative|ratio-range|skew-range|too-large"`
    * (it stays
@@ -693,6 +729,10 @@ export function useEditorSession(
     null,
   );
   const suppressedPressRef = useRef(false);
+  /** A press that landed on a mark of the open typed move: consumed, and a click at the release. */
+  const markPressRef = useRef<{ mark: number; x: number; y: number; touch: boolean } | null>(null);
+  const markClickRef = useRef<((mark: number) => void) | null>(null);
+  const [moveMarkHover, setMoveMarkHover] = useState(-1);
   /** The second press of a double-click: its position and modifiers, the
    * ones `double_click` is called with when its release arrives (a handle
    * is picked at the second press, `object-transform-refinements`). */
@@ -772,6 +812,10 @@ export function useEditorSession(
     entryOpenRef.current = next !== null || nextMove !== null;
     setTransformEntry((previous) => (sameEntry(previous, next) ? previous : next));
     setMoveEntry((previous) => (sameEntry(previous, nextMove) ? previous : nextMove));
+    if (nextMove === null) {
+      // No chip, no mark under the pointer.
+      setMoveMarkHover(-1);
+    }
   }, []);
 
   /** Re-reads the modifier badges: a pure read of Rust's state, called after
@@ -1302,6 +1346,26 @@ export function useEditorSession(
         return;
       }
 
+      // A press on a mark of the open typed move belongs to its chip: it does not cancel the
+      // chip, select, move or start a marquee, and acts at the release
+      // (`specs/0047-transform-polish/` criterion 40). Cancelling the default keeps the focus
+      // in the chip.
+      if (event.button === 0) {
+        const touch = event.pointerType !== "mouse";
+        const mark = session.move_mark_at(x, y, touch);
+        if (mark >= 0) {
+          event.preventDefault();
+          try {
+            event.currentTarget.setPointerCapture(event.pointerId);
+          } catch {
+            // Not capturable (e.g. a synthetic event): the click still works over the canvas.
+          }
+          markPressRef.current = { mark, x, y, touch };
+          lastPressRef.current = null;
+          return;
+        }
+      }
+
       const now = performance.now();
       const last = lastPressRef.current;
       // Alt-clicks step through overlapping objects (`specs/0014-advanced-selection/`
@@ -1382,6 +1446,7 @@ export function useEditorSession(
       setCursorHint(session?.cursor_hint() ?? "default");
       setHandleHint(session?.handle_hint() ?? "");
       setCornerHintLines(session?.corner_hint_lines() ?? []);
+      setMoveMarkHover(session?.move_mark_hover() ?? -1);
       if (session) {
         syncBadges(session);
       }
@@ -1418,6 +1483,18 @@ export function useEditorSession(
         event.currentTarget.releasePointerCapture(event.pointerId);
       } catch {
         // Not captured (e.g. a non-primary button) — nothing to release.
+      }
+
+      // The release of a press on a mark: a click if the pointer stayed within the slop, else
+      // nothing happens and the chip stays open.
+      const markPress = markPressRef.current;
+      if (markPress) {
+        markPressRef.current = null;
+        const slop = markPress.touch ? MARK_TOUCH_SLOP_PX : MARK_SLOP_PX;
+        if (Math.hypot(x - markPress.x, y - markPress.y) < slop) {
+          markClickRef.current?.(markPress.mark);
+        }
+        return;
       }
 
       if (suppressedPressRef.current) {
@@ -1488,6 +1565,7 @@ export function useEditorSession(
   );
 
   const onPointerCancel = useCallback(() => {
+    markPressRef.current = null;
     sessionRef.current?.pointer_cancelled();
     setLiveReadout(null);
     setCursorHint("default");
@@ -1501,6 +1579,7 @@ export function useEditorSession(
     setLiveReadout(null);
     setCursorHint("default");
     setHandleHint("");
+    setMoveMarkHover(-1);
     lastPointerRef.current = null;
     setMoveBadges(NO_BADGES);
   }, []);
@@ -1701,6 +1780,47 @@ export function useEditorSession(
     [syncFromSession],
   );
 
+  const setMoveChipAbsolute = useCallback(
+    (absolute: boolean) => {
+      sessionRef.current?.set_move_chip_absolute(absolute);
+      syncFromSession();
+    },
+    [syncFromSession],
+  );
+
+  const setMoveReference = useCallback(
+    (reference: number) => {
+      sessionRef.current?.set_move_reference(reference);
+      syncFromSession();
+    },
+    [syncFromSession],
+  );
+
+  const setMoveRadioHover = useCallback(
+    (reference: number) => {
+      sessionRef.current?.set_move_radio_hover(reference);
+      syncFromSession();
+    },
+    [syncFromSession],
+  );
+
+  const commitMoveEntryAt = useCallback(
+    (first: string, second: string, copy: boolean, reference: number): string => {
+      const session = sessionRef.current;
+      if (!session) {
+        return "unchanged";
+      }
+      const outcome = session.commit_move_entry_at(first, second, copy, reference);
+      syncFromSession();
+      return outcome;
+    },
+    [syncFromSession],
+  );
+
+  const setMarkClickHandler = useCallback((handler: ((mark: number) => void) | null) => {
+    markClickRef.current = handler;
+  }, []);
+
   const cancelTransformEntry = useCallback(() => {
     const session = sessionRef.current;
     if (!session || !entryOpenRef.current) {
@@ -1734,6 +1854,12 @@ export function useEditorSession(
     moveEntry,
     moveBadges,
     commitMoveEntry,
+    setMoveChipAbsolute,
+    setMoveReference,
+    setMoveRadioHover,
+    commitMoveEntryAt,
+    moveMarkHover,
+    setMarkClickHandler,
     commitTransformEntry,
     cancelTransformEntry,
     transformEntryLinked,

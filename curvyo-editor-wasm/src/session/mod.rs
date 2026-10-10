@@ -45,6 +45,7 @@ mod object_cache;
 mod open_error;
 mod panel_tabs;
 mod pen;
+mod reference_view;
 mod refusal;
 mod ruler;
 mod select;
