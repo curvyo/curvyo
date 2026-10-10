@@ -96,9 +96,9 @@ corner drags. `ConversionCounts`/`ConvertingKind` exist only to feed those texts
 
 ### Closing
 
-- [ ] Z1. Full gate: CLAUDE.md section 7, frontend tsc/oxlint/npm test, boolean budgets, wasm32
+- [x] Z1. Full gate: CLAUDE.md section 7, frontend tsc/oxlint/npm test, boolean budgets, wasm32
   builds of each touched `-core` crate.
-- [ ] Z2. PR description draft with the review guide (not opened here; reported to the lead).
+- [x] Z2. PR description draft with the review guide (not opened here; reported to the lead).
 
 ## Validation
 
