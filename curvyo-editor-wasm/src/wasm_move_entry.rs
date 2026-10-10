@@ -88,6 +88,10 @@ impl MoveEntryChip {
     /// centre", "Top right", "Left middle", "Centre", "Right middle", "Bottom left", "Bottom
     /// centre", "Bottom right"; empty beyond 8.
     #[must_use]
+    #[allow(
+        clippy::unused_self,
+        reason = "an instance method of the chip for the JS side"
+    )]
     pub fn reference_name(&self, index: u32) -> String {
         ReferencePoint::from_index(index as usize)
             .map(|point| point.name().to_string())
@@ -97,6 +101,10 @@ impl MoveEntryChip {
     /// The first line of the hint chip of the mark of reference point `index` (0 to 8): "Top left
     /// corner", "Top centre", ..., "Centre"; empty beyond 8.
     #[must_use]
+    #[allow(
+        clippy::unused_self,
+        reason = "an instance method of the chip for the JS side"
+    )]
     pub fn reference_hint_name(&self, index: u32) -> String {
         ReferencePoint::from_index(index as usize)
             .map(|point| point.hint_name().to_string())
