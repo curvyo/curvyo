@@ -1,6 +1,6 @@
 # Path offset: Outset and Inset by a typed distance, with a live preview
 
-Status: Draft (the criteria are complete and testable; becomes Ready when `adrs.md` and the UX notes exist, `CLAUDE.md` §4; the architect has a kernel decision to make first)
+Status: Draft (the criteria are complete and testable; becomes Ready when `adrs.md` and the UX notes exist, `CLAUDE.md` §4; the architect has a kernel decision to make first) Amended by `0020-undo-redo`: the sentence "No undo yet." and the statements that no undo exists are removed; Ctrl+Z takes the step back.
 Priority: Should
 Origin: Customer (Inset and Outset, request of 2026-10-09). R-EDIT-007 (outline/offset) existed as my Proposal since the first requirements; the customer has now asked for it. The preview, the copy-not-replace rule, the open-path rule and the defaults are my proposals, marked in "Decided by the product owner".
 
@@ -15,7 +15,7 @@ As a maker I want to make a bigger or smaller copy of a shape at an exact distan
 - LightBurn: Offset Shapes with Distance, Corner style (Round, Sharp, Bevel), Direction (outward, inward, both) and a "Delete original" check box; the closest model for a laser maker.
 - Affinity: the Contour tool.
 
-What we do better: the distance is in the command and in mm, the result is shown in blue over the unchanged original before it is accepted, the original is kept by default (there is no undo yet), and the rules for corners, open paths, holes and vanishing shapes are written down with numbers.
+What we do better: the distance is in the command and in mm, the result is shown in blue over the unchanged original before it is accepted, the original is kept by default (Ctrl+Z takes an offset back since `0020`), and the rules for corners, open paths, holes and vanishing shapes are written down with numbers.
 
 ## Words used below
 
@@ -71,7 +71,7 @@ What we do better: the distance is in the command and in mm, the result is shown
 Each has a default; nothing blocks, except that the kernel decision is the architect's and may need the customer.
 
 1. **Kernel (for the architect, flagged to the customer).** `docs/adr/0003-geometry-kernel-booleans-offsetting-vcarving.md` §4 plans offsetting as "expand each contour (kurbo stroke expansion) and union the pieces", and its 2026-10-09 amendment says it is **still to be checked whether `i_overlay` offers outline offsetting with the joins** this spec needs. This story is the moment to check. If `i_overlay` does, nothing new is added. If it does not, the architect proposes another library or the kurbo-based method in `adrs.md`; a new dependency or a change to ADR 0003 §4 is a customer decision (`needs-customer`). I could not confirm either way from here.
-2. **Keep or replace the original.** *A (default):* keep, add a copy above it (R-EDIT-007 says "copy"; there is no undo). *B:* a "Delete original" switch in the entry, off by default (LightBurn). *C:* replace always (Inkscape). Recommendation: A now, B as a small follow-up.
+2. **Keep or replace the original.** *A (default):* keep, add a copy above it (R-EDIT-007 says "copy"). *B:* a "Delete original" switch in the entry, off by default (LightBurn). *C:* replace always (Inkscape). Recommendation: A now, B as a small follow-up.
 3. **Round as the default join.** Default Round (Illustrator's is Miter, LightBurn's Round). Round is the safe choice for a cut line (no spikes). Say if you prefer Miter.
 4. **Miter limit of 4.** Default; fixed, as SVG's. 
 5. **Name.** Default: "Offset" for the command with Outset and Inset being the sign of the distance. Option: two buttons "Outset" and "Inset" that open the entry with the sign preset. Recommendation: one command, because the sign is visible and changeable in the preview.

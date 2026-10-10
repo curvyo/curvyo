@@ -1,6 +1,6 @@
 # Stroke and fill styling: width/dash/join/cap/color, solid and gradient fill
 
-Status: Done
+Status: Done Superseded by `0020-undo-redo` where it says there is no undo (a release or a conversion is one step that Ctrl+Z takes back); the rest stays as the record of what was built.
 Delivered in four PRs: #54 (model, format version 7), #55 (rendering, hit-testing), #58 (properties panel), #59 (gradients).
 Priority: Must
 Origin: Customer

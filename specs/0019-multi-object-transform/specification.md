@@ -1,6 +1,6 @@
 # Multi-object transform: one group box with the same handles as a single object
 
-Status: In progress
+Status: In progress Amended by `0020-undo-redo`: the sentence "No undo yet." and the statements that no undo exists are removed; Ctrl+Z takes the step back.
 Priority: Should
 Origin: Customer
 Depends on: `advanced-selection` merged (PR #61). Its press rules for Shift, Ctrl and Alt and its 8 px outline tolerance are part of the press order in criterion 43.
@@ -90,7 +90,7 @@ Facts from the specs listed under Links; the state is `main` plus
   writes nothing.
 - **Proportional-corner selection**: a multi-selection that holds at least one
   converting object. Its corner resize handles always scale by one factor, so the
-  most common gesture can never convert by accident (there is no undo yet). It is
+  most common gesture can never convert by accident (Ctrl+Z takes a conversion back since `0020`). It is
   stretched through the edge handles (one direction) or the typed size
   (criteria 19, 34, 53). Customer wording: "stretch several objects together in one
   direction"; lead decision 2026-10-10.
@@ -344,10 +344,9 @@ user-visible changes of accepted behaviour.
     otherwise invalid), then the whole resolution is no change, all or nothing
     (the single-object rule): no object of the selection is transformed and none
     is converted. A factor of 0 on one axis is a stretch like any other (a
-    converting object becomes a path collapsed onto a line; D5). There is
-    no undo yet, so a release at factor 0 collapses the
-    selection in that axis for good, exactly as it does for one object; Escape
-    during the drag cancels it (D5).
+    converting object becomes a path collapsed onto a line; D5). A release at
+    factor 0 collapses the selection in that axis, exactly as it does for one
+    object, and Ctrl+Z takes it back; Escape during the drag cancels it (D5).
 23. Given a scale gesture, then a live readout shows the group box size at the
     pointer, "123.4 mm × 67.8 mm", and the pivot marker shows the fixed point
     (opposite corner or side midpoint, the center with Shift), as
@@ -638,7 +637,7 @@ relative; every other entry has the same fixed point as the drag.
     selection of 10,000 objects, 5,000 paths with 20 nodes and 5,000 stars and
     rectangles turned by 30° (all 5,000 convert): the same budgets, including the
     5 s for the commit, which then includes the 5,000 conversions and the notice
-    of criterion 54 ("Stretching turned 5000 shapes into paths. No undo yet."). From the release until the commit is
+    of criterion 54 ("Stretching turned 5000 shapes into paths."). From the release until the commit is
     presented the cursor is `wait` and the preview stays unchanged. There is no
     simplified preview in this feature. The end-to-end pointer-to-frame time, the
     frame time at rest, the commit time of a copy, the browser (WASM) commit times
@@ -707,8 +706,8 @@ relative; every other entry has the same fixed point as the drag.
        Escape converts nothing. Aligned rectangles and ellipses and paths are never
        converted. Skew stays paths only (criterion 40).
     5. **Permanent.** A later scale to equal proportions does not turn the path
-       back into its primitive. There is no undo yet (slice 8); the notice of
-       criterion 54 says so.
+       back into its primitive. Ctrl+Z takes the conversion back
+       (`0020`); the notice of criterion 54 gives the count.
     6. **Atomic and all or nothing.** The conversion is part of the one commit of
        criterion 31. If any object of the selection makes the resolution invalid
        (criterion 22), nothing is scaled and nothing is converted.
@@ -733,16 +732,15 @@ relative; every other entry has the same fixed point as the drag.
     that cannot be undone). Text, with N as plain digits (no separator), N the
     count of objects converted in this commit and not the count of selected
     objects:
-    - N = 1: "Stretching turned 1 shape into a path. No undo yet."
-    - N ≥ 2: "Stretching turned N shapes into paths. No undo yet."
-    Examples: "Stretching turned 2 shapes into paths. No undo yet."; "Stretching
-    turned 5000 shapes into paths. No undo yet." No notice for a commit that
+    - N = 1: "Stretching turned 1 shape into a path."
+    - N ≥ 2: "Stretching turned N shapes into paths."
+    Examples: "Stretching turned 2 shapes into paths."; "Stretching
+    turned 5000 shapes into paths." No notice for a commit that
     converted nothing, for a move, rotate, skew or uniform scale, or for the
     circle-to-ellipse write of criterion 20 (an ellipse stays an ellipse). The
-    sentence "No undo yet." is removed in the story that builds `undo-redo`, which
-    replaces it with the way to undo. The text is a proposal for the customer's
-    review (D9); the product owner and the lead may sharpen it, the facts it must
-    state are the count and that there is no undo.
+    sentence "No undo yet." was removed by `0020`; Ctrl+Z is the way to undo. The text is a
+    proposal for the customer's review (D9); the product owner and the lead may sharpen it,
+    the fact it must state is the count.
 55. Given the pointer rests for 600 ms on an **edge** resize handle of a
     selection that holds at least one converting object, then the hint chip of
     criterion 38 has the extra line, after its title, with N the number of
@@ -751,7 +749,7 @@ relative; every other entry has the same fixed point as the drag.
     star and a polygon in the selection: "Stretching turns 2 shapes into paths").
     The line does not name kinds. A circle, an aligned rectangle or ellipse and a
     path are not counted. A selection without a converting object shows no extra
-    line. With no undo yet, this line is the maker's
+    line. This line is the maker's
     warning before the press; the preview during the drag (criterion 32) is the
     second one.
 56. **Proposal, default yes (question 5; built unless the customer says no).** Given
@@ -847,7 +845,7 @@ kept for the reasons. Question 5 is open, with a default.
    drawn and the hint says why; "Object to path" first removes the restriction.
    Rejected by the customer: the maker notices what is missing. (b) Chosen: a
    stretch always works; each object that cannot show it as the same kind becomes a
-   path in the same commit, the maker is told with a count, and there is no undo yet
+   path in the same commit, the maker is told with a count, and Ctrl+Z takes it back (`0020`)
    (criteria 20, 53 to 55). The earlier objection to (b), "no implicit conversion"
    (`primitive-shapes` criterion 21), is overruled by the customer for this
    gesture only (Changes to accepted behaviour, item 7). (c) Was: an approximate
@@ -922,10 +920,10 @@ answer:
   axis-parallel stretch (a different direction and radii), but arcs make the angle
   bookkeeping a second rule, and the customer's list names it as converting; default:
   it converts, like the turned rectangle. A circle never converts (it becomes an
-  ellipse, D3). The notice (criterion 54) says how many shapes changed and that there
-  is no undo, in 6 s on the existing hint surface; no dialog, because the customer
+  ellipse, D3). The notice (criterion 54) says how many shapes changed,
+  in 6 s on the existing hint surface; no dialog, because the customer
   wants a stretch to be one gesture. The wording "Stretching turned 2 shapes into
-  paths. No undo yet." is the product owner's proposal for the customer's sentence
+  paths." is the product owner's proposal for the customer's sentence
   "N shapes became paths"; change it if you prefer the shorter one.
 
 Defaults from the `ux-engineer` (UX notes section 15), kept unless the customer
@@ -1162,7 +1160,7 @@ The modifier indicators of `edit-interaction-polish` apply unchanged
   is counted or mentioned. **A corner drag of a selection that holds a converting
   object stays proportional** (Ctrl changes nothing, as for a polygon today) with the
   ordinary readout, so the commonest gesture can never turn a shape into a path by
-  accident while there is no undo. A selection without converting objects keeps the
+  accident. A selection without converting objects keeps the
   free corner stretch and Ctrl as they are. The edge handle is the one deliberate
   way to stretch with the mouse; the corner chip says so (section 10).
 - **Before the drag, during it, after it.** (1) *Before:* the hover chip of an edge
@@ -1173,7 +1171,7 @@ The modifier indicators of `edit-interaction-polish` apply unchanged
   600 ms rule keeps an idle hover quiet, and a drag is not idle). The count is the
   commit's own: objects whose result is a path, so a drag back to the start, a
   factor of 1, shows no line. (3) *After:* an Action notice, "Stretching turned
-  2 shapes into paths. No undo yet." (section 12). A selection of paths and aligned
+  2 shapes into paths." (section 12). A selection of paths and aligned
   shapes sees none of the three.
 - **Preview of a converting shape:** the same 1.5 px blue outline of the stretched
   outline as for every other object. Nothing marks the converting ones on the
@@ -1330,8 +1328,8 @@ refreshed once, at the commit.
   time in the PR, not by a message.
 - **A converting commit.** Same release, same `wait` cursor and kept preview. When
   the commit is presented the box refits (criterion 29), and **the Action notice**
-  appears: "Stretching turned 2 shapes into paths. No undo yet." (1 shape: "Stretching
-  turned 1 shape into a path. No undo yet."). Surface and rules are the row "Action
+  appears: "Stretching turned 2 shapes into paths." (1 shape: "Stretching
+  turned 1 shape into a path."). Surface and rules are the row "Action
   notice": `--toolbar-bg` ground, `role="status"`, `pointer-events: none`, **6 s**
   (not the 3 s of the other notices: the change cannot be undone, criterion 54), or
   until the next press or key. Anchor, because no control caused it: the

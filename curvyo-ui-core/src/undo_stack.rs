@@ -4,6 +4,7 @@
 //! memory (ADR 0009 §2).
 
 use std::collections::HashMap;
+use std::rc::Rc;
 
 use curvyo_document_core::{AnchorId, Event, NodeId, STACK_LIMIT, StackMachine, StepRef};
 
@@ -20,8 +21,10 @@ pub struct SelectionSnapshot {
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Entry {
     label: String,
-    before: SelectionSnapshot,
-    after: SelectionSnapshot,
+    /// Shared with the neighbouring entries whenever the selection did not change: a long run of
+    /// steps on one large selection holds the selection once.
+    before: Rc<SelectionSnapshot>,
+    after: Rc<SelectionSnapshot>,
 }
 
 /// The entry a press acts on.
@@ -42,6 +45,8 @@ pub struct Target {
 pub struct UndoStack {
     machine: StackMachine,
     entries: HashMap<StepRef, Entry>,
+    /// The selection of the newest recorded step, to be shared by the next one.
+    last: Option<Rc<SelectionSnapshot>>,
 }
 
 impl Default for UndoStack {
@@ -57,6 +62,7 @@ impl UndoStack {
         Self {
             machine: StackMachine::new(STACK_LIMIT),
             entries: HashMap::new(),
+            last: None,
         }
     }
 
@@ -68,6 +74,13 @@ impl UndoStack {
         before: SelectionSnapshot,
         after: SelectionSnapshot,
     ) {
+        let before = self.shared(before);
+        let after = if *before == after {
+            Rc::clone(&before)
+        } else {
+            self.shared(after)
+        };
+        self.last = Some(Rc::clone(&after));
         self.entries.insert(
             step,
             Entry {
@@ -78,6 +91,14 @@ impl UndoStack {
         );
         self.machine.apply(Event::Do(step));
         self.prune();
+    }
+
+    /// `selection` as a shared value, reusing the one of the step before when it is equal.
+    fn shared(&self, selection: SelectionSnapshot) -> Rc<SelectionSnapshot> {
+        match &self.last {
+            Some(last) if **last == selection => Rc::clone(last),
+            _ => Rc::new(selection),
+        }
     }
 
     /// The step an undo press acts on.
@@ -97,8 +118,8 @@ impl UndoStack {
         Some(Target {
             step,
             label: entry.label.clone(),
-            before: entry.before.clone(),
-            after: entry.after.clone(),
+            before: (*entry.before).clone(),
+            after: (*entry.after).clone(),
         })
     }
 
@@ -134,6 +155,27 @@ impl UndoStack {
     #[must_use]
     pub fn redo_len(&self) -> usize {
         self.machine.redo_stack().len()
+    }
+
+    /// The heap bytes the stacks hold, counted from their entries: what criterion 29 of
+    /// `specs/0020-undo-redo` budgets. A selection shared by neighbouring entries counts once.
+    #[must_use]
+    pub fn approx_bytes(&self) -> usize {
+        let mut seen: Vec<*const SelectionSnapshot> = Vec::new();
+        let mut total = 0;
+        for entry in self.entries.values() {
+            total += size_of::<StepRef>() + size_of::<Entry>() + entry.label.capacity();
+            for selection in [&entry.before, &entry.after] {
+                let at = Rc::as_ptr(selection);
+                if !seen.contains(&at) {
+                    seen.push(at);
+                    total += size_of::<SelectionSnapshot>()
+                        + selection.objects.capacity() * size_of::<NodeId>()
+                        + selection.nodes.capacity() * size_of::<(NodeId, AnchorId)>();
+                }
+            }
+        }
+        total + (self.undo_len() + self.redo_len()) * size_of::<StepRef>()
     }
 
     /// Forgets the selections of steps that left both stacks.

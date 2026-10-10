@@ -92,7 +92,14 @@ changes carrying the same message, and consecutive commits with the same label c
 change. The undo slice must therefore find an operation by its commit boundaries and message, and
 must not count `len_changes()` to see how many operations were made.
 
-**Resolution:** `undo-redo` decides how it groups changes (its own ADR); this entry is the warning.
+**Resolution (`0020-undo-redo`, ADR 0014 §2):** a step is all commits of one peer whose commit
+message carries the same header `<label>;s=<seq>;t=<seconds>`, not a Loro change. A result that Loro
+splits into several changes is still one step, one row and one press; two identical operations in a
+row have different `s` values and so never merge, whatever Loro does with equal messages. Tests:
+`curvyo-document-core/tests/undo_redo_engine.rs`
+(`a_large_result_split_into_several_changes_is_one_step`) and
+`curvyo-editor-wasm/tests/undo_redo_keys.rs`
+(`two_identical_moves_within_a_second_are_two_steps`).
 
 ## One-outline assumptions are found by audit, not by the compiler
 

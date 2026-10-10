@@ -220,3 +220,28 @@ fn an_unknown_step_is_refused() {
     let result = document.undo_step(curvyo_document_core::StepRef::new(99, 5));
     assert_eq!(result, Err(curvyo_document_core::HistoryError::NoSuchStep));
 }
+
+#[test]
+fn a_large_result_split_into_several_changes_is_one_step() {
+    use curvyo_document_core::{AnchorId, NewAnchor};
+    let document = Document::new(1);
+    let before = json(&document);
+    let anchors: Vec<NewAnchor> = (0..5_000_u64)
+        .map(|n| {
+            NewAnchor::corner(
+                AnchorId::new(1, n),
+                Point::new((n % 100) as f64, (n / 100) as f64),
+            )
+        })
+        .collect();
+    let _ = document.create_path(&anchors, true);
+    // After Save and Open, Loro keeps the commit as several changes with one message.
+    let reopened = replica(&document, 9);
+    let rows = reopened.history_page(0, 10);
+    assert_eq!(rows.len(), 1, "one commit is one row");
+    let step = rows[0].step;
+    let report = reopened.undo_step(step).unwrap();
+    assert!(report.wrote);
+    assert_eq!(json(&reopened), before, "one press takes the whole result back");
+    assert_eq!(reopened.history_page(0, 10).len(), 1);
+}
