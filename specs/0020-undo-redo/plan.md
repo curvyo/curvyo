@@ -27,61 +27,61 @@ frontend checks, the budget tests). Milestones are commits on the branch; none i
 - Steps are delimited by the commit message header `<label>;s=<seq>;t=<sec>[;k=v]*`. A step is all
   commits of one peer with the same header.
 - Undo reads the step's values before and after with a guarded checkout pair (ADR 0014 §12 guard)
-  and compares them with the live values field by field (a three-way merge over Loro deep values).
-  `diff` is not used: mapping a `DiffBatch` back to fields needs the same container-to-object map and
-  the checkout reads whole objects with less code. The budgets are measured (release tests).
+  and compares them with the live values field by field (a three-way merge over Loro container
+  values, `history/merge.rs`). `diff` is not used; this is an amendment of ADR 0014 §1 of 2026-10-10
+  (architect review of milestone 1). The budgets are measured (ADR 0014 §13, "Measured").
 - Deleted objects come back through the injected tree move of ADR 0014 §11, same header.
 
 ## Tasks
 
 ### Milestone 1: engine, keys, stacks, notices (AC 1 to 31, 41, 52, 54 to 58)
 
-- [ ] 1.1 Pin `loro = "=1.16.2"`; canary test `loro_revival_canary.rs`: the injected move revives the
+- [x] 1.1 Pin `loro = "=1.16.2"`; canary test `loro_revival_canary.rs`: the injected move revives the
   same NodeId, anchor containers, z-order, survives save and load, keeps a peer edit made while the
   node was deleted (ADR 0014 Verification 1, 2, 3) (AC 23, 59)
-- [ ] 1.2 Step header and step time: `commit_with_label` writes `<label>;s=<n>;t=<sec>`, `new_document`
+- [x] 1.2 Step header and step time: `commit_with_label` writes `<label>;s=<n>;t=<sec>`, `new_document`
   commit in `Document::new`, `Document::set_step_time`, `continue_step`, `batch` (AC 13, 14, 54, 57, 58)
-- [ ] 1.3 Commit-path audit: one test per row of the table "One interaction, one step" counting commits
+- [x] 1.3 Commit-path audit: one test per row of the table "One interaction, one step" counting commits
   and checking the label; `batch` where a gesture has several commits; one commit for several objects
   (`transform_commit.rs`); skew gets its own label (AC 10, 41, 58)
-- [ ] 1.4 Step log and touched objects: parse headers, group changes into steps, derive created,
+- [x] 1.4 Step log and touched objects: parse headers, group changes into steps, derive created,
   deleted, moved and changed objects from the step's ops (AC 11, 32, 38)
-- [ ] 1.5 Checkout guard (`history/checkout.rs`), `warm_history` (AC 30c)
-- [ ] 1.6 Restore engine: undo and redo by three-way merge over before, after and now, revival,
+- [x] 1.5 Checkout guard (`history/checkout.rs`), `warm_history` (AC 30c)
+- [x] 1.6 Restore engine: undo and redo by three-way merge over before, after and now, revival,
   conflict rules, skipped counts; two-replica tests through `export_updates` and `import_updates`
   (AC 11, 15 to 21, 23)
-- [ ] 1.7 Stack machine, pure, with the 1,000-event equivalence test against a log-derived replay
+- [x] 1.7 Stack machine, pure, with the 1,000-event equivalence test against a log-derived replay
   (AC 15, 22, 28, 55, 56)
-- [ ] 1.8 `ui-core`: operation names with the guard test, summaries, notice texts, selection per step
+- [x] 1.8 `ui-core`: operation names with the guard test, summaries, notice texts, selection per step
   (AC 1, 2, 4, 19, 23, 24, 41)
-- [ ] 1.9 `editor-wasm`: record steps with their selection per entry, `undo`/`redo` on the session,
+- [x] 1.9 `editor-wasm`: record steps with their selection per entry, `undo`/`redo` on the session,
   key rows and the gate (drag, chip, text field, busy, open Pen path), Ctrl+Y, QWERTZ, repeat, stacks
   limit, busy threshold (AC 1 to 7, 12, 22 to 28, 30)
-- [ ] 1.10 `wasm-bindgen` facade and frontend: key handling, canvas notice slot, Undo and Redo
+- [x] 1.10 `wasm-bindgen` facade and frontend: key handling, canvas notice slot, Undo and Redo
   commands, removal of "No undo yet." in texts, tests and specs (AC 1, 2, 4, 24, 52)
-- [ ] 1.11 Edit menu in `curvyo-app` (AC 8)
-- [ ] 1.12 Budget tests (release, `#[ignore]`): small step 100 ms, large steps, memory of 500 steps
+- [x] 1.11 Edit menu in `curvyo-app` (AC 8)
+- [x] 1.12 Budget tests (release, `#[ignore]`): small step 100 ms, large steps, memory of 500 steps
   (AC 29, 30)
 
 ### Milestone 2: step data (AC 32 to 38, 59, 60)
 
-- [ ] 2.1 `StepRef` and shown id (FNV-1a 64, base36, collision lengthening), pinned known value (AC 33)
-- [ ] 2.2 `Document::history_page`: rows with id, author, time, name label, kind, touched summary,
+- [x] 2.1 `StepRef` and shown id (FNV-1a 64, base36, collision lengthening), pinned known value (AC 33)
+- [x] 2.2 `Document::history_page`: rows with id, author, time, name label, kind, touched summary,
   status from the stack machine over the log (AC 32, 34, 35, 38, 60)
-- [ ] 2.3 Old files: legacy labels, unknown label shows "Edit", adjacent same-label commits as one row,
+- [x] 2.3 Old files: legacy labels, unknown label shows "Edit", adjacent same-label commits as one row,
   "Unknown time"; golden fixtures (AC 36, 37, 59)
-- [ ] 2.4 No `format_version` change; `history_wiped` optional-key reader test (AC 37, 59)
+- [x] 2.4 No `format_version` change; `history_wiped` optional-key reader test (AC 37, 59)
 
 ### Milestone 3: the History tab (AC 39 to 46)
 
-- [ ] 3.1 wasm API for pages, hover link, tab state; React History tab: list, pinned Now row, rows,
+- [x] 3.1 wasm API for pages, hover link, tab state; React History tab: list, pinned Now row, rows,
   status, tooltips, keyboard, virtualisation, Undo and Redo buttons in the header, footer line,
   Shift+Ctrl+H (AC 9, 39 to 46)
 
 ### Milestone 4: wipe (AC 47 to 51)
 
-- [ ] 4.1 `Document::wipe_history`, epoch key, `import_updates` epoch and `pending` refusal (AC 48, 49)
-- [ ] 4.2 Inline confirm in the footer, shared-document line (AC 47, 50, 51)
+- [x] 4.1 `Document::wipe_history`, epoch key, `import_updates` epoch and `pending` refusal (AC 48, 49)
+- [x] 4.2 Inline confirm in the footer, shared-document line (AC 47, 50, 51)
 
 ## Validation
 
@@ -91,3 +91,16 @@ frontend checks, the budget tests). Milestones are commits on the branch; none i
 - Release `#[ignore]` budget tests (`cargo test --release -- --ignored`) for AC 29 and 30.
 - Full gate: fmt, clippy, nextest, wasm32 builds of every touched core crate, deny, doc, and the
   frontend tsc, oxlint and tests.
+
+## Deviations and open points (written at the end of the slice)
+
+- `diff` replaced by the guarded checkout pair; the editor also announces the busy state for a step
+  more than 1,000 operations behind the latest version (`FAR_STEP_OPS`).
+- Group transforms are labelled `transform_resize`, `transform_rotate`, `transform_skew` (the
+  tester's `0019` test pins the word "transform"); single-object skew is `skew_path`.
+- `render-core`: `SelectDecorationInput::history_hovered` (additive) for the hover link of a row.
+- The wasm32 timing factor is not measured (no browser in the gate).
+- Z-order and parent moves of existing objects are not restored; reported as skipped (`adrs.md`).
+- The hold-to-nudge of `0044` calls `Document::continue_step()` once #87 has merged; nothing calls
+  it yet.
+- Not covered by the gate: the native Edit menu accelerators on each OS (AC 8, by hand).

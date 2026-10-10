@@ -363,3 +363,35 @@ fn a_style_value_drag_blocks_the_keys_like_any_drag() {
     session.commit_style_preview();
     assert_eq!(session.undo_len(), 2);
 }
+
+#[test]
+fn a_held_arrow_key_is_one_step_and_one_press_takes_the_whole_run_back() {
+    let mut session = fresh();
+    draw_square(&mut session, 10.0);
+    session.pointer_down(pt(-50.0, -50.0), false);
+    session.pointer_up(pt(500.0, 500.0), false, false);
+    let before = json(&session);
+    let steps = session.undo_len();
+    for n in 0..6_u32 {
+        let outcome = session.key_down(KeyInput {
+            key: "ArrowRight",
+            repeat: n > 0,
+            time_ms: 1_000.0 + f64::from(n) * 30.0,
+            ..KeyInput::default()
+        });
+        assert!(matches!(outcome, KeyOutcome::Nudged { .. }), "{outcome:?}");
+    }
+    assert_ne!(json(&session), before);
+    assert_eq!(session.undo_len(), steps + 1, "eleven commits, one step");
+    assert!(undo(&mut session).starts_with("Undid: Move"));
+    assert_eq!(json(&session), before);
+
+    // A nudge right after Ctrl+Z is a new step and never joins the undo.
+    let outcome = session.key_down(KeyInput {
+        key: "ArrowRight",
+        time_ms: 5_000.0,
+        ..KeyInput::default()
+    });
+    assert!(matches!(outcome, KeyOutcome::Nudged { new_run: true }));
+    assert_eq!(session.undo_len(), steps + 1);
+}

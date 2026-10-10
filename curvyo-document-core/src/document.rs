@@ -116,7 +116,19 @@ pub struct DocumentVersion(pub(crate) loro::Frontiers);
 /// version 8 would ignore the keys and draw no markers, a silent partial read,
 /// so it must refuse the file as too new. Migration from version 8 is none:
 /// absent keys read as None, Spaced and 1. Golden: `markers_v9.curvyo`.
-pub const CURRENT_FORMAT_VERSION: u32 = 9;
+///
+/// Bumped to 10 in `document-background` (`specs/0040-document-background/
+/// adrs.md`, decisions 2 and 3): the document root may carry the two registers
+/// `background_paint` (`"none"` or `"solid"`) and `background_color` (one list
+/// `[r, g, b, a]`). A build that stops at version 9 would ignore them and draw the
+/// default grey for a red document, a silent partial read, so it must refuse the
+/// file as too new. Migration from version 9 is none: absent registers read as
+/// solid `#E8E8EB`, and a file from an earlier build opens unchanged and is not
+/// rewritten. A present register that is malformed is refused as damaged
+/// (`crate::document_background`). The number is provisional by the rule above:
+/// whichever PR merges first takes `main`'s number plus one. Golden:
+/// `background_v10.curvyo`.
+pub const CURRENT_FORMAT_VERSION: u32 = 10;
 
 pub(crate) const ROOT_MAP: &str = "root";
 const KEY_FORMAT_VERSION: &str = "format_version";
@@ -218,7 +230,8 @@ impl Document {
     ///
     /// # Errors
     /// Returns [`OpenError::Damaged`] if the bytes are not a valid Loro
-    /// snapshot this build can import, or if they import cleanly but the
+    /// snapshot this build can import, if a background register is present
+    /// but malformed, or if they import cleanly but the
     /// `paths` tree inside them does not match the shape
     /// [`crate::path_codec`]'s writers always produce — a damaged-but-
     /// still-unzippable file (project-file-foundation's acceptance
@@ -235,7 +248,9 @@ impl Document {
         #[allow(clippy::unwrap_used)]
         loro.set_peer_id(peer_id).unwrap();
         loro.import(bytes).map_err(|_| OpenError::Damaged)?;
-        if !crate::path_codec::validate_path_tree(&loro, OBJECTS_TREE) {
+        if !crate::path_codec::validate_path_tree(&loro, OBJECTS_TREE)
+            || !crate::document_background::validate(&loro)
+        {
             return Err(OpenError::Damaged);
         }
         Ok(Self {
@@ -329,6 +344,7 @@ impl Document {
             format_version: CURRENT_FORMAT_VERSION,
             size: self.size(),
             display_unit: self.display_unit(),
+            background: self.background().into(),
             objects,
         };
         serde_json::to_vec_pretty(&view).map_err(|_| SaveError::Encode)
@@ -347,6 +363,7 @@ struct DocumentJsonView {
     format_version: u32,
     size: DocumentSize,
     display_unit: DisplayUnit,
+    background: crate::document_background::BackgroundJson,
     objects: Vec<ObjectJson>,
 }
 
@@ -501,5 +518,38 @@ mod tests {
         let value: serde_json::Value = serde_json::from_slice(&json).expect("parse");
         assert_eq!(value["format_version"], CURRENT_FORMAT_VERSION);
         assert!((value["size"]["width"].as_f64().unwrap() - 210.0).abs() < f64::EPSILON);
+    }
+
+    /// Caches of the whole document (the Pen's end index, the session's object read) key on
+    /// `version()`: it must change on a local commit and on a merge from another replica, and
+    /// stay the same when nothing happened.
+    #[test]
+    fn the_version_changes_on_a_local_commit_and_on_a_remote_merge() {
+        let a = Document::new(1);
+        let first = a.version();
+        assert_eq!(a.version(), first, "reading is not a change");
+        let id = a.create_rect(crate::RectBounds {
+            origin: crate::Point::new(0.0, 0.0),
+            width: Length::from_mm(10.0),
+            height: Length::from_mm(10.0),
+        });
+        let after_local = a.version();
+        assert_ne!(after_local, first, "a local commit");
+
+        let b = Document::from_loro_snapshot(2, &a.export_loro_snapshot().expect("snapshot"))
+            .expect("peer B opens it");
+        assert_eq!(b.version(), after_local, "the same state, the same version");
+        b.translate_objects(&[id], crate::Vec2::new(5.0, 0.0))
+            .expect("B moves the rectangle");
+        assert_eq!(a.version(), after_local, "A has not seen it yet");
+
+        let from_b = b.loro().export(loro::ExportMode::all_updates()).expect("B");
+        a.loro().import(&from_b).expect("A merges B");
+        assert_ne!(a.version(), after_local, "a remote merge");
+        assert_eq!(
+            a.version(),
+            b.version(),
+            "both replicas hold the same state"
+        );
     }
 }

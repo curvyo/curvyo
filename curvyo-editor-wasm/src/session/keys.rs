@@ -3,14 +3,14 @@
 //! decisions 4 and 6).
 
 use curvyo_document_core::Direction;
-use curvyo_ui_core::{EntryKey, KeyEntryRefusal};
+use curvyo_ui_core::{Arrow, EntryKey, KeyEntryRefusal, NudgeEvent};
 
 use super::{Session, Tool};
 
 /// One key event as the frontend reports it: the DOM `key` value, the
 /// modifiers (`ctrl` already folds in Cmd) and the two facts only the DOM
 /// knows.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
 #[allow(clippy::struct_excessive_bools)] // one flag per DOM fact, as the host reports them
 pub struct KeyInput<'a> {
     /// `KeyboardEvent.key`: `"r"`, `"*"`, `"Delete"`, `"Escape"` and so on.
@@ -30,6 +30,9 @@ pub struct KeyInput<'a> {
     /// The platform is macOS, where Cmd+Y is not a redo key
     /// (`specs/0020-undo-redo` criterion 3).
     pub mac: bool,
+    /// `KeyboardEvent.timeStamp` in milliseconds: decides whether a held arrow key is still the
+    /// same run of nudges. Tests that do not care leave it at 0.
+    pub time_ms: f64,
 }
 
 /// The one-line message of a key that cannot act (criterion 59); the
@@ -45,6 +48,9 @@ pub enum KeyHint {
     /// Undo or redo while the Pen holds an unfinished path: "Finish the path (Enter) or cancel it
     /// (Esc) first." (`specs/0020-undo-redo` criterion 6e).
     FinishPenFirst,
+    /// An arrow key would move the selection beyond the document's coordinate
+    /// limit: "Too far from the document. Nothing was changed."
+    TooFar,
 }
 
 /// What `Session::key_down` did.
@@ -74,6 +80,14 @@ pub enum KeyOutcome {
     UndoBusy,
     /// As [`KeyOutcome::UndoBusy`], for redo.
     RedoBusy,
+    /// Ctrl+A selected every object (it may have found none).
+    SelectedAll,
+    /// An arrow key moved the selection; `new_run` is true when the event
+    /// opened a new run of held-key events (a new step once `0020` exists).
+    Nudged {
+        /// The event opened a new run.
+        new_run: bool,
+    },
 }
 
 impl KeyOutcome {
@@ -100,6 +114,10 @@ impl KeyOutcome {
             Self::Redo => "redo",
             Self::UndoBusy => "undo-busy",
             Self::RedoBusy => "redo-busy",
+            Self::Hint(KeyHint::TooFar) => "hint-too-far",
+            Self::SelectedAll => "select-all",
+            Self::Nudged { new_run: false } => "nudge",
+            Self::Nudged { new_run: true } => "nudge-new",
         }
     }
 }
@@ -155,6 +173,8 @@ enum KeyAction {
     Escape,
     Hint(KeyHint),
     History(Direction),
+    SelectAll,
+    Nudge(Arrow),
 }
 
 /// The key table and its gate (criteria 54, 55, 60, 61) as a pure function:
@@ -177,6 +197,32 @@ fn decide(input: &KeyInput<'_>, state: KeyState) -> KeyAction {
             };
         }
         _ => {}
+    }
+    // The two keys of `specs/0044-editing-quick-wins/`: they pass the same gate as the letters
+    // (no text field, drag, entry chip or unfinished Pen path), and are decided before the line
+    // below, which would ignore every key with Ctrl.
+    let gate_open =
+        !input.dom_blocked && !state.operation_in_flight && !state.pen_open && !state.entry_open;
+    if let Some(arrow) = Arrow::from_key(input.key) {
+        let acts = gate_open
+            && !input.ctrl
+            && !input.alt
+            && state.tool == Tool::Select
+            && state.selected != Selected::None;
+        return if acts {
+            KeyAction::Nudge(arrow)
+        } else {
+            KeyAction::Ignore
+        };
+    }
+    if input.ctrl && input.key.eq_ignore_ascii_case("a") {
+        let acts =
+            gate_open && !input.alt && !input.shift && !input.repeat && state.tool == Tool::Select;
+        return if acts {
+            KeyAction::SelectAll
+        } else {
+            KeyAction::Ignore
+        };
     }
     // Letters are matched without regard to Caps Lock.
     let letter = match input.key.chars().collect::<Vec<_>>().as_slice() {
@@ -357,6 +403,13 @@ impl Session {
             KeyAction::Escape => KeyOutcome::Escape(self.escape()),
             KeyAction::Hint(hint) => KeyOutcome::Hint(hint),
             KeyAction::History(direction) => self.history_key(direction),
+            KeyAction::SelectAll => self.select_all(),
+            KeyAction::Nudge(arrow) => self.nudge_selection(NudgeEvent {
+                arrow,
+                shift: input.shift,
+                repeat: input.repeat,
+                time_ms: input.time_ms,
+            }),
         }
     }
 
@@ -590,7 +643,7 @@ mod tests {
     /// Keys that are not bound do nothing.
     #[test]
     fn unbound_keys_do_nothing() {
-        for k in ["x", "1", "ArrowLeft", "Tab", "F5", " ", "Shift"] {
+        for k in ["x", "1", "Home", "Tab", "F5", " ", "Shift"] {
             assert_eq!(
                 decide(&key(k), state(Tool::Select, Selected::One)),
                 KeyAction::Ignore,
@@ -796,5 +849,136 @@ mod tests {
         codes.dedup();
         assert_eq!(codes.len(), all.len());
         assert_eq!(KeyOutcome::Ignored.code(), "ignored");
+    }
+
+    const ARROWS: [(&str, Arrow); 4] = [
+        ("ArrowLeft", Arrow::Left),
+        ("ArrowRight", Arrow::Right),
+        ("ArrowUp", Arrow::Up),
+        ("ArrowDown", Arrow::Down),
+    ];
+
+    /// Ctrl and Cmd are one flag; the key is matched without regard to case.
+    fn ctrl(k: &str) -> KeyInput<'_> {
+        KeyInput {
+            key: k,
+            ctrl: true,
+            ..KeyInput::default()
+        }
+    }
+
+    /// `0044` criteria 1 and 3: Ctrl+A selects all in the Select tool only, whatever is selected.
+    #[test]
+    fn ctrl_a_selects_all_in_the_select_tool_and_is_ignored_in_every_other() {
+        for tool in TOOLS {
+            for selected in SELECTIONS {
+                for k in ["a", "A"] {
+                    let expected = if tool == Tool::Select {
+                        KeyAction::SelectAll
+                    } else {
+                        KeyAction::Ignore
+                    };
+                    assert_eq!(
+                        decide(&ctrl(k), state(tool, selected)),
+                        expected,
+                        "{k} in {tool:?} with {selected:?}"
+                    );
+                }
+            }
+        }
+    }
+
+    /// `0044` criterion 3 and the gate: Shift, Alt, a repeat, a focused field, a drag, an open
+    /// chip and an unfinished Pen path each block Ctrl+A; the plain letter binds nothing.
+    #[test]
+    fn every_gate_condition_blocks_ctrl_a() {
+        let blockers: Vec<(&str, Blocker)> = vec![
+            ("shift", Box::new(|i, _| i.shift = true)),
+            ("alt", Box::new(|i, _| i.alt = true)),
+            ("repeat", Box::new(|i, _| i.repeat = true)),
+            ("dom", Box::new(|i, _| i.dom_blocked = true)),
+            ("drag", Box::new(|_, s| s.operation_in_flight = true)),
+            ("pen path", Box::new(|_, s| s.pen_open = true)),
+            ("entry", Box::new(|_, s| s.entry_open = true)),
+        ];
+        for (name, block) in &blockers {
+            let mut input = ctrl("a");
+            let mut st = state(Tool::Select, Selected::Many);
+            block(&mut input, &mut st);
+            assert_eq!(decide(&input, st), KeyAction::Ignore, "{name}");
+        }
+        assert_eq!(
+            decide(&key("a"), state(Tool::Select, Selected::Many)),
+            KeyAction::Ignore
+        );
+    }
+
+    /// `0044` criteria 7 and 11: an arrow nudges in the Select tool with a selection, with or
+    /// without Shift, and on every repeat event; every other tool or an empty selection leaves
+    /// the key alone.
+    #[test]
+    fn an_arrow_nudges_only_the_select_tool_with_a_selection() {
+        for tool in TOOLS {
+            for selected in SELECTIONS {
+                for (k, arrow) in ARROWS {
+                    for (shift, repeat) in
+                        [(false, false), (true, false), (false, true), (true, true)]
+                    {
+                        let input = KeyInput {
+                            key: k,
+                            shift,
+                            repeat,
+                            ..KeyInput::default()
+                        };
+                        let expected = if tool == Tool::Select && selected != Selected::None {
+                            KeyAction::Nudge(arrow)
+                        } else {
+                            KeyAction::Ignore
+                        };
+                        assert_eq!(
+                            decide(&input, state(tool, selected)),
+                            expected,
+                            "{k} shift {shift} repeat {repeat} in {tool:?} with {selected:?}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    /// `0044` criteria 7 and 11: Ctrl, Cmd or Alt, a focused field, a drag, an open chip and an
+    /// unfinished Pen path each leave the arrow key to whoever else wants it.
+    #[test]
+    fn every_gate_condition_leaves_the_arrow_keys_alone() {
+        let blockers: Vec<(&str, Blocker)> = vec![
+            ("ctrl", Box::new(|i, _| i.ctrl = true)),
+            ("alt", Box::new(|i, _| i.alt = true)),
+            ("dom", Box::new(|i, _| i.dom_blocked = true)),
+            ("drag", Box::new(|_, s| s.operation_in_flight = true)),
+            ("pen path", Box::new(|_, s| s.pen_open = true)),
+            ("entry", Box::new(|_, s| s.entry_open = true)),
+        ];
+        for (k, _) in ARROWS {
+            for (name, block) in &blockers {
+                let mut input = key(k);
+                let mut st = state(Tool::Select, Selected::Many);
+                block(&mut input, &mut st);
+                assert_eq!(decide(&input, st), KeyAction::Ignore, "{k} with {name}");
+            }
+        }
+    }
+
+    /// The letters still ignore a repeat; only the arrows accept one.
+    #[test]
+    fn the_letters_still_ignore_a_repeat() {
+        let repeated = KeyInput {
+            key: "r",
+            repeat: true,
+            ..KeyInput::default()
+        };
+        assert_eq!(
+            decide(&repeated, state(Tool::Select, Selected::One)),
+            KeyAction::Ignore
+        );
     }
 }

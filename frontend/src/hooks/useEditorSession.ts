@@ -2,7 +2,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { type CanvasNotice, type HistoryNames, MAC, useHistory } from "@/hooks/useHistory";
 import type { HistoryDirection } from "@/lib/historyText";
+import { type NudgeFeedback, useNudgeFeedback } from "@/hooks/useNudgeFeedback";
 import { ModifierTracker } from "@/lib/keyModifiers";
+import { TOO_FAR_HINT } from "@/lib/nudgeText";
 import { createSession, openSession } from "@/lib/editorSession";
 import type { WasmSession } from "@/lib/editorSession";
 import type { EditHint } from "@/components/EditHintChip";
@@ -499,6 +501,7 @@ export interface KeyHint {
 const KEY_HINT_TEXT: Record<string, string> = {
   "hint-select-first": "Select an object first",
   "hint-path-only": "Skew works on paths only",
+  "hint-too-far": TOO_FAR_HINT,
 };
 
 /** How long a key hint stays. */
@@ -606,6 +609,8 @@ export interface EditorSession {
   pressHistory: (direction: HistoryDirection, source?: "canvas" | "panel") => void;
   /** Wipes the history; the steps removed, -1 when ignored, -2 for a shared document. */
   wipeHistory: () => number;
+  /** The move readout and hidden announcements of a nudge and of select all. */
+  nudgeFeedback: NudgeFeedback;
   convertSelected: (kind: "corner" | "symmetric" | "asymmetric") => void;
   makeLine: () => void;
   makeCurve: () => void;
@@ -805,6 +810,8 @@ export function useEditorSession(
   const [selectionAnnouncement, setSelectionAnnouncement] = useState("");
   const [keyHint, setKeyHint] = useState<KeyHint | null>(null);
   const keyHintCounter = useRef(0);
+  const nudgeFeedback = useNudgeFeedback();
+  const { onNudge, onSelectAll, onEscape, onKeyUp: onNudgeKeyUp } = nudgeFeedback;
   /** Where the closed entry chip was, for the notice of the commit it makes. */
   const noticeAnchorRef = useRef<{ x: number; y: number } | null>(null);
 
@@ -1686,6 +1693,7 @@ export function useEditorSession(
         event.repeat,
         event.nativeEvent.isComposing || isSpaceHeld,
         MAC,
+        event.timeStamp,
       );
       if (outcome === "ignored") {
         return;
@@ -1697,6 +1705,13 @@ export function useEditorSession(
         syncFromSession();
         return;
       }
+      if (outcome === "select-all") {
+        onSelectAll(session.selection_count());
+      } else if (outcome === "nudge" || outcome === "nudge-new") {
+        onNudge(session, outcome === "nudge-new");
+      } else if (outcome.startsWith("escape")) {
+        onEscape();
+      }
       const hint = KEY_HINT_TEXT[outcome];
       if (hint !== undefined) {
         keyHintCounter.current += 1;
@@ -1707,6 +1722,7 @@ export function useEditorSession(
       syncFromSession();
     },
     [handleKeyOutcome, isDuplicateKey, isSpaceHeld, syncFromSession],
+    [isSpaceHeld, syncFromSession, onNudge, onSelectAll, onEscape],
   );
 
   // A key hint clears itself after 2 s; a newer message restarts the clock.
@@ -1726,8 +1742,9 @@ export function useEditorSession(
       if (event.key === " ") {
         setIsSpaceHeld(false);
       }
+      onNudgeKeyUp(event.key);
     },
-    [],
+    [onNudgeKeyUp],
   );
 
   const commitTransformEntry = useCallback(
@@ -1834,6 +1851,7 @@ export function useEditorSession(
     historyNames: history.names,
     pressHistory: history.press,
     wipeHistory: history.wipe,
+    nudgeFeedback,
     convertSelected,
     makeLine,
     makeCurve,

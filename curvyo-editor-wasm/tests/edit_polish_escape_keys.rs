@@ -404,6 +404,7 @@ fn modified_repeated_and_dom_blocked_letters_do_nothing() {
             repeat,
             dom_blocked,
             mac: false,
+            time_ms: 0.0,
         });
         assert_eq!(outcome, KeyOutcome::Ignored, "{k}");
         assert_eq!(session.tool(), Tool::Select);

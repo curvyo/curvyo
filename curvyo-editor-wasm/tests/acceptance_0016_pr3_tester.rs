@@ -1885,6 +1885,7 @@ fn a_typed_entry_is_not_left_dangling_by_the_command() {
             repeat: false,
             dom_blocked: false,
             mac: false,
+            time_ms: 0.0,
         })
     };
     let _ = key(&mut s, "m");

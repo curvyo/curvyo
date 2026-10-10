@@ -134,6 +134,6 @@ fn a_document_written_with_the_optional_key_loads_in_a_reader_that_ignores_it() 
     let (mut document, ids) = busy_document(20);
     document.wipe_history().unwrap();
     let json: serde_json::Value = serde_json::from_slice(&document.export_json().unwrap()).unwrap();
-    assert_eq!(json["format_version"], 9);
+    assert_eq!(json["format_version"], 10);
     assert_eq!(json["objects"].as_array().unwrap().len(), ids.len());
 }

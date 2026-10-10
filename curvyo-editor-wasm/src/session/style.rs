@@ -50,7 +50,7 @@ impl Session {
         if !self.style.is_active() {
             return style_panel_state(&committed, &committed, &scope);
         }
-        let mut shown = committed.clone();
+        let mut shown = committed.to_vec();
         self.style.apply_to(&mut shown);
         style_panel_state(&committed, &shown, &scope)
             .map(|state| state.with_pending(self.style.pending_edit()))
@@ -78,12 +78,14 @@ impl Session {
         self.button_down
     }
 
-    /// Commits a panel drag still pending, against the objects it started on,
-    /// before anything that can change the selection or the tool (a release
-    /// outside the control never fires the control's own).
+    /// Commits a panel drag still pending, against the objects it started on
+    /// (and a Background block drag, `0040` criterion 23), before anything that can
+    /// change the selection or the tool (a release outside the control never fires
+    /// the control's own).
     pub(super) fn flush_style_preview(&mut self) {
         self.recording(|this| {
             let _ = this.style.commit(&this.document);
+            this.commit_background_preview();
         });
     }
 
