@@ -5,6 +5,7 @@ Priority: Should
 Origin: Customer
 Depends on: `advanced-selection` merged (PR #61). Its press rules for Shift, Ctrl and Alt and its 8 px outline tolerance are part of the press order in criterion 43.
 Sequencing: `style-panel-rework` runs before this story (both change `ui-core` and `editor-wasm`, so they do not run in parallel); this story starts after it and after #61.
+**Superseded in part by `specs/0047-transform-polish/` (customer, 2026-10-10): the notice and the hover, readout and entry lines about conversion (criteria 54 and 55), "paths only" for skew (criteria 36, 37, 40), the proportional corner (decision E, criterion 19) and the polygon and star corner rule (criterion 56) are replaced: a skew or a stretch converts primitives silently, every selection shows the skew handles, a corner drag is free and Ctrl keeps the proportions, and the typed move measures from a reference point (centre by default). The text below keeps the original wording; the marked criteria say where they changed.**
 Customer change 2026-10-10 (final): a selection can always be stretched in one direction. Question 2 is decided (b): objects that cannot stay the same kind under a stretch become paths in the same commit, and the maker is told. Lead decision 2026-10-10 (E): the stretch is made with the edge handles and the typed size; a corner drag of a selection that holds such an object stays proportional (criterion 19), so the most common gesture cannot convert by accident. This replaces "proportional only, with a hint" (old criterion 21). Criteria 21 (removed), 53, 54 and 55 carry the change; 56 is a proposal about single objects (question 5).
 
 ## User value
@@ -23,7 +24,7 @@ delete on purpose (its criterion 2 and its out-of-scope entry "Multi-object
 transform", which said "one shared box vs. independent is itself a real design
 question"). This spec answers the question: one shared box, in addition to the
 per-object boxes that are drawn today. The "skew" is in brackets in the
-customer's sentence; the customer decided on 2026-10-08 to keep it for selections of paths only (question 4).
+customer's sentence; the customer decided on 2026-10-08 to keep it for selections of paths only (question 4; reversed by `specs/0047-transform-polish/`, which skews every selection).
 
 **Field reference.** LightBurn treats a multi-object selection as one unit with
 the selection handles (scale, corner rotate handles about the selection center,
@@ -88,7 +89,7 @@ Facts from the specs listed under Links; the state is `main` plus
   no converting object, or a typed size of another aspect ratio). A scale with
   equal factors is **uniform**; a scale with both factors 1 within that tolerance
   writes nothing.
-- **Proportional-corner selection**: a multi-selection that holds at least one
+- **Proportional-corner selection** (removed by `specs/0047-transform-polish/`: a corner drag is free and Ctrl keeps the proportions): a multi-selection that holds at least one
   converting object. Its corner resize handles always scale by one factor, so the
   most common gesture can never convert by accident (there is no undo yet). It is
   stretched through the edge handles (one direction) or the typed size
@@ -136,7 +137,7 @@ user-visible changes of accepted behaviour.
 8. The out-of-scope lines "Non-uniform (non-proportional) resizing of a polygon or
    star" (`0005`) and "Non-uniform scaling or skewing of a polygon or star"
    (`polygon-star-box-refit`) are realised for multi-selections by conversion. Skew
-   stays paths only (criterion 40).
+   stays paths only (criterion 40; changed by `specs/0047-transform-polish/`).
 9. **Proposal, default yes (question 5, criterion 56):** the same conversion for a
    single selected polygon or star on an edge-handle stretch or a typed stretch;
    its corners stay proportional as today. It would change `0005` criterion 11
@@ -283,7 +284,7 @@ user-visible changes of accepted behaviour.
     (30, 10); dragging the bottom-right corner from (30, 10) to (60, 30) gives
     sx = 2, sy = 3: the rectangles become (0, 0) to (20, 30) and (40, 0) to
     (60, 30).
-19. Given the same selection, then Ctrl on a corner handle scales both axes by one
+19. (Changed by `specs/0047-transform-polish/` criterion 6: a corner drag is free for every selection; only Ctrl keeps the proportions.) Given the same selection, then Ctrl on a corner handle scales both axes by one
     factor (the drag's dominant axis, `0005` criterion 5); Shift scales about the
     group box center instead of the opposite corner or side, and combines with
     Ctrl; an edge resize handle changes only the axis perpendicular to its side
@@ -490,7 +491,7 @@ relative; every other entry has the same fixed point as the drag.
     beyond ±1e7 mm is invalid ("Too large"); an unedited Enter or a size equal to
     the current one writes nothing. A typed size whose factors are equal within
     the tolerance of "Stretch" (Terms) is a uniform scale and converts nothing.
-35. Given a multi-selection, when the maker double-clicks the center move handle
+35. (Changed by `specs/0047-transform-polish/` criteria 37 and 38: Absolute measures from a reference point, the centre by default, and "Top-left corner of the selection" is no longer the title.) Given a multi-selection, when the maker double-clicks the center move handle
     (inside its hover region, criterion 11) or presses M, then the move chip of
     `edit-interaction-polish` criteria 15 to 25 opens, with the same Relative and
     Absolute modes, the same key order and the Copy check. Relative translates
@@ -500,7 +501,7 @@ relative; every other entry has the same fixed point as the drag.
     (criterion 1). The "Absolute" segment states its reference: its `title` and
     accessible description read "Top-left corner of the selection". A copy (Ctrl at the second press, or the check) copies every
     selected object with the displacement and selects the copies.
-36. (Part E, kept: question 4 decided (a) 2026-10-08.) Given a selection of paths only, when the maker double-clicks a skew
+36. (Part E, kept: question 4 decided (a) 2026-10-08; "of paths only" removed by `specs/0047-transform-polish/` criterion 11: the skew chip opens for every selection.) Given a selection of paths only, when the maker double-clicks a skew
     handle, or presses K (top handle) or Shift+K (right handle), then the skew
     chip of `edit-interaction-polish` criteria 9 to 13 opens and applies the
     typed relative angle to every path, about the line a drag of that handle holds
@@ -510,7 +511,7 @@ relative; every other entry has the same fixed point as the drag.
     contains a rectangle, ellipse, polygon or star, then the hint "Skew works on
     paths only" shows and nothing changes. The hint "Select one object to type a
     value" no longer exists.
-38. Given the pointer rests on a group handle for 600 ms, then a hint chip appears
+38. (The rows "Edge resize, selection holds a converting object" and the proportional corner row are removed by `specs/0047-transform-polish/` criterion 11.) Given the pointer rests on a group handle for 600 ms, then a hint chip appears
     (same chip, `pointer-events: none`, wrapped at 240 px) with these lines:
 
     | Handle | Lines |
@@ -523,7 +524,7 @@ relative; every other entry has the same fixed point as the drag.
     | Side rotate | "Rotate selection" / "Pivot: opposite side" / "Ctrl: snap" / "Double-click or R: type an angle" |
     | Skew | "Skew selection" / "Shift: from the center line" / "Ctrl: snap" / "Double-click or K: type an angle" (left and right handles: "Shift+K") |
     | Center | "Move selection" / "Shift: keep one axis" / "Ctrl: copy" / "Double-click or M: type an offset" |
-39. Given the Select bar with a multi-selection, then its content follows
+39. (The tooltip "Paths can be stretched and skewed freely" is gone, `specs/0047-transform-polish/` criterion 11.) Given the Select bar with a multi-selection, then its content follows
     `unified-object-editing` criteria 21 to 23 unchanged (the two switches first,
     then the kind groups the selection contains, then "Object to path"); no
     text of the bar changes (the tooltip change of the first version is removed with
@@ -533,7 +534,7 @@ relative; every other entry has the same fixed point as the drag.
 
 ### Part E: skew (separable; kept, question 4 decided (a) 2026-10-08)
 
-40. Given a multi-selection of paths only (open or closed), whose group box has
+40. (Superseded by `specs/0047-transform-polish/` criterion 1: every selection shows the four skew handles, and a skew converts the primitives in it.) Given a multi-selection of paths only (open or closed), whose group box has
     non-zero extent in the axis the handle skews along, then four skew handles are
     shown, one per side of the group box, with the layout, glyph, 24 px lever rule
     and hit rules of `specs/0008-object-transform-refinements/` criteria 37 and 48. A
@@ -669,7 +670,7 @@ relative; every other entry has the same fixed point as the drag.
 
 ### Part H: stretching converts shapes to paths (customer change 2026-10-10)
 
-53. Given a stretch of a multi-selection (a drag of an **edge** resize handle
+53. (Changed by `specs/0047-transform-polish/` criteria 5 to 8: a free corner drag also stretches and converts; only Ctrl keeps one factor.) Given a stretch of a multi-selection (a drag of an **edge** resize handle
     that ends with unequal factors, or a typed size of another aspect ratio; a
     corner drag of a selection that holds a converting object is always uniform and
     never converts, criterion 19) that
@@ -726,7 +727,7 @@ relative; every other entry has the same fixed point as the drag.
     path with 10 nodes, the rectangle is still a rectangle; the Select bar lost
     its star group and keeps the rectangle group; the star kept its id, its place
     in the object list and its fill.
-54. Given a commit that converted N ≥ 1 objects (criterion 53), then a notice is
+54. (Removed by `specs/0047-transform-polish/` criterion 11: the conversion is silent.) Given a commit that converted N ≥ 1 objects (criterion 53), then a notice is
     shown right after the commit, in the one-line hint surface of
     `edit-interaction-polish` (criterion 59), for 6 s or until the next press or
     key, whichever is first (the 2 s of the other hints is too short for a change
@@ -743,7 +744,7 @@ relative; every other entry has the same fixed point as the drag.
     replaces it with the way to undo. The text is a proposal for the customer's
     review (D9); the product owner and the lead may sharpen it, the facts it must
     state are the count and that there is no undo.
-55. Given the pointer rests for 600 ms on an **edge** resize handle of a
+55. (Removed by `specs/0047-transform-polish/` criterion 11: no hover, readout or entry line about the conversion.) Given the pointer rests for 600 ms on an **edge** resize handle of a
     selection that holds at least one converting object, then the hint chip of
     criterion 38 has the extra line, after its title, with N the number of
     converting objects in the selection (as plain digits): N = 1: "Stretching turns 1
@@ -754,7 +755,7 @@ relative; every other entry has the same fixed point as the drag.
     line. With no undo yet, this line is the maker's
     warning before the press; the preview during the drag (criterion 32) is the
     second one.
-56. **Proposal, default yes (question 5; built unless the customer says no).** Given
+56. (Changed by `specs/0047-transform-polish/` criteria 9 and 12: a corner drag of a lone polygon or star is free and converts, Ctrl keeps the proportions and the kind, and the pivot is the opposite corner or, with Shift, the centre.) **Proposal, default yes (question 5; built unless the customer says no).** Given
     exactly one selected polygon or star, then it shows all eight resize handles
     (four corner, four edge); a corner drag is proportional as today, Ctrl or not
     (`0005` criterion 11, the corner rule of criterion 19); an edge handle drag
@@ -795,7 +796,7 @@ relative; every other entry has the same fixed point as the drag.
 - Moving the selection by a press on the **empty interior** of the group box
   (question 3, option (a), declined by the customer 2026-10-08).
 - Skew or shear of polygons, stars, rectangles and ellipses, with or without
-  conversion (criterion 40, D4): skew stays paths only. A maker who wants to skew
+  conversion (criterion 40, D4; done by `specs/0047-transform-polish/` with conversion): skew stays paths only. A maker who wants to skew
   such a shape uses "Object to path" first. (Non-uniform scale is no longer out
   of scope: criteria 53 to 55.)
 - Any conversion to a path by a move, a rotate, a uniform scale or a skew; a
@@ -899,7 +900,7 @@ answer:
 - **D3. Circles.** A circle counts as aligned whatever its rotation, since its
   outline does not depend on it, so a rotated group of circles and paths can still
   be stretched (criterion 20).
-- **D4. Mixed skew.** A selection with any primitive does not skew at all, the
+- **D4. Mixed skew.** (Superseded by `specs/0047-transform-polish/`: a mixed selection skews and converts its primitives.) A selection with any primitive does not skew at all, the
   rule recorded in `specs/0008-object-transform-refinements/` criterion 53. Refusing
   the whole gesture, rather than skewing the paths only, keeps the arrangement
   consistent: no object is left behind.
@@ -949,6 +950,8 @@ objects; none needs an answer:
   acceptance criterion.
 
 ## Customer change 2026-10-10: what the architect and the ux-engineer update
+
+*Decision E below and the notice texts are superseded by `specs/0047-transform-polish/`.*
 
 For the architect (`adrs.md`): the resolving function returns, per object, either
 the same kind with new fields or a path (criteria 20, 53); the path comes from the
@@ -1151,6 +1154,8 @@ The modifier indicators of `edit-interaction-polish` apply unchanged
 
 ### 6. Scale
 
+*Superseded in part by `specs/0047-transform-polish/`: the corner is free and Ctrl keeps the proportions, and no text names a conversion.*
+
 - **Readout:** "123.4 mm × 67.8 mm", the size of the group box in the preview,
   also when every object is a polygon or star (not "r R mm": there is no single radius). The
   pivot marker shows the fixed point (opposite corner or side midpoint, center
@@ -1218,6 +1223,8 @@ The modifier indicators of `edit-interaction-polish` apply unchanged
 
 ### 8. Skew (Part E)
 
+*Superseded in part by `specs/0047-transform-polish/`: every selection shows the skew handles ("Hidden, not inert" below no longer applies).*
+
 Glyph, offsets, 24 px lever rule, hover, cursor and hit radius as for a path.
 Readout "Skew x +12.5°" / "Skew y −8.0°" ("22.5°" under Ctrl). The fixed-line guide
 runs along the group box side (or the line through the center with Shift), 1 px,
@@ -1235,6 +1242,8 @@ same holds after a stretch that turned the last non-path into a path (section 12
 review checks a mixed selection screenshot with the skew handles absent.
 
 ### 9. Typed entry chips
+
+*Changed by `specs/0047-transform-polish/`: the Move chip measures from a reference point (centre by default), and no chip carries a conversion note.*
 
 All chips are the "Transform entry chip" and "Move entry chip" surfaces, opened
 by double-click on the handle or by `M`, `R`, `S`, `K`, placed as for one object
@@ -1255,6 +1264,8 @@ number", "Must be above 0", "Too large"; the error line is a polite live region
 and the border plus message carry the state, not colour alone.
 
 ### 10. Hover hint chips
+
+*Changed by `specs/0047-transform-polish/`: the conversion line and the "proportional" corner row are gone.*
 
 Same chip, 600 ms, `pointer-events: none`, now with a title that names the
 selection. Up to five lines; the chip wraps at 240 px.
@@ -1279,6 +1290,8 @@ gone: it explained a restriction, and there is none now. "Shape" is the word the
 Select bar uses ("Convert the selected shapes to paths").
 
 ### 11. Select bar and Properties panel
+
+*The tooltip "Paths can be stretched and skewed freely" is gone (`specs/0047-transform-polish/`).*
 
 **Select bar: unchanged** (criterion 39). The two switches first, then the kind
 groups the selection contains, then "Object to path". No "N objects" text, no group
@@ -1394,6 +1407,8 @@ object is near the box edge.
   clipped to the viewport; the box does not depend on the count.
 
 ### 14. Changes wanted from the product owner
+
+*Items that concern the notice, the conversion lines and "paths only" are superseded by `specs/0047-transform-polish/`.*
 
 By criterion number. 1 to 3, 6 to 12, 15, 17 to 20, 22 to 27, 29 to 32, 34, 36, 37,
 39 to 42, 47, 48, 50 to 52 need no change (39: tooltip text only, section 11).

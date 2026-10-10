@@ -1360,3 +1360,17 @@ built-in list.
 - **`session/mod.rs` is over 500 lines** (537 non-test lines before the slice); split the glue calls out
   when the next slice touches it.
 - **The Select bar overlaps the properties panel below about 600 px window width** (UX review of `0040`, found at 420 px; below the 800 x 600 minimum, so not fixed there).
+
+## The click on a reference mark is decided in TypeScript (0047)
+
+The press order (a mark before the handles), the 3 px / 8 px slop and Escape between the press and
+the release of a click on a reference mark of the typed move live in `useEditorSession.ts`, not in
+`curvyo-ui-core` ([ADR 0001](adr/0001-ui-framework-and-canvas-rendering.md) §1, and decision 3 of
+`specs/0010-edit-interaction-polish/adrs.md` put such rules in `ui-core`). The typed texts live in the
+DOM chip, so the frontend has to run the release anyway. Criterion 40 of
+`specs/0047-transform-polish/` ("3 px: nothing happens") therefore has no automated test; the geometry
+(`hit_mark`, `Session::move_mark_at`) is tested in Rust.
+
+**Resolution:** `Session::pointer_down` consumes a press on a mark and `pointer_up` executes it, with
+`DragOrigin` for the slop; the frontend then passes only the texts and the Copy flag at the release.
+Do it with the next slice that touches the move chip.

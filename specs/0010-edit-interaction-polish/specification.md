@@ -374,10 +374,10 @@ on the centre handle) and has left the 3 px dead zone.
     the centre handle stays drawn in its dragging look while it is open; no pivot
     marker. Layout, focus ring, colours and error text follow the entry chips of
     `object-transform-refinements` and `docs/design-system.md` ("Move entry
-    chip").
+    chip"). (Changed by `specs/0047-transform-polish/` criteria 37 to 50: the chip measures from one of nine reference points, the centre by default, and shows the pale red box.)
 19. Given the chip is open, then a field the maker has not edited means "no change
     on that axis". While untouched, a field shows "0" in Relative mode and the
-    object's current X or Y in Absolute mode (criterion 21), and it is
+    object's current X or Y of the reference point in Absolute mode (criterion 21), and it is
     re-rendered in the new mode's value when the mode switches; a field the
     maker has edited keeps its typed text when the mode switches, and that text
     is read in whatever mode is current at Enter. So "5, Tab, -3, Enter" applies
@@ -388,7 +388,10 @@ on the centre handle) and has left the 3 px dead zone.
     the same writes as a drag of the same offset (one commit; rotation, size,
     parameters unchanged). Example: an object whose bounds have top-left (10,
     20), typed 5 and -3: top-left (15, 17).
-21. Given Absolute mode and Enter, then the object is translated so that the
+21. (Changed by `specs/0047-transform-polish/` criteria 37 and 38: the reference
+    is the centre of the bounds unless another of the nine points is chosen;
+    the top-left is one of them. The example below holds with the top-left chosen.)
+    Given Absolute mode and Enter, then the object is translated so that the
     top-left corner of its axis-aligned bounds lies at (X, Y) in document
     coordinates (origin at the document's top-left corner, as the rulers).
     "Axis-aligned bounds" are the tight bounds of the object's drawn outline in
@@ -399,7 +402,7 @@ on the centre handle) and has left the 3 px dead zone.
     polygon, absolute X, Y is therefore the top-left of the box around its
     vertices, not the corner of its circumscribed square. Example: a 30 x 40 rectangle at origin (10, 20), typed 100 and
     50 in Absolute: its origin becomes (100, 50). Which reference point is the
-    open question 3.
+    open question 3 (answered by `specs/0047-transform-polish/`: nine points, the centre by default).
 22. Given a field with text that is not a finite number (empty after editing,
     letters, more than one separator), or a value whose result lies beyond
     ±1e7 mm, when the maker presses Enter, then the chip stays open, the offending
@@ -410,7 +413,7 @@ on the centre handle) and has left the 3 px dead zone.
     checkbox, accessible name "Copy"), the fourth control in the Tab order of
     criterion 18, unchecked on every open. When it is checked at Enter, the
     chip creates one copy of the object displaced as typed (Relative: by (X, Y);
-    Absolute: with its bounds' top-left at (X, Y)) with the result of criterion
+    Absolute: with the chosen reference point of its bounds at (X, Y)) with the result of criterion
     34, and the original is untouched; the selection is then the copy, as in
     criterion 35. Given the second press of the
     double-click happens with Ctrl held, then the chip opens with the check
@@ -778,7 +781,7 @@ system are in "UX notes round 2", section 1.
     the centre handle is not drawn, the chip opens where it would be. Examples: M,
     5, Tab, -3, Enter moves the object by (5, -3) mm; M, 100, Tab, 50, Tab, Space,
     Enter puts the top-left of its axis-aligned bounds at (100, 50) (criterion
-    21). A Copy check (criterion 23) is reachable by Tab.
+    21; with the top-left chosen as the reference, `0047-transform-polish`). A Copy check (criterion 23) is reachable by Tab.
 57. Given the Select tool with one object selected, when the maker presses R or S,
     then the angle entry or the size entry of `object-transform-refinements`
     (criteria 18 to 32) opens as a double-click on a rotate or a resize handle
@@ -846,8 +849,8 @@ system are in "UX notes round 2", section 1.
     act, then nothing is written, the tool and the selection stay as they are and
     a one-line hint chip shows for 2 s: "Select an object first" (nothing
     selected, or M and K outside the Select tool), "Select one object to type a
-    value" (several objects selected), "Skew works on paths only" (K or Shift+K
-    with one selected non-path).
+    value" (several objects selected). ("Skew works on paths only" is gone: K opens
+    the skew chip for every kind, `specs/0047-transform-polish/` criterion 11.)
 60. Given Escape, then the key repeat of a held Escape does nothing: one physical
     press performs at most one step of criterion 42 (holding Escape in the Node
     tool clears the node selection once and does not go on to leave the tool).
@@ -903,7 +906,7 @@ skew guide (criterion 68).
   typed size that uses the opposite corner from the keyboard (the double-click
   route does it).
 - Storing a skew, or any skew of primitives (`object-transform-refinements`
-  decision P1 stands).
+  decision P1 stood here; reversed by `specs/0047-transform-polish/`, which converts).
 - Any other angle behaviour of polygon and star creation (the press-centre,
   pointer-vertex rule stays); a default size or angle for a click without a drag.
 - Re-Join or undo of Split; `undo-redo` is its own slice.
@@ -933,7 +936,8 @@ one German message. Resolved questions stay for the record.
    document's top-left corner, X right, Y down (default, recommended: it is
    what the rulers show and what a machine's work area measures from, and it
    works for a rotated object); (b) the object's centre, i.e. where the centre
-   handle sits (it is what you drag); (c) a choice of nine anchor points later.
+   handle sits (it is what you drag); (c) a choice of nine anchor points later. *Answered by `specs/0047-transform-polish/`
+   (customer, 2026-10-10): (c), with the centre as the default.*
    The second part of this question, the typed move only being available
    while the centre handle is drawn, is closed: the key M opens it for an
    object of any size (criteria 17 and 56). If unanswered: (a).
@@ -1042,7 +1046,7 @@ that changes a letter is "Select tool with an object selected".
 | M | typed move (centre handle's chip) | nothing; hint "Select an object first" |
 | R | typed angle (top-right corner rotate handle's chip) | Rectangle tool |
 | S | typed size about the centre (chip at the bottom-right corner resize handle's position) | Select tool |
-| K, Shift+K | typed skew x, skew y (one path; hint otherwise) | nothing; hint |
+| K, Shift+K | typed skew x, skew y (one object of any kind) | nothing; hint |
 | B, N, E, `*` | Pen, Node, Ellipse, Polygon/star | the same |
 | Delete, Backspace | delete the selection | Node: delete nodes; Pen: nothing |
 | Escape | the cascade of criteria 42 to 49 | the same |
@@ -1094,9 +1098,8 @@ fixed point (criterion 57a). Decided 2026-10-07 (UX review): the S chip opens
 by the centre, placed as the move chip is, with no handle in its dragging look
 and the pivot marker at the centre in full `--accent`.
 While a chip is open the Shift-revealed side rotate handles other than the open
-chip's own are hidden, so the Shift+K chip never sits on one. With several objects selected, or K on a
-non-path, the key shows a one-line hint-chip message for 2 s and writes
-nothing ("Select one object to type a value", "Skew works on paths only").
+chip's own are hidden, so the Shift+K chip never sits on one. With several objects selected, the key
+shows a one-line hint-chip message for 2 s and writes nothing ("Select one object to type a value").
 `R, 0, Enter` is the keyboard way to stand a polygon or star back to its zero
 orientation.
 

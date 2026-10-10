@@ -263,7 +263,10 @@ referenz / fester punkt bleibt identisch zum händischen ziehen."
     and selected, Tab moving to Height. Given an edge resize handle, then
     only the one dimension that handle changes is shown (Width for a
     left or right handle, Height for a top or bottom one).
-26. Given one selected polygon or star, when the maker double-clicks a
+26. (Superseded by `specs/0047-transform-polish/` criteria 9 and 12: a polygon
+    or star opens the same W and H fields as every other kind, and an unequal
+    W and H converts it to a path.)
+    Given one selected polygon or star, when the maker double-clicks a
     corner resize handle, then a single field opens, visibly labelled "r"
     (accessible name "Outer radius"), pre-filled
     with the outer radius the readout shows; entering a value scales the
@@ -277,9 +280,9 @@ referenz / fester punkt bleibt identisch zum händischen ziehen."
 28. Given the entry opens, then the fixed reference is the one the hand-drag
     would use: for a corner handle of a rectangle, ellipse or path the
     opposite corner, for an edge handle the opposite edge; if Shift is held
-    at the second press of the double-click, the box center. For a polygon
-    or star it is always the shape's center, with or without Shift, because
-    slice 5 scales them about their center (criterion 26). It is fixed when
+    at the second press of the double-click, the box center. (Changed by
+    `specs/0047-transform-polish/`: a polygon or star follows the same rule as
+    a rectangle; it used to be always the shape's center.) It is fixed when
     the entry opens and shown with the pivot marker while it is open. This rule
     is for the double-click on a resize handle only. The key S opens the same
     entry with the box centre as the fixed point for every kind and reads no
@@ -368,6 +371,8 @@ verschieben 3 bis wir die primitive verfeinern."
   Trying it does nothing. No conversion to a path, no message. The maker who
   needs a skewed primitive uses "Object to path" first
   (`primitive-shapes` criterion 21: no implicit conversion stays intact).
+  *Reversed by the customer on 2026-10-10 (`specs/0047-transform-polish/`
+  criteria 1 and 2): a skew converts a primitive to a path silently, option P2.*
 - **Recorded future option, not planned:** P3, a stored per-object matrix so
   primitives stay primitives under skew. It is a document-model change
   (new stored field, version bump, every outline reader composing it) and
@@ -498,13 +503,17 @@ above), and the `rotation` register is **not changed** by a skew.
 
 ### Primitives and other selections under skew
 
-50. Given exactly one selected rectangle, ellipse, polygon or star, then no
+50. (Superseded by `specs/0047-transform-polish/` criterion 1: every selection
+    shows the skew handles.)
+    Given exactly one selected rectangle, ellipse, polygon or star, then no
     skew handles are shown (UX proposal for the `ux-engineer`: not drawing a
     handle that does nothing is the clearer affordance; if the
     `ux-engineer` finds showing them inert cheaper or clearer, that is
     acceptable as long as criterion 51 holds). All other handles behave as
     in Part A and slice 5.
-51. Given a rectangle, ellipse, polygon or star, when the maker tries to
+51. (Superseded by `specs/0047-transform-polish/` criteria 2 and 4: a skew
+    converts the primitive in one commit.)
+    Given a rectangle, ellipse, polygon or star, when the maker tries to
     skew it by any means this spec provides, then nothing happens: the
     document is unchanged, no commit is made, no undo step is added, no
     object is converted to a path, and no error or message is shown. In
@@ -520,7 +529,9 @@ above), and the `rotation` register is **not changed** by a skew.
     later multi-object transform story does not have to decide it again:
     if multi-object transform handles are ever added, a selection that
     contains any primitive does not skew at all (no partial skew of the
-    paths in it), consistent with this decision.
+    paths in it), consistent with this decision. (Superseded by
+    `specs/0047-transform-polish/` criterion 7: a group skews, and every
+    primitive in it becomes a path.)
 
 **Trade-off, accepted.** On a path the edge-midpoint resize handle is 14 px
 deep (8 px outward, 6 px inward) instead of slice 5's 22 px, because the skew
@@ -607,7 +618,8 @@ criterion concerned.
   general quadrilateral.
 - Skew of primitives (rectangle, ellipse, polygon, star), by conversion
   (P2, rejected) or by a stored per-object matrix (P3, deferred until the
-  primitives rework). Skew of multi-object selections.
+  primitives rework). Skew of multi-object selections. (Both done later by
+  `specs/0047-transform-polish/`, by conversion.)
 - Typed skew entry (a double-click on a skew handle does nothing, criterion
   49), a skew snap to anything but the criterion 47 stops, and skew about a
   point other than the fixed edge or the box center.
@@ -879,7 +891,8 @@ Clicking the switch while the chip is open closes the chip (blur rule).
 
 ### Skew (Part B)
 
-**Primitives: hidden, not inert.** A handle on screen promises that
+**Primitives: hidden, not inert.** (Superseded: since
+`specs/0047-transform-polish/` every selection shows the skew handles.) A handle on screen promises that
 dragging it does something; an inert one needs a third visual state, a
 reason the maker has to guess ("is it broken?") and a test of its own, to
 protect a case the customer explicitly said can do nothing. Hidden means

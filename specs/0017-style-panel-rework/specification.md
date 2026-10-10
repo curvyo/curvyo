@@ -195,7 +195,10 @@ holds for every later section of the panel, not only Style.
     one commit follows on release even if the pointer is outside the control.
     Dragging away and back makes no commit in between. Escape during the drag
     reverts and the release writes nothing. The commit changes RGB only; each
-    object's alpha stays.
+    object's alpha stays. (A click on the area or the hue slider sets the colour at
+    the pointer and commits once on release, and a double-click moves the focus to
+    the hex field: `specs/0047-transform-polish/` criteria 17 to 25, the "Slider" row of
+    `docs/design-system.md`.)
 19. Given the arrow keys on the area or the hue slider, then each step is 1% of
     the range, Shift makes it 10%, the object previews on key-down and commits
     on key-up, so a held key is one commit.
@@ -793,8 +796,10 @@ hue does not jump through a grey (criterion 20). Mixed: no thumbs; the area keep
 last hue (red before any interaction). Keys (criterion 19):
 arrows 1 %, Shift 10 %, preview on key-down, commit on key-up. Names:
 "Saturation and value" with `aria-valuetext` "Saturation 50 %, value 40 %" and
-"Hue" with `aria-valuetext` "Hue 215 degrees". A pointer press on the area also
-moves the thumb to the press point (a click picks), then drags.
+"Hue" with `aria-valuetext` "Hue 215 degrees". A click on the area picks the
+colour under the pointer at the release, a drag moves the thumb after 3 px, and a
+double-click hands the focus to the hex field (`specs/0047-transform-polish/` Part B;
+the behaviour of every slider is the "Slider" row of `docs/design-system.md`).
 
 **Current and old swatch: not in this slice.** It needs an "editing session"
 (when does "old" get captured?) and a place that does not exist yet: the sketch

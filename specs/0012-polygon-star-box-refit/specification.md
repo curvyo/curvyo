@@ -75,7 +75,11 @@ right, -180° to 180°; `edit-interaction-polish` criterion 1).
    upright whenever the readout shows 0°, 90°, -90° or 180°. Example: a shape at
    78.7° turned by a raw 1° with Ctrl lands on 75° and the box has the
    direction 75°.
-7. Given a polygon or star, when the maker drags a corner resize handle (now a
+7. (Changed by `specs/0047-transform-polish/` criteria 9 and 12: a uniform scale of
+   a polygon or star, by a Ctrl drag or an exact diagonal, keeps the opposite
+   corner of the box fixed, or C with Shift; a free drag stretches and converts
+   the shape to a path. The numbers below are for the pivot C.)
+   Given a polygon or star, when the maker drags a corner resize handle (now a
    corner of the turned box), then the shape scales uniformly about C, as
    today: the dragged handle follows the pointer exactly, R changes, α and C do
    not, and the box keeps the direction α. The typed radius (`object-transform-refinements`
@@ -90,12 +94,15 @@ right, -180° to 180°; `edit-interaction-polish` criterion 1).
    handle, as today. A point-count change keeps α, C and R, so the box does not
    move.
 9. Given a polygon or star, then the pivot marker and the fixed point of each
-   gesture are: resize, always C; rotate with no modifier, C; rotate with Shift
+   gesture are: resize, always C (since `specs/0047-transform-polish/`: the opposite
+   corner or edge, and C with Shift, as for a rectangle); rotate with no modifier, C; rotate with Shift
    from a corner rotate handle, the corner of the box (criterion 1)
    diagonally opposite the grabbed one. A rotation about a pivot other than C
    moves C along the circle about the pivot and turns the box by Δ, exactly as
    the shape turns. The centre move handle sits at C.
-10. Given a polygon or star at any α, then no skew handle is drawn or
+10. (Superseded by `specs/0047-transform-polish/` criterion 1: every kind shows the
+    skew handles, and a skew converts the shape to a path.)
+    Given a polygon or star at any α, then no skew handle is drawn or
     hit-testable, as today (skew handles belong to paths only), and a skew
     gesture or entry cannot be started on it.
 11. Given a polygon or star, then the cursor of a resize handle is the handle's
@@ -148,7 +155,8 @@ right, -180° to 180°; `edit-interaction-polish` criterion 1).
 - Marquee and lasso selection tests (`advanced-selection`); they take their
   box from the same function when they are built.
 - Non-uniform scaling or skewing of a polygon or star (not representable, see
-  `docs/technical-debt.md`, "Rotation is a stored angle").
+  `docs/technical-debt.md`, "Rotation is a stored angle"). (Done later by
+  `specs/0047-transform-polish/`: the shape becomes a path.)
 - Any change to rectangles, ellipses or paths.
 
 ## UX notes

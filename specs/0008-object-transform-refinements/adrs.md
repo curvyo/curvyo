@@ -367,7 +367,9 @@ repeated here.
    holds for rectangles, ellipses and paths only. Criterion 27 ("same as a
    hand-drag") is the governing rule. **Default: polygon/star size entry is
    about the center; the PO adds "polygon and star: the center" to
-   criterion 28.**
+   criterion 28.** *Reversed 2026-10-11 by `specs/0047-transform-polish/`: a polygon
+   or star now follows the rectangle's rule (the opposite corner, the centre with
+   Shift) on a double-click on a handle; the key S keeps the centre.*
 2. **Criterion 3's double-click on the center handle.** "What a
    double-click on the body does today" is nothing for an unfilled object:
    slice 4's `double_click` hits only the outline, while slice 5's

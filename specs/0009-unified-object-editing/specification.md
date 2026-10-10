@@ -291,7 +291,14 @@ the parameter-handle threshold).
     ellipse, r for polygon and star), the 3 px dead zone, the live readouts
     and the pivot marker. The polygon and star differences stay (corner
     resize handles only, always uniform, always about the centre).
-17. Given a rectangle, ellipse, polygon or star, then it shows no skew handles
+    (Superseded by `specs/0047-transform-polish/` criteria 9 and 12: a polygon
+    or star shows all eight handles, takes W and H like a rectangle, and
+    scales about the opposite corner, or the centre with Shift; an unequal
+    stretch converts it to a path.)
+17. (Superseded by `specs/0047-transform-polish/` criteria 1 and 2: every
+    selection shows the skew handles, and a skew converts a primitive to a
+    path silently.)
+    Given a rectangle, ellipse, polygon or star, then it shows no skew handles
     and cannot be skewed (`specs/0008-object-transform-refinements/` criteria 50
     and 51; the decision P1). Whether primitives should become skewable is
     question 5, because it would change the document model.
@@ -337,7 +344,9 @@ the parameter-handle threshold).
       on the stars.
 
     Changing Points or Ratio updates every acted-on shape live and commits once
-    per interaction (a slider drag is one commit, not one per tick; a stepper
+    per interaction (a slider drag is one commit, not one per tick; a click on
+    the Ratio slider sets the value at the pointer and a double-click opens the
+    value entry: `specs/0047-transform-polish/` Part B; a stepper
     click is one commit), as `0003` criteria 10, 14 and 15 define. The Points
     number field commits typed text on Enter or on blur, and a stepper click
     immediately; each is one commit, and typing does not commit per
@@ -371,7 +380,8 @@ the parameter-handle threshold).
     always enabled, and acts on exactly those objects, not on paths in the
     same selection; `0003` criteria 17 to 22 hold unchanged (one atomic
     commit, each primitive independently, no implicit conversion anywhere
-    else). It is the last control of the bar and has no keyboard shortcut. The
+    else except a skew or a stretch a primitive cannot represent, which
+    `specs/0047-transform-polish/` converts silently). It is the last control of the bar and has no keyboard shortcut. The
     shape tools' bars no longer show it.
 23. Given the Select tool is active, then two switches are the first group of
     the bar, shown and operable with or without a selection, never disabled and
@@ -502,7 +512,8 @@ the parameter-handle threshold).
   scaling switch itself is in scope: criterion 23; its full behaviour with four
   radii is `specs/0013-rectangle-corner-radii/`.)
 - Skewing primitives (a stored per-object matrix, or conversion to a path):
-  question 5, a document-model change that would be its own spec.
+  question 5, a document-model change that would be its own spec. (Done by
+  conversion in `specs/0047-transform-polish/`, question 5 answer (b).)
 - Showing a path's nodes in the Select tool, or merging the Node tool into the
   Select tool.
 - The blue-new/black-old preview in the Node tool (question 6).
@@ -549,7 +560,7 @@ has not objected to questions 1, 2, 3, 5 and 6; they stay on their defaults
    they show no skew handles (your decision P1 of 2026-10-06, "until we refine
    the primitives"). Is it time? (a) Keep it, use "Object to path" first
    (default, recommended); (b) skew converts the shape to a path on first use
-   (P2); (c) store a skew matrix per shape so it stays a rectangle (P3,
+   (P2; chosen by the customer on 2026-10-10, `specs/0047-transform-polish/`); (c) store a skew matrix per shape so it stays a rectangle (P3,
    changes the document model and `format_version`).
 6. **Blue and black elsewhere.** Should the Node tool (moving nodes and
    handles) and the pen tool preview the same way, with the old path in black
