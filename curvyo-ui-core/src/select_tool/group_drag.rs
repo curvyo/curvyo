@@ -109,11 +109,7 @@ impl SelectTool {
             .filter(|object| selected.contains(&object.id()))
             .cloned()
             .collect();
-        // A resize or a skew may convert; a rotate never does (`0047` criterion 10).
-        let converted = match handle {
-            EditHandle::Resize(_) | EditHandle::Skew(_) => converted_for_handle(&starts, handle),
-            EditHandle::Rotate(_) | EditHandle::Move | EditHandle::Param(_) => Vec::new(),
-        };
+        let converted = converted_for_handle(&starts, handle);
         GroupDrag {
             origin,
             starts,

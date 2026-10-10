@@ -157,7 +157,6 @@ pub fn group_handles(
     }
     let spec = HandleSpec {
         resize_directions: group.resize_directions(),
-        skew: true,
         side_rotate,
     };
     // The layout of a single object's box, on the group box. Its centre handle

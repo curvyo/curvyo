@@ -4,7 +4,7 @@
 //! that decides which of their marks a press is on, and when the marks are shown. The
 //! choice of a point is view state of the open move chip: nothing here is stored.
 
-use curvyo_document_core::Point;
+use curvyo_document_core::{Point, ViewTransform};
 
 /// One of the nine points of a box.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -159,22 +159,21 @@ pub fn mark_hit_radius_px(side_px: f64, touch: bool) -> f64 {
 
 /// The marks of the box `bounds` that are drawn and clickable: none unless the shorter side
 /// is at least [`MARKS_MIN_SIDE_PX`], and only those inside the viewport, a screen
-/// `viewport_px` wide and high; a mark outside it is not pulled in (criterion 39).
-/// `to_screen` maps a document point to screen pixels.
+/// `viewport_px` wide and high; a mark outside it is not pulled in (criterion 39). `view` maps
+/// document points to screen pixels.
 #[must_use]
 pub fn visible_marks(
     bounds: (Point, Point),
-    px_per_mm: f64,
+    view: ViewTransform,
     viewport_px: (f64, f64),
-    to_screen: impl Fn(Point) -> (f64, f64),
 ) -> Vec<ReferencePoint> {
-    if !marks_are_shown(shorter_side_px(bounds, px_per_mm)) {
+    if !marks_are_shown(shorter_side_px(bounds, view.scale())) {
         return Vec::new();
     }
     ReferencePoint::ALL
         .into_iter()
         .filter(|mark| {
-            let (x, y) = to_screen(mark.point(bounds));
+            let (x, y) = view.document_to_screen(mark.point(bounds));
             x >= 0.0 && y >= 0.0 && x <= viewport_px.0 && y <= viewport_px.1
         })
         .collect()
@@ -182,23 +181,22 @@ pub fn visible_marks(
 
 /// The mark a press at screen position `pointer_px` is on, if any: the nearest mark centre
 /// within the hit radius of [`mark_hit_radius_px`], the centre winning an exact tie
-/// (criterion 40). `marks` are the [`visible_marks`], `to_screen` as there.
+/// (criterion 40). `marks` are the [`visible_marks`], `view` as there.
 #[must_use]
 pub fn hit_mark(
     bounds: (Point, Point),
     marks: &[ReferencePoint],
+    view: ViewTransform,
     pointer_px: (f64, f64),
-    px_per_mm: f64,
     touch: bool,
-    to_screen: impl Fn(Point) -> (f64, f64),
 ) -> Option<ReferencePoint> {
-    let radius = mark_hit_radius_px(shorter_side_px(bounds, px_per_mm), touch);
+    let radius = mark_hit_radius_px(shorter_side_px(bounds, view.scale()), touch);
     let mut best: Option<(ReferencePoint, f64)> = None;
     // The centre is tried first, and only a strictly nearer mark replaces it.
     let centre_first = std::iter::once(ReferencePoint::Centre)
         .chain(ReferencePoint::ALL.into_iter().filter(|m| !m.is_centre()));
     for mark in centre_first.filter(|mark| marks.contains(mark)) {
-        let (x, y) = to_screen(mark.point(bounds));
+        let (x, y) = view.document_to_screen(mark.point(bounds));
         let distance = (x - pointer_px.0).hypot(y - pointer_px.1);
         if distance <= radius && best.is_none_or(|(_, nearest)| distance < nearest) {
             best = Some((mark, distance));
@@ -216,8 +214,8 @@ mod tests {
     }
 
     /// One screen pixel is one millimetre.
-    fn identity(point: Point) -> (f64, f64) {
-        (point.x, point.y)
+    fn identity() -> ViewTransform {
+        ViewTransform::identity()
     }
 
     /// Criterion 37 and the rectangle of criterion 40: a 30 x 40 box at (10, 20) has the
@@ -299,14 +297,21 @@ mod tests {
     #[test]
     fn a_small_box_has_no_marks() {
         let b = bounds(0.0, 0.0, 2.0, 2.0);
-        assert_eq!(visible_marks(b, 3.78, (1000.0, 800.0), identity), []);
+        assert_eq!(
+            visible_marks(
+                b,
+                ViewTransform::new(3.78, Point::new(0.0, 0.0)),
+                (1000.0, 800.0)
+            ),
+            []
+        );
     }
 
     /// Criterion 39: a mark outside the viewport is not drawn and not pulled in.
     #[test]
     fn marks_outside_the_viewport_are_dropped() {
         let b = bounds(-100.0, 100.0, 200.0, 400.0);
-        let shown = visible_marks(b, 1.0, (500.0, 800.0), identity);
+        let shown = visible_marks(b, identity(), (500.0, 800.0));
         assert!(!shown.contains(&ReferencePoint::TopLeft));
         assert!(!shown.contains(&ReferencePoint::LeftMiddle));
         assert!(!shown.contains(&ReferencePoint::BottomLeft));
@@ -319,8 +324,8 @@ mod tests {
     #[test]
     fn a_press_is_on_the_nearest_mark_within_the_radius() {
         let b = bounds(0.0, 0.0, 100.0, 100.0);
-        let marks = visible_marks(b, 1.0, (1000.0, 1000.0), identity);
-        let hit = |x: f64, y: f64| hit_mark(b, &marks, (x, y), 1.0, false, identity);
+        let marks = visible_marks(b, identity(), (1000.0, 1000.0));
+        let hit = |x: f64, y: f64| hit_mark(b, &marks, identity(), (x, y), false);
         assert_eq!(hit(0.0, 0.0), Some(ReferencePoint::TopLeft));
         assert_eq!(hit(11.0, 3.0), Some(ReferencePoint::TopLeft));
         assert_eq!(hit(50.0, 50.0), Some(ReferencePoint::Centre));
@@ -330,26 +335,25 @@ mod tests {
         assert_eq!(hit(13.0, 0.0), None, "13 px from the corner is outside 12");
         // A touch reaches 22 px, but never past 0.24 s = 24 px of this box.
         assert_eq!(
-            hit_mark(b, &marks, (21.0, 0.0), 1.0, true, identity),
+            hit_mark(b, &marks, identity(), (21.0, 0.0), true),
             Some(ReferencePoint::TopLeft)
         );
     }
 
-    /// An exact tie goes to the centre. With the real geometry a tie cannot happen (two
-    /// targets are `s / 2` apart and each radius is at most `0.24 s`), so the rule is tested
-    /// with a mapping that puts the top centre and the centre on one screen point.
+    /// An exact tie goes to the centre. With a real box a tie cannot happen (two targets are
+    /// `s / 2` apart and each radius is at most `0.24 s`), so the rule is tested with a box
+    /// that has collapsed to a point, where the top centre and the centre coincide.
     #[test]
     fn the_centre_wins_an_exact_tie() {
-        let b = bounds(0.0, 0.0, 10.0, 10.0);
+        let b = bounds(5.0, 5.0, 5.0, 5.0);
         let marks = [ReferencePoint::TopCentre, ReferencePoint::Centre];
-        let collapsed = |p: Point| (p.x * 10.0, 0.0);
         assert_eq!(
-            hit_mark(b, &marks, (50.0, 0.0), 10.0, false, collapsed),
+            hit_mark(b, &marks, identity(), (5.0, 5.0), false),
             Some(ReferencePoint::Centre)
         );
         let marks = [ReferencePoint::Centre, ReferencePoint::TopCentre];
         assert_eq!(
-            hit_mark(b, &marks, (50.0, 0.0), 10.0, false, collapsed),
+            hit_mark(b, &marks, identity(), (5.0, 5.0), false),
             Some(ReferencePoint::Centre),
             "whatever the order of the list"
         );

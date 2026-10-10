@@ -76,7 +76,7 @@ impl Session {
             list.extend(curvyo_render_core::build_move_axes(view, &axes));
         }
         // The pale red box of a move drag or the open typed move (`0047` criteria 33, 36).
-        let reference = self.reference_decoration(&objects);
+        let reference = self.reference_decoration();
         list.extend(reference_box_list(view, reference.as_ref()));
         // The blue half of blue-new, black-old: the geometry a release would
         // commit, over the committed objects drawn above and under the boxes

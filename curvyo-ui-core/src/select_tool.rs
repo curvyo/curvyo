@@ -286,12 +286,14 @@ impl SelectTool {
             // its first press must be recognised as a press on it
             // (criterion 15).
             PressTarget::CentreHandle => {
-                self.drag = SelectDrag::Moving(MoveDrag::new(origin, true));
+                self.drag =
+                    SelectDrag::Moving(MoveDrag::new(origin, true, objects, selection, None));
                 self.last_press_handle = Some(EditHandle::Move);
                 SelectPointerDownOutcome::Selected
             }
             PressTarget::InsideSelectedBox => {
-                self.drag = SelectDrag::Moving(MoveDrag::new(origin, false));
+                self.drag =
+                    SelectDrag::Moving(MoveDrag::new(origin, false, objects, selection, None));
                 SelectPointerDownOutcome::Selected
             }
             PressTarget::Empty => {
@@ -299,7 +301,8 @@ impl SelectTool {
                 SelectPointerDownOutcome::Marquee
             }
             PressTarget::Object(hit) => {
-                self.drag = SelectDrag::Moving(begin_object_press(selection, hit, shift, origin));
+                self.drag =
+                    SelectDrag::Moving(begin_object_press(objects, selection, hit, shift, origin));
                 SelectPointerDownOutcome::Selected
             }
             // The cycle survives: a release without movement continues it.

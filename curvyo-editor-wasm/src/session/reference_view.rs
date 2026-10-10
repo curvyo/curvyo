@@ -5,7 +5,7 @@
 //! (`curvyo_ui_core::MoveEntry`), reset when the chip opens; the DOM chip holds the text, the mode
 //! and the focus, and reports the mode, the chosen point and the radio under the pointer here.
 
-use curvyo_document_core::{ObjectSnapshot, Point, ViewTransform};
+use curvyo_document_core::{Point, ViewTransform};
 use curvyo_render_core::{
     DrawList, ReferenceBoxInput, ReferenceMark, build_reference_box_draw_list,
     build_reference_marks_draw_list,
@@ -33,13 +33,7 @@ impl Session {
         if !entry.is_absolute() {
             return Vec::new();
         }
-        let view = self.view();
-        visible_marks(
-            entry.bounds(),
-            view.scale(),
-            self.viewport.canvas_size(),
-            |point| view.document_to_screen(point),
-        )
+        visible_marks(entry.bounds(), self.view(), self.viewport.canvas_size())
     }
 
     /// The mark a press at the document point `at` is on, if any: only while the move chip is
@@ -53,14 +47,7 @@ impl Session {
         }
         let view = self.view();
         let pointer = view.document_to_screen(at);
-        hit_mark(
-            entry.bounds(),
-            &marks,
-            pointer,
-            view.scale(),
-            touch,
-            |point| view.document_to_screen(point),
-        )
+        hit_mark(entry.bounds(), &marks, view, pointer, touch)
     }
 
     /// The mark under the pointer, for the hover state, the hint chip and the prefill of the
@@ -123,10 +110,7 @@ impl Session {
     /// The box and marks to draw this frame: the true bounding box of the move drag in flight
     /// (criterion 33) or of the selection while the move chip is open (criterion 34), and the
     /// marks of the chip in Absolute mode (criterion 39). `None` when there is neither.
-    pub(super) fn reference_decoration(
-        &self,
-        objects: &[ObjectSnapshot],
-    ) -> Option<ReferenceBoxInput> {
+    pub(super) fn reference_decoration(&self) -> Option<ReferenceBoxInput> {
         if self.tool != Tool::Select {
             return None;
         }
@@ -145,12 +129,9 @@ impl Session {
             (entry.bounds(), marks)
         } else {
             let pointer = self.pointer_position?;
-            let bounds = self.select.live_move_box(
-                objects,
-                &self.selection,
-                pointer,
-                Modifiers::new(self.held.shift, self.held.ctrl),
-            )?;
+            let bounds = self
+                .select
+                .live_move_box(pointer, Modifiers::new(self.held.shift, self.held.ctrl))?;
             (bounds, Vec::new())
         };
         Some(ReferenceBoxInput {

@@ -733,7 +733,6 @@ fn ac20_ac53_spec_example_star_and_rectangle() {
         bar.object_to_path,
         "Object to path is still offered for the rectangle"
     );
-    // The notice: one star, once.
     // The label.
     let label = last_label(&doc_of(&s));
     assert!(label.contains("transform"), "label of the commit: {label}");
@@ -1161,10 +1160,9 @@ fn mixed_scene() -> Document {
 }
 
 /// Criterion 53.4: Escape, a drag back to factor 1 and an (almost) zero movement
-/// convert nothing and write nothing; there is no notice; the preview reports the
-/// count while the factors differ and nothing before.
+/// convert nothing and write nothing.
 #[test]
-fn ac53_ac54_no_conversion_and_no_notice_without_a_real_stretch() {
+fn ac53_no_conversion_without_a_real_stretch() {
     let d = mixed_scene();
     let mut s = open(&d);
     select_everything(&mut s);
@@ -1205,11 +1203,10 @@ fn ac53_ac54_no_conversion_and_no_notice_without_a_real_stretch() {
     assert!(bytes_of(&s) == before);
 }
 
-/// Criterion 54: the counts per kind are the number converted in this commit; a
-/// second stretch of the same (now path) selection converts nothing and reports
-/// nothing; the converted objects stay paths after a later uniform scale.
+/// Criterion 53.5: a second stretch of the same (now path) selection converts
+/// nothing more; the converted objects stay paths after a later uniform scale.
 #[test]
-fn ac54_the_counts_are_per_commit_and_the_conversion_is_permanent() {
+fn ac53_5_the_conversion_is_permanent() {
     let d = mixed_scene();
     let mut s = open(&d);
     select_everything(&mut s);
@@ -1667,12 +1664,11 @@ fn ac24_ac53_2_stroke_switch_on_converted_and_kept_objects() {
 // Criteria 38 and 55: hover chips
 // ---------------------------------------------------------------------
 
-/// Criteria 38 and 55: the edge handle hover reports the kinds that would convert,
-/// in the order polygons, stars, rotated rectangles, rotated ellipses; a circle
-/// never counts; a corner reports none; a selection without converting object
-/// reports none and its corner keeps the Ctrl line (hint "resize-corner").
+/// Criterion 38: the hover of an edge handle and of a corner handle of the group box
+/// gives the same hint lines whatever the kinds in the selection; the conversion is
+/// not announced (`specs/0047-transform-polish/`).
 #[test]
-fn ac38_ac55_hover_counts_and_hints() {
+fn ac38_hover_hints() {
     let d = kinds_scene();
     let mut s = open(&d);
     select_everything(&mut s);
@@ -1687,7 +1683,7 @@ fn ac38_ac55_hover_counts_and_hints() {
                 "Shift: from the center",
                 "Double-click or S: type a size"
             ],
-            "criterion 38, edge row (the conversion line is the host's, from the counts)"
+            "criterion 38, edge row"
         );
     }
     for (sx, sy) in [(1.0, 1.0), (-1.0, -1.0), (1.0, -1.0), (-1.0, 1.0)] {
@@ -1735,10 +1731,10 @@ fn ac38_the_corner_chip_of_a_selection_with_a_star_is_the_ordinary_one() {
     );
 }
 
-/// Criteria 32 and 53.7: the preview of a drag writes nothing; the converting kinds
-/// are counted live; the document is unchanged until the release.
+/// Criteria 32 and 53.7: the preview of a drag writes nothing; the document is
+/// unchanged until the release.
 #[test]
-fn ac32_the_preview_counts_the_conversions_and_writes_nothing() {
+fn ac32_the_preview_writes_nothing_before_the_release() {
     let d = kinds_scene();
     let mut s = open(&d);
     select_everything(&mut s);
@@ -2522,27 +2518,6 @@ fn delete_during_a_converting_stretch_resurrects_nothing() {
         );
     }
     assert!(unpack(4, &s.pack("0.1.0").unwrap()).is_ok());
-}
-
-/// Criterion 54: the notice is per commit and taken once (the host takes it after every
-/// event, `useEditorSession.ts`): it is gone after being taken, and a following move
-/// reports nothing. (A notice that nobody took stays until the next commit replaces
-/// it with that commit's counts; reported as an observation only.)
-#[test]
-fn ac54_the_notice_is_taken_once_and_a_following_move_reports_nothing() {
-    let d = mixed_scene();
-    let mut s = open(&d);
-    select_everything(&mut s);
-    let g = GBox::of(&s);
-    edge_drag(&mut s, &g, 1.0, 0.0, g.max.x + 20.0, false, false);
-    let ObjectSnapshot::Path(p) = &objects(&s)[0] else {
-        panic!()
-    };
-    let a = pt(
-        (p.anchors[0].point.x + p.anchors[1].point.x) / 2.0,
-        (p.anchors[0].point.y + p.anchors[1].point.y) / 2.0,
-    );
-    drag_mod(&mut s, a, pt(a.x + 9.0, a.y + 4.0), false, false);
 }
 
 /// Criterion 56: the typed size of a single turned polygon is the size of its box in

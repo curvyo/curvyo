@@ -96,6 +96,19 @@ pub(crate) fn with_fresh_anchor_ids(path: &mut PathSnapshot, minter: &mut Anchor
     }
 }
 
+/// Whether the gesture on `handle` turns `object` into a path (`specs/0047-transform-polish/`
+/// criteria 2, 7 and 10), the one rule behind [`converted_for_object`] and
+/// [`converted_for_handle`]. A skew converts every primitive; a resize converts what
+/// [`converts_on_stretch`] says along `axes`; a rotate, a move and a parameter handle
+/// never convert.
+fn converts_for(object: &ObjectSnapshot, handle: EditHandle, axes: Angle) -> bool {
+    match handle {
+        EditHandle::Skew(_) => matches!(object, ObjectSnapshot::Primitive(_)),
+        EditHandle::Resize(_) => converts_on_stretch(object, axes),
+        EditHandle::Rotate(_) | EditHandle::Move | EditHandle::Param(_) => false,
+    }
+}
+
 /// The path `object` becomes if the gesture on `handle` ends in a conversion, with the
 /// ids of a local counter (see [`converted_for_handle`]); `None` for an object the
 /// gesture leaves in its kind. A skew converts every primitive; a resize converts a
@@ -108,14 +121,9 @@ pub(crate) fn converted_for_object(
     let ObjectSnapshot::Primitive(primitive) = object else {
         return None;
     };
-    let converts = match handle {
-        EditHandle::Skew(_) => true,
-        EditHandle::Resize(_) => {
-            matches!(primitive.shape, Shape::Polygon { .. } | Shape::Star { .. })
-        }
-        EditHandle::Rotate(_) | EditHandle::Move | EditHandle::Param(_) => false,
-    };
-    converts.then(|| primitive_as_path(primitive, &mut AnchorIdMinter::new(0)))
+    // The box of a single object has its own axes, which a rectangle or ellipse shares.
+    converts_for(object, handle, object.rotation())
+        .then(|| primitive_as_path(primitive, &mut AnchorIdMinter::new(0)))
 }
 
 /// The paths the shapes of `starts` become if the group gesture on `handle` ends in a
@@ -132,18 +140,13 @@ pub(crate) fn converted_for_handle(
     let mut placeholder = AnchorIdMinter::new(0);
     starts
         .iter()
-        .map(|object| {
-            let converts = match handle {
-                EditHandle::Skew(_) => true,
-                EditHandle::Resize(_) => converts_on_stretch(object, Angle::from_radians(0.0)),
-                EditHandle::Rotate(_) | EditHandle::Move | EditHandle::Param(_) => false,
-            };
-            match object {
-                ObjectSnapshot::Primitive(primitive) if converts => {
-                    Some(primitive_as_path(primitive, &mut placeholder))
-                }
-                _ => None,
+        .map(|object| match object {
+            ObjectSnapshot::Primitive(primitive)
+                if converts_for(object, handle, Angle::from_radians(0.0)) =>
+            {
+                Some(primitive_as_path(primitive, &mut placeholder))
             }
+            _ => None,
         })
         .collect()
 }

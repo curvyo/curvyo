@@ -15,7 +15,7 @@ use curvyo_document_core::{
     Vec2,
 };
 use curvyo_ui_core::{
-    ALL_EIGHT, CORNERS_FOUR, EditHandle, HandleSpec, ResizeDirection, TransformHandleTolerances,
+    ALL_EIGHT, EditHandle, HandleSpec, ResizeDirection, TransformHandleTolerances,
     hit_transform_handle, oriented_bounds, resize_anchor_local_position,
     resize_cursor_angle_degrees, resize_local_box, rotate_delta_angle, rotate_pivot,
     scaled_and_floored, stroke_or_radius_factor, transform_handles,
@@ -34,11 +34,18 @@ fn tolerances(rotate_offset_mm: f64, hit_mm: f64) -> TransformHandleTolerances {
     }
 }
 
+/// The four corner resize handles of a box that allows only its corners.
+const CORNERS_FOUR: [ResizeDirection; 4] = [
+    ResizeDirection::Ne,
+    ResizeDirection::Se,
+    ResizeDirection::Sw,
+    ResizeDirection::Nw,
+];
+
 /// Eight resize handles plus all eight rotate handles (Shift revealed).
 fn all_handles_spec() -> HandleSpec {
     HandleSpec {
         resize_directions: &ALL_EIGHT,
-        skew: false,
         side_rotate: true,
     }
 }
@@ -269,7 +276,9 @@ fn eight_resize_plus_corner_rotate_handles_at_the_corners_and_edge_midpoints() {
         side_rotate: false,
         ..all_handles_spec()
     };
-    let handles = transform_handles(&b, spec, &tolerances(32.0, 1.0));
+    let mut handles = transform_handles(&b, spec, &tolerances(32.0, 1.0));
+    // The skew handles are the subject of the layout tests, not of this one.
+    handles.retain(|(h, _)| !matches!(h, EditHandle::Skew(_)));
     assert_eq!(handles.len(), 12);
     let at = |h: EditHandle| handles.iter().find(|(k, _)| *k == h).unwrap().1;
     let expect = [
@@ -303,7 +312,6 @@ fn polygon_star_handle_set_has_four_corners_and_the_corner_rotate_handles_only()
     let b = box_of(0.0, 0.0, 20.0, 20.0, 0.0);
     let spec = HandleSpec {
         resize_directions: &CORNERS_FOUR,
-        skew: false,
         side_rotate: false,
     };
     let handles = transform_handles(&b, spec, &tolerances(5.0, 1.0));
@@ -386,7 +394,8 @@ fn rotate_and_top_edge_hit_areas_at_the_documented_radii_do_not_overlap() {
     // midpoint, 16 px above the top edge.
     let b = box_of(0.0, 0.0, 100.0, 100.0, 0.0);
     let tol = tolerances(32.0, 16.0);
-    let handles = transform_handles(&b, all_handles_spec(), &tol);
+    let mut handles = transform_handles(&b, all_handles_spec(), &tol);
+    handles.retain(|(h, _)| !matches!(h, EditHandle::Skew(_)));
     let hit = |y: f64| hit_transform_handle(&handles, &b, pt(50.0, y), &tol, false);
     assert_eq!(hit(-15.0), Some(EditHandle::Resize(ResizeDirection::N)));
     assert_eq!(hit(-17.0), Some(EditHandle::Rotate(ResizeDirection::N)));

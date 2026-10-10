@@ -67,8 +67,7 @@ impl Rig {
     }
 
     fn red_box(&self, at: Point, modifiers: Modifiers) -> Option<(Point, Point)> {
-        self.tool
-            .live_move_box(&self.objects(), &self.selection, at, modifiers)
+        self.tool.live_move_box(at, modifiers)
     }
 }
 

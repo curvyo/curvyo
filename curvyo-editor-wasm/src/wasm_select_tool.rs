@@ -121,8 +121,8 @@ impl TransformEntryView {
 impl WasmSession {
     /// Which hint the handle under the pointer earns (`""`, `"resize-edge"`,
     /// `"resize-corner"`, `"rotate-corner"`,
-    /// `"rotate-side"`, `"skew"`, `"move"`, `"param-radius"` or
-    /// `"param-inner"`) — for the host's 600 ms hover
+    /// `"rotate-side"`, `"skew"`, `"move"`, `"param-radius"`,
+    /// `"param-inner"` or `"reference-mark"`) — for the host's 600 ms hover
     /// chip. Call after every [`WasmSession::pointer_hover`].
     #[must_use]
     pub fn handle_hint(&self) -> String {

@@ -24,7 +24,6 @@ use crate::transform_handle_layout::{
 const fn handle_spec(side_rotate: bool) -> HandleSpec {
     HandleSpec {
         resize_directions: &ALL_EIGHT,
-        skew: true,
         side_rotate,
     }
 }
