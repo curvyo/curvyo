@@ -43,12 +43,12 @@ impl Document {
         self.commit_state.is_warm()
     }
 
-    /// How many operations were made since `step` began, by anyone: the distance an undo reads
-    /// across. `None` when the step is not in the log.
+    /// How many operations were made after `step` ended, by anyone: the distance an undo reads
+    /// across besides the step itself. `None` when the step is not in the log.
     #[must_use]
     pub fn step_distance(&self, step: StepRef) -> Option<usize> {
         let log = find_step(self.loro(), step)?;
-        let start = self.loro().frontiers_to_vv(&log.before)?;
+        let start = self.loro().frontiers_to_vv(&log.after())?;
         let now = self.loro().oplog_vv();
         Some(
             now.iter()
@@ -58,6 +58,13 @@ impl Document {
                 })
                 .sum(),
         )
+    }
+
+    /// A number that changes whenever the operation log does (a step, an undo, a merge): the
+    /// History tab reads its rows again only when it changes.
+    #[must_use]
+    pub fn history_stamp(&self) -> u32 {
+        u32::try_from(self.loro().len_ops()).unwrap_or(u32::MAX)
     }
 
     /// The number of operations in `step`, read from the log before an undo is attempted.

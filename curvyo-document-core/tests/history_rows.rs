@@ -176,3 +176,49 @@ fn a_file_saved_by_this_build_keeps_the_format_version_of_the_build_before() {
     assert_eq!(json["format_version"], 9);
     assert_eq!(curvyo_document_core::CURRENT_FORMAT_VERSION, 9);
 }
+
+#[test]
+fn each_peers_own_time_survives_a_merge_whatever_loro_does_with_timestamps() {
+    let a = Document::new(1);
+    a.set_step_time(Timestamp::from_secs(2_000_000_000));
+    let _ = rect(&a, 0.0);
+    let b = reopened(&a, 2);
+    // B's clock runs behind A's.
+    b.set_step_time(Timestamp::from_secs(1_500_000_000));
+    let _ = rect(&b, 50.0);
+    let to_a = b.export_updates(&a.version()).unwrap();
+    a.import_updates(&to_a).unwrap();
+    let rows = all_rows(&a);
+    let times: Vec<_> = rows.iter().map(|r| r.time.as_secs()).collect();
+    assert!(
+        times.contains(&2_000_000_000) && times.contains(&1_500_000_000),
+        "{times:?}"
+    );
+}
+
+#[test]
+fn a_step_that_touched_an_object_keeps_it_in_its_row_after_the_object_was_deleted() {
+    use curvyo_document_core::{AnchorId, NewAnchor};
+    let document = Document::new(5);
+    let path = document.create_path(
+        &[
+            NewAnchor::corner(AnchorId::new(1, 1), Point::new(0.0, 0.0)),
+            NewAnchor::corner(AnchorId::new(1, 2), Point::new(10.0, 0.0)),
+        ],
+        false,
+    );
+    document
+        .move_anchors(&[(path, AnchorId::new(1, 2), Point::new(20.0, 5.0))])
+        .unwrap();
+    document.delete_objects(&[path]).unwrap();
+    let reopened = reopened(&document, 9);
+    let rows = all_rows(&reopened);
+    let moved = rows.iter().find(|r| r.label == "move_anchors").unwrap();
+    assert_eq!(moved.kind, StepKind::Change);
+    assert_eq!(
+        moved.objects.len(),
+        1,
+        "the nested anchor container resolves to the path"
+    );
+    assert_eq!(moved.objects[0].shape, ObjectShape::Path);
+}

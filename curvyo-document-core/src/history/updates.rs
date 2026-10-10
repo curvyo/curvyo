@@ -16,9 +16,11 @@ impl Document {
         self.assert_outside_batch();
         self.loro().commit();
         let known = self.loro().frontiers_to_vv(&since.0).unwrap_or_default();
-        self.loro()
+        let updates = self
+            .loro()
             .export(ExportMode::updates(&known))
-            .map_err(|_| SyncError::Encode)
+            .map_err(|_| SyncError::Encode)?;
+        Ok(frame(self.history_epoch().as_deref(), &updates))
     }
 
     /// Merges updates exported by another replica. The document is checked like an opened file:
@@ -29,6 +31,12 @@ impl Document {
     /// a shape this build cannot read; [`SyncError::Pending`] when part of the updates cannot be
     /// applied because the history they continue is missing here.
     pub fn import_updates(&self, bytes: &[u8]) -> Result<(), SyncError> {
+        let (epoch, bytes) = unframe(bytes).ok_or(SyncError::Malformed)?;
+        // A replica of another epoch still holds steps this one removed, or the other way round:
+        // Loro would not say so reliably, so nothing is merged (ADR 0014 §9).
+        if epoch.as_deref() != self.history_epoch().as_deref() {
+            return Err(SyncError::EpochMismatch);
+        }
         let status = self
             .loro()
             .import(bytes)
@@ -41,4 +49,26 @@ impl Document {
         }
         Ok(())
     }
+}
+
+/// The updates behind the history epoch of the sender: `[epoch length: u32][epoch][updates]`. The
+/// epoch is compared before anything is merged.
+fn frame(epoch: Option<&str>, updates: &[u8]) -> Vec<u8> {
+    let epoch = epoch.unwrap_or_default().as_bytes();
+    let length = u32::try_from(epoch.len()).unwrap_or(0);
+    let mut bytes = Vec::with_capacity(4 + epoch.len() + updates.len());
+    bytes.extend_from_slice(&length.to_le_bytes());
+    bytes.extend_from_slice(epoch);
+    bytes.extend_from_slice(updates);
+    bytes
+}
+
+/// The inverse of [`frame`]; an empty epoch is none.
+fn unframe(bytes: &[u8]) -> Option<(Option<String>, &[u8])> {
+    let (length, rest) = bytes.split_first_chunk::<4>()?;
+    let length = usize::try_from(u32::from_le_bytes(*length)).ok()?;
+    let epoch = rest.get(..length)?;
+    let updates = rest.get(length..)?;
+    let epoch = std::str::from_utf8(epoch).ok()?;
+    Some(((!epoch.is_empty()).then(|| epoch.to_owned()), updates))
 }

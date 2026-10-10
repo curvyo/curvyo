@@ -19,6 +19,7 @@ mod step_index;
 mod step_log;
 mod touched;
 mod updates;
+mod wipe;
 
 pub(crate) use commit::CommitState;
 pub use commit::OwnStep;

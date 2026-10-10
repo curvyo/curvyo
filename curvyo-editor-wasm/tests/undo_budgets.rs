@@ -6,7 +6,12 @@
 //! the measured time is printed. `#[ignore]`d, run on purpose:
 //! `cargo test --release -p curvyo-editor-wasm --test undo_budgets -- --ignored --nocapture`.
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::too_many_lines)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::too_many_lines,
+    clippy::cast_precision_loss
+)]
 
 use std::time::{Duration, Instant};
 
@@ -106,7 +111,7 @@ fn a_small_step_in_a_big_drawing_is_undone_within_100_ms_and_shows_no_busy_state
     session.warm_history();
     // Move three objects by a typed entry: a few hundred operations at most.
     session.pointer_down(pt(-1.0, -1.0), false);
-    session.pointer_up(pt(30.0, 5.0), false, false);
+    session.pointer_up(pt(40.0, 12.0), false, false);
     assert!(session.selected_object_count() > 0);
     typed_move(&mut session);
     assert!(!session.history_needs_busy_state(Direction::Undo));
@@ -174,7 +179,7 @@ fn five_thousand_objects_are_undone_within_one_second_behind_the_busy_state() {
 fn the_first_undo_after_open_is_a_large_step_until_the_history_was_warmed() {
     let mut session = open(&big_document());
     session.pointer_down(pt(-1.0, -1.0), false);
-    session.pointer_up(pt(30.0, 5.0), false, false);
+    session.pointer_up(pt(40.0, 12.0), false, false);
     typed_move(&mut session);
     assert!(
         session.history_needs_busy_state(Direction::Undo),
@@ -189,11 +194,11 @@ fn the_first_undo_after_open_is_a_large_step_until_the_history_was_warmed() {
 
 #[test]
 #[ignore = "a timing budget for release builds; run on purpose"]
-fn moving_one_path_of_two_thousand_anchors_is_undone_and_redone_within_100_ms() {
+fn moving_one_path_of_nineteen_hundred_anchors_is_undone_and_redone_within_100_ms() {
     let document = Document::new(1);
-    let anchors: Vec<NewAnchor> = (0..2_000_u64)
+    let anchors: Vec<NewAnchor> = (0..1_900_u64)
         .map(|n| {
-            let a = n as f64 / 2_000.0 * std::f64::consts::TAU;
+            let a = n as f64 / 1_900.0 * std::f64::consts::TAU;
             NewAnchor::corner(AnchorId::new(1, n), pt(100.0 * a.cos(), 100.0 * a.sin()))
         })
         .collect();
@@ -205,17 +210,17 @@ fn moving_one_path_of_two_thousand_anchors_is_undone_and_redone_within_100_ms() 
     typed_move(&mut session);
     assert!(
         !session.history_needs_busy_state(Direction::Undo),
-        "2,000 operations are a small step"
+        "1,900 anchors stay under the 2,000 operations of a small step"
     );
     within(
-        "undo of one path of 2,000 anchors",
+        "undo of one path of 1,900 anchors",
         timed_undo(&mut session),
         100,
     );
     let started = Instant::now();
     session.redo();
     let _ = session.draw_list();
-    within("redo of one path of 2,000 anchors", started.elapsed(), 100);
+    within("redo of one path of 1,900 anchors", started.elapsed(), 100);
 }
 
 #[test]

@@ -63,6 +63,12 @@ impl WasmSession {
         u32::try_from(self.session.redo_len()).unwrap_or(u32::MAX)
     }
 
+    /// Changes whenever the operation log does.
+    #[must_use]
+    pub fn history_stamp(&self) -> u32 {
+        self.session.history_stamp()
+    }
+
     /// How many steps the global history has.
     pub fn history_len(&mut self) -> u32 {
         u32::try_from(self.session.history_len()).unwrap_or(u32::MAX)
@@ -88,5 +94,25 @@ impl WasmSession {
     /// Shift+Ctrl+H: the History tab.
     pub fn panel_shortcut_history(&mut self) {
         self.session.panel_shortcut_history();
+    }
+
+    /// What the History footer offers: `"none"` (no step), `"offered"` or `"shared"`.
+    pub fn history_wipe_state(&mut self) -> String {
+        match self.session.history_wipe_state() {
+            crate::WipeState::NoSteps => "none",
+            crate::WipeState::Offered(_) => "offered",
+            crate::WipeState::Shared => "shared",
+        }
+        .to_owned()
+    }
+
+    /// Wipes the history. Returns the steps removed, or -1 when a drag, a chip or an unfinished Pen
+    /// path made the session ignore it, or -2 for a shared document.
+    pub fn history_wipe(&mut self) -> i32 {
+        match self.session.wipe_history() {
+            crate::WipeOutcome::Ignored => -1,
+            crate::WipeOutcome::Shared => -2,
+            crate::WipeOutcome::Wiped(removed) => i32::try_from(removed).unwrap_or(i32::MAX),
+        }
     }
 }

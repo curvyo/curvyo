@@ -83,6 +83,11 @@ impl Session {
         })
     }
 
+    /// Changes whenever the log does: the panel reads its rows again only then.
+    pub fn history_stamp(&self) -> u32 {
+        self.document.history_stamp()
+    }
+
     /// The number of steps in the global history (the rows of the History list).
     pub fn history_len(&mut self) -> usize {
         self.sync_history();
@@ -122,5 +127,58 @@ impl Session {
             .into_iter()
             .filter(|id| self.document.object(*id).is_some())
             .collect();
+    }
+}
+
+/// What the footer of the History tab offers (`specs/0020-undo-redo` criteria 47 and 50).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WipeState {
+    /// No step: the control is not in the tree.
+    NoSteps,
+    /// "Wipe history" is offered; the number is the steps it would remove.
+    Offered(usize),
+    /// The document is shared: the control gives way to a line.
+    Shared,
+}
+
+/// What a press on "Wipe" did.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WipeOutcome {
+    /// A drag, an open chip or an unfinished Pen path: ignored (criterion 51).
+    Ignored,
+    /// The document is shared.
+    Shared,
+    /// The history was wiped; the number is the steps removed.
+    Wiped(usize),
+}
+
+impl Session {
+    /// What the footer offers now.
+    pub fn history_wipe_state(&mut self) -> WipeState {
+        if self.document.is_shared() {
+            return WipeState::Shared;
+        }
+        match self.history_len() {
+            0 => WipeState::NoSteps,
+            n => WipeState::Offered(n),
+        }
+    }
+
+    /// "Wipe" was confirmed: cuts the history, empties both stacks and writes the one step
+    /// "History wiped". The drawing is unchanged.
+    pub fn wipe_history(&mut self) -> WipeOutcome {
+        if self.operation_in_flight() || self.select.has_entry() || self.pen_path_open() {
+            return WipeOutcome::Ignored;
+        }
+        self.sync_history();
+        self.document.set_step_time(self.history_clock()());
+        match self.document.wipe_history() {
+            Ok(removed) => {
+                self.reset_history_stacks();
+                self.history_hover.clear();
+                WipeOutcome::Wiped(removed)
+            }
+            Err(_) => WipeOutcome::Shared,
+        }
     }
 }

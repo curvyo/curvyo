@@ -287,7 +287,7 @@ impl Session {
     /// skew, parameter handle, create-drag, node or handle drag), or the
     /// canvas is being panned (criterion 55). The Pen's unfinished path is a
     /// separate fact.
-    fn operation_in_flight(&self) -> bool {
+    pub(super) fn operation_in_flight(&self) -> bool {
         let in_tool = match self.tool {
             Tool::Select => self.select.drag_in_flight(),
             Tool::Node => self.node.drag_in_flight(),
@@ -303,7 +303,7 @@ impl Session {
             || self.select.bar_preview().is_some()
     }
 
-    fn pen_path_open(&self) -> bool {
+    pub(super) fn pen_path_open(&self) -> bool {
         self.pen.in_progress_nodes().is_some()
     }
 

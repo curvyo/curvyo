@@ -603,7 +603,9 @@ export interface EditorSession {
   /** The names of the next undo and redo; `null` for an empty stack. */
   historyNames: HistoryNames;
   /** Undo or redo from a button. */
-  pressHistory: (direction: HistoryDirection) => void;
+  pressHistory: (direction: HistoryDirection, source?: "canvas" | "panel") => void;
+  /** Wipes the history; the steps removed, -1 when ignored, -2 for a shared document. */
+  wipeHistory: () => number;
   convertSelected: (kind: "corner" | "symmetric" | "asymmetric") => void;
   makeLine: () => void;
   makeCurve: () => void;
@@ -1831,6 +1833,7 @@ export function useEditorSession(
     historyBusy: history.busy,
     historyNames: history.names,
     pressHistory: history.press,
+    wipeHistory: history.wipe,
     convertSelected,
     makeLine,
     makeCurve,

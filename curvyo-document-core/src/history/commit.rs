@@ -43,6 +43,8 @@ pub(crate) struct CommitState {
     own: RefCell<Vec<OwnStep>>,
     /// The history was read since the document was opened (see `Document::warm_history`).
     warm: Cell<bool>,
+    /// The document has a keyring (see `Document::mark_shared`).
+    shared: Cell<bool>,
 }
 
 /// Ends a [`Document::batch`] even when the closure panics.
@@ -55,6 +57,22 @@ impl Drop for BatchGuard<'_> {
 }
 
 impl CommitState {
+    pub(crate) fn is_shared(&self) -> bool {
+        self.shared.get()
+    }
+
+    pub(crate) fn set_shared(&self) {
+        self.shared.set(true);
+    }
+
+    /// A wipe removed the steps this session started: they are no longer in the log.
+    pub(crate) fn forget_steps(&self) {
+        self.own.borrow_mut().clear();
+        *self.last.borrow_mut() = None;
+        self.continue_next.set(false);
+        self.warm.set(true);
+    }
+
     pub(super) fn is_warm(&self) -> bool {
         self.warm.get()
     }

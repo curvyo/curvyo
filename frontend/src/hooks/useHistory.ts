@@ -14,6 +14,7 @@ import {
   WORKING_NOTICE_DELAY_MS,
   workingNotice,
 } from "@/lib/historyText";
+import { wipedNotice } from "@/lib/historyRows";
 import { invoke, isTauri, listen } from "@/platform/host";
 import type { WasmSession } from "@/lib/editorSession";
 
@@ -23,6 +24,8 @@ export interface CanvasNotice {
   id: number;
   text: string;
   ms: number;
+  /** Where it shows: the canvas notice slot, or 4 px under the History tab's button. */
+  source: "canvas" | "panel";
 }
 
 /** The step names an undo and a redo would act on, `null` when a stack is empty. */
@@ -38,12 +41,15 @@ export interface HistoryApi {
   busy: boolean;
   names: HistoryNames;
   /** Shows `text` in the canvas notice slot, replacing the one on screen. */
-  showNotice: (text: string, ms?: number) => void;
+  showNotice: (text: string, ms?: number, source?: "canvas" | "panel") => void;
   /** Re-reads the names of the next undo and redo (and the native menu). Call after any change
    * of the session. */
   refresh: () => void;
-  /** Runs an undo or redo from a button or the menu. */
-  press: (direction: HistoryDirection) => void;
+  /** Runs an undo or redo from a button or the menu; `source` says where the notice shows. */
+  press: (direction: HistoryDirection, source?: "canvas" | "panel") => void;
+  /** Wipes the history (the confirm was pressed): the notice says how many steps went. Returns the
+   * steps removed, or -1 when the session ignored it and -2 for a shared document. */
+  wipe: () => number;
   /** Whether this key event is the second arrival of a press the native menu already handled. */
   isDuplicateKey: (event: KeyboardEvent | React.KeyboardEvent) => boolean;
   /** Handles the outcome string `key_down` returned when it belongs to history; `false`
@@ -102,10 +108,13 @@ export function useHistory(
   }, [onChange]);
   useBusyWindow(busy);
 
-  const showNotice = useCallback((text: string, ms?: number) => {
-    counter.current += 1;
-    setNotice({ id: counter.current, text, ms: ms ?? noticeDurationMs(text) });
-  }, []);
+  const showNotice = useCallback(
+    (text: string, ms?: number, source: "canvas" | "panel" = "canvas") => {
+      counter.current += 1;
+      setNotice({ id: counter.current, text, ms: ms ?? noticeDurationMs(text), source });
+    },
+    [],
+  );
 
   // A notice ends after its time, or when the next one replaces it.
   useEffect(() => {
@@ -156,10 +165,10 @@ export function useHistory(
   /** Runs a press the session announced as large: the state first, a frame to paint it, then the
    * call. */
   const runBusy = useCallback(
-    async (direction: HistoryDirection) => {
+    async (direction: HistoryDirection, source: "canvas" | "panel" = "canvas") => {
       setBusy(true);
       const timer = window.setTimeout(
-        () => showNotice(workingNotice(direction), 60_000),
+        () => showNotice(workingNotice(direction), 60_000, source),
         WORKING_NOTICE_DELAY_MS,
       );
       await afterFrames(2);
@@ -167,7 +176,7 @@ export function useHistory(
         const session = getSession();
         const text = noticeText(session?.history_press(direction) ?? "");
         if (text !== null) {
-          showNotice(text);
+          showNotice(text, undefined, source);
         }
       } finally {
         window.clearTimeout(timer);
@@ -179,18 +188,18 @@ export function useHistory(
   );
 
   const press = useCallback(
-    (direction: HistoryDirection) => {
+    (direction: HistoryDirection, source: "canvas" | "panel" = "canvas") => {
       const session = getSession();
       if (!session || busy) {
         return;
       }
       if (session.history_needs_busy_state(direction) && session.history_target_name(direction)) {
-        void runBusy(direction);
+        void runBusy(direction, source);
         return;
       }
       const text = noticeText(session.history_press(direction));
       if (text !== null) {
-        showNotice(text);
+        showNotice(text, undefined, source);
       }
       onChangeRef.current();
     },
@@ -289,6 +298,15 @@ export function useHistory(
     };
   }, [markPressed, press, pressedJustNow]);
 
+  const wipe = useCallback(() => {
+    const removed = getSession()?.history_wipe() ?? -1;
+    if (removed >= 0) {
+      showNotice(wipedNotice(removed));
+    }
+    onChangeRef.current();
+    return removed;
+  }, [getSession, showNotice]);
+
   const isDuplicateKey = useCallback(
     (event: KeyboardEvent | React.KeyboardEvent) => {
       const direction = historyKeyDirection(event, MAC);
@@ -297,5 +315,15 @@ export function useHistory(
     [pressedJustNow],
   );
 
-  return { notice, busy, names, showNotice, refresh, press, isDuplicateKey, handleKeyOutcome };
+  return {
+    notice,
+    busy,
+    names,
+    showNotice,
+    refresh,
+    press,
+    wipe,
+    isDuplicateKey,
+    handleKeyOutcome,
+  };
 }

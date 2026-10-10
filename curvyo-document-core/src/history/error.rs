@@ -12,6 +12,12 @@ pub enum HistoryError {
     /// The engine that brings a deleted object back was refused by the CRDT library.
     #[error("a deleted object could not be brought back")]
     Revive,
+    /// The history of a shared document is not wiped (`specs/0020-undo-redo` criterion 50).
+    #[error("the history of a shared document cannot be wiped yet")]
+    Shared,
+    /// The log could not be rewritten; the document is as it was.
+    #[error("the history could not be wiped")]
+    Wipe,
 }
 
 /// Why an exchange of updates between two replicas failed. The document is not changed by a
@@ -30,4 +36,8 @@ pub enum SyncError {
     /// still has steps from before a wipe).
     #[error("the updates depend on history this document does not have")]
     Pending,
+    /// The two documents do not hold the same history: one was wiped and the other still has the
+    /// steps from before (`specs/0020-undo-redo` criterion 49, ADR 0014 §9). Nothing was merged.
+    #[error("the documents were not wiped together and cannot be merged")]
+    EpochMismatch,
 }

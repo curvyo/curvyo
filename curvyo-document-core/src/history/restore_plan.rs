@@ -186,7 +186,7 @@ pub(super) fn revival_indices(
     let mut upper_of: Vec<Option<FractionalIndex>> = vec![None; siblings.len()];
     let mut upper = None;
     for (position, sibling) in siblings.iter().enumerate().rev() {
-        upper_of[position] = upper.clone();
+        upper_of[position].clone_from(&upper);
         if !coming.contains(sibling)
             && let Some(index) = index_now(*sibling)
         {

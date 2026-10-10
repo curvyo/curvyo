@@ -64,6 +64,18 @@ impl HistoryState {
 }
 
 impl Session {
+    /// The wall clock steps are stamped with.
+    pub(super) fn history_clock(&self) -> Clock {
+        self.history.clock
+    }
+
+    /// Empties both stacks (a wipe cut the log they point into).
+    pub(super) fn reset_history_stacks(&mut self) {
+        self.history.stack = UndoStack::new();
+        self.history.recorded = 0;
+        self.history.notice = None;
+    }
+
     /// Replaces the wall clock steps are stamped with (tests).
     pub fn set_clock(&mut self, clock: Clock) {
         self.history.clock = clock;

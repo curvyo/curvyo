@@ -18,7 +18,7 @@ export function CanvasNotice({ notice }: CanvasNoticeProps) {
       role="status"
       aria-live="polite"
     >
-      {notice ? (
+      {notice && notice.source === "canvas" ? (
         <div
           key={notice.id}
           className="rounded-md p-2 text-xs"

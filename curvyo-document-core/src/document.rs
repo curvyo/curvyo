@@ -148,7 +148,7 @@ pub(crate) const OBJECTS_TREE: &str = "paths";
 /// this type's public API (ADR 0004 §3): callers only ever see
 /// [`DocumentSize`] and this crate's own error types.
 pub struct Document {
-    loro: LoroDoc,
+    pub(crate) loro: LoroDoc,
     /// The commit path's session state (`crate::history`).
     pub(crate) commit_state: crate::history::CommitState,
     /// The container chains of the log, for the touched objects of a step.

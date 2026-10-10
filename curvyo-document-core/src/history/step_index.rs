@@ -25,6 +25,9 @@ pub(crate) struct StepIndex {
     /// The newest step of each peer, which the peer's next change may extend.
     newest: HashMap<u64, Position>,
     machines: HashMap<u64, StackMachine>,
+    /// Where the newest wipe sits: nothing before it is listed (the shallow snapshot keeps one
+    /// change from before it).
+    wiped_at: Option<Position>,
 }
 
 impl StepIndex {
@@ -35,7 +38,9 @@ impl StepIndex {
             return;
         }
         for (&peer, &last) in end.iter() {
-            let mut counter = self.indexed.get(&peer).copied().unwrap_or(0);
+            // After a wipe the log starts later than counter zero.
+            let floor = doc.shallow_since_vv().get(&peer).copied().unwrap_or(0);
+            let mut counter = self.indexed.get(&peer).copied().unwrap_or(0).max(floor);
             while counter < last {
                 let Some(change) = doc.get_change(loro::ID::new(peer, counter)) else {
                     // The log starts later than counter zero after a wipe.
@@ -82,6 +87,9 @@ impl StepIndex {
                 .or_insert_with(|| StackMachine::new(usize::MAX))
                 .apply(event);
         }
+        if label == LABEL_WIPE && self.wiped_at.is_none_or(|at| at < position) {
+            self.wiped_at = Some(position);
+        }
         self.steps.insert(
             position,
             LogStep {
@@ -98,7 +106,11 @@ impl StepIndex {
 
     /// All steps, oldest first.
     pub(crate) fn steps(&self) -> impl DoubleEndedIterator<Item = &LogStep> {
-        self.steps.values()
+        match self.wiped_at {
+            Some(at) => self.steps.range(at..),
+            None => self.steps.range(..),
+        }
+        .map(|(_, step)| step)
     }
 
     /// The stacks of `peer` as its commits tell them.

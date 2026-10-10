@@ -1,15 +1,15 @@
-import { Droplet, File } from "lucide-react";
+import { Droplet, File, History } from "lucide-react";
 import { type ComponentType, useEffect, useRef, useState } from "react";
 
 import { TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip } from "@/components/ui/tooltip";
 import type { PanelTabView } from "@/hooks/useDocumentPanel";
 
-/** The glyph of each tab (Lucide, 18 px, 1.5 px stroke). The History tab's
- * `History` glyph comes with `0020`. */
+/** The glyph of each tab (Lucide, 18 px, 1.5 px stroke). */
 const GLYPHS: Record<string, ComponentType<{ size: number; strokeWidth: number; "aria-hidden": boolean }>> = {
   document: File,
   style: Droplet,
+  history: History,
 };
 
 interface PanelTabStripProps {

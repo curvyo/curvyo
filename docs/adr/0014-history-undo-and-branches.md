@@ -195,6 +195,27 @@ and a marker a peer could edit concurrently.
     - **Object timeline** (0041 criterion 35): 100 ms once the index exists; the first build
       (up to 300 ms cold at 25,000 steps) runs behind the long-operation state.
 
+**Measured** (milestone 1 of `0020`, release build, native x86-64 Linux, noisy machine; tests in
+`curvyo-editor-wasm/tests/undo_budgets.rs` and `curvyo-document-core/tests/undo_budgets.rs`, run with
+`--ignored`; 5,000 objects and 25,000 steps unless stated; each test asserts four times the figure):
+
+| What | Budget | Measured |
+|---|---|---|
+| Undo, small step in the big drawing (3 objects) | 100 ms | 60 ms; redo 62 ms |
+| Undo and redo, one path of 1,900 anchors (just under 2,000 operations) | 100 ms | 34 ms and 36 ms |
+| Undo, 100 paths of 100 anchors (busy state) | 250 ms | 201 ms |
+| Undo, move of 5,000 objects (busy state) | 1 s | 285 ms |
+| Undo, Delete of 5,000 objects (one injected change) | 1 s | 180 ms |
+| Undo and redo, Boolean union with 5,000 anchors | one press | 165 ms and 126 ms |
+| First undo after Open, no warm-up (small step) | 250 ms | 140 ms |
+| `warm_history` after Open | | 73 ms, +2 MiB resident |
+| Undo of a 3-object step 500 / 5,000 operations behind the latest version | | 4.5 ms / 10 ms |
+| 500 stack entries (`UndoStack::approx_bytes`) | 50 MB | 80 KiB (500 unions) to 23 MiB (500 different 4,000-object selections) |
+
+`FAR_STEP_OPS` is 1,000: the measured distance cost is small at 5,000 operations, so the value
+errs on the side of the busy state until the History tab's reads (checkout of the older versions)
+are measured in `0042`. The wasm32 factor is not measured: no browser runs in the gate.
+
 ## Consequences
 
 - ADR 0009 §1 holds as written; ADR 0004 §2's mechanism sentence is replaced. The remapping that
