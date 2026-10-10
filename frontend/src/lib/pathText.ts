@@ -84,12 +84,12 @@ export function commandNote(
       const verb = availability.open === 1 ? "is" : "are";
       return `Needs closed paths: ${availability.open} of ${availability.of} selected ${verb} open.`;
     }
-    return "Replaces the selection. No undo yet.";
+    return "Replaces the selection.";
   }
   if (!availability.canBreakApart) {
     return withTool("Select a compound path.");
   }
-  return "Holes stay with their piece. Replaces the selection. No undo yet.";
+  return "Holes stay with their piece. Replaces the selection.";
 }
 
 /** A success notice lasts 3 s, or 5 s when its sentence is longer than 70 characters (criterion
@@ -105,7 +105,7 @@ export function combineSuccessText(result: CombineResult): string | null {
   }
   const holes = result.holes === 0 ? "" : ` with ${plural(result.holes, "hole", "holes")}`;
   const style = result.stylesDiffer ? " It uses the style of the lowest object." : "";
-  return `Combine: ${result.count} objects became 1 compound path${holes}.${style} No undo yet.`;
+  return `Combine: ${result.count} objects became 1 compound path${holes}.${style}`;
 }
 
 /** The notice after a refused Combine (criteria 9 to 11), or `null` for a result that is no
@@ -146,7 +146,7 @@ export function breakApartSuccessText(result: BreakApartResult): string | null {
   } else if (result.leftAlone > 1) {
     text += ` ${result.leftAlone} compound paths are one piece each and were left as they are.`;
   }
-  return `${text} No undo yet.`;
+  return `${text}`;
 }
 
 /** The notice after a refused Break apart (criterion 16), or `null` for a result that is no

@@ -6,7 +6,7 @@
  */
 
 /** How long the notice of a commit stays (criterion 54: more than the 2 s of a key
- * hint, since the change cannot be undone). */
+ * hint, since the shapes changed kind without a pointer on them). */
 export const CONVERSION_NOTICE_MS = 6000;
 
 /** "2 shapes into paths" / "1 shape into a path". */
@@ -34,7 +34,7 @@ export function stretchReadoutLine(total: number): string | null {
 export function stretchNotice(total: number): string | null {
   return total === 0
     ? null
-    : `Stretching turned ${intoPaths(total)}. No undo yet.`;
+    : `Stretching turned ${intoPaths(total)}.`;
 }
 
 /** The note under the fields of a size entry while the typed size is a stretch

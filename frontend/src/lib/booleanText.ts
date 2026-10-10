@@ -91,7 +91,7 @@ export function tooltipNote(availability: BooleanAvailabilityState, selectTool: 
     const verb = availability.open === 1 ? "is" : "are";
     return `Needs closed paths: ${availability.open} of ${availability.of} selected ${verb} open.`;
   }
-  return "Replaces the selection. No undo yet.";
+  return "Replaces the selection.";
 }
 
 export function plural(count: number, one: string, many: string): string {
@@ -104,7 +104,7 @@ export function successText(op: BooleanOp, result: BooleanResult): string | null
     return null;
   }
   const became = result.compound ? "1 compound path" : "1 path";
-  return `${NAMES[op]}: ${result.count} objects became ${became}. No undo yet.`;
+  return `${NAMES[op]}: ${result.count} objects became ${became}.`;
 }
 
 /** The refusals every rail command that needs closed shapes shares (`0016` criteria 15 to 17,

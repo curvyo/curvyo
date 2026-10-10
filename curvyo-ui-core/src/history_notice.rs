@@ -78,7 +78,7 @@ mod tests {
         let document = Document::new(1);
         (0..count)
             .map(|n| {
-                let x = n as f64 * 20.0;
+                let x = f64::from(u32::try_from(n).unwrap()) * 20.0;
                 document.create_rect(RectBounds::from_corners(
                     Point::new(x, 0.0),
                     Point::new(x + 10.0, 10.0),

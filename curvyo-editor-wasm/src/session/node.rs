@@ -98,7 +98,7 @@ impl Session {
             if this.tool == Tool::Node {
                 this.node.convert_selected(&this.document, kind);
             }
-        })
+        });
     }
 
     /// Acceptance criterion 14's "make line" (the contextual toolbar).
@@ -107,7 +107,7 @@ impl Session {
             if this.tool == Tool::Node {
                 this.node.make_line(&this.document);
             }
-        })
+        });
     }
 
     /// Acceptance criterion 14's "make curve" (the contextual toolbar).
@@ -116,7 +116,7 @@ impl Session {
             if this.tool == Tool::Node {
                 this.node.make_curve(&this.document);
             }
-        })
+        });
     }
 
     /// Acceptance criteria 8-11: Join (the contextual toolbar/context
@@ -127,7 +127,7 @@ impl Session {
             if this.tool == Tool::Node {
                 this.node.join_selected(&this.document);
             }
-        })
+        });
     }
 
     /// Acceptance criteria 12-15: Split (the contextual toolbar/context
@@ -138,7 +138,7 @@ impl Session {
             if this.tool == Tool::Node {
                 this.node.split_selected(&mut this.minter, &this.document);
             }
-        })
+        });
     }
 
     /// Acceptance criterion 12: a double-click (already recognized by
@@ -151,7 +151,7 @@ impl Session {
                 this.node
                     .insert_at(&mut this.minter, &this.document, &paths, point, tolerances);
             }
-        })
+        });
     }
 
     /// The contextual toolbar's "Insert node" action: splits the
@@ -164,7 +164,7 @@ impl Session {
                 this.node
                     .insert_on_selected_segment(&mut this.minter, &this.document, &paths);
             }
-        })
+        });
     }
 
     /// Which contextual-toolbar actions apply right now. Everything is

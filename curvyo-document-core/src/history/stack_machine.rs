@@ -150,7 +150,7 @@ mod tests {
         assert_eq!(machine.status(step(2)), Status::Undone);
         machine.apply(Event::Redo(step(2)));
         assert_eq!(machine.undo_stack(), [step(1), step(2)]);
-        assert!(machine.redo_stack().is_empty());
+        assert_eq!(machine.redo_stack().len(), 0);
         assert_eq!(machine.status(step(2)), Status::Applied);
     }
 
@@ -162,7 +162,7 @@ mod tests {
         machine.apply(Event::Undo(step(2)));
         machine.apply(Event::Undo(step(1)));
         machine.apply(Event::Do(step(3)));
-        assert!(machine.redo_stack().is_empty());
+        assert_eq!(machine.redo_stack().len(), 0);
         assert_eq!(machine.undo_stack(), [step(3)]);
         assert_eq!(machine.status(step(1)), Status::OnBranch);
         assert_eq!(machine.status(step(2)), Status::OnBranch);
@@ -186,7 +186,7 @@ mod tests {
         machine.apply(Event::Do(step(2)));
         machine.apply(Event::ConsumeUndo);
         assert_eq!(machine.undo_stack(), [step(1)]);
-        assert!(machine.redo_stack().is_empty());
+        assert_eq!(machine.redo_stack().len(), 0);
         assert_eq!(machine.status(step(2)), Status::Applied);
     }
 }

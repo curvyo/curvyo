@@ -190,14 +190,14 @@ fn the_shape_tools_draw_rectangle_ellipse_polygon_and_star() {
         let mut session = fresh();
         session.set_tool(tool);
         one_step(&mut session, name, |s| {
-            drag(s, pt(10.0, 10.0), pt(90.0, 70.0))
+            drag(s, pt(10.0, 10.0), pt(90.0, 70.0));
         });
     }
     let mut session = fresh();
     session.set_tool(Tool::PolygonStar);
     session.set_poly_star_mode(curvyo_ui_core::PolyStarMode::Star);
     one_step(&mut session, "Draw star", |s| {
-        drag(s, pt(10.0, 10.0), pt(90.0, 70.0))
+        drag(s, pt(10.0, 10.0), pt(90.0, 70.0));
     });
 }
 
@@ -214,7 +214,7 @@ fn square_session() -> Session {
 fn a_move_drag_is_move() {
     let mut session = square_session();
     one_step(&mut session, "Move", |s| {
-        drag(s, pt(70.0, 50.0), pt(100.0, 90.0))
+        drag(s, pt(70.0, 50.0), pt(100.0, 90.0));
     });
 }
 
@@ -278,7 +278,7 @@ fn a_resize_drag_is_resize() {
     let mut session = square_session();
     // The bottom-right corner handle of the selection box at (120, 80).
     one_step(&mut session, "Resize", |s| {
-        drag(s, pt(120.0, 80.0), pt(160.0, 100.0))
+        drag(s, pt(120.0, 80.0), pt(160.0, 100.0));
     });
 }
 
@@ -416,7 +416,7 @@ fn the_node_tool_commands_have_their_names() {
     let mut session = node_session();
     click(&mut session, pt(100.0, 0.0), false);
     one_step(&mut session, "Move nodes", |s| {
-        drag(s, pt(100.0, 0.0), pt(110.0, 20.0))
+        drag(s, pt(100.0, 0.0), pt(110.0, 20.0));
     });
     one_step(&mut session, "Change node type", |s| {
         s.convert_selected(AnchorKind::Symmetric);

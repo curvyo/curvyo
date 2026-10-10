@@ -69,7 +69,7 @@ pub use combine::{BreakApartOutcome, CombineOutcome};
 pub use document::{DocumentSide, FitOutcome, SizeOutcome};
 pub use document_presets::DocumentPresetsRecord;
 pub use formats::{FormTexts, FormatEdit};
-pub use history::{Clock, HistoryResult, wall_clock};
+pub use history::HistoryResult;
 pub use keys::{EscapeStep, KeyHint, KeyInput, KeyOutcome};
 pub use move_indicators::MoveIndicators;
 pub use panel_tabs::{PanelTabsRecord, PanelView};
@@ -357,7 +357,7 @@ impl Session {
                 this.command_refusal = None;
             }
             this.tool = tool;
-        })
+        });
     }
 
     /// The paths the Node and Pen tools work on. A compound path is left out:
@@ -434,7 +434,7 @@ impl Session {
                     this.shape_pointer_down(point);
                 }
             }
-        })
+        });
     }
 
     /// The pointer moved to `point`. Always records `point` as the live
@@ -529,7 +529,7 @@ impl Session {
                     this.shape_pointer_up(point, Modifiers::new(shift, constrain));
                 }
             }
-        })
+        });
     }
 
     /// The one double-click dispatch point

@@ -2,6 +2,15 @@
 //! is called in the log, who made it, when, what kind it is, what it touched and whether it is
 //! undone, also after Save and Open, after a merge and for files written by earlier builds.
 
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::too_many_lines,
+    clippy::cast_precision_loss,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss
+)]
+
 use std::collections::HashSet;
 
 use curvyo_document_core::{
@@ -152,7 +161,7 @@ fn a_file_from_an_earlier_build_lists_its_steps_with_unknown_time_and_earlier_au
     let bytes = std::fs::read("tests/fixtures/compound_v8.curvyo").unwrap();
     let document = unpack(99, &bytes).unwrap();
     let rows = all_rows(&document);
-    assert!(!rows.is_empty());
+    assert_ne!(rows.len(), 0);
     assert!(rows.iter().all(|r| r.time == Timestamp::UNKNOWN));
     assert!(rows.iter().all(|r| r.author == Author::Earlier));
     assert!(rows.iter().all(|r| !r.label.is_empty()));

@@ -43,7 +43,7 @@ test("criteria 1 and 2: tooltip notes", () => {
   );
   assert.equal(
     tooltipNote({ needsTwo: false, open: 0, of: 3 }, true),
-    "Replaces the selection. No undo yet.",
+    "Replaces the selection.",
   );
   // another tool wins over an open path
   assert.match(tooltipNote({ needsTwo: true, open: 1, of: 2 }, false), /Use the Select tool\.$/);
@@ -90,11 +90,11 @@ test("criterion 17: empty refusals, each followed by Nothing was changed.", () =
 test("criterion 29: success notices", () => {
   assert.equal(
     successText("union", { kind: "applied", count: 3, of: 3, compound: false }),
-    "Union: 3 objects became 1 path. No undo yet.",
+    "Union: 3 objects became 1 path.",
   );
   assert.equal(
     successText("difference", { kind: "applied", count: 2, of: 2, compound: true }),
-    "Difference: 2 objects became 1 compound path. No undo yet.",
+    "Difference: 2 objects became 1 compound path.",
   );
   // one line
   for (const op of BOOLEAN_OPS) {

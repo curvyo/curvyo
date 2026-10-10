@@ -108,7 +108,7 @@ fn a_held_key_takes_one_step_back_per_repeat_event() {
         assert_eq!(outcome, KeyOutcome::Undo);
         let _ = session.take_history_notice();
     }
-    assert!(ids(&session).is_empty());
+    assert_eq!(ids(&session).len(), 0);
     assert_eq!(undo(&mut session), "Nothing to undo.");
 }
 

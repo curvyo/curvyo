@@ -80,13 +80,14 @@ const SWALLOWED_EVENTS = [
  * The busy state of a running operation: the wait cursor over the whole window and every press,
  * key and wheel turn swallowed in the capture phase until it ends (criterion 47a).
  */
-function useBusyWindow(busy: boolean) {
+export function useBusyWindow(busy: boolean) {
   useEffect(() => {
     if (!busy) {
       return undefined;
     }
     const root = document.documentElement;
     root.dataset.booleanBusy = "true";
+    root.setAttribute("aria-busy", "true");
     // Not passive, so a wheel turn can be cancelled.
     const options = { capture: true, passive: false };
     for (const name of SWALLOWED_EVENTS) {
@@ -94,6 +95,7 @@ function useBusyWindow(busy: boolean) {
     }
     return () => {
       delete root.dataset.booleanBusy;
+      root.removeAttribute("aria-busy");
       for (const name of SWALLOWED_EVENTS) {
         window.removeEventListener(name, swallow, options);
       }

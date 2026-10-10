@@ -6,6 +6,15 @@
 //! label argument of `apply_size`, and the `boolean_*` labels of the Boolean operations. Test code
 //! (everything from the first `#[cfg(test)]` of a file on) is left out.
 
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::too_many_lines,
+    clippy::cast_precision_loss,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss
+)]
+
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};

@@ -475,7 +475,7 @@ impl Session {
                 Tool::Node => this.node.delete_selected(&this.document),
                 Tool::Pen | Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar => {}
             }
-        })
+        });
     }
 }
 

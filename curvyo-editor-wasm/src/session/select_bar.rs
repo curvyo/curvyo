@@ -30,7 +30,7 @@ impl Session {
     pub(super) fn flush_select_bar_preview(&mut self) {
         self.recording(|this| {
             this.select.flush_bar_preview(&this.document);
-        })
+        });
     }
 
     /// The typed "Radius" field (criterion 21a): Enter writes the value to
@@ -59,7 +59,7 @@ impl Session {
                 &this.selection,
                 ParamValue::PointCount(count),
             );
-        })
+        });
     }
 
     /// The "Ratio" field's discrete commit (a typed value or a stepper
@@ -73,7 +73,7 @@ impl Session {
                 &this.selection,
                 ParamValue::Ratio(ratio),
             );
-        })
+        });
     }
 
     /// The "Ratio" slider's live preview, on every tick: nothing is written;
@@ -89,7 +89,7 @@ impl Session {
     pub fn commit_selected_ratio(&mut self) {
         self.recording(|this| {
             this.flush_select_bar_preview();
-        })
+        });
     }
 
     /// "Object to path" (acceptance criteria 17, 21, 22): converts every
@@ -140,7 +140,7 @@ impl Session {
                     this.node.select_all_anchors(&path);
                 }
             }
-        })
+        });
     }
 
     /// "Remove rounding" of the Select bar (`unified-object-editing` criterion
@@ -151,7 +151,7 @@ impl Session {
             let objects = this.objects();
             this.select
                 .remove_rounding(&this.document, &objects, &this.selection);
-        })
+        });
     }
 }
 

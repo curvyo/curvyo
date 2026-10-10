@@ -1,6 +1,15 @@
 //! Criterion 55 of `specs/0020-undo-redo`: the live stacks and the stacks derived from the log are
 //! the same for the same sequence of events.
 
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::too_many_lines,
+    clippy::cast_precision_loss,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss
+)]
+
 use curvyo_document_core::{Document, Event, Point, RectBounds, STACK_LIMIT, StackMachine, Status};
 
 /// A small deterministic generator, so the sequence is the same on every run.

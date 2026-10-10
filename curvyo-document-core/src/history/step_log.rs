@@ -21,8 +21,6 @@ pub(crate) struct LogStep {
     pub end: i32,
     /// The version the step started from: the dependencies of its first change.
     pub before: Frontiers,
-    /// The Lamport clock of the step's first operation.
-    pub lamport: u32,
 }
 
 impl LogStep {
@@ -67,6 +65,5 @@ pub(crate) fn find_step(doc: &LoroDoc, step: StepRef) -> Option<LogStep> {
         message,
         end,
         before: first.deps.clone(),
-        lamport: first.lamport,
     })
 }

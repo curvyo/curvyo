@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { type CanvasNotice, type HistoryNames, MAC, useHistory } from "@/hooks/useHistory";
+import type { HistoryDirection } from "@/lib/historyText";
 import { ModifierTracker } from "@/lib/keyModifiers";
 import { createSession, openSession } from "@/lib/editorSession";
 import type { WasmSession } from "@/lib/editorSession";
@@ -594,6 +596,14 @@ export interface EditorSession {
   /** The one-line message of a key that could not act ("Select one object to
    * type a value"), or `null`; it clears itself after 2 s. */
   keyHint: KeyHint | null;
+  /** The notice of the last undo or redo, in the canvas notice slot. */
+  canvasNotice: CanvasNotice | null;
+  /** A large undo or redo is running. */
+  historyBusy: boolean;
+  /** The names of the next undo and redo; `null` for an empty stack. */
+  historyNames: HistoryNames;
+  /** Undo or redo from a button. */
+  pressHistory: (direction: HistoryDirection) => void;
   convertSelected: (kind: "corner" | "symmetric" | "asymmetric") => void;
   makeLine: () => void;
   makeCurve: () => void;
@@ -835,11 +845,13 @@ export function useEditorSession(
   /** Re-reads every bit of session-owned UI state after any call that
    * might have changed it — cheap, and simpler than having every call
    * site know which ones to refresh. */
+  const refreshHistoryRef = useRef<() => void>(() => {});
   const syncFromSession = useCallback(() => {
     const session = sessionRef.current;
     if (!session) {
       return;
     }
+    refreshHistoryRef.current();
     setToolState(session.tool() as Tool);
     setNodeToolbarState(readToolbarState(session.node_toolbar_state()));
     setPolyStarModeState(session.poly_star_mode() as PolyStarMode);
@@ -872,6 +884,8 @@ export function useEditorSession(
   }, [syncEntry, syncBadges]);
 
   const getSession = useCallback(() => sessionRef.current, []);
+  const history = useHistory(getSession, syncFromSession, containerRef);
+  refreshHistoryRef.current = history.refresh;
 
   const refreshCursor = useCallback(() => {
     const session = sessionRef.current;
@@ -942,6 +956,14 @@ export function useEditorSession(
           sessionRef.current = session;
         }
         syncFromSession();
+        // Reads the file's history after the first paint, so that the first undo is as fast as
+        // later ones (`specs/0020-undo-redo` criterion 30c).
+        const idle = window.requestIdleCallback ?? ((run: () => void) => window.setTimeout(run, 200));
+        idle(() => {
+          if (sessionRef.current === session) {
+            session.warm_history();
+          }
+        });
       }),
     [enqueueSessionTask, syncFromSession],
   );
@@ -1647,6 +1669,10 @@ export function useEditorSession(
       if (!session) {
         return;
       }
+      if (history.isDuplicateKey(event)) {
+        event.preventDefault();
+        return;
+      }
       const outcome = session.key_down(
         event.key,
         event.shiftKey,
@@ -1654,11 +1680,18 @@ export function useEditorSession(
         event.altKey,
         event.repeat,
         event.nativeEvent.isComposing || isSpaceHeld,
+        MAC,
       );
       if (outcome === "ignored") {
         return;
       }
       event.preventDefault();
+      if (history.handleKeyOutcome(outcome)) {
+        setLiveReadout(readReadout(session));
+        setCursorHint(session.cursor_hint());
+        syncFromSession();
+        return;
+      }
       const hint = KEY_HINT_TEXT[outcome];
       if (hint !== undefined) {
         keyHintCounter.current += 1;
@@ -1668,7 +1701,7 @@ export function useEditorSession(
       setCursorHint(session.cursor_hint());
       syncFromSession();
     },
-    [isSpaceHeld, syncFromSession],
+    [history.handleKeyOutcome, history.isDuplicateKey, isSpaceHeld, syncFromSession],
   );
 
   // A key hint clears itself after 2 s; a newer message restarts the clock.
@@ -1791,6 +1824,10 @@ export function useEditorSession(
     selectionCount,
     selectionAnnouncement,
     keyHint,
+    canvasNotice: history.notice,
+    historyBusy: history.busy,
+    historyNames: history.names,
+    pressHistory: history.press,
     convertSelected,
     makeLine,
     makeCurve,

@@ -46,6 +46,7 @@ impl StepHeader {
     }
 
     /// The same header with one more `key=value` pair.
+    #[cfg(test)]
     pub(crate) fn with(mut self, key: &str, value: impl Into<String>) -> Self {
         self.extra.push((key.to_owned(), value.into()));
         self

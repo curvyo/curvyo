@@ -149,10 +149,10 @@ mod tests {
 
     #[test]
     fn twenty_thousand_generated_steps_have_no_duplicate_shown_id() {
-        let steps: Vec<StepRef> = (0..20_000)
+        let steps: Vec<StepRef> = (0..20_000_i32)
             .map(|i| {
                 StepRef::new(
-                    u64::from(i as u32 % 7).wrapping_mul(0x9e37_79b9_7f4a_7c15),
+                    u64::from(i.cast_unsigned() % 7).wrapping_mul(0x9e37_79b9_7f4a_7c15),
                     i,
                 )
             })

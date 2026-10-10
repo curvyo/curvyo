@@ -23,10 +23,10 @@ impl Document {
         self.container_index.borrow_mut().extend(doc);
         // One checkout to the version before the newest change and back builds the cache.
         let newest = doc.oplog_frontiers();
-        if let Some(change) = newest.iter().find_map(|id| doc.get_change(id)) {
-            if let Ok(guard) = Detached::at(doc, &change.deps) {
-                drop(guard);
-            }
+        if let Some(change) = newest.iter().find_map(|id| doc.get_change(id))
+            && let Ok(guard) = Detached::at(doc, &change.deps)
+        {
+            drop(guard);
         }
         self.commit_state.set_warm();
     }

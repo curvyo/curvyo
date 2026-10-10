@@ -91,7 +91,6 @@ impl StepIndex {
                 message: message.to_owned(),
                 end: next,
                 before: change.deps.clone(),
-                lamport: change.lamport,
             },
         );
         self.newest.insert(peer, position);

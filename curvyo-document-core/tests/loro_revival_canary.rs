@@ -8,6 +8,15 @@
 //! It deliberately uses Loro directly and not `curvyo-document-core`'s own reviver, so that it
 //! stays an independent check of the library behaviour.
 
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::too_many_lines,
+    clippy::cast_precision_loss,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss
+)]
+
 use loro::{
     Container, ContainerID, ContainerTrait, ContainerType, ExportMode, FractionalIndex, JsonChange,
     JsonOp, JsonOpContent, JsonTreeOp, LoroDoc, LoroMap, LoroMovableList, TreeID, TreeParentId,
@@ -172,9 +181,9 @@ fn a_peer_edit_made_while_the_node_was_deleted_survives_the_revival() {
         .unwrap()
         .insert("x", 50.0)
         .unwrap();
-    let anchor = match anchors_of(&b, victim).get(0) {
-        Some(ValueOrContainer::Container(Container::Map(map))) => map,
-        _ => panic!("no anchor map"),
+    let Some(ValueOrContainer::Container(Container::Map(anchor))) = anchors_of(&b, victim).get(0)
+    else {
+        panic!("no anchor map")
     };
     anchor.insert("point", vec![5.0_f64, 6.0]).unwrap();
     b.commit();
@@ -188,9 +197,9 @@ fn a_peer_edit_made_while_the_node_was_deleted_survives_the_revival() {
     assert!(alive(&a, victim));
     let meta = a.get_tree(TREE).get_meta(victim).unwrap();
     assert_eq!(meta.get("x").map(|v| v.get_deep_value()), Some(50.0.into()));
-    let anchor = match anchors_of(&a, victim).get(0) {
-        Some(ValueOrContainer::Container(Container::Map(map))) => map,
-        _ => panic!("no anchor map"),
+    let Some(ValueOrContainer::Container(Container::Map(anchor))) = anchors_of(&a, victim).get(0)
+    else {
+        panic!("no anchor map")
     };
     assert_eq!(
         anchor.get("point").map(|v| v.get_deep_value()),

@@ -12,9 +12,9 @@ import {
 } from "../src/lib/conversionText.ts";
 
 test("criterion 54: the notice, N as plain digits", () => {
-  assert.equal(stretchNotice(1), "Stretching turned 1 shape into a path. No undo yet.");
-  assert.equal(stretchNotice(2), "Stretching turned 2 shapes into paths. No undo yet.");
-  assert.equal(stretchNotice(5000), "Stretching turned 5000 shapes into paths. No undo yet.");
+  assert.equal(stretchNotice(1), "Stretching turned 1 shape into a path.");
+  assert.equal(stretchNotice(2), "Stretching turned 2 shapes into paths.");
+  assert.equal(stretchNotice(5000), "Stretching turned 5000 shapes into paths.");
   assert.equal(stretchNotice(0), null);
   assert.equal(CONVERSION_NOTICE_MS, 6000);
 });

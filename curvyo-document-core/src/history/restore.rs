@@ -211,14 +211,14 @@ impl Document {
             let created_meta = after.nodes.get(&id).map(|n| &n.meta);
             match direction {
                 Direction::Undo if !now_alive => {
-                    push(Role::Created, Action::Skip(id, SkipReason::DeletedLater))
+                    push(Role::Created, Action::Skip(id, SkipReason::DeletedLater));
                 }
                 Direction::Undo if live_meta(id).as_ref() == created_meta => {
                     push(Role::Created, Action::Delete(id));
                 }
                 Direction::Undo => push(Role::Created, Action::Skip(id, SkipReason::ChangedLater)),
                 Direction::Redo if now_alive => {
-                    push(Role::Created, Action::Skip(id, SkipReason::ChangedLater))
+                    push(Role::Created, Action::Skip(id, SkipReason::ChangedLater));
                 }
                 Direction::Redo if by_me(id) => push(Role::Created, revival(id, after)),
                 Direction::Redo => push(Role::Created, Action::Skip(id, SkipReason::DeletedLater)),
@@ -229,12 +229,12 @@ impl Document {
             let deleted_meta = before.nodes.get(&id).map(|n| &n.meta);
             match direction {
                 Direction::Undo if now_alive => {
-                    push(Role::Deleted, Action::Skip(id, SkipReason::ChangedLater))
+                    push(Role::Deleted, Action::Skip(id, SkipReason::ChangedLater));
                 }
                 Direction::Undo if in_step(id) => push(Role::Deleted, revival(id, before)),
                 Direction::Undo => push(Role::Deleted, Action::Skip(id, SkipReason::DeletedLater)),
                 Direction::Redo if !now_alive => {
-                    push(Role::Deleted, Action::Skip(id, SkipReason::DeletedLater))
+                    push(Role::Deleted, Action::Skip(id, SkipReason::DeletedLater));
                 }
                 Direction::Redo if live_meta(id).as_ref() == deleted_meta => {
                     push(Role::Deleted, Action::Delete(id));

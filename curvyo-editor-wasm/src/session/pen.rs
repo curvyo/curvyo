@@ -38,7 +38,7 @@ impl Session {
     pub fn finish_pen(&mut self) {
         self.recording(|this| {
             this.pen.finish(&this.document);
-        })
+        });
     }
 
     /// The in-progress pen path's placed nodes, for the host's

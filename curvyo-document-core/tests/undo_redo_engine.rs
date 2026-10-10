@@ -1,6 +1,15 @@
 //! Undo and redo as the document engine does them (`specs/0020-undo-redo` criteria 10, 11, 15 to
 //! 23, 56, 57), on two replicas that merge in the test.
 
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::too_many_lines,
+    clippy::cast_precision_loss,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss
+)]
+
 use curvyo_document_core::{
     Document, Length, NodeId, Point, RectBounds, StyleEdit, Vec2, pack, unpack,
 };
@@ -154,7 +163,7 @@ fn an_object_a_peer_deleted_is_not_brought_back_by_an_undo() {
 
     let report = a.undo_step(step).unwrap();
     assert_eq!(report.skipped(), 1);
-    assert!(a.object_ids().is_empty());
+    assert_eq!(a.object_ids().len(), 0);
 }
 
 #[test]

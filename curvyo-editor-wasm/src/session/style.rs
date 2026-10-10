@@ -84,7 +84,7 @@ impl Session {
     pub(super) fn flush_style_preview(&mut self) {
         self.recording(|this| {
             let _ = this.style.commit(&this.document);
-        })
+        });
     }
 
     /// Enter or Tab in a typed field: `Ok(true)` after one commit for every
@@ -134,7 +134,7 @@ impl Session {
     pub fn commit_style_preview(&mut self) {
         self.recording(|this| {
             this.flush_style_preview();
-        })
+        });
     }
 
     /// Escape during a panel drag: the objects return to their committed

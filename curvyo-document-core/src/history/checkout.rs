@@ -16,8 +16,6 @@ use crate::document::{OBJECTS_TREE, ROOT_MAP};
 /// One tree node as it was at a version.
 #[derive(Debug, Clone)]
 pub(crate) struct NodeAt {
-    /// The node exists and is not deleted.
-    pub alive: bool,
     /// Its meta map; empty when the node does not exist.
     pub meta: BTreeMap<String, Node>,
     /// Its position among its siblings.
@@ -53,13 +51,11 @@ impl<'a> Detached<'a> {
         let alive = tree.contains(id) && matches!(tree.is_node_deleted(&id), Ok(false));
         if !alive {
             return NodeAt {
-                alive,
                 meta: BTreeMap::new(),
                 index: None,
             };
         }
         NodeAt {
-            alive,
             meta: tree
                 .get_meta(id)
                 .map(|meta| read_map(&meta))

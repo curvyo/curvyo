@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { Canvas } from "@/components/Canvas";
+import { CanvasNotice } from "@/components/CanvasNotice";
 import { ErrorDialog } from "@/components/ErrorDialog";
 import { NodeToolbar } from "@/components/NodeToolbar";
 import { PropertiesPanel } from "@/components/panel/PropertiesPanel";
@@ -171,6 +172,7 @@ function App() {
           commands={railCommands}
         />
         <Canvas editor={editor} />
+        <CanvasNotice notice={editor.canvasNotice} />
         {/* Contextual tool bar: floats over the canvas, right of the tool
          * rail, so showing/hiding it never resizes the canvas
          * (`docs/design-system.md`, "no layout shift on tool switch"). */}

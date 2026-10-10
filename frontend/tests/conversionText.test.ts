@@ -30,18 +30,18 @@ test("the readout line says how many shapes become paths", () => {
   assert.equal(stretchReadoutLine(1), "1 shape becomes a path");
 });
 
-test("the notice states the count in plain digits and that there is no undo", () => {
+test("the notice states the count in plain digits", () => {
   assert.equal(
     stretchNotice(2),
-    "Stretching turned 2 shapes into paths. No undo yet.",
+    "Stretching turned 2 shapes into paths.",
   );
   assert.equal(
     stretchNotice(1),
-    "Stretching turned 1 shape into a path. No undo yet.",
+    "Stretching turned 1 shape into a path.",
   );
   assert.equal(
     stretchNotice(5000),
-    "Stretching turned 5000 shapes into paths. No undo yet.",
+    "Stretching turned 5000 shapes into paths.",
   );
 });
 

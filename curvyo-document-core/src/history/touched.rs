@@ -112,11 +112,11 @@ impl ContainerIndex {
                 None => break,
             }
         }
-        self.owner_by_path(doc, container)
+        Self::owner_by_path(doc, container)
     }
 
     /// A container the chain does not know (created before a wipe): ask the live document.
-    fn owner_by_path(&self, doc: &LoroDoc, container: &ContainerID) -> Option<Owner> {
+    fn owner_by_path(doc: &LoroDoc, container: &ContainerID) -> Option<Owner> {
         let path = doc.get_path_to_container(container)?;
         path.iter().find_map(|(_, index)| match index {
             loro::Index::Node(id) => Some(Owner::Node(*id)),
@@ -126,13 +126,13 @@ impl ContainerIndex {
 
     /// The touched objects of the given changes of one step.
     pub(crate) fn touched(&self, doc: &LoroDoc, changes: &[JsonChange]) -> Touched {
-        let mut created = BTreeSet::new();
-        let mut deleted = BTreeSet::new();
-        let mut moved = BTreeSet::new();
-        let mut changed = BTreeSet::new();
+        let mut created_ids = BTreeSet::new();
+        let mut deleted_ids = BTreeSet::new();
+        let mut moved_ids = BTreeSet::new();
+        let mut changed_ids = BTreeSet::new();
         let mut root = false;
         let mut order: Vec<TreeID> = Vec::new();
-        let seen = |id: TreeID, order: &mut Vec<TreeID>| {
+        let note = |id: TreeID, order: &mut Vec<TreeID>| {
             if !order.contains(&id) {
                 order.push(id);
             }
@@ -141,23 +141,23 @@ impl ContainerIndex {
             match &op.content {
                 JsonOpContent::Tree(tree_op) => match tree_op {
                     JsonTreeOp::Create { target, .. } => {
-                        seen(*target, &mut order);
-                        created.insert(*target);
+                        note(*target, &mut order);
+                        created_ids.insert(*target);
                     }
                     JsonTreeOp::Move { target, .. } => {
-                        seen(*target, &mut order);
-                        moved.insert(*target);
+                        note(*target, &mut order);
+                        moved_ids.insert(*target);
                     }
                     JsonTreeOp::Delete { target } => {
-                        seen(*target, &mut order);
-                        deleted.insert(*target);
+                        note(*target, &mut order);
+                        deleted_ids.insert(*target);
                     }
                 },
                 _ => match self.owner(doc, &op.container) {
                     Some(Owner::Root) => root = true,
                     Some(Owner::Node(id)) => {
-                        seen(id, &mut order);
-                        changed.insert(id);
+                        note(id, &mut order);
+                        changed_ids.insert(id);
                     }
                     None => {}
                 },
@@ -173,10 +173,10 @@ impl ContainerIndex {
                 .collect()
         };
         Touched {
-            created: pick(&created, &[&deleted]),
-            deleted: pick(&deleted, &[&created]),
-            moved: pick(&moved, &[&created, &deleted]),
-            changed: pick(&changed, &[&created, &deleted]),
+            created: pick(&created_ids, &[&deleted_ids]),
+            deleted: pick(&deleted_ids, &[&created_ids]),
+            moved: pick(&moved_ids, &[&created_ids, &deleted_ids]),
+            changed: pick(&changed_ids, &[&created_ids, &deleted_ids]),
             root,
         }
     }

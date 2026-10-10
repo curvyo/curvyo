@@ -138,9 +138,9 @@ export function closeNoticeText(result: ClosePathResult): string | null {
   }
   const closed = `Closed ${paths(result.closed)}.`;
   if (result.skipped === 0) {
-    return `${closed} No undo yet.`;
+    return `${closed}`;
   }
-  return `${closed} ${skippedSentences(result.skipped, result.sameEnds ?? 0)} No undo yet.`;
+  return `${closed} ${skippedSentences(result.skipped, result.sameEnds ?? 0)}`;
 }
 
 /** How long that notice stays: 3 s, or 5 s when the sentence is longer than 70 characters. */
@@ -154,7 +154,7 @@ export function closeTooltipNote(state: ClosePathState): string {
     return "Select an open path with 3 or more nodes.";
   }
   if (state.skipped === 0) {
-    return `Closes ${paths(state.closable).replace(" path", " open path")}. No undo yet.`;
+    return `Closes ${paths(state.closable).replace(" path", " open path")}.`;
   }
   const total = state.closable + state.skipped;
   const sameEnds = state.sameEnds ?? 0;
@@ -168,7 +168,7 @@ export function closeTooltipNote(state: ClosePathState): string {
       `${sameEnds === 1 ? "1 starts and ends" : `${sameEnds} start and end`} on one point.`,
     );
   }
-  return `Closes ${state.closable} of ${total} open paths. ${reasons.join(" ")} No undo yet.`;
+  return `Closes ${state.closable} of ${total} open paths. ${reasons.join(" ")}`;
 }
 
 /** The two buttons: the visible word, the accessible name, the join code and the tooltip. */
