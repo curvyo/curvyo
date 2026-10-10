@@ -33,7 +33,16 @@ fn a_thousand_generated_events_give_the_same_stacks_live_and_from_the_log() {
     let mut done = 0;
     let mut events = 0;
     while events < 1_000 {
-        match rng.next(4) {
+        match rng.next(5) {
+            4 => {
+                // Delete the newest object that is still there (a step that revives on undo).
+                let Some(id) = document.object_ids().last().copied() else {
+                    continue;
+                };
+                document.delete_objects(&[id]).unwrap();
+                let step = document.own_steps().last().unwrap().step;
+                live.apply(Event::Do(step));
+            }
             0 | 1 => {
                 let x = f64::from(done) * 12.0;
                 let _ = document.create_rect(RectBounds::from_corners(

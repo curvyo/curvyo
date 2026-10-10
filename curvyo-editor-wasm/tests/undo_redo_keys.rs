@@ -404,3 +404,91 @@ fn a_held_arrow_key_is_one_step_and_one_press_takes_the_whole_run_back() {
     assert!(matches!(outcome, KeyOutcome::Nudged { new_run: true }));
     assert_eq!(session.undo_len(), steps + 1);
 }
+
+#[test]
+fn a_union_undone_redone_and_undone_again_gives_the_operands_back_each_time() {
+    let mut session = fresh();
+    draw_square(&mut session, 10.0);
+    draw_square(&mut session, 20.0);
+    session.set_tool(Tool::Select);
+    session.pointer_down(pt(0.0, 0.0), false);
+    session.pointer_up(pt(60.0, 60.0), false, false);
+    assert_eq!(session.selected_object_count(), 2);
+    let before = json(&session);
+    session.apply_boolean(BooleanOp::Union);
+    let united = json(&session);
+    for round in 0..3 {
+        assert!(
+            undo(&mut session).starts_with("Undid: Union"),
+            "round {round}"
+        );
+        assert_eq!(json(&session), before, "round {round}: undo");
+        assert_eq!(session.selected_object_count(), 2);
+        assert!(
+            redo(&mut session).starts_with("Redid: Union"),
+            "round {round}"
+        );
+        assert_eq!(json(&session), united, "round {round}: redo");
+    }
+}
+
+#[test]
+fn delete_undo_redo_undo_through_the_keys_restores_the_object() {
+    let mut session = fresh();
+    draw_square(&mut session, 10.0);
+    let before = json(&session);
+    session.set_tool(Tool::Select);
+    session.delete_selected();
+    for _ in 0..2 {
+        assert_eq!(undo(&mut session), "Undid: Delete (1 rectangle).");
+        assert_eq!(json(&session), before);
+        assert_eq!(redo(&mut session), "Redid: Delete (1 rectangle).");
+        assert_eq!(ids(&session).len(), 0);
+    }
+}
+
+#[test]
+fn the_buttons_and_the_menu_share_the_gate_of_the_keys() {
+    let mut session = fresh();
+    draw_square(&mut session, 10.0);
+    draw_square(&mut session, 50.0);
+    assert_eq!(session.undo_len(), 2);
+
+    // An unfinished Pen path: the hint, nothing taken back.
+    session.set_tool(Tool::Pen);
+    session.pointer_down(pt(100.0, 100.0), false);
+    session.pointer_up(pt(100.0, 100.0), false, false);
+    let result = session.undo();
+    assert!(!result.changed);
+    assert_eq!(
+        result.notice,
+        "Finish the path (Enter) or cancel it (Esc) first."
+    );
+    assert_eq!(session.undo_len(), 2);
+    assert!(!session.redo().changed);
+    session.escape();
+
+    // A drag in flight.
+    session.set_tool(Tool::Select);
+    session.pointer_down(pt(0.0, 0.0), false);
+    session.pointer_hover(pt(30.0, 30.0), false, false);
+    let result = session.undo();
+    assert!(!result.changed && result.notice.is_empty());
+    assert_eq!(session.undo_len(), 2);
+    session.pointer_up(pt(0.0, 0.0), false, false);
+
+    // An open entry chip.
+    session.pointer_down(pt(-50.0, -50.0), false);
+    session.pointer_up(pt(500.0, 500.0), false, false);
+    assert_eq!(
+        session.key_down(KeyInput {
+            key: "m",
+            ..KeyInput::default()
+        }),
+        KeyOutcome::EntryOpened
+    );
+    let result = session.undo();
+    assert!(!result.changed && result.notice.is_empty());
+    session.escape();
+    assert!(session.undo().changed, "without a gesture the button works");
+}

@@ -151,20 +151,20 @@ enum Selected {
 
 /// Everything about the session the key table reads.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct KeyState {
+pub(super) struct KeyState {
     tool: Tool,
     /// A drag is in flight in the active tool, or the canvas is panned.
-    operation_in_flight: bool,
+    pub(super) operation_in_flight: bool,
     /// The Pen has an unfinished path.
-    pen_open: bool,
+    pub(super) pen_open: bool,
     /// An entry chip is open.
-    entry_open: bool,
+    pub(super) entry_open: bool,
     selected: Selected,
 }
 
 /// What the key table decided.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum KeyAction {
+pub(super) enum KeyAction {
     Ignore,
     SetTool(Tool),
     OpenEntry(EntryKey),
@@ -229,8 +229,8 @@ fn decide(input: &KeyInput<'_>, state: KeyState) -> KeyAction {
         [c] if c.is_ascii_alphabetic() => Some(c.to_ascii_lowercase()),
         _ => None,
     };
-    if let Some(direction) = history_direction(input, letter) {
-        return history_action(direction, input, state);
+    if let Some(direction) = super::history::history_direction(input, letter) {
+        return super::history::history_action(direction, input, state);
     }
     if input.repeat || input.ctrl || input.alt || input.dom_blocked {
         return KeyAction::Ignore;
@@ -274,34 +274,6 @@ fn decide(input: &KeyInput<'_>, state: KeyState) -> KeyAction {
             _ => KeyAction::Hint(KeyHint::SelectFirst),
         },
     }
-}
-
-/// Which history key this is: Ctrl (Cmd) with the typed character z, Shift+Z or, off macOS, y
-/// (`specs/0020-undo-redo` criteria 1 to 3, 7). Matched by the character, not the key's place on
-/// the keyboard, so QWERTZ works.
-fn history_direction(input: &KeyInput<'_>, letter: Option<char>) -> Option<Direction> {
-    if !input.ctrl || input.alt {
-        return None;
-    }
-    match (letter?, input.shift) {
-        ('z', false) => Some(Direction::Undo),
-        ('z', true) => Some(Direction::Redo),
-        ('y', false) if !input.mac => Some(Direction::Redo),
-        _ => None,
-    }
-}
-
-/// The gate of undo and redo (criterion 6): text fields keep their own undo, a drag, an open entry
-/// chip and a long operation block the key, an unfinished Pen path answers with a hint. Auto-repeat
-/// is not gated (criterion 5).
-fn history_action(direction: Direction, input: &KeyInput<'_>, state: KeyState) -> KeyAction {
-    if input.dom_blocked || state.operation_in_flight || state.entry_open {
-        return KeyAction::Ignore;
-    }
-    if state.pen_open {
-        return KeyAction::Hint(KeyHint::FinishPenFirst);
-    }
-    KeyAction::History(direction)
 }
 
 /// What a key that passed the gate is bound to.

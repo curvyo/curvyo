@@ -30,6 +30,7 @@ pub use report::{
 };
 pub use rows::{Author, HistoryRow, StepKind, TouchedObject};
 pub use stack_machine::{Event, STACK_LIMIT, StackMachine, Status};
+pub use step_header::{LABEL_NEW_DOCUMENT, LABEL_REDO, LABEL_UNDO, LABEL_WIPE as WIPE_LABEL};
 pub use step_id::{MIN_SHOWN_ID_LEN, StepRef, shown_ids};
 pub(crate) use step_index::StepIndex;
 pub(crate) use touched::ContainerIndex;

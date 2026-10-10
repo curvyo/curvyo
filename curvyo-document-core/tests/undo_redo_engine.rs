@@ -321,3 +321,52 @@ fn chained_undo_and_redo_on_one_compound_path_keep_a_peers_edit_of_another_node(
     assert_eq!(point_of(&a, 22), (77.0, 77.0));
     assert_eq!(json(&a), json(&b));
 }
+
+#[test]
+fn delete_undo_redo_undo_redo_brings_the_objects_back_every_time() {
+    let document = Document::new(1);
+    let ids: Vec<NodeId> = (0..4)
+        .map(|n| rect(&document, f64::from(n) * 20.0))
+        .collect();
+    let before = json(&document);
+    document.delete_objects(&[ids[1], ids[2]]).unwrap();
+    let after = json(&document);
+    let step = document.own_steps().last().unwrap().step;
+    for round in 0..3 {
+        let report = document.undo_step(step).unwrap();
+        assert_eq!(report.skipped(), 0, "round {round}: nothing is skipped");
+        assert_eq!(json(&document), before, "round {round}: undo");
+        assert_eq!(document.object_ids(), ids);
+        document.redo_step(step).unwrap();
+        assert_eq!(json(&document), after, "round {round}: redo");
+    }
+}
+
+#[test]
+fn a_boolean_undone_redone_and_undone_again_brings_the_operands_back_and_removes_the_result() {
+    use curvyo_document_core::{AnchorId, NewAnchor};
+    let square = |first: u64, x: f64| -> Vec<NewAnchor> {
+        [(0.0, 0.0), (20.0, 0.0), (20.0, 20.0), (0.0, 20.0)]
+            .iter()
+            .enumerate()
+            .map(|(n, (dx, dy))| {
+                NewAnchor::corner(AnchorId::new(1, first + n as u64), Point::new(x + dx, *dy))
+            })
+            .collect()
+    };
+    let document = Document::new(1);
+    let a = document.create_path(&square(1, 0.0), true);
+    let b = document.create_path(&square(11, 10.0), true);
+    let before = json(&document);
+    document
+        .replace_with_path(&[a, b], a, &[(square(21, 0.0), true)], "boolean_union")
+        .unwrap();
+    let after = json(&document);
+    let step = document.own_steps().last().unwrap().step;
+    for round in 0..3 {
+        document.undo_step(step).unwrap();
+        assert_eq!(json(&document), before, "round {round}: undo");
+        document.redo_step(step).unwrap();
+        assert_eq!(json(&document), after, "round {round}: redo");
+    }
+}

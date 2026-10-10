@@ -8,6 +8,8 @@ use loro::{FractionalIndex, LoroDoc, TreeID};
 use super::checkout::NodeAt;
 use super::node_value::{Node, read_map};
 use super::report::{Direction, Role, SkipReason};
+use super::step_header::{KEY_REDONE, LABEL_REDO, StepHeader};
+use super::step_id::StepRef;
 use super::step_log::LogStep;
 use super::touched::Touched;
 use crate::document::OBJECTS_TREE;
@@ -104,13 +106,26 @@ impl PlanInput<'_> {
         tree.get_meta(id).map(|m| read_map(&m)).ok()
     }
 
-    fn last_move_in_step(&self, id: TreeID) -> bool {
+    /// Whether the node's last tree move is the step's own delete, or the delete of a redo of this
+    /// step (Delete, Ctrl+Z, Ctrl+Shift+Z, Ctrl+Z).
+    fn deleted_by_this_step(&self, id: TreeID) -> bool {
         let tree = self.doc.get_tree(OBJECTS_TREE);
-        tree.get_last_move_id(&id).is_some_and(|last| {
-            last.peer == self.log.step.peer()
-                && last.counter >= self.log.step.counter()
-                && last.counter < self.log.end
-        })
+        let Some(last) = tree.get_last_move_id(&id) else {
+            return false;
+        };
+        if last.peer == self.log.step.peer()
+            && (self.log.step.counter()..self.log.end).contains(&last.counter)
+        {
+            return true;
+        }
+        self.doc
+            .get_change(last)
+            .and_then(|change| StepHeader::parse(change.message.as_deref()?))
+            .is_some_and(|header| {
+                header.label == LABEL_REDO
+                    && header.extra_value(KEY_REDONE).and_then(StepRef::decode)
+                        == Some(self.log.step)
+            })
     }
 
     fn last_move_by_me(&self, id: TreeID) -> bool {
@@ -144,7 +159,7 @@ impl PlanInput<'_> {
         let now_alive = alive(self.doc, id);
         match self.direction {
             Direction::Undo if now_alive => plan.skip(Role::Deleted, id, SkipReason::ChangedLater),
-            Direction::Undo if self.last_move_in_step(id) => {
+            Direction::Undo if self.deleted_by_this_step(id) => {
                 plan.push(Role::Deleted, Action::Revive(id));
                 plan.revive_from_before.push(id);
             }

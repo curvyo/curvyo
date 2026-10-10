@@ -10,10 +10,8 @@ export function noticeDurationMs(text: string): number {
   return text.length > 70 ? 5000 : 3000;
 }
 
-/** The hint of an undo or redo while the Pen holds an unfinished path (criterion 6e). */
-export const FINISH_PEN_NOTICE = "Finish the path (Enter) or cancel it (Esc) first.";
-
-/** How long that hint stays. */
+/** How long the hint of an undo or redo with an unfinished Pen path stays (criterion 6e); its text
+ * is the session's (`finish_pen_first_notice`). */
 export const FINISH_PEN_NOTICE_MS = 2000;
 
 /** After this long the long-operation state names itself in the notice slot. */

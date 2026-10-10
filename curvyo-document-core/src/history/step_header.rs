@@ -3,13 +3,13 @@
 use crate::units::Timestamp;
 
 /// The reserved label of the commit that holds a new document's root setup (ADR 0014 context).
-pub(crate) const LABEL_NEW_DOCUMENT: &str = "new_document";
+pub const LABEL_NEW_DOCUMENT: &str = "new_document";
 /// The reserved label of an undo (`u` names the step it takes back).
-pub(crate) const LABEL_UNDO: &str = "undo";
+pub const LABEL_UNDO: &str = "undo";
 /// The reserved label of a redo (`d` names the step it applies again).
-pub(crate) const LABEL_REDO: &str = "redo";
+pub const LABEL_REDO: &str = "redo";
 /// The reserved label of a history wipe (milestone 4).
-pub(crate) const LABEL_WIPE: &str = "wipe_history";
+pub const LABEL_WIPE: &str = "wipe_history";
 
 /// The key of the step counter.
 const KEY_SEQ: &str = "s";

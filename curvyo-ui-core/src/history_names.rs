@@ -64,7 +64,12 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
 /// The labels the engine writes itself. They are no step of the maker's: the setup of a new
 /// document, an undo, a redo, a wipe. The history list shows the last two as statuses of other
 /// rows and the wipe as its own row.
-pub const RESERVED_LABELS: &[&str] = &["new_document", "undo", "redo", "wipe_history"];
+pub const RESERVED_LABELS: &[&str] = &[
+    curvyo_document_core::LABEL_NEW_DOCUMENT,
+    curvyo_document_core::LABEL_UNDO,
+    curvyo_document_core::LABEL_REDO,
+    curvyo_document_core::WIPE_LABEL,
+];
 
 /// The name for `label`, or `None` when the table does not know it.
 #[must_use]

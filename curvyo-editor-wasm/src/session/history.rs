@@ -7,8 +7,8 @@ use curvyo_document_core::{
     AnchorId, Direction, FAR_STEP_OPS, NodeId, SMALL_STEP_OPS, StepRef, Timestamp,
 };
 use curvyo_ui_core::{
-    SelectionSnapshot, UndoStack, nothing_notice, object_bounds, objects_summary, operation_name,
-    restore_notice,
+    FINISH_PEN_FIRST, SelectionSnapshot, UndoStack, nothing_notice, object_bounds, objects_summary,
+    operation_name, restore_notice,
 };
 
 use super::{KeyOutcome, Session};
@@ -214,6 +214,20 @@ impl Session {
     }
 
     fn press_history(&mut self, direction: Direction) -> HistoryResult {
+        // The gate of the keys (criterion 6) holds for every entry point: the History buttons and
+        // the Edit menu come here too.
+        if self.operation_in_flight() || self.select.has_entry() {
+            return HistoryResult {
+                notice: String::new(),
+                changed: false,
+            };
+        }
+        if self.pen_path_open() {
+            return HistoryResult {
+                notice: FINISH_PEN_FIRST.to_owned(),
+                changed: false,
+            };
+        }
         self.flush_select_bar_preview();
         self.flush_style_preview();
         self.sync_history();
@@ -322,4 +336,39 @@ impl Session {
                 max_x >= 0.0 && min_x <= width && max_y >= 0.0 && min_y <= height
             })
     }
+}
+
+/// Which history key this is: Ctrl (Cmd) with the typed character z, Shift+Z or, off macOS, y
+/// (`specs/0020-undo-redo` criteria 1 to 3, 7). Matched by the character, not the key's place on
+/// the keyboard, so QWERTZ works.
+pub(super) fn history_direction(
+    input: &super::keys::KeyInput<'_>,
+    letter: Option<char>,
+) -> Option<Direction> {
+    if !input.ctrl || input.alt {
+        return None;
+    }
+    match (letter?, input.shift) {
+        ('z', false) => Some(Direction::Undo),
+        ('z', true) => Some(Direction::Redo),
+        ('y', false) if !input.mac => Some(Direction::Redo),
+        _ => None,
+    }
+}
+
+/// The gate of undo and redo (criterion 6): text fields keep their own undo, a drag, an open entry
+/// chip and a long operation block the key, an unfinished Pen path answers with a hint. Auto-repeat
+/// is not gated (criterion 5).
+pub(super) fn history_action(
+    direction: Direction,
+    input: &super::keys::KeyInput<'_>,
+    state: super::keys::KeyState,
+) -> super::keys::KeyAction {
+    if input.dom_blocked || state.operation_in_flight || state.entry_open {
+        return super::keys::KeyAction::Ignore;
+    }
+    if state.pen_open {
+        return super::keys::KeyAction::Hint(super::keys::KeyHint::FinishPenFirst);
+    }
+    super::keys::KeyAction::History(direction)
 }

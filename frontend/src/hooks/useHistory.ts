@@ -3,7 +3,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useBusyWindow } from "@/hooks/useRailCommands";
 import {
   DUPLICATE_PRESS_MS,
-  FINISH_PEN_NOTICE,
   FINISH_PEN_NOTICE_MS,
   type HistoryDirection,
   historyKeyDirection,
@@ -48,7 +47,8 @@ export interface HistoryApi {
   /** Runs an undo or redo from a button or the menu; `source` says where the notice shows. */
   press: (direction: HistoryDirection, source?: "canvas" | "panel") => void;
   /** Wipes the history (the confirm was pressed): the notice says how many steps went. Returns the
-   * steps removed, or -1 when the session ignored it and -2 for a shared document. */
+   * steps removed, -1 when the session ignored it, -2 for a shared document and -3 when the
+   * log could not be rewritten. */
   wipe: () => number;
   /** Whether this key event is the second arrival of a press the native menu already handled. */
   isDuplicateKey: (event: KeyboardEvent | React.KeyboardEvent) => boolean;
@@ -226,7 +226,7 @@ export function useHistory(
           return true;
         }
         case "hint-finish-pen":
-          showNotice(FINISH_PEN_NOTICE, FINISH_PEN_NOTICE_MS);
+          showNotice(getSession()?.finish_pen_first_notice() ?? "", FINISH_PEN_NOTICE_MS);
           return true;
         default:
           return false;
@@ -288,7 +288,8 @@ export function useHistory(
     }
     const unlisten = listen<string>("history-menu", (event) => {
       const direction: HistoryDirection = event.payload === "redo" ? "redo" : "undo";
-      if (pressedJustNow(direction)) {
+      // A text field keeps its own undo; the native accelerator can fire while one has focus.
+      if (pressedJustNow(direction) || isTextEntry(document.activeElement)) {
         return;
       }
       markPressed(direction);
@@ -303,6 +304,8 @@ export function useHistory(
     const removed = getSession()?.history_wipe() ?? -1;
     if (removed >= 0) {
       showNotice(wipedNotice(removed));
+    } else if (removed === -3) {
+      showNotice("Could not wipe the history. Nothing was changed.");
     }
     onChangeRef.current();
     return removed;

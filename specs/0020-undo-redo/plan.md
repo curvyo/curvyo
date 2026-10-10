@@ -101,6 +101,6 @@ frontend checks, the budget tests). Milestones are commits on the branch; none i
 - `render-core`: `SelectDecorationInput::history_hovered` (additive) for the hover link of a row.
 - The wasm32 timing factor is not measured (no browser in the gate).
 - Z-order and parent moves of existing objects are not restored; reported as skipped (`adrs.md`).
-- The hold-to-nudge of `0044` calls `Document::continue_step()` once #87 has merged; nothing calls
-  it yet.
+- The hold-to-nudge calls `Document::continue_step()` (`curvyo-ui-core/src/nudge.rs`); a nudge
+  after Ctrl+Z starts a new step.
 - Not covered by the gate: the native Edit menu accelerators on each OS (AC 8, by hand).

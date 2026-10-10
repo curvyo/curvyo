@@ -162,7 +162,7 @@ and a marker a peer could edit concurrently.
     `history/revive.rs`: commit everything pending, then import one JSON change of this peer with
     the next counter, `deps` = oplog frontiers, Lamport = the highest `lamport + len` among the
     frontier changes, the step's header as message, and one tree `Move { target, parent: None,
-    fractional_index }`. The index is the node's old one when its old neighbours are unchanged,
+    fractional_index }` per revived node, all in one change. The index is the node's old one when its old neighbours are unchanged,
     else one between the current neighbours. The restore commit for the rest of the step follows
     with the same header, so both changes are one step. Guards: `loro` is pinned exactly
     (`=1.16.2`, like `i_overlay`), and a canary test in `curvyo-document-core` fails when Loro
@@ -183,12 +183,10 @@ and a marker a peer could edit concurrently.
       objects 1 s. The spike's read cost alone was 129 ms and 340 ms with checkouts; `diff` is
       expected to be lower, the writes come on top.
     - **First history call after Open**: the editor calls `Document::warm_history()` in an idle
-      callback after the first paint (one `diff` of the newest step). Until it has run, an undo
-      uses the long-operation state. The checkout cache (+48 MB, about 260 ms at 154,000 ops) is
-      built only by the first checkout-based read, behind the same state, and freed with
-      `free_history_cache` when the History tab closes. If milestone 1 finds that `diff` after
-      Open needs the same cache, `warm_history` builds it and the memory is paid by every open
-      document with history; the budget then states it.
+      callback after the first paint. It indexes the container chains of the log and builds Loro's
+      checkout cache with one checkout pair (§1 amendment). Until it has run, an undo uses the
+      long-operation state. The cache stays until the document is closed
+      (`docs/technical-debt.md`); there is no `free_history_cache`.
     - **Preview** (0042 criterion 21): first frame within 300 ms for rows up to 1,000 steps back
       from the current version; further back the row shows the long-operation state and the
       frame within 1.5 s at 10,000 steps back.
@@ -208,7 +206,7 @@ and a marker a peer could edit concurrently.
 | Undo, Delete of 5,000 objects (one injected change) | 1 s | 180 ms |
 | Undo and redo, Boolean union with 5,000 anchors | one press | 165 ms and 126 ms |
 | First undo after Open, no warm-up (small step) | 250 ms | 140 ms |
-| `warm_history` after Open | | 73 ms, +2 MiB resident |
+| `warm_history` after Open (113,003 operations; the test alone in its process) | | 220 ms, +40 MiB resident (open itself +7 MiB) |
 | Undo of a 3-object step 500 / 5,000 operations behind the latest version | | 4.5 ms / 10 ms |
 | 500 stack entries (`UndoStack::approx_bytes`) | 50 MB | 80 KiB (500 unions) to 23 MiB (500 different 4,000-object selections) |
 
@@ -227,8 +225,8 @@ are measured in `0042`. The wasm32 factor is not measured: no browser runs in th
   the live document is detached inside one call and attached again on every exit, a panic included.
 - Large undos are visible: a busy cursor and, past 150 ms, a working notice. Small ones stay at
   100 ms.
-- The first checkout-based history read after Open costs memory in proportion to the log (+48 MB at
-  154,000 ops) until the History tab closes.
+- `warm_history` builds the checkout cache after Open and keeps it until the document is closed:
+  memory in proportion to the log (spike: +48 MB at 154,000 ops; this build: §13 "Measured").
 - Undo stacks hold refs and selections, not inverses: 500 steps are kilobytes, not 50 MB.
 - An undo that skips everything writes nothing, so the log does not show it; the live stack has
   consumed it, the list shows the step as applied (its effect was overwritten by others).

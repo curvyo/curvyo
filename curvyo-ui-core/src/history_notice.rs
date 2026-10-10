@@ -3,6 +3,10 @@
 
 use curvyo_document_core::{Direction, ObjectShape, RestoreReport};
 
+/// The hint of an undo or redo while the Pen holds an unfinished path (`specs/0020-undo-redo`
+/// criterion 6e).
+pub const FINISH_PEN_FIRST: &str = "Finish the path (Enter) or cancel it (Esc) first.";
+
 /// "1 rectangle", "3 paths", "5 objects": the summary of the objects a step touched. Objects of
 /// one shape are counted by that shape, a mix as "objects". `None` for a step that touched no
 /// object.

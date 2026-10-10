@@ -1364,8 +1364,10 @@ built-in list.
   selection with the panel at the top (UX N11); consider scroll anchoring.
 - **List semantics:** the formats list is a `group` with buttons; `role="list"` and `listitem` rows would
   let a screen reader announce the count (UX N13).
-- **`session/mod.rs` is over 500 lines** (537 non-test lines before the slice); split the glue calls out
+- **`session/mod.rs` is over 500 lines** (537 non-test lines before the slice; 571 after `0020`; `session/keys.rs` has 506); split the glue calls out
   when the next slice touches it.
+- **The Select bar overlaps the properties panel below about 600 px window width** (UX review of `0040`, found at 420 px; below the 800 x 600 minimum, so not fixed there).
+
 
 
 ## The history cache stays in memory for the whole session
@@ -1376,4 +1378,3 @@ closed: +48 MB and about 260 ms at 154,000 operations in the Loro spike
 (`docs/spikes/loro-history-primitives.md`); the measured figure for this build is in ADR 0014 §13.
 The step index and the container chains of the log add to it. Freeing it when the History tab is
 closed (`free_history_cache`) is possible but would put the cold cost back on the next undo.
-- **The Select bar overlaps the properties panel below about 600 px window width** (UX review of `0040`, found at 420 px; below the 800 x 600 minimum, so not fixed there).

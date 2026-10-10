@@ -107,12 +107,19 @@ impl WasmSession {
     }
 
     /// Wipes the history. Returns the steps removed, or -1 when a drag, a chip or an unfinished Pen
-    /// path made the session ignore it, or -2 for a shared document.
+    /// path made the session ignore it, -2 for a shared document or -3 when the log could not be rewritten.
     pub fn history_wipe(&mut self) -> i32 {
         match self.session.wipe_history() {
             crate::WipeOutcome::Ignored => -1,
             crate::WipeOutcome::Shared => -2,
+            crate::WipeOutcome::Failed => -3,
             crate::WipeOutcome::Wiped(removed) => i32::try_from(removed).unwrap_or(i32::MAX),
         }
+    }
+
+    /// The hint shown for an undo or redo while the Pen holds an unfinished path.
+    #[must_use]
+    pub fn finish_pen_first_notice(&self) -> String {
+        curvyo_ui_core::FINISH_PEN_FIRST.to_owned()
     }
 }

@@ -213,7 +213,12 @@ fn read_versions(
         } else {
             BTreeMap::new()
         },
-        roots: guard.roots(),
+        // The z-order is only read to place objects that come back.
+        roots: if touched.created.is_empty() && touched.deleted.is_empty() {
+            Vec::new()
+        } else {
+            guard.roots()
+        },
     };
     let guard = Detached::at(doc, &log.before)?;
     let before = read(&guard);

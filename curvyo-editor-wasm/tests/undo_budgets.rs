@@ -248,7 +248,9 @@ fn resident_kib() -> usize {
 #[test]
 #[ignore = "a timing budget for release builds; run on purpose"]
 fn the_warm_up_after_open_costs_time_and_memory_that_are_written_down() {
-    let bytes = pack(&big_document(), "0.1.0").unwrap();
+    let document = big_document();
+    eprintln!("the drawing has {} operations", document.history_stamp());
+    let bytes = pack(&document, "0.1.0").unwrap();
     let before = resident_kib();
     let mut session = Session::open(2, &bytes).unwrap();
     session.resize_viewport(1200.0, 800.0);

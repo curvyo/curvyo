@@ -186,7 +186,7 @@ The customer accepted ADR 0014 and these defaults on 2026-10-10; no milestone wa
 
 - ADR 0002 §9 and ADR 0009 §1 stay the accepted base: the operation log is the history, undo is a forward commit, peer-scoped. ADR 0014 §1 supersedes the sentence of ADR 0004 §2 that names Loro's undo manager as the mechanism: the engine is our own restore over versions, because the manager has no per-object veto (criteria 17 to 19).
 - Step boundaries are a header in the commit message (not Loro's change boundaries, which split and merge: criteria 13 and 14). The kind and the touched objects are derived from the step's operations (criterion 32).
-- Undo reads the step's before and after values with `diff` and the current values live, so it does not check out (ADR 0014 §1); checkouts are only for whole past states, behind a guard (§12). The budgets of criterion 30 are ADR 0014 §13.
+- Undo reads the step's before and after values through one guarded checkout pair (ADR 0014 §1 amendment of 2026-10-10) and the current values live; the guard (§12) attaches the document again on every exit.
 - Undo of Delete needs a pinned Loro version and a canary test (ADR 0014 §11, Question 17). Risks the architect measures in milestone 1: the budgets of criterion 30 with the restore writes included, the canary, the nested containers of deleted objects (spike S6), old files with merged rows and no times (criterion 36).
 - `docs/technical-debt.md` "Document files grow with edit history": the wipe is the first user-visible answer; the compaction story stays separate.
 

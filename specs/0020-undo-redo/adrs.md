@@ -34,7 +34,7 @@ decisions 1, 2, 3, 7, 9, 11, 12 changed; 13 to 15 are new; milestone 0 is done.
    through the guarded checkout pair (decision 14; ADR 0014 §1 amendment, milestone 1 review) and writes back field by field where the current value is still the
    one S wrote (criterion 16), removes an object S created only if nobody changed it (18, default
    A), skips objects a peer deleted (17) and revives objects S deleted with their old `NodeId`
-   through ADR 0014 §11 (one injected tree move per object, same header). Redo is the same with
+   through ADR 0014 §11 (one injected change with one tree move per revived object, same header). Redo is the same with
    before and after swapped. The write is one step with header `undo;s=<n>;t=<sec>;u=<StepRef>`
    (or `redo;…;d=…`), replicated like any edit (20). The restore also covers root registers
    (document size, unit) for *Document* steps.
@@ -149,8 +149,8 @@ the trash node and carry a `format_version` bump with a migration test.
 - Old files: adjacent same-label commits show as one row; the first row includes the root
   initialisation; no times. Stated in the release notes.
 - Criterion 29 (50 MB): stacks hold refs and selections only. The checkout history cache (+48 MB at
-  154,000 ops) is not undo data; it is built only by checkout-based reads and freed when the
-  History tab closes.
+  154,000 ops) is not undo data; `warm_history` builds it after Open and it stays until the document
+  is closed (ADR 0014 §1 amendment).
 
 ## Notes added in the milestone 1 review (2026-10-10)
 
@@ -166,3 +166,5 @@ the trash node and carry a `format_version` bump with a migration test.
   outline is lost on merge. Known limit.
 - Verification items 7 (`t=` after a later Loro timestamp) and 8 (touched objects from nested
   containers of deleted nodes) are tested in milestone 2.
+- **`mark_shared` is session state** (2026-10-10): the test seam for criterion 50. The sharing slice
+  derives "shared" from the persisted keyring and removes `Document::mark_shared`.

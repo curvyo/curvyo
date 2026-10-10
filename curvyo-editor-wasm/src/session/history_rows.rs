@@ -7,9 +7,6 @@ use serde_json::{Value, json};
 
 use super::Session;
 
-/// The reserved label of a history wipe, which is a row with its own name.
-const WIPE_LABEL: &str = "wipe_history";
-
 fn kind_word(kind: StepKind) -> &'static str {
     match kind {
         StepKind::Create => "create",
@@ -46,7 +43,7 @@ fn step_text(step: StepRef) -> String {
 
 impl Session {
     fn row_json(&self, row: &HistoryRow) -> Value {
-        let (name, known) = if row.label == WIPE_LABEL {
+        let (name, known) = if row.label == curvyo_document_core::WIPE_LABEL {
             ("History wiped", true)
         } else {
             (
@@ -148,6 +145,8 @@ pub enum WipeOutcome {
     Ignored,
     /// The document is shared.
     Shared,
+    /// The log could not be rewritten; the document is as it was.
+    Failed,
     /// The history was wiped; the number is the steps removed.
     Wiped(usize),
 }
@@ -178,6 +177,7 @@ impl Session {
                 self.history_hover.clear();
                 WipeOutcome::Wiped(removed)
             }
+            Err(curvyo_document_core::HistoryError::Wipe) => WipeOutcome::Failed,
             Err(_) => WipeOutcome::Shared,
         }
     }

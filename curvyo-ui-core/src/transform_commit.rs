@@ -25,6 +25,10 @@ pub(crate) use curvyo_geometry_core::MAX_COORDINATE_MM;
 /// The label of a single-object skew: it writes the path through the resize writers.
 const SKEW_PATH_COMMIT_LABEL: &str = "skew_path";
 
+/// The label of a single-object resize that converts a shape: the group writer it goes through
+/// would call it a transform.
+const RESIZE_PATH_COMMIT_LABEL: &str = "resize_path";
+
 /// A move offset within this (millimetres) of zero is no move.
 pub(crate) const MOVE_EQUAL_EPSILON_MM: f64 = 1e-9;
 
@@ -52,7 +56,9 @@ pub(crate) fn commit_gesture(
     modes: ScaleModes,
 ) {
     match handle {
-        EditHandle::Resize(_) => commit_resize(document, result.id(), result, modes.stroke),
+        EditHandle::Resize(_) => document.batch(RESIZE_PATH_COMMIT_LABEL, |document| {
+            commit_resize(document, result.id(), result, modes.stroke);
+        }),
         // A refusal here means the object is gone (see `commit_resize`).
         EditHandle::Rotate(_) => {
             let _ = document.rotate_object(result);

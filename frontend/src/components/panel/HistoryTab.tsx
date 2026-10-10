@@ -460,7 +460,7 @@ function WipeFooter({
               return;
             }
             const removed = wipeHistory();
-            if (removed !== -1) {
+            if (removed >= 0) {
               setConfirming(false);
               onReturnFocus();
             }
