@@ -4,7 +4,7 @@
 //! §3; `specs/0001-project-file-foundation/adrs.md`, "a minimal document root
 //! record, and no more").
 
-use loro::{CommitOptions, ExportMode, LoroDoc, LoroMap, LoroValue};
+use loro::{ExportMode, LoroDoc, LoroMap, LoroValue};
 use serde::Serialize;
 
 use crate::display_unit::DisplayUnit;
@@ -149,6 +149,8 @@ pub(crate) const OBJECTS_TREE: &str = "paths";
 /// [`DocumentSize`] and this crate's own error types.
 pub struct Document {
     loro: LoroDoc,
+    /// The commit path's session state (`crate::history`).
+    pub(crate) commit_state: crate::history::CommitState,
 }
 
 impl Document {
@@ -188,7 +190,12 @@ impl Document {
             root.insert(KEY_WIDTH_MM, size.width.as_mm()).unwrap();
             root.insert(KEY_HEIGHT_MM, size.height.as_mm()).unwrap();
         }
-        Self { loro }
+        let document = Self {
+            loro,
+            commit_state: crate::history::CommitState::default(),
+        };
+        document.commit_new_document();
+        document
     }
 
     /// Rebuilds a document from a previously exported Loro snapshot — the
@@ -223,7 +230,10 @@ impl Document {
         if !crate::path_codec::validate_path_tree(&loro, OBJECTS_TREE) {
             return Err(OpenError::Damaged);
         }
-        Ok(Self { loro })
+        Ok(Self {
+            loro,
+            commit_state: crate::history::CommitState::default(),
+        })
     }
 
     /// The document's size in millimetres.
@@ -266,19 +276,6 @@ impl Document {
     #[must_use]
     pub fn version(&self) -> DocumentVersion {
         DocumentVersion(self.loro.state_frontiers())
-    }
-
-    /// Commits the pending auto-commit transaction with `label` as its
-    /// (persisted) commit message, so each editing method in
-    /// [`crate::paths`] ends its own transaction instead of letting every
-    /// edit since the last explicit commit pile into one (ADR 0002 §9;
-    /// `specs/0002-path-node-editing/adrs.md`'s PR review: "a pen session is
-    /// one commit" only holds if *every* mutating method commits its own
-    /// work, undo-readiness for a future undo/redo feature depends on
-    /// one commit per interaction).
-    pub(crate) fn commit_with_label(&self, label: &str) {
-        self.loro
-            .commit_with(CommitOptions::new().commit_msg(label));
     }
 
     fn read_mm(root: &LoroMap, key: &str) -> Option<f64> {
