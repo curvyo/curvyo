@@ -199,8 +199,8 @@ fn a_new_step_after_an_undo_empties_the_redo_stack() {
 #[test]
 fn five_hundred_and_one_steps_keep_five_hundred_undos() {
     let mut session = fresh();
-    session.set_tool(Tool::Rectangle);
     for n in 0..501 {
+        session.set_tool(Tool::Rectangle);
         let x = f64::from(n % 20) * 60.0;
         let y = f64::from(n / 20) * 60.0;
         drag(&mut session, pt(x, y), pt(x + 10.0, y + 10.0));

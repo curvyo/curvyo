@@ -3,9 +3,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use curvyo_document_core::{
-    AnchorId, Direction, NodeId, ObjectSnapshot, SMALL_STEP_OPS, StepRef, Timestamp,
-};
+use curvyo_document_core::{AnchorId, Direction, NodeId, SMALL_STEP_OPS, StepRef, Timestamp};
 use curvyo_ui_core::{
     SelectionSnapshot, UndoStack, nothing_notice, object_bounds, objects_summary, operation_name,
     restore_notice,
@@ -254,33 +252,29 @@ impl Session {
         }
     }
 
-    /// Selects what `snapshot` held, leaving out what no longer exists.
+    /// Selects what `snapshot` held, leaving out what no longer exists. Reads only the objects the
+    /// snapshot names, so the cost does not grow with the size of the drawing.
     fn restore_selection(&mut self, snapshot: &SelectionSnapshot) {
-        let objects = self.read_objects();
-        let live: HashSet<NodeId> = objects.iter().map(ObjectSnapshot::id).collect();
         let ids: Vec<NodeId> = snapshot
             .objects
             .iter()
             .copied()
-            .filter(|id| live.contains(id))
+            .filter(|id| self.document.object(*id).is_some())
             .collect();
         self.selection.set(&ids);
-        let anchors: HashMap<NodeId, HashSet<AnchorId>> = objects
-            .iter()
-            .filter_map(|object| match object {
-                ObjectSnapshot::Path(path) => Some((
-                    path.id,
-                    path.all_anchors().map(|anchor| anchor.id).collect(),
-                )),
-                ObjectSnapshot::Primitive(_) => None,
-            })
-            .collect();
-        let nodes: Vec<(NodeId, AnchorId)> = snapshot
-            .nodes
-            .iter()
-            .copied()
-            .filter(|(path, anchor)| anchors.get(path).is_some_and(|set| set.contains(anchor)))
-            .collect();
+        let mut anchors: HashMap<NodeId, HashSet<AnchorId>> = HashMap::new();
+        let mut nodes: Vec<(NodeId, AnchorId)> = Vec::new();
+        for &(path, anchor) in &snapshot.nodes {
+            let known = anchors.entry(path).or_insert_with(|| {
+                self.document
+                    .path(path)
+                    .map(|p| p.all_anchors().map(|a| a.id).collect())
+                    .unwrap_or_default()
+            });
+            if known.contains(&anchor) {
+                nodes.push((path, anchor));
+            }
+        }
         self.node.select_nodes(nodes);
         self.hovered_object = None;
         self.hovered = None;
@@ -295,11 +289,12 @@ impl Session {
         }
         let view = self.viewport.view();
         !self
-            .read_objects()
+            .selection
+            .ids()
             .iter()
-            .filter(|object| self.selection.contains(object.id()))
+            .filter_map(|id| self.document.object(*id))
             .any(|object| {
-                let (low, high) = object_bounds(object);
+                let (low, high) = object_bounds(&object);
                 let (left, top) = view.document_to_screen(low);
                 let (right, bottom) = view.document_to_screen(high);
                 let (min_x, max_x) = (left.min(right), left.max(right));
