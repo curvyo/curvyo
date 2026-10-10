@@ -476,7 +476,7 @@ impl GroupEntry {
             ),
             Ok(None) => (EntryOutcome::Unchanged, ConversionCounts::default()),
             Ok(Some(results)) => {
-                if commit_group(document, &results, self.modes.stroke) {
+                if commit_group(document, &results, self.modes.stroke, self.handle) {
                     (
                         EntryOutcome::Committed,
                         converted_counts(&self.starts, &results),

@@ -9,9 +9,11 @@ mod node_value;
 mod report;
 mod restore;
 mod revive;
+mod rows;
 mod stack_machine;
 mod step_header;
 mod step_id;
+mod step_index;
 mod step_log;
 mod touched;
 mod updates;
@@ -23,6 +25,8 @@ pub use error::{HistoryError, SyncError};
 pub use report::{
     Direction, ObjectReport, ObjectResult, ObjectShape, RestoreReport, Role, SkipReason,
 };
+pub use rows::{Author, HistoryRow, StepKind, TouchedObject};
 pub use stack_machine::{Event, STACK_LIMIT, StackMachine, Status};
 pub use step_id::{MIN_SHOWN_ID_LEN, StepRef, shown_ids};
+pub(crate) use step_index::StepIndex;
 pub(crate) use touched::ContainerIndex;

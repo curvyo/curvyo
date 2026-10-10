@@ -60,7 +60,6 @@ impl CommitState {
     pub(crate) fn set_warm(&self) {
         self.warm.set(true);
     }
-
 }
 
 impl Document {

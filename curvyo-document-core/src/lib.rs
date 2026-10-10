@@ -77,9 +77,9 @@ pub use format_library_file::{
 };
 pub use format_library_import::ImportReport;
 pub use history::{
-    Direction, Event, HistoryError, MIN_SHOWN_ID_LEN, ObjectReport, ObjectResult, ObjectShape,
-    OwnStep, RestoreReport, Role, SMALL_STEP_OPS, STACK_LIMIT, SkipReason, StackMachine, Status,
-    StepRef, SyncError, shown_ids,
+    Author, Direction, Event, HistoryError, HistoryRow, MIN_SHOWN_ID_LEN, ObjectReport,
+    ObjectResult, ObjectShape, OwnStep, RestoreReport, Role, SMALL_STEP_OPS, STACK_LIMIT,
+    SkipReason, StackMachine, Status, StepKind, StepRef, SyncError, TouchedObject, shown_ids,
 };
 pub use junction::{COINCIDENT_MM, interior_handle, merged_junction};
 pub use objects::{CopySource, ObjectEditError};

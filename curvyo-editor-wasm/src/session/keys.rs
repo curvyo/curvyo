@@ -2,6 +2,7 @@
 //! Delete (`specs/0010-edit-interaction-polish/`, Parts D and F; `adrs.md`
 //! decisions 4 and 6).
 
+use curvyo_document_core::Direction;
 use curvyo_ui_core::{EntryKey, KeyEntryRefusal};
 
 use super::{Session, Tool};
@@ -26,6 +27,9 @@ pub struct KeyInput<'a> {
     /// element, an IME composition is running, or Space is held: knowledge
     /// only the DOM has.
     pub dom_blocked: bool,
+    /// The platform is macOS, where Cmd+Y is not a redo key
+    /// (`specs/0020-undo-redo` criterion 3).
+    pub mac: bool,
 }
 
 /// The one-line message of a key that cannot act (criterion 59); the
@@ -38,6 +42,9 @@ pub enum KeyHint {
     /// K or Shift+K with a selection that holds an object that is not a path:
     /// "Skew works on paths only".
     PathOnly,
+    /// Undo or redo while the Pen holds an unfinished path: "Finish the path (Enter) or cancel it
+    /// (Esc) first." (`specs/0020-undo-redo` criterion 6e).
+    FinishPenFirst,
 }
 
 /// What `Session::key_down` did.
@@ -58,6 +65,15 @@ pub enum KeyOutcome {
     PenFinished,
     /// The key could not act; show this hint.
     Hint(KeyHint),
+    /// Ctrl+Z ran (or found nothing to undo); the notice is in [`Session::take_history_notice`].
+    Undo,
+    /// Ctrl+Shift+Z ran (or found nothing to redo).
+    Redo,
+    /// Ctrl+Z needs the long-operation state first (a large step, or the history is not read yet):
+    /// the host shows it, then calls `Session::undo`.
+    UndoBusy,
+    /// As [`KeyOutcome::UndoBusy`], for redo.
+    RedoBusy,
 }
 
 impl KeyOutcome {
@@ -79,6 +95,11 @@ impl KeyOutcome {
             Self::Escape(EscapeStep::Nothing) => "escape-none",
             Self::Hint(KeyHint::SelectFirst) => "hint-select-first",
             Self::Hint(KeyHint::PathOnly) => "hint-path-only",
+            Self::Hint(KeyHint::FinishPenFirst) => "hint-finish-pen",
+            Self::Undo => "undo",
+            Self::Redo => "redo",
+            Self::UndoBusy => "undo-busy",
+            Self::RedoBusy => "redo-busy",
         }
     }
 }
@@ -133,6 +154,7 @@ enum KeyAction {
     FinishPen,
     Escape,
     Hint(KeyHint),
+    History(Direction),
 }
 
 /// The key table and its gate (criteria 54, 55, 60, 61) as a pure function:
@@ -156,14 +178,17 @@ fn decide(input: &KeyInput<'_>, state: KeyState) -> KeyAction {
         }
         _ => {}
     }
-    if input.repeat || input.ctrl || input.alt || input.dom_blocked {
-        return KeyAction::Ignore;
-    }
     // Letters are matched without regard to Caps Lock.
     let letter = match input.key.chars().collect::<Vec<_>>().as_slice() {
         [c] if c.is_ascii_alphabetic() => Some(c.to_ascii_lowercase()),
         _ => None,
     };
+    if let Some(direction) = history_direction(input, letter) {
+        return history_action(direction, input, state);
+    }
+    if input.repeat || input.ctrl || input.alt || input.dom_blocked {
+        return KeyAction::Ignore;
+    }
     let binding = match (letter, input.key) {
         (Some('b'), _) => Binding::Tool(Tool::Pen),
         (Some('n'), _) => Binding::Tool(Tool::Node),
@@ -205,6 +230,34 @@ fn decide(input: &KeyInput<'_>, state: KeyState) -> KeyAction {
     }
 }
 
+/// Which history key this is: Ctrl (Cmd) with the typed character z, Shift+Z or, off macOS, y
+/// (`specs/0020-undo-redo` criteria 1 to 3, 7). Matched by the character, not the key's place on
+/// the keyboard, so QWERTZ works.
+fn history_direction(input: &KeyInput<'_>, letter: Option<char>) -> Option<Direction> {
+    if !input.ctrl || input.alt {
+        return None;
+    }
+    match (letter?, input.shift) {
+        ('z', false) => Some(Direction::Undo),
+        ('z', true) => Some(Direction::Redo),
+        ('y', false) if !input.mac => Some(Direction::Redo),
+        _ => None,
+    }
+}
+
+/// The gate of undo and redo (criterion 6): text fields keep their own undo, a drag, an open entry
+/// chip and a long operation block the key, an unfinished Pen path answers with a hint. Auto-repeat
+/// is not gated (criterion 5).
+fn history_action(direction: Direction, input: &KeyInput<'_>, state: KeyState) -> KeyAction {
+    if input.dom_blocked || state.operation_in_flight || state.entry_open {
+        return KeyAction::Ignore;
+    }
+    if state.pen_open {
+        return KeyAction::Hint(KeyHint::FinishPenFirst);
+    }
+    KeyAction::History(direction)
+}
+
 /// What a key that passed the gate is bound to.
 #[derive(Debug, Clone, Copy)]
 enum Binding {
@@ -243,7 +296,11 @@ impl Session {
             Tool::PolygonStar => self.poly_star.drag_in_flight(),
             Tool::Pen => false,
         };
-        in_tool || self.is_panning()
+        // A drag of a panel value field is a drag too (`specs/0020-undo-redo` criterion 6a).
+        in_tool
+            || self.is_panning()
+            || self.style.pending_edit().is_some()
+            || self.select.bar_preview().is_some()
     }
 
     fn pen_path_open(&self) -> bool {
@@ -299,6 +356,7 @@ impl Session {
             }
             KeyAction::Escape => KeyOutcome::Escape(self.escape()),
             KeyAction::Hint(hint) => KeyOutcome::Hint(hint),
+            KeyAction::History(direction) => self.history_key(direction),
         }
     }
 
@@ -405,17 +463,19 @@ impl Session {
     /// toolbar's Delete button): removes every selected object when the
     /// Select or Node tool is active. A no-op for every other tool.
     pub fn delete_selected(&mut self) {
-        self.flush_select_bar_preview();
-        self.flush_style_preview();
-        match self.tool {
-            Tool::Select => {
-                let objects = self.objects();
-                self.select
-                    .delete_selected(&self.document, &objects, &mut self.selection);
+        self.recording(|this| {
+            this.flush_select_bar_preview();
+            this.flush_style_preview();
+            match this.tool {
+                Tool::Select => {
+                    let objects = this.objects();
+                    this.select
+                        .delete_selected(&this.document, &objects, &mut this.selection);
+                }
+                Tool::Node => this.node.delete_selected(&this.document),
+                Tool::Pen | Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar => {}
             }
-            Tool::Node => self.node.delete_selected(&self.document),
-            Tool::Pen | Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar => {}
-        }
+        })
     }
 }
 

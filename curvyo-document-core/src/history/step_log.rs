@@ -3,10 +3,7 @@
 
 use loro::{Frontiers, IdSpan, LoroDoc};
 
-use super::stack_machine::Event;
-use super::step_header::{
-    KEY_REDONE, KEY_UNDONE, LABEL_NEW_DOCUMENT, LABEL_REDO, LABEL_UNDO, LABEL_WIPE, StepHeader,
-};
+use super::step_header::StepHeader;
 use super::step_id::StepRef;
 
 /// One step as the log holds it.
@@ -18,6 +15,8 @@ pub(crate) struct LogStep {
     pub header: Option<StepHeader>,
     /// The commit label: the header's label, or the whole legacy message.
     pub label: String,
+    /// The commit message as written.
+    pub message: String,
     /// One past the counter of the step's last operation.
     pub end: i32,
     /// The version the step started from: the dependencies of its first change.
@@ -65,42 +64,9 @@ pub(crate) fn find_step(doc: &LoroDoc, step: StepRef) -> Option<LogStep> {
         step,
         header,
         label,
+        message,
         end,
         before: first.deps.clone(),
         lamport: first.lamport,
     })
-}
-
-/// The events of one peer's stacks as its commits in the log tell them, oldest first: a step is a
-/// `Do`, an `undo` commit an `Undo` of the step it names, a `redo` commit a `Redo`. The reserved
-/// setup and wipe commits are no events.
-pub(crate) fn peer_events(doc: &LoroDoc, peer: u64) -> Vec<Event> {
-    let mut events = Vec::new();
-    let mut counter = 0;
-    let mut previous: Option<String> = None;
-    while let Some(change) = doc.get_change(loro::ID::new(peer, counter)) {
-        let message = change.message.as_deref().unwrap_or_default().to_owned();
-        let next = change.id.counter + i32::try_from(change.len).unwrap_or(i32::MAX);
-        if previous.as_deref() != Some(message.as_str()) {
-            if let Some(event) = event_of(&message, StepRef::new(peer, change.id.counter)) {
-                events.push(event);
-            }
-        }
-        previous = Some(message);
-        counter = next;
-    }
-    events
-}
-
-fn event_of(message: &str, step: StepRef) -> Option<Event> {
-    let Some(header) = StepHeader::parse(message) else {
-        return Some(Event::Do(step));
-    };
-    let target = |key: &str| header.extra_value(key).and_then(StepRef::decode);
-    match header.label.as_str() {
-        LABEL_NEW_DOCUMENT | LABEL_WIPE => None,
-        LABEL_UNDO => target(KEY_UNDONE).map(Event::Undo),
-        LABEL_REDO => target(KEY_REDONE).map(Event::Redo),
-        _ => Some(Event::Do(step)),
-    }
 }

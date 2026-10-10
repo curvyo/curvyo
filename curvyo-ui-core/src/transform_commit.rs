@@ -22,6 +22,9 @@ use crate::transform_handle_layout::EditHandle;
 /// become unopenable from a drag").
 pub(crate) use curvyo_geometry_core::MAX_COORDINATE_MM;
 
+/// The label of a single-object skew: it writes the path through the resize writers.
+const SKEW_PATH_COMMIT_LABEL: &str = "skew_path";
+
 /// A move offset within this (millimetres) of zero is no move.
 pub(crate) const MOVE_EQUAL_EPSILON_MM: f64 = 1e-9;
 
@@ -39,9 +42,9 @@ pub(crate) fn commit_gesture(
         EditHandle::Rotate(_) => {
             let _ = document.rotate_object(result);
         }
-        EditHandle::Skew(_) => {
+        EditHandle::Skew(_) => document.batch(SKEW_PATH_COMMIT_LABEL, |document| {
             commit_resize(document, result.id(), result, StrokeScaling::Keep);
-        }
+        }),
         EditHandle::Param(param) => commit_param(document, param, result),
         EditHandle::Move => {}
     }
@@ -123,7 +126,12 @@ pub(crate) fn commit_resize(
         ObjectSnapshot::Path(_) if document.primitive(id).is_some() => {
             // A path result for an object that is still a primitive is a
             // conversion (`specs/0019-multi-object-transform/` criterion 56).
-            let _ = commit_group(document, std::slice::from_ref(result), stroke_scaling);
+            let _ = commit_group(
+                document,
+                std::slice::from_ref(result),
+                stroke_scaling,
+                EditHandle::Move,
+            );
         }
         ObjectSnapshot::Path(path) => {
             let anchors: Vec<(AnchorId, Point, Vec2, Vec2)> = path

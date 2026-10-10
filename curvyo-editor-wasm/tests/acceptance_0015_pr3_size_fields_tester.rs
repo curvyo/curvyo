@@ -83,7 +83,9 @@ fn labels(s: &Session) -> Vec<String> {
     l.travel_change_ancestors(&ids, &mut |m| {
         out.push((
             m.lamport,
-            m.message.map(|x| x.to_string()).unwrap_or_default(),
+            m.message
+                .map(|x| x.split(';').next().unwrap_or_default().to_string())
+                .unwrap_or_default(),
         ));
         ControlFlow::Continue(())
     })

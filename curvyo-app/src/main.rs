@@ -227,6 +227,7 @@ fn main() {
             take_pending_open,
             confirm_project_opened,
             save_project_bytes,
+            menu::set_history_menu,
             formats::read_formats_file,
             formats::write_formats_file,
             formats::set_formats_file_aside,

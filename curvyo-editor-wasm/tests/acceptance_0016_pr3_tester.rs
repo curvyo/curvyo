@@ -350,7 +350,9 @@ fn labels(d: &Document) -> Vec<(String, usize)> {
     loro.travel_change_ancestors(&ids, &mut |m| {
         out.push((
             m.lamport,
-            m.message.map(|s| s.to_string()).unwrap_or_default(),
+            m.message
+                .map(|s| s.split(';').next().unwrap_or_default().to_string())
+                .unwrap_or_default(),
             m.len,
         ));
         ControlFlow::Continue(())
@@ -1882,6 +1884,7 @@ fn a_typed_entry_is_not_left_dangling_by_the_command() {
             alt: false,
             repeat: false,
             dom_blocked: false,
+            mac: false,
         })
     };
     let _ = key(&mut s, "m");

@@ -80,7 +80,7 @@ impl GroupDrag {
         document: &Document,
         results: &[ObjectSnapshot],
     ) -> Option<ConversionCounts> {
-        commit_group(document, results, self.modes.stroke)
+        commit_group(document, results, self.modes.stroke, self.handle)
             .then(|| converted_counts(&self.starts, results))
     }
 }

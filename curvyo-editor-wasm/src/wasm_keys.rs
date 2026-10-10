@@ -15,10 +15,12 @@ impl WasmSession {
     /// Cmd, `repeat` is the event's auto-repeat flag and `dom_blocked` is
     /// true when focus is in a text field, select, button, switch or
     /// contenteditable element, an IME composition is running, or Space is
-    /// held. Returns what happened: `"ignored"`, `"tool"`, `"entry"`,
+    /// held; `mac` is true on macOS (Cmd+Y is no redo key there). Returns what happened: `"ignored"`, `"tool"`, `"entry"`,
     /// `"deleted"`, `"pen"`, `"escape-entry"`, `"escape-drag"`,
     /// `"escape-state"`, `"escape-tool"`, `"escape-none"`,
-    /// `"hint-select-first"` or `"hint-path-only"`. The host prevents the page's default for every
+    /// `"hint-select-first"`, `"hint-path-only"`, `"hint-finish-pen"`, `"undo"`, `"redo"` (read the
+    /// notice with `take_history_notice`), `"undo-busy"` or `"redo-busy"` (show the long-operation
+    /// state, then call `history_press`). The host prevents the page's default for every
     /// result except `"ignored"` and re-reads the session state for them.
     #[allow(clippy::fn_params_excessive_bools)]
     pub fn key_down(
@@ -29,6 +31,7 @@ impl WasmSession {
         alt: bool,
         repeat: bool,
         dom_blocked: bool,
+        mac: bool,
     ) -> String {
         self.session
             .key_down(KeyInput {
@@ -38,6 +41,7 @@ impl WasmSession {
                 alt,
                 repeat,
                 dom_blocked,
+                mac,
             })
             .code()
             .to_string()

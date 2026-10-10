@@ -34,6 +34,8 @@ mod wasm_document;
 #[cfg(target_arch = "wasm32")]
 mod wasm_formats;
 #[cfg(target_arch = "wasm32")]
+mod wasm_history;
+#[cfg(target_arch = "wasm32")]
 mod wasm_keys;
 #[cfg(target_arch = "wasm32")]
 mod wasm_move;

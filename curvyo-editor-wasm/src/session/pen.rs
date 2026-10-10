@@ -36,7 +36,9 @@ impl Session {
     /// Acceptance criterion 3 / the dedicated "finish path" action
     /// (Enter, or a double-click the host has already recognized).
     pub fn finish_pen(&mut self) {
-        self.pen.finish(&self.document);
+        self.recording(|this| {
+            this.pen.finish(&this.document);
+        })
     }
 
     /// The in-progress pen path's placed nodes, for the host's

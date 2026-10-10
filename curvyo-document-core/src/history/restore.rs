@@ -353,10 +353,8 @@ impl Document {
     pub fn stacks_in_log(&self, peer: u64) -> super::StackMachine {
         let doc = self.loro();
         doc.commit();
-        let mut machine = super::StackMachine::new(usize::MAX);
-        for event in super::step_log::peer_events(doc, peer) {
-            machine.apply(event);
-        }
-        machine
+        let mut index = self.step_index.borrow_mut();
+        index.extend(doc);
+        index.machine(peer)
     }
 }

@@ -62,7 +62,10 @@ fn commit_labels(session: &Session) -> Vec<String> {
     loro.travel_change_ancestors(&ids, &mut |change| {
         changes.push((
             change.lamport,
-            change.message.map(|m| m.to_string()).unwrap_or_default(),
+            change
+                .message
+                .map(|m| m.split(';').next().unwrap_or_default().to_string())
+                .unwrap_or_default(),
         ));
         std::ops::ControlFlow::Continue(())
     })

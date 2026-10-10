@@ -60,47 +60,49 @@ impl Session {
     /// one commit labelled `boolean_<op>`, and selects the result alone. The tool stays Select.
     /// A refusal changes nothing (no commit, same selection) and outlines its offenders.
     pub fn apply_boolean(&mut self, op: BooleanOp) -> BooleanOutcome {
-        if !self.rail_command_ready() {
-            return BooleanOutcome::Ignored;
-        }
-        self.flush_select_bar_preview();
-        self.end_colour_pick();
-        let objects = self.objects();
-        let selection = self.boolean_selection();
-        let plan = match plan_boolean(&objects, &selection, op, &mut self.minter) {
-            Ok(plan) => plan,
-            Err(refusal) => {
-                self.command_refusal = match &refusal {
-                    BooleanRefusal::OpenPaths { offenders, .. }
-                    | BooleanRefusal::NoArea { offenders, .. }
-                    | BooleanRefusal::OutOfRange { offenders, .. } => {
-                        Some(RefusalMarks::new(offenders.clone(), &selection))
-                    }
-                    BooleanRefusal::NeedsTwo | BooleanRefusal::Empty => None,
-                };
-                return BooleanOutcome::Refused(refusal);
+        self.recording(|this| -> BooleanOutcome {
+            if !this.rail_command_ready() {
+                return BooleanOutcome::Ignored;
             }
-        };
-        let replaced = self.document.replace_with_path(
-            &plan.operands,
-            plan.base,
-            &plan.outlines,
-            op.commit_label(),
-        );
-        let Ok(result) = replaced else {
-            // invariant: the plan was made from the objects just read, with a base among the
-            // operands, at least one outline and fresh anchor ids, so the write cannot fail.
-            debug_assert!(false, "a planned boolean operation could not be written");
-            return BooleanOutcome::Ignored;
-        };
-        self.command_refusal = None;
-        // The operands are gone, and so are the nodes a Node-tool selection held.
-        self.node.clear_selection();
-        self.selection.select_single(result);
-        self.hovered_object = None;
-        BooleanOutcome::Applied {
-            operands: plan.operands.len(),
-            compound: plan.compound,
-        }
+            this.flush_select_bar_preview();
+            this.end_colour_pick();
+            let objects = this.objects();
+            let selection = this.boolean_selection();
+            let plan = match plan_boolean(&objects, &selection, op, &mut this.minter) {
+                Ok(plan) => plan,
+                Err(refusal) => {
+                    this.command_refusal = match &refusal {
+                        BooleanRefusal::OpenPaths { offenders, .. }
+                        | BooleanRefusal::NoArea { offenders, .. }
+                        | BooleanRefusal::OutOfRange { offenders, .. } => {
+                            Some(RefusalMarks::new(offenders.clone(), &selection))
+                        }
+                        BooleanRefusal::NeedsTwo | BooleanRefusal::Empty => None,
+                    };
+                    return BooleanOutcome::Refused(refusal);
+                }
+            };
+            let replaced = this.document.replace_with_path(
+                &plan.operands,
+                plan.base,
+                &plan.outlines,
+                op.commit_label(),
+            );
+            let Ok(result) = replaced else {
+                // invariant: the plan was made from the objects just read, with a base among the
+                // operands, at least one outline and fresh anchor ids, so the write cannot fail.
+                debug_assert!(false, "a planned boolean operation could not be written");
+                return BooleanOutcome::Ignored;
+            };
+            this.command_refusal = None;
+            // The operands are gone, and so are the nodes a Node-tool selection held.
+            this.node.clear_selection();
+            this.selection.select_single(result);
+            this.hovered_object = None;
+            BooleanOutcome::Applied {
+                operands: plan.operands.len(),
+                compound: plan.compound,
+            }
+        })
     }
 }

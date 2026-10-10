@@ -82,7 +82,9 @@ impl Session {
     /// before anything that can change the selection or the tool (a release
     /// outside the control never fires the control's own).
     pub(super) fn flush_style_preview(&mut self) {
-        let _ = self.style.commit(&self.document);
+        self.recording(|this| {
+            let _ = this.style.commit(&this.document);
+        })
     }
 
     /// Enter or Tab in a typed field: `Ok(true)` after one commit for every
@@ -130,7 +132,9 @@ impl Session {
     /// The release (or key-up): writes the previewed edit as one commit to the
     /// objects the drag started on. Writes nothing after Escape.
     pub fn commit_style_preview(&mut self) {
-        self.flush_style_preview();
+        self.recording(|this| {
+            this.flush_style_preview();
+        })
     }
 
     /// Escape during a panel drag: the objects return to their committed
@@ -234,8 +238,10 @@ impl Session {
     /// Writes `edit` to every edited object in one commit. `false` when there
     /// is nothing to edit or the document refused it.
     pub(super) fn apply_style_edit(&mut self, edit: &StyleEdit) -> bool {
-        self.flush_style_preview();
-        let ids = self.edit_ids(edit);
-        !ids.is_empty() && self.document.edit_style(&ids, edit).is_ok()
+        self.recording(|this| -> bool {
+            this.flush_style_preview();
+            let ids = this.edit_ids(edit);
+            !ids.is_empty() && this.document.edit_style(&ids, edit).is_ok()
+        })
     }
 }
