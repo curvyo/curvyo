@@ -327,3 +327,18 @@ fn revival_index(
         _ => FractionalIndex::new(lower.as_ref(), upper.as_ref()).unwrap_or_default(),
     }
 }
+
+impl Document {
+    /// The stacks and step statuses of `peer` as its commits in the log tell them (the history
+    /// list's source, `specs/0020-undo-redo` criterion 55), without a limit on the stacks.
+    #[must_use]
+    pub fn stacks_in_log(&self, peer: u64) -> super::StackMachine {
+        let doc = self.loro();
+        doc.commit();
+        let mut machine = super::StackMachine::new(usize::MAX);
+        for event in super::step_log::peer_events(doc, peer) {
+            machine.apply(event);
+        }
+        machine
+    }
+}
