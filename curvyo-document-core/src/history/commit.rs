@@ -39,6 +39,8 @@ pub(crate) struct CommitState {
     batch_depth: Cell<u32>,
     last: RefCell<Option<LastCommit>>,
     own: RefCell<Vec<OwnStep>>,
+    /// The history was read since the document was opened (see `Document::warm_history`).
+    warm: Cell<bool>,
 }
 
 /// Ends a [`Document::batch`] even when the closure panics.
@@ -48,6 +50,17 @@ impl Drop for BatchGuard<'_> {
     fn drop(&mut self) {
         self.0.batch_depth.set(self.0.batch_depth.get() - 1);
     }
+}
+
+impl CommitState {
+    pub(super) fn is_warm(&self) -> bool {
+        self.warm.get()
+    }
+
+    pub(crate) fn set_warm(&self) {
+        self.warm.set(true);
+    }
+
 }
 
 impl Document {
@@ -93,6 +106,17 @@ impl Document {
     #[must_use]
     pub fn own_steps(&self) -> Vec<OwnStep> {
         self.commit_state.own.borrow().clone()
+    }
+
+    /// The steps this session started from index `from` on (a cheap way to ask for the new ones).
+    #[must_use]
+    pub fn own_steps_from(&self, from: usize) -> Vec<OwnStep> {
+        self.commit_state
+            .own
+            .borrow()
+            .get(from..)
+            .map(<[OwnStep]>::to_vec)
+            .unwrap_or_default()
     }
 
     /// The number of steps this session started.

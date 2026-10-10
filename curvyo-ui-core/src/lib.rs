@@ -33,6 +33,8 @@ mod format_list_view;
 mod group_box;
 mod group_entry;
 mod group_transform;
+mod history_names;
+mod history_notice;
 mod hit_test;
 mod hit_test_object;
 mod marquee;
@@ -70,6 +72,7 @@ mod transform_entry;
 mod transform_handle_layout;
 mod transform_math;
 mod transform_primitive;
+mod undo_stack;
 mod value_scale;
 mod viewport;
 
@@ -111,6 +114,10 @@ pub use group_box::{
     GroupBoxShape, GroupSelection, group_handles, hit_group_handle, is_drawn_group_handle,
 };
 pub use group_entry::GroupEntry;
+pub use history_names::{
+    OPERATION_NAMES, RESERVED_LABELS, UNKNOWN_OPERATION_NAME, known_operation_name, operation_name,
+};
+pub use history_notice::{nothing_notice, objects_summary, restore_notice};
 pub use hit_test::{Hit, hit_test};
 pub use hit_test_object::{hit_test_object, hit_test_objects, hit_test_objects_along};
 pub use marquee::{MarqueeMode, objects_in_marquee};
@@ -186,5 +193,6 @@ pub use transform_math::{
     resize_local_box, rotate_delta_angle, rotate_delta_for, rotate_pivot, scaled_and_floored,
     stroke_or_radius_factor,
 };
+pub use undo_stack::{SelectionSnapshot, Target as UndoTarget, UndoStack};
 pub use value_scale::{FieldShown, Grid, ValueField, ValueScale};
 pub use viewport::{DOCUMENT_INSET_PX, PX_PER_MM_AT_100, Viewport, Zoom};

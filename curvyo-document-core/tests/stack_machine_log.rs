@@ -1,7 +1,7 @@
 //! Criterion 55 of `specs/0020-undo-redo`: the live stacks and the stacks derived from the log are
 //! the same for the same sequence of events.
 
-use curvyo_document_core::{Document, Event, STACK_LIMIT, StackMachine, Status, Point, RectBounds};
+use curvyo_document_core::{Document, Event, Point, RectBounds, STACK_LIMIT, StackMachine, Status};
 
 /// A small deterministic generator, so the sequence is the same on every run.
 struct Lcg(u64);
@@ -36,12 +36,16 @@ fn a_thousand_generated_events_give_the_same_stacks_live_and_from_the_log() {
                 live.apply(Event::Do(step));
             }
             2 => {
-                let Some(step) = live.top_undo() else { continue };
+                let Some(step) = live.top_undo() else {
+                    continue;
+                };
                 assert!(document.undo_step(step).unwrap().wrote);
                 live.apply(Event::Undo(step));
             }
             _ => {
-                let Some(step) = live.top_redo() else { continue };
+                let Some(step) = live.top_redo() else {
+                    continue;
+                };
                 assert!(document.redo_step(step).unwrap().wrote);
                 live.apply(Event::Redo(step));
             }

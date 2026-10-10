@@ -42,11 +42,28 @@ pub enum ObjectResult {
     Skipped(SkipReason),
 }
 
+/// What kind of object a touched object is, for the summary "3 rectangles".
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum ObjectShape {
+    /// A path.
+    Path,
+    /// A rectangle.
+    Rectangle,
+    /// An ellipse or circle.
+    Ellipse,
+    /// A polygon.
+    Polygon,
+    /// A star.
+    Star,
+}
+
 /// The outcome for one object.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ObjectReport {
     /// The object.
     pub id: NodeId,
+    /// What the object is.
+    pub shape: ObjectShape,
     /// What the step did to it.
     pub role: Role,
     /// What the restore did to it.

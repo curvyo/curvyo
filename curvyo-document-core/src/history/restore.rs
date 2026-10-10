@@ -14,7 +14,9 @@ use loro::{FractionalIndex, LoroDoc, TreeID};
 use super::checkout::{Detached, NodeAt};
 use super::error::HistoryError;
 use super::node_value::{Node, Tally, read_map, restore_map};
-use super::report::{Direction, ObjectReport, ObjectResult, RestoreReport, Role, SkipReason};
+use super::report::{
+    Direction, ObjectReport, ObjectResult, ObjectShape, RestoreReport, Role, SkipReason,
+};
 use super::revive::revive_node;
 use super::step_header::{KEY_REDONE, KEY_UNDONE, LABEL_REDO, LABEL_UNDO};
 use super::step_id::StepRef;
@@ -132,6 +134,7 @@ impl Document {
                     else {
                         objects.push(ObjectReport {
                             id: node_id(*id),
+                            shape: kind_of(doc, *id),
                             role: planned.role,
                             result: ObjectResult::Skipped(SkipReason::DeletedLater),
                         });
@@ -144,6 +147,7 @@ impl Document {
             };
             objects.push(ObjectReport {
                 id: node_id(id),
+                shape: kind_of(doc, id),
                 role: planned.role,
                 result,
             });
@@ -255,6 +259,20 @@ impl Document {
         index.extend(doc);
         let changes = doc.export_json_in_id_span(log.span());
         index.touched(doc, &changes)
+    }
+}
+
+/// The kind of an object, read from its meta map (a deleted object's stays readable).
+pub(crate) fn kind_of(doc: &LoroDoc, id: TreeID) -> ObjectShape {
+    let Ok(meta) = doc.get_tree(OBJECTS_TREE).get_meta(id) else {
+        return ObjectShape::Path;
+    };
+    match crate::shape_codec::read_shape_tag(&meta).as_deref() {
+        Some(crate::shape_codec::SHAPE_RECT) => ObjectShape::Rectangle,
+        Some(crate::shape_codec::SHAPE_ELLIPSE) => ObjectShape::Ellipse,
+        Some(crate::shape_codec::SHAPE_POLYGON) => ObjectShape::Polygon,
+        Some(crate::shape_codec::SHAPE_STAR) => ObjectShape::Star,
+        _ => ObjectShape::Path,
     }
 }
 

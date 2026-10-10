@@ -3,6 +3,7 @@
 
 mod checkout;
 mod commit;
+mod cost;
 mod error;
 mod node_value;
 mod report;
@@ -17,8 +18,11 @@ mod updates;
 
 pub(crate) use commit::CommitState;
 pub use commit::OwnStep;
+pub use cost::SMALL_STEP_OPS;
 pub use error::{HistoryError, SyncError};
-pub use report::{Direction, ObjectReport, ObjectResult, RestoreReport, Role, SkipReason};
+pub use report::{
+    Direction, ObjectReport, ObjectResult, ObjectShape, RestoreReport, Role, SkipReason,
+};
 pub use stack_machine::{Event, STACK_LIMIT, StackMachine, Status};
 pub use step_id::{MIN_SHOWN_ID_LEN, StepRef, shown_ids};
 pub(crate) use touched::ContainerIndex;

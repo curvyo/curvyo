@@ -47,9 +47,13 @@ fn the_first_step_does_not_undo_the_documents_setup() {
 #[test]
 fn one_press_takes_back_all_objects_of_a_step_and_redo_brings_them_back() {
     let document = Document::new(1);
-    let ids: Vec<NodeId> = (0..3).map(|n| rect(&document, f64::from(n) * 20.0)).collect();
+    let ids: Vec<NodeId> = (0..3)
+        .map(|n| rect(&document, f64::from(n) * 20.0))
+        .collect();
     let before = json(&document);
-    document.translate_objects(&ids, Vec2::new(5.0, 7.0)).unwrap();
+    document
+        .translate_objects(&ids, Vec2::new(5.0, 7.0))
+        .unwrap();
     let after = json(&document);
     let step = document.own_steps().last().unwrap().step;
 
@@ -64,7 +68,9 @@ fn one_press_takes_back_all_objects_of_a_step_and_redo_brings_them_back() {
 #[test]
 fn undo_of_delete_brings_every_object_back_with_the_same_id_and_z_order() {
     let document = Document::new(1);
-    let ids: Vec<NodeId> = (0..5).map(|n| rect(&document, f64::from(n) * 20.0)).collect();
+    let ids: Vec<NodeId> = (0..5)
+        .map(|n| rect(&document, f64::from(n) * 20.0))
+        .collect();
     let before = json(&document);
     document.delete_objects(&[ids[1], ids[3]]).unwrap();
     assert_eq!(document.object_ids().len(), 3);
@@ -88,10 +94,12 @@ fn a_field_a_peer_changed_since_keeps_the_peers_value() {
     let id = rect(&a, 0.0);
     let b = replica(&a, 2);
 
-    a.edit_style(&[id], &StyleEdit::StrokeWidth(Length::from_mm(2.0))).unwrap();
+    a.edit_style(&[id], &StyleEdit::StrokeWidth(Length::from_mm(2.0)))
+        .unwrap();
     let step = a.own_steps().last().unwrap().step;
     sync(&a, &b);
-    b.edit_style(&[id], &StyleEdit::StrokeWidth(Length::from_mm(5.0))).unwrap();
+    b.edit_style(&[id], &StyleEdit::StrokeWidth(Length::from_mm(5.0)))
+        .unwrap();
     sync(&a, &b);
 
     let report = a.undo_step(step).unwrap();
@@ -111,16 +119,21 @@ fn fields_the_peer_did_not_touch_go_back() {
 
     // One step of A writes the stroke width and the fill; B changes only the width afterwards.
     a.batch("two_edits", |d| {
-        d.edit_style(&[id], &StyleEdit::StrokeWidth(Length::from_mm(2.0))).unwrap();
+        d.edit_style(&[id], &StyleEdit::StrokeWidth(Length::from_mm(2.0)))
+            .unwrap();
         d.edit_style(&[id], &StyleEdit::FillEnabled(true)).unwrap();
     });
     let step = a.own_steps().last().unwrap().step;
     sync(&a, &b);
-    b.edit_style(&[id], &StyleEdit::StrokeWidth(Length::from_mm(5.0))).unwrap();
+    b.edit_style(&[id], &StyleEdit::StrokeWidth(Length::from_mm(5.0)))
+        .unwrap();
     sync(&a, &b);
 
     let report = a.undo_step(step).unwrap();
-    assert_eq!(report.objects[0].result, curvyo_document_core::ObjectResult::Partial);
+    assert_eq!(
+        report.objects[0].result,
+        curvyo_document_core::ObjectResult::Partial
+    );
     sync(&a, &b);
     let object = a.object(id).unwrap();
     assert!((object.style().stroke.width.as_mm() - 5.0).abs() < 1e-9);
@@ -150,7 +163,8 @@ fn an_object_created_by_the_step_stays_when_a_peer_changed_it() {
     let id = rect(&a, 0.0);
     let step = a.own_steps()[0].step;
     let b = replica(&a, 2);
-    b.edit_style(&[id], &StyleEdit::StrokeWidth(Length::from_mm(3.0))).unwrap();
+    b.edit_style(&[id], &StyleEdit::StrokeWidth(Length::from_mm(3.0)))
+        .unwrap();
     sync(&a, &b);
 
     let report = a.undo_step(step).unwrap();
@@ -177,10 +191,12 @@ fn a_peers_own_steps_do_not_enter_my_stack_and_my_undo_leaves_theirs_alone() {
 fn undo_and_redo_of_document_steps_restore_the_size() {
     let document = Document::new(1);
     let before = json(&document);
-    document.resize(curvyo_document_core::DocumentSize::new(
-        Length::from_mm(100.0),
-        Length::from_mm(50.0),
-    )).unwrap();
+    document
+        .resize(curvyo_document_core::DocumentSize::new(
+            Length::from_mm(100.0),
+            Length::from_mm(50.0),
+        ))
+        .unwrap();
     let after = json(&document);
     let step = document.own_steps()[0].step;
     document.undo_step(step).unwrap();

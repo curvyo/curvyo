@@ -198,6 +198,8 @@ impl Document {
             container_index: std::cell::RefCell::default(),
         };
         document.commit_new_document();
+        // A document without history has nothing to read.
+        document.commit_state.set_warm();
         document
     }
 
