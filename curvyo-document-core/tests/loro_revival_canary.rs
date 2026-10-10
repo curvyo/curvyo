@@ -49,8 +49,13 @@ fn document(peer: u64, nodes: usize) -> (LoroDoc, Vec<TreeID>) {
     (doc, ids)
 }
 
-/// The injected change of ADR 0014 §11.
+/// The injected change of ADR 0014 §11, for one node.
 fn revive(doc: &LoroDoc, target: TreeID, index: FractionalIndex, message: &str) {
+    revive_many(doc, &[(target, index)], message);
+}
+
+/// The injected change with one tree move per node, consecutive counters, in one change.
+fn revive_many(doc: &LoroDoc, nodes: &[(TreeID, FractionalIndex)], message: &str) {
     doc.commit();
     let peer = doc.peer_id();
     let vv = doc.oplog_vv();
@@ -62,6 +67,19 @@ fn revive(doc: &LoroDoc, target: TreeID, index: FractionalIndex, message: &str) 
         .map(|c| c.lamport + c.len as u32)
         .max()
         .unwrap_or(0);
+    let ops = nodes
+        .iter()
+        .zip(next..)
+        .map(|((target, index), counter)| JsonOp {
+            content: JsonOpContent::Tree(JsonTreeOp::Move {
+                target: *target,
+                parent: None,
+                fractional_index: index.clone(),
+            }),
+            container: ContainerID::new_root(TREE, ContainerType::Tree),
+            counter,
+        })
+        .collect();
     let mut schema = doc.export_json_updates_without_peer_compression(&vv, &vv);
     schema.changes.push(JsonChange {
         id: loro::ID::new(peer, next),
@@ -69,15 +87,7 @@ fn revive(doc: &LoroDoc, target: TreeID, index: FractionalIndex, message: &str) 
         deps: frontiers.iter().collect(),
         lamport,
         msg: Some(message.to_owned()),
-        ops: vec![JsonOp {
-            content: JsonOpContent::Tree(JsonTreeOp::Move {
-                target,
-                parent: None,
-                fractional_index: index,
-            }),
-            container: ContainerID::new_root(TREE, ContainerType::Tree),
-            counter: next,
-        }],
+        ops,
     });
     let status = doc
         .import_json_updates(schema)
@@ -298,4 +308,60 @@ fn a_reader_of_the_revived_history_sees_it_as_a_change_of_this_peer() {
     let change = doc.get_change(last).unwrap();
     assert_eq!(change.id.peer, 7);
     assert_eq!(change.message.as_deref(), Some("undo;s=3;t=3;u=7@0"));
+}
+
+#[test]
+fn one_change_with_two_moves_revives_both_nodes_in_their_old_order() {
+    let (doc, ids) = document(7, 4);
+    let indices: Vec<_> = ids.iter().map(|id| index_of(&doc, *id)).collect();
+    let tree = doc.get_tree(TREE);
+    tree.delete(ids[1]).unwrap();
+    tree.delete(ids[2]).unwrap();
+    doc.commit();
+    let changes = doc.len_changes();
+    revive_many(
+        &doc,
+        &[(ids[1], indices[1].clone()), (ids[2], indices[2].clone())],
+        "undo;s=3;t=3;u=7@0",
+    );
+    assert_eq!(doc.len_changes(), changes + 1, "one change for both nodes");
+    assert_eq!(doc.get_tree(TREE).roots(), ids);
+}
+
+#[test]
+fn a_checkout_across_the_revival_shows_the_node_deleted_and_the_next_edit_continues() {
+    let (doc, ids) = document(7, 2);
+    let victim = ids[0];
+    let index = index_of(&doc, victim);
+    doc.get_tree(TREE).delete(victim).unwrap();
+    doc.commit_with(loro::CommitOptions::new().commit_msg("delete;s=2;t=2"));
+    let deleted_at = doc.oplog_frontiers();
+    revive(&doc, victim, index, "undo;s=3;t=3;u=7@0");
+    let revived_at = doc.oplog_frontiers();
+    let counter_after = doc.oplog_vv().get(&7).copied().unwrap();
+
+    doc.checkout(&deleted_at).unwrap();
+    assert!(
+        !alive(&doc, victim),
+        "before the revival the node is deleted"
+    );
+    doc.checkout(&revived_at).unwrap();
+    assert!(alive(&doc, victim));
+    doc.checkout_to_latest();
+    assert!(alive(&doc, victim));
+
+    // The next local change starts right after the injected one, with a higher Lamport clock.
+    let revived_lamport = doc
+        .get_change(loro::ID::new(7, counter_after - 1))
+        .unwrap()
+        .lamport;
+    doc.get_tree(TREE)
+        .get_meta(victim)
+        .unwrap()
+        .insert("x", 5.0)
+        .unwrap();
+    doc.commit_with(loro::CommitOptions::new().commit_msg("edit;s=4;t=4"));
+    let next = doc.get_change(loro::ID::new(7, counter_after)).unwrap();
+    assert_eq!(next.message.as_deref(), Some("edit;s=4;t=4"));
+    assert!(next.lamport > revived_lamport);
 }

@@ -1,7 +1,7 @@
 //! What the body of the Properties panel shows for the active tab
 //! (`specs/0043-properties-tabs/` criteria 3, 10 and 23, `specs/0015-
 //! document-size-and-rulers/` criterion 14a): the document's settings, the
-//! Style area, or nothing.
+//! Style area, the history, or nothing.
 
 use crate::panel_tabs::PanelTab;
 
@@ -13,6 +13,8 @@ pub enum PanelContent {
     Document,
     /// The Style area: the tool's scope holds objects to style.
     Style,
+    /// The History list (`specs/0020-undo-redo` criterion 39).
+    History,
     /// Nothing: no heading, no text, no control (`specs/0017-style-panel-
     /// rework` criterion 1). The Document tab with an unfinished Pen path, so
     /// a resize would not move the path being drawn, or the Style tab with
@@ -38,6 +40,7 @@ pub fn panel_body(
         PanelTab::Document => PanelContent::Document,
         PanelTab::Style if style_has_objects => PanelContent::Style,
         PanelTab::Style => PanelContent::Empty,
+        PanelTab::History => PanelContent::History,
     }
 }
 
@@ -59,6 +62,9 @@ mod tests {
             (PanelTab::Style, true, true, Style),
             (PanelTab::Style, false, false, Empty),
             (PanelTab::Style, true, false, Empty),
+            // History shows its list whatever the tool and the scope are.
+            (PanelTab::History, false, false, PanelContent::History),
+            (PanelTab::History, true, true, PanelContent::History),
         ];
         for (tab, pen, scope, want) in rows {
             assert_eq!(

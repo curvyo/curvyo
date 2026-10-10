@@ -13,6 +13,7 @@ impl Document {
     /// # Errors
     /// [`SyncError::Encode`] if the updates cannot be encoded.
     pub fn export_updates(&self, since: &DocumentVersion) -> Result<Vec<u8>, SyncError> {
+        self.assert_outside_batch();
         self.loro().commit();
         let known = self.loro().frontiers_to_vv(&since.0).unwrap_or_default();
         self.loro()

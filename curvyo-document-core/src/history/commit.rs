@@ -18,6 +18,8 @@ struct LastCommit {
     header: String,
     /// The committed frontiers right after the commit.
     version: Frontiers,
+    /// The version vector right after the commit.
+    vv: loro::VersionVector,
 }
 
 /// A step this session started, in order.
@@ -148,7 +150,8 @@ impl Document {
             .continue_next
             .replace(false)
             .then(|| state.last.borrow().clone())
-            .flatten();
+            .flatten()
+            .filter(|last| self.only_own_since(last));
         if let Some(last) = joined {
             let step = self.finish_commit(&last.header, Some(last.step), pending);
             return Some(step);
@@ -174,15 +177,34 @@ impl Document {
         header
     }
 
-    /// Commits the pending writes with the given header and remembers the commit as the one a
-    /// continuation may join. Not listed among [`Document::own_steps`]: undo and redo use it.
+    /// Whether nothing but this peer's own pending writes happened since `last`: no commit of
+    /// another peer was merged in between.
+    fn only_own_since(&self, last: &LastCommit) -> bool {
+        let peer = self.loro().peer_id();
+        let now = self.loro().oplog_vv();
+        now.iter()
+            .all(|(other, counter)| *other == peer || last.vv.get(other) == Some(counter))
+            && last.vv.iter().all(|(other, _)| now.get(other).is_some())
+    }
+
+    /// Commits the pending writes of an undo or redo with the given header. Not listed among
+    /// [`Document::own_steps`], and never joined: a nudge after Ctrl+Z is a new step.
     pub(crate) fn commit_with_header(&self, header: &StepHeader) {
-        let pending = self.loro().get_pending_txn_len();
-        if pending > 0 {
-            self.finish_commit(&header.format(), None, pending);
-        } else {
-            self.note_last_commit(header);
+        if self.loro().get_pending_txn_len() > 0 {
+            self.loro()
+                .commit_with(CommitOptions::new().commit_msg(&header.format()));
         }
+        *self.commit_state.last.borrow_mut() = None;
+    }
+
+    /// History reads and restores commit pending writes without a header; inside a
+    /// [`Document::batch`] that would split the gesture into an unlabelled step.
+    pub(crate) fn assert_outside_batch(&self) {
+        debug_assert_eq!(
+            self.commit_state.batch_depth.get(),
+            0,
+            "a history call inside a batch"
+        );
     }
 
     fn finish_commit(&self, header: &str, existing: Option<StepRef>, pending: usize) -> StepRef {
@@ -196,20 +218,9 @@ impl Document {
             step,
             header: header.to_owned(),
             version: self.loro().oplog_frontiers(),
+            vv: self.loro().oplog_vv(),
         });
         step
-    }
-
-    /// Remembers that the newest commit of this peer carries `header` (after a change that was
-    /// imported instead of committed).
-    pub(crate) fn note_last_commit(&self, header: &StepHeader) {
-        let peer = self.loro().peer_id();
-        let end = self.loro().oplog_vv().get(&peer).copied().unwrap_or(0);
-        *self.commit_state.last.borrow_mut() = Some(LastCommit {
-            step: StepRef::new(peer, end.saturating_sub(1)),
-            header: header.format(),
-            version: self.loro().oplog_frontiers(),
-        });
     }
 
     /// Commits the root setup of a new document as its own change, so that the first user step
@@ -315,5 +326,19 @@ mod tests {
         document.continue_step();
         document.translate_objects(&[id], offset).unwrap();
         assert_eq!(document.own_step_count(), 3);
+    }
+
+    #[test]
+    fn a_nudge_after_an_undo_is_a_new_step_and_never_joins_the_undo() {
+        let document = Document::new(5);
+        let id = rect(&document, 0.0);
+        let offset = crate::Vec2::new(1.0, 0.0);
+        document.translate_objects(&[id], offset).unwrap();
+        let moved = document.own_steps()[1].step;
+        document.undo_step(moved).unwrap();
+        document.continue_step();
+        document.translate_objects(&[id], offset).unwrap();
+        assert_eq!(document.own_step_count(), 3, "a new step, not a join");
+        assert_ne!(document.own_steps()[2].step, moved);
     }
 }

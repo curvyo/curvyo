@@ -20,6 +20,8 @@ pub enum Role {
     Deleted,
     /// The step changed the object's values.
     Changed,
+    /// The step moved the object in the stacking order or to another parent. Not restored yet.
+    Moved,
 }
 
 /// Why part of a step was left as it is (`specs/0020-undo-redo` criteria 16 to 18).

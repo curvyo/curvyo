@@ -3,7 +3,9 @@
 
 use std::collections::{HashMap, HashSet};
 
-use curvyo_document_core::{AnchorId, Direction, NodeId, SMALL_STEP_OPS, StepRef, Timestamp};
+use curvyo_document_core::{
+    AnchorId, Direction, FAR_STEP_OPS, NodeId, SMALL_STEP_OPS, StepRef, Timestamp,
+};
 use curvyo_ui_core::{
     SelectionSnapshot, UndoStack, nothing_notice, object_bounds, objects_summary, operation_name,
     restore_notice,
@@ -126,9 +128,15 @@ impl Session {
         if !self.document.history_is_warm() {
             return true;
         }
-        self.target_step(direction)
-            .and_then(|(step, _)| self.document.step_op_count(step))
-            .is_some_and(|ops| ops > SMALL_STEP_OPS)
+        self.target_step(direction).is_some_and(|(step, _)| {
+            self.document
+                .step_op_count(step)
+                .is_some_and(|ops| ops > SMALL_STEP_OPS)
+                || self
+                    .document
+                    .step_distance(step)
+                    .is_some_and(|ops| ops > FAR_STEP_OPS)
+        })
     }
 
     /// Reads the document's history in the background of the first paint, so that the first undo

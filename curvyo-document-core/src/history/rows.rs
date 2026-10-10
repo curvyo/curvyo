@@ -93,16 +93,62 @@ impl Document {
     #[must_use]
     pub fn history_len(&self) -> usize {
         let doc = self.loro();
+        self.assert_outside_batch();
         doc.commit();
         let mut index = self.step_index.borrow_mut();
         index.extend(doc);
         index.steps().filter(|step| is_row(step)).count()
     }
 
+    /// The objects `step` touched (created, deleted, changed), for the hover link of a row.
+    #[must_use]
+    pub fn touched_objects(&self, step: StepRef) -> Vec<NodeId> {
+        let doc = self.loro();
+        self.assert_outside_batch();
+        doc.commit();
+        self.container_index.borrow_mut().extend(doc);
+        let Some(log) = super::step_log::find_step(doc, step) else {
+            return Vec::new();
+        };
+        let changes = doc.export_json_in_id_span(log.span());
+        let touched = self.container_index.borrow().touched(doc, &changes);
+        touched
+            .created
+            .iter()
+            .chain(&touched.deleted)
+            .chain(&touched.changed)
+            .map(|id| NodeId::from_parts(id.peer, id.counter))
+            .collect()
+    }
+
+    /// The shown id of the newest step that is in effect: what the pinned "Now" row names.
+    #[must_use]
+    pub fn history_newest_applied_id(&self) -> Option<String> {
+        let doc = self.loro();
+        self.assert_outside_batch();
+        doc.commit();
+        let mut index = self.step_index.borrow_mut();
+        index.extend(doc);
+        let all: Vec<StepRef> = index
+            .steps()
+            .filter(|step| is_row(step))
+            .map(|step| step.step)
+            .collect();
+        let newest = index
+            .steps()
+            .rev()
+            .filter(|step| is_row(step))
+            .find(|step| index.status(step.step) == Status::Applied)?
+            .step;
+        let position = all.iter().position(|step| *step == newest)?;
+        shown_ids(&all).into_iter().nth(position)
+    }
+
     /// `count` rows of the history from the `start`-th newest, newest first.
     #[must_use]
     pub fn history_page(&self, start: usize, count: usize) -> Vec<HistoryRow> {
         let doc = self.loro();
+        self.assert_outside_batch();
         doc.commit();
         self.container_index.borrow_mut().extend(doc);
         let mut index = self.step_index.borrow_mut();

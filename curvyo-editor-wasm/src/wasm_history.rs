@@ -62,4 +62,31 @@ impl WasmSession {
     pub fn redo_depth(&self) -> u32 {
         u32::try_from(self.session.redo_len()).unwrap_or(u32::MAX)
     }
+
+    /// How many steps the global history has.
+    pub fn history_len(&mut self) -> u32 {
+        u32::try_from(self.session.history_len()).unwrap_or(u32::MAX)
+    }
+
+    /// `count` rows of the global history from the `start`-th newest, newest first, as a JSON array
+    /// (`Session::history_rows_json`).
+    pub fn history_rows(&mut self, start: u32, count: u32) -> String {
+        self.session
+            .history_rows_json(start as usize, count as usize)
+    }
+
+    /// The shown id of the newest step in effect (the "Now" row), empty without a step.
+    pub fn history_now_id(&mut self) -> String {
+        self.session.history_now_id()
+    }
+
+    /// The pointer or focus rests on the row of `step` (`<peer>@<counter>`); empty ends the hover.
+    pub fn set_history_hover(&mut self, step: &str) {
+        self.session.set_history_hover(step);
+    }
+
+    /// Shift+Ctrl+H: the History tab.
+    pub fn panel_shortcut_history(&mut self) {
+        self.session.panel_shortcut_history();
+    }
 }

@@ -97,7 +97,9 @@ export function useHistory(
   const counter = useRef(0);
   const lastPress = useRef<{ direction: HistoryDirection; at: number } | null>(null);
   const onChangeRef = useRef(onChange);
-  onChangeRef.current = onChange;
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
   useBusyWindow(busy);
 
   const showNotice = useCallback((text: string, ms?: number) => {

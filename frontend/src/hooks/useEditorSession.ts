@@ -885,7 +885,10 @@ export function useEditorSession(
 
   const getSession = useCallback(() => sessionRef.current, []);
   const history = useHistory(getSession, syncFromSession, containerRef);
-  refreshHistoryRef.current = history.refresh;
+  const { refresh: refreshHistory, handleKeyOutcome, isDuplicateKey } = history;
+  useEffect(() => {
+    refreshHistoryRef.current = refreshHistory;
+  }, [refreshHistory]);
 
   const refreshCursor = useCallback(() => {
     const session = sessionRef.current;
@@ -1669,7 +1672,7 @@ export function useEditorSession(
       if (!session) {
         return;
       }
-      if (history.isDuplicateKey(event)) {
+      if (isDuplicateKey(event)) {
         event.preventDefault();
         return;
       }
@@ -1686,7 +1689,7 @@ export function useEditorSession(
         return;
       }
       event.preventDefault();
-      if (history.handleKeyOutcome(outcome)) {
+      if (handleKeyOutcome(outcome)) {
         setLiveReadout(readReadout(session));
         setCursorHint(session.cursor_hint());
         syncFromSession();
@@ -1701,7 +1704,7 @@ export function useEditorSession(
       setCursorHint(session.cursor_hint());
       syncFromSession();
     },
-    [history.handleKeyOutcome, history.isDuplicateKey, isSpaceHeld, syncFromSession],
+    [handleKeyOutcome, isDuplicateKey, isSpaceHeld, syncFromSession],
   );
 
   // A key hint clears itself after 2 s; a newer message restarts the clock.

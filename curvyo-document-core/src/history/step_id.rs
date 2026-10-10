@@ -52,7 +52,8 @@ impl StepRef {
     }
 
     /// The 13-character lowercase base-36 form of the FNV-1a 64 hash of the 12 bytes of the id
-    /// (peer, then counter, little endian). Shown ids are prefixes of it.
+    /// (peer, then counter, little endian), the least significant digit first. Shown ids are
+    /// prefixes of it.
     #[must_use]
     pub fn full_id(self) -> String {
         let mut hash = FNV_OFFSET;
@@ -65,8 +66,9 @@ impl StepRef {
             hash ^= u64::from(byte);
             hash = hash.wrapping_mul(FNV_PRIME);
         }
+        // Least significant digit first: every character carries the full 36 values.
         let mut digits = [b'0'; FULL_ID_LEN];
-        for slot in digits.iter_mut().rev() {
+        for slot in &mut digits {
             *slot = b"0123456789abcdefghijklmnopqrstuvwxyz"[(hash % 36) as usize];
             hash /= 36;
         }
@@ -110,9 +112,9 @@ mod tests {
         // Computed independently: FNV-1a 64 over `peer.to_le_bytes() ++ counter.to_le_bytes()`.
         assert_eq!(
             StepRef::new(0x1234_5678_9abc_def0, 42).full_id(),
-            "2b9mxh6qsoyun"
+            "nuyosq6hxm9b2"
         );
-        assert_eq!(StepRef::new(7, 0).full_id(), "1ruaghukn7hc2");
+        assert_eq!(StepRef::new(7, 0).full_id(), "2ch7nkuhgaur1");
     }
 
     #[test]

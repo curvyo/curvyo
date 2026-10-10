@@ -242,6 +242,82 @@ fn a_large_result_split_into_several_changes_is_one_step() {
     let step = rows[0].step;
     let report = reopened.undo_step(step).unwrap();
     assert!(report.wrote);
-    assert_eq!(json(&reopened), before, "one press takes the whole result back");
+    assert_eq!(
+        json(&reopened),
+        before,
+        "one press takes the whole result back"
+    );
     assert_eq!(reopened.history_page(0, 10).len(), 1);
+}
+
+#[test]
+fn chained_undo_and_redo_on_one_compound_path_keep_a_peers_edit_of_another_node() {
+    use curvyo_document_core::{AnchorId, NewAnchor};
+    let square = |first: u64, x: f64| -> (Vec<NewAnchor>, bool) {
+        (
+            (0..4_u64)
+                .map(|n| {
+                    let (dx, dy) = [(0.0, 0.0), (10.0, 0.0), (10.0, 10.0), (0.0, 10.0)][n as usize];
+                    NewAnchor::corner(AnchorId::new(1, first + n), Point::new(x + dx, dy))
+                })
+                .collect(),
+            true,
+        )
+    };
+    let a = Document::new(1);
+    let first = a.create_path(&square(1, 0.0).0, true);
+    let second = a.create_path(&square(11, 100.0).0, true);
+    let compound = a
+        .replace_with_path(
+            &[first, second],
+            first,
+            &[square(21, 0.0), square(31, 100.0)],
+            "combine_paths",
+        )
+        .unwrap();
+    let b = replica(&a, 2);
+    let original = json(&a);
+
+    // A: move the whole compound, then one node of its first outline.
+    a.translate_objects(&[compound], Vec2::new(5.0, 0.0))
+        .unwrap();
+    let step_move = a.own_steps().last().unwrap().step;
+    sync(&a, &b);
+    a.move_anchors(&[(compound, AnchorId::new(1, 21), Point::new(50.0, 50.0))])
+        .unwrap();
+    let step_node = a.own_steps().last().unwrap().step;
+    // B, in between: moves another node of the same outline.
+    b.move_anchors(&[(compound, AnchorId::new(1, 22), Point::new(77.0, 77.0))])
+        .unwrap();
+    sync(&a, &b);
+
+    let point_of = |d: &Document, anchor: u64| {
+        let curvyo_document_core::ObjectSnapshot::Path(path) = d.object(compound).unwrap() else {
+            panic!("a path")
+        };
+        let p = path
+            .all_anchors()
+            .find(|n| n.id == AnchorId::new(1, anchor))
+            .unwrap()
+            .point;
+        (p.x, p.y)
+    };
+    a.undo_step(step_node).unwrap();
+    a.undo_step(step_move).unwrap();
+    sync(&a, &b);
+    assert_eq!(point_of(&a, 21), (0.0, 0.0), "my nodes are back");
+    assert_eq!(
+        point_of(&a, 22),
+        (77.0, 77.0),
+        "the peer's node keeps the peer's value"
+    );
+    assert_eq!(json(&a), json(&b));
+    assert_ne!(json(&a), original);
+
+    a.redo_step(step_move).unwrap();
+    a.redo_step(step_node).unwrap();
+    sync(&a, &b);
+    assert_eq!(point_of(&a, 21), (50.0, 50.0));
+    assert_eq!(point_of(&a, 22), (77.0, 77.0));
+    assert_eq!(json(&a), json(&b));
 }

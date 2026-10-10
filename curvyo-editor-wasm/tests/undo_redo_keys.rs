@@ -335,3 +335,31 @@ fn two_identical_moves_within_a_second_are_two_steps() {
         "two presses were needed, and the square is still there"
     );
 }
+
+#[test]
+fn a_restore_off_screen_says_so_and_leaves_pan_and_zoom_alone() {
+    let mut session = fresh();
+    draw_square(&mut session, 10.0);
+    session.set_tool(Tool::Select);
+    session.delete_selected();
+    // Pan far away from the square, then undo the delete.
+    session.begin_pan(100.0, 100.0);
+    session.pan_to(100.0 + 5000.0, 100.0);
+    session.end_pan();
+    let zoom = session.zoom_percent();
+    let notice = undo(&mut session);
+    assert_eq!(notice, "Undid: Delete (1 rectangle), off screen.");
+    assert_eq!(session.zoom_percent(), zoom);
+    assert_eq!(session.selected_object_count(), 1);
+}
+
+#[test]
+fn a_style_value_drag_blocks_the_keys_like_any_drag() {
+    let mut session = fresh();
+    draw_square(&mut session, 10.0);
+    session.set_tool(Tool::Select);
+    session.preview_style_hsv(curvyo_ui_core::StyleField::StrokeColor, 0.5, 0.5, 0.5);
+    assert_eq!(key(&mut session, "z", false), KeyOutcome::Ignored);
+    session.commit_style_preview();
+    assert_eq!(session.undo_len(), 2);
+}

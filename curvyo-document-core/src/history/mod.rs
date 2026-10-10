@@ -5,9 +5,11 @@ mod checkout;
 mod commit;
 mod cost;
 mod error;
+mod merge;
 mod node_value;
 mod report;
 mod restore;
+mod restore_plan;
 mod revive;
 mod rows;
 mod stack_machine;
@@ -20,7 +22,7 @@ mod updates;
 
 pub(crate) use commit::CommitState;
 pub use commit::OwnStep;
-pub use cost::SMALL_STEP_OPS;
+pub use cost::{FAR_STEP_OPS, SMALL_STEP_OPS};
 pub use error::{HistoryError, SyncError};
 pub use report::{
     Direction, ObjectReport, ObjectResult, ObjectShape, RestoreReport, Role, SkipReason,

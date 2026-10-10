@@ -139,3 +139,17 @@ pub(crate) fn is_row(step: &LogStep) -> bool {
         LABEL_NEW_DOCUMENT | LABEL_UNDO | LABEL_REDO
     ) || step.header.is_none()
 }
+
+impl crate::document::Document {
+    /// The stacks and step statuses of `peer` as its commits in the log tell them (the history
+    /// list's source, `specs/0020-undo-redo` criterion 55), without a limit on the stacks.
+    #[must_use]
+    pub fn stacks_in_log(&self, peer: u64) -> StackMachine {
+        let doc = self.loro();
+        self.assert_outside_batch();
+        doc.commit();
+        let mut index = self.step_index.borrow_mut();
+        index.extend(doc);
+        index.machine(peer)
+    }
+}

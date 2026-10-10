@@ -94,6 +94,15 @@ and a marker a peer could edit concurrently.
    restricted to the step's touched containers; `N` is a live read. **Undo does not check out.**
    A `checkout` is used only to read whole objects at a version (preview, go to version, clone
    version, inherited rows), always through a guard (§12).
+   *Amended 2026-10-10 (milestone 1 review):* undo and redo read `B` and `A` of the touched objects
+   through one guarded checkout pair (§12) instead of `diff`, because the restore compares whole
+   meta maps. The document is detached only inside the guard, and the guard attaches it again on
+   error and panic. `warm_history` builds Loro's checkout cache after Open, so every open document
+   with history holds it until it is closed (measured: see "Measured" below; 48 MB and 261 ms at
+   154,000 operations in the spike). An undo costs more the further its step lies behind the
+   latest version; the editor enters the long-operation state when the step has more than 2,000
+   operations **or** lies more than 1,000 operations behind the latest version
+   (`FAR_STEP_OPS`, set from the measurement).
 2. **Step header.** A step is all changes of one peer whose commit message carries the same header
    `<label>;s=<seq>;t=<seconds>[;<key>=<value>]…`: `s` is the session's step counter, `t` the
    step's wall-clock time (§4); optional keys name the step a revert targets (`u` undo, `d` redo,
@@ -193,8 +202,8 @@ and a marker a peer could edit concurrently.
 - Undo of Delete depends on a pinned Loro version and an op the public API forbids. A Loro upgrade
   costs a canary run; if it fails, we stay on the pinned version until soft delete (Q7 B) and its
   format bump are approved and built.
-- Undo reads by `diff`, so the live document is never detached for an undo and a panic cannot leave
-  it detached. Reads of whole past states detach it briefly under the guard.
+- Undo reads the versions around a step through the checkout guard (§1 amendment of milestone 1):
+  the live document is detached inside one call and attached again on every exit, a panic included.
 - Large undos are visible: a busy cursor and, past 150 ms, a working notice. Small ones stay at
   100 ms.
 - The first checkout-based history read after Open costs memory in proportion to the log (+48 MB at

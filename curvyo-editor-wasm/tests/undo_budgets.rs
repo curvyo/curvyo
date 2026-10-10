@@ -186,3 +186,77 @@ fn the_first_undo_after_open_is_a_large_step_until_the_history_was_warmed() {
     session.redo();
     assert!(!session.history_needs_busy_state(Direction::Undo));
 }
+
+#[test]
+#[ignore = "a timing budget for release builds; run on purpose"]
+fn moving_one_path_of_two_thousand_anchors_is_undone_and_redone_within_100_ms() {
+    let document = Document::new(1);
+    let anchors: Vec<NewAnchor> = (0..2_000_u64)
+        .map(|n| {
+            let a = n as f64 / 2_000.0 * std::f64::consts::TAU;
+            NewAnchor::corner(AnchorId::new(1, n), pt(100.0 * a.cos(), 100.0 * a.sin()))
+        })
+        .collect();
+    let _ = document.create_path(&anchors, true);
+    let mut session = open(&document);
+    session.warm_history();
+    select_all(&mut session);
+    assert_eq!(session.selected_object_count(), 1);
+    typed_move(&mut session);
+    assert!(
+        !session.history_needs_busy_state(Direction::Undo),
+        "2,000 operations are a small step"
+    );
+    within(
+        "undo of one path of 2,000 anchors",
+        timed_undo(&mut session),
+        100,
+    );
+    let started = Instant::now();
+    session.redo();
+    let _ = session.draw_list();
+    within("redo of one path of 2,000 anchors", started.elapsed(), 100);
+}
+
+#[test]
+#[ignore = "a timing budget for release builds; run on purpose"]
+fn undo_of_delete_of_five_thousand_objects_is_within_one_second() {
+    let mut session = open(&big_document());
+    session.warm_history();
+    select_all(&mut session);
+    assert_eq!(session.selected_object_count(), 5_000);
+    session.delete_selected();
+    assert!(session.history_needs_busy_state(Direction::Undo));
+    let measured = timed_undo(&mut session);
+    within("undo of Delete of 5,000 objects", measured, 1_000);
+    assert_eq!(session.selected_object_count(), 5_000);
+}
+
+/// Resident set size in KiB on Linux, 0 elsewhere.
+fn resident_kib() -> usize {
+    std::fs::read_to_string("/proc/self/statm")
+        .ok()
+        .and_then(|text| text.split_whitespace().nth(1)?.parse::<usize>().ok())
+        .map_or(0, |pages| pages * 4)
+}
+
+#[test]
+#[ignore = "a timing budget for release builds; run on purpose"]
+fn the_warm_up_after_open_costs_time_and_memory_that_are_written_down() {
+    let bytes = pack(&big_document(), "0.1.0").unwrap();
+    let before = resident_kib();
+    let mut session = Session::open(2, &bytes).unwrap();
+    session.resize_viewport(1200.0, 800.0);
+    session.set_tool(Tool::Select);
+    let opened = resident_kib();
+    let started = Instant::now();
+    session.warm_history();
+    let warm = started.elapsed();
+    let after = resident_kib();
+    eprintln!(
+        "open: +{} MiB; warm_history: {warm:?}, +{} MiB (5,000 objects, 25,000 steps)",
+        opened.saturating_sub(before) / 1024,
+        after.saturating_sub(opened) / 1024
+    );
+    assert!(warm < Duration::from_secs(4), "{warm:?}");
+}

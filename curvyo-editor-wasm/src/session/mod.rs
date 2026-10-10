@@ -35,6 +35,7 @@ mod formats;
 mod frame;
 mod group_view;
 mod history;
+mod history_rows;
 mod keys;
 mod move_entry;
 mod move_indicators;
@@ -169,6 +170,8 @@ pub struct Session {
     /// the Select-tool counterpart to `hovered` above (acceptance criteria
     /// 14, 15's hover box). A creation tool has no hover highlight.
     hovered_object: Option<NodeId>,
+    /// The objects of the History row the pointer or focus rests on (`history.rs`).
+    history_hover: Vec<NodeId>,
     /// The live pointer position in document space, tracked regardless
     /// of the active tool — the pen tool's rubber-band preview
     /// (`specification.md`'s UX notes) needs it even though it keeps no
@@ -247,6 +250,7 @@ impl Session {
             viewport: Viewport::new(),
             hovered: None,
             hovered_object: None,
+            history_hover: Vec::new(),
             pointer_position: None,
             held: Modifiers::NONE,
             drag_objects: std::cell::RefCell::new(None),
@@ -287,6 +291,7 @@ impl Session {
             viewport: Viewport::new(),
             hovered: None,
             hovered_object: None,
+            history_hover: Vec::new(),
             pointer_position: None,
             held: Modifiers::NONE,
             drag_objects: std::cell::RefCell::new(None),

@@ -1302,3 +1302,12 @@ built-in list.
 - **`session/mod.rs` is over 500 lines** (537 non-test lines before the slice); split the glue calls out
   when the next slice touches it.
 
+
+## The history cache stays in memory for the whole session
+
+`Document::warm_history` (`0020-undo-redo`) reads the log once after Open and builds Loro's checkout
+cache so that the first undo is as fast as later ones. The cache is not freed until the document is
+closed: +48 MB and about 260 ms at 154,000 operations in the Loro spike
+(`docs/spikes/loro-history-primitives.md`); the measured figure for this build is in ADR 0014 §13.
+The step index and the container chains of the log add to it. Freeing it when the History tab is
+closed (`free_history_cache`) is possible but would put the cold cost back on the next undo.
