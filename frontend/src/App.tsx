@@ -196,6 +196,8 @@ function App() {
               onSetPointCount={editor.setSelectedPointCount}
               onPreviewRatio={editor.previewSelectedRatio}
               onCommitRatio={editor.commitSelectedRatio}
+              onSetRatio={editor.setSelectedRatio}
+              onCancelRatio={editor.cancelSelectedRatio}
               onConvertToPaths={editor.convertSelectedToPaths}
               onReturnFocus={() => editor.containerRef.current?.focus()}
             />
@@ -230,6 +232,7 @@ function App() {
               onSetPolyStarMode={editor.setPolyStarMode}
               onSetPolyStarPointCount={editor.setPolyStarPointCount}
               onSetPolyStarRatio={editor.setPolyStarRatio}
+              onReturnFocus={() => editor.containerRef.current?.focus()}
             />
           ) : null}
         </div>

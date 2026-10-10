@@ -30,6 +30,7 @@ interface StrokeSectionProps {
 export function StrokeSection({ panel, onReturnFocus }: StrokeSectionProps) {
   const { view } = panel;
   const section = useRef<HTMLDivElement>(null);
+  const hex = useRef<HTMLInputElement>(null);
   const rowsFocus = useRowsFocus(view.strokeRows, section);
   const markersFocus = useRowsFocus(view.markersShown, section);
   return (
@@ -55,6 +56,7 @@ export function StrokeSection({ panel, onReturnFocus }: StrokeSectionProps) {
             onPick={() => panel.beginPick("stroke")}
             onSubmitHex={(text) => panel.setText("stroke-color", text)}
             onReturnFocus={onReturnFocus}
+            hexRef={hex}
           />
           <ColourPicker
             name="Stroke"
@@ -65,6 +67,8 @@ export function StrokeSection({ panel, onReturnFocus }: StrokeSectionProps) {
             onPreview={(hue, saturation, value) =>
               panel.previewHsv("stroke-color", hue, saturation, value)
             }
+            onSettle={panel.settleHsv}
+            onOpenEntry={() => hex.current?.focus()}
           />
           <ValueField
             label="Opacity"

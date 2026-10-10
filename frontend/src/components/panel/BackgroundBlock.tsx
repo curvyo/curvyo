@@ -38,6 +38,7 @@ export function BackgroundBlock({ background, onReturnFocus }: BackgroundBlockPr
   const section = useRef<HTMLDivElement>(null);
   const solid = view.paint === "solid";
   const rowsFocus = useRowsFocus(solid, section);
+  const hex = useRef<HTMLInputElement>(null);
   return (
     <div ref={section} className="flex flex-col gap-2">
       <div className="flex h-7 items-center justify-between">
@@ -66,6 +67,7 @@ export function BackgroundBlock({ background, onReturnFocus }: BackgroundBlockPr
             onPick={background.beginPick}
             onSubmitHex={background.setHex}
             onReturnFocus={onReturnFocus}
+            hexRef={hex}
           />
           <ColourPicker
             name="Background"
@@ -74,6 +76,8 @@ export function BackgroundBlock({ background, onReturnFocus }: BackgroundBlockPr
             hsvOf={background.hsvOf}
             rgbOf={background.rgbOf}
             onPreview={background.previewHsv}
+            onSettle={background.settleHsv}
+            onOpenEntry={() => hex.current?.focus()}
           />
           <ValueField
             label="Opacity"

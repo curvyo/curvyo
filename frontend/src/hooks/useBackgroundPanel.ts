@@ -67,6 +67,8 @@ export interface BackgroundPanelApi {
   /** A tick of a drag in the colour area or the hue slider: shown on the canvas,
    * nothing written; one commit at the release. */
   previewHsv: (hue: number, saturation: number, value: number) => void;
+  /** Commits what `previewHsv` showed, once: the end of a click on the picker. */
+  settleHsv: () => void;
   hsvOf: (rgb: number) => HsvTriple;
   rgbOf: (hue: number, saturation: number, value: number) => number;
   /** Ticks, arrow keys, reset and typed text of the Opacity field. */
@@ -102,7 +104,7 @@ export function useBackgroundPanel(editor: EditorHandle): BackgroundPanelApi {
   const refresh = useCallback(() => setLocal((n) => n + 1), []);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const view = useMemo(() => readView(getSession()), [getSession, syncRevision, local]);
-  const { queue: preview } = usePreviewGesture(getSession, refresh, BACKGROUND_ENDS);
+  const { queue: preview, settle } = usePreviewGesture(getSession, refresh, BACKGROUND_ENDS);
 
   const act = useCallback(
     <T>(run: (session: WasmSession) => T, fallback: T): T => {
@@ -143,6 +145,7 @@ export function useBackgroundPanel(editor: EditorHandle): BackgroundPanelApi {
     setHex: (text) => act((s) => s.set_background_hex(text), "unchanged"),
     previewHsv: (hue, saturation, value) =>
       preview((s) => s.preview_background_hsv(hue, saturation, value)),
+    settleHsv: settle,
     hsvOf,
     rgbOf,
     previewOpacity: (p, grid) => preview((s) => s.preview_background_opacity(p, grid)),

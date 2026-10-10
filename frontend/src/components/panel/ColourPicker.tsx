@@ -1,12 +1,22 @@
 import { useEffect, useRef, useState } from "react";
-import type { KeyboardEvent, PointerEvent } from "react";
+import type { KeyboardEvent } from "react";
 
+import { Tooltip } from "@/components/ui/tooltip";
+import { useSliderPointer } from "@/hooks/useSliderPointer";
 import type { HsvTriple } from "@/hooks/useStylePanel";
 import { type PickerSeen, pickerStep } from "@/lib/pickerSync";
 
 const WIDTH = 244;
 const AREA_HEIGHT = 96;
 const HUE_HEIGHT = 12;
+/** The hue slider's pointer target is 24 px high around its 12 px ramp (WCAG 2.5.8,
+ * `specs/0047-transform-polish/` criterion 28); the 6 px above and below overlap the gap to
+ * its neighbours, which is 8 px, so no layout moves. */
+const HUE_TARGET_HEIGHT = 24;
+const HUE_TARGET_OVERHANG = (HUE_TARGET_HEIGHT - HUE_HEIGHT) / 2;
+/** The thumbs' drawn sizes: a click within them is a click on the thumb. */
+const AREA_THUMB = 14;
+const HUE_THUMB = 16;
 
 interface Hsv {
   /** Degrees, 0 to 360. */
@@ -30,9 +40,19 @@ interface ColourPickerProps {
   rgbOf: (hue: number, saturation: number, value: number) => number;
   /** A tick of a drag: shown on the canvas, nothing written. */
   onPreview: (hue: number, saturation: number, value: number) => void;
+  /** The end of a click: commits what `onPreview` showed, once. */
+  onSettle: () => void;
+  /** A double-click: the keyboard goes to the hex field of the same colour block
+   * (`specs/0047-transform-polish/` criterion 23), the picker's one value entry. */
+  onOpenEntry: () => void;
 }
 
-const clamp = (value: number, low: number, high: number) => Math.min(high, Math.max(low, value));
+/** The tooltip of both sliders: both gestures, since nothing on a slider shows the second
+ * (`specs/0047-transform-polish/` criterion 26). */
+const TOOLTIP = "Click to set, double-click to type the hex value";
+
+const clamp = (value: number, low: number, high: number) =>
+  Math.min(high, Math.max(low, value));
 
 /** Paints `draw(x, y)` (a packed colour) for every device pixel of a canvas. */
 function paint(
@@ -51,7 +71,10 @@ function paint(
   const image = context.createImageData(canvas.width, canvas.height);
   for (let py = 0; py < canvas.height; py += 1) {
     for (let px = 0; px < canvas.width; px += 1) {
-      const [r, g, b] = colourAt(px / Math.max(1, canvas.width - 1), py / Math.max(1, canvas.height - 1));
+      const [r, g, b] = colourAt(
+        px / Math.max(1, canvas.width - 1),
+        py / Math.max(1, canvas.height - 1),
+      );
       const at = (py * canvas.width + px) * 4;
       image.data[at] = r;
       image.data[at + 1] = g;
@@ -69,7 +92,15 @@ const channels = (rgb: number): [number, number, number] => [
 ];
 
 /** A thumb: a 2 px ring inside a 1 px casing, so it reads on every colour. */
-function Thumb({ size, left, top }: { size: number; left: number; top: number }) {
+function Thumb({
+  size,
+  left,
+  top,
+}: {
+  size: number;
+  left: number;
+  top: number;
+}) {
   return (
     <span
       aria-hidden
@@ -79,7 +110,8 @@ function Thumb({ size, left, top }: { size: number; left: number; top: number })
         height: size,
         left: left - size / 2,
         top: top - size / 2,
-        boxShadow: "0 0 0 1px var(--picker-thumb-casing), inset 0 0 0 1px var(--picker-thumb-casing)",
+        boxShadow:
+          "0 0 0 1px var(--picker-thumb-casing), inset 0 0 0 1px var(--picker-thumb-casing)",
       }}
     />
   );
@@ -102,6 +134,8 @@ export function ColourPicker({
   hsvOf,
   rgbOf,
   onPreview,
+  onSettle,
+  onOpenEntry,
 }: ColourPickerProps) {
   const [hsv, setHsv] = useState<Hsv>({ h: 0, s: 1, v: 1 });
   // The colour the picker last read from outside (and the converter that read it), and the one
@@ -116,7 +150,11 @@ export function ColourPicker({
     setSeen({ rgb, source: hsvOf });
     if (read === "derive") {
       const [hue, saturation, value] = hsvOf(rgb);
-      setHsv((previous) => ({ h: hue < 0 ? previous.h : hue, s: saturation, v: value }));
+      setHsv((previous) => ({
+        h: hue < 0 ? previous.h : hue,
+        s: saturation,
+        v: value,
+      }));
     }
   }
 
@@ -142,44 +180,76 @@ export function ColourPicker({
   }, [rgbOf]);
 
   const apply = (next: Hsv) => {
-    const clamped = { h: clamp(next.h, 0, 360), s: clamp(next.s, 0, 1), v: clamp(next.v, 0, 1) };
+    const clamped = {
+      h: clamp(next.h, 0, 360),
+      s: clamp(next.s, 0, 1),
+      v: clamp(next.v, 0, 1),
+    };
     setOwn(rgbOf(clamped.h, clamped.s, clamped.v));
     setHsv(clamped);
     onPreview(clamped.h, clamped.s, clamped.v);
   };
 
-  const dragArea = (event: PointerEvent<HTMLDivElement>) => {
-    const box = event.currentTarget.getBoundingClientRect();
-    apply({
-      h: hsv.h,
-      s: (event.clientX - box.left) / box.width,
-      v: 1 - (event.clientY - box.top) / box.height,
-    });
-  };
-  const dragHue = (event: PointerEvent<HTMLDivElement>) => {
-    const box = event.currentTarget.getBoundingClientRect();
-    apply({ ...hsv, h: (360 * (event.clientX - box.left)) / box.width });
-  };
-
-  const press = (move: (event: PointerEvent<HTMLDivElement>) => void) => ({
-    onPointerDown: (event: PointerEvent<HTMLDivElement>) => {
-      if (event.button !== 0) {
-        return;
-      }
-      event.currentTarget.setPointerCapture(event.pointerId);
-      event.currentTarget.focus({ preventScroll: true });
-      move(event);
-    },
-    onPointerMove: (event: PointerEvent<HTMLDivElement>) => {
-      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-        move(event);
-      }
-    },
+  // A click acts at the release, a drag after the slop; a drag is committed by the window
+  // listener its first tick installs (`usePreviewGesture`), a click by `onSettle`.
+  const areaAt = (at: { x: number; y: number }): Hsv => ({
+    h: hsv.h,
+    s: at.x / WIDTH,
+    v: 1 - at.y / AREA_HEIGHT,
   });
+  const hueAt = (at: { x: number }): Hsv => ({
+    ...hsv,
+    h: (360 * at.x) / WIDTH,
+  });
+  const areaPointer = useSliderPointer({
+    thumb: () =>
+      mixed
+        ? null
+        : {
+            at: { x: hsv.s * WIDTH, y: (1 - hsv.v) * AREA_HEIGHT },
+            radius: AREA_THUMB / 2,
+          },
+    onClick: (at) => {
+      apply(areaAt(at));
+      onSettle();
+    },
+    onDrag: (at) => apply(areaAt(at)),
+    onDragEnd: () => undefined,
+    onDoubleClick: onOpenEntry,
+  });
+  const huePointer = useSliderPointer({
+    thumb: () =>
+      mixed
+        ? null
+        : {
+            at: { x: (hsv.h / 360) * WIDTH, y: HUE_TARGET_HEIGHT / 2 },
+            radius: HUE_THUMB / 2,
+          },
+    onClick: (at) => {
+      apply(hueAt(at));
+      onSettle();
+    },
+    onDrag: (at) => apply(hueAt(at)),
+    onDragEnd: () => undefined,
+    onDoubleClick: onOpenEntry,
+  });
+
+  /** Enter or F2 opens the entry as a double-click does (criterion 25). */
+  const opensEntry = (event: KeyboardEvent) => {
+    if (event.key === "Enter" || event.key === "F2") {
+      event.preventDefault();
+      onOpenEntry();
+      return true;
+    }
+    return false;
+  };
 
   const step = (event: KeyboardEvent) => (event.shiftKey ? 0.1 : 0.01);
 
   const areaKeys = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (opensEntry(event)) {
+      return;
+    }
     const by = step(event);
     const moves: Record<string, Partial<Hsv>> = {
       ArrowLeft: { s: hsv.s - by },
@@ -194,6 +264,9 @@ export function ColourPicker({
     }
   };
   const hueKeys = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (opensEntry(event)) {
+      return;
+    }
     const by = 360 * step(event);
     const delta =
       event.key === "ArrowLeft" || event.key === "ArrowDown"
@@ -213,52 +286,75 @@ export function ColourPicker({
 
   return (
     <div className="flex flex-col gap-2" style={{ width: WIDTH }}>
-      <div
-        role="slider"
-        tabIndex={0}
-        aria-label={`${name} saturation and value`}
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={mixed ? undefined : percentOf(hsv.v)}
-        aria-valuetext={
-          mixed
-            ? "Mixed"
-            : `Saturation ${percentOf(hsv.s)} %, value ${percentOf(hsv.v)} %`
-        }
-        className={slider}
-        style={{ width: WIDTH, height: AREA_HEIGHT, touchAction: "none" }}
-        onKeyDown={areaKeys}
-        {...press(dragArea)}
-      >
-        <canvas
-          ref={areaCanvas}
-          aria-hidden
-          className="block rounded-[5px]"
-          style={{ width: WIDTH, height: AREA_HEIGHT }}
-        />
-        {!mixed && <Thumb size={14} left={hsv.s * WIDTH} top={(1 - hsv.v) * AREA_HEIGHT} />}
-      </div>
-      <div
-        role="slider"
-        tabIndex={0}
-        aria-label={`${name} hue`}
-        aria-valuemin={0}
-        aria-valuemax={360}
-        aria-valuenow={mixed ? undefined : Math.round(hsv.h)}
-        aria-valuetext={mixed ? "Mixed" : `Hue ${Math.round(hsv.h)} degrees`}
-        className={slider}
-        style={{ width: WIDTH, height: HUE_HEIGHT, touchAction: "none" }}
-        onKeyDown={hueKeys}
-        {...press(dragHue)}
-      >
-        <canvas
-          ref={hueCanvas}
-          aria-hidden
-          className="block rounded-[6px]"
-          style={{ width: WIDTH, height: HUE_HEIGHT }}
-        />
-        {!mixed && <Thumb size={16} left={(hsv.h / 360) * WIDTH} top={HUE_HEIGHT / 2} />}
-      </div>
+      <Tooltip side="left" content={TOOLTIP}>
+        <div
+          role="slider"
+          tabIndex={0}
+          aria-keyshortcuts="Enter F2"
+          aria-label={`${name} saturation and value`}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={mixed ? undefined : percentOf(hsv.v)}
+          aria-valuetext={
+            mixed
+              ? "Mixed"
+              : `Saturation ${percentOf(hsv.s)} %, value ${percentOf(hsv.v)} %`
+          }
+          className={slider}
+          style={{ width: WIDTH, height: AREA_HEIGHT, touchAction: "none" }}
+          onKeyDown={areaKeys}
+          {...areaPointer}
+        >
+          <canvas
+            ref={areaCanvas}
+            aria-hidden
+            className="block rounded-[5px]"
+            style={{ width: WIDTH, height: AREA_HEIGHT }}
+          />
+          {!mixed && (
+            <Thumb
+              size={AREA_THUMB}
+              left={hsv.s * WIDTH}
+              top={(1 - hsv.v) * AREA_HEIGHT}
+            />
+          )}
+        </div>
+      </Tooltip>
+      <Tooltip side="left" content={TOOLTIP}>
+        <div
+          role="slider"
+          tabIndex={0}
+          aria-keyshortcuts="Enter F2"
+          aria-label={`${name} hue`}
+          aria-valuemin={0}
+          aria-valuemax={360}
+          aria-valuenow={mixed ? undefined : Math.round(hsv.h)}
+          aria-valuetext={mixed ? "Mixed" : `Hue ${Math.round(hsv.h)} degrees`}
+          className={`${slider} flex items-center`}
+          style={{
+            width: WIDTH,
+            height: HUE_TARGET_HEIGHT,
+            margin: `-${HUE_TARGET_OVERHANG}px 0`,
+            touchAction: "none",
+          }}
+          onKeyDown={hueKeys}
+          {...huePointer}
+        >
+          <canvas
+            ref={hueCanvas}
+            aria-hidden
+            className="block rounded-[6px]"
+            style={{ width: WIDTH, height: HUE_HEIGHT }}
+          />
+          {!mixed && (
+            <Thumb
+              size={HUE_THUMB}
+              left={(hsv.h / 360) * WIDTH}
+              top={HUE_TARGET_HEIGHT / 2}
+            />
+          )}
+        </div>
+      </Tooltip>
     </div>
   );
 }

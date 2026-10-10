@@ -1,3 +1,4 @@
+import { RatioSlider } from "@/components/RatioSlider";
 import type { PolyStarMode, Tool } from "@/hooks/useEditorSession";
 
 export interface ShapeToolbarProps {
@@ -8,6 +9,8 @@ export interface ShapeToolbarProps {
   onSetPolyStarMode: (mode: PolyStarMode) => void;
   onSetPolyStarPointCount: (count: number) => void;
   onSetPolyStarRatio: (ratio: number) => void;
+  /** Returns the keyboard focus to the canvas (after Enter or Escape in the ratio entry). */
+  onReturnFocus: () => void;
 }
 
 const MIN_POINT_COUNT = 3;
@@ -29,6 +32,7 @@ export function ShapeToolbar({
   onSetPolyStarMode,
   onSetPolyStarPointCount,
   onSetPolyStarRatio,
+  onReturnFocus,
 }: ShapeToolbarProps) {
   if (tool !== "polygon-star") {
     return null;
@@ -93,18 +97,21 @@ export function ShapeToolbar({
       </label>
 
       {polyStarMode === "star" && (
-        <label className="flex items-center gap-1 text-[var(--toolbar-icon)]">
+        <div className="flex items-center gap-1 text-[var(--toolbar-icon)]">
           <span className="opacity-60">New:</span> Ratio
-          <input
-            type="range"
-            min={0.01}
-            max={0.99}
-            step={0.01}
+          <RatioSlider
+            label="Ratio of new stars"
+            title="Ratio of the next star. Click to set, double-click to type"
             value={polyStarRatio}
-            onChange={(event) => onSetPolyStarRatio(Number(event.target.value))}
+            // The setting is not a document write: every tick and click sets it, there is
+            // no commit, and Escape in a drag puts the value of the press back.
+            onPreview={onSetPolyStarRatio}
+            onRelease={() => undefined}
+            onSet={onSetPolyStarRatio}
+            onCancel={onSetPolyStarRatio}
+            onReturnFocus={onReturnFocus}
           />
-          <span className="w-10 text-right">{polyStarRatio.toFixed(2)}</span>
-        </label>
+        </div>
       )}
     </div>
   );

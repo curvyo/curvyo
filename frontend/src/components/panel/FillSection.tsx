@@ -24,6 +24,7 @@ interface FillSectionProps {
 export function FillSection({ panel, onReturnFocus }: FillSectionProps) {
   const { view } = panel;
   const section = useRef<HTMLDivElement>(null);
+  const hex = useRef<HTMLInputElement>(null);
   const rowsFocus = useRowsFocus(view.fillRows, section);
   return (
     <div ref={section} className="flex flex-col gap-2">
@@ -47,6 +48,7 @@ export function FillSection({ panel, onReturnFocus }: FillSectionProps) {
             onPick={() => panel.beginPick("fill")}
             onSubmitHex={(text) => panel.setText("fill-color", text)}
             onReturnFocus={onReturnFocus}
+            hexRef={hex}
           />
           <ColourPicker
             name="Fill"
@@ -57,6 +59,8 @@ export function FillSection({ panel, onReturnFocus }: FillSectionProps) {
             onPreview={(hue, saturation, value) =>
               panel.previewHsv("fill-color", hue, saturation, value)
             }
+            onSettle={panel.settleHsv}
+            onOpenEntry={() => hex.current?.focus()}
           />
           <ValueField
             label="Opacity"

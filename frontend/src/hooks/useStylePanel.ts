@@ -244,6 +244,8 @@ export interface StylePanelApi {
    * canvas, nothing written. The gesture ends, with one commit, at the next
    * pointer release or arrow key-up anywhere. */
   previewHsv: (field: StyleFieldName, hue: number, saturation: number, value: number) => void;
+  /** Commits what `previewHsv` showed, once: the end of a click on the picker. */
+  settleHsv: () => void;
   /** The hue, saturation and value of a packed colour (Rust's rounding). */
   hsvOf: (rgb: number) => HsvTriple;
   /** The packed colour of a hue, saturation and value (Rust's rounding). */
@@ -291,7 +293,7 @@ export function useStylePanel(editor: EditorHandle): StylePanelApi {
   // (`syncRevision`) or this panel changed something (`local`).
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const view = useMemo(() => readView(getSession()), [getSession, syncRevision, local]);
-  const { queue: preview, previewing, cancels } = usePreviewGesture(getSession, refresh);
+  const { queue: preview, settle, previewing, cancels } = usePreviewGesture(getSession, refresh);
 
   const setText = useCallback(
     (field: StyleFieldName, text: string): TextOutcome => {
@@ -337,6 +339,7 @@ export function useStylePanel(editor: EditorHandle): StylePanelApi {
     setText,
     previewHsv: (field, hue, saturation, value) =>
       preview((s) => s.preview_style_hsv(field, hue, saturation, value)),
+    settleHsv: settle,
     hsvOf,
     rgbOf,
     previewValue: (field, p, grid) => preview((s) => s.preview_value_field(field, p, grid)),
