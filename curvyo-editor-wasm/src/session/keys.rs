@@ -319,6 +319,7 @@ impl Session {
             || self.is_panning()
             || self.style.pending_edit().is_some()
             || self.select.bar_preview().is_some()
+            || self.background_preview.is_some()
     }
 
     pub(super) fn pen_path_open(&self) -> bool {

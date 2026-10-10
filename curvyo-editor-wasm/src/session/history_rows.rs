@@ -178,6 +178,7 @@ impl Session {
                 WipeOutcome::Wiped(removed)
             }
             Err(curvyo_document_core::HistoryError::Wipe) => WipeOutcome::Failed,
+            Err(curvyo_document_core::HistoryError::NoSteps) => WipeOutcome::Ignored,
             Err(_) => WipeOutcome::Shared,
         }
     }

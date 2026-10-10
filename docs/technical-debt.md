@@ -1378,3 +1378,9 @@ closed: +48 MB and about 260 ms at 154,000 operations in the Loro spike
 (`docs/spikes/loro-history-primitives.md`); the measured figure for this build is in ADR 0014 §13.
 The step index and the container chains of the log add to it. Freeing it when the History tab is
 closed (`free_history_cache`) is possible but would put the cold cost back on the next undo.
+
+## Undo and redo do not restore the Node tool's segment selection
+
+`0020-undo-redo` restores the selected objects and the Node tool's selected nodes by anchor id
+(`UndoStack`, `SelectionSnapshot`). A selected segment (two adjacent anchors) is not restored: after
+Ctrl+Z the segment is deselected. Minor; the snapshot would need the segment's end anchors.

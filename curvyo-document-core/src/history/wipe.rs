@@ -56,7 +56,7 @@ impl Document {
     /// caller empties its stacks.
     ///
     /// # Errors
-    /// [`HistoryError::Shared`] for a shared document; [`HistoryError::Wipe`] when the log could
+    /// [`HistoryError::Shared`] for a shared document; [`HistoryError::NoSteps`] without a step; [`HistoryError::Wipe`] when the log could
     /// not be rewritten (the document is then as it was).
     pub fn wipe_history(&mut self) -> Result<usize, HistoryError> {
         if self.is_shared() {
@@ -64,6 +64,9 @@ impl Document {
         }
         self.assert_outside_batch();
         let removed = self.history_len();
+        if removed == 0 {
+            return Err(HistoryError::NoSteps);
+        }
         let old = self.loro();
         old.commit();
         let peer = old.peer_id();

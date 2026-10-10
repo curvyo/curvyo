@@ -15,6 +15,9 @@ pub enum HistoryError {
     /// The history of a shared document is not wiped (`specs/0020-undo-redo` criterion 50).
     #[error("the history of a shared document cannot be wiped yet")]
     Shared,
+    /// There is no step to remove: a wipe would only add a row (`specs/0020-undo-redo` criterion 47).
+    #[error("there is no history to wipe")]
+    NoSteps,
     /// The log could not be rewritten; the document is as it was.
     #[error("the history could not be wiped")]
     Wipe,

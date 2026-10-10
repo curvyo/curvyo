@@ -115,6 +115,10 @@ and a marker a peer could edit concurrently.
 3. **Step identity.** `StepRef` = the id (peer, counter) of the step's first op, the same on every
    replica. Shown id: FNV-1a 64 of the 12 bytes, base36 lowercase, 7 characters, lengthened on a
    collision within the document. Hand-written, no dependency.
+   *Amended 2026-10-10 (milestone 1 review):* the 12 bytes are the peer as 8 bytes little endian and
+   the counter as 4 bytes little endian; the hash is written in base 36 (`0-9a-z`) with 13 digits,
+   **least significant digit first**, so that every character carries the full 36 values; the shown
+   id is a prefix of it. Pinned by tests, for example step (11, 3) is `px0eaw6`.
 4. **Time and author.** *Amended 2026-10-10:* the editor passes wall-clock seconds in
    (`Document::set_step_time`); `commit_with_label` writes them as `t=` in the header. Loro change
    timestamps are not set and not read: Loro clamps them ascending across peers, so they cannot
@@ -197,20 +201,21 @@ and a marker a peer could edit concurrently.
 `curvyo-editor-wasm/tests/undo_budgets.rs` and `curvyo-document-core/tests/undo_budgets.rs`, run with
 `--ignored`; 5,000 objects and 25,000 steps unless stated; each test asserts four times the figure):
 
-| What | Budget | Measured |
-|---|---|---|
-| Undo, small step in the big drawing (3 objects) | 100 ms | 60 ms; redo 62 ms |
-| Undo and redo, one path of 1,900 anchors (just under 2,000 operations) | 100 ms | 34 ms and 36 ms |
-| Undo, 100 paths of 100 anchors (busy state) | 250 ms | 201 ms |
-| Undo, move of 5,000 objects (busy state) | 1 s | 285 ms |
-| Undo, Delete of 5,000 objects (one injected change) | 1 s | 180 ms |
-| Undo and redo, Boolean union with 5,000 anchors | one press | 165 ms and 126 ms |
-| First undo after Open, no warm-up (small step) | 250 ms | 140 ms |
-| `warm_history` after Open (113,003 operations; the test alone in its process) | | 220 ms, +40 MiB resident (open itself +7 MiB) |
-| Undo of a 3-object step 500 / 5,000 operations behind the latest version | | 4.5 ms / 10 ms |
-| 500 stack entries (`UndoStack::approx_bytes`) | 50 MB | 80 KiB (500 unions) to 23 MiB (500 different 4,000-object selections) |
+| What | Budget | Measured (implementer) | Observed range (tester, other runs) |
+|---|---|---|---|
+| Undo, small step in the big drawing (3 objects) | 100 ms | 60 ms; redo 62 ms | |
+| Undo and redo, one path of 1,900 anchors (just under 2,000 operations) | 100 ms | 34 ms and 36 ms | 40 to 122 ms |
+| Undo, 100 paths of 100 anchors (busy state) | 250 ms | 201 ms | 214 to 260 ms |
+| Undo, move of 5,000 objects (busy state) | 1 s | 285 ms | 293 to 643 ms |
+| Undo, Delete of 5,000 objects (one injected change) | 1 s | 180 ms | |
+| Undo and redo, Boolean union with 5,000 anchors | one press | 165 ms and 126 ms | |
+| First undo after Open, no warm-up (small step) | 250 ms | 140 ms | up to 283 ms |
+| `warm_history` after Open (113,003 operations; the test alone in its process) | | 220 ms, +40 MiB resident (open itself +7 MiB) | |
+| Undo of a 3-object step 500 / 5,000 operations behind the latest version | | 4.5 ms / 10 ms | |
+| 500 stack entries (`UndoStack::approx_bytes`) | 50 MB | 80 KiB (500 unions) to 23 MiB (500 different 4,000-object selections) | |
 
-`FAR_STEP_OPS` is 1,000: the measured distance cost is small at 5,000 operations, so the value
+The budgets are targets; the tests assert four times each figure to absorb machine noise, and the
+tester's runs on other machines stayed inside that (the range column). `FAR_STEP_OPS` is 1,000: the measured distance cost is small at 5,000 operations, so the value
 errs on the side of the busy state until the History tab's reads (checkout of the older versions)
 are measured in `0042`. The wasm32 factor is not measured: no browser runs in the gate.
 
