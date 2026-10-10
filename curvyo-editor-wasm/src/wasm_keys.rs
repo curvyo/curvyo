@@ -18,7 +18,7 @@ impl WasmSession {
     /// held. Returns what happened: `"ignored"`, `"tool"`, `"entry"`,
     /// `"deleted"`, `"pen"`, `"escape-entry"`, `"escape-drag"`,
     /// `"escape-state"`, `"escape-tool"`, `"escape-none"`,
-    /// `"hint-select-first"`, `"hint-path-only"`,
+    /// `"hint-select-first"`,
     /// `"hint-too-far"`, `"select-all"`, `"nudge"` (an arrow key moved the
     /// selection) or `"nudge-new"` (and opened a new run of held-key events).
     /// `time_ms` is `KeyboardEvent.timeStamp`. The host prevents the page's

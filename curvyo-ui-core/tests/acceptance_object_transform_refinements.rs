@@ -18,7 +18,7 @@ use curvyo_document_core::{
 use curvyo_ui_core::{
     AnchorIdMinter, EditHandle, EntryKind, EntryOutcome, InvalidReason, Modifiers, ObjectSelection,
     ResizeDirection, SelectDoubleClickOutcome, SelectPointerDownOutcome, SelectTool, Side,
-    StrokeScaling, TransformHandleTolerances, oriented_bounds,
+    StrokeScaling, TransformHandleTolerances, oriented_bounds, primitive_as_path,
 };
 
 const EPS: f64 = 1e-9;
@@ -284,11 +284,8 @@ fn every_kind_shows_its_handle_set() {
         // `0019` criterion 56: a polygon or star shows all eight resize handles.
         assert_eq!(resize, 8, "{kind:?}");
         assert_eq!(rotate, 4, "{kind:?}: corner rotate handles only");
-        assert_eq!(
-            skew,
-            if is_path(kind) { 4 } else { 0 },
-            "{kind:?}: skew on paths only"
-        );
+        // `0047` criterion 1: skew handles for every kind.
+        assert_eq!(skew, 4, "{kind:?}: skew handles for every kind");
         assert_eq!(centre, 1, "{kind:?}: centre handle on a big box");
 
         let revealed = rig.handles(true);
@@ -441,21 +438,21 @@ fn skew_handles_hide_per_axis_below_24_px_and_at_zero_extent() {
     );
 }
 
+/// `0047` criteria 1 and 2: a primitive's skew handle skews it and the release makes it
+/// a path; no kind is refused.
 #[test]
-fn a_primitive_never_starts_a_skew_and_a_press_where_the_handle_would_be_writes_nothing() {
+fn a_primitive_skews_by_its_handle_and_becomes_a_path() {
     for kind in [Kind::Rect, Kind::Ellipse, Kind::Polygon, Kind::Star] {
         let mut rig = Rig::new(kind);
         let before = rig.object();
-        let box_ = oriented_bounds(&before);
-        // Where a top skew handle would sit: 8 mm above the top-edge midpoint.
-        let top_mid = box_.to_document(pt(f64::midpoint(box_.min.x, box_.max.x), box_.min.y));
-        let spot = top_mid.translated(Vec2::new(0.0, -10.0));
+        let spot = rig.handle(EditHandle::Skew(Side::Top), false);
         rig.drag(spot, spot.translated(Vec2::new(30.0, 0.0)), false, false);
-        assert_eq!(
-            rig.object(),
-            before,
-            "{kind:?}: not moved, resized, rotated or skewed"
+        let after = rig.object();
+        assert!(
+            matches!(after, ObjectSnapshot::Path(_)),
+            "{kind:?}: skewed, so a path"
         );
+        assert_ne!(after, before, "{kind:?}");
     }
 }
 
@@ -969,7 +966,8 @@ fn a_size_entry_has_the_fields_the_handle_changes() {
     open_size(&mut poly, ResizeDirection::Ne, false, false);
     let entry = poly.tool.entry().unwrap();
     // `0019` criterion 56 replaces the one "r" field (`0008` criterion 26): W and H
-    // of the frame square.
+    // of the frame square. `0047` criterion 12: the fixed point is the opposite corner
+    // like any other kind's, not the centre.
     assert_eq!(entry.kind(), EntryKind::Size);
     assert_eq!(entry.fields().len(), 2);
     assert_eq!(
@@ -978,9 +976,9 @@ fn a_size_entry_has_the_fields_the_handle_changes() {
     );
     assert_eq!(entry.fields()[0].prefill, "80.0");
     assert_eq!(entry.fields()[1].prefill, "80.0");
-    // Centre of the shape is the fixed point, with or without Shift (flag 1).
-    let center = poly.tool.entry().unwrap().pivot();
-    assert!(close(center.x, 60.0) && close(center.y, 50.0));
+    // The opposite (Sw) corner of the frame square (20, 90) is the fixed point.
+    let fixed = poly.tool.entry().unwrap().pivot();
+    assert!(close(fixed.x, 20.0) && close(fixed.y, 90.0), "{fixed:?}");
 }
 
 #[test]
@@ -1178,6 +1176,25 @@ fn a_typed_size_and_a_dragged_size_leave_the_same_snapshot() {
 
                     // The size the drag yielded, typed.
                     let b = oriented_bounds(&result);
+                    let (width, height) = if is_polygon_or_star(kind)
+                        && matches!(result, ObjectSnapshot::Path(_))
+                    {
+                        // A stretched polygon or star is a path with a tight box, while
+                        // the size chip measures the frame square: the same factors.
+                        let ObjectSnapshot::Primitive(primitive) = dragged_start(kind, turn) else {
+                            panic!("a primitive");
+                        };
+                        let tight = oriented_bounds(&ObjectSnapshot::Path(primitive_as_path(
+                            &primitive,
+                            &mut AnchorIdMinter::new(0),
+                        )));
+                        (
+                            start_box.width() * b.width() / tight.width(),
+                            start_box.height() * b.height() / tight.height(),
+                        )
+                    } else {
+                        (b.width(), b.height())
+                    };
                     open_size(&mut typed, direction, shift, ctrl);
                     let entry = typed.tool.entry().unwrap().clone();
                     let context =
@@ -1186,11 +1203,11 @@ fn a_typed_size_and_a_dragged_size_leave_the_same_snapshot() {
                         let touches_width =
                             matches!(direction, ResizeDirection::E | ResizeDirection::W);
                         [
-                            format!("{}", if touches_width { b.width() } else { b.height() }),
+                            format!("{}", if touches_width { width } else { height }),
                             String::new(),
                         ]
                     } else {
-                        [format!("{}", b.width()), format!("{}", b.height())]
+                        [format!("{width}"), format!("{height}")]
                     };
                     // Linked fields: the last edited one carries the target.
                     let last_edited = if entry.linked() {

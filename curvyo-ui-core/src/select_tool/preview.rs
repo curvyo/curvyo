@@ -140,9 +140,7 @@ impl SelectTool {
     #[must_use]
     pub fn live_pivot(&self, shift: bool) -> Option<Point> {
         match &self.drag {
-            SelectDrag::Transforming(drag) => {
-                pivot_for(drag.handle, &drag.start, &drag.start_box, shift)
-            }
+            SelectDrag::Transforming(drag) => pivot_for(drag.handle, &drag.start_box, shift),
             SelectDrag::GroupTransforming(drag) => drag.pivot(shift),
             SelectDrag::Moving(_) | SelectDrag::Marquee(_) | SelectDrag::Lasso(_) => None,
             SelectDrag::None => match &self.entry {
@@ -158,13 +156,8 @@ impl SelectTool {
     /// (criterion 55): the marker's preview while Shift is held with no drag
     /// running. `None` for the centre handle.
     #[must_use]
-    pub fn hover_pivot(
-        object: &ObjectSnapshot,
-        box_: &OrientedBox,
-        handle: EditHandle,
-        shift: bool,
-    ) -> Option<Point> {
-        pivot_for(handle, object, box_, shift)
+    pub fn hover_pivot(box_: &OrientedBox, handle: EditHandle, shift: bool) -> Option<Point> {
+        pivot_for(handle, box_, shift)
     }
     /// The live, uncommitted resize, rotate or skew preview (acceptance
     /// criteria 14, 22 of slice 5; 40 here): the object as it would commit

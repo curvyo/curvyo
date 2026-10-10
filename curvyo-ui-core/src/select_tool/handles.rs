@@ -17,14 +17,14 @@ use crate::transform_handle_layout::{
     transform_handles,
 };
 
-/// The handle kinds `object` shows (criteria 11, 37, 50): the four corner and four
-/// edge resize handles for every kind (a polygon's or star's edges stretch and
-/// convert it, `specs/0019-multi-object-transform/` criterion 56); skew handles
-/// only for a path; the side rotate handles when `side_rotate`.
-fn handle_spec_for(object: &ObjectSnapshot, side_rotate: bool) -> HandleSpec {
+/// The handle kinds every object shows (`specs/0047-transform-polish/` criteria 1 and 12):
+/// the four corner and four edge resize handles, the four skew handles, and the side
+/// rotate handles when `side_rotate`. The kind decides nothing: a polygon, a star or a
+/// primitive that is skewed becomes a path on release.
+const fn handle_spec(side_rotate: bool) -> HandleSpec {
     HandleSpec {
         resize_directions: &ALL_EIGHT,
-        skew: matches!(object, ObjectSnapshot::Path(_)),
+        skew: true,
         side_rotate,
     }
 }
@@ -42,7 +42,7 @@ fn drawn_edit_handles(
     tolerances: &TransformHandleTolerances,
     side_rotate: bool,
 ) -> Vec<(EditHandle, Point)> {
-    let mut handles = transform_handles(box_, handle_spec_for(object, side_rotate), tolerances);
+    let mut handles = transform_handles(box_, handle_spec(side_rotate), tolerances);
     let params = param_handles(object, box_, tolerances);
     let tiers = handle_tiers(box_.width().min(box_.height()), tolerances);
     let centre = box_.to_document(box_.local_center());

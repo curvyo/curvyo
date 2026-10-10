@@ -1,8 +1,8 @@
-//! `curvyo-ui-core` tests of the stretch that converts shapes to paths
-//! (`specs/0019-multi-object-transform/` criteria 18 to 20, 32, 34, 53 to 56 and
-//! `adrs.md` decision 8): which gestures convert, what the converted path is, that
-//! the preview is the commit, and the counts the notice and the hint lines use.
-//! Scale is 4 px/mm.
+//! `curvyo-ui-core` tests of the skew and the stretch that convert shapes to paths,
+//! silently (`specs/0047-transform-polish/` criteria 2 to 12; before it
+//! `specs/0019-multi-object-transform/` criteria 18 to 20, 32, 34 and 53 to 56):
+//! which gestures convert, what the converted path is, and that the preview is the
+//! commit. Scale is 4 px/mm.
 
 #![allow(
     clippy::unwrap_used,
@@ -18,7 +18,7 @@ use curvyo_document_core::{
 };
 use curvyo_ui_core::{
     AnchorIdMinter, EditHandle, EntryKey, EntryOutcome, Modifiers, ObjectSelection, PressTarget,
-    ResizeDirection, SelectTool, TransformHandleTolerances, classify_press,
+    ResizeDirection, SelectTool, Side, TransformHandleTolerances, classify_press,
 };
 
 const SCALE: f64 = 4.0;
@@ -237,43 +237,44 @@ fn an_edge_stretch_converts_the_star_and_keeps_the_rectangle() {
             && (high.x - (b_low.x + 2.0 * (b_high.x - b_low.x))).abs() < 1e-6
     );
     assert!((low.y - b_low.y).abs() < 1e-6 && (high.y - b_high.y).abs() < 1e-6);
-    // The notice counts it once.
-    assert_eq!(rig.tool.take_conversion_notice().as_array(), [0, 1, 0, 0]);
-    assert!(rig.tool.take_conversion_notice().is_empty(), "taken once");
 }
 
-/// Criterion 19 (lead decision E): a corner drag of a selection that holds a star is
-/// proportional whatever Ctrl does, and converts nothing.
+/// `0047` criterion 7: a corner drag of a selection that holds a star is free like any
+/// other and turns the star into a path; with Ctrl it keeps one factor and converts
+/// nothing (criterion 10).
 #[test]
-fn a_corner_drag_with_a_star_selected_stays_proportional() {
+fn a_corner_drag_is_free_and_ctrl_keeps_the_proportions() {
     for modifiers in [NONE, CTRL] {
         let (mut rig, star, rect) = star_and_rect();
         rig.select(&[star, rect]);
         let corner = rig.south_east_corner();
-        // A very uneven drag: the dominant axis decides.
+        // A very uneven drag.
         rig.drag(corner, pt(corner.x + 40.0, corner.y + 2.0), modifiers);
-        assert!(
-            !is_path(&rig.document, star),
-            "{modifiers:?}: the star stays a star"
-        );
-        assert!(rig.document.primitive(rect).is_some());
         let Shape::Rect { bounds, .. } = (match rig.document.object(rect).unwrap() {
             ObjectSnapshot::Primitive(p) => p.shape,
             ObjectSnapshot::Path(_) => panic!(),
         }) else {
             panic!()
         };
-        assert!(
-            (bounds.width.as_mm() - bounds.height.as_mm()).abs() < 1e-6,
-            "one factor for both axes"
-        );
         assert!(bounds.width.as_mm() > 10.0);
-        assert!(rig.tool.take_conversion_notice().is_empty(), "no notice");
+        if modifiers == CTRL {
+            assert!(!is_path(&rig.document, star), "a uniform scale keeps it");
+            assert!(
+                (bounds.width.as_mm() - bounds.height.as_mm()).abs() < 1e-6,
+                "one factor for both axes"
+            );
+        } else {
+            assert!(is_path(&rig.document, star), "a stretch converts it");
+            assert!(
+                (bounds.width.as_mm() - bounds.height.as_mm()).abs() > 1.0,
+                "two factors"
+            );
+        }
+        assert!(rig.document.primitive(rect).is_some());
     }
 }
 
-/// Criterion 18: a selection with no converting shape keeps the free corner stretch
-/// (and no notice).
+/// Criterion 18: a selection with no converting shape stretches freely at a corner.
 #[test]
 fn a_selection_without_converting_shapes_stretches_freely_at_a_corner() {
     let mut rig = Rig::new();
@@ -285,7 +286,6 @@ fn a_selection_without_converting_shapes_stretches_freely_at_a_corner() {
     let (min, max) = rig.group_box();
     assert!((max.x - min.x - 60.0).abs() < 1e-6 && (max.y - min.y - 30.0).abs() < 1e-6);
     assert!(rig.document.primitive(a).is_some() && rig.document.primitive(b).is_some());
-    assert!(rig.tool.take_conversion_notice().is_empty());
 }
 
 /// Criterion 20: a circle becomes an ellipse, never a path, and is not counted.
@@ -315,7 +315,6 @@ fn a_stretched_circle_becomes_an_ellipse_not_a_path() {
         "no longer a circle"
     );
     assert_eq!(rotation.as_radians(), 0.0);
-    assert!(rig.tool.take_conversion_notice().is_empty());
 }
 
 /// Criteria 53.2 and 55: a rectangle turned by 30 degrees is a converting shape; an
@@ -330,15 +329,12 @@ fn a_rotated_rectangle_becomes_a_path_in_place() {
     rig.select(&[first, turned, last]);
     let before = rig.document.object(turned).unwrap();
     let order = rig.document.object_ids();
-    let group = SelectTool::group_of(&rig.objects(), &rig.selection).unwrap();
-    assert_eq!(group.converting().as_array(), [0, 0, 1, 0]);
     let east = rig.east_edge();
     rig.drag(east, pt(east.x + 30.0, east.y), NONE);
     assert!(is_path(&rig.document, turned));
     assert_eq!(rig.document.object_ids(), order);
     assert_eq!(rig.document.object(turned).unwrap().style(), before.style());
     assert!(rig.document.primitive(first).is_some() && rig.document.primitive(last).is_some());
-    assert_eq!(rig.tool.take_conversion_notice().as_array(), [0, 0, 1, 0]);
 }
 
 /// Criterion 32: during the drag the converting shape is previewed as its path, the
@@ -358,18 +354,9 @@ fn the_preview_is_the_commit_and_a_drag_back_converts_nothing() {
         "the star previews as a path"
     );
     assert!(matches!(live[1], ObjectSnapshot::Primitive(_)));
-    assert_eq!(
-        rig.tool.live_conversion_counts(to, false, false).as_array(),
-        [0, 1, 0, 0]
-    );
     // Back to the start: no preview, nothing converted.
     rig.tool.pointer_moved(east, NONE, &mut rig.selection);
     assert!(rig.live(east, NONE).is_none());
-    assert!(
-        rig.tool
-            .live_conversion_counts(east, false, false)
-            .is_empty()
-    );
     // Out again and released: the committed objects are the previewed ones.
     rig.tool.pointer_moved(to, NONE, &mut rig.selection);
     let live = rig.live(to, NONE).unwrap();
@@ -377,10 +364,10 @@ fn the_preview_is_the_commit_and_a_drag_back_converts_nothing() {
     assert_eq!(rig.objects(), live, "preview and release agree");
 }
 
-/// Criteria 53.4 and 54: Escape, a drag of factor 1 and a refused commit convert
-/// nothing and leave no notice.
+/// `0019` criterion 53.4: Escape, a drag of factor 1 and a refused commit convert
+/// nothing.
 #[test]
-fn escape_factor_one_and_a_refused_commit_leave_no_notice() {
+fn escape_factor_one_and_a_refused_commit_convert_nothing() {
     let (mut rig, star, rect) = star_and_rect();
     rig.select(&[star, rect]);
     let before = rig.objects();
@@ -392,11 +379,9 @@ fn escape_factor_one_and_a_refused_commit_leave_no_notice() {
     rig.tool.escape();
     rig.release(pt(east.x + 30.0, east.y), NONE);
     assert_eq!(rig.objects(), before);
-    assert!(rig.tool.take_conversion_notice().is_empty());
     // Dragged along the edge only: factor 1 on both axes.
     rig.drag(east, pt(east.x, east.y + 30.0), NONE);
     assert_eq!(rig.objects(), before);
-    assert!(rig.tool.take_conversion_notice().is_empty());
     // A stale id: the snapshot holds an object that is gone, the document refuses it
     // all (criterion 53.6).
     let objects = rig.objects();
@@ -423,18 +408,23 @@ fn escape_factor_one_and_a_refused_commit_leave_no_notice() {
         rig.document.primitive(star).is_some(),
         "the star is still a star"
     );
-    assert!(rig.tool.take_conversion_notice().is_empty(), "no notice");
 }
 
-/// Criterion 53.4: move and rotate never convert.
+/// `0047` criterion 10: move and rotate never convert.
 #[test]
 fn move_and_rotate_never_convert() {
     let (mut rig, star, rect) = star_and_rect();
     rig.select(&[star, rect]);
-    let (min, max) = rig.group_box();
-    // Rotate: the north-east corner rotate handle sits just outside the corner.
-    let from = pt(max.x + 2.0, min.y - 2.0);
+    // Rotate: the north-east corner rotate handle.
+    let from =
+        SelectTool::group_handle_positions(&rig.objects(), &rig.selection, tolerances(), false)
+            .into_iter()
+            .find(|(h, _)| *h == EditHandle::Rotate(ResizeDirection::Ne))
+            .map(|(_, p)| p)
+            .unwrap();
+    let before = rig.objects();
     rig.drag(from, pt(from.x - 8.0, from.y + 14.0), NONE);
+    assert_ne!(rig.objects(), before, "the selection turned");
     assert!(!is_path(&rig.document, star));
     // Move: the star's outline.
     let objects = rig.objects();
@@ -445,13 +435,12 @@ fn move_and_rotate_never_convert() {
         NONE,
     );
     assert!(!is_path(&rig.document, star));
-    assert!(rig.tool.take_conversion_notice().is_empty());
 }
 
-/// Criterion 56: a single polygon or star shows all eight resize handles, its corner
-/// drag is proportional, its edge drag turns it into a path.
+/// `0047` criterion 12: a single polygon or star shows all eight resize handles; a
+/// corner drag stretches freely and converts, Ctrl keeps the proportions and the shape.
 #[test]
-fn a_single_star_converts_on_an_edge_and_not_on_a_corner() {
+fn a_single_star_converts_on_a_free_corner_and_keeps_its_kind_with_ctrl() {
     let mut rig = Rig::new();
     let star = rig.star(0.0, 10.0);
     rig.select(&[star]);
@@ -469,28 +458,26 @@ fn a_single_star_converts_on_an_edge_and_not_on_a_corner() {
             .map(|(_, p)| *p)
             .unwrap()
     };
-    // The corner: proportional, still a star, no notice.
+    // Ctrl on the corner: proportional, still a star.
     let se = position(ResizeDirection::Se);
-    rig.drag(se, pt(se.x + 12.0, se.y + 2.0), NONE);
+    rig.drag(se, pt(se.x + 12.0, se.y + 2.0), CTRL);
     assert!(rig.document.primitive(star).is_some());
-    assert!(rig.tool.take_conversion_notice().is_empty());
-    // The east edge: a stretch.
+    // The same corner without Ctrl: a stretch.
     let objects = rig.objects();
     let handles = SelectTool::transform_handles(&objects, &rig.selection, tolerances(), false);
-    let east = handles
+    let se = handles
         .iter()
-        .find(|(h, _)| *h == EditHandle::Resize(ResizeDirection::E))
+        .find(|(h, _)| *h == EditHandle::Resize(ResizeDirection::Se))
         .map(|(_, p)| *p)
         .unwrap();
-    rig.drag(east, pt(east.x + 30.0, east.y), NONE);
+    rig.drag(se, pt(se.x + 30.0, se.y + 1.0), NONE);
     assert!(
         is_path(&rig.document, star),
-        "an edge stretch turns it into a path"
+        "a free corner drag turns it into a path"
     );
-    assert_eq!(rig.tool.take_conversion_notice().as_array(), [0, 1, 0, 0]);
 }
 
-/// Criterion 56: the typed size of a single polygon has W and H; a size of another
+/// `0047` criteria 9 and 12: the typed size of a single polygon has W and H; a size of another
 /// aspect ratio converts it, the same aspect keeps it.
 #[test]
 fn a_single_polygon_typed_size_converts_only_when_it_is_a_stretch() {
@@ -522,7 +509,6 @@ fn a_single_polygon_typed_size_converts_only_when_it_is_a_stretch() {
         rig.document.primitive(polygon).is_some(),
         "still a polygon ({w} x {h})"
     );
-    assert!(rig.tool.take_conversion_notice().is_empty());
     // Another aspect: a stretch.
     let objects = rig.objects();
     rig.tool
@@ -532,41 +518,41 @@ fn a_single_polygon_typed_size_converts_only_when_it_is_a_stretch() {
     let outcome = rig.tool.commit_entry(&rig.document, ["60.0", "40.0"], 0);
     assert_eq!(outcome, EntryOutcome::Committed);
     assert!(is_path(&rig.document, polygon));
-    assert_eq!(rig.tool.take_conversion_notice().as_array(), [1, 0, 0, 0]);
 }
 
-/// Criteria 34 and 55: the typed size of a selection is a stretch only when the
-/// aspect ratio changes; the entry says how many shapes it would convert.
+/// `0047` criteria 7 and 9: the typed size of a selection is a stretch only when the
+/// aspect ratio changes; twice both ways is a uniform scale and converts nothing.
 #[test]
-fn the_group_size_entry_counts_what_a_stretch_would_convert() {
+fn the_group_size_entry_converts_only_a_stretch() {
     let (mut rig, star, rect) = star_and_rect();
     rig.select(&[star, rect]);
     let objects = rig.objects();
     rig.tool
         .open_entry_for_key(&objects, &rig.selection, EntryKey::Size)
         .unwrap();
+    rig.tool.mint_conversion_ids(&mut AnchorIdMinter::new(9));
     let entry = rig.tool.group_entry().unwrap();
     let (w, h) = (
         entry.fields()[0].prefill.clone(),
         entry.fields()[1].prefill.clone(),
     );
-    assert!(entry.conversion_counts([&w, &h], 0).is_empty(), "unedited");
+    assert_eq!(entry.resolve([&w, &h], 0), Ok(None), "unedited");
+    let wider = entry.resolve(["90.0", &h], 0).unwrap().unwrap();
     assert!(
-        entry.conversion_counts(["90.0", "40.0"], 0).as_array() == [0, 1, 0, 0],
+        matches!(wider[0], ObjectSnapshot::Path(_)),
         "a wider box converts the star"
     );
-    let h2: f64 = h.parse::<f64>().unwrap() * 2.0;
-    let w2: f64 = w.parse::<f64>().unwrap() * 2.0;
-    let _ = (w2, h2);
     // Exactly twice both ways (the prefill is rounded; the box itself is not).
     let (exact_w, exact_h) = {
         let group = SelectTool::group_of(&rig.objects(), &rig.selection).unwrap();
         (group.bounds().width() * 2.0, group.bounds().height() * 2.0)
     };
+    let twice = entry
+        .resolve([&format!("{exact_w}"), &format!("{exact_h}")], 0)
+        .unwrap()
+        .unwrap();
     assert!(
-        entry
-            .conversion_counts([&format!("{exact_w}"), &format!("{exact_h}")], 0)
-            .is_empty(),
+        matches!(twice[0], ObjectSnapshot::Primitive(_)),
         "twice both ways is a uniform scale"
     );
     assert_eq!(
@@ -574,7 +560,6 @@ fn the_group_size_entry_counts_what_a_stretch_would_convert() {
         EntryOutcome::Committed
     );
     assert!(is_path(&rig.document, star));
-    assert_eq!(rig.tool.take_conversion_notice().as_array(), [0, 1, 0, 0]);
 }
 
 /// Decision 8: the ids of a converted path are the session's own once minted; two
@@ -641,4 +626,219 @@ fn a_typed_size_beyond_the_limit_is_too_large() {
             );
         }
     }
+}
+
+/// The position of the skew handle `side` of the current selection (single object or group).
+fn skew_handle(rig: &Rig, side: Side) -> Point {
+    let objects = rig.objects();
+    let handles = if rig.selection.ids().len() >= 2 {
+        SelectTool::group_handle_positions(&objects, &rig.selection, tolerances(), false)
+    } else {
+        SelectTool::transform_handles(&objects, &rig.selection, tolerances(), false)
+    };
+    handles
+        .iter()
+        .find(|(h, _)| *h == EditHandle::Skew(side))
+        .map(|(_, p)| *p)
+        .unwrap()
+}
+
+fn corner_points(document: &Document, id: NodeId) -> Vec<(f64, f64)> {
+    let ObjectSnapshot::Path(path) = document.object(id).unwrap() else {
+        panic!("a path");
+    };
+    let mut points: Vec<(f64, f64)> = path
+        .anchors
+        .iter()
+        .map(|a| (a.point.x.round(), a.point.y.round()))
+        .collect();
+    points.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    points
+}
+
+/// `0047` criterion 2, worked example: a 10 x 10 rectangle at (0, 0), top skew handle,
+/// bottom side fixed, 45 degrees: one closed path with the corners (10, 0), (20, 0),
+/// (10, 10) and (0, 10) and the rectangle's style.
+#[test]
+fn skewing_a_rectangle_makes_a_path_with_the_sheared_corners() {
+    let mut rig = Rig::new();
+    let rect = rig.rect(0.0, 0.0, 10.0, 10.0);
+    let before = rig.document.object(rect).unwrap();
+    rig.select(&[rect]);
+    let top = skew_handle(&rig, Side::Top);
+    rig.drag(top, pt(top.x + 10.0, top.y), NONE);
+    let ObjectSnapshot::Path(path) = rig.document.object(rect).unwrap() else {
+        panic!("a path now");
+    };
+    assert!(path.closed && path.extra_subpaths.is_empty());
+    assert_eq!(path.anchors.len(), 4);
+    assert_eq!(&path.style, before.style());
+    assert_eq!(
+        corner_points(&rig.document, rect),
+        [(0.0, 10.0), (10.0, 0.0), (10.0, 10.0), (20.0, 0.0)]
+    );
+}
+
+/// `0047` criteria 2 and 5: the preview of a skew drag is the converted, sheared
+/// outline; the release commits exactly that; a drag back to the start converts nothing.
+#[test]
+fn the_skew_preview_is_the_commit_and_a_drag_back_converts_nothing() {
+    let mut rig = Rig::new();
+    let rect = rig.rect(0.0, 0.0, 10.0, 10.0);
+    rig.select(&[rect]);
+    let top = skew_handle(&rig, Side::Top);
+    rig.press(top, NONE);
+    let to = pt(top.x + 6.0, top.y);
+    rig.tool.pointer_moved(to, NONE, &mut rig.selection);
+    let live = rig.live(to, NONE).expect("a preview");
+    assert!(
+        matches!(live[0], ObjectSnapshot::Path(_)),
+        "previews as a path"
+    );
+    assert!(
+        rig.document.primitive(rect).is_some(),
+        "nothing written yet"
+    );
+    rig.tool.pointer_moved(top, NONE, &mut rig.selection);
+    assert!(
+        rig.live(top, NONE).is_none(),
+        "back at the start: no preview"
+    );
+    rig.tool.pointer_moved(to, NONE, &mut rig.selection);
+    let live = rig.live(to, NONE).unwrap();
+    rig.release(to, NONE);
+    assert_eq!(rig.objects(), live, "preview and release agree");
+    // Escape and a press without movement write nothing and convert nothing.
+    let mut rig = Rig::new();
+    let rect = rig.rect(0.0, 0.0, 10.0, 10.0);
+    rig.select(&[rect]);
+    let top = skew_handle(&rig, Side::Top);
+    rig.press(top, NONE);
+    rig.tool
+        .pointer_moved(pt(top.x + 8.0, top.y), NONE, &mut rig.selection);
+    rig.tool.escape();
+    rig.release(pt(top.x + 8.0, top.y), NONE);
+    rig.drag(top, top, NONE);
+    assert!(rig.document.primitive(rect).is_some());
+}
+
+/// `0047` criteria 1, 2 and 3: a skew of a mixed selection shears the path and converts
+/// the star and the ellipse, each under its own id and style.
+#[test]
+fn skewing_a_mixed_selection_converts_every_primitive() {
+    let mut rig = Rig::new();
+    let path = rig.document.create_path(
+        &[
+            curvyo_document_core::NewAnchor::corner(
+                curvyo_document_core::AnchorId::new(1, 1),
+                pt(0.0, 0.0),
+            ),
+            curvyo_document_core::NewAnchor::corner(
+                curvyo_document_core::AnchorId::new(1, 2),
+                pt(10.0, 10.0),
+            ),
+        ],
+        false,
+    );
+    let star = rig.star(30.0, 10.0);
+    let ellipse = rig.document.create_ellipse(EllipseFrame {
+        center: pt(80.0, 10.0),
+        rx: Length::from_mm(10.0),
+        ry: Length::from_mm(5.0),
+    });
+    let rect = rig.rect(100.0, 0.0, 10.0, 10.0);
+    rig.select(&[path, star, ellipse, rect]);
+    let styles: Vec<_> = [star, ellipse, rect]
+        .iter()
+        .map(|id| rig.document.object(*id).unwrap().style().clone())
+        .collect();
+    let order = rig.document.object_ids();
+    let top = skew_handle(&rig, Side::Top);
+    rig.drag(top, pt(top.x + 8.0, top.y), NONE);
+    for (id, style) in [star, ellipse, rect].iter().zip(&styles) {
+        let object = rig.document.object(*id).unwrap();
+        assert!(matches!(object, ObjectSnapshot::Path(_)), "converted");
+        assert_eq!(object.style(), style);
+    }
+    assert_eq!(rig.document.object_ids(), order, "same places");
+    let ObjectSnapshot::Path(star_path) = rig.document.object(star).unwrap() else {
+        panic!()
+    };
+    assert_eq!(
+        star_path.anchors.len(),
+        10,
+        "the nodes Object to path gives"
+    );
+    assert_eq!(rig.selection.ids().len(), 4, "everything stays selected");
+}
+
+/// `0047` criterion 6: the typed skew of a single primitive converts it and equals the
+/// drag of the same angle.
+#[test]
+fn the_typed_skew_of_a_rectangle_equals_the_drag() {
+    let mut rig = Rig::new();
+    let rect = rig.rect(0.0, 0.0, 10.0, 10.0);
+    rig.select(&[rect]);
+    let objects = rig.objects();
+    rig.tool
+        .open_entry_for_key(&objects, &rig.selection, EntryKey::SkewX)
+        .unwrap();
+    rig.tool.mint_conversion_ids(&mut AnchorIdMinter::new(9));
+    assert_eq!(
+        rig.tool.commit_entry(&rig.document, ["45", ""], 0),
+        EntryOutcome::Committed
+    );
+    assert_eq!(
+        corner_points(&rig.document, rect),
+        [(0.0, 10.0), (10.0, 0.0), (10.0, 10.0), (20.0, 0.0)]
+    );
+}
+
+/// `0047` criterion 10: a rotate converts nothing; a rotate and then a stretch
+/// converts at the stretch only.
+#[test]
+fn only_the_stretch_converts_after_a_rotate() {
+    let mut rig = Rig::new();
+    let star = rig.star(0.0, 10.0);
+    rig.turned(star, 20.0);
+    assert!(rig.document.primitive(star).is_some());
+    rig.select(&[star]);
+    let objects = rig.objects();
+    let handles = SelectTool::transform_handles(&objects, &rig.selection, tolerances(), false);
+    let east = handles
+        .iter()
+        .find(|(h, _)| *h == EditHandle::Resize(ResizeDirection::E))
+        .map(|(_, p)| *p)
+        .unwrap();
+    rig.drag(east, pt(east.x + 20.0, east.y + 7.0), NONE);
+    assert!(is_path(&rig.document, star));
+}
+
+/// `0047` criterion 12, worked example: a polygon with the vertices (25, 0), (30, 5),
+/// (25, 10) and (20, 5), right edge handle from x = 30 to x = 40, left side fixed: a path
+/// with the corners (30, 0), (40, 5), (30, 10) and (20, 5).
+#[test]
+fn a_single_polygon_stretched_by_its_edge_is_a_path_with_the_worked_corners() {
+    let mut rig = Rig::new();
+    let polygon = rig.document.create_polygon(
+        StarFrame {
+            center: pt(25.0, 5.0),
+            radius: Length::from_mm(5.0),
+            angle: Angle::from_radians(0.0),
+        },
+        PointCount::new(4).unwrap(),
+    );
+    rig.select(&[polygon]);
+    let objects = rig.objects();
+    let east = SelectTool::transform_handles(&objects, &rig.selection, tolerances(), false)
+        .into_iter()
+        .find(|(h, _)| *h == EditHandle::Resize(ResizeDirection::E))
+        .map(|(_, p)| p)
+        .unwrap();
+    assert!((east.x - 30.0).abs() < 1e-9);
+    rig.drag(east, pt(40.0, east.y), NONE);
+    assert_eq!(
+        corner_points(&rig.document, polygon),
+        [(20.0, 5.0), (30.0, 0.0), (30.0, 10.0), (40.0, 5.0)]
+    );
 }

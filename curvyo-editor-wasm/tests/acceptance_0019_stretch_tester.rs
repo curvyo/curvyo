@@ -734,8 +734,6 @@ fn ac20_ac53_spec_example_star_and_rectangle() {
         "Object to path is still offered for the rectangle"
     );
     // The notice: one star, once.
-    assert_eq!(s.take_conversion_notice(), 1);
-    assert_eq!(s.take_conversion_notice(), 0, "taken once");
     // The label.
     let label = last_label(&doc_of(&s));
     assert!(label.contains("transform"), "label of the commit: {label}");
@@ -947,7 +945,6 @@ fn ac20_ac53_every_kind_keeps_or_converts_on_an_edge_stretch() {
         assert_eq!(change_count(&s), commits + 1, "{what}: one commit");
         check_kinds_after(&d, &s, m, &otp, &what);
         // Polygon, star, two turned rectangles, one turned ellipse (a circle never counts).
-        assert_eq!(s.take_conversion_notice(), 5, "{what}: notice counts");
         // The new box is the tight box of the new outlines (criterion 29).
         s.pointer_hover(pt(5.0, 5.0), false, false);
     }
@@ -957,12 +954,12 @@ fn ac20_ac53_every_kind_keeps_or_converts_on_an_edge_stretch() {
 // Criteria 18 and 19: corners
 // ---------------------------------------------------------------------
 
-/// Criterion 19: a corner drag of a selection with a star is a uniform scale whatever
-/// Ctrl does, the dragged corner follows the diagonal only, Shift scales about the
-/// centre; the star stays a star; nothing is reported. The spec's example (45, 10) to
-/// (90, 12) scales both by 2.
+/// Criterion 19, as `0047` criterion 7 leaves it: a corner drag of a selection with a star
+/// is free like any other and turns the star into a path; with Ctrl it is a uniform scale
+/// (the dragged corner follows the dominant axis, Shift scales about the centre) and the
+/// star stays a star. The spec's example (45, 10) to (90, 12) scales both by 2 with Ctrl.
 #[test]
-fn ac19_corner_drag_with_a_star_is_proportional_whatever_ctrl_does() {
+fn ac19_corner_drag_with_a_star_is_free_and_ctrl_keeps_the_proportions() {
     for (ctrl, shift) in [(false, false), (true, false), (false, true), (true, true)] {
         let (d, st, _rc) = spec_example();
         let mut s = open(&d);
@@ -972,15 +969,33 @@ fn ac19_corner_drag_with_a_star_is_proportional_whatever_ctrl_does() {
         // Hover: the corner hint of a proportional-corner selection.
         hold(&mut s, g.corner(1.0, 1.0), false, false);
         assert_eq!(s.handle_hint(), "group");
-        assert!(s.hover_conversion_count() == 0, "a corner never converts");
         let to = pt(g.min.x + 90.0, g.min.y + 12.0); // (90, 12) in the example's coordinates
         let from = g.corner(1.0, 1.0);
         let commits = change_count(&s);
         drag_mod(&mut s, from, to, shift, ctrl);
         assert_eq!(change_count(&s), commits + 1);
         let o = objects(&s);
+        if !ctrl {
+            assert!(
+                matches!(&o[0], ObjectSnapshot::Path(_)),
+                "shift {shift}: a free corner drag stretches, so the star became a path"
+            );
+            let ObjectSnapshot::Primitive(pr) = &o[1] else {
+                panic!("the aligned rectangle keeps its kind")
+            };
+            let Shape::Rect { bounds, .. } = pr.shape else {
+                panic!()
+            };
+            assert!(
+                (bounds.width.as_mm() - bounds.height.as_mm()).abs() > 1e-3,
+                "shift {shift}: two factors, rect {}x{}",
+                bounds.width.as_mm(),
+                bounds.height.as_mm()
+            );
+            continue;
+        }
         let ObjectSnapshot::Primitive(p) = &o[0] else {
-            panic!("ctrl {ctrl} shift {shift}: a corner drag never converts the star")
+            panic!("ctrl {ctrl} shift {shift}: a Ctrl corner drag never converts the star")
         };
         let (Shape::Star { frame, .. }, ObjectSnapshot::Primitive(pb)) = (p.shape, &before) else {
             panic!()
@@ -1022,7 +1037,6 @@ fn ac19_corner_drag_with_a_star_is_proportional_whatever_ctrl_does() {
             1e-6,
             "rect origin",
         );
-        assert_eq!(s.take_conversion_notice(), 0, "no notice");
     }
 }
 
@@ -1109,11 +1123,6 @@ fn ac18_corner_drag_without_converting_objects_stretches_and_converts_nothing() 
     };
     assert!(near(frame.rx.as_mm(), 8.0 * m.sx, 1e-6) && near(frame.ry.as_mm(), 8.0 * m.sy, 1e-6));
     assert!(near(pc.rotation.as_radians(), 0.0, 1e-9));
-    assert_eq!(
-        s.take_conversion_notice(),
-        0,
-        "a circle-to-ellipse write is not a conversion"
-    );
     // Ctrl on the corner: one factor.
     let mut s = open(&d);
     select_everything(&mut s);
@@ -1166,35 +1175,21 @@ fn ac53_ac54_no_conversion_and_no_notice_without_a_real_stretch() {
     hold(&mut s, from, false, false);
     s.pointer_down(from, false);
     hold(&mut s, pt(from.x + 30.0, from.y), false, false);
-    assert_eq!(
-        s.live_conversion_count(),
-        4,
-        "the preview names the conversions"
-    );
     assert!(bytes_of(&s) == before, "nothing is written during the drag");
     s.escape();
     s.pointer_up(pt(from.x + 30.0, from.y), false, false);
     hold(&mut s, pt(5.0, 5.0), false, false);
     assert!(bytes_of(&s) == before, "Escape writes nothing");
-    assert_eq!(s.take_conversion_notice(), 0, "no notice after Escape");
-    assert_eq!(s.live_conversion_count(), 0, "no counts after Escape");
     // Out and back to the start (factor 1).
     hold(&mut s, from, false, false);
     s.pointer_down(from, false);
     hold(&mut s, pt(from.x + 30.0, from.y), false, false);
-    assert_ne!(s.live_conversion_count(), 0);
     hold(&mut s, from, false, false);
-    assert_eq!(
-        s.live_conversion_count(),
-        0,
-        "back at factor 1 the preview converts nothing"
-    );
     s.pointer_up(from, false, false);
     assert!(
         bytes_of(&s) == before,
         "a drag back to the start writes nothing"
     );
-    assert_eq!(s.take_conversion_notice(), 0, "no notice at factor 1");
     // Out and back to within 1e-12 mm of the start: factors equal 1 within 1e-9.
     hold(&mut s, from, false, false);
     s.pointer_down(from, false);
@@ -1205,11 +1200,9 @@ fn ac53_ac54_no_conversion_and_no_notice_without_a_real_stretch() {
         bytes_of(&s) == before,
         "a factor of 1 within the tolerance writes nothing (and converts nothing)"
     );
-    assert_eq!(s.take_conversion_notice(), 0);
     // A press and release without movement.
     drag_mod(&mut s, from, from, false, false);
     assert!(bytes_of(&s) == before);
-    assert_eq!(s.take_conversion_notice(), 0);
 }
 
 /// Criterion 54: the counts per kind are the number converted in this commit; a
@@ -1222,13 +1215,11 @@ fn ac54_the_counts_are_per_commit_and_the_conversion_is_permanent() {
     select_everything(&mut s);
     let g = GBox::of(&s);
     edge_drag(&mut s, &g, 1.0, 0.0, g.max.x + 20.0, false, false);
-    assert_eq!(s.take_conversion_notice(), 4);
     let kinds: Vec<bool> = objects(&s).iter().map(is_path).collect();
     assert_eq!(kinds, vec![true; 5]);
     // Stretch again: nothing to convert.
     let g = GBox::of(&s);
     edge_drag(&mut s, &g, 1.0, 0.0, g.max.x + 20.0, false, false);
-    assert_eq!(s.take_conversion_notice(), 0, "paths do not convert again");
     // Uniform scale back by the corner: still paths.
     let g = GBox::of(&s);
     drag_mod(
@@ -1240,7 +1231,6 @@ fn ac54_the_counts_are_per_commit_and_the_conversion_is_permanent() {
     );
     let kinds: Vec<bool> = objects(&s).iter().map(is_path).collect();
     assert_eq!(kinds, vec![true; 5], "permanent (53.5)");
-    assert_eq!(s.take_conversion_notice(), 0);
 }
 
 /// Criterion 54: a move, a rotate, a Ctrl-copy and a uniform scale of a selection with
@@ -1269,7 +1259,6 @@ fn ac53_ac54_move_rotate_and_uniform_scale_never_convert() {
         n_prim,
         "a move converts nothing"
     );
-    assert_eq!(s.take_conversion_notice(), 0);
     // Rotate by a corner rotate handle.
     let g = {
         let _ = g;
@@ -1283,7 +1272,6 @@ fn ac53_ac54_move_rotate_and_uniform_scale_never_convert() {
         n_prim,
         "a rotate converts nothing"
     );
-    assert_eq!(s.take_conversion_notice(), 0);
     // Uniform scale by a corner.
     let g = GBox::of(&s);
     drag_mod(
@@ -1298,7 +1286,6 @@ fn ac53_ac54_move_rotate_and_uniform_scale_never_convert() {
         n_prim,
         "a uniform scale converts nothing"
     );
-    assert_eq!(s.take_conversion_notice(), 0);
 }
 
 // ---------------------------------------------------------------------
@@ -1339,7 +1326,6 @@ fn ac34_typed_size_equal_vs_unequal_factors() {
         !is_path(&objects(&s)[0]),
         "equal factors: the star stays a star"
     );
-    assert_eq!(s.take_conversion_notice(), 0);
     let ObjectSnapshot::Primitive(p) = &objects(&s)[0] else {
         panic!()
     };
@@ -1359,7 +1345,6 @@ fn ac34_typed_size_equal_vs_unequal_factors() {
         !is_path(&objects(&s)[0]),
         "factors equal within 1e-9: no conversion"
     );
-    assert_eq!(s.take_conversion_notice(), 0);
     // Unequal by 1e-7: a stretch.
     let (mut s, _, _) = open_size_entry(&d);
     let out = s.commit_transform_entry("90", &format!("{}", 20.0 * (1.0 + 1e-7)), 0);
@@ -1368,7 +1353,6 @@ fn ac34_typed_size_equal_vs_unequal_factors() {
         is_path(&objects(&s)[0]),
         "factors unequal by 1e-7: the star converts"
     );
-    assert_eq!(s.take_conversion_notice(), 1);
     // Width alone: a stretch.
     let (mut s, _, _) = open_size_entry(&d);
     assert_eq!(
@@ -1395,7 +1379,6 @@ fn ac34_typed_size_equal_vs_unequal_factors() {
         EntryOutcome::Unchanged
     );
     assert!(bytes_of(&s) == before);
-    assert_eq!(s.take_conversion_notice(), 0);
 }
 
 /// Criterion 34 and 22: refusals keep the chip open, write nothing and convert
@@ -1424,7 +1407,6 @@ fn ac34_ac22_typed_refusals_convert_nothing() {
         );
         assert!(bytes_of(&s) == before, "{why}: nothing written");
         assert!(s.transform_entry().is_some(), "{why}: the chip stays open");
-        assert_eq!(s.take_conversion_notice(), 0, "{why}: no notice");
     }
 }
 
@@ -1461,7 +1443,6 @@ fn ac22_ac53_6_one_invalid_object_refuses_the_whole_stretch() {
     assert!(matches!(out, EntryOutcome::Invalid { .. }), "{out:?}");
     assert!(bytes_of(&s) == before, "nothing scaled, nothing converted");
     assert!(!is_path(&objects(&s)[0]), "the star stays a star");
-    assert_eq!(s.take_conversion_notice(), 0);
 }
 
 /// Criterion 22 (drag): a factor that would put a coordinate beyond 1e7 mm changes
@@ -1479,13 +1460,11 @@ fn ac22_a_huge_drag_factor_writes_and_converts_nothing() {
         bytes_of(&s) == before,
         "a result beyond 1e7 mm is no change"
     );
-    assert_eq!(s.take_conversion_notice(), 0);
     assert!(objects(&s).iter().filter(|o| !is_path(o)).count() == 4);
     // Non-finite pointer.
     drag_mod(&mut s, from, pt(f64::INFINITY, from.y), false, false);
     drag_mod(&mut s, from, pt(f64::NAN, from.y), false, false);
     assert!(bytes_of(&s) == before);
-    assert_eq!(s.take_conversion_notice(), 0);
 }
 
 /// Criterion 22 / D5: a factor below 0 clamps to 0 (no flip, no negative size). A
@@ -1537,7 +1516,6 @@ fn ac22_a_negative_factor_clamps_to_zero_and_collapses_onto_the_fixed_side() {
         bounds.width.as_mm()
     );
     let _ = rc;
-    assert_eq!(s.take_conversion_notice(), 1);
     // A top edge dragged below the bottom edge: the same for y.
     let (d, ..) = spec_example();
     let mut s = open(&d);
@@ -1682,7 +1660,6 @@ fn ac24_ac53_2_stroke_switch_on_converted_and_kept_objects() {
             is_path(&after[11]),
             "the radius switch never decides conversion"
         );
-        assert_eq!(s.take_conversion_notice(), 5);
     }
 }
 
@@ -1712,15 +1689,12 @@ fn ac38_ac55_hover_counts_and_hints() {
             ],
             "criterion 38, edge row (the conversion line is the host's, from the counts)"
         );
-        assert_eq!(s.hover_conversion_count(), 5, "edge ({nx}, {ny})");
     }
     for (sx, sy) in [(1.0, 1.0), (-1.0, -1.0), (1.0, -1.0), (-1.0, 1.0)] {
         hold(&mut s, g.corner(sx, sy), false, false);
         assert_eq!(s.handle_hint(), "group");
-        assert!(s.hover_conversion_count() == 0, "a corner never converts");
     }
     hold(&mut s, pt(5.0, 5.0), false, false);
-    assert_eq!(s.hover_conversion_count(), 0, "off a handle: none");
     // A selection without a converting object (path, aligned rect, circle at 30 degrees).
     let d = Document::new(1);
     let _ = curved_path(&d, 1, 60.0, 60.0);
@@ -1732,10 +1706,6 @@ fn ac38_ac55_hover_counts_and_hints() {
     let g = GBox::of(&s);
     hold(&mut s, g.mid(1.0, 0.0), false, false);
     assert_eq!(s.handle_hint(), "group");
-    assert!(
-        s.hover_conversion_count() == 0,
-        "a circle never counts as rotated"
-    );
     hold(&mut s, g.corner(1.0, 1.0), false, false);
     assert_eq!(s.handle_hint(), "group");
     assert_eq!(
@@ -1745,11 +1715,10 @@ fn ac38_ac55_hover_counts_and_hints() {
     );
 }
 
-/// Criterion 38, row "Corner resize, proportional-corner selection" (as aligned
-/// 2026-10-10 with the UX notes): four lines, no Ctrl line, and the line that points
-/// to the edge handle.
+/// `0047` criterion 11: the corner chip of a selection that holds a star is the ordinary
+/// corner chip; the "proportional" row of `0019` criterion 38 is gone.
 #[test]
-fn ac38_the_corner_chip_of_a_proportional_corner_selection_has_the_four_spec_lines() {
+fn ac38_the_corner_chip_of_a_selection_with_a_star_is_the_ordinary_one() {
     let (d, _, _) = spec_example();
     let mut s = open(&d);
     select_everything(&mut s);
@@ -1758,9 +1727,9 @@ fn ac38_the_corner_chip_of_a_proportional_corner_selection_has_the_four_spec_lin
     assert_eq!(
         s.corner_hint_lines(),
         vec![
-            "Resize selection, proportional",
-            "Stretch with an edge handle",
+            "Resize selection",
             "Shift: from the center",
+            "Ctrl: keep proportions",
             "Double-click or S: type a size"
         ]
     );
@@ -1780,7 +1749,6 @@ fn ac32_the_preview_counts_the_conversions_and_writes_nothing() {
     s.pointer_down(from, false);
     for dx in [5.0, 25.0, 60.0] {
         hold(&mut s, pt(from.x + dx, from.y), false, false);
-        assert_eq!(s.live_conversion_count(), 5, "dx {dx}");
         assert!(
             bytes_of(&s) == before,
             "dx {dx}: nothing converted before the release"
@@ -1815,7 +1783,6 @@ fn ac39_the_select_bar_follows_the_kinds_after_a_conversion() {
     );
     let g = GBox::of(&s);
     edge_drag(&mut s, &g, 0.0, 1.0, g.max.y + 12.0, false, false);
-    assert_eq!(s.take_conversion_notice(), 3);
     let bar = s.select_bar_state();
     assert!(bar.points.is_none(), "Points gone");
     assert!(bar.ratio.is_none(), "Ratio gone");
@@ -1878,7 +1845,6 @@ fn ac53_3_shown_angle_polygon_and_star_convert_to_the_stretched_outline() {
             }
         );
     }
-    assert_eq!(s.take_conversion_notice(), 2);
 }
 
 // ---------------------------------------------------------------------
@@ -1972,11 +1938,6 @@ fn ac56_single_polygon_and_star_eight_handles_and_edge_stretch_converts() {
                     "resize-edge",
                     "{what}: edge ({nx}, {ny}) is a handle"
                 );
-                assert_eq!(
-                    s.hover_conversion_count(),
-                    1,
-                    "{what}: the hover names the kind"
-                );
             }
             for (sx, sy) in [(1.0, 1.0), (-1.0, -1.0), (1.0, -1.0), (-1.0, 1.0)] {
                 hold(&mut s, b.corner(sx, sy), false, false);
@@ -2042,7 +2003,6 @@ fn ac56_single_polygon_and_star_eight_handles_and_edge_stretch_converts() {
                 near(rotation_of(&o[0]), rotation_of(&otp[0]), 1e-9),
                 "{what}: rotation as Object to path"
             );
-            assert_eq!(s.take_conversion_notice(), 1, "{what}: N = 1");
             assert_eq!(s.selected_object_count(), 1);
             let bar = s.select_bar_state();
             assert!(
@@ -2053,10 +2013,10 @@ fn ac56_single_polygon_and_star_eight_handles_and_edge_stretch_converts() {
     }
 }
 
-/// Criterion 56: a corner drag of a single star is proportional, Ctrl or not, and
-/// keeps the kind; so does an edge drag back to its start.
+/// `0047` criterion 12: a corner drag of a single star is free and converts it; with Ctrl
+/// it is proportional and keeps the kind; an edge drag back to its start writes nothing.
 #[test]
-fn ac56_single_star_corner_is_proportional_and_keeps_the_kind() {
+fn ac56_single_star_corner_is_free_and_ctrl_keeps_the_kind() {
     for ctrl in [false, true] {
         let d = Document::new(1);
         let id = star(&d, 80.0, 80.0, 12.0, -FRAC_PI_2);
@@ -2069,18 +2029,24 @@ fn ac56_single_star_corner_is_proportional_and_keeps_the_kind() {
         let (wx, wy) = (from.x - b.c.x, from.y - b.c.y);
         let to = pt(from.x + 0.8 * wx + 2.0, from.y + 0.8 * wy);
         drag_mod(&mut s, from, to, false, ctrl);
-        let ObjectSnapshot::Primitive(p) = &objects(&s)[0] else {
-            panic!("ctrl {ctrl}: a corner drag keeps the star")
-        };
-        let Shape::Star { frame, .. } = p.shape else {
-            panic!()
-        };
-        assert!(
-            frame.radius.as_mm() > 12.0,
-            "grown, radius {}",
-            frame.radius.as_mm()
-        );
-        assert_eq!(s.take_conversion_notice(), 0);
+        if ctrl {
+            let ObjectSnapshot::Primitive(p) = &objects(&s)[0] else {
+                panic!("a Ctrl corner drag keeps the star")
+            };
+            let Shape::Star { frame, .. } = p.shape else {
+                panic!()
+            };
+            assert!(
+                frame.radius.as_mm() > 12.0,
+                "grown, radius {}",
+                frame.radius.as_mm()
+            );
+        } else {
+            assert!(
+                matches!(&objects(&s)[0], ObjectSnapshot::Path(_)),
+                "a free corner drag converts the star"
+            );
+        }
         // An edge drag out and back to the start writes nothing.
         let mut s = open(&d);
         select_single(&mut s, &old);
@@ -2092,7 +2058,6 @@ fn ac56_single_star_corner_is_proportional_and_keeps_the_kind() {
         hold(&mut s, e, false, false);
         s.pointer_up(e, false, false);
         assert!(bytes_of(&s) == before);
-        assert_eq!(s.take_conversion_notice(), 0);
     }
 }
 
@@ -2132,7 +2097,6 @@ fn ac56_single_star_typed_size_has_w_and_h_and_converts_on_a_stretch() {
         panic!()
     };
     assert!(near(frame.radius.as_mm(), 18.0, 1e-6));
-    assert_eq!(s.take_conversion_notice(), 0);
     // Unequal: a stretch, a path, N = 1.
     let mut s = open(&d);
     select_single(&mut s, &old);
@@ -2142,7 +2106,6 @@ fn ac56_single_star_typed_size_has_w_and_h_and_converts_on_a_stretch() {
         EntryOutcome::Committed
     );
     assert!(is_path(&objects(&s)[0]));
-    assert_eq!(s.take_conversion_notice(), 1);
 }
 
 /// Criterion 56: a single turned rectangle or ellipse needs nothing: it already
@@ -2167,10 +2130,6 @@ fn ac56_a_single_turned_rectangle_or_ellipse_keeps_its_kind() {
     let handle = pt(c.x + 15.0 * u.0, c.y + 15.0 * u.1);
     hold(&mut s, handle, false, false);
     assert_eq!(s.handle_hint(), "resize-edge");
-    assert!(
-        s.hover_conversion_count() == 0,
-        "no conversion line for a rectangle"
-    );
     drag_mod(
         &mut s,
         handle,
@@ -2191,7 +2150,6 @@ fn ac56_a_single_turned_rectangle_or_ellipse_keeps_its_kind() {
         b2.height.as_mm()
     );
     assert!(near(p2.rotation.as_radians(), th, 1e-9));
-    assert_eq!(s.take_conversion_notice(), 0);
 }
 
 // ---------------------------------------------------------------------
@@ -2267,7 +2225,6 @@ fn compound_path_and_boolean_result_in_a_converting_stretch() {
     assert!(is_path(&after[1]) && is_path(&after[2]));
     assert_path_maps(&after[1], &otp[1], m, "star");
     assert_path_maps(&after[2], &otp[2], m, "rotated rect");
-    assert_eq!(s.take_conversion_notice(), 2, "the compound is not counted");
 }
 
 // ---------------------------------------------------------------------
@@ -2454,11 +2411,6 @@ fn the_quarter_turn_tolerance_of_a_rectangle_is_1e_9_rad() {
         let now = objects(&s);
         let idx = d.object_ids().iter().position(|i| *i == r).unwrap();
         assert_eq!(is_path(&now[idx]), converts, "delta {delta}");
-        assert_eq!(
-            s.take_conversion_notice(),
-            u32::from(converts),
-            "delta {delta}"
-        );
     }
     // 270 degrees stored as -90.
     let d = Document::new(1);
@@ -2491,7 +2443,6 @@ fn a_nearly_round_rotated_ellipse_is_a_circle_a_clearly_oval_one_converts() {
         let g = GBox::of(&s);
         edge_drag(&mut s, &g, 1.0, 0.0, g.max.x + 20.0, false, false);
         assert_eq!(is_path(&objects(&s)[1]), converts, "ry {ry}");
-        assert_eq!(s.take_conversion_notice(), u32::from(converts), "ry {ry}");
     }
 }
 
@@ -2542,7 +2493,6 @@ fn ac22_a_circle_at_factor_zero_stays_an_ellipse() {
         frame.rx.as_mm(),
         frame.ry.as_mm()
     );
-    assert_eq!(s.take_conversion_notice(), 0);
     assert!(unpack(4, &s.pack("0.1.0").unwrap()).is_ok());
 }
 
@@ -2570,7 +2520,6 @@ fn delete_during_a_converting_stretch_resurrects_nothing() {
             n, 0,
             "deleted objects stay deleted (no converted path appears)"
         );
-        assert_eq!(s.take_conversion_notice(), 0);
     }
     assert!(unpack(4, &s.pack("0.1.0").unwrap()).is_ok());
 }
@@ -2586,8 +2535,6 @@ fn ac54_the_notice_is_taken_once_and_a_following_move_reports_nothing() {
     select_everything(&mut s);
     let g = GBox::of(&s);
     edge_drag(&mut s, &g, 1.0, 0.0, g.max.x + 20.0, false, false);
-    assert_eq!(s.take_conversion_notice(), 4);
-    assert_eq!(s.take_conversion_notice(), 0, "taken once");
     let ObjectSnapshot::Path(p) = &objects(&s)[0] else {
         panic!()
     };
@@ -2596,11 +2543,6 @@ fn ac54_the_notice_is_taken_once_and_a_following_move_reports_nothing() {
         (p.anchors[0].point.y + p.anchors[1].point.y) / 2.0,
     );
     drag_mod(&mut s, a, pt(a.x + 9.0, a.y + 4.0), false, false);
-    assert_eq!(
-        s.take_conversion_notice(),
-        0,
-        "a move reports no conversion"
-    );
 }
 
 /// Criterion 56: the typed size of a single turned polygon is the size of its box in
@@ -2656,5 +2598,4 @@ fn ac56_single_turned_polygon_typed_width_stretches_along_its_box_axis() {
             want.y
         );
     }
-    assert_eq!(s.take_conversion_notice(), 1);
 }

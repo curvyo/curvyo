@@ -16,10 +16,9 @@ use curvyo_document_core::{
 };
 use curvyo_ui_core::{
     ALL_EIGHT, CORNERS_FOUR, EditHandle, HandleSpec, ResizeDirection, TransformHandleTolerances,
-    hit_transform_handle, oriented_bounds, polygon_star_resize_factor,
-    resize_anchor_local_position, resize_cursor_angle_degrees, resize_local_box,
-    rotate_delta_angle, rotate_pivot, scaled_and_floored, stroke_or_radius_factor,
-    transform_handles,
+    hit_transform_handle, oriented_bounds, resize_anchor_local_position,
+    resize_cursor_angle_degrees, resize_local_box, rotate_delta_angle, rotate_pivot,
+    scaled_and_floored, stroke_or_radius_factor, transform_handles,
 };
 use proptest::prelude::*;
 
@@ -710,28 +709,6 @@ fn stroke_factor_with_a_negative_or_nan_input_never_panics_or_goes_negative() {
         stroke_or_radius_factor(f64::NAN, 1.0).is_nan()
             || stroke_or_radius_factor(f64::NAN, 1.0) == 0.0
     );
-}
-
-// ---------------------------------------------------------------------
-// Polygon / star uniform factor (AC 11)
-// ---------------------------------------------------------------------
-
-proptest! {
-    #[test]
-    fn polygon_star_factor_is_non_negative_finite_and_ignores_the_other_axis_sign_convention(
-        r in 0.01..500.0_f64, dx in -1000.0..1000.0_f64, dy in -1000.0..1000.0_f64,
-    ) {
-        for d in CORNERS_FOUR {
-            let f = polygon_star_resize_factor(r, d, Vec2::new(dx, dy));
-            prop_assert!(f.is_finite() && f >= 0.0, "{d:?} {f}");
-        }
-        // Outward drag along each corner's own diagonal grows the radius.
-        let unit = ResizeDirection::Se.unit_vector().normalized_to(1.0);
-        let grow = polygon_star_resize_factor(r, ResizeDirection::Se, Vec2::new(unit.x * 5.0, unit.y * 5.0));
-        prop_assert!(grow > 1.0);
-        let shrink = polygon_star_resize_factor(r, ResizeDirection::Se, Vec2::new(-unit.x * 5.0, -unit.y * 5.0));
-        prop_assert!(shrink < 1.0);
-    }
 }
 
 // ---------------------------------------------------------------------

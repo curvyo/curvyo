@@ -1163,48 +1163,36 @@ fn c13_skew_then_negated_skew_restores_the_path_and_it_reopens_as_a_path() {
     }
 }
 
+/// Superseded by `transform-polish` criteria 1 and 6: a primitive has skew handles, a
+/// double-click on one opens the skew chip, and K and Shift+K open it too.
 #[test]
-fn c14_primitives_and_multi_selections_have_no_skew_handles_and_k_says_so() {
+fn c14_primitives_have_skew_handles_and_k_opens_the_chip() {
+    let wide = Bx::rect(0.0, 0.0, 120.0, 80.0, 0.0);
+    let square = Bx::rect(20.0, 0.0, 80.0, 80.0, 0.0);
     let docs = [
-        (rect_doc(0.0, 0.0, 120.0, 80.0), pt(60.0, 0.0), "rect"),
-        (
-            ellipse_doc(60.0, 40.0, 60.0, 40.0),
-            pt(60.0, 0.0),
-            "ellipse",
-        ),
-        (polygon_doc(60.0, 40.0, 40.0, 5), pt(60.0, 0.0), "polygon"),
-        (star_doc(60.0, 40.0, 40.0, 5, 0.5), pt(60.0, 0.0), "star"),
+        (rect_doc(0.0, 0.0, 120.0, 80.0), wide, "rect"),
+        (ellipse_doc(60.0, 40.0, 60.0, 40.0), wide, "ellipse"),
+        (polygon_doc(60.0, 40.0, 40.0, 5), square, "polygon"),
+        (star_doc(60.0, 40.0, 40.0, 5, 0.5), square, "star"),
     ];
-    for (d, on, name) in docs {
-        let mut s = select_at(&d, on);
-        let b = Bx::rect(0.0, 0.0, 120.0, 80.0, 0.0);
+    for (d, b, name) in docs {
+        let mut s = select_at(&d, pt(60.0, 0.0));
         let before = snapshot_bytes(&s);
         for side in SIDES {
             let h = skew_handle_pos(&s, &b, side);
             dbl(&mut s, h, h, false, false);
-            // the press where a skew handle would be hit empty canvas
-            click(&mut s, on);
-            assert_eq!(s.selected_object_count(), 1, "{name}");
-            assert!(
-                s.transform_entry().map(|e| e.kind) != Some("skew"),
-                "{name}: no skew entry at {side:?}"
+            assert_eq!(
+                s.transform_entry().map(|e| e.kind),
+                Some("skew"),
+                "{name}: the skew chip opens at {side:?}"
             );
             s.cancel_transform_entry();
-            assert_eq!(snapshot_bytes(&s), before, "{name}");
+            assert_eq!(snapshot_bytes(&s), before, "{name}: opening writes nothing");
         }
-        // keys
-        assert_eq!(
-            press(&mut s, "k"),
-            KeyOutcome::Hint(KeyHint::PathOnly),
-            "{name}"
-        );
-        assert_eq!(
-            press_shift(&mut s, "K"),
-            KeyOutcome::Hint(KeyHint::PathOnly),
-            "{name}"
-        );
-        assert!(s.transform_entry().is_none());
-        assert_eq!(snapshot_bytes(&s), before);
+        assert_eq!(press(&mut s, "k"), KeyOutcome::EntryOpened, "{name}");
+        s.cancel_transform_entry();
+        assert_eq!(press_shift(&mut s, "K"), KeyOutcome::EntryOpened, "{name}");
+        s.cancel_transform_entry();
         assert_eq!(s.tool(), Tool::Select);
         assert_eq!(s.selected_object_count(), 1);
     }
@@ -2130,11 +2118,11 @@ fn c25_a_committed_move_keeps_selection_and_tool_and_survives_save_and_reopen() 
 }
 
 /// Superseded by `multi-object-transform` (criteria 35 and 37, "Changes to
-/// accepted behaviour" 3): the typed move works for a selection, over the group
-/// box; skew still needs paths only, and says so; "Select one object to type a
+/// accepted behaviour" 3) and `transform-polish` criterion 6: the typed move and the
+/// typed skew work for a selection, over the group box; "Select one object to type a
 /// value" no longer exists.
 #[test]
-fn c25_the_typed_move_works_for_a_selection_and_skew_needs_paths() {
+fn c25_the_typed_move_and_skew_work_for_a_selection() {
     let d = Document::new(1);
     let _ = d.create_rect(bounds(0.0, 0.0, 120.0, 80.0));
     let _ = d.create_rect(bounds(300.0, 0.0, 120.0, 80.0));
@@ -2145,11 +2133,10 @@ fn c25_the_typed_move_works_for_a_selection_and_skew_needs_paths() {
     s.pointer_up(pt(360.0, 0.0), true, false);
     assert_eq!(s.selected_object_count(), 2);
     let before = snapshot_bytes(&s);
-    assert_eq!(press(&mut s, "k"), KeyOutcome::Hint(KeyHint::PathOnly));
-    assert_eq!(
-        press_shift(&mut s, "K"),
-        KeyOutcome::Hint(KeyHint::PathOnly)
-    );
+    assert_eq!(press(&mut s, "k"), KeyOutcome::EntryOpened);
+    s.cancel_transform_entry();
+    assert_eq!(press_shift(&mut s, "K"), KeyOutcome::EntryOpened);
+    s.cancel_transform_entry();
     assert!(s.move_entry().is_none());
     assert_eq!(snapshot_bytes(&s), before);
     assert_eq!(s.selected_object_count(), 2);
@@ -2754,8 +2741,9 @@ fn c57a_double_click_on_a_resize_handle_keeps_the_dragged_handles_fixed_point() 
         s.transform_entry().unwrap().linked,
         "Ctrl link on the double-click route is unchanged"
     );
-    // polygon and star: centre fixed on the double-click route, whichever
-    // corner (found by scanning for the uniform resize handle)
+    // polygon and star: since `0047` criterion 12 the opposite corner is fixed on the
+    // double-click route like for any other kind, whichever corner (found by scanning
+    // for a corner resize handle)
     for (name, d) in [
         ("polygon", polygon_doc(70.0, 60.0, 40.0, 5)),
         ("star", star_doc(70.0, 60.0, 40.0, 5, 0.5)),
@@ -2768,7 +2756,7 @@ fn c57a_double_click_on_a_resize_handle_keeps_the_dragged_handles_fixed_point() 
             let mut x = 70.0;
             while x <= 140.0 {
                 s.pointer_hover(pt(x, y), false, false);
-                if s.handle_hint() == "resize-corner-uniform" {
+                if s.handle_hint() == "resize-corner" {
                     found = Some(pt(x, y));
                     break 'scan;
                 }
@@ -2790,9 +2778,13 @@ fn c57a_double_click_on_a_resize_handle_keeps_the_dragged_handles_fixed_point() 
         let (Shape::Polygon { frame, .. } | Shape::Star { frame, .. }) = p.shape else {
             panic!()
         };
+        // The 80 x 80 box grows to 120 x 120 away from the opposite corner.
+        let (sign_x, sign_y) = ((at.x - 70.0).signum(), (at.y - 60.0).signum());
+        let fixed = pt(70.0 - sign_x * 40.0, 60.0 - sign_y * 40.0);
+        let want = pt(fixed.x + sign_x * 60.0, fixed.y + sign_y * 60.0);
         assert!(
-            pnear(frame.center, pt(70.0, 60.0), 1e-9),
-            "{name}: {:?}",
+            pnear(frame.center, want, 1e-6),
+            "{name}: {:?}, want {want:?}",
             frame.center
         );
         assert!(near(frame.radius.as_mm(), 60.0, 1e-9), "{name}");
@@ -3119,7 +3111,7 @@ fn x06_key_outcome_codes_for_the_new_hints() {
         KeyOutcome::Hint(KeyHint::SelectFirst).code(),
         "hint-select-first"
     );
-    assert_eq!(KeyOutcome::Hint(KeyHint::PathOnly).code(), "hint-path-only");
+    assert_eq!(KeyOutcome::Hint(KeyHint::TooFar).code(), "hint-too-far");
     assert_eq!(KeyOutcome::EntryOpened.code(), "entry");
 }
 

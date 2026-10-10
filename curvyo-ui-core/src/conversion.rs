@@ -1,7 +1,7 @@
-//! A primitive as a path (`specs/0019-multi-object-transform/` criterion 53 and
-//! `adrs.md` decision 8) and "Object to path" (acceptance criteria 17, 21, 22):
-//! which shapes a stretch turns into paths, the one function that builds the
-//! path, and the resolved anchor geometry a
+//! A primitive as a path (`specs/0047-transform-polish/` criteria 2, 3, 7 and 12;
+//! `specs/0019-multi-object-transform/` `adrs.md` decision 8) and "Object to path"
+//! (acceptance criteria 17, 21, 22): which shapes a skew or a stretch turns into paths,
+//! the one function that builds the path, and the resolved anchor geometry a
 //! [`curvyo_document_core::Document::convert_to_paths`] call needs,
 //! for a whole primitive selection at once. Lives in this crate, not
 //! `curvyo-editor-wasm`'s facade (architect review: ADR 0001 §1's
@@ -15,6 +15,7 @@ use curvyo_document_core::{
 };
 
 use crate::AnchorIdMinter;
+use crate::transform_handle_layout::EditHandle;
 
 /// A rotation within this (radians) of a multiple of 90 degrees is one.
 const QUARTER_TURN_TOLERANCE_RAD: f64 = 1e-9;
@@ -22,72 +23,6 @@ const QUARTER_TURN_TOLERANCE_RAD: f64 = 1e-9;
 /// The geometric tolerance (millimetres) of the group and conversion rules: two radii
 /// closer than this make a circle, and an extent below it is "zero".
 pub(crate) const GEOMETRIC_TOLERANCE_MM: f64 = 1e-6;
-
-/// The kinds of shape a stretch turns into paths, in the order the maker's texts
-/// name them (`specs/0019-multi-object-transform/` criteria 53 and 55).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ConvertingKind {
-    /// A regular polygon.
-    Polygon,
-    /// A star.
-    Star,
-    /// A rectangle that is not turned by a multiple of 90 degrees (against the
-    /// stretch axes).
-    RotatedRectangle,
-    /// An ellipse, not a circle, that is not turned by a multiple of 90 degrees.
-    RotatedEllipse,
-}
-
-/// How many shapes of each [`ConvertingKind`] a selection holds or a commit
-/// converted: what the texts of a stretch name ("Stretching turns 2 shapes into
-/// paths"). The wording is the frontend's; this only counts.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct ConversionCounts {
-    /// Polygons.
-    pub polygons: u32,
-    /// Stars.
-    pub stars: u32,
-    /// Rectangles turned off the axes.
-    pub rotated_rectangles: u32,
-    /// Ellipses turned off the axes.
-    pub rotated_ellipses: u32,
-}
-
-impl ConversionCounts {
-    /// All shapes counted.
-    #[must_use]
-    pub const fn total(&self) -> u32 {
-        self.polygons + self.stars + self.rotated_rectangles + self.rotated_ellipses
-    }
-
-    /// Whether nothing is counted.
-    #[must_use]
-    pub const fn is_empty(&self) -> bool {
-        self.total() == 0
-    }
-
-    /// The counts as `[polygons, stars, rotated rectangles, rotated ellipses]`,
-    /// the order of [`ConvertingKind`].
-    #[must_use]
-    pub const fn as_array(&self) -> [u32; 4] {
-        [
-            self.polygons,
-            self.stars,
-            self.rotated_rectangles,
-            self.rotated_ellipses,
-        ]
-    }
-
-    /// Counts one more shape of `kind`.
-    pub fn add(&mut self, kind: ConvertingKind) {
-        match kind {
-            ConvertingKind::Polygon => self.polygons += 1,
-            ConvertingKind::Star => self.stars += 1,
-            ConvertingKind::RotatedRectangle => self.rotated_rectangles += 1,
-            ConvertingKind::RotatedEllipse => self.rotated_ellipses += 1,
-        }
-    }
-}
 
 /// Whether `rotation` is a multiple of 90 degrees.
 fn is_quarter_turn(rotation: Angle) -> bool {
@@ -102,42 +37,23 @@ pub(crate) fn is_circle(frame: &EllipseFrame) -> bool {
     (frame.rx.as_mm() - frame.ry.as_mm()).abs() < GEOMETRIC_TOLERANCE_MM
 }
 
-/// The kind of `object` if a stretch along axes at `axes` would turn it into a
-/// path, `None` if it keeps its kind (`adrs.md` decision 8: the one predicate that
+/// Whether a stretch along axes at `axes` turns `object` into a path
+/// (`specs/0047-transform-polish/` criterion 7, `adrs.md` point 2: the one predicate that
 /// decides). A path never converts; a polygon and a star always do (they store one
-/// radius); a rectangle or ellipse does unless its `rotation` minus `axes` is a
-/// quarter turn; a circle never does (it becomes an ellipse). The group passes
-/// `axes` 0; a single object passes its own box angle, which a rectangle or
-/// ellipse shares.
+/// radius); a rectangle or ellipse does unless its `rotation` minus `axes` is a quarter
+/// turn; a circle never does (it becomes an ellipse). A group passes `axes` 0; a single
+/// object passes its own box angle, which a rectangle or ellipse shares, so it never
+/// converts.
 #[must_use]
-pub(crate) fn converting_kind(object: &ObjectSnapshot, axes: Angle) -> Option<ConvertingKind> {
+pub(crate) fn converts_on_stretch(object: &ObjectSnapshot, axes: Angle) -> bool {
     let ObjectSnapshot::Primitive(primitive) = object else {
-        return None;
+        return false;
     };
     let relative = Angle::from_radians(primitive.rotation.as_radians() - axes.as_radians());
     match &primitive.shape {
-        Shape::Polygon { .. } => Some(ConvertingKind::Polygon),
-        Shape::Star { .. } => Some(ConvertingKind::Star),
-        Shape::Rect { .. } => {
-            (!is_quarter_turn(relative)).then_some(ConvertingKind::RotatedRectangle)
-        }
-        Shape::Ellipse { frame } => (!is_quarter_turn(relative) && !is_circle(frame))
-            .then_some(ConvertingKind::RotatedEllipse),
-    }
-}
-
-impl ConversionCounts {
-    /// What an edge stretch of the one object `object` turns into a path (criterion
-    /// 56): one polygon or one star, nothing for any other object.
-    #[must_use]
-    pub fn of_single(object: &ObjectSnapshot) -> Self {
-        let mut counts = Self::default();
-        if let Some(kind @ (ConvertingKind::Polygon | ConvertingKind::Star)) =
-            converting_kind(object, Angle::from_radians(0.0))
-        {
-            counts.add(kind);
-        }
-        counts
+        Shape::Polygon { .. } | Shape::Star { .. } => true,
+        Shape::Rect { .. } => !is_quarter_turn(relative),
+        Shape::Ellipse { frame } => !is_quarter_turn(relative) && !is_circle(frame),
     }
 }
 
@@ -180,57 +96,56 @@ pub(crate) fn with_fresh_anchor_ids(path: &mut PathSnapshot, minter: &mut Anchor
     }
 }
 
-/// The path a single polygon or star becomes if an edge drag or a typed size
-/// stretches it (`specs/0019-multi-object-transform/` criterion 56), with the ids of
-/// a local counter (see [`converted_paths`]); `None` for any other object.
+/// The path `object` becomes if the gesture on `handle` ends in a conversion, with the
+/// ids of a local counter (see [`converted_for_handle`]); `None` for an object the
+/// gesture leaves in its kind. A skew converts every primitive; a resize converts a
+/// polygon or star (the box of a single rectangle or ellipse resizes in its own axes).
 #[must_use]
-pub(crate) fn converted_polygon_or_star(object: &ObjectSnapshot) -> Option<PathSnapshot> {
-    match object {
-        ObjectSnapshot::Primitive(primitive)
-            if matches!(primitive.shape, Shape::Polygon { .. } | Shape::Star { .. }) =>
-        {
-            Some(primitive_as_path(primitive, &mut AnchorIdMinter::new(0)))
+pub(crate) fn converted_for_object(
+    object: &ObjectSnapshot,
+    handle: EditHandle,
+) -> Option<PathSnapshot> {
+    let ObjectSnapshot::Primitive(primitive) = object else {
+        return None;
+    };
+    let converts = match handle {
+        EditHandle::Skew(_) => true,
+        EditHandle::Resize(_) => {
+            matches!(primitive.shape, Shape::Polygon { .. } | Shape::Star { .. })
         }
-        _ => None,
-    }
+        EditHandle::Rotate(_) | EditHandle::Move | EditHandle::Param(_) => false,
+    };
+    converts.then(|| primitive_as_path(primitive, &mut AnchorIdMinter::new(0)))
 }
 
-/// The paths the converting shapes of `starts` become if a stretch ends in a
-/// commit, one entry per start, `None` for an object that keeps its kind. The
-/// anchors carry the ids of a local counter, unique within the call and replaced by
-/// the session's own before the first preview (`SelectTool::mint_conversion_ids`).
+/// The paths the shapes of `starts` become if the group gesture on `handle` ends in a
+/// commit, one entry per start, `None` for an object that keeps its kind. A skew
+/// converts every primitive; a resize the objects that [`converts_on_stretch`] along
+/// the document axes. The anchors carry the ids of a local counter, unique within the
+/// call and replaced by the session's own before the first preview
+/// (`SelectTool::mint_conversion_ids`).
 #[must_use]
-pub(crate) fn converted_paths(starts: &[ObjectSnapshot]) -> Vec<Option<PathSnapshot>> {
+pub(crate) fn converted_for_handle(
+    starts: &[ObjectSnapshot],
+    handle: EditHandle,
+) -> Vec<Option<PathSnapshot>> {
     let mut placeholder = AnchorIdMinter::new(0);
     starts
         .iter()
-        .map(|object| match object {
-            ObjectSnapshot::Primitive(primitive)
-                if converting_kind(object, Angle::from_radians(0.0)).is_some() =>
-            {
-                Some(primitive_as_path(primitive, &mut placeholder))
+        .map(|object| {
+            let converts = match handle {
+                EditHandle::Skew(_) => true,
+                EditHandle::Resize(_) => converts_on_stretch(object, Angle::from_radians(0.0)),
+                EditHandle::Rotate(_) | EditHandle::Move | EditHandle::Param(_) => false,
+            };
+            match object {
+                ObjectSnapshot::Primitive(primitive) if converts => {
+                    Some(primitive_as_path(primitive, &mut placeholder))
+                }
+                _ => None,
             }
-            _ => None,
         })
         .collect()
-}
-
-/// The shapes a commit turned into paths: every start that is a primitive whose
-/// result is a path, counted by the kind it had.
-#[must_use]
-pub(crate) fn converted_counts(
-    starts: &[ObjectSnapshot],
-    results: &[ObjectSnapshot],
-) -> ConversionCounts {
-    let mut counts = ConversionCounts::default();
-    for (start, result) in starts.iter().zip(results) {
-        if matches!(result, ObjectSnapshot::Path(_))
-            && let Some(kind) = converting_kind(start, Angle::from_radians(0.0))
-        {
-            counts.add(kind);
-        }
-    }
-    counts
 }
 
 /// For every id in `ids` that still names a live primitive, the outline
@@ -314,37 +229,26 @@ mod tests {
             InnerRatio::new(0.4).expect("ratio"),
         );
         let zero = Angle::from_radians(0.0);
-        let kind = |object: &ObjectSnapshot| converting_kind(object, zero);
-        assert_eq!(kind(&document.object(rect).unwrap()), None);
-        assert_eq!(
-            kind(&turned(&document, rect, 90.0)),
-            None,
+        let converts = |object: &ObjectSnapshot| converts_on_stretch(object, zero);
+        assert!(!converts(&document.object(rect).unwrap()));
+        assert!(
+            !converts(&turned(&document, rect, 90.0)),
             "a quarter turn is aligned"
         );
-        assert_eq!(
-            kind(&turned(&document, rect, 30.0)),
-            Some(ConvertingKind::RotatedRectangle)
-        );
-        assert_eq!(kind(&document.object(ellipse).unwrap()), None);
-        assert_eq!(
-            kind(&turned(&document, ellipse, 30.0)),
-            Some(ConvertingKind::RotatedEllipse)
-        );
-        assert_eq!(
-            kind(&turned(&document, circle, 30.0)),
-            None,
+        assert!(converts(&turned(&document, rect, 30.0)));
+        assert!(!converts(&document.object(ellipse).unwrap()));
+        assert!(converts(&turned(&document, ellipse, 30.0)));
+        assert!(
+            !converts(&turned(&document, circle, 30.0)),
             "a circle never converts"
         );
-        assert_eq!(
-            kind(&document.object(star).unwrap()),
-            Some(ConvertingKind::Star)
-        );
+        assert!(converts(&document.object(star).unwrap()));
         // Against its own box angle a turned rectangle keeps its kind (one object).
         let own = turned(&document, rect, 30.0);
-        assert_eq!(converting_kind(&own, own.rotation()), None);
+        assert!(!converts_on_stretch(&own, own.rotation()));
     }
 
-    /// Criterion 53.8: a rotation within 1e-9 rad of a quarter turn is aligned (1e-10
+    /// `0019` criterion 53.8: a rotation within 1e-9 rad of a quarter turn is aligned (1e-10
     /// is, 1e-6 is not); a circle is |rx - ry| under 1e-6 mm.
     #[test]
     fn the_boundaries_of_aligned_and_circle() {
@@ -369,17 +273,17 @@ mod tests {
         let zero = Angle::from_radians(0.0);
         let quarter = std::f64::consts::FRAC_PI_2;
         for turns in [0.0, quarter, std::f64::consts::PI] {
-            assert_eq!(
-                converting_kind(&with_rotation(rect, turns + 1e-10), zero),
-                None
-            );
-            assert_eq!(
-                converting_kind(&with_rotation(rect, turns + 1e-6), zero),
-                Some(ConvertingKind::RotatedRectangle)
-            );
+            assert!(!converts_on_stretch(
+                &with_rotation(rect, turns + 1e-10),
+                zero
+            ));
+            assert!(converts_on_stretch(
+                &with_rotation(rect, turns + 1e-6),
+                zero
+            ));
         }
         // 1e-7 apart is a circle, whatever its rotation; 1e-5 apart is an ellipse.
-        assert_eq!(converting_kind(&with_rotation(ellipse, 0.5), zero), None);
+        assert!(!converts_on_stretch(&with_rotation(ellipse, 0.5), zero));
         let wider = match document.object(ellipse).unwrap() {
             ObjectSnapshot::Primitive(p) => ObjectSnapshot::Primitive(PrimitiveSnapshot {
                 shape: Shape::Ellipse {
@@ -394,10 +298,7 @@ mod tests {
             }),
             ObjectSnapshot::Path(_) => panic!("a primitive"),
         };
-        assert_eq!(
-            converting_kind(&wider, zero),
-            Some(ConvertingKind::RotatedEllipse)
-        );
+        assert!(converts_on_stretch(&wider, zero));
     }
 
     /// Criterion 53.1/53.2 and the debt item: the converted path has the id, style,

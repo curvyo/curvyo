@@ -28,7 +28,6 @@ mod box_refit_tests;
 mod close_path;
 mod colour_pick;
 mod combine;
-mod conversion_view;
 mod corner_readout;
 mod document;
 mod document_presets;

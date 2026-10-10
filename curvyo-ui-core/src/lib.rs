@@ -90,9 +90,7 @@ pub use combine::{
     COMBINE_COMMIT_LABEL, CombinePlan, CombineRefusal, PathAvailability, path_availability,
     plan_combine,
 };
-pub use conversion::{
-    ConversionCounts, ConvertingKind, build_primitive_conversions, primitive_as_path,
-};
+pub use conversion::{build_primitive_conversions, primitive_as_path};
 pub use dash_text::{MAX_DASH_NUMBER, MAX_DASH_NUMBERS, dash_text, parse_dash_text};
 pub use display_unit_text::{
     content_too_large_message, document_side_message, format_cursor, format_field_length,
@@ -186,8 +184,8 @@ pub use transform_handle_layout::{
     skew_cursor_angle_degrees, transform_handles,
 };
 pub use transform_math::{
-    ResizedBox, opposite_direction, polygon_star_resize_factor, resize_anchor_local_position,
-    resize_local_box, rotate_delta_angle, rotate_delta_for, rotate_pivot, scaled_and_floored,
+    ResizedBox, opposite_direction, resize_anchor_local_position, resize_local_box,
+    rotate_delta_angle, rotate_delta_for, rotate_pivot, scaled_and_floored,
     stroke_or_radius_factor,
 };
 pub use value_scale::{FieldShown, Grid, ValueField, ValueScale};

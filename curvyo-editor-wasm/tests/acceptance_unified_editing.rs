@@ -2023,6 +2023,22 @@ fn outline_samples(shape: &Shape, rotation: Angle, per_seg: usize) -> Vec<Point>
 }
 
 fn samples_of(s: &Session, index: usize) -> Vec<Point> {
+    let d = doc_of(s);
+    let id = d.object_ids()[index];
+    if let Some(path) = d.path(id) {
+        // A polygon or star that a free corner drag stretched is a straight-edged path
+        // now (`0047` criterion 12).
+        let n = path.anchors.len();
+        return (0..n)
+            .flat_map(|i| {
+                let (a, b) = (path.anchors[i].point, path.anchors[(i + 1) % n].point);
+                (0..12).map(move |j| {
+                    let t = f64::from(j) / 12.0;
+                    pt(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t)
+                })
+            })
+            .collect();
+    }
     let p = prim_of(s, index);
     outline_samples(&p.shape, p.rotation, 12)
 }
@@ -3006,7 +3022,7 @@ fn ac08_the_side_midpoints_of_polygon_and_star_are_edge_resize_handles() {
 }
 
 #[test]
-fn ac17_primitives_have_no_skew_handles_but_paths_do() {
+fn ac17_every_kind_has_skew_handles() {
     for build in 0..3 {
         let mut sc = match build {
             0 => rect_scene(100, 160.0, 120.0, 0.0, 0.0),
@@ -3021,8 +3037,8 @@ fn ac17_primitives_have_no_skew_handles_but_paths_do() {
             );
             let (cur, h) = hint(&mut sc.s, p);
             assert!(
-                !cur.starts_with("skew") && !h.starts_with("skew"),
-                "kind {build} side ({nx},{ny}): {cur} {h}"
+                cur.starts_with("skew") && h.starts_with("skew"),
+                "kind {build} side ({nx},{ny}): {cur} {h} (`0047` criterion 1)"
             );
         }
     }
@@ -3837,8 +3853,10 @@ fn ac16_live_readouts_during_primitive_drags() {
                 "kind {build}: {text}"
             );
         } else {
+            // A free corner drag stretches a polygon or star, so its readout is the size
+            // of the previewed path (`0047` criterion 12).
             assert!(
-                text.starts_with('r') && text.contains("mm"),
+                (text.starts_with('r') || text.contains('×')) && text.contains("mm"),
                 "kind {build}: {text}"
             );
         }

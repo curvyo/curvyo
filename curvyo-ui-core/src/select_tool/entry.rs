@@ -10,7 +10,6 @@ use curvyo_document_core::{Document, ObjectSnapshot, PathSnapshot, Point, Tolera
 use super::{SelectDoubleClickOutcome, SelectDrag, SelectTool, sole_selected};
 use crate::ResizeDirection;
 use crate::anchor_id_minter::AnchorIdMinter;
-use crate::conversion::{ConversionCounts, converted_counts};
 use crate::group_entry::GroupEntry;
 use crate::hit_test_object::hit_test_object;
 use crate::move_entry::MoveEntry;
@@ -60,9 +59,9 @@ pub enum EntryKey {
     Size,
     /// M: the typed move of the centre handle.
     Move,
-    /// K: the skew-x entry of the top skew handle (a path).
+    /// K: the skew-x entry of the top skew handle.
     SkewX,
-    /// Shift+K: the skew-y entry of the right skew handle (a path).
+    /// Shift+K: the skew-y entry of the right skew handle.
     SkewY,
 }
 
@@ -72,17 +71,6 @@ pub enum EntryKey {
 pub enum KeyEntryRefusal {
     /// Nothing is selected.
     NothingSelected,
-    /// K or Shift+K with a selection that holds an object that is not a path.
-    SkewNeedsPath,
-}
-
-/// The shapes a commit of the one object `start` turned into paths: it was a
-/// primitive and the document holds a path under its id now.
-fn single_conversion(document: &Document, start: &ObjectSnapshot) -> ConversionCounts {
-    document
-        .object(start.id())
-        .map(|now| converted_counts(std::slice::from_ref(start), &[now]))
-        .unwrap_or_default()
 }
 
 impl OpenEntry {
@@ -92,7 +80,8 @@ impl OpenEntry {
         match self {
             Self::Group(entry) => entry.converted_mut(),
             Self::Transform(entry) => entry.converted_mut(),
-            Self::Param(_) | Self::Skew(_) | Self::Move(_) => &mut [],
+            Self::Skew(entry) => entry.converted_mut(),
+            Self::Param(_) | Self::Move(_) => &mut [],
         }
     }
 
@@ -191,29 +180,17 @@ impl SelectTool {
         let Some(entry) = self.entry.as_ref() else {
             return EntryOutcome::Unchanged;
         };
-        let mut converted = ConversionCounts::default();
         let outcome = match entry {
-            OpenEntry::Transform(entry) => {
-                let outcome = entry.commit(document, texts, last_edited);
-                if outcome == EntryOutcome::Committed {
-                    converted = single_conversion(document, entry.object());
-                }
-                outcome
-            }
+            OpenEntry::Transform(entry) => entry.commit(document, texts, last_edited),
             OpenEntry::Param(entry) => entry.commit(document, texts[0]),
             OpenEntry::Skew(entry) => entry.commit(document, texts[0]),
-            OpenEntry::Group(entry) => {
-                let (outcome, counts) = entry.commit_counting(document, texts, last_edited);
-                converted = counts;
-                outcome
-            }
+            OpenEntry::Group(entry) => entry.commit(document, texts, last_edited),
             // The typed move has its own commit: it needs the mode.
             OpenEntry::Move(_) => EntryOutcome::Unchanged,
         };
         if !matches!(outcome, EntryOutcome::Invalid { .. }) {
             self.entry = None;
         }
-        self.record_conversion(converted);
         outcome
     }
 
@@ -255,9 +232,7 @@ impl SelectTool {
     /// they open for an object of any size.
     ///
     /// # Errors
-    /// [`KeyEntryRefusal`] when the selection is not exactly one object, or
-    /// when K or Shift+K meets a selected object that is not a path; nothing
-    /// changes then.
+    /// [`KeyEntryRefusal`] when nothing is selected; nothing changes then.
     pub fn open_entry_for_key(
         &mut self,
         objects: &[ObjectSnapshot],
@@ -270,15 +245,12 @@ impl SelectTool {
             _ => {
                 let group =
                     Self::group_of(objects, selection).ok_or(KeyEntryRefusal::NothingSelected)?;
-                return self.open_group_entry_for_key(objects, selection, &group, key);
+                self.open_group_entry_for_key(objects, selection, &group, key);
+                return Ok(());
             }
         };
         let box_ = oriented_bounds(object);
-        let skew = |side| {
-            SkewEntry::for_handle(object, &box_, side, false)
-                .map(OpenEntry::Skew)
-                .ok_or(KeyEntryRefusal::SkewNeedsPath)
-        };
+        let skew = |side| OpenEntry::Skew(SkewEntry::for_handle(object, &box_, side, false));
         let entry = match key {
             EntryKey::Angle => OpenEntry::Transform(TransformEntry::for_rotate(
                 object,
@@ -300,8 +272,8 @@ impl SelectTool {
                 .with_centre_chip(),
             ),
             EntryKey::Move => OpenEntry::Move(MoveEntry::new(object, &box_)),
-            EntryKey::SkewX => skew(Side::Top)?,
-            EntryKey::SkewY => skew(Side::Right)?,
+            EntryKey::SkewX => skew(Side::Top),
+            EntryKey::SkewY => skew(Side::Right),
         };
         self.entry = Some(entry);
         Ok(())
@@ -358,9 +330,9 @@ impl SelectTool {
                     self.corner_linking.is_unlinked_with(shift),
                 )
                 .map(OpenEntry::Param),
-                EditHandle::Skew(side) => {
-                    SkewEntry::for_handle(object, &box_, side, shift).map(OpenEntry::Skew)
-                }
+                EditHandle::Skew(side) => Some(OpenEntry::Skew(SkewEntry::for_handle(
+                    object, &box_, side, shift,
+                ))),
                 EditHandle::Move => Some(OpenEntry::Move(
                     MoveEntry::new(object, &box_).with_copy_preset(ctrl),
                 )),

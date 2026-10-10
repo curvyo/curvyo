@@ -161,7 +161,7 @@ impl Session {
     /// The lines of the hint chip of the group handle under the pointer
     /// (criterion 38), empty when there is none. The first line is the title.
     pub(super) fn group_hint_lines(&self, objects: &[ObjectSnapshot]) -> Vec<String> {
-        let Some((group, handle)) = self.group_hovered_handle(objects) else {
+        let Some((_, handle)) = self.group_hovered_handle(objects) else {
             return Vec::new();
         };
         let lines: &[&str] = match handle {
@@ -176,26 +176,6 @@ impl Session {
                 "Shift: from the center",
                 "Double-click or S: type a size",
             ],
-            // A corner of a selection that holds a shape a stretch converts is
-            // always proportional (criterion 19); the line points to the edge
-            // handle, which only exists to point to while it is drawn.
-            EditHandle::Resize(_) if group.proportional_corners() => {
-                let tolerances = self.transform_handle_tolerances();
-                let edge_drawn = group_handles(&group, group.bounds(), &tolerances, false)
-                    .into_iter()
-                    .any(|(handle, _)| {
-                        matches!(handle, EditHandle::Resize(d) if !is_corner(d))
-                            && is_drawn_group_handle(handle, &group, &tolerances)
-                    });
-                let mut lines = vec!["Resize selection, proportional".to_string()];
-                if edge_drawn {
-                    lines.push("Stretch with an edge handle".to_string());
-                }
-                lines.extend(
-                    ["Shift: from the center", "Double-click or S: type a size"].map(String::from),
-                );
-                return lines;
-            }
             EditHandle::Resize(_) => &[
                 "Resize selection",
                 "Shift: from the center",

@@ -16,7 +16,7 @@
 use curvyo_document_core::{Document, ObjectSnapshot, Point, Tolerance};
 
 use crate::anchor_id_minter::AnchorIdMinter;
-use crate::conversion::{ConversionCounts, converted_counts, converted_polygon_or_star};
+use crate::conversion::converted_for_object;
 use crate::modifiers::Modifiers;
 use crate::object_selection::ObjectSelection;
 use crate::param_handles::{ParamHandle, radius_gain};
@@ -25,8 +25,8 @@ use crate::transform_commit::same_within_tolerance;
 use crate::transform_drag::{
     CornerLinking, CornerRadiusScaling, DragOrigin, ScaleModes, StrokeScaling, TransformDrag,
 };
+use crate::transform_handle_layout::EditHandle;
 pub use crate::transform_handle_layout::TransformHandleTolerances;
-use crate::transform_handle_layout::{EditHandle, is_corner};
 
 mod bar;
 mod cycle;
@@ -152,9 +152,6 @@ pub struct SelectTool {
     /// begun by a plain click that acted on an object, dropped by anything
     /// else that is not an Alt-click on the same point.
     cycle: Option<ClickCycle>,
-    /// The shapes the last commit turned into paths, until the host has taken the
-    /// notice of it ([`SelectTool::take_conversion_notice`]).
-    last_conversion: ConversionCounts,
 }
 
 impl SelectTool {
@@ -260,8 +257,6 @@ impl SelectTool {
     ) -> SelectPointerDownOutcome {
         self.entry = None;
         self.last_press_handle = None;
-        // A notice not yet taken belongs to the gesture before this one.
-        self.last_conversion = ConversionCounts::default();
         // `adrs.md`: "ui-core filters the selection against the current
         // snapshot first" — drops any id a prior action (this peer's own
         // edit in a different tool, or a collaborator) has since removed,
@@ -341,14 +336,10 @@ impl SelectTool {
             param_gain,
             unlinked: matches!(handle, EditHandle::Param(ParamHandle::CornerRadius(_)))
                 && self.corner_linking.is_unlinked_with(origin.shift_at_press),
-            // Only an edge handle stretches a polygon or star (a corner drag is
-            // always proportional, criterion 56).
-            converted: match handle {
-                EditHandle::Resize(direction) if !is_corner(direction) => {
-                    converted_polygon_or_star(object).map(Box::new)
-                }
-                _ => None,
-            },
+            // A resize of a polygon or star and a skew of any primitive end as a path
+            // (`0047` criteria 2 and 12), built at the press so that the preview and
+            // the commit are the same snapshot.
+            converted: converted_for_object(object, handle).map(Box::new),
         }
     }
 
@@ -383,7 +374,6 @@ impl SelectTool {
                 let result = drag.resolve(point, modifiers.shift, modifiers.ctrl);
                 if !same_within_tolerance(&result, &drag.start) {
                     drag.commit(document, &result);
-                    self.record_single_conversion(document, &drag.start);
                 }
             }
             SelectDrag::GroupTransforming(drag) => {
@@ -395,8 +385,8 @@ impl SelectTool {
                     .iter()
                     .zip(&drag.starts)
                     .all(|(new, old)| same_within_tolerance(new, old));
-                if !unchanged && let Some(counts) = drag.commit(document, &results) {
-                    self.record_conversion(counts);
+                if !unchanged {
+                    drag.commit(document, &results);
                 }
             }
             SelectDrag::Marquee(drag) => {
@@ -406,30 +396,6 @@ impl SelectTool {
                 self.finish_lasso(&drag, objects, selection, point, modifiers);
             }
         }
-    }
-
-    /// Remembers that a commit turned `counts` shapes into paths; nothing for an
-    /// empty count, so a later commit never clears a notice not yet shown.
-    pub(crate) fn record_conversion(&mut self, counts: ConversionCounts) {
-        if !counts.is_empty() {
-            self.last_conversion = counts;
-        }
-    }
-
-    /// [`SelectTool::record_conversion`] for a commit of one object: it counts when
-    /// `start` was a primitive and the document holds a path under its id now.
-    pub(crate) fn record_single_conversion(&mut self, document: &Document, start: &ObjectSnapshot) {
-        if let Some(now) = document.object(start.id()) {
-            self.record_conversion(converted_counts(std::slice::from_ref(start), &[now]));
-        }
-    }
-
-    /// The shapes the last commit turned into paths, by kind, once: empty when it
-    /// converted nothing or the host has already taken it. The host shows the
-    /// notice of criterion 54 ("Stretching turned 2 shapes into paths. No undo
-    /// yet.") from it.
-    pub fn take_conversion_notice(&mut self) -> ConversionCounts {
-        std::mem::take(&mut self.last_conversion)
     }
 
     /// Cancels whichever drag is in flight, writing nothing, and ends the
@@ -937,18 +903,18 @@ mod tests {
     // --- object-transform (slice 5) ---
 
     /// Acceptance criterion 1: with exactly one object selected, its
-    /// handles appear: 8 resize and the 4 corner rotate handles on a
-    /// rectangle (the side rotate handles need Shift, the centre handle a
-    /// big enough box, skew a path).
+    /// handles appear: 8 resize, the 4 corner rotate handles and (`0047` criterion 1,
+    /// every kind) the 4 skew handles on a rectangle (the side rotate handles need
+    /// Shift, the centre handle a big enough box).
     #[test]
-    fn ac1_a_single_selection_shows_twelve_handles() {
+    fn ac1_a_single_selection_shows_sixteen_handles() {
         let document = Document::new(1);
         let id = rect(&document, 0.0);
         let objects = vec![document.object(id).expect("exists")];
         let mut selection = ObjectSelection::new();
         selection.select_single(id);
         let handles = SelectTool::transform_handles(&objects, &selection, HANDLE_TOLERANCES, false);
-        assert_eq!(handles.len(), 12);
+        assert_eq!(handles.len(), 16);
     }
 
     /// Acceptance criterion 2: a multi-selection shows no transform
@@ -1538,10 +1504,11 @@ mod tests {
         }
     }
 
-    /// Acceptance criterion 11: a star's corner-handle drag is always a
-    /// uniform scale, point count and ratio untouched.
+    /// Acceptance criterion 11, as `0047` criterion 12 leaves it: a star's corner-handle
+    /// drag with Ctrl is a uniform scale, point count and ratio untouched (without
+    /// Ctrl it stretches freely and converts).
     #[test]
-    fn ac11_star_corner_handle_is_uniform_scale() {
+    fn ac11_star_corner_handle_with_ctrl_is_uniform_scale() {
         use curvyo_document_core::{InnerRatio, PointCount};
         let document = Document::new(1);
         let frame = StarFrame {
@@ -1560,8 +1527,12 @@ mod tests {
         let mut tool = SelectTool::new();
         // The Ne corner handle sits along the (1,-1) diagonal.
         let handles = SelectTool::transform_handles(&objects, &selection, HANDLE_TOLERANCES, false);
-        // `0019` criterion 56: a polygon or star shows the edge handles too.
-        assert_eq!(handles.len(), 12, "4 corners + 4 edges + 4 corner rotate");
+        // `0047` criteria 1 and 12: a polygon or star shows every handle.
+        assert_eq!(
+            handles.len(),
+            16,
+            "4 corners + 4 edges + 4 corner rotate + 4 skew"
+        );
         let (_, ne_position) = handles
             .iter()
             .find(|(h, _)| matches!(h, EditHandle::Resize(ResizeDirection::Ne)))
@@ -1580,7 +1551,7 @@ mod tests {
             &objects,
             &mut selection,
             drag_to,
-            Modifiers::new(false, false),
+            Modifiers::new(false, true),
             &mut AnchorIdMinter::new(99),
         );
         let Shape::Star {
@@ -2375,9 +2346,9 @@ mod tests {
     }
 
     /// Tester finding: the polygon/star corner handle follows the pointer
-    /// exactly — dragging the NE corner out by (+5, -5) puts the new
-    /// corner at (r+5, -(r+5)), i.e. the radius grows by 5, not by the
-    /// 7.07 of raw diagonal displacement.
+    /// exactly. With the opposite corner fixed (`0047` criterion 12), dragging the NE
+    /// corner out by (+5, -5) puts the new corner at (15, -15): the box grows from 20 to
+    /// 25 mm, the radius to 12.5 and the centre moves to (2.5, -2.5).
     #[test]
     fn a_polygon_corner_handle_ends_up_under_the_pointer() {
         use curvyo_document_core::PointCount;
@@ -2420,10 +2391,11 @@ mod tests {
             panic!("polygon");
         };
         assert!(
-            (frame.radius.as_mm() - 15.0).abs() < 1e-9,
+            (frame.radius.as_mm() - 12.5).abs() < 1e-9,
             "{}",
             frame.radius.as_mm()
         );
+        assert!((frame.center.x - 2.5).abs() < 1e-9 && (frame.center.y + 2.5).abs() < 1e-9);
     }
 
     /// Tester/ADR: a NaN, infinite or absurd pointer never writes
