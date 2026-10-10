@@ -267,6 +267,7 @@ export function useHistory(
         event.repeat,
         false,
         MAC,
+        event.timeStamp,
       );
       if (outcome === "ignored") {
         return;

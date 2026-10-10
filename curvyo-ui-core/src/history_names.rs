@@ -56,6 +56,7 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     ("boolean_intersection", "Intersection"),
     ("boolean_exclusion", "Exclusion"),
     ("boolean_reverse_difference", "Reverse difference"),
+    ("set_document_background", "Change background"),
     ("combine_paths", "Combine"),
     ("break_apart", "Break apart"),
 ];

@@ -216,10 +216,10 @@ mod tests {
     fn the_dimmed_style_tab_does_nothing() {
         let mut session = Session::new(1);
         assert!(!session.press_panel_tab("style"));
-        assert!(!session.press_panel_tab("history"));
+        assert!(!session.press_panel_tab("unknown"));
         let record = PanelTabsRecord::new(&session.panel_view());
-        assert_eq!(record.tab_names, ["document", "style"]);
-        assert_eq!(record.tab_enabled, [1, 0]);
+        assert_eq!(record.tab_names, ["document", "style", "history"]);
+        assert_eq!(record.tab_enabled, [1, 0, 1]);
         assert_eq!(record.tab_tooltips[1], "Style: select an object first");
         assert_eq!(record.active, "document");
     }
@@ -269,7 +269,7 @@ mod tests {
         }
         let view = session.panel_view();
         assert_eq!(view.content, PanelContent::Empty);
-        assert_eq!(view.tabs.len(), 2);
+        assert_eq!(view.tabs.len(), 3);
         assert!(session.press_panel_tab("document"));
         assert_eq!(session.panel_content(), PanelContent::Empty);
         session.finish_pen();

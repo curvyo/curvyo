@@ -1721,8 +1721,7 @@ export function useEditorSession(
       setCursorHint(session.cursor_hint());
       syncFromSession();
     },
-    [handleKeyOutcome, isDuplicateKey, isSpaceHeld, syncFromSession],
-    [isSpaceHeld, syncFromSession, onNudge, onSelectAll, onEscape],
+    [handleKeyOutcome, isDuplicateKey, isSpaceHeld, syncFromSession, onNudge, onSelectAll, onEscape],
   );
 
   // A key hint clears itself after 2 s; a newer message restarts the clock.

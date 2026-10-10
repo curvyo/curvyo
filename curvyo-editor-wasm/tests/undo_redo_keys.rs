@@ -207,8 +207,17 @@ fn five_hundred_and_one_steps_keep_five_hundred_undos() {
     }
     assert_eq!(session.undo_len(), 500);
     for _ in 0..500 {
-        assert_eq!(key(&mut session, "z", false), KeyOutcome::Undo);
-        let _ = session.take_history_notice();
+        // The bottom of a long stack lies far behind the latest version: the host would show the
+        // busy state first, then call `undo`.
+        match key(&mut session, "z", false) {
+            KeyOutcome::Undo => {
+                let _ = session.take_history_notice();
+            }
+            KeyOutcome::UndoBusy => {
+                assert!(session.undo().changed);
+            }
+            other => panic!("{other:?}"),
+        }
     }
     assert_eq!(undo(&mut session), "Nothing to undo.");
     assert_eq!(

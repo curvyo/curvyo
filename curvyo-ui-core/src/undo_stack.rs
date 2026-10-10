@@ -4,7 +4,7 @@
 //! memory (ADR 0009 §2).
 
 use std::collections::HashMap;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use curvyo_document_core::{AnchorId, Event, NodeId, STACK_LIMIT, StackMachine, StepRef};
 
@@ -23,8 +23,8 @@ struct Entry {
     label: String,
     /// Shared with the neighbouring entries whenever the selection did not change: a long run of
     /// steps on one large selection holds the selection once.
-    before: Rc<SelectionSnapshot>,
-    after: Rc<SelectionSnapshot>,
+    before: Arc<SelectionSnapshot>,
+    after: Arc<SelectionSnapshot>,
 }
 
 /// The entry a press acts on.
@@ -46,7 +46,7 @@ pub struct UndoStack {
     machine: StackMachine,
     entries: HashMap<StepRef, Entry>,
     /// The selection of the newest recorded step, to be shared by the next one.
-    last: Option<Rc<SelectionSnapshot>>,
+    last: Option<Arc<SelectionSnapshot>>,
 }
 
 impl Default for UndoStack {
@@ -76,11 +76,11 @@ impl UndoStack {
     ) {
         let before = self.shared(before);
         let after = if *before == after {
-            Rc::clone(&before)
+            Arc::clone(&before)
         } else {
             self.shared(after)
         };
-        self.last = Some(Rc::clone(&after));
+        self.last = Some(Arc::clone(&after));
         self.entries.insert(
             step,
             Entry {
@@ -94,10 +94,10 @@ impl UndoStack {
     }
 
     /// `selection` as a shared value, reusing the one of the step before when it is equal.
-    fn shared(&self, selection: SelectionSnapshot) -> Rc<SelectionSnapshot> {
+    fn shared(&self, selection: SelectionSnapshot) -> Arc<SelectionSnapshot> {
         match &self.last {
-            Some(last) if **last == selection => Rc::clone(last),
-            _ => Rc::new(selection),
+            Some(last) if **last == selection => Arc::clone(last),
+            _ => Arc::new(selection),
         }
     }
 
@@ -166,7 +166,7 @@ impl UndoStack {
         for entry in self.entries.values() {
             total += size_of::<StepRef>() + size_of::<Entry>() + entry.label.capacity();
             for selection in [&entry.before, &entry.after] {
-                let at = Rc::as_ptr(selection);
+                let at = Arc::as_ptr(selection);
                 if !seen.contains(&at) {
                     seen.push(at);
                     total += size_of::<SelectionSnapshot>()
