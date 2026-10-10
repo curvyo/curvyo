@@ -14,7 +14,7 @@ use crate::units::{DocumentSize, Length};
 
 /// An opaque marker of a document's state, see [`Document::version`].
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DocumentVersion(loro::Frontiers);
+pub struct DocumentVersion(pub(crate) loro::Frontiers);
 
 /// The container `format_version` this build writes and the newest it
 /// accepts on read (ADR 0004 §9).
@@ -151,6 +151,8 @@ pub struct Document {
     loro: LoroDoc,
     /// The commit path's session state (`crate::history`).
     pub(crate) commit_state: crate::history::CommitState,
+    /// The container chains of the log, for the touched objects of a step.
+    pub(crate) container_index: std::cell::RefCell<crate::history::ContainerIndex>,
 }
 
 impl Document {
@@ -193,6 +195,7 @@ impl Document {
         let document = Self {
             loro,
             commit_state: crate::history::CommitState::default(),
+            container_index: std::cell::RefCell::default(),
         };
         document.commit_new_document();
         document
@@ -233,6 +236,7 @@ impl Document {
         Ok(Self {
             loro,
             commit_state: crate::history::CommitState::default(),
+            container_index: std::cell::RefCell::default(),
         })
     }
 

@@ -120,41 +120,73 @@ impl Document {
             state.continue_next.set(false);
             return None;
         }
-        let peer = self.loro().peer_id();
         // `continue_step` checked that nothing else was committed or merged since the last step.
         let joined = state
             .continue_next
             .replace(false)
             .then(|| state.last.borrow().clone())
             .flatten();
-        let (header, existing) = match joined {
-            Some(last) => (last.header, Some(last.step)),
-            None => {
-                state.seq.set(state.seq.get() + 1);
-                let mut header = StepHeader::new(label, state.seq.get(), state.time.get());
-                header.extra = extra
-                    .iter()
-                    .map(|(key, value)| ((*key).to_owned(), value.clone()))
-                    .collect();
-                (header.format(), None)
-            }
-        };
-        self.loro()
-            .commit_with(CommitOptions::new().commit_msg(&header));
-        let end = self.loro().oplog_vv().get(&peer).copied().unwrap_or(0);
-        let step = existing.unwrap_or_else(|| StepRef::new(peer, end - pending_counter(pending)));
-        if existing.is_none() {
-            state.own.borrow_mut().push(OwnStep {
-                step,
-                label: label.to_owned(),
-            });
+        if let Some(last) = joined {
+            let step = self.finish_commit(&last.header, Some(last.step), pending);
+            return Some(step);
         }
-        *state.last.borrow_mut() = Some(LastCommit {
+        let header = self.next_header(label, extra);
+        let step = self.finish_commit(&header.format(), None, pending);
+        state.own.borrow_mut().push(OwnStep {
             step,
-            header,
-            version: self.loro().oplog_frontiers(),
+            label: label.to_owned(),
         });
         Some(step)
+    }
+
+    /// The header of the next step this session starts; the step counter moves on.
+    pub(crate) fn next_header(&self, label: &str, extra: &[(&str, String)]) -> StepHeader {
+        let state = &self.commit_state;
+        state.seq.set(state.seq.get() + 1);
+        let mut header = StepHeader::new(label, state.seq.get(), state.time.get());
+        header.extra = extra
+            .iter()
+            .map(|(key, value)| ((*key).to_owned(), value.clone()))
+            .collect();
+        header
+    }
+
+    /// Commits the pending writes with the given header and remembers the commit as the one a
+    /// continuation may join. Not listed among [`Document::own_steps`]: undo and redo use it.
+    pub(crate) fn commit_with_header(&self, header: &StepHeader) {
+        let pending = self.loro().get_pending_txn_len();
+        if pending > 0 {
+            self.finish_commit(&header.format(), None, pending);
+        } else {
+            self.note_last_commit(header);
+        }
+    }
+
+    fn finish_commit(&self, header: &str, existing: Option<StepRef>, pending: usize) -> StepRef {
+        let peer = self.loro().peer_id();
+        self.loro()
+            .commit_with(CommitOptions::new().commit_msg(header));
+        let end = self.loro().oplog_vv().get(&peer).copied().unwrap_or(0);
+        let first = end - i32::try_from(pending).unwrap_or(i32::MAX);
+        let step = existing.unwrap_or_else(|| StepRef::new(peer, first));
+        *self.commit_state.last.borrow_mut() = Some(LastCommit {
+            step,
+            header: header.to_owned(),
+            version: self.loro().oplog_frontiers(),
+        });
+        step
+    }
+
+    /// Remembers that the newest commit of this peer carries `header` (after a change that was
+    /// imported instead of committed).
+    pub(crate) fn note_last_commit(&self, header: &StepHeader) {
+        let peer = self.loro().peer_id();
+        let end = self.loro().oplog_vv().get(&peer).copied().unwrap_or(0);
+        *self.commit_state.last.borrow_mut() = Some(LastCommit {
+            step: StepRef::new(peer, end.saturating_sub(1)),
+            header: header.format(),
+            version: self.loro().oplog_frontiers(),
+        });
     }
 
     /// Commits the root setup of a new document as its own change, so that the first user step
@@ -164,11 +196,6 @@ impl Document {
         self.loro()
             .commit_with(CommitOptions::new().commit_msg(&header.format()));
     }
-}
-
-/// The counter span of `pending` operations.
-fn pending_counter(pending: usize) -> i32 {
-    i32::try_from(pending).unwrap_or(i32::MAX)
 }
 
 #[cfg(test)]

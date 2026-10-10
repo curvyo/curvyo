@@ -76,7 +76,10 @@ pub use format_library_file::{
     MAX_USER_FILE_BYTES, MAX_USER_FORMATS, MAX_USER_GROUPS, USER_FILE_FORMAT, describe_error,
 };
 pub use format_library_import::ImportReport;
-pub use history::{HistoryError, MIN_SHOWN_ID_LEN, OwnStep, StepRef, shown_ids};
+pub use history::{
+    Direction, HistoryError, MIN_SHOWN_ID_LEN, ObjectReport, ObjectResult, OwnStep, RestoreReport,
+    Role, SkipReason, StepRef, SyncError, shown_ids,
+};
 pub use junction::{COINCIDENT_MM, interior_handle, merged_junction};
 pub use objects::{CopySource, ObjectEditError};
 pub use path_extend::{PathEnd, PathGrowth};
