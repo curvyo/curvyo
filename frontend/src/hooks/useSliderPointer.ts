@@ -62,7 +62,11 @@ export function useSliderPointer(
       if (event.button !== 0) {
         return;
       }
-      event.currentTarget.setPointerCapture(event.pointerId);
+      try {
+        event.currentTarget.setPointerCapture(event.pointerId);
+      } catch {
+        // Not capturable (a synthetic event): the gesture works while the pointer stays over it.
+      }
       // The slider takes the focus at the press, which also closes an entry beside it.
       event.currentTarget.focus({ preventScroll: true });
       grab.current = null;
@@ -73,7 +77,7 @@ export function useSliderPointer(
       );
     },
     onPointerMove: (event) => {
-      if (!event.currentTarget.hasPointerCapture(event.pointerId)) {
+      if (event.buttons === 0) {
         return;
       }
       const at = local(event);
