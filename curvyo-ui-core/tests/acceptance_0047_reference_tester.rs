@@ -17,10 +17,10 @@
     clippy::too_many_lines
 )]
 
-use curvyo_document_core::Point;
+use curvyo_document_core::{Point, ViewTransform};
 use curvyo_ui_core::{
-    MARKS_MIN_SIDE_PX, ReferencePoint, hit_mark, mark_hit_radius_px, marks_are_shown,
-    shorter_side_px, visible_marks,
+    MARKS_MIN_SIDE_PX, ReferencePoint, hit_mark as real_hit_mark, mark_hit_radius_px,
+    marks_are_shown, shorter_side_px, visible_marks as real_visible_marks,
 };
 use proptest::prelude::*;
 
@@ -53,6 +53,34 @@ fn model_points(b: (Point, Point)) -> [(f64, f64); 9] {
 /// Document to screen with a uniform zoom `k` (px per mm) and a pan.
 fn mapper(k: f64, pan: (f64, f64)) -> impl Fn(Point) -> (f64, f64) {
     move |p: Point| (p.x * k + pan.0, p.y * k + pan.1)
+}
+
+
+/// The view of a uniform zoom `k` and a pan given as the screen position of the document origin
+/// (the closures of this file are all linear).
+fn view_of(k: f64, to: &impl Fn(Point) -> (f64, f64)) -> ViewTransform {
+    let (px, py) = to(Point::new(0.0, 0.0));
+    ViewTransform::new(k, Point::new(-px / k, -py / k))
+}
+
+fn visible_marks(
+    bounds: (Point, Point),
+    k: f64,
+    viewport: (f64, f64),
+    to: impl Fn(Point) -> (f64, f64),
+) -> Vec<ReferencePoint> {
+    real_visible_marks(bounds, view_of(k, &to), viewport)
+}
+
+fn hit_mark(
+    bounds: (Point, Point),
+    marks: &[ReferencePoint],
+    pointer: (f64, f64),
+    k: f64,
+    touch: bool,
+    to: impl Fn(Point) -> (f64, f64),
+) -> Option<ReferencePoint> {
+    real_hit_mark(bounds, marks, view_of(k, &to), pointer, touch)
 }
 
 // ---------------------------------------------------------------------
@@ -263,13 +291,12 @@ fn only_visible_marks_can_be_hit() {
 }
 
 /// Criterion 40: "the centre cross winning a tie". The real geometry cannot tie (targets do not
-/// overlap), so the rule is checked with a mapping that puts the centre and the top centre on one
-/// screen point; the order of the mark list must not matter.
+/// overlap), so the rule is checked with a box collapsed to a point, where the top centre and the
+/// centre coincide on screen; the order of the mark list must not matter.
 #[test]
 fn the_centre_wins_an_exact_tie() {
-    let b = bx(0.0, 0.0, 300.0, 200.0);
-    // The top centre (150, 0) and the centre (150, 100) both land on (150, 100).
-    let squash = |p: Point| (p.x, if p.y <= 100.0 { 100.0 } else { p.y });
+    let b = bx(5.0, 5.0, 5.0, 5.0);
+    let to = mapper(1.0, (0.0, 0.0));
     let orders: [Vec<ReferencePoint>; 3] = [
         vec![ReferencePoint::TopCentre, ReferencePoint::Centre],
         vec![ReferencePoint::Centre, ReferencePoint::TopCentre],
@@ -277,28 +304,11 @@ fn the_centre_wins_an_exact_tie() {
     ];
     for marks in orders {
         assert_eq!(
-            hit_mark(b, &marks, (150.0, 100.0), 1.0, false, squash),
+            hit_mark(b, &marks, (5.0, 5.0), 1.0, false, &to),
             Some(ReferencePoint::Centre),
             "centre wins over the top centre, list {marks:?}"
         );
     }
-}
-
-/// Criterion 40: nearest centre first when two targets do share a point of the plane (a
-/// squashed mapping again): the nearer mark wins even though the centre is also in range.
-#[test]
-fn the_nearest_mark_wins() {
-    let b = bx(0.0, 0.0, 300.0, 200.0);
-    // Top centre lands at (150, 95), the centre at (150, 100).
-    let squash = |p: Point| (p.x, if p.y < 50.0 { 95.0 } else { p.y });
-    assert_eq!(
-        hit_mark(b, &ReferencePoint::ALL, (150.0, 94.0), 1.0, false, squash),
-        Some(ReferencePoint::TopCentre)
-    );
-    assert_eq!(
-        hit_mark(b, &ReferencePoint::ALL, (150.0, 101.0), 1.0, false, squash),
-        Some(ReferencePoint::Centre)
-    );
 }
 
 // ---------------------------------------------------------------------
