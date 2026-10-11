@@ -415,6 +415,11 @@ pub const REFERENCE_MARK: RgbaColor = MARQUEE_CONTAIN;
 /// `--reference-box`: the pale red true bounding box, `--reference-mark` at 55 %.
 pub const REFERENCE_BOX: RgbaColor = REFERENCE_MARK.with_alpha(140); // 55% of 255, rounded
 
+/// The width of the reference box's line, device pixels. 4 px, not 1: the blue outline of a move
+/// preview or the selection box lies exactly on the true box of an unrotated object and would
+/// cover a thinner line (UX review of `0047`, risk 1 of its UX notes).
+pub const REFERENCE_BOX_LINE_PX: f64 = 4.0;
+
 /// The reference box's casing: `--selection-casing` at the same 55 %, so the line reads on a fill.
 pub const REFERENCE_BOX_CASING: RgbaColor = SELECTION_CASING.with_alpha(140);
 

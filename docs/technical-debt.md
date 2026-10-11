@@ -1387,3 +1387,17 @@ Do it with the next slice that touches the move chip.
 - **Escape between the press and the release of a click on a reference mark is not handled in the
   slider-style hook or in the frontend.** The Rust session ignores it and writes nothing, so the
   outcome is right; it just is not a tested step (see the entry on the mark click above).
+
+## UX review leftovers of `0047-transform-polish` (2026-10-11)
+
+- **The hue thumb can read 1 degree off after Escape in a colour drag** (90 before, 89 after): the
+  committed colour is restored exactly, but the picker re-derives its hue from the 8-bit RGB. Not
+  caused by this slice (the picker sync of `0017`, `pickerSync`); the fix is to keep the picker's HSV
+  across an Escape that restores the same colour.
+- **The Move chip grows upward on a mode switch when it is flipped above the box** (its bottom edge
+  stays put), over the box and its top marks. Same side in both modes, as specified; the covered marks
+  are reachable through the Reference control. Recorded in the design-system row so nobody reports it.
+- **Not verified by the UX review (browser pane only, no device):** touch and pen (8 px slop, 22 px mark
+  targets), Ctrl copy at a mark click, Escape between the press and release of a mark click, a click on
+  a mixed Ratio or colour slider, the 10,000-object frame with the box drawn, a dark theme, and screen
+  reader output. The customer tries these in the app; the sliders' tooltips were seen.

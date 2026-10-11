@@ -1,3 +1,4 @@
+import { useHexEntry } from "@/hooks/useHexEntry";
 import { useRef } from "react";
 
 import { ColourBlock } from "@/components/panel/ColourBlock";
@@ -31,6 +32,7 @@ export function StrokeSection({ panel, onReturnFocus }: StrokeSectionProps) {
   const { view } = panel;
   const section = useRef<HTMLDivElement>(null);
   const hex = useRef<HTMLInputElement>(null);
+  const hexEntry = useHexEntry(hex, onReturnFocus);
   const rowsFocus = useRowsFocus(view.strokeRows, section);
   const markersFocus = useRowsFocus(view.markersShown, section);
   return (
@@ -55,7 +57,7 @@ export function StrokeSection({ panel, onReturnFocus }: StrokeSectionProps) {
             picking={view.pickTarget === "stroke"}
             onPick={() => panel.beginPick("stroke")}
             onSubmitHex={(text) => panel.setText("stroke-color", text)}
-            onReturnFocus={onReturnFocus}
+            onReturnFocus={hexEntry.returnFocus}
             hexRef={hex}
           />
           <ColourPicker
@@ -68,7 +70,7 @@ export function StrokeSection({ panel, onReturnFocus }: StrokeSectionProps) {
               panel.previewHsv("stroke-color", hue, saturation, value)
             }
             onSettle={panel.settleHsv}
-            onOpenEntry={() => hex.current?.focus()}
+            onOpenEntry={hexEntry.open}
           />
           <ValueField
             label="Opacity"

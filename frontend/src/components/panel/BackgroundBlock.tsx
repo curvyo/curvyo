@@ -1,3 +1,4 @@
+import { useHexEntry } from "@/hooks/useHexEntry";
 import { useId, useRef } from "react";
 
 import { ColourBlock } from "@/components/panel/ColourBlock";
@@ -39,6 +40,7 @@ export function BackgroundBlock({ background, onReturnFocus }: BackgroundBlockPr
   const solid = view.paint === "solid";
   const rowsFocus = useRowsFocus(solid, section);
   const hex = useRef<HTMLInputElement>(null);
+  const hexEntry = useHexEntry(hex, onReturnFocus);
   return (
     <div ref={section} className="flex flex-col gap-2">
       <div className="flex h-7 items-center justify-between">
@@ -66,7 +68,7 @@ export function BackgroundBlock({ background, onReturnFocus }: BackgroundBlockPr
             picking={view.picking}
             onPick={background.beginPick}
             onSubmitHex={background.setHex}
-            onReturnFocus={onReturnFocus}
+            onReturnFocus={hexEntry.returnFocus}
             hexRef={hex}
           />
           <ColourPicker
@@ -77,7 +79,7 @@ export function BackgroundBlock({ background, onReturnFocus }: BackgroundBlockPr
             rgbOf={background.rgbOf}
             onPreview={background.previewHsv}
             onSettle={background.settleHsv}
-            onOpenEntry={() => hex.current?.focus()}
+            onOpenEntry={hexEntry.open}
           />
           <ValueField
             label="Opacity"

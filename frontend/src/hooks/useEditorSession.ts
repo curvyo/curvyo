@@ -1026,7 +1026,14 @@ export function useEditorSession(
     // picked up on the very next frame, with no need to restart the
     // loop itself.
     let frame = requestAnimationFrame(function renderLoop() {
-      sessionRef.current?.render();
+      const session = sessionRef.current;
+      session?.render();
+      // An open typed entry follows every pan, zoom and resize, whatever moved the view: the
+      // chip stays where its placement rule puts it (`0047` UX review N1). A re-read that
+      // changed nothing sets no state.
+      if (session && entryOpenRef.current) {
+        syncEntry(session);
+      }
       frame = requestAnimationFrame(renderLoop);
     });
 

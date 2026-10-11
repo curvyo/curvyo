@@ -1,3 +1,4 @@
+import { useHexEntry } from "@/hooks/useHexEntry";
 import { useRef } from "react";
 
 import { ColourBlock } from "@/components/panel/ColourBlock";
@@ -25,6 +26,7 @@ export function FillSection({ panel, onReturnFocus }: FillSectionProps) {
   const { view } = panel;
   const section = useRef<HTMLDivElement>(null);
   const hex = useRef<HTMLInputElement>(null);
+  const hexEntry = useHexEntry(hex, onReturnFocus);
   const rowsFocus = useRowsFocus(view.fillRows, section);
   return (
     <div ref={section} className="flex flex-col gap-2">
@@ -47,7 +49,7 @@ export function FillSection({ panel, onReturnFocus }: FillSectionProps) {
             picking={view.pickTarget === "fill"}
             onPick={() => panel.beginPick("fill")}
             onSubmitHex={(text) => panel.setText("fill-color", text)}
-            onReturnFocus={onReturnFocus}
+            onReturnFocus={hexEntry.returnFocus}
             hexRef={hex}
           />
           <ColourPicker
@@ -60,7 +62,7 @@ export function FillSection({ panel, onReturnFocus }: FillSectionProps) {
               panel.previewHsv("fill-color", hue, saturation, value)
             }
             onSettle={panel.settleHsv}
-            onOpenEntry={() => hex.current?.focus()}
+            onOpenEntry={hexEntry.open}
           />
           <ValueField
             label="Opacity"

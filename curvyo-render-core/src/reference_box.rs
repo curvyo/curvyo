@@ -1,6 +1,6 @@
 //! The true bounding box of a move and the marks of its nine reference points
 //! (`specs/0047-transform-polish/` Part C, criteria 33 to 36 and 39; `docs/design-system.md`,
-//! rows "Reference box" and "Reference mark"): a pale red 1 px line over a white casing,
+//! rows "Reference box" and "Reference mark"): a pale red 4 px line over a white casing,
 //! pixel-aligned like the selection box, clipped to the viewport; and, in the typed move's
 //! Absolute mode, a hollow square at each corner and edge midpoint and a cross at the centre,
 //! the chosen one filled. Which marks there are, and which is current or hovered, is the
@@ -9,7 +9,7 @@
 use curvyo_document_core::{Point, ViewTransform};
 
 use crate::glyphs::{DrawList, thick_line};
-use crate::select_box::{ScreenBox, effective_ratio};
+use crate::select_box::{ScreenBox, effective_ratio, snap_to_device};
 use crate::theme;
 
 /// One mark to draw.
@@ -80,31 +80,51 @@ pub(crate) fn build_box(view: ViewTransform, input: &ReferenceBoxInput) -> DrawL
         (true, false) => vec![3],
         (false, false) => vec![0, 1, 2, 3],
     };
-    let half = screen.width_px / 2.0;
+    // The line is `REFERENCE_BOX_LINE_PX` device pixels wide, so that it shows on both sides of
+    // the blue outline that coincides with it (the move preview, the selection box); the casing
+    // adds one device pixel on each side.
+    let device_line = (theme::REFERENCE_BOX_LINE_PX * ratio).round().max(2.0);
+    let line = device_line / ratio;
+    // An axis-aligned box is snapped again for this line: its centre on a pixel boundary for an
+    // even width in device pixels, in a pixel's middle for an odd one, so both edges are crisp.
+    let axis_aligned = (0..4).all(|i| {
+        let (a, b) = (screen.corners[i], screen.corners[(i + 1) % 4]);
+        (b.0 - a.0).abs() <= 1e-6 || (b.1 - a.1).abs() <= 1e-6
+    });
+    let corners_px = screen.corners.map(|(x, y)| {
+        if axis_aligned {
+            (
+                snap_to_device(x, ratio, device_line),
+                snap_to_device(y, ratio, device_line),
+            )
+        } else {
+            (x, y)
+        }
+    });
+    let screen = ScreenBox {
+        corners: corners_px,
+        width_px: screen.width_px,
+    };
     let mut list = DrawList::default();
-    for (color, factor) in [
-        (theme::REFERENCE_BOX_CASING, theme::CASING_WIDTH_FACTOR),
-        (theme::REFERENCE_BOX, 1.0),
+    for (color, width) in [
+        (theme::REFERENCE_BOX_CASING, line + 2.0 / ratio),
+        (theme::REFERENCE_BOX, line),
     ] {
+        // Reaches half a line past each corner, so two edges cover the corner pixel.
+        let half = width / 2.0;
         for &i in &edges {
             let (from, to) = (screen.corners[i], screen.corners[(i + 1) % 4]);
             let length = (to.0 - from.0).hypot(to.1 - from.1);
             if length <= f64::EPSILON {
                 continue;
             }
-            // Reaches half a line past each corner, so two edges cover the corner pixel.
             let (ux, uy) = ((to.0 - from.0) / length, (to.1 - from.1) / length);
             let (a, b) = (
                 (from.0 - ux * half, from.1 - uy * half),
                 (to.0 + ux * half, to.1 + uy * half),
             );
-            if let Some((a, b)) = clip(a, b, input.canvas_px, screen.width_px * factor) {
-                list.extend(thick_line(
-                    at(a),
-                    at(b),
-                    screen.width_px * factor / view.scale(),
-                    color,
-                ));
+            if let Some((a, b)) = clip(a, b, input.canvas_px, width) {
+                list.extend(thick_line(at(a), at(b), width / view.scale(), color));
             }
         }
     }
@@ -173,11 +193,23 @@ fn mark(view: ViewTransform, mark: &ReferenceMark) -> DrawList {
 /// The marks, above the artwork, the box and the handles.
 #[must_use]
 pub(crate) fn build_marks(view: ViewTransform, input: &ReferenceBoxInput) -> DrawList {
+    let ratio = effective_ratio(input.device_pixel_ratio);
+    // The glyphs are an even number of pixels across, so a centre on a whole device pixel keeps
+    // their 1 px outline crisp (an edge midpoint of an odd-width box would be on a half pixel).
+    // The hit target keeps the exact point.
+    let snapped = |at: Point| {
+        let (x, y) = view.document_to_screen(at);
+        view.screen_to_document((x * ratio).round() / ratio, (y * ratio).round() / ratio)
+    };
     let mut list = DrawList::default();
     // The chosen mark last, so its fill is never covered by a neighbour's casing.
     for current in [false, true] {
         for item in input.marks.iter().filter(|m| m.current == current) {
-            list.extend(mark(view, item));
+            let item = ReferenceMark {
+                at: snapped(item.at),
+                ..*item
+            };
+            list.extend(mark(view, &item));
         }
     }
     list
@@ -259,7 +291,7 @@ mod tests {
             ),
         );
         let (x0, _, x1, _) = bounds_of(&list);
-        assert!(x0 >= -4.0 && x1 <= 804.0, "{x0} {x1}");
+        assert!(x0 >= -6.0 && x1 <= 806.0, "{x0} {x1}");
     }
 
     /// A box with no height is one line, drawn once.
@@ -312,5 +344,50 @@ mod tests {
         assert!(((x1 - x0) - 14.0).abs() < 1e-3, "2 px larger");
         let (x0, y0, x1, y1) = bounds_of(&one(true, true, false));
         assert!(((x1 - x0) - 14.0).abs() < 1e-3 && ((y1 - y0) - 14.0).abs() < 1e-3);
+    }
+
+    /// The line is 4 device pixels wide and the casing 6.
+    #[test]
+    fn the_line_is_four_pixels_wide() {
+        let list = build_box(
+            view(),
+            &input((Point::new(100.0, 100.0), Point::new(300.0, 250.0)), vec![]),
+        );
+        let xs: Vec<f64> = list
+            .triangles
+            .iter()
+            .filter(|v| v.color == theme::REFERENCE_BOX)
+            .map(|v| v.position.x)
+            .collect();
+        let x0 = xs.iter().copied().fold(f64::INFINITY, f64::min);
+        let x1 = xs.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+        // The left and right lines reach 2 px out on each side of the box (100.5 and 300.5
+        // after pixel snapping, so within half a pixel of 98 and 302).
+        assert!(
+            (x0 - 98.0).abs() <= 1.0 && (x1 - 302.0).abs() <= 1.0,
+            "{x0} {x1}"
+        );
+    }
+
+    /// A mark's centre is on a whole pixel, so its outline stays crisp on an odd-width box.
+    #[test]
+    fn a_mark_is_snapped_to_a_whole_pixel() {
+        let list = build_marks(
+            view(),
+            &input(
+                (Point::new(0.0, 0.0), Point::new(125.0, 100.0)),
+                vec![ReferenceMark {
+                    at: Point::new(62.5, 0.0),
+                    cross: false,
+                    current: false,
+                    hovered: false,
+                }],
+            ),
+        );
+        let (x0, _, x1, _) = bounds_of(&list);
+        assert!(
+            (x0.fract()).abs() < 1e-6 && (x1.fract()).abs() < 1e-6,
+            "{x0} {x1}"
+        );
     }
 }

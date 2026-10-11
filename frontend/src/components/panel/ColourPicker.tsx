@@ -42,9 +42,10 @@ interface ColourPickerProps {
   onPreview: (hue: number, saturation: number, value: number) => void;
   /** The end of a click: commits what `onPreview` showed, once. */
   onSettle: () => void;
-  /** A double-click: the keyboard goes to the hex field of the same colour block
-   * (`specs/0047-transform-polish/` criterion 23), the picker's one value entry. */
-  onOpenEntry: () => void;
+  /** A double-click, or Enter or F2 on a slider: the keyboard goes to the hex field of the
+   * same colour block (`specs/0047-transform-polish/` criteria 23 and 25), the picker's one
+   * value entry. `origin` is the slider a key was pressed on, `null` for a double-click. */
+  onOpenEntry: (origin: HTMLElement | null) => void;
 }
 
 /** The tooltip of both sliders: both gestures, since nothing on a slider shows the second
@@ -215,7 +216,7 @@ export function ColourPicker({
     },
     onDrag: (at) => apply(areaAt(at)),
     onDragEnd: () => undefined,
-    onDoubleClick: onOpenEntry,
+    onDoubleClick: () => onOpenEntry(null),
   });
   const huePointer = useSliderPointer({
     thumb: () =>
@@ -231,14 +232,14 @@ export function ColourPicker({
     },
     onDrag: (at) => apply(hueAt(at)),
     onDragEnd: () => undefined,
-    onDoubleClick: onOpenEntry,
+    onDoubleClick: () => onOpenEntry(null),
   });
 
   /** Enter or F2 opens the entry as a double-click does (criterion 25). */
   const opensEntry = (event: KeyboardEvent) => {
     if (event.key === "Enter" || event.key === "F2") {
       event.preventDefault();
-      onOpenEntry();
+      onOpenEntry(event.currentTarget as HTMLElement);
       return true;
     }
     return false;

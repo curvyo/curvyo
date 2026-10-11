@@ -1400,7 +1400,7 @@ fn ac35_the_box_is_exact() {
 
 /// Criterion 36: layer order. The pale box is below the blue selection decoration and below the
 /// marks; the marks are the topmost thing of the selection frame (above the handles); the box has
-/// a white casing; the box line is 1 px.
+/// a white casing; the box line is 4 px (changed from 1 px after the UX review).
 #[test]
 fn ac36_layer_order_and_line_width() {
     let (ox, oy) = (100.0, 100.0);
@@ -1433,7 +1433,7 @@ fn ac36_layer_order_and_line_width() {
         markv.iter().all(|(i, _)| *i > last_blue),
         "the marks are drawn above the blue handles"
     );
-    // The line is one screen pixel wide: its thinnest extent among the box vertices, in px.
+    // The line is four screen pixels wide: its extent among the box vertices, in px.
     let k = s.view().scale();
     let xs: std::collections::BTreeSet<i64> = boxv
         .iter()
@@ -1450,7 +1450,7 @@ fn ac36_layer_order_and_line_width() {
     let spread = near_left.last().unwrap() - near_left.first().unwrap();
     assert!(
         spread * k <= 4.0 + 1e-6,
-        "the left edge (line plus casing) spans {} px, a 1 px line has a casing of at most 3 px",
+        "the left edge (the 4 px line) spans {} px",
         spread * k
     );
     // The line proper (opaque? no, pale): there is a white casing under it.
@@ -1915,8 +1915,9 @@ fn ac49_switching_modes_keeps_things_apart() {
     assert_pt(rect_origin(&objects(&s)[0]), 15.0, 25.0, 1e-9, "relative");
 }
 
-/// Criterion 36: the 1 px line is pixel-aligned at other device pixel ratios as well: the edges
-/// of the red line lie on whole device pixels, and the line is one CSS pixel wide.
+/// Criterion 36: the 4 px line is pixel-aligned at other device pixel ratios as well: the edges
+/// of the red line lie on whole device pixels, and the line is four CSS pixels wide (changed
+/// from 1 px after the UX review of 2026-10-11).
 #[test]
 fn ac36_the_line_is_aligned_at_every_device_pixel_ratio() {
     for dpr in [1.0, 1.25, 1.5, 2.0, 3.0] {
@@ -1940,7 +1941,7 @@ fn ac36_the_line_is_aligned_at_every_device_pixel_ratio() {
                 "dpr {dpr}: a line edge at css x {x} is device pixel {device}"
             );
         }
-        // The vertical line: its two edges (left and right of the line) are one css pixel apart.
+        // The vertical line: its two edges (left and right of the line) are four css pixels apart.
         let left: Vec<f64> = xs
             .iter()
             .copied()
@@ -1950,9 +1951,8 @@ fn ac36_the_line_is_aligned_at_every_device_pixel_ratio() {
         let device_width = width * dpr;
         assert!(
             (device_width - device_width.round()).abs() < 1e-3
-                && device_width.round() >= dpr.floor()
-                && device_width.round() <= dpr.ceil(),
-            "dpr {dpr}: the line is {device_width} device px wide (a whole number of device pixels, 1 css px rounded)"
+                && device_width.round() == (4.0 * dpr).round(),
+            "dpr {dpr}: the line is {device_width} device px wide (a whole number of device pixels, 4 css px rounded)"
         );
     }
 }
