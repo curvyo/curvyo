@@ -7,7 +7,9 @@ import {
   type HistoryDirection,
   historyKeyDirection,
   isMac,
+  isObjectDirection,
   menuNames,
+  menuPressPlan,
   noticeDurationMs,
   noticeText,
   WORKING_NOTICE_DELAY_MS,
@@ -94,11 +96,14 @@ function isTextEntry(target: EventTarget | null): boolean {
  * skipped) is the session's; this hook forwards keys and shows what comes back.
  *
  * `onChange` runs after a press changed the document, to re-read the session's state.
+ * `onApplied` runs when an undo or redo is started, to end feedback that belongs to the step it
+ * takes back (the nudge readout).
  */
 export function useHistory(
   getSession: () => WasmSession | null,
   onChange: () => void,
   containerRef: React.RefObject<HTMLDivElement | null>,
+  onApplied?: () => void,
 ): HistoryApi {
   const [notice, setNotice] = useState<CanvasNotice | null>(null);
   const [busy, setBusy] = useState(false);
@@ -106,9 +111,11 @@ export function useHistory(
   const counter = useRef(0);
   const lastPress = useRef<{ direction: HistoryDirection; at: number } | null>(null);
   const onChangeRef = useRef(onChange);
+  const onAppliedRef = useRef(onApplied);
   useEffect(() => {
     onChangeRef.current = onChange;
-  }, [onChange]);
+    onAppliedRef.current = onApplied;
+  }, [onChange, onApplied]);
   useBusyWindow(busy);
 
   const showNotice = useCallback(
@@ -146,8 +153,9 @@ export function useHistory(
       const key = JSON.stringify({ ...next, objectStep });
       if (key !== sentToMenu.current) {
         sentToMenu.current = key;
-        void invoke("set_history_menu", { ...next, objectStep }).catch(() => {
-          /* The native menu falls behind; the keys and buttons still work. */
+        void invoke("set_history_menu", { ...next, objectStep }).catch((error: unknown) => {
+          // The native menu falls behind; the keys and buttons still work.
+          console.error("set_history_menu failed", error);
         });
       }
     }
@@ -197,6 +205,7 @@ export function useHistory(
       if (!session || busy) {
         return;
       }
+      onAppliedRef.current?.();
       if (session.history_needs_busy_state(direction) && session.history_target_name(direction)) {
         void runBusy(direction, source);
         return;
@@ -218,6 +227,7 @@ export function useHistory(
         case "object-undo":
         case "object-redo": {
           markPressed(outcome);
+          onAppliedRef.current?.();
           const text = noticeText(getSession()?.take_history_notice() ?? "");
           if (text !== null) {
             showNotice(text);
@@ -230,6 +240,7 @@ export function useHistory(
         case "object-redo-busy": {
           const direction = outcome.replace(/-busy$/, "") as HistoryDirection;
           markPressed(direction);
+          onAppliedRef.current?.();
           void runBusy(direction);
           return true;
         }
@@ -288,30 +299,42 @@ export function useHistory(
     return () => window.removeEventListener("keydown", onKey);
   }, [busy, containerRef, getSession, handleKeyOutcome, pressedJustNow]);
 
-  // The native Edit menu: its accelerator and the key event can both arrive for one press; the
-  // first one wins (criterion 8).
+  // The native Edit menu. A click arrives as `history-menu`; so does the macOS accelerator, which
+  // can also reach the page as a key event, and the first one wins (criterion 8). The listener is
+  // registered once and reads `press` through a ref, so a busy undo never leaves a gap.
+  const menuPressRef = useRef<(direction: HistoryDirection) => void>(() => {});
+  useEffect(() => {
+    menuPressRef.current = (direction) => {
+      const textEntry = isTextEntry(document.activeElement);
+      const plan = menuPressPlan({ duplicate: pressedJustNow(direction), textEntry });
+      if (plan === "text-undo") {
+        // A text field keeps its own undo; the object steps are not its business.
+        if (!isObjectDirection(direction)) {
+          document.execCommand(direction);
+        }
+      } else if (plan === "document") {
+        markPressed(direction);
+        press(direction);
+      }
+    };
+  }, [markPressed, press, pressedJustNow]);
   useEffect(() => {
     if (!isTauri) {
       return undefined;
     }
     const unlisten = listen<string>("history-menu", (event) => {
-      const direction: HistoryDirection =
-        event.payload === "redo" ||
-        event.payload === "object-undo" ||
-        event.payload === "object-redo"
-          ? event.payload
-          : "undo";
-      // A text field keeps its own undo; the native accelerator can fire while one has focus.
-      if (pressedJustNow(direction) || isTextEntry(document.activeElement)) {
-        return;
-      }
-      markPressed(direction);
-      press(direction);
+      const payload = event.payload;
+      menuPressRef.current(
+        payload === "redo" || payload === "object-undo" || payload === "object-redo"
+          ? payload
+          : "undo",
+      );
     });
+    void unlisten.catch((error: unknown) => console.error("history-menu listen failed", error));
     return () => {
-      void unlisten.then((stop) => stop());
+      void unlisten.then((stop) => stop()).catch(() => undefined);
     };
-  }, [markPressed, press, pressedJustNow]);
+  }, []);
 
   const wipe = useCallback(() => {
     const removed = getSession()?.history_wipe() ?? -1;
