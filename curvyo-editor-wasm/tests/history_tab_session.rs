@@ -68,14 +68,15 @@ fn a_deleted_object_stays_in_its_row_and_shows_no_hover() {
 }
 
 #[test]
-fn the_history_tab_is_the_third_tab_and_the_shortcut_selects_it() {
+fn the_history_tab_exists_and_the_shortcut_selects_it() {
     let mut session = fresh();
     session.panel_shortcut_history();
     let view = session.panel_view();
     let active = view.tabs.iter().find(|t| t.selected).unwrap();
     assert_eq!(active.name, "history");
-    assert_eq!(view.tabs.len(), 3);
-    assert_eq!(view.tabs[2].tooltip, "History (Shift+Ctrl+H)");
+    let history = view.tabs.iter().find(|t| t.name == "history").unwrap();
+    assert_eq!(history.tooltip, "History (Shift+Ctrl+H)");
+    assert_eq!(view.tabs.last().map(|t| t.name), Some("history"));
 }
 
 #[test]

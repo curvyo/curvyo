@@ -11,6 +11,9 @@ members = [
 ]
 
 [workspace.package]
+# The application version: the File tab shows it and every saved file records it
+# (`specs/0051-sidebar-and-no-menu`, criterion 42). `curvyo-app` and `curvyo-editor-wasm` take it.
+version = "0.1.0"
 edition = "2024"
 rust-version = "1.90"
 license = "AGPL-3.0-or-later"

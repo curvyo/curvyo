@@ -1,7 +1,7 @@
 //! `Session`'s glue for the Properties panel's tabs
 //! (`specs/0043-properties-tabs/`, `adrs.md` decision 4): the active tab as
-//! session view state, updated whenever the panel view is read, and the three
-//! ways a tab is chosen (a press, Shift+Ctrl+F, Shift+Ctrl+D). The rules are
+//! session view state, updated whenever the panel view is read, and the
+//! ways a tab is chosen (a press, Shift+Ctrl+F, Shift+Ctrl+D, Shift+Ctrl+H). The rules are
 //! `curvyo_ui_core::panel_tabs`'s and `panel_content`'s.
 
 use curvyo_ui_core::{
@@ -115,7 +115,7 @@ impl Session {
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PanelTabsRecord {
-    /// `"document"`, `"style"`, `"history"` or `"empty"`.
+    /// `"file"`, `"document"`, `"style"`, `"history"` or `"empty"`.
     #[cfg_attr(target_arch = "wasm32", wasm_bindgen(getter_with_clone))]
     pub content: String,
     /// The active tab's name.
@@ -140,6 +140,7 @@ impl PanelTabsRecord {
     #[must_use]
     pub fn new(view: &PanelView) -> Self {
         let content = match view.content {
+            PanelContent::File => "file",
             PanelContent::Document => "document",
             PanelContent::Style => "style",
             PanelContent::History => "history",
@@ -177,6 +178,12 @@ mod tests {
 
     fn active(session: &mut Session) -> String {
         PanelTabsRecord::new(&session.panel_view()).active
+    }
+
+    /// The index of the tab called `name` in the record; tests find a tab by its name, never by
+    /// its position (`0051` criterion 45).
+    fn at(record: &PanelTabsRecord, name: &str) -> usize {
+        record.tab_names.iter().position(|n| n == name).unwrap()
     }
 
     /// Criteria 5 and 6: a new session shows Document; a selection brings
@@ -218,9 +225,17 @@ mod tests {
         assert!(!session.press_panel_tab("style"));
         assert!(!session.press_panel_tab("unknown"));
         let record = PanelTabsRecord::new(&session.panel_view());
-        assert_eq!(record.tab_names, ["document", "style", "history"]);
-        assert_eq!(record.tab_enabled, [1, 0, 1]);
-        assert_eq!(record.tab_tooltips[1], "Style: select an object first");
+        assert_eq!(record.tab_names, ["file", "document", "style", "history"]);
+        assert_eq!(record.tab_enabled[at(&record, "style")], 0);
+        assert!(
+            ["file", "document", "history"]
+                .iter()
+                .all(|name| record.tab_enabled[at(&record, name)] == 1)
+        );
+        assert_eq!(
+            record.tab_tooltips[at(&record, "style")],
+            "Style: select an object first"
+        );
         assert_eq!(record.active, "document");
     }
 
@@ -232,7 +247,14 @@ mod tests {
         let id = rect(&session, 0.0);
         session.selection.select_single(id);
         session.set_tool(Tool::Node);
-        let tip = |s: &Session| s.panel_view().tabs[1].tooltip;
+        let tip = |s: &Session| {
+            let view = s.panel_view();
+            view.tabs
+                .iter()
+                .find(|t| t.name == "style")
+                .unwrap()
+                .tooltip
+        };
         assert_eq!(tip(&session), "Style: the Node tool styles paths only");
         session.set_tool(Tool::Pen);
         assert_eq!(tip(&session), "Style: the Pen tool has nothing to style");
@@ -269,7 +291,8 @@ mod tests {
         }
         let view = session.panel_view();
         assert_eq!(view.content, PanelContent::Empty);
-        assert_eq!(view.tabs.len(), 3);
+        assert!(view.tabs.iter().any(|tab| tab.name == "document"));
+        assert!(view.tabs.iter().any(|tab| tab.name == "history"));
         assert!(session.press_panel_tab("document"));
         assert_eq!(session.panel_content(), PanelContent::Empty);
         session.finish_pen();
@@ -303,6 +326,25 @@ mod tests {
         );
         assert_eq!(session.selection.ids(), [id]);
         assert_eq!(session.panel_content(), PanelContent::Document);
+    }
+
+    /// `0051` criterion 14: the File tab is sticky. A selection change neither makes another tab
+    /// active nor leaves File; a fresh session (New, Open) starts at Document.
+    #[test]
+    fn the_file_tab_stays_through_selection_changes_and_a_new_session_leaves_it() {
+        let mut session = Session::new(1);
+        let id = rect(&session, 0.0);
+        assert!(session.press_panel_tab("file"));
+        assert_eq!(session.panel_content(), PanelContent::File);
+        session.selection.select_single(id);
+        assert_eq!(active(&mut session), "file");
+        session.selection.clear();
+        assert_eq!(active(&mut session), "file");
+        // The tab is pressable with an empty scope and has no tooltip but its name.
+        let record = PanelTabsRecord::new(&session.panel_view());
+        assert_eq!(record.tab_tooltips[at(&record, "file")], "File");
+        let mut fresh = Session::new(2);
+        assert_eq!(active(&mut fresh), "document");
     }
 
     /// Criterion 11: a new session starts over.

@@ -33,6 +33,7 @@ mod corner_readout;
 mod document;
 mod document_presets;
 mod draw;
+mod file_chord;
 mod formats;
 mod frame;
 mod group_view;
@@ -54,6 +55,7 @@ mod object_history_rows;
 mod open_error;
 mod panel_tabs;
 mod pen;
+mod project;
 mod reference_view;
 mod refusal;
 mod ruler;
@@ -69,7 +71,9 @@ mod style_view;
 mod tolerances;
 mod transform_entry;
 
-use curvyo_document_core::{Document, NodeId, ObjectSnapshot, OpenError, Point, SaveError};
+use curvyo_document_core::{
+    Document, DocumentVersion, NodeId, ObjectSnapshot, OpenError, Point, SaveError,
+};
 use curvyo_ui_core::{
     AnchorIdMinter, EllipseTool, Hit, Modifiers, NodeTool, ObjectSelection, PenTool,
     PolygonStarTool, RectangleTool, SelectTool, StyleEditor, Viewport,
@@ -90,6 +94,7 @@ pub use keys::{EscapeStep, KeyHint, KeyInput, KeyOutcome};
 pub use move_indicators::MoveIndicators;
 pub use object_history::ObjectWipeOutcome;
 pub use panel_tabs::{PanelTabsRecord, PanelView};
+pub use project::APP_VERSION;
 pub use select::DoubleClickHint;
 #[cfg(target_arch = "wasm32")]
 pub use style_view::StylePanelView;
@@ -152,6 +157,10 @@ pub enum Tool {
 /// One open document's whole editing session.
 pub struct Session {
     document: Document,
+    /// The version of the document that the last Save, Save as, Open or New left (`project.rs`).
+    saved: DocumentVersion,
+    /// The version that went into the bytes of a save whose write has not been reported yet.
+    packed: Option<DocumentVersion>,
     minter: AnchorIdMinter,
     pen: PenTool,
     node: NodeTool,
@@ -249,8 +258,11 @@ impl Session {
     /// A brand-new, empty document (File → New), bound to `peer`.
     #[must_use]
     pub fn new(peer: u64) -> Self {
+        let document = Document::new(peer);
         Self {
-            document: Document::new(peer),
+            saved: document.version(),
+            packed: None,
+            document,
             minter: AnchorIdMinter::new(peer),
             pen: PenTool::new(),
             node: NodeTool::new(),
@@ -304,6 +316,8 @@ impl Session {
     pub fn open(peer: u64, bytes: &[u8]) -> Result<Self, OpenError> {
         let document = curvyo_document_core::unpack(peer, bytes)?;
         Ok(Self {
+            saved: document.version(),
+            packed: None,
             document,
             minter: AnchorIdMinter::new(peer),
             pen: PenTool::new(),

@@ -89,6 +89,12 @@ fn session_with_two() -> Session {
     s
 }
 
+/// The tab called `name`; no test addresses a tab by its position, since `0051` puts the File tab
+/// first (criterion 45).
+fn tab<'a>(v: &'a PanelView, name: &str) -> &'a curvyo_ui_core::PanelTabEntry {
+    v.tabs.iter().find(|t| t.name == name).unwrap()
+}
+
 fn active(v: &PanelView) -> &'static str {
     v.tabs.iter().find(|t| t.selected).unwrap().name
 }
@@ -98,18 +104,18 @@ fn doc_of(s: &Session) -> Document {
 }
 
 fn assert_consistent(v: &PanelView, ctx: &str) {
-    assert_eq!(v.tabs.len(), 3, "{ctx}");
+    assert_eq!(v.tabs.len(), 4, "{ctx}");
     assert_eq!(v.tabs.iter().filter(|t| t.selected).count(), 1, "{ctx}");
     assert_eq!(
         v.tabs.iter().map(|t| t.name).collect::<Vec<_>>(),
-        ["document", "style", "history"],
+        ["file", "document", "style", "history"],
         "{ctx}"
     );
-    let style = &v.tabs[1];
+    let style = tab(v, "style");
     if style.selected {
         assert!(style.enabled, "{ctx}: Style active but dimmed");
     }
-    assert!(v.tabs[0].enabled, "{ctx}");
+    assert!(tab(v, "document").enabled, "{ctx}");
     if v.content == PanelContent::Style {
         assert_eq!(active(v), "style", "{ctx}");
     }
@@ -126,8 +132,8 @@ fn c5_a_new_session_shows_document_with_style_dimmed() {
     let v = s.panel_view();
     assert_eq!(active(&v), "document");
     assert_eq!(v.content, PanelContent::Document);
-    assert!(!v.tabs[1].enabled);
-    assert_eq!(v.tabs[1].tooltip, "Style: select an object first");
+    assert!(!tab(&v, "style").enabled);
+    assert_eq!(tab(&v, "style").tooltip, "Style: select an object first");
     assert_eq!(s.panel_content(), PanelContent::Document);
 }
 
@@ -170,15 +176,15 @@ fn c6_c25_selecting_switches_document_to_style_and_clearing_switches_back() {
     let v = s.panel_view();
     assert_eq!(active(&v), "style");
     assert_eq!(v.content, PanelContent::Style);
-    assert!(v.tabs[1].enabled);
-    assert_eq!(v.tabs[1].tooltip, "Style (Shift+Ctrl+F)");
+    assert!(tab(&v, "style").enabled);
+    assert_eq!(tab(&v, "style").tooltip, "Style (Shift+Ctrl+F)");
     s.escape();
     let v = s.panel_view();
     assert_eq!(
         (active(&v), v.content),
         ("document", PanelContent::Document)
     );
-    assert!(!v.tabs[1].enabled);
+    assert!(!tab(&v, "style").enabled);
 }
 
 #[test]
@@ -267,7 +273,7 @@ fn c4_pressing_the_dimmed_style_tab_changes_nothing_and_reports_false() {
         (active(&v), v.content),
         ("document", PanelContent::Document)
     );
-    assert!(!v.tabs[1].enabled);
+    assert!(!tab(&v, "style").enabled);
     assert!(!s.press_panel_tab("style"), "still nothing");
 }
 
@@ -384,7 +390,7 @@ fn c10_switching_to_the_pen_with_a_selection_is_an_edge_to_empty() {
         ("document", PanelContent::Document),
         "Style hands over to Document when the scope empties"
     );
-    assert!(!v.tabs[1].enabled);
+    assert!(!tab(&v, "style").enabled);
     // Back to Select: the selection is still there, so empty -> non-empty.
     s.set_tool(Tool::Select);
     let v = s.panel_view();
@@ -401,7 +407,7 @@ fn c10_an_unfinished_pen_path_empties_the_body_and_keeps_the_strip() {
     assert!(s.pen_in_progress().is_some(), "an unfinished path");
     let v = s.panel_view();
     assert_eq!(v.content, PanelContent::Empty);
-    assert_eq!(v.tabs.len(), 3, "the strip stays");
+    assert_eq!(v.tabs.len(), 4, "the strip stays");
     assert_eq!(active(&v), "document");
     // A press on a tab sets the active tab.
     assert!(
@@ -480,7 +486,7 @@ fn c23_the_node_tool_with_a_selection_it_cannot_style_shows_document() {
         ("document", PanelContent::Document),
         "a selection the Node tool cannot style shows Document"
     );
-    assert!(!v.tabs[1].enabled);
+    assert!(!tab(&v, "style").enabled);
     assert_eq!(s.selected_object_count(), 1, "the selection itself stays");
     // And the Pen does the same.
     s.set_tool(Tool::Pen);
@@ -577,7 +583,7 @@ fn rapid_random_sequences_keep_the_strip_consistent_and_never_panic() {
             if rng.below(2) == 0 || what >= 9 {
                 let v = s.panel_view();
                 assert_consistent(&v, &format!("seed {seed} step {step} op {what}"));
-                if !v.tabs[1].enabled {
+                if !tab(&v, "style").enabled {
                     assert_ne!(active(&v), "style", "seed {seed} step {step}");
                     assert_ne!(v.content, PanelContent::Style, "seed {seed} step {step}");
                 }

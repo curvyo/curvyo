@@ -1,10 +1,14 @@
 //! Which tab of the Properties panel is active, and when it changes by itself
 //! (`specs/0043-properties-tabs/` criteria 4 to 8 and 14), plus the strip's
-//! entries: names, tooltips and which tab is dimmed.
+//! entries: names, tooltips and which tab is dimmed. The File tab
+//! (`specs/0051-sidebar-and-no-menu/` criteria 2 and 14) is first and never
+//! switched automatically.
 
 /// A tab of the Properties panel.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PanelTab {
+    /// The project: its file, and the file commands (`specs/0051-sidebar-and-no-menu`).
+    File,
     /// The document's own settings.
     Document,
     /// The style of the objects in the active tool's scope.
@@ -18,6 +22,7 @@ impl PanelTab {
     #[must_use]
     pub const fn name(self) -> &'static str {
         match self {
+            Self::File => "file",
             Self::Document => "document",
             Self::Style => "style",
             Self::History => "history",
@@ -32,6 +37,7 @@ impl PanelTab {
 
     fn label(self) -> &'static str {
         match self {
+            Self::File => "File",
             Self::Document => "Document",
             Self::Style => "Style",
             Self::History => "History",
@@ -40,6 +46,7 @@ impl PanelTab {
 
     fn tooltip(self, blocker: Option<StyleBlocker>) -> &'static str {
         match (self, blocker) {
+            (Self::File, _) => "File",
             (Self::Document, _) => "Document (Shift+Ctrl+D)",
             (Self::Style, None) => "Style (Shift+Ctrl+F)",
             (Self::Style, Some(blocker)) => blocker.tooltip(),
@@ -71,8 +78,14 @@ impl StyleBlocker {
     }
 }
 
-/// The strip's tabs, in order (criterion 1).
-const TABS: [PanelTab; 3] = [PanelTab::Document, PanelTab::Style, PanelTab::History];
+/// The strip's tabs, in order (`0051` criterion 2). A tab whose feature has not shipped is not
+/// built; the order never changes.
+const TABS: [PanelTab; 4] = [
+    PanelTab::File,
+    PanelTab::Document,
+    PanelTab::Style,
+    PanelTab::History,
+];
 
 /// The active tab and the one fact the automatic switches need: whether the
 /// style scope held objects when the panel was last read. Switches act on the
@@ -279,15 +292,19 @@ mod tests {
         }
     }
 
-    /// The History tab is never switched automatically and is pressable with an empty scope.
+    /// The History and File tabs are never switched automatically and are pressable with an
+    /// empty scope (`0051` criterion 14: File is sticky like History).
     #[test]
-    fn the_history_tab_stays_through_every_scope_change() {
-        let mut tabs = PanelTabs::new(false);
-        assert!(tabs.press(PanelTab::History, false));
-        for scope in [true, false, true, true, false] {
-            tabs.observe(scope);
-            assert_eq!(tabs.active(), PanelTab::History);
+    fn the_history_and_file_tabs_stay_through_every_scope_change() {
+        for tab in [PanelTab::History, PanelTab::File] {
+            let mut tabs = PanelTabs::new(false);
+            assert!(tabs.press(tab, false));
+            for scope in [true, false, true, true, false] {
+                tabs.observe(scope);
+                assert_eq!(tabs.active(), tab);
+            }
         }
+        let mut tabs = PanelTabs::new(false);
         tabs.shortcut_history();
         assert_eq!(tabs.active(), PanelTab::History);
     }
@@ -302,43 +319,52 @@ mod tests {
         assert!(with_objects.press(Style, true));
     }
 
-    /// Criterion 1 and 4: names, order, tooltips, the dimmed tab.
+    /// The entry called `name`; the tests never address a tab by its position (`0051` criterion 45).
+    fn entry<'a>(entries: &'a [PanelTabEntry], name: &str) -> &'a PanelTabEntry {
+        entries.iter().find(|e| e.name == name).unwrap()
+    }
+
+    /// `0051` criterion 2 and `0043` criterion 4: names, order, tooltips, the dimmed tab.
     #[test]
-    fn the_strip_has_three_tabs_with_tooltips_and_a_dimmed_style() {
+    fn the_strip_has_four_tabs_with_tooltips_and_a_dimmed_style() {
         let empty = tab_entries(Document, false);
         let names: Vec<_> = empty.iter().map(|e| (e.name, e.label)).collect();
         assert_eq!(
             names,
             [
+                ("file", "File"),
                 ("document", "Document"),
                 ("style", "Style"),
                 ("history", "History")
             ]
         );
-        assert_eq!(empty[2].tooltip, "History (Shift+Ctrl+H)");
-        assert_eq!(empty[0].tooltip, "Document (Shift+Ctrl+D)");
-        assert_eq!(empty[1].tooltip, "Style: select an object first");
+        assert_eq!(entry(&empty, "file").tooltip, "File");
+        assert_eq!(entry(&empty, "history").tooltip, "History (Shift+Ctrl+H)");
+        assert_eq!(entry(&empty, "document").tooltip, "Document (Shift+Ctrl+D)");
         assert_eq!(
-            empty
-                .iter()
-                .map(|e| (e.enabled, e.selected))
-                .collect::<Vec<_>>(),
-            [(true, true), (false, false), (true, false)]
+            entry(&empty, "style").tooltip,
+            "Style: select an object first"
+        );
+        let state = |entries: &[PanelTabEntry]| {
+            ["file", "document", "style", "history"]
+                .map(|name| (entry(entries, name).enabled, entry(entries, name).selected))
+        };
+        assert_eq!(
+            state(&empty),
+            [(true, false), (true, true), (false, false), (true, false)]
         );
         let full = tab_entries(Style, true);
-        assert_eq!(full[1].tooltip, "Style (Shift+Ctrl+F)");
+        assert_eq!(entry(&full, "style").tooltip, "Style (Shift+Ctrl+F)");
         assert_eq!(
-            full.iter()
-                .map(|e| (e.enabled, e.selected))
-                .collect::<Vec<_>>(),
-            [(true, false), (true, true), (true, false)]
+            state(&full),
+            [(true, false), (true, false), (true, true), (true, false)]
         );
     }
 
     /// Criterion 4: the tooltip names the reason the tab is dimmed.
     #[test]
     fn the_dimmed_tooltip_names_the_right_reason() {
-        let tip = |blocker| tab_entries_for(Document, Some(blocker))[1].tooltip;
+        let tip = |blocker| entry(&tab_entries_for(Document, Some(blocker)), "style").tooltip;
         assert_eq!(
             tip(StyleBlocker::NothingSelected),
             "Style: select an object first"
@@ -352,7 +378,7 @@ mod tests {
             "Style: the Node tool styles paths only"
         );
         assert_eq!(
-            tab_entries_for(Style, None)[1].tooltip,
+            entry(&tab_entries_for(Style, None), "style").tooltip,
             "Style (Shift+Ctrl+F)"
         );
     }
@@ -362,6 +388,7 @@ mod tests {
         assert_eq!(PanelTab::from_name("style"), Some(Style));
         assert_eq!(PanelTab::from_name("document"), Some(Document));
         assert_eq!(PanelTab::from_name("history"), Some(PanelTab::History));
+        assert_eq!(PanelTab::from_name("file"), Some(PanelTab::File));
         assert_eq!(PanelTab::from_name("unknown"), None);
     }
 }

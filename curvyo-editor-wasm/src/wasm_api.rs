@@ -135,15 +135,36 @@ impl WasmSession {
         Ok(Self { session, gpu: None })
     }
 
-    /// Packs the current document into `.curvyo` container bytes.
+    /// Packs the current document into `.curvyo` container bytes for a save, recording the
+    /// application version (`app_version`) in the file and which state went into the bytes. Call
+    /// `mark_saved` once the host reports the bytes written.
     ///
     /// # Errors
     /// A `JsValue` (a plain string) if the document could not be
     /// serialized.
-    pub fn pack(&self, app_version: &str) -> Result<Vec<u8>, JsValue> {
+    pub fn pack(&mut self) -> Result<Vec<u8>, JsValue> {
         self.session
-            .pack(app_version)
+            .pack_for_save()
             .map_err(|err| JsValue::from_str(&format!("{err}")))
+    }
+
+    /// The bytes of the last `pack` are written: the project is clean unless it changed since.
+    pub fn mark_saved(&mut self) {
+        self.session.mark_saved();
+    }
+
+    /// Whether the document differs from what the last save, open or New left
+    /// (`specs/0051-sidebar-and-no-menu/` criterion 22). Read between events.
+    #[must_use]
+    pub fn is_dirty(&self) -> bool {
+        self.session.is_dirty()
+    }
+
+    /// The application version: the File tab shows it and every saved file records it, in both
+    /// builds (criterion 42).
+    #[must_use]
+    pub fn app_version() -> String {
+        crate::session::APP_VERSION.to_string()
     }
 
     /// Switches the active tool: `"select"`, `"pen"`, `"node"`,
