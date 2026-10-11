@@ -1743,7 +1743,7 @@ export function useEditorSession(
       }
       event.preventDefault();
       if (handleKeyOutcome(outcome)) {
-        setLiveReadout(readReadout(session));
+        setLiveReadout(readLiveReadout(session.live_readout()));
         setCursorHint(session.cursor_hint());
         syncFromSession();
         return;
