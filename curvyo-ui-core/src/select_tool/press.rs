@@ -14,6 +14,7 @@ use crate::modifiers::Modifiers;
 use crate::object_selection::ObjectSelection;
 use crate::oriented_box::oriented_bounds;
 use crate::transform_drag::DragOrigin;
+use crate::units::Units;
 use crate::transform_handle_layout::{EditHandle, TransformHandleTolerances};
 
 /// What a press lands on, in the order [`classify_press`] tries them.
@@ -130,7 +131,7 @@ pub fn classify_press(
 }
 
 /// The move a press on `hit`'s outline or body begins, with the selection
-/// change its modifier asks for. Without Shift a different object becomes the
+/// change its modifier asks for. `hit` stands for its whole group (`units`) wherever it has one. Without Shift a different object becomes the
 /// single selection (criterion 16) and a selected one keeps the group so it
 /// can be dragged together (criterion 18). With Shift the selection does not
 /// change at the press (criterion 29): a release inside the dead zone toggles
@@ -141,6 +142,7 @@ pub(super) fn begin_object_press(
     hit: NodeId,
     shift: bool,
     origin: DragOrigin,
+    units: &Units,
 ) -> MoveDrag {
     let mut drag = MoveDrag::new(origin, false);
     if shift {
@@ -149,7 +151,8 @@ pub(super) fn begin_object_press(
             drag.joins = Some(hit);
         }
     } else if !selection.contains(hit) {
-        selection.select_single(hit);
+        // A group is selected as a whole (`0023` criterion 8).
+        selection.set(units.leaves_with(&hit));
     }
     drag
 }

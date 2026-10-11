@@ -209,7 +209,13 @@ pub fn nudge(
     if continues {
         document.continue_step();
     }
-    let _ = commit_move(document, &ids, event.offset(), false, minter);
+    let _ = commit_move(
+        document,
+        &ids,
+        event.offset(),
+        false,
+        (minter, &crate::units::Units::default()),
+    );
     let after = document.version();
     if after == before {
         return NudgeOutcome::NothingToMove;

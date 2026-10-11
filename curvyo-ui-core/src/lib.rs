@@ -74,6 +74,7 @@ mod transform_handle_layout;
 mod transform_math;
 mod transform_primitive;
 mod undo_stack;
+mod units;
 mod value_scale;
 mod viewport;
 
@@ -123,7 +124,7 @@ pub use history_notice::{
 };
 pub use hit_test::{Hit, hit_test};
 pub use hit_test_object::{hit_test_object, hit_test_objects, hit_test_objects_along};
-pub use marquee::{MarqueeMode, objects_in_marquee};
+pub use marquee::{MarqueeMode, objects_in_marquee, units_in_marquee};
 pub use modifiers::Modifiers;
 pub use move_entry::MoveEntry;
 pub use node_tool::{
@@ -165,7 +166,8 @@ pub use select_bar::{
 pub use select_tool::{
     Axis, EntryKey, GestureKind, GestureShape, KeyEntryRefusal, LiveEdit, LiveGesture,
     MoveEntryMode, MoveResolution, PressTarget, SelectDoubleClickOutcome, SelectPointerDownOutcome,
-    SelectTool, TransformHandleTolerances, classify_press, double_click, entry_anchor,
+    SelectTool, TransformHandleTolerances, classify_press, double_click, double_click_in,
+    entry_anchor,
 };
 pub use selection::NodeSelection;
 pub use shape_tool_common::{CreateOutcome, CreatePreview};
@@ -200,5 +202,6 @@ pub use transform_math::{
     stroke_or_radius_factor,
 };
 pub use undo_stack::{SelectionSnapshot, Target as UndoTarget, UndoStack};
+pub use units::{SelectedUnit, Units};
 pub use value_scale::{FieldShown, Grid, ValueField, ValueScale};
 pub use viewport::{DOCUMENT_INSET_PX, PX_PER_MM_AT_100, Viewport, Zoom};

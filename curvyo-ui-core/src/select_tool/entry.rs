@@ -20,6 +20,7 @@ use crate::param_entry::ParamEntry;
 use crate::skew_entry::SkewEntry;
 use crate::transform_entry::{EntryOutcome, TransformEntry};
 use crate::transform_handle_layout::{EditHandle, Side, TransformHandleTolerances};
+use crate::units::Units;
 
 /// The one open numeric entry: a transform entry (angle, size, outer radius),
 /// a parameter entry (corner radius, inner ratio), a skew entry or a move
@@ -233,7 +234,13 @@ impl SelectTool {
         let Some(OpenEntry::Move(entry)) = self.entry.as_ref() else {
             return EntryOutcome::Unchanged;
         };
-        let (outcome, copies) = entry.commit(document, texts, mode.absolute, mode.copy, minter);
+        let (outcome, copies) = entry.commit(
+            document,
+            texts,
+            mode.absolute,
+            mode.copy,
+            (minter, &self.units),
+        );
         if !matches!(outcome, EntryOutcome::Invalid { .. }) {
             self.entry = None;
         }
@@ -334,7 +341,7 @@ impl SelectTool {
             {
                 return outcome;
             }
-            return double_click(objects, point, tolerance);
+            return double_click_in(objects, &self.units, point, tolerance);
         }
         // Kept (not consumed): a rapid third press is another double-click on
         // the same handle and keeps its entry.
@@ -376,9 +383,9 @@ impl SelectTool {
         if Self::is_inside_selected_box(objects, selection, point)
             && let Some(object) = sole_selected(objects, selection)
         {
-            return hit_outcome(object);
+            return hit_outcome_in(object, &self.units);
         }
-        double_click(objects, point, tolerance)
+        double_click_in(objects, &self.units, point, tolerance)
     }
 }
 
@@ -391,13 +398,39 @@ pub fn double_click(
     point: Point,
     tolerance: Tolerance,
 ) -> SelectDoubleClickOutcome {
+    double_click_in(objects, &Units::default(), point, tolerance)
+}
+
+/// [`double_click`] where an object of a group of `units` opens the group instead
+/// (`specs/0023-groups` criterion 15).
+#[must_use]
+pub fn double_click_in(
+    objects: &[ObjectSnapshot],
+    units: &Units,
+    point: Point,
+    tolerance: Tolerance,
+) -> SelectDoubleClickOutcome {
     let Some(hit) = hit_test_object(objects, point, tolerance) else {
         return SelectDoubleClickOutcome::Miss;
     };
     objects
         .iter()
         .find(|object| object.id() == hit)
-        .map_or(SelectDoubleClickOutcome::Miss, hit_outcome)
+        .map_or(SelectDoubleClickOutcome::Miss, |object| {
+            hit_outcome_in(object, units)
+        })
+}
+
+/// [`hit_outcome`], except that an object inside a group of `units` is the group's: the host
+/// enters it.
+fn hit_outcome_in(object: &ObjectSnapshot, units: &Units) -> SelectDoubleClickOutcome {
+    match units.group_of(object.id()) {
+        Some(group) => SelectDoubleClickOutcome::EnterGroup {
+            group,
+            leaf: object.id(),
+        },
+        None => hit_outcome(object),
+    }
 }
 
 /// A path is handed off to the Node tool; a primitive only earns the edit

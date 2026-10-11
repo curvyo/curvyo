@@ -8,17 +8,20 @@ use super::PressTarget;
 use super::handles::sole_selected;
 use crate::hit_test_object::hit_test_objects;
 use crate::object_selection::ObjectSelection;
+use crate::units::Units;
 
 /// A cycle through the candidates under one point. The candidate list is
 /// captured the first time the cycle advances and kept, so the order stays
 /// stable while the pointer jitters inside the radius (criterion 5); the
-/// list is `hit_test_objects`, whose first element is a plain click's answer.
+/// list is `hit_test_objects`, whose first element is a plain click's answer,
+/// with every leaf standing for the object of the context that holds it: a group is one
+/// candidate (`specs/0023-groups` criterion 10), named by its group's id.
 #[derive(Debug, Clone)]
 pub(super) struct ClickCycle {
     /// Where the cycle started: the plain click, or the first Alt-click.
     at: Point,
-    /// The candidate the selection stands on now, `None` before the first
-    /// step of a cycle that no plain click began.
+    /// The candidate (an object of the context) the selection stands on now, `None` before the
+    /// first step of a cycle that no plain click began.
     current: Option<NodeId>,
     /// The candidates under `at`, empty until the first step.
     candidates: Vec<NodeId>,
@@ -34,14 +37,15 @@ impl ClickCycle {
         objects: &[ObjectSnapshot],
         selection: &ObjectSelection,
         shift: bool,
+        units: &Units,
     ) -> Option<Self> {
         if shift {
             return None;
         }
         match target {
-            PressTarget::Object(hit) => Some(Self::after_click(point, hit)),
+            PressTarget::Object(hit) => Some(Self::after_click(point, units.unit_of(hit))),
             PressTarget::InsideSelectedBox => sole_selected(objects, selection)
-                .map(|selected| Self::after_click(point, selected.id())),
+                .map(|selected| Self::after_click(point, units.unit_of(selected.id()))),
             PressTarget::Handle(_)
             | PressTarget::CentreHandle
             | PressTarget::Empty
@@ -75,20 +79,26 @@ impl ClickCycle {
         self.at.vector_to(point).length() <= tolerance.as_mm()
     }
 
-    /// The next candidate, wrapping around (criterion 5); a one-candidate
-    /// cycle returns the same object again (criterion 7). `None` when nothing
-    /// lies under the start point. An id that no longer names an object is
-    /// dropped first.
+    /// The next candidate (an object of the context: a leaf or a group), wrapping around
+    /// (criterion 5); a one-candidate cycle returns the same object again (criterion 7). `None`
+    /// when nothing lies under the start point. An id that no longer names an object is dropped
+    /// first.
     pub(super) fn advance(
         &mut self,
         objects: &[ObjectSnapshot],
         tolerance: Tolerance,
+        units: &Units,
     ) -> Option<NodeId> {
         if self.candidates.is_empty() {
-            self.candidates = hit_test_objects(objects, self.at, tolerance);
+            for leaf in hit_test_objects(objects, self.at, tolerance) {
+                let unit = units.unit_of(leaf);
+                if !self.candidates.contains(&unit) {
+                    self.candidates.push(unit);
+                }
+            }
         }
         self.candidates
-            .retain(|id| objects.iter().any(|object| object.id() == *id));
+            .retain(|id| objects.iter().any(|object| units.unit_of(object.id()) == *id));
         let count = self.candidates.len();
         let next = self
             .current

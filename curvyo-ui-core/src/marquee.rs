@@ -3,9 +3,12 @@
 //! rectangle selects in each mode. Pure functions of points and snapshots;
 //! the gesture state is in `select_tool`.
 
+use std::collections::HashMap;
+
 use curvyo_document_core::{NodeId, ObjectSnapshot, Point, Tolerance};
 
 use crate::oriented_box::oriented_bounds;
+use crate::units::Units;
 
 /// What a marquee selects.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -50,15 +53,41 @@ pub fn objects_in_marquee(
     mode: MarqueeMode,
     tolerance: Tolerance,
 ) -> Vec<NodeId> {
+    units_in_marquee(objects, &Units::default(), from, to, mode, tolerance)
+}
+
+/// [`objects_in_marquee`] with groups (`specs/0023-groups` criterion 9): a group of `units` is one
+/// object whose box is the bounding box of all its leaves' boxes, and it is selected as a whole,
+/// so every leaf of a matching group is in the result. Leaves come in the order of `objects`.
+#[must_use]
+pub fn units_in_marquee(
+    objects: &[ObjectSnapshot],
+    units: &Units,
+    from: Point,
+    to: Point,
+    mode: MarqueeMode,
+    tolerance: Tolerance,
+) -> Vec<NodeId> {
     let slack = tolerance.as_mm();
     let (low_x, high_x) = (from.x.min(to.x) - slack, from.x.max(to.x) + slack);
     let (low_y, high_y) = (from.y.min(to.y) - slack, from.y.max(to.y) + slack);
+    // The extent of each object of the context: its leaves' corners together.
+    let mut extents: HashMap<NodeId, [f64; 4]> = HashMap::new();
+    for object in objects {
+        let corners = oriented_bounds(object).document_corners();
+        let (min_x, max_x) = extent(corners.iter().map(|c| c.x));
+        let (min_y, max_y) = extent(corners.iter().map(|c| c.y));
+        extents
+            .entry(units.unit_of(object.id()))
+            .and_modify(|e| {
+                *e = [e[0].min(min_x), e[1].max(max_x), e[2].min(min_y), e[3].max(max_y)];
+            })
+            .or_insert([min_x, max_x, min_y, max_y]);
+    }
     objects
         .iter()
         .filter(|object| {
-            let corners = oriented_bounds(object).document_corners();
-            let (min_x, max_x) = extent(corners.iter().map(|c| c.x));
-            let (min_y, max_y) = extent(corners.iter().map(|c| c.y));
+            let [min_x, max_x, min_y, max_y] = extents[&units.unit_of(object.id())];
             match mode {
                 MarqueeMode::Contain => {
                     min_x >= low_x && max_x <= high_x && min_y >= low_y && max_y <= high_y

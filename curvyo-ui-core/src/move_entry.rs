@@ -13,6 +13,7 @@ use crate::anchor_id_minter::AnchorIdMinter;
 use crate::group_box::GroupSelection;
 use crate::object_bounds::object_outline_bounds;
 use crate::oriented_box::OrientedBox;
+use crate::units::Units;
 use crate::transform_commit::{
     MAX_COORDINATE_MM, MOVE_EQUAL_EPSILON_MM, axis_within_limit, commit_move,
 };
@@ -172,7 +173,7 @@ impl MoveEntry {
         texts: [&str; 2],
         absolute: bool,
         copy: bool,
-        minter: &mut AnchorIdMinter,
+        (minter, units): (&mut AnchorIdMinter, &Units),
     ) -> (EntryOutcome, Option<Vec<NodeId>>) {
         let unchanged = self
             .start
@@ -185,7 +186,7 @@ impl MoveEntry {
             Err((field, reason)) => (EntryOutcome::Invalid { field, reason }, None),
             Ok(None) => (EntryOutcome::Unchanged, None),
             Ok(Some(offset)) => {
-                let copies = commit_move(document, &self.ids, offset, copy, minter);
+                let copies = commit_move(document, &self.ids, offset, copy, (minter, units));
                 (EntryOutcome::Committed, copies)
             }
         }
@@ -254,7 +255,7 @@ mod tests {
                     ["5", "-3"],
                     false,
                     false,
-                    &mut AnchorIdMinter::new(99)
+                    (&mut AnchorIdMinter::new(99), &Units::default())
                 )
                 .0,
             EntryOutcome::Committed
@@ -276,7 +277,7 @@ mod tests {
                     ["100", "50"],
                     true,
                     false,
-                    &mut AnchorIdMinter::new(99)
+                    (&mut AnchorIdMinter::new(99), &Units::default())
                 )
                 .0,
             EntryOutcome::Committed
@@ -317,7 +318,7 @@ mod tests {
                         ["-12.5", "300.25"],
                         true,
                         false,
-                        &mut AnchorIdMinter::new(99)
+                        (&mut AnchorIdMinter::new(99), &Units::default())
                     )
                     .0,
                 EntryOutcome::Committed
@@ -375,7 +376,7 @@ mod tests {
                         texts,
                         absolute,
                         false,
-                        &mut AnchorIdMinter::new(99)
+                        (&mut AnchorIdMinter::new(99), &Units::default())
                     )
                     .0,
                 EntryOutcome::Unchanged,
@@ -411,7 +412,7 @@ mod tests {
                             texts,
                             absolute,
                             false,
-                            &mut AnchorIdMinter::new(99)
+                            (&mut AnchorIdMinter::new(99), &Units::default())
                         )
                         .0,
                     EntryOutcome::Invalid {
@@ -469,7 +470,7 @@ mod tests {
                         ["12.5", "-4.25"],
                         false,
                         false,
-                        &mut AnchorIdMinter::new(99)
+                        (&mut AnchorIdMinter::new(99), &Units::default())
                     )
                     .0,
                 EntryOutcome::Committed
@@ -499,7 +500,7 @@ mod tests {
                     ["5", "5"],
                     false,
                     false,
-                    &mut AnchorIdMinter::new(99)
+                    (&mut AnchorIdMinter::new(99), &Units::default())
                 )
                 .0,
             EntryOutcome::Unchanged
@@ -513,7 +514,7 @@ mod tests {
                     ["5", "5"],
                     false,
                     false,
-                    &mut AnchorIdMinter::new(99)
+                    (&mut AnchorIdMinter::new(99), &Units::default())
                 )
                 .0,
             EntryOutcome::Unchanged

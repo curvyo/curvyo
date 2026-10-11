@@ -9,6 +9,7 @@ use curvyo_document_core::{
     ShapeEditError, Vec2,
 };
 
+use crate::units::Units;
 use crate::anchor_id_minter::AnchorIdMinter;
 use crate::group_transform::commit_group;
 use crate::param_edit::commit_param;
@@ -72,36 +73,45 @@ pub(crate) fn commit_gesture(
 }
 
 /// Writes a move of `ids` by `offset` as one commit, or, with `copy`, one copy
-/// of each of them displaced by `offset` and the originals untouched (shared
+/// of each object of the selection displaced by `offset` and the originals untouched (shared
 /// by a drag's release, a Ctrl release and the typed move's Enter, so every
-/// route leaves the same registers). A stale id refuses the whole call, which
-/// writes nothing. Returns the copies' ids in `ids` order after a copy, `None`
-/// after a move or a refusal: the caller selects them.
+/// route leaves the same registers). A group of `units` is copied as a group, with new ids for the
+/// group, its descendants and their anchors (`specs/0023-groups` criterion 13). A stale id
+/// refuses the whole call, which writes nothing. Returns the leaves of the copies in `ids`
+/// order after a copy, `None` after a move or a refusal: the caller selects them.
 pub(crate) fn commit_move(
     document: &Document,
     ids: &[NodeId],
     offset: Vec2,
     copy: bool,
-    minter: &mut AnchorIdMinter,
+    (minter, units): (&mut AnchorIdMinter, &Units),
 ) -> Option<Vec<NodeId>> {
     if !copy {
         let _ = document.translate_objects(ids, offset);
         return None;
     }
-    let sources: Option<Vec<CopySource>> = ids
+    let sources: Option<Vec<CopySource>> = units
+        .selected(ids)
         .iter()
-        .map(|&id| {
-            let anchor_count = match document.object(id)? {
-                ObjectSnapshot::Path(path) => path.all_anchors().count(),
-                ObjectSnapshot::Primitive(_) => 0,
-            };
+        .map(|unit| {
+            if !document.contains_node(unit.id) {
+                return None;
+            }
             Some(CopySource {
-                id,
-                anchor_ids: (0..anchor_count).map(|_| minter.mint()).collect(),
+                id: unit.id,
+                anchor_ids: (0..document.anchor_count(unit.id))
+                    .map(|_| minter.mint())
+                    .collect(),
             })
         })
         .collect();
-    document.duplicate_objects(&sources?, offset).ok()
+    let copies = document.duplicate_objects(&sources?, offset).ok()?;
+    Some(
+        copies
+            .into_iter()
+            .flat_map(|copy| document.leaves_of(copy))
+            .collect(),
+    )
 }
 
 /// Writes a resize's resulting geometry, dispatching on the object's own
