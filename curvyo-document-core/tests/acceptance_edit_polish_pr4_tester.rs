@@ -314,7 +314,13 @@ fn as_map(v: &LoroValue) -> HashMap<String, LoroValue> {
 /// hold exactly the same keys and values, except that every anchor map may
 /// differ in exactly one key (its id).
 fn assert_same_meta_but_anchor_ids(orig: &LoroValue, copy: &LoroValue) {
-    let (a, b) = (as_map(orig), as_map(copy));
+    let (a, mut b) = (as_map(orig), as_map(copy));
+    // `specs/0041-object-history` criterion 37: a copy also records where it came from. That
+    // key is the one difference the copy may have.
+    assert!(
+        b.remove("clone_of").is_some(),
+        "the copy records its origin"
+    );
     let mut ka: Vec<_> = a.keys().cloned().collect();
     let mut kb: Vec<_> = b.keys().cloned().collect();
     ka.sort();
@@ -457,7 +463,12 @@ fn a_nonzero_offset_changes_geometry_only() {
     let m = metas(&d);
     for (orig, copy) in ids.iter().zip(&new) {
         let a = as_map(&m[&key(*orig)]);
-        let b = as_map(&m[&key(*copy)]);
+        let mut b = as_map(&m[&key(*copy)]);
+        // `specs/0041-object-history` criterion 37: the copy also records its origin.
+        assert!(
+            b.remove("clone_of").is_some(),
+            "the copy records its origin"
+        );
         let mut ka: Vec<_> = a.keys().collect();
         let mut kb: Vec<_> = b.keys().collect();
         ka.sort();

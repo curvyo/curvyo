@@ -37,6 +37,20 @@ impl NodeId {
     pub(crate) const fn from_parts(peer: u64, counter: i32) -> Self {
         Self { peer, counter }
     }
+
+    /// The 13-character id the History tab shows in full (a tooltip): the base-36 form of the
+    /// FNV-1a 64 hash of the id, the same as a step's (`crate::StepRef::full_id`).
+    #[must_use]
+    pub fn full_id(self) -> String {
+        crate::history::StepRef::new(self.peer, self.counter).full_id()
+    }
+
+    /// The first six characters of [`NodeId::full_id`]: how the History tab names an object
+    /// ("Rectangle 3f9a1c", `specs/0041-object-history` criterion 2).
+    #[must_use]
+    pub fn short_id(self) -> String {
+        self.full_id().chars().take(6).collect()
+    }
 }
 
 /// `document.json`'s on-the-wire shape for a [`NodeId`]: `peer` written as

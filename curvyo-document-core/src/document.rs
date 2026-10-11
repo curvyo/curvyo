@@ -167,6 +167,8 @@ pub struct Document {
     pub(crate) container_index: std::cell::RefCell<crate::history::ContainerIndex>,
     /// Every step of the log with the stacks of each peer, for the history list.
     pub(crate) step_index: std::cell::RefCell<crate::history::StepIndex>,
+    /// The steps that touched each object, for the Object scope of the history.
+    pub(crate) object_index: std::cell::RefCell<crate::history::ObjectIndex>,
 }
 
 impl Document {
@@ -211,6 +213,7 @@ impl Document {
             commit_state: crate::history::CommitState::default(),
             container_index: std::cell::RefCell::default(),
             step_index: std::cell::RefCell::default(),
+            object_index: std::cell::RefCell::default(),
         };
         document.commit_new_document();
         // A document without history has nothing to read.
@@ -258,6 +261,7 @@ impl Document {
             commit_state: crate::history::CommitState::default(),
             container_index: std::cell::RefCell::default(),
             step_index: std::cell::RefCell::default(),
+            object_index: std::cell::RefCell::default(),
         })
     }
 

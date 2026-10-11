@@ -8,7 +8,9 @@ use loro::{FractionalIndex, LoroDoc, TreeID};
 use super::checkout::NodeAt;
 use super::node_value::{Node, read_map};
 use super::report::{Direction, Role, SkipReason};
-use super::step_header::{KEY_REDONE, LABEL_REDO, StepHeader};
+use super::step_header::{
+    KEY_OBJECT_REDONE, KEY_REDONE, LABEL_OBJECT_REDO, LABEL_REDO, StepHeader,
+};
 use super::step_id::StepRef;
 use super::step_log::LogStep;
 use super::touched::Touched;
@@ -93,12 +95,24 @@ impl PlanInput<'_> {
                 plan.skip(Role::Changed, id, SkipReason::DeletedLater);
             }
         }
-        // Z-order and parent moves of existing objects are not restored yet: no gesture makes one
-        // (`adrs.md`, dated note). A later one fails visibly here.
         for &id in &self.touched.moved {
-            plan.skip(Role::Moved, id, SkipReason::ChangedLater);
+            if self.came_back_in_this_step(id) {
+                // A node an object undo brought back is a Move of a deleted node: for the restore
+                // it is a creation.
+                self.plan_created(&mut plan, id);
+            } else {
+                // Z-order and parent moves of existing objects are not restored yet: no gesture
+                // makes one (`adrs.md`, dated note). A later one fails visibly here.
+                plan.skip(Role::Moved, id, SkipReason::ChangedLater);
+            }
         }
         plan
+    }
+
+    /// Whether the node was deleted before the step and lives after it: the step revived it.
+    fn came_back_in_this_step(&self, id: TreeID) -> bool {
+        let meta_of = |snapshot: &Snapshot| snapshot.nodes.get(&id).map(|n| n.meta.is_empty());
+        meta_of(self.before) == Some(true) && meta_of(self.after) == Some(false)
     }
 
     fn live_meta(&self, id: TreeID) -> Option<BTreeMap<String, Node>> {
@@ -122,9 +136,11 @@ impl PlanInput<'_> {
             .get_change(last)
             .and_then(|change| StepHeader::parse(change.message.as_deref()?))
             .is_some_and(|header| {
-                header.label == LABEL_REDO
-                    && header.extra_value(KEY_REDONE).and_then(StepRef::decode)
-                        == Some(self.log.step)
+                let redone = |key: &str| {
+                    header.extra_value(key).and_then(StepRef::decode) == Some(self.log.step)
+                };
+                (header.label == LABEL_REDO && redone(KEY_REDONE))
+                    || (header.label == LABEL_OBJECT_REDO && redone(KEY_OBJECT_REDONE))
             })
     }
 

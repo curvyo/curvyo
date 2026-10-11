@@ -80,6 +80,15 @@ impl CommitState {
     pub(crate) fn set_warm(&self) {
         self.warm.set(true);
     }
+
+    /// An object undo or redo is a step of this session like any other: it goes on the maker's
+    /// stack (`specs/0041-object-history` criterion 8).
+    pub(crate) fn register_own(&self, step: StepRef, label: &str) {
+        self.own.borrow_mut().push(OwnStep {
+            step,
+            label: label.to_owned(),
+        });
+    }
 }
 
 impl Document {

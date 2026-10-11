@@ -2,13 +2,14 @@
 //! to 38, 60). A row is derived from the log, never stored: its kind and its touched objects come
 //! from the step's operations, its status from the stacks the commits tell.
 
-use std::collections::HashMap;
-
 use super::report::{ObjectShape, Role};
 use super::restore::kind_of;
 use super::stack_machine::Status;
-use super::step_id::{StepRef, shown_ids};
-use super::step_index::is_row;
+use super::step_header::{
+    KEY_OBJECT_REDONE, KEY_OBJECT_UNDONE, LABEL_OBJECT_REDO, LABEL_OBJECT_UNDO,
+};
+use super::step_id::StepRef;
+use super::step_index::{StepIndex, is_row};
 use super::touched::Touched;
 use crate::document::Document;
 use crate::path_model::NodeId;
@@ -70,6 +71,24 @@ pub struct HistoryRow {
     pub objects: Vec<TouchedObject>,
     /// Whether the step is in effect, undone, or replaced on a branch.
     pub status: Status,
+    /// For an object undo or redo: the step it took back or applied again.
+    pub reverts: Option<RowRevert>,
+    /// Who took the step back with an object undo, when that took back the step as a whole
+    /// (`specs/0041-object-history` criterion 8). Only set while `status` is applied.
+    pub undone_by: Option<Author>,
+}
+
+/// The step an object undo or redo named.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RowRevert {
+    /// The step.
+    pub step: StepRef,
+    /// Its shown id.
+    pub shown_id: String,
+    /// Its commit label.
+    pub label: String,
+    /// Whether the row is an object redo.
+    pub redo: bool,
 }
 
 /// Whether a command is about the document and not about its objects: the objects only follow the
@@ -80,8 +99,44 @@ pub fn is_document_level_label(label: &str) -> bool {
     matches!(label, "resize_document" | "fit_document_to_content")
 }
 
+/// Who took the step back as a whole with an object undo, if anybody did. A Replace step is taken
+/// back whole by one object undo; any other step only when every object it touched was.
+fn undone_by(index: &StepIndex, step: StepRef, touched: &Touched, me: u64) -> Option<Author> {
+    let mut marks: Vec<_> = index
+        .marks_on(step)
+        .iter()
+        .filter(|mark| index.status(mark.by) == Status::Applied)
+        .filter_map(|mark| Some((index.position(mark.by)?, *mark)))
+        .collect();
+    marks.sort_unstable_by_key(|(position, _)| *position);
+    let latest_undo = |objects: Option<loro::TreeID>| {
+        marks
+            .iter()
+            .rev()
+            .find(|(_, mark)| objects.is_none() || mark.object == objects)
+            .filter(|(_, mark)| !mark.redo)
+            .map(|(_, mark)| mark.by)
+    };
+    let by = if kind_of_touched(touched) == StepKind::Replace {
+        latest_undo(None)?
+    } else {
+        let mut nodes = touched.nodes().peekable();
+        nodes.peek()?;
+        nodes
+            .map(|node| latest_undo(Some(node)))
+            .collect::<Option<Vec<_>>>()?
+            .into_iter()
+            .next()?
+    };
+    Some(if by.peer() == me {
+        Author::You
+    } else {
+        Author::Earlier
+    })
+}
+
 /// The kind of a step from what it touched.
-fn kind_of_touched(touched: &Touched) -> StepKind {
+pub(super) fn kind_of_touched(touched: &Touched) -> StepKind {
     let created = !touched.created.is_empty();
     let deleted = !touched.deleted.is_empty();
     let moved = !touched.moved.is_empty();
@@ -137,19 +192,14 @@ impl Document {
         doc.commit();
         let mut index = self.step_index.borrow_mut();
         index.extend(doc);
-        let all: Vec<StepRef> = index
-            .steps()
-            .filter(|step| is_row(step))
-            .map(|step| step.step)
-            .collect();
+        index.ensure_shown();
         let newest = index
             .steps()
             .rev()
             .filter(|step| is_row(step))
             .find(|step| index.status(step.step) == Status::Applied)?
             .step;
-        let position = all.iter().position(|step| *step == newest)?;
-        shown_ids(&all).into_iter().nth(position)
+        index.shown().get(&newest).cloned()
     }
 
     /// `count` rows of the history from the `start`-th newest, newest first.
@@ -159,14 +209,11 @@ impl Document {
         self.assert_outside_batch();
         doc.commit();
         self.container_index.borrow_mut().extend(doc);
-        let mut index = self.step_index.borrow_mut();
-        index.extend(doc);
-        let all: Vec<StepRef> = index
-            .steps()
-            .filter(|step| is_row(step))
-            .map(|step| step.step)
-            .collect();
-        let shown: HashMap<StepRef, String> = all.iter().copied().zip(shown_ids(&all)).collect();
+        let mut guard = self.step_index.borrow_mut();
+        guard.extend(doc);
+        guard.ensure_shown();
+        let index = &*guard;
+        let shown = index.shown();
         let me = doc.peer_id();
         let chunk: Vec<_> = index
             .steps()
@@ -214,6 +261,25 @@ impl Document {
                     },
                     objects,
                     status: index.status(log.step),
+                    reverts: log.header.as_ref().and_then(|header| {
+                        let (key, redo) = match header.label.as_str() {
+                            LABEL_OBJECT_UNDO => (KEY_OBJECT_UNDONE, false),
+                            LABEL_OBJECT_REDO => (KEY_OBJECT_REDONE, true),
+                            _ => return None,
+                        };
+                        let step = StepRef::decode(header.extra_value(key)?)?;
+                        Some(RowRevert {
+                            step,
+                            shown_id: shown.get(&step).cloned().unwrap_or_default(),
+                            label: index.get(step).map(|t| t.label.clone()).unwrap_or_default(),
+                            redo,
+                        })
+                    }),
+                    undone_by: if index.status(log.step) == Status::Applied {
+                        undone_by(index, log.step, &touched, me)
+                    } else {
+                        None
+                    },
                 }
             })
             .collect()
