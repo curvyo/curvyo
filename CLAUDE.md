@@ -107,8 +107,8 @@ milestones. Only `chore/` and `fix/` PRs (small, self-contained) stand alone.
 **What changes in the demo (customer rule, 2026-10-11):** every PR description
 (story, `fix/` and `chore/` alike) starts with a section "What changes in the
 demo": the changes the maker notices when using the app, as a short list in
-the maker's words (what to click or press, what is new, what behaves
-differently than before, what is deliberately not there yet). A PR with no
+plain English like everything else in the repo (what to click or press, what is
+new, what behaves differently than before, what is deliberately not there yet). A PR with no
 visible change says "Nothing changes in the demo." The section comes before the
 Review guide.
 
