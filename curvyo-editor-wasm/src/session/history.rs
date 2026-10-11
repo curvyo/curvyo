@@ -8,7 +8,7 @@ use curvyo_document_core::{
 };
 use curvyo_ui_core::{
     FINISH_PEN_FIRST, SelectionSnapshot, UndoStack, nothing_notice, object_bounds, objects_summary,
-    operation_name, restore_notice,
+    operation_name, restore_notice, summary_shapes,
 };
 
 use super::{KeyOutcome, Session};
@@ -277,7 +277,8 @@ impl Session {
             self.restore_selection(snapshot);
             self.command_refusal = None;
         }
-        let shapes: Vec<_> = report.objects.iter().map(|o| o.shape).collect();
+        let touched: Vec<_> = report.objects.iter().map(|o| (o.shape, o.role)).collect();
+        let shapes = summary_shapes(&target.label, &touched);
         let summary = objects_summary(&shapes);
         let off_screen = report.wrote && self.selection_is_off_screen();
         HistoryResult {

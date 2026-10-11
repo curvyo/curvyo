@@ -118,7 +118,9 @@ pub use group_entry::GroupEntry;
 pub use history_names::{
     OPERATION_NAMES, RESERVED_LABELS, UNKNOWN_OPERATION_NAME, known_operation_name, operation_name,
 };
-pub use history_notice::{FINISH_PEN_FIRST, nothing_notice, objects_summary, restore_notice};
+pub use history_notice::{
+    FINISH_PEN_FIRST, nothing_notice, objects_summary, restore_notice, summary_shapes,
+};
 pub use hit_test::{Hit, hit_test};
 pub use hit_test_object::{hit_test_object, hit_test_objects, hit_test_objects_along};
 pub use marquee::{MarqueeMode, objects_in_marquee};

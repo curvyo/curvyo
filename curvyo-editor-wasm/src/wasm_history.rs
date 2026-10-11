@@ -122,4 +122,10 @@ impl WasmSession {
     pub fn finish_pen_first_notice(&self) -> String {
         curvyo_ui_core::FINISH_PEN_FIRST.to_owned()
     }
+
+    /// Whether the Pen holds an unfinished path, which makes a wipe refuse.
+    #[must_use]
+    pub fn history_wipe_blocked(&self) -> bool {
+        self.session.history_wipe_blocked()
+    }
 }

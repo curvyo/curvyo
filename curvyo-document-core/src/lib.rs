@@ -82,7 +82,7 @@ pub use history::{
     Author, Direction, Event, FAR_STEP_OPS, HistoryError, HistoryRow, LABEL_NEW_DOCUMENT,
     LABEL_REDO, LABEL_UNDO, MIN_SHOWN_ID_LEN, ObjectReport, ObjectResult, ObjectShape, OwnStep,
     RestoreReport, Role, SMALL_STEP_OPS, STACK_LIMIT, SkipReason, StackMachine, Status, StepKind,
-    StepRef, SyncError, TouchedObject, WIPE_LABEL, shown_ids,
+    StepRef, SyncError, TouchedObject, WIPE_LABEL, is_document_level_label, shown_ids,
 };
 pub use junction::{COINCIDENT_MM, interior_handle, merged_junction};
 pub use objects::{CopySource, ObjectEditError};

@@ -2,7 +2,7 @@
 //! link from a row to the objects it touched (`specs/0020-undo-redo` criteria 32 to 40).
 
 use curvyo_document_core::{Author, HistoryRow, ObjectShape, Role, Status, StepKind, StepRef};
-use curvyo_ui_core::{known_operation_name, objects_summary, operation_name};
+use curvyo_ui_core::{known_operation_name, objects_summary, operation_name, summary_shapes};
 use serde_json::{Value, json};
 
 use super::Session;
@@ -51,7 +51,8 @@ impl Session {
                 known_operation_name(&row.label).is_some(),
             )
         };
-        let shapes: Vec<ObjectShape> = row.objects.iter().map(|o| o.shape).collect();
+        let touched: Vec<_> = row.objects.iter().map(|o| (o.shape, o.role)).collect();
+        let shapes = summary_shapes(&row.label, &touched);
         let objects: Vec<Value> = row
             .objects
             .iter()
@@ -161,6 +162,13 @@ impl Session {
             0 => WipeState::NoSteps,
             n => WipeState::Offered(n),
         }
+    }
+
+    /// Whether a wipe would be ignored because the Pen holds an unfinished path: the panel then
+    /// shows the hint and does not open its confirm (`specs/0020-undo-redo` criteria 6e and 51).
+    #[must_use]
+    pub fn history_wipe_blocked(&self) -> bool {
+        self.pen_path_open()
     }
 
     /// "Wipe" was confirmed: cuts the history, empties both stacks and writes the one step

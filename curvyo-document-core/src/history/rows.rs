@@ -72,6 +72,14 @@ pub struct HistoryRow {
     pub status: Status,
 }
 
+/// Whether a command is about the document and not about its objects: the objects only follow the
+/// page (a resize or a fit moves them to keep their place on it), so the maker sees no object
+/// changed, and a row lists none.
+#[must_use]
+pub fn is_document_level_label(label: &str) -> bool {
+    matches!(label, "resize_document" | "fit_document_to_content")
+}
+
 /// The kind of a step from what it touched.
 fn kind_of_touched(touched: &Touched) -> StepKind {
     let created = !touched.created.is_empty();
@@ -186,6 +194,8 @@ impl Document {
                         role,
                     })
                     .collect();
+                let document_level = is_document_level_label(&log.label);
+                let objects = if document_level { Vec::new() } else { objects };
                 HistoryRow {
                     step: log.step,
                     shown_id: shown.get(&log.step).cloned().unwrap_or_default(),
@@ -197,7 +207,11 @@ impl Document {
                     },
                     peer: log.step.peer(),
                     time: log.header.as_ref().map_or(Timestamp::UNKNOWN, |h| h.time),
-                    kind: kind_of_touched(&touched),
+                    kind: if document_level {
+                        StepKind::Document
+                    } else {
+                        kind_of_touched(&touched)
+                    },
                     objects,
                     status: index.status(log.step),
                 }

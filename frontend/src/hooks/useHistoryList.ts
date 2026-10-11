@@ -5,6 +5,7 @@ import {
   PAGE_SIZE,
   pagesFor,
   parseRows,
+  rowsAdded,
 } from "@/lib/historyRows";
 import type { WasmSession } from "@/lib/editorSession";
 
@@ -39,6 +40,7 @@ export function useHistoryList(
   const wanted = useRef({ first: 0, last: PAGE_SIZE - 1 });
   const stamp = useRef<number | null>(null);
   const added = useRef(0);
+  const totalSeen = useRef(0);
   const [state, setState] = useState(() => ({ total: 0, nowId: "", version: 0, readAt: new Date() }));
 
   const load = useCallback(
@@ -77,15 +79,16 @@ export function useHistoryList(
     stamp.current = now;
     pages.current.clear();
     const total = session.history_len();
-    setState((previous) => {
-      added.current += Math.max(0, total - previous.total);
-      return {
-        total,
-        nowId: session.history_now_id(),
-        version: previous.version + 1,
-        readAt: new Date(),
-      };
-    });
+    // Counted outside the updater: React calls an updater twice in development.
+    added.current += rowsAdded(totalSeen.current, total);
+    totalSeen.current = total;
+    const nowId = session.history_now_id();
+    setState((previous) => ({
+      total,
+      nowId,
+      version: previous.version + 1,
+      readAt: new Date(),
+    }));
     load(wanted.current.first, wanted.current.last);
   }, [shown, syncRevision, getSession, load]);
 

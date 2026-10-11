@@ -114,3 +114,10 @@ test("the wipe confirm and its notice use the specified words", async () => {
   assert.equal(wipedNotice(1), "History wiped. 1 step removed.");
   assert.equal(WIPE_ARM_MS, 400);
 });
+
+test("rows added are counted from the totals seen, so a repeated read adds nothing", async () => {
+  const { rowsAdded } = await import("../src/lib/historyRows.ts");
+  assert.equal(rowsAdded(10, 11), 1);
+  assert.equal(rowsAdded(11, 11), 0);
+  assert.equal(rowsAdded(11, 1), 0, "a wipe adds nothing");
+});

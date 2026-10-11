@@ -204,3 +204,9 @@ export function wipedNotice(steps: number): string {
 
 /** The line that takes the button's place in a shared document (criterion 50). */
 export const WIPE_SHARED_LINE = "Wiping is not available for shared documents yet.";
+
+/** How many rows arrived at the top between two reads of the count. Pure and idempotent on purpose:
+ * the hook must not count inside a state updater, which React runs twice in development. */
+export function rowsAdded(seenTotal: number, total: number): number {
+  return Math.max(0, total - seenTotal);
+}

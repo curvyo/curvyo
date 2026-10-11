@@ -28,7 +28,7 @@ pub use error::{HistoryError, SyncError};
 pub use report::{
     Direction, ObjectReport, ObjectResult, ObjectShape, RestoreReport, Role, SkipReason,
 };
-pub use rows::{Author, HistoryRow, StepKind, TouchedObject};
+pub use rows::{Author, HistoryRow, StepKind, TouchedObject, is_document_level_label};
 pub use stack_machine::{Event, STACK_LIMIT, StackMachine, Status};
 pub use step_header::{LABEL_NEW_DOCUMENT, LABEL_REDO, LABEL_UNDO, LABEL_WIPE as WIPE_LABEL};
 pub use step_id::{MIN_SHOWN_ID_LEN, StepRef, shown_ids};

@@ -1,11 +1,29 @@
 //! The words of undo and redo: the touched-objects summary of a row and the one-line notice a key
 //! press leaves (`specs/0020-undo-redo` criteria 1, 2, 4, 19, 24 and the UX notes, "Notices").
 
-use curvyo_document_core::{Direction, ObjectShape, RestoreReport};
+use curvyo_document_core::{Direction, ObjectShape, RestoreReport, Role};
 
 /// The hint of an undo or redo while the Pen holds an unfinished path (`specs/0020-undo-redo`
 /// criterion 6e).
 pub const FINISH_PEN_FIRST: &str = "Finish the path (Enter) or cancel it (Esc) first.";
+
+/// The shapes a summary counts, from the objects a step touched with what it did to each: the
+/// objects as the maker saw them change. A step that deleted objects and created others (a Boolean,
+/// Combine, Break apart) counts the deleted ones, the two squares that were selected and not the
+/// one result; a document command counts none (`is_document_level_label`).
+#[must_use]
+pub fn summary_shapes(label: &str, touched: &[(ObjectShape, Role)]) -> Vec<ObjectShape> {
+    if curvyo_document_core::is_document_level_label(label) {
+        return Vec::new();
+    }
+    let replaced = touched.iter().any(|(_, role)| *role == Role::Deleted)
+        && touched.iter().any(|(_, role)| *role == Role::Created);
+    touched
+        .iter()
+        .filter(|(_, role)| !(replaced && *role == Role::Created))
+        .map(|(shape, _)| *shape)
+        .collect()
+}
 
 /// "1 rectangle", "3 paths", "5 objects": the summary of the objects a step touched. Objects of
 /// one shape are counted by that shape, a mix as "objects". `None` for a step that touched no
@@ -109,6 +127,25 @@ mod tests {
             root: None,
             wrote,
         }
+    }
+
+    #[test]
+    fn a_boolean_counts_its_operands_and_a_resize_of_the_document_counts_none() {
+        use ObjectShape::{Path, Rectangle};
+        let union = [
+            (Rectangle, Role::Deleted),
+            (Rectangle, Role::Deleted),
+            (Path, Role::Created),
+        ];
+        assert_eq!(
+            summary_shapes("boolean_union", &union),
+            [Rectangle, Rectangle]
+        );
+        let draw = [(Rectangle, Role::Created)];
+        assert_eq!(summary_shapes("create_rect", &draw), [Rectangle]);
+        let moved = [(Rectangle, Role::Changed), (Path, Role::Changed)];
+        assert_eq!(summary_shapes("resize_document", &moved), []);
+        assert_eq!(summary_shapes("translate_objects", &moved).len(), 2);
     }
 
     #[test]

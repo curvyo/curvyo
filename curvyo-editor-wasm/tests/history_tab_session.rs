@@ -124,3 +124,32 @@ fn wipe_is_offered_with_steps_ignored_during_a_gesture_and_empties_the_stacks() 
         before_objects.selected_object_count()
     );
 }
+
+#[test]
+fn a_union_counts_the_selected_operands_and_a_document_resize_counts_no_object() {
+    let mut session = fresh();
+    draw(&mut session, 10.0);
+    draw(&mut session, 20.0);
+    session.set_tool(Tool::Select);
+    session.pointer_down(pt(0.0, 0.0), false);
+    session.pointer_up(pt(80.0, 60.0), false, false);
+    assert_eq!(session.selected_object_count(), 2);
+    session.apply_boolean(curvyo_ui_core::BooleanOp::Union);
+    assert_eq!(session.undo().notice, "Undid: Union (2 rectangles).");
+    session.redo();
+    let list = rows(&mut session, 5);
+    assert_eq!(list[0]["name"], "Union");
+    assert_eq!(list[0]["summary"], "2 rectangles");
+    assert_eq!(
+        list[0]["objects"].as_array().unwrap().len(),
+        3,
+        "the hover link keeps all three"
+    );
+
+    let _ = session.set_document_side(curvyo_editor_wasm::DocumentSide::Width, "400");
+    let list = rows(&mut session, 5);
+    assert_eq!(list[0]["name"], "Resize document");
+    assert_eq!(list[0]["kind"], "document");
+    assert_eq!(list[0]["summary"], "");
+    assert!(session.undo().notice.starts_with("Undid: Resize document"));
+}

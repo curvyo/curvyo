@@ -607,6 +607,8 @@ export interface EditorSession {
   historyNames: HistoryNames;
   /** Undo or redo from a button. */
   pressHistory: (direction: HistoryDirection, source?: "canvas" | "panel") => void;
+  /** Shows a line in the notice slot of the canvas. */
+  showHistoryNotice: (text: string, ms?: number) => void;
   /** Wipes the history; the steps removed, -1 when ignored, -2 for a shared document. */
   wipeHistory: () => number;
   /** The move readout and hidden announcements of a nudge and of select all. */
@@ -1850,6 +1852,7 @@ export function useEditorSession(
     historyNames: history.names,
     pressHistory: history.press,
     wipeHistory: history.wipe,
+    showHistoryNotice: history.showNotice,
     nudgeFeedback,
     convertSelected,
     makeLine,

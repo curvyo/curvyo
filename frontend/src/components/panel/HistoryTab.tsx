@@ -81,7 +81,9 @@ export function HistoryTab({ editor, shown, onReturnFocus }: HistoryTabProps) {
   const scroller = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [viewport, setViewport] = useState(ROW_HEIGHT_PX * 8);
-  const [focused, setFocused] = useState(0);
+  const [focusedRaw, setFocused] = useState(0);
+  // A wipe or a shorter list leaves the roving index inside the list, so it keeps a Tab stop.
+  const focused = Math.min(focusedRaw, Math.max(0, list.total - 1));
   const refocus = useRef(false);
   const now = list.readAt;
 
@@ -204,7 +206,7 @@ export function HistoryTab({ editor, shown, onReturnFocus }: HistoryTabProps) {
   });
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
       <HistoryButtons editor={editor} onReturnFocus={onReturnFocus} />
       <div
         className="flex shrink-0 items-center justify-between rounded-[5px] bg-[var(--value-fill)] px-2 text-sm text-[var(--toolbar-icon)]"
@@ -220,7 +222,7 @@ export function HistoryTab({ editor, shown, onReturnFocus }: HistoryTabProps) {
         <span className="select-text font-mono text-xs text-[var(--panel-muted-fg)]">{list.nowId}</span>
       </div>
       {list.total === 0 ? (
-        <div className="px-2 pt-4 text-center">
+        <div className="px-2 pt-4 text-center outline-none" data-first-focus tabIndex={-1}>
           <p className="text-sm text-[var(--toolbar-icon)]">No steps yet.</p>
           <p className="text-xs text-[var(--panel-muted-fg)]">Steps appear here as you edit.</p>
         </div>
@@ -229,12 +231,18 @@ export function HistoryTab({ editor, shown, onReturnFocus }: HistoryTabProps) {
         ref={scroller}
         role="list"
         aria-label="History"
-        data-first-focus
+        data-first-focus={list.total > 0 ? "" : undefined}
         tabIndex={-1}
+        onFocus={(event) => {
+          // Focus that lands on the container (Shift+Ctrl+H) goes to the roving row.
+          if (event.target === event.currentTarget && list.total > 0) {
+            moveFocus(focused);
+          }
+        }}
         onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
         onKeyDown={onListKeyDown}
         onMouseLeave={() => setHover("")}
-        className="history-list relative min-h-0 flex-1 overflow-x-hidden overflow-y-auto"
+        className="history-list relative min-h-[120px] flex-1 overflow-x-hidden overflow-y-auto outline-none"
         style={{ overscrollBehavior: "contain", scrollbarWidth: "thin" }}
       >
         <div className="relative" style={{ height: list.total * ROW_HEIGHT_PX }}>
@@ -280,7 +288,7 @@ function StepRow({ row, index, total, now, tabbable, onFocusRow, onHover }: Step
           onBlur={() => onHover("")}
           onMouseEnter={() => onHover(row.step)}
           onMouseLeave={() => onHover("")}
-          className="flex h-full w-full items-stretch gap-1 rounded-[5px] text-left outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)]"
+          className="flex h-full w-full items-stretch gap-1 rounded-[5px] text-left outline-none hover:bg-[var(--row-hover)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)]"
         >
           <Lane undone={undone} last={index === total - 1} />
           <span className="flex min-w-0 flex-1 flex-col justify-center pr-2">
@@ -348,21 +356,25 @@ function HistoryButtons({
     <div className="relative mb-2 flex h-7 shrink-0 items-center justify-end">
       {slot("undo", historyNames.undo, Undo2, "Ctrl+Z")}
       {slot("redo", historyNames.redo, Redo2, "Ctrl+Shift+Z")}
-      {panelNotice ? (
-        <p
-          key={panelNotice.id}
-          role="status"
-          aria-live="polite"
-          className="pointer-events-none absolute top-full right-0 z-30 mt-1 max-w-[244px] rounded-md p-2 text-right text-xs"
-          style={{
-            background: "var(--toolbar-bg)",
-            color: "var(--toolbar-icon)",
-            boxShadow: "var(--panel-elevation-shadow)",
-          }}
-        >
-          {panelNotice.text}
-        </p>
-      ) : null}
+      {/* The live region exists empty and is filled, so the text is announced. */}
+      <p
+        role="status"
+        aria-live="polite"
+        className={`pointer-events-none absolute top-full right-0 z-30 mt-1 max-w-[244px] rounded-md p-2 text-right text-xs ${
+          panelNotice ? "" : "sr-only"
+        }`}
+        style={
+          panelNotice
+            ? {
+                background: "var(--toolbar-bg)",
+                color: "var(--toolbar-icon)",
+                boxShadow: "var(--panel-elevation-shadow)",
+              }
+            : undefined
+        }
+      >
+        {panelNotice?.text}
+      </p>
     </div>
   );
 }
@@ -383,10 +395,16 @@ function WipeFooter({
   total: number;
   onReturnFocus: () => void;
 }) {
-  const { getSession, syncRevision, selectionCount, wipeHistory } = editor;
+  const { getSession, syncRevision, selectionCount, wipeHistory, showHistoryNotice } = editor;
+  const showNotice = showHistoryNotice;
   const [confirming, setConfirming] = useState(false);
   const [armed, setArmed] = useState(false);
   const cancel = useRef<HTMLButtonElement>(null);
+  const opener = useRef<HTMLButtonElement>(null);
+  // The confirm held the focus when it closed by itself or by Cancel or Escape: it goes back to the
+  // button that opened it.
+  const confirmHadFocus = useRef(false);
+  const restoreToOpener = useRef(true);
   const shared = useMemo(
     () => getSession()?.history_wipe_state() === "shared",
     // The state follows the log and the session.
@@ -398,6 +416,14 @@ function WipeFooter({
   useEffect(() => {
     setConfirming(false);
   }, [selectionCount, total]);
+  useLayoutEffect(() => {
+    if (!confirming && confirmHadFocus.current) {
+      confirmHadFocus.current = false;
+      if (restoreToOpener.current) {
+        opener.current?.focus();
+      }
+    }
+  }, [confirming]);
   useEffect(() => {
     if (!confirming) {
       setArmed(false);
@@ -417,8 +443,17 @@ function WipeFooter({
   if (!confirming) {
     return (
       <button
+        ref={opener}
         type="button"
-        onClick={() => setConfirming(true)}
+        onClick={() => {
+          // An unfinished Pen path: ignored with the hint, like the keys (criteria 6e and 51).
+          if (getSession()?.history_wipe_blocked()) {
+            showNotice(getSession()?.finish_pen_first_notice() ?? "", 2000);
+            return;
+          }
+          restoreToOpener.current = true;
+          setConfirming(true);
+        }}
         className="mt-2 h-7 w-full shrink-0 rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_25%,transparent)] text-sm text-[var(--destructive)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
       >
         Wipe history
@@ -427,12 +462,14 @@ function WipeFooter({
   }
   const close = () => {
     setConfirming(false);
-    onReturnFocus();
   };
   return (
     <div
       role="group"
       aria-label={wipeQuestion(total)}
+      onFocus={() => {
+        confirmHadFocus.current = true;
+      }}
       onKeyDown={(event) => {
         if (event.key === "Escape") {
           event.preventDefault();
@@ -461,11 +498,12 @@ function WipeFooter({
             }
             const removed = wipeHistory();
             if (removed >= 0) {
+              restoreToOpener.current = false;
               setConfirming(false);
               onReturnFocus();
             }
           }}
-          className="h-7 w-[118px] rounded-[5px] border border-[var(--destructive)] bg-white text-sm text-[var(--destructive)] outline-none hover:bg-[var(--destructive)] hover:text-white focus-visible:bg-[var(--destructive)] focus-visible:text-white focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+          className="h-7 w-[118px] rounded-[5px] border border-[var(--destructive)] bg-white text-sm text-[var(--destructive)] outline-none hover:bg-[var(--destructive)] hover:text-white aria-disabled:hover:bg-white aria-disabled:hover:text-[var(--destructive)] focus-visible:bg-[var(--destructive)] focus-visible:text-white aria-disabled:focus-visible:bg-white aria-disabled:focus-visible:text-[var(--destructive)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
         >
           Wipe
         </button>
