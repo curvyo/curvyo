@@ -237,6 +237,23 @@ mod tests {
     }
 
     #[test]
+    fn undo_and_redo_end_the_nudge_step_and_its_readout() {
+        let (mut session, ids) = session_with_rects(1);
+        session.selection.select_single(ids[0]);
+        let _ = press(&mut session, "ArrowRight", false, false, 0.0);
+        assert!(session.nudge_readout().is_some());
+        let undone = session.undo();
+        assert!(undone.changed, "{}", undone.notice);
+        assert_eq!(origin_of(&session, ids[0]).x, 0.0);
+        assert!(session.nudge_readout().is_none(), "no stale Δ after undo");
+        assert_eq!(session.nudge_announcement(), "");
+        let redone = session.redo();
+        assert!(redone.changed, "{}", redone.notice);
+        assert_eq!(origin_of(&session, ids[0]).x, 1.0);
+        assert!(session.nudge_readout().is_none(), "no stale Δ after redo");
+    }
+
+    #[test]
     fn separate_presses_are_separate_runs() {
         let (mut session, ids) = session_with_rects(1);
         session.selection.select_single(ids[0]);

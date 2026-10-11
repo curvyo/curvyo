@@ -133,3 +133,50 @@ test("a synthetic event without a code is told apart by key and location", () =>
   assert.equal(t.keyEvent(down).shift, true);
   assert.equal(t.keyEvent(up).shift, false);
 });
+
+test("Ctrl+Z is a chord until Ctrl is released; Ctrl alone is not", () => {
+  const t = new ModifierTracker();
+  t.keyEvent(key("keydown", "Control", "ControlLeft"));
+  assert.equal(t.chord, false, "Ctrl alone arms the Ctrl badges");
+  t.keyEvent(key("keydown", "z", "KeyZ", { ctrlKey: true }));
+  assert.equal(t.chord, true);
+  t.keyEvent(key("keyup", "z", "KeyZ", { ctrlKey: true }));
+  assert.equal(t.chord, true, "still held: no flash between two presses of Ctrl+Z");
+  t.keyEvent(key("keyup", "Control", "ControlLeft"));
+  assert.equal(t.chord, false);
+  t.keyEvent(key("keydown", "Control", "ControlLeft"));
+  assert.equal(t.chord, false, "the next Ctrl starts clean");
+});
+
+test("Shift with Ctrl is no chord, Ctrl+Shift+Z is, and Cmd counts as Ctrl", () => {
+  const t = new ModifierTracker();
+  t.keyEvent(key("keydown", "Control", "ControlLeft"));
+  t.keyEvent(key("keydown", "Shift", "ShiftLeft", { ctrlKey: true }));
+  assert.equal(t.chord, false);
+  t.keyEvent(key("keydown", "Z", "KeyZ", { ctrlKey: true, shiftKey: true }));
+  assert.equal(t.chord, true);
+  t.reset();
+  assert.equal(t.chord, false);
+  t.keyEvent(key("keydown", "Meta", "MetaLeft"));
+  t.keyEvent(key("keydown", "z", "KeyZ", { metaKey: true }));
+  assert.equal(t.chord, true);
+});
+
+test("a pointer press ends the chord, so a Ctrl click after Ctrl+Z shows the badges again", () => {
+  const t = new ModifierTracker();
+  t.keyEvent(key("keydown", "Control", "ControlLeft"));
+  t.keyEvent(key("keydown", "z", "KeyZ", { ctrlKey: true }));
+  t.pointerPressed();
+  assert.equal(t.chord, false);
+  assert.equal(t.held.ctrl, true);
+});
+
+test("a chord ends when a pointer event reports Ctrl up, and a plain letter is no chord", () => {
+  const t = new ModifierTracker();
+  t.keyEvent(key("keydown", "z", "KeyZ"));
+  assert.equal(t.chord, false);
+  t.keyEvent(key("keydown", "Control", "ControlLeft"));
+  t.keyEvent(key("keydown", "z", "KeyZ", { ctrlKey: true }));
+  t.pointerFlags({ shift: false, ctrl: false, alt: false });
+  assert.equal(t.chord, false);
+});
