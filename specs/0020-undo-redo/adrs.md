@@ -1,5 +1,7 @@
 # ADRs for "Undo and redo"
 
+**Amended by `0051-sidebar-and-no-menu` (2026-10-11).** The Placement line "`curvyo-app`: the native Edit menu (Q5)" is withdrawn, and with it the dedupe it caused: the `history-menu` listener, the `set_history_menu` call, `isDuplicateKey`, `pressedJustNow`, `markPressed` and `DUPLICATE_PRESS_MS` are deleted. `menuNames` stays: it feeds the History tab's buttons.
+
 Undo is our own restore engine over Loro versions, steps are delimited by a header in the commit
 message, the stacks come from one pure stack machine, and the history list is derived from the log
 `document.loro` already holds. **No new crate, no new dependency, no `format_version` bump** (with

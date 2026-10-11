@@ -23,7 +23,7 @@ they conflict (the `project-file-foundation`, `path-node-editing` and
 `primitive-shapes` UX notes still describe what shipped; this is what it
 changes to).
 
-**Superseded 2026-10-11 by `0051`: the menu bar goes (Linux, Windows, browser); macOS keeps only the application menu and a Cut/Copy/Paste Edit menu. File actions are buttons in the File tab of the Properties panel ("Properties panel: File tab").** The paragraph below is the record of the 2026-10-05 reading.
+**Superseded 2026-10-11 by `0051`: the menu bar goes (Linux, Windows, browser); macOS keeps only the application menu (About, Hide, Hide Others, Show All and a Quit that asks about unsaved changes) and an Edit menu of the system's own Undo, Redo, Cut, Copy, Paste and Select All, which act on a focused text field. File actions are buttons in the File tab of the Properties panel ("Properties panel: File tab").** The paragraph below is the record of the 2026-10-05 reading.
 
 **Native OS menu: unchanged, stays native.** "No menu bar at top" is read
 here as targeting the in-canvas contextual tool-options bars
@@ -138,7 +138,7 @@ of contextual chrome this section describes — the floating left tool panel,
 the floating per-selection mini-toolbar, the right panel's *section*
 contents changing — is an overlay or an in-place content swap, never a
 layout participant that resizes the canvas. (The right panel's own
-collapse/expand, user-triggered via its chevron tab or `Shift+Ctrl+F`, is a
+collapse/expand, user-triggered via the collapse control of its strip or `Shift+Ctrl+F` (which only shows it), is a
 deliberate width change the maker asked for — not a tool-switch side
 effect, and not what this rule forbids.) Concretely for implementation:
 `App.tsx`'s current `<NodeToolbar>`/`<ShapeToolbar>` siblings stacked above
@@ -387,12 +387,12 @@ values, not an implementation site, for those four rows.
   in the Properties panel below instead (see `primitive-shapes`' point
   count, moved there 2026-10-05).
 - **`PropertiesPanel`** (2026-10-05, generalizes the `StylePanel` dock):
-  docks to the right edge, native-menu-bar to status-bar span, fixed 280px
-  width, canvas fills the remaining width edge-to-edge — this one *is*
+  docks to the right edge, top of the window to status-bar span (there is no menu bar since `0051`), fixed 280px
+  body beside a 32px strip, canvas fills the remaining width edge-to-edge — this one *is*
   docked, not floating, because its whole point is to stay put regardless
-  of selection or tool (the customer's "right side, fixed" ask). Collapsible
-  via a chevron tab on its canvas-facing edge and `Shift+Ctrl+F`; collapsed
-  width is 0. Structured as one scrolling column of named, stacked sections
+  of selection or tool (the customer's "right side, fixed" ask). The body hides
+  with the collapse control at the top of the strip; the strip stays, so the
+  collapsed width is 32px (`Shift+Ctrl+F` and the other tab shortcuts only show it). Structured as one scrolling column of named, stacked sections
   (superseded 2026-10-10: a strip of three tabs, one section each, "Properties
   panel: tabs"). When nothing
   relevant is selected the Style area is empty (superseded 2026-10-08: it no
@@ -897,7 +897,7 @@ every row below and for every later section.
 
 | Item | Value |
 |---|---|
-| Regions | Above the status bar (below the native menu until `0051` removes it): the canvas region (`relative flex-1 min-w-0`) and the panel (strip 32px and body 280px, `shrink-0`, full height). The tool rail and the bars' overlay row are children of the canvas region |
+| Regions | Above the status bar (the window has no menu bar since `0051`, on Linux and Windows; the browser build has no demo bar either): the canvas region (`relative flex-1 min-w-0`) and the panel (strip 32px and body 280px, `shrink-0`, full height). The tool rail and the bars' overlay row are children of the canvas region |
 | Overlay row | `absolute top-3 right-3 left-[72px] z-20` (`left` is `--rail-right` + 12: 72px with one rail column, 128px once the second column of the toolbox rail ships, row "Tool rail architecture") **inside the canvas region**. Its right limit is the canvas region's right edge less 12px, so a bar never runs under the panel. Bars wrap by whole groups as before |
 | Panel | `<aside aria-label="Properties">`, `--panel-bg`, a flex column since `0043`: the **header row with the tab strip** (`shrink-0`, does not scroll) and the **body** below it (`overflow-y: auto`, `overscroll-behavior: contain`, `scrollbar-width: thin`, one scrollbar for the whole body, no inner scroll areas; the scrollbar starts under the strip). **Exception: the History tab**, whose list is the one inner scroll area (the tab fills the body height, header rows and footer stay in view; row "History tab layout"); no shadow (docked); 1px left edge line `--toolbar-icon` at 25%; `user-select: none` except in its text inputs |
 | Padding, content width | 12px, content 244px (280 less 24 less a thin scrollbar) |
@@ -1170,7 +1170,7 @@ Decisions: `specs/0051-sidebar-and-no-menu/specification.md`, criteria 15 to 35 
 | Inline check | The five buttons are replaced in place by the **Inline confirm**, three-button variant (row "Inline confirm" in "Interaction conventions"): a sentence of up to four 12px lines ("Poster.curvyo has unsaved changes. Save them before you open another project? Discarded changes cannot be brought back."), then **Cancel** (outline, focused), **Discard** (`--destructive`, ignores presses for 400ms) and **Save** (Apply look), 76 x 28px each, 8px apart. Reserved at 100px, the height of the five buttons, so nothing below moves. Escape and Cancel close it; the project can be edited while it shows. Raised by a chord, the window close or a file handed over by the OS, it shows the body and the File tab and focuses Cancel; Cancel restores the previous tab and hidden state |
 | Dirty cues | Four, all changing in the same frame: window title marker, the File tab's dot and name, the subject line, the project block. Title: "Curvyo", "<file> — Curvyo", leading "*" when dirty (also in the browser page title) |
 | Notices | Canvas notice slot, `role="status"`, 3s: "Saved Poster.curvyo.", browser "Downloaded poster.curvyo.". Failed write and failed open keep the existing error dialogs and their text |
-| macOS | Application menu (About, Hide, Hide Others, Show All, Quit) and an Edit menu with Cut, Copy, Paste; nothing else, no accelerator that an editor action also uses |
+| macOS | Application menu (About, Hide, Hide Others, Show All, Quit) and an Edit menu with the system's Undo, Redo, Cut, Copy, Paste and Select All (predefined: they act on a focused text field only; the page takes Cmd+Z, Cmd+Shift+Z and Cmd+A first on the canvas); nothing else, no File menu, and Quit is the only custom item (it asks the page about unsaved changes) |
 
 ## Properties panel: History tab (`0020`, `0041`, `0042`, 2026-10-10)
 
@@ -1194,7 +1194,7 @@ Decisions: the UX notes of `specs/0020-undo-redo/`, `0041-object-history/`, `004
 | Scale | The scrollbar is exact from the first frame (row heights known); the first 50 rows at once; a placeholder row (two muted bars, no spinner) for rows not yet delivered; a new step at the top keeps the scroll position of a scrolled list; the scroll position is remembered per scope |
 | Hover link | A hovered or focused row shows the `0014` hover box on its existing touched objects and removes it in the frame the pointer or focus leaves; a deleted object shows nothing |
 | Notices | Canvas notice slot for keys; 4px under the button for a panel button. Texts: the tables in `0020`, `0041`, `0042` UX notes |
-| Edit menu | **Withdrawn by `0051`.** There is no native Edit menu on Linux, Windows or in the browser; Ctrl+Z, Ctrl+Shift+Z, Ctrl+Y, Ctrl+U, Ctrl+Shift+U and Ctrl+A are page keys and the Undo / Redo buttons of this tab are the visible route. macOS keeps a minimal Edit menu with Cut, Copy and Paste only (`0051` criterion 39). Ctrl+Y stays a hidden alias |
+| Edit menu | **Withdrawn by `0051`.** There is no native Edit menu on Linux, Windows or in the browser; Ctrl+Z, Ctrl+Shift+Z, Ctrl+Y, Ctrl+U, Ctrl+Shift+U and Ctrl+A are page keys and the Undo / Redo buttons of this tab are the visible route. macOS keeps an Edit menu of predefined Undo, Redo, Cut, Copy, Paste and Select All, which act on a focused text field only; document undo stays with the keys and the History tab (`0051` criterion 39). Ctrl+Y stays a hidden alias |
 
 ## Properties panel: Layers tab (`0050`, 2026-10-10)
 
@@ -1326,17 +1326,17 @@ Decisions: `specs/0045-document-formats-library/specification.md`, "UX notes". I
 | Bring to front, send to back | `Home`, `End`; one place: `Page Up`, `Page Down` (Select tool, selection, canvas focused) | `0050` criterion 33, kept as proposed by the customer on 2026-10-11 (all shortcuts get one overall review at the end, `README.md`); Inkscape's keys; gated like every letter shortcut, `preventDefault` when handled |
 | Linked clone, Select original, Select root original, Select clones, Unlink clone | none; the Linked clone button of the Select bar and the buttons of the Style tab (Tab, Space or Enter) | `0049`; no key (Alt+D is the browser address bar, Question 6). The customer kept it so on 2026-10-11; the overall review of all shortcuts decides again. The marks of a selected clone have no key and take no focus |
 | Show the Document tab | `Shift+Ctrl+D` (`Cmd`) | `0043`; Inkscape's Document Properties key. Expands the panel, activates Document, focus on its first control, also with a selection |
-| Switch tab | Left and Right on the focused strip | `0043`; activates at once; Home and End; a dimmed Style tab is skipped |
+| Switch tab | Up and Down on the focused strip | `0043`, vertical since `0051`; activates at once while the body is shown, only moves the focus while it is hidden; Home and End; a dimmed Style tab is skipped; no wrap |
 | Keyboard help | not built; proposal `?` | Separate story |
 | Any letter shortcut | ignored while a drag, a chip, a focused control or an unfinished Pen path is active, with Ctrl, Cmd or Alt down, and on key repeat | Not a per-shortcut rule; see "Keyboard concept". Built in PR 1. An ignored key gives no feedback (no hint, no `preventDefault`). A tool switched by clicking a rail button leaves focus on that button, so letters are ignored until the canvas is clicked or tabbed to (existing behaviour, not changed by PR 1) |
-| Open/focus the style panel | Shift+Ctrl+F (Cmd on macOS); since `0043` it also activates Style (or Document with nothing selected) when the History or Layers tab is active | Matches Inkscape's Fill & Stroke binding; app-global, not canvas-focus-scoped (`stroke-and-fill-styling`). Expands the panel if collapsed and moves focus to its first control (Stroke Paint; with nothing selected, the Width field of the Document section with its text selected; `document-size-and-rulers`), or to the panel itself when it is empty (`style-panel-rework`); never closes it; ignored while a canvas drag runs. Collapse and expand by the panel's edge tab. In the panel: Escape ends eyedropper picking, else reverts a running drag, else restores an edited field and returns focus to the canvas, and never clears the selection; Enter commits a field and returns to the canvas, Tab commits and moves on; Delete and Backspace never reach the canvas. See "Properties panel: Style section" |
+| Open/focus the style panel | Shift+Ctrl+F (Cmd on macOS); since `0043` it also activates Style (or Document with nothing selected) when the History or Layers tab is active | Matches Inkscape's Fill & Stroke binding; app-global, not canvas-focus-scoped (`stroke-and-fill-styling`). Expands the panel if collapsed and moves focus to its first control (Stroke Paint; with nothing selected, the Width field of the Document section with its text selected; `document-size-and-rulers`), or to the panel itself when it is empty (`style-panel-rework`); never closes it; ignored while a canvas drag runs. The collapse control at the top of the strip hides and shows the body; no key hides it. In the panel: Escape ends eyedropper picking, else reverts a running drag, else restores an edited field and returns focus to the canvas, and never clears the selection; Enter commits a field and returns to the canvas, Tab commits and moves on; Delete and Backspace never reach the canvas. See "Properties panel: Style section" |
 | Change a panel value field | drag in the field; or focus it and use arrows (Shift = 10x, Ctrl/Cmd = 1/10), Home, End; click, Enter, F2 or a digit to type | `style-panel-rework`; preview per frame, one commit on release or key-up; Escape reverts a drag |
 | Reset a panel value field | `Ctrl+Backspace` (`Cmd+Backspace` on macOS) on the focused field, or its reset icon | `style-panel-rework`; Width 0.25 mm, Opacity 100 %, Count 1. Bare Backspace and Delete do nothing |
 | Set the document background | none; Tab to the Background Paint group in the Document section (last block), arrows, then the Color row | `0040`; no shortcut (once per project). The block's eyedropper also picks the background itself |
 | Pick a colour from the drawing | the eyedropper button next to the swatch; no key | `style-panel-rework`; Escape or a right-click cancels; pointer-only in this slice |
 
-Single-letter shortcuts (tools and, since `edit-interaction-polish`, the selection entries M, R, S, K) are a different category from the File menu's
-native accelerators (table above) — they're bound at canvas-focus scope, the
+Single-letter shortcuts (tools and, since `edit-interaction-polish`, the selection entries M, R, S, K) are a different category from the file
+chords (table above, page chords since `0051`) — they're bound at canvas-focus scope, the
 same convention Inkscape/Illustrator/Affinity use, not native menu items.
 The style-panel shortcut is a third category: app-global (works regardless
 of canvas focus), since the panel it targets isn't canvas content.

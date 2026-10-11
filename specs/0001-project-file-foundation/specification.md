@@ -1,6 +1,6 @@
 # Project file foundation: new, open, save a local project
 
-Status: Done
+Status: Done **Amended by `0051-sidebar-and-no-menu`** (2026-10-11): "Window chrome and menu", "Keyboard shortcuts (accelerators on native items)", "Title bar states" (the dirty marker), "Precedent set here" and the Out of scope line on unsaved changes are superseded (no menu bar; the file actions are buttons and chords in the File tab; unsaved changes are tracked and asked about inline). This file stays as the record.
 Priority: Must
 Origin: Customer
 

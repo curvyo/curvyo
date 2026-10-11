@@ -1,5 +1,7 @@
 # ADRs for "Properties panel tabs"
 
+**Amended by `0051-sidebar-and-no-menu` (2026-10-11).** Decision 5: the tabs are a vertical Radix `Tabs` (`orientation="vertical"`) whose tablist sits outside the collapsible body, with `activationMode` `manual` while the body is hidden. Decision 6: Up and Down replace Left and Right. The File tab is first and never switched by the tab rule.
+
 The tabs are view state and a small rule set on top of `panel_content`. **No
 new ADR, no new crate, no new dependency, no format bump, no trait, no
 generic.** Reference state: `main` at `52d4101`.
