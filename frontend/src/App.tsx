@@ -16,6 +16,7 @@ import { useRailCommands } from "@/hooks/useRailCommands";
 import { useEditorSession } from "@/hooks/useEditorSession";
 import { useClosePathState } from "@/hooks/usePenCue";
 import { useDocumentPanel } from "@/hooks/useDocumentPanel";
+import { usePanelOpen } from "@/hooks/usePanelOpen";
 import type {
   OpenBytesPayload,
   OpenErrorPayload,
@@ -56,6 +57,7 @@ function App() {
   const railCommands = useRailCommands(editor);
   const closePathState = useClosePathState(editor);
   const documentPanel = useDocumentPanel(editor);
+  const panelOpen = usePanelOpen(editor.getSession);
   const [openErrorMessage, setOpenErrorMessage] = useState<string | null>(
     null,
   );
@@ -255,7 +257,7 @@ function App() {
         />
         </div>
         </div>
-        <PropertiesPanel editor={editor} document={documentPanel} />
+        <PropertiesPanel editor={editor} document={documentPanel} panelOpen={panelOpen} />
       </div>
       <StatusBar
         cursorText={documentPanel.cursorText(cursorMm.x, cursorMm.y)}
