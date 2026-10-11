@@ -212,29 +212,37 @@ impl Document {
                 continue;
             }
             match plain_value(&before, key) {
-                Some(Some(value)) => {
+                Plain::Value(value) => {
                     if meta.insert(key, value).is_ok() {
                         written += 1;
                     }
                 }
-                Some(None) => {
+                Plain::Absent => {
                     if meta.delete(key).is_ok() {
                         written += 1;
                     }
                 }
-                None => kept += 1,
+                Plain::Nested => kept += 1,
             }
         }
         Ok((written, kept))
     }
 }
 
-/// The plain value of `key`: `Some(Some(value))`, `Some(None)` when the key is absent, `None`
-/// for a nested container.
-fn plain_value(meta: &BTreeMap<String, Node>, key: &str) -> Option<Option<loro::LoroValue>> {
+/// What a key holds, as far as a restore of plain registers is concerned.
+enum Plain {
+    /// A plain value.
+    Value(loro::LoroValue),
+    /// No such key.
+    Absent,
+    /// A nested container, which is left alone.
+    Nested,
+}
+
+fn plain_value(meta: &BTreeMap<String, Node>, key: &str) -> Plain {
     match meta.get(key) {
-        None => Some(None),
-        Some(Node::Value(value)) => Some(Some(value.clone())),
-        Some(_) => None,
+        None => Plain::Absent,
+        Some(Node::Value(value)) => Plain::Value(value.clone()),
+        Some(_) => Plain::Nested,
     }
 }

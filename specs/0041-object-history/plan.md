@@ -58,50 +58,50 @@ and are written down in `docs/technical-debt.md`.
 
 ### Milestone 1: object index, timeline rows, Object scope list (AC 1 to 4, 21, 22, 35, 36)
 
-- [ ] 1.1 `NodeId::short_id` and `full_id`; step index keeps positions, marks (`ou`, `od`, `o`
+- [x] 1.1 `NodeId::short_id` and `full_id`; step index keeps positions, marks (`ou`, `od`, `o`
   from headers) and a cached shown-id map (AC 2, 3, 36)
-- [ ] 1.2 `ObjectIndex` and its extension per commit and import; a step that touched N objects is
+- [x] 1.2 `ObjectIndex` and its extension per commit and import; a step that touched N objects is
   in N lists; deleted objects resolve (AC 21, 22, 36)
-- [ ] 1.3 Object timeline entries and rows: kind, role, other-object count, sources of a created
+- [x] 1.3 Object timeline entries and rows: kind, role, other-object count, sources of a created
   object, statuses including "Undone by"; paged (AC 1, 3, 19, 20, 21, 28)
-- [ ] 1.4 Document list rows carry the reverted step of an object undo or redo and "Undone by"
+- [x] 1.4 Document list rows carry the reverted step of an object undo or redo and "Undone by"
   (AC 8)
-- [ ] 1.5 Budget test, release: 1,000 steps of an object in 20,000 steps (AC 35)
+- [x] 1.5 Budget test, release: 1,000 steps of an object in 20,000 steps (AC 35)
 
 ### Milestone 2: object undo and redo (AC 5 to 17, 40, 41)
 
-- [ ] 2.1 Restore scope in the engine; `object_undo` and `object_redo` headers; own step
+- [x] 2.1 Restore scope in the engine; `object_undo` and `object_redo` headers; own step
   registration; field counts kept later (AC 6, 7, 8, 12, 40)
-- [ ] 2.2 Object stack machine and targets: latest applied, redoable, cleared by a new step
+- [x] 2.2 Object stack machine and targets: latest applied, redoable, cleared by a new step
   (AC 9, 10, 11, 13, 14, 41)
-- [ ] 2.3 `ui-core` notices and names (AC 6, 7, 12, 13, 14, 15)
-- [ ] 2.4 Session: `object_undo`, `object_redo`, gate, tools, selection, off-screen, records the
+- [x] 2.3 `ui-core` notices and names (AC 6, 7, 12, 13, 14, 15)
+- [x] 2.4 Session: `object_undo`, `object_redo`, gate, tools, selection, off-screen, records the
   step on the undo stack; Ctrl+U and Ctrl+Shift+U in the key table; busy state (AC 5, 9, 10, 15,
   16, 17)
-- [ ] 2.5 wasm API, frontend keys, canvas notice, Edit menu items (AC 5, 16)
-- [ ] 2.6 Budget tests for object undo, a step 1,000 steps back (AC 17)
+- [x] 2.5 wasm API, frontend keys, canvas notice, Edit menu items (AC 5, 16)
+- [x] 2.6 Budget tests for object undo, a step 1,000 steps back (AC 17)
 
 ### Milestone 3: clone origin and inherited rows (AC 19, 20, 23 to 28 without groups, 37, 39)
 
-- [ ] 3.1 `clone_of` codec; Duplicate writes it in the copy commit and drops `clone_of` and
+- [x] 3.1 `clone_of` codec; Duplicate writes it in the copy commit and drops `clone_of` and
   `history_floor` of the source (AC 23, 37, 39)
-- [ ] 3.2 Inherited rows from the source's steps in the causal past of the version, recursive,
+- [x] 3.2 Inherited rows from the source's steps in the causal past of the version, recursive,
   with the floor at that version (AC 24, 26, 33)
-- [ ] 3.3 Object undo into inherited rows as a restore of plain registers (AC 25)
-- [ ] 3.4 Created-from rows for Boolean, Combine, Break apart, Offset: not clones (AC 19, 20, 28)
+- [x] 3.3 Object undo into inherited rows as a restore of plain registers (AC 25)
+- [x] 3.4 Created-from rows for Boolean, Combine, Break apart, Offset: not clones (AC 19, 20, 28)
 
 ### Milestone 4: wipe of one object (AC 29 to 34, 38)
 
-- [ ] 4.1 `Document::wipe_object_history`: the step, the `history_floor` register, floor in the
+- [x] 4.1 `Document::wipe_object_history`: the step, the `history_floor` register, floor in the
   timeline, undo stack entries that touched only this object are dropped (AC 30, 31, 32, 33, 34,
   38)
-- [ ] 4.2 Session and wasm: availability, blocked states, notice (AC 29, 34)
+- [x] 4.2 Session and wasm: availability, blocked states, notice (AC 29, 34)
 
 ### Milestone 5: the Object scope in the app (AC 1, 2, 16, 29)
 
-- [ ] 5.1 Scope group, subject line, Object list rows (clone start, inherited, floor), buttons with
+- [x] 5.1 Scope group, subject line, Object list rows (clone start, inherited, floor), buttons with
   tooltips, wipe footer with the inline confirm (AC 1, 2, 3, 16, 29)
-- [ ] 5.2 Docs: technical debt entries for groups, spec and ADR notes; PR description draft
+- [x] 5.2 Docs: technical debt entries for groups, spec and ADR notes; PR description draft
 
 ## Validation
 
@@ -118,4 +118,15 @@ and are written down in `docs/technical-debt.md`.
 
 ## Deviations and open points (written at the end of the slice)
 
-- To be filled in at the end.
+- Criteria 18 and 27 (groups) wait for `0023`: `docs/technical-debt.md`.
+- Version encoding, floor read from the wipe step, the lineage machine, redo of inherited steps and
+  the plan's reading of revived nodes: the build notes in `adrs.md`.
+- Two tester tests of `0010` (`acceptance_edit_polish_pr4_tester.rs`) compared a copy's meta keys
+  with its original's; they now allow exactly the key `clone_of` that criterion 37 adds. Two
+  mechanical type changes in tests: `history_target_name` returns a `String`, and the report types
+  gained fields (`kept`, `step`).
+- Object undo into inherited rows restores plain registers only; an object undo whose parts were
+  all skipped stays the latest step (technical debt).
+- Ctrl+Shift+U on WebKitGTK (spec Question 5) is a check by hand in the app; the Edit menu items are
+  the fallback and are in.
+- No browser run in this slice: the UX review of the History tab comes with the tester pass.

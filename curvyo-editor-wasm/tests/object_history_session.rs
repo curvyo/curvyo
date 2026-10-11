@@ -122,7 +122,7 @@ fn taking_back_the_creation_empties_the_selection_and_ctrl_z_brings_the_object_b
         "Undid: Draw rectangle. The object is gone. Ctrl+Z brings it back."
     );
     assert_eq!(session.selected_object_count(), 0);
-    assert!(doc(&session).object_ids().is_empty());
+    assert_eq!(doc(&session).object_ids().len(), 0);
     undo(&mut session);
     assert_eq!(json(&session), drawn, "the same id and the same drawing");
     assert_eq!(session.selected_object_count(), 1);
@@ -321,4 +321,46 @@ fn a_wipe_is_ignored_during_a_drag_and_with_an_unfinished_pen_path() {
     assert_eq!(session.wipe_object_history(), ObjectWipeOutcome::Ignored);
     session.pointer_up(pt(30.0, 30.0), false, false);
     let _ = KeyHint::SelectFirst;
+}
+
+#[test]
+fn a_copy_made_by_the_move_entry_keeps_the_history_of_its_original() {
+    use curvyo_ui_core::{EntryOutcome, MoveEntryMode};
+    let mut session = fresh();
+    draw_square(&mut session, 10.0);
+    nudge(&mut session, 1_000.0);
+    assert_eq!(
+        session.key_down(KeyInput {
+            key: "m",
+            ..KeyInput::default()
+        }),
+        KeyOutcome::EntryOpened
+    );
+    let outcome = session.commit_move_entry(
+        "40",
+        "0",
+        MoveEntryMode {
+            absolute: false,
+            copy: true,
+        },
+    );
+    assert_eq!(outcome, EntryOutcome::Committed);
+    assert_eq!(session.selected_object_count(), 1, "the copy is selected");
+    let rows: serde_json::Value =
+        serde_json::from_str(&session.object_history_rows_json(0, 10)).unwrap();
+    let rows = rows.as_array().unwrap();
+    let names: Vec<_> = rows
+        .iter()
+        .map(|r| r["name"].as_str().unwrap().to_owned())
+        .collect();
+    assert_eq!(rows.len(), 3);
+    assert!(names[0].starts_with("Duplicate of "), "{names:?}");
+    assert_eq!(rows[0]["class"], "clone-start");
+    assert_eq!(
+        rows[1]["from"].as_str().unwrap().len(),
+        6,
+        "inherited rows say where from"
+    );
+    assert_eq!(names[1], "Move");
+    assert_eq!(names[2], "Draw rectangle");
 }

@@ -38,14 +38,39 @@ import {
 
 type Glyph = ComponentType<{ size: number; strokeWidth: number; "aria-hidden": boolean }>;
 
-/** The glyph of each kind of step (criterion 32): a shape, never a colour. */
-const KIND_GLYPHS: Record<string, Glyph> = {
+type GlyphKey = "create" | "delete" | "replace" | "change" | "document" | "undoes" | "redoes" | "clone-start" | "floor";
+
+/** The glyph of each kind of step and of each row that exists only in the Object scope (criterion
+ * 32, `0041` UX notes): a shape, never a colour. */
+const GLYPHS: Record<GlyphKey, Glyph> = {
   create: Plus,
   delete: Minus,
   replace: Replace,
   change: Pencil,
   document: File,
+  undoes: Undo2,
+  redoes: Redo2,
+  "clone-start": Copy,
+  floor: Eraser,
 };
+
+/** Which glyph a row has: by class, then by what a replacing step did to the object, then by
+ * kind. */
+function glyphKey(row: HistoryRowData): GlyphKey {
+  if (row.label === "wipe_history") {
+    return "floor";
+  }
+  if (row.class && row.class !== "step") {
+    return row.class;
+  }
+  if (row.kind === "replace" && row.role === "created") {
+    return "create";
+  }
+  if (row.kind === "replace" && row.role === "deleted") {
+    return "delete";
+  }
+  return row.kind;
+}
 
 interface HistoryTabProps {
   editor: EditorSession;
@@ -54,32 +79,6 @@ interface HistoryTabProps {
   onReturnFocus: () => void;
   /** The scope of the list and the selected object's subject. */
   historyScope: HistoryScopeState;
-}
-
-/** The glyph of a row that is not an ordinary step (`0041` UX notes, "Rows that exist only here"). */
-const CLASS_GLYPHS: Record<string, Glyph> = {
-  undoes: Undo2,
-  redoes: Redo2,
-  "clone-start": Copy,
-  floor: Eraser,
-};
-
-/** The glyph of a row: by class, then by what a replacing step did to the object, then by kind. */
-function glyphOf(row: HistoryRowData): Glyph {
-  if (row.label === "wipe_history") {
-    return Eraser;
-  }
-  const byClass = row.class ? CLASS_GLYPHS[row.class] : undefined;
-  if (byClass) {
-    return byClass;
-  }
-  if (row.kind === "replace" && row.role === "created") {
-    return Plus;
-  }
-  if (row.kind === "replace" && row.role === "deleted") {
-    return Minus;
-  }
-  return KIND_GLYPHS[row.kind] ?? Pencil;
 }
 
 /** The mark of a step on the lane: a filled disc while in effect, an open ring with a dotted line
@@ -139,18 +138,16 @@ export function HistoryTab({ editor, shown, onReturnFocus, historyScope }: Histo
   // The scroll position of each scope is kept: it is saved as the list scrolls and put back once
   // the other scope's rows have arrived (`0041` criterion 1).
   const restore = useRef<number | null>(null);
-  const lastScope = useRef<HistoryScope>(scope);
-  if (lastScope.current !== scope) {
-    lastScope.current = scope;
-    restore.current = scrollMemory.current[scope];
-  }
+  useLayoutEffect(() => {
+    restore.current = scrollMemory.get(scope);
+  }, [scope, scrollMemory]);
   useLayoutEffect(() => {
     const element = scroller.current;
     if (restore.current !== null && element && list.total > 0) {
       element.scrollTop = restore.current;
       restore.current = null;
     }
-  }, [scope, list.total, scrollMemory]);
+  }, [scope, list.total]);
 
   const range = visibleRange(scrollTop, viewport, list.total);
   const { ensure } = list;
@@ -305,7 +302,7 @@ export function HistoryTab({ editor, shown, onReturnFocus, historyScope }: Histo
         onScroll={(event) => {
           setScrollTop(event.currentTarget.scrollTop);
           if (restore.current === null) {
-            scrollMemory.current[scope] = event.currentTarget.scrollTop;
+            scrollMemory.set(scope, event.currentTarget.scrollTop);
           }
         }}
         onKeyDown={onListKeyDown}
@@ -340,7 +337,7 @@ interface StepRowProps {
 
 /** One step: kind glyph, operation name, step id, and the second line (criterion 39). */
 function StepRow({ row, index, total, now, tabbable, onFocusRow, onHover }: StepRowProps) {
-  const Glyph = glyphOf(row);
+  const Glyph = GLYPHS[glyphKey(row)] ?? Pencil;
   const undone = isUndone(row);
   const lead = leadWords(row);
   const muted = undone ? "text-[var(--panel-muted-fg)]" : "text-[var(--toolbar-icon)]";
@@ -417,7 +414,7 @@ function HistoryHeader({
 }) {
   const { historyNames, pressHistory, canvasNotice, historyBusy } = editor;
   const { scope, info, hasGroup, choose } = historyScope;
-  const now = new Date();
+  const [now] = useState(() => new Date());
   const objectScope = scope === "object" && info !== null;
   const slot = (
     direction: "undo" | "redo",

@@ -130,7 +130,7 @@ fn a_boolean_result_begins_with_its_operands_and_they_end_with_the_step() {
         let rows = document.object_history_page(source, 0, 10);
         assert_eq!(rows[0].label, "boolean_union");
         assert_eq!(rows[0].role, Role::Deleted);
-        assert!(rows[0].sources.is_empty());
+        assert_eq!(rows[0].sources.len(), 0);
     }
 }
 

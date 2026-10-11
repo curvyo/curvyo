@@ -67,6 +67,39 @@ decisions 1, 2 and 6 and the risks changed.
 9. **Version encoding** for both keys: sorted `peer:counter` pairs joined by `,`, parsed leniently:
    an unreadable value means "no floor" or "no origin", never a refused file.
 
+## Build notes (2026-10-11, the slice as built)
+
+Dated notes, no new ADR. The decisions above hold; these are the places the build chose a detail.
+
+1. **Version encoding.** Decision 9 said `peer:counter` pairs. The merged wipe of `0020` already
+   writes `history_wiped` as sorted `peer@counter` pairs (`encode_frontiers`), so the floor and the
+   version inside `clone_of` use that encoding; a node id inside `clone_of` is `peer:counter`:
+   `clone_of = "<peer>:<counter>@<peer>@<counter>,..."`. The first `@` splits origin and version.
+2. **The floor is read from the wipe step.** The wipe step writes `history_floor` (its one
+   operation) and the timeline takes the floor from the start version of the object's latest wipe
+   step, which is the same value. This lets a clone made before a wipe keep the floor as it was at
+   its duplication without a checkout (criteria 24, 33). A unit test pins register and step to the
+   same version.
+3. **One machine over the lineage.** Inherited entries, then the object's own entries, run through
+   one `StackMachine`, so an object undo of an inherited step is an `Undo` event like any other.
+   The creation step of a clone is no target of an object undo while inherited rows exist; the
+   target after the last own step is the newest inherited step, and the oldest one (the original's
+   creation) removes the clone.
+4. **Object redo of an inherited step** is the undo of the object undo that took it back (it
+   restores the registers that undo wrote). Own steps use the redo direction of the engine.
+5. **Undone nodes count as created.** The restore plan treats a `Move` of a node that was deleted
+   before the step and lives after it as a creation. Without this, Ctrl+Z on an object undo that
+   brought a deleted object back (criterion 9 for a delete or a Boolean) could not delete it
+   again.
+6. **Stack names.** A stack entry can carry a name of its own: the object undo is "Undo Resize",
+   not the name of its label `object_undo`. `Session::history_target_name` returns a `String` for
+   that reason.
+7. **Index cost.** The shown ids (ADR 0014 §3) are rebuilt on the first read of rows after a new
+   step, not on the commit path. `warm_history` builds the object index; a log of more than 40,000
+   operations that has not been warmed announces the long-operation state before the first object
+   undo.
+8. **Groups** (criteria 18 and 27) are in `docs/technical-debt.md`.
+
 ## Placement
 
 `curvyo-document-core/src/history/`: `object_index.rs`, `lineage.rs` (clone origin and inherited

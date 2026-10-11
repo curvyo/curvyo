@@ -11,8 +11,8 @@ import type { WasmSession } from "@/lib/editorSession";
 
 /** The scroll position of each scope, kept for the session (`0041` criterion 1). */
 export interface ScrollMemory {
-  document: number;
-  object: number;
+  get: (scope: HistoryScope) => number;
+  set: (scope: HistoryScope, top: number) => void;
 }
 
 export interface HistoryScopeState {
@@ -24,7 +24,7 @@ export interface HistoryScopeState {
   choose: (scope: HistoryScope) => void;
   /** The selected object's subject and buttons, `null` unless exactly one object is selected. */
   info: ObjectHistoryInfo | null;
-  scrollMemory: React.RefObject<ScrollMemory>;
+  scrollMemory: ScrollMemory;
 }
 
 /**
@@ -40,7 +40,16 @@ export function useHistoryScope(
   historyShown: boolean,
 ): HistoryScopeState {
   const [choice, setChoice] = useState<HistoryScope>("object");
-  const scrollMemory = useRef<ScrollMemory>({ document: 0, object: 0 });
+  const tops = useRef({ document: 0, object: 0 });
+  const scrollMemory = useMemo<ScrollMemory>(
+    () => ({
+      get: (scope) => tops.current[scope],
+      set: (scope, top) => {
+        tops.current[scope] = top;
+      },
+    }),
+    [],
+  );
 
   // Leaving the single-object state resets a press on Document for the next time.
   useEffect(() => {
