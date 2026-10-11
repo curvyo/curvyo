@@ -20,7 +20,7 @@ pub enum Role {
     Deleted,
     /// The step changed the object's values.
     Changed,
-    /// The step moved the object in the stacking order or to another parent. Not restored yet.
+    /// The step moved the object in the stacking order or to another parent (grouping).
     Moved,
 }
 
@@ -57,6 +57,8 @@ pub enum ObjectShape {
     Polygon,
     /// A star.
     Star,
+    /// A group (`specs/0023-groups`).
+    Group,
 }
 
 /// The outcome for one object.

@@ -4,7 +4,7 @@
 //! the handle under the pointer. The single object's counterparts are in
 //! `select_view.rs` and `select_cursor.rs`; this is a child module of `session`.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use curvyo_document_core::{NodeId, ObjectSnapshot, Point};
 use curvyo_render_core::{
@@ -23,6 +23,32 @@ use super::{Session, Tool};
 /// A release that moves or transforms at least this many selected objects may take
 /// long enough for the host to show a `wait` cursor first (criteria 28, 46, 49).
 const SLOW_RELEASE_OBJECTS: usize = 100;
+
+/// The axis-aligned box around the boxes `corners`: one box's own corners when there is one (a
+/// rotated leaf keeps its turn), else the bounds of all of them (a group).
+pub(super) fn merged_corners(corners: &[[Point; 4]]) -> Option<[Point; 4]> {
+    match corners {
+        [] => None,
+        [only] => Some(*only),
+        many => {
+            let points = many.iter().flatten();
+            let (mut min_x, mut max_x) = (f64::INFINITY, f64::NEG_INFINITY);
+            let (mut min_y, mut max_y) = (f64::INFINITY, f64::NEG_INFINITY);
+            for point in points {
+                min_x = min_x.min(point.x);
+                max_x = max_x.max(point.x);
+                min_y = min_y.min(point.y);
+                max_y = max_y.max(point.y);
+            }
+            Some([
+                Point::new(min_x, min_y),
+                Point::new(max_x, min_y),
+                Point::new(max_x, max_y),
+                Point::new(min_x, max_y),
+            ])
+        }
+    }
+}
 
 /// More selected objects than this and no member box is drawn (criterion 5): a
 /// count of the selection, so panning and zooming never change it.
@@ -59,15 +85,33 @@ impl Session {
     ) -> Option<GroupDecorationInput> {
         let group = self.group_in(objects)?;
         let box_ = self.group_box_shown(&group);
-        let members = if self.selection.ids().len() > PER_OBJECT_BOX_LIMIT {
+        let units = self.units();
+        let selected_units = units.selected(self.selection.ids());
+        // One selected group draws its box only (`0023`, "Group selection box"); several objects
+        // draw one lighter box each, a group's being the box around all its leaves.
+        let members = if selected_units.len() > PER_OBJECT_BOX_LIMIT
+            || (selected_units.len() == 1 && selected_units[0].is_group)
+        {
             Vec::new()
         } else {
+            // One pass over the objects: each selected leaf adds its box to its unit.
             let selected: HashSet<NodeId> = self.selection.ids().iter().copied().collect();
-            objects
+            let unit_of: HashMap<NodeId, usize> = selected_units
                 .iter()
-                .filter(|object| selected.contains(&object.id()))
-                .map(|object| oriented_bounds(object).document_corners())
-                .collect()
+                .enumerate()
+                .flat_map(|(at, unit)| unit.leaves.iter().map(move |&leaf| (leaf, at)))
+                .collect();
+            let mut per_unit: Vec<Vec<[Point; 4]>> = vec![Vec::new(); selected_units.len()];
+            for object in objects.iter().filter(|o| selected.contains(&o.id())) {
+                if let Some(&at) = unit_of.get(&object.id()) {
+                    per_unit[at].push(oriented_bounds(object).document_corners());
+                }
+            }
+            let boxes: Vec<[Point; 4]> = per_unit
+                .iter()
+                .filter_map(|corners| merged_corners(corners))
+                .collect();
+            boxes
         };
         Some(GroupDecorationInput {
             corners: box_.document_corners(),
@@ -233,11 +277,11 @@ impl Session {
         let Some(group) = self.group_in(&objects) else {
             return String::new();
         };
-        format!(
-            "{} objects selected, {:.1} by {:.1} mm",
-            group.count(),
+        let selected = self.units().selected(self.selection.ids());
+        curvyo_ui_core::selection_announcement(
+            &selected,
             group.bounds().width(),
-            group.bounds().height()
+            group.bounds().height(),
         )
     }
 

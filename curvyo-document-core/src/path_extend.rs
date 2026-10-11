@@ -203,9 +203,12 @@ impl Document {
         }
         if let Some((other, _)) = &plan.absorbed {
             let tree = self.loro().get_tree(OBJECTS_TREE);
+            let other = crate::paths::tree_id_of(*other);
+            let parents = crate::group_tree::parents_of(&tree, &[other]);
             // invariant: `plan_growth` resolved this object moments ago.
             #[allow(clippy::unwrap_used)]
-            tree.delete(crate::paths::tree_id_of(*other)).unwrap();
+            tree.delete(other).unwrap();
+            crate::groups::remove_emptied_groups(&tree, &parents);
         }
         if plan.close {
             write_closed(&meta, true);

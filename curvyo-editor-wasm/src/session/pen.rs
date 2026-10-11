@@ -5,11 +5,14 @@
 
 use std::cell::RefCell;
 
-use curvyo_document_core::{DocumentVersion, Length, Point};
+use curvyo_document_core::{DocumentVersion, Length, NodeId, Point};
 use curvyo_render_core::{ClosingCue, PenCue};
 use curvyo_ui_core::{EndNodeIndex, JoinType, PenTarget, PressAction, continuation_of, pen_target};
 
 use super::{Session, Tool};
+
+/// What the end-node index was built for: the document read and the entered group.
+type EndIndexKey = (DocumentVersion, Option<NodeId>);
 
 /// What the Pen caches and remembers between events (`specs/0034-pen-path-extension`): the index
 /// of the end nodes of open paths, rebuilt only when the document changes (criterion 24), and the
@@ -17,7 +20,7 @@ use super::{Session, Tool};
 /// target is ignored and the cursor stays what it was).
 #[derive(Debug, Default)]
 pub(super) struct PenCueState {
-    ends: RefCell<Option<(DocumentVersion, EndNodeIndex)>>,
+    ends: RefCell<Option<(EndIndexKey, EndNodeIndex)>>,
     press: Option<PenTarget>,
 }
 
@@ -56,10 +59,19 @@ impl Session {
     /// Runs `f` on the index of the end nodes of open ordinary paths, rebuilding it first if the
     /// document changed since it was built.
     pub(super) fn with_end_index<R>(&self, f: impl FnOnce(&EndNodeIndex) -> R) -> R {
-        let version = self.document.version();
+        // Only the open paths of the entered group are targets (`0023` criterion 30).
+        let key = (self.document.version(), self.context_group());
         let mut cache = self.pen_cue.ends.borrow_mut();
-        if cache.as_ref().is_none_or(|(held, _)| *held != version) {
-            *cache = Some((version, EndNodeIndex::from_paths(&self.paths())));
+        if cache.as_ref().is_none_or(|(held, _)| *held != key) {
+            // Only open paths that are direct children of the context are targets, so a path
+            // inside a group is none at the root (criterion 30).
+            let units = self.units();
+            let paths: Vec<_> = self
+                .paths()
+                .into_iter()
+                .filter(|path| units.group_of(path.id).is_none())
+                .collect();
+            *cache = Some((key, EndNodeIndex::from_paths(&paths)));
         }
         // invariant: the cache was filled just above.
         #[allow(clippy::unwrap_used)]

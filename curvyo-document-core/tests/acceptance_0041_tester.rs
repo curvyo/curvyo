@@ -1503,8 +1503,12 @@ fn c39_no_format_bump_with_the_optional_keys() {
     mv(&d, &[a], 1.0);
     let _c = dup(&d, a, 3.0);
     d.wipe_object_history(a).unwrap();
-    assert_eq!(CURRENT_FORMAT_VERSION, 10, "no bump (ADR 0014 Q2 A)");
-    assert_eq!(manifest_version(&pack(&d, "t").unwrap()), 10);
+    // No bump of its own (ADR 0014 Q2 A): the file carries the version the build has (11 since
+    // `0023-groups`), with or without the optional keys.
+    assert_eq!(
+        manifest_version(&pack(&d, "t").unwrap()),
+        u64::from(CURRENT_FORMAT_VERSION)
+    );
 }
 
 #[test]

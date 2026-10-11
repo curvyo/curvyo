@@ -8,7 +8,8 @@ use curvyo_ui_core::{
 };
 
 use super::history::HistoryResult;
-use super::keys::{KeyAction, KeyHint, KeyInput, KeyOutcome, KeyState};
+use super::key_table::{KeyAction, KeyState};
+use super::keys::{KeyHint, KeyInput, KeyOutcome};
 use super::{Session, Tool};
 
 /// What a press on "Wipe" of an object's history did.

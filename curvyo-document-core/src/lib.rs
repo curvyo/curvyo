@@ -31,6 +31,8 @@ mod format_edit;
 mod format_library;
 mod format_library_file;
 mod format_library_import;
+mod group_tree;
+mod groups;
 mod history;
 mod junction;
 mod legacy_fill;
@@ -78,6 +80,8 @@ pub use format_library_file::{
     MAX_USER_FILE_BYTES, MAX_USER_FORMATS, MAX_USER_GROUPS, USER_FILE_FORMAT, describe_error,
 };
 pub use format_library_import::ImportReport;
+pub use group_tree::MAX_GROUP_DEPTH;
+pub use groups::{GROUP_COMMIT_LABEL, UNGROUP_COMMIT_LABEL};
 pub use history::{
     Author, Direction, Event, FAR_STEP_OPS, HistoryError, HistoryRow, LABEL_NEW_DOCUMENT,
     LABEL_OBJECT_REDO, LABEL_OBJECT_UNDO, LABEL_REDO, LABEL_UNDO, LABEL_WIPE_OBJECT,

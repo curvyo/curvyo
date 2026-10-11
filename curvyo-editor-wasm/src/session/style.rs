@@ -8,7 +8,7 @@
 use curvyo_document_core::{LineCap, LineJoin, MarkerPlace, MarkerShape, NodeId, StyleEdit};
 use curvyo_ui_core::{
     DashChoice, Grid, MarkerSlot, StyleEntryError, StyleField, StylePanelState, StyleScope,
-    StyleTool, ValueField, hsv_to_rgb, parse_dash_text, style_panel_state, style_scope,
+    StyleTool, ValueField, hsv_to_rgb, parse_dash_text, style_panel_state, style_scope_in,
 };
 
 use super::style_view::StylePanelView;
@@ -27,11 +27,12 @@ impl Session {
     /// (criterion 37).
     #[must_use]
     pub fn style_scope(&self) -> StyleScope {
-        style_scope(
+        style_scope_in(
             self.style_tool(),
             &self.objects(),
             &self.selection,
             self.node.selection(),
+            &self.units(),
         )
     }
 
@@ -41,11 +42,12 @@ impl Session {
     #[must_use]
     pub fn style_panel_state(&self) -> Option<StylePanelState> {
         let committed = self.objects();
-        let scope = style_scope(
+        let scope = style_scope_in(
             self.style_tool(),
             &committed,
             &self.selection,
             self.node.selection(),
+            &self.units(),
         );
         if !self.style.is_active() {
             return style_panel_state(&committed, &committed, &scope);

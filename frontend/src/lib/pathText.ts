@@ -126,7 +126,7 @@ export function combineRefusalText(result: CombineResult): string | null {
 
 /** Whether a refused Combine outlines objects on the canvas (criteria 9 to 11). */
 export function combineOutlinesObjects(result: CombineResult): boolean {
-  return ["open_paths", "no_area", "out_of_range", "touching", "self_touching"].includes(
+  return ["open_paths", "no_area", "out_of_range", "touching", "self_touching", "groups"].includes(
     result.kind,
   );
 }
@@ -150,11 +150,13 @@ export function breakApartSuccessText(result: BreakApartResult): string | null {
 }
 
 /** The notice after a refused Break apart (criterion 16), or `null` for a result that is no
- * refusal. Neither refusal outlines an object. */
+ * refusal. Only the refusal for a group outlines objects (the groups). */
 export function breakApartRefusalText(result: BreakApartResult): string | null {
   switch (result.kind) {
     case "no_compound":
       return `Break apart needs a compound path. ${NOTHING_CHANGED}`;
+    case "groups":
+      return `Break apart does not work on groups. Ungroup first. ${NOTHING_CHANGED}`;
     case "one_piece":
       return result.compounds === 1
         ? "Nothing to break apart. The compound path is one piece with its holes."

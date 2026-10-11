@@ -46,7 +46,7 @@ use gesture::{LassoDrag, MarqueeDrag};
 use group_drag::GroupDrag;
 use handles::sole_selected;
 
-pub use entry::{EntryKey, KeyEntryRefusal, MoveEntryMode, double_click};
+pub use entry::{EntryKey, KeyEntryRefusal, MoveEntryMode, double_click, double_click_in};
 pub use gesture::{GestureKind, GestureShape, LiveGesture};
 pub use handles::entry_anchor;
 use move_drag::MoveDrag;
@@ -123,6 +123,14 @@ pub enum SelectDoubleClickOutcome {
     /// double-clicked: the numeric entry is open (criteria 18, 25, 26; 9 and
     /// 15 of `edit-interaction-polish`), and there is no handoff.
     EntryOpened,
+    /// An object of a group of the context was double-clicked: the host enters the group, and
+    /// `leaf` is the leaf under the pointer (`specs/0023-groups` criterion 15).
+    EnterGroup {
+        /// The group of the context that holds the leaf.
+        group: curvyo_document_core::NodeId,
+        /// The leaf that was hit.
+        leaf: curvyo_document_core::NodeId,
+    },
 }
 
 /// The Select tool's state: no shape handles, no path nodes
@@ -152,6 +160,10 @@ pub struct SelectTool {
     /// begun by a plain click that acted on an object, dropped by anything
     /// else that is not an Alt-click on the same point.
     cycle: Option<ClickCycle>,
+    /// Which leaves belong to one object of the context (`specs/0023-groups`): a click,
+    /// Shift-click, marquee, lasso and the Alt-click cycle select a group as one. Set by the host
+    /// before it dispatches an event; a flat default means every leaf is its own object.
+    units: std::sync::Arc<crate::units::Units>,
 }
 
 impl SelectTool {
@@ -159,6 +171,17 @@ impl SelectTool {
     #[must_use]
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Sets the grouping of the leaves under the context the next events act in.
+    pub fn set_units(&mut self, units: std::sync::Arc<crate::units::Units>) {
+        self.units = units;
+    }
+
+    /// The grouping the tool selects by.
+    #[must_use]
+    pub fn units(&self) -> &crate::units::Units {
+        &self.units
     }
 
     /// Whether resizes scale the stroke width — the "Scale stroke width"
@@ -275,7 +298,8 @@ impl SelectTool {
         // An Alt press keeps the cycle: its release without movement
         // continues it.
         if target != PressTarget::Lasso {
-            self.cycle = ClickCycle::begun_by(target, point, objects, selection, shift);
+            self.cycle =
+                ClickCycle::begun_by(target, point, objects, selection, shift, &self.units);
         }
         match target {
             PressTarget::Handle(handle) => {
@@ -301,8 +325,14 @@ impl SelectTool {
                 SelectPointerDownOutcome::Marquee
             }
             PressTarget::Object(hit) => {
-                self.drag =
-                    SelectDrag::Moving(begin_object_press(objects, selection, hit, shift, origin));
+                self.drag = SelectDrag::Moving(begin_object_press(
+                    objects,
+                    selection,
+                    hit,
+                    shift,
+                    origin,
+                    &self.units,
+                ));
                 SelectPointerDownOutcome::Selected
             }
             // The cycle survives: a release without movement continues it.
@@ -367,7 +397,12 @@ impl SelectTool {
             SelectDrag::None => {}
             SelectDrag::Moving(drag) => {
                 Self::finish_move(
-                    &drag, document, objects, selection, point, modifiers, minter,
+                    &drag,
+                    document,
+                    objects,
+                    selection,
+                    (point, modifiers),
+                    (minter, &self.units),
                 );
             }
             SelectDrag::Transforming(drag) => {

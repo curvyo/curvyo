@@ -68,13 +68,22 @@ impl Session {
             this.end_colour_pick();
             let objects = this.objects();
             let selection = this.boolean_selection();
+            // The operation does not look through groups (`0023` criterion 28).
+            let in_groups = this.selected_group_leaves();
+            if !in_groups.is_empty() {
+                this.command_refusal = Some(RefusalMarks::new(in_groups.clone(), &selection));
+                return BooleanOutcome::Refused(BooleanRefusal::Groups {
+                    offenders: in_groups,
+                });
+            }
             let plan = match plan_boolean(&objects, &selection, op, &mut this.minter) {
                 Ok(plan) => plan,
                 Err(refusal) => {
                     this.command_refusal = match &refusal {
                         BooleanRefusal::OpenPaths { offenders, .. }
                         | BooleanRefusal::NoArea { offenders, .. }
-                        | BooleanRefusal::OutOfRange { offenders, .. } => {
+                        | BooleanRefusal::OutOfRange { offenders, .. }
+                        | BooleanRefusal::Groups { offenders } => {
                             Some(RefusalMarks::new(offenders.clone(), &selection))
                         }
                         BooleanRefusal::NeedsTwo | BooleanRefusal::Empty => None,

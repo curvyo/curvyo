@@ -21,6 +21,7 @@ use crate::transform_commit::{
 use crate::transform_entry::{
     EntryField, EntryOutcome, InvalidReason, format_mm, parse_entry_number,
 };
+use crate::units::Units;
 
 /// An open move entry: the object (or objects) and the drawn bounds as they
 /// were when it opened (an entry whose object changed or went away since
@@ -248,9 +249,15 @@ impl MoveEntry {
         texts: [&str; 2],
         absolute: bool,
         copy: bool,
-        minter: &mut AnchorIdMinter,
+        (minter, units): (&mut AnchorIdMinter, &Units),
     ) -> (EntryOutcome, Option<Vec<NodeId>>) {
-        self.commit_at(document, texts, (absolute, self.reference), copy, minter)
+        self.commit_at(
+            document,
+            texts,
+            (absolute, self.reference),
+            copy,
+            (minter, units),
+        )
     }
 
     /// [`MoveEntry::commit`] with `reference` instead of the chosen point: the click on a
@@ -262,7 +269,7 @@ impl MoveEntry {
         texts: [&str; 2],
         (absolute, reference): (bool, ReferencePoint),
         copy: bool,
-        minter: &mut AnchorIdMinter,
+        (minter, units): (&mut AnchorIdMinter, &Units),
     ) -> (EntryOutcome, Option<Vec<NodeId>>) {
         let unchanged = self
             .start
@@ -275,7 +282,7 @@ impl MoveEntry {
             Err((field, reason)) => (EntryOutcome::Invalid { field, reason }, None),
             Ok(None) => (EntryOutcome::Unchanged, None),
             Ok(Some(offset)) => {
-                let copies = commit_move(document, &self.ids, offset, copy, minter);
+                let copies = commit_move(document, &self.ids, offset, copy, (minter, units));
                 (EntryOutcome::Committed, copies)
             }
         }
@@ -352,7 +359,7 @@ mod tests {
                     ["5", "-3"],
                     false,
                     false,
-                    &mut AnchorIdMinter::new(99)
+                    (&mut AnchorIdMinter::new(99), &Units::default())
                 )
                 .0,
             EntryOutcome::Committed
@@ -374,7 +381,7 @@ mod tests {
                     ["100", "50"],
                     true,
                     false,
-                    &mut AnchorIdMinter::new(99)
+                    (&mut AnchorIdMinter::new(99), &Units::default())
                 )
                 .0,
             EntryOutcome::Committed
@@ -415,7 +422,7 @@ mod tests {
                         ["-12.5", "300.25"],
                         true,
                         false,
-                        &mut AnchorIdMinter::new(99)
+                        (&mut AnchorIdMinter::new(99), &Units::default())
                     )
                     .0,
                 EntryOutcome::Committed
@@ -473,7 +480,7 @@ mod tests {
                         texts,
                         absolute,
                         false,
-                        &mut AnchorIdMinter::new(99)
+                        (&mut AnchorIdMinter::new(99), &Units::default())
                     )
                     .0,
                 EntryOutcome::Unchanged,
@@ -509,7 +516,7 @@ mod tests {
                             texts,
                             absolute,
                             false,
-                            &mut AnchorIdMinter::new(99)
+                            (&mut AnchorIdMinter::new(99), &Units::default())
                         )
                         .0,
                     EntryOutcome::Invalid {
@@ -567,7 +574,7 @@ mod tests {
                         ["12.5", "-4.25"],
                         false,
                         false,
-                        &mut AnchorIdMinter::new(99)
+                        (&mut AnchorIdMinter::new(99), &Units::default())
                     )
                     .0,
                 EntryOutcome::Committed
@@ -597,7 +604,7 @@ mod tests {
                     ["5", "5"],
                     false,
                     false,
-                    &mut AnchorIdMinter::new(99)
+                    (&mut AnchorIdMinter::new(99), &Units::default())
                 )
                 .0,
             EntryOutcome::Unchanged
@@ -611,7 +618,7 @@ mod tests {
                     ["5", "5"],
                     false,
                     false,
-                    &mut AnchorIdMinter::new(99)
+                    (&mut AnchorIdMinter::new(99), &Units::default())
                 )
                 .0,
             EntryOutcome::Unchanged
@@ -653,7 +660,7 @@ mod tests {
                     ["100", "50"],
                     true,
                     false,
-                    &mut AnchorIdMinter::new(99)
+                    (&mut AnchorIdMinter::new(99), &Units::default())
                 )
                 .0,
             EntryOutcome::Committed
@@ -742,7 +749,7 @@ mod tests {
             ["0", "0"],
             (true, ReferencePoint::TopLeft),
             false,
-            &mut AnchorIdMinter::new(99),
+            (&mut AnchorIdMinter::new(99), &Units::default()),
         );
         assert_eq!(outcome, EntryOutcome::Committed);
         let centre = match document.object(id).expect("exists") {

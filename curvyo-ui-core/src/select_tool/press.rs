@@ -15,6 +15,7 @@ use crate::object_selection::ObjectSelection;
 use crate::oriented_box::oriented_bounds;
 use crate::transform_drag::DragOrigin;
 use crate::transform_handle_layout::{EditHandle, TransformHandleTolerances};
+use crate::units::Units;
 
 /// What a press lands on, in the order [`classify_press`] tries them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -130,7 +131,7 @@ pub fn classify_press(
 }
 
 /// The move a press on `hit`'s outline or body begins, with the selection
-/// change its modifier asks for. Without Shift a different object becomes the
+/// change its modifier asks for. `hit` stands for its whole group (`units`) wherever it has one. Without Shift a different object becomes the
 /// single selection (criterion 16) and a selected one keeps the group so it
 /// can be dragged together (criterion 18). With Shift the selection does not
 /// change at the press (criterion 29): a release inside the dead zone toggles
@@ -142,15 +143,23 @@ pub(super) fn begin_object_press(
     hit: NodeId,
     shift: bool,
     origin: DragOrigin,
+    units: &Units,
 ) -> MoveDrag {
     if shift {
+        // A group joins as a whole: the bounds of the move include all its leaves.
         let joins = (!selection.contains(hit)).then_some(hit);
-        let mut drag = MoveDrag::new(origin, false, objects, selection, joins);
+        let mut wider = selection.clone();
+        if joins.is_some() {
+            wider.add_all(units.leaves_with(&hit));
+        }
+        let mut drag = MoveDrag::new(origin, false, objects, &wider, None);
+        drag.joins = joins;
         drag.pending_toggle = Some(hit);
         return drag;
     }
     if !selection.contains(hit) {
-        selection.select_single(hit);
+        // A group is selected as a whole (`0023` criterion 8).
+        selection.set(units.leaves_with(&hit));
     }
     MoveDrag::new(origin, false, objects, selection, None)
 }

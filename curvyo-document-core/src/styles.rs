@@ -9,7 +9,7 @@ use std::collections::HashSet;
 use loro::LoroMap;
 
 use crate::document::{Document, OBJECTS_TREE};
-use crate::path_codec::node_exists;
+use crate::path_codec::leaf_exists;
 use crate::path_model::{Color, NodeId};
 use crate::paths::tree_id_of;
 use crate::shape_codec::{ShapeTag, read_shape_tag_checked};
@@ -197,7 +197,7 @@ impl Document {
     fn style_meta(&self, id: NodeId) -> Result<LoroMap, StyleEditError> {
         let tree = self.loro().get_tree(OBJECTS_TREE);
         let tree_id = tree_id_of(id);
-        if !node_exists(&tree, tree_id) {
+        if !leaf_exists(&tree, tree_id) {
             return Err(StyleEditError::NoSuchObject);
         }
         tree.get_meta(tree_id)

@@ -33,6 +33,7 @@ mod format_list_view;
 mod group_box;
 mod group_entry;
 mod group_transform;
+mod grouping;
 mod history_names;
 mod history_notice;
 mod hit_test;
@@ -76,6 +77,7 @@ mod transform_handle_layout;
 mod transform_math;
 mod transform_primitive;
 mod undo_stack;
+mod units;
 mod value_scale;
 mod viewport;
 
@@ -115,6 +117,10 @@ pub use group_box::{
     GroupBoxShape, GroupSelection, group_handles, hit_group_handle, is_drawn_group_handle,
 };
 pub use group_entry::GroupEntry;
+pub use grouping::{
+    GroupingAvailability, TOO_DEEP_NOTICE, context_announcement, grouped_notice,
+    grouping_availability, groups_refusal_notice, selection_announcement, ungrouped_notice,
+};
 pub use history_names::{
     OPERATION_NAMES, RESERVED_LABELS, UNKNOWN_OPERATION_NAME, known_operation_name, operation_name,
 };
@@ -124,7 +130,7 @@ pub use history_notice::{
 };
 pub use hit_test::{Hit, hit_test};
 pub use hit_test_object::{hit_test_object, hit_test_objects, hit_test_objects_along};
-pub use marquee::{MarqueeMode, objects_in_marquee};
+pub use marquee::{MarqueeMode, objects_in_marquee, units_in_marquee};
 pub use modifiers::Modifiers;
 pub use move_entry::MoveEntry;
 pub use node_tool::{
@@ -171,7 +177,8 @@ pub use select_bar::{
 pub use select_tool::{
     Axis, EntryKey, GestureKind, GestureShape, KeyEntryRefusal, LiveEdit, LiveGesture,
     MoveEntryMode, MoveResolution, PressTarget, SelectDoubleClickOutcome, SelectPointerDownOutcome,
-    SelectTool, TransformHandleTolerances, classify_press, double_click, entry_anchor,
+    SelectTool, TransformHandleTolerances, classify_press, double_click, double_click_in,
+    entry_anchor,
 };
 pub use selection::NodeSelection;
 pub use shape_tool_common::{CreateOutcome, CreatePreview};
@@ -187,7 +194,7 @@ pub use style_panel::{
     DashChoice, DashShown, FillPanel, MarkersPanel, Rgba, StrokePanel, StylePanelState,
     style_panel_state,
 };
-pub use style_scope::{StyleScope, StyleTool, object_kind_name, style_scope};
+pub use style_scope::{StyleScope, StyleTool, object_kind_name, style_scope, style_scope_in};
 pub use transform_drag::{
     CornerLinking, CornerRadiusScaling, ParamDragInfo, ScaleModes, StrokeScaling,
 };
@@ -206,5 +213,6 @@ pub use transform_math::{
     stroke_or_radius_factor,
 };
 pub use undo_stack::{SelectionSnapshot, Target as UndoTarget, UndoStack};
+pub use units::{SelectedUnit, Units};
 pub use value_scale::{FieldShown, Grid, ValueField, ValueScale};
 pub use viewport::{DOCUMENT_INSET_PX, PX_PER_MM_AT_100, Viewport, Zoom};

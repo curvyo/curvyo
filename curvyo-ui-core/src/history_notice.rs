@@ -20,11 +20,21 @@ pub fn summary_shapes(label: &str, touched: &[(ObjectShape, Role)]) -> Vec<Objec
     }
     let replaced = touched.iter().any(|(_, role)| *role == Role::Deleted)
         && touched.iter().any(|(_, role)| *role == Role::Created);
-    touched
+    let shapes: Vec<ObjectShape> = touched
         .iter()
         .filter(|(_, role)| !(replaced && *role == Role::Created))
         .map(|(shape, _)| *shape)
-        .collect()
+        .collect();
+    // The group node of a Group or Ungroup is not one of the objects the maker moved: they are
+    // the members. A step that touched only groups (a deleted group) counts the groups.
+    if shapes.iter().any(|shape| *shape != ObjectShape::Group) {
+        shapes
+            .into_iter()
+            .filter(|shape| *shape != ObjectShape::Group)
+            .collect()
+    } else {
+        shapes
+    }
 }
 
 /// "1 rectangle", "3 paths", "5 objects": the summary of the objects a step touched. Objects of
@@ -41,6 +51,7 @@ pub fn objects_summary(shapes: &[ObjectShape]) -> Option<String> {
             ObjectShape::Ellipse => ("ellipse", "ellipses"),
             ObjectShape::Polygon => ("polygon", "polygons"),
             ObjectShape::Star => ("star", "stars"),
+            ObjectShape::Group => ("group", "groups"),
         };
         Some(format!("{count} {}", if count == 1 { one } else { many }))
     } else {

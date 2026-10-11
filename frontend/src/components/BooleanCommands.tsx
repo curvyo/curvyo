@@ -3,7 +3,7 @@ import { useRef, useState } from "react";
 import { BooleanGlyph } from "@/components/BooleanGlyphs";
 import { CommandButton } from "@/components/CommandButton";
 import {
-  COLUMN_A_TOOLTIP_OFFSET_PX,
+  COLUMN_B_TOOLTIP_OFFSET_PX,
   RAIL_CARD_CLASS,
   RAIL_CARD_STYLE,
 } from "@/components/railCard";
@@ -45,10 +45,9 @@ function targetIndex(key: string, index: number): number | null {
 
 /**
  * The Boolean toolbox of the tool rail (`docs/design-system.md`, rows "Boolean toolbox" and
- * "Toolbox card"): a card of its own below the tools card, five commands, not tools, one
+ * "Toolbox card"): a card of its own below the Path card in column B, five commands, not tools, one
  * column. One Tab stop with roving focus. It shows what the session says is available and
- * decides nothing. Its notice is drawn by the rail (`BooleanNotice`), outside the card's
- * scrolling column.
+ * decides nothing. Its notice is drawn by the rail (`BooleanNotice`).
  */
 export function BooleanCommands({ commands, selectTool, onReturnFocus }: BooleanCommandsProps) {
   const { availability, busy, apply } = commands;
@@ -76,7 +75,7 @@ export function BooleanCommands({ commands, selectTool, onReturnFocus }: Boolean
           note={tooltipNote(availability, selectTool)}
           glyph={<BooleanGlyph op={op} />}
           dimmed={availability.needsTwo}
-          tooltipOffset={COLUMN_A_TOOLTIP_OFFSET_PX}
+          tooltipOffset={COLUMN_B_TOOLTIP_OFFSET_PX}
           tabIndex={index === stop ? 0 : -1}
           pressed={busy && pressed === op}
           onFocus={() => setStop(index)}

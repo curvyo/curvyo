@@ -128,6 +128,9 @@ export function sharedRefusalText(
       const verb = result.count === 1 ? "reaches" : "reach";
       return `${name} works only within 10 km of the point 0, 0. ${result.count} of ${objects} ${verb} further. ${NOTHING_CHANGED}`;
     }
+    case "groups":
+      // The operations do not look through groups (`0023` criterion 28).
+      return `${name} does not work on groups. Ungroup first. ${NOTHING_CHANGED}`;
     default:
       return null;
   }
@@ -145,6 +148,9 @@ export function refusalText(op: BooleanOp, result: BooleanResult): string | null
 /** Whether a refusal outlines objects on the canvas (criteria 15 and 16). */
 export function refusalOutlinesObjects(result: BooleanResult): boolean {
   return (
-    result.kind === "open_paths" || result.kind === "no_area" || result.kind === "out_of_range"
+    result.kind === "open_paths" ||
+    result.kind === "no_area" ||
+    result.kind === "out_of_range" ||
+    result.kind === "groups"
   );
 }

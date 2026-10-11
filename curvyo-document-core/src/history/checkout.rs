@@ -7,7 +7,7 @@
 
 use std::collections::BTreeMap;
 
-use loro::{FractionalIndex, Frontiers, LoroDoc, TreeID};
+use loro::{FractionalIndex, Frontiers, LoroDoc, TreeID, TreeParentId};
 
 use super::error::HistoryError;
 use super::node_value::{Node, read_map};
@@ -20,6 +20,8 @@ pub(crate) struct NodeAt {
     pub meta: BTreeMap<String, Node>,
     /// Its position among its siblings.
     pub index: Option<FractionalIndex>,
+    /// The group that holds it; `None` at the document root and for a node that does not exist.
+    pub parent: Option<TreeID>,
 }
 
 /// The document checked out to a version. Dropping it checks the document out to the latest
@@ -53,6 +55,7 @@ impl<'a> Detached<'a> {
             return NodeAt {
                 meta: BTreeMap::new(),
                 index: None,
+                parent: None,
             };
         }
         NodeAt {
@@ -63,6 +66,10 @@ impl<'a> Detached<'a> {
             index: tree
                 .fractional_index(id)
                 .map(FractionalIndex::from_hex_string),
+            parent: match tree.parent(id) {
+                Some(TreeParentId::Node(parent)) => Some(parent),
+                _ => None,
+            },
         }
     }
 
@@ -71,9 +78,12 @@ impl<'a> Detached<'a> {
         read_map(&self.doc.get_map(ROOT_MAP))
     }
 
-    /// The root objects in z-order at this version.
-    pub(crate) fn roots(&self) -> Vec<TreeID> {
-        self.doc.get_tree(OBJECTS_TREE).roots()
+    /// The children of `parent` (`None` is the document root) in z-order at this version.
+    pub(crate) fn children(&self, parent: Option<TreeID>) -> Vec<TreeID> {
+        self.doc
+            .get_tree(OBJECTS_TREE)
+            .children(parent.map_or(TreeParentId::Root, TreeParentId::Node))
+            .unwrap_or_default()
     }
 }
 

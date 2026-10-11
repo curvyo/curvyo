@@ -5,6 +5,7 @@ use curvyo_document_core::{NodeId, ObjectSnapshot, PrimitiveSnapshot, Shape, Sty
 
 use crate::object_selection::{ObjectSelection, objects_with_ids};
 use crate::selection::NodeSelection;
+use crate::units::Units;
 
 /// The tool the panel is scoped by (criterion 37). The creation tools and
 /// Select all edit the object selection.
@@ -60,6 +61,20 @@ pub fn style_scope(
     selection: &ObjectSelection,
     nodes: &NodeSelection,
 ) -> StyleScope {
+    style_scope_in(tool, objects, selection, nodes, &Units::default())
+}
+
+/// [`style_scope`] with groups (`specs/0023-groups` criteria 11 and 26): a selected group is
+/// edited through its leaves, and the subject line names it: "Group of 5 objects", "2 groups" or,
+/// for a mix of objects of the context, "4 objects".
+#[must_use]
+pub fn style_scope_in(
+    tool: StyleTool,
+    objects: &[ObjectSnapshot],
+    selection: &ObjectSelection,
+    nodes: &NodeSelection,
+    units: &Units,
+) -> StyleScope {
     if tool == StyleTool::Pen {
         return StyleScope {
             ids: Vec::new(),
@@ -78,10 +93,36 @@ pub fn style_scope(
         selection.ids().to_vec()
     };
     let held = objects_with_ids(objects, &wanted);
-    StyleScope {
-        ids: held.iter().map(|object| object.id()).collect(),
-        subject: subject_line(&held),
+    let ids: Vec<NodeId> = held.iter().map(|object| object.id()).collect();
+    let subject = group_subject(tool, &ids, units).unwrap_or_else(|| subject_line(&held));
+    StyleScope { ids, subject }
+}
+
+/// The subject line of a selection that holds a group, `None` when it holds none (or the panel is
+/// scoped by nodes): one group is "Group of 5 objects", several groups "2 groups", groups and
+/// leaves together a count of the objects of the context ("4 objects").
+fn group_subject(tool: StyleTool, ids: &[NodeId], units: &Units) -> Option<String> {
+    if tool == StyleTool::Node {
+        return None;
     }
+    let selected = units.selected(ids);
+    if !selected.iter().any(|unit| unit.is_group) {
+        return None;
+    }
+    let all_groups = selected.iter().all(|unit| unit.is_group);
+    Some(match selected.as_slice() {
+        [unit] => format!(
+            "Group of {} {}",
+            unit.leaves.len(),
+            if unit.leaves.len() == 1 {
+                "object"
+            } else {
+                "objects"
+            }
+        ),
+        _ if all_groups => format!("{} groups", selected.len()),
+        _ => format!("{} objects", selected.len()),
+    })
 }
 
 /// The paths owning the selected nodes or the selected segment, in selection

@@ -36,6 +36,8 @@ mod wasm_document;
 #[cfg(target_arch = "wasm32")]
 mod wasm_formats;
 #[cfg(target_arch = "wasm32")]
+mod wasm_group;
+#[cfg(target_arch = "wasm32")]
 mod wasm_history;
 #[cfg(target_arch = "wasm32")]
 mod wasm_keys;
@@ -65,8 +67,9 @@ mod wasm_shape_tools;
 pub use session::{
     BooleanOutcome, BreakApartOutcome, ClosePathOutcome, ClosePathState, CombineOutcome,
     DocumentPresetsRecord, DocumentSide, DoubleClickHint, EscapeStep, FitOutcome, FormTexts,
-    FormatEdit, HistoryResult, KeyHint, KeyInput, KeyOutcome, MoveIndicators, ObjectWipeOutcome,
-    PanelTabsRecord, PanelView, Session, SizeOutcome, Tool, WipeOutcome, WipeState,
+    FormatEdit, GroupingKind, GroupingResult, HistoryResult, KeyHint, KeyInput, KeyOutcome,
+    MoveIndicators, ObjectWipeOutcome, PanelTabsRecord, PanelView, Session, SizeOutcome, Tool,
+    WipeOutcome, WipeState,
 };
 
 #[cfg(target_arch = "wasm32")]

@@ -120,6 +120,23 @@ impl ObjectSelection {
         }
     }
 
+    /// Adds every id of `ids` to the selection, keeping the order of both.
+    pub fn add_all(&mut self, ids: &[NodeId]) {
+        for &id in ids {
+            self.add(id);
+        }
+    }
+
+    /// Shift-click on an object that is several leaves (a group): removes all of `ids` when every
+    /// one of them is selected, else adds the missing ones.
+    pub fn toggle_all(&mut self, ids: &[NodeId]) {
+        if !ids.is_empty() && ids.iter().all(|id| self.contains(*id)) {
+            self.ids.retain(|id| !ids.contains(id));
+        } else {
+            self.add_all(ids);
+        }
+    }
+
     /// Combines a gesture's `result` with the selection (`result` in the
     /// order the gesture found it): [`SelectionCombine::Replace`] selects
     /// exactly `result`, [`SelectionCombine::Add`] appends every id not yet

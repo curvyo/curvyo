@@ -107,6 +107,40 @@ first). No new crate, no new dependency, no trait, no generic.
   33 levels deep (refused), and one where a path node has a child
   (refused). The `specs/README.md` format table names the number in the PR.
 
+- **2026-10-11: how the build realises the shape (implementer).**
+  - `Document::object_ids()` keeps its meaning "every object with geometry, in paint order" and now
+    lists the **leaves** of the tree depth first. A group is not an `ObjectSnapshot`
+    (`object(group)` is `None`, like `path(primitive)`), so every reader of the flat list (render,
+    bounds, Fit to content, export) is unchanged. New reads: `children`, `parent_group`,
+    `ancestor_groups`, `leaves_of`, `child_groups`, `anchor_count`, `is_group`, `contains_node`.
+  - The **selection stays a set of leaf ids**; a group is selected when its leaves are. `ui-core`'s
+    `Units` (new `units.rs`) says which leaves belong together at the current level, so a click,
+    Shift-click, marquee, lasso, Alt-click cycle, Ctrl-copy and double-click treat a group as one
+    object. The group box, handles, move, nudge, typed values, style panel and Node tool needed no
+    change for groups; a group of exactly one leaf behaves like that leaf (its own box and handles).
+  - The context is `Session::context`, a stack of group ids; `Session::objects()` returns only the
+    leaves inside it (inert outside by construction), `render_objects()` the whole document with
+    the outside at 35 % (`curvyo-render-core::dim_outside`, cached per document read).
+    New objects are created under `Document::set_draw_parent` (view state, not stored).
+  - **Undo of group steps needed the history engine's parent and z-order restore**, which the
+    review note in `specs/0020-undo-redo/adrs.md` assigns to this slice: `NodeAt` carries the
+    parent, a moved object is put back after the siblings that precede it in the restored version
+    (by order, not by fractional index: the handler regenerates indices), a deleted node is
+    revived under its old parent in the same change (parents first), and a node that still has
+    children is never deleted by the undo of a created group. `ObjectShape::Group` is new.
+    "0023 adds no history code" above no longer holds.
+  - **Empty groups** from a file or a peer are removed by the next local command that touches
+    their parent (delete, replace, Group, Ungroup): `remove_emptied_groups` first removes every
+    empty group among the children of each touched parent, then walks upwards. There is no repair
+    commit on open.
+  - **Concurrency (ADR 0009 follow-up):** a member that one peer deletes while another groups it
+    comes back inside the group after the sync (the tree move beats the delete); the replicas
+    converge. Two peers that group the same object get Loro's move resolution as written above.
+  - Group refusals (criterion 28) are `Groups { offenders }` variants of `BooleanRefusal`,
+    `CombineRefusal` and `BreakApartRefusal`, raised by the session before planning.
+  - Open items: the double-click hint chip ("Double-click to open") and the glyph sheet are not
+    built; the Offset button (0038) and the other later commands add their own group refusal.
+
 ## Shared files and order
 
 - 0040 (format version, document root) and 0046 (format version): do not

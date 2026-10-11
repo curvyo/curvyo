@@ -527,6 +527,9 @@ fn every_older_fixture_still_opens_with_the_styles_it_stored() {
         "background_color_three_v10.curvyo",
         "background_color_range_v10.curvyo",
         "background_color_type_v10.curvyo",
+        // The damaged-group files of `0023-groups`.
+        "groups_too_deep_v11.curvyo",
+        "groups_leaf_child_v11.curvyo",
     ];
     let mut opened = 0;
     for entry in std::fs::read_dir(dir).unwrap() {

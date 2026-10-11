@@ -178,6 +178,12 @@ and a marker a peer could edit concurrently.
     (`=1.16.2`, like `i_overlay`), and a canary test in `curvyo-document-core` fails when Loro
     stops accepting the op or stops keeping the containers. A Loro upgrade that breaks the canary
     is not taken; soft delete (option B) is then built behind a customer decision on the bump.
+    *Amended 2026-10-11 (`0023-groups`):* the injected move carries the node's parent at the
+    restored version (`parent: Some(group)` inside a group, `None` at the root); a group that comes
+    back in the same restore precedes its children in the one change. Objects a step moved to
+    another parent or place (Group, Ungroup) are moved back in the restore commit, after the
+    nearest preceding sibling of the restored version that lives now (by order, not by fractional
+    index); a created group that still holds children is kept and reported.
 12. **Checkout guard** (*new 2026-10-10*). The only way to check out is a guard value whose `Drop`
     calls `checkout_to_latest`; it exposes reads only, and `Document::version()` and every cache
     keyed by `DocumentVersion` are unreachable while it lives. Detached editing

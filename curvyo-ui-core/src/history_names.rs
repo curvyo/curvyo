@@ -59,6 +59,8 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     ("set_document_background", "Change background"),
     ("combine_paths", "Combine"),
     ("break_apart", "Break apart"),
+    ("group", "Group"),
+    ("ungroup", "Ungroup"),
 ];
 
 /// The labels the engine writes itself. They are no step of the maker's: the setup of a new

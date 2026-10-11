@@ -1,9 +1,9 @@
 import { CircleAlert } from "lucide-react";
 
 import {
+  PATH_CARD_HEIGHT_PX,
   PATH_CARD_TOP_PX,
   RAIL_CARD_GAP_PX,
-  TOOLS_CARD_HEIGHT_PX,
 } from "@/components/railCard";
 import type { ActionNotice } from "@/hooks/useActionNotice";
 
@@ -11,17 +11,16 @@ import type { ActionNotice } from "@/hooks/useActionNotice";
 function noticeTop(notice: ActionNotice | null): number {
   return notice?.anchor === "path"
     ? PATH_CARD_TOP_PX
-    : TOOLS_CARD_HEIGHT_PX + RAIL_CARD_GAP_PX + 4;
+    : PATH_CARD_HEIGHT_PX + RAIL_CARD_GAP_PX + 4;
 }
 
 /**
  * The notice beside the rail (`docs/design-system.md`, row "Action notice"): text only, no
  * pointer events, no focus. Both live regions are in the tree from the start, so a notice is
- * announced as a change of text. A child of the rail's root (not of the scrolling card
- * column): its left edge is 12px right of the rail's right edge (`--rail-right` + 12) and its top
+ * announced as a change of text. A child of the rail's root: its left edge is 12px right of the rail's right edge (`--rail-right` + 12) and its top
  * edge is level with the top of the first button of the card that issued it: Union (below the
- * tools card, the 8px gap and the Boolean card's 4px padding) or Combine (the Path card's 4px
- * padding). One status region and one alert region serve every card.
+ * Path card in column B, the 8px gap and the Boolean card's 4px padding) or Combine (the Path
+ * card's 4px padding). One status region and one alert region serve every card.
  */
 export function BooleanNotice({ notice }: { notice: ActionNotice | null }) {
   return (

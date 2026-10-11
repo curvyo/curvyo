@@ -68,6 +68,12 @@ pub(crate) fn node_exists(tree: &LoroTree, id: loro::TreeID) -> bool {
     tree.contains(id) && matches!(tree.is_node_deleted(&id), Ok(false))
 }
 
+/// Whether `id` is a live leaf object (a path or a primitive): a live node that is not a group.
+/// The kind-specific commands use it, so a group id is "no such object" to them.
+pub(crate) fn leaf_exists(tree: &LoroTree, id: loro::TreeID) -> bool {
+    node_exists(tree, id) && !crate::group_tree::is_group_node(tree, id)
+}
+
 /// Writes a brand-new path's `closed` flag and its whole style. Takes the
 /// style explicitly so `Document::split_at_anchor`'s new object copies the
 /// split path's own style instead of resetting it
@@ -430,12 +436,10 @@ pub(crate) fn read_path_snapshot(id: NodeId, meta: &LoroMap) -> PathSnapshot {
 /// to defaults, matching slice 1's forward-compatible reading stance.
 pub(crate) fn validate_path_tree(loro: &LoroDoc, paths_tree_key: &str) -> bool {
     let tree = loro.get_tree(paths_tree_key);
-    tree.roots()
-        .into_iter()
-        .all(|id| validate_object_node(&tree, id))
+    crate::group_tree::validate_tree(&tree, validate_object_node)
 }
 
-/// Dispatches one object (root tree node) to path validation when its
+/// Dispatches one leaf object to path validation when its
 /// `shape` tag is absent, or to
 /// [`crate::shape_codec::validate_primitive_node`] when present
 /// (`specs/0003-primitive-shapes/adrs.md`: "open-file validation dispatches

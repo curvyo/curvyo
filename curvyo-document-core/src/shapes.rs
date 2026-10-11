@@ -6,12 +6,10 @@
 //! refused multi-object call (`convert_to_paths`) never leaves a partial
 //! edit behind.
 
-use loro::TreeParentId;
-
 use crate::corner_radii::CornerRadii;
 use crate::corner_radii_codec::write_corner_radii_if_changed;
 use crate::document::{Document, OBJECTS_TREE};
-use crate::path_codec::{self, node_exists};
+use crate::path_codec::{self, leaf_exists};
 use crate::path_model::{NewAnchor, NodeId};
 use crate::primitive_model::{
     EllipseFrame, InnerRatio, ObjectSnapshot, PointCount, PrimitiveSnapshot, RectBounds, StarFrame,
@@ -144,10 +142,10 @@ impl Document {
     /// neither of which Loro's API can reject.
     fn create_primitive_node(&self, shape: &str) -> NodeId {
         let tree = self.loro().get_tree(OBJECTS_TREE);
-        // invariant: creating a root-level node on a freshly obtained
-        // tree handle cannot fail.
+        // invariant: creating a node under the root or a live group on a
+        // freshly obtained tree handle cannot fail.
         #[allow(clippy::unwrap_used)]
-        let tree_id = tree.create(TreeParentId::Root).unwrap();
+        let tree_id = tree.create(self.creation_parent(&tree)).unwrap();
         // invariant: reading the meta map of a node this call just
         // created cannot fail.
         #[allow(clippy::unwrap_used)]
@@ -165,7 +163,7 @@ impl Document {
     pub fn object(&self, id: NodeId) -> Option<ObjectSnapshot> {
         let tree = self.loro().get_tree(OBJECTS_TREE);
         let tree_id = tree_id_of(id);
-        if !node_exists(&tree, tree_id) {
+        if !leaf_exists(&tree, tree_id) {
             return None;
         }
         let meta = tree.get_meta(tree_id).ok()?;
@@ -357,7 +355,7 @@ impl Document {
             .iter()
             .map(|(id, _)| {
                 let tree_id = tree_id_of(*id);
-                if !node_exists(&tree, tree_id) {
+                if !leaf_exists(&tree, tree_id) {
                     return Err(ShapeEditError::NoSuchObject);
                 }
                 let meta = tree
@@ -421,7 +419,7 @@ impl Document {
     fn require_primitive(&self, id: NodeId) -> Result<loro::LoroMap, ShapeEditError> {
         let tree = self.loro().get_tree(OBJECTS_TREE);
         let tree_id = tree_id_of(id);
-        if !node_exists(&tree, tree_id) {
+        if !leaf_exists(&tree, tree_id) {
             return Err(ShapeEditError::NoSuchObject);
         }
         tree.get_meta(tree_id)

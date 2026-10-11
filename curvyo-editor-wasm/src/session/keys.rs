@@ -2,9 +2,9 @@
 //! Delete (`specs/0010-edit-interaction-polish/`, Parts D and F; `adrs.md`
 //! decisions 4 and 6).
 
-use curvyo_document_core::Direction;
-use curvyo_ui_core::{Arrow, EntryKey, KeyEntryRefusal, NudgeEvent};
+use curvyo_ui_core::{KeyEntryRefusal, NudgeEvent};
 
+use super::key_table::{KeyAction, KeyState, Selected, decide};
 use super::{Session, Tool};
 
 /// One key event as the frontend reports it: the DOM `key` value, the
@@ -91,6 +91,13 @@ pub enum KeyOutcome {
     RedoBusy,
     /// Ctrl+A selected every object (it may have found none).
     SelectedAll,
+    /// Ctrl+G grouped the selection; the notice is in [`Session::take_grouping_result`].
+    Group,
+    /// Ctrl+Shift+G ungrouped the selected groups; the notice is in
+    /// [`Session::take_grouping_result`].
+    Ungroup,
+    /// Enter entered the selected group.
+    EnteredGroup,
     /// An arrow key moved the selection; `new_run` is true when the event
     /// opened a new run of held-key events (a new step once `0020` exists).
     Nudged {
@@ -114,6 +121,7 @@ impl KeyOutcome {
             Self::Escape(EscapeStep::ClosedEntry) => "escape-entry",
             Self::Escape(EscapeStep::CancelledDrag) => "escape-drag",
             Self::Escape(EscapeStep::ClearedState) => "escape-state",
+            Self::Escape(EscapeStep::LeftGroup) => "escape-group",
             Self::Escape(EscapeStep::LeftTool) => "escape-tool",
             Self::Escape(EscapeStep::Nothing) => "escape-none",
             Self::Hint(KeyHint::SelectFirst) => "hint-select-first",
@@ -129,6 +137,9 @@ impl KeyOutcome {
             Self::RedoBusy => "redo-busy",
             Self::Hint(KeyHint::TooFar) => "hint-too-far",
             Self::SelectedAll => "select-all",
+            Self::Group => "group",
+            Self::Ungroup => "ungroup",
+            Self::EnteredGroup => "enter-group",
             Self::Nudged { new_run: false } => "nudge",
             Self::Nudged { new_run: true } => "nudge-new",
         }
@@ -147,161 +158,13 @@ pub enum EscapeStep {
     /// tool's node and segment selection, the Select tool's object
     /// selection.
     ClearedState,
+    /// The Select tool left the innermost entered group (`specs/0023-groups` criterion 17); the
+    /// group just left is selected.
+    LeftGroup,
     /// The tool was left for the Select tool.
     LeftTool,
     /// There was nothing to do.
     Nothing,
-}
-
-/// How many objects the Select tool has selected, as far as the key table
-/// cares.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Selected {
-    None,
-    One,
-    Many,
-}
-
-/// Everything about the session the key table reads.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) struct KeyState {
-    pub(super) tool: Tool,
-    /// A drag is in flight in the active tool, or the canvas is panned.
-    pub(super) operation_in_flight: bool,
-    /// The Pen has an unfinished path.
-    pub(super) pen_open: bool,
-    /// An entry chip is open.
-    pub(super) entry_open: bool,
-    selected: Selected,
-}
-
-/// What the key table decided.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum KeyAction {
-    Ignore,
-    SetTool(Tool),
-    OpenEntry(EntryKey),
-    Delete,
-    FinishPen,
-    Escape,
-    Hint(KeyHint),
-    History(Direction),
-    ObjectHistory(Direction),
-    SelectAll,
-    Nudge(Arrow),
-}
-
-/// The key table and its gate (criteria 54, 55, 60, 61) as a pure function:
-/// the one place that says what a key does in which state.
-fn decide(input: &KeyInput<'_>, state: KeyState) -> KeyAction {
-    match input.key {
-        // Never gated by the list of criterion 55; a held Escape acts once.
-        "Escape" => {
-            return if input.repeat {
-                KeyAction::Ignore
-            } else {
-                KeyAction::Escape
-            };
-        }
-        "Enter" => {
-            return if state.tool == Tool::Pen && state.pen_open {
-                KeyAction::FinishPen
-            } else {
-                KeyAction::Ignore
-            };
-        }
-        _ => {}
-    }
-    // The two keys of `specs/0044-editing-quick-wins/`: they pass the same gate as the letters
-    // (no text field, drag, entry chip or unfinished Pen path), and are decided before the line
-    // below, which would ignore every key with Ctrl.
-    let gate_open =
-        !input.dom_blocked && !state.operation_in_flight && !state.pen_open && !state.entry_open;
-    if let Some(arrow) = Arrow::from_key(input.key) {
-        let acts = gate_open
-            && !input.ctrl
-            && !input.alt
-            && state.tool == Tool::Select
-            && state.selected != Selected::None;
-        return if acts {
-            KeyAction::Nudge(arrow)
-        } else {
-            KeyAction::Ignore
-        };
-    }
-    if input.ctrl && input.key.eq_ignore_ascii_case("a") {
-        let acts =
-            gate_open && !input.alt && !input.shift && !input.repeat && state.tool == Tool::Select;
-        return if acts {
-            KeyAction::SelectAll
-        } else {
-            KeyAction::Ignore
-        };
-    }
-    // Letters are matched without regard to Caps Lock.
-    let letter = match input.key.chars().collect::<Vec<_>>().as_slice() {
-        [c] if c.is_ascii_alphabetic() => Some(c.to_ascii_lowercase()),
-        _ => None,
-    };
-    if let Some(direction) = super::history::history_direction(input, letter) {
-        return super::history::history_action(direction, input, state);
-    }
-    if let Some(direction) = super::object_history::object_history_direction(input, letter) {
-        return super::object_history::object_history_action(direction, input, state);
-    }
-    if input.repeat || input.ctrl || input.alt || input.dom_blocked {
-        return KeyAction::Ignore;
-    }
-    let binding = match (letter, input.key) {
-        (Some('b'), _) => Binding::Tool(Tool::Pen),
-        (Some('n'), _) => Binding::Tool(Tool::Node),
-        (Some('e'), _) => Binding::Tool(Tool::Ellipse),
-        (_, "*") => Binding::Tool(Tool::PolygonStar),
-        (Some('r'), _) => Binding::Entry(EntryKey::Angle, Tool::Rectangle),
-        (Some('s'), _) => Binding::Entry(EntryKey::Size, Tool::Select),
-        (Some('m'), _) => Binding::EntryOnly(EntryKey::Move),
-        (Some('k'), _) => Binding::EntryOnly(if input.shift {
-            EntryKey::SkewY
-        } else {
-            EntryKey::SkewX
-        }),
-        (_, "Delete" | "Backspace") => Binding::Delete,
-        _ => return KeyAction::Ignore,
-    };
-    // Shift is allowed only for `*` and Shift+K.
-    if input.shift && input.key != "*" && letter != Some('k') {
-        return KeyAction::Ignore;
-    }
-    if state.operation_in_flight || state.pen_open || state.entry_open {
-        return KeyAction::Ignore;
-    }
-    match binding {
-        Binding::Tool(tool) => KeyAction::SetTool(tool),
-        Binding::Delete => KeyAction::Delete,
-        // The one state that changes a letter: the Select tool with an
-        // object selected acts on it; every other state switches tool.
-        Binding::Entry(entry, tool) => match (state.tool, state.selected) {
-            (Tool::Select, Selected::One | Selected::Many) => KeyAction::OpenEntry(entry),
-            _ => KeyAction::SetTool(tool),
-        },
-        // M and K have no tool to fall back to: outside the Select tool, or
-        // with nothing selected, they only explain themselves.
-        Binding::EntryOnly(entry) => match (state.tool, state.selected) {
-            (Tool::Select, Selected::One | Selected::Many) => KeyAction::OpenEntry(entry),
-            _ => KeyAction::Hint(KeyHint::SelectFirst),
-        },
-    }
-}
-
-/// What a key that passed the gate is bound to.
-#[derive(Debug, Clone, Copy)]
-enum Binding {
-    Tool(Tool),
-    /// The typed entry in the Select tool with a selection, else the tool.
-    Entry(EntryKey, Tool),
-    /// The typed entry in the Select tool with a selection, else a hint.
-    EntryOnly(EntryKey),
-    Delete,
 }
 
 impl Session {
@@ -394,6 +257,41 @@ impl Session {
             KeyAction::History(direction) => self.history_key(direction),
             KeyAction::ObjectHistory(direction) => self.object_history_key(direction),
             KeyAction::SelectAll => self.select_all(),
+            KeyAction::Group => {
+                // The chord acts only when the command is available; otherwise the page keeps it.
+                if !self.grouping_availability().group {
+                    return KeyOutcome::Ignored;
+                }
+                let result = self.group_selection();
+                let acted = result.kind != super::grouping::GroupingKind::Ignored;
+                self.grouping_result = Some(result);
+                if acted {
+                    KeyOutcome::Group
+                } else {
+                    KeyOutcome::Ignored
+                }
+            }
+            KeyAction::Ungroup => {
+                if !self.grouping_availability().ungroup {
+                    return KeyOutcome::Ignored;
+                }
+                let result = self.ungroup_selection();
+                let acted = result.kind != super::grouping::GroupingKind::Ignored;
+                self.grouping_result = Some(result);
+                if acted {
+                    KeyOutcome::Ungroup
+                } else {
+                    KeyOutcome::Ignored
+                }
+            }
+            KeyAction::EnterGroup => {
+                self.sync_context();
+                if self.enter_selected_group() {
+                    KeyOutcome::EnteredGroup
+                } else {
+                    KeyOutcome::Ignored
+                }
+            }
             KeyAction::Nudge(arrow) => self.nudge_selection(NudgeEvent {
                 arrow,
                 shift: input.shift,
@@ -475,7 +373,14 @@ impl Session {
             return EscapeStep::ClearedState;
         }
         if self.tool == Tool::Select {
-            return EscapeStep::Nothing;
+            // The selection is clear: leave the innermost entered group and select it
+            // (`0023` criterion 17); at the root there is nothing more to do.
+            self.sync_context();
+            return if self.leave_group(true) {
+                EscapeStep::LeftGroup
+            } else {
+                EscapeStep::Nothing
+            };
         }
         self.set_tool(Tool::Select);
         EscapeStep::LeftTool
@@ -524,6 +429,8 @@ impl Session {
 
 #[cfg(test)]
 mod tests {
+    use curvyo_ui_core::{Arrow, EntryKey};
+
     use super::*;
 
     const TOOLS: [Tool; 6] = [
@@ -830,6 +737,10 @@ mod tests {
             KeyOutcome::Escape(EscapeStep::ClosedEntry),
             KeyOutcome::Escape(EscapeStep::CancelledDrag),
             KeyOutcome::Escape(EscapeStep::ClearedState),
+            KeyOutcome::Escape(EscapeStep::LeftGroup),
+            KeyOutcome::Group,
+            KeyOutcome::Ungroup,
+            KeyOutcome::EnteredGroup,
             KeyOutcome::Escape(EscapeStep::LeftTool),
             KeyOutcome::Escape(EscapeStep::Nothing),
             KeyOutcome::Hint(KeyHint::SelectFirst),

@@ -15,6 +15,7 @@
 
 mod artwork;
 mod color;
+mod context_dim;
 mod dash;
 mod dash_walk;
 mod decorations;
@@ -39,6 +40,7 @@ mod theme;
 
 pub use artwork::build_artwork;
 pub use color::RgbaColor;
+pub use context_dim::{CONTEXT_DIM, dim_outside};
 pub use decorations::{DecorationInput, Hovered};
 pub use document_area::{
     CheckerGrid, background_at, build_document_area, checker_grid, checker_tone,

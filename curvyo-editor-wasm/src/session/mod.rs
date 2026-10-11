@@ -28,6 +28,7 @@ mod box_refit_tests;
 mod close_path;
 mod colour_pick;
 mod combine;
+mod context;
 mod corner_readout;
 mod document;
 mod document_presets;
@@ -35,8 +36,12 @@ mod draw;
 mod formats;
 mod frame;
 mod group_view;
+mod grouping;
+#[cfg(test)]
+mod grouping_tests;
 mod history;
 mod history_rows;
+mod key_table;
 mod keys;
 mod move_entry;
 mod move_indicators;
@@ -64,8 +69,6 @@ mod style_view;
 mod tolerances;
 mod transform_entry;
 
-use std::sync::Arc;
-
 use curvyo_document_core::{Document, NodeId, ObjectSnapshot, OpenError, Point, SaveError};
 use curvyo_ui_core::{
     AnchorIdMinter, EllipseTool, Hit, Modifiers, NodeTool, ObjectSelection, PenTool,
@@ -80,6 +83,7 @@ pub use combine::{BreakApartOutcome, CombineOutcome};
 pub use document::{DocumentSide, FitOutcome, SizeOutcome};
 pub use document_presets::DocumentPresetsRecord;
 pub use formats::{FormTexts, FormatEdit};
+pub use grouping::{GroupingKind, GroupingResult};
 pub use history::HistoryResult;
 pub use history_rows::{WipeOutcome, WipeState};
 pub use keys::{EscapeStep, KeyHint, KeyInput, KeyOutcome};
@@ -230,6 +234,15 @@ pub struct Session {
     history: history::HistoryState,
     /// The arrow-key nudges of the held press that last moved the selection (`nudge.rs`).
     nudge_run: Option<curvyo_ui_core::NudgeRun>,
+    /// The groups the maker has entered, outermost first (`grouping.rs`). View state: not saved.
+    context: Vec<NodeId>,
+    /// The objects and units of the context, kept for as long as the document read they were made
+    /// from (`grouping.rs`).
+    context_cache: context::ContextCache,
+    /// What the last Group or Ungroup said, until the host has taken it (`grouping.rs`).
+    grouping_result: Option<grouping::GroupingResult>,
+    /// What a screen reader hears about the context, until the host has taken it.
+    context_announcement: Option<String>,
 }
 
 impl Session {
@@ -276,6 +289,10 @@ impl Session {
             pen_cue: pen::PenCueState::default(),
             history: history::HistoryState::new(),
             nudge_run: None,
+            context: Vec::new(),
+            context_cache: context::ContextCache::default(),
+            grouping_result: None,
+            context_announcement: None,
         }
     }
 
@@ -319,6 +336,10 @@ impl Session {
             pen_cue: pen::PenCueState::default(),
             history: history::HistoryState::new(),
             nudge_run: None,
+            context: Vec::new(),
+            context_cache: context::ContextCache::default(),
+            grouping_result: None,
+            context_announcement: None,
         })
     }
 
@@ -383,28 +404,18 @@ impl Session {
         });
     }
 
-    /// The paths the Node and Pen tools work on. A compound path is left out:
-    /// its nodes cannot be edited yet (`specs/0016-boolean-operations`
-    /// criteria 38 and 38a), so it contributes no node, handle or segment.
+    /// The paths the Node and Pen tools work on: those of the entered group, or of the whole
+    /// document at the root. A compound path is left out: its nodes cannot be edited yet
+    /// (`specs/0016-boolean-operations` criteria 38 and 38a), so it contributes no node, handle or
+    /// segment.
     fn paths(&self) -> Vec<curvyo_document_core::PathSnapshot> {
-        self.document
-            .object_ids()
-            .into_iter()
-            .filter_map(|id| self.document.path(id))
-            .filter(|path| !path.is_compound())
+        self.objects()
+            .iter()
+            .filter_map(|object| match object {
+                ObjectSnapshot::Path(path) if !path.is_compound() => Some(path.clone()),
+                _ => None,
+            })
             .collect()
-    }
-
-    /// Every object in the document, any kind, in z-order — the Select
-    /// tool's own counterpart to [`Session::paths`]/[`Session::
-    /// primitives`]: both a path and a primitive are "any object" to
-    /// `hit_test_object`/`object_bounds`. Read once per document version.
-    fn objects(&self) -> Arc<[ObjectSnapshot]> {
-        // A Select or Node-tool drag reuses one read of the document for all its frames: nothing
-        // changes the document while it runs (`0031` criterion 17).
-        let drag = (self.tool == Tool::Select && self.select.drag_in_flight())
-            || (self.tool == Tool::Node && self.node.drag_in_flight());
-        self.object_cache.get(&self.document, drag)
     }
 
     /// The pointer went down at `point` (document space).
@@ -649,6 +660,7 @@ mod tests {
 
         session.set_tool(Tool::Node);
         session.pointer_down(Point::new(0.0, 0.0), false);
+        session.pointer_up(Point::new(0.0, 0.0), false, false);
         session.convert_selected(AnchorKind::Symmetric);
         assert_eq!(session.paths()[0].anchors[0].kind, AnchorKind::Symmetric);
     }

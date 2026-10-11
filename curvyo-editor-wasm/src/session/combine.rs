@@ -70,6 +70,14 @@ impl Session {
             this.end_colour_pick();
             let objects = this.objects();
             let selection = this.boolean_selection();
+            // The command does not look through groups (`0023` criterion 28).
+            let in_groups = this.selected_group_leaves();
+            if !in_groups.is_empty() {
+                this.command_refusal = Some(RefusalMarks::new(in_groups.clone(), &selection));
+                return CombineOutcome::Refused(CombineRefusal::Groups {
+                    offenders: in_groups,
+                });
+            }
             let plan = match plan_combine(&objects, &selection, &mut this.minter) {
                 Ok(plan) => plan,
                 Err(refusal) => {
@@ -78,7 +86,8 @@ impl Session {
                         | CombineRefusal::OutOfRange { offenders, .. }
                         | CombineRefusal::NoArea { offenders, .. }
                         | CombineRefusal::Touching { offenders, .. }
-                        | CombineRefusal::SelfTouching { offenders, .. } => {
+                        | CombineRefusal::SelfTouching { offenders, .. }
+                        | CombineRefusal::Groups { offenders } => {
                             Some(RefusalMarks::new(offenders.clone(), &selection))
                         }
                         CombineRefusal::NeedsTwo => None,
@@ -123,6 +132,13 @@ impl Session {
             this.end_colour_pick();
             let objects = this.objects();
             let selection = this.boolean_selection();
+            let in_groups = this.selected_group_leaves();
+            if !in_groups.is_empty() {
+                this.command_refusal = Some(RefusalMarks::new(in_groups.clone(), &selection));
+                return BreakApartOutcome::Refused(BreakApartRefusal::Groups {
+                    offenders: in_groups,
+                });
+            }
             let plan = match plan_break_apart(&objects, &selection, &mut this.minter) {
                 Ok(plan) => plan,
                 Err(refusal) => {

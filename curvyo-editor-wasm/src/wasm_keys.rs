@@ -19,7 +19,8 @@ impl WasmSession {
     /// `"deleted"`, `"pen"`, `"escape-entry"`, `"escape-drag"`,
     /// `"escape-state"`, `"escape-tool"`, `"escape-none"`,
     /// `"hint-select-first"`, `"hint-too-far"`, `"hint-finish-pen"`,
-    /// `"select-all"`, `"nudge"` (an arrow key moved the selection), `"nudge-new"` (and opened a
+    /// `"select-all"`, `"group"`, `"ungroup"` (read the notice with `take_grouping_result`),
+    /// `"enter-group"`, `"escape-group"` (left an entered group), `"nudge"` (an arrow key moved the selection), `"nudge-new"` (and opened a
     /// new run of held-key events), `"undo"`, `"redo"` (read the notice with
     /// `take_history_notice`), `"undo-busy"` or `"redo-busy"` (show the long-operation state, then
     /// call `history_press`). `time_ms` is `KeyboardEvent.timeStamp`; `mac` is true on macOS (Cmd+Y

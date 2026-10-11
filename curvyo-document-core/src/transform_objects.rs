@@ -8,7 +8,7 @@ use loro::TreeID;
 use crate::document::{Document, OBJECTS_TREE};
 use crate::objects::ObjectEditError;
 use crate::path_codec::{
-    self, KEY_HANDLE_IN, KEY_HANDLE_OUT, KEY_POINT, anchor_map_at, node_exists, read_point,
+    self, KEY_HANDLE_IN, KEY_HANDLE_OUT, KEY_POINT, anchor_map_at, leaf_exists, read_point,
     read_vec2, write_point, write_vec2,
 };
 use crate::path_model::{AnchorSnapshot, NewAnchor, PathSnapshot};
@@ -98,7 +98,7 @@ impl Document {
             .iter()
             .map(|result| {
                 let tree_id = TreeID::new(result.id().peer, result.id().counter);
-                if !node_exists(&tree, tree_id) {
+                if !leaf_exists(&tree, tree_id) {
                     return Err(ObjectEditError::NoSuchObject);
                 }
                 let meta = tree

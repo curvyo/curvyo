@@ -11,15 +11,15 @@ use std::collections::BTreeMap;
 
 use loro::{LoroDoc, TreeID};
 
-use super::checkout::Detached;
+use super::checkout::{Detached, NodeAt};
 use super::error::HistoryError;
 use super::lineage::encode_node;
 use super::merge::{Tally, restore_map};
 use super::report::{
-    Direction, ObjectReport, ObjectResult, ObjectShape, RestoreReport, SkipReason,
+    Direction, ObjectReport, ObjectResult, ObjectShape, RestoreReport, Role, SkipReason,
 };
 use super::restore_plan::{Action, Plan, PlanInput, Snapshot, revival_indices};
-use super::revive::revive_nodes;
+use super::revive::{Revival, revive_nodes};
 use super::step_header::{
     KEY_OBJECT, KEY_OBJECT_REDONE, KEY_OBJECT_UNDONE, KEY_REDONE, KEY_UNDONE, LABEL_OBJECT_REDO,
     LABEL_OBJECT_UNDO, LABEL_REDO, LABEL_UNDO, StepHeader,
@@ -168,40 +168,73 @@ impl Document {
         header: &StepHeader,
     ) -> Result<bool, HistoryError> {
         let doc = self.loro();
-        let mut indices = revival_indices(doc, &plan.revive_from_before, before);
-        indices.extend(revival_indices(doc, &plan.revive_from_after, after));
-        let nodes: Vec<_> = plan
+        let mut places = revival_indices(doc, &plan.revive_from_before, before);
+        places.extend(revival_indices(doc, &plan.revive_from_after, after));
+        let nodes: Vec<Revival> = plan
             .items
             .iter()
             .filter_map(|p| match p.action {
-                Action::Revive(id) => indices.remove(&id).map(|index| (id, index)),
+                Action::Revive(id) => places.remove(&id).map(|place| Revival {
+                    target: id,
+                    parent: place.parent,
+                    index: place.index,
+                }),
                 _ => None,
             })
             .collect();
+        let nodes = parents_first(nodes);
         revive_nodes(doc, &nodes, &header.format())?;
         Ok(!nodes.is_empty())
     }
 
-    /// Carries out the deletes and field merges of the plan and reports each object.
+    /// Carries out the moves, deletes and field merges of the plan and reports each object.
+    /// Moves come first, so a group is empty when its own delete comes; deletes go deepest first,
+    /// so a copied group's leaves go before the group; a node that still has children is never
+    /// deleted.
     fn apply_plan(&self, plan: &Plan, from: &Snapshot, to: &Snapshot) -> Vec<ObjectReport> {
         let doc = self.loro();
         let tree = doc.get_tree(OBJECTS_TREE);
+        tree.enable_fractional_index(0);
+        let mut results: Vec<Option<ObjectResult>> = vec![None; plan.items.len()];
+        let moves: Vec<(usize, TreeID, Option<TreeID>)> = plan
+            .items
+            .iter()
+            .enumerate()
+            .filter_map(|(at, planned)| match planned.action {
+                Action::Move(id, parent) => Some((at, id, parent)),
+                _ => None,
+            })
+            .collect();
+        for (at, result) in move_nodes(&tree, &moves, to) {
+            results[at] = Some(result);
+        }
+        let mut deletes: Vec<usize> = (0..plan.items.len())
+            .filter(|&at| matches!(plan.items[at].action, Action::Delete(_)))
+            .collect();
+        deletes.sort_by_key(|&at| match plan.items[at].action {
+            Action::Delete(id) => std::cmp::Reverse(depth_of(&tree, id)),
+            _ => std::cmp::Reverse(0),
+        });
+        for at in deletes {
+            if let Action::Delete(id) = plan.items[at].action {
+                // Taking back a created group must not hide members that stayed in it.
+                let guard_children = plan.items[at].role == Role::Created;
+                results[at] = Some(delete_node(&tree, id, guard_children));
+            }
+        }
         plan.items
             .iter()
-            .map(|planned| {
+            .zip(results)
+            .map(|(planned, done)| {
                 let mut kept = 0;
-                let (id, result) = match &planned.action {
-                    Action::Revive(id) => (*id, ObjectResult::Restored),
-                    Action::Skip(id, reason) => (*id, ObjectResult::Skipped(*reason)),
-                    Action::Delete(id) => {
-                        let result = if tree.delete(*id).is_ok() {
-                            ObjectResult::Restored
-                        } else {
-                            ObjectResult::Skipped(SkipReason::DeletedLater)
-                        };
-                        (*id, result)
+                let (id, result) = match (&planned.action, done) {
+                    (Action::Revive(id), _) => (*id, ObjectResult::Restored),
+                    (Action::Skip(id, reason), _) => (*id, ObjectResult::Skipped(*reason)),
+                    (Action::Move(id, ..) | Action::Delete(id), Some(result)) => (*id, result),
+                    (Action::Move(id, ..) | Action::Delete(id), None) => {
+                        (*id, ObjectResult::Skipped(SkipReason::ChangedLater))
                     }
-                    Action::Merge(id) => {
+                    (Action::Merge(id), _) => {
                         let nodes = (from.nodes.get(id), to.nodes.get(id), tree.get_meta(*id));
                         let result = if let (Some(f), Some(t), Ok(meta)) = nodes {
                             let mut tally = Tally::default();
@@ -235,11 +268,143 @@ impl Document {
     }
 }
 
+/// How many nodes lie above `id` in the tree.
+fn depth_of(tree: &loro::LoroTree, id: TreeID) -> usize {
+    let mut depth = 0;
+    let mut current = id;
+    while let Some(loro::TreeParentId::Node(parent)) = tree.parent(current) {
+        depth += 1;
+        current = parent;
+        if depth > 1_000 {
+            break;
+        }
+    }
+    depth
+}
+
+/// Puts the live nodes of `moves` (item index, node, target parent; `None` is the document root)
+/// where the restored version `to` had them, one pass per parent. A node goes right after the
+/// nearest node before it in that version's order that lives under the parent now (or was placed
+/// a moment ago); with none before it, right before the nearest one after it; with no living
+/// sibling at all, first. Siblings the version does not list never decide the place, so a peer's
+/// objects that lie below the restored one stay below it.
+fn move_nodes(
+    tree: &loro::LoroTree,
+    moves: &[(usize, TreeID, Option<TreeID>)],
+    to: &Snapshot,
+) -> Vec<(usize, ObjectResult)> {
+    let mut done = Vec::with_capacity(moves.len());
+    let mut parents: Vec<Option<TreeID>> = Vec::new();
+    for &(_, _, parent) in moves {
+        if !parents.contains(&parent) {
+            parents.push(parent);
+        }
+    }
+    for parent in parents {
+        let parent_id = parent.map_or(loro::TreeParentId::Root, loro::TreeParentId::Node);
+        let wanted: std::collections::HashMap<TreeID, usize> = moves
+            .iter()
+            .filter(|&&(_, _, p)| p == parent)
+            .map(|&(at, id, _)| (id, at))
+            .collect();
+        let live: std::collections::HashSet<TreeID> = tree
+            .children(parent_id)
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|child| !wanted.contains_key(child))
+            .collect();
+        let order: &[TreeID] = to.siblings.get(&parent).map_or(&[], Vec::as_slice);
+        // The nearest later sibling that lives under the parent now, for each position.
+        let mut above: Vec<Option<TreeID>> = vec![None; order.len()];
+        let mut next = None;
+        for (position, sibling) in order.iter().enumerate().rev() {
+            above[position] = next;
+            if live.contains(sibling) {
+                next = Some(*sibling);
+            }
+        }
+        let mut below: Option<TreeID> = None;
+        let mut placed: std::collections::HashSet<TreeID> = std::collections::HashSet::new();
+        for (position, sibling) in order.iter().enumerate() {
+            if let Some(&at) = wanted.get(sibling) {
+                done.push((
+                    at,
+                    placed_result(&match (below, above[position]) {
+                        (Some(after), _) => tree.mov_after(*sibling, after),
+                        (None, Some(before)) => tree.mov_before(*sibling, before),
+                        (None, None) => tree.mov_to(*sibling, parent_id, 0),
+                    }),
+                ));
+                placed.insert(*sibling);
+                below = Some(*sibling);
+            } else if live.contains(sibling) {
+                below = Some(*sibling);
+            }
+        }
+        // A node the version does not list (it cannot happen for a step's own nodes) goes last.
+        for (&id, &at) in &wanted {
+            if !placed.contains(&id) {
+                let end = tree.children_num(parent_id).unwrap_or(0);
+                done.push((
+                    at,
+                    placed_result(&tree.mov_to(id, parent_id, end.saturating_sub(1))),
+                ));
+            }
+        }
+    }
+    done
+}
+
+/// The report of one move.
+fn placed_result(moved: &loro::LoroResult<()>) -> ObjectResult {
+    if moved.is_ok() {
+        ObjectResult::Restored
+    } else {
+        ObjectResult::Skipped(SkipReason::ChangedLater)
+    }
+}
+
+/// Deletes the live node `id`; with `keep_children` it stays when it still holds children (those a
+/// peer or a skipped part of the step left in it).
+fn delete_node(tree: &loro::LoroTree, id: TreeID, keep_children: bool) -> ObjectResult {
+    if keep_children && tree.children_num(id).unwrap_or(0) > 0 {
+        return ObjectResult::Skipped(SkipReason::ChangedLater);
+    }
+    if tree.delete(id).is_ok() {
+        ObjectResult::Restored
+    } else {
+        ObjectResult::Skipped(SkipReason::DeletedLater)
+    }
+}
+
+/// `nodes` with every node after the node it comes back under, when that comes back too.
+fn parents_first(nodes: Vec<Revival>) -> Vec<Revival> {
+    let mut rest = nodes;
+    let mut ordered: Vec<Revival> = Vec::with_capacity(rest.len());
+    while !rest.is_empty() {
+        let waiting: Vec<TreeID> = rest.iter().map(|r| r.target).collect();
+        let (ready, later): (Vec<_>, Vec<_>) = rest
+            .into_iter()
+            .partition(|r| r.parent.is_none_or(|p| !waiting.contains(&p)));
+        if ready.is_empty() {
+            // A cycle cannot be revived; hand the rest over and let the import refuse it.
+            ordered.extend(later);
+            break;
+        }
+        ordered.extend(ready);
+        rest = later;
+    }
+    ordered
+}
+
 /// The kind of an object, read from its meta map (a deleted object's stays readable).
 pub(crate) fn kind_of(doc: &LoroDoc, id: TreeID) -> ObjectShape {
     let Ok(meta) = doc.get_tree(OBJECTS_TREE).get_meta(id) else {
         return ObjectShape::Path;
     };
+    if crate::group_tree::meta_is_group(&meta) {
+        return ObjectShape::Group;
+    }
     match crate::shape_codec::read_shape_tag(&meta).as_deref() {
         Some(crate::shape_codec::SHAPE_RECT) => ObjectShape::Rectangle,
         Some(crate::shape_codec::SHAPE_ELLIPSE) => ObjectShape::Ellipse,
@@ -264,22 +429,32 @@ fn read_versions(
     touched: &Touched,
 ) -> Result<(Snapshot, Snapshot), HistoryError> {
     let ids: Vec<TreeID> = touched.nodes().collect();
-    let read = |guard: &Detached<'_>| Snapshot {
-        nodes: ids.iter().map(|&id| (id, guard.node(id))).collect(),
-        root: if touched.root {
+    let read = |guard: &Detached<'_>| {
+        let nodes: BTreeMap<TreeID, NodeAt> = ids.iter().map(|&id| (id, guard.node(id))).collect();
+        // The children of the parents of created, deleted and moved objects, in z-order: where a
+        // returning object finds its neighbours. Each node is read once, for both.
+        let mut siblings = BTreeMap::new();
+        for id in touched
+            .created
+            .iter()
+            .chain(&touched.deleted)
+            .chain(&touched.moved)
+        {
+            let parent = nodes.get(id).and_then(|node| node.parent);
+            siblings
+                .entry(parent)
+                .or_insert_with(|| guard.children(parent));
+        }
+        let root = if touched.root {
             guard.root()
         } else {
             BTreeMap::new()
-        },
-        // The z-order is only read to place objects that come back.
-        roots: if touched.created.is_empty()
-            && touched.deleted.is_empty()
-            && touched.moved.is_empty()
-        {
-            Vec::new()
-        } else {
-            guard.roots()
-        },
+        };
+        Snapshot {
+            nodes,
+            root,
+            siblings,
+        }
     };
     let guard = Detached::at(doc, &log.before)?;
     let before = read(&guard);

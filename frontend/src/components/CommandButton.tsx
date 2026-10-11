@@ -109,7 +109,9 @@ export const CommandButton = forwardRef<HTMLButtonElement, CommandButtonProps>(
           >
             <div className="font-semibold whitespace-nowrap">{name}</div>
             <div className="whitespace-nowrap">{rule}</div>
-            <div style={{ color: "var(--panel-muted-fg)" }}>{note}</div>
+            <div className="whitespace-pre-line" style={{ color: "var(--panel-muted-fg)" }}>
+              {note}
+            </div>
           </Tooltip.Content>
         </Tooltip.Portal>
       </Tooltip.Root>

@@ -10,12 +10,15 @@ import { Tooltip } from "radix-ui";
 
 import { BooleanCommands } from "@/components/BooleanCommands";
 import { BooleanNotice } from "@/components/BooleanNotice";
+import { GroupCommands } from "@/components/GroupCommands";
 import { PathCommands } from "@/components/PathCommands";
 import {
   COLUMN_A_TOOLTIP_OFFSET_PX,
   RAIL_CARD_CLASS,
   RAIL_CARD_STYLE,
 } from "@/components/railCard";
+import type { GroupingCommands } from "@/hooks/useGrouping";
+import { MAC } from "@/hooks/useHistory";
 import type { RailCommands } from "@/hooks/useRailCommands";
 import type { Tool } from "@/hooks/useEditorSession";
 import { SELECT_KEYS_TOOLTIP } from "@/lib/nudgeText";
@@ -31,9 +34,11 @@ interface ToolRailProps {
   /** Called after a mouse click on a button, so the tool letters keep working
    * (keyboard activation keeps focus on the rail for Tab navigation). */
   onReturnFocus: () => void;
-  /** The Boolean card below the tools card (`specs/0016-boolean-operations/`), the Path card in
-   * column B (`specs/0035-combine-and-break-apart/`) and the notice both share. */
+  /** The Path card (`specs/0035-combine-and-break-apart/`) and the Boolean card below it
+   * (`specs/0016-boolean-operations/`) in column B, and the notice both share. */
   commands: RailCommands;
+  /** The Grouping card below the tools card in column A (`specs/0023-groups/`). */
+  grouping: GroupingCommands;
 }
 
 interface ToolButtonProps {
@@ -108,16 +113,17 @@ function ToolButton({
 
 /**
  * The tool rail (`docs/design-system.md`, rows "Tool rail architecture", "Toolbox card",
- * "Boolean toolbox" and "Path toolbox"): two columns of cards that float over the canvas, inset
- * 12px from the left and top edges (`--rail-inset`), each 48px wide and 8px apart (`--rail-right`
- * is the right edge of the second): column A holds the tools card and, 8px below it, the Boolean
- * card; column B holds the Path card. Select is first, a deliberate, one-time exception to "new
- * tools append in ship order" (acceptance criterion 12), then Pen, Node, Rectangle, Ellipse,
- * Polygon-star. The canvas is never resized or repositioned to make room for it.
+ * "Group toolbox", "Boolean toolbox" and "Path toolbox"): two columns of cards that float over
+ * the canvas, inset 12px from the left and top edges (`--rail-inset`), each 48px wide and 8px apart
+ * (`--rail-right` is the right edge of the second): column A holds the tools card and, 8px below
+ * it, the Grouping card; column B holds the Path card and, 8px below it, the Boolean card. Select
+ * is first, a deliberate, one-time exception to "new tools append in ship order" (acceptance
+ * criterion 12), then Pen, Node, Rectangle, Ellipse, Polygon-star. The canvas is never resized or
+ * repositioned to make room for it.
  *
- * The root keeps 4px clear under the column. In a viewport too short for it the tools card stays
- * fixed and the cards below scroll (`0016` criterion 1b); the root passes no pointer event
- * through to itself, so the canvas around the cards stays usable.
+ * The root keeps 4px clear under the columns; it passes no pointer event through to itself, so
+ * the canvas around the cards stays usable. Each column is at most 368px high, which fits the
+ * 546px viewport of the smallest window.
  */
 export function ToolRail({
   tool,
@@ -125,6 +131,7 @@ export function ToolRail({
   onSelect,
   onReturnFocus,
   commands,
+  grouping,
 }: ToolRailProps) {
   // The one state that changes a letter: the Select tool with a selection.
   const letterActsOnSelection = tool === "select" && selectionCount > 0;
@@ -193,23 +200,22 @@ export function ToolRail({
               onReturnFocus={onReturnFocus}
             />
           </div>
-          {/* The cards below the tools card scroll in a viewport too short for them; the wider
-           * box leaves room for their shadows. */}
-          <div
-            className="pointer-events-none -mx-3 min-h-0 overflow-y-auto px-3"
-            style={{ scrollbarWidth: "thin" }}
-          >
-            <BooleanCommands
-              commands={commands.booleans}
-              selectTool={tool === "select"}
-              onReturnFocus={onReturnFocus}
-            />
-          </div>
+          <GroupCommands
+            commands={grouping}
+            selectTool={tool === "select"}
+            mac={MAC}
+            onReturnFocus={onReturnFocus}
+          />
         </div>
-        {/* Column B: the Path card, which never scrolls (92px). */}
+        {/* Column B: the Path card and, 8px below it, the Boolean card. */}
         <div className="flex w-12 flex-col gap-2">
           <PathCommands
             commands={commands.path}
+            selectTool={tool === "select"}
+            onReturnFocus={onReturnFocus}
+          />
+          <BooleanCommands
+            commands={commands.booleans}
             selectTool={tool === "select"}
             onReturnFocus={onReturnFocus}
           />

@@ -15,6 +15,7 @@ use crate::object_bounds::object_outline_bounds;
 use crate::object_selection::ObjectSelection;
 use crate::transform_commit::{MOVE_EQUAL_EPSILON_MM, commit_move};
 use crate::transform_drag::DragOrigin;
+use crate::units::Units;
 
 /// Two absolute displacements closer than this (millimetres) are equal: an
 /// exact tie of the axis choice keeps the previous axis (criterion 30).
@@ -142,7 +143,7 @@ impl SelectTool {
                 drag.origin.note(point);
                 if drag.origin.is_active_at(point) {
                     if let Some(id) = drag.joins.take() {
-                        selection.add(id);
+                        selection.add_all(self.units.leaves_with(&id));
                     }
                     drag.last_axis = drag.resolve(point, modifiers).axis.or(drag.last_axis);
                 }
@@ -214,20 +215,19 @@ impl SelectTool {
         document: &Document,
         objects: &[ObjectSnapshot],
         selection: &mut ObjectSelection,
-        point: Point,
-        modifiers: Modifiers,
-        minter: &mut AnchorIdMinter,
+        (point, modifiers): (Point, Modifiers),
+        (minter, units): (&mut AnchorIdMinter, &Units),
     ) {
         if !drag.origin.is_active_at(point) {
             if let Some(id) = drag.pending_toggle {
-                selection.toggle(id);
+                selection.toggle_all(units.leaves_with(&id));
             }
             return;
         }
         // The drag left the dead zone with no `pointer_moved` in between (a
         // flick, a touch): the pressed object still joins the selection.
         if let Some(id) = drag.joins {
-            selection.add(id);
+            selection.add_all(units.leaves_with(&id));
         }
         let MoveResolution { offset, copy, .. } = drag.resolve(point, modifiers);
         if offset.length() <= MOVE_EQUAL_EPSILON_MM {
@@ -237,7 +237,8 @@ impl SelectTool {
         if selection.is_empty() {
             return;
         }
-        if let Some(copies) = commit_move(document, selection.ids(), offset, copy, minter) {
+        if let Some(copies) = commit_move(document, selection.ids(), offset, copy, (minter, units))
+        {
             selection.set(&copies);
         }
     }

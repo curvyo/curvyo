@@ -19,6 +19,7 @@ use curvyo_ui_core::{
 
 use super::Session;
 use super::Tool;
+use super::group_view::merged_corners;
 
 /// How far the skew guide extends past each end of the box, screen pixels
 /// (`docs/design-system.md`, "Transform skew fixed-line guide").
@@ -133,10 +134,15 @@ impl Session {
             .hovered_object
             .filter(|&id| hovering && !self.selection.contains(id))
             .and_then(|id| {
-                objects
+                // What a click would select: the hovered leaf's group as one box (`0023`).
+                let units = self.units();
+                let leaves = units.leaves_with(&id);
+                let corners: Vec<_> = objects
                     .iter()
-                    .find(|object| object.id() == id)
-                    .map(|object| (id, oriented_bounds(object).document_corners()))
+                    .filter(|object| leaves.contains(&object.id()))
+                    .map(|object| oriented_bounds(object).document_corners())
+                    .collect();
+                merged_corners(&corners).map(|shown| (id, shown))
             });
         SelectDecorationInput {
             selected,

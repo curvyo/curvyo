@@ -10,7 +10,7 @@ use curvyo_document_core::{ObjectSnapshot, Point, Tolerance};
 use super::cycle::ClickCycle;
 use super::{SelectDrag, SelectTool};
 use crate::hit_test_object::hit_test_objects_along;
-use crate::marquee::{MarqueeMode, objects_in_marquee};
+use crate::marquee::{MarqueeMode, units_in_marquee};
 use crate::modifiers::Modifiers;
 use crate::object_selection::{ObjectSelection, SelectionCombine};
 use crate::transform_drag::DragOrigin;
@@ -200,7 +200,7 @@ impl SelectTool {
         self.cycle = None;
         let from = drag.origin.down_at;
         let mode = MarqueeMode::for_drag(from, point, modifiers.alt);
-        let found = objects_in_marquee(objects, from, point, mode, BOX_TOLERANCE);
+        let found = units_in_marquee(objects, &self.units, from, point, mode, BOX_TOLERANCE);
         selection.retain_existing(objects);
         selection.apply(combine, &found);
     }
@@ -225,14 +225,18 @@ impl SelectTool {
                 Some(cycle) if cycle.continues_at(at, tolerance) => cycle,
                 _ => ClickCycle::fresh(at),
             };
-            if let Some(chosen) = cycle.advance(objects, tolerance) {
-                selection.select_single(chosen);
+            if let Some(chosen) = cycle.advance(objects, tolerance, &self.units) {
+                selection.set(&self.units.leaves_of_unit(chosen));
                 self.cycle = Some(cycle);
             }
             return;
         }
         self.cycle = None;
-        let found = hit_test_objects_along(objects, &drag.line_to(point), tolerance);
+        let found = self.units.widen(&hit_test_objects_along(
+            objects,
+            &drag.line_to(point),
+            tolerance,
+        ));
         selection.retain_existing(objects);
         selection.apply(
             SelectionCombine::from_modifiers(modifiers.shift, modifiers.ctrl),
