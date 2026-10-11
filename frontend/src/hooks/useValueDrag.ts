@@ -38,11 +38,14 @@ interface Drag {
   dragging: boolean;
   left: number;
   width: number;
+  limit: number;
 }
 
 interface ValueDragOptions {
-  /** The bar position at the press, 0 to 1. */
+  /** The position the drag starts from: the bar, or beyond 1 where the value is past the track. */
   bar: number;
+  /** The largest position of a drag (1 unless the value may grow beyond the track). */
+  limit: number;
   /** The edited objects differ: the pointer's own position is the value. */
   mixed: boolean;
   /** A tick: position `p` on the field's scale and the grid. */
@@ -68,6 +71,7 @@ interface ValueDragOptions {
  */
 export function useValueDrag({
   bar,
+  limit,
   mixed,
   onTick,
   onClickAt,
@@ -173,6 +177,7 @@ export function useValueDrag({
       dragging: false,
       left: box.left,
       width: box.width,
+      limit,
     };
     pointer.onPointerDown(event);
   };

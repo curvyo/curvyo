@@ -148,3 +148,58 @@ fn the_smallest_click_position_of_an_opacity_gives_one_percent() {
         );
     }
 }
+
+/// `0047` criterion 59: a drag past the end of the width field raises the width beyond 20 mm in
+/// one history step; a click at the end gives exactly 20; Escape drops it.
+#[test]
+fn a_drag_past_the_end_of_the_width_field_goes_beyond_twenty_millimetres() {
+    let field = ValueField::StrokeWidth;
+    let scale = field.scale();
+    let mut session = session_with_selected_rectangle();
+    session.warm_history();
+    let before = bytes(&session);
+    let steps = session.undo_len();
+    // A click at the right edge: the track end.
+    click_at(&mut session, field, 1.0);
+    let shown = session
+        .style_panel_state()
+        .and_then(|s| s.value_of(field))
+        .unwrap();
+    assert!((shown - 20.0).abs() < 1e-9, "click at the end: {shown}");
+    assert_eq!(session.undo_len(), steps + 1);
+    // A drag: ticks past the end, one commit.
+    let mut last = 20.0;
+    for p in [1.1, 1.3, 1.5, 1.7] {
+        session.preview_value_field(field, p, Grid::Normal);
+        let value = scale.round(scale.value_at_drag(p), Grid::Normal);
+        assert!(value > last, "rising at {p}");
+        last = value;
+    }
+    session.commit_style_preview();
+    let shown = session
+        .style_panel_state()
+        .and_then(|s| s.value_of(field))
+        .unwrap();
+    assert!(
+        (shown - last).abs() < 1e-9 && shown > 20.0,
+        "the drag: {shown}"
+    );
+    assert_eq!(session.undo_len(), steps + 2, "one step for the drag");
+    // The far end is the typed maximum.
+    session.preview_value_field(field, 50.0, Grid::Normal);
+    session.commit_style_preview();
+    let shown = session
+        .style_panel_state()
+        .and_then(|s| s.value_of(field))
+        .unwrap();
+    assert!((shown - scale.typed_max()).abs() < 1e-9, "clamped: {shown}");
+    // Escape drops a drag.
+    let steps_now = session.undo_len();
+    let at_max = bytes(&session);
+    session.preview_value_field(field, 1.2, Grid::Normal);
+    session.cancel_style_preview();
+    session.commit_style_preview();
+    assert!(bytes(&session) == at_max);
+    assert_eq!(session.undo_len(), steps_now);
+    let _ = before;
+}

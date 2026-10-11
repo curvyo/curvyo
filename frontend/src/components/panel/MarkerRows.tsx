@@ -66,6 +66,8 @@ export function MarkerRows({ panel, onReturnFocus }: MarkerRowsProps) {
           name={VALUE_FIELD_NAMES.markerCount}
           text={view.markerCountText}
           bar={view.markerCountBar}
+          dragBase={view.markerCountDragBase}
+          dragLimit={view.countDragLimit}
           mixed={view.markerCountMixed}
           resettable={view.markerCountResettable}
           unit=""

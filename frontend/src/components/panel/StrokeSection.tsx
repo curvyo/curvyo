@@ -99,6 +99,8 @@ export function StrokeSection({ panel, onReturnFocus }: StrokeSectionProps) {
             name={VALUE_FIELD_NAMES.strokeWidth}
             text={view.strokeWidthText}
             bar={view.strokeWidthBar}
+            dragBase={view.strokeWidthDragBase}
+            dragLimit={view.widthDragLimit}
             mixed={view.strokeWidthMixed}
             resettable={view.strokeWidthResettable}
             unit="mm"

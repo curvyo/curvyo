@@ -21,6 +21,11 @@ interface ValueFieldProps {
   text: string;
   /** The share of the field's width the bar fills, 0 to 1. */
   bar: number;
+  /** Where a drag starts from: `bar`, or beyond 1 for a value past the track. */
+  dragBase?: number;
+  /** The largest position of a drag: 1, or more where a drag past the right end keeps raising
+   * the value up to the typed maximum (`specs/0047-transform-polish/` criterion 59). */
+  dragLimit?: number;
   mixed: boolean;
   /** The value is mixed or not the default: the reset icon shows. */
   resettable: boolean;
@@ -77,6 +82,8 @@ export function ValueField({
   name,
   text,
   bar,
+  dragBase,
+  dragLimit = 1,
   mixed,
   resettable,
   unit,
@@ -98,7 +105,8 @@ export function ValueField({
   const [typing, setTyping] = useState<{ initial?: string } | null>(null);
 
   const { modifier, handlers } = useValueDrag({
-    bar: mixed ? 0 : bar,
+    bar: mixed ? 0 : (dragBase ?? bar),
+    limit: dragLimit,
     mixed,
     onTick: onPreview,
     // A click sets the value at the pointer and commits it; a double-click types

@@ -50,6 +50,10 @@ export interface StyleView {
   markerCount: number;
   markerCountMixed: boolean;
   markerCountBar: number;
+  /** Where a count drag starts from, on the scale continued beyond the track. */
+  markerCountDragBase: number;
+  /** The largest position of a count drag. */
+  countDragLimit: number;
   markerCountResettable: boolean;
   /** Start or End is set and every selected path is closed. */
   markerClosedNote: boolean;
@@ -71,6 +75,10 @@ export interface StyleView {
   strokeWidthText: string;
   /** The share of the field's width its bar fills, 0 to 1. */
   strokeWidthBar: number;
+  /** Where a width drag starts from, on the scale continued beyond the track. */
+  strokeWidthDragBase: number;
+  /** The largest position of a width drag. */
+  widthDragLimit: number;
   /** The value is mixed or not the default: the reset icon shows. */
   strokeWidthResettable: boolean;
   strokeOpacityText: string;
@@ -116,6 +124,8 @@ const DISABLED_VIEW: StyleView = {
   markerCount: 1,
   markerCountMixed: false,
   markerCountBar: 0,
+  markerCountDragBase: 0,
+  countDragLimit: 1,
   markerCountResettable: false,
   markerClosedNote: false,
   scopeKey: "",
@@ -131,6 +141,8 @@ const DISABLED_VIEW: StyleView = {
   strokeWidth: 0.25,
   strokeWidthText: "0.25",
   strokeWidthBar: 0.18,
+  strokeWidthDragBase: 0.18,
+  widthDragLimit: 1,
   strokeWidthResettable: false,
   strokeOpacityText: "100",
   strokeOpacityBar: 1,
@@ -179,6 +191,8 @@ function readView(session: WasmSession | null): StyleView {
     markerCount: raw.marker_count,
     markerCountMixed: raw.marker_count_mixed,
     markerCountBar: raw.marker_count_bar,
+    markerCountDragBase: raw.marker_count_drag_base,
+    countDragLimit: raw.count_drag_limit,
     markerCountResettable: raw.marker_count_resettable,
     markerClosedNote: raw.marker_closed_note,
     scopeKey: raw.scope_key,
@@ -194,6 +208,8 @@ function readView(session: WasmSession | null): StyleView {
     strokeWidth: raw.stroke_width,
     strokeWidthText: raw.stroke_width_text,
     strokeWidthBar: raw.stroke_width_bar,
+    strokeWidthDragBase: raw.stroke_width_drag_base,
+    widthDragLimit: raw.width_drag_limit,
     strokeWidthResettable: raw.stroke_width_resettable,
     strokeOpacityText: raw.stroke_opacity_text,
     strokeOpacityBar: raw.stroke_opacity_bar,

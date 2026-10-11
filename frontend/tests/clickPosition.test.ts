@@ -52,3 +52,28 @@ test("the second press of a double-click changes nothing until its release, whic
   assert.equal(g.move({ x: 103, y: 14 }).kind, "none");
   assert.equal(g.up({ x: 103, y: 14 }, 1250).kind, "double-click");
 });
+
+test("a drag past the right edge keeps raising the position up to the field's limit, a click does not", () => {
+  const frame = { mixed: false, baseP: 0.9, baseX: 100, factor: 1, left: 0, width: 200, limit: 1.85 };
+  // 100 px right of the press is half a field length: 0.9 + 0.5.
+  assert.equal(dragPosition(frame, 200), 1.4);
+  assert.equal(dragPosition(frame, 100 + 200 * 5), 1.85, "clamped at the limit");
+  assert.equal(dragPosition(frame, 100 - 200 * 5), 0, "and at the left end");
+  // Back inside the field the position follows the track again, with no re-basing.
+  assert.ok(Math.abs(dragPosition(frame, 80) - 0.8) < 1e-12);
+  // A field without room beyond its track (an opacity) stays at 1.
+  assert.equal(dragPosition({ ...frame, limit: undefined }, 100 + 200 * 5), 1);
+  // A click is the track only, whatever the pointer does outside.
+  assert.equal(clickPosition(200 * 3, 200), 1);
+});
+
+test("a mixed drag takes the pointer's own place and overshoots the same way", () => {
+  const frame = { mixed: true, baseP: 0, baseX: 0, factor: 1, left: 50, width: 200, limit: 10.18 };
+  assert.equal(dragPosition(frame, 50 + 300), 1.5);
+});
+
+test("a drag that starts on a value past the track starts from its own position", () => {
+  const frame = { mixed: false, baseP: 1.4, baseX: 300, factor: 1, left: 0, width: 200, limit: 1.85 };
+  assert.equal(dragPosition(frame, 300), 1.4, "no jump at the first move");
+  assert.equal(dragPosition(frame, 310), 1.45);
+});
