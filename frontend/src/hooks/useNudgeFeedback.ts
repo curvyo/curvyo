@@ -26,6 +26,9 @@ export interface NudgeFeedback {
   onSelectAll: (count: number) => void;
   /** Escape was pressed: the readout goes at once, the step is still announced. */
   onEscape: () => void;
+  /** An undo or redo started: the nudge step it takes back is over, its readout and
+   * announcement go without being spoken. */
+  onHistory: () => void;
   /** A key was released: an arrow key ends the step that is running. */
   onKeyUp: (key: string) => void;
 }
@@ -95,6 +98,13 @@ export function useNudgeFeedback(): NudgeFeedback {
     setReadout(null);
   }, []);
 
+  const onHistory = useCallback(() => {
+    window.clearTimeout(readoutTimer.current);
+    window.clearTimeout(endTimer.current);
+    pending.current = "";
+    setReadout(null);
+  }, []);
+
   const onKeyUp = useCallback(
     (key: string) => {
       if (key.startsWith("Arrow")) {
@@ -112,5 +122,5 @@ export function useNudgeFeedback(): NudgeFeedback {
     [],
   );
 
-  return { readout, announcement, onNudge, onSelectAll, onEscape, onKeyUp };
+  return { readout, announcement, onNudge, onSelectAll, onEscape, onHistory, onKeyUp };
 }
