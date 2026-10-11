@@ -320,6 +320,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn the_object_notices_read_as_the_specification_words_them() {
         let ok = ObjectResult::Restored;
         let plain = object_restore(
