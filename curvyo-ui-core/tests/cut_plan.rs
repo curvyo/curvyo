@@ -450,3 +450,113 @@ fn the_selection_order_does_not_matter() {
     ids.dedup();
     assert_eq!(ids.len(), count, "fresh ids");
 }
+
+mod pieces_rejoin {
+    use super::*;
+    use proptest::prelude::*;
+
+    fn coordinate() -> impl Strategy<Value = f64> {
+        (-100i32..=100).prop_map(|n| f64::from(n) * 0.2)
+    }
+
+    fn anchor_strategy() -> impl Strategy<Value = ((f64, f64), (f64, f64), (f64, f64))> {
+        (
+            (coordinate(), coordinate()),
+            (coordinate(), coordinate()),
+            (coordinate(), coordinate()),
+        )
+    }
+
+    fn path_of(
+        document: &Document,
+        first: u64,
+        nodes: &[((f64, f64), (f64, f64), (f64, f64))],
+        closed: bool,
+    ) -> NodeId {
+        let anchors: Vec<NewAnchor> = nodes
+            .iter()
+            .enumerate()
+            .map(|(k, &(p, hin, hout))| NewAnchor {
+                id: AnchorId::new(3, first + k as u64),
+                point: pt(p.0, p.1),
+                handle_in: Vec2::new(hin.0 * 0.3, hin.1 * 0.3),
+                handle_out: Vec2::new(hout.0 * 0.3, hout.1 * 0.3),
+                kind: AnchorKind::Corner,
+            })
+            .collect();
+        document.create_path(&anchors, closed)
+    }
+
+    /// The length of the cubic chain through `anchors` by dense sampling.
+    fn length(anchors: &[NewAnchor], closed: bool) -> f64 {
+        let count = anchors.len();
+        let segments = if closed { count } else { count - 1 };
+        let mut total = 0.0;
+        for k in 0..segments {
+            let (from, to) = (&anchors[k], &anchors[(k + 1) % count]);
+            let mut last = from.point;
+            for step in 1..=400 {
+                let t = f64::from(step) / 400.0;
+                let at = curvyo_geometry_core::subdivide_at_parameter(
+                    from.point,
+                    from.handle_out,
+                    to.handle_in,
+                    to.point,
+                    t,
+                )
+                .new_point;
+                total += (at.x - last.x).hypot(at.y - last.y);
+                last = at;
+            }
+        }
+        total
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(100))]
+
+        /// Whatever crosses, the pieces of an operand lie end to end along it: the same total
+        /// length, the first piece starts where the contour starts, the last one ends where it
+        /// ends, and every piece is open with at least two nodes.
+        #[test]
+        fn the_pieces_of_an_operand_lie_end_to_end(
+            a in proptest::collection::vec(anchor_strategy(), 2..4),
+            b in proptest::collection::vec(anchor_strategy(), 2..4),
+            closed_a in any::<bool>(),
+        ) {
+            let document = Document::new(1);
+            let first = path_of(&document, 10, &a, closed_a && a.len() > 2);
+            let second = path_of(&document, 40, &b, false);
+            let all = objects(&document);
+            let Ok(plan) = plan_cut(&all, &select(&[first, second]), &mut minter()) else {
+                return Ok(());
+            };
+            for id in &plan.removed {
+                let ObjectSnapshot::Path(original) = all.iter().find(|o| o.id() == *id).unwrap() else {
+                    panic!("a path");
+                };
+                let pieces: Vec<&Vec<NewAnchor>> = plan
+                    .pieces
+                    .iter()
+                    .filter(|(source, _)| source == id)
+                    .map(|(_, outlines)| &outlines[0].0)
+                    .collect();
+                prop_assert!(pieces.iter().all(|piece| piece.len() >= 2));
+                let total: f64 = pieces.iter().map(|piece| length(piece, false)).sum();
+                let whole = length(&original.anchors, original.closed);
+                prop_assert!((total - whole).abs() <= 1e-3 * whole.max(1.0), "{total} against {whole}");
+                for pair in pieces.windows(2) {
+                    let (end, start) = (pair[0].last().unwrap().point, pair[1][0].point);
+                    prop_assert!((end.x - start.x).hypot(end.y - start.y) < 1e-6);
+                }
+                if !original.closed {
+                    prop_assert_eq!(pieces[0][0].point, original.anchors[0].point);
+                    prop_assert_eq!(
+                        pieces.last().unwrap().last().unwrap().point,
+                        original.anchors.last().unwrap().point
+                    );
+                }
+            }
+        }
+    }
+}

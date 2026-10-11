@@ -67,6 +67,20 @@ impl Seg {
         }
     }
 
+    /// The velocity at parameter `t`, consistent with [`Seg::point_at`].
+    fn velocity_at(&self, t: f64) -> (f64, f64) {
+        let [p0, p1, p2, p3] = self.curve.0;
+        if self.line {
+            return (p3.x - p0.x, p3.y - p0.y);
+        }
+        let s = 1.0 - t;
+        let (a, b, c) = (3.0 * s * s, 6.0 * s * t, 3.0 * t * t);
+        (
+            a * (p1.x - p0.x) + b * (p2.x - p1.x) + c * (p3.x - p2.x),
+            a * (p1.y - p0.y) + b * (p2.y - p1.y) + c * (p3.y - p2.y),
+        )
+    }
+
     /// The point at parameter `t`, as `subdivide_at_parameter` places it.
     pub(crate) fn point_at(&self, t: f64) -> Point {
         if self.line {
@@ -172,6 +186,42 @@ struct Hits {
     spans: Vec<(Meeting, Meeting)>,
 }
 
+/// A crossing found on chords made exact by Newton's method on `a(ta) - b(tb)`, so the two
+/// contours are cut at the same point. A pair that does not converge (a touch, a tangent) keeps
+/// the chord result.
+fn refined(a: &Seg, b: &Seg, found: Meeting) -> Meeting {
+    let miss = |m: Meeting| dist(a.point_at(m.0), b.point_at(m.1));
+    let mut current = found;
+    for _ in 0..6 {
+        let (pa, pb) = (a.point_at(current.0), b.point_at(current.1));
+        let f = (pb.x - pa.x, pb.y - pa.y);
+        let (da, db) = (a.velocity_at(current.0), b.velocity_at(current.1));
+        let det = db.0 * da.1 - da.0 * db.1;
+        let scale = (da.0 * da.0 + da.1 * da.1).sqrt() * (db.0 * db.0 + db.1 * db.1).sqrt();
+        if det.abs() <= 1e-6 * scale {
+            break;
+        }
+        // Solves da * dt_a - db * dt_b = f.
+        let step = (
+            (f.0 * -db.1 + db.0 * f.1) / (da.0 * -db.1 + db.0 * da.1),
+            (da.0 * f.1 - da.1 * f.0) / (da.0 * -db.1 + db.0 * da.1),
+        );
+        let next = (
+            (current.0 + step.0).clamp(0.0, 1.0),
+            (current.1 + step.1).clamp(0.0, 1.0),
+        );
+        if miss(next) >= miss(current) {
+            break;
+        }
+        current = next;
+    }
+    if miss(current) < miss(found) && miss(current) <= 1e-9 {
+        current
+    } else {
+        found
+    }
+}
+
 /// Subdivides the pair until both pieces are flat, collecting what their chords do.
 fn meet(a: &Seg, b: &Seg, pa: Branch, pb: Branch, depth: u32, hits: &mut Hits) {
     let (ba, bb) = (pa.curve.bounds(), pb.curve.bounds());
@@ -190,7 +240,10 @@ fn meet(a: &Seg, b: &Seg, pa: Branch, pb: Branch, depth: u32, hits: &mut Hits) {
         let reach = TOUCH_DISTANCE_MM + dev_a + dev_b;
         match chord_hit(p0, p1, q0, q1, reach) {
             Chord::None => {}
-            Chord::At(u, v) => hits.points.push((pa.param_at(a, u), pb.param_at(b, v))),
+            Chord::At(u, v) => {
+                hits.points
+                    .push(refined(a, b, (pa.param_at(a, u), pb.param_at(b, v))))
+            }
             Chord::Span((u0, v0), (u1, v1)) => hits.spans.push((
                 (pa.param_at(a, u0), pb.param_at(b, v0)),
                 (pa.param_at(a, u1), pb.param_at(b, v1)),

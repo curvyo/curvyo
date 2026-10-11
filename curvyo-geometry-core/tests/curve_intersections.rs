@@ -160,6 +160,28 @@ fn two_overlapping_circles_cross_twice() {
     }
 }
 
+/// The two contours are cut at the very same point (Newton on the crossing), not a flattening
+/// tolerance apart.
+#[test]
+fn the_cuts_of_two_crossing_curves_coincide() {
+    let all = [
+        (circle(0.0, 0.0, 10.0), true),
+        (rotated(&circle(7.0, 3.0, 9.0), 17.0), true),
+    ];
+    let result = cuts(&all);
+    assert_eq!(result[0].len(), 2);
+    assert_eq!(result[1].len(), 2);
+    for cut in &result[0] {
+        let at = position(&all[0].0, true, *cut);
+        assert!(
+            result[1]
+                .iter()
+                .any(|other| near(position(&all[1].0, true, *other), at, 1e-9)),
+            "{at:?} is not a cut of the second circle too"
+        );
+    }
+}
+
 /// A closed path that crosses itself is cut at each pass through the crossing.
 #[test]
 fn a_figure_eight_is_cut_at_both_passes_of_its_crossing() {

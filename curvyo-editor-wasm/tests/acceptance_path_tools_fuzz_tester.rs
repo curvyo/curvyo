@@ -235,7 +235,7 @@ fn random_event_sequences_keep_the_document_valid() {
                 12 => {
                     s.finish_pen();
                 }
-                13 => match rng.below(5) {
+                13 => match rng.below(7) {
                     0 => {
                         s.apply_combine();
                     }
@@ -247,6 +247,12 @@ fn random_event_sequences_keep_the_document_valid() {
                     }
                     3 => {
                         s.close_paths(JoinType::Smooth);
+                    }
+                    4 => {
+                        s.apply_split();
+                    }
+                    5 => {
+                        s.apply_cut();
                     }
                     _ => {
                         s.make_line();
