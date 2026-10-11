@@ -387,15 +387,12 @@ fn ctrl_u_on_a_copy_never_takes_back_the_duplicate_and_passes_over_the_originals
         },
     );
     assert_eq!(outcome, EntryOutcome::Committed);
-    // The press may read several versions: the host shows the busy state first.
-    assert_eq!(object_key(&mut session, false), KeyOutcome::ObjectUndoBusy);
-    let notice = session.object_undo().notice;
+    // The original's move is not the copy's to take back, and the drawing would remove the copy.
     assert_eq!(
-        notice,
-        "Undid: Draw rectangle. The object is gone. Ctrl+Z brings it back. \
-         Skipped 1 step that only moved or reshaped the original."
+        object_undo(&mut session),
+        "Nothing to undo for this object: its earlier steps only moved or reshaped the original."
     );
-    // Ctrl+Z takes back the object undo, then the Duplicate.
-    assert!(undo(&mut session).starts_with("Undid: Undo Draw rectangle"));
+    assert_eq!(session.selected_object_count(), 1, "the copy stays");
+    // Ctrl+Z takes back the Duplicate.
     assert!(undo(&mut session).starts_with("Undid: Duplicate"));
 }

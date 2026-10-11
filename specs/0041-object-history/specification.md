@@ -164,7 +164,7 @@ Wiped rows leave the list. They have no status word because they cannot be seen 
 | Replace step | "Undid: Union. 2 other objects came back too." |
 | Field conflict | "Undid: Resize. 1 field kept later changes." (N fields: "N fields kept later changes.") |
 | Another author's step | "Undid Anna's Resize (a1b2c3d)." Until names exist: "Undid a step by someone else: Resize (a1b2c3d)." |
-| Creation step | "Undid: Draw rectangle. The object is gone. Ctrl+Z brings it back." (5 s, longer than 70 characters) |
+| Creation step | "Undid: Draw rectangle. The object is gone. Ctrl+Z brings it back." (3 s: a notice stays 3 s up to 70 characters and 5 s above, `0020`) |
 | Redo | "Redid: Resize." |
 | Nothing | "Nothing to undo for this object." / "Nothing to redo for this object." |
 | Not one object | "Select one object." |

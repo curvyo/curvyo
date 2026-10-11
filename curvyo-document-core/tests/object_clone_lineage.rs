@@ -222,36 +222,34 @@ fn an_object_undo_on_a_clone_goes_back_into_the_inherited_rows_and_spares_the_or
 }
 
 #[test]
-fn going_back_through_all_inherited_rows_removes_the_clone_and_redo_brings_it_back() {
+fn an_object_undo_gets_the_size_back_but_never_removes_a_clone() {
     let (document, original, clone) = drawn_resized_and_duplicated();
-    // The inherited resize only reshaped the original: passed over, the drawing removes the copy.
+    // The inherited resize: the copy is as wide as before it and keeps its own place.
     let done = document.undo_object_step(clone).unwrap().unwrap();
-    assert_eq!(done.target.label, "create_rect");
-    assert_eq!(done.passed_over, 1);
-    assert!(done.object_gone);
-    assert!(document.object(clone).is_none());
-    assert!(document.object(original).is_some());
+    assert!(done.report.wrote);
+    assert_eq!(done.target.label, "set_rect_bounds");
+    // The original's drawing is the start of the lineage, which only Ctrl+Z takes back.
     assert!(document.undo_object_step(clone).unwrap().is_none());
+    assert!(document.object(clone).is_some());
+    assert!(document.object(original).is_some());
     let redo = document.redo_object_step(clone).unwrap().unwrap();
-    assert_eq!(redo.target.label, "create_rect");
-    assert!(document.object(clone).is_some(), "with its id");
+    assert_eq!(redo.target.label, "set_rect_bounds");
 }
 
 #[test]
-fn a_copy_of_a_moved_original_keeps_its_place_and_the_press_goes_on_to_the_drawing() {
+fn a_copy_of_a_moved_original_keeps_its_place() {
     let document = Document::new(1);
     let original = document.create_rect(bounds(0.0, 10.0));
     document
         .translate_objects(&[original], Vec2::new(5.0, 0.0))
         .unwrap();
     let clone = duplicate(&document, original, Vec2::new(50.0, 0.0));
-    let at = serde_json::to_value(document.object(clone).unwrap()).unwrap();
+    let at = document.object(clone).unwrap();
+    // The inherited move wrote nothing: the copy's displacement is its own, and the drawing is
+    // the start of the lineage.
     let done = document.undo_object_step(clone).unwrap().unwrap();
-    // The inherited move wrote nothing: the copy's displacement is its own. The press went on.
-    assert_eq!(done.passed_over, 1);
-    assert_eq!(done.target.label, "create_rect");
-    assert!(done.object_gone);
-    assert!(at["Primitive"].is_object());
+    assert!(!done.report.wrote);
+    assert_eq!(document.object(clone).unwrap(), at);
     assert!(document.object(original).is_some());
 }
 
@@ -301,10 +299,10 @@ fn a_path_copy_passes_over_the_node_edit_and_takes_back_the_colour() {
     );
     assert!(done.report.wrote);
     assert_eq!(done.target.inherited_from, Some(path));
-    // The next press passes over the node edit again and removes the copy with the drawing.
+    // The next press finds nothing it can write, and the copy stays.
     let done = document.undo_object_step(copy).unwrap().unwrap();
-    assert_eq!(done.target.label, "create_path");
-    assert!(done.object_gone);
+    assert!(!done.report.wrote);
+    assert!(document.object(copy).is_some());
 }
 
 #[test]

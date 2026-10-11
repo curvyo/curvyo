@@ -82,9 +82,10 @@ Dated notes, no new ADR. The decisions above hold; these are the places the buil
    same version.
 3. **One machine over the lineage.** Inherited entries, then the object's own entries, run through
    one `StackMachine`, so an object undo of an inherited step is an `Undo` event like any other.
-   The creation step of a clone is no target of an object undo while inherited rows exist; the
-   target after the last own step is the newest inherited step, and the oldest one (the original's
-   creation) removes the clone.
+   The step that made a copy and the step that made the original (or an ancestor) are no targets of
+   an object undo: taking either back would remove the copy, which only Ctrl+Z does (tester review,
+   2026-10-11). After the copy's own steps the target is the newest inherited step that can write
+   something into the copy.
 4. **Object redo of an inherited step** is the undo of the object undo that took it back (it
    restores the registers that undo wrote). Own steps use the redo direction of the engine.
 5. **Undone nodes count as created.** The restore plan treats a `Move` of a node that was deleted
@@ -136,11 +137,13 @@ Q5) is checked by hand in milestone 2.
 
 9. **Object undo of an inherited step (review, 2026-10-11).** It follows the three-way rule of
    criterion 7: a register is written only where the copy still holds the value the original had
-   after the step. A copy is displaced, so steps that only moved or reshaped the original (a frame
-   register holds origin and size together; a path's anchors are nested) write nothing and are
-   passed over, at most 32 per press, to the next older step. The press reports how many it passed
-   over; when every candidate was passed over nothing is written and no row appears. Writing anchors
-   into a path copy by position is a follow-up (`docs/technical-debt.md`).
+   after the step. A frame register (rectangle, ellipse, star) is merged number by number, so a
+   copy gets back the size of an inherited resize and keeps its own place. A step that only moved
+   the original, or only edited a path's anchors, writes nothing and is passed over, at most 256 per
+   press; a step that wrote no register of the original is skipped without reading a version. The
+   Undo step button names the first step the press would really write (remembered until the log
+   changes). When every candidate was passed over nothing is written and no row appears. Writing
+   anchors into a path copy by position is a follow-up (`docs/technical-debt.md`).
 10. **Floors.** Every wipe step hides what lies in its causal past, so two concurrent wipes hide what
     either of them hid. The floor register is not a change of the object: it is ignored when Ctrl+Z
     decides whether a created object was changed since.

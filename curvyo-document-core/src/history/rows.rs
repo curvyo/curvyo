@@ -135,6 +135,16 @@ fn undone_by(index: &StepIndex, step: StepRef, touched: &Touched, me: u64) -> Op
     })
 }
 
+/// The kind of a step: from what it touched, except the wipe of one object's history, which
+/// changes no object (`specs/0041-object-history` criterion 30).
+pub(super) fn kind_of_step(label: &str, touched: &Touched) -> StepKind {
+    if label == super::step_header::LABEL_WIPE_OBJECT {
+        StepKind::Document
+    } else {
+        kind_of_touched(touched)
+    }
+}
+
 /// The kind of a step from what it touched.
 pub(super) fn kind_of_touched(touched: &Touched) -> StepKind {
     let created = !touched.created.is_empty();
@@ -257,7 +267,7 @@ impl Document {
                     kind: if document_level {
                         StepKind::Document
                     } else {
-                        kind_of_touched(&touched)
+                        kind_of_step(&log.label, &touched)
                     },
                     objects,
                     status: index.status(log.step),

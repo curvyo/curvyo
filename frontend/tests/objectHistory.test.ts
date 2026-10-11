@@ -14,7 +14,12 @@ import {
   secondLine,
   statusWord,
 } from "../src/lib/historyRows.ts";
-import { historyKeyDirection, isObjectDirection, workingNotice } from "../src/lib/historyText.ts";
+import {
+  historyKeyDirection,
+  isObjectDirection,
+  noticeDurationMs,
+  workingNotice,
+} from "../src/lib/historyText.ts";
 
 const row = (over: Partial<HistoryRowData> = {}): HistoryRowData => ({
   id: "a1b2c3d",
@@ -109,4 +114,14 @@ test("the wipe of one object says it hides and the file does not shrink", () => 
   assert.match(objectWipeQuestion(1), /the 1 earlier step of/);
   assert.equal(objectWipedNotice(12), "Hid 12 earlier steps of this object.");
   assert.equal(objectWipedNotice(1), "Hid 1 earlier step of this object.");
+});
+
+test("the notices of the object keys stay 3 s up to 70 characters and 5 s above", () => {
+  const creation = "Undid: Draw rectangle. The object is gone. Ctrl+Z brings it back.";
+  assert.ok(creation.length <= 70);
+  assert.equal(noticeDurationMs(creation), 3000);
+  const passed =
+    "Undid: Draw rectangle. The object is gone. Ctrl+Z brings it back. Skipped 2 steps that only moved or reshaped the original.";
+  assert.equal(noticeDurationMs(passed), 5000);
+  assert.equal(noticeDurationMs("Nothing to undo for this object."), 3000);
 });

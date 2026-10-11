@@ -83,7 +83,7 @@ fn a_change_step_is_taken_back_for_the_selected_object_only() {
 }
 
 #[test]
-fn a_create_only_step_removes_only_this_object() {
+fn the_duplicate_of_several_objects_is_not_taken_back_by_an_object_undo() {
     let document = Document::new(1);
     let source = rect(&document, 0.0);
     let copies = document
@@ -123,11 +123,9 @@ fn a_create_only_step_removes_only_this_object() {
             Vec2::new(0.0, 50.0),
         )
         .unwrap();
-    let done = document.undo_object_step(copies[1]).unwrap().unwrap();
-    assert!(done.object_gone);
-    assert!(document.object(copies[1]).is_none());
-    assert!(document.object(copies[0]).is_some());
-    assert!(document.object(copies[2]).is_some());
+    // Ctrl+U never takes back the Duplicate itself (only Ctrl+Z does): nothing to take back.
+    assert!(document.undo_object_step(copies[1]).unwrap().is_none());
+    assert!(copies.iter().all(|copy| document.object(*copy).is_some()));
 }
 
 #[test]

@@ -42,8 +42,9 @@ pub struct ObjectRestore {
     pub passed_over: usize,
 }
 
-/// How many candidates one press tries; each one reads two versions.
-const MAX_PASSED_OVER: usize = 32;
+/// How many candidates one press tries; each one reads two versions, except a step that wrote no
+/// register.
+const MAX_PASSED_OVER: usize = 256;
 
 impl Document {
     /// Takes the latest applied step of the object back, for this object only. `Ok(None)` when
@@ -150,9 +151,11 @@ impl Document {
         }))
     }
 
-    /// Takes back a step the object inherited from `source`: a creation removes the object, a
-    /// change sets the plain registers the step wrote back to what they were before it. Anchor
-    /// lists are left alone: a copy has anchor ids of its own.
+    /// Takes back a step the object inherited from `source`: the registers the step changed in
+    /// the original are set back to what they were before it, where the copy still holds the
+    /// value the original had after it (criterion 7). Nothing the original did to its anchors or
+    /// its place is written into the copy, and the step that made the original or a copy is
+    /// never taken back this way: the copy would vanish.
     fn undo_inherited(
         &self,
         object: TreeID,
@@ -162,62 +165,62 @@ impl Document {
         let doc = self.loro();
         doc.commit();
         let first = doc.oplog_vv().get(&doc.peer_id()).copied().unwrap_or(0);
-        let touched = self.touched_of(log).only(source);
-        let header = self.next_header(
-            LABEL_OBJECT_UNDO,
-            &[
-                (KEY_OBJECT_UNDONE, log.step.encode()),
-                (KEY_OBJECT, encode_node(object)),
-            ],
-        );
-        let tree = doc.get_tree(OBJECTS_TREE);
-        let (role, written, kept) = if !touched.created.is_empty() {
-            let gone = alive(doc, object) && tree.delete(object).is_ok();
-            (Role::Created, usize::from(gone), 0)
-        } else if touched.changed.is_empty() {
-            (Role::Changed, 0, 0)
-        } else {
-            let (written, kept) = self.restore_registers(log, source, object)?;
-            (Role::Changed, written, kept)
-        };
-        let wrote = written > 0;
+        let (writes, kept) = self.plan_registers(log, source, object)?;
+        let wrote = !writes.is_empty();
         let mut step = None;
-        if wrote {
+        if wrote && let Ok(meta) = doc.get_tree(OBJECTS_TREE).get_meta(object) {
+            let header = self.next_header(
+                LABEL_OBJECT_UNDO,
+                &[
+                    (KEY_OBJECT_UNDONE, log.step.encode()),
+                    (KEY_OBJECT, encode_node(object)),
+                ],
+            );
+            for (key, value) in &writes {
+                // Both writes only touch a plain register of a live meta map.
+                let _ = match value {
+                    Some(value) => meta.insert(key, value.clone()),
+                    None => meta.delete(key),
+                };
+            }
             self.commit_with_header(&header);
             let new = StepRef::new(doc.peer_id(), first);
             self.commit_state
                 .register_own(new, LABEL_OBJECT_UNDO, Some(log.label.clone()));
             step = Some(new);
         }
-        let result = match (written, kept) {
-            (0, _) => ObjectResult::Skipped(SkipReason::ChangedLater),
-            (_, 0) => ObjectResult::Restored,
-            _ => ObjectResult::Partial,
+        let result = match (wrote, kept) {
+            (false, _) => ObjectResult::Skipped(SkipReason::ChangedLater),
+            (true, 0) => ObjectResult::Restored,
+            (true, _) => ObjectResult::Partial,
         };
         Ok(RestoreReport {
             direction: Direction::Undo,
             objects: vec![ObjectReport {
                 id: node_id(object),
                 shape: kind_of(doc, object),
-                role,
+                role: Role::Changed,
                 result,
                 kept,
             }],
             root: None,
-            wrote,
+            wrote: step.is_some(),
             step,
         })
     }
 
-    /// Writes the plain registers `touched` changed in `source` at the step back to `object`, as
-    /// they were before the step. Returns what was written and what was left (nested values).
-    fn restore_registers(
+    /// What undoing an inherited step would write into the copy, and how many fields keep their
+    /// value. Reads two versions of the original, unless the step wrote no register of it.
+    fn plan_registers(
         &self,
         log: &super::step_log::LogStep,
         source: TreeID,
         object: TreeID,
-    ) -> Result<(usize, usize), HistoryError> {
+    ) -> Result<(Vec<RegisterWrite>, usize), HistoryError> {
         let doc = self.loro();
+        if !self.wrote_a_register(log, source) {
+            return Ok((Vec::new(), 0));
+        }
         let (before, after) = {
             let guard = Detached::at(doc, &log.before)?;
             let before = guard.node(source).meta;
@@ -225,42 +228,128 @@ impl Document {
             (before, guard.node(source).meta)
         };
         let Ok(meta) = doc.get_tree(OBJECTS_TREE).get_meta(object) else {
-            return Ok((0, 0));
+            return Ok((Vec::new(), 0));
         };
         let now = super::node_value::read_map(&meta);
-        let keys: Vec<&String> = before
+        let (mut writes, mut kept) = (Vec::new(), 0);
+        let keys: std::collections::BTreeSet<&String> = before
             .keys()
             .chain(after.keys())
             .filter(|key| key.as_str() != KEY_CLONE_OF && key.as_str() != KEY_HISTORY_FLOOR)
             .collect();
-        let (mut written, mut kept) = (0, 0);
-        let mut seen = std::collections::BTreeSet::new();
         for key in keys {
-            if !seen.insert(key) || before.get(key) == after.get(key) {
+            if before.get(key) == after.get(key) {
                 continue;
             }
-            // Criterion 7: a field the copy holds differently from the original after the step (its
-            // displacement at the copy, a later edit by anyone) keeps its value.
+            if FRAME_KEYS.contains(&key.as_str())
+                && let (Some(b), Some(a), Some(n)) = (before.get(key), after.get(key), now.get(key))
+                && let Some((merged, written, left)) = merge_frame(b, a, n)
+            {
+                kept += left;
+                if written > 0 {
+                    writes.push((key.clone(), Some(merged)));
+                }
+                continue;
+            }
+            // Criterion 7: a field the copy holds differently from the original after the step
+            // (its displacement at the copy, a later edit by anyone) keeps its value.
             if now.get(key) != after.get(key) {
                 kept += 1;
                 continue;
             }
             match plain_value(&before, key) {
-                Plain::Value(value) => {
-                    if meta.insert(key, value).is_ok() {
-                        written += 1;
-                    }
-                }
-                Plain::Absent => {
-                    if meta.delete(key).is_ok() {
-                        written += 1;
-                    }
-                }
+                Plain::Value(value) => writes.push((key.clone(), Some(value))),
+                Plain::Absent => writes.push((key.clone(), None)),
                 Plain::Nested => kept += 1,
             }
         }
-        Ok((written, kept))
+        Ok((writes, kept))
     }
+
+    /// Whether the step wrote a register of the original's meta map. A step that only edited
+    /// nested lists (a path's anchors) did not, and costs no checkout to pass over.
+    fn wrote_a_register(&self, log: &super::step_log::LogStep, source: TreeID) -> bool {
+        let meta = source.associated_meta_container();
+        self.loro()
+            .export_json_in_id_span(log.span())
+            .iter()
+            .flat_map(|change| &change.ops)
+            .any(|op| {
+                op.container == meta
+                    && matches!(
+                        &op.content,
+                        loro::JsonOpContent::Map(
+                            loro::JsonMapOp::Insert { .. } | loro::JsonMapOp::Delete { .. }
+                        )
+                    )
+            })
+    }
+
+    /// The first step an object undo of `object` would really write, looking past the steps it
+    /// would pass over: what the Undo step button offers. Remembered until the log changes.
+    pub(super) fn first_writable_undo(&self, object: TreeID) -> Option<Entry> {
+        let stamp = self.loro().len_ops();
+        if let Some((at, of, found)) = self.writable_cache.borrow().as_ref()
+            && *at == stamp
+            && *of == object
+        {
+            return *found;
+        }
+        let found = self
+            .undo_candidates_of(object)
+            .into_iter()
+            .take(MAX_PASSED_OVER + 1)
+            .find(|entry| {
+                let Some(source) = entry.from else {
+                    return true;
+                };
+                find_step(self.loro(), entry.step)
+                    .and_then(|log| self.plan_registers(&log, source, object).ok())
+                    .is_some_and(|(writes, _)| !writes.is_empty())
+            });
+        *self.writable_cache.borrow_mut() = Some((stamp, object, found));
+        found
+    }
+}
+
+/// The remembered answer of [`Document::first_writable_undo`]: the length of the log, the object
+/// and the entry.
+pub(crate) type WritableUndo = (usize, TreeID, Option<Entry>);
+
+/// A register an object undo writes: the key and the value, `None` for a key to remove.
+type RegisterWrite = (String, Option<loro::LoroValue>);
+
+/// The registers that hold a position and a size together as four numbers: origin and size of a
+/// rectangle, centre and radii of an ellipse, centre, radius and angle of a star.
+const FRAME_KEYS: &[&str] = &[
+    crate::shape_codec::KEY_RECT_BOUNDS,
+    crate::shape_codec::KEY_ELLIPSE_FRAME,
+    crate::shape_codec::KEY_STAR_FRAME,
+];
+
+/// The three-way merge of a frame, number by number: the copy gets back the numbers the step
+/// changed where it still holds the original's value after the step (the size), and keeps the
+/// others (its own place). Returns the merged list, what was written and what was kept.
+fn merge_frame(before: &Node, after: &Node, now: &Node) -> Option<(loro::LoroValue, usize, usize)> {
+    let list = |node: &Node| match node {
+        Node::Value(loro::LoroValue::List(items)) if items.len() == 4 => Some(items.to_vec()),
+        _ => None,
+    };
+    let (before, after, mut merged) = (list(before)?, list(after)?, list(now)?);
+    let now = merged.clone();
+    let (mut written, mut kept) = (0, 0);
+    for index in 0..4 {
+        if before[index] == after[index] {
+            continue;
+        }
+        if now[index] == after[index] {
+            merged[index] = before[index].clone();
+            written += 1;
+        } else {
+            kept += 1;
+        }
+    }
+    Some((loro::LoroValue::from(merged), written, kept))
 }
 
 /// What a key holds, as far as a restore of plain registers is concerned.

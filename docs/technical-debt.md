@@ -1403,17 +1403,18 @@ Accepted limits of the slice, each visible in the code:
 
 - **Anchors are not restored into path copies (follow-up).** Object undo of a step the copy
   inherited from its original writes a register only where the copy still holds the original's
-  value after the step (criterion 7). A copy is displaced, so geometry steps (a frame register holds
-  origin and size together; a path's anchors are nested lists with ids of their own) write nothing
-  and are passed over, at most 32 per press, to the next older step. For a path copy that is every
-  geometry step: only style steps and finally the original's drawing (which removes the copy) are
-  taken back. **Resolution:** write anchors into the copy by position with fresh anchor ids passed in
-  by the session, which completes criterion 25 for paths.
+  value after the step (criterion 7); a rectangle's, ellipse's or star's frame is merged number by
+  number, so the copy gets the size back and keeps its place. A copy is displaced and a path's
+  anchors are nested lists with ids of their own, so a move of the original, and every geometry
+  step of a path, write nothing and are passed over (at most 256 per press). For a path copy only
+  style steps are taken back. **Resolution:** write anchors into the copy by position with fresh
+  anchor ids passed in by the session, which completes criterion 25 for paths.
 - **A press that finds nothing to write leaves no row.** When every candidate of a copy was passed
   over the press reports "Nothing to undo for this object: its earlier steps only moved or reshaped
   the original." and writes nothing.
-- **Ctrl+U on a copy never takes back the Duplicate itself.** The step that made the copy is the
-  boundary between its own and the inherited rows; Ctrl+Z takes it back.
+- **Ctrl+U on a copy never takes back the Duplicate itself, nor the original's drawing.** Both
+  would remove the copy; Ctrl+Z takes the Duplicate back. This departs from the Create-only example
+  of criterion 6 for copies.
 - **The shown ids are rebuilt on the first read after a new step.** The abbreviation of a step id
   depends on all other ids (ADR 0014 §3); the rebuild is a few milliseconds at 20,000 steps and
   happens only when rows are read, not on the commit path.

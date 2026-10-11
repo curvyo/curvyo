@@ -169,6 +169,8 @@ pub struct Document {
     pub(crate) step_index: std::cell::RefCell<crate::history::StepIndex>,
     /// The steps that touched each object, for the Object scope of the history.
     pub(crate) object_index: std::cell::RefCell<crate::history::ObjectIndex>,
+    /// The step an object undo of one object would really write, until the log changes.
+    pub(crate) writable_cache: std::cell::RefCell<Option<crate::history::WritableUndo>>,
 }
 
 impl Document {
@@ -214,6 +216,7 @@ impl Document {
             container_index: std::cell::RefCell::default(),
             step_index: std::cell::RefCell::default(),
             object_index: std::cell::RefCell::default(),
+            writable_cache: std::cell::RefCell::default(),
         };
         document.commit_new_document();
         // A document without history has nothing to read.
@@ -262,6 +265,7 @@ impl Document {
             container_index: std::cell::RefCell::default(),
             step_index: std::cell::RefCell::default(),
             object_index: std::cell::RefCell::default(),
+            writable_cache: std::cell::RefCell::default(),
         })
     }
 

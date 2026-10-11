@@ -34,6 +34,7 @@ pub use error::{HistoryError, SyncError};
 pub(crate) use lineage::{KEY_CLONE_OF, KEY_HISTORY_FLOOR, encode_clone_of};
 pub(crate) use object_index::ObjectIndex;
 pub use object_restore::ObjectRestore;
+pub(crate) use object_restore::WritableUndo;
 pub use object_rows::{ObjectRow, ObjectRowClass, ObjectStatus, ObjectTarget, ObjectTargets};
 pub use report::{
     Direction, ObjectReport, ObjectResult, ObjectShape, RestoreReport, Role, SkipReason,

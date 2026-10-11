@@ -236,6 +236,13 @@ impl Timeline {
                 steps.status(**step) == Status::Applied && Some(**step) != self.creation_skipped
             })
             .filter_map(|step| self.entries.iter().rev().find(|e| e.step == *step).copied())
+            // The step that made the original (or an ancestor) is the start of the lineage:
+            // taking it back would remove the copy, which only Ctrl+Z does.
+            .filter(|entry| {
+                entry
+                    .from
+                    .is_none_or(|from| steps.step_at(from.peer, from.counter) != Some(entry.step))
+            })
             .collect()
     }
 

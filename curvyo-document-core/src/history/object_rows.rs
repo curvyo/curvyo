@@ -12,7 +12,7 @@ use loro::TreeID;
 use super::lineage::clone_origin;
 use super::object_timeline::{Entry, EntryClass, Reader, Targets, TimelineStatus};
 use super::report::Role;
-use super::rows::{Author, StepKind, kind_of_touched};
+use super::rows::{Author, StepKind, kind_of_step};
 use super::step_id::StepRef;
 use super::touched::Touched;
 use crate::document::Document;
@@ -154,7 +154,12 @@ impl Document {
     /// The steps Ctrl+U and Ctrl+Shift+U would act on for `id`.
     #[must_use]
     pub fn object_history_targets(&self, id: NodeId) -> ObjectTargets {
-        let targets = self.targets_of(tree_id(id));
+        let object = tree_id(id);
+        let mut targets = self.targets_of(object);
+        if targets.undo.is_some_and(|entry| entry.from.is_some()) {
+            // The first step an inherited press would write, not the first it would pass over.
+            targets.undo = self.first_writable_undo(object);
+        }
         ObjectTargets {
             undo: targets.undo.and_then(|entry| self.target_of(&entry)),
             redo: targets.redo.and_then(|entry| self.target_of(&entry)),
@@ -250,7 +255,9 @@ impl Document {
                 redo,
             },
             EntryClass::Do => match clone_origin(reader.doc, subject) {
-                Some((source, _)) if entry.step == StepRef::new(subject.peer, subject.counter) => {
+                Some((source, _))
+                    if reader.steps.step_at(subject.peer, subject.counter) == Some(entry.step) =>
+                {
                     ObjectRowClass::CloneStart {
                         source: node_id(source),
                     }
@@ -268,7 +275,7 @@ impl Document {
                 .and_then(|log| log.header.as_ref())
                 .map_or(Timestamp::UNKNOWN, |h| h.time),
             class,
-            kind: kind_of_touched(&touched),
+            kind: kind_of_step(&log.map_or(String::new(), |l| l.label.clone()), &touched),
             role: role_of(&touched, subject),
             others: other_objects(&touched, subject),
             sources: if created_here {
