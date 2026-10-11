@@ -17,8 +17,9 @@ use crate::transform_handle_layout::{is_corner, resize_handle_local_position};
 /// is written (`transform_entry`, `skew_entry`).
 pub(crate) const ANGLE_EQUAL_EPSILON_RAD: f64 = 1e-12;
 
-/// Whether `object` is a polygon or a star — the one kind whose transform
-/// handles are corner-only and always-uniform (slice 5, criterion 11).
+/// Whether `object` is a polygon or a star — the kinds a stretch turns into a
+/// path (`specs/0047-transform-polish/` criterion 12) and whose rotate snap works on
+/// the shown angle.
 pub(crate) fn is_polygon_or_star(object: &ObjectSnapshot) -> bool {
     matches!(
         object,
@@ -294,28 +295,6 @@ fn anchor_edge(start_min: f64, start_max: f64, new_extent: f64, dragged_sign: f6
     } else {
         (start_min, start_min + new_extent)
     }
-}
-
-/// A polygon/star's own uniform-scale factor from dragging corner
-/// handle `direction` (acceptance criterion 11: always uniform,
-/// regardless of Ctrl). The handle sits at the corner of the shape's
-/// frame box, `radius * √2` from the center along its diagonal, so the
-/// pointer's displacement along that diagonal moves the *corner*: the
-/// new corner distance is `radius·√2 + projected`, and the radius is
-/// that over `√2` — the handle then follows the pointer exactly instead
-/// of overshooting it. Clamped at zero; `1.0` for a degenerate zero
-/// starting radius (the same `safe_factor` rule every other factor here
-/// uses).
-#[must_use]
-pub fn polygon_star_resize_factor(
-    start_radius: f64,
-    direction: ResizeDirection,
-    local_delta: Vec2,
-) -> f64 {
-    let unit = direction.unit_vector().normalized_to(1.0);
-    let projected = local_delta.x * unit.x + local_delta.y * unit.y;
-    let new_radius = (start_radius + projected / std::f64::consts::SQRT_2).max(0.0);
-    safe_factor(new_radius, start_radius)
 }
 
 /// The stroke-width/corner-radius scale factor for a resize with
@@ -677,21 +656,6 @@ mod tests {
     fn scaled_and_floored_allows_corner_radius_to_reach_exactly_zero() {
         let radius = scaled_and_floored(Length::from_mm(2.0), 0.0, Length::from_mm(0.0));
         assert!(radius.as_mm().abs() < 1e-9);
-    }
-
-    /// Acceptance criterion 11: a polygon/star's corner-handle drag is
-    /// always a uniform radius scale.
-    #[test]
-    fn polygon_star_resize_factor_scales_the_radius() {
-        // The Ne handle sits r√2 = 14.14 from the center; pulling it
-        // 7.07 further along its diagonal puts it at 21.2 = 15·√2, so the
-        // radius is 15 (factor 1.5) — the handle ends exactly under the
-        // pointer.
-        let diagonal = ResizeDirection::Ne
-            .unit_vector()
-            .normalized_to(10.0 * std::f64::consts::SQRT_2 / 2.0);
-        let factor = polygon_star_resize_factor(10.0, ResizeDirection::Ne, diagonal);
-        assert!((factor - 1.5).abs() < 1e-9, "factor was {factor}");
     }
 
     /// Criterion 12: no modifier rotates about the box center, whatever

@@ -9,12 +9,6 @@ import { TOO_FAR_HINT } from "@/lib/nudgeText";
 import { createSession, openSession } from "@/lib/editorSession";
 import type { WasmSession } from "@/lib/editorSession";
 import type { EditHint } from "@/components/EditHintChip";
-import {
-  CONVERSION_NOTICE_MS,
-  stretchEntryNote,
-  stretchNotice,
-  stretchReadoutLine,
-} from "@/lib/conversionText";
 import type { BooleanOp, BooleanResult } from "@/lib/booleanText";
 import type { BreakApartResult, CombineResult } from "@/lib/pathText";
 import type { ClosePathResult } from "@/lib/penText";
@@ -190,6 +184,10 @@ const DOUBLE_CLICK_MS = 400;
  * presses land close enough to read as one double-click", independent
  * of zoom. */
 const DOUBLE_CLICK_PX = 5;
+/** A press on a mark of the typed move is a click if the pointer moves less than this before the
+ * release, px (`specs/0047-transform-polish/` criterion 40); 8 px for a touch or a pen. */
+const MARK_SLOP_PX = 3;
+const MARK_TOUCH_SLOP_PX = 8;
 
 /** How many wheel-delta pixels correspond to one print-sized "line" of
  * scroll (`deltaMode === 1`) or one "page" (`deltaMode === 2`) — most
@@ -267,19 +265,6 @@ function readLiveReadout(
   return readout;
 }
 
-/** The live readout of the drag in flight with its second line when the live
- * result turns shapes into paths ("2 shapes become paths", criterion 23). */
-function readReadout(session: WasmSession | null | undefined): LiveReadout | null {
-  const readout = readLiveReadout(session?.live_readout());
-  if (readout && session) {
-    const note = stretchReadoutLine(session.live_conversion_count());
-    if (note !== null) {
-      readout.note = note;
-    }
-  }
-  return readout;
-}
-
 /** Reads a wasm-bindgen `DocumentPoint` instance once, immediately, so
  * it can be `free()`d rather than held onto — same reasoning as
  * `readToolbarState`. */
@@ -302,8 +287,6 @@ export interface LiveReadout {
   text: string;
   x: number;
   y: number;
-  /** A second line under the numbers ("2 shapes become paths"). */
-  note?: string;
 }
 
 /** One field of the typed numeric entry chip (`object-transform-
@@ -406,16 +389,27 @@ function sameEntry<T>(a: T | null, b: T | null): boolean {
 export interface MoveEntryState {
   /** The box centre: the centre handle is there, or would be. */
   center: { x: number; y: number };
+  /** The lower edge of the true bounding box: the chip sits 16 px below it
+   * (`specs/0047-transform-polish/` UX notes, "Chip"). */
+  boxBottomY: number;
   /** What an untouched X and Y show in Relative mode. */
   relative: [string, string];
-  /** What an untouched X and Y show in Absolute mode (the current top-left). */
-  absolute: [string, string];
+  /** What an untouched X and Y show in Absolute mode for each of the nine reference points, in
+   * the order of the radios: top left, top centre, top right, left middle, centre, right
+   * middle, bottom left, bottom centre, bottom right. */
+  absolute: Array<[string, string]>;
+  /** The chosen reference point, 0 to 8: 4, the centre, on every open. */
+  reference: number;
+  /** The accessible name of each reference point's radio ("Top left", ...). */
+  referenceNames: string[];
+  /** The first line of the hint chip of each reference point's mark ("Top left corner", ...). */
+  referenceHints: string[];
   /** Whether the Copy check opens on (Ctrl at the second press). */
   copyPreset: boolean;
-  /** The chip moves a multi-selection: Absolute measures from the top-left
-   * corner of the group box (`specs/0019-multi-object-transform/` criterion 35). */
-  selection: boolean;
 }
+
+/** The nine reference points, as the index of [`MoveEntryState.absolute`]. */
+export const REFERENCE_COUNT = 9;
 
 /** Reads the wasm-bindgen `MoveEntryChip` once, immediately, so it can be
  * `free()`d rather than held onto. */
@@ -424,10 +418,13 @@ function readMoveEntry(
     | {
         center_x: number;
         center_y: number;
+        box_bottom_y: number;
         relative_prefill(axis: number): string;
-        absolute_prefill(axis: number): string;
+        absolute_prefill(reference: number, axis: number): string;
+        reference(): number;
+        reference_name(index: number): string;
+        reference_hint_name(index: number): string;
         copy_preset(): boolean;
-        selection(): boolean;
         free(): void;
       }
     | undefined,
@@ -435,12 +432,16 @@ function readMoveEntry(
   if (!raw) {
     return null;
   }
+  const points = Array.from({ length: REFERENCE_COUNT }, (_, index) => index);
   const entry: MoveEntryState = {
     center: { x: raw.center_x, y: raw.center_y },
+    boxBottomY: raw.box_bottom_y,
     relative: [raw.relative_prefill(0), raw.relative_prefill(1)],
-    absolute: [raw.absolute_prefill(0), raw.absolute_prefill(1)],
+    absolute: points.map((index) => [raw.absolute_prefill(index, 0), raw.absolute_prefill(index, 1)]),
+    reference: raw.reference(),
+    referenceNames: points.map((index) => raw.reference_name(index)),
+    referenceHints: points.map((index) => raw.reference_hint_name(index)),
     copyPreset: raw.copy_preset(),
-    selection: raw.selection(),
   };
   raw.free();
   return entry;
@@ -471,19 +472,11 @@ export interface KeyHint {
   text: string;
   /** Changes on every message, so the clock restarts. */
   id: number;
-  /** Where it appears (canvas pixels) instead of at the pointer: the place of the
-   * closed entry chip for the notice of a typed size. */
-  anchor?: { x: number; y: number };
-  /** How long it stays, ms; the 2 s of a key hint when absent. The notice of a
-   * stretch that converted shapes stays 6 s and goes at the next press or key
-   * (`specs/0019-multi-object-transform/` criterion 54). */
-  ms?: number;
 }
 
 /** What `WasmSession.key_down` returns for a refused key. */
 const KEY_HINT_TEXT: Record<string, string> = {
   "hint-select-first": "Select an object first",
-  "hint-path-only": "Skew works on paths only",
   "hint-too-far": TOO_FAR_HINT,
 };
 
@@ -525,9 +518,6 @@ export interface EditorSession {
    * (they depend on the "Link corners" switch and on a limited corner, see
    * `Session::corner_hint_lines`); empty on any other handle. */
   cornerHintLines: string[];
-  /** The number of shapes an edge stretch would turn into paths, while the pointer
-   * rests on an edge resize handle; 0 otherwise (`Session::hover_conversion_count`). */
-  conversionHoverCount: number;
   /** The typed numeric entry to show, or `null`. */
   transformEntry: TransformEntryState | null;
   /** The open typed move, if any. */
@@ -543,23 +533,29 @@ export interface EditorSession {
     absolute: boolean,
     copy: boolean,
   ) => string;
+  /** The typed move's Reference control and marks (`specs/0047-transform-polish/` Part C): the
+   * chip reports its mode, the point its control chose and the radio under the pointer to Rust,
+   * which draws the marks and reads the point at Enter. */
+  setMoveChipAbsolute: (absolute: boolean) => void;
+  setMoveReference: (reference: number) => void;
+  /** The radio with the pointer or the focus (0 to 8), or -1. */
+  setMoveRadioHover: (reference: number) => void;
+  /** A click on a mark: the move executes with that mark's point as the reference, with the
+   * texts of the fields and the Copy check; the codes of `commitMoveEntry` (criterion 40). */
+  commitMoveEntryAt: (first: string, second: string, copy: boolean, reference: number) => string;
+  /** The mark (0 to 8) under the pointer, or -1 (criteria 43 and 44). */
+  moveMarkHover: number;
+  /** The chip registers what a click on a mark does while it is open; `null` when it closes. */
+  setMarkClickHandler: (handler: ((mark: number) => void) | null) => void;
   /** Enter in the entry chip: `"committed"`, `"unchanged"` (both close it)
    * or `"invalid:<field>:number|positive|negative|ratio-range|skew-range|too-large"`
    * (it stays
    * open). */
-  commitTransformEntry: (
-    first: string,
-    second: string,
-    lastEdited: number,
-    chipAnchor?: { x: number; y: number },
-  ) => string;
+  commitTransformEntry: (first: string, second: string, lastEdited: number) => string;
   /** Closes the entry without writing (Escape, blur). Idempotent. */
   cancelTransformEntry: () => void;
   /** For linked fields: the text the other field takes. */
   transformEntryLinked: (field: number, text: string) => string | undefined;
-  /** The note under a size entry's fields while the typed size turns shapes into
-   * paths ("Turns 2 shapes into paths."); `null` when it does not. */
-  entryConversionNote: (first: string, second: string, lastEdited: number) => string | null;
   /** The current zoom level's integer percentage read-out (acceptance
    * criterion 9) — `StatusBar`'s new center segment. */
   zoomPercent: number;
@@ -650,6 +646,10 @@ export interface EditorSession {
    * written), one commit on release. */
   previewSelectedRatio: (ratio: number) => void;
   commitSelectedRatio: () => void;
+  /** A click on the slider or a typed ratio: one commit for every selected star. */
+  setSelectedRatio: (ratio: number) => void;
+  /** Escape in the middle of a slider drag: the preview is dropped. */
+  cancelSelectedRatio: () => void;
   /** The mode toggle (acceptance criteria 11 vs. 12). */
   setPolyStarMode: (mode: PolyStarMode) => void;
   /** The point-count setting for the next shape (acceptance criterion 10). */
@@ -728,6 +728,10 @@ export function useEditorSession(
     null,
   );
   const suppressedPressRef = useRef(false);
+  /** A press that landed on a mark of the open typed move: consumed, and a click at the release. */
+  const markPressRef = useRef<{ mark: number; x: number; y: number; touch: boolean } | null>(null);
+  const markClickRef = useRef<((mark: number) => void) | null>(null);
+  const [moveMarkHover, setMoveMarkHover] = useState(-1);
   /** The second press of a double-click: its position and modifiers, the
    * ones `double_click` is called with when its release arrives (a handle
    * is picked at the second press, `object-transform-refinements`). */
@@ -765,7 +769,6 @@ export function useEditorSession(
   const editHintCounter = useRef(0);
   const [handleHint, setHandleHint] = useState("");
   const [cornerHintLines, setCornerHintLines] = useState<string[]>([]);
-  const [conversionHoverCount, setConversionHoverCount] = useState(0);
   const limitNoticeTimer = useRef<number | undefined>(undefined);
   const [transformEntry, setTransformEntry] = useState<TransformEntryState | null>(null);
   const [moveEntry, setMoveEntry] = useState<MoveEntryState | null>(null);
@@ -805,8 +808,6 @@ export function useEditorSession(
     onHistory: onNudgeHistory,
     onKeyUp: onNudgeKeyUp,
   } = nudgeFeedback;
-  /** Where the closed entry chip was, for the notice of the commit it makes. */
-  const noticeAnchorRef = useRef<{ x: number; y: number } | null>(null);
 
   /** Re-reads the typed entry (position follows zoom, pan and resize; it
    * closes on a tool switch or a selection change). */
@@ -816,6 +817,10 @@ export function useEditorSession(
     entryOpenRef.current = next !== null || nextMove !== null;
     setTransformEntry((previous) => (sameEntry(previous, next) ? previous : next));
     setMoveEntry((previous) => (sameEntry(previous, nextMove) ? previous : nextMove));
+    if (nextMove === null) {
+      // No chip, no mark under the pointer.
+      setMoveMarkHover(-1);
+    }
   }, []);
 
   /** Re-reads the modifier badges: a pure read of Rust's state, called after
@@ -871,17 +876,6 @@ export function useEditorSession(
     setZoomPercent(session.zoom_percent());
     setSelectionCount(session.selection_count());
     setSelectionAnnouncement(session.selection_announcement());
-    // A commit that turned shapes into paths says so, once.
-    const notice = stretchNotice(session.take_conversion_notice());
-    if (notice !== null) {
-      keyHintCounter.current += 1;
-      setKeyHint({
-        text: notice,
-        id: keyHintCounter.current,
-        ms: CONVERSION_NOTICE_MS,
-        anchor: noticeAnchorRef.current ?? undefined,
-      });
-    }
     setSyncRevision((revision) => revision + 1);
     syncEntry(session);
     syncBadges(session);
@@ -1070,7 +1064,14 @@ export function useEditorSession(
     // picked up on the very next frame, with no need to restart the
     // loop itself.
     let frame = requestAnimationFrame(function renderLoop() {
-      sessionRef.current?.render();
+      const session = sessionRef.current;
+      session?.render();
+      // An open typed entry follows every pan, zoom and resize, whatever moved the view: the
+      // chip stays where its placement rule puts it (`0047` UX review N1). A re-read that
+      // changed nothing sets no state.
+      if (session && entryOpenRef.current) {
+        syncEntry(session);
+      }
       frame = requestAnimationFrame(renderLoop);
     });
 
@@ -1218,6 +1219,19 @@ export function useEditorSession(
     syncFromSession();
   }, [syncFromSession]);
 
+  const setSelectedRatio = useCallback(
+    (ratio: number) => {
+      sessionRef.current?.set_selected_ratio(ratio);
+      syncFromSession();
+    },
+    [syncFromSession],
+  );
+
+  const cancelSelectedRatio = useCallback(() => {
+    sessionRef.current?.cancel_selected_ratio();
+    syncFromSession();
+  }, [syncFromSession]);
+
   const setPolyStarMode = useCallback(
     (mode: PolyStarMode) => {
       sessionRef.current?.set_poly_star_mode(mode);
@@ -1334,8 +1348,6 @@ export function useEditorSession(
       if (releasePendingRef.current) {
         return;
       }
-      // The notice of a stretch goes at the next press or key (criterion 54).
-      setKeyHint((hint) => (hint?.ms === undefined ? hint : null));
       syncTrackedModifiers(event);
       modifierTrackerRef.current.pointerPressed();
       // A press on the canvas takes the focus from a field of the panel, and a
@@ -1380,6 +1392,26 @@ export function useEditorSession(
         return;
       }
 
+      // A press on a mark of the open typed move belongs to its chip: it does not cancel the
+      // chip, select, move or start a marquee, and acts at the release
+      // (`specs/0047-transform-polish/` criterion 40). Cancelling the default keeps the focus
+      // in the chip.
+      if (event.button === 0) {
+        const touch = event.pointerType !== "mouse";
+        const mark = session.move_mark_at(x, y, touch);
+        if (mark >= 0) {
+          event.preventDefault();
+          try {
+            event.currentTarget.setPointerCapture(event.pointerId);
+          } catch {
+            // Not capturable (e.g. a synthetic event): the click still works over the canvas.
+          }
+          markPressRef.current = { mark, x, y, touch };
+          lastPressRef.current = null;
+          return;
+        }
+      }
+
       const now = performance.now();
       const last = lastPressRef.current;
       // Alt-clicks step through overlapping objects (`specs/0014-advanced-selection/`
@@ -1401,7 +1433,6 @@ export function useEditorSession(
         return;
       }
       setHandleHint("");
-    setConversionHoverCount(0);
       // Capture the pointer for every tool, not only for panning: a
       // transform drag (a rotate swings the pointer in a wide arc) must
       // keep receiving moves and the release when the pointer leaves the
@@ -1457,11 +1488,11 @@ export function useEditorSession(
         event.ctrlKey || event.metaKey,
         event.altKey,
       );
-      setLiveReadout(readReadout(session));
+      setLiveReadout(readLiveReadout(session?.live_readout()));
       setCursorHint(session?.cursor_hint() ?? "default");
       setHandleHint(session?.handle_hint() ?? "");
       setCornerHintLines(session?.corner_hint_lines() ?? []);
-      setConversionHoverCount(session?.hover_conversion_count() ?? 0);
+      setMoveMarkHover(session?.move_mark_hover() ?? -1);
       if (session) {
         syncBadges(session);
       }
@@ -1498,6 +1529,18 @@ export function useEditorSession(
         event.currentTarget.releasePointerCapture(event.pointerId);
       } catch {
         // Not captured (e.g. a non-primary button) — nothing to release.
+      }
+
+      // The release of a press on a mark: a click if the pointer stayed within the slop, else
+      // nothing happens and the chip stays open.
+      const markPress = markPressRef.current;
+      if (markPress) {
+        markPressRef.current = null;
+        const slop = markPress.touch ? MARK_TOUCH_SLOP_PX : MARK_SLOP_PX;
+        if (Math.hypot(x - markPress.x, y - markPress.y) < slop) {
+          markClickRef.current?.(markPress.mark);
+        }
+        return;
       }
 
       if (suppressedPressRef.current) {
@@ -1568,6 +1611,7 @@ export function useEditorSession(
   );
 
   const onPointerCancel = useCallback(() => {
+    markPressRef.current = null;
     sessionRef.current?.pointer_cancelled();
     setLiveReadout(null);
     setCursorHint("default");
@@ -1581,7 +1625,7 @@ export function useEditorSession(
     setLiveReadout(null);
     setCursorHint("default");
     setHandleHint("");
-    setConversionHoverCount(0);
+    setMoveMarkHover(-1);
     lastPointerRef.current = null;
     setMoveBadges(NO_BADGES);
   }, []);
@@ -1601,9 +1645,8 @@ export function useEditorSession(
     const last = lastPointerRef.current;
     if (last) {
       session.pointer_hover(last.x, last.y, shift, ctrl, alt);
-      setLiveReadout(readReadout(session));
+      setLiveReadout(readLiveReadout(session?.live_readout()));
       setHandleHint("");
-    setConversionHoverCount(0);
     }
     setCursorHint(session.cursor_hint());
     syncBadges(session);
@@ -1677,7 +1720,6 @@ export function useEditorSession(
       if (isFormControl(event.target)) {
         return;
       }
-      setKeyHint((hint) => (hint?.ms === undefined ? hint : null));
       if (event.key === " ") {
         // Space+drag pans (acceptance criterion 4) — `preventDefault`
         // so it never activates a focused button
@@ -1712,7 +1754,7 @@ export function useEditorSession(
       }
       event.preventDefault();
       if (handleKeyOutcome(outcome)) {
-        setLiveReadout(readReadout(session));
+        setLiveReadout(readLiveReadout(session.live_readout()));
         setCursorHint(session.cursor_hint());
         syncFromSession();
         return;
@@ -1729,7 +1771,7 @@ export function useEditorSession(
         keyHintCounter.current += 1;
         setKeyHint({ text: hint, id: keyHintCounter.current });
       }
-      setLiveReadout(readReadout(session));
+      setLiveReadout(readLiveReadout(session?.live_readout()));
       setCursorHint(session.cursor_hint());
       syncFromSession();
     },
@@ -1741,7 +1783,7 @@ export function useEditorSession(
     if (!keyHint) {
       return undefined;
     }
-    const timer = window.setTimeout(() => setKeyHint(null), keyHint.ms ?? KEY_HINT_MS);
+    const timer = window.setTimeout(() => setKeyHint(null), KEY_HINT_MS);
     return () => window.clearTimeout(timer);
   }, [keyHint]);
 
@@ -1759,23 +1801,16 @@ export function useEditorSession(
   );
 
   const commitTransformEntry = useCallback(
-    (
-      first: string,
-      second: string,
-      lastEdited: number,
-      chipAnchor?: { x: number; y: number },
-    ): string => {
+    (first: string, second: string, lastEdited: number): string => {
       const session = sessionRef.current;
       if (!session) {
         return "unchanged";
       }
       const outcome = session.commit_transform_entry(first, second, lastEdited);
-      noticeAnchorRef.current = chipAnchor ?? null;
       syncFromSession();
-      noticeAnchorRef.current = null;
       // A typed corner radius past its limit is committed limited and says
       // "r 12.0 mm max" at the knob for 1.5 s: a limit is never silent.
-      const notice = readReadout(session);
+      const notice = readLiveReadout(session?.live_readout());
       if (outcome === "committed" && notice) {
         setLiveReadout(notice);
         window.clearTimeout(limitNoticeTimer.current);
@@ -1802,6 +1837,47 @@ export function useEditorSession(
     [syncFromSession],
   );
 
+  const setMoveChipAbsolute = useCallback(
+    (absolute: boolean) => {
+      sessionRef.current?.set_move_chip_absolute(absolute);
+      syncFromSession();
+    },
+    [syncFromSession],
+  );
+
+  const setMoveReference = useCallback(
+    (reference: number) => {
+      sessionRef.current?.set_move_reference(reference);
+      syncFromSession();
+    },
+    [syncFromSession],
+  );
+
+  const setMoveRadioHover = useCallback(
+    (reference: number) => {
+      sessionRef.current?.set_move_radio_hover(reference);
+      syncFromSession();
+    },
+    [syncFromSession],
+  );
+
+  const commitMoveEntryAt = useCallback(
+    (first: string, second: string, copy: boolean, reference: number): string => {
+      const session = sessionRef.current;
+      if (!session) {
+        return "unchanged";
+      }
+      const outcome = session.commit_move_entry_at(first, second, copy, reference);
+      syncFromSession();
+      return outcome;
+    },
+    [syncFromSession],
+  );
+
+  const setMarkClickHandler = useCallback((handler: ((mark: number) => void) | null) => {
+    markClickRef.current = handler;
+  }, []);
+
   const cancelTransformEntry = useCallback(() => {
     const session = sessionRef.current;
     if (!session || !entryOpenRef.current) {
@@ -1810,14 +1886,6 @@ export function useEditorSession(
     session.cancel_transform_entry();
     syncFromSession();
   }, [syncFromSession]);
-
-  const entryConversionNote = useCallback(
-    (first: string, second: string, lastEdited: number): string | null =>
-      stretchEntryNote(
-        sessionRef.current?.entry_conversion_count(first, second, lastEdited) ?? 0,
-      ),
-    [],
-  );
 
   const transformEntryLinked = useCallback(
     (field: number, text: string): string | undefined =>
@@ -1839,15 +1907,19 @@ export function useEditorSession(
     dismissEditHint,
     handleHint,
     cornerHintLines,
-    conversionHoverCount,
     transformEntry,
     moveEntry,
     moveBadges,
     commitMoveEntry,
+    setMoveChipAbsolute,
+    setMoveReference,
+    setMoveRadioHover,
+    commitMoveEntryAt,
+    moveMarkHover,
+    setMarkClickHandler,
     commitTransformEntry,
     cancelTransformEntry,
     transformEntryLinked,
-    entryConversionNote,
     onContainerBlur,
     zoomPercent,
     isPanning,
@@ -1887,6 +1959,8 @@ export function useEditorSession(
     setSelectedPointCount,
     previewSelectedRatio,
     commitSelectedRatio,
+    setSelectedRatio,
+    cancelSelectedRatio,
     setPolyStarMode,
     setPolyStarPointCount,
     setPolyStarRatio,

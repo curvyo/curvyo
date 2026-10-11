@@ -2,6 +2,8 @@ import { CircleAlert, Link, Unlink } from "lucide-react";
 import { Toggle, Tooltip } from "radix-ui";
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 
+import { RatioSlider } from "@/components/RatioSlider";
+import { RATIO_SLIDER_NAMES } from "@/lib/sliderNames";
 import { ToolbarSwitch } from "@/components/ToolbarSwitch";
 import type { SelectBarState } from "@/hooks/useEditorSession";
 
@@ -23,8 +25,12 @@ export interface SelectToolbarProps {
   onSetPointCount: (count: number) => void;
   /** The ratio slider's live preview on every tick; nothing is written. */
   onPreviewRatio: (ratio: number) => void;
-  /** One commit, when the slider drag ends. */
+  /** One commit, when the slider drag or a key run ends. */
   onCommitRatio: () => void;
+  /** A click on the slider or a typed value: set and commit in one go. */
+  onSetRatio: (ratio: number) => void;
+  /** Escape in the middle of a slider drag: the preview is dropped. */
+  onCancelRatio: () => void;
   onConvertToPaths: () => void;
   /** Returns the keyboard focus to the canvas (after Enter or Escape in a
    * field). */
@@ -425,6 +431,8 @@ export function SelectToolbar({
   onSetPointCount,
   onPreviewRatio,
   onCommitRatio,
+  onSetRatio,
+  onCancelRatio,
   onConvertToPaths,
   onReturnFocus,
 }: SelectToolbarProps) {
@@ -457,31 +465,19 @@ export function SelectToolbar({
       <div key={"star"} className={GROUP_CLASS}>
         {bar.pointsShown && <PointsField bar={bar} onSetPointCount={onSetPointCount} />}
         {bar.ratioShown && (
-          <label
-            className="flex items-center gap-1.5 text-[var(--toolbar-icon)]"
-            title="Inner ratio of the selected stars"
-          >
+          <div className="flex items-center gap-1.5 text-[var(--toolbar-icon)]">
             Ratio
-            <input
-              type="range"
-              min={0.01}
-              max={0.99}
-              step={0.01}
-              aria-label="Inner ratio"
-              aria-valuetext={bar.ratioMixed ? "Mixed" : undefined}
-              className={bar.ratioMixed ? "select-bar-slider-mixed" : undefined}
-              value={bar.ratioMixed ? 0.5 : bar.ratio}
-              // Every tick previews live in blue; the one commit happens on
-              // release, key-up or blur.
-              onChange={(event) => onPreviewRatio(Number(event.target.value))}
-              onPointerUp={onCommitRatio}
-              onKeyUp={onCommitRatio}
-              onBlur={onCommitRatio}
+            <RatioSlider
+              label={RATIO_SLIDER_NAMES.selectedStars}
+              value={bar.ratio}
+              mixed={bar.ratioMixed}
+              onPreview={onPreviewRatio}
+              onRelease={onCommitRatio}
+              onSet={onSetRatio}
+              onCancel={onCancelRatio}
+              onReturnFocus={onReturnFocus}
             />
-            <span className="w-11 text-right tabular-nums">
-              {bar.ratioMixed ? "Mixed" : bar.ratio.toFixed(2)}
-            </span>
-          </label>
+          </div>
         )}
       </div>,
     );
@@ -491,7 +487,7 @@ export function SelectToolbar({
       <button
         key="object-to-path"
         type="button"
-        title="Convert the selected shapes to paths. Paths can be stretched and skewed freely."
+        title="Convert the selected shapes to paths"
         onClick={onConvertToPaths}
         className={`${BUTTON_CLASS} my-1`}
       >

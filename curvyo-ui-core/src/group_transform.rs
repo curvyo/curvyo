@@ -48,8 +48,8 @@ pub(crate) enum GroupMap {
 /// width and the corner radii. A move, a rotate and a uniform scale never change
 /// the kind; a stretch (unequal factors) turns an object that has a `converted`
 /// path (a polygon, a star, a rectangle or ellipse off the axes) into that path,
-/// scaled (criterion 53). A skew leaves a primitive as it is (the handles are not
-/// offered for one, criterion 40).
+/// scaled, and a skew turns every primitive into its `converted` path, sheared
+/// (`specs/0047-transform-polish/` criteria 2 and 7).
 pub(crate) fn apply(
     object: &ObjectSnapshot,
     map: &GroupMap,
@@ -61,12 +61,15 @@ pub(crate) fn apply(
             scale_object(object, pivot, (sx, sy), modes, converted)
         }
         GroupMap::Rotate { pivot, delta } => object.rotated(pivot, delta),
-        GroupMap::Shear { fixed, ku, kv } => match object {
-            ObjectSnapshot::Path(path) => {
-                ObjectSnapshot::Path(path.sheared_along(fixed, ku, kv, Angle::from_radians(0.0)))
+        GroupMap::Shear { fixed, ku, kv } => {
+            let axes = Angle::from_radians(0.0);
+            match (object, converted) {
+                (ObjectSnapshot::Path(path), _) | (ObjectSnapshot::Primitive(_), Some(path)) => {
+                    ObjectSnapshot::Path(path.sheared_along(fixed, ku, kv, axes))
+                }
+                (ObjectSnapshot::Primitive(_), None) => object.clone(),
             }
-            ObjectSnapshot::Primitive(_) => object.clone(),
-        },
+        }
     }
 }
 
@@ -127,7 +130,7 @@ fn extent_factors(primitive: &PrimitiveSnapshot, (sx, sy): (f64, f64)) -> ((f64,
     }
 }
 
-fn scale_primitive(
+pub(crate) fn scale_primitive(
     primitive: &PrimitiveSnapshot,
     pivot: Point,
     (sx, sy): (f64, f64),
@@ -220,7 +223,6 @@ pub(crate) fn group_map(
     handle: EditHandle,
     (down_at, current): (Point, Point),
     (shift, ctrl): (bool, bool),
-    proportional_corners: bool,
 ) -> Option<GroupMap> {
     match handle {
         EditHandle::Resize(direction) => {
@@ -229,14 +231,8 @@ pub(crate) fn group_map(
             if !(delta.x.is_finite() && delta.y.is_finite()) {
                 return None;
             }
-            let resized = resize_local_box(
-                start_box.min,
-                start_box.max,
-                direction,
-                delta,
-                shift,
-                ctrl || proportional_corners,
-            );
+            let resized =
+                resize_local_box(start_box.min, start_box.max, direction, delta, shift, ctrl);
             let anchor =
                 resize_anchor_local_position(start_box.min, start_box.max, direction, shift);
             Some(GroupMap::Scale {
@@ -635,5 +631,104 @@ mod tests {
             (path.anchors[1].point.x - 10.0).abs() < 1e-9,
             "bottom stays"
         );
+    }
+
+    fn square_polygon(document: &Document) -> ObjectSnapshot {
+        let id = document.create_polygon(
+            StarFrame {
+                center: Point::new(25.0, 5.0),
+                radius: Length::from_mm(5.0),
+                angle: Angle::from_radians(0.0),
+            },
+            PointCount::new(4).expect("count"),
+        );
+        document.object(id).expect("exists")
+    }
+
+    #[allow(clippy::cast_possible_truncation)] // test coordinates are small whole numbers
+    fn to_whole(value: f64) -> i64 {
+        value.round() as i64
+    }
+
+    fn rounded_corners(path: &PathSnapshot) -> Vec<(i64, i64)> {
+        let mut corners: Vec<(i64, i64)> = path
+            .anchors
+            .iter()
+            .map(|a| (to_whole(a.point.x), to_whole(a.point.y)))
+            .collect();
+        corners.sort_unstable();
+        corners
+    }
+
+    /// `0047` criterion 7, worked example: a polygon with the vertices (25, 0), (30, 5),
+    /// (25, 10) and (20, 5) stretched by (2, 3) about the origin is a path with the corners
+    /// (50, 0), (60, 15), (50, 30) and (40, 15); a uniform scale keeps the polygon.
+    #[test]
+    fn a_stretched_polygon_is_the_scaled_object_to_path_outline() {
+        let document = Document::new(1);
+        let polygon = square_polygon(&document);
+        let converted = {
+            let ObjectSnapshot::Primitive(primitive) = &polygon else {
+                panic!("a polygon");
+            };
+            crate::conversion::primitive_as_path(primitive, &mut crate::AnchorIdMinter::new(0))
+        };
+        assert_eq!(
+            rounded_corners(&converted),
+            [(20, 5), (25, 0), (25, 10), (30, 5)],
+            "the vertices Object to path gives"
+        );
+        let stretched = apply(
+            &polygon,
+            &scale(2.0, 3.0),
+            ScaleModes::default(),
+            Some(&converted),
+        );
+        let ObjectSnapshot::Path(path) = stretched else {
+            panic!("a path");
+        };
+        assert_eq!(
+            rounded_corners(&path),
+            [(40, 15), (50, 0), (50, 30), (60, 15)]
+        );
+        let uniform = apply(
+            &polygon,
+            &scale(2.0, 2.0),
+            ScaleModes::default(),
+            Some(&converted),
+        );
+        assert!(matches!(uniform, ObjectSnapshot::Primitive(_)));
+    }
+
+    /// `0047` criterion 2: a shear turns a primitive into its sheared outline, exactly the
+    /// image of the path; without a converted path (a rotate never has one) it stays.
+    #[test]
+    fn a_shear_converts_a_primitive_with_a_converted_path() {
+        let document = Document::new(1);
+        let object = rect(&document, 0.0, 0.0, 10.0, 10.0);
+        let ObjectSnapshot::Primitive(primitive) = &object else {
+            panic!("a rectangle");
+        };
+        let converted =
+            crate::conversion::primitive_as_path(primitive, &mut crate::AnchorIdMinter::new(0));
+        let shear = GroupMap::Shear {
+            fixed: Point::new(5.0, 10.0),
+            ku: -1.0,
+            kv: 0.0,
+        };
+        let ObjectSnapshot::Path(path) =
+            apply(&object, &shear, ScaleModes::default(), Some(&converted))
+        else {
+            panic!("a path");
+        };
+        assert_eq!(
+            rounded_corners(&path),
+            [(0, 10), (10, 0), (10, 10), (20, 0)]
+        );
+        assert_eq!(path.id, primitive.id, "same object");
+        assert!(matches!(
+            apply(&object, &shear, ScaleModes::default(), None),
+            ObjectSnapshot::Primitive(_)
+        ));
     }
 }

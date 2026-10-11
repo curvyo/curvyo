@@ -1,3 +1,5 @@
+import { OPACITY_CLICK_MIN_P, VALUE_FIELD_NAMES, VALUE_FIELD_SCALE_END } from "@/lib/sliderNames";
+import { useHexEntry } from "@/hooks/useHexEntry";
 import { useRef } from "react";
 
 import { ColourBlock } from "@/components/panel/ColourBlock";
@@ -24,6 +26,8 @@ interface FillSectionProps {
 export function FillSection({ panel, onReturnFocus }: FillSectionProps) {
   const { view } = panel;
   const section = useRef<HTMLDivElement>(null);
+  const hex = useRef<HTMLInputElement>(null);
+  const hexEntry = useHexEntry(hex, onReturnFocus);
   const rowsFocus = useRowsFocus(view.fillRows, section);
   return (
     <div ref={section} className="flex flex-col gap-2">
@@ -46,7 +50,8 @@ export function FillSection({ panel, onReturnFocus }: FillSectionProps) {
             picking={view.pickTarget === "fill"}
             onPick={() => panel.beginPick("fill")}
             onSubmitHex={(text) => panel.setText("fill-color", text)}
-            onReturnFocus={onReturnFocus}
+            onReturnFocus={hexEntry.returnFocus}
+            hexRef={hex}
           />
           <ColourPicker
             name="Fill"
@@ -57,10 +62,12 @@ export function FillSection({ panel, onReturnFocus }: FillSectionProps) {
             onPreview={(hue, saturation, value) =>
               panel.previewHsv("fill-color", hue, saturation, value)
             }
+            onSettle={panel.settle}
+            onOpenEntry={hexEntry.open}
           />
           <ValueField
             label="Opacity"
-            name="Fill opacity"
+            name={VALUE_FIELD_NAMES.fillOpacity}
             text={view.fillOpacityText}
             bar={view.fillOpacityBar}
             mixed={view.fillOpacityMixed}
@@ -68,10 +75,12 @@ export function FillSection({ panel, onReturnFocus }: FillSectionProps) {
             unit="%"
             valueNow={view.fillOpacity}
             unitWords="percent"
-            typedMax={view.opacityTypedMax}
+            valueMax={VALUE_FIELD_SCALE_END.opacity}
+            clickMinP={OPACITY_CLICK_MIN_P}
             defaultText={view.opacityDefaultText}
             messages={PERCENT_MESSAGES}
             onPreview={(p, grid) => panel.previewValue("fill-opacity", p, grid)}
+            onSettle={panel.settle}
             onStep={(steps, grid) => panel.stepValue("fill-opacity", steps, grid)}
             onReset={() => panel.resetValue("fill-opacity")}
             onSubmit={(text) => panel.setText("fill-opacity", text)}

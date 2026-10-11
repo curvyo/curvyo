@@ -635,11 +635,16 @@ fn a_typed_relative_copy_displaces_the_copy_and_selects_it() {
     assert!(rig.tool.move_entry().is_none(), "the chip closed");
 }
 
-/// Criterion 23, absolute: the copy's bounds' top-left lies at (X, Y).
+/// Criterion 23, absolute, with the top-left as the reference (`0047` criterion 37 makes the
+/// centre the default): the copy's bounds' top-left lies at (X, Y).
 #[test]
 fn a_typed_absolute_copy_puts_the_copys_top_left_there() {
     let mut rig = Rig::new();
     rig.open_move_chip((false, false));
+    rig.tool
+        .move_entry_mut()
+        .unwrap()
+        .set_reference(curvyo_ui_core::ReferencePoint::TopLeft);
     assert_eq!(
         rig.commit_chip(["100", "50"], true, true),
         EntryOutcome::Committed

@@ -14,7 +14,8 @@ rounded corners for a box joint, a circle for a mounting hole, a hex/star
 outline) stays a few drag-and-adjust steps instead of a pen-tool exercise,
 matching how Inkscape itself separates "shape tool" from "node tool" and
 makes converting between them an explicit choice rather than something that
-happens automatically underneath the maker.
+happens automatically underneath the maker (the one exception is a skew or a
+stretch that a primitive cannot represent: `specs/0047-transform-polish/`).
 
 Per `specs/README.md`'s ordering note, this slice is a thin layer over
 `path-node-editing` (slice 2), not a parallel implementation: it reuses that
@@ -23,7 +24,8 @@ command/commit model, and "object to path" converts into exactly the
 anchor/path model slice 2 already built — no new document representation for
 edited paths. What is new here is the primitive shapes themselves: each is
 its own object with its own parameters (width/height/corner radius; rx/ry;
-point count/ratio), not a path, until the maker explicitly converts it.
+point count/ratio), not a path, until the maker explicitly converts it or a skew or
+stretch it cannot represent converts it (`specs/0047-transform-polish/`).
 
 **What we do differently from the tool this replaces:** at the interaction
 level, nothing by design — R-EDIT-002 and R-EDIT-004 ask for the primitives
@@ -171,7 +173,9 @@ per criterion below and in "Out of scope", not silently dropped.
     explicitly invoking "object to path" — switching tools, saving the
     project, exporting, or selecting a different object — then the shape
     stays a primitive with its own parameters; no implicit trigger performs
-    the conversion.
+    the conversion. (Changed by `specs/0047-transform-polish/` criteria 2 and
+    7: a skew, or a stretch a primitive cannot represent, converts it to a
+    path silently, in the one commit of that gesture.)
 22. Given two or more primitives selected together, when the maker invokes
     "object to path", then each selected primitive converts independently
     and correctly per criteria 17–20 (correct geometry, kept node identity,
@@ -349,7 +353,9 @@ both ways.**
     rather than accepting an out-of-range value and failing some other way
     later), direct type-in or up/down arrows. Persists across shapes and
     across mode changes (AC10).
-  - **Ratio (spoke ratio):** numeric field + slider, range 0.01–0.99 (AC12's
+  - **Ratio (spoke ratio):** numeric field + slider (a click on the slider sets
+    the value at the pointer, a double-click opens the numeric entry:
+    `specs/0047-transform-polish/` Part B), range 0.01–0.99 (AC12's
     0 < R < 1 taken literally — the field never allows exactly 0 or 1, which
     would collapse the star to a point or a plain polygon). Visible only in
     star mode; disabled/hidden in polygon mode, since a polygon has no

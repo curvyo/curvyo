@@ -251,8 +251,9 @@ fn cursors_and_hints_follow_the_handle_under_the_pointer() {
     );
 }
 
+/// `0047` criterion 12: a polygon's corner hint is the ordinary corner one, with the Ctrl line.
 #[test]
-fn a_polygons_resize_hint_has_no_proportional_line() {
+fn a_polygons_resize_hint_is_the_ordinary_corner_hint() {
     let document = Document::new(1);
     let _ = document.create_polygon(
         curvyo_document_core::StarFrame {
@@ -268,7 +269,7 @@ fn a_polygons_resize_hint_has_no_proportional_line() {
     // A vertex of the hexagon (angle 0) is on its outline: select by it.
     click(&mut session, pt(100.0, 50.0));
     session.pointer_hover(pt(100.0, 10.0), false, false);
-    assert_eq!(session.handle_hint(), "resize-corner-uniform");
+    assert_eq!(session.handle_hint(), "resize-corner");
 }
 
 #[test]
@@ -589,8 +590,9 @@ fn a_rotate_readout_shows_one_decimal_on_a_snap_stop() {
     session.escape();
 }
 
+/// `0047` criterion 2: a primitive skews by its handle and becomes a path, in one commit.
 #[test]
-fn a_primitive_never_skews() {
+fn a_primitive_skews_and_becomes_a_path_in_one_commit() {
     let mut session = selected(&rect_document());
     let before = object(&session);
     let before_changes = changes(&session);
@@ -601,8 +603,9 @@ fn a_primitive_never_skews() {
         false,
         false,
     );
-    assert_eq!(object(&session), before);
-    assert_eq!(changes(&session), before_changes);
+    assert_ne!(object(&session), before);
+    assert!(matches!(object(&session), ObjectSnapshot::Path(_)));
+    assert_eq!(changes(&session), before_changes + 1);
     assert_eq!(session.tool(), Tool::Select);
 }
 

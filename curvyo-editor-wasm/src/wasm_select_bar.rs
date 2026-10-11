@@ -183,6 +183,12 @@ impl WasmSession {
         self.session.preview_selected_ratio(clamped_ratio(ratio));
     }
 
+    /// Drops the slider edit pending without writing it: Escape in the middle of
+    /// a drag.
+    pub fn cancel_selected_ratio(&mut self) {
+        self.session.cancel_selected_ratio();
+    }
+
     /// Commits the slider edit pending, as one commit, on the slider's
     /// release, key-up or blur.
     pub fn commit_selected_ratio(&mut self) {

@@ -271,9 +271,9 @@ impl Session {
         // Criterion 55: Shift held, nothing running, the pointer on a handle:
         // the marker previews the point that handle would use.
         let preview = if self.held.shift && highlighted.is_none() {
-            hover.as_ref().and_then(|(object, box_, handle)| {
-                SelectTool::hover_pivot(object, box_, *handle, true)
-            })
+            hover
+                .as_ref()
+                .and_then(|(_, box_, handle)| SelectTool::hover_pivot(box_, *handle, true))
         } else {
             None
         };
@@ -635,7 +635,11 @@ mod tests {
         };
         // The default 96 dpi view is ~3.8 px per mm: 5 mm is ~19 px, 10 mm ~38 px.
         assert_eq!(draw_count(5.0), 8, "4 corner resize + 4 corner rotate");
-        assert_eq!(draw_count(10.0), 12, "8 resize + 4 corner rotate");
+        assert_eq!(
+            draw_count(10.0),
+            16,
+            "8 resize + 4 corner rotate + 4 skew (`0047` criterion 1)"
+        );
     }
     /// The decoration's handle count and pivot marker for a rectangle
     /// selected at the default zoom (a 100 x 60 mm box is 378 x 227 px).
@@ -661,17 +665,17 @@ mod tests {
     /// (`unified-object-editing` criteria 1, 7).
     const RADIUS_HANDLES: usize = 4;
 
-    /// Criteria 1, 5, 6: eight resize, four corner rotate and the centre
-    /// handle; Shift adds four side rotate handles in the same frame, with no
-    /// pointer movement, and moves none.
+    /// Criteria 1, 5, 6: eight resize, four corner rotate, four skew (`0047` criterion 1)
+    /// and the centre handle; Shift adds four side rotate handles in the same frame, with
+    /// no pointer movement, and moves none.
     #[test]
     fn shift_adds_the_side_rotate_handles_and_modifiers_changed_needs_no_pointer() {
         let mut session = big_rect_session();
-        assert_eq!(handle_count(&session), 13 + RADIUS_HANDLES);
-        session.modifiers_changed(true, false, false);
         assert_eq!(handle_count(&session), 17 + RADIUS_HANDLES);
+        session.modifiers_changed(true, false, false);
+        assert_eq!(handle_count(&session), 21 + RADIUS_HANDLES);
         session.modifiers_changed(false, false, false);
-        assert_eq!(handle_count(&session), 13 + RADIUS_HANDLES);
+        assert_eq!(handle_count(&session), 17 + RADIUS_HANDLES);
     }
 
     /// Criterion 6: the set is frozen during a drag (Shift pressed
@@ -689,11 +693,11 @@ mod tests {
         session.pointer_down(corner, false);
         assert_eq!(
             handle_count(&session),
-            12,
+            16,
             "centre hidden during a rotate, and no radius handle during another drag"
         );
         session.modifiers_changed(true, false, false);
-        assert_eq!(handle_count(&session), 12, "Shift mid-drag reveals nothing");
+        assert_eq!(handle_count(&session), 16, "Shift mid-drag reveals nothing");
         session.escape();
         session.modifiers_changed(false, false, false);
 
@@ -702,9 +706,9 @@ mod tests {
         session.pointer_hover(side, true, false);
         session.pointer_down(side, true);
         session.modifiers_changed(false, false, false);
-        assert_eq!(handle_count(&session), 16, "the dragged side handle stays");
+        assert_eq!(handle_count(&session), 20, "the dragged side handle stays");
         session.escape();
-        assert_eq!(handle_count(&session), 13 + RADIUS_HANDLES);
+        assert_eq!(handle_count(&session), 17 + RADIUS_HANDLES);
     }
 
     /// Criteria 40, 56 and 55: the pivot marker while a drag runs, the

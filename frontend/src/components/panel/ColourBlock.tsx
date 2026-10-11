@@ -22,6 +22,8 @@ interface ColourBlockProps {
   /** Enter or Tab in the hex field: `"committed"`, `"unchanged"` or `"invalid:hex"`. */
   onSubmitHex: (text: string) => string;
   onReturnFocus: () => void;
+  /** The hex field's input: the picker's double-click moves the focus there. */
+  hexRef?: React.Ref<HTMLInputElement>;
 }
 
 /**
@@ -40,6 +42,7 @@ export function ColourBlock({
   onPick,
   onSubmitHex,
   onReturnFocus,
+  hexRef,
 }: ColourBlockProps) {
   return (
     <div className="flex h-7 items-center gap-1">
@@ -72,6 +75,7 @@ export function ColourBlock({
         onSubmit={onSubmitHex}
         messages={HEX_MESSAGES}
         onReturnFocus={onReturnFocus}
+        inputRef={hexRef}
       />
     </div>
   );

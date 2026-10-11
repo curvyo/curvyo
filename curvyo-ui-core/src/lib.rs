@@ -55,6 +55,7 @@ mod pen_target;
 mod pen_tool;
 mod poly_star_tool;
 mod rectangle_tool;
+mod reference_point;
 mod resize_direction;
 mod ruler;
 mod segment_bend;
@@ -94,9 +95,7 @@ pub use combine::{
     COMBINE_COMMIT_LABEL, CombinePlan, CombineRefusal, PathAvailability, path_availability,
     plan_combine,
 };
-pub use conversion::{
-    ConversionCounts, ConvertingKind, build_primitive_conversions, primitive_as_path,
-};
+pub use conversion::{build_primitive_conversions, primitive_as_path};
 pub use dash_text::{MAX_DASH_NUMBER, MAX_DASH_NUMBERS, dash_text, parse_dash_text};
 pub use display_unit_text::{
     content_too_large_message, document_side_message, format_cursor, format_field_length,
@@ -159,6 +158,10 @@ pub use pen_tool::{
 };
 pub use poly_star_tool::{PolyStarMode, PolygonStarTool};
 pub use rectangle_tool::RectangleTool;
+pub use reference_point::{
+    MARKS_MIN_SIDE_PX, ReferencePoint, hit_mark, mark_hit_radius_px, marks_are_shown,
+    shorter_side_px, visible_marks,
+};
 pub use resize_direction::ResizeDirection;
 pub use ruler::{RulerAxis, RulerLabel, RulerLayout, RulerMajor, ruler_layout};
 pub use segment_bend::{BendResolution, segment_is_bendable};
@@ -193,13 +196,13 @@ pub use transform_entry::{
     parse_entry_number,
 };
 pub use transform_handle_layout::{
-    ALL_EIGHT, CORNERS_FOUR, EditHandle, HandleSpec, Side, hit_transform_handle, is_corner,
-    is_drawn_handle, resize_cursor_angle_degrees, resize_handle_local_position,
-    skew_cursor_angle_degrees, transform_handles,
+    ALL_EIGHT, EditHandle, HandleSpec, Side, hit_transform_handle, is_corner, is_drawn_handle,
+    resize_cursor_angle_degrees, resize_handle_local_position, skew_cursor_angle_degrees,
+    transform_handles,
 };
 pub use transform_math::{
-    ResizedBox, opposite_direction, polygon_star_resize_factor, resize_anchor_local_position,
-    resize_local_box, rotate_delta_angle, rotate_delta_for, rotate_pivot, scaled_and_floored,
+    ResizedBox, opposite_direction, resize_anchor_local_position, resize_local_box,
+    rotate_delta_angle, rotate_delta_for, rotate_pivot, scaled_and_floored,
     stroke_or_radius_factor,
 };
 pub use undo_stack::{SelectionSnapshot, Target as UndoTarget, UndoStack};

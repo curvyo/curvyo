@@ -180,3 +180,29 @@ export function placeMoveChip(
   }
   return clampInside(left, top, chip, canvas);
 }
+
+/**
+ * Where to put the typed-move chip with the reference control (`specs/0047-transform-polish/`
+ * UX notes, "Chip"): left as `placeMoveChip` has it, the top 16px below the lower edge of the
+ * box (never higher than the centre glyph's 16px), so the lower right mark is not under the
+ * chip for a box of ordinary size. It flips above the centre glyph when the chip, taken at its
+ * Absolute height `flipHeight` (the same in both modes, so switching the mode never changes the
+ * side), would cross the bottom edge, then it is clamped inside the canvas.
+ */
+export function placeMoveEntryChip(
+  anchor: { center: { x: number; y: number }; boxBottomY: number },
+  chip: Size,
+  canvas: Size,
+  flipHeight: number,
+): Placement {
+  const { center, boxBottomY } = anchor;
+  let left = center.x + MOVE_CHIP_OFFSET_PX;
+  let top = Math.max(center.y, boxBottomY) + MOVE_CHIP_OFFSET_PX;
+  if (left + chip.width > canvas.width) {
+    left = center.x - MOVE_CHIP_OFFSET_PX - chip.width;
+  }
+  if (top + flipHeight > canvas.height) {
+    top = center.y - MOVE_CHIP_OFFSET_PX - chip.height;
+  }
+  return clampInside(left, top, chip, canvas);
+}

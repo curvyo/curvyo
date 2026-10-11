@@ -1,6 +1,5 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
-import { stretchHoverLine } from "@/lib/conversionText";
 import { placeReadout } from "@/lib/readoutPlacement";
 
 /** How long the pointer must rest on a handle before the hint shows
@@ -18,12 +17,6 @@ const HINT_LINES: Record<string, string[]> = {
     "Resize",
     "Shift: from center",
     "Ctrl: keep proportions",
-    "Double-click or S: type a size",
-    "S: from the center; double-click: opposite corner",
-  ],
-  "resize-corner-uniform": [
-    "Resize",
-    "Shift: from center",
     "Double-click or S: type a size",
     "S: from the center; double-click: opposite corner",
   ],
@@ -69,10 +62,6 @@ interface HandleHintChipProps {
    * and all the lines of a group handle (`hint` is `"group"`, the text is
    * Rust's). Empty for any other handle, then the fixed lines of `hint` show. */
   cornerLines: string[];
-  /** The number of shapes an edge stretch would turn into paths; the line
-   * "Stretching turns 2 shapes into paths" goes after the title
-   * (`specs/0019-multi-object-transform/` criterion 55). */
-  conversionCount: number;
   containerRef: React.RefObject<HTMLDivElement | null>;
 }
 
@@ -87,19 +76,12 @@ interface HandleHintChipProps {
 export function HandleHintChip({
   hint,
   cornerLines,
-  conversionCount,
   containerRef,
 }: HandleHintChipProps) {
-  const base =
+  const lines =
     (hint === "param-radius" || hint === "group") && cornerLines.length > 0
       ? cornerLines
       : HINT_LINES[hint];
-  const conversion = stretchHoverLine(conversionCount);
-  // Memoized: the hover timer below restarts whenever `lines` changes identity.
-  const lines = useMemo(
-    () => (base && conversion !== null ? [base[0] ?? "", conversion, ...base.slice(1)] : base),
-    [base, conversion],
-  );
   const [anchor, setAnchor] = useState<{ x: number; y: number } | null>(null);
   const pointerRef = useRef<{ x: number; y: number } | null>(null);
   const chipRef = useRef<HTMLDivElement>(null);

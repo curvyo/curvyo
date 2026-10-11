@@ -21,15 +21,6 @@ use crate::param_handles::{
 /// criterion 1).
 pub const ALL_EIGHT: [ResizeDirection; 8] = ResizeDirection::ALL_EIGHT;
 
-/// The 4 corner-only handles a polygon or star shows (acceptance
-/// criterion 11: "corner handles only — no edge handles").
-pub const CORNERS_FOUR: [ResizeDirection; 4] = [
-    ResizeDirection::Ne,
-    ResizeDirection::Se,
-    ResizeDirection::Sw,
-    ResizeDirection::Nw,
-];
-
 /// One side of an oriented box: the four skew handles sit one per side.
 /// Its own type (not [`ResizeDirection`]) so an invalid `Skew(Ne)` cannot be
 /// written.
@@ -91,7 +82,7 @@ pub enum EditHandle {
     /// midpoint (only while Shift is held). The direction names the
     /// position; the pivot is derived from it (`rotate_pivot`).
     Rotate(ResizeDirection),
-    /// A skew handle at a side's midpoint (paths only).
+    /// A skew handle at a side's midpoint (every kind).
     Skew(Side),
     /// The centre move handle: hover feedback only, never a press target
     /// of its own (a press on it is a body press).
@@ -101,14 +92,14 @@ pub enum EditHandle {
     Param(ParamHandle),
 }
 
-/// Which handle kinds an object's box shows: derived from the object's
-/// kind and the live modifier state by the caller.
+/// Which handle kinds a box shows: the resize directions the box's extent allows and,
+/// while Shift is held with no drag running, the side rotate handles. Skew handles are
+/// shown for every kind (`specs/0047-transform-polish/` criterion 1), per axis by the
+/// 24 px lever rule.
 #[derive(Debug, Clone, Copy)]
 pub struct HandleSpec {
-    /// The resize handles (corners only for a polygon or star).
+    /// The resize handles the box's extent allows.
     pub resize_directions: &'static [ResizeDirection],
-    /// Whether skew handles may be shown (paths only, criteria 37, 50).
-    pub skew: bool,
     /// Whether the four side rotate handles are revealed (Shift held, no
     /// drag running, criterion 6).
     pub side_rotate: bool,
@@ -310,18 +301,16 @@ pub fn transform_handles(
             ));
         }
     }
-    if spec.skew {
-        for side in Side::ALL {
-            if skew_side_visible(box_, side, tolerances.skew_min_side_mm) {
-                handles.push((
-                    EditHandle::Skew(side),
-                    at(skew_handle_local_position(
-                        box_,
-                        side,
-                        tolerances.skew_offset_mm,
-                    )),
-                ));
-            }
+    for side in Side::ALL {
+        if skew_side_visible(box_, side, tolerances.skew_min_side_mm) {
+            handles.push((
+                EditHandle::Skew(side),
+                at(skew_handle_local_position(
+                    box_,
+                    side,
+                    tolerances.skew_offset_mm,
+                )),
+            ));
         }
     }
     if at_least(
@@ -516,9 +505,16 @@ mod tests {
 
     const RECT: HandleSpec = HandleSpec {
         resize_directions: &ALL_EIGHT,
-        skew: false,
         side_rotate: false,
     };
+
+    /// The four corner resize handles, as a box whose extent allows only corners shows them.
+    const CORNERS_FOUR: [ResizeDirection; 4] = [
+        ResizeDirection::Ne,
+        ResizeDirection::Se,
+        ResizeDirection::Sw,
+        ResizeDirection::Nw,
+    ];
 
     fn count(handles: &[(EditHandle, Point)], f: impl Fn(&EditHandle) -> bool) -> usize {
         handles.iter().filter(|(h, _)| f(h)).count()
@@ -539,15 +535,15 @@ mod tests {
         );
     }
 
-    /// Criteria 1, 5: eight resize, four corner rotate and the centre move
-    /// handle on a rectangle; no side rotate, no skew.
+    /// Criteria 1, 5: eight resize, four corner rotate, four skew and the centre
+    /// move handle on a rectangle; no side rotate.
     #[test]
-    fn a_rectangle_shows_resize_corner_rotate_and_centre_handles() {
+    fn a_rectangle_shows_resize_corner_rotate_skew_and_centre_handles() {
         let handles = transform_handles(&big_box(), RECT, &tol());
-        assert_eq!(handles.len(), 13);
+        assert_eq!(handles.len(), 17);
         assert_eq!(count(&handles, |h| matches!(h, EditHandle::Resize(_))), 8);
         assert_eq!(count(&handles, |h| matches!(h, EditHandle::Rotate(_))), 4);
-        assert_eq!(count(&handles, |h| matches!(h, EditHandle::Skew(_))), 0);
+        assert_eq!(count(&handles, |h| matches!(h, EditHandle::Skew(_))), 4);
         assert_eq!(count(&handles, |h| *h == EditHandle::Move), 1);
     }
 
@@ -557,7 +553,6 @@ mod tests {
     fn shift_reveals_four_side_rotate_handles_for_every_kind() {
         let polygon = HandleSpec {
             resize_directions: &CORNERS_FOUR,
-            skew: false,
             side_rotate: true,
         };
         let handles = transform_handles(&big_box(), polygon, &tol());
@@ -627,12 +622,10 @@ mod tests {
         );
     }
 
-    /// Criterion 37: skew handles 16 px outward of each side midpoint, on
-    /// a path.
+    /// Criterion 37: skew handles 16 px outward of each side midpoint.
     #[test]
-    fn a_path_shows_four_skew_handles_between_resize_and_side_rotate() {
+    fn a_box_shows_four_skew_handles_between_resize_and_side_rotate() {
         let spec = HandleSpec {
-            skew: true,
             side_rotate: true,
             ..RECT
         };
@@ -664,7 +657,7 @@ mod tests {
     /// left and right at least 24 px wide, and a non-zero extent.
     #[test]
     fn skew_handles_are_hidden_per_axis_on_a_small_or_zero_extent() {
-        let spec = HandleSpec { skew: true, ..RECT };
+        let spec = RECT;
         let flat = unrotated_box(Point::new(0.0, 0.0), Point::new(100.0, 20.0));
         let handles = transform_handles(&flat, spec, &tol());
         assert!(
@@ -741,7 +734,6 @@ mod tests {
     #[test]
     fn nearest_centre_splits_the_resize_skew_and_rotate_overlap() {
         let spec = HandleSpec {
-            skew: true,
             side_rotate: true,
             ..RECT
         };
@@ -865,7 +857,6 @@ mod tests {
     #[test]
     fn every_glyph_keeps_four_pixels_clear_of_every_other_glyph() {
         let spec = HandleSpec {
-            skew: true,
             side_rotate: true,
             ..RECT
         };
@@ -909,7 +900,7 @@ mod tests {
             let tolerances = TransformHandleTolerances::at_scale(scale);
             let box_ =
                 |px: f64| unrotated_box(Point::new(0.0, 0.0), Point::new(px / scale, px / scale));
-            let spec = HandleSpec { skew: true, ..RECT };
+            let spec = RECT;
             let handles = transform_handles(&box_(48.0), spec, &tolerances);
             assert!(
                 handles.iter().any(|(h, _)| *h == EditHandle::Move),

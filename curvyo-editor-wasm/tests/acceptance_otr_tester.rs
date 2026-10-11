@@ -827,17 +827,19 @@ fn ac07_polygon_and_star_have_all_eight_rotate_positions() {
             side_hits > 0,
             "side rotate handles exist on a polygon/star with Shift"
         );
-        // and no skew hint anywhere (`0019` criterion 56 gives a polygon or star
-        // edge resize handles)
+        // and skew handles too (`0047` criterion 1: every kind has them)
+        let mut skew_hits = 0;
         for i in 0..720 {
             let a = f64::from(i) * PI / 360.0;
             for r in [10.0, 15.0, 20.0, 25.0, 30.0, 40.0] {
                 let p = pt(b.c.x + r * a.cos(), b.c.y + r * a.sin());
                 s.pointer_hover(p, true, false);
-                let h = s.handle_hint();
-                assert!(!h.starts_with("skew"), "{h} on a polygon/star");
+                if s.handle_hint().starts_with("skew") {
+                    skew_hits += 1;
+                }
             }
         }
+        assert!(skew_hits > 0, "skew handles exist on a polygon/star");
     }
 }
 
@@ -926,7 +928,8 @@ fn model_hint(
             });
         }
     }
-    if kind == Kind::Path {
+    // Skew handles for every kind (`0047` criterion 1).
+    {
         if 2.0 * hh >= 24.0 {
             c.push(Cand {
                 class: "skew",
@@ -2416,7 +2419,7 @@ fn ac27_stroke_switch_value_is_honoured_and_corner_radius_scales() {
 }
 
 #[test]
-fn ac26_polygon_and_star_open_w_and_h_fields_and_scale_about_the_centre() {
+fn ac26_polygon_and_star_open_w_and_h_fields_and_scale_about_the_fixed_point() {
     for star in [false, true] {
         for shift in [false, true] {
             let d = if star {
@@ -2455,9 +2458,15 @@ fn ac26_polygon_and_star_open_w_and_h_fields_and_scale_about_the_centre() {
                 "radius {}",
                 frame.radius.as_mm()
             );
+            // `0047` criterion 12: about the opposite corner (10, 10), or the centre with Shift.
+            let want_centre = if shift {
+                pt(30.0, 30.0)
+            } else {
+                pt(40.0, 40.0)
+            };
             assert!(
-                pnear(frame.center, pt(30.0, 30.0), 1e-9),
-                "scaled about the centre (shift={shift}): {:?}",
+                pnear(frame.center, want_centre, 1e-9),
+                "scaled about the fixed point (shift={shift}): {:?}",
                 frame.center
             );
             if let Shape::Star { inner_ratio, .. } = p.shape {
@@ -2467,9 +2476,10 @@ fn ac26_polygon_and_star_open_w_and_h_fields_and_scale_about_the_centre() {
             let mut dr = open_in_session(&d);
             click(&mut dr, pt(30.0, 10.0));
             let mut best = None;
-            // find a drag target that yields the same radius: by symmetry
-            // dragging the corner outward along the diagonal by sqrt2 * 10
-            let to = pt(50.0 + 10.0, 50.0 + 10.0);
+            // the drag target that yields the same radius: the corner outward by 20
+            // each way about the opposite corner, by 10 about the centre (Shift)
+            let reach = if shift { 10.0 } else { 20.0 };
+            let to = pt(50.0 + reach, 50.0 + reach);
             drag_mod(&mut dr, h, to, shift, false);
             let doc2 = doc_of(&dr);
             let p2 = doc2.primitive(doc2.object_ids()[0]).unwrap();
@@ -3349,8 +3359,10 @@ fn ac49_double_click_on_a_skew_handle_opens_the_skew_chip_and_does_not_hand_off(
     }
 }
 
+/// Superseded by `transform-polish` criteria 1 and 2: every primitive shows the four skew
+/// handles, and a drag from one skews it and turns it into a path.
 #[test]
-fn ac50_ac51_primitives_show_no_skew_and_nothing_happens_where_one_would_be() {
+fn ac50_ac51_primitives_show_skew_handles_and_a_drag_skews_and_converts() {
     let docs = [
         rect_doc(0.0, 0.0, 40.0, 20.0),
         ellipse_doc(20.0, 10.0, 20.0, 10.0),
@@ -3358,50 +3370,43 @@ fn ac50_ac51_primitives_show_no_skew_and_nothing_happens_where_one_would_be() {
         star_doc(30.0, 30.0, 20.0, 5, 0.5),
     ];
     for (i, d) in docs.iter().enumerate() {
-        let mut s = open_in_session(d);
-        // select
         let press = [
             pt(20.0, 0.0),
             pt(20.0 + 14.14, 10.0 + 7.07),
             pt(30.0, 10.0),
             pt(30.0, 10.0),
         ][i];
-        click(&mut s, press);
-        // scan a ring of the plane; no skew hint anywhere with or without Shift
-        for shift in [false, true] {
-            let mut y = -40.0;
-            while y <= 100.0 {
-                let mut x = -40.0;
-                while x <= 100.0 {
-                    s.pointer_hover(pt(x, y), shift, false);
-                    assert!(
-                        !s.handle_hint().starts_with("skew"),
-                        "kind {i} at ({x},{y})"
-                    );
-                    assert!(!s.cursor_hint().starts_with("skew"));
-                    x += 1.3;
-                }
-                y += 1.3;
-            }
-        }
-        // where a skew handle would sit (20 px outward of each side midpoint)
-        // a press-drag changes nothing (empty canvas or no-op)
         let (c, hw, hh) = match i {
-            0 => (pt(20.0, 10.0), 20.0, 10.0),
-            1 => (pt(20.0, 10.0), 20.0, 10.0),
+            0 | 1 => (pt(20.0, 10.0), 20.0, 10.0),
             _ => (pt(30.0, 30.0), 20.0, 20.0),
         };
-        let kk = k(&s);
-        let b = Bx { c, hw, hh, th: 0.0 };
         for side in SIDES {
-            let before = snapshot_bytes(&s);
+            let mut s = open_in_session(d);
+            click(&mut s, press);
+            let kk = k(&s);
+            let b = Bx { c, hw, hh, th: 0.0 };
+            let from = b.side_out(kk, side.0, side.1, 16.0);
+            s.pointer_hover(from, false, false);
+            // (A polygon's or star's box turns with its angle, so the name of the axis
+            // depends on the kind; the handle is there.)
+            assert!(
+                s.handle_hint().starts_with("skew"),
+                "kind {i} side {side:?}: {}",
+                s.handle_hint()
+            );
+            assert!(s.cursor_hint().starts_with("skew"));
             let n = change_count(&s);
-            let from = b.side_out(kk, side.0, side.1, 20.0);
-            drag(&mut s, from, pt(from.x + 15.0, from.y + 15.0));
-            assert_eq!(snapshot_bytes(&s), before, "kind {i} side {side:?}");
-            assert_eq!(change_count(&s), n);
-            assert_eq!(s.tool(), Tool::Select);
-            click(&mut s, press); // reselect (an empty-canvas press deselects)
+            drag(&mut s, from, pt(from.x + 3.0, from.y + 3.0));
+            assert_eq!(
+                change_count(&s),
+                n + 1,
+                "kind {i} side {side:?}: one commit"
+            );
+            let doc = doc_of(&s);
+            assert!(
+                doc.path(doc.object_ids()[0]).is_some(),
+                "kind {i} side {side:?}: now a path"
+            );
         }
     }
 }
@@ -3494,22 +3499,6 @@ fn ac53_no_skew_handles_on_a_multi_selection() {
     }
 }
 
-#[test]
-fn ac51_a_press_on_a_primitive_where_a_skew_would_be_does_not_move_resize_or_rotate_it() {
-    // 16 px outside the top midpoint is the resize handle's edge (boundary);
-    // use the zone between 17 and 23 px where nothing is hit on a primitive
-    let mut s = selected_rect();
-    let b = Bx::rect(0.0, 0.0, 40.0, 20.0, 0.0);
-    let kk = k(&s);
-    for out in [18.0, 20.0, 22.0] {
-        click(&mut s, pt(20.0, 0.0));
-        let before = snapshot_bytes(&s);
-        let from = b.side_out(kk, 0.0, -1.0, out);
-        drag(&mut s, from, pt(from.x + 8.0, from.y));
-        assert_eq!(snapshot_bytes(&s), before, "{out} px");
-    }
-}
-
 // ---------------------------------------------------------------------
 // Optional criteria 54-56 (Session-visible parts) and misc
 // ---------------------------------------------------------------------
@@ -3535,13 +3524,10 @@ fn ac54_hint_names_follow_the_handle_kind_and_object_kind() {
     );
     assert_eq!(kind_at(&mut s, b.c, false).1, "move");
     assert_eq!(kind_at(&mut s, pt(500.0, 500.0), false).1, "");
-    // polygon: uniform
+    // polygon: the ordinary corner hint (`0047` criterion 12)
     let mut s = open_in_session(&polygon_doc(30.0, 30.0, 20.0, 5));
     click(&mut s, pt(30.0, 10.0));
-    assert_eq!(
-        kind_at(&mut s, pt(50.0, 50.0), false).1,
-        "resize-corner-uniform"
-    );
+    assert_eq!(kind_at(&mut s, pt(50.0, 50.0), false).1, "resize-corner");
     // path
     let (mut s, b) = selected_triangle();
     assert_eq!(

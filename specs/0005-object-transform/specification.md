@@ -82,7 +82,9 @@ needs either a new stored angle alongside each frame, or ADR 0002 §5's
 general per-node transform finally being built. Converting a rotated
 primitive to a path implicitly is not an option — `primitive-shapes`
 criterion 21 already rules out any implicit primitive→path conversion, and
-nothing here asks for an exception. Which exact mechanism a primitive uses
+nothing here asks for an exception. (Later changed by
+`specs/0047-transform-polish/`: a skew, or a stretch a primitive cannot
+represent, converts it silently; a rotation still never does.) Which exact mechanism a primitive uses
 (a per-shape angle field vs. the general per-node transform) is still the
 architect's call; criterion 19 below states the observable requirement
 (rotation persists, the object stays the same kind) without dictating
@@ -195,7 +197,10 @@ unrequested capability smuggled in to make them compose.
     already defines for the Ellipse tool's own handles — this slice adds no
     new ellipse-resize rule, only a second way (the Select tool) to reach
     the one that already exists.
-11. Given a selected polygon or star, then it shows **corner handles only
+11. (Superseded by `specs/0047-transform-polish/` criteria 1, 9 and 12: a polygon
+    or star shows all eight handles, a free corner or edge drag stretches it
+    and converts it to a path, and Ctrl keeps the proportions and the kind.)
+    Given a selected polygon or star, then it shows **corner handles only
     — no edge handles** — and dragging any corner handle always performs
     the uniform scale `primitive-shapes` criterion 13 already defines
     (outer radius changes; for a star, the inner radius scales with it so
@@ -272,7 +277,9 @@ unrequested capability smuggled in to make them compose.
     remains a primitive of the same kind afterward — rotating is not an
     implicit trigger for "object to path," consistent with
     `primitive-shapes` criterion 21's existing rule that only the explicit
-    "object to path" action converts a primitive.
+    "object to path" action converts a primitive (and, since
+    `specs/0047-transform-polish/`, a skew or a stretch a primitive cannot
+    represent).
 22. Given a rotate drag in progress, then a live numeric readout of the
     object's current rotation angle is shown on canvas, following the
     same convention as criterion 14; exact placement and precision are the
@@ -389,7 +396,8 @@ unrequested capability smuggled in to make them compose.
 - **Transform history or presets** (Illustrator's "Transform Again,"
   saved/reusable transform values). Not requested.
 - **Non-uniform (non-proportional) resizing of a polygon or star.**
-  Criterion 11 is the full extent of polygon/star resizing in this slice.
+  (Done later by `specs/0047-transform-polish/`: it converts the shape to a
+  path.) Criterion 11 is the full extent of polygon/star resizing in this slice.
   Making a polygon or star stretch non-uniformly would need either a
   schema change (independent x/y radii, which stops being "a regular
   polygon/star") or an implicit conversion to a path, and neither is in
@@ -553,7 +561,8 @@ to read while it's travelling in an arc.
   a deliberate departure from the "150% × 120%" phrasing floated when this
   task was framed — percentage is the wrong unit for a tool whose whole
   point is physical dimensions.) For a polygon/star (criterion 11, uniform
-  scale only) the readout shows the single outer-radius value, exactly as
+  scale only; since `0047-transform-polish` a stretch shows the size of the
+  previewed path) the readout shows the single outer-radius value, exactly as
   `primitive-shapes`' own creation-drag readout already does for that tool.
 - **Rotate drag (criterion 22):** shows the current angle, "**37.4°**" to
   one decimal place when unconstrained, falling out to a whole multiple of

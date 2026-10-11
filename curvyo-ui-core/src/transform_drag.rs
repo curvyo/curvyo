@@ -19,10 +19,10 @@ use crate::param_edit::{PARAM_EQUAL_EPSILON, apply_param, radius_is_limited, val
 use crate::param_handles::ParamHandle;
 use crate::skew_math::{skew_angle, skew_factor, skew_frame};
 use crate::transform_commit::{commit_gesture, sane_or};
-use crate::transform_handle_layout::{EditHandle, Side, is_corner};
+use crate::transform_handle_layout::{EditHandle, Side};
 use crate::transform_math::{
-    is_polygon_or_star, resize_anchor_local_position, resize_local_box, rotate_delta_for,
-    rotate_pivot, scaled_and_floored, stroke_or_radius_factor,
+    resize_anchor_local_position, resize_local_box, rotate_delta_for, rotate_pivot,
+    scaled_and_floored, stroke_or_radius_factor,
 };
 use crate::transform_primitive::{polygon_star_stretch, resize_primitive};
 
@@ -111,11 +111,8 @@ pub(crate) struct ResizeOptions<'a> {
     pub(crate) shift: bool,
     pub(crate) ctrl: bool,
     pub(crate) modes: ScaleModes,
-    /// A typed size: a polygon's or star's corner then takes free W and H like a
-    /// rectangle's, where a corner drag keeps the diagonal rule.
-    pub(crate) typed: bool,
     /// The path a polygon or star becomes if the resize is a stretch
-    /// (`specs/0019-multi-object-transform/` criterion 56).
+    /// (`specs/0047-transform-polish/` criterion 12).
     pub(crate) converted: Option<&'a PathSnapshot>,
 }
 
@@ -194,9 +191,9 @@ pub(crate) struct TransformDrag {
     /// ([`CornerLinking::is_unlinked_with`]) and frozen for the whole drag.
     /// `false` for every other handle.
     pub(crate) unlinked: bool,
-    /// For an edge resize of a polygon or star, the path it becomes (criterion
-    /// 56), built at the press so that the preview and the commit are the same
-    /// snapshot.
+    /// For a resize of a polygon or star and a skew of any primitive, the path it
+    /// becomes (`0047` criteria 2 and 12), built at the press so that the preview and
+    /// the commit are the same snapshot.
     pub(crate) converted: Option<Box<PathSnapshot>>,
 }
 
@@ -271,7 +268,6 @@ impl TransformDrag {
                         shift,
                         ctrl,
                         modes: self.modes,
-                        typed: false,
                         converted: self.converted.as_deref(),
                     },
                 )
@@ -287,9 +283,9 @@ impl TransformDrag {
             EditHandle::Skew(side) => skew_by_angle(
                 start,
                 start_box,
-                side,
-                shift,
+                (side, shift),
                 skew_angle(start_box, side, down_at, current, shift, ctrl),
+                self.converted.as_deref(),
             ),
             EditHandle::Param(handle) => {
                 let local_delta = local_delta_of(start_box, down_at, current);
@@ -330,26 +326,15 @@ impl TransformDrag {
 }
 
 /// The pivot (or fixed point) a drag or entry of `handle` would use right
-/// now (criteria 13, 28, 40, 55): the point the pivot marker shows. A
-/// polygon or star always scales about its center; a resize about the
-/// opposite corner/edge or, under Shift, the box center; a rotate per
-/// [`rotate_pivot`]; a skew about the fixed edge's midpoint or, under Shift,
-/// the center. `None` for the centre move handle.
-pub(crate) fn pivot_for(
-    handle: EditHandle,
-    object: &ObjectSnapshot,
-    box_: &OrientedBox,
-    shift: bool,
-) -> Option<Point> {
+/// now (criteria 13, 28, 40, 55): the point the pivot marker shows. A resize
+/// is about the opposite corner/edge or, under Shift, the box center, for every
+/// kind; a rotate per [`rotate_pivot`]; a skew about the fixed edge's midpoint
+/// or, under Shift, the center. `None` for the centre move handle.
+pub(crate) fn pivot_for(handle: EditHandle, box_: &OrientedBox, shift: bool) -> Option<Point> {
     match handle {
-        EditHandle::Resize(direction) => {
-            let local = if is_polygon_or_star(object) && is_corner(direction) {
-                box_.local_center()
-            } else {
-                resize_anchor_local_position(box_.min, box_.max, direction, shift)
-            };
-            Some(box_.to_document(local))
-        }
+        EditHandle::Resize(direction) => Some(box_.to_document(resize_anchor_local_position(
+            box_.min, box_.max, direction, shift,
+        ))),
         EditHandle::Rotate(direction) => Some(rotate_pivot(box_, direction, shift)),
         EditHandle::Skew(side) => Some(skew_frame(box_, side, shift).fixed_point),
         EditHandle::Move | EditHandle::Param(_) => None,
@@ -433,36 +418,38 @@ pub(crate) fn rotate_by(start: &ObjectSnapshot, pivot: Point, delta: Angle) -> O
     sane_or(start, start.rotated(pivot, delta))
 }
 
-/// The object skewed by `angle` from `side`'s handle (criteria 38, 39, 51):
-/// a path's anchors and handle vectors sheared about the fixed line, with
-/// `rotation` untouched. A primitive is returned unchanged, and so is a
-/// zero angle (a drag back to its start must not commit a rounding
-/// residue).
+/// The object skewed by `angle` from `side`'s handle (criteria 38, 39, 51 of `0008`;
+/// `0047` criterion 2): a path's anchors and handle vectors sheared about the fixed
+/// line, with `rotation` untouched; a primitive first becomes its `converted` path,
+/// the one "Object to path" gives. A zero angle returns `start` (a drag back to its
+/// start must not commit a rounding residue).
 pub(crate) fn skew_by_angle(
     start: &ObjectSnapshot,
     start_box: &OrientedBox,
-    side: Side,
-    shift: bool,
+    (side, shift): (Side, bool),
     angle: Angle,
+    converted: Option<&PathSnapshot>,
 ) -> ObjectSnapshot {
     sane_or(
         start,
-        skewed_unchecked(start, start_box, side, shift, angle),
+        skewed_unchecked(start, start_box, (side, shift), angle, converted),
     )
 }
 
 /// [`skew_by_angle`] before the sanity check: the sheared path whatever its
-/// coordinates are, `start` for a primitive or a zero angle. The typed skew
-/// uses it to tell a result refused for its size from one that did not change.
+/// coordinates are, `start` for a zero angle or a primitive with no `converted` path.
+/// The typed skew uses it to tell a result refused for its size from one that did not
+/// change.
 pub(crate) fn skewed_unchecked(
     start: &ObjectSnapshot,
     start_box: &OrientedBox,
-    side: Side,
-    shift: bool,
+    (side, shift): (Side, bool),
     angle: Angle,
+    converted: Option<&PathSnapshot>,
 ) -> ObjectSnapshot {
-    let ObjectSnapshot::Path(path) = start else {
-        return start.clone();
+    let path = match (start, converted) {
+        (ObjectSnapshot::Path(path), _) | (ObjectSnapshot::Primitive(_), Some(path)) => path,
+        (ObjectSnapshot::Primitive(_), None) => return start.clone(),
     };
     let frame = skew_frame(start_box, side, shift);
     let k = skew_factor(&frame, angle);

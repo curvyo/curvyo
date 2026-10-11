@@ -47,6 +47,9 @@ export interface EntryFieldProps {
   /** The virtual keyboard a touch device shows: `decimal` for a plain number
    * (the Document size), `text` (the default) for hex and anything with text. */
   inputMode?: "text" | "decimal";
+  /** The input element, for a control beside the field that moves focus here (the
+   * double-click on a colour slider, `specs/0047-transform-polish/` criterion 23). */
+  inputRef?: React.Ref<HTMLInputElement>;
 }
 
 /**
@@ -81,6 +84,7 @@ export function EntryField({
   firstFocus = false,
   commitOnBlur = false,
   inputMode = "text",
+  inputRef,
 }: EntryFieldProps) {
   const messageId = useId();
   const display = mixed ? "" : shown;
@@ -134,7 +138,14 @@ export function EntryField({
   return (
     <div className="relative" style={{ width }}>
       <input
-        ref={input}
+        ref={(node) => {
+          input.current = node;
+          if (typeof inputRef === "function") {
+            inputRef(node);
+          } else if (inputRef) {
+            inputRef.current = node;
+          }
+        }}
         type="text"
         inputMode={inputMode}
         autoComplete="off"
