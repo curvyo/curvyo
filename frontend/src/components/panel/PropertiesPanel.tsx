@@ -7,7 +7,7 @@ import { HistoryTab } from "@/components/panel/HistoryTab";
 import { PanelTabStrip } from "@/components/panel/PanelTabStrip";
 import { StyleSection } from "@/components/panel/StyleSection";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
-import { Tooltip, TooltipProvider } from "@/components/ui/tooltip";
+import { Tooltip } from "@/components/ui/tooltip";
 import type { DocumentPanelApi } from "@/hooks/useDocumentPanel";
 import type { EditorSession } from "@/hooks/useEditorSession";
 import { useBackgroundPanel } from "@/hooks/useBackgroundPanel";
@@ -146,7 +146,7 @@ export function PropertiesPanel({ editor, document: doc }: PropertiesPanelProps)
         : "";
   const label = open ? "Hide properties panel" : "Show properties panel";
   return (
-    <TooltipProvider>
+    <>
       <div
         className="relative shrink-0"
         style={{ width: open ? PANEL_WIDTH_PX : 0 }}
@@ -284,7 +284,7 @@ export function PropertiesPanel({ editor, document: doc }: PropertiesPanelProps)
           </Tabs>
         </aside>
       </div>
-    </TooltipProvider>
+    </>
   );
 }
 

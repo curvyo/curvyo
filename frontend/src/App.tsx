@@ -1,3 +1,4 @@
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { useEffect, useState } from "react";
 
 import { Canvas } from "@/components/Canvas";
@@ -145,6 +146,9 @@ function App() {
   }, []);
 
   return (
+    // The one tooltip provider of the app: every `Tooltip` and `SliderTip` below needs it, and a
+    // component that renders one without it throws (`frontend/tests/tooltipProvider.test.ts`).
+    <TooltipProvider>
     <div className="flex h-screen w-screen flex-col overflow-hidden">
       {isTauri ? null : <BrowserBar />}
       <div className="flex min-h-0 flex-1">
@@ -258,6 +262,7 @@ function App() {
         onDismiss={() => setSaveErrorMessage(null)}
       />
     </div>
+    </TooltipProvider>
   );
 }
 
