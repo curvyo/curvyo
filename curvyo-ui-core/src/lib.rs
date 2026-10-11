@@ -194,9 +194,7 @@ pub use style_panel::{
     DashChoice, DashShown, FillPanel, MarkersPanel, Rgba, StrokePanel, StylePanelState,
     style_panel_state,
 };
-pub use style_scope::{
-    StyleScope, StyleTool, object_kind_name, style_scope, style_scope_in,
-};
+pub use style_scope::{StyleScope, StyleTool, object_kind_name, style_scope, style_scope_in};
 pub use transform_drag::{
     CornerLinking, CornerRadiusScaling, ParamDragInfo, ScaleModes, StrokeScaling,
 };

@@ -547,3 +547,26 @@ fn the_typed_move_of_a_group_uses_the_group_box_and_copies_the_group() {
     assert_ne!(roots[2], group);
     assert_eq!(session.document.leaves_of(roots[2]).len(), 2);
 }
+
+/// Integration with `0041`: Ctrl+U on a selected group says to select one object (a group has no
+/// Object scope yet); a member entered inside its group has its own object undo.
+#[test]
+fn the_object_undo_needs_one_object_and_works_on_a_member_inside_a_group() {
+    let (mut session, ids, group) = with_group();
+    click(&mut session, pt(45.0, 0.0));
+    assert_eq!(session.selection.ids().len(), 2);
+    assert!(session.history_object().is_none());
+    assert_eq!(session.object_undo().notice, "Select one object.");
+    double_click(&mut session, pt(25.0, 0.0));
+    assert_eq!(session.selection.ids(), &[ids[1]]);
+    assert_eq!(session.history_object(), Some(ids[1]));
+    session.nudge_selection(curvyo_ui_core::NudgeEvent {
+        arrow: curvyo_ui_core::Arrow::Right,
+        shift: false,
+        repeat: false,
+        time_ms: 0.0,
+    });
+    let result = session.object_undo();
+    assert!(result.changed, "{}", result.notice);
+    assert_eq!(session.document.parent_group(ids[1]), Some(group));
+}

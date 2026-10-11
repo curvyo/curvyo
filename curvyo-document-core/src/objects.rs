@@ -372,7 +372,8 @@ fn copy_subtree(
     // (`specs/0041-object-history`).
     // invariant: the key is new in the meta map just created.
     #[allow(clippy::unwrap_used)]
-    meta.insert(KEY_CLONE_OF, encode_clone_of(source, version)).unwrap();
+    meta.insert(KEY_CLONE_OF, encode_clone_of(source, version))
+        .unwrap();
     if crate::group_tree::meta_is_group(&source_meta) {
         for child in tree.children(source).unwrap_or_default() {
             copy_subtree(
@@ -396,7 +397,6 @@ fn copy_subtree(
     translate_meta(&meta, offset);
     new_tree_id
 }
-
 
 /// The keys of the history lineage: a copy gets its own (`specs/0041-object-history`
 /// criterion 37), never the source's.

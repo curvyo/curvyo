@@ -1443,19 +1443,19 @@ fine (the group box stays under it), but the spec says "the offending group is o
 `curvyo-render-core/src/refusal_outline.rs`.
 
 
-## Object history: groups wait for 0023, and some limits are accepted
+## Object history: the timeline of a group is a follow-up, and some limits are accepted
 
-`specs/0041-object-history` is built without two criteria that need groups. **Resolution:** the
-branch of `0023-groups`, or a follow-up slice once it has merged.
-
-- **Criterion 18 (the timeline of a group).** The timeline of a group is meant to be the steps that
-  touched the group node or any object below it, and an object undo of a group restricts the step to
-  the group's subtree. Until groups exist the index only knows objects; a group node would show
-  only its own steps.
-- **Criterion 27 (the duplicate of a group).** Every descendant of a duplicated group is meant to be a
-  clone with its own `clone_of`, and the new group one too. `Document::duplicate_objects` writes
-  `clone_of` on every copy it makes, so descendants get theirs as soon as the duplicate of a group
-  goes through it; the test and the group timeline are what is missing.
+`specs/0041-object-history` was built without two criteria that need groups. **Criterion 27 (the
+duplicate of a group)** is done with `0023-groups`: `Document::duplicate_objects` writes `clone_of`
+on the new group and on every copied member, and `tests/groups_object_history.rs` checks that all of
+them inherit rows. **Criterion 18 (the timeline of a group)** is still open: the History tab's
+Object scope needs exactly one selected object, and a selected group is several leaves, so a group
+has no Object scope (the Document list shows) and Ctrl+U says "Select one object." The timeline of a
+group is meant to be the steps that touched the group node or any object below it, and an object
+undo of a group restricts the step to the group's subtree. A member entered inside its group has its
+own timeline and Ctrl+U works on it; Group and Ungroup are Replace steps there, so Ctrl+U takes
+them back whole. **Resolution:** a follow-up slice: `ObjectIndex::steps_of` for a subtree,
+`Touched::only` for a subtree, and the selection of a group as one object for the scope.
 
 Accepted limits of the slice, each visible in the code:
 
