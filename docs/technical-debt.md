@@ -1384,3 +1384,32 @@ closed (`free_history_cache`) is possible but would put the cold cost back on th
 `0020-undo-redo` restores the selected objects and the Node tool's selected nodes by anchor id
 (`UndoStack`, `SelectionSnapshot`). A selected segment (two adjacent anchors) is not restored: after
 Ctrl+Z the segment is deselected. Minor; the snapshot would need the segment's end anchors.
+
+## Object history: groups wait for 0023, and some limits are accepted
+
+`specs/0041-object-history` is built without two criteria that need groups. **Resolution:** the
+branch of `0023-groups`, or a follow-up slice once it has merged.
+
+- **Criterion 18 (the timeline of a group).** The timeline of a group is meant to be the steps that
+  touched the group node or any object below it, and an object undo of a group restricts the step to
+  the group's subtree. Until groups exist the index only knows objects; a group node would show
+  only its own steps.
+- **Criterion 27 (the duplicate of a group).** Every descendant of a duplicated group is meant to be a
+  clone with its own `clone_of`, and the new group one too. `Document::duplicate_objects` writes
+  `clone_of` on every copy it makes, so descendants get theirs as soon as the duplicate of a group
+  goes through it; the test and the group timeline are what is missing.
+
+Accepted limits of the slice, each visible in the code:
+
+- **Object undo into inherited rows restores plain registers only.** A copy of a path has anchor ids
+  of its own, so the anchor list of the original cannot be written into it. A step that only
+  changed anchors is reported as "1 field kept later changes" and writes nothing. A clone of a
+  rectangle, ellipse, polygon or star restores its frame, style and rotation.
+- **A restored inherited step moves the clone to the original's old values.** The registers a step
+  changed are set to what they were before it, so a clone that was displaced when it was made
+  jumps back to the original's place for that field (criterion 25: a restore of state).
+- **An object undo whose every part was skipped writes nothing and stays the latest step.** The stack
+  of a single object has no entry to consume; a later step by the same maker would be taken first.
+- **The shown ids are rebuilt on the first read after a new step.** The abbreviation of a step id
+  depends on all other ids (ADR 0014 §3); the rebuild is a few milliseconds at 20,000 steps and
+  happens only when rows are read, not on the commit path.

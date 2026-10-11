@@ -68,7 +68,7 @@ fn the_object_scope_opens_within_a_hundred_milliseconds_in_a_big_log() {
         .unwrap();
     let started = Instant::now();
     let len = reopened.object_history_len(id);
-    within("one commit extends the index", started.elapsed(), 100);
+    within("one commit extends the index", started.elapsed(), 1);
     assert_eq!(len, 1_002);
 }
 

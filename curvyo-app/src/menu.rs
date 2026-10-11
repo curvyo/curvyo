@@ -1,5 +1,6 @@
 //! The native File menu: New, Open…, Save, Save As…, a separator, Quit, and the Edit menu with Undo
-//! and Redo (`specs/0020-undo-redo` criterion 8), with OS-standard accelerators
+//! and Redo (`specs/0020-undo-redo` criterion 8) and the two object steps (`specs/0041-object-history`
+//! criterion 5), with OS-standard accelerators
 //! bound directly on the menu items
 //! (`specs/0001-project-file-foundation/specification.md`, "Keyboard shortcuts
 //! (from day one)"). Native menus and accelerators are free accessibility
@@ -17,14 +18,19 @@ const SAVE_ID: &str = "save";
 const SAVE_AS_ID: &str = "save_as";
 const UNDO_ID: &str = "edit_undo";
 const REDO_ID: &str = "edit_redo";
+const OBJECT_UNDO_ID: &str = "edit_object_undo";
+const OBJECT_REDO_ID: &str = "edit_object_redo";
 
-/// The event the Edit menu emits to the frontend; the payload is `"undo"` or `"redo"`.
+/// The event the Edit menu emits to the frontend; the payload is `"undo"`, `"redo"`,
+/// `"object-undo"` or `"object-redo"`.
 const HISTORY_MENU_EVENT: &str = "history-menu";
 
-/// The two Edit menu items whose text and enabled state follow the maker's stacks.
+/// The Edit menu items whose text and enabled state follow the maker's stacks and selection.
 pub struct HistoryItems {
     undo: MenuItem<Wry>,
     redo: MenuItem<Wry>,
+    object_undo: MenuItem<Wry>,
+    object_redo: MenuItem<Wry>,
 }
 
 /// Builds the application menu: File and Edit.
@@ -64,13 +70,27 @@ pub fn build(app: &tauri::App) -> tauri::Result<Menu<Wry>> {
         .accelerator("CmdOrCtrl+Shift+Z")
         .enabled(false)
         .build(app)?;
+    let object_undo_item = MenuItemBuilder::with_id(OBJECT_UNDO_ID, "Undo Step of Selected Object")
+        .accelerator("CmdOrCtrl+U")
+        .enabled(false)
+        .build(app)?;
+    let object_redo_item = MenuItemBuilder::with_id(OBJECT_REDO_ID, "Redo Step of Selected Object")
+        .accelerator("CmdOrCtrl+Shift+U")
+        .enabled(false)
+        .build(app)?;
     let edit_menu = SubmenuBuilder::new(app, "Edit")
         .item(&undo_item)
         .item(&redo_item)
+        .item(&PredefinedMenuItem::separator(app)?)
+        .item(&object_undo_item)
+        .item(&object_redo_item)
+        .item(&PredefinedMenuItem::separator(app)?)
         .build()?;
     app.manage(HistoryItems {
         undo: undo_item,
         redo: redo_item,
+        object_undo: object_undo_item,
+        object_redo: object_redo_item,
     });
 
     MenuBuilder::new(app)
@@ -90,6 +110,7 @@ fn history_item_text(verb: &str, name: Option<&str>) -> String {
 
 /// Sets the text and the enabled state of the Edit menu's Undo and Redo to follow the stacks:
 /// `undo` and `redo` are the names of the steps a press would act on, `None` for an empty stack.
+/// The two object items are enabled exactly when one object is selected (`object_step`).
 ///
 /// # Errors
 /// The menu error as text, when the native menu refuses the change.
@@ -99,6 +120,7 @@ pub fn set_history_menu(
     items: State<HistoryItems>,
     undo: Option<String>,
     redo: Option<String>,
+    object_step: bool,
 ) -> Result<(), String> {
     let apply = |item: &MenuItem<Wry>, verb: &str, name: Option<String>| {
         item.set_text(history_item_text(verb, name.as_deref()))
@@ -106,7 +128,12 @@ pub fn set_history_menu(
             .map_err(|error| error.to_string())
     };
     apply(&items.undo, "Undo", undo)?;
-    apply(&items.redo, "Redo", redo)
+    apply(&items.redo, "Redo", redo)?;
+    items
+        .object_undo
+        .set_enabled(object_step)
+        .and_then(|()| items.object_redo.set_enabled(object_step))
+        .map_err(|error| error.to_string())
 }
 
 /// Routes a menu event id to its handler in `main.rs`. Quit is a
@@ -123,6 +150,12 @@ pub fn dispatch(app: &AppHandle, id: &str) {
         }
         REDO_ID => {
             let _ = app.emit(HISTORY_MENU_EVENT, "redo");
+        }
+        OBJECT_UNDO_ID => {
+            let _ = app.emit(HISTORY_MENU_EVENT, "object-undo");
+        }
+        OBJECT_REDO_ID => {
+            let _ = app.emit(HISTORY_MENU_EVENT, "object-redo");
         }
         _ => {}
     }

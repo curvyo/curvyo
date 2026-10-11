@@ -129,6 +129,8 @@ impl Document {
     /// `count` rows of the timeline of `id` from the `start`-th newest, newest first.
     #[must_use]
     pub fn object_history_page(&self, id: NodeId, start: usize, count: usize) -> Vec<ObjectRow> {
+        self.sync_object_index();
+        self.step_index.borrow_mut().ensure_shown();
         self.with_reader(|reader, me| {
             let subject = tree_id(id);
             let timeline = reader.timeline(subject);
@@ -163,6 +165,8 @@ impl Document {
 
     /// The description of the step an entry stands for.
     pub(super) fn target_of(&self, entry: &Entry) -> Option<ObjectTarget> {
+        self.sync_object_index();
+        self.step_index.borrow_mut().ensure_shown();
         self.with_reader(|reader, me| {
             let log = reader.steps.get(entry.step)?;
             Some(ObjectTarget {

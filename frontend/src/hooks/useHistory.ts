@@ -13,7 +13,7 @@ import {
   WORKING_NOTICE_DELAY_MS,
   workingNotice,
 } from "@/lib/historyText";
-import { wipedNotice } from "@/lib/historyRows";
+import { objectWipedNotice, wipedNotice } from "@/lib/historyRows";
 import { invoke, isTauri, listen } from "@/platform/host";
 import type { WasmSession } from "@/lib/editorSession";
 
@@ -50,6 +50,9 @@ export interface HistoryApi {
    * steps removed, -1 when the session ignored it, -2 for a shared document and -3 when the
    * log could not be rewritten. */
   wipe: () => number;
+  /** Hides the selected object's earlier history: the notice says how many rows went. Returns
+   * the rows hidden, -1 when the session ignored it and -3 when the log could not take the step. */
+  wipeObject: () => number;
   /** Whether this key event is the second arrival of a press the native menu already handled. */
   isDuplicateKey: (event: KeyboardEvent | React.KeyboardEvent) => boolean;
   /** Handles the outcome string `key_down` returned when it belongs to history; `false`
@@ -139,10 +142,11 @@ export function useHistory(
       previous.undo === next.undo && previous.redo === next.redo ? previous : next,
     );
     if (isTauri) {
-      const key = JSON.stringify(next);
+      const objectStep = session.selection_count() === 1;
+      const key = JSON.stringify({ ...next, objectStep });
       if (key !== sentToMenu.current) {
         sentToMenu.current = key;
-        void invoke("set_history_menu", next).catch(() => {
+        void invoke("set_history_menu", { ...next, objectStep }).catch(() => {
           /* The native menu falls behind; the keys and buttons still work. */
         });
       }
@@ -210,7 +214,9 @@ export function useHistory(
     (outcome: string): boolean => {
       switch (outcome) {
         case "undo":
-        case "redo": {
+        case "redo":
+        case "object-undo":
+        case "object-redo": {
           markPressed(outcome);
           const text = noticeText(getSession()?.take_history_notice() ?? "");
           if (text !== null) {
@@ -219,8 +225,10 @@ export function useHistory(
           return true;
         }
         case "undo-busy":
-        case "redo-busy": {
-          const direction = outcome === "undo-busy" ? "undo" : "redo";
+        case "redo-busy":
+        case "object-undo-busy":
+        case "object-redo-busy": {
+          const direction = outcome.replace(/-busy$/, "") as HistoryDirection;
           markPressed(direction);
           void runBusy(direction);
           return true;
@@ -287,7 +295,12 @@ export function useHistory(
       return undefined;
     }
     const unlisten = listen<string>("history-menu", (event) => {
-      const direction: HistoryDirection = event.payload === "redo" ? "redo" : "undo";
+      const direction: HistoryDirection =
+        event.payload === "redo" ||
+        event.payload === "object-undo" ||
+        event.payload === "object-redo"
+          ? event.payload
+          : "undo";
       // A text field keeps its own undo; the native accelerator can fire while one has focus.
       if (pressedJustNow(direction) || isTextEntry(document.activeElement)) {
         return;
@@ -311,6 +324,17 @@ export function useHistory(
     return removed;
   }, [getSession, showNotice]);
 
+  const wipeObject = useCallback(() => {
+    const hidden = getSession()?.object_history_wipe() ?? -1;
+    if (hidden >= 0) {
+      showNotice(objectWipedNotice(hidden));
+    } else if (hidden === -3) {
+      showNotice("Could not hide the history of this object. Nothing was changed.");
+    }
+    onChangeRef.current();
+    return hidden;
+  }, [getSession, showNotice]);
+
   const isDuplicateKey = useCallback(
     (event: KeyboardEvent | React.KeyboardEvent) => {
       const direction = historyKeyDirection(event, MAC);
@@ -327,6 +351,7 @@ export function useHistory(
     refresh,
     press,
     wipe,
+    wipeObject,
     isDuplicateKey,
     handleKeyOutcome,
   };

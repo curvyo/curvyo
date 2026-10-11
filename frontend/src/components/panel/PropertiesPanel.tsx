@@ -11,6 +11,7 @@ import type { DocumentPanelApi } from "@/hooks/useDocumentPanel";
 import type { EditorSession } from "@/hooks/useEditorSession";
 import { useBackgroundPanel } from "@/hooks/useBackgroundPanel";
 import { useFormats } from "@/hooks/useFormats";
+import { useHistoryScope } from "@/hooks/useHistoryScope";
 import { useStylePanel } from "@/hooks/useStylePanel";
 
 /** The panel's width, px (`docs/design-system.md`, "Properties panel"). */
@@ -134,6 +135,13 @@ export function PropertiesPanel({ editor, document: doc }: PropertiesPanelProps)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [content, panel.view.scopeKey]);
 
+  const historyScope = useHistoryScope(
+    getSession,
+    editor.syncRevision,
+    editor.selectionCount,
+    doc.view.content === "history",
+  );
+  const objectSubject = historyScope.scope === "object" ? historyScope.info : null;
   const historyTotal = doc.view.content === "history" ? historyCount(editor) : 0;
   const subject =
     doc.view.content === "history"
@@ -242,7 +250,11 @@ export function PropertiesPanel({ editor, document: doc }: PropertiesPanelProps)
                 active={doc.view.activeTab}
                 onReturnFocus={returnFocus}
               />
-              <PanelSubject text={subject} />
+              {doc.view.content === "history" && objectSubject ? (
+                <ObjectSubject kind={objectSubject.kind} id={objectSubject.id} fullId={objectSubject.fullId} />
+              ) : (
+                <PanelSubject text={subject} />
+              )}
             </div>
             {/* Keyed on the tab: the scroll position starts at the top on every
                 tab change (criterion 19). */}
@@ -275,7 +287,12 @@ export function PropertiesPanel({ editor, document: doc }: PropertiesPanelProps)
                 ) : doc.view.content === "style" ? (
                   <StyleSection panel={panel} onReturnFocus={returnFocus} />
                 ) : doc.view.content === "history" ? (
-                  <HistoryTab editor={editor} shown={open} onReturnFocus={returnFocus} />
+                  <HistoryTab
+                    editor={editor}
+                    shown={open}
+                    onReturnFocus={returnFocus}
+                    historyScope={historyScope}
+                  />
                 ) : null}
               </TabsContent>
             </div>
@@ -283,6 +300,27 @@ export function PropertiesPanel({ editor, document: doc }: PropertiesPanelProps)
         </aside>
       </div>
     </TooltipProvider>
+  );
+}
+
+/** The subject line of the Object scope: the kind (it shortens with an ellipsis) and the first
+ * 6 characters of the id (never shortened); the tooltip has the kind and the full id as text
+ * that can be selected (`specs/0041-object-history` criterion 2). */
+function ObjectSubject({ kind, id, fullId }: { kind: string; id: string; fullId: string }) {
+  return (
+    <Tooltip
+      side="left"
+      content={
+        <span className="select-text">
+          {kind}, id {fullId}
+        </span>
+      }
+    >
+      <p className="flex min-w-0 max-w-[120px] gap-1 text-xs text-[var(--panel-muted-fg)]">
+        <span className="min-w-0 truncate">{kind}</span>
+        <span className="shrink-0 select-text font-mono">{id}</span>
+      </p>
+    </Tooltip>
   );
 }
 

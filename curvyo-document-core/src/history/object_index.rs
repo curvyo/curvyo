@@ -79,7 +79,6 @@ impl Document {
         containers.extend(doc);
         let mut steps = self.step_index.borrow_mut();
         steps.extend(doc);
-        steps.ensure_shown();
         self.object_index
             .borrow_mut()
             .extend(doc, &steps, &containers);
