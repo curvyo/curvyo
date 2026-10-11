@@ -5,6 +5,7 @@ import {
   historyKeyDirection,
   isMac,
   menuNames,
+  menuPressPlan,
   noticeDurationMs,
   noticeText,
   workingNotice,
@@ -45,4 +46,11 @@ test("platform names and small helpers", () => {
   assert.equal(noticeText(""), null);
   assert.equal(noticeText("Nothing to undo."), "Nothing to undo.");
   assert.deepEqual(menuNames("Move", ""), { undo: "Move", redo: null });
+});
+
+test("a menu press: skipped when the key already did it, text undo in a text field, else the document", () => {
+  assert.equal(menuPressPlan({ duplicate: true, textEntry: false }), "skip");
+  assert.equal(menuPressPlan({ duplicate: true, textEntry: true }), "skip");
+  assert.equal(menuPressPlan({ duplicate: false, textEntry: true }), "text-undo");
+  assert.equal(menuPressPlan({ duplicate: false, textEntry: false }), "document");
 });

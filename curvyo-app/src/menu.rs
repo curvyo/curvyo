@@ -1,6 +1,6 @@
 //! The native File menu: New, Open…, Save, Save As…, a separator, Quit, and the Edit menu with Undo
-//! and Redo (`specs/0020-undo-redo` criterion 8), with OS-standard accelerators
-//! bound directly on the menu items
+//! and Redo (`specs/0020-undo-redo` criterion 8). File items carry OS-standard accelerators bound
+//! directly on the menu items; Undo and Redo carry one on macOS only (see [`history_accelerator`])
 //! (`specs/0001-project-file-foundation/specification.md`, "Keyboard shortcuts
 //! (from day one)"). Native menus and accelerators are free accessibility
 //! and keyboard traversal on every platform (same spec, "Window chrome and
@@ -56,14 +56,8 @@ pub fn build(app: &tauri::App) -> tauri::Result<Menu<Wry>> {
         .item(&quit_item)
         .build()?;
 
-    let undo_item = MenuItemBuilder::with_id(UNDO_ID, "Undo")
-        .accelerator("CmdOrCtrl+Z")
-        .enabled(false)
-        .build(app)?;
-    let redo_item = MenuItemBuilder::with_id(REDO_ID, "Redo")
-        .accelerator("CmdOrCtrl+Shift+Z")
-        .enabled(false)
-        .build(app)?;
+    let undo_item = history_item(app, UNDO_ID, "Undo", HistoryKey::Undo)?;
+    let redo_item = history_item(app, REDO_ID, "Redo", HistoryKey::Redo)?;
     let edit_menu = SubmenuBuilder::new(app, "Edit")
         .item(&undo_item)
         .item(&redo_item)
@@ -77,6 +71,42 @@ pub fn build(app: &tauri::App) -> tauri::Result<Menu<Wry>> {
         .item(&file_menu)
         .item(&edit_menu)
         .build()
+}
+
+/// The two history keys the page's own key handler owns.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum HistoryKey {
+    Undo,
+    Redo,
+}
+
+/// The native accelerator of an Edit item, if it gets one.
+///
+/// On Linux and Windows the answer is `None`: a native accelerator on an enabled item takes the
+/// key before the web view sees it (GTK offers it to the accelerator groups first), which skips
+/// the page's gate and a text field's own undo. The page's key handler is the one path there.
+/// macOS keeps the standard Cmd+Z and Cmd+Shift+Z, which `WebKit` offers to the page first; the
+/// page prevents the default when it acts, so the menu does not fire a second time.
+fn history_accelerator(key: HistoryKey, mac: bool) -> Option<&'static str> {
+    match (mac, key) {
+        (false, _) => None,
+        (true, HistoryKey::Undo) => Some("Cmd+Z"),
+        (true, HistoryKey::Redo) => Some("Cmd+Shift+Z"),
+    }
+}
+
+/// An Edit item that starts greyed out; the frontend enables it with `set_history_menu`.
+fn history_item(
+    app: &tauri::App,
+    id: &str,
+    text: &str,
+    key: HistoryKey,
+) -> tauri::Result<MenuItem<Wry>> {
+    let builder = MenuItemBuilder::with_id(id, text).enabled(false);
+    match history_accelerator(key, cfg!(target_os = "macos")) {
+        Some(accelerator) => builder.accelerator(accelerator).build(app),
+        None => builder.build(app),
+    }
 }
 
 /// The Edit menu's item text for a step name: "Undo Move", or plain "Undo" when the stack is empty
@@ -130,7 +160,19 @@ pub fn dispatch(app: &AppHandle, id: &str) {
 
 #[cfg(test)]
 mod tests {
-    use super::history_item_text;
+    use super::{HistoryKey, history_accelerator, history_item_text};
+
+    #[test]
+    fn only_macos_binds_native_undo_and_redo_accelerators() {
+        for key in [HistoryKey::Undo, HistoryKey::Redo] {
+            assert_eq!(history_accelerator(key, false), None);
+        }
+        assert_eq!(history_accelerator(HistoryKey::Undo, true), Some("Cmd+Z"));
+        assert_eq!(
+            history_accelerator(HistoryKey::Redo, true),
+            Some("Cmd+Shift+Z")
+        );
+    }
 
     #[test]
     fn the_item_names_the_step_or_stays_plain() {

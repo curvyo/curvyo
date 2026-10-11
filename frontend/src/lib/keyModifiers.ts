@@ -50,6 +50,23 @@ const MODIFIER_OF_KEY: Record<string, Modifier | undefined> = {
 const UNKNOWN_KEY = "unknown";
 
 export class ModifierTracker {
+  private chordDown = false;
+
+  /**
+   * Whether Ctrl (Cmd) was pressed together with another, non-modifier key, as in Ctrl+Z, and has
+   * not been released since. The Ctrl badges (plus and minus) announce what a Ctrl click would
+   * do; during a keyboard chord they are noise. A pointer press ends the chord, so a Ctrl click or
+   * drag after Ctrl+Z still shows them.
+   */
+  get chord(): boolean {
+    return this.chordDown;
+  }
+
+  /** A pointer button went down: Ctrl now belongs to the click, not to a key chord. */
+  pointerPressed(): void {
+    this.chordDown = false;
+  }
+
   private readonly down: Record<Modifier, Set<string>> = {
     shift: new Set(),
     ctrl: new Set(),
@@ -85,6 +102,9 @@ export class ModifierTracker {
         }
       }
     }
+    if (changed === undefined && event.type === "keydown" && (event.ctrlKey || event.metaKey)) {
+      this.chordDown = true;
+    }
     // The flags of the modifiers this event did not change are right.
     this.resync(
       {
@@ -94,7 +114,7 @@ export class ModifierTracker {
       },
       changed,
     );
-    return this.held;
+    return this.settle();
   }
 
   /** The flags of a pointer event, which are always right: they correct the
@@ -102,15 +122,25 @@ export class ModifierTracker {
    * event. Returns what is held after it. */
   pointerFlags(flags: HeldModifiers): HeldModifiers {
     this.resync(flags, undefined);
-    return this.held;
+    return this.settle();
   }
 
   /** The window lost focus or the page was hidden: no key-up will come. */
   reset(): HeldModifiers {
+    this.chordDown = false;
     for (const keys of Object.values(this.down)) {
       keys.clear();
     }
     return this.held;
+  }
+
+  /** A chord ends with Ctrl; returns what is held. */
+  private settle(): HeldModifiers {
+    const held = this.held;
+    if (!held.ctrl) {
+      this.chordDown = false;
+    }
+    return held;
   }
 
   private resync(flags: HeldModifiers, except: Modifier | undefined): void {
