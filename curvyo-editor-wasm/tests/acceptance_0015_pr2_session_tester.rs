@@ -131,21 +131,40 @@ fn ac12_size_text_follows_the_open_file() {
 
 // ---- AC 11a ----
 
+/// Amended 2026-10-11 (`fix/center-document`): the untouched default view
+/// keeps the document centred through size reports and window resizes (x in
+/// the space right of the 128 px rail, y in the full height); an axis it does
+/// not fit starts at its margin (128 px left, 24 px top).
 #[test]
-fn ac11a_default_view_survives_resizes_until_first_pan_or_zoom() {
+fn ac11a_default_view_stays_centred_through_resizes_until_first_pan_or_zoom() {
+    let px_per_mm = 96.0 / 25.4;
+    let (a4_w, a4_h) = (210.0 * px_per_mm, 297.0 * px_per_mm);
     let mut s = Session::new(1);
     s.show_default_view();
-    for (w, h) in [(0.0, 0.0), (1000.0, 700.0), (496.0, 546.0), (1500.0, 900.0)] {
+    for (w, h) in [
+        (0.0, 0.0),
+        (1000.0, 700.0),
+        (496.0, 546.0),
+        (1500.0, 1300.0),
+    ] {
         s.resize_viewport(w, h);
         let (x, y) = corner(&s);
+        let (want_x, want_y) = if w == 0.0 {
+            (128.0, 128.0)
+        } else {
+            (
+                (128.0 + (w - 128.0 - a4_w) / 2.0).max(128.0),
+                ((h - a4_h) / 2.0).max(24.0),
+            )
+        };
         assert!(
-            (x - 128.0).abs() < 1e-9 && (y - 128.0).abs() < 1e-9,
-            "{w}x{h}: ({x}, {y})"
+            (x - want_x).abs() < 1e-9 && (y - want_y).abs() < 1e-9,
+            "{w}x{h}: ({x}, {y}) wanted ({want_x}, {want_y})"
         );
     }
     assert_eq!(s.zoom_percent(), 100);
     s.wheel(0.0, 40.0, 100.0, 100.0, false, false);
-    let before = s.screen_to_document(750.0, 450.0);
+    let before = s.screen_to_document(750.0, 650.0);
     s.resize_viewport(500.0, 450.0);
     let after = s.screen_to_document(250.0, 225.0);
     assert!((before.x - after.x).abs() < 1e-9 && (before.y - after.y).abs() < 1e-9);
@@ -204,17 +223,21 @@ fn ac2_session_layout_matches_the_canvas_projection_across_scripted_steps() {
 }
 
 #[test]
-fn ac3_default_view_has_the_origin_tick_72px_in_and_labels_0() {
+fn ac3_default_view_has_the_origin_tick_at_the_document_corner_and_labels_0() {
     let mut s = Session::new(1);
     s.show_default_view();
     s.resize_viewport(1000.0, 700.0);
-    for axis in [RulerAxis::Horizontal, RulerAxis::Vertical] {
+    let (corner_x, corner_y) = corner(&s);
+    for (axis, at) in [
+        (RulerAxis::Horizontal, corner_x),
+        (RulerAxis::Vertical, corner_y),
+    ] {
         let l = s.ruler_layout(axis, 900.0, 7.0, 7.0);
-        assert!((l.origin_px.unwrap() - 128.0).abs() < 1e-9);
+        assert!((l.origin_px.unwrap() - at).abs() < 1e-9);
         assert!(
             l.labels
                 .iter()
-                .any(|x| x.text == "0" && (x.tick_px - 128.0).abs() < 1e-9)
+                .any(|x| x.text == "0" && (x.tick_px - at).abs() < 1e-9)
         );
     }
     // mm at 100 %: majors every 20 mm
@@ -253,7 +276,8 @@ fn ac9_click_on_a_tick_hits_its_value_at_100_and_800_percent() {
     for (wheel_delta, percent, target_mm) in [(0.0, 100, 60.0), (-1200.0, 800, 50.0)] {
         let mut s = Session::new(1);
         s.show_default_view();
-        s.resize_viewport(1000.0, 700.0);
+        // Too narrow to centre the 794 px wide document: its corner stays 128 px in.
+        s.resize_viewport(700.0, 700.0);
         if wheel_delta != 0.0 {
             s.wheel(0.0, wheel_delta, 72.0, 72.0, false, true);
             // pan right so that 50 mm is on screen (800 %: 30.2 px per mm)

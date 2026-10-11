@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { type NudgeFeedback, useNudgeFeedback } from "@/hooks/useNudgeFeedback";
+import { type BackingBuffer, backingBufferFor, sameBackingBuffer } from "@/lib/canvasSize";
 import { ModifierTracker } from "@/lib/keyModifiers";
 import { TOO_FAR_HINT } from "@/lib/nudgeText";
 import { createSession, openSession } from "@/lib/editorSession";
@@ -16,28 +17,10 @@ import type { BooleanOp, BooleanResult } from "@/lib/booleanText";
 import type { BreakApartResult, CombineResult } from "@/lib/pathText";
 import type { ClosePathResult } from "@/lib/penText";
 
-/** The canvas's backing-buffer (physical pixel) size for a given CSS
- * (layout) size, plus the `devicePixelRatio` that relates the two —
- * `curvyo-editor-wasm`'s `Gpu` needs both: the buffer itself sized to
- * the display's actual resolution (correctness fix: a HiDPI display
- * previously got a buffer sized 1:1 to CSS pixels, then upscaled and
- * softened by the browser compositor — the same class of bug as this
- * slice's `wgpu` surface-resize requirement, but for resolution rather
- * than staleness), and the ratio itself so `Gpu::render` can map back to
- * CSS pixels for the clip-space transform. `devicePixelRatio` can be a
- * fractional, non-integer value (Windows/Linux fractional scaling, e.g.
- * 1.25 or 1.5), so the buffer size is rounded, not assumed to divide
- * evenly. */
-function backingBufferSize(
-  cssWidth: number,
-  cssHeight: number,
-): { width: number; height: number; devicePixelRatio: number } {
-  const devicePixelRatio = window.devicePixelRatio > 0 ? window.devicePixelRatio : 1;
-  return {
-    width: Math.max(1, Math.round(cssWidth * devicePixelRatio)),
-    height: Math.max(1, Math.round(cssHeight * devicePixelRatio)),
-    devicePixelRatio,
-  };
+/** The canvas's backing-buffer size for a CSS size at the window's current
+ * `devicePixelRatio` (`backingBufferFor`). */
+function backingBufferSize(cssWidth: number, cssHeight: number): BackingBuffer {
+  return backingBufferFor(cssWidth, cssHeight, window.devicePixelRatio);
 }
 
 /** Which tool is active (`specification.md`'s tool rail: Select is first
@@ -947,6 +930,22 @@ export function useEditorSession(
           await session.attach_canvas(canvas, width, height, devicePixelRatio);
         } finally {
           sessionRef.current = session;
+        }
+        // `attach_canvas` is async, and the ResizeObserver below skips every
+        // resize while the session is not yet published, so a layout change
+        // during the attach (the window shown or maximised, fonts or panels
+        // settling) never reached the session. It would keep the size measured
+        // before the attach and centre the document in that one. Measure again
+        // and hand over the real size.
+        const current = backingBufferSize(canvas.clientWidth, canvas.clientHeight);
+        if (!sameBackingBuffer(current, { width, height, devicePixelRatio })) {
+          canvas.width = current.width;
+          canvas.height = current.height;
+          try {
+            session.resize(current.width, current.height, current.devicePixelRatio);
+          } catch {
+            // As in the ResizeObserver: the render loop recovers a lost frame.
+          }
         }
         syncFromSession();
       }),
