@@ -119,7 +119,10 @@ fn last_label(s: &Session) -> String {
             best = Some((c.lamport, c.message().to_string()));
         }
     }
-    best.unwrap().1
+    // The history (`0020`) stamps the step time into the message ("..;t=<seconds>"): two sessions
+    // started a second apart differ there only.
+    let label = best.unwrap().1;
+    label.split(";t=").next().unwrap_or(&label).to_owned()
 }
 
 fn bytes_of(s: &Session) -> Vec<u8> {
