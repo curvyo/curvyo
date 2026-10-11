@@ -61,7 +61,7 @@ export function FillSection({ panel, onReturnFocus }: FillSectionProps) {
             onPreview={(hue, saturation, value) =>
               panel.previewHsv("fill-color", hue, saturation, value)
             }
-            onSettle={panel.settleHsv}
+            onSettle={panel.settle}
             onOpenEntry={hexEntry.open}
           />
           <ValueField
@@ -78,6 +78,7 @@ export function FillSection({ panel, onReturnFocus }: FillSectionProps) {
             defaultText={view.opacityDefaultText}
             messages={PERCENT_MESSAGES}
             onPreview={(p, grid) => panel.previewValue("fill-opacity", p, grid)}
+            onSettle={panel.settle}
             onStep={(steps, grid) => panel.stepValue("fill-opacity", steps, grid)}
             onReset={() => panel.resetValue("fill-opacity")}
             onSubmit={(text) => panel.setText("fill-opacity", text)}

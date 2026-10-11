@@ -26,7 +26,7 @@ made by the customer and final. What changes:
 - The colour is chosen inline, with no popup. An eyedropper next to the colour
   picks a colour from the drawing.
 - Dash keeps its presets and gains a text line for a custom pattern.
-- Number fields become GIMP-style value fields: drag to change, click to type,
+- Number fields become GIMP-style value fields: drag to change, click to type (changed by `specs/0047-transform-polish/` criteria 51 to 57: a click sets the value at the pointer, a double-click types),
   no text selection by dragging, no +/- buttons. Width and opacity drag on a
   slightly logarithmic scale.
 - No popups anywhere in the properties panel.
@@ -744,7 +744,7 @@ readout. Revisit if testers cannot predict where 1 mm sits.
 (5 px per step at W = 244).
 
 **Modifier legend** (kept in one place, shown in the tooltip, section 8): drag to
-change; Shift coarse (10x); Ctrl (Cmd on macOS) fine (1/10); click to type.
+change; Shift coarse (10x); Ctrl (Cmd on macOS) fine (1/10); click to type (since `specs/0047-transform-polish/`: click to set, double-click to type).
 The same keys, same meaning, for arrow keys.
 
 **Reset.** The default is Width 0.25 mm, Opacity 100 %, Count 1. It is a pointer

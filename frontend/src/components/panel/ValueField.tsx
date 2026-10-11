@@ -8,7 +8,7 @@ import { gridOf, useValueDrag } from "@/hooks/useValueDrag";
 import type { GridName } from "@/hooks/useStylePanel";
 
 const TOOLTIP_KEY = /Mac|iPhone|iPad/.test(navigator.platform) ? "Cmd" : "Ctrl";
-const TOOLTIP = `Drag to change, click to type. Shift: coarse. ${TOOLTIP_KEY}: fine. ${TOOLTIP_KEY}+Backspace: reset.`;
+const TOOLTIP = `Click to set, double-click to type, drag to change. Shift: coarse. ${TOOLTIP_KEY}: fine. ${TOOLTIP_KEY}+Backspace: reset.`;
 
 interface ValueFieldProps {
   /** The visible label inside the field ("Width", "Opacity"). */
@@ -38,6 +38,8 @@ interface ValueFieldProps {
   messages: Readonly<Record<string, string>>;
   /** A tick of a drag: position `p` (0 to 1) on the field's scale, rounded to `grid`. */
   onPreview: (p: number, grid: GridName) => void;
+  /** A click: ends the gesture its `onPreview` started, committing the value once. */
+  onSettle: () => void;
   /** An arrow key: `steps` steps from the shown value. */
   onStep: (steps: number, grid: GridName) => void;
   /** The reset icon or Ctrl+Backspace. */
@@ -74,6 +76,7 @@ export function ValueField({
   defaultText,
   messages,
   onPreview,
+  onSettle,
   onStep,
   onReset,
   onSubmit,
@@ -85,7 +88,13 @@ export function ValueField({
     bar: mixed ? 0 : bar,
     mixed,
     onTick: onPreview,
-    onClick: () => setTyping({}),
+    // A click sets the value at the pointer and commits it; a double-click types
+    // (`specs/0047-transform-polish/` criteria 33 to 36).
+    onClickAt: (p) => {
+      onPreview(p, "normal");
+      onSettle();
+    },
+    onDoubleClick: () => setTyping({}),
     onDragEnd: onReturnFocus,
   });
 
@@ -155,7 +164,7 @@ export function ValueField({
             aria-valuemax={typedMax}
             aria-valuenow={mixed ? undefined : valueNow}
             aria-valuetext={mixed ? "Mixed" : `${text} ${unitWords}`}
-            aria-keyshortcuts="Control+Backspace"
+            aria-keyshortcuts="Control+Backspace Enter F2"
             onKeyDown={onKeyDown}
             {...handlers}
             className="relative h-7 w-[244px] cursor-ew-resize overflow-hidden rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] bg-white outline-none hover:border-[var(--toolbar-icon)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)]"

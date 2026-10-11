@@ -16,8 +16,9 @@ export interface SliderPointerOptions {
   /** A click on the track (not on the thumb, not the second click of a double-click):
    * set the value at `at` and commit it. */
   onClick: (at: Point) => void;
-  /** A drag step: the value goes to `at`, which already includes the offset of a grab. */
-  onDrag: (at: Point) => void;
+  /** A drag step: the value goes to `at`, which already includes the offset of a grab. `event`
+   * is the pointer event, for a slider whose drag reads the modifier keys. */
+  onDrag: (at: Point, event: PointerEvent<HTMLElement>) => void;
   /** The release of a drag. */
   onDragEnd: () => void;
   /** The system took the pointer away in the middle of a press. */
@@ -66,10 +67,11 @@ export function useSliderPointer(
   // A slider that goes away in the middle of a press leaves no listener behind.
   useEffect(() => endPress, []);
 
-  const follow = (at: Point) => {
+  const follow = (at: Point, event: PointerEvent<HTMLElement>) => {
     const offset = grab.current;
     latest.current.onDrag(
       offset ? { x: at.x + offset.x, y: at.y + offset.y } : at,
+      event,
     );
   };
 
@@ -115,9 +117,9 @@ export function useSliderPointer(
       const result = gesture.current.move(at);
       if (result.kind === "drag-start") {
         grab.current = result.grab;
-        follow(at);
+        follow(at, event);
       } else if (result.kind === "drag") {
-        follow(at);
+        follow(at, event);
       }
     },
     onPointerUp: (event) => {

@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { PointerEvent } from "react";
 
 import type { GridName } from "@/hooks/useStylePanel";
-import { dragPosition } from "@/lib/dragPosition";
+import { useSliderPointer } from "@/hooks/useSliderPointer";
+import { clickPosition, dragPosition } from "@/lib/dragPosition";
 
 /** A press that has moved this far (px) starts a drag; less is a click. */
 export const DRAG_THRESHOLD_PX = 3;
@@ -46,8 +47,12 @@ interface ValueDragOptions {
   mixed: boolean;
   /** A tick: position `p` on the field's scale and the grid. */
   onTick: (p: number, grid: GridName) => void;
-  /** A press and release with less than the threshold of movement. */
-  onClick: () => void;
+  /** A click (a press and release with less than the slop of movement, not the second click of
+   * a double-click): the value goes to position `p`, 0 to 1, under the pointer, and is
+   * committed (`specs/0047-transform-polish/` criterion 33). */
+  onClickAt: (p: number) => void;
+  /** A double-click: the typed entry opens. The first click has set its value already. */
+  onDoubleClick: () => void;
   /** After a drag: the keyboard goes back to the canvas. */
   onDragEnd: () => void;
 }
@@ -61,7 +66,14 @@ interface ValueDragOptions {
  * A mixed field sets the value under the pointer. The commit, Escape and the
  * one-commit rule are `usePreviewGesture`'s, installed by the first tick.
  */
-export function useValueDrag({ bar, mixed, onTick, onClick, onDragEnd }: ValueDragOptions) {
+export function useValueDrag({
+  bar,
+  mixed,
+  onTick,
+  onClickAt,
+  onDoubleClick,
+  onDragEnd,
+}: ValueDragOptions) {
   const drag = useRef<Drag | null>(null);
   const [modifier, setModifier] = useState<GridName>("normal");
 
@@ -108,13 +120,47 @@ export function useValueDrag({ bar, mixed, onTick, onClick, onDragEnd }: ValueDr
     };
   }, [rebase]);
 
+  // The press, click, double-click, slop and Escape are the sliders' (`useSliderPointer`); the
+  // drag itself stays relative to the value at the press, with the modifiers (criteria 36 to 40).
+  const pointer = useSliderPointer({
+    thumb: () => null,
+    onClick: (at) => {
+      const current = drag.current;
+      if (current) {
+        onClickAt(clickPosition(at.x, current.width));
+      }
+    },
+    onDrag: (_at, event) => {
+      const current = drag.current;
+      if (!current) {
+        return;
+      }
+      if (!current.dragging) {
+        current.dragging = true;
+        document.documentElement.setAttribute("data-value-drag", "");
+      }
+      rebase(event);
+      const p = dragPosition(current, event.clientX);
+      current.lastP = p;
+      current.lastX = event.clientX;
+      onTick(p, gridOf(event));
+    },
+    onDragEnd: () => {
+      finish();
+      onDragEnd();
+    },
+    onPointerCancel: finish,
+    // The preview is dropped by `usePreviewGesture`'s own Escape; the press ends here.
+    onEscape: finish,
+    onDoubleClick,
+  });
+
   const onPointerDown = (event: PointerEvent<HTMLElement>) => {
     if (event.button !== 0) {
       return;
     }
     event.preventDefault();
     const box = event.currentTarget.getBoundingClientRect();
-    event.currentTarget.setPointerCapture(event.pointerId);
     drag.current = {
       pointerId: event.pointerId,
       startX: event.clientX,
@@ -128,44 +174,22 @@ export function useValueDrag({ bar, mixed, onTick, onClick, onDragEnd }: ValueDr
       left: box.left,
       width: box.width,
     };
-  };
-
-  const onPointerMove = (event: PointerEvent<HTMLElement>) => {
-    const current = drag.current;
-    if (!current || current.pointerId !== event.pointerId) {
-      return;
-    }
-    if (!current.dragging) {
-      if (Math.abs(event.clientX - current.startX) < DRAG_THRESHOLD_PX) {
-        return;
-      }
-      current.dragging = true;
-      document.documentElement.setAttribute("data-value-drag", "");
-    }
-    rebase(event);
-    const p = dragPosition(current, event.clientX);
-    current.lastP = p;
-    current.lastX = event.clientX;
-    onTick(p, gridOf(event));
+    pointer.onPointerDown(event);
   };
 
   const onPointerUp = (event: PointerEvent<HTMLElement>) => {
-    const current = drag.current;
-    if (!current || current.pointerId !== event.pointerId) {
-      return;
-    }
-    const wasDrag = current.dragging;
-    finish();
-    if (wasDrag) {
-      onDragEnd();
-    } else {
-      onClick();
-    }
-  };
-
-  const onPointerCancel = () => {
+    pointer.onPointerUp(event);
+    // A click or a double-click ends here; a drag ended in `onDragEnd`.
     finish();
   };
 
-  return { modifier, handlers: { onPointerDown, onPointerMove, onPointerUp, onPointerCancel } };
+  return {
+    modifier,
+    handlers: {
+      onPointerDown,
+      onPointerMove: pointer.onPointerMove,
+      onPointerUp,
+      onPointerCancel: pointer.onPointerCancel,
+    },
+  };
 }

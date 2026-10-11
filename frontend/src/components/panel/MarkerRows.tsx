@@ -75,6 +75,7 @@ export function MarkerRows({ panel, onReturnFocus }: MarkerRowsProps) {
           defaultText={view.countDefaultText}
           messages={COUNT_MESSAGES}
           onPreview={(p, grid) => panel.previewValue("marker-count", p, grid)}
+          onSettle={panel.settle}
           onStep={(steps, grid) => panel.stepValue("marker-count", steps, grid)}
           onReset={() => panel.resetValue("marker-count")}
           onSubmit={(text) => panel.setText("marker-count", text)}

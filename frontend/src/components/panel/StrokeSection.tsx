@@ -69,7 +69,7 @@ export function StrokeSection({ panel, onReturnFocus }: StrokeSectionProps) {
             onPreview={(hue, saturation, value) =>
               panel.previewHsv("stroke-color", hue, saturation, value)
             }
-            onSettle={panel.settleHsv}
+            onSettle={panel.settle}
             onOpenEntry={hexEntry.open}
           />
           <ValueField
@@ -86,6 +86,7 @@ export function StrokeSection({ panel, onReturnFocus }: StrokeSectionProps) {
             defaultText={view.opacityDefaultText}
             messages={PERCENT_MESSAGES}
             onPreview={(p, grid) => panel.previewValue("stroke-opacity", p, grid)}
+            onSettle={panel.settle}
             onStep={(steps, grid) => panel.stepValue("stroke-opacity", steps, grid)}
             onReset={() => panel.resetValue("stroke-opacity")}
             onSubmit={(text) => panel.setText("stroke-opacity", text)}
@@ -105,6 +106,7 @@ export function StrokeSection({ panel, onReturnFocus }: StrokeSectionProps) {
             defaultText={view.widthDefaultText}
             messages={WIDTH_MESSAGES}
             onPreview={(p, grid) => panel.previewValue("stroke-width", p, grid)}
+            onSettle={panel.settle}
             onStep={(steps, grid) => panel.stepValue("stroke-width", steps, grid)}
             onReset={() => panel.resetValue("stroke-width")}
             onSubmit={(text) => panel.setText("stroke-width", text)}

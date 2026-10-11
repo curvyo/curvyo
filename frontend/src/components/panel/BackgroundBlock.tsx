@@ -78,7 +78,7 @@ export function BackgroundBlock({ background, onReturnFocus }: BackgroundBlockPr
             hsvOf={background.hsvOf}
             rgbOf={background.rgbOf}
             onPreview={background.previewHsv}
-            onSettle={background.settleHsv}
+            onSettle={background.settle}
             onOpenEntry={hexEntry.open}
           />
           <ValueField
@@ -95,6 +95,7 @@ export function BackgroundBlock({ background, onReturnFocus }: BackgroundBlockPr
             defaultText={view.opacityDefaultText}
             messages={PERCENT_MESSAGES}
             onPreview={background.previewOpacity}
+            onSettle={background.settle}
             onStep={background.stepOpacity}
             onReset={background.resetOpacity}
             onSubmit={background.setOpacityText}

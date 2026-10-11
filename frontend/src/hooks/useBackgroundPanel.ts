@@ -68,7 +68,7 @@ export interface BackgroundPanelApi {
    * nothing written; one commit at the release. */
   previewHsv: (hue: number, saturation: number, value: number) => void;
   /** Commits what `previewHsv` showed, once: the end of a click on the picker. */
-  settleHsv: () => void;
+  settle: () => void;
   hsvOf: (rgb: number) => HsvTriple;
   rgbOf: (hue: number, saturation: number, value: number) => number;
   /** Ticks, arrow keys, reset and typed text of the Opacity field. */
@@ -145,7 +145,7 @@ export function useBackgroundPanel(editor: EditorHandle): BackgroundPanelApi {
     setHex: (text) => act((s) => s.set_background_hex(text), "unchanged"),
     previewHsv: (hue, saturation, value) =>
       preview((s) => s.preview_background_hsv(hue, saturation, value)),
-    settleHsv: settle,
+    settle: settle,
     hsvOf,
     rgbOf,
     previewOpacity: (p, grid) => preview((s) => s.preview_background_opacity(p, grid)),
