@@ -1,21 +1,20 @@
-//! Planning Break apart on the selected compound paths: which outlines form a region (a shape
-//! with the holes directly inside it) and what the pieces are
-//! (`specs/0035-combine-and-break-apart`, criteria 13 to 16).
+//! Planning Break apart on the selected compound paths: every outline becomes a closed path of
+//! its own, holes included (`specs/0048-split-compound-path`, criteria 11 to 13).
 //!
 //! Pure: it reads snapshots and the selection and returns a plan or a refusal. The one write
-//! (`Document::break_apart`) is the session's. Nodes are copied as they are, no flattening and no
-//! reversal: the windings of a compound path are canonical already.
+//! (`Document::replace_with_pieces`) is the session's. Nodes are copied as they are, not reversed:
+//! a released hole keeps its negative winding, which paints the same under the nonzero rule.
 
-use curvyo_document_core::{NewAnchor, NodeId, ObjectSnapshot, SubpathRef};
-use curvyo_geometry_core::{Outline, OutlineTriple, outline_nesting};
+use curvyo_document_core::{NodeId, ObjectSnapshot, PieceOutlines, SubpathRef};
 
 use crate::anchor_id_minter::AnchorIdMinter;
 use crate::boolean::operands_in_order;
-use crate::combine::{fresh_ids, is_compound};
+use crate::combine::is_compound;
 use crate::object_selection::ObjectSelection;
+use crate::split::{fresh_outline, nesting_of};
 
-/// One piece: the outlines of a region, the shape first and its holes after it.
-pub type Piece = Vec<(Vec<NewAnchor>, bool)>;
+/// The commit label of Break apart; the undo slice maps it to display text.
+pub const BREAK_APART_COMMIT_LABEL: &str = "break_apart";
 
 /// Why Break apart was refused. Nothing was changed in either case.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -29,72 +28,20 @@ pub enum BreakApartRefusal {
         /// The leaves of the selected groups, to outline.
         offenders: Vec<NodeId>,
     },
-    /// Every selected compound path is one region: `compounds` of them, each already one piece
-    /// with its holes.
-    OnePiece {
-        /// How many compound paths are selected.
-        compounds: usize,
-    },
 }
 
-/// What [`plan_break_apart`] decided, ready for `Document::break_apart`.
+/// What [`plan_break_apart`] decided, ready for `Document::replace_with_pieces`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct BreakApartPlan {
-    /// The compound paths to replace, bottom-most first, each with its pieces in the order of
-    /// their first outline and with fresh anchor ids.
-    pub parts: Vec<(NodeId, Vec<Piece>)>,
-    /// How many pieces there are in all.
-    pub pieces: usize,
-    /// Whether a piece has a hole.
+    /// The compound paths to replace, bottom-most first.
+    pub removed: Vec<NodeId>,
+    /// One closed path per outline, each with the compound path it takes its place and style
+    /// from, in the compound path's outline order, with fresh anchor ids.
+    pub pieces: Vec<(NodeId, PieceOutlines)>,
+    /// Whether an outline was a hole (odd depth), which is now a filled shape.
     pub with_holes: bool,
-    /// The selected objects that stay as they are: ordinary objects and compound paths of one
-    /// region.
+    /// The selected objects that were no compound path and stay as they are.
     pub kept: Vec<NodeId>,
-    /// How many of those are compound paths of one region.
-    pub left_alone: usize,
-}
-
-/// The regions of a compound path, each as indices into its outlines: an even-depth outline, then
-/// the outlines directly inside it. Ordered by the first outline of each region.
-fn regions_of(outlines: &[SubpathRef<'_>]) -> Vec<Vec<usize>> {
-    let owned: Vec<Vec<OutlineTriple>> = outlines
-        .iter()
-        .map(|outline| {
-            outline
-                .anchors
-                .iter()
-                .map(|a| (a.point, a.handle_in, a.handle_out))
-                .collect()
-        })
-        .collect();
-    let views: Vec<Outline<'_>> = owned
-        .iter()
-        .zip(outlines)
-        .map(|(triples, outline)| Outline::new(triples, outline.closed))
-        .collect();
-    let nesting = outline_nesting(&views);
-    let mut regions: Vec<Vec<usize>> = Vec::new();
-    let mut region_of = vec![usize::MAX; outlines.len()];
-    for (index, nest) in nesting.iter().enumerate() {
-        if nest.depth % 2 == 0 {
-            region_of[index] = regions.len();
-            regions.push(vec![index]);
-        }
-    }
-    for (index, nest) in nesting.iter().enumerate() {
-        if nest.depth % 2 == 1 {
-            // A hole's parent is the innermost enclosing outline, normally an even one that was
-            // given a region above; if not, the hole joins no region (see `plan_break_apart`).
-            if let Some(region) = nest
-                .parent
-                .map(|parent| region_of[parent])
-                .filter(|&region| region != usize::MAX)
-            {
-                regions[region].push(index);
-            }
-        }
-    }
-    regions
 }
 
 /// Plans Break apart over the selected objects.
@@ -107,14 +54,13 @@ pub fn plan_break_apart(
     minter: &mut AnchorIdMinter,
 ) -> Result<BreakApartPlan, BreakApartRefusal> {
     let operands = operands_in_order(objects, selection);
-    let compounds = operands.iter().filter(|object| is_compound(object)).count();
-    if compounds == 0 {
+    if !operands.iter().any(|object| is_compound(object)) {
         return Err(BreakApartRefusal::NoCompound);
     }
-    let mut parts = Vec::new();
+    let mut removed = Vec::new();
+    let mut pieces = Vec::new();
     let mut kept = Vec::new();
-    let mut left_alone = 0;
-    let (mut pieces, mut with_holes) = (0, false);
+    let mut with_holes = false;
     for object in &operands {
         let ObjectSnapshot::Path(path) = object else {
             kept.push(object.id());
@@ -125,40 +71,17 @@ pub fn plan_break_apart(
             continue;
         }
         let outlines: Vec<SubpathRef<'_>> = path.subpaths().collect();
-        let regions = regions_of(&outlines);
-        // A hole whose parent has no region (outlines that touch at a vertex can make the depth
-        // count differ from the enclosure chain) would be lost by a break: leave the compound
-        // path as it is rather than drop geometry.
-        let covered: usize = regions.iter().map(Vec::len).sum();
-        if regions.len() < 2 || covered != outlines.len() {
-            kept.push(object.id());
-            left_alone += 1;
-            continue;
+        with_holes |= nesting_of(&outlines).iter().any(|nest| nest.depth % 2 == 1);
+        removed.push(object.id());
+        for outline in &outlines {
+            let piece = vec![fresh_outline(outline.anchors, outline.closed, minter)];
+            pieces.push((object.id(), piece));
         }
-        pieces += regions.len();
-        with_holes |= regions.iter().any(|region| region.len() > 1);
-        let part = regions
-            .iter()
-            .map(|region| {
-                region
-                    .iter()
-                    .map(|&index| {
-                        let outline = &outlines[index];
-                        (fresh_ids(outline.anchors.to_vec(), minter), outline.closed)
-                    })
-                    .collect()
-            })
-            .collect();
-        parts.push((object.id(), part));
-    }
-    if parts.is_empty() {
-        return Err(BreakApartRefusal::OnePiece { compounds });
     }
     Ok(BreakApartPlan {
-        parts,
+        removed,
         pieces,
         with_holes,
         kept,
-        left_alone,
     })
 }

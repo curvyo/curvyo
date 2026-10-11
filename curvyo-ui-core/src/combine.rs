@@ -21,14 +21,18 @@ use crate::object_selection::ObjectSelection;
 /// The commit label of Combine; the undo slice maps it to display text.
 pub const COMBINE_COMMIT_LABEL: &str = "combine_paths";
 
-/// What the two buttons of the Path card show.
+/// What the buttons of the Path card show.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PathAvailability {
     /// Combine follows the rule of the Boolean buttons: two or more selected objects, an open
     /// path among them enabling the button but refusing the press.
     pub combine: BooleanAvailability,
-    /// Break apart is enabled when the selection holds a compound path.
-    pub break_apart: bool,
+    /// Split and Break apart are enabled when the selection holds a compound path: one rule, so
+    /// the two are never dimmed differently (`specs/0048-split-compound-path` criterion 1).
+    pub compound: bool,
+    /// Cut is enabled when anything is selected: one path can cross itself
+    /// (`specs/0036-cut-at-crossings` criterion 1).
+    pub cut: bool,
 }
 
 /// What the Path card shows for `selection`, counting only selected ids the document still
@@ -39,11 +43,11 @@ pub fn path_availability(
     objects: &[ObjectSnapshot],
     selection: &ObjectSelection,
 ) -> PathAvailability {
+    let operands = operands_in_order(objects, selection);
     PathAvailability {
         combine: boolean_availability(objects, selection),
-        break_apart: operands_in_order(objects, selection)
-            .iter()
-            .any(|object| is_compound(object)),
+        compound: operands.iter().any(|object| is_compound(object)),
+        cut: !operands.is_empty(),
     }
 }
 

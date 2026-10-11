@@ -63,13 +63,15 @@ mod wasm_select_bar;
 mod wasm_select_tool;
 #[cfg(target_arch = "wasm32")]
 mod wasm_shape_tools;
+#[cfg(target_arch = "wasm32")]
+mod wasm_split;
 
 pub use session::{
     BooleanOutcome, BreakApartOutcome, ClosePathOutcome, ClosePathState, CombineOutcome,
     DocumentPresetsRecord, DocumentSide, DoubleClickHint, EscapeStep, FitOutcome, FormTexts,
     FormatEdit, GroupingKind, GroupingResult, HistoryResult, KeyHint, KeyInput, KeyOutcome,
-    MoveIndicators, ObjectWipeOutcome, PanelTabsRecord, PanelView, Session, SizeOutcome, Tool,
-    WipeOutcome, WipeState,
+    MoveIndicators, ObjectWipeOutcome, PanelTabsRecord, PanelView, Session, SizeOutcome,
+    SplitOutcome, Tool, WipeOutcome, WipeState,
 };
 
 #[cfg(target_arch = "wasm32")]

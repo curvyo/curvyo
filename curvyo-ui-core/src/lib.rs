@@ -66,6 +66,7 @@ mod selection;
 mod shape_tool_common;
 mod skew_entry;
 mod skew_math;
+mod split;
 mod style_edit;
 mod style_entry;
 mod style_panel;
@@ -86,7 +87,9 @@ pub use angle_snap::{MAX_SKEW_SNAP_DEG, snap_angle, snap_skew_angle};
 pub use boolean::{
     BooleanAvailability, BooleanOp, BooleanPlan, BooleanRefusal, boolean_availability, plan_boolean,
 };
-pub use break_apart::{BreakApartPlan, BreakApartRefusal, Piece, plan_break_apart};
+pub use break_apart::{
+    BREAK_APART_COMMIT_LABEL, BreakApartPlan, BreakApartRefusal, plan_break_apart,
+};
 pub use close_path::{
     ClosableCounts, ClosePlan, closable_counts, close_path_set, plan_close_paths,
 };
@@ -184,6 +187,7 @@ pub use selection::NodeSelection;
 pub use shape_tool_common::{CreateOutcome, CreatePreview};
 pub use skew_entry::SkewEntry;
 pub use skew_math::{SkewFrame, skew_angle, skew_factor, skew_frame};
+pub use split::{SPLIT_COMMIT_LABEL, SplitPlan, SplitRefusal, plan_split};
 pub use style_edit::StyleEditor;
 pub use style_entry::{
     HexColour, MAX_STROKE_WIDTH_MM, MarkerSlot, StyleEntryError, StyleField, cap_from_name,

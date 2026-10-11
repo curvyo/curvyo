@@ -36,8 +36,8 @@ use curvyo_document_core::{
     AnchorId, AnchorKind, Color, Document, Length, NewAnchor, NodeId, PathSnapshot, Point,
     StyleEdit, Vec2, pack, unpack,
 };
-use curvyo_editor_wasm::{BreakApartOutcome, CombineOutcome, Session, Tool};
-use curvyo_ui_core::{BooleanAvailability, BreakApartRefusal, CombineRefusal};
+use curvyo_editor_wasm::{CombineOutcome, Session, SplitOutcome, Tool};
+use curvyo_ui_core::{BooleanAvailability, CombineRefusal, SplitRefusal};
 
 // ---------------------------------------------------------------------------------------------
 // Helpers
@@ -264,12 +264,12 @@ fn c1_availability_follows_the_selection_and_the_tool() {
     let mut s = session_of(&d);
     let a = s.path_availability();
     assert_eq!(a.combine, BooleanAvailability::NeedsTwo);
-    assert!(!a.break_apart, "nothing selected");
+    assert!(!a.compound, "nothing selected");
 
     marquee(&mut s, pt(-10.0, -10.0), pt(130.0, 30.0));
     let a = s.path_availability();
     assert_eq!(a.combine, BooleanAvailability::Ready);
-    assert!(!a.break_apart, "no compound path selected");
+    assert!(!a.compound, "no compound path selected");
 
     select_all(&mut s);
     let a = s.path_availability();
@@ -283,9 +283,9 @@ fn c1_availability_follows_the_selection_and_the_tool() {
     s.set_tool(Tool::Pen);
     let a = s.path_availability();
     assert_eq!(a.combine, BooleanAvailability::NeedsTwo);
-    assert!(!a.break_apart);
+    assert!(!a.compound);
     s.set_tool(Tool::Node);
-    assert!(!s.path_availability().break_apart);
+    assert!(!s.path_availability().compound);
 }
 
 #[test]
@@ -297,7 +297,7 @@ fn c1_break_apart_is_enabled_with_a_compound_path_in_the_selection() {
     select_all(&mut s);
     s.apply_combine();
     let a = s.path_availability();
-    assert!(a.break_apart, "a compound path is selected");
+    assert!(a.compound, "a compound path is selected");
     assert_eq!(
         a.combine,
         BooleanAvailability::NeedsTwo,
@@ -318,12 +318,9 @@ fn c1_a_dimmed_press_does_nothing_and_never_changes_the_tool() {
             matches!(c, CombineOutcome::Ignored | CombineOutcome::Refused(_)),
             "{tool:?}: {c:?}"
         );
-        let b = s.apply_break_apart();
+        let b = s.apply_split();
         assert!(
-            matches!(
-                b,
-                BreakApartOutcome::Ignored | BreakApartOutcome::Refused(_)
-            ),
+            matches!(b, SplitOutcome::Ignored | SplitOutcome::Refused(_)),
             "{tool:?}: {b:?}"
         );
         assert_eq!(json(&s), before);
@@ -470,7 +467,7 @@ fn c6_c7_style_place_selection_notice_data_and_one_commit() {
     assert_eq!(ids[1], mid, "the unrelated square keeps its place and id");
     assert_eq!(result.rotation.as_radians(), 0.0);
     assert_eq!(s.selected_object_count(), 1, "the result alone is selected");
-    assert_eq!(s.path_availability().break_apart, true);
+    assert_eq!(s.path_availability().compound, true);
     assert_eq!(result.subpaths().count(), 4);
 }
 
@@ -810,9 +807,9 @@ fn c13_ring_with_island_breaks_into_the_ring_and_the_disc() {
     let before = labels(&reread(&s));
     let compound = paths(&s)[0].clone();
     assert_eq!(compound.subpaths().count(), 3);
-    let out = s.apply_break_apart();
+    let out = s.apply_split();
     match out {
-        BreakApartOutcome::Applied {
+        SplitOutcome::Applied {
             compounds,
             pieces,
             with_holes,
@@ -823,7 +820,7 @@ fn c13_ring_with_island_breaks_into_the_ring_and_the_disc() {
         }
         other => panic!("{other:?}"),
     }
-    assert_eq!(new_labels(&before, &s), vec!["break_apart".to_string()]);
+    assert_eq!(new_labels(&before, &s), vec!["split".to_string()]);
     let ps = paths(&s);
     assert_eq!(ps.len(), 2);
     assert!(ps[0].is_compound(), "ring with a hole");
@@ -879,11 +876,11 @@ fn c13_two_separate_squares_become_two_closed_paths() {
     let mut s = session_of(&d);
     select_all(&mut s);
     s.apply_combine();
-    let out = s.apply_break_apart();
+    let out = s.apply_split();
     assert!(
         matches!(
             out,
-            BreakApartOutcome::Applied {
+            SplitOutcome::Applied {
                 compounds: 1,
                 pieces: 2,
                 with_holes: false,
@@ -914,9 +911,9 @@ fn c13_c16_a_one_region_compound_path_is_left_alone_and_the_press_is_refused() {
     let before = json(&s);
     let n = labels(&reread(&s)).len();
     let id = reread(&s).object_ids()[0];
-    let out = s.apply_break_apart();
+    let out = s.apply_split();
     match out {
-        BreakApartOutcome::Refused(BreakApartRefusal::OnePiece { compounds }) => {
+        SplitOutcome::Refused(SplitRefusal::OnePiece { compounds }) => {
             assert_eq!(compounds, 1);
         }
         other => panic!("{other:?}"),
@@ -940,8 +937,8 @@ fn c16_plural_one_piece_refusal_counts_the_selected_compound_paths() {
     s.apply_combine();
     select_all(&mut s);
     assert_eq!(s.selected_object_count(), 2);
-    match s.apply_break_apart() {
-        BreakApartOutcome::Refused(BreakApartRefusal::OnePiece { compounds }) => {
+    match s.apply_split() {
+        SplitOutcome::Refused(SplitRefusal::OnePiece { compounds }) => {
             assert_eq!(compounds, 2);
         }
         other => panic!("{other:?}"),
@@ -955,9 +952,9 @@ fn c16_break_apart_with_no_compound_path_is_refused_defensively() {
     let mut s = session_of(&d);
     select_all(&mut s);
     let before = json(&s);
-    match s.apply_break_apart() {
-        BreakApartOutcome::Refused(BreakApartRefusal::NoCompound) => {}
-        BreakApartOutcome::Ignored => {}
+    match s.apply_split() {
+        SplitOutcome::Refused(SplitRefusal::NoCompound) => {}
+        SplitOutcome::Ignored => {}
         other => panic!("{other:?}"),
     }
     assert_eq!(json(&s), before);
@@ -982,10 +979,10 @@ fn c15_c17_pieces_sit_at_the_compounds_place_and_untouched_objects_stay_selected
     let ids_before = reread(&s).object_ids();
     assert_eq!(ids_before.len(), 3);
     assert_eq!(ids_before[1], compound);
-    let out = s.apply_break_apart();
+    let out = s.apply_split();
     assert!(matches!(
         out,
-        BreakApartOutcome::Applied {
+        SplitOutcome::Applied {
             compounds: 1,
             pieces: 3,
             ..
@@ -1045,9 +1042,9 @@ fn c13_c15_mixed_selection_leaves_a_one_region_compound_untouched() {
     s.apply_combine();
     select_all(&mut s);
     assert_eq!(s.selected_object_count(), 2);
-    let out = s.apply_break_apart();
+    let out = s.apply_split();
     match out {
-        BreakApartOutcome::Applied {
+        SplitOutcome::Applied {
             compounds,
             pieces,
             left_alone,
@@ -1082,7 +1079,7 @@ fn c18_combine_then_break_apart_and_back_again() {
         })
         .collect();
     s.apply_combine();
-    s.apply_break_apart();
+    s.apply_split();
     let ps = paths(&s);
     assert_eq!(ps.len(), 2, "the plate with its hole, and the square");
     assert!(ps[0].is_compound() && ps[0].subpaths().count() == 2);
@@ -1129,8 +1126,8 @@ fn golden_file_combine_ring_island_opens_and_breaks_apart_into_two_objects() {
     let n = reread(&s).object_ids().len();
     assert_eq!(n, 1, "the saved result of Combine is one compound path");
     select_all(&mut s);
-    match s.apply_break_apart() {
-        BreakApartOutcome::Applied { pieces, .. } => assert_eq!(pieces, 2),
+    match s.apply_split() {
+        SplitOutcome::Applied { pieces, .. } => assert_eq!(pieces, 2),
         other => panic!("{other:?}"),
     }
     assert_eq!(reread(&s).object_ids().len(), 2);
@@ -1153,8 +1150,8 @@ fn c14_a_compound_path_remains_a_nonzero_even_after_break_apart_for_nested_depth
     assert!(!painted(p, 125.0, 100.0));
     assert!(painted(p, 115.0, 100.0));
     assert!(!painted(p, 100.0, 100.0));
-    match s.apply_break_apart() {
-        BreakApartOutcome::Applied { pieces, .. } => assert_eq!(pieces, 2, "two regions"),
+    match s.apply_split() {
+        SplitOutcome::Applied { pieces, .. } => assert_eq!(pieces, 2, "two regions"),
         other => panic!("{other:?}"),
     }
 }
@@ -1192,13 +1189,13 @@ fn c19_a_rectangle_with_1000_circles() {
     assert_eq!((n, holes), (1001, 1000));
     let p = &paths(&s)[0];
     assert_eq!(p.subpaths().count(), 1001);
-    let (out, t) = timed(|| s.apply_break_apart());
+    let (out, t) = timed(|| s.apply_split());
     eprintln!("(a) break apart {t:.3} s");
     assert!(t < 2.0, "{t}");
     assert!(
         matches!(
             out,
-            BreakApartOutcome::Refused(BreakApartRefusal::OnePiece { compounds: 1 })
+            SplitOutcome::Refused(SplitRefusal::OnePiece { compounds: 1 })
         ),
         "a plate with holes is one piece: {out:?}"
     );
@@ -1222,11 +1219,11 @@ fn c19_2000_disjoint_squares() {
     let (n, holes, _) = applied_combine(&out);
     assert_eq!((n, holes), (2000, 0));
     assert_eq!(paths(&s)[0].subpaths().count(), 2000);
-    let (out, t) = timed(|| s.apply_break_apart());
+    let (out, t) = timed(|| s.apply_split());
     eprintln!("(b) break apart {t:.3} s");
     assert!(t < 2.0, "{t}");
     assert!(
-        matches!(out, BreakApartOutcome::Applied { pieces: 2000, .. }),
+        matches!(out, SplitOutcome::Applied { pieces: 2000, .. }),
         "{out:?}"
     );
 }
@@ -1258,11 +1255,11 @@ fn c19_500_nested_squares_alternate_their_windings() {
         signs.windows(2).all(|w| w[0] != w[1]),
         "alternating windings"
     );
-    let (out, t) = timed(|| s.apply_break_apart());
+    let (out, t) = timed(|| s.apply_split());
     eprintln!("(c) break apart {t:.3} s");
     assert!(t < 2.0, "{t}");
     assert!(
-        matches!(out, BreakApartOutcome::Applied { pieces: 250, .. }),
+        matches!(out, SplitOutcome::Applied { pieces: 250, .. }),
         "{out:?}"
     );
 }
@@ -1283,11 +1280,11 @@ fn c19_a_compound_path_of_5000_tiny_squares_breaks_into_5000_paths() {
     eprintln!("(d) combine {t:.3} s");
     assert!(t < 2.0, "{t}");
     applied_combine(&out);
-    let (out, t) = timed(|| s.apply_break_apart());
+    let (out, t) = timed(|| s.apply_split());
     eprintln!("(d) break apart {t:.3} s");
     assert!(t < 2.0, "{t}");
     assert!(
-        matches!(out, BreakApartOutcome::Applied { pieces: 5000, .. }),
+        matches!(out, SplitOutcome::Applied { pieces: 5000, .. }),
         "{out:?}"
     );
     assert_eq!(reread(&s).object_ids().len(), 5000);
