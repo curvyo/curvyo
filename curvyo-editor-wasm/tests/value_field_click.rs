@@ -88,7 +88,7 @@ fn a_click_sets_the_value_at_the_pointer_as_one_step() {
             }
             assert_eq!(session.undo_len(), steps + 1, "{field:?} at {p}: one step");
             assert_eq!(
-                session.history_target_name(Direction::Undo),
+                session.history_target_name(Direction::Undo).as_deref(),
                 Some("Change style")
             );
             assert_eq!(key(&mut session, "z", false), KeyOutcome::Undo);

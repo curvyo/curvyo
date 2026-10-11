@@ -483,6 +483,9 @@ function HistoryHeader({
             value={scope}
             onChange={choose}
             itemWidth={66}
+            // 26 px items and the 1 px borders make the 28 px of the row: with 28 px items the group
+            // is 30 px high and the row (h-7) clips its top border and focus ring.
+            itemHeight={26}
             onReturnFocus={onReturnFocus}
           />
         ) : null}
