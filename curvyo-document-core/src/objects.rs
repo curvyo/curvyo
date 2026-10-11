@@ -313,9 +313,9 @@ impl Document {
         let doomed: Vec<TreeID> = tree_ids
             .iter()
             .copied()
-            .filter(|&id| !crate::groups::has_ancestor_in(&tree, id, &tree_ids))
+            .filter(|&id| !crate::group_tree::has_ancestor_in(&tree, id, &tree_ids))
             .collect();
-        let parents = crate::groups::parents_of(&tree, &doomed);
+        let parents = crate::group_tree::parents_of(&tree, &doomed);
         for tree_id in doomed {
             // invariant: every id here was just confirmed present above.
             #[allow(clippy::unwrap_used)]
@@ -334,7 +334,7 @@ fn check_anchor_ids(
     id: TreeID,
     anchor_ids: &[AnchorId],
 ) -> Result<(), ObjectEditError> {
-    let expected = crate::groups::anchors_under(tree, id);
+    let expected = crate::group_tree::anchors_under(tree, id);
     let distinct = anchor_ids.iter().collect::<HashSet<_>>().len();
     if anchor_ids.len() == expected && distinct == expected {
         Ok(())
@@ -364,7 +364,7 @@ fn copy_subtree(
     #[allow(clippy::unwrap_used)]
     let source_meta = tree.get_meta(source).unwrap();
     copy_map(&source_meta, &meta);
-    if crate::groups::meta_is_group(&source_meta) {
+    if crate::group_tree::meta_is_group(&source_meta) {
         for child in tree.children(source).unwrap_or_default() {
             copy_subtree(
                 tree,

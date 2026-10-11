@@ -28,22 +28,22 @@ Milestones are commits on the branch; none is a PR. `format_version` goes from 1
 
 ## Affected crates/modules
 
-- `curvyo-document-core`: new `groups.rs` (tree reads, group, ungroup, depth, emptied groups);
+- `curvyo-document-core`: new `group_tree.rs` (reads of the group structure, open-file validation) and `groups.rs` (Group, Ungroup, emptied groups, the parent of new objects);
   `objects.rs` (deep duplicate and delete), `replace.rs`, `path_topology.rs` (empty-group cleanup),
   `paths.rs`/`shapes.rs` (creation parent), `path_codec.rs` (validation), `document.rs` (format 11,
   `document.json`), `history/` (`restore_plan.rs`, `restore.rs`, `revive.rs`, `checkout.rs`,
   `report.rs`: `ObjectShape::Group`). Golden fixtures in `tests/fixtures/`.
-- `curvyo-ui-core`: new `context.rs` (the unit map and context stack), `grouping.rs`
+- `curvyo-ui-core`: new `units.rs` (which leaves form one object of the context), `grouping.rs`
   (availability and refusals of Group, Ungroup and the other commands), changes in `select_tool*`
   (units for click, toggle, marquee, lasso, cycle), `object_selection.rs`, `style_panel.rs` (subject
   line), `history_names.rs`, Escape cascade.
 - `curvyo-render-core`: dimming of the artwork outside the context, unit boxes (one box per selected
   unit, hover box of a unit), context readout data.
-- `curvyo-editor-wasm`: `session/grouping.rs` (Group, Ungroup, context, enter, leave, notices),
+- `curvyo-editor-wasm`: `session/context.rs` (the entered group: enter, leave, what the tools see and draw), `session/grouping.rs` (Group and Ungroup, notices), `session/key_table.rs` (the pure key table, split out of `keys.rs`),
   `session/mod.rs`, `select*.rs`, `keys.rs` (Ctrl+G, Ctrl+Shift+G, Enter, the Escape step),
   `wasm_group.rs`.
 - `frontend`: the rail (Boolean card moves to column B, Group card in column A), Group and Ungroup
-  glyphs, tooltips, the "Open groups" indicator in the canvas notice slot, notices, the hint chip,
+  glyphs, tooltips, the "Open groups" indicator in the canvas notice slot, notices,
   key handling.
 - Docs: `specs/README.md` (format plan, status), `specs/0023-groups/specification.md` (status line),
   `docs/design-system.md` only where the build differs.
@@ -70,7 +70,7 @@ Milestones are commits on the branch; none is a PR. `format_version` goes from 1
 
 ### Milestone 3: selection, context, tools in `ui-core` (AC 8 to 12, 15 to 22, 28 to 30)
 
-- [x] 3.1 `context.rs`: unit map, context stack, fallback (AC 8, 15, 20)
+- [x] 3.1 `units.rs`: unit map; `session/context.rs`: context stack, fallback (AC 8, 15, 20)
 - [x] 3.2 Click, Shift-click, hover, marquee, lasso, Alt-click cycle by unit (AC 8, 9, 10)
 - [x] 3.3 Group and Ungroup availability and commands; refusals of Boolean, Combine, Split, Break apart,
   Object to path for groups (AC 2, 28, 29)
@@ -90,7 +90,7 @@ Milestones are commits on the branch; none is a PR. `format_version` goes from 1
 ### Milestone 6: frontend (AC 2, 6, 7, 15 to 18)
 
 - [x] 6.1 Rail: Boolean card to column B, Group card in column A, glyphs, tooltips
-- [x] 6.2 Notices, the "Open groups" indicator, hint chip, keys, announcements; frontend tests
+- [x] 6.2 Notices, the "Open groups" indicator, keys, announcements (the hint chip is not built); frontend tests
 
 ### Milestone 7: gate and docs
 

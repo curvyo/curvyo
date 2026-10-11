@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 
 use loro::{LoroDoc, TreeID};
 
-use super::checkout::Detached;
+use super::checkout::{Detached, NodeAt};
 use super::error::HistoryError;
 use super::merge::{Tally, restore_map};
 use super::report::{
@@ -141,11 +141,17 @@ impl Document {
         let tree = doc.get_tree(OBJECTS_TREE);
         tree.enable_fractional_index(0);
         let mut results: Vec<Option<ObjectResult>> = vec![None; plan.items.len()];
-        for (at, planned) in plan.items.iter().enumerate() {
-            if let Action::Move(id, parent) = &planned.action {
-                let order: &[TreeID] = to.siblings.get(parent).map_or(&[], Vec::as_slice);
-                results[at] = Some(move_node(&tree, *id, *parent, order));
-            }
+        let moves: Vec<(usize, TreeID, Option<TreeID>)> = plan
+            .items
+            .iter()
+            .enumerate()
+            .filter_map(|(at, planned)| match planned.action {
+                Action::Move(id, parent) => Some((at, id, parent)),
+                _ => None,
+            })
+            .collect();
+        for (at, result) in move_nodes(&tree, &moves, to) {
+            results[at] = Some(result);
         }
         let mut deletes: Vec<usize> = (0..plan.items.len())
             .filter(|&at| matches!(plan.items[at].action, Action::Delete(_)))
@@ -218,23 +224,82 @@ fn depth_of(tree: &loro::LoroTree, id: TreeID) -> usize {
     depth
 }
 
-/// Moves the live node `id` under `parent` (`None` is the document root), after the live
-/// children of `parent` that come before it in `order`, the children the version being restored
-/// had (it lists `id` itself).
-fn move_node(
+/// Puts the live nodes of `moves` (item index, node, target parent; `None` is the document root)
+/// where the restored version `to` had them, one pass per parent. A node goes right after the
+/// nearest node before it in that version's order that lives under the parent now (or was placed
+/// a moment ago); with none before it, right before the nearest one after it; with no living
+/// sibling at all, first. Siblings the version does not list never decide the place, so a peer's
+/// objects that lie below the restored one stay below it.
+fn move_nodes(
     tree: &loro::LoroTree,
-    id: TreeID,
-    parent: Option<TreeID>,
-    order: &[TreeID],
-) -> ObjectResult {
-    let parent_id = parent.map_or(loro::TreeParentId::Root, loro::TreeParentId::Node);
-    let live: Vec<TreeID> = tree.children(parent_id).unwrap_or_default();
-    let position = order
-        .iter()
-        .take_while(|&&sibling| sibling != id)
-        .filter(|&&sibling| sibling != id && live.contains(&sibling))
-        .count();
-    if tree.mov_to(id, parent_id, position).is_ok() {
+    moves: &[(usize, TreeID, Option<TreeID>)],
+    to: &Snapshot,
+) -> Vec<(usize, ObjectResult)> {
+    let mut done = Vec::with_capacity(moves.len());
+    let mut parents: Vec<Option<TreeID>> = Vec::new();
+    for &(_, _, parent) in moves {
+        if !parents.contains(&parent) {
+            parents.push(parent);
+        }
+    }
+    for parent in parents {
+        let parent_id = parent.map_or(loro::TreeParentId::Root, loro::TreeParentId::Node);
+        let wanted: std::collections::HashMap<TreeID, usize> = moves
+            .iter()
+            .filter(|&&(_, _, p)| p == parent)
+            .map(|&(at, id, _)| (id, at))
+            .collect();
+        let live: std::collections::HashSet<TreeID> = tree
+            .children(parent_id)
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|child| !wanted.contains_key(child))
+            .collect();
+        let order: &[TreeID] = to.siblings.get(&parent).map_or(&[], Vec::as_slice);
+        // The nearest later sibling that lives under the parent now, for each position.
+        let mut above: Vec<Option<TreeID>> = vec![None; order.len()];
+        let mut next = None;
+        for (position, sibling) in order.iter().enumerate().rev() {
+            above[position] = next;
+            if live.contains(sibling) {
+                next = Some(*sibling);
+            }
+        }
+        let mut below: Option<TreeID> = None;
+        let mut placed: std::collections::HashSet<TreeID> = std::collections::HashSet::new();
+        for (position, sibling) in order.iter().enumerate() {
+            if let Some(&at) = wanted.get(sibling) {
+                done.push((
+                    at,
+                    placed_result(&match (below, above[position]) {
+                        (Some(after), _) => tree.mov_after(*sibling, after),
+                        (None, Some(before)) => tree.mov_before(*sibling, before),
+                        (None, None) => tree.mov_to(*sibling, parent_id, 0),
+                    }),
+                ));
+                placed.insert(*sibling);
+                below = Some(*sibling);
+            } else if live.contains(sibling) {
+                below = Some(*sibling);
+            }
+        }
+        // A node the version does not list (it cannot happen for a step's own nodes) goes last.
+        for (&id, &at) in &wanted {
+            if !placed.contains(&id) {
+                let end = tree.children_num(parent_id).unwrap_or(0);
+                done.push((
+                    at,
+                    placed_result(&tree.mov_to(id, parent_id, end.saturating_sub(1))),
+                ));
+            }
+        }
+    }
+    done
+}
+
+/// The report of one move.
+fn placed_result(moved: &loro::LoroResult<()>) -> ObjectResult {
+    if moved.is_ok() {
         ObjectResult::Restored
     } else {
         ObjectResult::Skipped(SkipReason::ChangedLater)
@@ -279,7 +344,7 @@ pub(crate) fn kind_of(doc: &LoroDoc, id: TreeID) -> ObjectShape {
     let Ok(meta) = doc.get_tree(OBJECTS_TREE).get_meta(id) else {
         return ObjectShape::Path;
     };
-    if crate::groups::meta_is_group(&meta) {
+    if crate::group_tree::meta_is_group(&meta) {
         return ObjectShape::Group;
     }
     match crate::shape_codec::read_shape_tag(&meta).as_deref() {
@@ -299,24 +364,6 @@ fn result_of(tally: Tally) -> ObjectResult {
     }
 }
 
-/// The children, at the version `guard` is checked out to, of every parent that a created,
-/// deleted or moved object has at that version.
-fn sibling_lists(guard: &Detached<'_>, touched: &Touched) -> BTreeMap<Option<TreeID>, Vec<TreeID>> {
-    let mut lists = BTreeMap::new();
-    for &id in touched
-        .created
-        .iter()
-        .chain(&touched.deleted)
-        .chain(&touched.moved)
-    {
-        let parent = guard.node(id).parent;
-        lists
-            .entry(parent)
-            .or_insert_with(|| guard.children(parent));
-    }
-    lists
-}
-
 /// Reads the touched objects before and after the step, through one guarded checkout pair.
 fn read_versions(
     doc: &LoroDoc,
@@ -324,15 +371,32 @@ fn read_versions(
     touched: &Touched,
 ) -> Result<(Snapshot, Snapshot), HistoryError> {
     let ids: Vec<TreeID> = touched.nodes().collect();
-    let read = |guard: &Detached<'_>| Snapshot {
-        nodes: ids.iter().map(|&id| (id, guard.node(id))).collect(),
-        root: if touched.root {
+    let read = |guard: &Detached<'_>| {
+        let nodes: BTreeMap<TreeID, NodeAt> = ids.iter().map(|&id| (id, guard.node(id))).collect();
+        // The children of the parents of created, deleted and moved objects, in z-order: where a
+        // returning object finds its neighbours. Each node is read once, for both.
+        let mut siblings = BTreeMap::new();
+        for id in touched
+            .created
+            .iter()
+            .chain(&touched.deleted)
+            .chain(&touched.moved)
+        {
+            let parent = nodes.get(id).and_then(|node| node.parent);
+            siblings
+                .entry(parent)
+                .or_insert_with(|| guard.children(parent));
+        }
+        let root = if touched.root {
             guard.root()
         } else {
             BTreeMap::new()
-        },
-        // The z-order is only read to place objects that come back.
-        siblings: sibling_lists(guard, touched),
+        };
+        Snapshot {
+            nodes,
+            root,
+            siblings,
+        }
     };
     let guard = Detached::at(doc, &log.before)?;
     let before = read(&guard);

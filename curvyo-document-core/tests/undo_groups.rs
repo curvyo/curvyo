@@ -314,3 +314,23 @@ fn a_member_a_peer_moved_into_another_group_stays_there_when_the_first_group_is_
     );
     assert_eq!(a.children(Some(second)), vec![y, z, w]);
 }
+
+/// A member goes back above the objects of a group a peer took apart below it, not below them
+/// (the place is decided by a neighbour that lives now, not by a count of earlier siblings).
+#[test]
+fn a_member_goes_back_above_the_children_of_a_group_a_peer_took_apart_below_it() {
+    let a = Document::new(1);
+    let (p1, p2) = (rect(&a, 0.0), rect(&a, 20.0));
+    let peers_group = a.group_objects(&[p1, p2]).unwrap();
+    let (x, y, z) = (rect(&a, 40.0), rect(&a, 60.0), rect(&a, 80.0));
+    a.group_objects(&[x, z]).unwrap();
+    let step = last_step(&a);
+    let b = replica(&a, 2);
+    b.ungroup(&[peers_group]).unwrap();
+    sync(&a, &b);
+
+    a.undo_step(step).unwrap();
+    assert_eq!(a.children(None), vec![p1, p2, x, y, z]);
+    sync(&a, &b);
+    assert_eq!(json(&a), json(&b));
+}

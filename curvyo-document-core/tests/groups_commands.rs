@@ -250,11 +250,11 @@ fn break_apart_pieces_take_the_place_of_the_compound_inside_its_group() {
 
 /// A command that deletes tree nodes must also remove the groups it emptied
 /// (`adrs.md`, "empty groups are removed in the same commit"): every source file outside the
-/// history engine that calls `tree.delete(` also calls `remove_emptied_groups`. A new command that
-/// deletes a node in a new file fails here until it does.
+/// history engine calls `remove_emptied_groups` at least as often as it calls `tree.delete(`. A new
+/// command that deletes a node fails here until it does (counted per call, not per file).
 #[test]
 fn every_command_that_deletes_a_node_removes_emptied_groups() {
-    fn scan(dir: &Path, found: &mut Vec<(String, bool)>) {
+    fn scan(dir: &Path, found: &mut Vec<(String, usize, usize)>) {
         for entry in std::fs::read_dir(dir).unwrap().flatten() {
             let path = entry.path();
             if path.is_dir() {
@@ -263,15 +263,17 @@ fn every_command_that_deletes_a_node_removes_emptied_groups() {
                 }
                 continue;
             }
-            if path.extension().is_none_or(|e| e != "rs") {
+            if path.extension().is_none_or(|e| e != "rs") || path.ends_with("groups.rs") {
                 continue;
             }
             let text = std::fs::read_to_string(&path).unwrap();
             let code = text.split("#[cfg(test)]").next().unwrap_or_default();
-            if code.contains("tree.delete(") && !path.ends_with("groups.rs") {
+            let deletes = code.matches("tree.delete(").count();
+            if deletes > 0 {
                 found.push((
                     path.file_name().unwrap().to_string_lossy().into_owned(),
-                    code.contains("remove_emptied_groups("),
+                    deletes,
+                    code.matches("remove_emptied_groups(").count(),
                 ));
             }
         }
@@ -282,10 +284,10 @@ fn every_command_that_deletes_a_node_removes_emptied_groups() {
         &mut found,
     );
     assert!(found.len() >= 5, "the scan found the commands: {found:?}");
-    for (file, removes) in found {
+    for (file, deletes, removals) in found {
         assert!(
-            removes,
-            "{file} deletes a node but does not remove emptied groups"
+            removals >= deletes,
+            "{file} deletes a node {deletes} times but removes emptied groups {removals} times"
         );
     }
 }

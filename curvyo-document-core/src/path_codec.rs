@@ -71,7 +71,7 @@ pub(crate) fn node_exists(tree: &LoroTree, id: loro::TreeID) -> bool {
 /// Whether `id` is a live leaf object (a path or a primitive): a live node that is not a group.
 /// The kind-specific commands use it, so a group id is "no such object" to them.
 pub(crate) fn leaf_exists(tree: &LoroTree, id: loro::TreeID) -> bool {
-    node_exists(tree, id) && !crate::groups::is_group_node(tree, id)
+    node_exists(tree, id) && !crate::group_tree::is_group_node(tree, id)
 }
 
 /// Writes a brand-new path's `closed` flag and its whole style. Takes the
@@ -436,7 +436,7 @@ pub(crate) fn read_path_snapshot(id: NodeId, meta: &LoroMap) -> PathSnapshot {
 /// to defaults, matching slice 1's forward-compatible reading stance.
 pub(crate) fn validate_path_tree(loro: &LoroDoc, paths_tree_key: &str) -> bool {
     let tree = loro.get_tree(paths_tree_key);
-    crate::groups::validate_tree(&tree, validate_object_node)
+    crate::group_tree::validate_tree(&tree, validate_object_node)
 }
 
 /// Dispatches one leaf object to path validation when its

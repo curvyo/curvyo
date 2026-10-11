@@ -1384,3 +1384,11 @@ closed (`free_history_cache`) is possible but would put the cold cost back on th
 `0020-undo-redo` restores the selected objects and the Node tool's selected nodes by anchor id
 (`UndoStack`, `SelectionSnapshot`). A selected segment (two adjacent anchors) is not restored: after
 Ctrl+Z the segment is deselected. Minor; the snapshot would need the segment's end anchors.
+
+## `compound_path_interactivity` has little headroom
+
+The release test `curvyo-editor-wasm/tests/compound_path_interactivity.rs` budgets 100 ms for the
+commit of a move of a big compound path. Measured back to back on 2026-10-11 on the same machine:
+`origin/main` 79 to 98 ms, `story/groups` 74 to 86 ms. The headroom of 2 to 21 % is old, not from
+`0023`, and the test can fail on a busy machine (one run beside other jobs took 256 ms). If it
+flakes in CI, find what the move commit of a 5,000-anchor object spends before raising the budget.

@@ -123,10 +123,14 @@ impl Units {
     /// makes, widened to whole groups, in paint order of the first group member.
     #[must_use]
     pub fn widen(&self, leaves: &[NodeId]) -> Vec<NodeId> {
+        if self.is_flat() {
+            return leaves.to_vec();
+        }
+        let mut seen = HashSet::with_capacity(leaves.len());
         let mut widened = Vec::with_capacity(leaves.len());
         for &leaf in leaves {
             for &member in self.leaves_with(&leaf) {
-                if !widened.contains(&member) {
+                if seen.insert(member) {
                     widened.push(member);
                 }
             }

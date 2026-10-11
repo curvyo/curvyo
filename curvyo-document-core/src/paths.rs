@@ -127,7 +127,7 @@ impl Document {
     #[must_use]
     pub fn object_ids(&self) -> Vec<NodeId> {
         let tree = self.loro().get_tree(OBJECTS_TREE);
-        crate::groups::leaves_under(&tree, None)
+        crate::group_tree::leaves_under(&tree, None)
             .into_iter()
             .map(|id| NodeId::from_parts(id.peer, id.counter))
             .collect()
@@ -462,7 +462,7 @@ impl Document {
         if remaining < 2 {
             let tree = self.loro().get_tree(OBJECTS_TREE);
             let tree_id = tree_id_of(path);
-            let parents = crate::groups::parents_of(&tree, &[tree_id]);
+            let parents = crate::group_tree::parents_of(&tree, &[tree_id]);
             // invariant: `path_parts` above already confirmed this node
             // exists.
             #[allow(clippy::unwrap_used)]

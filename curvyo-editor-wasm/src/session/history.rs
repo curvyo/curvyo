@@ -98,6 +98,9 @@ impl Session {
         self.document.set_step_time((self.history.clock)());
         let result = body(self);
         self.record_new_steps(&before);
+        // An entered group the step removed is left now, and a screen reader is told (`0023`
+        // criterion 20).
+        self.sync_context();
         result
     }
 
@@ -366,13 +369,13 @@ pub(super) fn history_direction(
 pub(super) fn history_action(
     direction: Direction,
     input: &super::keys::KeyInput<'_>,
-    state: super::keys::KeyState,
-) -> super::keys::KeyAction {
+    state: super::key_table::KeyState,
+) -> super::key_table::KeyAction {
     if input.dom_blocked || state.operation_in_flight || state.entry_open {
-        return super::keys::KeyAction::Ignore;
+        return super::key_table::KeyAction::Ignore;
     }
     if state.pen_open {
-        return super::keys::KeyAction::Hint(super::keys::KeyHint::FinishPenFirst);
+        return super::key_table::KeyAction::Hint(super::keys::KeyHint::FinishPenFirst);
     }
-    super::keys::KeyAction::History(direction)
+    super::key_table::KeyAction::History(direction)
 }

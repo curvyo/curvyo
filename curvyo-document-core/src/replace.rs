@@ -88,7 +88,7 @@ impl Document {
 
         tree.enable_fractional_index(0);
         let new_tree_id = create_path_after(&tree, tree_id_of(base), &style, outlines);
-        let parents = crate::groups::parents_of(&tree, &doomed);
+        let parents = crate::group_tree::parents_of(&tree, &doomed);
         for tree_id in doomed {
             // invariant: every id here was just confirmed present above.
             #[allow(clippy::unwrap_used)]
@@ -165,7 +165,7 @@ impl Document {
                 after = piece;
             }
         }
-        let parents = crate::groups::parents_of(&tree, &doomed);
+        let parents = crate::group_tree::parents_of(&tree, &doomed);
         for tree_id in doomed {
             // invariant: every id here was just confirmed present above.
             #[allow(clippy::unwrap_used)]
@@ -216,7 +216,7 @@ fn check_new_anchor_ids(
     doomed: &[loro::TreeID],
     seen: &HashSet<AnchorId>,
 ) -> Result<(), ObjectEditError> {
-    for leaf in crate::groups::leaves_under(tree, None) {
+    for leaf in crate::group_tree::leaves_under(tree, None) {
         if doomed.contains(&leaf) {
             continue;
         }

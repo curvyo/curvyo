@@ -129,6 +129,13 @@ first). No new crate, no new dependency, no trait, no generic.
     revived under its old parent in the same change (parents first), and a node that still has
     children is never deleted by the undo of a created group. `ObjectShape::Group` is new.
     "0023 adds no history code" above no longer holds.
+  - **Empty groups** from a file or a peer are removed by the next local command that touches
+    their parent (delete, replace, Group, Ungroup): `remove_emptied_groups` first removes every
+    empty group among the children of each touched parent, then walks upwards. There is no repair
+    commit on open.
+  - **Concurrency (ADR 0009 follow-up):** a member that one peer deletes while another groups it
+    comes back inside the group after the sync (the tree move beats the delete); the replicas
+    converge. Two peers that group the same object get Loro's move resolution as written above.
   - Group refusals (criterion 28) are `Groups { offenders }` variants of `BooleanRefusal`,
     `CombineRefusal` and `BreakApartRefusal`, raised by the session before planning.
   - Open items: the double-click hint chip ("Double-click to open") and the glyph sheet are not

@@ -63,7 +63,15 @@ impl Session {
         let key = (self.document.version(), self.context_group());
         let mut cache = self.pen_cue.ends.borrow_mut();
         if cache.as_ref().is_none_or(|(held, _)| *held != key) {
-            *cache = Some((key, EndNodeIndex::from_paths(&self.paths())));
+            // Only open paths that are direct children of the context are targets, so a path
+            // inside a group is none at the root (criterion 30).
+            let units = self.units();
+            let paths: Vec<_> = self
+                .paths()
+                .into_iter()
+                .filter(|path| units.group_of(path.id).is_none())
+                .collect();
+            *cache = Some((key, EndNodeIndex::from_paths(&paths)));
         }
         // invariant: the cache was filled just above.
         #[allow(clippy::unwrap_used)]

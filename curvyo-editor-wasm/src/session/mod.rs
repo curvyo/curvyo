@@ -28,6 +28,7 @@ mod box_refit_tests;
 mod close_path;
 mod colour_pick;
 mod combine;
+mod context;
 mod conversion_view;
 mod corner_readout;
 mod document;
@@ -41,6 +42,7 @@ mod grouping;
 mod grouping_tests;
 mod history;
 mod history_rows;
+mod key_table;
 mod keys;
 mod move_entry;
 mod move_indicators;
@@ -233,7 +235,7 @@ pub struct Session {
     context: Vec<NodeId>,
     /// The objects and units of the context, kept for as long as the document read they were made
     /// from (`grouping.rs`).
-    context_cache: grouping::ContextCache,
+    context_cache: context::ContextCache,
     /// What the last Group or Ungroup said, until the host has taken it (`grouping.rs`).
     grouping_result: Option<grouping::GroupingResult>,
     /// What a screen reader hears about the context, until the host has taken it.
@@ -285,7 +287,7 @@ impl Session {
             history: history::HistoryState::new(),
             nudge_run: None,
             context: Vec::new(),
-            context_cache: grouping::ContextCache::default(),
+            context_cache: context::ContextCache::default(),
             grouping_result: None,
             context_announcement: None,
         }
@@ -332,7 +334,7 @@ impl Session {
             history: history::HistoryState::new(),
             nudge_run: None,
             context: Vec::new(),
-            context_cache: grouping::ContextCache::default(),
+            context_cache: context::ContextCache::default(),
             grouping_result: None,
             context_announcement: None,
         })

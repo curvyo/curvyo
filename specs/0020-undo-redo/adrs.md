@@ -154,10 +154,10 @@ the trash node and carry a `format_version` bump with a migration test.
 
 ## Notes added in the milestone 1 review (2026-10-10)
 
-- **Z-order and parent moves are not restored.** `Touched::moved` is read and checked out, but the
-  restore reports a moved object as skipped. No gesture moves an existing node today, and the audit's
-  JSON equality would catch one. A command that reorders objects or groups them (`0023`) must add the
-  restore of the fractional index and the parent to `history/restore_plan.rs`.
+- **Z-order and parent moves are restored (since `0023-groups`, 2026-10-11).**
+  `restore_plan.rs` plans `Action::Move` when the object is still under the parent the step left it
+  under and the target parent lives now or comes back in the same restore; otherwise the move is
+  skipped and reported.
 - **Redo of a create revives when the last move of the node is this peer's.** If a peer deletes
   concurrently and this peer's undo-delete wins in Lamport order, the redo brings the object back.
   ADR 0009 §1 holds for deletes this replica has seen.

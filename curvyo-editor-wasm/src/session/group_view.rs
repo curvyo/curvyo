@@ -4,7 +4,7 @@
 //! the handle under the pointer. The single object's counterparts are in
 //! `select_view.rs` and `select_cursor.rs`; this is a child module of `session`.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use curvyo_document_core::{NodeId, ObjectSnapshot, Point};
 use curvyo_render_core::{
@@ -94,20 +94,23 @@ impl Session {
         {
             Vec::new()
         } else {
+            // One pass over the objects: each selected leaf adds its box to its unit.
             let selected: HashSet<NodeId> = self.selection.ids().iter().copied().collect();
-            let mut boxes = Vec::with_capacity(selected_units.len());
-            for unit in &selected_units {
-                let corners: Vec<[Point; 4]> = objects
-                    .iter()
-                    .filter(|object| {
-                        selected.contains(&object.id()) && unit.leaves.contains(&object.id())
-                    })
-                    .map(|object| oriented_bounds(object).document_corners())
-                    .collect();
-                if let Some(shown) = merged_corners(&corners) {
-                    boxes.push(shown);
+            let unit_of: HashMap<NodeId, usize> = selected_units
+                .iter()
+                .enumerate()
+                .flat_map(|(at, unit)| unit.leaves.iter().map(move |&leaf| (leaf, at)))
+                .collect();
+            let mut per_unit: Vec<Vec<[Point; 4]>> = vec![Vec::new(); selected_units.len()];
+            for object in objects.iter().filter(|o| selected.contains(&o.id())) {
+                if let Some(&at) = unit_of.get(&object.id()) {
+                    per_unit[at].push(oriented_bounds(object).document_corners());
                 }
             }
+            let boxes: Vec<[Point; 4]> = per_unit
+                .iter()
+                .filter_map(|corners| merged_corners(corners))
+                .collect();
             boxes
         };
         Some(GroupDecorationInput {
