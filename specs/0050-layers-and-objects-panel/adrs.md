@@ -1,8 +1,9 @@
 # ADRs for Layers and objects panel
 
-Architect review, 2026-10-10. This replaces the product owner's draft. The spec needs **one new
-ADR, [0015](../../docs/adr/0015-node-references-and-ancestor-resolved-state.md)**, which is
-`needs-customer` and shared with `0049`. It is not an in-place amendment of ADR 0002 §5, for
+Architect review, 2026-10-10, revised 2026-10-11 after the customer's decisions (ADR 0015
+accepted, output of hidden nodes left open, clone chains in `0049`). The spec needs **one new
+ADR, [0015](../../docs/adr/0015-node-references-and-ancestor-resolved-state.md)**, shared with
+`0049` and accepted by the customer on 2026-10-11. It is not an in-place amendment of ADR 0002 §5, for
 the reason given in 0015's preamble: 0002 is accepted, so changing it takes a new ADR. Layers
 need no other ADR: a layer is the group node of `0023` with one more register. No new crate, no
 new dependency, no trait, no generic.
@@ -10,7 +11,7 @@ new dependency, no trait, no generic.
 ## Depends on
 
 - [ADR 0015](../../docs/adr/0015-node-references-and-ancestor-resolved-state.md) §2, §4, §6
-  (Proposed): the node registers `name`, `visible`, `locked` and `opacity`, the effective values
+  (Accepted): the node registers `name`, `visible`, `locked` and `opacity`, the effective values
   resolved through the ancestors, tolerance of merge residue, and the single read pass.
 - [ADR 0002](../../docs/adr/0002-document-model-units-and-svg-round-trip.md):
   - §5: sibling order is z-order, and reparenting is a tree move that keeps the `NodeId`.
@@ -52,8 +53,9 @@ new dependency, no trait, no generic.
    - its kind (layer, group or leaf with its `ObjectSnapshot`);
    - its own registers;
    - its effective visible, effective locked and effective opacity (for a `0049` clone: the
-     origin's `opacity` register times the clone's own ancestors', ADR 0015 §3 and criterion 28;
-     the origin is read in the same pass, so this costs nothing extra);
+     **root** original's `opacity` register times the clone's own ancestors', ADR 0015 §3 and
+     criterion 28; the ancestors of the root and of middle clones do not count; the root is read
+     in the same pass, so this costs nothing extra);
    - the nearest ancestor that hides or locks it, which the inherited-state description of
      criterion 22 needs.
 
@@ -74,11 +76,14 @@ new dependency, no trait, no generic.
    version (a local commit, an import or an undo), the session drops from the selection every node
    that is effectively hidden or locked. It does this in the same pass that applies `0023`'s
    context fallback, before the frame is drawn. The cost is O(selection) set lookups in the read.
-6. **2026-10-10: no `output_objects()` in this slice (criterion 24 as fixed).** No exporter and no job generator exists
-   yet. A core function whose only callers are tests is the speculative API that `CLAUDE.md` §5
-   rules out. The decision "hidden is not output, locked is" is recorded in ADR 0015 §2 and here.
-   `0024` and `0029` build their output from the read's effective flags (clones resolved,
-   `0049`) and carry the end-to-end test. Criterion 24 is tested through that read.
+6. **2026-10-10, changed 2026-10-11: no output rule and no `output_objects()` (criteria 24,
+   54).** The customer left open what a hidden or locked node means for output (ADR 0015 §2), so
+   this slice writes no rule about it. No exporter or job generator exists; a core function whose
+   only callers are tests is the speculative API that `CLAUDE.md` §5 rules out. The read carries
+   every leaf with its effective flags, and the first exporter or job generator (`0024`, `0029`)
+   decides with the customer how to use them. The test of criterion 54 names the two writers
+   that exist (`export_loro_snapshot`, `export_json`) and checks that they carry hidden and
+   locked nodes with their registers.
 7. **2026-10-10: panel rows are a pure window over a cached flattening (criteria 48 to 52).**
    - `layer_rows(read, collapsed, selection)` in `curvyo-ui-core` flattens the visible rows once
      per document version and collapse change, and the session caches the result.
@@ -104,7 +109,10 @@ new dependency, no trait, no generic.
      tree `mov` / `mov_after` / `mov_before`, which keeps ids, registers and clone links
      (criterion 31). It checks the same rules again before the first write.
    - **Delete layer** (label `delete_layer`) does three things in one commit:
-     - It calls `0049`'s `unlink_clones_of_removed` for the layer's subtree, once `0049` exists.
+     - It calls `0049`'s `repair_clones_of_removed` for the layer's subtree, once `0049` exists:
+       clones outside the layer that follow something in it are unlinked, or re-pointed to the
+       next original that stays when a middle clone of a chain goes with the layer (criterion
+       36).
      - It deletes the layer node itself in **one** tree delete. Loro keeps the subtree under the
        deleted node, so the injected move of ADR 0014 §11 revives the layer with every
        descendant and every id (criterion 45).
@@ -131,7 +139,7 @@ new dependency, no trait, no generic.
     - `0023` did not fix this form, so the first of `0023` and `0050` to merge writes it. `0023`
       leaves out the registers.
 12. **2026-10-10: duplicate.** `copy_map` copies every key, so a copy keeps its name and flags
-    (the product owner's default: the same name). Copied clones are relinked by `0049` decision 8.
+    (the product owner's default: the same name). Copied clones are relinked by `0049` decision 8, chains included.
 13. **2026-10-10: concurrency.**
     - Each register is last writer wins.
     - If one peer hides a layer while another moves an object into it, the object is hidden.
@@ -174,10 +182,9 @@ spec merges second adds the operation names of criterion 44 to `0020`'s table.
 
 ## Flagged for the product owner (defaults taken, no customer question)
 
-Resolved in the spec fixes of 2026-10-10: criteria 24, 26, 27, 28 and 36. Two points remain:
+Resolved in the spec fixes of 2026-10-10 and 2026-10-11: criteria 24, 26, 27, 28, 36 and 46. One
+point remains:
 
-1. **Criterion 46, wording.** The earlier build refuses every file saved by this build, not only
-   files that use the new registers.
-2. **Criterion 47 and `0023` criterion 27.** "Deeper than 32 is damaged" stays for now. Under
+1. **Criterion 47 and `0023` criterion 27.** "Deeper than 32 is damaged" stays for now. Under
    sharing, two legal moves can merge into 33 levels. The sharing story relaxes the reader, which
    needs no change to any file.
