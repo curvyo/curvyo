@@ -8,8 +8,11 @@
 //! are intersected exactly: a crossing is one point, chords closer than the touch distance meet
 //! at their closest points, and collinear chords give the two ends of their shared stretch.
 //! Overlap ends that chain along both curves merge into one stretch whose two ends are the cut
-//! points. Only `+ - * /` and `sqrt` are used, so the result is bit-identical on every target
-//! (`0036` criterion 11).
+//! points, if the curves coincide along it. Curves that only come near each other (tangent
+//! circles) touch instead: the meetings of one contact, crossings of a lens thinner than 0.01 mm
+//! included, are one cut in the middle. Only `+ - * /` and `sqrt` are used, so the same input gives bit-identical cuts on every
+//! target (`0036` criterion 11; primitive outlines come from `sin` and `cos` of the platform, so the
+//! input itself can differ by an ulp).
 //!
 //! The hit on a chord is off the true curve by at most the flat tolerance (0.0005 mm), far inside
 //! the 0.01 mm the cut is promised to. Splitting at the reported parameter is exact: the halves
@@ -182,14 +185,49 @@ type Meeting = (f64, f64);
 /// What two segments do to each other, before merging.
 #[derive(Default)]
 struct Hits {
+    /// Crossings, exact to 1e-9 mm.
     points: Vec<Meeting>,
+    /// Places where the curves come within reach of each other without crossing.
+    touches: Vec<Meeting>,
     spans: Vec<(Meeting, Meeting)>,
+}
+
+/// Whether a piece of a cubic cannot cross itself: no side of its control polygon goes backwards
+/// along the chord, so neither does the curve (a sufficient test).
+fn cannot_loop(curve: &Cubic) -> bool {
+    let [p0, p1, p2, p3] = curve.0;
+    let chord = (p3.x - p0.x, p3.y - p0.y);
+    if chord.0 == 0.0 && chord.1 == 0.0 {
+        return false;
+    }
+    [(p0, p1), (p1, p2), (p2, p3)]
+        .iter()
+        .all(|&(from, to)| (to.x - from.x) * chord.0 + (to.y - from.y) * chord.1 >= 0.0)
+}
+
+/// Where one cubic crosses itself: a piece that cannot loop is done; otherwise its halves are met
+/// away from their join, and each half is searched again (a loop can lie inside one half).
+fn self_meet(seg: &Seg, piece: Branch, depth: u32, out: &mut Vec<Meeting>) {
+    if depth >= MAX_DEPTH || cannot_loop(&piece.curve) {
+        return;
+    }
+    let (left, right) = piece.halves();
+    let mut hits = Hits::default();
+    meet(seg, seg, left, right, depth + 1, &mut hits);
+    let joins = [seg.point_at(left.t1)];
+    out.extend(
+        merged(seg, seg, &hits)
+            .into_iter()
+            .filter(|&m| away_from(&joins, seg, seg, m)),
+    );
+    self_meet(seg, left, depth + 1, out);
+    self_meet(seg, right, depth + 1, out);
 }
 
 /// A crossing found on chords made exact by Newton's method on `a(ta) - b(tb)`, so the two
 /// contours are cut at the same point. A pair that does not converge (a touch, a tangent) keeps
-/// the chord result.
-fn refined(a: &Seg, b: &Seg, found: Meeting) -> Meeting {
+/// the chord result. The flag says the result is a crossing, exact to 1e-9 mm.
+fn refined(a: &Seg, b: &Seg, found: Meeting) -> (Meeting, bool) {
     let miss = |m: Meeting| dist(a.point_at(m.0), b.point_at(m.1));
     let mut current = found;
     for _ in 0..6 {
@@ -216,9 +254,9 @@ fn refined(a: &Seg, b: &Seg, found: Meeting) -> Meeting {
         current = next;
     }
     if miss(current) < miss(found) && miss(current) <= 1e-9 {
-        current
+        (current, true)
     } else {
-        found
+        (found, miss(found) <= 1e-9)
     }
 }
 
@@ -242,7 +280,10 @@ fn meet(a: &Seg, b: &Seg, pa: Branch, pb: Branch, depth: u32, hits: &mut Hits) {
             Chord::None => {}
             Chord::At(u, v) => {
                 let found = (pa.param_at(a, u), pb.param_at(b, v));
-                hits.points.push(refined(a, b, found));
+                match refined(a, b, found) {
+                    (meeting, true) => hits.points.push(meeting),
+                    (meeting, false) => hits.touches.push(meeting),
+                }
             }
             Chord::Span((u0, v0), (u1, v1)) => hits.spans.push((
                 (pa.param_at(a, u0), pb.param_at(b, v0)),
@@ -276,7 +317,7 @@ fn meet(a: &Seg, b: &Seg, pa: Branch, pb: Branch, depth: u32, hits: &mut Hits) {
 
 /// The points where `hits` cut the two segments: shared stretches merged into their two ends, and
 /// points inside a stretch dropped.
-fn merged(a: &Seg, hits: &Hits) -> Vec<Meeting> {
+fn merged(a: &Seg, b: &Seg, hits: &Hits) -> Vec<Meeting> {
     let mut spans: Vec<(Meeting, Meeting)> = hits
         .spans
         .iter()
@@ -297,21 +338,99 @@ fn merged(a: &Seg, hits: &Hits) -> Vec<Meeting> {
             _ => stretches.push(span),
         }
     }
-    let mut out: Vec<Meeting> = hits
+    // Curves that only come near each other (tangent circles) touch along a stretch without
+    // coinciding. Meetings of one contact (the curves stay within reach between them) are cut as
+    // one: at its crossings if it has any, else once in the middle of its touches.
+    let mut out: Vec<Meeting> = Vec::new();
+    let mut meetings: Vec<(Meeting, bool)> = hits
         .points
         .iter()
-        .copied()
-        .filter(|point| {
-            !stretches
-                .iter()
-                .any(|s| s.0.0 <= point.0 && point.0 <= s.1.0)
-        })
+        .map(|&m| (m, true))
+        .chain(hits.touches.iter().map(|&m| (m, false)))
+        .filter(|(m, _)| !stretches.iter().any(|s| s.0.0 <= m.0 && m.0 <= s.1.0))
         .collect();
-    for (low, high) in stretches {
-        out.push(low);
-        out.push(high);
+    for &(low, high) in &stretches {
+        if doubled(a, b, low, high) {
+            out.push(low);
+            out.push(high);
+        } else {
+            meetings.push((low, false));
+            meetings.push((high, false));
+        }
+    }
+    meetings.sort_by(|l, r| l.0.0.total_cmp(&r.0.0));
+    let mut contacts: Vec<Vec<(Meeting, bool)>> = Vec::new();
+    for meeting in meetings {
+        match contacts.last_mut() {
+            Some(last) if stays_near(a, b, last[last.len() - 1].0, meeting.0) => {
+                last.push(meeting);
+            }
+            _ => contacts.push(vec![meeting]),
+        }
+    }
+    for contact in contacts {
+        let crossings: Vec<Meeting> = contact.iter().filter(|m| m.1).map(|m| m.0).collect();
+        if crossings.is_empty() {
+            out.push(middle(contact[0].0, contact[contact.len() - 1].0));
+            continue;
+        }
+        // Crossings of a lens thinner than the cut tolerance (0.01 mm) (two circles that touch from
+        // outside cross twice, a tenth of a millimetre apart, by their own rounding) are one.
+        let mut group = vec![crossings[0]];
+        for &next in &crossings[1..] {
+            if stays_within(a, b, group[group.len() - 1], next, CUT_MERGE_MM) {
+                group.push(next);
+            } else {
+                out.push(middle(group[0], group[group.len() - 1]));
+                group = vec![next];
+            }
+        }
+        out.push(middle(group[0], group[group.len() - 1]));
     }
     out
+}
+
+/// The meeting half way between two.
+fn middle(first: Meeting, last: Meeting) -> Meeting {
+    (first.0.midpoint(last.0), first.1.midpoint(last.1))
+}
+
+/// The distance from `point` to the segment `b`, found by Newton's method from the parameter
+/// `guess`.
+fn gap_to(b: &Seg, point: Point, guess: f64) -> f64 {
+    let mut t = guess;
+    for _ in 0..6 {
+        let p = b.point_at(t);
+        let v = b.velocity_at(t);
+        let speed = v.0 * v.0 + v.1 * v.1;
+        if speed <= 0.0 {
+            break;
+        }
+        t = (t - ((p.x - point.x) * v.0 + (p.y - point.y) * v.1) / speed).clamp(0.0, 1.0);
+    }
+    dist(point, b.point_at(t))
+}
+
+/// Whether the curve `a` stays within `limit` of `b` along the stretch from `low` to `high`,
+/// judged at its quarter points.
+fn stays_within(a: &Seg, b: &Seg, low: Meeting, high: Meeting, limit: f64) -> bool {
+    [0.25, 0.5, 0.75].iter().all(|&q| {
+        let on_a = a.point_at(low.0 + q * (high.0 - low.0));
+        gap_to(b, on_a, low.1 + q * (high.1 - low.1)) <= limit
+    })
+}
+
+/// Whether the curves coincide along the stretch from `low` to `high` (to within 1e-6 mm), as
+/// doubled lines and identical circles do. Curves that merely run close, like two circles
+/// touching from outside, do not.
+fn doubled(a: &Seg, b: &Seg, low: Meeting, high: Meeting) -> bool {
+    stays_within(a, b, low, high, 1e-6)
+}
+
+/// Whether two meetings belong to one contact: the curves stay within the cut tolerance of each
+/// other between them.
+fn stays_near(a: &Seg, b: &Seg, low: Meeting, high: Meeting) -> bool {
+    stays_within(a, b, low, high, CUT_MERGE_MM)
 }
 
 /// The sweep's entry for one segment: its box, grown so that boxes within reach overlap.
@@ -372,17 +491,13 @@ pub fn cut_parameters(contours: &[Outline<'_>]) -> Vec<Vec<CutParameter>> {
 
     for (c, list) in segs.iter().enumerate() {
         for (k, seg) in list.iter().enumerate() {
-            // A cubic can cross itself: its two halves meet away from their join.
+            // A cubic can cross itself.
             if !seg.line {
-                let (left, right) = Branch::whole(seg).halves();
-                let mut hits = Hits::default();
-                meet(seg, seg, left, right, 0, &mut hits);
-                let joins = [seg.point_at(0.5)];
-                for (ta, tb) in merged(seg, &hits) {
-                    if away_from(&joins, seg, seg, (ta, tb)) {
-                        raw[c].push((k, ta));
-                        raw[c].push((k, tb));
-                    }
+                let mut found = Vec::new();
+                self_meet(seg, Branch::whole(seg), 0, &mut found);
+                for (ta, tb) in found {
+                    raw[c].push((k, ta));
+                    raw[c].push((k, tb));
                 }
             }
         }
@@ -402,7 +517,7 @@ pub fn cut_parameters(contours: &[Outline<'_>]) -> Vec<Vec<CutParameter>> {
         } else {
             Vec::new()
         };
-        for (ta, tb) in merged(a, &hits) {
+        for (ta, tb) in merged(a, b, &hits) {
             if away_from(&joins, a, b, (ta, tb)) {
                 raw[first.0].push((first.1, ta));
                 raw[second.0].push((second.1, tb));

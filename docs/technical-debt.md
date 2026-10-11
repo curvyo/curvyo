@@ -715,12 +715,23 @@ release build (budget 2 s): Split of the four generated inputs 15 ms (refused, i
 and 272 ms; Break apart 98, 115, 136 and 267 ms; Cut of a grid of 50 horizontal and 50 vertical
 lines (5,100 pieces) 237 ms through the session, of which the curve kernel is 0.5 ms; Cut of 400
 overlapping circles (5,928 pieces) 350 ms. The document write dominates, as for Combine.
-Known limits of Cut: two curves that run within 0.001 mm of each other along a stretch of more than
-0.01 mm are cut at both ends of that stretch (tangent circles touch along less and are cut once);
-a curve with a hairpin whose two sides come within 0.002 mm of each other is cut several times
-near its tip (a touch within the kernel tolerance counts as a meeting);
-the curve module has no Bézier clipping, so two very long curves that nearly coincide cost more than
-the budgets cover; the result is refused above 10,000 pieces.
+Known limits of Cut:
+- Curves that coincide along a stretch (doubled lines, identical circles) are cut at both ends of
+  it, and also at the nodes of the other contour inside it, because shared stretches are found per
+  pair of segments (the line (0,0)-(20,0) under the polyline (0,0)-(10,0)-(20,0) is cut at (10,0)).
+  Chaining stretches across neighbouring pairs in `curve_settle.rs` would fix it.
+- Curves that only come near each other are one cut: tangent circles up to a radius of about 15 mm,
+  whatever their rotation. Bézier circles of a larger radius that touch from outside cross twice by
+  their own rounding (0.027 % of the radius) with a lens thicker than 0.01 mm and are cut at both
+  crossings, 1 mm or more apart for a radius of 60 mm.
+- A curve with a hairpin whose two sides come within 0.002 mm of each other is cut several times
+  near its tip.
+- A self-crossing whose one pass lies within 0.01 mm of a split point of the loop search is taken
+  for the join and dropped.
+- The 10,000-piece limit is checked after the whole kernel run: 2,000 x 2,000 lines produce four
+  million meetings before the refusal. A cap inside `cut_parameters` would return early.
+- The curve module has no Bézier clipping, so two very long curves that nearly coincide cost more
+  than the budgets cover.
 
 **Update 2026-10-10 (`0044-editing-quick-wins`, milestone 1): the first half of the cache is built.**
 `Session::objects()` now returns one shared read of every object, kept per `Document::version()`

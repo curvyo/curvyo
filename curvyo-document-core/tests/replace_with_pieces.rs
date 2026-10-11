@@ -180,14 +180,18 @@ fn a_refusal_changes_nothing() {
 
     let cases: Vec<(Result<Vec<NodeId>, ObjectEditError>, ObjectEditError)> = vec![
         (
-            write(&[ghost], &[(whole, piece())]),
+            write(&[ghost], &[(ghost, piece())]),
             ObjectEditError::NoSuchObject,
         ),
         (
-            write(&[whole], &[(ghost, piece())]),
+            write(&[whole, ghost], &[(ghost, piece())]),
             ObjectEditError::NoSuchObject,
         ),
         (write(&[whole], &[]), ObjectEditError::NoOutlines),
+        (
+            write(&[other], &[(whole, piece())]),
+            ObjectEditError::BaseNotAnOperand,
+        ),
         (
             write(&[whole], &[(whole, Vec::new())]),
             ObjectEditError::NoOutlines,

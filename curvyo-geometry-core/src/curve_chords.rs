@@ -1,6 +1,6 @@
 //! The geometry under the curve intersections: a cubic and its flatness, and what two straight
 //! chords do to each other (`specs/0036-cut-at-crossings`). Only `+ - * /` and `sqrt` are used, so
-//! every result is bit-identical on every target.
+//! the same input gives a bit-identical result on every target.
 
 use curvyo_document_core::Point;
 

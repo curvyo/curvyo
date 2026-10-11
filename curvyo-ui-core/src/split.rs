@@ -195,6 +195,8 @@ pub fn plan_split(
         // A hole whose parent has no region (outlines that touch at a vertex can make the depth
         // count differ from the enclosure chain) would be lost by a split: leave the compound
         // path as it is rather than drop geometry.
+        // (Such a path is reported as "one piece", which is not quite true; leaving it alone is
+        // what matters.)
         let parts = parts_of(&outlines).filter(|parts| parts.len() > 1);
         let Some(parts) = parts else {
             kept.push(object.id());

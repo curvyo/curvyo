@@ -68,8 +68,8 @@ write for Split, Break apart, Cut and Fracture/Flatten.
 - **2026-10-10: session and frontend.** `session/combine.rs` keeps Combine.
   Split and Break apart get `session/split.rs` (both commands, one shared
   availability) and the matching `wasm_split.rs`. The rail buttons are
-  placed per the UX notes, in the Path card order Combine, Break apart,
-  Split, Cut.
+  placed per the UX notes, in the Path card order Combine, Split,
+  Break apart, Cut.
 - **2026-10-10: budget (criterion 15).** Same job and generator pattern as
   0035. The part search on input (a) has its own budget of 500 ms. The
   union-find adds less than linear cost over `touching_outlines`.

@@ -253,6 +253,29 @@ fn a_loop_in_one_cubic_is_found() {
     assert!(near(a, Point::new(2.857, 4.286), 0.01), "{a:?}");
 }
 
+/// A loop in the first half of its cubic (both passes before t = 0.5) is found too.
+#[test]
+fn a_loop_in_one_half_of_a_cubic_is_found() {
+    let early: Anchors = vec![
+        (Point::new(0.0, 0.0), Vec2::ZERO, Vec2::new(20.0, 20.0)),
+        (
+            Point::new(260.0, -60.0),
+            Vec2::new(-340.0, 60.0),
+            Vec2::ZERO,
+        ),
+    ];
+    let all = [(early, false)];
+    let result = cuts(&all);
+    assert_eq!(result[0].len(), 2, "{:?}", result[0]);
+    for cut in &result[0] {
+        assert!(near(
+            position(&all[0].0, false, *cut),
+            Point::new(2.857, 4.286),
+            0.01
+        ));
+    }
+}
+
 /// Neighbouring segments of a smooth outline are no crossing.
 #[test]
 fn a_circle_alone_has_no_cut() {
@@ -483,4 +506,46 @@ fn tangent_circles_are_cut_once_at_the_touching_point() {
     let result = cuts(&all);
     assert_eq!(result[0], vec![CutParameter { segment: 0, t: 0.0 }]);
     assert_eq!(result[1], vec![CutParameter { segment: 2, t: 0.0 }]);
+}
+
+/// A circle of radius `radius` about `(cx, cy)`, its nodes turned by `degrees` about its own
+/// centre, so that a touch on the x axis falls inside a segment.
+fn turned_about_centre(cx: f64, cy: f64, radius: f64, degrees: f64) -> Anchors {
+    rotated(&circle(0.0, 0.0, radius), degrees)
+        .into_iter()
+        .map(|(p, i, o)| (Point::new(p.x + cx, p.y + cy), i, o))
+        .collect()
+}
+
+/// Tangent circles whose nodes are turned, so that the touch lies inside a segment of each: one
+/// cut each, at the touch (a stretch of 0.2 mm for r = 10). Larger Bézier circles cross twice by
+/// their own rounding with a lens thicker than 0.01 mm and are cut at both crossings.
+#[test]
+fn tangent_circles_touching_inside_segments_are_cut_once() {
+    for radius in [3.0, 10.0, 15.0] {
+        for degrees in [7.0, 30.0, 45.0, 73.0] {
+            let all = [
+                (turned_about_centre(0.0, 0.0, radius, degrees), true),
+                (
+                    turned_about_centre(2.0 * radius, 0.0, radius, degrees),
+                    true,
+                ),
+            ];
+            let result = cuts(&all);
+            for (index, list) in result.iter().enumerate() {
+                assert_eq!(
+                    list.len(),
+                    1,
+                    "radius {radius}, {degrees} degrees, circle {index}"
+                );
+                assert!(
+                    list[0].t > 0.0,
+                    "the touch is inside a segment: {:?}",
+                    list[0]
+                );
+                let at = position(&all[index].0, true, list[0]);
+                assert!(near(at, Point::new(radius, 0.0), 0.01), "{at:?}");
+            }
+        }
+    }
 }

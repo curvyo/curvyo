@@ -117,6 +117,7 @@ impl Document {
     ///
     /// # Errors
     /// [`ObjectEditError::NoSuchObject`] if a source or a removed object no longer exists;
+    /// [`ObjectEditError::BaseNotAnOperand`] if a piece's source is not in `removed`;
     /// [`ObjectEditError::NoOutlines`] if there is no piece, a piece has no outline or an outline
     /// no anchor; [`ObjectEditError::AnchorIds`] as for [`Document::replace_with_path`].
     ///
@@ -131,6 +132,9 @@ impl Document {
     ) -> Result<Vec<NodeId>, ObjectEditError> {
         if pieces.is_empty() {
             return Err(ObjectEditError::NoOutlines);
+        }
+        if pieces.iter().any(|(source, _)| !removed.contains(source)) {
+            return Err(ObjectEditError::BaseNotAnOperand);
         }
         let mut seen: HashSet<AnchorId> = HashSet::new();
         for (_, outlines) in pieces {
@@ -154,24 +158,7 @@ impl Document {
                 doomed.push(tree_id);
             }
         }
-        let mut sources: HashMap<NodeId, (loro::TreeID, Style)> = HashMap::new();
-        for (source, _) in pieces {
-            if sources.contains_key(source) {
-                continue;
-            }
-            let tree_id = tree_id_of(*source);
-            if !leaf_exists(&tree, tree_id) {
-                return Err(ObjectEditError::NoSuchObject);
-            }
-            let meta = tree
-                .get_meta(tree_id)
-                .map_err(|_| ObjectEditError::NoSuchObject)?;
-            let mut style = style_codec::read_style(&meta);
-            if fill == PieceFill::None {
-                style.fill.enabled = false;
-            }
-            sources.insert(*source, (tree_id, style));
-        }
+        let sources = resolve_sources(&tree, pieces, fill)?;
         check_new_anchor_ids(&tree, &doomed, &seen)?;
 
         tree.enable_fractional_index(0);
@@ -210,6 +197,34 @@ pub enum PieceFill {
     /// The piece has no fill; the stored fill colour and opacity are kept, so a solid fill
     /// restores them (Cut: the pieces are lines, `specs/0036-cut-at-crossings` criterion 6).
     None,
+}
+
+/// The tree id and the style (with the fill turned off for [`PieceFill::None`]) of every source of
+/// `pieces`, or [`ObjectEditError::NoSuchObject`] if one is gone.
+fn resolve_sources(
+    tree: &loro::LoroTree,
+    pieces: &[(NodeId, PieceOutlines)],
+    fill: PieceFill,
+) -> Result<HashMap<NodeId, (loro::TreeID, Style)>, ObjectEditError> {
+    let mut sources: HashMap<NodeId, (loro::TreeID, Style)> = HashMap::new();
+    for (source, _) in pieces {
+        if sources.contains_key(source) {
+            continue;
+        }
+        let tree_id = tree_id_of(*source);
+        if !leaf_exists(tree, tree_id) {
+            return Err(ObjectEditError::NoSuchObject);
+        }
+        let meta = tree
+            .get_meta(tree_id)
+            .map_err(|_| ObjectEditError::NoSuchObject)?;
+        let mut style = style_codec::read_style(&meta);
+        if fill == PieceFill::None {
+            style.fill.enabled = false;
+        }
+        sources.insert(*source, (tree_id, style));
+    }
+    Ok(sources)
 }
 
 /// Creates a new path object directly after `after` in the stacking order, with `style`, no
