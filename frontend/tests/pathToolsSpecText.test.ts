@@ -163,11 +163,12 @@ test("0035 criteria 16 and 17 as renamed by 0048: Split notices and refusals", (
 });
 
 test("0035 criterion 2: tooltip notes, first match wins", () => {
-  const st = (p: Partial<{ needsTwo: boolean; open: number; of: number; hasCompound: boolean }>) => ({
+  const st = (p: Partial<{ needsTwo: boolean; open: number; of: number; hasCompound: boolean; canCut: boolean }>) => ({
     needsTwo: false,
     open: 0,
     of: 3,
     hasCompound: true,
+    canCut: true,
     ...p,
   });
   assert.equal(commandNote("combine", st({ needsTwo: true, of: 0 }), true), "Select two or more closed shapes.");

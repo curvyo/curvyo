@@ -15,12 +15,16 @@ import {
   commandName,
   commandNote,
   commandRule,
+  cutOutlinesObjects,
+  cutRefusalText,
+  cutSuccessText,
   noticeMs,
   PATH_COMMANDS,
   splitRefusalText,
   splitSuccessText,
   type BreakApartResult,
   type CombineResult,
+  type CutResult,
   type PathAvailabilityState,
   type SplitResult,
 } from "../src/lib/pathText.ts";
@@ -30,6 +34,7 @@ const available = (patch: Partial<PathAvailabilityState>): PathAvailabilityState
   open: 0,
   of: 3,
   hasCompound: true,
+  canCut: true,
   ...patch,
 });
 
@@ -59,8 +64,17 @@ const broken = (patch: Partial<BreakApartResult>): BreakApartResult => ({
   ...patch,
 });
 
+const cut = (patch: Partial<CutResult>): CutResult => ({
+  kind: "applied",
+  count: 2,
+  of: 2,
+  pieces: 9,
+  ...patch,
+});
+
 test("names and rules are those of 0048 criterion 2, and no rule wraps", () => {
-  assert.deepEqual(PATH_COMMANDS.map(commandName), ["Combine", "Split", "Break apart"]);
+  assert.deepEqual(PATH_COMMANDS.map(commandName), ["Combine", "Split", "Break apart", "Cut"]);
+  assert.equal(commandRule("cut"), "Cuts paths open where they cross or touch.");
   assert.equal(commandRule("combine"), "One object. Inner shapes become holes.");
   assert.equal(commandRule("split"), "Separates unconnected parts. Holes stay.");
   assert.equal(commandRule("break_apart"), "Every outline becomes its own object.");
@@ -249,4 +263,53 @@ test("the Break apart refusals are the sentences of criterion 13", () => {
     "Break apart does not work on groups. Ungroup first. Nothing was changed.",
   );
   assert.equal(breakApartRefusalText(broken({ kind: "applied" })), null);
+});
+
+test("the Cut note: nothing selected, another tool, else the effect", () => {
+  const none = available({ canCut: false });
+  assert.equal(commandNote("cut", none, true), "Select one or more paths.");
+  assert.equal(commandNote("cut", none, false), "Select one or more paths. Use the Select tool.");
+  assert.equal(commandNote("cut", available({}), true), "Pieces get no fill. Replaces the selection.");
+  assert.equal(commandDimmed("cut", none), true);
+  assert.equal(commandDimmed("cut", available({ hasCompound: false })), false, "plain paths enable Cut");
+  assert.equal(commandDimmed("split", available({ hasCompound: false })), true);
+});
+
+test("the Cut notice counts the paths and the pieces", () => {
+  assert.equal(cutSuccessText(cut({})), "Cut: 2 paths became 9 pieces.");
+  assert.equal(cutSuccessText(cut({ count: 1, pieces: 4 })), "Cut: 1 path became 4 pieces.");
+  assert.equal(cutSuccessText(cut({ kind: "no_crossing" })), null);
+});
+
+test("the Cut refusals are the sentences of criteria 8 to 10", () => {
+  assert.equal(
+    cutRefusalText(cut({ kind: "no_crossing" })),
+    "The selected paths do not cross each other or themselves. Nothing was changed.",
+  );
+  assert.equal(
+    cutRefusalText(cut({ kind: "groups", count: 3 })),
+    "Cut does not work on groups. Ungroup first. Nothing was changed.",
+  );
+  assert.equal(
+    cutRefusalText(cut({ kind: "compound", count: 1 })),
+    "Cut does not work on compound paths. Split or Break apart first. Nothing was changed.",
+  );
+  assert.equal(
+    cutRefusalText(cut({ kind: "too_many", pieces: 12000 })),
+    "Cut would make more than 10000 pieces. Nothing was changed.",
+  );
+  assert.equal(
+    cutRefusalText(cut({ kind: "out_of_range", count: 1, of: 3 })),
+    "Cut works only within 10 km of the point 0, 0. 1 of 3 selected objects reaches further. Nothing was changed.",
+  );
+  assert.equal(cutRefusalText(cut({ kind: "applied" })), null);
+});
+
+test("a refused Cut outlines groups, compound paths and objects out of range, not the missing crossing", () => {
+  for (const kind of ["groups", "compound", "out_of_range"]) {
+    assert.equal(cutOutlinesObjects(cut({ kind })), true, kind);
+  }
+  for (const kind of ["no_crossing", "too_many", "applied"]) {
+    assert.equal(cutOutlinesObjects(cut({ kind })), false, kind);
+  }
 });

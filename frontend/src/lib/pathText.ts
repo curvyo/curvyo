@@ -1,15 +1,15 @@
 /**
  * The words of the Path card (`specs/0035-combine-and-break-apart/` criteria 2, 7, 9 to 11,
- * `specs/0048-split-compound-path/` criteria 2, 7 to 9, 12 and 13): names, rules, tooltip notes
- * and notices. Rust sends codes and counts; the sentences are written here, once.
+ * `specs/0048-split-compound-path/` criteria 2, 7 to 9, 12 and 13, `specs/0036-cut-at-crossings/`
+ * criteria 1, 7 to 10): names, rules, tooltip notes and notices. Rust sends codes and counts; the sentences are written here, once.
  */
 
 import { NOTHING_CHANGED, plural, sharedRefusalText } from "./booleanText.ts";
 
 /** The commands of the Path card, in the card's order. */
-export type PathCommand = "combine" | "split" | "break_apart";
+export type PathCommand = "combine" | "split" | "break_apart" | "cut";
 
-export const PATH_COMMANDS: readonly PathCommand[] = ["combine", "split", "break_apart"];
+export const PATH_COMMANDS: readonly PathCommand[] = ["combine", "split", "break_apart", "cut"];
 
 /** What the Path card shows (`WasmSession.path_availability`). */
 export interface PathAvailabilityState {
@@ -21,6 +21,8 @@ export interface PathAvailabilityState {
   of: number;
   /** Split and Break apart are enabled: the selection holds a compound path. */
   hasCompound: boolean;
+  /** Cut is enabled: something is selected. */
+  canCut: boolean;
 }
 
 /** What `WasmSession.apply_combine` did (`kind` is the outcome code). */
@@ -49,16 +51,27 @@ export interface BreakApartResult {
   withHoles: boolean;
 }
 
+/** What `WasmSession.apply_cut` did (`kind` is the outcome code). `count` paths became `pieces`
+ * pieces; for a refusal `count` objects are to blame, `of` objects are selected. */
+export interface CutResult {
+  kind: string;
+  count: number;
+  of: number;
+  pieces: number;
+}
+
 const NAMES: Record<PathCommand, string> = {
   combine: "Combine",
   split: "Split",
   break_apart: "Break apart",
+  cut: "Cut",
 };
 
 const RULES: Record<PathCommand, string> = {
   combine: "One object. Inner shapes become holes.",
   split: "Separates unconnected parts. Holes stay.",
   break_apart: "Every outline becomes its own object.",
+  cut: "Cuts paths open where they cross or touch.",
 };
 
 const USE_SELECT = "Use the Select tool.";
@@ -75,7 +88,14 @@ export function commandRule(command: PathCommand): string {
 
 /** Whether the button is dimmed. */
 export function commandDimmed(command: PathCommand, availability: PathAvailabilityState): boolean {
-  return command === "combine" ? availability.needsTwo : !availability.hasCompound;
+  switch (command) {
+    case "combine":
+      return availability.needsTwo;
+    case "cut":
+      return !availability.canCut;
+    default:
+      return !availability.hasCompound;
+  }
 }
 
 /** The third tooltip line, first match wins (criterion 2). `selectTool` is whether the Select
@@ -95,6 +115,11 @@ export function commandNote(
       return `Needs closed paths: ${availability.open} of ${availability.of} selected ${verb} open.`;
     }
     return "Replaces the selection.";
+  }
+  if (command === "cut") {
+    return availability.canCut
+      ? "Pieces get no fill. Replaces the selection."
+      : withTool("Select one or more paths.");
   }
   if (!availability.hasCompound) {
     return withTool("Select a compound path.");
@@ -202,4 +227,35 @@ export function breakApartRefusalText(result: BreakApartResult): string | null {
     default:
       return null;
   }
+}
+
+/** The notice after a Cut, or `null` if nothing was done (`0036` criterion 7). */
+export function cutSuccessText(result: CutResult): string | null {
+  if (result.kind !== "applied") {
+    return null;
+  }
+  return `Cut: ${plural(result.count, "path", "paths")} became ${result.pieces} pieces.`;
+}
+
+/** The notice after a refused Cut (`0036` criteria 8 to 10), or `null` for a result that is no
+ * refusal. */
+export function cutRefusalText(result: CutResult): string | null {
+  switch (result.kind) {
+    case "no_crossing":
+      return `The selected paths do not cross each other or themselves. ${NOTHING_CHANGED}`;
+    case "compound":
+      return `Cut does not work on compound paths. Split or Break apart first. ${NOTHING_CHANGED}`;
+    case "too_many":
+      return `Cut would make more than 10000 pieces. ${NOTHING_CHANGED}`;
+    case "none_selected":
+      return `Cut needs one or more paths. ${NOTHING_CHANGED}`;
+    default:
+      return sharedRefusalText("Cut", result);
+  }
+}
+
+/** Whether a refused Cut outlines objects on the canvas: the groups' leaves, the compound paths
+ * and the objects out of range; "do not cross" outlines nothing. */
+export function cutOutlinesObjects(result: CutResult): boolean {
+  return ["groups", "compound", "out_of_range"].includes(result.kind);
 }

@@ -11,7 +11,7 @@ import { createSession, openSession } from "@/lib/editorSession";
 import type { WasmSession } from "@/lib/editorSession";
 import type { EditHint } from "@/components/EditHintChip";
 import type { BooleanOp, BooleanResult } from "@/lib/booleanText";
-import type { BreakApartResult, CombineResult, SplitResult } from "@/lib/pathText";
+import type { BreakApartResult, CombineResult, CutResult, SplitResult } from "@/lib/pathText";
 import type { ClosePathResult } from "@/lib/penText";
 
 /** The canvas's backing-buffer size for a CSS size at the window's current
@@ -672,6 +672,8 @@ export interface EditorSession {
   applySplit: () => SplitResult;
   /** Break apart on the selection, in one commit (`0048-split-compound-path`). */
   applyBreakApart: () => BreakApartResult;
+  /** Cut on the selection, in one commit (`0036-cut-at-crossings`). */
+  applyCut: () => CutResult;
   /** The Node bar's Close path buttons (`0034-pen-path-extension`): closes the open paths of
    * the editing set with `join` (`"sharp"` or `"smooth"`) in one commit. */
   closePath: (join: "sharp" | "smooth") => ClosePathResult;
@@ -1357,6 +1359,17 @@ export function useEditorSession(
     return result;
   }, [syncFromSession]);
 
+  const applyCut = useCallback((): CutResult => {
+    const raw = sessionRef.current?.apply_cut();
+    syncFromSession();
+    if (!raw) {
+      return { kind: "ignored", count: 0, of: 0, pieces: 0 };
+    }
+    const result = { kind: raw.kind, count: raw.count, of: raw.of, pieces: raw.pieces };
+    raw.free();
+    return result;
+  }, [syncFromSession]);
+
   /** The event's canvas-relative CSS pixel position — pure DOM geometry,
    * no wasm call and no document-space conversion (that happens inside
    * `Session` now, `specs/0004-canvas-navigation-and-selection/adrs.md`).
@@ -2011,6 +2024,7 @@ export function useEditorSession(
     applyCombine,
     applySplit,
     applyBreakApart,
+    applyCut,
     closePath,
     onPointerDown,
     onPointerMove,

@@ -9,6 +9,9 @@ import {
   combineRefusalText,
   combineSuccessText,
   commandDimmed,
+  cutOutlinesObjects,
+  cutRefusalText,
+  cutSuccessText,
   noticeMs,
   splitRefusalText,
   splitSuccessText,
@@ -110,6 +113,7 @@ const NO_PATH_AVAILABILITY: PathAvailabilityState = {
   open: 0,
   of: 0,
   hasCompound: false,
+  canCut: false,
 };
 
 /**
@@ -120,7 +124,7 @@ const NO_PATH_AVAILABILITY: PathAvailabilityState = {
  */
 export function useRailCommands(editor: EditorSession): RailCommands {
   const { getSession, syncRevision, tool, selectionCount, applyBoolean } = editor;
-  const { applyCombine, applySplit, applyBreakApart } = editor;
+  const { applyCombine, applySplit, applyBreakApart, applyCut } = editor;
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
   /** Whether the red outline of a refusal is on the canvas. */
@@ -148,6 +152,7 @@ export function useRailCommands(editor: EditorSession): RailCommands {
       open: raw.open,
       of: raw.of,
       hasCompound: raw.has_compound,
+      canCut: raw.can_cut,
     };
     raw.free();
     return state;
@@ -226,14 +231,18 @@ export function useRailCommands(editor: EditorSession): RailCommands {
           const result = applySplit();
           outlinedRef.current = result.kind === "groups";
           showPath(splitSuccessText(result), splitRefusalText(result));
-        } else {
+        } else if (command === "break_apart") {
           const result = applyBreakApart();
           outlinedRef.current = result.kind === "groups";
           showPath(breakApartSuccessText(result), breakApartRefusalText(result));
+        } else {
+          const result = applyCut();
+          outlinedRef.current = cutOutlinesObjects(result);
+          showPath(cutSuccessText(result), cutRefusalText(result));
         }
       });
     },
-    [applyBreakApart, applyCombine, applySplit, runBusy, showPath],
+    [applyBreakApart, applyCombine, applyCut, applySplit, runBusy, showPath],
   );
 
   return {
