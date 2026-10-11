@@ -108,6 +108,7 @@ pub use primitive_outline::{
     KAPPA, OutlineAnchor, ellipse_outline, outline_of, outline_of_rotated, polygon_outline,
     rect_outline, star_outline,
 };
+pub use replace::{PieceFill, PieceOutlines};
 pub use shapes::ShapeEditError;
 pub use smooth_handles::smooth_corner_handles;
 pub use style_model::{
