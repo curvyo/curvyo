@@ -1,237 +1,227 @@
-//! The native File menu: New, Open…, Save, Save As…, a separator, Quit, and the Edit menu with Undo
-//! and Redo (`specs/0020-undo-redo` criterion 8) and the two object steps (`specs/0041-object-history`
-//! criterion 5). File items carry OS-standard accelerators bound
-//! directly on the menu items; Undo, Redo and the object steps carry one on macOS only (see [`history_accelerator`])
-//! (`specs/0001-project-file-foundation/specification.md`, "Keyboard shortcuts
-//! (from day one)"). Native menus and accelerators are free accessibility
-//! and keyboard traversal on every platform (same spec, "Window chrome and
-//! menu").
+//! The menu bar of macOS, the only platform that has one
+//! (`specs/0051-sidebar-and-no-menu/` criteria 38 and 39, `adrs.md` decision 6).
+//!
+//! macOS draws a menu bar that no application can remove, and without a menu of our own Tauri
+//! installs a default one whose File, View and Window entries and Cmd+W would take chords away from
+//! the page. So there is the application menu, with Quit as a custom item that asks the page about
+//! unsaved changes (the predefined Quit would end the app without asking), and an Edit menu of
+//! predefined items only: they act on a focused text field, which `WKWebView` otherwise cannot do
+//! (it takes its editing key equivalents from menu items). No custom item carries an editor chord,
+//! so each chord reaches the page once. Linux and Windows build no menu at all.
+//!
+//! The table is plain data and the builder compiles everywhere, so the unit tests below check on
+//! every platform what the Mac gets.
 
-use tauri::menu::{
-    Menu, MenuBuilder, MenuItem, MenuItemBuilder, PredefinedMenuItem, SubmenuBuilder,
-};
-use tauri::{AppHandle, Emitter, Manager, State, Wry};
+#![cfg_attr(not(target_os = "macos"), allow(dead_code))]
 
-const NEW_ID: &str = "new";
-const OPEN_ID: &str = "open";
-const SAVE_ID: &str = "save";
-const SAVE_AS_ID: &str = "save_as";
-const UNDO_ID: &str = "edit_undo";
-const REDO_ID: &str = "edit_redo";
-const OBJECT_UNDO_ID: &str = "edit_object_undo";
-const OBJECT_REDO_ID: &str = "edit_object_redo";
+use tauri::menu::{Menu, MenuBuilder, MenuItemBuilder, PredefinedMenuItem, SubmenuBuilder};
+use tauri::{AppHandle, Wry};
 
-/// The event the Edit menu emits to the frontend; the payload is `"undo"`, `"redo"`,
-/// `"object-undo"` or `"object-redo"`.
-const HISTORY_MENU_EVENT: &str = "history-menu";
+/// The id of the one custom item.
+const QUIT_ID: &str = "quit";
 
-/// The Edit menu items whose text and enabled state follow the maker's stacks and selection.
-pub struct HistoryItems {
-    undo: MenuItem<Wry>,
-    redo: MenuItem<Wry>,
-    object_undo: MenuItem<Wry>,
-    object_redo: MenuItem<Wry>,
+/// A predefined item: a native selector that acts on the focused field, or an application command
+/// the system implements.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Predefined {
+    About,
+    Hide,
+    HideOthers,
+    ShowAll,
+    Undo,
+    Redo,
+    Cut,
+    Copy,
+    Paste,
+    SelectAll,
 }
 
-/// Builds the application menu: File and Edit.
+/// One row of a menu.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Entry {
+    Predefined(Predefined),
+    Separator,
+    /// An item of ours: `id` comes back in the menu event.
+    Custom {
+        id: &'static str,
+        text: &'static str,
+        accelerator: &'static str,
+    },
+}
+
+/// A menu of the bar.
+pub(crate) struct Submenu {
+    pub(crate) title: &'static str,
+    pub(crate) entries: &'static [Entry],
+}
+
+/// The whole bar: the application menu and Edit. Nothing else: no File menu.
+pub(crate) const MAC_MENU: &[Submenu] = &[
+    Submenu {
+        title: "Curvyo",
+        entries: &[
+            Entry::Predefined(Predefined::About),
+            Entry::Separator,
+            Entry::Predefined(Predefined::Hide),
+            Entry::Predefined(Predefined::HideOthers),
+            Entry::Predefined(Predefined::ShowAll),
+            Entry::Separator,
+            Entry::Custom {
+                id: QUIT_ID,
+                text: "Quit Curvyo",
+                accelerator: "Cmd+Q",
+            },
+        ],
+    },
+    Submenu {
+        title: "Edit",
+        entries: &[
+            Entry::Predefined(Predefined::Undo),
+            Entry::Predefined(Predefined::Redo),
+            Entry::Separator,
+            Entry::Predefined(Predefined::Cut),
+            Entry::Predefined(Predefined::Copy),
+            Entry::Predefined(Predefined::Paste),
+            Entry::Predefined(Predefined::SelectAll),
+        ],
+    },
+];
+
+/// Builds the bar from [`MAC_MENU`].
 ///
 /// # Errors
 /// Propagates any error Tauri's menu builders return.
-pub fn build(app: &tauri::App) -> tauri::Result<Menu<Wry>> {
-    let new_item = MenuItemBuilder::with_id(NEW_ID, "New")
-        .accelerator("CmdOrCtrl+N")
-        .build(app)?;
-    let open_item = MenuItemBuilder::with_id(OPEN_ID, "Open…")
-        .accelerator("CmdOrCtrl+O")
-        .build(app)?;
-    let save_item = MenuItemBuilder::with_id(SAVE_ID, "Save")
-        .accelerator("CmdOrCtrl+S")
-        .build(app)?;
-    let save_as_item = MenuItemBuilder::with_id(SAVE_AS_ID, "Save As…")
-        .accelerator("CmdOrCtrl+Shift+S")
-        .build(app)?;
-    let separator = PredefinedMenuItem::separator(app)?;
-    let quit_item = PredefinedMenuItem::quit(app, Some("Quit"))?;
-
-    let file_menu = SubmenuBuilder::new(app, "File")
-        .item(&new_item)
-        .item(&open_item)
-        .item(&save_item)
-        .item(&save_as_item)
-        .item(&separator)
-        .item(&quit_item)
-        .build()?;
-
-    let undo_item = history_item(app, UNDO_ID, "Undo", HistoryKey::Undo)?;
-    let redo_item = history_item(app, REDO_ID, "Redo", HistoryKey::Redo)?;
-    let object_undo_item = history_item(
-        app,
-        OBJECT_UNDO_ID,
-        "Undo Step of Selected Object",
-        HistoryKey::ObjectUndo,
-    )?;
-    let object_redo_item = history_item(
-        app,
-        OBJECT_REDO_ID,
-        "Redo Step of Selected Object",
-        HistoryKey::ObjectRedo,
-    )?;
-    let edit_menu = SubmenuBuilder::new(app, "Edit")
-        .item(&undo_item)
-        .item(&redo_item)
-        .item(&PredefinedMenuItem::separator(app)?)
-        .item(&object_undo_item)
-        .item(&object_redo_item)
-        .item(&PredefinedMenuItem::separator(app)?)
-        .build()?;
-    app.manage(HistoryItems {
-        undo: undo_item,
-        redo: redo_item,
-        object_undo: object_undo_item,
-        object_redo: object_redo_item,
-    });
-
-    MenuBuilder::new(app)
-        .item(&file_menu)
-        .item(&edit_menu)
-        .build()
+pub(crate) fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
+    let mut bar = MenuBuilder::new(app);
+    for submenu in MAC_MENU {
+        let mut menu = SubmenuBuilder::new(app, submenu.title);
+        for entry in submenu.entries {
+            menu = match *entry {
+                Entry::Separator => menu.separator(),
+                Entry::Predefined(item) => menu.item(&predefined(app, item)?),
+                Entry::Custom {
+                    id,
+                    text,
+                    accelerator,
+                } => menu.item(
+                    &MenuItemBuilder::with_id(id, text)
+                        .accelerator(accelerator)
+                        .build(app)?,
+                ),
+            };
+        }
+        bar = bar.item(&menu.build()?);
+    }
+    bar.build()
 }
 
-/// The history keys the page's own key handler owns.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum HistoryKey {
-    Undo,
-    Redo,
-    ObjectUndo,
-    ObjectRedo,
-}
-
-/// The native accelerator of an Edit item, if it gets one.
-///
-/// On Linux and Windows the answer is `None`: a native accelerator on an enabled item takes the
-/// key before the web view sees it (GTK offers it to the accelerator groups first), which skips
-/// the page's gate and a text field's own undo. The page's key handler is the one path there.
-/// macOS keeps the standard Cmd+Z and Cmd+Shift+Z, which `WebKit` offers to the page first; the
-/// page prevents the default when it acts, so the menu does not fire a second time.
-fn history_accelerator(key: HistoryKey, mac: bool) -> Option<&'static str> {
-    match (mac, key) {
-        (false, _) => None,
-        (true, HistoryKey::Undo) => Some("Cmd+Z"),
-        (true, HistoryKey::Redo) => Some("Cmd+Shift+Z"),
-        (true, HistoryKey::ObjectUndo) => Some("Cmd+U"),
-        (true, HistoryKey::ObjectRedo) => Some("Cmd+Shift+U"),
+fn predefined(app: &AppHandle, item: Predefined) -> tauri::Result<PredefinedMenuItem<Wry>> {
+    match item {
+        Predefined::About => PredefinedMenuItem::about(app, Some("About Curvyo"), None),
+        Predefined::Hide => PredefinedMenuItem::hide(app, None),
+        Predefined::HideOthers => PredefinedMenuItem::hide_others(app, None),
+        Predefined::ShowAll => PredefinedMenuItem::show_all(app, None),
+        Predefined::Undo => PredefinedMenuItem::undo(app, None),
+        Predefined::Redo => PredefinedMenuItem::redo(app, None),
+        Predefined::Cut => PredefinedMenuItem::cut(app, None),
+        Predefined::Copy => PredefinedMenuItem::copy(app, None),
+        Predefined::Paste => PredefinedMenuItem::paste(app, None),
+        Predefined::SelectAll => PredefinedMenuItem::select_all(app, None),
     }
 }
 
-/// An Edit item that starts greyed out; the frontend enables it with `set_history_menu`.
-fn history_item(
-    app: &tauri::App,
-    id: &str,
-    text: &str,
-    key: HistoryKey,
-) -> tauri::Result<MenuItem<Wry>> {
-    let builder = MenuItemBuilder::with_id(id, text).enabled(false);
-    match history_accelerator(key, cfg!(target_os = "macos")) {
-        Some(accelerator) => builder.accelerator(accelerator).build(app),
-        None => builder.build(app),
-    }
-}
-
-/// The Edit menu's item text for a step name: "Undo Move", or plain "Undo" when the stack is empty
-/// (the item is then greyed out).
-fn history_item_text(verb: &str, name: Option<&str>) -> String {
-    match name {
-        Some(name) if !name.is_empty() => format!("{verb} {name}"),
-        _ => verb.to_owned(),
-    }
-}
-
-/// Sets the text and the enabled state of the Edit menu's Undo and Redo to follow the stacks:
-/// `undo` and `redo` are the names of the steps a press would act on, `None` for an empty stack.
-/// The two object items are enabled exactly when one object is selected (`object_step`).
-///
-/// # Errors
-/// The menu error as text, when the native menu refuses the change.
-#[tauri::command]
-#[allow(clippy::needless_pass_by_value)]
-pub fn set_history_menu(
-    items: State<HistoryItems>,
-    undo: Option<String>,
-    redo: Option<String>,
-    object_step: bool,
-) -> Result<(), String> {
-    let apply = |item: &MenuItem<Wry>, verb: &str, name: Option<String>| {
-        item.set_text(history_item_text(verb, name.as_deref()))
-            .and_then(|()| item.set_enabled(name.is_some()))
-            .map_err(|error| error.to_string())
-    };
-    apply(&items.undo, "Undo", undo)?;
-    apply(&items.redo, "Redo", redo)?;
-    items
-        .object_undo
-        .set_enabled(object_step)
-        .and_then(|()| items.object_redo.set_enabled(object_step))
-        .map_err(|error| error.to_string())
-}
-
-/// Routes a menu event id to its handler in `main.rs`. Quit is a
-/// [`PredefinedMenuItem`] and needs no entry here — Tauri handles it
-/// directly.
-pub fn dispatch(app: &AppHandle, id: &str) {
-    match id {
-        NEW_ID => crate::handle_new(app),
-        OPEN_ID => crate::handle_open(app),
-        SAVE_ID => crate::handle_save(app),
-        SAVE_AS_ID => crate::handle_save_as(app),
-        UNDO_ID => {
-            let _ = app.emit(HISTORY_MENU_EVENT, "undo");
-        }
-        REDO_ID => {
-            let _ = app.emit(HISTORY_MENU_EVENT, "redo");
-        }
-        OBJECT_UNDO_ID => {
-            let _ = app.emit(HISTORY_MENU_EVENT, "object-undo");
-        }
-        OBJECT_REDO_ID => {
-            let _ = app.emit(HISTORY_MENU_EVENT, "object-redo");
-        }
-        _ => {}
+/// A click on a custom item: only Quit exists, and it asks the page when there is anything to lose.
+pub(crate) fn dispatch(app: &AppHandle, id: &str) {
+    if id == QUIT_ID {
+        crate::project::request_quit(app);
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{HistoryKey, history_accelerator, history_item_text};
+    use super::*;
 
-    #[test]
-    fn only_macos_binds_native_undo_and_redo_accelerators() {
-        for key in [
-            HistoryKey::Undo,
-            HistoryKey::Redo,
-            HistoryKey::ObjectUndo,
-            HistoryKey::ObjectRedo,
-        ] {
-            assert_eq!(history_accelerator(key, false), None);
-        }
-        assert_eq!(history_accelerator(HistoryKey::Undo, true), Some("Cmd+Z"));
-        assert_eq!(
-            history_accelerator(HistoryKey::Redo, true),
-            Some("Cmd+Shift+Z")
-        );
-        assert_eq!(
-            history_accelerator(HistoryKey::ObjectUndo, true),
-            Some("Cmd+U")
-        );
-        assert_eq!(
-            history_accelerator(HistoryKey::ObjectRedo, true),
-            Some("Cmd+Shift+U")
-        );
+    fn entries() -> impl Iterator<Item = &'static Entry> {
+        MAC_MENU.iter().flat_map(|submenu| submenu.entries.iter())
     }
 
+    /// Criterion 39: an application menu and Edit, and no File menu.
     #[test]
-    fn the_item_names_the_step_or_stays_plain() {
-        assert_eq!(history_item_text("Undo", Some("Move")), "Undo Move");
-        assert_eq!(history_item_text("Redo", None), "Redo");
-        assert_eq!(history_item_text("Redo", Some("")), "Redo");
+    fn the_bar_has_the_application_menu_and_edit_only() {
+        let titles: Vec<_> = MAC_MENU.iter().map(|menu| menu.title).collect();
+        assert_eq!(titles, ["Curvyo", "Edit"]);
+    }
+
+    /// Criterion 38: the only custom item is Quit, with Cmd+Q.
+    #[test]
+    fn the_only_custom_item_is_quit() {
+        let custom: Vec<_> = entries()
+            .filter_map(|entry| match entry {
+                Entry::Custom {
+                    id, accelerator, ..
+                } => Some((*id, *accelerator)),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(custom, [("quit", "Cmd+Q")]);
+    }
+
+    /// Criterion 38: no item carries a chord that the page handles, so each chord reaches the
+    /// page once: the file chords and the editor's own keys.
+    #[test]
+    fn no_item_has_a_chord_of_the_page() {
+        let page_chords = [
+            "Cmd+N",
+            "Cmd+O",
+            "Cmd+S",
+            "Cmd+Shift+S",
+            "Cmd+W",
+            "Cmd+Z",
+            "Cmd+Shift+Z",
+            "Cmd+A",
+            "Cmd+U",
+            "Cmd+Shift+U",
+        ];
+        for entry in entries() {
+            if let Entry::Custom { accelerator, .. } = entry {
+                assert!(!page_chords.contains(accelerator), "{accelerator}");
+            }
+        }
+    }
+
+    /// Criterion 39: the application menu has About, Hide, Hide Others and Show All, and Edit has
+    /// Undo, Redo, Cut, Copy, Paste and Select All, all predefined.
+    #[test]
+    fn the_predefined_items_are_the_ones_the_specification_names() {
+        let predefined = |menu: usize| -> Vec<Predefined> {
+            MAC_MENU[menu]
+                .entries
+                .iter()
+                .filter_map(|entry| match entry {
+                    Entry::Predefined(item) => Some(*item),
+                    _ => None,
+                })
+                .collect()
+        };
+        assert_eq!(
+            predefined(0),
+            [
+                Predefined::About,
+                Predefined::Hide,
+                Predefined::HideOthers,
+                Predefined::ShowAll
+            ]
+        );
+        assert_eq!(
+            predefined(1),
+            [
+                Predefined::Undo,
+                Predefined::Redo,
+                Predefined::Cut,
+                Predefined::Copy,
+                Predefined::Paste,
+                Predefined::SelectAll
+            ]
+        );
     }
 }

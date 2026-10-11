@@ -57,7 +57,7 @@ impl WasmSession {
     }
 
     /// The operation name of the step a press would act on (`"Move"`), or empty when the stack
-    /// has none: the Edit menu and the buttons' tooltips.
+    /// has none: the History tab's buttons and their tooltips.
     pub fn history_target_name(&mut self, direction: &str) -> String {
         let direction_name = direction_from(direction);
         if is_object(direction) {

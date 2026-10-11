@@ -1,4 +1,4 @@
-import { Droplet, File, History, PanelRightClose, PanelRightOpen } from "lucide-react";
+import { Droplet, File, FolderOpen, History, PanelRightClose, PanelRightOpen } from "lucide-react";
 import { type ComponentType, useEffect, useRef, useState } from "react";
 
 import { TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -16,6 +16,7 @@ type Glyph = ComponentType<{
 
 /** The glyph of each tab (Lucide, 16 px, 1.5 px absolute stroke). */
 const GLYPHS: Record<string, Glyph> = {
+  file: FolderOpen,
   document: File,
   style: Droplet,
   history: History,
@@ -33,6 +34,8 @@ interface PanelStripProps {
   open: boolean;
   /** The id of the body, for `aria-controls` of the collapse control. */
   bodyId: string;
+  /** The project has unsaved changes: the File tab carries a dot, also while the body is hidden. */
+  fileDirty: boolean;
   /** The collapse control was pressed. */
   onToggle: (event: React.MouseEvent<HTMLButtonElement>) => void;
   /** A tab was pressed or chosen from the keyboard: the body is shown with it. */
@@ -48,7 +51,7 @@ const BUTTON_CLASS =
   // outside it would be cut. Two tones, because the pressed ground has the colour of the accent.
   "focus-visible:shadow-[inset_0_0_0_2px_var(--editor-accent),inset_0_0_0_4px_var(--toolbar-bg)]";
 
-const TAB_CLASS = `${BUTTON_CLASS} aria-selected:!bg-[var(--toolbar-icon-active-bg)] aria-selected:!text-[var(--toolbar-icon-active-fg)] disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent`;
+const TAB_CLASS = `${BUTTON_CLASS} group aria-selected:!bg-[var(--toolbar-icon-active-bg)] aria-selected:!text-[var(--toolbar-icon-active-fg)] disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent`;
 
 /**
  * The strip: a column of icon buttons on the panel's inner edge, next to the canvas
@@ -65,6 +68,7 @@ export function PanelStrip({
   active,
   open,
   bodyId,
+  fileDirty,
   onToggle,
   onActivate,
   onReturnFocus,
@@ -124,10 +128,11 @@ export function PanelStrip({
       >
         {tabs.map((tab) => {
           const Glyph = GLYPHS[tab.name];
+          const dot = tab.name === "file" && fileDirty;
           const trigger = (
             <TabsTrigger
               value={tab.name}
-              aria-label={tab.label}
+              aria-label={dot ? `${tab.label}, unsaved changes` : tab.label}
               aria-selected={open && tab.name === active}
               disabled={!tab.enabled}
               aria-disabled={tab.enabled ? undefined : true}
@@ -141,6 +146,16 @@ export function PanelStrip({
               className={TAB_CLASS}
             >
               {Glyph && <Glyph size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />}
+              {dot ? (
+                // A shape badge in the glyph's colour, inside the 28 px box so the strip's scroll
+                // area never clips it; the casing has the ground's colour (the pressed ground
+                // while File is pressed).
+                <span
+                  aria-hidden
+                  data-dirty-dot
+                  className="absolute top-[2px] right-[2px] size-1.5 rounded-full bg-current shadow-[0_0_0_1.5px_var(--panel-bg)] group-aria-selected:shadow-[0_0_0_1.5px_var(--toolbar-icon-active-bg)]"
+                />
+              ) : null}
             </TabsTrigger>
           );
           return (

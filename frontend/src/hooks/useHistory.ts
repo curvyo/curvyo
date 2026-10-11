@@ -2,21 +2,17 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useBusyWindow } from "@/hooks/useRailCommands";
 import {
-  DUPLICATE_PRESS_MS,
   FINISH_PEN_NOTICE_MS,
   type HistoryDirection,
   historyKeyDirection,
   isMac,
-  isObjectDirection,
   menuNames,
-  menuPressPlan,
   noticeDurationMs,
   noticeText,
   WORKING_NOTICE_DELAY_MS,
   workingNotice,
 } from "@/lib/historyText";
 import { objectWipedNotice, wipedNotice } from "@/lib/historyRows";
-import { invoke, isTauri, listen } from "@/platform/host";
 import type { WasmSession } from "@/lib/editorSession";
 
 /** A line in the canvas notice slot (`docs/design-system.md`, "Canvas notice slot"). */
@@ -50,10 +46,9 @@ export interface HistoryApi {
     source?: "canvas" | "panel",
     kind?: "status" | "alert",
   ) => void;
-  /** Re-reads the names of the next undo and redo (and the native menu). Call after any change
-   * of the session. */
+  /** Re-reads the names of the next undo and redo. Call after any change of the session. */
   refresh: () => void;
-  /** Runs an undo or redo from a button or the menu; `source` says where the notice shows. */
+  /** Runs an undo or redo from a button; `source` says where the notice shows. */
   press: (direction: HistoryDirection, source?: "canvas" | "panel") => void;
   /** Wipes the history (the confirm was pressed): the notice says how many steps went. Returns the
    * steps removed, -1 when the session ignored it, -2 for a shared document and -3 when the
@@ -62,8 +57,6 @@ export interface HistoryApi {
   /** Hides the selected object's earlier history: the notice says how many rows went. Returns
    * the rows hidden, -1 when the session ignored it and -3 when the log could not take the step. */
   wipeObject: () => number;
-  /** Whether this key event is the second arrival of a press the native menu already handled. */
-  isDuplicateKey: (event: KeyboardEvent | React.KeyboardEvent) => boolean;
   /** Handles the outcome string `key_down` returned when it belongs to history; `false`
    * for every other outcome. */
   handleKeyOutcome: (outcome: string) => boolean;
@@ -98,8 +91,9 @@ function isTextEntry(target: EventTarget | null): boolean {
 
 /**
  * Undo and redo in the frontend (`specs/0020-undo-redo`): the canvas notice of every press, the
- * long-operation state of a large step, the keys outside the canvas (the tool rail and the
- * Properties panel), and the native Edit menu. Every decision (the gate, the stacks, what is
+ * long-operation state of a large step and the keys outside the canvas (the tool rail and the
+ * Properties panel). There is no Edit menu (`specs/0051-sidebar-and-no-menu/` criterion 35): the keys
+ * and the History tab's buttons are the routes. Every decision (the gate, the stacks, what is
  * skipped) is the session's; this hook forwards keys and shows what comes back.
  *
  * `onChange` runs after a press changed the document, to re-read the session's state.
@@ -116,7 +110,6 @@ export function useHistory(
   const [busy, setBusy] = useState(false);
   const [names, setNames] = useState<HistoryNames>({ undo: null, redo: null });
   const counter = useRef(0);
-  const lastPress = useRef<{ direction: HistoryDirection; at: number } | null>(null);
   const onChangeRef = useRef(onChange);
   const onAppliedRef = useRef(onApplied);
   useEffect(() => {
@@ -147,7 +140,6 @@ export function useHistory(
     return () => window.clearTimeout(timer);
   }, [notice]);
 
-  const sentToMenu = useRef<string>("");
   const refresh = useCallback(() => {
     const session = getSession();
     if (!session) {
@@ -160,31 +152,7 @@ export function useHistory(
     setNames((previous) =>
       previous.undo === next.undo && previous.redo === next.redo ? previous : next,
     );
-    if (isTauri) {
-      const objectStep = session.selection_count() === 1;
-      const key = JSON.stringify({ ...next, objectStep });
-      if (key !== sentToMenu.current) {
-        sentToMenu.current = key;
-        void invoke("set_history_menu", { ...next, objectStep }).catch((error: unknown) => {
-          // The native menu falls behind; the keys and buttons still work.
-          console.error("set_history_menu failed", error);
-        });
-      }
-    }
   }, [getSession]);
-
-  const markPressed = useCallback((direction: HistoryDirection) => {
-    lastPress.current = { direction, at: performance.now() };
-  }, []);
-
-  const pressedJustNow = useCallback((direction: HistoryDirection) => {
-    const last = lastPress.current;
-    return (
-      last !== null &&
-      last.direction === direction &&
-      performance.now() - last.at < DUPLICATE_PRESS_MS
-    );
-  }, []);
 
   /** Runs a press the session announced as large: the state first, a frame to paint it, then the
    * call. */
@@ -238,7 +206,6 @@ export function useHistory(
         case "redo":
         case "object-undo":
         case "object-redo": {
-          markPressed(outcome);
           onAppliedRef.current?.();
           const text = noticeText(getSession()?.take_history_notice() ?? "");
           if (text !== null) {
@@ -251,7 +218,6 @@ export function useHistory(
         case "object-undo-busy":
         case "object-redo-busy": {
           const direction = outcome.replace(/-busy$/, "") as HistoryDirection;
-          markPressed(direction);
           onAppliedRef.current?.();
           void runBusy(direction);
           return true;
@@ -266,7 +232,7 @@ export function useHistory(
           return false;
       }
     },
-    [getSession, markPressed, runBusy, showNotice],
+    [getSession, runBusy, showNotice],
   );
 
   // Undo and redo with the focus outside the canvas, in the tool rail or the Properties panel
@@ -285,7 +251,7 @@ export function useHistory(
       if (container && target instanceof Node && container.contains(target)) {
         return;
       }
-      if (busy || pressedJustNow(direction)) {
+      if (busy) {
         event.preventDefault();
         return;
       }
@@ -312,44 +278,7 @@ export function useHistory(
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [busy, containerRef, getSession, handleKeyOutcome, pressedJustNow]);
-
-  // The native Edit menu. A click arrives as `history-menu`; so does the macOS accelerator, which
-  // can also reach the page as a key event, and the first one wins (criterion 8). The listener is
-  // registered once and reads `press` through a ref, so a busy undo never leaves a gap.
-  const menuPressRef = useRef<(direction: HistoryDirection) => void>(() => {});
-  useEffect(() => {
-    menuPressRef.current = (direction) => {
-      const textEntry = isTextEntry(document.activeElement);
-      const plan = menuPressPlan({ duplicate: pressedJustNow(direction), textEntry });
-      if (plan === "text-undo") {
-        // A text field keeps its own undo; the object steps are not its business.
-        if (!isObjectDirection(direction)) {
-          document.execCommand(direction);
-        }
-      } else if (plan === "document") {
-        markPressed(direction);
-        press(direction);
-      }
-    };
-  }, [markPressed, press, pressedJustNow]);
-  useEffect(() => {
-    if (!isTauri) {
-      return undefined;
-    }
-    const unlisten = listen<string>("history-menu", (event) => {
-      const payload = event.payload;
-      menuPressRef.current(
-        payload === "redo" || payload === "object-undo" || payload === "object-redo"
-          ? payload
-          : "undo",
-      );
-    });
-    void unlisten.catch((error: unknown) => console.error("history-menu listen failed", error));
-    return () => {
-      void unlisten.then((stop) => stop()).catch(() => undefined);
-    };
-  }, []);
+  }, [busy, containerRef, getSession, handleKeyOutcome]);
 
   const wipe = useCallback(() => {
     const removed = getSession()?.history_wipe() ?? -1;
@@ -373,14 +302,6 @@ export function useHistory(
     return hidden;
   }, [getSession, showNotice]);
 
-  const isDuplicateKey = useCallback(
-    (event: KeyboardEvent | React.KeyboardEvent) => {
-      const direction = historyKeyDirection(event, MAC);
-      return direction !== null && pressedJustNow(direction);
-    },
-    [pressedJustNow],
-  );
-
   return {
     notice,
     busy,
@@ -390,7 +311,6 @@ export function useHistory(
     press,
     wipe,
     wipeObject,
-    isDuplicateKey,
     handleKeyOutcome,
   };
 }

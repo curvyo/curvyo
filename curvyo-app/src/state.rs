@@ -10,6 +10,7 @@
 //! `take_pending_open`).
 
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, MutexGuard};
 
 /// The app's one open project: nothing but where it lives on disk.
@@ -77,13 +78,41 @@ pub enum PendingOpen {
 /// event does not survive that race, so a file opened this way could be
 /// silently dropped — exactly what acceptance criterion 7 forbids. The
 /// frontend polls `take_pending_open` once on mount.
+///
+/// Two flags decide the window close without a round trip to the page
+/// (`specs/0051-sidebar-and-no-menu/` criterion 41): `dirty`, which the page reports on every
+/// change, and `quitting`, which the quit command sets so the exit it triggers is not held.
 #[derive(Default)]
 pub struct AppState {
     project: Mutex<ProjectState>,
     pending_open: Mutex<Option<PendingOpen>>,
+    dirty: AtomicBool,
+    quitting: AtomicBool,
 }
 
 impl AppState {
+    /// Records what the page reported: the project has changes that no saved file holds.
+    pub fn set_dirty(&self, dirty: bool) {
+        self.dirty.store(dirty, Ordering::SeqCst);
+    }
+
+    /// Whether the page last reported unsaved changes.
+    pub fn is_dirty(&self) -> bool {
+        self.dirty.load(Ordering::SeqCst)
+    }
+
+    /// The page asked to leave the application: the exit that follows is not held.
+    pub fn begin_quit(&self) {
+        self.quitting.store(true, Ordering::SeqCst);
+    }
+
+    /// Whether a window close or an exit must wait for the page's answer: there are unsaved
+    /// changes and the page has not asked to quit. A clean project is never held, so a hung page
+    /// cannot block closing it.
+    pub fn must_hold_close(&self) -> bool {
+        self.is_dirty() && !self.quitting.load(Ordering::SeqCst)
+    }
+
     /// Locks the project state.
     ///
     /// # Panics
@@ -122,5 +151,26 @@ impl AppState {
         #[allow(clippy::unwrap_used)]
         // invariant: nothing in this crate panics while holding the lock.
         self.pending_open.lock().unwrap().take()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Criterion 41: only a dirty project that is not being quit is held.
+    #[test]
+    fn only_a_dirty_project_that_is_not_quitting_holds_the_close() {
+        let state = AppState::default();
+        assert!(!state.must_hold_close(), "a clean project closes at once");
+        state.set_dirty(true);
+        assert!(state.must_hold_close());
+        state.begin_quit();
+        assert!(
+            !state.must_hold_close(),
+            "the exit the page asked for goes through"
+        );
+        state.set_dirty(false);
+        assert!(!state.must_hold_close());
     }
 }

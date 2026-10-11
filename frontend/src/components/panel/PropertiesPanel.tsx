@@ -2,6 +2,7 @@ import { panelHandlesEscape } from "@/lib/panelEscape";
 import { useCallback, useEffect, useId, useRef } from "react";
 
 import { DocumentSection } from "@/components/panel/DocumentSection";
+import { FileTab } from "@/components/panel/FileTab";
 import { HistoryTab } from "@/components/panel/HistoryTab";
 import { PanelStrip } from "@/components/panel/PanelStrip";
 import { StyleSection } from "@/components/panel/StyleSection";
@@ -10,16 +11,21 @@ import { Tooltip } from "@/components/ui/tooltip";
 import type { DocumentPanelApi } from "@/hooks/useDocumentPanel";
 import type { EditorSession } from "@/hooks/useEditorSession";
 import type { PanelOpenApi } from "@/hooks/usePanelOpen";
+import type { ProjectApi } from "@/hooks/useProject";
 import { useBackgroundPanel } from "@/hooks/useBackgroundPanel";
 import { useFormats } from "@/hooks/useFormats";
 import { useHistoryScope } from "@/hooks/useHistoryScope";
 import { useStylePanel } from "@/hooks/useStylePanel";
+import { appVersion, fileCommandTooltip } from "@/lib/editorSession";
+import { isTauri, PLATFORM } from "@/platform/host";
 
 interface PropertiesPanelProps {
   editor: EditorSession;
   document: DocumentPanelApi;
   /** Whether the body is shown; owned by the app so a request from outside the panel can show it. */
   panelOpen: PanelOpenApi;
+  /** The open project: the File tab shows it and the strip carries its dirty dot. */
+  project: ProjectApi;
 }
 
 /**
@@ -37,7 +43,12 @@ interface PropertiesPanelProps {
  * does (`specs/0043-properties-tabs/` criteria 18, 19). Which tab is active, and when it switches,
  * is the session's rule.
  */
-export function PropertiesPanel({ editor, document: doc, panelOpen }: PropertiesPanelProps) {
+export function PropertiesPanel({
+  editor,
+  document: doc,
+  panelOpen,
+  project,
+}: PropertiesPanelProps) {
   const { open, setOpen } = panelOpen;
   const panelId = useId();
   const asideRef = useRef<HTMLElement>(null);
@@ -132,7 +143,11 @@ export function PropertiesPanel({ editor, document: doc, panelOpen }: Properties
   const objectSubject = historyScope.scope === "object" ? historyScope.info : null;
   const historyTotal = doc.view.content === "history" ? historyCount(editor) : 0;
   const subject =
-    doc.view.content === "history"
+    doc.view.content === "file"
+      ? project.dirty
+        ? "Unsaved changes"
+        : ""
+      : doc.view.content === "history"
       ? `${historyTotal} ${historyTotal === 1 ? "step" : "steps"}`
       : doc.view.content === "document"
       ? doc.view.presets.subject
@@ -159,6 +174,7 @@ export function PropertiesPanel({ editor, document: doc, panelOpen }: Properties
         active={doc.view.activeTab}
         open={open}
         bodyId={panelId}
+        fileDirty={project.dirty}
         onToggle={(event) => {
           // A press on the collapse control ends picking too (`0040` UX notes).
           if (picking) {
@@ -255,7 +271,15 @@ export function PropertiesPanel({ editor, document: doc, panelOpen }: Properties
                 : "outline-none"
             }
           >
-            {doc.view.content === "document" ? (
+            {doc.view.content === "file" ? (
+              <FileTab
+                project={project}
+                desktop={isTauri}
+                version={appVersion()}
+                tooltipFor={(command) => fileCommandTooltip(command, PLATFORM)}
+                onReturnFocus={returnFocus}
+              />
+            ) : doc.view.content === "document" ? (
               <DocumentSection
                 document={doc}
                 formats={formats}
