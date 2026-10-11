@@ -106,6 +106,22 @@ impl AppState {
         self.quitting.store(true, Ordering::SeqCst);
     }
 
+    /// The page holds an empty, never-saved, clean project: forgets the path and the dirty flag.
+    /// A file handed over at launch stays buffered for the page to take.
+    pub fn reset_project(&self) {
+        *self.lock_project() = ProjectState::new_unsaved();
+        self.set_dirty(false);
+    }
+
+    /// The page opened the file at `path`: it is the project's path now, the project is clean,
+    /// and a buffered copy of the file is dropped so that a later page start (a reload) does not
+    /// open it again.
+    pub fn confirm_opened(&self, path: PathBuf) {
+        *self.lock_project() = ProjectState::opened(path);
+        self.set_dirty(false);
+        let _ = self.take_pending_open();
+    }
+
     /// Whether a window close or an exit must wait for the page's answer: there are unsaved
     /// changes and the page has not asked to quit. A clean project is never held, so a hung page
     /// cannot block closing it.
@@ -172,5 +188,38 @@ mod tests {
         );
         state.set_dirty(false);
         assert!(!state.must_hold_close());
+    }
+
+    /// A webview reload starts an empty page: the host must not keep the old path (Ctrl+S would
+    /// write the new document over the old file) or a dirty flag the new page never reports.
+    #[test]
+    fn a_page_start_resets_the_path_and_the_dirty_flag_but_keeps_a_launch_file() {
+        let state = AppState::default();
+        state.confirm_opened(PathBuf::from("/work/old.curvyo"));
+        state.set_dirty(true);
+        state.set_pending_open(PendingOpen::IoError("launch".to_string()));
+        state.reset_project();
+        assert_eq!(state.lock_project().path, None);
+        assert!(!state.is_dirty());
+        assert!(!state.must_hold_close());
+        assert!(matches!(
+            state.take_pending_open(),
+            Some(PendingOpen::IoError(_))
+        ));
+    }
+
+    /// An opened file is the project's path, clean, and no longer pending.
+    #[test]
+    fn opening_a_file_sets_the_path_and_drops_the_buffered_copy() {
+        let state = AppState::default();
+        state.set_dirty(true);
+        state.set_pending_open(PendingOpen::IoError("handed over".to_string()));
+        state.confirm_opened(PathBuf::from("/work/new.curvyo"));
+        assert_eq!(
+            state.lock_project().file_name().as_deref(),
+            Some("new.curvyo")
+        );
+        assert!(!state.is_dirty());
+        assert!(state.take_pending_open().is_none());
     }
 }

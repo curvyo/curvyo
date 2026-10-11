@@ -8,10 +8,11 @@
 
 use std::path::{Path, PathBuf};
 
+use tauri::Wry;
 use tauri::{AppHandle, Emitter, Manager};
-use tauri_plugin_dialog::DialogExt;
+use tauri_plugin_dialog::{DialogExt, FileDialogBuilder};
 
-use crate::state::{AppState, PendingOpen, ProjectState};
+use crate::state::{AppState, PendingOpen};
 
 /// The main window's label, matching `tauri.conf.json`.
 const MAIN_WINDOW: &str = "main";
@@ -118,11 +119,7 @@ pub(crate) fn take_pending_open(state: tauri::State<AppState>) -> Option<OpenPay
 #[tauri::command]
 #[allow(clippy::unused_async)] // async keeps the blocking dialog off the main thread
 pub(crate) async fn pick_project(app: AppHandle) -> Option<OpenPayload> {
-    let picked = app
-        .dialog()
-        .file()
-        .add_filter(PROJECT_FILTER_NAME, &[PROJECT_EXTENSION])
-        .blocking_pick_file()?;
+    let picked = project_dialog(&app).blocking_pick_file()?;
     let path = picked.into_path().ok()?;
     Some(read_project(&path).into())
 }
@@ -136,19 +133,17 @@ pub(crate) async fn pick_project(app: AppHandle) -> Option<OpenPayload> {
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)]
 pub(crate) fn confirm_project_opened(app: AppHandle, path: String) {
-    let state = app.state::<AppState>();
-    *state.lock_project() = ProjectState::opened(PathBuf::from(path));
-    state.set_dirty(false);
+    app.state::<AppState>().confirm_opened(PathBuf::from(path));
     refresh_window_title(&app);
 }
 
-/// New and Close: an empty, never-saved, clean project replaces whatever was open.
+/// New, Close, and the start of every page (a reload included): the page holds an empty,
+/// never-saved, clean project, so the host forgets the path and the dirty flag of whatever was
+/// open before. A file handed over at launch stays buffered.
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)]
 pub(crate) fn reset_project(app: AppHandle) {
-    let state = app.state::<AppState>();
-    *state.lock_project() = ProjectState::new_unsaved();
-    state.set_dirty(false);
+    app.state::<AppState>().reset_project();
     refresh_window_title(&app);
 }
 
@@ -276,11 +271,23 @@ pub(crate) fn open_handed_path(app: &AppHandle, path: &Path) {
     app.state::<AppState>().set_pending_open(pending);
 }
 
+/// A file dialog for project files, modal to the main window: on Linux and Windows the window
+/// stays operable while a dialog without a parent is up, and a New or Discard pressed meanwhile
+/// would make the dialog's answer land on a different project.
+fn project_dialog(app: &AppHandle) -> FileDialogBuilder<Wry> {
+    let dialog = app
+        .dialog()
+        .file()
+        .add_filter(PROJECT_FILTER_NAME, &[PROJECT_EXTENSION]);
+    match app.get_webview_window(MAIN_WINDOW) {
+        Some(window) => dialog.set_parent(&window),
+        None => dialog,
+    }
+}
+
 /// The native Save As… dialog, defaulting to the project's file name, or `Untitled.curvyo`.
 fn pick_save_path(app: &AppHandle, current_name: Option<&str>) -> Option<PathBuf> {
-    app.dialog()
-        .file()
-        .add_filter(PROJECT_FILTER_NAME, &[PROJECT_EXTENSION])
+    project_dialog(app)
         .set_file_name(current_name.unwrap_or(DEFAULT_FILE_NAME))
         .blocking_save_file()
         .and_then(|file_path| file_path.into_path().ok())

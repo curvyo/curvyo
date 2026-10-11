@@ -11,6 +11,7 @@ import {
   savedNotice,
 } from "@/lib/projectText";
 import { isMac } from "@/lib/historyText";
+import { createBusyGate } from "@/lib/busyGate";
 import { invoke, isTauri, listen, PLATFORM } from "@/platform/host";
 
 /** The browser build on a Mac uses Cmd as well. */
@@ -28,7 +29,7 @@ type Action =
   | { kind: "handover"; path: string; bytes: number[] };
 
 /** Who asked: a button of the File tab, or something outside it (a chord, the window close, the
- * operating system handing over a file, the native menu). */
+ * operating system handing over a file). */
 type Origin = { button: FileCommandName } | "outside";
 
 /** The inline check of unsaved changes while it shows (`specs/0051-sidebar-and-no-menu/`
@@ -89,7 +90,7 @@ function isTextField(element: Element | null): element is HTMLElement {
  * The open project in the page (`specs/0051-sidebar-and-no-menu/`, `adrs.md` decisions 3, 5, 7):
  * its file, the mirror of the session's dirty flag that the title, the File tab and the host
  * follow, and New, Open, Save, Save as, Close and Quit. `press` (the buttons), the file chords,
- * the window close, a file the operating system hands over and the native menu all end in the
+ * the window close and a file the operating system hands over all end in the
  * one place that reads the dirty state and raises the inline check. The rules (the chord table
  * and its gate, the dirty flag) are the session's; this hook runs the commands and keeps the host
  * told.
@@ -118,8 +119,9 @@ export function useProject(deps: ProjectDeps): ProjectApi {
   }, []);
   const checkCounter = useRef(0);
 
-  /** An Open or Save dialog is up, or a write is running: another one waits. */
-  const busyRef = useRef(false);
+  /** An Open or Save dialog is up, or a write is running: its answer belongs to the project that
+   * was open when it started, so nothing that ends that project starts meanwhile. */
+  const busy = useRef(createBusyGate()).current;
   const quittingRef = useRef(false);
 
   /** Re-reads the session's dirty flag and, when it changed, tells the host and the page title.
@@ -139,9 +141,11 @@ export function useProject(deps: ProjectDeps): ProjectApi {
   }, []);
 
   useEffect(() => {
+    // The next frame is scheduled first: a read that throws must not end dirty tracking, without
+    // which the host is never told and a window close is never held.
     let frame = requestAnimationFrame(function tick() {
-      refreshDirty();
       frame = requestAnimationFrame(tick);
+      refreshDirty();
     });
     return () => cancelAnimationFrame(frame);
   }, [refreshDirty]);
@@ -193,10 +197,9 @@ export function useProject(deps: ProjectDeps): ProjectApi {
   );
 
   const openFlow = useCallback(async () => {
-    if (busyRef.current) {
+    if (!busy.enter()) {
       return;
     }
-    busyRef.current = true;
     try {
       const picked = await invoke<OpenPayload | null>("pick_project");
       if (!picked) {
@@ -210,13 +213,15 @@ export function useProject(deps: ProjectDeps): ProjectApi {
     } catch (error) {
       depsRef.current.onOpenError(String(error));
     } finally {
-      busyRef.current = false;
+      busy.leave();
     }
-  }, [openBytes]);
+  }, [busy, openBytes]);
 
   const resetProject = useCallback(async () => {
-    await invoke("reset_project").catch(() => undefined);
+    // The host hears "clean" only once the new session exists: if the attach fails, the project is
+    // still the old one.
     await depsRef.current.editor.newProject();
+    await invoke("reset_project").catch(() => undefined);
     setInfo({ fileName: null, path: null });
   }, [setInfo]);
 
@@ -254,10 +259,9 @@ export function useProject(deps: ProjectDeps): ProjectApi {
    * the dialog, `"failed"` after the error dialog was raised. */
   const save = useCallback(
     async (saveAs: boolean): Promise<"saved" | "cancelled" | "failed"> => {
-      if (busyRef.current) {
+      if (!busy.enter()) {
         return "cancelled";
       }
-      busyRef.current = true;
       const { editor, onSaveError } = depsRef.current;
       try {
         let bytes: Uint8Array;
@@ -288,10 +292,10 @@ export function useProject(deps: ProjectDeps): ProjectApi {
         onSaveError(typeof error === "string" ? error : SAVE_FAILED);
         return "failed";
       } finally {
-        busyRef.current = false;
+        busy.leave();
       }
     },
-    [refreshDirty, setInfo],
+    [busy, refreshDirty, setInfo],
   );
 
   // ---- the check ---------------------------------------------------------------------------
@@ -300,6 +304,10 @@ export function useProject(deps: ProjectDeps): ProjectApi {
    * raises the check in the File tab (criteria 25 to 28). */
   const request = useCallback(
     (action: Action, origin: Origin) => {
+      // A dialog or a write is running: this action waits for the maker to ask again.
+      if (busy.isBusy()) {
+        return;
+      }
       // A commit of this very frame counts: the flag is read now, not at the last frame.
       refreshDirty();
       if (!dirtyRef.current) {
@@ -319,7 +327,7 @@ export function useProject(deps: ProjectDeps): ProjectApi {
         panel.pressTab("file");
       }
     },
-    [refreshDirty, runAction, setCheck],
+    [busy, refreshDirty, runAction, setCheck],
   );
 
   const saveFromCheck = useCallback(async () => {
@@ -342,12 +350,12 @@ export function useProject(deps: ProjectDeps): ProjectApi {
 
   const discard = useCallback(() => {
     const pending = checkRef.current;
-    if (!pending) {
+    if (!pending || busy.isBusy()) {
       return;
     }
     setCheck(null);
     void runAction(pending.action);
-  }, [runAction, setCheck]);
+  }, [busy, runAction, setCheck]);
 
   const cancel = useCallback(() => {
     const pending = checkRef.current;
@@ -460,9 +468,13 @@ export function useProject(deps: ProjectDeps): ProjectApi {
   }, [run]);
 
   // What the host sends: a file the operating system hands to the running app, the close of the
-  // window while there are unsaved changes, and (until the native menu goes) its commands.
+  // window while there are unsaved changes. A page that starts (a reload included) holds an empty
+  // project, so the host forgets the path and dirty flag of the one before, and only then hands
+  // over a file that came with the launch.
   useEffect(() => {
-    invoke<OpenPayload | null>("take_pending_open")
+    invoke("reset_project")
+      .catch(() => undefined)
+      .then(() => invoke<OpenPayload | null>("take_pending_open"))
       .then((pending) => {
         if (!pending) {
           return;

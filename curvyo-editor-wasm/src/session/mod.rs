@@ -357,8 +357,8 @@ impl Session {
         })
     }
 
-    /// Packs the current document into `.curvyo` container bytes (File →
-    /// Save/Save As).
+    /// Packs the current document into `.curvyo` container bytes. Not for a save: use
+    /// [`Session::pack_for_save`], which records the saved version.
     ///
     /// # Errors
     /// See [`curvyo_document_core::pack`].

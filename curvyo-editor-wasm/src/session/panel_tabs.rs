@@ -291,8 +291,9 @@ mod tests {
         }
         let view = session.panel_view();
         assert_eq!(view.content, PanelContent::Empty);
-        assert!(view.tabs.iter().any(|tab| tab.name == "document"));
-        assert!(view.tabs.iter().any(|tab| tab.name == "history"));
+        for name in ["file", "document", "style", "history"] {
+            assert!(view.tabs.iter().any(|tab| tab.name == name), "{name}");
+        }
         assert!(session.press_panel_tab("document"));
         assert_eq!(session.panel_content(), PanelContent::Empty);
         session.finish_pen();
