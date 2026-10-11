@@ -52,49 +52,49 @@ Milestones are commits on the branch; none is a PR. `format_version` goes from 1
 
 ### Milestone 1: model, commands, file format (AC 1 to 5, 13, 14, 25, 27)
 
-- [ ] 1.1 Tree reads: `children`, `parent`, `is_group`, `leaves_of`, `object_ids` as leaves in paint order,
+- [x] 1.1 Tree reads: `children`, `parent`, `is_group`, `leaves_of`, `object_ids` as leaves in paint order,
   `object`/`path`/`primitive` are `None` for a group (AC 25)
-- [ ] 1.2 `group_objects` and `ungroup` with the 32-level limit, order rule, one commit each (AC 1, 3, 4, 5)
-- [ ] 1.3 Empty groups removed in the same commit by delete, replace, break apart, split, last-node
+- [x] 1.2 `group_objects` and `ungroup` with the 32-level limit, order rule, one commit each (AC 1, 3, 4, 5)
+- [x] 1.3 Empty groups removed in the same commit by delete, replace, break apart, split, last-node
   delete (AC 14); a guard test lists the commands
-- [ ] 1.4 Deep duplicate with new ids for group, descendants and anchors; deep delete (AC 13)
-- [ ] 1.5 Creation inside the entered group (`Document::set_draw_parent`) (AC 19)
-- [ ] 1.6 Open-file validation (group shape, depth > 32, child of a leaf), `format_version` 11, golden
+- [x] 1.4 Deep duplicate with new ids for group, descendants and anchors; deep delete (AC 13)
+- [x] 1.5 Creation inside the entered group (`Document::set_draw_parent`) (AC 19)
+- [x] 1.6 Open-file validation (group shape, depth > 32, child of a leaf), `format_version` 11, golden
   files, older files byte-identical after Open, `document.json` nests groups (AC 27)
 
 ### Milestone 2: undo and redo of group steps (AC 6 history, `0020` review note)
 
-- [ ] 2.1 Restore moves (parent and z-position) in `restore_plan.rs`, revival under a parent, `ObjectShape::Group`
-- [ ] 2.2 Tests: Group, Ungroup, nested delete with emptied group, duplicate of a group; undo and redo
+- [x] 2.1 Restore moves (parent and z-position) in `restore_plan.rs`, revival under a parent, `ObjectShape::Group`
+- [x] 2.2 Tests: Group, Ungroup, nested delete with emptied group, duplicate of a group; undo and redo
   restore `export_json` exactly
 
 ### Milestone 3: selection, context, tools in `ui-core` (AC 8 to 12, 15 to 22, 28 to 30)
 
-- [ ] 3.1 `context.rs`: unit map, context stack, fallback (AC 8, 15, 20)
-- [ ] 3.2 Click, Shift-click, hover, marquee, lasso, Alt-click cycle by unit (AC 8, 9, 10)
-- [ ] 3.3 Group and Ungroup availability and commands; refusals of Boolean, Combine, Split, Break apart,
+- [x] 3.1 `context.rs`: unit map, context stack, fallback (AC 8, 15, 20)
+- [x] 3.2 Click, Shift-click, hover, marquee, lasso, Alt-click cycle by unit (AC 8, 9, 10)
+- [x] 3.3 Group and Ungroup availability and commands; refusals of Boolean, Combine, Split, Break apart,
   Object to path for groups (AC 2, 28, 29)
-- [ ] 3.4 Enter, double-click leave, Escape step (AC 15, 17, 18)
-- [ ] 3.5 Subject line, Node tool, Pen targets, style on groups (AC 11, 12, 26, 30)
-- [ ] 3.6 Operation names `group` and `ungroup` (history names guard)
+- [x] 3.4 Enter, double-click leave, Escape step (AC 15, 17, 18)
+- [x] 3.5 Subject line, Node tool, Pen targets, style on groups (AC 11, 12, 26, 30)
+- [x] 3.6 Operation names `group` and `ungroup` (history names guard)
 
 ### Milestone 4: drawing (AC 15, 16, 22)
 
-- [ ] 4.1 Dimming outside the context; group box only, no member boxes; unit hover box
+- [x] 4.1 Dimming outside the context; group box only, no member boxes; unit hover box (the hover hint chip "Double-click to open" is not built)
 
 ### Milestone 5: session and wasm API (AC 6, 7, 15 to 21)
 
-- [ ] 5.1 `Session` context, `group`/`ungroup`/`enter`/`leave`, notices, keys (Ctrl+G, Ctrl+Shift+G, Enter,
+- [x] 5.1 `Session` context, `group`/`ungroup`/`enter`/`leave`, notices, keys (Ctrl+G, Ctrl+Shift+G, Enter,
   Escape step), gate, wasm facade
 
 ### Milestone 6: frontend (AC 2, 6, 7, 15 to 18)
 
-- [ ] 6.1 Rail: Boolean card to column B, Group card in column A, glyphs, tooltips
-- [ ] 6.2 Notices, the "Open groups" indicator, hint chip, keys, announcements; frontend tests
+- [x] 6.1 Rail: Boolean card to column B, Group card in column A, glyphs, tooltips
+- [x] 6.2 Notices, the "Open groups" indicator, hint chip, keys, announcements; frontend tests
 
 ### Milestone 7: gate and docs
 
-- [ ] 7.1 Full local gate, wasm builds, boolean budgets, spec status and format plan, PR draft
+- [x] 7.1 Full local gate, wasm builds, boolean budgets, spec status and format plan, PR draft
 
 ## Validation
 
