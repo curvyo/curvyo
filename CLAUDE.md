@@ -104,12 +104,20 @@ format, public API) may run on the branch diff, the UX review and the full
 tester pass run once on the finished slice. No stop for the customer between
 milestones. Only `chore/` and `fix/` PRs (small, self-contained) stand alone.
 
+**What changes in the demo (customer rule, 2026-10-11):** every PR description
+(story, `fix/` and `chore/` alike) starts with a section "What changes in the
+demo": the changes the maker notices when using the app, as a short list in
+plain English like everything else in the repo (what to click or press, what is
+new, what behaves differently than before, what is deliberately not there yet). A PR with no
+visible change says "Nothing changes in the demo." The section comes before the
+Review guide.
+
 **The customer reviews selectively:** the central `.rs` files, `Cargo.toml`
 and `Cargo.lock` changes, and docs/spec/ADR changes; not the TypeScript. Every
-story PR description therefore starts with a "Review guide": the 3-8 central
-Rust files and what to look for in each, every dependency change with licence
-and reason, every docs/spec/ADR change, the format version change (if any),
-and how to try the slice.
+story PR description therefore has, after "What changes in the demo", a "Review
+guide": the 3-8 central Rust files and what to look for in each, every
+dependency change with licence and reason, every docs/spec/ADR change, the
+format version change (if any), and how to try the slice (the command).
 
 Parallel work: at most two implementers at once, each in its own worktree,
 on features that do not touch the same crates.
@@ -245,7 +253,7 @@ Use the ProjectAtlas MCP for code navigation before broad grep/read passes.
 - Branches: `story/<feature-slug>`, `fix/slug`, `chore/slug`.
 - Conventional Commits (`feat:`, `fix:`, `refactor:`, `test:`, `docs:`,
   `chore:`), scope = crate name where it applies.
-- One PR per feature (see §4: one PR per slice, opened when the slice is testable). PR description: starts with the Review guide (§4), then link to `specs/<NNNN-feature-slug>/`, what
+- One PR per feature (see §4: one PR per slice, opened when the slice is testable). PR description: starts with "What changes in the demo" and then the Review guide (§4), then link to `specs/<NNNN-feature-slug>/`, what
   changed, ADRs touched, new dependencies with license and reason, how to
   try it.
 - Squash-merge after green CI and customer acceptance. **Standing permission
