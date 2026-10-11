@@ -124,7 +124,7 @@ export function PanelStrip({
             focusInside.current = false;
           }
         }}
-        className="flex min-h-0 w-full flex-1 flex-col items-start gap-1 overflow-y-auto overflow-x-hidden [scrollbar-width:thin]"
+        className="flex min-h-0 w-full flex-1 flex-col items-start gap-1 overflow-y-auto overflow-x-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {tabs.map((tab) => {
           const Glyph = GLYPHS[tab.name];

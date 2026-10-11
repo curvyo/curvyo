@@ -65,3 +65,10 @@ test("the title (criterion 30)", () => {
   assert.equal(projectTitle("a.curvyo", false), "a.curvyo — Curvyo");
   assert.equal(projectTitle("a.curvyo", true), "*a.curvyo — Curvyo");
 });
+
+test("a long file name is cut in the middle in the sentence of the check and keeps its end", () => {
+  const long = `${"x".repeat(70)}.curvyo`;
+  const sentence = checkSentence(long, "new");
+  assert.match(sentence, /^x+…x*\.curvyo has unsaved changes\./);
+  assert.ok(sentence.indexOf(" has unsaved") <= 41);
+});

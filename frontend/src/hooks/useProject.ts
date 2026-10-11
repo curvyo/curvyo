@@ -147,7 +147,17 @@ export function useProject(deps: ProjectDeps): ProjectApi {
       frame = requestAnimationFrame(tick);
       refreshDirty();
     });
-    return () => cancelAnimationFrame(frame);
+    // A hidden or minimised window gets no frames, and a commit just before it hid would never be
+    // reported: the change of visibility reads once more, and a slow timer covers an engine that
+    // does not tell.
+    const onVisibility = () => refreshDirty();
+    document.addEventListener("visibilitychange", onVisibility);
+    const timer = window.setInterval(refreshDirty, 1000);
+    return () => {
+      cancelAnimationFrame(frame);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.clearInterval(timer);
+    };
   }, [refreshDirty]);
 
   // The browser's tab title follows the file name too; the desktop host sets the window title.
@@ -323,7 +333,8 @@ export function useProject(deps: ProjectDeps): ProjectApi {
       checkCounter.current += 1;
       setCheck({ id: checkCounter.current, kind: action.kind, origin, previous, action });
       if (!inFileTab) {
-        panelOpen.setOpen(true);
+        // Not the maker's choice: the saved hidden or shown state stays as it was.
+        panelOpen.setOpen(true, false);
         panel.pressTab("file");
       }
     },
@@ -369,7 +380,7 @@ export function useProject(deps: ProjectDeps): ProjectApi {
         panel.pressTab("document");
       }
       if (!pending.previous.open) {
-        panelOpen.setOpen(false);
+        panelOpen.setOpen(false, false);
       }
     }
     // The buttons come back with the focus on the one that was pressed, or on the canvas.
@@ -442,6 +453,10 @@ export function useProject(deps: ProjectDeps): ProjectApi {
       if (!session) {
         return;
       }
+      // An error dialog is up: the keys wait for it.
+      if (document.querySelector('[role="alertdialog"]')) {
+        return;
+      }
       const primary = MAC ? event.metaKey : event.ctrlKey;
       const blocked = event.isComposing || document.documentElement.hasAttribute("aria-busy");
       const name = session.file_chord(
@@ -457,11 +472,16 @@ export function useProject(deps: ProjectDeps): ProjectApi {
         return;
       }
       event.preventDefault();
-      if (isTextField(document.activeElement)) {
-        document.activeElement.blur();
+      const field = isTextField(document.activeElement) ? document.activeElement : null;
+      if (field) {
+        field.blur();
         editor.containerRef.current?.focus();
       }
       run(name as FileCommandName, "outside");
+      // A save leaves the maker where they typed; the other commands end or replace the project.
+      if (field?.isConnected && (name === "save" || name === "save-as")) {
+        field.focus();
+      }
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);

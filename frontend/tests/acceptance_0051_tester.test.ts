@@ -84,9 +84,8 @@ test("c16 name and status line", () => {
   assert.equal(projectStatus(null, false), "Not saved yet");
 });
 
-// A path ending in a separator has an empty base name. Not reachable from the OS dialogs (they
-// return files), so this is a todo, not a failure: the assertion is the real one.
-test("c16 an empty file name still shows a name (hostile: empty string)", { todo: "defect D5: baseName('dir/') is empty and projectName shows nothing" }, () => {
+// A path ending in a separator has the folder as its name (defect D5, fixed).
+test("c16 an empty file name still shows a name (hostile: empty string)", () => {
   // A path such as "dir/" or "C:\\" has an empty base name; the block must not render nothing.
   assert.notEqual(projectName(baseName("dir/")), "", "empty base name shows as an empty project name");
 });
@@ -472,7 +471,7 @@ import { noticeDurationMs } from "../src/lib/historyText.ts";
 
 // Criterion 19 says the "Saved <file name>." notice stays 3 s. The notice slot lengthens any text
 // over 70 characters to 5 s (`0016` criterion 29), so a long file name gets 5 s.
-test("c19 the saved notice stays 3 s whatever the file name", { todo: "defect D6: a file name over ~60 characters makes the notice last 5 s" }, () => {
+test("c19 the saved notice stays 3 s whatever the file name", () => {
   for (const name of ["a.curvyo", "x".repeat(80) + ".curvyo"]) {
     assert.equal(noticeDurationMs(savedNotice(name, false)), 3000, name);
   }

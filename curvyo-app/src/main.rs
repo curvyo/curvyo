@@ -156,13 +156,16 @@ fn main() {
         // sandbox; code-complete pending that verification.
         #[cfg(target_os = "macos")]
         if let tauri::RunEvent::Opened { urls } = event {
-            for url in urls {
-                if let Ok(path) = url.to_file_path()
-                    && path.extension().and_then(|ext| ext.to_str())
+            // One project is open at a time: the first project file of the event is opened and
+            // the rest are ignored, so a selection of many files cannot read them all.
+            let first = urls.iter().find_map(|url| {
+                url.to_file_path().ok().filter(|path| {
+                    path.extension().and_then(|ext| ext.to_str())
                         == Some(project::PROJECT_EXTENSION)
-                {
-                    project::open_handed_path(app_handle, &path);
-                }
+                })
+            });
+            if let Some(path) = first {
+                project::open_handed_path(app_handle, &path);
             }
         }
     });

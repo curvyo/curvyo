@@ -14,8 +14,9 @@ export interface PanelOpenApi {
   isOpen: () => boolean;
   /** Shows or hides the body. The canvas gains or loses the body's width, so the view keeps the
    * document where it is on screen (`0007` criterion 39), and the choice is saved for the OS
-   * user (`0051` criterion 10). */
-  setOpen: (next: boolean) => void;
+   * user (`0051` criterion 10). `persist` false is for a change the maker did not ask for (the
+   * inline check showing the body, and Cancel putting it back): the saved choice stays. */
+  setOpen: (next: boolean, persist?: boolean) => void;
 }
 
 /**
@@ -28,13 +29,15 @@ export function usePanelOpen(getSession: () => WasmSession | null): PanelOpenApi
 
   const isOpen = useCallback(() => openRef.current, []);
   const setOpen = useCallback(
-    (next: boolean) => {
+    (next: boolean, persist = true) => {
       if (openRef.current === next) {
         return;
       }
       openRef.current = next;
       getSession()?.keep_view_origin_for_panel_toggle(next ? -PANEL_WIDTH_PX : PANEL_WIDTH_PX);
-      writePanelCollapsed(!next);
+      if (persist) {
+        writePanelCollapsed(!next);
+      }
       setOpenState(next);
     },
     [getSession],

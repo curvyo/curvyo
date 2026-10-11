@@ -54,6 +54,13 @@ function pickProject(): Promise<OpenPayload | null> {
       );
     };
     input.addEventListener("cancel", () => resolve(null));
+    // An engine that sends no `cancel` would leave this open for good, and the dialog gate with
+    // it. When the window gets the focus back and no file arrived, the picker was dismissed.
+    window.addEventListener(
+      "focus",
+      () => window.setTimeout(() => (input.files?.length ? undefined : resolve(null)), 1500),
+      { once: true },
+    );
     input.click();
   });
 }

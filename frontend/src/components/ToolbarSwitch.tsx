@@ -2,8 +2,12 @@ import { Switch, Tooltip } from "radix-ui";
 import { useId } from "react";
 
 export interface ToolbarSwitchProps {
-  /** The visible label, left of the track. */
+  /** The name of the switch: its accessible name and, when `shortLabel` is not given, the visible
+   * label left of the track. */
   label: string;
+  /** A shorter visible label for a bar too narrow for the whole name; the tooltip and the
+   * accessible name keep the whole one. */
+  shortLabel?: string;
   /** What the switch does, shown as a tooltip after a short rest. */
   tooltip: string;
   checked: boolean;
@@ -23,6 +27,7 @@ export interface ToolbarSwitchProps {
  */
 export function ToolbarSwitch({
   label,
+  shortLabel,
   tooltip,
   checked,
   onCheckedChange,
@@ -36,9 +41,10 @@ export function ToolbarSwitch({
             htmlFor={id}
             className="flex h-7 cursor-pointer items-center gap-2 rounded-md px-1 text-sm text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)] has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[var(--editor-accent)] has-[:focus-visible]:ring-offset-1 has-[:focus-visible]:ring-offset-[var(--toolbar-bg)]"
           >
-            <span className="whitespace-nowrap">{label}</span>
+            <span className="whitespace-nowrap">{shortLabel ?? label}</span>
             <Switch.Root
               id={id}
+              aria-label={label}
               checked={checked}
               onCheckedChange={onCheckedChange}
               className="inline-flex h-[18px] w-8 shrink-0 cursor-pointer items-center rounded-full border-[1.5px] border-[var(--toolbar-icon)] bg-transparent outline-none data-[state=checked]:border-[var(--toolbar-icon-active-bg)] data-[state=checked]:bg-[var(--toolbar-icon-active-bg)]"

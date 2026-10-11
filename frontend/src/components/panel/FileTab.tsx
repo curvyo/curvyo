@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import { Tooltip } from "@/components/ui/tooltip";
 import type { FileCommandName, InlineCheck, ProjectApi } from "@/hooks/useProject";
@@ -159,6 +159,7 @@ function UnsavedCheck({
     return () => window.clearTimeout(timer);
   }, []);
   const sentence = checkSentence(fileName, check.kind);
+  const sentenceId = useId();
   return (
     <div
       role="group"
@@ -173,11 +174,14 @@ function UnsavedCheck({
         }
       }}
     >
-      <p className="text-xs text-[var(--toolbar-icon)]">{sentence}</p>
+      <p id={sentenceId} className="text-xs text-[var(--toolbar-icon)]">
+        {sentence}
+      </p>
       <div className="mt-2 flex gap-2">
         <button
           ref={cancel}
           type="button"
+          aria-describedby={sentenceId}
           onClick={project.cancel}
           className={`${BUTTON} ${OUTLINE} w-[76px]`}
         >
@@ -191,7 +195,7 @@ function UnsavedCheck({
               project.discard();
             }
           }}
-          className={`${BUTTON} w-[76px] border-[var(--destructive)] bg-white text-[var(--destructive)] hover:bg-[var(--destructive)] hover:text-white focus-visible:bg-[var(--destructive)] focus-visible:text-white aria-disabled:hover:bg-white aria-disabled:hover:text-[var(--destructive)] aria-disabled:focus-visible:bg-white aria-disabled:focus-visible:text-[var(--destructive)]`}
+          className={`${BUTTON} w-[76px] border-[var(--destructive)] bg-[var(--background)] text-[var(--destructive)] hover:bg-[var(--destructive)] hover:text-white focus-visible:bg-[var(--destructive)] focus-visible:text-white aria-disabled:hover:bg-[var(--background)] aria-disabled:hover:text-[var(--destructive)] aria-disabled:focus-visible:bg-[var(--background)] aria-disabled:focus-visible:text-[var(--destructive)]`}
         >
           Discard
         </button>

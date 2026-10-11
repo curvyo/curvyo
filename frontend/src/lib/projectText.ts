@@ -8,13 +8,14 @@ export type ReplacingKind = "new" | "open" | "close" | "quit" | "handover";
 
 /** The file name of a path, either separator, without the folders. */
 export function baseName(path: string): string {
-  const parts = path.split(/[\\/]/);
+  // A trailing separator is not a name of its own: "dir/" is "dir".
+  const parts = path.split(/[\\/]/).filter((part) => part !== "");
   return parts[parts.length - 1] ?? path;
 }
 
 /** The name the project block shows. */
 export function projectName(fileName: string | null): string {
-  return fileName ?? "Untitled";
+  return fileName === null || fileName === "" ? "Untitled" : fileName;
 }
 
 /** The status line under the name: "Unsaved changes" while dirty, otherwise whether the project
@@ -37,13 +38,32 @@ const ENDS: Record<ReplacingKind, string> = {
 /** The sentence of the inline check: what is at stake, what each answer does and that discarding
  * cannot be taken back. */
 export function checkSentence(fileName: string | null, kind: ReplacingKind): string {
-  const subject = fileName === null ? "This project has" : `${fileName} has`;
+  const subject =
+    fileName === null ? "This project has" : `${shortName(fileName, SENTENCE_NAME_MAX)} has`;
   return `${subject} unsaved changes. Save them before you ${ENDS[kind]}? Discarded changes cannot be brought back.`;
 }
 
 /** The line in the canvas notice slot after a save. */
 export function savedNotice(fileName: string, browser: boolean): string {
-  return `${browser ? "Downloaded" : "Saved"} ${fileName}.`;
+  return `${browser ? "Downloaded" : "Saved"} ${shortName(fileName)}.`;
+}
+
+/** The longest name a notice shows whole: with its words the line stays under the 70 characters
+ * after which the notice slot keeps a text for 5 s instead of 3 s (criterion 19). */
+const NOTICE_NAME_MAX = 56;
+
+/** The longest name the check's sentence shows whole: the sentence keeps within the four lines
+ * reserved for it. */
+const SENTENCE_NAME_MAX = 40;
+
+/** `name`, cut in the middle with an ellipsis when it is longer than the notice shows; the end
+ * (the extension) stays. */
+function shortName(name: string, max: number = NOTICE_NAME_MAX): string {
+  if (name.length <= max) {
+    return name;
+  }
+  const tail = name.slice(-12);
+  return `${name.slice(0, max - tail.length - 1)}…${tail}`;
 }
 
 /** The window title, and the page title in the browser: "Curvyo", "<file> — Curvyo", and a
@@ -51,5 +71,5 @@ export function savedNotice(fileName: string, browser: boolean): string {
  * `curvyo-app`. */
 export function projectTitle(fileName: string | null, dirty: boolean): string {
   const marker = dirty ? "*" : "";
-  return fileName === null ? `${marker}Curvyo` : `${marker}${fileName} — Curvyo`;
+  return fileName === null || fileName === "" ? `${marker}Curvyo` : `${marker}${fileName} — Curvyo`;
 }
