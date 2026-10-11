@@ -167,7 +167,7 @@ fn triples(anchors: &[NewAnchor]) -> Vec<OutlineTriple> {
 
 /// Whether a node or the end of one of its handles is not finite or lies beyond the kernel's
 /// range.
-fn out_of_range(anchors: &[NewAnchor]) -> bool {
+pub(crate) fn out_of_range(anchors: &[NewAnchor]) -> bool {
     anchors.iter().any(|a| {
         [
             a.point.x,

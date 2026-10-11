@@ -23,6 +23,8 @@ mod colour_hsv;
 mod colour_pick;
 mod combine;
 mod conversion;
+mod cut;
+mod cut_pieces;
 mod dash_text;
 mod display_unit_text;
 mod document_fit;
@@ -101,6 +103,7 @@ pub use combine::{
     plan_combine,
 };
 pub use conversion::{build_primitive_conversions, primitive_as_path};
+pub use cut::{CUT_COMMIT_LABEL, CutPlan, CutRefusal, MAX_CUT_PIECES, plan_cut};
 pub use dash_text::{MAX_DASH_NUMBER, MAX_DASH_NUMBERS, dash_text, parse_dash_text};
 pub use display_unit_text::{
     content_too_large_message, document_side_message, format_cursor, format_field_length,

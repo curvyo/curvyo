@@ -32,6 +32,8 @@ mod wasm_boolean;
 #[cfg(target_arch = "wasm32")]
 mod wasm_combine;
 #[cfg(target_arch = "wasm32")]
+mod wasm_cut;
+#[cfg(target_arch = "wasm32")]
 mod wasm_document;
 #[cfg(target_arch = "wasm32")]
 mod wasm_formats;
@@ -68,10 +70,10 @@ mod wasm_split;
 
 pub use session::{
     BooleanOutcome, BreakApartOutcome, ClosePathOutcome, ClosePathState, CombineOutcome,
-    DocumentPresetsRecord, DocumentSide, DoubleClickHint, EscapeStep, FitOutcome, FormTexts,
-    FormatEdit, GroupingKind, GroupingResult, HistoryResult, KeyHint, KeyInput, KeyOutcome,
-    MoveIndicators, ObjectWipeOutcome, PanelTabsRecord, PanelView, Session, SizeOutcome,
-    SplitOutcome, Tool, WipeOutcome, WipeState,
+    CutOutcome, DocumentPresetsRecord, DocumentSide, DoubleClickHint, EscapeStep, FitOutcome,
+    FormTexts, FormatEdit, GroupingKind, GroupingResult, HistoryResult, KeyHint, KeyInput,
+    KeyOutcome, MoveIndicators, ObjectWipeOutcome, PanelTabsRecord, PanelView, Session,
+    SizeOutcome, SplitOutcome, Tool, WipeOutcome, WipeState,
 };
 
 #[cfg(target_arch = "wasm32")]
