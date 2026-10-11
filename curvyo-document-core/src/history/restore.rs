@@ -13,13 +13,17 @@ use loro::{LoroDoc, TreeID};
 
 use super::checkout::Detached;
 use super::error::HistoryError;
+use super::lineage::encode_node;
 use super::merge::{Tally, restore_map};
 use super::report::{
     Direction, ObjectReport, ObjectResult, ObjectShape, RestoreReport, SkipReason,
 };
 use super::restore_plan::{Action, Plan, PlanInput, Snapshot, revival_indices};
 use super::revive::revive_nodes;
-use super::step_header::{KEY_REDONE, KEY_UNDONE, LABEL_REDO, LABEL_UNDO, StepHeader};
+use super::step_header::{
+    KEY_OBJECT, KEY_OBJECT_REDONE, KEY_OBJECT_UNDONE, KEY_REDONE, KEY_UNDONE, LABEL_OBJECT_REDO,
+    LABEL_OBJECT_UNDO, LABEL_REDO, LABEL_UNDO, StepHeader,
+};
 use super::step_id::StepRef;
 use super::step_log::{LogStep, find_step};
 use super::touched::Touched;
@@ -28,6 +32,33 @@ use crate::path_model::NodeId;
 
 fn node_id(id: TreeID) -> NodeId {
     NodeId::from_parts(id.peer, id.counter)
+}
+
+/// What a restore is for.
+#[derive(Debug, Clone, Copy)]
+pub(super) enum Mode {
+    /// Ctrl+Z, Ctrl+Shift+Z: the whole step, for the maker's own stacks.
+    Plain,
+    /// An object undo or redo for `object` (`specs/0041-object-history` criterion 6): a new step
+    /// of its own kind that names the step and the object. `only` cuts the step to that object;
+    /// a Replace step is taken back whole.
+    Object {
+        /// The object the maker has selected.
+        object: TreeID,
+        /// Whether only this object's part of the step is restored.
+        only: bool,
+        /// What the header of the new step says it did.
+        named: Named,
+    },
+}
+
+/// The step an object undo or redo says it took back or applied again.
+#[derive(Debug, Clone, Copy)]
+pub(super) struct Named {
+    /// The step.
+    pub step: StepRef,
+    /// Whether the new step is an object redo.
+    pub redo: bool,
 }
 
 impl Document {
@@ -41,7 +72,7 @@ impl Document {
     /// the versions around it cannot be read, [`HistoryError::Revive`] if the deleted objects could
     /// not be brought back (then nothing was written).
     pub fn undo_step(&self, step: StepRef) -> Result<RestoreReport, HistoryError> {
-        self.restore_step(step, Direction::Undo)
+        self.restore_step(step, Direction::Undo, Mode::Plain)
     }
 
     /// Applies `step` again after an undo, the mirror image of [`Document::undo_step`].
@@ -49,19 +80,28 @@ impl Document {
     /// # Errors
     /// As [`Document::undo_step`].
     pub fn redo_step(&self, step: StepRef) -> Result<RestoreReport, HistoryError> {
-        self.restore_step(step, Direction::Redo)
+        self.restore_step(step, Direction::Redo, Mode::Plain)
     }
 
-    fn restore_step(
+    pub(super) fn restore_step(
         &self,
         step: StepRef,
         direction: Direction,
+        mode: Mode,
     ) -> Result<RestoreReport, HistoryError> {
         let doc = self.loro();
         self.assert_outside_batch();
         doc.commit();
+        // The step this restore writes, if it writes one, starts at the next operation.
+        let first = doc.oplog_vv().get(&doc.peer_id()).copied().unwrap_or(0);
         let log = find_step(doc, step).ok_or(HistoryError::NoSuchStep)?;
-        let touched = self.touched_of(&log);
+        let mut touched = self.touched_of(&log);
+        if let Mode::Object {
+            object, only: true, ..
+        } = mode
+        {
+            touched = touched.only(object);
+        }
         let (before, after) = read_versions(doc, &log, &touched)?;
         let plan = PlanInput {
             doc,
@@ -72,12 +112,19 @@ impl Document {
             after: &after,
         }
         .plan();
-        let (label, key) = match direction {
-            Direction::Undo => (LABEL_UNDO, KEY_UNDONE),
-            Direction::Redo => (LABEL_REDO, KEY_REDONE),
+        let (label, key, named) = match (mode, direction) {
+            (Mode::Plain, Direction::Undo) => (LABEL_UNDO, KEY_UNDONE, step),
+            (Mode::Plain, Direction::Redo) => (LABEL_REDO, KEY_REDONE, step),
+            (Mode::Object { named, .. }, _) if named.redo => {
+                (LABEL_OBJECT_REDO, KEY_OBJECT_REDONE, named.step)
+            }
+            (Mode::Object { named, .. }, _) => (LABEL_OBJECT_UNDO, KEY_OBJECT_UNDONE, named.step),
         };
-        let header = (plan.writes() || touched.root)
-            .then(|| self.next_header(label, &[(key, step.encode())]));
+        let mut extra = vec![(key, named.encode())];
+        if let Mode::Object { object, .. } = mode {
+            extra.push((KEY_OBJECT, encode_node(object)));
+        }
+        let header = (plan.writes() || touched.root).then(|| self.next_header(label, &extra));
         let revived = match &header {
             Some(header) => self.revive_planned(&plan, &before, &after, header)?,
             None => false,
@@ -93,14 +140,22 @@ impl Document {
             result_of(tally)
         });
         let wrote = revived || doc.get_pending_txn_len() > 0;
+        let mut written = None;
         if let Some(header) = &header {
             self.commit_with_header(header);
+            if wrote && matches!(mode, Mode::Object { .. }) {
+                let new = StepRef::new(doc.peer_id(), first);
+                let reverts = find_step(doc, named).map(|reverted| reverted.label);
+                self.commit_state.register_own(new, label, reverts);
+                written = Some(new);
+            }
         }
         Ok(RestoreReport {
             direction,
             objects,
             root,
             wrote,
+            step: written,
         })
     }
 
@@ -134,6 +189,7 @@ impl Document {
         plan.items
             .iter()
             .map(|planned| {
+                let mut kept = 0;
                 let (id, result) = match &planned.action {
                     Action::Revive(id) => (*id, ObjectResult::Restored),
                     Action::Skip(id, reason) => (*id, ObjectResult::Skipped(*reason)),
@@ -150,6 +206,7 @@ impl Document {
                         let result = if let (Some(f), Some(t), Ok(meta)) = nodes {
                             let mut tally = Tally::default();
                             restore_map(&meta, &f.meta, &t.meta, &mut tally);
+                            kept = tally.kept;
                             result_of(tally)
                         } else {
                             ObjectResult::Skipped(SkipReason::DeletedLater)
@@ -162,13 +219,14 @@ impl Document {
                     shape: kind_of(doc, id),
                     role: planned.role,
                     result,
+                    kept,
                 }
             })
             .collect()
     }
 
     /// The objects the step touched, from its operations.
-    fn touched_of(&self, log: &LogStep) -> Touched {
+    pub(super) fn touched_of(&self, log: &LogStep) -> Touched {
         let doc = self.loro();
         let mut index = self.container_index.borrow_mut();
         index.extend(doc);
@@ -214,7 +272,10 @@ fn read_versions(
             BTreeMap::new()
         },
         // The z-order is only read to place objects that come back.
-        roots: if touched.created.is_empty() && touched.deleted.is_empty() {
+        roots: if touched.created.is_empty()
+            && touched.deleted.is_empty()
+            && touched.moved.is_empty()
+        {
             Vec::new()
         } else {
             guard.roots()

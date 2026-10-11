@@ -11,6 +11,13 @@ pub const LABEL_REDO: &str = "redo";
 /// The reserved label of a history wipe (milestone 4).
 pub const LABEL_WIPE: &str = "wipe_history";
 
+/// The reserved label of an object undo (`ou` names the step it takes back, `o` the object).
+pub const LABEL_OBJECT_UNDO: &str = "object_undo";
+/// The reserved label of an object redo (`od` names the step it applies again, `o` the object).
+pub const LABEL_OBJECT_REDO: &str = "object_redo";
+/// The reserved label of the wipe of one object's history (`o` names the object).
+pub const LABEL_WIPE_OBJECT: &str = "wipe_object_history";
+
 /// The key of the step counter.
 const KEY_SEQ: &str = "s";
 /// The key of the step time.
@@ -19,6 +26,12 @@ const KEY_TIME: &str = "t";
 pub(crate) const KEY_UNDONE: &str = "u";
 /// The key of the step a redo applies again.
 pub(crate) const KEY_REDONE: &str = "d";
+/// The key of the step an object undo takes back.
+pub(crate) const KEY_OBJECT_UNDONE: &str = "ou";
+/// The key of the step an object redo applies again.
+pub(crate) const KEY_OBJECT_REDONE: &str = "od";
+/// The key of the object an object undo, redo or wipe is about.
+pub(crate) const KEY_OBJECT: &str = "o";
 
 /// A parsed commit message that carries a header. A message without one is a legacy label, see
 /// [`StepHeader::parse`].

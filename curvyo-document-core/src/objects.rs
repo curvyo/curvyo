@@ -12,6 +12,7 @@ use std::collections::HashSet;
 use loro::{Container, TreeID, ValueOrContainer};
 
 use crate::document::{Document, OBJECTS_TREE};
+use crate::history::{KEY_CLONE_OF, KEY_HISTORY_FLOOR, encode_clone_of};
 use crate::path_codec::{
     self, KEY_HANDLE_IN, KEY_HANDLE_OUT, KEY_ID, KEY_POINT, anchor_map_at, node_exists,
     write_point, write_vec2,
@@ -189,6 +190,9 @@ impl Document {
         // `mov_after` needs the fractional-index feature on for this tree;
         // enabled on every call, as `split_at_anchor` does.
         tree.enable_fractional_index(0);
+        // The version the copies are made from: the lineage of `specs/0041-object-history` reads
+        // the source's steps in its causal past.
+        let version = self.loro().oplog_frontiers();
         let mut created = Vec::with_capacity(sources.len());
         for (source, source_meta) in sources.iter().zip(&metas) {
             // invariant: a root-level create on a live tree cannot fail, and
@@ -197,7 +201,14 @@ impl Document {
             let new_tree_id = tree.create(loro::TreeParentId::Root).unwrap();
             #[allow(clippy::unwrap_used)]
             let meta = tree.get_meta(new_tree_id).unwrap();
-            copy_map(source_meta, &meta);
+            copy_map(source_meta, &meta, LINEAGE_KEYS);
+            // invariant: the key is new in the meta map just created.
+            #[allow(clippy::unwrap_used)]
+            meta.insert(
+                KEY_CLONE_OF,
+                encode_clone_of(tree_id_of(source.id), &version),
+            )
+            .unwrap();
             if shape_codec::read_shape_tag(&meta).is_none() {
                 renumber_anchors(&meta, &source.anchor_ids);
             }
@@ -333,11 +344,19 @@ fn check_anchor_ids(meta: &loro::LoroMap, anchor_ids: &[AnchorId]) -> Result<(),
     }
 }
 
+/// The keys of the history lineage: a copy gets its own (`specs/0041-object-history`
+/// criterion 37), never the source's.
+const LINEAGE_KEYS: &[&str] = &[KEY_CLONE_OF, KEY_HISTORY_FLOOR];
+
 /// Copies every key of `from` into `into` as it is: a plain value as the same
-/// value, a nested map or movable list (a path's anchors) entry by entry. No
-/// key is named here, so a register added later is copied with no change.
-fn copy_map(from: &loro::LoroMap, into: &loro::LoroMap) {
+/// value, a nested map or movable list (a path's anchors) entry by entry. Only
+/// the keys in `skip` are named here, so a register added later is copied with
+/// no change.
+fn copy_map(from: &loro::LoroMap, into: &loro::LoroMap, skip: &[&str]) {
     for key in from.keys() {
+        if skip.contains(&&*key) {
+            continue;
+        }
         let Some(value) = from.get(&key) else {
             continue;
         };
@@ -348,7 +367,7 @@ fn copy_map(from: &loro::LoroMap, into: &loro::LoroMap) {
             ValueOrContainer::Value(plain) => into.insert(&key, plain.clone()).unwrap(),
             ValueOrContainer::Container(Container::Map(map)) => {
                 let nested = into.insert_container(&key, loro::LoroMap::new()).unwrap();
-                copy_map(map, &nested);
+                copy_map(map, &nested, &[]);
             }
             ValueOrContainer::Container(Container::MovableList(list)) => {
                 let nested = into
@@ -358,7 +377,7 @@ fn copy_map(from: &loro::LoroMap, into: &loro::LoroMap) {
                     match list.get(index) {
                         Some(ValueOrContainer::Container(Container::Map(map))) => {
                             let element = nested.push_container(loro::LoroMap::new()).unwrap();
-                            copy_map(&map, &element);
+                            copy_map(&map, &element, &[]);
                         }
                         Some(ValueOrContainer::Value(plain)) => nested.push(plain).unwrap(),
                         _ => {}
@@ -680,7 +699,8 @@ mod tests {
     }
 
     /// Decision 2: the copy is a copy of the meta map, so it holds every key,
-    /// including one this build does not know. A zero offset makes the two
+    /// including one this build does not know (apart from the lineage keys, which it
+    /// writes for itself). A zero offset makes the two
     /// deep values equal apart from the anchor ids.
     #[test]
     fn a_copy_holds_every_key_of_the_original_including_an_unknown_one() {
@@ -718,6 +738,10 @@ mod tests {
                     .expect("meta")
                     .get_deep_value()
                     .to_json_value();
+                // The one key a copy has and its original has not: where the copy came from.
+                if let Some(entries) = value.as_object_mut() {
+                    entries.remove("clone_of");
+                }
                 if let Some(anchors) = value.get_mut("anchors").and_then(|a| a.as_array_mut()) {
                     for anchor in anchors {
                         anchor["id"] = serde_json::Value::Null;

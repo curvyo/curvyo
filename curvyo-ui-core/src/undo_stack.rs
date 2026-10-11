@@ -21,6 +21,8 @@ pub struct SelectionSnapshot {
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Entry {
     label: String,
+    /// What the maker reads for the step, when it is not the label's name ("Undo Resize").
+    name: Option<String>,
     /// Shared with the neighbouring entries whenever the selection did not change: a long run of
     /// steps on one large selection holds the selection once.
     before: Arc<SelectionSnapshot>,
@@ -34,6 +36,8 @@ pub struct Target {
     pub step: StepRef,
     /// Its commit label.
     pub label: String,
+    /// What the maker reads for it: "Move", or "Undo Move" for an object undo.
+    pub name: String,
     /// The selection to set when the step is taken back.
     pub before: SelectionSnapshot,
     /// The selection to set when the step is applied again.
@@ -74,6 +78,19 @@ impl UndoStack {
         before: SelectionSnapshot,
         after: SelectionSnapshot,
     ) {
+        self.record_named(step, label, None, before, after);
+    }
+
+    /// As [`UndoStack::record`], for a step the maker reads under a name of its own (an object
+    /// undo is "Undo Resize", not the name of its label).
+    pub fn record_named(
+        &mut self,
+        step: StepRef,
+        label: &str,
+        name: Option<String>,
+        before: SelectionSnapshot,
+        after: SelectionSnapshot,
+    ) {
         let before = self.shared(before);
         let after = if *before == after {
             Arc::clone(&before)
@@ -85,6 +102,7 @@ impl UndoStack {
             step,
             Entry {
                 label: label.to_owned(),
+                name,
                 before,
                 after,
             },
@@ -118,6 +136,10 @@ impl UndoStack {
         Some(Target {
             step,
             label: entry.label.clone(),
+            name: entry
+                .name
+                .clone()
+                .unwrap_or_else(|| crate::operation_name(&entry.label).to_owned()),
             before: (*entry.before).clone(),
             after: (*entry.after).clone(),
         })
@@ -142,6 +164,12 @@ impl UndoStack {
     /// As [`UndoStack::consume_undo`], for the redo stack.
     pub fn consume_redo(&mut self) {
         self.machine.apply(Event::ConsumeRedo);
+        self.prune();
+    }
+
+    /// Drops the steps `keep` refuses from both stacks (the wipe of one object's history).
+    pub fn retain_steps(&mut self, keep: impl FnMut(StepRef) -> bool) {
+        self.machine.retain(keep);
         self.prune();
     }
 

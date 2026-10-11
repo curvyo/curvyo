@@ -7,6 +7,7 @@ import {
   type HistoryDirection,
   historyKeyDirection,
   isMac,
+  isObjectDirection,
   menuNames,
   menuPressPlan,
   noticeDurationMs,
@@ -14,7 +15,7 @@ import {
   WORKING_NOTICE_DELAY_MS,
   workingNotice,
 } from "@/lib/historyText";
-import { wipedNotice } from "@/lib/historyRows";
+import { objectWipedNotice, wipedNotice } from "@/lib/historyRows";
 import { invoke, isTauri, listen } from "@/platform/host";
 import type { WasmSession } from "@/lib/editorSession";
 
@@ -51,6 +52,9 @@ export interface HistoryApi {
    * steps removed, -1 when the session ignored it, -2 for a shared document and -3 when the
    * log could not be rewritten. */
   wipe: () => number;
+  /** Hides the selected object's earlier history: the notice says how many rows went. Returns
+   * the rows hidden, -1 when the session ignored it and -3 when the log could not take the step. */
+  wipeObject: () => number;
   /** Whether this key event is the second arrival of a press the native menu already handled. */
   isDuplicateKey: (event: KeyboardEvent | React.KeyboardEvent) => boolean;
   /** Handles the outcome string `key_down` returned when it belongs to history; `false`
@@ -145,10 +149,11 @@ export function useHistory(
       previous.undo === next.undo && previous.redo === next.redo ? previous : next,
     );
     if (isTauri) {
-      const key = JSON.stringify(next);
+      const objectStep = session.selection_count() === 1;
+      const key = JSON.stringify({ ...next, objectStep });
       if (key !== sentToMenu.current) {
         sentToMenu.current = key;
-        void invoke("set_history_menu", next).catch((error: unknown) => {
+        void invoke("set_history_menu", { ...next, objectStep }).catch((error: unknown) => {
           // The native menu falls behind; the keys and buttons still work.
           console.error("set_history_menu failed", error);
         });
@@ -218,7 +223,9 @@ export function useHistory(
     (outcome: string): boolean => {
       switch (outcome) {
         case "undo":
-        case "redo": {
+        case "redo":
+        case "object-undo":
+        case "object-redo": {
           markPressed(outcome);
           onAppliedRef.current?.();
           const text = noticeText(getSession()?.take_history_notice() ?? "");
@@ -228,13 +235,18 @@ export function useHistory(
           return true;
         }
         case "undo-busy":
-        case "redo-busy": {
-          const direction = outcome === "undo-busy" ? "undo" : "redo";
+        case "redo-busy":
+        case "object-undo-busy":
+        case "object-redo-busy": {
+          const direction = outcome.replace(/-busy$/, "") as HistoryDirection;
           markPressed(direction);
           onAppliedRef.current?.();
           void runBusy(direction);
           return true;
         }
+        case "hint-object-tool":
+          showNotice(getSession()?.object_tool_notice() ?? "", FINISH_PEN_NOTICE_MS);
+          return true;
         case "hint-finish-pen":
           showNotice(getSession()?.finish_pen_first_notice() ?? "", FINISH_PEN_NOTICE_MS);
           return true;
@@ -299,7 +311,10 @@ export function useHistory(
       const textEntry = isTextEntry(document.activeElement);
       const plan = menuPressPlan({ duplicate: pressedJustNow(direction), textEntry });
       if (plan === "text-undo") {
-        document.execCommand(direction);
+        // A text field keeps its own undo; the object steps are not its business.
+        if (!isObjectDirection(direction)) {
+          document.execCommand(direction);
+        }
       } else if (plan === "document") {
         markPressed(direction);
         press(direction);
@@ -311,7 +326,12 @@ export function useHistory(
       return undefined;
     }
     const unlisten = listen<string>("history-menu", (event) => {
-      menuPressRef.current(event.payload === "redo" ? "redo" : "undo");
+      const payload = event.payload;
+      menuPressRef.current(
+        payload === "redo" || payload === "object-undo" || payload === "object-redo"
+          ? payload
+          : "undo",
+      );
     });
     void unlisten.catch((error: unknown) => console.error("history-menu listen failed", error));
     return () => {
@@ -330,6 +350,17 @@ export function useHistory(
     return removed;
   }, [getSession, showNotice]);
 
+  const wipeObject = useCallback(() => {
+    const hidden = getSession()?.object_history_wipe() ?? -1;
+    if (hidden >= 0) {
+      showNotice(objectWipedNotice(hidden));
+    } else if (hidden === -3) {
+      showNotice("Could not hide the history of this object. Nothing was changed.");
+    }
+    onChangeRef.current();
+    return hidden;
+  }, [getSession, showNotice]);
+
   const isDuplicateKey = useCallback(
     (event: KeyboardEvent | React.KeyboardEvent) => {
       const direction = historyKeyDirection(event, MAC);
@@ -346,6 +377,7 @@ export function useHistory(
     refresh,
     press,
     wipe,
+    wipeObject,
     isDuplicateKey,
     handleKeyOutcome,
   };

@@ -95,6 +95,7 @@ impl Document {
         self.loro = fresh;
         *self.step_index.borrow_mut() = super::StepIndex::default();
         *self.container_index.borrow_mut() = super::ContainerIndex::default();
+        *self.object_index.borrow_mut() = super::ObjectIndex::default();
         self.commit_state.forget_steps();
     }
 }

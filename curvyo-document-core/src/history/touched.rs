@@ -35,6 +35,19 @@ pub struct Touched {
 }
 
 impl Touched {
+    /// The same step cut to one object: what an object undo of a Change, Create or Delete step
+    /// restores.
+    pub(crate) fn only(&self, object: TreeID) -> Self {
+        let keep = |nodes: &[TreeID]| nodes.iter().copied().filter(|n| *n == object).collect();
+        Self {
+            created: keep(&self.created),
+            deleted: keep(&self.deleted),
+            moved: keep(&self.moved),
+            changed: keep(&self.changed),
+            root: false,
+        }
+    }
+
     /// Every touched object, created ones first.
     pub(crate) fn nodes(&self) -> impl Iterator<Item = TreeID> + '_ {
         self.created

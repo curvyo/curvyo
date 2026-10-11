@@ -82,7 +82,10 @@ fn assert_one_step(session: &mut Session, steps_before: usize, name: &str, befor
     let after = json(session);
     assert_ne!(after, before, "the gesture changed the document");
     assert_eq!(session.undo_len(), steps_before + 1, "exactly one step");
-    assert_eq!(session.history_target_name(Direction::Undo), Some(name));
+    assert_eq!(
+        session.history_target_name(Direction::Undo).as_deref(),
+        Some(name)
+    );
     assert_eq!(key(session, "z", true, false), KeyOutcome::Undo);
     let _ = session.take_history_notice();
     assert_eq!(json(session), before, "undo is byte-equal");

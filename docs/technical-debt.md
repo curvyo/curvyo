@@ -1425,3 +1425,42 @@ closed (`free_history_cache`) is possible but would put the cold cost back on th
 `0020-undo-redo` restores the selected objects and the Node tool's selected nodes by anchor id
 (`UndoStack`, `SelectionSnapshot`). A selected segment (two adjacent anchors) is not restored: after
 Ctrl+Z the segment is deselected. Minor; the snapshot would need the segment's end anchors.
+
+## Object history: groups wait for 0023, and some limits are accepted
+
+`specs/0041-object-history` is built without two criteria that need groups. **Resolution:** the
+branch of `0023-groups`, or a follow-up slice once it has merged.
+
+- **Criterion 18 (the timeline of a group).** The timeline of a group is meant to be the steps that
+  touched the group node or any object below it, and an object undo of a group restricts the step to
+  the group's subtree. Until groups exist the index only knows objects; a group node would show
+  only its own steps.
+- **Criterion 27 (the duplicate of a group).** Every descendant of a duplicated group is meant to be a
+  clone with its own `clone_of`, and the new group one too. `Document::duplicate_objects` writes
+  `clone_of` on every copy it makes, so descendants get theirs as soon as the duplicate of a group
+  goes through it; the test and the group timeline are what is missing.
+
+Accepted limits of the slice, each visible in the code:
+
+- **Anchors are not restored into path copies (follow-up).** Object undo of a step the copy
+  inherited from its original writes a register only where the copy still holds the original's
+  value after the step (criterion 7); a rectangle's, ellipse's or star's frame is merged number by
+  number, so the copy gets the size back and keeps its place. A copy is displaced and a path's
+  anchors are nested lists with ids of their own, so a move of the original, and every geometry
+  step of a path, write nothing and are passed over (at most 256 per press). For a path copy only
+  style steps are taken back. **Resolution:** write anchors into the copy by position with fresh
+  anchor ids passed in by the session, which completes criterion 25 for paths.
+- **A press that finds nothing to write leaves no row.** When every candidate of a copy was passed
+  over the press reports "Nothing to undo for this object: its earlier steps only moved or reshaped
+  the original." and writes nothing.
+- **Ctrl+U on a copy never takes back the Duplicate itself, nor the original's drawing.** Both
+  would remove the copy; Ctrl+Z takes the Duplicate back. This departs from the Create-only example
+  of criterion 6 for copies.
+- **Left open by the UX review of 0041** (non-blocking): the notice for Ctrl+Z of an object undo reads
+  "Undid: Undo Draw rectangle" (a double negative; two tester tests pin the text); the Document
+  scope's Undo tooltip omits "You, 12:03" (needs the target's author and time from the session);
+  the Edit menu shows no key text for the object items on Linux and Windows (accelerators there are
+  macOS only, and the menu goes away with `0051`).
+- **The shown ids are rebuilt on the first read after a new step.** The abbreviation of a step id
+  depends on all other ids (ADR 0014 §3); the rebuild is a few milliseconds at 20,000 steps and
+  happens only when rows are read, not on the commit path.

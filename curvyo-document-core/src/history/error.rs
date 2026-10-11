@@ -21,6 +21,9 @@ pub enum HistoryError {
     /// The log could not be rewritten; the document is as it was.
     #[error("the history could not be wiped")]
     Wipe,
+    /// The object does not exist (any more).
+    #[error("no such object")]
+    NoSuchObject,
 }
 
 /// Why an exchange of updates between two replicas failed. The document is not changed by a

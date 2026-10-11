@@ -84,7 +84,7 @@ fn one_step(session: &mut Session, name: &str, gesture: impl FnOnce(&mut Session
     assert_eq!(session.undo_len(), steps + 1, "{name}: exactly one step");
     assert_eq!(commits(session), changes + 1, "{name}: exactly one commit");
     assert_eq!(
-        session.history_target_name(Direction::Undo),
+        session.history_target_name(Direction::Undo).as_deref(),
         Some(name),
         "the operation name"
     );

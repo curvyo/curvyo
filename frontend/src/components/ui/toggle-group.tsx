@@ -10,6 +10,9 @@ export interface ToggleOption<T extends string> {
   /** The tooltip text. */
   tooltip: string;
   icon: ReactNode;
+  /** The item's width in px when it differs from the group's `itemWidth` (text items of
+   * different lengths: Document 76, Object 56). */
+  width?: number;
 }
 
 interface ToggleGroupProps<T extends string> {
@@ -107,7 +110,7 @@ export function ToggleGroup<T extends string>({
             className={`flex items-center justify-center bg-transparent text-[var(--toolbar-icon)] outline-none enabled:hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)] aria-checked:enabled:!bg-[var(--toolbar-icon-active-bg)] aria-checked:enabled:!text-[var(--toolbar-icon-active-fg)] aria-checked:disabled:bg-[color-mix(in_srgb,var(--toolbar-icon)_30%,transparent)] ${
               index > 0 ? `border-l ${BORDER}` : ""
             }`}
-            style={{ width: itemWidth, height: itemHeight }}
+            style={{ width: option.width ?? itemWidth, height: itemHeight }}
           >
             {option.icon}
           </RadioGroup.Item>
