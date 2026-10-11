@@ -1,5 +1,6 @@
 // Run with `npm test`. The sentences of `src/lib/pathText.ts` against the wording of
-// `specs/0035-combine-and-break-apart/specification.md` (criteria 2, 7, 9 to 11, 16, 17).
+// `specs/0035-combine-and-break-apart/specification.md` (criteria 2, 7, 9 to 11) and
+// `specs/0048-split-compound-path/specification.md` (criteria 2, 7 to 9, 12, 13).
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
@@ -16,16 +17,19 @@ import {
   commandRule,
   noticeMs,
   PATH_COMMANDS,
+  splitRefusalText,
+  splitSuccessText,
   type BreakApartResult,
   type CombineResult,
   type PathAvailabilityState,
+  type SplitResult,
 } from "../src/lib/pathText.ts";
 
 const available = (patch: Partial<PathAvailabilityState>): PathAvailabilityState => ({
   needsTwo: false,
   open: 0,
   of: 3,
-  canBreakApart: true,
+  hasCompound: true,
   ...patch,
 });
 
@@ -38,7 +42,7 @@ const combined = (patch: Partial<CombineResult>): CombineResult => ({
   ...patch,
 });
 
-const broken = (patch: Partial<BreakApartResult>): BreakApartResult => ({
+const split = (patch: Partial<SplitResult>): SplitResult => ({
   kind: "applied",
   compounds: 1,
   pieces: 3,
@@ -47,10 +51,19 @@ const broken = (patch: Partial<BreakApartResult>): BreakApartResult => ({
   ...patch,
 });
 
-test("names and rules are those of criterion 2, and no rule wraps", () => {
-  assert.deepEqual(PATH_COMMANDS.map(commandName), ["Combine", "Break apart"]);
+const broken = (patch: Partial<BreakApartResult>): BreakApartResult => ({
+  kind: "applied",
+  compounds: 1,
+  pieces: 3,
+  withHoles: false,
+  ...patch,
+});
+
+test("names and rules are those of 0048 criterion 2, and no rule wraps", () => {
+  assert.deepEqual(PATH_COMMANDS.map(commandName), ["Combine", "Split", "Break apart"]);
   assert.equal(commandRule("combine"), "One object. Inner shapes become holes.");
-  assert.equal(commandRule("break_apart"), "Splits a compound path into its pieces.");
+  assert.equal(commandRule("split"), "Separates unconnected parts. Holes stay.");
+  assert.equal(commandRule("break_apart"), "Every outline becomes its own object.");
   for (const command of PATH_COMMANDS) {
     assert.ok(commandRule(command).length <= 45, command);
   }
@@ -77,24 +90,29 @@ test("the Combine note: fewer than two, another tool, an open path, else the eff
   );
 });
 
-test("the Break apart note: no compound path, another tool, else the effect", () => {
-  const none = available({ canBreakApart: false });
-  assert.equal(commandNote("break_apart", none, true), "Select a compound path.");
-  assert.equal(
-    commandNote("break_apart", none, false),
-    "Select a compound path. Use the Select tool.",
-  );
+test("the Split and Break apart notes: no compound path, another tool, else the effect", () => {
+  const none = available({ hasCompound: false });
+  for (const command of ["split", "break_apart"] as const) {
+    assert.equal(commandNote(command, none, true), "Select a compound path.");
+    assert.equal(
+      commandNote(command, none, false),
+      "Select a compound path. Use the Select tool.",
+    );
+  }
+  assert.equal(commandNote("split", available({}), true), "Replaces the selection.");
   assert.equal(
     commandNote("break_apart", available({}), true),
-    "Holes stay with their piece. Replaces the selection.",
+    "Holes become filled shapes. Use Split to keep them.",
   );
 });
 
 test("dimming follows the session: an open path or touching shapes do not dim Combine", () => {
   assert.equal(commandDimmed("combine", available({ needsTwo: true })), true);
   assert.equal(commandDimmed("combine", available({ open: 1 })), false);
-  assert.equal(commandDimmed("break_apart", available({ canBreakApart: false })), true);
-  assert.equal(commandDimmed("break_apart", available({})), false);
+  for (const command of ["split", "break_apart"] as const) {
+    assert.equal(commandDimmed(command, available({ hasCompound: false })), true, command);
+    assert.equal(commandDimmed(command, available({})), false, command);
+  }
 });
 
 test("the Combine notice counts the objects and the holes", () => {
@@ -164,7 +182,48 @@ test("every refusal of Combine outlines its offenders, a success none", () => {
   assert.equal(combineOutlinesObjects(combined({ kind: "needs_two" })), false);
 });
 
-test("the Break apart notice counts the pieces and mentions holes and compounds left alone", () => {
+test("the Split notice counts the pieces and mentions holes and compounds left alone", () => {
+  assert.equal(splitSuccessText(split({})), "Split: 1 compound path became 3 objects.");
+  assert.equal(
+    splitSuccessText(split({ compounds: 2, pieces: 5 })),
+    "Split: 2 compound paths became 5 objects.",
+  );
+  assert.equal(
+    splitSuccessText(split({ withHoles: true })),
+    "Split: 1 compound path became 3 objects. Holes stayed with their piece.",
+  );
+  assert.equal(
+    splitSuccessText(split({ leftAlone: 1 })),
+    "Split: 1 compound path became 3 objects. 1 compound path is one piece and was left as it is.",
+  );
+  assert.equal(
+    splitSuccessText(split({ withHoles: true, leftAlone: 2 })),
+    "Split: 1 compound path became 3 objects. Holes stayed with their piece. 2 compound paths are one piece each and were left as they are.",
+  );
+  assert.equal(splitSuccessText(split({ kind: "one_piece" })), null);
+});
+
+test("the Split refusals are the sentences of criteria 7 and 9", () => {
+  assert.equal(
+    splitRefusalText(split({ kind: "no_compound" })),
+    "Split needs a compound path. Nothing was changed.",
+  );
+  assert.equal(
+    splitRefusalText(split({ kind: "groups" })),
+    "Split does not work on groups. Ungroup first. Nothing was changed.",
+  );
+  assert.equal(
+    splitRefusalText(split({ kind: "one_piece", compounds: 1 })),
+    "Nothing to split. The compound path is one piece with its holes. Use Break apart to release the holes. Nothing was changed.",
+  );
+  assert.equal(
+    splitRefusalText(split({ kind: "one_piece", compounds: 2 })),
+    "Nothing to split. The 2 selected compound paths are one piece each, with their holes. Use Break apart to release the holes. Nothing was changed.",
+  );
+  assert.equal(splitRefusalText(split({ kind: "applied" })), null);
+});
+
+test("the Break apart notice counts the objects and warns when holes became shapes", () => {
   assert.equal(
     breakApartSuccessText(broken({})),
     "Break apart: 1 compound path became 3 objects.",
@@ -175,31 +234,19 @@ test("the Break apart notice counts the pieces and mentions holes and compounds 
   );
   assert.equal(
     breakApartSuccessText(broken({ withHoles: true })),
-    "Break apart: 1 compound path became 3 objects. Holes stayed with their piece.",
+    "Break apart: 1 compound path became 3 objects. Holes became filled shapes.",
   );
-  assert.equal(
-    breakApartSuccessText(broken({ leftAlone: 1 })),
-    "Break apart: 1 compound path became 3 objects. 1 compound path is one piece and was left as it is.",
-  );
-  assert.equal(
-    breakApartSuccessText(broken({ withHoles: true, leftAlone: 2 })),
-    "Break apart: 1 compound path became 3 objects. Holes stayed with their piece. 2 compound paths are one piece each and were left as they are.",
-  );
-  assert.equal(breakApartSuccessText(broken({ kind: "one_piece" })), null);
+  assert.equal(breakApartSuccessText(broken({ kind: "no_compound" })), null);
 });
 
-test("the Break apart refusals are the sentences of criterion 16", () => {
+test("the Break apart refusals are the sentences of criterion 13", () => {
   assert.equal(
     breakApartRefusalText(broken({ kind: "no_compound" })),
     "Break apart needs a compound path. Nothing was changed.",
   );
   assert.equal(
-    breakApartRefusalText(broken({ kind: "one_piece", compounds: 1 })),
-    "Nothing to break apart. The compound path is one piece with its holes.",
-  );
-  assert.equal(
-    breakApartRefusalText(broken({ kind: "one_piece", compounds: 2 })),
-    "Nothing to break apart. The 2 selected compound paths are one piece each, with their holes.",
+    breakApartRefusalText(broken({ kind: "groups" })),
+    "Break apart does not work on groups. Ungroup first. Nothing was changed.",
   );
   assert.equal(breakApartRefusalText(broken({ kind: "applied" })), null);
 });

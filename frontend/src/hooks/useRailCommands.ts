@@ -10,6 +10,8 @@ import {
   combineSuccessText,
   commandDimmed,
   noticeMs,
+  splitRefusalText,
+  splitSuccessText,
   type PathAvailabilityState,
   type PathCommand,
 } from "@/lib/pathText";
@@ -107,7 +109,7 @@ const NO_PATH_AVAILABILITY: PathAvailabilityState = {
   needsTwo: true,
   open: 0,
   of: 0,
-  canBreakApart: false,
+  hasCompound: false,
 };
 
 /**
@@ -118,7 +120,7 @@ const NO_PATH_AVAILABILITY: PathAvailabilityState = {
  */
 export function useRailCommands(editor: EditorSession): RailCommands {
   const { getSession, syncRevision, tool, selectionCount, applyBoolean } = editor;
-  const { applyCombine, applyBreakApart } = editor;
+  const { applyCombine, applySplit, applyBreakApart } = editor;
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
   /** Whether the red outline of a refusal is on the canvas. */
@@ -145,7 +147,7 @@ export function useRailCommands(editor: EditorSession): RailCommands {
       needsTwo: raw.needs_two,
       open: raw.open,
       of: raw.of,
-      canBreakApart: raw.can_break_apart,
+      hasCompound: raw.has_compound,
     };
     raw.free();
     return state;
@@ -198,6 +200,18 @@ export function useRailCommands(editor: EditorSession): RailCommands {
     [applyBoolean, runBusy, show],
   );
 
+  /** The notice of a Path command: the success sentence, else the refusal sentence. */
+  const showPath = useCallback(
+    (success: string | null, refusal: string | null) => {
+      if (success !== null) {
+        show("success", success, noticeMs(success), "path");
+      } else if (refusal !== null) {
+        show("refusal", refusal, undefined, "path");
+      }
+    },
+    [show],
+  );
+
   const applyPath = useCallback(
     (command: PathCommand) => {
       if (busyRef.current || commandDimmed(command, pathRef.current)) {
@@ -207,27 +221,19 @@ export function useRailCommands(editor: EditorSession): RailCommands {
         if (command === "combine") {
           const result = applyCombine();
           outlinedRef.current = combineOutlinesObjects(result);
-          const success = combineSuccessText(result);
-          const refusal = combineRefusalText(result);
-          if (success !== null) {
-            show("success", success, noticeMs(success), "path");
-          } else if (refusal !== null) {
-            show("refusal", refusal, undefined, "path");
-          }
+          showPath(combineSuccessText(result), combineRefusalText(result));
+        } else if (command === "split") {
+          const result = applySplit();
+          outlinedRef.current = result.kind === "groups";
+          showPath(splitSuccessText(result), splitRefusalText(result));
         } else {
           const result = applyBreakApart();
           outlinedRef.current = result.kind === "groups";
-          const success = breakApartSuccessText(result);
-          const refusal = breakApartRefusalText(result);
-          if (success !== null) {
-            show("success", success, noticeMs(success), "path");
-          } else if (refusal !== null) {
-            show("refusal", refusal, undefined, "path");
-          }
+          showPath(breakApartSuccessText(result), breakApartRefusalText(result));
         }
       });
     },
-    [applyBreakApart, applyCombine, runBusy, show],
+    [applyBreakApart, applyCombine, applySplit, runBusy, showPath],
   );
 
   return {

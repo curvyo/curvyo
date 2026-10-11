@@ -46,7 +46,7 @@ function targetIndex(key: string, index: number): number | null {
 
 /**
  * The Path card of the tool rail (`docs/design-system.md`, row "Path toolbox"): the first card of
- * column B, Combine above Break apart, commands and not tools. One Tab stop with roving focus. It
+ * column B, Combine, Split and Break apart, commands and not tools. One Tab stop with roving focus. It
  * shows what the session says is available and decides nothing. Its notice is drawn by the rail.
  */
 export function PathCommands({ commands, selectTool, onReturnFocus }: PathCommandsProps) {

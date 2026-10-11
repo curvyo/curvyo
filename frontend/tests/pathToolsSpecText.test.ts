@@ -1,17 +1,19 @@
 // Run with `npm test`. Independent check of the sentences quoted verbatim in
 // `specs/0034-pen-path-extension` (criteria 1, 7, 16, 20) and `specs/0035-combine-and-break-apart`
-// (criteria 2, 7, 9, 10, 10a, 11, 16, 17), written from the specifications.
+// (criteria 2, 7, 9, 10, 10a, 11), written from the specifications. The Break apart sentences of
+// `0035` criteria 16 and 17 are the Split sentences of `specs/0048-split-compound-path` since the
+// customer's decision of 2026-10-10.
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
-  breakApartRefusalText,
-  breakApartSuccessText,
   combineRefusalText,
   combineSuccessText,
   commandNote,
   noticeMs,
+  splitRefusalText,
+  splitSuccessText,
 } from "../src/lib/pathText.ts";
 import {
   CHIP_REST_MS,
@@ -128,44 +130,44 @@ test("0035 criteria 9 to 11: the Combine refusals", () => {
   );
 });
 
-test("0035 criteria 16 and 17: Break apart notices and refusals", () => {
+test("0035 criteria 16 and 17 as renamed by 0048: Split notices and refusals", () => {
   const ok = { kind: "applied", compounds: 1, pieces: 3, withHoles: false, leftAlone: 0 };
-  assert.equal(breakApartSuccessText(ok), "Break apart: 1 compound path became 3 objects.");
+  assert.equal(splitSuccessText(ok), "Split: 1 compound path became 3 objects.");
   assert.equal(
-    breakApartSuccessText({ ...ok, compounds: 2, pieces: 5 }),
-    "Break apart: 2 compound paths became 5 objects.",
+    splitSuccessText({ ...ok, compounds: 2, pieces: 5 }),
+    "Split: 2 compound paths became 5 objects.",
   );
   assert.equal(
-    breakApartSuccessText({ ...ok, withHoles: true }),
-    "Break apart: 1 compound path became 3 objects. Holes stayed with their piece.",
+    splitSuccessText({ ...ok, withHoles: true }),
+    "Split: 1 compound path became 3 objects. Holes stayed with their piece.",
   );
   assert.equal(
-    breakApartSuccessText({ ...ok, leftAlone: 1 }),
-    "Break apart: 1 compound path became 3 objects. 1 compound path is one piece and was left as it is.",
+    splitSuccessText({ ...ok, leftAlone: 1 }),
+    "Split: 1 compound path became 3 objects. 1 compound path is one piece and was left as it is.",
   );
   assert.equal(
-    breakApartSuccessText({ ...ok, leftAlone: 2 }),
-    "Break apart: 1 compound path became 3 objects. 2 compound paths are one piece each and were left as they are.",
+    splitSuccessText({ ...ok, leftAlone: 2 }),
+    "Split: 1 compound path became 3 objects. 2 compound paths are one piece each and were left as they are.",
   );
   const no = (kind: string, compounds: number) =>
-    breakApartRefusalText({ kind, compounds, pieces: 0, withHoles: false, leftAlone: 0 });
-  assert.equal(no("no_compound", 0), "Break apart needs a compound path. Nothing was changed.");
+    splitRefusalText({ kind, compounds, pieces: 0, withHoles: false, leftAlone: 0 });
+  assert.equal(no("no_compound", 0), "Split needs a compound path. Nothing was changed.");
   assert.equal(
     no("one_piece", 1),
-    "Nothing to break apart. The compound path is one piece with its holes.",
+    "Nothing to split. The compound path is one piece with its holes. Use Break apart to release the holes. Nothing was changed.",
   );
   assert.equal(
     no("one_piece", 2),
-    "Nothing to break apart. The 2 selected compound paths are one piece each, with their holes.",
+    "Nothing to split. The 2 selected compound paths are one piece each, with their holes. Use Break apart to release the holes. Nothing was changed.",
   );
 });
 
 test("0035 criterion 2: tooltip notes, first match wins", () => {
-  const st = (p: Partial<{ needsTwo: boolean; open: number; of: number; canBreakApart: boolean }>) => ({
+  const st = (p: Partial<{ needsTwo: boolean; open: number; of: number; hasCompound: boolean }>) => ({
     needsTwo: false,
     open: 0,
     of: 3,
-    canBreakApart: true,
+    hasCompound: true,
     ...p,
   });
   assert.equal(commandNote("combine", st({ needsTwo: true, of: 0 }), true), "Select two or more closed shapes.");
@@ -175,13 +177,10 @@ test("0035 criterion 2: tooltip notes, first match wins", () => {
   );
   assert.equal(commandNote("combine", st({ open: 1 }), true), "Needs closed paths: 1 of 3 selected is open.");
   assert.equal(commandNote("combine", st({}), true), "Replaces the selection.");
-  assert.equal(commandNote("break_apart", st({ canBreakApart: false }), true), "Select a compound path.");
+  assert.equal(commandNote("split", st({ hasCompound: false }), true), "Select a compound path.");
   assert.equal(
-    commandNote("break_apart", st({ canBreakApart: false }), false),
+    commandNote("split", st({ hasCompound: false }), false),
     "Select a compound path. Use the Select tool.",
   );
-  assert.equal(
-    commandNote("break_apart", st({}), true),
-    "Holes stay with their piece. Replaces the selection.",
-  );
+  assert.equal(commandNote("split", st({}), true), "Replaces the selection.");
 });
