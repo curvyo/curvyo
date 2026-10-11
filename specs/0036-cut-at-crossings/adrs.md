@@ -87,3 +87,27 @@ paths), no trait, no generic.
 ## Flagged
 
 None for the customer. The spec's own questions all have defaults.
+
+## Notes made while building (2026-10-11, implementer)
+
+- **A figure eight gives two pieces, not one.** Criterion 12 says "a figure-eight (one closed
+  path crossing itself once): one open piece". The spec's own definition (a piece is the part of
+  a contour between two consecutive cut points) gives two: the contour passes the crossing twice,
+  so there are two cuts and two lobes, and one piece would still cross itself in the middle. The
+  kernel and the plan cut at both passes, and the test says so. If the customer wants one piece,
+  it is a change of the rule, not of the code path.
+- **No `kurbo` in the curve module.** `curve_intersections.rs` and `curve_chords.rs` do their own
+  de Casteljau and chord arithmetic with `+ - * /`, `sqrt` and `f64::midpoint`, so criterion 11
+  (identical on every target) does not depend on the maths library of the platform. The split of
+  the module into three files (`curve_chords.rs`, `curve_intersections.rs`, `curve_settle.rs`)
+  keeps each under the 500 lines of `CLAUDE.md` §5.
+- **Crossings are made exact.** A crossing found on flattened chords is refined by Newton's
+  method on both curves (at most six steps, kept only if the miss is below 1e-9 mm), so the two
+  contours are cut at the same point and not a flattening tolerance apart; touches and tangents
+  keep the chord result.
+- **Merging cuts along the contour.** Two cuts are one when they are within 0.01 mm in space and
+  along the contour (chord lengths); two cuts at one place far apart along the contour (the two
+  passes of a figure eight) stay two. Meetings at the join of neighbouring segments (a polyline
+  run of at most 0.002 mm between them) are no cuts.
+- **The split of a contour is `curvyo-ui-core/src/cut_pieces.rs`**, written through the
+  `replace_with_pieces` of 0048 with `PieceFill::None`.

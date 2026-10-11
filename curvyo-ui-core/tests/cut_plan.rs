@@ -560,3 +560,25 @@ mod pieces_rejoin {
         }
     }
 }
+
+/// Degenerate paths never panic: one node, a zero-length line, a closed path of two nodes, a path
+/// that doubles over itself exactly.
+#[test]
+fn degenerate_paths_are_no_trouble() {
+    let document = Document::new(1);
+    let single = poly(&document, 10, &[(5.0, 5.0)], false);
+    let point_line = poly(&document, 20, &[(5.0, 5.0), (5.0, 5.0)], false);
+    let two_closed = poly(&document, 30, &[(0.0, 0.0), (10.0, 10.0)], true);
+    let through = poly(&document, 40, &[(0.0, 10.0), (10.0, 0.0)], false);
+    let ids = [single, point_line, two_closed, through];
+    let result = plan(&document, &ids);
+    let plan = result.unwrap();
+    // The two-node closed path is a line out and back; the crossing line cuts it at (5, 5).
+    assert!(plan.removed.contains(&through));
+    assert!(plan.removed.contains(&two_closed));
+    assert_eq!(plan.kept.len(), 2, "{:?}", plan.kept);
+    for (_, outlines) in &plan.pieces {
+        assert!(outlines[0].0.len() >= 2);
+        assert!(!outlines[0].1);
+    }
+}

@@ -79,3 +79,18 @@ write for Split, Break apart, Cut and Fracture/Flatten.
 - Spec Question 1 (rename 0035's command to Split, Break apart becomes the
   every-outline command) is the customer's. Default A, as written here. On
   B this spec is dropped and nothing above is built.
+
+## Notes made while building (2026-10-11, implementer)
+
+- **One availability flag.** `PathAvailability` has `compound` for Split and Break apart together
+  (the one-function rule of criterion 1, so the two are never dimmed differently) and `cut`; the
+  wasm view calls them `has_compound` and `can_cut`.
+- **The plans carry the write's shape.** `SplitPlan` and `BreakApartPlan` hold `removed` and a
+  flat `pieces: Vec<(NodeId, PieceOutlines)>` that go straight into `replace_with_pieces`
+  (`PieceOutlines` is a type alias of `Vec<(Vec<NewAnchor>, bool)>` in `document-core`); the
+  `parts` list of the 0035 plan is gone. `replace_with_pieces` refuses an empty `pieces` list.
+- **Hole of the Split glyph.** The brief says a hole of 3 x 3; on the glyph sheet at 1x it shows
+  two pixels wide, so the built hole is 4 x 4 (`docs/design-system.md`, "Command glyphs").
+- **Tests of 0035 moved by name only.** The tests that checked the old Break apart now call
+  `apply_split`, `plan_split` and `SplitRefusal` with the same assertions; `Break apart` keeps its
+  own tests (`split_break_apart_session.rs`, `split_and_break_apart.rs`).

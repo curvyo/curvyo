@@ -360,7 +360,7 @@ fn away_from(joins: &[Point], a: &Seg, b: &Seg, meeting: Meeting) -> bool {
 }
 
 /// Where each contour is cut by the others and by itself: per contour, the cut parameters in
-/// order along it, cuts within [`CUT_MERGE_MM`] of each other merged, cuts within 0.001 mm of a
+/// order along it, cuts within 0.01 mm of each other merged, cuts within 0.001 mm of a
 /// node made at the node, and the two end nodes of an open contour left out (a cut at an end adds
 /// no piece). A closed contour that passes one point twice (a figure eight) has a cut for each
 /// pass. Segments that share a stretch are cut at the two ends of it.

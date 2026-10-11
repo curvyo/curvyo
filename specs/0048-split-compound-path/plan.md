@@ -50,46 +50,61 @@ in each task (0048 or 0036).
 
 ### Milestone 1: Split and Break apart (0048)
 
-- [ ] 1.1 `document-core`: `replace_with_pieces` with `PieceFill`; refusal-writes-nothing tests, label pin
+- [x] 1.1 `document-core`: `replace_with_pieces` with `PieceFill`; refusal-writes-nothing tests, label pin
   (0048 criteria 5, 6, 8, 11, 12; 0036 criteria 6, 7)
-- [ ] 1.2 `ui-core`: `split.rs` = old plan + touch rule (union-find over `touching_outlines`), one-part
+- [x] 1.2 `ui-core`: `split.rs` = old plan + touch rule (union-find over `touching_outlines`), one-part
   refusal (0048 criteria 3, 4, 5, 7, 9, 16)
-- [ ] 1.3 `ui-core`: new `break_apart.rs`, one closed path per outline, hole flag from the nesting
+- [x] 1.3 `ui-core`: new `break_apart.rs`, one closed path per outline, hole flag from the nesting
   (0048 criteria 11, 13)
-- [ ] 1.4 `ui-core`: `PathAvailability` with `split`, `break_apart`, `cut` from one function (0048
+- [x] 1.4 `ui-core`: `PathAvailability` with `split`, `break_apart`, `cut` from one function (0048
   criterion 1); `history_names` entries `split`, `cut_at_crossings`; guard test stays green
-- [ ] 1.5 `editor-wasm`: `session/split.rs`, `wasm_split.rs`, selection afterwards, refusal marks, label
+- [x] 1.5 `editor-wasm`: `session/split.rs`, `wasm_split.rs`, selection afterwards, refusal marks, label
   `split` / `break_apart` pinned (0048 criteria 6, 8, 9, 12, 13)
-- [ ] 1.6 Existing 0035 tests moved to the Split names (same assertions); golden file
+- [x] 1.6 Existing 0035 tests moved to the Split names (same assertions); golden file
   `compound_overlapping_squares.curvyo` (0048 criterion 4); Combine then Split and back (criterion 10)
-- [ ] 1.7 Budget test with the four generated inputs of 0048 criterion 15, golden counts, part search
+- [x] 1.7 Budget test with the four generated inputs of 0048 criterion 15, golden counts, part search
   under 500 ms (0048 criteria 15, 16)
-- [ ] 1.8 Frontend: Path card with Combine, Split, Break apart; texts, glyphs (Split = the redrawn
+- [x] 1.8 Frontend: Path card with Combine, Split, Break apart; texts, glyphs (Split = the redrawn
   built art, Break apart = no hole), notices, tests (0048 criteria 1, 2, 8, 9, 12, 13)
 
 ### Milestone 2: Cut (0036)
 
-- [ ] 2.1 `geometry-core`: `curve_intersections.rs`: chord meeting (crossing, touch, T, collinear overlap),
+- [x] 2.1 `geometry-core`: `curve_intersections.rs`: chord meeting (crossing, touch, T, collinear overlap),
   recursive subdivision, self-intersection, merge of overlap ends, snap to nodes; unit tests for
   lines and curves, a property test on random cubic pairs (0036 criteria 2, 4, 11, 12)
-- [ ] 2.2 `ui-core`: `cut_pieces.rs`, split of a contour into open pieces on `subdivide_at_parameter`
+- [x] 2.2 `ui-core`: `cut_pieces.rs`, split of a contour into open pieces on `subdivide_at_parameter`
   (0036 criteria 3, 4, 5)
-- [ ] 2.3 `ui-core`: `cut.rs`: operands (paths, primitives), refusals (groups, compound, nothing crosses,
+- [x] 2.3 `ui-core`: `cut.rs`: operands (paths, primitives), refusals (groups, compound, nothing crosses,
   out of range, more than 10000 pieces), plan (0036 criteria 1, 2, 6, 8, 9, 10)
-- [ ] 2.4 `editor-wasm`: `session/cut.rs`, `wasm_cut.rs`, label `cut_at_crossings`, selection afterwards,
+- [x] 2.4 `editor-wasm`: `session/cut.rs`, `wasm_cut.rs`, label `cut_at_crossings`, selection afterwards,
   red outline of compound offenders (0036 criteria 2, 7, 9)
-- [ ] 2.5 Tests of 0036 criteria 12 and 12a (two lines, circle and line, rotated circle, figure eight,
+- [x] 2.5 Tests of 0036 criteria 12 and 12a (two lines, circle and line, rotated circle, figure eight,
   T, collinear, overlapping circles) and the E1 to E6 sheet of 0048 criterion 14 through the session
-- [ ] 2.6 Budget: the 50 x 50 grid, 5100 pieces under 2 s in release (0036 criterion 13); the
+- [x] 2.6 Budget: the 50 x 50 grid, 5100 pieces under 2 s in release (0036 criterion 13); the
   `boolean-budgets` CI job runs the new release tests
-- [ ] 2.7 Frontend: Cut button, glyph (X of four stubs), texts, notice "pieces", refusal outline
+- [x] 2.7 Frontend: Cut button, glyph (X of four stubs), texts, notice "pieces", refusal outline
   (0036 criteria 1, 7, 8, 9, 10)
 
 ### Milestone 3: docs and gate
 
-- [ ] 3.1 Docs: README rows and statuses, 0035 amendment note, design-system differences
-- [ ] 3.2 Full gate (`CLAUDE.md` §7 for the whole workspace, all targets; frontend `tsc`, oxlint, tests;
+- [x] 3.1 Docs: README rows and statuses, 0035 amendment note, design-system differences
+- [x] 3.2 Full gate (`CLAUDE.md` §7 for the whole workspace, all targets; frontend `tsc`, oxlint, tests;
   release budgets), merge `origin/main`, PR draft for the lead
+
+## Decisions made while building
+
+- **`PathAvailability`** has one `compound` flag for Split and Break apart (criterion 1: one
+  function) and `cut`; `BreakApartPlan` and `SplitPlan` hold `removed` and a flat `pieces` list.
+- **A figure eight is cut at both passes of its crossing** and gives two pieces; the spec text of
+  0036 criterion 12 says one (see the note in `specs/0036-cut-at-crossings/adrs.md`).
+- **The curve module does its own cubic arithmetic** instead of `kurbo`'s, so that the result is
+  bit-identical on every target; it is three files (`curve_chords.rs`, `curve_intersections.rs`,
+  `curve_settle.rs`), and crossings are refined by Newton's method.
+- **Glyphs:** the hole of the Split glyph is 4 x 4 (the brief said about 3 x 3; two pixels wide at
+  1x does not read), the stubs of Cut end 2 units from the centre.
+- **Path card height** is 180px in `railCard.ts` (four buttons).
+- The tester-written 0035 tests that checked the old Break apart were renamed to Split; nothing was
+  weakened, and the fuzz test of the path tools also presses Split and Cut now.
 
 ## Validation
 

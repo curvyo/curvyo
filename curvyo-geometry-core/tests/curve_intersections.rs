@@ -335,8 +335,22 @@ mod random_pairs {
         (-200i32..=200).prop_map(|n| f64::from(n) * 0.1)
     }
 
+    /// Four control points with x not decreasing: the curve is a graph over x and has no
+    /// self-crossing and no hairpin, so every cut it gets comes from the other curve.
     fn control() -> impl Strategy<Value = [(f64, f64); 4]> {
-        proptest::array::uniform4((coordinate(), coordinate()))
+        (
+            proptest::array::uniform4(coordinate()),
+            proptest::array::uniform4(coordinate()),
+        )
+            .prop_map(|(mut xs, ys)| {
+                xs.sort_by(f64::total_cmp);
+                [
+                    (xs[0], ys[0]),
+                    (xs[1], ys[1]),
+                    (xs[2], ys[2]),
+                    (xs[3], ys[3]),
+                ]
+            })
     }
 
     proptest! {
@@ -350,15 +364,10 @@ mod random_pairs {
                 for cut in list {
                     let at = position(&all[index].0, false, *cut);
                     let other = &all[1 - index];
-                    // A cut caused by a self-crossing is on its own curve twice; the other curve
-                    // need not be near it.
                     let own = nearest_distance(&all[index].0, false, at);
                     prop_assert!(own <= 1e-6, "off its own curve by {own}");
                     let there = nearest_distance(&other.0, false, at);
-                    let self_cut = result[index].iter().filter(|c| {
-                        near(position(&all[index].0, false, **c), at, 0.01)
-                    }).count() > 1;
-                    prop_assert!(self_cut || there <= 0.01, "{there} from the other curve at {at:?}");
+                    prop_assert!(there <= 0.01, "{there} from the other curve at {at:?}");
                 }
             }
         }
@@ -420,9 +429,14 @@ mod recall {
             let result = cut_parameters(&outlines(&all));
             for crossing in brute_force_crossings(&all[0].0, &all[1].0) {
                 for index in 0..2 {
-                    let hit = result[index].iter().any(|cut| {
-                        near(position(&all[index].0, false, *cut), crossing, 0.05)
-                    });
+                    // A crossing at an end of an open curve is no cut of it (it adds no piece).
+                    let anchors = &all[index].0;
+                    let at_end = near(anchors[0].0, crossing, 0.05)
+                        || near(anchors[1].0, crossing, 0.05);
+                    let hit = at_end
+                        || result[index].iter().any(|cut| {
+                            near(position(anchors, false, *cut), crossing, 0.05)
+                        });
                     prop_assert!(hit, "curve {index} is not cut at {crossing:?}: {:?}", result[index]);
                 }
             }
@@ -456,4 +470,17 @@ fn a_grid_of_a_hundred_lines() {
     if !cfg!(debug_assertions) {
         assert!(took <= Duration::from_secs(2), "{took:?}");
     }
+}
+
+/// Two circles that touch from outside are cut once each, at the touching point (here a node of
+/// both): the stretch within 0.001 mm of the other circle is shorter than 0.01 mm.
+#[test]
+fn tangent_circles_are_cut_once_at_the_touching_point() {
+    let all = [
+        (circle(0.0, 0.0, 10.0), true),
+        (circle(20.0, 0.0, 10.0), true),
+    ];
+    let result = cuts(&all);
+    assert_eq!(result[0], vec![CutParameter { segment: 0, t: 0.0 }]);
+    assert_eq!(result[1], vec![CutParameter { segment: 2, t: 0.0 }]);
 }
