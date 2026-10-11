@@ -3,6 +3,7 @@ import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "re
 
 import { HandleHintChip } from "@/components/HandleHintChip";
 import { type MoveEntryState, REFERENCE_COUNT } from "@/hooks/useEditorSession";
+import { fieldText, submittedTexts } from "@/lib/moveEntryText";
 import { placeMoveEntryChip } from "@/lib/readoutPlacement";
 
 /** The tool rail's clearance from the canvas's left edge, px (`App.tsx`'s
@@ -104,10 +105,9 @@ export function MoveEntryChip({
   // The reference whose position an untouched field shows: the mark under the pointer, else the
   // chosen point (criterion 44).
   const shownReference = absolute && markHover >= 0 ? markHover : entry.reference;
-  const prefill = (axis: 0 | 1, mode: boolean, reference: number) =>
-    mode ? (entry.absolute[reference]?.[axis] ?? "") : entry.relative[axis];
+  const fields = { edited, typed };
   const textOfAt = (axis: 0 | 1, reference: number) =>
-    edited[axis] ? typed[axis] : prefill(axis, absolute, reference);
+    fieldText(entry, fields, axis, absolute, reference);
   const textOf = (axis: 0 | 1) => textOfAt(axis, shownReference);
 
   // Rust draws the marks in Absolute only.
@@ -167,7 +167,12 @@ export function MoveEntryChip({
     returnFocusToCanvas();
   };
 
-  const submit = () => finish(onCommit(textOf(0), textOf(1), absolute, copy));
+  // Enter sends the prefill of the chosen reference, not of the mark the pointer rests on
+  // (criteria 38 and 44): an untouched field must read as untouched.
+  const submit = () => {
+    const [first, second] = submittedTexts(entry, fields, absolute, entry.reference);
+    finish(onCommit(first, second, absolute, copy));
+  };
 
   // A click on a mark executes the move with that mark's point (criterion 40), with the fields
   // compared to the prefill of that point (criterion 44). Registered again after every render, so

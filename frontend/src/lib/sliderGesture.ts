@@ -90,7 +90,7 @@ export class SliderGesture {
   /** The pointer moved with the button down. */
   move(at: Point): GestureEvent {
     const press = this.press;
-    if (!press) {
+    if (!press || !Number.isFinite(at.x) || !Number.isFinite(at.y)) {
       return { kind: "none" };
     }
     if (press.dragging) {
@@ -119,6 +119,7 @@ export class SliderGesture {
     const last = this.lastClick;
     if (
       last &&
+      time >= last.time &&
       time - last.time <= DOUBLE_CLICK_MS &&
       distance(at, last.at) <= slop
     ) {

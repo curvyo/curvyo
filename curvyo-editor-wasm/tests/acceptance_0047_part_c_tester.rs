@@ -28,6 +28,14 @@
     clippy::manual_midpoint,
     clippy::uninlined_format_args
 )]
+// Mechanical lints of the tester files, allowed so the gate stays strict for production code.
+#![allow(
+    clippy::approx_constant,
+    clippy::cast_sign_loss,
+    clippy::collapsible_if,
+    clippy::assert_is_empty,
+    clippy::manual_assert_eq
+)]
 
 use std::f64::consts::FRAC_PI_2;
 
@@ -1124,11 +1132,17 @@ fn ac50_a_box_larger_than_the_viewport() {
             assert_eq!(hit, None, "{m:?} lies outside the viewport");
         }
     }
-    assert!(any_inside >= 1, "at least the centre lies inside the viewport");
+    assert!(
+        any_inside >= 1,
+        "at least the centre lies inside the viewport"
+    );
     // The line is clipped: no vertex lies far outside the canvas.
     let l = s.draw_list();
     let v = box_vertices(&l);
-    assert!(v.is_empty(), "all four edges lie outside the viewport: nothing is drawn");
+    assert!(
+        v.is_empty(),
+        "all four edges lie outside the viewport: nothing is drawn"
+    );
     let lo = s.screen_to_document(-50.0, -50.0);
     let hi = s.screen_to_document(1650.0, 1050.0);
     for (_, p) in &v {
@@ -1170,12 +1184,7 @@ fn ac33_move_drag_shows_the_box() {
     assert!(red_box(&s).is_none(), "no box at the press");
     // Inside the dead zone (1 px).
     let one_px = 1.0 / s.view().scale();
-    hold(
-        &mut s,
-        pt(from.x + one_px, from.y),
-        false,
-        false,
-    );
+    hold(&mut s, pt(from.x + one_px, from.y), false, false);
     assert!(red_box(&s).is_none(), "no box inside the 3 px dead zone");
     // The example offset.
     hold(&mut s, pt(from.x + 20.0, from.y + 10.0), false, false);
@@ -1337,7 +1346,11 @@ fn ac34_the_box_stays_while_the_chip_is_open() {
         // Enter.
         open_chip(&mut s, absolute);
         assert!(red_box(&s).is_some());
-        let (tx, ty) = if absolute { ("200", "150") } else { ("20", "15") };
+        let (tx, ty) = if absolute {
+            ("200", "150")
+        } else {
+            ("20", "15")
+        };
         let out = s.commit_move_entry(tx, ty, mode(absolute, false));
         assert_eq!(out, EntryOutcome::Committed);
         assert!(red_box(&s).is_none(), "Enter: no box");
@@ -1560,14 +1573,26 @@ fn ac39_the_current_mark_is_drawn_differently() {
         l.triangles
             .iter()
             .filter(|v| {
-                (v.position.x - p.x).abs() <= 8.0 / k && (v.position.y - p.y).abs() <= 8.0 / k
+                (v.position.x - p.x).abs() <= 8.0 / k
+                    && (v.position.y - p.y).abs() <= 8.0 / k
                     && v.color.a == 255
             })
             .count()
     };
-    let (c, br) = (ref_point(bx, ReferencePoint::Centre), ref_point(bx, ReferencePoint::BottomRight));
-    assert_ne!(count_near(&a, c), count_near(&b, c), "the centre cross changed look");
-    assert_ne!(count_near(&a, br), count_near(&b, br), "the bottom right square changed look");
+    let (c, br) = (
+        ref_point(bx, ReferencePoint::Centre),
+        ref_point(bx, ReferencePoint::BottomRight),
+    );
+    assert_ne!(
+        count_near(&a, c),
+        count_near(&b, c),
+        "the centre cross changed look"
+    );
+    assert_ne!(
+        count_near(&a, br),
+        count_near(&b, br),
+        "the bottom right square changed look"
+    );
     // A mark that was not touched keeps its look.
     let tl = ref_point(bx, ReferencePoint::TopLeft);
     assert_eq!(count_near(&a, tl), count_near(&b, tl));
@@ -1704,7 +1729,10 @@ fn ac36_ac50_one_edge_crossing_the_viewport_is_clipped() {
     open_chip(&mut s, false);
     let l = s.draw_list();
     let v = box_vertices(&l);
-    assert!(!v.is_empty(), "the top edge crosses the viewport and is drawn");
+    assert!(
+        !v.is_empty(),
+        "the top edge crosses the viewport and is drawn"
+    );
     let lo = s.screen_to_document(-30.0, -30.0);
     let hi = s.screen_to_document(1630.0, 1030.0);
     for (_, p) in &v {
@@ -1716,7 +1744,10 @@ fn ac36_ac50_one_edge_crossing_the_viewport_is_clipped() {
         );
     }
     let (min, max) = extent(&v).unwrap();
-    assert!(max.x - min.x > 100.0, "the visible part of the edge is long");
+    assert!(
+        max.x - min.x > 100.0,
+        "the visible part of the edge is long"
+    );
 }
 
 fn dbl(s: &mut Session, at: Point, ctrl: bool) -> bool {
@@ -1841,7 +1872,13 @@ fn ac41_the_chosen_option_is_used_by_enter_and_relative_ignores_it() {
             EntryOutcome::Committed,
             "{r:?}"
         );
-        assert_pt(ref_point(tbb_of(&s), r), 100.0, 50.0, 1e-9, &format!("{r:?}"));
+        assert_pt(
+            ref_point(tbb_of(&s), r),
+            100.0,
+            50.0,
+            1e-9,
+            &format!("{r:?}"),
+        );
         // Relative: the reference is not used.
         let mut s = open(&rect_30x40(0.0, 0.0));
         select_everything(&mut s);
@@ -1851,7 +1888,13 @@ fn ac41_the_chosen_option_is_used_by_enter_and_relative_ignores_it() {
             s.commit_move_entry("7", "3", mode(false, false)),
             EntryOutcome::Committed
         );
-        assert_pt(rect_origin(&objects(&s)[0]), 17.0, 23.0, 1e-9, &format!("relative {r:?}"));
+        assert_pt(
+            rect_origin(&objects(&s)[0]),
+            17.0,
+            23.0,
+            1e-9,
+            &format!("relative {r:?}"),
+        );
     }
 }
 
@@ -1884,7 +1927,10 @@ fn ac36_the_line_is_aligned_at_every_device_pixel_ratio() {
         let view = s.view();
         let v = box_vertices(&s.draw_list());
         assert!(!v.is_empty(), "dpr {dpr}");
-        let mut xs: Vec<f64> = v.iter().map(|(_, p)| view.document_to_screen(*p).0).collect();
+        let mut xs: Vec<f64> = v
+            .iter()
+            .map(|(_, p)| view.document_to_screen(*p).0)
+            .collect();
         xs.sort_by(f64::total_cmp);
         xs.dedup_by(|a, b| (*a - *b).abs() < 1e-6);
         for x in &xs {
@@ -1895,7 +1941,11 @@ fn ac36_the_line_is_aligned_at_every_device_pixel_ratio() {
             );
         }
         // The vertical line: its two edges (left and right of the line) are one css pixel apart.
-        let left: Vec<f64> = xs.iter().copied().filter(|x| (x - view.document_to_screen(pt(110.3, 0.0)).0).abs() < 3.0).collect();
+        let left: Vec<f64> = xs
+            .iter()
+            .copied()
+            .filter(|x| (x - view.document_to_screen(pt(110.3, 0.0)).0).abs() < 3.0)
+            .collect();
         let width = left.last().unwrap() - left.first().unwrap();
         let device_width = width * dpr;
         assert!(

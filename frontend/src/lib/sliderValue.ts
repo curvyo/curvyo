@@ -16,8 +16,11 @@ export interface SliderRange {
 /** The message of a refused typed ratio (criterion 22). */
 export const RATIO_MESSAGE = "Enter a number from 0.01 to 0.99";
 
-/** `value` clamped to the range and rounded to the nearest step. */
+/** `value` clamped to the range and rounded to the nearest step; a NaN gives the minimum. */
 export function snapToStep(value: number, range: SliderRange): number {
+  if (Number.isNaN(value)) {
+    return range.min;
+  }
   const clamped = Math.min(range.max, Math.max(range.min, value));
   const steps = Math.round((clamped - range.min) / range.step);
   // Six decimals shed the float noise of `0.01 * 3`.
@@ -33,7 +36,8 @@ export function valueAtPosition(
   width: number,
   range: SliderRange,
 ): number {
-  const fraction = width > 0 ? Math.min(1, Math.max(0, x / width)) : 0;
+  // A NaN position (a pointer event without coordinates) is the start of the track.
+  const fraction = width > 0 && !Number.isNaN(x) ? Math.min(1, Math.max(0, x / width)) : 0;
   return snapToStep(range.min + fraction * (range.max - range.min), range);
 }
 

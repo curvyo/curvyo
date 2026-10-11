@@ -213,7 +213,7 @@ test("hostile: NaN, infinity and huge coordinates and time stamps never throw", 
   assert.ok(true);
 });
 
-test("hostile: a time stamp that runs backwards is not a double-click", { todo: "low: input a browser never produces; reported as a defect, not fixed here" }, () => {
+test("hostile: a time stamp that runs backwards is not a double-click", () => {
   const g = new SliderGesture();
   click(g, { x: 40, y: 12 }, 5000);
   // A second click 'before' the first one: the clock was reset or the event came from
@@ -221,7 +221,7 @@ test("hostile: a time stamp that runs backwards is not a double-click", { todo: 
   assert.equal(click(g, { x: 40, y: 12 }, 100).kind, "click");
 });
 
-test("hostile: NaN pointer movement is not a drag that moves the thumb to NaN", { todo: "low: input a browser never produces; reported as a defect, not fixed here" }, () => {
+test("hostile: NaN pointer movement is not a drag that moves the thumb to NaN", () => {
   const g = new SliderGesture();
   g.down(track, false, thumb);
   const ev = g.move({ x: Number.NaN, y: 0 });
@@ -271,7 +271,7 @@ test("hostile: a zero or negative track width gives the minimum, not NaN", () =>
   assert.equal(valueAtPosition(5, -10, RATIO_RANGE), 0.01);
 });
 
-test("hostile: a NaN or infinite pointer position gives a finite value in range", { todo: "low: input a browser never produces; reported as a defect, not fixed here" }, () => {
+test("hostile: a NaN or infinite pointer position gives a finite value in range", () => {
   for (const x of [Number.NaN, Infinity, -Infinity]) {
     const v = valueAtPosition(x, W, RATIO_RANGE);
     assert.ok(Number.isFinite(v) && v >= 0.01 && v <= 0.99, `x=${x} gave ${v}`);

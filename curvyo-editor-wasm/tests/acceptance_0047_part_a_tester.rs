@@ -628,7 +628,6 @@ fn assert_ids_unique(s: &Session, what: &str) {
     }
 }
 
-
 // ---------------------------------------------------------------------
 // Criterion 1: skew handles for every kind
 // ---------------------------------------------------------------------
@@ -1156,7 +1155,10 @@ fn ac04_one_commit_for_all_objects() {
     // The replica, holding the old state, got exactly one change from the update: either it
     // has the old document or the one change that carries every object.
     let new_changes = replica.len_changes() - loro_of(&before_doc).len_changes();
-    assert_eq!(new_changes, 1, "the update carries one change for all objects");
+    assert_eq!(
+        new_changes, 1,
+        "the update carries one change for all objects"
+    );
 
     // Stretch by drag.
     let mut s = open(&make());
@@ -1491,8 +1493,16 @@ fn ac07_kind_matrix_free_corner_drag() {
                 // The corner radius follows sqrt(sx * sy) (0005 criterion 9, question 15): an
                 // approximation the spec names; the box itself is exact.
                 let (lo, hi) = tight_bounds(std::slice::from_ref(n));
-                let (wlo, whi) = (map.p(tight_bounds(std::slice::from_ref(old)).0), map.p(tight_bounds(std::slice::from_ref(old)).1));
-                assert!(near(lo.x, wlo.x, 1e-6) && near(lo.y, wlo.y, 1e-6) && near(hi.x, whi.x, 1e-6) && near(hi.y, whi.y, 1e-6));
+                let (wlo, whi) = (
+                    map.p(tight_bounds(std::slice::from_ref(old)).0),
+                    map.p(tight_bounds(std::slice::from_ref(old)).1),
+                );
+                assert!(
+                    near(lo.x, wlo.x, 1e-6)
+                        && near(lo.y, wlo.y, 1e-6)
+                        && near(hi.x, whi.x, 1e-6)
+                        && near(hi.y, whi.y, 1e-6)
+                );
             }
             for p in polyline(n).into_iter().filter(|_| kind != Kind::RoundRect) {
                 assert!(
@@ -1511,7 +1521,8 @@ fn ac07_kind_matrix_free_corner_drag() {
                 "{kind:?}: scale map {m:?} vs ({sx}, {sy})"
             );
             assert!(
-                near(m.p(anchor_pt).x, anchor_pt.x, 1e-3) && near(m.p(anchor_pt).y, anchor_pt.y, 1e-3),
+                near(m.p(anchor_pt).x, anchor_pt.x, 1e-3)
+                    && near(m.p(anchor_pt).y, anchor_pt.y, 1e-3),
                 "{kind:?}: the opposite corner stays fixed"
             );
         }
@@ -2429,8 +2440,11 @@ fn ac08_stroke_width_switch_read_at_the_press_and_followed_by_converted_objects(
         let p = curved_path(&d, 1, 100.0, 100.0);
         let q = polygon(&d, 140.0, 100.0, 8.0, -FRAC_PI_2, 5);
         for id in [p, q] {
-            d.edit_style(&[id], &curvyo_document_core::StyleEdit::StrokeWidth(Length::from_mm(0.8)))
-                .unwrap();
+            d.edit_style(
+                &[id],
+                &curvyo_document_core::StyleEdit::StrokeWidth(Length::from_mm(0.8)),
+            )
+            .unwrap();
         }
         d
     };
@@ -2451,11 +2465,20 @@ fn ac08_stroke_width_switch_read_at_the_press_and_followed_by_converted_objects(
         let os = objects(&s);
         assert!(is_path(&os[1]), "the polygon converted");
         let (a, b) = (stroke_mm(&os[0]) / 0.8, stroke_mm(&os[1]) / 0.8);
-        assert!(near(a, b, 1e-9), "converted stroke follows the path's: {a} vs {b}");
+        assert!(
+            near(a, b, 1e-9),
+            "converted stroke follows the path's: {a} vs {b}"
+        );
         if on_at_press {
-            assert!(a > 1.0 + 1e-6, "the switch was on at the press: scaled ({a})");
+            assert!(
+                a > 1.0 + 1e-6,
+                "the switch was on at the press: scaled ({a})"
+            );
         } else {
-            assert!(near(a, 1.0, 1e-9), "the switch was off at the press: unchanged ({a})");
+            assert!(
+                near(a, 1.0, 1e-9),
+                "the switch was off at the press: unchanged ({a})"
+            );
         }
     }
 }
@@ -2483,7 +2506,10 @@ fn ac10_uniform_means_within_1e_9() {
         let to = pt(from.x + 0.5 * g.w(), from.y + 0.5 * g.h() + extra_y);
         drag(&mut s, from, to);
         let any_path = objects(&s).iter().any(is_path);
-        assert_eq!(any_path, converts, "extra {extra_y}: converted = {any_path}");
+        assert_eq!(
+            any_path, converts,
+            "extra {extra_y}: converted = {any_path}"
+        );
     }
     // Typed: exactly proportional text does not convert (here a 2x on exact sizes).
     let mut s = open(&make());
@@ -2520,22 +2546,49 @@ fn ac07_aligned_means_a_multiple_of_90_degrees_within_1e_9_rad() {
         is_path(&n)
     };
     let quarter = std::f64::consts::FRAC_PI_2;
-    assert!(!stretch(&|d, id| rotate_about_centre(d, id, quarter)), "90 degrees stays a rectangle");
-    assert!(!stretch(&|d, id| rotate_about_centre(d, id, 3.0 * quarter)), "270");
-    assert!(!stretch(&|d, id| rotate_about_centre(d, id, -quarter)), "-90");
-    assert!(!stretch(&|d, id| rotate_about_centre(d, id, 2.0 * quarter)), "180");
-    assert!(!stretch(&|d, id| {
-        rotate_about_centre(d, id, quarter / 2.0);
-        rotate_about_centre(d, id, quarter / 2.0);
-    }), "two 45 degree turns");
-    assert!(!stretch(&|d, id| {
-        for _ in 0..9 {
-            rotate_about_centre(d, id, quarter / 9.0);
-        }
-    }), "nine 10 degree turns (rounding noise)");
-    assert!(!stretch(&|d, id| rotate_about_centre(d, id, quarter + 1e-12)), "90 degrees + 1e-12 rad");
-    assert!(stretch(&|d, id| rotate_about_centre(d, id, quarter + 1e-6)), "90 degrees + 1e-6 rad converts");
-    assert!(stretch(&|d, id| rotate_about_centre(d, id, 0.5)), "0.5 rad converts");
+    assert!(
+        !stretch(&|d, id| rotate_about_centre(d, id, quarter)),
+        "90 degrees stays a rectangle"
+    );
+    assert!(
+        !stretch(&|d, id| rotate_about_centre(d, id, 3.0 * quarter)),
+        "270"
+    );
+    assert!(
+        !stretch(&|d, id| rotate_about_centre(d, id, -quarter)),
+        "-90"
+    );
+    assert!(
+        !stretch(&|d, id| rotate_about_centre(d, id, 2.0 * quarter)),
+        "180"
+    );
+    assert!(
+        !stretch(&|d, id| {
+            rotate_about_centre(d, id, quarter / 2.0);
+            rotate_about_centre(d, id, quarter / 2.0);
+        }),
+        "two 45 degree turns"
+    );
+    assert!(
+        !stretch(&|d, id| {
+            for _ in 0..9 {
+                rotate_about_centre(d, id, quarter / 9.0);
+            }
+        }),
+        "nine 10 degree turns (rounding noise)"
+    );
+    assert!(
+        !stretch(&|d, id| rotate_about_centre(d, id, quarter + 1e-12)),
+        "90 degrees + 1e-12 rad"
+    );
+    assert!(
+        stretch(&|d, id| rotate_about_centre(d, id, quarter + 1e-6)),
+        "90 degrees + 1e-6 rad converts"
+    );
+    assert!(
+        stretch(&|d, id| rotate_about_centre(d, id, 0.5)),
+        "0.5 rad converts"
+    );
 }
 
 /// A star with 1024 points (2048 nodes) and a 1024-gon skew exactly as their "Object to path"
@@ -2559,19 +2612,27 @@ fn many_nodes_convert_without_an_extra_commit() {
     select_everything(&mut r);
     let rc = change_count(&r);
     key(&mut r, "k", false);
-    assert_eq!(r.commit_transform_entry("12", "", 0), EntryOutcome::Committed);
+    assert_eq!(
+        r.commit_transform_entry("12", "", 0),
+        EntryOutcome::Committed
+    );
     let path_delta = change_count(&r) - rc;
     let mut s = open(&d);
     select_everything(&mut s);
     let before_vv = loro_of(&doc_of(&s)).oplog_vv();
     key(&mut s, "k", false);
-    assert_eq!(s.commit_transform_entry("12", "", 0), EntryOutcome::Committed);
+    assert_eq!(
+        s.commit_transform_entry("12", "", 0),
+        EntryOutcome::Committed
+    );
     // Loro splits a very large commit into several changes; they are one commit when they
     // carry the same message and the same time stamp, and the message is the skew's label.
     let new_changes = changes_since(&s, &before_vv);
     assert!(!new_changes.is_empty());
     assert!(
-        new_changes.iter().all(|(m, t)| *m == new_changes[0].0 && *t == new_changes[0].1),
+        new_changes
+            .iter()
+            .all(|(m, t)| *m == new_changes[0].0 && *t == new_changes[0].1),
         "all new changes belong to one commit: {new_changes:?}"
     );
     assert!(path_delta >= 1);
@@ -2631,7 +2692,10 @@ fn ac01_ac02_turned_single_objects_skew_by_drag() {
         // Top skew handle: 16 px out along the box's own -y axis from the top side's middle.
         let out = 6.0 + 16.0 / k;
         let h = pt(120.0 + out * sn, 100.0 - out * cs);
-        assert!(skew_cursor_at(&mut s, h), "{kind:?}: the turned box has a skew handle at the top");
+        assert!(
+            skew_cursor_at(&mut s, h),
+            "{kind:?}: the turned box has a skew handle at the top"
+        );
         let base_changes = change_count(&s);
         // Drag along the box's own x axis by 6 mm.
         drag(&mut s, h, pt(h.x + 6.0 * cs, h.y + 6.0 * sn));
@@ -2639,12 +2703,21 @@ fn ac01_ac02_turned_single_objects_skew_by_drag() {
         let after = objects(&s);
         assert!(is_path(&after[0]), "{kind:?} became a path");
         let m = fitted_image(&otp[0], &after[0], "turned skew");
-        assert!(m.nilpotency() < 1e-7 && near(m.det(), 1.0, 1e-7), "{kind:?}: a shear");
-        assert!(m.frob_minus_identity() > 0.05, "{kind:?}: the skew did something");
+        assert!(
+            m.nilpotency() < 1e-7 && near(m.det(), 1.0, 1e-7),
+            "{kind:?}: a shear"
+        );
+        assert!(
+            m.frob_minus_identity() > 0.05,
+            "{kind:?}: the skew did something"
+        );
         // The shear is along the box's own x axis: (A - I) maps everything onto +-(cs, sn).
         let (dx, dy) = (m.a - 1.0 + m.b * 0.0, m.c);
         let along = dx * sn - dy * cs; // component of the first column of A-I across the axis
-        assert!(along.abs() < 1e-6, "{kind:?}: the displacement lies along the box x axis, off by {along}");
+        assert!(
+            along.abs() < 1e-6,
+            "{kind:?}: the displacement lies along the box x axis, off by {along}"
+        );
     }
 }
 
@@ -2723,13 +2796,16 @@ fn ac11_handle_hints_do_not_depend_on_the_kinds() {
         }
         (out, (g.min.x, g.max.x))
     };
-    let (a, ga) = hover_texts(&paths());
+    let (a, _ga) = hover_texts(&paths());
     for (name, d) in [("polygon + rect", shapes()), ("two stars", stars())] {
         let (b, gb) = hover_texts(&d);
         let _ = gb;
         assert_eq!(a.len(), b.len());
         for (i, (x, y)) in a.iter().zip(&b).enumerate() {
-            assert_eq!(x, y, "{name}: handle {i} says something else than for two paths");
+            assert_eq!(
+                x, y,
+                "{name}: handle {i} says something else than for two paths"
+            );
         }
     }
 }

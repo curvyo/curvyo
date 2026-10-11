@@ -12,6 +12,8 @@
     clippy::float_cmp,
     clippy::too_many_lines
 )]
+// Mechanical lints of the tester files, allowed so the gate stays strict for production code.
+#![allow(clippy::cast_precision_loss, clippy::manual_assert_eq)]
 
 use std::f64::consts::FRAC_PI_2;
 
@@ -225,7 +227,11 @@ fn ac11_ac13_object_to_path_flag_follows_the_primitives_left() {
     // Skew: everything converts.
     assert_eq!(key(&mut s, "k"), KeyOutcome::EntryOpened);
     s.commit_transform_entry("20", "", 0);
-    assert!(objects(&s).iter().all(|o| matches!(o, ObjectSnapshot::Path(_))));
+    assert!(
+        objects(&s)
+            .iter()
+            .all(|o| matches!(o, ObjectSnapshot::Path(_)))
+    );
     assert!(!s.select_bar_state().object_to_path, "all paths: no button");
     // Stretch: only the polygon converts, the aligned rectangle stays.
     let mut s = open(&make());
@@ -240,5 +246,8 @@ fn ac11_ac13_object_to_path_flag_follows_the_primitives_left() {
     let os = objects(&s);
     assert!(matches!(os[0], ObjectSnapshot::Path(_)));
     assert!(matches!(os[1], ObjectSnapshot::Primitive(_)));
-    assert!(s.select_bar_state().object_to_path, "a primitive is left in the selection");
+    assert!(
+        s.select_bar_state().object_to_path,
+        "a primitive is left in the selection"
+    );
 }

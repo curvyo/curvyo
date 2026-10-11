@@ -1374,3 +1374,16 @@ DOM chip, so the frontend has to run the release anyway. Criterion 40 of
 **Resolution:** `Session::pointer_down` consumes a press on a mark and `pointer_up` executes it, with
 `DragOrigin` for the slop; the frontend then passes only the texts and the Copy flag at the release.
 Do it with the next slice that touches the move chip.
+
+## Open points of `0047-transform-polish` (tester review, 2026-10-11)
+
+- **A very large commit is stored as several Loro changes.** Loro splits a commit of this size
+  into more than one change: a conversion of a 1024-point star gives 15 changes instead of 3, and
+  the same holds for any very large path. The commit is still logically atomic (one call, the same
+  message and timestamp), and a reader or peer sees the whole result after the import; the change
+  count only matters for history and for `0020`'s step counting.
+- **The double-click interval is a fixed 500 ms** (criterion 21 of `0047`), not the platform's
+  setting, which a webview does not expose. Revisit if a platform's own interval is needed.
+- **Escape between the press and the release of a click on a reference mark is not handled in the
+  slider-style hook or in the frontend.** The Rust session ignores it and writes nothing, so the
+  outcome is right; it just is not a tested step (see the entry on the mark click above).

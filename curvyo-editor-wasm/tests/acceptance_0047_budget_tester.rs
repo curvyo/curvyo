@@ -11,12 +11,12 @@
     clippy::cast_precision_loss,
     clippy::too_many_lines
 )]
+// Mechanical lints of the tester files, allowed so the gate stays strict for production code.
+#![allow(clippy::manual_midpoint, clippy::many_single_char_names)]
 
 use std::time::{Duration, Instant};
 
-use curvyo_document_core::{
-    AnchorId, Document, Length, NewAnchor, Point, RectBounds, pack,
-};
+use curvyo_document_core::{AnchorId, Document, Length, NewAnchor, Point, RectBounds, pack};
 use curvyo_editor_wasm::{KeyInput, Session, Tool};
 
 fn pt(x: f64, y: f64) -> Point {
@@ -126,7 +126,9 @@ fn the_red_box_keeps_the_ten_thousand_object_move_frame_within_budget() {
     let red = live
         .triangles
         .iter()
-        .filter(|v| v.color.r.abs_diff(0xE5) <= 3 && v.color.g.abs_diff(0x48) <= 3 && v.color.a < 255)
+        .filter(|v| {
+            v.color.r.abs_diff(0xE5) <= 3 && v.color.g.abs_diff(0x48) <= 3 && v.color.a < 255
+        })
         .count();
     s.escape();
     s.pointer_up(move_to, false, false);
@@ -137,7 +139,10 @@ fn the_red_box_keeps_the_ten_thousand_object_move_frame_within_budget() {
     );
     // `0019` criterion 49 measures the preview step itself (the hover that resolves the gesture),
     // not the draw: the frame is the artwork's own cost in both cases.
-    assert!(mv0 < Duration::from_millis(50), "move preview step {mv0:?} exceeds 50 ms");
+    assert!(
+        mv0 < Duration::from_millis(50),
+        "move preview step {mv0:?} exceeds 50 ms"
+    );
     assert!(
         mv.as_secs_f64() <= sc.as_secs_f64() * 1.1 + 0.002,
         "the red box costs more than a pass: move {mv:?} vs scale {sc:?}"

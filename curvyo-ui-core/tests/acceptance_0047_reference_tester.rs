@@ -16,6 +16,8 @@
     clippy::many_single_char_names,
     clippy::too_many_lines
 )]
+// Mechanical lints of the tester files, allowed so the gate stays strict for production code.
+#![allow(clippy::manual_midpoint, clippy::assert_is_empty)]
 
 use curvyo_document_core::{Point, ViewTransform};
 use curvyo_ui_core::{
@@ -54,7 +56,6 @@ fn model_points(b: (Point, Point)) -> [(f64, f64); 9] {
 fn mapper(k: f64, pan: (f64, f64)) -> impl Fn(Point) -> (f64, f64) {
     move |p: Point| (p.x * k + pan.0, p.y * k + pan.1)
 }
-
 
 /// The view of a uniform zoom `k` and a pan given as the screen position of the document origin
 /// (the closures of this file are all linear).
@@ -203,7 +204,14 @@ fn a_two_mm_square_at_100_percent_has_no_marks() {
     assert!(visible_marks(b, k, (1600.0, 1000.0), mapper(k, (0.0, 0.0))).is_empty());
     let shown = visible_marks(b, k, (1600.0, 1000.0), mapper(k, (0.0, 0.0)));
     assert_eq!(
-        hit_mark(b, &shown, (11.0 * k, 11.0 * k), k, false, mapper(k, (0.0, 0.0))),
+        hit_mark(
+            b,
+            &shown,
+            (11.0 * k, 11.0 * k),
+            k,
+            false,
+            mapper(k, (0.0, 0.0))
+        ),
         None,
         "marks that are not shown are not clickable"
     );
@@ -331,7 +339,10 @@ fn marks_outside_the_viewport_are_dropped() {
         assert!((0.0..=800.0).contains(&x) && (0.0..=600.0).contains(&y));
     }
     assert!(v.contains(&ReferencePoint::RightMiddle));
-    assert!(!v.contains(&ReferencePoint::Centre), "the centre is off screen to the left");
+    assert!(
+        !v.contains(&ReferencePoint::Centre),
+        "the centre is off screen to the left"
+    );
     assert!(!v.contains(&ReferencePoint::TopLeft));
     assert!(!v.contains(&ReferencePoint::BottomRight));
 }
