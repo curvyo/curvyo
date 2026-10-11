@@ -3,7 +3,7 @@
 //! `specs/0008-object-transform-refinements`, `specs/0009-unified-object-editing`).
 //! Split out of `session/select_view.rs`.
 
-use curvyo_document_core::{Angle, ObjectSnapshot, Shape};
+use curvyo_document_core::{Angle, ObjectSnapshot};
 use curvyo_ui_core::{
     EditHandle, ParamHandle, PressTarget, classify_press, is_corner, oriented_bounds,
     resize_cursor_angle_degrees, skew_cursor_angle_degrees,
@@ -49,6 +49,10 @@ impl Session {
         }
         if let Some(hint) = self.gesture_cursor() {
             return hint.to_string();
+        }
+        // A mark of the open typed move is a button (`0047` criterion 43).
+        if self.move_mark_hover().is_some() {
+            return "pointer".to_string();
         }
         let objects = self.objects();
         // The cursor arrows follow the box the maker sees: its direction is the
@@ -110,15 +114,20 @@ impl Session {
     /// Which hint the handle under the pointer earns (criterion 54;
     /// `unified-object-editing` criterion 20), as a plain string for the
     /// host's hover chip: `""` (none), `"resize-edge"`, `"resize-corner"`,
-    /// `"resize-corner-uniform"` (polygon and star: no Ctrl line),
     /// `"rotate-corner"`, `"rotate-side"`, `"skew"` (top and bottom: skew x),
     /// `"skew-y"` (left and right), `"move"`,
-    /// `"param-radius"` (a rectangle's corner radius) or `"param-inner"` (a
-    /// star's inner radius). Empty while a drag runs or an entry is open.
+    /// `"param-radius"` (a rectangle's corner radius), `"param-inner"` (a
+    /// star's inner radius) or `"reference-mark"` (a mark of the typed move, whose
+    /// hint the move chip words). Empty while a drag runs or an entry other than the typed
+    /// move is open.
     #[must_use]
     pub fn handle_hint(&self) -> String {
         if self.tool != Tool::Select || self.colour_pick_target().is_some() {
             return String::new();
+        }
+        // The hint of a mark is the chip's (its second line depends on the typed text).
+        if self.move_mark_hover().is_some() {
+            return "reference-mark".to_string();
         }
         let objects = self.objects();
         if self.selection.ids().len() >= 2 {
@@ -128,17 +137,11 @@ impl Session {
                 String::new()
             };
         }
-        let Some((object, _, handle)) = self.select_hovered_handle(&objects) else {
+        let Some((_, _, handle)) = self.select_hovered_handle(&objects) else {
             return String::new();
         };
-        let uniform = matches!(
-            &object,
-            ObjectSnapshot::Primitive(p)
-                if matches!(p.shape, Shape::Polygon { .. } | Shape::Star { .. })
-        );
         match handle {
             EditHandle::Resize(direction) if !is_corner(direction) => "resize-edge",
-            EditHandle::Resize(_) if uniform => "resize-corner-uniform",
             EditHandle::Resize(_) => "resize-corner",
             EditHandle::Rotate(direction) if is_corner(direction) => "rotate-corner",
             EditHandle::Rotate(_) => "rotate-side",

@@ -9,7 +9,7 @@
 use curvyo_document_core::{Angle, Document, ObjectSnapshot, PathSnapshot, Point};
 
 use crate::ResizeDirection;
-use crate::conversion::{ConversionCounts, converted_counts, converted_polygon_or_star};
+use crate::conversion::converted_for_object;
 use crate::oriented_box::OrientedBox;
 use crate::transform_commit::{MAX_COORDINATE_MM, commit_gesture};
 use crate::transform_drag::{
@@ -48,7 +48,7 @@ pub enum EntryKind {
     /// One or two fields: the width and/or height along the object's own
     /// axes, in millimetres (criterion 25; also a polygon's or star's, where a
     /// size of another aspect ratio turns it into a path,
-    /// `specs/0019-multi-object-transform/` criterion 56).
+    /// `specs/0047-transform-polish/` criteria 9 and 12).
     Size,
     /// One field: a rectangle's corner radius, in millimetres
     /// (`specs/0009-unified-object-editing/`, criterion 18).
@@ -131,8 +131,7 @@ pub struct TransformEntry {
     handle: EditHandle,
     /// Shift at the second press: the fixed point and the rotate pivot.
     shift: bool,
-    /// Width and height are linked (Ctrl at the second press on a corner
-    /// of a rectangle, ellipse or path).
+    /// Width and height are linked (Ctrl at the second press on a corner).
     linked: bool,
     modes: ScaleModes,
     side_rotate_revealed: bool,
@@ -143,7 +142,7 @@ pub struct TransformEntry {
     pivot: Point,
     fields: Vec<EntryField>,
     /// For a polygon or star, the path it becomes if the typed size is a stretch
-    /// (criterion 56), built when the entry opens.
+    /// (`0047` criterion 12), built when the entry opens.
     converted: Option<PathSnapshot>,
 }
 
@@ -221,7 +220,7 @@ impl TransformEntry {
             modes: ScaleModes::default(),
             side_rotate_revealed: !is_corner(direction),
             centre_chip: false,
-            pivot: pivot_for(handle, object, box_, shift)
+            pivot: pivot_for(handle, box_, shift)
                 .unwrap_or_else(|| box_.to_document(box_.local_center())),
             fields: vec![EntryField {
                 label: "",
@@ -281,20 +280,10 @@ impl TransformEntry {
             modes,
             side_rotate_revealed: false,
             centre_chip: false,
-            pivot: pivot_for(handle, object, box_, shift)
+            pivot: pivot_for(handle, box_, shift)
                 .unwrap_or_else(|| box_.to_document(box_.local_center())),
             fields,
-            converted: converted_polygon_or_star(object),
-        }
-    }
-
-    /// The shapes the typed values would turn into paths: one for a polygon or star
-    /// typed to another aspect ratio, else none.
-    #[must_use]
-    pub fn conversion_counts(&self, texts: [&str; 2], last_edited: usize) -> ConversionCounts {
-        match self.resolve(texts, last_edited) {
-            Ok(Some(result)) => converted_counts(std::slice::from_ref(&self.start), &[result]),
-            _ => ConversionCounts::default(),
+            converted: converted_for_object(object, handle),
         }
     }
 
@@ -497,7 +486,6 @@ impl TransformEntry {
                         shift: self.shift,
                         ctrl: self.linked,
                         modes: self.modes,
-                        typed: true,
                         converted: self.converted.as_ref(),
                     },
                 )

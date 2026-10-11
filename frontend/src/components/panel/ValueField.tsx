@@ -3,12 +3,14 @@ import { useState } from "react";
 import type { KeyboardEvent } from "react";
 
 import { EntryField } from "@/components/panel/EntryField";
+import { SliderTip } from "@/components/SliderTip";
 import { Tooltip } from "@/components/ui/tooltip";
 import { gridOf, useValueDrag } from "@/hooks/useValueDrag";
 import type { GridName } from "@/hooks/useStylePanel";
+import { HELP_VALUE_FIELD } from "@/lib/sliderNames";
 
 const TOOLTIP_KEY = /Mac|iPhone|iPad/.test(navigator.platform) ? "Cmd" : "Ctrl";
-const TOOLTIP = `Drag to change, click to type. Shift: coarse. ${TOOLTIP_KEY}: fine. ${TOOLTIP_KEY}+Backspace: reset.`;
+const HELP = HELP_VALUE_FIELD.replaceAll("Ctrl", TOOLTIP_KEY);
 
 interface ValueFieldProps {
   /** The visible label inside the field ("Width", "Opacity"). */
@@ -19,6 +21,11 @@ interface ValueFieldProps {
   text: string;
   /** The share of the field's width the bar fills, 0 to 1. */
   bar: number;
+  /** Where a drag starts from: `bar`, or beyond 1 for a value past the track. */
+  dragBase?: number;
+  /** The largest position of a drag: 1, or more where a drag past the right end keeps raising
+   * the value up to the typed maximum (`specs/0047-transform-polish/` criterion 59). */
+  dragLimit?: number;
   mixed: boolean;
   /** The value is mixed or not the default: the reset icon shows. */
   resettable: boolean;
@@ -28,16 +35,24 @@ interface ValueFieldProps {
   valueNow: number;
   /** The unit spelled out for `aria-valuetext` ("millimetres", "percent"). */
   unitWords: string;
+  /** The unit for a value of exactly 1 ("marker"); `unitWords` when it has no singular. */
+  unitWordOne?: string;
   /** The smallest value, for `aria-valuemin` (0 unless the scale starts higher). */
   valueMin?: number;
-  /** The largest value that may be typed, for `aria-valuemax`. */
-  typedMax: number;
+  /** The end of the track, for `aria-valuemax` and the largest `aria-valuenow`: the slider's
+   * own range, not the larger maximum that may be typed. */
+  valueMax: number;
+  /** The smallest position a plain click sets, 0 to 1 (0 unless a click at the far left must
+   * not set the minimum, as for an opacity). A drag and the keys still reach the end. */
+  clickMinP?: number;
   /** The reset target as text ("0.25 mm", "100 %"). */
   defaultText: string;
   /** The message of a refused typed value. */
   messages: Readonly<Record<string, string>>;
   /** A tick of a drag: position `p` (0 to 1) on the field's scale, rounded to `grid`. */
   onPreview: (p: number, grid: GridName) => void;
+  /** A click: ends the gesture its `onPreview` started, committing the value once. */
+  onSettle: () => void;
   /** An arrow key: `steps` steps from the shown value. */
   onStep: (steps: number, grid: GridName) => void;
   /** The reset icon or Ctrl+Backspace. */
@@ -46,6 +61,9 @@ interface ValueFieldProps {
   onSubmit: (text: string) => string;
   onReturnFocus: () => void;
 }
+
+/** `aria-valuenow` without the float noise of the scale (14.000000000000002). */
+const roundedNow = (value: number) => Number(value.toFixed(3));
 
 /** Characters that start typing in a focused value field (criterion 43). */
 const STARTS_TYPING = /^[0-9.,-]$/;
@@ -64,16 +82,21 @@ export function ValueField({
   name,
   text,
   bar,
+  dragBase,
+  dragLimit = 1,
   mixed,
   resettable,
   unit,
   valueNow,
   unitWords,
+  unitWordOne,
   valueMin = 0,
-  typedMax,
+  valueMax,
+  clickMinP = 0,
   defaultText,
   messages,
   onPreview,
+  onSettle,
   onStep,
   onReset,
   onSubmit,
@@ -82,10 +105,17 @@ export function ValueField({
   const [typing, setTyping] = useState<{ initial?: string } | null>(null);
 
   const { modifier, handlers } = useValueDrag({
-    bar: mixed ? 0 : bar,
+    bar: mixed ? 0 : (dragBase ?? bar),
+    limit: dragLimit,
     mixed,
     onTick: onPreview,
-    onClick: () => setTyping({}),
+    // A click sets the value at the pointer and commits it; a double-click types
+    // (`specs/0047-transform-polish/` criteria 33 to 36).
+    onClickAt: (p) => {
+      onPreview(Math.max(p, clickMinP), "normal");
+      onSettle();
+    },
+    onDoubleClick: () => setTyping({}),
     onDragEnd: onReturnFocus,
   });
 
@@ -146,16 +176,23 @@ export function ValueField({
           </span>
         </>
       ) : (
-        <Tooltip side="left" content={TOOLTIP}>
+        <SliderTip
+          side="left"
+          name={name}
+          valueText={mixed ? "Mixed" : `${text}${unit ? ` ${unit}` : ""}`}
+          help={HELP}
+        >
           <div
             role="spinbutton"
             tabIndex={0}
             aria-label={name}
             aria-valuemin={valueMin}
-            aria-valuemax={typedMax}
-            aria-valuenow={mixed ? undefined : valueNow}
-            aria-valuetext={mixed ? "Mixed" : `${text} ${unitWords}`}
-            aria-keyshortcuts="Control+Backspace"
+            aria-valuemax={valueMax}
+            aria-valuenow={mixed ? undefined : Math.min(valueMax, roundedNow(valueNow))}
+            aria-valuetext={
+              mixed ? "Mixed" : `${text} ${text === "1" && unitWordOne ? unitWordOne : unitWords}`
+            }
+            aria-keyshortcuts="Control+Backspace Enter F2"
             onKeyDown={onKeyDown}
             {...handlers}
             className="relative h-7 w-[244px] cursor-ew-resize overflow-hidden rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] bg-white outline-none hover:border-[var(--toolbar-icon)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)]"
@@ -198,7 +235,7 @@ export function ValueField({
               )}
             </span>
           </div>
-        </Tooltip>
+        </SliderTip>
       )}
       {resettable && !typing && (
         <Tooltip side="left" content={`Reset to ${defaultText} (${TOOLTIP_KEY}+Backspace)`}>

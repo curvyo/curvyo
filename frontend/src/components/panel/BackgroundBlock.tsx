@@ -1,3 +1,5 @@
+import { OPACITY_CLICK_MIN_P, VALUE_FIELD_NAMES, VALUE_FIELD_SCALE_END } from "@/lib/sliderNames";
+import { useHexEntry } from "@/hooks/useHexEntry";
 import { useId, useRef } from "react";
 
 import { ColourBlock } from "@/components/panel/ColourBlock";
@@ -38,6 +40,8 @@ export function BackgroundBlock({ background, onReturnFocus }: BackgroundBlockPr
   const section = useRef<HTMLDivElement>(null);
   const solid = view.paint === "solid";
   const rowsFocus = useRowsFocus(solid, section);
+  const hex = useRef<HTMLInputElement>(null);
+  const hexEntry = useHexEntry(hex, onReturnFocus);
   return (
     <div ref={section} className="flex flex-col gap-2">
       <div className="flex h-7 items-center justify-between">
@@ -65,7 +69,8 @@ export function BackgroundBlock({ background, onReturnFocus }: BackgroundBlockPr
             picking={view.picking}
             onPick={background.beginPick}
             onSubmitHex={background.setHex}
-            onReturnFocus={onReturnFocus}
+            onReturnFocus={hexEntry.returnFocus}
+            hexRef={hex}
           />
           <ColourPicker
             name="Background"
@@ -74,10 +79,12 @@ export function BackgroundBlock({ background, onReturnFocus }: BackgroundBlockPr
             hsvOf={background.hsvOf}
             rgbOf={background.rgbOf}
             onPreview={background.previewHsv}
+            onSettle={background.settle}
+            onOpenEntry={hexEntry.open}
           />
           <ValueField
             label="Opacity"
-            name="Background opacity"
+            name={VALUE_FIELD_NAMES.backgroundOpacity}
             text={view.opacityText}
             bar={view.opacityBar}
             mixed={false}
@@ -85,10 +92,12 @@ export function BackgroundBlock({ background, onReturnFocus }: BackgroundBlockPr
             unit="%"
             valueNow={view.opacity}
             unitWords="percent"
-            typedMax={view.opacityTypedMax}
+            valueMax={VALUE_FIELD_SCALE_END.opacity}
+            clickMinP={OPACITY_CLICK_MIN_P}
             defaultText={view.opacityDefaultText}
             messages={PERCENT_MESSAGES}
             onPreview={background.previewOpacity}
+            onSettle={background.settle}
             onStep={background.stepOpacity}
             onReset={background.resetOpacity}
             onSubmit={background.setOpacityText}

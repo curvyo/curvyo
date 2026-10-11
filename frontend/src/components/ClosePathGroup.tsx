@@ -1,4 +1,4 @@
-import { TooltipProvider, Tooltip } from "@/components/ui/tooltip";
+import { Tooltip } from "@/components/ui/tooltip";
 import { useActionNotice } from "@/hooks/useActionNotice";
 import {
   CLOSE_BUTTONS,
@@ -37,7 +37,7 @@ export function ClosePathGroup({
   const dimmed = state.closable === 0;
   const { notice, show } = useActionNotice(tool, selectionCount, () => {});
   return (
-    <TooltipProvider>
+    <>
       <div className="relative flex items-center gap-1">
         <div role="group" aria-label="Close path" className="flex items-center gap-1">
           <span className="px-1 text-sm text-[var(--toolbar-icon)]">Close path</span>
@@ -96,6 +96,6 @@ export function ClosePathGroup({
           </p>
         )}
       </div>
-    </TooltipProvider>
+    </>
   );
 }

@@ -11,7 +11,7 @@ use curvyo_document_core::{
     AnchorId, Document, Length, NewAnchor, ObjectSnapshot, Point, RectBounds, pack, unpack,
 };
 use curvyo_editor_wasm::{EscapeStep, KeyHint, KeyInput, KeyOutcome, Session, Tool};
-use curvyo_ui_core::{EntryOutcome, MoveEntryMode, object_outline_bounds};
+use curvyo_ui_core::{EntryOutcome, MoveEntryMode, ReferencePoint, object_outline_bounds};
 
 /// Screen pixels per millimetre of a fresh session (96 dpi at 100 %).
 const SCALE: f64 = 96.0 / 25.4;
@@ -110,11 +110,12 @@ fn m_opens_the_move_chip_and_a_relative_entry_is_one_commit() {
     let mut session = selected(&rect_document(), pt(40.0, 20.0));
     let before = top_left(&session);
     assert_eq!(key(&mut session, "m", false), KeyOutcome::EntryOpened);
+    session.set_move_reference(ReferencePoint::TopLeft);
     let chip = session.move_entry().expect("the move chip");
     assert!(near(chip.center, 60.0, 50.0), "the box centre");
     assert_eq!(chip.relative_prefill, ["0".to_string(), "0".to_string()]);
     assert_eq!(
-        chip.absolute_prefill,
+        chip.absolute_prefills[ReferencePoint::TopLeft.index()],
         ["10.0".to_string(), "20.0".to_string()]
     );
     assert!(session.transform_entry().is_none());
@@ -143,6 +144,7 @@ fn m_opens_the_move_chip_and_a_relative_entry_is_one_commit() {
 fn an_absolute_entry_puts_the_top_left_of_the_bounds_there() {
     let mut session = selected(&rect_document(), pt(40.0, 20.0));
     key(&mut session, "m", false);
+    session.set_move_reference(ReferencePoint::TopLeft);
     assert_eq!(
         session.commit_move_entry(
             "100",
@@ -165,6 +167,7 @@ fn invalid_and_no_op_entries_write_nothing() {
     let mut session = selected(&rect_document(), pt(40.0, 20.0));
     let before = session.pack("0.1.0").unwrap();
     key(&mut session, "m", false);
+    session.set_move_reference(ReferencePoint::TopLeft);
     assert!(matches!(
         session.commit_move_entry(
             "1,2,3",
@@ -190,6 +193,7 @@ fn invalid_and_no_op_entries_write_nothing() {
     );
     assert!(session.move_entry().is_none());
     key(&mut session, "m", false);
+    session.set_move_reference(ReferencePoint::TopLeft);
     assert_eq!(
         session.commit_move_entry(
             "10.0",
@@ -253,6 +257,7 @@ fn elsewhere_in_the_box_the_double_click_keeps_its_behaviour() {
     assert!(small.move_entry().is_none());
     // M opens it all the same, with the chip where the handle would be.
     assert_eq!(key(&mut small, "m", false), KeyOutcome::EntryOpened);
+    small.set_move_reference(ReferencePoint::TopLeft);
     assert!(near(small.move_entry().unwrap().center, 14.0, 24.0));
 }
 
@@ -353,7 +358,7 @@ fn the_skew_chip_refuses_out_of_range_text_and_writes_nothing() {
 
 /// Criterion 59: the entry keys that cannot act show a hint and change
 /// nothing: nothing selected and M or K outside the Select tool "select
-/// first", a non-path "paths only" (several objects: see the end of the test).
+/// first". A non-path opens the skew chip since `0047` criterion 6.
 #[test]
 fn the_entry_keys_that_cannot_act_give_the_hints() {
     // Nothing selected.
@@ -378,16 +383,13 @@ fn the_entry_keys_that_cannot_act_give_the_hints() {
         assert_eq!(session.tool(), Tool::Rectangle, "no tool change");
         assert_eq!(session.pack("0.1.0").unwrap(), before);
     }
-    // A non-path.
-    let mut session = selected(&rect_document(), pt(40.0, 20.0));
+    // A non-path opens the skew chip (`0047` criterion 6).
     for shift in [false, true] {
-        assert_eq!(
-            key(&mut session, "k", shift),
-            KeyOutcome::Hint(KeyHint::PathOnly)
-        );
-        assert!(session.transform_entry().is_none());
+        let mut session = selected(&rect_document(), pt(40.0, 20.0));
+        assert_eq!(key(&mut session, "k", shift), KeyOutcome::EntryOpened);
+        assert_eq!(session.transform_entry().unwrap().kind, "skew");
+        assert_eq!(session.selected_object_count(), 1);
     }
-    assert_eq!(session.selected_object_count(), 1);
     // Several objects.
     let document = rect_document();
     let _ = document.create_rect(RectBounds {
@@ -401,16 +403,12 @@ fn the_entry_keys_that_cannot_act_give_the_hints() {
     session.pointer_down(pt(220.0, 20.0), true);
     session.pointer_up(pt(220.0, 20.0), true, false);
     assert_eq!(session.selected_object_count(), 2);
-    // `multi-object-transform` criterion 37: M opens the move chip of the
-    // selection; K and Shift+K on rectangles say that skew works on paths only.
-    // "Select one object to type a value" no longer exists.
-    for (k, shift) in [("k", false), ("k", true)] {
-        assert_eq!(
-            key(&mut session, k, shift),
-            KeyOutcome::Hint(KeyHint::PathOnly)
-        );
+    // `multi-object-transform` criterion 37 and `0047` criterion 6: M, K and Shift+K
+    // open the chip of the selection whatever it holds.
+    for (k, shift) in [("k", false), ("k", true), ("m", false)] {
+        assert_eq!(key(&mut session, k, shift), KeyOutcome::EntryOpened);
+        session.cancel_transform_entry();
     }
-    assert_eq!(key(&mut session, "m", false), KeyOutcome::EntryOpened);
 }
 
 /// Criterion 12 and 25: Escape closes the chip first and writes nothing; a
@@ -483,6 +481,7 @@ fn an_open_entry_chip_shows_no_side_rotate_handle() {
     assert_ne!(plain, shifted, "Shift reveals the side rotate handles");
     session.modifiers_changed(false, false, false);
     key(&mut session, "m", false);
+    session.set_move_reference(ReferencePoint::TopLeft);
     let no_shift = session.draw_list().triangle_count();
     session.modifiers_changed(true, false, false);
     assert_eq!(

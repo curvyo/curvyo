@@ -1,13 +1,14 @@
-//! The typed skew entry of a path
-//! (`specs/0010-edit-interaction-polish/specification.md`, criteria 9 to 14, 58):
-//! its state, validation and commit. The typed angle goes through
-//! the skew drag's own arithmetic (`skew_by_angle`, through its unchecked
-//! half), so a typed value and a
-//! dragged one cannot disagree (`adrs.md`, decision 3). The DOM chip only
-//! holds the text, the caret and the focus.
+//! The typed skew entry of one object
+//! (`specs/0010-edit-interaction-polish/specification.md`, criteria 9 to 14, 58;
+//! `specs/0047-transform-polish/` criterion 6): its state, validation and commit.
+//! The typed angle goes through the skew drag's own arithmetic (`skew_by_angle`,
+//! through its unchecked half), so a typed value and a dragged one cannot disagree
+//! (`adrs.md`, decision 3). A primitive converts to its path when the angle is
+//! applied. The DOM chip only holds the text, the caret and the focus.
 
-use curvyo_document_core::{Angle, Document, ObjectSnapshot, Point};
+use curvyo_document_core::{Angle, Document, ObjectSnapshot, PathSnapshot, Point};
 
+use crate::conversion::converted_for_object;
 use crate::oriented_box::OrientedBox;
 use crate::skew_math::{MIN_SKEW_LEVER_MM, skew_frame};
 use crate::transform_commit::{commit_gesture, is_sane, same_within_tolerance};
@@ -30,11 +31,13 @@ pub struct SkewEntry {
     shift: bool,
     pivot: Point,
     fields: [EntryField; 1],
+    /// For a primitive, the path it becomes when the angle is applied (`0047` criterion 2),
+    /// built when the entry opens.
+    converted: Option<PathSnapshot>,
 }
 
 impl SkewEntry {
-    /// An entry for skew handle `side` of `object`, pre-filled "0". `None`
-    /// for anything but a path (primitives have no skew handles). The field
+    /// An entry for skew handle `side` of `object`, pre-filled "0". The field
     /// is read-only when the box has no extent across the skew axis: such a
     /// skew has no distance to scale by, and a drag cannot do it either.
     #[must_use]
@@ -43,10 +46,7 @@ impl SkewEntry {
         box_: &OrientedBox,
         side: Side,
         shift: bool,
-    ) -> Option<Self> {
-        if !matches!(object, ObjectSnapshot::Path(_)) {
-            return None;
-        }
+    ) -> Self {
         let frame = skew_frame(box_, side, shift);
         let mut field = EntryField::for_param(
             "",
@@ -58,14 +58,21 @@ impl SkewEntry {
             format_degrees(0.0).trim_end_matches('°').to_string(),
         );
         field.editable = frame.lever.abs() >= MIN_SKEW_LEVER_MM;
-        Some(Self {
+        Self {
             start: object.clone(),
             start_box: *box_,
             side,
             shift,
             pivot: frame.fixed_point,
             fields: [field],
-        })
+            converted: converted_for_object(object, EditHandle::Skew(side)),
+        }
+    }
+
+    /// The path this entry would turn a primitive into (`None` for a path), for the
+    /// session to give real anchor ids.
+    pub(crate) fn converted_mut(&mut self) -> &mut [Option<PathSnapshot>] {
+        std::slice::from_mut(&mut self.converted)
     }
 
     /// What this entry edits.
@@ -81,13 +88,13 @@ impl SkewEntry {
         EditHandle::Skew(self.side)
     }
 
-    /// The path being edited.
+    /// The object being edited.
     #[must_use]
     pub fn object(&self) -> &ObjectSnapshot {
         &self.start
     }
 
-    /// The box the path had when the entry opened.
+    /// The box the object had when the entry opened.
     #[must_use]
     pub const fn start_box(&self) -> &OrientedBox {
         &self.start_box
@@ -106,7 +113,7 @@ impl SkewEntry {
         &self.fields
     }
 
-    /// The path after skewing by the typed `text`, `Ok(None)` if nothing would
+    /// The object after skewing by the typed `text`, `Ok(None)` if nothing would
     /// change (untouched text, an angle of zero, a read-only field), or why
     /// the text was refused.
     ///
@@ -129,7 +136,13 @@ impl SkewEntry {
         if angle.as_radians().abs() <= ANGLE_EQUAL_EPSILON_RAD {
             return Ok(None);
         }
-        let result = skewed_unchecked(&self.start, &self.start_box, self.side, self.shift, angle);
+        let result = skewed_unchecked(
+            &self.start,
+            &self.start_box,
+            (self.side, self.shift),
+            angle,
+            self.converted.as_ref(),
+        );
         if !is_sane(&result) {
             return Err(InvalidReason::TooLarge);
         }
@@ -140,7 +153,7 @@ impl SkewEntry {
     }
 
     /// Validates the typed text and, if valid and changed, writes the skew as
-    /// one commit, the one a skew drag writes. An entry whose path changed or
+    /// one commit, the one a skew drag writes. An entry whose object changed or
     /// vanished since it opened writes nothing.
     #[must_use]
     pub fn commit(&self, document: &Document, text: &str) -> EntryOutcome {
@@ -195,10 +208,10 @@ mod tests {
 
     fn entry_of(document: &Document, id: NodeId, side: Side, shift: bool) -> SkewEntry {
         let object = document.object(id).expect("exists");
-        SkewEntry::for_handle(&object, &oriented_bounds(&object), side, shift).expect("a path")
+        SkewEntry::for_handle(&object, &oriented_bounds(&object), side, shift)
     }
 
-    /// Criterion 9: the field is "0", named per axis, and only a path has one.
+    /// Criterion 9: the field is "0", named per axis, and every kind has one (`0047` criterion 6).
     #[test]
     fn the_field_is_zero_and_named_for_the_axis() {
         let document = Document::new(1);
@@ -217,14 +230,6 @@ mod tests {
             assert_eq!(entry.kind(), EntryKind::Skew);
             assert_eq!(entry.handle(), EditHandle::Skew(side));
         }
-        let rect = document.create_rect(curvyo_document_core::RectBounds::from_corners(
-            Point::new(0.0, 0.0),
-            Point::new(5.0, 5.0),
-        ));
-        let object = document.object(rect).expect("exists");
-        assert!(
-            SkewEntry::for_handle(&object, &oriented_bounds(&object), Side::Top, false).is_none()
-        );
     }
 
     /// Criterion 10, worked example: a 20 x 10 straight path, top handle, 45

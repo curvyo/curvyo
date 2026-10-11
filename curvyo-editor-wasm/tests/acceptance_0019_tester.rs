@@ -30,7 +30,7 @@ use curvyo_document_core::{
     Point, PointCount, RectBounds, Shape, StarFrame, Vec2, outline_of_rotated, pack, unpack,
 };
 use curvyo_editor_wasm::{EscapeStep, KeyHint, KeyInput, KeyOutcome, Session, Tool};
-use curvyo_ui_core::{EntryOutcome, MoveEntryMode};
+use curvyo_ui_core::{EntryOutcome, MoveEntryMode, ReferencePoint};
 
 // ---------------------------------------------------------------------
 // Helpers
@@ -386,8 +386,12 @@ fn ac1_group_box_of_a_rotated_rectangle_and_a_circle() {
     // Move chip, absolute prefill: the top-left corner.
     assert_eq!(key(&mut s, "m", false), KeyOutcome::EntryOpened);
     let m = s.move_entry().expect("move chip");
-    let x: f64 = m.absolute_prefill[0].parse().unwrap();
-    let y: f64 = m.absolute_prefill[1].parse().unwrap();
+    let x: f64 = m.absolute_prefills[ReferencePoint::TopLeft.index()][0]
+        .parse()
+        .unwrap();
+    let y: f64 = m.absolute_prefills[ReferencePoint::TopLeft.index()][1]
+        .parse()
+        .unwrap();
     assert!(near(x, -1.16, 0.06), "X {x}");
     assert!(near(y, -4.33, 0.06), "Y {y}");
 }
@@ -1238,9 +1242,10 @@ fn ac45_the_empty_interior_clears_or_marquees_and_never_moves() {
     // second square.
     drag_mod(&mut s, pt(85.0, 45.0), pt(115.0, 75.0), true, false);
     assert_eq!(s.selected_object_count(), 2, "Shift adds");
-    // Ctrl removes: a marquee from the empty interior of the group box that
-    // covers the second square entirely.
-    drag_mod(&mut s, pt(80.0, 75.0), pt(115.0, 45.0), false, true);
+    // Ctrl removes: a marquee from beside the group box that covers the second square
+    // entirely. (It starts at x = 72, not 80: the bottom skew handle sits at (80, 73.7)
+    // now that every selection has one, `0047` criterion 1.)
+    drag_mod(&mut s, pt(72.0, 75.0), pt(115.0, 45.0), false, true);
     assert_eq!(s.selected_object_count(), 1, "Ctrl removes");
 }
 
@@ -1458,11 +1463,11 @@ fn ac43_alt_on_a_handle_starts_the_lasso() {
     assert!(bytes_of(&s) == before, "no scale");
 }
 
-/// Criterion 43 step 2: a plain press on a handle that is not drawn is an
-/// ordinary press: with a primitive in the selection there is no skew handle,
-/// so a drag from where it would be runs the marquee and moves nothing.
+/// Criterion 43 step 2, as `0047` criterion 1 leaves it: with a primitive in the
+/// selection the skew handle is there, so a drag from it skews every object and the
+/// squares become paths.
 #[test]
-fn ac14_press_where_a_hidden_skew_handle_would_be_is_ordinary() {
+fn ac14_the_skew_handle_of_a_selection_with_primitives_skews_them() {
     let d = wide_squares();
     let mut s = open(&d);
     select_all(&mut s);
@@ -1473,7 +1478,13 @@ fn ac14_press_where_a_hidden_skew_handle_would_be_is_ordinary() {
         g.skew(0.0, -1.0),
         pt(g.skew(0.0, -1.0).x + 10.0, g.skew(0.0, -1.0).y),
     );
-    assert!(bytes_of(&s) == before, "the document changed");
+    assert!(bytes_of(&s) != before, "the document changed");
+    assert!(
+        objects(&s)
+            .iter()
+            .all(|o| matches!(o, ObjectSnapshot::Path(_))),
+        "both squares are paths now"
+    );
 }
 
 /// Criterion 43 step 4: Ctrl on empty canvas (also inside the group box) is
@@ -1606,8 +1617,12 @@ fn ac41_skew_and_skew_back_restores() {
     );
     let m = s.move_entry().unwrap();
     let tl = pt(
-        m.absolute_prefill[0].parse().unwrap(),
-        m.absolute_prefill[1].parse().unwrap(),
+        m.absolute_prefills[ReferencePoint::TopLeft.index()][0]
+            .parse()
+            .unwrap(),
+        m.absolute_prefills[ReferencePoint::TopLeft.index()][1]
+            .parse()
+            .unwrap(),
     );
     assert_eq!(
         key(&mut s, "Escape", false),
@@ -1719,8 +1734,8 @@ fn ac41_ac42_skew_angle_cap_and_readout() {
     }
 }
 
-/// Criterion 40: the skew handles of a mixed selection are hidden; K shows the
-/// hint and writes nothing; K on paths opens the skew chip.
+/// Criterion 40, as `0047` criterion 6 leaves it: K on a mixed selection opens the skew
+/// chip (no hint), and the chip writes nothing until Enter; K on paths opens it too.
 #[test]
 fn ac37_ac40_skew_key_on_a_mixed_selection() {
     let d = two_paths();
@@ -1728,10 +1743,12 @@ fn ac37_ac40_skew_key_on_a_mixed_selection() {
     let mut s = open(&d);
     select_all(&mut s);
     let before = bytes_of(&s);
-    assert_eq!(key(&mut s, "k", false), KeyOutcome::Hint(KeyHint::PathOnly));
-    assert_eq!(key(&mut s, "k", true), KeyOutcome::Hint(KeyHint::PathOnly));
-    assert!(bytes_of(&s) == before, "the document changed");
-    assert!(s.transform_entry().is_none());
+    assert_eq!(key(&mut s, "k", false), KeyOutcome::EntryOpened);
+    assert!(bytes_of(&s) == before, "opening the chip writes nothing");
+    assert_eq!(s.transform_entry().unwrap().kind, "skew");
+    let mut s = open(&d);
+    select_all(&mut s);
+    assert_eq!(key(&mut s, "k", true), KeyOutcome::EntryOpened);
     // Paths only: K opens a skew chip and Enter applies it to every path.
     let d = two_paths();
     let mut s = open(&d);
@@ -2523,8 +2540,8 @@ fn ac34_size_chip_reads_the_switches_when_it_opens() {
     assert!(bytes_of(&s) == before);
 }
 
-/// Criterion 35: the move chip: relative offset, absolute top-left of the group
-/// box, the Copy check copies every object and selects the copies; one commit.
+/// Criterion 35 (the top-left reference since `0047`): the move chip: relative offset,
+/// absolute top-left of the group box, the Copy check copies every object and selects the copies; one commit.
 #[test]
 fn ac35_the_move_chip() {
     let d = wide_squares();
@@ -2532,13 +2549,23 @@ fn ac35_the_move_chip() {
         let mut s = open(&d);
         select_all(&mut s);
         assert_eq!(key(&mut s, "m", false), KeyOutcome::EntryOpened);
+        s.set_move_reference(ReferencePoint::TopLeft);
         s
     };
     let mut s = fresh();
+    assert_eq!(s.selected_object_count(), 2, "the chip of a selection");
     let v = s.move_entry().unwrap();
-    assert!(v.selection);
     assert_eq!(v.relative_prefill, ["0".to_string(), "0".to_string()]);
-    assert_eq!(v.absolute_prefill, ["50.0".to_string(), "50.0".to_string()]);
+    // The default reference is the centre of the group box (`0047` criterion 37): (80, 60);
+    // `fresh` has set the top-left, whose position these examples use.
+    assert_eq!(
+        v.absolute_prefills[ReferencePoint::Centre.index()],
+        ["80.0".to_string(), "60.0".to_string()]
+    );
+    assert_eq!(
+        v.absolute_prefills[ReferencePoint::TopLeft.index()],
+        ["50.0".to_string(), "50.0".to_string()]
+    );
     let commits = change_count(&s);
     assert_eq!(
         s.commit_move_entry(
@@ -2607,8 +2634,9 @@ fn ac35_the_move_chip() {
     assert!(bytes_of(&s) == before);
 }
 
-/// Criterion 35: the absolute move of the spec's rotated rectangle and circle
-/// puts the top-left of their outline bounds at (X, Y).
+/// Criterion 35, with the top-left as the reference (`0047` criterion 37 makes the centre the
+/// default; its examples are in `transform_polish.rs`): the absolute move of the spec's rotated
+/// rectangle and circle puts the top-left of their outline bounds at (X, Y).
 #[test]
 fn ac35_absolute_move_uses_the_outline_bounds_of_a_rotated_rectangle() {
     let d = Document::new(1);
@@ -2622,6 +2650,7 @@ fn ac35_absolute_move_uses_the_outline_bounds_of_a_rotated_rectangle() {
     let mut s = open(&d);
     select_everything(&mut s);
     key(&mut s, "m", false);
+    s.set_move_reference(ReferencePoint::TopLeft);
     s.commit_move_entry(
         "100",
         "100",
@@ -2715,7 +2744,7 @@ fn ac38_hint_lines() {
             "Double-click or M: type an offset"
         ]
     );
-    // Uniform-only corner.
+    // A corner of a selection with a star (the uniform-only row is gone).
     let d = Document::new(1);
     let _ = d.create_path(&[anchor(1, 50.0, 50.0), anchor(2, 100.0, 50.0)], false);
     let st = d.create_star(
@@ -2736,8 +2765,12 @@ fn ac38_hint_lines() {
     key(&mut s, "m", false);
     let m = s.move_entry().unwrap();
     let tl = pt(
-        m.absolute_prefill[0].parse().unwrap(),
-        m.absolute_prefill[1].parse().unwrap(),
+        m.absolute_prefills[ReferencePoint::TopLeft.index()][0]
+            .parse()
+            .unwrap(),
+        m.absolute_prefills[ReferencePoint::TopLeft.index()][1]
+            .parse()
+            .unwrap(),
     );
     key(&mut s, "Escape", false);
     select_everything(&mut s);
@@ -2751,15 +2784,9 @@ fn ac38_hint_lines() {
     select_everything(&mut s);
     let g = GBox::new(&s, tl, pt(tl.x + w, tl.y + h));
     let l = lines(&mut s, g.corner(1.0, 1.0), false);
-    assert_eq!(
-        l,
-        [
-            "Resize selection, proportional",
-            "Stretch with an edge handle",
-            "Shift: from the center",
-            "Double-click or S: type a size"
-        ]
-    );
+    // `0047` criterion 11: the "proportional" row is gone; a corner of a selection that holds
+    // a star shows the ordinary corner lines.
+    assert_eq!(l, resize(false));
 }
 
 /// Part U4: the screen reader announcement.
@@ -3183,11 +3210,11 @@ fn ac20_other_quarter_turns() {
     }
 }
 
-/// Criterion 20/21: a uniform factor on a uniform-only selection scales a
-/// polygon, a star and a rotated rectangle without changing their registers or
-/// counts; a corner drag is proportional whatever the drag.
+/// Criterion 20: a uniform factor on a selection with a polygon, a star and a rotated
+/// rectangle scales them without changing their registers or counts. Since `0047` it is
+/// a Ctrl corner drag that is proportional whatever the drag (the free one stretches).
 #[test]
-fn ac21_uniform_only_corner_drag_is_proportional() {
+fn ac21_ctrl_corner_drag_is_proportional() {
     let d = Document::new(1);
     let _ = d.create_path(&[anchor(1, 50.0, 50.0), anchor(2, 150.0, 50.0)], false);
     let poly = d.create_polygon(
@@ -3217,8 +3244,12 @@ fn ac21_uniform_only_corner_drag_is_proportional() {
     key(&mut s, "m", false);
     let m = s.move_entry().unwrap();
     let tl = pt(
-        m.absolute_prefill[0].parse().unwrap(),
-        m.absolute_prefill[1].parse().unwrap(),
+        m.absolute_prefills[ReferencePoint::TopLeft.index()][0]
+            .parse()
+            .unwrap(),
+        m.absolute_prefills[ReferencePoint::TopLeft.index()][1]
+            .parse()
+            .unwrap(),
     );
     key(&mut s, "Escape", false);
     select_everything(&mut s);
@@ -3237,7 +3268,7 @@ fn ac21_uniform_only_corner_drag_is_proportional() {
     // A drag mostly in x: still one factor; sx dominated: f = (w + 50) / w.
     let f = (g.w() + 50.0) / g.w();
     let c = g.corner(1.0, 1.0);
-    drag(&mut s, c, pt(c.x + 50.0, c.y + 3.0));
+    drag_mod(&mut s, c, pt(c.x + 50.0, c.y + 3.0), false, true);
     let after = objects(&s);
     let p0 = tl;
     let mapped = |q: Point| pt(p0.x + (q.x - p0.x) * f, p0.y + (q.y - p0.y) * f);
@@ -3776,8 +3807,9 @@ fn ac47_double_clicks_on_the_other_handles() {
     assert!(s.move_entry().expect("move chip").copy_preset);
 }
 
-/// Question 2 (a), the remedy: "Object to path" turns a uniform-only selection
-/// into one that stretches and skews; the selection survives the conversion.
+/// "Object to path" still turns a selection with a polygon into paths and the selection
+/// survives it; since `0047` it is no remedy for anything (a polygon skews and stretches
+/// as it is), the paths just do the same.
 #[test]
 fn q2_object_to_path_lifts_the_restriction() {
     let d = Document::new(1);
@@ -3794,9 +3826,10 @@ fn q2_object_to_path_lifts_the_restriction() {
     select_everything(&mut s);
     key(&mut s, "k", false);
     assert!(
-        s.transform_entry().is_none(),
-        "no skew with a polygon in it"
+        s.transform_entry().is_some(),
+        "the skew chip opens with a polygon in the selection"
     );
+    s.cancel_transform_entry();
     s.convert_selected_to_paths();
     s.set_tool(Tool::Select);
     assert_eq!(s.selected_object_count(), 2, "the selection survives");
@@ -3809,8 +3842,12 @@ fn q2_object_to_path_lifts_the_restriction() {
     key(&mut s, "m", false);
     let m = s.move_entry().unwrap();
     let tl = pt(
-        m.absolute_prefill[0].parse().unwrap(),
-        m.absolute_prefill[1].parse().unwrap(),
+        m.absolute_prefills[ReferencePoint::TopLeft.index()][0]
+            .parse()
+            .unwrap(),
+        m.absolute_prefills[ReferencePoint::TopLeft.index()][1]
+            .parse()
+            .unwrap(),
     );
     key(&mut s, "Escape", false);
     key(&mut s, "s", false);

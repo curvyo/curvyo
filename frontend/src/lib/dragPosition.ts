@@ -13,6 +13,9 @@ export interface DragFrame {
   /** The field's left edge and width, px. */
   left: number;
   width: number;
+  /** The largest position: 1 at the end of the track, more for a field whose typed range goes
+   * beyond it (a width, a count), where overshooting the right edge keeps the value growing. */
+  limit?: number;
 }
 
 /** The position `p`, 0 to 1, for the pointer at `clientX`. A mixed drag takes
@@ -22,5 +25,16 @@ export function dragPosition(frame: DragFrame, clientX: number): number {
   const raw = frame.mixed
     ? (clientX - frame.left) / frame.width
     : frame.baseP + (frame.factor * (clientX - frame.baseX)) / frame.width;
-  return Math.min(1, Math.max(0, raw));
+  return Math.min(frame.limit ?? 1, Math.max(0, raw));
+}
+
+/** The position `p`, 0 to 1, a click at `x` px from the left edge of a field `width` px wide
+ * sets (`specs/0047-transform-polish/` Part B, criterion 33): the pointer's own place on the
+ * scale, clamped to the field. A width that is not positive or an `x` that is not a number is
+ * the start of the scale. */
+export function clickPosition(x: number, width: number): number {
+  if (!(width > 0) || Number.isNaN(x)) {
+    return 0;
+  }
+  return Math.min(1, Math.max(0, x / width));
 }

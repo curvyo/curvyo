@@ -42,9 +42,6 @@ pub enum KeyHint {
     /// Nothing is selected, or M or K was pressed outside the Select tool:
     /// "Select an object first".
     SelectFirst,
-    /// K or Shift+K with a selection that holds an object that is not a path:
-    /// "Skew works on paths only".
-    PathOnly,
     /// Undo or redo while the Pen holds an unfinished path: "Finish the path (Enter) or cancel it
     /// (Esc) first." (`specs/0020-undo-redo` criterion 6e).
     FinishPenFirst,
@@ -108,7 +105,6 @@ impl KeyOutcome {
             Self::Escape(EscapeStep::LeftTool) => "escape-tool",
             Self::Escape(EscapeStep::Nothing) => "escape-none",
             Self::Hint(KeyHint::SelectFirst) => "hint-select-first",
-            Self::Hint(KeyHint::PathOnly) => "hint-path-only",
             Self::Hint(KeyHint::FinishPenFirst) => "hint-finish-pen",
             Self::Undo => "undo",
             Self::Redo => "redo",
@@ -362,7 +358,6 @@ impl Session {
                         KeyOutcome::EntryOpened
                     }
                     Err(KeyEntryRefusal::NothingSelected) => KeyOutcome::Hint(KeyHint::SelectFirst),
-                    Err(KeyEntryRefusal::SkewNeedsPath) => KeyOutcome::Hint(KeyHint::PathOnly),
                 }
             }
             KeyAction::Delete => {
@@ -815,7 +810,8 @@ mod tests {
             KeyOutcome::Escape(EscapeStep::ClearedState),
             KeyOutcome::Escape(EscapeStep::LeftTool),
             KeyOutcome::Escape(EscapeStep::Nothing),
-            KeyOutcome::Hint(KeyHint::PathOnly),
+            KeyOutcome::Hint(KeyHint::SelectFirst),
+            KeyOutcome::Hint(KeyHint::TooFar),
         ];
         let mut codes: Vec<&str> = all.iter().map(|o| o.code()).collect();
         codes.sort_unstable();

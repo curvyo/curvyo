@@ -458,10 +458,10 @@ fn ac8_degenerate_below_the_geometric_tolerance() {
 // Criterion 21, 40: kinds
 // ---------------------------------------------------------------------
 
-/// Criterion 40: any rectangle, ellipse, polygon or star removes every skew
-/// handle (hidden, not inert); a path-only selection keeps all four.
+/// Criterion 40, as `0047` criterion 1 leaves it: no kind hides a skew handle; every
+/// selection keeps all four.
 #[test]
-fn ac40_primitives_in_the_selection_hide_skew() {
+fn ac40_no_kind_hides_skew() {
     let skew = |d: &Document| {
         handles(d, true)
             .iter()
@@ -486,7 +486,7 @@ fn ac40_primitives_in_the_selection_hide_skew() {
                 let _ = star(&d, 20.0, 10.0, 3.0);
             }
         }
-        assert_eq!(skew(&d), 0, "kind {kind}");
+        assert_eq!(skew(&d), 4, "kind {kind}");
     }
 }
 
@@ -547,30 +547,8 @@ fn ac18_every_selection_has_all_eight_resize_handles() {
     }
 }
 
-/// Criteria 53 and 55 (replacing the cause line of the removed criterion 21): the
-/// shapes a stretch would convert are counted by kind in the order polygon, star,
-/// rotated rectangle, rotated ellipse; a circle never counts.
-#[test]
-fn ac55_converting_kinds_are_counted() {
-    let counts_of = |d: &Document| {
-        SelectTool::group_of(&snapshots(d), &selection(d))
-            .unwrap()
-            .converting()
-            .as_array()
-    };
-    let d = two_paths(0.0, 0.0, 40.0, 20.0);
-    assert_eq!(counts_of(&d), [0, 0, 0, 0]);
-    let _ = star(&d, 10.0, 10.0, 3.0);
-    let r = rect(&d, 15.0, 5.0, 10.0, 6.0);
-    rotate(&d, r, pt(20.0, 8.0), 0.3);
-    assert_eq!(counts_of(&d), [0, 1, 1, 0]);
-    let _ = polygon(&d, 30.0, 10.0, 3.0);
-    assert_eq!(counts_of(&d), [1, 1, 1, 0]);
-}
-
-/// Criterion 14: a handle that is not drawn has no hit area: the skew handle of a
-/// mixed selection is not there; the north edge handle is (every selection has the
-/// edge handles, criterion 18).
+/// Criterion 14: the north edge handle and the skew handle of a mixed selection are both
+/// there and hit (every selection has all of them, `0047` criteria 1 and 7).
 #[test]
 fn ac14_a_handle_that_is_not_drawn_has_no_hit_area() {
     let d = two_paths(0.0, 0.0, 40.0, 20.0);
@@ -580,10 +558,9 @@ fn ac14_a_handle_that_is_not_drawn_has_no_hit_area() {
     let hit = SelectTool::group_handle_at(&objects, &sel, pt(20.0, 0.0), tol(), false, true)
         .map(|(_, e)| e);
     assert_eq!(hit, Some(EditHandle::Resize(N)));
-    // The skew handle of a mixed selection is not there either.
     let hit = SelectTool::group_handle_at(&objects, &sel, pt(20.0, -4.0), tol(), false, true)
         .map(|(_, e)| e);
-    assert!(!matches!(hit, Some(EditHandle::Skew(_))));
+    assert!(matches!(hit, Some(EditHandle::Skew(_))));
 }
 
 /// Criterion 25: the pivot of a rotate by the opposite corner (Shift) and the

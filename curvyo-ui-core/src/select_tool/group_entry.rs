@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use curvyo_document_core::{NodeId, ObjectSnapshot, Point};
 
 use super::entry::OpenEntry;
-use super::{EntryKey, KeyEntryRefusal, SelectDoubleClickOutcome, SelectTool};
+use super::{EntryKey, SelectDoubleClickOutcome, SelectTool};
 use crate::ResizeDirection;
 use crate::group_box::GroupSelection;
 use crate::group_entry::GroupEntry;
@@ -43,13 +43,9 @@ impl SelectTool {
         selection: &ObjectSelection,
         group: &GroupSelection,
         key: EntryKey,
-    ) -> Result<(), KeyEntryRefusal> {
+    ) {
         let members = selected_in_order(objects, selection);
-        let skew = |side| {
-            GroupEntry::for_skew(&members, group, side, false)
-                .map(OpenEntry::Group)
-                .ok_or(KeyEntryRefusal::SkewNeedsPath)
-        };
+        let skew = |side| OpenEntry::Group(GroupEntry::for_skew(&members, group, side, false));
         let entry = match key {
             EntryKey::Move => OpenEntry::Move(MoveEntry::for_group(&members, group)),
             EntryKey::Angle => OpenEntry::Group(GroupEntry::for_rotate(
@@ -68,11 +64,10 @@ impl SelectTool {
                 )
                 .with_centre_chip(),
             ),
-            EntryKey::SkewX => skew(Side::Top)?,
-            EntryKey::SkewY => skew(Side::Right)?,
+            EntryKey::SkewX => skew(Side::Top),
+            EntryKey::SkewY => skew(Side::Right),
         };
         self.entry = Some(entry);
-        Ok(())
     }
 
     /// A double-click on a group handle (criterion 47): opens the entry of that
@@ -108,7 +103,7 @@ impl SelectTool {
                 self.modes,
             )),
             EditHandle::Skew(side) => {
-                OpenEntry::Group(GroupEntry::for_skew(&members, &group, side, shift)?)
+                OpenEntry::Group(GroupEntry::for_skew(&members, &group, side, shift))
             }
             EditHandle::Param(_) => return None,
         };

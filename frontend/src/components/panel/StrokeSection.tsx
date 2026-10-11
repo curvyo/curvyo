@@ -1,3 +1,5 @@
+import { OPACITY_CLICK_MIN_P, VALUE_FIELD_NAMES, VALUE_FIELD_SCALE_END } from "@/lib/sliderNames";
+import { useHexEntry } from "@/hooks/useHexEntry";
 import { useRef } from "react";
 
 import { ColourBlock } from "@/components/panel/ColourBlock";
@@ -30,6 +32,8 @@ interface StrokeSectionProps {
 export function StrokeSection({ panel, onReturnFocus }: StrokeSectionProps) {
   const { view } = panel;
   const section = useRef<HTMLDivElement>(null);
+  const hex = useRef<HTMLInputElement>(null);
+  const hexEntry = useHexEntry(hex, onReturnFocus);
   const rowsFocus = useRowsFocus(view.strokeRows, section);
   const markersFocus = useRowsFocus(view.markersShown, section);
   return (
@@ -54,7 +58,8 @@ export function StrokeSection({ panel, onReturnFocus }: StrokeSectionProps) {
             picking={view.pickTarget === "stroke"}
             onPick={() => panel.beginPick("stroke")}
             onSubmitHex={(text) => panel.setText("stroke-color", text)}
-            onReturnFocus={onReturnFocus}
+            onReturnFocus={hexEntry.returnFocus}
+            hexRef={hex}
           />
           <ColourPicker
             name="Stroke"
@@ -65,10 +70,12 @@ export function StrokeSection({ panel, onReturnFocus }: StrokeSectionProps) {
             onPreview={(hue, saturation, value) =>
               panel.previewHsv("stroke-color", hue, saturation, value)
             }
+            onSettle={panel.settle}
+            onOpenEntry={hexEntry.open}
           />
           <ValueField
             label="Opacity"
-            name="Stroke opacity"
+            name={VALUE_FIELD_NAMES.strokeOpacity}
             text={view.strokeOpacityText}
             bar={view.strokeOpacityBar}
             mixed={view.strokeOpacityMixed}
@@ -76,10 +83,12 @@ export function StrokeSection({ panel, onReturnFocus }: StrokeSectionProps) {
             unit="%"
             valueNow={view.strokeOpacity}
             unitWords="percent"
-            typedMax={view.opacityTypedMax}
+            valueMax={VALUE_FIELD_SCALE_END.opacity}
+            clickMinP={OPACITY_CLICK_MIN_P}
             defaultText={view.opacityDefaultText}
             messages={PERCENT_MESSAGES}
             onPreview={(p, grid) => panel.previewValue("stroke-opacity", p, grid)}
+            onSettle={panel.settle}
             onStep={(steps, grid) => panel.stepValue("stroke-opacity", steps, grid)}
             onReset={() => panel.resetValue("stroke-opacity")}
             onSubmit={(text) => panel.setText("stroke-opacity", text)}
@@ -87,18 +96,21 @@ export function StrokeSection({ panel, onReturnFocus }: StrokeSectionProps) {
           />
           <ValueField
             label="Width"
-            name="Stroke width"
+            name={VALUE_FIELD_NAMES.strokeWidth}
             text={view.strokeWidthText}
             bar={view.strokeWidthBar}
+            dragBase={view.strokeWidthDragBase}
+            dragLimit={view.widthDragLimit}
             mixed={view.strokeWidthMixed}
             resettable={view.strokeWidthResettable}
             unit="mm"
             valueNow={view.strokeWidth}
             unitWords="millimetres"
-            typedMax={view.widthTypedMax}
+            valueMax={VALUE_FIELD_SCALE_END.strokeWidth}
             defaultText={view.widthDefaultText}
             messages={WIDTH_MESSAGES}
             onPreview={(p, grid) => panel.previewValue("stroke-width", p, grid)}
+            onSettle={panel.settle}
             onStep={(steps, grid) => panel.stepValue("stroke-width", steps, grid)}
             onReset={() => panel.resetValue("stroke-width")}
             onSubmit={(text) => panel.setText("stroke-width", text)}

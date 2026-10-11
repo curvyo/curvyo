@@ -137,21 +137,22 @@ pub fn classify_press(
 /// `hit`, a drag that leaves it moves the selection along one axis, and an
 /// unselected `hit` joins it then.
 pub(super) fn begin_object_press(
+    objects: &[ObjectSnapshot],
     selection: &mut ObjectSelection,
     hit: NodeId,
     shift: bool,
     origin: DragOrigin,
 ) -> MoveDrag {
-    let mut drag = MoveDrag::new(origin, false);
     if shift {
+        let joins = (!selection.contains(hit)).then_some(hit);
+        let mut drag = MoveDrag::new(origin, false, objects, selection, joins);
         drag.pending_toggle = Some(hit);
-        if !selection.contains(hit) {
-            drag.joins = Some(hit);
-        }
-    } else if !selection.contains(hit) {
+        return drag;
+    }
+    if !selection.contains(hit) {
         selection.select_single(hit);
     }
-    drag
+    MoveDrag::new(origin, false, objects, selection, None)
 }
 
 impl SelectTool {

@@ -9,7 +9,7 @@
 use curvyo_document_core::{Angle, Document, NodeId, ObjectSnapshot, PathSnapshot, Point};
 
 use crate::ResizeDirection;
-use crate::conversion::{ConversionCounts, converted_counts, converted_paths};
+use crate::conversion::converted_for_handle;
 use crate::group_box::GroupSelection;
 use crate::group_transform::{GroupMap, commit_group, group_pivot, map_all_checked};
 use crate::oriented_box::OrientedBox;
@@ -54,8 +54,8 @@ pub struct GroupEntry {
     pivot: Point,
     fields: Vec<EntryField>,
     axes: Vec<Axis>,
-    /// For a size entry, beside each start, the path it becomes if the typed size
-    /// is a stretch (criterion 53); built when the entry opens.
+    /// For a size or skew entry, beside each start, the path it becomes if the typed
+    /// value is a stretch or a skew (`0047` criteria 6 and 7); built when the entry opens.
     converted: Vec<Option<PathSnapshot>>,
 }
 
@@ -138,35 +138,34 @@ impl GroupEntry {
         );
         entry.linked = linked;
         entry.modes = modes;
-        entry.converted = converted_paths(&entry.starts);
+        entry.converted = converted_for_handle(&entry.starts, entry.handle);
         entry
     }
 
-    /// A skew entry for skew handle `side` (criterion 36); `None` unless every
-    /// selected object is a path.
+    /// A skew entry for skew handle `side` (`0047` criterion 6): every selection has
+    /// one, and a primitive in it converts when the typed angle is applied.
     #[must_use]
     pub fn for_skew(
         members: &[ObjectSnapshot],
         group: &GroupSelection,
         side: Side,
         shift: bool,
-    ) -> Option<Self> {
-        if !group.all_paths() {
-            return None;
-        }
+    ) -> Self {
         let editable = skew_frame(group.bounds(), side, shift).lever.abs() >= MIN_SKEW_LEVER_MM;
         let name = if side.skews_along_u() {
             "Skew angle x"
         } else {
             "Skew angle y"
         };
-        Some(Self::new(
+        let mut entry = Self::new(
             EntryKind::Skew,
             members,
             group,
             (EditHandle::Skew(side), shift),
             vec![(Axis::Skew, field("", name, "0".to_string(), editable))],
-        ))
+        );
+        entry.converted = converted_for_handle(&entry.starts, entry.handle);
+        entry
     }
 
     fn new(
@@ -405,17 +404,6 @@ impl GroupEntry {
         &mut self.converted
     }
 
-    /// The shapes the typed values would turn into paths, counted by kind: empty
-    /// unless the typed size is a stretch (criterion 55's note under the fields,
-    /// "Turns 2 shapes into paths.") or a text is refused.
-    #[must_use]
-    pub fn conversion_counts(&self, texts: [&str; 2], last_edited: usize) -> ConversionCounts {
-        match self.resolve(texts, last_edited) {
-            Ok(Some(results)) => converted_counts(&self.starts, &results),
-            _ => ConversionCounts::default(),
-        }
-    }
-
     /// The objects after applying the typed values, `Ok(None)` if nothing would
     /// change, or the first refused field. Pure: the snapshots a drag to the same
     /// value with the same handle and modifiers would produce.
@@ -450,39 +438,21 @@ impl GroupEntry {
         texts: [&str; 2],
         last_edited: usize,
     ) -> EntryOutcome {
-        self.commit_counting(document, texts, last_edited).0
-    }
-
-    /// [`GroupEntry::commit`], and the shapes the commit turned into paths (empty
-    /// unless it was committed and converted something).
-    #[must_use]
-    pub fn commit_counting(
-        &self,
-        document: &Document,
-        texts: [&str; 2],
-        last_edited: usize,
-    ) -> (EntryOutcome, ConversionCounts) {
         let current = self
             .starts
             .iter()
             .all(|object| document.object(object.id()).as_ref() == Some(object));
         if !current {
-            return (EntryOutcome::Unchanged, ConversionCounts::default());
+            return EntryOutcome::Unchanged;
         }
         match self.resolve(texts, last_edited) {
-            Err((field, reason)) => (
-                EntryOutcome::Invalid { field, reason },
-                ConversionCounts::default(),
-            ),
-            Ok(None) => (EntryOutcome::Unchanged, ConversionCounts::default()),
+            Err((field, reason)) => EntryOutcome::Invalid { field, reason },
+            Ok(None) => EntryOutcome::Unchanged,
             Ok(Some(results)) => {
                 if commit_group(document, &results, self.modes.stroke, self.handle) {
-                    (
-                        EntryOutcome::Committed,
-                        converted_counts(&self.starts, &results),
-                    )
+                    EntryOutcome::Committed
                 } else {
-                    (EntryOutcome::Unchanged, ConversionCounts::default())
+                    EntryOutcome::Unchanged
                 }
             }
         }

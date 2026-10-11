@@ -248,10 +248,9 @@ mod tests {
     };
     use proptest::prelude::*;
 
+    use crate::ResizeDirection;
     use crate::oriented_box::oriented_bounds;
-    use crate::transform_handle_layout::{
-        ALL_EIGHT, CORNERS_FOUR, EditHandle, HandleSpec, transform_handles,
-    };
+    use crate::transform_handle_layout::{ALL_EIGHT, EditHandle, HandleSpec, transform_handles};
 
     /// The 8 px resize squircle, the 12 px rotate glyph and the 16 px centre
     /// glyph (`docs/design-system.md`). `curvyo-render-core` asserts in its own
@@ -260,6 +259,14 @@ mod tests {
     const RESIZE_GLYPH_PX: f64 = 8.0;
     const ROTATE_GLYPH_PX: f64 = 12.0;
     const CENTRE_GLYPH_PX: f64 = 16.0;
+
+    /// The resize directions of a box that allows only its corners.
+    const CORNERS_FOUR: [ResizeDirection; 4] = [
+        ResizeDirection::Ne,
+        ResizeDirection::Se,
+        ResizeDirection::Sw,
+        ResizeDirection::Nw,
+    ];
     /// A circumscribed radius: half the diagonal of the square glyph.
     const RESIZE_GLYPH_RADIUS_PX: f64 = RESIZE_GLYPH_PX * std::f64::consts::FRAC_1_SQRT_2;
     const KNOB_RADIUS_PX: f64 = KNOB_DIAMETER_PX / 2.0;
@@ -559,7 +566,6 @@ mod tests {
             } else {
                 &ALL_EIGHT
             },
-            skew: false,
             side_rotate,
         };
         let mut glyphs: Vec<(Point, f64)> = transform_handles(&box_, spec, t)

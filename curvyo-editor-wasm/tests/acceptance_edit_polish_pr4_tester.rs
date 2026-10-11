@@ -28,7 +28,7 @@ use curvyo_document_core::{
 };
 use curvyo_editor_wasm::{EscapeStep, KeyInput, KeyOutcome, Session, Tool};
 use curvyo_render_core::{DrawList, RgbaColor, Vertex, build_live_edit_preview};
-use curvyo_ui_core::{Axis, EntryOutcome, InvalidReason, MoveEntryMode};
+use curvyo_ui_core::{Axis, EntryOutcome, InvalidReason, MoveEntryMode, ReferencePoint};
 
 // ---------------------------------------------------------------------
 // Helpers
@@ -1464,9 +1464,13 @@ fn hostile_pointer_values_write_nothing_bad() {
 // Typed move: the Copy check (criteria 23, 24)
 // ---------------------------------------------------------------------
 
+/// Opens the chip with the key M. The examples of these tests measure Absolute from the
+/// top-left corner (`0047` criterion 37 makes the centre the default), so the reference is
+/// set to it here.
 fn open_move_chip(s: &mut Session) {
     assert_eq!(press(s, "m"), KeyOutcome::EntryOpened);
     assert!(s.move_entry().is_some());
+    s.set_move_reference(ReferencePoint::TopLeft);
 }
 
 #[test]
@@ -1582,8 +1586,7 @@ fn c23_a_typed_copy_of_a_rotated_primitive_uses_the_drawn_bounds_for_absolute() 
     assert_eq!(sel(&s), 1);
     open_move_chip(&mut s);
     let view = s.move_entry().unwrap();
-    let top_left: Vec<f64> = view
-        .absolute_prefill
+    let top_left: Vec<f64> = view.absolute_prefills[ReferencePoint::TopLeft.index()]
         .iter()
         .map(|t| t.replace(',', ".").parse().unwrap())
         .collect();

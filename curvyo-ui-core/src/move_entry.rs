@@ -1,11 +1,12 @@
 //! The typed move entry of one object or of a multi-selection
 //! (`specs/0010-edit-interaction-polish/specification.md`, criteria 15 to 22, 25,
-//! 56; `specs/0019-multi-object-transform/` criterion 35): two fields X and Y,
-//! read as a relative offset or as an absolute position of the top-left corner
-//! of the drawn bounds (of the group box for a selection). The mode is
-//! the chip's (the DOM holds it and passes it with every commit), so the rule
-//! exists once, here. The DOM chip only holds the text, the caret and the
-//! focus (`adrs.md`, decision 3).
+//! 56; `specs/0019-multi-object-transform/` criterion 35; `specs/0047-transform-polish/`
+//! criteria 37 to 50): two fields X and Y, read as a relative offset or as the absolute
+//! position of a chosen [`ReferencePoint`] of the drawn bounds (of the group box for a
+//! selection), the centre until another is chosen. The mode is the chip's (the DOM holds it
+//! and passes it with every commit), the chosen point is view state of this entry, so the rule
+//! exists once, here. The DOM chip only holds the text, the caret and the focus
+//! (`adrs.md`, decision 3).
 
 use curvyo_document_core::{Document, NodeId, ObjectSnapshot, Point, Vec2};
 
@@ -13,6 +14,7 @@ use crate::anchor_id_minter::AnchorIdMinter;
 use crate::group_box::GroupSelection;
 use crate::object_bounds::object_outline_bounds;
 use crate::oriented_box::OrientedBox;
+use crate::reference_point::ReferencePoint;
 use crate::transform_commit::{
     MAX_COORDINATE_MM, MOVE_EQUAL_EPSILON_MM, axis_within_limit, commit_move,
 };
@@ -32,8 +34,15 @@ pub struct MoveEntry {
     bounds: (Point, Point),
     /// X and Y as the chip shows them in Relative mode: prefill "0".
     fields: [EntryField; 2],
-    /// What an untouched field shows in Absolute mode: the current top-left.
-    absolute_prefill: [String; 2],
+    /// Whether the chip shows its Absolute mode right now. View state the chip reports, so that
+    /// the marks are drawn and clickable in Absolute only (criteria 39 and 40).
+    absolute: bool,
+    /// The point of the bounds that Absolute measures from: the centre on every open
+    /// (criteria 37 and 49), never stored.
+    reference: ReferencePoint,
+    /// The point whose radio has the pointer or the keyboard focus: its mark is drawn in its
+    /// hover state (criterion 41).
+    radio_hover: Option<ReferencePoint>,
     /// Whether the chip opens with its Copy check on: Ctrl was held at the
     /// second press of the double-click (criterion 23).
     copy_preset: bool,
@@ -49,7 +58,7 @@ impl MoveEntry {
 
     /// An entry for the selected `objects` (in selection order) with their
     /// `group` box: relative offsets move all of them, an absolute position
-    /// puts the top-left corner of the group box there, and a copy copies all
+    /// puts the chosen point of the group box there, and a copy copies all
     /// of them (`specs/0019-multi-object-transform/` criterion 35).
     #[must_use]
     pub fn for_group(objects: &[ObjectSnapshot], group: &GroupSelection) -> Self {
@@ -68,7 +77,9 @@ impl MoveEntry {
                 field("X", "Horizontal offset"),
                 field("Y", "Vertical offset"),
             ],
-            absolute_prefill: [format_mm(bounds.0.x), format_mm(bounds.0.y)],
+            absolute: false,
+            reference: ReferencePoint::Centre,
+            radio_hover: None,
             copy_preset: false,
         }
     }
@@ -108,35 +119,100 @@ impl MoveEntry {
         &self.fields
     }
 
-    /// What an untouched X and Y field show in Absolute mode: the current
-    /// top-left of the drawn bounds, one decimal.
+    /// The tight bounds of the drawn outline, corners `(min, max)`: the box the reference
+    /// points lie on and the pale red box shows while the chip is open (criterion 34).
     #[must_use]
-    pub fn absolute_prefill(&self) -> &[String; 2] {
-        &self.absolute_prefill
+    pub const fn bounds(&self) -> (Point, Point) {
+        self.bounds
+    }
+
+    /// What an untouched X and Y field show in Absolute mode for the chosen reference point:
+    /// its current position, one decimal (criterion 37).
+    #[must_use]
+    pub fn absolute_prefill(&self) -> [String; 2] {
+        self.absolute_prefill_for(self.reference)
+    }
+
+    /// The same for `reference`: also what the fields show while the pointer is on its
+    /// mark (criterion 44).
+    #[must_use]
+    pub fn absolute_prefill_for(&self, reference: ReferencePoint) -> [String; 2] {
+        let at = reference.point(self.bounds);
+        [format_mm(at.x), format_mm(at.y)]
+    }
+
+    /// The chosen reference point of Absolute: the centre until another is chosen.
+    #[must_use]
+    pub const fn reference(&self) -> ReferencePoint {
+        self.reference
+    }
+
+    /// Chooses the reference point. Nothing is applied (criterion 41).
+    pub const fn set_reference(&mut self, reference: ReferencePoint) {
+        self.reference = reference;
+    }
+
+    /// Whether the chip shows Absolute right now.
+    #[must_use]
+    pub const fn is_absolute(&self) -> bool {
+        self.absolute
+    }
+
+    /// The chip reports its mode: the marks exist in Absolute only (criterion 39).
+    pub const fn set_absolute(&mut self, absolute: bool) {
+        self.absolute = absolute;
+    }
+
+    /// The point whose radio has the pointer or the focus, if any.
+    #[must_use]
+    pub const fn radio_hover(&self) -> Option<ReferencePoint> {
+        self.radio_hover
+    }
+
+    /// The chip reports the radio under the pointer or with the focus.
+    pub const fn set_radio_hover(&mut self, hover: Option<ReferencePoint>) {
+        self.radio_hover = hover;
     }
 
     /// The offset the typed `texts` mean in the given mode, `Ok(None)` when it
     /// is no move (an unedited chip, relative 0 and 0, an absolute position
     /// equal to the current one), or the first refused field. A field whose
     /// text equals the prefill of the mode in force is untouched and means "no
-    /// change on that axis".
+    /// change on that axis". Absolute reads the chosen reference point.
     ///
     /// # Errors
     /// The index of the first offending field with
     /// [`InvalidReason::NotANumber`]: text that is not a number, or a value or
-    /// a result beyond the document's coordinate limit.
+    /// a result beyond the document's coordinate limit on any of the four edges.
     pub fn resolve(
         &self,
         texts: [&str; 2],
         absolute: bool,
     ) -> Result<Option<Vec2>, (usize, InvalidReason)> {
+        self.resolve_at(texts, absolute, self.reference)
+    }
+
+    /// [`MoveEntry::resolve`] with `reference` instead of the chosen point: the click on a
+    /// mark moves that point (criterion 40), and "untouched" is decided against its prefill
+    /// (criterion 44).
+    ///
+    /// # Errors
+    /// As [`MoveEntry::resolve`].
+    pub fn resolve_at(
+        &self,
+        texts: [&str; 2],
+        absolute: bool,
+        reference: ReferencePoint,
+    ) -> Result<Option<Vec2>, (usize, InvalidReason)> {
         let (min, max) = self.bounds;
-        let origin = [min.x, min.y];
-        let far = [max.x, max.y];
+        let (origin, far) = ([min.x, min.y], [max.x, max.y]);
+        let at = reference.point(self.bounds);
+        let current = [at.x, at.y];
+        let absolute_prefill = self.absolute_prefill_for(reference);
         let mut offset = [0.0_f64; 2];
         for index in 0..2 {
             let prefill = if absolute {
-                self.absolute_prefill[index].as_str()
+                absolute_prefill[index].as_str()
             } else {
                 self.fields[index].prefill.as_str()
             };
@@ -147,7 +223,7 @@ impl MoveEntry {
                 .filter(|value| value.abs() <= MAX_COORDINATE_MM)
                 .ok_or((index, InvalidReason::NotANumber))?;
             offset[index] = if absolute {
-                value - origin[index]
+                value - current[index]
             } else {
                 value
             };
@@ -174,6 +250,20 @@ impl MoveEntry {
         copy: bool,
         minter: &mut AnchorIdMinter,
     ) -> (EntryOutcome, Option<Vec<NodeId>>) {
+        self.commit_at(document, texts, (absolute, self.reference), copy, minter)
+    }
+
+    /// [`MoveEntry::commit`] with `reference` instead of the chosen point: the click on a
+    /// mark (criterion 40). `mode` is the chip's mode and the point to move.
+    #[must_use]
+    pub fn commit_at(
+        &self,
+        document: &Document,
+        texts: [&str; 2],
+        (absolute, reference): (bool, ReferencePoint),
+        copy: bool,
+        minter: &mut AnchorIdMinter,
+    ) -> (EntryOutcome, Option<Vec<NodeId>>) {
         let unchanged = self
             .start
             .iter()
@@ -181,7 +271,7 @@ impl MoveEntry {
         if !unchanged {
             return (EntryOutcome::Unchanged, None);
         }
-        match self.resolve(texts, absolute) {
+        match self.resolve_at(texts, absolute, reference) {
             Err((field, reason)) => (EntryOutcome::Invalid { field, reason }, None),
             Ok(None) => (EntryOutcome::Unchanged, None),
             Ok(Some(offset)) => {
@@ -208,11 +298,18 @@ mod tests {
         })
     }
 
+    /// An entry over one object, measuring Absolute from the **top-left**: the reference
+    /// the examples of `0010` criteria 18 to 25 were written for (`0047` criterion 37: their
+    /// numbers hold for the top-left reference). [`fresh_entry_of`] has the default centre.
     fn entry_of(document: &Document, id: NodeId) -> MoveEntry {
-        {
-            let object = document.object(id).expect("exists");
-            MoveEntry::new(&object, &crate::oriented_box::oriented_bounds(&object))
-        }
+        let mut entry = fresh_entry_of(document, id);
+        entry.set_reference(ReferencePoint::TopLeft);
+        entry
+    }
+
+    fn fresh_entry_of(document: &Document, id: NodeId) -> MoveEntry {
+        let object = document.object(id).expect("exists");
+        MoveEntry::new(&object, &crate::oriented_box::oriented_bounds(&object))
     }
 
     fn top_left(document: &Document, id: NodeId) -> Point {
@@ -223,21 +320,22 @@ mod tests {
         (a.x - x).abs() < 1e-9 && (a.y - y).abs() < 1e-9
     }
 
-    /// Criterion 18: both fields open at "0" in Relative mode and show the
-    /// current top-left in Absolute mode.
+    /// Criterion 18, as `0047` criterion 37 changes it: both fields open at "0" in Relative
+    /// mode and show the current centre in Absolute mode (the top-left with that reference).
     #[test]
-    fn the_fields_open_at_zero_and_the_absolute_prefill_is_the_top_left() {
+    fn the_fields_open_at_zero_and_the_absolute_prefill_is_the_centre() {
         let document = Document::new(1);
         let id = rect(&document, 10.0, 20.0, 30.0, 40.0);
+        let fresh = fresh_entry_of(&document, id);
+        assert_eq!(fresh.reference(), ReferencePoint::Centre);
+        assert_eq!(fresh.absolute_prefill(), ["25.0", "40.0"]);
+        assert!(!fresh.is_absolute(), "the chip opens in Relative");
         let entry = entry_of(&document, id);
         assert_eq!(entry.fields()[0].prefill, "0");
         assert_eq!(entry.fields()[1].prefill, "0");
         assert_eq!(entry.fields()[0].label, "X");
         assert_eq!(entry.fields()[1].label, "Y");
-        assert_eq!(
-            entry.absolute_prefill(),
-            &["10.0".to_string(), "20.0".to_string()]
-        );
+        assert_eq!(entry.absolute_prefill(), ["10.0", "20.0"]);
     }
 
     /// Criterion 20: relative (5, -3) moves the top-left from (10, 20) to
@@ -539,5 +637,147 @@ mod tests {
             entry.resolve(["\u{2212}5", "20.0"], true),
             Ok(Some(Vec2::new(-15.0, 0.0)))
         );
+    }
+
+    /// `0047` criterion 38, worked example: typed 100 and 50 with the centre as the reference
+    /// puts the centre of the 30 x 40 rectangle at (100, 50), the top-left corner at (85, 30).
+    #[test]
+    fn plain_enter_puts_the_centre_there() {
+        let document = Document::new(1);
+        let id = rect(&document, 10.0, 20.0, 30.0, 40.0);
+        let entry = fresh_entry_of(&document, id);
+        assert_eq!(
+            entry
+                .commit(
+                    &document,
+                    ["100", "50"],
+                    true,
+                    false,
+                    &mut AnchorIdMinter::new(99)
+                )
+                .0,
+            EntryOutcome::Committed
+        );
+        assert!(near(top_left(&document, id), 85.0, 30.0));
+    }
+
+    /// Criterion 40, the examples of the rectangle: typed 100 and 50 and each mark.
+    #[test]
+    fn each_reference_point_moves_that_point_to_the_typed_position() {
+        let document = Document::new(1);
+        let id = rect(&document, 10.0, 20.0, 30.0, 40.0);
+        let entry = fresh_entry_of(&document, id);
+        for (reference, origin) in [
+            (ReferencePoint::TopLeft, (100.0, 50.0)),
+            (ReferencePoint::BottomRight, (70.0, 10.0)),
+            (ReferencePoint::Centre, (85.0, 30.0)),
+            (ReferencePoint::LeftMiddle, (100.0, 30.0)),
+            (ReferencePoint::BottomCentre, (85.0, 10.0)),
+            (ReferencePoint::TopRight, (70.0, 50.0)),
+            (ReferencePoint::TopCentre, (85.0, 50.0)),
+            (ReferencePoint::RightMiddle, (70.0, 30.0)),
+            (ReferencePoint::BottomLeft, (100.0, 10.0)),
+        ] {
+            let offset = entry
+                .resolve_at(["100", "50"], true, reference)
+                .expect("valid")
+                .expect("moves");
+            assert!(
+                (10.0 + offset.x - origin.0).abs() < 1e-9
+                    && (20.0 + offset.y - origin.1).abs() < 1e-9,
+                "{reference:?}: {offset:?}"
+            );
+        }
+    }
+
+    /// Criterion 40: typed X = 100 only, then the top-right mark: the top-right corner's x
+    /// becomes 100 and its y stays. The untouched field is compared with the prefill of the
+    /// point that was clicked (criterion 44).
+    #[test]
+    fn an_untouched_field_is_untouched_for_the_point_clicked() {
+        let document = Document::new(1);
+        let id = rect(&document, 10.0, 20.0, 30.0, 40.0);
+        let entry = fresh_entry_of(&document, id);
+        // The top-right corner is at (40, 20); the fields showed its prefill "20.0" for Y.
+        assert_eq!(
+            entry.absolute_prefill_for(ReferencePoint::TopRight),
+            ["40.0", "20.0"]
+        );
+        assert_eq!(
+            entry.resolve_at(["100", "20.0"], true, ReferencePoint::TopRight),
+            Ok(Some(Vec2::new(60.0, 0.0)))
+        );
+        // Nothing typed: both fields are the clicked point's prefill, nothing to apply
+        // (criterion 45).
+        assert_eq!(
+            entry.resolve_at(["40.0", "20.0"], true, ReferencePoint::TopRight),
+            Ok(None)
+        );
+        // A typed position equal to the point's current one is no move either.
+        assert_eq!(
+            entry.resolve_at(["40", "20"], true, ReferencePoint::TopRight),
+            Ok(None)
+        );
+    }
+
+    /// Criterion 40, rotated example: the 20 x 10 rectangle with its centre at (10, 5) turned by
+    /// 30 degrees has the true bounds x -1.16 to 21.16, y -4.33 to 14.33; typed 0 and 0 and the
+    /// top-left mark put the corner of those bounds at the origin, so the centre goes to
+    /// (11.16, 9.33).
+    #[test]
+    fn the_marks_of_a_turned_rectangle_are_those_of_its_true_bounds() {
+        let document = Document::new(1);
+        let id = rect(&document, 0.0, 0.0, 20.0, 10.0);
+        let turned = document.object(id).expect("exists").rotated(
+            Point::new(10.0, 5.0),
+            Angle::from_radians(30.0_f64.to_radians()),
+        );
+        document.rotate_object(&turned).expect("rotates");
+        let entry = fresh_entry_of(&document, id);
+        let (min, max) = entry.bounds();
+        assert!((min.x + 1.160_254).abs() < 1e-5 && (max.x - 21.160_254).abs() < 1e-5);
+        assert!((min.y + 4.330_127).abs() < 1e-5 && (max.y - 14.330_127).abs() < 1e-5);
+        let (outcome, _) = entry.commit_at(
+            &document,
+            ["0", "0"],
+            (true, ReferencePoint::TopLeft),
+            false,
+            &mut AnchorIdMinter::new(99),
+        );
+        assert_eq!(outcome, EntryOutcome::Committed);
+        let centre = match document.object(id).expect("exists") {
+            ObjectSnapshot::Primitive(p) => match p.shape {
+                curvyo_document_core::Shape::Rect { bounds, .. } => Point::new(
+                    bounds.origin.x + bounds.width.as_mm() / 2.0,
+                    bounds.origin.y + bounds.height.as_mm() / 2.0,
+                ),
+                _ => panic!("a rectangle"),
+            },
+            ObjectSnapshot::Path(_) => panic!("a primitive"),
+        };
+        assert!(
+            (centre.x - 11.160_254).abs() < 1e-5 && (centre.y - 9.330_127).abs() < 1e-5,
+            "{centre:?}"
+        );
+    }
+
+    /// Criterion 45: the coordinate limit is checked on all four edges, so it is the same for
+    /// every reference point: a result that puts the far edge beyond it is refused, also for
+    /// the near point.
+    #[test]
+    fn the_limit_holds_on_all_four_edges_for_every_reference() {
+        let document = Document::new(1);
+        let id = rect(&document, 10.0, 20.0, 30.0, 40.0);
+        let entry = fresh_entry_of(&document, id);
+        for reference in ReferencePoint::ALL {
+            // The point goes to just inside the limit, the far edge lands beyond it.
+            let result = entry.resolve_at(["9999990", "0"], true, reference);
+            let (min, max) = entry.bounds();
+            let at = reference.point((min, max));
+            let moved_max = max.x + (9_999_990.0 - at.x);
+            let moved_min = min.x + (9_999_990.0 - at.x);
+            let inside = moved_max.abs() <= 1.0e7 && moved_min.abs() <= 1.0e7;
+            assert_eq!(result.is_ok(), inside, "{reference:?}: {result:?}");
+        }
     }
 }
