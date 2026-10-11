@@ -3,7 +3,12 @@
 //! and commits it. The mapping to a value is Rust's; this checks that one such click is one
 //! history step, with the value the scale gives at `p`, and that undo and redo are byte-equal.
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::float_cmp)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::float_cmp,
+    clippy::manual_assert_eq
+)]
 
 use curvyo_document_core::{Direction, Point, unpack};
 use curvyo_editor_wasm::{KeyInput, KeyOutcome, Session, Tool};
