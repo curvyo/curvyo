@@ -1,51 +1,182 @@
 # ADRs for Sidebar: a vertical tab strip, a File tab, and no menu bar
 
-Written by the product owner on 2026-10-11 as the list of points for the architect, who reviews it, answers the flags below and replaces the "to decide" lines with decisions before the spec is `Ready`. Reference state: the worktree of `chore/spec-batch7` (`0043`, `0020` and `0045` built; `0050` and `0049` not built).
+First list of points by the product owner (2026-10-11). Reviewed and decided by the architect on 2026-10-11 against ADR 0001, 0004, 0009, 0011, 0014, the `0020` and `0043` decisions and the code on `chore/spec-batch7` (`0043`, `0020`, `0045` built; `0049`, `0050` not built). The decisions below replace the PO's "to decide" points. The spec can go to `Ready` after the PO has handled the items under "Flagged to the PO".
 
-**Is a new ADR needed?** The strip and the File tab: **no**. They are frontend layout and one more variant in the Rust tab rule. The removal of the native menu, the close handshake between host and frontend, the dirty baseline and the macOS menu touch the platform shell and the document's version; `CLAUDE.md` §3 puts platform ADRs to the customer. **PO recommendation:** record them as dated notes in this file (they extend ADR 0001 §6 and do not contradict it), and write a short ADR "Application chrome without a native menu" (`needs-customer`) only if the architect finds that the dirty baseline (point 4) needs a new function on the document's version or history (ADR 0014), or that the macOS menu (point 2) cannot be done without a platform decision. The architect decides which.
+**New ADR: none.** Each trigger the PO named was checked:
+
+- *Dirty baseline:* `Document::version()` exists (Loro state frontiers, `PartialEq`). The flag is session state in `curvyo-editor-wasm`. No new function on `Document` or the history, and ADR 0014 is untouched (decision 2).
+- *Host role:* removing the menu narrows the host. Intercepting the window close, setting the title and building the menu that macOS requires are shell work of the kind ADR 0001 §6 gives the host (the title and the menu were there already). The native-menu precedent is in **spec** `0001`, not in an ADR, so no ADR is superseded.
+- *Preference store:* one boolean in webview storage, with no file and no host code (decision 8). ADR 0004 covers the files we write, and this is not one of them.
+- *macOS menu:* a mechanism inside ADR 0001 §6 (decision 6). It needs a hand check on a Mac, not a platform decision.
 
 ## Depends on
 
-- [ADR 0001 §2, §5, §6](../../docs/adr/0001-ui-framework-and-canvas-rendering.md): the shell is Tauri 2 with React and shadcn over Radix (the vertical `Tabs` use Radix `orientation="vertical"`, no new dependency); which tab is active, enabled and why stays decided in Rust; the host "owns only platform I/O" and now loses the menu, which narrows its job and keeps §6 true. The host gains one thing it did not have: it must be able to refuse a window close and a quit until the frontend answers (point 3).
-- [ADR 0004](../../docs/adr/0004-persistence-and-cross-machine-sync.md) §1 (the `.curvyo` container: unchanged, no `format_version` change) and the data directory that `0045` already uses for `document-formats.toml` (point 6).
-- [ADR 0009](../../docs/adr/0009-concurrent-editing-semantics.md) §2: the active tab, the collapsed state and the dirty flag are view state or user preference, never written to the document.
-- [ADR 0014](../../docs/adr/0014-history-undo-and-branches.md): every step is one commit, so "dirty" can be read from the document's version (point 4); an undo is a forward commit, which is why "clean again after undo" is a Proposal and not a rule.
-- [ADR 0011](../../docs/adr/0011-workspace-and-crate-layout.md) §3: no new crate; the tab rule stays in `curvyo-ui-core`, the session state in `curvyo-editor-wasm`, platform work in `curvyo-app`.
-- [`0043` adrs.md](../0043-properties-tabs/adrs.md) decisions 1 to 6: amended as the points below say.
-- [`0020` adrs.md](../0020-undo-redo/adrs.md): the Edit menu decisions (native Undo and Redo items, `set_history_menu`, the `history-menu` event and its dedupe) are withdrawn.
-- `docs/design-system.md`, "2026-10-05: chrome architecture change": its paragraph "Native OS menu: unchanged" is superseded by the customer's request of 2026-10-11.
+- [ADR 0001](../../docs/adr/0001-ui-framework-and-canvas-rendering.md) §1: the tab rule and the chord table stay in Rust (`curvyo-ui-core`); the frontend renders and forwards. §2: Radix `Tabs` with `orientation="vertical"`, Lucide glyphs, no new dependency. §6: the host keeps byte I/O, the file dialogs, the window title and close interception, and the macOS menu. It loses the File and Edit menus.
+- [ADR 0004](../../docs/adr/0004-persistence-and-cross-machine-sync.md) §1: the `.curvyo` container is unchanged, with no `format_version` bump and no golden-file change.
+- [ADR 0009](../../docs/adr/0009-concurrent-editing-semantics.md) §2: the active tab, the collapsed state and the dirty flag are view state. They are never written to the document.
+- [ADR 0011](../../docs/adr/0011-workspace-and-crate-layout.md) §3: no new crate. Tab rule and chord table go in `curvyo-ui-core`, dirty flag and gate in `curvyo-editor-wasm`, and window and dialogs in `curvyo-app`.
+- [ADR 0014](../../docs/adr/0014-history-undo-and-branches.md): every step is one commit, so the version changes exactly when the document does. An undo is a forward commit, which is why "clean again after undo" is rejected (decision 2). A wipe is a commit (§9), so it makes the project dirty, as criterion 22 says.
+- [`0043` adrs.md](../0043-properties-tabs/adrs.md) decisions 4 to 6, and [`0020` adrs.md](../0020-undo-redo/adrs.md) Placement ("`curvyo-app`: the native Edit menu"): both are amended in milestone 3 (see "Amendments to other adrs.md").
 
-## Points for the architect (to decide)
+## Decisions (architect, 2026-10-11)
 
-1. **The tab rule.** `PanelTab` gets a `File` variant first in the list. `observe` and `press` treat it like History and Layers: never switched to or from by a selection edge; `reset` after New and Open still gives Document or Style (spec criterion 14). The tab list sent to the frontend keeps its shape (id, accessible name, tooltip, `enabled`, `selected`); the vertical layout, the 28 px hit areas and the collapse control are frontend only. A table row in `panel_tabs.rs` tests "File is sticky".
-2. **The macOS menu (criterion 39, Question 3).** Tauri's `app.set_menu` is simply not called on Linux and Windows. On macOS the menu bar cannot be removed, and, as far as I know, Tauri 2 applies a default application menu on macOS when none is set (check on the pinned version); that default has File, Edit, View, Window and Help items and accelerators of its own (Cmd+N, Cmd+W and others), which would swallow the chords before the page sees them. Decide: build the minimal menu of the spec explicitly (application menu with About, Hide, Hide Others, Show All, Quit; Edit with Cut, Copy and Paste), keep predefined Undo, Redo and Select All **out** (their accelerators reach the responder chain and not the page, which is what `0020` criterion 8 warned about), and say how Cmd+Z and Cmd+A in a text field of the panel keep working without them (Question 3 option B is the fallback: custom items that emit an event and are routed to the focused field or the canvas). This cannot be tested in CI; the check is by hand on a Mac and is listed in the PR. Make the menu plan a pure function `fn menu_plan(os) -> MenuPlan` (empty off macOS) so the Linux and Windows "no menu" claim has a unit test, with no trait.
-3. **Closing and quitting while dirty.** The dirty flag lives in the frontend's wasm session, not in the host. Needed: on `WindowEvent::CloseRequested` and `RunEvent::ExitRequested` (Cmd+Q, Quit button, logout where the OS asks) the host calls `prevent_close` or `prevent_exit`, emits one event (`close-requested`), and exits only when the frontend calls a command (`quit_app`) after a clean state, Discard, or a successful Save. Decide: what happens when the frontend never answers (a hang): a second close request within a few seconds does not close (data loss) but the OS force-quit still works; say so in the notes. The browser build uses `beforeunload` (criterion 29). One function in the frontend, `requestReplacingAction(kind, payload)`, is the only place that checks dirty and raises the block, so New, Open, Close, Quit, the OS file handover and the window close share one code path (criterion 27).
-4. **The dirty flag.** Where it lives and how it is computed: proposal, `Session` keeps `saved_version` (the version recorded when `pack` ran, not when the host finished writing, so a change during a slow write stays dirty, criterion 22) and `is_dirty()` compares the document's version (frontiers or version vector) with it; New and Open set it to the new document's version; the frontend reads `is_dirty()` after every commit it already re-reads for (`syncRevision`), and tells the host once per change of value (`set_dirty(bool)`) so the host can write the title. The host must not need the document. Open: can "clean again after undo" (criterion 22, Proposal) be answered without exporting the document? A version comparison cannot, because the undo is a forward commit; a content hash of the exported snapshot can but costs time on a large document. Decide between "stays dirty after undo" (cheap, safe, the default) and a hash taken only when Ctrl+Z reaches the step that was the saved one. If the first needs a new function on `Document` or the history, this is the trigger for the ADR above.
-5. **Host commands in place of menu dispatch.** `menu::dispatch`, `handle_new`, `handle_open`, `handle_save`, `handle_save_as` and the events `new-project` and `request-pack` exist because the menu called them. Decide the replacement: the File tab's buttons and the chords call the same frontend functions; those call host commands for the native parts only (`open_project` shows the dialog and emits the bytes as `open-bytes` does today, `save_project_bytes` stays, `set_dirty`, `quit_app`). `ProjectState::new_unsaved` is reached from a `reset_project` command. Keep `take_pending_open` and the macOS `RunEvent::Opened` path, but route both through the check (criterion 27). Delete `menu.rs` on Linux and Windows builds in milestone 3, `HistoryItems`, `set_history_menu`, the `history-menu` listener in `useHistory.ts` and `pressedJustNow`'s menu half, and `BrowserBar`'s buttons (`host.ts` keeps `emitLocal`, `pickProjectFile` and `download`, which the File tab uses).
-6. **A per-user UI preference (criterion 10).** The collapsed state is the first stored UI preference. Proposal: one small file in the data directory next to `document-formats.toml`, written atomically with the same helper of `curvyo-storage-io`, browser `localStorage` as `FORMATS_KEY` is; read failure means "expanded". Decide whether this is a new concept (a settings store) that later preferences will pile onto, or just a second file; the rule `CLAUDE.md` §5 ("no speculative config options") says: one boolean, no schema, no settings framework until a second preference exists.
-7. **Chords in the frontend (criteria 32, 33).** Today `keys.rs` says Ctrl+S "keeps its page and menu behaviour" (the key table returns `Ignored` and the page does nothing). Decide where the file chords live: a small `fileChords.ts` next to the `useHistory.ts` listener, matching by typed character, with the gate read from the session in one method (`Session::file_chord_allowed()`: no drag, no chip, no long operation) so the gate has one source of truth in Rust and a test. Text fields commit through their own blur path first (criterion 32). The browser table of reserved keys (N, W, Q not bound) is data in the same file.
-8. **Layout.** `PropertiesPanel.tsx` is split: the strip (`PanelStrip.tsx`, replacing `PanelTabStrip.tsx` and the collapse tab) is a sibling of the body; the strip is outside the element that is `hidden` when collapsed; `PANEL_WIDTH_PX` stays 280 for the view-origin shift (`keep_view_origin_for_panel_toggle`), the strip adds 32 px that never toggles. The strip is on the inner edge (lead decision 2026-10-11; spec Question 1 option A): DOM order, Tab order and screen order are the same (strip, then body); when the body is hidden the strip moves to the window edge, no special state. The outer edge (option B) would need CSS order to keep Tab going collapse control, tablist, body. `docs/design-system.md` rows are rewritten by the ux-engineer.
-9. **Tests.** Unit: `panel_tabs.rs` rows; `menu_plan`; the gate method; dirty transitions on a generated sequence (edit, save, edit, undo, open, new) against a reference model. Frontend: strip keyboard model (Up, Down, Home, End; collapsed arrows only focus), chord table per platform, the three-button block, the title rule. Host: `close-requested` handshake with a fake frontend answer. By hand: Linux (GTK: no menu bar, Alt does nothing), Windows, macOS (criterion 39), browser leave-page question. No golden files (no file format changes).
+1. **Tab rule.** `PanelTab::File` comes first in `TABS` (`curvyo-ui-core/src/panel_tabs.rs`), with name `"file"` and tooltip `"File"`. `observe` needs no new arm: it only switches when Document or Style is active, so File is sticky by construction. New and Open build a fresh `Session` with `PanelTabs::new(false)`, which gives Document (criterion 14). When a check is raised from outside the File tab, the frontend calls `press(File)` and remembers the previous tab. Cancel calls `press(previous)`. If that is refused (Style became dimmed meanwhile), Cancel falls back to `press(Document)`. The collapsed state and "no tab pressed while hidden" (criterion 5) are frontend state, like the panel's `open` today. Tests find tabs by name, never by index (see "Tests at risk").
+
+2. **Dirty flag: session state over `Document::version()`, no core API.** `Session` gets `saved: DocumentVersion` and `packed: Option<DocumentVersion>`:
+   - `pack()` (now `&mut self`) records `packed = Some(version)`.
+   - `mark_saved()` moves `packed` into `saved`. The frontend calls it only after the host reports `Saved`.
+   - `is_dirty()` is `document.version() != saved`.
+   - `Session::new` and `Session::open` set `saved` as their last step, so anything open commits counts as saved.
+
+   A change during a slow write stays dirty, and a failed write changes nothing (criterion 22). Read `is_dirty()` only outside a batch.
+
+   **The Proposal "clean again after undo" is rejected; the project stays dirty.** The undo is a forward commit, so the version differs. Three ways to check content equality instead were considered, and none qualifies:
+   - A snapshot hash costs time proportional to the document on every undo.
+   - A Loro diff between two frontiers needs a new `Document` function, and nobody has checked that a map key set and reset, or a tree move and its move back, gives an empty diff (that needs a spike). It also fails across a wipe.
+   - A clean index on the stack (as in `QUndoStack`) is cheap, but wrong once a merge or an object undo (`0041`) changes content off the stack.
+
+   This is the safe direction the spec allows. If the customer asks for it, it becomes a small story with its own spike.
+
+3. **Host commands replace the menu dispatch** (`curvyo-app/src/main.rs`). Every command that opens a dialog is `async`. Today `save_project_bytes` is a sync command and the menu handlers run in the menu callback, so both call `blocking_*` dialogs on the main thread, which `tauri-plugin-dialog` does not allow. This is a latent hang on macOS and Windows that this slice removes. The commands:
+   - `pick_project() -> Option<OpenPick>`, where `OpenPick` is `Bytes { path, bytes }` or `IoError { message }`. The dialog and the read return as a result, not as an event, so a file chosen after Discard never re-enters the check (criterion 18).
+   - `confirm_project_opened(path)`: unchanged.
+   - `save_project_bytes(bytes, save_as) -> SaveOutcome`, where `SaveOutcome` is `Saved { file_name, path }`, `Cancelled` or `Failed { message }`. The `save-error` event goes. A cancelled dialog inside the check keeps the block and the pending action (criterion 26).
+   - `reset_project()` (New, Close): path `None`, title updated.
+   - `set_dirty(dirty)`: stored in `AppState`, title updated.
+   - `quit_app()`: sets `quitting`, then calls `app.exit(0)`.
+
+   `open-bytes`, `open-error` and `take_pending_open` stay, but only for a file the OS hands over. The frontend routes them through the check (a clean project at launch runs none).
+
+   Deleted: `handle_new`, `handle_open`, `handle_save`, `handle_save_as`, `request_pack`, `RequestPackPayload`, the events `new-project`, `request-pack` and `save-error`, `menu::dispatch`, `HistoryItems` and `set_history_menu`.
+
+   The host stays the source of truth for the path (`ProjectState`), and the frontend shows the name and path the last command returned. The title rule is `window_title(file_name, dirty)` in `main.rs`, a pure function with a unit test. The browser build applies the same rule to `document.title` in TypeScript.
+
+   The version comes from one place: `WasmSession::app_version()` (`CARGO_PKG_VERSION`) feeds `pack` and the version line in both builds. `curvyo-app` and `curvyo-editor-wasm` take `version.workspace = true`, and the `version` key leaves `tauri.conf.json` (Tauri then reads Cargo's). A browser-saved file then records the real version instead of `web-demo`.
+
+4. **Close and quit handshake.** `AppState` gets `dirty` and `quitting` (`AtomicBool`):
+   - `on_window_event`, `WindowEvent::CloseRequested { api }` (window button, Alt+F4): if dirty and not quitting, call `api.prevent_close()` and emit `close-requested`. Otherwise the window closes.
+   - `RunEvent::ExitRequested { api, .. }` (last window closed, OS quit): the same test, with `api.prevent_exit()`.
+   - The macOS Quit item calls the same `request_quit` (decision 6).
+   - The frontend answers `close-requested` with `requestReplacingAction("quit")` and finishes with `quit_app`.
+
+   A clean project closes without a round trip to the webview, so a hung webview never blocks closing a clean project. Ctrl+Q (Linux) and the Quit button run in the frontend and end in `quit_app`.
+
+5. **One path for replacing actions.** A new frontend hook `useProject.ts` owns the mirror of the dirty flag, the one pending action, the check, and New, Open, Save, Save as, Close and Quit. `requestReplacingAction(kind, payload?)` is the only place that reads dirty and raises the block. Buttons, chords, `close-requested` and `open-bytes` all call it. A second request replaces the pending action (criterion 28). `App.tsx` keeps only the wiring.
+
+6. **The macOS menu (Question 3): the mechanism.**
+   - **Linux and Windows:** `set_menu` and `on_menu_event` are gone. Tauri 2 sets no default menu on these platforms, so there is no bar and Alt opens nothing.
+   - **macOS:** Tauri 2 installs its default menu when none is set. That menu has File, View, Window and Help, and Cmd+W (Close Window) among its keys, which would take chords away from the page. So `menu.rs` becomes one `#[cfg(target_os = "macos")]` builder over a const table:
+     - Application menu: About, Hide, Hide Others and Show All (predefined), a separator, and **Quit** as a custom item with Cmd+Q. It is custom because `PredefinedMenuItem::quit` terminates without asking the frontend, and the custom item calls `request_quit` instead.
+     - Edit menu: **predefined** Undo, Redo, Cut, Copy, Paste and Select All.
+     - Nothing else.
+
+   **Why the Edit menu has predefined Undo, Redo and Select All.** This contradicts criterion 39 and the default A of Question 3. On macOS, WKWebView gives a key equivalent to the page first and passes it to the menu only when the page did not call `preventDefault`. Predefined items are native selectors sent to the focused field, not Tauri events.
+   - On the canvas, the editor takes Cmd+Z and Cmd+A and prevents the default, so the menu never acts.
+   - In a text field, the editor ignores them, and the menu performs the field's own undo or select all.
+
+   So there is no event, no listener and no dedupe. Without these items (option A), Cmd+Z and Cmd+A do nothing in text fields on macOS, because WKWebView's editing key equivalents come only from menu items. That fails criterion 39's own hand check, and it is also why Cut, Copy and Paste must be in the menu. Undo chosen with the mouse in the Edit menu acts on a focused field only; document undo stays with the keys and the History tab.
+
+   **By hand on a Mac** (no Mac in CI): the list in criterion 39, plus "Cmd+Z on the canvas undoes exactly one step". If a double fire shows, the fallback is to drop the three items and let the frontend call `document.execCommand("undo" | "redo" | "selectAll")` for a focused text field on macOS. A unit test that runs on Linux checks the table: the only custom item is Quit, and no item has a file chord (decision 7).
+
+7. **Chords: the table and the gate live in Rust.** In `curvyo-ui-core/src/file_chords.rs`:
+   - `FileCommand` has the variants New, Open, Save, SaveAs, Close and Quit.
+   - `Platform` has Linux, Windows, MacOs and Browser. All four differ today, so the enum is not speculative.
+   - `file_chord(key, shift, primary, alt, platform) -> Option<FileCommand>` matches the typed character case-insensitively. Cmd+Q on macOS gives `None` (the menu owns it), and N, W and Q in the browser give `None`.
+   - `chord_label(command, platform)` returns the key text for the tooltips (criterion 34), so a tooltip and its chord cannot drift apart.
+
+   `Session::file_chord(input, platform) -> &'static str` adds the gate. It ignores a key repeat, `dom_blocked` (the frontend's busy flag and an IME composition), `operation_in_flight()` and an open entry chip. It does **not** block on an unfinished Pen path (criterion 33). It is a separate method from `key_down`, so `key_down` still returns `Ignored` for Ctrl+S, as two existing tests pin.
+
+   The frontend has one `keydown` listener on `window` in the capture phase (in `useProject.ts`) for every target, text fields included. When the session names a command, the listener calls `preventDefault`, blurs a focused text field (whose blur path commits the value, criterion 32), and then runs the command. The PO's `fileChords.ts` with a TypeScript table is not built.
+
+8. **The collapsed state (criterion 10): webview `localStorage` in both builds.** The key is `curvyo.panel-collapsed`. Every access is in `try/catch`, and a failure means the body is shown. There is no host command, no file in the data directory and no settings store. One boolean for one viewer fits webview storage: all three desktop webviews keep it per OS user, and both builds share one code path. The dev server (`devUrl`) and a release build keep separate values, which is accepted. A file next to `document-formats.toml` waits until a preference must be read by the host or exported.
+
+9. **Browser build.**
+   - **Open:** a promise over `<input type=file>`; the `cancel` event resolves to `null`, as `pickTextFile` already does.
+   - **Save and Save as:** download `<file name>` or `Untitled.curvyo`. The download counts as `Saved` (the page cannot see a browser save prompt being cancelled).
+   - **No File System Access API:** it exists only in Chromium and would add a second save path. That is a later story.
+   - **Reload and close:** `beforeunload` is registered only while dirty (registering it always disables the back-forward cache in some browsers). It is registered in **both** builds: on the desktop it catches a webview reload (WebView2's F5 and Ctrl+R), which no host event sees. `quit_app` removes it first.
+
+10. **Layout.** The PO's point 8 is confirmed. The strip is a sibling of the body and outside the element that is hidden. `PANEL_WIDTH_PX` stays 280 for `keep_view_origin_for_panel_toggle`, and the 32 px strip never toggles. DOM order, Tab order and screen order are the same.
+
+## Accepted risks
+
+- **Dirty in the host trails the commit by one IPC call.** A window close in that gap (milliseconds, and only on the first change after a save) closes without the check. To keep the gap small, the frontend sends `set_dirty(true)` in the same task as the re-read after the commit, before the paint.
+- **A hung webview with a dirty project:** the window does not close. There is no timer, because a timer cannot tell a hang from a maker reading the sentence. The exit is the OS's force quit. The document is unreachable in a hung webview anyway.
+- **macOS** is checked by hand only (decision 6).
+- **Milestone 2 on macOS:** the menu without accelerators breaks Cmd+Z in text fields until milestone 3. It is never shipped on its own.
+
+## Flagged to the PO (spec text; defaults taken, the build is not blocked)
+
+1. **Criterion 39 and Question 3:** make B the default with the mechanism of decision 6 (predefined items, no dedupe). Option B's "needs the same dedupe" is wrong for predefined items. Reword "no item with an accelerator that an editor action also uses" to "no custom item with an editor chord; the predefined Undo, Redo and Select All act only when the page did not handle the key".
+2. **Criterion 22:** strike the Proposal (decision 2). Criterion 30's test "edit, save, edit, undo the edit" expects `*` after the undo.
+3. **Criterion 27:** Linux and Windows have no handover to a running app. A double-click while Curvyo runs starts a second process, because there is no single-instance handling today. Say so, and put single-instance handling under Out of scope.
+4. **Criteria 19 and 29 (browser):** a download counts as saved, and a cancelled browser prompt cannot be seen. The download name is the file name or `Untitled.curvyo`; today it is always `untitled.curvyo`.
+5. **Criterion 36:** a test over a menu that milestone 3 deletes becomes an empty test. Make the inventory a checklist in the PR. The lasting test is the macOS table of decision 6.
+6. **Criterion 38:** "each chord on each OS runs once" can be automated only on Linux CI. Split it: unit tests (decisions 6 and 7), the frontend's single listener, and a hand list for Windows (nightly) and macOS.
+7. **Hang case:** add "a hung webview with unsaved changes cannot close its window; the OS force quit can" to Out of scope.
+8. **Amendments table:**
+   - The `0020` row misses the `0020` adrs.md Placement line ("`curvyo-app`: the native Edit menu") and the dedupe it caused (`isDuplicateKey`, `pressedJustNow`, `DUPLICATE_PRESS_MS`), all deleted here.
+   - The `0044` row should say that macOS keeps a native Select All, which acts on text fields only.
+
+## Amendments to other adrs.md (made in milestone 3, each with "amended by `0051`")
+
+- `0043` adrs.md decision 5: vertical Radix `Tabs`; the tablist is outside the collapsible body; `activationMode` is `manual` while the body is hidden (criterion 9). Decision 6: Up and Down replace Left and Right.
+- `0020` adrs.md Placement: "`curvyo-app`: the native Edit menu (Q5)" is withdrawn. The frontend loses the `history-menu` listener, the `set_history_menu` call in `refresh`, and `isDuplicateKey`, `pressedJustNow`, `markPressed` and `DUPLICATE_PRESS_MS`. `menuNames` stays, because it feeds the History tab's buttons.
+
+## Tests at risk
+
+Expected to change:
+
+- `curvyo-ui-core/tests/acceptance_0043_tester.rs` (c1: three tabs, `entries[2]`).
+- The unit tests in `curvyo-ui-core/src/panel_tabs.rs` (`empty[2]`).
+- `curvyo-editor-wasm/tests/acceptance_0043_tester.rs` (`assert_consistent`: `tabs.len() == 3`, `tabs[0]`, `tabs[1]`).
+- The tests in `curvyo-editor-wasm/src/session/panel_tabs.rs` (`tabs[1]`, `len() == 3`).
+- `curvyo-editor-wasm/tests/history_tab_session.rs` (`tabs.len() == 3`).
+
+Rewrite all of these to find tabs by name.
+
+- `curvyo-app/src/menu.rs` tests: deleted together with `history_item_text`.
+- `curvyo-editor-wasm/tests/undo_redo_keys.rs` (`the_buttons_and_the_menu_share_the_gate_of_the_keys`): rename only.
+- `frontend/tests/historyText.test.ts` (`menuNames`): stays.
+
+Must pass **unchanged**, because they pin that `key_down` ignores Ctrl+S (decision 7): `curvyo-editor-wasm/tests/edit_polish_escape_keys.rs` and `curvyo-editor-wasm/tests/acceptance_edit_polish_pr1_escape_keys.rs`.
+
+New tests:
+
+- The dirty transitions over a generated sequence (edit, save, edit during a pending save, undo, wipe, open, new) against a reference model.
+- "Open, then idle, is clean" for every fixture in `tests/fixtures/`. This catches an open path that commits lazily.
+- The `file_chord` table per platform, and the gate.
+- `window_title`.
+- The macOS menu table.
 
 ## Collisions and order
 
-- Footprint: `PropertiesPanel.tsx`, `PanelTabStrip.tsx`, `App.tsx`, `host.ts`, `BrowserBar.tsx`, `useHistory.ts`, `useEditorSession.ts` (key gate), `panel_tabs.rs`, `session/mod.rs` and `session/document.rs`, `curvyo-app/src/main.rs`, `menu.rs`, `state.rs`, `tauri.conf.json` if the title or close handling needs it, `docs/design-system.md`.
-- **Runs alone among the panel slices.** It conflicts with `0050` (the Layers tab and its strip numbers), `0044` (the key gate), `0047` and `0049` (panel files) and `0041` (History tab, Edit menu items). Recommended order: **before `0050`**, so the Layers tab is built straight into the vertical strip and `0050`'s height numbers are written once. If `0050` merges first, `0051` rebuilds its Layers tab entry and amends its numbers (the "Amendments" table of the spec). `0043`, `0020` and `0045` are merged in the reference state.
-- `0041` and `0044` are unbuilt: their menu items are not built at all; the amendments are spec text only.
-- No `format_version` bump (the saved file is untouched); no new crate; no new dependency (Radix `Tabs` and Lucide glyphs are in the project). Lucide `FolderOpen`, `PanelRightClose` and `PanelRightOpen` are in the pinned `lucide-react`; verify at build.
+- **Footprint:** `PropertiesPanel.tsx`, `PanelTabStrip.tsx` (replaced), `App.tsx`, `host.ts`, `BrowserBar.tsx` (deleted), `useHistory.ts`, `useEditorSession.ts`, a new `useProject.ts`, `panel_tabs.rs` (ui-core and session), a new `file_chords.rs`, `session/mod.rs`, `session/keys.rs`, `wasm_api.rs`, `curvyo-app/src/main.rs`, `menu.rs`, `state.rs`, `tauri.conf.json` (the `version` key), the two crates' `Cargo.toml` (`version.workspace`), and `docs/design-system.md`.
+- **Runs alone among the panel slices.** It conflicts with `0050`, `0044` (the key gate), `0047`, `0049` and `0041`. Build it **before `0050`**. If `0050` merges first, this slice rebuilds the Layers entry and its numbers.
+- No `format_version` bump, no new crate, no new dependency. Check at build time that `FolderOpen`, `PanelRightClose` and `PanelRightOpen` exist in the pinned `lucide-react`.
 
 ## Delivery: one branch `story/sidebar-and-no-menu`, one PR
 
-1. Milestone 1, the strip (criteria 1 to 14): frontend and the `File`-less tab list; the UX measurement of the bars at 464 px.
-2. Milestone 2, File tab and unsaved changes (criteria 15 to 36): dirty flag, `set_dirty`, `quit_app`, close handshake, File tab, inline check, chords in the frontend and the accelerators removed from the menu items (so nothing fires twice while the menu still exists).
-3. Milestone 3, no menu (criteria 37 to 40): `menu.rs` reduced to `menu_plan`, the Edit menu and its glue deleted, the browser bar deleted, macOS menu, docs and amendments.
+1. **Milestone 1, the strip** (criteria 1 to 14): the frontend, the tab list without File yet, the collapsed state in `localStorage`, and the UX measurement of the bars at 464 px.
+2. **Milestone 2, the File tab and unsaved changes** (criteria 15 to 36): decisions 2 to 5, 7 and 9; accelerators removed from the menu items. The architect reviews this milestone's branch diff (public session API, host commands).
+3. **Milestone 3, no menu** (criteria 37 to 40): decision 6, the deletions of decision 3, the browser bar removed, the documentation, and the amendments.
 
-Review guide for the PR (the customer reads `.rs`, `Cargo.toml` and docs): `curvyo-app/src/main.rs` (close handshake, no `set_menu` off macOS), `curvyo-app/src/menu.rs` (the plan), `curvyo-ui-core/src/panel_tabs.rs` (File is sticky), `curvyo-editor-wasm/src/session/` (dirty flag and the chord gate), `curvyo-app/src/state.rs`; no dependency change expected; docs: `docs/design-system.md`, the amended specs.
+**Review guide** (the customer reads `.rs`, `Cargo.toml` and docs):
 
-## Feature-local decisions (2026-10-11, product owner; the architect confirms or changes)
+- `curvyo-app/src/main.rs`: the commands, the close and exit handshake, no `set_menu` off macOS, `window_title`.
+- `curvyo-app/src/menu.rs`: the macOS table.
+- `curvyo-app/src/state.rs`: `dirty` and `quitting`.
+- `curvyo-ui-core/src/panel_tabs.rs`: File is sticky.
+- `curvyo-ui-core/src/file_chords.rs`: the table.
+- `curvyo-editor-wasm/src/session/`: the dirty flag and the chord gate.
+- The `version.workspace` lines.
+- Docs: `docs/design-system.md` and the amended specs.
 
-- 2026-10-11: the strip is on the inner edge, next to the canvas (spec Question 1, default A, lead decision because the customer asked for Blender's placement) — natural DOM order; cost is that the strip travels 280 px when the body is hidden; the outer edge stays as option B, reversible at the demo by changing a flex order.
-- 2026-10-11: unsaved changes are asked inline in the File tab (the design system's "Inline confirm" with a third button), not in a dialog — the customer's no-popup rule for the panel; the only layers are the OS file dialogs and the two existing error dialogs.
-- 2026-10-11: the dirty marker in the title is a leading asterisk — Inkscape's marker, a symbol to a screen reader.
-- 2026-10-11: the collapsed state is saved per OS user, not per project and not in the file — it is a preference of the person, and the file must not change for it.
-- 2026-10-11: no Export, Recent files or start screen are built; none exists today and the File tab shows only what exists.
+## Feature-local decisions
+
+- 2026-10-11 (PO, confirmed): the strip is on the inner edge, next to the canvas. DOM order is natural. The cost is that the strip travels 280 px when the body is hidden. The outer edge stays as option B, reversible at the demo.
+- 2026-10-11 (PO, confirmed): unsaved changes are asked inline in the File tab, not in a dialog. The only layers are the OS file dialogs and the two existing error dialogs.
+- 2026-10-11 (PO, confirmed): the dirty marker in the title is a leading asterisk.
+- 2026-10-11 (PO, confirmed with a different mechanism): the collapsed state is saved per OS user, not per project and not in the file. It is stored in webview storage, not in a data-directory file (decision 8).
+- 2026-10-11 (PO, confirmed): no Export, Recent files or start screen.
+- 2026-10-11 (architect): decisions 1 to 10 above, with no new ADR.
