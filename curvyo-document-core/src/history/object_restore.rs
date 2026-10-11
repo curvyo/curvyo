@@ -158,7 +158,8 @@ impl Document {
         if wrote {
             self.commit_with_header(&header);
             let new = StepRef::new(doc.peer_id(), first);
-            self.commit_state.register_own(new, LABEL_OBJECT_UNDO);
+            self.commit_state
+                .register_own(new, LABEL_OBJECT_UNDO, Some(log.label.clone()));
             step = Some(new);
         }
         let result = match (written, kept) {

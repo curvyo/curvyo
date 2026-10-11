@@ -75,6 +75,15 @@ pub enum KeyOutcome {
     Undo,
     /// Ctrl+Shift+Z ran (or found nothing to redo).
     Redo,
+    /// Ctrl+U ran for the selected object (or found nothing to undo, or no single object); the
+    /// notice is in [`Session::take_history_notice`].
+    ObjectUndo,
+    /// Ctrl+Shift+U ran for the selected object.
+    ObjectRedo,
+    /// Ctrl+U needs the long-operation state first.
+    ObjectUndoBusy,
+    /// Ctrl+Shift+U needs the long-operation state first.
+    ObjectRedoBusy,
     /// Ctrl+Z needs the long-operation state first (a large step, or the history is not read yet):
     /// the host shows it, then calls `Session::undo`.
     UndoBusy,
@@ -112,6 +121,10 @@ impl KeyOutcome {
             Self::Hint(KeyHint::FinishPenFirst) => "hint-finish-pen",
             Self::Undo => "undo",
             Self::Redo => "redo",
+            Self::ObjectUndo => "object-undo",
+            Self::ObjectRedo => "object-redo",
+            Self::ObjectUndoBusy => "object-undo-busy",
+            Self::ObjectRedoBusy => "object-redo-busy",
             Self::UndoBusy => "undo-busy",
             Self::RedoBusy => "redo-busy",
             Self::Hint(KeyHint::TooFar) => "hint-too-far",
@@ -152,7 +165,7 @@ enum Selected {
 /// Everything about the session the key table reads.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct KeyState {
-    tool: Tool,
+    pub(super) tool: Tool,
     /// A drag is in flight in the active tool, or the canvas is panned.
     pub(super) operation_in_flight: bool,
     /// The Pen has an unfinished path.
@@ -173,6 +186,7 @@ pub(super) enum KeyAction {
     Escape,
     Hint(KeyHint),
     History(Direction),
+    ObjectHistory(Direction),
     SelectAll,
     Nudge(Arrow),
 }
@@ -231,6 +245,9 @@ fn decide(input: &KeyInput<'_>, state: KeyState) -> KeyAction {
     };
     if let Some(direction) = super::history::history_direction(input, letter) {
         return super::history::history_action(direction, input, state);
+    }
+    if let Some(direction) = super::object_history::object_history_direction(input, letter) {
+        return super::object_history::object_history_action(direction, input, state);
     }
     if input.repeat || input.ctrl || input.alt || input.dom_blocked {
         return KeyAction::Ignore;
@@ -376,6 +393,7 @@ impl Session {
             KeyAction::Escape => KeyOutcome::Escape(self.escape()),
             KeyAction::Hint(hint) => KeyOutcome::Hint(hint),
             KeyAction::History(direction) => self.history_key(direction),
+            KeyAction::ObjectHistory(direction) => self.object_history_key(direction),
             KeyAction::SelectAll => self.select_all(),
             KeyAction::Nudge(arrow) => self.nudge_selection(NudgeEvent {
                 arrow,

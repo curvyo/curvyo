@@ -12,6 +12,7 @@ mod object_index;
 mod object_restore;
 mod object_rows;
 mod object_timeline;
+mod object_wipe;
 mod report;
 mod restore;
 mod restore_plan;

@@ -43,6 +43,7 @@ mod move_entry;
 mod node_tool;
 mod nudge;
 mod object_bounds;
+mod object_history_text;
 mod object_selection;
 mod oriented_box;
 mod panel_content;
@@ -119,7 +120,8 @@ pub use history_names::{
     OPERATION_NAMES, RESERVED_LABELS, UNKNOWN_OPERATION_NAME, known_operation_name, operation_name,
 };
 pub use history_notice::{
-    FINISH_PEN_FIRST, nothing_notice, objects_summary, restore_notice, summary_shapes,
+    FINISH_PEN_FIRST, SELECT_ONE_OBJECT, nothing_notice, object_nothing_notice,
+    object_restore_notice, objects_summary, restore_notice, summary_shapes,
 };
 pub use hit_test::{Hit, hit_test};
 pub use hit_test_object::{hit_test_object, hit_test_objects, hit_test_objects_along};
@@ -134,6 +136,7 @@ pub use nudge::{
     Arrow, CONTINUATION_WINDOW_MS, NudgeEvent, NudgeOutcome, NudgeRun, nudge, selection_centre,
 };
 pub use object_bounds::{content_bounds, object_bounds, object_outline_bounds};
+pub use object_history_text::{object_row_name, object_row_summary};
 pub use object_selection::{ObjectSelection, SelectionCombine};
 pub use oriented_box::{OrientedBox, oriented_bounds};
 pub use panel_content::{PanelContent, panel_body};
@@ -181,7 +184,7 @@ pub use style_panel::{
     DashChoice, DashShown, FillPanel, MarkersPanel, Rgba, StrokePanel, StylePanelState,
     style_panel_state,
 };
-pub use style_scope::{StyleScope, StyleTool, style_scope};
+pub use style_scope::{StyleScope, StyleTool, object_kind_name, style_scope};
 pub use transform_drag::{
     CornerLinking, CornerRadiusScaling, ParamDragInfo, ScaleModes, StrokeScaling,
 };

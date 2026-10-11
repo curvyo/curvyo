@@ -65,8 +65,8 @@ mod wasm_shape_tools;
 pub use session::{
     BooleanOutcome, BreakApartOutcome, ClosePathOutcome, ClosePathState, CombineOutcome,
     DocumentPresetsRecord, DocumentSide, DoubleClickHint, EscapeStep, FitOutcome, FormTexts,
-    FormatEdit, HistoryResult, KeyHint, KeyInput, KeyOutcome, MoveIndicators, PanelTabsRecord,
-    PanelView, Session, SizeOutcome, Tool, WipeOutcome, WipeState,
+    FormatEdit, HistoryResult, KeyHint, KeyInput, KeyOutcome, MoveIndicators, ObjectWipeOutcome,
+    PanelTabsRecord, PanelView, Session, SizeOutcome, Tool, WipeOutcome, WipeState,
 };
 
 #[cfg(target_arch = "wasm32")]

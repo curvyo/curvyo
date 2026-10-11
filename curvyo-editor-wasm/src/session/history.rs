@@ -4,7 +4,8 @@
 use std::collections::{HashMap, HashSet};
 
 use curvyo_document_core::{
-    AnchorId, Direction, FAR_STEP_OPS, NodeId, SMALL_STEP_OPS, StepRef, Timestamp,
+    AnchorId, Direction, FAR_STEP_OPS, LABEL_OBJECT_REDO, NodeId, SMALL_STEP_OPS, StepRef,
+    Timestamp,
 };
 use curvyo_ui_core::{
     FINISH_PEN_FIRST, SelectionSnapshot, UndoStack, nothing_notice, object_bounds, objects_summary,
@@ -49,7 +50,7 @@ pub(super) struct HistoryState {
     pub(super) stack: UndoStack,
     recorded: usize,
     clock: Clock,
-    notice: Option<String>,
+    pub(super) notice: Option<String>,
 }
 
 impl HistoryState {
@@ -82,7 +83,7 @@ impl Session {
     }
 
     /// The selection as the stacks keep it.
-    fn selection_snapshot(&self) -> SelectionSnapshot {
+    pub(super) fn selection_snapshot(&self) -> SelectionSnapshot {
         SelectionSnapshot {
             objects: self.selection.ids().to_vec(),
             nodes: self.node.selection().node_pairs().to_vec(),
@@ -101,16 +102,28 @@ impl Session {
     }
 
     /// Puts the steps the document started since the last look on the undo stack.
-    fn record_new_steps(&mut self, before: &SelectionSnapshot) {
+    pub(super) fn record_new_steps(&mut self, before: &SelectionSnapshot) {
         let new = self.document.own_steps_from(self.history.recorded);
         if new.is_empty() {
             return;
         }
         let after = self.selection_snapshot();
         for step in &new {
-            self.history
-                .stack
-                .record(step.step, &step.label, before.clone(), after.clone());
+            let name = step.reverts.as_ref().map(|reverted| {
+                let verb = if step.label == LABEL_OBJECT_REDO {
+                    "Redo"
+                } else {
+                    "Undo"
+                };
+                format!("{verb} {}", operation_name(reverted))
+            });
+            self.history.stack.record_named(
+                step.step,
+                &step.label,
+                name,
+                before.clone(),
+                after.clone(),
+            );
         }
         self.history.recorded += new.len();
     }
@@ -128,7 +141,7 @@ impl Session {
             Direction::Undo => self.history.stack.undo_target(),
             Direction::Redo => self.history.stack.redo_target(),
         }?;
-        Some((target.step, target.label))
+        Some((target.step, target.name))
     }
 
     /// Whether the press would take long enough to show the long-operation state first
@@ -171,10 +184,9 @@ impl Session {
 
     /// The label of the step an undo or redo press would act on.
     #[must_use]
-    pub fn history_target_name(&mut self, direction: Direction) -> Option<&'static str> {
+    pub fn history_target_name(&mut self, direction: Direction) -> Option<String> {
         self.sync_history();
-        self.target_step(direction)
-            .map(|(_, label)| operation_name(&label))
+        self.target_step(direction).map(|(_, name)| name)
     }
 
     /// The key press of undo or redo that passed the gate: runs it, or asks the host for the
@@ -241,7 +253,7 @@ impl Session {
                 changed: false,
             };
         };
-        let name = operation_name(&target.label);
+        let name = target.name.clone();
         self.document.set_step_time((self.history.clock)());
         let report = match direction {
             Direction::Undo => self.document.undo_step(target.step),
@@ -282,14 +294,14 @@ impl Session {
         let summary = objects_summary(&shapes);
         let off_screen = report.wrote && self.selection_is_off_screen();
         HistoryResult {
-            notice: restore_notice(name, &report, summary.as_deref(), off_screen),
+            notice: restore_notice(&name, &report, summary.as_deref(), off_screen),
             changed: report.wrote,
         }
     }
 
     /// Selects what `snapshot` held, leaving out what no longer exists. Reads only the objects the
     /// snapshot names, so the cost does not grow with the size of the drawing.
-    fn restore_selection(&mut self, snapshot: &SelectionSnapshot) {
+    pub(super) fn restore_selection(&mut self, snapshot: &SelectionSnapshot) {
         let ids: Vec<NodeId> = snapshot
             .objects
             .iter()

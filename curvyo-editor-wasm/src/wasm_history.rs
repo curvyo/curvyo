@@ -6,12 +6,19 @@ use wasm_bindgen::prelude::*;
 
 use crate::wasm_api::WasmSession;
 
+/// The directions the panel names: `"undo"`, `"redo"` and, for the selected object,
+/// `"object-undo"` and `"object-redo"`.
 fn direction_from(name: &str) -> Direction {
-    if name == "redo" {
+    if name == "redo" || name == "object-redo" {
         Direction::Redo
     } else {
         Direction::Undo
     }
+}
+
+/// Whether the name is one of the object history's two.
+fn is_object(name: &str) -> bool {
+    name.starts_with("object-")
 }
 
 #[wasm_bindgen]
@@ -19,9 +26,11 @@ impl WasmSession {
     /// Takes the maker's latest step back (`direction` `"undo"`) or applies the latest undone step
     /// again (`"redo"`) and returns the one-line notice. Also the Undo and Redo buttons' action.
     pub fn history_press(&mut self, direction: &str) -> String {
-        match direction_from(direction) {
-            Direction::Undo => self.session.undo().notice,
-            Direction::Redo => self.session.redo().notice,
+        match (is_object(direction), direction_from(direction)) {
+            (false, Direction::Undo) => self.session.undo().notice,
+            (false, Direction::Redo) => self.session.redo().notice,
+            (true, Direction::Undo) => self.session.object_undo().notice,
+            (true, Direction::Redo) => self.session.object_redo().notice,
         }
     }
 
@@ -33,6 +42,11 @@ impl WasmSession {
     /// Whether the press would take long enough to show the long-operation state first: the step
     /// is large, or the history has not been read since the file was opened.
     pub fn history_needs_busy_state(&mut self, direction: &str) -> bool {
+        if is_object(direction) {
+            return self
+                .session
+                .object_history_needs_busy_state(direction_from(direction));
+        }
         self.session
             .history_needs_busy_state(direction_from(direction))
     }
@@ -45,10 +59,17 @@ impl WasmSession {
     /// The operation name of the step a press would act on (`"Move"`), or empty when the stack
     /// has none: the Edit menu and the buttons' tooltips.
     pub fn history_target_name(&mut self, direction: &str) -> String {
+        let direction_name = direction_from(direction);
+        if is_object(direction) {
+            return self
+                .session
+                .object_history_target_name(direction_name)
+                .unwrap_or_default()
+                .to_owned();
+        }
         self.session
-            .history_target_name(direction_from(direction))
+            .history_target_name(direction_name)
             .unwrap_or_default()
-            .to_owned()
     }
 
     /// How many steps are on the undo stack.
@@ -114,6 +135,34 @@ impl WasmSession {
             crate::WipeOutcome::Shared => -2,
             crate::WipeOutcome::Failed => -3,
             crate::WipeOutcome::Wiped(removed) => i32::try_from(removed).unwrap_or(i32::MAX),
+        }
+    }
+
+    /// The Object scope's subject as JSON (kind, ids, the steps the two buttons act on, what a wipe
+    /// would hide); empty unless exactly one object is selected.
+    pub fn object_history_info(&mut self) -> String {
+        self.session.object_history_info_json()
+    }
+
+    /// How many rows the selected object's timeline has.
+    pub fn object_history_len(&mut self) -> u32 {
+        u32::try_from(self.session.object_history_len()).unwrap_or(u32::MAX)
+    }
+
+    /// `count` rows of the selected object's timeline from the `start`-th newest, as a JSON array.
+    pub fn object_history_rows(&mut self, start: u32, count: u32) -> String {
+        self.session
+            .object_history_rows_json(start as usize, count as usize)
+    }
+
+    /// Hides the selected object's earlier history. Returns the rows hidden, -1 when the session
+    /// ignored it (a drag, a chip, an unfinished Pen path, no single object) or -3 when the log
+    /// could not take the step.
+    pub fn object_history_wipe(&mut self) -> i32 {
+        match self.session.wipe_object_history() {
+            crate::ObjectWipeOutcome::Ignored => -1,
+            crate::ObjectWipeOutcome::Failed => -3,
+            crate::ObjectWipeOutcome::Wiped(hidden) => i32::try_from(hidden).unwrap_or(i32::MAX),
         }
     }
 

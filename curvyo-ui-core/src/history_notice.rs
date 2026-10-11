@@ -1,7 +1,9 @@
 //! The words of undo and redo: the touched-objects summary of a row and the one-line notice a key
 //! press leaves (`specs/0020-undo-redo` criteria 1, 2, 4, 19, 24 and the UX notes, "Notices").
 
-use curvyo_document_core::{Direction, ObjectShape, RestoreReport, Role};
+use curvyo_document_core::{Author, Direction, ObjectRestore, ObjectShape, RestoreReport, Role};
+
+use crate::history_names::operation_name;
 
 /// The hint of an undo or redo while the Pen holds an unfinished path (`specs/0020-undo-redo`
 /// criterion 6e).
@@ -52,6 +54,59 @@ pub const fn nothing_notice(direction: Direction) -> &'static str {
     match direction {
         Direction::Undo => "Nothing to undo.",
         Direction::Redo => "Nothing to redo.",
+    }
+}
+
+/// The notice of Ctrl+U and Ctrl+Shift+U with none or several objects selected
+/// (`specs/0041-object-history` criterion 5).
+pub const SELECT_ONE_OBJECT: &str = "Select one object.";
+
+/// The notice for an object undo or redo with nothing to act on (criteria 11 and 14).
+#[must_use]
+pub const fn object_nothing_notice(direction: Direction) -> &'static str {
+    match direction {
+        Direction::Undo => "Nothing to undo for this object.",
+        Direction::Redo => "Nothing to redo for this object.",
+    }
+}
+
+/// The notice for an object undo or redo that ran (`specs/0041-object-history` UX notes,
+/// "Object undo and redo"): "Undid: Resize.", "Undid: Union. 2 other objects came back too.",
+/// "Undid: Resize. 1 field kept later changes.", "Undid a step by someone else: Resize (a1b2c3d).",
+/// "Undid: Draw rectangle. The object is gone. Ctrl+Z brings it back.".
+#[must_use]
+pub fn object_restore_notice(restore: &ObjectRestore) -> String {
+    let name = operation_name(&restore.target.label);
+    let report = &restore.report;
+    if !report.wrote {
+        return restore_notice(name, report, None, false);
+    }
+    let (done, others) = match report.direction {
+        Direction::Undo => ("Undid", "came back too"),
+        Direction::Redo => ("Redid", "changed too"),
+    };
+    if restore.target.author == Author::Earlier {
+        return format!(
+            "{done} a step by someone else: {name} ({}).",
+            restore.target.shown_id
+        );
+    }
+    let head = format!("{done}: {name}.");
+    if restore.whole_step {
+        let count = report.objects.len().saturating_sub(1);
+        return match count {
+            0 => head,
+            1 => format!("{head} 1 other object {others}."),
+            n => format!("{head} {n} other objects {others}."),
+        };
+    }
+    if restore.object_gone {
+        return format!("{head} The object is gone. Ctrl+Z brings it back.");
+    }
+    match report.objects.iter().map(|o| o.kept).sum::<usize>() {
+        0 => head,
+        1 => format!("{head} 1 field kept later changes."),
+        n => format!("{head} {n} fields kept later changes."),
     }
 }
 
@@ -119,6 +174,7 @@ mod tests {
                 shape: ObjectShape::Path,
                 role: Role::Changed,
                 result: *result,
+                kept: 0,
             })
             .collect();
         RestoreReport {
@@ -126,6 +182,7 @@ mod tests {
             objects,
             root: None,
             wrote,
+            step: None,
         }
     }
 
@@ -200,6 +257,139 @@ mod tests {
         );
         assert_eq!(nothing_notice(Direction::Undo), "Nothing to undo.");
         assert_eq!(nothing_notice(Direction::Redo), "Nothing to redo.");
+    }
+
+    fn object_restore(
+        label: &str,
+        direction: Direction,
+        author: Author,
+        results: &[(ObjectResult, usize)],
+        gone: bool,
+        whole: bool,
+    ) -> ObjectRestore {
+        let ids = node_ids(results.len());
+        let objects = results
+            .iter()
+            .zip(ids)
+            .map(|((result, kept), id)| ObjectReport {
+                id,
+                shape: ObjectShape::Path,
+                role: Role::Changed,
+                result: *result,
+                kept: *kept,
+            })
+            .collect();
+        ObjectRestore {
+            target: curvyo_document_core::ObjectTarget {
+                step: curvyo_document_core::StepRef::new(1, 3),
+                shown_id: "a1b2c3d".to_owned(),
+                label: label.to_owned(),
+                author,
+                time: curvyo_document_core::Timestamp::UNKNOWN,
+                inherited_from: None,
+            },
+            report: RestoreReport {
+                direction,
+                objects,
+                root: None,
+                wrote: true,
+                step: None,
+            },
+            object_gone: gone,
+            whole_step: whole,
+        }
+    }
+
+    #[test]
+    fn the_object_notices_read_as_the_specification_words_them() {
+        let ok = ObjectResult::Restored;
+        let plain = object_restore(
+            "set_rect_bounds",
+            Direction::Undo,
+            Author::You,
+            &[(ok, 0)],
+            false,
+            false,
+        );
+        assert_eq!(object_restore_notice(&plain), "Undid: Resize.");
+        let redo = object_restore(
+            "set_rect_bounds",
+            Direction::Redo,
+            Author::You,
+            &[(ok, 0)],
+            false,
+            false,
+        );
+        assert_eq!(object_restore_notice(&redo), "Redid: Resize.");
+        let union = object_restore(
+            "boolean_union",
+            Direction::Undo,
+            Author::You,
+            &[(ok, 0); 3],
+            false,
+            true,
+        );
+        assert_eq!(
+            object_restore_notice(&union),
+            "Undid: Union. 2 other objects came back too."
+        );
+        let kept = object_restore(
+            "set_rect_bounds",
+            Direction::Undo,
+            Author::You,
+            &[(ObjectResult::Partial, 1)],
+            false,
+            false,
+        );
+        assert_eq!(
+            object_restore_notice(&kept),
+            "Undid: Resize. 1 field kept later changes."
+        );
+        let kept_many = object_restore(
+            "set_rect_bounds",
+            Direction::Undo,
+            Author::You,
+            &[(ObjectResult::Partial, 3)],
+            false,
+            false,
+        );
+        assert_eq!(
+            object_restore_notice(&kept_many),
+            "Undid: Resize. 3 fields kept later changes."
+        );
+        let other = object_restore(
+            "set_rect_bounds",
+            Direction::Undo,
+            Author::Earlier,
+            &[(ok, 0)],
+            false,
+            false,
+        );
+        assert_eq!(
+            object_restore_notice(&other),
+            "Undid a step by someone else: Resize (a1b2c3d)."
+        );
+        let gone = object_restore(
+            "create_rect",
+            Direction::Undo,
+            Author::You,
+            &[(ok, 0)],
+            true,
+            false,
+        );
+        assert_eq!(
+            object_restore_notice(&gone),
+            "Undid: Draw rectangle. The object is gone. Ctrl+Z brings it back."
+        );
+        assert_eq!(
+            object_nothing_notice(Direction::Undo),
+            "Nothing to undo for this object."
+        );
+        assert_eq!(
+            object_nothing_notice(Direction::Redo),
+            "Nothing to redo for this object."
+        );
+        assert_eq!(SELECT_ONE_OBJECT, "Select one object.");
     }
 
     #[test]

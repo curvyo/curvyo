@@ -45,6 +45,7 @@ mod navigation;
 mod node;
 mod nudge;
 mod object_cache;
+mod object_history;
 mod open_error;
 mod panel_tabs;
 mod pen;
@@ -82,6 +83,7 @@ pub use history::HistoryResult;
 pub use history_rows::{WipeOutcome, WipeState};
 pub use keys::{EscapeStep, KeyHint, KeyInput, KeyOutcome};
 pub use move_indicators::MoveIndicators;
+pub use object_history::ObjectWipeOutcome;
 pub use panel_tabs::{PanelTabsRecord, PanelView};
 pub use select::DoubleClickHint;
 #[cfg(target_arch = "wasm32")]

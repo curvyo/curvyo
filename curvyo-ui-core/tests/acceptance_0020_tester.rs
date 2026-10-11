@@ -148,11 +148,13 @@ fn report(
     wrote: bool,
 ) -> RestoreReport {
     RestoreReport {
+        step: None,
         direction,
         objects: results
             .iter()
             .zip(ids(results.len()))
             .map(|(result, id)| ObjectReport {
+                kept: 0,
                 id,
                 shape: ObjectShape::Rectangle,
                 role,
@@ -182,6 +184,7 @@ fn restore_notices_follow_the_texts_of_the_specification() {
     );
     // No objects: no parentheses.
     let doc = RestoreReport {
+        step: None,
         direction: Direction::Undo,
         objects: vec![],
         root: Some(ok),
@@ -224,6 +227,7 @@ fn restore_notices_follow_the_texts_of_the_specification() {
 #[test]
 fn a_partly_skipped_notice_counts_the_root_register_too() {
     let root_kept = RestoreReport {
+        step: None,
         direction: Direction::Undo,
         objects: vec![],
         root: Some(ObjectResult::Partial),

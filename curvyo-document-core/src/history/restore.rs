@@ -145,7 +145,8 @@ impl Document {
             self.commit_with_header(header);
             if wrote && matches!(mode, Mode::Object { .. }) {
                 let new = StepRef::new(doc.peer_id(), first);
-                self.commit_state.register_own(new, label);
+                let reverts = find_step(doc, named).map(|reverted| reverted.label);
+                self.commit_state.register_own(new, label, reverts);
                 written = Some(new);
             }
         }
