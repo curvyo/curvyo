@@ -192,8 +192,7 @@ fn handles_that_are_not_drawn_have_no_hit_area() {
         "hit-testable under 24 px"
     );
 
-    // A star makes the corners proportional but the east edge handle exists
-    // (`0019` criteria 18, 19).
+    // A star changes no handle: the east edge handle exists (`0047` criterion 7).
     let mut rig = Rig::new();
     let star = rig.document.create_star(
         StarFrame {
@@ -207,7 +206,6 @@ fn handles_that_are_not_drawn_have_no_hit_area() {
     let plain = rig.rect(60.0, 0.0, 40.0, 60.0);
     rig.select(&[star, plain]);
     let group = SelectTool::group_of(&rig.objects(), &rig.selection).unwrap();
-    assert!(group.proportional_corners());
     let b = group.bounds();
     let east = pt(b.max.x, f64::midpoint(b.min.y, b.max.y));
     assert_eq!(
@@ -220,10 +218,10 @@ fn handles_that_are_not_drawn_have_no_hit_area() {
     );
 }
 
-/// Criterion 19: a free corner drag and a Ctrl corner drag give a selection that
-/// holds a star the same result: one factor for both axes, and nothing converts.
+/// `0047` criterion 7: a corner drag of a selection that holds a star is free like any
+/// other (the star becomes a path); Ctrl keeps one factor and nothing converts.
 #[test]
-fn a_proportional_corner_selection_ignores_ctrl_and_keeps_one_factor() {
+fn a_corner_drag_is_free_and_ctrl_keeps_one_factor() {
     let build = || {
         let mut rig = Rig::new();
         let star = rig.document.create_star(
@@ -237,7 +235,7 @@ fn a_proportional_corner_selection_ignores_ctrl_and_keeps_one_factor() {
         );
         let plain = rig.rect(60.0, 0.0, 40.0, 40.0);
         rig.select(&[star, plain]);
-        (rig, plain)
+        (rig, star, plain)
     };
     let corner_of = |rig: &Rig| {
         let b = *SelectTool::group_of(&rig.objects(), &rig.selection)
@@ -245,22 +243,36 @@ fn a_proportional_corner_selection_ignores_ctrl_and_keeps_one_factor() {
             .bounds();
         pt(b.max.x, b.max.y)
     };
-    let mut results = Vec::new();
-    for modifiers in [NONE, CTRL] {
-        let (mut rig, plain) = build();
-        let corner = corner_of(&rig);
-        rig.drag(corner, pt(corner.x + 30.0, corner.y + 2.0), modifiers);
-        let Shape::Rect { bounds, .. } = rig.shape(plain) else {
-            panic!("a rectangle");
-        };
-        assert!(
-            (bounds.width.as_mm() / 40.0 - bounds.height.as_mm() / 40.0).abs() < 1e-9,
-            "one factor"
-        );
-        assert!(bounds.width.as_mm() > 40.0);
-        results.push(bounds.width.as_mm());
-    }
-    assert_eq!(results[0], results[1]);
+    let (mut rig, star, plain) = build();
+    let corner = corner_of(&rig);
+    rig.drag(corner, pt(corner.x + 30.0, corner.y + 2.0), NONE);
+    let Shape::Rect { bounds, .. } = rig.shape(plain) else {
+        panic!("a rectangle");
+    };
+    assert!(bounds.width.as_mm() / 40.0 > bounds.height.as_mm() / 40.0 + 0.1);
+    assert!(
+        matches!(rig.document.object(star), Some(ObjectSnapshot::Path(_))),
+        "a free corner drag stretches, so the star became a path"
+    );
+
+    let (mut rig, star, plain) = build();
+    let corner = corner_of(&rig);
+    rig.drag(corner, pt(corner.x + 30.0, corner.y + 2.0), CTRL);
+    let Shape::Rect { bounds, .. } = rig.shape(plain) else {
+        panic!("a rectangle");
+    };
+    assert!(
+        (bounds.width.as_mm() / 40.0 - bounds.height.as_mm() / 40.0).abs() < 1e-9,
+        "one factor"
+    );
+    assert!(bounds.width.as_mm() > 40.0);
+    assert!(
+        matches!(
+            rig.document.object(star),
+            Some(ObjectSnapshot::Primitive(_))
+        ),
+        "a uniform scale keeps the star"
+    );
 }
 
 /// Criterion 22: a result beyond the coordinate limit is no change, all or
@@ -502,6 +514,7 @@ fn the_skew_entry_is_for_paths_and_refuses_a_right_angle() {
         entry.commit(&rig.document, ["-45", ""], 0),
         EntryOutcome::Committed
     );
+    // `0047` criterion 6: a rectangle in the selection no longer refuses the skew entry.
     let r = rig.rect(200.0, 0.0, 10.0, 10.0);
     rig.select(&[p, r]);
     let mut tool = SelectTool::new();
@@ -511,7 +524,7 @@ fn the_skew_entry_is_for_paths_and_refuses_a_right_angle() {
             &rig.selection,
             curvyo_ui_core::EntryKey::SkewX
         ),
-        Err(curvyo_ui_core::KeyEntryRefusal::SkewNeedsPath)
+        Ok(())
     );
     let _ = ScaleModes::default();
 }

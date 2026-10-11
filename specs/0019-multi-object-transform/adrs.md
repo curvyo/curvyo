@@ -442,7 +442,7 @@ against.
     make the conversion and the history large; covered by the same 5 s gate.
     (d) Criteria 20, 21, 29 and 31 change wording; the PO owns that.
 
-- **2026-10-10: (8) notes from the build (implementer).** One deviation, accepted by the architect 2026-10-10 (ids are minted by the session after the press, not passed into `pointer_down`), the rest records choices.
+- **2026-10-10: (8) notes from the build (implementer).** *Superseded 2026-10-11 by `specs/0047-transform-polish/` (customer, 2026-10-10): the counts, the notice, the hover/readout/entry lines (`take_conversion_notice`, `*_conversion_count`, `ConversionCounts`, `conversionText.ts`) and lead decision E (`proportional_corners`) are deleted; a corner drag is free and Ctrl keeps the proportions; a single polygon or star stretches on every handle. The id minting and the `transform_objects` route stay.* One deviation, accepted by the architect 2026-10-10 (ids are minted by the session after the press, not passed into `pointer_down`), the rest records choices.
   - **Ids without a minter at the press (deviation, accepted).** `SelectTool::pointer_down` and
     `open_entry_for_key` keep their signatures. The conversions are built at the press
     with the ids of a local counter (unique within the drag) and the session calls

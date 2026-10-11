@@ -525,8 +525,10 @@ fn model_apply(initial: &[NodeId], result: &[NodeId], combine: SelectionCombine)
 
 #[test]
 fn ac9_to_14_the_full_modifier_table_for_a_marquee_drag() {
-    // Box (-5,-5)..(25,15): crosses B, contains A only.
-    let corners = (pt(-2.0, -12.0), pt(25.0, 15.0));
+    // Box (-2,-12)..(28,15): crosses B, contains A only. The lower right corner is
+    // (28, 15), not (25, 15): every selection has skew handles now (`0047`), and (25, 15)
+    // lands on the bottom one of the box of A and C and on the top one of D.
+    let corners = (pt(-2.0, -12.0), pt(28.0, 15.0));
     for initial_ix in [vec![1, 2], vec![0, 2], vec![3], vec![]] {
         for (m, rightward, mode, combine) in table() {
             let (mut rig, ids) = scene();

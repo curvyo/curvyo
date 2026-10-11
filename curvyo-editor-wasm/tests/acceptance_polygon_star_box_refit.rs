@@ -720,7 +720,7 @@ fn ac06_ctrl_snap_is_absolute_and_the_box_has_the_snapped_direction() {
 // ---------------------------------------------------------------------
 
 #[test]
-fn ac07_corner_resize_scales_about_c_keeps_alpha_and_the_box_direction() {
+fn ac07_corner_resize_scales_about_the_opposite_corner_keeps_alpha_and_the_box_direction() {
     let c = pt(100.0, 50.0);
     let r = 30.0;
     for (mode, n, start) in [
@@ -749,20 +749,33 @@ fn ac07_corner_resize_scales_about_c_keeps_alpha_and_the_box_direction() {
             assert_eq!(change_count(&s), changes + 1, "one commit");
             let after = prim_of(&s, 0);
             let (fa, fb) = (frame_of(&after), frame_of(&before));
-            assert_eq!(fa.center, fb.center, "C does not move");
             assert_eq!(fa.angle, fb.angle, "frame angle not written");
             assert_eq!(after.rotation, before.rotation, "rotation not written");
-            // the dragged handle follows the pointer: R' is the pointer's
-            // distance along the diagonal divided by sqrt(2)
-            let along = ((to.x - c.x) * ux + (to.y - c.y) * uy) / SQRT_2;
-            assert!(
-                (fa.radius.as_mm() - along).abs() < 1e-6,
-                "{mode:?} {start} ({sx},{sy}): R {} vs {along}",
-                fa.radius.as_mm()
+            // `0047` criterion 12: the dragged corner moved 12/sqrt(2) mm along each box
+            // axis, the factor is one for both, and the opposite corner stays where it is.
+            let factor = 1.0 + 12.0 / SQRT_2 / (2.0 * r);
+            let fixed = corner(c, r, alpha, -sx, -sy);
+            let want = pt(
+                fixed.x + factor * (c.x - fixed.x),
+                fixed.y + factor * (c.y - fixed.y),
             );
+            assert!(
+                near(fa.center, want, 1e-6),
+                "{mode:?} {start} ({sx},{sy}): centre {:?} vs {want:?}",
+                fa.center
+            );
+            assert!(
+                (fa.radius.as_mm() - r * factor).abs() < 1e-6,
+                "{mode:?} {start} ({sx},{sy}): R {} vs {}",
+                fa.radius.as_mm(),
+                r * factor
+            );
+            // the dragged handle follows the pointer
+            let handle_after = corner(fa.center, fa.radius.as_mm(), alpha, sx, sy);
+            assert!(near(handle_after, to, 1e-6), "{handle_after:?} vs {to:?}");
             assert!(adiff(geom_angle(&after), alpha).abs() < 1e-9);
             let r2 = fa.radius.as_mm();
-            assert_box(&mut s, c, r2, alpha, "after resize");
+            assert_box(&mut s, fa.center, r2, alpha, "after resize");
         }
     }
 }
@@ -776,10 +789,19 @@ fn ac07_spec_example_hexagon_r10_alpha30_dragged_5mm_along_the_diagonal() {
     let r0 = frame_of(&prim_of(&s, 0)).radius.as_mm();
     let h = corner(c, r0, alpha, 1.0, -1.0);
     assert!(near(h, pt(13.66, -3.66), 0.02), "{h:?}");
-    drag(&mut s, h, pt(h.x + 4.83, h.y - 1.29), false, false);
+    // `0047` criterion 12: the corner dragged 4 mm each way in the box's own axes is the
+    // uniform factor 1.2 about the opposite corner: R = 12 and the angle stays.
+    let (sin, cos) = alpha.to_radians().sin_cos();
+    drag(
+        &mut s,
+        h,
+        pt(h.x + 4.0 * (cos + sin), h.y + 4.0 * (sin - cos)),
+        false,
+        false,
+    );
     let p = prim_of(&s, 0);
     assert!(
-        (frame_of(&p).radius.as_mm() - 13.54).abs() < 0.02,
+        (frame_of(&p).radius.as_mm() - 12.0).abs() < 0.02,
         "R = {}",
         frame_of(&p).radius.as_mm()
     );
@@ -796,7 +818,8 @@ fn ac07_typed_size_gives_the_same_result_as_the_drag_to_that_radius() {
         let h = corner(c, 30.0, alpha, 1.0, -1.0);
         let dir = rot(pt(c.x + 1.0, c.y - 1.0), c, alpha);
         let (ux, uy) = ((dir.x - c.x) / SQRT_2, (dir.y - c.y) / SQRT_2);
-        drag(&mut a, h, pt(h.x + 9.0 * ux, h.y + 9.0 * uy), false, false);
+        // With Shift the centre stays, like the typed size of the key S.
+        drag(&mut a, h, pt(h.x + 9.0 * ux, h.y + 9.0 * uy), true, false);
         let r_drag = frame_of(&prim_of(&a, 0)).radius.as_mm();
         assert_eq!(
             b.key_down(key("s")),
@@ -978,8 +1001,10 @@ fn ac09_the_s_key_resize_and_resize_handles_use_c_and_the_centre_handle_sits_at_
 // Criteria 10, 11, 12: skew hidden, cursors, hit rule
 // ---------------------------------------------------------------------
 
+/// Criterion 10, superseded by `transform-polish` criterion 1: the four skew handles of a
+/// polygon or star are there and hit-testable at any angle, and K opens the skew entry.
 #[test]
-fn ac10_no_skew_handle_is_hit_testable_and_k_refuses_on_a_polygon_or_star() {
+fn ac10_the_skew_handles_are_hit_testable_and_k_opens_the_entry_on_a_polygon_or_star() {
     let c = pt(100.0, 50.0);
     let r = 30.0;
     for mode in [PolyStarMode::Polygon, PolyStarMode::Star] {
@@ -988,21 +1013,19 @@ fn ac10_no_skew_handle_is_hit_testable_and_k_refuses_on_a_polygon_or_star() {
             let alpha = geom_angle(&prim_of(&s, 0));
             let k = k_of(&s);
             for (mx, my) in [(0.0, -1.0), (1.0, 0.0), (0.0, 1.0), (-1.0, 0.0)] {
-                for off_px in [8.0, 12.0, 16.0, 20.0] {
-                    let o = r + off_px / k;
-                    let p = rot(pt(c.x + mx * o, c.y + my * o), c, alpha);
-                    s.pointer_hover(p, false, false);
-                    let hint = s.handle_hint();
-                    assert!(
-                        hint != "skew" && hint != "skew-y",
-                        "skew handle at side ({mx},{my}) {off_px} px, deg {deg}: {hint}"
-                    );
-                    assert!(!s.cursor_hint().starts_with("skew"));
-                }
+                let o = r + 16.0 / k;
+                let p = rot(pt(c.x + mx * o, c.y + my * o), c, alpha);
+                s.pointer_hover(p, false, false);
+                let hint = s.handle_hint();
+                assert!(
+                    hint == "skew" || hint == "skew-y",
+                    "no skew handle at side ({mx},{my}), deg {deg}: {hint}"
+                );
+                assert!(s.cursor_hint().starts_with("skew"));
             }
             let out = s.key_down(key("k"));
-            assert_ne!(out, KeyOutcome::EntryOpened, "k must not open a skew entry");
-            assert!(s.transform_entry().is_none());
+            assert_eq!(out, KeyOutcome::EntryOpened, "k opens a skew entry");
+            assert!(s.transform_entry().is_some());
         }
     }
 }
@@ -1386,7 +1409,8 @@ fn ac14_no_new_stored_key_format_version_5_and_one_commit_per_gesture() {
         counts.push(change_count(s));
         let alpha = alpha + 33.0;
         let h = corner(c, r, alpha, 1.0, 1.0);
-        drag(s, h, pt(h.x + 5.0, h.y + 5.0), false, false);
+        // Ctrl: the proportional resize keeps the polygon a polygon (`0047` criterion 12).
+        drag(s, h, pt(h.x + 5.0, h.y + 5.0), false, true);
         counts.push(change_count(s));
         counts
     };
@@ -1526,8 +1550,9 @@ fn regress_typed_move_and_keys_on_a_polygon_at_an_angle() {
         assert_eq!(out, KeyOutcome::EntryOpened, "{k}");
         s.cancel_transform_entry();
     }
-    // K does not skew a polygon
-    assert_ne!(s.key_down(key("k")), KeyOutcome::EntryOpened);
+    // K opens the skew entry of a polygon too (`0047` criterion 6)
+    assert_eq!(s.key_down(key("k")), KeyOutcome::EntryOpened);
+    s.cancel_transform_entry();
 }
 
 #[test]

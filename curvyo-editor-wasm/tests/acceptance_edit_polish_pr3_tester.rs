@@ -24,7 +24,7 @@ use curvyo_document_core::{
     PointCount, RectBounds, Shape, StarFrame, Vec2, pack, unpack,
 };
 use curvyo_editor_wasm::{EscapeStep, KeyHint, KeyInput, KeyOutcome, Session, Tool};
-use curvyo_ui_core::{EntryOutcome, InvalidReason, MoveEntryMode};
+use curvyo_ui_core::{EntryOutcome, InvalidReason, MoveEntryMode, ReferencePoint};
 
 // ---------------------------------------------------------------------
 // Helpers
@@ -1120,6 +1120,7 @@ fn c12_escape_blur_tool_switch_selection_change_and_press_elsewhere_write_nothin
     assert_eq!(s.selected_object_count(), 1);
     assert_eq!(snapshot_bytes(&s), before);
     assert_eq!(press(&mut s, "m"), KeyOutcome::EntryOpened);
+    s.set_move_reference(ReferencePoint::TopLeft);
     let c = s.move_entry().unwrap().center;
     assert!(
         pnear(c, pt(220.0, 10.0), 1e-6),
@@ -1166,48 +1167,36 @@ fn c13_skew_then_negated_skew_restores_the_path_and_it_reopens_as_a_path() {
     }
 }
 
+/// Superseded by `transform-polish` criteria 1 and 6: a primitive has skew handles, a
+/// double-click on one opens the skew chip, and K and Shift+K open it too.
 #[test]
-fn c14_primitives_and_multi_selections_have_no_skew_handles_and_k_says_so() {
+fn c14_primitives_have_skew_handles_and_k_opens_the_chip() {
+    let wide = Bx::rect(0.0, 0.0, 120.0, 80.0, 0.0);
+    let square = Bx::rect(20.0, 0.0, 80.0, 80.0, 0.0);
     let docs = [
-        (rect_doc(0.0, 0.0, 120.0, 80.0), pt(60.0, 0.0), "rect"),
-        (
-            ellipse_doc(60.0, 40.0, 60.0, 40.0),
-            pt(60.0, 0.0),
-            "ellipse",
-        ),
-        (polygon_doc(60.0, 40.0, 40.0, 5), pt(60.0, 0.0), "polygon"),
-        (star_doc(60.0, 40.0, 40.0, 5, 0.5), pt(60.0, 0.0), "star"),
+        (rect_doc(0.0, 0.0, 120.0, 80.0), wide, "rect"),
+        (ellipse_doc(60.0, 40.0, 60.0, 40.0), wide, "ellipse"),
+        (polygon_doc(60.0, 40.0, 40.0, 5), square, "polygon"),
+        (star_doc(60.0, 40.0, 40.0, 5, 0.5), square, "star"),
     ];
-    for (d, on, name) in docs {
-        let mut s = select_at(&d, on);
-        let b = Bx::rect(0.0, 0.0, 120.0, 80.0, 0.0);
+    for (d, b, name) in docs {
+        let mut s = select_at(&d, pt(60.0, 0.0));
         let before = snapshot_bytes(&s);
         for side in SIDES {
             let h = skew_handle_pos(&s, &b, side);
             dbl(&mut s, h, h, false, false);
-            // the press where a skew handle would be hit empty canvas
-            click(&mut s, on);
-            assert_eq!(s.selected_object_count(), 1, "{name}");
-            assert!(
-                s.transform_entry().map(|e| e.kind) != Some("skew"),
-                "{name}: no skew entry at {side:?}"
+            assert_eq!(
+                s.transform_entry().map(|e| e.kind),
+                Some("skew"),
+                "{name}: the skew chip opens at {side:?}"
             );
             s.cancel_transform_entry();
-            assert_eq!(snapshot_bytes(&s), before, "{name}");
+            assert_eq!(snapshot_bytes(&s), before, "{name}: opening writes nothing");
         }
-        // keys
-        assert_eq!(
-            press(&mut s, "k"),
-            KeyOutcome::Hint(KeyHint::PathOnly),
-            "{name}"
-        );
-        assert_eq!(
-            press_shift(&mut s, "K"),
-            KeyOutcome::Hint(KeyHint::PathOnly),
-            "{name}"
-        );
-        assert!(s.transform_entry().is_none());
-        assert_eq!(snapshot_bytes(&s), before);
+        assert_eq!(press(&mut s, "k"), KeyOutcome::EntryOpened, "{name}");
+        s.cancel_transform_entry();
+        assert_eq!(press_shift(&mut s, "K"), KeyOutcome::EntryOpened, "{name}");
+        s.cancel_transform_entry();
         assert_eq!(s.tool(), Tool::Select);
         assert_eq!(s.selected_object_count(), 1);
     }
@@ -1414,6 +1403,7 @@ fn c17_small_objects_and_hidden_centre_handles_open_no_chip_by_double_click_but_
         s.set_tool(Tool::Select);
         let mut s = select_at(&d, on);
         assert_eq!(press(&mut s, "m"), KeyOutcome::EntryOpened, "{name}");
+        s.set_move_reference(ReferencePoint::TopLeft);
         let v = s.move_entry().expect("chip");
         assert!(
             pnear(v.center, ctr, 1e-6),
@@ -1459,6 +1449,7 @@ fn c17_a_parameter_handle_near_the_centre_hides_the_centre_handle_so_only_m_open
     assert_eq!(s.tool(), Tool::Select);
     let mut s = select_at(&d, pt(70.0, 20.0));
     assert_eq!(press(&mut s, "m"), KeyOutcome::EntryOpened);
+    s.set_move_reference(ReferencePoint::TopLeft);
     assert!(s.move_entry().is_some());
 }
 
@@ -1468,6 +1459,7 @@ fn c18_the_chip_prefills_relative_zero_and_absolute_the_tight_top_left() {
         for c in kinds_big(th) {
             let mut s = select_at(&c.doc, c.on);
             assert_eq!(press(&mut s, "m"), KeyOutcome::EntryOpened);
+            s.set_move_reference(ReferencePoint::TopLeft);
             let v = s.move_entry().unwrap();
             let (x0, y0, _, _) = tight_of(&obj_of(&s, 0));
             let name = format!("{} th {th}", c.name);
@@ -1477,16 +1469,24 @@ fn c18_the_chip_prefills_relative_zero_and_absolute_the_tight_top_left() {
                 "{name}"
             );
             assert!(
-                near(num(&v.absolute_prefill[0]), x0, 0.051)
-                    && near(num(&v.absolute_prefill[1]), y0, 0.051),
+                near(
+                    num(&v.absolute_prefills[ReferencePoint::TopLeft.index()][0]),
+                    x0,
+                    0.051
+                ) && near(
+                    num(&v.absolute_prefills[ReferencePoint::TopLeft.index()][1]),
+                    y0,
+                    0.051
+                ),
                 "{name}: absolute prefill {:?} vs tight top-left ({x0}, {y0})",
-                v.absolute_prefill
+                v.absolute_prefills[ReferencePoint::TopLeft.index()]
             );
         }
     }
     // the bulgy path: the curve, not the anchors, sets the tight box
     let mut s = select_at(&bulgy_doc(), pt(10.04, 0.0));
     press(&mut s, "m");
+    s.set_move_reference(ReferencePoint::TopLeft);
     let v = s.move_entry().unwrap();
     let (x0, y0, _, _) = tight_of(&obj_of(&s, 0));
     assert!(
@@ -1494,10 +1494,17 @@ fn c18_the_chip_prefills_relative_zero_and_absolute_the_tight_top_left() {
         "oracle sanity: the curve rises above its anchors ({y0})"
     );
     assert!(
-        near(num(&v.absolute_prefill[0]), x0, 0.051)
-            && near(num(&v.absolute_prefill[1]), y0, 0.051),
+        near(
+            num(&v.absolute_prefills[ReferencePoint::TopLeft.index()][0]),
+            x0,
+            0.051
+        ) && near(
+            num(&v.absolute_prefills[ReferencePoint::TopLeft.index()][1]),
+            y0,
+            0.051
+        ),
         "{:?} vs ({x0}, {y0})",
-        v.absolute_prefill
+        v.absolute_prefills[ReferencePoint::TopLeft.index()]
     );
 }
 
@@ -1532,6 +1539,7 @@ fn c20_relative_move_equals_a_drag_of_the_same_offset_and_is_one_commit() {
             same_object(&obj_of(&a, 0), &obj_of(&b, 0), 1e-9, &name);
             // centre handle follows
             assert_eq!(press(&mut a, "m"), KeyOutcome::EntryOpened);
+            a.set_move_reference(ReferencePoint::TopLeft);
             let c2 = a.move_entry().unwrap().center;
             assert!(
                 pnear(c2, pt(ctr.x + dx, ctr.y + dy), 1e-6),
@@ -1546,6 +1554,7 @@ fn c20_spec_example_relative_5_and_minus_3_moves_top_left_10_20_to_15_17() {
     // a 30 x 40 rect at (10, 20): tight bounds top-left (10, 20)
     let mut s = select_at(&rect_doc(10.0, 20.0, 30.0, 40.0), pt(25.0, 20.0));
     assert_eq!(press(&mut s, "m"), KeyOutcome::EntryOpened);
+    s.set_move_reference(ReferencePoint::TopLeft);
     assert_eq!(
         s.commit_move_entry(
             "5",
@@ -1566,6 +1575,7 @@ fn c20_spec_example_relative_5_and_minus_3_moves_top_left_10_20_to_15_17() {
 fn c21_spec_example_absolute_100_50_puts_the_rect_origin_at_100_50() {
     let mut s = select_at(&rect_doc(10.0, 20.0, 30.0, 40.0), pt(25.0, 20.0));
     assert_eq!(press(&mut s, "m"), KeyOutcome::EntryOpened);
+    s.set_move_reference(ReferencePoint::TopLeft);
     assert_eq!(
         s.commit_move_entry(
             "100",
@@ -1632,6 +1642,7 @@ fn c21_absolute_puts_the_top_left_of_the_tight_drawn_outline_at_x_y_for_every_ki
             let before = tight_of(&obj_of(&s, 0));
             let n = change_count(&s);
             assert_eq!(press(&mut s, "m"), KeyOutcome::EntryOpened, "{name}");
+            s.set_move_reference(ReferencePoint::TopLeft);
             let out = s.commit_move_entry(
                 &format!("{tx}"),
                 &format!("{ty}"),
@@ -1673,6 +1684,7 @@ fn c21_absolute_does_not_include_the_stroke_width_and_equals_the_relative_offset
         let mut a = select_at(&c.doc, c.on);
         let (x0, y0, _, _) = tight_of(&obj_of(&a, 0));
         press(&mut a, "m");
+        a.set_move_reference(ReferencePoint::TopLeft);
         a.commit_move_entry(
             "40.25",
             "-7.5",
@@ -1683,6 +1695,7 @@ fn c21_absolute_does_not_include_the_stroke_width_and_equals_the_relative_offset
         );
         let mut b = select_at(&c.doc, c.on);
         press(&mut b, "m");
+        b.set_move_reference(ReferencePoint::TopLeft);
         b.commit_move_entry(
             &format!("{}", 40.25 - x0),
             &format!("{}", -7.5 - y0),
@@ -1700,6 +1713,7 @@ fn c19_an_untouched_field_means_no_change_on_that_axis() {
     // relative: the prefill text "0" on either axis
     let mut s = select_at(&bulgy_doc(), pt(10.04, 0.0));
     press(&mut s, "m");
+    s.set_move_reference(ReferencePoint::TopLeft);
     let v = s.move_entry().unwrap();
     let before = snapshot_bytes(&s);
     let n = change_count(&s);
@@ -1721,10 +1735,11 @@ fn c19_an_untouched_field_means_no_change_on_that_axis() {
     // absolute: both prefills (one decimal, rounded) change nothing
     let mut s = select_at(&bulgy_doc(), pt(10.04, 0.0));
     press(&mut s, "m");
+    s.set_move_reference(ReferencePoint::TopLeft);
     let v = s.move_entry().unwrap();
     let out = s.commit_move_entry(
-        &v.absolute_prefill[0],
-        &v.absolute_prefill[1],
+        &v.absolute_prefills[ReferencePoint::TopLeft.index()][0],
+        &v.absolute_prefills[ReferencePoint::TopLeft.index()][1],
         MoveEntryMode {
             absolute: true,
             copy: false,
@@ -1734,7 +1749,7 @@ fn c19_an_untouched_field_means_no_change_on_that_axis() {
         out,
         EntryOutcome::Unchanged,
         "prefills {:?}",
-        v.absolute_prefill
+        v.absolute_prefills[ReferencePoint::TopLeft.index()]
     );
     assert_eq!(snapshot_bytes(&s), before);
 
@@ -1742,11 +1757,12 @@ fn c19_an_untouched_field_means_no_change_on_that_axis() {
     // 10.04 to 10.0), Y typed
     let mut s = select_at(&bulgy_doc(), pt(10.04, 0.0));
     press(&mut s, "m");
+    s.set_move_reference(ReferencePoint::TopLeft);
     let v = s.move_entry().unwrap();
     let (x0, _y0, _, _) = tight_of(&obj_of(&s, 0));
     assert_eq!(
         s.commit_move_entry(
-            &v.absolute_prefill[0],
+            &v.absolute_prefills[ReferencePoint::TopLeft.index()][0],
             "5",
             MoveEntryMode {
                 absolute: true,
@@ -1767,12 +1783,13 @@ fn c19_an_untouched_field_means_no_change_on_that_axis() {
     // absolute: Y untouched, X typed
     let mut s = select_at(&bulgy_doc(), pt(10.04, 0.0));
     press(&mut s, "m");
+    s.set_move_reference(ReferencePoint::TopLeft);
     let v = s.move_entry().unwrap();
     let (_x0, y0, _, _) = tight_of(&obj_of(&s, 0));
     assert_eq!(
         s.commit_move_entry(
             "77",
-            &v.absolute_prefill[1],
+            &v.absolute_prefills[ReferencePoint::TopLeft.index()][1],
             MoveEntryMode {
                 absolute: true,
                 copy: false
@@ -1792,6 +1809,7 @@ fn c19_an_untouched_field_means_no_change_on_that_axis() {
     // relative: one axis typed, the other the prefill
     let mut s = select_at(&rect_doc(10.0, 20.0, 30.0, 40.0), pt(25.0, 20.0));
     press(&mut s, "m");
+    s.set_move_reference(ReferencePoint::TopLeft);
     assert_eq!(
         s.commit_move_entry(
             "5",
@@ -1809,6 +1827,7 @@ fn c19_an_untouched_field_means_no_change_on_that_axis() {
     // typed text is read in the mode current at Enter: "5, -3" in Absolute
     let mut s = select_at(&rect_doc(10.0, 20.0, 30.0, 40.0), pt(25.0, 20.0));
     press(&mut s, "m");
+    s.set_move_reference(ReferencePoint::TopLeft);
     assert_eq!(
         s.commit_move_entry(
             "5",
@@ -1832,6 +1851,7 @@ fn c22_invalid_text_or_out_of_range_keeps_the_chip_open_and_writes_nothing() {
     for absolute in [false, true] {
         let mut s = select_at(&rect_doc(10.0, 20.0, 30.0, 40.0), pt(25.0, 20.0));
         press(&mut s, "m");
+        s.set_move_reference(ReferencePoint::TopLeft);
         let before = snapshot_bytes(&s);
         let n = change_count(&s);
         for (a, b, field) in [
@@ -1910,6 +1930,7 @@ fn c22_a_result_beyond_the_coordinate_limit_is_refused_in_both_modes() {
     // relative: 10 + 1e7 is beyond; 10 + 9e6 is not
     let mut s = select_at(&rect_doc(10.0, 20.0, 30.0, 40.0), pt(25.0, 20.0));
     press(&mut s, "m");
+    s.set_move_reference(ReferencePoint::TopLeft);
     let before = snapshot_bytes(&s);
     for (a, b) in [("10000000", "0"), ("0", "-10000100"), ("1e7", "1")] {
         let out = s.commit_move_entry(
@@ -1974,6 +1995,7 @@ fn c22_number_formats_comma_point_sign_and_odd_spellings() {
     ] {
         let mut s = select_at(&rect_doc(10.0, 20.0, 30.0, 40.0), pt(25.0, 20.0));
         press(&mut s, "m");
+        s.set_move_reference(ReferencePoint::TopLeft);
         let out = s.commit_move_entry(
             text,
             "0",
@@ -2000,6 +2022,7 @@ fn c22_number_formats_comma_point_sign_and_odd_spellings() {
     ] {
         let mut s = select_at(&rect_doc(10.0, 20.0, 30.0, 40.0), pt(25.0, 20.0));
         press(&mut s, "m");
+        s.set_move_reference(ReferencePoint::TopLeft);
         let out = s.commit_move_entry(
             text,
             "0",
@@ -2022,6 +2045,7 @@ fn c25_closing_without_writing_escape_blur_tool_switch_selection_change_press_el
         let mut s = open_in_session(d);
         click(&mut s, pt(60.0, 0.0));
         assert_eq!(press(&mut s, "m"), KeyOutcome::EntryOpened);
+        s.set_move_reference(ReferencePoint::TopLeft);
         s
     };
     let mut s = open(&d);
@@ -2056,6 +2080,7 @@ fn c25_closing_without_writing_escape_blur_tool_switch_selection_change_press_el
     assert_eq!(s.selected_object_count(), 1);
     assert_eq!(snapshot_bytes(&s), before);
     press(&mut s, "m");
+    s.set_move_reference(ReferencePoint::TopLeft);
     assert!(
         pnear(s.move_entry().unwrap().center, pt(360.0, 40.0), 1e-6),
         "the other rect got selected"
@@ -2111,6 +2136,7 @@ fn c25_closing_without_writing_escape_blur_tool_switch_selection_change_press_el
 fn c25_a_committed_move_keeps_selection_and_tool_and_survives_save_and_reopen() {
     let mut s = select_at(&triangle_doc_sized(120.0, 80.0), pt(60.0, 0.0));
     press(&mut s, "m");
+    s.set_move_reference(ReferencePoint::TopLeft);
     assert_eq!(
         s.commit_move_entry(
             "10",
@@ -2133,11 +2159,11 @@ fn c25_a_committed_move_keeps_selection_and_tool_and_survives_save_and_reopen() 
 }
 
 /// Superseded by `multi-object-transform` (criteria 35 and 37, "Changes to
-/// accepted behaviour" 3): the typed move works for a selection, over the group
-/// box; skew still needs paths only, and says so; "Select one object to type a
+/// accepted behaviour" 3) and `transform-polish` criterion 6: the typed move and the
+/// typed skew work for a selection, over the group box; "Select one object to type a
 /// value" no longer exists.
 #[test]
-fn c25_the_typed_move_works_for_a_selection_and_skew_needs_paths() {
+fn c25_the_typed_move_and_skew_work_for_a_selection() {
     let d = Document::new(1);
     let _ = d.create_rect(bounds(0.0, 0.0, 120.0, 80.0));
     let _ = d.create_rect(bounds(300.0, 0.0, 120.0, 80.0));
@@ -2148,16 +2174,16 @@ fn c25_the_typed_move_works_for_a_selection_and_skew_needs_paths() {
     s.pointer_up(pt(360.0, 0.0), true, false);
     assert_eq!(s.selected_object_count(), 2);
     let before = snapshot_bytes(&s);
-    assert_eq!(press(&mut s, "k"), KeyOutcome::Hint(KeyHint::PathOnly));
-    assert_eq!(
-        press_shift(&mut s, "K"),
-        KeyOutcome::Hint(KeyHint::PathOnly)
-    );
+    assert_eq!(press(&mut s, "k"), KeyOutcome::EntryOpened);
+    s.cancel_transform_entry();
+    assert_eq!(press_shift(&mut s, "K"), KeyOutcome::EntryOpened);
+    s.cancel_transform_entry();
     assert!(s.move_entry().is_none());
     assert_eq!(snapshot_bytes(&s), before);
     assert_eq!(s.selected_object_count(), 2);
     assert_eq!(s.tool(), Tool::Select);
     assert_eq!(press(&mut s, "m"), KeyOutcome::EntryOpened);
+    s.set_move_reference(ReferencePoint::TopLeft);
     assert!(s.move_entry().is_some(), "the move chip of the selection");
     assert_eq!(snapshot_bytes(&s), before, "opening writes nothing");
 }
@@ -2402,6 +2428,7 @@ fn c54_the_keyboard_gate_still_holds_for_m_and_k() {
     // a chip is open: M, K, S, R do nothing (focus is in it anyway)
     let mut s = base();
     assert_eq!(press(&mut s, "m"), KeyOutcome::EntryOpened);
+    s.set_move_reference(ReferencePoint::TopLeft);
     for kk in ["m", "k", "s", "r", "b", "n", "e", "Delete", "Backspace"] {
         assert_eq!(press(&mut s, kk), KeyOutcome::Ignored, "chip open: {kk}");
     }
@@ -2422,6 +2449,7 @@ fn c54_the_keyboard_gate_still_holds_for_m_and_k() {
     let mut s = base();
     assert_eq!(press(&mut s, "s"), KeyOutcome::EntryOpened);
     assert_eq!(press(&mut s, "m"), KeyOutcome::Ignored);
+    s.set_move_reference(ReferencePoint::TopLeft);
     assert_eq!(press(&mut s, "k"), KeyOutcome::Ignored);
 }
 
@@ -2462,6 +2490,7 @@ fn c55_during_a_drag_m_and_k_do_nothing_and_the_commit_equals_the_same_drag_with
     s.pointer_hover(pt(h.x + 30.0 / k(&s), h.y), false, false);
     assert_eq!(press(&mut s, "k"), KeyOutcome::Ignored);
     assert_eq!(press(&mut s, "m"), KeyOutcome::Ignored);
+    s.set_move_reference(ReferencePoint::TopLeft);
     s.pointer_up(pt(h.x + 30.0 / k(&s), h.y), false, false);
     assert!(s.transform_entry().is_none());
 }
@@ -2474,6 +2503,7 @@ fn c55_an_unfinished_pen_path_gates_m_and_k() {
         click(&mut s, p);
     }
     assert_eq!(press(&mut s, "m"), KeyOutcome::Ignored);
+    s.set_move_reference(ReferencePoint::TopLeft);
     assert_eq!(press(&mut s, "k"), KeyOutcome::Ignored);
     assert_eq!(press_shift(&mut s, "K"), KeyOutcome::Ignored);
     assert_eq!(s.tool(), Tool::Pen);
@@ -2757,8 +2787,9 @@ fn c57a_double_click_on_a_resize_handle_keeps_the_dragged_handles_fixed_point() 
         s.transform_entry().unwrap().linked,
         "Ctrl link on the double-click route is unchanged"
     );
-    // polygon and star: centre fixed on the double-click route, whichever
-    // corner (found by scanning for the uniform resize handle)
+    // polygon and star: since `0047` criterion 12 the opposite corner is fixed on the
+    // double-click route like for any other kind, whichever corner (found by scanning
+    // for a corner resize handle)
     for (name, d) in [
         ("polygon", polygon_doc(70.0, 60.0, 40.0, 5)),
         ("star", star_doc(70.0, 60.0, 40.0, 5, 0.5)),
@@ -2771,7 +2802,7 @@ fn c57a_double_click_on_a_resize_handle_keeps_the_dragged_handles_fixed_point() 
             let mut x = 70.0;
             while x <= 140.0 {
                 s.pointer_hover(pt(x, y), false, false);
-                if s.handle_hint() == "resize-corner-uniform" {
+                if s.handle_hint() == "resize-corner" {
                     found = Some(pt(x, y));
                     break 'scan;
                 }
@@ -2793,9 +2824,13 @@ fn c57a_double_click_on_a_resize_handle_keeps_the_dragged_handles_fixed_point() 
         let (Shape::Polygon { frame, .. } | Shape::Star { frame, .. }) = p.shape else {
             panic!()
         };
+        // The 80 x 80 box grows to 120 x 120 away from the opposite corner.
+        let (sign_x, sign_y) = ((at.x - 70.0).signum(), (at.y - 60.0).signum());
+        let fixed = pt(70.0 - sign_x * 40.0, 60.0 - sign_y * 40.0);
+        let want = pt(fixed.x + sign_x * 60.0, fixed.y + sign_y * 60.0);
         assert!(
-            pnear(frame.center, pt(70.0, 60.0), 1e-9),
-            "{name}: {:?}",
+            pnear(frame.center, want, 1e-6),
+            "{name}: {:?}, want {want:?}",
             frame.center
         );
         assert!(near(frame.radius.as_mm(), 60.0, 1e-9), "{name}");
@@ -3122,7 +3157,7 @@ fn x06_key_outcome_codes_for_the_new_hints() {
         KeyOutcome::Hint(KeyHint::SelectFirst).code(),
         "hint-select-first"
     );
-    assert_eq!(KeyOutcome::Hint(KeyHint::PathOnly).code(), "hint-path-only");
+    assert_eq!(KeyOutcome::Hint(KeyHint::TooFar).code(), "hint-too-far");
     assert_eq!(KeyOutcome::EntryOpened.code(), "entry");
 }
 
@@ -3159,6 +3194,7 @@ fn x08_s_r_m_k_open_for_a_rotated_selection_at_the_rotated_anchors() {
     assert!(pnear(e.handle, skew_handle_pos(&s, &b, (1.0, 0.0)), 1e-6));
     s.cancel_transform_entry();
     assert_eq!(press(&mut s, "m"), KeyOutcome::EntryOpened);
+    s.set_move_reference(ReferencePoint::TopLeft);
     assert!(pnear(s.move_entry().unwrap().center, b.c, 1e-6));
 }
 

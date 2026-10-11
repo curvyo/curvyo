@@ -1,8 +1,8 @@
 //! The group box of a multi-selection and the handles on it
 //! (`specs/0019-multi-object-transform/`, criteria 1 to 15): the axis-aligned
-//! tight bounds of the drawn outlines of the selected objects, what kinds the
-//! selection holds (which decides the handles), and the handle layout over the
-//! box, which is the single-object layout of [`crate::transform_handle_layout`]
+//! tight bounds of the drawn outlines of the selected objects and the handle
+//! layout over the box (the same handles whatever kinds the selection holds,
+//! `specs/0047-transform-polish/` criterion 1), which is the single-object layout of [`crate::transform_handle_layout`]
 //! on an angle-0 [`OrientedBox`].
 
 use std::collections::HashSet;
@@ -10,7 +10,7 @@ use std::collections::HashSet;
 use curvyo_document_core::{Angle, NodeId, ObjectSnapshot, Point};
 
 use crate::ResizeDirection;
-use crate::conversion::{ConversionCounts, GEOMETRIC_TOLERANCE_MM, converting_kind};
+use crate::conversion::GEOMETRIC_TOLERANCE_MM;
 use crate::object_bounds::object_outline_bounds;
 use crate::oriented_box::OrientedBox;
 use crate::transform_handle_layout::{
@@ -35,8 +35,6 @@ pub enum GroupBoxShape {
 pub struct GroupSelection {
     box_: OrientedBox,
     count: usize,
-    all_paths: bool,
-    converting: ConversionCounts,
 }
 
 impl GroupSelection {
@@ -50,22 +48,15 @@ impl GroupSelection {
         let first = members.next()?;
         let (mut min, mut max) = object_outline_bounds(first);
         let mut count = 1;
-        let mut all_paths = matches!(first, ObjectSnapshot::Path(_));
-        let mut converting = ConversionCounts::default();
-        note_converting(&mut converting, first);
         for object in members {
             let (low, high) = object_outline_bounds(object);
             min = Point::new(min.x.min(low.x), min.y.min(low.y));
             max = Point::new(max.x.max(high.x), max.y.max(high.y));
             count += 1;
-            all_paths &= matches!(object, ObjectSnapshot::Path(_));
-            note_converting(&mut converting, object);
         }
         (count >= 2).then(|| Self {
             box_: axis_aligned_box(min, max),
             count,
-            all_paths,
-            converting,
         })
     }
 
@@ -80,29 +71,6 @@ impl GroupSelection {
     #[must_use]
     pub const fn count(&self) -> usize {
         self.count
-    }
-
-    /// Whether every selected object is a path (the skew handles exist only
-    /// then, criterion 40).
-    #[must_use]
-    pub const fn all_paths(&self) -> bool {
-        self.all_paths
-    }
-
-    /// How many shapes of each kind a stretch of the selection would turn into
-    /// paths (criteria 53 and 55); empty when nothing would convert.
-    #[must_use]
-    pub const fn converting(&self) -> ConversionCounts {
-        self.converting
-    }
-
-    /// Whether a corner drag is proportional (criterion 19, lead decision E): the
-    /// selection holds a shape a stretch would convert, so that the most common
-    /// gesture never converts by accident. Only an edge handle and a typed size
-    /// stretch it.
-    #[must_use]
-    pub const fn proportional_corners(&self) -> bool {
-        !self.converting.is_empty()
     }
 
     /// Whether the box has no extent in its x axis (width under the tolerance).
@@ -134,14 +102,6 @@ impl GroupSelection {
             GroupBoxShape::Line => self.box_.width().max(self.box_.height()),
             GroupBoxShape::Point => 0.0,
         }
-    }
-}
-
-/// Counts `object` in `converting` if a stretch along the document axes would turn
-/// it into a path.
-fn note_converting(converting: &mut ConversionCounts, object: &ObjectSnapshot) {
-    if let Some(kind) = converting_kind(object, Angle::from_radians(0.0)) {
-        converting.add(kind);
     }
 }
 
@@ -197,7 +157,6 @@ pub fn group_handles(
     }
     let spec = HandleSpec {
         resize_directions: group.resize_directions(),
-        skew: group.all_paths(),
         side_rotate,
     };
     // The layout of a single object's box, on the group box. Its centre handle
@@ -365,60 +324,6 @@ mod tests {
         assert_eq!(point.side_mm(), 0.0);
     }
 
-    /// Criteria 19, 53 and 55 and D3: polygons, stars and misaligned rectangles and
-    /// ellipses are the shapes a stretch converts and make the corners
-    /// proportional; a circle and a path never do; the counts are by kind.
-    #[test]
-    fn the_converting_shapes_are_counted_by_kind() {
-        let document = Document::new(1);
-        let plain = rect(&document, 0.0, 0.0, 10.0, 10.0);
-        let path = line_path(&document, 1, Point::new(0.0, 0.0), Point::new(5.0, 5.0));
-        let frame = StarFrame {
-            center: Point::new(50.0, 0.0),
-            radius: Length::from_mm(5.0),
-            angle: Angle::from_radians(0.0),
-        };
-        let star = document.create_star(
-            frame,
-            PointCount::new(5).expect("count"),
-            curvyo_document_core::InnerRatio::new(0.5).expect("ratio"),
-        );
-        let polygon = document.create_polygon(frame, PointCount::new(5).expect("count"));
-        let turned = rect(&document, 30.0, 0.0, 10.0, 5.0);
-        let object = document
-            .object(turned)
-            .expect("exists")
-            .rotated(Point::new(35.0, 2.5), Angle::from_radians(0.3));
-        document.rotate_object(&object).expect("rotates");
-        let circle = document.create_ellipse(curvyo_document_core::EllipseFrame {
-            center: Point::new(70.0, 0.0),
-            rx: Length::from_mm(3.0),
-            ry: Length::from_mm(3.0),
-        });
-        let turned_circle = document
-            .object(circle)
-            .expect("exists")
-            .rotated(Point::new(70.0, 0.0), Angle::from_radians(0.4));
-        document.rotate_object(&turned_circle).expect("rotates");
-
-        let counts = |ids: &[NodeId]| group_of(&document, ids).expect("g").converting();
-        assert!(counts(&[plain, path]).is_empty());
-        assert!(
-            counts(&[plain, circle]).is_empty(),
-            "a circle never converts"
-        );
-        let g = group_of(&document, &[plain, star, turned]).expect("g");
-        assert!(g.proportional_corners());
-        assert_eq!(g.converting().as_array(), [0, 1, 1, 0]);
-        assert_eq!(counts(&[polygon, star, turned]).as_array(), [1, 1, 1, 0]);
-        assert_eq!(counts(&[path, star]).as_array(), [0, 1, 0, 0]);
-        assert!(
-            !group_of(&document, &[plain, path])
-                .expect("g")
-                .proportional_corners()
-        );
-    }
-
     /// Criterion 10: the centre handle from 48 px, not before; corner resize and
     /// corner rotate always; the edge resize handles from 24 px are drawn, below
     /// that they are hit-testable but not drawn.
@@ -555,13 +460,22 @@ mod tests {
         );
     }
 
-    /// Criteria 9 and 40: skew handles for a selection of paths only.
+    /// `0047` criterion 1: four skew handles for every selection, whatever kinds it holds.
     #[test]
-    fn only_a_selection_of_paths_has_skew_handles() {
+    fn every_selection_has_the_skew_handles() {
         let document = Document::new(1);
         let a = line_path(&document, 1, Point::new(0.0, 0.0), Point::new(60.0, 40.0));
         let b = line_path(&document, 3, Point::new(70.0, 0.0), Point::new(90.0, 40.0));
         let plain = rect(&document, 0.0, 100.0, 10.0, 10.0);
+        let star = document.create_star(
+            StarFrame {
+                center: Point::new(50.0, 50.0),
+                radius: Length::from_mm(20.0),
+                angle: Angle::from_radians(0.0),
+            },
+            PointCount::new(5).expect("count"),
+            curvyo_document_core::InnerRatio::new(0.5).expect("ratio"),
+        );
         let tolerances = TransformHandleTolerances::at_scale(3.0);
         let skews = |ids: &[NodeId]| {
             let group = group_of(&document, ids).expect("group");
@@ -571,6 +485,7 @@ mod tests {
                 .count()
         };
         assert_eq!(skews(&[a, b]), 4);
-        assert_eq!(skews(&[a, plain]), 0, "hidden, not inert");
+        assert_eq!(skews(&[a, plain]), 4);
+        assert_eq!(skews(&[plain, star]), 4);
     }
 }

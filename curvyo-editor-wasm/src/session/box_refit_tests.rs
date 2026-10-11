@@ -289,9 +289,10 @@ fn a_press_inside_the_turned_box_moves_the_shape_and_one_outside_does_not() {
     assert!(near(still, pt(0.0, 0.0), 1e-9), "{still:?}");
 }
 
-/// Criterion 10: no skew handle at any angle, drawn or hit-testable.
+/// Criterion 10, superseded by `transform-polish` criterion 1: the four skew handles exist
+/// at any angle, drawn and hit-testable, and K opens the skew chip.
 #[test]
-fn no_skew_handle_exists_at_any_angle() {
+fn the_skew_handles_exist_at_any_angle() {
     for deg in [0.0, 30.0, 78.7, -90.0, 180.0] {
         for (mut session, _) in [
             hexagon(pt(0.0, 0.0), 10.0, deg),
@@ -304,25 +305,20 @@ fn no_skew_handle_exists_at_any_angle() {
                     session.transform_handle_tolerances(),
                     side_rotate,
                 );
-                assert!(
-                    handles
-                        .iter()
-                        .all(|(h, _)| !matches!(h, EditHandle::Skew(_))),
-                    "{deg}: {handles:?}"
-                );
+                let skews = handles
+                    .iter()
+                    .filter(|(h, _)| matches!(h, EditHandle::Skew(_)))
+                    .count();
+                assert_eq!(skews, 4, "{deg}: {handles:?}");
             }
             let drawn = session.select_transform_decoration_input().handles;
-            assert!(
-                drawn
-                    .iter()
-                    .all(|g| !matches!(g.kind, TransformGlyphKind::Skew { .. })),
-                "{deg}"
-            );
+            let drawn_skews = drawn
+                .iter()
+                .filter(|g| matches!(g.kind, TransformGlyphKind::Skew { .. }))
+                .count();
+            assert_eq!(drawn_skews, 4, "{deg}");
             key(&mut session, "k");
-            assert!(
-                session.transform_entry().is_none(),
-                "no skew entry at {deg}"
-            );
+            assert!(session.transform_entry().is_some(), "skew entry at {deg}");
         }
     }
 }
@@ -397,13 +393,18 @@ fn a_ctrl_rotate_lands_the_box_on_the_snapped_angle() {
     );
 }
 
-/// Criterion 7: the corner resize example.
+/// Criterion 7, as `transform-polish` criterion 12 leaves it: a corner dragged along the
+/// box's own diagonal by 4 mm each way is the uniform factor 1.2 about the opposite
+/// corner, so the hexagon stays a hexagon with radius 12, its angle and the dragged
+/// handle under the pointer; its centre moves by (2, -2) in the box's frame.
 #[test]
 fn a_corner_resize_follows_the_pointer_and_keeps_the_angle() {
     let (mut session, id) = hexagon(pt(0.0, 0.0), 10.0, 30.0);
     let ne = handle_position(&session, EditHandle::Resize(ResizeDirection::Ne), false);
     assert!(near(ne, pt(13.66, -3.66), 0.01), "{ne:?}");
-    let to = pt(ne.x + 4.83, ne.y - 1.29);
+    // Four millimetres right and up in the box's own axes (turned by 30 degrees).
+    let (sin, cos) = 30.0_f64.to_radians().sin_cos();
+    let to = pt(ne.x + 4.0 * (cos + sin), ne.y + 4.0 * (sin - cos));
     session.pointer_hover(ne, false, false);
     session.pointer_down(ne, false);
     session.pointer_hover(pt(ne.x + 1.0, ne.y - 0.3), false, false);
@@ -412,11 +413,15 @@ fn a_corner_resize_follows_the_pointer_and_keeps_the_angle() {
     let p = primitive_of(&session, id);
     let frame = frame_of(&p.shape);
     assert!(
-        (frame.radius.as_mm() - 13.54).abs() < 0.01,
+        (frame.radius.as_mm() - 12.0).abs() < 1e-3,
         "{}",
         frame.radius.as_mm()
     );
-    assert!(near(frame.center, pt(0.0, 0.0), 1e-9));
+    assert!(
+        near(frame.center, pt(2.732, -0.732), 1e-3),
+        "{:?}",
+        frame.center
+    );
     assert!((shown_degrees(&session, id) - 30.0).abs() < 1e-6);
     // The box keeps the direction and the dragged handle sits under the pointer.
     assert!(angle_diff(box_direction(&drawn_box(&session)), 30.0_f64.to_radians()).abs() < 1e-9);

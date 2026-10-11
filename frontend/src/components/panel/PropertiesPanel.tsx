@@ -1,3 +1,4 @@
+import { panelHandlesEscape } from "@/lib/panelEscape";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 
@@ -6,7 +7,7 @@ import { HistoryTab } from "@/components/panel/HistoryTab";
 import { PanelTabStrip } from "@/components/panel/PanelTabStrip";
 import { StyleSection } from "@/components/panel/StyleSection";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
-import { Tooltip, TooltipProvider } from "@/components/ui/tooltip";
+import { Tooltip } from "@/components/ui/tooltip";
 import type { DocumentPanelApi } from "@/hooks/useDocumentPanel";
 import type { EditorSession } from "@/hooks/useEditorSession";
 import { useBackgroundPanel } from "@/hooks/useBackgroundPanel";
@@ -145,7 +146,7 @@ export function PropertiesPanel({ editor, document: doc }: PropertiesPanelProps)
         : "";
   const label = open ? "Hide properties panel" : "Show properties panel";
   return (
-    <TooltipProvider>
+    <>
       <div
         className="relative shrink-0"
         style={{ width: open ? PANEL_WIDTH_PX : 0 }}
@@ -217,9 +218,10 @@ export function PropertiesPanel({ editor, document: doc }: PropertiesPanelProps)
             // Escape in the panel (`0017` criterion 60): a running drag is
             // reverted first (`usePreviewGesture` takes the key before it gets
             // here); a field restores itself and returns focus; otherwise focus
-            // returns to the canvas. It never clears the selection and never
-            // reaches the canvas.
-            if (event.key === "Escape" && event.currentTarget.contains(event.target as Node)) {
+            // returns to the canvas, unless a field already handled the key (its
+            // `preventDefault`), as the hex field does for the slider it came from.
+            // It never clears the selection and never reaches the canvas.
+            if (panelHandlesEscape(event) && event.currentTarget.contains(event.target as Node)) {
               event.preventDefault();
               // Picking ends first and keeps the focus where it is.
               if (picking) {
@@ -282,7 +284,7 @@ export function PropertiesPanel({ editor, document: doc }: PropertiesPanelProps)
           </Tabs>
         </aside>
       </div>
-    </TooltipProvider>
+    </>
   );
 }
 

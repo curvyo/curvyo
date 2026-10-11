@@ -11,6 +11,7 @@ use curvyo_document_core::{
     unpack,
 };
 use curvyo_editor_wasm::{KeyInput, KeyOutcome, Session, Tool};
+use curvyo_ui_core::ReferencePoint;
 
 fn pt(x: f64, y: f64) -> Point {
     Point::new(x, y)
@@ -318,9 +319,10 @@ fn the_typed_move_uses_the_group_box_top_left() {
     let mut session = session();
     select_both(&mut session);
     assert_eq!(key(&mut session, "m", false), KeyOutcome::EntryOpened);
+    session.set_move_reference(ReferencePoint::TopLeft);
     let view = session.move_entry().expect("a move chip");
     assert_eq!(
-        view.absolute_prefill,
+        view.absolute_prefills[ReferencePoint::TopLeft.index()],
         ["20.0".to_string(), "20.0".to_string()]
     );
     assert_eq!(view.center, pt(140.0, 50.0));

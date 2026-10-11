@@ -90,6 +90,12 @@ impl Session {
             .preview_bar_value(&objects, &self.selection, ParamValue::Ratio(ratio));
     }
 
+    /// Drops the slider edit pending without writing it (Escape in the middle of a
+    /// drag).
+    pub fn cancel_selected_ratio(&mut self) {
+        self.select.cancel_bar_preview();
+    }
+
     /// Commits the slider edit pending as one commit, when the slider is
     /// released.
     pub fn commit_selected_ratio(&mut self) {

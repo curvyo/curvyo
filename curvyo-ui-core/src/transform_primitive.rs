@@ -5,24 +5,24 @@
 
 use curvyo_document_core::{
     Angle, Corner, EllipseFrame, Length, ObjectSnapshot, Point, PrimitiveSnapshot, RectBounds,
-    Shape, StarFrame, Vec2, shape_center, translate_shape,
+    Shape, Vec2, shape_center, translate_shape,
 };
 
 use crate::ResizeDirection;
-use crate::group_transform::is_stretch;
+use crate::group_transform::{is_stretch, scale_primitive};
 use crate::oriented_box::OrientedBox;
 use crate::transform_drag::{CornerRadiusScaling, ResizeOptions};
-use crate::transform_handle_layout::is_corner;
 use crate::transform_math::{
-    is_polygon_or_star, polygon_star_resize_factor, resize_anchor_local_position, resize_local_box,
-    scaled_and_floored, stroke_or_radius_factor,
+    is_polygon_or_star, resize_anchor_local_position, resize_local_box, scaled_and_floored,
+    stroke_or_radius_factor,
 };
 
 /// A primitive's resized frame and the stroke/radius factor that goes
 /// with it. Rectangles and ellipses resize their local box (the corner
 /// radius scales with the factor only under [`CornerRadiusScaling::Proportional`],
 /// acceptance criterion 9 of slice 5, criterion 23 of `unified-object-editing`); a polygon or
-/// star is always a uniform outer-radius scale (criterion 11).
+/// star that is not stretched is a uniform scale about the resize's anchor, outer radius
+/// times the factor (`0047` criterion 10; a stretch is [`polygon_star_stretch`]).
 pub(crate) fn resize_primitive(
     primitive: &PrimitiveSnapshot,
     start_box: &OrientedBox,
@@ -88,26 +88,17 @@ pub(crate) fn resize_primitive(
             };
             (shape, stroke_or_radius_factor(resized.sx, resized.sy))
         }
-        Shape::Polygon { frame, point_count } => {
-            let factor = polygon_star_resize_factor(frame.radius.as_mm(), direction, local_delta);
-            let shape = Shape::Polygon {
-                frame: scaled_star_frame(frame, factor),
-                point_count,
-            };
-            (shape, factor)
-        }
-        Shape::Star {
-            frame,
-            point_count,
-            inner_ratio,
-        } => {
-            let factor = polygon_star_resize_factor(frame.radius.as_mm(), direction, local_delta);
-            let shape = Shape::Star {
-                frame: scaled_star_frame(frame, factor),
-                point_count,
-                inner_ratio,
-            };
-            (shape, factor)
+        Shape::Polygon { .. } | Shape::Star { .. } => {
+            let sx = box_resize().sx;
+            let anchor =
+                resize_anchor_local_position(start_box.min, start_box.max, direction, shift);
+            let scaled = scale_primitive(
+                primitive,
+                start_box.to_document(anchor),
+                (sx, sx),
+                radius_scaling,
+            );
+            return (scaled, sx);
         }
     };
     let anchor_local = resize_anchor_local_position(start_box.min, start_box.max, direction, shift);
@@ -121,13 +112,11 @@ pub(crate) fn resize_primitive(
     )
 }
 
-/// A polygon's or star's resize along its box axes (`specs/0019-multi-object-
-/// transform/` criterion 56): an edge drag, or a typed size, with the opposite side
-/// (or the centre under Shift; always the centre for a corner) fixed. Unequal
-/// factors are a stretch: the shape becomes its `converted` path, scaled along the
-/// box's axes. Equal factors are a uniform scale and keep the shape. `None` for any
-/// other object, and for a corner drag, which keeps the diagonal rule of
-/// [`resize_primitive`] (always proportional, `0005` criterion 11).
+/// A polygon's or star's stretch along its box axes (`specs/0047-transform-polish/`
+/// criterion 12): any resize handle or a typed size, with the opposite corner or side
+/// (or the centre under Shift) fixed. Unequal factors are a stretch: the shape becomes
+/// its `converted` path, scaled along the box's axes. `None` for any other object and
+/// for equal factors, which [`resize_primitive`] scales uniformly and keeps the shape.
 pub(crate) fn polygon_star_stretch(
     start: &ObjectSnapshot,
     start_box: &OrientedBox,
@@ -135,10 +124,7 @@ pub(crate) fn polygon_star_stretch(
     local_delta: Vec2,
     options: &ResizeOptions,
 ) -> Option<(ObjectSnapshot, f64)> {
-    let ObjectSnapshot::Primitive(primitive) = start else {
-        return None;
-    };
-    if !is_polygon_or_star(start) || (is_corner(direction) && !options.typed) {
+    if !is_polygon_or_star(start) {
         return None;
     }
     let resized = resize_local_box(
@@ -151,50 +137,18 @@ pub(crate) fn polygon_star_stretch(
     );
     let (sx, sy) = (resized.sx, resized.sy);
     if !is_stretch(sx, sy) {
-        let shape = match primitive.shape {
-            Shape::Polygon { frame, point_count } => Shape::Polygon {
-                frame: scaled_star_frame(frame, sx),
-                point_count,
-            },
-            Shape::Star {
-                frame,
-                point_count,
-                inner_ratio,
-            } => Shape::Star {
-                frame: scaled_star_frame(frame, sx),
-                point_count,
-                inner_ratio,
-            },
-            _ => return None,
-        };
-        return Some((
-            ObjectSnapshot::Primitive(PrimitiveSnapshot {
-                shape,
-                ..primitive.clone()
-            }),
-            sx,
-        ));
+        return None;
     }
     let Some(path) = options.converted else {
         return Some((start.clone(), 1.0));
     };
-    let pivot_local = if is_corner(direction) {
-        start_box.local_center()
-    } else {
-        resize_anchor_local_position(start_box.min, start_box.max, direction, options.shift)
-    };
+    let pivot_local =
+        resize_anchor_local_position(start_box.min, start_box.max, direction, options.shift);
     let scaled = path.scaled_along(start_box.to_document(pivot_local), sx, sy, start_box.angle);
     Some((
         ObjectSnapshot::Path(scaled),
         stroke_or_radius_factor(sx, sy),
     ))
-}
-
-pub(crate) fn scaled_star_frame(frame: StarFrame, factor: f64) -> StarFrame {
-    StarFrame {
-        radius: Length::from_mm(frame.radius.as_mm() * factor),
-        ..frame
-    }
 }
 
 /// Keeps a resize's anchor fixed in document space.

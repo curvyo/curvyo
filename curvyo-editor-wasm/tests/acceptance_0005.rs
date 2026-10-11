@@ -1083,9 +1083,10 @@ fn ac11_polygon_readout_matches_the_committed_radius() {
     select_at(&mut s, sel);
     s.pointer_hover(pt(40.0, 40.0), false, false);
     s.pointer_down(pt(40.0, 40.0), false);
-    s.pointer_hover(pt(47.0, 52.0), false, false);
+    // Ctrl keeps the proportions, so it stays a polygon with one radius (`0047` criterion 12).
+    s.pointer_hover(pt(47.0, 52.0), false, true);
     let text = s.live_readout().unwrap().text;
-    s.pointer_up(pt(47.0, 52.0), false, false);
+    s.pointer_up(pt(47.0, 52.0), false, true);
     let r = star_like(&s).0.radius.as_mm();
     assert_eq!(text, format!("r {r:.1} mm"));
 }
@@ -2625,7 +2626,8 @@ fn ac25_a_rotated_polygon_corner_handle_follows_the_rotation_and_scales_the_radi
     // handles of the old tool no longer exist.
     let corner = rot(pt(40.0, 40.0), c, rotation);
     assert!(pclose(corner, pt(20.0, 40.0)));
-    // 6 along each local axis is 6 sqrt(2) along the diagonal: radius 10 + 6.
+    // 6 along each local axis is the factor 1.3 on both axes about the opposite corner
+    // (`0047` criterion 12): radius 13.
     let (sn, cs) = rotation.sin_cos();
     let to = pt(
         corner.x + 6.0 * cs - 6.0 * sn,
@@ -2634,7 +2636,7 @@ fn ac25_a_rotated_polygon_corner_handle_follows_the_rotation_and_scales_the_radi
     drag(&mut s, corner, to, false, false);
     let (frame, ..) = star_like(&s);
     assert!(
-        close(frame.radius.as_mm(), 16.0),
+        close(frame.radius.as_mm(), 13.0),
         "{}",
         frame.radius.as_mm()
     );

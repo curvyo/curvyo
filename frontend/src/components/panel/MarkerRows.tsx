@@ -1,3 +1,4 @@
+import { VALUE_FIELD_NAMES, VALUE_FIELD_SCALE_END } from "@/lib/sliderNames";
 import { StyleRow } from "@/components/panel/StyleRow";
 import { ValueField } from "@/components/panel/ValueField";
 import { PLACE_OPTIONS, markerOptions } from "@/components/panel/styleOptions";
@@ -62,19 +63,23 @@ export function MarkerRows({ panel, onReturnFocus }: MarkerRowsProps) {
       {view.markerCountShown && (
         <ValueField
           label="Count"
-          name="Marker count"
+          name={VALUE_FIELD_NAMES.markerCount}
           text={view.markerCountText}
           bar={view.markerCountBar}
+          dragBase={view.markerCountDragBase}
+          dragLimit={view.countDragLimit}
           mixed={view.markerCountMixed}
           resettable={view.markerCountResettable}
           unit=""
           valueNow={view.markerCount}
           unitWords="markers"
+          unitWordOne="marker"
           valueMin={1}
-          typedMax={view.countTypedMax}
+          valueMax={VALUE_FIELD_SCALE_END.markerCount}
           defaultText={view.countDefaultText}
           messages={COUNT_MESSAGES}
           onPreview={(p, grid) => panel.previewValue("marker-count", p, grid)}
+          onSettle={panel.settle}
           onStep={(steps, grid) => panel.stepValue("marker-count", steps, grid)}
           onReset={() => panel.resetValue("marker-count")}
           onSubmit={(text) => panel.setText("marker-count", text)}

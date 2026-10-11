@@ -53,6 +53,13 @@ impl SelectTool {
         self.bar_preview = (!ids.is_empty()).then_some(BarPreview { ids, value });
     }
 
+    /// Drops the slider edit in flight without writing it: Escape in the middle of a
+    /// slider drag (`specs/0047-transform-polish/` criterion 19). `true` when one was
+    /// pending.
+    pub fn cancel_bar_preview(&mut self) -> bool {
+        self.bar_preview.take().is_some()
+    }
+
     /// Commits the slider edit in flight as one commit for the objects it was
     /// started against, then forgets it: the slider's release, key-up or blur,
     /// and the flush before anything that could change the selection. Writes
@@ -310,6 +317,26 @@ mod tests {
         assert!(rig.tool.flush_bar_preview(&rig.document));
         assert!((rig.ratio(star) - 0.7).abs() < 1e-12);
         assert!(!rig.tool.flush_bar_preview(&rig.document), "once");
+    }
+
+    /// `0047` criterion 19: Escape in the middle of a slider drag drops the preview; the
+    /// flush that follows the release writes nothing.
+    #[test]
+    fn a_cancelled_slider_edit_writes_nothing() {
+        let mut rig = Rig::new();
+        let star = rig.star(5, 0.4);
+        let objects = rig.objects();
+        let before = rig.snapshot();
+        rig.tool.preview_bar_value(
+            &objects,
+            &rig.selection,
+            ParamValue::Ratio(InnerRatio::new(0.9).unwrap()),
+        );
+        assert!(rig.tool.cancel_bar_preview());
+        assert!(!rig.tool.cancel_bar_preview(), "once");
+        assert!(!rig.tool.flush_bar_preview(&rig.document));
+        assert_eq!(rig.snapshot(), before);
+        assert!((rig.ratio(star) - 0.4).abs() < 1e-12);
     }
 
     /// The pending edit is fixed to the objects it started on: a selection

@@ -372,41 +372,30 @@ fn the_entry_keys_open_their_entries_for_any_size() {
                 (EntryKey::SkewY, "Skew angle y", Side::Right),
             ] {
                 let mut rig = Rig::new(kind, size);
-                if matches!(kind, Kind::Path) {
-                    assert_eq!(rig.key(key), Ok(()), "{size}");
-                    let entry = rig.tool.skew_entry().unwrap();
-                    assert_eq!(entry.fields()[0].accessible_name, name);
-                    assert_eq!(entry.handle(), EditHandle::Skew(side));
-                    // The key never uses the Shift pivot: the opposite side.
-                    let b = oriented_bounds(&rig.object());
-                    let fixed = entry.pivot();
-                    let want = if side == Side::Top {
-                        b.to_document(pt(0.0, b.max.y)).y
-                    } else {
-                        b.to_document(pt(b.min.x, 0.0)).x
-                    };
-                    assert!(
-                        (if side == Side::Top { fixed.y } else { fixed.x } - want).abs() < 1e-9
-                    );
+                // `0047` criterion 6: every kind opens the skew entry.
+                assert_eq!(rig.key(key), Ok(()), "{kind:?} {size}");
+                let entry = rig.tool.skew_entry().unwrap();
+                assert_eq!(entry.fields()[0].accessible_name, name);
+                assert_eq!(entry.handle(), EditHandle::Skew(side));
+                // The key never uses the Shift pivot: the opposite side.
+                let b = oriented_bounds(&rig.object());
+                let fixed = entry.pivot();
+                let want = if side == Side::Top {
+                    b.to_document(pt(0.0, b.max.y)).y
                 } else {
-                    assert_eq!(
-                        rig.key(key),
-                        Err(KeyEntryRefusal::SkewNeedsPath),
-                        "{kind:?}"
-                    );
-                    assert!(!rig.tool.has_entry());
-                }
+                    b.to_document(pt(b.min.x, 0.0)).x
+                };
+                assert!((if side == Side::Top { fixed.y } else { fixed.x } - want).abs() < 1e-9);
             }
         }
     }
 }
 
-/// Criterion 59: nothing selected and several selected refuse M, K and
-/// Nothing selected opens nothing; several objects: M opens the move entry of
-/// the selection, K and Shift+K refuse a selection that holds a non-path
-/// (`multi-object-transform` criteria 35 and 37).
+/// Criterion 59: nothing selected opens nothing; several objects: M, K and Shift+K open
+/// the entry of the selection whatever it holds (`multi-object-transform` criterion 35;
+/// `transform-polish` criterion 6).
 #[test]
-fn the_entry_keys_refuse_nothing_or_a_selection_that_cannot_act() {
+fn the_entry_keys_refuse_nothing_and_open_for_a_selection() {
     for key in [EntryKey::Move, EntryKey::SkewX, EntryKey::SkewY] {
         let mut rig = Rig::new(Kind::Path, 100.0);
         rig.selection.clear();
@@ -423,13 +412,8 @@ fn the_entry_keys_refuse_nothing_or_a_selection_that_cannot_act() {
             .map(|id| rig.document.object(*id).unwrap())
             .collect();
         let opened = rig.tool.open_entry_for_key(&objects, &rig.selection, key);
-        if key == EntryKey::Move {
-            assert_eq!(opened, Ok(()));
-            assert!(rig.tool.has_entry());
-        } else {
-            assert_eq!(opened, Err(KeyEntryRefusal::SkewNeedsPath));
-            assert!(!rig.tool.has_entry());
-        }
+        assert_eq!(opened, Ok(()));
+        assert!(rig.tool.has_entry());
     }
 }
 
@@ -476,6 +460,11 @@ fn the_move_entry_commits_through_the_tool() {
         }
     );
     assert!(rig.tool.has_entry(), "an invalid entry stays open");
+    // The top-left as the reference (`0047` criterion 37 makes the centre the default).
+    rig.tool
+        .move_entry_mut()
+        .unwrap()
+        .set_reference(curvyo_ui_core::ReferencePoint::TopLeft);
     assert_eq!(
         rig.tool.commit_move_entry(
             &rig.document,

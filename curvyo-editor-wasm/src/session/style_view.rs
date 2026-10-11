@@ -51,6 +51,10 @@ pub struct StylePanelView {
     pub stroke_width_text: String,
     /// The share of the field's width the bar is filled to (`0` to `1`).
     pub stroke_width_bar: f64,
+    /// Where a width drag starts from: the position on the scale continued beyond the track.
+    pub stroke_width_drag_base: f64,
+    /// The largest position of a width drag (the continued curve reaches the typed maximum).
+    pub width_drag_limit: f64,
     /// The value differs from the default or is mixed: the reset icon shows.
     pub stroke_width_resettable: bool,
     /// The stroke opacity as the field shows it.
@@ -118,6 +122,10 @@ pub struct StylePanelView {
     pub marker_count_mixed: bool,
     /// The bar position of the count.
     pub marker_count_bar: f64,
+    /// Where a count drag starts from: the position on the scale continued beyond the track.
+    pub marker_count_drag_base: f64,
+    /// The largest position of a count drag.
+    pub count_drag_limit: f64,
     /// The count is mixed or not 1: the reset icon shows.
     pub marker_count_resettable: bool,
     /// One muted line says closed paths have no start or end.
@@ -241,6 +249,8 @@ impl StylePanelView {
             stroke_width,
             stroke_width_text: width_shown.text,
             stroke_width_bar: width_shown.bar,
+            stroke_width_drag_base: width_shown.drag_base,
+            width_drag_limit: ValueScale::StrokeWidth.drag_limit(),
             stroke_width_resettable: width_shown.resettable,
             stroke_opacity_text: stroke_opacity_shown.text,
             stroke_opacity_bar: stroke_opacity_shown.bar,
@@ -286,6 +296,8 @@ impl StylePanelView {
             marker_count: 1.0,
             marker_count_mixed: false,
             marker_count_bar: 0.0,
+            marker_count_drag_base: 0.0,
+            count_drag_limit: ValueScale::MarkerCount.drag_limit(),
             marker_count_resettable: false,
             marker_closed_note: false,
         };
@@ -319,6 +331,7 @@ impl StylePanelView {
             ValueScale::MarkerCount.shown(uniform(markers.count, |count| f64::from(count.get())));
         self.marker_count_text = count.text;
         self.marker_count_bar = count.bar;
+        self.marker_count_drag_base = count.drag_base;
         self.marker_count_resettable = count.resettable;
         match markers.count {
             BarValue::Uniform(count) => {
@@ -350,6 +363,9 @@ impl StylePanelView {
             stroke_width: defaults.stroke.width.as_mm(),
             stroke_width_text: ValueScale::StrokeWidth.text(defaults.stroke.width.as_mm()),
             stroke_width_bar: ValueScale::StrokeWidth.position_of(defaults.stroke.width.as_mm()),
+            stroke_width_drag_base: ValueScale::StrokeWidth
+                .position_of_drag(defaults.stroke.width.as_mm()),
+            width_drag_limit: ValueScale::StrokeWidth.drag_limit(),
             stroke_width_resettable: false,
             stroke_opacity_text: "100".to_string(),
             stroke_opacity_bar: 1.0,
@@ -387,6 +403,8 @@ impl StylePanelView {
             marker_count: 1.0,
             marker_count_mixed: false,
             marker_count_bar: 0.0,
+            marker_count_drag_base: 0.0,
+            count_drag_limit: ValueScale::MarkerCount.drag_limit(),
             marker_count_resettable: false,
             marker_closed_note: false,
         }

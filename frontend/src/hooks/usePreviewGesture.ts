@@ -17,6 +17,10 @@ const STYLE_ENDS: GestureEnds = {
 export interface PreviewGesture {
   /** Shows `tick` on the next frame; the first of a gesture starts it. */
   queue: (tick: (session: WasmSession) => void) => void;
+  /** A click: the gesture ends now, with the last tick shown and committed once. For a
+   * control that acts at the release of a click, after the window listener that commits
+   * a drag has already missed the release (`specs/0047-transform-polish/` criterion 17). */
+  settle: () => void;
   /** A gesture is running (from its first tick to its release). */
   previewing: boolean;
   /** Counts the Escapes that dropped a preview, so a colour picker that kept
@@ -152,5 +156,5 @@ export function usePreviewGesture(
     },
     [begin, flush],
   );
-  return { queue, previewing, cancels };
+  return { queue, settle: commit, previewing, cancels };
 }

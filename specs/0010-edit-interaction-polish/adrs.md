@@ -274,8 +274,9 @@ to the PO" (criteria 21, 41, 59, 64 and four smaller ones).
     zero-extent resize field is, rather than reporting a silent "no change".
   - **`ui-core/src/move_entry.rs`** (about 200 lines). State: the object, its
     start snapshot, the start tight bounds, `[EntryField; 2]` for X and Y with
-    two prefill sets (Relative "0", Absolute the current top-left X and Y,
-    `format_mm`), and nothing about the mode: **the mode and the Copy check
+    two prefill sets (Relative "0", Absolute the current X and Y of the reference
+    point, the centre by default since `0047-transform-polish`; originally the
+    top-left; `format_mm`), and nothing about the mode: **the mode and the Copy check
     arrive with the commit call**, so the DOM owns them and the rule exists
     once. `resolve(texts, absolute, copy) -> Result<Option<MoveResult>,
     (usize, InvalidReason)>` where a field whose text equals the prefill of the
@@ -365,7 +366,7 @@ to the PO" (criteria 21, 41, 59, 64 and four smaller ones).
   flat path's field is read-only; K opens the same chip as the double-click for
   a 20 px path. Move: Relative (5, -3) from top-left (10, 20) gives (15, 17);
   Absolute (100, 50) on a 30 x 40 rectangle at origin (10, 20) gives origin
-  (100, 50); a 30° rotated rectangle and a star: Absolute puts the **tight**
+  (100, 50) (with the top-left as the reference, since `0047-transform-polish`); a 30° rotated rectangle and a star: Absolute puts the **tight**
   top-left at (X, Y) to 1e-9 mm; one untouched field means no change on its
   axis in both modes; the same text is read in the mode current at Enter;
   `NaN`, empty, "1,2,3", 1e8 are `NotANumber` and write nothing; the drag of the
@@ -939,7 +940,8 @@ to the PO" (criteria 21, 41, 59, 64 and four smaller ones).
    drawn, rotated shape, which is a new function (`object_outline_bounds`,
    decision 3). **Default: build that function; reword "as the selection's
    plain box" to "of the drawn outline". A star's absolute X, Y is therefore
-   not the top-left of its selection box.**
+   not the top-left of its selection box.** (The top-left is the reference only
+   if chosen, since `0047-transform-polish`.)
 2. **Criterion 64 cannot hold literally for two edge lengths.** With a dash of
    exactly 4 px, a gap of 2 to 4 px and a dash at both ends, an edge of `n`
    dashes must have length between `6n - 2` and `8n - 4` px, which leaves edges

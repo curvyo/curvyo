@@ -10,8 +10,9 @@ use curvyo_render_core::{
     build_marquee_overlay, build_pen_preview, build_select_draw_list, build_transform_draw_list,
 };
 
-use curvyo_document_core::{ObjectSnapshot, PathSnapshot};
+use curvyo_document_core::{ObjectSnapshot, PathSnapshot, ViewTransform};
 
+use super::reference_view::{reference_box_list, reference_marks_list};
 use super::{Session, Tool};
 
 impl Session {
@@ -63,13 +64,7 @@ impl Session {
         }
         let mut list = build_artwork(&artwork_objects, view);
         // The blue half of a segment bend, over the artwork and under the nodes and handles.
-        let bend_preview = self.bend_preview_objects(&objects);
-        if !bend_preview.is_empty() {
-            list.extend(curvyo_render_core::build_live_edit_preview(
-                &bend_preview,
-                view,
-            ));
-        }
+        list.extend(self.bend_preview_list(view, &objects));
         // A compound path shows no node, handle or segment (`0016-boolean-operations` criterion 38).
         let editable: Vec<_> = paths
             .iter()
@@ -96,6 +91,11 @@ impl Session {
         if !refused.is_empty() {
             list.extend(curvyo_render_core::build_refusal_outlines(&refused, view));
         }
+        // The pale red box of a move drag or the open typed move (`0047` criteria 33, 36): above
+        // the blue preview, whose white casing would otherwise cover it where the two coincide
+        // (an unrotated object), and below the selection box and the handles.
+        let reference = self.reference_decoration();
+        list.extend(reference_box_list(view, reference.as_ref()));
         let live_objects = Self::live_objects_in(&objects, live.as_ref());
         list.extend(build_select_draw_list(
             view,
@@ -108,6 +108,8 @@ impl Session {
             view,
             &self.select_transform_decoration_input_in(&live_objects),
         ));
+        // The nine marks of the typed move, above the handles.
+        list.extend(reference_marks_list(view, reference.as_ref()));
         // The marquee box or lasso line: above the boxes and handles, the
         // topmost layer of a selection drag.
         if let Some(overlay) = self.marquee_overlay() {
@@ -167,6 +169,15 @@ impl Session {
             ));
         }
         list
+    }
+
+    /// The blue outline of the segment bend in flight, nothing without one.
+    fn bend_preview_list(&self, view: ViewTransform, objects: &[ObjectSnapshot]) -> DrawList {
+        let bend_preview = self.bend_preview_objects(objects);
+        if bend_preview.is_empty() {
+            return DrawList::default();
+        }
+        curvyo_render_core::build_live_edit_preview(&bend_preview, view)
     }
 
     /// `objects` with each path replaced by the path of the same id in `paths`

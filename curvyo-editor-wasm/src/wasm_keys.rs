@@ -18,7 +18,7 @@ impl WasmSession {
     /// held; `mac` is true on macOS (Cmd+Y is no redo key there). Returns what happened: `"ignored"`, `"tool"`, `"entry"`,
     /// `"deleted"`, `"pen"`, `"escape-entry"`, `"escape-drag"`,
     /// `"escape-state"`, `"escape-tool"`, `"escape-none"`,
-    /// `"hint-select-first"`, `"hint-path-only"`, `"hint-too-far"`, `"hint-finish-pen"`,
+    /// `"hint-select-first"`, `"hint-too-far"`, `"hint-finish-pen"`,
     /// `"select-all"`, `"group"`, `"ungroup"` (read the notice with `take_grouping_result`),
     /// `"enter-group"`, `"escape-group"` (left an entered group), `"nudge"` (an arrow key moved the selection), `"nudge-new"` (and opened a
     /// new run of held-key events), `"undo"`, `"redo"` (read the notice with

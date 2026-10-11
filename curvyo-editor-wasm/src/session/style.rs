@@ -157,7 +157,9 @@ impl Session {
             return;
         }
         let scale = field.scale();
-        let value = scale.round(scale.value_at(p), grid);
+        // A click sends a position on the track; a drag past the end of the field sends more, and
+        // the continued curve gives the larger values (`0047` criterion 59).
+        let value = scale.round(scale.value_at_drag(p), grid);
         self.preview_style_edit(field.edit(value));
     }
 

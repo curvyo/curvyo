@@ -1368,6 +1368,47 @@ built-in list.
   when the next slice touches it.
 - **The Select bar overlaps the properties panel below about 600 px window width** (UX review of `0040`, found at 420 px; below the 800 x 600 minimum, so not fixed there).
 
+## The click on a reference mark is decided in TypeScript (0047)
+
+The press order (a mark before the handles), the 3 px / 8 px slop and Escape between the press and
+the release of a click on a reference mark of the typed move live in `useEditorSession.ts`, not in
+`curvyo-ui-core` ([ADR 0001](adr/0001-ui-framework-and-canvas-rendering.md) §1, and decision 3 of
+`specs/0010-edit-interaction-polish/adrs.md` put such rules in `ui-core`). The typed texts live in the
+DOM chip, so the frontend has to run the release anyway. Criterion 40 of
+`specs/0047-transform-polish/` ("3 px: nothing happens") therefore has no automated test; the geometry
+(`hit_mark`, `Session::move_mark_at`) is tested in Rust.
+
+**Resolution:** `Session::pointer_down` consumes a press on a mark and `pointer_up` executes it, with
+`DragOrigin` for the slop; the frontend then passes only the texts and the Copy flag at the release.
+Do it with the next slice that touches the move chip.
+
+## Open points of `0047-transform-polish` (tester review, 2026-10-11)
+
+- **A very large commit is stored as several Loro changes.** Loro splits a commit of this size
+  into more than one change: a conversion of a 1024-point star gives 15 changes instead of 3, and
+  the same holds for any very large path. The commit is still logically atomic (one call, the same
+  message and timestamp), and a reader or peer sees the whole result after the import; the change
+  count only matters for history and for `0020`'s step counting.
+- **The double-click interval is a fixed 500 ms** (criterion 21 of `0047`), not the platform's
+  setting, which a webview does not expose. Revisit if a platform's own interval is needed.
+- **Escape between the press and the release of a click on a reference mark is not handled in the
+  slider-style hook or in the frontend.** The Rust session ignores it and writes nothing, so the
+  outcome is right; it just is not a tested step (see the entry on the mark click above).
+
+## UX review leftovers of `0047-transform-polish` (2026-10-11)
+
+- **The hue thumb can read 1 degree off after Escape in a colour drag** (90 before, 89 after): the
+  committed colour is restored exactly, but the picker re-derives its hue from the 8-bit RGB. Not
+  caused by this slice (the picker sync of `0017`, `pickerSync`); the fix is to keep the picker's HSV
+  across an Escape that restores the same colour.
+- **The Move chip grows upward on a mode switch when it is flipped above the box** (its bottom edge
+  stays put), over the box and its top marks. Same side in both modes, as specified; the covered marks
+  are reachable through the Reference control. Recorded in the design-system row so nobody reports it.
+- **Not verified by the UX review (browser pane only, no device):** touch and pen (8 px slop, 22 px mark
+  targets), Ctrl copy at a mark click, Escape between the press and release of a mark click, a click on
+  a mixed Ratio or colour slider, the 10,000-object frame with the box drawn, a dark theme, and screen
+  reader output. The customer tries these in the app; the sliders' tooltips were seen.
+
 
 
 ## The history cache stays in memory for the whole session

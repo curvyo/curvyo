@@ -891,8 +891,9 @@ fn ported_ac9_resizing_an_ellipse_can_break_rx_eq_ry() {
     assert!((frame.center.x - 7.5).abs() < 1e-6);
 }
 
-/// Was `PolygonStarTool` AC13: a corner handle scales a star uniformly about
-/// its centre, keeping point count and ratio (outer radius 10 becomes 20).
+/// Was `PolygonStarTool` AC13: a corner handle dragged along its diagonal scales a star
+/// uniformly, keeping point count and ratio. Since `0047` criterion 12 the opposite corner
+/// stays where it is (it was the centre): the outer radius 10 becomes 15.
 #[test]
 fn ported_ac13_a_corner_handle_scales_a_star_uniformly_keeping_count_and_ratio() {
     let document = Document::new(1);
@@ -915,7 +916,7 @@ fn ported_ac13_a_corner_handle_scales_a_star_uniformly_keeping_count_and_ratio()
         panic!("a star");
     };
     assert!(
-        (frame.radius.as_mm() - 20.0).abs() < 1e-6,
+        (frame.radius.as_mm() - 15.0).abs() < 1e-6,
         "{}",
         frame.radius.as_mm()
     );

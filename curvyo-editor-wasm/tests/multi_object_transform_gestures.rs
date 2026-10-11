@@ -288,8 +288,7 @@ fn a_selection_with_a_star_scales_proportionally_at_a_corner_and_says_where_to_s
         })
         .unwrap();
     let group_box = (low.x, low.y, high.x, high.y);
-    // The east edge midpoint is a handle (criterion 18), and the star counts for
-    // its hint line (criterion 55).
+    // The east edge midpoint is a handle (criterion 18).
     hold(
         &mut session,
         pt(group_box.2, f64::midpoint(group_box.1, group_box.3)),
@@ -297,19 +296,12 @@ fn a_selection_with_a_star_scales_proportionally_at_a_corner_and_says_where_to_s
         false,
     );
     assert_eq!(session.handle_hint(), "group");
-    assert_eq!(session.hover_conversion_count(), 1);
-    // The south-east corner is proportional and points to the edge handle.
+    // The south-east corner is a handle with the ordinary corner lines (`0047` criterion 11).
     hold(&mut session, pt(group_box.2, group_box.3), false, false);
     assert_eq!(session.handle_hint(), "group");
-    assert_eq!(
-        session.hover_conversion_count(),
-        0,
-        "a corner never converts"
-    );
     let lines = session.corner_hint_lines();
-    assert_eq!(lines[0], "Resize selection, proportional");
-    assert_eq!(lines[1], "Stretch with an edge handle");
-    // A free drag of the corner scales both axes by one factor.
+    assert_eq!(lines[0], "Resize selection");
+    // A free drag of the corner scales the axes by two factors (`0047` criterion 7).
     drag(
         &mut session,
         pt(group_box.2, group_box.3),
@@ -317,7 +309,7 @@ fn a_selection_with_a_star_scales_proportionally_at_a_corner_and_says_where_to_s
     );
     let after = objects(&session);
     let a = bounds_of(&after[0]);
-    assert!(near(a.width.as_mm() / 100.0, a.height.as_mm() / 60.0));
+    assert!(!near(a.width.as_mm() / 100.0, a.height.as_mm() / 60.0));
     assert!(a.width.as_mm() > 100.0);
 }
 
@@ -449,10 +441,10 @@ fn a_skew_drag_shears_every_path_with_the_bottom_fixed() {
     assert!(near(second[0].x, 110.0) && near(second[1].x, 90.0));
 }
 
-/// Criterion 40: a selection with a rectangle shows no skew handle at all, and
-/// the keys say so.
+/// Criterion 40, as `0047` criterion 1 leaves it: a selection with a rectangle shows the
+/// skew handles, and the keys open the skew chip.
 #[test]
-fn a_selection_with_a_rectangle_has_no_skew_handle() {
+fn a_selection_with_a_rectangle_has_the_skew_handles() {
     let document = paths();
     let _ = document.create_rect(RectBounds {
         origin: pt(100.0, 0.0),
@@ -463,11 +455,8 @@ fn a_selection_with_a_rectangle_has_no_skew_handle() {
     select_two(&mut session, pt(30.0, 20.0), pt(100.0, 20.0));
     let handle = pt(f64::midpoint(0.0, 120.0), -16.0 / k(&session));
     hold(&mut session, handle, false, false);
-    assert!(!session.cursor_hint().starts_with("skew"), "no skew handle");
-    assert_eq!(
-        key(&mut session, "k", false),
-        KeyOutcome::Hint(curvyo_editor_wasm::KeyHint::PathOnly)
-    );
+    assert!(session.cursor_hint().starts_with("skew"), "a skew handle");
+    assert_eq!(key(&mut session, "k", false), KeyOutcome::EntryOpened);
 }
 
 // ---------------------------------------------------------------------
@@ -652,10 +641,8 @@ fn an_edge_stretch_counts_converts_and_notices_once() {
     hold(&mut session, east, false, false);
     session.pointer_down(east, false);
     hold(&mut session, to, false, false);
-    assert_eq!(session.live_conversion_count(), 1);
     assert_eq!(session.escape(), EscapeStep::CancelledDrag);
     session.pointer_up(to, false, false);
-    assert_eq!(session.take_conversion_notice(), 0);
     assert!(
         objects(&session)
             .iter()
@@ -668,9 +655,6 @@ fn an_edge_stretch_counts_converts_and_notices_once() {
         objects(&session).iter().find(|o| o.id() == star).unwrap(),
         ObjectSnapshot::Path(_)
     ));
-    assert_eq!(session.take_conversion_notice(), 1);
-    assert_eq!(session.take_conversion_notice(), 0, "taken once");
-    assert_eq!(session.live_conversion_count(), 0);
 }
 
 /// Decision 8 (id handling): the anchors of converted paths carry the ids the session

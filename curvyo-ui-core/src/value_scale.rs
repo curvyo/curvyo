@@ -52,6 +52,9 @@ pub struct FieldShown {
     pub text: String,
     /// The share of the field's width the bar is filled to, `0` to `1`.
     pub bar: f64,
+    /// Where a drag starts from: the position of the value on the scale extended beyond the
+    /// track (`ValueScale::position_of_drag`), equal to `bar` where the value is on the track.
+    pub drag_base: f64,
     /// The reset icon shows.
     pub resettable: bool,
 }
@@ -68,14 +71,53 @@ pub enum ValueScale {
 }
 
 impl ValueScale {
-    /// The value at position `p` (clamped to `[0, 1]`), not yet rounded.
+    /// The value at position `p` (clamped to `[0, 1]`), not yet rounded: the value on the track,
+    /// what a click sets.
     #[must_use]
     pub fn value_at(self, p: f64) -> f64 {
-        let p = if p.is_finite() {
+        self.curve(if p.is_finite() {
             p.clamp(0.0, 1.0)
         } else {
             0.0
-        };
+        })
+    }
+
+    /// The value at position `p` of a drag, not yet rounded: the track's own curve continued
+    /// beyond its end, so the value is continuous and rising at `p = 1` and grows with the
+    /// pointer's overshoot up to [`ValueScale::typed_max`] (`specs/0047-transform-polish/`
+    /// criterion 59). `p` is clamped to `[0, drag_limit]`; below 1 it is [`ValueScale::value_at`].
+    #[must_use]
+    pub fn value_at_drag(self, p: f64) -> f64 {
+        let limit = self.drag_limit();
+        if p.is_nan() {
+            return self.curve(0.0);
+        }
+        if p >= limit {
+            // The end of the continued curve is the typed maximum exactly, not its float echo.
+            return self.typed_max();
+        }
+        self.curve(p.max(0.0)).min(self.typed_max())
+    }
+
+    /// The position at which the continued curve reaches the typed maximum: 1 for a field whose
+    /// typed range ends with its track (an opacity), more for a width and a count.
+    #[must_use]
+    pub fn drag_limit(self) -> f64 {
+        self.position_unclamped(self.typed_max()).max(1.0)
+    }
+
+    /// The position of `value` on the continued curve, `0` to [`ValueScale::drag_limit`]: where a
+    /// drag that starts on a value beyond the track starts from.
+    #[must_use]
+    pub fn position_of_drag(self, value: f64) -> f64 {
+        if !value.is_finite() || value <= 0.0 {
+            return 0.0;
+        }
+        self.position_unclamped(value).clamp(0.0, self.drag_limit())
+    }
+
+    /// The curve itself, defined beyond the track.
+    fn curve(self, p: f64) -> f64 {
         match self {
             Self::StrokeWidth => {
                 WIDTH_DRAG_MAX_MM * (WIDTH_BASE.powf(p) - 1.0) / (WIDTH_BASE - 1.0)
@@ -92,7 +134,12 @@ impl ValueScale {
         if !value.is_finite() || value <= 0.0 {
             return 0.0;
         }
-        let p = match self {
+        self.position_unclamped(value).clamp(0.0, 1.0)
+    }
+
+    /// The inverse of the curve, not clamped to the track.
+    fn position_unclamped(self, value: f64) -> f64 {
+        match self {
             Self::MarkerCount => (value - COUNT_MIN) / (COUNT_DRAG_MAX - COUNT_MIN),
             Self::StrokeWidth => {
                 (1.0 + value * (WIDTH_BASE - 1.0) / WIDTH_DRAG_MAX_MM).ln() / WIDTH_BASE.ln()
@@ -100,8 +147,7 @@ impl ValueScale {
             Self::Opacity => {
                 (1.0 + value * (OPACITY_BASE - 1.0) / OPACITY_MAX).ln() / OPACITY_BASE.ln()
             }
-        };
-        p.clamp(0.0, 1.0)
+        }
     }
 
     /// The value at the end of the scale (`End`, criterion 43).
@@ -170,11 +216,13 @@ impl ValueScale {
             Some(v) => FieldShown {
                 text: self.text(v),
                 bar: self.position_of(v),
+                drag_base: self.position_of_drag(v),
                 resettable: !self.is_default(v),
             },
             None => FieldShown {
                 text: String::new(),
                 bar: 0.0,
+                drag_base: 0.0,
                 resettable: true,
             },
         }
@@ -529,5 +577,59 @@ mod tests {
         assert_eq!(ValueField::from_name("fill-width"), None);
         assert_eq!(Grid::from_name("fine"), Some(Grid::Fine));
         assert_eq!(Grid::from_name("x"), None);
+    }
+
+    /// `0047` criterion 59: a drag past the right end of the field continues the track's curve:
+    /// the value is continuous at the end of the track, rises with the overshoot, and stops at the
+    /// typed maximum. Opacity has no room beyond its track.
+    #[test]
+    fn the_drag_curve_continues_past_the_track_to_the_typed_maximum() {
+        for scale in [ValueScale::StrokeWidth, ValueScale::MarkerCount] {
+            let end = scale.value_at(1.0);
+            assert!(
+                (scale.value_at_drag(1.0) - end).abs() < 1e-12,
+                "{scale:?}: continuous at the end of the track"
+            );
+            let step = 1e-6;
+            assert!(
+                (scale.value_at_drag(1.0 + step) - end).abs() < 1e-3 * end,
+                "{scale:?}: no jump just past the end"
+            );
+            let mut previous = scale.value_at_drag(0.0);
+            let mut p = 0.0;
+            while p <= scale.drag_limit() + 0.5 {
+                let value = scale.value_at_drag(p);
+                assert!(value >= previous - 1e-9, "{scale:?}: monotonic at {p}");
+                assert!(
+                    value <= scale.typed_max() + 1e-9,
+                    "{scale:?}: clamped at {p}"
+                );
+                previous = value;
+                p += 0.01;
+            }
+            assert!(
+                (scale.value_at_drag(scale.drag_limit()) - scale.typed_max()).abs() < 1e-6,
+                "{scale:?}: the limit is the typed maximum"
+            );
+            assert_eq!(
+                scale.value_at_drag(scale.drag_limit() + 5.0),
+                scale.typed_max(),
+                "{scale:?}: clamped beyond the limit"
+            );
+            // A click is the track only.
+            assert!((scale.value_at(7.0) - end).abs() < 1e-12);
+            // A drag that starts on a value past the track starts from its own position.
+            let past = (end * 2.0).min(scale.typed_max());
+            assert!((scale.value_at_drag(scale.position_of_drag(past)) - past).abs() < 1e-6 * past);
+            assert_eq!(scale.position_of(past), 1.0, "the bar stays full");
+        }
+        let opacity = ValueScale::Opacity;
+        assert!((opacity.drag_limit() - 1.0).abs() < 1e-9);
+        assert!((opacity.value_at_drag(3.0) - 100.0).abs() < 1e-9);
+        // Specific numbers: a width at 1.5 track lengths, the typed maximum at about 1.85.
+        let width = ValueScale::StrokeWidth;
+        assert!((width.value_at_drag(1.5) - 20.0 * (1000.0 - 1.0) / 99.0).abs() < 1e-9);
+        assert!((width.drag_limit() - 1.85).abs() < 0.01);
+        assert!((ValueScale::MarkerCount.drag_limit() - 499.0 / 49.0).abs() < 1e-9);
     }
 }

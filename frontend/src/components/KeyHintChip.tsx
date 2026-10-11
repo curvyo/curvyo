@@ -48,8 +48,7 @@ export function KeyHintChip({ hint, containerRef }: KeyHintChipProps) {
     const container = containerRef.current;
     if (hint && container) {
       setAnchor(
-        hint.anchor ??
-          pointerRef.current ?? { x: container.clientWidth / 2, y: container.clientHeight / 2 },
+        pointerRef.current ?? { x: container.clientWidth / 2, y: container.clientHeight / 2 },
       );
     }
   }, [hint, containerRef]);

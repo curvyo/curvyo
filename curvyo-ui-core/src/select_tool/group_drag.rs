@@ -10,15 +10,13 @@ use curvyo_document_core::{Angle, Document, NodeId, ObjectSnapshot, PathSnapshot
 
 use super::{SelectDrag, SelectTool};
 use crate::anchor_id_minter::AnchorIdMinter;
-use crate::conversion::{
-    ConversionCounts, converted_counts, converted_paths, with_fresh_anchor_ids,
-};
+use crate::conversion::{converted_for_handle, with_fresh_anchor_ids};
 use crate::group_box::GroupSelection;
 use crate::group_transform::{GroupMap, commit_group, group_map, group_pivot, map_all};
 use crate::object_selection::ObjectSelection;
 use crate::oriented_box::OrientedBox;
 use crate::transform_drag::{DragOrigin, ScaleModes};
-use crate::transform_handle_layout::{EditHandle, is_corner};
+use crate::transform_handle_layout::EditHandle;
 
 /// A resize, rotate or skew drag on the group box in flight.
 #[derive(Debug, Clone)]
@@ -31,13 +29,10 @@ pub(super) struct GroupDrag {
     pub(super) handle: EditHandle,
     /// The tool's switches as of the press (criterion 24).
     pub(super) modes: ScaleModes,
-    /// The selection holds a shape a stretch would convert: a corner drag then
-    /// always keeps one factor (criterion 19, lead decision E).
-    pub(super) proportional_corners: bool,
-    /// For a resize handle, beside each start, the path it becomes if the drag ends
-    /// as a stretch (criterion 53); `None` for an object that keeps its kind. Built
-    /// once, at the press, so that the preview and the commit are the same
-    /// snapshots (criterion 32).
+    /// For a resize or skew handle, beside each start, the path it becomes if the drag
+    /// ends as a stretch or a skew (`0047` criteria 2 and 7); `None` for an object that
+    /// keeps its kind. Built once, at the press, so that the preview and the commit are
+    /// the same snapshots (criterion 5).
     pub(super) converted: Vec<Option<PathSnapshot>>,
 }
 
@@ -52,7 +47,6 @@ impl GroupDrag {
             self.handle,
             (self.origin.down_at, current),
             (shift, ctrl),
-            self.proportional_corners,
         )
     }
 
@@ -73,15 +67,9 @@ impl GroupDrag {
 
     /// Writes `results` (from [`GroupDrag::resolve`]) as one commit
     /// (criterion 31). A width the document refuses costs the maker nothing
-    /// else: the write is repeated without widths. The shapes the commit turned
-    /// into paths, or `None` if the document took nothing.
-    pub(super) fn commit(
-        &self,
-        document: &Document,
-        results: &[ObjectSnapshot],
-    ) -> Option<ConversionCounts> {
-        commit_group(document, results, self.modes.stroke, self.handle)
-            .then(|| converted_counts(&self.starts, results))
+    /// else: the write is repeated without widths.
+    pub(super) fn commit(&self, document: &Document, results: &[ObjectSnapshot]) {
+        commit_group(document, results, self.modes.stroke, self.handle);
     }
 }
 
@@ -121,45 +109,14 @@ impl SelectTool {
             .filter(|object| selected.contains(&object.id()))
             .cloned()
             .collect();
-        // Only an edge handle stretches: a corner drag of a selection that holds a
-        // converting shape is proportional, and one that holds none has nothing to
-        // convert (criterion 19).
-        let converted = if matches!(handle, EditHandle::Resize(d) if !is_corner(d)) {
-            converted_paths(&starts)
-        } else {
-            Vec::new()
-        };
+        let converted = converted_for_handle(&starts, handle);
         GroupDrag {
             origin,
             starts,
             start_box: *group.bounds(),
             handle,
             modes: self.modes,
-            proportional_corners: group.proportional_corners(),
             converted,
-        }
-    }
-
-    /// The shapes the drag in flight (a group's or a single polygon's or star's) would turn into paths if a release
-    /// at `current` committed it: counted by kind, empty while the preview is not
-    /// a stretch, before the dead zone is left, or for no group drag (the readout's
-    /// second line, criterion 23).
-    #[must_use]
-    pub fn live_conversion_counts(
-        &self,
-        current: Point,
-        shift: bool,
-        ctrl: bool,
-    ) -> ConversionCounts {
-        match &self.drag {
-            SelectDrag::GroupTransforming(drag) if drag.origin.is_active_at(current) => {
-                converted_counts(&drag.starts, &drag.resolve(current, shift, ctrl))
-            }
-            SelectDrag::Transforming(drag) if drag.origin.is_active_at(current) => {
-                let result = drag.resolve(current, shift, ctrl);
-                converted_counts(std::slice::from_ref(&drag.start), &[result])
-            }
-            _ => ConversionCounts::default(),
         }
     }
 

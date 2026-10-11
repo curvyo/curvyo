@@ -375,28 +375,25 @@ mod select_tool_state {
         let _ = &sel;
         let b = oriented_bounds(object);
         // rotate corner Ne with Shift -> opposite (Sw) corner (0, 40)
-        let p = SelectTool::hover_pivot(object, &b, EditHandle::Rotate(ResizeDirection::Ne), true)
-            .unwrap();
+        let p = SelectTool::hover_pivot(&b, EditHandle::Rotate(ResizeDirection::Ne), true).unwrap();
         assert!(
             (p.x - 0.0).abs() < 1e-9 && (p.y - 40.0).abs() < 1e-9,
             "{p:?}"
         );
         // rotate side N with Shift -> bottom midpoint (30, 40)
-        let p = SelectTool::hover_pivot(object, &b, EditHandle::Rotate(ResizeDirection::N), true)
-            .unwrap();
+        let p = SelectTool::hover_pivot(&b, EditHandle::Rotate(ResizeDirection::N), true).unwrap();
         assert!(
             (p.x - 30.0).abs() < 1e-9 && (p.y - 40.0).abs() < 1e-9,
             "{p:?}"
         );
         // resize with Shift -> centre
-        let p = SelectTool::hover_pivot(object, &b, EditHandle::Resize(ResizeDirection::Se), true)
-            .unwrap();
+        let p = SelectTool::hover_pivot(&b, EditHandle::Resize(ResizeDirection::Se), true).unwrap();
         assert!(
             (p.x - 30.0).abs() < 1e-9 && (p.y - 20.0).abs() < 1e-9,
             "{p:?}"
         );
         // the centre handle has no pivot
-        assert!(SelectTool::hover_pivot(object, &b, EditHandle::Move, true).is_none());
+        assert!(SelectTool::hover_pivot(&b, EditHandle::Move, true).is_none());
     }
 
     #[test]

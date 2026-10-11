@@ -30,6 +30,7 @@ mod marquee_overlay;
 mod move_axes;
 mod pen_cue;
 mod pen_preview;
+mod reference_box;
 mod refusal_outline;
 mod select_box;
 mod select_decoration;
@@ -51,6 +52,7 @@ pub use marquee_overlay::{MarqueeOverlay, build_marquee_overlay};
 pub use move_axes::{LockedAxis, MoveAxes, build_move_axes};
 pub use pen_cue::{ClosingCue, PenCue, build_pen_cue};
 pub use pen_preview::build_pen_preview;
+pub use reference_box::{ReferenceBoxInput, ReferenceMark};
 pub use refusal_outline::build_refusal_outlines;
 pub use select_box::{SelectDecorationInput, SelectionBox};
 pub use select_decoration::{TransformDecorationInput, TransformGlyphKind, TransformHandleGlyph};
@@ -82,6 +84,20 @@ pub fn build_decorations(
 #[must_use]
 pub fn build_select_draw_list(view: ViewTransform, input: &SelectDecorationInput) -> DrawList {
     select_box::build(view, input)
+}
+
+/// Builds the pale red true bounding box of a move (`specs/0047-transform-polish/` criteria 33
+/// to 36): drawn below the blue outlines and the selection box.
+#[must_use]
+pub fn build_reference_box_draw_list(view: ViewTransform, input: &ReferenceBoxInput) -> DrawList {
+    reference_box::build_box(view, input)
+}
+
+/// Builds the marks of the nine reference points of the open typed move (criterion 39): drawn
+/// above the artwork, the box and the handles.
+#[must_use]
+pub fn build_reference_marks_draw_list(view: ViewTransform, input: &ReferenceBoxInput) -> DrawList {
+    reference_box::build_marks(view, input)
 }
 
 /// Builds the group box of a multi-selection with the lighter member boxes

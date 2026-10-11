@@ -466,3 +466,84 @@ fn the_fallback_after_an_undo_is_announced_at_once() {
     assert_eq!(session.take_context_announcement(), "Back at the document.");
     assert_eq!(session.context_depth(), 0);
 }
+
+/// Integration with `0047`: skewing a group that holds a rectangle converts the rectangle to a
+/// path silently, as one atomic step with the transform's label; undo and redo take the
+/// conversion and the group's geometry back and forth together.
+#[test]
+fn skewing_a_group_converts_its_shapes_in_one_step_and_undo_restores_them() {
+    use curvyo_ui_core::EntryOutcome;
+    let mut session = Session::new(1);
+    let r = rect(&session, 0.0);
+    let p = session.document.create_path(
+        &[
+            curvyo_document_core::NewAnchor::corner(
+                curvyo_document_core::AnchorId::new(1, 900),
+                pt(40.0, 0.0),
+            ),
+            curvyo_document_core::NewAnchor::corner(
+                curvyo_document_core::AnchorId::new(1, 901),
+                pt(60.0, 10.0),
+            ),
+        ],
+        false,
+    );
+    let group = session.document.group_objects(&[r, p]).unwrap();
+    session.selection.clear();
+    click(&mut session, pt(25.0, 0.0));
+    click(&mut session, pt(0.0, 0.0));
+    assert_eq!(session.selection.ids().len(), 2, "the group is selected");
+    let before = session.document.export_json().unwrap();
+    let steps = session.document.own_steps().len();
+
+    assert_eq!(key(&mut session, "k"), KeyOutcome::EntryOpened);
+    assert_eq!(
+        session.commit_transform_entry("20", "", 0),
+        EntryOutcome::Committed
+    );
+    assert_eq!(session.document.own_steps().len(), steps + 1, "one step");
+    assert!(
+        session.document.path(r).is_some(),
+        "the rectangle became a path"
+    );
+    assert!(session.document.is_group(group), "still inside the group");
+    assert_eq!(session.document.parent_group(r), Some(group));
+    let after = session.document.export_json().unwrap();
+
+    session.undo();
+    assert!(session.document.primitive(r).is_some(), "a rectangle again");
+    assert_eq!(session.document.export_json().unwrap(), before);
+    session.redo();
+    assert_eq!(session.document.export_json().unwrap(), after);
+}
+
+/// Integration with the typed move: its reference box and Absolute values are those of the group
+/// box, and a copy copies the group as a group.
+#[test]
+fn the_typed_move_of_a_group_uses_the_group_box_and_copies_the_group() {
+    let (mut session, ids, group) = with_group();
+    click(&mut session, pt(45.0, 0.0));
+    assert_eq!(session.selection.ids(), &[ids[1], ids[2]]);
+    assert_eq!(key(&mut session, "m"), KeyOutcome::EntryOpened);
+    let chip = session.move_entry().expect("the move chip is open");
+    // The group box runs from x = 20 to 50 and y = 0 to 10: its centre is (35, 5).
+    assert!((chip.center.x - 35.0).abs() < 0.5 && (chip.center.y - 5.0).abs() < 0.5);
+    let outcome = session.commit_move_entry(
+        "0",
+        "30",
+        curvyo_ui_core::MoveEntryMode {
+            absolute: false,
+            copy: true,
+        },
+    );
+    assert_eq!(outcome, curvyo_ui_core::EntryOutcome::Committed);
+    let roots = session.document.children(None);
+    assert_eq!(
+        roots.len(),
+        4,
+        "the original group and a copy group: {roots:?}"
+    );
+    assert!(session.document.is_group(roots[2]));
+    assert_ne!(roots[2], group);
+    assert_eq!(session.document.leaves_of(roots[2]).len(), 2);
+}
