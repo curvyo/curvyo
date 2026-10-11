@@ -1,7 +1,8 @@
+import { SliderTip } from "@/components/SliderTip";
+import { HELP_COLOUR, colourSliderName } from "@/lib/sliderNames";
 import { useEffect, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
 
-import { Tooltip } from "@/components/ui/tooltip";
 import { useSliderPointer } from "@/hooks/useSliderPointer";
 import type { HsvTriple } from "@/hooks/useStylePanel";
 import { type PickerSeen, pickerStep } from "@/lib/pickerSync";
@@ -48,9 +49,6 @@ interface ColourPickerProps {
   onOpenEntry: (origin: HTMLElement | null) => void;
 }
 
-/** The tooltip of both sliders: both gestures, since nothing on a slider shows the second
- * (`specs/0047-transform-polish/` criterion 26). */
-const TOOLTIP = "Click to set, double-click to type the hex value";
 
 const clamp = (value: number, low: number, high: number) =>
   Math.min(high, Math.max(low, value));
@@ -287,12 +285,19 @@ export function ColourPicker({
 
   return (
     <div className="flex flex-col gap-2" style={{ width: WIDTH }}>
-      <Tooltip side="left" content={TOOLTIP}>
+      <SliderTip
+        side="left"
+        name={colourSliderName(name, "saturationValue")}
+        valueText={
+          mixed ? "Mixed" : `saturation ${percentOf(hsv.s)} %, value ${percentOf(hsv.v)} %`
+        }
+        help={HELP_COLOUR}
+      >
         <div
           role="slider"
           tabIndex={0}
           aria-keyshortcuts="Enter F2"
-          aria-label={`${name} saturation and value`}
+          aria-label={colourSliderName(name, "saturationValue")}
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={mixed ? undefined : percentOf(hsv.v)}
@@ -320,13 +325,18 @@ export function ColourPicker({
             />
           )}
         </div>
-      </Tooltip>
-      <Tooltip side="left" content={TOOLTIP}>
+      </SliderTip>
+      <SliderTip
+        side="left"
+        name={colourSliderName(name, "hue")}
+        valueText={mixed ? "Mixed" : `${Math.round(hsv.h)}°`}
+        help={HELP_COLOUR}
+      >
         <div
           role="slider"
           tabIndex={0}
           aria-keyshortcuts="Enter F2"
-          aria-label={`${name} hue`}
+          aria-label={colourSliderName(name, "hue")}
           aria-valuemin={0}
           aria-valuemax={360}
           aria-valuenow={mixed ? undefined : Math.round(hsv.h)}
@@ -355,7 +365,7 @@ export function ColourPicker({
             />
           )}
         </div>
-      </Tooltip>
+      </SliderTip>
     </div>
   );
 }

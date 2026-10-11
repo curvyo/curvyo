@@ -2,7 +2,9 @@ import { useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
 
 import { EntryField } from "@/components/panel/EntryField";
+import { SliderTip } from "@/components/SliderTip";
 import { useSliderPointer } from "@/hooks/useSliderPointer";
+import { HELP_RATIO } from "@/lib/sliderNames";
 import {
   RATIO_MESSAGE,
   RATIO_RANGE,
@@ -31,10 +33,9 @@ const STEP_KEYS = new Set([
 ]);
 
 export interface RatioSliderProps {
-  /** The accessible name of the slider and of its entry: "Inner ratio". */
+  /** The accessible name of the slider and of its entry, and the first line of its tooltip
+   * (`RATIO_SLIDER_NAMES`). The second line names both gestures, since nothing else shows them. */
   label: string;
-  /** The tooltip. Both gestures are in it, since nothing else shows them. */
-  title: string;
   value: number;
   /** The edited objects differ: no thumb, "Mixed". */
   mixed?: boolean;
@@ -60,7 +61,6 @@ export interface RatioSliderProps {
  */
 export function RatioSlider({
   label,
-  title,
   value,
   mixed = false,
   onPreview,
@@ -145,6 +145,12 @@ export function RatioSlider({
 
   return (
     <>
+      <SliderTip
+        side="bottom"
+        name={label}
+        valueText={mixed ? "Mixed" : value.toFixed(2)}
+        help={HELP_RATIO}
+      >
       <div
         ref={track}
         role="slider"
@@ -155,7 +161,6 @@ export function RatioSlider({
         aria-valuenow={mixed ? undefined : value}
         aria-valuetext={mixed ? "Mixed" : value.toFixed(2)}
         aria-keyshortcuts="Enter F2"
-        title={title}
         className="relative shrink-0 cursor-pointer rounded-[5px] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
         style={{
           width: WIDTH,
@@ -202,6 +207,7 @@ export function RatioSlider({
           />
         )}
       </div>
+      </SliderTip>
       {entry ? (
         <EntryField
           label={label}

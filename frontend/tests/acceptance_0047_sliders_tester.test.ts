@@ -351,19 +351,19 @@ test("22: no accepted entry is outside the range or off the grid (sweep)", () =>
 
 const src = (path: string) => readFileSync(new URL(`../src/${path}`, import.meta.url), "utf8");
 
-test("26/28 (static): S1 and S2 tooltips state both gestures after a full stop; accessible names", () => {
+test("26/28/58 (static): S1 and S2 take their names from the table; the tooltip's second line states both gestures", () => {
   const select = src("components/SelectToolbar.tsx");
   const shape = src("components/ShapeToolbar.tsx");
-  assert.match(select, /label="Inner ratio"/);
-  assert.match(select, /title="[^"]*\. Click to set, double-click to type"/);
-  assert.match(shape, /label="Ratio of new stars"/);
-  assert.match(shape, /title="[^"]*\. Click to set, double-click to type"/);
+  assert.match(select, /label=\{RATIO_SLIDER_NAMES\.selectedStars\}/);
+  assert.match(shape, /label=\{RATIO_SLIDER_NAMES\.newStars\}/);
+  assert.match(src("lib/sliderNames.ts"), /HELP_RATIO = "Click to set, double-click to type"/);
 });
 
 test("26 (static): S3 and S4 tooltip, names, aria-valuetext, keyshortcuts", () => {
   const picker = src("components/panel/ColourPicker.tsx");
-  assert.match(picker, /Click to set, double-click to type the hex value/);
-  assert.match(picker, /saturation and value/);
+  assert.match(src("lib/sliderNames.ts"), /Click to set, double-click to type the hex value/);
+  assert.match(picker, /HELP_COLOUR/);
+  assert.match(picker, /colourSliderName\(name, "saturationValue"\)/);
   assert.match(picker, /aria-keyshortcuts="Enter F2"/);
   assert.match(picker, /Saturation \$\{percentOf\(hsv\.s\)\} %, value \$\{percentOf\(hsv\.v\)\} %/);
   assert.match(picker, /Hue \$\{Math\.round\(hsv\.h\)\} degrees/);

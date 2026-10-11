@@ -3,6 +3,7 @@ import { Toggle, Tooltip } from "radix-ui";
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 
 import { RatioSlider } from "@/components/RatioSlider";
+import { RATIO_SLIDER_NAMES } from "@/lib/sliderNames";
 import { ToolbarSwitch } from "@/components/ToolbarSwitch";
 import type { SelectBarState } from "@/hooks/useEditorSession";
 
@@ -467,8 +468,7 @@ export function SelectToolbar({
           <div className="flex items-center gap-1.5 text-[var(--toolbar-icon)]">
             Ratio
             <RatioSlider
-              label="Inner ratio"
-              title="Inner ratio of the selected stars. Click to set, double-click to type"
+              label={RATIO_SLIDER_NAMES.selectedStars}
               value={bar.ratio}
               mixed={bar.ratioMixed}
               onPreview={onPreviewRatio}

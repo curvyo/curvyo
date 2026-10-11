@@ -1,4 +1,5 @@
 import { RatioSlider } from "@/components/RatioSlider";
+import { RATIO_SLIDER_NAMES } from "@/lib/sliderNames";
 import type { PolyStarMode, Tool } from "@/hooks/useEditorSession";
 
 export interface ShapeToolbarProps {
@@ -100,8 +101,7 @@ export function ShapeToolbar({
         <div className="flex items-center gap-1 text-[var(--toolbar-icon)]">
           <span className="opacity-60">New:</span> Ratio
           <RatioSlider
-            label="Ratio of new stars"
-            title="Ratio of the next star. Click to set, double-click to type"
+            label={RATIO_SLIDER_NAMES.newStars}
             value={polyStarRatio}
             // The setting is not a document write: every tick and click sets it, there is
             // no commit, and Escape in a drag puts the value of the press back.

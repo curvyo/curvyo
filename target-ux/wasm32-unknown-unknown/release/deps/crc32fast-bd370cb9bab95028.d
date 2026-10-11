@@ -1,0 +1,11 @@
+/home/marc/workbench/vecmanf-claude/transform-polish/target-ux/wasm32-unknown-unknown/release/deps/crc32fast-bd370cb9bab95028.d: /home/marc/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crc32fast-1.5.2/src/lib.rs /home/marc/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crc32fast-1.5.2/src/baseline.rs /home/marc/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crc32fast-1.5.2/src/combine.rs /home/marc/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crc32fast-1.5.2/src/specialized/mod.rs /home/marc/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crc32fast-1.5.2/src/table.rs
+
+/home/marc/workbench/vecmanf-claude/transform-polish/target-ux/wasm32-unknown-unknown/release/deps/libcrc32fast-bd370cb9bab95028.rlib: /home/marc/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crc32fast-1.5.2/src/lib.rs /home/marc/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crc32fast-1.5.2/src/baseline.rs /home/marc/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crc32fast-1.5.2/src/combine.rs /home/marc/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crc32fast-1.5.2/src/specialized/mod.rs /home/marc/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crc32fast-1.5.2/src/table.rs
+
+/home/marc/workbench/vecmanf-claude/transform-polish/target-ux/wasm32-unknown-unknown/release/deps/libcrc32fast-bd370cb9bab95028.rmeta: /home/marc/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crc32fast-1.5.2/src/lib.rs /home/marc/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crc32fast-1.5.2/src/baseline.rs /home/marc/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crc32fast-1.5.2/src/combine.rs /home/marc/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crc32fast-1.5.2/src/specialized/mod.rs /home/marc/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crc32fast-1.5.2/src/table.rs
+
+/home/marc/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crc32fast-1.5.2/src/lib.rs:
+/home/marc/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crc32fast-1.5.2/src/baseline.rs:
+/home/marc/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crc32fast-1.5.2/src/combine.rs:
+/home/marc/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crc32fast-1.5.2/src/specialized/mod.rs:
+/home/marc/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crc32fast-1.5.2/src/table.rs:

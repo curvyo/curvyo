@@ -1,3 +1,4 @@
+import { VALUE_FIELD_NAMES } from "@/lib/sliderNames";
 import { StyleRow } from "@/components/panel/StyleRow";
 import { ValueField } from "@/components/panel/ValueField";
 import { PLACE_OPTIONS, markerOptions } from "@/components/panel/styleOptions";
@@ -62,7 +63,7 @@ export function MarkerRows({ panel, onReturnFocus }: MarkerRowsProps) {
       {view.markerCountShown && (
         <ValueField
           label="Count"
-          name="Marker count"
+          name={VALUE_FIELD_NAMES.markerCount}
           text={view.markerCountText}
           bar={view.markerCountBar}
           mixed={view.markerCountMixed}

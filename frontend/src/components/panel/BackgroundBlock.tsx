@@ -1,3 +1,4 @@
+import { VALUE_FIELD_NAMES } from "@/lib/sliderNames";
 import { useHexEntry } from "@/hooks/useHexEntry";
 import { useId, useRef } from "react";
 
@@ -83,7 +84,7 @@ export function BackgroundBlock({ background, onReturnFocus }: BackgroundBlockPr
           />
           <ValueField
             label="Opacity"
-            name="Background opacity"
+            name={VALUE_FIELD_NAMES.backgroundOpacity}
             text={view.opacityText}
             bar={view.opacityBar}
             mixed={false}

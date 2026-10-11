@@ -111,8 +111,8 @@ The four sliders of today (verified by `type="range"` and `role="slider"` in `fr
 
 | # | Slider | Where | Kind | Range, step | Accessible name | Readout |
 |---|---|---|---|---|---|---|
-| S1 | Inner ratio of the selected stars | Select bar, "Ratio" | native range input | 0.01 to 0.99, step 0.01 | "Inner ratio" | text "0.45" or "Mixed" beside it; no thumb while mixed |
-| S2 | Ratio of new stars | Polygon/star tool bar, Star mode, "New: Ratio" | native range input | 0.01 to 0.99, step 0.01 | "Ratio of new stars" (the input has no name today; this spec gives it one) | text "0.45" |
+| S1 | Inner ratio of the selected stars | Select bar, "Ratio" | native range input | 0.01 to 0.99, step 0.01 | "Inner ratio" (since criterion 58: "Star inner ratio") | text "0.45" or "Mixed" beside it; no thumb while mixed |
+| S2 | Ratio of new stars | Polygon/star tool bar, Star mode, "New: Ratio" | native range input | 0.01 to 0.99, step 0.01 | "Ratio of new stars" (the input has no name today; this spec gives it one; since criterion 58: "Star inner ratio of new stars") | text "0.45" |
 | S3 | Saturation and value | Colour picker of Stroke, Fill and, with `0040`, Background | `role="slider"`, 244 x 96 px, two values | S and V 0 to 100 % | "Stroke saturation and value" (Fill, Background likewise) | the hex field of the same colour block |
 | S4 | Hue | The same pickers | `role="slider"`, 244 x 12 px | 0 to 360° | "Stroke hue" (Fill, Background likewise) | the hex field of the same colour block |
 
@@ -154,6 +154,8 @@ The controls are the five value fields with a bar (`ValueField.tsx`), all `role=
 55. Given the tooltip, the accessible name and the shortcuts of a value field, then the tooltip names the gestures ("Click to set, double-click to type, drag to change. Shift: coarse. Ctrl: fine. Ctrl+Backspace: reset."), `aria-keyshortcuts` lists "Control+Backspace Enter F2", and `touch-action` stays `pan-y`.
 56. Given a field that has **no bounded scale or no track** (document Width and Height, Dash pattern, hex fields, the chips for X and Y, size, angle and skew, the Select bar's Radius, the Points fields), then there is nothing to set by a click at a position: they keep a click that focuses the field for typing, and a double-click that selects its text. Points (3 to 1024) is a number field with a stepper, not a slider.
 57. Given the implementation, then the five fields use the shared slider behaviour (`useSliderPointer`, through `useValueDrag`): the click, the slop, the double-click, Escape and the touch thresholds are the sliders' (criteria 17 to 29), so a sixth value field gets them by using `ValueField`. Value fields are written as one commit by the same `commit_style_preview` the drag ends with.
+
+58. Given any slider or value field (the five value fields V1 to V5, the Ratio sliders S1 and S2, the colour area S3 and the hue slider S4), then its tooltip has two lines: the first is the name of the value and, when it fits, its current value with the unit ("Stroke width: 0.50 mm", "Fill opacity: 80 %", "Marker count: 3", "Star inner ratio: 0.45", "Stroke hue: 215°", "Stroke saturation and value: saturation 50 %, value 40 %"; "Mixed" for a mixed value), and the second, muted, is the gesture help of criterion 26 and 55. The name is the same text as the accessible name (`aria-label`); the names are in one table (`lib/sliderNames.ts`): Stroke width, Stroke opacity, Fill opacity, Marker count, Background opacity, Star inner ratio (the Select bar), Star inner ratio of new stars (the polygon/star bar), and "<Stroke|Fill|Background> saturation and value" and "<...> hue". The value fields' tooltips open to the left like the panel's, the ratio sliders' below their bar, so that none covers a neighbouring field; the delay is the house 400 ms. A test checks that every name in the table is non-empty and distinct and that every slider takes its name from it.
 
 ### Part C: the typed move measures from the centre, and the box is visible
 

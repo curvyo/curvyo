@@ -3,12 +3,14 @@ import { useState } from "react";
 import type { KeyboardEvent } from "react";
 
 import { EntryField } from "@/components/panel/EntryField";
+import { SliderTip } from "@/components/SliderTip";
 import { Tooltip } from "@/components/ui/tooltip";
 import { gridOf, useValueDrag } from "@/hooks/useValueDrag";
 import type { GridName } from "@/hooks/useStylePanel";
+import { HELP_VALUE_FIELD } from "@/lib/sliderNames";
 
 const TOOLTIP_KEY = /Mac|iPhone|iPad/.test(navigator.platform) ? "Cmd" : "Ctrl";
-const TOOLTIP = `Click to set, double-click to type, drag to change. Shift: coarse. ${TOOLTIP_KEY}: fine. ${TOOLTIP_KEY}+Backspace: reset.`;
+const HELP = HELP_VALUE_FIELD.replaceAll("Ctrl", TOOLTIP_KEY);
 
 interface ValueFieldProps {
   /** The visible label inside the field ("Width", "Opacity"). */
@@ -155,7 +157,12 @@ export function ValueField({
           </span>
         </>
       ) : (
-        <Tooltip side="left" content={TOOLTIP}>
+        <SliderTip
+          side="left"
+          name={name}
+          valueText={mixed ? "Mixed" : `${text}${unit ? ` ${unit}` : ""}`}
+          help={HELP}
+        >
           <div
             role="spinbutton"
             tabIndex={0}
@@ -207,7 +214,7 @@ export function ValueField({
               )}
             </span>
           </div>
-        </Tooltip>
+        </SliderTip>
       )}
       {resettable && !typing && (
         <Tooltip side="left" content={`Reset to ${defaultText} (${TOOLTIP_KEY}+Backspace)`}>

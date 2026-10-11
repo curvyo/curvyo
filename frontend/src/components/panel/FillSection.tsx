@@ -1,3 +1,4 @@
+import { VALUE_FIELD_NAMES } from "@/lib/sliderNames";
 import { useHexEntry } from "@/hooks/useHexEntry";
 import { useRef } from "react";
 
@@ -66,7 +67,7 @@ export function FillSection({ panel, onReturnFocus }: FillSectionProps) {
           />
           <ValueField
             label="Opacity"
-            name="Fill opacity"
+            name={VALUE_FIELD_NAMES.fillOpacity}
             text={view.fillOpacityText}
             bar={view.fillOpacityBar}
             mixed={view.fillOpacityMixed}

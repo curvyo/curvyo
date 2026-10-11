@@ -1,3 +1,4 @@
+import { VALUE_FIELD_NAMES } from "@/lib/sliderNames";
 import { useHexEntry } from "@/hooks/useHexEntry";
 import { useRef } from "react";
 
@@ -74,7 +75,7 @@ export function StrokeSection({ panel, onReturnFocus }: StrokeSectionProps) {
           />
           <ValueField
             label="Opacity"
-            name="Stroke opacity"
+            name={VALUE_FIELD_NAMES.strokeOpacity}
             text={view.strokeOpacityText}
             bar={view.strokeOpacityBar}
             mixed={view.strokeOpacityMixed}
@@ -94,7 +95,7 @@ export function StrokeSection({ panel, onReturnFocus }: StrokeSectionProps) {
           />
           <ValueField
             label="Width"
-            name="Stroke width"
+            name={VALUE_FIELD_NAMES.strokeWidth}
             text={view.strokeWidthText}
             bar={view.strokeWidthBar}
             mixed={view.strokeWidthMixed}

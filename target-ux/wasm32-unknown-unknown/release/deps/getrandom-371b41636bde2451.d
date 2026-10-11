@@ -1,0 +1,11 @@
+/home/marc/workbench/vecmanf-claude/transform-polish/target-ux/wasm32-unknown-unknown/release/deps/getrandom-371b41636bde2451.d: /home/marc/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/getrandom-0.2.17/src/lib.rs /home/marc/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/getrandom-0.2.17/src/error.rs /home/marc/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/getrandom-0.2.17/src/util.rs /home/marc/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/getrandom-0.2.17/src/error_impls.rs /home/marc/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/getrandom-0.2.17/src/js.rs
+
+/home/marc/workbench/vecmanf-claude/transform-polish/target-ux/wasm32-unknown-unknown/release/deps/libgetrandom-371b41636bde2451.rlib: /home/marc/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/getrandom-0.2.17/src/lib.rs /home/marc/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/getrandom-0.2.17/src/error.rs /home/marc/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/getrandom-0.2.17/src/util.rs /home/marc/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/getrandom-0.2.17/src/error_impls.rs /home/marc/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/getrandom-0.2.17/src/js.rs
+
+/home/marc/workbench/vecmanf-claude/transform-polish/target-ux/wasm32-unknown-unknown/release/deps/libgetrandom-371b41636bde2451.rmeta: /home/marc/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/getrandom-0.2.17/src/lib.rs /home/marc/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/getrandom-0.2.17/src/error.rs /home/marc/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/getrandom-0.2.17/src/util.rs /home/marc/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/getrandom-0.2.17/src/error_impls.rs /home/marc/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/getrandom-0.2.17/src/js.rs
+
+/home/marc/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/getrandom-0.2.17/src/lib.rs:
+/home/marc/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/getrandom-0.2.17/src/error.rs:
+/home/marc/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/getrandom-0.2.17/src/util.rs:
+/home/marc/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/getrandom-0.2.17/src/error_impls.rs:
+/home/marc/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/getrandom-0.2.17/src/js.rs:
