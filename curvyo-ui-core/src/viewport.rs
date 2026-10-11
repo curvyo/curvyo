@@ -79,6 +79,11 @@ impl Default for Zoom {
 /// `specs/0035-combine-and-break-apart` criterion 1a).
 pub const DOCUMENT_INSET_PX: f64 = 128.0;
 
+/// The least distance between the canvas's top edge and the document's top edge
+/// in a centred new view, CSS pixels: a document taller than the canvas starts
+/// here instead of being cut off at the top as well as at the bottom.
+const DOCUMENT_TOP_MARGIN_PX: f64 = 24.0;
+
 /// How far the real width change of a panel toggle may differ from the
 /// announced one, CSS pixels: the host rounds to whole device pixels.
 const PANEL_TOGGLE_TOLERANCE_PX: f64 = 1.5;
@@ -215,6 +220,28 @@ impl Viewport {
         self.origin = self.origin.translated(offset);
     }
 
+    /// Centres the document, `width_mm` by `height_mm`, in the canvas while
+    /// the view is still the untouched [`Viewport::with_document_inset`] one:
+    /// on x in the space right of the tool rail (from [`DOCUMENT_INSET_PX`]),
+    /// on y in the whole height. An axis the document does not fit keeps its
+    /// start margin ([`DOCUMENT_INSET_PX`] on x, 24 px on y) so the corner and the 0 ticks stay visible. A no-op once the maker
+    /// panned, zoomed or opened or closed the panel, and before the host's first
+    /// size report. Call it after every [`Viewport::resize`], with the
+    /// document's current size; it sets the origin from scratch, so repeated
+    /// calls do not drift.
+    pub fn centre_document(&mut self, width_mm: f64, height_mm: f64) {
+        let (canvas_width, canvas_height) = self.canvas_size;
+        if !self.inset_view || canvas_width <= 0.0 || canvas_height <= 0.0 {
+            return;
+        }
+        let scale = self.zoom.scale();
+        let left = (DOCUMENT_INSET_PX
+            + (canvas_width - DOCUMENT_INSET_PX - width_mm * scale) / 2.0)
+            .max(DOCUMENT_INSET_PX);
+        let top = ((canvas_height - height_mm * scale) / 2.0).max(DOCUMENT_TOP_MARGIN_PX);
+        self.origin = Point::new(-left / scale, -top / scale);
+    }
+
     /// Starts a drag-pan gesture (acceptance criteria 3, 4): records the
     /// document point currently under `(screen_x, screen_y)` as the
     /// anchor [`Viewport::continue_drag_pan`] keeps fixed under the
@@ -292,6 +319,10 @@ impl Viewport {
             (width - old_width - expected).abs() <= PANEL_TOGGLE_TOLERANCE_PX
                 && (height - old_height).abs() <= PANEL_TOGGLE_TOLERANCE_PX
         });
+        if keep_origin {
+            // The document stays where it is on screen: no longer the centred default.
+            self.inset_view = false;
+        }
         if !keep_origin && !self.inset_view && (old_width > 0.0 || old_height > 0.0) {
             let scale = self.zoom.scale();
             let delta = Vec2::new((old_width - width) / 2.0, (old_height - height) / 2.0)
