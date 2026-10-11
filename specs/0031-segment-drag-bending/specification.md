@@ -1,6 +1,6 @@
 # Segment drag bending: drag a line or curve segment of a path to bend it
 
-Status: Ready (`adrs.md` by the architect and the UX notes by the ux-engineer exist, both 2026-10-10; their requested changes are applied below)
+Status: Ready (`adrs.md` by the architect and the UX notes by the ux-engineer exist, both 2026-10-10; their requested changes are applied below) Amended by `0020-undo-redo`: the sentence "No undo yet." and the statements that no undo exists are removed; Ctrl+Z takes the step back.
 Priority: Should
 Origin: Customer (the request: click a segment in the Node tool and drag it to bend it, as in Inkscape). The shape rule, the 3 px dead zone, the hover look, Shift and the preview are my proposals, marked in "Decided by the product owner" and "Proposals".
 
@@ -54,7 +54,7 @@ Distances are in document millimetres unless a criterion says "px", which is scr
 19. Given the pointer is released with a net displacement d below 1e-9 mm (dragged away and back to the press point, or Shift made d zero), then nothing is written and no commit is made; a line stays a line with no stored handles.
 20. Given a bend in progress, when Escape is pressed or the system cancels the pointer, then the preview, the readout and the Lock badge disappear, the path is as committed, the segment stays selected (its 2 px overlay is drawn again on the unchanged shape), and the release writes nothing. One Escape ends the drag and nothing more (`0010` criterion 45); a second Escape clears the selection.
 21. Given the Select, Pen, Rectangle, Ellipse and Polygon/Star tools, then they behave as before: a drag on a path's outline in the Select tool still moves the object; the Pen still starts a new path; nothing bends.
-22. Given this slice, then no undo exists (`0020-undo-redo` is not built). The bend is one commit so that undo can take it later.
+22. Given a finished bend, then Ctrl+Z takes it back (`0020-undo-redo`; amended by `0020`). The bend is one commit.
 23. Given the tool rail, then the tooltip of the Node tool reads "Node tool (N)" with the second line "Drag a segment to bend it. Shift: one axis". There is no hint chip over a segment.
 
 ## Out of scope

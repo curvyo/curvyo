@@ -68,16 +68,17 @@ test("only a close chip is immediate, and nothing else has a chip", () => {
 });
 
 test("the Close path notice (criterion 20)", () => {
-  assert.equal(closeNoticeText({ closed: 3, skipped: 0 }), "Closed 3 paths. No undo yet.");
-  assert.equal(closeNoticeText({ closed: 1, skipped: 0 }), "Closed 1 path. No undo yet.");
+  assert.equal(closeNoticeText({ closed: 3, skipped: 0 }), "Closed 3 paths.");
+  assert.equal(closeNoticeText({ closed: 1, skipped: 0 }), "Closed 1 path.");
   const skipped = closeNoticeText({ closed: 2, skipped: 1 });
   assert.equal(
     skipped,
-    "Closed 2 paths. 1 path has fewer than 3 nodes and was not closed. No undo yet.",
+    "Closed 2 paths. 1 path has fewer than 3 nodes and was not closed.",
   );
-  assert.equal(skipped?.length, 78, "the sentence the spec counts as 78 characters");
-  assert.equal(closeNoticeMs(skipped ?? ""), 5000);
-  assert.equal(closeNoticeMs("Closed 3 paths. No undo yet."), 3000);
+  assert.equal(skipped?.length, 65, "the sentence without the 'No undo yet.' of before 0020");
+  assert.equal(closeNoticeMs(skipped ?? ""), 3000);
+  assert.equal(closeNoticeMs("x".repeat(71)), 5000);
+  assert.equal(closeNoticeMs("Closed 3 paths."), 3000);
   assert.equal(closeNoticeText({ closed: 0, skipped: 2 }), null);
 });
 
@@ -86,28 +87,28 @@ test("the Close path tooltip note by state", () => {
     closeTooltipNote({ closable: 0, skipped: 0 }),
     "Select an open path with 3 or more nodes.",
   );
-  assert.equal(closeTooltipNote({ closable: 2, skipped: 0 }), "Closes 2 open paths. No undo yet.");
+  assert.equal(closeTooltipNote({ closable: 2, skipped: 0 }), "Closes 2 open paths.");
   assert.equal(
     closeTooltipNote({ closable: 2, skipped: 1 }),
-    "Closes 2 of 3 open paths. 1 has fewer than 3 nodes. No undo yet.",
+    "Closes 2 of 3 open paths. 1 has fewer than 3 nodes.",
   );
 });
 
 test("a path whose three nodes start and end on one point has its own words", () => {
   assert.equal(
     closeNoticeText({ closed: 1, skipped: 1, sameEnds: 1 }),
-    "Closed 1 path. 1 path starts and ends on the same point and was not closed. No undo yet.",
+    "Closed 1 path. 1 path starts and ends on the same point and was not closed.",
   );
   assert.equal(
     closeNoticeText({ closed: 1, skipped: 3, sameEnds: 2 }),
-    "Closed 1 path. 1 path has fewer than 3 nodes and was not closed. 2 paths start and end on the same point and were not closed. No undo yet.",
+    "Closed 1 path. 1 path has fewer than 3 nodes and was not closed. 2 paths start and end on the same point and were not closed.",
   );
   assert.equal(
     closeTooltipNote({ closable: 1, skipped: 1, sameEnds: 1 }),
-    "Closes 1 of 2 open paths. 1 starts and ends on one point. No undo yet.",
+    "Closes 1 of 2 open paths. 1 starts and ends on one point.",
   );
   assert.equal(
     closeTooltipNote({ closable: 2, skipped: 2, sameEnds: 1 }),
-    "Closes 2 of 4 open paths. 1 has fewer than 3 nodes. 1 starts and ends on one point. No undo yet.",
+    "Closes 2 of 4 open paths. 1 has fewer than 3 nodes. 1 starts and ends on one point.",
   );
 });

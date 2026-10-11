@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { type CanvasNotice, type HistoryNames, MAC, useHistory } from "@/hooks/useHistory";
+import type { HistoryDirection } from "@/lib/historyText";
 import { type NudgeFeedback, useNudgeFeedback } from "@/hooks/useNudgeFeedback";
 import { type BackingBuffer, backingBufferFor, sameBackingBuffer } from "@/lib/canvasSize";
 import { ModifierTracker } from "@/lib/keyModifiers";
@@ -580,6 +582,18 @@ export interface EditorSession {
   /** The one-line message of a key that could not act ("Select one object to
    * type a value"), or `null`; it clears itself after 2 s. */
   keyHint: KeyHint | null;
+  /** The notice of the last undo or redo, in the canvas notice slot. */
+  canvasNotice: CanvasNotice | null;
+  /** A large undo or redo is running. */
+  historyBusy: boolean;
+  /** The names of the next undo and redo; `null` for an empty stack. */
+  historyNames: HistoryNames;
+  /** Undo or redo from a button. */
+  pressHistory: (direction: HistoryDirection, source?: "canvas" | "panel") => void;
+  /** Shows a line in the notice slot of the canvas. */
+  showHistoryNotice: (text: string, ms?: number) => void;
+  /** Wipes the history; the steps removed, -1 when ignored, -2 for a shared document. */
+  wipeHistory: () => number;
   /** The move readout and hidden announcements of a nudge and of select all. */
   nudgeFeedback: NudgeFeedback;
   convertSelected: (kind: "corner" | "symmetric" | "asymmetric") => void;
@@ -825,11 +839,13 @@ export function useEditorSession(
   /** Re-reads every bit of session-owned UI state after any call that
    * might have changed it — cheap, and simpler than having every call
    * site know which ones to refresh. */
+  const refreshHistoryRef = useRef<() => void>(() => {});
   const syncFromSession = useCallback(() => {
     const session = sessionRef.current;
     if (!session) {
       return;
     }
+    refreshHistoryRef.current();
     setToolState(session.tool() as Tool);
     setNodeToolbarState(readToolbarState(session.node_toolbar_state()));
     setPolyStarModeState(session.poly_star_mode() as PolyStarMode);
@@ -862,6 +878,11 @@ export function useEditorSession(
   }, [syncEntry, syncBadges]);
 
   const getSession = useCallback(() => sessionRef.current, []);
+  const history = useHistory(getSession, syncFromSession, containerRef);
+  const { refresh: refreshHistory, handleKeyOutcome, isDuplicateKey } = history;
+  useEffect(() => {
+    refreshHistoryRef.current = refreshHistory;
+  }, [refreshHistory]);
 
   const refreshCursor = useCallback(() => {
     const session = sessionRef.current;
@@ -948,6 +969,14 @@ export function useEditorSession(
           }
         }
         syncFromSession();
+        // Reads the file's history after the first paint, so that the first undo is as fast as
+        // later ones (`specs/0020-undo-redo` criterion 30c).
+        const idle = window.requestIdleCallback ?? ((run: () => void) => window.setTimeout(run, 200));
+        idle(() => {
+          if (sessionRef.current === session) {
+            session.warm_history();
+          }
+        });
       }),
     [enqueueSessionTask, syncFromSession],
   );
@@ -1653,6 +1682,10 @@ export function useEditorSession(
       if (!session) {
         return;
       }
+      if (isDuplicateKey(event)) {
+        event.preventDefault();
+        return;
+      }
       const outcome = session.key_down(
         event.key,
         event.shiftKey,
@@ -1660,12 +1693,19 @@ export function useEditorSession(
         event.altKey,
         event.repeat,
         event.nativeEvent.isComposing || isSpaceHeld,
+        MAC,
         event.timeStamp,
       );
       if (outcome === "ignored") {
         return;
       }
       event.preventDefault();
+      if (handleKeyOutcome(outcome)) {
+        setLiveReadout(readReadout(session));
+        setCursorHint(session.cursor_hint());
+        syncFromSession();
+        return;
+      }
       if (outcome === "select-all") {
         onSelectAll(session.selection_count());
       } else if (outcome === "nudge" || outcome === "nudge-new") {
@@ -1682,7 +1722,7 @@ export function useEditorSession(
       setCursorHint(session.cursor_hint());
       syncFromSession();
     },
-    [isSpaceHeld, syncFromSession, onNudge, onSelectAll, onEscape],
+    [handleKeyOutcome, isDuplicateKey, isSpaceHeld, syncFromSession, onNudge, onSelectAll, onEscape],
   );
 
   // A key hint clears itself after 2 s; a newer message restarts the clock.
@@ -1806,6 +1846,12 @@ export function useEditorSession(
     selectionCount,
     selectionAnnouncement,
     keyHint,
+    canvasNotice: history.notice,
+    historyBusy: history.busy,
+    historyNames: history.names,
+    pressHistory: history.press,
+    wipeHistory: history.wipe,
+    showHistoryNotice: history.showNotice,
     nudgeFeedback,
     convertSelected,
     makeLine,

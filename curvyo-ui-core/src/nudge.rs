@@ -174,7 +174,7 @@ pub enum NudgeOutcome {
     Moved {
         /// The run after this event.
         run: NudgeRun,
-        /// This event opened a new run (a new step, once `0020` groups commits).
+        /// This event opened a new run (a new step).
         new_run: bool,
     },
 }
@@ -186,9 +186,8 @@ pub enum NudgeOutcome {
 /// refuses (an object in `objects` that is gone from the document) leaves the version as it was
 /// and reports [`NudgeOutcome::NothingToMove`], not a move.
 ///
-/// Future work (`0020`, `specs/0044-editing-quick-wins/adrs.md` decision 4): when `continues` is
-/// true, this is where `Document::continue_step()` will be called before the write, so the
-/// commits of a held key form one step. It does not exist yet and nothing calls it.
+/// When the event continues a run, `Document::continue_step()` is called before the write, so the
+/// commits of a held key are one step (`specs/0020-undo-redo` criterion 54).
 pub fn nudge(
     document: &Document,
     objects: &[ObjectSnapshot],
@@ -207,7 +206,9 @@ pub fn nudge(
     let before = document.version();
     let continues = NudgeRun::continues(previous, event, &before);
     let ids: Vec<NodeId> = live.iter().map(|object| object.id()).collect();
-    // 0020: `Document::continue_step()` goes directly above this write when `continues`.
+    if continues {
+        document.continue_step();
+    }
     let _ = commit_move(document, &ids, event.offset(), false, minter);
     let after = document.version();
     if after == before {

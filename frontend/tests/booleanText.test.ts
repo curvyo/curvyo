@@ -39,7 +39,7 @@ test("the five operations come in the rail order with their names and rules", ()
 
 test("the tooltip note follows criteria 1 and 2", () => {
   const ready = { needsTwo: false, open: 0, of: 0 };
-  assert.equal(tooltipNote(ready, true), "Replaces the selection. No undo yet.");
+  assert.equal(tooltipNote(ready, true), "Replaces the selection.");
   assert.equal(
     tooltipNote({ needsTwo: false, open: 2, of: 3 }, true),
     "Needs closed paths: 2 of 3 selected are open.",
@@ -56,11 +56,11 @@ test("the tooltip note follows criteria 1 and 2", () => {
 test("a success names the operation and the counts (criterion 29)", () => {
   assert.equal(
     successText("union", result("applied", 3, 3, false)),
-    "Union: 3 objects became 1 path. No undo yet.",
+    "Union: 3 objects became 1 path.",
   );
   assert.equal(
     successText("difference", result("applied", 2, 2, true)),
-    "Difference: 2 objects became 1 compound path. No undo yet.",
+    "Difference: 2 objects became 1 compound path.",
   );
   assert.equal(successText("union", result("open_paths", 1, 3)), null);
 });

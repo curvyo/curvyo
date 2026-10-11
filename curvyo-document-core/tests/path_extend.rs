@@ -49,7 +49,10 @@ fn labels(document: &Document) -> Vec<String> {
     loro.travel_change_ancestors(&frontiers, &mut |change| {
         changes.push((
             change.lamport,
-            change.message.map(|m| m.to_string()).unwrap_or_default(),
+            change
+                .message
+                .map(|m| m.split(';').next().unwrap_or_default().to_string())
+                .unwrap_or_default(),
         ));
         ControlFlow::Continue(())
     })

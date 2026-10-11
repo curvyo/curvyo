@@ -199,7 +199,7 @@ mod tests {
             .loro()
             .get_change(loro::ID::new(peer, end - 1))
             .expect("the newest change exists");
-        assert_eq!(change.message(), "set_display_unit");
+        assert_eq!(change.message().split(';').next(), Some("set_display_unit"));
         assert_eq!(document.object(id), object);
         assert_eq!(document.size(), size);
 

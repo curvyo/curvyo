@@ -126,7 +126,10 @@ fn last_change_message(d: &Document) -> String {
     let l = loro_of(d);
     let mut out = String::new();
     l.travel_change_ancestors(&[l.oplog_frontiers().iter().next().unwrap()], &mut |m| {
-        out = m.message.map(|s| s.to_string()).unwrap_or_default();
+        out = m
+            .message
+            .map(|x| x.split(';').next().unwrap_or_default().to_string())
+            .unwrap_or_default();
         std::ops::ControlFlow::Break(())
     })
     .unwrap();

@@ -94,63 +94,77 @@ impl Session {
     /// Acceptance criterion 11 (the contextual toolbar's convert
     /// buttons). A no-op for the pen tool.
     pub fn convert_selected(&mut self, kind: AnchorKind) {
-        if self.tool == Tool::Node {
-            self.node.convert_selected(&self.document, kind);
-        }
+        self.recording(|this| {
+            if this.tool == Tool::Node {
+                this.node.convert_selected(&this.document, kind);
+            }
+        });
     }
 
     /// Acceptance criterion 14's "make line" (the contextual toolbar).
     pub fn make_line(&mut self) {
-        if self.tool == Tool::Node {
-            self.node.make_line(&self.document);
-        }
+        self.recording(|this| {
+            if this.tool == Tool::Node {
+                this.node.make_line(&this.document);
+            }
+        });
     }
 
     /// Acceptance criterion 14's "make curve" (the contextual toolbar).
     pub fn make_curve(&mut self) {
-        if self.tool == Tool::Node {
-            self.node.make_curve(&self.document);
-        }
+        self.recording(|this| {
+            if this.tool == Tool::Node {
+                this.node.make_curve(&this.document);
+            }
+        });
     }
 
     /// Acceptance criteria 8-11: Join (the contextual toolbar/context
     /// menu button). A no-op outside the node tool or when the current
     /// selection does not qualify.
     pub fn join_selected(&mut self) {
-        if self.tool == Tool::Node {
-            self.node.join_selected(&self.document);
-        }
+        self.recording(|this| {
+            if this.tool == Tool::Node {
+                this.node.join_selected(&this.document);
+            }
+        });
     }
 
     /// Acceptance criteria 12-15: Split (the contextual toolbar/context
     /// menu button). A no-op outside the node tool or when the current
     /// selection does not qualify.
     pub fn split_selected(&mut self) {
-        if self.tool == Tool::Node {
-            self.node.split_selected(&mut self.minter, &self.document);
-        }
+        self.recording(|this| {
+            if this.tool == Tool::Node {
+                this.node.split_selected(&mut this.minter, &this.document);
+            }
+        });
     }
 
     /// Acceptance criterion 12: a double-click (already recognized by
     /// the host) at `point`.
     pub fn insert_at(&mut self, point: Point) {
-        if self.tool == Tool::Node {
-            let paths = self.paths();
-            let tolerances = self.hit_tolerances();
-            self.node
-                .insert_at(&mut self.minter, &self.document, &paths, point, tolerances);
-        }
+        self.recording(|this| {
+            if this.tool == Tool::Node {
+                let paths = this.paths();
+                let tolerances = this.hit_tolerances();
+                this.node
+                    .insert_at(&mut this.minter, &this.document, &paths, point, tolerances);
+            }
+        });
     }
 
     /// The contextual toolbar's "Insert node" action: splits the
     /// currently selected segment at its midpoint. A no-op outside the
     /// node tool or without a segment selected.
     pub fn insert_selected(&mut self) {
-        if self.tool == Tool::Node {
-            let paths = self.paths();
-            self.node
-                .insert_on_selected_segment(&mut self.minter, &self.document, &paths);
-        }
+        self.recording(|this| {
+            if this.tool == Tool::Node {
+                let paths = this.paths();
+                this.node
+                    .insert_on_selected_segment(&mut this.minter, &this.document, &paths);
+            }
+        });
     }
 
     /// Which contextual-toolbar actions apply right now. Everything is

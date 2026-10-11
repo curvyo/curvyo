@@ -103,6 +103,35 @@ impl Angle {
     }
 }
 
+/// A wall-clock time in whole seconds since the Unix epoch, as the editor reads it and passes it in
+/// (this crate reads no clock, `CLAUDE.md` §6). Zero means "unknown": the time of a step from a file
+/// written before steps carried one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+pub struct Timestamp(u64);
+
+impl Timestamp {
+    /// The unknown time.
+    pub const UNKNOWN: Self = Self(0);
+
+    /// Builds a [`Timestamp`] from seconds since the Unix epoch.
+    #[must_use]
+    pub const fn from_secs(seconds: u64) -> Self {
+        Self(seconds)
+    }
+
+    /// The seconds since the Unix epoch; zero when unknown.
+    #[must_use]
+    pub const fn as_secs(self) -> u64 {
+        self.0
+    }
+
+    /// Whether the time is known.
+    #[must_use]
+    pub const fn is_known(self) -> bool {
+        self.0 != 0
+    }
+}
+
 /// A document's page size in millimetres (ADR 0002 §2; this slice's minimal
 /// root record, `specs/0001-project-file-foundation/adrs.md`).
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]

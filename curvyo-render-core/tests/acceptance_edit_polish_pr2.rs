@@ -92,6 +92,7 @@ fn build(
         &SelectDecorationInput {
             selected: selected.iter().map(|b| (id, doc_quad(view, *b))).collect(),
             hovered: hovered.map(|b| (id, doc_quad(view, b))),
+            history_hovered: Vec::new(),
             device_pixel_ratio: dpr,
             skew_guide: None,
         },
@@ -833,6 +834,7 @@ fn hostile_non_finite_corners_do_not_panic_or_hang() {
                 &SelectDecorationInput {
                     selected: vec![(id, q)],
                     hovered: Some((id, q)),
+                    history_hovered: Vec::new(),
                     device_pixel_ratio: 1.0,
                     skew_guide: None,
                 },
@@ -855,6 +857,7 @@ fn hostile_non_finite_corners_do_not_panic_or_hang() {
             &SelectDecorationInput {
                 selected: vec![(id, q)],
                 hovered: None,
+                history_hovered: Vec::new(),
                 device_pixel_ratio: 2.0,
                 skew_guide: None,
             },

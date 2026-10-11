@@ -4,7 +4,7 @@
 //! §3; `specs/0001-project-file-foundation/adrs.md`, "a minimal document root
 //! record, and no more").
 
-use loro::{CommitOptions, ExportMode, LoroDoc, LoroMap, LoroValue};
+use loro::{ExportMode, LoroDoc, LoroMap, LoroValue};
 use serde::Serialize;
 
 use crate::display_unit::DisplayUnit;
@@ -14,7 +14,7 @@ use crate::units::{DocumentSize, Length};
 
 /// An opaque marker of a document's state, see [`Document::version`].
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DocumentVersion(loro::Frontiers);
+pub struct DocumentVersion(pub(crate) loro::Frontiers);
 
 /// The container `format_version` this build writes and the newest it
 /// accepts on read (ADR 0004 §9).
@@ -160,7 +160,13 @@ pub(crate) const OBJECTS_TREE: &str = "paths";
 /// this type's public API (ADR 0004 §3): callers only ever see
 /// [`DocumentSize`] and this crate's own error types.
 pub struct Document {
-    loro: LoroDoc,
+    pub(crate) loro: LoroDoc,
+    /// The commit path's session state (`crate::history`).
+    pub(crate) commit_state: crate::history::CommitState,
+    /// The container chains of the log, for the touched objects of a step.
+    pub(crate) container_index: std::cell::RefCell<crate::history::ContainerIndex>,
+    /// Every step of the log with the stacks of each peer, for the history list.
+    pub(crate) step_index: std::cell::RefCell<crate::history::StepIndex>,
 }
 
 impl Document {
@@ -200,7 +206,16 @@ impl Document {
             root.insert(KEY_WIDTH_MM, size.width.as_mm()).unwrap();
             root.insert(KEY_HEIGHT_MM, size.height.as_mm()).unwrap();
         }
-        Self { loro }
+        let document = Self {
+            loro,
+            commit_state: crate::history::CommitState::default(),
+            container_index: std::cell::RefCell::default(),
+            step_index: std::cell::RefCell::default(),
+        };
+        document.commit_new_document();
+        // A document without history has nothing to read.
+        document.commit_state.set_warm();
+        document
     }
 
     /// Rebuilds a document from a previously exported Loro snapshot — the
@@ -238,7 +253,12 @@ impl Document {
         {
             return Err(OpenError::Damaged);
         }
-        Ok(Self { loro })
+        Ok(Self {
+            loro,
+            commit_state: crate::history::CommitState::default(),
+            container_index: std::cell::RefCell::default(),
+            step_index: std::cell::RefCell::default(),
+        })
     }
 
     /// The document's size in millimetres.
@@ -281,19 +301,6 @@ impl Document {
     #[must_use]
     pub fn version(&self) -> DocumentVersion {
         DocumentVersion(self.loro.state_frontiers())
-    }
-
-    /// Commits the pending auto-commit transaction with `label` as its
-    /// (persisted) commit message, so each editing method in
-    /// [`crate::paths`] ends its own transaction instead of letting every
-    /// edit since the last explicit commit pile into one (ADR 0002 §9;
-    /// `specs/0002-path-node-editing/adrs.md`'s PR review: "a pen session is
-    /// one commit" only holds if *every* mutating method commits its own
-    /// work, undo-readiness for a future undo/redo feature depends on
-    /// one commit per interaction).
-    pub(crate) fn commit_with_label(&self, label: &str) {
-        self.loro
-            .commit_with(CommitOptions::new().commit_msg(label));
     }
 
     fn read_mm(root: &LoroMap, key: &str) -> Option<f64> {

@@ -94,8 +94,22 @@ impl Session {
         // A creation tool draws no selection box at all (choosing one clears
         // the selection, customer decision 2026-10-06 reversing criterion 27);
         // the Pen and Node tools draw their own.
+        // The objects of a hovered History row get their hover box under every tool.
+        let history_hovered: Vec<_> = self
+            .history_hover
+            .iter()
+            .filter_map(|&id| {
+                objects
+                    .iter()
+                    .find(|object| object.id() == id)
+                    .map(|object| (id, oriented_bounds(object).document_corners()))
+            })
+            .collect();
         if self.tool != Tool::Select {
-            return SelectDecorationInput::default();
+            return SelectDecorationInput {
+                history_hovered,
+                ..SelectDecorationInput::default()
+            };
         }
         // A multi-selection draws its member boxes with the group box
         // (`group_view.rs`), not here.
@@ -127,6 +141,7 @@ impl Session {
         SelectDecorationInput {
             selected,
             hovered,
+            history_hovered,
             device_pixel_ratio: self.device_pixel_ratio,
             skew_guide: self.skew_guide_now(),
         }

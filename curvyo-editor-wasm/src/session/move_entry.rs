@@ -66,16 +66,18 @@ impl Session {
         second: &str,
         mode: MoveEntryMode,
     ) -> EntryOutcome {
-        if self.open_move_entry().is_none() {
-            self.select.cancel_entry();
-            return EntryOutcome::Unchanged;
-        }
-        self.select.commit_move_entry(
-            &self.document,
-            &mut self.selection,
-            &mut self.minter,
-            [first, second],
-            mode,
-        )
+        self.recording(|this| -> EntryOutcome {
+            if this.open_move_entry().is_none() {
+                this.select.cancel_entry();
+                return EntryOutcome::Unchanged;
+            }
+            this.select.commit_move_entry(
+                &this.document,
+                &mut this.selection,
+                &mut this.minter,
+                [first, second],
+                mode,
+            )
+        })
     }
 }

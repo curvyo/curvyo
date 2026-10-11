@@ -118,6 +118,7 @@ fn ac65_ac67_the_session_draws_strokes_then_the_dashed_box_then_the_handles() {
             &SelectDecorationInput {
                 selected: vec![(id, rect_corners(10.0, 10.0, 40.0, 20.0))],
                 hovered: None,
+                history_hovered: Vec::new(),
                 device_pixel_ratio: dpr,
                 skew_guide: None,
             },
@@ -209,6 +210,7 @@ fn ac65_the_box_keeps_snapping_after_zoom_and_pan() {
                 &SelectDecorationInput {
                     selected: vec![(id, rect_corners(10.0, 10.0, 40.0, 20.0))],
                     hovered: None,
+                    history_hovered: Vec::new(),
                     device_pixel_ratio: dpr,
                     skew_guide: None,
                 },
@@ -261,6 +263,7 @@ fn ac66_hovering_an_unselected_object_draws_a_solid_accent_hover_box() {
         &SelectDecorationInput {
             selected: vec![],
             hovered: Some((b, rect_corners(100.0, 10.0, 40.0, 20.0))),
+            history_hovered: Vec::new(),
             device_pixel_ratio: 2.0,
             skew_guide: None,
         },
@@ -294,6 +297,7 @@ fn ac66_hovering_an_unselected_object_draws_a_solid_accent_hover_box() {
         &SelectDecorationInput {
             selected: vec![(a, rect_corners(10.0, 10.0, 40.0, 20.0))],
             hovered: None,
+            history_hovered: Vec::new(),
             device_pixel_ratio: 2.0,
             skew_guide: None,
         },
@@ -321,6 +325,7 @@ fn ac66_hovering_the_selected_object_adds_no_hover_box() {
         &SelectDecorationInput {
             selected: vec![],
             hovered: Some((id, rect_corners(10.0, 10.0, 40.0, 20.0))),
+            history_hovered: Vec::new(),
             device_pixel_ratio: 1.0,
             skew_guide: None,
         },

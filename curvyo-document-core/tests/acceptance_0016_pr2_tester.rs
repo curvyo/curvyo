@@ -107,7 +107,14 @@ fn last_label(d: &Document) -> String {
         let c = l.get_change(loro::ID::new(*p, *e - 1)).unwrap();
         let lamport = c.lamport;
         if best.as_ref().is_none_or(|(b, _)| lamport >= *b) {
-            best = Some((lamport, c.message().to_string()));
+            best = Some((
+                lamport,
+                c.message()
+                    .split(';')
+                    .next()
+                    .unwrap_or_default()
+                    .to_string(),
+            ));
         }
     }
     let _ = (peer, end);

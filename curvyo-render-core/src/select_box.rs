@@ -38,6 +38,9 @@ pub struct SelectDecorationInput {
     pub selected: Vec<(NodeId, SelectionBox)>,
     /// A hovered, not-yet-selected object's id and box, if any.
     pub hovered: Option<(NodeId, SelectionBox)>,
+    /// The objects a History row touches while the row is hovered or focused
+    /// (`specs/0020-undo-redo` criterion 40): drawn like [`Self::hovered`].
+    pub history_hovered: Vec<(NodeId, SelectionBox)>,
     /// `window.devicePixelRatio`: device pixels per screen (CSS) pixel. An
     /// axis-aligned box line snaps to whole device pixels with it. A value
     /// that is not a positive finite number, and the default 0, read as 1.
@@ -358,7 +361,8 @@ pub fn build(view: ViewTransform, input: &SelectDecorationInput) -> DrawList {
             }
         }
     }
-    if let Some((_, corners)) = input.hovered {
+    for (_, corners) in input.hovered.iter().chain(&input.history_hovered) {
+        let corners = *corners;
         let screen = ScreenBox::new(view, corners, ratio);
         let corners = screen.document_corners(view);
         let width_mm = screen.width_px / view.scale();

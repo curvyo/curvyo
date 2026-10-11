@@ -24,7 +24,9 @@ serde_json = { version = "1", default-features = false, features = ["std"] }
 # written, which needs `display` (the `toml_writer` crate, pure Rust, builds for wasm32).
 toml = { version = "1.1", default-features = false, features = ["std", "parse", "display", "serde"] }
 zip = { version = "8", default-features = false, features = ["deflate"] }
-loro = { version = "1.16", default-features = false }
+# Pinned exactly: undo of Delete revives a node through an injected tree move that the handler API
+# forbids (ADR 0014 §11). A Loro upgrade is taken only with `tests/loro_revival_canary.rs` green.
+loro = { version = "=1.16.2", default-features = false }
 kurbo = { version = "0.13", default-features = false, features = ["std"] }
 lyon = "1"
 # Pinned exactly: a polygon boolean engine whose rare defects would ruin a workpiece, so every

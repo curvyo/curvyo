@@ -1623,6 +1623,7 @@ fn hostile_random_sequences_never_panic_and_ignored_keys_change_nothing() {
                         alt: rng.next().is_multiple_of(8),
                         repeat: rng.next().is_multiple_of(6),
                         dom_blocked: rng.next().is_multiple_of(8),
+                        mac: false,
                         time_ms: 0.0,
                     };
                     let before = bundle(&s);
