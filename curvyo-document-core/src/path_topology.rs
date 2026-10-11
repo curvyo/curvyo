@@ -267,10 +267,12 @@ impl Document {
 
         let tree = self.loro().get_tree(OBJECTS_TREE);
         let b_tree_id = crate::paths::tree_id_of(b_path);
+        let parents = crate::groups::parents_of(&tree, &[b_tree_id]);
         // invariant: `self.path(b_path)` resolved this same node moments
         // ago in `join_endpoints`.
         #[allow(clippy::unwrap_used)]
         tree.delete(b_tree_id).unwrap();
+        crate::groups::remove_emptied_groups(&tree, &parents);
 
         self.commit_with_label("join_endpoints");
         Ok((a_path, a_anchor.id))

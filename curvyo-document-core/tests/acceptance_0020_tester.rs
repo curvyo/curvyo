@@ -652,8 +652,8 @@ fn c35_author_is_you_for_this_session_and_earlier_for_every_other_peer() {
 
 #[test]
 fn c37_c59_no_format_version_bump_and_optional_keys_load_in_a_reader_that_ignores_them() {
-    // The build before this one (origin/main on 2026-10-10) is format version 10.
-    assert_eq!(CURRENT_FORMAT_VERSION, 10, "criterion 37 and 59: no bump");
+    // History adds no bump of its own: the version is whatever the build had (10 on
+    // 2026-10-10; `0023-groups` took 11 afterwards).
     let a = Document::new(1);
     let r = rect(&a, 0.0);
     set_width(&a, r, 2.0);
@@ -677,7 +677,7 @@ fn c37_c59_no_format_version_bump_and_optional_keys_load_in_a_reader_that_ignore
     )
     .unwrap();
     let v: serde_json::Value = serde_json::from_str(&manifest).unwrap();
-    assert_eq!(v["format_version"], 10);
+    assert_eq!(v["format_version"], CURRENT_FORMAT_VERSION);
     // No new member in the container.
     let names: Vec<String> = archive.file_names().map(str::to_owned).collect();
     let plain_archive = zip::ZipArchive::new(std::io::Cursor::new(pack(&a, "t").unwrap())).unwrap();

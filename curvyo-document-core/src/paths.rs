@@ -8,13 +8,13 @@
 //! deferred is that each mutating method ends in exactly one Loro commit"
 //! (ADR 0002 §9).
 
-use loro::{LoroMap, LoroMovableList, TreeID, TreeParentId};
+use loro::{LoroMap, LoroMovableList, TreeID};
 
 use crate::document::{Document, OBJECTS_TREE};
 use crate::path_codec::{
     self, KEY_HANDLE_IN, KEY_HANDLE_OUT, KEY_POINT, adjacent_segment_indices, anchor_index,
     anchor_map_at, anchors_container, insert_anchor_at, insert_anchors_container,
-    neighbour_tangent, node_exists, push_anchor, read_closed, read_kind, read_point, read_vec2,
+    leaf_exists, neighbour_tangent, push_anchor, read_closed, read_kind, read_point, read_vec2,
     write_kind, write_point, write_vec2,
 };
 use crate::path_model::{
@@ -117,17 +117,17 @@ impl Document {
         id
     }
 
-    /// Every object's identity (path or primitive alike), in sibling
-    /// (z-)order (ADR 0002 §5) — never an array offset a caller may rely
-    /// on staying stable. Renamed from `path_ids` in `primitive-shapes`
-    /// (architect review): it always listed every root tree node, and
-    /// now that some of those are primitives, the old name was
-    /// misleading. [`Document::path`] and [`Document::primitive`] each
-    /// filter the result to their own kind.
+    /// Every object that has geometry (path or primitive alike) in paint
+    /// order (ADR 0002 §5): depth first, siblings in z-order. A group is
+    /// not listed, its leaves are (`specs/0023-groups`), so the list is
+    /// still "everything that is drawn". Never an array offset a caller may
+    /// rely on staying stable. Renamed from `path_ids` in
+    /// `primitive-shapes` (architect review). [`Document::path`] and
+    /// [`Document::primitive`] each filter the result to their own kind.
     #[must_use]
     pub fn object_ids(&self) -> Vec<NodeId> {
         let tree = self.loro().get_tree(OBJECTS_TREE);
-        tree.roots()
+        crate::groups::leaves_under(&tree, None)
             .into_iter()
             .map(|id| NodeId::from_parts(id.peer, id.counter))
             .collect()
@@ -144,7 +144,7 @@ impl Document {
     pub fn path(&self, id: NodeId) -> Option<PathSnapshot> {
         let tree = self.loro().get_tree(OBJECTS_TREE);
         let tree_id = tree_id_of(id);
-        if !node_exists(&tree, tree_id) {
+        if !leaf_exists(&tree, tree_id) {
             return None;
         }
         let meta = tree.get_meta(tree_id).ok()?;
@@ -462,10 +462,12 @@ impl Document {
         if remaining < 2 {
             let tree = self.loro().get_tree(OBJECTS_TREE);
             let tree_id = tree_id_of(path);
+            let parents = crate::groups::parents_of(&tree, &[tree_id]);
             // invariant: `path_parts` above already confirmed this node
             // exists.
             #[allow(clippy::unwrap_used)]
             tree.delete(tree_id).unwrap();
+            crate::groups::remove_emptied_groups(&tree, &parents);
             self.commit_with_label("delete_anchors");
             return Ok(());
         }
@@ -572,10 +574,10 @@ impl Document {
         rotation: crate::units::Angle,
     ) -> NodeId {
         let tree = self.loro().get_tree(OBJECTS_TREE);
-        // invariant: creating a root-level node on a freshly obtained
-        // tree handle cannot fail.
+        // invariant: creating a node under the root or a live group on a
+        // freshly obtained tree handle cannot fail.
         #[allow(clippy::unwrap_used)]
-        let tree_id = tree.create(TreeParentId::Root).unwrap();
+        let tree_id = tree.create(self.creation_parent(&tree)).unwrap();
         // invariant: reading the meta map of a node this call just
         // created cannot fail.
         #[allow(clippy::unwrap_used)]
@@ -601,7 +603,7 @@ impl Document {
     ) -> Result<(LoroMap, LoroMovableList), PathEditError> {
         let tree = self.loro().get_tree(OBJECTS_TREE);
         let tree_id = tree_id_of(path);
-        if !node_exists(&tree, tree_id) {
+        if !leaf_exists(&tree, tree_id) {
             return Err(PathEditError::NoSuchPath);
         }
         let meta = tree

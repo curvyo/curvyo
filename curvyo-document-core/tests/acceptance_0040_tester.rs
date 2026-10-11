@@ -353,8 +353,8 @@ fn ac4_the_background_of_an_opened_older_file_is_editable_and_then_saved() {
 fn ac5_the_writer_writes_the_named_constant_and_it_is_ten() {
     let bytes = pack(&Document::new(1), "0.1.0").unwrap();
     assert_eq!(manifest_version(&bytes), u64::from(CURRENT_FORMAT_VERSION));
-    // `main` was 9 before this slice, nothing else merged first (specs/README.md plan).
-    assert_eq!(CURRENT_FORMAT_VERSION, 10);
+    // `main` was 9 before this slice (specs/README.md plan); 0023 took 11 after it.
+    assert!(CURRENT_FORMAT_VERSION >= 10);
 }
 
 #[test]

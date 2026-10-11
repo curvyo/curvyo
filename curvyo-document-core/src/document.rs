@@ -128,7 +128,17 @@ pub struct DocumentVersion(pub(crate) loro::Frontiers);
 /// (`crate::document_background`). The number is provisional by the rule above:
 /// whichever PR merges first takes `main`'s number plus one. Golden:
 /// `background_v10.curvyo`.
-pub const CURRENT_FORMAT_VERSION: u32 = 10;
+///
+/// Bumped to 11 in `groups` (`specs/0023-groups/adrs.md`, "the stored shape of a group"): an
+/// object-tree node may have children, and a node whose meta map holds `group: true` is a group
+/// (no style, no anchors, no shape tag; its children are its members in z-order, at most 32
+/// groups on one chain). A build that stops at version 10 would read the group node as a path
+/// without anchors and the members as objects nested under it that it never draws, a silent
+/// partial read, so it must refuse the file as too new. Migration from version 10 is none: a file
+/// from an earlier build is a tree of depth 0 and opens unchanged and is not rewritten. A group
+/// nested deeper than 32, a leaf with children, and a group that carries anchors or a shape tag
+/// are refused as damaged (`crate::groups`). Golden: `groups_v11.curvyo`.
+pub const CURRENT_FORMAT_VERSION: u32 = 11;
 
 pub(crate) const ROOT_MAP: &str = "root";
 const KEY_FORMAT_VERSION: &str = "format_version";
@@ -167,6 +177,8 @@ pub struct Document {
     pub(crate) container_index: std::cell::RefCell<crate::history::ContainerIndex>,
     /// Every step of the log with the stacks of each peer, for the history list.
     pub(crate) step_index: std::cell::RefCell<crate::history::StepIndex>,
+    /// The group new objects are created in (`crate::groups`); view state, never stored.
+    pub(crate) draw_parent: std::cell::Cell<Option<loro::TreeID>>,
 }
 
 impl Document {
@@ -211,6 +223,7 @@ impl Document {
             commit_state: crate::history::CommitState::default(),
             container_index: std::cell::RefCell::default(),
             step_index: std::cell::RefCell::default(),
+            draw_parent: std::cell::Cell::default(),
         };
         document.commit_new_document();
         // A document without history has nothing to read.
@@ -258,6 +271,7 @@ impl Document {
             commit_state: crate::history::CommitState::default(),
             container_index: std::cell::RefCell::default(),
             step_index: std::cell::RefCell::default(),
+            draw_parent: std::cell::Cell::default(),
         })
     }
 
@@ -334,12 +348,7 @@ impl Document {
     /// # Errors
     /// Returns [`SaveError::Encode`] if the view cannot be serialized.
     pub fn export_json(&self) -> Result<Vec<u8>, SaveError> {
-        let objects = self
-            .object_ids()
-            .into_iter()
-            .filter_map(|id| self.object(id))
-            .map(ObjectJson::from)
-            .collect();
+        let objects = self.json_children(None);
         let view = DocumentJsonView {
             format_version: CURRENT_FORMAT_VERSION,
             size: self.size(),
@@ -348,6 +357,26 @@ impl Document {
             objects,
         };
         serde_json::to_vec_pretty(&view).map_err(|_| SaveError::Encode)
+    }
+}
+
+impl Document {
+    /// The `document.json` entries of the children of `parent` (`None` is the document root), in
+    /// z-order; a group nests its own children.
+    fn json_children(&self, parent: Option<crate::path_model::NodeId>) -> Vec<ObjectJson> {
+        self.children(parent)
+            .into_iter()
+            .filter_map(|id| {
+                if self.is_group(id) {
+                    Some(ObjectJson::Group {
+                        id,
+                        objects: self.json_children(Some(id)),
+                    })
+                } else {
+                    self.object(id).map(ObjectJson::from)
+                }
+            })
+            .collect()
     }
 }
 
@@ -374,6 +403,11 @@ struct DocumentJsonView {
 #[derive(Serialize)]
 #[serde(tag = "shape", rename_all = "lowercase")]
 enum ObjectJson {
+    /// A group (`specs/0023-groups`): no geometry and no style, only its children in z-order.
+    Group {
+        id: crate::path_model::NodeId,
+        objects: Vec<ObjectJson>,
+    },
     Path {
         id: crate::path_model::NodeId,
         closed: bool,

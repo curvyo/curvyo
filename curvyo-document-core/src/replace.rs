@@ -9,7 +9,7 @@ use loro::TreeParentId;
 
 use crate::document::{Document, OBJECTS_TREE};
 use crate::objects::ObjectEditError;
-use crate::path_codec::{self, anchor_map_at, insert_anchors_container, node_exists, push_anchor};
+use crate::path_codec::{self, anchor_map_at, insert_anchors_container, leaf_exists, push_anchor};
 use crate::path_model::{AnchorId, NewAnchor, NodeId};
 use crate::paths::tree_id_of;
 use crate::style_codec;
@@ -73,7 +73,7 @@ impl Document {
         let mut doomed = Vec::with_capacity(operands.len());
         for &operand in operands {
             let tree_id = tree_id_of(operand);
-            if !node_exists(&tree, tree_id) {
+            if !leaf_exists(&tree, tree_id) {
                 return Err(ObjectEditError::NoSuchObject);
             }
             if !doomed.contains(&tree_id) {
@@ -88,11 +88,13 @@ impl Document {
 
         tree.enable_fractional_index(0);
         let new_tree_id = create_path_after(&tree, tree_id_of(base), &style, outlines);
+        let parents = crate::groups::parents_of(&tree, &doomed);
         for tree_id in doomed {
             // invariant: every id here was just confirmed present above.
             #[allow(clippy::unwrap_used)]
             tree.delete(tree_id).unwrap();
         }
+        crate::groups::remove_emptied_groups(&tree, &parents);
         self.commit_with_label(label);
         Ok(NodeId::from_parts(new_tree_id.peer, new_tree_id.counter))
     }
@@ -140,7 +142,7 @@ impl Document {
         let mut styles = Vec::with_capacity(parts.len());
         for (compound, _) in parts {
             let tree_id = tree_id_of(*compound);
-            if !node_exists(&tree, tree_id) {
+            if !leaf_exists(&tree, tree_id) {
                 return Err(ObjectEditError::NoSuchObject);
             }
             let meta = tree
@@ -163,11 +165,13 @@ impl Document {
                 after = piece;
             }
         }
+        let parents = crate::groups::parents_of(&tree, &doomed);
         for tree_id in doomed {
             // invariant: every id here was just confirmed present above.
             #[allow(clippy::unwrap_used)]
             tree.delete(tree_id).unwrap();
         }
+        crate::groups::remove_emptied_groups(&tree, &parents);
         self.commit_with_label("break_apart");
         Ok(created)
     }
@@ -183,7 +187,7 @@ fn create_path_after(
 ) -> loro::TreeID {
     // `mov_after` needs the fractional-index feature on for this tree (the caller enabled it).
     // invariant: a root-level create on a live tree cannot fail, and reading the meta map of the
-    // node just created cannot fail.
+    // node just created cannot fail. `mov_after` below puts the node into the parent of `after`.
     #[allow(clippy::unwrap_used)]
     let new_tree_id = tree.create(TreeParentId::Root).unwrap();
     #[allow(clippy::unwrap_used)]
@@ -198,7 +202,7 @@ fn create_path_after(
     }
     write_extra_subpaths(&meta, rest);
     // invariant: `after` was resolved by the caller and the new node was just created: both are
-    // live root siblings.
+    // live.
     #[allow(clippy::unwrap_used)]
     tree.mov_after(new_tree_id, after).unwrap();
     new_tree_id
@@ -212,13 +216,13 @@ fn check_new_anchor_ids(
     doomed: &[loro::TreeID],
     seen: &HashSet<AnchorId>,
 ) -> Result<(), ObjectEditError> {
-    for root in tree.roots() {
-        if doomed.contains(&root) {
+    for leaf in crate::groups::leaves_under(tree, None) {
+        if doomed.contains(&leaf) {
             continue;
         }
-        // invariant: a root of the tree has a meta map.
+        // invariant: a leaf of the tree has a meta map.
         #[allow(clippy::unwrap_used)]
-        let meta = tree.get_meta(root).unwrap();
+        let meta = tree.get_meta(leaf).unwrap();
         if crate::shape_codec::read_shape_tag(&meta).is_some() {
             continue;
         }

@@ -13,7 +13,7 @@ use loro::{Container, TreeID, ValueOrContainer};
 
 use crate::document::{Document, OBJECTS_TREE};
 use crate::path_codec::{
-    self, KEY_HANDLE_IN, KEY_HANDLE_OUT, KEY_ID, KEY_POINT, anchor_map_at, node_exists,
+    self, KEY_HANDLE_IN, KEY_HANDLE_OUT, KEY_ID, KEY_POINT, anchor_map_at, leaf_exists, node_exists,
     write_point, write_vec2,
 };
 use crate::path_model::{AnchorId, NodeId};
@@ -62,6 +62,18 @@ pub enum ObjectEditError {
     /// different ids: nothing was written.
     #[error("a converted shape must be one closed outline of two or more anchors")]
     InvalidConversion,
+    /// [`Document::group_objects`] was given fewer than two different objects.
+    #[error("a group needs two or more objects")]
+    NotEnoughObjects,
+    /// [`Document::group_objects`] was given objects that do not share one parent.
+    #[error("the objects do not share one parent")]
+    NotSiblings,
+    /// A group would put more than [`crate::MAX_GROUP_DEPTH`] groups on one chain.
+    #[error("groups can be nested 32 levels deep")]
+    TooDeep,
+    /// [`Document::ungroup`] was given an object that is not a group.
+    #[error("the object is not a group")]
+    NotAGroup,
 }
 
 /// One object to duplicate with [`Document::duplicate_objects`], and the
@@ -119,7 +131,7 @@ impl Document {
             .iter()
             .map(|&id| {
                 let tree_id = tree_id_of(id);
-                if !node_exists(&tree, tree_id) {
+                if !leaf_exists(&tree, tree_id) {
                     return Err(ObjectEditError::NoSuchObject);
                 }
                 tree.get_meta(tree_id)
@@ -171,39 +183,29 @@ impl Document {
         let mut seen = HashSet::with_capacity(sources.len());
         let sources: Vec<&CopySource> = sources.iter().filter(|s| seen.insert(s.id)).collect();
         let tree = self.loro().get_tree(OBJECTS_TREE);
-        let metas: Vec<loro::LoroMap> = sources
-            .iter()
-            .map(|source| {
-                let tree_id = tree_id_of(source.id);
-                if !node_exists(&tree, tree_id) {
-                    return Err(ObjectEditError::NoSuchObject);
-                }
-                let meta = tree
-                    .get_meta(tree_id)
-                    .map_err(|_| ObjectEditError::NoSuchObject)?;
-                check_anchor_ids(&meta, &source.anchor_ids)?;
-                Ok(meta)
-            })
-            .collect::<Result<_, _>>()?;
+        for source in &sources {
+            let tree_id = tree_id_of(source.id);
+            if !node_exists(&tree, tree_id) {
+                return Err(ObjectEditError::NoSuchObject);
+            }
+            check_anchor_ids(&tree, tree_id, &source.anchor_ids)?;
+        }
 
         // `mov_after` needs the fractional-index feature on for this tree;
         // enabled on every call, as `split_at_anchor` does.
         tree.enable_fractional_index(0);
         let mut created = Vec::with_capacity(sources.len());
-        for (source, source_meta) in sources.iter().zip(&metas) {
-            // invariant: a root-level create on a live tree cannot fail, and
-            // reading the meta map of the node just created cannot fail.
-            #[allow(clippy::unwrap_used)]
-            let new_tree_id = tree.create(loro::TreeParentId::Root).unwrap();
-            #[allow(clippy::unwrap_used)]
-            let meta = tree.get_meta(new_tree_id).unwrap();
-            copy_map(source_meta, &meta);
-            if shape_codec::read_shape_tag(&meta).is_none() {
-                renumber_anchors(&meta, &source.anchor_ids);
-            }
-            translate_meta(&meta, offset);
+        for source in &sources {
+            let mut anchor_ids = source.anchor_ids.iter();
+            let new_tree_id = copy_subtree(
+                &tree,
+                tree_id_of(source.id),
+                loro::TreeParentId::Root,
+                &mut anchor_ids,
+                offset,
+            );
             // invariant: the source was resolved above and the new node was
-            // just created: both are live root siblings.
+            // just created: `mov_after` puts it next to its original.
             #[allow(clippy::unwrap_used)]
             tree.mov_after(new_tree_id, tree_id_of(source.id)).unwrap();
             created.push(NodeId::from_parts(new_tree_id.peer, new_tree_id.counter));
@@ -237,7 +239,7 @@ impl Document {
     pub fn rotate_object(&self, rotated: &ObjectSnapshot) -> Result<(), ObjectEditError> {
         let tree = self.loro().get_tree(OBJECTS_TREE);
         let tree_id = tree_id_of(rotated.id());
-        if !node_exists(&tree, tree_id) {
+        if !leaf_exists(&tree, tree_id) {
             return Err(ObjectEditError::NoSuchObject);
         }
         let meta = tree
@@ -307,30 +309,83 @@ impl Document {
             })
             .collect::<Result<_, _>>()?;
 
-        for tree_id in tree_ids {
+        // A node under another named node goes with it.
+        let doomed: Vec<TreeID> = tree_ids
+            .iter()
+            .copied()
+            .filter(|&id| !crate::groups::has_ancestor_in(&tree, id, &tree_ids))
+            .collect();
+        let parents = crate::groups::parents_of(&tree, &doomed);
+        for tree_id in doomed {
             // invariant: every id here was just confirmed present above.
             #[allow(clippy::unwrap_used)]
             tree.delete(tree_id).unwrap();
         }
+        crate::groups::remove_emptied_groups(&tree, &parents);
         self.commit_with_label("delete_objects");
         Ok(())
     }
 }
 
-/// Checks a copy source's fresh anchor ids against its meta map: a primitive
-/// takes none, a path exactly one per anchor, all different.
-fn check_anchor_ids(meta: &loro::LoroMap, anchor_ids: &[AnchorId]) -> Result<(), ObjectEditError> {
-    let expected = if shape_codec::read_shape_tag(meta).is_some() {
-        0
-    } else {
-        total_anchor_count(meta)
-    };
+/// Checks a copy source's fresh anchor ids: a primitive takes none, a path exactly one per anchor,
+/// a group one per anchor of all its leaves, in paint order; all different.
+fn check_anchor_ids(
+    tree: &loro::LoroTree,
+    id: TreeID,
+    anchor_ids: &[AnchorId],
+) -> Result<(), ObjectEditError> {
+    let expected = crate::groups::anchors_under(tree, id);
     let distinct = anchor_ids.iter().collect::<HashSet<_>>().len();
     if anchor_ids.len() == expected && distinct == expected {
         Ok(())
     } else {
         Err(ObjectEditError::AnchorIds)
     }
+}
+
+/// Copies the node `source` and everything under it to a new node under `parent`: every key of the
+/// meta maps as it is, a path's anchors renumbered from `anchor_ids` (one per anchor, in paint
+/// order), the geometry of each leaf displaced by `offset`. A group's copy is a new group with
+/// copies of its children in their order. Returns the copy.
+fn copy_subtree(
+    tree: &loro::LoroTree,
+    source: TreeID,
+    parent: loro::TreeParentId,
+    anchor_ids: &mut std::slice::Iter<'_, AnchorId>,
+    offset: Vec2,
+) -> TreeID {
+    // invariant: creating a node under the root or under a node this call just created cannot
+    // fail, and reading the meta map of a node just created cannot fail.
+    #[allow(clippy::unwrap_used)]
+    let new_tree_id = tree.create(parent).unwrap();
+    #[allow(clippy::unwrap_used)]
+    let meta = tree.get_meta(new_tree_id).unwrap();
+    // invariant: the source was resolved by the caller (or is a child of one that was).
+    #[allow(clippy::unwrap_used)]
+    let source_meta = tree.get_meta(source).unwrap();
+    copy_map(&source_meta, &meta);
+    if crate::groups::meta_is_group(&source_meta) {
+        for child in tree.children(source).unwrap_or_default() {
+            copy_subtree(
+                tree,
+                child,
+                loro::TreeParentId::Node(new_tree_id),
+                anchor_ids,
+                offset,
+            );
+        }
+        return new_tree_id;
+    }
+    if shape_codec::read_shape_tag(&meta).is_none() {
+        let own: Vec<AnchorId> = anchor_ids
+            .by_ref()
+            .take(total_anchor_count(&meta))
+            .copied()
+            .collect();
+        renumber_anchors(&meta, &own);
+    }
+    translate_meta(&meta, offset);
+    new_tree_id
 }
 
 /// Copies every key of `from` into `into` as it is: a plain value as the same

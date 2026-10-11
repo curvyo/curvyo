@@ -169,12 +169,14 @@ fn a_file_from_an_earlier_build_lists_its_steps_with_unknown_time_and_earlier_au
 }
 
 #[test]
-fn a_file_saved_by_this_build_keeps_the_format_version_of_the_build_before() {
+fn history_adds_no_format_version_of_its_own() {
     let document = Document::new(5);
     let _ = rect(&document, 0.0);
     let json: serde_json::Value = serde_json::from_slice(&document.export_json().unwrap()).unwrap();
-    assert_eq!(json["format_version"], 10);
-    assert_eq!(curvyo_document_core::CURRENT_FORMAT_VERSION, 10);
+    assert_eq!(
+        json["format_version"],
+        curvyo_document_core::CURRENT_FORMAT_VERSION
+    );
 }
 
 #[test]
