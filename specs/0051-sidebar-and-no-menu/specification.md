@@ -1,6 +1,6 @@
 # Sidebar: a vertical tab strip, a File tab, and no menu bar
 
-Status: Draft (2026-10-11). The criteria are complete and testable. Before Ready: the ux-engineer confirms the UX notes (my draft), the architect answers the points in `adrs.md`, and the customer accepts or vetoes the items marked **Proposal** (all have a default, nothing blocks the build). One branch `story/sidebar-and-no-menu`, one PR, three milestones.
+Status: Draft (2026-10-11). The criteria are complete and testable. The ux-engineer confirmed and completed the UX notes on 2026-10-11 (two corrections to criteria 5 and 23, one to criterion 30). Before Ready: the architect answers the points in `adrs.md`, and the customer accepts or vetoes the items marked **Proposal** (all have a default, nothing blocks the build). One branch `story/sidebar-and-no-menu`, one PR, three milestones.
 Priority: Should
 Origin: Customer (request of 2026-10-11, paraphrased from German): the native menu bar at the top should go away in the long run, because menus make things hard to find and cost too many clicks; Open, Close and the other file actions move into the tabs on the right; the tabs become Blender-like and vertical (a strip of icon tabs along the panel's edge) because the horizontal strip leaves too little room; the collapse and expand symbol goes into that strip; the icons become smaller. Everything marked **Proposal** is mine: unsaved-changes protection, the header word, the version line, the "Saved" notice and the macOS exception. The strip sits on the inner edge next to the canvas, Blender's placement (lead decision, 2026-10-11).
 
@@ -35,13 +35,13 @@ As a maker I want one fixed column of small icon tabs along the edge of the righ
 2. Given the strip, then from top to bottom it holds the collapse control (criterion 7), a 1 px divider, and the tabs **File, Document, Style, Layers, History** in this order. A tab whose feature has not shipped is not built (Layers until `0050` ships); the order never changes. Each tab is one button with a 28 x 28 px hit area, centred in the strip, 4 px apart, and a 16 px Lucide glyph with a 1.5 px stroke: File `FolderOpen`, Document `File`, Style `Droplet`, Layers `Layers`, History `History`. No visible text. (The glyphs are 2 px smaller and the hit areas 8 px narrower than in `0043`; 28 px is above the 24 px minimum of WCAG 2.2 2.5.8 and equals the height of every other control in the panel.)
 3. Given `pointer: coarse` (a tablet), then each tab's hit area is 36 x 36 px and the strip is 40 px wide; the glyphs stay 16 px. Test: media emulation.
 4. Given a tab, then its accessible name is "File", "Document", "Style", "Layers" or "History", and its tooltip (Radix, text only, after 400 ms and on keyboard focus, `side="left"`) reads "File", "Document (Shift+Ctrl+D)", "Style (Shift+Ctrl+F)", "Layers (Shift+Ctrl+L)", "History (Shift+Ctrl+H)" (Shift+Cmd on macOS). The File tab names no key: it has none (the keys of the file actions are in criterion 32).
-5. Given the active tab, then it is shown pressed by a shape (the `--toolbar-icon-active-bg` ground, as the active tool on the rail), not by colour alone, and no other tab is. Exactly one tab is active at any time. The dimmed Style tab (nothing selected, the Pen, the Node tool without a path) behaves as `0043` criterion 4 says: dimmed, `aria-disabled="true"`, not focusable, its tooltip names the reason.
+5. Given the body shown, then the active tab is shown pressed by a shape (the `--toolbar-icon-active-bg` ground, as the active tool on the rail), not by colour alone, and no other tab is. Exactly one tab is active at any time. Given the body hidden, then no tab is shown pressed (the pressed ground says that the content is open) and `aria-selected` is false on all; the active tab is still remembered, stays the tab stop and is the one that Show panel restores. The dimmed Style tab (nothing selected, the Pen, the Node tool without a path) behaves as `0043` criterion 4 says: dimmed, `aria-disabled="true"`, not focusable, its tooltip names the reason.
 6. Given the keyboard, then the tabs are `role="tablist"` with `aria-orientation="vertical"`, named "Panel"; each is `role="tab"` with `aria-selected` and `aria-controls`; the body is `role="tabpanel"` with `aria-labelledby`. The tablist is one Tab stop (the active tab). **Up** and **Down** move to the previous and next tab and activate it (the content is instant); Home and End jump to the first and last; there is no wrap; Left and Right do nothing; a dimmed Style tab is skipped; Escape returns focus to the canvas and never clears the selection. Tab order in the panel is the screen order: the collapse control, the tablist, the body.
 7. Given the collapse control, then it is the first button of the strip, 28 x 28 px, glyph Lucide `PanelRightClose` while the body is shown and `PanelRightOpen` while it is hidden (16 px). Its accessible name and tooltip are "Hide panel" and "Show panel"; it has `aria-expanded` and `aria-controls` (the body). Pressing it shows or hides the body. Nothing else hides the body: Shift+Ctrl+D, F, H and L only show it.
 8. Given the body hidden (collapsed), then it is not drawn, out of the tab order and out of the accessibility tree; the strip is still drawn with all tabs and the collapse control, now against the window edge (it moves right by exactly 280 px, its size is unchanged); the canvas region is exactly 280 px wider; and the document stays where it is on screen (the view keeps its origin, as `0007` criterion 39 says).
 9. Given the body hidden, when the maker presses a tab with the pointer, then the body is shown with that tab active. Given the body shown, when the maker presses the active tab, then nothing happens (a tab never collapses the body). Given the body hidden and the keyboard, then Up, Down, Home and End only move the focus along the strip (nothing is activated, the body stays hidden), and Enter or Space on a focused tab shows the body with that tab active.
 10. Given the maker hides or shows the body, then the choice is saved for the OS user (not for the project, not in the `.curvyo` file, no `format_version` change) and is applied at the next start. Given a first start with nothing saved, then the body is shown. Given New or Open, then the choice does not change. Given the place it is saved to cannot be read or written, then the body is shown, no error appears and nothing else is affected. The same rules hold in the browser build (browser storage). The active tab is not saved (`0043` Out of scope stays).
-11. Given the tabs are taller than the strip (a browser window 160 px high), then the tabs scroll vertically inside the strip with a thin scrollbar; the collapse control and the divider stay at the top; a tab that gets keyboard focus is scrolled into view; every tab can be reached. At 800 x 600 all five tabs fit (about 200 px of 546) and nothing scrolls.
+11. Given the tabs are taller than the strip (a browser window 160 px high), then the tabs scroll vertically inside the strip with a thin scrollbar; the collapse control and the divider stay at the top; a tab that gets keyboard focus is scrolled into view; every tab can be reached. At 800 x 600 all five tabs fit (about 203 px of 546) and nothing scrolls.
 12. Given a window of 800 x 600, then strip and body together are 312 px wide, the canvas region is 488 px wide (the viewport 464 px beside the 24 px ruler; collapsed 768 and 744 px), and no component of the body changes size (content width 244 px). This is 32 px less than before (`0043` criterion 18: 520). The ux-engineer measures the Select, Node and shape bars at 464 px and reports before milestone 1 is accepted. Test: the figures, window 800 x 600.
 13. **Proposal (the visible word):** given the body, then its header row is 24 px high (28 px in `0043`) and shows the active tab's name at the left (14 px, `--toolbar-icon`: "File", "Document", "Style", "Layers", "History", the word the header had before `0043`) and the subject line right-aligned in the rest (12 px `--panel-muted-fg`, ellipsis, full text in a tooltip). Reason: the icons are smaller and have tooltips only; the word says which tab is open. The File tab's subject line is "Unsaved changes" while the project is dirty and empty otherwise. Default yes; without it the header row goes and the body gains 28 px.
 14. Given the rules of `0043` (which tab is active and when it switches: criteria 5 to 11, 13 to 17, 19 and 23 to 25) and the shortcuts of `0043`, `0020` and `0050` (Shift+Ctrl+D, F, H, L: expand, activate, focus), then they hold unchanged with the File tab added, with two additions: the File tab never switches by itself and no selection change leaves it (it is sticky like History and Layers); after New or Open, from any route, the active tab is Document or Style as `0043` criterion 5 says, so a successful Open hands the maker to the drawing.
@@ -56,7 +56,7 @@ As a maker I want one fixed column of small icon tabs along the edge of the righ
 20. **Save as…** Given Save as…, then the OS save dialog opens, the default name is the current file name or `Untitled.curvyo`, and on success the path, the title and the project block show the new file and the project is clean. A cancelled dialog changes nothing.
 21. **Close.** Given Close, then the project is ended after the check of criterion 25 and the result is an empty untitled project, the state of a fresh launch, which is the result of New (the product has no start screen and no "no project open" state apart from that one). Ctrl+W does the same (criterion 32). **Question 2:** Close and New give the same result.
 22. **Dirty.** Given a project, then it is dirty exactly when the document differs from what the last Save, Save as… or Open (or New) left: every step of `0020` (each row of its table, the document settings, the background, the history wipe) makes it dirty; selection, tool, pan, zoom, the entered group, the active tab, the panel's collapsed state and a held preview do not. Given a change made while a save is being written, then the project is dirty after the write. The safe direction is a rule: a project that differs from its saved file is never shown clean. **Proposal:** given a save, one step and Ctrl+Z, so that the content equals the saved content again, the project is shown clean (`0020` Out of scope expected this); if the architect finds that this costs more than a version comparison, it stays dirty, which is the safe direction.
-23. **Dirty indicators.** Given a dirty project, then (a) the window title has the marker (criterion 33), (b) the File tab shows a 6 px filled dot in `--accent` at the upper right of its glyph, also while the body is hidden, with the accessible name "File, unsaved changes", (c) the File tab's subject line and the project block say "Unsaved changes". Given it becomes clean, all four go in the same frame.
+23. **Dirty indicators.** Given a dirty project, then (a) the window title has the marker (criterion 33), (b) the File tab shows a 6 px filled dot in the glyph's colour with a casing in the ground colour (not `--accent`, which is the pressed ground), inside the button at its upper right, also while the body is hidden, with the accessible name "File, unsaved changes", (c) the File tab's subject line and the project block say "Unsaved changes". Given it becomes clean, all four go in the same frame.
 24. Given the File tab, then it contains no popup, menu, `dialog`, `listbox` or `menu` role and no popover. The only layers over the window are the OS file dialogs (Open, Save as) and the two existing error dialogs of `0001`, whose text and behaviour are unchanged.
 
 ### Unsaved changes: the inline check
@@ -69,7 +69,7 @@ As a maker I want one fixed column of small icon tabs along the edge of the righ
 
 ### Window title
 
-30. Given the project, then the window title is: "Curvyo" (untitled and clean), "<file name> — Curvyo" (saved or opened and clean; em dash, the file name without path as `0001` says), and the same with a leading asterisk when dirty: "*Curvyo", "*<file name> — Curvyo". The asterisk is Inkscape's marker and reads as a symbol, not a word, in a screen reader. In the browser build the page title follows the same rule. Test: edit, save, edit, undo the edit, reopen; the title after each step.
+30. Given the project, then the window title is: "Curvyo" (untitled and clean), "<file name> — Curvyo" (saved or opened and clean; em dash, the file name without path as `0001` says), and the same with a leading asterisk when dirty: "*Curvyo", "*<file name> — Curvyo". The asterisk is Inkscape's and the Linux and Windows marker; a screen reader may say "star" or "asterisk" when the window gets focus, so the page carries the state in text too (criterion 23). macOS keeps the asterisk. In the browser build the page title follows the same rule. Test: edit, save, edit, undo the edit, reopen; the title after each step.
 31. Given the first change after a save or open, then the title and the dot change within one frame of the commit (the same frame as the canvas).
 
 ### Keyboard
@@ -151,16 +151,16 @@ The customer sees the slice once, at the end; no stop between milestones.
 
 ## UX notes
 
-Draft by the product owner, 2026-10-11; the ux-engineer confirms or changes them and moves the numbers into `docs/design-system.md` before Ready. Reference: Blender's vertical tab column on the Properties editor's inner edge; Illustrator's icon dock for the collapsed state.
+Confirmed and completed by the ux-engineer, 2026-10-11 (first draft: product owner). The numbers are in `docs/design-system.md`, "Properties panel: tabs" and "Properties panel: File tab". Reference: Blender's vertical tab column on the Properties editor's inner edge; Illustrator's icon dock for the collapsed state; VS Code's activity bar for "tabs stay, body hides".
 
 ### The strip
 
 ```
 canvas | strip (32 px)          | body (280 px)
-       |  [>]  collapse        |
-       |  ---                  | File                Unsaved
-       |  [F]  File (dot)      |
-       |  [D]  Document        | (tab content, 244 px)
+       |  [>]  collapse        | File                Unsaved changes   header row, 24 px
+       |  ---                  |
+       |  [F]  File (dot)      | (tab content, 244 px)
+       |  [D]  Document        |
        |  [S]  Style           |
        |  [L]  Layers          |
        |  [H]  History         |
@@ -168,13 +168,26 @@ canvas | strip (32 px)          | body (280 px)
 
 | Part | Rule |
 |---|---|
-| Strip | 32 px, `--panel-bg`, a 1 px `--toolbar-icon` at 25% line on its canvas side (it replaces the body's old left border), full height, 8 px padding above. Items centred, 28 x 28 px, 4 px apart, `rounded-[5px]`. Collapse control, 1 px divider with 4 px above and below (the divider is `--toolbar-icon` at 25%, 16 px wide), then the tabs. About 201 px high with five tabs |
-| Tab states | As `0043` UX notes: unpressed `--toolbar-icon` glyph (8.3:1), hover `--editor-accent-hover` ground, pressed `--toolbar-icon-active-bg` ground and `--toolbar-icon-active-fg` glyph (3.3:1 on the panel), focus the panel ring (2 px `--editor-accent`, 1 px `--toolbar-bg` offset), dimmed Style at 40% |
-| Dot | 6 px filled disc, `--accent`, at the upper right of the File glyph, 1 px `--panel-bg` casing so it reads on the pressed ground. A shape, plus the accessible name and the text in the tab; 3:1 against the panel and against the pressed ground |
-| Tooltips | Radix, 400 ms, `side="left"`, text only; they open to the left, over the canvas edge, so they never cover the body's content |
-| Body hidden | Strip only: 32 px, moved to the right window edge (it travels 280 px); the dot stays. The canvas is 280 px wider and the view keeps its origin |
-| Why 28 px and 16 px | Smaller than `0043` (36 x 28, 18 px) as the customer asked. 28 px is the panel's control height and clears the 24 px WCAG 2.5.8 minimum; 16 px is the size the panel already uses for its row glyphs (`Undo2`, `Redo2`, kind glyphs). Touch: 36 px and a 40 px strip |
-| Width cost | 32 px of canvas at every window width (464 px viewport at 800 x 600). Gains: no menu bar on Linux and Windows (about 28 px of height), no demo bar in the browser (36 px), and 4 px from the header row |
+| Strip | 32 px, `--panel-bg`, full height, a 1 px `--toolbar-icon` at 25% line on its canvas side (it replaces the body's old left border). The line takes pixel 0 of the 32; the 28 px buttons sit at x = 2 to 30, so the margins are 1 px (line side) and 2 px. Top padding **10 px**, not 8: the collapse control's centre is then 24 px below the top, the same line as the header row's centre (12 px body padding, 24 px row), so the control and the tab name read as one row. Order: collapse control (y 10 to 38), 4 px, a 16 px wide 1 px divider (`--toolbar-icon` at 25%), 4 px, then the tabs at a 32 px pitch (28 + 4). About **203 px** high with five tabs; twelve tabs would need about 427 px, which still fits the 546 px panel viewport, so "scales to a dozen" holds |
+| Tab states | As `0043`: unpressed `--toolbar-icon` glyph (8.3:1), hover `--editor-accent-hover` ground, pressed `--toolbar-icon-active-bg` ground and `--toolbar-icon-active-fg` glyph (4.5:1 glyph on ground; the ground is 3.3:1 against the panel), dimmed Style at 40%. **Focus ring drawn inside the 28 px box**, not outside with a 1 px offset: the margin is 2 px and the strip scrolls (criterion 11), so an outside ring would be cut at the strip edge. Two tones, because the pressed ground has the colour of the ring: 2 px `--editor-accent` at the box edge, then 2 px `--toolbar-bg` inside it. On the panel and hover grounds the accent ring shows (3.3:1) and the light line vanishes; on the pressed ground the accent ring vanishes and the light line shows (3.3:1 against the blue). The glyph box (x 6 to 22) is clear of the 4 px band. **While the body is hidden no tab is shown pressed** (the pressed ground says "this content is open"); the remembered tab is still the tab stop and the one `Show panel` restores |
+| Glyphs | Lucide, **16 px, 1.5 px absolute stroke** (`absoluteStrokeWidth`; without it a 1.5 stroke in the 24 grid renders as 1 px at 16 px and the glyphs lose contrast). File `FolderOpen`, Document `File`, Style `Droplet`, Layers `Layers`, History `History`; collapse `PanelRightClose` / `PanelRightOpen`. At 16 px the six silhouettes differ: a wide folder, a tall page with a folded corner, a drop, a stacked rhombus, a circle with an arrow, a frame with a chevron. The two nearest in meaning, File and Document, differ in outline (landscape against portrait), and File is the first tab and the only one that carries a dot |
+| Dirty dot | 6 px filled disc at the upper right of the File button, centre 5 px from the button's top and right edge (so it is inside the 28 px box and never clipped by the strip's scroll area), with a 1.5 px casing in the ground colour (`--panel-bg`, or `--toolbar-icon-active-bg` while File is pressed). **Fill: the glyph colour (`currentColor`)**, 8.3:1 on the panel and 4.5:1 on the pressed ground. The draft's `--accent` dot is withdrawn: `--accent` equals `--toolbar-icon-active-bg`, so on the pressed File tab it was 1:1 and only the casing showed. The dot is a shape badge; the text cues are the accessible name "File, unsaved changes", the tab's subject line and the project block. The disc overlaps the glyph's box by 2 x 2 px; its casing may take a pixel off the glyph's corner, which is accepted and looked at in the build review |
+| Tooltips | Radix, 400 ms, `side="left"` (text only), also on keyboard focus. After one tooltip has opened, the next one in the strip opens at once (Radix skip delay 300 ms), so scanning the icons costs one wait, not five. They open over the canvas edge, never over the body; z above the overlay row, so they may cover a bar's right end for a moment (as tooltips cover the rulers) |
+| Body hidden | Strip only, 32 px, at the window's right edge; the dot stays. The canvas is 280 px wider and the view keeps its origin. Nothing animates (the whole panel is instant, so `prefers-reduced-motion` needs no case) |
+| Touch | `pointer: coarse`: 36 px hit area, 40 px strip, same glyphs. Below the 44 px of Apple and WCAG 2.5.5 (AAA); it matches the Layers rows (40 px) and footer buttons (36 px), and a tablet window is wide enough for the 8 px. No hover on touch, so only the open tab has its name visible (header row); a long-press tooltip is not built and is part of the later touch pass |
+
+**Target size, checked.** WCAG 2.2 SC 2.5.8 (AA) asks for 24 x 24 px or 24 px clear spacing: 28 x 28 with 4 px gaps passes either way. The design system's own scale: panel controls 28 px (value fields, buttons, `ToggleGroup`), row buttons 24 px, rail 40 px. 28 px is the panel's control height, so the strip is not the smallest thing in the panel, and a 36 px target would not fit 32 px. The customer asked for smaller icons; a 20 px glyph in a 28 px box would not shrink the strip. Fitts: the strip is a column of equal targets 4 px apart; with the body hidden it touches the window edge, which makes it faster to hit, not slower. Adjusted: only the focus ring (inside the box) and the dot (colour, position). Not adjusted: 28 and 16.
+
+### Collapse control: the 280 px jump
+
+Hide moves the control from the inner edge to the window edge; Show moves it back. Judged **acceptable**, with these reasons:
+
+- The y position never changes (the top of the strip). Reaching the control after Hide is a horizontal sweep to the window's right edge, which needs no aim in x: the edge stops the pointer. That is the cheap half of Fitts' law.
+- A second route does not need the control at all: any tab press, and Shift+Ctrl+D, F, H, L, show the body. Illustrator's dock and Photoshop's panel dock move their collapse chevron the same way when they fold.
+- It cannot be double-clicked into a flicker: the control is gone from under the pointer after the first press.
+- The alternative (outer edge, Question 1 B) has no jump but puts the tabs away from the canvas and makes DOM order differ from screen order. It stays a demo-time switch (one flex row plus criteria 1 and 8).
+
+The one thing missing is a **key to hide** the body: criterion 7 says nothing else hides it, so a keyboard user has to Tab to the control. Recommended later addition, not in this spec: one chord, which must work on a QWERTZ layout (Ctrl+\ needs AltGr there, so it is no candidate) and in the browser build (Shift+Ctrl+P is Firefox's private window). Left to the customer with the shortcut review (R-SYS-009).
 
 ### The File tab (content width 244 px)
 
@@ -190,20 +203,20 @@ Unsaved changes                                        12 px muted
 Curvyo 0.4.0                                           12 px muted
 ```
 
-Gaps 8 px between rows, 16 px around the divider; about 260 px high, no scroll at 800 x 600 (a panel viewport of about 546 px). The tooltips name the chords: "New (Ctrl+N)", "Open (Ctrl+O)", "Save (Ctrl+S)", "Save as (Ctrl+Shift+S)", "Close (Ctrl+W)", "Quit (Ctrl+Q)" (Linux).
+Gaps 8 px between rows, 16 px around the divider, 12 px under the project block and above the version line; about 270 px high with the header row, no scroll at 800 x 600 (a panel viewport of about 546 px; the browser build omits Save as, Quit and the divider). The buttons are the "Fit to content" outline button at 118 px (28 px; 36 px on touch). Hierarchy: no filled button; a filled one would call New the primary action, and Save is the frequent one. The project block is the only thing that tells state, so it is text, not a banner. The tooltips name the chords: "New (Ctrl+N)", "Open (Ctrl+O)", "Save (Ctrl+S)", "Save as (Ctrl+Shift+S)", "Close (Ctrl+W)", "Quit (Ctrl+Q)" (Linux); a button whose chord does not exist on the build names none. Tab order is reading order; there is no initial focus (the maker came by a click or a key on the strip).
 
 ### The inline check
 
-The five buttons are replaced in place by the block (the design system's "Inline confirm", with a third button):
+The five buttons are replaced in place by the block (the design system's "Inline confirm", three-button variant):
 
 ```
 Poster.curvyo has unsaved changes. Save them
 before you open another project? Discarded
 changes cannot be brought back.            12 px, up to four lines
-[ Cancel ] [ Discard ] [ Save ]            76 px each, 8 px apart
+[ Cancel ] [ Discard ] [ Save ]            76 x 28 each, 8 px apart (3 x 76 + 2 x 8 = 244)
 ```
 
-Cancel on the left and focused; Discard with the `--destructive` look and the 400 ms delay; Save with the look of Apply in the Offset section. The block is a `role="group"` named by its sentence, not a dialog. The project block above it stays. Nothing floats and nothing else moves. After Cancel the five buttons come back with focus on the button that was pressed (a button) or on the canvas (a chord).
+Cancel on the left and focused (outline); Discard with the `--destructive` look and the 400 ms delay; **Save with the look of Apply** in the Offset section (`--toolbar-icon-active-bg` ground, white label, 4.5:1). Three different looks (outline, red outline, blue fill) so no button is picked by position alone; Discard and Save are neighbours, but Discard cannot be pressed for 400 ms and Save is the one that cannot lose work. The longest label "Discard" is about 50 px at 14 px, inside the 60 px left after 8 px padding. The block is a `role="group"` named by its sentence, not a dialog; the project block above it stays; nothing floats and nothing else moves (the block is reserved at 100 px, the height of the five buttons it replaces: four sentence lines of 16 px, 8 px, 28 px, so the divider, Quit and the version line do not move). After Cancel the five buttons come back with focus on the button that was pressed (a button) or on the canvas (a chord). A check raised from a chord or a window close while the body is hidden or another tab is open shows the body and takes focus (criterion 28); that is a response to the maker's own key, and Cancel restores the previous view.
 
 ### Texts
 
@@ -213,18 +226,35 @@ Cancel on the left and focused; Discard with the `--destructive` look and the 40
 | Browser | "Downloaded poster.curvyo." |
 | Window close while dirty | the block with "...before you quit?" |
 | Status line | "Unsaved changes" / "No changes since the last save" / "Not saved yet" |
+| Dirty File tab, accessible name | "File, unsaved changes" |
+| Collapse control | "Hide panel" / "Show panel" |
 
-### Keyboard summary
+### Keyboard
 
-Tab: collapse control, then the tablist (one stop), then the body. Up and Down move along the strip and activate, Home and End jump. With the body hidden, arrows only move the focus; Enter or Space opens the tab. In the File tab the buttons are ordinary Tab stops in reading order. The chords work from anywhere (criterion 32).
+- Tab order is screen order: the collapse control, the tablist (one stop: the active tab, or the last focused tab while the body is hidden), the body.
+- **Roving tabindex**: the tab stop moves with focus. Up and Down move and, while the body is shown, activate (the content is instant, so automatic activation costs nothing); Home and End jump; no wrap; a dimmed Style tab is skipped; the arrow keys call `preventDefault` so the strip never scrolls the page. Left and Right do nothing (a vertical tablist).
+- While the body is hidden the arrows only move focus (criterion 9); Enter or Space opens the focused tab.
+- **No Ctrl+Tab, Ctrl+PageUp or Ctrl+PageDown** for tab cycling: the browser build cannot have them (the browser takes them for its own tabs), and a desktop-only key that the browser build lacks would split the documentation. Direct jumps exist: Shift+Ctrl+D, F, H, L (Shift+Cmd on macOS). The File tab has no jump key by design; its actions have their own chords.
+- Escape from any strip control returns focus to the canvas and never clears the selection. Inside the inline check, Escape closes the block first.
+- The chords of criterion 32 work from every focus. Shortcut discovery: the tooltips name them; a keyboard-help overlay is a separate proposal.
 
-### Design questions for the ux-engineer
+### How Layers and History fit
 
-1. The strip is on the inner edge (Question 1). Is the 280 px jump of the collapse control acceptable, or is the outer edge better after seeing it at 800 x 600?
-2. Do the Select, Node and Pencil bars survive 464 px (criterion 12), or does one need a wrap rule?
-3. The dot: position, size and the pressed-ground contrast on the File tab.
-4. The Save button's look in the three-button block.
-5. The header row: keep the name (Question 4)?
+They are two more tabs of the same strip, nothing else changes: Layers (`0050`) is the fourth, History (`0020`) the fifth; the order never changes, and an unshipped tab is not built, so the strip is shorter, not gapped. The header row gives both 4 px more list height than `0043` did (24 px against 28 px); the removal of the menu bar adds about 28 px on Linux and Windows. Both stay sticky (criterion 14). Their glyphs, `Layers` and `History`, were already 18 px in `0043` and `0050` and are 16 px here; `docs/design-system.md` has the figures.
+
+### Answers to the design questions
+
+1. **280 px jump:** acceptable (see above). Outer edge only if the customer finds it wrong at the demo.
+2. **Bars at 464 px:** the overlay row is 464 - 128 - 12 = **324 px** (356 px at 496 px before this spec). The Node bar (about 300 px) and the polygon/star bar (about 310 px) still fit, with 24 px and 14 px to spare; the Select bar already wraps (three rows at 356 px) and may need a fourth at 324 px. The Pencil bar's width is not known. Rule for milestone 1: no bar overflows or is clipped, and none wraps to more than three rows; if one does, it gets a wrap rule (the Select bar's groups wrap as whole groups), not a smaller control. The measurement stays with the build.
+3. **The dot:** corrected, see "Dirty dot".
+4. **Save in the three-button block:** the Apply look.
+5. **Header row:** keep the name (Question 4, A). The icons are 16 px with tooltips only; on touch there is no tooltip, and the word is then the only name on screen.
+
+### Risks for the build
+
+- Clipping: the strip scrolls, so anything drawn outside a button's 28 px box (ring, dot) is cut. Both are kept inside.
+- macOS (criterion 39): a webview without an Edit menu usually loses Cmd+C, Cmd+V, Cmd+X and may lose Cmd+Z and Cmd+A in text fields. The hand test decides; if undo and select-all fail in text fields, the fallback is Option B of Question 3, not a page-side workaround.
+- The window-title asterisk is the Linux and Windows convention. macOS shows the document-edited dot in the close button; Tauri has no setting for it, so macOS keeps the asterisk until a platform call is added (architect).
 
 ## Links
 
