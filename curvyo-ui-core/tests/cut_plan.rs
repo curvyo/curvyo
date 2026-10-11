@@ -105,7 +105,7 @@ fn two_crossing_lines_give_four_pieces_meeting_at_the_crossing() {
     let plan = plan(&document, &[a, b]).unwrap();
     assert_eq!(plan.removed, vec![a, b]);
     assert_eq!(plan.pieces.len(), 4);
-    assert!(plan.kept.is_empty());
+    assert_eq!(plan.kept, vec![]);
     let centre = pt(5.0, 5.0);
     for (_, outlines) in &plan.pieces {
         assert_eq!(outlines.len(), 1);
@@ -115,7 +115,7 @@ fn two_crossing_lines_give_four_pieces_meeting_at_the_crossing() {
         let ends = points_of(anchors);
         assert!(near(ends[0], centre) || near(ends[1], centre), "{ends:?}");
         // New end nodes are corners with a zero handle on the open side.
-        let at_cut = if near(ends[0], centre) { 0 } else { 1 };
+        let at_cut = usize::from(!near(ends[0], centre));
         assert_eq!(anchors[at_cut].kind, AnchorKind::Corner);
     }
     // The pieces of one operand come in order along it, directly after each other.
