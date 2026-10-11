@@ -75,9 +75,6 @@ impl Session {
         if let Some(axes) = self.move_axes_in(&objects) {
             list.extend(curvyo_render_core::build_move_axes(view, &axes));
         }
-        // The pale red box of a move drag or the open typed move (`0047` criteria 33, 36).
-        let reference = self.reference_decoration();
-        list.extend(reference_box_list(view, reference.as_ref()));
         // The blue half of blue-new, black-old: the geometry a release would
         // commit, over the committed objects drawn above and under the boxes
         // and handles below (`specs/0009-unified-object-editing` criterion 10).
@@ -92,6 +89,11 @@ impl Session {
         if !refused.is_empty() {
             list.extend(curvyo_render_core::build_refusal_outlines(&refused, view));
         }
+        // The pale red box of a move drag or the open typed move (`0047` criteria 33, 36): above
+        // the blue preview, whose white casing would otherwise cover it where the two coincide
+        // (an unrotated object), and below the selection box and the handles.
+        let reference = self.reference_decoration();
+        list.extend(reference_box_list(view, reference.as_ref()));
         let live_objects = Self::live_objects_in(&objects, live.as_ref());
         list.extend(build_select_draw_list(
             view,

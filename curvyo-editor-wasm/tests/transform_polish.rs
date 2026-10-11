@@ -495,6 +495,39 @@ fn the_box_follows_a_move_drag() {
     assert_eq!(count_colour(&session, RED_BOX), 0, "released");
 }
 
+/// Criterion 36 (UX re-check): in a move drag the box lies above the blue preview, whose white
+/// casing would cover it where the two coincide, and below the selection box and the handles:
+/// blue vertices come both before and after the box in the draw list.
+#[test]
+fn the_box_is_drawn_above_the_blue_preview_and_below_the_handles() {
+    let mut session = session_of(&tall());
+    click(&mut session, pt(25.0, 20.0), false);
+    hold(&mut session, pt(20.0, 30.0), false, false);
+    session.pointer_down(pt(20.0, 30.0), false);
+    hold(&mut session, pt(40.0, 40.0), false, false);
+    let list = session.draw_list();
+    let index_of = |keep: &dyn Fn(usize, RgbaColor) -> bool| -> Vec<usize> {
+        list.triangles
+            .iter()
+            .enumerate()
+            .filter(|(i, vertex)| keep(*i, vertex.color))
+            .map(|(i, _)| i)
+            .collect()
+    };
+    let red = index_of(&|_, colour| colour == RED_BOX);
+    let blue =
+        index_of(&|_, colour| i32::from(colour.b) - i32::from(colour.r) > 60 && colour.a > 0);
+    let (first_red, last_red) = (red[0], red[red.len() - 1]);
+    assert!(
+        blue.iter().any(|&i| i < first_red),
+        "the blue preview is drawn before the box"
+    );
+    assert!(
+        blue.iter().any(|&i| i > last_red),
+        "the selection box and handles are drawn after the box"
+    );
+}
+
 /// Criterion 50: a 2 mm square at 100 % zoom has the box but no mark; the Reference control
 /// with "Top left" and Enter moves the top-left corner.
 #[test]

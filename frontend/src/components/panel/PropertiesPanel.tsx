@@ -1,3 +1,4 @@
+import { panelHandlesEscape } from "@/lib/panelEscape";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 
@@ -206,9 +207,10 @@ export function PropertiesPanel({ editor, document: doc }: PropertiesPanelProps)
             // Escape in the panel (`0017` criterion 60): a running drag is
             // reverted first (`usePreviewGesture` takes the key before it gets
             // here); a field restores itself and returns focus; otherwise focus
-            // returns to the canvas. It never clears the selection and never
-            // reaches the canvas.
-            if (event.key === "Escape" && event.currentTarget.contains(event.target as Node)) {
+            // returns to the canvas, unless a field already handled the key (its
+            // `preventDefault`), as the hex field does for the slider it came from.
+            // It never clears the selection and never reaches the canvas.
+            if (panelHandlesEscape(event) && event.currentTarget.contains(event.target as Node)) {
               event.preventDefault();
               // Picking ends first and keeps the focus where it is.
               if (picking) {
