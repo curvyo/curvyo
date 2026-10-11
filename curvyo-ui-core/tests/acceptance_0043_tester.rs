@@ -22,14 +22,15 @@ const STYLE: PanelTab = PanelTab::Style;
 // ---------------------------------------------------------------- the strip
 
 #[test]
-fn c1_two_tabs_in_the_order_document_style_with_names_and_tooltips() {
+fn c1_three_tabs_in_the_order_document_style_history_with_names_and_tooltips() {
     for non_empty in [false, true] {
         for active in [DOC, STYLE] {
             let entries = tab_entries(active, non_empty);
             let names: Vec<&str> = entries.iter().map(|e| e.name).collect();
-            assert_eq!(names, ["document", "style"], "no History until 0020");
+            assert_eq!(names, ["document", "style", "history"]);
             let labels: Vec<&str> = entries.iter().map(|e| e.label).collect();
-            assert_eq!(labels, ["Document", "Style"]);
+            assert_eq!(labels, ["Document", "Style", "History"]);
+            assert_eq!(entries[2].tooltip, "History (Shift+Ctrl+H)");
             assert_eq!(entries[0].tooltip, "Document (Shift+Ctrl+D)");
             if non_empty {
                 assert_eq!(entries[1].tooltip, "Style (Shift+Ctrl+F)");
@@ -61,7 +62,7 @@ fn c12_tab_names_round_trip_and_unknown_names_are_none() {
     assert_eq!(PanelTab::from_name("document"), Some(DOC));
     assert_eq!(PanelTab::from_name("style"), Some(STYLE));
     for bad in [
-        "", "Document", "STYLE", "history", " style", "style ", "panel", "💧",
+        "", "Document", "STYLE", "History", " style", "style ", "panel", "💧",
     ] {
         assert_eq!(PanelTab::from_name(bad), None, "{bad:?}");
     }

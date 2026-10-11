@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { type CanvasNotice, type HistoryNames, MAC, useHistory } from "@/hooks/useHistory";
+import type { HistoryDirection } from "@/lib/historyText";
 import { type NudgeFeedback, useNudgeFeedback } from "@/hooks/useNudgeFeedback";
+import { type BackingBuffer, backingBufferFor, sameBackingBuffer } from "@/lib/canvasSize";
 import { ModifierTracker } from "@/lib/keyModifiers";
 import { TOO_FAR_HINT } from "@/lib/nudgeText";
 import { createSession, openSession } from "@/lib/editorSession";
@@ -10,28 +13,10 @@ import type { BooleanOp, BooleanResult } from "@/lib/booleanText";
 import type { BreakApartResult, CombineResult } from "@/lib/pathText";
 import type { ClosePathResult } from "@/lib/penText";
 
-/** The canvas's backing-buffer (physical pixel) size for a given CSS
- * (layout) size, plus the `devicePixelRatio` that relates the two —
- * `curvyo-editor-wasm`'s `Gpu` needs both: the buffer itself sized to
- * the display's actual resolution (correctness fix: a HiDPI display
- * previously got a buffer sized 1:1 to CSS pixels, then upscaled and
- * softened by the browser compositor — the same class of bug as this
- * slice's `wgpu` surface-resize requirement, but for resolution rather
- * than staleness), and the ratio itself so `Gpu::render` can map back to
- * CSS pixels for the clip-space transform. `devicePixelRatio` can be a
- * fractional, non-integer value (Windows/Linux fractional scaling, e.g.
- * 1.25 or 1.5), so the buffer size is rounded, not assumed to divide
- * evenly. */
-function backingBufferSize(
-  cssWidth: number,
-  cssHeight: number,
-): { width: number; height: number; devicePixelRatio: number } {
-  const devicePixelRatio = window.devicePixelRatio > 0 ? window.devicePixelRatio : 1;
-  return {
-    width: Math.max(1, Math.round(cssWidth * devicePixelRatio)),
-    height: Math.max(1, Math.round(cssHeight * devicePixelRatio)),
-    devicePixelRatio,
-  };
+/** The canvas's backing-buffer size for a CSS size at the window's current
+ * `devicePixelRatio` (`backingBufferFor`). */
+function backingBufferSize(cssWidth: number, cssHeight: number): BackingBuffer {
+  return backingBufferFor(cssWidth, cssHeight, window.devicePixelRatio);
 }
 
 /** Which tool is active (`specification.md`'s tool rail: Select is first
@@ -593,6 +578,18 @@ export interface EditorSession {
   /** The one-line message of a key that could not act ("Select one object to
    * type a value"), or `null`; it clears itself after 2 s. */
   keyHint: KeyHint | null;
+  /** The notice of the last undo or redo, in the canvas notice slot. */
+  canvasNotice: CanvasNotice | null;
+  /** A large undo or redo is running. */
+  historyBusy: boolean;
+  /** The names of the next undo and redo; `null` for an empty stack. */
+  historyNames: HistoryNames;
+  /** Undo or redo from a button. */
+  pressHistory: (direction: HistoryDirection, source?: "canvas" | "panel") => void;
+  /** Shows a line in the notice slot of the canvas. */
+  showHistoryNotice: (text: string, ms?: number) => void;
+  /** Wipes the history; the steps removed, -1 when ignored, -2 for a shared document. */
+  wipeHistory: () => number;
   /** The move readout and hidden announcements of a nudge and of select all. */
   nudgeFeedback: NudgeFeedback;
   convertSelected: (kind: "corner" | "symmetric" | "asymmetric") => void;
@@ -847,11 +844,13 @@ export function useEditorSession(
   /** Re-reads every bit of session-owned UI state after any call that
    * might have changed it — cheap, and simpler than having every call
    * site know which ones to refresh. */
+  const refreshHistoryRef = useRef<() => void>(() => {});
   const syncFromSession = useCallback(() => {
     const session = sessionRef.current;
     if (!session) {
       return;
     }
+    refreshHistoryRef.current();
     setToolState(session.tool() as Tool);
     setNodeToolbarState(readToolbarState(session.node_toolbar_state()));
     setPolyStarModeState(session.poly_star_mode() as PolyStarMode);
@@ -873,6 +872,11 @@ export function useEditorSession(
   }, [syncEntry, syncBadges]);
 
   const getSession = useCallback(() => sessionRef.current, []);
+  const history = useHistory(getSession, syncFromSession, containerRef);
+  const { refresh: refreshHistory, handleKeyOutcome, isDuplicateKey } = history;
+  useEffect(() => {
+    refreshHistoryRef.current = refreshHistory;
+  }, [refreshHistory]);
 
   const refreshCursor = useCallback(() => {
     const session = sessionRef.current;
@@ -942,7 +946,31 @@ export function useEditorSession(
         } finally {
           sessionRef.current = session;
         }
+        // `attach_canvas` is async, and the ResizeObserver below skips every
+        // resize while the session is not yet published, so a layout change
+        // during the attach (the window shown or maximised, fonts or panels
+        // settling) never reached the session. It would keep the size measured
+        // before the attach and centre the document in that one. Measure again
+        // and hand over the real size.
+        const current = backingBufferSize(canvas.clientWidth, canvas.clientHeight);
+        if (!sameBackingBuffer(current, { width, height, devicePixelRatio })) {
+          canvas.width = current.width;
+          canvas.height = current.height;
+          try {
+            session.resize(current.width, current.height, current.devicePixelRatio);
+          } catch {
+            // As in the ResizeObserver: the render loop recovers a lost frame.
+          }
+        }
         syncFromSession();
+        // Reads the file's history after the first paint, so that the first undo is as fast as
+        // later ones (`specs/0020-undo-redo` criterion 30c).
+        const idle = window.requestIdleCallback ?? ((run: () => void) => window.setTimeout(run, 200));
+        idle(() => {
+          if (sessionRef.current === session) {
+            session.warm_history();
+          }
+        });
       }),
     [enqueueSessionTask, syncFromSession],
   );
@@ -1696,6 +1724,10 @@ export function useEditorSession(
       if (!session) {
         return;
       }
+      if (isDuplicateKey(event)) {
+        event.preventDefault();
+        return;
+      }
       const outcome = session.key_down(
         event.key,
         event.shiftKey,
@@ -1703,12 +1735,19 @@ export function useEditorSession(
         event.altKey,
         event.repeat,
         event.nativeEvent.isComposing || isSpaceHeld,
+        MAC,
         event.timeStamp,
       );
       if (outcome === "ignored") {
         return;
       }
       event.preventDefault();
+      if (handleKeyOutcome(outcome)) {
+        setLiveReadout(readReadout(session));
+        setCursorHint(session.cursor_hint());
+        syncFromSession();
+        return;
+      }
       if (outcome === "select-all") {
         onSelectAll(session.selection_count());
       } else if (outcome === "nudge" || outcome === "nudge-new") {
@@ -1725,7 +1764,7 @@ export function useEditorSession(
       setCursorHint(session.cursor_hint());
       syncFromSession();
     },
-    [isSpaceHeld, syncFromSession, onNudge, onSelectAll, onEscape],
+    [handleKeyOutcome, isDuplicateKey, isSpaceHeld, syncFromSession, onNudge, onSelectAll, onEscape],
   );
 
   // A key hint clears itself after 2 s; a newer message restarts the clock.
@@ -1879,6 +1918,12 @@ export function useEditorSession(
     selectionCount,
     selectionAnnouncement,
     keyHint,
+    canvasNotice: history.notice,
+    historyBusy: history.busy,
+    historyNames: history.names,
+    pressHistory: history.press,
+    wipeHistory: history.wipe,
+    showHistoryNotice: history.showNotice,
     nudgeFeedback,
     convertSelected,
     makeLine,

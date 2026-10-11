@@ -92,7 +92,7 @@ Shapes are SVG path data in a unit box (1 = the stroke width); parameters are ty
 
 1. **Which kinds in the first version.** *A (default):* width profile and stamp. *B:* also pattern along path. *C:* all three. Recommendation: A, then pattern along path as a second slice; it needs the shape to be bent, which is the hardest part.
 2. **Data files first, plugins later (criteria 11, 12).** Default: data-file brushes first; plugin brushes when the plugin host exists. Say if code brushes must come first.
-3. **Expand: keep or replace the original.** Default: keep the original and add the expanded result as a new object (there is no undo yet). Option: replace, as Inkscape's "Object to path" does.
+3. **Expand: keep or replace the original.** Default: keep the original and add the expanded result as a new object (Ctrl+Z takes a replacement back since `0020`). Option: replace, as Inkscape's "Object to path" does.
 4. **Manufacturing (criterion 10).** *A (default, recommended):* the expanded geometry is cut. *B:* a brush is design-only and jobs cut the centre line, as markers may be (`0018` Question 5). B is surprising for Perforation and Scallop, whose whole point is to be cut.
 5. **Plugin brush without the plugin (criterion 13).** Default: show the cached geometry, forbid regeneration, say so. Option: refuse to open such a file (bad: it locks the maker out of their own file).
 6. **Colour of stamps and patterns.** Default: one colour, the stroke's. Multi-colour art brushes are out of scope.

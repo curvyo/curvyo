@@ -49,27 +49,29 @@ impl Session {
     /// becoming the closing node with `join` applied, as one commit (`0034` criteria 19 to 21).
     /// Does nothing outside the Node tool.
     pub fn close_paths(&mut self, join: JoinType) -> ClosePathOutcome {
-        if self.tool != Tool::Node {
-            return ClosePathOutcome::default();
-        }
-        self.end_colour_pick();
-        let paths = self.paths();
-        let set = close_path_set(&paths, self.node.selection(), &self.selection);
-        let plan = plan_close_paths(&set, join);
-        if plan.growths.is_empty() {
-            return ClosePathOutcome {
-                closed: 0,
-                skipped: plan.skipped,
-                same_ends: plan.same_ends,
-            };
-        }
-        match self.document.close_paths(&plan.growths) {
-            Ok(()) => ClosePathOutcome {
-                closed: plan.closed,
-                skipped: plan.skipped,
-                same_ends: plan.same_ends,
-            },
-            Err(_) => ClosePathOutcome::default(),
-        }
+        self.recording(|this| -> ClosePathOutcome {
+            if this.tool != Tool::Node {
+                return ClosePathOutcome::default();
+            }
+            this.end_colour_pick();
+            let paths = this.paths();
+            let set = close_path_set(&paths, this.node.selection(), &this.selection);
+            let plan = plan_close_paths(&set, join);
+            if plan.growths.is_empty() {
+                return ClosePathOutcome {
+                    closed: 0,
+                    skipped: plan.skipped,
+                    same_ends: plan.same_ends,
+                };
+            }
+            match this.document.close_paths(&plan.growths) {
+                Ok(()) => ClosePathOutcome {
+                    closed: plan.closed,
+                    skipped: plan.skipped,
+                    same_ends: plan.same_ends,
+                },
+                Err(_) => ClosePathOutcome::default(),
+            }
+        })
     }
 }

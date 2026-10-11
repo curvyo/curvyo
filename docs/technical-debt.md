@@ -92,7 +92,14 @@ changes carrying the same message, and consecutive commits with the same label c
 change. The undo slice must therefore find an operation by its commit boundaries and message, and
 must not count `len_changes()` to see how many operations were made.
 
-**Resolution:** `undo-redo` decides how it groups changes (its own ADR); this entry is the warning.
+**Resolution (`0020-undo-redo`, ADR 0014 §2):** a step is all commits of one peer whose commit
+message carries the same header `<label>;s=<seq>;t=<seconds>`, not a Loro change. A result that Loro
+splits into several changes is still one step, one row and one press; two identical operations in a
+row have different `s` values and so never merge, whatever Loro does with equal messages. Tests:
+`curvyo-document-core/tests/undo_redo_engine.rs`
+(`a_large_result_split_into_several_changes_is_one_step`) and
+`curvyo-editor-wasm/tests/undo_redo_keys.rs`
+(`two_identical_moves_within_a_second_are_two_steps`).
 
 ## One-outline assumptions are found by audit, not by the compiler
 
@@ -1357,7 +1364,7 @@ built-in list.
   selection with the panel at the top (UX N11); consider scroll anchoring.
 - **List semantics:** the formats list is a `group` with buttons; `role="list"` and `listitem` rows would
   let a screen reader announce the count (UX N13).
-- **`session/mod.rs` is over 500 lines** (537 non-test lines before the slice); split the glue calls out
+- **`session/mod.rs` is over 500 lines** (537 non-test lines before the slice; 571 after `0020`; `session/keys.rs` has 506); split the glue calls out
   when the next slice touches it.
 - **The Select bar overlaps the properties panel below about 600 px window width** (UX review of `0040`, found at 420 px; below the 800 x 600 minimum, so not fixed there).
 
@@ -1401,3 +1408,20 @@ Do it with the next slice that touches the move chip.
   targets), Ctrl copy at a mark click, Escape between the press and release of a mark click, a click on
   a mixed Ratio or colour slider, the 10,000-object frame with the box drawn, a dark theme, and screen
   reader output. The customer tries these in the app; the sliders' tooltips were seen.
+
+
+
+## The history cache stays in memory for the whole session
+
+`Document::warm_history` (`0020-undo-redo`) reads the log once after Open and builds Loro's checkout
+cache so that the first undo is as fast as later ones. The cache is not freed until the document is
+closed: +48 MB and about 260 ms at 154,000 operations in the Loro spike
+(`docs/spikes/loro-history-primitives.md`); the measured figure for this build is in ADR 0014 §13.
+The step index and the container chains of the log add to it. Freeing it when the History tab is
+closed (`free_history_cache`) is possible but would put the cold cost back on the next undo.
+
+## Undo and redo do not restore the Node tool's segment selection
+
+`0020-undo-redo` restores the selected objects and the Node tool's selected nodes by anchor id
+(`UndoStack`, `SelectionSnapshot`). A selected segment (two adjacent anchors) is not restored: after
+Ctrl+Z the segment is deselected. Minor; the snapshot would need the segment's end anchors.

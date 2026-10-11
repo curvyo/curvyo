@@ -83,7 +83,9 @@ fn labels(s: &Session) -> Vec<String> {
     l.travel_change_ancestors(&ids, &mut |m| {
         out.push((
             m.lamport,
-            m.message.map(|x| x.to_string()).unwrap_or_default(),
+            m.message
+                .map(|x| x.split(';').next().unwrap_or_default().to_string())
+                .unwrap_or_default(),
         ));
         ControlFlow::Continue(())
     })
@@ -345,14 +347,27 @@ fn ac20_refused_and_unchanged_input_leaves_the_view_alone() {
     assert_eq!(s.view(), view);
 }
 
+/// Amended 2026-10-11 (`fix/center-document`): a window resize of the untouched
+/// view centres the document again, so the objects move with it: they keep
+/// their place relative to the document's corner.
 #[test]
-fn ac20_a_window_resize_after_a_typed_resize_in_the_untouched_view_keeps_objects() {
+fn ac20_a_window_resize_after_a_typed_resize_in_the_untouched_view_keeps_objects_in_the_document() {
     let mut s = one_rect_session();
-    let before = screen_points(&s);
     s.set_document_side(Width, "500");
+    let corner = |s: &Session| s.view().document_to_screen(pt(0.0, 0.0));
+    let (corner_before, before) = (corner(&s), screen_points(&s));
     s.resize_viewport(640.0, 480.0);
     s.resize_viewport(1300.0, 900.0);
-    assert_still(&before, &screen_points(&s), "window resize");
+    let corner_after = corner(&s);
+    let shift = (
+        corner_after.0 - corner_before.0,
+        corner_after.1 - corner_before.1,
+    );
+    let moved: Vec<_> = before
+        .iter()
+        .map(|p| (p.0 + shift.0, p.1 + shift.1))
+        .collect();
+    assert_still(&moved, &screen_points(&s), "window resize");
 }
 
 // ---- repeated resizes do not drift ----

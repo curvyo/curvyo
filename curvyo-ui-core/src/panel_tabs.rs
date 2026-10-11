@@ -2,13 +2,15 @@
 //! (`specs/0043-properties-tabs/` criteria 4 to 8 and 14), plus the strip's
 //! entries: names, tooltips and which tab is dimmed.
 
-/// A tab of the Properties panel. The History tab arrives with `0020`.
+/// A tab of the Properties panel.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PanelTab {
     /// The document's own settings.
     Document,
     /// The style of the objects in the active tool's scope.
     Style,
+    /// The history of every step in the document (`specs/0020-undo-redo` criterion 39).
+    History,
 }
 
 impl PanelTab {
@@ -18,6 +20,7 @@ impl PanelTab {
         match self {
             Self::Document => "document",
             Self::Style => "style",
+            Self::History => "history",
         }
     }
 
@@ -31,6 +34,7 @@ impl PanelTab {
         match self {
             Self::Document => "Document",
             Self::Style => "Style",
+            Self::History => "History",
         }
     }
 
@@ -39,6 +43,7 @@ impl PanelTab {
             (Self::Document, _) => "Document (Shift+Ctrl+D)",
             (Self::Style, None) => "Style (Shift+Ctrl+F)",
             (Self::Style, Some(blocker)) => blocker.tooltip(),
+            (Self::History, _) => "History (Shift+Ctrl+H)",
         }
     }
 }
@@ -67,7 +72,7 @@ impl StyleBlocker {
 }
 
 /// The strip's tabs, in order (criterion 1).
-const TABS: [PanelTab; 2] = [PanelTab::Document, PanelTab::Style];
+const TABS: [PanelTab; 3] = [PanelTab::Document, PanelTab::Style, PanelTab::History];
 
 /// The active tab and the one fact the automatic switches need: whether the
 /// style scope held objects when the panel was last read. Switches act on the
@@ -131,6 +136,11 @@ impl PanelTabs {
         } else {
             PanelTab::Document
         };
+    }
+
+    /// Shift+Ctrl+H (`specs/0020-undo-redo` criterion 46): History, whatever the scope.
+    pub fn shortcut_history(&mut self) {
+        self.active = PanelTab::History;
     }
 
     /// Shift+Ctrl+D (criterion 14): Document, whatever the scope.
@@ -269,6 +279,19 @@ mod tests {
         }
     }
 
+    /// The History tab is never switched automatically and is pressable with an empty scope.
+    #[test]
+    fn the_history_tab_stays_through_every_scope_change() {
+        let mut tabs = PanelTabs::new(false);
+        assert!(tabs.press(PanelTab::History, false));
+        for scope in [true, false, true, true, false] {
+            tabs.observe(scope);
+            assert_eq!(tabs.active(), PanelTab::History);
+        }
+        tabs.shortcut_history();
+        assert_eq!(tabs.active(), PanelTab::History);
+    }
+
     /// Criterion 4: the refused press reports it.
     #[test]
     fn pressing_style_with_an_empty_scope_is_refused() {
@@ -281,10 +304,18 @@ mod tests {
 
     /// Criterion 1 and 4: names, order, tooltips, the dimmed tab.
     #[test]
-    fn the_strip_has_two_tabs_with_tooltips_and_a_dimmed_style() {
+    fn the_strip_has_three_tabs_with_tooltips_and_a_dimmed_style() {
         let empty = tab_entries(Document, false);
         let names: Vec<_> = empty.iter().map(|e| (e.name, e.label)).collect();
-        assert_eq!(names, [("document", "Document"), ("style", "Style")]);
+        assert_eq!(
+            names,
+            [
+                ("document", "Document"),
+                ("style", "Style"),
+                ("history", "History")
+            ]
+        );
+        assert_eq!(empty[2].tooltip, "History (Shift+Ctrl+H)");
         assert_eq!(empty[0].tooltip, "Document (Shift+Ctrl+D)");
         assert_eq!(empty[1].tooltip, "Style: select an object first");
         assert_eq!(
@@ -292,7 +323,7 @@ mod tests {
                 .iter()
                 .map(|e| (e.enabled, e.selected))
                 .collect::<Vec<_>>(),
-            [(true, true), (false, false)]
+            [(true, true), (false, false), (true, false)]
         );
         let full = tab_entries(Style, true);
         assert_eq!(full[1].tooltip, "Style (Shift+Ctrl+F)");
@@ -300,7 +331,7 @@ mod tests {
             full.iter()
                 .map(|e| (e.enabled, e.selected))
                 .collect::<Vec<_>>(),
-            [(true, false), (true, true)]
+            [(true, false), (true, true), (true, false)]
         );
     }
 
@@ -330,6 +361,7 @@ mod tests {
     fn names_round_trip() {
         assert_eq!(PanelTab::from_name("style"), Some(Style));
         assert_eq!(PanelTab::from_name("document"), Some(Document));
-        assert_eq!(PanelTab::from_name("history"), None);
+        assert_eq!(PanelTab::from_name("history"), Some(PanelTab::History));
+        assert_eq!(PanelTab::from_name("unknown"), None);
     }
 }

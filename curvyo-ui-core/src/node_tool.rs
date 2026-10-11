@@ -228,6 +228,12 @@ impl NodeTool {
         &self.selection
     }
 
+    /// Replaces the node selection by `pairs`, leaving the segment selection (undo restores the
+    /// nodes a step had selected, by anchor id).
+    pub fn select_nodes(&mut self, pairs: Vec<(NodeId, curvyo_document_core::AnchorId)>) {
+        self.selection.select_nodes(pairs);
+    }
+
     /// Selects every anchor of `path` as one multi-node selection —
     /// `primitive-shapes`' "object to path" (acceptance criterion 17)
     /// uses this so a freshly converted primitive is immediately

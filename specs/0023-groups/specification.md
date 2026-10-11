@@ -1,6 +1,6 @@
 # Groups: group, nest, enter and leave, ungroup
 
-Status: Ready (2026-10-10: `adrs.md` and the UX notes exist; the customer accepted the document-model change on 2026-10-10 (Question 1: yes); criterion 27 reworded the same day)
+Status: Ready (2026-10-10: `adrs.md` and the UX notes exist; the customer accepted the document-model change on 2026-10-10 (Question 1: yes); criterion 27 reworded the same day) Amended by `0020-undo-redo`: the sentence "No undo yet." and the statements that no undo exists are removed; Ctrl+Z takes the step back.
 Priority: Must
 Origin: Customer (groups, nested groups, entering a group, ungrouping; request of 2026-10-09, with the wish that the UX be much better than Inkscape's). Requirement R-EDIT-009 (grouping and layers) is in the customer-confirmed MVP; this spec is its **grouping half**. Layers are a separate, later entry (`0039`, see "Groups and layers"). The decisions marked in "Decided by the product owner" are my proposals.
 
@@ -33,7 +33,7 @@ As a maker I want to bind several parts into one group, move, scale and rotate i
 3. Given one or more groups selected, when the maker activates **Ungroup**, then each selected group is replaced, at its stacking position, by its children in their order, and the children are selected together with any other objects that were selected. Nested groups inside it stay groups (one level per Ungroup). The objects look exactly as before: no geometry, style or position of any child changes. One commit, stored as `ungroup`. Given the selection holds no group, Ungroup is not available and does nothing.
 4. Given Group then Ungroup on the same selection with no non-selected object between the selected ones, then the document is as before apart from the new object ids of the groups. With non-selected objects between them it differs by the order of criterion 1, which is shown in the Group tooltip.
 5. Given a group is nested inside another group, then depth up to 32 levels is allowed. Given a Group that would exceed it, then it is refused with the notice "Groups can be nested 32 levels deep. Nothing was changed." and nothing changes.
-6. Given a successful Group or Ungroup, then a one-line notice names what happened ("Grouped 3 objects." or "Ungrouped 2 groups into 7 objects."), ends with "No undo yet." until `0020-undo-redo` exists, disappears within 3 seconds, takes no focus and is a `role="status"` live region, as `0016` criterion 29.
+6. Given a successful Group or Ungroup, then a one-line notice names what happened ("Grouped 3 objects." or "Ungrouped 2 groups into 7 objects."), ends after what happened ("No undo yet." is gone since `0020`), disappears within 3 seconds, takes no focus and is a `role="status"` live region, as `0016` criterion 29.
 7. Given the shortcuts, then Group is **Ctrl+G** and Ungroup is **Ctrl+Shift+G** (Cmd on macOS), which Inkscape and Illustrator share. They are gated like every shortcut (not during a drag, with a chip open or in the Pen with an unfinished path, `0010` criterion 55). Proposal (Question 4): they are a pair of undoable-by-each-other commands, unlike the Boolean operations that had no shortcut because they cannot be undone.
 
 ### Selecting groups

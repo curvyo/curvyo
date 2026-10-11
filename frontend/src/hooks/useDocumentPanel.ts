@@ -3,7 +3,7 @@ import { useCallback, useMemo, useState } from "react";
 import type { WasmSession } from "@/lib/editorSession";
 
 /** What the Properties panel's body shows (`curvyo-ui-core::panel_content`). */
-export type PanelContent = "document" | "style" | "empty";
+export type PanelContent = "document" | "style" | "history" | "empty";
 
 /** One tab of the panel's strip (`curvyo-ui-core::panel_tabs`). */
 export interface PanelTabView {
@@ -161,7 +161,7 @@ export interface DocumentPanelApi {
   /** A press on a tab of the strip (also an arrow key on it). */
   pressTab: (name: string) => void;
   /** Shift+Ctrl+F or Shift+Ctrl+D: the tab the shortcut names. */
-  shortcut: (tab: "style" | "document") => void;
+  shortcut: (tab: "style" | "document" | "history") => void;
 }
 
 interface EditorHandle {
@@ -256,10 +256,12 @@ export function useDocumentPanel(editor: EditorHandle): DocumentPanelApi {
   );
 
   const shortcut = useCallback(
-    (tab: "style" | "document") => {
+    (tab: "style" | "document" | "history") => {
       const session = getSession();
       if (tab === "style") {
         session?.panel_shortcut_style();
+      } else if (tab === "history") {
+        session?.panel_shortcut_history();
       } else {
         session?.panel_shortcut_document();
       }

@@ -1,6 +1,6 @@
 # Rectangle corner radii: a separate radius for each corner
 
-Status: Done
+Status: Done Superseded by `0020-undo-redo` where it says there is no undo (a release or a conversion is one step that Ctrl+Z takes back); the rest stays as the record of what was built.
 Priority: Should
 Origin: Customer
 

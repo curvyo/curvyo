@@ -1,6 +1,6 @@
 # Unified object editing: one Select tool for every object and its own handles
 
-Status: Done
+Status: Done Superseded by `0020-undo-redo` where it says there is no undo (a release or a conversion is one step that Ctrl+Z takes back); the rest stays as the record of what was built.
 Done, with: the advanced-selection clauses of criterion 35 are not built (`advanced-selection` is not built); `shape-creation-from-center` criteria 16 and 17 (first sentence) are superseded by this spec.
 Priority: Must
 Origin: Customer

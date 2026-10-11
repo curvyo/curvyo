@@ -11,7 +11,8 @@ circumstances get a new ADR that supersedes the old one, and the old one's
 Status line is updated to point at it. ADRs 0001–0011 below are accepted, so
 this rule is now live: every further change to any of these decisions is a new
 ADR. ADR 0012 was rejected before acceptance, so that rule never applied to it.
-ADRs 0013 and 0014 are accepted as well (0014 by the customer on 2026-10-10).
+ADRs 0013, 0014 and 0015 are accepted as well (0014 by the customer on 2026-10-10, 0015 on
+2026-10-11).
 (0001–0010 were accepted by customer sign-off; 0011 is downstream assembly of
 them and was accepted by the architect — see its own preamble for why
 `CLAUDE.md` §3 does not require a customer round for it.)
@@ -39,7 +40,7 @@ A decision too small for a full ADR gets a short dated note in that feature's
 | [0012](0012-pages-in-the-document-model.md) | Pages in the document model | workspace | Rejected (2026-10-05, dropped from MVP) |
 | [0013](0013-rename-to-curvyo.md) | Rename the product to Curvyo (amends 0011 crate names, 0004 §1 file extension; [inventory](0013-rename-to-curvyo-inventory.md)) | workspace | Accepted |
 | [0014](0014-history-undo-and-branches.md) | History, undo and branches over the operation log (own restore engine on `diff` instead of Loro's `UndoManager`, step header with time in commit messages, deleted objects revived by an injected tree move under a pinned Loro, previews from the live document, wipe by shallow snapshot with an epoch, budgets by step size; amended 2026-10-10 after the Loro spike; supersedes one sentence of 0004 §2) | workspace | Accepted (customer, 2026-10-10; option A on all seven questions) |
-| [0015](0015-node-references-and-ancestor-resolved-state.md) | Node references and ancestor-resolved node state (a linked clone reads its origin's outline and style; `visible`, `locked`, `opacity` resolve through ancestors; supersedes one sentence of 0002 §5; asked by specs 0049 and 0050) | workspace | Proposed (2026-10-10), `needs-customer` |
+| [0015](0015-node-references-and-ancestor-resolved-state.md) | Node references and ancestor-resolved node state (a linked clone, also in a chain, reads its root original's outline, style and opacity through one atomic `clone_link`; `visible`, `locked`, `opacity` resolve through ancestors; output of hidden nodes left open; supersedes one sentence of 0002 §5; asked by specs 0049 and 0050) | workspace | Accepted (customer, 2026-10-11) |
 
 ## Customer sign-off, 2026-10-02
 

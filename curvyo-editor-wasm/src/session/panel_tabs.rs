@@ -91,6 +91,15 @@ impl Session {
         });
     }
 
+    /// Shift+Ctrl+H (`specs/0020-undo-redo` criterion 46): the History tab.
+    pub fn panel_shortcut_history(&mut self) {
+        let non_empty = self.panel_scope_non_empty();
+        self.update_panel_tabs(|tabs| {
+            tabs.observe(non_empty);
+            tabs.shortcut_history();
+        });
+    }
+
     /// Shift+Ctrl+D (criterion 14): the Document tab.
     pub fn panel_shortcut_document(&mut self) {
         let non_empty = self.panel_scope_non_empty();
@@ -106,7 +115,7 @@ impl Session {
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PanelTabsRecord {
-    /// `"document"`, `"style"` or `"empty"`.
+    /// `"document"`, `"style"`, `"history"` or `"empty"`.
     #[cfg_attr(target_arch = "wasm32", wasm_bindgen(getter_with_clone))]
     pub content: String,
     /// The active tab's name.
@@ -133,6 +142,7 @@ impl PanelTabsRecord {
         let content = match view.content {
             PanelContent::Document => "document",
             PanelContent::Style => "style",
+            PanelContent::History => "history",
             PanelContent::Empty => "empty",
         };
         Self {
@@ -206,10 +216,10 @@ mod tests {
     fn the_dimmed_style_tab_does_nothing() {
         let mut session = Session::new(1);
         assert!(!session.press_panel_tab("style"));
-        assert!(!session.press_panel_tab("history"));
+        assert!(!session.press_panel_tab("unknown"));
         let record = PanelTabsRecord::new(&session.panel_view());
-        assert_eq!(record.tab_names, ["document", "style"]);
-        assert_eq!(record.tab_enabled, [1, 0]);
+        assert_eq!(record.tab_names, ["document", "style", "history"]);
+        assert_eq!(record.tab_enabled, [1, 0, 1]);
         assert_eq!(record.tab_tooltips[1], "Style: select an object first");
         assert_eq!(record.active, "document");
     }
@@ -259,7 +269,7 @@ mod tests {
         }
         let view = session.panel_view();
         assert_eq!(view.content, PanelContent::Empty);
-        assert_eq!(view.tabs.len(), 2);
+        assert_eq!(view.tabs.len(), 3);
         assert!(session.press_panel_tab("document"));
         assert_eq!(session.panel_content(), PanelContent::Empty);
         session.finish_pen();

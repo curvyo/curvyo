@@ -69,7 +69,7 @@ impl Session {
     /// Sets the display unit, one commit that moves nothing (criterion 36).
     /// Returns whether it changed.
     pub fn set_display_unit(&mut self, unit: DisplayUnit) -> bool {
-        self.document.set_display_unit(unit)
+        self.recording(|this| -> bool { this.document.set_display_unit(unit) })
     }
 
     /// Whether the document has any object: Fit to content is offered only
@@ -121,41 +121,48 @@ impl Session {
     /// within 1e-9 mm of the current one writes nothing. Ignored while the Pen
     /// has an unfinished path.
     pub(super) fn resize_document_to(&mut self, wanted: DocumentSize) -> SizeOutcome {
-        if self.pen_path_unfinished() {
-            return SizeOutcome::Unchanged;
-        }
-        let before = self.document.size();
-        match self.document.resize(wanted) {
-            Ok(true) => {
-                self.follow_document_shift(Document::resize_shift(before, self.document.size()));
-                SizeOutcome::Committed
+        self.recording(|this| -> SizeOutcome {
+            if this.pen_path_unfinished() {
+                return SizeOutcome::Unchanged;
             }
-            Ok(false) => SizeOutcome::Unchanged,
-            Err(_) => SizeOutcome::Invalid,
-        }
+            let before = this.document.size();
+            match this.document.resize(wanted) {
+                Ok(true) => {
+                    this.follow_document_shift(Document::resize_shift(
+                        before,
+                        this.document.size(),
+                    ));
+                    SizeOutcome::Committed
+                }
+                Ok(false) => SizeOutcome::Unchanged,
+                Err(_) => SizeOutcome::Invalid,
+            }
+        })
     }
 
     /// Fits the document to the extent of all objects (criteria 22 to 27a).
     pub fn fit_document(&mut self) -> FitOutcome {
-        if self.pen_path_unfinished() {
-            return FitOutcome::Blocked;
-        }
-        let Some(bounds) = content_bounds(&self.document) else {
-            return FitOutcome::Empty;
-        };
-        let shift = Document::fit_shift(bounds);
-        match self.document.fit_to_content(bounds) {
-            Ok(true) => {
-                self.follow_document_shift(shift);
-                FitOutcome::Fitted
+        self.recording(|this| -> FitOutcome {
+            if this.pen_path_unfinished() {
+                return FitOutcome::Blocked;
             }
-            Ok(false) => FitOutcome::AlreadyFits,
-            Err(DocumentSizeError::OutOfRange) => {
-                FitOutcome::TooLarge(content_too_large_message(self.display_unit()))
+            let Some(bounds) = content_bounds(&this.document) else {
+                return FitOutcome::Empty;
+            };
+            let shift = Document::fit_shift(bounds);
+            match this.document.fit_to_content(bounds) {
+                Ok(true) => {
+                    this.follow_document_shift(shift);
+                    FitOutcome::Fitted
+                }
+                Ok(false) => FitOutcome::AlreadyFits,
+                Err(DocumentSizeError::OutOfRange) => {
+                    FitOutcome::TooLarge(content_too_large_message(this.display_unit()))
+                }
+                // A box that is not finite (a damaged file) is not "too large".
+                Err(_) => FitOutcome::Empty,
             }
-            // A box that is not finite (a damaged file) is not "too large".
-            Err(_) => FitOutcome::Empty,
-        }
+        })
     }
 
     /// Moves the view by the shift every object just moved by, so the objects

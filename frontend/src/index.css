@@ -61,7 +61,7 @@
     --muted-foreground: oklch(0.556 0 0);
     --accent: oklch(0.97 0 0);
     --accent-foreground: oklch(0.205 0 0);
-    --destructive: oklch(0.577 0.245 27.325);
+    --destructive: var(--field-invalid);
     --border: oklch(0.922 0 0);
     --input: oklch(0.922 0 0);
     --ring: oklch(0.708 0 0);
@@ -119,6 +119,9 @@
     --toolbar-icon-active-fg: #FFFFFF;
     --editor-accent: #2F6FEE;
     --editor-accent-hover: color-mix(in srgb, #2F6FEE 20%, transparent);
+    /* The ground of a list row under the pointer: lighter than the control hover so the muted
+       text on it keeps 4.5:1 (4.58:1 at 8 %). */
+    --row-hover: color-mix(in srgb, #2F6FEE 8%, transparent);
     /* docs/design-system.md, 2026-10-05: drop shadow on every floating
        chrome surface (the left tool panel, the per-selection contextual
        mini-toolbar) — what makes them read as "floating over" the
@@ -264,7 +267,8 @@
   user-select: none;
   -webkit-user-drag: none;
 }
-.properties-panel input {
+.properties-panel input,
+.properties-panel .select-text {
   user-select: text;
 }
 

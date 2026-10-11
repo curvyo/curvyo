@@ -81,7 +81,10 @@ fn last_label(s: &Session) -> String {
     let l = loro_of(s);
     let mut out = String::new();
     l.travel_change_ancestors(&[l.oplog_frontiers().iter().next().unwrap()], &mut |m| {
-        out = m.message.map(|x| x.to_string()).unwrap_or_default();
+        out = m
+            .message
+            .map(|x| x.split(';').next().unwrap_or_default().to_string())
+            .unwrap_or_default();
         std::ops::ControlFlow::Break(())
     })
     .unwrap();

@@ -233,7 +233,12 @@ mod tests {
             .loro()
             .get_change(loro::ID::new(peer, end - 1))
             .expect("the newest change exists");
-        change.message().to_string()
+        change
+            .message()
+            .split(';')
+            .next()
+            .unwrap_or_default()
+            .to_string()
     }
 
     /// Criterion 17's example: a 50 x 50 rectangle at (10, 10) in the A4

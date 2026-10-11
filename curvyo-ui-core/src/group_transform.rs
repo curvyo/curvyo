@@ -322,14 +322,33 @@ pub(crate) fn commit_group(
     document: &Document,
     results: &[ObjectSnapshot],
     stroke: StrokeScaling,
+    handle: EditHandle,
 ) -> bool {
     let with_width = stroke == StrokeScaling::Proportional;
-    let outcome = document.transform_objects(results, with_width);
-    if with_width && outcome == Err(ObjectEditError::InvalidStrokeWidth) {
-        // Anything else means an object is gone: nothing is left to write.
-        return document.transform_objects(results, false).is_ok();
+    document.batch(group_label(handle), |document| {
+        let outcome = document.transform_objects(results, with_width);
+        if with_width && outcome == Err(ObjectEditError::InvalidStrokeWidth) {
+            // Anything else means an object is gone: nothing is left to write.
+            return document.transform_objects(results, false).is_ok();
+        }
+        outcome.is_ok()
+    })
+}
+
+const TRANSFORM_RESIZE_COMMIT_LABEL: &str = "transform_resize";
+const TRANSFORM_ROTATE_COMMIT_LABEL: &str = "transform_rotate";
+const TRANSFORM_SKEW_COMMIT_LABEL: &str = "transform_skew";
+const TRANSFORM_OBJECTS_COMMIT_LABEL: &str = "transform_objects";
+
+/// The commit label of a group gesture on `handle`: one step for all objects, named after the
+/// gesture (`specs/0020-undo-redo` criteria 10 and 58).
+const fn group_label(handle: EditHandle) -> &'static str {
+    match handle {
+        EditHandle::Resize(_) => TRANSFORM_RESIZE_COMMIT_LABEL,
+        EditHandle::Rotate(_) => TRANSFORM_ROTATE_COMMIT_LABEL,
+        EditHandle::Skew(_) => TRANSFORM_SKEW_COMMIT_LABEL,
+        EditHandle::Move | EditHandle::Param(_) => TRANSFORM_OBJECTS_COMMIT_LABEL,
     }
-    outcome.is_ok()
 }
 
 #[cfg(test)]

@@ -179,7 +179,7 @@ ordinary anchor insert, delete or register write. Reference state: `main` at
   registers and anchor maps. The labels `extend_path`, `connect_paths` and
   `close_path` are new commit messages, pinned by a test (as `boolean_command.rs`
   does).
-- **2026-10-10: no undo (criterion 27).** Each gesture is exactly one commit.
+- **2026-10-10: undo (criterion 27).** Each gesture is exactly one commit; `0020` amended criterion 27 to Ctrl+Z.
   Escape before the finish is the only way back, and it writes nothing.
   Tests count commits with `len_changes()` on small inputs only (see the
   technical-debt item "one commit is not one Loro change").

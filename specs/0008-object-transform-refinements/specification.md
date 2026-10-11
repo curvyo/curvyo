@@ -1,6 +1,6 @@
 # Object transform refinements: handles, pivots, numeric entry, 22.5° snap
 
-Status: Done
+Status: Done Superseded by `0020-undo-redo` where it says there is no undo (a release or a conversion is one step that Ctrl+Z takes back); the rest stays as the record of what was built.
 Done, with: criterion 49 and the typed-skew out-of-scope line are superseded by `edit-interaction-polish` criteria 9 to 14; the optional criteria 54 to 56 were built.
 Priority: Must
 Origin: Customer

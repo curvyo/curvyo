@@ -31,6 +31,7 @@ mod format_edit;
 mod format_library;
 mod format_library_file;
 mod format_library_import;
+mod history;
 mod junction;
 mod legacy_fill;
 mod objects;
@@ -77,6 +78,12 @@ pub use format_library_file::{
     MAX_USER_FILE_BYTES, MAX_USER_FORMATS, MAX_USER_GROUPS, USER_FILE_FORMAT, describe_error,
 };
 pub use format_library_import::ImportReport;
+pub use history::{
+    Author, Direction, Event, FAR_STEP_OPS, HistoryError, HistoryRow, LABEL_NEW_DOCUMENT,
+    LABEL_REDO, LABEL_UNDO, MIN_SHOWN_ID_LEN, ObjectReport, ObjectResult, ObjectShape, OwnStep,
+    RestoreReport, Role, SMALL_STEP_OPS, STACK_LIMIT, SkipReason, StackMachine, Status, StepKind,
+    StepRef, SyncError, TouchedObject, WIPE_LABEL, is_document_level_label, shown_ids,
+};
 pub use junction::{COINCIDENT_MM, interior_handle, merged_junction};
 pub use objects::{CopySource, ObjectEditError};
 pub use path_extend::{PathEnd, PathGrowth};
@@ -102,4 +109,4 @@ pub use style_model::{
     Stroke, Style, StyleParamError,
 };
 pub use styles::{StyleEdit, StyleEditError};
-pub use units::{Angle, DocumentSize, Length, Point, Tolerance, Vec2, ViewTransform};
+pub use units::{Angle, DocumentSize, Length, Point, Timestamp, Tolerance, Vec2, ViewTransform};

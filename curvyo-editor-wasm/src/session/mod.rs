@@ -35,6 +35,8 @@ mod draw;
 mod formats;
 mod frame;
 mod group_view;
+mod history;
+mod history_rows;
 mod keys;
 mod move_entry;
 mod move_indicators;
@@ -76,6 +78,8 @@ pub use combine::{BreakApartOutcome, CombineOutcome};
 pub use document::{DocumentSide, FitOutcome, SizeOutcome};
 pub use document_presets::DocumentPresetsRecord;
 pub use formats::{FormTexts, FormatEdit};
+pub use history::HistoryResult;
+pub use history_rows::{WipeOutcome, WipeState};
 pub use keys::{EscapeStep, KeyHint, KeyInput, KeyOutcome};
 pub use move_indicators::MoveIndicators;
 pub use panel_tabs::{PanelTabsRecord, PanelView};
@@ -178,6 +182,8 @@ pub struct Session {
     /// the Select-tool counterpart to `hovered` above (acceptance criteria
     /// 14, 15's hover box). A creation tool has no hover highlight.
     hovered_object: Option<NodeId>,
+    /// The objects of the History row the pointer or focus rests on (`history.rs`).
+    history_hover: Vec<NodeId>,
     /// The live pointer position in document space, tracked regardless
     /// of the active tool — the pen tool's rubber-band preview
     /// (`specification.md`'s UX notes) needs it even though it keeps no
@@ -217,6 +223,8 @@ pub struct Session {
     command_refusal: Option<refusal::RefusalMarks>,
     /// The Pen's end-node cache and the target of the press in flight (`0034`).
     pen_cue: pen::PenCueState,
+    /// The maker's undo and redo stacks of this session (`history.rs`).
+    history: history::HistoryState,
     /// The arrow-key nudges of the held press that last moved the selection (`nudge.rs`).
     nudge_run: Option<curvyo_ui_core::NudgeRun>,
 }
@@ -254,6 +262,7 @@ impl Session {
             viewport: Viewport::new(),
             hovered: None,
             hovered_object: None,
+            history_hover: Vec::new(),
             pointer_position: None,
             held: Modifiers::NONE,
             object_cache: object_cache::ObjectCache::default(),
@@ -262,6 +271,7 @@ impl Session {
             limit_notice: None,
             command_refusal: None,
             pen_cue: pen::PenCueState::default(),
+            history: history::HistoryState::new(),
             nudge_run: None,
         }
     }
@@ -295,6 +305,7 @@ impl Session {
             viewport: Viewport::new(),
             hovered: None,
             hovered_object: None,
+            history_hover: Vec::new(),
             pointer_position: None,
             held: Modifiers::NONE,
             object_cache: object_cache::ObjectCache::default(),
@@ -303,6 +314,7 @@ impl Session {
             limit_notice: None,
             command_refusal: None,
             pen_cue: pen::PenCueState::default(),
+            history: history::HistoryState::new(),
             nudge_run: None,
         })
     }
@@ -333,37 +345,39 @@ impl Session {
     /// no acceptance criterion exercises switching tools mid-drag, so
     /// the same conservative stance applies.
     pub fn set_tool(&mut self, tool: Tool) {
-        // Flushes any pending ratio-slider preview against the
-        // selection it was actually previewed against, before anything
-        // else can change that selection (architect re-verification: a
-        // slider drag released outside the slider element never fires
-        // the slider's own `pointerup`/`blur`, so without this the
-        // preview would otherwise sit unflushed until some later event
-        // commits it against whatever is selected *then* instead).
-        self.flush_select_bar_preview();
-        self.flush_style_preview();
-        self.end_colour_pick();
-        self.select.cancel_entry();
-        self.select.forget_press();
-        self.select.cancel_gesture();
-        // Leaving the Pen ends its path as drawn (a lone node is dropped): no
-        // unfinished path stays behind that the Document section's resize would
-        // not move (`specs/0015-document-size-and-rulers/` criterion 14a).
-        if self.tool == Tool::Pen && tool != Tool::Pen {
-            self.pen.finish(&self.document);
-            self.pen.escape();
-        }
-        // A creation tool starts from an empty selection: no selection box
-        // stays behind from the Select tool. Creating a shape then selects
-        // the new one (`shape_pointer_up`).
-        if matches!(tool, Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar) {
-            self.selection.clear();
-            self.hovered_object = None;
-        }
-        if tool != self.tool {
-            self.command_refusal = None;
-        }
-        self.tool = tool;
+        self.recording(|this| {
+            // Flushes any pending ratio-slider preview against the
+            // selection it was actually previewed against, before anything
+            // else can change that selection (architect re-verification: a
+            // slider drag released outside the slider element never fires
+            // the slider's own `pointerup`/`blur`, so without this the
+            // preview would otherwise sit unflushed until some later event
+            // commits it against whatever is selected *then* instead).
+            this.flush_select_bar_preview();
+            this.flush_style_preview();
+            this.end_colour_pick();
+            this.select.cancel_entry();
+            this.select.forget_press();
+            this.select.cancel_gesture();
+            // Leaving the Pen ends its path as drawn (a lone node is dropped): no
+            // unfinished path stays behind that the Document section's resize would
+            // not move (`specs/0015-document-size-and-rulers/` criterion 14a).
+            if this.tool == Tool::Pen && tool != Tool::Pen {
+                this.pen.finish(&this.document);
+                this.pen.escape();
+            }
+            // A creation tool starts from an empty selection: no selection box
+            // stays behind from the Select tool. Creating a shape then selects
+            // the new one (`shape_pointer_up`).
+            if matches!(tool, Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar) {
+                this.selection.clear();
+                this.hovered_object = None;
+            }
+            if tool != this.tool {
+                this.command_refusal = None;
+            }
+            this.tool = tool;
+        });
     }
 
     /// The paths the Node and Pen tools work on. A compound path is left out:
@@ -392,36 +406,38 @@ impl Session {
 
     /// The pointer went down at `point` (document space).
     pub fn pointer_down(&mut self, point: Point, shift: bool) {
-        let Some(point) = sanitized_point(point) else {
-            return;
-        };
-        // Same flush as `set_tool`'s own doc comment explains: a canvas
-        // click can change the selection (e.g. selecting a different
-        // star) before a pending ratio-slider preview ever gets a
-        // chance to commit against the selection it was previewed
-        // against, if the mouse was released outside the slider itself.
-        self.flush_select_bar_preview();
-        self.flush_style_preview();
-        if self.colour_pick_press(point) {
-            return;
-        }
-        self.button_down = true;
-        match self.tool {
-            Tool::Select => {
-                self.select_pointer_down(point, shift);
+        self.recording(|this| {
+            let Some(point) = sanitized_point(point) else {
+                return;
+            };
+            // Same flush as `set_tool`'s own doc comment explains: a canvas
+            // click can change the selection (e.g. selecting a different
+            // star) before a pending ratio-slider preview ever gets a
+            // chance to commit against the selection it was previewed
+            // against, if the mouse was released outside the slider itself.
+            this.flush_select_bar_preview();
+            this.flush_style_preview();
+            if this.colour_pick_press(point) {
+                return;
             }
-            Tool::Pen => {
-                self.pen_pointer_down(point, shift);
+            this.button_down = true;
+            match this.tool {
+                Tool::Select => {
+                    this.select_pointer_down(point, shift);
+                }
+                Tool::Pen => {
+                    this.pen_pointer_down(point, shift);
+                }
+                Tool::Node => {
+                    let paths = this.paths();
+                    let tolerances = this.hit_tolerances();
+                    this.node.pointer_down(&paths, point, tolerances, shift);
+                }
+                Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar => {
+                    this.shape_pointer_down(point);
+                }
             }
-            Tool::Node => {
-                let paths = self.paths();
-                let tolerances = self.hit_tolerances();
-                self.node.pointer_down(&paths, point, tolerances, shift);
-            }
-            Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar => {
-                self.shape_pointer_down(point);
-            }
-        }
+        });
     }
 
     /// The pointer moved to `point`. Always records `point` as the live
@@ -487,34 +503,36 @@ impl Session {
     /// `object-transform`, by the Select tool's own resize/rotate commit
     /// alongside `shift` (acceptance criteria 5, 7, 16, 17).
     pub fn pointer_up(&mut self, point: Point, shift: bool, constrain: bool) {
-        self.button_down = false;
-        if self.colour_pick_release() {
-            return;
-        }
-        let Some(point) = sanitized_point(point) else {
-            // A release at a non-finite position cannot be committed to
-            // anything; cancel the gesture rather than write NaN.
-            self.cancel_gesture();
-            return;
-        };
-        match self.tool {
-            Tool::Select => {
-                self.select_pointer_up(point, shift, constrain);
+        self.recording(|this| {
+            this.button_down = false;
+            if this.colour_pick_release() {
+                return;
             }
-            Tool::Pen => {
-                let threshold = self.drag_threshold();
-                self.pen
-                    .pointer_up(&mut self.minter, &self.document, point, threshold);
-                self.pen_cue.release();
+            let Some(point) = sanitized_point(point) else {
+                // A release at a non-finite position cannot be committed to
+                // anything; cancel the gesture rather than write NaN.
+                this.cancel_gesture();
+                return;
+            };
+            match this.tool {
+                Tool::Select => {
+                    this.select_pointer_up(point, shift, constrain);
+                }
+                Tool::Pen => {
+                    let threshold = this.drag_threshold();
+                    this.pen
+                        .pointer_up(&mut this.minter, &this.document, point, threshold);
+                    this.pen_cue.release();
+                }
+                Tool::Node => {
+                    this.node.pointer_moved(point, shift);
+                    this.node.pointer_up(&this.document, point);
+                }
+                Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar => {
+                    this.shape_pointer_up(point, Modifiers::new(shift, constrain));
+                }
             }
-            Tool::Node => {
-                self.node.pointer_moved(point, shift);
-                self.node.pointer_up(&self.document, point);
-            }
-            Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar => {
-                self.shape_pointer_up(point, Modifiers::new(shift, constrain));
-            }
-        }
+        });
     }
 
     /// The one double-click dispatch point
@@ -536,16 +554,18 @@ impl Session {
 
     /// [`Session::double_click`], telling the host which hint to show, if any.
     pub fn double_click_hint(&mut self, point: Point, shift: bool, ctrl: bool) -> DoubleClickHint {
-        let Some(point) = sanitized_point(point) else {
-            return DoubleClickHint::None;
-        };
-        match self.tool {
-            Tool::Pen => self.finish_pen(),
-            Tool::Node => self.insert_at(point),
-            Tool::Select => return self.select_double_click(point, shift, ctrl),
-            Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar => {}
-        }
-        DoubleClickHint::None
+        self.recording(|this| -> DoubleClickHint {
+            let Some(point) = sanitized_point(point) else {
+                return DoubleClickHint::None;
+            };
+            match this.tool {
+                Tool::Pen => this.finish_pen(),
+                Tool::Node => this.insert_at(point),
+                Tool::Select => return this.select_double_click(point, shift, ctrl),
+                Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar => {}
+            }
+            DoubleClickHint::None
+        })
     }
 }
 

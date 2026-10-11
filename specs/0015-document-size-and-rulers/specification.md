@@ -39,6 +39,7 @@ Distances are in millimetres unless a criterion names the display unit. Test val
 10a. Given the wheel or a pinch gesture over a ruler, then it acts on the canvas as if the pointer were at the nearest point inside the canvas, so a zoom does not stop when the pointer slips onto a ruler.
 11. Given a window size of 800 × 600 (the minimum), then the canvas is still usable: it is at least 400 px wide and 400 px high after the rulers, panel and status bar are placed.
 11a. Given a project is created or opened, then the document's top-left corner is shown 72 px right of and 72 px below the canvas's top-left corner (so the edge and the 0 ticks are not hidden under the tool rail). This changes the initial view of `0004`.
+    *Amended 2026-10-11 (`fix/center-document`, customer observation: the document sat at the left):* the document is centred in the canvas instead, horizontally right of the tool rail and vertically in the full height; an axis it does not fit starts 128 px (x) or 24 px (y) in. It stays centred through window resizes until the first pan, zoom or properties panel toggle.
 
 ### Part B: document size
 

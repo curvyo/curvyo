@@ -276,3 +276,122 @@ fn a_document_offset_does_not_end_the_untouched_view() {
         "origin kept through the resize: {x}"
     );
 }
+
+/// Where the document's top-left and bottom-right corners sit on screen.
+fn document_box_px(viewport: &Viewport, width_mm: f64, height_mm: f64) -> ((f64, f64), (f64, f64)) {
+    let view = viewport.view();
+    (
+        view.document_to_screen(Point::new(0.0, 0.0)),
+        view.document_to_screen(Point::new(width_mm, height_mm)),
+    )
+}
+
+/// A small document in a big canvas sits in the middle of the space right of
+/// the tool rail (x) and of the whole height (y), at 100 % zoom.
+#[test]
+fn an_untouched_view_centres_a_document_that_fits() {
+    let mut viewport = Viewport::with_document_inset();
+    viewport.resize(1328.0, 800.0);
+    viewport.centre_document(100.0, 50.0);
+
+    let ((left, top), (right, bottom)) = document_box_px(&viewport, 100.0, 50.0);
+    assert!((right - left - 100.0 * PX_PER_MM_AT_100).abs() < 1e-9);
+    // Free space right of the rail: 1328 - 128 wide, centred in it.
+    let rail_space = (left - DOCUMENT_INSET_PX, 1328.0 - right);
+    assert!((rail_space.0 - rail_space.1).abs() < 1e-9, "{rail_space:?}");
+    assert!(((top) - (800.0 - bottom)).abs() < 1e-9, "{top} {bottom}");
+    assert!(left > DOCUMENT_INSET_PX && top > 0.0);
+}
+
+/// A document wider or taller than the free space keeps its top-left at the
+/// rail inset (x) or the small top margin (y) instead of being cut off on
+/// both sides; the other axis is still centred.
+#[test]
+fn an_axis_that_does_not_fit_keeps_the_start_margin_and_the_other_is_centred() {
+    let mut viewport = Viewport::with_document_inset();
+    viewport.resize(1100.0, 800.0);
+    // A4 portrait: 297 mm is 1122 px tall, more than the canvas.
+    viewport.centre_document(210.0, 297.0);
+
+    let ((left, top), (right, _)) = document_box_px(&viewport, 210.0, 297.0);
+    assert!((top - DOCUMENT_TOP_MARGIN_PX).abs() < 1e-9, "{top}");
+    assert!(((left - DOCUMENT_INSET_PX) - (1100.0 - right)).abs() < 1e-9);
+
+    let mut wide = Viewport::with_document_inset();
+    wide.resize(500.0, 800.0);
+    wide.centre_document(210.0, 100.0);
+    let ((left, top), (_, bottom)) = document_box_px(&wide, 210.0, 100.0);
+    assert!((left - DOCUMENT_INSET_PX).abs() < 1e-9, "{left}");
+    assert!((top - (800.0 - bottom)).abs() < 1e-9);
+}
+
+/// Before the host reported a size there is nothing to centre in: the
+/// inset view stays as it was, and the first size report followed by the
+/// call centres it (the order `Session::resize_viewport` uses).
+#[test]
+fn centring_waits_for_the_first_size_report() {
+    let mut viewport = Viewport::with_document_inset();
+    viewport.centre_document(100.0, 50.0);
+    assert_eq!(viewport, Viewport::with_document_inset());
+
+    viewport.resize(1328.0, 800.0);
+    viewport.centre_document(100.0, 50.0);
+    assert_ne!(viewport, Viewport::with_document_inset());
+}
+
+/// A window shown, maximised or resized after the session was created keeps
+/// the document centred, however many size reports arrive and in which
+/// order, with no drift.
+#[test]
+fn every_resize_of_an_untouched_view_recentres() {
+    let mut viewport = Viewport::with_document_inset();
+    for (width, height) in [(1.0, 1.0), (700.0, 500.0), (1600.0, 900.0), (1000.0, 700.0)] {
+        viewport.resize(width, height);
+        viewport.centre_document(100.0, 50.0);
+        let ((left, top), (right, bottom)) = document_box_px(&viewport, 100.0, 50.0);
+        if width > 400.0 {
+            assert!(((left - DOCUMENT_INSET_PX) - (width - right)).abs() < 1e-9);
+            assert!((top - (height - bottom)).abs() < 1e-9);
+        }
+    }
+}
+
+/// After the first pan, zoom or drag-pan the view is the maker's: the call
+/// changes nothing (`0004` criterion 10 applies again).
+#[test]
+fn a_panned_or_zoomed_view_is_never_recentred() {
+    let gestures: [fn(&mut Viewport); 3] = [
+        |v| v.pan_by_screen_delta(5.0, 0.0),
+        |v| v.zoom_about(300.0, 300.0, 2.0),
+        |v| v.begin_drag_pan(10.0, 10.0),
+    ];
+    for gesture in gestures {
+        let mut viewport = Viewport::with_document_inset();
+        viewport.resize(1328.0, 800.0);
+        viewport.centre_document(100.0, 50.0);
+        gesture(&mut viewport);
+        let before = viewport;
+        viewport.centre_document(300.0, 20.0);
+        assert_eq!(viewport, before);
+    }
+}
+
+/// A properties panel toggle keeps the document where it is (`0007`
+/// criterion 39), also in a view that was still the centred default: it is
+/// not moved back to the middle afterwards.
+#[test]
+fn a_panel_toggle_ends_the_centred_default_view() {
+    let mut viewport = Viewport::with_document_inset();
+    viewport.resize(1328.0, 800.0);
+    viewport.centre_document(100.0, 50.0);
+    let corner = viewport.view().document_to_screen(Point::new(0.0, 0.0));
+
+    viewport.keep_origin_for_width_change(-280.0);
+    viewport.resize(1048.0, 800.0);
+    viewport.centre_document(100.0, 50.0);
+
+    assert_eq!(
+        viewport.view().document_to_screen(Point::new(0.0, 0.0)),
+        corner
+    );
+}

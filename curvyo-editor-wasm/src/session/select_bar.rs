@@ -28,7 +28,9 @@ impl Session {
     /// slider outside its element never fires its own release): a tool switch,
     /// a canvas press, Delete, "Object to path".
     pub(super) fn flush_select_bar_preview(&mut self) {
-        self.select.flush_bar_preview(&self.document);
+        self.recording(|this| {
+            this.select.flush_bar_preview(&this.document);
+        });
     }
 
     /// The typed "Radius" field (criterion 21a): Enter writes the value to
@@ -36,36 +38,42 @@ impl Session {
     /// (the field keeps the shown value) or a refusal: the field stays open
     /// marked invalid and nothing is written.
     pub fn set_selected_radius_text(&mut self, text: &str) -> EntryOutcome {
-        if self.tool != Tool::Select {
-            return EntryOutcome::Unchanged;
-        }
-        let objects = self.objects();
-        self.select
-            .commit_bar_radius_text(&self.document, &objects, &self.selection, text)
+        self.recording(|this| -> EntryOutcome {
+            if this.tool != Tool::Select {
+                return EntryOutcome::Unchanged;
+            }
+            let objects = this.objects();
+            this.select
+                .commit_bar_radius_text(&this.document, &objects, &this.selection, text)
+        })
     }
 
     /// The "Points" field and its stepper (criterion 21): one commit for
     /// every selected polygon and star.
     pub fn set_selected_point_count(&mut self, count: PointCount) {
-        let objects = self.objects();
-        let _ = self.select.commit_bar_value(
-            &self.document,
-            &objects,
-            &self.selection,
-            ParamValue::PointCount(count),
-        );
+        self.recording(|this| {
+            let objects = this.objects();
+            let _ = this.select.commit_bar_value(
+                &this.document,
+                &objects,
+                &this.selection,
+                ParamValue::PointCount(count),
+            );
+        });
     }
 
     /// The "Ratio" field's discrete commit (a typed value or a stepper
     /// click): one commit for every selected star.
     pub fn set_selected_ratio(&mut self, ratio: InnerRatio) {
-        let objects = self.objects();
-        let _ = self.select.commit_bar_value(
-            &self.document,
-            &objects,
-            &self.selection,
-            ParamValue::Ratio(ratio),
-        );
+        self.recording(|this| {
+            let objects = this.objects();
+            let _ = this.select.commit_bar_value(
+                &this.document,
+                &objects,
+                &this.selection,
+                ParamValue::Ratio(ratio),
+            );
+        });
     }
 
     /// The "Ratio" slider's live preview, on every tick: nothing is written;
@@ -85,7 +93,9 @@ impl Session {
     /// Commits the slider edit pending as one commit, when the slider is
     /// released.
     pub fn commit_selected_ratio(&mut self) {
-        self.flush_select_bar_preview();
+        self.recording(|this| {
+            this.flush_select_bar_preview();
+        });
     }
 
     /// "Object to path" (acceptance criteria 17, 21, 22): converts every
@@ -118,32 +128,36 @@ impl Session {
     /// AC22's "remain selected together" wording, not a literal one — a
     /// known, narrowed scope (see this crate's own report).
     pub fn convert_selected_to_paths(&mut self) {
-        self.flush_select_bar_preview();
-        self.select.cancel_entry();
-        let ids = self.selection.ids().to_vec();
-        if ids.is_empty() {
-            return;
-        }
-        let conversions = build_primitive_conversions(&self.document, &mut self.minter, &ids);
-        if conversions.is_empty() {
-            return;
-        }
-        let first_converted = conversions[0].0;
-        if self.document.convert_to_paths(&conversions).is_ok() {
-            self.tool = Tool::Node;
-            if let Some(path) = self.document.path(first_converted) {
-                self.node.select_all_anchors(&path);
+        self.recording(|this| {
+            this.flush_select_bar_preview();
+            this.select.cancel_entry();
+            let ids = this.selection.ids().to_vec();
+            if ids.is_empty() {
+                return;
             }
-        }
+            let conversions = build_primitive_conversions(&this.document, &mut this.minter, &ids);
+            if conversions.is_empty() {
+                return;
+            }
+            let first_converted = conversions[0].0;
+            if this.document.convert_to_paths(&conversions).is_ok() {
+                this.tool = Tool::Node;
+                if let Some(path) = this.document.path(first_converted) {
+                    this.node.select_all_anchors(&path);
+                }
+            }
+        });
     }
 
     /// "Remove rounding" of the Select bar (`unified-object-editing` criterion
     /// 21): zeroes the radius of every selected rectangle that has one, in one
     /// commit; the other objects of the selection are left alone.
     pub fn remove_corner_rounding(&mut self) {
-        let objects = self.objects();
-        self.select
-            .remove_rounding(&self.document, &objects, &self.selection);
+        self.recording(|this| {
+            let objects = this.objects();
+            this.select
+                .remove_rounding(&this.document, &objects, &this.selection);
+        });
     }
 }
 

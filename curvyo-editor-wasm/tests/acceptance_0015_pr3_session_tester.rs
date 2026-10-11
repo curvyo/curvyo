@@ -158,7 +158,9 @@ fn labels(s: &Session) -> Vec<String> {
     l.travel_change_ancestors(&ids, &mut |m| {
         out.push((
             m.lamport,
-            m.message.map(|x| x.to_string()).unwrap_or_default(),
+            m.message
+                .map(|x| x.split(';').next().unwrap_or_default().to_string())
+                .unwrap_or_default(),
         ));
         ControlFlow::Continue(())
     })
@@ -565,17 +567,30 @@ fn ac20_a_fit_moves_no_object_on_screen_at_any_zoom_or_pan() {
     }
 }
 
+/// Amended 2026-10-11 (`fix/center-document`): a window resize of the untouched
+/// view centres the document again, so the objects move with it: they keep
+/// their place relative to the document's corner.
 #[test]
-fn ac20_a_window_resize_after_a_fit_in_the_untouched_view_keeps_objects_in_place() {
+fn ac20_a_window_resize_after_a_fit_in_the_untouched_view_keeps_objects_in_the_document() {
     let mut s = session_of(&populated());
     s.show_default_view();
     s.resize_viewport(1000.0, 700.0);
-    let before = on_screen(s.view(), &points(&reopened(&s)));
     assert_eq!(fit(&mut s), "Fitted");
+    let corner = |s: &Session| s.view().document_to_screen(pt(0.0, 0.0));
+    let (corner_before, before) = (corner(&s), on_screen(s.view(), &points(&reopened(&s))));
     s.resize_viewport(700.0, 500.0);
     s.resize_viewport(1300.0, 900.0);
+    let corner_after = corner(&s);
+    let shift = (
+        corner_after.0 - corner_before.0,
+        corner_after.1 - corner_before.1,
+    );
     let after = on_screen(s.view(), &points(&reopened(&s)));
-    assert_same_screen(&before, &after, "window resize after fit");
+    let moved: Vec<_> = before
+        .iter()
+        .map(|p| (p.0 + shift.0, p.1 + shift.1))
+        .collect();
+    assert_same_screen(&moved, &after, "window resize after fit");
 }
 
 #[test]

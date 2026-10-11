@@ -35,11 +35,13 @@ fn zoom_factor_from_wheel_delta(delta_y: f64) -> f64 {
 
 impl Session {
     /// Puts the document's top-left corner 128 px in from the canvas's
-    /// top-left corner at 100 % zoom (criterion 11a). The host calls it once
+    /// top-left corner at 100 % zoom (criterion 11a) until the canvas size is
+    /// known; every size report then centres the document in the canvas
+    /// (`resize_viewport`). The host calls it once
     /// for a project that was just created or opened (`WasmSession::new` and
     /// `open`), not `Session::new`: headless sessions keep the plain view of
-    /// `0004`, which tests rely on. The view keeps that origin through
-    /// window resizes until the first pan or zoom.
+    /// `0004`, which tests rely on. The view stays centred through window
+    /// resizes until the first pan or zoom.
     pub fn show_default_view(&mut self) {
         self.viewport = Viewport::with_document_inset();
     }
@@ -128,9 +130,14 @@ impl Session {
     }
 
     /// Resizes the canvas, keeping the zoom and the document point at
-    /// the viewport's own center fixed (acceptance criterion 10).
+    /// the viewport's own center fixed (acceptance criterion 10). A view that
+    /// is still the untouched default keeps the document centred in the new
+    /// size instead (`Viewport::centre_document`).
     pub fn resize_viewport(&mut self, width: f64, height: f64) {
         self.viewport.resize(width, height);
+        let size = self.document.size();
+        self.viewport
+            .centre_document(size.width.as_mm(), size.height.as_mm());
     }
 
     /// The properties panel is about to open or close and change the canvas
@@ -159,5 +166,63 @@ impl Session {
     #[must_use]
     pub fn device_pixel_ratio(&self) -> f64 {
         self.device_pixel_ratio
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use curvyo_document_core::Point;
+
+    use super::*;
+
+    /// The document's left and right edge, top and bottom edge on screen.
+    fn document_edges(session: &Session) -> ((f64, f64), (f64, f64)) {
+        let size = session.document.size();
+        let view = session.view();
+        let (left, top) = view.document_to_screen(Point::new(0.0, 0.0));
+        let (right, bottom) =
+            view.document_to_screen(Point::new(size.width.as_mm(), size.height.as_mm()));
+        ((left, right), (top, bottom))
+    }
+
+    /// The customer's observation: a new project showed the document at the
+    /// left. After the first size report it sits in the middle of the canvas
+    /// right of the tool rail, and a later window resize keeps it there.
+    #[test]
+    fn a_new_project_is_centred_after_the_size_report_and_after_a_window_resize() {
+        let mut session = Session::new(1);
+        session.show_default_view();
+        // A4 is 794 px wide at 100 %: a canvas wide enough for it with room.
+        session.resize_viewport(1500.0, 1300.0);
+        let ((left, right), (top, bottom)) = document_edges(&session);
+        assert!(
+            ((left - 128.0) - (1500.0 - right)).abs() < 1e-9,
+            "{left} {right}"
+        );
+        assert!((top - (1300.0 - bottom)).abs() < 1e-9, "{top} {bottom}");
+
+        session.resize_viewport(1100.0, 1250.0);
+        let ((left, right), (top, bottom)) = document_edges(&session);
+        assert!(
+            ((left - 128.0) - (1100.0 - right)).abs() < 1e-9,
+            "{left} {right}"
+        );
+        assert!((top - (1250.0 - bottom)).abs() < 1e-9, "{top} {bottom}");
+    }
+
+    /// After the first pan the view is the maker's own: a resize keeps the
+    /// centre point as before.
+    #[test]
+    fn a_panned_view_is_not_centred_again() {
+        let mut session = Session::new(1);
+        session.show_default_view();
+        session.resize_viewport(1500.0, 1300.0);
+        session.wheel(30.0, 0.0, 400.0, 400.0, false, false);
+        let centre = session.screen_to_document(750.0, 650.0);
+
+        session.resize_viewport(1100.0, 1250.0);
+
+        let after = session.screen_to_document(550.0, 625.0);
+        assert!((centre.x - after.x).abs() < 1e-9 && (centre.y - after.y).abs() < 1e-9);
     }
 }

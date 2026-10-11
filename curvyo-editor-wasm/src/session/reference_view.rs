@@ -88,23 +88,26 @@ impl Session {
         copy: bool,
         reference: ReferencePoint,
     ) -> EntryOutcome {
-        if self.reference_entry().is_none() {
-            self.select.cancel_entry();
-            return EntryOutcome::Unchanged;
-        }
-        self.select.commit_move_entry_at(
-            &self.document,
-            &mut self.selection,
-            &mut self.minter,
-            [first, second],
-            (
-                MoveEntryMode {
-                    absolute: true,
-                    copy,
-                },
-                reference,
-            ),
-        )
+        // Recorded as one step of the maker's, like the Enter of the same chip.
+        self.recording(|this| -> EntryOutcome {
+            if this.reference_entry().is_none() {
+                this.select.cancel_entry();
+                return EntryOutcome::Unchanged;
+            }
+            this.select.commit_move_entry_at(
+                &this.document,
+                &mut this.selection,
+                &mut this.minter,
+                [first, second],
+                (
+                    MoveEntryMode {
+                        absolute: true,
+                        copy,
+                    },
+                    reference,
+                ),
+            )
+        })
     }
 
     /// The box and marks to draw this frame: the true bounding box of the move drag in flight

@@ -204,6 +204,9 @@ fn rotate_doc_object(d: &Document, radians: f64) {
 fn open_in_session(d: &Document) -> Session {
     let bytes = pack(d, "0.1.0").unwrap();
     let mut s = Session::open(2, &bytes).unwrap();
+    // The step time is part of the commit message, so two sessions compared byte for byte need
+    // the same clock.
+    s.set_clock(|| curvyo_document_core::Timestamp::from_secs(1_700_000_000));
     s.set_tool(Tool::Select);
     s
 }

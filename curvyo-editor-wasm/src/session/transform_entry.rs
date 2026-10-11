@@ -293,41 +293,43 @@ impl Session {
         second: &str,
         last_edited: usize,
     ) -> EntryOutcome {
-        if self.open_entry().is_none()
-            && self.open_param_entry().is_none()
-            && self.open_skew_entry().is_none()
-            && self.open_group_entry().is_none()
-        {
-            self.select.cancel_entry();
-            return EntryOutcome::Unchanged;
-        }
-        // A typed corner radius past its limit is committed limited, and says
-        // so at the knob for a moment (criterion 6): the notice is built from
-        // the entry as it was before it closes.
-        let notice = self.open_param_entry().and_then(|entry| {
-            let limited = entry.is_limited(first);
-            let knob = self.param_entry_view(entry)?.handle;
-            limited.then(|| (entry.clone(), knob))
-        });
-        let outcome = self
-            .select
-            .commit_entry(&self.document, [first, second], last_edited);
-        if outcome == EntryOutcome::Committed
-            && let Some((entry, anchor)) = notice
-            && let Some(object) = self.document.object(entry.object().id())
-            && let EditHandle::Param(param) = entry.handle()
-            && let Some(text) = param_readout(
-                &object,
-                param,
-                Some(ParamDragInfo {
-                    limited: true,
-                    overwrites_unequal: false,
-                }),
-            )
-        {
-            self.limit_notice = Some(super::shapes::LiveReadout { text, anchor });
-        }
-        outcome
+        self.recording(|this| -> EntryOutcome {
+            if this.open_entry().is_none()
+                && this.open_param_entry().is_none()
+                && this.open_skew_entry().is_none()
+                && this.open_group_entry().is_none()
+            {
+                this.select.cancel_entry();
+                return EntryOutcome::Unchanged;
+            }
+            // A typed corner radius past its limit is committed limited, and says
+            // so at the knob for a moment (criterion 6): the notice is built from
+            // the entry as it was before it closes.
+            let notice = this.open_param_entry().and_then(|entry| {
+                let limited = entry.is_limited(first);
+                let knob = this.param_entry_view(entry)?.handle;
+                limited.then(|| (entry.clone(), knob))
+            });
+            let outcome = this
+                .select
+                .commit_entry(&this.document, [first, second], last_edited);
+            if outcome == EntryOutcome::Committed
+                && let Some((entry, anchor)) = notice
+                && let Some(object) = this.document.object(entry.object().id())
+                && let EditHandle::Param(param) = entry.handle()
+                && let Some(text) = param_readout(
+                    &object,
+                    param,
+                    Some(ParamDragInfo {
+                        limited: true,
+                        overwrites_unequal: false,
+                    }),
+                )
+            {
+                this.limit_notice = Some(super::shapes::LiveReadout { text, anchor });
+            }
+            outcome
+        })
     }
 
     /// Closes the entry without writing (criterion 20): Escape in the chip,

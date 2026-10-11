@@ -449,7 +449,7 @@ impl GroupEntry {
             Err((field, reason)) => EntryOutcome::Invalid { field, reason },
             Ok(None) => EntryOutcome::Unchanged,
             Ok(Some(results)) => {
-                if commit_group(document, &results, self.modes.stroke) {
+                if commit_group(document, &results, self.modes.stroke, self.handle) {
                     EntryOutcome::Committed
                 } else {
                     EntryOutcome::Unchanged

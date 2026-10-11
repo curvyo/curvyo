@@ -73,7 +73,7 @@ test("the Combine note: fewer than two, another tool, an open path, else the eff
   );
   assert.equal(
     commandNote("combine", available({}), true),
-    "Replaces the selection. No undo yet.",
+    "Replaces the selection.",
   );
 });
 
@@ -86,7 +86,7 @@ test("the Break apart note: no compound path, another tool, else the effect", ()
   );
   assert.equal(
     commandNote("break_apart", available({}), true),
-    "Holes stay with their piece. Replaces the selection. No undo yet.",
+    "Holes stay with their piece. Replaces the selection.",
   );
 });
 
@@ -100,15 +100,15 @@ test("dimming follows the session: an open path or touching shapes do not dim Co
 test("the Combine notice counts the objects and the holes", () => {
   assert.equal(
     combineSuccessText(combined({})),
-    "Combine: 4 objects became 1 compound path with 3 holes. No undo yet.",
+    "Combine: 4 objects became 1 compound path with 3 holes.",
   );
   assert.equal(
     combineSuccessText(combined({ holes: 1 })),
-    "Combine: 4 objects became 1 compound path with 1 hole. No undo yet.",
+    "Combine: 4 objects became 1 compound path with 1 hole.",
   );
   assert.equal(
     combineSuccessText(combined({ holes: 0, count: 2 })),
-    "Combine: 2 objects became 1 compound path. No undo yet.",
+    "Combine: 2 objects became 1 compound path.",
   );
   assert.equal(combineSuccessText(combined({ kind: "touching" })), null);
 });
@@ -116,7 +116,7 @@ test("the Combine notice counts the objects and the holes", () => {
 test("the Combine notice names the style that was used when the styles differed", () => {
   assert.equal(
     combineSuccessText(combined({ stylesDiffer: true })),
-    "Combine: 4 objects became 1 compound path with 3 holes. It uses the style of the lowest object. No undo yet.",
+    "Combine: 4 objects became 1 compound path with 3 holes. It uses the style of the lowest object.",
   );
 });
 
@@ -167,23 +167,23 @@ test("every refusal of Combine outlines its offenders, a success none", () => {
 test("the Break apart notice counts the pieces and mentions holes and compounds left alone", () => {
   assert.equal(
     breakApartSuccessText(broken({})),
-    "Break apart: 1 compound path became 3 objects. No undo yet.",
+    "Break apart: 1 compound path became 3 objects.",
   );
   assert.equal(
     breakApartSuccessText(broken({ compounds: 2, pieces: 5 })),
-    "Break apart: 2 compound paths became 5 objects. No undo yet.",
+    "Break apart: 2 compound paths became 5 objects.",
   );
   assert.equal(
     breakApartSuccessText(broken({ withHoles: true })),
-    "Break apart: 1 compound path became 3 objects. Holes stayed with their piece. No undo yet.",
+    "Break apart: 1 compound path became 3 objects. Holes stayed with their piece.",
   );
   assert.equal(
     breakApartSuccessText(broken({ leftAlone: 1 })),
-    "Break apart: 1 compound path became 3 objects. 1 compound path is one piece and was left as it is. No undo yet.",
+    "Break apart: 1 compound path became 3 objects. 1 compound path is one piece and was left as it is.",
   );
   assert.equal(
     breakApartSuccessText(broken({ withHoles: true, leftAlone: 2 })),
-    "Break apart: 1 compound path became 3 objects. Holes stayed with their piece. 2 compound paths are one piece each and were left as they are. No undo yet.",
+    "Break apart: 1 compound path became 3 objects. Holes stayed with their piece. 2 compound paths are one piece each and were left as they are.",
   );
   assert.equal(breakApartSuccessText(broken({ kind: "one_piece" })), null);
 });

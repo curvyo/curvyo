@@ -76,13 +76,16 @@ test("0034 criterion 16: the four close chips", () => {
 
 test("0034 criterion 20: the Close path notices and their durations", () => {
   const a = closeNoticeText({ closed: 3, skipped: 0 });
-  assert.equal(a, "Closed 3 paths. No undo yet.");
+  assert.equal(a, "Closed 3 paths.");
   assert.equal(closeNoticeMs(a ?? ""), 3000);
   const b = closeNoticeText({ closed: 2, skipped: 1 });
-  assert.equal(b, "Closed 2 paths. 1 path has fewer than 3 nodes and was not closed. No undo yet.");
-  assert.equal((b ?? "").length, 78, "the skipped variant has 78 characters");
-  assert.equal(closeNoticeMs(b ?? ""), 5000);
-  assert.equal(closeNoticeText({ closed: 1, skipped: 0 }), "Closed 1 path. No undo yet.");
+  assert.equal(b, "Closed 2 paths. 1 path has fewer than 3 nodes and was not closed.");
+  // The sentence "No undo yet." is gone (0020 criterion 52): the skipped variant has 65 characters,
+  // so it keeps the 3 s; a longer sentence (above 70 characters) keeps 5 s.
+  assert.equal((b ?? "").length, 65);
+  assert.equal(closeNoticeMs(b ?? ""), 3000);
+  assert.equal(closeNoticeMs("x".repeat(71)), 5000);
+  assert.equal(closeNoticeText({ closed: 1, skipped: 0 }), "Closed 1 path.");
   assert.equal(closeNoticeText({ closed: 0, skipped: 0 }), null);
 });
 
@@ -90,19 +93,19 @@ test("0035 criterion 7: the Combine notice", () => {
   const base = { kind: "applied", count: 4, of: 4, holes: 3, stylesDiffer: false };
   assert.equal(
     combineSuccessText(base),
-    "Combine: 4 objects became 1 compound path with 3 holes. No undo yet.",
+    "Combine: 4 objects became 1 compound path with 3 holes.",
   );
   assert.equal(
     combineSuccessText({ ...base, holes: 1 }),
-    "Combine: 4 objects became 1 compound path with 1 hole. No undo yet.",
+    "Combine: 4 objects became 1 compound path with 1 hole.",
   );
   assert.equal(
     combineSuccessText({ ...base, holes: 0 }),
-    "Combine: 4 objects became 1 compound path. No undo yet.",
+    "Combine: 4 objects became 1 compound path.",
   );
   assert.equal(
     combineSuccessText({ ...base, stylesDiffer: true }),
-    "Combine: 4 objects became 1 compound path with 3 holes. It uses the style of the lowest object. No undo yet.",
+    "Combine: 4 objects became 1 compound path with 3 holes. It uses the style of the lowest object.",
   );
   assert.equal(noticeMs("x".repeat(70)), undefined);
   assert.equal(noticeMs("x".repeat(71)), 5000);
@@ -127,22 +130,22 @@ test("0035 criteria 9 to 11: the Combine refusals", () => {
 
 test("0035 criteria 16 and 17: Break apart notices and refusals", () => {
   const ok = { kind: "applied", compounds: 1, pieces: 3, withHoles: false, leftAlone: 0 };
-  assert.equal(breakApartSuccessText(ok), "Break apart: 1 compound path became 3 objects. No undo yet.");
+  assert.equal(breakApartSuccessText(ok), "Break apart: 1 compound path became 3 objects.");
   assert.equal(
     breakApartSuccessText({ ...ok, compounds: 2, pieces: 5 }),
-    "Break apart: 2 compound paths became 5 objects. No undo yet.",
+    "Break apart: 2 compound paths became 5 objects.",
   );
   assert.equal(
     breakApartSuccessText({ ...ok, withHoles: true }),
-    "Break apart: 1 compound path became 3 objects. Holes stayed with their piece. No undo yet.",
+    "Break apart: 1 compound path became 3 objects. Holes stayed with their piece.",
   );
   assert.equal(
     breakApartSuccessText({ ...ok, leftAlone: 1 }),
-    "Break apart: 1 compound path became 3 objects. 1 compound path is one piece and was left as it is. No undo yet.",
+    "Break apart: 1 compound path became 3 objects. 1 compound path is one piece and was left as it is.",
   );
   assert.equal(
     breakApartSuccessText({ ...ok, leftAlone: 2 }),
-    "Break apart: 1 compound path became 3 objects. 2 compound paths are one piece each and were left as they are. No undo yet.",
+    "Break apart: 1 compound path became 3 objects. 2 compound paths are one piece each and were left as they are.",
   );
   const no = (kind: string, compounds: number) =>
     breakApartRefusalText({ kind, compounds, pieces: 0, withHoles: false, leftAlone: 0 });
@@ -171,7 +174,7 @@ test("0035 criterion 2: tooltip notes, first match wins", () => {
     "Select two or more closed shapes. Use the Select tool.",
   );
   assert.equal(commandNote("combine", st({ open: 1 }), true), "Needs closed paths: 1 of 3 selected is open.");
-  assert.equal(commandNote("combine", st({}), true), "Replaces the selection. No undo yet.");
+  assert.equal(commandNote("combine", st({}), true), "Replaces the selection.");
   assert.equal(commandNote("break_apart", st({ canBreakApart: false }), true), "Select a compound path.");
   assert.equal(
     commandNote("break_apart", st({ canBreakApart: false }), false),
@@ -179,6 +182,6 @@ test("0035 criterion 2: tooltip notes, first match wins", () => {
   );
   assert.equal(
     commandNote("break_apart", st({}), true),
-    "Holes stay with their piece. Replaces the selection. No undo yet.",
+    "Holes stay with their piece. Replaces the selection.",
   );
 });

@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 
 import { DocumentSection } from "@/components/panel/DocumentSection";
+import { HistoryTab } from "@/components/panel/HistoryTab";
 import { PanelTabStrip } from "@/components/panel/PanelTabStrip";
 import { StyleSection } from "@/components/panel/StyleSection";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
@@ -80,6 +81,10 @@ export function PropertiesPanel({ editor, document: doc }: PropertiesPanelProps)
     // webview does not count script focus as keyboard focus; the mark goes
     // when the focus does.
     target.focus({ focusVisible: true } as FocusOptions);
+    if (document.activeElement !== target) {
+      // The target handed focus on (the History list to its current row).
+      return;
+    }
     target.setAttribute("data-keyboard-focus", "");
     target.addEventListener("blur", () => target.removeAttribute("data-keyboard-focus"), {
       once: true,
@@ -89,7 +94,10 @@ export function PropertiesPanel({ editor, document: doc }: PropertiesPanelProps)
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const key = event.key.toLowerCase();
-      if (!(event.shiftKey && (event.ctrlKey || event.metaKey)) || (key !== "f" && key !== "d")) {
+      if (
+        !(event.shiftKey && (event.ctrlKey || event.metaKey)) ||
+        (key !== "f" && key !== "d" && key !== "h")
+      ) {
         return;
       }
       event.preventDefault();
@@ -97,7 +105,7 @@ export function PropertiesPanel({ editor, document: doc }: PropertiesPanelProps)
         return;
       }
       focusAfterShortcut.current = true;
-      shortcut(key === "f" ? "style" : "document");
+      shortcut(key === "f" ? "style" : key === "h" ? "history" : "document");
       if (!open) {
         setOpenKeepingView(true);
       }
@@ -127,8 +135,11 @@ export function PropertiesPanel({ editor, document: doc }: PropertiesPanelProps)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [content, panel.view.scopeKey]);
 
+  const historyTotal = doc.view.content === "history" ? historyCount(editor) : 0;
   const subject =
-    doc.view.content === "document"
+    doc.view.content === "history"
+      ? `${historyTotal} ${historyTotal === 1 ? "step" : "steps"}`
+      : doc.view.content === "document"
       ? doc.view.presets.subject
       : doc.view.content === "style"
         ? panel.view.subject
@@ -239,9 +250,23 @@ export function PropertiesPanel({ editor, document: doc }: PropertiesPanelProps)
                 tab change (criterion 19). */}
             <div
               key={doc.view.activeTab}
-              className="properties-panel-body min-h-0 flex-1 px-3 pb-3"
+              className={
+                doc.view.content === "history"
+                  ? // The one tab with an inner scroll area, the list: the header, the buttons
+                    // and the footer stay in view (`0020` criterion 43).
+                    "flex min-h-0 flex-1 flex-col px-3 pb-3"
+                  : "properties-panel-body min-h-0 flex-1 px-3 pb-3"
+              }
             >
-              <TabsContent value={doc.view.activeTab} tabIndex={-1} className="outline-none">
+              <TabsContent
+                value={doc.view.activeTab}
+                tabIndex={-1}
+                className={
+                  doc.view.content === "history"
+                    ? "flex min-h-0 flex-1 flex-col outline-none"
+                    : "outline-none"
+                }
+              >
                 {doc.view.content === "document" ? (
                   <DocumentSection
                     document={doc}
@@ -251,6 +276,8 @@ export function PropertiesPanel({ editor, document: doc }: PropertiesPanelProps)
                   />
                 ) : doc.view.content === "style" ? (
                   <StyleSection panel={panel} onReturnFocus={returnFocus} />
+                ) : doc.view.content === "history" ? (
+                  <HistoryTab editor={editor} shown={open} onReturnFocus={returnFocus} />
                 ) : null}
               </TabsContent>
             </div>
@@ -272,4 +299,11 @@ function PanelSubject({ text }: { text: string }) {
       <p className="min-w-0 truncate text-xs text-[var(--panel-muted-fg)]">{text}</p>
     </Tooltip>
   );
+}
+
+/** The number of steps for the subject line of the History tab. */
+function historyCount(editor: EditorSession): number {
+  // `syncRevision` makes this read again after every change of the session.
+  void editor.syncRevision;
+  return editor.getSession()?.history_len() ?? 0;
 }
