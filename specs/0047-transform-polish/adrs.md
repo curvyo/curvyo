@@ -29,7 +29,7 @@ Decisions (architect, 2026-10-11, recorded after the build review; as built on `
 6. **Module size.** As decided: the reference code is in new modules; `move_entry.rs` is 284 non-test lines.
 7. **Collisions.** As stated; expect conflicts with `story/undo-redo` in `keys.rs`, `draw.rs`, `session/mod.rs` and `useEditorSession.ts`.
 
-Note for `0020`: a skew or stretch that converts commits with the label `transform_objects`. The same gesture on paths only commits through the per-kind writers. `0020` maps both to the gesture's name ("Skew", "Resize") so that criterion 15 holds.
+History (`0020`, merged 2026-10-11): a skew or stretch that converts is one step named after the gesture, "Skew" or "Resize" (the batch labels `skew_path`, `resize_path`, `transform_skew`, `transform_resize` of the table in `curvyo-ui-core::history_names`; no new label). A typed move with a reference, and a click on a mark, are one "Move" step (`translate_objects`); the mark click goes through `Session::recording` like the chip's Enter. Tests: `curvyo-editor-wasm/tests/transform_polish_undo.rs` (undo and redo are byte-equal).
 
 ## Flagged to the PO
 
