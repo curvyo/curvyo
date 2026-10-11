@@ -20,7 +20,13 @@ impl Session {
     /// [`Session::scale_corner_radius`]).
     #[must_use]
     pub fn select_bar_state(&self) -> SelectBarState {
-        select_bar_state(&self.objects(), &self.selection, self.select.bar_preview())
+        let mut state =
+            select_bar_state(&self.objects(), &self.selection, self.select.bar_preview());
+        // "Object to path" is not offered for a group (`0023` criterion 29).
+        if state.object_to_path && !self.selected_group_leaves().is_empty() {
+            state.object_to_path = false;
+        }
+        state
     }
 
     /// Commits a slider edit still pending, against the objects it was
@@ -126,7 +132,7 @@ impl Session {
             this.flush_select_bar_preview();
             this.select.cancel_entry();
             let ids = this.selection.ids().to_vec();
-            if ids.is_empty() {
+            if ids.is_empty() || !this.selected_group_leaves().is_empty() {
                 return;
             }
             let conversions = build_primitive_conversions(&this.document, &mut this.minter, &ids);

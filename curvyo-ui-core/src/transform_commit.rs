@@ -9,12 +9,12 @@ use curvyo_document_core::{
     ShapeEditError, Vec2,
 };
 
-use crate::units::Units;
 use crate::anchor_id_minter::AnchorIdMinter;
 use crate::group_transform::commit_group;
 use crate::param_edit::commit_param;
 use crate::transform_drag::{ScaleModes, StrokeScaling};
 use crate::transform_handle_layout::EditHandle;
+use crate::units::Units;
 
 /// The largest coordinate or size (millimetres, 10 km) a drag may write: the bound of the boolean
 /// kernel, so that a file never becomes one the kernel refuses because of a drag. A pointer value

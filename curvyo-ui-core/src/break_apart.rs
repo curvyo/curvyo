@@ -23,6 +23,12 @@ pub enum BreakApartRefusal {
     /// The selection holds no compound path (the button is dimmed then; reachable only through
     /// the session function).
     NoCompound,
+    /// The selection holds a group; Break apart does not look through groups
+    /// (`specs/0023-groups` criterion 28). `offenders` are the leaves of the groups, to outline.
+    Groups {
+        /// The leaves of the selected groups, to outline.
+        offenders: Vec<NodeId>,
+    },
     /// Every selected compound path is one region: `compounds` of them, each already one piece
     /// with its holes.
     OnePiece {

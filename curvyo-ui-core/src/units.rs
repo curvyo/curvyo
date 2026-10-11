@@ -42,10 +42,7 @@ impl Units {
     #[must_use]
     pub fn build(document: &Document, context: Option<NodeId>) -> Self {
         let mut group_of = HashMap::new();
-        for (child, leaves) in document.child_leaves(context) {
-            if leaves.len() == 1 && leaves[0] == child {
-                continue;
-            }
+        for (child, leaves) in document.child_groups(context) {
             let unit = GroupUnit {
                 id: child,
                 leaves: leaves.iter().copied().collect(),

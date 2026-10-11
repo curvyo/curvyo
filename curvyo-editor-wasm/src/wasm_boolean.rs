@@ -51,7 +51,7 @@ fn count(n: usize) -> u32 {
 
 /// What `apply_boolean` did. `kind` is `"ignored"`, `"applied"` (`count` objects became one;
 /// `compound` says whether it is a compound path) or a refusal: `"needs_two"`, `"open_paths"`,
-/// `"no_area"`, `"out_of_range"` (`count` of the `of` selected objects are to blame) or
+/// `"no_area"`, `"groups"`, `"out_of_range"` (`count` of the `of` selected objects are to blame) or
 /// `"empty"`. Nothing was changed by anything but `"applied"`.
 #[wasm_bindgen]
 #[derive(Debug, Clone)]
@@ -90,6 +90,9 @@ impl From<BooleanOutcome> for BooleanResultView {
                 }
                 BooleanRefusal::OutOfRange { offenders, of } => {
                     view("out_of_range", offenders.len(), of, false)
+                }
+                BooleanRefusal::Groups { offenders } => {
+                    view("groups", offenders.len(), offenders.len(), false)
                 }
                 BooleanRefusal::Empty => view("empty", 0, 0, false),
             },

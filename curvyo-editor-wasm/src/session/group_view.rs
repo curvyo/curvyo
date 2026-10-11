@@ -24,6 +24,32 @@ use super::{Session, Tool};
 /// long enough for the host to show a `wait` cursor first (criteria 28, 46, 49).
 const SLOW_RELEASE_OBJECTS: usize = 100;
 
+/// The axis-aligned box around the boxes `corners`: one box's own corners when there is one (a
+/// rotated leaf keeps its turn), else the bounds of all of them (a group).
+pub(super) fn merged_corners(corners: &[[Point; 4]]) -> Option<[Point; 4]> {
+    match corners {
+        [] => None,
+        [only] => Some(*only),
+        many => {
+            let points = many.iter().flatten();
+            let (mut min_x, mut max_x) = (f64::INFINITY, f64::NEG_INFINITY);
+            let (mut min_y, mut max_y) = (f64::INFINITY, f64::NEG_INFINITY);
+            for point in points {
+                min_x = min_x.min(point.x);
+                max_x = max_x.max(point.x);
+                min_y = min_y.min(point.y);
+                max_y = max_y.max(point.y);
+            }
+            Some([
+                Point::new(min_x, min_y),
+                Point::new(max_x, min_y),
+                Point::new(max_x, max_y),
+                Point::new(min_x, max_y),
+            ])
+        }
+    }
+}
+
 /// More selected objects than this and no member box is drawn (criterion 5): a
 /// count of the selection, so panning and zooming never change it.
 const PER_OBJECT_BOX_LIMIT: usize = 500;
@@ -59,15 +85,30 @@ impl Session {
     ) -> Option<GroupDecorationInput> {
         let group = self.group_in(objects)?;
         let box_ = self.group_box_shown(&group);
-        let members = if self.selection.ids().len() > PER_OBJECT_BOX_LIMIT {
+        let units = self.units();
+        let selected_units = units.selected(self.selection.ids());
+        // One selected group draws its box only (`0023`, "Group selection box"); several objects
+        // draw one lighter box each, a group's being the box around all its leaves.
+        let members = if selected_units.len() > PER_OBJECT_BOX_LIMIT
+            || (selected_units.len() == 1 && selected_units[0].is_group)
+        {
             Vec::new()
         } else {
             let selected: HashSet<NodeId> = self.selection.ids().iter().copied().collect();
-            objects
-                .iter()
-                .filter(|object| selected.contains(&object.id()))
-                .map(|object| oriented_bounds(object).document_corners())
-                .collect()
+            let mut boxes = Vec::with_capacity(selected_units.len());
+            for unit in &selected_units {
+                let corners: Vec<[Point; 4]> = objects
+                    .iter()
+                    .filter(|object| {
+                        selected.contains(&object.id()) && unit.leaves.contains(&object.id())
+                    })
+                    .map(|object| oriented_bounds(object).document_corners())
+                    .collect();
+                if let Some(shown) = merged_corners(&corners) {
+                    boxes.push(shown);
+                }
+            }
+            boxes
         };
         Some(GroupDecorationInput {
             corners: box_.document_corners(),
@@ -253,11 +294,11 @@ impl Session {
         let Some(group) = self.group_in(&objects) else {
             return String::new();
         };
-        format!(
-            "{} objects selected, {:.1} by {:.1} mm",
-            group.count(),
+        let selected = self.units().selected(self.selection.ids());
+        curvyo_ui_core::selection_announcement(
+            &selected,
             group.bounds().width(),
-            group.bounds().height()
+            group.bounds().height(),
         )
     }
 

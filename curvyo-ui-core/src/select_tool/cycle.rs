@@ -97,8 +97,11 @@ impl ClickCycle {
                 }
             }
         }
-        self.candidates
-            .retain(|id| objects.iter().any(|object| units.unit_of(object.id()) == *id));
+        self.candidates.retain(|id| {
+            objects
+                .iter()
+                .any(|object| units.unit_of(object.id()) == *id)
+        });
         let count = self.candidates.len();
         let next = self
             .current

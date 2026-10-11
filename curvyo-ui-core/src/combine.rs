@@ -57,6 +57,12 @@ pub(crate) fn is_compound(object: &ObjectSnapshot) -> bool {
 pub enum CombineRefusal {
     /// Fewer than two objects are selected.
     NeedsTwo,
+    /// The selection holds a group; Combine does not look through groups
+    /// (`specs/0023-groups` criterion 28). `offenders` are the leaves of the groups, to outline.
+    Groups {
+        /// The leaves of the selected groups, to outline.
+        offenders: Vec<NodeId>,
+    },
     /// `offenders` of the `of` selected objects are open paths.
     OpenPaths {
         /// The open paths, to outline.

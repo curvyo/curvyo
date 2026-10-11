@@ -170,9 +170,15 @@ function App() {
           onSelect={editor.setTool}
           onReturnFocus={() => editor.containerRef.current?.focus()}
           commands={railCommands}
+          grouping={editor.grouping.commands}
         />
         <Canvas editor={editor} />
-        <CanvasNotice notice={editor.canvasNotice} />
+        <CanvasNotice
+          notice={editor.canvasNotice}
+          groupDepth={editor.grouping.depth}
+          onLeaveToLevel={editor.grouping.leaveToLevel}
+          announcement={editor.grouping.announcement}
+        />
         {/* Contextual tool bar: floats over the canvas, right of the tool
          * rail, so showing/hiding it never resizes the canvas
          * (`docs/design-system.md`, "no layout shift on tool switch"). */}

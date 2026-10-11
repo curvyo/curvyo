@@ -80,7 +80,12 @@ pub fn units_in_marquee(
         extents
             .entry(units.unit_of(object.id()))
             .and_modify(|e| {
-                *e = [e[0].min(min_x), e[1].max(max_x), e[2].min(min_y), e[3].max(max_y)];
+                *e = [
+                    e[0].min(min_x),
+                    e[1].max(max_x),
+                    e[2].min(min_y),
+                    e[3].max(max_y),
+                ];
             })
             .or_insert([min_x, max_x, min_y, max_y]);
     }

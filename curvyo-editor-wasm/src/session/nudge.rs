@@ -12,7 +12,8 @@ impl Session {
     /// Ctrl+A: every object of the document root becomes the selection, bottom to top. View
     /// state only: nothing is written. An empty document is still a handled key.
     pub(super) fn select_all(&mut self) -> KeyOutcome {
-        let ids = self.document.object_ids();
+        // The leaves of the context: at the root every object, inside a group those of the group.
+        let ids: Vec<_> = self.objects().iter().map(|object| object.id()).collect();
         self.selection.set(&ids);
         KeyOutcome::SelectedAll
     }

@@ -201,7 +201,8 @@ impl SelectTool {
         if selection.is_empty() {
             return;
         }
-        if let Some(copies) = commit_move(document, selection.ids(), offset, copy, (minter, units)) {
+        if let Some(copies) = commit_move(document, selection.ids(), offset, copy, (minter, units))
+        {
             selection.set(&copies);
         }
     }

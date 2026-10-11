@@ -13,13 +13,13 @@ use crate::anchor_id_minter::AnchorIdMinter;
 use crate::group_box::GroupSelection;
 use crate::object_bounds::object_outline_bounds;
 use crate::oriented_box::OrientedBox;
-use crate::units::Units;
 use crate::transform_commit::{
     MAX_COORDINATE_MM, MOVE_EQUAL_EPSILON_MM, axis_within_limit, commit_move,
 };
 use crate::transform_entry::{
     EntryField, EntryOutcome, InvalidReason, format_mm, parse_entry_number,
 };
+use crate::units::Units;
 
 /// An open move entry: the object (or objects) and the drawn bounds as they
 /// were when it opened (an entry whose object changed or went away since

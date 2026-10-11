@@ -216,7 +216,7 @@ export function useRailCommands(editor: EditorSession): RailCommands {
           }
         } else {
           const result = applyBreakApart();
-          outlinedRef.current = false;
+          outlinedRef.current = result.kind === "groups";
           const success = breakApartSuccessText(result);
           const refusal = breakApartRefusalText(result);
           if (success !== null) {

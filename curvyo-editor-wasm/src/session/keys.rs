@@ -82,6 +82,13 @@ pub enum KeyOutcome {
     RedoBusy,
     /// Ctrl+A selected every object (it may have found none).
     SelectedAll,
+    /// Ctrl+G grouped the selection; the notice is in [`Session::take_grouping_result`].
+    Group,
+    /// Ctrl+Shift+G ungrouped the selected groups; the notice is in
+    /// [`Session::take_grouping_result`].
+    Ungroup,
+    /// Enter entered the selected group.
+    EnteredGroup,
     /// An arrow key moved the selection; `new_run` is true when the event
     /// opened a new run of held-key events (a new step once `0020` exists).
     Nudged {
@@ -105,6 +112,7 @@ impl KeyOutcome {
             Self::Escape(EscapeStep::ClosedEntry) => "escape-entry",
             Self::Escape(EscapeStep::CancelledDrag) => "escape-drag",
             Self::Escape(EscapeStep::ClearedState) => "escape-state",
+            Self::Escape(EscapeStep::LeftGroup) => "escape-group",
             Self::Escape(EscapeStep::LeftTool) => "escape-tool",
             Self::Escape(EscapeStep::Nothing) => "escape-none",
             Self::Hint(KeyHint::SelectFirst) => "hint-select-first",
@@ -116,6 +124,9 @@ impl KeyOutcome {
             Self::RedoBusy => "redo-busy",
             Self::Hint(KeyHint::TooFar) => "hint-too-far",
             Self::SelectedAll => "select-all",
+            Self::Group => "group",
+            Self::Ungroup => "ungroup",
+            Self::EnteredGroup => "enter-group",
             Self::Nudged { new_run: false } => "nudge",
             Self::Nudged { new_run: true } => "nudge-new",
         }
@@ -134,6 +145,9 @@ pub enum EscapeStep {
     /// tool's node and segment selection, the Select tool's object
     /// selection.
     ClearedState,
+    /// The Select tool left the innermost entered group (`specs/0023-groups` criterion 17); the
+    /// group just left is selected.
+    LeftGroup,
     /// The tool was left for the Select tool.
     LeftTool,
     /// There was nothing to do.
@@ -175,6 +189,9 @@ pub(super) enum KeyAction {
     History(Direction),
     SelectAll,
     Nudge(Arrow),
+    Group,
+    Ungroup,
+    EnterGroup,
 }
 
 /// The key table and its gate (criteria 54, 55, 60, 61) as a pure function:
@@ -192,6 +209,18 @@ fn decide(input: &KeyInput<'_>, state: KeyState) -> KeyAction {
         "Enter" => {
             return if state.tool == Tool::Pen && state.pen_open {
                 KeyAction::FinishPen
+            } else if state.tool == Tool::Select
+                && !input.repeat
+                && !input.dom_blocked
+                && !input.ctrl
+                && !input.alt
+                && !input.shift
+                && !state.operation_in_flight
+                && !state.pen_open
+                && !state.entry_open
+            {
+                // Enter opens the one selected group; the session says whether there is one.
+                KeyAction::EnterGroup
             } else {
                 KeyAction::Ignore
             };
@@ -222,6 +251,15 @@ fn decide(input: &KeyInput<'_>, state: KeyState) -> KeyAction {
             KeyAction::SelectAll
         } else {
             KeyAction::Ignore
+        };
+    }
+    // Group and Ungroup (`0023` criterion 7): once per press, gated like every shortcut.
+    if input.ctrl && input.key.eq_ignore_ascii_case("g") {
+        let acts = gate_open && !input.alt && !input.repeat && state.tool == Tool::Select;
+        return match (acts, input.shift) {
+            (true, false) => KeyAction::Group,
+            (true, true) => KeyAction::Ungroup,
+            (false, _) => KeyAction::Ignore,
         };
     }
     // Letters are matched without regard to Caps Lock.
@@ -377,6 +415,41 @@ impl Session {
             KeyAction::Hint(hint) => KeyOutcome::Hint(hint),
             KeyAction::History(direction) => self.history_key(direction),
             KeyAction::SelectAll => self.select_all(),
+            KeyAction::Group => {
+                // The chord acts only when the command is available; otherwise the page keeps it.
+                if !self.grouping_availability().group {
+                    return KeyOutcome::Ignored;
+                }
+                let result = self.group_selection();
+                let acted = result.kind != super::grouping::GroupingKind::Ignored;
+                self.grouping_result = Some(result);
+                if acted {
+                    KeyOutcome::Group
+                } else {
+                    KeyOutcome::Ignored
+                }
+            }
+            KeyAction::Ungroup => {
+                if !self.grouping_availability().ungroup {
+                    return KeyOutcome::Ignored;
+                }
+                let result = self.ungroup_selection();
+                let acted = result.kind != super::grouping::GroupingKind::Ignored;
+                self.grouping_result = Some(result);
+                if acted {
+                    KeyOutcome::Ungroup
+                } else {
+                    KeyOutcome::Ignored
+                }
+            }
+            KeyAction::EnterGroup => {
+                self.sync_context();
+                if self.enter_selected_group() {
+                    KeyOutcome::EnteredGroup
+                } else {
+                    KeyOutcome::Ignored
+                }
+            }
             KeyAction::Nudge(arrow) => self.nudge_selection(NudgeEvent {
                 arrow,
                 shift: input.shift,
@@ -458,7 +531,14 @@ impl Session {
             return EscapeStep::ClearedState;
         }
         if self.tool == Tool::Select {
-            return EscapeStep::Nothing;
+            // The selection is clear: leave the innermost entered group and select it
+            // (`0023` criterion 17); at the root there is nothing more to do.
+            self.sync_context();
+            return if self.leave_group(true) {
+                EscapeStep::LeftGroup
+            } else {
+                EscapeStep::Nothing
+            };
         }
         self.set_tool(Tool::Select);
         EscapeStep::LeftTool
@@ -813,6 +893,10 @@ mod tests {
             KeyOutcome::Escape(EscapeStep::ClosedEntry),
             KeyOutcome::Escape(EscapeStep::CancelledDrag),
             KeyOutcome::Escape(EscapeStep::ClearedState),
+            KeyOutcome::Escape(EscapeStep::LeftGroup),
+            KeyOutcome::Group,
+            KeyOutcome::Ungroup,
+            KeyOutcome::EnteredGroup,
             KeyOutcome::Escape(EscapeStep::LeftTool),
             KeyOutcome::Escape(EscapeStep::Nothing),
             KeyOutcome::Hint(KeyHint::PathOnly),

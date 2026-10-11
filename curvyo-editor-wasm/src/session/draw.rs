@@ -41,6 +41,8 @@ impl Session {
         // that read: reading the objects out of the document is by far the
         // largest cost of a frame with many objects.
         let objects = self.objects();
+        // Outside an entered group the artwork recedes; the decorations only see the inside.
+        let render = self.render_objects();
         let live = self.select_live_edit_in(&objects);
         let paths = self.live_node_drag_paths_in(&objects);
         // The artwork: every object in tree order, paths and primitives
@@ -50,9 +52,9 @@ impl Session {
         // A segment bend leaves the artwork as committed ("black old"): its blue outline is
         // drawn over it below, and only the decorations read the live paths.
         let mut artwork_objects = if self.tool == Tool::Node && self.live_bend().is_none() {
-            Cow::Owned(Self::with_paths(&objects, &paths))
+            Cow::Owned(Self::with_paths(&render, &paths))
         } else {
-            Cow::Borrowed(&objects[..])
+            Cow::Borrowed(&render[..])
         };
         // A panel drag draws the objects in the style being previewed
         // (criterion 36); nothing is written until the release.

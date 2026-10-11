@@ -5,7 +5,7 @@
 
 use std::cell::RefCell;
 
-use curvyo_document_core::{DocumentVersion, Length, Point};
+use curvyo_document_core::{DocumentVersion, Length, NodeId, Point};
 use curvyo_render_core::{ClosingCue, PenCue};
 use curvyo_ui_core::{EndNodeIndex, JoinType, PenTarget, PressAction, continuation_of, pen_target};
 
@@ -17,7 +17,7 @@ use super::{Session, Tool};
 /// target is ignored and the cursor stays what it was).
 #[derive(Debug, Default)]
 pub(super) struct PenCueState {
-    ends: RefCell<Option<(DocumentVersion, EndNodeIndex)>>,
+    ends: RefCell<Option<((DocumentVersion, Option<NodeId>), EndNodeIndex)>>,
     press: Option<PenTarget>,
 }
 
@@ -56,10 +56,11 @@ impl Session {
     /// Runs `f` on the index of the end nodes of open ordinary paths, rebuilding it first if the
     /// document changed since it was built.
     pub(super) fn with_end_index<R>(&self, f: impl FnOnce(&EndNodeIndex) -> R) -> R {
-        let version = self.document.version();
+        // Only the open paths of the entered group are targets (`0023` criterion 30).
+        let key = (self.document.version(), self.context_group());
         let mut cache = self.pen_cue.ends.borrow_mut();
-        if cache.as_ref().is_none_or(|(held, _)| *held != version) {
-            *cache = Some((version, EndNodeIndex::from_paths(&self.paths())));
+        if cache.as_ref().is_none_or(|(held, _)| *held != key) {
+            *cache = Some((key, EndNodeIndex::from_paths(&self.paths())));
         }
         // invariant: the cache was filled just above.
         #[allow(clippy::unwrap_used)]

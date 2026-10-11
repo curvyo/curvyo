@@ -46,8 +46,8 @@ impl From<PathAvailability> for PathAvailabilityView {
 
 /// What `apply_combine` did. `kind` is `"ignored"`, `"applied"` (`count` objects became one
 /// compound path with `holes` holes; `styles_differ` says the lowest object's style was used) or a
-/// refusal: `"needs_two"`, `"open_paths"`, `"out_of_range"`, `"no_area"`, `"touching"` or
-/// `"self_touching"` (`count` of the `of` selected objects are to blame). Nothing was changed by
+/// refusal: `"needs_two"`, `"open_paths"`, `"out_of_range"`, `"no_area"`, `"touching"`,
+/// `"self_touching"` or `"groups"` (`count` of the `of` selected objects are to blame). Nothing was changed by
 /// anything but `"applied"`.
 #[wasm_bindgen]
 #[derive(Debug, Clone)]
@@ -98,6 +98,9 @@ impl From<CombineOutcome> for CombineResultView {
                 CombineRefusal::SelfTouching { offenders, of } => {
                     view("self_touching", offenders.len(), of, 0, false)
                 }
+                CombineRefusal::Groups { offenders } => {
+                    view("groups", offenders.len(), offenders.len(), 0, false)
+                }
             },
         }
     }
@@ -105,7 +108,7 @@ impl From<CombineOutcome> for CombineResultView {
 
 /// What `apply_break_apart` did. `kind` is `"ignored"`, `"applied"` (`compounds` compound paths
 /// became `pieces` objects; `with_holes` says a piece has a hole; `left_alone` compound paths
-/// were one piece already) or a refusal: `"no_compound"` or `"one_piece"` (`compounds` selected
+/// were one piece already) or a refusal: `"no_compound"`, `"groups"` or `"one_piece"` (`compounds` selected
 /// compound paths are one piece each). Nothing was changed by anything but `"applied"`.
 #[wasm_bindgen]
 #[derive(Debug, Clone)]
@@ -146,6 +149,9 @@ impl From<BreakApartOutcome> for BreakApartResultView {
             }
             BreakApartOutcome::Refused(BreakApartRefusal::OnePiece { compounds }) => {
                 view("one_piece", compounds, 0, false, 0)
+            }
+            BreakApartOutcome::Refused(BreakApartRefusal::Groups { offenders }) => {
+                view("groups", offenders.len(), 0, false, 0)
             }
         }
     }

@@ -93,6 +93,7 @@ impl Session {
     /// the selection before it ran and the one it left. Every entry point that writes the
     /// document goes through here, so one maker's interaction is one stack entry.
     pub(super) fn recording<R>(&mut self, body: impl FnOnce(&mut Self) -> R) -> R {
+        self.sync_context();
         let before = self.selection_snapshot();
         self.document.set_step_time((self.history.clock)());
         let result = body(self);

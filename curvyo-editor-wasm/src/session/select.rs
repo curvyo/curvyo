@@ -188,6 +188,7 @@ impl Session {
     /// lets a drag in flight note the pointer (the dead zone, once left,
     /// stays left).
     pub(super) fn select_hover(&mut self, point: Point, modifiers: Modifiers) {
+        self.sync_context();
         self.select
             .pointer_moved(point, modifiers, &mut self.selection);
         let objects = self.objects();
@@ -253,9 +254,17 @@ impl Session {
             }
             SelectDoubleClickOutcome::EditHint => DoubleClickHint::EditHint,
             SelectDoubleClickOutcome::CompoundPath => DoubleClickHint::CompoundPath,
-            SelectDoubleClickOutcome::Miss | SelectDoubleClickOutcome::EntryOpened => {
+            // A group opens: everything outside it recedes (`0023` criterion 15).
+            SelectDoubleClickOutcome::EnterGroup { group, leaf } => {
+                self.enter_group(group, Some(leaf));
                 DoubleClickHint::None
             }
+            // Empty canvas inside a group leaves it by one level (criterion 18).
+            SelectDoubleClickOutcome::Miss => {
+                self.leave_group(false);
+                DoubleClickHint::None
+            }
+            SelectDoubleClickOutcome::EntryOpened => DoubleClickHint::None,
         }
     }
 }

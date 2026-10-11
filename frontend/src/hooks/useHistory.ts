@@ -25,6 +25,8 @@ export interface CanvasNotice {
   ms: number;
   /** Where it shows: the canvas notice slot, or 4 px under the History tab's button. */
   source: "canvas" | "panel";
+  /** A status is polite and takes the slot for 3 s; an alert is a refusal and stays 8 s. */
+  kind: "status" | "alert";
 }
 
 /** The step names an undo and a redo would act on, `null` when a stack is empty. */
@@ -40,7 +42,12 @@ export interface HistoryApi {
   busy: boolean;
   names: HistoryNames;
   /** Shows `text` in the canvas notice slot, replacing the one on screen. */
-  showNotice: (text: string, ms?: number, source?: "canvas" | "panel") => void;
+  showNotice: (
+    text: string,
+    ms?: number,
+    source?: "canvas" | "panel",
+    kind?: "status" | "alert",
+  ) => void;
   /** Re-reads the names of the next undo and redo (and the native menu). Call after any change
    * of the session. */
   refresh: () => void;
@@ -109,9 +116,14 @@ export function useHistory(
   useBusyWindow(busy);
 
   const showNotice = useCallback(
-    (text: string, ms?: number, source: "canvas" | "panel" = "canvas") => {
+    (
+      text: string,
+      ms?: number,
+      source: "canvas" | "panel" = "canvas",
+      kind: "status" | "alert" = "status",
+    ) => {
       counter.current += 1;
-      setNotice({ id: counter.current, text, ms: ms ?? noticeDurationMs(text), source });
+      setNotice({ id: counter.current, text, ms: ms ?? noticeDurationMs(text), source, kind });
     },
     [],
   );

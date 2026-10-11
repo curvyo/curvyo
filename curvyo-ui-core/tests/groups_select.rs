@@ -330,4 +330,3 @@ fn a_ctrl_copy_of_a_group_copies_the_group() {
         "the copy is selected"
     );
 }
-

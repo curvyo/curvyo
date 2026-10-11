@@ -8,8 +8,9 @@ use std::io::{Cursor, Read, Write};
 use std::path::PathBuf;
 
 use curvyo_document_core::{
-    AnchorId, CURRENT_FORMAT_VERSION, CURRENT_LORO_SNAPSHOT_VERSION, Document, EllipseFrame,
-    Length, MAX_GROUP_DEPTH, NewAnchor, NodeId, OpenError, Point, RectBounds, pack, unpack,
+    AnchorId, Angle, CURRENT_FORMAT_VERSION, CURRENT_LORO_SNAPSHOT_VERSION, Document, EllipseFrame,
+    Length, MAX_GROUP_DEPTH, NewAnchor, NodeId, OpenError, Point, PointCount, RectBounds,
+    StarFrame, pack, unpack,
 };
 use loro::{LoroDoc, LoroValue, TreeID, TreeParentId};
 
@@ -62,8 +63,19 @@ fn golden_document() -> Document {
         ry: Length::from_mm(8.0),
     });
     let r = rect(&document, 80.0);
-    let last = rect(&document, 120.0);
+    let last = document.create_polygon(
+        StarFrame {
+            center: Point::new(130.0, 20.0),
+            radius: Length::from_mm(10.0),
+            angle: Angle::from_radians(0.0),
+        },
+        PointCount::new(5).unwrap(),
+    );
     let inner = document.group_objects(&[e, r]).unwrap();
+    // Not two adjacent steps with one label: an old file shows those as one row.
+    document
+        .translate_objects(&[last], curvyo_document_core::Vec2::new(1.0, 0.0))
+        .unwrap();
     let outer = document.group_objects(&[p, inner]).unwrap();
     assert_eq!(document.children(None), vec![first, outer, last]);
     document

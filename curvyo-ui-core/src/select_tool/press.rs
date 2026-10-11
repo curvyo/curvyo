@@ -14,8 +14,8 @@ use crate::modifiers::Modifiers;
 use crate::object_selection::ObjectSelection;
 use crate::oriented_box::oriented_bounds;
 use crate::transform_drag::DragOrigin;
-use crate::units::Units;
 use crate::transform_handle_layout::{EditHandle, TransformHandleTolerances};
+use crate::units::Units;
 
 /// What a press lands on, in the order [`classify_press`] tries them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

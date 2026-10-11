@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { type CanvasNotice, type HistoryNames, MAC, useHistory } from "@/hooks/useHistory";
+import { type GroupingApi, useGrouping } from "@/hooks/useGrouping";
 import type { HistoryDirection } from "@/lib/historyText";
 import { type NudgeFeedback, useNudgeFeedback } from "@/hooks/useNudgeFeedback";
 import { type BackingBuffer, backingBufferFor, sameBackingBuffer } from "@/lib/canvasSize";
@@ -584,6 +585,9 @@ export interface EditorSession {
   keyHint: KeyHint | null;
   /** The notice of the last undo or redo, in the canvas notice slot. */
   canvasNotice: CanvasNotice | null;
+  /** Groups (`specs/0023-groups`): the Grouping card, the entered group's depth and its
+   * announcements. */
+  grouping: GroupingApi;
   /** A large undo or redo is running. */
   historyBusy: boolean;
   /** The names of the next undo and redo; `null` for an empty stack. */
@@ -840,12 +844,14 @@ export function useEditorSession(
    * might have changed it — cheap, and simpler than having every call
    * site know which ones to refresh. */
   const refreshHistoryRef = useRef<() => void>(() => {});
+  const refreshGroupingRef = useRef<() => void>(() => {});
   const syncFromSession = useCallback(() => {
     const session = sessionRef.current;
     if (!session) {
       return;
     }
     refreshHistoryRef.current();
+    refreshGroupingRef.current();
     setToolState(session.tool() as Tool);
     setNodeToolbarState(readToolbarState(session.node_toolbar_state()));
     setPolyStarModeState(session.poly_star_mode() as PolyStarMode);
@@ -883,6 +889,11 @@ export function useEditorSession(
   useEffect(() => {
     refreshHistoryRef.current = refreshHistory;
   }, [refreshHistory]);
+  const grouping = useGrouping(getSession, syncFromSession, history.showNotice);
+  const { refresh: refreshGrouping, handleKeyOutcome: handleGroupingOutcome } = grouping;
+  useEffect(() => {
+    refreshGroupingRef.current = refreshGrouping;
+  }, [refreshGrouping]);
 
   const refreshCursor = useCallback(() => {
     const session = sessionRef.current;
@@ -1706,6 +1717,8 @@ export function useEditorSession(
         syncFromSession();
         return;
       }
+      // Group and Ungroup say what they did in the canvas notice slot, as the buttons do.
+      handleGroupingOutcome(outcome);
       if (outcome === "select-all") {
         onSelectAll(session.selection_count());
       } else if (outcome === "nudge" || outcome === "nudge-new") {
@@ -1722,7 +1735,16 @@ export function useEditorSession(
       setCursorHint(session.cursor_hint());
       syncFromSession();
     },
-    [handleKeyOutcome, isDuplicateKey, isSpaceHeld, syncFromSession, onNudge, onSelectAll, onEscape],
+    [
+      handleKeyOutcome,
+      handleGroupingOutcome,
+      isDuplicateKey,
+      isSpaceHeld,
+      syncFromSession,
+      onNudge,
+      onSelectAll,
+      onEscape,
+    ],
   );
 
   // A key hint clears itself after 2 s; a newer message restarts the clock.
@@ -1847,6 +1869,7 @@ export function useEditorSession(
     selectionAnnouncement,
     keyHint,
     canvasNotice: history.notice,
+    grouping,
     historyBusy: history.busy,
     historyNames: history.names,
     pressHistory: history.press,

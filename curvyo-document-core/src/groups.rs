@@ -284,10 +284,11 @@ impl Document {
             .collect()
     }
 
-    /// Every child of `parent` (`None` is the document root) with its leaves: one entry per object
-    /// the Select tool sees at that level. A leaf lists itself; an empty group lists nothing.
+    /// The groups among the children of `parent` (`None` is the document root), each with its
+    /// leaves in paint order: what the Select tool needs to treat a group as one object. A leaf
+    /// child is not listed; an empty group lists no leaf.
     #[must_use]
-    pub fn child_leaves(&self, parent: Option<NodeId>) -> Vec<(NodeId, Vec<NodeId>)> {
+    pub fn child_groups(&self, parent: Option<NodeId>) -> Vec<(NodeId, Vec<NodeId>)> {
         let tree = self.loro().get_tree(OBJECTS_TREE);
         if let Some(parent) = parent
             && !node_exists(&tree, tree_id_of(parent))
@@ -296,16 +297,10 @@ impl Document {
         }
         children_of(&tree, parent.map(tree_id_of))
             .into_iter()
+            .filter(|&child| is_group_node(&tree, child))
             .map(|child| {
-                let leaves = if is_group_node(&tree, child) {
-                    leaves_under(&tree, Some(child))
-                        .into_iter()
-                        .map(node_id)
-                        .collect()
-                } else {
-                    vec![node_id(child)]
-                };
-                (node_id(child), leaves)
+                let leaves = leaves_under(&tree, Some(child)).into_iter().map(node_id);
+                (node_id(child), leaves.collect())
             })
             .collect()
     }

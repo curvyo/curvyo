@@ -111,7 +111,7 @@ impl Session {
     /// background. The stored one, not a drag's preview: `begin_colour_pick` flushed it.
     fn pick_at(&self, point: Point) -> Option<PickedColour> {
         pick_colour(
-            &self.objects(),
+            &self.all_objects(),
             point,
             self.object_tolerance(),
             self.document.size(),
