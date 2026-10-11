@@ -115,7 +115,8 @@ impl Session {
             return dimmed;
         }
         let inside: HashSet<NodeId> = held.objects.iter().map(ObjectSnapshot::id).collect();
-        let dimmed: Arc<[ObjectSnapshot]> = dim_outside(&held.all, &inside).into();
+        let dimmed: Arc<[ObjectSnapshot]> =
+            dim_outside(&held.all, &|id| inside.contains(&id)).into();
         if let Some(entry) = self.context_cache.held.borrow_mut().as_mut() {
             entry.dimmed = Some(Arc::clone(&dimmed));
         }
@@ -183,8 +184,8 @@ impl Session {
 
     /// Brings the session in line with the context before an event is dispatched: a group that is
     /// gone is left (the context falls back to the nearest one that exists and a screen reader is
-    /// told), new objects go into the entered group, and the Select tool selects by the units of
-    /// this context.
+    /// told) and new objects go into the entered group. Reads nothing from the document at the
+    /// root, so a drawing tool pays nothing for groups.
     pub(super) fn sync_context(&mut self) {
         let live = self.context_group();
         if self.context.last().copied() != live {
@@ -196,6 +197,12 @@ impl Session {
             }
         }
         self.document.set_draw_parent(live);
+    }
+
+    /// Tells the Select tool which leaves belong together in the current context. Called before
+    /// every Select-tool event that selects, toggles, copies or opens by object.
+    pub(super) fn sync_select_units(&mut self) {
+        self.sync_context();
         let units = self.units();
         self.select.set_units(units);
     }

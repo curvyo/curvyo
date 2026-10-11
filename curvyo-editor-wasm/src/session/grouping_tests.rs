@@ -2,7 +2,7 @@
 //! clicking a group, entering and leaving it, the dimming of the outside, drawing inside, the
 //! refusals of the operations that do not look through groups, and undo.
 
-use curvyo_document_core::{Length, NodeId, Point, RectBounds};
+use curvyo_document_core::{Length, NodeId, ObjectSnapshot, Point, RectBounds};
 use curvyo_ui_core::BooleanOp;
 
 use super::grouping::GroupingKind;
@@ -187,11 +187,10 @@ fn a_click_selects_the_group_and_the_panel_names_it() {
     click(&mut session, pt(45.0, 0.0));
     assert_eq!(session.selection.ids(), &[ids[1], ids[2]]);
     assert_eq!(session.style_scope().subject, "Group of 2 objects");
-    assert_eq!(
+    assert!(
         session
             .selection_announcement()
-            .starts_with("Group of 2 objects selected"),
-        true
+            .starts_with("Group of 2 objects selected")
     );
 }
 
@@ -211,7 +210,7 @@ fn a_double_click_enters_the_group_and_everything_else_goes_inert() {
         session.take_context_announcement(),
         "Inside group, 1 level. Escape leaves."
     );
-    let inside: Vec<_> = session.objects().iter().map(|o| o.id()).collect();
+    let inside: Vec<_> = session.objects().iter().map(ObjectSnapshot::id).collect();
     assert_eq!(
         inside,
         vec![ids[1], ids[2]],

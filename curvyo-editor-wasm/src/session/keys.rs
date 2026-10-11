@@ -194,6 +194,19 @@ pub(super) enum KeyAction {
     EnterGroup,
 }
 
+/// Whether Enter may enter a group: the Select tool, a plain press, nothing in flight.
+fn enter_acts(input: &KeyInput<'_>, state: KeyState) -> bool {
+    state.tool == Tool::Select
+        && !input.repeat
+        && !input.dom_blocked
+        && !input.ctrl
+        && !input.alt
+        && !input.shift
+        && !state.operation_in_flight
+        && !state.pen_open
+        && !state.entry_open
+}
+
 /// The key table and its gate (criteria 54, 55, 60, 61) as a pure function:
 /// the one place that says what a key does in which state.
 fn decide(input: &KeyInput<'_>, state: KeyState) -> KeyAction {
@@ -209,16 +222,7 @@ fn decide(input: &KeyInput<'_>, state: KeyState) -> KeyAction {
         "Enter" => {
             return if state.tool == Tool::Pen && state.pen_open {
                 KeyAction::FinishPen
-            } else if state.tool == Tool::Select
-                && !input.repeat
-                && !input.dom_blocked
-                && !input.ctrl
-                && !input.alt
-                && !input.shift
-                && !state.operation_in_flight
-                && !state.pen_open
-                && !state.entry_open
-            {
+            } else if enter_acts(input, state) {
                 // Enter opens the one selected group; the session says whether there is one.
                 KeyAction::EnterGroup
             } else {

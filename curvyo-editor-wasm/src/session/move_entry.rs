@@ -71,6 +71,9 @@ impl Session {
                 this.select.cancel_entry();
                 return EntryOutcome::Unchanged;
             }
+            if mode.copy {
+                this.sync_select_units();
+            }
             this.select.commit_move_entry(
                 &this.document,
                 &mut this.selection,

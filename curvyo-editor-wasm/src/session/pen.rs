@@ -11,13 +11,16 @@ use curvyo_ui_core::{EndNodeIndex, JoinType, PenTarget, PressAction, continuatio
 
 use super::{Session, Tool};
 
+/// What the end-node index was built for: the document read and the entered group.
+type EndIndexKey = (DocumentVersion, Option<NodeId>);
+
 /// What the Pen caches and remembers between events (`specs/0034-pen-path-extension`): the index
 /// of the end nodes of open paths, rebuilt only when the document changes (criterion 24), and the
 /// target the latest press was decided on, which the cue keeps until the release (a drag from a
 /// target is ignored and the cursor stays what it was).
 #[derive(Debug, Default)]
 pub(super) struct PenCueState {
-    ends: RefCell<Option<((DocumentVersion, Option<NodeId>), EndNodeIndex)>>,
+    ends: RefCell<Option<(EndIndexKey, EndNodeIndex)>>,
     press: Option<PenTarget>,
 }
 

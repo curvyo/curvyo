@@ -13,7 +13,11 @@ impl Session {
     /// state only: nothing is written. An empty document is still a handled key.
     pub(super) fn select_all(&mut self) -> KeyOutcome {
         // The leaves of the context: at the root every object, inside a group those of the group.
-        let ids: Vec<_> = self.objects().iter().map(|object| object.id()).collect();
+        let ids: Vec<_> = self
+            .objects()
+            .iter()
+            .map(curvyo_document_core::ObjectSnapshot::id)
+            .collect();
         self.selection.set(&ids);
         KeyOutcome::SelectedAll
     }

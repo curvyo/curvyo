@@ -3,22 +3,23 @@
 //! normal strength. Selection boxes, handles and the other overlays are not artwork and stay at
 //! full strength.
 
-use std::collections::HashSet;
-
 use curvyo_document_core::{NodeId, ObjectSnapshot, Opacity};
 
 /// The strength of the artwork outside the entered group (`--context-dim`, 35 %).
 pub const CONTEXT_DIM: f64 = 0.35;
 
-/// `objects` with every object that is not in `inside` drawn at [`CONTEXT_DIM`] of its fill and
+/// `objects` with every object for which `inside` is false drawn at [`CONTEXT_DIM`] of its fill and
 /// stroke opacity, in the same order. The objects inside are cloned as they are.
 #[must_use]
-pub fn dim_outside(objects: &[ObjectSnapshot], inside: &HashSet<NodeId>) -> Vec<ObjectSnapshot> {
+pub fn dim_outside(
+    objects: &[ObjectSnapshot],
+    inside: &dyn Fn(NodeId) -> bool,
+) -> Vec<ObjectSnapshot> {
     objects
         .iter()
         .map(|object| {
             let mut shown = object.clone();
-            if !inside.contains(&object.id()) {
+            if !inside(object.id()) {
                 let style = shown.style_mut();
                 let dim =
                     |opacity: Opacity| Opacity::new(opacity.get() * CONTEXT_DIM).unwrap_or(opacity);
@@ -49,8 +50,8 @@ mod tests {
     fn only_the_objects_outside_are_dimmed_to_35_percent() {
         let document = Document::new(1);
         let (inside, outside) = (rect(&document, 0.0), rect(&document, 20.0));
-        let keep: HashSet<NodeId> = [inside.id()].into_iter().collect();
-        let shown = dim_outside(&[inside.clone(), outside.clone()], &keep);
+        let keep: std::collections::HashSet<NodeId> = [inside.id()].into_iter().collect();
+        let shown = dim_outside(&[inside.clone(), outside.clone()], &|id| keep.contains(&id));
         assert_eq!(
             shown[0], inside,
             "the context's own content is drawn normally"
