@@ -6,7 +6,6 @@
 //! refused multi-object call (`convert_to_paths`) never leaves a partial
 //! edit behind.
 
-
 use crate::corner_radii::CornerRadii;
 use crate::corner_radii_codec::write_corner_radii_if_changed;
 use crate::document::{Document, OBJECTS_TREE};

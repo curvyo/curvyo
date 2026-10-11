@@ -278,8 +278,8 @@ fn document_json_shows_the_background() {
 
 #[test]
 fn this_slice_took_its_format_version_and_the_writer_declares_it() {
-    assert!(CURRENT_FORMAT_VERSION >= THIS_SLICE_VERSION);
     let bytes = pack(&Document::new(1), "t").unwrap();
+    assert!(manifest_version(&bytes) >= THIS_SLICE_VERSION);
     assert_eq!(manifest_version(&bytes), CURRENT_FORMAT_VERSION);
 }
 

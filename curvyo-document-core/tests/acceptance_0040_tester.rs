@@ -354,7 +354,7 @@ fn ac5_the_writer_writes_the_named_constant_and_it_is_ten() {
     let bytes = pack(&Document::new(1), "0.1.0").unwrap();
     assert_eq!(manifest_version(&bytes), u64::from(CURRENT_FORMAT_VERSION));
     // `main` was 9 before this slice (specs/README.md plan); 0023 took 11 after it.
-    assert!(CURRENT_FORMAT_VERSION >= 10);
+    assert!(manifest_version(&bytes) >= 10);
 }
 
 #[test]

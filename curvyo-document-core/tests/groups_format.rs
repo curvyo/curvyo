@@ -313,7 +313,7 @@ fn an_empty_group_is_valid_on_read_and_draws_nothing() {
     mark_group(&loro, node);
     let document = unpack(2, &file_from_loro(&loro)).unwrap();
     assert_eq!(document.children(None).len(), 1);
-    assert!(document.object_ids().is_empty());
+    assert_eq!(document.object_ids(), Vec::<NodeId>::new());
 }
 
 #[test]

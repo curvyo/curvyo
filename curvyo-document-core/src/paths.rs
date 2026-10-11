@@ -13,9 +13,9 @@ use loro::{LoroMap, LoroMovableList, TreeID};
 use crate::document::{Document, OBJECTS_TREE};
 use crate::path_codec::{
     self, KEY_HANDLE_IN, KEY_HANDLE_OUT, KEY_POINT, adjacent_segment_indices, anchor_index,
-    anchor_map_at, anchors_container, insert_anchor_at, insert_anchors_container,
-    leaf_exists, neighbour_tangent, push_anchor, read_closed, read_kind, read_point, read_vec2,
-    write_kind, write_point, write_vec2,
+    anchor_map_at, anchors_container, insert_anchor_at, insert_anchors_container, leaf_exists,
+    neighbour_tangent, push_anchor, read_closed, read_kind, read_point, read_vec2, write_kind,
+    write_point, write_vec2,
 };
 use crate::path_model::{
     AnchorId, AnchorKind, HandleSlot, NewAnchor, NodeId, PathEditError, PathSnapshot,

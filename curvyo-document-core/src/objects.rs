@@ -13,8 +13,8 @@ use loro::{Container, TreeID, ValueOrContainer};
 
 use crate::document::{Document, OBJECTS_TREE};
 use crate::path_codec::{
-    self, KEY_HANDLE_IN, KEY_HANDLE_OUT, KEY_ID, KEY_POINT, anchor_map_at, leaf_exists, node_exists,
-    write_point, write_vec2,
+    self, KEY_HANDLE_IN, KEY_HANDLE_OUT, KEY_ID, KEY_POINT, anchor_map_at, leaf_exists,
+    node_exists, write_point, write_vec2,
 };
 use crate::path_model::{AnchorId, NodeId};
 use crate::primitive_model::{ObjectSnapshot, translate_shape};

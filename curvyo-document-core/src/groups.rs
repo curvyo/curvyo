@@ -456,6 +456,7 @@ impl Document {
 }
 
 #[cfg(test)]
+#[allow(clippy::many_single_char_names, clippy::cast_precision_loss)]
 mod tests {
     use crate::{AnchorId, Document, NewAnchor, ObjectEditError, Point, RectBounds};
 

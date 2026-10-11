@@ -14,26 +14,38 @@ use loro::{
 use super::error::HistoryError;
 use crate::document::OBJECTS_TREE;
 
-/// Moves the deleted nodes `nodes` back to the root of the objects tree, each at its index, as one
-/// change of this peer with `message`. Everything pending is committed first, so the change is
-/// complete and the next local counter continues after it. Nothing is imported unless every node
-/// is a deleted node of the tree.
+/// Where a deleted node comes back to.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Revival {
+    /// The deleted node.
+    pub(crate) target: TreeID,
+    /// The group it goes back into; `None` is the document root. A parent that is itself
+    /// revived in the same change comes earlier in the list.
+    pub(crate) parent: Option<TreeID>,
+    /// Its position among its siblings.
+    pub(crate) index: FractionalIndex,
+}
+
+/// Moves the deleted nodes `nodes` back under their parents (the document root or a group), each at
+/// its index, as one change of this peer with `message`. Everything pending is committed first, so
+/// the change is complete and the next local counter continues after it. Nothing is imported
+/// unless every node is a deleted node of the tree.
 ///
 /// # Errors
 /// [`HistoryError::Revive`] when a node is not a deleted node, or the import is refused or leaves
 /// anything pending.
 pub(crate) fn revive_nodes(
     doc: &LoroDoc,
-    nodes: &[(TreeID, FractionalIndex)],
+    nodes: &[Revival],
     message: &str,
 ) -> Result<(), HistoryError> {
     if nodes.is_empty() {
         return Ok(());
     }
     let tree = doc.get_tree(OBJECTS_TREE);
-    let all_deleted = nodes
-        .iter()
-        .all(|(id, _)| tree.contains(*id) && matches!(tree.is_node_deleted(id), Ok(true)));
+    let all_deleted = nodes.iter().all(|revival| {
+        tree.contains(revival.target) && matches!(tree.is_node_deleted(&revival.target), Ok(true))
+    });
     if !all_deleted {
         return Err(HistoryError::Revive);
     }
@@ -52,11 +64,11 @@ pub(crate) fn revive_nodes(
     let ops = nodes
         .iter()
         .zip(counter..)
-        .map(|((target, index), op_counter)| JsonOp {
+        .map(|(revival, op_counter)| JsonOp {
             content: JsonOpContent::Tree(JsonTreeOp::Move {
-                target: *target,
-                parent: None,
-                fractional_index: index.clone(),
+                target: revival.target,
+                parent: revival.parent,
+                fractional_index: revival.index.clone(),
             }),
             container: container.clone(),
             counter: op_counter,
@@ -96,6 +108,14 @@ mod tests {
         (doc, ids)
     }
 
+    fn at_root(target: TreeID, index: FractionalIndex) -> Revival {
+        Revival {
+            target,
+            parent: None,
+            index,
+        }
+    }
+
     fn index_of(doc: &LoroDoc, id: TreeID) -> FractionalIndex {
         FractionalIndex::from_hex_string(doc.get_tree(OBJECTS_TREE).fractional_index(id).unwrap())
     }
@@ -111,12 +131,48 @@ mod tests {
         let changes_before = doc.len_changes();
         revive_nodes(
             &doc,
-            &[(ids[1], indices[1].clone()), (ids[2], indices[2].clone())],
+            &[
+                at_root(ids[1], indices[1].clone()),
+                at_root(ids[2], indices[2].clone()),
+            ],
             "undo;s=3;t=1;u=5@0",
         )
         .unwrap();
         assert_eq!(doc.len_changes(), changes_before + 1, "one change for both");
         assert_eq!(doc.get_tree(OBJECTS_TREE).roots(), ids);
+    }
+
+    #[test]
+    fn a_group_and_its_child_come_back_in_one_change_parent_first() {
+        let (doc, ids) = tree_doc(1);
+        let tree = doc.get_tree(OBJECTS_TREE);
+        let child = tree.create(ids[0]).unwrap();
+        doc.commit();
+        let group_index = index_of(&doc, ids[0]);
+        let child_index = index_of(&doc, child);
+        tree.delete(child).unwrap();
+        tree.delete(ids[0]).unwrap();
+        doc.commit();
+        let changes_before = doc.len_changes();
+        revive_nodes(
+            &doc,
+            &[
+                at_root(ids[0], group_index),
+                Revival {
+                    target: child,
+                    parent: Some(ids[0]),
+                    index: child_index,
+                },
+            ],
+            "undo;s=3;t=1;u=5@0",
+        )
+        .unwrap();
+        assert_eq!(doc.len_changes(), changes_before + 1, "one change for both");
+        assert_eq!(doc.get_tree(OBJECTS_TREE).roots(), ids);
+        assert_eq!(
+            doc.get_tree(OBJECTS_TREE).children(ids[0]),
+            Some(vec![child])
+        );
     }
 
     #[test]
@@ -129,7 +185,7 @@ mod tests {
         // The second node is alive, not deleted: nothing may be imported, not even the first.
         let result = revive_nodes(
             &doc,
-            &[(ids[0], index.clone()), (ids[1], index)],
+            &[at_root(ids[0], index.clone()), at_root(ids[1], index)],
             "undo;s=3;t=1;u=5@0",
         );
         assert_eq!(result, Err(HistoryError::Revive));
