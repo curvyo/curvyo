@@ -30,10 +30,16 @@ interface ValueFieldProps {
   valueNow: number;
   /** The unit spelled out for `aria-valuetext` ("millimetres", "percent"). */
   unitWords: string;
+  /** The unit for a value of exactly 1 ("marker"); `unitWords` when it has no singular. */
+  unitWordOne?: string;
   /** The smallest value, for `aria-valuemin` (0 unless the scale starts higher). */
   valueMin?: number;
-  /** The largest value that may be typed, for `aria-valuemax`. */
-  typedMax: number;
+  /** The end of the track, for `aria-valuemax` and the largest `aria-valuenow`: the slider's
+   * own range, not the larger maximum that may be typed. */
+  valueMax: number;
+  /** The smallest position a plain click sets, 0 to 1 (0 unless a click at the far left must
+   * not set the minimum, as for an opacity). A drag and the keys still reach the end. */
+  clickMinP?: number;
   /** The reset target as text ("0.25 mm", "100 %"). */
   defaultText: string;
   /** The message of a refused typed value. */
@@ -50,6 +56,9 @@ interface ValueFieldProps {
   onSubmit: (text: string) => string;
   onReturnFocus: () => void;
 }
+
+/** `aria-valuenow` without the float noise of the scale (14.000000000000002). */
+const roundedNow = (value: number) => Number(value.toFixed(3));
 
 /** Characters that start typing in a focused value field (criterion 43). */
 const STARTS_TYPING = /^[0-9.,-]$/;
@@ -73,8 +82,10 @@ export function ValueField({
   unit,
   valueNow,
   unitWords,
+  unitWordOne,
   valueMin = 0,
-  typedMax,
+  valueMax,
+  clickMinP = 0,
   defaultText,
   messages,
   onPreview,
@@ -93,7 +104,7 @@ export function ValueField({
     // A click sets the value at the pointer and commits it; a double-click types
     // (`specs/0047-transform-polish/` criteria 33 to 36).
     onClickAt: (p) => {
-      onPreview(p, "normal");
+      onPreview(Math.max(p, clickMinP), "normal");
       onSettle();
     },
     onDoubleClick: () => setTyping({}),
@@ -168,9 +179,11 @@ export function ValueField({
             tabIndex={0}
             aria-label={name}
             aria-valuemin={valueMin}
-            aria-valuemax={typedMax}
-            aria-valuenow={mixed ? undefined : valueNow}
-            aria-valuetext={mixed ? "Mixed" : `${text} ${unitWords}`}
+            aria-valuemax={valueMax}
+            aria-valuenow={mixed ? undefined : Math.min(valueMax, roundedNow(valueNow))}
+            aria-valuetext={
+              mixed ? "Mixed" : `${text} ${text === "1" && unitWordOne ? unitWordOne : unitWords}`
+            }
             aria-keyshortcuts="Control+Backspace Enter F2"
             onKeyDown={onKeyDown}
             {...handlers}

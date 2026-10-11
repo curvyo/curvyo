@@ -1,4 +1,4 @@
-import { VALUE_FIELD_NAMES } from "@/lib/sliderNames";
+import { OPACITY_CLICK_MIN_P, VALUE_FIELD_NAMES, VALUE_FIELD_SCALE_END } from "@/lib/sliderNames";
 import { useHexEntry } from "@/hooks/useHexEntry";
 import { useRef } from "react";
 
@@ -75,7 +75,8 @@ export function FillSection({ panel, onReturnFocus }: FillSectionProps) {
             unit="%"
             valueNow={view.fillOpacity}
             unitWords="percent"
-            typedMax={view.opacityTypedMax}
+            valueMax={VALUE_FIELD_SCALE_END.opacity}
+            clickMinP={OPACITY_CLICK_MIN_P}
             defaultText={view.opacityDefaultText}
             messages={PERCENT_MESSAGES}
             onPreview={(p, grid) => panel.previewValue("fill-opacity", p, grid)}

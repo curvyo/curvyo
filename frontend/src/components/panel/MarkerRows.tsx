@@ -1,4 +1,4 @@
-import { VALUE_FIELD_NAMES } from "@/lib/sliderNames";
+import { VALUE_FIELD_NAMES, VALUE_FIELD_SCALE_END } from "@/lib/sliderNames";
 import { StyleRow } from "@/components/panel/StyleRow";
 import { ValueField } from "@/components/panel/ValueField";
 import { PLACE_OPTIONS, markerOptions } from "@/components/panel/styleOptions";
@@ -71,8 +71,9 @@ export function MarkerRows({ panel, onReturnFocus }: MarkerRowsProps) {
           unit=""
           valueNow={view.markerCount}
           unitWords="markers"
+          unitWordOne="marker"
           valueMin={1}
-          typedMax={view.countTypedMax}
+          valueMax={VALUE_FIELD_SCALE_END.markerCount}
           defaultText={view.countDefaultText}
           messages={COUNT_MESSAGES}
           onPreview={(p, grid) => panel.previewValue("marker-count", p, grid)}

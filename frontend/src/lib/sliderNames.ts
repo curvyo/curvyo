@@ -56,3 +56,23 @@ export function allSliderNames(): string[] {
     ...paints.flatMap((paint) => kinds.map((kind) => colourSliderName(paint, kind))),
   ];
 }
+
+/**
+ * The end of each value field's track, the number its slider semantics use (`aria-valuemax`):
+ * the drag range of `curvyo-ui-core/src/value_scale.rs` (a test compares them with that file),
+ * not the larger maximum a typed value may have.
+ */
+export const VALUE_FIELD_SCALE_END = {
+  strokeWidth: 20,
+  opacity: 100,
+  markerCount: 50,
+} as const;
+
+/**
+ * The smallest position a plain click on an opacity field sets: the position of 1 % on its scale
+ * (`100 (4^p - 1) / 3 = 1` at p = 0.0213, so 0.0214 rounds to 1 %). A click at the far left of the
+ * field never makes the object fully transparent by accident (and so hides its section); 0 % is
+ * set by dragging to the left end, by Home, or by typing (`specs/0047-transform-polish/`
+ * criterion 51).
+ */
+export const OPACITY_CLICK_MIN_P = 0.0214;

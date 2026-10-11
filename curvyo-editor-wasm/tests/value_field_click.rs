@@ -121,3 +121,30 @@ fn a_position_that_is_not_a_number_writes_nothing() {
     session.commit_style_preview();
     assert!(bytes(&session) == before);
 }
+
+/// A plain click never sets an opacity to 0 %: the host clamps the position to 0.0214, which the
+/// scale rounds to 1 %, so the object stays visible (`0047` criterion 51). The left end of a drag
+/// (position 0) still gives 0 %.
+#[test]
+fn the_smallest_click_position_of_an_opacity_gives_one_percent() {
+    for field in [ValueField::StrokeOpacity, ValueField::FillOpacity] {
+        let mut session = session_with_selected_rectangle();
+        session.preview_value_field(field, 0.0214, Grid::Normal);
+        session.commit_style_preview();
+        let shown = session
+            .style_panel_state()
+            .and_then(|state| state.value_of(field))
+            .unwrap();
+        assert!((shown - 1.0).abs() < 1e-9, "{field:?}: {shown}");
+        session.preview_value_field(field, 0.0, Grid::Normal);
+        session.commit_style_preview();
+        let shown = session
+            .style_panel_state()
+            .and_then(|state| state.value_of(field))
+            .unwrap();
+        assert!(
+            shown.abs() < 1e-9,
+            "{field:?} at the left end of a drag: {shown}"
+        );
+    }
+}

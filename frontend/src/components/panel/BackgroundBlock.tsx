@@ -1,4 +1,4 @@
-import { VALUE_FIELD_NAMES } from "@/lib/sliderNames";
+import { OPACITY_CLICK_MIN_P, VALUE_FIELD_NAMES, VALUE_FIELD_SCALE_END } from "@/lib/sliderNames";
 import { useHexEntry } from "@/hooks/useHexEntry";
 import { useId, useRef } from "react";
 
@@ -92,7 +92,8 @@ export function BackgroundBlock({ background, onReturnFocus }: BackgroundBlockPr
             unit="%"
             valueNow={view.opacity}
             unitWords="percent"
-            typedMax={view.opacityTypedMax}
+            valueMax={VALUE_FIELD_SCALE_END.opacity}
+            clickMinP={OPACITY_CLICK_MIN_P}
             defaultText={view.opacityDefaultText}
             messages={PERCENT_MESSAGES}
             onPreview={background.previewOpacity}

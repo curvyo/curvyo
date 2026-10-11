@@ -1,4 +1,4 @@
-import { VALUE_FIELD_NAMES } from "@/lib/sliderNames";
+import { OPACITY_CLICK_MIN_P, VALUE_FIELD_NAMES, VALUE_FIELD_SCALE_END } from "@/lib/sliderNames";
 import { useHexEntry } from "@/hooks/useHexEntry";
 import { useRef } from "react";
 
@@ -83,7 +83,8 @@ export function StrokeSection({ panel, onReturnFocus }: StrokeSectionProps) {
             unit="%"
             valueNow={view.strokeOpacity}
             unitWords="percent"
-            typedMax={view.opacityTypedMax}
+            valueMax={VALUE_FIELD_SCALE_END.opacity}
+            clickMinP={OPACITY_CLICK_MIN_P}
             defaultText={view.opacityDefaultText}
             messages={PERCENT_MESSAGES}
             onPreview={(p, grid) => panel.previewValue("stroke-opacity", p, grid)}
@@ -103,7 +104,7 @@ export function StrokeSection({ panel, onReturnFocus }: StrokeSectionProps) {
             unit="mm"
             valueNow={view.strokeWidth}
             unitWords="millimetres"
-            typedMax={view.widthTypedMax}
+            valueMax={VALUE_FIELD_SCALE_END.strokeWidth}
             defaultText={view.widthDefaultText}
             messages={WIDTH_MESSAGES}
             onPreview={(p, grid) => panel.previewValue("stroke-width", p, grid)}

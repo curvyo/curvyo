@@ -6,8 +6,10 @@ import {
   HELP_COLOUR,
   HELP_RATIO,
   HELP_VALUE_FIELD,
+  OPACITY_CLICK_MIN_P,
   RATIO_SLIDER_NAMES,
   VALUE_FIELD_NAMES,
+  VALUE_FIELD_SCALE_END,
   allSliderNames,
   colourSliderName,
   tipHeading,
@@ -68,4 +70,51 @@ test("every slider component takes its name from the table, so the aria-label an
   ] as const) {
     assert.match(src(file), new RegExp(`name=\\{VALUE_FIELD_NAMES\\.${key}\\}`), `${file} ${key}`);
   }
+});
+
+test("the scale ends are the drag ranges of value_scale.rs", () => {
+  const rust = readFileSync(
+    new URL("../../curvyo-ui-core/src/value_scale.rs", import.meta.url),
+    "utf8",
+  );
+  const constant = (name: string) => {
+    const found = rust.match(new RegExp(`const ${name}: f64 = ([0-9.]+);`));
+    assert.ok(found, `${name} not found in value_scale.rs`);
+    return Number(found[1]);
+  };
+  assert.equal(VALUE_FIELD_SCALE_END.strokeWidth, constant("WIDTH_DRAG_MAX_MM"));
+  assert.equal(VALUE_FIELD_SCALE_END.opacity, constant("OPACITY_MAX"));
+  assert.equal(VALUE_FIELD_SCALE_END.markerCount, constant("COUNT_DRAG_MAX"));
+});
+
+test("a plain click on an opacity field never sets 0 %: the smallest click position gives 1 %", () => {
+  const opacityAt = (p: number) => (100 * (4 ** p - 1)) / 3;
+  const rounded = Math.round(opacityAt(OPACITY_CLICK_MIN_P));
+  assert.equal(rounded, 1);
+  // Just below the position the scale gives less than 1 %, so the click stops here.
+  assert.ok(opacityAt(OPACITY_CLICK_MIN_P) >= 0.99);
+  assert.equal(Math.round(opacityAt(0)), 0, "the left end of a drag is still 0 %");
+});
+
+test("every value field passes its scale end, and the opacity fields their click minimum", () => {
+  for (const file of ["StrokeSection", "FillSection", "BackgroundBlock", "MarkerRows"]) {
+    const text = readFileSync(
+      new URL(`../src/components/panel/${file}.tsx`, import.meta.url),
+      "utf8",
+    );
+    assert.doesNotMatch(text, /typedMax=/, `${file} still sends the typed maximum`);
+    assert.match(text, /valueMax=\{VALUE_FIELD_SCALE_END\./, file);
+  }
+  for (const file of ["StrokeSection", "FillSection", "BackgroundBlock"]) {
+    const text = readFileSync(
+      new URL(`../src/components/panel/${file}.tsx`, import.meta.url),
+      "utf8",
+    );
+    assert.match(text, /clickMinP=\{OPACITY_CLICK_MIN_P\}/, file);
+  }
+  const markers = readFileSync(
+    new URL("../src/components/panel/MarkerRows.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(markers, /unitWordOne="marker"/);
 });
