@@ -19,6 +19,9 @@ export interface HistoryList {
   rowAt: (index: number) => HistoryRowData | undefined;
   /** Asks for the pages that hold rows `first` to `last`. */
   ensure: (first: number, last: number) => void;
+  /** The `scope:object` the pages hold rows for: it differs from what is wanted until the rows of
+   * a new scope or object have been read. */
+  loadedFor: string;
   /** When the rows were read: "today" for the times in the rows. */
   readAt: Date;
   /** How many rows arrived at the top since the list was last read, for keeping a scrolled list
@@ -47,7 +50,7 @@ export function useHistoryList(
   const reading = useRef("");
   const added = useRef(0);
   const totalSeen = useRef(0);
-  const [state, setState] = useState(() => ({ total: 0, nowId: "", version: 0, readAt: new Date() }));
+  const [state, setState] = useState(() => ({ total: 0, nowId: "", version: 0, readAt: new Date(), loadedFor: "" }));
 
   const load = useCallback(
     (first: number, last: number) => {
@@ -103,6 +106,7 @@ export function useHistoryList(
       nowId,
       version: previous.version + 1,
       readAt: new Date(),
+      loadedFor: reads,
     }));
     load(wanted.current.first, wanted.current.last);
   }, [shown, syncRevision, getSession, load, scope, source]);
@@ -131,6 +135,7 @@ export function useHistoryList(
     total: state.total,
     nowId: state.nowId,
     readAt: state.readAt,
+    loadedFor: state.loadedFor,
     rowAt,
     ensure,
     takeAdded,

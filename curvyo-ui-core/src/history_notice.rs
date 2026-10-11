@@ -61,6 +61,14 @@ pub const fn nothing_notice(direction: Direction) -> &'static str {
 /// (`specs/0041-object-history` criterion 5).
 pub const SELECT_ONE_OBJECT: &str = "Select one object.";
 
+/// The hint of Ctrl+U and Ctrl+Shift+U with a tool other than Select and Node.
+pub const OBJECT_TOOL_NOTICE: &str = "Object undo needs the Select or Node tool.";
+
+/// The notice of an object undo on a copy that has no step left it can take back, when its earlier
+/// steps are the original's.
+pub const NOTHING_FROM_ORIGINAL: &str =
+    "Nothing to undo for this object: its earlier steps only moved or reshaped the original.";
+
 /// The notice for an object undo or redo with nothing to act on (criteria 11 and 14).
 #[must_use]
 pub const fn object_nothing_notice(direction: Direction) -> &'static str {
@@ -93,8 +101,7 @@ fn object_restore_text(restore: &ObjectRestore) -> String {
     let name = operation_name(&restore.target.label);
     let report = &restore.report;
     if !report.wrote && restore.target.inherited_from.is_some() {
-        return "Nothing to undo for this object: its earlier steps only moved or reshaped the original."
-            .to_owned();
+        return NOTHING_FROM_ORIGINAL.to_owned();
     }
     if !report.wrote {
         return restore_notice(name, report, None, false);

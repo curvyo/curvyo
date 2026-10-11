@@ -3,8 +3,8 @@
 
 use curvyo_document_core::{Direction, HistoryError, NodeId, ObjectTarget};
 use curvyo_ui_core::{
-    FINISH_PEN_FIRST, SELECT_ONE_OBJECT, SelectionSnapshot, object_nothing_notice,
-    object_restore_notice, operation_name,
+    FINISH_PEN_FIRST, NOTHING_FROM_ORIGINAL, OBJECT_TOOL_NOTICE, SELECT_ONE_OBJECT,
+    SelectionSnapshot, object_nothing_notice, object_restore_notice, operation_name,
 };
 
 use super::history::HistoryResult;
@@ -128,7 +128,7 @@ impl Session {
             return nothing(FINISH_PEN_FIRST);
         }
         if !matches!(self.tool, Tool::Select | Tool::Node) {
-            return nothing("");
+            return nothing(OBJECT_TOOL_NOTICE);
         }
         let Some(id) = self.history_object() else {
             return nothing(SELECT_ONE_OBJECT);
@@ -144,6 +144,9 @@ impl Session {
         };
         let restore = match outcome {
             Ok(Some(restore)) => restore,
+            Ok(None) if direction == Direction::Undo && self.document.object_inherits(id) => {
+                return nothing(NOTHING_FROM_ORIGINAL);
+            }
             Ok(None) => return nothing(object_nothing_notice(direction)),
             Err(_) => {
                 let verb = if direction == Direction::Undo {
@@ -228,11 +231,11 @@ pub(super) fn object_history_action(
     if input.dom_blocked || state.operation_in_flight || state.entry_open {
         return KeyAction::Ignore;
     }
-    if !matches!(state.tool, Tool::Select | Tool::Node) {
-        return KeyAction::Ignore;
-    }
     if state.pen_open {
         return KeyAction::Hint(KeyHint::FinishPenFirst);
+    }
+    if !matches!(state.tool, Tool::Select | Tool::Node) {
+        return KeyAction::Hint(KeyHint::ObjectTool);
     }
     KeyAction::ObjectHistory(direction)
 }

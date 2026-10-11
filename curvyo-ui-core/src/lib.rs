@@ -120,8 +120,8 @@ pub use history_names::{
     OPERATION_NAMES, RESERVED_LABELS, UNKNOWN_OPERATION_NAME, known_operation_name, operation_name,
 };
 pub use history_notice::{
-    FINISH_PEN_FIRST, SELECT_ONE_OBJECT, nothing_notice, object_nothing_notice,
-    object_restore_notice, objects_summary, restore_notice, summary_shapes,
+    FINISH_PEN_FIRST, NOTHING_FROM_ORIGINAL, OBJECT_TOOL_NOTICE, SELECT_ONE_OBJECT, nothing_notice,
+    object_nothing_notice, object_restore_notice, objects_summary, restore_notice, summary_shapes,
 };
 pub use hit_test::{Hit, hit_test};
 pub use hit_test_object::{hit_test_object, hit_test_objects, hit_test_objects_along};

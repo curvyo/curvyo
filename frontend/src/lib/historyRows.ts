@@ -124,18 +124,38 @@ export function secondLine(row: HistoryRowData, now: Date): string {
   return [leadWords(row), secondLineRest(row, now)].filter((part) => part !== "").join(" · ");
 }
 
-/** The second line without its status word: summary, author and time. */
+/** The second line without its status and flag words: summary, author and time. A row that is
+ * "Undone by <author>" leaves the author out when it is the step's own, and a row with such a
+ * word or with "from <id>" puts the summary last, so a line that does not fit loses the summary
+ * and keeps the author and the time (`0041` UX review). */
 export function secondLineRest(row: HistoryRowData, now: Date): string {
-  return [row.summary, authorWord(row), formatRowTime(row.time, now)]
-    .filter((part) => part !== "")
-    .join(" · ");
+  const summary = rowDisplay(row).summary;
+  const author =
+    row.status === "undone-by" && row.undoneBy === row.author ? "" : authorWord(row);
+  const time = formatRowTime(row.time, now);
+  const parts =
+    row.status === "undone-by" || row.from
+      ? [author, time, summary]
+      : [summary, author, time];
+  return parts.filter((part) => part !== "").join(" · ");
+}
+
+/** What a row shows as its name and summary. The wipe of one object's history is titled "Wipe
+ * history" with the object on line 2, so the id is not the part an ellipsis cuts. */
+export function rowDisplay(row: HistoryRowData): { name: string; summary: string } {
+  const wiped = /^Wipe history of (.+)$/.exec(row.name);
+  if (row.label === "wipe_object_history" && wiped) {
+    return { name: "Wipe history", summary: (wiped[1] ?? "").replace(", ", " ") };
+  }
+  return { name: row.name, summary: row.summary };
 }
 
 /** The tooltip: "Move, 3 paths. You, 9 Oct 2026 12:03:41. Id a1b2c3d.", plus the raw label of an
  * unknown old label. */
 export function rowTooltip(row: HistoryRowData): string {
   const head = row.summary === "" ? row.name : `${row.name}, ${row.summary}`;
-  const text = `${head}. ${authorLong(row)}, ${formatFullTime(row.time)}. Id ${row.id}.`;
+  const status = row.status === "applied" ? "" : ` ${statusWord(row)}.`;
+  const text = `${head}.${status} ${authorLong(row)}, ${formatFullTime(row.time)}. Id ${row.id}.`;
   const sources =
     row.sources && row.sources.length > 0 ? ` Sources: ${row.sources.join(", ")}.` : "";
   const lineage = row.from ? ` Taken over from ${row.from}.` : "";
@@ -319,4 +339,28 @@ export function effectiveScope(selectionCount: number, choice: HistoryScope): Hi
  * Object for the next time. */
 export function choiceAfterSelection(selectionCount: number, choice: HistoryScope): HistoryScope {
   return selectionCount === 1 ? choice : "object";
+}
+
+/** What an open wipe confirm belongs to: a change of selection, of the object the Object scope is
+ * about, of the number of rows or of the scope closes it without writing (`0041` criterion 29).
+ * Two objects with the same number of steps must still differ, so the object is part of it. */
+export function wipeConfirmKey(state: {
+  selectionCount: number;
+  subjectKey: string;
+  total: number;
+  scope: HistoryScope;
+}): string {
+  return `${state.scope}|${state.selectionCount}|${state.subjectKey}|${state.total}`;
+}
+
+/** Whether a kept scroll position can be put back now: one is waiting, the list has rows, and
+ * they are the rows of the wanted scope and object (not those of the scope just left, whose
+ * shorter list would clamp the position to the top). */
+export function canRestoreScroll(state: {
+  pending: number | null;
+  total: number;
+  loadedFor: string;
+  wanted: string;
+}): boolean {
+  return state.pending !== null && state.total > 0 && state.loadedFor === state.wanted;
 }

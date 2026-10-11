@@ -244,6 +244,9 @@ export function useHistory(
           void runBusy(direction);
           return true;
         }
+        case "hint-object-tool":
+          showNotice(getSession()?.object_tool_notice() ?? "", FINISH_PEN_NOTICE_MS);
+          return true;
         case "hint-finish-pen":
           showNotice(getSession()?.finish_pen_first_notice() ?? "", FINISH_PEN_NOTICE_MS);
           return true;

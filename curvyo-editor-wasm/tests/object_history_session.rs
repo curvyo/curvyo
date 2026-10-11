@@ -189,7 +189,14 @@ fn the_keys_are_gated_like_undo_and_act_in_the_select_and_node_tools_only() {
 
     // A tool that is neither Select nor Node.
     session.set_tool(Tool::Rectangle);
-    assert_eq!(object_key(&mut session, false), KeyOutcome::Ignored);
+    assert_eq!(
+        object_key(&mut session, false),
+        KeyOutcome::Hint(KeyHint::ObjectTool)
+    );
+    assert_eq!(
+        session.object_undo().notice,
+        "Object undo needs the Select or Node tool."
+    );
 
     // The Node tool acts.
     session.set_tool(Tool::Node);
@@ -200,7 +207,10 @@ fn the_keys_are_gated_like_undo_and_act_in_the_select_and_node_tools_only() {
     session.set_tool(Tool::Pen);
     session.pointer_down(pt(100.0, 100.0), false);
     session.pointer_up(pt(100.0, 100.0), false, false);
-    assert_eq!(object_key(&mut session, false), KeyOutcome::Ignored);
+    assert_eq!(
+        object_key(&mut session, false),
+        KeyOutcome::Hint(KeyHint::FinishPenFirst)
+    );
     session.set_tool(Tool::Select);
 }
 
@@ -395,4 +405,31 @@ fn ctrl_u_on_a_copy_never_takes_back_the_duplicate_and_passes_over_the_originals
     assert_eq!(session.selected_object_count(), 1, "the copy stays");
     // Ctrl+Z takes back the Duplicate.
     assert!(undo(&mut session).starts_with("Undid: Duplicate"));
+}
+
+#[test]
+fn a_copy_with_nothing_to_take_back_explains_it_whatever_the_original_did() {
+    use curvyo_ui_core::{EntryOutcome, MoveEntryMode};
+    let mut session = fresh();
+    draw_square(&mut session, 10.0);
+    assert_eq!(
+        session.key_down(KeyInput {
+            key: "m",
+            ..KeyInput::default()
+        }),
+        KeyOutcome::EntryOpened
+    );
+    let outcome = session.commit_move_entry(
+        "40",
+        "0",
+        MoveEntryMode {
+            absolute: false,
+            copy: true,
+        },
+    );
+    assert_eq!(outcome, EntryOutcome::Committed);
+    assert_eq!(
+        object_undo(&mut session),
+        "Nothing to undo for this object: its earlier steps only moved or reshaped the original."
+    );
 }

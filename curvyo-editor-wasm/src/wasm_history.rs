@@ -172,6 +172,12 @@ impl WasmSession {
         curvyo_ui_core::FINISH_PEN_FIRST.to_owned()
     }
 
+    /// The hint shown for Ctrl+U and Ctrl+Shift+U with a tool that is neither Select nor Node.
+    #[must_use]
+    pub fn object_tool_notice(&self) -> String {
+        curvyo_ui_core::OBJECT_TOOL_NOTICE.to_owned()
+    }
+
     /// Whether the Pen holds an unfinished path, which makes a wipe refuse.
     #[must_use]
     pub fn history_wipe_blocked(&self) -> bool {

@@ -167,6 +167,18 @@ impl Document {
         }
     }
 
+    /// Whether the object has rows it took over from the object it was copied from.
+    #[must_use]
+    pub fn object_inherits(&self, id: NodeId) -> bool {
+        self.with_reader(|reader, _| {
+            reader
+                .timeline(tree_id(id))
+                .entries
+                .iter()
+                .any(|entry| entry.from.is_some())
+        })
+    }
+
     /// The steps an object undo of `object` may take back, newest first.
     pub(super) fn undo_candidates_of(&self, object: TreeID) -> Vec<Entry> {
         self.with_reader(|reader, _| reader.timeline(object).undo_candidates(reader.steps))

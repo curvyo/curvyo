@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   type HistoryRowData,
+  canRestoreScroll,
   choiceAfterSelection,
   effectiveScope,
   leadWords,
@@ -10,9 +11,11 @@ import {
   objectWipeQuestion,
   objectWipedNotice,
   parseObjectInfo,
+  rowDisplay,
   rowTooltip,
   secondLine,
   statusWord,
+  wipeConfirmKey,
 } from "../src/lib/historyRows.ts";
 import {
   historyKeyDirection,
@@ -65,7 +68,7 @@ test("a step taken back by an object undo says by whom", () => {
   assert.equal(statusWord(row({ status: "undone" })), "Undone");
   assert.equal(
     secondLine(row({ status: "undone-by", undoneBy: "you", summary: "with 2 other objects" }), today),
-    "Undone by You · with 2 other objects · You · 12:03",
+    "Undone by You · 12:03 · with 2 other objects",
   );
 });
 
@@ -124,4 +127,40 @@ test("the notices of the object keys stay 3 s up to 70 characters and 5 s above"
     "Undid: Draw rectangle. The object is gone. Ctrl+Z brings it back. Skipped 2 steps that only moved or reshaped the original.";
   assert.equal(noticeDurationMs(passed), 5000);
   assert.equal(noticeDurationMs("Nothing to undo for this object."), 3000);
+});
+
+test("an open wipe confirm closes when the selection moves to another object with as many steps", () => {
+  const first = { selectionCount: 1, subjectKey: "copy-a", total: 3, scope: "object" } as const;
+  const second = { ...first, subjectKey: "copy-b" };
+  assert.notEqual(wipeConfirmKey(first), wipeConfirmKey(second));
+  assert.notEqual(wipeConfirmKey(first), wipeConfirmKey({ ...first, total: 4 }));
+  assert.notEqual(wipeConfirmKey(first), wipeConfirmKey({ ...first, scope: "document" }));
+  assert.notEqual(wipeConfirmKey(first), wipeConfirmKey({ ...first, selectionCount: 2 }));
+  assert.equal(wipeConfirmKey(first), wipeConfirmKey({ ...first }));
+});
+
+test("the wipe of one object is titled without its object so the id is not cut", () => {
+  const wipe = row({
+    label: "wipe_object_history",
+    name: "Wipe history of Rectangle, 8qdzay",
+    summary: "",
+  });
+  assert.deepEqual(rowDisplay(wipe), { name: "Wipe history", summary: "Rectangle 8qdzay" });
+  assert.equal(secondLine(wipe, today), "Rectangle 8qdzay · You · 12:03");
+  assert.deepEqual(rowDisplay(row()), { name: "Move", summary: "" });
+});
+
+test("a row taken back by its own author's object undo says it once and keeps author and time", () => {
+  const taken = row({ status: "undone-by", undoneBy: "you", summary: "with 2 other objects" });
+  assert.equal(secondLine(taken, today), "Undone by You · 12:03 · with 2 other objects");
+  assert.match(rowTooltip(taken), /Undone by You\./);
+});
+
+test("a kept scroll position waits for the rows of the wanted scope", () => {
+  const base = { pending: 500, total: 26, loadedFor: "object:k", wanted: "document:k" };
+  // The list still holds the scope just left: restoring now would clamp to the top.
+  assert.equal(canRestoreScroll(base), false);
+  assert.equal(canRestoreScroll({ ...base, loadedFor: "document:k" }), true);
+  assert.equal(canRestoreScroll({ ...base, loadedFor: "document:k", total: 0 }), false);
+  assert.equal(canRestoreScroll({ ...base, loadedFor: "document:k", pending: null }), false);
 });

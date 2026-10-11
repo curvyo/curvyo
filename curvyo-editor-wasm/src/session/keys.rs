@@ -48,6 +48,9 @@ pub enum KeyHint {
     /// Undo or redo while the Pen holds an unfinished path: "Finish the path (Enter) or cancel it
     /// (Esc) first." (`specs/0020-undo-redo` criterion 6e).
     FinishPenFirst,
+    /// Ctrl+U or Ctrl+Shift+U with a tool other than Select and Node: "Object undo needs the
+    /// Select or Node tool." (`specs/0041-object-history` criterion 5).
+    ObjectTool,
     /// An arrow key would move the selection beyond the document's coordinate
     /// limit: "Too far from the document. Nothing was changed."
     TooFar,
@@ -119,6 +122,7 @@ impl KeyOutcome {
             Self::Hint(KeyHint::SelectFirst) => "hint-select-first",
             Self::Hint(KeyHint::PathOnly) => "hint-path-only",
             Self::Hint(KeyHint::FinishPenFirst) => "hint-finish-pen",
+            Self::Hint(KeyHint::ObjectTool) => "hint-object-tool",
             Self::Undo => "undo",
             Self::Redo => "redo",
             Self::ObjectUndo => "object-undo",

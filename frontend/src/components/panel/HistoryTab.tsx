@@ -30,10 +30,13 @@ import {
   wipeQuestion,
   nextFocus,
   rowAriaName,
+  rowDisplay,
   rowTooltip,
   scrollAfterInsert,
   secondLineRest,
   visibleRange,
+  canRestoreScroll,
+  wipeConfirmKey,
 } from "@/lib/historyRows";
 
 type Glyph = ComponentType<{ size: number; strokeWidth: number; "aria-hidden": boolean }>;
@@ -137,17 +140,28 @@ export function HistoryTab({ editor, shown, onReturnFocus, historyScope }: Histo
 
   // The scroll position of each scope is kept: it is saved as the list scrolls and put back once
   // the other scope's rows have arrived (`0041` criterion 1).
+  const wanted = `${scope}:${info?.key ?? ""}`;
   const restore = useRef<number | null>(null);
   useLayoutEffect(() => {
     restore.current = scrollMemory.get(scope);
   }, [scope, scrollMemory]);
+  // The position is put back only once the rows of the wanted scope are in the list: before that
+  // the list is short and the browser would clamp it to the top.
   useLayoutEffect(() => {
     const element = scroller.current;
-    if (restore.current !== null && element && list.total > 0) {
-      element.scrollTop = restore.current;
+    if (
+      element &&
+      canRestoreScroll({
+        pending: restore.current,
+        total: list.total,
+        loadedFor: list.loadedFor,
+        wanted,
+      })
+    ) {
+      element.scrollTop = restore.current ?? 0;
       restore.current = null;
     }
-  }, [scope, list.total]);
+  }, [wanted, list.total, list.loadedFor]);
 
   const range = visibleRange(scrollTop, viewport, list.total);
   const { ensure } = list;
@@ -275,7 +289,7 @@ export function HistoryTab({ editor, shown, onReturnFocus, historyScope }: Histo
           </svg>
           Now
         </span>
-        <span className="select-text font-mono text-xs text-[var(--panel-muted-fg)]">{list.nowId}</span>
+        <span className="select-text font-mono text-xs text-[var(--toolbar-icon)]">{list.nowId}</span>
       </div>
       {list.total === 0 && scope === "object" ? (
         <div className="px-2 pt-4 text-center outline-none" data-first-focus tabIndex={-1}>
@@ -301,7 +315,7 @@ export function HistoryTab({ editor, shown, onReturnFocus, historyScope }: Histo
         }}
         onScroll={(event) => {
           setScrollTop(event.currentTarget.scrollTop);
-          if (restore.current === null) {
+          if (restore.current === null && list.loadedFor === wanted) {
             scrollMemory.set(scope, event.currentTarget.scrollTop);
           }
         }}
@@ -318,6 +332,7 @@ export function HistoryTab({ editor, shown, onReturnFocus, historyScope }: Histo
       <WipeFooter
         editor={editor}
         scope={scope}
+        subjectKey={info?.key ?? ""}
         total={scope === "object" ? (info?.wipeCount ?? 0) : list.total}
         onReturnFocus={onReturnFocus}
       />
@@ -365,7 +380,7 @@ function StepRow({ row, index, total, now, tabbable, onFocusRow, onHover }: Step
           <span className="flex min-w-0 flex-1 flex-col justify-center pr-2">
             <span className={`flex h-5 items-center gap-1.5 text-sm ${muted}`}>
               <Glyph size={16} strokeWidth={1.5} aria-hidden />
-              <span className="min-w-0 flex-1 truncate">{row.name}</span>
+              <span className="min-w-0 flex-1 truncate">{rowDisplay(row).name}</span>
               <span className="select-text font-mono text-xs text-[var(--panel-muted-fg)]">
                 {row.id}
               </span>
@@ -420,6 +435,7 @@ function HistoryHeader({
     direction: "undo" | "redo",
     available: boolean,
     tooltip: string,
+    keys: string,
     Icon: Glyph,
   ) => (
     <span className="inline-flex h-7 w-7 items-center justify-center">
@@ -428,6 +444,7 @@ function HistoryHeader({
           <button
             type="button"
             aria-label={tooltip.replace(/ \(.*\)$/, "")}
+            aria-keyshortcuts={keys}
             disabled={historyBusy}
             onClick={(event) => {
               pressHistory(objectScope ? `object-${direction}` : direction, "panel");
@@ -471,8 +488,14 @@ function HistoryHeader({
         ) : null}
       </span>
       <span className="inline-flex">
-        {slot("undo", canUndo, undoTip, Undo2)}
-        {slot("redo", canRedo, redoTip, Redo2)}
+        {slot("undo", canUndo, undoTip, objectScope ? "Control+U" : "Control+Z", Undo2)}
+        {slot(
+          "redo",
+          canRedo,
+          redoTip,
+          objectScope ? "Control+Shift+U" : "Control+Shift+Z",
+          Redo2,
+        )}
       </span>
       {/* The live region exists empty and is filled, so the text is announced. */}
       <p
@@ -507,11 +530,14 @@ function HistoryHeader({
 function WipeFooter({
   editor,
   scope,
+  subjectKey,
   total,
   onReturnFocus,
 }: {
   editor: EditorSession;
   scope: HistoryScope;
+  /** Which object the Object scope is about: another one closes an open confirm. */
+  subjectKey: string;
   /** The rows a wipe would hide. */
   total: number;
   onReturnFocus: () => void;
@@ -543,9 +569,10 @@ function WipeFooter({
   );
 
   // A change of selection, a new step or a tab change (this component leaving) cancels.
+  const wipeKey = wipeConfirmKey({ selectionCount, subjectKey, total, scope });
   useEffect(() => {
     setConfirming(false);
-  }, [selectionCount, total, scope]);
+  }, [wipeKey]);
   useLayoutEffect(() => {
     if (!confirming && confirmHadFocus.current) {
       confirmHadFocus.current = false;
