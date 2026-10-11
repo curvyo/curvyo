@@ -796,7 +796,13 @@ export function useEditorSession(
   const [keyHint, setKeyHint] = useState<KeyHint | null>(null);
   const keyHintCounter = useRef(0);
   const nudgeFeedback = useNudgeFeedback();
-  const { onNudge, onSelectAll, onEscape, onKeyUp: onNudgeKeyUp } = nudgeFeedback;
+  const {
+    onNudge,
+    onSelectAll,
+    onEscape,
+    onHistory: onNudgeHistory,
+    onKeyUp: onNudgeKeyUp,
+  } = nudgeFeedback;
   /** Where the closed entry chip was, for the notice of the commit it makes. */
   const noticeAnchorRef = useRef<{ x: number; y: number } | null>(null);
 
@@ -816,9 +822,11 @@ export function useEditorSession(
   const syncBadges = useCallback((session: WasmSession) => {
     const last = lastPointerRef.current;
     const raw = session.move_indicators();
+    // Ctrl+Z and the like are a key chord, not a Ctrl click in waiting: no plus or minus.
+    const chord = modifierTrackerRef.current.chord;
     const next: MoveBadgeState = {
-      copy: last !== null && raw.copy_badge,
-      remove: last !== null && raw.remove_badge,
+      copy: last !== null && !chord && raw.copy_badge,
+      remove: last !== null && !chord && raw.remove_badge,
       lock: last !== null && (raw.lock === "x" || raw.lock === "y") ? raw.lock : "",
       x: last?.x ?? 0,
       y: last?.y ?? 0,
@@ -878,7 +886,7 @@ export function useEditorSession(
   }, [syncEntry, syncBadges]);
 
   const getSession = useCallback(() => sessionRef.current, []);
-  const history = useHistory(getSession, syncFromSession, containerRef);
+  const history = useHistory(getSession, syncFromSession, containerRef, onNudgeHistory);
   const { refresh: refreshHistory, handleKeyOutcome, isDuplicateKey } = history;
   useEffect(() => {
     refreshHistoryRef.current = refreshHistory;
@@ -1327,6 +1335,7 @@ export function useEditorSession(
       // The notice of a stretch goes at the next press or key (criterion 54).
       setKeyHint((hint) => (hint?.ms === undefined ? hint : null));
       syncTrackedModifiers(event);
+      modifierTrackerRef.current.pointerPressed();
       // A press on the canvas takes the focus from a field of the panel, and a
       // field that commits when it is left (the Document size) must do so
       // before the tool sees the press: a resize moves every object and the

@@ -231,6 +231,8 @@ impl Session {
         self.flush_select_bar_preview();
         self.flush_style_preview();
         self.sync_history();
+        // An undone or redone nudge step is over: its readout and announcement would be stale.
+        self.nudge_run = None;
         let target = match direction {
             Direction::Undo => self.history.stack.undo_target(),
             Direction::Redo => self.history.stack.redo_target(),
