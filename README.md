@@ -41,6 +41,10 @@ What does not exist yet:
 - Machine profiles, cut/engrave roles, material records and test patterns.
 - Job preview and G-code output.
 
+Keyboard shortcuts are added feature by feature. All of them get one overall
+review at the end (customer, 2026-10-11), so a key you see today can still
+change.
+
 The feature list with the status of every spec is at the top of
 [`specs/README.md`](specs/README.md).
 
