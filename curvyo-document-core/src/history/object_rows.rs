@@ -108,6 +108,9 @@ pub struct ObjectTargets {
     pub undo: Option<ObjectTarget>,
     /// The step the last object undo took back.
     pub redo: Option<ObjectTarget>,
+    /// How many steps an object undo could take back, the first one included. An object undo
+    /// passes over steps that write nothing (`ObjectRestore::passed_over`).
+    pub undo_candidates: usize,
 }
 
 pub(super) fn tree_id(id: NodeId) -> TreeID {
@@ -155,7 +158,13 @@ impl Document {
         ObjectTargets {
             undo: targets.undo.and_then(|entry| self.target_of(&entry)),
             redo: targets.redo.and_then(|entry| self.target_of(&entry)),
+            undo_candidates: targets.undo_candidates,
         }
+    }
+
+    /// The steps an object undo of `object` may take back, newest first.
+    pub(super) fn undo_candidates_of(&self, object: TreeID) -> Vec<Entry> {
+        self.with_reader(|reader, _| reader.timeline(object).undo_candidates(reader.steps))
     }
 
     /// The entries an object undo and an object redo of `object` would act on.

@@ -364,3 +364,38 @@ fn a_copy_made_by_the_move_entry_keeps_the_history_of_its_original() {
     assert_eq!(names[1], "Move");
     assert_eq!(names[2], "Draw rectangle");
 }
+
+#[test]
+fn ctrl_u_on_a_copy_never_takes_back_the_duplicate_and_passes_over_the_originals_moves() {
+    use curvyo_ui_core::{EntryOutcome, MoveEntryMode};
+    let mut session = fresh();
+    draw_square(&mut session, 10.0);
+    nudge(&mut session, 1_000.0);
+    assert_eq!(
+        session.key_down(KeyInput {
+            key: "m",
+            ..KeyInput::default()
+        }),
+        KeyOutcome::EntryOpened
+    );
+    let outcome = session.commit_move_entry(
+        "40",
+        "0",
+        MoveEntryMode {
+            absolute: false,
+            copy: true,
+        },
+    );
+    assert_eq!(outcome, EntryOutcome::Committed);
+    // The press may read several versions: the host shows the busy state first.
+    assert_eq!(object_key(&mut session, false), KeyOutcome::ObjectUndoBusy);
+    let notice = session.object_undo().notice;
+    assert_eq!(
+        notice,
+        "Undid: Draw rectangle. The object is gone. Ctrl+Z brings it back. \
+         Skipped 1 step that only moved or reshaped the original."
+    );
+    // Ctrl+Z takes back the object undo, then the Duplicate.
+    assert!(undo(&mut session).starts_with("Undid: Undo Draw rectangle"));
+    assert!(undo(&mut session).starts_with("Undid: Duplicate"));
+}

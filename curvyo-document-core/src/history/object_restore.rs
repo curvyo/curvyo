@@ -37,7 +37,13 @@ pub struct ObjectRestore {
     pub object_gone: bool,
     /// Whether the whole step was restored because it replaced objects (a Boolean, Combine).
     pub whole_step: bool,
+    /// How many newer steps the press passed over because they wrote nothing: steps a copy
+    /// inherited that only moved or reshaped the original.
+    pub passed_over: usize,
 }
+
+/// How many candidates one press tries; each one reads two versions.
+const MAX_PASSED_OVER: usize = 32;
 
 impl Document {
     /// Takes the latest applied step of the object back, for this object only. `Ok(None)` when
@@ -64,7 +70,41 @@ impl Document {
         direction: Direction,
     ) -> Result<Option<ObjectRestore>, HistoryError> {
         let object = tree_id(id);
-        let Some((entry, mark, target)) = self.object_action(object, direction) else {
+        if direction == Direction::Redo {
+            let targets = self.targets_of(object);
+            let Some(entry) = targets.redo else {
+                return Ok(None);
+            };
+            return self.restore_entry(object, entry, direction, targets.redo_mark);
+        }
+        // An inherited step may write nothing (it only moved or reshaped the original, whose
+        // place the copy does not share): such a step is passed over to the next one.
+        let candidates = self.undo_candidates_of(object);
+        let mut first = None;
+        for (passed_over, entry) in candidates.into_iter().take(MAX_PASSED_OVER + 1).enumerate() {
+            let Some(restore) = self.restore_entry(object, entry, direction, None)? else {
+                continue;
+            };
+            if restore.report.wrote || entry.from.is_none() {
+                return Ok(Some(ObjectRestore {
+                    passed_over,
+                    ..restore
+                }));
+            }
+            first.get_or_insert(restore);
+        }
+        Ok(first)
+    }
+
+    /// Takes `entry` back or brings it again, for `object`.
+    fn restore_entry(
+        &self,
+        object: TreeID,
+        entry: Entry,
+        direction: Direction,
+        mark: Option<StepRef>,
+    ) -> Result<Option<ObjectRestore>, HistoryError> {
+        let Some(target) = self.target_of(&entry) else {
             return Ok(None);
         };
         let doc = self.loro();
@@ -84,6 +124,8 @@ impl Document {
                 };
                 self.restore_step(entry.step, direction, mode)?
             }
+            // A copy that is gone has nothing to take back from the original's steps.
+            (Some(_), Direction::Undo, _) if !alive(doc, object) => return Ok(None),
             (Some(source), Direction::Undo, _) => self.undo_inherited(object, source, &log)?,
             (Some(_), Direction::Redo, Some(mark)) => {
                 let named = Named {
@@ -104,23 +146,8 @@ impl Document {
             report,
             object_gone: !alive(doc, object),
             whole_step,
+            passed_over: 0,
         }))
-    }
-
-    /// The step the press acts on, the object undo that took it back (for a redo), and its
-    /// description.
-    fn object_action(
-        &self,
-        object: TreeID,
-        direction: Direction,
-    ) -> Option<(Entry, Option<StepRef>, ObjectTarget)> {
-        let targets = self.targets_of(object);
-        let (entry, mark) = match direction {
-            Direction::Undo => (targets.undo?, None),
-            Direction::Redo => (targets.redo?, targets.redo_mark),
-        };
-        let target = self.target_of(&entry)?;
-        Some((entry, mark, target))
     }
 
     /// Takes back a step the object inherited from `source`: a creation removes the object, a
@@ -200,6 +227,7 @@ impl Document {
         let Ok(meta) = doc.get_tree(OBJECTS_TREE).get_meta(object) else {
             return Ok((0, 0));
         };
+        let now = super::node_value::read_map(&meta);
         let keys: Vec<&String> = before
             .keys()
             .chain(after.keys())
@@ -209,6 +237,12 @@ impl Document {
         let mut seen = std::collections::BTreeSet::new();
         for key in keys {
             if !seen.insert(key) || before.get(key) == after.get(key) {
+                continue;
+            }
+            // Criterion 7: a field the copy holds differently from the original after the step (its
+            // displacement at the copy, a later edit by anyone) keeps its value.
+            if now.get(key) != after.get(key) {
+                kept += 1;
                 continue;
             }
             match plain_value(&before, key) {

@@ -46,6 +46,7 @@ mod node;
 mod nudge;
 mod object_cache;
 mod object_history;
+mod object_history_rows;
 mod open_error;
 mod panel_tabs;
 mod pen;

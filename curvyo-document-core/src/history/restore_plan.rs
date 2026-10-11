@@ -63,6 +63,12 @@ impl Plan {
     }
 }
 
+/// A meta map without the floor register of an object wipe.
+fn without_floor(mut meta: BTreeMap<String, Node>) -> BTreeMap<String, Node> {
+    meta.remove(super::lineage::KEY_HISTORY_FLOOR);
+    meta
+}
+
 pub(super) fn alive(doc: &LoroDoc, id: TreeID) -> bool {
     let tree = doc.get_tree(OBJECTS_TREE);
     tree.contains(id) && matches!(tree.is_node_deleted(&id), Ok(false))
@@ -155,8 +161,13 @@ impl PlanInput<'_> {
         match self.direction {
             Direction::Undo if !now_alive => plan.skip(Role::Created, id, SkipReason::DeletedLater),
             Direction::Undo => {
-                let created = self.after.nodes.get(&id).map(|n| &n.meta);
-                if self.live_meta(id).as_ref() == created {
+                // The floor an object wipe wrote is not a change of the object's look.
+                let created = self
+                    .after
+                    .nodes
+                    .get(&id)
+                    .map(|n| without_floor(n.meta.clone()));
+                if self.live_meta(id).map(without_floor) == created {
                     plan.push(Role::Created, Action::Delete(id));
                 } else {
                     plan.skip(Role::Created, id, SkipReason::ChangedLater);

@@ -64,17 +64,17 @@ decisions 1, 2 and 6 and the risks changed.
    exist, and an O(1) read for the timeline.
 8. **Boolean, Combine, Break apart, Offset results** are fresh nodes without `clone_of` (20, 28,
    Q2 A). Their first row names the sources from the step's touched objects.
-9. **Version encoding** for both keys: sorted `peer:counter` pairs joined by `,`, parsed leniently:
-   an unreadable value means "no floor" or "no origin", never a refused file.
+9. **Version encoding** for both keys (*amended 2026-10-11*, build note 1): a version is the sorted
+   `peer@counter` pairs joined by `,`, the encoding `history_wiped` already uses
+   (`encode_frontiers`); a node id is `peer:counter`; `clone_of = <peer>:<counter>@<version>`,
+   split at the first `@`. Parsed leniently: an unreadable value means "no floor" or "no origin",
+   never a refused file. The grammar is in ADR 0014 §7.
 
 ## Build notes (2026-10-11, the slice as built)
 
 Dated notes, no new ADR. The decisions above hold; these are the places the build chose a detail.
 
-1. **Version encoding.** Decision 9 said `peer:counter` pairs. The merged wipe of `0020` already
-   writes `history_wiped` as sorted `peer@counter` pairs (`encode_frontiers`), so the floor and the
-   version inside `clone_of` use that encoding; a node id inside `clone_of` is `peer:counter`:
-   `clone_of = "<peer>:<counter>@<peer>@<counter>,..."`. The first `@` splits origin and version.
+1. **Version encoding.** Moved into decision 9 and ADR 0014 §7 (architect review, 2026-10-11).
 2. **The floor is read from the wipe step.** The wipe step writes `history_floor` (its one
    operation) and the timeline takes the floor from the start version of the object's latest wipe
    step, which is the same value. This lets a clone made before a wipe keep the floor as it was at
@@ -133,3 +133,14 @@ Q5) is checked by hand in milestone 2.
   grandparent's lineage. Never a wrong drawing (ADR 0014 consequences).
 - Restore with the same `NodeId` (criterion 12) depends on the injected tree move of ADR 0014 §11
   and its canary; with Q7 B it is a move out of the trash node instead.
+
+9. **Object undo of an inherited step (review, 2026-10-11).** It follows the three-way rule of
+   criterion 7: a register is written only where the copy still holds the value the original had
+   after the step. A copy is displaced, so steps that only moved or reshaped the original (a frame
+   register holds origin and size together; a path's anchors are nested) write nothing and are
+   passed over, at most 32 per press, to the next older step. The press reports how many it passed
+   over; when every candidate was passed over nothing is written and no row appears. Writing anchors
+   into a path copy by position is a follow-up (`docs/technical-debt.md`).
+10. **Floors.** Every wipe step hides what lies in its causal past, so two concurrent wipes hide what
+    either of them hid. The floor register is not a change of the object: it is ignored when Ctrl+Z
+    decides whether a created object was changed since.

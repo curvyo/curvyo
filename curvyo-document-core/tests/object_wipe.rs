@@ -212,3 +212,51 @@ fn a_deleted_object_cannot_be_wiped() {
         Err(HistoryError::NoSuchObject)
     );
 }
+
+#[test]
+fn ctrl_z_of_a_step_that_made_several_objects_also_removes_one_that_was_wiped() {
+    let document = Document::new(1);
+    let a = rect(&document, 0.0);
+    let b = rect(&document, 20.0);
+    let copies = document
+        .duplicate_objects(
+            &[
+                CopySource {
+                    id: a,
+                    anchor_ids: vec![],
+                },
+                CopySource {
+                    id: b,
+                    anchor_ids: vec![],
+                },
+            ],
+            Vec2::new(0.0, 50.0),
+        )
+        .unwrap();
+    document.wipe_object_history(copies[0]).unwrap();
+    let step = document.own_steps()[2].step;
+    let report = document.undo_step(step).unwrap();
+    assert!(
+        !report.created_object_kept(),
+        "the floor is no change of the object"
+    );
+    assert!(document.object(copies[0]).is_none() && document.object(copies[1]).is_none());
+}
+
+#[test]
+fn two_concurrent_wipes_hide_what_either_of_them_hid() {
+    let a = Document::new(1);
+    let id = rect(&a, 0.0);
+    let b = unpack(2, &pack(&a, "test").unwrap()).unwrap();
+    moved(&a, id, 1);
+    moved(&b, id, 1);
+    a.wipe_object_history(id).unwrap();
+    b.wipe_object_history(id).unwrap();
+    let to_a = b.export_updates(&a.version()).unwrap();
+    a.import_updates(&to_a).unwrap();
+    assert_eq!(
+        labels(&a, id),
+        ["wipe_object_history", "wipe_object_history"],
+        "neither peer's earlier steps come back"
+    );
+}

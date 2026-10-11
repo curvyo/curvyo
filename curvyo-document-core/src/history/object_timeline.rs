@@ -74,6 +74,8 @@ pub(crate) struct Timeline {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub(crate) struct Targets {
     pub undo: Option<Entry>,
+    /// How many steps an object undo could take back, the first one included.
+    pub undo_candidates: usize,
     pub redo: Option<Entry>,
     /// The object undo that took the redo target back.
     pub redo_mark: Option<StepRef>,
@@ -146,16 +148,16 @@ impl Reader<'_> {
                 })
             })
             .collect();
-        let floor = entries
+        // Every wipe hides what lies in its causal past: with two concurrent wipes the steps either
+        // of them hid stay hidden after the merge.
+        let floors: Vec<VersionVector> = entries
             .iter()
-            .rev()
-            .find(|entry| entry.class == EntryClass::Floor)
-            .and_then(|entry| self.steps.get(entry.step))
-            .and_then(|log| self.doc.frontiers_to_vv(&log.before));
-        if let Some(floor) = &floor {
-            entries.retain(|entry| !seen_in(floor, entry.step));
-        }
-        (entries, floor.is_some())
+            .filter(|entry| entry.class == EntryClass::Floor)
+            .filter_map(|entry| self.steps.get(entry.step))
+            .filter_map(|log| self.doc.frontiers_to_vv(&log.before))
+            .collect();
+        entries.retain(|entry| !floors.iter().any(|floor| seen_in(floor, entry.step)));
+        (entries, !floors.is_empty())
     }
 
     /// What a step is in the timeline of `id`; `None` for a step that is no row of it.
@@ -223,21 +225,33 @@ impl Timeline {
         }
     }
 
-    /// The steps an object undo and an object redo would act on now.
-    pub(crate) fn targets(&self, steps: &StepIndex) -> Targets {
-        let find = |step: StepRef| self.entries.iter().rev().find(|e| e.step == step).copied();
-        let applied = |step: &StepRef| steps.status(*step) == Status::Applied;
-        let undo = self
-            .machine
+    /// The steps an object undo may take back, newest first: the applied steps on the stack,
+    /// without the creation step of a copy that has inherited rows to go back into.
+    pub(crate) fn undo_candidates(&self, steps: &StepIndex) -> Vec<Entry> {
+        self.machine
             .undo_stack()
             .iter()
             .rev()
-            .find(|step| applied(step) && Some(**step) != self.creation_skipped)
-            .and_then(|step| find(*step));
-        let redo = self.machine.top_redo().filter(applied).and_then(find);
+            .filter(|step| {
+                steps.status(**step) == Status::Applied && Some(**step) != self.creation_skipped
+            })
+            .filter_map(|step| self.entries.iter().rev().find(|e| e.step == *step).copied())
+            .collect()
+    }
+
+    /// The steps an object undo and an object redo would act on now.
+    pub(crate) fn targets(&self, steps: &StepIndex) -> Targets {
+        let applied = |step: &StepRef| steps.status(*step) == Status::Applied;
+        let candidates = self.undo_candidates(steps);
+        let redo = self
+            .machine
+            .top_redo()
+            .filter(applied)
+            .and_then(|step| self.entries.iter().rev().find(|e| e.step == step).copied());
         let redo_mark = redo.and_then(|entry| self.undone_by.get(&entry.step).copied());
         Targets {
-            undo,
+            undo: candidates.first().copied(),
+            undo_candidates: candidates.len(),
             redo,
             redo_mark,
         }

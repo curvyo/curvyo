@@ -76,8 +76,26 @@ pub const fn object_nothing_notice(direction: Direction) -> &'static str {
 /// "Undid: Draw rectangle. The object is gone. Ctrl+Z brings it back.".
 #[must_use]
 pub fn object_restore_notice(restore: &ObjectRestore) -> String {
+    let text = object_restore_text(restore);
+    match restore.passed_over {
+        0 => text,
+        1 if restore.report.wrote => {
+            format!("{text} Skipped 1 step that only moved or reshaped the original.")
+        }
+        n if restore.report.wrote => {
+            format!("{text} Skipped {n} steps that only moved or reshaped the original.")
+        }
+        _ => text,
+    }
+}
+
+fn object_restore_text(restore: &ObjectRestore) -> String {
     let name = operation_name(&restore.target.label);
     let report = &restore.report;
+    if !report.wrote && restore.target.inherited_from.is_some() {
+        return "Nothing to undo for this object: its earlier steps only moved or reshaped the original."
+            .to_owned();
+    }
     if !report.wrote {
         return restore_notice(name, report, None, false);
     }
@@ -297,6 +315,7 @@ mod tests {
             },
             object_gone: gone,
             whole_step: whole,
+            passed_over: 0,
         }
     }
 
@@ -380,6 +399,20 @@ mod tests {
         assert_eq!(
             object_restore_notice(&gone),
             "Undid: Draw rectangle. The object is gone. Ctrl+Z brings it back."
+        );
+        let mut passed = gone.clone();
+        passed.passed_over = 2;
+        passed.object_gone = false;
+        assert_eq!(
+            object_restore_notice(&passed),
+            "Undid: Draw rectangle. Skipped 2 steps that only moved or reshaped the original."
+        );
+        let mut inherited = plain.clone();
+        inherited.report.wrote = false;
+        inherited.target.inherited_from = Some(plain.report.objects[0].id);
+        assert_eq!(
+            object_restore_notice(&inherited),
+            "Nothing to undo for this object: its earlier steps only moved or reshaped the original."
         );
         assert_eq!(
             object_nothing_notice(Direction::Undo),

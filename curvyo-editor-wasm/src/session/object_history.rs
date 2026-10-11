@@ -1,17 +1,11 @@
 //! `Session`'s object history (`specs/0041-object-history`): Ctrl+U and Ctrl+Shift+U for the one
-//! selected object, the rows and the subject of the Object scope of the History tab, and the wipe
-//! of one object's history.
+//! selected object, and the wipe of one object's history.
 
-use curvyo_document_core::{
-    Author, Direction, HistoryError, NodeId, ObjectRow, ObjectRowClass, ObjectStatus, ObjectTarget,
-    Role, StepKind,
-};
+use curvyo_document_core::{Direction, HistoryError, NodeId, ObjectTarget};
 use curvyo_ui_core::{
-    FINISH_PEN_FIRST, SELECT_ONE_OBJECT, SelectionSnapshot, known_operation_name, object_kind_name,
-    object_nothing_notice, object_restore_notice, object_row_name, object_row_summary,
-    operation_name,
+    FINISH_PEN_FIRST, SELECT_ONE_OBJECT, SelectionSnapshot, object_nothing_notice,
+    object_restore_notice, operation_name,
 };
-use serde_json::{Value, json};
 
 use super::history::HistoryResult;
 use super::keys::{KeyAction, KeyHint, KeyInput, KeyOutcome, KeyState};
@@ -26,13 +20,6 @@ pub enum ObjectWipeOutcome {
     Failed,
     /// The history of the object was hidden; the number is the rows hidden.
     Wiped(usize),
-}
-
-fn author_word(author: Author) -> &'static str {
-    match author {
-        Author::You => "you",
-        Author::Earlier => "earlier",
-    }
 }
 
 fn nothing(notice: &str) -> HistoryResult {
@@ -81,10 +68,21 @@ impl Session {
         if !self.document.history_is_warm() || !self.document.object_history_is_cheap() {
             return true;
         }
-        self.object_target(direction).is_some_and(|target| {
-            self.document
-                .step_op_count(target.step)
-                .is_some_and(|ops| ops > curvyo_document_core::SMALL_STEP_OPS)
+        let Some(id) = self.history_object() else {
+            return false;
+        };
+        let targets = self.document.object_history_targets(id);
+        let (target, passes) = match direction {
+            Direction::Undo => (targets.undo, targets.undo_candidates > 1),
+            Direction::Redo => (targets.redo, false),
+        };
+        target.is_some_and(|target| {
+            // A press that may pass over inherited steps reads two versions for each.
+            (passes && target.inherited_from.is_some())
+                || self
+                    .document
+                    .step_op_count(target.step)
+                    .is_some_and(|ops| ops > curvyo_document_core::SMALL_STEP_OPS)
                 || self
                     .document
                     .step_distance(target.step)
@@ -202,118 +200,6 @@ impl Session {
             Err(_) => ObjectWipeOutcome::Failed,
         }
     }
-
-    /// The subject of the Object scope as one JSON object: the kind and ids of the selected object,
-    /// the steps its buttons would act on, and what a wipe would hide. Empty for none or several
-    /// selected objects.
-    pub fn object_history_info_json(&mut self) -> String {
-        self.sync_history();
-        let Some(id) = self.history_object() else {
-            return String::new();
-        };
-        let Some(object) = self.document.object(id) else {
-            return String::new();
-        };
-        let targets = self.document.object_history_targets(id);
-        let target = |target: Option<ObjectTarget>| -> Value {
-            target.map_or(Value::Null, |target| {
-                json!({
-                    "id": target.shown_id,
-                    "name": operation_name(&target.label),
-                    "author": author_word(target.author),
-                    "time": target.time.as_secs(),
-                })
-            })
-        };
-        json!({
-            "key": id.full_id(),
-            "kind": object_kind_name(&object),
-            "id": id.short_id(),
-            "fullId": id.full_id(),
-            "undo": target(targets.undo),
-            "redo": target(targets.redo),
-            "wipeCount": self.document.object_wipe_count(id),
-            "total": self.document.object_history_len(id),
-        })
-        .to_string()
-    }
-
-    /// The number of rows in the Object scope for the selected object.
-    pub fn object_history_len(&mut self) -> usize {
-        self.sync_history();
-        self.history_object()
-            .map_or(0, |id| self.document.object_history_len(id))
-    }
-
-    /// `count` rows of the selected object's timeline from the `start`-th newest, as a JSON array.
-    pub fn object_history_rows_json(&mut self, start: usize, count: usize) -> String {
-        self.sync_history();
-        let Some(id) = self.history_object() else {
-            return "[]".to_owned();
-        };
-        let rows: Vec<Value> = self
-            .document
-            .object_history_page(id, start, count)
-            .iter()
-            .map(object_row_json)
-            .collect();
-        Value::Array(rows).to_string()
-    }
-}
-
-fn kind_word(kind: StepKind) -> &'static str {
-    match kind {
-        StepKind::Create => "create",
-        StepKind::Delete => "delete",
-        StepKind::Replace => "replace",
-        StepKind::Change => "change",
-        StepKind::Document => "document",
-    }
-}
-
-fn role_word(role: Role) -> &'static str {
-    match role {
-        Role::Created => "created",
-        Role::Deleted => "deleted",
-        Role::Changed => "changed",
-        Role::Moved => "moved",
-    }
-}
-
-fn object_row_json(row: &ObjectRow) -> Value {
-    let (class, reverts) = match &row.class {
-        ObjectRowClass::Step => ("step", Value::Null),
-        ObjectRowClass::Reverts { shown_id, redo, .. } => (
-            if *redo { "redoes" } else { "undoes" },
-            Value::String(shown_id.clone()),
-        ),
-        ObjectRowClass::CloneStart { source } => ("clone-start", Value::String(source.short_id())),
-        ObjectRowClass::Floor => ("floor", Value::Null),
-    };
-    let (status, undone_by) = match row.status {
-        ObjectStatus::Applied => ("applied", ""),
-        ObjectStatus::Undone => ("undone", ""),
-        ObjectStatus::UndoneBy(author) => ("undone-by", author_word(author)),
-    };
-    json!({
-        "id": row.shown_id,
-        "step": format!("{}@{}", row.step.peer(), row.step.counter()),
-        "label": row.label,
-        "name": object_row_name(row),
-        "known": known_operation_name(&row.label).is_some() || !matches!(row.class, ObjectRowClass::Step),
-        "author": author_word(row.author),
-        "time": row.time.as_secs(),
-        "class": class,
-        "target": reverts,
-        "kind": kind_word(row.kind),
-        "role": role_word(row.role),
-        "summary": object_row_summary(row),
-        "status": status,
-        "undoneBy": undone_by,
-        "from": row.inherited_from.map(NodeId::short_id).unwrap_or_default(),
-        "sources": row.sources.iter().map(|id| id.full_id()).collect::<Vec<_>>(),
-        "objects": [],
-    })
 }
 
 /// Which object-history key this is: Ctrl (Cmd) with the typed character u, Shift+U for the redo

@@ -167,32 +167,40 @@ fn the_lineage_survives_save_and_open() {
 
 #[test]
 fn an_object_undo_on_a_clone_goes_back_into_the_inherited_rows_and_spares_the_original() {
-    let (document, original, clone) = drawn_resized_and_duplicated();
+    use curvyo_document_core::{Length, StyleEdit};
+    let document = Document::new(1);
+    let original = document.create_rect(bounds(0.0, 10.0));
+    document
+        .set_rect_bounds(original, bounds(0.0, 30.0))
+        .unwrap();
+    document
+        .edit_style(&[original], &StyleEdit::StrokeWidth(Length::from_mm(2.0)))
+        .unwrap();
+    let clone = duplicate(&document, original, Vec2::new(50.0, 0.0));
     document
         .translate_objects(&[clone], Vec2::new(0.0, 4.0))
         .unwrap();
     let original_before = document.object(original).unwrap();
+    let stroke = |id: NodeId| {
+        serde_json::to_value(document.object(id).unwrap()).unwrap()["Primitive"]["style"]["stroke"]
+            ["width"]
+            .as_f64()
+            .unwrap()
+    };
+    assert!((stroke(clone) - 2.0).abs() < 1e-9);
 
     // First the clone's own move.
     let done = document.undo_object_step(clone).unwrap().unwrap();
     assert_eq!(done.target.label, "translate_objects");
     assert_eq!(done.target.inherited_from, None);
+    assert_eq!(done.passed_over, 0);
 
-    // Then the resize it inherited: the clone is as wide as before the resize, at its own place.
+    // Then the colour it inherited: the stroke is thin again, the clone stays where it is.
     let done = document.undo_object_step(clone).unwrap().unwrap();
-    assert_eq!(done.target.label, "set_rect_bounds");
+    assert_eq!(done.target.label, "edit_style");
     assert_eq!(done.target.inherited_from, Some(original));
     assert!(done.report.wrote);
-    let clone_now = serde_json::to_value(document.object(clone).unwrap()).unwrap();
-    let width = |value: &serde_json::Value| {
-        value["Primitive"]["shape"]["Rect"]["bounds"]["width"]
-            .as_f64()
-            .unwrap()
-    };
-    assert!(
-        (width(&clone_now) - 10.0).abs() < 1e-9,
-        "as wide as before the resize"
-    );
+    assert!((stroke(clone) - 0.25).abs() < 1e-9);
     assert_eq!(
         document.object(original).unwrap(),
         original_before,
@@ -200,28 +208,26 @@ fn an_object_undo_on_a_clone_goes_back_into_the_inherited_rows_and_spares_the_or
     );
     assert_eq!(
         labels(&document, original),
-        ["set_rect_bounds", "create_rect"],
+        ["edit_style", "set_rect_bounds", "create_rect"],
         "no step of the clone landed in the original's history"
     );
-
-    // The rows say so: the inherited resize is undone by this object undo.
     let list = rows(&document, clone);
-    let resize = list.iter().find(|r| r.label == "set_rect_bounds").unwrap();
-    assert!(matches!(resize.status, ObjectStatus::UndoneBy(_)));
+    let style = list.iter().find(|r| r.label == "edit_style").unwrap();
+    assert!(matches!(style.status, ObjectStatus::UndoneBy(_)));
 
     // Redo brings it back.
     let redo = document.redo_object_step(clone).unwrap().unwrap();
-    assert_eq!(redo.target.label, "set_rect_bounds");
-    let clone_after = serde_json::to_value(document.object(clone).unwrap()).unwrap();
-    assert!((width(&clone_after) - 30.0).abs() < 1e-9, "wide again");
+    assert_eq!(redo.target.label, "edit_style");
+    assert!((stroke(clone) - 2.0).abs() < 1e-9);
 }
 
 #[test]
 fn going_back_through_all_inherited_rows_removes_the_clone_and_redo_brings_it_back() {
     let (document, original, clone) = drawn_resized_and_duplicated();
-    document.undo_object_step(clone).unwrap().unwrap(); // the inherited resize
-    let done = document.undo_object_step(clone).unwrap().unwrap(); // the original's drawing
+    // The inherited resize only reshaped the original: passed over, the drawing removes the copy.
+    let done = document.undo_object_step(clone).unwrap().unwrap();
     assert_eq!(done.target.label, "create_rect");
+    assert_eq!(done.passed_over, 1);
     assert!(done.object_gone);
     assert!(document.object(clone).is_none());
     assert!(document.object(original).is_some());
@@ -229,4 +235,109 @@ fn going_back_through_all_inherited_rows_removes_the_clone_and_redo_brings_it_ba
     let redo = document.redo_object_step(clone).unwrap().unwrap();
     assert_eq!(redo.target.label, "create_rect");
     assert!(document.object(clone).is_some(), "with its id");
+}
+
+#[test]
+fn a_copy_of_a_moved_original_keeps_its_place_and_the_press_goes_on_to_the_drawing() {
+    let document = Document::new(1);
+    let original = document.create_rect(bounds(0.0, 10.0));
+    document
+        .translate_objects(&[original], Vec2::new(5.0, 0.0))
+        .unwrap();
+    let clone = duplicate(&document, original, Vec2::new(50.0, 0.0));
+    let at = serde_json::to_value(document.object(clone).unwrap()).unwrap();
+    let done = document.undo_object_step(clone).unwrap().unwrap();
+    // The inherited move wrote nothing: the copy's displacement is its own. The press went on.
+    assert_eq!(done.passed_over, 1);
+    assert_eq!(done.target.label, "create_rect");
+    assert!(done.object_gone);
+    assert!(at["Primitive"].is_object());
+    assert!(document.object(original).is_some());
+}
+
+/// A path that was drawn, recoloured and had a node moved, and its copy.
+fn path_with_a_style_and_a_node_edit() -> (Document, NodeId, NodeId) {
+    use curvyo_document_core::{AnchorId, Color, NewAnchor, StyleEdit};
+    let document = Document::new(1);
+    let anchors = [(0.0, 0.0), (10.0, 0.0), (10.0, 10.0)]
+        .iter()
+        .enumerate()
+        .map(|(n, (x, y))| NewAnchor::corner(AnchorId::new(1, n as u64 + 1), Point::new(*x, *y)))
+        .collect::<Vec<_>>();
+    let path = document.create_path(&anchors, true);
+    document
+        .edit_style(
+            &[path],
+            &StyleEdit::StrokeColor(Color { r: 200, g: 0, b: 0 }),
+        )
+        .unwrap();
+    document
+        .move_anchors(&[(path, AnchorId::new(1, 2), Point::new(12.0, 1.0))])
+        .unwrap();
+    let copy = document
+        .duplicate_objects(
+            &[CopySource {
+                id: path,
+                anchor_ids: vec![
+                    AnchorId::new(2, 1),
+                    AnchorId::new(2, 2),
+                    AnchorId::new(2, 3),
+                ],
+            }],
+            Vec2::new(30.0, 0.0),
+        )
+        .unwrap()[0];
+    (document, path, copy)
+}
+
+#[test]
+fn a_path_copy_passes_over_the_node_edit_and_takes_back_the_colour() {
+    let (document, path, copy) = path_with_a_style_and_a_node_edit();
+    let done = document.undo_object_step(copy).unwrap().unwrap();
+    assert_eq!(done.target.label, "edit_style");
+    assert_eq!(
+        done.passed_over, 1,
+        "the node edit only moved the original's nodes"
+    );
+    assert!(done.report.wrote);
+    assert_eq!(done.target.inherited_from, Some(path));
+    // The next press passes over the node edit again and removes the copy with the drawing.
+    let done = document.undo_object_step(copy).unwrap().unwrap();
+    assert_eq!(done.target.label, "create_path");
+    assert!(done.object_gone);
+}
+
+#[test]
+fn a_press_that_finds_only_steps_it_cannot_write_leaves_no_row() {
+    let (document, path, _) = path_with_a_style_and_a_node_edit();
+    // Wipe the original's story up to the node edit, then copy it again: the copy inherits the
+    // floor and the steps after it, which here are only a node edit.
+    document.wipe_object_history(path).unwrap();
+    document
+        .move_anchors(&[(
+            path,
+            curvyo_document_core::AnchorId::new(1, 3),
+            Point::new(9.0, 11.0),
+        )])
+        .unwrap();
+    let copy = document
+        .duplicate_objects(
+            &[CopySource {
+                id: path,
+                anchor_ids: vec![
+                    curvyo_document_core::AnchorId::new(3, 1),
+                    curvyo_document_core::AnchorId::new(3, 2),
+                    curvyo_document_core::AnchorId::new(3, 3),
+                ],
+            }],
+            Vec2::new(0.0, 30.0),
+        )
+        .unwrap()[0];
+    let before = document.object_history_len(copy);
+    let version = document.version();
+    let done = document.undo_object_step(copy).unwrap().unwrap();
+    assert!(!done.report.wrote);
+    assert!(done.target.inherited_from.is_some());
+    assert_eq!(document.version(), version, "nothing was written");
+    assert_eq!(document.object_history_len(copy), before);
 }
