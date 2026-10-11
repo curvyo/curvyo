@@ -80,6 +80,10 @@ export function PropertiesPanel({ editor, document: doc }: PropertiesPanelProps)
     // webview does not count script focus as keyboard focus; the mark goes
     // when the focus does.
     target.focus({ focusVisible: true } as FocusOptions);
+    if (document.activeElement !== target) {
+      // The target handed focus on (the History list to its current row).
+      return;
+    }
     target.setAttribute("data-keyboard-focus", "");
     target.addEventListener("blur", () => target.removeAttribute("data-keyboard-focus"), {
       once: true,

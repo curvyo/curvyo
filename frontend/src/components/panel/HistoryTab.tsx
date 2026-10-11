@@ -157,6 +157,12 @@ export function HistoryTab({ editor, shown, onReturnFocus }: HistoryTabProps) {
     }
     refocus.current = true;
     setFocused(to);
+    // setFocused changes nothing when the index did not: focus the row now when it exists.
+    const row = element.querySelector<HTMLElement>(`[data-row-index="${to}"]`);
+    if (row) {
+      refocus.current = false;
+      row.focus();
+    }
   };
 
   const onListKeyDown = (event: React.KeyboardEvent) => {
@@ -206,7 +212,7 @@ export function HistoryTab({ editor, shown, onReturnFocus }: HistoryTabProps) {
   });
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+    <div className="flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto">
       <HistoryButtons editor={editor} onReturnFocus={onReturnFocus} />
       <div
         className="flex shrink-0 items-center justify-between rounded-[5px] bg-[var(--value-fill)] px-2 text-sm text-[var(--toolbar-icon)]"
