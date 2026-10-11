@@ -152,6 +152,12 @@ fn kind_name(object: &ObjectSnapshot) -> (&'static str, &'static str) {
     }
 }
 
+/// What one object is called in a subject line: "Rectangle", "Path", "Compound path".
+#[must_use]
+pub fn object_kind_name(object: &ObjectSnapshot) -> &'static str {
+    kind_name(object).0
+}
+
 fn subject_line(objects: &[&ObjectSnapshot]) -> String {
     let Some(first) = objects.first() else {
         return String::new();

@@ -8,7 +8,9 @@ use loro::{FractionalIndex, LoroDoc, TreeID, TreeParentId};
 use super::checkout::NodeAt;
 use super::node_value::{Node, read_map};
 use super::report::{Direction, Role, SkipReason};
-use super::step_header::{KEY_REDONE, LABEL_REDO, StepHeader};
+use super::step_header::{
+    KEY_OBJECT_REDONE, KEY_REDONE, LABEL_OBJECT_REDO, LABEL_REDO, StepHeader,
+};
 use super::step_id::StepRef;
 use super::step_log::LogStep;
 use super::touched::Touched;
@@ -65,6 +67,12 @@ impl Plan {
     }
 }
 
+/// A meta map without the floor register of an object wipe.
+fn without_floor(mut meta: BTreeMap<String, Node>) -> BTreeMap<String, Node> {
+    meta.remove(super::lineage::KEY_HISTORY_FLOOR);
+    meta
+}
+
 pub(super) fn alive(doc: &LoroDoc, id: TreeID) -> bool {
     let tree = doc.get_tree(OBJECTS_TREE);
     tree.contains(id) && matches!(tree.is_node_deleted(&id), Ok(false))
@@ -98,7 +106,13 @@ impl PlanInput<'_> {
             }
         }
         for &id in &self.touched.moved {
-            self.plan_moved(&mut plan, id);
+            if self.came_back_in_this_step(id) {
+                // A node an object undo brought back is a Move of a deleted node: for the restore
+                // it is a creation.
+                self.plan_created(&mut plan, id);
+            } else {
+                self.plan_moved(&mut plan, id);
+            }
         }
         plan
     }
@@ -150,6 +164,12 @@ impl PlanInput<'_> {
         }
     }
 
+    /// Whether the node was deleted before the step and lives after it: the step revived it.
+    fn came_back_in_this_step(&self, id: TreeID) -> bool {
+        let meta_of = |snapshot: &Snapshot| snapshot.nodes.get(&id).map(|n| n.meta.is_empty());
+        meta_of(self.before) == Some(true) && meta_of(self.after) == Some(false)
+    }
+
     fn live_meta(&self, id: TreeID) -> Option<BTreeMap<String, Node>> {
         let tree = self.doc.get_tree(OBJECTS_TREE);
         tree.get_meta(id).map(|m| read_map(&m)).ok()
@@ -171,9 +191,11 @@ impl PlanInput<'_> {
             .get_change(last)
             .and_then(|change| StepHeader::parse(change.message.as_deref()?))
             .is_some_and(|header| {
-                header.label == LABEL_REDO
-                    && header.extra_value(KEY_REDONE).and_then(StepRef::decode)
-                        == Some(self.log.step)
+                let redone = |key: &str| {
+                    header.extra_value(key).and_then(StepRef::decode) == Some(self.log.step)
+                };
+                (header.label == LABEL_REDO && redone(KEY_REDONE))
+                    || (header.label == LABEL_OBJECT_REDO && redone(KEY_OBJECT_REDONE))
             })
     }
 
@@ -188,8 +210,13 @@ impl PlanInput<'_> {
         match self.direction {
             Direction::Undo if !now_alive => plan.skip(Role::Created, id, SkipReason::DeletedLater),
             Direction::Undo => {
-                let created = self.after.nodes.get(&id).map(|n| &n.meta);
-                if self.live_meta(id).as_ref() == created {
+                // The floor an object wipe wrote is not a change of the object's look.
+                let created = self
+                    .after
+                    .nodes
+                    .get(&id)
+                    .map(|n| without_floor(n.meta.clone()));
+                if self.live_meta(id).map(without_floor) == created {
                     plan.push(Role::Created, Action::Delete(id));
                 } else {
                     plan.skip(Role::Created, id, SkipReason::ChangedLater);

@@ -84,9 +84,11 @@ pub use group_tree::MAX_GROUP_DEPTH;
 pub use groups::{GROUP_COMMIT_LABEL, UNGROUP_COMMIT_LABEL};
 pub use history::{
     Author, Direction, Event, FAR_STEP_OPS, HistoryError, HistoryRow, LABEL_NEW_DOCUMENT,
-    LABEL_REDO, LABEL_UNDO, MIN_SHOWN_ID_LEN, ObjectReport, ObjectResult, ObjectShape, OwnStep,
-    RestoreReport, Role, SMALL_STEP_OPS, STACK_LIMIT, SkipReason, StackMachine, Status, StepKind,
-    StepRef, SyncError, TouchedObject, WIPE_LABEL, is_document_level_label, shown_ids,
+    LABEL_OBJECT_REDO, LABEL_OBJECT_UNDO, LABEL_REDO, LABEL_UNDO, LABEL_WIPE_OBJECT,
+    MIN_SHOWN_ID_LEN, ObjectReport, ObjectRestore, ObjectResult, ObjectRow, ObjectRowClass,
+    ObjectShape, ObjectStatus, ObjectTarget, ObjectTargets, OwnStep, RestoreReport, Role,
+    RowRevert, SMALL_STEP_OPS, STACK_LIMIT, SkipReason, StackMachine, Status, StepKind, StepRef,
+    SyncError, TouchedObject, WIPE_LABEL, is_document_level_label, shown_ids,
 };
 pub use junction::{COINCIDENT_MM, interior_handle, merged_junction};
 pub use objects::{CopySource, ObjectEditError};

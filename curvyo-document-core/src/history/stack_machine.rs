@@ -88,6 +88,13 @@ impl StackMachine {
         }
     }
 
+    /// Drops the steps `keep` refuses from both stacks. The wipe of one object's history uses it:
+    /// a step that touched only that object can no longer be taken back with Ctrl+Z.
+    pub fn retain(&mut self, mut keep: impl FnMut(StepRef) -> bool) {
+        self.undo.retain(|step| keep(*step));
+        self.redo.retain(|step| keep(*step));
+    }
+
     fn push_undo(&mut self, step: StepRef) {
         self.undo.push(step);
         if self.undo.len() > self.limit {
@@ -177,6 +184,18 @@ mod tests {
         }
         assert_eq!(machine.undo_stack().len(), 500);
         assert_eq!(machine.undo_stack()[0], step(1));
+    }
+
+    #[test]
+    fn retain_drops_the_refused_steps_from_both_stacks() {
+        let mut machine = StackMachine::new(STACK_LIMIT);
+        for n in 1..=4 {
+            machine.apply(Event::Do(step(n)));
+        }
+        machine.apply(Event::Undo(step(4)));
+        machine.retain(|s| s != step(2) && s != step(4));
+        assert_eq!(machine.undo_stack(), [step(1), step(3)]);
+        assert_eq!(machine.redo_stack().len(), 0);
     }
 
     #[test]

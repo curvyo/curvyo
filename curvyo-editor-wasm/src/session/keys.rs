@@ -45,6 +45,9 @@ pub enum KeyHint {
     /// Undo or redo while the Pen holds an unfinished path: "Finish the path (Enter) or cancel it
     /// (Esc) first." (`specs/0020-undo-redo` criterion 6e).
     FinishPenFirst,
+    /// Ctrl+U or Ctrl+Shift+U with a tool other than Select and Node: "Object undo needs the
+    /// Select or Node tool." (`specs/0041-object-history` criterion 5).
+    ObjectTool,
     /// An arrow key would move the selection beyond the document's coordinate
     /// limit: "Too far from the document. Nothing was changed."
     TooFar,
@@ -72,6 +75,15 @@ pub enum KeyOutcome {
     Undo,
     /// Ctrl+Shift+Z ran (or found nothing to redo).
     Redo,
+    /// Ctrl+U ran for the selected object (or found nothing to undo, or no single object); the
+    /// notice is in [`Session::take_history_notice`].
+    ObjectUndo,
+    /// Ctrl+Shift+U ran for the selected object.
+    ObjectRedo,
+    /// Ctrl+U needs the long-operation state first.
+    ObjectUndoBusy,
+    /// Ctrl+Shift+U needs the long-operation state first.
+    ObjectRedoBusy,
     /// Ctrl+Z needs the long-operation state first (a large step, or the history is not read yet):
     /// the host shows it, then calls `Session::undo`.
     UndoBusy,
@@ -114,8 +126,13 @@ impl KeyOutcome {
             Self::Escape(EscapeStep::Nothing) => "escape-none",
             Self::Hint(KeyHint::SelectFirst) => "hint-select-first",
             Self::Hint(KeyHint::FinishPenFirst) => "hint-finish-pen",
+            Self::Hint(KeyHint::ObjectTool) => "hint-object-tool",
             Self::Undo => "undo",
             Self::Redo => "redo",
+            Self::ObjectUndo => "object-undo",
+            Self::ObjectRedo => "object-redo",
+            Self::ObjectUndoBusy => "object-undo-busy",
+            Self::ObjectRedoBusy => "object-redo-busy",
             Self::UndoBusy => "undo-busy",
             Self::RedoBusy => "redo-busy",
             Self::Hint(KeyHint::TooFar) => "hint-too-far",
@@ -238,6 +255,7 @@ impl Session {
             KeyAction::Escape => KeyOutcome::Escape(self.escape()),
             KeyAction::Hint(hint) => KeyOutcome::Hint(hint),
             KeyAction::History(direction) => self.history_key(direction),
+            KeyAction::ObjectHistory(direction) => self.object_history_key(direction),
             KeyAction::SelectAll => self.select_all(),
             KeyAction::Group => {
                 // The chord acts only when the command is available; otherwise the page keeps it.

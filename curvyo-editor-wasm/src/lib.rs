@@ -68,7 +68,8 @@ pub use session::{
     BooleanOutcome, BreakApartOutcome, ClosePathOutcome, ClosePathState, CombineOutcome,
     DocumentPresetsRecord, DocumentSide, DoubleClickHint, EscapeStep, FitOutcome, FormTexts,
     FormatEdit, GroupingKind, GroupingResult, HistoryResult, KeyHint, KeyInput, KeyOutcome,
-    MoveIndicators, PanelTabsRecord, PanelView, Session, SizeOutcome, Tool, WipeOutcome, WipeState,
+    MoveIndicators, ObjectWipeOutcome, PanelTabsRecord, PanelView, Session, SizeOutcome, Tool,
+    WipeOutcome, WipeState,
 };
 
 #[cfg(target_arch = "wasm32")]

@@ -37,6 +37,53 @@ fn role_word(role: Role) -> &'static str {
     }
 }
 
+fn author_word(author: Author) -> &'static str {
+    match author {
+        Author::You => "you",
+        Author::Earlier => "earlier",
+    }
+}
+
+/// The name, whether the table knows the label, the row class and the summary of a row.
+fn row_words(row: &HistoryRow, summary: Option<String>) -> (String, bool, &'static str, String) {
+    let summary = summary.unwrap_or_default();
+    if row.label == curvyo_document_core::WIPE_LABEL {
+        return ("History wiped".to_owned(), true, "step", summary);
+    }
+    if row.label == curvyo_document_core::LABEL_WIPE_OBJECT {
+        let object = row.objects.first().map_or_else(String::new, |o| {
+            format!("{}, {}", shape_name(o.shape), o.id.short_id())
+        });
+        let name = format!("Wipe history of {object}");
+        return (name, true, "floor", summary);
+    }
+    if let Some(revert) = &row.reverts {
+        let verb = if revert.redo { "Redo" } else { "Undo" };
+        let name = format!("{verb} {}", operation_name(&revert.label));
+        let noun = if revert.redo { "restores" } else { "reverts" };
+        let class = if revert.redo { "redoes" } else { "undoes" };
+        return (name, true, class, format!("{noun} {}", revert.shown_id));
+    }
+    (
+        operation_name(&row.label).to_owned(),
+        known_operation_name(&row.label).is_some(),
+        "step",
+        summary,
+    )
+}
+
+/// The kind of an object as a title, for "Wipe history of Rectangle, 3f9a1c".
+fn shape_name(shape: ObjectShape) -> &'static str {
+    match shape {
+        ObjectShape::Path => "Path",
+        ObjectShape::Rectangle => "Rectangle",
+        ObjectShape::Ellipse => "Ellipse",
+        ObjectShape::Polygon => "Polygon",
+        ObjectShape::Star => "Star",
+        ObjectShape::Group => "Group",
+    }
+}
+
 /// A step reference as the panel sends it back: `<peer>@<counter>`.
 fn step_text(step: StepRef) -> String {
     format!("{}@{}", step.peer(), step.counter())
@@ -44,16 +91,9 @@ fn step_text(step: StepRef) -> String {
 
 impl Session {
     fn row_json(&self, row: &HistoryRow) -> Value {
-        let (name, known) = if row.label == curvyo_document_core::WIPE_LABEL {
-            ("History wiped", true)
-        } else {
-            (
-                operation_name(&row.label),
-                known_operation_name(&row.label).is_some(),
-            )
-        };
         let touched: Vec<_> = row.objects.iter().map(|o| (o.shape, o.role)).collect();
         let shapes = summary_shapes(&row.label, &touched);
+        let (name, known, class, summary) = row_words(row, objects_summary(&shapes));
         let objects: Vec<Value> = row
             .objects
             .iter()
@@ -66,18 +106,25 @@ impl Session {
                 })
             })
             .collect();
+        let (status, undone_by) = match (row.status, row.undone_by) {
+            (Status::Applied, Some(author)) => ("undone-by", author_word(author)),
+            (Status::Applied, None) => ("applied", ""),
+            // An undone step and a step on a branch both read "Undone" until `0042` shows branches.
+            _ => ("undone", ""),
+        };
         json!({
             "id": row.shown_id,
             "step": step_text(row.step),
             "label": row.label,
             "name": name,
             "known": known,
-            "author": if row.author == Author::You { "you" } else { "earlier" },
+            "author": author_word(row.author),
             "time": row.time.as_secs(),
-            // An undone step and a step on a branch both read "Undone" until `0042` shows branches.
-            "status": if row.status == Status::Applied { "applied" } else { "undone" },
+            "status": status,
+            "undoneBy": undone_by,
+            "class": class,
             "kind": kind_word(row.kind),
-            "summary": objects_summary(&shapes).unwrap_or_default(),
+            "summary": summary,
             "objects": objects,
         })
     }

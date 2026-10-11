@@ -64,8 +64,42 @@ decisions 1, 2 and 6 and the risks changed.
    exist, and an O(1) read for the timeline.
 8. **Boolean, Combine, Break apart, Offset results** are fresh nodes without `clone_of` (20, 28,
    Q2 A). Their first row names the sources from the step's touched objects.
-9. **Version encoding** for both keys: sorted `peer:counter` pairs joined by `,`, parsed leniently:
-   an unreadable value means "no floor" or "no origin", never a refused file.
+9. **Version encoding** for both keys (*amended 2026-10-11*, build note 1): a version is the sorted
+   `peer@counter` pairs joined by `,`, the encoding `history_wiped` already uses
+   (`encode_frontiers`); a node id is `peer:counter`; `clone_of = <peer>:<counter>@<version>`,
+   split at the first `@`. Parsed leniently: an unreadable value means "no floor" or "no origin",
+   never a refused file. The grammar is in ADR 0014 §7.
+
+## Build notes (2026-10-11, the slice as built)
+
+Dated notes, no new ADR. The decisions above hold; these are the places the build chose a detail.
+
+1. **Version encoding.** Moved into decision 9 and ADR 0014 §7 (architect review, 2026-10-11).
+2. **The floor is read from the wipe step.** The wipe step writes `history_floor` (its one
+   operation) and the timeline takes the floor from the start version of the object's latest wipe
+   step, which is the same value. This lets a clone made before a wipe keep the floor as it was at
+   its duplication without a checkout (criteria 24, 33). A unit test pins register and step to the
+   same version.
+3. **One machine over the lineage.** Inherited entries, then the object's own entries, run through
+   one `StackMachine`, so an object undo of an inherited step is an `Undo` event like any other.
+   The step that made a copy and the step that made the original (or an ancestor) are no targets of
+   an object undo: taking either back would remove the copy, which only Ctrl+Z does (tester review,
+   2026-10-11). After the copy's own steps the target is the newest inherited step that can write
+   something into the copy.
+4. **Object redo of an inherited step** is the undo of the object undo that took it back (it
+   restores the registers that undo wrote). Own steps use the redo direction of the engine.
+5. **Undone nodes count as created.** The restore plan treats a `Move` of a node that was deleted
+   before the step and lives after it as a creation. Without this, Ctrl+Z on an object undo that
+   brought a deleted object back (criterion 9 for a delete or a Boolean) could not delete it
+   again.
+6. **Stack names.** A stack entry can carry a name of its own: the object undo is "Undo Resize",
+   not the name of its label `object_undo`. `Session::history_target_name` returns a `String` for
+   that reason.
+7. **Index cost.** The shown ids (ADR 0014 §3) are rebuilt on the first read of rows after a new
+   step, not on the commit path. `warm_history` builds the object index; a log of more than 40,000
+   operations that has not been warmed announces the long-operation state before the first object
+   undo.
+8. **Groups** (criteria 18 and 27) are in `docs/technical-debt.md`.
 
 ## Placement
 
@@ -100,3 +134,16 @@ Q5) is checked by hand in milestone 2.
   grandparent's lineage. Never a wrong drawing (ADR 0014 consequences).
 - Restore with the same `NodeId` (criterion 12) depends on the injected tree move of ADR 0014 §11
   and its canary; with Q7 B it is a move out of the trash node instead.
+
+9. **Object undo of an inherited step (review, 2026-10-11).** It follows the three-way rule of
+   criterion 7: a register is written only where the copy still holds the value the original had
+   after the step. A frame register (rectangle, ellipse, star) is merged number by number, so a
+   copy gets back the size of an inherited resize and keeps its own place. A step that only moved
+   the original, or only edited a path's anchors, writes nothing and is passed over, at most 256 per
+   press; a step that wrote no register of the original is skipped without reading a version. The
+   Undo step button names the first step the press would really write (remembered until the log
+   changes). When every candidate was passed over nothing is written and no row appears. Writing
+   anchors into a path copy by position is a follow-up (`docs/technical-debt.md`).
+10. **Floors.** Every wipe step hides what lies in its causal past, so two concurrent wipes hide what
+    either of them hid. The floor register is not a change of the object: it is ignored when Ctrl+Z
+    decides whether a created object was changed since.

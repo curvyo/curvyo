@@ -19,6 +19,10 @@ export interface HistoryObject {
   alive: boolean;
 }
 
+/** What a row is: a step, an object undo or redo, the start of a clone, or the floor of a wiped
+ * object history (`specs/0041-object-history`). */
+export type RowClass = "step" | "undoes" | "redoes" | "clone-start" | "floor";
+
 /** One row of the history list, as the session returns it. */
 export interface HistoryRowData {
   /** The shown step id, at least seven characters. */
@@ -35,8 +39,22 @@ export interface HistoryRowData {
   kind: "create" | "delete" | "replace" | "change" | "document";
   /** "3 paths", or empty when the step touched no object. */
   summary: string;
-  status: "applied" | "undone";
+  /** "undone-by": taken back by an object undo of `undoneBy`. */
+  status: "applied" | "undone" | "undone-by";
+  undoneBy?: "you" | "earlier" | "";
+  class?: RowClass;
+  /** What the step did to the selected object (Object scope rows). */
+  role?: "created" | "deleted" | "changed" | "moved";
+  /** The short id of the object an inherited row was taken over from; empty for a row of its own. */
+  from?: string;
+  /** The full ids of the objects a created object came from (a Boolean's operands). */
+  sources?: string[];
   objects: HistoryObject[];
+}
+
+/** Whether the row stands for a step that is not in effect. */
+export function isUndone(row: HistoryRowData): boolean {
+  return row.status !== "applied";
 }
 
 /** Reads the JSON array the session returns. */
@@ -84,30 +102,65 @@ export function authorLong(row: HistoryRowData): string {
   return row.author === "you" ? "You" : "Earlier session";
 }
 
-/** The status word of a row, empty while it is in effect. */
+/** The status word of a row, empty while it is in effect: "Undone" for a step taken back with
+ * Ctrl+Z, "Undone by You" for one taken back by an object undo (`0041` criterion 8). */
 export function statusWord(row: HistoryRowData): string {
+  if (row.status === "undone-by") {
+    return row.undoneBy === "earlier" ? "Undone by Earlier session" : "Undone by You";
+  }
   return row.status === "undone" ? "Undone" : "";
+}
+
+/** The words that start line 2 and are set in semibold: the status word and, for an inherited
+ * row, "from 3f9a1c". */
+export function leadWords(row: HistoryRowData): string {
+  const from = row.from ? `from ${row.from}` : "";
+  return [statusWord(row), from].filter((part) => part !== "").join(" · ");
 }
 
 /** The second line of a row: status word (only when not Applied), summary, author and time,
  * separated by " · " (criterion 39). */
 export function secondLine(row: HistoryRowData, now: Date): string {
-  return [statusWord(row), secondLineRest(row, now)].filter((part) => part !== "").join(" · ");
+  return [leadWords(row), secondLineRest(row, now)].filter((part) => part !== "").join(" · ");
 }
 
-/** The second line without its status word: summary, author and time. */
+/** The second line without its status and flag words: summary, author and time. A row that is
+ * "Undone by <author>" leaves the author out when it is the step's own, and a row with such a
+ * word or with "from <id>" puts the summary last, so a line that does not fit loses the summary
+ * and keeps the author and the time (`0041` UX review). */
 export function secondLineRest(row: HistoryRowData, now: Date): string {
-  return [row.summary, authorWord(row), formatRowTime(row.time, now)]
-    .filter((part) => part !== "")
-    .join(" · ");
+  const summary = rowDisplay(row).summary;
+  const author =
+    row.status === "undone-by" && row.undoneBy === row.author ? "" : authorWord(row);
+  const time = formatRowTime(row.time, now);
+  const parts =
+    row.status === "undone-by" || row.from
+      ? [author, time, summary]
+      : [summary, author, time];
+  return parts.filter((part) => part !== "").join(" · ");
+}
+
+/** What a row shows as its name and summary. The wipe of one object's history is titled "Wipe
+ * history" with the object on line 2, so the id is not the part an ellipsis cuts. */
+export function rowDisplay(row: HistoryRowData): { name: string; summary: string } {
+  const wiped = /^Wipe history of (.+)$/.exec(row.name);
+  if (row.label === "wipe_object_history" && wiped) {
+    return { name: "Wipe history", summary: (wiped[1] ?? "").replace(", ", " ") };
+  }
+  return { name: row.name, summary: row.summary };
 }
 
 /** The tooltip: "Move, 3 paths. You, 9 Oct 2026 12:03:41. Id a1b2c3d.", plus the raw label of an
  * unknown old label. */
 export function rowTooltip(row: HistoryRowData): string {
   const head = row.summary === "" ? row.name : `${row.name}, ${row.summary}`;
-  const text = `${head}. ${authorLong(row)}, ${formatFullTime(row.time)}. Id ${row.id}.`;
-  return row.known ? text : `${text} Label: ${row.label}.`;
+  const status = row.status === "applied" ? "" : ` ${statusWord(row)}.`;
+  const text = `${head}.${status} ${authorLong(row)}, ${formatFullTime(row.time)}. Id ${row.id}.`;
+  const sources =
+    row.sources && row.sources.length > 0 ? ` Sources: ${row.sources.join(", ")}.` : "";
+  const lineage = row.from ? ` Taken over from ${row.from}.` : "";
+  const full = `${text}${sources}${lineage}`;
+  return row.known ? full : `${full} Label: ${row.label}.`;
 }
 
 /** The accessible name: "Move, 3 paths, You, 12:03, id a1b2c3d, undone". */
@@ -118,7 +171,8 @@ export function rowAriaName(row: HistoryRowData, now: Date): string {
     authorLong(row),
     formatRowTime(row.time, now),
     `id ${row.id}`,
-    row.status === "undone" ? "undone" : "",
+    statusWord(row).toLowerCase(),
+    row.from ? `from ${row.from}` : "",
   ]
     .filter((part) => part !== "")
     .join(", ");
@@ -209,4 +263,104 @@ export const WIPE_SHARED_LINE = "Wiping is not available for shared documents ye
  * the hook must not count inside a state updater, which React runs twice in development. */
 export function rowsAdded(seenTotal: number, total: number): number {
   return Math.max(0, total - seenTotal);
+}
+
+/** A step an object undo or redo would act on, as the session names it. */
+export interface ObjectStepInfo {
+  id: string;
+  name: string;
+  author: "you" | "earlier";
+  time: number;
+}
+
+/** The subject of the Object scope: what the selected object is called, the steps its two buttons
+ * act on and what a wipe would hide. */
+export interface ObjectHistoryInfo {
+  /** Changes when another object is selected. */
+  key: string;
+  kind: string;
+  /** The first 6 characters of the object's id. */
+  id: string;
+  fullId: string;
+  undo: ObjectStepInfo | null;
+  redo: ObjectStepInfo | null;
+  /** The rows a wipe would hide. */
+  wipeCount: number;
+  total: number;
+}
+
+/** Reads what `object_history_info` returns; `null` for none or several selected objects. */
+export function parseObjectInfo(json: string): ObjectHistoryInfo | null {
+  if (json === "") {
+    return null;
+  }
+  return JSON.parse(json) as ObjectHistoryInfo;
+}
+
+/** The tooltip of a step button of the Object scope: "Undo: Resize, You, 12:03 (Ctrl+U)", "Redo:
+ * Resize (Ctrl+Shift+U)" (`0041` criterion 16). */
+export function objectButtonTooltip(
+  verb: "Undo" | "Redo",
+  step: ObjectStepInfo,
+  shortcut: string,
+  now: Date,
+): string {
+  if (verb === "Redo") {
+    return `Redo: ${step.name} (${shortcut})`;
+  }
+  const who = step.author === "you" ? "You" : "Earlier session";
+  return `Undo: ${step.name}, ${who}, ${formatRowTime(step.time, now)} (${shortcut})`;
+}
+
+/** The question of the inline confirm of a wipe of one object's history (`0041` criterion 29). */
+export function objectWipeQuestion(steps: number): string {
+  const what = steps === 1 ? "the 1 earlier step" : `the ${steps} earlier steps`;
+  return `Hide ${what} of this object? They stay in the document history. The file does not get smaller.`;
+}
+
+/** The notice after a wipe of one object's history. */
+export function objectWipedNotice(steps: number): string {
+  return `Hid ${steps} earlier ${steps === 1 ? "step" : "steps"} of this object.`;
+}
+
+/** The row of an object whose timeline the file does not hold (a very old file). */
+export const NO_OBJECT_STEPS_LINE = "No steps recorded for this object.";
+
+/** The History tab's scope. */
+export type HistoryScope = "document" | "object";
+
+/** The scope that shows: the Object scope exists only with exactly one object selected, and a
+ * press on Document is kept while the selection stays one object (`0041` criterion 1). */
+export function effectiveScope(selectionCount: number, choice: HistoryScope): HistoryScope {
+  return selectionCount === 1 ? choice : "document";
+}
+
+/** The choice to keep after the selection changed: leaving the single-object state resets it to
+ * Object for the next time. */
+export function choiceAfterSelection(selectionCount: number, choice: HistoryScope): HistoryScope {
+  return selectionCount === 1 ? choice : "object";
+}
+
+/** What an open wipe confirm belongs to: a change of selection, of the object the Object scope is
+ * about, of the number of rows or of the scope closes it without writing (`0041` criterion 29).
+ * Two objects with the same number of steps must still differ, so the object is part of it. */
+export function wipeConfirmKey(state: {
+  selectionCount: number;
+  subjectKey: string;
+  total: number;
+  scope: HistoryScope;
+}): string {
+  return `${state.scope}|${state.selectionCount}|${state.subjectKey}|${state.total}`;
+}
+
+/** Whether a kept scroll position can be put back now: one is waiting, the list has rows, and
+ * they are the rows of the wanted scope and object (not those of the scope just left, whose
+ * shorter list would clamp the position to the top). */
+export function canRestoreScroll(state: {
+  pending: number | null;
+  total: number;
+  loadedFor: string;
+  wanted: string;
+}): boolean {
+  return state.pending !== null && state.total > 0 && state.loadedFor === state.wanted;
 }

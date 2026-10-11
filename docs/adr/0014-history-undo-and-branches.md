@@ -144,6 +144,12 @@ and a marker a peer could edit concurrently.
    `format_version` bump for 0020 (with Q7 A). 0041 adds two optional keys on an object,
    `history_floor` (the version at an object wipe) and `clone_of` (`<NodeId>@<version>`), and
    0020's wipe writes one root key `history_wiped`; older builds ignore all three (Q2).
+   *Amended 2026-10-11 (0041 build):* encoding. A version is the sorted `<peer>@<counter>` pairs of
+   its frontiers joined by `,` (decimal); a `NodeId` is `<peer>:<counter>`. `history_wiped` and
+   `history_floor` hold a version; `clone_of` holds `<NodeId>@<version>` and is split at the first
+   `@`. An unreadable value means none. The timeline reads an object's floor from the start version
+   of its latest wipe step (the register holds the same value), so a `history_floor` an older build
+   copied onto a duplicate has no effect.
 8. **Previews.** *Amended 2026-10-10, replaces "previews use a forked copy":* no fork. A preview
    reads the objects it shows from the live document inside one guarded `checkout` (§12), copies
    them into plain `ObjectSnapshot`s (a `HistoricalDocument` that is data, not a `LoroDoc`, so it
@@ -153,7 +159,7 @@ and a marker a peer could edit concurrently.
 9. **Document wipe** = `export(shallow_snapshot(current frontiers))`, re-imported in place under the
    same peer; object ids, tombstones and state unchanged, older ops gone, stacks emptied. Offered
    only for a document without a keyring (Q3). *Amended 2026-10-10:* the wipe step writes the root
-   key `history_wiped` = the **epoch**, the encoded shallow-start frontiers (0041 decision 9
+   key `history_wiped` = the **epoch**, the encoded shallow-start frontiers (§7
    encoding), the same on every replica that has the wipe. Because Loro does not reliably report a
    failed merge across a trim, every exchange of updates (the `import_updates` seam of 0020 now,
    the sync layer later) compares epochs first and refuses a mismatch; `import_updates` also

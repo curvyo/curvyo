@@ -72,6 +72,8 @@ pub struct ObjectReport {
     pub role: Role,
     /// What the restore did to it.
     pub result: ObjectResult,
+    /// How many fields kept a later change by someone else.
+    pub kept: usize,
 }
 
 /// What an undo or redo did.
@@ -85,6 +87,9 @@ pub struct RestoreReport {
     pub root: Option<ObjectResult>,
     /// Whether anything was written. A step whose every part was skipped writes nothing.
     pub wrote: bool,
+    /// The step an object undo or redo wrote; `None` for Ctrl+Z, Ctrl+Shift+Z and when nothing
+    /// was written.
+    pub step: Option<super::step_id::StepRef>,
 }
 
 impl RestoreReport {

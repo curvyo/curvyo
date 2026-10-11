@@ -594,6 +594,8 @@ export interface EditorSession {
   showHistoryNotice: (text: string, ms?: number) => void;
   /** Wipes the history; the steps removed, -1 when ignored, -2 for a shared document. */
   wipeHistory: () => number;
+  /** Hides the selected object's earlier history; the rows hidden, -1 when ignored. */
+  wipeObjectHistory: () => number;
   /** The move readout and hidden announcements of a nudge and of select all. */
   nudgeFeedback: NudgeFeedback;
   convertSelected: (kind: "corner" | "symmetric" | "asymmetric") => void;
@@ -1956,6 +1958,7 @@ export function useEditorSession(
     historyNames: history.names,
     pressHistory: history.press,
     wipeHistory: history.wipe,
+    wipeObjectHistory: history.wipeObject,
     showHistoryNotice: history.showNotice,
     nudgeFeedback,
     convertSelected,

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   type HistoryRowData,
+  type HistoryScope,
   PAGE_SIZE,
   pagesFor,
   parseRows,
@@ -10,7 +11,7 @@ import {
 import type { WasmSession } from "@/lib/editorSession";
 
 export interface HistoryList {
-  /** The number of steps in the global history. */
+  /** The number of rows: the steps of the global history, or the rows of the selected object. */
   total: number;
   /** The shown id of the newest step in effect, for the "Now" row; empty without a step. */
   nowId: string;
@@ -18,6 +19,9 @@ export interface HistoryList {
   rowAt: (index: number) => HistoryRowData | undefined;
   /** Asks for the pages that hold rows `first` to `last`. */
   ensure: (first: number, last: number) => void;
+  /** The `scope:object` the pages hold rows for: it differs from what is wanted until the rows of
+   * a new scope or object have been read. */
+  loadedFor: string;
   /** When the rows were read: "today" for the times in the rows. */
   readAt: Date;
   /** How many rows arrived at the top since the list was last read, for keeping a scrolled list
@@ -29,19 +33,24 @@ export interface HistoryList {
  * The global history as the History tab reads it (`specs/0020-undo-redo` criteria 43 and 44): the
  * session counts the steps and returns rows in pages of fifty, newest first. A page is read once;
  * every change of the log (a step, an undo, a merge) drops the pages and reads the visible ones
- * again. Nothing is read while the tab is not shown.
+ * again. Nothing is read while the tab is not shown. The Object scope reads the selected object's
+ * rows (`specs/0041-object-history`) through the same pages; another scope or another object
+ * drops them (`source`).
  */
 export function useHistoryList(
   getSession: () => WasmSession | null,
   syncRevision: number,
   shown: boolean,
+  scope: HistoryScope,
+  source: string,
 ): HistoryList {
   const pages = useRef(new Map<number, HistoryRowData[]>());
   const wanted = useRef({ first: 0, last: PAGE_SIZE - 1 });
   const stamp = useRef<number | null>(null);
+  const reading = useRef("");
   const added = useRef(0);
   const totalSeen = useRef(0);
-  const [state, setState] = useState(() => ({ total: 0, nowId: "", version: 0, readAt: new Date() }));
+  const [state, setState] = useState(() => ({ total: 0, nowId: "", version: 0, readAt: new Date(), loadedFor: "" }));
 
   const load = useCallback(
     (first: number, last: number) => {
@@ -52,10 +61,11 @@ export function useHistoryList(
       let changed = false;
       for (const page of pagesFor(first, last)) {
         if (!pages.current.has(page)) {
-          pages.current.set(
-            page,
-            parseRows(session.history_rows(page * PAGE_SIZE, PAGE_SIZE)),
-          );
+          const json =
+            scope === "object"
+              ? session.object_history_rows(page * PAGE_SIZE, PAGE_SIZE)
+              : session.history_rows(page * PAGE_SIZE, PAGE_SIZE);
+          pages.current.set(page, parseRows(json));
           changed = true;
         }
       }
@@ -63,7 +73,7 @@ export function useHistoryList(
         setState((previous) => ({ ...previous, version: previous.version + 1 }));
       }
     },
-    [getSession],
+    [getSession, scope],
   );
 
   // The log changed: read the count and the visible pages again.
@@ -73,13 +83,21 @@ export function useHistoryList(
       return;
     }
     const now = session.history_stamp();
-    if (stamp.current === now) {
+    const reads = `${scope}:${source}`;
+    if (stamp.current === now && reading.current === reads) {
       return;
     }
+    const sourceChanged = reading.current !== reads;
     stamp.current = now;
+    reading.current = reads;
     pages.current.clear();
-    const total = session.history_len();
-    // Counted outside the updater: React calls an updater twice in development.
+    const total = scope === "object" ? session.object_history_len() : session.history_len();
+    // Counted outside the updater: React calls an updater twice in development. Another scope
+    // or object starts a new list: nothing "arrived" at its top.
+    if (sourceChanged) {
+      added.current = 0;
+      totalSeen.current = total;
+    }
     added.current += rowsAdded(totalSeen.current, total);
     totalSeen.current = total;
     const nowId = session.history_now_id();
@@ -88,9 +106,10 @@ export function useHistoryList(
       nowId,
       version: previous.version + 1,
       readAt: new Date(),
+      loadedFor: reads,
     }));
     load(wanted.current.first, wanted.current.last);
-  }, [shown, syncRevision, getSession, load]);
+  }, [shown, syncRevision, getSession, load, scope, source]);
 
   const rowAt = useCallback((index: number) => {
     return pages.current.get(Math.floor(index / PAGE_SIZE))?.[index % PAGE_SIZE];
@@ -116,6 +135,7 @@ export function useHistoryList(
     total: state.total,
     nowId: state.nowId,
     readAt: state.readAt,
+    loadedFor: state.loadedFor,
     rowAt,
     ensure,
     takeAdded,

@@ -29,6 +29,9 @@ pub struct OwnStep {
     pub step: StepRef,
     /// The commit label of the step, as written (`translate_objects`).
     pub label: String,
+    /// For an object undo or redo: the commit label of the step it names, which the stack entry
+    /// is called after ("Undo Resize").
+    pub reverts: Option<String>,
 }
 
 /// The session state of the commit path.
@@ -79,6 +82,16 @@ impl CommitState {
 
     pub(crate) fn set_warm(&self) {
         self.warm.set(true);
+    }
+
+    /// An object undo or redo is a step of this session like any other: it goes on the maker's
+    /// stack (`specs/0041-object-history` criterion 8).
+    pub(crate) fn register_own(&self, step: StepRef, label: &str, reverts: Option<String>) {
+        self.own.borrow_mut().push(OwnStep {
+            step,
+            label: label.to_owned(),
+            reverts,
+        });
     }
 }
 
@@ -179,6 +192,7 @@ impl Document {
         state.own.borrow_mut().push(OwnStep {
             step,
             label: label.to_owned(),
+            reverts: None,
         });
         Some(step)
     }

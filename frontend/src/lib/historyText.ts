@@ -2,8 +2,14 @@
 // 24): how long a notice stays, what the long-operation state says, which key presses are history
 // keys. Pure, so `tests/historyText.test.ts` covers it; the session decides everything else.
 
-/** The direction of a history command. */
-export type HistoryDirection = "undo" | "redo";
+/** The direction of a history command: Ctrl+Z and Ctrl+Shift+Z, and for the one selected object
+ * Ctrl+U and Ctrl+Shift+U (`specs/0041-object-history`). */
+export type HistoryDirection = "undo" | "redo" | "object-undo" | "object-redo";
+
+/** Whether the command acts on the selected object only. */
+export function isObjectDirection(direction: HistoryDirection): boolean {
+  return direction === "object-undo" || direction === "object-redo";
+}
 
 /** How long a notice stays: 3 s, or 5 s above 70 characters (`0016` criterion 29). */
 export function noticeDurationMs(text: string): number {
@@ -19,7 +25,9 @@ export const WORKING_NOTICE_DELAY_MS = 150;
 
 /** The notice of the long-operation state. */
 export function workingNotice(direction: HistoryDirection): string {
-  return direction === "undo" ? "Undo: working..." : "Redo: working...";
+  return direction === "undo" || direction === "object-undo"
+    ? "Undo: working..."
+    : "Redo: working...";
 }
 
 /** A second trigger of the same direction within this long is the same press arriving by both
@@ -29,7 +37,7 @@ export const DUPLICATE_PRESS_MS = 25;
 
 /**
  * Whether a key press is undo or redo: Ctrl (Cmd) with the typed character z (Shift: redo) or,
- * off macOS, y. The character is matched, not the key's place, so a German keyboard works
+ * off macOS, y; or the object variants with the typed character u. The character is matched, not the key's place, so a German keyboard works
  * (criterion 7). The session applies its gate; this only says whether to ask it.
  */
 export function historyKeyDirection(event: {
@@ -45,6 +53,9 @@ export function historyKeyDirection(event: {
   const key = event.key.toLowerCase();
   if (key === "z") {
     return event.shiftKey ? "redo" : "undo";
+  }
+  if (key === "u") {
+    return event.shiftKey ? "object-redo" : "object-undo";
   }
   if (key === "y" && !event.shiftKey && !mac) {
     return "redo";

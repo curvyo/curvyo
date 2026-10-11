@@ -42,6 +42,7 @@ pub(super) enum KeyAction {
     Escape,
     Hint(KeyHint),
     History(Direction),
+    ObjectHistory(Direction),
     SelectAll,
     Nudge(Arrow),
     Group,
@@ -128,6 +129,9 @@ pub(super) fn decide(input: &KeyInput<'_>, state: KeyState) -> KeyAction {
     };
     if let Some(direction) = super::history::history_direction(input, letter) {
         return super::history::history_action(direction, input, state);
+    }
+    if let Some(direction) = super::object_history::object_history_direction(input, letter) {
+        return super::object_history::object_history_action(direction, input, state);
     }
     if input.repeat || input.ctrl || input.alt || input.dom_blocked {
         return KeyAction::Ignore;
