@@ -236,6 +236,8 @@ impl Session {
     /// What a screen reader should hear about the context, once (entering and leaving a group,
     /// and a context that fell back).
     pub fn take_context_announcement(&mut self) -> String {
+        // The fallback after an undo, a redo or an open, not only before the next event.
+        self.sync_context();
         self.context_announcement.take().unwrap_or_default()
     }
 }

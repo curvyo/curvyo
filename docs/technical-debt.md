@@ -1392,3 +1392,11 @@ commit of a move of a big compound path. Measured back to back on 2026-10-11 on 
 `origin/main` 79 to 98 ms, `story/groups` 74 to 86 ms. The headroom of 2 to 21 % is old, not from
 `0023`, and the test can fail on a busy machine (one run beside other jobs took 256 ms). If it
 flakes in CI, find what the move commit of a 5,000-anchor object spends before raising the budget.
+
+## The refusal outline of a group is drawn on its leaves
+
+When Union, Combine or Break apart refuse a selected group, the red outline (`0016` criterion 15,
+`0023` criterion 28) is drawn around every leaf of the group, not around the group's box. It reads
+fine (the group box stays under it), but the spec says "the offending group is outlined in red".
+`RefusalMarks` holds object ids; a group box mark needs a second kind of mark and a draw path in
+`curvyo-render-core/src/refusal_outline.rs`.

@@ -1,7 +1,7 @@
 import { ChevronRight } from "lucide-react";
 import { Fragment } from "react";
 
-import { collapsedName, crumbRow } from "@/lib/groupText";
+import { collapsedName, crumbName, crumbRow } from "@/lib/groupText";
 
 interface OpenGroupsProps {
   /** How many groups deep the Select tool is; 0 at the document root, where nothing is drawn. */
@@ -38,8 +38,12 @@ export function OpenGroups({ depth, onLeaveToLevel }: OpenGroupsProps) {
           {crumbs.map((crumb, index) => (
             <Fragment key={crumb.level}>
               {collapsed > 0 && index === collapsedAt ? (
-                <li className="flex items-center" aria-label={collapsedName(collapsed)}>
-                  <span style={{ color: "var(--panel-muted-fg)" }} aria-hidden="true">
+                <li className="flex items-center">
+                  <span
+                    role="img"
+                    aria-label={collapsedName(collapsed)}
+                    style={{ color: "var(--panel-muted-fg)" }}
+                  >
                     ...
                   </span>
                   <ChevronRight size={12} aria-hidden="true" />
@@ -47,11 +51,20 @@ export function OpenGroups({ depth, onLeaveToLevel }: OpenGroupsProps) {
               ) : null}
               <li className="flex items-center">
                 {crumb.current ? (
-                  <span className="flex h-7 items-center px-3 font-semibold" aria-current="location">
+                  <span
+                    className="flex h-7 items-center px-3 font-semibold"
+                    aria-current="location"
+                    aria-label={crumbName(crumb)}
+                  >
                     {crumb.label}
                   </span>
                 ) : (
-                  <button type="button" className={CRUMB_CLASS} onClick={() => onLeaveToLevel(crumb.level)}>
+                  <button
+                    type="button"
+                    className={CRUMB_CLASS}
+                    aria-label={crumbName(crumb)}
+                    onClick={() => onLeaveToLevel(crumb.level)}
+                  >
                     {crumb.label}
                   </button>
                 )}

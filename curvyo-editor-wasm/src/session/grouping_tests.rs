@@ -448,3 +448,21 @@ fn the_node_tool_sees_the_paths_of_a_group_and_not_those_outside_an_entered_one(
     assert_eq!(inside, vec![b, c], "outside paths are inert");
     let _ = a;
 }
+
+/// UX review N1: an undo that removes the entered group is announced when the host asks, not at
+/// the next event.
+#[test]
+fn the_fallback_after_an_undo_is_announced_at_once() {
+    let mut session = Session::new(1);
+    let ids = [0.0, 20.0].map(|x| rect(&session, x));
+    session.selection.set(&ids);
+    session.group_selection();
+    assert!(session.enter_selected_group());
+    assert_eq!(
+        session.take_context_announcement(),
+        "Inside group, 1 level. Escape leaves."
+    );
+    session.undo();
+    assert_eq!(session.take_context_announcement(), "Back at the document.");
+    assert_eq!(session.context_depth(), 0);
+}

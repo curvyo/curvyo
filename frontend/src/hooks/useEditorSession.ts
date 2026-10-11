@@ -852,14 +852,14 @@ export function useEditorSession(
    * might have changed it — cheap, and simpler than having every call
    * site know which ones to refresh. */
   const refreshHistoryRef = useRef<() => void>(() => {});
-  const refreshGroupingRef = useRef<() => void>(() => {});
+  const refreshGroupingRef = useRef<() => boolean>(() => false);
   const syncFromSession = useCallback(() => {
     const session = sessionRef.current;
     if (!session) {
       return;
     }
     refreshHistoryRef.current();
-    refreshGroupingRef.current();
+    const contextAnnounced = refreshGroupingRef.current();
     setToolState(session.tool() as Tool);
     setNodeToolbarState(readToolbarState(session.node_toolbar_state()));
     setPolyStarModeState(session.poly_star_mode() as PolyStarMode);
@@ -874,7 +874,8 @@ export function useEditorSession(
     setSelectBar((previous) => (sameSelectBar(previous, nextBar) ? previous : nextBar));
     setZoomPercent(session.zoom_percent());
     setSelectionCount(session.selection_count());
-    setSelectionAnnouncement(session.selection_announcement());
+    // One polite message at a time: the context announcement wins over the selection one.
+    setSelectionAnnouncement(contextAnnounced ? "" : session.selection_announcement());
     // A commit that turned shapes into paths says so, once.
     const notice = stretchNotice(session.take_conversion_notice());
     if (notice !== null) {

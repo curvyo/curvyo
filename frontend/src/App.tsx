@@ -173,12 +173,6 @@ function App() {
           grouping={editor.grouping.commands}
         />
         <Canvas editor={editor} />
-        <CanvasNotice
-          notice={editor.canvasNotice}
-          groupDepth={editor.grouping.depth}
-          onLeaveToLevel={editor.grouping.leaveToLevel}
-          announcement={editor.grouping.announcement}
-        />
         {/* Contextual tool bar: floats over the canvas, right of the tool
          * rail, so showing/hiding it never resizes the canvas
          * (`docs/design-system.md`, "no layout shift on tool switch"). */}
@@ -241,6 +235,17 @@ function App() {
             />
           ) : null}
         </div>
+        {/* After the bars in the tab order: canvas, bars, then the indicator's buttons. */}
+        <CanvasNotice
+          notice={editor.canvasNotice}
+          groupDepth={editor.grouping.depth}
+          onLeaveToLevel={(level) => {
+            editor.grouping.leaveToLevel(level);
+            // The pressed crumb unmounts; keep the keyboard on the canvas.
+            editor.containerRef.current?.focus();
+          }}
+          announcement={editor.grouping.announcement}
+        />
         </div>
         </div>
         <PropertiesPanel editor={editor} document={documentPanel} />

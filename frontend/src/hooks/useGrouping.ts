@@ -29,8 +29,9 @@ export interface GroupingApi {
   announcement: ContextAnnouncement;
   /** A crumb of the indicator: makes `level` the context. */
   leaveToLevel: (level: number) => void;
-  /** Re-reads the session. Call after any change of it. */
-  refresh: () => void;
+  /** Re-reads the session. Call after any change of it. Returns whether the context announced
+   * something new, so that the selection announcer can stay quiet in the same frame. */
+  refresh: () => boolean;
   /** Handles the outcome strings of the Group and Ungroup chords (the notice); `false` for every
    * other outcome. Entering and leaving a group need nothing but the re-read. */
   handleKeyOutcome: (outcome: string) => boolean;
@@ -66,10 +67,10 @@ export function useGrouping(
     onChangeRef.current = onChange;
   }, [onChange]);
 
-  const refresh = useCallback(() => {
+  const refresh = useCallback((): boolean => {
     const session = getSession();
     if (!session) {
-      return;
+      return false;
     }
     const raw = session.grouping_availability();
     const next = { group: raw.group, ungroup: raw.ungroup };
@@ -83,6 +84,7 @@ export function useGrouping(
       counter.current += 1;
       setAnnouncement({ id: counter.current, text: said });
     }
+    return said !== "";
   }, [getSession]);
 
   const show = useCallback(

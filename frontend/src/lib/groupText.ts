@@ -60,7 +60,7 @@ export function groupCommandDimmed(
 }
 
 /** The third tooltip line: what the press does, or why the button is dimmed (another tool adds
- * "Use the Select tool."). */
+ * "Use the Select tool." on a line of its own). */
 export function groupCommandNote(
   command: GroupCommand,
   availability: GroupingAvailabilityState,
@@ -72,7 +72,8 @@ export function groupCommandNote(
       : "One level only. Inner groups stay groups.";
   }
   const why = command === "group" ? "Select two or more objects." : "Select a group.";
-  return selectTool ? why : `${why} Use the Select tool.`;
+  // The tool line stands on its own line, so the tooltip never wraps it with an orphan word.
+  return selectTool ? why : `${why}\nUse the Select tool.`;
 }
 
 /** The crumbs of the indicator for `depth` entered groups: "Document", then one "Group" per
@@ -106,6 +107,11 @@ export function crumbRow(depth: number): CrumbRow {
     collapsed: depth - 2,
     collapsedAt: 1,
   };
+}
+
+/** The accessible name of a crumb: "Document", or "Group, level 2" so that the levels differ. */
+export function crumbName(crumb: Crumb): string {
+  return crumb.level === 0 ? crumb.label : `${crumb.label}, level ${crumb.level}`;
 }
 
 /** The accessible name of the collapsed levels: "4 more levels". */

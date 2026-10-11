@@ -9,6 +9,7 @@ import { refusalText, refusalOutlinesObjects } from "../src/lib/booleanText.ts";
 import { breakApartRefusalText, combineRefusalText } from "../src/lib/pathText.ts";
 import {
   collapsedName,
+  crumbName,
   crumbRow,
   groupChord,
   groupCommandDimmed,
@@ -42,10 +43,10 @@ test("a dimmed button says why, and which tool to take", () => {
   assert.equal(groupCommandNote("group", none, true), "Select two or more objects.");
   assert.equal(
     groupCommandNote("group", none, false),
-    "Select two or more objects. Use the Select tool.",
+    "Select two or more objects.\nUse the Select tool.",
   );
   assert.equal(groupCommandNote("ungroup", none, true), "Select a group.");
-  assert.equal(groupCommandNote("ungroup", none, false), "Select a group. Use the Select tool.");
+  assert.equal(groupCommandNote("ungroup", none, false), "Select a group.\nUse the Select tool.");
   assert.equal(groupCommandDimmed("ungroup", { group: true, ungroup: false }), true);
 });
 
@@ -95,4 +96,9 @@ test("the operations refuse a group in the style of the other refusals (criterio
     }),
     "Break apart does not work on groups. Ungroup first. Nothing was changed.",
   );
+});
+
+test("crumbs have different accessible names", () => {
+  const names = crumbRow(3).crumbs.map(crumbName);
+  assert.deepEqual(names, ["Document", "Group, level 1", "Group, level 2", "Group, level 3"]);
 });

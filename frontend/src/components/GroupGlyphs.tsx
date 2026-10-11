@@ -4,7 +4,7 @@ import type { GroupCommand } from "@/lib/groupText";
  * The glyphs of Group and Ungroup (`docs/design-system.md`, row "Command glyphs"): 16 x 16 viewBox
  * drawn at 20px, 1.5px stroke kept absolute, solid shapes, `currentColor`. Group is a rounded
  * frame around two small solid squares; Ungroup is the two squares moved apart, the frame reduced
- * to corner ticks. Not final art: the pair has to read apart at 1x on the glyph sheet.
+ * to corner ticks. The squares carry no stroke, so the gaps stay at least 2.4 px at 1x (checked on the glyph sheet by the UX review).
  */
 
 const STROKE = {
@@ -27,16 +27,14 @@ function shapes(command: GroupCommand) {
     return (
       <>
         <path d={FRAME} fill="none" {...STROKE} />
-        <path d="M4.5 4.5H7.5V7.5H4.5Z" fill="currentColor" {...STROKE} />
-        <path d="M8.5 8.5H11.5V11.5H8.5Z" fill="currentColor" {...STROKE} />
+        <path d="M4.5 4.5H7.25V7.25H4.5ZM8.75 8.75H11.5V11.5H8.75Z" fill="currentColor" />
       </>
     );
   }
   return (
     <>
       <path d={TICKS} fill="none" {...STROKE} />
-      <path d="M4 4H6.5V6.5H4Z" fill="currentColor" {...STROKE} />
-      <path d="M9.5 9.5H12V12H9.5Z" fill="currentColor" {...STROKE} />
+      <path d="M4 4H6.75V6.75H4ZM9.25 9.25H12V12H9.25Z" fill="currentColor" />
     </>
   );
 }
