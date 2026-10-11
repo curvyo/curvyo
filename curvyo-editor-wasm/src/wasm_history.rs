@@ -64,8 +64,7 @@ impl WasmSession {
             return self
                 .session
                 .object_history_target_name(direction_name)
-                .unwrap_or_default()
-                .to_owned();
+                .unwrap_or_default();
         }
         self.session
             .history_target_name(direction_name)
