@@ -1,162 +1,31 @@
-//! The Curvyo desktop host: a Tauri 2 binary owning the native menu,
-//! native file dialogs, the `.curvyo` file association and all filesystem
-//! access, behind the narrow command/event interface this module defines
-//! (ADR 0001 §6).
+//! The Curvyo desktop host: a Tauri 2 binary owning native file dialogs,
+//! the `.curvyo` file association, the window title and close, and all
+//! filesystem access, behind the narrow command/event interface of the
+//! `project` module (ADR 0001 §6).
 //!
 //! `path-node-editing`'s own PR review narrowed this crate's job further:
 //! the host does byte I/O only. The actual document lives in the
 //! `WasmSession` the frontend owns (`curvyo-editor-wasm`, hosted in the
 //! webview); this crate never builds or reads a
 //! `curvyo_document_core::Document` itself any more. Save hands this
-//! host already-packed bytes (via [`save_project_bytes`]) and it writes
-//! them; Open reads bytes from disk and hands them to the frontend (the
-//! "open-bytes" event) for `WasmSession::open` to parse.
+//! host already-packed bytes and it writes them; Open reads bytes from
+//! disk and hands them to the frontend for `WasmSession::open` to parse.
 
 // `CLAUDE.md` §5 allows unwrap/expect in tests; only production code is held
 // to the stricter rule.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
 mod formats;
+#[cfg(any(target_os = "macos", test))]
 mod menu;
+mod project;
 mod state;
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
-use tauri::{AppHandle, Emitter, Manager, State};
-use tauri_plugin_dialog::DialogExt;
+use tauri::Manager;
 
-use state::{AppState, PendingOpen, ProjectState};
-
-/// The main window's label, matching `tauri.conf.json`.
-const MAIN_WINDOW: &str = "main";
-
-/// The native file filter/extension for a Curvyo project, used by both
-/// dialogs and the file association in `tauri.conf.json`.
-const PROJECT_EXTENSION: &str = "curvyo";
-const PROJECT_FILTER_NAME: &str = "Curvyo project";
-const DEFAULT_FILE_NAME: &str = "Untitled.curvyo";
-
-/// A host-level failure to even read a path's bytes (missing file,
-/// permissions, not a file) — distinct from a `.curvyo` whose *content* is
-/// invalid, which is the frontend's own refusal once it tries
-/// `WasmSession::open` on bytes this host did successfully read.
-#[derive(Clone, serde::Serialize)]
-struct OpenErrorPayload {
-    message: String,
-}
-
-/// What the "open-bytes" event (and a successful [`take_pending_open`])
-/// carries: a file this host *could* read, for the frontend to try
-/// `WasmSession::open` on — this host never looks inside these bytes
-/// itself.
-#[derive(Clone, serde::Serialize)]
-struct OpenBytesPayload {
-    path: String,
-    bytes: Vec<u8>,
-}
-
-/// The discriminated union [`take_pending_open`] returns, mirroring
-/// [`state::PendingOpen`] across the IPC boundary.
-#[derive(Clone, serde::Serialize)]
-#[serde(tag = "kind")]
-enum PendingOpenPayload {
-    #[serde(rename = "bytes")]
-    Bytes { path: String, bytes: Vec<u8> },
-    #[serde(rename = "io_error")]
-    IoError { message: String },
-}
-
-impl From<PendingOpen> for PendingOpenPayload {
-    fn from(pending: PendingOpen) -> Self {
-        match pending {
-            PendingOpen::Bytes { path, bytes } => Self::Bytes {
-                path: path.to_string_lossy().into_owned(),
-                bytes,
-            },
-            PendingOpen::IoError(message) => Self::IoError { message },
-        }
-    }
-}
-
-/// A save failure (File → Save / Save As). Unlike [`OpenErrorPayload`]
-/// this has no three-case taxonomy — "the write failed" is the whole
-/// story the UI needs — but it must still reach the user: a save that
-/// silently fails and looks successful is the worst failure mode this
-/// product can have.
-#[derive(Clone, serde::Serialize)]
-struct SaveErrorPayload {
-    message: String,
-}
-
-/// What the "request-pack" event carries: the frontend packs the live
-/// session's document (`WasmSession::pack(app_version)`) and hands the
-/// resulting bytes to [`save_project_bytes`] — this host decides *when*
-/// (Save vs Save As) but never builds the bytes itself.
-#[derive(Clone, serde::Serialize)]
-struct RequestPackPayload {
-    save_as: bool,
-    app_version: String,
-}
-
-/// Returns and clears any open payload buffered before the frontend had
-/// mounted — the file-association launch path's open attempt runs in
-/// `.setup()`, ahead of any `listen()` call. Call once, at mount.
-#[tauri::command]
-#[allow(clippy::needless_pass_by_value)]
-fn take_pending_open(state: State<AppState>) -> Option<PendingOpenPayload> {
-    state.take_pending_open().map(PendingOpenPayload::from)
-}
-
-/// The frontend's confirmation that bytes this host handed it (via
-/// "open-bytes" or [`take_pending_open`]) parsed successfully and are now
-/// the live `WasmSession`. Only now does this host start treating `path`
-/// as the open project's own path — acceptance criterion 7: a refusal
-/// (the frontend never calling this) must never touch an already-open
-/// project, and nothing here ever does.
-#[tauri::command]
-#[allow(clippy::needless_pass_by_value)]
-fn confirm_project_opened(app: AppHandle, state: State<AppState>, path: String) {
-    let mut project = state.lock_project();
-    *project = ProjectState::opened(PathBuf::from(path));
-    let file_name = project.file_name();
-    drop(project);
-    set_window_title(&app, file_name.as_deref());
-}
-
-/// The frontend's half of Save/Save As: here are the live session's
-/// already-packed bytes, write them. `save_as` forces the native save
-/// dialog even when a path is already known (acceptance criterion 3);
-/// otherwise an unknown path falls back to the same dialog (first-ever
-/// save).
-#[tauri::command]
-#[allow(clippy::needless_pass_by_value)]
-fn save_project_bytes(app: AppHandle, state: State<AppState>, bytes: Vec<u8>, save_as: bool) {
-    let existing_path = if save_as {
-        None
-    } else {
-        state.lock_project().path.clone()
-    };
-
-    let Some(path) = existing_path.or_else(|| pick_save_path(&app)) else {
-        return; // no known path, and the user cancelled the dialog.
-    };
-
-    if curvyo_storage_io::write_atomic(&path, &bytes).is_err() {
-        // A failed save that looks successful is the worst failure mode
-        // this product can have — report it, don't just return.
-        emit_save_error(
-            &app,
-            "This project couldn't be saved. Check that you have permission to write to this location and that there's enough disk space, then try again.",
-        );
-        return;
-    }
-
-    let mut project = state.lock_project();
-    project.path = Some(path);
-    let file_name = project.file_name();
-    drop(project);
-    set_window_title(&app, file_name.as_deref());
-}
+use state::AppState;
 
 /// Whether `WEBKIT_DISABLE_DMABUF_RENDERER` still needs to be set in this
 /// process's own environment. Compiled on Linux (where `main` acts on a
@@ -224,31 +93,48 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .manage(AppState::default())
         .invoke_handler(tauri::generate_handler![
-            take_pending_open,
-            confirm_project_opened,
-            save_project_bytes,
-            menu::set_history_menu,
+            project::take_pending_open,
+            project::pick_project,
+            project::confirm_project_opened,
+            project::reset_project,
+            project::set_dirty,
+            project::save_project_bytes,
+            project::quit_app,
             formats::read_formats_file,
             formats::write_formats_file,
             formats::set_formats_file_aside,
             formats::import_formats_file,
             formats::export_formats_file,
         ])
+        // The window's close button and Alt+F4: a project with unsaved changes holds the close and
+        // the page asks; a clean one closes at once, with no round trip to the page.
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event
+                && project::hold_close_for_check(window.app_handle())
+            {
+                api.prevent_close();
+            }
+        })
         .setup(|app| {
             let handle = app.handle().clone();
-            let menu = menu::build(app)?;
-            app.set_menu(menu)?;
-            let menu_handle = handle.clone();
-            app.on_menu_event(move |_app, event| {
-                menu::dispatch(&menu_handle, event.id().as_ref());
-            });
+            // Linux and Windows have no menu bar: Tauri sets no default menu there, and none is
+            // built. macOS cannot lose its bar, so it gets the small one of `menu` (criterion 39).
+            #[cfg(target_os = "macos")]
+            {
+                app.set_menu(menu::build(&handle)?)?;
+                let menu_handle = handle.clone();
+                app.on_menu_event(move |_app, event| {
+                    menu::dispatch(&menu_handle, event.id().as_ref());
+                });
+            }
 
             // A `.curvyo` opened via the OS file association on Linux/Windows
             // arrives as argv[1] (specs/0001-project-file-foundation, AC5).
             if let Some(path) = std::env::args().nth(1) {
                 let path = PathBuf::from(path);
-                if path.extension().and_then(|ext| ext.to_str()) == Some(PROJECT_EXTENSION) {
-                    open_path(&handle, &path);
+                if path.extension().and_then(|ext| ext.to_str()) == Some(project::PROJECT_EXTENSION)
+                {
+                    project::open_handed_path(&handle, &path);
                 }
             }
             Ok(())
@@ -256,154 +142,33 @@ fn main() {
         .build(tauri::generate_context!())
         .expect("error while building the Curvyo application");
 
-    // macOS (and iOS) deliver a double-clicked `.curvyo` as an Apple Event,
-    // surfaced here rather than as argv[1] — the file-association half of
-    // acceptance criterion 5 that the Linux/Windows argv path above does
-    // not cover. Not build-verified on real macOS hardware in this
-    // sandbox; code-complete pending that verification.
     app.run(|app_handle, event| {
+        // The last window closed or the OS asked to quit: held like the window's close button.
+        if let tauri::RunEvent::ExitRequested { api, .. } = &event
+            && project::hold_close_for_check(app_handle)
+        {
+            api.prevent_exit();
+        }
+        // macOS (and iOS) deliver a double-clicked `.curvyo` as an Apple Event,
+        // surfaced here rather than as argv[1] — the file-association half of
+        // acceptance criterion 5 that the Linux/Windows argv path above does
+        // not cover. Not build-verified on real macOS hardware in this
+        // sandbox; code-complete pending that verification.
         #[cfg(target_os = "macos")]
         if let tauri::RunEvent::Opened { urls } = event {
-            for url in urls {
-                if let Ok(path) = url.to_file_path()
-                    && path.extension().and_then(|ext| ext.to_str()) == Some(PROJECT_EXTENSION)
-                {
-                    open_path(app_handle, &path);
-                }
+            // One project is open at a time: the first project file of the event is opened and
+            // the rest are ignored, so a selection of many files cannot read them all.
+            let first = urls.iter().find_map(|url| {
+                url.to_file_path().ok().filter(|path| {
+                    path.extension().and_then(|ext| ext.to_str())
+                        == Some(project::PROJECT_EXTENSION)
+                })
+            });
+            if let Some(path) = first {
+                project::open_handed_path(app_handle, &path);
             }
         }
-        #[cfg(not(target_os = "macos"))]
-        {
-            let _ = (app_handle, event);
-        }
     });
-}
-
-fn window_title(file_name: Option<&str>) -> String {
-    match file_name {
-        Some(name) => format!("{name} — Curvyo"),
-        None => "Curvyo".to_string(),
-    }
-}
-
-fn set_window_title(app: &AppHandle, file_name: Option<&str>) {
-    if let Some(window) = app.get_webview_window(MAIN_WINDOW) {
-        let _ = window.set_title(&window_title(file_name));
-    }
-}
-
-/// Emits the live "open-error" event (for an already-mounted frontend) and
-/// buffers the same message in [`AppState`] (for the file-association
-/// launch race — see [`take_pending_open`]). Harmless if nobody ever
-/// reads the buffered copy: it is only polled once, at mount.
-fn emit_open_error(app: &AppHandle, message: String) {
-    app.state::<AppState>()
-        .set_pending_open(PendingOpen::IoError(message.clone()));
-    let _ = app.emit("open-error", OpenErrorPayload { message });
-}
-
-/// Reports a failed Save/Save As. There is always a running, mounted
-/// frontend by the time a save can happen (unlike open, it is never
-/// triggered from `.setup()`), so — unlike open-error — this has no
-/// pending-buffer fallback to worry about.
-fn emit_save_error(app: &AppHandle, message: &str) {
-    let payload = SaveErrorPayload {
-        message: message.to_string(),
-    };
-    let _ = app.emit("save-error", payload);
-}
-
-/// Handles File → New: a fresh, never-saved project replaces whatever was
-/// open (acceptance criterion 2). The frontend reacts to "new-project" by
-/// swapping in a brand-new, empty `WasmSession` of its own.
-pub(crate) fn handle_new(app: &AppHandle) {
-    let state = app.state::<AppState>();
-    let mut project = state.lock_project();
-    *project = ProjectState::new_unsaved();
-    drop(project);
-    set_window_title(app, None);
-    let _ = app.emit("new-project", ());
-}
-
-/// Handles File → Open…: the native picker, then [`open_path`].
-pub(crate) fn handle_open(app: &AppHandle) {
-    let picked = app
-        .dialog()
-        .file()
-        .add_filter(PROJECT_FILTER_NAME, &[PROJECT_EXTENSION])
-        .blocking_pick_file();
-
-    let Some(file_path) = picked else {
-        return; // user cancelled; already-open project stays untouched.
-    };
-    let Some(path) = file_path.into_path().ok() else {
-        return;
-    };
-    open_path(app, &path);
-}
-
-/// Reads the bytes at `path` and hands them to the frontend to open
-/// (acceptance criterion 7: a refusal never touches an already-open
-/// project — this host does not update [`AppState`]'s path at all here;
-/// [`confirm_project_opened`] does, once the frontend reports success).
-fn open_path(app: &AppHandle, path: &Path) {
-    let Ok(bytes) = curvyo_storage_io::read_to_vec(path) else {
-        // Not one of curvyo_document_core::OpenError's three cases (that
-        // taxonomy is about file *content*, and only the frontend's
-        // `WasmSession::open` ever sees it now), but the UI has one
-        // failure dialog, so an unreadable path is reported the same way
-        // a damaged container used to be.
-        emit_open_error(app, "This file is damaged and can't be read.".to_string());
-        return;
-    };
-    app.state::<AppState>()
-        .set_pending_open(PendingOpen::Bytes {
-            path: path.to_path_buf(),
-            bytes: bytes.clone(),
-        });
-    let _ = app.emit(
-        "open-bytes",
-        OpenBytesPayload {
-            path: path.to_string_lossy().into_owned(),
-            bytes,
-        },
-    );
-}
-
-/// Handles File → Save: asks the frontend to pack the live session and
-/// hand this host the bytes (via [`save_project_bytes`]), writing to the
-/// project's known path once it does, or falling back to the Save As
-/// dialog when the project has never been saved.
-pub(crate) fn handle_save(app: &AppHandle) {
-    request_pack(app, false);
-}
-
-/// Handles File → Save As…: always prompts, defaulting to `Untitled.curvyo`
-/// (acceptance criterion 3).
-pub(crate) fn handle_save_as(app: &AppHandle) {
-    request_pack(app, true);
-}
-
-/// The native Save As… dialog, defaulting to `Untitled.curvyo` (acceptance
-/// criterion 3). Shared by [`save_project_bytes`]'s "no known path yet"
-/// and "Save As was explicitly requested" cases.
-fn pick_save_path(app: &AppHandle) -> Option<PathBuf> {
-    app.dialog()
-        .file()
-        .add_filter(PROJECT_FILTER_NAME, &[PROJECT_EXTENSION])
-        .set_file_name(DEFAULT_FILE_NAME)
-        .blocking_save_file()
-        .and_then(|file_path| file_path.into_path().ok())
-}
-
-fn request_pack(app: &AppHandle, save_as: bool) {
-    let _ = app.emit(
-        "request-pack",
-        RequestPackPayload {
-            save_as,
-            app_version: env!("CARGO_PKG_VERSION").to_string(),
-        },
-    );
 }
 
 #[cfg(test)]
@@ -427,5 +192,30 @@ mod webkit_dmabuf_env_var_tests {
              this build does that by relaunching itself with the variable set, which this \
              check decides is necessary"
         );
+    }
+}
+
+#[cfg(test)]
+mod capability_tests {
+    /// Tauri 2 denies `listen` to a page that has no capability: the host's events (a file the
+    /// operating system hands over, a window close with unsaved changes) then never arrive and
+    /// the page never says so. The capability file of the main window has to name both calls.
+    #[test]
+    fn the_main_window_may_listen_to_the_hosts_events() {
+        let text = include_str!("../capabilities/default.json");
+        let capability: serde_json::Value = serde_json::from_str(text).unwrap();
+        let strings = |key: &str| -> Vec<String> {
+            capability[key]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|value| value.as_str().unwrap().to_string())
+                .collect()
+        };
+        assert!(strings("windows").contains(&"main".to_string()));
+        let permissions = strings("permissions");
+        for needed in ["core:event:allow-listen", "core:event:allow-unlisten"] {
+            assert!(permissions.contains(&needed.to_string()), "{needed}");
+        }
     }
 }

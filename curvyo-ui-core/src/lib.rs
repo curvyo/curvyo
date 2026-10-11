@@ -28,6 +28,7 @@ mod display_unit_text;
 mod document_fit;
 mod document_presets_view;
 mod ellipse_tool;
+mod file_chords;
 mod format_form;
 mod format_list_view;
 mod group_box;
@@ -108,6 +109,7 @@ pub use document_presets_view::{
     PresetEntry, PresetGroupView, PresetsView, orientation_swap, preset_pick_size, presets_view,
 };
 pub use ellipse_tool::EllipseTool;
+pub use file_chords::{FileCommand, Platform, chord_label, command_tooltip, file_chord};
 pub use format_form::{
     FieldError, FormDraft, FormField, FormPrefill, add_prefill, added_notice, check_format_form,
     edit_prefill, field_error, import_notice, import_refusal, saved_notice,

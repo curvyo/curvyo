@@ -1,6 +1,6 @@
 # Editing quick wins: select all and keyboard nudge
 
-Status: Ready (the criteria are complete and testable; `adrs.md` and the UX notes exist). Build after PR #80 (`story/multi-object-transform`) merges: it needs #80's group box, multi-object move and key table. It is a Proposal that the lead scheduled because it is small and reversible in one PR; the customer can veto it at the demo.
+Status: Ready (the criteria are complete and testable; `adrs.md` and the UX notes exist). Build after PR #80 (`story/multi-object-transform`) merges: it needs #80's group box, multi-object move and key table. It is a Proposal that the lead scheduled because it is small and reversible in one PR; the customer can veto it at the demo. **Amended by `0051-sidebar-and-no-menu`** (2026-10-11): criterion 14 and the line "the native Edit menu has Select All" are replaced: there is no menu on Linux, Windows or in the browser and Ctrl+A is the route; macOS keeps a predefined Select All in its Edit menu, which acts on text fields only (the page takes Cmd+A on the canvas).
 Priority: Should
 Origin: Proposal (collected from the ux-engineer's and the tester's reviews; both keys are listed as "Reserved, not built" in `docs/design-system.md`, "Keyboard concept", and the nudge as "needs a decision (scope growth)" in the shortcut table). Not accepted until the customer says so; small and reversible in one PR.
 

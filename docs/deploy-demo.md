@@ -42,9 +42,13 @@ npx vite preview       # serves frontend/dist
 ## Limits of the browser build
 
 - Needs a browser with WebAssembly and WebGL 2. If it is missing, a message is
-  shown in the bar at the top.
+  shown instead of the editor.
 - No device access (no machines, no serial/USB).
-- There is no native menu. The top bar has New, Open and Save instead. Open
-  picks a `.curvyo` file; Save downloads `untitled.curvyo`. Nothing is stored
-  on a server and nothing is saved automatically.
-- The desktop app (Tauri) is unchanged: the bar is not shown there.
+- There is no menu. The File tab of the panel on the right has New, Open, Save
+  and Close. Open picks a `.curvyo` file; Save downloads it under the project's
+  file name, or `Untitled.curvyo`, and counts as saved (the page cannot see
+  whether the browser's own save prompt was cancelled). Ctrl+S and Ctrl+O work;
+  the browser keeps Ctrl+N and Ctrl+W. Reloading or closing the page with unsaved
+  changes asks the browser's own leave-page question. Nothing is stored on a
+  server and nothing is saved automatically.
+- The collapsed state of the panel is kept in the browser's local storage.

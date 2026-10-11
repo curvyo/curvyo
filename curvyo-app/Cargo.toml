@@ -1,10 +1,10 @@
 [package]
 name = "curvyo-app"
-version = "0.1.0"
+version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
-description = "The Tauri 2 desktop host: native menu, native file dialogs, the .curvyo file association, and platform I/O behind a narrow command interface (ADR 0001 §6, ADR 0011 §2)."
+description = "The Tauri 2 desktop host: native file dialogs, the .curvyo file association, the window title and close, the macOS menu, and platform I/O behind a narrow command interface (ADR 0001 §6, ADR 0011 §2)."
 
 [lints]
 workspace = true

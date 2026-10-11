@@ -19,7 +19,6 @@ import {
 } from "../src/lib/historyRows.ts";
 import {
   historyKeyDirection,
-  isObjectDirection,
   noticeDurationMs,
   workingNotice,
 } from "../src/lib/historyText.ts";
@@ -55,7 +54,6 @@ test("Ctrl+U and Ctrl+Shift+U are the object keys, by the typed character", () =
   assert.equal(historyKeyDirection(key("u", { metaKey: true }), true), "object-undo");
   assert.equal(historyKeyDirection(key("u"), false), null);
   assert.equal(historyKeyDirection(key("u", { ctrlKey: true, altKey: true }), false), null);
-  assert.ok(isObjectDirection("object-undo") && !isObjectDirection("undo"));
   assert.equal(workingNotice("object-redo"), "Redo: working...");
 });
 

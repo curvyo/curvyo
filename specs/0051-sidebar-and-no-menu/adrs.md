@@ -180,3 +180,7 @@ New tests:
 - 2026-10-11 (PO, confirmed with a different mechanism): the collapsed state is saved per OS user, not per project and not in the file. It is stored in webview storage, not in a data-directory file (decision 8).
 - 2026-10-11 (PO, confirmed): no Export, Recent files or start screen.
 - 2026-10-11 (architect): decisions 1 to 10 above, with no new ADR.
+- 2026-10-11 (architect, review): `curvyo-app/capabilities/default.json` is new: `core:event:allow-listen` and `allow-unlisten`, window `main`. Without it Tauri 2.12 drops every host event. No ADR: Tauri's ACL is host mechanism under ADR 0001 §6. The test in `main.rs` guards it.
+- 2026-10-11 (architect, review): the page reads the dirty flag once per animation frame and once synchronously in `request`, instead of after each commit. This is accepted.
+- 2026-10-11 (architect, review): the commands live in `curvyo-app/src/project.rs`, and `main.rs` keeps the builder and the handshake. `Session::pack(&self, v)` stays for tests, and `pack_for_save(&mut self)` records the version.
+- 2026-10-11 (architect, review): file dialogs are modal to the main window, and replacing actions wait while a dialog or a write runs (review B1). A page that starts, a reload included, tells the host `reset_project` before it takes a file handed over at launch (review B2).

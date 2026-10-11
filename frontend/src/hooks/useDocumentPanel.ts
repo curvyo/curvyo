@@ -3,11 +3,11 @@ import { useCallback, useMemo, useState } from "react";
 import type { WasmSession } from "@/lib/editorSession";
 
 /** What the Properties panel's body shows (`curvyo-ui-core::panel_content`). */
-export type PanelContent = "document" | "style" | "history" | "empty";
+export type PanelContent = "file" | "document" | "style" | "history" | "empty";
 
 /** One tab of the panel's strip (`curvyo-ui-core::panel_tabs`). */
 export interface PanelTabView {
-  /** Sent back on a press: "document" or "style". */
+  /** Sent back on a press: "file", "document", "style" or "history". */
   name: string;
   /** The accessible name. */
   label: string;
@@ -158,8 +158,9 @@ export interface DocumentPanelApi {
   fit: () => FitResult;
   /** Re-reads the view after a command that did not go through this hook. */
   refresh: () => void;
-  /** A press on a tab of the strip (also an arrow key on it). */
-  pressTab: (name: string) => void;
+  /** A press on a tab of the strip (also an arrow key on it). `false` when the session refused it
+   * (the dimmed Style tab). */
+  pressTab: (name: string) => boolean;
   /** Shift+Ctrl+F or Shift+Ctrl+D: the tab the shortcut names. */
   shortcut: (tab: "style" | "document" | "history") => void;
 }
@@ -248,9 +249,10 @@ export function useDocumentPanel(editor: EditorHandle): DocumentPanelApi {
   }, [getSession, refresh, refreshCursor]);
 
   const pressTab = useCallback(
-    (name: string) => {
-      getSession()?.press_panel_tab(name);
+    (name: string): boolean => {
+      const accepted = getSession()?.press_panel_tab(name) ?? false;
       refresh();
+      return accepted;
     },
     [getSession, refresh],
   );

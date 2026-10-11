@@ -2,7 +2,8 @@
 // shell `invoke`/`listen` are Tauri's own, unchanged. In a plain browser (the
 // public demo build, docs/deploy-demo.md) there is no host: the same two
 // functions are served by a tiny in-page implementation, so `App` runs
-// the same code on both. Browser Open reads a picked file, Save downloads it.
+// the same code on both. Browser Open reads a picked file, Save downloads it
+// and counts as saved: the page cannot see whether the browser's own save prompt was cancelled.
 import { invoke as tauriInvoke } from "@tauri-apps/api/core";
 import {
   listen as tauriListen,
@@ -10,29 +11,58 @@ import {
   type UnlistenFn,
 } from "@tauri-apps/api/event";
 
+import { detectPlatform, type PlatformKind } from "@/lib/platformKind";
+import type { OpenPayload, SaveOutcome } from "@/lib/projectState";
+
 /** True inside the Tauri desktop shell, false in a plain browser. */
 export const isTauri = "__TAURI_INTERNALS__" in window;
 
-const listeners = new Map<string, Set<EventCallback<never>>>();
+/** The build and system the page runs on: which file chords exist and how they are named. */
+export const PLATFORM: PlatformKind = detectPlatform(navigator.platform, isTauri);
 
-/** Delivers `payload` to every browser-side `listen` handler of `event`. */
-export function emitLocal(event: string, payload?: unknown) {
-  for (const handler of listeners.get(event) ?? []) {
-    (handler as EventCallback<unknown>)({
-      event,
-      id: 0,
-      payload,
-    });
-  }
-}
+/** The name a download gets when the project has none. */
+const DEFAULT_FILE_NAME = "Untitled.curvyo";
 
-function download(bytes: number[]) {
+/** Browser Save: downloads the bytes as `fileName`. */
+function download(bytes: number[], fileName: string): SaveOutcome {
   const url = URL.createObjectURL(new Blob([new Uint8Array(bytes)]));
   const link = document.createElement("a");
   link.href = url;
-  link.download = "untitled.curvyo";
+  link.download = fileName;
   link.click();
   URL.revokeObjectURL(url);
+  return { kind: "saved", file_name: fileName, path: fileName };
+}
+
+/** Browser Open: the picked `.curvyo` file's name and bytes, `null` when the picker was
+ * cancelled, or the read error. The answer returns to the caller, as the desktop command's does. */
+function pickProject(): Promise<OpenPayload | null> {
+  return new Promise((resolve) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".curvyo";
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (!file) {
+        resolve(null);
+        return;
+      }
+      file.arrayBuffer().then(
+        (buffer) =>
+          resolve({ kind: "bytes", path: file.name, bytes: Array.from(new Uint8Array(buffer)) }),
+        () => resolve({ kind: "io_error", message: "This file couldn't be read." }),
+      );
+    };
+    input.addEventListener("cancel", () => resolve(null));
+    // An engine that sends no `cancel` would leave this open for good, and the dialog gate with
+    // it. When the window gets the focus back and no file arrived, the picker was dismissed.
+    window.addEventListener(
+      "focus",
+      () => window.setTimeout(() => (input.files?.length ? undefined : resolve(null)), 1500),
+      { once: true },
+    );
+    input.click();
+  });
 }
 
 /** Where the browser build keeps the text of the formats file
@@ -79,8 +109,12 @@ function downloadText(name: string, text: string) {
 
 const browserCommands: Record<string, (args?: Record<string, unknown>) => unknown> = {
   take_pending_open: () => null,
+  pick_project: () => pickProject(),
   confirm_project_opened: () => undefined,
-  save_project_bytes: (args) => download(args?.bytes as number[]),
+  reset_project: () => undefined,
+  set_dirty: () => undefined,
+  save_project_bytes: (args) =>
+    download(args?.bytes as number[], String(args?.fileName ?? DEFAULT_FILE_NAME)),
   read_formats_file: () => readStored(FORMATS_KEY),
   write_formats_file: (args) => window.localStorage.setItem(FORMATS_KEY, String(args?.text)),
   set_formats_file_aside: () => {
@@ -117,7 +151,7 @@ export function invoke<T>(
   }
 }
 
-/** Same contract as Tauri's `listen`. */
+/** Same contract as Tauri's `listen`. The browser has no host, so no event ever arrives. */
 export function listen<T>(
   event: string,
   handler: EventCallback<T>,
@@ -125,33 +159,7 @@ export function listen<T>(
   if (isTauri) {
     return tauriListen<T>(event, handler);
   }
-  const set = listeners.get(event) ?? new Set();
-  set.add(handler as EventCallback<never>);
-  listeners.set(event, set);
-  return Promise.resolve(() => set.delete(handler as EventCallback<never>));
-}
-
-/** Browser-only File > Open: asks for a `.curvyo` file and hands its bytes
- * to the same `open-bytes` listener the native menu feeds. */
-export function pickProjectFile() {
-  const input = document.createElement("input");
-  input.type = "file";
-  input.accept = ".curvyo";
-  input.onchange = () => {
-    const file = input.files?.[0];
-    if (!file) {
-      return;
-    }
-    file.arrayBuffer().then(
-      (buffer) =>
-        emitLocal("open-bytes", {
-          path: file.name,
-          bytes: Array.from(new Uint8Array(buffer)),
-        }),
-      () => emitLocal("open-error", { message: "This file couldn't be read." }),
-    );
-  };
-  input.click();
+  return Promise.resolve(() => undefined);
 }
 
 /** Why this browser cannot run the editor, or `null` if it can. */

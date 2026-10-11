@@ -6,8 +6,27 @@
 
 use wasm_bindgen::prelude::*;
 
+use curvyo_ui_core::{FileCommand, Platform, command_tooltip};
+
 use crate::session::KeyInput;
 use crate::wasm_api::{LiveReadout, WasmSession};
+
+/// The tooltip of a File tab button, with the chord this build has for it ("New (Ctrl+N)", "New"
+/// in the browser): `command` is one of `"new"`, `"open"`, `"save"`, `"save-as"`, `"close"`,
+/// `"quit"`, `platform` one of `"linux"`, `"windows"`, `"macos"`, `"browser"`. An unknown name
+/// gives an empty string. The key text comes from the table that matches the keys
+/// (`specs/0051-sidebar-and-no-menu/` criterion 34).
+#[wasm_bindgen]
+#[must_use]
+pub fn file_command_tooltip(command: &str, platform: &str) -> String {
+    match (
+        FileCommand::from_name(command),
+        Platform::from_name(platform),
+    ) {
+        (Some(command), Some(platform)) => command_tooltip(command, platform),
+        _ => String::new(),
+    }
+}
 
 #[wasm_bindgen]
 impl WasmSession {
@@ -51,6 +70,43 @@ impl WasmSession {
             })
             .code()
             .to_string()
+    }
+
+    /// One key press that may be a file chord (`specs/0051-sidebar-and-no-menu/` criteria 32 and
+    /// 33). `key` is `KeyboardEvent.key`, `primary` is Ctrl (Cmd on macOS), `blocked` is true
+    /// during an IME composition or a long operation, `platform` is `"linux"`, `"windows"`,
+    /// `"macos"` or `"browser"`. Returns the command to run (`"new"`, `"open"`, `"save"`,
+    /// `"save-as"`, `"close"`, `"quit"`) or an empty string when the press is no chord or may not
+    /// act now; the host prevents the page's default for a command only.
+    #[allow(clippy::fn_params_excessive_bools, clippy::too_many_arguments)] // one scalar per DOM fact
+    #[must_use]
+    pub fn file_chord(
+        &self,
+        key: &str,
+        shift: bool,
+        primary: bool,
+        alt: bool,
+        repeat: bool,
+        blocked: bool,
+        platform: &str,
+    ) -> String {
+        let Some(platform) = Platform::from_name(platform) else {
+            return String::new();
+        };
+        self.session
+            .file_chord(
+                &KeyInput {
+                    key,
+                    shift,
+                    ctrl: primary,
+                    alt,
+                    repeat,
+                    dom_blocked: blocked,
+                    ..KeyInput::default()
+                },
+                platform,
+            )
+            .map_or_else(String::new, |command| command.name().to_string())
     }
 
     /// The move readout of the nudge step that is running ("Δ 3.0, 0.0 mm"),

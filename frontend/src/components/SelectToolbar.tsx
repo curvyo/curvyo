@@ -513,12 +513,14 @@ export function SelectToolbar({
       <div className="flex min-h-9 flex-wrap content-start items-center gap-x-1 gap-y-0 py-1">
         <ToolbarSwitch
           label="Scale stroke width"
+          shortLabel="Scale stroke"
           tooltip="Scale stroke width with the object. Off: a resize keeps the stroke thickness."
           checked={scaleStrokeWidth}
           onCheckedChange={onSetScaleStrokeWidth}
         />
         <ToolbarSwitch
           label="Scale corner radius"
+          shortLabel="Scale corners"
           tooltip="Scale corner radius with the object. Off: a resize keeps the corner radius."
           checked={scaleCornerRadius}
           onCheckedChange={onSetScaleCornerRadius}

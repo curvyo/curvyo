@@ -13,8 +13,14 @@
     clippy::type_complexity
 )]
 
-use curvyo_ui_core::{PanelContent, PanelTab, PanelTabs, panel_body, tab_entries};
+use curvyo_ui_core::{PanelContent, PanelTab, PanelTabEntry, PanelTabs, panel_body, tab_entries};
 use proptest::prelude::*;
+
+/// The entry called `name`. `0051` puts the File tab first, so no test here addresses a tab by its
+/// position (`0051` criterion 45).
+fn entry<'a>(entries: &'a [PanelTabEntry], name: &str) -> &'a PanelTabEntry {
+    entries.iter().find(|e| e.name == name).unwrap()
+}
 
 const DOC: PanelTab = PanelTab::Document;
 const STYLE: PanelTab = PanelTab::Style;
@@ -22,20 +28,27 @@ const STYLE: PanelTab = PanelTab::Style;
 // ---------------------------------------------------------------- the strip
 
 #[test]
-fn c1_three_tabs_in_the_order_document_style_history_with_names_and_tooltips() {
+fn c1_the_tabs_in_order_with_names_and_tooltips() {
     for non_empty in [false, true] {
         for active in [DOC, STYLE] {
             let entries = tab_entries(active, non_empty);
+            // The File tab (`0051`) comes first; the other three keep their order.
             let names: Vec<&str> = entries.iter().map(|e| e.name).collect();
-            assert_eq!(names, ["document", "style", "history"]);
+            assert_eq!(names, ["file", "document", "style", "history"]);
             let labels: Vec<&str> = entries.iter().map(|e| e.label).collect();
-            assert_eq!(labels, ["Document", "Style", "History"]);
-            assert_eq!(entries[2].tooltip, "History (Shift+Ctrl+H)");
-            assert_eq!(entries[0].tooltip, "Document (Shift+Ctrl+D)");
+            assert_eq!(labels, ["File", "Document", "Style", "History"]);
+            assert_eq!(entry(&entries, "history").tooltip, "History (Shift+Ctrl+H)");
+            assert_eq!(
+                entry(&entries, "document").tooltip,
+                "Document (Shift+Ctrl+D)"
+            );
             if non_empty {
-                assert_eq!(entries[1].tooltip, "Style (Shift+Ctrl+F)");
+                assert_eq!(entry(&entries, "style").tooltip, "Style (Shift+Ctrl+F)");
             } else {
-                assert_eq!(entries[1].tooltip, "Style: select an object first");
+                assert_eq!(
+                    entry(&entries, "style").tooltip,
+                    "Style: select an object first"
+                );
             }
         }
     }
@@ -51,8 +64,11 @@ fn c2_c4_exactly_one_tab_selected_and_style_is_dimmed_only_without_a_selection()
                 entries.iter().find(|e| e.selected).unwrap().name,
                 active.name()
             );
-            assert!(entries[0].enabled, "Document is never dimmed");
-            assert_eq!(entries[1].enabled, non_empty);
+            assert!(
+                entry(&entries, "document").enabled,
+                "Document is never dimmed"
+            );
+            assert_eq!(entry(&entries, "style").enabled, non_empty);
         }
     }
 }
@@ -261,7 +277,7 @@ proptest! {
             // The strip agrees with the rule.
             let e = tab_entries(t.active(), scope);
             prop_assert_eq!(e.iter().filter(|x| x.selected).count(), 1);
-            prop_assert_eq!(e[1].enabled, scope);
+            prop_assert_eq!(entry(&e, "style").enabled, scope);
         }
     }
 
