@@ -459,7 +459,9 @@ mod pieces_rejoin {
         (-100i32..=100).prop_map(|n| f64::from(n) * 0.2)
     }
 
-    fn anchor_strategy() -> impl Strategy<Value = ((f64, f64), (f64, f64), (f64, f64))> {
+    type Triple = ((f64, f64), (f64, f64), (f64, f64));
+
+    fn anchor_strategy() -> impl Strategy<Value = Triple> {
         (
             (coordinate(), coordinate()),
             (coordinate(), coordinate()),
@@ -467,12 +469,7 @@ mod pieces_rejoin {
         )
     }
 
-    fn path_of(
-        document: &Document,
-        first: u64,
-        nodes: &[((f64, f64), (f64, f64), (f64, f64))],
-        closed: bool,
-    ) -> NodeId {
+    fn path_of(document: &Document, first: u64, nodes: &[Triple], closed: bool) -> NodeId {
         let anchors: Vec<NewAnchor> = nodes
             .iter()
             .enumerate()

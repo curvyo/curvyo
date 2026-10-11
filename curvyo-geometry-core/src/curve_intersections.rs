@@ -69,15 +69,15 @@ impl Seg {
 
     /// The velocity at parameter `t`, consistent with [`Seg::point_at`].
     fn velocity_at(&self, t: f64) -> (f64, f64) {
-        let [p0, p1, p2, p3] = self.curve.0;
+        let [start, c1, c2, end] = self.curve.0;
         if self.line {
-            return (p3.x - p0.x, p3.y - p0.y);
+            return (end.x - start.x, end.y - start.y);
         }
-        let s = 1.0 - t;
-        let (a, b, c) = (3.0 * s * s, 6.0 * s * t, 3.0 * t * t);
+        let rest = 1.0 - t;
+        let (w0, w1, w2) = (3.0 * rest * rest, 6.0 * rest * t, 3.0 * t * t);
         (
-            a * (p1.x - p0.x) + b * (p2.x - p1.x) + c * (p3.x - p2.x),
-            a * (p1.y - p0.y) + b * (p2.y - p1.y) + c * (p3.y - p2.y),
+            w0 * (c1.x - start.x) + w1 * (c2.x - c1.x) + w2 * (end.x - c2.x),
+            w0 * (c1.y - start.y) + w1 * (c2.y - c1.y) + w2 * (end.y - c2.y),
         )
     }
 
@@ -241,8 +241,8 @@ fn meet(a: &Seg, b: &Seg, pa: Branch, pb: Branch, depth: u32, hits: &mut Hits) {
         match chord_hit(p0, p1, q0, q1, reach) {
             Chord::None => {}
             Chord::At(u, v) => {
-                hits.points
-                    .push(refined(a, b, (pa.param_at(a, u), pb.param_at(b, v))))
+                let found = (pa.param_at(a, u), pb.param_at(b, v));
+                hits.points.push(refined(a, b, found));
             }
             Chord::Span((u0, v0), (u1, v1)) => hits.spans.push((
                 (pa.param_at(a, u0), pb.param_at(b, v0)),
