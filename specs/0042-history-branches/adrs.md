@@ -119,3 +119,22 @@ mode (spec Q3 A) because a document-wide go-to would be `revert_to`, which rever
   write engine (ADR 0014 §1: one read, different write rules).
 - **Branch marks are not stored.** `BranchMark` and `HistoryBranch` are derived per call;
   `format_version` and the saved file are unchanged (criterion 33).
+
+**2026-10-12, architect review of milestones 2 to 4** (`6571ba9..d224ab9`):
+
+- **Exploration continuation.** A further go-to press repeats the header with a new `v` (same
+  label, `s` and `o`); `step_header::continues` joins it in the step index and in `find_step`, and
+  the step names its latest version. This is what decision 5 says; ADR 0014 §2 ("repeats the header
+  verbatim") gets a one-line amendment for this one exception. An older build reads each press as
+  its own step with an unknown label: a longer list there, never a wrong drawing.
+- **One write engine.** `version_write.rs` reads through the checkout guard (`Detached`) and
+  writes through `merge::restore_map`, the restore write path, with "now" as the from-side so every
+  field takes the version's value. A clone creates a new node, so `revive.rs` has nothing to do; a
+  go to on a deleted object is refused. The condition of the milestone 1 note is met. A go to sets
+  the object's meta map only; its tree parent and z-position stay where they are now.
+- **Inherited rows along the path.** Inherited rows leave out steps their author had taken back by
+  the copy's version (`StepIndex::machine_within`), for a clone of a version and for `0041`'s
+  Duplicate alike: one lineage rule, as criterion 23 asks. For Duplicate this hides rows that
+  `0041` criterion 24 listed; it goes to the customer with the demo (default: keep the new rule).
+- **No format change.** Go to and clone are ordinary commits with headers; clone writes the
+  existing `clone_of`; `format_version` is unchanged.
