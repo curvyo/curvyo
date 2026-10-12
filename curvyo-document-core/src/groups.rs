@@ -9,7 +9,7 @@ use loro::{LoroTree, TreeID, TreeParentId};
 use crate::document::{Document, OBJECTS_TREE};
 use crate::group_tree::{
     KEY_GROUP, MAX_GROUP_DEPTH, children_of, group_parent, groups_above, groups_in, is_group_node,
-    node_id,
+    is_layer_node, node_id,
 };
 use crate::objects::ObjectEditError;
 use crate::path_codec::node_exists;
@@ -30,17 +30,27 @@ pub const UNGROUP_COMMIT_LABEL: &str = "ungroup";
 /// reader tolerates) go too: every group without a child that is a child of one of `parents`
 /// (`None` is the document root) is removed before the walk upwards, so the next local command
 /// that touches a parent cleans up what lies in it.
+///
+/// A layer is never removed: a new layer is empty, and a maker empties a layer on purpose
+/// (`specs/0050-layers-and-objects-panel/adrs.md` decision 2).
 pub(crate) fn remove_emptied_groups(tree: &LoroTree, parents: &[Option<TreeID>]) {
     for &start in parents {
         for child in children_of(tree, start) {
-            if tree.children_num(child).unwrap_or(0) == 0 && is_group_node(tree, child) {
+            if tree.children_num(child).unwrap_or(0) == 0
+                && is_group_node(tree, child)
+                && !is_layer_node(tree, child)
+            {
                 let _ = tree.delete(child);
             }
         }
         let mut current = start;
         while let Some(group) = current {
             let alive = tree.contains(group) && matches!(tree.is_node_deleted(&group), Ok(false));
-            if !alive || !is_group_node(tree, group) || tree.children_num(group).unwrap_or(0) != 0 {
+            if !alive
+                || !is_group_node(tree, group)
+                || is_layer_node(tree, group)
+                || tree.children_num(group).unwrap_or(0) != 0
+            {
                 break;
             }
             let above = group_parent(tree, group);

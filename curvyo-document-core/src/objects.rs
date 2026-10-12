@@ -75,6 +75,13 @@ pub enum ObjectEditError {
     /// [`Document::ungroup`] was given an object that is not a group.
     #[error("the object is not a group")]
     NotAGroup,
+    /// The node, or a container above it, is locked (`specs/0050-layers-and-objects-panel`
+    /// criterion 20): nothing was written.
+    #[error("the node is locked")]
+    Locked,
+    /// [`Document::delete_layer`] was given a node that is not a layer.
+    #[error("the node is not a layer")]
+    NotALayer,
 }
 
 /// One object to duplicate with [`Document::duplicate_objects`], and the

@@ -138,6 +138,15 @@ new dependency, no trait, no generic.
     - Registers at their defaults are omitted.
     - `0023` did not fix this form, so the first of `0023` and `0050` to merge writes it. `0023`
       leaves out the registers.
+    - **Superseded 2026-10-12 (implementer, by the lead's decision):** `0023` merged first and
+      wrote groups as `{ "shape": "group", "id", "objects": [...] }`, the key its leaves already
+      use (`"shape": "path" | "rect" | ...`). That form stays. A layer is written as
+      `{ "shape": "layer", "id", "objects": [...] }`, and every node, layer, group or leaf, may
+      carry the optional keys `"name"` (string), `"visible": false`, `"locked": true` and
+      `"opacity"` (number below 1), each left out at its default. Reason: renaming `shape` to
+      `kind` and `objects` to `children` would change a merged view for no reader's gain, and
+      one key that names what a node is (`shape`) reads the same for leaves, groups and layers.
+      `document.json` is non-authoritative (ADR 0004 §1), so no format version depends on it.
 12. **2026-10-10: duplicate.** `copy_map` copies every key, so a copy keeps its name and flags
     (the product owner's default: the same name). Copied clones are relinked by `0049` decision 8, chains included.
 13. **2026-10-10: concurrency.**
