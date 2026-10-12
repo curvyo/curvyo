@@ -26,19 +26,26 @@ amends Outset/Inset later and is not anticipated here.
 
 ### Milestone 1: the kernel (AC 6, 7, 8, 9, 11, 12, 15 to 20, 3)
 
-- [ ] 1.1 Tests first (`tests/offset.rs`): square Miter/Round/Bevel/Inset/empty/9.99 (AC 15), ring (AC 16),
+- [x] 1.1 Tests first (`tests/offset.rs`): square Miter/Round/Bevel/Inset/empty/9.99 (AC 15), ring (AC 16),
   open line with the three caps and refused inset (AC 17), L-shape reflex corner (AC 18), miter limit
   on a square and a 20-degree triangle (AC 19), circle polyline (AC 20), self-crossing operand (AC 9),
   output rules: corner-only, min spacing, no collinear vertex, canonical winding (AC 11), determinism
   under operand outline order (AC 12).
-- [ ] 1.2 `offset.rs`: closed pipeline `grid_paths` → `normalize` → `IntOutlineOffset::outline` →
+- [x] 1.2 `offset.rs`: closed pipeline `grid_paths` → `normalize` → `IntOutlineOffset::outline` →
   `cleanup` → `canonical_millimetres`; open pipeline flatten → snap → `IntStrokeOffset::stroke(2|d|)`;
   integer API, `MathMode::Integer`, distance rounded to the grid; joins and caps mapped as in `adrs.md`;
   `ArcOptions.max_step` from `sqrt` only (deterministic); `miter_min_turn = min(5°, sqrt(0.04/|d|))`;
   `validate_outline`/`validate_stroke` → out of range; empty → `OffsetError::Empty` (AC 6 to 9, 11, 12).
-- [ ] 1.3 Property test: random grid polygons, outset contains the operand, inset lies inside it, area
+- [x] 1.3 Property test: random grid polygons, outset contains the operand, inset lies inside it, area
   monotonic in `d` (AC 6).
-- [ ] 1.4 Budget test: 200 curved nodes within 50 ms in release (AC 3), next to `boolean_performance`.
+- [x] 1.4 Budget test: 200 curved nodes within 50 ms in release (AC 3), in `boolean_performance` (the
+  `boolean-budgets` CI job). Measured: about 20 ms at 2 mm and 4 ms at -1 mm on the gear-like operand;
+  a 5 mm outset that fills its 4 mm pockets takes about 55 ms (open point for the lead).
+- [x] 1.5 Golden results (`tests/offset_golden.rs`, `fixtures/offset/cases.golden`), compared natively
+  and in the wasm build in CI (AC 12).
+- Note: slivers narrower on average than the flattening tolerance are dropped after the offset, so a
+  ring inset by half its width vanishes as AC 16 asks (two flattened circles meeting leave chords
+  a few micrometres apart).
 
 ### Milestone 2: the document write (AC 10, 13)
 

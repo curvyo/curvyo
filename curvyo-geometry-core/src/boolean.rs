@@ -110,6 +110,11 @@ pub struct BooleanResult {
 }
 
 impl BooleanResult {
+    /// A result of outlines already in the canonical form (the offset kernel's).
+    pub(crate) fn from_canonical(outlines: Vec<Vec<Point>>) -> Self {
+        Self { outlines }
+    }
+
     /// The outlines in canonical order. Never empty.
     #[must_use]
     pub fn outlines(&self) -> &[Vec<Point>] {
@@ -140,7 +145,7 @@ pub fn signed_area_mm2(polygon: &[Point]) -> f64 {
 }
 
 /// Whether every number that describes the outline is finite and within range.
-fn outline_in_range(outline: &Outline<'_>) -> bool {
+pub(crate) fn outline_in_range(outline: &Outline<'_>) -> bool {
     let in_range = |value: f64| value.is_finite() && value.abs() <= MAX_COORDINATE_MM;
     outline
         .anchors
@@ -170,7 +175,7 @@ fn operands_where(operands: &[&[Outline<'_>]], bad: impl Fn(&Outline<'_>) -> boo
 }
 
 /// Flattens and snaps every outline of an operand into one set of grid polygons.
-fn grid_paths(operand: &[Outline<'_>], flatten_tolerance_mm: f64) -> Paths64 {
+pub(crate) fn grid_paths(operand: &[Outline<'_>], flatten_tolerance_mm: f64) -> Paths64 {
     operand
         .iter()
         .map(|outline| snap_polygon(&flatten_closed(outline.anchors, flatten_tolerance_mm)))
