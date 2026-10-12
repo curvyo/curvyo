@@ -122,7 +122,11 @@ impl Document {
     /// # Errors
     /// [`HistoryError::NoSuchStep`] if `version` is not in the log, [`HistoryError::NoSuchObject`]
     /// if the object exists at neither version, [`HistoryError::Group`] for a group (criterion
-    /// 25), [`HistoryError::Unreadable`] if the version cannot be checked out.
+    /// 25), [`HistoryError::Unreadable`] if the version cannot be checked out. Nothing is written
+    /// when it fails.
+    ///
+    /// # Panics
+    /// Does not panic in practice: after the checks every write goes to the node it creates.
     pub fn clone_version(
         &self,
         source: NodeId,
@@ -151,21 +155,25 @@ impl Document {
         if at.meta.get(KEY_GROUP) == Some(&Node::Value(loro::LoroValue::Bool(true))) {
             return Err(HistoryError::Group);
         }
+        // Everything that can fail is behind this point: from here on every write goes to the node
+        // created here, so a refusal never leaves a half-made clone in the pending changes.
         let tree = doc.get_tree(OBJECTS_TREE);
-        let created = tree
-            .create(loro::TreeParentId::Root)
-            .map_err(|_| HistoryError::Unreadable)?;
-        let meta = tree
-            .get_meta(created)
-            .map_err(|_| HistoryError::Unreadable)?;
+        // invariant: creating a node under the root cannot fail, and reading the meta map of a
+        // node just created cannot fail (as in `objects::copy_subtree`).
+        #[allow(clippy::unwrap_used)]
+        let created = tree.create(loro::TreeParentId::Root).unwrap();
+        #[allow(clippy::unwrap_used)]
+        let meta = tree.get_meta(created).unwrap();
         let mut tally = Tally::default();
         restore_map(&meta, &BTreeMap::new(), &own_fields(at.meta), &mut tally);
         if read_shape_tag(&meta).is_none() {
             let ids: Vec<AnchorId> = (0..total_anchor_count(&meta)).map(|_| mint()).collect();
             renumber_anchors(&meta, &ids);
         }
+        // invariant: the key is new in the meta map just created and the value is a plain string.
+        #[allow(clippy::unwrap_used)]
         meta.insert(KEY_CLONE_OF, encode_clone_of(src, &read_at))
-            .map_err(|_| HistoryError::Unreadable)?;
+            .unwrap();
         let extra = [
             (KEY_OBJECT, encode_node(src)),
             (KEY_VERSION, version.encode()),

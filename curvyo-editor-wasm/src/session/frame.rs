@@ -14,18 +14,28 @@ impl Session {
     /// `draw_list` so the area is not mistaken for artwork of the document.
     #[must_use]
     pub fn frame_draw_list(&self) -> DrawList {
+        // A document preview draws the version, its page included, plain, with nothing over it
+        // (`specs/0042-history-branches` criterion 19).
+        if let Some(version) = self.document_preview() {
+            let mut list = build_document_area(
+                version.size,
+                version.background,
+                self.view(),
+                self.device_pixel_ratio,
+            );
+            list.extend(curvyo_render_core::build_artwork(
+                &version.objects,
+                self.view(),
+            ));
+            return list;
+        }
         let mut list = build_document_area(
             self.document.size(),
             self.shown_background(),
             self.view(),
             self.device_pixel_ratio,
         );
-        // A document preview draws the version plain, with nothing over it
-        // (`specs/0042-history-branches` criterion 19).
-        list.extend(match self.document_preview_objects() {
-            Some(version) => curvyo_render_core::build_artwork(version, self.view()),
-            None => self.draw_list(),
-        });
+        list.extend(self.draw_list());
         list
     }
 }

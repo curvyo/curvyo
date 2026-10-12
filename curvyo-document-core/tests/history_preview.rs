@@ -54,3 +54,27 @@ fn c20_c32_a_peers_step_merges_while_a_preview_is_held_and_the_preview_stays() {
         .unwrap();
     assert_eq!(a.history_len(), 3, "the live document stays editable");
 }
+
+#[test]
+fn c19_a_document_preview_holds_the_page_of_that_version() {
+    let d = Document::new(1);
+    rect(&d);
+    let first = d.own_steps().last().unwrap().step;
+    let size_then = d.size();
+    let background_then = d.background();
+    d.resize(curvyo_document_core::DocumentSize::new(
+        Length::from_mm(300.0),
+        Length::from_mm(200.0),
+    ))
+    .unwrap();
+    let mut background = background_then;
+    background.paint = match background.paint {
+        curvyo_document_core::BackgroundPaint::None => curvyo_document_core::BackgroundPaint::Solid,
+        curvyo_document_core::BackgroundPaint::Solid => curvyo_document_core::BackgroundPaint::None,
+    };
+    assert!(d.set_background(background));
+    let preview = d.preview_document_at(first).unwrap();
+    assert_eq!(preview.size, size_then);
+    assert_eq!(preview.background, background_then);
+    assert_ne!(d.size(), size_then, "the live page changed");
+}

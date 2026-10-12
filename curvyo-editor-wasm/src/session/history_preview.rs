@@ -182,13 +182,10 @@ impl Session {
         }
     }
 
-    /// The objects a Document-scope preview draws in place of the document.
-    pub(super) fn document_preview_objects(&self) -> Option<&[ObjectSnapshot]> {
+    /// The version a Document-scope preview draws in place of the document.
+    pub(super) fn document_preview(&self) -> Option<&HistoricalDocument> {
         let shown = self.history.preview.shown.as_ref()?;
-        shown
-            .subject
-            .is_none()
-            .then_some(&shown.version.objects[..])
+        shown.subject.is_none().then_some(&shown.version)
     }
 
     /// An Object-scope preview over the selected object: the version's ghost and its blue outline

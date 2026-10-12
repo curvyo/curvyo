@@ -294,14 +294,19 @@ impl Document {
     /// and stays as it is until the maker resizes.
     #[must_use]
     pub fn size(&self) -> DocumentSize {
+        Self::size_of_root(&self.loro.get_map(ROOT_MAP))
+    }
+
+    /// The size a root map holds, read as [`Document::size`] reads it; also for a checked-out
+    /// version (`history/checkout.rs`).
+    pub(crate) fn size_of_root(root: &LoroMap) -> DocumentSize {
         let default = DocumentSize::default();
-        let root = self.loro.get_map(ROOT_MAP);
         let valid = |value: Option<f64>| {
             value.filter(|mm| (MIN_DOCUMENT_MM..=MAX_DOCUMENT_MM).contains(mm))
         };
         match (
-            valid(Self::read_mm(&root, KEY_WIDTH_MM)),
-            valid(Self::read_mm(&root, KEY_HEIGHT_MM)),
+            valid(Self::read_mm(root, KEY_WIDTH_MM)),
+            valid(Self::read_mm(root, KEY_HEIGHT_MM)),
         ) {
             (Some(width), Some(height)) => {
                 DocumentSize::new(Length::from_mm(width), Length::from_mm(height))

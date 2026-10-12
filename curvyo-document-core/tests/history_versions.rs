@@ -239,3 +239,32 @@ fn c33_only_a_clone_writes_clone_of_and_the_format_version_stays() {
         curvyo_document_core::CURRENT_FORMAT_VERSION
     );
 }
+
+#[test]
+fn c22_a_refused_clone_leaves_nothing_behind_for_the_next_commit() {
+    let d = Document::new(1);
+    let a = rect(&d);
+    let b = rect(&d);
+    let group = d.group_objects(&[a, b]).unwrap();
+    let grouped = d.own_steps().last().unwrap().step;
+    let version = d.version();
+    let objects = d.object_ids().len();
+    assert!(d.clone_version(group, grouped, &mut minter(1)).is_err());
+    assert!(
+        d.clone_version(a, StepRef::new(9, 0), &mut minter(1))
+            .is_err()
+    );
+    assert_eq!(d.version(), version, "nothing committed");
+    width(&d, a, 3.0);
+    assert_eq!(
+        d.object_ids().len(),
+        objects,
+        "no stray node in the next step"
+    );
+    let row = d.history_page(0, 1).pop().unwrap();
+    assert_eq!(
+        row.objects.len(),
+        1,
+        "the next step touched only the rectangle"
+    );
+}

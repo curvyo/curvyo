@@ -7,17 +7,23 @@ use super::error::HistoryError;
 use super::step_id::StepRef;
 use super::step_log::find_step;
 use crate::document::Document;
+use crate::document_background::DocumentBackground;
 use crate::path_model::NodeId;
 use crate::primitive_model::ObjectSnapshot;
+use crate::units::DocumentSize;
 
-/// What a preview shows: the objects as they were right after `step`, as plain data that cannot be
-/// edited. The live document keeps committing and merging while a preview holds one.
+/// What a preview shows: the objects and the page as they were right after `step`, as plain data
+/// that cannot be edited. The live document keeps committing and merging while a preview holds one.
 #[derive(Debug, Clone, PartialEq)]
 pub struct HistoricalDocument {
     /// The step whose version this is.
     pub step: StepRef,
     /// The objects at that version, in paint order; empty when none existed.
     pub objects: Vec<ObjectSnapshot>,
+    /// The page size at that version.
+    pub size: DocumentSize,
+    /// The background at that version.
+    pub background: DocumentBackground,
 }
 
 impl Document {
@@ -32,39 +38,41 @@ impl Document {
         step: StepRef,
         id: NodeId,
     ) -> Result<HistoricalDocument, HistoryError> {
-        self.read_at(step, |document| document.object(id).into_iter().collect())
+        self.read_at(step, Some(id))
     }
 
-    /// Every object as it was right after `step`, in paint order (criterion 19).
+    /// Every object and the page as they were right after `step` (criterion 19).
     ///
     /// # Errors
     /// As [`Document::preview_object_at`].
     pub fn preview_document_at(&self, step: StepRef) -> Result<HistoricalDocument, HistoryError> {
-        self.read_at(step, |document| {
-            document
-                .object_ids()
-                .into_iter()
-                .filter_map(|id| document.object(id))
-                .collect()
-        })
+        self.read_at(step, None)
     }
 
-    /// Checks the document out to the version right after `step`, reads plain copies, and attaches
-    /// it again in the same call, also when the read panics (the guard of ADR 0014 §12).
+    /// Checks the document out to the version right after `step`, reads plain copies of `object`
+    /// (every object for `None`) through the guard, and attaches it again in the same call, also when the read panics (ADR 0014 §12).
     fn read_at(
         &self,
         step: StepRef,
-        read: impl FnOnce(&Self) -> Vec<ObjectSnapshot>,
+        object: Option<NodeId>,
     ) -> Result<HistoricalDocument, HistoryError> {
         let doc = self.loro();
         self.assert_outside_batch();
         doc.commit();
         let log = find_step(doc, step).ok_or(HistoryError::NoSuchStep)?;
-        let objects = {
-            let _guard = Detached::at(doc, &log.after())?;
-            read(self)
+        let guard = Detached::at(doc, &log.after())?;
+        let objects = match object {
+            Some(id) => guard.object(id).into_iter().collect(),
+            None => guard.objects(),
         };
-        Ok(HistoricalDocument { step, objects })
+        let (size, background) = guard.page();
+        drop(guard);
+        Ok(HistoricalDocument {
+            step,
+            objects,
+            size,
+            background,
+        })
     }
 }
 

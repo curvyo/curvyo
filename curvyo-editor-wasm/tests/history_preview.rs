@@ -143,3 +143,29 @@ fn c21_only_rows_a_thousand_back_need_the_long_operation_state() {
     let mut s = widths();
     assert!(!s.history_item_is_far(false, 1));
 }
+
+/// The x extent of the document area: the first six triangles of the frame.
+fn area_width(s: &Session) -> f64 {
+    let frame = s.frame_draw_list();
+    let xs = frame.triangles[..6].iter().map(|v| v.position.x);
+    xs.clone().fold(f64::NEG_INFINITY, f64::max) - xs.fold(f64::INFINITY, f64::min)
+}
+
+#[test]
+fn c19_a_document_preview_draws_the_page_of_that_version() {
+    let mut s = widths();
+    let width_then = area_width(&s);
+    s.set_document_side(curvyo_editor_wasm::DocumentSide::Width, "300");
+    assert!(
+        (area_width(&s) - width_then).abs() > 1.0,
+        "the page changed"
+    );
+    let last = s.history_len() - 1;
+    assert_eq!(s.preview_history_item(false, last), RowPress::Previewed);
+    assert!(
+        (area_width(&s) - width_then).abs() < 0.5,
+        "the page as it was then"
+    );
+    s.end_history_preview();
+    assert!((area_width(&s) - width_then).abs() > 1.0);
+}

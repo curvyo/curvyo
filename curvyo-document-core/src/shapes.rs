@@ -161,20 +161,7 @@ impl Document {
     /// primitive node... reading goes through an object-level snapshot").
     #[must_use]
     pub fn object(&self, id: NodeId) -> Option<ObjectSnapshot> {
-        let tree = self.loro().get_tree(OBJECTS_TREE);
-        let tree_id = tree_id_of(id);
-        if !leaf_exists(&tree, tree_id) {
-            return None;
-        }
-        let meta = tree.get_meta(tree_id).ok()?;
-        match shape_codec::read_shape_tag(&meta) {
-            Some(shape) => Some(ObjectSnapshot::Primitive(
-                shape_codec::read_primitive_snapshot(id, &meta, &shape),
-            )),
-            None => Some(ObjectSnapshot::Path(crate::path_codec::read_path_snapshot(
-                id, &meta,
-            ))),
-        }
+        object_in(&self.loro().get_tree(OBJECTS_TREE), id)
     }
 
     /// Reads one primitive's full current data, or `None` if it no
@@ -452,6 +439,24 @@ pub(crate) fn write_stroke_width_if_changed(meta: &loro::LoroMap, stroke_width: 
 
 fn tree_id_of(id: NodeId) -> loro::TreeID {
     loro::TreeID::new(id.peer, id.counter)
+}
+
+/// One object of `tree` as [`Document::object`] reads it; also for a checked-out version
+/// (`history/checkout.rs`).
+pub(crate) fn object_in(tree: &loro::LoroTree, id: NodeId) -> Option<ObjectSnapshot> {
+    let tree_id = tree_id_of(id);
+    if !leaf_exists(tree, tree_id) {
+        return None;
+    }
+    let meta = tree.get_meta(tree_id).ok()?;
+    match shape_codec::read_shape_tag(&meta) {
+        Some(shape) => Some(ObjectSnapshot::Primitive(
+            shape_codec::read_primitive_snapshot(id, &meta, &shape),
+        )),
+        None => Some(ObjectSnapshot::Path(crate::path_codec::read_path_snapshot(
+            id, &meta,
+        ))),
+    }
 }
 
 #[cfg(test)]

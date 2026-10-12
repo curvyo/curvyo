@@ -177,20 +177,7 @@ impl Document {
     /// does too, and the read writes nothing.
     #[must_use]
     pub fn background(&self) -> DocumentBackground {
-        let root = self.loro().get_map(ROOT_MAP);
-        let read = |key: &str| plain(&root, key).ok().flatten();
-        let default = DocumentBackground::DEFAULT;
-        let paint = read(KEY_PAINT)
-            .and_then(|value| paint_of(&value))
-            .unwrap_or(default.paint);
-        let (color, opacity) = read(KEY_COLOR)
-            .and_then(|value| colour_of(&value))
-            .unwrap_or((default.color, default.opacity));
-        DocumentBackground {
-            paint,
-            color,
-            opacity,
-        }
+        background_of_root(&self.loro().get_map(ROOT_MAP))
     }
 
     /// Sets the background as one commit labelled `set_document_background`
@@ -223,6 +210,24 @@ impl Document {
         }
         self.commit_with_label("set_document_background");
         true
+    }
+}
+
+/// The background a root map holds, read as [`Document::background`] reads it; also for a
+/// checked-out version (`history/checkout.rs`).
+pub(crate) fn background_of_root(root: &LoroMap) -> DocumentBackground {
+    let read = |key: &str| plain(root, key).ok().flatten();
+    let default = DocumentBackground::DEFAULT;
+    let paint = read(KEY_PAINT)
+        .and_then(|value| paint_of(&value))
+        .unwrap_or(default.paint);
+    let (color, opacity) = read(KEY_COLOR)
+        .and_then(|value| colour_of(&value))
+        .unwrap_or((default.color, default.opacity));
+    DocumentBackground {
+        paint,
+        color,
+        opacity,
     }
 }
 

@@ -112,7 +112,7 @@ file with the two new labels as legacy-labelled steps.
   focus into and out of the row action (AC 9, 25, 26, 27).
 
 ### Milestone 5: slice check and PR
-- [ ] 5.1 Full gate (§7) plus frontend checks; browser walk-through of every criterion in WebKitGTK
+- [x] 5.1 Full gate (§7) plus frontend checks; browser walk-through of every criterion in WebKitGTK
   MiniBrowser under Xvfb; `/no-slop` on user-facing text.
 - [ ] 5.2 PR per `CLAUDE.md` §9: What changes in the demo, Review guide, no new dependencies.
 
@@ -137,10 +137,11 @@ file with the two new labels as legacy-labelled steps.
 - Milestone 2: the readout, the banner and the Mode captions are built in the frontend
   (`lib/historyPreview.ts`), not in `curvyo-ui-core`: they hold the local clock time, which only the
   browser knows. A document preview answers every key with the new `KeyOutcome::Paused` (the key
-  does nothing and its page default is prevented). It draws the version's objects on the current
+  does nothing and its page default is prevented). It draws the version with its own
   page and background. The release budgets of AC 21 are in
   `curvyo-document-core/tests/history_preview_budgets.rs`; the wasm figure is measured in the
-  browser walk-through.
+  browser walk-through. (Review of milestones 2 to 4: a document preview now reads the page
+  size and background of the version as well, through `Detached::page`.)
 - Milestone 3: a further press of an exploration repeats the go-to header with the new `v` (the
   same `s` and `o`, `adrs.md` decision 5); `step_header::continues` joins such commits into one
   step in the step index and in `find_step`, so the step names its latest version and Ctrl+Z takes
