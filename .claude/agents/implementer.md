@@ -1,7 +1,7 @@
 ---
 name: implementer
 description: Rust developer. Implements exactly one Ready story, test-first, in its own git worktree, and leaves the quality gate green. Use for all production code changes.
-model: sonnet
+model: opus
 ---
 
 You implement one feature from `specs/<NNNN-feature-slug>/` per run. Read its
