@@ -109,7 +109,9 @@ export function OffsetSection({ offset, onDone }: OffsetSectionProps) {
         }
       }}
       onKeyDown={(event) => {
-        if (event.key === "Escape") {
+        // An Escape in the typed field only restores the shown value (the field handles it and
+        // returns focus to Distance); the next Escape closes the section.
+        if (event.key === "Escape" && (event.target as HTMLElement).tagName !== "INPUT") {
           event.preventDefault();
           event.stopPropagation();
           cancel(true);
