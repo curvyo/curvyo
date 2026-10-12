@@ -155,6 +155,9 @@ impl Session {
     /// starts a stroke, a move extends it or, without contact, only moves the pointer, and the
     /// release commits it (criteria 7, 8, 12, 13). Touch is ignored (criterion 4).
     pub fn pencil_input(&mut self, phase: PencilPhase, buttons: u32, samples: &[PointerSample]) {
+        if self.tool != Tool::Pencil {
+            return;
+        }
         let samples: Vec<PointerSample> = samples
             .iter()
             .filter_map(|sample| {
@@ -165,6 +168,12 @@ impl Session {
             })
             .collect();
         let Some(last) = samples.last().copied() else {
+            // A release whose samples were all unusable still ends the stroke: nothing may stay
+            // in progress after the pointer is up.
+            if phase == PencilPhase::Up {
+                self.button_down = false;
+                self.recording(|this| this.commit_pencil_stroke(&[]));
+            }
             return;
         };
         if last.kind == PointerKind::Touch {
@@ -664,5 +673,34 @@ mod tests {
         );
         assert!(hole.abs() > 400.0, "hole area {hole}");
         assert_eq!(session.selection.ids(), &[path.id]);
+    }
+
+    /// Tester note: samples reach the Pencil only while it is the active tool.
+    #[test]
+    fn samples_are_ignored_while_another_tool_is_active() {
+        let mut session = Session::new(1);
+        let pen = |x: f64| reading(PointerKind::Pen, x, 20.0, 0.4);
+        session.pencil_input(PencilPhase::Down, TIP, &[pen(0.0)]);
+        session.pencil_input(PencilPhase::Move, TIP, &[pen(10.0), pen(20.0)]);
+        assert!(!session.pencil.is_drawing());
+        session.pencil_input(PencilPhase::Up, 0, &[pen(30.0)]);
+        assert!(session.objects().is_empty());
+        assert!(!session.pencil_bar().pen_seen);
+    }
+
+    /// Tester note: a release without usable samples still ends the stroke.
+    #[test]
+    fn a_release_without_usable_samples_ends_the_stroke() {
+        let pen = |x: f64| reading(PointerKind::Pen, x, 20.0, 0.4);
+        let not_finite = reading(PointerKind::Pen, f64::NAN, 20.0, 0.4);
+        for release in [vec![], vec![not_finite]] {
+            let mut session = pencil_session();
+            session.pencil_input(PencilPhase::Down, TIP, &[pen(0.0)]);
+            session.pencil_input(PencilPhase::Move, TIP, &[pen(10.0), pen(20.0)]);
+            session.pencil_input(PencilPhase::Up, 0, &release);
+            assert!(!session.pencil.is_drawing(), "{release:?}");
+            assert!(!session.button_down);
+            assert_eq!(session.objects().len(), 1, "the stroke so far is committed");
+        }
     }
 }
