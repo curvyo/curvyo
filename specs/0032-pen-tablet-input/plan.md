@@ -23,7 +23,8 @@ card and only the Group card moves down 44 px (row "Tool rail architecture", exc
   minimum length, cancel). One row in `history_names.rs` (`pencil_stroke` → "Pencil
   stroke"). Module lines in `lib.rs`.
 - `curvyo-render-core`: the blue in-flight preview: a 1.5 px line or a hollow outline,
-  white casing. One additive field in the decoration input.
+  white casing. Built: one additive function `build_outline_preview` in `live_preview.rs`
+  (the live-edit preview's line for outlines that are no object yet), no decoration field.
 - `curvyo-editor-wasm`: `Tool::Pencil` (one variant), new `session/pencil.rs` (session
   settings, preview, the commit through the existing path-creation command, selection of
   the new object), new `wasm_pencil.rs` (`pencil_samples` taking one flat `Float64Array`
@@ -95,22 +96,25 @@ refactoring of shared code; anything worth refactoring is noted for the lead.
 
 ### Milestone C: session, preview, commit in editor-wasm and render-core (AC 1, 2, 6, 7, 8, 11, 12, 13, 14, 16)
 
-- [ ] C1. Test first, `session/pencil.rs` through the session API with synthetic sample
+- [x] C1. Test first, `session/pencil.rs` through the session API with synthetic sample
   batches: a mouse stroke gives one open path with the new-Pen-path style; a pressure
   stroke gives one closed path, fill = new-path stroke colour, stroke None; exactly one
   commit labelled `pencil_stroke`; the new object is selected; the tool stays Pencil;
-  Escape mid-stroke writes nothing. (AC 7, 8, 12, 13)
-- [ ] C2. `wasm_pencil.rs`: `pencil_samples(kind, buttons, Float64Array)` with 6 values per
+  Escape mid-stroke writes nothing. Built without a `curvyo-document-core` change: one
+  `Document::batch("pencil_stroke")` around `create_path`, the style edits and, for a stroke
+  with holes, `replace_with_path`. The session takes samples in document mm
+  (`Session::pencil_input`); `wasm_pencil.rs` converts screen pixels. (AC 7, 8, 12, 13)
+- [x] C2. `wasm_pencil.rs`: `pencil_samples(kind, buttons, Float64Array)` with 6 values per
   sample; one batch of 5 samples gives 5 samples in the stroke. No pointer id or device
   name in the signature. (AC 1, 2, 16)
-- [ ] C3. `Tool::Pencil`, key `P` in `key_table.rs` (gated like the other tool letters),
+- [x] C3. `Tool::Pencil`, key `P` in `key_table.rs` (gated like the other tool letters),
   Escape cascade first step, crosshair cursor id. Every existing mouse test passes
   unedited. (AC 1, 6, 12)
-- [ ] C4. Session settings Min, Max, Curve with getters/setters; "pen seen" and "pressure
+- [x] C4. Session settings Min, Max, Curve with getters/setters; "pen seen" and "pressure
   seen" flags for the bar; readout values (pressure, tilt). Settings are not in the
   document, the log or any file: a test saves the document after a pressure stroke and
   checks the bytes for none of the settings or sample data. (AC 14, 15, 16)
-- [ ] C5. Render-core preview: line or hollow outline in blue with white casing; on
+- [x] C5. Render-core preview: line or hollow outline in blue with white casing; on
   release the preview is gone and the object lies within 0.15 mm of the last preview
   (test compares the last preview outline with the committed outline). (AC 11)
 

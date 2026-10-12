@@ -47,7 +47,7 @@ pub use document_area::{
 };
 pub use glyphs::{DrawList, Vertex};
 pub use group_box::{GroupBoxKind, GroupDecorationInput};
-pub use live_preview::build_live_edit_preview;
+pub use live_preview::{build_live_edit_preview, build_outline_preview};
 pub use marquee_overlay::{MarqueeOverlay, build_marquee_overlay};
 pub use move_axes::{LockedAxis, MoveAxes, build_move_axes};
 pub use pen_cue::{ClosingCue, PenCue, build_pen_cue};

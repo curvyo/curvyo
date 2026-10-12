@@ -141,6 +141,7 @@ pub(super) fn decide(input: &KeyInput<'_>, state: KeyState) -> KeyAction {
         (Some('n'), _) => Binding::Tool(Tool::Node),
         (Some('e'), _) => Binding::Tool(Tool::Ellipse),
         (_, "*") => Binding::Tool(Tool::PolygonStar),
+        (Some('p'), _) => Binding::Tool(Tool::Pencil),
         (Some('r'), _) => Binding::Entry(EntryKey::Angle, Tool::Rectangle),
         (Some('s'), _) => Binding::Entry(EntryKey::Size, Tool::Select),
         (Some('m'), _) => Binding::EntryOnly(EntryKey::Move),

@@ -11,6 +11,9 @@ use curvyo_geometry_core::{OutlineTriple, WidthProfile, fit_freehand, variable_o
 use crate::pencil_pressure::PencilSettings;
 use crate::pointer_sample::{PointerKind, PointerSample};
 
+/// The commit label of a Pencil stroke (criterion 13), named "Pencil stroke" in the history.
+pub const PENCIL_COMMIT_LABEL: &str = "pencil_stroke";
+
 /// The `buttons` bit of the primary contact: a pen tip touching, the left mouse button.
 const PRIMARY_BUTTON: u32 = 1;
 

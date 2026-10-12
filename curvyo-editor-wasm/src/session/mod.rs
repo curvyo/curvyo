@@ -56,6 +56,7 @@ mod object_history_rows;
 mod open_error;
 mod panel_tabs;
 mod pen;
+mod pencil;
 mod project;
 mod reference_view;
 mod refusal;
@@ -97,6 +98,7 @@ pub use keys::{EscapeStep, KeyHint, KeyInput, KeyOutcome};
 pub use move_indicators::MoveIndicators;
 pub use object_history::ObjectWipeOutcome;
 pub use panel_tabs::{PanelTabsRecord, PanelView};
+pub use pencil::{PenReadout, PencilBar, PencilPhase};
 pub use project::APP_VERSION;
 pub use select::DoubleClickHint;
 pub use split::{BreakApartOutcome, SplitOutcome};
@@ -137,7 +139,7 @@ fn sanitized_point(point: Point) -> Option<Point> {
 
 /// Which tool is active. Exactly one at a time — `specification.md`'s
 /// tool rail has six buttons (Select, Pen, Node, Rectangle, Ellipse,
-/// Polygon/Star), and switching tools is a single active-tool state,
+/// Polygon/Star; the Pencil of `0032` is the seventh), and switching tools is a single active-tool state,
 /// not independent flags.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Tool {
@@ -156,6 +158,8 @@ pub enum Tool {
     Ellipse,
     /// The polygon/star tool (acceptance criteria 10-15).
     PolygonStar,
+    /// The Pencil: freehand strokes, widened by pen pressure (`specs/0032-pen-tablet-input`).
+    Pencil,
 }
 
 /// One open document's whole editing session.
@@ -256,6 +260,8 @@ pub struct Session {
     grouping_result: Option<grouping::GroupingResult>,
     /// What a screen reader hears about the context, until the host has taken it.
     context_announcement: Option<String>,
+    /// The Pencil's stroke in progress, settings and readout (`pencil.rs`). Never saved.
+    pencil: pencil::PencilState,
 }
 
 impl Session {
@@ -309,6 +315,7 @@ impl Session {
             context_cache: context::ContextCache::default(),
             grouping_result: None,
             context_announcement: None,
+            pencil: pencil::PencilState::default(),
         }
     }
 
@@ -358,6 +365,7 @@ impl Session {
             context_cache: context::ContextCache::default(),
             grouping_result: None,
             context_announcement: None,
+            pencil: pencil::PencilState::default(),
         })
     }
 
@@ -408,10 +416,17 @@ impl Session {
                 this.pen.finish(&this.document);
                 this.pen.escape();
             }
+            // Leaving the Pencil drops a stroke in progress, writing nothing.
+            if tool != Tool::Pencil {
+                this.pencil.cancel();
+            }
             // A creation tool starts from an empty selection: no selection box
             // stays behind from the Select tool. Creating a shape then selects
             // the new one (`shape_pointer_up`).
-            if matches!(tool, Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar) {
+            if matches!(
+                tool,
+                Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar | Tool::Pencil
+            ) {
                 this.selection.clear();
                 this.hovered_object = None;
             }
@@ -468,6 +483,8 @@ impl Session {
                 Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar => {
                     this.shape_pointer_down(point);
                 }
+                // The Pencil takes its samples through `pencil_input`.
+                Tool::Pencil => {}
             }
         });
     }
@@ -516,7 +533,7 @@ impl Session {
             Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar => {
                 self.shape_pointer_move(point, Modifiers::new(shift, constrain));
             }
-            Tool::Pen => {}
+            Tool::Pen | Tool::Pencil => {}
         }
     }
 
@@ -563,6 +580,7 @@ impl Session {
                 Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar => {
                     this.shape_pointer_up(point, Modifiers::new(shift, constrain));
                 }
+                Tool::Pencil => {}
             }
         });
     }
@@ -594,7 +612,7 @@ impl Session {
                 Tool::Pen => this.finish_pen(),
                 Tool::Node => this.insert_at(point),
                 Tool::Select => return this.select_double_click(point, shift, ctrl),
-                Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar => {}
+                Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar | Tool::Pencil => {}
             }
             DoubleClickHint::None
         })

@@ -159,6 +159,8 @@ impl Session {
                 self.shown_background(),
             ));
         }
+        // The Pencil's stroke in progress, blue over everything (`0032` criterion 11).
+        list.extend(self.pencil_preview_list(view));
         // What a press would continue, join or close onto, before the click (`0034`).
         if self.tool == Tool::Pen {
             list.extend(curvyo_render_core::build_pen_cue(

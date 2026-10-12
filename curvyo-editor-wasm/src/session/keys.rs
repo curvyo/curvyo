@@ -192,6 +192,7 @@ impl Session {
             Tool::Rectangle => self.rectangle.drag_in_flight(),
             Tool::Ellipse => self.ellipse.drag_in_flight(),
             Tool::PolygonStar => self.poly_star.drag_in_flight(),
+            Tool::Pencil => self.pencil.is_drawing(),
             Tool::Pen => false,
         };
         // A drag of a panel value field is a drag too (`specs/0020-undo-redo` criterion 6a).
@@ -316,6 +317,8 @@ impl Session {
             }
             Tool::Node => self.node.cancel_drag(),
             Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar => self.shape_escape(),
+            // A stroke in progress is the Pencil's drag (`0032` criterion 12).
+            Tool::Pencil => self.pencil.cancel(),
             Tool::Pen => false,
         }
     }
@@ -360,7 +363,7 @@ impl Session {
             return EscapeStep::Nothing;
         }
         let cleared = match self.tool {
-            Tool::Pen | Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar => false,
+            Tool::Pen | Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar | Tool::Pencil => false,
             Tool::Node => self.node.clear_selection(),
             Tool::Select => {
                 let had = !self.selection.is_empty();
@@ -421,7 +424,7 @@ impl Session {
                         .delete_selected(&this.document, &objects, &mut this.selection);
                 }
                 Tool::Node => this.node.delete_selected(&this.document),
-                Tool::Pen | Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar => {}
+                Tool::Pen | Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar | Tool::Pencil => {}
             }
         });
     }

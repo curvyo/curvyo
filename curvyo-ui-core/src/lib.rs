@@ -174,7 +174,9 @@ pub use pen_tool::{
     ClosingPreview, Continuation, PenTool, PointerUpOutcome as PenPointerUpOutcome, PressAction,
 };
 pub use pencil_pressure::{PencilSettings, PressureCurve, smooth_pressures};
-pub use pencil_tool::{FinishedStroke, PencilTool, StrokeShape, stroke_has_pressure};
+pub use pencil_tool::{
+    FinishedStroke, PENCIL_COMMIT_LABEL, PencilTool, StrokeShape, stroke_has_pressure,
+};
 pub use pointer_sample::{ERASER_BUTTON, PointerKind, PointerSample};
 pub use poly_star_tool::{PolyStarMode, PolygonStarTool};
 pub use rectangle_tool::RectangleTool;

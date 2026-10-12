@@ -54,6 +54,8 @@ mod wasm_node_tool;
 #[cfg(target_arch = "wasm32")]
 mod wasm_pen;
 #[cfg(target_arch = "wasm32")]
+mod wasm_pencil;
+#[cfg(target_arch = "wasm32")]
 mod wasm_properties_panel;
 #[cfg(target_arch = "wasm32")]
 mod wasm_render;
@@ -75,6 +77,7 @@ pub use session::{
     KeyInput, KeyOutcome, MoveIndicators, ObjectWipeOutcome, PanelTabsRecord, PanelView, Session,
     SizeOutcome, SplitOutcome, Tool, WipeOutcome, WipeState,
 };
+pub use session::{PenReadout, PencilBar, PencilPhase};
 
 #[cfg(target_arch = "wasm32")]
 pub use wasm_api::{WasmSession, init_panic_hook};

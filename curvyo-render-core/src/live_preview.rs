@@ -6,7 +6,7 @@
 //! second render path, because the document's own strokes are drawn exactly
 //! as they are.
 
-use curvyo_document_core::{ObjectSnapshot, ViewTransform};
+use curvyo_document_core::{ObjectSnapshot, SubpathRef, ViewTransform};
 
 use crate::glyphs::DrawList;
 use crate::shape_preview::shape_live_outline;
@@ -53,6 +53,34 @@ pub fn build_live_edit_preview(objects: &[ObjectSnapshot], view: ViewTransform) 
                     outlines
                 }
             });
+        }
+    }
+    list
+}
+
+/// The same hollow `--preview-new` line for outlines that belong to no object yet: the
+/// Pencil's stroke in progress (`specs/0032-pen-tablet-input` criterion 11), its centre line or
+/// its variable-width outline. Same width and white casing as [`build_live_edit_preview`].
+#[must_use]
+pub fn build_outline_preview(outlines: &[SubpathRef<'_>], view: ViewTransform) -> DrawList {
+    let width_mm = theme::LIVE_PREVIEW_STROKE_PX / view.scale();
+    let tolerance_mm = theme::DISPLAY_TOLERANCE_PX / view.scale();
+    let mut list = DrawList::default();
+    for (width, color) in [
+        (
+            width_mm * theme::CASING_WIDTH_FACTOR,
+            theme::SELECTION_CASING,
+        ),
+        (width_mm, theme::PREVIEW_NEW),
+    ] {
+        for outline in outlines {
+            list.extend(stroke::path_stroke(
+                outline.anchors,
+                outline.closed,
+                width,
+                color,
+                tolerance_mm,
+            ));
         }
     }
     list
@@ -203,5 +231,39 @@ mod tests {
     #[test]
     fn nothing_to_preview_draws_nothing() {
         assert_eq!(build_live_edit_preview(&[], view(1.0)).triangle_count(), 0);
+    }
+
+    /// `0032` criterion 11: an outline of no object draws the blue line over a white casing.
+    #[test]
+    fn an_outline_preview_draws_the_line_over_its_casing() {
+        let anchors = [
+            NewAnchor::corner(AnchorId::new(1, 1), Point::new(0.0, 0.0)),
+            NewAnchor::corner(AnchorId::new(1, 2), Point::new(10.0, 0.0)),
+        ];
+        let outline = SubpathRef {
+            closed: false,
+            anchors: &anchors,
+        };
+        let list = build_outline_preview(&[outline], view(4.0));
+        let blue = line(&list);
+        assert!(!blue.is_empty());
+        let casing = list
+            .triangles
+            .iter()
+            .filter(|v| v.color == theme::SELECTION_CASING)
+            .count();
+        assert!(casing > 0);
+        // The line is drawn after its casing.
+        let first_blue = list
+            .triangles
+            .iter()
+            .position(|v| v.color == theme::PREVIEW_NEW)
+            .unwrap();
+        assert!(
+            list.triangles[..first_blue]
+                .iter()
+                .all(|v| v.color == theme::SELECTION_CASING)
+        );
+        assert!(build_outline_preview(&[], view(4.0)).triangles.is_empty());
     }
 }
