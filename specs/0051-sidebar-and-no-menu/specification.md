@@ -1,6 +1,6 @@
 # Sidebar: a vertical tab strip, a File tab, and no menu bar
 
-Status: Ready (2026-10-11; items marked Proposal stay vetoable at the demo). The criteria are complete and testable. The ux-engineer confirmed and completed the UX notes on 2026-10-11 (two corrections to criteria 5 and 23, one to criterion 30). The architect approved on 2026-10-11 (`adrs.md`, no new ADR) and the eight points it flagged are worked into the criteria below (criteria 41 to 45 are new, nothing is renumbered). The customer may veto the items marked **Proposal** at the demo (all have a default, nothing blocks the build). One branch `story/sidebar-and-no-menu`, one PR, three milestones.
+Status: Done (#104, 2026-10-11; the Proposal items shipped as specified). Not part of this slice and still missing: the Layers tab in the strip (`0050`); undoing back to the saved state does not make the project clean again (as specified, see `0020`).
 Priority: Should
 Origin: Customer (request of 2026-10-11, paraphrased from German): the native menu bar at the top should go away in the long run, because menus make things hard to find and cost too many clicks; Open, Close and the other file actions move into the tabs on the right; the tabs become Blender-like and vertical (a strip of icon tabs along the panel's edge) because the horizontal strip leaves too little room; the collapse and expand symbol goes into that strip; the icons become smaller. Everything marked **Proposal** is mine: unsaved-changes protection, the header word, the version line, the "Saved" notice and the macOS exception. The strip sits on the inner edge next to the canvas, Blender's placement (lead decision, 2026-10-11).
 
@@ -278,4 +278,4 @@ Requirements: R-EDIT-032, R-SYS-010 (`docs/requirements.md`); R-SYS-009 (all sho
 Builds on: `specs/0043-properties-tabs/`, `specs/0020-undo-redo/`, `specs/0001-project-file-foundation/`
 Touches: `specs/0050-layers-and-objects-panel/` (the Layers tab joins the vertical strip), `specs/0041-object-history/`, `specs/0044-editing-quick-wins/`, `specs/0045-document-formats-library/` (its Import and Export stay in the Document tab)
 ADRs: `adrs.md`
-PR: -
+PR: #104

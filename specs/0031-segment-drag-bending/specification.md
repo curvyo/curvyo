@@ -1,6 +1,6 @@
 # Segment drag bending: drag a line or curve segment of a path to bend it
 
-Status: Ready (`adrs.md` by the architect and the UX notes by the ux-engineer exist, both 2026-10-10; their requested changes are applied below) Amended by `0020-undo-redo`: the sentence "No undo yet." and the statements that no undo exists are removed; Ctrl+Z takes the step back.
+Status: Done (#79, milestone M2 of the path-tools PR). Amended by `0020-undo-redo`: the sentence "No undo yet." and the statements that no undo exists are removed; Ctrl+Z takes the step back.
 Priority: Should
 Origin: Customer (the request: click a segment in the Node tool and drag it to bend it, as in Inkscape). The shape rule, the 3 px dead zone, the hover look, Shift and the preview are my proposals, marked in "Decided by the product owner" and "Proposals".
 
@@ -171,4 +171,4 @@ Requirements: R-EDIT-020, R-EDIT-001 (`docs/requirements.md`)
 Builds on: `specs/0002-path-node-editing/` (segment selection, make line and curve, node and handle model), `specs/0006-path-merge-split-and-node-types/` (Corner, Symmetric, Asymmetric), `specs/0014-advanced-selection/` (criterion 2: the Node tool's 4 px segment tolerance), `specs/0009-unified-object-editing/` (blue and black preview), `specs/0010-edit-interaction-polish/` (Escape, Shift)
 Related: `specs/0016-boolean-operations/` (compound paths), `specs/0020` (undo, reserved)
 ADRs: `adrs.md` (architect, 2026-10-10: no new ADR; the architect's rewordings of criteria 1, 3, 12 and 13 and the two-node closed path fix, criterion 6a, are applied)
-PR: TBD
+PR: #79 (path tools, with `0016`'s toolbox amendment, `0034` and `0035`)

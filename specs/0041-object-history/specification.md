@@ -1,6 +1,6 @@
 # Object history: the steps of one object, object undo and redo, clones that keep their history, wipe
 
-Status: Ready (2026-10-10). The customer accepted ADR 0014 (`docs/adr/0014-history-undo-and-branches.md`) and every default of the open questions below on 2026-10-10. `adrs.md` and the UX notes exist; the criteria are complete and testable. The build starts once `0020` milestone 2 has merged; criteria 18 and 27 (groups) wait for `0023`. **Amended by `0051-sidebar-and-no-menu`** (2026-10-11): criterion 5 and its UX note (Edit menu items for Ctrl+U and Ctrl+Shift+U) are replaced: the fallback for a platform that takes Ctrl+Shift+U is the Undo and Redo buttons of the History tab's Object scope.
+Status: Done except two criteria (#103, 2026-10-11; criterion 27 completed with `0023`, #102). **Open:** criterion 18 (the timeline of a group: a selected group has no Object scope and Ctrl+U says "Select one object."); criterion 25 for path copies (object undo on a copy of a path takes back only style steps, because anchors are not yet written into copies). Both are follow-ups in `docs/technical-debt.md` ("Object history: the timeline of a group is a follow-up"). **Amended by `0051-sidebar-and-no-menu`** (2026-10-11): criterion 5 and its UX note (Edit menu items for Ctrl+U and Ctrl+Shift+U) are replaced: the fallback for a platform that takes Ctrl+Shift+U is the Undo and Redo buttons of the History tab's Object scope.
 Priority: Should
 Origin: Customer (specification of 2026-10-10, final: the history of single objects with undo and redo there, Ctrl+U and Ctrl+Shift+U, an object undo is an editing step that user undo can take back, a clone duplicates the history, a wipe for one object, deletions visible in the global history). Requirements R-HIST-002 and R-HIST-004 (object part). Everything marked **Proposal** is the product owner's idea and is not accepted until the customer says so.
 
@@ -196,4 +196,4 @@ Depends on: `specs/0020-undo-redo/`, `specs/0043-properties-tabs/`
 Follow-up: `specs/0042-history-branches/`
 Related: `specs/0023-groups/` (criterion 18), `specs/0016-boolean-operations/`, ADR 0009 §1 (option C)
 ADRs: `adrs.md` (architect); ADR 0014 (accepted 2026-10-10: the floor and origin keys, the object wipe, taking back other people's steps)
-PR: -
+PR: #103 (criterion 27 in #102)

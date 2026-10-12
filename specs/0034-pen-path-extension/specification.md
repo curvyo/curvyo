@@ -1,6 +1,6 @@
 # Pen path extension: continue an open path, connect two paths, choose how a path closes, close a selected path
 
-Status: Ready (`adrs.md` and the UX notes exist, both 2026-10-10) Amended by `0020-undo-redo`: the sentence "No undo yet." and the statements that no undo exists are removed; Ctrl+Z takes the step back.
+Status: Done (#79, milestone M3 of the path-tools PR). Amended by `0020-undo-redo`: the sentence "No undo yet." and the statements that no undo exists are removed; Ctrl+Z takes the step back.
 Priority: Should
 Origin: Customer (the four requests: extend an open path from either end, connect two paths with the Pen, choose a sharp or smooth closing node, an auto-close helper). The modifier, the defaults, the preview, the labels and the "Shift means the alternative" rule are my proposals, marked in "Decided by the product owner" and in the open questions.
 
@@ -195,4 +195,4 @@ Requirements: R-EDIT-022 (`docs/requirements.md`); related R-EDIT-001, R-EDIT-01
 Builds on: `specs/0002-path-node-editing/` (Pen, close, hover cues), `specs/0006-path-merge-split-and-node-types/` (Join, node kinds), `specs/0010-edit-interaction-polish/` (Escape cascade), `specs/0014-advanced-selection/` (live modifier keys)
 Related: `specs/0016-boolean-operations/` (compound paths excluded), `specs/0023-groups/` (targets inside groups), `specs/0015-document-size-and-rulers/` (criterion 14a)
 ADRs: `adrs.md` (architect, 2026-10-10)
-PR: TBD (shared path-tools PR)
+PR: #79 (path tools, with `0016`'s toolbox amendment, `0031` and `0035`)

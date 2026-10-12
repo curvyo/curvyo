@@ -1,6 +1,6 @@
 # Document formats library: formats, groups and favourites the maker can change
 
-Status: Ready for the rectangular part (criteria 1 to 34; `adrs.md` and the UX notes exist). Where the maker's formats are stored is decided: a per-user file `document-formats.toml` in the data directory (customer, 2026-10-10, Question 1). Shapes are `0046-document-shapes`. Build after `0040` and `0043` merge (milestone 1, the loader in `document-core`, may start earlier, `adrs.md`).
+Status: Done (#84, 2026-10-10, one PR with `0043`; criteria 1 to 34, all of this spec). The maker's formats live in a per-user file `document-formats.toml` in the data directory (customer, 2026-10-10, Question 1). Non-rectangular shapes are `0046-document-shapes`.
 Priority: Should
 Origin: Customer (request of 2026-10-10, final: the format list must be customisable, built-in defaults with A0 to A6 on, groups, favourites with a star, a full list inline, a way to add custom formats, an inline add and save, import for sharing is the product owner's addition). The place where user formats are stored was my proposal and is decided (Question 1). Follow-up of the merged `0030-document-size-presets`. Non-rectangular formats (circle, outline from a file) are `0046-document-shapes`.
 
@@ -220,4 +220,4 @@ Builds on: `specs/0030-document-size-presets/`, `specs/0015-document-size-and-ru
 Follow-up: `specs/0046-document-shapes/`
 Panel placement: `specs/0043-properties-tabs/` (the Document tab)
 ADRs: `adrs.md` (architect): no new ADR; one new written file format (the user file, `format = 1`) and the `toml` writer feature; where the file lives is decided (Question 1, A)
-PR: -
+PR: #84 (with `0043`)
