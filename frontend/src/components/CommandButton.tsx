@@ -69,7 +69,13 @@ export const CommandButton = forwardRef<HTMLButtonElement, CommandButtonProps>(
             aria-disabled={dimmed}
             tabIndex={tabIndex}
             onFocus={onFocus}
-            onKeyDown={onKeyDown}
+            onKeyDown={(event) => {
+              // A key press on a dimmed button keeps its tooltip open too: the reason stays.
+              if (dimmed && (event.key === "Enter" || event.key === " ")) {
+                holdOpen.current = true;
+              }
+              onKeyDown(event);
+            }}
             onPointerDown={() => {
               holdOpen.current = dimmed;
             }}

@@ -50,7 +50,7 @@ paths), no trait, no generic.
   Self-intersection: a contour is tested against itself. Adjacent segments
   ignore the hit at their shared node. One cubic is split at t = 0.5 so that
   a loop is found. All of it uses only `+ - * /` and `sqrt` with no fused
-  operations, so it is bit-identical on every target (criterion 11).
+  operations, so the same input gives bit-identical cuts on every target (criterion 11; a primitive's outline comes from the platform's `sin` and `cos`, so criterion 11 holds to 1e-6 mm).
   Rejected: flattening and intersecting polylines, because a polyline cut
   point is off the curve by up to the flatten tolerance and criterion 4
   needs 1e-6 mm on the curve. Also rejected: Bézier clipping, because it is
@@ -87,3 +87,44 @@ paths), no trait, no generic.
 ## Flagged
 
 None for the customer. The spec's own questions all have defaults.
+
+## Notes made while building (2026-10-11, implementer)
+
+- **A figure eight gives two pieces.** The contour passes the crossing twice and is cut at both
+  passes, one piece per lobe. Criterion 12 and the definition of a cut point were corrected on
+  2026-10-11 (lead decision, the architect agrees): the first text said "one open piece", which
+  contradicted the definition of a piece (the part between two consecutive cut points) and would
+  leave a piece that still crosses itself.
+- **No `kurbo` in the curve module.** `curve_intersections.rs` and `curve_chords.rs` do their own
+  de Casteljau and chord arithmetic with `+ - * /`, `sqrt` and `f64::midpoint`, so criterion 11
+  (identical on every target) does not depend on the maths library of the platform. The split of
+  the module into three files (`curve_chords.rs`, `curve_intersections.rs`, `curve_settle.rs`)
+  keeps each under the 500 lines of `CLAUDE.md` §5.
+- **Crossings are made exact.** A crossing found on flattened chords is refined by Newton's
+  method on both curves (at most six steps, kept only if the miss is below 1e-9 mm), so the two
+  contours are cut at the same point and not a flattening tolerance apart; touches and tangents
+  keep the chord result.
+- **Merging cuts along the contour.** Two cuts are one when they are within 0.01 mm in space and
+  along the contour (chord lengths); two cuts at one place far apart along the contour (the two
+  passes of a figure eight) stay two. Meetings at the join of neighbouring segments (a polyline
+  run of at most 0.002 mm between them) are no cuts.
+- **The split of a contour is `curvyo-ui-core/src/cut_pieces.rs`**, written through the
+  `replace_with_pieces` of 0048 with `PieceFill::None`.
+- **A loop in one cubic** is found by meeting the two halves of every piece that could loop (its
+  control polygon goes backwards along its chord), recursively. Splitting once at t = 0.5 missed
+  loops that lie in one half. A self-crossing whose one pass lies within 0.01 mm of a split point
+  is taken for the join and dropped.
+- **Contacts are grouped per pair of contours (2026-10-11, after the tester's report).** A
+  shallow crossing comes within reach of the other curve also in the neighbouring segment, so the
+  meetings of all segment pairs of two contours are grouped together (`curve_contacts.rs`): a
+  contact with crossings is cut at its crossings, one without at the middle of its touches. A
+  contour meeting itself keeps every crossing (no lens rule), and two meetings whose stretches on
+  that one contour overlap never form one contact.
+- **Near-touches are one cut.** Curves that come within the touch distance along a stretch without
+  coinciding (tangent circles) make one contact: the touches and the crossings of a lens thinner
+  than 0.01 mm (two Bézier circles that touch from outside cross twice by their own rounding) are
+  cut once, in the middle. Stretches along which the curves coincide to 1e-6 mm (doubled lines,
+  identical circles) keep a cut at each end.
+- **2026-10-11: fixed tolerances.** `cut_parameters` uses fixed tolerances derived from
+  `TOUCH_DISTANCE_MM` (0.001 mm) and the 0.01 mm kernel tolerance, as `touching_outlines` does; no
+  caller needs another value. A `Tolerance` parameter comes with the first caller that does.

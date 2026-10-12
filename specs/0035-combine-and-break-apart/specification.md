@@ -4,7 +4,7 @@ Status: Ready (`adrs.md` and the UX notes exist, both 2026-10-10) Amended by `00
 Priority: Should
 Origin: Customer (Combine, and Break apart "into separate paths: what happens to the holes", request of 2026-10-09, with the wish that the UX be much better than Inkscape's). The hole rule, the refusals, the names and the defaults are my proposals, marked in "Decided by the product owner".
 
-Amendment pending (customer decision of 2026-10-10, `specs/0048-split-compound-path/`): the command specified here as Break apart, which keeps holes with their piece, is the customer's **Split**; Break apart is to become the command that gives every outline its own object (Question 2, option B, promoted). Criteria 13 to 18 and Question 2 change with it once `0048` Question 1 is confirmed; until then the text below stands.
+Amended (customer decision of 2026-10-10, built in the slice `story/split-and-cut`, `specs/0048-split-compound-path/`): the command specified here as Break apart, which keeps holes with their piece, is the customer's **Split** (commit label `split`, notice "Split: ..."); Break apart is now the command that gives every outline its own object (Question 2, option B, promoted; label `break_apart`). Read "Break apart" in criteria 13 to 18 and in Question 2 below as "Split"; the criteria of `0048` replace them. The tests that checked these criteria carry the Split names and the same assertions.
 
 ## User value
 

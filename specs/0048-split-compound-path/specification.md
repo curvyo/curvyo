@@ -1,6 +1,6 @@
 # Split: separate the unconnected parts of a compound path, holes stay with their part
 
-Status: Ready (2026-10-10: `adrs.md` and the UX notes exist; the customer's decision of 2026-10-10 settles what Split means; built on the default of Question 1: the built Break apart is renamed Split, and Break apart becomes the every-outline command, unless the customer vetoes)
+Status: Built on `story/split-and-cut` (PR to come; one PR with `0036`; no format change). Ready since 2026-10-10: (`adrs.md` and the UX notes exist; the customer's decision of 2026-10-10 settles what Split means; built on the default of Question 1: the built Break apart is renamed Split, and Break apart becomes the every-outline command, unless the customer vetoes)
 Priority: Should
 Origin: Customer (2026-10-10: "Split works like Inkscape's Split Path: it separates the parts that are not connected or overlapping; an outer outline with the holes inside it stays one object. Break apart separates every subpath, including holes. The operation that cuts paths where they cross is Cut."). The texts, numbers and tests are mine.
 
@@ -60,7 +60,7 @@ Radii and offsets in millimetres. "Ring" means a compound path with an outline o
 ### Entry
 
 1. Given any state of the app, then Split is a command in the Path card of the left rail (`0035` criterion 1a), directly after Combine (the card reads Combine, Split, Break apart, Cut; Split takes the place of the built second button, whose behaviour it keeps). Its button follows the rules of `0035` criterion 1: always rendered; dimmed (`aria-disabled`, still focusable, tooltip explains, activation does nothing) when the selection holds no compound path or a tool other than Select is active; never changes the tool; no shortcut. A pure function in `curvyo-ui-core` decides from the objects and the selection, and it is the same function that decides for Break apart (both are dimmed in the same cases). The frontend only shows it.
-2. Given the tooltips (name, rule, note; the rail's rules), then Split reads "Split" / "Separates unconnected parts. Holes stay." / "Replaces the selection." and, amended, Break apart reads "Break apart" / "Every outline becomes its own object." / "Holes become filled shapes. Use Split to keep them." Each rule line is at most 45 characters. When Split or Break apart is dimmed the note says why, first match wins: no compound path "Select a compound path.", with another tool than Select adding "Use the Select tool." ("No undo yet." goes with `0020`, its criterion 52.)
+2. Given the tooltips (name, rule, note; the rail's rules), then Split reads "Split" / "Separates unconnected parts. Holes stay." / "Replaces the selection." and, amended, Break apart reads "Break apart" / "Every outline becomes its own object." / "Holes become filled shapes. Use Split to keep them." Each rule line is at most 45 characters. When Split or Break apart is dimmed the note says why, first match wins: no compound path "Select a compound path."; with another tool than Select the note is "Use the Select tool." alone (amended 2026-10-12 after the UX review: the session reports nothing as selected under another tool, so a selection sentence would be false; the same holds for Combine and Cut) ("No undo yet." goes with `0020`, its criterion 52.)
 
 ### Split
 
@@ -141,7 +141,7 @@ Dimming is `aria-disabled="true"` at 40 % opacity, focusable, tooltip open, acti
 
 ### Texts
 
-Tooltips, success notices and refusals are in the criteria and in the row "Path tooltips and notices". Changes made to the spec's wording (no scope change): the Break apart note now points to Split; the refusal of criterion 7 ends with "Nothing was changed." like every other refusal and points to Break apart; "When Split is dimmed" reads "When Split or Break apart is dimmed" (the same function decides for both). Success notices are 3 s, 5 s above 70 characters (the long Split notice), `role="status"`; refusals are `role="alert"`, 8 s, no outline for "one piece", the group sentence outlines nothing either (the whole selection is the offender). "No undo yet." in the quoted texts goes away with `0020` criterion 52.
+Tooltips, success notices and refusals are in the criteria and in the row "Path tooltips and notices". Changes made to the spec's wording (no scope change): the Break apart note now points to Split; the refusal of criterion 7 ends with "Nothing was changed." like every other refusal and points to Break apart; "When Split is dimmed" reads "When Split or Break apart is dimmed" (the same function decides for both). Success notices are 3 s, 5 s above 70 characters (the long Split notice), `role="status"`; refusals are `role="alert"`, 8 s, no outline for "one piece", the group sentence outlines the groups, as Cut does (amended 2026-10-12 after the UX review: the group is the offender). "No undo yet." in the quoted texts goes away with `0020` criterion 52.
 
 ### Glyphs
 

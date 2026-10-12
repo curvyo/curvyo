@@ -1,16 +1,18 @@
-//! The Path card's `wasm-bindgen` surface (`specs/0035-combine-and-break-apart`): what the two
-//! buttons show and the two commands. A further `impl WasmSession` block; codes and counts only
-//! (the sentences are the host's, ADR 0001 §5), every method a pass-through to `Session`. The
-//! refusal outline is cleared by `clear_boolean_refusal`, which serves every rail command.
+//! The Path card's `wasm-bindgen` surface (`specs/0035-combine-and-break-apart`): what its
+//! buttons show and Combine. A further `impl WasmSession` block; codes and counts only (the
+//! sentences are the host's, ADR 0001 §5), every method a pass-through to `Session`. Split and
+//! Break apart are in `wasm_split.rs`, Cut in `wasm_cut.rs`. The refusal outline is cleared by
+//! `clear_boolean_refusal`, which serves every rail command.
 
-use curvyo_ui_core::{BooleanAvailability, BreakApartRefusal, CombineRefusal, PathAvailability};
+use curvyo_ui_core::{BooleanAvailability, CombineRefusal, PathAvailability};
 use wasm_bindgen::prelude::*;
 
-use crate::session::{BreakApartOutcome, CombineOutcome};
+use crate::session::CombineOutcome;
 use crate::wasm_api::WasmSession;
 
 /// What the Path card shows: Combine as the Boolean buttons (`needs_two` dimmed; else enabled,
-/// with `open` of the `of` selected objects open paths) and whether Break apart is enabled.
+/// with `open` of the `of` selected objects open paths), whether Split and Break apart are
+/// enabled (one flag: the selection holds a compound path) and whether Cut is.
 #[wasm_bindgen]
 #[derive(Debug, Clone, Copy)]
 pub struct PathAvailabilityView {
@@ -20,8 +22,10 @@ pub struct PathAvailabilityView {
     pub open: u32,
     /// How many objects are selected (0 when `needs_two`).
     pub of: u32,
-    /// The selection holds a compound path.
-    pub can_break_apart: bool,
+    /// The selection holds a compound path: Split and Break apart are enabled.
+    pub has_compound: bool,
+    /// Something is selected: Cut is enabled.
+    pub can_cut: bool,
 }
 
 fn count(n: usize) -> u32 {
@@ -39,7 +43,8 @@ impl From<PathAvailability> for PathAvailabilityView {
             needs_two,
             open,
             of,
-            can_break_apart: availability.break_apart,
+            has_compound: availability.compound,
+            can_cut: availability.cut,
         }
     }
 }
@@ -106,57 +111,6 @@ impl From<CombineOutcome> for CombineResultView {
     }
 }
 
-/// What `apply_break_apart` did. `kind` is `"ignored"`, `"applied"` (`compounds` compound paths
-/// became `pieces` objects; `with_holes` says a piece has a hole; `left_alone` compound paths
-/// were one piece already) or a refusal: `"no_compound"`, `"groups"` or `"one_piece"` (`compounds` selected
-/// compound paths are one piece each). Nothing was changed by anything but `"applied"`.
-#[wasm_bindgen]
-#[derive(Debug, Clone)]
-pub struct BreakApartResultView {
-    /// The outcome code.
-    #[wasm_bindgen(getter_with_clone)]
-    pub kind: String,
-    /// Compound paths broken apart, or selected compound paths when refused as one piece.
-    pub compounds: u32,
-    /// Objects they became.
-    pub pieces: u32,
-    /// A piece has a hole.
-    pub with_holes: bool,
-    /// Compound paths left as they are.
-    pub left_alone: u32,
-}
-
-impl From<BreakApartOutcome> for BreakApartResultView {
-    fn from(outcome: BreakApartOutcome) -> Self {
-        let view =
-            |kind: &str, compounds: usize, pieces: usize, with_holes: bool, left: usize| Self {
-                kind: kind.to_string(),
-                compounds: count(compounds),
-                pieces: count(pieces),
-                with_holes,
-                left_alone: count(left),
-            };
-        match outcome {
-            BreakApartOutcome::Ignored => view("ignored", 0, 0, false, 0),
-            BreakApartOutcome::Applied {
-                compounds,
-                pieces,
-                with_holes,
-                left_alone,
-            } => view("applied", compounds, pieces, with_holes, left_alone),
-            BreakApartOutcome::Refused(BreakApartRefusal::NoCompound) => {
-                view("no_compound", 0, 0, false, 0)
-            }
-            BreakApartOutcome::Refused(BreakApartRefusal::OnePiece { compounds }) => {
-                view("one_piece", compounds, 0, false, 0)
-            }
-            BreakApartOutcome::Refused(BreakApartRefusal::Groups { offenders }) => {
-                view("groups", offenders.len(), 0, false, 0)
-            }
-        }
-    }
-}
-
 #[wasm_bindgen]
 impl WasmSession {
     /// What the Path card of the tool rail shows. Call it with every other state read.
@@ -168,10 +122,5 @@ impl WasmSession {
     /// Combines the selected objects into one compound path, in one commit.
     pub fn apply_combine(&mut self) -> CombineResultView {
         self.session.apply_combine().into()
-    }
-
-    /// Breaks the selected compound paths apart into their pieces, in one commit.
-    pub fn apply_break_apart(&mut self) -> BreakApartResultView {
-        self.session.apply_break_apart().into()
     }
 }

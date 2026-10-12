@@ -30,6 +30,7 @@ mod colour_pick;
 mod combine;
 mod context;
 mod corner_readout;
+mod cut;
 mod document;
 mod document_presets;
 mod draw;
@@ -66,6 +67,7 @@ mod select_gesture;
 mod select_readout;
 mod select_view;
 mod shapes;
+mod split;
 mod style;
 mod style_view;
 mod tolerances;
@@ -83,7 +85,8 @@ use curvyo_ui_core::{
 pub use background_view::BackgroundView;
 pub use boolean::BooleanOutcome;
 pub use close_path::{ClosePathOutcome, ClosePathState};
-pub use combine::{BreakApartOutcome, CombineOutcome};
+pub use combine::CombineOutcome;
+pub use cut::CutOutcome;
 pub use document::{DocumentSide, FitOutcome, SizeOutcome};
 pub use document_presets::DocumentPresetsRecord;
 pub use formats::{FormTexts, FormatEdit};
@@ -96,6 +99,7 @@ pub use object_history::ObjectWipeOutcome;
 pub use panel_tabs::{PanelTabsRecord, PanelView};
 pub use project::APP_VERSION;
 pub use select::DoubleClickHint;
+pub use split::{BreakApartOutcome, SplitOutcome};
 #[cfg(target_arch = "wasm32")]
 pub use style_view::StylePanelView;
 

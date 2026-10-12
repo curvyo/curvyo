@@ -11,7 +11,7 @@ import { createSession, openSession } from "@/lib/editorSession";
 import type { WasmSession } from "@/lib/editorSession";
 import type { EditHint } from "@/components/EditHintChip";
 import type { BooleanOp, BooleanResult } from "@/lib/booleanText";
-import type { BreakApartResult, CombineResult } from "@/lib/pathText";
+import type { BreakApartResult, CombineResult, CutResult, SplitResult } from "@/lib/pathText";
 import type { ClosePathResult } from "@/lib/penText";
 
 /** The canvas's backing-buffer size for a CSS size at the window's current
@@ -668,8 +668,12 @@ export interface EditorSession {
   applyBoolean: (op: BooleanOp) => BooleanResult;
   /** Combine on the selection, in one commit (`0035-combine-and-break-apart`). */
   applyCombine: () => CombineResult;
-  /** Break apart on the selection, in one commit (`0035-combine-and-break-apart`). */
+  /** Split on the selection, in one commit (`0048-split-compound-path`). */
+  applySplit: () => SplitResult;
+  /** Break apart on the selection, in one commit (`0048-split-compound-path`). */
   applyBreakApart: () => BreakApartResult;
+  /** Cut on the selection, in one commit (`0036-cut-at-crossings`). */
+  applyCut: () => CutResult;
   /** The Node bar's Close path buttons (`0034-pen-path-extension`): closes the open paths of
    * the editing set with `join` (`"sharp"` or `"smooth"`) in one commit. */
   closePath: (join: "sharp" | "smooth") => ClosePathResult;
@@ -1330,8 +1334,8 @@ export function useEditorSession(
     return result;
   }, [syncFromSession]);
 
-  const applyBreakApart = useCallback((): BreakApartResult => {
-    const raw = sessionRef.current?.apply_break_apart();
+  const applySplit = useCallback((): SplitResult => {
+    const raw = sessionRef.current?.apply_split();
     syncFromSession();
     if (!raw) {
       return { kind: "ignored", compounds: 0, pieces: 0, withHoles: false, leftAlone: 0 };
@@ -1342,7 +1346,35 @@ export function useEditorSession(
       pieces: raw.pieces,
       withHoles: raw.with_holes,
       leftAlone: raw.left_alone,
+      of: raw.of,
     };
+    raw.free();
+    return result;
+  }, [syncFromSession]);
+
+  const applyBreakApart = useCallback((): BreakApartResult => {
+    const raw = sessionRef.current?.apply_break_apart();
+    syncFromSession();
+    if (!raw) {
+      return { kind: "ignored", compounds: 0, pieces: 0, withHoles: false };
+    }
+    const result = {
+      kind: raw.kind,
+      compounds: raw.compounds,
+      pieces: raw.pieces,
+      withHoles: raw.with_holes,
+    };
+    raw.free();
+    return result;
+  }, [syncFromSession]);
+
+  const applyCut = useCallback((): CutResult => {
+    const raw = sessionRef.current?.apply_cut();
+    syncFromSession();
+    if (!raw) {
+      return { kind: "ignored", count: 0, of: 0, pieces: 0 };
+    }
+    const result = { kind: raw.kind, count: raw.count, of: raw.of, pieces: raw.pieces };
     raw.free();
     return result;
   }, [syncFromSession]);
@@ -1994,7 +2026,9 @@ export function useEditorSession(
     convertSelectedToPaths,
     applyBoolean,
     applyCombine,
+    applySplit,
     applyBreakApart,
+    applyCut,
     closePath,
     onPointerDown,
     onPointerMove,

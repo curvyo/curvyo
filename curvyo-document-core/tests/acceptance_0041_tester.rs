@@ -28,8 +28,8 @@ use std::time::Instant;
 use curvyo_document_core::{
     AnchorId, Author, CURRENT_FORMAT_VERSION, CURRENT_LORO_SNAPSHOT_VERSION, CopySource, Document,
     HistoryError, Length, NewAnchor, NodeId, ObjectRow, ObjectRowClass, ObjectSnapshot,
-    ObjectStatus, OpenError, Point, RectBounds, Role, Status, StepKind, StepRef, StyleEdit, Vec2,
-    pack, unpack,
+    ObjectStatus, OpenError, PieceFill, Point, RectBounds, Role, Status, StepKind, StepRef,
+    StyleEdit, Vec2, pack, unpack,
 };
 use loro::LoroDoc;
 
@@ -844,13 +844,15 @@ fn c19_combine_and_break_apart_are_replace_steps_with_the_right_timeline_ends() 
     assert_eq!(rows(&d, a)[0].role, Role::Deleted);
     // Break apart the other way.
     let pieces = d
-        .break_apart(&[(
-            compound,
-            vec![
-                vec![square(200, 0.0, 0.0, 10.0)],
-                vec![square(210, 40.0, 0.0, 10.0)],
+        .replace_with_pieces(
+            &[compound],
+            &[
+                (compound, vec![square(200, 0.0, 0.0, 10.0)]),
+                (compound, vec![square(210, 40.0, 0.0, 10.0)]),
             ],
-        )])
+            PieceFill::Keep,
+            "break_apart",
+        )
         .unwrap();
     let break_step = last_step(&d);
     assert_eq!(rows(&d, compound)[0].step, break_step);
