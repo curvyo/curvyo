@@ -26,8 +26,8 @@ use std::collections::HashSet;
 use std::time::Instant;
 
 use curvyo_document_core::{
-    Vec2, AnchorId, AnchorKind, Color, Document, EllipseFrame, Length, NewAnchor, NodeId, PathSnapshot,
-    RectBounds, StyleEdit,
+    AnchorId, AnchorKind, Color, Document, EllipseFrame, Length, NewAnchor, NodeId, PathSnapshot,
+    RectBounds, StyleEdit, Vec2,
 };
 use curvyo_editor_wasm::{CutOutcome, Session, Tool};
 use curvyo_ui_core::CutRefusal;
@@ -323,11 +323,23 @@ fn c12_new_end_nodes_are_corners_with_a_zero_handle_on_the_open_side_and_the_cur
     };
     let cross = |u: Vec2, w: Vec2| (u.x * w.y - u.y * w.x).abs();
     for (arc, a, b) in [(arc_of(0, 1), 0, 1), (arc_of(2, 3), 2, 3)] {
-        assert_eq!(arc.anchors[1].handle_out, circ[a].handle_out, "far handle kept");
-        assert_eq!(arc.anchors[2].handle_in, circ[b].handle_in, "far handle kept");
-        assert!(cross(arc.anchors[1].handle_in, circ[a].handle_in) < 1e-9, "collinear");
+        assert_eq!(
+            arc.anchors[1].handle_out, circ[a].handle_out,
+            "far handle kept"
+        );
+        assert_eq!(
+            arc.anchors[2].handle_in, circ[b].handle_in,
+            "far handle kept"
+        );
+        assert!(
+            cross(arc.anchors[1].handle_in, circ[a].handle_in) < 1e-9,
+            "collinear"
+        );
         assert!(arc.anchors[1].handle_in.length() < circ[a].handle_in.length());
-        assert!(cross(arc.anchors[2].handle_out, circ[b].handle_out) < 1e-9, "collinear");
+        assert!(
+            cross(arc.anchors[2].handle_out, circ[b].handle_out) < 1e-9,
+            "collinear"
+        );
     }
     // The arcs run in the circle's direction and end where the line crosses.
     assert!(near(endpoints(arc_of(0, 1)).0, (110.0, 100.0)));
@@ -1602,9 +1614,15 @@ fn defect_a_symmetric_node_next_to_a_cut_keeps_symmetric_with_unequal_handles() 
         for n in &p.anchors {
             let (li, lo) = (n.handle_in.length(), n.handle_out.length());
             if n.kind == AnchorKind::Symmetric && (li - lo).abs() > 1e-6 {
-                bad.push(format!("({:.4}, {:.4}) in {li:.4} out {lo:.4}", n.point.x, n.point.y));
+                bad.push(format!(
+                    "({:.4}, {:.4}) in {li:.4} out {lo:.4}",
+                    n.point.x, n.point.y
+                ));
             }
         }
     }
-    assert!(bad.is_empty(), "Symmetric nodes with unequal handles: {bad:?}");
+    assert!(
+        bad.is_empty(),
+        "Symmetric nodes with unequal handles: {bad:?}"
+    );
 }

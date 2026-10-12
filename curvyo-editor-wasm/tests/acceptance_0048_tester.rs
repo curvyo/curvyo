@@ -523,7 +523,7 @@ fn c4_touching_regions_chain_into_one_part_which_stays_one_object() {
     );
     let mut s = session_of(&d);
     select_all(&mut s);
-    assert_eq!(split_applied(&s.apply_split()), (1, 2, false, 0));
+    let out = s.apply_split();
     let ps = paths(&s);
     assert_eq!(ps.len(), 2);
     assert_eq!(
@@ -532,6 +532,11 @@ fn c4_touching_regions_chain_into_one_part_which_stays_one_object() {
         "the chain of three squares stays one object"
     );
     assert_eq!(ps[1].subpaths().count(), 1);
+    assert_eq!(
+        split_applied(&out),
+        (1, 2, false, 0),
+        "no piece has a hole, so no hole sentence"
+    );
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1026,7 +1031,10 @@ fn c11_e5_gives_three_closed_paths_and_e2_two_in_outline_order() {
     select_all(&mut s);
     assert_eq!(break_applied(&s.apply_break_apart()), (1, 3, true));
     let ps = paths(&s);
-    let radii: Vec<f64> = ps.iter().map(|p| p.anchors[0].point.x - 100.0).collect();
+    let radii: Vec<f64> = ps
+        .iter()
+        .map(|p| p.anchors.iter().map(|a| a.point.x).fold(f64::MIN, f64::max) - 100.0)
+        .collect();
     assert_eq!(
         radii,
         vec![20.0, 10.0, 5.0],
@@ -1308,7 +1316,7 @@ fn c16_the_result_does_not_depend_on_how_the_objects_were_selected() {
     select_all(&mut a);
     let mut b = open(&bytes);
     // Shift-click the objects in reverse order.
-    for p in [pt(520.0, 100.0), pt(300.0, 100.0), pt(120.0, 100.0)] {
+    for p in [pt(520.0, 100.0), pt(120.0, 100.0)] {
         b.pointer_hover(p, true, false);
         b.pointer_down(p, true);
         b.pointer_up(p, true, false);
@@ -1316,7 +1324,11 @@ fn c16_the_result_does_not_depend_on_how_the_objects_were_selected() {
     let mut c = open(&bytes);
     marquee(&mut c, pt(0.0, 0.0), pt(1000.0, 300.0));
     for s in [&mut a, &mut b, &mut c] {
-        assert_eq!(s.selected_object_count(), 3);
+        assert_eq!(
+            s.selected_object_count(),
+            2,
+            "the compound path and the square"
+        );
         s.apply_split();
     }
     assert_eq!(bits(&a), bits(&b));
@@ -1413,7 +1425,10 @@ fn hostile_degenerate_outlines_do_not_panic_and_nothing_is_lost() {
 fn hostile_value(name: &str, x: f64, command: &str) {
     let d = Document::new(1);
     let bad = vec![corner(x, 0.0), corner(1.0, 1.0), corner(5.0, 10.0)];
-    compound(&d, vec![square(0.0, 0.0, 20.0), bad, square(100.0, 0.0, 20.0)]);
+    compound(
+        &d,
+        vec![square(0.0, 0.0, 20.0), bad, square(100.0, 0.0, 20.0)],
+    );
     let mut s = session_of(&d);
     select_all(&mut s);
     let before = json(&s);
