@@ -12,7 +12,7 @@ amends Outset/Inset later and is not anticipated here.
   (exports), `boolean.rs` (`grid_paths` and the `BooleanResult` constructor shared with `crate`),
   new `tests/offset.rs` (AC 15 to 20, properties), `tests/offset_performance.rs` (AC 3 budget).
 - `curvyo-document-core`: `replace.rs`, one additive command `add_paths_above` (AC 10, 13).
-- `curvyo-ui-core`: new `offset_entry.rs` (entry values, ranges, session memory, availability, the plan
+- `curvyo-ui-core`: new `offset_entry.rs` (entry values, ranges, session memory) and `offset_plan.rs` (availability, the plan
   per operand with refusals and fresh anchor ids), `lib.rs` exports.
 - `curvyo-render-core`: the blue hollow preview outlines, reusing the live-preview stroke (no new layer
   kind if the existing preview path fits).
@@ -55,10 +55,10 @@ amends Outset/Inset later and is not anticipated here.
 
 ### Milestone 3: the plan in `curvyo-ui-core` (AC 1, 5, 7, 8, 10, 12, 14)
 
-- [ ] 3.1 Tests first, then `offset_entry.rs`: `OffsetSettings` (distance with typed range ±1000 and drag
+- [x] 3.1 Tests first, then `offset_entry.rs`: `OffsetSettings` (distance with typed range ±1000 and drag
   range ±50, default 1 mm, join, cap; session memory), `offset_availability` (operands, open paths
   present → Cap shown, groups only → not offered) (AC 1).
-- [ ] 3.2 `plan_offset`: operands in stacking order, one kernel call per operand, refusals Groups,
+- [x] 3.2 `plan_offset`: operands in stacking order, one kernel call per operand, refusals Groups,
   OpenInset (offenders), OutOfRange, NoArea, AllVanished(distance), partial vanish count, Distance 0 →
   nothing; corner anchors with fresh ids (AC 5, 7, 8, 10, 12, 14).
 
