@@ -3,6 +3,7 @@ import {
   MousePointer2,
   MousePointer as SelectIcon,
   PenTool as PenToolIcon,
+  PencilLine,
   Square,
   Star,
 } from "lucide-react";
@@ -118,7 +119,8 @@ function ToolButton({
  * (`--rail-right` is the right edge of the second): column A holds the tools card and, 8px below
  * it, the Grouping card; column B holds the Path card and, 8px below it, the Boolean card. Select
  * is first, a deliberate, one-time exception to "new tools append in ship order" (acceptance
- * criterion 12), then Pen, Node, Rectangle, Ellipse, Polygon-star. The canvas is never resized or
+ * criterion 12), then Pen, Node, Rectangle, Ellipse, Polygon-star and the Pencil
+ * (`specs/0032-pen-tablet-input`, appended last). The canvas is never resized or
  * repositioned to make room for it.
  *
  * The root keeps 4px clear under the columns; it passes no pointer event through to itself, so
@@ -196,6 +198,15 @@ export function ToolRail({
               label="Polygon/star tool"
               shortcut="*"
               icon={<Star size={20} />}
+              onSelect={onSelect}
+              onReturnFocus={onReturnFocus}
+            />
+            <ToolButton
+              tool="pencil"
+              active={tool === "pencil"}
+              label="Pencil tool"
+              shortcut={letterActsOnSelection ? "Esc, P" : "P"}
+              icon={<PencilLine size={20} />}
               onSelect={onSelect}
               onReturnFocus={onReturnFocus}
             />

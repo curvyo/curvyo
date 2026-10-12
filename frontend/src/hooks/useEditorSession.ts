@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { type CanvasNotice, type HistoryNames, MAC, useHistory } from "@/hooks/useHistory";
 import { type GroupingApi, useGrouping } from "@/hooks/useGrouping";
+import { type PencilApi, usePencil } from "@/hooks/usePencil";
 import type { HistoryDirection } from "@/lib/historyText";
 import { type NudgeFeedback, useNudgeFeedback } from "@/hooks/useNudgeFeedback";
 import { type BackingBuffer, backingBufferFor, sameBackingBuffer } from "@/lib/canvasSize";
@@ -23,7 +24,14 @@ function backingBufferSize(cssWidth: number, cssHeight: number): BackingBuffer {
 /** Which tool is active (`specification.md`'s tool rail: Select is first
  * — `canvas-navigation-and-selection`'s launch default, acceptance
  * criterion 13 — then Pen, Node, Rectangle, Ellipse, Polygon/Star). */
-export type Tool = "select" | "pen" | "node" | "rectangle" | "ellipse" | "polygon-star";
+export type Tool =
+  | "select"
+  | "pen"
+  | "node"
+  | "rectangle"
+  | "ellipse"
+  | "polygon-star"
+  | "pencil";
 
 /** The polygon/star tool-options bar's mode toggle (acceptance criteria
  * 11 vs. 12). */
@@ -484,7 +492,7 @@ const KEY_HINT_TEXT: Record<string, string> = {
 /** How long a key hint stays. */
 const KEY_HINT_MS = 2000;
 
-export interface EditorSession {
+export interface EditorSession extends PencilApi {
   /** Attach to the `<canvas>` element the host renders. */
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
   /** Attach to the canvas's focusable container (canvas-focus shortcut
@@ -902,6 +910,8 @@ export function useEditorSession(
     refreshHistoryRef.current = refreshHistory;
   }, [refreshHistory]);
   const grouping = useGrouping(getSession, syncFromSession, history.showNotice);
+  const pencil = usePencil(getSession);
+  const pencilInput = pencil.input;
   const { refresh: refreshGrouping, handleKeyOutcome: handleGroupingOutcome } = grouping;
   useEffect(() => {
     refreshGroupingRef.current = refreshGrouping;
@@ -1444,6 +1454,20 @@ export function useEditorSession(
         return;
       }
 
+      // The Pencil takes every press of the tip or the left button with its samples
+      // (`specs/0032-pen-tablet-input`); a double-click means nothing to it.
+      if (event.button === 0 && session.tool() === "pencil") {
+        event.preventDefault();
+        try {
+          event.currentTarget.setPointerCapture(event.pointerId);
+        } catch {
+          // Not capturable (e.g. a synthetic event): the stroke still works over the canvas.
+        }
+        pencilInput("down", event);
+        syncFromSession();
+        return;
+      }
+
       // A press on a mark of the open typed move belongs to its chip: it does not cancel the
       // chip, select, move or start a marquee, and acts at the release
       // (`specs/0047-transform-polish/` criterion 40). Cancelling the default keeps the focus
@@ -1507,7 +1531,7 @@ export function useEditorSession(
       setCursorHint(session.cursor_hint());
       syncFromSession();
     },
-    [canvasPoint, isSpaceHeld, syncFromSession, syncTrackedModifiers],
+    [canvasPoint, isSpaceHeld, pencilInput, syncFromSession, syncTrackedModifiers],
   );
 
   const onPointerMove = useCallback(
@@ -1533,6 +1557,11 @@ export function useEditorSession(
         }
         return;
       }
+      // Every Pencil move, touching or in range, with its coalesced samples.
+      if (session?.tool() === "pencil") {
+        pencilInput("move", event);
+        return;
+      }
       session?.pointer_hover(
         x,
         y,
@@ -1549,7 +1578,7 @@ export function useEditorSession(
         syncBadges(session);
       }
     },
-    [canvasPoint, onCursorMove, syncEntry, syncBadges, syncTrackedModifiers],
+    [canvasPoint, onCursorMove, pencilInput, syncEntry, syncBadges, syncTrackedModifiers],
   );
 
   const onPointerUp = useCallback(
@@ -1581,6 +1610,12 @@ export function useEditorSession(
         event.currentTarget.releasePointerCapture(event.pointerId);
       } catch {
         // Not captured (e.g. a non-primary button) — nothing to release.
+      }
+
+      if (!markPressRef.current && session.tool() === "pencil") {
+        pencilInput("up", event);
+        syncFromSession();
+        return;
       }
 
       // The release of a press on a mark: a click if the pointer stayed within the slop, else
@@ -1659,7 +1694,7 @@ export function useEditorSession(
       setCursorHint(session.cursor_hint());
       syncFromSession();
     },
-    [canvasPoint, syncFromSession, syncTrackedModifiers],
+    [canvasPoint, pencilInput, syncFromSession, syncTrackedModifiers],
   );
 
   const onPointerCancel = useCallback(() => {
@@ -2023,6 +2058,10 @@ export function useEditorSession(
     setPolyStarMode,
     setPolyStarPointCount,
     setPolyStarRatio,
+    pencilBar: pencil.pencilBar,
+    setPencilMinimum: pencil.setPencilMinimum,
+    setPencilMaximum: pencil.setPencilMaximum,
+    setPencilCurve: pencil.setPencilCurve,
     convertSelectedToPaths,
     applyBoolean,
     applyCombine,

@@ -83,9 +83,11 @@ export function Canvas({ editor }: CanvasProps) {
                     : "canvas-cursor-pen"
               : editor.tool === "rectangle" ||
                   editor.tool === "ellipse" ||
-                  editor.tool === "polygon-star"
+                  editor.tool === "polygon-star" ||
+                  editor.tool === "pencil"
                 ? // The creation tools show their crosshair everywhere, over
-                  // existing objects too (`unified-object-editing` criterion 25).
+                  // existing objects too (`unified-object-editing` criterion 25), the
+                  // Pencil too (`0032` criterion 6).
                   "cursor-crosshair"
                 : "cursor-default"
       }`}

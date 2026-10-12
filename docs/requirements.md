@@ -204,7 +204,7 @@ provide.
 
 | id | requirement | priority | origin |
 |---|---|---|---|
-| R-INP-001 | Pen tablet input: pressure (and tilt) from a drawing tablet, read through browser Pointer Events in the webview, changes the width of strokes drawn with a minimal Pencil (freehand) tool; a mouse or a pen without pressure draws a plain path. "Later" on 2026-10-09, promoted on 2026-10-10: built after undo (`0020`) and `0047`, not at the back of the queue. Tablet and OS questions are confirmed at the demo (the Linux webview in particular). Eraser end, brushes and a stored width profile come later. `specs/0032-pen-tablet-input/` | Should | Customer |
+| R-INP-001 | Pen tablet input: pressure (and tilt) from a drawing tablet, read through browser Pointer Events in the webview, changes the width of strokes drawn with a minimal Pencil (freehand) tool; a mouse or a pen without pressure draws a plain path. "Later" on 2026-10-09, promoted on 2026-10-10: built after undo (`0020`) and `0047`, not at the back of the queue. Tablet and OS questions are confirmed at the demo (the Linux webview in particular). Eraser end, brushes and a stored width profile come later. Status: in progress (`story/pen-tablet-input`, 2026-10-12). `specs/0032-pen-tablet-input/` | Should | Customer |
 
 ## 15. History: global history, object history, branches, wipe
 

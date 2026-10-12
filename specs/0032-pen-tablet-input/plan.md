@@ -120,18 +120,20 @@ refactoring of shared code; anything worth refactoring is noted for the lead.
 
 ### Milestone D: frontend wiring, rail button, Pencil bar (AC 1, 2, 4, 5, 6, 14, 15)
 
-- [ ] D1. Test first, `lib/penInput.ts` (node test): a move event with 5 coalesced events
+- [x] D1. Test first, `lib/penInput.ts` (node test): a move event with 5 coalesced events
   gives 5 samples, one without `getCoalescedEvents` gives 1; touch is filtered for the
   Pencil; pen hover goes the mouse-move path. (AC 2, 4, 5)
-- [ ] D2. `Canvas.tsx`: with the Pencil active, down/move/up send one `pencil_samples` call
-  per DOM event; other tools unchanged. (AC 1, 2, 6)
-- [ ] D3. `ToolRail.tsx`: seventh button, `PencilLine`, "Pencil tool (P)" / "(Esc, P)", Group
+- [x] D2. With the Pencil active, down/move/up send one `pencil_samples` call per DOM event;
+  other tools unchanged. Built in `useEditorSession.ts` (where the canvas handlers live) with
+  a new `hooks/usePencil.ts`; `Canvas.tsx` only adds the crosshair. (AC 1, 2, 6)
+- [x] D3. `ToolRail.tsx`: seventh button, `PencilLine`, "Pencil tool (P)" / "(Esc, P)", Group
   card moves down 44 px by layout. (AC 6)
-- [ ] D4. `PencilToolbar.tsx`: hidden until a pen is seen; readout "Pen: pressure 0.62, tilt
+- [x] D4. `PencilToolbar.tsx`: hidden until a pen is seen; readout "Pen: pressure 0.62, tilt
   12° / -3°" in a fixed 232 px muted box; Min, Max, Curve after the first pressure stroke
   (value fields of `0017`, `role="radiogroup"`); not in the tree for a mouse-only
   session. (AC 14, 15)
-- [ ] D5. Docs: design-system rows touched only where the build differs; R-INP-001 status.
+- [x] D5. Docs: R-INP-001 status. The design-system rows needed no change: the bar, the
+  readout box, the rail button and the key are built as the rows say.
 
 ### Milestone E: verification and PR
 

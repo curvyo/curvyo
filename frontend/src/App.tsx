@@ -5,6 +5,7 @@ import { Canvas } from "@/components/Canvas";
 import { CanvasNotice } from "@/components/CanvasNotice";
 import { ErrorDialog } from "@/components/ErrorDialog";
 import { NodeToolbar } from "@/components/NodeToolbar";
+import { PencilToolbar } from "@/components/PencilToolbar";
 import { PropertiesPanel } from "@/components/panel/PropertiesPanel";
 import { Rulers } from "@/components/Rulers";
 import { SelectToolbar } from "@/components/SelectToolbar";
@@ -146,6 +147,15 @@ function Editor() {
               onSetPolyStarMode={editor.setPolyStarMode}
               onSetPolyStarPointCount={editor.setPolyStarPointCount}
               onSetPolyStarRatio={editor.setPolyStarRatio}
+              onReturnFocus={() => editor.containerRef.current?.focus()}
+            />
+          ) : null}
+          {editor.tool === "pencil" ? (
+            <PencilToolbar
+              bar={editor.pencilBar}
+              onSetMinimum={editor.setPencilMinimum}
+              onSetMaximum={editor.setPencilMaximum}
+              onSetCurve={editor.setPencilCurve}
               onReturnFocus={() => editor.containerRef.current?.focus()}
             />
           ) : null}
