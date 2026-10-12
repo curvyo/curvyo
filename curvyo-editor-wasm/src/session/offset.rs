@@ -49,6 +49,11 @@ pub enum OffsetPreviewState {
     },
     /// Apply would be refused, or the distance is zero.
     Refused(OffsetRefusal),
+    /// Apply would be refused: the selection holds a group (`0023` criterion 28).
+    RefusedGroups {
+        /// How many leaves the selected groups hold.
+        leaves: usize,
+    },
 }
 
 /// What [`Session::apply_offset`] did.
@@ -83,7 +88,24 @@ impl Session {
     /// Select (criterion 1).
     #[must_use]
     pub fn offset_availability(&self) -> OffsetAvailability {
-        offset_availability(&self.objects(), &self.boolean_selection())
+        offset_availability(&self.objects(), &self.offset_selection())
+    }
+
+    /// The selection without the leaves of selected groups: a group is no operand, so a group
+    /// alone offers nothing (criterion 1, `0023` criterion 28).
+    fn offset_selection(&self) -> curvyo_ui_core::ObjectSelection {
+        let in_groups = self.selected_group_leaves();
+        let mut selection = self.boolean_selection();
+        if !in_groups.is_empty() {
+            let ids: Vec<NodeId> = selection
+                .ids()
+                .iter()
+                .copied()
+                .filter(|id| !in_groups.contains(id))
+                .collect();
+            selection.set(&ids);
+        }
+        selection
     }
 
     /// The values the entry shows, remembered for the session.
@@ -145,6 +167,10 @@ impl Session {
         if !self.offset_open() {
             return OffsetPreviewState::Closed;
         }
+        let leaves = self.selected_group_leaves().len();
+        if leaves > 0 {
+            return OffsetPreviewState::RefusedGroups { leaves };
+        }
         match self.current_offset_preview().result {
             Ok(result) => OffsetPreviewState::Result {
                 vanished: result.vanished,
@@ -158,7 +184,8 @@ impl Session {
     /// the entry is closed or Apply would be refused.
     #[must_use]
     pub(super) fn offset_preview_outlines(&self) -> Vec<Vec<Point>> {
-        if !self.offset_open() {
+        // Apply refuses a selection with a group, so nothing is previewed (criterion 2).
+        if !self.offset_open() || !self.selected_group_leaves().is_empty() {
             return Vec::new();
         }
         match self.current_offset_preview().result {

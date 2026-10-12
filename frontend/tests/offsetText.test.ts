@@ -72,6 +72,13 @@ test("the caption turns the sign into a word and shows the reason of a refusal",
   );
 });
 
+test("a group in the selection is named in the caption", () => {
+  assert.deepEqual(offsetCaption({ ...OFFSET_CLOSED, kind: "groups", count: 2, of: 2 }), {
+    text: "Does not work on groups. Ungroup first.",
+    refusal: true,
+  });
+});
+
 test("distances keep three decimals at most", () => {
   assert.equal(formatDistance(0.15, false), "0.15");
   assert.equal(formatDistance(-2.0004, true), "−2");

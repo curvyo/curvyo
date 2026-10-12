@@ -7,7 +7,7 @@ import { NOTHING_CHANGED, plural, sharedRefusalText } from "./booleanText.ts";
 /** What `WasmSession.offset_state` reports. */
 export interface OffsetState {
   /** `"closed"`, `"result"`, `"zero"`, `"no_operands"`, `"inset_open"`, `"out_of_range"`,
-   * `"no_area"` or `"empty"`. */
+   * `"no_area"`, `"groups"` or `"empty"`. */
   kind: string;
   count: number;
   of: number;
@@ -71,6 +71,8 @@ export function offsetCaption(state: OffsetState): { text: string; refusal: bool
     }
     case "no_area":
       return { text: "Needs shapes that enclose an area.", refusal: true };
+    case "groups":
+      return { text: "Does not work on groups. Ungroup first.", refusal: true };
     case "out_of_range":
       return { text: "Reaches beyond 10 km from the point 0, 0.", refusal: true };
     default:

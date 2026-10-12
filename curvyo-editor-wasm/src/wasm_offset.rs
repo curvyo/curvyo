@@ -137,6 +137,7 @@ impl WasmSession {
                 let (code, n, of) = refusal_code(&refusal);
                 (code, n, of, 0)
             }
+            OffsetPreviewState::RefusedGroups { leaves } => ("groups", leaves, leaves, 0),
         };
         OffsetStateView {
             kind: kind.to_string(),
