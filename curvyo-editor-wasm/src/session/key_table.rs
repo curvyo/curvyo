@@ -4,7 +4,7 @@
 //! is in `keys.rs`.
 
 use curvyo_document_core::Direction;
-use curvyo_ui_core::{Arrow, EntryKey};
+use curvyo_ui_core::{Arrow, EntryKey, Reorder};
 
 use super::Tool;
 use super::keys::{KeyHint, KeyInput};
@@ -48,6 +48,7 @@ pub(super) enum KeyAction {
     Group,
     Ungroup,
     EnterGroup,
+    Reorder(Reorder),
 }
 
 /// Whether Enter may enter a group: the Select tool, a plain press, nothing in flight.
@@ -61,6 +62,31 @@ fn enter_acts(input: &KeyInput<'_>, state: KeyState) -> bool {
         && !state.operation_in_flight
         && !state.pen_open
         && !state.entry_open
+}
+
+/// The stacking-order keys (`specs/0050-layers-and-objects-panel` criterion 33): Home, End,
+/// Page Up and Page Down act in the Select tool with a selection, plain presses, gated like every
+/// letter. `None` for any other key.
+fn reorder_action(input: &KeyInput<'_>, state: KeyState, gate_open: bool) -> Option<KeyAction> {
+    let how = match input.key {
+        "Home" => Reorder::Front,
+        "End" => Reorder::Back,
+        "PageUp" => Reorder::Forward,
+        "PageDown" => Reorder::Backward,
+        _ => return None,
+    };
+    let acts = gate_open
+        && !input.ctrl
+        && !input.alt
+        && !input.shift
+        && !input.repeat
+        && state.tool == Tool::Select
+        && state.selected != Selected::None;
+    Some(if acts {
+        KeyAction::Reorder(how)
+    } else {
+        KeyAction::Ignore
+    })
 }
 
 /// The key table and its gate (criteria 54, 55, 60, 61) as a pure function:
@@ -103,6 +129,9 @@ pub(super) fn decide(input: &KeyInput<'_>, state: KeyState) -> KeyAction {
         } else {
             KeyAction::Ignore
         };
+    }
+    if let Some(action) = reorder_action(input, state, gate_open) {
+        return action;
     }
     if input.ctrl && input.key.eq_ignore_ascii_case("a") {
         let acts =

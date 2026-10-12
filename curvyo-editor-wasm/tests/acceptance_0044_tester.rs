@@ -939,14 +939,9 @@ fn c11_nothing_selected_other_tools_and_modifiers_leave_the_key_alone() {
         KeyOutcome::Ignored,
         "a focused field keeps its arrows"
     );
-    for k in [
-        "Home",
-        "End",
-        "PageUp",
-        "PageDown",
-        "ArrowRightX",
-        "arrowright",
-    ] {
+    // Home, End, Page Up and Page Down are the stacking-order keys of `0050` criterion 33 since
+    // that slice; they are tested there.
+    for k in ["ArrowRightX", "arrowright"] {
         assert_eq!(
             arrow(&mut s, k, false, false, 0.0),
             KeyOutcome::Ignored,

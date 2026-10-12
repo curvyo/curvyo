@@ -97,6 +97,7 @@ impl Session {
         }
         match classify_press(
             objects,
+            &self.pickable_objects(),
             &self.selection,
             pointer,
             self.object_tolerance(),

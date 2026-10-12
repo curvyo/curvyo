@@ -45,6 +45,9 @@ mod history;
 mod history_rows;
 mod key_table;
 mod keys;
+mod layers;
+#[cfg(test)]
+mod layers_tests;
 mod move_entry;
 mod move_indicators;
 mod navigation;
@@ -256,6 +259,8 @@ pub struct Session {
     grouping_result: Option<grouping::GroupingResult>,
     /// What a screen reader hears about the context, until the host has taken it.
     context_announcement: Option<String>,
+    /// The active layer and the layer notice (`layers.rs`).
+    layers: layers::LayerState,
 }
 
 impl Session {
@@ -309,6 +314,7 @@ impl Session {
             context_cache: context::ContextCache::default(),
             grouping_result: None,
             context_announcement: None,
+            layers: layers::LayerState::default(),
         }
     }
 
@@ -358,6 +364,7 @@ impl Session {
             context_cache: context::ContextCache::default(),
             grouping_result: None,
             context_announcement: None,
+            layers: layers::LayerState::default(),
         })
     }
 
@@ -427,7 +434,9 @@ impl Session {
     /// (`specs/0016-boolean-operations` criteria 38 and 38a), so it contributes no node, handle or
     /// segment.
     fn paths(&self) -> Vec<curvyo_document_core::PathSnapshot> {
-        self.objects()
+        // A hidden or locked path is no target of the Node tool or the Pen
+        // (`specs/0050-layers-and-objects-panel` criteria 19 and 20).
+        self.pickable_objects()
             .iter()
             .filter_map(|object| match object {
                 ObjectSnapshot::Path(path) if !path.is_compound() => Some(path.clone()),
@@ -450,6 +459,9 @@ impl Session {
             this.flush_select_bar_preview();
             this.flush_style_preview();
             if this.colour_pick_press(point) {
+                return;
+            }
+            if this.refuse_drawing_into_layer() {
                 return;
             }
             this.button_down = true;

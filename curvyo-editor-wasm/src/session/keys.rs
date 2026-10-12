@@ -98,6 +98,9 @@ pub enum KeyOutcome {
     Ungroup,
     /// Enter entered the selected group.
     EnteredGroup,
+    /// Home, End, Page Up or Page Down changed the stacking order of the selection (or found it
+    /// already there); a refusal is in [`Session::take_layer_notice`].
+    Reordered,
     /// An arrow key moved the selection; `new_run` is true when the event
     /// opened a new run of held-key events (a new step once `0020` exists).
     Nudged {
@@ -140,6 +143,7 @@ impl KeyOutcome {
             Self::Group => "group",
             Self::Ungroup => "ungroup",
             Self::EnteredGroup => "enter-group",
+            Self::Reordered => "reordered",
             Self::Nudged { new_run: false } => "nudge",
             Self::Nudged { new_run: true } => "nudge-new",
         }
@@ -292,6 +296,7 @@ impl Session {
                     KeyOutcome::Ignored
                 }
             }
+            KeyAction::Reorder(how) => self.reorder_selection(how),
             KeyAction::Nudge(arrow) => self.nudge_selection(NudgeEvent {
                 arrow,
                 shift: input.shift,
@@ -540,7 +545,7 @@ mod tests {
     /// Keys that are not bound do nothing.
     #[test]
     fn unbound_keys_do_nothing() {
-        for k in ["x", "1", "Home", "Tab", "F5", " ", "Shift"] {
+        for k in ["x", "1", "Tab", "F5", " ", "Shift"] {
             assert_eq!(
                 decide(&key(k), state(Tool::Select, Selected::One)),
                 KeyAction::Ignore,

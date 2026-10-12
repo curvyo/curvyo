@@ -6,10 +6,11 @@
 //! are. A [`Units`] says which leaves belong together at the current level, so a click, a
 //! Shift-click, a marquee, a lasso and the Alt-click cycle select and toggle a group as one object.
 
+use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use curvyo_document_core::{Document, NodeId};
+use curvyo_document_core::{Document, NodeId, ObjectSnapshot};
 
 /// One object of the context that has more than one way to be reached: a group with its leaves.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -20,10 +21,17 @@ struct GroupUnit {
 
 /// The grouping of the leaves under one context. A leaf that is not under a group of the context
 /// is its own unit and is not listed, so a document without groups costs nothing.
+///
+/// It also knows which nodes are inert: effectively hidden or locked
+/// (`specs/0050-layers-and-objects-panel` criteria 14, 19 and 20). An inert leaf is never hit, and
+/// an inert object of the context is never selected; a selected group carries its inert members
+/// (criterion 21).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Units {
     /// For each leaf inside a group of the context, that group.
     group_of: HashMap<NodeId, GroupUnit>,
+    /// The nodes, leaves and groups, that are effectively hidden or locked.
+    inert: Arc<HashSet<NodeId>>,
 }
 
 /// A selected object of the context, as the commands and the panel see it.
@@ -51,7 +59,51 @@ impl Units {
                 group_of.insert(leaf, unit.clone());
             }
         }
-        Self { group_of }
+        Self {
+            group_of,
+            inert: Arc::default(),
+        }
+    }
+
+    /// These units with `inert` as the nodes that are effectively hidden or locked.
+    #[must_use]
+    pub fn with_inert(mut self, inert: Arc<HashSet<NodeId>>) -> Self {
+        self.inert = inert;
+        self
+    }
+
+    /// Whether `id` (a leaf or a group) is effectively hidden or locked.
+    #[must_use]
+    pub fn is_inert(&self, id: NodeId) -> bool {
+        self.inert.contains(&id)
+    }
+
+    /// The objects of `objects` a press, a marquee, a lasso or the Alt-click cycle may hit: those
+    /// that are not inert (criteria 19 and 20). Borrowed when nothing is inert.
+    #[must_use]
+    pub fn pickable<'a>(&self, objects: &'a [ObjectSnapshot]) -> Cow<'a, [ObjectSnapshot]> {
+        if self.inert.is_empty() {
+            return Cow::Borrowed(objects);
+        }
+        Cow::Owned(
+            objects
+                .iter()
+                .filter(|object| !self.inert.contains(&object.id()))
+                .cloned()
+                .collect(),
+        )
+    }
+
+    /// `leaves` without those whose object of the context is inert: the selection invariant of
+    /// criterion 14. A group that is not inert keeps every member, inert ones included
+    /// (criterion 21).
+    #[must_use]
+    pub fn without_inert(&self, leaves: &[NodeId]) -> Vec<NodeId> {
+        leaves
+            .iter()
+            .copied()
+            .filter(|&leaf| !self.inert.contains(&self.unit_of(leaf)))
+            .collect()
     }
 
     /// Whether no leaf is inside a group of the context.

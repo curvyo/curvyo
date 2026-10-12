@@ -116,18 +116,18 @@ supply its root's register.
 
 ### M2: canvas consumers (`curvyo-render-core`, `curvyo-ui-core`, `curvyo-editor-wasm`)
 
-- [ ] 10. Per-paint alpha times effective opacity in `artwork.rs`, test with the numbers of
+- [x] 10. Per-paint alpha times effective opacity in `artwork.rs`, test with the numbers of
       criterion 27 (AC 27)
-- [ ] 11. Object cache holds the node read; drawn and pickable lists; render draws exactly the
+- [x] 11. Object cache holds the node read; drawn and pickable lists; render draws exactly the
       effectively visible leaves in stacking order (AC 24)
-- [ ] 12. Hit test, marquee, lasso, Alt-click cycle, Ctrl+A, eyedropper, Fit to content,
+- [x] 12. Hit test, marquee, lasso, Alt-click cycle, Ctrl+A, eyedropper, Fit to content,
       status measures, Node tool, Pen continue and connect read the flags; one table test
       lists every consumer (AC 19, 20, 42)
-- [ ] 13. Selection invariant after every version change, with the `0023` context fallback;
+- [x] 13. Selection invariant after every version change, with the `0023` context fallback;
       group selection carries locked members (AC 14, 21, 43)
-- [ ] 14. Active layer (view state): draw parent, set by selecting an object, front-most layer
+- [x] 14. Active layer (view state): draw parent, set by selecting an object, front-most layer
       at Open; drawing into a hidden or locked active layer refused with the notice (AC 23, 35)
-- [ ] 15. Canvas z-order keys Home, End, Page Up, Page Down via `plan_move` (AC 33)
+- [x] 15. Canvas z-order keys Home, End, Page Up, Page Down via `plan_move` (AC 33)
 
 ### M3: panel logic (`curvyo-ui-core`)
 
@@ -194,6 +194,15 @@ supply its root's register.
   layers (criterion 42). `Document::parent_node` gives the real parent for the panel.
 - **Where the effective flags live.** On the node read in document-core; the session cache
   derives two lists from it once per version, so no consumer filters on its own.
+- **Status-bar measures (criterion 19).** The status bar shows the cursor, the zoom and the
+  document size; no measure of objects exists there yet, so nothing is filtered.
+- **Where the flags reach the tools (M2).** The session's document read gives three lists: every
+  leaf (what commands act on, so a selected group carries its hidden and locked members,
+  criterion 21), the visible leaves (eyedropper; Fit to content reads the same filter in
+  `content_bounds`) and the drawn leaves (faded per paint, `curvyo-render-core`
+  `node_opacity.rs`). `Units` carries the set of hidden or locked nodes: a press, the marquee, the
+  lasso, the Alt-click cycle, Ctrl+A, the Node tool and the Pen hit only what is not in it, and the
+  selection drops every object of the context that is in it.
 - **Alt+Left/Right.** `preventDefault` on keydown; checked on WebKitGTK and the browser build
   here; WebView2 and WKWebView are left to the ux-engineer's check and the nightly runs
   (UX notes: fall back to Shift+Alt on a platform that cannot).

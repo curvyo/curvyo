@@ -1422,6 +1422,7 @@ fn ac55_shift_is_allowed_only_for_star_and_shift_k() {
 fn ac55_the_modifier_keys_themselves_and_unknown_keys_are_ignored_without_effect() {
     let mut s = select_rect();
     let before = bundle(&s);
+    // Home and PageDown are the stacking-order keys of `0050` criterion 33 since that slice.
     for k in [
         "Shift",
         "Control",
@@ -1430,7 +1431,6 @@ fn ac55_the_modifier_keys_themselves_and_unknown_keys_are_ignored_without_effect
         "CapsLock",
         " ",
         "Tab",
-        "PageDown",
         "F5",
         "",
         "Dead",
@@ -1444,7 +1444,6 @@ fn ac55_the_modifier_keys_themselves_and_unknown_keys_are_ignored_without_effect
         "R ",
         "\u{1f600}",
         "Insert",
-        "Home",
         "1",
         "0",
         "-",

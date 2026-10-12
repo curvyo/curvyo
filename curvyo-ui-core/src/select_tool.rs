@@ -287,8 +287,10 @@ impl SelectTool {
         selection.retain_existing(objects);
         let shift = modifiers.shift;
         let origin = DragOrigin::new(point, handle_tolerances.drag_threshold_mm, shift);
+        let pickable = self.units.pickable(objects);
         let target = classify_press(
             objects,
+            &pickable,
             selection,
             point,
             tolerance,
