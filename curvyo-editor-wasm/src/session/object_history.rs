@@ -51,8 +51,7 @@ impl Session {
         }
     }
 
-    /// The operation name of the step an object undo or redo would act on, for the tooltips and
-    /// the Edit menu.
+    /// The operation name of the step an object undo or redo would act on, for the tooltips.
     pub fn object_history_target_name(&mut self, direction: Direction) -> Option<String> {
         self.object_target(direction)
             .map(|target| operation_name(&target.label).to_owned())

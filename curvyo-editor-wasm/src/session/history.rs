@@ -230,8 +230,8 @@ impl Session {
     }
 
     fn press_history(&mut self, direction: Direction) -> HistoryResult {
-        // The gate of the keys (criterion 6) holds for every entry point: the History buttons and
-        // the Edit menu come here too.
+        // The gate of the keys (criterion 6) holds for every entry point: the History buttons come
+        // here too.
         if self.operation_in_flight() || self.select.has_entry() {
             return HistoryResult {
                 notice: String::new(),

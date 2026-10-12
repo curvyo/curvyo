@@ -1,5 +1,5 @@
 // Mirrors the payloads curvyo-app (src-tauri) sends across the IPC
-// boundary: the various `...Payload` structs in curvyo-app/src/main.rs.
+// boundary: the payload and outcome types in curvyo-app/src/project.rs.
 // Keep these in sync with that file — there is no shared schema generator
 // for this slice.
 //
@@ -21,34 +21,28 @@ export interface OpenErrorPayload {
 }
 
 /** A file the host could read, for `WasmSession.open` to try parsing —
- * what an `open-bytes` event carries. */
+ * what an `open-bytes` event carries (a file the operating system handed to the running app). */
 export interface OpenBytesPayload {
   path: string;
   bytes: number[];
 }
 
 /**
- * What `take_pending_open` returns (or `null`/`undefined` if nothing is
- * pending) for the file-association launch race: either of the two
- * payloads above, tagged by `kind` so the one listener that handles both
- * live events can handle this too.
+ * A project file the host read, or failed to read: what `pick_project` returns (`null` when the
+ * maker cancelled the dialog) and what `take_pending_open` returns (`null` if nothing is pending)
+ * for the file-association launch race. Tagged by `kind` so one handler takes both live events
+ * and these answers.
  */
-export type PendingOpenPayload =
+export type OpenPayload =
   | ({ kind: "bytes" } & OpenBytesPayload)
   | ({ kind: "io_error" } & OpenErrorPayload);
 
-/** What a `save-error` event carries. */
-export interface SaveErrorPayload {
-  message: string;
-}
-
 /**
- * What a `request-pack` event carries: the host is asking the frontend to
- * pack the live session's document and hand the bytes to
- * `save_project_bytes` — `save_as` forces the native Save As… dialog even
- * when a path is already known (acceptance criterion 3).
+ * How `save_project_bytes` ended: written (with the file's name and path), cancelled (the maker
+ * closed the dialog) or failed (with the sentence for the error dialog). There is no separate
+ * error event.
  */
-export interface RequestPackPayload {
-  save_as: boolean;
-  app_version: string;
-}
+export type SaveOutcome =
+  | { kind: "saved"; file_name: string; path: string }
+  | { kind: "cancelled" }
+  | { kind: "failed"; message: string };

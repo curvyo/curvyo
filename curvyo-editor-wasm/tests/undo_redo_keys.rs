@@ -448,7 +448,7 @@ fn delete_undo_redo_undo_through_the_keys_restores_the_object() {
 }
 
 #[test]
-fn the_buttons_and_the_menu_share_the_gate_of_the_keys() {
+fn the_buttons_and_the_keys_share_one_gate() {
     let mut session = fresh();
     draw_square(&mut session, 10.0);
     draw_square(&mut session, 50.0);

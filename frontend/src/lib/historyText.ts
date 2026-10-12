@@ -6,11 +6,6 @@
  * Ctrl+U and Ctrl+Shift+U (`specs/0041-object-history`). */
 export type HistoryDirection = "undo" | "redo" | "object-undo" | "object-redo";
 
-/** Whether the command acts on the selected object only. */
-export function isObjectDirection(direction: HistoryDirection): boolean {
-  return direction === "object-undo" || direction === "object-redo";
-}
-
 /** How long a notice stays: 3 s, or 5 s above 70 characters (`0016` criterion 29). */
 export function noticeDurationMs(text: string): number {
   return text.length > 70 ? 5000 : 3000;
@@ -29,11 +24,6 @@ export function workingNotice(direction: HistoryDirection): string {
     ? "Undo: working..."
     : "Redo: working...";
 }
-
-/** A second trigger of the same direction within this long is the same press arriving by both
- * paths, the key event and the native menu accelerator (criterion 8: exactly one handler fires).
- * Only macOS binds the accelerator natively; on Linux and Windows the key event is the one path. */
-export const DUPLICATE_PRESS_MS = 25;
 
 /**
  * Whether a key press is undo or redo: Ctrl (Cmd) with the typed character z (Shift: redo) or,
@@ -63,22 +53,6 @@ export function historyKeyDirection(event: {
   return null;
 }
 
-/** What a press that came from the native Edit menu does. */
-export type MenuPressPlan = "skip" | "text-undo" | "document";
-
-/**
- * What to do with a `history-menu` event: nothing when the same press already arrived as a key
- * event (macOS keeps a native accelerator), the focused text field's own undo or redo when one has
- * focus (criterion 8: a text field keeps its own undo, also when the menu item is clicked), and
- * otherwise the document's undo or redo.
- */
-export function menuPressPlan(state: { duplicate: boolean; textEntry: boolean }): MenuPressPlan {
-  if (state.duplicate) {
-    return "skip";
-  }
-  return state.textEntry ? "text-undo" : "document";
-}
-
 /** Whether the platform is macOS (Cmd+Y is not a redo key there). */
 export function isMac(platform: string): boolean {
   return /mac|iphone|ipad/i.test(platform);
@@ -89,7 +63,7 @@ export function noticeText(raw: string): string | null {
   return raw === "" ? null : raw;
 }
 
-/** The names of the next undo and redo for the native Edit menu: `null` when a stack is empty. */
+/** The names of the next undo and redo for the History tab's buttons: `null` when a stack is empty. */
 export function menuNames(undo: string, redo: string): { undo: string | null; redo: string | null } {
   return { undo: undo === "" ? null : undo, redo: redo === "" ? null : redo };
 }

@@ -11,6 +11,7 @@
 import { applyFormats, formatsFileReady } from "@/lib/formatsFile";
 import init, {
   WasmSession,
+  file_command_tooltip,
   init_panic_hook,
 } from "@/wasm-bindings/curvyo_editor_wasm.js";
 
@@ -69,6 +70,19 @@ export async function openSession(bytes: Uint8Array): Promise<WasmSession> {
   const session = WasmSession.open(mintPeerId(), bytes);
   applyFormats(session);
   return session;
+}
+
+/** The application version, the same in both builds (`specs/0051-sidebar-and-no-menu/`
+ * criterion 42). Needs the wasm module loaded, which any session guarantees. */
+export function appVersion(): string {
+  return WasmSession.app_version();
+}
+
+/** The tooltip of a File tab button with the chord this build has for it. The table names Ctrl for
+ * the browser build; on a Mac the browser takes Cmd, so the tooltip says so. */
+export function fileCommandTooltip(command: string, platform: string): string {
+  const tooltip = file_command_tooltip(command, platform);
+  return /mac|iphone|ipad/i.test(navigator.platform) ? tooltip.replace("Ctrl+", "Cmd+") : tooltip;
 }
 
 export type { WasmSession, NodeToolbarState, FormatListRecord } from "@/wasm-bindings/curvyo_editor_wasm.js";

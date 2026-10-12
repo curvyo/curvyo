@@ -1506,9 +1506,15 @@ Accepted limits of the slice, each visible in the code:
   of criterion 6 for copies.
 - **Left open by the UX review of 0041** (non-blocking): the notice for Ctrl+Z of an object undo reads
   "Undid: Undo Draw rectangle" (a double negative; two tester tests pin the text); the Document
-  scope's Undo tooltip omits "You, 12:03" (needs the target's author and time from the session);
-  the Edit menu shows no key text for the object items on Linux and Windows (accelerators there are
-  macOS only, and the menu goes away with `0051`).
+  scope's Undo tooltip omits "You, 12:03" (needs the target's author and time from the session).
 - **The shown ids are rebuilt on the first read after a new step.** The abbreviation of a step id
   depends on all other ids (ADR 0014 §3); the rebuild is a few milliseconds at 20,000 steps and
   happens only when rows are read, not on the commit path.
+
+## The Select bar draws over the strip below about 640 px (browser build) (`0051`, 2026-10-11)
+
+The desktop window has a minimum width of 800 px, where the bars' overlay row is 324 px and ends
+at the strip. The browser build has no minimum: below about 640 px of window width the viewport is
+narrower than the bars and the Select bar is drawn over the strip and the body. **Resolution:** a
+minimum width for the editor in the browser build, or a wrap rule for the overlay row. Not needed
+for the desktop app.

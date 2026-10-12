@@ -688,20 +688,23 @@ export interface EditorSession {
   onContainerBlur: (event: React.FocusEvent<HTMLDivElement>) => void;
   onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => void;
   onKeyUp: (event: React.KeyboardEvent<HTMLDivElement>) => void;
-  /** File → New: swaps in a brand-new, empty session. */
-  newProject: () => void;
+  /** New and Close: swaps in a brand-new, empty session. Resolves once it is attached. */
+  newProject: () => Promise<void>;
   /** File → Open / the OS file association: parses `bytes` as a `.curvyo`
    * and swaps it in as the live session.
    * @throws the exact user-facing sentence naming why `bytes` could not
    * be opened (see `@/lib/editorSession`'s `openSession`) — the caller
    * shows it, this hook does not. */
   openProject: (bytes: Uint8Array) => Promise<void>;
-  /** File → Save / Save As: packs the live session's document into
-   * `.curvyo` container bytes for the host to write.
+  /** Save / Save as: packs the live session's document into `.curvyo` container bytes for the
+   * host to write, recording the application version. Call `markSaved` once they are written.
    * @throws a plain `Error` if there is no live session yet, or the
    * `JsValue` `curvyo-editor-wasm`'s `pack` throws if the document could
    * not be serialized — the caller shows it, this hook does not. */
-  packProject: (appVersion: string) => Uint8Array;
+  packProject: () => Uint8Array;
+  /** The bytes of the last `packProject` are written: the project is clean unless it changed
+   * since (`specs/0051-sidebar-and-no-menu/` criterion 22). */
+  markSaved: () => void;
 }
 
 /** Owns one `WasmSession` for the app's lifetime: creates it, attaches
@@ -894,7 +897,7 @@ export function useEditorSession(
 
   const getSession = useCallback(() => sessionRef.current, []);
   const history = useHistory(getSession, syncFromSession, containerRef, onNudgeHistory);
-  const { refresh: refreshHistory, handleKeyOutcome, isDuplicateKey } = history;
+  const { refresh: refreshHistory, handleKeyOutcome } = history;
   useEffect(() => {
     refreshHistoryRef.current = refreshHistory;
   }, [refreshHistory]);
@@ -1106,9 +1109,10 @@ export function useEditorSession(
     };
   }, [attachSession, enqueueSessionTask, onCursorMove, syncEntry]);
 
-  const newProject = useCallback(() => {
-    void createSession().then(attachSession);
-  }, [attachSession]);
+  const newProject = useCallback(
+    () => createSession().then(attachSession),
+    [attachSession],
+  );
 
   const openProject = useCallback(
     async (bytes: Uint8Array) => {
@@ -1118,12 +1122,16 @@ export function useEditorSession(
     [attachSession],
   );
 
-  const packProject = useCallback((appVersion: string): Uint8Array => {
+  const packProject = useCallback((): Uint8Array => {
     const session = sessionRef.current;
     if (!session) {
       throw new Error("no editing session is attached yet");
     }
-    return session.pack(appVersion);
+    return session.pack();
+  }, []);
+
+  const markSaved = useCallback(() => {
+    sessionRef.current?.mark_saved();
   }, []);
 
   const setTool = useCallback(
@@ -1779,10 +1787,6 @@ export function useEditorSession(
       if (!session) {
         return;
       }
-      if (isDuplicateKey(event)) {
-        event.preventDefault();
-        return;
-      }
       const outcome = session.key_down(
         event.key,
         event.shiftKey,
@@ -1824,7 +1828,6 @@ export function useEditorSession(
     [
       handleKeyOutcome,
       handleGroupingOutcome,
-      isDuplicateKey,
       isSpaceHeld,
       syncFromSession,
       onNudge,
@@ -2037,5 +2040,6 @@ export function useEditorSession(
     newProject,
     openProject,
     packProject,
+    markSaved,
   };
 }

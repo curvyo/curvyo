@@ -1,45 +1,55 @@
 import { panelHandlesEscape } from "@/lib/panelEscape";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef } from "react";
 
 import { DocumentSection } from "@/components/panel/DocumentSection";
+import { FileTab } from "@/components/panel/FileTab";
 import { HistoryTab } from "@/components/panel/HistoryTab";
-import { PanelTabStrip } from "@/components/panel/PanelTabStrip";
+import { PanelStrip } from "@/components/panel/PanelStrip";
 import { StyleSection } from "@/components/panel/StyleSection";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Tooltip } from "@/components/ui/tooltip";
 import type { DocumentPanelApi } from "@/hooks/useDocumentPanel";
 import type { EditorSession } from "@/hooks/useEditorSession";
+import type { PanelOpenApi } from "@/hooks/usePanelOpen";
+import type { ProjectApi } from "@/hooks/useProject";
 import { useBackgroundPanel } from "@/hooks/useBackgroundPanel";
 import { useFormats } from "@/hooks/useFormats";
 import { useHistoryScope } from "@/hooks/useHistoryScope";
 import { useStylePanel } from "@/hooks/useStylePanel";
-
-/** The panel's width, px (`docs/design-system.md`, "Properties panel"). */
-export const PANEL_WIDTH_PX = 280;
+import { appVersion, fileCommandTooltip } from "@/lib/editorSession";
+import { isTauri, PLATFORM } from "@/platform/host";
 
 interface PropertiesPanelProps {
   editor: EditorSession;
   document: DocumentPanelApi;
+  /** Whether the body is shown; owned by the app so a request from outside the panel can show it. */
+  panelOpen: PanelOpenApi;
+  /** The open project: the File tab shows it and the strip carries its dirty dot. */
+  project: ProjectApi;
 }
 
 /**
- * The right-docked properties panel (`specs/0007-stroke-and-fill-styling`
- * criteria 38, 39): 280 px, full height down to the status bar, a sibling of
- * the canvas region and never an overlay. A 16 x 48 px tab on its canvas-facing
- * edge collapses it (state per session, default open). Collapsed, the content
- * is hidden and out of the tab order and the canvas region takes the width; the document does not move
- * on screen because the resize keeps the view's top-left origin.
- * `Shift+Ctrl+F` (Style, or Document with nothing selected) and `Shift+Ctrl+D`
- * (Document) expand the panel, choose the tab and move focus to its first
- * control; they never collapse it and are ignored during a canvas drag.
+ * The right-docked properties panel (`specs/0007-stroke-and-fill-styling` criteria 38, 39;
+ * `specs/0051-sidebar-and-no-menu/` criteria 1 to 14): a 32 px strip of icon tabs on the edge next
+ * to the canvas and, to its right, the 280 px body, full height down to the status bar, a sibling of
+ * the canvas region and never an overlay. The collapse control in the strip hides the body; the
+ * strip stays. A hidden body is out of the tab order and the canvas region takes its width; the
+ * document does not move on screen because the resize keeps the view's top-left origin.
+ * `Shift+Ctrl+F` (Style, or Document with nothing selected), `Shift+Ctrl+D` (Document) and
+ * `Shift+Ctrl+H` (History) show the body, choose the tab and move focus to its first control; they
+ * never hide it and are ignored during a canvas drag.
  *
- * The header row holds the strip of tabs and the subject line and does not
- * scroll; the body below it does (`specs/0043-properties-tabs/` criteria 18,
- * 19). Which tab is active, and when it switches, is the session's rule.
+ * The header row (the active tab's name and the subject line) does not scroll; the body below it
+ * does (`specs/0043-properties-tabs/` criteria 18, 19). Which tab is active, and when it switches,
+ * is the session's rule.
  */
-export function PropertiesPanel({ editor, document: doc }: PropertiesPanelProps) {
-  const [open, setOpen] = useState(true);
+export function PropertiesPanel({
+  editor,
+  document: doc,
+  panelOpen,
+  project,
+}: PropertiesPanelProps) {
+  const { open, setOpen } = panelOpen;
   const panelId = useId();
   const asideRef = useRef<HTMLElement>(null);
   /** A shortcut asked for the first control: it is focused once the chosen
@@ -56,16 +66,6 @@ export function PropertiesPanel({ editor, document: doc }: PropertiesPanelProps)
     panel.endPick();
     background.endPick();
   };
-
-  const setOpenKeepingView = useCallback(
-    (next: boolean) => {
-      // The canvas is about to gain or lose the panel's width: keep the
-      // document where it is on screen (criterion 39).
-      getSession()?.keep_view_origin_for_panel_toggle(next ? -PANEL_WIDTH_PX : PANEL_WIDTH_PX);
-      setOpen(next);
-    },
-    [getSession],
-  );
 
   /** Focus lands on the first control (Stroke Paint), or on the panel itself
    * when it is empty. */
@@ -107,13 +107,11 @@ export function PropertiesPanel({ editor, document: doc }: PropertiesPanelProps)
       }
       focusAfterShortcut.current = true;
       shortcut(key === "f" ? "style" : key === "h" ? "history" : "document");
-      if (!open) {
-        setOpenKeepingView(true);
-      }
+      setOpen(true);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open, getSession, shortcut, setOpenKeepingView]);
+  }, [getSession, shortcut, setOpen]);
 
   useEffect(() => {
     if (open && focusAfterShortcut.current) {
@@ -145,163 +143,163 @@ export function PropertiesPanel({ editor, document: doc }: PropertiesPanelProps)
   const objectSubject = historyScope.scope === "object" ? historyScope.info : null;
   const historyTotal = doc.view.content === "history" ? historyCount(editor) : 0;
   const subject =
-    doc.view.content === "history"
+    doc.view.content === "file"
+      ? project.dirty
+        ? "Unsaved changes"
+        : ""
+      : doc.view.content === "history"
       ? `${historyTotal} ${historyTotal === 1 ? "step" : "steps"}`
       : doc.view.content === "document"
       ? doc.view.presets.subject
       : doc.view.content === "style"
         ? panel.view.subject
         : "";
-  const label = open ? "Hide properties panel" : "Show properties panel";
+  const activeLabel = doc.view.tabs.find((tab) => tab.name === doc.view.activeTab)?.label ?? "";
+  /** A press on a tab (or Enter, Space on a focused one) shows the body with that tab. */
+  const activate = (name: string) => {
+    setOpen(true);
+    doc.pressTab(name);
+  };
   return (
-    <>
-      <div
-        className="relative shrink-0"
-        style={{ width: open ? PANEL_WIDTH_PX : 0 }}
-      >
-        <Tooltip side="left" content="Properties (Shift+Ctrl+F)">
-          <button
-            type="button"
-            aria-label={label}
-            aria-expanded={open}
-            aria-controls={panelId}
-            onClick={(event) => {
-              // A press on the collapse tab ends picking too (`0040` UX notes).
-              if (picking) {
-                endPick();
-              }
-              setOpenKeepingView(!open);
-              // `detail` is 0 for keyboard activation, 1 or more for a click.
-              if (event.detail > 0) {
-                returnFocus();
-              }
-            }}
-            // The hit target is 24 px wide (WCAG 2.2 AA 2.5.8); the 16 px tab
-            // of the design system is drawn inside it, on the canvas side.
-            className="group absolute top-1/2 left-[-24px] z-30 flex h-12 w-6 -translate-y-1/2 items-center justify-end outline-none"
-          >
-            <span
-              className="flex h-12 w-4 items-center justify-center rounded-l-md border border-r-0 border-[color-mix(in_srgb,var(--toolbar-icon)_25%,transparent)] bg-[var(--toolbar-bg)] text-[var(--toolbar-icon)] group-hover:bg-[var(--editor-accent-hover)] group-focus-visible:ring-2 group-focus-visible:ring-[var(--editor-accent)]"
-              style={{ boxShadow: "var(--panel-elevation-shadow)" }}
-            >
-              {open ? <ChevronRight size={12} aria-hidden /> : <ChevronLeft size={12} aria-hidden />}
-            </span>
-          </button>
-        </Tooltip>
-        <aside
-          id={panelId}
-          ref={asideRef}
-          aria-label="Properties"
-          tabIndex={-1}
-          hidden={!open}
-          onFocus={() => {
-            focusInside.current = true;
-          }}
-          onBlur={(event) => {
-            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-              focusInside.current = false;
-            }
-          }}
-          onMouseDown={(event) => {
-            // A press on dead space (the heading, a label) must not leave the
-            // focus on the panel, where the tool letters would do nothing: it
-            // goes back to the canvas. A control keeps the press.
-            if (
-              !(event.target as HTMLElement).closest(
-                "input, button, [role]:not([role=tabpanel]), select",
-              )
-            ) {
-              event.preventDefault();
-              returnFocus();
-            }
-          }}
-          onPointerDownCapture={(event) => {
-            // A press anywhere in the panel other than the eyedropper button ends
-            // picking and writes nothing (`0017` criterion 26).
-            if (picking && !(event.target as HTMLElement).closest("[data-eyedropper]")) {
+    <Tabs
+      value={doc.view.activeTab}
+      onValueChange={activate}
+      orientation="vertical"
+      // Hidden, the arrows only move the focus; Enter or Space opens the focused tab.
+      activationMode={open ? "automatic" : "manual"}
+      className="flex h-full shrink-0"
+    >
+      <PanelStrip
+        tabs={doc.view.tabs}
+        active={doc.view.activeTab}
+        open={open}
+        bodyId={panelId}
+        fileDirty={project.dirty}
+        onToggle={(event) => {
+          // A press on the collapse control ends picking too (`0040` UX notes).
+          if (picking) {
+            endPick();
+          }
+          setOpen(!open);
+          // `detail` is 0 for keyboard activation, 1 or more for a click.
+          if (event.detail > 0) {
+            returnFocus();
+          }
+        }}
+        onActivate={activate}
+        onReturnFocus={returnFocus}
+      />
+      <aside
+        id={panelId}
+        ref={asideRef}
+        aria-label="Properties"
+        tabIndex={-1}
+        hidden={!open}
+        onFocus={() => {
+          focusInside.current = true;
+        }}
+        onBlur={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+            focusInside.current = false;
+          }
+        }}
+        onMouseDown={(event) => {
+          // A press on dead space (the heading, a label) must not leave the
+          // focus on the panel, where the tool letters would do nothing: it
+          // goes back to the canvas. A control keeps the press.
+          if (
+            !(event.target as HTMLElement).closest(
+              "input, button, [role]:not([role=tabpanel]), select",
+            )
+          ) {
+            event.preventDefault();
+            returnFocus();
+          }
+        }}
+        onPointerDownCapture={(event) => {
+          // A press anywhere in the panel other than the eyedropper button ends
+          // picking and writes nothing (`0017` criterion 26).
+          if (picking && !(event.target as HTMLElement).closest("[data-eyedropper]")) {
+            endPick();
+          }
+        }}
+        onKeyDown={(event) => {
+          // Escape in the panel (`0017` criterion 60): a running drag is
+          // reverted first (`usePreviewGesture` takes the key before it gets
+          // here); a field restores itself and returns focus; otherwise focus
+          // returns to the canvas, unless a field already handled the key (its
+          // `preventDefault`), as the hex field does for the slider it came from.
+          // It never clears the selection and never reaches the canvas.
+          if (panelHandlesEscape(event) && event.currentTarget.contains(event.target as Node)) {
+            event.preventDefault();
+            // Picking ends first and keeps the focus where it is.
+            if (picking) {
               endPick();
+              return;
             }
-          }}
-          onKeyDown={(event) => {
-            // Escape in the panel (`0017` criterion 60): a running drag is
-            // reverted first (`usePreviewGesture` takes the key before it gets
-            // here); a field restores itself and returns focus; otherwise focus
-            // returns to the canvas, unless a field already handled the key (its
-            // `preventDefault`), as the hex field does for the slider it came from.
-            // It never clears the selection and never reaches the canvas.
-            if (panelHandlesEscape(event) && event.currentTarget.contains(event.target as Node)) {
-              event.preventDefault();
-              // Picking ends first and keeps the focus where it is.
-              if (picking) {
-                endPick();
-                return;
-              }
-              returnFocus();
-            }
-          }}
-          className="properties-panel flex h-full w-[280px] flex-col overflow-hidden border-l border-[color-mix(in_srgb,var(--toolbar-icon)_25%,transparent)] bg-[var(--panel-bg)] outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)]"
+            returnFocus();
+          }
+        }}
+        className="properties-panel flex h-full w-[280px] flex-col overflow-hidden bg-[var(--panel-bg)] outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)]"
+      >
+        <div className="box-content flex h-6 shrink-0 items-center justify-between gap-2 px-3 pt-3 pb-2">
+          <h2 className="shrink-0 text-sm font-normal text-[var(--toolbar-icon)]">{activeLabel}</h2>
+          {doc.view.content === "history" && objectSubject ? (
+            <ObjectSubject kind={objectSubject.kind} id={objectSubject.id} fullId={objectSubject.fullId} />
+          ) : (
+            <PanelSubject text={subject} />
+          )}
+        </div>
+        {/* Keyed on the tab: the scroll position starts at the top on every
+            tab change (criterion 19). */}
+        <div
+          key={doc.view.activeTab}
+          className={
+            doc.view.content === "history"
+              ? // The one tab with an inner scroll area, the list: the header, the buttons
+                // and the footer stay in view (`0020` criterion 43).
+                "flex min-h-0 flex-1 flex-col px-3 pb-3"
+              : "properties-panel-body min-h-0 flex-1 px-3 pb-3"
+          }
         >
-          <Tabs
+          <TabsContent
             value={doc.view.activeTab}
-            onValueChange={doc.pressTab}
-            className="flex min-h-0 flex-1 flex-col"
+            tabIndex={-1}
+            className={
+              doc.view.content === "history"
+                ? "flex min-h-0 flex-1 flex-col outline-none"
+                : "outline-none"
+            }
           >
-            <div className="flex h-7 shrink-0 items-center justify-between gap-2 px-3 pt-3 pb-2 box-content">
-              <PanelTabStrip
-                tabs={doc.view.tabs}
-                active={doc.view.activeTab}
+            {doc.view.content === "file" ? (
+              <FileTab
+                project={project}
+                desktop={isTauri}
+                version={appVersion()}
+                tooltipFor={(command) => fileCommandTooltip(command, PLATFORM)}
                 onReturnFocus={returnFocus}
               />
-              {doc.view.content === "history" && objectSubject ? (
-                <ObjectSubject kind={objectSubject.kind} id={objectSubject.id} fullId={objectSubject.fullId} />
-              ) : (
-                <PanelSubject text={subject} />
-              )}
-            </div>
-            {/* Keyed on the tab: the scroll position starts at the top on every
-                tab change (criterion 19). */}
-            <div
-              key={doc.view.activeTab}
-              className={
-                doc.view.content === "history"
-                  ? // The one tab with an inner scroll area, the list: the header, the buttons
-                    // and the footer stay in view (`0020` criterion 43).
-                    "flex min-h-0 flex-1 flex-col px-3 pb-3"
-                  : "properties-panel-body min-h-0 flex-1 px-3 pb-3"
-              }
-            >
-              <TabsContent
-                value={doc.view.activeTab}
-                tabIndex={-1}
-                className={
-                  doc.view.content === "history"
-                    ? "flex min-h-0 flex-1 flex-col outline-none"
-                    : "outline-none"
-                }
-              >
-                {doc.view.content === "document" ? (
-                  <DocumentSection
-                    document={doc}
-                    formats={formats}
-                    background={background}
-                    onReturnFocus={returnFocus}
-                  />
-                ) : doc.view.content === "style" ? (
-                  <StyleSection panel={panel} onReturnFocus={returnFocus} />
-                ) : doc.view.content === "history" ? (
-                  <HistoryTab
-                    editor={editor}
-                    shown={open}
-                    onReturnFocus={returnFocus}
-                    historyScope={historyScope}
-                  />
-                ) : null}
-              </TabsContent>
-            </div>
-          </Tabs>
-        </aside>
-      </div>
-    </>
+            ) : doc.view.content === "document" ? (
+              <DocumentSection
+                document={doc}
+                formats={formats}
+                background={background}
+                onReturnFocus={returnFocus}
+              />
+            ) : doc.view.content === "style" ? (
+              <StyleSection panel={panel} onReturnFocus={returnFocus} />
+            ) : doc.view.content === "history" ? (
+              <HistoryTab
+                editor={editor}
+                shown={open}
+                onReturnFocus={returnFocus}
+                historyScope={historyScope}
+              />
+            ) : null}
+          </TabsContent>
+        </div>
+      </aside>
+    </Tabs>
   );
 }
 

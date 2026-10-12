@@ -8,6 +8,8 @@ use crate::panel_tabs::PanelTab;
 /// The panel's content.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PanelContent {
+    /// The File tab: the project and the file commands (`specs/0051-sidebar-and-no-menu`).
+    File,
     /// The Document section: the Document tab is active and the Pen has no
     /// unfinished path.
     Document,
@@ -41,6 +43,7 @@ pub fn panel_body(
         PanelTab::Style if style_has_objects => PanelContent::Style,
         PanelTab::Style => PanelContent::Empty,
         PanelTab::History => PanelContent::History,
+        PanelTab::File => PanelContent::File,
     }
 }
 
@@ -65,6 +68,9 @@ mod tests {
             // History shows its list whatever the tool and the scope are.
             (PanelTab::History, false, false, PanelContent::History),
             (PanelTab::History, true, true, PanelContent::History),
+            // So does File (`0051`).
+            (PanelTab::File, false, false, PanelContent::File),
+            (PanelTab::File, true, true, PanelContent::File),
         ];
         for (tab, pen, scope, want) in rows {
             assert_eq!(
