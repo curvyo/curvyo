@@ -246,7 +246,7 @@ mod tests {
         };
         let list = build_outline_preview(&[outline], view(4.0));
         let blue = line(&list);
-        assert!(!blue.is_empty());
+        assert_ne!(blue.len(), 0);
         let casing = list
             .triangles
             .iter()
@@ -264,6 +264,6 @@ mod tests {
                 .iter()
                 .all(|v| v.color == theme::SELECTION_CASING)
         );
-        assert!(build_outline_preview(&[], view(4.0)).triangles.is_empty());
+        assert_eq!(build_outline_preview(&[], view(4.0)).triangles.len(), 0);
     }
 }
