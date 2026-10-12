@@ -229,7 +229,7 @@ export function useRailCommands(editor: EditorSession): RailCommands {
           showPath(combineSuccessText(result), combineRefusalText(result));
         } else if (command === "split") {
           const result = applySplit();
-          outlinedRef.current = result.kind === "groups";
+          outlinedRef.current = result.kind === "groups" || result.kind === "out_of_range";
           showPath(splitSuccessText(result), splitRefusalText(result));
         } else if (command === "break_apart") {
           const result = applyBreakApart();

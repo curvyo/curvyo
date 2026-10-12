@@ -73,7 +73,12 @@ impl Session {
             let plan = match plan_split(&objects, &selection, &mut this.minter) {
                 Ok(plan) => plan,
                 Err(refusal) => {
-                    this.command_refusal = None;
+                    this.command_refusal = match &refusal {
+                        SplitRefusal::OutOfRange { offenders, .. } => {
+                            Some(RefusalMarks::new(offenders.clone(), &selection))
+                        }
+                        _ => None,
+                    };
                     return SplitOutcome::Refused(refusal);
                 }
             };

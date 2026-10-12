@@ -14,8 +14,9 @@ fn count(n: usize) -> u32 {
 
 /// What `apply_split` did. `kind` is `"ignored"`, `"applied"` (`compounds` compound paths became
 /// `pieces` objects; `with_holes` says a piece has a hole; `left_alone` compound paths were one
-/// piece already) or a refusal: `"no_compound"`, `"groups"` or `"one_piece"` (`compounds` selected
-/// compound paths are one piece each). Nothing was changed by anything but `"applied"`.
+/// piece already) or a refusal: `"no_compound"`, `"groups"`, `"one_piece"` (`compounds` selected
+/// compound paths are one piece each) or `"out_of_range"` (`compounds` of the `of` selected objects
+/// reach beyond the kernel's range). Nothing was changed by anything but `"applied"`.
 #[wasm_bindgen]
 #[derive(Debug, Clone)]
 pub struct SplitResultView {
@@ -30,6 +31,8 @@ pub struct SplitResultView {
     pub with_holes: bool,
     /// Compound paths left as they are.
     pub left_alone: u32,
+    /// Objects selected, for the out-of-range sentence.
+    pub of: u32,
 }
 
 impl From<SplitOutcome> for SplitResultView {
@@ -41,6 +44,7 @@ impl From<SplitOutcome> for SplitResultView {
                 pieces: count(pieces),
                 with_holes,
                 left_alone: count(left),
+                of: 0,
             };
         match outcome {
             SplitOutcome::Ignored => view("ignored", 0, 0, false, 0),
@@ -57,6 +61,10 @@ impl From<SplitOutcome> for SplitResultView {
             SplitOutcome::Refused(SplitRefusal::Groups { offenders }) => {
                 view("groups", offenders.len(), 0, false, 0)
             }
+            SplitOutcome::Refused(SplitRefusal::OutOfRange { offenders, of }) => Self {
+                of: count(of),
+                ..view("out_of_range", offenders.len(), 0, false, 0)
+            },
         }
     }
 }

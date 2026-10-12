@@ -41,6 +41,8 @@ export interface SplitResult {
   pieces: number;
   withHoles: boolean;
   leftAlone: number;
+  /** Objects selected (for the out-of-range sentence). */
+  of?: number;
 }
 
 /** What `WasmSession.apply_break_apart` did (`kind` is the outcome code). */
@@ -201,6 +203,12 @@ export function splitRefusalText(result: SplitResult): string | null {
       return result.compounds === 1
         ? `Nothing to split. The compound path is one piece with its holes. Use Break apart to release the holes. ${NOTHING_CHANGED}`
         : `Nothing to split. The ${result.compounds} selected compound paths are one piece each, with their holes. Use Break apart to release the holes. ${NOTHING_CHANGED}`;
+    case "out_of_range":
+      return sharedRefusalText("Split", {
+        kind: result.kind,
+        count: result.compounds,
+        of: result.of ?? result.compounds,
+      });
     default:
       return null;
   }

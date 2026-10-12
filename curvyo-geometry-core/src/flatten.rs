@@ -58,13 +58,19 @@ fn step_count(control: &[Point; 4], tolerance_mm: f64) -> usize {
     let d1 = norm(p3.x - 2.0 * p2.x + p1.x, p3.y - 2.0 * p2.y + p1.y);
     let second_derivative_max = 6.0 * d0.max(d1);
     let steps = (second_derivative_max / (8.0 * tolerance_mm)).sqrt().ceil();
-    // A finite, non-negative float: the cast saturates and cannot wrap. `max(1.0)` keeps a
-    // straight segment (zero handles) at one step.
+    // `max(1.0)` keeps a straight segment (zero handles) at one step and turns NaN into one step;
+    // `min` bounds the allocation for a coordinate that is infinite or far out of range (callers
+    // refuse those, this is the guard behind them). Inside the kernel's range the bound is never
+    // reached, so the tolerance holds there.
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     {
-        steps.max(1.0) as usize
+        steps.max(1.0).min(MAX_STEPS) as usize
     }
 }
+
+/// At most this many chords per segment: within `MAX_COORDINATE_MM` and at the finest tolerance
+/// the kernel uses (0.0005 mm) a cubic needs fewer than 250,000.
+const MAX_STEPS: f64 = 262_144.0;
 
 fn eval(control: &[Point; 4], t: f64) -> Point {
     let [p0, p1, p2, p3] = *control;

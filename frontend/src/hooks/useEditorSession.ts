@@ -1338,6 +1338,7 @@ export function useEditorSession(
       pieces: raw.pieces,
       withHoles: raw.with_holes,
       leftAlone: raw.left_alone,
+      of: raw.of,
     };
     raw.free();
     return result;

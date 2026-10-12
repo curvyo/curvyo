@@ -11,7 +11,7 @@ use curvyo_geometry_core::{Nesting, Outline, OutlineTriple, outline_nesting, tou
 
 use crate::anchor_id_minter::AnchorIdMinter;
 use crate::boolean::operands_in_order;
-use crate::combine::{fresh_ids, is_compound};
+use crate::combine::{fresh_ids, is_compound, out_of_range};
 use crate::object_selection::ObjectSelection;
 
 /// The commit label of Split; the undo slice maps it to display text.
@@ -28,6 +28,14 @@ pub enum SplitRefusal {
     Groups {
         /// The leaves of the selected groups, to outline.
         offenders: Vec<NodeId>,
+    },
+    /// `offenders` of the `of` selected objects are compound paths with a coordinate that is not
+    /// finite or beyond the kernel's range: the part search cannot measure them.
+    OutOfRange {
+        /// The compound paths out of range, to outline.
+        offenders: Vec<NodeId>,
+        /// How many objects are selected.
+        of: usize,
     },
     /// Every selected compound path is one part: `compounds` of them, each already one piece with
     /// its holes.
@@ -177,6 +185,17 @@ pub fn plan_split(
     if compounds == 0 {
         return Err(SplitRefusal::NoCompound);
     }
+    let offenders: Vec<NodeId> = operands
+        .iter()
+        .filter(|object| is_compound(object) && !in_range(object))
+        .map(|object| object.id())
+        .collect();
+    if !offenders.is_empty() {
+        return Err(SplitRefusal::OutOfRange {
+            offenders,
+            of: operands.len(),
+        });
+    }
     let mut removed = Vec::new();
     let mut pieces = Vec::new();
     let mut kept = Vec::new();
@@ -225,6 +244,17 @@ pub fn plan_split(
         kept,
         left_alone,
     })
+}
+
+/// Whether every node and handle end of `object` is finite and within the kernel's range (the
+/// rule of the Boolean operations, Combine and Cut).
+pub(crate) fn in_range(object: &ObjectSnapshot) -> bool {
+    match object {
+        ObjectSnapshot::Path(path) => path
+            .subpaths()
+            .all(|outline| !out_of_range(outline.anchors)),
+        ObjectSnapshot::Primitive(_) => true,
+    }
 }
 
 /// The anchors of an outline with fresh ids, as one outline of a piece.

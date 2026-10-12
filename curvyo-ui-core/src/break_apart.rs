@@ -11,7 +11,7 @@ use crate::anchor_id_minter::AnchorIdMinter;
 use crate::boolean::operands_in_order;
 use crate::combine::is_compound;
 use crate::object_selection::ObjectSelection;
-use crate::split::{fresh_outline, nesting_of};
+use crate::split::{fresh_outline, in_range, nesting_of};
 
 /// The commit label of Break apart; the undo slice maps it to display text.
 pub const BREAK_APART_COMMIT_LABEL: &str = "break_apart";
@@ -71,7 +71,11 @@ pub fn plan_break_apart(
             continue;
         }
         let outlines: Vec<SubpathRef<'_>> = path.subpaths().collect();
-        with_holes |= nesting_of(&outlines).iter().any(|nest| nest.depth % 2 == 1);
+        // The hole flag needs the nesting, which cannot measure a coordinate out of range; such a
+        // compound path is still broken apart (no arithmetic), only the flag is not set for it.
+        if in_range(object) {
+            with_holes |= nesting_of(&outlines).iter().any(|nest| nest.depth % 2 == 1);
+        }
         removed.push(object.id());
         for outline in &outlines {
             let piece = vec![fresh_outline(outline.anchors, outline.closed, minter)];
