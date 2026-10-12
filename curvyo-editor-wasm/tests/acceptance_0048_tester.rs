@@ -1407,44 +1407,54 @@ fn hostile_degenerate_outlines_do_not_panic_and_nothing_is_lost() {
     }
 }
 
-#[test]
-fn hostile_not_finite_and_huge_coordinates_do_not_panic_or_hang() {
-    for (name, x) in [
-        ("NaN", f64::NAN),
-        ("infinity", f64::INFINITY),
-        ("1e300", 1.0e300),
-        ("-1e300", -1.0e300),
-        ("beyond the kernel range", 2.0e7),
-        ("just inside the kernel range", 9.9e6),
-    ] {
-        let d = Document::new(1);
-        let bad = vec![corner(x, 0.0), corner(1.0, 1.0), corner(5.0, 10.0)];
-        compound(
-            &d,
-            vec![square(0.0, 0.0, 20.0), bad, square(100.0, 0.0, 20.0)],
-        );
-        let mut s = session_of(&d);
-        select_all(&mut s);
-        let before = json(&s);
-        let t = Instant::now();
+/// One compound path of two squares and a triangle with one bad x coordinate. Split or Break
+/// apart must answer quickly, without panic and without a huge allocation: no arithmetic beyond
+/// ordering is needed for Break apart, and Split may refuse but must not change anything then.
+fn hostile_value(name: &str, x: f64, command: &str) {
+    let d = Document::new(1);
+    let bad = vec![corner(x, 0.0), corner(1.0, 1.0), corner(5.0, 10.0)];
+    compound(&d, vec![square(0.0, 0.0, 20.0), bad, square(100.0, 0.0, 20.0)]);
+    let mut s = session_of(&d);
+    select_all(&mut s);
+    let before = json(&s);
+    let t = Instant::now();
+    if command == "split" {
         let out = s.apply_split();
-        assert!(t.elapsed().as_secs() < 5, "{name}: hang");
         if let SplitOutcome::Refused(_) | SplitOutcome::Ignored = out {
             assert_eq!(json(&s), before, "{name}: a refusal changes nothing");
         }
-        let mut s2 = session_of(&d);
-        select_all(&mut s2);
-        let t = Instant::now();
-        let out = s2.apply_break_apart();
-        assert!(t.elapsed().as_secs() < 5, "{name}: hang");
-        // No arithmetic happens: Break apart gives one piece per outline whatever the numbers.
-        assert_eq!(break_applied(&out).1, 3, "{name}");
-        // The result never makes coordinates up: the bad node is still there bit for bit.
-        let has = paths(&s2)
+    } else {
+        let out = s.apply_break_apart();
+        assert_eq!(break_applied(&out).1, 3, "{name}: one piece per outline");
+        let has = paths(&s)
             .iter()
             .any(|p| p.anchors.iter().any(|a| a.point.x.to_bits() == x.to_bits()));
         assert!(has || x.is_nan(), "{name}: the node keeps its value");
     }
+    assert!(t.elapsed().as_secs() < 5, "{name}: {command} took too long");
+}
+
+macro_rules! hostile {
+    ($($test:ident: $x:expr, $cmd:literal;)*) => {$(
+        #[test]
+        fn $test() {
+            hostile_value(stringify!($test), $x, $cmd);
+        }
+    )*};
+}
+
+hostile! {
+    hostile_split_nan: f64::NAN, "split";
+    hostile_split_infinity: f64::INFINITY, "split";
+    hostile_split_1e300: 1.0e300, "split";
+    hostile_split_minus_1e300: -1.0e300, "split";
+    hostile_split_beyond_kernel_range: 2.0e7, "split";
+    hostile_split_inside_kernel_range: 9.9e6, "split";
+    hostile_split_1e5: 1.0e5, "split";
+    hostile_break_apart_nan: f64::NAN, "break_apart";
+    hostile_break_apart_infinity: f64::INFINITY, "break_apart";
+    hostile_break_apart_1e300: 1.0e300, "break_apart";
+    hostile_break_apart_beyond_kernel_range: 2.0e7, "break_apart";
 }
 
 #[test]

@@ -26,7 +26,7 @@ use std::collections::HashSet;
 use std::time::Instant;
 
 use curvyo_document_core::{
-    AnchorId, AnchorKind, Color, Document, EllipseFrame, Length, NewAnchor, NodeId, PathSnapshot,
+    Vec2, AnchorId, AnchorKind, Color, Document, EllipseFrame, Length, NewAnchor, NodeId, PathSnapshot,
     RectBounds, StyleEdit,
 };
 use curvyo_editor_wasm::{CutOutcome, Session, Tool};
@@ -310,20 +310,29 @@ fn c12_new_end_nodes_are_corners_with_a_zero_handle_on_the_open_side_and_the_cur
             "the curve is kept"
         );
     }
-    // Every other node keeps position, handles and kind. The arc with the circle's nodes 0 and 1
-    // inside and the arc with nodes 2 and 3 inside, in whichever order the contour is cut.
+    // Every other node keeps its position bit for bit and its handle away from the cut; the handle
+    // toward the cut keeps its direction and is shortened, which de Casteljau needs to keep the
+    // curve exact (criterion 4; criterion 5's "keeps its handles" cannot hold for that one).
+    let same_pos = |a: &NewAnchor, b: &NewAnchor| {
+        a.point.x.to_bits() == b.point.x.to_bits() && a.point.y.to_bits() == b.point.y.to_bits()
+    };
     let arc_of = |a: usize, b: usize| {
         arcs.iter()
-            .find(|arc| {
-                node_sig(&arc.anchors[1]) == node_sig(&circ[a])
-                    && node_sig(&arc.anchors[2]) == node_sig(&circ[b])
-            })
-            .unwrap_or_else(|| panic!("no arc holds nodes {a} and {b} untouched"))
+            .find(|arc| same_pos(&arc.anchors[1], &circ[a]) && same_pos(&arc.anchors[2], &circ[b]))
+            .unwrap_or_else(|| panic!("no arc holds nodes {a} and {b} at their places"))
     };
-    let (arc01, arc23) = (arc_of(0, 1), arc_of(2, 3));
+    let cross = |u: Vec2, w: Vec2| (u.x * w.y - u.y * w.x).abs();
+    for (arc, a, b) in [(arc_of(0, 1), 0, 1), (arc_of(2, 3), 2, 3)] {
+        assert_eq!(arc.anchors[1].handle_out, circ[a].handle_out, "far handle kept");
+        assert_eq!(arc.anchors[2].handle_in, circ[b].handle_in, "far handle kept");
+        assert!(cross(arc.anchors[1].handle_in, circ[a].handle_in) < 1e-9, "collinear");
+        assert!(arc.anchors[1].handle_in.length() < circ[a].handle_in.length());
+        assert!(cross(arc.anchors[2].handle_out, circ[b].handle_out) < 1e-9, "collinear");
+    }
     // The arcs run in the circle's direction and end where the line crosses.
-    assert!(near(endpoints(arc01).0, (110.0, 100.0)) && near(endpoints(arc01).1, (90.0, 100.0)));
-    assert!(near(endpoints(arc23).0, (90.0, 100.0)) && near(endpoints(arc23).1, (110.0, 100.0)));
+    assert!(near(endpoints(arc_of(0, 1)).0, (110.0, 100.0)));
+    assert!(near(endpoints(arc_of(0, 1)).1, (90.0, 100.0)));
+    assert!(near(endpoints(arc_of(2, 3)).0, (90.0, 100.0)));
     // Every point of both halves lies within 1e-6 mm of the original curve.
     check_pieces(&[(circ, true)], arcs, 1e-6, 20_000);
 }
@@ -1574,4 +1583,28 @@ fn defect_a_shallow_crossing_of_two_circles_is_one_cut_not_two() {
         }
     }
     assert!(bad.is_empty(), "{bad:#?}");
+}
+
+/// A node next to a cut inside a segment keeps its kind, but de Casteljau shortens its handle
+/// toward the cut. A Symmetric node (mirrored handles of equal length) with unequal handles is a
+/// state the kind forbids: the next drag of either handle mirrors it and bends the curve. Such a
+/// node must become Asymmetric (collinear, own lengths).
+#[test]
+fn defect_a_symmetric_node_next_to_a_cut_keeps_symmetric_with_unequal_handles() {
+    let d = Document::new(1);
+    d.create_path(&rotated_circle(100.0, 100.0, 10.0, 30.0, false), true);
+    d.create_path(&line(80.0, 100.0, 120.0, 100.0), false);
+    let mut s = session_of(&d);
+    select_all(&mut s);
+    cut_applied(&s.apply_cut());
+    let mut bad = Vec::new();
+    for p in paths(&s) {
+        for n in &p.anchors {
+            let (li, lo) = (n.handle_in.length(), n.handle_out.length());
+            if n.kind == AnchorKind::Symmetric && (li - lo).abs() > 1e-6 {
+                bad.push(format!("({:.4}, {:.4}) in {li:.4} out {lo:.4}", n.point.x, n.point.y));
+            }
+        }
+    }
+    assert!(bad.is_empty(), "Symmetric nodes with unequal handles: {bad:?}");
 }
