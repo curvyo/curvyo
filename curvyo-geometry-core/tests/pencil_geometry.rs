@@ -96,7 +96,10 @@ fn criterion_7_uneven_spacing_and_repeated_samples_still_fit() {
 #[test]
 fn fewer_than_two_distinct_samples_fit_nothing() {
     assert_eq!(fit_freehand(&[], FIT_ACCURACY), Vec::new());
-    assert_eq!(fit_freehand(&[Point::new(1.0, 1.0)], FIT_ACCURACY), Vec::new());
+    assert_eq!(
+        fit_freehand(&[Point::new(1.0, 1.0)], FIT_ACCURACY),
+        Vec::new()
+    );
     let same = [Point::new(1.0, 1.0); 5];
     assert_eq!(fit_freehand(&same, FIT_ACCURACY), Vec::new());
 }

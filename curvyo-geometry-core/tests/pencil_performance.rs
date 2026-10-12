@@ -109,7 +109,8 @@ fn a_jittery_pressure_stroke_stays_inside_the_node_and_time_budget() {
     }
     let started = Instant::now();
     let centre = fit_freehand(&points, Tolerance::from_mm(0.08));
-    let outlines = variable_outline(&centre, &WidthProfile::from_samples(&points, &widths)).unwrap();
+    let outlines =
+        variable_outline(&centre, &WidthProfile::from_samples(&points, &widths)).unwrap();
     let elapsed = started.elapsed();
     let nodes = node_count(&outlines);
     println!(
