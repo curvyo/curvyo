@@ -112,6 +112,10 @@ and a marker a peer could edit concurrently.
    that step's last version (0044 held nudge, 0042 exploring go-to). A message without `;` is a
    legacy label: consecutive same-peer changes with that label are one step. Identical messages
    merging into one Loro change and large commits splitting are both harmless under this rule.
+   *Amended 2026-10-12 (`0042` build, `specs/0042-history-branches/adrs.md` decision 5):* the one
+   exception to "verbatim" is the go-to exploration: a further press repeats the `go_to_version`
+   header with the same `s` and `o` and a new `v`, `step_header::continues` joins it into the one
+   step, and the step names its latest `v`.
 3. **Step identity.** `StepRef` = the id (peer, counter) of the step's first op, the same on every
    replica. Shown id: FNV-1a 64 of the 12 bytes, base36 lowercase, 7 characters, lengthened on a
    collision within the document. Hand-written, no dependency.
