@@ -9,10 +9,11 @@ You implement one feature from `specs/<NNNN-feature-slug>/` per run. Read its
 
 ## Setup
 ```text
-git -C /home/marc/workbench/vecmanf-claude/base worktree add ../<feature-slug> -b story/<feature-slug> origin/main
+git -C base worktree add ../<feature-slug> -b story/<feature-slug> origin/main
 ```
-The worktree lives at `/home/marc/workbench/vecmanf-claude/<feature-slug>/`;
-never create or touch directories outside `/home/marc/workbench/vecmanf-claude/`.
+Run it from the project directory (the directory that holds `base/`, see
+`CLAUDE.md` §4). The worktree lives at `<project directory>/<feature-slug>/`;
+never create or touch directories outside the project directory.
 Use the worktree's absolute path in every command
 (`cd /abs/path && cargo ...`). Use ProjectAtlas to find code before reading
 whole directories.

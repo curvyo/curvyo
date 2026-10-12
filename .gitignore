@@ -15,3 +15,7 @@ curvyo-app/gen/
 .projectatlas/*.db-shm
 .projectatlas/*.db-wal
 .projectatlas/projectatlas.db
+# ProjectAtlas MCP configs: generated per machine by `projectatlas init` (absolute paths)
+.projectatlas/projectatlas.claude.mcp.json
+.projectatlas/projectatlas.mcp.json
+.projectatlas/projectatlas.opencode.json

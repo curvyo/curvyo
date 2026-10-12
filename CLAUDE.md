@@ -122,15 +122,17 @@ format version change (if any), and how to try the slice (the command).
 Parallel work: at most two implementers at once, each in its own worktree,
 on features that do not touch the same crates.
 
-**Where agents work (customer rule, 2026-10-06):** everything happens under
-`/home/marc/workbench/vecmanf-claude/`. `base/` is the main checkout and the
-session's primary directory. Every agent that needs its own copy (implementer,
-tester, fix branches) gets a git worktree next to it, at
-`/home/marc/workbench/vecmanf-claude/<slug>/`
-(`git -C /home/marc/workbench/vecmanf-claude/base worktree add ../<slug> -b <branch> origin/main`),
-and the lead removes it after the PR is merged. Nothing is ever created
-directly under `/home/marc/workbench/`, and no agent reads or writes outside
-`/home/marc/workbench/vecmanf-claude/`.
+**Where agents work (customer rule, 2026-10-06; paths relative since 2026-10-12):**
+everything happens inside the **project directory**: the directory that holds
+the main checkout `base/` (on the customer's laptop
+`~/workbench/vecmanf-claude/`, on the agent VMs `~/work/`). The project
+directory also holds the symlinks `CLAUDE.md` and `.claude` into `base/`, and
+the sessions start there. Every agent that needs its own copy (implementer,
+tester, fix branches) gets a git worktree next to `base/`, at `../<slug>/`
+relative to `base/` (`git -C base worktree add ../<slug> -b <branch> origin/main`,
+run from the project directory), and the lead removes it after the PR is merged.
+Nothing is ever created outside the project directory, and no agent reads or
+writes outside it. No machine-specific absolute path goes into the repo.
 
 ## 5. Engineering rules
 
