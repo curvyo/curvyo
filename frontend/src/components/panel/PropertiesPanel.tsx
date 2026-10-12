@@ -293,14 +293,24 @@ export function PropertiesPanel({
                   <OffsetSection
                     offset={editor.offset}
                     onDone={(byKey) => {
-                      const button = byKey
-                        ? window.document.querySelector<HTMLElement>("[data-offset-button]")
-                        : null;
-                      if (button) {
-                        button.focus();
-                      } else {
+                      if (!byKey) {
                         returnFocus();
+                        return;
                       }
+                      // After the state sync has re-rendered the Select bar and removed the
+                      // section: two frames, so the focus lands on the button that stays.
+                      requestAnimationFrame(() =>
+                        requestAnimationFrame(() => {
+                          const button = window.document.querySelector<HTMLElement>(
+                            "[data-offset-button]",
+                          );
+                          if (button) {
+                            button.focus();
+                          } else {
+                            returnFocus();
+                          }
+                        }),
+                      );
                     }}
                   />
                 )}
