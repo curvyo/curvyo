@@ -153,6 +153,7 @@ export function OffsetSection({ offset, onDone }: OffsetSectionProps) {
             return offset.setDistance(value) ? "committed" : "invalid:range";
           }}
           onReturnFocus={focusDistance}
+          keyShortcuts="Control+Backspace F2"
         />
         <p
           aria-live="polite"
