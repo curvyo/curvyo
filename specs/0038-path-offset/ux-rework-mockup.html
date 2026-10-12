@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Offset Tool Mockup</title>
+<style>
+  :root {
+    --canvas-bg: #E8E8EB;
+    --pasteboard-bg: #B8B8BE;
+    --toolbar-bg: #DCDCE0;
+    --toolbar-icon: #3A3A3F;
+    --active-bg: #2F6FEE;
+    --active-fg: #FFFFFF;
+    --accent: #2F6FEE;
+    --accent-hover: rgba(47, 111, 238, 0.2);
+    --muted: #5A5A5F;
+    --divider: rgba(58, 58, 63, 0.25);
+    --shadow: 0 2px 8px rgba(0, 0, 0, 0.24);
+    --font: system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #F4F4F6; color: var(--toolbar-icon); font: 14px/1.4 var(--font); padding: 16px; }
+  h1 { font-size: 16px; margin: 0 0 4px; }
+  p.lead { margin: 0 0 12px; color: var(--muted); font-size: 13px; max-width: 900px; }
+  .window { display: flex; height: 620px; min-width: 1120px; border: 1px solid #C4C4C9; background: var(--pasteboard-bg); overflow: hidden; }
+  .scroll { overflow-x: auto; }
+  .viewport { position: relative; flex: 1; background: var(--pasteboard-bg); }
+  .doc { position: absolute; left: 150px; top: 70px; width: 620px; height: 520px; background: var(--canvas-bg); }
+
+  /* Rail */
+  .col { position: absolute; top: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .col.a { left: 12px; } .col.b { left: 68px; }
+  .card { width: 48px; background: var(--toolbar-bg); border-radius: 8px; box-shadow: var(--shadow); padding: 4px; display: flex; flex-direction: column; gap: 4px; position: relative; }
+  .btn { width: 40px; height: 40px; border-radius: 6px; display: grid; place-items: center; color: var(--toolbar-icon); }
+  .btn svg { width: 20px; height: 20px; }
+  .btn.active { background: var(--active-bg); color: var(--active-fg); }
+  .btn.dim { opacity: 0.4; }
+  .tag { position: absolute; left: 132px; white-space: nowrap; font-size: 12px; background: #fff; border: 1px solid var(--accent); color: var(--accent); padding: 2px 6px; border-radius: 4px; }
+  .tag::before { content: ""; position: absolute; left: -66px; top: 50%; width: 64px; border-top: 1px dashed var(--accent); }
+
+  /* Bar */
+  .bar { position: absolute; top: 12px; left: 128px; right: 12px; display: flex; justify-content: center; pointer-events: none; }
+  .pill { pointer-events: auto; background: var(--toolbar-bg); border-radius: 18px; box-shadow: var(--shadow); padding: 4px 12px; display: flex; align-items: center; gap: 12px; height: 36px; }
+  .grp { display: flex; align-items: center; gap: 6px; }
+  .lbl { font-size: 14px; }
+  .field { width: 80px; height: 28px; background: #fff; border-radius: 5px; display: flex; align-items: center; justify-content: flex-end; padding: 0 6px; font-variant-numeric: tabular-nums; gap: 4px; }
+  .field .u { color: var(--muted); font-size: 12px; }
+  .seg { display: flex; height: 28px; border: 1px solid rgba(58,58,63,0.6); border-radius: 5px; overflow: hidden; }
+  .seg span { display: grid; place-items: center; padding: 0 9px; font-size: 13px; min-width: 32px; }
+  .seg span + span { border-left: 1px solid rgba(58,58,63,0.3); }
+  .seg span.on { background: var(--active-bg); color: var(--active-fg); }
+  .seg.off { opacity: 0.4; }
+  .seg svg { width: 16px; height: 16px; }
+  .div { width: 1px; height: 20px; background: var(--divider); }
+  .apply { height: 28px; padding: 0 12px; border-radius: 5px; background: var(--active-bg); color: #fff; display: grid; place-items: center; font-size: 14px; }
+  .status { width: 150px; font-size: 12px; color: var(--muted); }
+
+  /* Panel */
+  .strip { width: 32px; background: var(--toolbar-bg); border-left: 1px solid #C4C4C9; display: flex; flex-direction: column; align-items: center; gap: 4px; padding-top: 6px; }
+  .strip i { width: 28px; height: 28px; border-radius: 5px; display: block; background: rgba(58,58,63,0.12); }
+  .strip i.on { background: var(--active-bg); }
+  .panel { width: 280px; background: var(--toolbar-bg); padding: 8px 18px; font-size: 13px; }
+  .panel .hd { display: flex; justify-content: space-between; height: 24px; align-items: center; }
+  .panel .hd span:last-child { color: var(--muted); font-size: 12px; }
+  .panel .row { height: 28px; margin-top: 8px; border-radius: 5px; background: rgba(255,255,255,0.6); display: flex; align-items: center; padding: 0 8px; color: var(--muted); }
+
+  .notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-top: 12px; max-width: 1120px; }
+  .notes div { background: #fff; border: 1px solid #DDDDE2; border-radius: 8px; padding: 10px 12px; font-size: 13px; }
+  .notes b { display: block; margin-bottom: 4px; }
+  kbd { font: 12px var(--font); border: 1px solid #BDBDC3; border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; background: #fafafa; }
+</style>
+</head>
+<body>
+<h1>Offset tool: rework mockup (0038)</h1>
+<p class="lead">Static sketch for discussion, not a build reference. The Offset tool is active in the new "Path tools" card; its options are in the bar at the top; the selected rounded rectangle shows four offset handles. The bottom-right handle is being dragged outward: the blue outline is the result a release writes, the chip at the pointer shows the value. The Properties panel is unchanged: no section appears there.</p>
+
+<div class="scroll">
+<div class="window">
+  <div class="viewport">
+    <div class="doc"></div>
+
+    <!-- Column A -->
+    <div class="col a">
+      <div class="card" aria-label="Tools">
+        <div class="btn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M3 2l9 5-4 1-2 4z"/></svg></div>
+        <div class="btn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 13l2-7 6-3"/><rect x="2" y="12" width="3" height="3"/><rect x="10" y="2" width="3" height="3"/></svg></div>
+        <div class="btn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M8 2l4 6-4 6-4-6z"/><path d="M8 8v6"/></svg></div>
+        <div class="btn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2 13c3-1 5-7 12-10"/><path d="M11 2l3 1-1 3"/></svg></div>
+        <div class="btn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2.5" y="3.5" width="11" height="9" rx="1"/></svg></div>
+        <div class="btn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><ellipse cx="8" cy="8" rx="6" ry="4.5"/></svg></div>
+        <div class="btn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M8 1.8l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.6l-3.8 2 .7-4.3-3.1-3 4.3-.6z"/></svg></div>
+      </div>
+      <div class="card" aria-label="Grouping">
+        <div class="btn dim"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.5" y="1.5" width="13" height="13" rx="2"/><rect x="4" y="4" width="3.5" height="3.5" fill="currentColor"/><rect x="8.5" y="8.5" width="3.5" height="3.5" fill="currentColor"/></svg></div>
+        <div class="btn dim"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1.5 4V1.5H4M12 1.5h2.5V4M14.5 12v2.5H12M4 14.5H1.5V12"/><rect x="3.5" y="3.5" width="3.5" height="3.5" fill="currentColor"/><rect x="9" y="9" width="3.5" height="3.5" fill="currentColor"/></svg></div>
+      </div>
+      <div class="card" aria-label="Path tools">
+        <div class="btn active" title="Offset tool (O)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.5" y="1.5" width="13" height="13" rx="3" stroke-dasharray="2.2 1.8"/><rect x="5" y="5" width="6" height="6" rx="1" fill="currentColor"/></svg></div>
+        <span class="tag" style="top:14px">New card "Path tools": Offset tool (O)</span>
+      </div>
+    </div>
+
+    <!-- Column B -->
+    <div class="col b">
+      <div class="card" aria-label="Path operations">
+        <div class="btn dim"><svg viewBox="0 0 16 16"><path fill="currentColor" fill-rule="evenodd" d="M2.5 2.5h11v11h-11zM5.5 5.5v5h5v-5z"/></svg></div>
+        <div class="btn"><svg viewBox="0 0 16 16"><path fill="currentColor" fill-rule="evenodd" d="M2 2h7v7H2zM3.5 3.5v4h4v-4z"/><rect x="10" y="10" width="4" height="4" fill="currentColor"/></svg></div>
+        <div class="btn"><svg viewBox="0 0 16 16"><rect x="2" y="2" width="7" height="7" fill="currentColor"/><rect x="10" y="10" width="4" height="4" fill="currentColor"/></svg></div>
+        <div class="btn"><svg viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3 3l3 3M13 13l-3-3M13 3l-3 3M3 13l3-3"/></svg></div>
+      </div>
+      <div class="card" aria-label="Boolean operations">
+        <div class="btn dim"><svg viewBox="0 0 16 16"><path fill="currentColor" d="M1.75 1.75h9v3.5h3.5v9h-9v-3.5h-3.5z"/></svg></div>
+        <div class="btn dim"><svg viewBox="0 0 16 16"><path fill="currentColor" d="M1.75 1.75h9v3.5h-5.5v5.5h-3.5z"/><rect x="5.25" y="5.25" width="9" height="9" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></div>
+        <div class="btn dim"><svg viewBox="0 0 16 16"><rect x="1.75" y="1.75" width="9" height="9" fill="none" stroke="currentColor" stroke-width="1.2"/><rect x="5.25" y="5.25" width="9" height="9" fill="none" stroke="currentColor" stroke-width="1.2"/><rect x="5.25" y="5.25" width="5.5" height="5.5" fill="currentColor"/></svg></div>
+        <div class="btn dim"><svg viewBox="0 0 16 16"><path fill="currentColor" fill-rule="evenodd" d="M1.75 1.75h9v3.5h3.5v9h-9v-3.5h-3.5zM5.25 5.25v5.5h5.5v-5.5z"/></svg></div>
+        <div class="btn dim"><svg viewBox="0 0 16 16"><path fill="currentColor" d="M5.25 10.75h5.5v-5.5h3.5v9h-9z"/><rect x="1.75" y="1.75" width="9" height="9" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></div>
+        <div class="btn dim"><svg viewBox="0 0 16 16" fill="currentColor"><rect x="1.75" y="1.75" width="4" height="9"/><rect x="7" y="7" width="3.75" height="3.75"/><rect x="12" y="5.25" width="2.25" height="9"/></svg></div>
+        <div class="btn dim"><svg viewBox="0 0 16 16" fill="currentColor"><rect x="5.25" y="5.25" width="9" height="9"/><path d="M1.75 1.75h9v2h-7v7h-2z"/></svg></div>
+      </div>
+    </div>
+
+    <!-- Offset bar -->
+    <div class="bar">
+      <div class="pill" role="toolbar" aria-label="Offset">
+        <div class="grp"><span class="lbl">Distance</span><span class="field">2.5 <span class="u">mm</span></span></div>
+        <span class="div"></span>
+        <div class="grp" aria-label="Direction"><div class="seg"><span class="on">Out</span><span>In</span><span>Both</span></div></div>
+        <span class="div"></span>
+        <div class="grp"><span class="lbl">Corners</span><div class="seg">
+          <span class="on" title="Round"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 14V8a5 5 0 0 1 5-5h6"/></svg></span>
+          <span title="Miter"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 14V3h11"/></svg></span>
+          <span title="Bevel"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 14V7l4-4h7"/></svg></span>
+        </div></div>
+        <div class="grp"><span class="lbl" style="opacity:.4">Ends</span><div class="seg off" aria-disabled="true">
+          <span class="on"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 4H8a4 4 0 0 0 0 8h6"/></svg></span>
+          <span><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 4H5v8h9"/></svg></span>
+          <span><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 4H2v8h12"/></svg></span>
+        </div></div>
+        <span class="div"></span>
+        <div class="grp" aria-label="Result"><div class="seg"><span class="on">New object</span><span>Change original</span></div></div>
+        <span class="apply">Apply</span>
+        <span class="status">Stays a rectangle.</span>
+      </div>
+    </div>
+
+    <!-- Canvas content -->
+    <svg style="position:absolute; left:0; top:0" width="100%" height="100%" aria-label="Rectangle with offset handles and preview">
+      <!-- original: rounded rectangle, 180 x 120 at (360,250), radius 14 -->
+      <rect x="360" y="250" width="180" height="120" rx="14" fill="#F5D9A8" stroke="#000" stroke-width="1.5"/>
+      <!-- selection box -->
+      <rect x="359.5" y="249.5" width="181" height="121" fill="none" stroke="#2F6FEE" stroke-width="1" stroke-dasharray="4 3"/>
+      <!-- preview: outset 30 px, round corners -> radius 44, white casing + blue -->
+      <rect x="330" y="220" width="240" height="180" rx="44" fill="none" stroke="#fff" stroke-width="3.5"/>
+      <rect x="330" y="220" width="240" height="180" rx="44" fill="none" stroke="#2F6FEE" stroke-width="1.5"/>
+      <!-- diagonal guide of the dragged handle -->
+      <line x1="540" y1="370" x2="590" y2="420" stroke="#2F6FEE" stroke-opacity="0.6" stroke-width="1" stroke-dasharray="3 3"/>
+      <!-- idle handles: 12 px outside the corner on the diagonal (8.5 px each axis) -->
+      <g stroke="#2F6FEE" stroke-width="1.5">
+        <circle cx="351.5" cy="241.5" r="5" fill="#fff"/><circle cx="351.5" cy="241.5" r="2" fill="#2F6FEE" stroke="none"/>
+        <circle cx="548.5" cy="241.5" r="5" fill="#fff"/><circle cx="548.5" cy="241.5" r="2" fill="#2F6FEE" stroke="none"/>
+        <circle cx="351.5" cy="378.5" r="5" fill="#fff"/><circle cx="351.5" cy="378.5" r="2" fill="#2F6FEE" stroke="none"/>
+        <!-- dragged handle: at the grown box corner + 12 px -->
+        <circle cx="578.5" cy="408.5" r="5" fill="#2F6FEE"/><circle cx="578.5" cy="408.5" r="2" fill="#fff" stroke="none"/>
+      </g>
+      <!-- pointer -->
+      <path d="M584 414l0 14 4-4 3 6 2-1-3-6 5 0z" fill="#000" stroke="#fff" stroke-width="1"/>
+      <!-- copy badge -->
+      <circle cx="604" cy="436" r="8" fill="#2F6FEE" stroke="#fff" stroke-width="1"/>
+      <path d="M600 436h8M604 432v8" stroke="#fff" stroke-width="1.5"/>
+    </svg>
+
+    <!-- readout chip -->
+    <div style="position:absolute; left:598px; top:378px; background:var(--toolbar-bg); border-radius:8px; padding:6px 8px; font-size:12px; box-shadow:var(--shadow); line-height:1.35">
+      <div style="font-weight:600">Outset 2.5 mm</div>
+      <div style="color:var(--muted)">New object. Ctrl: change the original</div>
+    </div>
+  </div>
+
+  <div class="strip" aria-hidden="true"><i></i><i></i><i></i><i class="on"></i><i></i><i></i></div>
+  <div class="panel" aria-label="Properties panel">
+    <div class="hd"><span>Style</span><span>Rectangle</span></div>
+    <div class="row">Stroke</div>
+    <div class="row">Fill</div>
+    <div class="row">Corner radius</div>
+    <div class="row">Opacity</div>
+    <p style="color:var(--muted); font-size:12px; margin-top:16px">Unchanged. No Offset section in the panel any more.</p>
+  </div>
+</div>
+</div>
+
+<div class="notes">
+  <div><b>Drag a corner handle</b>Outward = outset, inward = inset. The distance is the drag projected on the corner's diagonal. Snaps to a zoom step and to the Distance typed in the bar. Release writes one undo step; <kbd>Esc</kbd> cancels.</div>
+  <div><b>Modifiers</b><kbd>Shift</kbd> both sides. <kbd>Ctrl</kbd> change the original instead of adding a copy. <kbd>Shift</kbd>+<kbd>Ctrl</kbd> the original takes the dragged side, a copy is made for the other side.</div>
+  <div><b>Primitives stay primitives</b>This rounded rectangle outset with Round corners stays a rectangle (radius r + d): the status says "Stays a rectangle." An ellipse that is not a circle becomes a path.</div>
+  <div><b>Preview colour</b>The result is the solid blue "Live preview outline" of the design system (blue new, black old). Dashed stays reserved for the selection box.</div>
+</div>
+</body>
+</html>
