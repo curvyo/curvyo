@@ -98,3 +98,19 @@ not part of this slice.
 - Spec Question 2, B (an editable width profile) would be a document-model
   and format change. It belongs with `0033-stroke-brushes` and its ADR, not
   here.
+
+## Review notes
+
+- **2026-10-12: architect review of the branch diff.** Two deviations from
+  the decisions above are accepted. (1) The fit is Schneider's method in
+  `freehand_fit.rs` from the start instead of `kurbo::simplify_bezpath`: it
+  is the fallback this file already named, our own code, no dependency, and
+  it fits the samples rather than a curve through them. (2) The preview runs
+  the same fit and outline as the commit, not the outline of the raw
+  polyline: the release test measures 0.4 ms for 2,000 samples, far inside
+  a frame, and the preview then matches the object exactly. The 0.05 mm
+  decimation stays the fallback. `build_outline_preview` in
+  `curvyo-render-core` as a second free function next to
+  `build_live_edit_preview` is accepted; no decoration field. No
+  document-model or format change: the stroke is one `Document::batch`
+  step labelled `pencil_stroke`.
