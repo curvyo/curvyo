@@ -98,3 +98,24 @@ mode (spec Q3 A) because a document-wide go-to would be `revert_to`, which rever
 - Lamport order for concurrent steps can differ from wall-clock order; the list shows times, so a
   row may look out of order by a few seconds. Accepted: the same order on every replica matters
   more.
+
+## Notes
+
+**2026-10-12, architect review of milestone 1** (`58914d3`):
+
+- **Peers in the Object scope.** Decision 2 holds for the Document scope only. The Object scope
+  runs the one machine of `0041` over the object's timeline, every author's steps included (ADR
+  0014 §6 "per object", `0041` criterion 11 "a new do step on the same object (by anyone)", this
+  spec's criterion 28). So a peer's step on an object does end a pending object redo and leaves the
+  object-undone step on a branch of that object's list; a row reading "Undone" there would promise
+  a Ctrl+Shift+U that `0041` criterion 11 already refuses. Steps taken back with Ctrl+Z keep the
+  author's own machine in both scopes, so a peer never branches someone else's Ctrl+Z. No ADR
+  change. Criterion 5 is read as "in the Document scope"; the product owner adds that qualifier
+  and one sentence for the Object scope.
+- **Placement.** Go to version and clone version get their own module
+  `curvyo-document-core/src/history/version_write.rs` instead of `restore.rs` (464 lines), with
+  one responsibility: write an object's state at a past version as a new step. It reuses the
+  guarded checkout read (§12), `revive.rs` (§11) and the restore write path; it adds no second
+  write engine (ADR 0014 §1: one read, different write rules).
+- **Branch marks are not stored.** `BranchMark` and `HistoryBranch` are derived per call;
+  `format_version` and the saved file are unchanged (criterion 33).
