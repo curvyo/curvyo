@@ -5,8 +5,8 @@
 //! them reaches the document (criteria 14, 16).
 
 use curvyo_document_core::{
-    AnchorKind, Document, Length, NewAnchor, NodeId, Point, Style, StyleEdit, SubpathRef, Vec2,
-    ViewTransform,
+    AnchorKind, Angle, Document, Length, NewAnchor, NodeId, Point, Style, StyleEdit, SubpathRef,
+    Vec2, ViewTransform,
 };
 use curvyo_render_core::{DrawList, build_outline_preview};
 use curvyo_ui_core::{
@@ -32,10 +32,10 @@ pub enum PencilPhase {
 pub struct PenReadout {
     /// The pressure from 0 to 1.
     pub pressure: f64,
-    /// The tilt along X in degrees.
-    pub tilt_x_deg: f64,
-    /// The tilt along Y in degrees.
-    pub tilt_y_deg: f64,
+    /// The tilt along X.
+    pub tilt_x: Angle,
+    /// The tilt along Y.
+    pub tilt_y: Angle,
 }
 
 /// What the Pencil bar shows (criteria 14, 15).
@@ -118,6 +118,8 @@ fn shape_outlines(minter: &mut AnchorIdMinter, shape: &StrokeShape) -> Vec<(Vec<
 /// stroke colour and no stroke (criteria 7, 8, 13). Returns the new object.
 fn write_stroke(document: &Document, outlines: &[(Vec<NewAnchor>, bool)], filled: bool) -> NodeId {
     document.batch(PENCIL_COMMIT_LABEL, |document| {
+        // invariant: `shape_outlines` gives one outline for a centre line and one per outline
+        // of a variable-width result, which `variable_outline` never returns empty.
         let (first, closed) = &outlines[0];
         let id = document.create_path(first, *closed);
         if !filled {
@@ -137,9 +139,13 @@ fn write_stroke(document: &Document, outlines: &[(Vec<NewAnchor>, bool)], filled
             return id;
         }
         // Holes: the path is replaced by one compound path with its style, in the same step.
+        // invariant: `id` was created above and is its own base, no outline is empty, and
+        // every anchor id is freshly minted (the first outline's ids belong to `id`, which is
+        // replaced), so none of the refusals of `replace_with_path` can apply.
+        #[allow(clippy::expect_used)]
         document
             .replace_with_path(&[id], id, outlines, PENCIL_COMMIT_LABEL)
-            .unwrap_or(id)
+            .expect("replacing a path created in the same batch by its outlines")
     })
 }
 
@@ -189,8 +195,8 @@ impl Session {
             self.pencil.pen_seen = true;
             self.pencil.readout = Some(PenReadout {
                 pressure: sample.pressure,
-                tilt_x_deg: sample.tilt_x_deg,
-                tilt_y_deg: sample.tilt_y_deg,
+                tilt_x: sample.tilt_x,
+                tilt_y: sample.tilt_y,
             });
         } else {
             self.pencil.readout = None;
@@ -289,8 +295,8 @@ mod tests {
             position: Point::new(x, y),
             kind,
             pressure,
-            tilt_x_deg: 12.0,
-            tilt_y_deg: -3.0,
+            tilt_x: Angle::from_radians(12.0_f64.to_radians()),
+            tilt_y: Angle::from_radians(-3.0_f64.to_radians()),
             eraser: false,
             time_ms: x,
         }
@@ -452,8 +458,8 @@ mod tests {
         let bar = session.pencil_bar();
         assert!(bar.pen_seen && !bar.pressure_seen);
         let readout = bar.readout.unwrap();
-        assert!((readout.tilt_x_deg - 12.0).abs() < 1e-12);
-        assert!((readout.tilt_y_deg + 3.0).abs() < 1e-12);
+        assert!((readout.tilt_x.as_radians().to_degrees() - 12.0).abs() < 1e-9);
+        assert!((readout.tilt_y.as_radians().to_degrees() + 3.0).abs() < 1e-9);
 
         // A pen without pressure shows the readout but not the controls.
         draw(&mut session, PointerKind::Pen, |_| 0.5, 10);
@@ -615,5 +621,48 @@ mod tests {
             KeyOutcome::Ignored,
             "no tool letter during a stroke"
         );
+    }
+
+    /// Architect review: a pressure stroke that crosses itself around an empty area keeps its
+    /// hole as a compound path in exactly one step.
+    #[test]
+    fn criterion_8_a_pressure_stroke_that_crosses_itself_keeps_its_hole_in_one_step() {
+        let mut session = pencil_session();
+        let before = session.document.own_step_count();
+        // A loop of radius 15 mm drawn 1.2 times round, so the stroke crosses its own start.
+        let at = |i: u32| {
+            let angle = std::f64::consts::TAU * 1.2 * f64::from(i) / 300.0;
+            reading(
+                PointerKind::Pen,
+                50.0 + 15.0 * angle.cos(),
+                50.0 + 15.0 * angle.sin(),
+                0.6,
+            )
+        };
+        session.pencil_input(PencilPhase::Down, TIP, &[at(0)]);
+        let middle: Vec<_> = (1..300).map(at).collect();
+        session.pencil_input(PencilPhase::Move, TIP, &middle);
+        session.pencil_input(PencilPhase::Up, 0, &[at(300)]);
+        let steps = session.document.own_steps_from(before);
+        assert_eq!(steps.len(), 1);
+        assert_eq!(steps[0].label, PENCIL_COMMIT_LABEL);
+        let path = only_path(&session);
+        assert!(path.closed);
+        assert_eq!(
+            path.extra_subpaths.len(),
+            1,
+            "an outer outline and one hole"
+        );
+        let area = |anchors: &[NewAnchor]| {
+            let points: Vec<Point> = anchors.iter().map(|a| a.point).collect();
+            signed_area_of(&points)
+        };
+        let (outer, hole) = (area(&path.anchors), area(&path.extra_subpaths[0].anchors));
+        assert!(
+            outer * hole < 0.0,
+            "the hole is wound against the outer outline"
+        );
+        assert!(hole.abs() > 400.0, "hole area {hole}");
+        assert_eq!(session.selection.ids(), &[path.id]);
     }
 }
