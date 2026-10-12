@@ -172,12 +172,12 @@ supply its root's register.
 
 ### M6: performance, docs, gate, PR
 
-- [ ] 31. Release-build benchmarks in `curvyo-editor-wasm/tests` (the pattern of
+- [x] 31. Release-build benchmarks in `curvyo-editor-wasm/tests` (the pattern of
       `draw_list_cache_budget.rs`): first window within 100 ms, at most 60 rows, Ctrl+A
       within 100 ms, layer toggle within 150 ms, moves of 1 / 1,000 / 10,000 rows, expand and
       collapse of 10,000 children (AC 48 to 52)
-- [ ] 32. Criterion 54 test naming `export_loro_snapshot` and `export_json` (AC 54)
-- [ ] 33. Spec status line, design-system numbers if changed, `/no-slop` on new UI text; full
+- [x] 32. Criterion 54 test naming `export_loro_snapshot` and `export_json` (AC 54)
+- [x] 33. Spec status line, design-system numbers if changed, `/no-slop` on new UI text; full
       gate (§7); PR with "What changes in the demo" and the Review guide
 
 ## Decisions taken in this plan (reversible in this PR)
@@ -220,6 +220,14 @@ supply its root's register.
   for the browser build.
 - Manual run of the app (`cargo tauri dev` in `curvyo-app`, README) at 800 x 600: 12 rows,
   drag, keyboard, screen-reader names via the accessibility tree.
+
+### Measured (2026-10-12, release, native, this machine)
+
+`cargo test --release -p curvyo-editor-wasm --test layers_budget -- --ignored --nocapture`:
+first window of 10,000 objects in 20 layers 23 ms (budget 100), jump to the end 0.4 ms (16),
+Ctrl+A with frame and rows 42 ms (100), hide, show, lock, unlock and opacity of a layer of 10,000
+58 to 63 ms (150), one row moved 15 ms (100), 1,000 rows into another layer 78 ms (1 s), 9,000
+rows 111 ms (5 s), collapse and expand of 10,000 children 2 and 3 ms (100).
 
 ## Milestones (commits on this branch, each green)
 

@@ -134,7 +134,7 @@ pub struct LayerRow {
     pub depth: usize,
     /// What it is.
     pub kind: RowKind,
-    /// The name the row shows: its own, or "<Kind> <id>" (criterion 7).
+    /// The name the row shows: its own, or `"<Kind> <id>"` (criterion 7).
     pub name: String,
     /// Whether the name is the node's own.
     pub named: bool,
