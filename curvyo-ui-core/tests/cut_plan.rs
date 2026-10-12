@@ -212,14 +212,17 @@ fn a_turned_circle_is_cut_on_its_curve() {
         assert_eq!(arc[0].handle_in, Vec2::ZERO);
         assert_eq!(arc[arc.len() - 1].kind, AnchorKind::Corner);
         assert_eq!(arc[arc.len() - 1].handle_out, Vec2::ZERO);
-        // Every other node keeps its place and its handles.
+        // Every other node keeps its place.
         for inner in &arc[1..arc.len() - 1] {
-            assert!(
-                original
-                    .anchors
-                    .iter()
-                    .any(|o| o.point == inner.point && o.kind == inner.kind)
-            );
+            assert!(original.anchors.iter().any(|o| o.point == inner.point));
+            // A Symmetric node next to a cut has a shortened handle: it becomes Asymmetric.
+            let unequal = (inner.handle_in.length() - inner.handle_out.length()).abs() > 1e-9;
+            let expected = if unequal {
+                AnchorKind::Asymmetric
+            } else {
+                AnchorKind::Symmetric
+            };
+            assert_eq!(inner.kind, expected);
         }
     }
 }
