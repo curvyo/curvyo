@@ -90,6 +90,28 @@ compound paths), no trait, no generic. The customer chose the library on
   Budget (criterion 3): 200 nodes in under 50 ms, release build, in the
   `boolean-budgets` CI job.
 
+- **2026-10-12 (architect review): accepted deviations from the notes above.**
+  - The kernel signature takes `distance: Length`, not `distance_mm: f64`
+    (CLAUDE.md §5, units are types). The host-facing entry values in
+    `curvyo-ui-core` stay `f64` millimetres, as elsewhere in that crate.
+  - `curvyo-ui-core` holds two modules instead of one: `offset_entry.rs` (the
+    entry's values, ranges and codes) and `offset_plan.rs` (availability,
+    refusals, per-operand kernel calls, anchor ids for the write). One
+    responsibility each (§5).
+  - `history_names.rs` maps the commit label `offset_path` to "Offset", so the
+    history panel names the step (criterion 13).
+  - The kernel drops result outlines whose width estimate (2 x area /
+    perimeter) is below the flattening tolerance (0.008 mm at the 0.01 mm
+    kernel tolerance). Such slivers come from chords of two flattened curves
+    meeting under an inset; they are below the kernel's own accuracy and far
+    below any kerf or tool width, so they are not part of the exact result
+    (criterion 16). Criterion 15's 0.02 mm square (width 0.01 mm by the
+    estimate) stays.
+  - Criterion 3's 50 ms budget is missed at a 5 mm outset of the 200-node
+    gear (about 55 ms; 2 mm and -1 mm are within). Accepted for this slice
+    and logged in `docs/technical-debt.md` ("Offset preview runs on the main
+    thread").
+
 ## Flagged to the PO (criterion changes the spec invites)
 
 1. **Criterion 19 and "Miter limit": `i_overlay` clips the miter, it does

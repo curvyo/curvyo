@@ -1523,3 +1523,17 @@ at the strip. The browser build has no minimum: below about 640 px of window wid
 narrower than the bars and the Select bar is drawn over the strip and the body. **Resolution:** a
 minimum width for the editor in the browser build, or a wrap rule for the overlay row. Not needed
 for the desktop app.
+
+## Offset preview runs on the main thread
+
+The live preview of Offset (`specs/0038-path-offset` criterion 3, 50 ms per
+update for 200 nodes) runs the kernel synchronously in the editor session.
+Large outsets that fill deep pockets cost more: a 5 mm outset of the 200-node
+gear-like operand takes about 55 ms in release, so dragging the distance can
+drop a frame. The budget test asserts 2 mm and -1 mm only. Accepted for the
+0038 slice by the architect on 2026-10-12
+([ADR 0003](adr/0003-geometry-kernel-booleans-offsetting-vcarving.md) §4).
+
+**Resolution:** move the preview computation to a worker (Web Worker in the
+browser, a thread in the desktop shell), keeping Apply on the cached result;
+then add the 5 mm case to the budget test.
