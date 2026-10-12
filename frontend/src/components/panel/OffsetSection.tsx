@@ -123,7 +123,7 @@ export function OffsetSection({ offset, onDone }: OffsetSectionProps) {
         <ValueField
           label="Distance"
           name="Distance, millimetres"
-          text={`${state.distanceMm < 0 ? "-" : ""}${formatDistance(state.distanceMm, false)}`}
+          text={formatDistance(state.distanceMm, true)}
           bar={Math.max(0, Math.min(1, (state.distanceMm + limit) / (2 * limit)))}
           mixed={false}
           resettable={state.distanceMm !== 1}
