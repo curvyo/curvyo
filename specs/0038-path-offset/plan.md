@@ -75,11 +75,11 @@ amends Outset/Inset later and is not anticipated here.
 
 ### Milestone 5: the UI (AC 1, 2, 4, 5, 7, 8, 13, 14)
 
-- [ ] 5.1 Select bar: "Offset" text button last, shown while an operand is selected, `aria-expanded` (AC 1).
-- [ ] 5.2 Offset section at the top of the Style tab: Distance value field, caption, Join and Cap
+- [x] 5.1 Select bar: "Offset" text button last, shown while an operand is selected, `aria-expanded` (AC 1).
+- [x] 5.2 Offset section at the top of the Style tab: Distance value field, caption, Join and Cap
   radiogroups, Apply and Cancel; two-step Enter; preview after commit/drag frame (AC 1, 2, 4, 5).
-- [ ] 5.3 Notices and refusal sentences in `lib/offsetText.ts` with unit tests (AC 7, 8, 13, 14).
-- [ ] 5.4 Full gate (`CLAUDE.md` §7), frontend tests and typecheck; spec `PR:` link.
+- [x] 5.3 Notices and refusal sentences in `lib/offsetText.ts` with unit tests (AC 7, 8, 13, 14).
+- [x] 5.4 Full gate (`CLAUDE.md` §7), frontend tests and typecheck; spec `PR:` link.
 
 ## Validation
 
