@@ -1,6 +1,6 @@
 # Groups: group, nest, enter and leave, ungroup
 
-Status: Ready (2026-10-10: `adrs.md` and the UX notes exist; the customer accepted the document-model change on 2026-10-10 (Question 1: yes); criterion 27 reworded the same day) Amended by `0020-undo-redo`: the sentence "No undo yet." and the statements that no undo exists are removed; Ctrl+Z takes the step back.
+Status: Done (#102, 2026-10-11; `format_version` 11). Amended by `0020-undo-redo`: the sentence "No undo yet." and the statements that no undo exists are removed; Ctrl+Z takes the step back.
 Priority: Must
 Origin: Customer (groups, nested groups, entering a group, ungrouping; request of 2026-10-09, with the wish that the UX be much better than Inkscape's). Requirement R-EDIT-009 (grouping and layers) is in the customer-confirmed MVP; this spec is its **grouping half**. Layers are a separate, later entry (`0039`, see "Groups and layers"). The decisions marked in "Decided by the product owner" are my proposals.
 
@@ -153,5 +153,5 @@ Requirements: R-EDIT-009 (`docs/requirements.md`); related R-EDIT-012
 Builds on: `specs/0019-multi-object-transform/` (the group box and its handles; must be built first), `specs/0014-advanced-selection/` (hit rules, Alt-click cycle, marquee), `specs/0010-edit-interaction-polish/` (Escape cascade, shortcut gating), `specs/0017-style-panel-rework/` (Style area, subject line, Mixed)
 Amends: `specs/0016-boolean-operations/` (refusal for groups, criterion 28), `specs/0034-pen-path-extension/` (targets, criterion 30)
 Related: `docs/adr/0002-document-model-units-and-svg-round-trip.md` §5 (tree, no inheritance), `specs/0050-layers-and-objects-panel/` (layers, names, flags and the tree panel; replaced the placeholder `0039`), `specs/0049-linked-clone/`, `specs/0020` (undo, reserved)
-ADRs: `adrs.md` (architect, to come; document model, accepted by the customer on 2026-10-10)
-PR: TBD
+ADRs: `adrs.md` (architect; document model, accepted by the customer on 2026-10-10)
+PR: #102

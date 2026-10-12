@@ -1,6 +1,6 @@
 # Undo and redo: one step per interaction, per-user stacks, a document history with step ids
 
-Status: Ready (2026-10-10). The customer accepted ADR 0014 (`docs/adr/0014-history-undo-and-branches.md`) and every default of the open questions below on 2026-10-10. `adrs.md` and the UX notes exist; the criteria are complete and testable. Milestone 3 needs `0043` (merged with #84). **Amended by `0051-sidebar-and-no-menu`** (2026-10-11): criterion 8 and the UX note "Edit menu" are withdrawn (no native Edit menu on Linux, Windows or in the browser; macOS keeps predefined items that act on text fields only); criteria 9, 25 and 26 hold unchanged. The Out of scope item "Unsaved-changes tracking" is delivered by `0051` criterion 22, except that undoing back to the saved state does not make the project clean again.
+Status: Done (#95, 2026-10-11). Known limits recorded in the PR and `docs/technical-debt.md`, none tied to a criterion: z-order and parent moves of existing objects are not restored; the 5,000-object budget is measured on the host, not in wasm. **Amended by `0051-sidebar-and-no-menu`** (2026-10-11): criterion 8 and the UX note "Edit menu" are withdrawn (no native Edit menu on Linux, Windows or in the browser; macOS keeps predefined items that act on text fields only); criteria 9, 25 and 26 hold unchanged. The Out of scope item "Unsaved-changes tracking" is delivered by `0051` criterion 22, except that undoing back to the saved state does not make the project clean again.
 Priority: Must
 Origin: Customer (specification of 2026-10-10, final: per-user undo and redo in the session, a global history of the document, Ctrl+Z and Ctrl+Shift+Z, step hashes or a shorter form, the kind of operation visible, deletions visible, wipe of the document history). Requirements R-EDIT-008 (the confirmed MVP slice 8) and R-HIST-001, R-HIST-004. Everything marked **Proposal** is the product owner's idea and is not accepted until the customer says so. Object history, object undo and branches are the follow-up specs `0041-object-history` and `0042-history-branches`; the right-panel tabs this spec needs are `0043-properties-tabs`.
 
@@ -329,4 +329,4 @@ Requirements: R-EDIT-008, R-HIST-001, R-HIST-004
 Depends on: `0043-properties-tabs` (milestone 3)
 Follow-ups: `0041-object-history`, `0042-history-branches`
 ADRs: `adrs.md` (architect); ADR 0014 (accepted 2026-10-10); ADR 0002 §9, ADR 0004 §2, ADR 0009 §1 are the base
-PR: -
+PR: #95 (fix #101: Ctrl+Z and Ctrl+Shift+Z in the desktop app)

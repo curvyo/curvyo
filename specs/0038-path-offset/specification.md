@@ -1,6 +1,6 @@
 # Path offset: Outset and Inset by a typed distance, with a live preview
 
-Status: Ready (2026-10-10: `adrs.md` and the UX notes exist; the kernel question is decided, no customer question is open; criteria 11 and 19 and the miter definitions reworded on 2026-10-10 to what the library does, see `adrs.md`) Amended by `0020-undo-redo`: the sentence "No undo yet." and the statements that no undo exists are removed; Ctrl+Z takes the step back.
+Status: In progress (branch `story/path-offset` pushed 2026-10-12, no PR yet). Ready since 2026-10-10; criteria 11 and 19 and the miter definitions were reworded that day to what the library does, see `adrs.md`. Amended by `0020-undo-redo`: the sentence "No undo yet." and the statements that no undo exists are removed; Ctrl+Z takes the step back.
 Priority: Should
 Origin: Customer (Inset and Outset, request of 2026-10-09). R-EDIT-007 (outline/offset) existed as my Proposal since the first requirements; the customer has now asked for it. The preview, the copy-not-replace rule, the open-path rule and the defaults are my proposals, marked in "Decided by the product owner".
 

@@ -1,6 +1,6 @@
 # Transform polish: silent conversion, click-and-double-click sliders, a visible reference box for the typed move
 
-Status: Ready (customer changes of 2026-10-10 applied: a lone polygon or star converts on a stretch, question 2; nine reference points, question 8)
+Status: Done (#97, 2026-10-11; customer changes of 2026-10-10 included: a lone polygon or star converts on a stretch, question 2; nine reference points, question 8). Criterion 40's "3 px: nothing happens" is decided in TypeScript and has no automated test (`docs/technical-debt.md`).
 Priority: Should
 Origin: Customer (three change requests of 2026-10-10). Criteria marked (Proposal) are the product owner's additions; they are built with the slice and the customer can veto them at the demo, as with `0044`. None of them is needed for the three requests.
 Depends on: `0019-multi-object-transform` merged (PR #80: the group box, the multi-object skew and stretch rules, the group move chip) and `0017-style-panel-rework` merged (the colour picker and the Select-bar slider). Runs before `0044` and `0020` or after them, in either order (customer, 2026-10-10: 0047 does not wait for undo), never beside them: it touches `session/keys.rs`, the commit labels and the move chip, which they touch too (`adrs.md`).
@@ -288,4 +288,4 @@ New: "Slider" (gestures, 24 px target, entry placement); "Reference box" and "Re
 Requirements: R-EDIT-029 (new, `docs/requirements.md`: transform polish), R-EDIT-012 and R-EDIT-015 (amended: skew now covers every kind), R-EDIT-004 (conversion by a gesture)
 Builds on: `specs/0019-multi-object-transform/` (group box, criteria 1, 20, 21, 31, 34 to 41), `specs/0010-edit-interaction-polish/` (criteria 15 to 25, move chip), `specs/0008-object-transform-refinements/` (Part B skew, decision P1), `specs/0003-primitive-shapes/` (criteria 17 to 22), `specs/0017-style-panel-rework/` (criteria 17 to 21, value fields), `specs/0009-unified-object-editing/` (criteria 17, 21, 22, 32, question 5)
 Touches (no change): `specs/0044-editing-quick-wins/` (nudge uses the same bounds), `specs/0020-undo-redo/` (criterion 15 here), `specs/0023-groups/` (criterion 16 here), `specs/0040-document-background/` (a third picker)
-PR: (set when opened)
+PR: #97

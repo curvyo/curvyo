@@ -1,6 +1,6 @@
 # Style panel rework: empty when idle, hidden instead of disabled, RGBA hex, inline colour, eyedropper, custom dash, value fields, no gradients
 
-Status: In progress Superseded by `0020-undo-redo` where it says there is no undo (a release or a conversion is one step that Ctrl+Z takes back); the rest stays as the record of what was built.
+Status: Done (#78, one PR with `0018` and `0030`). Superseded by `0020-undo-redo` where it says there is no undo (a release or a conversion is one step that Ctrl+Z takes back); the rest stays as the record of what was built.
 Priority: Must
 Origin: Customer
 
