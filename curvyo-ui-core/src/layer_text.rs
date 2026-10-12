@@ -41,6 +41,21 @@ fn state_words(row: &LayerRow) -> Vec<String> {
     words
 }
 
+/// The inherited states of a row as the eye and the lock describe them: ("Hidden by layer Cut",
+/// "Locked by group Tabs"), each empty when no ancestor gives it (criterion 22).
+#[must_use]
+pub fn inherited_lines(row: &LayerRow) -> (String, String) {
+    let line = |cause: &Option<Cause>, word: &str| {
+        cause
+            .as_ref()
+            .map_or_else(String::new, |cause| format!("{word} {}", by(cause)))
+    };
+    (
+        line(&row.hidden_by, "Hidden"),
+        line(&row.locked_by, "Locked"),
+    )
+}
+
 /// A row's accessible name: "Rectangle 3f9a1c, rectangle, hidden, locked, opacity 60 percent"
 /// (criterion 41); a collapsed container with a selected descendant adds "contains the selection".
 #[must_use]
@@ -236,6 +251,10 @@ mod tests {
         document.set_node_visible(&[layer], false).unwrap();
         let row = row_of(&document, a);
         assert_eq!(row_state_line(&row), "Hidden by layer Cut");
+        assert_eq!(
+            inherited_lines(&row),
+            ("Hidden by layer Cut".to_owned(), String::new())
+        );
         assert!(row_accessible_name(&row).ends_with("hidden by layer Cut"));
     }
 

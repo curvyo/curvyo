@@ -16,7 +16,6 @@ import type { ProjectApi } from "@/hooks/useProject";
 import { useBackgroundPanel } from "@/hooks/useBackgroundPanel";
 import { useFormats } from "@/hooks/useFormats";
 import { useHistoryScope } from "@/hooks/useHistoryScope";
-import { useLayersList } from "@/hooks/useLayersList";
 import { useStylePanel } from "@/hooks/useStylePanel";
 import { appVersion, fileCommandTooltip } from "@/lib/editorSession";
 import { isTauri, PLATFORM } from "@/platform/host";
@@ -145,12 +144,6 @@ export function PropertiesPanel({
     doc.view.content === "history",
   );
   const objectSubject = historyScope.scope === "object" ? historyScope.info : null;
-  const layersList = useLayersList(
-    getSession,
-    editor.syncRevision,
-    doc.view.content === "layers",
-    editor.sync,
-  );
   const historyTotal = doc.view.content === "history" ? historyCount(editor) : 0;
   const subject =
     doc.view.content === "file"
@@ -160,7 +153,7 @@ export function PropertiesPanel({
       : doc.view.content === "history"
       ? `${historyTotal} ${historyTotal === 1 ? "step" : "steps"}`
       : doc.view.content === "layers"
-      ? layersList.view.subject
+      ? (getSession()?.layers_subject() ?? "")
       : doc.view.content === "document"
       ? doc.view.presets.subject
       : doc.view.content === "style"
@@ -302,8 +295,9 @@ export function PropertiesPanel({
               <StyleSection panel={panel} onReturnFocus={returnFocus} />
             ) : doc.view.content === "layers" ? (
               <LayersTab
-                list={layersList}
                 getSession={getSession}
+                syncRevision={editor.syncRevision}
+                sync={editor.sync}
                 shown={open}
                 showNotice={editor.showHistoryNotice}
                 onReturnFocus={returnFocus}

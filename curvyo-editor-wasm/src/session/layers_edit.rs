@@ -3,13 +3,12 @@
 //! (`specs/0050-layers-and-objects-panel` criteria 16, 18, 20, 26, 29 to 32, 34, 36 and 37). Each
 //! is one step; all pass the Pen gate of `layers_panel.rs`.
 
-use std::collections::HashMap;
 use std::sync::Arc;
 
 use curvyo_document_core::{
     MovePlan, MoveTarget, NodeId, ObjectEditError, ObjectSnapshot, Opacity,
 };
-use curvyo_render_core::faded;
+use curvyo_render_core::drawn_leaves_with;
 use curvyo_ui_core::{
     OpacityTarget, Reorder, RowMark, delete_locked_layer_notice, deleted_layer_notice,
     move_refusal_text, moved_announcement, opacity_caption, percent,
@@ -27,6 +26,18 @@ pub enum RowFlag {
     Visible,
     /// The lock (criterion 20).
     Locked,
+}
+
+impl RowFlag {
+    /// The flag called `name` (`"visible"`, `"locked"`).
+    #[must_use]
+    pub fn from_name(name: &str) -> Option<Self> {
+        match name {
+            "visible" => Some(Self::Visible),
+            "locked" => Some(Self::Locked),
+            _ => None,
+        }
+    }
 }
 
 /// Where a drop puts the dragged rows, relative to the row under the pointer (criterion 29).
@@ -155,14 +166,16 @@ impl Session {
     }
 
     /// The Opacity field is dragged to `percent`: the canvas shows it, nothing is written
-    /// (criterion 26, "live while dragging").
+    /// (criterion 26, "live while dragging"). It checks the Pen itself instead of going through
+    /// `panel_action`: a preview writes nothing and records no step, so it needs no recording;
+    /// with an unfinished path it shows nothing.
     pub fn preview_layer_opacity(&mut self, value: f64) {
         if self.pen_path_unfinished() {
             return;
         }
         let (targets, _) = self.opacity_target();
         if let Ok(opacity) = Opacity::new((value / 100.0).clamp(0.0, 1.0)) {
-            self.panel.opacity_preview = Some((targets, opacity));
+            self.panel.opacity_preview = Some((targets.into_iter().collect(), opacity));
         }
     }
 
@@ -222,27 +235,7 @@ impl Session {
     pub(super) fn previewed_drawn(&self) -> Option<Arc<[ObjectSnapshot]>> {
         let (targets, opacity) = self.panel.opacity_preview.as_ref()?;
         let read = self.document_read();
-        let mut effective: HashMap<NodeId, f64> = HashMap::with_capacity(read.nodes.len());
-        let mut drawn = Vec::new();
-        for node in read.nodes.iter() {
-            let own = if targets.contains(&node.id) {
-                opacity.get()
-            } else {
-                node.registers.opacity.get()
-            };
-            let above = node
-                .parent
-                .and_then(|parent| effective.get(&parent).copied())
-                .unwrap_or(1.0);
-            let here = above * own;
-            effective.insert(node.id, here);
-            if node.visible
-                && let Some(object) = node.object()
-            {
-                drawn.push(faded(object, Opacity::new(here).unwrap_or(Opacity::OPAQUE)));
-            }
-        }
-        Some(drawn.into())
+        Some(drawn_leaves_with(&read.nodes, &|id| targets.contains(&id), *opacity).into())
     }
 
     /// New layer: an empty "Layer N" directly in front of the active layer, which becomes the
@@ -278,11 +271,10 @@ impl Session {
         if self.document.is_layer(id) {
             return self.panel_action(|this| this.delete_layer_now(id));
         }
-        if self.pen_path_unfinished() {
-            return PanelReply::Hint(curvyo_ui_core::FINISH_PEN_FIRST.to_owned());
-        }
-        self.delete_selected();
-        PanelReply::Quiet
+        self.panel_action(|this| {
+            this.delete_selected();
+            PanelReply::Quiet
+        })
     }
 
     fn delete_layer_now(&mut self, layer: NodeId) -> PanelReply {

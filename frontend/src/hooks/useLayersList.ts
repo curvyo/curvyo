@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import {
   type LayersViewData,
@@ -11,11 +11,9 @@ import type { WasmSession } from "@/lib/editorSession";
 export interface LayersListApi {
   /** The tab and the rows of the window as the session sees them now. */
   view: LayersViewData;
-  /** The window of rows the list draws (criterion 48: only these cross from Rust). */
-  setWindow: (first: number, count: number) => void;
   /** Runs a panel call, then re-reads everything that may have changed. */
   act: (call: (session: WasmSession) => string) => PanelReplyData;
-  /** Re-reads the view only (expand, collapse, hover). */
+  /** Re-reads the view only (expand, collapse). */
   refresh: () => void;
 }
 
@@ -23,35 +21,26 @@ const EMPTY: LayersViewData = parseLayersView("");
 
 /**
  * The Layers tab's state (`specs/0050-layers-and-objects-panel` criteria 3 to 9 and 48): the
- * session's view of the window of rows in sight, re-read on every change of the session while
- * the tab is shown. A call that writes or selects goes through `act`, which re-reads the whole
- * editor so the canvas, the rail and the other tabs follow in the same frame.
+ * session's view of the rows `first` to `first + count`, read while rendering whenever the
+ * session, the window or a panel call changed it (a second read of the same state returns the
+ * same text, so nothing is stored here). A call that writes or selects goes through `act`, which
+ * re-reads the whole editor so the canvas, the rail and the other tabs follow in the same frame.
  */
 export function useLayersList(
   getSession: () => WasmSession | null,
   syncRevision: number,
-  shown: boolean,
   sync: () => void,
+  first: number,
+  count: number,
 ): LayersListApi {
-  const [range, setRange] = useState({ first: 0, count: 60 });
   const [local, setLocal] = useState(0);
-  const [view, setView] = useState<LayersViewData>(EMPTY);
 
-  useEffect(() => {
-    if (!shown) {
-      return;
-    }
+  const view = useMemo(() => {
     const session = getSession();
-    if (session) {
-      setView(parseLayersView(session.layers_view(range.first, range.count)));
-    }
-  }, [getSession, shown, syncRevision, local, range.first, range.count]);
-
-  const setWindow = useCallback((first: number, count: number) => {
-    setRange((previous) =>
-      previous.first === first && previous.count === count ? previous : { first, count },
-    );
-  }, []);
+    return session ? parseLayersView(session.layers_view(first, count)) : EMPTY;
+    // `syncRevision` and `local` name the changes of the session the read depends on.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [getSession, syncRevision, local, first, count]);
 
   const refresh = useCallback(() => setLocal((n) => n + 1), []);
 
@@ -69,5 +58,5 @@ export function useLayersList(
     [getSession, sync, refresh],
   );
 
-  return { view, setWindow, act, refresh };
+  return { view, act, refresh };
 }

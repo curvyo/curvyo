@@ -189,6 +189,7 @@ impl Session {
         self.sync_context();
         let units = self.units();
         self.select.set_units(units);
+        self.select.set_pickable(Some(self.pickable_objects()));
     }
 
     /// Makes `chain` the entered groups and starts from an empty selection and no hover.
@@ -204,6 +205,7 @@ impl Session {
         self.node.clear_selection();
         let units = self.units();
         self.select.set_units(units);
+        self.select.set_pickable(Some(self.pickable_objects()));
         self.context_announcement = Some(context_announcement(self.context.len(), entered));
     }
 

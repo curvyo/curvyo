@@ -108,8 +108,8 @@ impl Session {
             .collect();
         // The row under the pointer or the focus in the Layers list: its node's box, a group's
         // box for a group (`specs/0050-layers-and-objects-panel` criterion 15).
-        if let Some(hovered) = self.panel.hover {
-            let leaves = self.layer_hover_leaves();
+        if let Some((hovered, leaves)) = &self.panel.hover {
+            let hovered = *hovered;
             let corners: Vec<_> = objects
                 .iter()
                 .filter(|object| leaves.contains(&object.id()))

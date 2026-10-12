@@ -313,7 +313,11 @@ fn the_list_follows_a_canvas_selection_and_opens_only_the_first_rows_ancestors()
     let _ = view(&mut session);
     session.selection.set(&[a, b]);
     let shown = view(&mut session);
-    assert_eq!(shown["firstSelected"], shown["scrollTo"]);
+    let first = shown["firstSelected"]
+        .as_u64()
+        .map(|row| usize::try_from(row).unwrap());
+    assert_eq!(session.take_layer_scroll(), first);
+    assert_eq!(session.take_layer_scroll(), None, "once");
     assert_eq!(
         row(&mut session, layer)["expanded"],
         true,

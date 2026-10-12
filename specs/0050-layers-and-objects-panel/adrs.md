@@ -120,8 +120,8 @@ new dependency, no trait, no generic.
        revives.
    - **2026-10-12 (amends decisions 8 and 14).** The rules of criterion 30 live once in
      `curvyo-document-core` `Document::check_move`; `move_nodes` runs it before the first write.
-     ui-core `plan_move` only turns a gesture into a `MovePlan` and asks `check_move`, and maps
-     `MoveRefusal` to the texts of criterion 32. `parent_group`, `ancestor_groups` and
+     ui-core `reorder_plans` (`layer_move.rs`) only turns a gesture into `MovePlan`s, each asked
+     of `check_move`, and `move_refusal_text` maps `MoveRefusal` to the texts of criterion 30. `parent_group`, `ancestor_groups` and
      `child_groups(None)` treat layers as the top level (criterion 42); `parent_node` and
      `children` give the raw tree. Layers count toward the 32-level limit of `0023` criterion 5,
      in the reader and in every writer alike, so a layer holds at most 31 nested groups. Group,
@@ -136,8 +136,9 @@ new dependency, no trait, no generic.
     collapsing do not pass through it. One test per action listed in criterion 53, done as a
     table.
 10. **2026-10-10: opacity per paint (criterion 27, Question 5 A).**
-   - The render change is in `curvyo-render-core` `artwork.rs`: each paint's alpha is multiplied
-     by the effective opacity.
+   - The render change is in `curvyo-render-core` `node_opacity.rs` (`faded`, `drawn_leaves`,
+     and `drawn_leaves_with` for the Opacity preview; corrected 2026-10-12): each paint's alpha is
+     multiplied by the effective opacity.
    - The cost of option B is in ADR 0015's Consequences: one more render pass and texture per
      faded container per frame.
 11. **2026-10-10: the tree form of `document.json` (decided once for groups and layers).**
@@ -174,8 +175,8 @@ new dependency, no trait, no generic.
       effective values, `move_nodes`, `new_layer`, `delete_layer`, the setters
       (`set_node_visible`, `set_node_locked`, `set_node_opacity`, `rename_node`; each takes many
       ids and makes one commit; `set_node_opacity` skips clones, criterion 26), and the format bump.
-    - `curvyo-ui-core`: `layer_rows`, `plan_move`, the selection filter and the transparent
-      context.
+    - `curvyo-ui-core`: `layer_rows`, `layer_move` (`reorder_plans`, `move_refusal_text`;
+      corrected 2026-10-12), `layer_text`, the selection filter and the transparent context.
     - `curvyo-render-core`: alpha.
     - `curvyo-editor-wasm`: the row window, the commands and the key gate (Shift+Ctrl+L, Alt+arrows
       and the Proposal keys of criterion 33).

@@ -197,3 +197,33 @@ fn a_layer_of_ten_thousand_expands_and_collapses() {
         session.layers_view_json(0, 60)
     });
 }
+
+/// Criterion 15 within the frame budget: the hover box of a group row of 5,000 leaves in a
+/// 10,000-object document costs one frame, every frame the pointer rests there.
+#[test]
+#[ignore = "a timing budget for release builds; run on purpose"]
+fn hovering_a_group_row_of_five_thousand_leaves() {
+    let document = Document::new(1);
+    let ids: Vec<NodeId> = (0..OBJECTS)
+        .map(|i| {
+            document.create_rect(RectBounds {
+                origin: Point::new((i % 100) as f64 * 20.0, (i / 100) as f64 * 20.0),
+                width: Length::from_mm(10.0),
+                height: Length::from_mm(10.0),
+            })
+        })
+        .collect();
+    let group = document.group_objects(&ids[..OBJECTS / 2]).unwrap();
+    let mut session = Session::open(2, &pack(&document, "0.1.0").unwrap()).unwrap();
+    session.resize_viewport(1600.0, 900.0);
+    session.set_tool(Tool::Select);
+    let _ = session.draw_list();
+    session.set_layer_hover(&key(group));
+    timed(
+        "a frame with the group row hovered",
+        Duration::from_millis(16),
+        || {
+            let _ = session.draw_list();
+        },
+    );
+}

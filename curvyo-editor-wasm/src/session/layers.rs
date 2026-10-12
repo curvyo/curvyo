@@ -147,8 +147,11 @@ impl Session {
         }
         self.document.batch(MOVE_NODES_COMMIT_LABEL, |document| {
             for plan in &plans {
-                // Checked just above; a refusal here would change nothing.
-                let _ = document.move_nodes(plan);
+                // invariant: the plans are independent: one per parent, each among that parent's
+                // own children (`reorder_plans`), so a plan checked before the first move still
+                // holds after the others ran.
+                let moved = document.move_nodes(plan);
+                debug_assert!(moved.is_ok(), "a checked plan was refused: {moved:?}");
             }
         });
         Ok(true)

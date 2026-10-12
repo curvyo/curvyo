@@ -51,7 +51,7 @@ pub use group_box::{GroupBoxKind, GroupDecorationInput};
 pub use live_preview::build_live_edit_preview;
 pub use marquee_overlay::{MarqueeOverlay, build_marquee_overlay};
 pub use move_axes::{LockedAxis, MoveAxes, build_move_axes};
-pub use node_opacity::{drawn_leaves, faded};
+pub use node_opacity::{drawn_leaves, drawn_leaves_with, faded};
 pub use pen_cue::{ClosingCue, PenCue, build_pen_cue};
 pub use pen_preview::build_pen_preview;
 pub use reference_box::{ReferenceBoxInput, ReferenceMark};

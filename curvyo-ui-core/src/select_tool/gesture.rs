@@ -200,10 +200,10 @@ impl SelectTool {
         self.cycle = None;
         let from = drag.origin.down_at;
         let mode = MarqueeMode::for_drag(from, point, modifiers.alt);
-        let pickable = self.units.pickable(objects);
+        let pickable = self.hit_objects(objects);
         // A group takes its hidden and locked members along (criterion 21).
         let found = self.units.widen(&units_in_marquee(
-            &pickable,
+            pickable,
             &self.units,
             from,
             point,
@@ -234,17 +234,17 @@ impl SelectTool {
                 Some(cycle) if cycle.continues_at(at, tolerance) => cycle,
                 _ => ClickCycle::fresh(at),
             };
-            let pickable = self.units.pickable(objects);
-            if let Some(chosen) = cycle.advance(&pickable, tolerance, &self.units) {
+            let pickable = self.hit_objects(objects);
+            if let Some(chosen) = cycle.advance(pickable, tolerance, &self.units) {
                 selection.set(&self.units.leaves_of_unit(chosen));
                 self.cycle = Some(cycle);
             }
             return;
         }
         self.cycle = None;
-        let pickable = self.units.pickable(objects);
+        let pickable = self.hit_objects(objects);
         let found = self.units.widen(&hit_test_objects_along(
-            &pickable,
+            pickable,
             &drag.line_to(point),
             tolerance,
         ));

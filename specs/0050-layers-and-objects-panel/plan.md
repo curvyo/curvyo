@@ -34,13 +34,14 @@ is 11; this slice makes it **12**.
     registers (`adrs.md`, the note of 2026-10-12 on decision 11).
   - `tests/fixtures/`: `layers_v12.curvyo`, `layers_opacity_damaged_v12.curvyo`,
     `layers_marker_in_group_v12.curvyo`.
-- `curvyo-render-core`: `artwork.rs` multiplies each paint's alpha by the leaf's effective
+- `curvyo-render-core`: `node_opacity.rs` multiplies each paint's alpha by the leaf's effective
   opacity (decision 10); the `0023` dimming multiplies on top.
 - `curvyo-ui-core`
   - new `layer_rows.rs`: `layer_rows(read, collapsed, selection)` flattening and
     `rows_window(first, count)`; default names, the opacity readout, "contains the selection",
     posinset/setsize, inherited-state cause.
-  - new `layer_move.rs`: `plan_move(read, moved, target) -> Result<MovePlan, MoveRefusal>`
+  - new `layer_move.rs`: `reorder_plans(document, nodes, how) -> Vec<MovePlan>` and
+    `move_refusal_text`; the rules themselves are `Document::check_move`
     for drag, Alt+arrows and the canvas z-order keys, with the refusal texts.
   - new `layer_text.rs`: accessible names, tooltips, notices ("Deleted layer Cut and 12
     objects.", "Layer Cut is locked. ...", "Moved Rectangle 3f9a1c to position 2 of 5"),
@@ -116,7 +117,7 @@ supply its root's register.
 
 ### M2: canvas consumers (`curvyo-render-core`, `curvyo-ui-core`, `curvyo-editor-wasm`)
 
-- [x] 10. Per-paint alpha times effective opacity in `artwork.rs`, test with the numbers of
+- [x] 10. Per-paint alpha times effective opacity in `node_opacity.rs`, test with the numbers of
       criterion 27 (AC 27)
 - [x] 11. Object cache holds the node read; drawn and pickable lists; render draws exactly the
       effectively visible leaves in stacking order (AC 24)
@@ -127,14 +128,14 @@ supply its root's register.
       group selection carries locked members (AC 14, 21, 43)
 - [x] 14. Active layer (view state): draw parent, set by selecting an object, front-most layer
       at Open; drawing into a hidden or locked active layer refused with the notice (AC 23, 35)
-- [x] 15. Canvas z-order keys Home, End, Page Up, Page Down via `plan_move` (AC 33)
+- [x] 15. Canvas z-order keys Home, End, Page Up, Page Down via `reorder_plans` (AC 33)
 
 ### M3: panel logic (`curvyo-ui-core`)
 
 - [x] 16. `layer_rows` and `rows_window`: depth-first front-most first, collapse, default
       names, readout, "contains the selection", posinset/setsize, row count (AC 5, 6, 7, 8, 9,
       12, 22, 48, 52)
-- [x] 17. `plan_move` and `MoveRefusal` texts; Alt+Up/Down/Home/End/Left/Right targets
+- [x] 17. `reorder_plans` and the `MoveRefusal` texts; Alt+Up/Down/Home/End/Left/Right targets
       (AC 29, 30, 32)
 - [x] 18. Texts: accessible names, tooltips, notices, Opacity caption and "Mixed"; markup and
       bidi shown as plain text (AC 17, 26, 32, 36, 41)
@@ -187,13 +188,18 @@ supply its root's register.
   `"shape": "layer"`, and `name`, `visible`, `locked` and `opacity` are optional keys.
 - **The move rules live in document-core.** `Document::check_move` holds the rules of
   criterion 30 once; `Document::move_nodes` runs it before the first write, and ui-core's
-  `plan_move` only turns a gesture into a `MovePlan` and asks `check_move`, so the rules are not
+  `reorder_plans` only turns a gesture into `MovePlan`s and asks `check_move`, so the rules are not
   written twice.
 - **`parent_group` treats a layer as the top level.** The Select tool's context, entering and
   units read `parent_group`, `ancestor_groups` and `child_groups(None)`; these now see through
   layers (criterion 42). `Document::parent_node` gives the real parent for the panel.
 - **Where the effective flags live.** On the node read in document-core; the session cache
   derives two lists from it once per version, so no consumer filters on its own.
+- **The Layers tab is the fourth tab of a strip of five.** `0051` criterion 2 fixes the order
+  File, Document, Style, Layers, History; File came with `0051` (merged in #104) and History with
+  `0020`. So Layers is the fourth button, as the amendment of `0050` says, and the strip now has
+  five tabs; the M3 commit's "fifth tab" counts the tabs, not the position. The tests find tabs
+  by name (`0051` criterion 45).
 - **Status-bar measures (criterion 19).** The status bar shows the cursor, the zoom and the
   document size; no measure of objects exists there yet, so nothing is filtered.
 - **Where the flags reach the tools (M2).** The session's document read gives three lists: every
@@ -210,7 +216,7 @@ supply its root's register.
 ## Validation
 
 - Unit tests first for every core function (registers, read pass, setters, moves, rows,
-  `plan_move`, texts); golden files for format 12 (`CLAUDE.md` §5).
+  `reorder_plans`, texts); golden files for format 12 (`CLAUDE.md` §5).
 - Undo tests for each step label against the real history (criteria 44, 45).
 - A consumer table test that fails when a new canvas consumer reads unfiltered objects
   (criterion 19).

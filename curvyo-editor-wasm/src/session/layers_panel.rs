@@ -10,7 +10,8 @@ use std::sync::Arc;
 use curvyo_document_core::{NodeId, NodeRead};
 use curvyo_ui_core::{
     Expansion, FINISH_PEN_FIRST, LayerRow, LayerRows, NothingToSelect, RowFacts, RowKind, RowMark,
-    nothing_to_select_notice, objects_count_text, row_accessible_name, row_refusal, row_state_line,
+    inherited_lines, nothing_to_select_notice, objects_count_text, row_accessible_name,
+    row_refusal, row_state_line,
 };
 use serde_json::{Value, json};
 
@@ -58,6 +59,19 @@ pub enum RowPress {
     Range,
 }
 
+impl RowPress {
+    /// The press called `name` (`"plain"`, `"toggle"`, `"range"`).
+    #[must_use]
+    pub fn from_name(name: &str) -> Option<Self> {
+        match name {
+            "plain" => Some(Self::Plain),
+            "toggle" => Some(Self::Toggle),
+            "range" => Some(Self::Range),
+            _ => None,
+        }
+    }
+}
+
 /// The rows of one state of the document and the session, and that state.
 #[derive(Debug, Clone)]
 struct RowsKey {
@@ -91,12 +105,15 @@ pub(super) struct PanelState {
     from_list: bool,
     /// The first selected object the list last scrolled to.
     scrolled_to: Option<NodeId>,
-    /// The row under the pointer or the focus (criterion 15).
-    pub(super) hover: Option<NodeId>,
+    /// The row the host should scroll into view, until it takes it.
+    pending_scroll: Option<usize>,
+    /// The row under the pointer or the focus and its leaves, read once when it is set
+    /// (criterion 15), so a frame tests each object against a set.
+    pub(super) hover: Option<(NodeId, HashSet<NodeId>)>,
     /// A layer New layer just created, whose rename joins that step (criterion 34).
     pub(super) fresh_layer: Option<NodeId>,
     /// The Opacity field's drag in flight: the targets and the value drawn, never stored.
-    pub(super) opacity_preview: Option<(Vec<NodeId>, curvyo_document_core::Opacity)>,
+    pub(super) opacity_preview: Option<(HashSet<NodeId>, curvyo_document_core::Opacity)>,
     rows: RefCell<Option<(RowsKey, Arc<LayerRows>)>>,
 }
 
@@ -145,8 +162,15 @@ impl Session {
     }
 
     /// The collapsed ancestors of the first selected object open, once per change of it, unless
-    /// the selection came from the list (criterion 12). Returns the row to scroll to.
-    fn follow_selection_in_list(&mut self) -> Option<usize> {
+    /// the selection came from the list (criterion 12). The row to scroll to waits for the host.
+    fn follow_selection_in_list(&mut self) {
+        if let Some(to) = self.opened_for_selection() {
+            self.panel.pending_scroll = Some(to);
+        }
+    }
+
+    /// Opens the ancestors of a newly selected first object and returns its row.
+    fn opened_for_selection(&mut self) -> Option<usize> {
         let first = self.selected_units().first().copied();
         if first == self.panel.scrolled_to {
             return None;
@@ -173,11 +197,24 @@ impl Session {
         self.layer_rows().index_of(first)
     }
 
+    /// The row a canvas selection asks the list to scroll into view, once (criterion 12).
+    pub fn take_layer_scroll(&mut self) -> Option<usize> {
+        self.panel.pending_scroll.take()
+    }
+
+    /// The subject line of the Layers tab: "40 objects" (criterion 4).
+    #[must_use]
+    pub fn layers_subject(&self) -> String {
+        objects_count_text(self.layer_rows().objects())
+    }
+
     /// The Layers tab's state and the rows `first` to `first + count` as JSON (criterion 48: only
     /// the window crosses to the host): the row count (exact scrollbar), the subject line, the
-    /// Opacity header, the footer, the row to scroll to and the rows.
+    /// Opacity header, the footer and the rows. A canvas selection opens the ancestors of its
+    /// first row first; the row to scroll to waits in [`Session::take_layer_scroll`]. A second
+    /// call at the same state returns the same text.
     pub fn layers_view_json(&mut self, first: usize, count: usize) -> String {
-        let scroll_to = self.follow_selection_in_list();
+        self.follow_selection_in_list();
         let rows = self.layer_rows();
         let first_selected = self
             .selected_units()
@@ -195,7 +232,6 @@ impl Session {
             "opacity": self.layer_opacity_json(),
             "activeLayer": self.active_layer(),
             "canDeleteLayer": self.active_layer().is_some(),
-            "scrollTo": scroll_to,
             "firstSelected": first_selected,
             "rows": window,
         })
@@ -218,15 +254,12 @@ impl Session {
     /// The row under the pointer or the focus: the canvas draws its hover box (criterion 15). An
     /// empty or unknown id, or a layer, clears it.
     pub fn set_layer_hover(&mut self, id: &str) {
-        self.panel.hover = parse_id(id).filter(|&id| !self.document.is_layer(id));
-    }
-
-    /// The leaves the hover box of the hovered row covers.
-    pub(super) fn layer_hover_leaves(&self) -> Vec<NodeId> {
-        self.panel
-            .hover
-            .map(|id| self.document.leaves_of(id))
-            .unwrap_or_default()
+        let hovered = parse_id(id).filter(|&id| !self.document.is_layer(id));
+        if self.panel.hover.as_ref().map(|(held, _)| *held) == hovered {
+            return;
+        }
+        self.panel.hover =
+            hovered.map(|id| (id, self.document.leaves_of(id).into_iter().collect()));
     }
 
     /// Runs a panel action that writes or selects, unless the Pen has an unfinished path
@@ -386,11 +419,7 @@ pub(super) fn layer_name(session: &Session, layer: NodeId) -> String {
 
 /// One row as the host reads it.
 fn row_json(row: &LayerRow, index: usize) -> Value {
-    let inherited = |by: &Option<curvyo_ui_core::Cause>, word: &str| {
-        by.as_ref().map_or(String::new(), |cause| {
-            format!("{word} by {} {}", cause.kind, cause.name)
-        })
-    };
+    let (hidden_by, locked_by) = inherited_lines(row);
     let container = row.container;
     json!({
         "index": index,
@@ -403,8 +432,8 @@ fn row_json(row: &LayerRow, index: usize) -> Value {
         "locked": row.own.locked,
         "effectiveVisible": row.effective.visible,
         "effectiveLocked": row.effective.locked,
-        "hiddenBy": inherited(&row.hidden_by, "Hidden"),
-        "lockedBy": inherited(&row.locked_by, "Locked"),
+        "hiddenBy": hidden_by,
+        "lockedBy": locked_by,
         "readout": row.opacity_readout(),
         "container": container.is_some(),
         "expanded": row.expanded(),

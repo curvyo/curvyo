@@ -5,7 +5,9 @@
 //! Each paint is multiplied separately; nothing is composited as a group (Question 5 A), so where
 //! a fill and a stroke, or two leaves of one faded layer, overlap, the lower shows through.
 
-use curvyo_document_core::{NodeRead, ObjectSnapshot, Opacity};
+use std::collections::HashMap;
+
+use curvyo_document_core::{NodeId, NodeRead, ObjectSnapshot, Opacity};
 
 /// `object` with its fill and stroke opacity multiplied by `opacity`.
 #[must_use]
@@ -33,8 +35,46 @@ pub fn drawn_leaves(reads: &[NodeRead]) -> Vec<ObjectSnapshot> {
         .collect()
 }
 
+/// [`drawn_leaves`] while the Opacity field is dragged: every node for which `target` is true is
+/// drawn as if its
+/// own opacity were `opacity`, and the effective opacity below it is multiplied again from there
+/// (`specs/0050-layers-and-objects-panel` criterion 26, "live while dragging"). Nothing is
+/// written. The multiplication is the one of `curvyo_document_core::Document::read_nodes`; whoever
+/// changes that rule (a clone's root opacity, `0049`) changes this function with it.
+#[must_use]
+pub fn drawn_leaves_with(
+    reads: &[NodeRead],
+    target: &dyn Fn(NodeId) -> bool,
+    opacity: Opacity,
+) -> Vec<ObjectSnapshot> {
+    let mut effective: HashMap<NodeId, f64> = HashMap::with_capacity(reads.len());
+    let mut drawn = Vec::new();
+    for read in reads {
+        let own = if target(read.id) {
+            opacity
+        } else {
+            read.registers.opacity
+        };
+        let above = read
+            .parent
+            .and_then(|parent| effective.get(&parent).copied())
+            .unwrap_or(1.0);
+        let here = above * own.get();
+        effective.insert(read.id, here);
+        if read.visible
+            && let Some(object) = read.object()
+        {
+            // invariant: a product of numbers in 0..=1 lies in 0..=1, so `new` cannot refuse it.
+            drawn.push(faded(object, Opacity::new(here).unwrap_or(Opacity::OPAQUE)));
+        }
+    }
+    drawn
+}
+
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
+
     use curvyo_document_core::{Document, MovePlan, MoveTarget, NodeId, Point, RectBounds};
 
     use super::*;
@@ -107,6 +147,34 @@ mod tests {
         assert_eq!(drawn, vec![visible, locked]);
         let leaves = reads.iter().filter(|read| read.object().is_some()).count();
         assert_eq!(leaves, 4, "the read still lists every leaf");
+    }
+
+    /// With each target's own value, the preview draws exactly what the read draws.
+    #[test]
+    fn the_preview_with_the_stored_values_equals_the_drawn_leaves() {
+        let document = Document::new(1);
+        let layer = document.new_layer(None);
+        let (a, b) = (rect(&document, 0.0), rect(&document, 20.0));
+        into(&document, &[a, b], layer);
+        let half = Opacity::new(0.5).unwrap();
+        document.set_node_opacity(&[layer, a], half).unwrap();
+        let reads = document.read_nodes();
+        let targets: HashSet<NodeId> = [layer, a].into_iter().collect();
+        assert_eq!(
+            drawn_leaves_with(&reads, &|id| targets.contains(&id), half),
+            drawn_leaves(&reads)
+        );
+        let none: HashSet<NodeId> = HashSet::new();
+        assert_eq!(
+            drawn_leaves_with(&reads, &|id| none.contains(&id), half),
+            drawn_leaves(&reads)
+        );
+        // A new value for the layer reaches both children.
+        let quarter = Opacity::new(0.25).unwrap();
+        let layer_only: HashSet<NodeId> = [layer].into_iter().collect();
+        let previewed = drawn_leaves_with(&reads, &|id| layer_only.contains(&id), quarter);
+        let expected = 0.25 * 0.5 * document.object(a).unwrap().style().stroke.opacity.get();
+        assert!((previewed[0].style().stroke.opacity.get() - expected).abs() < 1e-12);
     }
 
     #[test]

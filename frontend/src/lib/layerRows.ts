@@ -77,8 +77,6 @@ export interface LayersViewData {
   opacity: LayerOpacityData;
   activeLayer: { peer: string; counter: number } | null;
   canDeleteLayer: boolean;
-  /** The row to scroll into view after a canvas selection, or null. */
-  scrollTo: number | null;
   /** The first selected row, or null (Shift+Ctrl+L scrolls to it). */
   firstSelected: number | null;
   rows: LayerRowData[];
@@ -96,7 +94,6 @@ const EMPTY_VIEW: LayersViewData = {
   opacity: { caption: "", field: false, layer: false, value: null },
   activeLayer: null,
   canDeleteLayer: false,
-  scrollTo: null,
   firstSelected: null,
   rows: [],
 };

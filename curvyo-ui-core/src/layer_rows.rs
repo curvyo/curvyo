@@ -242,17 +242,21 @@ fn shown_name(read: &NodeRead, kind: RowKind) -> (String, bool) {
     }
 }
 
-/// The flattened list of every visible row and the counts the panel needs.
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct LayerRows {
-    rows: Vec<LayerRow>,
-    objects: usize,
+/// The node read as a tree, made once per build: the children of each node, the top level, and
+/// what each node shows.
+struct Tree<'a> {
+    nodes: &'a [NodeRead],
+    index: std::collections::HashMap<NodeId, usize>,
+    children: Vec<Vec<usize>>,
+    top: Vec<usize>,
+    /// A container holds a selected node somewhere below it.
+    below_selected: Vec<bool>,
+    kinds: Vec<RowKind>,
+    names: Vec<(String, bool)>,
 }
 
-impl LayerRows {
-    /// The rows of `nodes` (a pre-order read, back to front) under `expansion` and `facts`.
-    #[must_use]
-    pub fn build(nodes: &[NodeRead], expansion: &Expansion, facts: RowFacts<'_>) -> Self {
+impl<'a> Tree<'a> {
+    fn of(nodes: &'a [NodeRead], selected: &HashSet<NodeId>) -> Self {
         let index: std::collections::HashMap<NodeId, usize> = nodes
             .iter()
             .enumerate()
@@ -266,73 +270,110 @@ impl LayerRows {
                 None => top.push(at),
             }
         }
-        // A container holds a selected node somewhere below it.
         let mut below_selected = vec![false; nodes.len()];
         for at in (0..nodes.len()).rev() {
-            let here = below_selected[at] || facts.selected.contains(&nodes[at].id);
+            let here = below_selected[at] || selected.contains(&nodes[at].id);
             if here && let Some(&parent) = nodes[at].parent.and_then(|p| index.get(&p)) {
                 below_selected[parent] = true;
             }
         }
         let kinds: Vec<RowKind> = nodes.iter().map(|read| RowKind::of(&read.kind)).collect();
-        let names: Vec<(String, bool)> = nodes
+        let names = nodes
             .iter()
             .zip(&kinds)
             .map(|(read, &kind)| shown_name(read, kind))
             .collect();
-        let cause = |id: Option<NodeId>| {
-            id.and_then(|id| index.get(&id)).map(|&at| Cause {
-                id: nodes[at].id,
-                kind: if kinds[at] == RowKind::Layer {
-                    "layer"
-                } else {
-                    "group"
-                },
-                name: names[at].0.clone(),
-            })
-        };
+        Self {
+            nodes,
+            index,
+            children,
+            top,
+            below_selected,
+            kinds,
+            names,
+        }
+    }
+
+    /// The ancestor `id` as a cause of an inherited state.
+    fn cause(&self, id: Option<NodeId>) -> Option<Cause> {
+        id.and_then(|id| self.index.get(&id)).map(|&at| Cause {
+            id: self.nodes[at].id,
+            kind: if self.kinds[at] == RowKind::Layer {
+                "layer"
+            } else {
+                "group"
+            },
+            name: self.names[at].0.clone(),
+        })
+    }
+
+    /// The row of the node at `at`, `position` of `siblings` among its siblings.
+    fn row(
+        &self,
+        at: usize,
+        position: usize,
+        siblings: usize,
+        expansion: &Expansion,
+        facts: RowFacts<'_>,
+    ) -> LayerRow {
+        let read = &self.nodes[at];
+        let kind = self.kinds[at];
+        let expanded = read.is_container() && expansion.is_expanded(read.id, kind);
+        let container = read.is_container().then_some(Container {
+            children: self.children[at].len(),
+            expanded,
+            contains_selection: !expanded && self.below_selected[at],
+        });
+        LayerRow {
+            id: read.id,
+            parent: read.parent,
+            depth: read.depth,
+            kind,
+            name: self.names[at].0.clone(),
+            named: self.names[at].1,
+            own: Flags {
+                visible: read.registers.visible,
+                locked: read.registers.locked,
+            },
+            effective: Flags {
+                visible: read.visible,
+                locked: read.locked,
+            },
+            hidden_by: self.cause(read.hidden_by),
+            locked_by: self.cause(read.locked_by),
+            opacity: read.registers.opacity,
+            container,
+            mark: row_mark(facts, read.id, kind),
+            position,
+            siblings,
+        }
+    }
+}
+
+/// The flattened list of every visible row and the counts the panel needs.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct LayerRows {
+    rows: Vec<LayerRow>,
+    objects: usize,
+}
+
+impl LayerRows {
+    /// The rows of `nodes` (a pre-order read, back to front) under `expansion` and `facts`.
+    #[must_use]
+    pub fn build(nodes: &[NodeRead], expansion: &Expansion, facts: RowFacts<'_>) -> Self {
+        let tree = Tree::of(nodes, facts.selected);
         let mut rows = Vec::new();
         // Depth first, the front-most (last) child first.
-        let mut stack: Vec<(usize, usize, usize)> = top
+        let mut stack: Vec<(usize, usize, usize)> = tree
+            .top
             .iter()
             .enumerate()
-            .map(|(place, &at)| (at, top.len() - place, top.len()))
+            .map(|(place, &at)| (at, tree.top.len() - place, tree.top.len()))
             .collect();
         while let Some((at, position, siblings)) = stack.pop() {
-            let read = &nodes[at];
-            let kind = kinds[at];
-            let expanded = read.is_container() && expansion.is_expanded(read.id, kind);
-            let below = &children[at];
-            let container = read.is_container().then_some(Container {
-                children: below.len(),
-                expanded,
-                contains_selection: !expanded && below_selected[at],
-            });
-            let mark = row_mark(facts, read.id, kind);
-            rows.push(LayerRow {
-                id: read.id,
-                parent: read.parent,
-                depth: read.depth,
-                kind,
-                name: names[at].0.clone(),
-                named: names[at].1,
-                own: Flags {
-                    visible: read.registers.visible,
-                    locked: read.registers.locked,
-                },
-                effective: Flags {
-                    visible: read.visible,
-                    locked: read.locked,
-                },
-                hidden_by: cause(read.hidden_by),
-                locked_by: cause(read.locked_by),
-                opacity: read.registers.opacity,
-                container,
-                mark,
-                position,
-                siblings,
-            });
-            if expanded {
+            let row = tree.row(at, position, siblings, expansion, facts);
+            if row.expanded() {
+                let below = &tree.children[at];
                 stack.extend(
                     below
                         .iter()
@@ -340,6 +381,7 @@ impl LayerRows {
                         .map(|(place, &child)| (child, below.len() - place, below.len())),
                 );
             }
+            rows.push(row);
         }
         let objects = nodes
             .iter()

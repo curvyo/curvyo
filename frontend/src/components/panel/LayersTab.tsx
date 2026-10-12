@@ -3,7 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 
 import { LayerRow, type RowCell } from "@/components/panel/LayerRow";
 import { ValueField } from "@/components/panel/ValueField";
-import type { LayersListApi } from "@/hooks/useLayersList";
+import { useLayersList } from "@/hooks/useLayersList";
 import type { GridName } from "@/hooks/useStylePanel";
 import { usePreviewGesture } from "@/hooks/usePreviewGesture";
 import type { WasmSession } from "@/lib/editorSession";
@@ -32,8 +32,11 @@ const PERCENT_MESSAGES = { percent: "Enter a number from 0 to 100" } as const;
 const OPACITY_TOOLTIP = "Fades fill and stroke separately. Overlapping parts show through.";
 
 interface LayersTabProps {
-  list: LayersListApi;
   getSession: () => WasmSession | null;
+  /** Counts the re-reads of the session (`EditorSession.syncRevision`). */
+  syncRevision: number;
+  /** Re-reads the whole editor after a panel call. */
+  sync: () => void;
   /** The tab is on screen. */
   shown: boolean;
   /** Shows a line in the canvas notice slot. */
@@ -60,15 +63,20 @@ interface RowDrag {
  * the footer with New layer and Delete layer. Every rule and word is the session's; this file
  * holds the focus, the scroll, the drag gesture and the text field of a rename.
  */
-export function LayersTab({ list, getSession, shown, showNotice, onReturnFocus }: LayersTabProps) {
-  const { view, setWindow, act, refresh } = list;
+export function LayersTab({
+  getSession,
+  syncRevision,
+  sync,
+  shown,
+  showNotice,
+  onReturnFocus,
+}: LayersTabProps) {
   const scroller = useRef<HTMLDivElement>(null);
   const coarse = useMemo(() => window.matchMedia?.("(pointer: coarse)").matches ?? false, []);
   const rowHeight = coarse ? COARSE_ROW_HEIGHT_PX : ROW_HEIGHT_PX;
   const [scrollTop, setScrollTop] = useState(0);
   const [viewport, setViewport] = useState(rowHeight * 14);
   const [focusedRaw, setFocused] = useState(0);
-  const focused = Math.min(focusedRaw, Math.max(0, view.count - 1));
   const [cell, setCell] = useState<RowCell>("name");
   const [renaming, setRenaming] = useState<string | null>(null);
   const [hint, setHint] = useState("");
@@ -90,13 +98,18 @@ export function LayersTab({ list, getSession, shown, showNotice, onReturnFocus }
     return () => observer.disconnect();
   }, [shown]);
 
-  const range = windowRange(scrollTop, viewport, view.count, rowHeight);
-  // The window always holds the focused row, so focus is never lost when it scrolls away.
-  const first = Math.min(range.first, focused);
-  const count = Math.max(range.first + range.count, focused + 1) - first;
-  useEffect(() => {
-    setWindow(first, Math.min(count, 60));
-  }, [setWindow, first, count]);
+  // The row count of the last read decides the window of the next; the window always holds the
+  // focused row, so focus is never lost when it scrolls away (criterion 48).
+  const [total, setTotal] = useState(0);
+  const range = windowRange(scrollTop, viewport, total, rowHeight);
+  const first = Math.min(range.first, focusedRaw);
+  const count = Math.min(Math.max(range.first + range.count, focusedRaw + 1) - first, 60);
+  const { view, act, refresh } = useLayersList(getSession, syncRevision, sync, first, count);
+  if (view.count !== total) {
+    // A change of the row count during render, the pattern React documents for derived state.
+    setTotal(view.count);
+  }
+  const focused = Math.min(focusedRaw, Math.max(0, view.count - 1));
 
   const scrollToRow = useCallback(
     (index: number) => {
@@ -114,12 +127,13 @@ export function LayersTab({ list, getSession, shown, showNotice, onReturnFocus }
     [rowHeight],
   );
 
-  // A canvas selection scrolls its first row into view (criterion 12).
+  // A canvas selection scrolls its first row into view (criterion 12); the scroll is the DOM's.
   useEffect(() => {
-    if (view.scrollTo !== null) {
-      scrollToRow(view.scrollTo);
+    const to = getSession()?.take_layer_scroll() ?? -1;
+    if (to >= 0) {
+      scrollToRow(to);
     }
-  }, [view.scrollTo, scrollToRow]);
+  });
 
   // The panel hint of an unfinished Pen path lasts 2 s (criterion 53).
   useEffect(() => {

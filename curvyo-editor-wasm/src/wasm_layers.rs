@@ -6,16 +6,8 @@
 use curvyo_ui_core::Reorder;
 use wasm_bindgen::prelude::*;
 
-use crate::session::{RowFlag, RowPress};
+use crate::session::{PanelReply, RowFlag, RowPress};
 use crate::wasm_api::WasmSession;
-
-fn press_from(name: &str) -> RowPress {
-    match name {
-        "toggle" => RowPress::Toggle,
-        "range" => RowPress::Range,
-        _ => RowPress::Plain,
-    }
-}
 
 fn reorder_from(name: &str) -> Option<Reorder> {
     Some(match name {
@@ -37,6 +29,20 @@ impl WasmSession {
             .layers_view_json(first as usize, count as usize)
     }
 
+    /// The subject line of the Layers tab.
+    #[must_use]
+    pub fn layers_subject(&self) -> String {
+        self.session.layers_subject()
+    }
+
+    /// The row to scroll into view after a canvas selection, once; -1 for none.
+    pub fn take_layer_scroll(&mut self) -> i32 {
+        self.session
+            .take_layer_scroll()
+            .and_then(|row| i32::try_from(row).ok())
+            .unwrap_or(-1)
+    }
+
     /// Shift+Ctrl+L: the Layers tab becomes active.
     pub fn panel_shortcut_layers(&mut self) {
         self.session.panel_shortcut_layers();
@@ -44,9 +50,10 @@ impl WasmSession {
 
     /// A press on a row: `press` is `"plain"`, `"toggle"` or `"range"`.
     pub fn press_layer_row(&mut self, id: &str, press: &str) -> String {
-        self.session
-            .press_layer_row(id, press_from(press))
-            .to_json()
+        match RowPress::from_name(press) {
+            Some(press) => self.session.press_layer_row(id, press).to_json(),
+            None => PanelReply::Quiet.to_json(),
+        }
     }
 
     /// Select contents on a layer row.
@@ -66,12 +73,10 @@ impl WasmSession {
 
     /// The eye (`flag` `"visible"`) or the lock (`"locked"`) of a row.
     pub fn toggle_layer_row_flag(&mut self, id: &str, flag: &str) -> String {
-        let flag = if flag == "locked" {
-            RowFlag::Locked
-        } else {
-            RowFlag::Visible
-        };
-        self.session.toggle_layer_row_flag(id, flag).to_json()
+        match RowFlag::from_name(flag) {
+            Some(flag) => self.session.toggle_layer_row_flag(id, flag).to_json(),
+            None => PanelReply::Quiet.to_json(),
+        }
     }
 
     /// Commits a rename.
@@ -138,7 +143,7 @@ impl WasmSession {
     pub fn reorder_layer_rows(&mut self, focused: &str, how: &str) -> String {
         match reorder_from(how) {
             Some(how) => self.session.reorder_layer_rows(focused, how).to_json(),
-            None => String::from(r#"{"kind":"","text":""}"#),
+            None => PanelReply::Quiet.to_json(),
         }
     }
 

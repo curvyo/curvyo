@@ -1,5 +1,7 @@
-//! The objects the Select tool sees at one level of the document: the direct children of the
-//! context, each a leaf or a group (`specs/0023-groups` criteria 8 to 10).
+//! Which objects of one level of the document a gesture reaches, and as which unit: the direct
+//! children of the context, each a leaf or a group, and which of them are inert because they are
+//! hidden or locked (`specs/0023-groups` criteria 8 to 10, `specs/0050-layers-and-objects-panel`
+//! criteria 14, 19 and 20).
 //!
 //! The selection stays a set of leaf ids (the Select tool's box, handles, move, nudge, typed
 //! values, style and the Node tool all work on leaves); a group is selected when all of its leaves
