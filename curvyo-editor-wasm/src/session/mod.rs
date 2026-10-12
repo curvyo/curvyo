@@ -53,6 +53,7 @@ mod nudge;
 mod object_cache;
 mod object_history;
 mod object_history_rows;
+mod offset;
 mod open_error;
 mod panel_tabs;
 mod pen;
@@ -96,6 +97,7 @@ pub use history_rows::{WipeOutcome, WipeState};
 pub use keys::{EscapeStep, KeyHint, KeyInput, KeyOutcome};
 pub use move_indicators::MoveIndicators;
 pub use object_history::ObjectWipeOutcome;
+pub use offset::{OFFSET_COMMIT_LABEL, OffsetOutcome, OffsetPreviewState};
 pub use panel_tabs::{PanelTabsRecord, PanelView};
 pub use project::APP_VERSION;
 pub use select::DoubleClickHint;
@@ -256,6 +258,10 @@ pub struct Session {
     grouping_result: Option<grouping::GroupingResult>,
     /// What a screen reader hears about the context, until the host has taken it.
     context_announcement: Option<String>,
+    /// The Offset entry and its preview (`specs/0038-path-offset`).
+    offset: offset::OffsetEntry,
+    /// The Offset entry's values, remembered for the session (criterion 1).
+    offset_settings: curvyo_ui_core::OffsetSettings,
 }
 
 impl Session {
@@ -309,6 +315,8 @@ impl Session {
             context_cache: context::ContextCache::default(),
             grouping_result: None,
             context_announcement: None,
+            offset: offset::OffsetEntry::default(),
+            offset_settings: curvyo_ui_core::OffsetSettings::default(),
         }
     }
 
@@ -358,6 +366,8 @@ impl Session {
             context_cache: context::ContextCache::default(),
             grouping_result: None,
             context_announcement: None,
+            offset: offset::OffsetEntry::default(),
+            offset_settings: curvyo_ui_core::OffsetSettings::default(),
         })
     }
 

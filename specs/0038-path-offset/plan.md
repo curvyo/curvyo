@@ -64,13 +64,13 @@ amends Outset/Inset later and is not anticipated here.
 
 ### Milestone 4: session, wasm API and preview (AC 2, 3, 4, 5, 13)
 
-- [ ] 4.1 Tests first, then `session/offset.rs`: open/close, set distance/join/cap → recompute preview
+- [x] 4.1 Tests first, then `session/offset.rs`: open/close, set distance/join/cap → recompute preview
   (cached plan), apply writes the cached plan in one `offset_path` commit and selects the results,
   closing on Escape (first step of the cascade), Cancel, tool change, selection change and a press on
   empty canvas, refusal marks (AC 2, 4, 5, 13).
-- [ ] 4.2 Preview outlines drawn blue (`--accent`) 1.5 px hollow over the unchanged originals, never
+- [x] 4.2 Preview outlines drawn blue (`--accent`) 1.5 px hollow over the unchanged originals, never
   stored (AC 2).
-- [ ] 4.3 `wasm_offset.rs`: availability, open, set values, preview status (caption code), apply outcome
+- [x] 4.3 `wasm_offset.rs`: availability, open, set values, preview status (caption code), apply outcome
   (codes and counts; sentences are the host's).
 
 ### Milestone 5: the UI (AC 1, 2, 4, 5, 7, 8, 13, 14)

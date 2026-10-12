@@ -324,7 +324,7 @@ impl Session {
     /// (`specs/0010-edit-interaction-polish/` criterion 42), and the document is
     /// never written:
     ///
-    /// 1. an open entry chip closes;
+    /// 1. an open entry chip or the Offset entry closes;
     /// 2. a drag in flight is cancelled and the selection stays as it was;
     /// 3. the tool's own state is cleared: the Pen path (also during a handle
     ///    drag, steps 2 and 3 in one), the Node tool's node and segment
@@ -339,6 +339,10 @@ impl Session {
         if self.colour_pick_target().is_some() {
             self.end_colour_pick();
             return EscapeStep::ClearedState;
+        }
+        if self.offset_open() {
+            self.close_offset();
+            return EscapeStep::ClosedEntry;
         }
         if self.select.has_entry() {
             self.select.cancel_entry();
