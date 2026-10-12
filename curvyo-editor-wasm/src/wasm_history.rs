@@ -148,6 +148,33 @@ impl WasmSession {
         .to_owned()
     }
 
+    /// A press, Enter or Space on item `index` of the Object scope in Live mode, as JSON:
+    /// `{"kind": "went" | "same" | "ignored" | "none", "notice"}`.
+    pub fn history_go_to_item(&mut self, index: u32) -> String {
+        let (kind, notice) = match self.session.go_to_history_item(index as usize) {
+            crate::GoToOutcome::Ignored => ("ignored", String::new()),
+            crate::GoToOutcome::NotARow => ("none", String::new()),
+            crate::GoToOutcome::Same => ("same", String::new()),
+            crate::GoToOutcome::Went(notice) => ("went", notice),
+        };
+        serde_json::json!({"kind": kind, "notice": notice}).to_string()
+    }
+
+    /// Whether Restore previous state is offered: an exploration lasts.
+    pub fn history_exploring(&mut self) -> bool {
+        self.session.history_exploring()
+    }
+
+    /// Restore previous state; returns the notice, empty when nothing was restored.
+    pub fn history_restore_exploration(&mut self) -> String {
+        self.session.restore_exploration().unwrap_or_default()
+    }
+
+    /// A change of tab ends the exploration.
+    pub fn history_end_exploration(&mut self) {
+        self.session.end_exploration();
+    }
+
     /// Ends the preview.
     pub fn history_preview_end(&mut self) {
         self.session.end_history_preview();

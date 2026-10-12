@@ -219,6 +219,23 @@ impl Document {
             && last.vv.iter().all(|(other, _)| now.get(other).is_some())
     }
 
+    /// This session's last step with its header, while nothing was committed or merged since it:
+    /// the step a go-to exploration may continue (`specs/0042-history-branches` criterion 31).
+    pub(crate) fn last_step_if_current(&self) -> Option<(StepRef, StepHeader)> {
+        let last = self.commit_state.last.borrow().clone()?;
+        if last.version != self.loro().oplog_frontiers() || !self.only_own_since(&last) {
+            return None;
+        }
+        Some((last.step, StepHeader::parse(&last.header)?))
+    }
+
+    /// Commits the pending writes as a further commit of `step` with `header`, which
+    /// [`super::step_header::continues`] joins to it. Not listed again among the own steps.
+    pub(crate) fn commit_joining(&self, step: StepRef, header: &StepHeader) -> Option<StepRef> {
+        let pending = self.loro().get_pending_txn_len();
+        (pending > 0).then(|| self.finish_commit(&header.format(), Some(step), pending))
+    }
+
     /// Commits the pending writes of an undo or redo with the given header. Not listed among
     /// [`Document::own_steps`], and never joined: a nudge after Ctrl+Z is a new step.
     pub(crate) fn commit_with_header(&self, header: &StepHeader) {

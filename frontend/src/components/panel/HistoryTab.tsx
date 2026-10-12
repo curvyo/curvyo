@@ -199,6 +199,15 @@ export function HistoryTab({ editor, shown, onReturnFocus, historyScope }: Histo
   const [live, setLive] = useState(() => getSession()?.history_live() ?? false);
   const [busy, setBusy] = useState(false);
   useBusyWindow(busy);
+  // An exploration in Live mode: Restore previous state is offered and the pressed row looks
+  // selected (criteria 11 and 12).
+  const [explored, setExplored] = useState<string | null>(null);
+  const exploring = useMemo(
+    () => object && (getSession()?.history_exploring() ?? false),
+    // The session's state follows every change it reports.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [getSession, object, syncRevision, list.total],
+  );
 
   // The session holds the preview; read it again whenever the session changed (a press on the
   // canvas or another selection ends an object preview there).
@@ -213,13 +222,15 @@ export function HistoryTab({ editor, shown, onReturnFocus, historyScope }: Histo
     getSession()?.history_preview_end();
     readPreview();
   }, [getSession, readPreview]);
-  // A change of tab, a collapsed panel or another scope ends a preview (criteria 18 and 19).
+  // A change of tab, a collapsed panel or another scope ends a preview (criteria 18 and 19) and an
+  // exploration (criterion 13).
   useEffect(() => {
     if (!shown) {
       endPreview();
+      getSession()?.history_end_exploration();
     }
     return endPreview;
-  }, [shown, scope, endPreview]);
+  }, [shown, scope, endPreview, getSession]);
 
   /** A press, Enter or Space on the row at `index`: Preview shows the version (criteria 17 to
    * 21). A row far back shows the long-operation state first. */
@@ -227,6 +238,18 @@ export function HistoryTab({ editor, shown, onReturnFocus, historyScope }: Histo
     (index: number) => {
       const session = getSession();
       if (!session || busy) {
+        return;
+      }
+      if (object && live) {
+        // Live: the object goes to the version as one step (criteria 10 and 11).
+        const row = list.itemAt(index);
+        editor.runHistoryAction((s) => {
+          const result = JSON.parse(s.history_go_to_item(index)) as { kind: string; notice: string };
+          if (result.kind === "went" && row?.type === "row") {
+            setExplored(row.step);
+          }
+          return result.notice;
+        });
         return;
       }
       if (session.history_item_is_far(object, index)) {
@@ -246,7 +269,7 @@ export function HistoryTab({ editor, shown, onReturnFocus, historyScope }: Histo
       session.history_preview_item(object, index);
       readPreview();
     },
-    [busy, getSession, object, readPreview],
+    [busy, editor, getSession, list, live, object, readPreview],
   );
 
   useLayoutEffect(() => {
@@ -426,6 +449,7 @@ export function HistoryTab({ editor, shown, onReturnFocus, historyScope }: Histo
           setFocused(index);
           pressRow(index);
         }}
+        selected={exploring && explored !== null && item.step === explored}
       />
     ) : (
       <div
@@ -453,6 +477,23 @@ export function HistoryTab({ editor, shown, onReturnFocus, historyScope }: Histo
             readPreview();
           }}
           onReturnFocus={onReturnFocus}
+          action={
+            exploring ? (
+              <Tooltip side="left" content="Put the object back as it was before you started clicking through versions">
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  onClick={() => {
+                    editor.runHistoryAction((s) => s.history_restore_exploration());
+                    setExplored(null);
+                  }}
+                  className="h-7 w-full rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_25%,transparent)] text-sm text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+                >
+                  Restore previous state
+                </button>
+              </Tooltip>
+            ) : undefined
+          }
         />
       ) : null}
       <button
@@ -530,6 +571,8 @@ interface StepRowProps {
   onFocusRow: () => void;
   onHover: (step: string) => void;
   onPress: () => void;
+  /** The row an exploration went to last: the selected look. */
+  selected?: boolean;
 }
 
 /** One step: kind glyph, operation name, step id, and the second line (criterion 39). */
@@ -544,6 +587,7 @@ function StepRow({
   onFocusRow,
   onHover,
   onPress,
+  selected = false,
 }: StepRowProps) {
   const Glyph = GLYPHS[glyphKey(row)] ?? Pencil;
   const undone = isUndone(row);
@@ -568,7 +612,10 @@ function StepRow({
           onBlur={() => onHover("")}
           onMouseEnter={() => onHover(row.step)}
           onMouseLeave={() => onHover("")}
-          className="flex h-full w-full items-stretch gap-1 rounded-[5px] text-left outline-none hover:bg-[var(--row-hover)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)]"
+          aria-current={selected ? "true" : undefined}
+          className={`flex h-full w-full items-stretch gap-1 rounded-[5px] text-left outline-none hover:bg-[var(--row-hover)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)] ${
+            selected ? "bg-[var(--value-fill)] shadow-[inset_3px_0_0_var(--editor-accent)]" : ""
+          }`}
         >
           <Gutter segments={row.gutter} lanes={lanes} height={ROW_HEIGHT_PX} />
           <span className="flex min-w-0 flex-1 flex-col justify-center pr-2">

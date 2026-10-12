@@ -132,7 +132,8 @@ pub use grouping::{
     grouping_availability, groups_refusal_notice, selection_announcement, ungrouped_notice,
 };
 pub use history_branch_text::{
-    BRANCH_STATUS_WORD, branch_header_text, branch_lane_name, more_branches_text,
+    BRANCH_STATUS_WORD, RESTORED_NOTICE, branch_header_text, branch_lane_name, cloned_notice,
+    more_branches_text, went_to_notice,
 };
 pub use history_lanes::{
     BranchSpan, DRAWN_BRANCHES, Edge, HistoryItem, LineStyle, ListLayout, MAX_LANE, RowLook,

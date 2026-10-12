@@ -55,6 +55,8 @@ pub(super) struct HistoryState {
     pub(super) list: super::history_list::ListState,
     /// The Mode switch and the version a preview shows (`history_preview.rs`).
     pub(super) preview: super::history_preview::PreviewState,
+    /// The go-to step the maker is exploring in (`history_version.rs`).
+    pub(super) version: super::history_version::VersionState,
 }
 
 impl HistoryState {
@@ -66,6 +68,7 @@ impl HistoryState {
             notice: None,
             list: super::history_list::ListState::default(),
             preview: super::history_preview::PreviewState::default(),
+            version: super::history_version::VersionState::default(),
         }
     }
 }

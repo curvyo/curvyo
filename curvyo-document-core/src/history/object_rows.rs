@@ -13,7 +13,7 @@ use super::branches::{HistoryBranch, Listed, derive};
 use super::lineage::clone_origin;
 use super::object_timeline::{Entry, EntryClass, Reader, Targets, TimelineStatus};
 use super::report::Role;
-use super::rows::{Author, StepKind, kind_of_step};
+use super::rows::{Author, RowVersion, StepKind, kind_of_step, version_of};
 use super::step_id::StepRef;
 use super::touched::Touched;
 use crate::document::Document;
@@ -85,6 +85,8 @@ pub struct ObjectRow {
     pub inherited_from: Option<NodeId>,
     /// Whether the step is in effect.
     pub status: ObjectStatus,
+    /// For a go to version or a clone of a version: the step whose version it named.
+    pub version: Option<RowVersion>,
 }
 
 /// A step an object undo or redo would act on.
@@ -248,7 +250,7 @@ impl Document {
     }
 
     /// Runs `read` with the three indexes brought up to the log.
-    fn with_reader<R>(&self, read: impl FnOnce(&Reader<'_>, u64) -> R) -> R {
+    pub(super) fn with_reader<R>(&self, read: impl FnOnce(&Reader<'_>, u64) -> R) -> R {
         self.sync_object_index();
         let steps = self.step_index.borrow();
         let objects = self.object_index.borrow();
@@ -318,6 +320,7 @@ impl Document {
                 Vec::new()
             },
             inherited_from: entry.from.map(node_id),
+            version: version_of(log.and_then(|log| log.header.as_ref()), reader.steps),
             status: match status {
                 TimelineStatus::Applied => ObjectStatus::Applied,
                 TimelineStatus::Undone => ObjectStatus::Undone,

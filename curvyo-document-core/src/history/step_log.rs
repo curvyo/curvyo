@@ -3,7 +3,7 @@
 
 use loro::{Frontiers, IdSpan, LoroDoc};
 
-use super::step_header::StepHeader;
+use super::step_header::{StepHeader, continues};
 use super::step_id::StepRef;
 
 /// One step as the log holds it.
@@ -46,12 +46,15 @@ pub(crate) fn find_step(doc: &LoroDoc, step: StepRef) -> Option<LogStep> {
     if first.id.counter != step.counter() {
         return None;
     }
-    let message = first.message.as_deref().unwrap_or_default().to_owned();
+    let mut message = first.message.as_deref().unwrap_or_default().to_owned();
     let mut end = first.id.counter + i32::try_from(first.len).ok()?;
     while let Some(next) = doc.get_change(loro::ID::new(step.peer(), end)) {
-        if next.id.counter != end || next.message.as_deref().unwrap_or_default() != message {
+        let next_message = next.message.as_deref().unwrap_or_default();
+        if next.id.counter != end || !continues(&message, next_message) {
             break;
         }
+        // A go-to exploration names its latest version.
+        next_message.clone_into(&mut message);
         end += i32::try_from(next.len).ok()?;
     }
     let header = StepHeader::parse(&message);

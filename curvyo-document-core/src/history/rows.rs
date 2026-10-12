@@ -77,6 +77,40 @@ pub struct HistoryRow {
     /// Who took the step back with an object undo, when that took back the step as a whole
     /// (`specs/0041-object-history` criterion 8). Only set while `status` is applied.
     pub undone_by: Option<Author>,
+    /// For a go to version or a clone of a version: the step whose version it named
+    /// (`specs/0042-history-branches` criteria 10 and 22).
+    pub version: Option<RowVersion>,
+}
+
+/// The step whose version a go to or a clone named.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RowVersion {
+    /// The step.
+    pub step: StepRef,
+    /// Its shown id.
+    pub shown_id: String,
+    /// Its commit label.
+    pub label: String,
+}
+
+/// The version a go to or a clone step names, read from its header.
+pub(super) fn version_of(
+    header: Option<&super::step_header::StepHeader>,
+    index: &StepIndex,
+) -> Option<RowVersion> {
+    let header = header?;
+    if !matches!(
+        header.label.as_str(),
+        super::step_header::LABEL_GO_TO_VERSION | super::step_header::LABEL_CLONE_VERSION
+    ) {
+        return None;
+    }
+    let step = StepRef::decode(header.extra_value(super::step_header::KEY_VERSION)?)?;
+    Some(RowVersion {
+        step,
+        shown_id: index.shown().get(&step).cloned().unwrap_or_default(),
+        label: index.get(step).map(|t| t.label.clone()).unwrap_or_default(),
+    })
 }
 
 /// The step an object undo or redo named.
@@ -325,6 +359,7 @@ impl Document {
                     } else {
                         None
                     },
+                    version: version_of(log.header.as_ref(), index),
                 }
             })
             .collect()

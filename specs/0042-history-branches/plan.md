@@ -91,13 +91,13 @@ file with the two new labels as legacy-labelled steps.
   state beyond 1,000 and 1.5 s at 10,000 back; warm and right after Open; once on wasm (AC 21).
 
 ### Milestone 3: Live, exploring, Restore
-- [ ] 3.1 Test first: go to version writes one step with header `o`, `v`; no write when equal;
+- [x] 3.1 Test first: go to version writes one step with header `o`, `v`; no write when equal;
   works on main line and branch; a later step forks (AC 10, 31).
-- [ ] 3.2 Exploration as header continuation: five presses, one stack entry, one row, Ctrl+Z to
+- [x] 3.2 Exploration as header continuation: five presses, one stack entry, one row, Ctrl+Z to
   the state before the first press; ends on selection change, tab change or any edit (AC 11, 13,
   31).
-- [ ] 3.3 Over a peer's later steps: written anyway, notice names authors and count (AC 15).
-- [ ] 3.4 Restore previous state in the caption slot, only while the exploration is top of stack
+- [x] 3.3 Over a peer's later steps: written anyway, notice names authors and count (AC 15).
+- [x] 3.4 Restore previous state in the caption slot, only while the exploration is top of stack
   and the object selected, never takes focus; notice and Undone mark (AC 12, 14).
 
 ### Milestone 4: Clone version
@@ -141,6 +141,15 @@ file with the two new labels as legacy-labelled steps.
   page and background. The release budgets of AC 21 are in
   `curvyo-document-core/tests/history_preview_budgets.rs`; the wasm figure is measured in the
   browser walk-through.
+- Milestone 3: a further press of an exploration repeats the go-to header with the new `v` (the
+  same `s` and `o`, `adrs.md` decision 5); `step_header::continues` joins such commits into one
+  step in the step index and in `find_step`, so the step names its latest version and Ctrl+Z takes
+  back from before the first press. The step is written through `merge::restore_map` with the
+  live fields as "from", which writes every field (no three-way check); the lineage keys
+  `clone_of` and `history_floor` stay. Other peers have no names in the file (ADR 0014 Q5), so the
+  notice of AC 15 reads "Earlier session's 2 later steps were reverted for this object." The session
+  ends an exploration when its step is no longer the top of the stack or another object is
+  selected; the History tab reads that on every change of the session.
 
 ## Validation
 

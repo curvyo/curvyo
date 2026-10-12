@@ -130,6 +130,9 @@ impl Session {
     /// "id", "name", "author", "time", "since"}`, or `{"kind": ""}` without one. An Object-scope
     /// preview ends here once its object is no longer the one selected (criterion 18).
     pub fn history_preview_json(&mut self) -> String {
+        // Read on every change of the session: another selection ends an exploration here too
+        // (criterion 13).
+        self.history_exploring();
         if self
             .history
             .preview
@@ -200,7 +203,7 @@ impl Session {
     }
 
     /// The row index of item `index`, when it is a step row.
-    fn history_row_at(&mut self, object: bool, index: usize) -> Option<usize> {
+    pub(super) fn history_row_at(&mut self, object: bool, index: usize) -> Option<usize> {
         match self.history_list_item(object, index)? {
             HistoryItem::Row(row) => Some(row),
             _ => None,

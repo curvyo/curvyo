@@ -71,7 +71,7 @@ mod wasm_split;
 pub use session::{
     APP_VERSION, BooleanOutcome, BreakApartOutcome, ClosePathOutcome, ClosePathState,
     CombineOutcome, CutOutcome, DocumentPresetsRecord, DocumentSide, DoubleClickHint, EscapeStep,
-    FAR_PREVIEW_ROWS, FitOutcome, FormTexts, FormatEdit, GroupingKind, GroupingResult,
+    FAR_PREVIEW_ROWS, FitOutcome, FormTexts, FormatEdit, GoToOutcome, GroupingKind, GroupingResult,
     HistoryResult, KeyHint, KeyInput, KeyOutcome, MoveIndicators, ObjectWipeOutcome,
     PanelTabsRecord, PanelView, RowPress, Session, SizeOutcome, SplitOutcome, Tool, WipeOutcome,
     WipeState,

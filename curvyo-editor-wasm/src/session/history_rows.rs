@@ -57,6 +57,16 @@ fn row_words(row: &HistoryRow, summary: Option<String>) -> (String, bool, &'stat
         let name = format!("Wipe history of {object}");
         return (name, true, "floor", summary);
     }
+    if let Some(version) = &row.version {
+        // "Go to version a1b2c3d", line 2 "Resize" (`specs/0042-history-branches` criterion 11).
+        let name = format!("{} {}", operation_name(&row.label), version.shown_id);
+        return (
+            name,
+            true,
+            "step",
+            operation_name(&version.label).to_owned(),
+        );
+    }
     if let Some(revert) = &row.reverts {
         let verb = if revert.redo { "Redo" } else { "Undo" };
         let name = format!("{verb} {}", operation_name(&revert.label));

@@ -10,7 +10,7 @@ use super::stack_machine::{BranchMark, Event, StackMachine, Status};
 use super::step_header::{
     KEY_OBJECT, KEY_OBJECT_REDONE, KEY_OBJECT_UNDONE, KEY_REDONE, KEY_UNDONE, LABEL_NEW_DOCUMENT,
     LABEL_OBJECT_REDO, LABEL_OBJECT_UNDO, LABEL_REDO, LABEL_UNDO, LABEL_WIPE, LABEL_WIPE_OBJECT,
-    StepHeader,
+    StepHeader, continues,
 };
 use super::step_id::{StepRef, shown_ids};
 use super::step_log::LogStep;
@@ -88,11 +88,17 @@ impl StepIndex {
     fn note_change(&mut self, peer: u64, change: &loro::ChangeMeta, message: &str, next: i32) {
         let extends = self.newest.get(&peer).and_then(|position| {
             let step = self.steps.get(position)?;
-            (step.message == message && step.end == change.id.counter).then_some(*position)
+            (continues(&step.message, message) && step.end == change.id.counter)
+                .then_some(*position)
         });
         if let Some(position) = extends {
             if let Some(step) = self.steps.get_mut(&position) {
                 step.end = next;
+                if step.message != message {
+                    // A further go-to press: the step names its latest version.
+                    message.clone_into(&mut step.message);
+                    step.header = StepHeader::parse(message);
+                }
             }
             return;
         }

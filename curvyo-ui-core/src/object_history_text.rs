@@ -16,7 +16,19 @@ pub fn object_row_name(row: &ObjectRow) -> String {
             let verb = if *redo { "Redo" } else { "Undo" };
             format!("{verb} {}", operation_name(label))
         }
-        ObjectRowClass::CloneStart { source } => format!("Duplicate of {}", source.short_id()),
+        ObjectRowClass::CloneStart { source } => match &row.version {
+            // `specs/0042-history-branches` criterion 23.
+            Some(version) => format!(
+                "Clone of {} at version {}",
+                source.short_id(),
+                version.shown_id
+            ),
+            None => format!("Duplicate of {}", source.short_id()),
+        },
+        ObjectRowClass::Step if row.version.is_some() => {
+            let id = row.version.as_ref().map_or("", |v| v.shown_id.as_str());
+            format!("{name} {id}")
+        }
         ObjectRowClass::Step => match (row.kind, row.role) {
             (StepKind::Replace, Role::Created) => format!("Created by {name}"),
             (StepKind::Replace, Role::Deleted) => format!("Deleted by {name}"),
@@ -37,6 +49,11 @@ pub fn object_row_summary(row: &ObjectRow) -> String {
             format!("{verb} {shown_id}")
         }
         ObjectRowClass::CloneStart { .. } => String::new(),
+        // A go to names the step whose version it went to: "Resize" (criterion 11's row).
+        ObjectRowClass::Step if row.version.is_some() => row
+            .version
+            .as_ref()
+            .map_or_else(String::new, |v| operation_name(&v.label).to_owned()),
         ObjectRowClass::Step => {
             if !row.sources.is_empty() {
                 return format!("from {}", plural(row.sources.len(), "object"));
