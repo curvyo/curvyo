@@ -112,6 +112,16 @@ compound paths), no trait, no generic. The customer chose the library on
     and logged in `docs/technical-debt.md` ("Offset preview runs on the main
     thread").
 
+- **2026-10-12 (rework, customer review of #115): ADR 0003 §4 amendment
+  approved by the customer.** Offset results are curves rebuilt from exact
+  pieces (parallel lines, `kurbo` `offset_cubic`, true arcs for Round joins and
+  caps, miter and bevel lines); `i_overlay` decides topology only; the polyline
+  is the per-outline fallback. Primitives stay primitives where the exact
+  offset is one. No new dependency, no `format_version` bump, no precision
+  setting. Details: `geometry-rework.md`; criteria 33 to 44 of the reworked
+  `specification.md`. The "results are polylines" lines above are superseded
+  for offsetting by this entry.
+
 ## Flagged to the PO (criterion changes the spec invites)
 
 1. **Criterion 19 and "Miter limit": `i_overlay` clips the miter, it does
