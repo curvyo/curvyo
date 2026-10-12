@@ -166,4 +166,4 @@ Requirements: R-EDIT-007 (`docs/requirements.md`)
 Builds on: `specs/0016-boolean-operations/` (kernel, compound paths, region, refusals, notices, determinism; must be merged first), `specs/0009-unified-object-editing/` (blue-new/black-old), `specs/0010-edit-interaction-polish/` (entry chips, Escape cascade), `specs/0017-style-panel-rework/` (value fields)
 Related: `specs/0023-groups/` (groups refused), `specs/0037-fracture-and-flatten/`, `specs/0033-stroke-brushes/` (variable-width stroke offset), `docs/adr/0003-geometry-kernel-booleans-offsetting-vcarving.md` §3, §4
 ADRs: `adrs.md` (architect, to come; ADR 0003 §4 amendment: `i_overlay` offset, no new dependency)
-PR: TBD
+PR: https://github.com/curvyo/curvyo/pull/115
