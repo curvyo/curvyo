@@ -69,7 +69,7 @@ fn derivatives(cubic: &Cubic, t: f64) -> (Vec2, Vec2) {
 }
 
 /// The unit direction from `points[from]` towards the first sample at least `TANGENT_REACH_MM`
-/// away, walking by `step` (+1 or -1) and stopping at `end` (inclusive).
+/// away, walking forward (`forward`) or backward and stopping at `end` (inclusive).
 fn tangent_towards(points: &[Point], from: usize, end: usize, forward: bool) -> Vec2 {
     let mut index = from;
     loop {
