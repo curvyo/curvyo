@@ -203,6 +203,28 @@ impl StepIndex {
         self.machines.get(&step.peer())?.branch_of(step)
     }
 
+    /// The stacks of `peer` as its commits up to `within` tell them: which of its steps were in
+    /// effect at that version (`specs/0042-history-branches` criterion 23).
+    pub(crate) fn machine_within(&self, peer: u64, within: &VersionVector) -> StackMachine {
+        let end = within.get(&peer).copied().unwrap_or(0);
+        let mut machine = StackMachine::new(usize::MAX);
+        let Some(starts) = self.by_peer.get(&peer) else {
+            return machine;
+        };
+        for position in starts.values() {
+            let Some(step) = self.steps.get(position) else {
+                continue;
+            };
+            if step.end > end {
+                break;
+            }
+            if let Some(event) = event_of(step.header.as_ref(), step.step) {
+                machine.apply(event);
+            }
+        }
+        machine
+    }
+
     /// The status of a step.
     pub(crate) fn status(&self, step: StepRef) -> Status {
         self.machines

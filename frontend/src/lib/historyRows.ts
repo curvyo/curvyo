@@ -17,6 +17,8 @@ export interface HistoryObject {
   shape: string;
   role: "created" | "deleted" | "changed" | "moved";
   alive: boolean;
+  /** The first 6 characters of the object's id ("3f9a1c"). */
+  short?: string;
 }
 
 /** What a row is: a step, an object undo or redo, the start of a clone, or the floor of a wiped

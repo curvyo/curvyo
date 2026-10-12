@@ -1,16 +1,4 @@
-import {
-  ChevronDown,
-  ChevronRight,
-  Copy,
-  Eraser,
-  File,
-  Minus,
-  Pencil,
-  Plus,
-  Redo2,
-  Replace,
-  Undo2,
-} from "lucide-react";
+import { Redo2, Undo2 } from "lucide-react";
 import {
   type ComponentType,
   useCallback,
@@ -25,29 +13,22 @@ import { ToggleGroup, type ToggleOption } from "@/components/ui/toggle-group";
 import { Tooltip } from "@/components/ui/tooltip";
 import type { EditorSession } from "@/hooks/useEditorSession";
 import { HistoryModeRow } from "@/components/panel/HistoryModeRow";
+import { FoldRow, StepRow } from "@/components/panel/HistoryRow";
 import { useHistoryList } from "@/hooks/useHistoryList";
 import { useBusyWindow } from "@/hooks/useRailCommands";
 import { NO_PREVIEW, parsePreview } from "@/lib/historyPreview";
 import { setPreviewState, usePreviewState } from "@/lib/historyPreviewStore";
 import {
-  type FoldItem,
-  type GutterSegment,
-  type RowItem,
-  edgeY,
-  forkPath,
-  gutterWidth,
   itemHeight,
   itemRange,
   itemTop,
-  laneX,
   listHeight,
+  objectsHeight,
+  withRowHeight,
 } from "@/lib/historyItems";
 import type { HistoryScopeState } from "@/hooks/useHistoryScope";
 import {
-  type HistoryRowData,
   type HistoryScope,
-  isUndone,
-  leadWords,
   NO_OBJECT_STEPS_LINE,
   NOW_ROW_HEIGHT_PX,
   objectButtonTooltip,
@@ -58,50 +39,12 @@ import {
   WIPE_SHARED_LINE,
   wipeQuestion,
   nextFocus,
-  rowAriaName,
-  rowDisplay,
-  rowTooltip,
   scrollAfterInsert,
-  secondLineRest,
   canRestoreScroll,
   wipeConfirmKey,
 } from "@/lib/historyRows";
 
 type Glyph = ComponentType<{ size: number; strokeWidth: number; "aria-hidden": boolean }>;
-
-type GlyphKey = "create" | "delete" | "replace" | "change" | "document" | "undoes" | "redoes" | "clone-start" | "floor";
-
-/** The glyph of each kind of step and of each row that exists only in the Object scope (criterion
- * 32, `0041` UX notes): a shape, never a colour. */
-const GLYPHS: Record<GlyphKey, Glyph> = {
-  create: Plus,
-  delete: Minus,
-  replace: Replace,
-  change: Pencil,
-  document: File,
-  undoes: Undo2,
-  redoes: Redo2,
-  "clone-start": Copy,
-  floor: Eraser,
-};
-
-/** Which glyph a row has: by class, then by what a replacing step did to the object, then by
- * kind. */
-function glyphKey(row: HistoryRowData): GlyphKey {
-  if (row.label === "wipe_history") {
-    return "floor";
-  }
-  if (row.class && row.class !== "step") {
-    return row.class;
-  }
-  if (row.kind === "replace" && row.role === "created") {
-    return "create";
-  }
-  if (row.kind === "replace" && row.role === "deleted") {
-    return "delete";
-  }
-  return row.kind;
-}
 
 interface HistoryTabProps {
   editor: EditorSession;
@@ -112,76 +55,6 @@ interface HistoryTabProps {
   historyScope: HistoryScopeState;
 }
 
-/** An item's slice of the lane gutter (`specs/0042-history-branches` UX notes): the main lane (a
- * filled disc while in effect, an open ring on a dotted line once taken back, dashed for an
- * inherited row; criterion 39 of `0020`), branch lanes with open rings, and the connector at a
- * fork point. Every item draws its own slice, so the lines are continuous in a virtualised list. */
-function Gutter({ segments, lanes, height }: { segments: GutterSegment[]; lanes: number; height: number }) {
-  return (
-    <svg
-      width={gutterWidth(lanes)}
-      height={height}
-      aria-hidden
-      className="shrink-0 text-[var(--toolbar-icon)]"
-    >
-      {segments.map((segment, n) => {
-        const key = `${n}`;
-        switch (segment[0]) {
-          case "line": {
-            const [, lane, from, to, style] = segment;
-            const branch = style === "branch";
-            const quiet = branch || style === "dotted";
-            return (
-              <line
-                key={key}
-                x1={laneX(lane)}
-                x2={laneX(lane)}
-                y1={edgeY(from, height)}
-                y2={edgeY(to, height)}
-                stroke={quiet ? "var(--lane-line)" : "currentColor"}
-                strokeWidth={branch ? 1.5 : 2}
-                strokeDasharray={style === "dotted" ? "2 3" : style === "dashed" ? "6 3" : undefined}
-              />
-            );
-          }
-          case "disc":
-            return <circle key={key} cx={laneX(segment[1])} cy={height / 2} r={4} fill="currentColor" />;
-          case "ring":
-            return (
-              <circle
-                key={key}
-                cx={laneX(segment[1])}
-                cy={height / 2}
-                r={3.5}
-                fill="var(--panel-bg)"
-                stroke={segment[1] === 0 ? "currentColor" : "var(--lane-line)"}
-                strokeWidth={1.5}
-              />
-            );
-          case "fork":
-            return (
-              <path
-                key={key}
-                d={forkPath(segment[1], segment[2], height)}
-                fill="none"
-                stroke="var(--lane-line)"
-                strokeWidth={1.5}
-              />
-            );
-          default:
-            return null;
-        }
-      })}
-    </svg>
-  );
-}
-
-/**
- * The History tab (`specs/0020-undo-redo` criteria 9 and 39 to 46): the Undo and Redo buttons, the
- * pinned "Now" row, the global history as one virtualised list (newest first, 44 px rows, only the
- * rows in view are in the DOM) and the line that says the history is saved in the file. The header
- * and the footer stay in view; only the list scrolls.
- */
 export function HistoryTab({ editor, shown, onReturnFocus, historyScope }: HistoryTabProps) {
   const { getSession, syncRevision } = editor;
   const { scope, info, scrollMemory } = historyScope;
@@ -309,7 +182,17 @@ export function HistoryTab({ editor, shown, onReturnFocus, historyScope }: Histo
     }
   }, [wanted, list.total, list.loadedFor]);
 
-  const { shape } = list;
+  // One objects disclosure open at a time, in the Document scope (criterion 24); it closes when
+  // the list changes under it.
+  const [openObjects, setOpenObjects] = useState<{ step: string; index: number } | null>(null);
+  const openItem = openObjects ? list.itemAt(openObjects.index) : undefined;
+  const open =
+    openObjects && !object && openItem?.type === "row" && openItem.step === openObjects.step
+      ? { index: openObjects.index, row: openItem }
+      : null;
+  const shape = open
+    ? withRowHeight(list.shape, open.index, 44 + objectsHeight(open.row))
+    : list.shape;
   const range = itemRange(scrollTop, viewport, shape);
   const { ensure } = list;
   useEffect(() => {
@@ -450,6 +333,14 @@ export function HistoryTab({ editor, shown, onReturnFocus, historyScope }: Histo
           pressRow(index);
         }}
         selected={exploring && explored !== null && item.step === explored}
+        action={object ? "clone" : item.objects.length > 0 ? "objects" : null}
+        objectsOpen={open?.index === index}
+        onToggleObjects={() =>
+          setOpenObjects(open?.index === index ? null : { step: item.step, index })
+        }
+        onClone={(touched) =>
+          editor.runHistoryAction((s) => s.history_clone_item(object, index, touched ?? 0))
+        }
       />
     ) : (
       <div
@@ -556,124 +447,6 @@ export function HistoryTab({ editor, shown, onReturnFocus, historyScope }: Histo
         total={scope === "object" ? (info?.wipeCount ?? 0) : list.total}
         onReturnFocus={onReturnFocus}
       />
-    </div>
-  );
-}
-
-interface StepRowProps {
-  row: RowItem;
-  index: number;
-  total: number;
-  lanes: number;
-  place: { top: number; height: number };
-  now: Date;
-  tabbable: boolean;
-  onFocusRow: () => void;
-  onHover: (step: string) => void;
-  onPress: () => void;
-  /** The row an exploration went to last: the selected look. */
-  selected?: boolean;
-}
-
-/** One step: kind glyph, operation name, step id, and the second line (criterion 39). */
-function StepRow({
-  row,
-  index,
-  total,
-  lanes,
-  place,
-  now,
-  tabbable,
-  onFocusRow,
-  onHover,
-  onPress,
-  selected = false,
-}: StepRowProps) {
-  const Glyph = GLYPHS[glyphKey(row)] ?? Pencil;
-  const undone = isUndone(row);
-  const lead = leadWords(row);
-  const muted = undone ? "text-[var(--panel-muted-fg)]" : "text-[var(--toolbar-icon)]";
-  return (
-    <div
-      role="listitem"
-      aria-posinset={index + 1}
-      aria-setsize={total}
-      className="absolute right-0 left-0"
-      style={place}
-    >
-      <Tooltip side="left" content={rowTooltip(row)}>
-        <button
-          type="button"
-          data-row-index={index}
-          tabIndex={tabbable ? 0 : -1}
-          aria-label={rowAriaName(row, now)}
-          onFocus={onFocusRow}
-          onClick={onPress}
-          onBlur={() => onHover("")}
-          onMouseEnter={() => onHover(row.step)}
-          onMouseLeave={() => onHover("")}
-          aria-current={selected ? "true" : undefined}
-          className={`flex h-full w-full items-stretch gap-1 rounded-[5px] text-left outline-none hover:bg-[var(--row-hover)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)] ${
-            selected ? "bg-[var(--value-fill)] shadow-[inset_3px_0_0_var(--editor-accent)]" : ""
-          }`}
-        >
-          <Gutter segments={row.gutter} lanes={lanes} height={ROW_HEIGHT_PX} />
-          <span className="flex min-w-0 flex-1 flex-col justify-center pr-2">
-            <span className={`flex h-5 items-center gap-1.5 text-sm ${muted}`}>
-              <Glyph size={16} strokeWidth={1.5} aria-hidden />
-              <span className="min-w-0 flex-1 truncate">{rowDisplay(row).name}</span>
-              <span className="select-text font-mono text-xs text-[var(--panel-muted-fg)]">
-                {row.id}
-              </span>
-            </span>
-            <span className="h-4 truncate text-xs text-[var(--panel-muted-fg)]">
-              {lead !== "" ? <strong className="font-semibold">{lead}</strong> : null}
-              {lead !== "" ? " · " : null}
-              {secondLineRest(row, now)}
-            </span>
-          </span>
-        </button>
-      </Tooltip>
-    </div>
-  );
-}
-
-interface FoldRowProps {
-  item: FoldItem;
-  index: number;
-  total: number;
-  lanes: number;
-  place: { top: number; height: number };
-  tabbable: boolean;
-  onFocusRow: () => void;
-  onToggle: () => void;
-}
-
-/** A branch header row ("Branch from a1b2c3d, 2 steps") or the "N more branches" row: a press or
- * Enter folds or unfolds it (`specs/0042-history-branches` criterion 8). */
-function FoldRow({ item, index, total, lanes, place, tabbable, onFocusRow, onToggle }: FoldRowProps) {
-  const Chevron = item.expanded ? ChevronDown : ChevronRight;
-  return (
-    <div role="listitem" aria-posinset={index + 1} aria-setsize={total} className="absolute right-0 left-0" style={place}>
-      <button
-        type="button"
-        data-row-index={index}
-        tabIndex={tabbable ? 0 : -1}
-        aria-expanded={item.expanded}
-        onFocus={onFocusRow}
-        onClick={onToggle}
-        className="flex h-full w-full items-stretch gap-1 rounded-[5px] text-left outline-none hover:bg-[var(--row-hover)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)]"
-      >
-        <Gutter segments={item.gutter} lanes={lanes} height={place.height} />
-        <span
-          className={`flex min-w-0 flex-1 items-center justify-between pr-2 text-xs text-[var(--panel-muted-fg)] ${
-            item.type === "header" ? "font-semibold" : ""
-          }`}
-        >
-          <span className="truncate">{item.text}</span>
-          <Chevron size={12} strokeWidth={1.5} aria-hidden />
-        </span>
-      </button>
     </div>
   );
 }

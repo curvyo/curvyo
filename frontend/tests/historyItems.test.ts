@@ -13,7 +13,9 @@ import {
   itemTop,
   laneX,
   listHeight,
+  objectsHeight,
   parseShape,
+  withRowHeight,
 } from "../src/lib/historyItems.ts";
 import { type HistoryRowData, ROW_HEIGHT_PX, rowAriaName, secondLine } from "../src/lib/historyRows.ts";
 
@@ -82,4 +84,15 @@ test("a row on a branch says Branch first on line 2 and names its lane to a scre
     rowAriaName(row, today),
     "Move, 3 paths, You, 12:03, id a1b2c3d, on branch from 9f8e7d6, step 2 of 2",
   );
+});
+
+test("an open disclosure grows its row by 28 px per object, at most 20 and a more line", () => {
+  const base = { id: "a", step: "1@1", label: "x", name: "x", known: true, author: "you" as const, time: 0, kind: "change" as const, summary: "", status: "applied" as const };
+  const object = { id: 1, shape: "rectangle", role: "changed" as const, alive: true };
+  assert.equal(objectsHeight({ ...base, objects: [object, object] }), 56);
+  assert.equal(objectsHeight({ ...base, objects: Array(25).fill(object) }), 21 * 28);
+  const grown = withRowHeight(shape, 2, 100);
+  assert.equal(itemHeight(2, grown), 100);
+  assert.equal(itemTop(3, grown), 68 + 100);
+  assert.equal(itemAtY(68 + 99, grown), 2);
 });

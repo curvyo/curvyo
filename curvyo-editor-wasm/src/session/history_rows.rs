@@ -110,6 +110,7 @@ impl Session {
             .map(|o| {
                 json!({
                     "id": serde_json::to_value(o.id).unwrap_or_default(),
+                    "short": o.id.short_id(),
                     "shape": shape_word(o.shape),
                     "role": role_word(o.role),
                     "alive": self.document.object(o.id).is_some(),

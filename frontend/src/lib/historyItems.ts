@@ -42,11 +42,16 @@ export interface FoldItem {
 /** One item of the list. */
 export type HistoryItemData = RowItem | FoldItem;
 
-/** The shape of the list: how many items, how many lanes, and which items are not step rows. */
+/** An item whose height is not a step row's 44 px: a header row, the "more" row, or a step row
+ * with its objects disclosure open (with its whole height). Sorted by index. */
+export type SpecialItem = [number, "header" | "more"] | [number, "row", number];
+
+/** The shape of the list: how many items, how many lanes, and which items are not plain step
+ * rows. */
 export interface ListShape {
   total: number;
   lanes: number;
-  special: [number, "header" | "more"][];
+  special: SpecialItem[];
 }
 
 /** The shape of an empty list. */
@@ -68,24 +73,37 @@ export function parseItems(json: string): HistoryItemData[] {
   return Array.isArray(value) ? (value as HistoryItemData[]) : [];
 }
 
-function heightOfKind(kind: "header" | "more"): number {
-  return kind === "header" ? HEADER_HEIGHT_PX : MORE_HEIGHT_PX;
+function heightOf(item: SpecialItem): number {
+  if (item[1] === "row") {
+    return item[2];
+  }
+  return item[1] === "header" ? HEADER_HEIGHT_PX : MORE_HEIGHT_PX;
 }
 
 /** The height of the item at `index`. */
 export function itemHeight(index: number, shape: ListShape): number {
   const special = shape.special.find(([at]) => at === index);
-  return special ? heightOfKind(special[1]) : ROW_HEIGHT_PX;
+  return special ? heightOf(special) : ROW_HEIGHT_PX;
 }
+
+/** The shape with the step row at `index` grown to `height` (an open objects disclosure). */
+export function withRowHeight(shape: ListShape, index: number, height: number): ListShape {
+  const special: SpecialItem[] = [
+    ...shape.special.filter(([at]) => at !== index),
+    [index, "row", height] as SpecialItem,
+  ].sort((a, b) => a[0] - b[0]);
+  return { ...shape, special };
+}
+
 
 /** The top of the item at `index`, px from the top of the list. */
 export function itemTop(index: number, shape: ListShape): number {
   let shrink = 0;
-  for (const [at, kind] of shape.special) {
-    if (at >= index) {
+  for (const item of shape.special) {
+    if (item[0] >= index) {
       break;
     }
-    shrink += ROW_HEIGHT_PX - heightOfKind(kind);
+    shrink += ROW_HEIGHT_PX - heightOf(item);
   }
   return index * ROW_HEIGHT_PX - shrink;
 }
@@ -98,12 +116,13 @@ export function listHeight(shape: ListShape): number {
 /** The item under `y`, px from the top of the list, clamped to the list. */
 export function itemAtY(y: number, shape: ListShape): number {
   let shrink = 0;
-  for (const [at, kind] of shape.special) {
+  for (const item of shape.special) {
+    const at = item[0];
     const top = at * ROW_HEIGHT_PX - shrink;
     if (y < top) {
       break;
     }
-    const height = heightOfKind(kind);
+    const height = heightOf(item);
     if (y < top + height) {
       return at;
     }
@@ -150,4 +169,15 @@ export function forkPath(fromLane: number, lane: number, height: number): string
   const y = height / 2;
   const x = laneX(lane);
   return `M ${laneX(fromLane)} ${y} H ${x - 4} Q ${x} ${y} ${x} ${y - 4} V 0`;
+}
+
+/** The disclosure of a Document-scope row: one 28 px sub-row per touched object, at most 20, then
+ * the line "and N more" (`specs/0042-history-branches` criterion 24). */
+export const SUB_ROW_HEIGHT_PX = 28;
+export const MAX_SUB_ROWS = 20;
+
+/** How tall the open disclosure of `row` is. */
+export function objectsHeight(row: HistoryRowData): number {
+  const n = row.objects.length;
+  return (Math.min(n, MAX_SUB_ROWS) + (n > MAX_SUB_ROWS ? 1 : 0)) * SUB_ROW_HEIGHT_PX;
 }

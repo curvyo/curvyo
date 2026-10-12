@@ -1,23 +1,28 @@
-//! Writes an object's state at a past version as a new step: go to version
-//! (`specs/0042-history-branches` criteria 10, 11, 15 and 31). The version is read under the
-//! checkout guard (ADR 0014 §12) and written through the restore write path (`merge.rs`), with no
-//! three-way check: a go to is a deliberate return, so every field takes the version's value.
+//! Writes an object's state at a past version as a new step: go to version into the object itself,
+//! clone version into a new object (`specs/0042-history-branches` criteria 10, 11, 15, 22 to 25
+//! and 31). The version is read under the checkout guard (ADR 0014 §12) and written through the
+//! restore write path (`merge.rs`), with no three-way check: a go to is a deliberate return, so
+//! every field takes the version's value.
 
 use std::collections::BTreeMap;
 
 use super::checkout::Detached;
 use super::error::HistoryError;
-use super::lineage::{KEY_CLONE_OF, KEY_HISTORY_FLOOR, encode_node};
+use super::lineage::{KEY_CLONE_OF, KEY_HISTORY_FLOOR, encode_clone_of, encode_node};
 use super::merge::{Tally, restore_map};
 use super::node_value::{Node, read_map};
-use super::object_rows::tree_id;
+use super::object_rows::{node_id, tree_id};
 use super::object_timeline::EntryClass;
 use super::stack_machine::Status;
-use super::step_header::{KEY_OBJECT, KEY_VERSION, LABEL_GO_TO_VERSION};
+use super::step_header::{KEY_OBJECT, KEY_VERSION, LABEL_CLONE_VERSION, LABEL_GO_TO_VERSION};
 use super::step_id::StepRef;
 use super::step_log::find_step;
 use crate::document::{Document, OBJECTS_TREE};
-use crate::path_model::NodeId;
+use crate::group_tree::KEY_GROUP;
+use crate::objects::renumber_anchors;
+use crate::path_model::{AnchorId, NodeId};
+use crate::shape_codec::read_shape_tag;
+use crate::subpath_codec::total_anchor_count;
 
 /// What a go to version did.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -107,6 +112,66 @@ impl Document {
             continued,
             others_reverted,
         })
+    }
+
+    /// Creates a new object with the state `source` had right after `version` (or right before
+    /// it, for a step that deleted it), on top of the stack, as one step "Clone version"
+    /// (criteria 22 and 24). A path's anchors get ids from `mint`; the clone's lineage names
+    /// `source` at that version (criterion 23). Returns the clone.
+    ///
+    /// # Errors
+    /// [`HistoryError::NoSuchStep`] if `version` is not in the log, [`HistoryError::NoSuchObject`]
+    /// if the object exists at neither version, [`HistoryError::Group`] for a group (criterion
+    /// 25), [`HistoryError::Unreadable`] if the version cannot be checked out.
+    pub fn clone_version(
+        &self,
+        source: NodeId,
+        version: StepRef,
+        mint: &mut dyn FnMut() -> AnchorId,
+    ) -> Result<NodeId, HistoryError> {
+        let doc = self.loro();
+        self.assert_outside_batch();
+        doc.commit();
+        let log = find_step(doc, version).ok_or(HistoryError::NoSuchStep)?;
+        let src = tree_id(source);
+        let (at, read_at) = {
+            let guard = Detached::at(doc, &log.after())?;
+            let after = guard.node(src);
+            if after.meta.is_empty() {
+                // The step deleted it: the clone is the object just before (criterion 24).
+                guard.goto(&log.before)?;
+                (guard.node(src), log.before.clone())
+            } else {
+                (after, log.after())
+            }
+        };
+        if at.meta.is_empty() {
+            return Err(HistoryError::NoSuchObject);
+        }
+        if at.meta.get(KEY_GROUP) == Some(&Node::Value(loro::LoroValue::Bool(true))) {
+            return Err(HistoryError::Group);
+        }
+        let tree = doc.get_tree(OBJECTS_TREE);
+        let created = tree
+            .create(loro::TreeParentId::Root)
+            .map_err(|_| HistoryError::Unreadable)?;
+        let meta = tree
+            .get_meta(created)
+            .map_err(|_| HistoryError::Unreadable)?;
+        let mut tally = Tally::default();
+        restore_map(&meta, &BTreeMap::new(), &own_fields(at.meta), &mut tally);
+        if read_shape_tag(&meta).is_none() {
+            let ids: Vec<AnchorId> = (0..total_anchor_count(&meta)).map(|_| mint()).collect();
+            renumber_anchors(&meta, &ids);
+        }
+        meta.insert(KEY_CLONE_OF, encode_clone_of(src, &read_at))
+            .map_err(|_| HistoryError::Unreadable)?;
+        let extra = [
+            (KEY_OBJECT, encode_node(src)),
+            (KEY_VERSION, version.encode()),
+        ];
+        self.commit_step(LABEL_CLONE_VERSION, &extra);
+        Ok(node_id(created))
     }
 
     /// The steps of other authors on `id`, in effect, that came after `version`.

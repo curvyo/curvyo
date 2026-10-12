@@ -137,6 +137,16 @@ impl Reader<'_> {
         };
         if let Some(vv) = within {
             listed.retain(|(_, step)| seen_in(vv, *step));
+            // Inherited rows follow the path that led to the version: a step its author had taken
+            // back by then is on another branch (`specs/0042-history-branches` criterion 23).
+            let mut machines: HashMap<u64, StackMachine> = HashMap::new();
+            listed.retain(|(_, step)| {
+                machines
+                    .entry(step.peer())
+                    .or_insert_with(|| self.steps.machine_within(step.peer(), vv))
+                    .status(*step)
+                    == Status::Applied
+            });
         }
         let mut entries: Vec<Entry> = listed
             .iter()

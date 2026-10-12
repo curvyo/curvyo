@@ -101,14 +101,14 @@ file with the two new labels as legacy-labelled steps.
   and the object selected, never takes focus; notice and Undone mark (AC 12, 14).
 
 ### Milestone 4: Clone version
-- [ ] 4.1 Test first: clone of a version on the main line and on a branch equals that version,
+- [x] 4.1 Test first: clone of a version on the main line and on a branch equals that version,
   new id, on top, selected, one step, Ctrl+Z removes it, original unchanged (AC 22, 31, 33).
-- [ ] 4.2 The clone's timeline: "Clone of ... at version ...", inherited rows along the path to
+- [x] 4.2 The clone's timeline: "Clone of ... at version ...", inherited rows along the path to
   that version only (AC 23).
-- [ ] 4.3 Document scope disclosure: touched objects (20, then "and N more"), one open at a time;
+- [x] 4.3 Document scope disclosure: touched objects (20, then "and N more"), one open at a time;
   clone of a deleted object reads the before-version; draw, resize, delete, Save, Open, clone
   test (AC 24).
-- [ ] 4.4 No Clone for groups; gate of criterion 26; ids selectable in rows; Left and Right move
+- [x] 4.4 No Clone for groups; gate of criterion 26; ids selectable in rows; Left and Right move
   focus into and out of the row action (AC 9, 25, 26, 27).
 
 ### Milestone 5: slice check and PR
@@ -150,6 +150,15 @@ file with the two new labels as legacy-labelled steps.
   notice of AC 15 reads "Earlier session's 2 later steps were reverted for this object." The session
   ends an exploration when its step is no longer the top of the stack or another object is
   selected; the History tab reads that on every change of the session.
+- Milestone 4: `clone_version` lives next to `go_to_version` in `version_write.rs` and writes the
+  version through `merge::restore_map` into a new node at the top of the root, with fresh anchor
+  ids from the session's minter (a `&mut dyn FnMut`), `clone_of = <source>@<version>` and the
+  header `clone_version;o=;v=`. A version the object does not have after the step (a Delete row)
+  is read at the step's before-version. A group's version is refused with the new
+  `HistoryError::Group`. Inherited rows now leave out the steps their author had taken back by the
+  version of the copy (`StepIndex::machine_within`), so a clone follows the path that led to its
+  version (AC 23); this applies to Duplicate's inherited rows too, where a step undone before the
+  copy no longer shows as an inherited row.
 
 ## Validation
 

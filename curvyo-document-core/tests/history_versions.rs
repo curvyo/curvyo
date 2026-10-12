@@ -85,3 +85,157 @@ fn c31_c33_a_go_to_is_a_header_and_saves_like_any_step() {
     assert_eq!(row.version.unwrap().step, s1);
     assert_eq!(reopened.export_json().unwrap(), d.export_json().unwrap());
 }
+
+fn minter(peer: u64) -> impl FnMut() -> curvyo_document_core::AnchorId {
+    let mut next = 1_000;
+    move || {
+        next += 1;
+        curvyo_document_core::AnchorId::new(peer, next)
+    }
+}
+
+fn timeline(d: &Document, id: NodeId) -> Vec<(StepRef, Option<NodeId>)> {
+    d.object_history_page(id, 0, d.object_history_len(id))
+        .into_iter()
+        .map(|row| (row.step, row.inherited_from))
+        .collect()
+}
+
+#[test]
+fn c22_a_clone_of_an_earlier_version_is_a_new_object_on_top_and_one_step() {
+    let d = Document::new(1);
+    let r = rect(&d);
+    let s1 = width(&d, r, 1.0);
+    for mm in [2.0, 3.0, 4.0] {
+        width(&d, r, mm);
+    }
+    let steps = d.own_step_count();
+    let clone = d.clone_version(r, s1, &mut minter(1)).unwrap();
+    assert_ne!(clone, r);
+    assert_eq!(stroke(&d, clone), 1.0, "the clone equals s1's state");
+    assert_eq!(stroke(&d, r), 4.0, "the original does not change");
+    assert_eq!(d.object_ids().last(), Some(&clone), "on top of the stack");
+    assert_eq!(d.own_step_count(), steps + 1, "one step");
+    let row = d.history_page(0, 1).pop().unwrap();
+    assert_eq!(row.label, "clone_version");
+    d.undo_step(d.own_steps().last().unwrap().step).unwrap();
+    assert!(d.object(clone).is_none(), "Ctrl+Z removes the clone");
+}
+
+#[test]
+fn c23_the_clone_inherits_the_rows_up_to_that_version_and_no_later_ones() {
+    let d = Document::new(1);
+    let r = rect(&d);
+    let create = d.own_steps().last().unwrap().step;
+    let s1 = width(&d, r, 1.0);
+    width(&d, r, 2.0);
+    let clone = d.clone_version(r, s1, &mut minter(1)).unwrap();
+    let rows = d.object_history_page(clone, 0, d.object_history_len(clone));
+    assert_eq!(rows[0].version.as_ref().map(|v| v.step), Some(s1));
+    assert!(matches!(
+        rows[0].class,
+        curvyo_document_core::ObjectRowClass::CloneStart { .. }
+    ));
+    assert_eq!(
+        timeline(&d, clone)[1..],
+        [(s1, Some(r)), (create, Some(r))],
+        "inherited up to s1, flagged from the original"
+    );
+}
+
+#[test]
+fn c23_a_clone_follows_the_path_that_led_to_its_version_not_the_other_branches() {
+    let d = Document::new(1);
+    let r = rect(&d);
+    let create = d.own_steps().last().unwrap().step;
+    let s1 = width(&d, r, 1.0);
+    let s2 = width(&d, r, 2.0);
+    let s3 = width(&d, r, 3.0);
+    d.undo_step(s3).unwrap();
+    d.undo_step(s2).unwrap();
+    let s4 = width(&d, r, 4.0);
+    let main = d.clone_version(r, s4, &mut minter(1)).unwrap();
+    assert_eq!(
+        timeline(&d, main)[1..],
+        [(s4, Some(r)), (s1, Some(r)), (create, Some(r))],
+        "the main line, without the branch"
+    );
+    let branch = d.clone_version(r, s3, &mut minter(1)).unwrap();
+    assert_eq!(stroke(&d, branch), 3.0);
+    assert_eq!(
+        timeline(&d, branch)[1..],
+        [
+            (s3, Some(r)),
+            (s2, Some(r)),
+            (s1, Some(r)),
+            (create, Some(r))
+        ],
+        "the branch's path"
+    );
+}
+
+#[test]
+fn c24_a_deleted_object_is_cloned_from_its_delete_row_after_save_and_open() {
+    let d = Document::new(1);
+    let r = rect(&d);
+    d.set_rect_bounds(
+        r,
+        RectBounds {
+            origin: Point::new(10.0, 10.0),
+            width: Length::from_mm(40.0),
+            height: Length::from_mm(25.0),
+        },
+    )
+    .unwrap();
+    let resized = d.object(r).unwrap();
+    d.delete_objects(&[r]).unwrap();
+    let delete = d.own_steps().last().unwrap().step;
+    let reopened = unpack(4, &pack(&d, "t").unwrap()).unwrap();
+    let clone = reopened.clone_version(r, delete, &mut minter(4)).unwrap();
+    let curvyo_document_core::ObjectSnapshot::Primitive(got) = reopened.object(clone).unwrap()
+    else {
+        panic!("a rectangle");
+    };
+    let curvyo_document_core::ObjectSnapshot::Primitive(want) = resized else {
+        panic!("a rectangle");
+    };
+    assert_eq!(got.shape, want.shape, "the resized geometry");
+}
+
+#[test]
+fn c25_a_groups_version_is_not_cloned() {
+    let d = Document::new(1);
+    let a = rect(&d);
+    let b = rect(&d);
+    let group = d.group_objects(&[a, b]).unwrap();
+    let step = d.own_steps().last().unwrap().step;
+    assert_eq!(
+        d.clone_version(group, step, &mut minter(1)),
+        Err(curvyo_document_core::HistoryError::Group)
+    );
+}
+
+#[test]
+fn c33_only_a_clone_writes_clone_of_and_the_format_version_stays() {
+    let d = Document::new(1);
+    let r = rect(&d);
+    let s1 = width(&d, r, 1.0);
+    d.clone_version(r, s1, &mut minter(1)).unwrap();
+    let bytes = pack(&d, "t").unwrap();
+    let reopened = unpack(5, &bytes).unwrap();
+    assert_eq!(reopened.export_json().unwrap(), d.export_json().unwrap());
+    let mut archive = zip::ZipArchive::new(std::io::Cursor::new(bytes)).unwrap();
+    let mut manifest = String::new();
+    std::io::Read::read_to_string(
+        &mut archive.by_name("manifest.json").unwrap(),
+        &mut manifest,
+    )
+    .unwrap();
+    let manifest: serde_json::Value = serde_json::from_str(&manifest).unwrap();
+    // 11 since `0023-groups`; 0042 adds no bump (criterion 33).
+    assert_eq!(manifest["format_version"], 11);
+    assert_eq!(
+        manifest["format_version"],
+        curvyo_document_core::CURRENT_FORMAT_VERSION
+    );
+}

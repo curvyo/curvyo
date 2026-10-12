@@ -97,7 +97,7 @@ pub use grouping::{GroupingKind, GroupingResult};
 pub use history::HistoryResult;
 pub use history_preview::{FAR_PREVIEW_ROWS, RowPress};
 pub use history_rows::{WipeOutcome, WipeState};
-pub use history_version::GoToOutcome;
+pub use history_version::{CloneOutcome, GoToOutcome};
 pub use keys::{EscapeStep, KeyHint, KeyInput, KeyOutcome};
 pub use move_indicators::MoveIndicators;
 pub use object_history::ObjectWipeOutcome;

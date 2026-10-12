@@ -1,9 +1,9 @@
-//! `Session`'s Live mode of the Object scope: a press on a row goes to that version as one step,
-//! further presses on the same object explore inside that step, and Restore previous state takes
-//! the exploration back (`specs/0042-history-branches` criteria 10 to 13, 15, 16 and 31).
+//! `Session`'s writes of a past version from the History list: Live mode's go to version (one
+//! step, explored by further presses, taken back by Restore previous state) and Clone of any
+//! version (`specs/0042-history-branches` criteria 10 to 13, 15, 16, 22 to 26 and 31).
 
 use curvyo_document_core::{NodeId, StepRef};
-use curvyo_ui_core::{RESTORED_NOTICE, went_to_notice};
+use curvyo_ui_core::{RESTORED_NOTICE, cloned_notice, went_to_notice};
 
 use super::Session;
 
@@ -26,7 +26,65 @@ pub enum GoToOutcome {
     Went(String),
 }
 
+/// What a press on Clone did.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CloneOutcome {
+    /// A drag, a chip, a long operation or an unfinished Pen path: ignored (criterion 26).
+    Ignored,
+    /// No such row or touched object, a group (criterion 25), or a version that cannot be read.
+    Refused,
+    /// The clone exists and is selected; the notice says so.
+    Cloned(String),
+}
+
 impl Session {
+    /// Clone on item `index`: in the Object scope the version of the selected object (or of the
+    /// object an inherited row came from); in the Document scope the version of the `touched`-th
+    /// object the step touched (criteria 22 and 24). The clone is selected.
+    pub fn clone_history_item(
+        &mut self,
+        object: bool,
+        index: usize,
+        touched: usize,
+    ) -> CloneOutcome {
+        if self.operation_in_flight() || self.select.has_entry() || self.pen_path_open() {
+            return CloneOutcome::Ignored;
+        }
+        let Some(row) = self.history_row_at(object, index) else {
+            return CloneOutcome::Refused;
+        };
+        let target = if object {
+            self.history_object().and_then(|subject| {
+                let typed = self.document.object_history_page(subject, row, 1).pop()?;
+                Some((
+                    typed.inherited_from.unwrap_or(subject),
+                    typed.step,
+                    typed.shown_id,
+                ))
+            })
+        } else {
+            self.document.history_page(row, 1).pop().and_then(|typed| {
+                let id = typed.objects.get(touched)?.id;
+                Some((id, typed.step, typed.shown_id))
+            })
+        };
+        let Some((source, step, shown_id)) = target else {
+            return CloneOutcome::Refused;
+        };
+        let result = self.recording(|this| {
+            let minter = &mut this.minter;
+            this.document
+                .clone_version(source, step, &mut || minter.mint())
+        });
+        match result {
+            Ok(clone) => {
+                self.selection.select_single(clone);
+                CloneOutcome::Cloned(cloned_notice(&shown_id))
+            }
+            Err(_) => CloneOutcome::Refused,
+        }
+    }
+
     /// A press, Enter or Space on item `index` of the Object scope in Live mode: the selected
     /// object goes to that version (criterion 10), continuing the exploration step while it is the
     /// top of the stack (criterion 11).

@@ -160,6 +160,18 @@ impl WasmSession {
         serde_json::json!({"kind": kind, "notice": notice}).to_string()
     }
 
+    /// Clone on item `index` (`touched`: which object of a Document-scope row); returns the
+    /// notice, empty when the press was ignored or refused.
+    pub fn history_clone_item(&mut self, object: bool, index: u32, touched: u32) -> String {
+        match self
+            .session
+            .clone_history_item(object, index as usize, touched as usize)
+        {
+            crate::CloneOutcome::Cloned(notice) => notice,
+            crate::CloneOutcome::Ignored | crate::CloneOutcome::Refused => String::new(),
+        }
+    }
+
     /// Whether Restore previous state is offered: an exploration lasts.
     pub fn history_exploring(&mut self) -> bool {
         self.session.history_exploring()
