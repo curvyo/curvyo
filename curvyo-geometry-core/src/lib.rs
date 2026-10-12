@@ -25,10 +25,12 @@ mod curve_contacts;
 mod curve_intersections;
 mod curve_settle;
 mod flatten;
+mod freehand_fit;
 mod interior;
 mod outline_nesting;
 mod outline_touch;
 mod segment;
+mod variable_outline;
 
 pub use boolean::{BooleanError, BooleanOp, BooleanResult, Outline, boolean, signed_area_mm2};
 pub use boolean_grid::MAX_COORDINATE_MM;
@@ -41,3 +43,5 @@ pub use segment::{
     BentHandles, Subdivision, bend_segment_handles, nearest_point_on_segment, segment_bounds,
     subdivide_at_parameter,
 };
+pub use freehand_fit::fit_freehand;
+pub use variable_outline::{VariableOutlineError, WidthProfile, variable_outline};

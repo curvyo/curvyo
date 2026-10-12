@@ -48,25 +48,31 @@ refactoring of shared code; anything worth refactoring is noted for the lead.
 
 ### Milestone A: geometry (AC 7, 8, 10)
 
-- [ ] A1. Test first, `freehand_fit.rs`: 100 samples on a line give 2 nodes; 200 samples
+- [x] A1. Test first, `freehand_fit.rs`: 100 samples on a line give 2 nodes; 200 samples
   on a half circle r = 30 mm give fewer than 10 nodes; every sample within 0.1 mm of the
   result, measured with `nearest_point_on_segment`, not trusted from the accuracy
   argument; fewer than 2 samples or length below 0.1 mm give no path. (AC 7, 12)
-- [ ] A2. Implement the fit with `kurbo::simplify_bezpath` at 0.08 mm on the sample
-  polyline (duplicate points dropped within the 0.001 mm grid). (AC 7)
-- [ ] A3. Test first, `variable_outline.rs`: constant width 2 mm on 50 mm gives a capsule
+- [x] A2. Implement the fit at 0.08 mm (duplicate points dropped within the 0.001 mm grid).
+  **Deviation:** Schneider's least-squares fit (the fallback `adrs.md` names) instead of
+  `kurbo::simplify_bezpath`: `simplify_bezpath` returns a polyline unchanged (every vertex is
+  a corner), and on a spline through the samples it followed a 0.05 mm tremor node by node
+  (696 centre nodes, 3640 outline nodes for 2,000 samples). Schneider fits the samples: 11
+  centre nodes, about 300 outline nodes. (AC 7)
+- [x] A3. Test first, `variable_outline.rs`: constant width 2 mm on 50 mm gives a capsule
   of 103.1 mm² ± 0.3; linear 0.2 → 2 mm is 0.2 mm wide at the start and 1.1 mm at x = 25
   ± 0.05; the outline lies within 0.02 mm of the exact variable-width outline (sampled
   check against the analytic offset); a self-crossing stroke gives an outline with a hole
   as a compound result. (AC 8)
-- [ ] A4. Implement: flatten within 0.01 mm, widths interpolated by arc length, snap to
+- [x] A4. Implement: flatten within 0.01 mm, widths interpolated by arc length, snap to
   grid, integer `variable_stroke` with round joins and ends and the 0.01 mm arc step of
   `0038`, `cleanup`, `canonical_millimetres`. (AC 8)
-- [ ] A5. Budget tests (release, `boolean-budgets` job, `#[ignore]` in debug as the
+- [x] A5. Budget tests (release, `boolean-budgets` job, `#[ignore]` in debug as the
   existing budget tests do): 2000 samples on a 150 mm S-curve give fewer than 600 nodes
   and fit plus outline under 200 ms; outline of the raw 2000-sample polyline (the
-  preview path) under one frame (16 ms). Decimate to 0.05 mm spacing only if it misses.
-  (AC 10, 11)
+  preview path) under one frame (16 ms). **Deviation:** the raw-polyline outline took 35 ms
+  for 2,000 samples, while fit plus outline takes under 1 ms, so the preview runs the same fit
+  and outline as the commit (preview and object are then identical, AC 11). A tremor variant
+  (0.02 mm jitter) is in the same test file. (AC 10, 11)
 
 ### Milestone B: input record and Pencil state machine in ui-core (AC 1, 3, 4, 5, 9, 12, 14)
 
