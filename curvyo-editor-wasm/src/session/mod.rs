@@ -46,6 +46,10 @@ mod history_rows;
 mod key_table;
 mod keys;
 mod layers;
+mod layers_edit;
+mod layers_panel;
+#[cfg(test)]
+mod layers_panel_tests;
 #[cfg(test)]
 mod layers_tests;
 mod move_entry;
@@ -97,6 +101,8 @@ pub use grouping::{GroupingKind, GroupingResult};
 pub use history::HistoryResult;
 pub use history_rows::{WipeOutcome, WipeState};
 pub use keys::{EscapeStep, KeyHint, KeyInput, KeyOutcome};
+pub use layers_edit::{DropPlace, RowFlag};
+pub use layers_panel::{PanelReply, RowPress};
 pub use move_indicators::MoveIndicators;
 pub use object_history::ObjectWipeOutcome;
 pub use panel_tabs::{PanelTabsRecord, PanelView};
@@ -261,6 +267,8 @@ pub struct Session {
     context_announcement: Option<String>,
     /// The active layer and the layer notice (`layers.rs`).
     layers: layers::LayerState,
+    /// The Layers list's view state (`layers_panel.rs`).
+    panel: layers_panel::PanelState,
 }
 
 impl Session {
@@ -315,6 +323,7 @@ impl Session {
             grouping_result: None,
             context_announcement: None,
             layers: layers::LayerState::default(),
+            panel: layers_panel::PanelState::default(),
         }
     }
 
@@ -365,6 +374,7 @@ impl Session {
             grouping_result: None,
             context_announcement: None,
             layers: layers::LayerState::default(),
+            panel: layers_panel::PanelState::default(),
         })
     }
 

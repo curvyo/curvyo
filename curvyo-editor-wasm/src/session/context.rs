@@ -75,6 +75,13 @@ impl Session {
     /// `specs/0050-layers-and-objects-panel` criterion 27).
     pub(super) fn render_objects(&self) -> Arc<[ObjectSnapshot]> {
         let held = self.held_context();
+        if let Some(previewed) = self.previewed_drawn() {
+            let inside: HashSet<NodeId> = held.objects.iter().map(ObjectSnapshot::id).collect();
+            return match held.context {
+                None => previewed,
+                Some(_) => dim_outside(&previewed, &|id| inside.contains(&id)).into(),
+            };
+        }
         if held.context.is_none() {
             return held.drawn;
         }

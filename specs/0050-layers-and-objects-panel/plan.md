@@ -143,15 +143,15 @@ supply its root's register.
 
 ### M4: session and wasm surface (`curvyo-editor-wasm`)
 
-- [ ] 20. Row press: plain (enters the parent group when needed), Ctrl, Shift range among
+- [x] 20. Row press: plain (enters the parent group when needed), Ctrl, Shift range among
       siblings, other-parent fallback, layer row (active layer, panel target, clear
       selection), Select contents, hidden/locked row refuses (AC 10, 11, 13, 14)
-- [ ] 21. Selection to rows in the same frame: expand ancestors of the first selected row
+- [x] 21. Selection to rows in the same frame: expand ancestors of the first selected row
       only, scroll target unless the change came from the list (AC 12, 49)
-- [ ] 22. Eye, lock, rename, Opacity field, New layer, Delete layer, Delete on a row, moves:
+- [x] 22. Eye, lock, rename, Opacity field, New layer, Delete layer, Delete on a row, moves:
       one step each, multi-row toggles in one step (AC 16, 18, 20, 26, 34, 36, 37, 44)
-- [ ] 23. Hover or focus on a row draws the `0014` hover box (AC 15)
-- [ ] 24. One Pen-unfinished gate for every panel write or select, table test over the list of
+- [x] 23. Hover or focus on a row draws the `0014` hover box (AC 15)
+- [x] 24. One Pen-unfinished gate for every panel write or select, table test over the list of
       criterion 53 (AC 53)
 
 ### M5: the tab (`frontend`)

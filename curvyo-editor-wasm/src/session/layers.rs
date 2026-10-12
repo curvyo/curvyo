@@ -63,6 +63,8 @@ impl Session {
         self.layers.seen_head = head;
         if let Some(leaf) = head {
             self.layers.active = ActiveLayer::Chosen(self.layer_of(leaf));
+            // The panel target is the selection again (criterion 13).
+            self.panel.target_layer = false;
         }
     }
 

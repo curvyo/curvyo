@@ -13,6 +13,8 @@ use curvyo_document_core::{Document, DocumentVersion, NodeId, NodeRead, ObjectSn
 /// from it once, so no consumer filters or walks on its own (decision 4).
 #[derive(Debug)]
 pub(super) struct DocumentRead {
+    /// Every node, pre-order, back to front: what the Layers list shows.
+    pub(super) nodes: Arc<[NodeRead]>,
     /// Every leaf in stacking order, hidden and locked ones included: what the tools act on.
     pub(super) leaves: Arc<[ObjectSnapshot]>,
     /// The effectively visible leaves, unfaded: what the eyedropper samples and Fit to content
@@ -59,6 +61,7 @@ impl DocumentRead {
             .map(|read| read.id);
         Self {
             front_layer,
+            nodes,
             leaves,
             visible,
             drawn,
