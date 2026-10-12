@@ -230,7 +230,7 @@ fn c12_two_crossing_lines_give_four_pieces_each_from_or_to_the_crossing() {
     // The stored fill colour and opacity are kept, so Solid restores it.
     assert_eq!(pa[0].style.fill.color, style_a.fill.color);
     assert_eq!(pa[0].style.fill.opacity, style_a.fill.opacity);
-    let all_new: HashSet<AnchorId> = ps[1..5].iter().flat_map(|p| anchor_ids(p)).collect();
+    let all_new: HashSet<AnchorId> = ps[1..5].iter().flat_map(anchor_ids).collect();
     assert_eq!(all_new.len(), 8, "no anchor id twice");
     // All pieces selected; the untouched ones too.
     assert_eq!(s.selected_object_count(), 6);
@@ -412,10 +412,10 @@ fn c12_a_figure_eight_of_curves_is_cut_at_its_crossing_too() {
             if i == 0 && j == n - 1 {
                 continue;
             }
-            if let Some(x) = seg_cross(poly[i], poly[i + 1], poly[j], poly[j + 1]) {
-                if !xs.iter().any(|q| near(*q, x)) {
-                    xs.push(x);
-                }
+            if let Some(x) = seg_cross(poly[i], poly[i + 1], poly[j], poly[j + 1])
+                && !xs.iter().any(|q| near(*q, x))
+            {
+                xs.push(x);
             }
         }
     }
@@ -925,7 +925,7 @@ fn c4_hairpins_and_doubled_stretches_keep_the_invariants() {
                 assert!(open.len() >= pieces.min(open.len()), "{name}");
                 let _ = closed;
                 // Everything lies on the original contours and no length is lost.
-                for p in open.iter() {
+                for p in &open {
                     for q in sample_piece(p) {
                         let dmin = contours
                             .iter()
@@ -971,11 +971,9 @@ fn seg_cross(a: Xy, b: Xy, c: Xy, e: Xy) -> Option<Xy> {
 }
 
 fn brute_crossings(poly: &[Xy], closed: bool) -> usize {
-    let n = if closed {
-        poly.len() - 1
-    } else {
-        poly.len() - 1
-    };
+    // The polyline repeats its first point at the end when closed, so both cases have len - 1
+    // segments.
+    let n = poly.len() - 1;
     let mut k = 0;
     for i in 0..n {
         for j in (i + 2)..n {
@@ -1479,7 +1477,7 @@ fn c11_the_result_does_not_depend_on_how_the_objects_were_selected_or_on_the_run
     marquee(&mut b, pt(0.0, 0.0), pt(500.0, 500.0));
     let outs: Vec<_> = [&mut a, &mut b]
         .into_iter()
-        .map(|s| s.apply_cut())
+        .map(Session::apply_cut)
         .collect();
     assert_eq!(outs[0], outs[1]);
     assert_eq!(bits(&a), bits(&b));

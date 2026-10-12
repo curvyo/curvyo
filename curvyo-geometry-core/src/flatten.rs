@@ -62,7 +62,12 @@ fn step_count(control: &[Point; 4], tolerance_mm: f64) -> usize {
     // `min` bounds the allocation for a coordinate that is infinite or far out of range (callers
     // refuse those, this is the guard behind them). Inside the kernel's range the bound is never
     // reached, so the tolerance holds there.
-    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    // Not `clamp`: it keeps NaN, which `max` turns into one step.
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        clippy::manual_clamp
+    )]
     {
         steps.max(1.0).min(MAX_STEPS) as usize
     }

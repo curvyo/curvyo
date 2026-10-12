@@ -674,7 +674,7 @@ fn c6_only_the_selected_compound_path_is_split_and_only_its_pieces_end_up_select
     assert_eq!(ids.len(), 3);
     assert_eq!(ids[2], c2, "the unselected compound path is untouched");
     assert_eq!(s.selected_object_count(), 2);
-    assert_eq!(s.path_availability().cut, true);
+    assert!(s.path_availability().cut);
 }
 
 #[test]
@@ -752,7 +752,7 @@ fn c8_one_commit_labelled_split_and_undo_redo_are_byte_equal() {
     );
     let after_json = json(&s);
     assert_ne!(after_json, before_json);
-    assert_eq!(s.undo_len() >= 1, true);
+    assert!(s.undo_len() >= 1);
     s.undo();
     assert_eq!(
         json(&s),
@@ -1405,7 +1405,7 @@ fn hostile_degenerate_outlines_do_not_panic_and_nothing_is_lost() {
         let out = s.apply_split();
         match out {
             SplitOutcome::Applied { .. } => {
-                assert_eq!(total_nodes(&s), want, "{name}: no node lost")
+                assert_eq!(total_nodes(&s), want, "{name}: no node lost");
             }
             SplitOutcome::Refused(_) => assert_eq!(json(&s), before, "{name}"),
             SplitOutcome::Ignored => panic!("{name}: ignored"),

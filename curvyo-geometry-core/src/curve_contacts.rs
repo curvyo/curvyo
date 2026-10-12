@@ -166,8 +166,8 @@ fn middle(a: Contour<'_>, b: Contour<'_>, first: Unrolled, last: Unrolled) -> (P
     )
 }
 
-/// The cuts one contact makes: its crossings, a lens of crossings counting as one, or the middle
-/// of its touches when it has no crossing.
+/// The cuts one contact makes: its crossings, a lens of crossings counting as one (cut in its
+/// middle), or the middle of its touches when it has no crossing.
 fn cuts_of(
     (a, b, same): (Contour<'_>, Contour<'_>, bool),
     contact: &[Unrolled],
@@ -212,10 +212,10 @@ pub(crate) fn contact_cuts(
     let mut contacts: Vec<Vec<Unrolled>> = Vec::new();
     for meeting in meetings {
         match contacts.last_mut() {
-            Some(last)
-                if stays_within((a, b, same), last[last.len() - 1], meeting, CUT_MERGE_MM) =>
+            Some(open)
+                if stays_within((a, b, same), open[open.len() - 1], meeting, CUT_MERGE_MM) =>
             {
-                last.push(meeting);
+                open.push(meeting);
             }
             _ => contacts.push(vec![meeting]),
         }

@@ -217,7 +217,7 @@ pub fn marquee(s: &mut Session, from: Point, to: Point) {
     s.pointer_hover(from, false, false);
     s.pointer_down(from, false);
     s.pointer_hover(
-        pt((from.x + to.x) / 2.0, (from.y + to.y) / 2.0),
+        pt(from.x.midpoint(to.x), from.y.midpoint(to.y)),
         false,
         false,
     );
