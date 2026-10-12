@@ -164,11 +164,22 @@ That trade is what makes it an escalation rather than the first choice.
 
 ## Node selection holds one path
 
-`curvyo-ui-core`'s `NodeSelection` refers to a single path. After
-"object to path" on several primitives, only the first converted path is
-selected in the node tool (`specs/0003-primitive-shapes/adrs.md`, 2026-10-04
-PR #10 review note). Node editing across several paths at once, as
-Inkscape allows, is not possible.
+**Update 2026-10-12.** `NodeSelection` has held an ordered `(path, anchor)`
+list across paths since `0006`, and a multi-path node drag is one commit.
+Two gaps remain. `NodeTool::delete_selected` and `convert_selected` act
+only when `NodeSelection::path()` names one path. So on a cross-path
+selection, Delete, Backspace, the Delete node button and Make
+corner/symmetric/asymmetric do nothing, although their buttons are
+enabled. `specs/0053-node-marquee-selection/adrs.md` decision 4 resolves
+this with pair-based `Document::delete_anchors` and `convert_anchor_kind`,
+each one commit. Remove this item when that slice merges.
+
+The original text follows. `curvyo-ui-core`'s `NodeSelection` referred to
+a single path. After "object to path" on several primitives, only the
+first converted path was selected in the node tool
+(`specs/0003-primitive-shapes/adrs.md`, 2026-10-04 PR #10 review note).
+Node editing across several paths at once, as Inkscape allows, was not
+possible.
 
 **Resolution:** a story that asks for node editing across several paths.
 `canvas-navigation-and-selection` (slice 4) does not: its Select tool hands
