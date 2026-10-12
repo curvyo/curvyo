@@ -53,6 +53,8 @@ pub(super) struct HistoryState {
     pub(super) notice: Option<String>,
     /// The folded and unfolded branches of the History list (`history_list.rs`).
     pub(super) list: super::history_list::ListState,
+    /// The Mode switch and the version a preview shows (`history_preview.rs`).
+    pub(super) preview: super::history_preview::PreviewState,
 }
 
 impl HistoryState {
@@ -63,6 +65,7 @@ impl HistoryState {
             clock: wall_clock,
             notice: None,
             list: super::history_list::ListState::default(),
+            preview: super::history_preview::PreviewState::default(),
         }
     }
 }

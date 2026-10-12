@@ -63,6 +63,7 @@ impl Session {
             self.style.apply_to(artwork_objects.to_mut());
         }
         let mut list = build_artwork(&artwork_objects, view);
+        list.extend(self.object_preview_list(view));
         // The blue half of a segment bend, over the artwork and under the nodes and handles.
         list.extend(self.bend_preview_list(view, &objects));
         // A compound path shows no node, handle or segment (`0016-boolean-operations` criterion 38).

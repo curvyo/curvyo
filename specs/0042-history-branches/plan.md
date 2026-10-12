@@ -76,18 +76,18 @@ file with the two new labels as legacy-labelled steps.
   (public history API).
 
 ### Milestone 2: Preview, object and document
-- [ ] 2.1 Test first: `preview_at` returns plain snapshots, attaches again on error, writes and
+- [x] 2.1 Test first: `preview_at` returns plain snapshots, attaches again on error, writes and
   replicates nothing; a peer's step arriving meanwhile is merged, the snapshot is unchanged and the
   "since" count grows (AC 20, 30, 32).
-- [ ] 2.2 render-core: blue outline plus 40 % ghost for an object snapshot; plain drawing of a
+- [x] 2.2 render-core: blue outline plus 40 % ghost for an object snapshot; plain drawing of a
   document snapshot (AC 17, 19).
-- [ ] 2.3 Session preview state: Mode switch (default Preview, kept for the session, Object scope
+- [x] 2.3 Session preview state: Mode switch (default Preview, kept for the session, Object scope
   only), every end-of-preview rule, gate of criterion 16, editing keys ignored in a document
   preview (AC 14, 16, 18, 19).
-- [ ] 2.4 Frontend: Mode row and caption slot, readout in the notice slot (`role="status"`),
+- [x] 2.4 Frontend: Mode row and caption slot, readout in the notice slot (`role="status"`),
   banner with Back to live and "(N new steps since)", inset frame, inert rail, arrow pointer;
   preview by press, Enter or Space, Up/Down move it only while one shows (AC 14, 17, 18, 19, 21).
-- [ ] 2.5 Budgets (release, assert 4x): rows 10, 100, 1,000 back within 300 ms; long-operation
+- [x] 2.5 Budgets (release, assert 4x): rows 10, 100, 1,000 back within 300 ms; long-operation
   state beyond 1,000 and 1.5 s at 10,000 back; warm and right after Open; once on wasm (AC 21).
 
 ### Milestone 3: Live, exploring, Restore
@@ -134,6 +134,13 @@ file with the two new labels as legacy-labelled steps.
   folded again; the revealed headers sit above their own newest rows. A branch revealed from it and
   unfolded takes a lane by the same rule, the rightmost one when all three are taken.
 - Folding a branch also hides the branches that fork from it.
+- Milestone 2: the readout, the banner and the Mode captions are built in the frontend
+  (`lib/historyPreview.ts`), not in `curvyo-ui-core`: they hold the local clock time, which only the
+  browser knows. A document preview answers every key with the new `KeyOutcome::Paused` (the key
+  does nothing and its page default is prevented). It draws the version's objects on the current
+  page and background. The release budgets of AC 21 are in
+  `curvyo-document-core/tests/history_preview_budgets.rs`; the wasm figure is measured in the
+  browser walk-through.
 
 ## Validation
 

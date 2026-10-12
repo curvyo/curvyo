@@ -119,6 +119,45 @@ impl WasmSession {
         self.session.toggle_history_item(object, index as usize)
     }
 
+    /// The Mode switch of the Object scope: `true` for Live (`specs/0042-history-branches`).
+    pub fn set_history_live(&mut self, live: bool) {
+        self.session.set_history_live(live);
+    }
+
+    /// Whether the Mode switch stands at Live.
+    #[must_use]
+    pub fn history_live(&self) -> bool {
+        self.session.history_live()
+    }
+
+    /// Whether a press on item `index` needs the long-operation state first.
+    pub fn history_item_is_far(&mut self, object: bool, index: u32) -> bool {
+        self.session.history_item_is_far(object, index as usize)
+    }
+
+    /// A press, Enter or Space on item `index` in Preview mode: `"previewed"`, `"ended"` (the
+    /// object already has that version), `"ignored"` (a drag, a chip or an unfinished Pen path) or
+    /// `"none"` (no step row).
+    pub fn history_preview_item(&mut self, object: bool, index: u32) -> String {
+        match self.session.preview_history_item(object, index as usize) {
+            crate::RowPress::Ignored => "ignored",
+            crate::RowPress::NotARow => "none",
+            crate::RowPress::Previewed => "previewed",
+            crate::RowPress::Ended => "ended",
+        }
+        .to_owned()
+    }
+
+    /// Ends the preview.
+    pub fn history_preview_end(&mut self) {
+        self.session.end_history_preview();
+    }
+
+    /// The preview as JSON (`Session::history_preview_json`).
+    pub fn history_preview(&mut self) -> String {
+        self.session.history_preview_json()
+    }
+
     /// The shown id of the newest step in effect (the "Now" row), empty without a step.
     pub fn history_now_id(&mut self) -> String {
         self.session.history_now_id()

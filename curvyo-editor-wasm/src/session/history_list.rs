@@ -203,6 +203,11 @@ impl Session {
             .and_then(|fork| self.document.history_shown_id(fork))
     }
 
+    /// The item at `index` of the list.
+    pub(super) fn history_list_item(&mut self, object: bool, index: usize) -> Option<HistoryItem> {
+        self.shown_list(object)?.layout.items().get(index).copied()
+    }
+
     /// A press or Enter on the header row or the "more" row at `index`: folds or unfolds it.
     /// Returns whether the list changed.
     pub fn toggle_history_item(&mut self, object: bool, index: usize) -> bool {

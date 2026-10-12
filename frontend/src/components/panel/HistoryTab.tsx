@@ -24,7 +24,11 @@ import {
 import { ToggleGroup, type ToggleOption } from "@/components/ui/toggle-group";
 import { Tooltip } from "@/components/ui/tooltip";
 import type { EditorSession } from "@/hooks/useEditorSession";
+import { HistoryModeRow } from "@/components/panel/HistoryModeRow";
 import { useHistoryList } from "@/hooks/useHistoryList";
+import { useBusyWindow } from "@/hooks/useRailCommands";
+import { NO_PREVIEW, parsePreview } from "@/lib/historyPreview";
+import { setPreviewState, usePreviewState } from "@/lib/historyPreviewStore";
 import {
   type FoldItem,
   type GutterSegment,
@@ -190,6 +194,60 @@ export function HistoryTab({ editor, shown, onReturnFocus, historyScope }: Histo
   const focused = Math.min(focusedRaw, Math.max(0, list.total - 1));
   const refocus = useRef(false);
   const now = list.readAt;
+  const object = scope === "object";
+  const preview = usePreviewState();
+  const [live, setLive] = useState(() => getSession()?.history_live() ?? false);
+  const [busy, setBusy] = useState(false);
+  useBusyWindow(busy);
+
+  // The session holds the preview; read it again whenever the session changed (a press on the
+  // canvas or another selection ends an object preview there).
+  const readPreview = useCallback(() => {
+    const session = getSession();
+    setPreviewState(session ? parsePreview(session.history_preview()) : NO_PREVIEW);
+  }, [getSession]);
+  useEffect(() => {
+    readPreview();
+  }, [readPreview, syncRevision]);
+  const endPreview = useCallback(() => {
+    getSession()?.history_preview_end();
+    readPreview();
+  }, [getSession, readPreview]);
+  // A change of tab, a collapsed panel or another scope ends a preview (criteria 18 and 19).
+  useEffect(() => {
+    if (!shown) {
+      endPreview();
+    }
+    return endPreview;
+  }, [shown, scope, endPreview]);
+
+  /** A press, Enter or Space on the row at `index`: Preview shows the version (criteria 17 to
+   * 21). A row far back shows the long-operation state first. */
+  const pressRow = useCallback(
+    (index: number) => {
+      const session = getSession();
+      if (!session || busy) {
+        return;
+      }
+      if (session.history_item_is_far(object, index)) {
+        setBusy(true);
+        requestAnimationFrame(() =>
+          requestAnimationFrame(() => {
+            try {
+              session.history_preview_item(object, index);
+            } finally {
+              setBusy(false);
+              readPreview();
+            }
+          }),
+        );
+        return;
+      }
+      session.history_preview_item(object, index);
+      readPreview();
+    },
+    [busy, getSession, object, readPreview],
+  );
 
   useLayoutEffect(() => {
     const element = scroller.current;
@@ -297,11 +355,23 @@ export function HistoryTab({ editor, shown, onReturnFocus, historyScope }: Histo
   };
 
   const onListKeyDown = (event: React.KeyboardEvent) => {
+    // The first Escape ends a preview; the next one leaves the list (criterion 18).
+    if (event.key === "Escape" && preview.kind !== "") {
+      event.preventDefault();
+      event.stopPropagation();
+      endPreview();
+      return;
+    }
     const pageRows = Math.max(1, Math.floor(viewport / ROW_HEIGHT_PX));
     const to = nextFocus(event.key, focused, list.total, pageRows);
     if (to !== null) {
       event.preventDefault();
       moveFocus(to);
+      // While a preview shows, the preview moves along with the focus; without one, focus alone
+      // reads nothing (criterion 21).
+      if (preview.kind !== "" && list.itemAt(to)?.type === "row") {
+        pressRow(to);
+      }
     }
   };
 
@@ -352,6 +422,10 @@ export function HistoryTab({ editor, shown, onReturnFocus, historyScope }: Histo
           setHover(item.step);
         }}
         onHover={setHover}
+        onPress={() => {
+          setFocused(index);
+          pressRow(index);
+        }}
       />
     ) : (
       <div
@@ -370,8 +444,21 @@ export function HistoryTab({ editor, shown, onReturnFocus, historyScope }: Histo
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto">
       <HistoryHeader editor={editor} historyScope={historyScope} onReturnFocus={onReturnFocus} />
-      <div
-        className="flex shrink-0 items-center justify-between rounded-[5px] bg-[var(--value-fill)] px-2 text-sm text-[var(--toolbar-icon)]"
+      {object && info !== null ? (
+        <HistoryModeRow
+          live={live}
+          onChange={(next) => {
+            getSession()?.set_history_live(next);
+            setLive(next);
+            readPreview();
+          }}
+          onReturnFocus={onReturnFocus}
+        />
+      ) : null}
+      <button
+        type="button"
+        onClick={endPreview}
+        className="flex shrink-0 items-center justify-between rounded-[5px] bg-[var(--value-fill)] px-2 text-left text-sm text-[var(--toolbar-icon)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
         style={{ height: NOW_ROW_HEIGHT_PX }}
         aria-current="true"
       >
@@ -382,7 +469,7 @@ export function HistoryTab({ editor, shown, onReturnFocus, historyScope }: Histo
           Now
         </span>
         <span className="select-text font-mono text-xs text-[var(--toolbar-icon)]">{list.nowId}</span>
-      </div>
+      </button>
       {list.total === 0 && scope === "object" ? (
         <div className="px-2 pt-4 text-center outline-none" data-first-focus tabIndex={-1}>
           <p className="text-xs text-[var(--panel-muted-fg)]">{NO_OBJECT_STEPS_LINE}</p>
@@ -442,10 +529,22 @@ interface StepRowProps {
   tabbable: boolean;
   onFocusRow: () => void;
   onHover: (step: string) => void;
+  onPress: () => void;
 }
 
 /** One step: kind glyph, operation name, step id, and the second line (criterion 39). */
-function StepRow({ row, index, total, lanes, place, now, tabbable, onFocusRow, onHover }: StepRowProps) {
+function StepRow({
+  row,
+  index,
+  total,
+  lanes,
+  place,
+  now,
+  tabbable,
+  onFocusRow,
+  onHover,
+  onPress,
+}: StepRowProps) {
   const Glyph = GLYPHS[glyphKey(row)] ?? Pencil;
   const undone = isUndone(row);
   const lead = leadWords(row);
@@ -465,6 +564,7 @@ function StepRow({ row, index, total, lanes, place, now, tabbable, onFocusRow, o
           tabIndex={tabbable ? 0 : -1}
           aria-label={rowAriaName(row, now)}
           onFocus={onFocusRow}
+          onClick={onPress}
           onBlur={() => onHover("")}
           onMouseEnter={() => onHover(row.step)}
           onMouseLeave={() => onHover("")}

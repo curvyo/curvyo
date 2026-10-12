@@ -11,6 +11,8 @@ import { SelectToolbar } from "@/components/SelectToolbar";
 import { ShapeToolbar } from "@/components/ShapeToolbar";
 import { StatusBar } from "@/components/StatusBar";
 import { ToolRail } from "@/components/ToolRail";
+import { HistoryPreviewFrame, HistoryPreviewLine } from "@/components/HistoryPreview";
+import { usePreviewState } from "@/lib/historyPreviewStore";
 import { useRailCommands } from "@/hooks/useRailCommands";
 import { useEditorSession } from "@/hooks/useEditorSession";
 import { useClosePathState } from "@/hooks/usePenCue";
@@ -36,6 +38,7 @@ function App() {
 function Editor() {
   const [cursorMm, setCursorMm] = useState({ x: 0, y: 0 });
   const editor = useEditorSession(setCursorMm);
+  const historyPreview = usePreviewState();
   const railCommands = useRailCommands(editor);
   const closePathState = useClosePathState(editor);
   const documentPanel = useDocumentPanel(editor);
@@ -83,8 +86,10 @@ function Editor() {
           onReturnFocus={() => editor.containerRef.current?.focus()}
           commands={railCommands}
           grouping={editor.grouping.commands}
+          paused={historyPreview.kind === "document"}
         />
         <Canvas editor={editor} />
+        <HistoryPreviewFrame />
         {/* Contextual tool bar: floats over the canvas, right of the tool
          * rail, so showing/hiding it never resizes the canvas
          * (`docs/design-system.md`, "no layout shift on tool switch"). */}
@@ -160,6 +165,7 @@ function Editor() {
             editor.containerRef.current?.focus();
           }}
           announcement={editor.grouping.announcement}
+          persistent={<HistoryPreviewLine getSession={editor.getSession} />}
         />
         </div>
         </div>

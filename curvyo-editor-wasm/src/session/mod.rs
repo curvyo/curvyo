@@ -43,6 +43,7 @@ mod grouping;
 mod grouping_tests;
 mod history;
 mod history_list;
+mod history_preview;
 mod history_rows;
 mod key_table;
 mod keys;
@@ -93,6 +94,7 @@ pub use document_presets::DocumentPresetsRecord;
 pub use formats::{FormTexts, FormatEdit};
 pub use grouping::{GroupingKind, GroupingResult};
 pub use history::HistoryResult;
+pub use history_preview::{FAR_PREVIEW_ROWS, RowPress};
 pub use history_rows::{WipeOutcome, WipeState};
 pub use keys::{EscapeStep, KeyHint, KeyInput, KeyOutcome};
 pub use move_indicators::MoveIndicators;
@@ -443,6 +445,10 @@ impl Session {
             let Some(point) = sanitized_point(point) else {
                 return;
             };
+            // A press during a preview only ends it (`specs/0042-history-branches` criterion 18).
+            if this.history_preview_takes_press() {
+                return;
+            }
             // Same flush as `set_tool`'s own doc comment explains: a canvas
             // click can change the selection (e.g. selecting a different
             // star) before a pending ratio-slider preview ever gets a

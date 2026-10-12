@@ -20,7 +20,12 @@ impl Session {
             self.view(),
             self.device_pixel_ratio,
         );
-        list.extend(self.draw_list());
+        // A document preview draws the version plain, with nothing over it
+        // (`specs/0042-history-branches` criterion 19).
+        list.extend(match self.document_preview_objects() {
+            Some(version) => curvyo_render_core::build_artwork(version, self.view()),
+            None => self.draw_list(),
+        });
         list
     }
 }

@@ -71,9 +71,10 @@ mod wasm_split;
 pub use session::{
     APP_VERSION, BooleanOutcome, BreakApartOutcome, ClosePathOutcome, ClosePathState,
     CombineOutcome, CutOutcome, DocumentPresetsRecord, DocumentSide, DoubleClickHint, EscapeStep,
-    FitOutcome, FormTexts, FormatEdit, GroupingKind, GroupingResult, HistoryResult, KeyHint,
-    KeyInput, KeyOutcome, MoveIndicators, ObjectWipeOutcome, PanelTabsRecord, PanelView, Session,
-    SizeOutcome, SplitOutcome, Tool, WipeOutcome, WipeState,
+    FAR_PREVIEW_ROWS, FitOutcome, FormTexts, FormatEdit, GroupingKind, GroupingResult,
+    HistoryResult, KeyHint, KeyInput, KeyOutcome, MoveIndicators, ObjectWipeOutcome,
+    PanelTabsRecord, PanelView, RowPress, Session, SizeOutcome, SplitOutcome, Tool, WipeOutcome,
+    WipeState,
 };
 
 #[cfg(target_arch = "wasm32")]

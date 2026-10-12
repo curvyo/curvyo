@@ -14,6 +14,7 @@ mod object_restore;
 mod object_rows;
 mod object_timeline;
 mod object_wipe;
+mod preview;
 mod report;
 mod restore;
 mod restore_plan;
@@ -38,6 +39,7 @@ pub(crate) use object_index::ObjectIndex;
 pub use object_restore::ObjectRestore;
 pub(crate) use object_restore::WritableUndo;
 pub use object_rows::{ObjectRow, ObjectRowClass, ObjectStatus, ObjectTarget, ObjectTargets};
+pub use preview::HistoricalDocument;
 pub use report::{
     Direction, ObjectReport, ObjectResult, ObjectShape, RestoreReport, Role, SkipReason,
 };
