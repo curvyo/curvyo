@@ -125,7 +125,8 @@ on features that do not touch the same crates.
 **Where agents work (customer rule, 2026-10-06; paths relative since 2026-10-12):**
 everything happens inside the **project directory**: the directory that holds
 the main checkout `base/` (on the customer's laptop
-`~/workbench/vecmanf-claude/`, on the agent VMs `~/work/`). The project
+`~/workbench/vecmanf-claude/`, on the VMs `~/<project>/`, set up by
+`tools/worker-setup/`). The project
 directory also holds the symlinks `CLAUDE.md` and `.claude` into `base/`, and
 the sessions start there. Every agent that needs its own copy (implementer,
 tester, fix branches) gets a git worktree next to `base/`, at `../<slug>/`
