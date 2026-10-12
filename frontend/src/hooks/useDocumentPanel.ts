@@ -3,11 +3,11 @@ import { useCallback, useMemo, useState } from "react";
 import type { WasmSession } from "@/lib/editorSession";
 
 /** What the Properties panel's body shows (`curvyo-ui-core::panel_content`). */
-export type PanelContent = "file" | "document" | "style" | "history" | "empty";
+export type PanelContent = "file" | "document" | "style" | "layers" | "history" | "empty";
 
 /** One tab of the panel's strip (`curvyo-ui-core::panel_tabs`). */
 export interface PanelTabView {
-  /** Sent back on a press: "file", "document", "style" or "history". */
+  /** Sent back on a press: "file", "document", "style", "layers" or "history". */
   name: string;
   /** The accessible name. */
   label: string;
@@ -162,7 +162,7 @@ export interface DocumentPanelApi {
    * (the dimmed Style tab). */
   pressTab: (name: string) => boolean;
   /** Shift+Ctrl+F or Shift+Ctrl+D: the tab the shortcut names. */
-  shortcut: (tab: "style" | "document" | "history") => void;
+  shortcut: (tab: "style" | "document" | "history" | "layers") => void;
 }
 
 interface EditorHandle {
@@ -258,12 +258,14 @@ export function useDocumentPanel(editor: EditorHandle): DocumentPanelApi {
   );
 
   const shortcut = useCallback(
-    (tab: "style" | "document" | "history") => {
+    (tab: "style" | "document" | "history" | "layers") => {
       const session = getSession();
       if (tab === "style") {
         session?.panel_shortcut_style();
       } else if (tab === "history") {
         session?.panel_shortcut_history();
+      } else if (tab === "layers") {
+        session?.panel_shortcut_layers();
       } else {
         session?.panel_shortcut_document();
       }

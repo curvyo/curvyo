@@ -591,7 +591,12 @@ export interface EditorSession {
   /** Undo or redo from a button. */
   pressHistory: (direction: HistoryDirection, source?: "canvas" | "panel") => void;
   /** Shows a line in the notice slot of the canvas. */
-  showHistoryNotice: (text: string, ms?: number) => void;
+  showHistoryNotice: (
+    text: string,
+    ms?: number,
+    source?: "canvas" | "panel",
+    kind?: "status" | "alert",
+  ) => void;
   /** Wipes the history; the steps removed, -1 when ignored, -2 for a shared document. */
   wipeHistory: () => number;
   /** Hides the selected object's earlier history; the rows hidden, -1 when ignored. */
@@ -630,6 +635,9 @@ export interface EditorSession {
   /** Counts every re-read of the session's UI state: the Style panel reads
    * its own state from the session whenever this changes. */
   syncRevision: number;
+  /** Re-reads every bit of session-owned UI state: after a panel call that changed the
+   * selection or the document (the Layers tab). */
+  sync: () => void;
   /** The live wasm session, or `null` before the first attach. */
   getSession: () => WasmSession | null;
   /** Registers a function that runs right after every canvas resize has
@@ -1504,10 +1512,15 @@ export function useEditorSession(
         event.ctrlKey || event.metaKey,
         event.altKey,
       );
+      // Drawing into a hidden or locked layer is refused with a notice (`0050` criterion 23).
+      const layerNotice = session.take_layer_notice();
+      if (layerNotice !== "") {
+        history.showNotice(layerNotice, undefined, "canvas", "alert");
+      }
       setCursorHint(session.cursor_hint());
       syncFromSession();
     },
-    [canvasPoint, isSpaceHeld, syncFromSession, syncTrackedModifiers],
+    [canvasPoint, history, isSpaceHeld, syncFromSession, syncTrackedModifiers],
   );
 
   const onPointerMove = useCallback(
@@ -1809,6 +1822,13 @@ export function useEditorSession(
       }
       // Group and Ungroup say what they did in the canvas notice slot, as the buttons do.
       handleGroupingOutcome(outcome);
+      if (outcome === "reordered") {
+        // A refused stacking-order key says why (`0050` criterion 33).
+        const layerNotice = session.take_layer_notice();
+        if (layerNotice !== "") {
+          history.showNotice(layerNotice, undefined, "canvas", "alert");
+        }
+      }
       if (outcome === "select-all") {
         onSelectAll(session.selection_count());
       } else if (outcome === "nudge" || outcome === "nudge-new") {
@@ -1828,6 +1848,7 @@ export function useEditorSession(
     [
       handleKeyOutcome,
       handleGroupingOutcome,
+      history,
       isSpaceHeld,
       syncFromSession,
       onNudge,
@@ -2011,6 +2032,7 @@ export function useEditorSession(
     setLinkCorners,
     selectBar,
     syncRevision,
+    sync: syncFromSession,
     getSession,
     addViewResizedListener,
     refreshCursor,

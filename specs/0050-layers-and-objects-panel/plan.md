@@ -156,17 +156,17 @@ supply its root's register.
 
 ### M5: the tab (`frontend`)
 
-- [ ] 25. Fourth strip button, header row word and subject line "40 objects" (AC 1, 4 as
+- [x] 25. Fourth strip button, header row word and subject line "40 objects" (AC 1, 4 as
       amended by `0051`)
-- [ ] 26. Tab body: Opacity header (52 px reserved), list as the one scroll area, footer with
+- [x] 26. Tab body: Opacity header (52 px reserved), list as the one scroll area, footer with
       fixed slots; 12 rows at 800 x 600 (AC 3, 9, 26)
-- [ ] 27. Virtualised treegrid row component: glyphs, eye, lock, readout, row action, states,
+- [x] 27. Virtualised treegrid row component: glyphs, eye, lock, readout, row action, states,
       collapse mark, inherited look, `aria-*`, coarse-pointer sizes (AC 6, 8, 22, 38, 41, 48)
-- [ ] 28. Keyboard: roving focus, arrows, Home/End/Page, Enter/Space, Ctrl+Space,
+- [x] 28. Keyboard: roving focus, arrows, Home/End/Page, Enter/Space, Ctrl+Space,
       Shift+Up/Down, F2, Delete, Alt+arrows with `preventDefault`, Escape to canvas (AC 32,
       38, 39, 40)
-- [ ] 29. Rename field: F2/double-click, Enter/blur commits, Escape cancels (AC 16, 34)
-- [ ] 30. Pointer drag: 4 px threshold, insertion line, container outline, edge scroll,
+- [x] 29. Rename field: F2/double-click, Enter/blur commits, Escape cancels (AC 16, 34)
+- [x] 30. Pointer drag: 4 px threshold, insertion line, container outline, edge scroll,
       600 ms expand, refusal cursor and tooltip, count badge, Escape cancels, long press on
       coarse pointer (AC 29, 30, 51)
 

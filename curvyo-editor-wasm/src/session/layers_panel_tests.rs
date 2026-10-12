@@ -250,6 +250,20 @@ fn the_opacity_field_writes_its_target_once_and_shows_mixed() {
     assert_eq!(view(&mut session)["opacity"]["value"], 30);
     assert_eq!(row(&mut session, a)["readout"], "30%");
     assert!(session.previewed_drawn().is_none());
+    session.preview_layer_opacity(70.0);
+    session.commit_layer_opacity_preview();
+    assert_eq!(
+        view(&mut session)["opacity"]["value"],
+        70,
+        "the release commits the preview"
+    );
+    session.preview_layer_opacity(10.0);
+    session.cancel_layer_opacity();
+    assert_eq!(
+        view(&mut session)["opacity"]["value"],
+        70,
+        "Escape restores"
+    );
 }
 
 #[test]

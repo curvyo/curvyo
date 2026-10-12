@@ -194,6 +194,30 @@ impl Session {
         })
     }
 
+    /// The Opacity field's release: the previewed value is committed, once (criterion 26).
+    pub fn commit_layer_opacity_preview(&mut self) -> PanelReply {
+        match self
+            .panel
+            .opacity_preview
+            .as_ref()
+            .map(|(_, opacity)| *opacity)
+        {
+            Some(opacity) => self.commit_layer_opacity(opacity.get() * 100.0),
+            None => PanelReply::Quiet,
+        }
+    }
+
+    /// The panel hint while the Pen has an unfinished path, else empty: what a press that would
+    /// open a rename or start an Opacity drag shows instead (criterion 53).
+    #[must_use]
+    pub fn layers_pen_hint(&self) -> String {
+        if self.pen_path_unfinished() {
+            curvyo_ui_core::FINISH_PEN_FIRST.to_owned()
+        } else {
+            String::new()
+        }
+    }
+
     /// The drawn leaves with the Opacity preview applied, while one runs.
     pub(super) fn previewed_drawn(&self) -> Option<Arc<[ObjectSnapshot]>> {
         let (targets, opacity) = self.panel.opacity_preview.as_ref()?;

@@ -84,6 +84,17 @@ impl WasmSession {
         self.session.preview_layer_opacity(percent);
     }
 
+    /// The Opacity field's release: the previewed value is committed once.
+    pub fn commit_layer_opacity_preview(&mut self) -> String {
+        self.session.commit_layer_opacity_preview().to_json()
+    }
+
+    /// The panel hint while the Pen has an unfinished path, else empty.
+    #[must_use]
+    pub fn layers_pen_hint(&self) -> String {
+        self.session.layers_pen_hint()
+    }
+
     /// Escape in the Opacity field.
     pub fn cancel_layer_opacity(&mut self) {
         self.session.cancel_layer_opacity();
