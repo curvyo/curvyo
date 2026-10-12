@@ -21,6 +21,7 @@ mod boolean;
 mod boolean_cleanup;
 mod boolean_grid;
 mod curve_chords;
+mod curve_contacts;
 mod curve_intersections;
 mod curve_settle;
 mod flatten;

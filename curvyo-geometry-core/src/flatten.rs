@@ -115,6 +115,21 @@ mod tests {
     use super::*;
     use curvyo_document_core::Vec2;
 
+    /// A coordinate that is infinite or far out of range does not make the flattening allocate
+    /// without bound (callers refuse such outlines; this is the guard behind them).
+    #[test]
+    fn hostile_coordinates_give_a_bounded_polyline() {
+        for x in [f64::INFINITY, 1.0e300, -1.0e300, f64::NAN] {
+            let outline = [
+                (Point::new(x, 0.0), Vec2::ZERO, Vec2::ZERO),
+                (Point::new(1.0, 1.0), Vec2::new(5.0, 0.0), Vec2::ZERO),
+                (Point::new(5.0, 10.0), Vec2::ZERO, Vec2::ZERO),
+            ];
+            let points = flatten_closed(&outline, 0.0005);
+            assert!(points.len() <= 3 * (262_144 + 1), "{x}: {}", points.len());
+        }
+    }
+
     /// Circle of `radius` about the origin as four Bézier arcs, the usual 0.5522847498 handles.
     fn circle(radius: f64) -> Vec<OutlineTriple> {
         let k = 0.552_284_749_830_793_4 * radius;

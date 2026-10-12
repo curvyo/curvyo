@@ -549,3 +549,82 @@ fn tangent_circles_touching_inside_segments_are_cut_once() {
         }
     }
 }
+
+/// Two circles that cross at a shallow angle come within reach of each other before and after
+/// the crossing, also in the neighbouring segment: still one cut per crossing (the cases a tester
+/// found with a third cut 0.01 to 0.03 mm from a crossing).
+#[test]
+fn a_shallow_crossing_is_one_cut() {
+    for (r1, r2, dc, rot1, rot2) in [
+        (7.4517, 7.2716, 0.4435, 20.63, 22.22),
+        (6.1582, 6.4379, 0.3795, 82.68, 41.31),
+    ] {
+        let all = [
+            (turned_about_centre(100.0, 100.0, r1, rot1), true),
+            (turned_about_centre(100.0 + dc, 100.0, r2, rot2), true),
+        ];
+        let result = cuts(&all);
+        assert_eq!(result[0].len(), 2, "r {r1}/{r2}: {:?}", result[0]);
+        assert_eq!(result[1].len(), 2, "r {r1}/{r2}: {:?}", result[1]);
+    }
+}
+
+/// A closed path of four curved segments with eight self-crossings, two of them in small loops
+/// near a node: every pass is cut (16 cuts). Found by the tester's random paths.
+#[test]
+fn a_path_with_small_loops_near_its_nodes_is_cut_at_every_pass() {
+    let p = |x: f64, y: f64| Point::new(x, y);
+    let v = |x: f64, y: f64| Vec2::new(x, y);
+    let path: Anchors = vec![
+        (
+            p(104.07075928969789, 147.54823554533624),
+            v(-10.103578192844154, 27.171230079166776),
+            v(-22.556999587000533, 5.345248747930178),
+        ),
+        (
+            p(170.30915734046124, 155.00804855997592),
+            v(28.380417667819046, -14.242189225030735),
+            v(26.785454640653924, -7.724240613605353),
+        ),
+        (
+            p(107.02681371004414, 100.48433705974098),
+            v(-21.408023654654436, -8.486139418080533),
+            v(-15.376232412666475, 13.086479141123412),
+        ),
+        (
+            p(177.87897115387716, 110.13151110158583),
+            v(-33.479572895884445, 16.002962779405877),
+            v(-12.201018420480459, -7.529593607003726),
+        ),
+    ];
+    let all = [(path, true)];
+    let result = cuts(&all);
+    assert_eq!(result[0].len(), 16, "{:?}", result[0]);
+}
+
+/// A closed path of three segments that crosses itself twice: every pass is cut (4 cuts).
+#[test]
+fn a_path_crossing_itself_twice_is_cut_four_times() {
+    let p = |x: f64, y: f64| Point::new(x, y);
+    let v = |x: f64, y: f64| Vec2::new(x, y);
+    let path: Anchors = vec![
+        (
+            p(162.66286217843285, 165.04877449083688),
+            v(22.50019254531839, 30.236225811122978),
+            v(32.32544699111243, 32.47234796973555),
+        ),
+        (
+            p(110.89490753083632, 191.2390349331352),
+            v(-29.845669127197645, 31.355953386115644),
+            v(18.94343338303922, 39.482989010694524),
+        ),
+        (
+            p(199.1803876327335, 182.67299477303823),
+            v(3.4342489257535362, 15.337471024045925),
+            v(2.5451372358631303, -23.377358415465316),
+        ),
+    ];
+    let all = [(path, true)];
+    let result = cuts(&all);
+    assert_eq!(result[0].len(), 4, "{:?}", result[0]);
+}
