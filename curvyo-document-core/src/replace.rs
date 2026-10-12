@@ -1,8 +1,9 @@
-//! The two commands that replace objects by new paths in a single commit: several objects by one
+//! The commands that write paths computed by the caller in a single commit: several objects by one
 //! path with one or more outlines (Combine, the Boolean operations,
 //! `specs/0016-boolean-operations/adrs.md`), and objects by pieces that take the place and style
-//! of the object they come from (Split, Break apart, Cut, `specs/0048-split-compound-path`). They
-//! compute no geometry; the caller passes the result.
+//! of the object they come from (Split, Break apart, Cut, `specs/0048-split-compound-path`); and
+//! the one that adds new paths above their sources without replacing them (Offset,
+//! `specs/0038-path-offset`). They compute no geometry; the caller passes the result.
 
 use std::collections::{HashMap, HashSet};
 
@@ -180,6 +181,66 @@ impl Document {
             tree.delete(tree_id).unwrap();
         }
         crate::groups::remove_emptied_groups(&tree, &parents);
+        self.commit_with_label(label);
+        Ok(created)
+    }
+}
+
+impl Document {
+    /// Adds `pieces` as new paths, each directly above its source in the stacking order, in **one
+    /// commit** labelled `label`, deleting nothing (`specs/0038-path-offset` criteria 10 and 13).
+    ///
+    /// Each piece is `(source, outlines)`: the piece takes a copy of its source's complete style,
+    /// whichever kind the source is, and no rotation; its first outline is stored in the ordinary
+    /// keys and the others as extra subpaths. Several pieces of one source sit consecutively above
+    /// it, in the order given.
+    ///
+    /// Every id is resolved and every anchor id checked before the first write, so a refusal
+    /// changes nothing. Returns the new objects' ids in the order of `pieces`.
+    ///
+    /// # Errors
+    /// [`ObjectEditError::NoSuchObject`] if a source no longer exists;
+    /// [`ObjectEditError::NoOutlines`] if there is no piece, a piece has no outline or an outline
+    /// no anchor; [`ObjectEditError::AnchorIds`] if two anchors share an id or an id already
+    /// belongs to an object of the document.
+    ///
+    /// # Panics
+    /// Does not panic in practice, for the reasons given at [`Document::replace_with_path`].
+    pub fn add_paths_above(
+        &self,
+        pieces: &[(NodeId, PieceOutlines)],
+        label: &str,
+    ) -> Result<Vec<NodeId>, ObjectEditError> {
+        if pieces.is_empty() {
+            return Err(ObjectEditError::NoOutlines);
+        }
+        let mut seen: HashSet<AnchorId> = HashSet::new();
+        for (_, outlines) in pieces {
+            if outlines.is_empty() || outlines.iter().any(|(anchors, _)| anchors.is_empty()) {
+                return Err(ObjectEditError::NoOutlines);
+            }
+            for anchor in outlines.iter().flat_map(|(anchors, _)| anchors) {
+                if !seen.insert(anchor.id) {
+                    return Err(ObjectEditError::AnchorIds);
+                }
+            }
+        }
+        let tree = self.loro().get_tree(OBJECTS_TREE);
+        let sources = resolve_sources(&tree, pieces, PieceFill::Keep)?;
+        check_new_anchor_ids(&tree, &[], &seen)?;
+
+        tree.enable_fractional_index(0);
+        let mut after: HashMap<NodeId, loro::TreeID> = HashMap::new();
+        let mut created = Vec::with_capacity(pieces.len());
+        for (source, outlines) in pieces {
+            // invariant: every source was resolved above.
+            #[allow(clippy::unwrap_used)]
+            let (place, style) = sources.get(source).unwrap();
+            let anchor = *after.get(source).unwrap_or(place);
+            let piece = create_path_after(&tree, anchor, style, outlines);
+            created.push(NodeId::from_parts(piece.peer, piece.counter));
+            after.insert(*source, piece);
+        }
         self.commit_with_label(label);
         Ok(created)
     }

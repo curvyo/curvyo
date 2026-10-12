@@ -49,7 +49,7 @@ amends Outset/Inset later and is not anticipated here.
 
 ### Milestone 2: the document write (AC 10, 13)
 
-- [ ] 2.1 Test first, then `Document::add_paths_above(pieces, label)`: each result directly above its
+- [x] 2.1 Test first, then `Document::add_paths_above(pieces, label)`: each result directly above its
   operand, complete style copied, rotation 0, nothing deleted, one commit, anchor-id check, refusal
   changes nothing (AC 10, 13).
 
