@@ -58,3 +58,9 @@ test("the readout reads pressure to two places and tilt in whole degrees", () =>
   assert.equal(penReadoutText(0.623, 12.4, -3), "Pen: pressure 0.62, tilt 12° / −3°");
   assert.equal(penReadoutText(1, 0, 0), "Pen: pressure 1.00, tilt 0° / 0°");
 });
+
+test("tilt of exactly 90° / 0° is what a webview reports without tilt: the readout says so", () => {
+  assert.equal(penReadoutText(0.5, 90, 0), "Pen: pressure 0.50, tilt –");
+  assert.equal(penReadoutText(0.5, (90 * Math.PI) / 180 / (Math.PI / 180), 0), "Pen: pressure 0.50, tilt –");
+  assert.equal(penReadoutText(0.5, 89.6, 0), "Pen: pressure 0.50, tilt 90° / 0°");
+});

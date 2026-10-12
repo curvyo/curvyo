@@ -48,7 +48,15 @@ function degrees(value: number): string {
   return `${rounded < 0 ? "−" : ""}${Math.abs(rounded)}°`;
 }
 
-/** "Pen: pressure 0.62, tilt 12° / −3°". */
+/** Exactly tiltX 90° and tiltY 0°: what synthetic events and some Linux WebKitGTK builds report
+ * for a pen without tilt (a pen lying flat along X, which no hand holds). */
+function noTilt(tiltX: number, tiltY: number): boolean {
+  // The values pass through radians in the editor core, so "exactly" allows its rounding.
+  return Math.abs(tiltX - 90) < 1e-6 && Math.abs(tiltY) < 1e-6;
+}
+
+/** "Pen: pressure 0.62, tilt 12° / −3°", or "tilt –" when the webview reports no tilt. */
 export function penReadoutText(pressure: number, tiltX: number, tiltY: number): string {
-  return `Pen: pressure ${pressure.toFixed(2)}, tilt ${degrees(tiltX)} / ${degrees(tiltY)}`;
+  const tilt = noTilt(tiltX, tiltY) ? "–" : `${degrees(tiltX)} / ${degrees(tiltY)}`;
+  return `Pen: pressure ${pressure.toFixed(2)}, tilt ${tilt}`;
 }

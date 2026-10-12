@@ -42,8 +42,8 @@ function CurveGroup({
   return (
     <div
       role="radiogroup"
-      aria-label="Curve"
-      className="flex overflow-hidden rounded-md ring-1 ring-border"
+      aria-label="Pressure curve"
+      className="flex rounded-md ring-1 ring-border"
     >
       {CURVES.map((entry, index) => {
         const checked = entry.curve === curve;
@@ -67,7 +67,11 @@ function CurveGroup({
                 pick(index - 1);
               }
             }}
-            className="h-7 px-2 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)]"
+            // The ring sits outside the segment with a bar-coloured gap, so it reads against the
+            // blue of the chosen segment and against the bar alike (the Select bar's toggles).
+            className={`relative h-7 w-[52px] outline-none focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)] ${
+              index === 0 ? "rounded-l-md" : index === CURVES.length - 1 ? "rounded-r-md" : ""
+            }`}
             style={{
               background: checked ? "var(--toolbar-icon-active-bg)" : "transparent",
               color: checked ? "var(--toolbar-icon-active-fg)" : "var(--toolbar-icon)",
@@ -84,7 +88,7 @@ function CurveGroup({
 /**
  * The Pencil bar (`specs/0032-pen-tablet-input` criteria 14 and 15, `docs/design-system.md` row
  * "Pencil bar"): hidden while only a mouse has been used. Once a pen is seen it shows the muted
- * readout; after the first stroke with pressure it adds Min, Max and Curve. The settings are the
+ * readout first; after the first stroke with pressure a divider, then Min, Max and Curve. The settings are the
  * session's and apply from the next stroke; nothing here is saved.
  */
 export function PencilToolbar({
@@ -105,8 +109,19 @@ export function PencilToolbar({
         boxShadow: "var(--panel-elevation-shadow)",
       }}
     >
+      <span
+        className="w-[232px] shrink-0 truncate text-xs tabular-nums"
+        style={{ color: "var(--panel-muted-fg)" }}
+      >
+        {bar.readout ?? "\u00a0"}
+      </span>
       {bar.pressureSeen && (
         <>
+          <div
+            aria-hidden
+            className="h-5 w-px shrink-0"
+            style={{ background: "var(--toolbar-icon)", opacity: 0.25 }}
+          />
           <div className="flex items-center gap-1 text-[var(--toolbar-icon)]">
             <span>Min</span>
             <EntryField
@@ -141,12 +156,6 @@ export function PencilToolbar({
           </div>
         </>
       )}
-      <span
-        className="w-[232px] truncate tabular-nums"
-        style={{ color: "var(--panel-muted-fg)" }}
-      >
-        {bar.readout ?? " "}
-      </span>
     </div>
   );
 }
