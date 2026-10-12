@@ -137,7 +137,7 @@ export function ToolRail({
   const letterActsOnSelection = tool === "select" && selectionCount > 0;
   return (
     <Tooltip.Provider>
-      <div className="pointer-events-none absolute top-3 bottom-1 left-3 z-30 flex gap-2">
+      <div className="pointer-events-none absolute top-3 right-3 bottom-1 left-3 z-30 flex gap-2">
         <div className="flex min-h-0 w-12 flex-col gap-2">
           <div className={RAIL_CARD_CLASS} style={RAIL_CARD_STYLE}>
             <ToolButton

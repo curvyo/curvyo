@@ -14,7 +14,8 @@ fn count(n: usize) -> u32 {
 
 /// What `apply_cut` did. `kind` is `"ignored"`, `"applied"` (`count` paths became `pieces`
 /// pieces) or a refusal: `"none_selected"`, `"groups"` or `"compound"` (`count` objects are to
-/// blame), `"out_of_range"` (`count` of the `of` selected objects), `"no_crossing"` or
+/// blame), `"out_of_range"` (`count` of the `of` selected objects), `"no_crossing"` (`of` objects
+/// selected) or
 /// `"too_many"` (the cut would make `pieces` pieces). Nothing was changed by anything but
 /// `"applied"`.
 #[wasm_bindgen]
@@ -62,8 +63,14 @@ impl From<CutOutcome> for CutResultView {
 
 #[wasm_bindgen]
 impl WasmSession {
-    /// Cuts the selected paths open where they cross, touch or overlap, in one commit.
+    /// Cuts the selected paths open where they cross, touch or overlap, in one commit. For
+    /// `"no_crossing"`, `of` is the number of selected objects (the sentence says "path" or
+    /// "paths"); a refusal leaves the selection as it was.
     pub fn apply_cut(&mut self) -> CutResultView {
-        self.session.apply_cut().into()
+        let mut view: CutResultView = self.session.apply_cut().into();
+        if view.kind == "no_crossing" {
+            view.of = count(self.session.selected_object_count());
+        }
+        view
     }
 }

@@ -101,16 +101,21 @@ export function commandDimmed(command: PathCommand, availability: PathAvailabili
 }
 
 /** The third tooltip line, first match wins (criterion 2). `selectTool` is whether the Select
- * tool is active: with another tool the buttons are dimmed and the note says which tool to take. */
+ * tool is active: with another tool the buttons are dimmed and the note only says which tool to
+ * take. */
 export function commandNote(
   command: PathCommand,
   availability: PathAvailabilityState,
   selectTool: boolean,
 ): string {
-  const withTool = (note: string) => (selectTool ? note : `${note} ${USE_SELECT}`);
+  // With another tool the session reports nothing as selected, so a sentence about the selection
+  // would be false; the tool is the one reason (UX review of 0048 and 0036, 2026-10-12).
+  if (!selectTool) {
+    return USE_SELECT;
+  }
   if (command === "combine") {
     if (availability.needsTwo) {
-      return withTool("Select two or more closed shapes.");
+      return "Select two or more closed shapes.";
     }
     if (availability.open > 0) {
       const verb = availability.open === 1 ? "is" : "are";
@@ -121,10 +126,10 @@ export function commandNote(
   if (command === "cut") {
     return availability.canCut
       ? "Pieces get no fill. Replaces the selection."
-      : withTool("Select one or more paths.");
+      : "Select one or more paths.";
   }
   if (!availability.hasCompound) {
-    return withTool("Select a compound path.");
+    return "Select a compound path.";
   }
   return command === "split"
     ? "Replaces the selection."
@@ -242,7 +247,13 @@ export function cutSuccessText(result: CutResult): string | null {
   if (result.kind !== "applied") {
     return null;
   }
-  return `Cut: ${plural(result.count, "path", "paths")} became ${result.pieces} pieces.`;
+  const paths = plural(result.count, "path", "paths");
+  // Closed paths cut once each give as many pieces as paths: the picture does not change, so the
+  // notice says what happened to them.
+  if (result.pieces === result.count) {
+    return result.count === 1 ? "Cut: 1 path was cut open." : `Cut: ${paths} were cut open.`;
+  }
+  return `Cut: ${paths} became ${plural(result.pieces, "piece", "pieces")}.`;
 }
 
 /** The notice after a refused Cut (`0036` criteria 8 to 10), or `null` for a result that is no
@@ -250,7 +261,9 @@ export function cutSuccessText(result: CutResult): string | null {
 export function cutRefusalText(result: CutResult): string | null {
   switch (result.kind) {
     case "no_crossing":
-      return `The selected paths do not cross each other or themselves. ${NOTHING_CHANGED}`;
+      return result.of === 1
+        ? `The selected path does not cross itself. ${NOTHING_CHANGED}`
+        : `The selected paths do not cross each other or themselves. ${NOTHING_CHANGED}`;
     case "compound":
       return `Cut does not work on compound paths. Split or Break apart first. ${NOTHING_CHANGED}`;
     case "too_many":

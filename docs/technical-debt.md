@@ -737,6 +737,11 @@ Known limits of Cut:
   an unchecked caller cannot allocate without limit.
 - The 10,000-piece limit is checked after the whole kernel run: 2,000 x 2,000 lines produce four
   million meetings before the refusal. A cap inside `cut_parameters` would return early.
+- UX follow-ups from the review of 2026-10-12: Split's one-piece refusal speaks of holes also for a
+  compound path of overlapping outlines without a hole (only files from other programs hold one;
+  the refusal would need a hole flag); the member boxes of neighbouring pieces that share an edge
+  draw it as a solid line (two dash patterns on one line), which Cut makes common; the red
+  refusal outline is drawn under the blue selection dashes where the two coincide.
 - The curve module has no Bézier clipping, so two very long curves that nearly coincide cost more
   than the budgets cover.
 

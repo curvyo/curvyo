@@ -88,7 +88,7 @@ test("the Combine note: fewer than two, another tool, an open path, else the eff
   assert.equal(commandNote("combine", none, true), "Select two or more closed shapes.");
   assert.equal(
     commandNote("combine", none, false),
-    "Select two or more closed shapes. Use the Select tool.",
+    "Use the Select tool.",
   );
   assert.equal(
     commandNote("combine", available({ open: 1 }), true),
@@ -110,7 +110,7 @@ test("the Split and Break apart notes: no compound path, another tool, else the 
     assert.equal(commandNote(command, none, true), "Select a compound path.");
     assert.equal(
       commandNote(command, none, false),
-      "Select a compound path. Use the Select tool.",
+      "Use the Select tool.",
     );
   }
   assert.equal(commandNote("split", available({}), true), "Replaces the selection.");
@@ -268,7 +268,7 @@ test("the Break apart refusals are the sentences of criterion 13", () => {
 test("the Cut note: nothing selected, another tool, else the effect", () => {
   const none = available({ canCut: false });
   assert.equal(commandNote("cut", none, true), "Select one or more paths.");
-  assert.equal(commandNote("cut", none, false), "Select one or more paths. Use the Select tool.");
+  assert.equal(commandNote("cut", none, false), "Use the Select tool.");
   assert.equal(commandNote("cut", available({}), true), "Pieces get no fill. Replaces the selection.");
   assert.equal(commandDimmed("cut", none), true);
   assert.equal(commandDimmed("cut", available({ hasCompound: false })), false, "plain paths enable Cut");
@@ -278,6 +278,10 @@ test("the Cut note: nothing selected, another tool, else the effect", () => {
 test("the Cut notice counts the paths and the pieces", () => {
   assert.equal(cutSuccessText(cut({})), "Cut: 2 paths became 9 pieces.");
   assert.equal(cutSuccessText(cut({ count: 1, pieces: 4 })), "Cut: 1 path became 4 pieces.");
+  assert.equal(cutSuccessText(cut({ count: 2, pieces: 3 })), "Cut: 2 paths became 3 pieces.");
+  // A closed path cut once is one piece: the picture does not change, the notice says why.
+  assert.equal(cutSuccessText(cut({ count: 1, pieces: 1 })), "Cut: 1 path was cut open.");
+  assert.equal(cutSuccessText(cut({ count: 2, pieces: 2 })), "Cut: 2 paths were cut open.");
   assert.equal(cutSuccessText(cut({ kind: "no_crossing" })), null);
 });
 
@@ -285,6 +289,10 @@ test("the Cut refusals are the sentences of criteria 8 to 10", () => {
   assert.equal(
     cutRefusalText(cut({ kind: "no_crossing" })),
     "The selected paths do not cross each other or themselves. Nothing was changed.",
+  );
+  assert.equal(
+    cutRefusalText(cut({ kind: "no_crossing", of: 1 })),
+    "The selected path does not cross itself. Nothing was changed.",
   );
   assert.equal(
     cutRefusalText(cut({ kind: "groups", count: 3 })),

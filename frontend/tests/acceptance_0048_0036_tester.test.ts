@@ -102,14 +102,17 @@ test("States: nothing selected dims Cut with its note", () => {
   assert.equal(commandNote("cut", none, true), "Select one or more paths.");
 });
 
-test("States: another tool than Select adds 'Use the Select tool.'", () => {
+// Amended after the UX review of 2026-10-12 (lead decision): with another tool the note is "Use the
+// Select tool." alone; the session reports nothing as selected then, so a selection sentence would
+// be false.
+test("States: another tool than Select says 'Use the Select tool.'", () => {
   const off = avail({}); // the session reports nothing for another tool
-  assert.equal(commandNote("split", off, false), "Select a compound path. Use the Select tool.");
+  assert.equal(commandNote("split", off, false), "Use the Select tool.");
   assert.equal(
     commandNote("break_apart", off, false),
-    "Select a compound path. Use the Select tool.",
+    "Use the Select tool.",
   );
-  assert.equal(commandNote("cut", off, false), "Select one or more paths. Use the Select tool.");
+  assert.equal(commandNote("cut", off, false), "Use the Select tool.");
   for (const c of ["split", "break_apart", "cut"] as const) {
     assert.equal(commandDimmed(c, off), true);
   }

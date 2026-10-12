@@ -174,14 +174,14 @@ test("0035 criterion 2: tooltip notes, first match wins", () => {
   assert.equal(commandNote("combine", st({ needsTwo: true, of: 0 }), true), "Select two or more closed shapes.");
   assert.equal(
     commandNote("combine", st({ needsTwo: true, of: 0 }), false),
-    "Select two or more closed shapes. Use the Select tool.",
+    "Use the Select tool.",
   );
   assert.equal(commandNote("combine", st({ open: 1 }), true), "Needs closed paths: 1 of 3 selected is open.");
   assert.equal(commandNote("combine", st({}), true), "Replaces the selection.");
   assert.equal(commandNote("split", st({ hasCompound: false }), true), "Select a compound path.");
   assert.equal(
     commandNote("split", st({ hasCompound: false }), false),
-    "Select a compound path. Use the Select tool.",
+    "Use the Select tool.",
   );
   assert.equal(commandNote("split", st({}), true), "Replaces the selection.");
 });
