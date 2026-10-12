@@ -347,7 +347,7 @@ mod tests {
         assert!(offset_distance_is_zero(Length::from_mm(-0.0004)));
         assert!(!offset_distance_is_zero(Length::from_mm(0.0005)));
         assert!(!offset_distance_is_zero(Length::from_mm(f64::NAN)));
-        assert!(without_flattening_noise(vec![Vec::new()], 0.008).is_empty());
+        assert_eq!(without_flattening_noise(vec![Vec::new()], 0.008), Paths64::new());
     }
 
     #[test]
