@@ -6,7 +6,7 @@ use std::collections::{BTreeMap, HashMap};
 
 use loro::{LoroDoc, VersionVector};
 
-use super::stack_machine::{Event, StackMachine, Status};
+use super::stack_machine::{BranchMark, Event, StackMachine, Status};
 use super::step_header::{
     KEY_OBJECT, KEY_OBJECT_REDONE, KEY_OBJECT_UNDONE, KEY_REDONE, KEY_UNDONE, LABEL_NEW_DOCUMENT,
     LABEL_OBJECT_REDO, LABEL_OBJECT_UNDO, LABEL_REDO, LABEL_UNDO, LABEL_WIPE, LABEL_WIPE_OBJECT,
@@ -190,6 +190,11 @@ impl StepIndex {
             .get(&peer)
             .cloned()
             .unwrap_or_else(|| StackMachine::new(usize::MAX))
+    }
+
+    /// The branch a step's own peer left it on, while it is on one.
+    pub(crate) fn branch_of(&self, step: StepRef) -> Option<BranchMark> {
+        self.machines.get(&step.peer())?.branch_of(step)
     }
 
     /// The status of a step.

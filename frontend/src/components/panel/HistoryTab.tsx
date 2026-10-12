@@ -1,4 +1,16 @@
-import { Copy, Eraser, File, Minus, Pencil, Plus, Redo2, Replace, Undo2 } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  Copy,
+  Eraser,
+  File,
+  Minus,
+  Pencil,
+  Plus,
+  Redo2,
+  Replace,
+  Undo2,
+} from "lucide-react";
 import {
   type ComponentType,
   useCallback,
@@ -13,6 +25,19 @@ import { ToggleGroup, type ToggleOption } from "@/components/ui/toggle-group";
 import { Tooltip } from "@/components/ui/tooltip";
 import type { EditorSession } from "@/hooks/useEditorSession";
 import { useHistoryList } from "@/hooks/useHistoryList";
+import {
+  type FoldItem,
+  type GutterSegment,
+  type RowItem,
+  edgeY,
+  forkPath,
+  gutterWidth,
+  itemHeight,
+  itemRange,
+  itemTop,
+  laneX,
+  listHeight,
+} from "@/lib/historyItems";
 import type { HistoryScopeState } from "@/hooks/useHistoryScope";
 import {
   type HistoryRowData,
@@ -34,7 +59,6 @@ import {
   rowTooltip,
   scrollAfterInsert,
   secondLineRest,
-  visibleRange,
   canRestoreScroll,
   wipeConfirmKey,
 } from "@/lib/historyRows";
@@ -84,25 +108,66 @@ interface HistoryTabProps {
   historyScope: HistoryScopeState;
 }
 
-/** The mark of a step on the lane: a filled disc while in effect, an open ring with a dotted line
- * once taken back (criterion 39); the line of an inherited row is dashed and keeps the disc. */
-function Lane({ undone, last, dashed }: { undone: boolean; last: boolean; dashed: boolean }) {
+/** An item's slice of the lane gutter (`specs/0042-history-branches` UX notes): the main lane (a
+ * filled disc while in effect, an open ring on a dotted line once taken back, dashed for an
+ * inherited row; criterion 39 of `0020`), branch lanes with open rings, and the connector at a
+ * fork point. Every item draws its own slice, so the lines are continuous in a virtualised list. */
+function Gutter({ segments, lanes, height }: { segments: GutterSegment[]; lanes: number; height: number }) {
   return (
-    <svg width={16} height={ROW_HEIGHT_PX} aria-hidden className="shrink-0 text-[var(--panel-muted-fg)]">
-      <line
-        x1={8}
-        x2={8}
-        y1={0}
-        y2={last ? 22 : ROW_HEIGHT_PX}
-        stroke="currentColor"
-        strokeWidth={1.5}
-        strokeDasharray={undone ? "2 3" : dashed ? "6 3" : undefined}
-      />
-      {undone ? (
-        <circle cx={8} cy={22} r={3.5} fill="var(--panel-bg)" stroke="currentColor" strokeWidth={1.5} />
-      ) : (
-        <circle cx={8} cy={22} r={4} fill="currentColor" />
-      )}
+    <svg
+      width={gutterWidth(lanes)}
+      height={height}
+      aria-hidden
+      className="shrink-0 text-[var(--toolbar-icon)]"
+    >
+      {segments.map((segment, n) => {
+        const key = `${n}`;
+        switch (segment[0]) {
+          case "line": {
+            const [, lane, from, to, style] = segment;
+            const branch = style === "branch";
+            const quiet = branch || style === "dotted";
+            return (
+              <line
+                key={key}
+                x1={laneX(lane)}
+                x2={laneX(lane)}
+                y1={edgeY(from, height)}
+                y2={edgeY(to, height)}
+                stroke={quiet ? "var(--lane-line)" : "currentColor"}
+                strokeWidth={branch ? 1.5 : 2}
+                strokeDasharray={style === "dotted" ? "2 3" : style === "dashed" ? "6 3" : undefined}
+              />
+            );
+          }
+          case "disc":
+            return <circle key={key} cx={laneX(segment[1])} cy={height / 2} r={4} fill="currentColor" />;
+          case "ring":
+            return (
+              <circle
+                key={key}
+                cx={laneX(segment[1])}
+                cy={height / 2}
+                r={3.5}
+                fill="var(--panel-bg)"
+                stroke={segment[1] === 0 ? "currentColor" : "var(--lane-line)"}
+                strokeWidth={1.5}
+              />
+            );
+          case "fork":
+            return (
+              <path
+                key={key}
+                d={forkPath(segment[1], segment[2], height)}
+                fill="none"
+                stroke="var(--lane-line)"
+                strokeWidth={1.5}
+              />
+            );
+          default:
+            return null;
+        }
+      })}
     </svg>
   );
 }
@@ -163,7 +228,8 @@ export function HistoryTab({ editor, shown, onReturnFocus, historyScope }: Histo
     }
   }, [wanted, list.total, list.loadedFor]);
 
-  const range = visibleRange(scrollTop, viewport, list.total);
+  const { shape } = list;
+  const range = itemRange(scrollTop, viewport, shape);
   const { ensure } = list;
   useEffect(() => {
     ensure(range.first, range.last);
@@ -213,11 +279,12 @@ export function HistoryTab({ editor, shown, onReturnFocus, historyScope }: Histo
     if (!element) {
       return;
     }
-    const top = to * ROW_HEIGHT_PX;
+    const top = itemTop(to, shape);
+    const height = itemHeight(to, shape);
     if (top < element.scrollTop) {
       element.scrollTop = top;
-    } else if (top + ROW_HEIGHT_PX > element.scrollTop + element.clientHeight) {
-      element.scrollTop = top + ROW_HEIGHT_PX - element.clientHeight;
+    } else if (top + height > element.scrollTop + element.clientHeight) {
+      element.scrollTop = top + height - element.clientHeight;
     }
     refocus.current = true;
     setFocused(to);
@@ -246,18 +313,43 @@ export function HistoryTab({ editor, shown, onReturnFocus, historyScope }: Histo
     }
   }
   const rows = indices.map((index) => {
-    const row = list.rowAt(index);
-    return row ? (
+    const item = list.itemAt(index);
+    const place = { top: itemTop(index, shape), height: itemHeight(index, shape) };
+    if (item && item.type !== "row") {
+      return (
+        <FoldRow
+          key={item.key}
+          item={item}
+          index={index}
+          total={list.total}
+          lanes={shape.lanes}
+          place={place}
+          tabbable={index === focused}
+          onFocusRow={() => {
+            setFocused(index);
+            setHover("");
+          }}
+          onToggle={() => {
+            refocus.current = true;
+            setFocused(index);
+            list.toggle(index);
+          }}
+        />
+      );
+    }
+    return item ? (
       <StepRow
-        key={row.step}
-        row={row}
+        key={item.step}
+        row={item}
         index={index}
         total={list.total}
+        lanes={shape.lanes}
+        place={place}
         now={now}
         tabbable={index === focused}
         onFocusRow={() => {
           setFocused(index);
-          setHover(row.step);
+          setHover(item.step);
         }}
         onHover={setHover}
       />
@@ -267,7 +359,7 @@ export function HistoryTab({ editor, shown, onReturnFocus, historyScope }: Histo
         role="listitem"
         aria-hidden
         className="absolute right-0 left-0 flex flex-col justify-center gap-1 px-2"
-        style={{ top: index * ROW_HEIGHT_PX, height: ROW_HEIGHT_PX }}
+        style={place}
       >
         <span className="h-2 w-2/3 rounded bg-[var(--value-fill)]" />
         <span className="h-2 w-1/3 rounded bg-[var(--value-fill)]" />
@@ -324,7 +416,7 @@ export function HistoryTab({ editor, shown, onReturnFocus, historyScope }: Histo
         className="history-list relative min-h-[120px] flex-1 overflow-x-hidden overflow-y-auto outline-none"
         style={{ overscrollBehavior: "contain", scrollbarWidth: "thin" }}
       >
-        <div className="relative" style={{ height: list.total * ROW_HEIGHT_PX }}>
+        <div className="relative" style={{ height: listHeight(shape) }}>
           {rows}
         </div>
       </div>
@@ -341,9 +433,11 @@ export function HistoryTab({ editor, shown, onReturnFocus, historyScope }: Histo
 }
 
 interface StepRowProps {
-  row: HistoryRowData;
+  row: RowItem;
   index: number;
   total: number;
+  lanes: number;
+  place: { top: number; height: number };
   now: Date;
   tabbable: boolean;
   onFocusRow: () => void;
@@ -351,7 +445,7 @@ interface StepRowProps {
 }
 
 /** One step: kind glyph, operation name, step id, and the second line (criterion 39). */
-function StepRow({ row, index, total, now, tabbable, onFocusRow, onHover }: StepRowProps) {
+function StepRow({ row, index, total, lanes, place, now, tabbable, onFocusRow, onHover }: StepRowProps) {
   const Glyph = GLYPHS[glyphKey(row)] ?? Pencil;
   const undone = isUndone(row);
   const lead = leadWords(row);
@@ -362,7 +456,7 @@ function StepRow({ row, index, total, now, tabbable, onFocusRow, onHover }: Step
       aria-posinset={index + 1}
       aria-setsize={total}
       className="absolute right-0 left-0"
-      style={{ top: index * ROW_HEIGHT_PX, height: ROW_HEIGHT_PX }}
+      style={place}
     >
       <Tooltip side="left" content={rowTooltip(row)}>
         <button
@@ -376,7 +470,7 @@ function StepRow({ row, index, total, now, tabbable, onFocusRow, onHover }: Step
           onMouseLeave={() => onHover("")}
           className="flex h-full w-full items-stretch gap-1 rounded-[5px] text-left outline-none hover:bg-[var(--row-hover)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)]"
         >
-          <Lane undone={undone} last={index === total - 1} dashed={Boolean(row.from)} />
+          <Gutter segments={row.gutter} lanes={lanes} height={ROW_HEIGHT_PX} />
           <span className="flex min-w-0 flex-1 flex-col justify-center pr-2">
             <span className={`flex h-5 items-center gap-1.5 text-sm ${muted}`}>
               <Glyph size={16} strokeWidth={1.5} aria-hidden />
@@ -393,6 +487,46 @@ function StepRow({ row, index, total, now, tabbable, onFocusRow, onHover }: Step
           </span>
         </button>
       </Tooltip>
+    </div>
+  );
+}
+
+interface FoldRowProps {
+  item: FoldItem;
+  index: number;
+  total: number;
+  lanes: number;
+  place: { top: number; height: number };
+  tabbable: boolean;
+  onFocusRow: () => void;
+  onToggle: () => void;
+}
+
+/** A branch header row ("Branch from a1b2c3d, 2 steps") or the "N more branches" row: a press or
+ * Enter folds or unfolds it (`specs/0042-history-branches` criterion 8). */
+function FoldRow({ item, index, total, lanes, place, tabbable, onFocusRow, onToggle }: FoldRowProps) {
+  const Chevron = item.expanded ? ChevronDown : ChevronRight;
+  return (
+    <div role="listitem" aria-posinset={index + 1} aria-setsize={total} className="absolute right-0 left-0" style={place}>
+      <button
+        type="button"
+        data-row-index={index}
+        tabIndex={tabbable ? 0 : -1}
+        aria-expanded={item.expanded}
+        onFocus={onFocusRow}
+        onClick={onToggle}
+        className="flex h-full w-full items-stretch gap-1 rounded-[5px] text-left outline-none hover:bg-[var(--row-hover)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)]"
+      >
+        <Gutter segments={item.gutter} lanes={lanes} height={place.height} />
+        <span
+          className={`flex min-w-0 flex-1 items-center justify-between pr-2 text-xs text-[var(--panel-muted-fg)] ${
+            item.type === "header" ? "font-semibold" : ""
+          }`}
+        >
+          <span className="truncate">{item.text}</span>
+          <Chevron size={12} strokeWidth={1.5} aria-hidden />
+        </span>
+      </button>
     </div>
   );
 }

@@ -109,8 +109,8 @@ impl Session {
         let (status, undone_by) = match (row.status, row.undone_by) {
             (Status::Applied, Some(author)) => ("undone-by", author_word(author)),
             (Status::Applied, None) => ("applied", ""),
-            // An undone step and a step on a branch both read "Undone" until `0042` shows branches.
-            _ => ("undone", ""),
+            (Status::Undone, _) => ("undone", ""),
+            (Status::OnBranch, _) => ("branch", ""),
         };
         json!({
             "id": row.shown_id,
@@ -142,14 +142,17 @@ impl Session {
 
     /// `count` rows of the history from the `start`-th newest, newest first, as one JSON array.
     pub fn history_rows_json(&mut self, start: usize, count: usize) -> String {
+        Value::Array(self.history_row_values(start, count)).to_string()
+    }
+
+    /// `count` rows of the history from the `start`-th newest, newest first.
+    pub(super) fn history_row_values(&mut self, start: usize, count: usize) -> Vec<Value> {
         self.sync_history();
-        let rows: Vec<Value> = self
-            .document
+        self.document
             .history_page(start, count)
             .iter()
             .map(|row| self.row_json(row))
-            .collect();
-        Value::Array(rows).to_string()
+            .collect()
     }
 
     /// The shown id of the newest step in effect, for the pinned "Now" row; empty without a step.

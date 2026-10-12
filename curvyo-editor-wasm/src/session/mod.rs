@@ -42,6 +42,7 @@ mod grouping;
 #[cfg(test)]
 mod grouping_tests;
 mod history;
+mod history_list;
 mod history_rows;
 mod key_table;
 mod keys;

@@ -51,6 +51,8 @@ pub(super) struct HistoryState {
     recorded: usize,
     clock: Clock,
     pub(super) notice: Option<String>,
+    /// The folded and unfolded branches of the History list (`history_list.rs`).
+    pub(super) list: super::history_list::ListState,
 }
 
 impl HistoryState {
@@ -60,6 +62,7 @@ impl HistoryState {
             recorded: 0,
             clock: wall_clock,
             notice: None,
+            list: super::history_list::ListState::default(),
         }
     }
 }

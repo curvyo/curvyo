@@ -9,6 +9,7 @@ use std::collections::HashSet;
 
 use loro::TreeID;
 
+use super::branches::{HistoryBranch, Listed, derive};
 use super::lineage::clone_origin;
 use super::object_timeline::{Entry, EntryClass, Reader, Targets, TimelineStatus};
 use super::report::Role;
@@ -49,8 +50,10 @@ pub enum ObjectRowClass {
 pub enum ObjectStatus {
     /// In effect.
     Applied,
-    /// Taken back with Ctrl+Z (or replaced after that).
+    /// Taken back with Ctrl+Z or an object undo, and still redoable.
     Undone,
+    /// Taken back and then left by a newer step: on a branch (`specs/0042-history-branches`).
+    OnBranch,
     /// Taken back by an object undo of this author.
     UndoneBy(Author),
 }
@@ -148,6 +151,25 @@ impl Document {
                     self.object_row(reader, me, subject, entry, status)
                 })
                 .collect()
+        })
+    }
+
+    /// The branches of the timeline of `id`, newest first (`specs/0042-history-branches` criteria 1
+    /// to 3). Row indices count like [`Document::object_history_page`].
+    #[must_use]
+    pub fn object_history_branches(&self, id: NodeId) -> Vec<HistoryBranch> {
+        self.with_reader(|reader, _| {
+            let timeline = reader.timeline(tree_id(id));
+            let list: Vec<Listed> = timeline
+                .entries
+                .iter()
+                .map(|entry| Listed {
+                    step: entry.step,
+                    position: reader.steps.position(entry.step).unwrap_or_default(),
+                    mark: timeline.branch_mark(entry, reader.steps),
+                })
+                .collect();
+            derive(&list, |step| reader.steps.position(step))
         })
     }
 
@@ -299,6 +321,7 @@ impl Document {
             status: match status {
                 TimelineStatus::Applied => ObjectStatus::Applied,
                 TimelineStatus::Undone => ObjectStatus::Undone,
+                TimelineStatus::OnBranch => ObjectStatus::OnBranch,
                 TimelineStatus::UndoneBy(by) => ObjectStatus::UndoneBy(author_of(by, me)),
             },
         }

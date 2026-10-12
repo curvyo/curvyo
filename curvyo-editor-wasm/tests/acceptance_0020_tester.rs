@@ -1100,8 +1100,9 @@ fn c22_undone_steps_stay_in_the_global_history_marked_undone() {
     drag(&mut s, Tool::Ellipse, pt(20.0, 80.0), pt(60.0, 120.0));
     assert_eq!(s.history_len(), rows_before + 1);
     let text = s.history_rows_json(0, 10);
+    // Since `0042` (criteria 1 and 4) a step left by a newer step is on a branch.
     assert!(
-        text.contains("\"status\":\"undone\""),
+        text.contains("\"status\":\"branch\""),
         "the undone step is not lost: {text}"
     );
 }

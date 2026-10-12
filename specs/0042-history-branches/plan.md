@@ -58,19 +58,20 @@ file with the two new labels as legacy-labelled steps.
 ## Tasks
 
 ### Milestone 1: branches, row states, lanes, keyboard
-- [ ] 1.1 Test first: the stack machine reports fork point and branch for each dropped step;
+- [x] 1.1 Test first: the stack machine reports fork point and branch for each dropped step;
   redo at a fork returns the most recently left branch (AC 1, 2, 28).
-- [ ] 1.2 `branches.rs`: branch id, fork point, step count, nested forks; one peer's machine per
+- [x] 1.2 `branches.rs`: branch id, fork point, step count, nested forks; one peer's machine per
   Document scope, one object's timeline per Object scope; peers' steps never start a branch;
   main-line order by (Lamport, peer) (AC 3, 5, 28, 29).
-- [ ] 1.3 Rows carry status and branch in both scopes; wiped steps and their branches leave the
+- [x] 1.3 Rows carry status and branch in both scopes; wiped steps and their branches leave the
   list (AC 4, 7).
-- [ ] 1.4 Save and Open give the same branches; two-replica test (AC 5, 6, 29).
-- [ ] 1.5 `history_lanes.rs`: lane per row, fork connectors, header rows, fold of the fourth and
+- [x] 1.4 Save and Open give the same branches; two-replica test (AC 5, 6, 29).
+- [x] 1.5 `history_lanes.rs`: lane per row, fork connectors, header rows, fold of the fourth and
   later branches; texts and accessible names in `history_branch_text.rs` (AC 3, 4, 8, 9).
-- [ ] 1.6 wasm rows with branch and lane fields; frontend lanes, header rows, folding, the word
-  "Branch", Left/Right into the row action, Enter folds (AC 4, 8, 9, 27).
-- [ ] 1.7 Budget: 50 branches, 10,000 steps, list opens within 200 ms (AC 8).
+- [x] 1.6 wasm rows with branch and lane fields; frontend lanes, header rows, folding, the word
+  "Branch", Enter folds (AC 4, 8, 9, 27). Left/Right into the row action moves to 4.4: the row
+  actions (Clone, the objects disclosure) arrive with milestone 4.
+- [x] 1.7 Budget: 50 branches, 10,000 steps, list opens within 200 ms (AC 8).
   Commit `feat(document-core): derive history branches`; architect review of the branch diff
   (public history API).
 
@@ -107,12 +108,32 @@ file with the two new labels as legacy-labelled steps.
 - [ ] 4.3 Document scope disclosure: touched objects (20, then "and N more"), one open at a time;
   clone of a deleted object reads the before-version; draw, resize, delete, Save, Open, clone
   test (AC 24).
-- [ ] 4.4 No Clone for groups; gate of criterion 26; ids selectable in rows (AC 25, 26, 27).
+- [ ] 4.4 No Clone for groups; gate of criterion 26; ids selectable in rows; Left and Right move
+  focus into and out of the row action (AC 9, 25, 26, 27).
 
 ### Milestone 5: slice check and PR
 - [ ] 5.1 Full gate (§7) plus frontend checks; browser walk-through of every criterion in WebKitGTK
   MiniBrowser under Xvfb; `/no-slop` on user-facing text.
 - [ ] 5.2 PR per `CLAUDE.md` §9: What changes in the demo, Review guide, no new dependencies.
+
+## Notes from the build
+
+- Milestone 1 (2026-10-12): the Document scope runs one stack machine per peer, so a peer's step
+  never starts a branch there (AC 5). The Object scope keeps the one machine of `0041` over the
+  object's timeline: an object undo followed by anybody's step on the object leaves the undone step
+  on a branch, because that is also when Ctrl+Shift+U stops being able to bring it back; a row
+  that read "Undone" there would promise a redo that does not exist (AC 4). Ctrl+Z take-backs in
+  the Object scope follow the author's own machine.
+- A branch whose fork point is not in the list (it forked before the first listed step, or the
+  fork point was wiped) is named "Branch from the start".
+- Three tester assertions written before `0042` expected the placeholder "Undone" for a step left
+  by a newer step (`acceptance_0041_tester` c11, `acceptance_0020_tester` c22,
+  `acceptance_0020_tester_more` c55's model). They now expect the branch state of AC 1 and 4; the
+  intent of each test is unchanged.
+- The "N more branches" row stays in the list while unfolded (with `aria-expanded`), so it can be
+  folded again; the revealed headers sit above their own newest rows. A branch revealed from it and
+  unfolded takes a lane by the same rule, the rightmost one when all three are taken.
+- Folding a branch also hides the branches that fork from it.
 
 ## Validation
 

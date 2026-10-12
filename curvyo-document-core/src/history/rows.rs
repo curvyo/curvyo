@@ -2,6 +2,7 @@
 //! to 38, 60). A row is derived from the log, never stored: its kind and its touched objects come
 //! from the step's operations, its status from the stacks the commits tell.
 
+use super::branches::{HistoryBranch, Listed, derive};
 use super::report::{ObjectShape, Role};
 use super::restore::kind_of;
 use super::stack_machine::Status;
@@ -210,6 +211,40 @@ impl Document {
             .find(|step| index.status(step.step) == Status::Applied)?
             .step;
         index.shown().get(&newest).cloned()
+    }
+
+    /// The shown id of `step` (`specs/0020-undo-redo` criterion 33), for a step that is a row.
+    #[must_use]
+    pub fn history_shown_id(&self, step: StepRef) -> Option<String> {
+        let doc = self.loro();
+        self.assert_outside_batch();
+        doc.commit();
+        let mut index = self.step_index.borrow_mut();
+        index.extend(doc);
+        index.ensure_shown();
+        index.shown().get(&step).cloned()
+    }
+
+    /// The branches of the global history, newest first (`specs/0042-history-branches` criteria 1
+    /// to 3, 5). Each peer's branches come from that peer's own take-backs; row indices count like
+    /// [`Document::history_page`].
+    #[must_use]
+    pub fn history_branches(&self) -> Vec<HistoryBranch> {
+        let doc = self.loro();
+        self.assert_outside_batch();
+        doc.commit();
+        let mut index = self.step_index.borrow_mut();
+        index.extend(doc);
+        let list: Vec<Listed> = index
+            .steps()
+            .filter(|step| is_row(step))
+            .map(|log| Listed {
+                step: log.step,
+                position: index.position(log.step).unwrap_or_default(),
+                mark: index.branch_of(log.step),
+            })
+            .collect();
+        derive(&list, |step| index.position(step))
     }
 
     /// `count` rows of the history from the `start`-th newest, newest first.

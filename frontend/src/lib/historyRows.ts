@@ -39,8 +39,11 @@ export interface HistoryRowData {
   kind: "create" | "delete" | "replace" | "change" | "document";
   /** "3 paths", or empty when the step touched no object. */
   summary: string;
-  /** "undone-by": taken back by an object undo of `undoneBy`. */
-  status: "applied" | "undone" | "undone-by";
+  /** "undone-by": taken back by an object undo of `undoneBy`; "branch": taken back and then left
+   * by a newer step (`specs/0042-history-branches` criterion 4). */
+  status: "applied" | "undone" | "undone-by" | "branch";
+  /** For a row on a branch: "on branch from a1b2c3d, step 2 of 2" (criterion 9). */
+  lane?: string;
   undoneBy?: "you" | "earlier" | "";
   class?: RowClass;
   /** What the step did to the selected object (Object scope rows). */
@@ -103,10 +106,14 @@ export function authorLong(row: HistoryRowData): string {
 }
 
 /** The status word of a row, empty while it is in effect: "Undone" for a step taken back with
- * Ctrl+Z, "Undone by You" for one taken back by an object undo (`0041` criterion 8). */
+ * Ctrl+Z, "Undone by You" for one taken back by an object undo (`0041` criterion 8), "Branch" for
+ * one on a branch (`0042` criterion 4). */
 export function statusWord(row: HistoryRowData): string {
   if (row.status === "undone-by") {
     return row.undoneBy === "earlier" ? "Undone by Earlier session" : "Undone by You";
+  }
+  if (row.status === "branch") {
+    return "Branch";
   }
   return row.status === "undone" ? "Undone" : "";
 }
@@ -171,7 +178,7 @@ export function rowAriaName(row: HistoryRowData, now: Date): string {
     authorLong(row),
     formatRowTime(row.time, now),
     `id ${row.id}`,
-    statusWord(row).toLowerCase(),
+    row.status === "branch" ? (row.lane ?? "") : statusWord(row).toLowerCase(),
     row.from ? `from ${row.from}` : "",
   ]
     .filter((part) => part !== "")

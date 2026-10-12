@@ -434,7 +434,10 @@ fn c55_a_thousand_generated_events_match_a_model_of_the_stacks_and_row_statuses(
             let id = rows[0]["step"].as_str().unwrap().to_owned();
             model_undo.push(id.clone());
             status.insert(id, "applied");
-            model_redo.clear();
+            // Since `0042` (criteria 1 and 4) the steps a new step leaves are on a branch.
+            for left in model_redo.drain(..) {
+                status.insert(left, "branch");
+            }
             if model_undo.len() > 500 {
                 model_undo.remove(0);
             }

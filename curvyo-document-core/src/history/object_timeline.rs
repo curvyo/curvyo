@@ -14,7 +14,7 @@ use loro::{LoroDoc, TreeID, VersionVector};
 use super::lineage::{clone_origin, decode_node};
 use super::object_index::ObjectIndex;
 use super::rows::is_document_level_label;
-use super::stack_machine::{Event, StackMachine, Status};
+use super::stack_machine::{BranchMark, Event, StackMachine, Status};
 use super::step_header::{
     KEY_OBJECT, KEY_OBJECT_REDONE, KEY_OBJECT_UNDONE, LABEL_NEW_DOCUMENT, LABEL_OBJECT_REDO,
     LABEL_OBJECT_UNDO, LABEL_REDO, LABEL_UNDO, LABEL_WIPE, LABEL_WIPE_OBJECT,
@@ -213,15 +213,35 @@ impl Reader<'_> {
 impl Timeline {
     /// How an entry stands: applied, taken back by its author's undo, or by an object undo.
     pub(crate) fn status(&self, entry: &Entry, steps: &StepIndex) -> TimelineStatus {
-        if steps.status(entry.step) != Status::Applied {
-            return TimelineStatus::Undone;
+        match steps.status(entry.step) {
+            Status::OnBranch => return TimelineStatus::OnBranch,
+            Status::Undone => return TimelineStatus::Undone,
+            Status::Applied => {}
         }
         match entry.class {
-            EntryClass::Do if self.machine.status(entry.step) != Status::Applied => self
-                .undone_by
-                .get(&entry.step)
-                .map_or(TimelineStatus::Undone, |by| TimelineStatus::UndoneBy(*by)),
+            EntryClass::Do => match self.machine.status(entry.step) {
+                Status::Applied => TimelineStatus::Applied,
+                Status::OnBranch => TimelineStatus::OnBranch,
+                Status::Undone => self
+                    .undone_by
+                    .get(&entry.step)
+                    .map_or(TimelineStatus::Undone, |by| TimelineStatus::UndoneBy(*by)),
+            },
             _ => TimelineStatus::Applied,
+        }
+    }
+
+    /// The branch an entry is on: the one its author's Ctrl+Z and next step left it on, else the
+    /// one an object undo and the object's next step left it on (`specs/0042-history-branches`
+    /// criterion 1).
+    pub(crate) fn branch_mark(&self, entry: &Entry, steps: &StepIndex) -> Option<BranchMark> {
+        match steps.status(entry.step) {
+            Status::OnBranch => steps.branch_of(entry.step),
+            Status::Undone => None,
+            Status::Applied => match entry.class {
+                EntryClass::Do => self.machine.branch_of(entry.step),
+                _ => None,
+            },
         }
     }
 
@@ -270,8 +290,10 @@ impl Timeline {
 pub(crate) enum TimelineStatus {
     /// In effect.
     Applied,
-    /// Taken back by its author's Ctrl+Z, or replaced after that.
+    /// Taken back by its author's Ctrl+Z, or by an object undo nobody is named for.
     Undone,
+    /// Taken back and then left by a newer step (`specs/0042-history-branches`).
+    OnBranch,
     /// Taken back by this object undo.
     UndoneBy(StepRef),
 }

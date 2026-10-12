@@ -4,6 +4,9 @@
 //! The session feeds [`StackMachine::apply`] its own actions, with a limit of
 //! [`STACK_LIMIT`] entries. The history list feeds it the events of a peer's commits read from the
 //! log, without a limit. Both give the same stacks and the same statuses for the same events.
+//!
+//! A new step that arrives while the redo side holds steps leaves them as a branch whose fork point
+//! is the top of the undo side at that moment (`specs/0042-history-branches` criterion 28).
 
 use std::collections::HashMap;
 
@@ -21,6 +24,15 @@ pub enum Status {
     Undone,
     /// Taken back and then replaced by a new step: no longer on the redo stack.
     OnBranch,
+}
+
+/// The branch a step was left on (`specs/0042-history-branches` criteria 1 and 28).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BranchMark {
+    /// The newest step of the run that was left together: the branch's identity in this machine.
+    pub key: StepRef,
+    /// The top of the undo side when the run was left; `None` when the undo side was empty.
+    pub fork: Option<StepRef>,
 }
 
 /// One thing that happened to a peer's stacks.
@@ -46,6 +58,7 @@ pub struct StackMachine {
     undo: Vec<StepRef>,
     redo: Vec<StepRef>,
     statuses: HashMap<StepRef, Status>,
+    branches: HashMap<StepRef, BranchMark>,
 }
 
 impl StackMachine {
@@ -57,6 +70,7 @@ impl StackMachine {
             undo: Vec::new(),
             redo: Vec::new(),
             statuses: HashMap::new(),
+            branches: HashMap::new(),
         }
     }
 
@@ -64,8 +78,17 @@ impl StackMachine {
     pub fn apply(&mut self, event: Event) {
         match event {
             Event::Do(step) => {
-                for dropped in self.redo.drain(..) {
-                    self.statuses.insert(dropped, Status::OnBranch);
+                // The redo side holds the run newest first at its bottom: the first entry is the
+                // newest step of the run.
+                if let Some(&key) = self.redo.first() {
+                    let mark = BranchMark {
+                        key,
+                        fork: self.undo.last().copied(),
+                    };
+                    for dropped in self.redo.drain(..) {
+                        self.statuses.insert(dropped, Status::OnBranch);
+                        self.branches.insert(dropped, mark);
+                    }
                 }
                 self.push_undo(step);
             }
@@ -77,6 +100,7 @@ impl StackMachine {
             Event::Redo(step) => {
                 self.redo.retain(|entry| *entry != step);
                 self.statuses.remove(&step);
+                self.branches.remove(&step);
                 self.push_undo(step);
             }
             Event::ConsumeUndo => {
@@ -132,6 +156,12 @@ impl StackMachine {
         self.statuses.get(&step).copied().unwrap_or(Status::Applied)
     }
 
+    /// The branch a step was left on, while it is on one.
+    #[must_use]
+    pub fn branch_of(&self, step: StepRef) -> Option<BranchMark> {
+        self.branches.get(&step).copied()
+    }
+
     /// Every step that is not applied, with its status.
     pub fn non_applied(&self) -> impl Iterator<Item = (StepRef, Status)> + '_ {
         self.statuses.iter().map(|(step, status)| (*step, *status))
@@ -174,6 +204,77 @@ mod tests {
         assert_eq!(machine.status(step(1)), Status::OnBranch);
         assert_eq!(machine.status(step(2)), Status::OnBranch);
         assert_eq!(machine.status(step(3)), Status::Applied);
+    }
+
+    #[test]
+    fn the_steps_a_new_step_leaves_are_one_branch_from_the_top_of_the_undo_side() {
+        let mut machine = StackMachine::new(STACK_LIMIT);
+        for n in 1..=3 {
+            machine.apply(Event::Do(step(n)));
+        }
+        machine.apply(Event::Undo(step(3)));
+        machine.apply(Event::Undo(step(2)));
+        machine.apply(Event::Do(step(4)));
+        let mark = BranchMark {
+            key: step(3),
+            fork: Some(step(1)),
+        };
+        assert_eq!(machine.branch_of(step(2)), Some(mark));
+        assert_eq!(machine.branch_of(step(3)), Some(mark));
+        assert_eq!(machine.branch_of(step(1)), None);
+        assert_eq!(machine.branch_of(step(4)), None);
+        assert_eq!(machine.top_redo(), None, "nothing to redo after the fork");
+    }
+
+    #[test]
+    fn redo_at_a_fork_brings_back_the_branch_left_last() {
+        let mut machine = StackMachine::new(STACK_LIMIT);
+        for n in 1..=3 {
+            machine.apply(Event::Do(step(n)));
+        }
+        machine.apply(Event::Undo(step(3)));
+        machine.apply(Event::Undo(step(2)));
+        machine.apply(Event::Do(step(4)));
+        machine.apply(Event::Undo(step(4)));
+        assert_eq!(machine.top_undo(), Some(step(1)));
+        assert_eq!(machine.top_redo(), Some(step(4)));
+        assert_eq!(machine.status(step(4)), Status::Undone);
+        assert_eq!(machine.status(step(2)), Status::OnBranch);
+    }
+
+    #[test]
+    fn a_fork_with_an_empty_undo_side_has_no_fork_point() {
+        let mut machine = StackMachine::new(STACK_LIMIT);
+        machine.apply(Event::Do(step(1)));
+        machine.apply(Event::Undo(step(1)));
+        machine.apply(Event::Do(step(2)));
+        assert_eq!(
+            machine.branch_of(step(1)),
+            Some(BranchMark {
+                key: step(1),
+                fork: None
+            })
+        );
+    }
+
+    #[test]
+    fn a_step_on_a_branch_can_fork_again_when_its_own_branch_is_left() {
+        // s1 s2 s3, take back s3, s4: s3 forks from s2. Take back s4 and s2, s5: s2 and s4 are a
+        // branch from s1, and s3 keeps its fork point s2.
+        let mut machine = StackMachine::new(STACK_LIMIT);
+        for n in 1..=3 {
+            machine.apply(Event::Do(step(n)));
+        }
+        machine.apply(Event::Undo(step(3)));
+        machine.apply(Event::Do(step(4)));
+        machine.apply(Event::Undo(step(4)));
+        machine.apply(Event::Undo(step(2)));
+        machine.apply(Event::Do(step(5)));
+        assert_eq!(machine.branch_of(step(3)).unwrap().fork, Some(step(2)));
+        let outer = machine.branch_of(step(2)).unwrap();
+        assert_eq!(outer.fork, Some(step(1)));
+        assert_eq!(outer.key, step(4));
+        assert_eq!(machine.branch_of(step(4)), Some(outer));
     }
 
     #[test]

@@ -101,6 +101,24 @@ impl WasmSession {
             .history_rows_json(start as usize, count as usize)
     }
 
+    /// The shape of the History list of the Document scope (`object` false) or the selected
+    /// object's, as JSON (`Session::history_layout_json`).
+    pub fn history_layout(&mut self, object: bool) -> String {
+        self.session.history_layout_json(object)
+    }
+
+    /// `count` items of the History list from the `start`-th, as a JSON array: step rows, branch
+    /// header rows and the "more" row, each with its lane gutter (`Session::history_items_json`).
+    pub fn history_items(&mut self, object: bool, start: u32, count: u32) -> String {
+        self.session
+            .history_items_json(object, start as usize, count as usize)
+    }
+
+    /// A press or Enter on the header row or the "more" row at `index`: folds or unfolds it.
+    pub fn history_toggle(&mut self, object: bool, index: u32) -> bool {
+        self.session.toggle_history_item(object, index as usize)
+    }
+
     /// The shown id of the newest step in effect (the "Now" row), empty without a step.
     pub fn history_now_id(&mut self) -> String {
         self.session.history_now_id()

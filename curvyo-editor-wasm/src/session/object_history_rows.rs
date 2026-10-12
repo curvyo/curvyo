@@ -64,16 +64,21 @@ impl Session {
     /// `count` rows of the selected object's timeline from the `start`-th newest, as a JSON array.
     pub fn object_history_rows_json(&mut self, start: usize, count: usize) -> String {
         self.sync_history();
+        Value::Array(self.object_history_row_values(start, count)).to_string()
+    }
+
+    /// `count` rows of the selected object's timeline from the `start`-th newest; none without
+    /// exactly one selected object.
+    pub(super) fn object_history_row_values(&mut self, start: usize, count: usize) -> Vec<Value> {
+        self.sync_history();
         let Some(id) = self.history_object() else {
-            return "[]".to_owned();
+            return Vec::new();
         };
-        let rows: Vec<Value> = self
-            .document
+        self.document
             .object_history_page(id, start, count)
             .iter()
             .map(object_row_json)
-            .collect();
-        Value::Array(rows).to_string()
+            .collect()
     }
 }
 
@@ -109,6 +114,7 @@ fn object_row_json(row: &ObjectRow) -> Value {
     let (status, undone_by) = match row.status {
         ObjectStatus::Applied => ("applied", ""),
         ObjectStatus::Undone => ("undone", ""),
+        ObjectStatus::OnBranch => ("branch", ""),
         ObjectStatus::UndoneBy(author) => ("undone-by", author_word(author)),
     };
     json!({

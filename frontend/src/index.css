@@ -122,6 +122,8 @@
     /* The ground of a list row under the pointer: lighter than the control hover so the muted
        text on it keeps 4.5:1 (4.58:1 at 8 %). */
     --row-hover: color-mix(in srgb, #2F6FEE 8%, transparent);
+    /* `0042`: the lines and rings of branch lanes in the History list (3.1:1 on --panel-bg). */
+    --lane-line: color-mix(in srgb, var(--toolbar-icon) 60%, transparent);
     /* docs/design-system.md, 2026-10-05: drop shadow on every floating
        chrome surface (the left tool panel, the per-selection contextual
        mini-toolbar) — what makes them read as "floating over" the

@@ -1,6 +1,7 @@
 //! The document's history: steps delimited by a header in the commit message, their identity, and
 //! the undo and redo engine over the operation log (ADR 0014; `specs/0020-undo-redo`).
 
+mod branches;
 mod checkout;
 mod commit;
 mod cost;
@@ -27,6 +28,7 @@ mod touched;
 mod updates;
 mod wipe;
 
+pub use branches::HistoryBranch;
 pub(crate) use commit::CommitState;
 pub use commit::OwnStep;
 pub use cost::{FAR_STEP_OPS, SMALL_STEP_OPS};
@@ -40,7 +42,7 @@ pub use report::{
     Direction, ObjectReport, ObjectResult, ObjectShape, RestoreReport, Role, SkipReason,
 };
 pub use rows::{Author, HistoryRow, RowRevert, StepKind, TouchedObject, is_document_level_label};
-pub use stack_machine::{Event, STACK_LIMIT, StackMachine, Status};
+pub use stack_machine::{BranchMark, Event, STACK_LIMIT, StackMachine, Status};
 pub use step_header::{
     LABEL_NEW_DOCUMENT, LABEL_OBJECT_REDO, LABEL_OBJECT_UNDO, LABEL_REDO, LABEL_UNDO,
     LABEL_WIPE as WIPE_LABEL, LABEL_WIPE_OBJECT,
