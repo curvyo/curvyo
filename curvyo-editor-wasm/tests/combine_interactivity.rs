@@ -1,6 +1,7 @@
-//! Combine and Break apart at the size of the budgets (`specs/0035-combine-and-break-apart`
-//! criterion 19): four generated inputs, each command through the session in under 2 s with the
-//! expected counts. Budgets are asserted in release builds only; a debug build runs a tenth of the
+//! Combine, Split and Break apart at the size of the budgets (`specs/0035-combine-and-break-apart`
+//! criterion 19, `specs/0048-split-compound-path` criterion 15): four generated inputs, each
+//! command through the session in under 2 s with the expected counts; on input (a) the part
+//! search alone (Split's refusal) is under 500 ms. Budgets are asserted in release builds only; a debug build runs a tenth of the
 //! size and prints the numbers.
 //! Run: `cargo test --release -p curvyo-editor-wasm --test combine_interactivity -- --nocapture`.
 
@@ -17,11 +18,12 @@ use curvyo_document_core::{
     AnchorId, AnchorKind, Document, Length, NewAnchor, ObjectSnapshot, Point, RectBounds, Vec2,
     pack,
 };
-use curvyo_editor_wasm::{BreakApartOutcome, CombineOutcome, Session, Tool};
-use curvyo_ui_core::BreakApartRefusal;
+use curvyo_editor_wasm::{BreakApartOutcome, CombineOutcome, Session, SplitOutcome, Tool};
+use curvyo_ui_core::SplitRefusal;
 
 const SCALE: usize = if cfg!(debug_assertions) { 10 } else { 1 };
 const BUDGET: Duration = Duration::from_secs(2);
+const PART_SEARCH_BUDGET: Duration = Duration::from_millis(500);
 
 fn pt(x: f64, y: f64) -> Point {
     Point::new(x, y)
@@ -43,9 +45,13 @@ fn select_all(session: &mut Session, to: Point) {
 }
 
 fn check(label: &str, took: Duration) {
-    println!("{label}: {took:?} (budget {BUDGET:?})");
+    check_within(label, took, BUDGET);
+}
+
+fn check_within(label: &str, took: Duration, budget: Duration) {
+    println!("{label}: {took:?} (budget {budget:?})");
     if !cfg!(debug_assertions) {
-        assert!(took <= BUDGET, "{label}: {took:?} is over {BUDGET:?}");
+        assert!(took <= budget, "{label}: {took:?} is over {budget:?}");
     }
 }
 
@@ -98,11 +104,8 @@ fn unpacked(session: &Session) -> Document {
     curvyo_document_core::unpack(3, &session.pack("0.1.0").unwrap()).unwrap()
 }
 
-/// (a) One rectangle with 1,000 circles inside: Combine gives one compound path of 1,001
-/// outlines; Break apart of it is one piece with its holes and is refused.
-#[test]
-fn a_rectangle_with_a_thousand_circles() {
-    let count = 1000 / SCALE;
+/// (a) One rectangle with 1,000 circles inside, all selected.
+fn session_a(count: usize) -> Session {
     let document = Document::new(1);
     let mut ids = Ids(0);
     let _ = document.create_rect(RectBounds {
@@ -117,6 +120,15 @@ fn a_rectangle_with_a_thousand_circles() {
     let mut session = session_of(&document);
     select_all(&mut session, pt(600.0, 600.0));
     assert_eq!(session.selected_object_count(), count + 1);
+    session
+}
+
+/// (a) Combine gives one compound path of 1,001 outlines; Split of it is one piece with its holes
+/// and is refused, the part search alone within 500 ms.
+#[test]
+fn a_rectangle_with_a_thousand_circles() {
+    let count = 1000 / SCALE;
+    let mut session = session_a(count);
 
     let started = Instant::now();
     let outcome = session.apply_combine();
@@ -125,18 +137,30 @@ fn a_rectangle_with_a_thousand_circles() {
     assert_eq!(only_path(&session).subpaths().count(), count + 1);
 
     let started = Instant::now();
-    let outcome = session.apply_break_apart();
-    check("break apart (a)", started.elapsed());
+    let outcome = session.apply_split();
+    check_within("split (a)", started.elapsed(), PART_SEARCH_BUDGET);
     assert_eq!(
         outcome,
-        BreakApartOutcome::Refused(BreakApartRefusal::OnePiece { compounds: 1 })
+        SplitOutcome::Refused(SplitRefusal::OnePiece { compounds: 1 })
     );
 }
 
-/// (b) 2,000 disjoint squares: one compound path of 2,000 outlines, then 2,000 objects.
+/// (a) Break apart of the compound path gives 1,001 closed paths.
 #[test]
-fn two_thousand_disjoint_squares() {
-    let count = 2000 / SCALE;
+fn a_rectangle_with_a_thousand_circles_breaks_apart() {
+    let count = 1000 / SCALE;
+    let mut session = session_a(count);
+    let _ = session.apply_combine();
+
+    let started = Instant::now();
+    let outcome = session.apply_break_apart();
+    check("break apart (a)", started.elapsed());
+    assert!(matches!(outcome, BreakApartOutcome::Applied { pieces, .. } if pieces == count + 1));
+    assert_eq!(unpacked(&session).object_ids().len(), count + 1);
+}
+
+/// (b) 2,000 disjoint squares, all selected.
+fn session_b(count: usize) -> Session {
     let document = Document::new(1);
     let mut ids = Ids(0);
     for i in 0..count {
@@ -151,6 +175,14 @@ fn two_thousand_disjoint_squares() {
     let mut session = session_of(&document);
     select_all(&mut session, pt(700.0, 700.0));
     assert_eq!(session.selected_object_count(), count);
+    session
+}
+
+/// (b) Combine gives one compound path of 2,000 outlines, Split 2,000 objects.
+#[test]
+fn two_thousand_disjoint_squares() {
+    let count = 2000 / SCALE;
+    let mut session = session_b(count);
 
     let started = Instant::now();
     assert!(matches!(
@@ -161,17 +193,28 @@ fn two_thousand_disjoint_squares() {
     assert_eq!(only_path(&session).subpaths().count(), count);
 
     let started = Instant::now();
+    let outcome = session.apply_split();
+    check("split (b)", started.elapsed());
+    assert!(matches!(outcome, SplitOutcome::Applied { pieces, .. } if pieces == count));
+    assert_eq!(unpacked(&session).object_ids().len(), count);
+}
+
+/// (b) Break apart gives the same 2,000 objects.
+#[test]
+fn two_thousand_disjoint_squares_break_apart() {
+    let count = 2000 / SCALE;
+    let mut session = session_b(count);
+    let _ = session.apply_combine();
+
+    let started = Instant::now();
     let outcome = session.apply_break_apart();
     check("break apart (b)", started.elapsed());
     assert!(matches!(outcome, BreakApartOutcome::Applied { pieces, .. } if pieces == count));
     assert_eq!(unpacked(&session).object_ids().len(), count);
 }
 
-/// (c) 500 nested squares: one compound path of 500 outlines with alternating windings, then 250
-/// regions of a square and its hole.
-#[test]
-fn five_hundred_nested_squares() {
-    let count = 500 / SCALE;
+/// (c) 500 nested squares, all selected.
+fn session_c(count: usize) -> Session {
     let document = Document::new(1);
     let mut ids = Ids(0);
     for i in 0..count {
@@ -190,6 +233,15 @@ fn five_hundred_nested_squares() {
         pt(2.0 * count as f64 + 50.0, 2.0 * count as f64 + 50.0),
     );
     assert_eq!(session.selected_object_count(), count);
+    session
+}
+
+/// (c) Combine gives one compound path of 500 outlines with alternating windings; Split gives 250
+/// compound paths of a square and its hole.
+#[test]
+fn five_hundred_nested_squares() {
+    let count = 500 / SCALE;
+    let mut session = session_c(count);
 
     let started = Instant::now();
     assert!(matches!(
@@ -220,15 +272,26 @@ fn five_hundred_nested_squares() {
     );
 
     let started = Instant::now();
-    let outcome = session.apply_break_apart();
-    check("break apart (c)", started.elapsed());
-    assert!(matches!(outcome, BreakApartOutcome::Applied { pieces, .. } if pieces == count / 2));
+    let outcome = session.apply_split();
+    check("split (c)", started.elapsed());
+    assert!(matches!(outcome, SplitOutcome::Applied { pieces, .. } if pieces == count / 2));
 }
 
-/// (d) A compound path of 5,000 tiny squares breaks apart into 5,000 closed paths.
+/// (c) Break apart gives 500 closed paths.
 #[test]
-fn a_compound_path_of_five_thousand_squares() {
-    let count = 5000 / SCALE;
+fn five_hundred_nested_squares_break_apart() {
+    let count = 500 / SCALE;
+    let mut session = session_c(count);
+    let _ = session.apply_combine();
+
+    let started = Instant::now();
+    let outcome = session.apply_break_apart();
+    check("break apart (c)", started.elapsed());
+    assert!(matches!(outcome, BreakApartOutcome::Applied { pieces, .. } if pieces == count));
+}
+
+/// (d) A compound path of 5,000 tiny squares, selected.
+fn session_d(count: usize) -> Session {
     let big = Document::new(1);
     let mut ids = Ids(0);
     let outlines: Vec<(Vec<NewAnchor>, bool)> = (0..count)
@@ -251,6 +314,27 @@ fn a_compound_path_of_five_thousand_squares() {
     let mut session = session_of(&big);
     select_all(&mut session, pt(400.0, 400.0));
     assert_eq!(session.selected_object_count(), 1);
+    session
+}
+
+/// (d) Split gives 5,000 closed paths.
+#[test]
+fn a_compound_path_of_five_thousand_squares() {
+    let count = 5000 / SCALE;
+    let mut session = session_d(count);
+
+    let started = Instant::now();
+    let outcome = session.apply_split();
+    check("split (d)", started.elapsed());
+    assert!(matches!(outcome, SplitOutcome::Applied { pieces, .. } if pieces == count));
+    assert_eq!(unpacked(&session).object_ids().len(), count);
+}
+
+/// (d) Break apart gives the same 5,000 closed paths.
+#[test]
+fn a_compound_path_of_five_thousand_squares_breaks_apart() {
+    let count = 5000 / SCALE;
+    let mut session = session_d(count);
 
     let started = Instant::now();
     let outcome = session.apply_break_apart();

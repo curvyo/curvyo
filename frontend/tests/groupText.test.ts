@@ -92,7 +92,6 @@ test("the operations refuse a group in the style of the other refusals (criterio
       compounds: 0,
       pieces: 0,
       withHoles: false,
-      leftAlone: 0,
     }),
     "Break apart does not work on groups. Ungroup first. Nothing was changed.",
   );

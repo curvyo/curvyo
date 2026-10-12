@@ -8,8 +8,8 @@
 use curvyo_document_core::{
     Document, Length, NodeId, ObjectSnapshot, Point, RectBounds, pack, unpack,
 };
-use curvyo_editor_wasm::{BreakApartOutcome, CombineOutcome, Session, Tool};
-use curvyo_ui_core::{BooleanAvailability, BreakApartRefusal, CombineRefusal};
+use curvyo_editor_wasm::{CombineOutcome, Session, SplitOutcome, Tool};
+use curvyo_ui_core::{BooleanAvailability, CombineRefusal, SplitRefusal};
 
 fn pt(x: f64, y: f64) -> Point {
     Point::new(x, y)
@@ -104,16 +104,16 @@ fn the_path_card_follows_the_selection_and_the_tool() {
     let mut session = plate_hole_island();
     let ready = session.path_availability();
     assert_eq!(ready.combine, BooleanAvailability::Ready);
-    assert!(!ready.break_apart, "no compound path selected");
+    assert!(!ready.compound, "no compound path selected");
     session.set_tool(Tool::Node);
     let other = session.path_availability();
     assert_eq!(other.combine, BooleanAvailability::NeedsTwo);
-    assert!(!other.break_apart);
+    assert!(!other.compound);
     session.set_tool(Tool::Select);
     let _ = session.apply_combine();
     let one = session.path_availability();
     assert_eq!(one.combine, BooleanAvailability::NeedsTwo);
-    assert!(one.break_apart, "the compound path enables Break apart");
+    assert!(one.compound, "the compound path enables Break apart");
 }
 
 /// Criteria 3, 7, 15, 17, 18: Combine, Break apart, Combine again.
@@ -144,10 +144,10 @@ fn combine_and_break_apart_round_trip_with_one_commit_each() {
         .map(|s| s.anchors.iter().map(|a| a.point).collect())
         .collect();
 
-    let outcome = session.apply_break_apart();
+    let outcome = session.apply_split();
     assert_eq!(
         outcome,
-        BreakApartOutcome::Applied {
+        SplitOutcome::Applied {
             compounds: 1,
             pieces: 2,
             with_holes: true,
@@ -156,7 +156,7 @@ fn combine_and_break_apart_round_trip_with_one_commit_each() {
     );
     let labels = commit_labels(&session);
     assert_eq!(labels.len(), before + 2);
-    assert_eq!(labels.last().unwrap(), "break_apart");
+    assert_eq!(labels.last().unwrap(), "split");
     assert_eq!(
         session.selected_object_count(),
         2,
@@ -232,8 +232,8 @@ fn a_ring_alone_is_one_piece_and_the_defensive_refusal_needs_no_compound() {
     let plain = session.draw_list().triangle_count();
 
     assert_eq!(
-        session.apply_break_apart(),
-        BreakApartOutcome::Refused(BreakApartRefusal::OnePiece { compounds: 1 })
+        session.apply_split(),
+        SplitOutcome::Refused(SplitRefusal::OnePiece { compounds: 1 })
     );
     assert_eq!(json(&session), before);
     assert_eq!(commit_labels(&session), labels);
@@ -243,8 +243,8 @@ fn a_ring_alone_is_one_piece_and_the_defensive_refusal_needs_no_compound() {
 
     click(&mut session, pt(500.0, 500.0), false);
     assert_eq!(
-        session.apply_break_apart(),
-        BreakApartOutcome::Refused(BreakApartRefusal::NoCompound)
+        session.apply_split(),
+        SplitOutcome::Refused(SplitRefusal::NoCompound)
     );
 }
 
@@ -254,7 +254,7 @@ fn the_commands_are_ignored_outside_the_select_tool() {
     let mut session = plate_hole_island();
     session.set_tool(Tool::Node);
     assert_eq!(session.apply_combine(), CombineOutcome::Ignored);
-    assert_eq!(session.apply_break_apart(), BreakApartOutcome::Ignored);
+    assert_eq!(session.apply_split(), SplitOutcome::Ignored);
 }
 
 /// Criterion 19, golden file: the ring with an island, saved after Combine, opens and breaks
@@ -287,8 +287,8 @@ fn the_golden_ring_with_an_island_breaks_apart_into_two_objects() {
     assert_eq!(doc(&session).object_ids().len(), 1);
     select_all(&mut session, pt(60.0, 60.0));
     assert_eq!(
-        session.apply_break_apart(),
-        BreakApartOutcome::Applied {
+        session.apply_split(),
+        SplitOutcome::Applied {
             compounds: 1,
             pieces: 2,
             with_holes: true,

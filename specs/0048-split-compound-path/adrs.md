@@ -68,8 +68,8 @@ write for Split, Break apart, Cut and Fracture/Flatten.
 - **2026-10-10: session and frontend.** `session/combine.rs` keeps Combine.
   Split and Break apart get `session/split.rs` (both commands, one shared
   availability) and the matching `wasm_split.rs`. The rail buttons are
-  placed per the UX notes, in the Path card order Combine, Break apart,
-  Split, Cut.
+  placed per the UX notes, in the Path card order Combine, Split,
+  Break apart, Cut.
 - **2026-10-10: budget (criterion 15).** Same job and generator pattern as
   0035. The part search on input (a) has its own budget of 500 ms. The
   union-find adds less than linear cost over `touching_outlines`.
@@ -79,3 +79,26 @@ write for Split, Break apart, Cut and Fracture/Flatten.
 - Spec Question 1 (rename 0035's command to Split, Break apart becomes the
   every-outline command) is the customer's. Default A, as written here. On
   B this spec is dropped and nothing above is built.
+
+## Notes made while building (2026-10-11, implementer)
+
+- **One availability flag.** `PathAvailability` has `compound` for Split and Break apart together
+  (the one-function rule of criterion 1, so the two are never dimmed differently) and `cut`; the
+  wasm view calls them `has_compound` and `can_cut`.
+- **The plans carry the write's shape.** `SplitPlan` and `BreakApartPlan` hold `removed` and a
+  flat `pieces: Vec<(NodeId, PieceOutlines)>` that go straight into `replace_with_pieces`
+  (`PieceOutlines` is a type alias of `Vec<(Vec<NewAnchor>, bool)>` in `document-core`); the
+  `parts` list of the 0035 plan is gone. `replace_with_pieces` refuses an empty `pieces` list.
+- **Hole of the Split glyph.** The brief says a hole of 3 x 3; on the glyph sheet at 1x it shows
+  two pixels wide, so the built hole is 4 x 4 (`docs/design-system.md`, "Command glyphs").
+- **Tests of 0035 moved by name only.** The tests that checked the old Break apart now call
+  `apply_split`, `plan_split` and `SplitRefusal` with the same assertions; `Break apart` keeps its
+  own tests (`split_break_apart_session.rs`, `split_and_break_apart.rs`).
+- **Coordinates out of range (2026-10-12, after the tester's report).** Split refuses a compound
+  path with a coordinate that is not finite or beyond `MAX_COORDINATE_MM` (code `out_of_range`, the
+  sentence of the Boolean operations, the compound paths outlined), because its part search
+  flattens the outlines; an infinite x made the flattening allocate gigabytes. Break apart needs
+  no arithmetic and still breaks such a path apart; only its hole flag is not computed for it.
+  The flattening is bounded as a guard behind every caller.
+- **The hole flag of Split** is "an outline of odd depth", not "a part with several outlines": a
+  part of touching shapes has no hole.

@@ -13,10 +13,10 @@ export const RAIL_CARD_STYLE: CSSProperties = {
   boxShadow: "var(--panel-elevation-shadow)",
 };
 
-/** Height of the Path card in px (2 buttons: 2 x 40, one gap of 4, 2 x 4 padding). The notice of
+/** Height of the Path card in px (4 buttons: 4 x 40, three gaps of 4, 2 x 4 padding). The notice of
  * the Boolean card, which lies below it in column B, is anchored level with the top of its first
  * button. */
-export const PATH_CARD_HEIGHT_PX = 92;
+export const PATH_CARD_HEIGHT_PX = 180;
 
 /** The gap between two cards of a column, in px. */
 export const RAIL_CARD_GAP_PX = 8;
@@ -30,5 +30,5 @@ export const COLUMN_A_TOOLTIP_OFFSET_PX = 66;
 export const COLUMN_B_TOOLTIP_OFFSET_PX = 10;
 
 /** The top of the first button of the Path card in px, the 4px padding of the card: a Path
- * notice is anchored level with it (the card itself is 92px high: 2 x 40, one gap of 4, 2 x 4). */
+ * notice is anchored level with it (the card itself is 180px high: 4 x 40, three gaps of 4, 2 x 4). */
 export const PATH_CARD_TOP_PX = 4;

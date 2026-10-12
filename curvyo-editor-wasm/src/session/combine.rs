@@ -1,10 +1,10 @@
-//! The session's Combine and Break apart commands: what the Path card shows, the two writes
-//! (`Document::replace_with_path` and `Document::break_apart`) and the red outline of the objects
-//! a refusal names (`specs/0035-combine-and-break-apart`).
+//! The session's Combine command and what the Path card shows: the write
+//! (`Document::replace_with_path`) and the red outline of the objects a refusal names
+//! (`specs/0035-combine-and-break-apart`). Split and Break apart are in `split.rs`, Cut in
+//! `cut.rs`.
 
 use curvyo_ui_core::{
-    BreakApartRefusal, COMBINE_COMMIT_LABEL, CombineRefusal, PathAvailability, path_availability,
-    plan_break_apart, plan_combine,
+    COMBINE_COMMIT_LABEL, CombineRefusal, PathAvailability, path_availability, plan_combine,
 };
 
 use super::Session;
@@ -28,26 +28,6 @@ pub enum CombineOutcome {
     /// Refused; nothing was changed. The offending objects, if any, are outlined until the
     /// selection or the tool changes or the host clears them.
     Refused(CombineRefusal),
-}
-
-/// What [`Session::apply_break_apart`] did.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum BreakApartOutcome {
-    /// Nothing, as for [`CombineOutcome::Ignored`].
-    Ignored,
-    /// Compound paths were replaced by their pieces.
-    Applied {
-        /// How many compound paths were broken apart.
-        compounds: usize,
-        /// How many objects they became.
-        pieces: usize,
-        /// Whether a piece has a hole.
-        with_holes: bool,
-        /// How many selected compound paths were one piece and left as they are.
-        left_alone: usize,
-    },
-    /// Refused; nothing was changed.
-    Refused(BreakApartRefusal),
 }
 
 impl Session {
@@ -116,54 +96,6 @@ impl Session {
                 operands: plan.operands.len(),
                 holes: plan.holes,
                 styles_differ: plan.styles_differ,
-            }
-        })
-    }
-
-    /// Replaces each selected compound path of more than one region by one object per region, in
-    /// one commit labelled `break_apart`, and selects all the pieces together with the selected
-    /// objects that stayed. The tool stays Select. A refusal changes nothing.
-    pub fn apply_break_apart(&mut self) -> BreakApartOutcome {
-        self.recording(|this| -> BreakApartOutcome {
-            if !this.rail_command_ready() {
-                return BreakApartOutcome::Ignored;
-            }
-            this.flush_select_bar_preview();
-            this.end_colour_pick();
-            let objects = this.objects();
-            let selection = this.boolean_selection();
-            let in_groups = this.selected_group_leaves();
-            if !in_groups.is_empty() {
-                this.command_refusal = Some(RefusalMarks::new(in_groups.clone(), &selection));
-                return BreakApartOutcome::Refused(BreakApartRefusal::Groups {
-                    offenders: in_groups,
-                });
-            }
-            let plan = match plan_break_apart(&objects, &selection, &mut this.minter) {
-                Ok(plan) => plan,
-                Err(refusal) => {
-                    this.command_refusal = None;
-                    return BreakApartOutcome::Refused(refusal);
-                }
-            };
-            let Ok(created) = this.document.break_apart(&plan.parts) else {
-                // invariant: the plan was made from the objects just read, each compound still
-                // exists, every region has an outline with nodes and the anchor ids are fresh.
-                debug_assert!(false, "a planned break apart could not be written");
-                return BreakApartOutcome::Ignored;
-            };
-            this.command_refusal = None;
-            this.node.clear_selection();
-            this.selection.clear();
-            for id in plan.kept.iter().chain(&created) {
-                this.selection.add(*id);
-            }
-            this.hovered_object = None;
-            BreakApartOutcome::Applied {
-                compounds: plan.parts.len(),
-                pieces: plan.pieces,
-                with_holes: plan.with_holes,
-                left_alone: plan.left_alone,
             }
         })
     }

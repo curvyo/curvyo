@@ -20,12 +20,16 @@ function noticeTop(notice: ActionNotice | null): number {
  * announced as a change of text. A child of the rail's root: its left edge is 12px right of the rail's right edge (`--rail-right` + 12) and its top
  * edge is level with the top of the first button of the card that issued it: Union (below the
  * Path card in column B, the 8px gap and the Boolean card's 4px padding) or Combine (the Path
- * card's 4px padding). One status region and one alert region serve every card.
+ * card's 4px padding). One status region and one alert region serve every card; only one of them
+ * holds a notice at a time, so there is no gap between them (a gap would push a refusal 4px below
+ * the button). The rail's root spans the viewport, so the notice is at most as wide as the space
+ * between `--rail-right` + 12 and 12px before the viewport's right edge (the panel never covers
+ * it at 800 x 600).
  */
 export function BooleanNotice({ notice }: { notice: ActionNotice | null }) {
   return (
     <div
-      className="pointer-events-none absolute z-30 flex w-max max-w-[min(360px,calc(100vw-96px))] flex-col gap-1 text-xs"
+      className="pointer-events-none absolute z-30 flex w-max max-w-[min(360px,calc(100%-var(--rail-right)))] flex-col text-xs"
       style={{
         // The rail root sits `--rail-inset` from the viewport edge.
         left: "calc(var(--rail-right) - var(--rail-inset) + 12px)",

@@ -58,7 +58,9 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     ("boolean_reverse_difference", "Reverse difference"),
     ("set_document_background", "Change background"),
     ("combine_paths", "Combine"),
+    ("split", "Split"),
     ("break_apart", "Break apart"),
+    ("cut_at_crossings", "Cut"),
     ("group", "Group"),
     ("ungroup", "Ungroup"),
 ];

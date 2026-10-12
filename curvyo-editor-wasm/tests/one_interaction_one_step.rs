@@ -509,7 +509,7 @@ fn every_boolean_operation_has_its_name() {
 }
 
 #[test]
-fn combine_and_break_apart_have_their_names() {
+fn combine_split_break_apart_and_cut_have_their_names() {
     let document = Document::new(1);
     let outer = [
         node(1, 0.0, 0.0),
@@ -537,8 +537,23 @@ fn combine_and_break_apart_have_their_names() {
     one_step(&mut session, "Combine", |s| {
         s.apply_combine();
     });
+    one_step(&mut session, "Split", |s| {
+        s.apply_split();
+    });
+    one_step(&mut session, "Combine", |s| {
+        s.apply_combine();
+    });
     one_step(&mut session, "Break apart", |s| {
         s.apply_break_apart();
+    });
+
+    let crossing = Document::new(1);
+    let _ = crossing.create_path(&[node(21, 0.0, 0.0), node(22, 100.0, 100.0)], false);
+    let _ = crossing.create_path(&[node(23, 0.0, 100.0), node(24, 100.0, 0.0)], false);
+    let mut lines = open(&crossing);
+    marquee_all(&mut lines);
+    one_step(&mut lines, "Cut", |s| {
+        s.apply_cut();
     });
 }
 

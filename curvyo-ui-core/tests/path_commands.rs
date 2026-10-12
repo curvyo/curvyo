@@ -1,5 +1,6 @@
-//! The pure part of Combine and Break apart (`specs/0035-combine-and-break-apart` criteria 1, 3 to
-//! 6, 8 to 11, 13 to 16): availability, plans and refusals.
+//! The pure part of Combine, Split and Break apart (`specs/0035-combine-and-break-apart` criteria
+//! 1, 3 to 6, 8 to 11; `specs/0048-split-compound-path` criteria 1, 3 to 7, 11 to 13):
+//! availability, plans and refusals.
 
 #![allow(clippy::unwrap_used, clippy::float_cmp, clippy::cast_precision_loss)]
 
@@ -9,7 +10,7 @@ use curvyo_document_core::{
 };
 use curvyo_ui_core::{
     AnchorIdMinter, BooleanAvailability, BreakApartRefusal, CombineRefusal, ObjectSelection,
-    path_availability, plan_break_apart, plan_combine,
+    SplitRefusal, path_availability, plan_break_apart, plan_combine, plan_split,
 };
 
 fn pt(x: f64, y: f64) -> Point {
@@ -100,19 +101,22 @@ fn availability_follows_the_selection() {
 
     let none = path_availability(&all, &ObjectSelection::new());
     assert_eq!(none.combine, BooleanAvailability::NeedsTwo);
-    assert!(!none.break_apart);
+    assert!(!none.compound);
+    assert!(!none.cut, "nothing selected");
 
     let two = path_availability(&all, &select(&[a, b]));
     assert_eq!(two.combine, BooleanAvailability::Ready);
-    assert!(!two.break_apart, "no compound path selected");
+    assert!(!two.compound, "no compound path selected");
+    assert!(two.cut, "ordinary paths enable Cut");
 
     let one = path_availability(&all, &select(&[compound]));
     assert_eq!(one.combine, BooleanAvailability::NeedsTwo);
-    assert!(one.break_apart, "one compound path is enough");
+    assert!(one.compound, "one compound path is enough");
+    assert!(one.cut);
 
     let mixed = path_availability(&all, &select(&[a, compound]));
     assert_eq!(mixed.combine, BooleanAvailability::Ready);
-    assert!(mixed.break_apart);
+    assert!(mixed.compound);
 
     let open = poly(&document, 900, &[(0.0, 0.0), (5.0, 5.0), (9.0, 0.0)], false);
     let all = objects(&document);
@@ -286,9 +290,9 @@ fn refusals_name_their_offenders() {
     );
 }
 
-/// Criteria 13 to 16.
+/// 0048 criteria 3 and 5: Split keeps holes with their piece.
 #[test]
-fn break_apart_keeps_holes_with_their_piece() {
+fn split_keeps_holes_with_their_piece() {
     let document = Document::new(1);
     let outer = rect(&document, 0.0, 0.0, 40.0);
     let hole = rect(&document, 10.0, 10.0, 20.0);
@@ -306,14 +310,13 @@ fn break_apart_keeps_holes_with_their_piece() {
     let plain = rect(&document, 100.0, 0.0, 10.0);
     let all = objects(&document);
 
-    let broken = plan_break_apart(&all, &select(&[plain, compound]), &mut minter_of(72)).unwrap();
-    assert_eq!(broken.parts.len(), 1);
-    let (id, pieces) = &broken.parts[0];
-    assert_eq!(*id, compound);
-    assert_eq!(pieces.len(), 2, "the ring and the island");
+    let broken = plan_split(&all, &select(&[plain, compound]), &mut minter_of(72)).unwrap();
+    assert_eq!(broken.removed, vec![compound]);
+    assert_eq!(broken.pieces.len(), 2, "the ring and the island");
+    assert!(broken.pieces.iter().all(|(id, _)| *id == compound));
+    let pieces: Vec<_> = broken.pieces.iter().map(|(_, piece)| piece).collect();
     assert_eq!(pieces[0].len(), 2, "the ring has its hole");
     assert_eq!(pieces[1].len(), 1);
-    assert_eq!(broken.pieces, 2);
     assert!(broken.with_holes);
     assert_eq!(broken.kept, vec![plain]);
     assert_eq!(broken.left_alone, 0);
@@ -333,26 +336,30 @@ fn break_apart_keeps_holes_with_their_piece() {
 }
 
 #[test]
-fn break_apart_refusals() {
+fn split_refusals() {
     let document = Document::new(1);
     let ring_id = ring(&document);
     let plain = rect(&document, 100.0, 0.0, 10.0);
     let all = objects(&document);
     assert_eq!(
+        plan_split(&all, &select(&[plain]), &mut minter()),
+        Err(SplitRefusal::NoCompound)
+    );
+    assert_eq!(
+        plan_split(&all, &ObjectSelection::new(), &mut minter()),
+        Err(SplitRefusal::NoCompound)
+    );
+    assert_eq!(
+        plan_split(&all, &select(&[ring_id, plain]), &mut minter()),
+        Err(SplitRefusal::OnePiece { compounds: 1 })
+    );
+    assert_eq!(
         plan_break_apart(&all, &select(&[plain]), &mut minter()),
         Err(BreakApartRefusal::NoCompound)
     );
-    assert_eq!(
-        plan_break_apart(&all, &ObjectSelection::new(), &mut minter()),
-        Err(BreakApartRefusal::NoCompound)
-    );
-    assert_eq!(
-        plan_break_apart(&all, &select(&[ring_id, plain]), &mut minter()),
-        Err(BreakApartRefusal::OnePiece { compounds: 1 })
-    );
 }
 
-/// A ring left alone beside a compound that does break apart: counted, kept, selected after.
+/// A ring left alone beside a compound that does split: counted, kept, selected after.
 #[test]
 fn one_region_compounds_are_left_as_they_are() {
     let document = Document::new(1);
@@ -365,9 +372,9 @@ fn one_region_compounds_are_left_as_they_are() {
         .replace_with_path(&pair.operands, pair.base, &pair.outlines, "combine_paths")
         .unwrap();
     let all = objects(&document);
-    let plan = plan_break_apart(&all, &select(&[ring_id, two]), &mut minter()).unwrap();
-    assert_eq!(plan.parts.len(), 1);
-    assert_eq!(plan.pieces, 2);
+    let plan = plan_split(&all, &select(&[ring_id, two]), &mut minter()).unwrap();
+    assert_eq!(plan.removed, vec![two]);
+    assert_eq!(plan.pieces.len(), 2);
     assert!(!plan.with_holes);
     assert_eq!(plan.kept, vec![ring_id]);
     assert_eq!(plan.left_alone, 1);
@@ -467,7 +474,7 @@ fn a_plate_with_slots_and_a_rounded_square_combine() {
 /// Overlapping outlines can make the depth count differ from the enclosure chain; whatever the
 /// plan does, no outline may be lost: every outline is in a piece, or the compound is left alone.
 #[test]
-fn break_apart_never_drops_an_outline() {
+fn split_never_drops_an_outline() {
     let document = Document::new(1);
     let base = rect(&document, 0.0, 0.0, 1.0);
     let square = |first: u64, x: f64, size: f64| {
@@ -489,14 +496,11 @@ fn break_apart_never_drops_an_outline() {
         .replace_with_path(&[base], base, &outlines, "combine_paths")
         .unwrap();
     let all = objects(&document);
-    match plan_break_apart(&all, &select(&[compound]), &mut minter()) {
+    match plan_split(&all, &select(&[compound]), &mut minter()) {
         Ok(plan) => {
-            let lost = plan
-                .parts
-                .iter()
-                .any(|(_, pieces)| pieces.iter().map(Vec::len).sum::<usize>() != outlines.len());
-            assert!(!lost, "a break must keep every outline");
+            let kept: usize = plan.pieces.iter().map(|(_, piece)| piece.len()).sum();
+            assert_eq!(kept, outlines.len(), "a split must keep every outline");
         }
-        Err(refusal) => assert_eq!(refusal, BreakApartRefusal::OnePiece { compounds: 1 }),
+        Err(refusal) => assert_eq!(refusal, SplitRefusal::OnePiece { compounds: 1 }),
     }
 }

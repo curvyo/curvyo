@@ -9,7 +9,7 @@ use std::path::Path;
 
 use curvyo_document_core::{
     AnchorId, CopySource, Document, Length, NewAnchor, NodeId, ObjectEditError, ObjectSnapshot,
-    Point, RectBounds, Vec2,
+    PieceFill, Point, RectBounds, Vec2,
 };
 
 fn rect(document: &Document, x: f64) -> NodeId {
@@ -231,18 +231,23 @@ fn break_apart_pieces_take_the_place_of_the_compound_inside_its_group() {
     let b = rect(&document, 40.0);
     let group = document.group_objects(&[a, b]).unwrap();
     let region = |n: u64| {
-        vec![vec![(
+        vec![(
             vec![
                 NewAnchor::corner(AnchorId::new(4, n), Point::new(0.0, 0.0)),
                 NewAnchor::corner(AnchorId::new(4, n + 1), Point::new(5.0, 5.0)),
                 NewAnchor::corner(AnchorId::new(4, n + 2), Point::new(0.0, 5.0)),
             ],
             true,
-        )]]
+        )]
     };
-    let mut regions = region(1);
-    regions.extend(region(10));
-    let pieces = document.break_apart(&[(a, regions)]).unwrap();
+    let pieces = document
+        .replace_with_pieces(
+            &[a],
+            &[(a, region(1)), (a, region(10))],
+            PieceFill::Keep,
+            "break_apart",
+        )
+        .unwrap();
     assert_eq!(pieces.len(), 2);
     assert_eq!(document.children(Some(group))[..2], pieces[..]);
     assert_eq!(document.children(Some(group)).len(), 3);

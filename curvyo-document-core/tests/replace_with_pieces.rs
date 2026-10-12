@@ -1,6 +1,7 @@
-//! The document half of Break apart (`specs/0035-combine-and-break-apart` criteria 13 to 15
-//! and 17): one commit, pieces consecutive at the compound's place with its whole style, and a
-//! refusal that changes nothing.
+//! The document half of Split, Break apart and Cut (`specs/0048-split-compound-path` criteria 5,
+//! 6, 8, 11 and 12, `specs/0036-cut-at-crossings` criteria 6 and 7): one commit with the caller's
+//! label, pieces consecutive at their source's place with its whole style, and a refusal that
+//! changes nothing.
 
 #![allow(
     clippy::unwrap_used,
@@ -12,8 +13,8 @@
 use std::ops::ControlFlow;
 
 use curvyo_document_core::{
-    AnchorId, Angle, Document, Length, NewAnchor, NodeId, ObjectEditError, PathSnapshot, Point,
-    RectBounds, StyleEdit,
+    AnchorId, Angle, Color, Document, Length, NewAnchor, NodeId, ObjectEditError, PathSnapshot,
+    PieceFill, Point, RectBounds, StyleEdit,
 };
 use loro::LoroDoc;
 
@@ -85,10 +86,10 @@ fn compound(document: &Document, first: u64) -> NodeId {
         .unwrap()
 }
 
-/// Criteria 13 to 15, 17: pieces replace the compound at its place, in the order given, with its
-/// whole style, in one commit with the pinned label.
+/// Pieces replace the compound at its place, in the order given, with its whole style, in one
+/// commit with the caller's label.
 #[test]
-fn break_apart_writes_consecutive_pieces_with_the_compounds_style_in_one_commit() {
+fn replace_with_pieces_writes_consecutive_pieces_with_the_compounds_style_in_one_commit() {
     let document = Document::new(1);
     let below = rect(&document, 100.0);
     let whole = compound(&document, 100);
@@ -101,7 +102,12 @@ fn break_apart_writes_consecutive_pieces_with_the_compounds_style_in_one_commit(
     let ring = vec![square(500, 0.0, 0.0, 40.0), square(510, 10.0, 10.0, 20.0)];
     let island = vec![square(520, 15.0, 15.0, 10.0)];
     let created = document
-        .break_apart(&[(whole, vec![ring.clone(), island.clone()])])
+        .replace_with_pieces(
+            &[whole],
+            &[(whole, ring.clone()), (whole, island.clone())],
+            PieceFill::Keep,
+            "break_apart",
+        )
         .unwrap();
 
     assert_eq!(created.len(), 2);
@@ -123,7 +129,7 @@ fn break_apart_writes_consecutive_pieces_with_the_compounds_style_in_one_commit(
     assert_eq!(second.all_anchors().copied().collect::<Vec<_>>(), expected);
 }
 
-/// Criterion 15 with several compounds: each is replaced at its own place, one commit.
+/// Several sources: each is replaced at its own place, one commit.
 #[test]
 fn several_compounds_are_written_in_one_commit() {
     let document = Document::new(1);
@@ -132,22 +138,17 @@ fn several_compounds_are_written_in_one_commit() {
     let b = compound(&document, 200);
     let before = labels(&document).len();
     let created = document
-        .break_apart(&[
-            (
-                a,
-                vec![
-                    vec![square(600, 0.0, 0.0, 5.0)],
-                    vec![square(610, 9.0, 9.0, 5.0)],
-                ],
-            ),
-            (
-                b,
-                vec![
-                    vec![square(620, 0.0, 0.0, 5.0)],
-                    vec![square(630, 9.0, 9.0, 5.0)],
-                ],
-            ),
-        ])
+        .replace_with_pieces(
+            &[a, b],
+            &[
+                (a, vec![square(600, 0.0, 0.0, 5.0)]),
+                (a, vec![square(610, 9.0, 9.0, 5.0)]),
+                (b, vec![square(620, 0.0, 0.0, 5.0)]),
+                (b, vec![square(630, 9.0, 9.0, 5.0)]),
+            ],
+            PieceFill::Keep,
+            "split",
+        )
         .unwrap();
     assert_eq!(created.len(), 4);
     assert_eq!(labels(&document).len(), before + 1);
@@ -159,7 +160,7 @@ fn several_compounds_are_written_in_one_commit() {
 
 /// A refusal writes nothing: same objects, no commit.
 #[test]
-fn break_apart_refuses_without_changing_anything() {
+fn a_refusal_changes_nothing() {
     let document = Document::new(1);
     let whole = compound(&document, 100);
     let other = rect(&document, 60.0);
@@ -173,30 +174,38 @@ fn break_apart_refuses_without_changing_anything() {
     let changes = labels(&document).len();
     let snapshot = (document.object(whole), document.object(other));
     let piece = || vec![square(700, 0.0, 0.0, 5.0)];
+    let write = |removed: &[NodeId], pieces: &[(NodeId, Vec<Outline>)]| {
+        document.replace_with_pieces(removed, pieces, PieceFill::Keep, "split")
+    };
 
     let cases: Vec<(Result<Vec<NodeId>, ObjectEditError>, ObjectEditError)> = vec![
         (
-            document.break_apart(&[(ghost, vec![piece()])]),
+            write(&[ghost], &[(ghost, piece())]),
             ObjectEditError::NoSuchObject,
         ),
         (
-            document.break_apart(&[(whole, Vec::new())]),
+            write(&[whole, ghost], &[(ghost, piece())]),
+            ObjectEditError::NoSuchObject,
+        ),
+        (write(&[whole], &[]), ObjectEditError::NoOutlines),
+        (
+            write(&[other], &[(whole, piece())]),
+            ObjectEditError::BaseNotAnOperand,
+        ),
+        (
+            write(&[whole], &[(whole, Vec::new())]),
             ObjectEditError::NoOutlines,
         ),
         (
-            document.break_apart(&[(whole, vec![Vec::new()])]),
+            write(&[whole], &[(whole, vec![(Vec::new(), true)])]),
             ObjectEditError::NoOutlines,
         ),
         (
-            document.break_apart(&[(whole, vec![vec![(Vec::new(), true)]])]),
-            ObjectEditError::NoOutlines,
-        ),
-        (
-            document.break_apart(&[(whole, vec![piece(), piece()])]),
+            write(&[whole], &[(whole, piece()), (whole, piece())]),
             ObjectEditError::AnchorIds,
         ),
         (
-            document.break_apart(&[(whole, vec![vec![square(800, 0.0, 0.0, 5.0)]])]),
+            write(&[whole], &[(whole, vec![square(800, 0.0, 0.0, 5.0)])]),
             ObjectEditError::AnchorIds,
         ),
     ];
@@ -214,7 +223,64 @@ fn pieces_may_reuse_the_deleted_compounds_anchor_ids() {
     let document = Document::new(1);
     let whole = compound(&document, 100);
     let created = document
-        .break_apart(&[(whole, vec![vec![square(100, 0.0, 0.0, 40.0)]])])
+        .replace_with_pieces(
+            &[whole],
+            &[(whole, vec![square(100, 0.0, 0.0, 40.0)])],
+            PieceFill::Keep,
+            "split",
+        )
         .unwrap();
     assert_eq!(created.len(), 1);
+}
+
+/// Cut: `PieceFill::None` turns the fill off and keeps its colour and opacity; an open outline
+/// is stored open; a source that is not removed stays.
+#[test]
+fn fill_none_keeps_the_stored_colour_and_open_pieces_stay_open() {
+    let document = Document::new(1);
+    let base = rect(&document, 0.0);
+    let keep = rect(&document, 50.0);
+    document
+        .edit_style(
+            &[base],
+            &StyleEdit::FillColor(Color {
+                r: 10,
+                g: 20,
+                b: 30,
+            }),
+        )
+        .unwrap();
+    document
+        .edit_style(&[base], &StyleEdit::FillEnabled(true))
+        .unwrap();
+    let open = |first: u64| {
+        let anchors = vec![
+            NewAnchor::corner(id(first), pt(0.0, 0.0)),
+            NewAnchor::corner(id(first + 1), pt(5.0, 5.0)),
+        ];
+        vec![(anchors, false)]
+    };
+    let created = document
+        .replace_with_pieces(
+            &[base],
+            &[(base, open(900)), (base, open(910))],
+            PieceFill::None,
+            "cut_at_crossings",
+        )
+        .unwrap();
+    assert_eq!(document.object_ids(), vec![created[0], created[1], keep]);
+    assert_eq!(labels(&document).last().unwrap(), "cut_at_crossings");
+    for piece in created {
+        let path = path_of(&document, piece);
+        assert!(!path.closed);
+        assert!(!path.style.fill.enabled, "fill is None");
+        assert_eq!(
+            path.style.fill.color,
+            Color {
+                r: 10,
+                g: 20,
+                b: 30
+            }
+        );
+    }
 }
