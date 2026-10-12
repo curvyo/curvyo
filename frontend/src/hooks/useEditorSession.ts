@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { type CanvasNotice, type HistoryNames, MAC, useHistory } from "@/hooks/useHistory";
 import { type GroupingApi, useGrouping } from "@/hooks/useGrouping";
+import { type OffsetApi, useOffset } from "@/hooks/useOffset";
 import type { HistoryDirection } from "@/lib/historyText";
 import { type NudgeFeedback, useNudgeFeedback } from "@/hooks/useNudgeFeedback";
 import { type BackingBuffer, backingBufferFor, sameBackingBuffer } from "@/lib/canvasSize";
@@ -584,6 +585,8 @@ export interface EditorSession {
   /** Groups (`specs/0023-groups`): the Grouping card, the entered group's depth and its
    * announcements. */
   grouping: GroupingApi;
+  /** The Offset entry (`specs/0038-path-offset`): its state, values, preview and Apply. */
+  offset: OffsetApi;
   /** A large undo or redo is running. */
   historyBusy: boolean;
   /** The names of the next undo and redo; `null` for an empty stack. */
@@ -902,6 +905,7 @@ export function useEditorSession(
     refreshHistoryRef.current = refreshHistory;
   }, [refreshHistory]);
   const grouping = useGrouping(getSession, syncFromSession, history.showNotice);
+  const offset = useOffset(getSession, syncFromSession, syncRevision);
   const { refresh: refreshGrouping, handleKeyOutcome: handleGroupingOutcome } = grouping;
   useEffect(() => {
     refreshGroupingRef.current = refreshGrouping;
@@ -1989,6 +1993,7 @@ export function useEditorSession(
     keyHint,
     canvasNotice: history.notice,
     grouping,
+    offset,
     historyBusy: history.busy,
     historyNames: history.names,
     pressHistory: history.press,

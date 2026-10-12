@@ -3,6 +3,7 @@ import { useCallback, useEffect, useId, useRef } from "react";
 
 import { DocumentSection } from "@/components/panel/DocumentSection";
 import { FileTab } from "@/components/panel/FileTab";
+import { OffsetSection } from "@/components/panel/OffsetSection";
 import { HistoryTab } from "@/components/panel/HistoryTab";
 import { PanelStrip } from "@/components/panel/PanelStrip";
 import { StyleSection } from "@/components/panel/StyleSection";
@@ -287,7 +288,24 @@ export function PropertiesPanel({
                 onReturnFocus={returnFocus}
               />
             ) : doc.view.content === "style" ? (
-              <StyleSection panel={panel} onReturnFocus={returnFocus} />
+              <>
+                {editor.offset.open && (
+                  <OffsetSection
+                    offset={editor.offset}
+                    onDone={(byKey) => {
+                      const button = byKey
+                        ? window.document.querySelector<HTMLElement>("[data-offset-button]")
+                        : null;
+                      if (button) {
+                        button.focus();
+                      } else {
+                        returnFocus();
+                      }
+                    }}
+                  />
+                )}
+                <StyleSection panel={panel} onReturnFocus={returnFocus} />
+              </>
             ) : doc.view.content === "history" ? (
               <HistoryTab
                 editor={editor}
