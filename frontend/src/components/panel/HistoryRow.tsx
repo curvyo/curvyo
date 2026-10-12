@@ -9,6 +9,7 @@ import {
   CopyPlus,
   Eraser,
   File,
+  Locate,
   Minus,
   Pencil,
   Plus,
@@ -44,7 +45,17 @@ import {
 
 type Glyph = ComponentType<{ size: number; strokeWidth: number; "aria-hidden": boolean }>;
 
-type GlyphKey = "create" | "delete" | "replace" | "change" | "document" | "undoes" | "redoes" | "clone-start" | "floor";
+type GlyphKey =
+  | "create"
+  | "delete"
+  | "replace"
+  | "change"
+  | "document"
+  | "undoes"
+  | "redoes"
+  | "clone-start"
+  | "floor"
+  | "go-to";
 
 /** The glyph of each kind of step and of each row that exists only in the Object scope (criterion
  * 32, `0041` UX notes): a shape, never a colour. */
@@ -58,6 +69,7 @@ const GLYPHS: Record<GlyphKey, Glyph> = {
   redoes: Redo2,
   "clone-start": Copy,
   floor: Eraser,
+  "go-to": Locate,
 };
 
 /** Which glyph a row has: by class, then by what a replacing step did to the object, then by
@@ -65,6 +77,10 @@ const GLYPHS: Record<GlyphKey, Glyph> = {
 function glyphKey(row: HistoryRowData): GlyphKey {
   if (row.label === "wipe_history") {
     return "floor";
+  }
+  // `specs/0042-history-branches` UX notes: a go to version has the Locate glyph.
+  if (row.label === "go_to_version") {
+    return "go-to";
   }
   if (row.class && row.class !== "step") {
     return row.class;

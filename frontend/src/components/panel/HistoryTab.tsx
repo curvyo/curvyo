@@ -294,7 +294,7 @@ export function HistoryTab({ editor, shown, onReturnFocus, historyScope }: Histo
     if (item && item.type !== "row") {
       return (
         <FoldRow
-          key={item.key}
+          key={`fold-${item.key}`}
           item={item}
           index={index}
           total={list.total}

@@ -94,6 +94,7 @@ function Editor() {
          * rail, so showing/hiding it never resizes the canvas
          * (`docs/design-system.md`, "no layout shift on tool switch"). */}
         <div
+          inert={historyPreview.kind === "document"}
           className={`pointer-events-none absolute top-3 right-3 left-[calc(var(--rail-right)+12px)] z-20 flex ${
             // The Select bar is left-aligned so its two switches never move
             // when the selection changes; the Node and Shape bars stay
