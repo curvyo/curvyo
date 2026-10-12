@@ -124,10 +124,10 @@ pub fn offset(
     if !distance_mm.is_finite() || distance_mm.abs() > MAX_COORDINATE_MM {
         return Err(OffsetError::OutOfRange);
     }
-    let units = snap(Point::new(distance_mm, 0.0)).x;
-    if units == 0 {
+    if offset_distance_is_zero(distance) {
         return Err(OffsetError::ZeroDistance);
     }
+    let units = snap(Point::new(distance_mm, 0.0)).x;
     let is_open = operand.iter().any(|outline| !outline.closed);
     if is_open && units < 0 {
         return Err(OffsetError::InsetOfOpenPath);
@@ -181,7 +181,10 @@ fn without_flattening_noise(mut paths: Paths64, flatten_tolerance_mm: f64) -> Pa
     let threshold_units = flatten_tolerance_mm / GRID_MM;
     paths.retain(|path| {
         let mut perimeter = 0.0_f64;
-        let mut previous = path[path.len() - 1];
+        let Some(&last) = path.last() else {
+            return false;
+        };
+        let mut previous = last;
         for point in path {
             // IEEE `sqrt` of a sum of squares, not `hypot` (criterion 12). Exact below 2^53.
             #[allow(clippy::cast_precision_loss)]
@@ -194,6 +197,18 @@ fn without_flattening_noise(mut paths: Paths64, flatten_tolerance_mm: f64) -> Pa
         double_area >= threshold_units * perimeter
     });
     paths
+}
+
+/// Whether `distance` rounds to zero on the kernel's 0.001 mm grid, so [`offset`] would refuse it
+/// with [`OffsetError::ZeroDistance`]. Callers that check the distance before other refusals use
+/// this, so their rule and the kernel's cannot drift apart. A distance that is not finite or out
+/// of range is not zero.
+#[must_use]
+pub fn offset_distance_is_zero(distance: Length) -> bool {
+    let distance_mm = distance.as_mm();
+    distance_mm.is_finite()
+        && distance_mm.abs() <= MAX_COORDINATE_MM
+        && snap(Point::new(distance_mm, 0.0)).x == 0
 }
 
 /// The open operand grown into a closed region: every outline stroked as a line (an open one
@@ -324,6 +339,15 @@ mod tests {
         let at_fifty =
             f64::from(miter_min_turn(50.0).bits()) / UNITS_PER_TURN * std::f64::consts::TAU;
         assert!(50.0 * at_fifty * at_fifty / 8.0 <= 0.005 + 1e-9);
+    }
+
+    #[test]
+    fn the_zero_rule_is_the_grid_rounding() {
+        assert!(offset_distance_is_zero(Length::from_mm(0.0)));
+        assert!(offset_distance_is_zero(Length::from_mm(-0.0004)));
+        assert!(!offset_distance_is_zero(Length::from_mm(0.0005)));
+        assert!(!offset_distance_is_zero(Length::from_mm(f64::NAN)));
+        assert!(without_flattening_noise(vec![Vec::new()], 0.008).is_empty());
     }
 
     #[test]

@@ -93,13 +93,14 @@ fn two_operands_of_ten_thousand_nodes() {
 /// `specs/0038-path-offset` criterion 3: the kernel part of one preview update, on the gear-like
 /// operand of the Boolean budgets. The cost grows with how far the offset fills its pockets: at
 /// 2 mm it is about 20 ms, at 5 mm (pockets of 4 mm filled completely) about 55 ms on the
-/// development machine, which is above the budget (reported in the PR as an open point).
+/// development machine, which is above the budget (`docs/technical-debt.md`): that case has an
+/// interim release ceiling of 100 ms until the preview leaves the UI thread.
 #[test]
 fn an_offset_of_two_hundred_curved_nodes() {
     let operand = wavy(200, 0.0, 0.0);
-    let budget = Duration::from_millis(50);
     for join in [OffsetJoin::Round, OffsetJoin::Miter, OffsetJoin::Bevel] {
-        for d in [2.0, -1.0] {
+        for (d, budget_ms) in [(2.0, 50), (-1.0, 50), (5.0, 100)] {
+            let budget = Duration::from_millis(budget_ms);
             let started = Instant::now();
             let result = offset(
                 &[Outline::new(&operand, true)],

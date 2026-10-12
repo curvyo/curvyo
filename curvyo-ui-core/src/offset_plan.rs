@@ -8,7 +8,7 @@
 use curvyo_document_core::{
     Length, NewAnchor, NodeId, ObjectSnapshot, PieceOutlines, Point, Tolerance,
 };
-use curvyo_geometry_core::{OffsetError, Outline, OutlineTriple, offset};
+use curvyo_geometry_core::{OffsetError, Outline, OutlineTriple, offset, offset_distance_is_zero};
 
 use crate::anchor_id_minter::AnchorIdMinter;
 use crate::boolean::{is_open, operands_in_order, outlines_of};
@@ -128,7 +128,7 @@ pub fn compute_offset(
         return Err(OffsetRefusal::NoOperands);
     }
     let distance_mm = settings.distance_mm();
-    if (distance_mm * 1000.0).round() == 0.0 {
+    if offset_distance_is_zero(Length::from_mm(distance_mm)) {
         return Err(OffsetRefusal::ZeroDistance);
     }
     if distance_mm < 0.0 {
