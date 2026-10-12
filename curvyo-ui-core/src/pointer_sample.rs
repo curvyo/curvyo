@@ -1,7 +1,7 @@
 //! The editor's record of one pointer reading as the webview delivered it
 //! (`specs/0032-pen-tablet-input` criterion 1, `adrs.md` "the input record").
 
-use curvyo_document_core::Point;
+use curvyo_document_core::{Angle, Point};
 
 /// The `buttons` bit a pen sets while its eraser end is in contact or pressed.
 pub const ERASER_BUTTON: u32 = 32;
@@ -39,10 +39,10 @@ pub struct PointerSample {
     pub kind: PointerKind,
     /// The pressure from 0 to 1, exactly as delivered (0.5 for a device without pressure).
     pub pressure: f64,
-    /// The tilt along X in degrees, from -90 to 90.
-    pub tilt_x_deg: f64,
-    /// The tilt along Y in degrees, from -90 to 90.
-    pub tilt_y_deg: f64,
+    /// The tilt along X, from -90° to 90°.
+    pub tilt_x: Angle,
+    /// The tilt along Y, from -90° to 90°.
+    pub tilt_y: Angle,
     /// Whether the eraser end is in use (`buttons` bit 32).
     pub eraser: bool,
     /// The event time in milliseconds, as the webview delivered it.
@@ -50,7 +50,7 @@ pub struct PointerSample {
 }
 
 impl PointerSample {
-    /// The record of a reading passed as `[x, y, pressure, tilt_x, tilt_y, time_ms]` (the layout
+    /// The record of a reading passed as `[x, y, pressure, tilt_x_deg, tilt_y_deg, time_ms]` (the layout
     /// of one sample in the wasm call), with its `pointerType` and `buttons`. The position is
     /// taken as given; the caller converts it to document millimetres first.
     #[must_use]
@@ -59,8 +59,8 @@ impl PointerSample {
             position: Point::new(values[0], values[1]),
             kind: PointerKind::from_dom(pointer_type),
             pressure: values[2],
-            tilt_x_deg: values[3],
-            tilt_y_deg: values[4],
+            tilt_x: Angle::from_radians(values[3].to_radians()),
+            tilt_y: Angle::from_radians(values[4].to_radians()),
             eraser: buttons & ERASER_BUTTON != 0,
             time_ms: values[5],
         }

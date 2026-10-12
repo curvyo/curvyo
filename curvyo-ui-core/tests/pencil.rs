@@ -3,7 +3,7 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, missing_docs)]
 
-use curvyo_document_core::{Length, Point};
+use curvyo_document_core::{Angle, Length, Point};
 use curvyo_ui_core::{
     PencilSettings, PencilTool, PointerKind, PointerSample, PressureCurve, StrokeShape,
     smooth_pressures, stroke_has_pressure,
@@ -16,8 +16,8 @@ fn sample(kind: PointerKind, x: f64, pressure: f64) -> PointerSample {
         position: Point::new(x, 10.0),
         kind,
         pressure,
-        tilt_x_deg: 0.0,
-        tilt_y_deg: 0.0,
+        tilt_x: Angle::from_radians(0.0),
+        tilt_y: Angle::from_radians(0.0),
         eraser: false,
         time_ms: x,
     }
@@ -35,8 +35,8 @@ fn criterion_1_the_record_carries_every_value_as_delivered() {
     assert_eq!(record.position, Point::new(12.5, 7.25));
     assert_eq!(record.kind, PointerKind::Pen);
     assert!((record.pressure - 0.62).abs() < 1e-12);
-    assert!((record.tilt_x_deg - 12.0).abs() < 1e-12);
-    assert!((record.tilt_y_deg + 3.0).abs() < 1e-12);
+    assert!((record.tilt_x.as_radians() - 12.0_f64.to_radians()).abs() < 1e-12);
+    assert!((record.tilt_y.as_radians() + 3.0_f64.to_radians()).abs() < 1e-12);
     assert!(record.eraser);
     assert!((record.time_ms - 1234.5).abs() < 1e-12);
     assert!(!PointerSample::from_values("pen", 1, [0.0; 6]).eraser);
