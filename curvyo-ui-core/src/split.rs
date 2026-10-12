@@ -120,8 +120,9 @@ impl Sets {
 /// The parts of a compound path, each as indices into its outlines: the regions (an even-depth
 /// outline, then the outlines directly inside it) of which an outline touches or crosses an
 /// outline of another one, joined. Ordered by the first region of each part. `None` when the
-/// regions do not hold every outline (see [`plan_split`]).
-fn parts_of(outlines: &[SubpathRef<'_>]) -> Option<Vec<Vec<usize>>> {
+/// regions do not hold every outline (see [`plan_split`]). The flag says whether an outline is a
+/// hole (odd depth): a part of several touching shapes has several outlines and no hole.
+fn parts_of(outlines: &[SubpathRef<'_>]) -> Option<(Vec<Vec<usize>>, bool)> {
     let triples = kernel_triples(outlines);
     let views = kernel_views(&triples, outlines);
     let nesting = outline_nesting(&views);
@@ -168,7 +169,8 @@ fn parts_of(outlines: &[SubpathRef<'_>]) -> Option<Vec<Vec<usize>>> {
         }
         parts[part_of_root[root]].extend(members);
     }
-    Some(parts)
+    let has_holes = nesting.iter().any(|nest| nest.depth % 2 == 1);
+    Some((parts, has_holes))
 }
 
 /// Plans Split over the selected objects.
@@ -216,13 +218,14 @@ pub fn plan_split(
         // path as it is rather than drop geometry.
         // (Such a path is reported as "one piece", which is not quite true; leaving it alone is
         // what matters.)
-        let parts = parts_of(&outlines).filter(|parts| parts.len() > 1);
-        let Some(parts) = parts else {
+        let found = parts_of(&outlines).filter(|(parts, _)| parts.len() > 1);
+        let Some((parts, has_holes)) = found else {
             kept.push(object.id());
             left_alone += 1;
             continue;
         };
-        with_holes |= parts.iter().any(|part| part.len() > 1);
+        // A part of several touching shapes has several outlines and no hole.
+        with_holes |= has_holes;
         removed.push(object.id());
         for part in parts {
             let piece = part

@@ -94,3 +94,11 @@ write for Split, Break apart, Cut and Fracture/Flatten.
 - **Tests of 0035 moved by name only.** The tests that checked the old Break apart now call
   `apply_split`, `plan_split` and `SplitRefusal` with the same assertions; `Break apart` keeps its
   own tests (`split_break_apart_session.rs`, `split_and_break_apart.rs`).
+- **Coordinates out of range (2026-10-12, after the tester's report).** Split refuses a compound
+  path with a coordinate that is not finite or beyond `MAX_COORDINATE_MM` (code `out_of_range`, the
+  sentence of the Boolean operations, the compound paths outlined), because its part search
+  flattens the outlines; an infinite x made the flattening allocate gigabytes. Break apart needs
+  no arithmetic and still breaks such a path apart; only its hole flag is not computed for it.
+  The flattening is bounded as a guard behind every caller.
+- **The hole flag of Split** is "an outline of odd depth", not "a part with several outlines": a
+  part of touching shapes has no hole.

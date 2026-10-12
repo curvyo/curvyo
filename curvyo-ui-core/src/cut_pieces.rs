@@ -4,9 +4,10 @@
 //!
 //! A closed contour with `m` cuts gives `m` pieces (the last runs round the closing segment), an
 //! open one `m + 1`. A new end node is a Corner node with a zero handle on its open side; every
-//! other node keeps its place, handles and kind.
+//! other node keeps its place and its far handle, the handle toward a cut stays collinear
+//! (shortened), and a Symmetric node whose handles become unequal turns Asymmetric.
 
-use curvyo_document_core::{AnchorKind, NewAnchor, Point, Vec2};
+use curvyo_document_core::{AnchorKind, NewAnchor, Point, Tolerance, Vec2};
 use curvyo_geometry_core::{CutParameter, subdivide_at_parameter};
 
 use crate::anchor_id_minter::AnchorIdMinter;
@@ -56,6 +57,26 @@ fn sub_curve(from: &NewAnchor, to: &NewAnchor, t0: f64, t1: f64) -> Curve {
     curve
 }
 
+/// Two handle lengths this close are equal (millimetres).
+const EQUAL_HANDLES: Tolerance = Tolerance::from_mm(1e-9);
+
+/// A node next to a cut inside a segment: de Casteljau shortens its handle toward the cut and
+/// keeps it collinear. A Symmetric node whose handles are no longer of equal length becomes
+/// Asymmetric (collinear, own lengths), so that the next drag of a handle does not bend the curve
+/// (`0036` criterion 5).
+fn kept_kind(anchor: NewAnchor) -> NewAnchor {
+    let unequal =
+        (anchor.handle_in.length() - anchor.handle_out.length()).abs() > EQUAL_HANDLES.as_mm();
+    if anchor.kind == AnchorKind::Symmetric && unequal {
+        NewAnchor {
+            kind: AnchorKind::Asymmetric,
+            ..anchor
+        }
+    } else {
+        anchor
+    }
+}
+
 /// Where a piece starts or ends.
 #[derive(Clone, Copy)]
 enum Stop {
@@ -92,12 +113,12 @@ fn piece(
     };
     let start_node = node(from.0);
     out.push(match stops.0 {
-        Stop::Node => NewAnchor {
+        Stop::Node => kept_kind(NewAnchor {
             id: minter.mint(),
             point: first.start,
             handle_out: first.start_out,
             ..start_node
-        },
+        }),
         Stop::Cut => NewAnchor {
             id: minter.mint(),
             point: first.start,
@@ -108,21 +129,21 @@ fn piece(
     });
     for (offset, pair) in curves.windows(2).enumerate() {
         let original = node(from.0 + offset + 1);
-        out.push(NewAnchor {
+        out.push(kept_kind(NewAnchor {
             id: minter.mint(),
             handle_in: pair[0].end_in,
             handle_out: pair[1].start_out,
             ..original
-        });
+        }));
     }
     let end_node = node(to.0);
     out.push(match stops.1 {
-        Stop::Node => NewAnchor {
+        Stop::Node => kept_kind(NewAnchor {
             id: minter.mint(),
             point: last.end,
             handle_in: last.end_in,
             ..end_node
-        },
+        }),
         Stop::Cut => NewAnchor {
             id: minter.mint(),
             point: last.end,

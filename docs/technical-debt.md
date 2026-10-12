@@ -720,14 +720,21 @@ Known limits of Cut:
   it, and also at the nodes of the other contour inside it, because shared stretches are found per
   pair of segments (the line (0,0)-(20,0) under the polyline (0,0)-(10,0)-(20,0) is cut at (10,0)).
   Chaining stretches across neighbouring pairs in `curve_settle.rs` would fix it.
-- Curves that only come near each other are one cut: tangent circles up to a radius of about 15 mm,
-  whatever their rotation. Bézier circles of a larger radius that touch from outside cross twice by
+- Curves that only come near each other are one cut, also when the contact runs over a node:
+  tangent circles from outside up to a radius of about 15 mm, whatever their rotation, and circles
+  touching from inside. The cut is the middle of the contact, which can lie up to 0.02 mm from the
+  geometric touch point (the curves stay within 0.001 mm of each other along up to half a
+  millimetre there). Bézier circles of a larger radius that touch from outside cross twice by
   their own rounding (0.027 % of the radius) with a lens thicker than 0.01 mm and are cut at both
   crossings, 1 mm or more apart for a radius of 60 mm.
 - A curve with a hairpin whose two sides come within 0.002 mm of each other is cut several times
   near its tip.
 - A self-crossing whose one pass lies within 0.01 mm of a split point of the loop search is taken
   for the join and dropped.
+- Split, Combine, the Boolean operations and Cut refuse coordinates that are not finite or beyond
+  the kernel's range before any flattening; Break apart needs no arithmetic and only skips its hole
+  flag for such a path. The flattening itself is bounded (at most 262,144 chords per segment), so
+  an unchecked caller cannot allocate without limit.
 - The 10,000-piece limit is checked after the whole kernel run: 2,000 x 2,000 lines produce four
   million meetings before the refusal. A cap inside `cut_parameters` would return early.
 - The curve module has no Bézier clipping, so two very long curves that nearly coincide cost more

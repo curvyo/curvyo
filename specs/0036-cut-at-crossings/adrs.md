@@ -114,6 +114,12 @@ None for the customer. The spec's own questions all have defaults.
   control polygon goes backwards along its chord), recursively. Splitting once at t = 0.5 missed
   loops that lie in one half. A self-crossing whose one pass lies within 0.01 mm of a split point
   is taken for the join and dropped.
+- **Contacts are grouped per pair of contours (2026-10-11, after the tester's report).** A
+  shallow crossing comes within reach of the other curve also in the neighbouring segment, so the
+  meetings of all segment pairs of two contours are grouped together (`curve_contacts.rs`): a
+  contact with crossings is cut at its crossings, one without at the middle of its touches. A
+  contour meeting itself keeps every crossing (no lens rule), and two meetings whose stretches on
+  that one contour overlap never form one contact.
 - **Near-touches are one cut.** Curves that come within the touch distance along a stretch without
   coinciding (tangent circles) make one contact: the touches and the crossings of a lens thinner
   than 0.01 mm (two Bézier circles that touch from outside cross twice by their own rounding) are

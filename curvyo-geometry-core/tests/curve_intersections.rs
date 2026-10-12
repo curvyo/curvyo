@@ -628,3 +628,22 @@ fn a_path_crossing_itself_twice_is_cut_four_times() {
     let result = cuts(&all);
     assert_eq!(result[0].len(), 4, "{:?}", result[0]);
 }
+
+/// A circle touching another from inside is cut once each at the touch, at a node or inside a
+/// segment. The curves stay within 0.001 mm of each other along almost half a millimetre there,
+/// so the middle of that contact lies up to 0.02 mm from the touch point.
+#[test]
+fn circles_touching_from_inside_are_cut_once() {
+    for degrees in [0.0, 7.0, 30.0, 73.0] {
+        let all = [
+            (turned_about_centre(100.0, 100.0, 10.0, degrees), true),
+            (turned_about_centre(105.0, 100.0, 5.0, degrees), true),
+        ];
+        let result = cuts(&all);
+        for (index, list) in result.iter().enumerate() {
+            assert_eq!(list.len(), 1, "{degrees} degrees, circle {index}: {list:?}");
+            let at = position(&all[index].0, true, list[0]);
+            assert!(near(at, Point::new(110.0, 100.0), 0.02), "{at:?}");
+        }
+    }
+}
