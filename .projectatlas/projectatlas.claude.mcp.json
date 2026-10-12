@@ -6,9 +6,9 @@
         "--require-version",
         "0.4.5",
         "--db",
-        "/home/marc/workbench/vecmanf-claude/.projectatlas/projectatlas.db",
+        "/home/marc/workbench/vecmanf-claude/base/.projectatlas/projectatlas.db",
         "--config",
-        "/home/marc/workbench/vecmanf-claude/.projectatlas/config.toml",
+        "/home/marc/workbench/vecmanf-claude/base/.projectatlas/config.toml",
         "mcp"
       ]
     }

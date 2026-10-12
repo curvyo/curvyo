@@ -10,3 +10,8 @@ frontend/.vite/
 # Tauri
 curvyo-app/gen/
 /target-ux/
+
+# ProjectAtlas index and SQLite side files: built per machine with `projectatlas init` (the index is over 100 MB)
+.projectatlas/*.db-shm
+.projectatlas/*.db-wal
+.projectatlas/projectatlas.db
