@@ -145,40 +145,22 @@ impl Session {
             .take(count)
             .collect();
         let rows = self.rows_of_items(object, &items);
-        let fork_name = |branch: &HistoryBranch| {
-            branch
-                .fork
-                .and_then(|fork| self.document.history_shown_id(fork))
-        };
         let out: Vec<Value> = items
             .iter()
             .map(|(index, item)| match *item {
                 HistoryItem::Row(row) => {
-                    let mut value = rows
+                    let value = rows
                         .iter()
                         .find(|(r, _)| *r == row)
                         .map_or(Value::Null, |(_, value)| value.clone());
-                    let look = RowLook {
-                        undone: value["status"] != "applied",
-                        inherited: value["from"].as_str().is_some_and(|from| !from.is_empty()),
-                    };
-                    value["type"] = json!("row");
-                    value["gutter"] = gutter_json(&shown.layout.gutter(*index, look));
-                    if let Some(b) = shown.layout.branch_of_row(row) {
-                        let branch = &shown.branches[b];
-                        let of = branch.rows.len();
-                        let step = of - branch.rows.iter().position(|r| *r == row).unwrap_or(0);
-                        value["lane"] =
-                            json!(branch_lane_name(fork_name(branch).as_deref(), step, of));
-                    }
-                    value
+                    self.row_item(&shown, *index, row, value)
                 }
                 HistoryItem::Header(b) => {
                     let branch = &shown.branches[b];
                     json!({
                         "type": "header",
                         "key": format!("{}@{}", branch.id.peer(), branch.id.counter()),
-                        "text": branch_header_text(fork_name(branch).as_deref(), branch.rows.len()),
+                        "text": branch_header_text(self.fork_name(branch).as_deref(), branch.rows.len()),
                         "expanded": shown.layout.is_open(b),
                         "gutter": gutter_json(&shown.layout.gutter(*index, RowLook::default())),
                     })
@@ -193,6 +175,32 @@ impl Session {
             })
             .collect();
         Value::Array(out).to_string()
+    }
+
+    /// A step row as an item: the row's JSON with its type, its gutter and, on a branch, the lane
+    /// name a screen reader hears (criterion 9).
+    fn row_item(&self, shown: &Shown, index: usize, row: usize, mut value: Value) -> Value {
+        let look = RowLook {
+            undone: value["status"] != "applied",
+            inherited: value["from"].as_str().is_some_and(|from| !from.is_empty()),
+        };
+        value["type"] = json!("row");
+        value["gutter"] = gutter_json(&shown.layout.gutter(index, look));
+        if let Some(b) = shown.layout.branch_of_row(row) {
+            let branch = &shown.branches[b];
+            let of = branch.rows.len();
+            let step = of - branch.rows.iter().position(|r| *r == row).unwrap_or(0);
+            let fork = self.fork_name(branch);
+            value["lane"] = json!(branch_lane_name(fork.as_deref(), step, of));
+        }
+        value
+    }
+
+    /// The shown id of a branch's fork point.
+    fn fork_name(&self, branch: &HistoryBranch) -> Option<String> {
+        branch
+            .fork
+            .and_then(|fork| self.document.history_shown_id(fork))
     }
 
     /// A press or Enter on the header row or the "more" row at `index`: folds or unfolds it.

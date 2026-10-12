@@ -63,7 +63,6 @@ impl Session {
 
     /// `count` rows of the selected object's timeline from the `start`-th newest, as a JSON array.
     pub fn object_history_rows_json(&mut self, start: usize, count: usize) -> String {
-        self.sync_history();
         Value::Array(self.object_history_row_values(start, count)).to_string()
     }
 

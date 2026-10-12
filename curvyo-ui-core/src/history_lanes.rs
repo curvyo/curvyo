@@ -140,57 +140,17 @@ impl ListLayout {
         let open: Vec<bool> = (0..branches.len())
             .map(|b| primary[b] != toggled.get(b).copied().unwrap_or(false))
             .collect();
-        let mut header_shown = vec![false; branches.len()];
-        // A parent comes after its child in the newest-first order only when the child is
-        // newer; resolve in rounds until nothing changes.
-        let mut changed = true;
-        while changed {
-            changed = false;
-            for b in 0..branches.len() {
-                let shown = match parent[b] {
-                    None => primary[b] || more_open,
-                    Some(p) if !primary[b] && primary[p] => more_open && header_shown[p] && open[p],
-                    Some(p) => header_shown[p] && open[p],
-                };
-                if shown != header_shown[b] {
-                    header_shown[b] = shown;
-                    changed = true;
-                }
-            }
-        }
-        let header_at: HashMap<usize, usize> = branches
-            .iter()
-            .enumerate()
-            .filter(|(b, _)| header_shown[*b])
-            .filter_map(|(b, branch)| Some((*branch.rows.first()?, b)))
-            .collect();
-        let more_roots: Vec<usize> = (0..branches.len())
-            .filter(|b| !primary[*b] && parent[*b].is_none_or(|p| primary[p]))
-            .collect();
-        let more_count = primary.iter().filter(|p| !**p).count();
-        let more_at = more_roots
-            .iter()
-            .filter_map(|b| branches[*b].rows.first().copied())
-            .min();
-        let mut items = Vec::with_capacity(total + branches.len() + 1);
-        let mut item_of_row = HashMap::new();
-        let mut header_item = vec![None; branches.len()];
-        for row in 0..total {
-            if more_at == Some(row) {
-                items.push(HistoryItem::More { count: more_count });
-            }
-            if let Some(b) = header_at.get(&row) {
-                header_item[*b] = Some(items.len());
-                items.push(HistoryItem::Header(*b));
-            }
-            let visible = branch_of_row
-                .get(&row)
-                .is_none_or(|b| header_shown[*b] && open[*b]);
-            if visible {
-                item_of_row.insert(row, items.len());
-                items.push(HistoryItem::Row(row));
-            }
-        }
+        let header_shown = headers_shown(&parent, &primary, &open, more_open);
+        let built = build_items(
+            total,
+            branches,
+            &branch_of_row,
+            &parent,
+            &primary,
+            &header_shown,
+            &open,
+        );
+        let (items, item_of_row, header_item) = (built.items, built.item_of_row, built.header_item);
         let fork_item: Vec<Option<usize>> = branches
             .iter()
             .map(|branch| {
@@ -306,6 +266,88 @@ impl ListLayout {
         }
         out
     }
+}
+
+/// Which branches show their header row: a branch held by the "more" row only while it is
+/// unfolded, and a branch that forks from another only while that one shows and is unfolded.
+fn headers_shown(
+    parent: &[Option<usize>],
+    primary: &[bool],
+    open: &[bool],
+    more_open: bool,
+) -> Vec<bool> {
+    let mut shown = vec![false; parent.len()];
+    // A parent comes after its child in the newest-first order only when the child is newer;
+    // resolve in rounds until nothing changes.
+    let mut changed = true;
+    while changed {
+        changed = false;
+        for b in 0..parent.len() {
+            let now = match parent[b] {
+                None => primary[b] || more_open,
+                Some(p) if !primary[b] && primary[p] => more_open && shown[p] && open[p],
+                Some(p) => shown[p] && open[p],
+            };
+            if now != shown[b] {
+                shown[b] = now;
+                changed = true;
+            }
+        }
+    }
+    shown
+}
+
+/// The items of the list and where each row and header landed.
+struct BuiltItems {
+    items: Vec<HistoryItem>,
+    item_of_row: HashMap<usize, usize>,
+    header_item: Vec<Option<usize>>,
+}
+
+/// The items top to bottom: the "more" row and each shown header directly above the newest row of
+/// their branch, and every row whose branch is shown and unfolded.
+fn build_items(
+    total: usize,
+    branches: &[BranchSpan],
+    branch_of_row: &HashMap<usize, usize>,
+    parent: &[Option<usize>],
+    primary: &[bool],
+    header_shown: &[bool],
+    open: &[bool],
+) -> BuiltItems {
+    let header_at: HashMap<usize, usize> = branches
+        .iter()
+        .enumerate()
+        .filter(|(b, _)| header_shown[*b])
+        .filter_map(|(b, branch)| Some((*branch.rows.first()?, b)))
+        .collect();
+    let more_count = primary.iter().filter(|p| !**p).count();
+    let more_at = (0..branches.len())
+        .filter(|b| !primary[*b] && parent[*b].is_none_or(|p| primary[p]))
+        .filter_map(|b| branches[b].rows.first().copied())
+        .min();
+    let mut built = BuiltItems {
+        items: Vec::with_capacity(total + branches.len() + 1),
+        item_of_row: HashMap::new(),
+        header_item: vec![None; branches.len()],
+    };
+    for row in 0..total {
+        if more_at == Some(row) {
+            built.items.push(HistoryItem::More { count: more_count });
+        }
+        if let Some(b) = header_at.get(&row) {
+            built.header_item[*b] = Some(built.items.len());
+            built.items.push(HistoryItem::Header(*b));
+        }
+        let visible = branch_of_row
+            .get(&row)
+            .is_none_or(|b| header_shown[*b] && open[*b]);
+        if visible {
+            built.item_of_row.insert(row, built.items.len());
+            built.items.push(HistoryItem::Row(row));
+        }
+    }
+    built
 }
 
 /// The first three branches, newest first, whose parent is drawn too.
