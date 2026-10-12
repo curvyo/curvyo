@@ -10,7 +10,7 @@ use loro::{LoroTree, TreeID, TreeParentId};
 use crate::document::{Document, OBJECTS_TREE};
 use crate::group_tree::{
     MAX_GROUP_DEPTH, children_of, group_parent, groups_above, groups_in, is_group_node,
-    is_layer_node, node_id,
+    is_layer_node,
 };
 use crate::groups::remove_emptied_groups;
 use crate::node_read::locked_through;
@@ -99,17 +99,14 @@ fn target_parent(tree: &LoroTree, target: MoveTarget) -> Result<Option<TreeID>, 
 
 /// Whether `node` or a node above it is in `set`.
 fn is_or_under(tree: &LoroTree, node: TreeID, set: &HashSet<TreeID>) -> bool {
+    // A Loro tree holds no cycle, so the walk to the root ends; it is not capped, so no merged
+    // tree deeper than a cap can make a cyclic move look allowed.
     let mut current = Some(node);
-    let mut steps = 0;
     while let Some(here) = current {
         if set.contains(&here) {
             return true;
         }
         current = group_parent(tree, here);
-        steps += 1;
-        if steps > MAX_GROUP_DEPTH * 4 {
-            break;
-        }
     }
     false
 }
@@ -136,10 +133,16 @@ fn checked(tree: &LoroTree, plan: &MovePlan) -> Result<(Vec<TreeID>, Option<Tree
     if plan.nodes.is_empty() {
         return Err(MoveRefusal::Nothing);
     }
-    let moved: HashSet<TreeID> = plan.nodes.iter().map(|&id| tree_id_of(id)).collect();
-    if moved.iter().any(|&id| !node_exists(tree, id)) {
+    let named: HashSet<TreeID> = plan.nodes.iter().map(|&id| tree_id_of(id)).collect();
+    if named.iter().any(|&id| !node_exists(tree, id)) {
         return Err(MoveRefusal::NoSuchNode);
     }
+    // A node under another moved node goes with it and keeps its place inside it.
+    let moved: HashSet<TreeID> = named
+        .iter()
+        .copied()
+        .filter(|&id| group_parent(tree, id).is_none_or(|p| !is_or_under(tree, p, &named)))
+        .collect();
     let parent = target_parent(tree, plan.target)?;
     if let MoveTarget::Above(sibling) | MoveTarget::Below(sibling) = plan.target
         && moved.contains(&tree_id_of(sibling))
@@ -226,17 +229,5 @@ impl Document {
         remove_emptied_groups(&tree, &old_parents);
         self.commit_with_label(MOVE_NODES_COMMIT_LABEL);
         Ok(())
-    }
-
-    /// The node that directly holds `id` (a layer or a group), `None` at the top level or for a
-    /// node that does not exist.
-    #[must_use]
-    pub fn parent_node(&self, id: NodeId) -> Option<NodeId> {
-        let tree = self.loro().get_tree(OBJECTS_TREE);
-        let tree_id = tree_id_of(id);
-        if !node_exists(&tree, tree_id) {
-            return None;
-        }
-        group_parent(&tree, tree_id).map(node_id)
     }
 }

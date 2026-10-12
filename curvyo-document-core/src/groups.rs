@@ -90,7 +90,7 @@ impl Document {
     /// [`ObjectEditError::NotEnoughObjects`] for fewer than two different ids;
     /// [`ObjectEditError::NotSiblings`] if the objects do not share one parent;
     /// [`ObjectEditError::TooDeep`] if the group would put more than [`MAX_GROUP_DEPTH`] groups on
-    /// one chain.
+    /// one chain; [`ObjectEditError::IsALayer`] if an id is a layer.
     ///
     /// # Panics
     /// Does not panic in practice: every tree operation below acts on nodes just confirmed live.
@@ -104,6 +104,9 @@ impl Document {
             .collect();
         if members.iter().any(|&id| !node_exists(&tree, id)) {
             return Err(ObjectEditError::NoSuchObject);
+        }
+        if members.iter().any(|&id| is_layer_node(&tree, id)) {
+            return Err(ObjectEditError::IsALayer);
         }
         if members.len() < 2 {
             return Err(ObjectEditError::NotEnoughObjects);
@@ -158,7 +161,7 @@ impl Document {
     ///
     /// # Errors
     /// [`ObjectEditError::NoSuchObject`] if an id does not exist; [`ObjectEditError::NotAGroup`] if
-    /// an id is a leaf (nothing is written).
+    /// an id is a leaf; [`ObjectEditError::IsALayer`] if an id is a layer (nothing is written).
     ///
     /// # Panics
     /// Does not panic in practice: every tree operation below acts on nodes just confirmed live.
@@ -172,6 +175,9 @@ impl Document {
             .collect();
         if groups.iter().any(|&id| !node_exists(&tree, id)) {
             return Err(ObjectEditError::NoSuchObject);
+        }
+        if groups.iter().any(|&id| is_layer_node(&tree, id)) {
+            return Err(ObjectEditError::IsALayer);
         }
         if groups.is_empty() || groups.iter().any(|&id| !is_group_node(&tree, id)) {
             return Err(ObjectEditError::NotAGroup);

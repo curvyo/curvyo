@@ -20,7 +20,7 @@ pub const DELETE_LAYER_COMMIT_LABEL: &str = "delete_layer";
 
 /// "Layer N" with the smallest positive N that no name of `taken` uses (criterion 7).
 #[must_use]
-pub fn next_layer_name<'a>(taken: impl IntoIterator<Item = &'a str>) -> String {
+pub(crate) fn next_layer_name<'a>(taken: impl IntoIterator<Item = &'a str>) -> String {
     let used: std::collections::HashSet<u64> = taken
         .into_iter()
         .filter_map(|name| name.strip_prefix("Layer ")?.parse().ok())

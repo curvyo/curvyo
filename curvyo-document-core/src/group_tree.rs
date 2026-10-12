@@ -241,6 +241,19 @@ impl Document {
             .map(node_id)
     }
 
+    /// The node that directly holds `id` (a layer or a group), `None` at the top level or for a
+    /// node that does not exist: the raw tree, where [`Document::parent_group`] sees through
+    /// layers.
+    #[must_use]
+    pub fn parent_node(&self, id: NodeId) -> Option<NodeId> {
+        let tree = self.loro().get_tree(OBJECTS_TREE);
+        let tree_id = tree_id_of(id);
+        if !node_exists(&tree, tree_id) {
+            return None;
+        }
+        group_parent(&tree, tree_id).map(node_id)
+    }
+
     /// The groups that hold `id`, the nearest first. Empty for a node at the document root.
     #[must_use]
     pub fn ancestor_groups(&self, id: NodeId) -> Vec<NodeId> {

@@ -527,3 +527,82 @@ fn ten_thousand_nodes_in_a_layer_take_one_register_write_to_hide() {
             .all(|read| !read.visible)
     );
 }
+
+#[test]
+fn group_ungroup_and_delete_refuse_a_layer_before_the_first_write() {
+    let document = Document::new(1);
+    let (layer, a, b) = layer_with_one(&document);
+    let other = document.new_layer(None);
+    let steps = document.own_step_count();
+    assert_eq!(
+        document.group_objects(&[layer, other]),
+        Err(ObjectEditError::IsALayer)
+    );
+    assert_eq!(
+        document.group_objects(&[b, other]),
+        Err(ObjectEditError::IsALayer)
+    );
+    assert_eq!(document.ungroup(&[layer]), Err(ObjectEditError::IsALayer));
+    assert_eq!(
+        document.delete_objects(&[a, layer]),
+        Err(ObjectEditError::IsALayer)
+    );
+    assert_eq!(document.own_step_count(), steps, "nothing was written");
+    assert!(document.is_layer(layer) && document.is_layer(other));
+    assert_eq!(document.children(Some(layer)), vec![a]);
+}
+
+#[test]
+fn moving_a_group_with_one_of_its_members_keeps_the_member_inside() {
+    let document = Document::new(1);
+    let (a, b, c) = (
+        rect(&document, 0.0),
+        rect(&document, 20.0),
+        rect(&document, 40.0),
+    );
+    let group = document.group_objects(&[a, b]).unwrap();
+    let layer = document.new_layer(None);
+    document
+        .move_nodes(&move_plan(&[b, group], MoveTarget::FrontOf(Some(layer))))
+        .unwrap();
+    assert_eq!(document.children(Some(layer)), vec![group]);
+    assert_eq!(document.children(Some(group)), vec![a, b]);
+    assert_eq!(document.children(None), vec![c, layer]);
+}
+
+#[test]
+fn the_read_of_a_deep_chain_carries_flags_and_opacity_to_the_bottom() {
+    let document = Document::new(1);
+    let layer = document.new_layer(None);
+    let mut inner = rect(&document, 0.0);
+    document
+        .move_nodes(&move_plan(&[inner], MoveTarget::FrontOf(Some(layer))))
+        .unwrap();
+    let leaf = inner;
+    // The layer counts toward the 32 levels: it holds at most 31 nested groups.
+    for i in 0..31 {
+        let extra = rect(&document, f64::from(i));
+        document
+            .move_nodes(&move_plan(&[extra], MoveTarget::Above(inner)))
+            .unwrap();
+        inner = document.group_objects(&[inner, extra]).unwrap();
+    }
+    let extra = rect(&document, 99.0);
+    document
+        .move_nodes(&move_plan(&[extra], MoveTarget::Above(inner)))
+        .unwrap();
+    assert_eq!(
+        document.group_objects(&[inner, extra]),
+        Err(ObjectEditError::TooDeep)
+    );
+    document
+        .set_node_opacity(&[layer], Opacity::new(0.5).unwrap())
+        .unwrap();
+    document.set_node_locked(&[layer], true).unwrap();
+    let read = read_of(&document, leaf);
+    assert_eq!(read.depth, 32);
+    assert!(read.locked);
+    assert_eq!(read.locked_by, Some(layer));
+    assert_eq!(read.opacity.get(), 0.5);
+    assert_eq!(document.read_nodes().len(), 1 + 31 + 32 + 1);
+}

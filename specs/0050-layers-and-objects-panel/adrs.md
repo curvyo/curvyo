@@ -118,6 +118,15 @@ new dependency, no trait, no generic.
        descendant and every id (criterion 45).
      - It does **not** delete each descendant on its own. That would turn one undo into N
        revives.
+   - **2026-10-12 (amends decisions 8 and 14).** The rules of criterion 30 live once in
+     `curvyo-document-core` `Document::check_move`; `move_nodes` runs it before the first write.
+     ui-core `plan_move` only turns a gesture into a `MovePlan` and asks `check_move`, and maps
+     `MoveRefusal` to the texts of criterion 32. `parent_group`, `ancestor_groups` and
+     `child_groups(None)` treat layers as the top level (criterion 42); `parent_node` and
+     `children` give the raw tree. Layers count toward the 32-level limit of `0023` criterion 5,
+     in the reader and in every writer alike, so a layer holds at most 31 nested groups. Group,
+     Ungroup and Delete of objects refuse a layer (`ObjectEditError::IsALayer`); a layer goes
+     only by `delete_layer`, which checks its lock.
 9. **2026-10-10: Delete layer never confirms (criterion 36), and the Pen gate (criterion
    53).** Delete layer is reversible by Ctrl+Z (decision 8), so it writes at once; there is no
     confirm state in the session. Every panel action that writes or selects passes the

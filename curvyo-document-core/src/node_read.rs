@@ -89,7 +89,14 @@ impl Inherited {
     };
 }
 
-fn read_node(document: &Document, tree: &LoroTree, id: TreeID, from: Inherited) -> NodeRead {
+/// The read of one node, or `None` for a leaf whose data does not decode (merge residue only:
+/// open refuses such a file), which the read leaves out with everything it would hold.
+fn read_node(
+    document: &Document,
+    tree: &LoroTree,
+    id: TreeID,
+    from: Inherited,
+) -> Option<NodeRead> {
     let node = node_id(id);
     let registers = tree
         .get_meta(id)
@@ -100,15 +107,12 @@ fn read_node(document: &Document, tree: &LoroTree, id: TreeID, from: Inherited) 
     } else if is_group_node(tree, id) {
         NodeKind::Group
     } else {
-        match document.object(node) {
-            Some(object) => NodeKind::Leaf(object),
-            None => NodeKind::Group,
-        }
+        NodeKind::Leaf(document.object(node)?)
     };
     let product = from.opacity * registers.opacity.get();
     // invariant: a product of numbers in 0..=1 lies in 0..=1.
     let opacity = Opacity::new(product).unwrap_or(Opacity::OPAQUE);
-    NodeRead {
+    Some(NodeRead {
         id: node,
         parent: from.parent,
         depth: from.depth,
@@ -119,13 +123,15 @@ fn read_node(document: &Document, tree: &LoroTree, id: TreeID, from: Inherited) 
         hidden_by: from.hidden_by,
         locked_by: from.locked_by,
         registers,
-    }
+    })
 }
 
 impl Document {
     /// Every node of the object tree in one pre-order pass, siblings in stacking order (back to
     /// front), each with its effective visible, locked and opacity values
-    /// (`specs/0050-layers-and-objects-panel` criterion 24). Hidden and locked nodes are listed.
+    /// (`specs/0050-layers-and-objects-panel` criterion 24). Hidden and locked nodes are listed. A
+    /// leaf whose data does not decode (merge residue) is left out, as `document.json` leaves it
+    /// out, so no consumer meets a node it cannot use.
     #[must_use]
     pub fn read_nodes(&self) -> Vec<NodeRead> {
         let tree = self.loro().get_tree(OBJECTS_TREE);
@@ -136,7 +142,9 @@ impl Document {
             .map(|id| (id, Inherited::TOP))
             .collect();
         while let Some((id, from)) = stack.pop() {
-            let read = read_node(self, &tree, id, from);
+            let Some(read) = read_node(self, &tree, id, from) else {
+                continue;
+            };
             if read.is_container() {
                 let down = Inherited {
                     parent: Some(read.id),
@@ -190,8 +198,9 @@ impl Document {
 /// Whether `id` or any node above it has its own `locked` flag on: the effective lock of one node,
 /// for the writes that refuse a locked node.
 pub(crate) fn locked_through(tree: &LoroTree, id: TreeID) -> bool {
+    // A Loro tree holds no cycle, so the walk to the root ends; it is not capped, so a merged
+    // tree deeper than any limit still answers correctly.
     let mut current = Some(id);
-    let mut steps = 0;
     while let Some(node) = current {
         if tree
             .get_meta(node)
@@ -200,10 +209,6 @@ pub(crate) fn locked_through(tree: &LoroTree, id: TreeID) -> bool {
             return true;
         }
         current = crate::group_tree::group_parent(tree, node);
-        steps += 1;
-        if steps > crate::group_tree::MAX_GROUP_DEPTH * 4 {
-            break;
-        }
     }
     false
 }

@@ -96,7 +96,7 @@ pub use history::{
     SyncError, TouchedObject, WIPE_LABEL, is_document_level_label, shown_ids,
 };
 pub use junction::{COINCIDENT_MM, interior_handle, merged_junction};
-pub use layers::{DELETE_LAYER_COMMIT_LABEL, NEW_LAYER_COMMIT_LABEL, next_layer_name};
+pub use layers::{DELETE_LAYER_COMMIT_LABEL, NEW_LAYER_COMMIT_LABEL};
 pub use node_edit::{
     RENAME_NODE_COMMIT_LABEL, SET_NODE_LOCKED_COMMIT_LABEL, SET_NODE_OPACITY_COMMIT_LABEL,
     SET_NODE_VISIBLE_COMMIT_LABEL,
