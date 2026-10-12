@@ -76,18 +76,21 @@ refactoring of shared code; anything worth refactoring is noted for the lead.
 
 ### Milestone B: input record and Pencil state machine in ui-core (AC 1, 3, 4, 5, 9, 12, 14)
 
-- [ ] B1. Test first, `pointer_sample.rs`: `PointerSample` carries position, kind, pressure,
+- [x] B1. Test first, `pointer_sample.rs`: `PointerSample` carries position, kind, pressure,
   tilt x/y, eraser (`buttons & 32`), time, unchanged from the input. (AC 1)
-- [ ] B2. Test first, `pencil_pressure.rs`: smoothing 0.2, 0.2, 1.0, 0.2, 0.2 → 0.2, 0.2,
+- [x] B2. Test first, `pencil_pressure.rs`: smoothing 0.2, 0.2, 1.0, 0.2, 0.2 → 0.2, 0.2,
   0.467, 0.467, 0.467 (± 0.001); 0.25 → 1.1 / 0.65 / 0.3125 mm for Soft / Linear / Firm
   with 0.2 and 2 mm; Min range 0.05 to 20, Max 0.1 to 50, Max below Min raised to Min.
   (AC 9, 14)
-- [ ] B3. Test first, `pencil_tool.rs`: pressure present for pen 0.1 to 0.9, absent for pen
+- [x] B3. Test first, `pencil_tool.rs`: pressure present for pen 0.1 to 0.9, absent for pen
   constant 0.5, pen constant 0 with contact, and mouse; touch starts nothing; pen move
   with `buttons` 0 starts nothing, pen down with `buttons` 1 starts a stroke; Escape
   cancels; fewer than 2 samples or length below 0.1 mm finish with nothing; the
-  pressure-present flag switches mid-stroke on the first usable sample. (AC 3, 4, 5, 12)
-- [ ] B4. `history_names.rs`: `pencil_stroke` → "Pencil stroke"; the guard test there
+  pressure-present flag switches mid-stroke on the first usable sample. A press needs the
+  primary contact (`buttons` bit 1), so the eraser end touching (bit 32 alone) starts nothing.
+  `pencil_tool.rs` also turns a stroke into its shape (fit, widths, outline), so the preview
+  and the commit share one function. (AC 3, 4, 5, 12)
+- [x] B4. `history_names.rs`: `pencil_stroke` → "Pencil stroke"; the guard test there
   passes. (AC 13)
 
 ### Milestone C: session, preview, commit in editor-wasm and render-core (AC 1, 2, 6, 7, 8, 11, 12, 13, 14, 16)

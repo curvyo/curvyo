@@ -57,6 +57,9 @@ mod param_entry;
 mod param_handles;
 mod pen_target;
 mod pen_tool;
+mod pencil_pressure;
+mod pencil_tool;
+mod pointer_sample;
 mod poly_star_tool;
 mod rectangle_tool;
 mod reference_point;
@@ -170,6 +173,9 @@ pub use pen_target::{EndNode, EndNodeIndex, PenTarget, continuation_of, pen_targ
 pub use pen_tool::{
     ClosingPreview, Continuation, PenTool, PointerUpOutcome as PenPointerUpOutcome, PressAction,
 };
+pub use pencil_pressure::{PencilSettings, PressureCurve, smooth_pressures};
+pub use pencil_tool::{FinishedStroke, PencilTool, StrokeShape, stroke_has_pressure};
+pub use pointer_sample::{ERASER_BUTTON, PointerKind, PointerSample};
 pub use poly_star_tool::{PolyStarMode, PolygonStarTool};
 pub use rectangle_tool::RectangleTool;
 pub use reference_point::{

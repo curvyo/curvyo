@@ -63,6 +63,7 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     ("cut_at_crossings", "Cut"),
     ("group", "Group"),
     ("ungroup", "Ungroup"),
+    ("pencil_stroke", "Pencil stroke"),
 ];
 
 /// The labels the engine writes itself. They are no step of the maker's: the setup of a new
