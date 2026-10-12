@@ -704,9 +704,12 @@ fn active(s: &Session) -> Vec<&'static str> {
 fn c2_tab_order_is_file_document_style_history_and_labels_and_tooltips() {
     let s = fresh();
     let view = s.panel_view();
-    assert_eq!(names(&s), ["file", "document", "style", "history"]);
+    assert_eq!(
+        names(&s),
+        ["file", "document", "style", "layers", "history"]
+    );
     let labels: Vec<_> = view.tabs.iter().map(|t| t.label).collect();
-    assert_eq!(labels, ["File", "Document", "Style", "History"]);
+    assert_eq!(labels, ["File", "Document", "Style", "Layers", "History"]);
     let tip = |n: &str| view.tabs.iter().find(|t| t.name == n).unwrap().tooltip;
     assert_eq!(tip("file"), "File", "the File tab names no key");
     assert_eq!(tip("document"), "Document (Shift+Ctrl+D)");
@@ -804,7 +807,7 @@ fn c2_hostile_tab_names_are_refused() {
         "FILE",
         " file",
         "file\0",
-        "layers",
+        "Layers",
         "../file",
         "fil\u{e9}",
     ] {

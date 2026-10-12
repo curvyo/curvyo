@@ -131,14 +131,14 @@ supply its root's register.
 
 ### M3: panel logic (`curvyo-ui-core`)
 
-- [ ] 16. `layer_rows` and `rows_window`: depth-first front-most first, collapse, default
+- [x] 16. `layer_rows` and `rows_window`: depth-first front-most first, collapse, default
       names, readout, "contains the selection", posinset/setsize, row count (AC 5, 6, 7, 8, 9,
       12, 22, 48, 52)
-- [ ] 17. `plan_move` and `MoveRefusal` texts; Alt+Up/Down/Home/End/Left/Right targets
+- [x] 17. `plan_move` and `MoveRefusal` texts; Alt+Up/Down/Home/End/Left/Right targets
       (AC 29, 30, 32)
-- [ ] 18. Texts: accessible names, tooltips, notices, Opacity caption and "Mixed"; markup and
+- [x] 18. Texts: accessible names, tooltips, notices, Opacity caption and "Mixed"; markup and
       bidi shown as plain text (AC 17, 26, 32, 36, 41)
-- [ ] 19. `PanelTab::Layers`, sticky, Shift+Ctrl+L, Shift+Ctrl+F leaves it (AC 1, 2; `0051`
+- [x] 19. `PanelTab::Layers`, sticky, Shift+Ctrl+L, Shift+Ctrl+F leaves it (AC 1, 2; `0051`
       AC 2, 13, 14)
 
 ### M4: session and wasm surface (`curvyo-editor-wasm`)

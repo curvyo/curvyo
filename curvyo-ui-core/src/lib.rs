@@ -42,6 +42,7 @@ mod history_notice;
 mod hit_test;
 mod hit_test_object;
 mod layer_move;
+mod layer_rows;
 mod layer_text;
 mod marquee;
 mod modifiers;
@@ -141,7 +142,14 @@ pub use history_notice::{
 pub use hit_test::{Hit, hit_test};
 pub use hit_test_object::{hit_test_object, hit_test_objects, hit_test_objects_along};
 pub use layer_move::{Reorder, move_refusal_text, reorder_plans};
-pub use layer_text::draw_refused_notice;
+pub use layer_rows::{
+    Cause, Container, Expansion, Flags, LayerRow, LayerRows, RowFacts, RowKind, RowMark, percent,
+};
+pub use layer_text::{
+    NothingToSelect, OpacityTarget, delete_locked_layer_notice, deleted_layer_notice,
+    draw_refused_notice, moved_announcement, nothing_to_select_notice, objects_count_text,
+    opacity_caption, row_accessible_name, row_refusal, row_state_line,
+};
 pub use marquee::{MarqueeMode, objects_in_marquee, units_in_marquee};
 pub use modifiers::Modifiers;
 pub use move_entry::MoveEntry;
