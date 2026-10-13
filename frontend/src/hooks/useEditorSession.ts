@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { type CanvasNotice, type HistoryNames, MAC, useHistory } from "@/hooks/useHistory";
 import { type GroupingApi, useGrouping } from "@/hooks/useGrouping";
 import { type OffsetApi, readOffsetView, useOffset } from "@/hooks/useOffset";
-import { offsetReadout, offsetReadoutInvalid } from "@/lib/offsetText";
+import { cornerStyleLines, offsetReadout } from "@/lib/offsetText";
 import type { HistoryDirection } from "@/lib/historyText";
 import { type NudgeFeedback, useNudgeFeedback } from "@/hooks/useNudgeFeedback";
 import { type BackingBuffer, backingBufferFor, sameBackingBuffer } from "@/lib/canvasSize";
@@ -21,6 +21,10 @@ import type { ClosePathResult } from "@/lib/penText";
 function backingBufferSize(cssWidth: number, cssHeight: number): BackingBuffer {
   return backingBufferFor(cssWidth, cssHeight, window.devicePixelRatio);
 }
+
+/** How long the corner style chip of a double-click on an Offset corner handle stays at most
+ * (`specs/0038-path-offset/ux-rework.md` section 3). */
+const CORNER_STYLE_MS = 2000;
 
 /** Which tool is active (`specification.md`'s tool rail: Select is first
  * — `canvas-navigation-and-selection`'s launch default, acceptance
@@ -282,8 +286,9 @@ function offsetLiveReadout(session: WasmSession, x: number, y: number): LiveRead
   if (!view.dragging) {
     return null;
   }
-  const [text, second] = offsetReadout(view);
-  return { text, second, invalid: offsetReadoutInvalid(view), x, y };
+  const { lines, invalid } = offsetReadout(view);
+  const [text = "", second, third] = lines;
+  return { text, second, third, thirdInvalid: invalid, x, y };
 }
 
 /** Reads a wasm-bindgen `DocumentPoint` instance once, immediately, so
@@ -308,10 +313,12 @@ export interface LiveReadout {
   text: string;
   x: number;
   y: number;
-  /** A muted second line (the Offset tool's result line). */
+  /** A muted second line (the Offset tool's mode). */
   second?: string;
-  /** The first line is in the invalid colour (the Offset tool's stop). */
-  invalid?: boolean;
+  /** A third line (the Offset tool's message). */
+  third?: string;
+  /** The third line is in the invalid colour (the Offset tool's stop). */
+  thirdInvalid?: boolean;
 }
 
 /** One field of the typed numeric entry chip (`object-transform-
@@ -930,7 +937,11 @@ export function useEditorSession(
   }, [refreshHistory]);
   const grouping = useGrouping(getSession, syncFromSession, history.showNotice);
   const offset = useOffset(getSession, syncFromSession, syncRevision, history.showNotice);
-  const { showReleaseOutcome: showOffsetOutcome, distanceRef: offsetDistanceRef } = offset;
+  const { showReleaseOutcome: showOffsetOutcome } = offset;
+  // The corner style a double-click on a corner handle stepped, shown at the pointer until a
+  // press, the pointer leaving the handle, or 2 s (`0038` criterion 56).
+  const cornerStyleTimerRef = useRef<number | undefined>(undefined);
+  const cornerStyleShownRef = useRef(false);
   const { refresh: refreshGrouping, handleKeyOutcome: handleGroupingOutcome } = grouping;
   useEffect(() => {
     refreshGroupingRef.current = refreshGrouping;
@@ -1534,6 +1545,10 @@ export function useEditorSession(
           // works while the pointer stays over the canvas.
         }
       }
+      if (cornerStyleShownRef.current) {
+        cornerStyleShownRef.current = false;
+        setLiveReadout(null);
+      }
       session.pointer_down(
         x,
         y,
@@ -1578,9 +1593,17 @@ export function useEditorSession(
         event.altKey,
       );
       const offsetReadout = session?.tool() === "offset" ? offsetLiveReadout(session, x, y) : null;
-      setLiveReadout(offsetReadout ?? readLiveReadout(session?.live_readout()));
+      // The corner style chip stays while the pointer rests on its handle (`0038` criterion 56).
+      const keepCornerStyle =
+        cornerStyleShownRef.current &&
+        !offsetReadout &&
+        (session?.handle_hint() ?? "").startsWith("offset-corner");
+      if (!keepCornerStyle) {
+        cornerStyleShownRef.current = false;
+        setLiveReadout(offsetReadout ?? readLiveReadout(session?.live_readout()));
+      }
       if (offsetReadout) {
-        // The bar follows an Offset drag live: its Distance and status (`0038` criteria 6, 15).
+        // The handles and the preview follow an Offset drag live (`0038` criterion 15).
         syncFromSession();
       }
       setCursorHint(session?.cursor_hint() ?? "default");
@@ -1651,10 +1674,18 @@ export function useEditorSession(
         };
         doubleClickPressRef.current = null;
         const hintCode = session.double_click(press.x, press.y, press.shift, press.ctrl);
-        if (hintCode === "offset_distance") {
-          // A double-click on an Offset handle types its value (`0038` criterion 13).
-          offsetDistanceRef.current?.focus();
-          offsetDistanceRef.current?.select();
+        if (hintCode === "offset_corner_style") {
+          const view = readOffsetView(session);
+          const [text, second] = cornerStyleLines(view.pendingJoin || view.dragJoin);
+          setLiveReadout({ text, second, x: press.x, y: press.y });
+          cornerStyleShownRef.current = true;
+          window.clearTimeout(cornerStyleTimerRef.current);
+          cornerStyleTimerRef.current = window.setTimeout(() => {
+            cornerStyleShownRef.current = false;
+            setLiveReadout(null);
+          }, CORNER_STYLE_MS);
+        } else if (hintCode === "offset_chip") {
+          // The chip mounts with the next sync and takes the focus (`0038` criterion 53).
         } else if (hintCode) {
           // A double-click on a primitive changes nothing; the hint says how
           // to edit it (criterion 32), on every such double-click. On a
@@ -1707,7 +1738,7 @@ export function useEditorSession(
       setCursorHint(session.cursor_hint());
       syncFromSession();
     },
-    [canvasPoint, syncFromSession, syncTrackedModifiers, showOffsetOutcome, offsetDistanceRef],
+    [canvasPoint, syncFromSession, syncTrackedModifiers, showOffsetOutcome],
   );
 
   const onPointerCancel = useCallback(() => {

@@ -156,12 +156,12 @@ the fallback fired for 0 of 135 outlines over the test shapes.
 
 ### M8' Frontend: the Offset entry chip, tooltip, readout (AC 1, 6, 15, 24, 25, 53, 54)
 
-- [ ] 8'.1 `OffsetEntryChip.tsx`: Distance (Up/Down 0.1, Shift 1, Ctrl 0.01 mm), Direction pill,
+- [x] 8'.1 `OffsetEntryChip.tsx`: Distance (Up/Down 0.1, Shift 1, Ctrl 0.01 mm), Direction pill,
   Corners and Mode (Lucide `Plus`, `RefreshCw`) radio groups; Tab loop, roving tabindex, focus,
   Enter/Escape, message card, placement below the result (ux-rework 2) (25, 53, 54).
-- [ ] 8'.2 Tooltip second line, readout lines with the corner style, the corner-style chip after
+- [x] 8'.2 Tooltip second line, readout lines with the corner style, the corner-style chip after
   a double-click, hint chips for the corner and center handles (1, 15, 56).
-- [ ] 8'.3 `offsetText.ts` and `offsetChipPlacement` unit tests (15, 24, 54).
+- [x] 8'.3 `offsetText.ts` and `offsetChipPlacement` unit tests (15, 24, 54).
 
 ### M9' Docs and gate
 

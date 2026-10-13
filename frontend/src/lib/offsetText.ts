@@ -30,7 +30,13 @@ export interface OffsetView {
   refusalOf: number;
   valuesDistanceMm: number;
   direction: OffsetDirectionName;
+  /** The remembered Corners, which the chip shows. */
   join: OffsetJoinName;
+  /** The corner style the preview and the next drag use (a pending one or the remembered one). */
+  dragJoin: OffsetJoinName;
+  /** `""` or the corner style a double-click on a corner handle set for the next drag. */
+  pendingJoin: OffsetJoinName | "";
+  chipOpen: boolean;
   result: OffsetResultName;
   minMm: number;
   maxMm: number;
@@ -67,6 +73,9 @@ export const OFFSET_IDLE: OffsetView = {
   valuesDistanceMm: 1,
   direction: "out",
   join: "round",
+  dragJoin: "round",
+  pendingJoin: "",
+  chipOpen: false,
   result: "new",
   minMm: 0.01,
   maxMm: 1000,
@@ -77,38 +86,68 @@ export function formatDistance(mm: number): string {
   return String(Math.round(Math.abs(mm) * 1000) / 1000);
 }
 
-/** The two lines of the readout chip during a drag (criteria 12, 15, 18). */
-export function offsetReadout(view: OffsetView): [string, string] {
+/** The corner styles by name, as the readout and the chip's tooltips say them. */
+export const JOIN_NAMES: Record<OffsetJoinName, string> = {
+  round: "Round",
+  miter: "Miter",
+  bevel: "Bevel",
+};
+
+/** The readout chip during a drag (criteria 12, 15, 18; `ux-rework.md` section 3): line 1 the side,
+ * the distance and always the corner style; line 2 the effective mode; line 3 only when it applies,
+ * in the invalid colour when nothing is left. */
+export function offsetReadout(view: OffsetView): { lines: string[]; invalid: boolean } {
   const d = formatDistance(view.distanceMm);
-  let first = view.both
-    ? `Both ±${d} mm`
-    : view.distanceMm < 0
-      ? `Inset ${d} mm`
-      : `Outset ${d} mm`;
-  if (view.stop === "nothing_left") {
-    first = "Nothing is left";
-  } else if (view.vanished > 0) {
-    first = `${first}, ${view.vanished} of ${view.of} ${view.of === 1 ? "shape vanishes" : "shapes vanish"}`;
-  }
-  let second: string;
-  if (view.large) {
-    second = "Preview off: large selection";
-  } else if (!view.change) {
-    second = "New object";
+  const side = view.both ? `Both ±${d} mm` : view.distanceMm < 0 ? `Inset ${d} mm` : `Outset ${d} mm`;
+  const lines = [`${side} · ${JOIN_NAMES[view.dragJoin]}`];
+  if (!view.change) {
+    lines.push("New object");
   } else if (view.both) {
-    second =
+    lines.push(
       view.distanceMm < 0
         ? "Changes the original, adds the outer copy"
-        : "Changes the original, adds the inner copy";
+        : "Changes the original, adds the inner copy",
+    );
   } else {
-    second = "Changes the original";
+    lines.push("Changes the original");
   }
-  return [first, second];
+  if (view.stop === "nothing_left") {
+    lines.push("Nothing is left");
+  } else if (view.large) {
+    lines.push("Preview off: large selection");
+  } else if (view.vanished > 0) {
+    const shapes = view.of === 1 ? "shape" : "shapes";
+    lines.push(`${view.vanished} of ${view.of} ${shapes} ${view.vanished === 1 ? "vanishes" : "vanish"}`);
+  }
+  return { lines, invalid: view.stop === "nothing_left" };
 }
 
-/** Whether the readout's first line is in the invalid colour. */
-export function offsetReadoutInvalid(view: OffsetView): boolean {
-  return view.stop !== "";
+/** The readout after a double-click on a corner handle (criterion 56). */
+export function cornerStyleLines(join: OffsetJoinName): [string, string] {
+  return [`${JOIN_NAMES[join]} corners`, "For the next drag"];
+}
+
+/** The chip's Distance text: up to two decimals, no trailing zeros (`ux-rework.md` 2.3). */
+export function chipDistanceText(mm: number): string {
+  return String(Math.round(Math.abs(mm) * 100) / 100);
+}
+
+/** The typed Distance as a number (`.` or `,` as the decimal mark), or `NaN`. */
+export function parseChipDistance(text: string): number {
+  const trimmed = text.trim().replace(",", ".");
+  return /^(\d+\.?\d*|\.\d+)$/.test(trimmed) ? Number(trimmed) : Number.NaN;
+}
+
+/** Up or Down in Distance (`ux-rework.md` 2.6): 0.1 mm, Shift 1 mm, Ctrl 0.01 mm, rounded to the
+ * step and clamped to 0.01 to 1000 mm. */
+export function stepChipDistance(
+  mm: number,
+  direction: 1 | -1,
+  keys: { shift?: boolean; ctrl?: boolean },
+): number {
+  const step = keys.ctrl ? 0.01 : keys.shift ? 1 : 0.1;
+  const stepped = Math.round((mm + direction * step) / step) * step;
+  return Math.min(1000, Math.max(0.01, Math.round(stepped * 100) / 100));
 }
 
 /** The notice after a release or the chip's Enter (criterion 24), or `null` if nothing was written. */

@@ -11,6 +11,10 @@ import {
   offsetReadout,
   offsetRefusalText,
   offsetSuccessText,
+  chipDistanceText,
+  cornerStyleLines,
+  parseChipDistance,
+  stepChipDistance,
 } from "../src/lib/offsetText.ts";
 
 const outcome = (fields: Partial<OffsetOutcome>): OffsetOutcome => ({
@@ -57,27 +61,54 @@ test("criteria 29, 32: the refusals", () => {
   assert.equal(offsetRefusalText(outcome({ kind: "applied" })), null);
 });
 
-test("criteria 12, 15, 18: the readout's two lines", () => {
+test("criteria 12, 15, 18: the readout names side, distance and corner style, then the mode", () => {
   const dragging = { ...OFFSET_IDLE, operands: 1, dragging: true };
-  assert.deepEqual(offsetReadout({ ...dragging, distanceMm: 2.5 }), ["Outset 2.5 mm", "New object"]);
-  assert.deepEqual(offsetReadout({ ...dragging, distanceMm: -0.8, change: true }), [
-    "Inset 0.8 mm",
+  assert.deepEqual(offsetReadout({ ...dragging, distanceMm: 2.5 }), {
+    lines: ["Outset 2.5 mm · Round", "New object"],
+    invalid: false,
+  });
+  assert.deepEqual(offsetReadout({ ...dragging, distanceMm: -0.8, change: true, dragJoin: "miter" }).lines, [
+    "Inset 0.8 mm · Miter",
     "Changes the original",
   ]);
-  assert.deepEqual(offsetReadout({ ...dragging, distanceMm: 2.5, both: true, change: true }), [
-    "Both ±2.5 mm",
-    "Changes the original, adds the inner copy",
-  ]);
-  assert.deepEqual(offsetReadout({ ...dragging, distanceMm: -2.5, both: true, change: true }), [
-    "Both ±2.5 mm",
+  assert.deepEqual(
+    offsetReadout({ ...dragging, distanceMm: 2.5, both: true, change: true, dragJoin: "bevel" }).lines,
+    ["Both ±2.5 mm · Bevel", "Changes the original, adds the inner copy"],
+  );
+  assert.deepEqual(offsetReadout({ ...dragging, distanceMm: -2.5, both: true, change: true }).lines, [
+    "Both ±2.5 mm · Round",
     "Changes the original, adds the outer copy",
   ]);
-  assert.equal(offsetReadout({ ...dragging, distanceMm: -1, stop: "nothing_left" })[0], "Nothing is left");
-  assert.equal(
-    offsetReadout({ ...dragging, distanceMm: -1, vanished: 1, of: 3 })[0],
-    "Inset 1 mm, 1 of 3 shapes vanish",
-  );
-  assert.equal(offsetReadout({ ...dragging, large: true })[1], "Preview off: large selection");
+  const stopped = offsetReadout({ ...dragging, distanceMm: -1, stop: "nothing_left" });
+  assert.deepEqual(stopped.lines, ["Inset 1 mm · Round", "New object", "Nothing is left"]);
+  assert.equal(stopped.invalid, true);
+  assert.equal(offsetReadout({ ...dragging, distanceMm: -1, vanished: 1, of: 3 }).lines[2], "1 of 3 shapes vanishes");
+  assert.equal(offsetReadout({ ...dragging, large: true }).lines[2], "Preview off: large selection");
+  for (const line of Object.values(offsetReadout({ ...dragging, distanceMm: 2 }).lines)) {
+    assert.ok(!/Stays|Becomes/.test(line), "no result-kind hint (criterion 15)");
+  }
+});
+
+test("criterion 56: the corner style chip after a double-click", () => {
+  assert.deepEqual(cornerStyleLines("miter"), ["Miter corners", "For the next drag"]);
+  assert.deepEqual(cornerStyleLines("round"), ["Round corners", "For the next drag"]);
+});
+
+test("criteria 6, 25, 54: the chip's Distance text, steps and parsing", () => {
+  assert.equal(chipDistanceText(1), "1");
+  assert.equal(chipDistanceText(2.5), "2.5");
+  assert.equal(chipDistanceText(0.15), "0.15");
+  assert.equal(chipDistanceText(0.1 + 0.2), "0.3");
+  assert.equal(parseChipDistance("2,5"), 2.5);
+  assert.equal(parseChipDistance(" 3 "), 3);
+  assert.ok(Number.isNaN(parseChipDistance("")));
+  assert.ok(Number.isNaN(parseChipDistance("abc")));
+  assert.ok(Number.isNaN(parseChipDistance("2mm")));
+  assert.equal(stepChipDistance(1, 1, {}), 1.1);
+  assert.equal(stepChipDistance(1, -1, { shift: true }), 0.01, "clamped to 0.01");
+  assert.equal(stepChipDistance(2.53, 1, {}), 2.6, "rounded to the step");
+  assert.equal(stepChipDistance(2.5, 1, { ctrl: true }), 2.51);
+  assert.equal(stepChipDistance(999.5, 1, { shift: true }), 1000);
 });
 
 test("distances print without float noise", () => {

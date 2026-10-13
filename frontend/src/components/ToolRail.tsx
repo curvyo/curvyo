@@ -243,7 +243,7 @@ export function ToolRail({
               label="Offset tool"
               name="Offset tool"
               shortcut="O"
-              hint="Drag a corner handle. Shift: both sides. Ctrl: change the original."
+              hint="Drag a corner handle. Shift: both sides. Ctrl: new or change."
               icon={<OffsetGlyph />}
               onSelect={onSelect}
               onReturnFocus={onReturnFocus}

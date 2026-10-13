@@ -42,6 +42,20 @@ const HINT_LINES: Record<string, string[]> = {
   move: ["Move", "Shift: keep one axis", "Ctrl: copy", "Double-click or M: type an offset"],
   "param-radius": ["Corner radius", "Double-click: type a value"],
   "param-inner": ["Inner radius", "Double-click: type a ratio"],
+  // The Offset tool's handles (`specs/0038-path-offset/ux-rework.md` sections 2.1 and 3).
+  "offset-corner": [
+    "Drag: outset or inset",
+    "Shift: both sides",
+    "Ctrl: change the original",
+    "Double-click: next corner style",
+  ],
+  "offset-corner-change": [
+    "Drag: outset or inset",
+    "Shift: both sides",
+    "Ctrl: make a new object",
+    "Double-click: next corner style",
+  ],
+  "offset-center": ["Double-click, O or Enter: type a distance"],
 };
 
 /** The notes a corner knob's hint can open with
