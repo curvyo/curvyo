@@ -4,7 +4,7 @@
 //! # Pipeline
 //!
 //! 1. `offset_pieces` builds the exact raw offset of every outline: parallel lines, offset
-//!    cubics, true arcs for Round joins and caps, miter and bevel lines.
+//!    cubics, true arcs for Round joins, miter and bevel lines.
 //! 2. `offset_rebuild` flattens it onto the 0.001 mm grid of the Boolean operations, lets
 //!    `i_overlay` (integer engine, Positive fill rule) decide which parts survive, and maps every
 //!    surviving ring back onto the exact pieces.
@@ -22,9 +22,9 @@ use crate::boolean::{Outline, grid_paths, outline_in_range};
 use crate::boolean_grid::{
     GRID_MM, MAX_COORDINATE_MM, Paths64, Point64, double_area, normalize, snap, to_millimetres,
 };
-use crate::flatten::{flatten_closed, flatten_open};
+use crate::flatten::flatten_closed;
 use crate::offset_finish::{canonical, lines_of_mm};
-use crate::offset_pieces::{RawStyle, closed_loop, open_loop, segments_of};
+use crate::offset_pieces::{RawStyle, closed_loop, segments_of};
 use crate::offset_polyline::{polyline_offset, without_flattening_noise};
 use crate::offset_rebuild::rebuild;
 use crate::outline_touch::point_segment_distance;
@@ -38,17 +38,6 @@ pub enum OffsetJoin {
     Miter,
     /// A straight cut across the gap.
     Bevel,
-}
-
-/// How the ends of an open path are finished when it is grown.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OffsetCap {
-    /// A half disc of radius |d|.
-    Round,
-    /// Cut square at the end point.
-    Flat,
-    /// Cut square |d| beyond the end point.
-    Square,
 }
 
 /// Why an offset was refused. Nothing is computed in any of these cases.
@@ -67,9 +56,9 @@ pub enum OffsetError {
     /// A closed operand encloses no area.
     #[error("the operand encloses no area")]
     NoArea,
-    /// An open path cannot be shrunk.
-    #[error("an open path cannot be inset")]
-    InsetOfOpenPath,
+    /// An outline of the operand is open: only closed paths are offset (criterion 55).
+    #[error("an open path is not offset")]
+    OpenPath,
     /// Nothing is left: the operand vanished under the inset.
     #[error("the result is empty")]
     Empty,
@@ -134,12 +123,11 @@ impl OffsetOutlines {
 /// Offsets one operand by `distance`: positive grows its region (Outset), negative shrinks it
 /// (Inset).
 ///
-/// `operand` is the operand's outlines. If all are closed, the region they paint (nonzero) is
-/// offset with `join`; if any is open, the operand is a line and grows into the closed outline of
-/// every point within `|distance|` of it, with `join` at its corners and `cap` at its ends.
+/// `operand` is the operand's outlines, all closed: the region they paint (nonzero) is offset with
+/// `join`. An open outline is refused (criterion 55: the stroke does that job).
 ///
 /// The result is built from the exact offset of every piece of the operand (parallel lines,
-/// offset cubics, arcs, miter and bevel lines, caps); `i_overlay` decides only which parts survive
+/// offset cubics, arcs, miter and bevel lines); `i_overlay` decides only which parts survive
 /// (ADR 0003 §4 as amended on 2026-10-12). `tolerance` bounds how far the result may lie from the
 /// exact offset of the operand's curves. An operand whose outlines cross or touch takes the
 /// polyline route of the first build, as does any outline that cannot be matched.
@@ -147,30 +135,24 @@ impl OffsetOutlines {
 /// # Errors
 ///
 /// [`OffsetError`]: checked in the order tolerance, distance (not finite or out of range, then
-/// zero), inset of an open operand, operand out of range, closed operand without area; after the
+/// zero), an open outline, operand out of range, closed operand without area; after the
 /// offset, an empty result, then a result out of range.
 pub fn offset(
     operand: &[Outline<'_>],
     distance: Length,
     join: OffsetJoin,
-    cap: OffsetCap,
     tolerance: Tolerance,
 ) -> Result<OffsetOutlines, OffsetError> {
     let checked = checked_request(operand, distance, tolerance)?;
     let style = RawStyle {
         join,
-        cap,
         curve_tolerance_mm: checked.flatten_mm / 2.0,
     };
-    let loops = if checked.is_open {
-        open_loops(operand, checked.d.abs(), style)
-    } else {
-        let region = normalize(&grid_paths(operand, checked.flatten_mm));
-        if region.is_empty() {
-            return Err(OffsetError::NoArea);
-        }
-        closed_loops(operand, &region, checked.d, style, checked.flatten_mm)
-    };
+    let region = normalize(&grid_paths(operand, checked.flatten_mm));
+    if region.is_empty() {
+        return Err(OffsetError::NoArea);
+    }
+    let loops = closed_loops(operand, &region, checked.d, style, checked.flatten_mm);
     let (outlines, fallback) = if let Some(loops) = loops {
         let rebuilt = rebuild(&loops, checked.flatten_mm, tolerance.as_mm(), |rings| {
             let rings = without_flattening_noise(rings, checked.flatten_mm);
@@ -178,14 +160,7 @@ pub fn offset(
         });
         (rebuilt.outlines, rebuilt.fallback)
     } else {
-        let polylines = polyline_offset(
-            operand,
-            checked.units,
-            join,
-            cap,
-            checked.flatten_mm,
-            checked.is_open,
-        )?;
+        let polylines = polyline_offset(operand, checked.units, join, checked.flatten_mm)?;
         let count = polylines.len();
         (
             polylines.iter().map(|path| lines_of_mm(path)).collect(),
@@ -223,22 +198,14 @@ fn without_inverted_rings(
     if threshold <= 0.0 {
         return rings;
     }
-    let polylines: Vec<(Vec<Point>, bool)> = operand
+    let polylines: Vec<Vec<Point>> = operand
         .iter()
-        .map(|outline| {
-            let points = if outline.closed {
-                flatten_closed(outline.anchors, flatten_mm)
-            } else {
-                flatten_open(outline.anchors, flatten_mm)
-            };
-            (points, outline.closed)
-        })
+        .map(|outline| flatten_closed(outline.anchors, flatten_mm))
         .collect();
     let near = |point: Point| {
-        polylines.iter().any(|(points, closed)| {
+        polylines.iter().any(|points| {
             let n = points.len();
-            let edges = if *closed { n } else { n.saturating_sub(1) };
-            (0..edges)
+            (0..n)
                 .any(|i| point_segment_distance(point, points[i], points[(i + 1) % n]) < threshold)
         })
     };
@@ -261,8 +228,6 @@ struct Checked {
     units: i64,
     /// The distance on the grid, in millimetres.
     d: f64,
-    /// Some outline is open: the operand is a line.
-    is_open: bool,
 }
 
 /// The refusals [`offset`] makes before any work, in its documented order.
@@ -283,9 +248,8 @@ fn checked_request(
         return Err(OffsetError::ZeroDistance);
     }
     let units = snap(Point::new(distance_mm, 0.0)).x;
-    let is_open = operand.iter().any(|outline| !outline.closed);
-    if is_open && units < 0 {
-        return Err(OffsetError::InsetOfOpenPath);
+    if operand.iter().any(|outline| !outline.closed) {
+        return Err(OffsetError::OpenPath);
     }
     if !operand.iter().all(outline_in_range) {
         return Err(OffsetError::OutOfRange);
@@ -297,7 +261,6 @@ fn checked_request(
         flatten_mm,
         units,
         d,
-        is_open,
     })
 }
 
@@ -314,26 +277,6 @@ fn kurbo_anchors(outline: &Outline<'_>) -> Vec<(KPoint, KVec, KVec)> {
             )
         })
         .collect()
-}
-
-/// The raw loops of an open operand grown by `radius`: each open outline stroked with its caps,
-/// each closed one on both sides. `None` (the polyline route) if an outline has no segment.
-fn open_loops(operand: &[Outline<'_>], radius: f64, style: RawStyle) -> Option<Vec<Vec<KSeg>>> {
-    let mut loops = Vec::new();
-    for outline in operand {
-        let segments = segments_of(&kurbo_anchors(outline), outline.closed);
-        if segments.is_empty() {
-            return None;
-        }
-        if outline.closed {
-            let reversed: Vec<KSeg> = segments.iter().rev().map(KSeg::reverse).collect();
-            loops.push(closed_loop(&segments, radius, style));
-            loops.push(closed_loop(&reversed, radius, style));
-        } else {
-            loops.push(open_loop(&segments, radius, style));
-        }
-    }
-    Some(loops)
 }
 
 /// The raw loops of a closed operand: the outlines that bound its nonzero region, each wound

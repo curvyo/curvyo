@@ -19,7 +19,7 @@ use std::f64::consts::PI;
 use common::offset_check::{area, bbox, check_node_rules, cubic_count, largest_deviation, nodes};
 use common::{Anchors, KERNEL_TOLERANCE, circle, ellipse, polygon, rect, rounded_rect, wavy};
 use curvyo_document_core::{Length, Point};
-use curvyo_geometry_core::{OffsetCap, OffsetError, OffsetJoin, OffsetOutlines, Outline, offset};
+use curvyo_geometry_core::{OffsetError, OffsetJoin, OffsetOutlines, Outline, offset};
 
 const JOINS: [OffsetJoin; 3] = [OffsetJoin::Round, OffsetJoin::Miter, OffsetJoin::Bevel];
 
@@ -27,14 +27,13 @@ fn run(
     operand: &[(Anchors, bool)],
     d: f64,
     join: OffsetJoin,
-    cap: OffsetCap,
 ) -> Result<OffsetOutlines, OffsetError> {
     let borrowed: Vec<Outline<'_>> = operand.iter().map(|(a, c)| Outline::new(a, *c)).collect();
-    offset(&borrowed, Length::from_mm(d), join, cap, KERNEL_TOLERANCE)
+    offset(&borrowed, Length::from_mm(d), join, KERNEL_TOLERANCE)
 }
 
 fn one(a: &Anchors, d: f64, join: OffsetJoin) -> Result<OffsetOutlines, OffsetError> {
-    run(&[(a.clone(), true)], d, join, OffsetCap::Round)
+    run(&[(a.clone(), true)], d, join)
 }
 
 fn good(a: &Anchors, d: f64, join: OffsetJoin) -> OffsetOutlines {
@@ -195,14 +194,8 @@ fn ac38_gear_outset_stays_within_the_segment_budget() {
     assert!(segments(&r_in) <= 400);
 }
 
-/// One numeric case: name, operand outlines, distance, join, cap.
-type NumericCase = (
-    &'static str,
-    Vec<(Anchors, bool)>,
-    f64,
-    OffsetJoin,
-    OffsetCap,
-);
+/// One numeric case: name, operand outlines, distance, join.
+type NumericCase = (&'static str, Vec<(Anchors, bool)>, f64, OffsetJoin);
 
 /// Criterion 39: how often the fallback fires on the numeric set of criteria 45 to 51.
 #[test]
@@ -213,50 +206,27 @@ fn ac39_numeric_set_never_falls_back() {
             vec![(rect(0., 0., 20., 20.), true)],
             5.0,
             OffsetJoin::Round,
-            OffsetCap::Round,
         ),
         (
             "sq miter",
             vec![(rect(0., 0., 20., 20.), true)],
             5.0,
             OffsetJoin::Miter,
-            OffsetCap::Round,
         ),
         (
             "sq bevel",
             vec![(rect(0., 0., 20., 20.), true)],
             5.0,
             OffsetJoin::Bevel,
-            OffsetCap::Round,
         ),
         (
             "sq in",
             vec![(rect(0., 0., 20., 20.), true)],
             -5.0,
             OffsetJoin::Round,
-            OffsetCap::Round,
         ),
-        (
-            "ring out",
-            ring_operand(),
-            2.0,
-            OffsetJoin::Round,
-            OffsetCap::Round,
-        ),
-        (
-            "ring in",
-            ring_operand(),
-            -2.0,
-            OffsetJoin::Round,
-            OffsetCap::Round,
-        ),
-        (
-            "line round",
-            vec![(polygon(&[(0., 0.), (20., 0.)]), false)],
-            5.0,
-            OffsetJoin::Round,
-            OffsetCap::Round,
-        ),
+        ("ring out", ring_operand(), 2.0, OffsetJoin::Round),
+        ("ring in", ring_operand(), -2.0, OffsetJoin::Round),
         (
             "triangle miter",
             vec![(
@@ -265,19 +235,17 @@ fn ac39_numeric_set_never_falls_back() {
             )],
             5.0,
             OffsetJoin::Miter,
-            OffsetCap::Round,
         ),
         (
             "ellipse",
             vec![(ellipse(0., 0., 20., 10.), true)],
             2.0,
             OffsetJoin::Round,
-            OffsetCap::Round,
         ),
     ];
     let mut fallbacks = 0;
-    for (name, operand, d, join, cap) in &cases {
-        let r = run(operand, *d, *join, *cap).unwrap_or_else(|e| panic!("{name}: {e}"));
+    for (name, operand, d, join) in &cases {
+        let r = run(operand, *d, *join).unwrap_or_else(|e| panic!("{name}: {e}"));
         fallbacks += r.fallback_outlines();
         assert_eq!(r.fallback_outlines(), 0, "{name} ended in the fallback");
     }
@@ -318,13 +286,13 @@ fn ac44_deterministic_for_curved_operands() {
 #[test]
 fn ac46_ring_numbers_and_vanish() {
     let ring = ring_operand();
-    let out = run(&ring, 2.0, OffsetJoin::Round, OffsetCap::Round).unwrap();
+    let out = run(&ring, 2.0, OffsetJoin::Round).unwrap();
     assert!((area(&out) - PI * (484.0 - 64.0)).abs() < 3.0);
     assert_eq!(out.outlines().len(), 2);
-    let inn = run(&ring, -2.0, OffsetJoin::Round, OffsetCap::Round).unwrap();
+    let inn = run(&ring, -2.0, OffsetJoin::Round).unwrap();
     assert!((area(&inn) - PI * (324.0 - 144.0)).abs() < 3.0);
     assert_eq!(
-        run(&ring, -5.0, OffsetJoin::Round, OffsetCap::Round).unwrap_err(),
+        run(&ring, -5.0, OffsetJoin::Round).unwrap_err(),
         OffsetError::Empty
     );
 }
@@ -349,18 +317,16 @@ fn ac45_collapse_boundaries() {
     }
 }
 
-/// Criterion 47: open line numbers for every cap.
+/// Criterion 55 (2026-10-13, replaces criterion 47): an open path is not offset.
 #[test]
-fn ac47_line_caps() {
+fn ac55_an_open_path_is_refused() {
     let l = [(polygon(&[(0., 0.), (20., 0.)]), false)];
-    let a = |cap| area(&run(&l, 5.0, OffsetJoin::Round, cap).unwrap());
-    assert!((a(OffsetCap::Round) - (200.0 + 25.0 * PI)).abs() < 0.1);
-    assert!((a(OffsetCap::Flat) - 200.0).abs() < 0.01);
-    assert!((a(OffsetCap::Square) - 300.0).abs() < 0.01);
-    assert_eq!(
-        run(&l, -5.0, OffsetJoin::Round, OffsetCap::Round).unwrap_err(),
-        OffsetError::InsetOfOpenPath
-    );
+    for d in [5.0, -5.0] {
+        assert_eq!(
+            run(&l, d, OffsetJoin::Round).unwrap_err(),
+            OffsetError::OpenPath
+        );
+    }
 }
 
 /// Edges: distances at both ends of the range and beyond it.
@@ -412,31 +378,14 @@ fn edge_distance_extremes() {
 #[test]
 fn edge_degenerate_inputs_do_not_panic() {
     let none: Vec<(Anchors, bool)> = vec![];
-    assert!(run(&none, 2.0, OffsetJoin::Round, OffsetCap::Round).is_err());
+    assert!(run(&none, 2.0, OffsetJoin::Round).is_err());
     let one_node = polygon(&[(1.0, 1.0)]);
-    assert!(
-        run(
-            &[(one_node.clone(), true)],
-            2.0,
-            OffsetJoin::Round,
-            OffsetCap::Round
-        )
-        .is_err()
-    );
-    let r = run(
-        &[(one_node, false)],
-        2.0,
-        OffsetJoin::Round,
-        OffsetCap::Round,
-    );
-    println!(
-        "single-node open path outset: {:?}",
-        r.as_ref().map(OffsetOutlines::segment_count)
-    );
+    assert!(run(&[(one_node.clone(), true)], 2.0, OffsetJoin::Round).is_err());
+    assert!(run(&[(one_node, false)], 2.0, OffsetJoin::Round).is_err());
     let two = polygon(&[(0., 0.), (10., 0.)]);
-    assert!(run(&[(two, true)], 2.0, OffsetJoin::Round, OffsetCap::Round).is_err());
+    assert!(run(&[(two, true)], 2.0, OffsetJoin::Round).is_err());
     let dup = polygon(&[(0., 0.), (0., 0.), (10., 0.), (10., 10.)]);
-    let _ = run(&[(dup, true)], 2.0, OffsetJoin::Round, OffsetCap::Round);
+    let _ = run(&[(dup, true)], 2.0, OffsetJoin::Round);
 }
 
 /// Criteria 28, 31: opposite winding gives the same region; nonzero for a mirrored operand.
@@ -460,7 +409,7 @@ fn edge_reversed_and_mirrored_operands_agree() {
 #[test]
 fn ac28_outset_past_the_hole_radius_closes_the_hole() {
     for d in [10.01, 10.5, 12.0, 25.0] {
-        let r = run(&ring_operand(), d, OffsetJoin::Round, OffsetCap::Round).unwrap();
+        let r = run(&ring_operand(), d, OffsetJoin::Round).unwrap();
         let want = PI * (20.0 + d) * (20.0 + d);
         assert_eq!(
             r.outlines().len(),
@@ -484,7 +433,7 @@ fn ac28_square_ring_outset_past_the_hole_closes_the_hole() {
     let ring = [(rect(0.0, 0.0, 20.0, 20.0), true), (hole, true)];
     for join in JOINS {
         for d in [5.5, 8.0] {
-            let r = run(&ring, d, join, OffsetCap::Round).unwrap();
+            let r = run(&ring, d, join).unwrap();
             assert_eq!(r.outlines().len(), 1, "{join:?} d={d}: spurious hole");
         }
     }

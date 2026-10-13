@@ -3,7 +3,6 @@ import { useCallback, useMemo, useRef } from "react";
 import type { WasmSession } from "@/lib/editorSession";
 import {
   OFFSET_IDLE,
-  type OffsetCapName,
   type OffsetDirectionName,
   type OffsetJoinName,
   type OffsetOutcome,
@@ -20,10 +19,7 @@ export interface OffsetApi {
   setDistance: (mm: number) => boolean;
   setDirection: (direction: OffsetDirectionName) => void;
   setJoin: (join: OffsetJoinName) => void;
-  setCap: (cap: OffsetCapName) => void;
   setResult: (result: OffsetResultName) => void;
-  /** Focus entered or left the bar: the preview of the bar's values follows. */
-  setBarFocus: (focused: boolean) => void;
   apply: () => void;
   /** After a pointer release: shows the notice of what the release did, if anything. */
   showReleaseOutcome: () => void;
@@ -48,7 +44,6 @@ export function readOffsetView(session: WasmSession | null): OffsetView {
   }
   const view: OffsetView = {
     operands: raw.operands,
-    hasOpen: raw.has_open,
     hasGroup: raw.has_group,
     handles: raw.handles,
     dragging: raw.dragging,
@@ -59,14 +54,12 @@ export function readOffsetView(session: WasmSession | null): OffsetView {
     vanished: raw.vanished,
     of: raw.of,
     large: raw.large,
-    kind: raw.kind,
     refusal: raw.refusal,
     refusalCount: raw.refusal_count,
     refusalOf: raw.refusal_of,
-    barDistanceMm: raw.bar_distance_mm,
+    valuesDistanceMm: raw.values_distance_mm,
     direction: raw.direction as OffsetDirectionName,
     join: raw.join as OffsetJoinName,
-    cap: raw.cap as OffsetCapName,
     result: raw.result as OffsetResultName,
     minMm: raw.min_mm,
     maxMm: raw.max_mm,
@@ -77,13 +70,11 @@ export function readOffsetView(session: WasmSession | null): OffsetView {
 
 function readOutcome(raw: ReturnType<WasmSession["apply_offset"]>): OffsetOutcome {
   const outcome: OffsetOutcome = {
-    kind: raw.kind,
     added: raw.added,
     changed: raw.changed,
     count: raw.count,
     of: raw.of,
     vanished: raw.vanished,
-    openLeftOut: raw.open_left_out,
     distanceMm: raw.distance_mm,
     direction: raw.direction,
   };
@@ -169,9 +160,7 @@ export function useOffset(
     setDistance,
     setDirection: (direction) => call((session) => session.set_offset_direction(direction)),
     setJoin: (join) => call((session) => session.set_offset_join(join)),
-    setCap: (cap) => call((session) => session.set_offset_cap(cap)),
     setResult: (result) => call((session) => session.set_offset_result(result)),
-    setBarFocus: (focused) => call((session) => session.set_offset_bar_focus(focused)),
     apply,
     showReleaseOutcome,
     distanceRef,

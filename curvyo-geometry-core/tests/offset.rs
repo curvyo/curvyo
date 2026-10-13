@@ -22,7 +22,7 @@ use common::offset_check::{
 use common::{Anchors, KERNEL_TOLERANCE, circle, ellipse, polygon, rect, rounded_rect, wavy};
 use curvyo_document_core::{Length, Point};
 use curvyo_geometry_core::{
-    OffsetCap, OffsetError, OffsetJoin, OffsetOutlines, Outline, offset, signed_area_mm2,
+    OffsetError, OffsetJoin, OffsetOutlines, Outline, offset, signed_area_mm2,
 };
 
 const JOINS: [OffsetJoin; 3] = [OffsetJoin::Round, OffsetJoin::Miter, OffsetJoin::Bevel];
@@ -31,10 +31,9 @@ fn run(
     outlines: &[(Anchors, bool)],
     d: f64,
     join: OffsetJoin,
-    cap: OffsetCap,
 ) -> Result<OffsetOutlines, OffsetError> {
     let borrowed: Vec<Outline<'_>> = outlines.iter().map(|(a, c)| Outline::new(a, *c)).collect();
-    offset(&borrowed, Length::from_mm(d), join, cap, KERNEL_TOLERANCE)
+    offset(&borrowed, Length::from_mm(d), join, KERNEL_TOLERANCE)
 }
 
 fn closed_all(outlines: &[Anchors]) -> Vec<(Anchors, bool)> {
@@ -43,15 +42,11 @@ fn closed_all(outlines: &[Anchors]) -> Vec<(Anchors, bool)> {
 
 /// A result that obeys the node rules and needed no fallback.
 fn ok(outlines: &[Anchors], d: f64, join: OffsetJoin) -> OffsetOutlines {
-    let r = run(&closed_all(outlines), d, join, OffsetCap::Round)
+    let r = run(&closed_all(outlines), d, join)
         .unwrap_or_else(|e| panic!("offset {d} {join:?} refused: {e}"));
     check_node_rules(&r).unwrap_or_else(|e| panic!("{d} {join:?}: criterion 33: {e}"));
     assert_eq!(r.fallback_outlines(), 0, "{d} {join:?}: criterion 39");
     r
-}
-
-fn line(points: &[(f64, f64)], d: f64, cap: OffsetCap) -> Result<OffsetOutlines, OffsetError> {
-    run(&[(polygon(points), false)], d, OffsetJoin::Round, cap)
 }
 
 fn reversed(mut anchors: Anchors) -> Anchors {
@@ -148,7 +143,7 @@ fn ac39_the_fallback_count_over_the_test_shapes() {
     for shape in &shapes {
         for join in JOINS {
             for d in [-1.3, 0.01, 0.7, 3.0, 12.0] {
-                if let Ok(r) = run(&closed_all(shape), d, join, OffsetCap::Round) {
+                if let Ok(r) = run(&closed_all(shape), d, join) {
                     check_node_rules(&r).unwrap_or_else(|e| panic!("{d} {join:?}: {e}"));
                     fired += r.fallback_outlines();
                     outlines += r.outlines().len();
@@ -169,7 +164,7 @@ fn ac33_nodes_follow_the_output_rules() {
     ] {
         for join in JOINS {
             for d in [-1.3, 0.7, 3.0] {
-                if let Ok(r) = run(&closed_all(&shape), d, join, OffsetCap::Round) {
+                if let Ok(r) = run(&closed_all(&shape), d, join) {
                     check_node_rules(&r).unwrap_or_else(|e| panic!("{d} {join:?}: {e}"));
                 }
             }
@@ -198,24 +193,26 @@ fn ac28_outer_outlines_are_positive_and_holes_negative() {
 #[test]
 fn ac31_a_self_crossing_operand_gives_a_clean_outline() {
     let bowtie = polygon(&[(0.0, 0.0), (20.0, 20.0), (20.0, 0.0), (0.0, 20.0)]);
-    let r = run(&[(bowtie, true)], 1.0, OffsetJoin::Miter, OffsetCap::Round).unwrap();
+    let r = run(&[(bowtie, true)], 1.0, OffsetJoin::Miter).unwrap();
     assert!(covers(&r, Point::new(3.0, 10.0)));
     assert!(covers(&r, Point::new(17.0, 10.0)));
     assert!(!covers(&r, Point::new(10.0, 2.0)));
 }
 
 #[test]
-fn ac30_an_open_line_grows_and_refuses_an_inset() {
-    let r = line(&[(0.0, 0.0), (20.0, 0.0)], 5.0, OffsetCap::Round).unwrap();
-    assert_eq!(r.fallback_outlines(), 0);
+fn ac55_an_open_line_is_not_offset() {
+    let line = [(polygon(&[(0.0, 0.0), (20.0, 0.0)]), false)];
     assert_eq!(
-        r.segment_count(),
-        6,
-        "two sides, two half circles of two cubics"
+        run(&line, 5.0, OffsetJoin::Round),
+        Err(OffsetError::OpenPath)
     );
+    let mixed = [
+        (square(), true),
+        (polygon(&[(0.0, 30.0), (20.0, 30.0)]), false),
+    ];
     assert_eq!(
-        line(&[(0.0, 0.0), (20.0, 0.0)], -5.0, OffsetCap::Round),
-        Err(OffsetError::InsetOfOpenPath)
+        run(&mixed, -1.0, OffsetJoin::Round),
+        Err(OffsetError::OpenPath)
     );
 }
 
@@ -239,7 +236,7 @@ fn ac45_square_outset_inset_and_collapse() {
         assert_eq!(inset.segment_count(), 4);
         assert!((area(&inset) - 100.0).abs() <= 1e-6);
         assert_eq!(
-            run(&closed_all(&[square()]), -10.0, join, OffsetCap::Round),
+            run(&closed_all(&[square()]), -10.0, join),
             Err(OffsetError::Empty)
         );
         let tiny = ok(&[square()], -9.99, join);
@@ -269,32 +266,9 @@ fn ac46_ring_outset_inset_and_vanish() {
         area(&inset)
     );
     assert_eq!(
-        run(
-            &closed_all(&ring()),
-            -5.0,
-            OffsetJoin::Round,
-            OffsetCap::Round
-        ),
+        run(&closed_all(&ring()), -5.0, OffsetJoin::Round),
         Err(OffsetError::Empty)
     );
-}
-
-#[test]
-fn ac47_open_line_caps() {
-    let points = [(0.0, 0.0), (20.0, 0.0)];
-    let round = line(&points, 5.0, OffsetCap::Round).unwrap();
-    assert!(
-        (area(&round) - (200.0 + PI * 25.0)).abs() <= 0.1,
-        "{}",
-        area(&round)
-    );
-    let flat = line(&points, 5.0, OffsetCap::Flat).unwrap();
-    assert!((area(&flat) - 200.0).abs() <= 1e-6);
-    assert_eq!(flat.segment_count(), 4);
-    let square_cap = line(&points, 5.0, OffsetCap::Square).unwrap();
-    assert!((area(&square_cap) - 300.0).abs() <= 1e-6);
-    let b = bbox(&square_cap);
-    assert!((b.0 + 5.0).abs() < 1e-9 && (b.2 - 25.0).abs() < 1e-9);
 }
 
 fn l_shape() -> Anchors {
@@ -399,23 +373,18 @@ fn ac44_the_start_node_and_direction_do_not_matter() {
 fn edge_zero_tiny_nonfinite_and_huge_distances() {
     let sq = closed_all(&[square()]);
     assert_eq!(
-        run(&sq, 0.0, OffsetJoin::Round, OffsetCap::Round),
+        run(&sq, 0.0, OffsetJoin::Round),
         Err(OffsetError::ZeroDistance)
     );
     assert_eq!(
-        run(&sq, f64::NAN, OffsetJoin::Round, OffsetCap::Round),
+        run(&sq, f64::NAN, OffsetJoin::Round),
         Err(OffsetError::OutOfRange)
     );
     let tiny = ok(&[square()], 0.01, OffsetJoin::Round);
     assert!((bbox(&tiny).0 + 0.01).abs() < 1e-6);
     let flat_closed = polygon(&[(0.0, 0.0), (5.0, 0.0), (9.0, 0.0)]);
     assert_eq!(
-        run(
-            &[(flat_closed, true)],
-            1.0,
-            OffsetJoin::Round,
-            OffsetCap::Round
-        ),
+        run(&[(flat_closed, true)], 1.0, OffsetJoin::Round),
         Err(OffsetError::NoArea)
     );
 }

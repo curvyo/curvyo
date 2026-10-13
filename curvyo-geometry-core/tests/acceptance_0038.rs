@@ -24,7 +24,7 @@ use common::offset_check::{area, check_node_rules, covers, flattened, nodes};
 use common::{Anchors, KERNEL_TOLERANCE, circle, polygon, rect};
 use curvyo_document_core::{Length, Point};
 use curvyo_geometry_core::{
-    OffsetCap, OffsetError, OffsetJoin, OffsetOutlines, Outline, offset, signed_area_mm2,
+    OffsetError, OffsetJoin, OffsetOutlines, Outline, offset, signed_area_mm2,
 };
 use proptest::prelude::*;
 
@@ -34,25 +34,20 @@ fn run(
     outlines: &[(Anchors, bool)],
     d: f64,
     join: OffsetJoin,
-    cap: OffsetCap,
 ) -> Result<OffsetOutlines, OffsetError> {
     let borrowed: Vec<Outline<'_>> = outlines.iter().map(|(a, c)| Outline::new(a, *c)).collect();
-    offset(&borrowed, Length::from_mm(d), join, cap, KERNEL_TOLERANCE)
+    offset(&borrowed, Length::from_mm(d), join, KERNEL_TOLERANCE)
 }
 
 fn closed(outlines: &[Anchors], d: f64, join: OffsetJoin) -> Result<OffsetOutlines, OffsetError> {
     let v: Vec<(Anchors, bool)> = outlines.iter().map(|a| (a.clone(), true)).collect();
-    run(&v, d, join, OffsetCap::Round)
+    run(&v, d, join)
 }
 
 fn ok(outlines: &[Anchors], d: f64, join: OffsetJoin) -> OffsetOutlines {
     let r = closed(outlines, d, join).unwrap_or_else(|e| panic!("{d} {join:?}: {e}"));
     check_node_rules(&r).unwrap_or_else(|e| panic!("{d} {join:?}: criterion 33: {e}"));
     r
-}
-
-fn line(points: &[(f64, f64)], d: f64, cap: OffsetCap) -> Result<OffsetOutlines, OffsetError> {
-    run(&[(polygon(points), false)], d, OffsetJoin::Round, cap)
 }
 
 fn reversed(mut a: Anchors) -> Anchors {
@@ -158,30 +153,6 @@ fn ac16_ring_outset_inset_and_vanish() {
         assert!(!covers(&inn, Point::new(11.9, 0.0)) && covers(&inn, Point::new(12.1, 0.0)));
         assert!(covers(&inn, Point::new(17.9, 0.0)) && !covers(&inn, Point::new(18.1, 0.0)));
         assert_eq!(closed(&ring(), -5.0, join), Err(OffsetError::Empty));
-    }
-}
-
-// ---------------------------------------------------------------- criterion 17 -----------------
-
-#[test]
-fn ac17_open_line_caps_and_inset_refusal() {
-    let pts = [(0.0, 0.0), (20.0, 0.0)];
-    let round = line(&pts, 5.0, OffsetCap::Round).unwrap();
-    check_node_rules(&round).unwrap();
-    assert_eq!(round.outlines().len(), 1);
-    assert!(
-        (area(&round) - (200.0 + PI * 25.0)).abs() <= 0.3,
-        "{}",
-        area(&round)
-    );
-    let flat = line(&pts, 5.0, OffsetCap::Flat).unwrap();
-    assert!((area(&flat) - 200.0).abs() <= 0.01, "{}", area(&flat));
-    assert!(near(bbox(&flat), (0.0, -5.0, 20.0, 5.0), 1e-6));
-    let square = line(&pts, 5.0, OffsetCap::Square).unwrap();
-    assert!((area(&square) - 300.0).abs() <= 0.01, "{}", area(&square));
-    assert!(near(bbox(&square), (-5.0, -5.0, 25.0, 5.0), 1e-6));
-    for cap in [OffsetCap::Round, OffsetCap::Flat, OffsetCap::Square] {
-        assert_eq!(line(&pts, -5.0, cap), Err(OffsetError::InsetOfOpenPath));
     }
 }
 
@@ -391,45 +362,6 @@ fn ac9_self_crossing_bowtie_and_pentagram_nonzero() {
     assert!(covers(&shrunk, Point::new(0.0, 0.0)));
 }
 
-// ---------------------------------------------------------------- criterion 8 ------------------
-
-#[test]
-fn ac8_open_polyline_join_choice_and_self_crossing_hole() {
-    let zig = [(0.0, 0.0), (20.0, 0.0), (20.0, 20.0)];
-    let miter = run(
-        &[(polygon(&zig), false)],
-        2.0,
-        OffsetJoin::Miter,
-        OffsetCap::Flat,
-    )
-    .unwrap();
-    assert!(
-        has_node(&miter, 22.0, -2.0, 1e-6),
-        "miter at the outer corner"
-    );
-    let round = run(
-        &[(polygon(&zig), false)],
-        2.0,
-        OffsetJoin::Round,
-        OffsetCap::Flat,
-    )
-    .unwrap();
-    assert!(!has_node(&round, 22.0, -2.0, 1e-3));
-    // A path that crosses itself and leaves a hole: a closed loop drawn open with a tail.
-    let loopy = [
-        (0.0, -5.0),
-        (0.0, 20.0),
-        (20.0, 20.0),
-        (20.0, 0.0),
-        (-5.0, 0.0),
-    ];
-    let r = line(&loopy, 1.0, OffsetCap::Round).unwrap();
-    check_node_rules(&r).unwrap();
-    assert_eq!(r.outlines().len(), 2, "outline plus hole: compound");
-    assert!(!covers(&r, Point::new(10.0, 10.0)));
-    assert!(covers(&r, Point::new(0.0, 10.0)));
-}
-
 // ---------------------------------------------------------------- criterion 12 -----------------
 
 #[test]
@@ -503,28 +435,6 @@ fn edge_closed_collinear_operand_has_no_area() {
     assert_eq!(
         closed(&flat, -1.0, OffsetJoin::Round),
         Err(OffsetError::NoArea)
-    );
-}
-
-#[test]
-fn edge_degenerate_open_paths() {
-    // A single-point open path grown by d: a disc, or refused, never a panic.
-    let dot = line(&[(5.0, 5.0)], 2.0, OffsetCap::Round);
-    if let Ok(r) = &dot {
-        check_node_rules(r).unwrap();
-    }
-    let twice = line(&[(5.0, 5.0), (5.0, 5.0)], 2.0, OffsetCap::Round);
-    if let Ok(r) = &twice {
-        check_node_rules(r).unwrap();
-    }
-    // A back-and-forth open path: the result is still clean.
-    let back = line(&[(0.0, 0.0), (20.0, 0.0), (5.0, 0.0)], 2.0, OffsetCap::Flat).unwrap();
-    check_node_rules(&back).unwrap();
-    // 20 x 4 band plus the Round join at the 180-degree turn (a half disc of radius 2).
-    assert!(
-        (area(&back) - (80.0 + 2.0 * PI)).abs() <= 0.05,
-        "{}",
-        area(&back)
     );
 }
 

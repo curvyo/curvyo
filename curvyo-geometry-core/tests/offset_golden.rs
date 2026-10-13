@@ -1,5 +1,5 @@
 //! The golden results of the offset kernel (`specs/0038-path-offset` criterion 44): a fixed set of
-//! cases (curves, holes, every join and cap, the curved paths of the criterion) rendered as nodes
+//! cases (curves, holes, every join, the curved paths of the criterion) rendered as nodes
 //! and handles in integer nanometres (1e-6 mm) and compared byte for byte with
 //! `fixtures/offset/cases.golden`, natively and in Node on `wasm32-unknown-unknown`, so a result
 //! that differs between targets by 1e-6 mm or in its segment count fails:
@@ -26,7 +26,7 @@ use std::fmt::Write as _;
 
 use common::{Anchors, KERNEL_TOLERANCE, circle, ellipse, polygon, rect, rounded_rect, wavy};
 use curvyo_document_core::Length;
-use curvyo_geometry_core::{OffsetCap, OffsetJoin, Outline, offset};
+use curvyo_geometry_core::{OffsetJoin, Outline, offset};
 
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen_test::wasm_bindgen_test as test;
@@ -41,8 +41,8 @@ fn reversed(mut anchors: Anchors) -> Anchors {
     anchors
 }
 
-/// `(name, outlines, closed, distance, join, cap)`.
-type Case = (&'static str, Vec<Anchors>, bool, f64, OffsetJoin, OffsetCap);
+/// `(name, outlines, closed, distance, join)`.
+type Case = (&'static str, Vec<Anchors>, bool, f64, OffsetJoin);
 
 #[allow(clippy::too_many_lines)] // a flat table of cases
 fn cases() -> Vec<Case> {
@@ -55,8 +55,6 @@ fn cases() -> Vec<Case> {
         (0.0, 30.0),
     ]);
     let ring = vec![circle(0.0, 0.0, 20.0), reversed(circle(0.0, 0.0, 10.0))];
-    let mut open_curve = circle(0.0, 0.0, 5.0);
-    open_curve.truncate(3);
     vec![
         (
             "circle path round outset (criterion 35)",
@@ -64,7 +62,6 @@ fn cases() -> Vec<Case> {
             true,
             2.0,
             OffsetJoin::Round,
-            OffsetCap::Round,
         ),
         (
             "ellipse path round outset (criterion 37)",
@@ -72,7 +69,6 @@ fn cases() -> Vec<Case> {
             true,
             2.0,
             OffsetJoin::Round,
-            OffsetCap::Round,
         ),
         (
             "ellipse path round inset (criterion 37)",
@@ -80,7 +76,6 @@ fn cases() -> Vec<Case> {
             true,
             -2.0,
             OffsetJoin::Round,
-            OffsetCap::Round,
         ),
         (
             "rounded rectangle path round outset (criterion 36)",
@@ -88,7 +83,6 @@ fn cases() -> Vec<Case> {
             true,
             2.0,
             OffsetJoin::Round,
-            OffsetCap::Round,
         ),
         (
             "gear round outset (criterion 38)",
@@ -96,7 +90,6 @@ fn cases() -> Vec<Case> {
             true,
             2.0,
             OffsetJoin::Round,
-            OffsetCap::Round,
         ),
         (
             "square miter outset",
@@ -104,7 +97,6 @@ fn cases() -> Vec<Case> {
             true,
             5.0,
             OffsetJoin::Miter,
-            OffsetCap::Round,
         ),
         (
             "square round outset",
@@ -112,7 +104,6 @@ fn cases() -> Vec<Case> {
             true,
             5.0,
             OffsetJoin::Round,
-            OffsetCap::Round,
         ),
         (
             "l bevel inset",
@@ -120,7 +111,6 @@ fn cases() -> Vec<Case> {
             true,
             -2.0,
             OffsetJoin::Bevel,
-            OffsetCap::Round,
         ),
         (
             "l round inset",
@@ -128,7 +118,6 @@ fn cases() -> Vec<Case> {
             true,
             -2.0,
             OffsetJoin::Round,
-            OffsetCap::Round,
         ),
         (
             "ring round outset",
@@ -136,40 +125,16 @@ fn cases() -> Vec<Case> {
             true,
             2.0,
             OffsetJoin::Round,
-            OffsetCap::Round,
         ),
-        (
-            "ring miter inset",
-            ring,
-            true,
-            -2.0,
-            OffsetJoin::Miter,
-            OffsetCap::Round,
-        ),
-        (
-            "open arc round cap",
-            vec![open_curve.clone()],
-            false,
-            1.5,
-            OffsetJoin::Round,
-            OffsetCap::Round,
-        ),
-        (
-            "open arc square cap",
-            vec![open_curve],
-            false,
-            1.5,
-            OffsetJoin::Miter,
-            OffsetCap::Square,
-        ),
+        ("ring miter inset", ring, true, -2.0, OffsetJoin::Miter),
     ]
 }
 
 fn render() -> String {
     let mut text = String::new();
-    for (name, outlines, closed, d, join, cap) in cases() {
+    for (name, outlines, closed, d, join) in cases() {
         let borrowed: Vec<Outline<'_>> = outlines.iter().map(|a| Outline::new(a, closed)).collect();
-        let result = offset(&borrowed, Length::from_mm(d), join, cap, KERNEL_TOLERANCE);
+        let result = offset(&borrowed, Length::from_mm(d), join, KERNEL_TOLERANCE);
         writeln!(text, "# {name}").unwrap();
         match result {
             Err(error) => writeln!(text, "error {error:?}").unwrap(),

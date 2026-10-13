@@ -8,12 +8,12 @@
 
 use std::cell::RefCell;
 
-use curvyo_document_core::{Angle, DocumentVersion, NodeId, ObjectSnapshot, Point};
+use curvyo_document_core::{Angle, DocumentVersion, NodeId, Point};
 use curvyo_ui_core::{
-    CORNER_SIGNS, HANDLE_HIT_RADIUS_PX, Modifiers, ObjectSelection, OffsetBar, OffsetCap,
-    OffsetDirection, OffsetJoin, OffsetPlan, OffsetRefusal, OffsetRequest, OffsetResultChoice,
-    OffsetSide, OffsetSides, OrientedBox, PressTarget, classify_press, drag_distance,
-    handle_positions, hit_test_objects, offset_box, plan_offset, snap_distance,
+    CORNER_SIGNS, HANDLE_HIT_RADIUS_PX, Modifiers, ObjectSelection, OffsetDirection, OffsetJoin,
+    OffsetPlan, OffsetRefusal, OffsetRequest, OffsetResultChoice, OffsetSide, OffsetSides,
+    OffsetValues, OrientedBox, PressTarget, classify_press, drag_distance, handle_positions,
+    hit_test_objects, offset_box, offset_operands, plan_offset, snap_distance,
 };
 
 use super::refusal::RefusalMarks;
@@ -26,10 +26,9 @@ pub const OFFSET_COMMIT_LABEL: &str = "offset_path";
 /// the handle under the pointer and the cached preview.
 #[derive(Debug, Default)]
 pub(super) struct OffsetTool {
-    pub(super) bar: OffsetBar,
+    pub(super) values: OffsetValues,
     pub(super) drag: Option<OffsetDrag>,
     pub(super) hovered: Option<usize>,
-    pub(super) bar_focus: bool,
     outcome: Option<OffsetOutcome>,
     preview: RefCell<Option<Cached>>,
 }
@@ -52,13 +51,11 @@ pub(super) struct OffsetDrag {
     pub(super) stop: Option<DragStop>,
 }
 
-/// Why the handle stopped (criteria 12, 30).
+/// Why the handle stopped (criterion 12).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DragStop {
     /// Further in, the whole selection vanishes.
     NothingLeft,
-    /// Only open paths are selected: they have no inside.
-    InsetNeedsClosed,
 }
 
 /// One computed plan and what it was computed from.
@@ -89,8 +86,6 @@ pub enum OffsetOutcome {
         vanished: usize,
         /// Operands.
         of: usize,
-        /// Open paths left out of an inset.
-        open_left_out: usize,
     },
     /// Refused; nothing was written. Offenders are outlined.
     Refused {
@@ -107,41 +102,30 @@ pub enum OffsetOutcome {
 }
 
 impl Session {
-    /// The bar's values.
+    /// The remembered values (criterion 7).
     #[must_use]
-    pub const fn offset_bar(&self) -> OffsetBar {
-        self.offset.bar
+    pub const fn offset_values(&self) -> OffsetValues {
+        self.offset.values
     }
 
     /// Sets the Distance (criterion 6); returns whether it was within 0.01..1000 mm.
     pub fn set_offset_distance(&mut self, distance_mm: f64) -> bool {
-        self.offset.bar.set_distance_mm(distance_mm)
+        self.offset.values.set_distance_mm(distance_mm)
     }
 
     /// Sets the Direction.
     pub fn set_offset_direction(&mut self, direction: OffsetDirection) {
-        self.offset.bar.set_direction(direction);
+        self.offset.values.set_direction(direction);
     }
 
     /// Sets the Corners.
     pub fn set_offset_join(&mut self, join: OffsetJoin) {
-        self.offset.bar.set_join(join);
-    }
-
-    /// Sets the Ends.
-    pub fn set_offset_cap(&mut self, cap: OffsetCap) {
-        self.offset.bar.set_cap(cap);
+        self.offset.values.set_join(join);
     }
 
     /// Sets the Result.
     pub fn set_offset_result(&mut self, result: OffsetResultChoice) {
-        self.offset.bar.set_result(result);
-    }
-
-    /// Focus entered or left the bar: while it is there the preview of the bar's values shows
-    /// (criterion 25).
-    pub fn set_offset_bar_focus(&mut self, focused: bool) {
-        self.offset.bar_focus = focused;
+        self.offset.values.set_result(result);
     }
 
     /// What the last release did, once (the host shows the notice).
@@ -165,20 +149,16 @@ impl Session {
         selection
     }
 
-    /// The box the handles sit on, over the whole selection.
+    /// The operand box the handles sit on: over the closed operands only (criterion 55).
     pub(super) fn offset_box_now(&self) -> Option<OrientedBox> {
         let objects = self.objects();
-        let selected: Vec<&ObjectSnapshot> = objects
-            .iter()
-            .filter(|object| self.selection.contains(object.id()))
-            .collect();
-        offset_box(&selected)
+        offset_box(&offset_operands(&objects, &self.offset_selection()))
     }
 
-    /// Whether the handles are drawn: the Offset tool with an operand selected (a group alone
-    /// draws none, criterion 5).
+    /// Whether the handles are drawn: the Offset tool with a closed operand selected (a group
+    /// alone or only open paths draw none, criteria 5, 55).
     pub(super) fn offset_handles_shown(&self) -> bool {
-        self.tool == Tool::Offset && !self.offset_selection().is_empty()
+        self.tool == Tool::Offset && self.offset_box_now().is_some()
     }
 
     /// The handle at `point`, if the handles are drawn.
@@ -202,7 +182,7 @@ impl Session {
 
     /// The request of a drag at the signed `d` with `held` keys, or of the bar.
     pub(super) fn offset_request(&self, signed: Option<(f64, Modifiers)>) -> OffsetRequest {
-        let bar = &self.offset.bar;
+        let values = &self.offset.values;
         let (distance_mm, sides) = match signed {
             Some((d, held)) => {
                 let dragged = if d < 0.0 {
@@ -212,16 +192,15 @@ impl Session {
                 };
                 (
                     d.abs(),
-                    OffsetSides::of(dragged, held.shift, bar.changes_original(held.ctrl)),
+                    OffsetSides::of(dragged, held.shift, values.changes_original(held.ctrl)),
                 )
             }
-            None => (bar.distance_mm(), bar.apply_sides()),
+            None => (values.distance_mm(), values.entry_sides()),
         };
         OffsetRequest {
             distance_mm,
             sides,
-            join: bar.join(),
-            cap: bar.cap(),
+            join: values.join(),
         }
     }
 
@@ -262,8 +241,8 @@ impl Session {
                 angle: bounds.angle,
                 d: 0.0,
                 last_good: 0.0,
-                bar_at_press: self.offset.bar.distance_mm(),
-                direction_at_press: self.offset.bar.direction(),
+                bar_at_press: self.offset.values.distance_mm(),
+                direction_at_press: self.offset.values.direction(),
                 stop: None,
             });
             return;
@@ -329,10 +308,6 @@ impl Session {
                     d = drag.last_good;
                     drag.stop = Some(DragStop::NothingLeft);
                 }
-                Err(OffsetRefusal::InsetOfOpenPaths { .. }) => {
-                    d = 0.0;
-                    drag.stop = Some(DragStop::InsetNeedsClosed);
-                }
                 _ => drag.last_good = d,
             }
         }
@@ -340,8 +315,8 @@ impl Session {
         self.offset.drag = Some(drag);
         // The bar follows the drag (criteria 6, 10).
         if d != 0.0 {
-            self.offset.bar.set_distance_mm(d.abs());
-            self.offset.bar.set_direction(if self.held.shift {
+            self.offset.values.set_distance_mm(d.abs());
+            self.offset.values.set_direction(if self.held.shift {
                 OffsetDirection::Both
             } else if d < 0.0 {
                 OffsetDirection::In
@@ -386,8 +361,8 @@ impl Session {
         let Some(drag) = self.offset.drag.take() else {
             return false;
         };
-        self.offset.bar.set_distance_mm(drag.bar_at_press);
-        self.offset.bar.set_direction(drag.direction_at_press);
+        self.offset.values.set_distance_mm(drag.bar_at_press);
+        self.offset.values.set_direction(drag.direction_at_press);
         true
     }
 
@@ -397,7 +372,7 @@ impl Session {
         self.offset.drag.is_some_and(|drag| {
             drag.d != 0.0
                 && drag.stop.is_none()
-                && !self.offset.bar.changes_original(self.held.ctrl)
+                && !self.offset.values.changes_original(self.held.ctrl)
         })
     }
 
@@ -413,7 +388,7 @@ impl Session {
                 return OffsetOutcome::Ignored;
             }
             let request = this.offset_request(None);
-            let direction = this.offset.bar.direction();
+            let direction = this.offset.values.direction();
             this.write_offset_plan(request, direction)
         })
     }
@@ -438,8 +413,7 @@ impl Session {
             }
             Err(refusal) => {
                 self.command_refusal = match &refusal {
-                    OffsetRefusal::InsetOfOpenPaths { offenders, .. }
-                    | OffsetRefusal::OutOfRange { offenders, .. }
+                    OffsetRefusal::OutOfRange { offenders, .. }
                     | OffsetRefusal::NoArea { offenders, .. } => {
                         Some(RefusalMarks::new(offenders.clone(), &self.selection))
                     }
@@ -454,7 +428,7 @@ impl Session {
             }
         };
         let (added, changed) = (plan.added(), plan.changed());
-        let (vanished, of, open_left_out) = (plan.vanished, plan.of, plan.open_left_out.len());
+        let (vanished, of) = (plan.vanished, plan.of);
         let writes = plan.into_writes(&mut self.minter);
         let Ok(ids) = self.document.write_offset(&writes, OFFSET_COMMIT_LABEL) else {
             // invariant: the plan was computed from the objects of this document version, with
@@ -471,7 +445,6 @@ impl Session {
             direction,
             vanished,
             of,
-            open_left_out,
         }
     }
 }
@@ -479,7 +452,9 @@ impl Session {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use curvyo_document_core::{AnchorId, Length, NewAnchor, RectBounds, Shape, Vec2};
+    use curvyo_document_core::{
+        AnchorId, Length, NewAnchor, ObjectSnapshot, RectBounds, Shape, Vec2,
+    };
 
     fn rect(session: &Session, x: f64, side: f64) -> NodeId {
         session.document.create_rect(RectBounds {
@@ -565,7 +540,7 @@ mod tests {
         ));
         assert_eq!(session.tool(), Tool::Offset, "the tool stays");
         assert!(
-            (session.offset_bar().distance_mm() - 2.0).abs() < 1e-9,
+            (session.offset_values().distance_mm() - 2.0).abs() < 1e-9,
             "the bar follows"
         );
     }
@@ -627,15 +602,15 @@ mod tests {
         session.pointer_hover(along(from, 3.0), false, false);
         assert!(session.offset_drag_makes_copy());
         assert!(
-            (session.offset_bar().distance_mm() - 1.0).abs() > 1e-9,
+            (session.offset_values().distance_mm() - 1.0).abs() > 1e-9,
             "the bar follows"
         );
         assert_eq!(
             session.escape(),
             super::super::keys::EscapeStep::CancelledDrag
         );
-        assert!((session.offset_bar().distance_mm() - 1.0).abs() < 1e-9);
-        assert_eq!(session.offset_bar().direction(), OffsetDirection::Out);
+        assert!((session.offset_values().distance_mm() - 1.0).abs() < 1e-9);
+        assert_eq!(session.offset_values().direction(), OffsetDirection::Out);
 
         let mut small = Session::new(1);
         let square = square_path(&small, 0.0, 4.0, 1);
@@ -654,13 +629,6 @@ mod tests {
         session.set_offset_distance(1.0);
         session.set_offset_direction(OffsetDirection::Both);
         session.set_offset_result(OffsetResultChoice::ChangeOriginal);
-        session.set_offset_bar_focus(true);
-        assert_eq!(
-            session.offset_view().kind_note,
-            Some(curvyo_ui_core::KindNote::Stays(
-                curvyo_ui_core::PrimitiveKind::Rectangle
-            ))
-        );
         let outcome = session.apply_offset();
         assert!(
             matches!(

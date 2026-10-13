@@ -24,7 +24,7 @@ use std::time::{Duration, Instant};
 
 use common::{Operand, run, wavy};
 use curvyo_document_core::Length;
-use curvyo_geometry_core::{BooleanOp, OffsetCap, OffsetJoin, Outline, offset};
+use curvyo_geometry_core::{BooleanOp, OffsetJoin, Outline, offset};
 
 fn measure(nodes: usize, budget: Duration) {
     let radius = nodes as f64 / std::f64::consts::TAU;
@@ -80,7 +80,6 @@ fn an_offset_of_two_hundred_curved_nodes() {
                 &[Outline::new(&operand, true)],
                 Length::from_mm(d),
                 join,
-                OffsetCap::Round,
                 common::KERNEL_TOLERANCE,
             )
             .unwrap();

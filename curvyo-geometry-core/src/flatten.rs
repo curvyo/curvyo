@@ -1,4 +1,4 @@
-//! Flattens a closed or open outline of cubic Bézier segments to a polyline whose chords stay within a
+//! Flattens a closed outline of cubic Bézier segments to a polyline whose chords stay within a
 //! given distance of the curve, using only `+ - * /` and `sqrt` so the points are bit-identical on
 //! every target.
 //!
@@ -115,27 +115,6 @@ pub(crate) fn flatten_closed(anchors: &[OutlineTriple], tolerance_mm: f64) -> Ve
     points
 }
 
-/// The vertices of the open polyline through `anchors`, in order, from the first anchor to the
-/// last; no closing segment. The same rules as [`flatten_closed`] otherwise.
-pub(crate) fn flatten_open(anchors: &[OutlineTriple], tolerance_mm: f64) -> Vec<Point> {
-    let mut points = Vec::with_capacity(anchors.len());
-    for pair in anchors.windows(2) {
-        points.push(pair[0].0);
-        let control = control_points(pair[0], pair[1]);
-        let steps = step_count(&control, tolerance_mm);
-        for step in 1..steps {
-            // Exact: `step` and `steps` are far below 2^53.
-            #[allow(clippy::cast_precision_loss)]
-            let t = step as f64 / steps as f64;
-            points.push(eval(&control, t));
-        }
-    }
-    if let Some(last) = anchors.last() {
-        points.push(last.0);
-    }
-    points
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -226,17 +205,6 @@ mod tests {
         let one = [(Point::new(1.0, 2.0), Vec2::new(5.0, 5.0), Vec2::ZERO)];
         assert_eq!(flatten_closed(&one, 0.008), vec![Point::new(1.0, 2.0)]);
         assert_eq!(flatten_closed(&[], 0.008), Vec::<Point>::new());
-    }
-
-    #[test]
-    fn an_open_outline_has_no_closing_segment() {
-        let anchors = circle(10.0);
-        let open = flatten_open(&anchors, 0.01);
-        let closed = flatten_closed(&anchors, 0.01);
-        assert_eq!(open.first(), Some(&anchors[0].0));
-        assert_eq!(open.last(), Some(&anchors[3].0));
-        assert_eq!(open[..open.len() - 1], closed[..open.len() - 1]);
-        assert!(open.len() < closed.len());
     }
 
     #[test]

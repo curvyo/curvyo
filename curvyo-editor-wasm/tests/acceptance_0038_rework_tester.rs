@@ -20,8 +20,7 @@ use curvyo_document_core::{
 use curvyo_editor_wasm::{DoubleClickHint, DragStop, OffsetOutcome, Session, Tool};
 use curvyo_editor_wasm::{KeyInput, OFFSET_COMMIT_LABEL};
 use curvyo_ui_core::{
-    OffsetCap, OffsetDirection, OffsetJoin, OffsetRefusal, OffsetResultChoice, handle_positions,
-    offset_box,
+    OffsetDirection, OffsetJoin, OffsetRefusal, OffsetResultChoice, handle_positions, offset_box,
 };
 
 fn pt(x: f64, y: f64) -> Point {
@@ -182,25 +181,24 @@ fn ac2_key_o_selects_the_tool_and_keeps_the_selection() {
 #[test]
 fn ac4_ac5_ac6_bar_defaults_and_ranges() {
     let (mut s, _) = square_session();
-    let bar = s.offset_bar();
+    let bar = s.offset_values();
     assert_eq!(bar.distance_mm(), 1.0);
     assert_eq!(bar.direction(), OffsetDirection::Out);
     assert_eq!(bar.join(), OffsetJoin::Round);
-    assert_eq!(bar.cap(), OffsetCap::Round);
     assert_eq!(bar.result(), OffsetResultChoice::NewObject);
     assert!(s.set_offset_distance(0.01));
     assert!(s.set_offset_distance(1000.0));
     assert!(!s.set_offset_distance(0.009), "below the range");
     assert!(!s.set_offset_distance(1000.01), "above the range");
     assert!(!s.set_offset_distance(f64::NAN));
-    let v = s.offset_bar().distance_mm();
+    let v = s.offset_values().distance_mm();
     assert!(
         (0.01..=1000.0).contains(&v),
         "the stored value stays in range: {v}"
     );
     assert!(s.set_offset_distance(3.0));
     let (mut again, _) = square_session();
-    assert_eq!(again.offset_bar().distance_mm(), 1.0);
+    assert_eq!(again.offset_values().distance_mm(), 1.0);
     let _ = again.apply_offset();
 }
 
@@ -217,8 +215,10 @@ fn ac5_no_selection_shows_no_handles_and_apply_does_nothing() {
     assert_eq!(s.pack("0.1.0").unwrap(), before);
 }
 
+/// Criterion 55 (2026-10-13, replaces the Ends test of criterion 5): only open paths selected
+/// draw no handles.
 #[test]
-fn ac5_ends_applies_only_to_open_paths() {
+fn ac55_only_open_paths_draw_no_handles() {
     let d = Document::new(1);
     let _ = d.create_path(
         &[
@@ -229,14 +229,12 @@ fn ac5_ends_applies_only_to_open_paths() {
     );
     rect_at(&d, 0.0, 40.0, 20.0, 20.0);
     let mut s = open(&d);
-    s.set_tool(Tool::Select);
-    click(&mut s, pt(10.0, 40.0), false);
-    s.set_tool(Tool::Offset);
-    assert!(!s.offset_view().has_open);
-    s.set_tool(Tool::Select);
-    click(&mut s, pt(10.0, 0.0), false);
-    s.set_tool(Tool::Offset);
-    assert!(s.offset_view().has_open);
+    select_and_offset(&mut s, pt(10.0, 40.0));
+    assert!(s.offset_view().handles);
+    select_and_offset(&mut s, pt(10.0, 0.0));
+    assert_eq!(s.selected_object_count(), 1);
+    let v = s.offset_view();
+    assert!(!v.handles && v.operands == 0, "{v:?}");
 }
 
 // ------------------------------------------------------------------------ AC 9, 10, 11 --------
@@ -341,8 +339,8 @@ fn ac10_the_drag_writes_into_the_bar_and_direction_sticks() {
     let (mut s, _) = square_session();
     drag(&mut s, BR, (-4.0, -4.0), false, false);
     let _ = outcome(&mut s);
-    assert!((s.offset_bar().distance_mm() - 4.0).abs() < 1e-9);
-    assert_eq!(s.offset_bar().direction(), OffsetDirection::In);
+    assert!((s.offset_values().distance_mm() - 4.0).abs() < 1e-9);
+    assert_eq!(s.offset_values().direction(), OffsetDirection::In);
 }
 
 #[test]
@@ -833,14 +831,6 @@ fn ac25_apply_writes_the_bar_values_in_one_commit() {
     assert_eq!(distance_mm, 2.5);
     assert_eq!(s.undo_len(), n + 1);
     assert!(objects(&s).iter().any(|o| size(o) == (25.0, 25.0)));
-    // Keyboard preview: while focus is in the bar the bar values preview.
-    let (mut s, _) = square_session();
-    s.set_offset_bar_focus(true);
-    let v = s.offset_view();
-    assert!(
-        v.refusal.is_none() && v.kind_note.is_some(),
-        "preview for the bar values: {v:?}"
-    );
 }
 
 #[test]
@@ -915,71 +905,14 @@ fn ac27_selecting_in_the_tool() {
     assert_eq!(s.selected_object_count(), 2, "Ctrl+A");
 }
 
-// -------------------------------------------------------------------------- AC 30 open paths ----
+// ----------------------------------------------------------------------- AC 55 open paths ----
 
-fn open_line_session() -> (Session, NodeId) {
+/// Criterion 55 (2026-10-13, replaces criterion 30): open paths in a mixed selection are ignored,
+/// unchanged and not selected after the write.
+#[test]
+fn ac55_mixed_selection_ignores_open_paths() {
     let d = Document::new(1);
-    let l = d.create_path(
-        &[
-            NewAnchor::corner(AnchorId::new(1, 1), pt(0.0, 0.0)),
-            NewAnchor::corner(AnchorId::new(1, 2), pt(20.0, 0.0)),
-        ],
-        false,
-    );
-    let mut s = open(&d);
-    select_and_offset(&mut s, pt(10.0, 0.0));
-    (s, l)
-}
-
-#[test]
-fn ac30_open_path_outset_gives_a_closed_outline() {
-    let (mut s, _) = open_line_session();
-    assert!(s.set_offset_distance(5.0));
-    s.set_offset_cap(OffsetCap::Flat);
-    let OffsetOutcome::Applied { added, .. } = s.apply_offset() else {
-        panic!()
-    };
-    assert_eq!(added, 1);
-    let mut closed = 0;
-    for o in objects(&s) {
-        if let ObjectSnapshot::Path(p) = o
-            && p.closed
-        {
-            closed += 1;
-            assert_eq!(p.anchors.len(), 4, "flat ends: a rectangle");
-        }
-    }
-    assert_eq!(closed, 1);
-}
-
-#[test]
-fn ac30_open_path_inset_handle_stops_at_zero_and_apply_refuses() {
-    let (mut s, _) = open_line_session();
-    let h = handle_of(&s, BR);
-    s.pointer_hover(h, false, false);
-    s.pointer_down(h, false);
-    s.pointer_hover(pt(h.x - 5.0, h.y - 5.0), false, false);
-    let v = s.offset_view();
-    assert_eq!(v.stop, Some(DragStop::InsetNeedsClosed));
-    assert_eq!(v.distance_mm, 0.0);
-    let before = s.pack("0.1.0").unwrap();
-    s.pointer_up(pt(h.x - 5.0, h.y - 5.0), false, false);
-    assert_eq!(s.pack("0.1.0").unwrap(), before);
-    s.set_offset_direction(OffsetDirection::In);
-    match s.apply_offset() {
-        OffsetOutcome::Refused {
-            refusal: OffsetRefusal::InsetOfOpenPaths { .. },
-            ..
-        } => {}
-        other => panic!("{other:?}"),
-    }
-    assert_eq!(s.pack("0.1.0").unwrap(), before);
-}
-
-#[test]
-fn ac30_mixed_selection_inset_leaves_open_paths_out() {
-    let d = Document::new(1);
-    let _ = d.create_path(
+    let line = d.create_path(
         &[
             NewAnchor::corner(AnchorId::new(1, 1), pt(0.0, 50.0)),
             NewAnchor::corner(AnchorId::new(1, 2), pt(20.0, 50.0)),
@@ -996,17 +929,34 @@ fn ac30_mixed_selection_inset_leaves_open_paths_out() {
     });
     s.set_tool(Tool::Offset);
     assert_eq!(s.selected_object_count(), 2);
-    assert!(s.set_offset_distance(2.0));
-    s.set_offset_direction(OffsetDirection::In);
-    let OffsetOutcome::Applied {
-        open_left_out,
-        added,
-        ..
-    } = s.apply_offset()
-    else {
-        panic!()
-    };
-    assert_eq!((open_left_out, added), (1, 1));
+    assert_eq!(s.offset_view().operands, 1);
+    let line_before = doc(&s).object(line).unwrap();
+    for direction in [OffsetDirection::In, OffsetDirection::Both] {
+        assert!(s.set_offset_distance(2.0));
+        s.set_offset_direction(direction);
+        let closed = s.offset_view().operands;
+        assert_eq!(
+            closed,
+            s.selected_object_count() - 1,
+            "the line is no operand"
+        );
+        let OffsetOutcome::Applied { added, of, .. } = s.apply_offset() else {
+            panic!()
+        };
+        assert_eq!(of, closed, "{direction:?}");
+        assert!(added >= 1);
+        assert_eq!(doc(&s).object(line).unwrap(), line_before, "unchanged");
+        assert_eq!(
+            s.selected_object_count(),
+            added,
+            "the line is not selected after"
+        );
+        let _ = s.key_down(KeyInput {
+            key: "a",
+            ctrl: true,
+            ..KeyInput::default()
+        });
+    }
 }
 
 // ------------------------------------------------------------------ AC 32 groups ---------------

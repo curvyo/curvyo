@@ -1,7 +1,6 @@
 //! The exact raw offset of an outline as closed loops of lines and cubics: every segment's parallel
-//! curve, and between them the join where a gap opens, the corner point where the curves overlap,
-//! and the caps of an open line (`specs/0038-path-offset` criteria 30, 34; ADR 0003 §4 as amended
-//! on 2026-10-12).
+//! curve, and between them the join where a gap opens or the corner point where the curves overlap
+//! (`specs/0038-path-offset` criterion 34; ADR 0003 §4 as amended on 2026-10-12).
 //!
 //! A raw loop may cross itself; `offset_rebuild` lets `i_overlay` decide which parts survive. A
 //! loop is wound so that the region it adds lies on its left (positive area in the kernel's
@@ -12,7 +11,7 @@
 
 use kurbo::{BezPath, CubicBez, Line, ParamCurve, PathEl, PathSeg, Point, Vec2};
 
-use crate::offset::{OffsetCap, OffsetJoin};
+use crate::offset::OffsetJoin;
 
 /// Distances below this, in millimetres, are one point: segment lengths, gaps between pieces.
 const COINCIDENT_MM: f64 = 1e-9;
@@ -41,8 +40,6 @@ const QUARTER_ARC_RADIUS_LIMIT_MM: f64 = 37.0;
 pub(crate) struct RawStyle {
     /// The join where a gap opens.
     pub join: OffsetJoin,
-    /// The cap at the ends of an open line.
-    pub cap: OffsetCap,
     /// The accuracy handed to `kurbo`'s cubic offset, in millimetres.
     pub curve_tolerance_mm: f64,
 }
@@ -131,39 +128,6 @@ pub(crate) fn closed_loop(segments: &[PathSeg], d: f64, style: RawStyle) -> Vec<
             d,
             style,
         );
-    }
-    pieces
-}
-
-/// The raw outline of every point within `radius` of the open line `segments`: the right side
-/// forward, the end cap, the left side back, the start cap. `segments` is not empty.
-pub(crate) fn open_loop(segments: &[PathSeg], radius: f64, style: RawStyle) -> Vec<PathSeg> {
-    let reversed: Vec<PathSeg> = segments.iter().rev().map(PathSeg::reverse).collect();
-    let mut pieces = Vec::new();
-    for side in [segments, reversed.as_slice()] {
-        let offsets: Vec<Vec<PathSeg>> = side
-            .iter()
-            .map(|segment| offset_segment(segment, radius, style))
-            .collect();
-        for (index, offset) in offsets.iter().enumerate() {
-            pieces.extend_from_slice(offset);
-            if index + 1 < side.len() {
-                corner(
-                    &mut pieces,
-                    &side[index],
-                    &side[index + 1],
-                    &offsets[index + 1],
-                    radius,
-                    style,
-                );
-            }
-        }
-        // invariant: the caller passes at least one segment, so `side` has a last one.
-        #[allow(clippy::unwrap_used)]
-        let last = side.last().unwrap();
-        let end = last.eval(1.0);
-        let u = end_tangent(last);
-        cap(&mut pieces, end, u, radius, style);
     }
     pieces
 }
@@ -267,23 +231,6 @@ fn corner(
     }
 }
 
-/// The cap at the end `at` of an open line with the unit end direction `u`, from the right side
-/// to the left side.
-fn cap(pieces: &mut Vec<PathSeg>, at: Point, u: Vec2, radius: f64, style: RawStyle) {
-    let n = right_of(u) * radius;
-    let (from, to) = (at + n, at - n);
-    match style.cap {
-        OffsetCap::Flat => pieces.push(PathSeg::Line(Line::new(from, to))),
-        OffsetCap::Square => {
-            let ahead = u * radius;
-            pieces.push(PathSeg::Line(Line::new(from, from + ahead)));
-            pieces.push(PathSeg::Line(Line::new(from + ahead, to + ahead)));
-            pieces.push(PathSeg::Line(Line::new(to + ahead, to)));
-        }
-        OffsetCap::Round => arc(pieces, at, from, to, u, radius),
-    }
-}
-
 /// A circular arc around `center` from `from` to `to` (both at `radius` from it), as cubics of at
 /// most 90° (45° above 37 mm). The arc turns the short way; for a half turn it passes through
 /// `center + radius x ahead`.
@@ -347,7 +294,6 @@ mod tests {
 
     const STYLE: RawStyle = RawStyle {
         join: OffsetJoin::Round,
-        cap: OffsetCap::Round,
         curve_tolerance_mm: 0.001,
     };
 
@@ -407,17 +353,5 @@ mod tests {
         let start = pieces[0].eval(0.0);
         let expected = Point::new(0.0, 0.0) + right_of(start_tangent(&PathSeg::Cubic(cubic)));
         assert!((start - expected).hypot() < 1e-6, "{start:?} {expected:?}");
-    }
-
-    #[test]
-    fn an_open_line_gets_two_sides_and_two_round_caps() {
-        let line = [PathSeg::Line(Line::new(
-            Point::new(0.0, 0.0),
-            Point::new(20.0, 0.0),
-        ))];
-        let raw = open_loop(&line, 5.0, STYLE);
-        assert_eq!(raw.len(), 6);
-        let far = raw[1].eval(1.0);
-        assert!((far - Point::new(25.0, 0.0)).hypot() < 1e-9);
     }
 }

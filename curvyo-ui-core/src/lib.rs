@@ -159,13 +159,12 @@ pub use offset_drag::{
     CORNER_SIGNS, HANDLE_HIT_RADIUS_PX, drag_distance, handle_positions, offset_box, snap_distance,
 };
 pub use offset_entry::{
-    OFFSET_DEFAULT_MM, OFFSET_MAX_MM, OFFSET_MIN_MM, OffsetBar, OffsetCap, OffsetDirection,
-    OffsetJoin, OffsetResultChoice, OffsetRole, OffsetSide, OffsetSides, offset_cap_from_code,
+    OFFSET_DEFAULT_MM, OFFSET_MAX_MM, OFFSET_MIN_MM, OffsetDirection, OffsetJoin,
+    OffsetResultChoice, OffsetRole, OffsetSide, OffsetSides, OffsetValues, next_offset_join,
     offset_direction_from_code, offset_join_from_code, offset_result_from_code,
 };
 pub use offset_plan::{
-    KindNote, OffsetItem, OffsetPlan, OffsetRefusal, OffsetRequest, OffsetShape, PrimitiveKind,
-    offset_operands, plan_offset,
+    OffsetItem, OffsetPlan, OffsetRefusal, OffsetRequest, OffsetShape, offset_operands, plan_offset,
 };
 pub use oriented_box::{OrientedBox, oriented_bounds};
 pub use panel_content::{PanelContent, panel_body};

@@ -1,8 +1,8 @@
-//! The values of the Offset bar (`specs/0038-path-offset` criteria 4, 6, 7, 19, 26): the unsigned
-//! distance and its range, Direction, Corners, Ends and Result, and which sides a drag or Apply
-//! writes and how, from them and the modifier keys.
+//! The remembered values of the Offset tool (`specs/0038-path-offset` criteria 6, 7, 19, 26, 54):
+//! the unsigned distance and its range, Direction, Corners and Mode as the Offset entry chip shows
+//! them, and which sides a drag or the chip's Enter writes and how, from them and the modifier keys.
 
-pub use curvyo_geometry_core::{OffsetCap, OffsetJoin};
+pub use curvyo_geometry_core::OffsetJoin;
 
 /// The smallest distance the Distance field takes, in millimetres.
 pub const OFFSET_MIN_MM: f64 = 0.01;
@@ -62,7 +62,7 @@ pub struct OffsetSides {
 
 impl OffsetSides {
     /// The sides for a drag towards `dragged`, with `both` (Shift) and `change` (the effective
-    /// Change original: the bar's Result inverted by Ctrl). Shift+Ctrl: the original takes the
+    /// Change original: the remembered Mode inverted by Ctrl). Shift+Ctrl: the original takes the
     /// dragged side and a copy is made for the other.
     #[must_use]
     pub const fn of(dragged: OffsetSide, both: bool, change: bool) -> Self {
@@ -85,30 +85,28 @@ impl OffsetSides {
     }
 }
 
-/// What the bar holds. The session keeps one for its whole life; it is never stored in the
-/// document and never part of undo (criterion 7).
+/// The remembered values, which the Offset entry chip shows and sets. The session keeps one for
+/// its whole life; it is never stored in the document and never part of undo (criterion 7).
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct OffsetBar {
+pub struct OffsetValues {
     distance_mm: f64,
     direction: OffsetDirection,
     join: OffsetJoin,
-    cap: OffsetCap,
     result: OffsetResultChoice,
 }
 
-impl Default for OffsetBar {
+impl Default for OffsetValues {
     fn default() -> Self {
         Self {
             distance_mm: OFFSET_DEFAULT_MM,
             direction: OffsetDirection::Out,
             join: OffsetJoin::Round,
-            cap: OffsetCap::Round,
             result: OffsetResultChoice::NewObject,
         }
     }
 }
 
-impl OffsetBar {
+impl OffsetValues {
     /// The unsigned distance in millimetres.
     #[must_use]
     pub const fn distance_mm(&self) -> f64 {
@@ -125,12 +123,6 @@ impl OffsetBar {
     #[must_use]
     pub const fn join(&self) -> OffsetJoin {
         self.join
-    }
-
-    /// The end cap of open paths.
-    #[must_use]
-    pub const fn cap(&self) -> OffsetCap {
-        self.cap
     }
 
     /// New object or Change original.
@@ -161,26 +153,22 @@ impl OffsetBar {
         self.join = join;
     }
 
-    /// Sets the cap.
-    pub fn set_cap(&mut self, cap: OffsetCap) {
-        self.cap = cap;
-    }
-
     /// Sets New object or Change original.
     pub fn set_result(&mut self, result: OffsetResultChoice) {
         self.result = result;
     }
 
-    /// Whether a drag changes the original: the bar's Result, inverted while Ctrl is held.
+    /// Whether a drag changes the original: the remembered Mode, inverted while Ctrl is held.
     #[must_use]
     pub fn changes_original(&self, ctrl: bool) -> bool {
         (self.result == OffsetResultChoice::ChangeOriginal) != ctrl
     }
 
-    /// The sides of the Apply route (criterion 26): Direction and Result from the bar; Both with
-    /// Change original gives the Out side to the original.
+    /// The sides the standing preview shows and the chip's Enter writes (criteria 26, 52):
+    /// Direction and Mode as remembered; Both with Change original gives the Out side to the
+    /// original.
     #[must_use]
-    pub fn apply_sides(&self) -> OffsetSides {
+    pub fn entry_sides(&self) -> OffsetSides {
         let change = self.result == OffsetResultChoice::ChangeOriginal;
         match self.direction {
             OffsetDirection::Out => OffsetSides::of(OffsetSide::Out, false, change),
@@ -201,15 +189,15 @@ pub fn offset_join_from_code(code: &str) -> Option<OffsetJoin> {
     })
 }
 
-/// The cap named by its host code (`"round"`, `"flat"`, `"square"`).
+/// The corner style after `join` in the cycle of a double-click on a corner handle: Round,
+/// Miter, Bevel, back to Round (criteria 13, 56).
 #[must_use]
-pub fn offset_cap_from_code(code: &str) -> Option<OffsetCap> {
-    Some(match code {
-        "round" => OffsetCap::Round,
-        "flat" => OffsetCap::Flat,
-        "square" => OffsetCap::Square,
-        _ => return None,
-    })
+pub const fn next_offset_join(join: OffsetJoin) -> OffsetJoin {
+    match join {
+        OffsetJoin::Round => OffsetJoin::Miter,
+        OffsetJoin::Miter => OffsetJoin::Bevel,
+        OffsetJoin::Bevel => OffsetJoin::Round,
+    }
 }
 
 /// The direction named by its host code (`"out"`, `"in"`, `"both"`).
@@ -238,33 +226,32 @@ mod tests {
     use super::*;
 
     #[test]
-    fn ac4_ac6_the_first_use_is_one_millimetre_out_round_new_object() {
-        let bar = OffsetBar::default();
-        assert!((bar.distance_mm() - 1.0).abs() < f64::EPSILON);
-        assert_eq!(bar.direction(), OffsetDirection::Out);
-        assert_eq!(bar.join(), OffsetJoin::Round);
-        assert_eq!(bar.cap(), OffsetCap::Round);
-        assert_eq!(bar.result(), OffsetResultChoice::NewObject);
+    fn ac6_ac52_the_first_use_is_one_millimetre_out_round_new_object() {
+        let values = OffsetValues::default();
+        assert!((values.distance_mm() - 1.0).abs() < f64::EPSILON);
+        assert_eq!(values.direction(), OffsetDirection::Out);
+        assert_eq!(values.join(), OffsetJoin::Round);
+        assert_eq!(values.result(), OffsetResultChoice::NewObject);
     }
 
     #[test]
     fn ac6_the_distance_is_clamped_to_its_range() {
-        let mut bar = OffsetBar::default();
-        assert!(bar.set_distance_mm(2.5));
-        assert!(!bar.set_distance_mm(1500.0));
-        assert!((bar.distance_mm() - 1000.0).abs() < f64::EPSILON);
-        assert!(!bar.set_distance_mm(0.001));
-        assert!((bar.distance_mm() - 0.01).abs() < f64::EPSILON);
-        assert!(!bar.set_distance_mm(f64::NAN));
-        assert!((bar.distance_mm() - 0.01).abs() < f64::EPSILON);
+        let mut values = OffsetValues::default();
+        assert!(values.set_distance_mm(2.5));
+        assert!(!values.set_distance_mm(1500.0));
+        assert!((values.distance_mm() - 1000.0).abs() < f64::EPSILON);
+        assert!(!values.set_distance_mm(0.001));
+        assert!((values.distance_mm() - 0.01).abs() < f64::EPSILON);
+        assert!(!values.set_distance_mm(f64::NAN));
+        assert!((values.distance_mm() - 0.01).abs() < f64::EPSILON);
     }
 
     #[test]
     fn ac19_the_modifier_table() {
         use OffsetRole::{Copy, Original};
-        let bar = OffsetBar::default();
+        let values = OffsetValues::default();
         let sides =
-            |dragged, shift, ctrl| OffsetSides::of(dragged, shift, bar.changes_original(ctrl));
+            |dragged, shift, ctrl| OffsetSides::of(dragged, shift, values.changes_original(ctrl));
         assert_eq!(
             sides(OffsetSide::Out, false, false),
             OffsetSides {
@@ -294,22 +281,22 @@ mod tests {
             },
             "Shift+Ctrl: the original takes the dragged side"
         );
-        let mut change = OffsetBar::default();
+        let mut change = OffsetValues::default();
         change.set_result(OffsetResultChoice::ChangeOriginal);
         assert!(change.changes_original(false));
         assert!(
             !change.changes_original(true),
-            "Ctrl inverts the bar's choice"
+            "Ctrl inverts the remembered Mode"
         );
     }
 
     #[test]
-    fn ac26_the_apply_route_reads_direction_and_result() {
-        let mut bar = OffsetBar::default();
-        bar.set_direction(OffsetDirection::Both);
-        bar.set_result(OffsetResultChoice::ChangeOriginal);
+    fn ac26_the_chip_route_reads_direction_and_mode() {
+        let mut values = OffsetValues::default();
+        values.set_direction(OffsetDirection::Both);
+        values.set_result(OffsetResultChoice::ChangeOriginal);
         assert_eq!(
-            bar.apply_sides(),
+            values.entry_sides(),
             OffsetSides {
                 out: Some(OffsetRole::Original),
                 inside: Some(OffsetRole::Copy)
@@ -318,9 +305,27 @@ mod tests {
     }
 
     #[test]
+    fn ac13_ac56_a_double_click_steps_round_miter_bevel() {
+        let mut join = OffsetJoin::Round;
+        let mut seen = Vec::new();
+        for _ in 0..4 {
+            join = next_offset_join(join);
+            seen.push(join);
+        }
+        assert_eq!(
+            seen,
+            [
+                OffsetJoin::Miter,
+                OffsetJoin::Bevel,
+                OffsetJoin::Round,
+                OffsetJoin::Miter
+            ]
+        );
+    }
+
+    #[test]
     fn codes_name_the_values() {
         assert_eq!(offset_join_from_code("miter"), Some(OffsetJoin::Miter));
-        assert_eq!(offset_cap_from_code("square"), Some(OffsetCap::Square));
         assert_eq!(
             offset_direction_from_code("both"),
             Some(OffsetDirection::Both)
@@ -330,7 +335,6 @@ mod tests {
             Some(OffsetResultChoice::ChangeOriginal)
         );
         assert_eq!(offset_join_from_code("butt"), None);
-        assert_eq!(offset_cap_from_code("miter"), None);
         assert_eq!(offset_direction_from_code("up"), None);
         assert_eq!(offset_result_from_code("keep"), None);
     }

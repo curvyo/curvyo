@@ -3,7 +3,7 @@
 
 use curvyo_document_core::{ObjectSnapshot, Point};
 use curvyo_ui_core::{
-    KindNote, OffsetDirection, OffsetRefusal, OffsetRequest, OffsetResultChoice, OrientedBox,
+    OffsetDirection, OffsetRefusal, OffsetRequest, OffsetResultChoice, OrientedBox,
     handle_positions, offset_operands,
 };
 
@@ -23,8 +23,6 @@ const PRIMITIVE_NODES: usize = 8;
 pub struct OffsetView {
     /// Operands in the selection (groups not counted).
     pub operands: usize,
-    /// An open path is selected: Ends applies.
-    pub has_open: bool,
     /// The selection holds a group.
     pub has_group: bool,
     /// The handles are drawn.
@@ -45,8 +43,6 @@ pub struct OffsetView {
     pub of: usize,
     /// The preview is replaced by the grown box.
     pub large: bool,
-    /// Stays a primitive or becomes a path.
-    pub kind_note: Option<KindNote>,
     /// Why the preview shows nothing, if it is refused.
     pub refusal: Option<OffsetRefusal>,
 }
@@ -74,7 +70,7 @@ impl Session {
         if let Some(drag) = self.offset.drag {
             return (drag.d != 0.0).then(|| self.offset_request(Some((drag.d, self.held))));
         }
-        self.offset.bar_focus.then(|| self.offset_request(None))
+        None
     }
 
     /// What the bar, readout and canvas show.
@@ -83,32 +79,27 @@ impl Session {
         let objects = self.objects();
         let selection = self.offset_selection();
         let operands = offset_operands(&objects, &selection);
-        let has_open = operands.iter().any(|object| match object {
-            ObjectSnapshot::Path(path) => path.subpaths().any(|subpath| !subpath.closed),
-            ObjectSnapshot::Primitive(_) => false,
-        });
         let drag = self.offset.drag;
-        let bar = self.offset.bar;
+        let values = self.offset.values;
         let (distance_mm, both, change) = match drag {
             Some(drag) => (
                 drag.d,
                 self.held.shift,
-                bar.changes_original(self.held.ctrl),
+                values.changes_original(self.held.ctrl),
             ),
             None => (
-                if bar.direction() == OffsetDirection::In {
-                    -bar.distance_mm()
+                if values.direction() == OffsetDirection::In {
+                    -values.distance_mm()
                 } else {
-                    bar.distance_mm()
+                    values.distance_mm()
                 },
-                bar.direction() == OffsetDirection::Both,
-                bar.result() == OffsetResultChoice::ChangeOriginal,
+                values.direction() == OffsetDirection::Both,
+                values.result() == OffsetResultChoice::ChangeOriginal,
             ),
         };
         let large = self.offset_selection_is_large();
         let mut view = OffsetView {
             operands: operands.len(),
-            has_open,
             has_group: !self.selected_group_leaves().is_empty(),
             handles: self.offset_handles_shown(),
             dragging: drag.is_some(),
@@ -119,7 +110,6 @@ impl Session {
             vanished: 0,
             of: operands.len(),
             large,
-            kind_note: None,
             refusal: None,
         };
         if large {
@@ -129,7 +119,6 @@ impl Session {
             match self.offset_plan_for(request) {
                 Ok(plan) => {
                     view.vanished = plan.vanished;
-                    view.kind_note = plan.kind_note;
                 }
                 Err(refusal) => view.refusal = Some(refusal),
             }

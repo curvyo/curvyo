@@ -118,16 +118,16 @@ the fallback fired for 0 of 135 outlines over the test shapes.
 
 ### M5' Remove what the 2026-10-13 amendment removes (AC 3 to 5, 15, 30, 42, 47, 55)
 
-- [ ] 5'.1 Kernel: open-path offsetting goes (`OffsetCap`, `open_loop`, caps, `stroke_line`,
+- [x] 5'.1 Kernel: open-path offsetting goes (`OffsetCap`, `open_loop`, caps, `stroke_line`,
   `flatten_open`); an open outline is refused as `OffsetError::OpenPath`; their tests and the two
   open-arc golden cases go. Closed-path results stay bit-identical (the golden fixture's closed
   cases unchanged) (55).
-- [ ] 5'.2 `curvyo-ui-core`: Ends, `InsetOfOpenPaths`, `open_left_out` and the kind note
+- [x] 5'.2 `curvyo-ui-core`: Ends, `InsetOfOpenPaths`, `open_left_out` and the kind note
   ("Stays a rectangle" / "Becomes a path") go; open paths are not operands (`offset_operands`,
   `plan_offset`); the bar's values become `OffsetValues` (the chip's remembered values) (15, 42, 55).
-- [ ] 5'.3 Session and wasm: Ends, the bar focus, the kind code and the open-path stop go; a
+- [x] 5'.3 Session and wasm: Ends, the bar focus, the kind code and the open-path stop go; a
   selection of only open paths draws no handles (5, 55).
-- [ ] 5'.4 Frontend: `OffsetToolbar.tsx` (the top bar with Apply) and its wiring go; the status
+- [x] 5'.4 Frontend: `OffsetToolbar.tsx` (the top bar with Apply) and its wiring go; the status
   text and the Ends words leave `offsetText.ts` (3, 4).
 
 ### M6' Session: standing preview, modifiers, corner style by double-click (AC 6, 10, 13, 15, 19, 52, 56)

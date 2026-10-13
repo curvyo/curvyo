@@ -1,20 +1,17 @@
 //! The polyline route of the first build, kept as the fallback of the offset kernel
 //! (`specs/0038-path-offset` criterion 39): the operand flattened onto the 0.001 mm grid and offset
-//! by `i_overlay`'s own integer offsetter, with the join and cap angles computed from `sqrt` only.
+//! by `i_overlay`'s own integer offsetter, with the join angles computed from `sqrt` only.
 
-use curvyo_document_core::Point;
 use i_overlay::i_float::int::angle::Angle;
 use i_overlay::mesh::int::arc::ArcOptions;
 use i_overlay::mesh::int::outline::offset::IntOutlineOffset;
-use i_overlay::mesh::int::stroke::offset::IntStrokeOffset;
-use i_overlay::mesh::int::style::{IntLineCap, IntLineJoin, IntOutlineStyle, IntStrokeStyle};
+use i_overlay::mesh::int::style::{IntLineJoin, IntOutlineStyle};
 use i_overlay::mesh::math::MathMode;
 
 use crate::boolean::{Outline, grid_paths};
 use crate::boolean_cleanup::cleanup;
-use crate::boolean_grid::{GRID_MM, Path64, Paths64, double_area, normalize, snap};
-use crate::flatten::{flatten_closed, flatten_open};
-use crate::offset::{OffsetCap, OffsetError, OffsetJoin};
+use crate::boolean_grid::{GRID_MM, Paths64, double_area, normalize};
+use crate::offset::{OffsetError, OffsetJoin};
 
 /// One turn in the library's binary angle units.
 const UNITS_PER_TURN: f64 = 4_294_967_296.0;
@@ -31,33 +28,27 @@ const MITER_MIN_TURN_DEFAULT_RAD: f64 = 5.0 * std::f64::consts::PI / 180.0;
 const MITER_STRAIGHT_ERROR_MM: f64 = 0.005;
 
 /// The polyline route of the first build: flatten, offset with `i_overlay`'s own offsetter, clean
-/// up. Used for operands whose outlines cross or touch and for degenerate open lines.
+/// up. Used for operands whose outlines cross or touch.
 pub(crate) fn polyline_offset(
     operand: &[Outline<'_>],
     units: i64,
     join: OffsetJoin,
-    cap: OffsetCap,
     flatten_tolerance_mm: f64,
-    is_open: bool,
 ) -> Result<Paths64, OffsetError> {
     #[allow(clippy::cast_precision_loss)] // |units| <= 10^10
     let radius_mm = (units as f64 * GRID_MM).abs();
-    let raw = if is_open {
-        stroke_line(operand, units, join, cap, radius_mm, flatten_tolerance_mm)?
-    } else {
-        let region = normalize(&grid_paths(operand, flatten_tolerance_mm));
-        let style = IntOutlineStyle::new(units)
-            .line_join(int_join(join, radius_mm, flatten_tolerance_mm))
-            .miter_min_turn(miter_min_turn(radius_mm))
-            .math(MathMode::Integer);
-        region
-            .validate_outline(&style)
-            .map_err(|_| OffsetError::OutOfRange)?;
-        let shapes = region
-            .outline(&style)
-            .map_err(|_| OffsetError::OutOfRange)?;
-        shapes.into_iter().flatten().collect()
-    };
+    let region = normalize(&grid_paths(operand, flatten_tolerance_mm));
+    let style = IntOutlineStyle::new(units)
+        .line_join(int_join(join, radius_mm, flatten_tolerance_mm))
+        .miter_min_turn(miter_min_turn(radius_mm))
+        .math(MathMode::Integer);
+    region
+        .validate_outline(&style)
+        .map_err(|_| OffsetError::OutOfRange)?;
+    let shapes = region
+        .outline(&style)
+        .map_err(|_| OffsetError::OutOfRange)?;
+    let raw: Paths64 = shapes.into_iter().flatten().collect();
     Ok(without_flattening_noise(
         cleanup(&raw),
         flatten_tolerance_mm,
@@ -92,58 +83,6 @@ pub(crate) fn without_flattening_noise(mut paths: Paths64, flatten_tolerance_mm:
         double_area >= threshold_units * perimeter
     });
     paths
-}
-
-/// The open operand grown into a closed region: every outline stroked as a line (an open one
-/// with caps, a closed one as a loop), the pieces united.
-fn stroke_line(
-    operand: &[Outline<'_>],
-    units: i64,
-    join: OffsetJoin,
-    cap: OffsetCap,
-    radius_mm: f64,
-    flatten_tolerance_mm: f64,
-) -> Result<Paths64, OffsetError> {
-    let int_cap = match cap {
-        OffsetCap::Round => IntLineCap::Round(arc_options(radius_mm, flatten_tolerance_mm)),
-        OffsetCap::Flat => IntLineCap::Butt,
-        OffsetCap::Square => IntLineCap::Square,
-    };
-    let style = IntStrokeStyle::new(2 * units)
-        .start_cap(int_cap.clone())
-        .end_cap(int_cap)
-        .line_join(int_join(join, radius_mm, flatten_tolerance_mm))
-        .miter_min_turn(miter_min_turn(radius_mm))
-        .math(MathMode::Integer);
-    let mut pieces = Paths64::new();
-    for outline in operand {
-        let points = if outline.closed {
-            flatten_closed(outline.anchors, flatten_tolerance_mm)
-        } else {
-            flatten_open(outline.anchors, flatten_tolerance_mm)
-        };
-        let line = snap_line(&points);
-        line.validate_stroke(&style)
-            .map_err(|_| OffsetError::OutOfRange)?;
-        let shapes = line
-            .stroke(&style, outline.closed)
-            .map_err(|_| OffsetError::OutOfRange)?;
-        pieces.extend(shapes.into_iter().flatten());
-    }
-    Ok(normalize(&pieces))
-}
-
-/// Snaps a line's vertices to the grid and drops consecutive duplicates (not the wrap-around pair:
-/// an open line may end where it starts).
-fn snap_line(points: &[Point]) -> Path64 {
-    let mut line: Path64 = Vec::with_capacity(points.len());
-    for point in points {
-        let snapped = snap(*point);
-        if line.last() != Some(&snapped) {
-            line.push(snapped);
-        }
-    }
-    line
 }
 
 /// The library's join for `join` at radius `radius_mm`.

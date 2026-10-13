@@ -19,7 +19,7 @@ use common::offset_check::{area, check_node_rules, covers, flattened};
 use common::{Anchors, KERNEL_TOLERANCE, distance_to_segment, grid_points, polygon};
 use curvyo_document_core::Length;
 use curvyo_geometry_core::{
-    OffsetCap, OffsetError, OffsetJoin, OffsetOutlines, Outline, offset, signed_area_mm2,
+    OffsetError, OffsetJoin, OffsetOutlines, Outline, offset, signed_area_mm2,
 };
 use proptest::prelude::*;
 use proptest::test_runner::{Config, RngSeed};
@@ -57,7 +57,6 @@ fn run(anchors: &Anchors, d: f64, join: OffsetJoin) -> Result<OffsetOutlines, Of
         &[Outline::new(anchors, true)],
         Length::from_mm(d),
         join,
-        OffsetCap::Round,
         KERNEL_TOLERANCE,
     )
 }

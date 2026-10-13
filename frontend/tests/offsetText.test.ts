@@ -1,5 +1,5 @@
 // Run with `npm test`. The words of `src/lib/offsetText.ts` against `specs/0038-path-offset`
-// (criteria 5, 12, 15, 24, 29, 30, 32).
+// (criteria 12, 15, 24, 29, 32).
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
@@ -10,7 +10,6 @@ import {
   formatDistance,
   offsetReadout,
   offsetRefusalText,
-  offsetStatus,
   offsetSuccessText,
 } from "../src/lib/offsetText.ts";
 
@@ -21,7 +20,6 @@ const outcome = (fields: Partial<OffsetOutcome>): OffsetOutcome => ({
   count: 0,
   of: 1,
   vanished: 0,
-  openLeftOut: 0,
   distanceMm: 2.5,
   direction: "out",
   ...fields,
@@ -47,7 +45,7 @@ test("criterion 24: the notice names what was added or changed, the distance and
   assert.equal(offsetSuccessText(outcome({ kind: "ignored" })), null);
 });
 
-test("criteria 29, 30, 32: the refusals", () => {
+test("criteria 29, 32: the refusals", () => {
   assert.equal(
     offsetRefusalText(outcome({ kind: "empty", distanceMm: 10 })),
     "Inset is empty: nothing is left at 10 mm. Nothing was changed.",
@@ -56,29 +54,7 @@ test("criteria 29, 30, 32: the refusals", () => {
     offsetRefusalText(outcome({ kind: "groups", count: 2 })),
     "Offset does not work on groups. Ungroup first. Nothing was changed.",
   );
-  assert.equal(
-    offsetRefusalText(outcome({ kind: "inset_open", count: 1, of: 2 })),
-    "Inset needs closed paths: 1 of 2 is open. Nothing was changed.",
-  );
   assert.equal(offsetRefusalText(outcome({ kind: "applied" })), null);
-});
-
-test("criterion 5: the status names why the bar is greyed", () => {
-  assert.equal(offsetStatus(OFFSET_IDLE), "Select one or more shapes.");
-  assert.equal(
-    offsetStatus({ ...OFFSET_IDLE, hasGroup: true }),
-    "Groups cannot be offset. Ungroup first.",
-  );
-  assert.equal(offsetStatus({ ...OFFSET_IDLE, operands: 1, kind: "stays_rectangle" }), "Stays a rectangle.");
-  assert.equal(offsetStatus({ ...OFFSET_IDLE, operands: 1, kind: "becomes_path" }), "Becomes a path.");
-  assert.equal(
-    offsetStatus({ ...OFFSET_IDLE, operands: 2, refusal: "inset_open", refusalCount: 1, refusalOf: 2 }),
-    "Inset needs closed paths: 1 of 2 is open.",
-  );
-  assert.equal(
-    offsetStatus({ ...OFFSET_IDLE, operands: 2, stop: "inset_open" }),
-    "Inset needs closed paths: 2 of 2 are open.",
-  );
 });
 
 test("criteria 12, 15, 18: the readout's two lines", () => {
@@ -102,7 +78,6 @@ test("criteria 12, 15, 18: the readout's two lines", () => {
     "Inset 1 mm, 1 of 3 shapes vanish",
   );
   assert.equal(offsetReadout({ ...dragging, large: true })[1], "Preview off: large selection");
-  assert.equal(offsetReadout({ ...dragging, stop: "inset_open" })[0], "Inset needs closed paths");
 });
 
 test("distances print without float noise", () => {

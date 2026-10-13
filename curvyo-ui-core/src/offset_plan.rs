@@ -1,10 +1,10 @@
-//! Computing an offset of the selected objects (`specs/0038-path-offset` criteria 20 to 23, 29 to
-//! 32, 40 to 43): which objects are operands, one result per operand and side (a primitive where
-//! it stays one, otherwise the curve kernel's path), why the whole offset is refused, and the
-//! writes that put the results into the document.
+//! Computing an offset of the selected objects (`specs/0038-path-offset` criteria 20 to 23, 29,
+//! 31, 32, 40 to 43, 55): which objects are operands (closed ones only), one result per operand
+//! and side (a primitive where it stays one, otherwise the curve kernel's path), why the whole
+//! offset is refused, and the writes that put the results into the document.
 //!
 //! Pure: it reads snapshots and the selection, so the preview draws exactly what the release or
-//! Apply writes; [`OffsetPlan::into_writes`] mints the anchor ids only for the write. Groups are
+//! the chip's Enter writes; [`OffsetPlan::into_writes`] mints the anchor ids only for the write. Groups are
 //! refused by the session, which knows them.
 
 use curvyo_document_core::{
@@ -19,7 +19,7 @@ use curvyo_geometry_core::{
 use crate::anchor_id_minter::AnchorIdMinter;
 use crate::boolean::{is_open, operands_in_order, outlines_of};
 use crate::object_selection::ObjectSelection;
-use crate::offset_entry::{OffsetCap, OffsetJoin, OffsetRole, OffsetSide, OffsetSides};
+use crate::offset_entry::{OffsetJoin, OffsetRole, OffsetSide, OffsetSides};
 use crate::offset_primitive::{PrimitiveOffset, offset_primitive};
 
 /// The kernel tolerance (criterion 34).
@@ -34,24 +34,15 @@ pub struct OffsetRequest {
     pub sides: OffsetSides,
     /// The corner join.
     pub join: OffsetJoin,
-    /// The end cap of open paths.
-    pub cap: OffsetCap,
 }
 
 /// Why an offset was refused. Nothing is written in any of these cases.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum OffsetRefusal {
-    /// No operand is selected.
+    /// No operand is selected (open paths are not operands, criterion 55).
     NoOperands,
     /// The distance is zero: nothing is written.
     ZeroDistance,
-    /// Only an inset is asked for and every operand is an open path (criterion 30).
-    InsetOfOpenPaths {
-        /// The open paths, to outline.
-        offenders: Vec<NodeId>,
-        /// How many objects are selected.
-        of: usize,
-    },
     /// `offenders` of the `of` selected objects, or their results, have a coordinate the kernel
     /// cannot work with (criterion 32).
     OutOfRange {
@@ -98,31 +89,6 @@ pub struct OffsetItem {
     pub shape: OffsetShape,
 }
 
-/// Whether the results of primitive operands stay primitives (the bar's "Stays a rectangle." or
-/// "Becomes a path.", criterion 15).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum KindNote {
-    /// Every operand is this kind of primitive and every result stays one.
-    Stays(PrimitiveKind),
-    /// Every operand is a primitive and some result becomes a path.
-    BecomesPath,
-}
-
-/// The kinds of primitives, for [`KindNote`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PrimitiveKind {
-    /// A rectangle.
-    Rectangle,
-    /// A circle.
-    Circle,
-    /// An ellipse.
-    Ellipse,
-    /// A polygon.
-    Polygon,
-    /// A star.
-    Star,
-}
-
 /// The computed offset: every result, bottom-most operand first.
 #[derive(Debug, Clone, PartialEq)]
 pub struct OffsetPlan {
@@ -130,12 +96,8 @@ pub struct OffsetPlan {
     pub items: Vec<OffsetItem>,
     /// Operands whose inset vanished (criterion 29, "1 of 3 shapes vanished").
     pub vanished: usize,
-    /// Open paths left out of an inset (criterion 30).
-    pub open_left_out: Vec<NodeId>,
     /// How many operands there were.
     pub of: usize,
-    /// Stays a primitive or becomes a path, for an all-primitive selection.
-    pub kind_note: Option<KindNote>,
 }
 
 impl OffsetPlan {
@@ -236,45 +198,36 @@ fn path_outlines(outlines: &[Vec<OffsetAnchor>], minter: &mut AnchorIdMinter) ->
         .collect()
 }
 
-/// The operands of `selection` in stacking order: the objects the Offset tool works on.
+/// The operands of `selection` in stacking order: the closed objects the Offset tool works on.
+/// An open path is not an operand (criterion 55).
 #[must_use]
 pub fn offset_operands<'a>(
     objects: &'a [ObjectSnapshot],
     selection: &ObjectSelection,
 ) -> Vec<&'a ObjectSnapshot> {
-    operands_in_order(objects, selection)
+    let mut operands = operands_in_order(objects, selection);
+    operands.retain(|object| !is_open(object));
+    operands
 }
 
 /// Offsets every selected operand on its own (criterion 22: results are not merged), in stacking
 /// order, so the selection order does not matter (criterion 44).
 ///
 /// # Errors
-/// An [`OffsetRefusal`]; the checks run in the order: no operand, zero distance, an inset of
-/// open paths only, then per operand out of range and no area, then everything vanished.
+/// An [`OffsetRefusal`]; the checks run in the order: no operand, zero distance, then per
+/// operand out of range and no area, then everything vanished.
 pub fn plan_offset(
     objects: &[ObjectSnapshot],
     selection: &ObjectSelection,
     request: &OffsetRequest,
 ) -> Result<OffsetPlan, OffsetRefusal> {
-    let operands = operands_in_order(objects, selection);
+    let operands = offset_operands(objects, selection);
     let of = operands.len();
     if operands.is_empty() {
         return Err(OffsetRefusal::NoOperands);
     }
     if offset_distance_is_zero(Length::from_mm(request.distance_mm)) {
         return Err(OffsetRefusal::ZeroDistance);
-    }
-    let inset_only = request.sides.out.is_none();
-    let open: Vec<NodeId> = operands
-        .iter()
-        .filter(|object| is_open(object))
-        .map(|object| object.id())
-        .collect();
-    if inset_only && open.len() == of {
-        return Err(OffsetRefusal::InsetOfOpenPaths {
-            offenders: open,
-            of,
-        });
     }
     let mut results = Results::default();
     for object in &operands {
@@ -301,13 +254,10 @@ pub fn plan_offset(
     if items.is_empty() {
         return Err(OffsetRefusal::Empty);
     }
-    let kind_note = kind_note(&operands, &items);
     Ok(OffsetPlan {
         items,
         vanished,
-        open_left_out: if inset_only { open } else { Vec::new() },
         of,
-        kind_note,
     })
 }
 
@@ -321,8 +271,7 @@ struct Results {
 }
 
 impl Results {
-    /// Offsets `object` on every side `request` asks for. An open path has no inside: its Both is
-    /// its Out, its In is left out.
+    /// Offsets `object` on every side `request` asks for.
     fn add(&mut self, object: &ObjectSnapshot, request: &OffsetRequest) {
         let id = object.id();
         let sides = [
@@ -331,9 +280,6 @@ impl Results {
         ];
         for (side, role) in sides {
             let Some(role) = role else { continue };
-            if side == OffsetSide::In && is_open(object) {
-                continue;
-            }
             let d = match side {
                 OffsetSide::Out => request.distance_mm,
                 OffsetSide::In => -request.distance_mm,
@@ -397,47 +343,9 @@ fn offset_one(
         &outlines,
         Length::from_mm(d),
         request.join,
-        request.cap,
         OFFSET_TOLERANCE,
     )
     .map(|result| OffsetShape::Path(OffsetOutlines::into_outlines(result)))
-}
-
-/// The bar's note for a selection of primitives of one kind.
-fn kind_note(operands: &[&ObjectSnapshot], items: &[OffsetItem]) -> Option<KindNote> {
-    let mut kind = None;
-    for object in operands {
-        let ObjectSnapshot::Primitive(primitive) = object else {
-            return None;
-        };
-        let this = primitive_kind(&primitive.shape);
-        if kind.is_some_and(|k| k != this) {
-            return None;
-        }
-        kind = Some(this);
-    }
-    let all_stay = items
-        .iter()
-        .all(|item| matches!(item.shape, OffsetShape::Primitive { .. }));
-    kind.map(|kind| {
-        if all_stay {
-            KindNote::Stays(kind)
-        } else {
-            KindNote::BecomesPath
-        }
-    })
-}
-
-fn primitive_kind(shape: &Shape) -> PrimitiveKind {
-    match shape {
-        Shape::Rect { .. } => PrimitiveKind::Rectangle,
-        Shape::Ellipse { frame } if (frame.rx.as_mm() - frame.ry.as_mm()).abs() <= 1e-9 => {
-            PrimitiveKind::Circle
-        }
-        Shape::Ellipse { .. } => PrimitiveKind::Ellipse,
-        Shape::Polygon { .. } => PrimitiveKind::Polygon,
-        Shape::Star { .. } => PrimitiveKind::Star,
-    }
 }
 
 #[cfg(test)]
@@ -494,7 +402,6 @@ mod tests {
             distance_mm,
             sides,
             join: OffsetJoin::Round,
-            cap: OffsetCap::Round,
         }
     }
 
@@ -538,10 +445,6 @@ mod tests {
                 .iter()
                 .all(|item| matches!(item.shape, OffsetShape::Primitive { .. }))
         );
-        assert_eq!(
-            plan.kind_note,
-            Some(KindNote::Stays(PrimitiveKind::Rectangle))
-        );
         let oval = document.create_ellipse(EllipseFrame {
             center: Point::new(50.0, 50.0),
             rx: Length::from_mm(20.0),
@@ -550,7 +453,6 @@ mod tests {
         let all = objects(&document);
         let plan = plan_offset(&all, &selection_of(&[oval]), &request(2.0, OUT_COPY)).unwrap();
         assert!(matches!(plan.items[0].shape, OffsetShape::Path(_)));
-        assert_eq!(plan.kind_note, Some(KindNote::BecomesPath));
     }
 
     #[test]
@@ -585,23 +487,26 @@ mod tests {
     }
 
     #[test]
-    fn ac30_open_paths_grow_and_are_left_out_of_an_inset() {
+    fn ac55_open_paths_are_not_operands() {
         let document = Document::new(1);
         let a = square_path(&document, 0.0, 10.0, 1);
         let open = line(&document, 20);
         let all = objects(&document);
-        let grown = plan_offset(&all, &selection_of(&[open]), &request(5.0, BOTH)).unwrap();
-        assert_eq!(grown.items.len(), 1, "Both on an open path is its Out");
         assert_eq!(
-            plan_offset(&all, &selection_of(&[open]), &request(1.0, IN_COPY)),
-            Err(OffsetRefusal::InsetOfOpenPaths {
-                offenders: vec![open],
-                of: 1
-            })
+            plan_offset(&all, &selection_of(&[open]), &request(5.0, BOTH)),
+            Err(OffsetRefusal::NoOperands),
+            "only open paths: nothing to offset"
         );
-        let mixed = plan_offset(&all, &selection_of(&[a, open]), &request(1.0, IN_COPY)).unwrap();
-        assert_eq!(mixed.items.len(), 1);
-        assert_eq!(mixed.open_left_out, vec![open]);
+        let mixed = plan_offset(&all, &selection_of(&[a, open]), &request(1.0, BOTH)).unwrap();
+        assert_eq!(mixed.of, 1, "the open path is ignored");
+        assert!(mixed.items.iter().all(|item| item.operand == a));
+        assert_eq!(
+            offset_operands(&all, &selection_of(&[a, open]))
+                .iter()
+                .map(|object| object.id())
+                .collect::<Vec<_>>(),
+            vec![a]
+        );
     }
 
     #[test]
