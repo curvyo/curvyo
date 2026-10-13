@@ -12,6 +12,7 @@ import {
   offsetRefusalText,
   offsetSuccessText,
   chipDistanceText,
+  clampChipDistance,
   cornerStyleLines,
   keepsCornerStyleChip,
   parseChipDistance,
@@ -118,6 +119,9 @@ test("criteria 6, 25, 54: the chip's Distance text, steps and parsing", () => {
   assert.equal(stepChipDistance(2.53, 1, {}), 2.6, "rounded to the step");
   assert.equal(stepChipDistance(2.5, 1, { ctrl: true }), 2.51);
   assert.equal(stepChipDistance(999.5, 1, { shift: true }), 1000);
+  assert.equal(chipDistanceText(clampChipDistance(1500)), "1000");
+  assert.equal(chipDistanceText(clampChipDistance(0.001)), "0.01");
+  assert.equal(clampChipDistance(2.5), 2.5);
 });
 
 test("distances print without float noise", () => {

@@ -196,6 +196,29 @@ impl Session {
 }
 
 impl Session {
+    /// The selection boxes of the selected objects that are not operands (open paths): they
+    /// stay drawn as selected (criterion 55).
+    pub(super) fn offset_ignored_boxes(
+        &self,
+        objects: &[ObjectSnapshot],
+    ) -> Vec<(curvyo_document_core::NodeId, [Point; 4])> {
+        let selection = self.offset_selection();
+        let operands: Vec<_> = offset_operands(objects, &selection)
+            .iter()
+            .map(|object| object.id())
+            .collect();
+        objects
+            .iter()
+            .filter(|object| selection.contains(object.id()) && !operands.contains(&object.id()))
+            .map(|object| {
+                (
+                    object.id(),
+                    curvyo_ui_core::oriented_bounds(object).document_corners(),
+                )
+            })
+            .collect()
+    }
+
     /// Where the Offset entry chip is placed from, in document millimetres: the center handle
     /// and the axis-aligned box around the operand box and the standing preview (`ux-rework.md`
     /// 2.4). `None` without operands.

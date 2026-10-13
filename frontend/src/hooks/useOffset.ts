@@ -97,8 +97,8 @@ function readOutcome(raw: ReturnType<WasmSession["apply_offset"]>): OffsetOutcom
 }
 
 /**
- * The Offset tool's bar state and commands. Every decision (what applies, the preview, why a
- * release is refused) is the session's; this hook reads it after every sync and turns outcomes
+ * The Offset tool's view and the entry chip's commands. Every decision (what is written, the
+ * preview, why a release or Enter is refused) is the session's; this hook reads it after every sync and turns outcomes
  * into the canvas notice.
  */
 export function useOffset(

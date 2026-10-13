@@ -198,3 +198,9 @@ export function offsetRefusalText(outcome: OffsetOutcome): string | null {
 export function keepsCornerStyleChip(shown: boolean, handleHint: string, dragging: boolean): boolean {
   return shown && !dragging && handleHint.startsWith("offset-corner");
 }
+
+/** A typed Distance clamped to 0.01 to 1000 mm (criterion 6): what the field shows after an
+ * out-of-range Enter, selected so the next keystroke replaces it. */
+export function clampChipDistance(mm: number): number {
+  return Math.min(1000, Math.max(0.01, mm));
+}

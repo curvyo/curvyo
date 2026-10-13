@@ -922,4 +922,35 @@ mod tests {
         assert_eq!(session.selection.ids(), &[square], "the selection stays");
         assert_eq!(session.tool(), Tool::Offset);
     }
+
+    #[test]
+    fn ac55_selected_open_paths_stay_drawn_as_selected() {
+        let (mut session, square) = offset_session();
+        let line = session.document.create_path(
+            &[
+                NewAnchor::corner(AnchorId::new(9, 50), Point::new(0.0, 50.0)),
+                NewAnchor::corner(AnchorId::new(9, 51), Point::new(20.0, 50.0)),
+            ],
+            false,
+        );
+        session.selection.set(&[square, line]);
+        let objects = session.objects();
+        let boxed: Vec<NodeId> = session
+            .select_decoration_input_in(&objects)
+            .selected
+            .iter()
+            .map(|(id, _)| *id)
+            .collect();
+        assert_eq!(
+            boxed,
+            vec![line],
+            "the ignored open path keeps its selection box"
+        );
+        session.selection.set(&[line]);
+        let objects = session.objects();
+        assert_eq!(
+            session.select_decoration_input_in(&objects).selected.len(),
+            1
+        );
+    }
 }

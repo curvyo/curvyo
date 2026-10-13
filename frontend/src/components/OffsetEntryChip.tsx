@@ -1,5 +1,5 @@
 import { CircleAlert, Plus, RefreshCw } from "lucide-react";
-import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { useId, useLayoutEffect, useRef, useState } from "react";
 
 import { JoinIcon } from "@/components/panel/StyleIcons";
 import type { OffsetApi, OffsetChipAnchor } from "@/hooks/useOffset";
@@ -9,6 +9,7 @@ import {
   type OffsetJoinName,
   type OffsetResultName,
   chipDistanceText,
+  clampChipDistance,
   parseChipDistance,
   stepChipDistance,
 } from "@/lib/offsetText";
@@ -20,10 +21,6 @@ const TOOL_RAIL_CLEAR_PX = 128;
 
 /** Height of the message card plus its gap, in px. */
 const MESSAGE_CARD_PX = 28;
-
-/** The smallest and largest Distance (`specification.md` criterion 6). */
-const MIN_MM = 0.01;
-const MAX_MM = 1000;
 
 const DIRECTIONS: RadioItem<OffsetDirectionName>[] = [
   { value: "out", label: "Out", title: "Outset: grow" },
@@ -79,6 +76,8 @@ export function OffsetEntryChip({ offset, containerRef }: OffsetEntryChipProps) 
   const [text, setText] = useState(() => chipDistanceText(view.valuesDistanceMm));
   const [message, setMessage] = useState<string | null>(null);
   const [invalid, setInvalid] = useState(false);
+  // Bumped to select Distance after React has rendered the text set with it (the clamped value).
+  const [selectRequest, setSelectRequest] = useState(0);
   const fresh = offset.readAnchor();
   const [anchor, setAnchor] = useState<OffsetChipAnchor | null>(fresh);
   const [sizes, setSizes] = useState({
@@ -92,11 +91,12 @@ export function OffsetEntryChip({ offset, containerRef }: OffsetEntryChipProps) 
     setAnchor(fresh);
   }
 
-  // Focus in Distance with its text selected, once per open.
-  useEffect(() => {
+  // Focus in Distance with its text selected, once per open and after every invalid Enter, so
+  // the next keystroke replaces the whole (clamped) text.
+  useLayoutEffect(() => {
     inputRef.current?.focus();
     inputRef.current?.select();
-  }, []);
+  }, [selectRequest]);
 
   useLayoutEffect(() => {
     const chip = chipRef.current;
@@ -132,7 +132,7 @@ export function OffsetEntryChip({ offset, containerRef }: OffsetEntryChipProps) 
       return null;
     }
     const inRange = offset.setDistance(value);
-    setText(chipDistanceText(Math.min(MAX_MM, Math.max(MIN_MM, value))));
+    setText(chipDistanceText(clampChipDistance(value)));
     return inRange;
   };
 
@@ -152,8 +152,7 @@ export function OffsetEntryChip({ offset, containerRef }: OffsetEntryChipProps) 
   const markInvalid = (sentence: string) => {
     setInvalid(true);
     setMessage(sentence);
-    inputRef.current?.focus();
-    inputRef.current?.select();
+    setSelectRequest((n) => n + 1);
   };
 
   const submit = () => {

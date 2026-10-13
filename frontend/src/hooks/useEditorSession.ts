@@ -615,8 +615,8 @@ export interface EditorSession {
   /** Groups (`specs/0023-groups`): the Grouping card, the entered group's depth and its
    * announcements. */
   grouping: GroupingApi;
-  /** The Offset tool (`specs/0038-path-offset`): its bar's view and values, Apply and the
-   * notice after a release. */
+  /** The Offset tool (`specs/0038-path-offset`): its view, the entry chip's values and Enter,
+   * and the notice after a release. */
   offset: OffsetApi;
   /** A large undo or redo is running. */
   historyBusy: boolean;

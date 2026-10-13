@@ -98,13 +98,16 @@ pub fn build_offset_handles(
         } else {
             theme::SELECTION_CASING
         };
-        let ring = if state.hovered == Some(index) && state.dragged.is_none() {
-            theme::ACCENT_HOVER
-        } else {
-            theme::ACCENT
-        };
-        list.extend(circle(at, mm(HANDLE_PX), ring));
+        // The ring stays at full `--accent`; hover tints the ground (the "Parameter handle" look).
+        list.extend(circle(at, mm(HANDLE_PX), theme::ACCENT));
         list.extend(circle(at, mm(HANDLE_PX - 2.0 * HANDLE_RING_PX), ground));
+        if state.hovered == Some(index) && state.dragged.is_none() {
+            list.extend(circle(
+                at,
+                mm(HANDLE_PX - 2.0 * HANDLE_RING_PX),
+                theme::ACCENT_HOVER,
+            ));
+        }
         list.extend(circle(at, mm(HANDLE_DOT_PX), theme::ACCENT));
     }
     list
@@ -299,6 +302,32 @@ mod tests {
         let view = ViewTransform::new(1.0, Point::new(0.0, 0.0));
         let list = build_offset_handles(corners, handles, OffsetHandleState::default(), view);
         assert!(list.triangles.iter().any(|v| v.color == theme::ACCENT));
+        let hovered = build_offset_handles(
+            corners,
+            handles,
+            OffsetHandleState {
+                hovered: Some(0),
+                dragged: None,
+            },
+            view,
+        );
+        let ring_triangles = |l: &DrawList| {
+            l.triangles
+                .iter()
+                .filter(|v| v.color == theme::ACCENT)
+                .count()
+        };
+        assert_eq!(
+            ring_triangles(&hovered),
+            ring_triangles(&list),
+            "hover keeps the full ring"
+        );
+        assert!(
+            hovered
+                .triangles
+                .iter()
+                .any(|v| v.color == theme::ACCENT_HOVER)
+        );
         let grown = build_offset_grown_box(corners, view);
         assert!(
             grown
