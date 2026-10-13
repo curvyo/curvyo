@@ -98,6 +98,8 @@ pub enum KeyOutcome {
     Ungroup,
     /// Enter entered the selected group.
     EnteredGroup,
+    /// O or Enter opened the Offset entry chip (`specs/0038-path-offset` criterion 25).
+    OffsetChipOpened,
     /// An arrow key moved the selection; `new_run` is true when the event
     /// opened a new run of held-key events (a new step once `0020` exists).
     Nudged {
@@ -140,6 +142,7 @@ impl KeyOutcome {
             Self::Group => "group",
             Self::Ungroup => "ungroup",
             Self::EnteredGroup => "enter-group",
+            Self::OffsetChipOpened => "offset-chip",
             Self::Nudged { new_run: false } => "nudge",
             Self::Nudged { new_run: true } => "nudge-new",
         }
@@ -223,8 +226,9 @@ impl Session {
             tool: self.tool,
             operation_in_flight: self.operation_in_flight(),
             pen_open: self.pen_path_open(),
-            entry_open: self.select.has_entry(),
+            entry_open: self.select.has_entry() || self.offset_chip_open(),
             selected: self.selected_for_keys(),
+            offset_ready: self.offset_center().is_some(),
         };
         match decide(&input, state) {
             KeyAction::Ignore => KeyOutcome::Ignored,
@@ -281,6 +285,13 @@ impl Session {
                 self.grouping_result = Some(result);
                 if acted {
                     KeyOutcome::Ungroup
+                } else {
+                    KeyOutcome::Ignored
+                }
+            }
+            KeyAction::OpenOffsetChip => {
+                if self.open_offset_chip() {
+                    KeyOutcome::OffsetChipOpened
                 } else {
                     KeyOutcome::Ignored
                 }
@@ -461,6 +472,7 @@ mod tests {
             pen_open: false,
             entry_open: false,
             selected,
+            offset_ready: false,
         }
     }
 
@@ -468,6 +480,39 @@ mod tests {
         KeyInput {
             key,
             ..KeyInput::default()
+        }
+    }
+
+    /// `specs/0038-path-offset` criteria 25, 53: in the Offset tool with an operand, O and Enter
+    /// open the chip, gated like every shortcut; without one O stays the tool letter.
+    #[test]
+    fn o_and_enter_open_the_offset_chip_in_the_offset_tool() {
+        let ready = KeyState {
+            offset_ready: true,
+            ..state(Tool::Offset, Selected::One)
+        };
+        assert_eq!(decide(&key("o"), ready), KeyAction::OpenOffsetChip);
+        assert_eq!(decide(&key("Enter"), ready), KeyAction::OpenOffsetChip);
+        assert_eq!(
+            decide(&key("o"), state(Tool::Offset, Selected::One)),
+            KeyAction::SetTool(Tool::Offset)
+        );
+        assert_eq!(
+            decide(&key("o"), state(Tool::Select, Selected::One)),
+            KeyAction::SetTool(Tool::Offset)
+        );
+        let blocked: [Blocker; 4] = [
+            Box::new(|k, _| k.repeat = true),
+            Box::new(|k, _| k.dom_blocked = true),
+            Box::new(|_, s| s.entry_open = true),
+            Box::new(|_, s| s.operation_in_flight = true),
+        ];
+        for block in &blocked {
+            for name in ["o", "Enter"] {
+                let (mut k, mut s) = (key(name), ready);
+                block(&mut k, &mut s);
+                assert_ne!(decide(&k, s), KeyAction::OpenOffsetChip, "{name}");
+            }
         }
     }
 

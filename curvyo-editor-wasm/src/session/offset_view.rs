@@ -166,6 +166,16 @@ impl Session {
                 ));
             }
         }
+        if let Some(center) = self.offset_center() {
+            list.extend(curvyo_render_core::build_offset_center_handle(
+                center,
+                curvyo_render_core::OffsetCenterState {
+                    hovered: self.offset.center_hovered,
+                    open: self.offset_chip_open(),
+                },
+                view,
+            ));
+        }
         if self.offset_handles_shown() {
             let placed = self
                 .offset
@@ -182,6 +192,38 @@ impl Session {
             ));
         }
         list
+    }
+}
+
+impl Session {
+    /// Where the Offset entry chip is placed from, in document millimetres: the center handle
+    /// and the axis-aligned box around the operand box and the standing preview (`ux-rework.md`
+    /// 2.4). `None` without operands.
+    #[must_use]
+    pub fn offset_chip_anchor(&self) -> Option<(Point, Point, Point)> {
+        let center = self.offset_center()?;
+        let mut points: Vec<Point> = self
+            .offset_box_now()
+            .map(|bounds| bounds.document_corners().to_vec())
+            .unwrap_or_default();
+        if !self.offset_selection_is_large()
+            && let Some(request) = self.offset_preview_request()
+            && let Ok(plan) = self.offset_plan_for(request)
+        {
+            points.extend(
+                plan.preview_outlines()
+                    .iter()
+                    .flatten()
+                    .map(|anchor| anchor.0),
+            );
+        }
+        let min = points
+            .iter()
+            .fold(center, |m, p| Point::new(m.x.min(p.x), m.y.min(p.y)));
+        let max = points
+            .iter()
+            .fold(center, |m, p| Point::new(m.x.max(p.x), m.y.max(p.y)));
+        Some((center, min, max))
     }
 }
 

@@ -52,8 +52,8 @@ pub use live_preview::build_live_edit_preview;
 pub use marquee_overlay::{MarqueeOverlay, build_marquee_overlay};
 pub use move_axes::{LockedAxis, MoveAxes, build_move_axes};
 pub use offset_preview::{
-    OffsetHandleState, PreviewAnchor, build_offset_grown_box, build_offset_handles,
-    build_offset_preview,
+    OffsetCenterState, OffsetHandleState, PreviewAnchor, build_offset_center_handle,
+    build_offset_grown_box, build_offset_handles, build_offset_preview,
 };
 pub use pen_cue::{ClosingCue, PenCue, build_pen_cue};
 pub use pen_preview::build_pen_preview;

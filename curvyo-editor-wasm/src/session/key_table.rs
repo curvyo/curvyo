@@ -20,6 +20,7 @@ pub(super) enum Selected {
 
 /// Everything about the session the key table reads.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(clippy::struct_excessive_bools)] // one flag per session fact the table reads
 pub(super) struct KeyState {
     pub(super) tool: Tool,
     /// A drag is in flight in the active tool, or the canvas is panned.
@@ -29,6 +30,9 @@ pub(super) struct KeyState {
     /// An entry chip is open.
     pub(super) entry_open: bool,
     pub(super) selected: Selected,
+    /// The Offset tool has a closed operand selected and no drag: O and Enter open its chip
+    /// (`specs/0038-path-offset` criteria 25, 53).
+    pub(super) offset_ready: bool,
 }
 
 /// What the key table decided.
@@ -48,6 +52,7 @@ pub(super) enum KeyAction {
     Group,
     Ungroup,
     EnterGroup,
+    OpenOffsetChip,
 }
 
 /// Whether Enter may enter a group: the Select tool, a plain press, nothing in flight.
@@ -60,6 +65,34 @@ fn enter_acts(input: &KeyInput<'_>, state: KeyState) -> bool {
         && !input.shift
         && !state.operation_in_flight
         && !state.pen_open
+        && !state.entry_open
+}
+
+/// What Enter does: finish the Pen path, open the Offset entry chip, or enter the one selected
+/// group (the session says whether there is one).
+fn enter_action(input: &KeyInput<'_>, state: KeyState) -> KeyAction {
+    if state.tool == Tool::Pen && state.pen_open {
+        KeyAction::FinishPen
+    } else if offset_enter_acts(input, state) {
+        KeyAction::OpenOffsetChip
+    } else if enter_acts(input, state) {
+        KeyAction::EnterGroup
+    } else {
+        KeyAction::Ignore
+    }
+}
+
+/// Whether Enter opens the Offset entry chip: the Offset tool with an operand, a plain press,
+/// nothing in flight and no chip open.
+fn offset_enter_acts(input: &KeyInput<'_>, state: KeyState) -> bool {
+    state.tool == Tool::Offset
+        && state.offset_ready
+        && !input.repeat
+        && !input.dom_blocked
+        && !input.ctrl
+        && !input.alt
+        && !input.shift
+        && !state.operation_in_flight
         && !state.entry_open
 }
 
@@ -81,16 +114,7 @@ pub(super) fn decide(input: &KeyInput<'_>, state: KeyState) -> KeyAction {
                 KeyAction::Escape
             };
         }
-        "Enter" => {
-            return if state.tool == Tool::Pen && state.pen_open {
-                KeyAction::FinishPen
-            } else if enter_acts(input, state) {
-                // Enter opens the one selected group; the session says whether there is one.
-                KeyAction::EnterGroup
-            } else {
-                KeyAction::Ignore
-            };
-        }
+        "Enter" => return enter_action(input, state),
         _ => {}
     }
     // The two keys of `specs/0044-editing-quick-wins/`: they pass the same gate as the letters
@@ -166,6 +190,10 @@ pub(super) fn decide(input: &KeyInput<'_>, state: KeyState) -> KeyAction {
         return KeyAction::Ignore;
     }
     match binding {
+        // O in the Offset tool with an operand opens the chip; otherwise it is the tool letter.
+        Binding::Tool(Tool::Offset) if state.tool == Tool::Offset && state.offset_ready => {
+            KeyAction::OpenOffsetChip
+        }
         Binding::Tool(tool) => KeyAction::SetTool(tool),
         Binding::Delete => KeyAction::Delete,
         // The one state that changes a letter: the Select tool with an

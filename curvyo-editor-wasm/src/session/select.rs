@@ -30,11 +30,14 @@ pub enum DoubleClickHint {
     /// A corner handle of the Offset tool stepped the corner style for the next drag: the host
     /// shows it at the pointer (`specs/0038-path-offset` criteria 13, 56).
     OffsetCornerStyle,
+    /// The center handle of the Offset tool opened the Offset entry chip: the host focuses its
+    /// Distance field (`specs/0038-path-offset` criterion 53).
+    OffsetChip,
 }
 
 impl DoubleClickHint {
     /// The code the host keys its text or action on: `""`, `"edit_hint"`, `"compound_path"` or
-    /// `"offset_corner_style"`.
+    /// `"offset_corner_style"` or `"offset_chip"`.
     #[must_use]
     pub const fn code(self) -> &'static str {
         match self {
@@ -42,6 +45,7 @@ impl DoubleClickHint {
             Self::EditHint => "edit_hint",
             Self::CompoundPath => "compound_path",
             Self::OffsetCornerStyle => "offset_corner_style",
+            Self::OffsetChip => "offset_chip",
         }
     }
 }

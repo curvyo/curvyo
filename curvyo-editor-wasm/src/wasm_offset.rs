@@ -66,6 +66,8 @@ pub struct OffsetViewJs {
     /// `"new"` or `"change"`: the remembered Mode, as Ctrl inverts it during a drag (criterion 19).
     #[wasm_bindgen(getter_with_clone)]
     pub result: String,
+    /// The Offset entry chip is open (criterion 53).
+    pub chip_open: bool,
     /// The smallest Distance.
     pub min_mm: f64,
     /// The largest Distance.
@@ -97,6 +99,25 @@ pub struct OffsetOutcomeJs {
     /// `"out"`, `"in"` or `"both"`.
     #[wasm_bindgen(getter_with_clone)]
     pub direction: String,
+}
+
+/// Where the Offset entry chip is placed from, in canvas-relative CSS pixels (`ux-rework.md` 2.4):
+/// the center handle and the box around the operand box and the standing preview.
+#[wasm_bindgen]
+#[derive(Debug, Clone, Copy)]
+pub struct OffsetChipAnchorJs {
+    /// The center handle.
+    pub center_x: f64,
+    /// The center handle.
+    pub center_y: f64,
+    /// The anchor box's left edge.
+    pub left: f64,
+    /// The anchor box's top edge.
+    pub top: f64,
+    /// The anchor box's right edge.
+    pub right: f64,
+    /// The anchor box's bottom edge.
+    pub bottom: f64,
 }
 
 fn count(n: usize) -> u32 {
@@ -217,6 +238,7 @@ impl WasmSession {
             drag_join: join_code(view.join).to_string(),
             pending_join: view.pending_join.map_or("", join_code).to_string(),
             result: if view.change { "change" } else { "new" }.to_string(),
+            chip_open: self.session.offset_chip_open(),
             min_mm: OFFSET_MIN_MM,
             max_mm: OFFSET_MAX_MM,
         }
@@ -273,6 +295,36 @@ impl WasmSession {
             .take_offset_outcome()
             .unwrap_or(OffsetOutcome::Ignored)
             .into()
+    }
+
+    /// Opens the Offset entry chip (the host's route for a key it handles itself); returns whether
+    /// it is open.
+    pub fn open_offset_chip(&mut self) -> bool {
+        self.session.open_offset_chip()
+    }
+
+    /// Closes the Offset entry chip without writing (Escape, a blur, a press outside).
+    pub fn close_offset_chip(&mut self) {
+        self.session.close_offset_chip();
+    }
+
+    /// Where the open chip is placed from; `None` without operands. Read it again on pan, zoom and
+    /// resize.
+    #[must_use]
+    pub fn offset_chip_anchor(&self) -> Option<OffsetChipAnchorJs> {
+        let (center, min, max) = self.session.offset_chip_anchor()?;
+        let view = self.session.view();
+        let (center_x, center_y) = view.document_to_screen(center);
+        let (x0, y0) = view.document_to_screen(min);
+        let (x1, y1) = view.document_to_screen(max);
+        Some(OffsetChipAnchorJs {
+            center_x,
+            center_y,
+            left: x0.min(x1),
+            top: y0.min(y1),
+            right: x0.max(x1),
+            bottom: y0.max(y1),
+        })
     }
 
     /// The other mouse button during a drag: cancels it; returns whether one was in flight.

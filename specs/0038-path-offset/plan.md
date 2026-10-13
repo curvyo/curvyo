@@ -146,11 +146,11 @@ the fallback fired for 0 of 135 outlines over the test shapes.
 
 ### M7' Canvas and wasm: the center handle and opening the chip (AC 9, 25, 53)
 
-- [ ] 7'.1 Tests first: the center handle at the operand box center, its 12 px hit area claims
+- [x] 7'.1 Tests first: the center handle at the operand box center, its 12 px hit area claims
   the press (no marquee, no deselect), hidden during a corner drag (53).
-- [ ] 7'.2 A double-click on it, or O or Enter with the tool active and an operand selected,
+- [x] 7'.2 A double-click on it, or O or Enter with the tool active and an operand selected,
   opens the chip; O without an operand keeps selecting the tool; gated like every shortcut (25, 53).
-- [ ] 7'.3 Render: the center handle (Move handle shell, Offset glyph, hover, active while the
+- [x] 7'.3 Render: the center handle (Move handle shell, Offset glyph, hover, active while the
   chip is open). wasm: chip open/close, Enter writes the values (refusals keep it open), the
   chip's anchor (center and the screen box around the operand box and the standing preview).
 

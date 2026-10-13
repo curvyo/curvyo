@@ -5,7 +5,8 @@
 
 use curvyo_document_core::{AnchorId, AnchorKind, NewAnchor, Point, Vec2, ViewTransform};
 
-use crate::glyphs::{DrawList, circle};
+use crate::RgbaColor;
+use crate::glyphs::{DrawList, circle, rounded_square};
 use crate::select_box::dashed_edge;
 use crate::stroke;
 use crate::theme;
@@ -109,6 +110,77 @@ pub fn build_offset_handles(
     list
 }
 
+/// The side of the Offset glyph in the center handle, in screen pixels.
+const CENTER_GLYPH_PX: f64 = 10.0;
+
+/// The ring width and corner radius of the center glyph's square outline, in screen pixels.
+const CENTER_GLYPH_RING_PX: f64 = 1.5;
+const CENTER_GLYPH_RADIUS_PX: f64 = 2.0;
+
+/// The solid square inside the center glyph, in screen pixels.
+const CENTER_GLYPH_DOT_PX: f64 = 4.0;
+
+/// What the center handle shows.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct OffsetCenterState {
+    /// The pointer is over it.
+    pub hovered: bool,
+    /// The Offset entry chip is open: solid `--accent` with a white glyph.
+    pub open: bool,
+}
+
+/// The center handle of the Offset tool at `center` (`specs/0038-path-offset` criterion 53,
+/// design-system row "Offset handles"): the shell of the Move center handle (16 px rounded square,
+/// 1 px `--accent` outline, white ground, `--accent-hover` on hover, solid `--accent` while the
+/// chip is open) around the Offset glyph in small (a 10 px square outline around a 4 px solid
+/// square). Upright: it never turns with the box.
+#[must_use]
+pub fn build_offset_center_handle(
+    center: Point,
+    state: OffsetCenterState,
+    view: ViewTransform,
+) -> DrawList {
+    let mm = |px: f64| px / view.scale();
+    let size = mm(theme::TRANSFORM_MOVE_HANDLE_SIZE_PX);
+    let outline = mm(theme::TRANSFORM_MOVE_HANDLE_OUTLINE_PX);
+    let radius = mm(theme::TRANSFORM_MOVE_HANDLE_CORNER_RADIUS_PX);
+    let inner = (size - 2.0 * outline).max(0.0);
+    let inner_radius = (radius - outline).max(0.0);
+    let (ground, glyph) = if state.open {
+        (theme::ACCENT, RgbaColor::WHITE)
+    } else if state.hovered {
+        (theme::ACCENT_HOVER, theme::ACCENT)
+    } else {
+        (RgbaColor::WHITE, theme::ACCENT)
+    };
+    let mut list = rounded_square(center, size, radius, theme::ACCENT);
+    list.extend(rounded_square(
+        center,
+        inner,
+        inner_radius,
+        RgbaColor::WHITE,
+    ));
+    if ground != RgbaColor::WHITE {
+        list.extend(rounded_square(center, inner, inner_radius, ground));
+    }
+    let ring = mm(CENTER_GLYPH_RING_PX);
+    let glyph_radius = mm(CENTER_GLYPH_RADIUS_PX);
+    list.extend(rounded_square(
+        center,
+        mm(CENTER_GLYPH_PX),
+        glyph_radius,
+        glyph,
+    ));
+    let hole = mm(CENTER_GLYPH_PX) - 2.0 * ring;
+    let hole_radius = (glyph_radius - ring).max(0.0);
+    list.extend(rounded_square(center, hole, hole_radius, RgbaColor::WHITE));
+    if ground != RgbaColor::WHITE {
+        list.extend(rounded_square(center, hole, hole_radius, ground));
+    }
+    list.extend(rounded_square(center, mm(CENTER_GLYPH_DOT_PX), 0.0, glyph));
+    list
+}
+
 /// The dashed `--preview-new` box through `corners` that stands for the result of a selection
 /// too large to preview (criterion 18).
 #[must_use]
@@ -175,6 +247,43 @@ mod tests {
             build_offset_preview(&[], ViewTransform::new(1.0, Point::new(0.0, 0.0)))
                 .triangle_count(),
             0
+        );
+    }
+
+    #[test]
+    fn ac53_the_center_handle_turns_solid_while_the_chip_is_open() {
+        let view = ViewTransform::new(1.0, Point::new(0.0, 0.0));
+        let at = Point::new(50.0, 50.0);
+        let idle = build_offset_center_handle(at, OffsetCenterState::default(), view);
+        assert!(idle.triangles.iter().any(|v| v.color == theme::ACCENT));
+        assert!(
+            idle.triangles
+                .iter()
+                .all(|v| (v.position.x - 50.0).abs() <= 8.01 && (v.position.y - 50.0).abs() <= 8.01),
+            "16 px across"
+        );
+        let open = build_offset_center_handle(
+            at,
+            OffsetCenterState {
+                hovered: false,
+                open: true,
+            },
+            view,
+        );
+        assert_ne!(idle, open);
+        let hovered = build_offset_center_handle(
+            at,
+            OffsetCenterState {
+                hovered: true,
+                open: false,
+            },
+            view,
+        );
+        assert!(
+            hovered
+                .triangles
+                .iter()
+                .any(|v| v.color == theme::ACCENT_HOVER)
         );
     }
 

@@ -489,10 +489,12 @@ fn ac13_double_click_on_a_corner_handle_steps_the_corner_style() {
         DoubleClickHint::OffsetCornerStyle
     );
     assert_eq!(s.offset_view().pending_join, Some(OffsetJoin::Miter));
+    // The center of the box is the center handle: it opens the chip (criterion 53).
     assert_eq!(
         s.double_click_hint(pt(10.0, 10.0), false, false),
-        DoubleClickHint::None
+        DoubleClickHint::OffsetChip
     );
+    assert!(s.offset_chip_open());
 }
 
 #[test]

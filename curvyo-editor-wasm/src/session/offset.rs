@@ -23,6 +23,9 @@ use super::{DoubleClickHint, Session, Tool};
 /// The label of the commit an offset makes (criterion 16).
 pub const OFFSET_COMMIT_LABEL: &str = "offset_path";
 
+/// The radius of the center handle's hit area, in screen pixels (`ux-rework.md` 2.1).
+pub(super) const CENTER_HIT_RADIUS_PX: f64 = 12.0;
+
 /// How far, in screen pixels, the pointer moves from a corner press before the drag preview takes
 /// over from the standing preview (`ux-rework.md` section 3).
 const DEAD_ZONE_PX: f64 = 3.0;
@@ -38,6 +41,10 @@ pub(super) struct OffsetTool {
     /// The corner style a double-click on a corner handle set for the next written drag
     /// (criterion 56).
     pub(super) pending_join: Option<OffsetJoin>,
+    /// The pointer is over the center handle.
+    pub(super) center_hovered: bool,
+    /// The Offset entry chip is open (criterion 53).
+    chip_open: bool,
     outcome: Option<OffsetOutcome>,
     preview: RefCell<Option<Cached>>,
 }
@@ -181,6 +188,80 @@ impl Session {
             .position(|handle| handle.vector_to(point).length() <= reach)
     }
 
+    /// The center handle: the center of the operand box, while the handles are drawn and no
+    /// corner drag runs (criterion 53).
+    pub(super) fn offset_center(&self) -> Option<Point> {
+        if !self.offset_handles_shown() || self.offset.drag.is_some() {
+            return None;
+        }
+        let corners = self.offset_box_now()?.document_corners();
+        Some(Point::new(
+            corners.iter().map(|c| c.x).sum::<f64>() / 4.0,
+            corners.iter().map(|c| c.y).sum::<f64>() / 4.0,
+        ))
+    }
+
+    /// Whether `point` is in the center handle's 12 px hit area.
+    fn offset_center_at(&self, point: Point) -> bool {
+        self.offset_center().is_some_and(|center| {
+            center.vector_to(point).length() * self.view().scale() <= CENTER_HIT_RADIUS_PX
+        })
+    }
+
+    /// Opens the Offset entry chip (a double-click on the center handle, or O or Enter): only
+    /// in the Offset tool with a closed operand selected and no drag. A pending corner style
+    /// becomes the chip's Corners (criterion 56). Returns whether it is open.
+    pub fn open_offset_chip(&mut self) -> bool {
+        if self.offset_center().is_none() {
+            return false;
+        }
+        if let Some(join) = self.offset.pending_join.take() {
+            self.offset.values.set_join(join);
+        }
+        self.offset.chip_open = true;
+        true
+    }
+
+    /// Closes the Offset entry chip without writing: its values stay remembered (criterion 54).
+    pub fn close_offset_chip(&mut self) {
+        self.offset.chip_open = false;
+    }
+
+    /// Whether the Offset entry chip is open: it closes with the tool or when the selection has no
+    /// operand left.
+    #[must_use]
+    pub fn offset_chip_open(&self) -> bool {
+        self.offset.chip_open && self.offset_center().is_some()
+    }
+
+    /// The cursor in the Offset tool: `"pointer"` over a handle or during a corner drag
+    /// (`ux-rework.md` 2.1), else `"default"`.
+    pub(super) fn offset_cursor_hint(&self) -> &'static str {
+        if self.offset.drag.is_some() || self.offset.hovered.is_some() || self.offset.center_hovered
+        {
+            "pointer"
+        } else {
+            "default"
+        }
+    }
+
+    /// The hover hint of the Offset handle under the pointer: `"offset-center"`,
+    /// `"offset-corner"` or `"offset-corner-change"` (the remembered Mode is Change original, so
+    /// Ctrl makes a new object), `""` during a drag or off the handles (`ux-rework.md` 2.1, 3).
+    pub(super) fn offset_handle_hint(&self) -> &'static str {
+        if self.offset.drag.is_some() || self.offset_chip_open() {
+            ""
+        } else if self.offset.center_hovered {
+            "offset-center"
+        } else if self.offset.hovered.is_none() {
+            ""
+        } else if self.offset.values.result() == OffsetResultChoice::ChangeOriginal {
+            "offset-corner-change"
+        } else {
+            "offset-corner"
+        }
+    }
+
     /// The request of a drag at the signed `d` with `held` keys, or of the remembered values
     /// (the standing preview and the chip's Enter). The corner style is the pending one of a
     /// double-click, else the remembered Corners (criterion 56).
@@ -235,6 +316,12 @@ impl Session {
     /// (Shift adds or removes) and nothing moves; on empty canvas a marquee begins (criterion 27).
     pub(super) fn offset_pointer_down(&mut self, point: Point, shift: bool) {
         self.command_refusal = None;
+        // A press outside the chip closes it and is not swallowed (`ux-rework.md` 2.8).
+        self.offset.chip_open = false;
+        // The center handle claims the press: no marquee, no deselect, no move (criterion 53).
+        if self.offset_center_at(point) {
+            return;
+        }
         if let Some(corner) = self.offset_handle_at(point)
             && let Some(bounds) = self.offset_box_now()
         {
@@ -294,6 +381,7 @@ impl Session {
         }
         let Some(mut drag) = self.offset.drag else {
             self.offset.hovered = self.offset_handle_at(point);
+            self.offset.center_hovered = self.offset_center_at(point);
             return;
         };
         let scale = self.view().scale();
@@ -384,10 +472,12 @@ impl Session {
         true
     }
 
-    /// A double-click in the Offset tool: on a corner handle it steps the corner style
-    /// (criteria 13, 56).
+    /// A double-click in the Offset tool: on the center handle it opens the chip (criterion 53),
+    /// on a corner handle it steps the corner style (criteria 13, 56).
     pub(super) fn offset_double_click(&mut self, point: Point) -> DoubleClickHint {
-        if self.offset_step_corner_style(point) {
+        if self.offset_center_at(point) && self.open_offset_chip() {
+            DoubleClickHint::OffsetChip
+        } else if self.offset_step_corner_style(point) {
             DoubleClickHint::OffsetCornerStyle
         } else {
             DoubleClickHint::None
@@ -399,6 +489,7 @@ impl Session {
     pub(super) fn leave_offset_tool(&mut self) {
         self.cancel_offset_drag();
         self.offset.pending_join = None;
+        self.offset.chip_open = false;
     }
 
     /// Whether a drag past 0, not at a stop, is in flight that makes a new object (Ctrl does not change the
@@ -425,7 +516,12 @@ impl Session {
             }
             let request = this.offset_request(None);
             let direction = this.offset.values.direction();
-            this.write_offset_plan(request, direction)
+            let outcome = this.write_offset_plan(request, direction);
+            // A refusal keeps the chip open with its message (`ux-rework.md` 2.7).
+            if matches!(outcome, OffsetOutcome::Applied { .. }) {
+                this.offset.chip_open = false;
+            }
+            outcome
         })
     }
 
@@ -811,5 +907,107 @@ mod tests {
         session.pointer_down(Point::new(0.0, 10.0), true);
         session.pointer_up(Point::new(0.0, 10.0), true, false);
         assert!(session.selection.contains(square) && session.selection.contains(other));
+    }
+
+    fn center(session: &Session) -> Point {
+        session.offset_center().expect("the center handle")
+    }
+
+    #[test]
+    fn ac53_the_center_handle_claims_the_press_and_a_double_click_opens_the_chip() {
+        let (mut session, square) = offset_session();
+        let at = center(&session);
+        assert!((at.x - 10.0).abs() < 1e-9 && (at.y - 10.0).abs() < 1e-9);
+        let near = at.translated(Vec2::new(10.0 / session.view().scale(), 0.0));
+        session.pointer_down(near, false);
+        session.pointer_hover(near.translated(Vec2::new(30.0, 30.0)), false, false);
+        session.pointer_up(near.translated(Vec2::new(30.0, 30.0)), false, false);
+        assert_eq!(
+            session.selection.ids(),
+            &[square],
+            "no marquee, no deselect"
+        );
+        assert!(!session.offset_chip_open(), "a single click does nothing");
+        assert_eq!(
+            session.double_click_hint(near, false, false),
+            super::super::DoubleClickHint::OffsetChip
+        );
+        assert!(session.offset_chip_open());
+        assert_eq!(session.cursor_hint(), "default");
+        session.pointer_hover(at, false, false);
+        assert_eq!(session.cursor_hint(), "pointer");
+        // A press outside closes it without writing.
+        let steps = session.undo_len();
+        session.pointer_down(Point::new(400.0, 400.0), false);
+        session.pointer_up(Point::new(400.0, 400.0), false, false);
+        assert!(!session.offset_chip_open());
+        assert_eq!(session.undo_len(), steps);
+    }
+
+    #[test]
+    fn ac53_the_center_handle_is_hidden_during_a_corner_drag_and_without_operands() {
+        let (mut session, _) = offset_session();
+        assert_eq!(session.offset_handle_hint(), "");
+        session.pointer_hover(center(&session), false, false);
+        assert_eq!(session.offset_handle_hint(), "offset-center");
+        let from = bottom_right(&session);
+        session.pointer_hover(from, false, false);
+        assert_eq!(session.offset_handle_hint(), "offset-corner");
+        session.pointer_down(from, false);
+        assert_eq!(session.offset_center(), None);
+        assert!(!session.open_offset_chip(), "not during a drag");
+        session.cancel_offset_drag();
+        session.selection.clear();
+        assert_eq!(session.offset_center(), None);
+    }
+
+    #[test]
+    fn ac25_o_and_enter_open_the_chip_and_enter_in_it_writes_and_closes() {
+        let (mut session, _) = offset_session();
+        let press = |session: &mut Session, key: &str| {
+            session
+                .key_down(crate::KeyInput {
+                    key,
+                    ..crate::KeyInput::default()
+                })
+                .code()
+        };
+        assert_eq!(press(&mut session, "o"), "offset-chip");
+        assert!(session.offset_chip_open());
+        assert_eq!(press(&mut session, "o"), "ignored", "gated while open");
+        session.close_offset_chip();
+        assert_eq!(press(&mut session, "Enter"), "offset-chip");
+        let steps = session.undo_len();
+        assert!(matches!(
+            session.apply_offset(),
+            OffsetOutcome::Applied { added: 1, .. }
+        ));
+        assert_eq!(session.undo_len(), steps + 1);
+        assert!(!session.offset_chip_open(), "Enter closes it");
+        let (anchor, min, max) = session.offset_chip_anchor().expect("an anchor");
+        assert!(min.x <= anchor.x && anchor.x <= max.x);
+        assert!(
+            max.x - min.x >= 24.0 - 1e-9,
+            "the box around the standing preview"
+        );
+    }
+
+    #[test]
+    fn ac29_a_refused_enter_keeps_the_chip_open_and_a_pending_style_moves_into_it() {
+        let (mut session, _) = offset_session();
+        let corner = bottom_right(&session);
+        session.double_click_hint(corner, false, false);
+        assert!(session.open_offset_chip());
+        assert_eq!(session.offset_values().join(), OffsetJoin::Miter);
+        assert_eq!(session.offset_view().pending_join, None);
+        session.set_offset_distance(10.0);
+        session.set_offset_direction(OffsetDirection::In);
+        assert!(matches!(
+            session.apply_offset(),
+            OffsetOutcome::Refused { .. }
+        ));
+        assert!(session.offset_chip_open(), "the refusal shows in the chip");
+        session.set_tool(Tool::Select);
+        assert!(!session.offset_chip_open());
     }
 }
