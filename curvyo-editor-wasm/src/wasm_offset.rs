@@ -21,16 +21,14 @@ pub struct OffsetViewJs {
     pub operands: u32,
     /// The selection holds a group.
     pub has_group: bool,
-    /// The handles are drawn.
-    pub handles: bool,
-    /// A drag is in flight.
-    pub dragging: bool,
+    /// What the tool shows: `"none"` (no handles), `"handles"`, `"dragging"` (a corner drag past
+    /// its dead zone) or `"chip"` (the Offset entry chip is open).
+    #[wasm_bindgen(getter_with_clone)]
+    pub phase: String,
     /// The signed distance shown: positive outward.
     pub distance_mm: f64,
     /// Both sides.
     pub both: bool,
-    /// The release or the chip's Enter changes the original.
-    pub change: bool,
     /// `""` or `"nothing_left"`.
     #[wasm_bindgen(getter_with_clone)]
     pub stop: String,
@@ -63,11 +61,10 @@ pub struct OffsetViewJs {
     /// (criterion 56).
     #[wasm_bindgen(getter_with_clone)]
     pub pending_join: String,
-    /// `"new"` or `"change"`: the remembered Mode, as Ctrl inverts it during a drag (criterion 19).
+    /// `"new"` or `"change"`: whether the release or the chip's Enter changes the original (the
+    /// remembered Mode, as Ctrl inverts it during a drag, criterion 19).
     #[wasm_bindgen(getter_with_clone)]
     pub result: String,
-    /// The Offset entry chip is open (criterion 53).
-    pub chip_open: bool,
     /// The smallest Distance.
     pub min_mm: f64,
     /// The largest Distance.
@@ -212,11 +209,18 @@ impl WasmSession {
         OffsetViewJs {
             operands: count(view.operands),
             has_group: view.has_group,
-            handles: view.handles,
-            dragging: view.dragging,
+            phase: if self.session.offset_chip_open() {
+                "chip"
+            } else if view.dragging {
+                "dragging"
+            } else if view.handles {
+                "handles"
+            } else {
+                "none"
+            }
+            .to_string(),
             distance_mm: view.distance_mm,
             both: view.both,
-            change: view.change,
             stop: match view.stop {
                 None => "",
                 Some(DragStop::NothingLeft) => "nothing_left",
@@ -238,7 +242,6 @@ impl WasmSession {
             drag_join: join_code(view.join).to_string(),
             pending_join: view.pending_join.map_or("", join_code).to_string(),
             result: if view.change { "change" } else { "new" }.to_string(),
-            chip_open: self.session.offset_chip_open(),
             min_mm: OFFSET_MIN_MM,
             max_mm: OFFSET_MAX_MM,
         }
