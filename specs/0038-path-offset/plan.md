@@ -69,7 +69,7 @@ the fallback fired for 0 of 135 outlines over the test shapes.
 
 ### M2 Primitives stay primitives (AC 40, 41, 43, 50, 51)
 
-- [ ] 2.1 Tests first, then `offset_primitive.rs`: rectangle (sharp, radii, Bevel → path), circle,
+- [x] 2.1 Tests first, then `offset_primitive.rs`: rectangle (sharp, radii, Bevel → path), circle,
   ellipse (deterministic sampled deviation check, else path), polygon (Miter stays, Round/Bevel path),
   star (scale while no tip or inner corner is clipped), vanishing, rotation kept.
 

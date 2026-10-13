@@ -51,6 +51,7 @@ mod object_history_text;
 mod object_selection;
 mod offset_entry;
 mod offset_plan;
+mod offset_primitive;
 mod oriented_box;
 mod panel_content;
 mod panel_tabs;
@@ -157,6 +158,7 @@ pub use offset_entry::{
     OFFSET_DEFAULT_MM, OFFSET_DRAG_LIMIT_MM, OFFSET_TYPED_LIMIT_MM, OffsetCap, OffsetJoin,
     OffsetSettings, offset_cap_from_code, offset_join_from_code,
 };
+pub use offset_primitive::{PrimitiveOffset, offset_primitive};
 pub use offset_plan::{
     OffsetAvailability, OffsetRefusal, OffsetResult, compute_offset, offset_availability,
 };
