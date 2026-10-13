@@ -175,3 +175,16 @@ file with the two new labels as legacy-labelled steps.
 - Manual end-to-end in the app under WebKitGTK MiniBrowser and Xvfb (no Playwright here).
 - Every build and test command runs with `ulimit -v 8000000; export CARGO_BUILD_JOBS=4` and
   `cargo nextest run -j 4`.
+
+## Paused 2026-10-13 (customer): remaining before the PR
+
+The architect approved all milestones, and the tester passed every criterion (acceptance tests are on the branch). The ux-engineer's review (2026-10-13) requires these changes:
+
+1. `frontend/src/components/HistoryTab.tsx:502` and the Wipe button in `WipeFooter` (line 443): during a Document preview the panel Undo, Redo and Wipe buttons must be disabled or hidden (criterion 19). Today a click on Undo writes a step.
+2. `HistoryTab.tsx:376`: remove `tabIndex={-1}` from "Restore previous state". Tab order: Scope, Undo, Mode, Restore, Now, list. No auto-focus.
+3. `HistoryRow.tsx:264`: the full 7-character version id must stay visible on go-to and clone rows at 244 px with 0 to 3 lanes, for example on line 2.
+4. `HistoryPreview.tsx:49`: "Back to live" gets `shrink-0 whitespace-nowrap` and stays a single-line 28 px button at 800 x 600.
+
+Optional: give the previewed row a mark in the list (`aria-current`); dim the contextual toolbar during a Document preview; make the branch headers tell apart when there are 3 lanes. The ux-engineer also saw a Go-to row stay Applied once and could not reproduce it; the tester should try again.
+
+After the fixes: the UX re-check, the full gate, then the PR. The Duplicate lineage question goes to the customer in the demo (see the specification).
