@@ -1,6 +1,6 @@
 # Combine and Break apart: several closed shapes into one compound path, and back
 
-Status: Ready (`adrs.md` and the UX notes exist, both 2026-10-10) Amended by `0020-undo-redo`: the sentence "No undo yet." and the statements that no undo exists are removed; Ctrl+Z takes the step back.
+Status: Done (#79, milestone M4 of the path-tools PR). Criterion 15's group selection box was not drawn in #79 because `0019` was not built yet; `0019` (#80) draws that box for every multi-selection, so criterion 15 should now hold, but no test checks the box after Break apart. Amended by `0020-undo-redo`: the sentence "No undo yet." and the statements that no undo exists are removed; Ctrl+Z takes the step back.
 Priority: Should
 Origin: Customer (Combine, and Break apart "into separate paths: what happens to the holes", request of 2026-10-09, with the wish that the UX be much better than Inkscape's). The hole rule, the refusals, the names and the defaults are my proposals, marked in "Decided by the product owner".
 
@@ -182,4 +182,4 @@ Requirements: R-EDIT-023 (`docs/requirements.md`); related R-EDIT-003
 Builds on: `specs/0016-boolean-operations/` (compound path, winding rule, rail commands, refusal notices; must be merged first)
 Related: `specs/0023-groups/` (refusal for groups), `specs/0048-split-compound-path/`, `specs/0036-cut-at-crossings/`, `specs/0037-fracture-and-flatten/`, `specs/0006-path-merge-split-and-node-types/` (node-level Join and Split)
 ADRs: `adrs.md` (architect, 2026-10-10)
-PR: TBD (shared path-tools PR)
+PR: #79 (path tools, with `0016`'s toolbox amendment, `0031` and `0034`); renamed and amended by `0048` (#105)

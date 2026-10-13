@@ -1,6 +1,6 @@
 # Pen tablet input: pressure from a stylus sets the width of Pencil strokes
 
-Status: Ready (2026-10-10: `adrs.md` and the UX notes exist; customer decisions of 2026-10-10 applied; no customer question blocks; the device and OS questions are confirmed at the demo, see the section of that name)
+Status: In progress (branch `story/pen-tablet-input` pushed 2026-10-12, no PR yet). Ready since 2026-10-10: customer decisions applied; the device and OS questions are confirmed at the demo, see the section of that name.
 Priority: Should (was Could; the customer does not want it at the back of the queue, 2026-10-10)
 Origin: Customer ("later, not now", 2026-10-09; promoted on 2026-10-10 with the defaults below). The minimal Pencil tool inside this slice, the numbers and the texts are my proposals; the customer can veto the Pencil tool at the demo.
 

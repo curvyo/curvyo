@@ -1,6 +1,6 @@
 # Multi-object transform: one group box with the same handles as a single object
 
-Status: In progress Amended by `0020-undo-redo`: the sentence "No undo yet." and the statements that no undo exists are removed; Ctrl+Z takes the step back.
+Status: Done (#80). Amended by `0020-undo-redo`: the sentence "No undo yet." and the statements that no undo exists are removed; Ctrl+Z takes the step back.
 Priority: Should
 Origin: Customer
 Depends on: `advanced-selection` merged (PR #61). Its press rules for Shift, Ctrl and Alt and its 8 px outline tolerance are part of the press order in criterion 43.
