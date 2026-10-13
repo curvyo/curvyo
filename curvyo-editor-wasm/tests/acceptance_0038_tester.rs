@@ -319,11 +319,12 @@ fn ac5_ac10_ac13_apply_one_commit_results_above_their_operands_and_selected() {
     let order = after.children(None);
     assert_eq!(order.len(), 5);
     let pos = |id: NodeId| order.iter().position(|x| *x == id).unwrap();
-    let ra = order[pos(a) + 1];
-    let rb = order[pos(b) + 1];
+    // Reworked spec, criterion 20: an outset copy goes directly below its original.
+    let ra = order[pos(a) - 1];
+    let rb = order[pos(b) - 1];
     assert!(pos(a) < pos(b) && pos(b) < pos(top));
-    assert_eq!(pos(ra), pos(a) + 1, "result of a directly above a");
-    assert_eq!(pos(rb), pos(b) + 1, "result of b directly above b");
+    assert_eq!(pos(ra) + 1, pos(a), "result of a directly below a");
+    assert_eq!(pos(rb) + 1, pos(b), "result of b directly below b");
     assert_eq!(
         after.object(rb).unwrap().style(),
         after.object(b).unwrap().style(),

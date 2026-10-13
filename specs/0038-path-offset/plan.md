@@ -75,7 +75,7 @@ the fallback fired for 0 of 135 outlines over the test shapes.
 
 ### M3 The write (AC 16, 20, 21, 22, 42)
 
-- [ ] 3.1 Tests first, then `Document::write_offset`: copies with the source's complete style below
+- [x] 3.1 Tests first, then `Document::write_offset`: copies with the source's complete style below
   (outset) or above (inset) the source; Change original keeps id, name and place (path geometry
   replaced and rotation 0; primitive fields set; primitive → path in place); one commit
   `offset_path`; refusal changes nothing. `add_paths_above` and its tests go.

@@ -276,7 +276,15 @@ impl Session {
             };
             let (vanished, of) = (result.vanished, result.of);
             let pieces = result.into_pieces(&mut this.minter);
-            let Ok(added) = this.document.add_paths_above(&pieces, OFFSET_COMMIT_LABEL) else {
+            let writes: Vec<curvyo_document_core::OffsetWrite> = pieces
+                .into_iter()
+                .map(|(source, outlines)| curvyo_document_core::OffsetWrite::Add {
+                    source,
+                    below: distance_mm > 0.0,
+                    geometry: curvyo_document_core::OffsetGeometry::Path(outlines),
+                })
+                .collect();
+            let Ok(added) = this.document.write_offset(&writes, OFFSET_COMMIT_LABEL) else {
                 // invariant: the result was computed from the objects of this document version,
                 // each with an outline and fresh anchor ids, so the write cannot fail.
                 debug_assert!(false, "a computed offset could not be written");
@@ -356,11 +364,11 @@ mod tests {
         assert_ne!(session.document.version(), before);
         let ids = session.document.object_ids();
         assert_eq!(ids.len(), 3);
-        assert_eq!(ids[0], square, "the original is kept");
+        assert_eq!(ids[1], square, "the original is kept, the outset below it");
         assert_eq!(ids[2], other);
-        assert_eq!(session.selection.ids(), &[ids[1]]);
+        assert_eq!(session.selection.ids(), &[ids[0]]);
         assert!(!session.offset_open());
-        let Some(ObjectSnapshot::Path(result)) = session.document.object(ids[1]) else {
+        let Some(ObjectSnapshot::Path(result)) = session.document.object(ids[0]) else {
             panic!("a path");
         };
         let points: Vec<Point> = result.all_anchors().map(|a| a.point).collect();
