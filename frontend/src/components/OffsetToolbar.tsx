@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import type { ReactNode } from "react";
 
 import { CapIcon, JoinIcon } from "@/components/panel/StyleIcons";
+import { useRowStarts } from "@/components/SelectToolbar";
 import type { OffsetApi } from "@/hooks/useOffset";
 import {
   type OffsetCapName,
@@ -48,7 +49,7 @@ const RESULTS: Choice<OffsetResultName>[] = [
 ];
 
 const ITEM_CLASS =
-  "flex h-7 items-center justify-center px-2 text-xs text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-ring aria-disabled:opacity-40";
+  "flex h-7 items-center justify-center px-2 text-sm text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-ring aria-disabled:opacity-40";
 
 /** One radio group of the bar: one Tab stop, arrows move and choose (criterion 25). */
 function RadioGroup<T extends string>({
@@ -128,8 +129,24 @@ function RadioGroup<T extends string>({
   );
 }
 
+/** The divider before a group; hidden when its group starts a wrapped row. */
 function Divider() {
-  return <div className="mx-1 h-5 w-px bg-border" aria-hidden />;
+  return <div className="mx-1 h-5 w-px shrink-0 bg-border group-data-[row-start]/row:hidden" aria-hidden />;
+}
+
+/** One group of the bar: its divider and its controls, wrapped as a whole. */
+function Group({ children, first = false }: { children: ReactNode; first?: boolean }) {
+  return (
+    <div className="group/row flex items-center gap-x-3">
+      {!first && <Divider />}
+      {children}
+    </div>
+  );
+}
+
+/** A group's label, greyed with its control (criterion 5). */
+function labelClass(disabled: boolean): string {
+  return `flex items-center gap-1 text-sm text-[var(--toolbar-icon)]${disabled ? " opacity-40" : ""}`;
 }
 
 /** The Distance field (criteria 6, 25): typed, with arrow steps; Enter commits and previews,
@@ -163,7 +180,7 @@ function DistanceField({
     return true;
   };
   return (
-    <label className="flex items-center gap-1 text-xs text-[var(--toolbar-icon)]">
+    <label className={labelClass(disabled)}>
       Distance
       <span className="relative flex items-center">
         <input
@@ -206,7 +223,7 @@ function DistanceField({
               setInvalid(!setDistance(next));
             }
           }}
-          className="h-7 w-20 rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] bg-white pr-7 pl-1.5 text-right text-xs outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] aria-invalid:border-[var(--field-invalid)]"
+          className="h-7 w-20 rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] bg-white pr-7 pl-1.5 text-right text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] aria-invalid:border-[var(--field-invalid)]"
         />
         <span className="pointer-events-none absolute right-1.5 text-[var(--panel-muted-fg)]">mm</span>
       </span>
@@ -223,8 +240,13 @@ function DistanceField({
 export function OffsetToolbar({ offset, onReturnFocus }: OffsetToolbarProps) {
   const { view } = offset;
   const none = view.operands === 0;
+  const barRef = useRef<HTMLDivElement>(null);
+  useRowStarts(barRef);
   return (
     <div
+      ref={barRef}
+      role="toolbar"
+      aria-label="Offset"
       data-context-bar=""
       className="pointer-events-auto flex min-h-9 max-w-full min-w-0 flex-wrap items-center gap-x-3 gap-y-1 rounded-lg px-2 py-1"
       style={{
@@ -238,77 +260,85 @@ export function OffsetToolbar({ offset, onReturnFocus }: OffsetToolbarProps) {
         }
       }}
     >
-      <DistanceField
-        distanceMm={view.barDistanceMm}
-        inputRef={offset.distanceRef}
-        setDistance={offset.setDistance}
-        apply={offset.apply}
-        disabled={none}
-        onReturnFocus={onReturnFocus}
-      />
-      <Divider />
-      <RadioGroup
-        name="Direction"
-        choices={DIRECTIONS}
-        value={view.direction}
-        disabled={none}
-        onChange={offset.setDirection}
-      />
-      <Divider />
-      <div className="flex items-center gap-1 text-xs text-[var(--toolbar-icon)]">
-        Corners
-        <RadioGroup
-          name="Corners"
-          choices={CORNERS}
-          value={view.join}
+      <Group first>
+        <DistanceField
+          distanceMm={view.barDistanceMm}
+          inputRef={offset.distanceRef}
+          setDistance={offset.setDistance}
+          apply={offset.apply}
           disabled={none}
-          onChange={offset.setJoin}
+          onReturnFocus={onReturnFocus}
         />
-      </div>
-      <Divider />
-      <div className="flex items-center gap-1 text-xs text-[var(--toolbar-icon)]">
-        Ends
+      </Group>
+      <Group>
         <RadioGroup
-          name="Ends"
-          choices={ENDS}
-          value={view.cap}
-          disabled={none || !view.hasOpen}
-          onChange={offset.setCap}
+          name="Direction"
+          choices={DIRECTIONS}
+          value={view.direction}
+          disabled={none}
+          onChange={offset.setDirection}
         />
-      </div>
-      <Divider />
-      <RadioGroup
-        name="Result"
-        choices={RESULTS}
-        value={view.result}
-        disabled={none}
-        onChange={offset.setResult}
-      />
-      <Divider />
-      <button
-        type="button"
-        aria-label="Apply offset"
-        aria-disabled={none || undefined}
-        onClick={() => {
-          if (!none) {
-            offset.apply();
-          }
-        }}
-        className="h-7 rounded-md px-3 text-xs font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring aria-disabled:opacity-40"
-        style={{
-          background: "var(--toolbar-icon-active-bg)",
-          color: "var(--toolbar-icon-active-fg)",
-        }}
-      >
-        Apply
-      </button>
-      <div
-        role="status"
-        aria-live="polite"
-        className="w-[200px] truncate text-xs text-[var(--panel-muted-fg)]"
-      >
-        {offsetStatus(view)}
-      </div>
+      </Group>
+      <Group>
+        <div className={labelClass(none)}>
+          Corners
+          <RadioGroup
+            name="Corners"
+            choices={CORNERS}
+            value={view.join}
+            disabled={none}
+            onChange={offset.setJoin}
+          />
+        </div>
+      </Group>
+      <Group>
+        <div className={labelClass(none || !view.hasOpen)}>
+          Ends
+          <RadioGroup
+            name="Ends"
+            choices={ENDS}
+            value={view.cap}
+            disabled={none || !view.hasOpen}
+            onChange={offset.setCap}
+          />
+        </div>
+      </Group>
+      <Group>
+        <RadioGroup
+          name="Result"
+          choices={RESULTS}
+          value={view.result}
+          disabled={none}
+          onChange={offset.setResult}
+        />
+      </Group>
+      <Group>
+        <button
+          type="button"
+          aria-label="Apply offset"
+          aria-disabled={none || undefined}
+          onClick={() => {
+            if (!none) {
+              offset.apply();
+            }
+          }}
+          className="h-7 rounded-md px-3 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring aria-disabled:opacity-40"
+          style={{
+            background: "var(--toolbar-icon-active-bg)",
+            color: "var(--toolbar-icon-active-fg)",
+          }}
+        >
+          Apply
+        </button>
+        {/* Two lines at most: a refusal is never cut off (criterion 5). */}
+        <div
+          role="status"
+          aria-live="polite"
+          className="w-[200px] text-xs leading-4 text-[var(--panel-muted-fg)]"
+        >
+          {offsetStatus(view)}
+        </div>
+      </Group>
     </div>
   );
 }

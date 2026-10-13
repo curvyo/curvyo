@@ -5,8 +5,8 @@
 
 use curvyo_ui_core::{
     KindNote, OFFSET_MAX_MM, OFFSET_MIN_MM, OffsetCap, OffsetDirection, OffsetJoin, OffsetRefusal,
-    OffsetResultChoice, PrimitiveKind, offset_cap_from_code, offset_direction_from_code,
-    offset_join_from_code, offset_result_from_code,
+    PrimitiveKind, offset_cap_from_code, offset_direction_from_code, offset_join_from_code,
+    offset_result_from_code,
 };
 use wasm_bindgen::prelude::*;
 
@@ -49,6 +49,10 @@ pub struct OffsetViewJs {
     /// `""` or the refusal code of the preview (see [`OffsetOutcomeJs`]).
     #[wasm_bindgen(getter_with_clone)]
     pub refusal: String,
+    /// The objects the preview's refusal blames, and how many are selected.
+    pub refusal_count: u32,
+    /// How many objects the refusal counts against.
+    pub refusal_of: u32,
     /// The bar's Distance in millimetres.
     pub bar_distance_mm: f64,
     /// `"out"`, `"in"` or `"both"`.
@@ -60,7 +64,7 @@ pub struct OffsetViewJs {
     /// `"round"`, `"flat"` or `"square"`.
     #[wasm_bindgen(getter_with_clone)]
     pub cap: String,
-    /// `"new"` or `"change"`.
+    /// `"new"` or `"change"`: the bar's Result, as Ctrl inverts it during a drag (criterion 19).
     #[wasm_bindgen(getter_with_clone)]
     pub result: String,
     /// The smallest Distance.
@@ -211,6 +215,7 @@ impl WasmSession {
     pub fn offset_view(&self) -> OffsetViewJs {
         let view = self.session.offset_view();
         let bar = self.session.offset_bar();
+        let refusal = view.refusal.as_ref().map_or(("", 0, 0), refusal_code);
         OffsetViewJs {
             operands: count(view.operands),
             has_open: view.has_open,
@@ -230,6 +235,8 @@ impl WasmSession {
             of: count(view.of),
             large: view.large,
             kind: kind_code(view.kind_note).to_string(),
+            refusal_count: count(refusal.1),
+            refusal_of: count(refusal.2),
             refusal: view
                 .refusal
                 .as_ref()
@@ -239,11 +246,7 @@ impl WasmSession {
             direction: direction_code(bar.direction()).to_string(),
             join: join_code(bar.join()).to_string(),
             cap: cap_code(bar.cap()).to_string(),
-            result: match bar.result() {
-                OffsetResultChoice::NewObject => "new",
-                OffsetResultChoice::ChangeOriginal => "change",
-            }
-            .to_string(),
+            result: if view.change { "change" } else { "new" }.to_string(),
             min_mm: OFFSET_MIN_MM,
             max_mm: OFFSET_MAX_MM,
         }

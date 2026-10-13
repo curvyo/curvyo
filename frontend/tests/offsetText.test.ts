@@ -71,6 +71,14 @@ test("criterion 5: the status names why the bar is greyed", () => {
   );
   assert.equal(offsetStatus({ ...OFFSET_IDLE, operands: 1, kind: "stays_rectangle" }), "Stays a rectangle.");
   assert.equal(offsetStatus({ ...OFFSET_IDLE, operands: 1, kind: "becomes_path" }), "Becomes a path.");
+  assert.equal(
+    offsetStatus({ ...OFFSET_IDLE, operands: 2, refusal: "inset_open", refusalCount: 1, refusalOf: 2 }),
+    "Inset needs closed paths: 1 of 2 is open.",
+  );
+  assert.equal(
+    offsetStatus({ ...OFFSET_IDLE, operands: 2, stop: "inset_open" }),
+    "Inset needs closed paths: 2 of 2 are open.",
+  );
 });
 
 test("criteria 12, 15, 18: the readout's two lines", () => {

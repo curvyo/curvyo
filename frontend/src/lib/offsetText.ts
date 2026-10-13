@@ -29,6 +29,9 @@ export interface OffsetView {
   kind: string;
   /** `""` or a refusal code. */
   refusal: string;
+  /** The objects the refusal blames, and how many it counts against. */
+  refusalCount: number;
+  refusalOf: number;
   barDistanceMm: number;
   direction: OffsetDirectionName;
   join: OffsetJoinName;
@@ -68,6 +71,8 @@ export const OFFSET_IDLE: OffsetView = {
   large: false,
   kind: "",
   refusal: "",
+  refusalCount: 0,
+  refusalOf: 0,
   barDistanceMm: 1,
   direction: "out",
   join: "round",
@@ -100,7 +105,10 @@ export function offsetStatus(view: OffsetView): string {
     return "Select one or more shapes.";
   }
   if (view.refusal === "inset_open" || view.stop === "inset_open") {
-    return "Inset needs closed paths.";
+    // A stop happens only when every operand is open (criterion 30).
+    const [count, of] =
+      view.refusal === "inset_open" ? [view.refusalCount, view.refusalOf] : [view.operands, view.operands];
+    return `Inset needs closed paths: ${count} of ${of} ${count === 1 ? "is" : "are"} open.`;
   }
   return KIND_NAMES[view.kind] ?? "";
 }

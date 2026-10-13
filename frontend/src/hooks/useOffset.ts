@@ -61,6 +61,8 @@ export function readOffsetView(session: WasmSession | null): OffsetView {
     large: raw.large,
     kind: raw.kind,
     refusal: raw.refusal,
+    refusalCount: raw.refusal_count,
+    refusalOf: raw.refusal_of,
     barDistanceMm: raw.bar_distance_mm,
     direction: raw.direction as OffsetDirectionName,
     join: raw.join as OffsetJoinName,

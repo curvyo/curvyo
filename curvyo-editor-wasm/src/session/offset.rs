@@ -47,6 +47,8 @@ pub(super) struct OffsetDrag {
     /// The bar's Distance at the press: the drag snaps to it (criterion 11), not to the value
     /// the drag itself writes into the bar.
     bar_at_press: f64,
+    /// The bar's Direction at the press, restored with the distance when the drag is cancelled.
+    direction_at_press: OffsetDirection,
     pub(super) stop: Option<DragStop>,
 }
 
@@ -261,6 +263,7 @@ impl Session {
                 d: 0.0,
                 last_good: 0.0,
                 bar_at_press: self.offset.bar.distance_mm(),
+                direction_at_press: self.offset.bar.direction(),
                 stop: None,
             });
             return;
@@ -378,16 +381,24 @@ impl Session {
 
     /// Escape or the other button during a drag: nothing is written (criterion 17). Returns
     /// whether a drag was cancelled.
+    /// The bar gets back the Distance and Direction it had at the press.
     pub fn cancel_offset_drag(&mut self) -> bool {
-        self.offset.drag.take().is_some()
+        let Some(drag) = self.offset.drag.take() else {
+            return false;
+        };
+        self.offset.bar.set_distance_mm(drag.bar_at_press);
+        self.offset.bar.set_direction(drag.direction_at_press);
+        true
     }
 
-    /// Whether a drag past 0 is in flight that makes a new object (Ctrl does not change the
+    /// Whether a drag past 0, not at a stop, is in flight that makes a new object (Ctrl does not change the
     /// original): the move's plus badge shows (criterion 15).
     pub(super) fn offset_drag_makes_copy(&self) -> bool {
-        self.offset
-            .drag
-            .is_some_and(|drag| drag.d != 0.0 && !self.offset.bar.changes_original(self.held.ctrl))
+        self.offset.drag.is_some_and(|drag| {
+            drag.d != 0.0
+                && drag.stop.is_none()
+                && !self.offset.bar.changes_original(self.held.ctrl)
+        })
     }
 
     /// Whether an Offset handle drag is in flight.
@@ -605,6 +616,36 @@ mod tests {
         );
         session.pointer_up(from, false, false);
         assert_eq!(session.document.object_ids().len(), 1);
+    }
+
+    #[test]
+    fn ac17_a_cancel_restores_the_bar_and_a_stop_shows_no_plus() {
+        let (mut session, _) = offset_session();
+        session.set_offset_distance(1.0);
+        let from = bottom_right(&session);
+        session.pointer_down(from, false);
+        session.pointer_hover(along(from, 3.0), false, false);
+        assert!(session.offset_drag_makes_copy());
+        assert!(
+            (session.offset_bar().distance_mm() - 1.0).abs() > 1e-9,
+            "the bar follows"
+        );
+        assert_eq!(
+            session.escape(),
+            super::super::keys::EscapeStep::CancelledDrag
+        );
+        assert!((session.offset_bar().distance_mm() - 1.0).abs() < 1e-9);
+        assert_eq!(session.offset_bar().direction(), OffsetDirection::Out);
+
+        let mut small = Session::new(1);
+        let square = square_path(&small, 0.0, 4.0, 1);
+        small.set_tool(Tool::Offset);
+        small.selection.select_single(square);
+        let from = bottom_right(&small);
+        small.pointer_down(from, false);
+        small.pointer_hover(along(from, -5.0), false, false);
+        assert_eq!(small.offset_view().stop, Some(DragStop::NothingLeft));
+        assert!(!small.offset_drag_makes_copy(), "no plus at the stop");
     }
 
     #[test]
