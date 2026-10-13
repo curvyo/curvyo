@@ -276,47 +276,16 @@ pub fn plan_offset(
             of,
         });
     }
-    let mut items = Vec::new();
-    let mut vanished = 0;
-    let mut out_of_range = Vec::new();
-    let mut no_area = Vec::new();
+    let mut results = Results::default();
     for object in &operands {
-        let id = object.id();
-        let sides = [
-            (OffsetSide::Out, request.sides.out),
-            (OffsetSide::In, request.sides.inside),
-        ];
-        for (side, role) in sides {
-            let Some(role) = role else { continue };
-            // An open path has no inside: its Both is its Out, its In is left out.
-            if side == OffsetSide::In && is_open(object) {
-                continue;
-            }
-            let d = match side {
-                OffsetSide::Out => request.distance_mm,
-                OffsetSide::In => -request.distance_mm,
-            };
-            match offset_one(object, d, request) {
-                Ok(shape) => items.push(OffsetItem {
-                    operand: id,
-                    side,
-                    role,
-                    shape,
-                }),
-                Err(OffsetError::Empty) => vanished += 1,
-                Err(OffsetError::NoArea) => {
-                    if !no_area.contains(&id) {
-                        no_area.push(id);
-                    }
-                }
-                Err(_) => {
-                    if !out_of_range.contains(&id) {
-                        out_of_range.push(id);
-                    }
-                }
-            }
-        }
+        results.add(object, request);
     }
+    let Results {
+        items,
+        vanished,
+        out_of_range,
+        no_area,
+    } = results;
     if !out_of_range.is_empty() {
         return Err(OffsetRefusal::OutOfRange {
             offenders: out_of_range,
@@ -342,6 +311,56 @@ pub fn plan_offset(
     })
 }
 
+/// The results of the operands, collected one operand after the other.
+#[derive(Default)]
+struct Results {
+    items: Vec<OffsetItem>,
+    vanished: usize,
+    out_of_range: Vec<NodeId>,
+    no_area: Vec<NodeId>,
+}
+
+impl Results {
+    /// Offsets `object` on every side `request` asks for. An open path has no inside: its Both is
+    /// its Out, its In is left out.
+    fn add(&mut self, object: &ObjectSnapshot, request: &OffsetRequest) {
+        let id = object.id();
+        let sides = [
+            (OffsetSide::Out, request.sides.out),
+            (OffsetSide::In, request.sides.inside),
+        ];
+        for (side, role) in sides {
+            let Some(role) = role else { continue };
+            if side == OffsetSide::In && is_open(object) {
+                continue;
+            }
+            let d = match side {
+                OffsetSide::Out => request.distance_mm,
+                OffsetSide::In => -request.distance_mm,
+            };
+            match offset_one(object, d, request) {
+                Ok(shape) => self.items.push(OffsetItem {
+                    operand: id,
+                    side,
+                    role,
+                    shape,
+                }),
+                Err(OffsetError::Empty) => self.vanished += 1,
+                Err(OffsetError::NoArea) => {
+                    if !self.no_area.contains(&id) {
+                        self.no_area.push(id);
+                    }
+                }
+                Err(_) => {
+                    if !self.out_of_range.contains(&id) {
+                        self.out_of_range.push(id);
+                    }
+                }
+            }
+        }
+    }
+}
+
 /// One side of one operand: a primitive's own offset where it stays one, otherwise the kernel.
 fn offset_one(
     object: &ObjectSnapshot,
@@ -349,7 +368,7 @@ fn offset_one(
     request: &OffsetRequest,
 ) -> Result<OffsetShape, OffsetError> {
     if let ObjectSnapshot::Primitive(primitive) = object {
-        match offset_primitive(&primitive.shape, d, request.join) {
+        match offset_primitive(&primitive.shape, Length::from_mm(d), request.join) {
             PrimitiveOffset::Stays(shape) => {
                 return Ok(OffsetShape::Primitive {
                     shape,

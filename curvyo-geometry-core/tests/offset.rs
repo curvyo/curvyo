@@ -16,7 +16,8 @@ mod common;
 use std::f64::consts::PI;
 
 use common::offset_check::{
-    area, bbox, check_node_rules, covers, cubic_count, has_node, largest_deviation, nodes,
+    area, bbox, check_node_rules, covers, cubic_count, flattened, has_node, largest_deviation,
+    nodes,
 };
 use common::{Anchors, KERNEL_TOLERANCE, circle, ellipse, polygon, rect, rounded_rect, wavy};
 use curvyo_document_core::{Length, Point};
@@ -181,8 +182,7 @@ fn ac33_nodes_follow_the_output_rules() {
 #[test]
 fn ac28_outer_outlines_are_positive_and_holes_negative() {
     let r = ok(&ring(), 1.0, OffsetJoin::Round);
-    let mut signs: Vec<bool> = r
-        .flattened(0.001)
+    let mut signs: Vec<bool> = flattened(&r, 0.001)
         .iter()
         .map(|o| signed_area_mm2(o) > 0.0)
         .collect();

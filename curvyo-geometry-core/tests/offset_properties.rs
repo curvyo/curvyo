@@ -15,7 +15,7 @@
 
 mod common;
 
-use common::offset_check::{area, check_node_rules, covers};
+use common::offset_check::{area, check_node_rules, covers, flattened};
 use common::{Anchors, KERNEL_TOLERANCE, distance_to_segment, grid_points, polygon};
 use curvyo_document_core::Length;
 use curvyo_geometry_core::{
@@ -105,7 +105,7 @@ proptest! {
         prop_assert!(check_node_rules(&result).is_ok(), "{:?}", check_node_rules(&result));
         let operand = vec![anchors.clone()];
         let region = common::ok(curvyo_geometry_core::BooleanOp::Union, &[operand]);
-        for outline in result.flattened(0.002) {
+        for outline in flattened(&result, 0.002) {
             for point in outline {
                 let p = ((point.x * 1000.0).round() as i64, (point.y * 1000.0).round() as i64);
                 // Inside the region, or on its boundary within the kernel tolerance.
@@ -141,5 +141,5 @@ proptest! {
 fn the_signed_area_of_an_outset_outer_outline_is_positive() {
     let anchors = polygon(&[(0.0, 0.0), (0.0, 10.0), (10.0, 10.0), (10.0, 0.0)]);
     let result = run(&anchors, 1.0, OffsetJoin::Round).unwrap();
-    assert!(signed_area_mm2(&result.flattened(0.01)[0]) > 0.0);
+    assert!(signed_area_mm2(&flattened(&result, 0.01)[0]) > 0.0);
 }

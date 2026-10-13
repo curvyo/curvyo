@@ -24,6 +24,14 @@ const TANGENT_SINE: f64 = 1e-9;
 /// corner, which is at most `4 |d|` while `1 + cos(turn) ≥ 2 / 16`.
 const MITER_LIMIT_ONE_PLUS_COS: f64 = 0.125;
 
+/// Whether a miter at a corner whose edge directions turn by an angle with cosine `cos_turn`
+/// stays within the miter limit of 4 (SVG's): its tip lies at most `4 |d|` from the corner.
+/// The one rule for the kernel's joins and for primitives that stay primitives.
+#[must_use]
+pub fn miter_within_limit(cos_turn: f64) -> bool {
+    1.0 + cos_turn >= MITER_LIMIT_ONE_PLUS_COS
+}
+
 /// Above this radius, in millimetres, an arc is cut into pieces of at most 45° instead of 90°,
 /// so that a cubic stays within 0.01 mm of its circle (error 2.7e-4 x r at 90°).
 const QUARTER_ARC_RADIUS_LIMIT_MM: f64 = 37.0;
@@ -241,7 +249,7 @@ fn corner(
         OffsetJoin::Bevel => pieces.push(PathSeg::Line(Line::new(end, start))),
         OffsetJoin::Round => arc(pieces, at, end, start, u1, radius),
         OffsetJoin::Miter => {
-            if 1.0 + dot >= MITER_LIMIT_ONE_PLUS_COS {
+            if miter_within_limit(dot) {
                 let (n1, n2) = (right_of(u1), right_of(u2));
                 let tip = at + (n1 + n2) * (d / (1.0 + dot));
                 pieces.push(PathSeg::Line(Line::new(end, tip)));

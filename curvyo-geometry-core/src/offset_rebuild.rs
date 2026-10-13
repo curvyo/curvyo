@@ -8,31 +8,22 @@
 //! as the loop's own pieces; between runs lies a crossing, which is solved on the two exact pieces.
 //! A ring that cannot be mapped within the tolerance is written as its polyline (the fallback).
 
+use std::cell::OnceCell;
 use std::collections::HashMap;
 
+use curvyo_document_core::Point as DocPoint;
 use i_overlay::core::fill_rule::FillRule;
 use i_overlay::core::overlay::{IntOverlayOptions, Overlay, ShapeType};
 use i_overlay::core::overlay_rule::OverlayRule;
 use i_overlay::core::solver::Solver;
-use kurbo::{CubicBez, Line, ParamCurve, ParamCurveDeriv, PathSeg, Point, Vec2};
+use kurbo::{ParamCurve, ParamCurveDeriv, PathSeg, Point, Vec2};
 
 use crate::boolean_cleanup::cleanup;
-use crate::boolean_grid::{Path64, Paths64, Point64};
-
-/// Grid units per millimetre.
-const UNITS_PER_MM: f64 = 1000.0;
+use crate::boolean_grid::{Path64, Paths64, Point64, snap, to_millimetres};
+use crate::offset_finish::{finish, lines_of_mm, set_end, set_start};
 
 /// At most this many flattening steps per cubic piece.
 const MAX_STEPS: f64 = 4096.0;
-
-/// Nodes closer than this, in millimetres, are merged (criterion 33).
-const MIN_NODE_SPACING_MM: f64 = 0.001;
-
-/// A node this close to the line between its straight neighbours is dropped, in millimetres.
-const COLLINEAR_MM: f64 = 1e-6;
-
-/// The sine of the largest tangent difference of a smooth node: 0.1° (criterion 33).
-const SMOOTH_SINE: f64 = 0.001_745_328_365_898_309;
 
 /// One flattened vertex of a raw loop.
 #[derive(Debug, Clone, Copy)]
@@ -92,6 +83,7 @@ pub(crate) fn rebuild(
         samples: &samples,
         tags: &tags,
         tolerance_mm,
+        cells: OnceCell::new(),
     };
     let mut rebuilt = Rebuilt::default();
     for ring in keep(rings) {
@@ -102,32 +94,11 @@ pub(crate) fn rebuild(
                 rebuilt.fallback += polyline.len();
                 rebuilt
                     .outlines
-                    .extend(polyline.iter().map(|path| lines_of(path)));
+                    .extend(polyline.iter().map(|path| lines_of_mm(path)));
             }
         }
     }
     rebuilt
-}
-
-/// A grid polygon as closed lines in millimetres.
-fn lines_of(path: &[Point64]) -> Vec<PathSeg> {
-    (0..path.len())
-        .map(|i| PathSeg::Line(Line::new(to_mm(path[i]), to_mm(path[(i + 1) % path.len()]))))
-        .collect()
-}
-
-#[allow(clippy::cast_precision_loss)] // |units| <= 10^10, exact in an f64
-fn to_mm(point: Point64) -> Point {
-    Point::new(point.x as f64 / UNITS_PER_MM, point.y as f64 / UNITS_PER_MM)
-}
-
-fn snap(point: Point) -> Point64 {
-    // Inside the kernel's range after the caller's checks, so the casts are exact.
-    #[allow(clippy::cast_possible_truncation)]
-    Point64::new(
-        (point.x * UNITS_PER_MM).round() as i64,
-        (point.y * UNITS_PER_MM).round() as i64,
-    )
 }
 
 /// The flattened, snapped vertices of one loop, each tagged with its piece and parameter, without
@@ -139,7 +110,7 @@ fn flatten_loop(pieces: &[PathSeg], tolerance_mm: f64) -> Vec<Sample> {
         for step in 0..steps {
             #[allow(clippy::cast_precision_loss)] // far below 2^53
             let t = step as f64 / steps as f64;
-            let point = snap(segment.eval(t));
+            let point = grid_of(segment.eval(t));
             if samples.last().is_none_or(|last| last.point != point) {
                 samples.push(Sample { point, piece, t });
             }
@@ -181,6 +152,92 @@ struct Context<'a> {
     samples: &'a [Vec<Sample>],
     tags: &'a HashMap<(i64, i64), (usize, usize)>,
     tolerance_mm: f64,
+    /// The chords by grid cell, built the first time an edge has no tagged end.
+    cells: OnceCell<ChordCells>,
+}
+
+/// The chords of all loops by square cell of the grid, for finding the chord of a ring edge
+/// between two crossings without scanning every chord.
+struct ChordCells {
+    /// The cell side in grid units.
+    side: i64,
+    cells: HashMap<(i64, i64), Vec<Chord>>,
+    /// Chords that would cover too many cells; always tried.
+    long: Vec<Chord>,
+}
+
+/// A chord whose box covers more cells than this goes to the `long` list.
+const MAX_CELLS_PER_CHORD: i64 = 64;
+
+impl ChordCells {
+    fn new(samples: &[Vec<Sample>]) -> Self {
+        let count: usize = samples.iter().map(Vec::len).sum();
+        let (mut min, mut max) = ((i64::MAX, i64::MAX), (i64::MIN, i64::MIN));
+        for sample in samples.iter().flatten() {
+            min = (min.0.min(sample.point.x), min.1.min(sample.point.y));
+            max = (max.0.max(sample.point.x), max.1.max(sample.point.y));
+        }
+        // About one chord per cell: the side of a square of the box's area over the count.
+        #[allow(
+            clippy::cast_precision_loss,
+            clippy::cast_possible_truncation,
+            clippy::cast_sign_loss
+        )]
+        let side = {
+            let area = (max.0 - min.0).max(1) as f64 * (max.1 - min.1).max(1) as f64;
+            ((area / count.max(1) as f64).sqrt().ceil() as i64).max(1)
+        };
+        let mut grid = Self {
+            side,
+            cells: HashMap::new(),
+            long: Vec::new(),
+        };
+        let reach = ON_CHORD_REACH;
+        for (lp, loop_samples) in samples.iter().enumerate() {
+            for index in 0..loop_samples.len() {
+                let (p, q) = (
+                    loop_samples[index].point,
+                    loop_samples[(index + 1) % loop_samples.len()].point,
+                );
+                let (x0, x1) = (p.x.min(q.x) - reach, p.x.max(q.x) + reach);
+                let (y0, y1) = (p.y.min(q.y) - reach, p.y.max(q.y) + reach);
+                let (cx0, cx1) = (x0.div_euclid(side), x1.div_euclid(side));
+                let (cy0, cy1) = (y0.div_euclid(side), y1.div_euclid(side));
+                if (cx1 - cx0 + 1) * (cy1 - cy0 + 1) > MAX_CELLS_PER_CHORD {
+                    grid.long.push((lp, index));
+                    continue;
+                }
+                for cx in cx0..=cx1 {
+                    for cy in cy0..=cy1 {
+                        grid.cells.entry((cx, cy)).or_default().push((lp, index));
+                    }
+                }
+            }
+        }
+        grid
+    }
+
+    /// The chords that may hold the point `at`: those of its cell and the long ones.
+    fn near(&self, at: Point64) -> impl Iterator<Item = Chord> + '_ {
+        let cell = (at.x.div_euclid(self.side), at.y.div_euclid(self.side));
+        self.cells
+            .get(&cell)
+            .into_iter()
+            .flatten()
+            .chain(&self.long)
+            .copied()
+    }
+}
+
+/// A point in millimetres snapped to the grid.
+fn grid_of(point: Point) -> Point64 {
+    snap(DocPoint::new(point.x, point.y))
+}
+
+/// A grid point in millimetres.
+fn mm_of(point: Point64) -> Point {
+    let mm = to_millimetres(&point);
+    Point::new(mm.x, mm.y)
 }
 
 /// A place on a loop: piece index and parameter.
@@ -195,6 +252,9 @@ type Chord = (usize, usize);
 
 /// Grid units a ring edge may lie off the chord it came from (the overlay rounds crossings).
 const ON_CHORD_UNITS: f64 = 2.0;
+
+/// [`ON_CHORD_UNITS`] as whole grid units, for the cell boxes.
+const ON_CHORD_REACH: i64 = 2;
 
 impl Context<'_> {
     fn tag(&self, point: Point64) -> Option<(usize, usize)> {
@@ -236,7 +296,7 @@ impl Context<'_> {
         let mut ends: Vec<(Place, Point, Place)> = Vec::with_capacity(runs.len());
         for (k, &(_, last)) in runs.iter().enumerate() {
             let (next_first, _) = runs[(k + 1) % runs.len()];
-            let vertex = to_mm(ring[next_first]);
+            let vertex = mm_of(ring[next_first]);
             ends.push(self.crossing(labels[last], labels[next_first], vertex)?);
         }
         let mut pieces = Vec::new();
@@ -256,7 +316,7 @@ impl Context<'_> {
     }
 
     /// The chord the ring edge from `a` to `b` lies on: first the chords the tags of its ends
-    /// suggest, then every chord.
+    /// suggest, then the chords near its middle.
     fn label(&self, a: Point64, b: Point64) -> Option<Chord> {
         let mut candidates: Vec<Chord> = Vec::with_capacity(2);
         if let Some((lp, index)) = self.tag(a) {
@@ -269,8 +329,10 @@ impl Context<'_> {
         if let Some(&chord) = candidates.iter().find(|&&c| self.on_chord(c, a, b)) {
             return Some(chord);
         }
-        (0..self.samples.len())
-            .flat_map(|lp| (0..self.samples[lp].len()).map(move |index| (lp, index)))
+        let middle = Point64::new(a.x + (b.x - a.x) / 2, a.y + (b.y - a.y) / 2);
+        self.cells
+            .get_or_init(|| ChordCells::new(self.samples))
+            .near(middle)
             .find(|&chord| self.on_chord(chord, a, b))
     }
 
@@ -347,7 +409,7 @@ impl Context<'_> {
         let from = samples[index];
         let to = samples[(index + 1) % samples.len()];
         let end_t = if to.piece == from.piece { to.t } else { 1.0 };
-        let (a, b) = (to_mm(from.point), to_mm(to.point));
+        let (a, b) = (mm_of(from.point), mm_of(to.point));
         let chord = b - a;
         let length2 = chord.hypot2();
         let along = if length2 > 0.0 {
@@ -426,190 +488,4 @@ fn solve_crossing(a: &PathSeg, s0: f64, b: &PathSeg, u0: f64) -> (f64, f64) {
         u = (u + du).clamp(0.0, 1.0);
     }
     (s, u)
-}
-
-fn set_start(segment: &mut PathSeg, point: Point) {
-    match segment {
-        PathSeg::Line(line) => line.p0 = point,
-        PathSeg::Cubic(cubic) => {
-            let shift = point - cubic.p0;
-            cubic.p0 = point;
-            cubic.p1 += shift;
-        }
-        PathSeg::Quad(quad) => quad.p0 = point,
-    }
-}
-
-fn set_end(segment: &mut PathSeg, point: Point) {
-    match segment {
-        PathSeg::Line(line) => line.p1 = point,
-        PathSeg::Cubic(cubic) => {
-            let shift = point - cubic.p3;
-            cubic.p3 = point;
-            cubic.p2 += shift;
-        }
-        PathSeg::Quad(quad) => quad.p2 = point,
-    }
-}
-
-fn start_point(segment: &PathSeg) -> Point {
-    segment.eval(0.0)
-}
-
-fn end_point(segment: &PathSeg) -> Point {
-    segment.eval(1.0)
-}
-
-/// The size of a segment: the largest distance of a control point from its start.
-fn extent(segment: &PathSeg) -> f64 {
-    match *segment {
-        PathSeg::Line(line) => (line.p1 - line.p0).hypot(),
-        PathSeg::Cubic(c) => (c.p1 - c.p0)
-            .hypot()
-            .max((c.p2 - c.p0).hypot())
-            .max((c.p3 - c.p0).hypot()),
-        PathSeg::Quad(q) => (q.p1 - q.p0).hypot().max((q.p2 - q.p0).hypot()),
-    }
-}
-
-/// The output rules of criterion 33 on a closed list of pieces: no two nodes closer than
-/// 0.001 mm, no node on the straight line between two straight neighbours, every joint closed.
-pub(crate) fn finish(pieces: &[PathSeg]) -> Vec<PathSeg> {
-    let mut out: Vec<PathSeg> = Vec::with_capacity(pieces.len());
-    for piece in pieces {
-        if extent(piece) < MIN_NODE_SPACING_MM {
-            continue;
-        }
-        if let Some(previous) = out.last() {
-            let joint = end_point(previous);
-            let mut piece = *piece;
-            set_start(&mut piece, joint);
-            out.push(piece);
-        } else {
-            out.push(*piece);
-        }
-    }
-    // Merge straight runs and close the outline.
-    let mut merged: Vec<PathSeg> = Vec::with_capacity(out.len());
-    for piece in out {
-        if let (Some(PathSeg::Line(previous)), PathSeg::Line(line)) = (merged.last(), piece)
-            && is_straight_through(previous.p0, previous.p1, line.p1)
-        {
-            let start = previous.p0;
-            merged.pop();
-            merged.push(PathSeg::Line(Line::new(start, line.p1)));
-            continue;
-        }
-        merged.push(piece);
-    }
-    while merged.len() > 2 {
-        let (PathSeg::Line(last), PathSeg::Line(first)) = (merged[merged.len() - 1], merged[0])
-        else {
-            break;
-        };
-        if !is_straight_through(last.p0, first.p0, first.p1) {
-            break;
-        }
-        merged.pop();
-        merged[0] = PathSeg::Line(Line::new(last.p0, first.p1));
-    }
-    if let (Some(first), Some(last)) = (merged.first().copied(), merged.last_mut()) {
-        let joint = start_point(&first);
-        if (end_point(last) - joint).hypot() < MIN_NODE_SPACING_MM {
-            set_end(last, joint);
-        } else {
-            let from = end_point(last);
-            merged.push(PathSeg::Line(Line::new(from, joint)));
-        }
-    }
-    merged
-}
-
-/// Whether `middle` lies on the straight line from `a` to `b`, between them.
-fn is_straight_through(a: Point, middle: Point, b: Point) -> bool {
-    let chord = b - a;
-    let length = chord.hypot();
-    if length <= COLLINEAR_MM {
-        return false;
-    }
-    let off = (middle - a).cross(chord).abs() / length;
-    let along = (middle - a).dot(chord);
-    off <= COLLINEAR_MM && along > 0.0 && along < chord.hypot2()
-}
-
-/// Whether the joint from `before` into `after` is smooth: the tangents differ by at most 0.1°.
-pub(crate) fn is_smooth(before: &PathSeg, after: &PathSeg) -> bool {
-    let (u1, u2) = (
-        crate::offset_pieces::end_tangent(before),
-        crate::offset_pieces::start_tangent(after),
-    );
-    u1.dot(u2) > 0.0 && u1.cross(u2).abs() <= SMOOTH_SINE
-}
-
-/// Twice the area of a closed list of pieces in square millimetres, positive for an outer
-/// outline: the polygon of the end points plus each cubic's area against its chord.
-pub(crate) fn double_area_mm2(pieces: &[PathSeg]) -> f64 {
-    let mut sum = 0.0;
-    for piece in pieces {
-        let (a, b) = (start_point(piece), end_point(piece));
-        sum += a.x * b.y - b.x * a.y;
-        if let PathSeg::Cubic(c) = *piece {
-            sum += 2.0 * cubic_chord_area(&c);
-        }
-    }
-    sum
-}
-
-/// The signed area between a cubic and its chord (positive for a bulge to the left).
-fn cubic_chord_area(c: &CubicBez) -> f64 {
-    // Green's theorem on the cubic minus the chord's own term, in closed form.
-    let (p0, p1, p2, p3) = (
-        c.p0.to_vec2(),
-        c.p1.to_vec2(),
-        c.p2.to_vec2(),
-        c.p3.to_vec2(),
-    );
-    let whole = (p0.cross(p1) * 6.0
-        + p0.cross(p2) * 3.0
-        + p0.cross(p3)
-        + p1.cross(p2) * 3.0
-        + p1.cross(p3) * 3.0
-        + p2.cross(p3) * 6.0)
-        / 20.0;
-    whole - p0.cross(p3) / 2.0
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn the_area_of_a_cubic_circle_is_near_pi_r_squared() {
-        let k = 0.552_284_749_830_793_4 * 10.0;
-        let p = |x: f64, y: f64| Point::new(x, y);
-        let quarter = [
-            CubicBez::new(p(10.0, 0.0), p(10.0, k), p(k, 10.0), p(0.0, 10.0)),
-            CubicBez::new(p(0.0, 10.0), p(-k, 10.0), p(-10.0, k), p(-10.0, 0.0)),
-            CubicBez::new(p(-10.0, 0.0), p(-10.0, -k), p(-k, -10.0), p(0.0, -10.0)),
-            CubicBez::new(p(0.0, -10.0), p(k, -10.0), p(10.0, -k), p(10.0, 0.0)),
-        ];
-        let pieces: Vec<PathSeg> = quarter.into_iter().map(PathSeg::Cubic).collect();
-        let area = double_area_mm2(&pieces) / 2.0;
-        assert!((area - std::f64::consts::PI * 100.0).abs() < 0.1, "{area}");
-    }
-
-    #[test]
-    fn straight_runs_merge_and_tiny_pieces_go() {
-        let p = |x: f64, y: f64| Point::new(x, y);
-        let pieces = [
-            PathSeg::Line(Line::new(p(0.0, 0.0), p(5.0, 0.0))),
-            PathSeg::Line(Line::new(p(5.0, 0.0), p(10.0, 0.0))),
-            PathSeg::Line(Line::new(p(10.0, 0.0), p(10.0, 0.0005))),
-            PathSeg::Line(Line::new(p(10.0, 0.0005), p(10.0, 10.0))),
-            PathSeg::Line(Line::new(p(10.0, 10.0), p(0.0, 10.0))),
-            PathSeg::Line(Line::new(p(0.0, 10.0), p(0.0, 0.0))),
-        ];
-        let finished = finish(&pieces);
-        assert_eq!(finished.len(), 4, "{finished:?}");
-    }
 }

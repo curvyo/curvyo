@@ -83,49 +83,8 @@ impl Document {
         writes: &[OffsetWrite],
         label: &str,
     ) -> Result<Vec<NodeId>, ObjectEditError> {
-        if writes.is_empty() {
-            return Err(ObjectEditError::NoOutlines);
-        }
         let tree = self.loro().get_tree(OBJECTS_TREE);
-        let mut seen: HashSet<AnchorId> = HashSet::new();
-        let mut replaced: Vec<TreeID> = Vec::new();
-        for write in writes {
-            let (object, geometry) = match write {
-                OffsetWrite::Add {
-                    source, geometry, ..
-                } => (*source, geometry),
-                OffsetWrite::Change { target, geometry } => (*target, geometry),
-            };
-            let tree_id = tree_id_of(object);
-            if !leaf_exists(&tree, tree_id) {
-                return Err(ObjectEditError::NoSuchObject);
-            }
-            if let OffsetGeometry::Path(outlines) = geometry {
-                if outlines.is_empty() || outlines.iter().any(|(anchors, _)| anchors.is_empty()) {
-                    return Err(ObjectEditError::NoOutlines);
-                }
-                for anchor in outlines.iter().flat_map(|(anchors, _)| anchors) {
-                    if !seen.insert(anchor.id) {
-                        return Err(ObjectEditError::AnchorIds);
-                    }
-                }
-            }
-            if let OffsetWrite::Change { geometry, .. } = write {
-                let meta = tree
-                    .get_meta(tree_id)
-                    .map_err(|_| ObjectEditError::NoSuchObject)?;
-                let tag = shape_codec::read_shape_tag(&meta);
-                match (geometry, tag.as_deref()) {
-                    (OffsetGeometry::Path(_), _) => replaced.push(tree_id),
-                    (OffsetGeometry::Primitive { shape, .. }, Some(tag))
-                        if tag == shape_tag(shape) => {}
-                    (OffsetGeometry::Primitive { .. }, _) => {
-                        return Err(ObjectEditError::InvalidConversion);
-                    }
-                }
-            }
-        }
-        check_new_anchor_ids(&tree, &replaced, &seen)?;
+        validate(&tree, writes)?;
 
         tree.enable_fractional_index(0);
         let mut ids = Vec::with_capacity(writes.len());
@@ -172,6 +131,54 @@ impl Document {
         self.commit_with_label(label);
         Ok(ids)
     }
+}
+
+/// Every check of [`Document::write_offset`] before its first write: the objects exist, every
+/// path has outlines with anchors, the anchor ids are new, and no change turns a path into a
+/// primitive or a primitive into another kind.
+fn validate(tree: &LoroTree, writes: &[OffsetWrite]) -> Result<(), ObjectEditError> {
+    if writes.is_empty() {
+        return Err(ObjectEditError::NoOutlines);
+    }
+    let mut seen: HashSet<AnchorId> = HashSet::new();
+    let mut replaced: Vec<TreeID> = Vec::new();
+    for write in writes {
+        let (object, geometry) = match write {
+            OffsetWrite::Add {
+                source, geometry, ..
+            } => (*source, geometry),
+            OffsetWrite::Change { target, geometry } => (*target, geometry),
+        };
+        let tree_id = tree_id_of(object);
+        if !leaf_exists(tree, tree_id) {
+            return Err(ObjectEditError::NoSuchObject);
+        }
+        if let OffsetGeometry::Path(outlines) = geometry {
+            if outlines.is_empty() || outlines.iter().any(|(anchors, _)| anchors.is_empty()) {
+                return Err(ObjectEditError::NoOutlines);
+            }
+            for anchor in outlines.iter().flat_map(|(anchors, _)| anchors) {
+                if !seen.insert(anchor.id) {
+                    return Err(ObjectEditError::AnchorIds);
+                }
+            }
+        }
+        if let OffsetWrite::Change { geometry, .. } = write {
+            let meta = tree
+                .get_meta(tree_id)
+                .map_err(|_| ObjectEditError::NoSuchObject)?;
+            let tag = shape_codec::read_shape_tag(&meta);
+            match (geometry, tag.as_deref()) {
+                (OffsetGeometry::Path(_), _) => replaced.push(tree_id),
+                (OffsetGeometry::Primitive { shape, .. }, Some(tag)) if tag == shape_tag(shape) => {
+                }
+                (OffsetGeometry::Primitive { .. }, _) => {
+                    return Err(ObjectEditError::InvalidConversion);
+                }
+            }
+        }
+    }
+    check_new_anchor_ids(tree, &replaced, &seen)
 }
 
 /// The stored tag of a primitive kind.

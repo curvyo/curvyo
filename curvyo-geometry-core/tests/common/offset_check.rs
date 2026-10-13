@@ -11,7 +11,42 @@ pub const MEASURE_MM: f64 = 0.0005;
 
 /// The result's outlines as fine polygons.
 pub fn flat(result: &OffsetOutlines) -> Vec<Vec<Point>> {
-    result.flattened(MEASURE_MM)
+    flattened(result, MEASURE_MM)
+}
+
+/// Every outline of `result` as a polygon of `steps` points per segment, at most `tolerance_mm`
+/// coarse (enough steps for the segment lengths of the tests).
+#[allow(
+    clippy::cast_sign_loss,
+    clippy::cast_possible_truncation,
+    clippy::cast_precision_loss
+)]
+pub fn flattened(result: &OffsetOutlines, tolerance_mm: f64) -> Vec<Vec<Point>> {
+    let steps = ((0.01 / tolerance_mm).sqrt() * 64.0).ceil().max(8.0) as usize;
+    result
+        .outlines()
+        .iter()
+        .map(|outline| {
+            let mut points = Vec::new();
+            for i in 0..outline.len() {
+                let (a, b) = (outline[i], outline[(i + 1) % outline.len()]);
+                let (p0, p3) = (a.point, b.point);
+                let (p1, p2) = (p0.translated(a.handle_out), p3.translated(b.handle_in));
+                let straight = a.handle_out == Vec2::ZERO && b.handle_in == Vec2::ZERO;
+                let count = if straight { 1 } else { steps };
+                for k in 0..count {
+                    let t = k as f64 / count as f64;
+                    let mt = 1.0 - t;
+                    let w = [mt * mt * mt, 3.0 * mt * mt * t, 3.0 * mt * t * t, t * t * t];
+                    points.push(Point::new(
+                        w[0] * p0.x + w[1] * p1.x + w[2] * p2.x + w[3] * p3.x,
+                        w[0] * p0.y + w[1] * p1.y + w[2] * p2.y + w[3] * p3.y,
+                    ));
+                }
+            }
+            points
+        })
+        .collect()
 }
 
 /// The area the result paints (holes negative).
@@ -144,8 +179,7 @@ pub fn distance_to_operand(polylines: &[(Vec<Point>, bool)], p: Point) -> f64 {
 /// within 0.01 mm. Returns the largest deviation.
 pub fn largest_deviation(operand: &[(Anchors, bool)], result: &OffsetOutlines, d: f64) -> f64 {
     let polylines = operand_polylines(operand);
-    result
-        .flattened(0.002)
+    flattened(result, 0.002)
         .iter()
         .flatten()
         .map(|&p| (distance_to_operand(&polylines, p) - d.abs()).abs())

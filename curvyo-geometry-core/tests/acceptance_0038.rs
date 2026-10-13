@@ -20,7 +20,7 @@ mod common;
 
 use std::f64::consts::PI;
 
-use common::offset_check::{area, check_node_rules, covers, nodes};
+use common::offset_check::{area, check_node_rules, covers, flattened, nodes};
 use common::{Anchors, KERNEL_TOLERANCE, circle, polygon, rect};
 use curvyo_document_core::{Length, Point};
 use curvyo_geometry_core::{
@@ -65,7 +65,7 @@ fn reversed(mut a: Anchors) -> Anchors {
 
 fn bbox(r: &OffsetOutlines) -> (f64, f64, f64, f64) {
     let mut b = (f64::MAX, f64::MAX, f64::MIN, f64::MIN);
-    for p in r.flattened(0.0005).iter().flatten() {
+    for p in flattened(r, 0.0005).iter().flatten() {
         b = (b.0.min(p.x), b.1.min(p.y), b.2.max(p.x), b.3.max(p.y));
     }
     b
@@ -344,8 +344,7 @@ fn ac11_results_obey_output_rules_for_many_shapes() {
 #[test]
 fn ac6_outer_outline_positive_holes_negative() {
     let r = ok(&ring(), 1.0, OffsetJoin::Round);
-    let mut signs: Vec<bool> = r
-        .flattened(0.001)
+    let mut signs: Vec<bool> = flattened(&r, 0.001)
         .iter()
         .map(|o| signed_area_mm2(o) > 0.0)
         .collect();

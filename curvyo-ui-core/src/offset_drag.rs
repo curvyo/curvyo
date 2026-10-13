@@ -87,7 +87,7 @@ pub fn drag_distance(angle: Angle, signs: (f64, f64), delta: Vec2) -> f64 {
 /// The snap step at `scale` screen pixels per millimetre: the smallest of the series that is at
 /// least 2 pixels on screen (criterion 11).
 #[must_use]
-pub fn snap_step(scale: f64) -> f64 {
+fn snap_step(scale: f64) -> f64 {
     SNAP_SERIES_MM
         .into_iter()
         .find(|step| step * scale >= MIN_STEP_PX)

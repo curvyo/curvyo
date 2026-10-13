@@ -6,6 +6,8 @@ use curvyo_document_core::{
     CornerRadii, EllipseFrame, Length, Point, RectBounds, Shape, StarFrame, effective_corner_radii,
 };
 
+use curvyo_geometry_core::miter_within_limit;
+
 use crate::offset_entry::OffsetJoin;
 
 /// The kernel tolerance: an ellipse stays an ellipse only within it (criterion 40).
@@ -14,15 +16,12 @@ const STAYS_TOLERANCE_MM: f64 = 0.01;
 /// Radii and distances below this, in millimetres, are zero.
 const ZERO_MM: f64 = 1e-9;
 
-/// The miter limit 4 as `1 + cos(turn)` (see `offset_pieces` in the kernel).
-const MITER_LIMIT_ONE_PLUS_COS: f64 = 0.125;
-
 /// How many points per quarter of an ellipse the deviation check samples.
 const ELLIPSE_SAMPLES: u32 = 64;
 
 /// What the offset of a primitive is.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum PrimitiveOffset {
+pub(crate) enum PrimitiveOffset {
     /// The same kind of primitive with these fields (in the primitive's own frame).
     Stays(Shape),
     /// Nothing is left (criterion 41).
@@ -31,9 +30,15 @@ pub enum PrimitiveOffset {
     Path,
 }
 
-/// The offset of `shape` by `d` (positive grows) with `join` at the corners where a gap opens.
+/// The offset of `shape` by `distance` (positive grows) with `join` at the corners where a gap
+/// opens.
 #[must_use]
-pub fn offset_primitive(shape: &Shape, d: f64, join: OffsetJoin) -> PrimitiveOffset {
+pub(crate) fn offset_primitive(
+    shape: &Shape,
+    distance: Length,
+    join: OffsetJoin,
+) -> PrimitiveOffset {
+    let d = distance.as_mm();
     match *shape {
         Shape::Rect {
             bounds,
@@ -206,7 +211,7 @@ fn scaled_frame(frame: StarFrame, unit: &[(f64, f64)], d: f64, join: OffsetJoin)
         let cross = (u1.0 * u2.1 - u1.1 * u2.0) * orientation;
         let dot = u1.0 * u2.0 + u1.1 * u2.1;
         let gap = cross * d > ZERO_MM * ZERO_MM;
-        if gap && (join != OffsetJoin::Miter || 1.0 + dot < MITER_LIMIT_ONE_PLUS_COS) {
+        if gap && (join != OffsetJoin::Miter || !miter_within_limit(dot)) {
             return Scaled::Path;
         }
     }
@@ -232,6 +237,11 @@ fn unit_vector(x: f64, y: f64) -> (f64, f64) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The offset by a distance in millimetres.
+    fn off(shape: &Shape, d: f64, join: OffsetJoin) -> PrimitiveOffset {
+        offset_primitive(shape, Length::from_mm(d), join)
+    }
     use curvyo_document_core::{Angle, InnerRatio, PointCount};
 
     fn rect(w: f64, h: f64, r: f64) -> Shape {
@@ -265,8 +275,7 @@ mod tests {
     #[test]
     fn ac50_a_rounded_rectangle_grows_its_radius_with_every_join() {
         for join in [OffsetJoin::Round, OffsetJoin::Miter, OffsetJoin::Bevel] {
-            let (x, y, w, h, radii) =
-                rect_fields(offset_primitive(&rect(100.0, 50.0, 5.0), 2.0, join));
+            let (x, y, w, h, radii) = rect_fields(off(&rect(100.0, 50.0, 5.0), 2.0, join));
             assert_eq!((x, y, w, h), (-2.0, -2.0, 104.0, 54.0));
             assert_eq!(radii, [7.0; 4]);
         }
@@ -274,20 +283,12 @@ mod tests {
 
     #[test]
     fn ac50_a_sharp_rectangle_follows_the_join() {
-        let (_, _, w, _, radii) = rect_fields(offset_primitive(
-            &rect(20.0, 20.0, 0.0),
-            2.0,
-            OffsetJoin::Round,
-        ));
+        let (_, _, w, _, radii) = rect_fields(off(&rect(20.0, 20.0, 0.0), 2.0, OffsetJoin::Round));
         assert_eq!((w, radii), (24.0, [2.0; 4]));
-        let (_, _, w, _, radii) = rect_fields(offset_primitive(
-            &rect(20.0, 20.0, 0.0),
-            2.0,
-            OffsetJoin::Miter,
-        ));
+        let (_, _, w, _, radii) = rect_fields(off(&rect(20.0, 20.0, 0.0), 2.0, OffsetJoin::Miter));
         assert_eq!((w, radii), (24.0, [0.0; 4]));
         assert_eq!(
-            offset_primitive(&rect(20.0, 20.0, 0.0), 2.0, OffsetJoin::Bevel),
+            off(&rect(20.0, 20.0, 0.0), 2.0, OffsetJoin::Bevel),
             PrimitiveOffset::Path
         );
     }
@@ -295,15 +296,13 @@ mod tests {
     #[test]
     fn ac40_an_inset_rectangle_shrinks_its_radii_and_vanishes_at_half_the_side() {
         for join in [OffsetJoin::Round, OffsetJoin::Miter, OffsetJoin::Bevel] {
-            let (x, _, w, h, radii) =
-                rect_fields(offset_primitive(&rect(100.0, 50.0, 5.0), -2.0, join));
+            let (x, _, w, h, radii) = rect_fields(off(&rect(100.0, 50.0, 5.0), -2.0, join));
             assert_eq!((x, w, h), (2.0, 96.0, 46.0));
             assert_eq!(radii, [3.0; 4]);
-            let (_, _, _, _, radii) =
-                rect_fields(offset_primitive(&rect(100.0, 50.0, 5.0), -7.0, join));
+            let (_, _, _, _, radii) = rect_fields(off(&rect(100.0, 50.0, 5.0), -7.0, join));
             assert_eq!(radii, [0.0; 4]);
             assert_eq!(
-                offset_primitive(&rect(100.0, 50.0, 5.0), -25.0, join),
+                off(&rect(100.0, 50.0, 5.0), -25.0, join),
                 PrimitiveOffset::Vanishes
             );
         }
@@ -319,22 +318,20 @@ mod tests {
             },
         };
         for join in [OffsetJoin::Round, OffsetJoin::Miter, OffsetJoin::Bevel] {
-            let PrimitiveOffset::Stays(Shape::Ellipse { frame }) =
-                offset_primitive(&circle, 2.0, join)
-            else {
+            let PrimitiveOffset::Stays(Shape::Ellipse { frame }) = off(&circle, 2.0, join) else {
                 panic!("a circle");
             };
             assert_eq!((frame.rx.as_mm(), frame.ry.as_mm()), (22.0, 22.0));
             assert_eq!(frame.center, Point::new(5.0, 5.0));
         }
         let PrimitiveOffset::Stays(Shape::Ellipse { frame }) =
-            offset_primitive(&circle, -2.0, OffsetJoin::Round)
+            off(&circle, -2.0, OffsetJoin::Round)
         else {
             panic!("a circle");
         };
         assert_eq!(frame.rx.as_mm(), 18.0);
         assert_eq!(
-            offset_primitive(&circle, -20.0, OffsetJoin::Round),
+            off(&circle, -20.0, OffsetJoin::Round),
             PrimitiveOffset::Vanishes
         );
     }
@@ -349,12 +346,12 @@ mod tests {
             },
         };
         assert_eq!(
-            offset_primitive(&ellipse(20.0, 10.0), 2.0, OffsetJoin::Round),
+            off(&ellipse(20.0, 10.0), 2.0, OffsetJoin::Round),
             PrimitiveOffset::Path
         );
         assert!(ellipse_deviation(20.0, 10.0, 2.0) > 0.05);
         assert!(matches!(
-            offset_primitive(&ellipse(20.0, 19.999), 2.0, OffsetJoin::Round),
+            off(&ellipse(20.0, 19.999), 2.0, OffsetJoin::Round),
             PrimitiveOffset::Stays(_)
         ));
     }
@@ -370,7 +367,7 @@ mod tests {
             point_count: PointCount::new(6).unwrap(),
         };
         let PrimitiveOffset::Stays(Shape::Polygon { frame, .. }) =
-            offset_primitive(&hexagon, 2.0, OffsetJoin::Miter)
+            off(&hexagon, 2.0, OffsetJoin::Miter)
         else {
             panic!("a polygon");
         };
@@ -380,22 +377,16 @@ mod tests {
             frame.radius.as_mm()
         );
         assert_eq!(frame.angle, Angle::from_radians(0.3));
-        assert_eq!(
-            offset_primitive(&hexagon, 2.0, OffsetJoin::Round),
-            PrimitiveOffset::Path
-        );
-        assert_eq!(
-            offset_primitive(&hexagon, 2.0, OffsetJoin::Bevel),
-            PrimitiveOffset::Path
-        );
+        assert_eq!(off(&hexagon, 2.0, OffsetJoin::Round), PrimitiveOffset::Path);
+        assert_eq!(off(&hexagon, 2.0, OffsetJoin::Bevel), PrimitiveOffset::Path);
         let PrimitiveOffset::Stays(Shape::Polygon { frame, .. }) =
-            offset_primitive(&hexagon, -2.0, OffsetJoin::Round)
+            off(&hexagon, -2.0, OffsetJoin::Round)
         else {
             panic!("an inset polygon stays one");
         };
         assert!((frame.radius.as_mm() - (10.0 - 2.0 / 30f64.to_radians().cos())).abs() < 1e-9);
         assert_eq!(
-            offset_primitive(&hexagon, -9.0, OffsetJoin::Round),
+            off(&hexagon, -9.0, OffsetJoin::Round),
             PrimitiveOffset::Vanishes
         );
     }
@@ -414,7 +405,7 @@ mod tests {
         // A plump star: tips of about 108°, inside the limit.
         let PrimitiveOffset::Stays(Shape::Star {
             frame, inner_ratio, ..
-        }) = offset_primitive(&star(0.7), 1.0, OffsetJoin::Miter)
+        }) = off(&star(0.7), 1.0, OffsetJoin::Miter)
         else {
             panic!("a star");
         };
@@ -422,20 +413,20 @@ mod tests {
         assert!((inner_ratio.get() - 0.7).abs() < 1e-12);
         // A thin star: tips sharper than 29°, clipped by the limit.
         assert_eq!(
-            offset_primitive(&star(0.1), 1.0, OffsetJoin::Miter),
+            off(&star(0.1), 1.0, OffsetJoin::Miter),
             PrimitiveOffset::Path
         );
         assert_eq!(
-            offset_primitive(&star(0.7), 1.0, OffsetJoin::Round),
+            off(&star(0.7), 1.0, OffsetJoin::Round),
             PrimitiveOffset::Path
         );
         // An inset opens gaps at the inner corners: Miter scales, Round is a path.
         assert!(matches!(
-            offset_primitive(&star(0.5), -1.0, OffsetJoin::Miter),
+            off(&star(0.5), -1.0, OffsetJoin::Miter),
             PrimitiveOffset::Stays(_)
         ));
         assert_eq!(
-            offset_primitive(&star(0.5), -1.0, OffsetJoin::Round),
+            off(&star(0.5), -1.0, OffsetJoin::Round),
             PrimitiveOffset::Path
         );
     }

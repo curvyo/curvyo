@@ -27,7 +27,9 @@ mod curve_settle;
 mod flatten;
 mod interior;
 mod offset;
+mod offset_finish;
 mod offset_pieces;
+mod offset_polyline;
 mod offset_rebuild;
 mod outline_nesting;
 mod outline_touch;
@@ -42,6 +44,7 @@ pub use offset::{
     OffsetAnchor, OffsetCap, OffsetError, OffsetJoin, OffsetOutlines, offset,
     offset_distance_is_zero,
 };
+pub use offset_pieces::miter_within_limit;
 pub use outline_nesting::{Nesting, outline_area_mm2, outline_has_area, outline_nesting};
 pub use outline_touch::{TOUCH_DISTANCE_MM, touching_outlines};
 pub use segment::{

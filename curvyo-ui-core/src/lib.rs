@@ -157,7 +157,6 @@ pub use object_history_text::{object_row_name, object_row_summary};
 pub use object_selection::{ObjectSelection, SelectionCombine};
 pub use offset_drag::{
     CORNER_SIGNS, HANDLE_HIT_RADIUS_PX, drag_distance, handle_positions, offset_box, snap_distance,
-    snap_step,
 };
 pub use offset_entry::{
     OFFSET_DEFAULT_MM, OFFSET_MAX_MM, OFFSET_MIN_MM, OffsetBar, OffsetCap, OffsetDirection,
@@ -168,7 +167,6 @@ pub use offset_plan::{
     KindNote, OffsetItem, OffsetPlan, OffsetRefusal, OffsetRequest, OffsetShape, PrimitiveKind,
     offset_operands, plan_offset,
 };
-pub use offset_primitive::{PrimitiveOffset, offset_primitive};
 pub use oriented_box::{OrientedBox, oriented_bounds};
 pub use panel_content::{PanelContent, panel_body};
 pub use panel_tabs::{
