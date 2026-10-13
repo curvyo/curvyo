@@ -1,9 +1,14 @@
 # Plan for Path offset: Outset and Inset by dragging a handle, with curves kept as curves
 
-Rework of 2026-10-13 for the specification rewritten on 2026-10-12 (51 criteria). One branch
-`story/path-offset`, one PR (#115, reworked; no new PR), seven milestones, each a green commit pushed
-to the branch. No `format_version` change, no new crate, no new dependency, no `Cargo.toml` change.
-AC numbers are those of the reworked `specification.md`.
+Rework of 2026-10-13 for the specification rewritten on 2026-10-12, amended on 2026-10-13 after the
+customer tried the rework (56 criteria, some removed). One branch `story/path-offset`, one PR (#115,
+reworked; no new PR), milestones each a green commit pushed to the branch. No `format_version`
+change, no new crate, no new dependency, no `Cargo.toml` change. AC numbers are those of
+`specification.md`.
+
+**2026-10-13 amendment:** M1 to M4 (kernel, primitives, write, drag rules) stay. M5 and M6 (the
+Offset bar, Apply, Ends, the status hint) are replaced by M5' to M9' below; the old M5/M6/M7 task
+lists are kept for history, struck where the amendment removed what they built.
 
 ## What stays from the first build, what goes
 
@@ -89,7 +94,7 @@ the fallback fired for 0 of 135 outlines over the test shapes.
 - [x] 4.3 `offset_plan.rs`: per operand outer/inner results (primitive or path), vanish counts, the
   open-path rules (30), groups (32), out of range and no area, and the list of writes (20 to 23).
 
-### M5 Session, wasm API and canvas (AC 2, 9 to 19, 23, 25 to 27)
+### M5 Session, wasm API and canvas (superseded in part by M5' to M8') (AC 2, 9 to 19, 23, 25 to 27)
 
 - [x] 5.1 Tests first, then `Tool::Offset` and `session/offset.rs`: handles, drag, modifiers at
   release, inset stop at the last non-empty d, preview cache, release = one commit and the new
@@ -97,7 +102,7 @@ the fallback fired for 0 of 135 outlines over the test shapes.
 - [x] 5.2 Render: curve preview (blue, white casing), handles, dashed grown box over 2,000 nodes.
 - [x] 5.3 `wasm_offset.rs`: bar state, readout state (side, d, result line, stays/becomes), notice.
 
-### M6 The UI (AC 1 to 8, 13, 15, 24, 25)
+### M6 The UI (superseded by M5' and M8') (AC 1 to 8, 13, 15, 24, 25)
 
 - [x] 6.1 Remove the Select bar button and the panel section (3).
 - [x] 6.2 "Path tools" card with the Offset tool, key O, active look shared with the Tools card (1, 2).
@@ -105,11 +110,64 @@ the fallback fired for 0 of 135 outlines over the test shapes.
   (4 to 8, 25); readout chip (15); notice (24); double-click focuses Distance (13).
 - [x] 6.4 `offsetText.ts` sentences with unit tests.
 
-### M7 Docs and gate
+### M7 Docs and gate (first rework)
 
 - [x] 7.1 Design-system rows (Offset section removed, Path tools card, Offset bar, Offset handles),
   technical-debt entry updated, `adrs.md` implementer notes.
 - [x] 7.2 Full gate (`CLAUDE.md` §7), frontend tests and `tsc`, once.
+
+### M5' Remove what the 2026-10-13 amendment removes (AC 3 to 5, 15, 30, 42, 47, 55)
+
+- [ ] 5'.1 Kernel: open-path offsetting goes (`OffsetCap`, `open_loop`, caps, `stroke_line`,
+  `flatten_open`); an open outline is refused as `OffsetError::OpenPath`; their tests and the two
+  open-arc golden cases go. Closed-path results stay bit-identical (the golden fixture's closed
+  cases unchanged) (55).
+- [ ] 5'.2 `curvyo-ui-core`: Ends, `InsetOfOpenPaths`, `open_left_out` and the kind note
+  ("Stays a rectangle" / "Becomes a path") go; open paths are not operands (`offset_operands`,
+  `plan_offset`); the bar's values become `OffsetValues` (the chip's remembered values) (15, 42, 55).
+- [ ] 5'.3 Session and wasm: Ends, the bar focus, the kind code and the open-path stop go; a
+  selection of only open paths draws no handles (5, 55).
+- [ ] 5'.4 Frontend: `OffsetToolbar.tsx` (the top bar with Apply) and its wiring go; the status
+  text and the Ends words leave `offsetText.ts` (3, 4).
+
+### M6' Session: standing preview, modifiers, corner style by double-click (AC 6, 10, 13, 15, 19, 52, 56)
+
+- [ ] 6'.1 Tests first: the standing preview shows on selection and tool switch for the
+  remembered values, after a write for the new selection, and is the outline a write gives (52);
+  the press keeps it until the 3 px dead zone is left (ux-rework 3).
+- [ ] 6'.2 A drag never changes Direction; the dragged distance becomes the remembered one on a
+  written release only (6, 10). Shift = Both, Ctrl = the other Mode, Shift+Ctrl = the original
+  takes the dragged side (19).
+- [ ] 6'.3 A double-click on a corner handle steps a pending corner style Round, Miter, Bevel
+  (from the pending one or the remembered Corners); the standing preview and the next drag use
+  it; a written release consumes it, a cancelled drag keeps it, a tool switch drops it (13, 56).
+- [ ] 6'.4 The readout state carries the effective corner style for line 1 and the mode for
+  line 2 (15).
+
+### M7' Canvas and wasm: the center handle and opening the chip (AC 9, 25, 53)
+
+- [ ] 7'.1 Tests first: the center handle at the operand box center, its 12 px hit area claims
+  the press (no marquee, no deselect), hidden during a corner drag (53).
+- [ ] 7'.2 A double-click on it, or O or Enter with the tool active and an operand selected,
+  opens the chip; O without an operand keeps selecting the tool; gated like every shortcut (25, 53).
+- [ ] 7'.3 Render: the center handle (Move handle shell, Offset glyph, hover, active while the
+  chip is open). wasm: chip open/close, Enter writes the values (refusals keep it open), the
+  chip's anchor (center and the screen box around the operand box and the standing preview).
+
+### M8' Frontend: the Offset entry chip, tooltip, readout (AC 1, 6, 15, 24, 25, 53, 54)
+
+- [ ] 8'.1 `OffsetEntryChip.tsx`: Distance (Up/Down 0.1, Shift 1, Ctrl 0.01 mm), Direction pill,
+  Corners and Mode (Lucide `Plus`, `RefreshCw`) radio groups; Tab loop, roving tabindex, focus,
+  Enter/Escape, message card, placement below the result (ux-rework 2) (25, 53, 54).
+- [ ] 8'.2 Tooltip second line, readout lines with the corner style, the corner-style chip after
+  a double-click, hint chips for the corner and center handles (1, 15, 56).
+- [ ] 8'.3 `offsetText.ts` and `offsetChipPlacement` unit tests (15, 24, 54).
+
+### M9' Docs and gate
+
+- [ ] 9'.1 `adrs.md` implementer note (open paths refused by the kernel), design-system rows
+  checked against the build, technical-debt entry if any.
+- [ ] 9'.2 Full gate (`CLAUDE.md` §7), frontend tests and `tsc`, a headless browser check.
 
 ## Validation
 
@@ -119,5 +177,6 @@ the fallback fired for 0 of 135 outlines over the test shapes.
 - Primitives: table-driven tests against the formulas and against the curve kernel on the same shape
   converted to a path (the two agree within 0.01 mm where both apply).
 - Session: unit tests of the drag state machine with synthetic pointer events.
-- Manual: `cd frontend && npm run dev`, press O, select a circle, drag a corner handle out with and
-  without Shift and Ctrl.
+- Manual: `cd frontend && npm run dev`, press O, select a circle (the standing preview shows), drag a
+  corner handle out with and without Shift and Ctrl, double-click a corner handle, press O to open
+  the chip, Enter.
