@@ -10,10 +10,10 @@ use std::cell::RefCell;
 
 use curvyo_document_core::{Angle, DocumentVersion, NodeId, ObjectSnapshot, Point};
 use curvyo_ui_core::{
-    CORNER_SIGNS, HANDLE_HIT_RADIUS_PX, KindNote, Modifiers, ObjectSelection, OffsetBar, OffsetCap,
+    CORNER_SIGNS, HANDLE_HIT_RADIUS_PX, Modifiers, ObjectSelection, OffsetBar, OffsetCap,
     OffsetDirection, OffsetJoin, OffsetPlan, OffsetRefusal, OffsetRequest, OffsetResultChoice,
     OffsetSide, OffsetSides, OrientedBox, PressTarget, classify_press, drag_distance,
-    handle_positions, hit_test_objects, offset_box, offset_operands, plan_offset, snap_distance,
+    handle_positions, hit_test_objects, offset_box, plan_offset, snap_distance,
 };
 
 use super::refusal::RefusalMarks;
@@ -22,35 +22,29 @@ use super::{Session, Tool};
 /// The label of the commit an offset makes (criterion 16).
 pub const OFFSET_COMMIT_LABEL: &str = "offset_path";
 
-/// Above this many operand nodes the preview is the grown box (criterion 18).
-const PREVIEW_NODE_LIMIT: usize = 2000;
-
-/// The nodes a primitive counts for the preview limit.
-const PRIMITIVE_NODES: usize = 8;
-
 /// The Offset tool's state: the bar's values (session memory, criterion 7), the drag in flight,
 /// the handle under the pointer and the cached preview.
 #[derive(Debug, Default)]
 pub(super) struct OffsetTool {
-    bar: OffsetBar,
-    drag: Option<OffsetDrag>,
-    hovered: Option<usize>,
-    bar_focus: bool,
+    pub(super) bar: OffsetBar,
+    pub(super) drag: Option<OffsetDrag>,
+    pub(super) hovered: Option<usize>,
+    pub(super) bar_focus: bool,
     outcome: Option<OffsetOutcome>,
     preview: RefCell<Option<Cached>>,
 }
 
 /// A handle drag in flight.
 #[derive(Debug, Clone, Copy)]
-struct OffsetDrag {
-    corner: usize,
+pub(super) struct OffsetDrag {
+    pub(super) corner: usize,
     start: Point,
     angle: Angle,
     /// The signed, snapped, stopped distance: positive outward.
-    d: f64,
+    pub(super) d: f64,
     /// The last distance at which something was left.
     last_good: f64,
-    stop: Option<DragStop>,
+    pub(super) stop: Option<DragStop>,
 }
 
 /// Why the handle stopped (criteria 12, 30).
@@ -107,41 +101,6 @@ pub enum OffsetOutcome {
     },
 }
 
-/// What the bar, the readout and the canvas show (criteria 4, 5, 12, 15, 18).
-// Flags the host reads one by one, not a state machine.
-#[allow(clippy::struct_excessive_bools)]
-#[derive(Debug, Clone, PartialEq)]
-pub struct OffsetView {
-    /// Operands in the selection (groups not counted).
-    pub operands: usize,
-    /// An open path is selected: Ends applies.
-    pub has_open: bool,
-    /// The selection holds a group.
-    pub has_group: bool,
-    /// The handles are drawn.
-    pub handles: bool,
-    /// A drag is in flight.
-    pub dragging: bool,
-    /// The signed distance shown (the drag's, or the bar's with its Direction).
-    pub distance_mm: f64,
-    /// Both sides (Shift during a drag, or Direction Both).
-    pub both: bool,
-    /// The release or Apply changes the original.
-    pub change: bool,
-    /// Where the handle stopped, if it did.
-    pub stop: Option<DragStop>,
-    /// Operands whose inset vanishes in the preview.
-    pub vanished: usize,
-    /// How many operands the preview covers.
-    pub of: usize,
-    /// The preview is replaced by the grown box.
-    pub large: bool,
-    /// Stays a primitive or becomes a path.
-    pub kind_note: Option<KindNote>,
-    /// Why the preview shows nothing, if it is refused.
-    pub refusal: Option<OffsetRefusal>,
-}
-
 impl Session {
     /// The bar's values.
     #[must_use]
@@ -186,7 +145,7 @@ impl Session {
     }
 
     /// The selection's operands, the leaves of selected groups left out.
-    fn offset_selection(&self) -> ObjectSelection {
+    pub(super) fn offset_selection(&self) -> ObjectSelection {
         let in_groups = self.selected_group_leaves();
         let mut selection = self.selection.clone();
         if !in_groups.is_empty() {
@@ -202,7 +161,7 @@ impl Session {
     }
 
     /// The box the handles sit on, over the whole selection.
-    fn offset_box_now(&self) -> Option<OrientedBox> {
+    pub(super) fn offset_box_now(&self) -> Option<OrientedBox> {
         let objects = self.objects();
         let selected: Vec<&ObjectSnapshot> = objects
             .iter()
@@ -213,7 +172,7 @@ impl Session {
 
     /// Whether the handles are drawn: the Offset tool with an operand selected (a group alone
     /// draws none, criterion 5).
-    fn offset_handles_shown(&self) -> bool {
+    pub(super) fn offset_handles_shown(&self) -> bool {
         self.tool == Tool::Offset && !self.offset_selection().is_empty()
     }
 
@@ -237,7 +196,7 @@ impl Session {
     }
 
     /// The request of a drag at the signed `d` with `held` keys, or of the bar.
-    fn offset_request(&self, signed: Option<(f64, Modifiers)>) -> OffsetRequest {
+    pub(super) fn offset_request(&self, signed: Option<(f64, Modifiers)>) -> OffsetRequest {
         let bar = &self.offset.bar;
         let (distance_mm, sides) = match signed {
             Some((d, held)) => {
@@ -262,7 +221,10 @@ impl Session {
     }
 
     /// The plan for `request`, from the cache when nothing changed.
-    fn offset_plan_for(&self, request: OffsetRequest) -> Result<OffsetPlan, OffsetRefusal> {
+    pub(super) fn offset_plan_for(
+        &self,
+        request: OffsetRequest,
+    ) -> Result<OffsetPlan, OffsetRefusal> {
         let version = self.document.version();
         let selection = self.offset_selection();
         if let Some(cached) = self.offset.preview.borrow().as_ref()
@@ -280,140 +242,6 @@ impl Session {
             result: result.clone(),
         }));
         result
-    }
-
-    /// Whether the operands have more nodes than the preview draws (criterion 18).
-    fn offset_selection_is_large(&self) -> bool {
-        let objects = self.objects();
-        let selection = self.offset_selection();
-        let nodes: usize = offset_operands(&objects, &selection)
-            .iter()
-            .map(|object| match object {
-                ObjectSnapshot::Path(path) => path.all_anchors().count(),
-                ObjectSnapshot::Primitive(_) => PRIMITIVE_NODES,
-            })
-            .sum();
-        nodes > PREVIEW_NODE_LIMIT
-    }
-
-    /// The request the canvas previews now: the drag's, or the bar's while focus is in the bar.
-    fn offset_preview_request(&self) -> Option<OffsetRequest> {
-        if self.tool != Tool::Offset {
-            return None;
-        }
-        if let Some(drag) = self.offset.drag {
-            return (drag.d != 0.0).then(|| self.offset_request(Some((drag.d, self.held))));
-        }
-        self.offset.bar_focus.then(|| self.offset_request(None))
-    }
-
-    /// What the bar, readout and canvas show.
-    #[must_use]
-    pub fn offset_view(&self) -> OffsetView {
-        let objects = self.objects();
-        let selection = self.offset_selection();
-        let operands = offset_operands(&objects, &selection);
-        let has_open = operands.iter().any(|object| match object {
-            ObjectSnapshot::Path(path) => path.subpaths().any(|subpath| !subpath.closed),
-            ObjectSnapshot::Primitive(_) => false,
-        });
-        let drag = self.offset.drag;
-        let bar = self.offset.bar;
-        let (distance_mm, both, change) = match drag {
-            Some(drag) => (
-                drag.d,
-                self.held.shift,
-                bar.changes_original(self.held.ctrl),
-            ),
-            None => (
-                if bar.direction() == OffsetDirection::In {
-                    -bar.distance_mm()
-                } else {
-                    bar.distance_mm()
-                },
-                bar.direction() == OffsetDirection::Both,
-                bar.result() == OffsetResultChoice::ChangeOriginal,
-            ),
-        };
-        let large = self.offset_selection_is_large();
-        let mut view = OffsetView {
-            operands: operands.len(),
-            has_open,
-            has_group: !self.selected_group_leaves().is_empty(),
-            handles: self.offset_handles_shown(),
-            dragging: drag.is_some(),
-            distance_mm,
-            both,
-            change,
-            stop: drag.and_then(|drag| drag.stop),
-            vanished: 0,
-            of: operands.len(),
-            large,
-            kind_note: None,
-            refusal: None,
-        };
-        if large {
-            return view;
-        }
-        if let Some(request) = self.offset_preview_request() {
-            match self.offset_plan_for(request) {
-                Ok(plan) => {
-                    view.vanished = plan.vanished;
-                    view.kind_note = plan.kind_note;
-                }
-                Err(refusal) => view.refusal = Some(refusal),
-            }
-        }
-        view
-    }
-
-    /// The Offset tool's canvas layer: the preview outlines (or the grown box), the selection box
-    /// and the handles.
-    pub(super) fn offset_draw_list(
-        &self,
-        view: curvyo_document_core::ViewTransform,
-    ) -> curvyo_render_core::DrawList {
-        let mut list = curvyo_render_core::DrawList::default();
-        if self.tool != Tool::Offset {
-            return list;
-        }
-        let Some(bounds) = self.offset_box_now() else {
-            return list;
-        };
-        if let Some(request) = self.offset_preview_request() {
-            if self.offset_selection_is_large() {
-                let signed = if request.sides.out.is_some() {
-                    request.distance_mm
-                } else {
-                    -request.distance_mm
-                };
-                list.extend(curvyo_render_core::build_offset_grown_box(
-                    grown_box(&bounds, signed).document_corners(),
-                    view,
-                ));
-            } else if let Ok(plan) = self.offset_plan_for(request) {
-                list.extend(curvyo_render_core::build_offset_preview(
-                    &plan.preview_outlines(),
-                    view,
-                ));
-            }
-        }
-        if self.offset_handles_shown() {
-            let placed = self
-                .offset
-                .drag
-                .map_or(bounds, |drag| grown_box(&bounds, drag.d));
-            list.extend(curvyo_render_core::build_offset_handles(
-                bounds.document_corners(),
-                handle_positions(&placed, view.scale()),
-                curvyo_render_core::OffsetHandleState {
-                    hovered: self.offset.hovered,
-                    dragged: self.offset.drag.map(|drag| drag.corner),
-                },
-                view,
-            ));
-        }
-        list
     }
 
     /// A press in the Offset tool: on a handle a drag begins; on an object it is selected
@@ -527,7 +355,9 @@ impl Session {
             return;
         };
         self.offset.hovered = self.offset_handle_at(point);
-        if drag.d == 0.0 {
+        // At the inset stop the readout says "Nothing is left": a release there writes nothing
+        // (criterion 12).
+        if drag.d == 0.0 || drag.stop == Some(DragStop::NothingLeft) {
             return;
         }
         let request = self.offset_request(Some((drag.d, Modifiers::new(shift, ctrl))));
@@ -631,18 +461,6 @@ impl Session {
     }
 }
 
-/// `bounds` grown by `d` on every side (shrunk at most to its middle), for the handles during a
-/// drag and the grown box.
-fn grown_box(bounds: &OrientedBox, d: f64) -> OrientedBox {
-    let grow = d.max(-bounds.width().min(bounds.height()) / 2.0);
-    OrientedBox {
-        min: Point::new(bounds.min.x - grow, bounds.min.y - grow),
-        max: Point::new(bounds.max.x + grow, bounds.max.y + grow),
-        angle: bounds.angle,
-        pivot: bounds.pivot,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -661,7 +479,7 @@ mod tests {
         let anchors: Vec<NewAnchor> = corners
             .into_iter()
             .zip(first..)
-            .map(|((cx, cy), n)| NewAnchor::corner(AnchorId::new(1, n), Point::new(cx, cy)))
+            .map(|((cx, cy), n)| NewAnchor::corner(AnchorId::new(9, n), Point::new(cx, cy)))
             .collect();
         session.document.create_path(&anchors, true)
     }
@@ -752,7 +570,7 @@ mod tests {
     }
 
     #[test]
-    fn ac12_an_inset_stops_where_something_is_left() {
+    fn ac12_an_inset_stops_where_something_is_left_and_a_release_there_writes_nothing() {
         let mut session = Session::new(1);
         let small = square_path(&session, 0.0, 4.0, 1);
         session.set_tool(Tool::Offset);
@@ -764,8 +582,10 @@ mod tests {
         let view = session.offset_view();
         assert_eq!(view.stop, Some(DragStop::NothingLeft));
         assert!(view.distance_mm < 0.0 && view.distance_mm > -2.0);
-        assert!(session.cancel_offset_drag(), "Escape or the other button");
+        // A release at the stop writes nothing (criterion 12).
+        session.pointer_up(along(from, -5.0), false, false);
         assert_eq!(session.document.object_ids(), vec![small]);
+        assert_eq!(session.take_offset_outcome(), None);
     }
 
     #[test]
@@ -792,7 +612,9 @@ mod tests {
         session.set_offset_bar_focus(true);
         assert_eq!(
             session.offset_view().kind_note,
-            Some(KindNote::Stays(curvyo_ui_core::PrimitiveKind::Rectangle))
+            Some(curvyo_ui_core::KindNote::Stays(
+                curvyo_ui_core::PrimitiveKind::Rectangle
+            ))
         );
         let outcome = session.apply_offset();
         assert!(

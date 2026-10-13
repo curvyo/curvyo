@@ -149,8 +149,9 @@ compound paths), no trait, no generic. The customer chose the library on
   changed originals in place, a primitive turned into a path keeps its id).
   The session keeps the bar's values for its life; the preview is cached by
   document version, selection and request, so a release writes what the last
-  frame showed. The inset stop keeps the last distance at which something was
-  left, which a release then writes. A primitive counts 8 nodes towards the
+  frame showed. At the inset stop the handle stays at the last distance at which
+  something was left, and a release there writes nothing (criterion 12;
+  architect ruling 2026-10-13). A primitive counts 8 nodes towards the
   2,000-node preview limit. Selecting in the tool uses the Select tool's
   object hit test and its marquee, armed against an empty selection so the
   invisible transform handles of the Select tool never catch a press. The
