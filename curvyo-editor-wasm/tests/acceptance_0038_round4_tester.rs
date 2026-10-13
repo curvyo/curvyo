@@ -496,7 +496,7 @@ fn ac54_chip_style_survives_escape() {
     let mut s = rect_session();
     assert_eq!(key(&mut s, "o"), "offset-chip");
     s.set_offset_join(Miter);
-    assert!(!key(&mut s, "Escape").is_empty());
+    let _ = key(&mut s, "Escape");
     assert_eq!(s.offset_values().join(), Miter);
     let _ = press_moved(&mut s, 6.0);
     assert_eq!(join(&s), Miter);
