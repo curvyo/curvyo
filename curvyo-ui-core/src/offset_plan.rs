@@ -12,7 +12,7 @@ use curvyo_document_core::{
     PieceOutlines, Shape, Tolerance,
 };
 use curvyo_geometry_core::{
-    OffsetAnchor, OffsetError, OffsetOutlines, Outline, OutlineTriple, offset,
+    MAX_COORDINATE_MM, OffsetAnchor, OffsetError, OffsetOutlines, Outline, OutlineTriple, offset,
     offset_distance_is_zero,
 };
 
@@ -370,6 +370,15 @@ fn offset_one(
     if let ObjectSnapshot::Primitive(primitive) = object {
         match offset_primitive(&primitive.shape, Length::from_mm(d), request.join) {
             PrimitiveOffset::Stays(shape) => {
+                // The range check a path result gets from the kernel (criterion 32).
+                let in_range = curvyo_document_core::outline_of_rotated(&shape, primitive.rotation)
+                    .iter()
+                    .all(|a| {
+                        a.point.x.abs() <= MAX_COORDINATE_MM && a.point.y.abs() <= MAX_COORDINATE_MM
+                    });
+                if !in_range {
+                    return Err(OffsetError::OutOfRange);
+                }
                 return Ok(OffsetShape::Primitive {
                     shape,
                     rotation: primitive.rotation,

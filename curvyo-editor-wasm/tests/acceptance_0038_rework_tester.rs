@@ -7,6 +7,7 @@
     clippy::unwrap_used,
     clippy::expect_used,
     clippy::float_cmp,
+    clippy::many_single_char_names,
     missing_docs
 )]
 
@@ -219,7 +220,7 @@ fn ac5_no_selection_shows_no_handles_and_apply_does_nothing() {
 #[test]
 fn ac5_ends_applies_only_to_open_paths() {
     let d = Document::new(1);
-    d.create_path(
+    let _ = d.create_path(
         &[
             NewAnchor::corner(AnchorId::new(1, 1), pt(0.0, 0.0)),
             NewAnchor::corner(AnchorId::new(1, 2), pt(20.0, 0.0)),
@@ -350,10 +351,10 @@ fn ac10_distance_is_limited_to_1000() {
     drag(&mut s, BR, (5000.0, 5000.0), false, false);
     match outcome(&mut s) {
         OffsetOutcome::Applied { distance_mm, .. } => {
-            assert!(distance_mm <= 1000.0, "{distance_mm}")
+            assert!(distance_mm <= 1000.0, "{distance_mm}");
         }
         OffsetOutcome::Refused { .. } | OffsetOutcome::Ignored => {}
-        other => panic!("{other:?}"),
+        other @ OffsetOutcome::RefusedGroups { .. } => panic!("{other:?}"),
     }
 }
 
@@ -700,7 +701,7 @@ fn ac20_z_order_outset_below_inset_above_both_around() {
     drag(&mut s, BR, (4.0, 4.0), false, false);
     let _ = outcome(&mut s);
     let (pos, sizes) = order(&s, a);
-    assert_eq!(sizes[pos + 0], (20.0, 20.0));
+    assert_eq!(sizes[pos], (20.0, 20.0));
     assert_eq!(
         sizes[0],
         (28.0, 28.0),
@@ -978,7 +979,7 @@ fn ac30_open_path_inset_handle_stops_at_zero_and_apply_refuses() {
 #[test]
 fn ac30_mixed_selection_inset_leaves_open_paths_out() {
     let d = Document::new(1);
-    d.create_path(
+    let _ = d.create_path(
         &[
             NewAnchor::corner(AnchorId::new(1, 1), pt(0.0, 50.0)),
             NewAnchor::corner(AnchorId::new(1, 2), pt(20.0, 50.0)),
@@ -1372,7 +1373,7 @@ fn ac42_both_on_a_rectangle_gives_two_rectangles() {
 #[test]
 fn circle_converted_to_a_path_gives_four_cubics() {
     let d = Document::new(1);
-    d.create_ellipse(EllipseFrame {
+    let _ = d.create_ellipse(EllipseFrame {
         center: pt(50.0, 50.0),
         rx: Length::from_mm(20.0),
         ry: Length::from_mm(20.0),
@@ -1408,7 +1409,7 @@ fn edge_huge_distance_on_a_rectangle_and_out_of_range_result() {
     assert_eq!(big, 2020.0);
 }
 
-/// Criterion 32: a result beyond MAX_COORDINATE_MM (1e7 mm) is refused, also when the rectangle
+/// Criterion 32: a result beyond `MAX_COORDINATE_MM` (1e7 mm) is refused, also when the rectangle
 /// would stay a rectangle (the primitive route).
 #[test]
 fn edge_rectangle_result_beyond_the_coordinate_limit_is_refused() {
@@ -1503,11 +1504,11 @@ fn ac11_successive_moves_pass_through_every_step() {
     assert!(seen.len() >= 9, "expected a step per mm, saw {seen:?}");
 }
 
-/// Criterion 32 (0016 17a): a result beyond MAX_COORDINATE_MM is refused, for a path as well.
+/// Criterion 32 (0016 17a): a result beyond `MAX_COORDINATE_MM` is refused, for a path as well.
 #[test]
 fn edge_path_result_beyond_the_coordinate_limit_is_refused() {
     let d = Document::new(1);
-    d.create_path(
+    let _ = d.create_path(
         &[
             NewAnchor::corner(AnchorId::new(1, 1), pt(9_999_900.0, 0.0)),
             NewAnchor::corner(AnchorId::new(1, 2), pt(9_999_950.0, 0.0)),

@@ -216,6 +216,7 @@ pub fn signed(outline: &[Point]) -> f64 {
 /// A grid point, in 0.001 mm units.
 pub type Grid = (i64, i64);
 
+#[allow(clippy::cast_possible_truncation)] // test coordinates are far inside i64
 pub fn grid_points(outline: &[Point]) -> Vec<Grid> {
     outline
         .iter()

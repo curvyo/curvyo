@@ -44,6 +44,9 @@ pub(super) struct OffsetDrag {
     pub(super) d: f64,
     /// The last distance at which something was left.
     last_good: f64,
+    /// The bar's Distance at the press: the drag snaps to it (criterion 11), not to the value
+    /// the drag itself writes into the bar.
+    bar_at_press: f64,
     pub(super) stop: Option<DragStop>,
 }
 
@@ -257,6 +260,7 @@ impl Session {
                 angle: bounds.angle,
                 d: 0.0,
                 last_good: 0.0,
+                bar_at_press: self.offset.bar.distance_mm(),
                 stop: None,
             });
             return;
@@ -314,7 +318,7 @@ impl Session {
             CORNER_SIGNS[drag.corner],
             drag.start.vector_to(point),
         );
-        let mut d = snap_distance(raw, scale, self.offset.bar.distance_mm());
+        let mut d = snap_distance(raw, scale, drag.bar_at_press);
         drag.stop = None;
         if d < 0.0 && !self.offset_selection_is_large() {
             match self.offset_plan_for(self.offset_request(Some((d, self.held)))) {

@@ -181,6 +181,29 @@ compound paths), no trait, no generic. The customer chose the library on
   - **The miter limit is one rule.** `ui-core/src/offset_primitive.rs` must
     not hold its own copy of the limit; the kernel exports it.
 
+- **2026-10-13 (implementer, tester finding): criterion 37 is open for narrow
+  ellipses.** Measured on the cubic ellipse paths of the tester (Round,
+  kernel tolerance 0.01 mm, `kurbo` cubic offset at 0.004 mm):
+
+  | Ellipse, d | Cubics | Largest deviation |
+  |---|---|---|
+  | 40 x 10, +5 | 16 | 0.0032 mm |
+  | 40 x 10, -3 | 16 | 0.0041 mm |
+  | 40 x 10, +2 | 12 | 0.0056 mm |
+  | 50 x 5, +3 | 16 | 0.0039 mm |
+  | 20 x 10, +/-2 | 4 | 0.0045 / 0.0029 mm |
+
+  With the `kurbo` tolerance raised to 0.008 mm, 40 x 10 at +5 still needs 12
+  cubics and the -3 inset leaves 0.0102 mm. The best single cubic per quarter
+  (end points and tangents fixed, handle lengths searched) misses the exact
+  offset by about 0.040 mm (40 x 10, +5), 0.027 mm (40 x 10, +2) and 0.13 mm
+  (50 x 5, +3), so at most 8 smooth cubics within 0.01 mm is not reachable
+  for ellipses this narrow; the -3 inset is past ry²/rx = 2.5 mm and has
+  cusps besides. The criterion holds for the 40 x 20 ellipse of criteria 37
+  and 51. The tester's narrow-ellipse test is ignored until the PO decides
+  (options: a budget that grows with rx/ry, e.g. at most 16 cubics; or the
+  limit stated for ellipses with ry/rx of at least 0.5).
+
 ## Flagged to the PO (criterion changes the spec invites)
 
 1. **Criterion 19 and "Miter limit": `i_overlay` clips the miter, it does

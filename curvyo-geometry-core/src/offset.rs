@@ -20,12 +20,14 @@ use kurbo::{PathSeg as KSeg, Point as KPoint, Vec2 as KVec};
 
 use crate::boolean::{Outline, grid_paths, outline_in_range};
 use crate::boolean_grid::{
-    GRID_MM, MAX_COORDINATE_MM, Paths64, Point64, double_area, normalize, snap,
+    GRID_MM, MAX_COORDINATE_MM, Paths64, Point64, double_area, normalize, snap, to_millimetres,
 };
+use crate::flatten::{flatten_closed, flatten_open};
 use crate::offset_finish::{canonical, lines_of_mm};
 use crate::offset_pieces::{RawStyle, closed_loop, open_loop, segments_of};
 use crate::offset_polyline::{polyline_offset, without_flattening_noise};
 use crate::offset_rebuild::rebuild;
+use crate::outline_touch::point_segment_distance;
 
 /// How a corner is treated where the offset outline opens a gap.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -171,7 +173,8 @@ pub fn offset(
     };
     let (outlines, fallback) = if let Some(loops) = loops {
         let rebuilt = rebuild(&loops, checked.flatten_mm, tolerance.as_mm(), |rings| {
-            without_flattening_noise(rings, checked.flatten_mm)
+            let rings = without_flattening_noise(rings, checked.flatten_mm);
+            without_inverted_rings(rings, operand, checked.d.abs(), checked.flatten_mm)
         });
         (rebuilt.outlines, rebuilt.fallback)
     } else {
@@ -200,6 +203,54 @@ pub fn offset(
         return Err(OffsetError::OutOfRange);
     }
     Ok(OffsetOutlines { outlines, fallback })
+}
+
+/// `rings` without those that lie closer to the operand than the distance.
+///
+/// Every point of a true offset lies at least `|d|` from the operand's outlines. An outline that
+/// shrinks by more than its own size turns its parallel curve inside out without crossing it (a
+/// hole of radius 10 grown by 10.5 gives a circle of radius 0.5 wound like the hole), so the
+/// overlay keeps it as a spurious hole or island (criterion 28). Such a ring lies nearer than
+/// `|d|`: it is dropped when two of three of its vertices, spread over it, do.
+fn without_inverted_rings(
+    mut rings: Paths64,
+    operand: &[Outline<'_>],
+    distance_mm: f64,
+    flatten_mm: f64,
+) -> Paths64 {
+    // The ring and the operand are each flattened within `flatten_mm`, the ring also snapped.
+    let threshold = distance_mm - 3.0 * flatten_mm - 2.0 * GRID_MM;
+    if threshold <= 0.0 {
+        return rings;
+    }
+    let polylines: Vec<(Vec<Point>, bool)> = operand
+        .iter()
+        .map(|outline| {
+            let points = if outline.closed {
+                flatten_closed(outline.anchors, flatten_mm)
+            } else {
+                flatten_open(outline.anchors, flatten_mm)
+            };
+            (points, outline.closed)
+        })
+        .collect();
+    let near = |point: Point| {
+        polylines.iter().any(|(points, closed)| {
+            let n = points.len();
+            let edges = if *closed { n } else { n.saturating_sub(1) };
+            (0..edges)
+                .any(|i| point_segment_distance(point, points[i], points[(i + 1) % n]) < threshold)
+        })
+    };
+    rings.retain(|ring| {
+        let n = ring.len();
+        let close = [0, n / 3, 2 * n / 3]
+            .into_iter()
+            .filter(|&i| near(to_millimetres(&ring[i])))
+            .count();
+        close < 2
+    });
+    rings
 }
 
 /// What [`offset`] works with once its input passed the checks.
