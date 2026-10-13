@@ -1,6 +1,6 @@
 # Path offset: Outset and Inset by dragging a handle, with curves kept as curves
 
-Status: In progress (rework 2026-10-12 after customer review of #115, amended 2026-10-13, built on branch `story/path-offset`)
+Status: In review (rework 2026-10-12 after customer review of #115, amended 2026-10-13; built on branch `story/path-offset`, PR #115 ready for the customer)
 Priority: Should
 Origin: Customer (Inset and Outset, request of 2026-10-09; rework decisions of 2026-10-12 and 2026-10-13). R-EDIT-007 (outline/offset). Amended by `0020-undo-redo`: Ctrl+Z takes the step back.
 
@@ -236,4 +236,4 @@ Builds on: `specs/0016-boolean-operations/` (kernel, compound paths, region, ref
 Related: `specs/0023-groups/` (groups refused), `specs/0037-fracture-and-flatten/`, `specs/0033-stroke-brushes/`, `docs/adr/0003-geometry-kernel-booleans-offsetting-vcarving.md` §3, §4
 Design documents: `ux-rework.md`, `geometry-rework.md` in this folder
 ADRs: `adrs.md` (ADR 0003 §4 amendment of 2026-10-12, approved by the customer)
-PR: https://github.com/curvyo/curvyo/pull/115 (draft, to be reworked)
+PR: https://github.com/curvyo/curvyo/pull/115 (reworked, ready for review)
