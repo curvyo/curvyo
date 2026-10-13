@@ -1534,4 +1534,3 @@ at the strip. The browser build has no minimum: below about 640 px of window wid
 narrower than the bars and the Select bar is drawn over the strip and the body. **Resolution:** a
 minimum width for the editor in the browser build, or a wrap rule for the overlay row. Not needed
 for the desktop app.
-

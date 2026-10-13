@@ -159,6 +159,27 @@ compound paths), no trait, no generic. The customer chose the library on
   Select-bar entry and are deleted with it; the tester writes new ones from the
   reworked criteria.
 
+- **2026-10-13 (architect review of the rework, HEAD 8e06cd6): rulings.**
+  - **Mapping by tagged flattening, approved.** Overlaying the flattened exact
+    raw loops (Positive rule, the construction `i_overlay`'s own offsetter
+    uses internally) and labelling ring edges by exact grid lookup replaces
+    the distance heuristic of `geometry-rework.md` §2 (c) step 3. It keeps
+    `i_overlay` as the only judge of topology, as the ADR 0003 §4 amendment of
+    2026-10-12 requires, and it removes the one non-deterministic-looking step
+    of the plan. The amendment text needs no change. The polyline route stays
+    the fallback for crossing or touching outlines and unmappable rings.
+  - **Smooth result nodes are `AnchorKind::Asymmetric`, approved.** The two
+    sides of an offset node have the same tangent but different handle lengths
+    (an arc meeting a line, a cubic of another curvature), which is exactly
+    Asymmetric; Symmetric would move a handle on the first edit, Corner would
+    drop the tangent constraint. No format impact.
+  - **Determinism.** The kernel uses `kurbo` `offset_cubic` and `hypot`; the
+    `offset_golden` test runs natively and in Node on wasm32 at 1e-6 mm and
+    with segment counts, which is the check `geometry-rework.md` asked for.
+    If it ever fails, replace `offset_cubic` as written there.
+  - **The miter limit is one rule.** `ui-core/src/offset_primitive.rs` must
+    not hold its own copy of the limit; the kernel exports it.
+
 ## Flagged to the PO (criterion changes the spec invites)
 
 1. **Criterion 19 and "Miter limit": `i_overlay` clips the miter, it does
