@@ -3,7 +3,6 @@ import { useCallback, useEffect, useId, useRef } from "react";
 
 import { DocumentSection } from "@/components/panel/DocumentSection";
 import { FileTab } from "@/components/panel/FileTab";
-import { OffsetSection } from "@/components/panel/OffsetSection";
 import { HistoryTab } from "@/components/panel/HistoryTab";
 import { PanelStrip } from "@/components/panel/PanelStrip";
 import { StyleSection } from "@/components/panel/StyleSection";
@@ -288,34 +287,7 @@ export function PropertiesPanel({
                 onReturnFocus={returnFocus}
               />
             ) : doc.view.content === "style" ? (
-              <>
-                {editor.offset.open && (
-                  <OffsetSection
-                    offset={editor.offset}
-                    onDone={(byKey) => {
-                      if (!byKey) {
-                        returnFocus();
-                        return;
-                      }
-                      // After the state sync has re-rendered the Select bar and removed the
-                      // section: two frames, so the focus lands on the button that stays.
-                      requestAnimationFrame(() =>
-                        requestAnimationFrame(() => {
-                          const button = window.document.querySelector<HTMLElement>(
-                            "[data-offset-button]",
-                          );
-                          if (button) {
-                            button.focus();
-                          } else {
-                            returnFocus();
-                          }
-                        }),
-                      );
-                    }}
-                  />
-                )}
-                <StyleSection panel={panel} onReturnFocus={returnFocus} />
-              </>
+              <StyleSection panel={panel} onReturnFocus={returnFocus} />
             ) : doc.view.content === "history" ? (
               <HistoryTab
                 editor={editor}

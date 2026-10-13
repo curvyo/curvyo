@@ -1,67 +1,101 @@
-//! The Offset entry's `wasm-bindgen` surface (`specs/0038-path-offset`): what the Select bar
-//! button and the Properties panel section show, their values, and Apply. A further
-//! `impl WasmSession` block; codes and counts only (the sentences are the host's, ADR 0001 §5),
+//! The Offset tool's `wasm-bindgen` surface (`specs/0038-path-offset`): what the Offset bar, the
+//! readout chip and the notice show, the bar's values, Apply and the drag's cancel. A further
+//! `impl WasmSession` block; codes and numbers only (the sentences are the host's, ADR 0001 §5),
 //! every method a pass-through to `Session`.
 
 use curvyo_ui_core::{
-    OFFSET_DRAG_LIMIT_MM, OFFSET_TYPED_LIMIT_MM, OffsetCap, OffsetJoin, OffsetRefusal,
-    offset_cap_from_code, offset_join_from_code,
+    KindNote, OFFSET_MAX_MM, OFFSET_MIN_MM, OffsetCap, OffsetDirection, OffsetJoin, OffsetRefusal,
+    OffsetResultChoice, PrimitiveKind, offset_cap_from_code, offset_direction_from_code,
+    offset_join_from_code, offset_result_from_code,
 };
 use wasm_bindgen::prelude::*;
 
-use crate::session::{OffsetOutcome, OffsetPreviewState};
+use crate::session::{DragStop, OffsetOutcome};
 use crate::wasm_api::WasmSession;
 
-/// What the Offset entry shows. `kind` is `"closed"`, `"result"` (`vanished` of `of` operands
-/// are gone), `"zero"`, `"no_operands"`, or the refusal Apply would give: `"inset_open"`,
-/// `"out_of_range"`, `"no_area"` (`count` of `of` selected objects to blame) or `"empty"`.
+/// What the Offset bar and the readout show.
 #[wasm_bindgen]
 #[derive(Debug, Clone)]
-pub struct OffsetStateView {
-    /// The state code.
+pub struct OffsetViewJs {
+    /// Operands selected (groups not counted).
+    pub operands: u32,
+    /// An open path is selected: Ends applies.
+    pub has_open: bool,
+    /// The selection holds a group.
+    pub has_group: bool,
+    /// The handles are drawn.
+    pub handles: bool,
+    /// A drag is in flight.
+    pub dragging: bool,
+    /// The signed distance shown: positive outward.
+    pub distance_mm: f64,
+    /// Both sides.
+    pub both: bool,
+    /// The release or Apply changes the original.
+    pub change: bool,
+    /// `""`, `"nothing_left"` or `"inset_open"`.
+    #[wasm_bindgen(getter_with_clone)]
+    pub stop: String,
+    /// Operands whose inset vanishes in the preview.
+    pub vanished: u32,
+    /// Operands the preview covers.
+    pub of: u32,
+    /// The preview is replaced by the grown box.
+    pub large: bool,
+    /// `""`, `"becomes_path"` or `"stays_<kind>"` (`rectangle`, `circle`, `ellipse`, `polygon`,
+    /// `star`).
     #[wasm_bindgen(getter_with_clone)]
     pub kind: String,
-    /// Objects to blame.
-    pub count: u32,
-    /// Operands or selected objects.
-    pub of: u32,
-    /// Operands that vanish.
-    pub vanished: u32,
-    /// The Offset button is shown.
-    pub offered: bool,
-    /// An open path is selected: the Cap choice is shown.
-    pub has_open: bool,
-    /// The distance in millimetres.
-    pub distance_mm: f64,
+    /// `""` or the refusal code of the preview (see [`OffsetOutcomeJs`]).
+    #[wasm_bindgen(getter_with_clone)]
+    pub refusal: String,
+    /// The bar's Distance in millimetres.
+    pub bar_distance_mm: f64,
+    /// `"out"`, `"in"` or `"both"`.
+    #[wasm_bindgen(getter_with_clone)]
+    pub direction: String,
     /// `"round"`, `"miter"` or `"bevel"`.
     #[wasm_bindgen(getter_with_clone)]
     pub join: String,
     /// `"round"`, `"flat"` or `"square"`.
     #[wasm_bindgen(getter_with_clone)]
     pub cap: String,
-    /// The largest typed distance either way.
-    pub typed_limit_mm: f64,
-    /// The largest dragged distance either way.
-    pub drag_limit_mm: f64,
+    /// `"new"` or `"change"`.
+    #[wasm_bindgen(getter_with_clone)]
+    pub result: String,
+    /// The smallest Distance.
+    pub min_mm: f64,
+    /// The largest Distance.
+    pub max_mm: f64,
 }
 
-/// What `apply_offset` did. `kind` is `"ignored"`, `"closed_zero"`, `"applied"` (`count` shapes
-/// added, `vanished` of `of` operands gone, at `distance_mm`), `"groups"` (`count` leaves
-/// outlined) or a refusal code of [`OffsetStateView`].
+/// What a release or Apply did. `kind` is `"ignored"`, `"applied"` (`added` new, `changed`
+/// changed, at `distance_mm` in `direction`, `vanished` of `of` gone, `open_left_out` open paths
+/// left out), `"groups"` (`count` leaves outlined), or a refusal: `"inset_open"`,
+/// `"out_of_range"`, `"no_area"` (`count` of `of` to blame) or `"empty"` (at `distance_mm`).
 #[wasm_bindgen]
 #[derive(Debug, Clone)]
-pub struct OffsetResultView {
+pub struct OffsetOutcomeJs {
     /// The outcome code.
     #[wasm_bindgen(getter_with_clone)]
     pub kind: String,
-    /// Shapes added, or objects to blame.
+    /// New objects.
+    pub added: u32,
+    /// Changed originals.
+    pub changed: u32,
+    /// Objects to blame.
     pub count: u32,
     /// Operands or selected objects.
     pub of: u32,
-    /// Operands that vanished.
+    /// Operands whose inset vanished.
     pub vanished: u32,
-    /// The signed distance in millimetres.
+    /// Open paths left out of an inset.
+    pub open_left_out: u32,
+    /// The unsigned distance in millimetres.
     pub distance_mm: f64,
+    /// `"out"`, `"in"` or `"both"`.
+    #[wasm_bindgen(getter_with_clone)]
+    pub direction: String,
 }
 
 fn count(n: usize) -> u32 {
@@ -77,6 +111,14 @@ fn refusal_code(refusal: &OffsetRefusal) -> (&'static str, usize, usize) {
         OffsetRefusal::OutOfRange { offenders, of } => ("out_of_range", offenders.len(), *of),
         OffsetRefusal::NoArea { offenders, of } => ("no_area", offenders.len(), *of),
         OffsetRefusal::Empty => ("empty", 0, 0),
+    }
+}
+
+const fn direction_code(direction: OffsetDirection) -> &'static str {
+    match direction {
+        OffsetDirection::Out => "out",
+        OffsetDirection::In => "in",
+        OffsetDirection::Both => "both",
     }
 }
 
@@ -96,80 +138,135 @@ const fn cap_code(cap: OffsetCap) -> &'static str {
     }
 }
 
-impl From<OffsetOutcome> for OffsetResultView {
+fn kind_code(note: Option<KindNote>) -> &'static str {
+    match note {
+        None => "",
+        Some(KindNote::BecomesPath) => "becomes_path",
+        Some(KindNote::Stays(kind)) => match kind {
+            PrimitiveKind::Rectangle => "stays_rectangle",
+            PrimitiveKind::Circle => "stays_circle",
+            PrimitiveKind::Ellipse => "stays_ellipse",
+            PrimitiveKind::Polygon => "stays_polygon",
+            PrimitiveKind::Star => "stays_star",
+        },
+    }
+}
+
+impl From<OffsetOutcome> for OffsetOutcomeJs {
     fn from(outcome: OffsetOutcome) -> Self {
-        let view = |kind: &str, n: usize, of: usize, vanished: usize, distance_mm: f64| Self {
-            kind: kind.to_string(),
-            count: count(n),
-            of: count(of),
-            vanished: count(vanished),
-            distance_mm,
+        let mut view = Self {
+            kind: "ignored".to_string(),
+            added: 0,
+            changed: 0,
+            count: 0,
+            of: 0,
+            vanished: 0,
+            open_left_out: 0,
+            distance_mm: 0.0,
+            direction: String::new(),
         };
         match outcome {
-            OffsetOutcome::Ignored => view("ignored", 0, 0, 0, 0.0),
-            OffsetOutcome::ClosedAtZero => view("closed_zero", 0, 0, 0, 0.0),
+            OffsetOutcome::Ignored => {}
             OffsetOutcome::Applied {
                 added,
+                changed,
+                distance_mm,
+                direction,
                 vanished,
                 of,
+                open_left_out,
+            } => {
+                view.kind = "applied".to_string();
+                view.added = count(added);
+                view.changed = count(changed);
+                view.distance_mm = distance_mm;
+                view.direction = direction_code(direction).to_string();
+                view.vanished = count(vanished);
+                view.of = count(of);
+                view.open_left_out = count(open_left_out);
+            }
+            OffsetOutcome::RefusedGroups { leaves } => {
+                view.kind = "groups".to_string();
+                view.count = count(leaves);
+            }
+            OffsetOutcome::Refused {
+                refusal,
                 distance_mm,
-            } => view("applied", added, of, vanished, distance_mm),
-            OffsetOutcome::RefusedGroups { leaves } => view("groups", leaves, leaves, 0, 0.0),
-            OffsetOutcome::Refused(refusal) => {
+            } => {
                 let (code, n, of) = refusal_code(&refusal);
-                view(code, n, of, 0, 0.0)
+                view.kind = code.to_string();
+                view.count = count(n);
+                view.of = count(of);
+                view.distance_mm = distance_mm;
             }
         }
+        view
     }
 }
 
 #[wasm_bindgen]
 impl WasmSession {
-    /// Everything the Offset button and section show. Call it with every other state read.
+    /// Everything the Offset bar and the readout show. Read it with every other state read.
     #[must_use]
-    pub fn offset_state(&self) -> OffsetStateView {
-        let availability = self.session.offset_availability();
-        let settings = self.session.offset_settings();
-        let (kind, n, of, vanished) = match self.session.offset_preview_state() {
-            OffsetPreviewState::Closed => ("closed", 0, 0, 0),
-            OffsetPreviewState::Result { vanished, of } => ("result", 0, of, vanished),
-            OffsetPreviewState::Refused(refusal) => {
-                let (code, n, of) = refusal_code(&refusal);
-                (code, n, of, 0)
+    pub fn offset_view(&self) -> OffsetViewJs {
+        let view = self.session.offset_view();
+        let bar = self.session.offset_bar();
+        OffsetViewJs {
+            operands: count(view.operands),
+            has_open: view.has_open,
+            has_group: view.has_group,
+            handles: view.handles,
+            dragging: view.dragging,
+            distance_mm: view.distance_mm,
+            both: view.both,
+            change: view.change,
+            stop: match view.stop {
+                None => "",
+                Some(DragStop::NothingLeft) => "nothing_left",
+                Some(DragStop::InsetNeedsClosed) => "inset_open",
             }
-            OffsetPreviewState::RefusedGroups { leaves } => ("groups", leaves, leaves, 0),
-        };
-        OffsetStateView {
-            kind: kind.to_string(),
-            count: count(n),
-            of: count(of),
-            vanished: count(vanished),
-            offered: availability.offered,
-            has_open: availability.has_open,
-            distance_mm: settings.distance_mm(),
-            join: join_code(settings.join()).to_string(),
-            cap: cap_code(settings.cap()).to_string(),
-            typed_limit_mm: OFFSET_TYPED_LIMIT_MM,
-            drag_limit_mm: OFFSET_DRAG_LIMIT_MM,
+            .to_string(),
+            vanished: count(view.vanished),
+            of: count(view.of),
+            large: view.large,
+            kind: kind_code(view.kind_note).to_string(),
+            refusal: view
+                .refusal
+                .as_ref()
+                .map_or("", |refusal| refusal_code(refusal).0)
+                .to_string(),
+            bar_distance_mm: bar.distance_mm(),
+            direction: direction_code(bar.direction()).to_string(),
+            join: join_code(bar.join()).to_string(),
+            cap: cap_code(bar.cap()).to_string(),
+            result: match bar.result() {
+                OffsetResultChoice::NewObject => "new",
+                OffsetResultChoice::ChangeOriginal => "change",
+            }
+            .to_string(),
+            min_mm: OFFSET_MIN_MM,
+            max_mm: OFFSET_MAX_MM,
         }
     }
 
-    /// Opens the Offset entry for the selection; returns whether it opened.
-    pub fn open_offset(&mut self) -> bool {
-        self.session.open_offset()
-    }
-
-    /// Closes the Offset entry without writing.
-    pub fn close_offset(&mut self) {
-        self.session.close_offset();
-    }
-
-    /// Sets the distance in millimetres; returns whether it was within the typed range.
+    /// Sets the Distance in millimetres; returns whether it was within the range (it is clamped
+    /// otherwise).
     pub fn set_offset_distance(&mut self, distance_mm: f64) -> bool {
         self.session.set_offset_distance(distance_mm)
     }
 
-    /// Sets the join (`"round"`, `"miter"`, `"bevel"`).
+    /// Sets the Direction (`"out"`, `"in"`, `"both"`).
+    ///
+    /// # Errors
+    /// A `JsValue` if the code is none of those.
+    pub fn set_offset_direction(&mut self, code: &str) -> Result<(), JsValue> {
+        let direction = offset_direction_from_code(code)
+            .ok_or_else(|| JsValue::from_str(&format!("unknown direction: {code}")))?;
+        self.session.set_offset_direction(direction);
+        Ok(())
+    }
+
+    /// Sets the Corners (`"round"`, `"miter"`, `"bevel"`).
     ///
     /// # Errors
     /// A `JsValue` if the code is none of those.
@@ -180,7 +277,7 @@ impl WasmSession {
         Ok(())
     }
 
-    /// Sets the cap (`"round"`, `"flat"`, `"square"`).
+    /// Sets the Ends (`"round"`, `"flat"`, `"square"`).
     ///
     /// # Errors
     /// A `JsValue` if the code is none of those.
@@ -191,8 +288,37 @@ impl WasmSession {
         Ok(())
     }
 
-    /// Applies the previewed offset in one commit.
-    pub fn apply_offset(&mut self) -> OffsetResultView {
+    /// Sets the Result (`"new"`, `"change"`).
+    ///
+    /// # Errors
+    /// A `JsValue` if the code is none of those.
+    pub fn set_offset_result(&mut self, code: &str) -> Result<(), JsValue> {
+        let result = offset_result_from_code(code)
+            .ok_or_else(|| JsValue::from_str(&format!("unknown result: {code}")))?;
+        self.session.set_offset_result(result);
+        Ok(())
+    }
+
+    /// Focus entered (`true`) or left the Offset bar.
+    pub fn set_offset_bar_focus(&mut self, focused: bool) {
+        self.session.set_offset_bar_focus(focused);
+    }
+
+    /// Applies the bar's values to the selection in one commit.
+    pub fn apply_offset(&mut self) -> OffsetOutcomeJs {
         self.session.apply_offset().into()
+    }
+
+    /// What the last release did, once; `"ignored"` when nothing happened since.
+    pub fn take_offset_outcome(&mut self) -> OffsetOutcomeJs {
+        self.session
+            .take_offset_outcome()
+            .unwrap_or(OffsetOutcome::Ignored)
+            .into()
+    }
+
+    /// The other mouse button during a drag: cancels it; returns whether one was in flight.
+    pub fn cancel_offset_drag(&mut self) -> bool {
+        self.session.cancel_offset_drag()
     }
 }

@@ -60,9 +60,6 @@ interface ValueFieldProps {
   /** Enter or Tab in the typed field: `"committed"`, `"unchanged"` or `"invalid:<code>"`. */
   onSubmit: (text: string) => string;
   onReturnFocus: () => void;
-  /** The field's `aria-keyshortcuts`; a field whose Enter does something else leaves Enter
-   * out. */
-  keyShortcuts?: string;
 }
 
 /** `aria-valuenow` without the float noise of the scale (14.000000000000002). */
@@ -104,7 +101,6 @@ export function ValueField({
   onReset,
   onSubmit,
   onReturnFocus,
-  keyShortcuts = "Control+Backspace Enter F2",
 }: ValueFieldProps) {
   const [typing, setTyping] = useState<{ initial?: string } | null>(null);
 
@@ -196,7 +192,7 @@ export function ValueField({
             aria-valuetext={
               mixed ? "Mixed" : `${text} ${text === "1" && unitWordOne ? unitWordOne : unitWords}`
             }
-            aria-keyshortcuts={keyShortcuts}
+            aria-keyshortcuts="Control+Backspace Enter F2"
             onKeyDown={onKeyDown}
             {...handlers}
             className="relative h-7 w-[244px] cursor-ew-resize overflow-hidden rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] bg-white outline-none hover:border-[var(--toolbar-icon)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)]"

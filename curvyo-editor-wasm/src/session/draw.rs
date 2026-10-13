@@ -86,8 +86,9 @@ impl Session {
                 view,
             ));
         }
-        // The blue hollow outline of the Offset result (`specs/0038-path-offset` criterion 2).
-        list.extend(self.offset_preview_list(view));
+        // The Offset tool: the blue hollow result, the box and its four handles
+        // (`specs/0038-path-offset` criteria 9, 14, 18).
+        list.extend(self.offset_draw_list(view));
         // The red hollow outline of the objects a refused boolean operation names.
         let refused = self.refusal_objects(&objects);
         if !refused.is_empty() {

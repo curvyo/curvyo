@@ -77,7 +77,7 @@ pub use session::{
     KeyInput, KeyOutcome, MoveIndicators, ObjectWipeOutcome, PanelTabsRecord, PanelView, Session,
     SizeOutcome, SplitOutcome, Tool, WipeOutcome, WipeState,
 };
-pub use session::{OFFSET_COMMIT_LABEL, OffsetOutcome, OffsetPreviewState};
+pub use session::{DragStop, OFFSET_COMMIT_LABEL, OffsetOutcome, OffsetView};
 
 #[cfg(target_arch = "wasm32")]
 pub use wasm_api::{WasmSession, init_panic_hook};

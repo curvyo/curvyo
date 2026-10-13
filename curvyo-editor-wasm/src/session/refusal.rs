@@ -40,7 +40,9 @@ impl Session {
         let Some(marks) = &self.command_refusal else {
             return Vec::new();
         };
-        if self.tool != Tool::Select || self.selection.ids() != marks.selection.as_slice() {
+        if !matches!(self.tool, Tool::Select | Tool::Offset)
+            || self.selection.ids() != marks.selection.as_slice()
+        {
             return Vec::new();
         }
         objects

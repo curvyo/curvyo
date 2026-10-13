@@ -35,20 +35,6 @@ export interface SelectToolbarProps {
   /** Returns the keyboard focus to the canvas (after Enter or Escape in a
    * field). */
   onReturnFocus: () => void;
-  /** The Offset button, last (`specs/0038-path-offset`, row "Offset section"). */
-  offset?: OffsetButtonProps;
-}
-
-/** The Offset button of the Select bar and the notice under it. */
-export interface OffsetButtonProps {
-  /** An operand is selected: the button is in the bar. */
-  offered: boolean;
-  /** The Offset section is open: the button shows the open ground. */
-  open: boolean;
-  /** Opens or closes the section; `byKey` for a keyboard press. */
-  onToggle: (byKey: boolean) => void;
-  /** The success notice of the last Apply, 4 px under the button. */
-  notice: string | null;
 }
 
 const MIN_POINT_COUNT = 3;
@@ -449,7 +435,6 @@ export function SelectToolbar({
   onCancelRatio,
   onConvertToPaths,
   onReturnFocus,
-  offset,
 }: SelectToolbarProps) {
   const barRef = useRef<HTMLDivElement>(null);
   useRowStarts(barRef);
@@ -508,37 +493,6 @@ export function SelectToolbar({
       >
         Object to path
       </button>,
-    );
-  }
-  if (offset?.offered) {
-    groups.push(
-      <div key="offset" className="relative my-1">
-        <button
-          type="button"
-          data-offset-button=""
-          aria-expanded={offset.open}
-          title="Offset: makes a bigger or smaller copy at a distance. Opens in the Properties panel."
-          onClick={(event) => offset.onToggle(event.detail === 0)}
-          className={`${BUTTON_CLASS} rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)]`}
-          style={offset.open ? { background: "var(--editor-accent-hover)" } : undefined}
-        >
-          Offset
-        </button>
-        <div role="status" className="absolute top-full right-0 z-30 mt-1 w-max max-w-[360px] text-xs">
-          {offset.notice !== null ? (
-            <div
-              className="rounded-lg p-2"
-              style={{
-                background: "var(--toolbar-bg)",
-                color: "var(--toolbar-icon)",
-                boxShadow: "var(--panel-elevation-shadow)",
-              }}
-            >
-              {offset.notice}
-            </div>
-          ) : null}
-        </div>
-      </div>,
     );
   }
   return (

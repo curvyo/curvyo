@@ -27,16 +27,21 @@ pub enum DoubleClickHint {
     /// The sentence that a compound path's nodes cannot be edited yet
     /// (`0016-boolean-operations` criterion 38).
     CompoundPath,
+    /// A handle of the Offset tool: focus the bar's Distance field
+    /// (`specs/0038-path-offset` criterion 13).
+    OffsetDistance,
 }
 
 impl DoubleClickHint {
-    /// The code the host keys its text on: `""`, `"edit_hint"` or `"compound_path"`.
+    /// The code the host keys its text or action on: `""`, `"edit_hint"`, `"compound_path"` or
+    /// `"offset_distance"`.
     #[must_use]
     pub const fn code(self) -> &'static str {
         match self {
             Self::None => "",
             Self::EditHint => "edit_hint",
             Self::CompoundPath => "compound_path",
+            Self::OffsetDistance => "offset_distance",
         }
     }
 }

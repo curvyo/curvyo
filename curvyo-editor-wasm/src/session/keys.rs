@@ -171,7 +171,7 @@ impl Session {
     /// The selection as the key table sees it: only the Select tool's
     /// object selection counts.
     fn selected_for_keys(&self) -> Selected {
-        if self.tool != Tool::Select {
+        if !matches!(self.tool, Tool::Select | Tool::Offset) {
             return Selected::None;
         }
         match self.selection.ids().len() {
@@ -192,6 +192,7 @@ impl Session {
             Tool::Rectangle => self.rectangle.drag_in_flight(),
             Tool::Ellipse => self.ellipse.drag_in_flight(),
             Tool::PolygonStar => self.poly_star.drag_in_flight(),
+            Tool::Offset => self.offset_drag_in_flight() || self.select.drag_in_flight(),
             Tool::Pen => false,
         };
         // A drag of a panel value field is a drag too (`specs/0020-undo-redo` criterion 6a).
@@ -316,6 +317,13 @@ impl Session {
             }
             Tool::Node => self.node.cancel_drag(),
             Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar => self.shape_escape(),
+            Tool::Offset => {
+                let marquee = self.select.drag_in_flight();
+                if marquee {
+                    self.select.escape();
+                }
+                self.cancel_offset_drag() || marquee
+            }
             Tool::Pen => false,
         }
     }
@@ -324,7 +332,7 @@ impl Session {
     /// (`specs/0010-edit-interaction-polish/` criterion 42), and the document is
     /// never written:
     ///
-    /// 1. an open entry chip or the Offset entry closes;
+    /// 1. an open entry chip closes;
     /// 2. a drag in flight is cancelled and the selection stays as it was;
     /// 3. the tool's own state is cleared: the Pen path (also during a handle
     ///    drag, steps 2 and 3 in one), the Node tool's node and segment
@@ -339,10 +347,6 @@ impl Session {
         if self.colour_pick_target().is_some() {
             self.end_colour_pick();
             return EscapeStep::ClearedState;
-        }
-        if self.offset_open() {
-            self.close_offset();
-            return EscapeStep::ClosedEntry;
         }
         if self.select.has_entry() {
             self.select.cancel_entry();
@@ -366,7 +370,7 @@ impl Session {
         let cleared = match self.tool {
             Tool::Pen | Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar => false,
             Tool::Node => self.node.clear_selection(),
-            Tool::Select => {
+            Tool::Select | Tool::Offset => {
                 let had = !self.selection.is_empty();
                 self.selection.clear();
                 self.select.end_cycle();
@@ -425,7 +429,7 @@ impl Session {
                         .delete_selected(&this.document, &objects, &mut this.selection);
                 }
                 Tool::Node => this.node.delete_selected(&this.document),
-                Tool::Pen | Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar => {}
+                Tool::Pen | Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar | Tool::Offset => {}
             }
         });
     }
@@ -467,7 +471,8 @@ mod tests {
         }
     }
 
-    /// Criterion 54: B, N, E and `*` select their tool in every state.
+    /// Criterion 54: B, N, E and `*` select their tool in every state; so does O
+    /// (`specs/0038-path-offset` criterion 2).
     #[test]
     fn b_n_e_and_star_select_their_tool_in_every_state() {
         for tool in TOOLS {
@@ -477,6 +482,7 @@ mod tests {
                     ("n", Tool::Node),
                     ("e", Tool::Ellipse),
                     ("*", Tool::PolygonStar),
+                    ("o", Tool::Offset),
                 ] {
                     assert_eq!(
                         decide(&key(k), state(tool, selected)),

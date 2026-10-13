@@ -97,7 +97,7 @@ pub use history_rows::{WipeOutcome, WipeState};
 pub use keys::{EscapeStep, KeyHint, KeyInput, KeyOutcome};
 pub use move_indicators::MoveIndicators;
 pub use object_history::ObjectWipeOutcome;
-pub use offset::{OFFSET_COMMIT_LABEL, OffsetOutcome, OffsetPreviewState};
+pub use offset::{DragStop, OFFSET_COMMIT_LABEL, OffsetOutcome, OffsetView};
 pub use panel_tabs::{PanelTabsRecord, PanelView};
 pub use project::APP_VERSION;
 pub use select::DoubleClickHint;
@@ -158,6 +158,9 @@ pub enum Tool {
     Ellipse,
     /// The polygon/star tool (acceptance criteria 10-15).
     PolygonStar,
+    /// The Offset tool (`specs/0038-path-offset` criteria 1, 2): handles on the selection box,
+    /// its options in the Offset bar.
+    Offset,
 }
 
 /// One open document's whole editing session.
@@ -258,10 +261,9 @@ pub struct Session {
     grouping_result: Option<grouping::GroupingResult>,
     /// What a screen reader hears about the context, until the host has taken it.
     context_announcement: Option<String>,
-    /// The Offset entry and its preview (`specs/0038-path-offset`).
-    offset: offset::OffsetEntry,
-    /// The Offset entry's values, remembered for the session (criterion 1).
-    offset_settings: curvyo_ui_core::OffsetSettings,
+    /// The Offset tool: its bar's values (session memory), drag and preview
+    /// (`specs/0038-path-offset`).
+    offset: offset::OffsetTool,
 }
 
 impl Session {
@@ -315,8 +317,7 @@ impl Session {
             context_cache: context::ContextCache::default(),
             grouping_result: None,
             context_announcement: None,
-            offset: offset::OffsetEntry::default(),
-            offset_settings: curvyo_ui_core::OffsetSettings::default(),
+            offset: offset::OffsetTool::default(),
         }
     }
 
@@ -366,8 +367,7 @@ impl Session {
             context_cache: context::ContextCache::default(),
             grouping_result: None,
             context_announcement: None,
-            offset: offset::OffsetEntry::default(),
-            offset_settings: curvyo_ui_core::OffsetSettings::default(),
+            offset: offset::OffsetTool::default(),
         })
     }
 
@@ -427,6 +427,7 @@ impl Session {
             }
             if tool != this.tool {
                 this.command_refusal = None;
+                this.cancel_offset_drag();
             }
             this.tool = tool;
         });
@@ -478,6 +479,9 @@ impl Session {
                 Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar => {
                     this.shape_pointer_down(point);
                 }
+                Tool::Offset => {
+                    this.offset_pointer_down(point, shift);
+                }
             }
         });
     }
@@ -526,6 +530,9 @@ impl Session {
             Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar => {
                 self.shape_pointer_move(point, Modifiers::new(shift, constrain));
             }
+            Tool::Offset => {
+                self.offset_hover(point);
+            }
             Tool::Pen => {}
         }
     }
@@ -573,6 +580,9 @@ impl Session {
                 Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar => {
                     this.shape_pointer_up(point, Modifiers::new(shift, constrain));
                 }
+                Tool::Offset => {
+                    this.offset_pointer_up(point, shift, constrain);
+                }
             }
         });
     }
@@ -604,7 +614,10 @@ impl Session {
                 Tool::Pen => this.finish_pen(),
                 Tool::Node => this.insert_at(point),
                 Tool::Select => return this.select_double_click(point, shift, ctrl),
-                Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar => {}
+                Tool::Offset if this.offset_handle_hit(point) => {
+                    return DoubleClickHint::OffsetDistance;
+                }
+                Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar | Tool::Offset => {}
             }
             DoubleClickHint::None
         })

@@ -63,6 +63,12 @@ fn enter_acts(input: &KeyInput<'_>, state: KeyState) -> bool {
         && !state.entry_open
 }
 
+/// Whether the active tool selects objects: the Select tool and the Offset tool
+/// (`specs/0038-path-offset` criterion 27) take Ctrl+A and the arrows.
+fn selects(state: KeyState) -> bool {
+    matches!(state.tool, Tool::Select | Tool::Offset)
+}
+
 /// The key table and its gate (criteria 54, 55, 60, 61) as a pure function:
 /// the one place that says what a key does in which state.
 pub(super) fn decide(input: &KeyInput<'_>, state: KeyState) -> KeyAction {
@@ -96,7 +102,7 @@ pub(super) fn decide(input: &KeyInput<'_>, state: KeyState) -> KeyAction {
         let acts = gate_open
             && !input.ctrl
             && !input.alt
-            && state.tool == Tool::Select
+            && selects(state)
             && state.selected != Selected::None;
         return if acts {
             KeyAction::Nudge(arrow)
@@ -105,8 +111,7 @@ pub(super) fn decide(input: &KeyInput<'_>, state: KeyState) -> KeyAction {
         };
     }
     if input.ctrl && input.key.eq_ignore_ascii_case("a") {
-        let acts =
-            gate_open && !input.alt && !input.shift && !input.repeat && state.tool == Tool::Select;
+        let acts = gate_open && !input.alt && !input.shift && !input.repeat && selects(state);
         return if acts {
             KeyAction::SelectAll
         } else {
@@ -140,6 +145,7 @@ pub(super) fn decide(input: &KeyInput<'_>, state: KeyState) -> KeyAction {
         (Some('b'), _) => Binding::Tool(Tool::Pen),
         (Some('n'), _) => Binding::Tool(Tool::Node),
         (Some('e'), _) => Binding::Tool(Tool::Ellipse),
+        (Some('o'), _) => Binding::Tool(Tool::Offset),
         (_, "*") => Binding::Tool(Tool::PolygonStar),
         (Some('r'), _) => Binding::Entry(EntryKey::Angle, Tool::Rectangle),
         (Some('s'), _) => Binding::Entry(EntryKey::Size, Tool::Select),
