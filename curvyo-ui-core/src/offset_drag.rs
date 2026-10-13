@@ -95,7 +95,7 @@ fn snap_step(scale: f64) -> f64 {
 }
 
 /// `d` snapped: to the bar's value `bar_mm` (either sign) when the pointer is within 6 pixels of
-/// where that value puts it, otherwise to the step of [`snap_step`].
+/// where that value puts it, otherwise to the smallest step of the snap series that is at least 2 pixels on screen.
 #[must_use]
 pub fn snap_distance(d: f64, scale: f64, bar_mm: f64) -> f64 {
     // The pointer moves `sqrt(2)` times `d` along the diagonal.
