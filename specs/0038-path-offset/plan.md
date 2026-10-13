@@ -1,92 +1,120 @@
-# Plan for Path offset: Outset and Inset by a typed distance, with a live preview
+# Plan for Path offset: Outset and Inset by dragging a handle, with curves kept as curves
 
-One branch `story/path-offset`, one PR, five milestones (commits on the branch, each green). No
-`format_version` change, no new crate, no new dependency, no `Cargo.toml` change. Acceptance criteria
-(AC) numbers are those of `specification.md`. Built exactly as specified; `0054` (combine open paths)
-amends Outset/Inset later and is not anticipated here.
+Rework of 2026-10-13 for the specification rewritten on 2026-10-12 (51 criteria). One branch
+`story/path-offset`, one PR (#115, reworked; no new PR), seven milestones, each a green commit pushed
+to the branch. No `format_version` change, no new crate, no new dependency, no `Cargo.toml` change.
+AC numbers are those of the reworked `specification.md`.
+
+## What stays from the first build, what goes
+
+- **Stays:** the `i_overlay` topology work (integer grid, `MathMode::Integer`, the polyline offsetter
+  as the per-outline fallback of AC 39), the refusal codes and refusal outlines, `history_names`
+  (`offset_path` → "Offset"), the blue hollow preview stroke, the golden and property tests (adapted
+  to curve results), the session's preview cache keyed by document version and values.
+- **Goes (no dead code):** the Select bar "Offset" button, the Properties panel Offset section
+  (`OffsetSection.tsx`, its `PropertiesPanel` wiring, `useOffset.ts`), the entry open/close state
+  of `session/offset.rs`, the drag range of ±50 mm, `add_paths_above` (replaced by the one offset
+  write, which places copies below or above and changes originals), polyline-only result tests
+  whose criteria no longer exist.
 
 ## Affected crates/modules
 
-- `curvyo-geometry-core`: new `src/offset.rs` (the kernel: `offset`, `OffsetJoin`, `OffsetCap`,
-  `OffsetError`), `flatten.rs` (an open-polyline flattener next to `flatten_closed`), `lib.rs`
-  (exports), `boolean.rs` (`grid_paths` and the `BooleanResult` constructor shared with `crate`),
-  new `tests/offset.rs` (AC 15 to 20, properties), `tests/offset_performance.rs` (AC 3 budget).
-- `curvyo-document-core`: `replace.rs`, one additive command `add_paths_above` (AC 10, 13).
-- `curvyo-ui-core`: new `offset_entry.rs` (entry values, ranges, session memory) and `offset_plan.rs` (availability, the plan
-  per operand with refusals and fresh anchor ids), `lib.rs` exports.
-- `curvyo-render-core`: the blue hollow preview outlines, reusing the live-preview stroke (no new layer
-  kind if the existing preview path fits).
-- `curvyo-editor-wasm`: new `session/offset.rs` (open/close, preview cache, apply, Escape cascade,
-  closing on tool/selection change and empty-canvas press), new `wasm_offset.rs`, small additive hooks
-  in `session/mod.rs`, `session/keys.rs`, the render frame.
-- `frontend/`: Offset text button last in the Select bar, the Offset section at the top of the Style
-  tab, caption, notices and refusal texts (new `lib/offsetText.ts`), wiring in `useEditorSession.ts`.
+- `curvyo-geometry-core`: `offset.rs` stays the entry point and returns curve outlines; new
+  `offset_pieces.rs` (the exact raw offset of one operand: parallel lines, `kurbo::offset::offset_cubic`,
+  join arcs as cubics, miter/miter-clip/bevel lines, caps), new `offset_rebuild.rs` (flatten the raw
+  offset with a tag per vertex, `i_overlay` overlay with the Positive rule decides topology, map every
+  ring back onto the exact pieces, the per-ring polyline fallback and its deviation check),
+  `lib.rs` exports.
+- `curvyo-document-core`: `replace.rs`, one command `write_offset` (copies below/above their source,
+  changed originals keep id and place, primitive fields or conversion to a path) in one commit,
+  replacing `add_paths_above`.
+- `curvyo-ui-core`: `offset_entry.rs` (bar values: unsigned distance 0.01..1000 mm, Direction, Corners,
+  Ends, Result; codes), new `offset_primitive.rs` (the "stays a primitive" table), new `offset_drag.rs`
+  (handle placement, d from the drag, snap series and snap to the bar value), `offset_plan.rs` (per
+  operand and side: primitive or curve path, vanish counts, refusals, the writes for New object /
+  Change original / Both / Shift+Ctrl, z-order).
+- `curvyo-render-core`: `offset_preview.rs` draws curve outlines (flattened for the stroke), the four
+  handles and the dashed grown box of a large selection.
+- `curvyo-editor-wasm`: `Tool::Offset`; `session/offset.rs` (bar values, handle hit, drag with
+  modifiers, preview per frame with drop of stale work, release writes one commit, Escape/other
+  button cancel, Apply route, selection in the tool); `wasm_offset.rs` (state for the bar, readout and
+  notice as codes and numbers); key **O**.
+- `frontend/`: the "Path tools" rail card with the Offset tool, the Offset bar (`OffsetToolbar.tsx`),
+  the readout chip, the notice; sentences in `lib/offsetText.ts`; removal of the Select bar button and
+  the panel section.
+- Docs: `docs/design-system.md` rows, `docs/technical-debt.md`, `adrs.md` implementer notes.
 
 ## Milestones and tasks
 
-### Milestone 1: the kernel (AC 6, 7, 8, 9, 11, 12, 15 to 20, 3)
+### M1 Curves stay curves: the kernel (AC 28, 30, 31, 33 to 39, 44 to 49)
 
-- [x] 1.1 Tests first (`tests/offset.rs`): square Miter/Round/Bevel/Inset/empty/9.99 (AC 15), ring (AC 16),
-  open line with the three caps and refused inset (AC 17), L-shape reflex corner (AC 18), miter limit
-  on a square and a 20-degree triangle (AC 19), circle polyline (AC 20), self-crossing operand (AC 9),
-  output rules: corner-only, min spacing, no collinear vertex, canonical winding (AC 11), determinism
-  under operand outline order (AC 12).
-- [x] 1.2 `offset.rs`: closed pipeline `grid_paths` → `normalize` → `IntOutlineOffset::outline` →
-  `cleanup` → `canonical_millimetres`; open pipeline flatten → snap → `IntStrokeOffset::stroke(2|d|)`;
-  integer API, `MathMode::Integer`, distance rounded to the grid; joins and caps mapped as in `adrs.md`;
-  `ArcOptions.max_step` from `sqrt` only (deterministic); `miter_min_turn = min(5°, sqrt(0.04/|d|))`;
-  `validate_outline`/`validate_stroke` → out of range; empty → `OffsetError::Empty` (AC 6 to 9, 11, 12).
-- [x] 1.3 Property test: random grid polygons, outset contains the operand, inset lies inside it, area
-  monotonic in `d` (AC 6).
-- [x] 1.4 Budget test: 200 curved nodes within 50 ms in release (AC 3), in `boolean_performance` (the
-  `boolean-budgets` CI job). Measured: about 20 ms at 2 mm and 4 ms at -1 mm on the gear-like operand;
-  a 5 mm outset that fills its 4 mm pockets takes about 55 ms (open point for the lead).
-- [x] 1.5 Golden results (`tests/offset_golden.rs`, `fixtures/offset/cases.golden`), compared natively
-  and in the wasm build in CI (AC 12).
-- Note: slivers narrower on average than the flattening tolerance are dropped after the offset, so a
-  ring inset by half its width vanishes as AC 16 asks (two flattened circles meeting leave chords
-  a few micrometres apart).
+- [ ] 1.1 Tests first (`tests/offset.rs`, `tests/acceptance_0038.rs` adapted): circle path → 4 smooth
+  cubics (35), rounded rectangle path → 8 segments, sharp square Round → 8, Miter → 4 lines (36),
+  ellipse path ≤ 8 cubics within 0.01 mm of the exact offset (37), gear ≤ 400 segments and ≤ the
+  polyline count (38), fallback counter printed and zero on the numeric tests (39), node rules (33),
+  distance to the exact offset by sampling (34), numeric tests on areas of the curve result (45 to 49).
+- [ ] 1.2 `offset_pieces.rs`: raw offset loops of a closed outline (positive outer, negative hole) and of
+  an open line (both sides and caps); joins only where a gap opens, the corner point otherwise; arcs
+  one cubic per ≤ 90° (≤ 45° above 37 mm); miter-clip at 4 d.
+- [ ] 1.3 `offset_rebuild.rs`: tagged flattening, Positive overlay, mapping runs back to pieces, cut
+  at crossings (Newton on the two exact pieces), smooth/corner by tangent (0.1°), collinear lines
+  merged, nodes closer than 0.001 mm merged, deviation check against the ring, polyline fallback.
+- [ ] 1.4 Operands whose outlines cross (31) or touch take the polyline route for the whole operand.
+- [ ] 1.5 Determinism (44): golden fixture extended with curved cases (circle, ellipse, rounded
+  rectangle paths, the gear), compared natively and in the wasm build; budget test prints segment
+  counts and fallback count; 200 nodes within 50 ms at 2 mm and −1 mm (18).
 
-### Milestone 2: the document write (AC 10, 13)
+### M2 Primitives stay primitives (AC 40, 41, 43, 50, 51)
 
-- [x] 2.1 Test first, then `Document::add_paths_above(pieces, label)`: each result directly above its
-  operand, complete style copied, rotation 0, nothing deleted, one commit, anchor-id check, refusal
-  changes nothing (AC 10, 13).
+- [ ] 2.1 Tests first, then `offset_primitive.rs`: rectangle (sharp, radii, Bevel → path), circle,
+  ellipse (deterministic sampled deviation check, else path), polygon (Miter stays, Round/Bevel path),
+  star (scale while no tip or inner corner is clipped), vanishing, rotation kept.
 
-### Milestone 3: the plan in `curvyo-ui-core` (AC 1, 5, 7, 8, 10, 12, 14)
+### M3 The write (AC 16, 20, 21, 22, 42)
 
-- [x] 3.1 Tests first, then `offset_entry.rs`: `OffsetSettings` (distance with typed range ±1000 and drag
-  range ±50, default 1 mm, join, cap; session memory), `offset_availability` (operands, open paths
-  present → Cap shown, groups only → not offered) (AC 1).
-- [x] 3.2 `plan_offset`: operands in stacking order, one kernel call per operand, refusals Groups,
-  OpenInset (offenders), OutOfRange, NoArea, AllVanished(distance), partial vanish count, Distance 0 →
-  nothing; corner anchors with fresh ids (AC 5, 7, 8, 10, 12, 14).
+- [ ] 3.1 Tests first, then `Document::write_offset`: copies with the source's complete style below
+  (outset) or above (inset) the source; Change original keeps id, name and place (path geometry
+  replaced and rotation 0; primitive fields set; primitive → path in place); one commit
+  `offset_path`; refusal changes nothing. `add_paths_above` and its tests go.
 
-### Milestone 4: session, wasm API and preview (AC 2, 3, 4, 5, 13)
+### M4 The plan and the drag rules in `curvyo-ui-core` (AC 6, 7, 9, 10, 11, 19, 20, 22, 26, 29, 30, 32)
 
-- [x] 4.1 Tests first, then `session/offset.rs`: open/close, set distance/join/cap → recompute preview
-  (cached plan), apply writes the cached plan in one `offset_path` commit and selects the results,
-  closing on Escape (first step of the cascade), Cancel, tool change, selection change and a press on
-  empty canvas, refusal marks (AC 2, 4, 5, 13).
-- [x] 4.2 Preview outlines drawn blue (`--accent`) 1.5 px hollow over the unchanged originals, never
-  stored (AC 2).
-- [x] 4.3 `wasm_offset.rs`: availability, open, set values, preview status (caption code), apply outcome
-  (codes and counts; sentences are the host's).
+- [ ] 4.1 `offset_entry.rs`: bar values and codes, Direction/Result, modifier table (19, 26).
+- [ ] 4.2 `offset_drag.rs`: handle positions (12 px out on the diagonal, 24 px minimum box, rotated box
+  for one rotated object), `d = (dx sx + dy sy) / 2` in the box frame, snap series ≥ 2 px, snap to the
+  bar value within 6 px, limit 1000 mm (9, 10, 11).
+- [ ] 4.3 `offset_plan.rs`: per operand outer/inner results (primitive or path), vanish counts, the
+  open-path rules (30), groups (32), out of range and no area, and the list of writes (20 to 23).
 
-### Milestone 5: the UI (AC 1, 2, 4, 5, 7, 8, 13, 14)
+### M5 Session, wasm API and canvas (AC 2, 9 to 19, 23, 25 to 27)
 
-- [x] 5.1 Select bar: "Offset" text button last, shown while an operand is selected, `aria-expanded` (AC 1).
-- [x] 5.2 Offset section at the top of the Style tab: Distance value field, caption, Join and Cap
-  radiogroups, Apply and Cancel; two-step Enter; preview after commit/drag frame (AC 1, 2, 4, 5).
-- [x] 5.3 Notices and refusal sentences in `lib/offsetText.ts` with unit tests (AC 7, 8, 13, 14).
-- [x] 5.4 Full gate (`CLAUDE.md` §7), frontend tests and typecheck; spec `PR:` link.
+- [ ] 5.1 Tests first, then `Tool::Offset` and `session/offset.rs`: handles, drag, modifiers at
+  release, inset stop at the last non-empty d, preview cache, release = one commit and the new
+  selection, Escape and the other button cancel, Apply route, click/marquee/Ctrl+A selection, no move.
+- [ ] 5.2 Render: curve preview (blue, white casing), handles, dashed grown box over 2,000 nodes.
+- [ ] 5.3 `wasm_offset.rs`: bar state, readout state (side, d, result line, stays/becomes), notice.
+
+### M6 The UI (AC 1 to 8, 13, 15, 24, 25)
+
+- [ ] 6.1 Remove the Select bar button and the panel section (3).
+- [ ] 6.2 "Path tools" card with the Offset tool, key O, active look shared with the Tools card (1, 2).
+- [ ] 6.3 Offset bar, always all controls, greyed with reasons, wraps at 800 x 600, keyboard route
+  (4 to 8, 25); readout chip (15); notice (24); double-click focuses Distance (13).
+- [ ] 6.4 `offsetText.ts` sentences with unit tests.
+
+### M7 Docs and gate
+
+- [ ] 7.1 Design-system rows (Offset section removed, Path tools card, Offset bar, Offset handles),
+  technical-debt entry updated, `adrs.md` implementer notes.
+- [ ] 7.2 Full gate (`CLAUDE.md` §7), frontend tests and `tsc`, once.
 
 ## Validation
 
-- Unit tests in `offset.rs` and acceptance tests for AC 15 to 20 in `tests/offset.rs`, with the areas and
-  tolerances of the spec.
-- Property test (proptest): containment and area monotonicity on random grid polygons.
-- Determinism (AC 12): integer API and `MathMode::Integer`, angles computed with `sqrt` and basic
-  arithmetic only; a test compares results for permuted outline order.
-- Budget (AC 3): release-only assertion, 200 nodes under 50 ms.
-- Manual: `cd frontend && npm run dev`, select a rectangle, press Offset, drag Distance, Apply.
+- Kernel: unit and acceptance tests with exact segment counts and sampled distance to the exact offset
+  (lines and arcs analytic; cubics by dense sampling of the source curve's normals), golden fixture
+  natively and in wasm, property test (containment, monotonic area), budget test in release.
+- Primitives: table-driven tests against the formulas and against the curve kernel on the same shape
+  converted to a path (the two agree within 0.01 mm where both apply).
+- Session: unit tests of the drag state machine with synthetic pointer events.
+- Manual: `cd frontend && npm run dev`, press O, select a circle, drag a corner handle out with and
+  without Shift and Ctrl.
