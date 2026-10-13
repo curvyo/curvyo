@@ -69,16 +69,14 @@
 
 <div class="grid">
 
-<!-- 1: tool active, standing preview, center handle hovered -->
+<!-- 1: tool active, handles only (no preview), center handle hovered -->
 <figure>
 <div class="frame">
   <div class="card" aria-label="Path tools"><div class="btn" title="Offset tool (O)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.5" y="1.5" width="13" height="13" rx="3" stroke-dasharray="2.2 1.8"/><rect x="5" y="5" width="6" height="6" rx="1" fill="currentColor"/></svg></div></div>
-  <svg class="art" width="540" height="360" aria-label="Rectangle with offset handles and the standing preview">
+  <svg class="art" width="540" height="360" aria-label="Rectangle with offset handles and no preview">
     <rect x="170" y="100" width="160" height="100" fill="#F5D9A8" stroke="#000" stroke-width="1.5"/>
     <rect x="169.5" y="99.5" width="161" height="101" fill="none" stroke="#2F6FEE" stroke-width="1" stroke-dasharray="4 3"/>
-    <!-- standing preview: Outset 1 mm, Round (remembered values) -->
-    <rect x="166" y="96" width="168" height="108" rx="4" fill="none" stroke="#fff" stroke-width="4.5"/>
-    <rect x="166" y="96" width="168" height="108" rx="4" fill="none" stroke="#2F6FEE" stroke-width="1.5"/>
+    <!-- no preview: only the handles are drawn when an object is selected -->
     <g stroke="#2F6FEE" stroke-width="1.5">
       <circle cx="161.5" cy="91.5" r="5" fill="#fff"/><circle cx="161.5" cy="91.5" r="2" fill="#2F6FEE" stroke="none"/>
       <circle cx="338.5" cy="91.5" r="5" fill="#fff"/><circle cx="338.5" cy="91.5" r="2" fill="#2F6FEE" stroke="none"/>
@@ -95,7 +93,7 @@
   </svg>
   <div class="readout" style="left:265px; top:115px"><div>Double-click, O or Enter: type a distance</div></div>
 </div>
-<figcaption><b>1. Tool active, standing preview</b>Selecting the rectangle shows the result for the remembered values at once (1 mm, Out, Round, New object). Four corner handles 12 px outside the corners, the center handle in the middle (Move shell, Offset glyph). Pointer resting on the center handle: hint chip after 600 ms.</figcaption>
+<figcaption><b>1. Tool active, no preview</b>Selecting the rectangle draws only the handles; no preview is shown until a handle is dragged or the chip is open. Four corner handles 12 px outside the corners, the center handle in the middle (Move shell, Offset glyph). Pointer resting on the center handle: hint chip after 600 ms.</figcaption>
 </figure>
 
 <!-- 2: drag with readout -->
@@ -116,13 +114,11 @@
       <circle cx="357.5" cy="227.5" r="5" fill="#2F6FEE"/><circle cx="357.5" cy="227.5" r="2" fill="#fff" stroke="none"/>
     </g>
     <path d="M357.5 227.5l0 14 4-4 3 6 2-1-3-6 5 0z" fill="#000" stroke="#fff" stroke-width="1"/>
-    <!-- copy badge: 16 px left of and below the pointer -->
-    <circle cx="341.5" cy="243.5" r="8" fill="#2F6FEE" stroke="#fff" stroke-width="1"/>
-    <path d="M337.5 243.5h8M341.5 239.5v8" stroke="#fff" stroke-width="1.5"/>
+    <!-- no plus badge: no modifier = Change original, no new object (the badge shows with Ctrl or Shift) -->
   </svg>
-  <div class="readout" style="left:370px; top:171px"><div class="l1">Outset 5 mm · Round</div><div class="l2">New object</div></div>
+  <div class="readout" style="left:370px; top:171px"><div class="l1">Outset 5 mm · Round</div><div class="l2">Changes the original</div></div>
 </div>
-<figcaption><b>2. Dragging a corner handle</b>The standing preview gives way to the drag preview once the pointer leaves the 3 px dead zone. Readout line 1: side, distance, corner style (always). Line 2: the mode. The plus badge says a new object is made. <kbd>Shift</kbd> both sides, <kbd>Ctrl</kbd> change the original, <kbd>Esc</kbd> cancels, release writes.</figcaption>
+<figcaption><b>2. Dragging a corner handle</b>The drag preview appears once the pointer leaves the 3 px dead zone. Readout line 1: side, distance, corner style (always). Line 2: the effective result; with no modifier the original is changed, so no plus badge. <kbd>Shift</kbd> both sides (original becomes the outset, one new inner object), <kbd>Ctrl</kbd> new object (plus badge, "New object"), <kbd>Ctrl</kbd>+<kbd>Shift</kbd> both sides as two new objects, <kbd>Esc</kbd> cancels, release writes.</figcaption>
 </figure>
 
 <!-- 3: double-click on a corner handle -->
@@ -132,9 +128,7 @@
   <svg class="art" width="540" height="360" aria-label="Corner style stepped to Miter by a double-click">
     <rect x="170" y="100" width="160" height="100" fill="#F5D9A8" stroke="#000" stroke-width="1.5"/>
     <rect x="169.5" y="99.5" width="161" height="101" fill="none" stroke="#2F6FEE" stroke-width="1" stroke-dasharray="4 3"/>
-    <!-- standing preview redrawn with Miter: sharp corners -->
-    <rect x="166" y="96" width="168" height="108" fill="none" stroke="#fff" stroke-width="4.5"/>
-    <rect x="166" y="96" width="168" height="108" fill="none" stroke="#2F6FEE" stroke-width="1.5"/>
+    <!-- no preview on a corner-style double-click, only the readout -->
     <g stroke="#2F6FEE" stroke-width="1.5">
       <circle cx="161.5" cy="91.5" r="5" fill="#fff"/><circle cx="161.5" cy="91.5" r="2" fill="#2F6FEE" stroke="none"/>
       <circle cx="338.5" cy="91.5" r="5" fill="#D5E2FC"/><circle cx="338.5" cy="91.5" r="2" fill="#2F6FEE" stroke="none"/>
@@ -148,7 +142,7 @@
   </svg>
   <div class="readout" style="left:351px; top:36px"><div class="l1">Miter corners</div><div class="l2">For the next drag</div></div>
 </div>
-<figcaption><b>3. Double-click on a corner handle</b>Steps the corner style Round, Miter, Bevel. The standing preview redraws at once and the readout names the style. It applies to the next drag that writes, then the chip's Corners value applies again ("for that drag").</figcaption>
+<figcaption><b>3. Double-click on a corner handle</b>Steps the corner style Round, Miter, Bevel. The readout names the style; no preview is drawn. It applies to the next drag that writes, then the chip's Corners value applies again ("for that drag").</figcaption>
 </figure>
 
 <!-- 4: chip open -->
@@ -183,20 +177,20 @@
         <span title="Bevel"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 14V7l4-4h7"/></svg></span>
       </div>
       <div class="pill icons w56" role="radiogroup" aria-label="Mode">
-        <span class="on" title="New object: the original stays"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M12 5v14"/></svg></span>
-        <span title="Change original: no copy is made"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg></span>
+        <span title="New object: the original stays"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M12 5v14"/></svg></span>
+        <span class="on" title="Change original: no copy is made"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg></span>
       </div>
     </div>
   </div>
 </div>
-<figcaption><b>4. Offset entry chip open</b>Opened by a double-click on the center handle, or <kbd>O</kbd> / <kbd>Enter</kbd>. Placed 16 px right of the center and 20 px below the result, focus in Distance with the text selected. Tab: Distance, Direction, Corners, Mode. <kbd>Enter</kbd> writes one undo step, <kbd>Esc</kbd> closes without writing. The preview follows the chip.</figcaption>
+<figcaption><b>4. Offset entry chip open</b>Opened by a double-click on the center handle (<kbd>Shift</kbd> preselects Both, <kbd>Ctrl</kbd> New object), or <kbd>O</kbd> / <kbd>Enter</kbd> with the remembered values; Mode defaults to Change original. Placed 16 px right of the center and 20 px below the result, focus in Distance with the text selected. Tab: Distance, Direction, Corners, Mode. <kbd>Enter</kbd> writes one undo step, <kbd>Esc</kbd> closes without writing. The preview is shown only while the chip is open and follows its values.</figcaption>
 </figure>
 
 </div>
 
 <div class="notes">
-  <div><b>Mode icons</b>Plus = New object (the original stays). Two arrows in a circle (Lucide RefreshCw) = Change original. Not RotateCcw, which is the reset glyph of the panel's value fields.</div>
-  <div><b>Modifiers while dragging</b><kbd>Shift</kbd> Both sides. <kbd>Ctrl</kbd> the other mode than the chip's. <kbd>Shift</kbd>+<kbd>Ctrl</kbd> the original takes the dragged side, a copy is made for the other side.</div>
+  <div><b>Mode icons</b>Plus = New object (the original stays). Default is Change original. Two arrows in a circle (Lucide RefreshCw) = Change original. Not RotateCcw, which is the reset glyph of the panel's value fields.</div>
+  <div><b>Modifiers while dragging</b>None: the original is changed. <kbd>Shift</kbd> Both sides: the original becomes the outset, one new object for the inset. <kbd>Ctrl</kbd> New object. <kbd>Ctrl</kbd>+<kbd>Shift</kbd> New object, both sides (two new objects).</div>
   <div><b>Not there</b>No bar at the top, no Apply button, no "Stays a rectangle" / "Becomes a path" text, no Ends. Open paths get no handles and no preview.</div>
   <div><b>Defaults pending customer</b>Center handle as the double-click target and its glyph; O and Enter; Corners in the chip; Escape keeps the values; chip below the result; drag starts from 0 at the operand box; corner style for one drag; readout always names the style.</div>
 </div>

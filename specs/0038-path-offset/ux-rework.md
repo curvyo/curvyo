@@ -4,6 +4,23 @@ Status: accepted by the customer on 2026-10-12 with all defaults; **reworked 202
 `ux-engineer` after the customer tried the build. `specification.md` wins where the two differ.
 Mockup: `ux-rework-mockup.html` in this folder (open it in a browser).
 
+## Customer decision 2026-10-13 (third round)
+
+Three decisions of the customer, after trying the entry chip; they override the sections below
+where they differ (the sections are updated; the specification, note at the top, has the criteria):
+
+1. **Mode mapping.** The default Mode is **Change original** (also the chip's initial Mode).
+   **Ctrl = New object** (as Ctrl = copy in Move). Drag: none = Change original; **Shift** = Both
+   with Change original; **Ctrl** = New object; **Ctrl+Shift** = New object and Both. The old chord
+   "the original takes the dragged side, a copy for the other" is dropped. **Shift alone writes**
+   (default pending customer): the original becomes the outset side, one new object is added for
+   the inset side (section 4).
+2. **Preview only while it is being judged:** live during a handle drag, and while the entry chip
+   is open, showing the chip's values. **No standing preview**: not on tool choice, selection,
+   after a release, Escape or closing the chip (section 3).
+3. **Modifiers at the double-click on the center handle** preselect the chip: Shift = Direction
+   Both; Ctrl = Mode New object; Ctrl+Shift = both; none = the remembered values (section 2.1).
+
 ## 2026-10-13: what changed and why
 
 The customer tried the reworked slice on 2026-10-13 and decided (spec, note at the top):
@@ -13,10 +30,11 @@ The customer tried the reworked slice on 2026-10-13 and decided (spec, note at t
   (section 2), or by **O** or **Enter**.
 - **No status hint.** "Stays a rectangle" / "Becomes a path" is removed with no replacement.
 - **No Ends, no open paths.** An open path is not offset and gets no handles (section 8).
-- **The preview stands.** With the tool active and a closed shape selected, the result for the
-  remembered values is shown at once, without a drag (section 3).
-- **Modifiers while dragging a corner handle:** Shift = the direction (Both), Ctrl = New or Change
-  original, Shift+Ctrl = the original takes the dragged side and a copy the other (section 4).
+- ~~**The preview stands.** With the tool active and a closed shape selected, the result for the
+  remembered values is shown at once.~~ Replaced in the third round: no standing preview (section 3).
+- **Modifiers while dragging a corner handle:** Shift = Both, Ctrl = New object, default Mode
+  Change original (third round; the first 2026-10-13 version had Ctrl = change the original and a
+  Shift+Ctrl chord "dragged side plus copy", both dropped) (section 4).
 - **A double-click on a corner handle steps the corner style** Round, Miter, Bevel, shown in the
   readout chip (section 3).
 
@@ -52,8 +70,8 @@ the rail keyboard model; Tab order Tools, Group, Path tools, Path, Boolean. Key 
 letter in every state (as B, N, E, P).
 
 Tooltip "Offset tool (O)", muted second line **"Drag a corner handle. Shift: both sides. Ctrl:
-new or change."** (2026-10-13, default pending customer; "Shift: direction" did not say what Shift
-does, the readout and the handle hint chip say the rest).
+new object."** (third round: Ctrl now means New object; the readout and the handle hint chip say
+the rest).
 
 ## 2. Offset entry chip and center handle (new 2026-10-13)
 
@@ -67,15 +85,17 @@ does, the readout and the handle hint chip say the rest).
 | When drawn | Whenever the corner handles are drawn (at least one closed operand selected), **at every box size**: the box is widened to 24 px per axis for placing handles, so the glyph keeps at least 13 px clear of every corner handle. Not drawn during a corner drag (the preview needs the room). Not drawn with nothing selected, a group alone, or only open paths. |
 | Hit area | A circle of **12 px radius** around its center (24 px target), always, because in this tool no other handle lies inside the box. Corner handle hit areas (8 px radius, 12 px outside the corner) never overlap it: at the 24 px minimum box the two centers are 29 px apart. |
 | Press | The hit area **claims the press**: no marquee, no selection change, no move, no drag. This matters for an unfilled shape, where the center is "empty canvas" and a press would otherwise clear the selection on the first click of the double-click. |
-| Double-click | Two primary presses within the system double-click interval, both inside the hit area, neither moving past the 3 px dead zone: **opens the Offset entry chip**. Modifiers held at the double-click have no meaning. A single click does nothing. |
+| Double-click | Two primary presses within the system double-click interval, both inside the hit area, neither moving past the 3 px dead zone: **opens the Offset entry chip**. **Modifiers held at the second press preselect options (third round, spec criterion 57):** Shift = Direction Both; Ctrl = Mode New object; Ctrl+Shift = both. A value not named by a held key shows the remembered value; with no modifier all values are the remembered ones. A single click does nothing. |
 | Cursor | The built-in `pointer` (not `move`). |
-| Hint chip | After 600 ms of rest (row "Transform handle hint chip"): one line, "Double-click, O or Enter: type a distance". |
+| Hint chip | After 600 ms of rest (row "Transform handle hint chip"): one line, "Double-click, O or Enter: type a distance" (third round, default pending customer: a second muted line "Shift: both sides. Ctrl: new object." tells that the modifiers preselect). |
 
 ### 2.2 Opening the chip by keyboard
 
 With the Offset tool active, the canvas focused and at least one closed operand selected:
 **O** or **Enter** opens the chip (default pending customer: both keys; the customer named
-"O/Enter"). It is placed exactly as if the center handle had been double-clicked. With no operand
+"O/Enter") with the **remembered values**; modifier keys held with O or Enter preselect nothing
+(only the double-click does, 2.1). It is placed exactly as if the center handle had been
+double-clicked, with no modifiers. No preview is shown before the chip opens. With no operand
 selected, O re-selects the Offset tool and Enter does nothing; no hint is shown (spec criterion 5).
 Both keys are gated like every shortcut (not during a drag, not with a chip open, not on key
 repeat). O in the Select tool is the tool letter: so from the Select tool with a selection,
@@ -90,7 +110,7 @@ The "Transform entry chip" surface: `--toolbar-bg`, `--panel-elevation-shadow`, 
 |---|---|---|---|
 | 1 | Visible label **"Distance"** (12 px), then the **Distance field** with the fixed `mm` suffix | label box 52 px, 4 px gap, field 100 x 28 px | The field of the Move chip: white ground, 14 px tabular text, right-aligned, 32 px right padding for the suffix. Prefilled with the remembered distance, up to two decimals ("1", "2.5", "0.15"). |
 | 2 | **Direction:** a three-segment pill **Out \| In \| Both** | 156 x 28 px, three 52 px segments, 12 px text | The Move mode pill's look (1.5 px `--toolbar-icon` ring; active segment `--toolbar-icon-active-bg` / `--toolbar-icon-active-fg`). |
-| 3 | **Corners:** three icon segments **Round, Miter, Bevel**; then, right-aligned, **Mode:** two icon segments **New object, Change original** | Corners 84 x 28 px (three 28 px), Mode 56 x 28 px (two 28 px), 16 px between | Corner glyphs: the stroke Join glyphs (`JoinIcon` of `panel/StyleIcons.tsx`) at 16 px. Mode glyphs: Lucide **`Plus`** (New object) and **`RefreshCw`** (Change original: two arrows in a circle), 16 px, 1.5 px stroke. Not `RotateCcw`: that is the reset glyph of the panel's value fields. Icons only; each segment has a tooltip with its name. |
+| 3 | **Corners:** three icon segments **Round, Miter, Bevel**; then, right-aligned, **Mode:** two icon segments **New object, Change original** | Corners 84 x 28 px (three 28 px), Mode 56 x 28 px (two 28 px), 16 px between | Corner glyphs: the stroke Join glyphs (`JoinIcon` of `panel/StyleIcons.tsx`) at 16 px. Mode glyphs: Lucide **`Plus`** (New object) and **`RefreshCw`** (Change original: two arrows in a circle), 16 px, 1.5 px stroke. Not `RotateCcw`: that is the reset glyph of the panel's value fields. Icons only; each segment has a tooltip with its name. **Default segment: Change original** (third round; New object was the default before). |
 
 Invalid input and refusals use the Move chip's **message card** (a separate small card under the
 chip, above it when there is no room; `CircleAlert` 12 px and one line of 12 px text; the body of
@@ -104,8 +124,9 @@ customer, spec open question 3).
 
 The Move chip's rule, adapted so the chip does not cover the result:
 
-1. **Anchor box:** the screen-space axis-aligned box around the operand box **and** the standing
-   preview at the moment the chip opens (with Out or Both the preview is bigger than the object).
+1. **Anchor box:** the screen-space axis-aligned box around the operand box **and** the preview
+   of the chip's values at the moment the chip opens (with Out or Both the preview is bigger than
+   the object). The preview appears with the chip and goes with it (section 3).
 2. **Left edge** 16 px right of the center glyph's center; **top edge 20 px below the anchor box's
    lower edge** (not 16: the bottom corner handles reach 13.5 px below the box corner).
 3. **Flip:** to the left of the center (right edge 16 px left of it) when it would cross the
@@ -127,9 +148,10 @@ open).
 - **Tab order:** Distance, Direction, Corners, Mode, and back to Distance. The chip is a **closed
   loop** like the Move chip: Tab never leaves it (leaving would close it by blur). Shift+Tab goes
   backwards. Each radio group is one Tab stop (roving `tabindex`: the chosen item).
-- **On close** (Enter or Escape): focus returns to the canvas container. After a write the
-  standing preview of the new selection is shown at once (spec criterion 52), so **O, Enter**
-  again makes the next concentric copy.
+- **On close** (Enter or Escape): focus returns to the canvas container. The preview goes with the
+  chip (spec criterion 52); nothing stands on the canvas after a write. **O, Enter** again offsets
+  the new selection: it changes the same object once more with Mode Change original, and makes the
+  next concentric copy with Mode New object.
 
 ### 2.6 Keys inside the chip
 
@@ -149,8 +171,9 @@ open).
 - **Valid:** the result for the chip's values is written as **one commit** labelled "Offset"
   (spec criterion 16); the chip closes; the canvas notice of criterion 24 appears; the selection
   becomes what was produced or changed (criterion 23). Direction and Mode combine as the
-  modifiers do (criterion 26): Both + Change original = the Shift+Ctrl result, with the Out side
-  as the original's side.
+  modifiers do (criterion 26): Both + Change original = the Shift result (the original becomes the
+  outset, one new object for the inset); Both + New object = the Ctrl+Shift result (two new
+  objects).
 - **Not a number** (empty, "abc"): the chip stays open, Distance is marked (2 px `--field-invalid`,
   `aria-invalid`), its text re-selected, the message card says "Enter a number". The mark clears
   on the next keystroke.
@@ -199,7 +222,7 @@ the chip's valid values become the remembered values, as with Escape (default pe
   equivalent**, including the corner style. The readout and badges stay `aria-hidden`; what was
   written is announced by the notice (`role="status"`).
 
-## 3. The handles, the standing preview and the drag
+## 3. The handles, the preview rule and the drag
 
 **Corner handles** (unchanged from 2026-10-12): four, one per corner of the operand box, each 12 px
 outside the corner on the box's outward diagonal; the "Parameter handle" look (10 px circle,
@@ -207,22 +230,23 @@ outside the corner on the box's outward diagonal; the "Parameter handle" look (1
 `--accent` ground; hit area 16 px. One rotated object: its own rotated box; several objects: the
 axis-aligned box around them; an axis under 24 px on screen widened to 24 px for placing the
 handles only. **Hint chip** after 600 ms of rest on a corner handle: "Drag: outset or inset" /
-"Shift: both sides" / "Ctrl: change the original" (or "Ctrl: make a new object" while the chip's
-Mode is Change original) / "Double-click: next corner style".
+"Shift: both sides" / "Ctrl: make a new object" (or "Ctrl: change the original" while the chip's
+Mode is New object) / "Double-click: next corner style".
 
-**Standing preview** (new 2026-10-13, spec criterion 52). With the tool active and an operand
-selected, the result for the remembered values (Distance, Direction, Corners or a pending corner
-style, Mode) is drawn at once as the "Live preview outline" (1.5 px hollow `--preview-new`, white
-casing, no fill). It is recomputed when the selection or a value changes, follows the chip while it
-is open, and is replaced by the grown box (dashed `--preview-new`) over 2,000 operand nodes.
+**Preview: only while it is judged** (third round, spec criterion 52; replaces the "standing
+preview" of the first 2026-10-13 version). The "Live preview outline" (1.5 px hollow
+`--preview-new`, white casing, no fill) is drawn in two situations only: (a) **live while a corner
+handle is dragged**, from the moment the pointer leaves the 3 px dead zone to the release or
+Escape; (b) **while the Offset entry chip is open**, for the chip's current values (Distance,
+Direction, Corners, Mode; a pending corner style shows as the chip's Corners value). Not on tool
+choice, selection, after a release, after Escape, after closing the chip, and not on a corner-style
+double-click. Over 2,000 operand nodes the grown box (dashed `--preview-new`) replaces the outline
+in (a) and (b).
 
-**The handles stay at the operand box**, not at the corners of the standing preview (spec
-criterion 9). On a press on a corner handle the standing preview stays until the pointer leaves the
-3 px dead zone; from then the drag preview takes over, starting from d = 0 at the press point
-(criterion 10). Snapping to the remembered distance within 6 px (criterion 11) lets the maker drag
-back to exactly the value that was standing. Escape or the other button restores the standing
-preview. (Default pending customer; alternative: the handles sit at the corners of the standing
-preview and a drag continues from the remembered distance.)
+**The handles stay at the operand box** (spec criterion 9); a drag starts from d = 0 at the press
+point (criterion 10). Snapping to the remembered distance within 6 px (criterion 11) lets the
+maker drag back to exactly that value. Before the drag nothing but the handles is drawn.
+(Default pending customer; alternative: a drag continues from the remembered distance.)
 
 **The drag** (unchanged): d is the pointer's movement projected on the handle's outward diagonal,
 `d = (dx * sx + dy * sy) / 2`; outward Outset, inward Inset, switching live through the press
@@ -237,14 +261,15 @@ flip and clamp rules), amended 2026-10-13:
   "Inset 0.8 mm · Miter", "Both ±2.5 mm · Bevel". Always, not only when it is not Round: with a
   pending style that is used once and then given back, the maker must see which one this drag uses.
   (Default pending customer; changes spec criterion 15, see its 2026-10-13 remark.)
-- **Line 2, muted, the mode:** "New object", "Changes the original" (Ctrl), "Changes the original,
-  adds the inner copy" / "... adds the outer copy" (Shift+Ctrl). It follows the effective Mode: with
-  the chip's Mode on Change original, no Ctrl shows "Changes the original" and Ctrl shows "New
-  object".
+- **Line 2, muted, the effective Mode and Direction** (third round): "Changes the original" (no
+  modifier, default), "Changes the original, adds the inner copy" (Shift), "New object" (Ctrl),
+  "Two new objects" (Ctrl+Shift). It follows the effective result: with the chip's Mode remembered
+  as New object, no modifier shows "New object" and Ctrl shows "Changes the original".
 - **Line 3, only when it applies:** "Nothing is left" (`--field-invalid`), "1 of 3 shapes vanishes",
   "Preview off: large selection".
-- With a new object being made, the copy-move **plus badge** sits 16 px left of and below the
-  pointer (row "Modifier badge"); not with Change original.
+- Whenever at least one new object is made (Ctrl, Ctrl+Shift, and Shift alone with its inner
+  copy), the copy-move **plus badge** sits 16 px left of and below the pointer (row "Modifier
+  badge"); not with a single-side Change original (no modifier).
 - No line ever says "Stays a rectangle" or "Becomes a path".
 
 **Corner style by double-click** (2026-10-13, "for that drag"):
@@ -253,36 +278,39 @@ flip and clamp rules), amended 2026-10-13:
   leaving the 3 px dead zone) steps the **pending corner style** one place in the cycle Round,
   Miter, Bevel, Round, starting from the current pending style or, if none, from the chip's
   Corners value. Neither click writes anything (a click is a drag of d = 0).
-- At once: the **standing preview redraws** with the new style, and the **readout chip appears at
-  the pointer** with line 1 "Miter corners" and muted line 2 "For the next drag". It stays while
+- At once: the **readout chip appears at the pointer** with line 1 "Miter corners" and muted line 2
+  "For the next drag". No preview is drawn (there is none outside a drag and the open chip). It stays while
   the pointer rests on that handle, at most 2 s, and goes on a press or when the pointer leaves the
   handle's hit area.
 - The **next drag that writes** uses the pending style (its readout line 1 names it) and **consumes
-  it**: after the release the standing preview and the next drag use the chip's Corners value
-  again. A cancelled drag (Escape, other button, release at 0) keeps it pending. A tool switch drops
+  it**: after the release the next drag uses the chip's Corners value again. A cancelled drag (Escape, other button, release at 0) keeps it pending. A tool switch drops
   it. A selection change keeps it.
 - **Opening the chip while a style is pending** shows that style chosen in Corners; from then the
   chip's rules apply (Enter writes it, Escape keeps it as the remembered value).
 
 **Release and Escape** (unchanged): release writes one commit "Offset"; Escape during the drag or
-the other mouse button cancels. After the release the tool stays active, the result is selected
-(spec criterion 23) and its standing preview is shown.
+the other mouse button cancels. After the release the tool stays active and the result is selected
+(spec criterion 23); no preview is shown.
 
-## 4. Modifier keys (amended 2026-10-13)
+## 4. Modifier keys (rewritten 2026-10-13, third round)
 
-| Held during the drag | Direction | Result |
+| Held during the drag | Direction | Result (default Mode: Change original) |
 |---|---|---|
-| none | from the drag (outward Out, inward In) | the chip's Mode: **New object** by default |
-| **Shift** | **Both** at the dragged distance | the chip's Mode (default: two new objects, the original unchanged) |
-| **Ctrl** | from the drag | the **other** Mode: by default **the original is changed**, no new object |
-| **Shift+Ctrl** | Both | the original takes the **dragged** side (drag outward: it becomes the outset), a new object is made for the other side |
+| none | from the drag (outward Out, inward In) | **the original is changed**, no new object |
+| **Shift** | **Both** at the dragged distance | **the original becomes the outset side**, one new object is made for the inset side (default pending customer) |
+| **Ctrl** | from the drag | a **new object**, the original unchanged |
+| **Ctrl+Shift** | Both | **two new objects** (outer and inner), the original unchanged |
 
-Shift stands for the chip's Direction control (Both), Ctrl for its Mode toggle. Keys may be
+Ctrl switches to the other Mode than the remembered one; the table shows the default. The old
+Shift+Ctrl chord "original takes the dragged side plus a copy for the other" is gone: Shift alone
+now gives that result with the outset side fixed for the original (the result no longer depends on
+which way the pointer went). Shift stands for the chip's Direction control (Both), Ctrl for its
+Mode toggle; the same combinations apply in the chip (2.7). Keys may be
 pressed before the press or during the drag; the state at release counts; the readout, the badge
 and the preview follow in the frame a key changes; the release reads the modifiers from its own
 event (WebKitGTK's late Shift key-up, `0014`). Shift and Ctrl in other tools mean "about the
-centre / one axis" and "copy"; the reasons this is acceptable are unchanged from 2026-10-12 (Shift
-is the symmetric choice, Ctrl is "the other result than the default", the readout says which).
+centre / one axis" and "copy"; Ctrl = New object now agrees with Ctrl = copy in Move (customer,
+third round). Shift is the symmetric choice; the readout says which result a release writes.
 
 ## 5. What is created, z-order, selection after
 
@@ -317,18 +345,22 @@ Unchanged: curves stay curves, exact to 0.01 mm (spec criteria 33 to 39).
   does nothing (2.1).
 - **Large documents:** handles, readout and chip follow at frame rate; previews are computed after
   the frame, a stale one is dropped; over 2,000 operand nodes the grown box replaces the preview,
-  for the standing preview too; a write computes the real result. A selection change from Ctrl+A on
-  a large document never blocks the pointer.
+  while dragging and while the chip is open; a write computes the real result. A selection change
+  from Ctrl+A on a large document never blocks the pointer (no preview is computed on selection).
 
 ## 9. Keyboard-only route (amended 2026-10-13)
 
 1. **O** selects the Offset tool (or Tab to the "Path tools" toolbox, Space).
-2. Select with Ctrl+A, or select in the Select tool first; the selection is kept. The standing
-   preview shows the result for the remembered values.
-3. **O** or **Enter** opens the chip, focus in Distance with its text selected.
-4. Type a distance or step it with Up / Down; Tab to Direction, Corners, Mode; arrows choose.
+2. Select with Ctrl+A, or select in the Select tool first; the selection is kept. Only the handles
+   are drawn, no preview.
+3. **O** or **Enter** opens the chip with the remembered values, focus in Distance with its text
+   selected; the preview of those values appears with the chip.
+4. Type a distance or step it with Up / Down; Tab to Direction, Corners, Mode; arrows choose; the
+   preview follows.
 5. **Enter** writes one commit and returns focus to the canvas; **Escape** closes without writing.
-6. **O, Enter** again offsets the result: concentric copies by keyboard.
+   The preview goes with the chip.
+6. **O, Enter** again offsets the result: with Mode New object it makes concentric copies by
+   keyboard; with Change original (default) it changes the same object once more.
 
 Arrow keys on the canvas nudge as in the Select tool and do not offset.
 
@@ -348,14 +380,23 @@ mm.
 4. **Escape, a press outside, a tool switch or a selection change** close the chip without
    writing and keep its values as the remembered ones.
 5. The **chip is placed below the result**, not over the box (Move chip rule adapted, 2.4).
-6. The **handles stay at the operand box** and a drag starts from d = 0 (alternative: at the
-   standing preview's corners, continuing from the remembered distance).
+6. The **handles stay at the operand box** and a drag starts from d = 0 (alternative: continuing
+   from the remembered distance).
 7. The **pending corner style** from a double-click is used by the next written drag only ("for
    that drag"), then the chip's Corners value applies again; the readout always names the corner
-   style.
+   style. The double-click draws no preview.
 8. **Open paths** in a mixed selection are ignored silently; only open paths or a group alone show
    nothing.
-9. Tooltip second line: "Drag a corner handle. Shift: both sides. Ctrl: new or change."
+9. Tooltip second line: "Drag a corner handle. Shift: both sides. Ctrl: new object."
+10. *Third round.* **Shift alone** = Both with Change original: the original becomes the outset
+    side, one new object is made for the inset side (alternative: the original takes the inset
+    side).
+11. *Third round.* **Ctrl at the double-click** sets Mode New object whatever the remembered Mode
+    is (the customer's words); in a drag Ctrl switches to the other Mode. They differ only when the
+    remembered Mode is New object (alternative: the drag rule in the chip too).
+12. *Third round.* The plus badge shows whenever a new object is made, so also with Shift alone.
+13. *Third round.* The center handle's hint chip gets a second muted line "Shift: both sides. Ctrl:
+    new object." so the maker learns that the double-click takes modifiers.
 
 ## 12. Questions for the architect
 
