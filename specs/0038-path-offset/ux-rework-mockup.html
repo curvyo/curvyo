@@ -121,14 +121,14 @@
 <figcaption><b>2. Dragging a corner handle</b>The drag preview appears once the pointer leaves the 3 px dead zone. Readout line 1: side, distance, corner style (always). Line 2: the effective result; with no modifier the original is changed, so no plus badge. <kbd>Shift</kbd> both sides (original becomes the outset, one new inner object), <kbd>Ctrl</kbd> new object (plus badge, "New object"), <kbd>Ctrl</kbd>+<kbd>Shift</kbd> both sides as two new objects, <kbd>Esc</kbd> cancels, release writes.</figcaption>
 </figure>
 
-<!-- 3: double-click on a corner handle -->
+<!-- 3: Alt while dragging a corner handle (fourth round; texts only, the art still shows the handles and not the drag preview) -->
 <figure>
 <div class="frame">
   <div class="card" aria-label="Path tools"><div class="btn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.5" y="1.5" width="13" height="13" rx="3" stroke-dasharray="2.2 1.8"/><rect x="5" y="5" width="6" height="6" rx="1" fill="currentColor"/></svg></div></div>
-  <svg class="art" width="540" height="360" aria-label="Corner style stepped to Miter by a double-click">
+  <svg class="art" width="540" height="360" aria-label="Corner style stepped to Miter by pressing Alt while dragging">
     <rect x="170" y="100" width="160" height="100" fill="#F5D9A8" stroke="#000" stroke-width="1.5"/>
     <rect x="169.5" y="99.5" width="161" height="101" fill="none" stroke="#2F6FEE" stroke-width="1" stroke-dasharray="4 3"/>
-    <!-- no preview on a corner-style double-click, only the readout -->
+    <!-- fourth round: the preview of the drag (as in figure 2) is not redrawn here; only the texts changed -->
     <g stroke="#2F6FEE" stroke-width="1.5">
       <circle cx="161.5" cy="91.5" r="5" fill="#fff"/><circle cx="161.5" cy="91.5" r="2" fill="#2F6FEE" stroke="none"/>
       <circle cx="338.5" cy="91.5" r="5" fill="#D5E2FC"/><circle cx="338.5" cy="91.5" r="2" fill="#2F6FEE" stroke="none"/>
@@ -140,9 +140,9 @@
     <rect x="248.5" y="148.5" width="4" height="4" fill="#2F6FEE"/>
     <path d="M338.5 91.5l0 14 4-4 3 6 2-1-3-6 5 0z" fill="#000" stroke="#fff" stroke-width="1"/>
   </svg>
-  <div class="readout" style="left:351px; top:36px"><div class="l1">Miter corners</div><div class="l2">For the next drag</div></div>
+  <div class="readout" style="left:351px; top:36px"><div class="l1">Outset 2 mm · Miter</div><div class="l2">Changes the original</div></div>
 </div>
-<figcaption><b>3. Double-click on a corner handle</b>Steps the corner style Round, Miter, Bevel. The readout names the style; no preview is drawn. It applies to the next drag that writes, then the chip's Corners value applies again ("for that drag").</figcaption>
+<figcaption><b>3. Alt while dragging a corner handle</b>Each <kbd>Alt</kbd> press during the drag steps the corner style Round, Miter, Bevel, Round; the preview and line 1 of the readout change in the same frame. The press starts without Alt; only the keydown counts, key repeat is ignored. A written drag stores the style as the remembered one, the next drag starts with it, and the chip's Corners control shows and sets the same value (first ever: Round). A cancelled drag stores nothing (default pending customer). The corner handle's hint line says "Alt: corner style". There is no double-click on corner handles. The drawing of this figure shows the handles only, not the drag preview.</figcaption>
 </figure>
 
 <!-- 4: chip open -->
@@ -192,7 +192,7 @@
   <div><b>Mode icons</b>Plus = New object (the original stays). Default is Change original. Two arrows in a circle (Lucide RefreshCw) = Change original. Not RotateCcw, which is the reset glyph of the panel's value fields.</div>
   <div><b>Modifiers while dragging</b>None: the original is changed. <kbd>Shift</kbd> Both sides: the original becomes the outset, one new object for the inset. <kbd>Ctrl</kbd> New object. <kbd>Ctrl</kbd>+<kbd>Shift</kbd> New object, both sides (two new objects).</div>
   <div><b>Not there</b>No bar at the top, no Apply button, no "Stays a rectangle" / "Becomes a path" text, no Ends. Open paths get no handles and no preview.</div>
-  <div><b>Defaults pending customer</b>Center handle as the double-click target and its glyph; O and Enter; Corners in the chip; Escape keeps the values; chip below the result; drag starts from 0 at the operand box; corner style for one drag; readout always names the style.</div>
+  <div><b>Defaults pending customer</b>Center handle as the double-click target and its glyph; O and Enter; Corners in the chip; Escape keeps the values; chip below the result; drag starts from 0 at the operand box; readout always names the corner style; a cancelled drag does not change the remembered corner style (Alt steps the style while dragging, customer decision of the fourth round).</div>
 </div>
 </body>
 </html>

@@ -4,6 +4,26 @@ Status: accepted by the customer on 2026-10-12 with all defaults; **reworked 202
 `ux-engineer` after the customer tried the build. `specification.md` wins where the two differ.
 Mockup: `ux-rework-mockup.html` in this folder (open it in a browser).
 
+## Customer decision 2026-10-13 (fourth round): Alt steps the corner style
+
+Replaces the double-click on a corner handle and the "pending style for one drag" (sections 3 and
+11); the specification (note at the top, criteria 13 and 56) has the criteria.
+
+- While a corner handle is dragged, **each Alt press steps the corner style** Round, Miter, Bevel,
+  Round. Preview and readout follow in the same frame.
+- The **first drag ever starts with Round**; then the **last used style is remembered** (app
+  setting like the remembered distance, document-independent, not in the file) and the next drag
+  starts with it. The **chip's Corners control reads and writes the same value.**
+- The double-click on a corner handle is gone. The center-handle double-click stays.
+- Constraints: act on Alt **keydown** only; ignore `repeat`; no key-up needed (WebKitGTK may not
+  deliver it); `preventDefault` so Alt does not focus a menu or menubar in the webview; the press
+  starts **without** Alt (Alt held at the press is not used, so Linux window managers' Alt+drag
+  does not matter; the step needs a fresh Alt keydown after the press). Alt outside a corner drag
+  is not touched.
+- Defaults pending customer: only a written drag updates the remembered style (Escape, the other
+  button, release at d = 0 and a refused release leave it); Alt in the dead zone already steps; Alt
+  works with Shift or Ctrl held; the hint is on the corner handle's hint chip, not the tool tooltip.
+
 ## Customer decision 2026-10-13 (third round)
 
 Three decisions of the customer, after trying the entry chip; they override the sections below
@@ -35,19 +55,16 @@ The customer tried the reworked slice on 2026-10-13 and decided (spec, note at t
 - **Modifiers while dragging a corner handle:** Shift = Both, Ctrl = New object, default Mode
   Change original (third round; the first 2026-10-13 version had Ctrl = change the original and a
   Shift+Ctrl chord "dragged side plus copy", both dropped) (section 4).
-- **A double-click on a corner handle steps the corner style** Round, Miter, Bevel, shown in the
-  readout chip (section 3).
+- ~~**A double-click on a corner handle steps the corner style** Round, Miter, Bevel, shown in the
+  readout chip.~~ Replaced in the fourth round by Alt while dragging (section 3).
 
 Everything below that the customer did not state is marked **default pending customer** and is
 collected in section 11.
 
-**"For that drag" (the corner style).** The customer said the double-click sets the corner style
-"for that drag"; the first spec amendment made it the remembered value. This concept follows the
-customer's wording, because it is workable: the double-click sets a **pending corner style** that
-the **next written drag** uses and then gives back (section 3, "Corner style by double-click").
-The chip's Corners control stays the remembered value. The one point where the two meet is when the
-chip is opened while a style is pending: the chip takes it over (section 2). The spec's criteria 13,
-15 and 56 are amended to match (2026-10-13 remark there).
+**The corner style (fourth round).** The earlier "pending style for one drag" is gone. There is one
+**remembered corner style**; a drag starts with it, Alt presses step it during the drag, and a
+written drag stores the result (section 3, "Corner style by Alt"). The chip's Corners control shows
+and sets the same value.
 
 ## Reference tools (as far as I know them)
 
@@ -110,14 +127,13 @@ The "Transform entry chip" surface: `--toolbar-bg`, `--panel-elevation-shadow`, 
 |---|---|---|---|
 | 1 | Visible label **"Distance"** (12 px), then the **Distance field** with the fixed `mm` suffix | label box 52 px, 4 px gap, field 100 x 28 px | The field of the Move chip: white ground, 14 px tabular text, right-aligned, 32 px right padding for the suffix. Prefilled with the remembered distance, up to two decimals ("1", "2.5", "0.15"). |
 | 2 | **Direction:** a three-segment pill **Out \| In \| Both** | 156 x 28 px, three 52 px segments, 12 px text | The Move mode pill's look (1.5 px `--toolbar-icon` ring; active segment `--toolbar-icon-active-bg` / `--toolbar-icon-active-fg`). |
-| 3 | **Corners:** three icon segments **Round, Miter, Bevel**; then, right-aligned, **Mode:** two icon segments **New object, Change original** | Corners 84 x 28 px (three 28 px), Mode 56 x 28 px (two 28 px), 16 px between | Corner glyphs: the stroke Join glyphs (`JoinIcon` of `panel/StyleIcons.tsx`) at 16 px. Mode glyphs: Lucide **`Plus`** (New object) and **`RefreshCw`** (Change original: two arrows in a circle), 16 px, 1.5 px stroke. Not `RotateCcw`: that is the reset glyph of the panel's value fields. Icons only; each segment has a tooltip with its name. **Default segment: Change original** (third round; New object was the default before). |
+| 3 | **Corners:** three icon segments **Round, Miter, Bevel**; then, right-aligned, **Mode:** two icon segments **New object, Change original** | Corners 84 x 28 px (three 28 px), Mode 56 x 28 px (two 28 px), 16 px between | Corner glyphs: the stroke Join glyphs (`JoinIcon` of `panel/StyleIcons.tsx`) at 16 px. Mode glyphs: Lucide **`Plus`** (New object) and **`RefreshCw`** (Change original: two arrows in a circle), 16 px, 1.5 px stroke. Not `RotateCcw`: that is the reset glyph of the panel's value fields. Icons only; each segment has a tooltip with its name. **Default segment: Change original** (third round; New object was the default before). **Corners (fourth round) reads the remembered corner style on opening and writes it when another segment is chosen**; it is the same value a corner drag starts with and stores. |
 
 Invalid input and refusals use the Move chip's **message card** (a separate small card under the
 chip, above it when there is no room; `CircleAlert` 12 px and one line of 12 px text; the body of
 the chip never moves).
 
-Why Corners is in the chip although the customer only named the double-click: the keyboard route
-needs it, and the chip is where a maker looks for "the settings of this offset" (default pending
+Why Corners is in the chip: the keyboard route needs it (Alt is a pointer-drag key), and the chip is where a maker looks for "the settings of this offset" (default pending
 customer, spec open question 3).
 
 ### 2.4 Placement
@@ -200,7 +216,7 @@ the chip's valid values become the remembered values, as with Escape (default pe
   drag starts from the values just set: a distance typed as 2 mm is the snap target of that drag
   (spec criterion 11).
 - During a corner drag the chip cannot open: O and Enter are gated, and a double-click needs two
-  clicks.
+  clicks. Opening the chip shows the remembered corner style in Corners (section 3).
 - A drag does not change the chip's Direction or Mode (spec criterion 10); its distance becomes
   the remembered distance on release (criterion 6), so the next chip opens with it.
 
@@ -231,16 +247,17 @@ outside the corner on the box's outward diagonal; the "Parameter handle" look (1
 axis-aligned box around them; an axis under 24 px on screen widened to 24 px for placing the
 handles only. **Hint chip** after 600 ms of rest on a corner handle: "Drag: outset or inset" /
 "Shift: both sides" / "Ctrl: make a new object" (or "Ctrl: change the original" while the chip's
-Mode is New object) / "Double-click: next corner style".
+Mode is New object) / "Alt: corner style" (fourth round; replaces "Double-click: next corner
+style").
 
 **Preview: only while it is judged** (third round, spec criterion 52; replaces the "standing
 preview" of the first 2026-10-13 version). The "Live preview outline" (1.5 px hollow
 `--preview-new`, white casing, no fill) is drawn in two situations only: (a) **live while a corner
 handle is dragged**, from the moment the pointer leaves the 3 px dead zone to the release or
 Escape; (b) **while the Offset entry chip is open**, for the chip's current values (Distance,
-Direction, Corners, Mode; a pending corner style shows as the chip's Corners value). Not on tool
-choice, selection, after a release, after Escape, after closing the chip, and not on a corner-style
-double-click. Over 2,000 operand nodes the grown box (dashed `--preview-new`) replaces the outline
+Direction, Corners, Mode; Corners is the remembered corner style). Not on tool choice, selection,
+after a release, after Escape or after closing the chip. An Alt step changes the style only inside
+a drag, so it needs no preview of its own. Over 2,000 operand nodes the grown box (dashed `--preview-new`) replaces the outline
 in (a) and (b).
 
 **The handles stay at the operand box** (spec criterion 9); a drag starts from d = 0 at the press
@@ -258,8 +275,9 @@ during the drag.
 flip and clamp rules), amended 2026-10-13:
 
 - **Line 1:** the side, the distance and **always the corner style**: "Outset 2.5 mm · Round",
-  "Inset 0.8 mm · Miter", "Both ±2.5 mm · Bevel". Always, not only when it is not Round: with a
-  pending style that is used once and then given back, the maker must see which one this drag uses.
+  "Inset 0.8 mm · Miter", "Both ±2.5 mm · Bevel". Always, not only when it is not Round: Alt can
+  change the style during the drag, so the maker must see which one the drag uses now; the text
+  changes in the frame of the Alt press.
   (Default pending customer; changes spec criterion 15, see its 2026-10-13 remark.)
 - **Line 2, muted, the effective Mode and Direction** (third round): "Changes the original" (no
   modifier, default), "Changes the original, adds the inner copy" (Shift), "New object" (Ctrl),
@@ -272,21 +290,26 @@ flip and clamp rules), amended 2026-10-13:
   badge"); not with a single-side Change original (no modifier).
 - No line ever says "Stays a rectangle" or "Becomes a path".
 
-**Corner style by double-click** (2026-10-13, "for that drag"):
+**Corner style by Alt** (fourth round, 2026-10-13; replaces the double-click on a corner handle,
+which no longer exists):
 
-- A **double-click on a corner handle** (two primary presses within the system interval, neither
-  leaving the 3 px dead zone) steps the **pending corner style** one place in the cycle Round,
-  Miter, Bevel, Round, starting from the current pending style or, if none, from the chip's
-  Corners value. Neither click writes anything (a click is a drag of d = 0).
-- At once: the **readout chip appears at the pointer** with line 1 "Miter corners" and muted line 2
-  "For the next drag". No preview is drawn (there is none outside a drag and the open chip). It stays while
-  the pointer rests on that handle, at most 2 s, and goes on a press or when the pointer leaves the
-  handle's hit area.
-- The **next drag that writes** uses the pending style (its readout line 1 names it) and **consumes
-  it**: after the release the next drag uses the chip's Corners value again. A cancelled drag (Escape, other button, release at 0) keeps it pending. A tool switch drops
-  it. A selection change keeps it.
-- **Opening the chip while a style is pending** shows that style chosen in Corners; from then the
-  chip's rules apply (Enter writes it, Escape keeps it as the remembered value).
+- **Start:** a drag starts with the **remembered corner style**: Round on the very first drag, then
+  the last style a written drag used. The press itself is made without Alt.
+- **Step:** during the drag each **Alt keydown** moves one place in the cycle Round, Miter, Bevel,
+  Round. Auto-repeat (`repeat`) is ignored, so holding Alt steps once; the key-up is not needed.
+  The keydown is `preventDefault`-ed, so Alt does not focus a menu or menubar in the webview. Alt
+  held at the press is not used (a fresh Alt keydown after the press is needed), which also keeps
+  Linux window managers' Alt+drag out of the picture. Alt works with or without Shift and Ctrl.
+  Alt outside a corner drag does nothing and is not intercepted.
+- **Feedback:** in the same frame the preview (or the grown box) and line 1 of the readout show the
+  new style ("Outset 2.5 mm · Miter"). There is no separate message for the step.
+- **Store:** a **written** drag stores the style in use at the release as the remembered one. A
+  drag that writes nothing (Escape, the other button, release at d = 0, a refusal) leaves the
+  remembered style as it was (default pending customer). The chip's Corners control reads and writes
+  the same value (section 2.3).
+- **Hint:** the corner handle's hint chip (600 ms) ends with "Alt: corner style".
+- **Two quick clicks on a corner handle** are two drags of d = 0; they write nothing and change
+  nothing. The center handle's double-click still opens the chip.
 
 **Release and Escape** (unchanged): release writes one commit "Offset"; Escape during the drag or
 the other mouse button cancels. After the release the tool stays active and the result is selected
@@ -382,9 +405,13 @@ mm.
 5. The **chip is placed below the result**, not over the box (Move chip rule adapted, 2.4).
 6. The **handles stay at the operand box** and a drag starts from d = 0 (alternative: continuing
    from the remembered distance).
-7. The **pending corner style** from a double-click is used by the next written drag only ("for
-   that drag"), then the chip's Corners value applies again; the readout always names the corner
-   style. The double-click draws no preview.
+7. ~~The pending corner style from a double-click is used by the next written drag only.~~
+   **Replaced, fourth round (customer decision):** Alt while dragging steps the style; the last
+   used style is remembered and shared with the chip's Corners; the readout always names it. Still
+   **default pending customer:** only a written drag updates the remembered style (a cancelled or
+   refused drag does not); Alt in the dead zone already steps; Alt works with Shift or Ctrl held;
+   "Alt: corner style" is on the corner handle's hint chip, not the tool tooltip; whether the
+   remembered style survives an app restart is as for the remembered distance.
 8. **Open paths** in a mixed selection are ignored silently; only open paths or a group alone show
    nothing.
 9. Tooltip second line: "Drag a corner handle. Shift: both sides. Ctrl: new object."
