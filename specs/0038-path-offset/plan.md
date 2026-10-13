@@ -165,7 +165,7 @@ the fallback fired for 0 of 135 outlines over the test shapes.
 
 ### M9' Docs and gate
 
-- [ ] 9'.1 `adrs.md` implementer note (open paths refused by the kernel), design-system rows
+- [x] 9'.1 `adrs.md` implementer note (open paths refused by the kernel), design-system rows
   checked against the build, technical-debt entry if any.
 - [ ] 9'.2 Full gate (`CLAUDE.md` §7), frontend tests and `tsc`, a headless browser check.
 

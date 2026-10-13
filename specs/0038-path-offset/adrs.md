@@ -204,6 +204,19 @@ compound paths), no trait, no generic. The customer chose the library on
   amended: ry/rx ≥ 0.5 at most 8 cubics, narrower at most 16, within 0.01 mm
   everywhere; the tester's narrow-ellipse test checks that budget.
 
+- **2026-10-13 (implementer, amendment M5' to M8'): open paths, the chip, the corner style.**
+  `curvyo_geometry_core::offset` loses its `cap` parameter and `OffsetCap`; an open outline is
+  refused with `OffsetError::OpenPath` (criterion 55), in the place of the old
+  `InsetOfOpenPath` in the refusal order. The open-line pieces, caps, the stroke route of the
+  polyline fallback and `flatten_open` are deleted; closed results are bit-identical to before
+  (checked on the golden cases plus crossing and Bevel-inset cases, f64 bits compared).
+  `curvyo-ui-core`: `offset_operands` keeps closed objects only, `OffsetBar` becomes
+  `OffsetValues` (the chip's remembered values) and `next_offset_join` is the double-click cycle.
+  The session owns the chip's open state (so O, Enter, the center handle's look and the key gate
+  agree), the pending corner style (moved into the remembered Corners when the chip opens,
+  consumed by a written drag, dropped by a tool switch) and the chip's anchor; the frontend owns
+  the typed text, its validation messages and the focus, as for the Move chip.
+
 ## Flagged to the PO (criterion changes the spec invites)
 
 1. **Criterion 19 and "Miter limit": `i_overlay` clips the miter, it does
