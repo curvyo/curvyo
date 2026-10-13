@@ -191,3 +191,10 @@ export function offsetRefusalText(outcome: OffsetOutcome): string | null {
       return null;
   }
 }
+
+/** Whether the corner style chip of a double-click on a corner handle stays (criterion 56): it is
+ * shown, no drag readout replaces it, and the pointer is still on a corner handle (a release
+ * leaves the hint on the handle, so the double-click's own release keeps it). */
+export function keepsCornerStyleChip(shown: boolean, handleHint: string, dragging: boolean): boolean {
+  return shown && !dragging && handleHint.startsWith("offset-corner");
+}

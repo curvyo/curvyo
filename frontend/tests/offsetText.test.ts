@@ -13,6 +13,7 @@ import {
   offsetSuccessText,
   chipDistanceText,
   cornerStyleLines,
+  keepsCornerStyleChip,
   parseChipDistance,
   stepChipDistance,
 } from "../src/lib/offsetText.ts";
@@ -92,6 +93,14 @@ test("criteria 12, 15, 18: the readout names side, distance and corner style, th
 test("criterion 56: the corner style chip after a double-click", () => {
   assert.deepEqual(cornerStyleLines("miter"), ["Miter corners", "For the next drag"]);
   assert.deepEqual(cornerStyleLines("round"), ["Round corners", "For the next drag"]);
+});
+
+test("criterion 56: the corner style chip survives its own release and goes off the handle", () => {
+  assert.equal(keepsCornerStyleChip(true, "offset-corner", false), true);
+  assert.equal(keepsCornerStyleChip(true, "offset-corner-change", false), true);
+  assert.equal(keepsCornerStyleChip(true, "", false), false, "left the handle");
+  assert.equal(keepsCornerStyleChip(true, "offset-corner", true), false, "a drag readout");
+  assert.equal(keepsCornerStyleChip(false, "offset-corner", false), false);
 });
 
 test("criteria 6, 25, 54: the chip's Distance text, steps and parsing", () => {

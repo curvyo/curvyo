@@ -908,4 +908,18 @@ mod tests {
         session.set_tool(Tool::Select);
         assert!(!session.offset_chip_open());
     }
+
+    #[test]
+    fn ac54_escape_with_the_chip_open_only_closes_the_chip() {
+        let (mut session, square) = offset_session();
+        assert!(session.open_offset_chip());
+        let outcome = session.key_down(crate::KeyInput {
+            key: "Escape",
+            ..crate::KeyInput::default()
+        });
+        assert_eq!(outcome.code(), "escape-entry");
+        assert!(!session.offset_chip_open());
+        assert_eq!(session.selection.ids(), &[square], "the selection stays");
+        assert_eq!(session.tool(), Tool::Offset);
+    }
 }

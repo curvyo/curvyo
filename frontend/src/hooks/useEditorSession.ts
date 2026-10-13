@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { type CanvasNotice, type HistoryNames, MAC, useHistory } from "@/hooks/useHistory";
 import { type GroupingApi, useGrouping } from "@/hooks/useGrouping";
 import { type OffsetApi, readOffsetView, useOffset } from "@/hooks/useOffset";
-import { cornerStyleLines, offsetReadout } from "@/lib/offsetText";
+import { cornerStyleLines, keepsCornerStyleChip, offsetReadout } from "@/lib/offsetText";
 import type { HistoryDirection } from "@/lib/historyText";
 import { type NudgeFeedback, useNudgeFeedback } from "@/hooks/useNudgeFeedback";
 import { type BackingBuffer, backingBufferFor, sameBackingBuffer } from "@/lib/canvasSize";
@@ -1594,10 +1594,11 @@ export function useEditorSession(
       );
       const offsetReadout = session?.tool() === "offset" ? offsetLiveReadout(session, x, y) : null;
       // The corner style chip stays while the pointer rests on its handle (`0038` criterion 56).
-      const keepCornerStyle =
-        cornerStyleShownRef.current &&
-        !offsetReadout &&
-        (session?.handle_hint() ?? "").startsWith("offset-corner");
+      const keepCornerStyle = keepsCornerStyleChip(
+        cornerStyleShownRef.current,
+        session?.handle_hint() ?? "",
+        offsetReadout !== null,
+      );
       if (!keepCornerStyle) {
         cornerStyleShownRef.current = false;
         setLiveReadout(offsetReadout ?? readLiveReadout(session?.live_readout()));
@@ -1734,6 +1735,14 @@ export function useEditorSession(
         session.pointer_up(x, y, shift, ctrl, alt);
         showOffsetOutcome();
       }
+      // The double-click's own release keeps the corner style chip it just showed (`0038`
+      // criterion 56); every other release ends the readout.
+      if (keepsCornerStyleChip(cornerStyleShownRef.current, session.handle_hint(), false)) {
+        setCursorHint(session.cursor_hint());
+        syncFromSession();
+        return;
+      }
+      cornerStyleShownRef.current = false;
       setLiveReadout(null);
       setCursorHint(session.cursor_hint());
       syncFromSession();

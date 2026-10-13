@@ -363,6 +363,11 @@ impl Session {
             self.select.cancel_entry();
             return EscapeStep::ClosedEntry;
         }
+        // The Offset entry chip closes without writing; the selection stays (`0038` criterion 54).
+        if self.offset_chip_open() {
+            self.close_offset_chip();
+            return EscapeStep::ClosedEntry;
+        }
         if self.cancel_drag_in_flight() {
             return EscapeStep::CancelledDrag;
         }
