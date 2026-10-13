@@ -1,193 +1,177 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef } from "react";
 
 import type { WasmSession } from "@/lib/editorSession";
-import { noticeMs } from "@/lib/pathText";
 import {
-  OFFSET_CLOSED,
+  OFFSET_IDLE,
   type OffsetCapName,
+  type OffsetDirectionName,
   type OffsetJoinName,
-  type OffsetResult,
-  type OffsetState,
+  type OffsetOutcome,
+  type OffsetResultName,
+  type OffsetView,
   offsetRefusalText,
   offsetSuccessText,
 } from "@/lib/offsetText";
 
-/** A notice of the Offset command: success under the Offset button, refusal under Apply. */
-export interface OffsetNotice {
-  id: number;
-  kind: "success" | "refusal";
-  text: string;
-}
-
-/** The Offset entry in the frontend (`specs/0038-path-offset`). */
+/** The Offset tool in the frontend (`specs/0038-path-offset`): the bar's view and values, Apply,
+ * and the notice after a release. */
 export interface OffsetApi {
-  state: OffsetState;
-  /** The section is open. */
-  open: boolean;
-  /** Opens the entry for the selection; returns whether it opened. */
-  openEntry: () => boolean;
-  /** Closes the entry without writing. */
-  close: () => void;
-  /** Sets the distance; returns whether it was within the typed range. The preview follows on
-   * the next frame. */
+  view: OffsetView;
   setDistance: (mm: number) => boolean;
+  setDirection: (direction: OffsetDirectionName) => void;
   setJoin: (join: OffsetJoinName) => void;
   setCap: (cap: OffsetCapName) => void;
-  /** Applies the previewed result; shows its notice. */
-  apply: () => OffsetResult;
-  notice: OffsetNotice | null;
+  setResult: (result: OffsetResultName) => void;
+  /** Focus entered or left the bar: the preview of the bar's values follows. */
+  setBarFocus: (focused: boolean) => void;
+  apply: () => void;
+  /** After a pointer release: shows the notice of what the release did, if anything. */
+  showReleaseOutcome: () => void;
+  /** The Distance field, which a double-click on a handle focuses (criterion 13). */
+  distanceRef: React.RefObject<HTMLInputElement | null>;
 }
 
 const REFUSAL_MS = 8000;
-const SUCCESS_MS = 3000;
 
-function readState(session: WasmSession | null): OffsetState {
-  const raw = session?.offset_state();
+type ShowNotice = (
+  text: string,
+  ms?: number,
+  source?: "canvas" | "panel",
+  kind?: "status" | "alert",
+) => void;
+
+/** Reads the session's view of the Offset tool. */
+export function readOffsetView(session: WasmSession | null): OffsetView {
+  const raw = session?.offset_view();
   if (!raw) {
-    return OFFSET_CLOSED;
+    return OFFSET_IDLE;
   }
-  const state: OffsetState = {
+  const view: OffsetView = {
+    operands: raw.operands,
+    hasOpen: raw.has_open,
+    hasGroup: raw.has_group,
+    handles: raw.handles,
+    dragging: raw.dragging,
+    distanceMm: raw.distance_mm,
+    both: raw.both,
+    change: raw.change,
+    stop: raw.stop,
+    vanished: raw.vanished,
+    of: raw.of,
+    large: raw.large,
     kind: raw.kind,
+    refusal: raw.refusal,
+    barDistanceMm: raw.bar_distance_mm,
+    direction: raw.direction as OffsetDirectionName,
+    join: raw.join as OffsetJoinName,
+    cap: raw.cap as OffsetCapName,
+    result: raw.result as OffsetResultName,
+    minMm: raw.min_mm,
+    maxMm: raw.max_mm,
+  };
+  raw.free();
+  return view;
+}
+
+function readOutcome(raw: ReturnType<WasmSession["apply_offset"]>): OffsetOutcome {
+  const outcome: OffsetOutcome = {
+    kind: raw.kind,
+    added: raw.added,
+    changed: raw.changed,
     count: raw.count,
     of: raw.of,
     vanished: raw.vanished,
-    offered: raw.offered,
-    hasOpen: raw.has_open,
+    openLeftOut: raw.open_left_out,
     distanceMm: raw.distance_mm,
-    join: raw.join as OffsetJoinName,
-    cap: raw.cap as OffsetCapName,
-    typedLimitMm: raw.typed_limit_mm,
-    dragLimitMm: raw.drag_limit_mm,
+    direction: raw.direction,
   };
   raw.free();
-  return state;
+  return outcome;
 }
 
 /**
- * The Offset entry's state and commands. Every decision (what is offered, the preview, why Apply
- * is refused) is the session's; this hook reads it after every sync, coalesces value changes to
- * one re-read per animation frame (criterion 2), and keeps the notice of the last Apply.
+ * The Offset tool's bar state and commands. Every decision (what applies, the preview, why a
+ * release is refused) is the session's; this hook reads it after every sync and turns outcomes
+ * into the canvas notice.
  */
 export function useOffset(
   getSession: () => WasmSession | null,
   onChange: () => void,
   syncRevision: number,
+  showNotice: ShowNotice,
 ): OffsetApi {
-  const state = useMemo(
-    () => readState(getSession()),
+  const view = useMemo(
+    () => readOffsetView(getSession()),
     // The session is read again after every sync (`syncRevision`).
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [getSession, syncRevision],
   );
-  const [notice, setNotice] = useState<OffsetNotice | null>(null);
-  const noticeId = useRef(0);
-  const frame = useRef<number | null>(null);
+  const distanceRef = useRef<HTMLInputElement | null>(null);
 
-  const syncNextFrame = useCallback(() => {
-    if (frame.current !== null) {
-      return;
-    }
-    frame.current = requestAnimationFrame(() => {
-      frame.current = null;
-      onChange();
-    });
-  }, [onChange]);
-  useEffect(
-    () => () => {
-      if (frame.current !== null) {
-        cancelAnimationFrame(frame.current);
+  const announce = useCallback(
+    (outcome: OffsetOutcome) => {
+      const success = offsetSuccessText(outcome);
+      const refusal = offsetRefusalText(outcome);
+      if (success !== null) {
+        showNotice(success, 3000, "canvas", "status");
+      } else if (refusal !== null) {
+        showNotice(refusal, REFUSAL_MS, "canvas", "alert");
       }
     },
-    [],
+    [showNotice],
   );
 
-  useEffect(() => {
-    if (notice === null) {
-      return undefined;
-    }
-    const ms = notice.kind === "refusal" ? REFUSAL_MS : (noticeMs(notice.text) ?? SUCCESS_MS);
-    const timer = window.setTimeout(() => {
-      setNotice((current) => (current?.id === notice.id ? null : current));
-      if (notice.kind === "refusal") {
-        getSession()?.clear_boolean_refusal();
+  const call = useCallback(
+    (run: (session: WasmSession) => void) => {
+      const session = getSession();
+      if (session) {
+        run(session);
         onChange();
       }
-    }, ms);
-    return () => window.clearTimeout(timer);
-  }, [notice, getSession, onChange]);
-
-  const openEntry = useCallback(() => {
-    const opened = getSession()?.open_offset() ?? false;
-    setNotice(null);
-    onChange();
-    return opened;
-  }, [getSession, onChange]);
-
-  const close = useCallback(() => {
-    getSession()?.close_offset();
-    onChange();
-  }, [getSession, onChange]);
+    },
+    [getSession, onChange],
+  );
 
   const setDistance = useCallback(
     (mm: number) => {
       const taken = getSession()?.set_offset_distance(mm) ?? false;
-      syncNextFrame();
+      onChange();
       return taken;
     },
-    [getSession, syncNextFrame],
+    [getSession, onChange],
   );
 
-  const setJoin = useCallback(
-    (join: OffsetJoinName) => {
-      getSession()?.set_offset_join(join);
-      syncNextFrame();
-    },
-    [getSession, syncNextFrame],
-  );
-
-  const setCap = useCallback(
-    (cap: OffsetCapName) => {
-      getSession()?.set_offset_cap(cap);
-      syncNextFrame();
-    },
-    [getSession, syncNextFrame],
-  );
-
-  const apply = useCallback((): OffsetResult => {
+  const apply = useCallback(() => {
     const session = getSession();
-    const distanceMm = readState(session).distanceMm;
-    const raw = session?.apply_offset();
-    const result: OffsetResult = raw
-      ? {
-          kind: raw.kind,
-          count: raw.count,
-          of: raw.of,
-          vanished: raw.vanished,
-          distanceMm: raw.distance_mm,
-        }
-      : { kind: "ignored", count: 0, of: 0, vanished: 0, distanceMm: 0 };
-    raw?.free();
-    onChange();
-    const success = offsetSuccessText(result);
-    const refusal = offsetRefusalText(result, distanceMm);
-    noticeId.current += 1;
-    if (success !== null) {
-      setNotice({ id: noticeId.current, kind: "success", text: success });
-    } else if (refusal !== null) {
-      setNotice({ id: noticeId.current, kind: "refusal", text: refusal });
+    if (!session) {
+      return;
     }
-    return result;
-  }, [getSession, onChange]);
+    const outcome = readOutcome(session.apply_offset());
+    onChange();
+    announce(outcome);
+  }, [getSession, onChange, announce]);
+
+  const showReleaseOutcome = useCallback(() => {
+    const session = getSession();
+    if (!session) {
+      return;
+    }
+    const outcome = readOutcome(session.take_offset_outcome());
+    if (outcome.kind !== "ignored") {
+      announce(outcome);
+    }
+  }, [getSession, announce]);
 
   return {
-    state,
-    open: state.kind !== "closed",
-    openEntry,
-    close,
+    view,
     setDistance,
-    setJoin,
-    setCap,
+    setDirection: (direction) => call((session) => session.set_offset_direction(direction)),
+    setJoin: (join) => call((session) => session.set_offset_join(join)),
+    setCap: (cap) => call((session) => session.set_offset_cap(cap)),
+    setResult: (result) => call((session) => session.set_offset_result(result)),
+    setBarFocus: (focused) => call((session) => session.set_offset_bar_focus(focused)),
     apply,
-    notice,
+    showReleaseOutcome,
+    distanceRef,
   };
 }

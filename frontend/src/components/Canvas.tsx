@@ -183,6 +183,8 @@ export function Canvas({ editor }: CanvasProps) {
       {editor.liveReadout && (
         <ReadoutChip
           text={editor.liveReadout.text}
+          second={editor.liveReadout.second}
+          invalid={editor.liveReadout.invalid}
           x={editor.liveReadout.x}
           y={editor.liveReadout.y}
           containerRef={editor.containerRef}
@@ -218,6 +220,10 @@ function sameRect(a: Rect | null, b: Rect | null): boolean {
 
 interface ReadoutChipProps {
   text: string;
+  /** A muted second line. */
+  second?: string;
+  /** The first line in the invalid colour. */
+  invalid?: boolean;
   /** Canvas-relative CSS pixels, already converted by Rust
    * (`specs/0004-canvas-navigation-and-selection/adrs.md`: "Anything the
    * DOM positions... is returned already converted"). */
@@ -234,7 +240,7 @@ interface ReadoutChipProps {
  * render so it can be kept fully inside the canvas — flipped left or below
  * the pointer near the right and top edges — instead of vanishing there.
  */
-function ReadoutChip({ text, x, y, containerRef }: ReadoutChipProps) {
+function ReadoutChip({ text, second, invalid, x, y, containerRef }: ReadoutChipProps) {
   const chipRef = useRef<HTMLDivElement>(null);
   const [sizes, setSizes] = useState({
     chip: { width: 0, height: 0 },
@@ -268,7 +274,7 @@ function ReadoutChip({ text, x, y, containerRef }: ReadoutChipProps) {
         ? previous
         : next,
     );
-  }, [text, x, y, containerRef]);
+  }, [text, second, x, y, containerRef]);
 
   const placement = placeReadout(
     { x, y },
@@ -292,7 +298,8 @@ function ReadoutChip({ text, x, y, containerRef }: ReadoutChipProps) {
         border: "1px solid color-mix(in srgb, var(--toolbar-icon) 25%, transparent)",
       }}
     >
-      {text}
+      <div style={invalid ? { color: "var(--field-invalid)" } : undefined}>{text}</div>
+      {second && <div className="text-muted-foreground">{second}</div>}
     </div>
   );
 }

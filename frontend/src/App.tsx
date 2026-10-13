@@ -5,6 +5,7 @@ import { Canvas } from "@/components/Canvas";
 import { CanvasNotice } from "@/components/CanvasNotice";
 import { ErrorDialog } from "@/components/ErrorDialog";
 import { NodeToolbar } from "@/components/NodeToolbar";
+import { OffsetToolbar } from "@/components/OffsetToolbar";
 import { PropertiesPanel } from "@/components/panel/PropertiesPanel";
 import { Rulers } from "@/components/Rulers";
 import { SelectToolbar } from "@/components/SelectToolbar";
@@ -114,24 +115,6 @@ function Editor() {
               onCancelRatio={editor.cancelSelectedRatio}
               onConvertToPaths={editor.convertSelectedToPaths}
               onReturnFocus={() => editor.containerRef.current?.focus()}
-              offset={{
-                offered: editor.offset.state.offered,
-                open: editor.offset.open,
-                notice:
-                  editor.offset.notice?.kind === "success" ? editor.offset.notice.text : null,
-                onToggle: (byKey) => {
-                  if (editor.offset.open) {
-                    editor.offset.close();
-                    if (!byKey) {
-                      editor.containerRef.current?.focus();
-                    }
-                  } else if (editor.offset.openEntry()) {
-                    // The section is the first of the Style tab (row "Command with parameters").
-                    documentPanel.shortcut("style");
-                    panelOpen.setOpen(true);
-                  }
-                },
-              }}
             />
           ) : null}
           {editor.tool === "node" ? (
@@ -153,6 +136,12 @@ function Editor() {
                 joinSelected: editor.joinSelected,
                 splitSelected: editor.splitSelected,
               }}
+            />
+          ) : null}
+          {editor.tool === "offset" ? (
+            <OffsetToolbar
+              offset={editor.offset}
+              onReturnFocus={() => editor.containerRef.current?.focus()}
             />
           ) : null}
           {editor.tool === "polygon-star" ? (

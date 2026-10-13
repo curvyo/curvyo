@@ -140,6 +140,25 @@ compound paths), no trait, no generic. The customer chose the library on
   technical-debt entry "Offset preview runs on the main thread" is resolved by
   this and removed.
 
+- **2026-10-13 (implementer, rework M4 to M6): the tool's plumbing.**
+  `curvyo-ui-core` holds `offset_entry.rs` (bar values, the modifier table),
+  `offset_drag.rs` (handle placement, the diagonal projection, snapping) and
+  `offset_plan.rs` (per operand and side a primitive or a curve path, the
+  writes); `curvyo-document-core` has one `write_offset` command in
+  `offset_write.rs` that replaces `add_paths_above` (copies below or above,
+  changed originals in place, a primitive turned into a path keeps its id).
+  The session keeps the bar's values for its life; the preview is cached by
+  document version, selection and request, so a release writes what the last
+  frame showed. The inset stop keeps the last distance at which something was
+  left, which a release then writes. A primitive counts 8 nodes towards the
+  2,000-node preview limit. Selecting in the tool uses the Select tool's
+  object hit test and its marquee, armed against an empty selection so the
+  invisible transform handles of the Select tool never catch a press. The
+  tester's session tests of the first build
+  (`curvyo-editor-wasm/tests/acceptance_0038_tester.rs`) tested the removed
+  Select-bar entry and are deleted with it; the tester writes new ones from the
+  reworked criteria.
+
 ## Flagged to the PO (criterion changes the spec invites)
 
 1. **Criterion 19 and "Miter limit": `i_overlay` clips the miter, it does

@@ -82,32 +82,32 @@ the fallback fired for 0 of 135 outlines over the test shapes.
 
 ### M4 The plan and the drag rules in `curvyo-ui-core` (AC 6, 7, 9, 10, 11, 19, 20, 22, 26, 29, 30, 32)
 
-- [ ] 4.1 `offset_entry.rs`: bar values and codes, Direction/Result, modifier table (19, 26).
-- [ ] 4.2 `offset_drag.rs`: handle positions (12 px out on the diagonal, 24 px minimum box, rotated box
+- [x] 4.1 `offset_entry.rs`: bar values and codes, Direction/Result, modifier table (19, 26).
+- [x] 4.2 `offset_drag.rs`: handle positions (12 px out on the diagonal, 24 px minimum box, rotated box
   for one rotated object), `d = (dx sx + dy sy) / 2` in the box frame, snap series ≥ 2 px, snap to the
   bar value within 6 px, limit 1000 mm (9, 10, 11).
-- [ ] 4.3 `offset_plan.rs`: per operand outer/inner results (primitive or path), vanish counts, the
+- [x] 4.3 `offset_plan.rs`: per operand outer/inner results (primitive or path), vanish counts, the
   open-path rules (30), groups (32), out of range and no area, and the list of writes (20 to 23).
 
 ### M5 Session, wasm API and canvas (AC 2, 9 to 19, 23, 25 to 27)
 
-- [ ] 5.1 Tests first, then `Tool::Offset` and `session/offset.rs`: handles, drag, modifiers at
+- [x] 5.1 Tests first, then `Tool::Offset` and `session/offset.rs`: handles, drag, modifiers at
   release, inset stop at the last non-empty d, preview cache, release = one commit and the new
   selection, Escape and the other button cancel, Apply route, click/marquee/Ctrl+A selection, no move.
-- [ ] 5.2 Render: curve preview (blue, white casing), handles, dashed grown box over 2,000 nodes.
-- [ ] 5.3 `wasm_offset.rs`: bar state, readout state (side, d, result line, stays/becomes), notice.
+- [x] 5.2 Render: curve preview (blue, white casing), handles, dashed grown box over 2,000 nodes.
+- [x] 5.3 `wasm_offset.rs`: bar state, readout state (side, d, result line, stays/becomes), notice.
 
 ### M6 The UI (AC 1 to 8, 13, 15, 24, 25)
 
-- [ ] 6.1 Remove the Select bar button and the panel section (3).
-- [ ] 6.2 "Path tools" card with the Offset tool, key O, active look shared with the Tools card (1, 2).
-- [ ] 6.3 Offset bar, always all controls, greyed with reasons, wraps at 800 x 600, keyboard route
+- [x] 6.1 Remove the Select bar button and the panel section (3).
+- [x] 6.2 "Path tools" card with the Offset tool, key O, active look shared with the Tools card (1, 2).
+- [x] 6.3 Offset bar, always all controls, greyed with reasons, wraps at 800 x 600, keyboard route
   (4 to 8, 25); readout chip (15); notice (24); double-click focuses Distance (13).
-- [ ] 6.4 `offsetText.ts` sentences with unit tests.
+- [x] 6.4 `offsetText.ts` sentences with unit tests.
 
 ### M7 Docs and gate
 
-- [ ] 7.1 Design-system rows (Offset section removed, Path tools card, Offset bar, Offset handles),
+- [x] 7.1 Design-system rows (Offset section removed, Path tools card, Offset bar, Offset handles),
   technical-debt entry updated, `adrs.md` implementer notes.
 - [ ] 7.2 Full gate (`CLAUDE.md` §7), frontend tests and `tsc`, once.
 

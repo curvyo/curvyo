@@ -1,118 +1,192 @@
-// The words of the Offset command (`specs/0038-path-offset` criteria 7, 8, 13, 14 and the UX notes,
-// `docs/design-system.md` rows "Offset section" and "Action notice"): the caption under Distance,
-// the success notice and the refusal sentences. Pure, so they are tested without a session.
+// The words of the Offset tool (`specs/0038-path-offset` criteria 5, 12, 15, 24, 29, 30, 32 and
+// `ux-rework.md`): the bar's status, the two readout lines, the notice after a release or Apply
+// and the refusal sentences. Pure, so they are tested without a session.
 
 import { NOTHING_CHANGED, plural, sharedRefusalText } from "./booleanText.ts";
 
-/** What `WasmSession.offset_state` reports. */
-export interface OffsetState {
-  /** `"closed"`, `"result"`, `"zero"`, `"no_operands"`, `"inset_open"`, `"out_of_range"`,
-   * `"no_area"`, `"groups"` or `"empty"`. */
-  kind: string;
-  count: number;
-  of: number;
-  vanished: number;
-  offered: boolean;
-  hasOpen: boolean;
-  distanceMm: number;
-  join: OffsetJoinName;
-  cap: OffsetCapName;
-  typedLimitMm: number;
-  dragLimitMm: number;
-}
-
+export type OffsetDirectionName = "out" | "in" | "both";
 export type OffsetJoinName = "round" | "miter" | "bevel";
 export type OffsetCapName = "round" | "flat" | "square";
+export type OffsetResultName = "new" | "change";
 
-/** What `WasmSession.apply_offset` did. */
-export interface OffsetResult {
-  /** `"ignored"`, `"closed_zero"`, `"applied"`, `"groups"` or a refusal code of `OffsetState`. */
+/** What `WasmSession.offset_view` reports. */
+export interface OffsetView {
+  operands: number;
+  hasOpen: boolean;
+  hasGroup: boolean;
+  handles: boolean;
+  dragging: boolean;
+  /** Signed: positive outward. */
+  distanceMm: number;
+  both: boolean;
+  change: boolean;
+  /** `""`, `"nothing_left"` or `"inset_open"`. */
+  stop: string;
+  vanished: number;
+  of: number;
+  large: boolean;
+  /** `""`, `"becomes_path"` or `"stays_<kind>"`. */
   kind: string;
+  /** `""` or a refusal code. */
+  refusal: string;
+  barDistanceMm: number;
+  direction: OffsetDirectionName;
+  join: OffsetJoinName;
+  cap: OffsetCapName;
+  result: OffsetResultName;
+  minMm: number;
+  maxMm: number;
+}
+
+/** What `WasmSession.apply_offset` or `take_offset_outcome` reports. */
+export interface OffsetOutcome {
+  /** `"ignored"`, `"applied"`, `"groups"`, `"inset_open"`, `"out_of_range"`, `"no_area"` or
+   * `"empty"`. */
+  kind: string;
+  added: number;
+  changed: number;
   count: number;
   of: number;
   vanished: number;
+  openLeftOut: number;
   distanceMm: number;
+  direction: string;
 }
 
-export const OFFSET_CLOSED: OffsetState = {
-  kind: "closed",
-  count: 0,
-  of: 0,
-  vanished: 0,
-  offered: false,
+export const OFFSET_IDLE: OffsetView = {
+  operands: 0,
   hasOpen: false,
+  hasGroup: false,
+  handles: false,
+  dragging: false,
   distanceMm: 1,
+  both: false,
+  change: false,
+  stop: "",
+  vanished: 0,
+  of: 0,
+  large: false,
+  kind: "",
+  refusal: "",
+  barDistanceMm: 1,
+  direction: "out",
   join: "round",
   cap: "round",
-  typedLimitMm: 1000,
-  dragLimitMm: 50,
+  result: "new",
+  minMm: 0.01,
+  maxMm: 1000,
 };
 
-/** A distance in millimetres with up to three decimals and no trailing zeros; a negative one with
- * a real minus sign when `signed` ("−10"). */
-export function formatDistance(mm: number, signed: boolean): string {
-  const rounded = Math.round(Math.abs(mm) * 1000) / 1000;
-  const text = String(rounded);
-  return signed && mm < 0 && rounded !== 0 ? `−${text}` : text;
+/** A distance in millimetres with up to three decimals and no trailing zeros. */
+export function formatDistance(mm: number): string {
+  return String(Math.round(Math.abs(mm) * 1000) / 1000);
 }
 
-/** The caption under Distance: the side ("Outset", "Inset", nothing at 0), or the reason the
- * previewed result is empty or refused. `refusal` says whether it is shown as a refusal. */
-export function offsetCaption(state: OffsetState): { text: string; refusal: boolean } {
-  switch (state.kind) {
-    case "empty":
-      return { text: `Nothing is left at ${formatDistance(state.distanceMm, true)} mm.`, refusal: true };
-    case "inset_open": {
-      const verb = state.count === 1 ? "is" : "are";
-      return {
-        text: `Needs closed paths: ${state.count} of ${state.of} selected ${verb} open.`,
-        refusal: true,
-      };
-    }
-    case "no_area":
-      return { text: "Needs shapes that enclose an area.", refusal: true };
-    case "groups":
-      return { text: "Does not work on groups. Ungroup first.", refusal: true };
-    case "out_of_range":
-      return { text: "Reaches beyond 10 km from the point 0, 0.", refusal: true };
-    default:
-      if (state.distanceMm > 0) {
-        return { text: "Outset", refusal: false };
-      }
-      if (state.distanceMm < 0) {
-        return { text: "Inset", refusal: false };
-      }
-      return { text: "", refusal: false };
+const KIND_NAMES: Record<string, string> = {
+  stays_rectangle: "Stays a rectangle.",
+  stays_circle: "Stays a circle.",
+  stays_ellipse: "Stays an ellipse.",
+  stays_polygon: "Stays a polygon.",
+  stays_star: "Stays a star.",
+  becomes_path: "Becomes a path.",
+};
+
+/** The bar's status text (criteria 5, 15, 30): why controls are greyed, or what the result is. */
+export function offsetStatus(view: OffsetView): string {
+  if (view.hasGroup && view.operands === 0) {
+    return "Groups cannot be offset. Ungroup first.";
   }
+  if (view.operands === 0) {
+    return "Select one or more shapes.";
+  }
+  if (view.refusal === "inset_open" || view.stop === "inset_open") {
+    return "Inset needs closed paths.";
+  }
+  return KIND_NAMES[view.kind] ?? "";
 }
 
-/** The notice after Apply (criteria 7 and 13), or `null` if nothing was added. */
-export function offsetSuccessText(result: OffsetResult): string | null {
-  if (result.kind !== "applied") {
+/** The two lines of the readout chip during a drag (criteria 12, 15, 18, 30). */
+export function offsetReadout(view: OffsetView): [string, string] {
+  if (view.stop === "inset_open") {
+    return ["Inset needs closed paths", ""];
+  }
+  const d = formatDistance(view.distanceMm);
+  let first = view.both
+    ? `Both ±${d} mm`
+    : view.distanceMm < 0
+      ? `Inset ${d} mm`
+      : `Outset ${d} mm`;
+  if (view.stop === "nothing_left") {
+    first = "Nothing is left";
+  } else if (view.vanished > 0) {
+    first = `${first}, ${view.vanished} of ${view.of} ${view.of === 1 ? "shape vanishes" : "shapes vanish"}`;
+  }
+  let second: string;
+  if (view.large) {
+    second = "Preview off: large selection";
+  } else if (!view.change) {
+    second = "New object";
+  } else if (view.both) {
+    second =
+      view.distanceMm < 0
+        ? "Changes the original, adds the outer copy"
+        : "Changes the original, adds the inner copy";
+  } else {
+    second = "Changes the original";
+  }
+  return [first, second];
+}
+
+/** Whether the readout's first line is in the invalid colour. */
+export function offsetReadoutInvalid(view: OffsetView): boolean {
+  return view.stop !== "";
+}
+
+/** The notice after a release or Apply (criterion 24), or `null` if nothing was written. */
+export function offsetSuccessText(outcome: OffsetOutcome): string | null {
+  if (outcome.kind !== "applied") {
     return null;
   }
-  const side = result.distanceMm < 0 ? "inward" : "outward";
-  const added = `Offset: added ${plural(result.count, "shape", "shapes")}, ${formatDistance(result.distanceMm, false)} mm ${side}.`;
-  if (result.vanished === 0) {
-    return added;
+  const side =
+    outcome.direction === "both"
+      ? "both sides"
+      : outcome.direction === "in"
+        ? "inward"
+        : "outward";
+  const d = `${formatDistance(outcome.distanceMm)} mm ${side}`;
+  let what: string;
+  if (outcome.changed > 0 && outcome.added > 0) {
+    what = `changed ${plural(outcome.changed, "shape", "shapes")} and added ${outcome.added}`;
+  } else if (outcome.changed > 0) {
+    what = `changed ${plural(outcome.changed, "shape", "shapes")}`;
+  } else {
+    what = `added ${plural(outcome.added, "shape", "shapes")}`;
   }
-  return `${added} ${result.vanished} of ${result.of} shapes vanished.`;
+  let text = `Offset: ${what}, ${d}.`;
+  if (outcome.vanished > 0) {
+    text += ` ${outcome.vanished} of ${outcome.of} shapes vanished.`;
+  }
+  if (outcome.openLeftOut > 0) {
+    const verb = outcome.openLeftOut === 1 ? "is" : "are";
+    text += ` Inset needs closed paths: ${outcome.openLeftOut} of ${outcome.of} ${verb} open.`;
+  }
+  return text;
 }
 
-/** The refusal after Apply (criteria 7, 8, 14), or `null` for a result that is no refusal. */
-export function offsetRefusalText(result: OffsetResult, distanceMm: number): string | null {
-  switch (result.kind) {
+/** The refusal after a release or Apply (criteria 29, 30, 32), or `null` for no refusal. */
+export function offsetRefusalText(outcome: OffsetOutcome): string | null {
+  switch (outcome.kind) {
     case "empty":
-      return `Inset is empty: nothing is left at ${formatDistance(distanceMm, false)} mm. ${NOTHING_CHANGED}`;
+      return `Inset is empty: nothing is left at ${formatDistance(outcome.distanceMm)} mm. ${NOTHING_CHANGED}`;
     case "inset_open": {
-      const verb = result.count === 1 ? "is" : "are";
-      const objects = plural(result.of, "selected object", "selected objects");
-      return `Inset needs closed paths. ${result.count} of ${objects} ${verb} open. ${NOTHING_CHANGED}`;
+      const verb = outcome.count === 1 ? "is" : "are";
+      return `Inset needs closed paths: ${outcome.count} of ${outcome.of} ${verb} open. ${NOTHING_CHANGED}`;
     }
     case "groups":
+      return `Offset does not work on groups. Ungroup first. ${NOTHING_CHANGED}`;
     case "no_area":
     case "out_of_range":
-      return sharedRefusalText("Offset", result);
+      return sharedRefusalText("Offset", outcome);
     default:
       return null;
   }
