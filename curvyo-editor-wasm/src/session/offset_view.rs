@@ -66,8 +66,8 @@ impl Session {
         nodes > PREVIEW_NODE_LIMIT
     }
 
-    /// The request the canvas previews now: the drag's once it has left the dead zone, otherwise
-    /// the standing preview of the remembered values (criterion 52).
+    /// The request the canvas previews now (criterion 52): a handle drag's once it has left the
+    /// dead zone, or the open chip's values; otherwise none.
     pub(super) fn offset_preview_request(&self) -> Option<OffsetRequest> {
         if self.tool != Tool::Offset {
             return None;
@@ -76,7 +76,8 @@ impl Session {
             Some(drag) if drag.moved => {
                 (drag.d != 0.0).then(|| self.offset_request(Some((drag.d, self.held))))
             }
-            _ => Some(self.offset_request(None)),
+            Some(_) => None,
+            None => self.offset_chip_open().then(|| self.offset_request(None)),
         }
     }
 

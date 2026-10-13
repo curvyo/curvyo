@@ -62,7 +62,7 @@ export const OFFSET_IDLE: OffsetView = {
   dragging: false,
   distanceMm: 1,
   both: false,
-  change: false,
+  change: true,
   stop: "",
   vanished: 0,
   of: 0,
@@ -76,7 +76,7 @@ export const OFFSET_IDLE: OffsetView = {
   dragJoin: "round",
   pendingJoin: "",
   chipOpen: false,
-  result: "new",
+  result: "change",
   minMm: 0.01,
   maxMm: 1000,
 };
@@ -94,22 +94,18 @@ export const JOIN_NAMES: Record<OffsetJoinName, string> = {
 };
 
 /** The readout chip during a drag (criteria 12, 15, 18; `ux-rework.md` section 3): line 1 the side,
- * the distance and always the corner style; line 2 the effective mode; line 3 only when it applies,
+ * the distance and always the corner style; line 2 the effective Mode and Direction; line 3 only when it applies,
  * in the invalid colour when nothing is left. */
 export function offsetReadout(view: OffsetView): { lines: string[]; invalid: boolean } {
   const d = formatDistance(view.distanceMm);
   const side = view.both ? `Both ±${d} mm` : view.distanceMm < 0 ? `Inset ${d} mm` : `Outset ${d} mm`;
   const lines = [`${side} · ${JOIN_NAMES[view.dragJoin]}`];
-  if (!view.change) {
-    lines.push("New object");
-  } else if (view.both) {
-    lines.push(
-      view.distanceMm < 0
-        ? "Changes the original, adds the outer copy"
-        : "Changes the original, adds the inner copy",
-    );
+  // Both with Change original: the original takes the outset, the copy is the inner one
+  // (criterion 19, third round).
+  if (view.change) {
+    lines.push(view.both ? "Changes the original, adds the inner copy" : "Changes the original");
   } else {
-    lines.push("Changes the original");
+    lines.push(view.both ? "Two new objects" : "New object");
   }
   if (view.stop === "nothing_left") {
     lines.push("Nothing is left");

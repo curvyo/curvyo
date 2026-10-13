@@ -230,7 +230,8 @@ fn path_session() -> Session {
 // ------------------------------------------------------------------------------- AC 52 --------
 
 #[test]
-fn ac52_preview_shows_at_once_for_the_remembered_values() {
+fn ac52_no_preview_on_selection_the_chip_shows_the_remembered_values() {
+    // Criterion 52 replaced in the third round: no preview on selection; the open chip shows it.
     let d = Document::new(1);
     rect_at(&d, 0.0, 0.0, 20.0, 20.0);
     let mut s = open(&d);
@@ -244,16 +245,21 @@ fn ac52_preview_shows_at_once_for_the_remembered_values() {
     assert_eq!(s.selected_object_count(), 1);
     let v = s.offset_view();
     assert!(v.handles && v.operands == 1 && !v.dragging, "{v:?}");
+    assert!(!preview_drawn(&mut s), "no preview on selection");
+    assert_eq!(key(&mut s, "o"), "offset-chip");
+    let v = s.offset_view();
     assert_eq!(v.distance_mm, -3.0, "Inset 3 mm");
     assert_eq!(v.join, OffsetJoin::Miter);
     assert!(v.refusal.is_none());
-    assert!(preview_drawn(&mut s), "the standing preview is drawn");
+    assert!(preview_drawn(&mut s), "the open chip shows its values");
     assert_eq!(packed(&s), before, "showing it writes nothing");
     assert_eq!(s.undo_len(), steps);
+    s.close_offset_chip();
+    assert!(!preview_drawn(&mut s), "closing the chip ends it");
 }
 
 #[test]
-fn ac52_preview_for_every_way_of_selecting_and_on_tool_switch() {
+fn ac52_no_preview_for_any_way_of_selecting_or_on_tool_switch() {
     let d = Document::new(1);
     rect_at(&d, 0.0, 0.0, 20.0, 20.0);
     rect_at(&d, 100.0, 0.0, 20.0, 20.0);
@@ -261,43 +267,47 @@ fn ac52_preview_for_every_way_of_selecting_and_on_tool_switch() {
     s.set_tool(Tool::Offset);
     assert!(!preview_drawn(&mut s), "nothing selected, no preview");
     click(&mut s, pt(20.0, 10.0), false);
-    assert!(preview_drawn(&mut s), "click");
+    assert!(!preview_drawn(&mut s), "click");
     click(&mut s, pt(120.0, 10.0), true);
     assert_eq!(s.selected_object_count(), 2);
     assert_eq!(s.offset_view().operands, 2);
-    assert!(preview_drawn(&mut s), "shift+click");
+    assert!(!preview_drawn(&mut s), "shift+click");
     click(&mut s, pt(60.0, 300.0), false);
     assert_eq!(s.selected_object_count(), 0);
-    assert!(!preview_drawn(&mut s), "empty press: no preview");
+    assert!(!preview_drawn(&mut s), "empty press");
     s.pointer_down(pt(-10.0, -10.0), false);
     s.pointer_hover(pt(30.0, 30.0), false, false);
     s.pointer_up(pt(30.0, 30.0), false, false);
     assert_eq!(s.selected_object_count(), 1, "marquee");
-    assert!(preview_drawn(&mut s), "marquee");
+    assert!(!preview_drawn(&mut s), "marquee");
     ctrl_a(&mut s);
     assert_eq!(s.selected_object_count(), 2);
-    assert!(preview_drawn(&mut s), "Ctrl+A");
+    assert!(!preview_drawn(&mut s), "Ctrl+A");
     s.set_tool(Tool::Select);
-    assert!(!preview_drawn(&mut s), "not in the Offset tool");
     s.set_tool(Tool::Offset);
     assert!(
-        preview_drawn(&mut s),
+        !preview_drawn(&mut s),
         "switching to the tool with a selection"
     );
 }
 
 #[test]
-fn ac52_after_a_write_the_new_selection_has_its_preview_and_enter_continues_from_it() {
+fn ac52_no_preview_after_a_write_and_enter_continues_from_the_result() {
     let mut s = rect_session();
     drag_br(&mut s, (3.0, 3.0), false, false);
-    assert_eq!(take_applied(&mut s), (1, 0));
-    assert!(preview_drawn(&mut s), "preview for the new selection");
+    assert_eq!(take_applied(&mut s), (0, 1), "Change original by default");
+    assert!(!preview_drawn(&mut s), "no preview after the release");
     assert_eq!(key(&mut s, "o"), "offset-chip");
     assert!(s.offset_chip_open());
+    assert!(preview_drawn(&mut s));
     let steps = s.undo_len();
-    assert_eq!(applied(&s.apply_offset()), (1, 0));
+    assert_eq!(applied(&s.apply_offset()), (0, 1));
     assert_eq!(s.undo_len(), steps + 1);
-    assert_eq!(objects(&s).len(), 3);
+    assert_eq!(objects(&s).len(), 1);
+    assert!(
+        !preview_drawn(&mut s),
+        "Enter closes the chip and its preview"
+    );
 }
 
 #[test]
@@ -320,6 +330,8 @@ fn ac52_more_than_2000_nodes_show_the_grown_box_without_a_computed_preview() {
     let v = s.offset_view();
     assert!(v.large, "{v:?}");
     assert!(v.refusal.is_none());
+    assert!(!preview_drawn(&mut s), "nothing before the chip opens");
+    assert_eq!(key(&mut s, "o"), "offset-chip");
     assert!(preview_drawn(&mut s), "the grown box follows the distance");
 }
 
@@ -394,7 +406,7 @@ fn ac55_mixed_selection_handles_chip_and_preview_are_for_the_closed_ones() {
         "handle at the rectangle, not at the line: {h:?}"
     );
     assert!(preview_drawn(&mut s));
-    assert_eq!(applied(&s.apply_offset()), (1, 0), "only the closed one");
+    assert_eq!(applied(&s.apply_offset()), (0, 1), "only the closed one");
     assert_eq!(doc(&s).object(line).unwrap(), line_before, "unchanged");
     assert_eq!(
         s.selected_object_count(),
@@ -465,7 +477,8 @@ fn ac53_hit_area_is_twelve_screen_pixels_at_any_zoom() {
 }
 
 #[test]
-fn ac53_modifiers_at_the_double_click_have_no_meaning_and_the_cursor_is_pointer() {
+fn ac53_ac57_modifiers_at_the_double_click_preselect_and_the_cursor_is_pointer() {
+    // Criterion 57 (third round): Ctrl+Shift preselects Both and New object.
     let mut s = path_session();
     let c = pt(20.0, 20.0);
     s.pointer_hover(c, false, false);
@@ -476,7 +489,7 @@ fn ac53_modifiers_at_the_double_click_have_no_meaning_and_the_cursor_is_pointer(
         DoubleClickHint::OffsetChip
     );
     assert!(s.offset_chip_open());
-    assert_eq!(s.offset_values().direction(), OffsetDirection::Out);
+    assert_eq!(s.offset_values().direction(), OffsetDirection::Both);
     assert_eq!(s.offset_values().result(), OffsetResultChoice::NewObject);
     assert_eq!(s.handle_hint(), "", "no hint while the chip is open");
 }
@@ -559,6 +572,8 @@ fn ac54_enter_writes_one_commit_closes_the_chip_selects_the_result_and_undo_take
     let before = objects(&s);
     let steps = s.undo_len();
     assert!(s.open_offset_chip());
+    // A new object, so the count shows the step (Mode New object; the default is Change original).
+    s.set_offset_result(OffsetResultChoice::NewObject);
     assert_eq!(applied(&s.apply_offset()), (1, 0));
     assert!(!s.offset_chip_open(), "Enter closes the chip");
     assert_eq!(s.undo_len(), steps + 1, "one commit");
@@ -658,9 +673,13 @@ fn ac29_a_refused_inset_keeps_the_chip_open_and_writes_nothing_then_a_valid_valu
     assert_eq!(packed(&s), before);
     assert_eq!(s.undo_len(), steps);
     assert!(s.set_offset_distance(2.0));
-    assert_eq!(applied(&s.apply_offset()), (1, 0));
+    assert_eq!(
+        applied(&s.apply_offset()),
+        (0, 1),
+        "Change original by default"
+    );
     assert!(!s.offset_chip_open());
-    assert_eq!(sorted_rect_widths(&s), [16.0, 20.0]);
+    assert_eq!(sorted_rect_widths(&s), [16.0]);
 }
 
 #[test]
@@ -676,7 +695,7 @@ fn ac29_partial_vanish_survivors_get_their_results() {
     s.set_offset_direction(OffsetDirection::In);
     assert!(s.open_offset_chip());
     let OffsetOutcome::Applied {
-        added,
+        changed: added,
         vanished,
         of,
         ..
@@ -766,7 +785,7 @@ fn ac54_a_press_on_a_corner_handle_closes_the_chip_and_the_drag_snaps_to_the_typ
         "snapped to the remembered 2 mm"
     );
     s.pointer_up(pt(h.x + by, h.y + by), false, false);
-    assert_eq!(take_applied(&mut s), (1, 0));
+    assert_eq!(take_applied(&mut s), (0, 1));
     assert_eq!(s.offset_values().direction(), OffsetDirection::Out);
 }
 
@@ -817,17 +836,17 @@ fn ac56_the_cycle_starts_from_the_chip_corners_value() {
 }
 
 #[test]
-fn ac56_the_standing_preview_redraws_with_the_pending_style() {
+fn ac52_ac56_a_corner_style_double_click_draws_no_preview_and_the_chip_takes_it_over() {
     let mut s = rect_session();
     assert!(s.set_offset_distance(3.0));
-    let round = s.draw_list().triangles;
+    let before = s.draw_list().triangles;
     let _ = s.double_click_hint(br(&s), false, false);
     assert_eq!(s.offset_view().join, OffsetJoin::Miter);
-    assert_ne!(
-        s.draw_list().triangles,
-        round,
-        "mitered corners look different"
-    );
+    assert!(!preview_drawn(&mut s), "no preview after the double-click");
+    assert_eq!(s.draw_list().triangles, before, "nothing else is drawn");
+    assert_eq!(key(&mut s, "o"), "offset-chip");
+    assert_eq!(s.offset_values().join(), OffsetJoin::Miter);
+    assert!(preview_drawn(&mut s), "the chip previews the pending style");
 }
 
 #[test]
@@ -860,7 +879,8 @@ fn ac56_the_next_written_drag_uses_the_pending_style_and_consumes_it() {
         OffsetJoin::Miter,
         "the readout names it"
     );
-    s.pointer_up(pt(h.x + 6.0, h.y + 6.0), false, false);
+    // Ctrl: a new object (third round), so the original and the result can be compared.
+    s.pointer_up(pt(h.x + 6.0, h.y + 6.0), false, true);
     assert_eq!(take_applied(&mut s).0, 1);
     // A mitered outset of a rectangle is a rectangle with sharp corners.
     let first = objects(&s);
@@ -871,7 +891,7 @@ fn ac56_the_next_written_drag_uses_the_pending_style_and_consumes_it() {
             .all(|o| rect_size(o).is_some() && rect_radius(o) == Some(0.0)),
         "{first:?}"
     );
-    // Consumed: the standing preview and the next drag use Round again.
+    // Consumed: the next drag uses Round again.
     assert_eq!(s.offset_view().pending_join, None);
     assert_eq!(s.offset_view().join, OffsetJoin::Round);
     // The produced rectangle is selected; drag its own handle.
@@ -885,7 +905,7 @@ fn ac56_the_next_written_drag_uses_the_pending_style_and_consumes_it() {
     s.pointer_down(h, false);
     s.pointer_hover(pt(h.x + 4.0, h.y + 4.0), false, false);
     assert_eq!(s.offset_view().join, OffsetJoin::Round);
-    s.pointer_up(pt(h.x + 4.0, h.y + 4.0), false, false);
+    s.pointer_up(pt(h.x + 4.0, h.y + 4.0), false, true);
     assert_eq!(take_applied(&mut s).0, 1);
     assert!(
         objects(&s)
@@ -951,7 +971,7 @@ fn ac56_opening_the_chip_with_a_pending_style_takes_it_over() {
         "Escape keeps it"
     );
     assert!(s.open_offset_chip());
-    assert_eq!(applied(&s.apply_offset()), (1, 0));
+    assert_eq!(applied(&s.apply_offset()), (0, 1));
     assert!(objects(&s).iter().any(|o| rect_size(o).is_none()));
 }
 
@@ -970,10 +990,11 @@ fn ac56_a_double_click_off_the_handles_does_nothing() {
 #[test]
 fn ac19_modifier_table_on_a_drag() {
     for (shift, ctrl, expected) in [
-        (false, false, (1, 0)),
-        (true, false, (2, 0)),
-        (false, true, (0, 1)),
-        (true, true, (1, 1)),
+        // Third round (customer, 2026-10-13).
+        (false, false, (0, 1)),
+        (true, false, (1, 1)),
+        (false, true, (1, 0)),
+        (true, true, (2, 0)),
     ] {
         let mut s = rect_session();
         drag_br(&mut s, (4.0, 4.0), shift, ctrl);
@@ -985,19 +1006,22 @@ fn ac19_modifier_table_on_a_drag() {
 }
 
 #[test]
-fn ac19_shift_ctrl_outward_gives_the_original_the_dragged_side() {
-    let mut s = rect_session();
-    drag_br(&mut s, (4.0, 4.0), true, true);
-    let _ = take_applied(&mut s);
-    let sizes = sorted_rect_widths(&s);
-    assert_eq!(sizes.len(), 2, "{sizes:?}");
-    assert!(sizes[0] < 20.0 && sizes[1] > 20.0, "{sizes:?}");
-    // The original (same id, first in the document) is the outset one.
-    let first = objects(&s);
-    let ids = doc(&s).object_ids();
-    let orig = rect_size(&doc(&s).object(ids[0]).unwrap());
-    let _ = first;
-    assert!(orig.is_some());
+fn ac19_shift_gives_the_original_the_outset_whatever_the_drag_direction() {
+    // Third round: Shift alone = Both with Change original; the Shift+Ctrl chord is gone.
+    for delta in [(4.0, 4.0), (-4.0, -4.0)] {
+        let mut s = rect_session();
+        let id = doc(&s).object_ids()[0];
+        drag_br(&mut s, delta, true, false);
+        let _ = take_applied(&mut s);
+        let sizes = sorted_rect_widths(&s);
+        assert_eq!(sizes.len(), 2, "{sizes:?}");
+        assert!(sizes[0] < 20.0 && sizes[1] > 20.0, "{sizes:?}");
+        let orig = rect_size(&doc(&s).object(id).unwrap()).unwrap();
+        assert!(
+            orig.0 > 20.0,
+            "the original is the outset: {orig:?} ({delta:?})"
+        );
+    }
 }
 
 #[test]
@@ -1009,12 +1033,12 @@ fn ac19_the_release_event_decides_not_earlier_key_state() {
     s.pointer_hover(pt(h.x + 4.0, h.y + 4.0), true, false);
     s.modifiers_changed(false, false, false);
     s.pointer_up(pt(h.x + 4.0, h.y + 4.0), false, false);
-    assert_eq!(take_applied(&mut s), (1, 0), "key up before release");
+    assert_eq!(take_applied(&mut s), (0, 1), "key up before release");
     let mut s = rect_session();
     drag_br(&mut s, (4.0, 4.0), true, false);
     assert_eq!(
         take_applied(&mut s),
-        (2, 0),
+        (1, 1),
         "Shift on the release event only"
     );
 }

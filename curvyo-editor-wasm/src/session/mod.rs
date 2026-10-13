@@ -617,7 +617,7 @@ impl Session {
                 Tool::Pen => this.finish_pen(),
                 Tool::Node => this.insert_at(point),
                 Tool::Select => return this.select_double_click(point, shift, ctrl),
-                Tool::Offset => return this.offset_double_click(point),
+                Tool::Offset => return this.offset_double_click(point, shift, ctrl),
                 Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar => {}
             }
             DoubleClickHint::None

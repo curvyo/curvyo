@@ -62,8 +62,9 @@ pub struct OffsetSides {
 
 impl OffsetSides {
     /// The sides for a drag towards `dragged`, with `both` (Shift) and `change` (the effective
-    /// Change original: the remembered Mode inverted by Ctrl). Shift+Ctrl: the original takes the
-    /// dragged side and a copy is made for the other.
+    /// Change original: the remembered Mode, switched by Ctrl). Both with Change original: the
+    /// original takes the outset and one copy is made for the inset, whatever the drag direction
+    /// (criterion 19, third round).
     #[must_use]
     pub const fn of(dragged: OffsetSide, both: bool, change: bool) -> Self {
         let own = if change {
@@ -71,14 +72,19 @@ impl OffsetSides {
         } else {
             OffsetRole::Copy
         };
-        let other = if both { Some(OffsetRole::Copy) } else { None };
+        if both {
+            return Self {
+                out: Some(own),
+                inside: Some(OffsetRole::Copy),
+            };
+        }
         match dragged {
             OffsetSide::Out => Self {
                 out: Some(own),
-                inside: other,
+                inside: None,
             },
             OffsetSide::In => Self {
-                out: other,
+                out: None,
                 inside: Some(own),
             },
         }
@@ -101,7 +107,7 @@ impl Default for OffsetValues {
             distance_mm: OFFSET_DEFAULT_MM,
             direction: OffsetDirection::Out,
             join: OffsetJoin::Round,
-            result: OffsetResultChoice::NewObject,
+            result: OffsetResultChoice::ChangeOriginal,
         }
     }
 }
@@ -226,12 +232,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn ac6_ac52_the_first_use_is_one_millimetre_out_round_new_object() {
+    fn ac6_ac54_the_first_use_is_one_millimetre_out_round_change_original() {
         let values = OffsetValues::default();
         assert!((values.distance_mm() - 1.0).abs() < f64::EPSILON);
         assert_eq!(values.direction(), OffsetDirection::Out);
         assert_eq!(values.join(), OffsetJoin::Round);
-        assert_eq!(values.result(), OffsetResultChoice::NewObject);
+        assert_eq!(
+            values.result(),
+            OffsetResultChoice::ChangeOriginal,
+            "third round: Change original by default"
+        );
     }
 
     #[test]
@@ -252,41 +262,42 @@ mod tests {
         let values = OffsetValues::default();
         let sides =
             |dragged, shift, ctrl| OffsetSides::of(dragged, shift, values.changes_original(ctrl));
-        assert_eq!(
-            sides(OffsetSide::Out, false, false),
-            OffsetSides {
-                out: Some(Copy),
-                inside: None
-            }
-        );
-        assert_eq!(
-            sides(OffsetSide::In, true, false),
-            OffsetSides {
-                out: Some(Copy),
-                inside: Some(Copy)
-            }
-        );
-        assert_eq!(
-            sides(OffsetSide::In, false, true),
-            OffsetSides {
-                out: None,
-                inside: Some(Original)
-            }
-        );
-        assert_eq!(
-            sides(OffsetSide::Out, true, true),
-            OffsetSides {
-                out: Some(Original),
-                inside: Some(Copy)
-            },
-            "Shift+Ctrl: the original takes the dragged side"
-        );
-        let mut change = OffsetValues::default();
-        change.set_result(OffsetResultChoice::ChangeOriginal);
-        assert!(change.changes_original(false));
+        for dragged in [OffsetSide::Out, OffsetSide::In] {
+            let own = |role| match dragged {
+                OffsetSide::Out => OffsetSides {
+                    out: Some(role),
+                    inside: None,
+                },
+                OffsetSide::In => OffsetSides {
+                    out: None,
+                    inside: Some(role),
+                },
+            };
+            assert_eq!(sides(dragged, false, false), own(Original), "none: change");
+            assert_eq!(sides(dragged, false, true), own(Copy), "Ctrl: new object");
+            assert_eq!(
+                sides(dragged, true, false),
+                OffsetSides {
+                    out: Some(Original),
+                    inside: Some(Copy)
+                },
+                "Shift: the original takes the outset whatever the drag direction"
+            );
+            assert_eq!(
+                sides(dragged, true, true),
+                OffsetSides {
+                    out: Some(Copy),
+                    inside: Some(Copy)
+                },
+                "Ctrl+Shift: two new objects"
+            );
+        }
+        let mut new = OffsetValues::default();
+        new.set_result(OffsetResultChoice::NewObject);
+        assert!(!new.changes_original(false));
         assert!(
-            !change.changes_original(true),
-            "Ctrl inverts the remembered Mode"
+            new.changes_original(true),
+            "Ctrl switches to the other Mode"
         );
     }
 
@@ -294,7 +305,6 @@ mod tests {
     fn ac26_the_chip_route_reads_direction_and_mode() {
         let mut values = OffsetValues::default();
         values.set_direction(OffsetDirection::Both);
-        values.set_result(OffsetResultChoice::ChangeOriginal);
         assert_eq!(
             values.entry_sides(),
             OffsetSides {

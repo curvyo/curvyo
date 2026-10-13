@@ -65,24 +65,28 @@ test("criteria 29, 32: the refusals", () => {
 
 test("criteria 12, 15, 18: the readout names side, distance and corner style, then the mode", () => {
   const dragging = { ...OFFSET_IDLE, operands: 1, dragging: true };
+  // Third round: the default Mode is Change original (OFFSET_IDLE), Ctrl makes new objects.
   assert.deepEqual(offsetReadout({ ...dragging, distanceMm: 2.5 }), {
-    lines: ["Outset 2.5 mm · Round", "New object"],
+    lines: ["Outset 2.5 mm · Round", "Changes the original"],
     invalid: false,
   });
-  assert.deepEqual(offsetReadout({ ...dragging, distanceMm: -0.8, change: true, dragJoin: "miter" }).lines, [
+  assert.deepEqual(offsetReadout({ ...dragging, distanceMm: -0.8, change: false, dragJoin: "miter" }).lines, [
     "Inset 0.8 mm · Miter",
-    "Changes the original",
+    "New object",
   ]);
-  assert.deepEqual(
-    offsetReadout({ ...dragging, distanceMm: 2.5, both: true, change: true, dragJoin: "bevel" }).lines,
-    ["Both ±2.5 mm · Bevel", "Changes the original, adds the inner copy"],
-  );
-  assert.deepEqual(offsetReadout({ ...dragging, distanceMm: -2.5, both: true, change: true }).lines, [
+  for (const distanceMm of [2.5, -2.5]) {
+    assert.deepEqual(
+      offsetReadout({ ...dragging, distanceMm, both: true, dragJoin: "bevel" }).lines,
+      ["Both ±2.5 mm · Bevel", "Changes the original, adds the inner copy"],
+      "Shift: the original takes the outset whatever the drag direction",
+    );
+  }
+  assert.deepEqual(offsetReadout({ ...dragging, distanceMm: 2.5, both: true, change: false }).lines, [
     "Both ±2.5 mm · Round",
-    "Changes the original, adds the outer copy",
+    "Two new objects",
   ]);
   const stopped = offsetReadout({ ...dragging, distanceMm: -1, stop: "nothing_left" });
-  assert.deepEqual(stopped.lines, ["Inset 1 mm · Round", "New object", "Nothing is left"]);
+  assert.deepEqual(stopped.lines, ["Inset 1 mm · Round", "Changes the original", "Nothing is left"]);
   assert.equal(stopped.invalid, true);
   assert.equal(offsetReadout({ ...dragging, distanceMm: -1, vanished: 1, of: 3 }).lines[2], "1 of 3 shapes vanishes");
   assert.equal(offsetReadout({ ...dragging, large: true }).lines[2], "Preview off: large selection");

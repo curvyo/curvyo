@@ -185,7 +185,11 @@ fn ac4_ac5_ac6_bar_defaults_and_ranges() {
     assert_eq!(bar.distance_mm(), 1.0);
     assert_eq!(bar.direction(), OffsetDirection::Out);
     assert_eq!(bar.join(), OffsetJoin::Round);
-    assert_eq!(bar.result(), OffsetResultChoice::NewObject);
+    assert_eq!(
+        bar.result(),
+        OffsetResultChoice::ChangeOriginal,
+        "third round: Change original by default (criterion 54)"
+    );
     assert!(s.set_offset_distance(0.01));
     assert!(s.set_offset_distance(1000.0));
     assert!(!s.set_offset_distance(0.009), "below the range");
@@ -287,7 +291,7 @@ fn ac10_projection_formula_and_sign() {
     else {
         panic!("applied")
     };
-    assert_eq!((added, changed, direction), (1, 0, OffsetDirection::Out));
+    assert_eq!((added, changed, direction), (0, 1, OffsetDirection::Out));
     assert!(
         (distance_mm - 4.0).abs() < 1e-9,
         "d = (4 + 4) / 2: {distance_mm}"
@@ -502,7 +506,8 @@ fn ac16_one_commit_named_offset_path_and_undo_redo() {
     let (mut s, _) = square_session();
     let before = s.pack("0.1.0").unwrap();
     let n = s.undo_len();
-    drag(&mut s, BR, (4.0, 4.0), false, false);
+    // Ctrl: a new object (third round), so undo removes one object.
+    drag(&mut s, BR, (4.0, 4.0), false, true);
     assert_eq!(s.undo_len(), n + 1, "one step");
     assert_eq!(OFFSET_COMMIT_LABEL, "offset_path");
     assert_eq!(
@@ -567,17 +572,28 @@ fn ac17_pointer_cancelled_writes_nothing() {
 
 #[test]
 fn ac19_modifier_table_on_a_rectangle() {
-    // none: new object
-    let (mut s, a) = square_session();
+    // Third round (customer, 2026-10-13). None: the original is changed, same id.
+    let (mut s, a_id) = square_session();
     drag(&mut s, BR, (4.0, 4.0), false, false);
+    let OffsetOutcome::Applied { added, changed, .. } = outcome(&mut s) else {
+        panic!()
+    };
+    assert_eq!((added, changed), (0, 1));
+    let d = doc(&s);
+    assert_eq!(d.object_ids(), vec![a_id], "same object, same id");
+    assert_eq!(size(&d.object(a_id).unwrap()), (28.0, 28.0));
+    // Ctrl: a new object, the original unchanged.
+    let (mut s, a_id) = square_session();
+    drag(&mut s, BR, (4.0, 4.0), false, true);
     let OffsetOutcome::Applied { added, changed, .. } = outcome(&mut s) else {
         panic!()
     };
     assert_eq!((added, changed), (1, 0));
     assert_eq!(objects(&s).len(), 2);
-    // Shift: two new objects, original unchanged.
+    assert_eq!(size(&doc(&s).object(a_id).unwrap()), (20.0, 20.0));
+    // Ctrl+Shift: two new objects, original unchanged.
     let (mut s, a_id) = square_session();
-    drag(&mut s, BR, (4.0, 4.0), true, false);
+    drag(&mut s, BR, (4.0, 4.0), true, true);
     let OffsetOutcome::Applied {
         added,
         changed,
@@ -594,42 +610,22 @@ fn ac19_modifier_table_on_a_rectangle() {
     let mut sizes: Vec<(f64, f64)> = objects(&s).iter().map(size).collect();
     sizes.sort_by(|x, y| x.0.partial_cmp(&y.0).unwrap());
     assert_eq!(sizes, vec![(12.0, 12.0), (20.0, 20.0), (28.0, 28.0)]);
-    // Ctrl: original changed, no new object, same id.
-    let (mut s, a_id) = square_session();
-    drag(&mut s, BR, (4.0, 4.0), false, true);
-    let OffsetOutcome::Applied { added, changed, .. } = outcome(&mut s) else {
-        panic!()
-    };
-    assert_eq!((added, changed), (0, 1));
-    let d = doc(&s);
-    assert_eq!(d.object_ids(), vec![a_id], "same object, same id");
-    assert_eq!(size(&d.object(a_id).unwrap()), (28.0, 28.0));
-    // Shift+Ctrl dragged outward: original becomes the outset, a new object is the inset.
-    let (mut s, a_id) = square_session();
-    drag(&mut s, BR, (4.0, 4.0), true, true);
-    let OffsetOutcome::Applied { added, changed, .. } = outcome(&mut s) else {
-        panic!()
-    };
-    assert_eq!((added, changed), (1, 1));
-    let d = doc(&s);
-    assert_eq!(size(&d.object(a_id).unwrap()), (28.0, 28.0));
-    assert!(
-        d.object_ids()
-            .iter()
-            .any(|id| size(&d.object(*id).unwrap()) == (12.0, 12.0))
-    );
-    // Shift+Ctrl dragged inward: original becomes the inset.
-    let (mut s, a_id) = square_session();
-    drag(&mut s, BR, (-4.0, -4.0), true, true);
-    let _ = outcome(&mut s);
-    let d = doc(&s);
-    assert_eq!(size(&d.object(a_id).unwrap()), (12.0, 12.0));
-    assert!(
-        d.object_ids()
-            .iter()
-            .any(|id| size(&d.object(*id).unwrap()) == (28.0, 28.0))
-    );
-    let _ = a;
+    // Shift, dragged outward or inward: the original becomes the outset, one new object the inset.
+    for delta in [(4.0, 4.0), (-4.0, -4.0)] {
+        let (mut s, a_id) = square_session();
+        drag(&mut s, BR, delta, true, false);
+        let OffsetOutcome::Applied { added, changed, .. } = outcome(&mut s) else {
+            panic!()
+        };
+        assert_eq!((added, changed), (1, 1));
+        let d = doc(&s);
+        assert_eq!(size(&d.object(a_id).unwrap()), (28.0, 28.0), "{delta:?}");
+        assert!(
+            d.object_ids()
+                .iter()
+                .any(|id| size(&d.object(*id).unwrap()) == (12.0, 12.0))
+        );
+    }
 }
 
 #[test]
@@ -650,7 +646,7 @@ fn ac19_release_reads_the_modifier_from_its_own_event() {
     };
     assert_eq!(
         (added, direction),
-        (1, OffsetDirection::Out),
+        (0, OffsetDirection::Out),
         "late Shift key-up must not count"
     );
     // And the other way: Shift only on the release event.
@@ -666,7 +662,11 @@ fn ac19_release_reads_the_modifier_from_its_own_event() {
     else {
         panic!()
     };
-    assert_eq!((added, direction), (2, OffsetDirection::Both));
+    assert_eq!(
+        (added, direction),
+        (1, OffsetDirection::Both),
+        "Shift: one inner copy"
+    );
 }
 
 #[test]
@@ -702,7 +702,7 @@ fn ac20_z_order_outset_below_inset_above_both_around() {
         )
     };
     let (mut s, a) = square_session();
-    drag(&mut s, BR, (4.0, 4.0), false, false);
+    drag(&mut s, BR, (4.0, 4.0), false, true);
     let _ = outcome(&mut s);
     let (pos, sizes) = order(&s, a);
     assert_eq!(sizes[pos], (20.0, 20.0));
@@ -713,13 +713,13 @@ fn ac20_z_order_outset_below_inset_above_both_around() {
     );
     assert_eq!(pos, 1);
     let (mut s, a) = square_session();
-    drag(&mut s, BR, (-4.0, -4.0), false, false);
+    drag(&mut s, BR, (-4.0, -4.0), false, true);
     let _ = outcome(&mut s);
     let (pos, sizes) = order(&s, a);
     assert_eq!(pos, 0);
     assert_eq!(sizes[1], (12.0, 12.0), "inset directly above: {sizes:?}");
     let (mut s, a) = square_session();
-    drag(&mut s, BR, (4.0, 4.0), true, false);
+    drag(&mut s, BR, (4.0, 4.0), true, true);
     let _ = outcome(&mut s);
     let (pos, sizes) = order(&s, a);
     assert_eq!(pos, 1);
@@ -761,7 +761,8 @@ fn ac22_ac23_several_operands_each_on_their_own_and_selection_after() {
     s.pointer_hover(h, false, false);
     s.pointer_down(h, false);
     s.pointer_hover(pt(h.x + 6.0, h.y + 6.0), false, false);
-    s.pointer_up(pt(h.x + 6.0, h.y + 6.0), false, false);
+    // Ctrl: new objects (third round).
+    s.pointer_up(pt(h.x + 6.0, h.y + 6.0), false, true);
     let OffsetOutcome::Applied { added, .. } = outcome(&mut s) else {
         panic!()
     };
@@ -783,9 +784,10 @@ fn ac22_ac23_several_operands_each_on_their_own_and_selection_after() {
 #[test]
 fn ac23_second_drag_offsets_the_result() {
     let (mut s, _) = square_session();
-    drag(&mut s, BR, (4.0, 4.0), false, false);
+    // Ctrl (New object) gives concentric copies (criterion 23, third round).
+    drag(&mut s, BR, (4.0, 4.0), false, true);
     let _ = outcome(&mut s);
-    drag(&mut s, BR, (4.0, 4.0), false, false);
+    drag(&mut s, BR, (4.0, 4.0), false, true);
     let _ = outcome(&mut s);
     let mut sizes: Vec<f64> = objects(&s).iter().map(|o| size(o).0).collect();
     sizes.sort_by(|a, b| a.partial_cmp(b).unwrap());
@@ -793,7 +795,7 @@ fn ac23_second_drag_offsets_the_result() {
 }
 
 #[test]
-fn ac23_ctrl_selects_the_changed_original() {
+fn ac23_a_plain_release_selects_the_changed_original() {
     let d = Document::new(1);
     rect_at(&d, 0.0, 0.0, 20.0, 20.0);
     rect_at(&d, 100.0, 0.0, 20.0, 20.0);
@@ -801,11 +803,10 @@ fn ac23_ctrl_selects_the_changed_original() {
     select_and_offset(&mut s, pt(0.0, 10.0));
     let first = objects(&s);
     let h = handle_over(&s, &[&first[0]], BR);
-    s.modifiers_changed(false, true, false);
     s.pointer_hover(h, false, false);
     s.pointer_down(h, false);
     s.pointer_hover(pt(h.x + 4.0, h.y + 4.0), false, false);
-    s.pointer_up(pt(h.x + 4.0, h.y + 4.0), false, true);
+    s.pointer_up(pt(h.x + 4.0, h.y + 4.0), false, false);
     let _ = outcome(&mut s);
     assert_eq!(s.selected_object_count(), 1);
     s.set_tool(Tool::Select);
@@ -833,7 +834,11 @@ fn ac25_apply_writes_the_bar_values_in_one_commit() {
     else {
         panic!()
     };
-    assert_eq!((added, direction), (1, OffsetDirection::Out));
+    assert_eq!(
+        (added, direction),
+        (0, OffsetDirection::Out),
+        "Change original by default"
+    );
     assert_eq!(distance_mm, 2.5);
     assert_eq!(s.undo_len(), n + 1);
     assert!(objects(&s).iter().any(|o| size(o) == (25.0, 25.0)));
@@ -937,6 +942,7 @@ fn ac55_mixed_selection_ignores_open_paths() {
     assert_eq!(s.selected_object_count(), 2);
     assert_eq!(s.offset_view().operands, 1);
     let line_before = doc(&s).object(line).unwrap();
+    s.set_offset_result(OffsetResultChoice::NewObject);
     for direction in [OffsetDirection::In, OffsetDirection::Both] {
         assert!(s.set_offset_distance(2.0));
         s.set_offset_direction(direction);
@@ -1046,6 +1052,8 @@ fn ac40_circle_stays_a_circle() {
     );
     for join in [OffsetJoin::Round, OffsetJoin::Miter, OffsetJoin::Bevel] {
         s.set_offset_join(join);
+        // These results are checked as new objects (Mode New object).
+        s.set_offset_result(OffsetResultChoice::NewObject);
         assert!(s.set_offset_distance(2.0));
         let OffsetOutcome::Applied { added, .. } = s.apply_offset() else {
             panic!()
@@ -1097,6 +1105,8 @@ fn ac40_ac41_rounded_rectangle_rotated_keeps_rotation() {
     });
     s.set_tool(Tool::Offset);
     assert_eq!(s.selected_object_count(), 1);
+    // These results are checked as new objects (Mode New object).
+    s.set_offset_result(OffsetResultChoice::NewObject);
     assert!(s.set_offset_distance(2.0));
     let OffsetOutcome::Applied { added, .. } = s.apply_offset() else {
         panic!("{:?}", s.offset_view())
@@ -1219,6 +1229,7 @@ fn ac40_hexagon_miter_stays_a_hexagon_round_becomes_a_path() {
         let (mut s, _) = one_object_session(hexagon, pt(50.0, 40.0));
         s.set_offset_join(join);
         s.set_offset_direction(OffsetDirection::In);
+        s.set_offset_result(OffsetResultChoice::NewObject);
         assert!(s.set_offset_distance(1.0));
         assert!(matches!(s.apply_offset(), OffsetOutcome::Applied { .. }));
         let objs = objects(&s);
@@ -1314,6 +1325,8 @@ fn ac37_ac42_ellipse_becomes_a_path_change_original_keeps_id_and_place() {
 fn ac42_both_on_a_rectangle_gives_two_rectangles() {
     let (mut s, _) = square_session();
     s.set_offset_direction(OffsetDirection::Both);
+    // These results are checked as new objects (Mode New object).
+    s.set_offset_result(OffsetResultChoice::NewObject);
     assert!(s.set_offset_distance(3.0));
     assert!(matches!(
         s.apply_offset(),

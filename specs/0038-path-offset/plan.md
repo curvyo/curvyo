@@ -132,9 +132,8 @@ the fallback fired for 0 of 135 outlines over the test shapes.
 
 ### M6' Session: standing preview, modifiers, corner style by double-click (AC 6, 10, 13, 15, 19, 52, 56)
 
-- [x] 6'.1 Tests first: the standing preview shows on selection and tool switch for the
-  remembered values, after a write for the new selection, and is the outline a write gives (52);
-  the press keeps it until the 3 px dead zone is left (ux-rework 3).
+- [x] 6'.1 ~~Tests first: the standing preview shows on selection and tool switch~~ (replaced by
+  6'.6 in the third round); the drag preview starts once the 3 px dead zone is left (ux-rework 3).
 - [x] 6'.2 A drag never changes Direction; the dragged distance becomes the remembered one on a
   written release only (6, 10). Shift = Both, Ctrl = the other Mode, Shift+Ctrl = the original
   takes the dragged side (19).
@@ -143,6 +142,17 @@ the fallback fired for 0 of 135 outlines over the test shapes.
   it; a written release consumes it, a cancelled drag keeps it, a tool switch drops it (13, 56).
 - [x] 6'.4 The readout state carries the effective corner style for line 1 and the mode for
   line 2 (15).
+
+- [x] 6'.5 Third round (customer, 2026-10-13): default Mode Change original; Ctrl = New object;
+  Shift = Both with Change original (the original takes the outset, one copy for the inset,
+  whatever the drag direction); Ctrl+Shift = two new objects; the old "dragged side plus copy"
+  chord goes. Readout line 2, plus badge (any new object), tooltip and hint texts (1, 15, 19, 20,
+  23, 26, 54).
+- [x] 6'.6 Preview only during a handle drag past the dead zone and while the chip is open; the
+  standing preview goes (52 replaced, 9, 10, 23, 25, 56).
+- [x] 6'.7 A double-click on the center handle with Shift / Ctrl preselects Direction Both / Mode
+  New object; O and Enter open with the remembered values; second hint line on the center handle
+  (53, 57).
 
 ### M7' Canvas and wasm: the center handle and opening the chip (AC 9, 25, 53)
 

@@ -3,7 +3,7 @@
 //! does, and whether the chip is open.
 
 use curvyo_document_core::Point;
-use curvyo_ui_core::{OffsetResultChoice, next_offset_join};
+use curvyo_ui_core::{OffsetDirection, OffsetResultChoice, next_offset_join};
 
 use super::{DoubleClickHint, Session};
 
@@ -69,8 +69,8 @@ impl Session {
     }
 
     /// The hover hint of the Offset handle under the pointer: `"offset-center"`,
-    /// `"offset-corner"` or `"offset-corner-change"` (the remembered Mode is Change original, so
-    /// Ctrl makes a new object), `""` during a drag or off the handles (`ux-rework.md` 2.1, 3).
+    /// `"offset-corner"` (Ctrl makes a new object, the remembered Mode being Change original) or
+    /// `"offset-corner-change"` (the remembered Mode is New object, so Ctrl changes the original), `""` during a drag or off the handles (`ux-rework.md` 2.1, 3).
     pub(super) fn offset_handle_hint(&self) -> &'static str {
         if self.offset.drag.is_some() || self.offset_chip_open() {
             ""
@@ -78,7 +78,7 @@ impl Session {
             "offset-center"
         } else if self.offset.hovered.is_none() {
             ""
-        } else if self.offset.values.result() == OffsetResultChoice::ChangeOriginal {
+        } else if self.offset.values.result() == OffsetResultChoice::NewObject {
             "offset-corner-change"
         } else {
             "offset-corner"
@@ -96,10 +96,22 @@ impl Session {
         true
     }
 
-    /// A double-click in the Offset tool: on the center handle it opens the chip (criterion 53),
-    /// on a corner handle it steps the corner style (criteria 13, 56).
-    pub(super) fn offset_double_click(&mut self, point: Point) -> DoubleClickHint {
+    /// A double-click in the Offset tool: on the center handle it opens the chip (criterion 53)
+    /// with the modifiers of the second press preselecting it, Shift = Direction Both, Ctrl = Mode
+    /// New object (criterion 57); on a corner handle it steps the corner style (criteria 13, 56).
+    pub(super) fn offset_double_click(
+        &mut self,
+        point: Point,
+        shift: bool,
+        ctrl: bool,
+    ) -> DoubleClickHint {
         if self.offset_center_at(point) && self.open_offset_chip() {
+            if shift {
+                self.offset.values.set_direction(OffsetDirection::Both);
+            }
+            if ctrl {
+                self.offset.values.set_result(OffsetResultChoice::NewObject);
+            }
             DoubleClickHint::OffsetChip
         } else if self.offset_step_corner_style(point) {
             DoubleClickHint::OffsetCornerStyle

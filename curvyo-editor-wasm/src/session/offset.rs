@@ -390,13 +390,14 @@ impl Session {
         self.offset.chip_open = false;
     }
 
-    /// Whether a drag past 0, not at a stop, is in flight that makes a new object (Ctrl does not change the
-    /// original): the move's plus badge shows (criterion 15).
+    /// Whether a drag past 0, not at a stop, is in flight that makes at least one new object (the
+    /// effective Mode New object, or Both, which adds the inner copy): the move's plus badge shows
+    /// (criterion 15).
     pub(super) fn offset_drag_makes_copy(&self) -> bool {
         self.offset.drag.is_some_and(|drag| {
             drag.d != 0.0
                 && drag.stop.is_none()
-                && !self.offset.values.changes_original(self.held.ctrl)
+                && (self.held.shift || !self.offset.values.changes_original(self.held.ctrl))
         })
     }
 
@@ -547,24 +548,22 @@ mod tests {
     }
 
     #[test]
-    fn ac16_ac20_ac23_a_release_writes_a_copy_below_and_selects_it() {
+    fn ac16_ac19_ac23_a_plain_release_changes_the_original_and_selects_it() {
         let (mut session, square) = offset_session();
         let steps = session.undo_len();
         drag(&mut session, 2.0, false, false);
         assert_eq!(session.undo_len(), steps + 1, "one commit");
-        let ids = session.document.object_ids();
-        assert_eq!(ids.len(), 2);
-        assert_eq!(ids[1], square, "the outset goes below the original");
-        assert_eq!(session.selection.ids(), &[ids[0]]);
+        assert_eq!(session.document.object_ids(), vec![square], "no new object");
+        assert_eq!(session.selection.ids(), &[square]);
         assert!(
-            (rect_width(&session, ids[0]) - 24.0).abs() < 1e-9,
+            (rect_width(&session, square) - 24.0).abs() < 1e-9,
             "a rectangle stays one"
         );
         assert!(matches!(
             session.take_offset_outcome(),
             Some(OffsetOutcome::Applied {
-                added: 1,
-                changed: 0,
+                added: 0,
+                changed: 1,
                 ..
             })
         ));
@@ -576,17 +575,44 @@ mod tests {
     }
 
     #[test]
-    fn ac19_shift_gives_both_sides_and_ctrl_changes_the_original() {
+    fn ac19_ac20_ctrl_makes_a_copy_below() {
         let (mut session, square) = offset_session();
-        drag(&mut session, 2.0, true, false);
+        drag(&mut session, 2.0, false, true);
+        let ids = session.document.object_ids();
+        assert_eq!(ids.len(), 2);
+        assert_eq!(ids[1], square, "the outset copy goes below the original");
+        assert_eq!(session.selection.ids(), &[ids[0]]);
+        assert!(
+            (rect_width(&session, square) - 20.0).abs() < 1e-9,
+            "unchanged"
+        );
+    }
+
+    #[test]
+    fn ac19_ac20_shift_makes_the_original_the_outset_and_one_inner_copy_above() {
+        for by in [2.0, -2.0] {
+            let (mut session, square) = offset_session();
+            drag(&mut session, by, true, false);
+            let ids = session.document.object_ids();
+            assert_eq!(ids.len(), 2, "{by}");
+            assert_eq!(ids[0], square, "the inner copy is directly above");
+            assert!(
+                (rect_width(&session, square) - 24.0).abs() < 1e-9,
+                "the original takes the outset whatever the drag direction ({by})"
+            );
+            assert!((rect_width(&session, ids[1]) - 16.0).abs() < 1e-9);
+            assert_eq!(session.selection.ids().len(), 2);
+        }
+    }
+
+    #[test]
+    fn ac19_ctrl_shift_makes_two_new_objects() {
+        let (mut session, square) = offset_session();
+        drag(&mut session, 2.0, true, true);
         let ids = session.document.object_ids();
         assert_eq!(ids.len(), 3);
         assert_eq!(ids[1], square, "outer below, inner above");
-        session.selection.select_single(square);
-        drag(&mut session, -2.0, false, true);
-        assert_eq!(session.document.object_ids().len(), 3, "Ctrl adds nothing");
-        assert_eq!(session.selection.ids(), &[square]);
-        assert!((rect_width(&session, square) - 16.0).abs() < 1e-9);
+        assert!((rect_width(&session, square) - 20.0).abs() < 1e-9);
     }
 
     #[test]
@@ -672,60 +698,57 @@ mod tests {
     }
 
     #[test]
-    fn ac52_the_standing_preview_is_what_enter_writes() {
+    fn ac52_no_preview_on_tool_choice_selection_release_or_escape() {
         let mut session = Session::new(1);
         let square = rect(&session, 0.0, 20.0);
         session.selection.select_single(square);
-        assert_eq!(session.offset_preview_request(), None, "Select tool: none");
         session.set_tool(Tool::Offset);
-        let standing = session
-            .offset_preview_request()
-            .expect("a preview at once, without a drag");
-        assert_eq!(standing, session.offset_request(None));
-        assert!(
-            (standing.distance_mm - 1.0).abs() < 1e-9,
-            "1 mm on first use"
-        );
-        let plan = session.offset_plan_for(standing).expect("a result");
-        assert_eq!(plan.items.len(), 1);
-        session.set_offset_direction(OffsetDirection::Both);
-        assert_eq!(
-            session.offset_preview_request().map(|r| r.sides),
-            Some(session.offset_values().entry_sides()),
-            "the preview follows the values"
-        );
+        assert_eq!(session.offset_preview_request(), None, "tool choice");
         session.selection.clear();
-        assert!(session.offset_plan_for(standing).is_err(), "no operand");
-        assert_eq!(
-            session.offset_draw_list(session.view()),
-            curvyo_render_core::DrawList::default()
-        );
-    }
-
-    #[test]
-    fn ac52_after_a_write_the_preview_stands_for_the_new_selection() {
-        let (mut session, square) = offset_session();
-        drag(&mut session, 2.0, false, false);
-        assert_ne!(session.selection.ids(), &[square]);
-        let plan = session
-            .offset_plan_for(session.offset_preview_request().unwrap())
-            .unwrap();
-        assert_eq!(plan.items[0].operand, session.selection.ids()[0]);
-    }
-
-    #[test]
-    fn the_press_keeps_the_standing_preview_inside_the_dead_zone() {
-        let (mut session, _) = offset_session();
-        let standing = session.offset_preview_request();
+        session.selection.select_single(square);
+        assert_eq!(session.offset_preview_request(), None, "selection");
+        // Inside the dead zone a press shows nothing; past it the drag preview shows.
         let from = bottom_right(&session);
         let scale = session.view().scale();
         session.pointer_down(from, false);
         session.pointer_hover(along(from, 1.5 / scale), false, false);
-        assert_eq!(session.offset_preview_request(), standing);
+        assert_eq!(session.offset_preview_request(), None);
         assert!(!session.offset_view().dragging);
         session.pointer_hover(along(from, 10.0 / scale), false, false);
         assert!(session.offset_view().dragging);
-        assert_ne!(session.offset_preview_request(), standing);
+        assert!(
+            session.offset_preview_request().is_some(),
+            "live while dragging"
+        );
+        assert_eq!(
+            session.escape(),
+            super::super::keys::EscapeStep::CancelledDrag
+        );
+        assert_eq!(session.offset_preview_request(), None, "after Escape");
+        drag(&mut session, 2.0, false, false);
+        assert_eq!(session.offset_preview_request(), None, "after a release");
+    }
+
+    #[test]
+    fn ac52_ac54_the_open_chip_previews_its_values_and_closing_ends_it() {
+        let (mut session, _) = offset_session();
+        assert!(session.open_offset_chip());
+        let request = session.offset_preview_request().expect("chip open");
+        assert_eq!(request, session.offset_request(None));
+        assert!(session.offset_plan_for(request).is_ok());
+        session.set_offset_direction(OffsetDirection::Both);
+        assert_eq!(
+            session.offset_preview_request().map(|r| r.sides),
+            Some(session.offset_values().entry_sides()),
+            "the preview follows the chip"
+        );
+        session.close_offset_chip();
+        assert_eq!(session.offset_preview_request(), None);
+        assert_ne!(
+            session.offset_draw_list(session.view()),
+            curvyo_render_core::DrawList::default(),
+            "the handles stay"
+        );
     }
 
     #[test]
@@ -742,11 +765,7 @@ mod tests {
         assert_eq!(session.offset_join(), OffsetJoin::Miter);
         session.double_click_hint(corner, false, false);
         assert_eq!(session.offset_view().join, OffsetJoin::Bevel);
-        assert_eq!(
-            session.offset_preview_request().map(|r| r.join),
-            Some(OffsetJoin::Bevel),
-            "the standing preview uses it"
-        );
+        assert_eq!(session.offset_preview_request(), None, "no preview (52)");
         assert_eq!(session.offset_values().join(), OffsetJoin::Round);
         // A cancelled drag keeps it.
         session.pointer_down(corner, false);
@@ -878,15 +897,16 @@ mod tests {
         let steps = session.undo_len();
         assert!(matches!(
             session.apply_offset(),
-            OffsetOutcome::Applied { added: 1, .. }
+            OffsetOutcome::Applied { changed: 1, .. }
         ));
         assert_eq!(session.undo_len(), steps + 1);
         assert!(!session.offset_chip_open(), "Enter closes it");
+        assert!(session.open_offset_chip());
         let (anchor, min, max) = session.offset_chip_anchor().expect("an anchor");
         assert!(min.x <= anchor.x && anchor.x <= max.x);
         assert!(
             max.x - min.x >= 24.0 - 1e-9,
-            "the box around the standing preview"
+            "the box around the chip's preview (22 mm + 1 mm each side)"
         );
     }
 
@@ -952,5 +972,47 @@ mod tests {
             session.select_decoration_input_in(&objects).selected.len(),
             1
         );
+    }
+
+    #[test]
+    fn ac57_modifiers_at_the_center_double_click_preselect_the_chip() {
+        use OffsetResultChoice::{ChangeOriginal, NewObject};
+        let cases = [
+            ((false, false), OffsetDirection::Out, ChangeOriginal),
+            ((true, false), OffsetDirection::Both, ChangeOriginal),
+            ((false, true), OffsetDirection::Out, NewObject),
+            ((true, true), OffsetDirection::Both, NewObject),
+        ];
+        for ((shift, ctrl), direction, result) in cases {
+            let (mut session, _) = offset_session();
+            let at = center(&session);
+            assert_eq!(
+                session.double_click_hint(at, shift, ctrl),
+                super::super::DoubleClickHint::OffsetChip
+            );
+            assert_eq!(
+                session.offset_values().direction(),
+                direction,
+                "{shift} {ctrl}"
+            );
+            assert_eq!(session.offset_values().result(), result, "{shift} {ctrl}");
+        }
+    }
+
+    #[test]
+    fn ac15_the_plus_badge_shows_whenever_a_new_object_is_made() {
+        for (shift, ctrl, badge) in [
+            (false, false, false),
+            (true, false, true),
+            (false, true, true),
+            (true, true, true),
+        ] {
+            let (mut session, _) = offset_session();
+            let from = bottom_right(&session);
+            session.modifiers_changed(shift, ctrl, false);
+            session.pointer_down(from, shift);
+            session.pointer_hover(along(from, 4.0), shift, ctrl);
+            assert_eq!(session.offset_drag_makes_copy(), badge, "{shift} {ctrl}");
+        }
     }
 }
