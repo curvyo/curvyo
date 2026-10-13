@@ -63,6 +63,8 @@ export interface LayerRowProps {
   renaming: boolean;
   /** The drop mark a drag shows on this row. */
   drop: "above" | "below" | "into" | null;
+  /** A row drag runs: no tooltip opens (UX review item 12). */
+  dragging: boolean;
   onPress: (event: React.MouseEvent | React.KeyboardEvent) => void;
   onFlag: (flag: "visible" | "locked") => void;
   onExpand: (expanded: boolean) => void;
@@ -118,7 +120,6 @@ function FlagButton({
         type="button"
         tabIndex={-1}
         aria-label={label}
-        aria-pressed={on}
         aria-description={inherited !== "" ? inherited : undefined}
         // A press on the eye or the lock keeps the focus where it was (criterion 40).
         onMouseDown={(event) => event.preventDefault()}
@@ -158,6 +159,7 @@ export function LayerRow({
   cell,
   renaming,
   drop,
+  dragging,
   onPress,
   onFlag,
   onExpand,
@@ -199,6 +201,9 @@ export function LayerRow({
     </span>
   );
   const showAction = row.rowAction !== "";
+  const nameClass = `min-w-0 flex-1 truncate ${active ? "font-semibold" : ""} ${
+    hidden ? "text-[var(--panel-muted-fg)]" : "text-[var(--toolbar-icon)]"
+  }`;
   return (
     <div
       ref={rowRef}
@@ -221,20 +226,18 @@ export function LayerRow({
       onMouseEnter={() => onHover(true)}
       onMouseLeave={() => onHover(false)}
       onClick={(event) => onPress(event)}
-      className={`group/row absolute right-0 left-0 flex items-center rounded-[4px] pr-1 text-sm outline-none select-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)] ${
+      className={`group/row absolute right-0 left-0 flex items-center rounded-[4px] pr-1 text-sm outline-none select-none hover:bg-[var(--row-hover)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)] ${
         selected ? "!bg-[var(--value-fill)]" : ""
-      } ${entered ? "ring-[1.5px] ring-inset ring-[var(--accent)]" : ""} ${
-        drop === "into" ? "outline outline-[1.5px] outline-[var(--accent)]" : ""
-      }`}
+      } ${entered || drop === "into" ? "ring-[1.5px] ring-inset ring-[var(--editor-accent)]" : ""}`}
       style={{ top, height }}
     >
       {selected || active ? (
-        <span aria-hidden className="absolute top-0 bottom-0 left-0 w-[3px] rounded-l bg-[var(--accent)]" />
+        <span aria-hidden className="absolute top-0 bottom-0 left-0 w-[3px] rounded-l bg-[var(--editor-accent)]" />
       ) : null}
       {drop === "above" || drop === "below" ? (
         <span
           aria-hidden
-          className="pointer-events-none absolute right-0 left-0 h-[2px] bg-[var(--accent)]"
+          className="pointer-events-none absolute right-0 left-0 h-[2px] bg-[var(--editor-accent)]"
           style={drop === "above" ? { top: -1 } : { bottom: -1 }}
         />
       ) : null}
@@ -279,7 +282,7 @@ export function LayerRow({
               ref={inputRef}
               defaultValue={row.name}
               aria-label="Name"
-              maxLength={256}
+              maxLength={128}
               onClick={(event) => event.stopPropagation()}
               onPointerDown={(event) => event.stopPropagation()}
               onKeyDown={(event) => {
@@ -293,23 +296,19 @@ export function LayerRow({
                 }
               }}
               onBlur={(event) => onRename(event.currentTarget.value)}
-              className="h-7 min-w-0 flex-1 rounded-[4px] border border-[var(--field-border)] bg-white px-1 text-sm text-black outline-none"
+              className="h-7 min-w-0 flex-1 rounded-[5px] border border-[var(--field-border)] bg-white px-1.5 text-sm text-[var(--toolbar-icon)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
             />
+          ) : dragging ? (
+            <span className={nameClass}>{row.name}</span>
           ) : (
             <Tooltip side="left" content={tooltip}>
-              <span
-                className={`min-w-0 flex-1 truncate ${active ? "font-semibold" : ""} ${
-                  hidden ? "text-[var(--panel-muted-fg)]" : "text-[var(--toolbar-icon)]"
-                }`}
-              >
-                {row.name}
-              </span>
+              <span className={nameClass}>{row.name}</span>
             </Tooltip>
           )}
           {row.containsSelection ? (
             <Tooltip side="left" content="Contains the selection">
               <svg width={6} height={6} viewBox="0 0 6 6" aria-hidden className="shrink-0">
-                <path d="M3 0 6 3 3 6 0 3z" fill="var(--accent)" />
+                <path d="M3 0 6 3 3 6 0 3z" fill="var(--editor-accent)" />
               </svg>
             </Tooltip>
           ) : null}

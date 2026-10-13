@@ -219,7 +219,7 @@ impl Session {
         let first_selected = self
             .selected_units()
             .first()
-            .and_then(|&id| rows.index_of(id));
+            .and_then(|&id| self.shown_row_of(&rows, id));
         let window: Vec<Value> = rows
             .window(first, count)
             .iter()
@@ -236,6 +236,25 @@ impl Session {
             "rows": window,
         })
         .to_string()
+    }
+
+    /// The row of `id`, or of its nearest ancestor that is shown when `id` is inside a collapsed
+    /// container (UX review item 11: Shift+Ctrl+L focuses a row that can be seen).
+    fn shown_row_of(&self, rows: &LayerRows, id: NodeId) -> Option<usize> {
+        let mut current = Some(id);
+        while let Some(node) = current {
+            if let Some(index) = rows.index_of(node) {
+                return Some(index);
+            }
+            current = self.document.parent_node(node);
+        }
+        None
+    }
+
+    /// The index of the row of `id` in the whole list, `None` when it is not shown.
+    #[must_use]
+    pub fn layer_row_index(&self, id: &str) -> Option<usize> {
+        parse_id(id).and_then(|id| self.layer_rows().index_of(id))
     }
 
     /// Opens or closes the container `id` (chevron, Right, Left; criterion 8). Not gated by the

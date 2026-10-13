@@ -43,6 +43,12 @@ test("the Alt keys name their reorder (criterion 32)", () => {
   assert.equal(reorderFor("ArrowRight"), "in");
   assert.equal(reorderFor("End"), "back");
   assert.equal(reorderFor("a"), null);
+  // The browser build takes Shift+Alt+Home and Shift+Alt+End; the desktop takes Alt+Home.
+  assert.equal(reorderFor("Home", false, true), null);
+  assert.equal(reorderFor("Home", true, true), "front");
+  assert.equal(reorderFor("End", true, true), "back");
+  assert.equal(reorderFor("Home", false, false), "front");
+  assert.equal(reorderFor("ArrowUp", false, true), "forward", "Alt+Up needs no Shift");
 });
 
 test("a drop goes above, below or into a container row (criterion 29)", () => {

@@ -26,6 +26,8 @@ import {
   windowRange,
 } from "@/lib/layerRows";
 import { OPACITY_CLICK_MIN_P, VALUE_FIELD_SCALE_END } from "@/lib/sliderNames";
+import { isTauri } from "@/platform/host";
+import { Tooltip } from "@/components/ui/tooltip";
 
 const CELLS: RowCell[] = ["name", "eye", "lock", "action"];
 const PERCENT_MESSAGES = { percent: "Enter a number from 0 to 100" } as const;
@@ -84,6 +86,7 @@ export function LayersTab({
   const [drag, setDrag] = useState<RowDrag | null>(null);
   const dragRef = useRef<RowDrag | null>(null);
   const expandTimer = useRef(0);
+  const edgeTimer = useRef(0);
   const longPress = useRef(0);
 
   useLayoutEffect(() => {
@@ -238,11 +241,16 @@ export function LayersTab({
     const row = focusedRow;
     const pageRows = Math.max(1, Math.floor(viewport / rowHeight));
     if (event.altKey) {
-      const how = reorderFor(event.key);
+      const how = reorderFor(event.key, event.shiftKey, !isTauri);
       if (how !== null) {
         // Alt+Left and Alt+Right are Back and Forward in the browsers (UX notes): taken here.
         event.preventDefault();
         reply(act((session) => session.reorder_layer_rows(idText(row.id), how)));
+        // The focus stays on the moved row (criterion 32).
+        const moved = getSession()?.layer_row_index(idText(row.id)) ?? -1;
+        if (moved >= 0) {
+          moveFocus(moved, cell);
+        }
       }
       return;
     }
@@ -373,7 +381,15 @@ export function LayersTab({
         }
       }
       const box = element.getBoundingClientRect();
-      element.scrollTop += edgeScroll(event.clientY, box.top, box.height, rowHeight);
+      // In an edge zone the list keeps scrolling while the pointer rests (UX review item 8).
+      window.clearInterval(edgeTimer.current);
+      const step = edgeScroll(event.clientY, box.top, box.height, rowHeight);
+      if (step !== 0) {
+        element.scrollTop += step;
+        edgeTimer.current = window.setInterval(() => {
+          element.scrollTop += step;
+        }, 50);
+      }
       const offset = event.clientY - box.top + element.scrollTop;
       const index = Math.floor(offset / rowHeight);
       const over = view.rows.find((row) => row.index === index);
@@ -407,6 +423,7 @@ export function LayersTab({
       }
       window.clearTimeout(longPress.current);
       window.clearTimeout(expandTimer.current);
+      window.clearInterval(edgeTimer.current);
       updateDrag(null);
       if (commit && current.active && current.target && current.refusal === "") {
         const { row, place } = current.target;
@@ -421,6 +438,7 @@ export function LayersTab({
         event.preventDefault();
         event.stopPropagation();
         window.clearTimeout(expandTimer.current);
+        window.clearInterval(edgeTimer.current);
         updateDrag(null);
       }
     };
@@ -469,6 +487,7 @@ export function LayersTab({
       tabbable={row.index === focused}
       cell={row.index === focused ? cell : "name"}
       renaming={renaming === rowKey(row)}
+      dragging={drag?.active ?? false}
       drop={
         drag?.active && drag.target && rowKey(drag.target.row) === rowKey(row) && drag.refusal === ""
           ? drag.target.place
@@ -496,62 +515,64 @@ export function LayersTab({
   ));
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    // A 12 px inset at the right keeps the rows 244 px wide and clear of an overlay scrollbar
+    // (UX review item 5).
+    <div className="flex min-h-0 flex-1 flex-col pr-3">
       <div className="shrink-0" style={{ height: 52 }}>
-        <div className="flex h-7 items-center gap-2">
-          <span className="w-[60px] shrink-0 text-xs text-[var(--toolbar-icon)]" title={OPACITY_TOOLTIP}>
-            Opacity
-          </span>
+        <div className="flex h-7 items-center">
           {opacity.field ? (
-            <div className="min-w-0 flex-1">
-              <ValueField
-                label="Opacity"
-                name="Layer or object opacity"
-                text={String(value)}
-                bar={value / 100}
-                mixed={opacity.value === null}
-                resettable={opacity.value !== 100}
-                unit="%"
-                valueNow={value}
-                unitWords="percent"
-                valueMax={VALUE_FIELD_SCALE_END.opacity}
-                clickMinP={OPACITY_CLICK_MIN_P}
-                defaultText="100 %"
-                messages={PERCENT_MESSAGES}
-                onPreview={(p) => {
-                  const blocked = getSession()?.layers_pen_hint() ?? "";
-                  if (blocked !== "") {
-                    setHint(blocked);
-                    return;
-                  }
-                  gesture.queue((session) => session.preview_layer_opacity(Math.round(p * 100)));
-                }}
-                onSettle={gesture.settle}
-                onStep={(steps, grid) => commitValue(Math.max(0, Math.min(100, value + steps * stepSize(grid))))}
-                onReset={() => commitValue(100)}
-                onSubmit={(text) => {
-                  const number = Number(text.replace(",", ".").replace("%", "").trim());
-                  if (!Number.isFinite(number) || number < 0 || number > 100) {
-                    return "invalid:percent";
-                  }
-                  if (opacity.value === Math.round(number)) {
-                    return "unchanged";
-                  }
-                  commitValue(Math.round(number));
-                  return "committed";
-                }}
-                onReturnFocus={onReturnFocus}
-              />
-            </div>
+            <Tooltip side="left" content={OPACITY_TOOLTIP}>
+              <div className="min-w-0 flex-1">
+                <ValueField
+                  label="Opacity"
+                  name="Layer or object opacity"
+                  text={String(value)}
+                  bar={value / 100}
+                  mixed={opacity.value === null}
+                  resettable={opacity.value !== 100}
+                  unit="%"
+                  valueNow={value}
+                  unitWords="percent"
+                  valueMax={VALUE_FIELD_SCALE_END.opacity}
+                  clickMinP={OPACITY_CLICK_MIN_P}
+                  defaultText="100 %"
+                  messages={PERCENT_MESSAGES}
+                  onPreview={(p) => {
+                    const blocked = getSession()?.layers_pen_hint() ?? "";
+                    if (blocked !== "") {
+                      setHint(blocked);
+                      return;
+                    }
+                    gesture.queue((session) => session.preview_layer_opacity(Math.round(p * 100)));
+                  }}
+                  onSettle={gesture.settle}
+                  onStep={(steps, grid) => commitValue(Math.max(0, Math.min(100, value + steps * stepSize(grid))))}
+                  onReset={() => commitValue(100)}
+                  onSubmit={(text) => {
+                    const number = Number(text.replace(",", ".").replace("%", "").trim());
+                    if (!Number.isFinite(number) || number < 0 || number > 100) {
+                      return "invalid:percent";
+                    }
+                    if (opacity.value === Math.round(number)) {
+                      return "unchanged";
+                    }
+                    commitValue(Math.round(number));
+                    return "committed";
+                  }}
+                  onReturnFocus={onReturnFocus}
+                />
+              </div>
+            </Tooltip>
           ) : null}
         </div>
-        <p className="mt-1 flex h-4 items-center gap-1 truncate pl-[68px] text-xs text-[var(--panel-muted-fg)]">
+        <p className="mt-1 flex h-4 items-center gap-1 truncate text-xs text-[var(--panel-muted-fg)]">
           {opacity.layer ? <Layers size={12} strokeWidth={1.5} aria-hidden /> : null}
           {opacity.caption}
         </p>
       </div>
       {view.count === 0 ? (
-        <div className="px-2 pt-4 text-center">
+        // The empty state fills the list's place, so the footer stays at the bottom (UX item 9).
+        <div className="min-h-[120px] flex-1 px-2 pt-4 text-center">
           <p className="text-sm text-[var(--toolbar-icon)]">No objects yet.</p>
           <p className="text-xs text-[var(--panel-muted-fg)]">Draw something or add a layer.</p>
         </div>
@@ -593,7 +614,7 @@ export function LayersTab({
         >
           <span className="max-w-[160px] truncate">{drag.refusal !== "" ? drag.refusal : drag.pressed.name}</span>
           {dragBadge(drag.count) !== "" ? (
-            <span className="rounded-full bg-[var(--accent)] px-1.5 text-white">{dragBadge(drag.count)}</span>
+            <span className="rounded-full bg-[var(--editor-accent)] px-1.5 text-white">{dragBadge(drag.count)}</span>
           ) : null}
         </div>
       ) : null}

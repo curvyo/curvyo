@@ -71,12 +71,8 @@ fn target_of(
             (!(contiguous && front + 1 == siblings.len())).then_some(MoveTarget::FrontOf(parent))
         }
         Reorder::Back => (!(contiguous && back == 0)).then_some(MoveTarget::BackOf(parent)),
-        Reorder::Forward => siblings[front + 1..]
-            .first()
-            .map(|&next| MoveTarget::Above(next)),
-        Reorder::Backward => back
-            .checked_sub(1)
-            .map(|before| MoveTarget::Below(siblings[before])),
+        // Steps are `steps`'.
+        Reorder::Forward | Reorder::Backward => None,
         Reorder::Out => parent.map(MoveTarget::Above),
         Reorder::In => siblings[front + 1..]
             .first()
@@ -85,20 +81,92 @@ fn target_of(
     }
 }
 
-/// The moves `how` makes of `nodes`, one per parent the nodes have, each keeping the relative
-/// order of its nodes. Empty when nothing would move. The caller runs them in one step and checks
-/// each with `Document::check_move` first.
+/// The one-place steps of `members` under `parent` toward the front (`forward`) or the back: each
+/// selected node passes the unselected sibling next to it, a node at the edge or behind another
+/// selected node that cannot move stays (criteria 32 and 33, amended 2026-10-12). One plan per
+/// node that moves; they are independent, because each names its own node and the unselected
+/// sibling it passes, which no other plan moves.
+fn steps(
+    document: &Document,
+    parent: Option<NodeId>,
+    members: &[NodeId],
+    forward: bool,
+) -> Vec<MovePlan> {
+    let mut order = document.children(parent);
+    let moved: HashSet<NodeId> = members.iter().copied().collect();
+    let mut plans = Vec::new();
+    let len = order.len();
+    // Front-most first when stepping forward, back-most first when stepping back, so a node
+    // that cannot move blocks the selected node behind it.
+    let indices: Vec<usize> = if forward {
+        (0..len).rev().collect()
+    } else {
+        (0..len).collect()
+    };
+    for at in indices {
+        let node = order[at];
+        if !moved.contains(&node) {
+            continue;
+        }
+        let next = if forward {
+            at + 1
+        } else {
+            match at.checked_sub(1) {
+                Some(before) => before,
+                None => continue,
+            }
+        };
+        let Some(&passed) = order.get(next) else {
+            continue;
+        };
+        if moved.contains(&passed) {
+            continue;
+        }
+        plans.push(MovePlan {
+            nodes: vec![node],
+            target: if forward {
+                MoveTarget::Above(passed)
+            } else {
+                MoveTarget::Below(passed)
+            },
+        });
+        order.swap(at, next);
+    }
+    plans
+}
+
+/// The moves `how` makes of `nodes`: per parent the nodes have, one move that keeps their
+/// relative order, or for a one-place step one move per node that steps (criterion 32). Empty
+/// when nothing would move. The caller runs them in one step and checks each with
+/// `Document::check_move` first; the plans are independent of each other.
 #[must_use]
 pub fn reorder_plans(document: &Document, nodes: &[NodeId], how: Reorder) -> Vec<MovePlan> {
     by_parent(document, nodes)
         .into_iter()
-        .filter_map(|(parent, members)| {
-            target_of(document, parent, &members, how).map(|target| MovePlan {
-                nodes: members,
-                target,
-            })
+        .flat_map(|(parent, members)| match how {
+            Reorder::Forward | Reorder::Backward => {
+                steps(document, parent, &members, how == Reorder::Forward)
+            }
+            _ => target_of(document, parent, &members, how)
+                .map(|target| MovePlan {
+                    nodes: members,
+                    target,
+                })
+                .into_iter()
+                .collect(),
         })
         .collect()
+}
+
+/// "Already at the front" or "Already at the back": a step or a move to the edge that changes
+/// nothing is said, never silent (criterion 32); `None` for the other reorders.
+#[must_use]
+pub const fn unchanged_text(how: Reorder) -> Option<&'static str> {
+    match how {
+        Reorder::Front | Reorder::Forward => Some("Already at the front"),
+        Reorder::Back | Reorder::Backward => Some("Already at the back"),
+        Reorder::Out | Reorder::In => None,
+    }
 }
 
 /// Why a move is refused, in the maker's words (criterion 30): the tooltip of a refused drop
@@ -148,6 +216,29 @@ mod tests {
         assert_eq!(document.children(None), vec![a, c, e, b, d]);
         run(&document, &[d, b], Reorder::Back);
         assert_eq!(document.children(None), vec![b, d, a, c, e]);
+    }
+
+    /// Criteria 32 and 33 (amended 2026-10-12): a selection with gaps steps node by node, the
+    /// gaps are kept, a node at the edge stays, and no node passes another selected node.
+    #[test]
+    #[allow(clippy::many_single_char_names)]
+    fn a_selection_with_gaps_steps_node_by_node() {
+        let document = Document::new(1);
+        let ids: Vec<NodeId> = (0..6).map(|i| rect(&document, f64::from(i))).collect();
+        let [a, b, c, d, e, f] = ids[..] else {
+            panic!()
+        };
+        run(&document, &[a, c], Reorder::Forward);
+        assert_eq!(document.children(None), vec![b, a, d, c, e, f]);
+        run(&document, &[e, f], Reorder::Forward);
+        assert_eq!(
+            document.children(None),
+            vec![b, a, d, c, e, f],
+            "the front-most stays, and e does not pass f"
+        );
+        assert_eq!(reorder_plans(&document, &[e, f], Reorder::Forward), vec![]);
+        run(&document, &[b, d, f], Reorder::Backward);
+        assert_eq!(document.children(None), vec![b, d, a, c, f, e]);
     }
 
     #[test]

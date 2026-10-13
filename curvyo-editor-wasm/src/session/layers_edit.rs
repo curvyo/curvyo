@@ -11,7 +11,8 @@ use curvyo_document_core::{
 use curvyo_render_core::drawn_leaves_with;
 use curvyo_ui_core::{
     OpacityTarget, Reorder, RowMark, delete_locked_layer_notice, deleted_layer_notice,
-    move_refusal_text, moved_announcement, opacity_caption, percent,
+    locked_object_notice, move_refusal_text, moved_announcement, opacity_caption, percent,
+    unchanged_text,
 };
 use serde_json::{Value, json};
 
@@ -271,8 +272,30 @@ impl Session {
         if self.document.is_layer(id) {
             return self.panel_action(|this| this.delete_layer_now(id));
         }
+        // Delete acts on what the focus shows (criterion 37, amended 2026-10-12): the whole
+        // selection when the row's node is part of it, else only that node.
+        let leaves = self.document.leaves_of(id);
+        let in_selection =
+            !leaves.is_empty() && leaves.iter().all(|&leaf| self.selection.contains(leaf));
         self.panel_action(|this| {
-            this.delete_selected();
+            if in_selection {
+                this.delete_selected();
+                return PanelReply::Quiet;
+            }
+            let locked = this
+                .document_read()
+                .nodes
+                .iter()
+                .find(|node| node.id == id)
+                .is_some_and(|node| node.locked);
+            if locked {
+                let name = this
+                    .layer_rows()
+                    .row(id)
+                    .map_or_else(|| id.short_id(), |row| row.name.clone());
+                return PanelReply::Refusal(locked_object_notice(&name));
+            }
+            let _ = this.document.delete_objects(&[id]);
             PanelReply::Quiet
         })
     }
@@ -384,7 +407,10 @@ impl Session {
                         ))
                     })
                 }
-                Ok(false) => PanelReply::Quiet,
+                // A press that changes nothing is said (criterion 32, amended 2026-10-12).
+                Ok(false) => unchanged_text(how).map_or(PanelReply::Quiet, |text| {
+                    PanelReply::Announce(text.to_owned())
+                }),
                 Err(refusal) => PanelReply::Refusal(move_refusal_text(refusal).to_owned()),
             }
         })

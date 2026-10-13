@@ -124,6 +124,12 @@ pub fn delete_locked_layer_notice(layer: &str) -> String {
     format!("Layer {layer} is locked. Unlock it first.")
 }
 
+/// "Rectangle 3f9a1c is locked. Unlock it first." (criterion 37, amended 2026-10-12).
+#[must_use]
+pub fn locked_object_notice(name: &str) -> String {
+    format!("{name} is locked. Unlock it first.")
+}
+
 /// Why Select contents found nothing to select (UX notes): the layer is empty, hidden or locked.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NothingToSelect {

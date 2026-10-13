@@ -4,7 +4,9 @@
 //! and 35).
 
 use curvyo_document_core::{MOVE_NODES_COMMIT_LABEL, MoveRefusal, NodeId};
-use curvyo_ui_core::{Reorder, draw_refused_notice, move_refusal_text, reorder_plans};
+use curvyo_ui_core::{
+    Reorder, draw_refused_notice, move_refusal_text, reorder_plans, unchanged_text,
+};
 
 use super::keys::KeyOutcome;
 use super::{Session, Tool};
@@ -26,8 +28,9 @@ pub(super) struct LayerState {
     pub(super) active: ActiveLayer,
     /// The first selected leaf when the active layer last followed the selection.
     seen_head: Option<NodeId>,
-    /// A notice for the canvas notice slot, until the host has taken it.
-    pub(super) notice: Option<String>,
+    /// A notice for the canvas notice slot and whether it is a refusal (an alert), until the
+    /// host has taken it.
+    pub(super) notice: Option<(String, bool)>,
 }
 
 impl Session {
@@ -110,7 +113,7 @@ impl Session {
             return false;
         }
         let name = registers.name.unwrap_or_default();
-        self.layers.notice = Some(draw_refused_notice(&name, registers.locked));
+        self.layers.notice = Some((draw_refused_notice(&name, registers.locked), true));
         true
     }
 
@@ -124,8 +127,15 @@ impl Session {
                 .into_iter()
                 .map(|unit| unit.id)
                 .collect();
-            if let Err(refusal) = this.run_reorder(&nodes, how) {
-                this.layers.notice = Some(move_refusal_text(refusal).to_owned());
+            match this.run_reorder(&nodes, how) {
+                Ok(true) => {}
+                // A press that changes nothing is said (criterion 33, amended 2026-10-12).
+                Ok(false) => {
+                    this.layers.notice = unchanged_text(how).map(|text| (text.to_owned(), false));
+                }
+                Err(refusal) => {
+                    this.layers.notice = Some((move_refusal_text(refusal).to_owned(), true));
+                }
             }
             KeyOutcome::Reordered
         })
@@ -159,7 +169,23 @@ impl Session {
 
     /// The layer notice for the canvas notice slot, once; empty when there is none.
     pub fn take_layer_notice(&mut self) -> String {
-        self.layers.notice.take().unwrap_or_default()
+        self.layers
+            .notice
+            .take()
+            .map(|(text, _)| text)
+            .unwrap_or_default()
+    }
+
+    /// The layer notice and its kind as the host reads it, once: `{"kind": "alert" | "status" |
+    /// "", "text"}`.
+    pub fn take_layer_notice_json(&mut self) -> String {
+        let (text, alert) = self.layers.notice.take().unwrap_or_default();
+        let kind = match (text.is_empty(), alert) {
+            (true, _) => "",
+            (false, true) => "alert",
+            (false, false) => "status",
+        };
+        serde_json::json!({ "kind": kind, "text": text }).to_string()
     }
 }
 

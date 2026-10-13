@@ -200,6 +200,14 @@ supply its root's register.
   `0020`. So Layers is the fourth button, as the amendment of `0050` says, and the strip now has
   five tabs; the M3 commit's "fifth tab" counts the tabs, not the position. The tests find tabs
   by name (`0051` criterion 45).
+- **After the UX and tester reviews (2026-10-13).** Criteria 32, 33 and 37 as amended on
+  2026-10-12: `reorder_plans` steps a selection with gaps node by node (one plan per stepping
+  node, each passing its unselected neighbour), and a press that changes nothing writes no step
+  and is said ("Already at the front", "Already at the back") in the list's status region or, for
+  the canvas keys, the canvas notice slot as a status. Delete on a focused object row deletes the
+  selection when the row's node is part of it, else only that node; a locked one refuses with
+  "<name> is locked. Unlock it first.". The browser build takes Shift+Alt+Home and Shift+Alt+End
+  (the UX notes' fallback, `reorderFor`); the desktop windows keep Alt+Home and Alt+End.
 - **Status-bar measures (criterion 19).** The status bar shows the cursor, the zoom and the
   document size; no measure of objects exists there yet, so nothing is filtered.
 - **Where the flags reach the tools (M2).** The session's document read gives three lists: every

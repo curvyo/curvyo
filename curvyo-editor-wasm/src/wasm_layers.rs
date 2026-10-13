@@ -148,8 +148,18 @@ impl WasmSession {
     }
 
     /// The layer notice for the canvas notice slot (drawing into a hidden or locked layer, a
-    /// refused stacking-order key), once; empty when there is none.
+    /// refused or unchanged stacking-order key), once, as `{"kind", "text"}`.
     pub fn take_layer_notice(&mut self) -> String {
-        self.session.take_layer_notice()
+        self.session.take_layer_notice_json()
+    }
+
+    /// The index of the row of `id` in the whole list, -1 when it is not shown: the focus follows
+    /// a moved row (criterion 32).
+    #[must_use]
+    pub fn layer_row_index(&self, id: &str) -> i32 {
+        self.session
+            .layer_row_index(id)
+            .and_then(|index| i32::try_from(index).ok())
+            .unwrap_or(-1)
     }
 }

@@ -404,3 +404,81 @@ fn every_writing_or_selecting_action_waits_for_the_pen() {
     );
     assert_eq!(session.selection.ids(), &[a]);
 }
+
+/// Criterion 37 (amended 2026-10-12): Delete on a focused row that is not selected deletes that
+/// row only; on a selected row it deletes the selection; a locked row refuses.
+#[test]
+fn delete_on_a_row_acts_on_what_the_focus_shows() {
+    let (mut session, layer, [a, b, c, _]) = cut_layer();
+    session.press_layer_row(&key(a), RowPress::Plain);
+    let steps = session.document.own_step_count();
+    assert_eq!(session.delete_layer_row(&key(b)), PanelReply::Quiet);
+    assert_eq!(session.document.own_step_count(), steps + 1);
+    assert!(!session.document.contains_node(b));
+    assert_eq!(session.selection.ids(), &[a], "the selection stays");
+    session.delete_layer_row(&key(a));
+    assert!(!session.document.contains_node(a));
+    session.document.set_node_locked(&[c], true).unwrap();
+    assert_eq!(
+        session.delete_layer_row(&key(c)),
+        PanelReply::Refusal(format!(
+            "Rectangle {} is locked. Unlock it first.",
+            c.short_id()
+        ))
+    );
+    assert!(session.document.contains_node(c));
+    assert!(session.document.is_layer(layer));
+}
+
+/// Criteria 32 and 33 (amended 2026-10-12): a step that changes nothing is said, and no step is
+/// written.
+#[test]
+fn a_move_that_changes_nothing_is_announced() {
+    let (mut session, _, [_, _, c, _]) = cut_layer();
+    let steps = session.document.own_step_count();
+    assert_eq!(
+        session.reorder_layer_rows(&key(c), Reorder::Forward),
+        PanelReply::Announce("Already at the front".into())
+    );
+    assert_eq!(session.document.own_step_count(), steps);
+    session.press_layer_row(&key(c), RowPress::Plain);
+    let outcome = session.key_down(crate::KeyInput {
+        key: "Home",
+        ..crate::KeyInput::default()
+    });
+    assert_eq!(outcome, super::KeyOutcome::Reordered);
+    assert_eq!(
+        session.take_layer_notice_json(),
+        r#"{"kind":"status","text":"Already at the front"}"#
+    );
+    assert_eq!(session.document.own_step_count(), steps);
+}
+
+/// Criterion 32: the host finds the moved row to keep the focus on it.
+#[test]
+fn the_moved_row_can_be_found_after_a_move() {
+    let (mut session, _, [a, ..]) = cut_layer();
+    session.reorder_layer_rows(&key(a), Reorder::Forward);
+    let shown = view(&mut session);
+    let index = session.layer_row_index(&key(a)).unwrap();
+    assert_eq!(shown["rows"][index]["id"], serde_json::to_value(a).unwrap());
+}
+
+/// Shift+Ctrl+L: with the first selected object inside a collapsed group, the first selected row
+/// is the group's row, which shows the mark (UX review item 11).
+#[test]
+fn the_first_selected_row_falls_back_to_the_shown_ancestor() {
+    let (mut session, layer, [a, b, ..]) = cut_layer();
+    let group = session.document.group_objects(&[a, b]).unwrap();
+    session.sync_context();
+    // A click on a's row enters the group; the group's row stays collapsed (from the list).
+    session.press_layer_row(&key(a), RowPress::Plain);
+    assert_eq!(session.context_group(), Some(group));
+    let _ = layer;
+    let shown = view(&mut session);
+    let index = shown["firstSelected"].as_u64().unwrap();
+    assert_eq!(
+        shown["rows"][usize::try_from(index).unwrap()]["id"],
+        serde_json::to_value(group).unwrap()
+    );
+}

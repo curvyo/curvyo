@@ -175,8 +175,14 @@ export function nextRow(key: string, current: number, total: number, pageRows: n
   }
 }
 
-/** The reorder an Alt+key asks for (criterion 32), or null for another key. */
-export function reorderFor(key: string): string | null {
+/** The reorder an Alt+key asks for (criterion 32), or null for another key. In the browser build
+ * Alt+Home is the browser's home page and is handled before the page sees it, so there the two
+ * keys are Shift+Alt+Home and Shift+Alt+End (the UX notes' fallback); the desktop windows take
+ * Alt+Home and Alt+End as they are. */
+export function reorderFor(key: string, shift = false, browser = false): string | null {
+  if (browser && (key === "Home" || key === "End") && !shift) {
+    return null;
+  }
   switch (key) {
     case "ArrowUp":
       return "forward";
