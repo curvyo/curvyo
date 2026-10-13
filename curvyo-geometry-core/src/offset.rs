@@ -16,13 +16,13 @@
 //! the library runs in its integer mode, so a result is the same on every target (criterion 44).
 
 use curvyo_document_core::{Length, Point, Tolerance, Vec2};
-use kurbo::{ParamCurve, PathSeg as KSeg, Point as KPoint, Vec2 as KVec};
 use i_overlay::i_float::int::angle::Angle;
 use i_overlay::mesh::int::arc::ArcOptions;
 use i_overlay::mesh::int::outline::offset::IntOutlineOffset;
 use i_overlay::mesh::int::stroke::offset::IntStrokeOffset;
 use i_overlay::mesh::int::style::{IntLineCap, IntLineJoin, IntOutlineStyle, IntStrokeStyle};
 use i_overlay::mesh::math::MathMode;
+use kurbo::{ParamCurve, PathSeg as KSeg, Point as KPoint, Vec2 as KVec};
 
 use crate::boolean::{Outline, grid_paths, outline_in_range};
 use crate::boolean_cleanup::cleanup;
@@ -233,7 +233,10 @@ pub fn offset(
     } else {
         let polylines = polyline_offset(operand, units, join, cap, flatten_tolerance_mm, is_open)?;
         let count = polylines.len();
-        (polylines.iter().map(|path| lines_of_mm(path)).collect(), count)
+        (
+            polylines.iter().map(|path| lines_of_mm(path)).collect(),
+            count,
+        )
     };
     if outlines.is_empty() {
         return Err(OffsetError::Empty);
@@ -365,7 +368,12 @@ fn lines_of_mm(path: &[Point64]) -> Vec<KSeg> {
         KPoint::new(p.x as f64 * GRID_MM, p.y as f64 * GRID_MM)
     };
     (0..path.len())
-        .map(|i| KSeg::Line(kurbo::Line::new(mm(path[i]), mm(path[(i + 1) % path.len()]))))
+        .map(|i| {
+            KSeg::Line(kurbo::Line::new(
+                mm(path[i]),
+                mm(path[(i + 1) % path.len()]),
+            ))
+        })
         .collect()
 }
 
@@ -445,7 +453,10 @@ fn polyline_offset(
             .map_err(|_| OffsetError::OutOfRange)?;
         shapes.into_iter().flatten().collect()
     };
-    Ok(without_flattening_noise(cleanup(&raw), flatten_tolerance_mm))
+    Ok(without_flattening_noise(
+        cleanup(&raw),
+        flatten_tolerance_mm,
+    ))
 }
 
 /// `paths` without the outlines that are on average narrower than the flattening tolerance.

@@ -24,7 +24,7 @@ use common::offset_check::{area, check_node_rules, covers, nodes};
 use common::{Anchors, KERNEL_TOLERANCE, circle, polygon, rect};
 use curvyo_document_core::{Length, Point};
 use curvyo_geometry_core::{
-    OffsetCap, OffsetError, OffsetOutlines, OffsetJoin, Outline, offset, signed_area_mm2,
+    OffsetCap, OffsetError, OffsetJoin, OffsetOutlines, Outline, offset, signed_area_mm2,
 };
 use proptest::prelude::*;
 
@@ -79,9 +79,7 @@ fn near(a: (f64, f64, f64, f64), b: (f64, f64, f64, f64), tol: f64) -> bool {
 }
 
 fn has_node(r: &OffsetOutlines, x: f64, y: f64, tol: f64) -> bool {
-    nodes(r)
-        .iter()
-        .any(|p| (p.x - x).hypot(p.y - y) <= tol)
+    nodes(r).iter().any(|p| (p.x - x).hypot(p.y - y) <= tol)
 }
 
 fn nodes_within(r: &OffsetOutlines, c: Point, radius: f64) -> Vec<Point> {
@@ -330,10 +328,10 @@ fn ac11_results_obey_output_rules_for_many_shapes() {
                 if let Ok(r) = closed(&shape, d, join) {
                     check_node_rules(&r).unwrap_or_else(|e| panic!("{d} {join:?}: {e}"));
                     for o in r.outlines() {
-                        assert!(
-                            o.windows(2)
-                                .all(|w| (w[0].point.x - w[1].point.x).hypot(w[0].point.y - w[1].point.y) >= 0.001 - 1e-9)
-                        );
+                        assert!(o.windows(2).all(|w| {
+                            (w[0].point.x - w[1].point.x).hypot(w[0].point.y - w[1].point.y)
+                                >= 0.001 - 1e-9
+                        }));
                     }
                 }
             }

@@ -135,15 +135,21 @@ function Divider() {
 /** The Distance field (criteria 6, 25): typed, with arrow steps; Enter commits and previews,
  * Enter again applies; Escape restores the typed text, then returns to the canvas. */
 function DistanceField({
-  offset,
+  distanceMm,
+  inputRef,
+  setDistance,
+  apply,
   disabled,
   onReturnFocus,
 }: {
-  offset: OffsetApi;
+  distanceMm: number;
+  inputRef: OffsetApi["distanceRef"];
+  setDistance: OffsetApi["setDistance"];
+  apply: OffsetApi["apply"];
   disabled: boolean;
   onReturnFocus: () => void;
 }) {
-  const shown = formatDistance(offset.view.barDistanceMm);
+  const shown = formatDistance(distanceMm);
   const [typed, setTyped] = useState<string | null>(null);
   const [invalid, setInvalid] = useState(false);
   const commit = (text: string): boolean => {
@@ -152,7 +158,7 @@ function DistanceField({
       setInvalid(true);
       return false;
     }
-    setInvalid(!offset.setDistance(value));
+    setInvalid(!setDistance(value));
     setTyped(null);
     return true;
   };
@@ -161,7 +167,7 @@ function DistanceField({
       Distance
       <span className="relative flex items-center">
         <input
-          ref={offset.distanceRef}
+          ref={inputRef}
           type="text"
           inputMode="decimal"
           aria-label="Distance, millimetres"
@@ -180,7 +186,7 @@ function DistanceField({
               if (typed !== null) {
                 commit(typed);
               } else if (!disabled) {
-                offset.apply();
+                apply();
               }
             } else if (event.key === "Escape") {
               event.preventDefault();
@@ -194,10 +200,10 @@ function DistanceField({
               event.preventDefault();
               const step = event.shiftKey ? 1 : event.ctrlKey || event.metaKey ? 0.01 : 0.1;
               const sign = event.key === "ArrowUp" ? 1 : -1;
-              const base = typed !== null ? Number(typed) : offset.view.barDistanceMm;
+              const base = typed !== null ? Number(typed) : distanceMm;
               const next = Math.round((base + sign * step) * 1000) / 1000;
               setTyped(null);
-              setInvalid(!offset.setDistance(next));
+              setInvalid(!setDistance(next));
             }
           }}
           className="h-7 w-20 rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] bg-white pr-7 pl-1.5 text-right text-xs outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] aria-invalid:border-[var(--field-invalid)]"
@@ -232,7 +238,14 @@ export function OffsetToolbar({ offset, onReturnFocus }: OffsetToolbarProps) {
         }
       }}
     >
-      <DistanceField offset={offset} disabled={none} onReturnFocus={onReturnFocus} />
+      <DistanceField
+        distanceMm={view.barDistanceMm}
+        inputRef={offset.distanceRef}
+        setDistance={offset.setDistance}
+        apply={offset.apply}
+        disabled={none}
+        onReturnFocus={onReturnFocus}
+      />
       <Divider />
       <RadioGroup
         name="Direction"

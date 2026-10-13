@@ -156,8 +156,8 @@ pub use object_bounds::{content_bounds, object_bounds, object_outline_bounds};
 pub use object_history_text::{object_row_name, object_row_summary};
 pub use object_selection::{ObjectSelection, SelectionCombine};
 pub use offset_drag::{
-    CORNER_SIGNS, HANDLE_HIT_RADIUS_PX, drag_distance, handle_positions, offset_box,
-    snap_distance, snap_step,
+    CORNER_SIGNS, HANDLE_HIT_RADIUS_PX, drag_distance, handle_positions, offset_box, snap_distance,
+    snap_step,
 };
 pub use offset_entry::{
     OFFSET_DEFAULT_MM, OFFSET_MAX_MM, OFFSET_MIN_MM, OffsetBar, OffsetCap, OffsetDirection,

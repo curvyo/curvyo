@@ -43,7 +43,9 @@ pub fn offset_primitive(shape: &Shape, d: f64, join: OffsetJoin) -> PrimitiveOff
         Shape::Polygon { frame, point_count } => {
             let n = f64::from(point_count.get());
             match scaled_frame(frame, &regular_vertices(n, 1.0), d, join) {
-                Scaled::Stays(frame) => PrimitiveOffset::Stays(Shape::Polygon { frame, point_count }),
+                Scaled::Stays(frame) => {
+                    PrimitiveOffset::Stays(Shape::Polygon { frame, point_count })
+                }
                 Scaled::Vanishes => PrimitiveOffset::Vanishes,
                 Scaled::Path => PrimitiveOffset::Path,
             }

@@ -109,7 +109,7 @@ the fallback fired for 0 of 135 outlines over the test shapes.
 
 - [x] 7.1 Design-system rows (Offset section removed, Path tools card, Offset bar, Offset handles),
   technical-debt entry updated, `adrs.md` implementer notes.
-- [ ] 7.2 Full gate (`CLAUDE.md` §7), frontend tests and `tsc`, once.
+- [x] 7.2 Full gate (`CLAUDE.md` §7), frontend tests and `tsc`, once.
 
 ## Validation
 

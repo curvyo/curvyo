@@ -157,8 +157,12 @@ fn step_count(segment: &PathSeg, tolerance_mm: f64) -> usize {
     let PathSeg::Cubic(c) = *segment else {
         return 1;
     };
-    let d0 = (c.p2.to_vec2() - c.p1.to_vec2() * 2.0 + c.p0.to_vec2()).hypot2().sqrt();
-    let d1 = (c.p3.to_vec2() - c.p2.to_vec2() * 2.0 + c.p1.to_vec2()).hypot2().sqrt();
+    let d0 = (c.p2.to_vec2() - c.p1.to_vec2() * 2.0 + c.p0.to_vec2())
+        .hypot2()
+        .sqrt();
+    let d1 = (c.p3.to_vec2() - c.p2.to_vec2() * 2.0 + c.p1.to_vec2())
+        .hypot2()
+        .sqrt();
     let steps = (6.0 * d0.max(d1) / (8.0 * tolerance_mm)).sqrt().ceil();
     // Not `clamp`: NaN becomes one step through `max`.
     #[allow(
@@ -278,8 +282,7 @@ impl Context<'_> {
             samples[(index + 1) % samples.len()].point,
         );
         #[allow(clippy::cast_precision_loss)] // grid units <= 10^10
-        let vector =
-            |p: Point64, q: Point64| Vec2::new((q.x - p.x) as f64, (q.y - p.y) as f64);
+        let vector = |p: Point64, q: Point64| Vec2::new((q.x - p.x) as f64, (q.y - p.y) as f64);
         let chord = vector(start, end);
         let length2 = chord.hypot2();
         if length2 == 0.0 || vector(from, to).dot(chord) <= 0.0 {
