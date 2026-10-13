@@ -1,306 +1,362 @@
-# Path offset: UX rework concept (for discussion)
+# Path offset: UX rework concept
 
-Status: Draft for the customer, 2026-10-12, by `ux-engineer`. Replaces the "UX notes" of
-`specification.md` once the customer agrees; the criteria that change are listed at the end.
+Status: accepted by the customer on 2026-10-12 with all defaults; **reworked 2026-10-13** by
+`ux-engineer` after the customer tried the build. `specification.md` wins where the two differ.
 Mockup: `ux-rework-mockup.html` in this folder (open it in a browser).
 
-## Why the built slice was rejected
+## 2026-10-13: what changed and why
 
-Customer feedback on PR #115 (2026-10-12, translated): the Offset section appeared at the top of
-the Properties panel out of nowhere and pushed the Style rows down. In the right panel nothing
-appears or disappears: sections are collapsed, expanded or greyed out. Offset is not a property of
-the object, it is an operation, and in the panel the maker cannot see when it takes effect.
+The customer tried the reworked slice on 2026-10-13 and decided (spec, note at the top):
 
-What follows from that, as rules for this concept:
+- **No top bar, no Apply button.** The Offset bar (old section 2) is gone. Its values move into an
+  **Offset entry chip** at the selection, opened like the Move entry chip from a **center handle**
+  (section 2), or by **O** or **Enter**.
+- **No status hint.** "Stays a rectangle" / "Becomes a path" is removed with no replacement.
+- **No Ends, no open paths.** An open path is not offset and gets no handles (section 8).
+- **The preview stands.** With the tool active and a closed shape selected, the result for the
+  remembered values is shown at once, without a drag (section 3).
+- **Modifiers while dragging a corner handle:** Shift = the direction (Both), Ctrl = New or Change
+  original, Shift+Ctrl = the original takes the dragged side and a copy the other (section 4).
+- **A double-click on a corner handle steps the corner style** Round, Miter, Bevel, shown in the
+  readout chip (section 3).
 
-1. **Offset is a tool**, like the Node tool: a rail button, its options in the bar at the top, its
-   own handles on the canvas. The Properties panel is not involved at all.
-2. **It takes effect on release.** The drag shows the result in blue; releasing the pointer writes
-   it; Escape during the drag writes nothing. There is no second "Apply" step after a drag.
-3. **Nothing appears out of nowhere** in the bar either: every control is always there and greyed
-   when it does not apply (the Node bar's rule), never added or removed.
+Everything below that the customer did not state is marked **default pending customer** and is
+collected in section 11.
+
+**"For that drag" (the corner style).** The customer said the double-click sets the corner style
+"for that drag"; the first spec amendment made it the remembered value. This concept follows the
+customer's wording, because it is workable: the double-click sets a **pending corner style** that
+the **next written drag** uses and then gives back (section 3, "Corner style by double-click").
+The chip's Corners control stays the remembered value. The one point where the two meet is when the
+chip is opened while a style is pending: the chip takes it over (section 2). The spec's criteria 13,
+15 and 56 are amended to match (2026-10-13 remark there).
 
 ## Reference tools (as far as I know them)
 
-- **Inkscape:** Path > Outset / Inset (Ctrl+) and Ctrl+() replace the path by a fixed step set in
-  Preferences. **Dynamic Offset** (Ctrl+J) turns the path into an offset object with one handle on
-  the outline that is dragged to set the distance; **Linked Offset** does the same on a linked copy.
-  The handle on the canvas is the idea we take; the conversion into a special object type is not.
+- **Inkscape:** Path > Outset / Inset step by a fixed amount; Dynamic Offset (Ctrl+J) turns the
+  path into an offset object with one handle on the outline. We take the handle, not the conversion.
 - **Illustrator:** Object > Path > Offset Path, a dialog (Offset, Joins, Miter limit, Preview).
   Adds a new path, keeps the original. We take "keep the original" as default.
 - **LightBurn:** Offset Shapes, a dialog with Distance, Corner style, Direction (Outward, Inward,
-  Both) and "Delete original". We take Direction "Both" and the replace choice, but on the canvas
-  and as modifier keys instead of a dialog.
-- **What we do better:** the distance is dragged on the canvas with a live result and a number at
-  the pointer, typed in the bar when it must be exact, both sides in one drag (Shift), and
-  rectangles and circles stay rectangles and circles.
+  Both) and "Delete original". We take Both and the replace choice, on the canvas.
+- **Figma / Affinity:** typed values sit next to the object, not in a dialog. The entry chip is
+  Curvyo's version of that (the Move entry chip already works so).
 
-## 1. Where the tool lives: a "Path tools" toolbox
+## 1. Where the tool lives: the "Path tools" card
+
+Unchanged since 2026-10-12. A toolbox card **"Path tools"** in rail column A, 8 px under the Group
+card, with one 40 x 40 px button, the **Offset tool** (glyph: a solid rounded square inside a
+dashed concentric outline). Tools, not commands: the button takes the active-tool look and shares
+the one-active-tool rule with the Tools card. `role="toolbar"`, name "Path tools", one Tab stop,
+the rail keyboard model; Tab order Tools, Group, Path tools, Path, Boolean. Key **O**, a tool
+letter in every state (as B, N, E, P).
+
+Tooltip "Offset tool (O)", muted second line **"Drag a corner handle. Shift: both sides. Ctrl:
+new or change."** (2026-10-13, default pending customer; "Shift: direction" did not say what Shift
+does, the readout and the handle hint chip say the rest).
+
+## 2. Offset entry chip and center handle (new 2026-10-13)
+
+### 2.1 The center handle
 
 | | |
 |---|---|
-| Card | A new toolbox card **"Path tools"** in rail column A, **8 px under the Group card** (top 432 px, card 48 px high with one button, ends 480 px below the viewport top; 32 px clear at 800 x 600). The look of every toolbox card (row "Toolbox card"). |
-| Button | **Offset tool**, 40 x 40 px, a 20 px glyph: a solid rounded square inside a dashed concentric outline (the result around the source). Tooltip "Offset tool (O)", second line muted "Drag a corner handle. Shift: both sides. Ctrl: change the original." |
-| Kind | These are **tools**, not commands: the button shows the solid `--toolbar-icon-active-bg` of the active tool and belongs to the same set as the Tools card (exactly one tool is active, in either card). The Path card in column B (Combine, Split, Break apart, Cut) and the Boolean card stay **commands**: one press, no mode, never the active look. |
-| Letter | **O** (free; Inkscape uses it for the connector tool, which Curvyo does not have). A tool letter like N, B, R, E, P. |
-| Keyboard | `role="toolbar"`, name "Path tools", one Tab stop, the rail keyboard model. Tab order: Tools, Group, Path tools, Path, Boolean. |
+| Where | The center of the **operand box** (the box the corner handles use, section 3: one rotated object its own rotated box, otherwise the axis-aligned box around the closed operands). Upright, never rotated. |
+| Look | The shell of the Move center handle (row "Transform center move handle"): 16 x 16 px screen-space rounded square, 3 px radius, white fill, 1 px `--accent` outline. **Glyph (default pending customer):** not the four-way arrow, because a drag here does not move anything; instead the Offset glyph in small: a 10 px square outline (1.5 px `--accent`, 2 px radius) around a 4 px solid `--accent` square. Alternative: the Move glyph unchanged. |
+| States | Idle: as above. Hover: `--accent-hover` over the white fill. **Chip open:** solid `--accent` with a white glyph (the Move rule "the handle stays in its dragging look while the chip is open"). |
+| When drawn | Whenever the corner handles are drawn (at least one closed operand selected), **at every box size**: the box is widened to 24 px per axis for placing handles, so the glyph keeps at least 13 px clear of every corner handle. Not drawn during a corner drag (the preview needs the room). Not drawn with nothing selected, a group alone, or only open paths. |
+| Hit area | A circle of **12 px radius** around its center (24 px target), always, because in this tool no other handle lies inside the box. Corner handle hit areas (8 px radius, 12 px outside the corner) never overlap it: at the 24 px minimum box the two centers are 29 px apart. |
+| Press | The hit area **claims the press**: no marquee, no selection change, no move, no drag. This matters for an unfilled shape, where the center is "empty canvas" and a press would otherwise clear the selection on the first click of the double-click. |
+| Double-click | Two primary presses within the system double-click interval, both inside the hit area, neither moving past the 3 px dead zone: **opens the Offset entry chip**. Modifiers held at the double-click have no meaning. A single click does nothing. |
+| Cursor | The built-in `pointer` (not `move`). |
+| Hint chip | After 600 ms of rest (row "Transform handle hint chip"): one line, "Double-click, O or Enter: type a distance". |
 
-**How it relates to the Path card.** The difference the maker sees: a press on a Path card button
-does something at once to the selection; a press on a Path tools button changes what the pointer
-does on the canvas and shows a bar at the top. The two cards have different names ("Path tools",
-"Path operations") and the active-tool blue only ever appears in column A.
+### 2.2 Opening the chip by keyboard
 
-**Why a new card and not the Tools card:** the Tools card holds the tools that create or select;
-an eighth button would push the Group card down 44 px (the rule of the rail allows it, but it moves
-a card under the hand). A card of its own leaves every built button where it is and gives later
-path tools a home (candidates: a knife tool that cuts along a dragged line, a width tool for
-variable strokes). **Space:** with one button the card fits at 800 x 600. A second button (92 px
-card, ending 524 px) fits only if the viewport is taller since `0051` removed the menu bar; this is
-measured at build. If it does not fit, a second path tool is a customer decision (see question 1).
+With the Offset tool active, the canvas focused and at least one closed operand selected:
+**O** or **Enter** opens the chip (default pending customer: both keys; the customer named
+"O/Enter"). It is placed exactly as if the center handle had been double-clicked. With no operand
+selected, O re-selects the Offset tool and Enter does nothing; no hint is shown (spec criterion 5).
+Both keys are gated like every shortcut (not during a drag, not with a chip open, not on key
+repeat). O in the Select tool is the tool letter: so from the Select tool with a selection,
+**O, O** opens the chip.
 
-**What goes away:** the "Offset" text button in the Select bar and the Offset section of the
-Properties panel. The kernel, the preview renderer and the plan code of the built slice are reused.
+### 2.3 Contents and layout
 
-## 2. The bar at the top (Offset bar)
+The "Transform entry chip" surface: `--toolbar-bg`, `--panel-elevation-shadow`, 8 px radius,
+6 px padding. **168 x 108 px.** Three rows, 6 px apart:
 
-The bar is in the overlay row, centred like the Node and shape bars, a pill with 36 px rows and
-28 px controls. It is there whenever the Offset tool is active, also with nothing selected; then
-every control is greyed and the status text says "Select one or more shapes.".
+| Row | Content | Size | Notes |
+|---|---|---|---|
+| 1 | Visible label **"Distance"** (12 px), then the **Distance field** with the fixed `mm` suffix | label box 52 px, 4 px gap, field 100 x 28 px | The field of the Move chip: white ground, 14 px tabular text, right-aligned, 32 px right padding for the suffix. Prefilled with the remembered distance, up to two decimals ("1", "2.5", "0.15"). |
+| 2 | **Direction:** a three-segment pill **Out \| In \| Both** | 156 x 28 px, three 52 px segments, 12 px text | The Move mode pill's look (1.5 px `--toolbar-icon` ring; active segment `--toolbar-icon-active-bg` / `--toolbar-icon-active-fg`). |
+| 3 | **Corners:** three icon segments **Round, Miter, Bevel**; then, right-aligned, **Mode:** two icon segments **New object, Change original** | Corners 84 x 28 px (three 28 px), Mode 56 x 28 px (two 28 px), 16 px between | Corner glyphs: the stroke Join glyphs (`JoinIcon` of `panel/StyleIcons.tsx`) at 16 px. Mode glyphs: Lucide **`Plus`** (New object) and **`RefreshCw`** (Change original: two arrows in a circle), 16 px, 1.5 px stroke. Not `RotateCcw`: that is the reset glyph of the panel's value fields. Icons only; each segment has a tooltip with its name. |
 
-| # | Group | Control | Default | Notes |
-|---|---|---|---|---|
-| 1 | Distance | label "Distance", the bar value field (80 px, `mm` suffix, unsigned) | 1 mm, then the last value used in the session (dragged or typed) | Typed 0.01 to 1000 mm. A drag on the canvas writes its value here live. |
-| 2 | Direction | segmented text items **Out**, **In**, **Both** (44 px each, `role="radiogroup"` "Direction") | Out | A canvas drag sets it from the drag (outward Out, inward In, Shift Both) and it stays so. |
-| 3 | Corners | three icon items **Round**, **Miter**, **Bevel** (the stroke Join glyphs, 32 px each, `role="radiogroup"` "Corners") | Round | Label "Corners", not "Join": the maker's word. |
-| 4 | Ends | three icon items **Round**, **Flat**, **Square** (the stroke Cap glyphs) | Round | Greyed unless an open path is selected. Always in the bar. |
-| 5 | Result | segmented text items **New object**, **Change original** (`role="radiogroup"` "Result") | New object | Ctrl during a drag inverts it for that drag only; the bar shows the inverted choice while Ctrl is held. |
-| 6 | Apply | text button **Apply** (the filled look) | | Applies the bar values to the selection. Greyed with nothing selected. The keyboard route; the mouse route is the drag. |
-| 7 | Status | muted 12 px text at the end, fixed 200 px box, polite live region | empty | The reason a control is greyed or a drag is refused: "Select one or more shapes.", "Groups cannot be offset. Ungroup first.", "Inset needs closed paths: 1 of 2 is open." |
+Invalid input and refusals use the Move chip's **message card** (a separate small card under the
+chip, above it when there is no room; `CircleAlert` 12 px and one line of 12 px text; the body of
+the chip never moves).
 
-Groups are separated by the bar's 1 px 20 px divider and 12 px gap. About 860 px wide; one row
-from a window of about 1330 px with the panel open (or about 1050 px with it collapsed); at
-800 x 600 (324 px overlay row) it wraps by whole groups to four rows, as the Node and Pencil bars
-wrap. The bar values are session state, never saved in the file.
+Why Corners is in the chip although the customer only named the double-click: the keyboard route
+needs it, and the chip is where a maker looks for "the settings of this offset" (default pending
+customer, spec open question 3).
 
-**Not in the bar:**
+### 2.4 Placement
 
-- **Miter limit.** Fixed at 4 (SVG's), as in the spec. A field that only matters for Miter would be
-  greyed most of the time; add it if a maker asks.
-- **Precision.** Not a maker setting: the result must be exact to 0.01 mm and keep curves as curves
-  (section 7). A precision field would hand the kernel's problem to the maker.
-- **Count / spacing** (several concentric copies). A follow-up; repeated drags already do it
-  (after a drag the result is selected, so the next drag offsets the result).
+The Move chip's rule, adapted so the chip does not cover the result:
 
-## 3. The handles on the canvas
+1. **Anchor box:** the screen-space axis-aligned box around the operand box **and** the standing
+   preview at the moment the chip opens (with Out or Both the preview is bigger than the object).
+2. **Left edge** 16 px right of the center glyph's center; **top edge 20 px below the anchor box's
+   lower edge** (not 16: the bottom corner handles reach 13.5 px below the box corner).
+3. **Flip:** to the left of the center (right edge 16 px left of it) when it would cross the
+   canvas's right edge; **above the anchor box** (bottom edge 20 px above its upper edge) when it
+   would cross the bottom edge. The Move chip flips to above the center glyph and covers the upper
+   half of the box; the Offset chip does not, because the preview is what the maker is judging.
+4. **Clamp** inside the canvas and right of the tool rail (`--rail-right` + 12 = 128 px), as the
+   Move chip.
+5. **Fixed while open.** Typing, arrow steps or a new Direction change the preview but do not move
+   the chip; a bigger preview may then run under it. Pan, zoom and window resize recompute the
+   placement from the anchor box at its new screen position.
 
-**Look.** Four handles, one per corner of the selection box, each sitting **12 px outside the
-corner on the box's outward diagonal**, so it never covers a rectangle's corner node or a transform
-handle position. Glyph: the "Parameter handle" (10 px circle, 1.5 px `--accent` ring, white ground,
-4 px `--accent` centre dot), hover `--accent-hover`, being dragged `--accent` ground; hit area 16 px.
-The box is drawn as the selection box (1 px dashed `--accent`). One rotated object: its own rotated
-box (as the transform handles); several objects: the axis-aligned box around all of them. A box
-smaller than 24 px on screen in an axis (a straight horizontal line) is widened to 24 px in that
-axis for placing the handles only.
+At 800 x 600 the 168 x 108 px chip fits in every case (canvas about 324 px wide with the panel
+open).
 
-**What a drag maps to.**
+### 2.5 Focus and Tab order
 
-- The distance d is the pointer's movement **projected onto the handle's outward diagonal**, in
-  document millimetres, as the amount the box grows on each side: `d = (dx * sx + dy * sy) / 2`,
-  where `(sx, sy)` is the corner's outward direction (each ±1 in the box frame). Moving the handle
-  1 mm right and 1 mm down from the bottom right corner is an outset of 1 mm.
-- **Outward (away from the box centre) = Outset, inward = Inset.** Passing through the start point
-  switches between them live. At 0 the preview is gone and a release writes nothing.
-- The handle stays on the diagonal and moves with the grown box, so it is always at the corner of
-  the result's box (exact for Round corners; with Miter a sharp corner may reach a bit further).
-- **Inset is limited:** the handle stops where the whole selection would vanish; at that point the
-  readout says "Nothing is left" in `--field-invalid` and a release there writes nothing. If only
-  some shapes vanish, the drag goes on and the readout adds "1 of 3 shapes vanishes".
-- **Snapping:** d snaps to a step that is at least 2 screen pixels, from the series 0.01, 0.02,
-  0.05, 0.1, 0.2, 0.5, 1, 2, 5 mm (1 mm at 100 % zoom, 0.2 mm at 400 %). It also snaps to the value
-  in the bar's Distance field when the pointer is within 6 px of it, so a typed 2 mm can be dragged
-  to exactly. No key turns snapping off (Ctrl is taken, Alt is unreliable on Linux): zoom in for a
-  finer step, or type the value.
+- **On open:** focus in Distance, its text selected (so typing replaces it).
+- **Tab order:** Distance, Direction, Corners, Mode, and back to Distance. The chip is a **closed
+  loop** like the Move chip: Tab never leaves it (leaving would close it by blur). Shift+Tab goes
+  backwards. Each radio group is one Tab stop (roving `tabindex`: the chosen item).
+- **On close** (Enter or Escape): focus returns to the canvas container. After a write the
+  standing preview of the new selection is shown at once (spec criterion 52), so **O, Enter**
+  again makes the next concentric copy.
 
-**Preview.** While dragging, the result is drawn as the "Live preview outline": a hollow 1.5 px
-`--preview-new` line with the white casing over the unchanged original, every outline of the result
-(holes included), no fill. With Both, two outlines. The original stays as it is drawn ("blue new,
-black old"). Solid, not dashed: dashed is the selection box. Updated once per frame.
+### 2.6 Keys inside the chip
 
-**Readout chip** (the "Live transform readout", 12 px up and right of the pointer), two lines:
-
-- Line 1: "Outset 2.5 mm", "Inset 0.8 mm", "Both ±2.5 mm".
-- Line 2, muted: "New object", "Changes the original" (Ctrl), "Changes the original, adds the inner
-  copy" (Shift+Ctrl, naming the side that is the copy).
-- With Ctrl not held and a new object being made, the plus badge of the copy-move is shown beside
-  the pointer (row "Modifier badge"), so the move's "plus = a new object" holds here too.
-
-**Release and Escape.** Release writes the result as **one undo step** ("Offset"). Escape during
-the drag (the first step of the cascade) or a press of the other mouse button cancels: the preview
-goes, nothing is written, the handles return. A double-click on a handle focuses the Distance field
-of the bar (the convention "double-click a handle to type its value").
-
-**After the release:** the tool stays active; the result is the selection (rules in section 5), so
-its handles are ready for the next drag. A notice in the canvas notice slot (bottom centre, 3 s,
-`role="status"`): "Offset: added 1 shape, 2.5 mm outward." / "Offset: changed 1 shape, 2.5 mm
-inward." / "Offset: changed 1 shape and added 1, 2.5 mm both sides."
-
-## 4. Modifier keys
-
-| Held during the drag | Effect | Result |
+| Key | Where | Effect |
 |---|---|---|
-| none | one side, from the drag direction | a new object, the original unchanged |
-| **Shift** | **both sides** at the dragged distance | two new objects (outer and inner), the original unchanged |
-| **Ctrl** | one side | **the original is changed**, no new object |
-| **Shift+Ctrl** | both sides | the original takes the **dragged** side (drag outward: it becomes the outset), a new object is made for the other side |
+| Digits, `.` or `,` | Distance | Edit the text. `inputmode="decimal"`. No preview per keystroke (`0017` criterion 42). |
+| Up / Down | Distance | Step the value by 0.1 mm; **Shift** 1 mm; **Ctrl** 0.01 mm (the panel field rule; a deliberate exception to the entry-chip rule "no stepping with arrow keys", spec criterion 25). The value is rounded to the step, clamped to 0.01 to 1000 mm, and the preview follows at once. |
+| Left / Right, Home / End | Distance | Move the caret (the field is text). |
+| Left / Right (also Up / Down) | a radio group | Move to the next or previous item and choose it; wraps (the radio group pattern). Home / End: first and last item. Space chooses the focused item. The preview follows at once. |
+| Tab / Shift+Tab | anywhere | Next or previous stop in the loop. Leaving Distance with a valid value commits it to the preview. |
+| **Enter** | anywhere | **Writes** (2.7). Also with an untouched Distance: the prefilled value is the value to use (a deliberate exception to the entry-chip rule "Enter on unedited text writes nothing", because **O, Enter** with the remembered distance is the fast keyboard route). |
+| **Escape** | anywhere | Closes the chip, **writes nothing**. The values chosen in it become the remembered values (default pending customer); a Distance text that is not a valid number is dropped and the last valid value stays. Escape is the first step of the cascade: the selection stays. |
+| Ctrl+Z | Distance | The field's own text undo; key events inside the chip never reach the app's undo or the canvas shortcuts (entry-chip rule). |
 
-Keys may be pressed before the press or during the drag; the state at release counts; the preview,
-the readout and the bar follow in the frame a key changes (the move's rule). On Linux/WebKitGTK the
-Shift key-up may arrive late (known, `0014`); the release reads the modifier from its own event.
+### 2.7 Enter: writing, and what refuses
 
-**Conflicts with the meanings elsewhere, and why they are acceptable:**
+- **Valid:** the result for the chip's values is written as **one commit** labelled "Offset"
+  (spec criterion 16); the chip closes; the canvas notice of criterion 24 appears; the selection
+  becomes what was produced or changed (criterion 23). Direction and Mode combine as the
+  modifiers do (criterion 26): Both + Change original = the Shift+Ctrl result, with the Out side
+  as the original's side.
+- **Not a number** (empty, "abc"): the chip stays open, Distance is marked (2 px `--field-invalid`,
+  `aria-invalid`), its text re-selected, the message card says "Enter a number". The mark clears
+  on the next keystroke.
+- **Out of range** (below 0.01 or above 1000 mm): the field shows the clamped value, is marked,
+  the message card says "From 0.01 to 1000 mm"; nothing is written by this Enter. The mark clears
+  on the next keystroke; the next Enter writes the clamped value (spec criterion 6).
+- **Refusals** (a group among the operands, criterion 32; an inset that leaves nothing, criterion
+  29): nothing is written; the chip **stays open** and its message card shows the refusal text of
+  the spec ("Offset does not work on groups. Ungroup first. Nothing was changed.", "Inset is
+  empty: nothing is left at 10 mm. Nothing was changed."); the group is outlined (row "Refusal
+  outline"). The maker can change a value or press Escape. The error is shown where the eye is,
+  not in the bottom notice slot.
 
-- **Shift elsewhere means "about the centre" or "one axis"** (resize, create, move). Here it means
-  "both sides of the outline": also the symmetric choice, so the meaning is close. There is no axis
-  to lock in an offset.
-- **Ctrl elsewhere means "copy" for a move and "keep proportions / snap angles" for a resize or
-  rotate.** Here the default already makes a copy, so Ctrl gives the other choice: change the
-  original. The common rule is "Ctrl = the other result than the default", and the readout's second
-  line and the plus badge say which one the release gives. This is the one real inversion
-  (question 2). Ctrl cannot also mean "snap" here; snapping is always on (section 3).
-- **Alt** is not used (window managers on Linux take Alt+drag).
+### 2.8 Other ways the chip closes
+
+As the Move chip, and always without writing: a **press outside the chip** (the press is not
+swallowed: a press on a corner handle starts that drag at once, a press on an object selects it),
+a tool switch, a selection change (also by Ctrl+A or undo), the window losing focus. In each case
+the chip's valid values become the remembered values, as with Escape (default pending customer).
+
+### 2.9 The chip and a drag
+
+- They never run at the same time. A press on a corner handle closes the chip first (2.8), so the
+  drag starts from the values just set: a distance typed as 2 mm is the snap target of that drag
+  (spec criterion 11).
+- During a corner drag the chip cannot open: O and Enter are gated, and a double-click needs two
+  clicks.
+- A drag does not change the chip's Direction or Mode (spec criterion 10); its distance becomes
+  the remembered distance on release (criterion 6), so the next chip opens with it.
+
+### 2.10 Accessibility
+
+- The chip: `role="group"`, `aria-label="Offset"`. Distance: `aria-label="Distance, millimetres"`,
+  `aria-invalid` and `aria-describedby` (the message card) when marked. The message card is a
+  polite `role="status"` that is always mounted, empty when there is nothing to say.
+- Direction: `role="radiogroup"` named "Direction", radios named by their visible text "Out",
+  "In", "Both"; `title` "Outset: grow", "Inset: shrink", "Both sides: one copy outside, one
+  inside".
+- Corners: `role="radiogroup"` named "Corners", radios `aria-label` "Round", "Miter", "Bevel".
+- Mode: `role="radiogroup"` named "Mode", radios `aria-label` "New object" and "Change original";
+  `title` "New object: the original stays" and "Change original: no copy is made". Icons
+  `aria-hidden`.
+- Focus ring: 2 px `--editor-accent`, as the Move chip. Contrast as the Move chip (text
+  `--toolbar-icon` on `--toolbar-bg` and on white, active segments white on `--accent`).
+- The canvas handles are pointer targets only; **O / Enter and the chip are their keyboard
+  equivalent**, including the corner style. The readout and badges stay `aria-hidden`; what was
+  written is announced by the notice (`role="status"`).
+
+## 3. The handles, the standing preview and the drag
+
+**Corner handles** (unchanged from 2026-10-12): four, one per corner of the operand box, each 12 px
+outside the corner on the box's outward diagonal; the "Parameter handle" look (10 px circle,
+1.5 px `--accent` ring, white ground, 4 px `--accent` dot); hover `--accent-hover`, being dragged
+`--accent` ground; hit area 16 px. One rotated object: its own rotated box; several objects: the
+axis-aligned box around them; an axis under 24 px on screen widened to 24 px for placing the
+handles only. **Hint chip** after 600 ms of rest on a corner handle: "Drag: outset or inset" /
+"Shift: both sides" / "Ctrl: change the original" (or "Ctrl: make a new object" while the chip's
+Mode is Change original) / "Double-click: next corner style".
+
+**Standing preview** (new 2026-10-13, spec criterion 52). With the tool active and an operand
+selected, the result for the remembered values (Distance, Direction, Corners or a pending corner
+style, Mode) is drawn at once as the "Live preview outline" (1.5 px hollow `--preview-new`, white
+casing, no fill). It is recomputed when the selection or a value changes, follows the chip while it
+is open, and is replaced by the grown box (dashed `--preview-new`) over 2,000 operand nodes.
+
+**The handles stay at the operand box**, not at the corners of the standing preview (spec
+criterion 9). On a press on a corner handle the standing preview stays until the pointer leaves the
+3 px dead zone; from then the drag preview takes over, starting from d = 0 at the press point
+(criterion 10). Snapping to the remembered distance within 6 px (criterion 11) lets the maker drag
+back to exactly the value that was standing. Escape or the other button restores the standing
+preview. (Default pending customer; alternative: the handles sit at the corners of the standing
+preview and a drag continues from the remembered distance.)
+
+**The drag** (unchanged): d is the pointer's movement projected on the handle's outward diagonal,
+`d = (dx * sx + dy * sy) / 2`; outward Outset, inward Inset, switching live through the press
+point; snapping as in criterion 11; the inset stops where nothing is left. The dragged handle moves
+with the grown box; the other three stay idle at the operand box. The center handle is hidden
+during the drag.
+
+**Readout chip** during a drag (the "Live transform readout", 12 px up and right of the pointer,
+flip and clamp rules), amended 2026-10-13:
+
+- **Line 1:** the side, the distance and **always the corner style**: "Outset 2.5 mm · Round",
+  "Inset 0.8 mm · Miter", "Both ±2.5 mm · Bevel". Always, not only when it is not Round: with a
+  pending style that is used once and then given back, the maker must see which one this drag uses.
+  (Default pending customer; changes spec criterion 15, see its 2026-10-13 remark.)
+- **Line 2, muted, the mode:** "New object", "Changes the original" (Ctrl), "Changes the original,
+  adds the inner copy" / "... adds the outer copy" (Shift+Ctrl). It follows the effective Mode: with
+  the chip's Mode on Change original, no Ctrl shows "Changes the original" and Ctrl shows "New
+  object".
+- **Line 3, only when it applies:** "Nothing is left" (`--field-invalid`), "1 of 3 shapes vanishes",
+  "Preview off: large selection".
+- With a new object being made, the copy-move **plus badge** sits 16 px left of and below the
+  pointer (row "Modifier badge"); not with Change original.
+- No line ever says "Stays a rectangle" or "Becomes a path".
+
+**Corner style by double-click** (2026-10-13, "for that drag"):
+
+- A **double-click on a corner handle** (two primary presses within the system interval, neither
+  leaving the 3 px dead zone) steps the **pending corner style** one place in the cycle Round,
+  Miter, Bevel, Round, starting from the current pending style or, if none, from the chip's
+  Corners value. Neither click writes anything (a click is a drag of d = 0).
+- At once: the **standing preview redraws** with the new style, and the **readout chip appears at
+  the pointer** with line 1 "Miter corners" and muted line 2 "For the next drag". It stays while
+  the pointer rests on that handle, at most 2 s, and goes on a press or when the pointer leaves the
+  handle's hit area.
+- The **next drag that writes** uses the pending style (its readout line 1 names it) and **consumes
+  it**: after the release the standing preview and the next drag use the chip's Corners value
+  again. A cancelled drag (Escape, other button, release at 0) keeps it pending. A tool switch drops
+  it. A selection change keeps it.
+- **Opening the chip while a style is pending** shows that style chosen in Corners; from then the
+  chip's rules apply (Enter writes it, Escape keeps it as the remembered value).
+
+**Release and Escape** (unchanged): release writes one commit "Offset"; Escape during the drag or
+the other mouse button cancels. After the release the tool stays active, the result is selected
+(spec criterion 23) and its standing preview is shown.
+
+## 4. Modifier keys (amended 2026-10-13)
+
+| Held during the drag | Direction | Result |
+|---|---|---|
+| none | from the drag (outward Out, inward In) | the chip's Mode: **New object** by default |
+| **Shift** | **Both** at the dragged distance | the chip's Mode (default: two new objects, the original unchanged) |
+| **Ctrl** | from the drag | the **other** Mode: by default **the original is changed**, no new object |
+| **Shift+Ctrl** | Both | the original takes the **dragged** side (drag outward: it becomes the outset), a new object is made for the other side |
+
+Shift stands for the chip's Direction control (Both), Ctrl for its Mode toggle. Keys may be
+pressed before the press or during the drag; the state at release counts; the readout, the badge
+and the preview follow in the frame a key changes; the release reads the modifiers from its own
+event (WebKitGTK's late Shift key-up, `0014`). Shift and Ctrl in other tools mean "about the
+centre / one axis" and "copy"; the reasons this is acceptable are unchanged from 2026-10-12 (Shift
+is the symmetric choice, Ctrl is "the other result than the default", the readout says which).
 
 ## 5. What is created, z-order, selection after
 
-- **Style:** each result copies its original's complete style.
-- **Each object is offset on its own.** Several selected objects give one result each, never
-  merged (as in the spec). Overlapping outsets of neighbours stay separate objects; Union merges
-  them when wanted.
-- **Z-order, proposal (question 3): the bigger one goes below.** An outset copy goes directly
-  **below** its original, an inset copy directly **above** it. Then a filled border never covers
-  the part, and an inner contour is visible on a filled part. The built slice puts every result
-  above its original.
-- **With Both:** outer copy below, inner copy above, the original in between.
-- **With Change original (Ctrl):** the original keeps its place in the stacking order, its name,
-  its id (and so its linked clones follow it), only its geometry changes.
-- **Selection after the release:** the objects that the drag produced or changed: the new copies,
-  or the changed originals, or with Shift+Ctrl the changed original and its copy. The unchanged
-  originals are not selected. So a second drag offsets the result, which gives concentric copies.
+Unchanged. Each result copies its original's complete style; each object is offset on its own; an
+outset copy goes directly below its original, an inset copy directly above; with Both the outer
+below, the inner above. Change original keeps place, name and id. After a write the produced or
+changed objects are selected, the unchanged originals are not, open paths that were ignored are
+not.
 
-## 6. Rectangles, circles, polygons, stars: stay primitives where the result is exact
+## 6. Rectangles, circles, polygons, stars: stay primitives where exact
 
-The customer asked for this, and it is a real advantage: the result keeps its radius knobs, its
-size fields and its exact curves. **Rule: the result stays the same kind of primitive whenever the
-exact offset is that kind; otherwise it becomes a path (with curves, section 7).** The bar's status
-says which: "Stays a rectangle." / "Becomes a path." while dragging (second readout line too).
+Unchanged rules (spec criterion 40). **2026-10-13:** no text anywhere says whether the result
+stays a primitive or becomes a path; the old status line and readout line are removed.
 
-| Original | Out (outset) | In (inset) |
-|---|---|---|
-| **Rectangle**, any corner radii, rotated or not | **Round:** rectangle w+2d, h+2d, every corner radius r+d (a sharp corner gets radius d). **Miter:** rectangle w+2d, h+2d, sharp corners stay sharp, rounded corners get r+d. **Bevel:** a rectangle only if every corner is already rounded (r+d); with a sharp corner it becomes a path (Curvyo's rectangle has no chamfer). | Every corner style: rectangle w−2d, h−2d, each radius max(r−d, 0). Vanishes when d reaches half the shorter side. |
-| **Circle** (rx = ry) | circle r+d, every corner style | circle r−d; vanishes at d ≥ r |
-| **Ellipse** (rx ≠ ry) | **a path.** The exact offset of an ellipse is not an ellipse (an ellipse with rx+d, ry+d is off by about 0.08 mm for a 40 x 20 mm ellipse at 2 mm and about 0.5 mm for an 80 x 20 mm one at 5 mm, far above the 0.01 mm tolerance). | a path; a narrow ellipse inset further than its tightest curve radius gets pointed ends |
-| **Polygon** (regular) | **Miter:** polygon of the same count and angle, outer radius R + d / cos(π/n) (no corner of a regular polygon is sharp enough to reach the miter limit). Round or Bevel: a path. | Every style: polygon with outer radius R − d / cos(π/n). |
-| **Star** | **Miter:** a star with the same points and ratio, scaled about its centre (all edge lines of a regular star are at the same distance from its centre, so the offset is a scaling), as long as no point is clipped by the miter limit 4; otherwise a path. Round or Bevel: a path. | Miter: the same scaled star unless an inner corner is clipped; otherwise a path. |
-| Path, compound path, open path | path / compound path (open path: a closed outline around it, with the Ends style) | path / compound path; open paths are refused |
+## 7. Output quality
 
-With **Both**, each side follows the table on its own (an outset Round rectangle and an inset
-rectangle are both rectangles). With **Change original**, a rectangle that stays a rectangle keeps
-its kind; one that would become a path is converted, and the readout says "Becomes a path".
+Unchanged: curves stay curves, exact to 0.01 mm (spec criteria 33 to 39).
 
-The architect confirms the formulas and the star case (open question for the architect, A1). The
-spec's criteria 6, 10, 11 and 20 change for primitives.
+## 8. Multi-selection, groups, open paths, large documents
 
-## 7. Output quality (requirement from UX, geometry by the architect)
+- **Multi-selection:** one operand box, four corner handles, one center handle, one d for all.
+- **Groups:** a group alone, nothing is drawn (no handles, no preview, no message). A group among
+  closed operands: handles and preview for the operands; a release or Enter is refused with the
+  spec's sentence and the group outlined. After a release the sentence is an alert in the canvas
+  notice slot, as the Boolean refusals of `0016`; after Enter it is the chip's message card (2.7).
+- **Open paths (2026-10-13):** never offset. Only open paths selected: no handles, no preview, no
+  message. Mixed with closed operands: the operand box, the handles and the preview are for the
+  closed ones only; the open paths stay drawn as selected and are left unchanged and unselected
+  after a write; no message (default pending customer).
+- **Selecting in the tool:** click, Shift+click, a press on empty canvas, the marquee, Ctrl+A, as
+  in the Select tool. A drag on an object does not move it. A press on the center handle's hit area
+  does nothing (2.1).
+- **Large documents:** handles, readout and chip follow at frame rate; previews are computed after
+  the frame, a stale one is dropped; over 2,000 operand nodes the grown box replaces the preview,
+  for the standing preview too; a write computes the real result. A selection change from Ctrl+A on
+  a large document never blocks the pointer.
 
-A curved original must give a result that a maker can edit and a machine can run smoothly:
-**curves stay curves** (Bézier segments, smooth nodes), and the node count grows with the original's
-node count, not with its size. A circle outset is a circle (section 6); a path with 4 Bézier nodes
-gives a result with a comparable number of curve nodes, not hundreds of corners. Exactness 0.01 mm
-as before. How (curve offset, refitting the polyline, arcs) is the architect's decision (A2). Until
-that exists, the built polyline is a known limitation and must not ship as the final result,
-because it is what the customer saw.
-
-## 8. Multi-selection, groups, large documents
-
-- **Multi-selection:** one box, four handles, one d for all; each object offset on its own;
-  primitives and paths mixed (each by its own rule in section 6). One undo step for all.
-- **Groups:** refused as in the spec: the handles are not drawn, the bar is greyed, the status says
-  "Groups cannot be offset. Ungroup first.". A group together with other objects: the handles are
-  drawn; release is refused with the existing sentence and the group outlined (row "Refusal
-  outline"). Offsetting group members inside an entered group works.
-- **Open paths:** In is refused: the handle stops at 0 for a selection of only open paths and the
-  readout says "Inset needs closed paths"; in a mixed selection the open ones are left out and named
-  in the notice. Both on an open path is the same outline as Out.
-- **Selecting in the tool:** a click on an object selects it, Shift+click adds or removes, a press
-  on empty canvas clears, the marquee works as in the Select tool, Ctrl+A selects all. A drag on an
-  object does **not** move it (only handles act), so the tool cannot move things by accident.
-- **Large documents:** the handles and the readout always follow the pointer at frame rate (they do
-  not depend on the geometry). The preview is computed after the frame and a stale one is dropped;
-  over 2,000 operand nodes it is replaced by the grown box (dashed `--preview-new`) and the readout
-  says "Preview off: large selection"; the release computes the real result. Never block the
-  pointer.
-
-## 9. Keyboard-only route
+## 9. Keyboard-only route (amended 2026-10-13)
 
 1. **O** selects the Offset tool (or Tab to the "Path tools" toolbox, Space).
-2. Select with the keyboard as before (Ctrl+A, or select in the Select tool first; the selection is
-   kept when the tool changes).
-3. Tab into the bar: Distance (type, or arrows: 0.1 mm, Shift 1 mm, Ctrl 0.01 mm, the panel field
-   rule), Direction, Corners, Ends, Result (arrows inside each group), Apply.
-4. **While focus is in the bar and a selection exists, the preview is shown** for the bar values,
-   so the keyboard user sees what Apply does. Enter in Distance commits a typed value; Enter again
-   (or Apply) applies. One undo step. Focus stays in the bar for the next value.
-5. Escape in the bar restores a typed value, then returns focus to the canvas.
+2. Select with Ctrl+A, or select in the Select tool first; the selection is kept. The standing
+   preview shows the result for the remembered values.
+3. **O** or **Enter** opens the chip, focus in Distance with its text selected.
+4. Type a distance or step it with Up / Down; Tab to Direction, Corners, Mode; arrows choose.
+5. **Enter** writes one commit and returns focus to the canvas; **Escape** closes without writing.
+6. **O, Enter** again offsets the result: concentric copies by keyboard.
 
-Accessible names: "Offset tool", "Distance, millimetres", "Direction", "Corners", "Ends",
-"Result", "Apply offset". The handles are pointer-only; the bar is their equivalent. Every
-greyed control is `aria-disabled` with the reason in the status text. Contrast as the existing
-bar (Apply white on `--toolbar-icon-active-bg` 4.5:1, status `--panel-muted-fg` 5.0:1).
+Arrow keys on the canvas nudge as in the Select tool and do not offset.
 
 ## 10. Deliberately not there
 
-- A live, linked offset that follows its source (Inkscape's Dynamic and Linked Offset). Possible
-  later as an offset in the object's history or as a linked clone kind; not now.
-- "Adjust the last offset" (Blender's redo panel: change the bar after a drag and the last result
-  is recomputed). Bar changes affect the next drag or Apply only, so it is always clear when
-  something is written.
-- Miter limit and precision fields, several copies at once, a variable distance, offsetting strokes
-  or text, document units other than mm.
-- Arrow keys on the canvas do not offset (they nudge as in the Select tool); the typed route is the
-  bar.
+A top bar, an Apply button, a status hint for the result kind, Ends and offsetting open paths
+(removed 2026-10-13); a linked live offset; "adjust the last offset"; miter limit and precision
+fields; several copies at once; a variable distance; offsetting strokes or text; units other than
+mm.
 
-## 11. Questions for the customer
+## 11. Defaults pending customer (2026-10-13)
 
-1. **Where does the tool go?** *A (recommended, default):* a new card "Path tools" in column A under
-   Group, with Offset only; later path tools join it. *B:* the same card, and the **Node tool moves
-   into it** (it is a path tool too; the Tools card gets shorter, and a button the hands know moves
-   once). *C:* Offset as the eighth button of the Tools card (Group moves down 44 px).
-2. **Ctrl = change the original** (your proposal) inverts the move, where Ctrl = make a copy.
-   *A (recommended, default):* keep your mapping; the default already copies, Ctrl gives the other
-   result, and the readout says which. *B:* default changes the original, Ctrl makes a copy (same
-   as the move, but the frequent case, a second contour for cutting, then always needs Ctrl).
-3. **Z-order of the result.** *A (recommended, default):* outset copy below the original, inset
-   copy above it. *B:* every copy above its original (as built).
-4. **Ellipses that are not circles.** *A (recommended, default):* the result becomes a path with
-   curves, exact to 0.01 mm. *B:* it stays an ellipse with rx+d and ry+d, editable but off by about 0.1 mm on a
-   40 x 20 mm ellipse and up to 0.5 mm on narrow ones.
-5. **Tool letter O.** Default O; say if you want another key.
+1. The **center handle** is the double-click target for the chip (alternative: a double-click
+   anywhere in the operand box). Its glyph is the Offset glyph in small, not the Move arrows.
+2. **O and Enter** both open the chip.
+3. **Corners is in the chip**, beside Distance, Direction and Mode.
+4. **Escape, a press outside, a tool switch or a selection change** close the chip without
+   writing and keep its values as the remembered ones.
+5. The **chip is placed below the result**, not over the box (Move chip rule adapted, 2.4).
+6. The **handles stay at the operand box** and a drag starts from d = 0 (alternative: at the
+   standing preview's corners, continuing from the remembered distance).
+7. The **pending corner style** from a double-click is used by the next written drag only ("for
+   that drag"), then the chip's Corners value applies again; the readout always names the corner
+   style.
+8. **Open paths** in a mixed selection are ignored silently; only open paths or a group alone show
+   nothing.
+9. Tooltip second line: "Drag a corner handle. Shift: both sides. Ctrl: new or change."
 
 ## 12. Questions for the architect
 
-- **A1:** Confirm the primitive rules of section 6 (rectangle radii r ± d with effective radii,
-  polygon R ± d / cos(π/n), star as a scaling about its centre and the miter-limit check, circle).
-  Is there a case where the "stays a primitive" result differs from the kernel's result by more
-  than 0.01 mm?
-- **A2:** How the result of curves keeps curves (section 7), and whether that is part of this slice
-  or a fix before it.
-
-## What changes in `specification.md` if this is accepted
-
-Criterion 1 (entry: the tool, the bar, the handles instead of the Select bar button and the panel
-section), 2 and 3 (preview during a drag and with focus in the bar), 4 (cancel: Escape during the
-drag, a press of the other button), 5 (written on release, or Apply), 6 and 11 (primitives stay
-primitives, curves stay curves), 10 (z-order, Change original, Both), 13 (the notice texts and
-place), "Out of scope" (both directions and replacing the original are now in scope), Question 1
-and 5 of the spec (answered by the tool), and the UX notes (replaced by this document). Design
-system rows that change: "Command with parameters" and "Offset section" (removed), "Tool rail
-architecture" (column A gets the Path tools card), a new row "Offset bar" and "Offset handles".
+A1 and A2 of 2026-10-12 are answered in `geometry-rework.md` and `adrs.md`.
