@@ -1,9 +1,9 @@
-//! What the Offset tool shows (`specs/0038-path-offset` criteria 4, 5, 9, 12, 14, 15, 18): the
-//! view the bar and the readout read, and the canvas layer of preview, box and handles.
+//! What the Offset tool shows (`specs/0038-path-offset` criteria 5, 9, 12, 14, 15, 18, 52): the
+//! view the chip and the readout read, and the canvas layer of preview, box and handles.
 
 use curvyo_document_core::{ObjectSnapshot, Point};
 use curvyo_ui_core::{
-    OffsetDirection, OffsetRefusal, OffsetRequest, OffsetResultChoice, OrientedBox,
+    OffsetDirection, OffsetJoin, OffsetRefusal, OffsetRequest, OffsetResultChoice, OrientedBox,
     handle_positions, offset_operands,
 };
 
@@ -16,7 +16,7 @@ const PREVIEW_NODE_LIMIT: usize = 2000;
 /// The nodes a primitive counts for the preview limit.
 const PRIMITIVE_NODES: usize = 8;
 
-/// What the bar, the readout and the canvas show (criteria 4, 5, 12, 15, 18).
+/// What the chip, the readout and the canvas show (criteria 5, 12, 15, 18, 56).
 // Flags the host reads one by one, not a state machine.
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone, PartialEq)]
@@ -27,13 +27,17 @@ pub struct OffsetView {
     pub has_group: bool,
     /// The handles are drawn.
     pub handles: bool,
-    /// A drag is in flight.
+    /// A drag is in flight and has left the dead zone around the press.
     pub dragging: bool,
-    /// The signed distance shown (the drag's, or the bar's with its Direction).
+    /// The signed distance shown (the drag's, or the remembered one with its Direction).
     pub distance_mm: f64,
+    /// The corner style the preview and the next drag use (criteria 15, 56).
+    pub join: OffsetJoin,
+    /// The corner style a double-click set for the next drag, if any (criterion 56).
+    pub pending_join: Option<OffsetJoin>,
     /// Both sides (Shift during a drag, or Direction Both).
     pub both: bool,
-    /// The release or Apply changes the original.
+    /// The release or the chip's Enter changes the original.
     pub change: bool,
     /// Where the handle stopped, if it did.
     pub stop: Option<DragStop>,
@@ -62,18 +66,21 @@ impl Session {
         nodes > PREVIEW_NODE_LIMIT
     }
 
-    /// The request the canvas previews now: the drag's, or the bar's while focus is in the bar.
-    fn offset_preview_request(&self) -> Option<OffsetRequest> {
+    /// The request the canvas previews now: the drag's once it has left the dead zone, otherwise
+    /// the standing preview of the remembered values (criterion 52).
+    pub(super) fn offset_preview_request(&self) -> Option<OffsetRequest> {
         if self.tool != Tool::Offset {
             return None;
         }
-        if let Some(drag) = self.offset.drag {
-            return (drag.d != 0.0).then(|| self.offset_request(Some((drag.d, self.held))));
+        match self.offset.drag {
+            Some(drag) if drag.moved => {
+                (drag.d != 0.0).then(|| self.offset_request(Some((drag.d, self.held))))
+            }
+            _ => Some(self.offset_request(None)),
         }
-        None
     }
 
-    /// What the bar, readout and canvas show.
+    /// What the chip, readout and canvas show.
     #[must_use]
     pub fn offset_view(&self) -> OffsetView {
         let objects = self.objects();
@@ -102,8 +109,10 @@ impl Session {
             operands: operands.len(),
             has_group: !self.selected_group_leaves().is_empty(),
             handles: self.offset_handles_shown(),
-            dragging: drag.is_some(),
+            dragging: drag.is_some_and(|drag| drag.moved),
             distance_mm,
+            join: self.offset_join(),
+            pending_join: self.offset.pending_join,
             both,
             change,
             stop: drag.and_then(|drag| drag.stop),

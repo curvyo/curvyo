@@ -334,13 +334,15 @@ fn ac10_projection_formula_and_sign() {
     assert_eq!(s.undo_len(), undo_before);
 }
 
+/// Criteria 6 and 10 as amended 2026-10-13: the released distance is remembered, the Direction is
+/// not changed by a drag.
 #[test]
-fn ac10_the_drag_writes_into_the_bar_and_direction_sticks() {
+fn ac10_the_drag_remembers_its_distance_and_keeps_the_direction() {
     let (mut s, _) = square_session();
     drag(&mut s, BR, (-4.0, -4.0), false, false);
     let _ = outcome(&mut s);
     assert!((s.offset_values().distance_mm() - 4.0).abs() < 1e-9);
-    assert_eq!(s.offset_values().direction(), OffsetDirection::In);
+    assert_eq!(s.offset_values().direction(), OffsetDirection::Out);
 }
 
 #[test]
@@ -477,14 +479,16 @@ fn ac12_some_vanish_drag_goes_on_and_notice_counts() {
 
 // ------------------------------------------------------------------ AC 13, 16, 17 ---------------
 
+/// Criterion 13 as rewritten 2026-10-13: a double-click on a corner handle steps the corner style.
 #[test]
-fn ac13_double_click_on_a_handle_focuses_the_distance_field() {
+fn ac13_double_click_on_a_corner_handle_steps_the_corner_style() {
     let (mut s, _) = square_session();
     let h = handle_of(&s, BR);
     assert_eq!(
         s.double_click_hint(h, false, false),
-        DoubleClickHint::OffsetDistance
+        DoubleClickHint::OffsetCornerStyle
     );
+    assert_eq!(s.offset_view().pending_join, Some(OffsetJoin::Miter));
     assert_eq!(
         s.double_click_hint(pt(10.0, 10.0), false, false),
         DoubleClickHint::None

@@ -1,6 +1,7 @@
-//! The Offset tool in the session (`specs/0038-path-offset` criteria 2, 5 to 27): the bar's
-//! values, the four handles, the drag with its modifiers and the inset stop, the preview, the
-//! write on release or Apply, and selecting with the tool.
+//! The Offset tool in the session (`specs/0038-path-offset` criteria 2, 5 to 27, 52, 55, 56): the
+//! remembered values, the corner handles, the drag with its modifiers and the inset stop, the
+//! corner style a double-click sets for the next drag, the write on release or on the chip's
+//! Enter, and selecting with the tool.
 //!
 //! The preview is computed once per frame from the current values and cached by document
 //! version, selection and request, so what a release writes is what the last frame showed
@@ -13,22 +14,30 @@ use curvyo_ui_core::{
     CORNER_SIGNS, HANDLE_HIT_RADIUS_PX, Modifiers, ObjectSelection, OffsetDirection, OffsetJoin,
     OffsetPlan, OffsetRefusal, OffsetRequest, OffsetResultChoice, OffsetSide, OffsetSides,
     OffsetValues, OrientedBox, PressTarget, classify_press, drag_distance, handle_positions,
-    hit_test_objects, offset_box, offset_operands, plan_offset, snap_distance,
+    hit_test_objects, next_offset_join, offset_box, offset_operands, plan_offset, snap_distance,
 };
 
 use super::refusal::RefusalMarks;
-use super::{Session, Tool};
+use super::{DoubleClickHint, Session, Tool};
 
 /// The label of the commit an offset makes (criterion 16).
 pub const OFFSET_COMMIT_LABEL: &str = "offset_path";
 
-/// The Offset tool's state: the bar's values (session memory, criterion 7), the drag in flight,
-/// the handle under the pointer and the cached preview.
+/// How far, in screen pixels, the pointer moves from a corner press before the drag preview takes
+/// over from the standing preview (`ux-rework.md` section 3).
+const DEAD_ZONE_PX: f64 = 3.0;
+
+/// The Offset tool's state: the remembered values (session memory, criterion 7), the drag in
+/// flight, the handle under the pointer, the corner style set for the next drag and the cached
+/// preview.
 #[derive(Debug, Default)]
 pub(super) struct OffsetTool {
     pub(super) values: OffsetValues,
     pub(super) drag: Option<OffsetDrag>,
     pub(super) hovered: Option<usize>,
+    /// The corner style a double-click on a corner handle set for the next written drag
+    /// (criterion 56).
+    pub(super) pending_join: Option<OffsetJoin>,
     outcome: Option<OffsetOutcome>,
     preview: RefCell<Option<Cached>>,
 }
@@ -43,11 +52,9 @@ pub(super) struct OffsetDrag {
     pub(super) d: f64,
     /// The last distance at which something was left.
     last_good: f64,
-    /// The bar's Distance at the press: the drag snaps to it (criterion 11), not to the value
-    /// the drag itself writes into the bar.
-    bar_at_press: f64,
-    /// The bar's Direction at the press, restored with the distance when the drag is cancelled.
-    direction_at_press: OffsetDirection,
+    /// The pointer has left the dead zone around the press: the drag preview has taken over
+    /// from the standing preview.
+    pub(super) moved: bool,
     pub(super) stop: Option<DragStop>,
 }
 
@@ -67,7 +74,7 @@ struct Cached {
     result: Result<OffsetPlan, OffsetRefusal>,
 }
 
-/// What a release or Apply did (criterion 24).
+/// What a release or the chip's Enter did (criterion 24).
 #[derive(Debug, Clone, PartialEq)]
 pub enum OffsetOutcome {
     /// Nothing: no drag, a distance of 0, or no operand.
@@ -174,13 +181,9 @@ impl Session {
             .position(|handle| handle.vector_to(point).length() <= reach)
     }
 
-    /// Whether `point` is on a handle: a double-click there focuses the Distance field
-    /// (criterion 13).
-    pub(super) fn offset_handle_hit(&self, point: Point) -> bool {
-        self.offset_handle_at(point).is_some()
-    }
-
-    /// The request of a drag at the signed `d` with `held` keys, or of the bar.
+    /// The request of a drag at the signed `d` with `held` keys, or of the remembered values
+    /// (the standing preview and the chip's Enter). The corner style is the pending one of a
+    /// double-click, else the remembered Corners (criterion 56).
     pub(super) fn offset_request(&self, signed: Option<(f64, Modifiers)>) -> OffsetRequest {
         let values = &self.offset.values;
         let (distance_mm, sides) = match signed {
@@ -200,7 +203,7 @@ impl Session {
         OffsetRequest {
             distance_mm,
             sides,
-            join: values.join(),
+            join: self.offset_join(),
         }
     }
 
@@ -241,8 +244,7 @@ impl Session {
                 angle: bounds.angle,
                 d: 0.0,
                 last_good: 0.0,
-                bar_at_press: self.offset.values.distance_mm(),
-                direction_at_press: self.offset.values.direction(),
+                moved: false,
                 stop: None,
             });
             return;
@@ -295,12 +297,20 @@ impl Session {
             return;
         };
         let scale = self.view().scale();
+        if !drag.moved {
+            // The standing preview stays until the pointer leaves the dead zone; the drag starts
+            // from d = 0 at the press point (`ux-rework.md` section 3).
+            if drag.start.vector_to(point).length() * scale <= DEAD_ZONE_PX {
+                return;
+            }
+            drag.moved = true;
+        }
         let raw = drag_distance(
             drag.angle,
             CORNER_SIGNS[drag.corner],
             drag.start.vector_to(point),
         );
-        let mut d = snap_distance(raw, scale, drag.bar_at_press);
+        let mut d = snap_distance(raw, scale, self.offset.values.distance_mm());
         drag.stop = None;
         if d < 0.0 && !self.offset_selection_is_large() {
             match self.offset_plan_for(self.offset_request(Some((d, self.held)))) {
@@ -313,17 +323,6 @@ impl Session {
         }
         drag.d = d;
         self.offset.drag = Some(drag);
-        // The bar follows the drag (criteria 6, 10).
-        if d != 0.0 {
-            self.offset.values.set_distance_mm(d.abs());
-            self.offset.values.set_direction(if self.held.shift {
-                OffsetDirection::Both
-            } else if d < 0.0 {
-                OffsetDirection::In
-            } else {
-                OffsetDirection::Out
-            });
-        }
     }
 
     /// The release in the Offset tool: a drag with a distance writes its result in one commit
@@ -351,19 +350,55 @@ impl Session {
             OffsetDirection::Out
         };
         let outcome = self.write_offset_plan(request, direction);
+        if matches!(outcome, OffsetOutcome::Applied { .. }) {
+            // The written distance is remembered (criterion 6); the pending corner style was for
+            // this drag (criterion 56). A drag never changes Direction (criterion 10).
+            self.offset.values.set_distance_mm(drag.d.abs());
+            self.offset.pending_join = None;
+        }
         self.offset.outcome = Some(outcome);
     }
 
-    /// Escape or the other button during a drag: nothing is written (criterion 17). Returns
-    /// whether a drag was cancelled.
-    /// The bar gets back the Distance and Direction it had at the press.
+    /// Escape or the other button during a drag: nothing is written and the remembered values
+    /// and a pending corner style stay (criteria 17, 56). Returns whether a drag was cancelled.
     pub fn cancel_offset_drag(&mut self) -> bool {
-        let Some(drag) = self.offset.drag.take() else {
+        self.offset.drag.take().is_some()
+    }
+
+    /// The corner style the standing preview and the next drag use: the pending one of a
+    /// double-click, else the remembered Corners (criterion 56).
+    pub(super) fn offset_join(&self) -> OffsetJoin {
+        self.offset
+            .pending_join
+            .unwrap_or_else(|| self.offset.values.join())
+    }
+
+    /// A double-click at `point`: on a corner handle it steps the corner style for the next drag,
+    /// Round, Miter, Bevel, from the pending one or the remembered Corners (criteria 13, 56).
+    /// Returns whether it did.
+    pub(super) fn offset_step_corner_style(&mut self, point: Point) -> bool {
+        if self.offset.drag.is_some() || self.offset_handle_at(point).is_none() {
             return false;
-        };
-        self.offset.values.set_distance_mm(drag.bar_at_press);
-        self.offset.values.set_direction(drag.direction_at_press);
+        }
+        self.offset.pending_join = Some(next_offset_join(self.offset_join()));
         true
+    }
+
+    /// A double-click in the Offset tool: on a corner handle it steps the corner style
+    /// (criteria 13, 56).
+    pub(super) fn offset_double_click(&mut self, point: Point) -> DoubleClickHint {
+        if self.offset_step_corner_style(point) {
+            DoubleClickHint::OffsetCornerStyle
+        } else {
+            DoubleClickHint::None
+        }
+    }
+
+    /// The Offset tool is left: a drag in flight is cancelled and a pending corner style is
+    /// dropped (criterion 56).
+    pub(super) fn leave_offset_tool(&mut self) {
+        self.cancel_offset_drag();
+        self.offset.pending_join = None;
     }
 
     /// Whether a drag past 0, not at a stop, is in flight that makes a new object (Ctrl does not change the
@@ -381,7 +416,8 @@ impl Session {
         self.offset.drag.is_some()
     }
 
-    /// Apply: writes the bar's values for the selection in one commit (criteria 25, 26).
+    /// Enter in the Offset entry chip: writes the remembered values for the selection in one
+    /// commit (criteria 25, 26, 54).
     pub fn apply_offset(&mut self) -> OffsetOutcome {
         self.recording(|this| {
             if this.tool != Tool::Offset || this.offset.drag.is_some() {
@@ -493,8 +529,8 @@ mod tests {
     }
 
     /// A drag of the bottom-right handle by `by` along the diagonal. The default view shows
-    /// 1 px per mm, where the snap to the bar's value (6 px) catches every small distance, so the
-    /// bar holds the dragged value first.
+    /// 1 px per mm, where the snap to the remembered value (6 px) catches every small distance, so
+    /// the remembered value is set to the dragged one first.
     fn drag(session: &mut Session, by: f64, shift: bool, ctrl: bool) {
         session.set_offset_distance(by.abs());
         let from = bottom_right(session);
@@ -541,7 +577,7 @@ mod tests {
         assert_eq!(session.tool(), Tool::Offset, "the tool stays");
         assert!(
             (session.offset_values().distance_mm() - 2.0).abs() < 1e-9,
-            "the bar follows"
+            "the written distance is remembered"
         );
     }
 
@@ -594,23 +630,23 @@ mod tests {
     }
 
     #[test]
-    fn ac17_a_cancel_restores_the_bar_and_a_stop_shows_no_plus() {
+    fn ac10_ac17_a_drag_keeps_the_values_and_a_stop_shows_no_plus() {
         let (mut session, _) = offset_session();
         session.set_offset_distance(1.0);
         let from = bottom_right(&session);
         session.pointer_down(from, false);
-        session.pointer_hover(along(from, 3.0), false, false);
+        session.pointer_hover(along(from, -3.0), true, false);
         assert!(session.offset_drag_makes_copy());
-        assert!(
-            (session.offset_values().distance_mm() - 1.0).abs() > 1e-9,
-            "the bar follows"
+        assert_eq!(
+            session.offset_values(),
+            OffsetValues::default(),
+            "a drag changes no remembered value"
         );
         assert_eq!(
             session.escape(),
             super::super::keys::EscapeStep::CancelledDrag
         );
-        assert!((session.offset_values().distance_mm() - 1.0).abs() < 1e-9);
-        assert_eq!(session.offset_values().direction(), OffsetDirection::Out);
+        assert_eq!(session.offset_values(), OffsetValues::default());
 
         let mut small = Session::new(1);
         let square = square_path(&small, 0.0, 4.0, 1);
@@ -621,6 +657,118 @@ mod tests {
         small.pointer_hover(along(from, -5.0), false, false);
         assert_eq!(small.offset_view().stop, Some(DragStop::NothingLeft));
         assert!(!small.offset_drag_makes_copy(), "no plus at the stop");
+    }
+
+    #[test]
+    fn ac6_ac10_a_written_drag_remembers_its_distance_but_not_its_direction() {
+        let (mut session, _) = offset_session();
+        let from = bottom_right(&session);
+        session.pointer_down(from, false);
+        session.pointer_hover(along(from, -3.0), false, false);
+        session.pointer_up(along(from, -3.0), false, false);
+        assert!(matches!(
+            session.take_offset_outcome(),
+            Some(OffsetOutcome::Applied {
+                direction: OffsetDirection::In,
+                ..
+            })
+        ));
+        assert!((session.offset_values().distance_mm() - 3.0).abs() < 1e-9);
+        assert_eq!(session.offset_values().direction(), OffsetDirection::Out);
+    }
+
+    #[test]
+    fn ac52_the_standing_preview_is_what_enter_writes() {
+        let mut session = Session::new(1);
+        let square = rect(&session, 0.0, 20.0);
+        session.selection.select_single(square);
+        assert_eq!(session.offset_preview_request(), None, "Select tool: none");
+        session.set_tool(Tool::Offset);
+        let standing = session
+            .offset_preview_request()
+            .expect("a preview at once, without a drag");
+        assert_eq!(standing, session.offset_request(None));
+        assert!(
+            (standing.distance_mm - 1.0).abs() < 1e-9,
+            "1 mm on first use"
+        );
+        let plan = session.offset_plan_for(standing).expect("a result");
+        assert_eq!(plan.items.len(), 1);
+        session.set_offset_direction(OffsetDirection::Both);
+        assert_eq!(
+            session.offset_preview_request().map(|r| r.sides),
+            Some(session.offset_values().entry_sides()),
+            "the preview follows the values"
+        );
+        session.selection.clear();
+        assert!(session.offset_plan_for(standing).is_err(), "no operand");
+        assert_eq!(
+            session.offset_draw_list(session.view()),
+            curvyo_render_core::DrawList::default()
+        );
+    }
+
+    #[test]
+    fn ac52_after_a_write_the_preview_stands_for_the_new_selection() {
+        let (mut session, square) = offset_session();
+        drag(&mut session, 2.0, false, false);
+        assert_ne!(session.selection.ids(), &[square]);
+        let plan = session
+            .offset_plan_for(session.offset_preview_request().unwrap())
+            .unwrap();
+        assert_eq!(plan.items[0].operand, session.selection.ids()[0]);
+    }
+
+    #[test]
+    fn the_press_keeps_the_standing_preview_inside_the_dead_zone() {
+        let (mut session, _) = offset_session();
+        let standing = session.offset_preview_request();
+        let from = bottom_right(&session);
+        let scale = session.view().scale();
+        session.pointer_down(from, false);
+        session.pointer_hover(along(from, 1.5 / scale), false, false);
+        assert_eq!(session.offset_preview_request(), standing);
+        assert!(!session.offset_view().dragging);
+        session.pointer_hover(along(from, 10.0 / scale), false, false);
+        assert!(session.offset_view().dragging);
+        assert_ne!(session.offset_preview_request(), standing);
+    }
+
+    #[test]
+    fn ac56_a_double_click_steps_the_corner_style_for_the_next_drag() {
+        let (mut session, _) = offset_session();
+        let corner = bottom_right(&session);
+        assert!(!session.double_click(Point::new(500.0, 500.0), false, false));
+        assert_eq!(session.offset_view().pending_join, None);
+        assert_eq!(
+            session.double_click_hint(corner, false, false),
+            super::super::DoubleClickHint::OffsetCornerStyle
+        );
+        assert_eq!(session.offset_view().pending_join, Some(OffsetJoin::Miter));
+        assert_eq!(session.offset_join(), OffsetJoin::Miter);
+        session.double_click_hint(corner, false, false);
+        assert_eq!(session.offset_view().join, OffsetJoin::Bevel);
+        assert_eq!(
+            session.offset_preview_request().map(|r| r.join),
+            Some(OffsetJoin::Bevel),
+            "the standing preview uses it"
+        );
+        assert_eq!(session.offset_values().join(), OffsetJoin::Round);
+        // A cancelled drag keeps it.
+        session.pointer_down(corner, false);
+        session.pointer_hover(along(corner, 4.0), false, false);
+        assert!(session.cancel_offset_drag());
+        assert_eq!(session.offset_view().pending_join, Some(OffsetJoin::Bevel));
+        // A written drag uses it and consumes it.
+        drag(&mut session, 2.0, false, false);
+        assert_eq!(session.offset_view().pending_join, None);
+        assert_eq!(session.offset_join(), OffsetJoin::Round);
+        // A tool switch drops it.
+        let corner = bottom_right(&session);
+        session.double_click_hint(corner, false, false);
+        session.set_tool(Tool::Select);
+        session.set_tool(Tool::Offset);
+        assert_eq!(session.offset_view().pending_join, None);
     }
 
     #[test]

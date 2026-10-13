@@ -132,16 +132,16 @@ the fallback fired for 0 of 135 outlines over the test shapes.
 
 ### M6' Session: standing preview, modifiers, corner style by double-click (AC 6, 10, 13, 15, 19, 52, 56)
 
-- [ ] 6'.1 Tests first: the standing preview shows on selection and tool switch for the
+- [x] 6'.1 Tests first: the standing preview shows on selection and tool switch for the
   remembered values, after a write for the new selection, and is the outline a write gives (52);
   the press keeps it until the 3 px dead zone is left (ux-rework 3).
-- [ ] 6'.2 A drag never changes Direction; the dragged distance becomes the remembered one on a
+- [x] 6'.2 A drag never changes Direction; the dragged distance becomes the remembered one on a
   written release only (6, 10). Shift = Both, Ctrl = the other Mode, Shift+Ctrl = the original
   takes the dragged side (19).
-- [ ] 6'.3 A double-click on a corner handle steps a pending corner style Round, Miter, Bevel
+- [x] 6'.3 A double-click on a corner handle steps a pending corner style Round, Miter, Bevel
   (from the pending one or the remembered Corners); the standing preview and the next drag use
   it; a written release consumes it, a cancelled drag keeps it, a tool switch drops it (13, 56).
-- [ ] 6'.4 The readout state carries the effective corner style for line 1 and the mode for
+- [x] 6'.4 The readout state carries the effective corner style for line 1 and the mode for
   line 2 (15).
 
 ### M7' Canvas and wasm: the center handle and opening the chip (AC 9, 25, 53)

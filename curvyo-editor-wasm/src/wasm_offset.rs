@@ -52,9 +52,17 @@ pub struct OffsetViewJs {
     /// `"out"`, `"in"` or `"both"`.
     #[wasm_bindgen(getter_with_clone)]
     pub direction: String,
-    /// `"round"`, `"miter"` or `"bevel"`.
+    /// The remembered Corners: `"round"`, `"miter"` or `"bevel"`.
     #[wasm_bindgen(getter_with_clone)]
     pub join: String,
+    /// The corner style the preview and the next drag use, for the readout's first line
+    /// (criteria 15, 56).
+    #[wasm_bindgen(getter_with_clone)]
+    pub drag_join: String,
+    /// `""` or the corner style a double-click on a corner handle set for the next drag
+    /// (criterion 56).
+    #[wasm_bindgen(getter_with_clone)]
+    pub pending_join: String,
     /// `"new"` or `"change"`: the remembered Mode, as Ctrl inverts it during a drag (criterion 19).
     #[wasm_bindgen(getter_with_clone)]
     pub result: String,
@@ -206,6 +214,8 @@ impl WasmSession {
             values_distance_mm: values.distance_mm(),
             direction: direction_code(values.direction()).to_string(),
             join: join_code(values.join()).to_string(),
+            drag_join: join_code(view.join).to_string(),
+            pending_join: view.pending_join.map_or("", join_code).to_string(),
             result: if view.change { "change" } else { "new" }.to_string(),
             min_mm: OFFSET_MIN_MM,
             max_mm: OFFSET_MAX_MM,

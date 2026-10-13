@@ -429,7 +429,7 @@ impl Session {
             }
             if tool != this.tool {
                 this.command_refusal = None;
-                this.cancel_offset_drag();
+                this.leave_offset_tool();
             }
             this.tool = tool;
         });
@@ -616,10 +616,8 @@ impl Session {
                 Tool::Pen => this.finish_pen(),
                 Tool::Node => this.insert_at(point),
                 Tool::Select => return this.select_double_click(point, shift, ctrl),
-                Tool::Offset if this.offset_handle_hit(point) => {
-                    return DoubleClickHint::OffsetDistance;
-                }
-                Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar | Tool::Offset => {}
+                Tool::Offset => return this.offset_double_click(point),
+                Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar => {}
             }
             DoubleClickHint::None
         })
