@@ -3,7 +3,7 @@
 //! does, and whether the chip is open.
 
 use curvyo_document_core::Point;
-use curvyo_ui_core::{OffsetDirection, OffsetResultChoice, next_offset_join};
+use curvyo_ui_core::{OffsetDirection, OffsetResultChoice};
 
 use super::{DoubleClickHint, Session};
 
@@ -32,14 +32,10 @@ impl Session {
     }
 
     /// Opens the Offset entry chip (a double-click on the center handle, or O or Enter): only
-    /// in the Offset tool with a closed operand selected and no drag. A pending corner style
-    /// becomes the chip's Corners (criterion 56). Returns whether it is open.
+    /// in the Offset tool with a closed operand selected and no drag. Returns whether it is open.
     pub fn open_offset_chip(&mut self) -> bool {
         if self.offset_center().is_none() {
             return false;
-        }
-        if let Some(join) = self.offset.pending_join.take() {
-            self.offset.values.set_join(join);
         }
         self.offset.chip_open = true;
         true
@@ -85,20 +81,9 @@ impl Session {
         }
     }
 
-    /// A double-click at `point`: on a corner handle it steps the corner style for the next drag,
-    /// Round, Miter, Bevel, from the pending one or the remembered Corners (criteria 13, 56).
-    /// Returns whether it did.
-    pub(super) fn offset_step_corner_style(&mut self, point: Point) -> bool {
-        if self.offset.drag.is_some() || self.offset_handle_at(point).is_none() {
-            return false;
-        }
-        self.offset.pending_join = Some(next_offset_join(self.offset_join()));
-        true
-    }
-
     /// A double-click in the Offset tool: on the center handle it opens the chip (criterion 53)
     /// with the modifiers of the second press preselecting it, Shift = Direction Both, Ctrl = Mode
-    /// New object (criterion 57); on a corner handle it steps the corner style (criteria 13, 56).
+    /// New object (criterion 57). A double-click on a corner handle does nothing (criterion 13).
     pub(super) fn offset_double_click(
         &mut self,
         point: Point,
@@ -113,8 +98,6 @@ impl Session {
                 self.offset.values.set_result(OffsetResultChoice::NewObject);
             }
             DoubleClickHint::OffsetChip
-        } else if self.offset_step_corner_style(point) {
-            DoubleClickHint::OffsetCornerStyle
         } else {
             DoubleClickHint::None
         }

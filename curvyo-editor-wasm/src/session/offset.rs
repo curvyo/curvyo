@@ -12,7 +12,7 @@ use curvyo_ui_core::{
     CORNER_SIGNS, HANDLE_HIT_RADIUS_PX, Modifiers, ObjectSelection, OffsetDirection, OffsetJoin,
     OffsetPlan, OffsetRefusal, OffsetRequest, OffsetResultChoice, OffsetSide, OffsetSides,
     OffsetValues, OrientedBox, PressTarget, classify_press, drag_distance, handle_positions,
-    hit_test_objects, offset_box, offset_operands, plan_offset, snap_distance,
+    hit_test_objects, next_offset_join, offset_box, offset_operands, plan_offset, snap_distance,
 };
 
 use super::refusal::RefusalMarks;
@@ -26,16 +26,12 @@ pub const OFFSET_COMMIT_LABEL: &str = "offset_path";
 const DEAD_ZONE_PX: f64 = 3.0;
 
 /// The Offset tool's state: the remembered values (session memory, criterion 7), the drag in
-/// flight, the handle under the pointer, the corner style set for the next drag and the cached
-/// preview.
+/// flight, the handle under the pointer and the cached preview.
 #[derive(Debug, Default)]
 pub(super) struct OffsetTool {
     pub(super) values: OffsetValues,
     pub(super) drag: Option<OffsetDrag>,
     pub(super) hovered: Option<usize>,
-    /// The corner style a double-click on a corner handle set for the next written drag
-    /// (criterion 56).
-    pub(super) pending_join: Option<OffsetJoin>,
     /// The pointer is over the center handle.
     pub(super) center_hovered: bool,
     /// The Offset entry chip is open (criterion 53).
@@ -57,6 +53,8 @@ pub(super) struct OffsetDrag {
     /// The pointer has left the dead zone around the press: the drag preview has taken over
     /// from the standing preview.
     pub(super) moved: bool,
+    /// The corner style in use: the remembered one at the press, stepped by Alt (criterion 13).
+    pub(super) join: OffsetJoin,
     pub(super) stop: Option<DragStop>,
 }
 
@@ -253,6 +251,7 @@ impl Session {
                 d: 0.0,
                 last_good: 0.0,
                 moved: false,
+                join: self.offset.values.join(),
                 stop: None,
             });
             return;
@@ -350,7 +349,11 @@ impl Session {
         if drag.d == 0.0 || drag.stop == Some(DragStop::NothingLeft) {
             return;
         }
-        let request = self.offset_request(Some((drag.d, Modifiers::new(shift, ctrl))));
+        // The drag is taken already: its corner style is passed on explicitly (criterion 13).
+        let request = OffsetRequest {
+            join: drag.join,
+            ..self.offset_request(Some((drag.d, Modifiers::new(shift, ctrl))))
+        };
         let direction = if shift {
             OffsetDirection::Both
         } else if drag.d < 0.0 {
@@ -360,33 +363,41 @@ impl Session {
         };
         let outcome = self.write_offset_plan(request, direction);
         if matches!(outcome, OffsetOutcome::Applied { .. }) {
-            // The written distance is remembered (criterion 6); the pending corner style was for
-            // this drag (criterion 56). A drag never changes Direction (criterion 10).
+            // The written distance and corner style are remembered (criteria 6, 56). A drag never
+            // changes Direction (criterion 10).
             self.offset.values.set_distance_mm(drag.d.abs());
-            self.offset.pending_join = None;
+            self.offset.values.set_join(drag.join);
         }
         self.offset.outcome = Some(outcome);
     }
 
-    /// Escape or the other button during a drag: nothing is written and the remembered values
-    /// and a pending corner style stay (criteria 17, 56). Returns whether a drag was cancelled.
+    /// Escape or the other button during a drag: nothing is written and the remembered values,
+    /// the corner style among them, stay (criteria 17, 56). Returns whether a drag was cancelled.
     pub fn cancel_offset_drag(&mut self) -> bool {
         self.offset.drag.take().is_some()
     }
 
-    /// The corner style the standing preview and the next drag use: the pending one of a
-    /// double-click, else the remembered Corners (criterion 56).
+    /// The corner style in use: the drag's, else the remembered one the chip shows (criterion 56).
     pub(super) fn offset_join(&self) -> OffsetJoin {
         self.offset
-            .pending_join
-            .unwrap_or_else(|| self.offset.values.join())
+            .drag
+            .map_or_else(|| self.offset.values.join(), |drag| drag.join)
     }
 
-    /// The Offset tool is left: a drag in flight is cancelled and a pending corner style is
-    /// dropped (criterion 56).
+    /// An Alt keydown during a corner drag steps its corner style Round, Miter, Bevel, Round
+    /// (criterion 13); the preview and the readout read it in the next frame. Returns whether a
+    /// drag was in flight.
+    pub(super) fn offset_step_drag_join(&mut self) -> bool {
+        let Some(drag) = self.offset.drag.as_mut() else {
+            return false;
+        };
+        drag.join = next_offset_join(drag.join);
+        true
+    }
+
+    /// The Offset tool is left: a drag in flight is cancelled and the chip closes.
     pub(super) fn leave_offset_tool(&mut self) {
         self.cancel_offset_drag();
-        self.offset.pending_join = None;
         self.offset.chip_open = false;
     }
 
@@ -752,36 +763,115 @@ mod tests {
     }
 
     #[test]
-    fn ac56_a_double_click_steps_the_corner_style_for_the_next_drag() {
+    fn ac13_alt_during_a_corner_drag_steps_the_corner_style() {
         let (mut session, _) = offset_session();
+        let alt = |session: &mut Session, repeat: bool| {
+            session
+                .key_down(crate::KeyInput {
+                    key: "Alt",
+                    alt: true,
+                    repeat,
+                    ..crate::KeyInput::default()
+                })
+                .code()
+        };
+        assert_eq!(
+            alt(&mut session, false),
+            "ignored",
+            "no drag: not intercepted"
+        );
         let corner = bottom_right(&session);
-        assert!(!session.double_click(Point::new(500.0, 500.0), false, false));
-        assert_eq!(session.offset_view().pending_join, None);
+        // A double-click on a corner handle no longer does anything (fourth round).
         assert_eq!(
             session.double_click_hint(corner, false, false),
-            super::super::DoubleClickHint::OffsetCornerStyle
+            super::super::DoubleClickHint::None
         );
-        assert_eq!(session.offset_view().pending_join, Some(OffsetJoin::Miter));
-        assert_eq!(session.offset_join(), OffsetJoin::Miter);
-        session.double_click_hint(corner, false, false);
-        assert_eq!(session.offset_view().join, OffsetJoin::Bevel);
-        assert_eq!(session.offset_preview_request(), None, "no preview (52)");
-        assert_eq!(session.offset_values().join(), OffsetJoin::Round);
-        // A cancelled drag keeps it.
+        session.pointer_down(corner, false);
+        assert_eq!(
+            alt(&mut session, false),
+            "offset-corner-style",
+            "in the dead zone"
+        );
+        assert_eq!(session.offset_view().join, OffsetJoin::Miter);
+        assert_eq!(alt(&mut session, true), "ignored", "auto-repeat");
+        assert_eq!(session.offset_view().join, OffsetJoin::Miter);
+        session.modifiers_changed(true, true, false);
+        session.pointer_hover(along(corner, 4.0), true, true);
+        assert_eq!(
+            alt(&mut session, false),
+            "offset-corner-style",
+            "with Shift and Ctrl"
+        );
+        assert_eq!(
+            session.offset_preview_request().map(|r| r.join),
+            Some(OffsetJoin::Bevel),
+            "the preview follows at once"
+        );
+        assert_eq!(alt(&mut session, false), "offset-corner-style");
+        assert_eq!(
+            session.offset_view().join,
+            OffsetJoin::Round,
+            "back to Round"
+        );
+        assert_eq!(
+            session.offset_values().join(),
+            OffsetJoin::Round,
+            "not stored yet"
+        );
+    }
+
+    #[test]
+    fn ac56_only_a_written_drag_remembers_the_corner_style() {
+        let (mut session, _) = offset_session();
+        let alt = |session: &mut Session| {
+            let _ = session.key_down(crate::KeyInput {
+                key: "Alt",
+                alt: true,
+                ..crate::KeyInput::default()
+            });
+        };
+        // Escape: nothing stored.
+        let corner = bottom_right(&session);
         session.pointer_down(corner, false);
         session.pointer_hover(along(corner, 4.0), false, false);
-        assert!(session.cancel_offset_drag());
-        assert_eq!(session.offset_view().pending_join, Some(OffsetJoin::Bevel));
-        // A written drag uses it and consumes it.
-        drag(&mut session, 2.0, false, false);
-        assert_eq!(session.offset_view().pending_join, None);
-        assert_eq!(session.offset_join(), OffsetJoin::Round);
-        // A tool switch drops it.
+        alt(&mut session);
+        assert_eq!(
+            session.escape(),
+            super::super::keys::EscapeStep::CancelledDrag
+        );
+        session.pointer_up(along(corner, 4.0), false, false);
+        assert_eq!(session.offset_values().join(), OffsetJoin::Round);
+        // A release at d = 0: nothing stored.
+        session.pointer_down(corner, false);
+        alt(&mut session);
+        session.pointer_up(corner, false, false);
+        assert_eq!(session.offset_values().join(), OffsetJoin::Round);
+        // A written drag stores it; the next drag and the chip start with it.
+        session.set_offset_distance(2.0);
         let corner = bottom_right(&session);
-        session.double_click_hint(corner, false, false);
-        session.set_tool(Tool::Select);
-        session.set_tool(Tool::Offset);
-        assert_eq!(session.offset_view().pending_join, None);
+        session.pointer_down(corner, false);
+        session.pointer_hover(along(corner, 2.0), false, false);
+        alt(&mut session);
+        session.pointer_up(along(corner, 2.0), false, false);
+        assert!(matches!(
+            session.take_offset_outcome(),
+            Some(OffsetOutcome::Applied { .. })
+        ));
+        assert_eq!(session.offset_values().join(), OffsetJoin::Miter);
+        let corner = bottom_right(&session);
+        session.pointer_down(corner, false);
+        assert_eq!(
+            session.offset_view().join,
+            OffsetJoin::Miter,
+            "the next drag"
+        );
+        session.cancel_offset_drag();
+        assert!(session.open_offset_chip());
+        assert_eq!(
+            session.offset_values().join(),
+            OffsetJoin::Miter,
+            "the chip"
+        );
     }
 
     #[test]
@@ -911,13 +1001,9 @@ mod tests {
     }
 
     #[test]
-    fn ac29_a_refused_enter_keeps_the_chip_open_and_a_pending_style_moves_into_it() {
+    fn ac29_a_refused_enter_keeps_the_chip_open() {
         let (mut session, _) = offset_session();
-        let corner = bottom_right(&session);
-        session.double_click_hint(corner, false, false);
         assert!(session.open_offset_chip());
-        assert_eq!(session.offset_values().join(), OffsetJoin::Miter);
-        assert_eq!(session.offset_view().pending_join, None);
         session.set_offset_distance(10.0);
         session.set_offset_direction(OffsetDirection::In);
         assert!(matches!(

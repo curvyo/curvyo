@@ -483,22 +483,30 @@ fn ac12_some_vanish_drag_goes_on_and_notice_counts() {
 
 // ------------------------------------------------------------------ AC 13, 16, 17 ---------------
 
-/// Criterion 13 as rewritten 2026-10-13: a double-click on a corner handle steps the corner style.
+/// Criterion 13 as rewritten in the fourth round: a double-click on a corner handle does nothing;
+/// Alt during the drag steps the corner style.
 #[test]
-fn ac13_double_click_on_a_corner_handle_steps_the_corner_style() {
+fn ac13_alt_during_the_drag_steps_the_corner_style() {
     let (mut s, _) = square_session();
     let h = handle_of(&s, BR);
-    assert_eq!(
-        s.double_click_hint(h, false, false),
-        DoubleClickHint::OffsetCornerStyle
-    );
-    assert_eq!(s.offset_view().pending_join, Some(OffsetJoin::Miter));
+    assert_eq!(s.double_click_hint(h, false, false), DoubleClickHint::None);
+    s.pointer_hover(h, false, false);
+    s.pointer_down(h, false);
+    let code = s
+        .key_down(KeyInput {
+            key: "Alt",
+            alt: true,
+            ..KeyInput::default()
+        })
+        .code();
+    assert_eq!(code, "offset-corner-style");
+    assert_eq!(s.offset_view().join, OffsetJoin::Miter);
+    assert!(s.cancel_offset_drag());
     // The center of the box is the center handle: it opens the chip (criterion 53).
     assert_eq!(
         s.double_click_hint(pt(10.0, 10.0), false, false),
         DoubleClickHint::OffsetChip
     );
-    assert!(s.offset_chip_open());
 }
 
 #[test]

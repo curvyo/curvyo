@@ -100,6 +100,9 @@ pub enum KeyOutcome {
     EnteredGroup,
     /// O or Enter opened the Offset entry chip (`specs/0038-path-offset` criterion 25).
     OffsetChipOpened,
+    /// Alt stepped the corner style of the Offset corner drag (`specs/0038-path-offset`
+    /// criterion 13).
+    OffsetCornerStyle,
     /// An arrow key moved the selection; `new_run` is true when the event
     /// opened a new run of held-key events (a new step once `0020` exists).
     Nudged {
@@ -143,6 +146,7 @@ impl KeyOutcome {
             Self::Ungroup => "ungroup",
             Self::EnteredGroup => "enter-group",
             Self::OffsetChipOpened => "offset-chip",
+            Self::OffsetCornerStyle => "offset-corner-style",
             Self::Nudged { new_run: false } => "nudge",
             Self::Nudged { new_run: true } => "nudge-new",
         }
@@ -229,6 +233,7 @@ impl Session {
             entry_open: self.select.has_entry() || self.offset_chip_open(),
             selected: self.selected_for_keys(),
             offset_ready: self.offset_center().is_some(),
+            offset_dragging: self.tool == Tool::Offset && self.offset_drag_in_flight(),
         };
         match decide(&input, state) {
             KeyAction::Ignore => KeyOutcome::Ignored,
@@ -292,6 +297,13 @@ impl Session {
             KeyAction::OpenOffsetChip => {
                 if self.open_offset_chip() {
                     KeyOutcome::OffsetChipOpened
+                } else {
+                    KeyOutcome::Ignored
+                }
+            }
+            KeyAction::StepOffsetCornerStyle => {
+                if self.offset_step_drag_join() {
+                    KeyOutcome::OffsetCornerStyle
                 } else {
                     KeyOutcome::Ignored
                 }
@@ -478,6 +490,7 @@ mod tests {
             entry_open: false,
             selected,
             offset_ready: false,
+            offset_dragging: false,
         }
     }
 
@@ -490,6 +503,41 @@ mod tests {
 
     /// `specs/0038-path-offset` criteria 25, 53: in the Offset tool with an operand, O and Enter
     /// open the chip, gated like every shortcut; without one O stays the tool letter.
+    /// `specs/0038-path-offset` criterion 13 (fourth round): Alt steps the corner style only
+    /// during an Offset corner drag, once per press, with or without Shift and Ctrl.
+    #[test]
+    fn alt_steps_the_offset_corner_style_only_during_a_corner_drag() {
+        let dragging = KeyState {
+            offset_dragging: true,
+            operation_in_flight: true,
+            ..state(Tool::Offset, Selected::One)
+        };
+        let alt = KeyInput {
+            alt: true,
+            ..key("Alt")
+        };
+        assert_eq!(decide(&alt, dragging), KeyAction::StepOffsetCornerStyle);
+        let held = KeyInput {
+            shift: true,
+            ctrl: true,
+            ..alt
+        };
+        assert_eq!(decide(&held, dragging), KeyAction::StepOffsetCornerStyle);
+        let repeat = KeyInput {
+            repeat: true,
+            ..alt
+        };
+        assert_eq!(decide(&repeat, dragging), KeyAction::Ignore);
+        for tool in TOOLS {
+            assert_eq!(decide(&alt, state(tool, Selected::One)), KeyAction::Ignore);
+        }
+        assert_eq!(
+            decide(&alt, state(Tool::Offset, Selected::One)),
+            KeyAction::Ignore,
+            "no drag: not intercepted"
+        );
+    }
+
     #[test]
     fn o_and_enter_open_the_offset_chip_in_the_offset_tool() {
         let ready = KeyState {

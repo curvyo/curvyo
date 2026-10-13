@@ -49,13 +49,13 @@ const HINT_LINES: Record<string, string[]> = {
     "Drag: outset or inset",
     "Shift: both sides",
     "Ctrl: make a new object",
-    "Double-click: next corner style",
+    "Alt: corner style",
   ],
   "offset-corner-change": [
     "Drag: outset or inset",
     "Shift: both sides",
     "Ctrl: change the original",
-    "Double-click: next corner style",
+    "Alt: corner style",
   ],
   "offset-center": [
     "Double-click, O or Enter: type a distance",

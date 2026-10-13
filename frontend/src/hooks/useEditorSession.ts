@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { type CanvasNotice, type HistoryNames, MAC, useHistory } from "@/hooks/useHistory";
 import { type GroupingApi, useGrouping } from "@/hooks/useGrouping";
 import { type OffsetApi, readOffsetView, useOffset } from "@/hooks/useOffset";
-import { cornerStyleLines, keepsCornerStyleChip, offsetReadout } from "@/lib/offsetText";
+import { offsetKeyOutcome, offsetReadout } from "@/lib/offsetText";
 import type { HistoryDirection } from "@/lib/historyText";
 import { type NudgeFeedback, useNudgeFeedback } from "@/hooks/useNudgeFeedback";
 import { type BackingBuffer, backingBufferFor, sameBackingBuffer } from "@/lib/canvasSize";
@@ -21,10 +21,6 @@ import type { ClosePathResult } from "@/lib/penText";
 function backingBufferSize(cssWidth: number, cssHeight: number): BackingBuffer {
   return backingBufferFor(cssWidth, cssHeight, window.devicePixelRatio);
 }
-
-/** How long the corner style chip of a double-click on an Offset corner handle stays at most
- * (`specs/0038-path-offset/ux-rework.md` section 3). */
-const CORNER_STYLE_MS = 2000;
 
 /** Which tool is active (`specification.md`'s tool rail: Select is first
  * — `canvas-navigation-and-selection`'s launch default, acceptance
@@ -938,10 +934,6 @@ export function useEditorSession(
   const grouping = useGrouping(getSession, syncFromSession, history.showNotice);
   const offset = useOffset(getSession, syncFromSession, syncRevision, history.showNotice);
   const { showReleaseOutcome: showOffsetOutcome } = offset;
-  // The corner style a double-click on a corner handle stepped, shown at the pointer until a
-  // press, the pointer leaving the handle, or 2 s (`0038` criterion 56).
-  const cornerStyleTimerRef = useRef<number | undefined>(undefined);
-  const cornerStyleShownRef = useRef(false);
   const { refresh: refreshGrouping, handleKeyOutcome: handleGroupingOutcome } = grouping;
   useEffect(() => {
     refreshGroupingRef.current = refreshGrouping;
@@ -1545,10 +1537,6 @@ export function useEditorSession(
           // works while the pointer stays over the canvas.
         }
       }
-      if (cornerStyleShownRef.current) {
-        cornerStyleShownRef.current = false;
-        setLiveReadout(null);
-      }
       session.pointer_down(
         x,
         y,
@@ -1593,16 +1581,7 @@ export function useEditorSession(
         event.altKey,
       );
       const offsetReadout = session?.tool() === "offset" ? offsetLiveReadout(session, x, y) : null;
-      // The corner style chip stays while the pointer rests on its handle (`0038` criterion 56).
-      const keepCornerStyle = keepsCornerStyleChip(
-        cornerStyleShownRef.current,
-        session?.handle_hint() ?? "",
-        offsetReadout !== null,
-      );
-      if (!keepCornerStyle) {
-        cornerStyleShownRef.current = false;
-        setLiveReadout(offsetReadout ?? readLiveReadout(session?.live_readout()));
-      }
+      setLiveReadout(offsetReadout ?? readLiveReadout(session?.live_readout()));
       if (offsetReadout) {
         // The handles and the preview follow an Offset drag live (`0038` criterion 15).
         syncFromSession();
@@ -1675,17 +1654,7 @@ export function useEditorSession(
         };
         doubleClickPressRef.current = null;
         const hintCode = session.double_click(press.x, press.y, press.shift, press.ctrl);
-        if (hintCode === "offset_corner_style") {
-          const view = readOffsetView(session);
-          const [text, second] = cornerStyleLines(view.pendingJoin || view.dragJoin);
-          setLiveReadout({ text, second, x: press.x, y: press.y });
-          cornerStyleShownRef.current = true;
-          window.clearTimeout(cornerStyleTimerRef.current);
-          cornerStyleTimerRef.current = window.setTimeout(() => {
-            cornerStyleShownRef.current = false;
-            setLiveReadout(null);
-          }, CORNER_STYLE_MS);
-        } else if (hintCode === "offset_chip") {
+        if (hintCode === "offset_chip") {
           // The chip mounts with the next sync and takes the focus (`0038` criterion 53).
         } else if (hintCode) {
           // A double-click on a primitive changes nothing; the hint says how
@@ -1735,14 +1704,6 @@ export function useEditorSession(
         session.pointer_up(x, y, shift, ctrl, alt);
         showOffsetOutcome();
       }
-      // The double-click's own release keeps the corner style chip it just showed (`0038`
-      // criterion 56); every other release ends the readout.
-      if (keepsCornerStyleChip(cornerStyleShownRef.current, session.handle_hint(), false)) {
-        setCursorHint(session.cursor_hint());
-        syncFromSession();
-        return;
-      }
-      cornerStyleShownRef.current = false;
       setLiveReadout(null);
       setCursorHint(session.cursor_hint());
       syncFromSession();
@@ -1785,7 +1746,10 @@ export function useEditorSession(
     const last = lastPointerRef.current;
     if (last) {
       session.pointer_hover(last.x, last.y, shift, ctrl, alt);
-      setLiveReadout(readLiveReadout(session?.live_readout()));
+      // An Offset drag keeps its own readout through a modifier change (`0038` criteria 15, 19).
+      const offsetReadout =
+        session.tool() === "offset" ? offsetLiveReadout(session, last.x, last.y) : null;
+      setLiveReadout(offsetReadout ?? readLiveReadout(session?.live_readout()));
       setHandleHint("");
     }
     setCursorHint(session.cursor_hint());
@@ -1885,10 +1849,21 @@ export function useEditorSession(
         MAC,
         event.timeStamp,
       );
-      if (outcome === "ignored") {
+      const offsetKey = offsetKeyOutcome(outcome);
+      if (offsetKey.ignored) {
         return;
       }
       event.preventDefault();
+      if (offsetKey.cornerStyle) {
+        // Alt stepped the corner style of an Offset drag: the readout and the preview show it
+        // now (`0038` criterion 13).
+        const at = lastPointerRef.current;
+        if (at) {
+          setLiveReadout(offsetLiveReadout(session, at.x, at.y));
+        }
+        syncFromSession();
+        return;
+      }
       if (handleKeyOutcome(outcome)) {
         setLiveReadout(readLiveReadout(session.live_readout()));
         setCursorHint(session.cursor_hint());

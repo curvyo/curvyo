@@ -31,10 +31,8 @@ pub struct OffsetView {
     pub dragging: bool,
     /// The signed distance shown (the drag's, or the remembered one with its Direction).
     pub distance_mm: f64,
-    /// The corner style the preview and the next drag use (criteria 15, 56).
+    /// The corner style in use: the drag's, else the remembered one (criteria 15, 56).
     pub join: OffsetJoin,
-    /// The corner style a double-click set for the next drag, if any (criterion 56).
-    pub pending_join: Option<OffsetJoin>,
     /// Both sides (Shift during a drag, or Direction Both).
     pub both: bool,
     /// The release or the chip's Enter changes the original.
@@ -113,7 +111,6 @@ impl Session {
             dragging: drag.is_some_and(|drag| drag.moved),
             distance_mm,
             join: self.offset_join(),
-            pending_join: self.offset.pending_join,
             both,
             change,
             stop: drag.and_then(|drag| drag.stop),

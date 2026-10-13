@@ -137,7 +137,7 @@ the fallback fired for 0 of 135 outlines over the test shapes.
 - [x] 6'.2 A drag never changes Direction; the dragged distance becomes the remembered one on a
   written release only (6, 10). Shift = Both, Ctrl = the other Mode, Shift+Ctrl = the original
   takes the dragged side (19).
-- [x] 6'.3 A double-click on a corner handle steps a pending corner style Round, Miter, Bevel
+- [x] 6'.3 ~~A double-click on a corner handle steps a pending corner style~~ (replaced by 6'.8) Round, Miter, Bevel
   (from the pending one or the remembered Corners); the standing preview and the next drag use
   it; a written release consumes it, a cancelled drag keeps it, a tool switch drops it (13, 56).
 - [x] 6'.4 The readout state carries the effective corner style for line 1 and the mode for
@@ -153,6 +153,13 @@ the fallback fired for 0 of 135 outlines over the test shapes.
 - [x] 6'.7 A double-click on the center handle with Shift / Ctrl preselects Direction Both / Mode
   New object; O and Enter open with the remembered values; second hint line on the center handle
   (53, 57).
+
+- [x] 6'.8 Fourth round (customer, 2026-10-13): the double-click on a corner handle and the pending
+  style go. Each Alt keydown during a corner drag (not a repeat, also in the dead zone, with Shift
+  or Ctrl) steps Round, Miter, Bevel, Round; preview and readout follow at once; the keydown is
+  `preventDefault`-ed. A drag starts with the remembered corner style; only a written drag stores
+  it; the chip's Corners is the same value. The corner hint ends with "Alt: corner style"
+  (7, 13, 15, 17, 52, 54, 56).
 
 ### M7' Canvas and wasm: the center handle and opening the chip (AC 9, 25, 53)
 

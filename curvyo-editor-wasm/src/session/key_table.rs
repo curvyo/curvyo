@@ -33,6 +33,9 @@ pub(super) struct KeyState {
     /// The Offset tool has a closed operand selected and no drag: O and Enter open its chip
     /// (`specs/0038-path-offset` criteria 25, 53).
     pub(super) offset_ready: bool,
+    /// A corner drag of the Offset tool is in flight: Alt steps its corner style
+    /// (`specs/0038-path-offset` criterion 13).
+    pub(super) offset_dragging: bool,
 }
 
 /// What the key table decided.
@@ -53,6 +56,7 @@ pub(super) enum KeyAction {
     Ungroup,
     EnterGroup,
     OpenOffsetChip,
+    StepOffsetCornerStyle,
 }
 
 /// Whether Enter may enter a group: the Select tool, a plain press, nothing in flight.
@@ -115,6 +119,15 @@ pub(super) fn decide(input: &KeyInput<'_>, state: KeyState) -> KeyAction {
             };
         }
         "Enter" => return enter_action(input, state),
+        // Alt during an Offset corner drag steps its corner style; held Alt steps once
+        // (`specs/0038-path-offset` criterion 13). Elsewhere Alt is not intercepted.
+        "Alt" => {
+            return if state.offset_dragging && !input.repeat {
+                KeyAction::StepOffsetCornerStyle
+            } else {
+                KeyAction::Ignore
+            };
+        }
         _ => {}
     }
     // The two keys of `specs/0044-editing-quick-wins/`: they pass the same gate as the letters

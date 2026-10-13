@@ -32,10 +32,8 @@ export interface OffsetView {
   direction: OffsetDirectionName;
   /** The remembered Corners, which the chip shows. */
   join: OffsetJoinName;
-  /** The corner style the preview and the next drag use (a pending one or the remembered one). */
+  /** The corner style in use: the drag's (stepped by Alt), else the remembered one. */
   dragJoin: OffsetJoinName;
-  /** `""` or the corner style a double-click on a corner handle set for the next drag. */
-  pendingJoin: OffsetJoinName | "";
   chipOpen: boolean;
   result: OffsetResultName;
   minMm: number;
@@ -74,7 +72,6 @@ export const OFFSET_IDLE: OffsetView = {
   direction: "out",
   join: "round",
   dragJoin: "round",
-  pendingJoin: "",
   chipOpen: false,
   result: "change",
   minMm: 0.01,
@@ -116,11 +113,6 @@ export function offsetReadout(view: OffsetView): { lines: string[]; invalid: boo
     lines.push(`${view.vanished} of ${view.of} ${shapes} ${view.vanished === 1 ? "vanishes" : "vanish"}`);
   }
   return { lines, invalid: view.stop === "nothing_left" };
-}
-
-/** The readout after a double-click on a corner handle (criterion 56). */
-export function cornerStyleLines(join: OffsetJoinName): [string, string] {
-  return [`${JOIN_NAMES[join]} corners`, "For the next drag"];
 }
 
 /** The chip's Distance text: up to two decimals, no trailing zeros (`ux-rework.md` 2.3). */
@@ -188,11 +180,12 @@ export function offsetRefusalText(outcome: OffsetOutcome): string | null {
   }
 }
 
-/** Whether the corner style chip of a double-click on a corner handle stays (criterion 56): it is
- * shown, no drag readout replaces it, and the pointer is still on a corner handle (a release
- * leaves the hint on the handle, so the double-click's own release keeps it). */
-export function keepsCornerStyleChip(shown: boolean, handleHint: string, dragging: boolean): boolean {
-  return shown && !dragging && handleHint.startsWith("offset-corner");
+/** What the canvas does with a key outcome of the session (criterion 13): `ignored` keeps the
+ * page default; any other outcome is `preventDefault`-ed, so Alt during an Offset drag never
+ * focuses a menu in the webview; `cornerStyle` (Alt stepped the drag's corner style) refreshes
+ * the readout at the pointer. Auto-repeat is ignored by the session's key table. */
+export function offsetKeyOutcome(outcome: string): { ignored: boolean; cornerStyle: boolean } {
+  return { ignored: outcome === "ignored", cornerStyle: outcome === "offset-corner-style" };
 }
 
 /** A typed Distance clamped to 0.01 to 1000 mm (criterion 6): what the field shows after an

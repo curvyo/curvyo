@@ -401,6 +401,23 @@ fn ac54_initial_chip_state_is_change_original() {
 /// A preview is drawn if switching the remembered Corners changes the canvas while a drag past
 /// the dead zone or the open chip applies them (the box and handles do not depend on Corners).
 fn preview_by_join(s: &mut Session) -> bool {
+    // Fourth round: a drag carries its own corner style, stepped by Alt; three steps go round.
+    let alt = |s: &mut Session| {
+        s.key_down(KeyInput {
+            key: "Alt",
+            alt: true,
+            ..KeyInput::default()
+        })
+        .code()
+            == "offset-corner-style"
+    };
+    let a = s.draw_list().triangles;
+    if alt(s) {
+        let b = s.draw_list().triangles;
+        alt(s);
+        alt(s);
+        return a != b;
+    }
     let keep = s.offset_values().join();
     s.set_offset_join(OffsetJoin::Round);
     let a = s.draw_list().triangles;
@@ -455,12 +472,9 @@ fn ac52_none_on_tool_choice_selection_release_escape_close_and_corner_double_cli
     s.close_offset_chip();
     assert!(!preview_by_join(&mut s), "chip closed");
 
-    // Corner style double-click.
+    // A double-click on a corner handle does nothing in the fourth round (criterion 13).
     let h = br(&s);
-    assert_eq!(
-        s.double_click_hint(h, false, false),
-        DoubleClickHint::OffsetCornerStyle
-    );
+    assert_eq!(s.double_click_hint(h, false, false), DoubleClickHint::None);
     assert!(!preview_by_join(&mut s), "after corner double-click");
     assert!(!preview_drawn(&mut s), "after corner double-click");
 }

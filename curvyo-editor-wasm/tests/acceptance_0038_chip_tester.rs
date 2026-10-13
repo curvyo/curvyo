@@ -790,20 +790,39 @@ fn ac54_a_press_on_a_corner_handle_closes_the_chip_and_the_drag_snaps_to_the_typ
 }
 
 // ----------------------------------------------------------------- AC 13, 56 corner style ----
+// Fourth round (customer, 2026-10-13): Alt during a corner drag steps the corner style; the
+// double-click on a corner handle is gone; the style is remembered by a written drag.
+
+/// One Alt keydown, as the host reports it.
+fn alt(s: &mut Session, repeat: bool) -> &'static str {
+    s.key_down(KeyInput {
+        key: "Alt",
+        alt: true,
+        repeat,
+        ..KeyInput::default()
+    })
+    .code()
+}
+
+/// Presses the bottom right handle and moves past the dead zone.
+fn press_br(s: &mut Session, by: f64) -> Point {
+    let h = br(s);
+    s.pointer_hover(h, false, false);
+    s.pointer_down(h, false);
+    s.pointer_hover(pt(h.x + by, h.y + by), false, false);
+    h
+}
 
 #[test]
-fn ac56_double_click_on_a_corner_steps_round_miter_bevel_round_and_writes_nothing() {
+fn ac13_alt_steps_round_miter_bevel_round_and_writes_nothing() {
     let mut s = rect_session();
-    let h = br(&s);
     let before = packed(&s);
     let steps = s.undo_len();
+    press_br(&mut s, 6.0);
     let mut seen = vec![];
     for _ in 0..4 {
-        assert_eq!(
-            s.double_click_hint(h, false, false),
-            DoubleClickHint::OffsetCornerStyle
-        );
-        seen.push(s.offset_view().pending_join.unwrap());
+        assert_eq!(alt(&mut s, false), "offset-corner-style");
+        seen.push(s.offset_view().join);
     }
     assert_eq!(
         seen,
@@ -814,43 +833,54 @@ fn ac56_double_click_on_a_corner_steps_round_miter_bevel_round_and_writes_nothin
             OffsetJoin::Miter
         ]
     );
+    assert_eq!(alt(&mut s, true), "ignored", "a held Alt steps once");
+    assert_eq!(s.offset_view().join, OffsetJoin::Miter);
     assert_eq!(
         s.offset_values().join(),
         OffsetJoin::Round,
-        "Corners is not changed"
+        "not stored yet"
     );
+    assert!(s.cancel_offset_drag());
     assert_eq!(packed(&s), before);
     assert_eq!(s.undo_len(), steps);
-    assert_eq!(s.selected_object_count(), 1);
 }
 
 #[test]
-fn ac56_the_cycle_starts_from_the_chip_corners_value() {
+fn ac56_the_cycle_starts_from_the_remembered_style() {
     let mut s = rect_session();
     s.set_offset_join(OffsetJoin::Bevel);
-    let h = br(&s);
-    let _ = s.double_click_hint(h, false, false);
-    assert_eq!(s.offset_view().pending_join, Some(OffsetJoin::Round));
-    let _ = s.double_click_hint(h, false, false);
-    assert_eq!(s.offset_view().pending_join, Some(OffsetJoin::Miter));
+    press_br(&mut s, 6.0);
+    assert_eq!(
+        s.offset_view().join,
+        OffsetJoin::Bevel,
+        "the drag starts with it"
+    );
+    let _ = alt(&mut s, false);
+    assert_eq!(s.offset_view().join, OffsetJoin::Round);
 }
 
 #[test]
-fn ac52_ac56_a_corner_style_double_click_draws_no_preview_and_the_chip_takes_it_over() {
+fn ac52_ac13_alt_redraws_the_live_preview_and_does_nothing_outside_a_drag() {
     let mut s = rect_session();
     assert!(s.set_offset_distance(3.0));
-    let before = s.draw_list().triangles;
-    let _ = s.double_click_hint(br(&s), false, false);
-    assert_eq!(s.offset_view().join, OffsetJoin::Miter);
-    assert!(!preview_drawn(&mut s), "no preview after the double-click");
-    assert_eq!(s.draw_list().triangles, before, "nothing else is drawn");
-    assert_eq!(key(&mut s, "o"), "offset-chip");
-    assert_eq!(s.offset_values().join(), OffsetJoin::Miter);
-    assert!(preview_drawn(&mut s), "the chip previews the pending style");
+    assert_eq!(
+        alt(&mut s, false),
+        "ignored",
+        "no drag: Alt is not intercepted"
+    );
+    assert!(!preview_drawn(&mut s));
+    press_br(&mut s, 3.0);
+    let round = s.draw_list().triangles;
+    assert_eq!(alt(&mut s, false), "offset-corner-style");
+    assert_ne!(
+        s.draw_list().triangles,
+        round,
+        "mitered corners look different"
+    );
 }
 
 #[test]
-fn ac56_the_press_clicks_of_a_double_click_write_nothing() {
+fn ac13_two_quick_clicks_on_a_corner_handle_write_and_change_nothing() {
     let mut s = rect_session();
     let h = br(&s);
     let before = packed(&s);
@@ -860,20 +890,16 @@ fn ac56_the_press_clicks_of_a_double_click_write_nothing() {
         s.pointer_up(h, false, false);
     }
     assert_eq!(packed(&s), before, "a click is a drag of d = 0");
-    assert_eq!(
-        s.double_click_hint(h, false, false),
-        DoubleClickHint::OffsetCornerStyle
-    );
+    assert_eq!(s.double_click_hint(h, false, false), DoubleClickHint::None);
     assert_eq!(packed(&s), before);
+    assert_eq!(s.offset_values().join(), OffsetJoin::Round);
 }
 
 #[test]
-fn ac56_the_next_written_drag_uses_the_pending_style_and_consumes_it() {
+fn ac56_a_written_drag_stores_the_style_for_the_next_drag() {
     let mut s = rect_session();
-    let _ = s.double_click_hint(br(&s), false, false); // Miter
-    let h = br(&s);
-    s.pointer_down(h, false);
-    s.pointer_hover(pt(h.x + 6.0, h.y + 6.0), false, false);
+    let h = press_br(&mut s, 6.0);
+    let _ = alt(&mut s, false); // Miter
     assert_eq!(
         s.offset_view().join,
         OffsetJoin::Miter,
@@ -891,10 +917,8 @@ fn ac56_the_next_written_drag_uses_the_pending_style_and_consumes_it() {
             .all(|o| rect_size(o).is_some() && rect_radius(o) == Some(0.0)),
         "{first:?}"
     );
-    // Consumed: the next drag uses Round again.
-    assert_eq!(s.offset_view().pending_join, None);
-    assert_eq!(s.offset_view().join, OffsetJoin::Round);
-    // The produced rectangle is selected; drag its own handle.
+    assert_eq!(s.offset_values().join(), OffsetJoin::Miter, "remembered");
+    // The produced rectangle is selected; its next drag starts with Miter.
     let produced: Vec<ObjectSnapshot> = first
         .into_iter()
         .filter(|o| rect_size(o).is_some_and(|(w, _)| w > 20.5))
@@ -904,7 +928,9 @@ fn ac56_the_next_written_drag_uses_the_pending_style_and_consumes_it() {
     s.pointer_hover(h, false, false);
     s.pointer_down(h, false);
     s.pointer_hover(pt(h.x + 4.0, h.y + 4.0), false, false);
-    assert_eq!(s.offset_view().join, OffsetJoin::Round);
+    assert_eq!(s.offset_view().join, OffsetJoin::Miter);
+    let _ = alt(&mut s, false);
+    let _ = alt(&mut s, false); // Round
     s.pointer_up(pt(h.x + 4.0, h.y + 4.0), false, true);
     assert_eq!(take_applied(&mut s).0, 1);
     assert!(
@@ -913,66 +939,64 @@ fn ac56_the_next_written_drag_uses_the_pending_style_and_consumes_it() {
             .any(|o| rect_radius(o).is_some_and(|r| r > 0.0)),
         "Round outset of a rectangle is a rounded rectangle"
     );
+    assert_eq!(s.offset_values().join(), OffsetJoin::Round);
 }
 
 #[test]
-fn ac56_a_cancelled_drag_keeps_the_pending_style_a_tool_switch_drops_it() {
+fn ac56_escape_a_release_at_zero_or_a_refusal_store_nothing() {
     let mut s = rect_session();
-    let _ = s.double_click_hint(br(&s), false, false);
-    let h = br(&s);
-    s.pointer_down(h, false);
-    s.pointer_hover(pt(h.x + 8.0, h.y + 8.0), false, false);
-    assert!(s.cancel_offset_drag());
-    assert_eq!(
-        s.offset_view().pending_join,
-        Some(OffsetJoin::Miter),
-        "Escape"
-    );
-    s.pointer_down(h, false);
-    s.pointer_hover(pt(h.x + 8.0, h.y + 8.0), false, false);
+    let h = press_br(&mut s, 8.0);
+    let _ = alt(&mut s, false);
+    assert!(s.cancel_offset_drag(), "Escape or the other button");
+    s.pointer_up(pt(h.x + 8.0, h.y + 8.0), false, false);
+    assert_eq!(s.offset_values().join(), OffsetJoin::Round);
+    let h = press_br(&mut s, 8.0);
+    let _ = alt(&mut s, false);
     s.pointer_hover(h, false, false);
     s.pointer_up(h, false, false);
-    assert_eq!(
-        s.offset_view().pending_join,
-        Some(OffsetJoin::Miter),
-        "release at 0"
-    );
+    assert_eq!(s.offset_values().join(), OffsetJoin::Round, "release at 0");
     s.set_tool(Tool::Select);
     s.set_tool(Tool::Offset);
-    assert_eq!(s.offset_view().pending_join, None);
     assert_eq!(s.offset_view().join, OffsetJoin::Round);
 }
 
 #[test]
-fn ac56_a_selection_change_keeps_the_pending_style() {
+fn ac56_a_selection_change_or_tool_switch_keeps_the_remembered_style() {
     let d = Document::new(1);
     rect_at(&d, 0.0, 0.0, 20.0, 20.0);
     rect_at(&d, 100.0, 0.0, 20.0, 20.0);
     let mut s = open(&d);
     select_and_offset(&mut s, pt(20.0, 10.0));
-    let _ = s.double_click_hint(br(&s), false, false);
+    s.set_offset_join(OffsetJoin::Miter);
     click(&mut s, pt(120.0, 10.0), false);
-    assert_eq!(s.offset_view().pending_join, Some(OffsetJoin::Miter));
+    assert_eq!(s.offset_view().join, OffsetJoin::Miter);
+    s.set_tool(Tool::Select);
+    s.set_tool(Tool::Offset);
+    assert_eq!(s.offset_values().join(), OffsetJoin::Miter);
 }
 
 #[test]
-fn ac56_opening_the_chip_with_a_pending_style_takes_it_over() {
+fn ac54_ac56_the_chip_corners_is_the_remembered_style() {
     let mut s = rect_session();
-    let h = br(&s);
-    let _ = s.double_click_hint(h, false, false);
-    let _ = s.double_click_hint(h, false, false); // Bevel
+    let h = press_br(&mut s, 6.0);
+    let _ = alt(&mut s, false);
+    let _ = alt(&mut s, false); // Bevel
+    s.pointer_up(pt(h.x + 6.0, h.y + 6.0), false, false);
+    let _ = take_applied(&mut s);
     assert_eq!(key(&mut s, "o"), "offset-chip");
-    assert_eq!(s.offset_values().join(), OffsetJoin::Bevel);
-    assert_eq!(s.offset_view().pending_join, None);
-    s.close_offset_chip();
     assert_eq!(
         s.offset_values().join(),
         OffsetJoin::Bevel,
-        "Escape keeps it"
+        "the chip reads it"
     );
-    assert!(s.open_offset_chip());
-    assert_eq!(applied(&s.apply_offset()), (0, 1));
-    assert!(objects(&s).iter().any(|o| rect_size(o).is_none()));
+    s.set_offset_join(OffsetJoin::Miter);
+    s.close_offset_chip();
+    press_br(&mut s, 6.0);
+    assert_eq!(
+        s.offset_view().join,
+        OffsetJoin::Miter,
+        "the chip writes it"
+    );
 }
 
 #[test]
@@ -982,7 +1006,7 @@ fn ac56_a_double_click_off_the_handles_does_nothing() {
         s.double_click_hint(pt(300.0, 300.0), false, false),
         DoubleClickHint::None
     );
-    assert_eq!(s.offset_view().pending_join, None);
+    assert_eq!(s.offset_values().join(), OffsetJoin::Round);
 }
 
 // ----------------------------------------------------------------- AC 10, 19, 26 modifiers ----

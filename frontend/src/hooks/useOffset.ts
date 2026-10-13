@@ -71,7 +71,6 @@ export function readOffsetView(session: WasmSession | null): OffsetView {
     direction: raw.direction as OffsetDirectionName,
     join: raw.join as OffsetJoinName,
     dragJoin: raw.drag_join as OffsetJoinName,
-    pendingJoin: raw.pending_join as OffsetJoinName | "",
     chipOpen: raw.phase === "chip",
     result: raw.result as OffsetResultName,
     minMm: raw.min_mm,
