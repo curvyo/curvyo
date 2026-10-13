@@ -200,9 +200,9 @@ compound paths), no trait, no generic. The customer chose the library on
   (50 x 5, +3), so at most 8 smooth cubics within 0.01 mm is not reachable
   for ellipses this narrow; the -3 inset is past ry²/rx = 2.5 mm and has
   cusps besides. The criterion holds for the 40 x 20 ellipse of criteria 37
-  and 51. The tester's narrow-ellipse test is ignored until the PO decides
-  (options: a budget that grows with rx/ry, e.g. at most 16 cubics; or the
-  limit stated for ellipses with ry/rx of at least 0.5).
+  and 51. The lead decided on 2026-10-13 (option a) and criterion 37 is
+  amended: ry/rx ≥ 0.5 at most 8 cubics, narrower at most 16, within 0.01 mm
+  everywhere; the tester's narrow-ellipse test checks that budget.
 
 ## Flagged to the PO (criterion changes the spec invites)
 

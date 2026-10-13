@@ -490,22 +490,28 @@ fn ac28_square_ring_outset_past_the_hole_closes_the_hole() {
     }
 }
 
-/// Criterion 37 holds for any non-circular ellipse path: a narrow one (4:1, the UX document's own
-/// example of 80 x 20 at 5 mm) must also stay within 8 cubics.
+/// Criterion 37 (amended 2026-10-13) for narrow ellipse paths: at most 16 cubics below ry/rx 0.5,
+/// at most 8 from 0.5 up, within 0.01 mm everywhere.
 #[test]
-#[ignore = "AC 37 open, see adrs.md"]
-fn ac37_narrow_ellipse_outset_stays_within_eight_cubics() {
+fn ac37_narrow_ellipse_stays_within_its_cubic_budget() {
+    // Criterion 37 as amended 2026-10-13: ry/rx >= 0.5 at most 8 cubics, narrower at most 16,
+    // within 0.01 mm everywhere.
     for (rx, ry, d) in [
         (40.0, 10.0, 5.0),
         (40.0, 10.0, -3.0),
         (40.0, 10.0, 2.0),
         (50.0, 5.0, 3.0),
+        (40.0, 20.0, 2.0),
     ] {
-        let r = good(&ellipse(0.0, 0.0, rx, ry), d, OffsetJoin::Round);
+        let op = ellipse(0.0, 0.0, rx, ry);
+        let r = good(&op, d, OffsetJoin::Round);
+        let budget = if ry / rx >= 0.5 { 8 } else { 16 };
         assert!(
-            cubic_count(&r) <= 8,
-            "{rx}x{ry} d={d}: {} cubics",
+            cubic_count(&r) <= budget,
+            "{rx}x{ry} d={d}: {} cubics, budget {budget}",
             cubic_count(&r)
         );
+        let dev = largest_deviation(&[(op, true)], &r, d);
+        assert!(dev <= 0.01, "{rx}x{ry} d={d}: deviation {dev}");
     }
 }
