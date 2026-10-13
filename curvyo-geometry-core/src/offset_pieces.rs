@@ -44,14 +44,10 @@ pub(crate) struct RawStyle {
     pub curve_tolerance_mm: f64,
 }
 
-/// The segments of an outline through `anchors` (point, handle in, handle out; handles relative),
+/// The segments of the closed outline through `anchors` (point, handle in, handle out; handles relative),
 /// without segments of zero length. A cubic whose control points lie on one line is a line.
-pub(crate) fn segments_of(anchors: &[(Point, Vec2, Vec2)], closed: bool) -> Vec<PathSeg> {
-    let count = if closed {
-        anchors.len()
-    } else {
-        anchors.len().saturating_sub(1)
-    };
+pub(crate) fn segments_of(anchors: &[(Point, Vec2, Vec2)]) -> Vec<PathSeg> {
+    let count = anchors.len();
     let mut segments = Vec::with_capacity(count);
     for index in 0..count {
         let (p0, _, out) = anchors[index];

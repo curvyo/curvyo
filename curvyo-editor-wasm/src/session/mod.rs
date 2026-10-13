@@ -54,6 +54,7 @@ mod object_cache;
 mod object_history;
 mod object_history_rows;
 mod offset;
+mod offset_chip;
 mod offset_view;
 mod open_error;
 mod panel_tabs;

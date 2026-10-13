@@ -315,7 +315,7 @@ fn closed_loops(
             continue;
         }
         let wanted = if outside == 0 { 1 } else { -1 };
-        let mut segments = segments_of(&kurbo_anchors(outline), true);
+        let mut segments = segments_of(&kurbo_anchors(outline));
         if segments.is_empty() {
             return None;
         }

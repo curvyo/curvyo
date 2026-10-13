@@ -29,7 +29,7 @@ pub struct OffsetViewJs {
     pub distance_mm: f64,
     /// Both sides.
     pub both: bool,
-    /// The release or Apply changes the original.
+    /// The release or the chip's Enter changes the original.
     pub change: bool,
     /// `""` or `"nothing_left"`.
     #[wasm_bindgen(getter_with_clone)]

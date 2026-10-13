@@ -1,7 +1,5 @@
-//! The Offset tool in the session (`specs/0038-path-offset` criteria 2, 5 to 27, 52, 55, 56): the
-//! remembered values, the corner handles, the drag with its modifiers and the inset stop, the
-//! corner style a double-click sets for the next drag, the write on release or on the chip's
-//! Enter, and selecting with the tool.
+//! The Offset tool's corner-handle drag in the session (`specs/0038-path-offset` criteria 2, 5 to
+//! 27, 52, 55, 56): from the remembered values to one commit on release or on the chip's Enter.
 //!
 //! The preview is computed once per frame from the current values and cached by document
 //! version, selection and request, so what a release writes is what the last frame showed
@@ -14,17 +12,14 @@ use curvyo_ui_core::{
     CORNER_SIGNS, HANDLE_HIT_RADIUS_PX, Modifiers, ObjectSelection, OffsetDirection, OffsetJoin,
     OffsetPlan, OffsetRefusal, OffsetRequest, OffsetResultChoice, OffsetSide, OffsetSides,
     OffsetValues, OrientedBox, PressTarget, classify_press, drag_distance, handle_positions,
-    hit_test_objects, next_offset_join, offset_box, offset_operands, plan_offset, snap_distance,
+    hit_test_objects, offset_box, offset_operands, plan_offset, snap_distance,
 };
 
 use super::refusal::RefusalMarks;
-use super::{DoubleClickHint, Session, Tool};
+use super::{Session, Tool};
 
 /// The label of the commit an offset makes (criterion 16).
 pub const OFFSET_COMMIT_LABEL: &str = "offset_path";
-
-/// The radius of the center handle's hit area, in screen pixels (`ux-rework.md` 2.1).
-pub(super) const CENTER_HIT_RADIUS_PX: f64 = 12.0;
 
 /// How far, in screen pixels, the pointer moves from a corner press before the drag preview takes
 /// over from the standing preview (`ux-rework.md` section 3).
@@ -44,7 +39,7 @@ pub(super) struct OffsetTool {
     /// The pointer is over the center handle.
     pub(super) center_hovered: bool,
     /// The Offset entry chip is open (criterion 53).
-    chip_open: bool,
+    pub(super) chip_open: bool,
     outcome: Option<OffsetOutcome>,
     preview: RefCell<Option<Cached>>,
 }
@@ -137,7 +132,7 @@ impl Session {
         self.offset.values.set_join(join);
     }
 
-    /// Sets the Result.
+    /// Sets the Mode.
     pub fn set_offset_result(&mut self, result: OffsetResultChoice) {
         self.offset.values.set_result(result);
     }
@@ -176,7 +171,7 @@ impl Session {
     }
 
     /// The handle at `point`, if the handles are drawn.
-    fn offset_handle_at(&self, point: Point) -> Option<usize> {
+    pub(super) fn offset_handle_at(&self, point: Point) -> Option<usize> {
         if !self.offset_handles_shown() {
             return None;
         }
@@ -186,80 +181,6 @@ impl Session {
         handle_positions(&bounds, view.scale())
             .iter()
             .position(|handle| handle.vector_to(point).length() <= reach)
-    }
-
-    /// The center handle: the center of the operand box, while the handles are drawn and no
-    /// corner drag runs (criterion 53).
-    pub(super) fn offset_center(&self) -> Option<Point> {
-        if !self.offset_handles_shown() || self.offset.drag.is_some() {
-            return None;
-        }
-        let corners = self.offset_box_now()?.document_corners();
-        Some(Point::new(
-            corners.iter().map(|c| c.x).sum::<f64>() / 4.0,
-            corners.iter().map(|c| c.y).sum::<f64>() / 4.0,
-        ))
-    }
-
-    /// Whether `point` is in the center handle's 12 px hit area.
-    fn offset_center_at(&self, point: Point) -> bool {
-        self.offset_center().is_some_and(|center| {
-            center.vector_to(point).length() * self.view().scale() <= CENTER_HIT_RADIUS_PX
-        })
-    }
-
-    /// Opens the Offset entry chip (a double-click on the center handle, or O or Enter): only
-    /// in the Offset tool with a closed operand selected and no drag. A pending corner style
-    /// becomes the chip's Corners (criterion 56). Returns whether it is open.
-    pub fn open_offset_chip(&mut self) -> bool {
-        if self.offset_center().is_none() {
-            return false;
-        }
-        if let Some(join) = self.offset.pending_join.take() {
-            self.offset.values.set_join(join);
-        }
-        self.offset.chip_open = true;
-        true
-    }
-
-    /// Closes the Offset entry chip without writing: its values stay remembered (criterion 54).
-    pub fn close_offset_chip(&mut self) {
-        self.offset.chip_open = false;
-    }
-
-    /// Whether the Offset entry chip is open: it closes with the tool or when the selection has no
-    /// operand left.
-    #[must_use]
-    pub fn offset_chip_open(&self) -> bool {
-        self.offset.chip_open && self.offset_center().is_some()
-    }
-
-    /// The cursor in the Offset tool: `"pointer"` over a handle or during a corner drag
-    /// (`ux-rework.md` 2.1), else `"default"`.
-    pub(super) fn offset_cursor_hint(&self) -> &'static str {
-        if self.offset.drag.is_some() || self.offset.hovered.is_some() || self.offset.center_hovered
-        {
-            "pointer"
-        } else {
-            "default"
-        }
-    }
-
-    /// The hover hint of the Offset handle under the pointer: `"offset-center"`,
-    /// `"offset-corner"` or `"offset-corner-change"` (the remembered Mode is Change original, so
-    /// Ctrl makes a new object), `""` during a drag or off the handles (`ux-rework.md` 2.1, 3).
-    pub(super) fn offset_handle_hint(&self) -> &'static str {
-        if self.offset.drag.is_some() || self.offset_chip_open() {
-            ""
-        } else if self.offset.center_hovered {
-            "offset-center"
-        } else if self.offset.hovered.is_none() {
-            ""
-        } else if self.offset.values.result() == OffsetResultChoice::ChangeOriginal {
-            "offset-corner-change"
-        } else {
-            "offset-corner"
-        }
     }
 
     /// The request of a drag at the signed `d` with `held` keys, or of the remembered values
@@ -459,29 +380,6 @@ impl Session {
         self.offset
             .pending_join
             .unwrap_or_else(|| self.offset.values.join())
-    }
-
-    /// A double-click at `point`: on a corner handle it steps the corner style for the next drag,
-    /// Round, Miter, Bevel, from the pending one or the remembered Corners (criteria 13, 56).
-    /// Returns whether it did.
-    pub(super) fn offset_step_corner_style(&mut self, point: Point) -> bool {
-        if self.offset.drag.is_some() || self.offset_handle_at(point).is_none() {
-            return false;
-        }
-        self.offset.pending_join = Some(next_offset_join(self.offset_join()));
-        true
-    }
-
-    /// A double-click in the Offset tool: on the center handle it opens the chip (criterion 53),
-    /// on a corner handle it steps the corner style (criteria 13, 56).
-    pub(super) fn offset_double_click(&mut self, point: Point) -> DoubleClickHint {
-        if self.offset_center_at(point) && self.open_offset_chip() {
-            DoubleClickHint::OffsetChip
-        } else if self.offset_step_corner_style(point) {
-            DoubleClickHint::OffsetCornerStyle
-        } else {
-            DoubleClickHint::None
-        }
     }
 
     /// The Offset tool is left: a drag in flight is cancelled and a pending corner style is
