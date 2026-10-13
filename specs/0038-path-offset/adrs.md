@@ -122,6 +122,24 @@ compound paths), no trait, no generic. The customer chose the library on
   `specification.md`. The "results are polylines" lines above are superseded
   for offsetting by this entry.
 
+- **2026-10-13 (implementer, rework M1): how the pieces are mapped back.** The
+  architect's plan ran `i_overlay`'s offsetter on the flattened operand and
+  labelled result vertices by their distance to the pieces. Built instead, with
+  the same split of work: the raw offset loops (`offset_pieces.rs`) are
+  flattened with a tag per vertex (loop, piece, parameter) and handed to
+  `i_overlay`'s integer overlay with the Positive fill rule, which is what its
+  offsetter does internally; `i_overlay` still decides every survivor, hole and
+  vanishing part. Each result ring edge is labelled with the flattened chord it
+  lies on (exact grid lookup, then a collinearity check), so no distance
+  heuristic decides a label; runs of consecutive chords become the exact pieces,
+  and crossings between runs are solved by Newton's method on the two exact
+  pieces. The polyline route of the first build stays as the fallback, for
+  operands whose outlines cross or touch and for any ring that cannot be mapped
+  within 0.01 mm. Measured: the 200-node gear takes about 1 ms at 2 mm, -1 mm and
+  5 mm (release), 180 segments at 2 mm, no fallback on the test shapes. The
+  technical-debt entry "Offset preview runs on the main thread" is resolved by
+  this and removed.
+
 ## Flagged to the PO (criterion changes the spec invites)
 
 1. **Criterion 19 and "Miter limit": `i_overlay` clips the miter, it does

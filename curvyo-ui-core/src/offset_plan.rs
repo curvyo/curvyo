@@ -6,9 +6,12 @@
 //! the anchor ids only for the write. Groups are refused by the session, which knows them.
 
 use curvyo_document_core::{
-    Length, NewAnchor, NodeId, ObjectSnapshot, PieceOutlines, Point, Tolerance,
+    Length, NewAnchor, NodeId, ObjectSnapshot, PieceOutlines, Tolerance,
 };
-use curvyo_geometry_core::{OffsetError, Outline, OutlineTriple, offset, offset_distance_is_zero};
+use curvyo_document_core::AnchorKind;
+use curvyo_geometry_core::{
+    OffsetAnchor, OffsetError, Outline, OutlineTriple, offset, offset_distance_is_zero,
+};
 
 use crate::anchor_id_minter::AnchorIdMinter;
 use crate::boolean::{is_open, operands_in_order, outlines_of};
@@ -81,7 +84,7 @@ pub enum OffsetRefusal {
 #[derive(Debug, Clone, PartialEq)]
 pub struct OffsetResult {
     /// `(operand, outlines)`, bottom-most operand first.
-    pub pieces: Vec<(NodeId, Vec<Vec<Point>>)>,
+    pub pieces: Vec<(NodeId, Vec<Vec<OffsetAnchor>>)>,
     /// How many operands vanished (criterion 7, "1 of 3 shapes vanished").
     pub vanished: usize,
     /// How many operands there were.
@@ -100,7 +103,17 @@ impl OffsetResult {
                     .map(|points| {
                         let anchors = points
                             .iter()
-                            .map(|&point| NewAnchor::corner(minter.mint(), point))
+                            .map(|anchor| NewAnchor {
+                                id: minter.mint(),
+                                point: anchor.point,
+                                handle_in: anchor.handle_in,
+                                handle_out: anchor.handle_out,
+                                kind: if anchor.smooth {
+                                    AnchorKind::Asymmetric
+                                } else {
+                                    AnchorKind::Corner
+                                },
+                            })
                             .collect();
                         (anchors, true)
                     })
@@ -188,7 +201,7 @@ pub fn compute_offset(
 fn offset_one(
     object: &ObjectSnapshot,
     settings: &OffsetSettings,
-) -> Result<Vec<Vec<Point>>, OffsetError> {
+) -> Result<Vec<Vec<OffsetAnchor>>, OffsetError> {
     let owned: Vec<(Vec<OutlineTriple>, bool)> = outlines_of(object);
     let outlines: Vec<Outline<'_>> = owned
         .iter()
@@ -201,13 +214,13 @@ fn offset_one(
         settings.cap(),
         OFFSET_TOLERANCE,
     )
-    .map(curvyo_geometry_core::BooleanResult::into_outlines)
+    .map(curvyo_geometry_core::OffsetOutlines::into_outlines)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use curvyo_document_core::{AnchorId, Document, RectBounds};
+    use curvyo_document_core::{AnchorId, Document, Point, RectBounds};
 
     use crate::offset_entry::OffsetJoin;
 

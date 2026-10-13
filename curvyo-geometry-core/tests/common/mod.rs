@@ -4,6 +4,7 @@
 #![allow(dead_code, clippy::unwrap_used, clippy::expect_used, missing_docs)]
 
 pub mod golden;
+pub mod offset_check;
 
 use curvyo_document_core::{Point, Tolerance, Vec2};
 use curvyo_geometry_core::{
@@ -45,6 +46,70 @@ pub fn circle(cx: f64, cy: f64, r: f64) -> Anchors {
         anchor(0.0, r, (k, 0.0), (-k, 0.0)),
         anchor(-r, 0.0, (0.0, k), (0.0, -k)),
         anchor(0.0, -r, (-k, 0.0), (k, 0.0)),
+    ]
+}
+
+/// A closed wavy outline of `nodes` smooth nodes (Catmull-Rom handles) around `(cx, cy)`, about
+/// 1 mm between nodes, with a radial wave of 2 mm amplitude and ten nodes to the period. The
+/// segments are strongly curved (a chord of 1 mm needs about four flat steps at 0.008 mm), the
+/// worst realistic case for the flattening.
+pub fn wavy(nodes: usize, cx: f64, cy: f64) -> Anchors {
+    let radius = nodes as f64 / std::f64::consts::TAU;
+    let position = |i: usize| {
+        let angle = std::f64::consts::TAU * i as f64 / nodes as f64;
+        let r = radius + 2.0 * (nodes as f64 / 10.0 * angle).sin();
+        Point::new(cx + r * angle.cos(), cy + r * angle.sin())
+    };
+    (0..nodes)
+        .map(|i| {
+            let (prev, here, next) = (
+                position((i + nodes - 1) % nodes),
+                position(i),
+                position((i + 1) % nodes),
+            );
+            let tangent = Vec2::new((next.x - prev.x) / 6.0, (next.y - prev.y) / 6.0);
+            (here, Vec2::new(-tangent.x, -tangent.y), tangent)
+        })
+        .collect()
+}
+
+/// An ellipse as four Bézier arcs.
+pub fn ellipse(cx: f64, cy: f64, rx: f64, ry: f64) -> Anchors {
+    let (kx, ky) = (0.552_284_749_830_793_4 * rx, 0.552_284_749_830_793_4 * ry);
+    let a = |x: f64, y: f64, hin: (f64, f64), hout: (f64, f64)| {
+        (
+            Point::new(cx + x, cy + y),
+            Vec2::new(hin.0, hin.1),
+            Vec2::new(hout.0, hout.1),
+        )
+    };
+    vec![
+        a(rx, 0.0, (0.0, -ky), (0.0, ky)),
+        a(0.0, ry, (kx, 0.0), (-kx, 0.0)),
+        a(-rx, 0.0, (0.0, ky), (0.0, -ky)),
+        a(0.0, -ry, (-kx, 0.0), (kx, 0.0)),
+    ]
+}
+
+/// A rectangle with rounded corners of radius `r`: 4 lines and 4 quarter arcs.
+pub fn rounded_rect(x0: f64, y0: f64, x1: f64, y1: f64, r: f64) -> Anchors {
+    let k = 0.552_284_749_830_793_4 * r;
+    let a = |x: f64, y: f64, hin: (f64, f64), hout: (f64, f64)| {
+        (
+            Point::new(x, y),
+            Vec2::new(hin.0, hin.1),
+            Vec2::new(hout.0, hout.1),
+        )
+    };
+    vec![
+        a(x0 + r, y0, (-k, 0.0), (0.0, 0.0)),
+        a(x1 - r, y0, (0.0, 0.0), (k, 0.0)),
+        a(x1, y0 + r, (0.0, -k), (0.0, 0.0)),
+        a(x1, y1 - r, (0.0, 0.0), (0.0, k)),
+        a(x1 - r, y1, (k, 0.0), (0.0, 0.0)),
+        a(x0 + r, y1, (0.0, 0.0), (-k, 0.0)),
+        a(x0, y1 - r, (0.0, k), (0.0, 0.0)),
+        a(x0, y0 + r, (0.0, 0.0), (0.0, -k)),
     ]
 }
 

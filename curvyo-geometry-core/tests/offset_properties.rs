@@ -1,7 +1,7 @@
 //! Property tests of the offset kernel on random straight-edged polygons
 //! (`specs/0038-path-offset` criteria 6, 9 and 11, `adrs.md` "tests"): an outset contains the
 //! operand, an inset lies inside it, the area grows with the distance, and every result keeps the
-//! output rules of the Boolean kernel. The seed is fixed, so a failure reproduces.
+//! output rules of criterion 33. The seed is fixed, so a failure reproduces.
 
 // Native only: `proptest` needs the operating system.
 #![cfg(not(target_arch = "wasm32"))]
@@ -15,13 +15,11 @@
 
 mod common;
 
-use common::{
-    Anchors, KERNEL_TOLERANCE, area, check_invariants, covers, distance_to_segment, grid_points,
-    polygon,
-};
-use curvyo_document_core::{Length, Point};
+use common::offset_check::{area, check_node_rules, covers};
+use common::{Anchors, KERNEL_TOLERANCE, distance_to_segment, grid_points, polygon};
+use curvyo_document_core::Length;
 use curvyo_geometry_core::{
-    BooleanResult, OffsetCap, OffsetError, OffsetJoin, Outline, offset, signed_area_mm2,
+    OffsetCap, OffsetError, OffsetJoin, OffsetOutlines, Outline, offset, signed_area_mm2,
 };
 use proptest::prelude::*;
 use proptest::test_runner::{Config, RngSeed};
@@ -54,7 +52,7 @@ fn join() -> impl Strategy<Value = OffsetJoin> {
     ]
 }
 
-fn run(anchors: &Anchors, d: f64, join: OffsetJoin) -> Result<BooleanResult, OffsetError> {
+fn run(anchors: &Anchors, d: f64, join: OffsetJoin) -> Result<OffsetOutlines, OffsetError> {
     offset(
         &[Outline::new(anchors, true)],
         Length::from_mm(d),
@@ -68,7 +66,7 @@ fn run(anchors: &Anchors, d: f64, join: OffsetJoin) -> Result<BooleanResult, Off
 fn painted_area(anchors: &Anchors) -> f64 {
     let operand = vec![anchors.clone()];
     let union = common::run(curvyo_geometry_core::BooleanOp::Union, &[operand]);
-    union.map_or(0.0, |result| area(&result))
+    union.map_or(0.0, |result| common::area(&result))
 }
 
 proptest! {
@@ -86,7 +84,7 @@ proptest! {
             prop_assert!(painted_area(&anchors).abs() < 1e-9);
             return Ok(());
         };
-        prop_assert!(check_invariants(&result).is_ok(), "{:?}", check_invariants(&result));
+        prop_assert!(check_node_rules(&result).is_ok(), "{:?}", check_node_rules(&result));
         // Every vertex of the operand lies within d of its region, so it is covered.
         for (point, _, _) in &anchors {
             prop_assert!(covers(&result, *point), "{point:?} is not covered");
@@ -104,18 +102,18 @@ proptest! {
         let Ok(result) = run(&anchors, -d, join) else {
             return Ok(());
         };
-        prop_assert!(check_invariants(&result).is_ok(), "{:?}", check_invariants(&result));
+        prop_assert!(check_node_rules(&result).is_ok(), "{:?}", check_node_rules(&result));
         let operand = vec![anchors.clone()];
         let region = common::ok(curvyo_geometry_core::BooleanOp::Union, &[operand]);
-        for outline in result.outlines() {
-            for p in grid_points(outline) {
-                let point = Point::new(p.0 as f64 / 1000.0, p.1 as f64 / 1000.0);
-                // Inside the region, or on its boundary to the grid's rounding.
+        for outline in result.flattened(0.002) {
+            for point in outline {
+                let p = ((point.x * 1000.0).round() as i64, (point.y * 1000.0).round() as i64);
+                // Inside the region, or on its boundary within the kernel tolerance.
                 let near_boundary = region.outlines().iter().any(|o| {
                     let g = grid_points(o);
-                    (0..g.len()).any(|i| distance_to_segment(p, g[i], g[(i + 1) % g.len()]) <= 1.5)
+                    (0..g.len()).any(|i| distance_to_segment(p, g[i], g[(i + 1) % g.len()]) <= 10.0)
                 });
-                prop_assert!(covers(&region, point) || near_boundary, "{point:?} outside");
+                prop_assert!(common::covers(&region, point) || near_boundary, "{point:?} outside");
             }
         }
         prop_assert!(area(&result) <= painted_area(&anchors) + 1e-6);
@@ -143,5 +141,5 @@ proptest! {
 fn the_signed_area_of_an_outset_outer_outline_is_positive() {
     let anchors = polygon(&[(0.0, 0.0), (0.0, 10.0), (10.0, 10.0), (10.0, 0.0)]);
     let result = run(&anchors, 1.0, OffsetJoin::Round).unwrap();
-    assert!(signed_area_mm2(&result.outlines()[0]) > 0.0);
+    assert!(signed_area_mm2(&result.flattened(0.01)[0]) > 0.0);
 }

@@ -110,11 +110,6 @@ pub struct BooleanResult {
 }
 
 impl BooleanResult {
-    /// A result of outlines already in the canonical form (the offset kernel's).
-    pub(crate) fn from_canonical(outlines: Vec<Vec<Point>>) -> Self {
-        Self { outlines }
-    }
-
     /// The outlines in canonical order. Never empty.
     #[must_use]
     pub fn outlines(&self) -> &[Vec<Point>] {

@@ -1,5 +1,7 @@
-//! Tester's acceptance tests for `specs/0038-path-offset` on the kernel: criteria 6 to 9, 11, 12,
-//! 14 (kernel part) and 15 to 20, written from the specification; plus edge cases (zero, tiny,
+//! Tester's acceptance tests for `specs/0038-path-offset` on the kernel, written from the first
+//! specification and adapted to the rework of 2026-10-12 (the test names keep the first numbers:
+//! 15 to 19 are now criteria 45 to 49, 6 to 9 are 28 to 31, 11 is 33; the polyline-only tests of
+//! the first criteria 11 and 20 went with them); plus edge cases (zero, tiny,
 //! non-finite and huge distances, self-crossing operands, open paths that cross themselves) and
 //! proptest invariants (outset contains the operand, inset lies inside it).
 
@@ -18,10 +20,11 @@ mod common;
 
 use std::f64::consts::PI;
 
-use common::{Anchors, KERNEL_TOLERANCE, area, check_invariants, circle, covers, polygon, rect};
+use common::offset_check::{area, check_node_rules, covers, nodes};
+use common::{Anchors, KERNEL_TOLERANCE, circle, polygon, rect};
 use curvyo_document_core::{Length, Point};
 use curvyo_geometry_core::{
-    BooleanResult, OffsetCap, OffsetError, OffsetJoin, Outline, offset, signed_area_mm2,
+    OffsetCap, OffsetError, OffsetOutlines, OffsetJoin, Outline, offset, signed_area_mm2,
 };
 use proptest::prelude::*;
 
@@ -32,23 +35,23 @@ fn run(
     d: f64,
     join: OffsetJoin,
     cap: OffsetCap,
-) -> Result<BooleanResult, OffsetError> {
+) -> Result<OffsetOutlines, OffsetError> {
     let borrowed: Vec<Outline<'_>> = outlines.iter().map(|(a, c)| Outline::new(a, *c)).collect();
     offset(&borrowed, Length::from_mm(d), join, cap, KERNEL_TOLERANCE)
 }
 
-fn closed(outlines: &[Anchors], d: f64, join: OffsetJoin) -> Result<BooleanResult, OffsetError> {
+fn closed(outlines: &[Anchors], d: f64, join: OffsetJoin) -> Result<OffsetOutlines, OffsetError> {
     let v: Vec<(Anchors, bool)> = outlines.iter().map(|a| (a.clone(), true)).collect();
     run(&v, d, join, OffsetCap::Round)
 }
 
-fn ok(outlines: &[Anchors], d: f64, join: OffsetJoin) -> BooleanResult {
+fn ok(outlines: &[Anchors], d: f64, join: OffsetJoin) -> OffsetOutlines {
     let r = closed(outlines, d, join).unwrap_or_else(|e| panic!("{d} {join:?}: {e}"));
-    check_invariants(&r).unwrap_or_else(|e| panic!("{d} {join:?}: criterion 11: {e}"));
+    check_node_rules(&r).unwrap_or_else(|e| panic!("{d} {join:?}: criterion 33: {e}"));
     r
 }
 
-fn line(points: &[(f64, f64)], d: f64, cap: OffsetCap) -> Result<BooleanResult, OffsetError> {
+fn line(points: &[(f64, f64)], d: f64, cap: OffsetCap) -> Result<OffsetOutlines, OffsetError> {
     run(&[(polygon(points), false)], d, OffsetJoin::Round, cap)
 }
 
@@ -60,9 +63,9 @@ fn reversed(mut a: Anchors) -> Anchors {
     a
 }
 
-fn bbox(r: &BooleanResult) -> (f64, f64, f64, f64) {
+fn bbox(r: &OffsetOutlines) -> (f64, f64, f64, f64) {
     let mut b = (f64::MAX, f64::MAX, f64::MIN, f64::MIN);
-    for p in r.outlines().iter().flatten() {
+    for p in r.flattened(0.0005).iter().flatten() {
         b = (b.0.min(p.x), b.1.min(p.y), b.2.max(p.x), b.3.max(p.y));
     }
     b
@@ -75,18 +78,15 @@ fn near(a: (f64, f64, f64, f64), b: (f64, f64, f64, f64), tol: f64) -> bool {
         && (a.3 - b.3).abs() <= tol
 }
 
-fn has_node(r: &BooleanResult, x: f64, y: f64, tol: f64) -> bool {
-    r.outlines()
+fn has_node(r: &OffsetOutlines, x: f64, y: f64, tol: f64) -> bool {
+    nodes(r)
         .iter()
-        .flatten()
         .any(|p| (p.x - x).hypot(p.y - y) <= tol)
 }
 
-fn nodes_within(r: &BooleanResult, c: Point, radius: f64) -> Vec<Point> {
-    r.outlines()
-        .iter()
-        .flatten()
-        .copied()
+fn nodes_within(r: &OffsetOutlines, c: Point, radius: f64) -> Vec<Point> {
+    nodes(r)
+        .into_iter()
         .filter(|p| (p.x - c.x).hypot(p.y - c.y) <= radius)
         .collect()
 }
@@ -169,7 +169,7 @@ fn ac16_ring_outset_inset_and_vanish() {
 fn ac17_open_line_caps_and_inset_refusal() {
     let pts = [(0.0, 0.0), (20.0, 0.0)];
     let round = line(&pts, 5.0, OffsetCap::Round).unwrap();
-    check_invariants(&round).unwrap();
+    check_node_rules(&round).unwrap();
     assert_eq!(round.outlines().len(), 1);
     assert!(
         (area(&round) - (200.0 + PI * 25.0)).abs() <= 0.3,
@@ -299,77 +299,10 @@ fn ac19_square_miter_tips_at_5_sqrt2() {
     for p in &r.outlines()[0] {
         let d = [(0.0, 0.0), (20.0, 0.0), (20.0, 20.0), (0.0, 20.0)]
             .iter()
-            .map(|c| (p.x - c.0).hypot(p.y - c.1))
+            .map(|c| (p.point.x - c.0).hypot(p.point.y - c.1))
             .fold(f64::MAX, f64::min);
         assert!((d - 50f64.sqrt()).abs() <= 1e-6);
     }
-}
-
-// ---------------------------------------------------------------- criterion 20 -----------------
-
-#[test]
-fn ac20_circle_outset_is_a_polyline_near_r22() {
-    let c = circle(0.0, 0.0, 20.0);
-    let before = c.clone();
-    let r = ok(std::slice::from_ref(&c), 2.0, OffsetJoin::Round);
-    assert_eq!(r.outlines().len(), 1);
-    for p in &r.outlines()[0] {
-        assert!(
-            (p.x.hypot(p.y) - 22.0).abs() <= 0.02,
-            "{p:?} at {}",
-            p.x.hypot(p.y)
-        );
-    }
-    assert!((area(&r) - PI * 484.0).abs() <= 3.0, "{}", area(&r));
-    assert_eq!(c, before, "the operand is unchanged");
-}
-
-// ---------------------------------------------------------------- criterion 11 -----------------
-
-/// Fewest segments that keep every chord of an arc of `angle` at radius `r` within 0.01 mm.
-fn fewest(angle: f64, r: f64) -> usize {
-    let step = 2.0 * (1.0 - 0.01 / r).acos();
-    (angle / step).ceil() as usize
-}
-
-#[test]
-fn ac11_round_join_node_budget_and_chord_error() {
-    for d in [0.5, 2.0, 5.0, 40.0] {
-        let r = ok(&[rect(0.0, 0.0, 20.0, 20.0)], d, OffsetJoin::Round);
-        // Arc around the corner (20, 0): nodes strictly in the corner quadrant.
-        let arc: Vec<Point> = r.outlines()[0]
-            .iter()
-            .copied()
-            .filter(|p| p.x >= 20.0 - 1e-9 && p.y <= 1e-9)
-            .collect();
-        let segments = arc.len() - 1;
-        let n = fewest(PI / 2.0, d);
-        assert!(
-            segments >= n && segments <= 2 * n,
-            "d {d}: {segments} segments, fewest {n}"
-        );
-        for w in arc.windows(2) {
-            let m = Point::new(f64::midpoint(w[0].x, w[1].x), f64::midpoint(w[0].y, w[1].y));
-            let sag = d - (m.x - 20.0).hypot(m.y);
-            assert!(sag <= 0.0105, "d {d}: chord error {sag}");
-        }
-    }
-}
-
-#[test]
-fn ac11_round_cap_node_budget() {
-    let r = line(&[(0.0, 0.0), (20.0, 0.0)], 5.0, OffsetCap::Round).unwrap();
-    let cap: Vec<Point> = r.outlines()[0]
-        .iter()
-        .copied()
-        .filter(|p| p.x >= 20.0 - 1e-9)
-        .collect();
-    let segments = cap.len() - 1;
-    let n = fewest(PI, 5.0);
-    assert!(
-        segments >= n && segments <= 2 * n,
-        "{segments} segments, fewest {n}"
-    );
 }
 
 #[test]
@@ -395,11 +328,11 @@ fn ac11_results_obey_output_rules_for_many_shapes() {
         for join in JOINS {
             for d in [-1.3, 0.01, 0.7, 3.0, 12.0] {
                 if let Ok(r) = closed(&shape, d, join) {
-                    check_invariants(&r).unwrap_or_else(|e| panic!("{d} {join:?}: {e}"));
+                    check_node_rules(&r).unwrap_or_else(|e| panic!("{d} {join:?}: {e}"));
                     for o in r.outlines() {
                         assert!(
                             o.windows(2)
-                                .all(|w| (w[0].x - w[1].x).hypot(w[0].y - w[1].y) >= 0.001 - 1e-9)
+                                .all(|w| (w[0].point.x - w[1].point.x).hypot(w[0].point.y - w[1].point.y) >= 0.001 - 1e-9)
                         );
                     }
                 }
@@ -414,7 +347,7 @@ fn ac11_results_obey_output_rules_for_many_shapes() {
 fn ac6_outer_outline_positive_holes_negative() {
     let r = ok(&ring(), 1.0, OffsetJoin::Round);
     let mut signs: Vec<bool> = r
-        .outlines()
+        .flattened(0.001)
         .iter()
         .map(|o| signed_area_mm2(o) > 0.0)
         .collect();
@@ -494,7 +427,7 @@ fn ac8_open_polyline_join_choice_and_self_crossing_hole() {
         (-5.0, 0.0),
     ];
     let r = line(&loopy, 1.0, OffsetCap::Round).unwrap();
-    check_invariants(&r).unwrap();
+    check_node_rules(&r).unwrap();
     assert_eq!(r.outlines().len(), 2, "outline plus hole: compound");
     assert!(!covers(&r, Point::new(10.0, 10.0)));
     assert!(covers(&r, Point::new(0.0, 10.0)));
@@ -581,15 +514,15 @@ fn edge_degenerate_open_paths() {
     // A single-point open path grown by d: a disc, or refused, never a panic.
     let dot = line(&[(5.0, 5.0)], 2.0, OffsetCap::Round);
     if let Ok(r) = &dot {
-        check_invariants(r).unwrap();
+        check_node_rules(r).unwrap();
     }
     let twice = line(&[(5.0, 5.0), (5.0, 5.0)], 2.0, OffsetCap::Round);
     if let Ok(r) = &twice {
-        check_invariants(r).unwrap();
+        check_node_rules(r).unwrap();
     }
     // A back-and-forth open path: the result is still clean.
     let back = line(&[(0.0, 0.0), (20.0, 0.0), (5.0, 0.0)], 2.0, OffsetCap::Flat).unwrap();
-    check_invariants(&back).unwrap();
+    check_node_rules(&back).unwrap();
     // 20 x 4 band plus the Round join at the 180-degree turn (a half disc of radius 2).
     assert!(
         (area(&back) - (80.0 + 2.0 * PI)).abs() <= 0.05,
@@ -622,14 +555,14 @@ proptest! {
         let join = JOINS[j];
         let base = signed_area_mm2(&shape.iter().map(|a| a.0).collect::<Vec<_>>()).abs();
         let out = closed(std::slice::from_ref(&shape), d, join).unwrap();
-        prop_assert!(check_invariants(&out).is_ok());
+        prop_assert!(check_node_rules(&out).is_ok());
         prop_assert!(area(&out) >= base - 1e-3);
         for a in &shape {
             prop_assert!(covers(&out, a.0), "outset covers the operand's corner {:?}", a.0);
         }
         match closed(std::slice::from_ref(&shape), -d, join) {
             Ok(inn) => {
-                prop_assert!(check_invariants(&inn).is_ok());
+                prop_assert!(check_node_rules(&inn).is_ok());
                 prop_assert!(area(&inn) <= base + 1e-3);
                 prop_assert!(area(&inn) > 0.0);
             }

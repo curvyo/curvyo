@@ -48,21 +48,24 @@ AC numbers are those of the reworked `specification.md`.
 
 ### M1 Curves stay curves: the kernel (AC 28, 30, 31, 33 to 39, 44 to 49)
 
-- [ ] 1.1 Tests first (`tests/offset.rs`, `tests/acceptance_0038.rs` adapted): circle path → 4 smooth
+- [x] 1.1 Tests first (`tests/offset.rs`, `tests/acceptance_0038.rs` adapted): circle path → 4 smooth
   cubics (35), rounded rectangle path → 8 segments, sharp square Round → 8, Miter → 4 lines (36),
   ellipse path ≤ 8 cubics within 0.01 mm of the exact offset (37), gear ≤ 400 segments and ≤ the
   polyline count (38), fallback counter printed and zero on the numeric tests (39), node rules (33),
   distance to the exact offset by sampling (34), numeric tests on areas of the curve result (45 to 49).
-- [ ] 1.2 `offset_pieces.rs`: raw offset loops of a closed outline (positive outer, negative hole) and of
+- [x] 1.2 `offset_pieces.rs`: raw offset loops of a closed outline (positive outer, negative hole) and of
   an open line (both sides and caps); joins only where a gap opens, the corner point otherwise; arcs
   one cubic per ≤ 90° (≤ 45° above 37 mm); miter-clip at 4 d.
-- [ ] 1.3 `offset_rebuild.rs`: tagged flattening, Positive overlay, mapping runs back to pieces, cut
+- [x] 1.3 `offset_rebuild.rs`: tagged flattening, Positive overlay, mapping runs back to pieces, cut
   at crossings (Newton on the two exact pieces), smooth/corner by tangent (0.1°), collinear lines
   merged, nodes closer than 0.001 mm merged, deviation check against the ring, polyline fallback.
-- [ ] 1.4 Operands whose outlines cross (31) or touch take the polyline route for the whole operand.
-- [ ] 1.5 Determinism (44): golden fixture extended with curved cases (circle, ellipse, rounded
+- [x] 1.4 Operands whose outlines cross (31) or touch take the polyline route for the whole operand.
+- [x] 1.5 Determinism (44): golden fixture extended with curved cases (circle, ellipse, rounded
   rectangle paths, the gear), compared natively and in the wasm build; budget test prints segment
   counts and fallback count; 200 nodes within 50 ms at 2 mm and −1 mm (18).
+
+Measured (release): the gear offsets in about 1 ms at 2, -1 and 5 mm; 180 segments at 2 mm;
+the fallback fired for 0 of 135 outlines over the test shapes.
 
 ### M2 Primitives stay primitives (AC 40, 41, 43, 50, 51)
 

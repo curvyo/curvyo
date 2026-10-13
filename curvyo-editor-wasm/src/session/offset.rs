@@ -191,8 +191,14 @@ impl Session {
         match self.current_offset_preview().result {
             Ok(result) => result
                 .pieces
-                .into_iter()
+                .iter()
                 .flat_map(|(_, outlines)| outlines)
+                .map(|outline| {
+                    outline
+                        .iter()
+                        .map(|anchor| anchor.point)
+                        .collect()
+                })
                 .collect(),
             Err(_) => Vec::new(),
         }

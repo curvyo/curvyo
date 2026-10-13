@@ -1,5 +1,6 @@
-//! Acceptance tests of the offset kernel (`specs/0038-path-offset` criteria 6 to 9, 11, 12 and 15
-//! to 20): the numbers of the spec's "Tests" section, and the output rules of criterion 11.
+//! Acceptance tests of the offset kernel (`specs/0038-path-offset`, reworked 2026-10-12): curves
+//! stay curves (criteria 33 to 39), the kernel behaviour (28, 30, 31) and the numeric tests
+//! (45 to 49), measured on the exact curve result.
 
 #![allow(
     clippy::unwrap_used,
@@ -14,42 +15,42 @@ mod common;
 
 use std::f64::consts::PI;
 
-use common::{
-    Anchors, KERNEL_TOLERANCE, area, circle, covers, distance_to_segment, grid_points, node_count,
-    polygon, rect,
+use common::offset_check::{
+    area, bbox, check_node_rules, covers, cubic_count, has_node, largest_deviation, nodes,
 };
-use curvyo_document_core::{Length, Point, Vec2};
+use common::{Anchors, KERNEL_TOLERANCE, circle, ellipse, polygon, rect, rounded_rect, wavy};
+use curvyo_document_core::{Length, Point};
 use curvyo_geometry_core::{
-    BooleanResult, OffsetCap, OffsetError, OffsetJoin, Outline, offset, signed_area_mm2,
+    OffsetCap, OffsetError, OffsetJoin, OffsetOutlines, Outline, offset, signed_area_mm2,
 };
 
-fn closed(outlines: &[Anchors], d: f64, join: OffsetJoin) -> Result<BooleanResult, OffsetError> {
-    let borrowed: Vec<Outline<'_>> = outlines.iter().map(|a| Outline::new(a, true)).collect();
-    offset(
-        &borrowed,
-        Length::from_mm(d),
-        join,
-        OffsetCap::Round,
-        KERNEL_TOLERANCE,
-    )
+const JOINS: [OffsetJoin; 3] = [OffsetJoin::Round, OffsetJoin::Miter, OffsetJoin::Bevel];
+
+fn run(
+    outlines: &[(Anchors, bool)],
+    d: f64,
+    join: OffsetJoin,
+    cap: OffsetCap,
+) -> Result<OffsetOutlines, OffsetError> {
+    let borrowed: Vec<Outline<'_>> = outlines.iter().map(|(a, c)| Outline::new(a, *c)).collect();
+    offset(&borrowed, Length::from_mm(d), join, cap, KERNEL_TOLERANCE)
 }
 
-fn open(line: &Anchors, d: f64, cap: OffsetCap) -> Result<BooleanResult, OffsetError> {
-    offset(
-        &[Outline::new(line, false)],
-        Length::from_mm(d),
-        OffsetJoin::Round,
-        cap,
-        KERNEL_TOLERANCE,
-    )
+fn closed_all(outlines: &[Anchors]) -> Vec<(Anchors, bool)> {
+    outlines.iter().map(|a| (a.clone(), true)).collect()
 }
 
-fn ok(outlines: &[Anchors], d: f64, join: OffsetJoin) -> BooleanResult {
-    closed(outlines, d, join).unwrap_or_else(|e| panic!("offset {d} {join:?} refused: {e}"))
+/// A result that obeys the node rules and needed no fallback.
+fn ok(outlines: &[Anchors], d: f64, join: OffsetJoin) -> OffsetOutlines {
+    let r = run(&closed_all(outlines), d, join, OffsetCap::Round)
+        .unwrap_or_else(|e| panic!("offset {d} {join:?} refused: {e}"));
+    check_node_rules(&r).unwrap_or_else(|e| panic!("{d} {join:?}: criterion 33: {e}"));
+    assert_eq!(r.fallback_outlines(), 0, "{d} {join:?}: criterion 39");
+    r
 }
 
-fn square() -> Anchors {
-    rect(0.0, 0.0, 20.0, 20.0)
+fn line(points: &[(f64, f64)], d: f64, cap: OffsetCap) -> Result<OffsetOutlines, OffsetError> {
+    run(&[(polygon(points), false)], d, OffsetJoin::Round, cap)
 }
 
 fn reversed(mut anchors: Anchors) -> Anchors {
@@ -60,356 +61,361 @@ fn reversed(mut anchors: Anchors) -> Anchors {
     anchors
 }
 
-fn sorted_points(result: &BooleanResult) -> Vec<(i64, i64)> {
-    let mut points: Vec<(i64, i64)> = result
-        .outlines()
-        .iter()
-        .flat_map(|o| grid_points(o))
-        .collect();
-    points.sort_unstable();
-    points
+fn square() -> Anchors {
+    rect(0.0, 0.0, 20.0, 20.0)
 }
 
-fn distance(a: Point, b: Point) -> f64 {
-    (b.x - a.x).hypot(b.y - a.y)
+// ------------------------------------------------------------ curves stay curves (33 to 39) ---
+
+#[test]
+fn ac35_a_circle_path_gives_four_smooth_cubics() {
+    let c = circle(0.0, 0.0, 20.0);
+    let r = ok(std::slice::from_ref(&c), 2.0, OffsetJoin::Round);
+    assert_eq!(r.outlines().len(), 1);
+    assert_eq!(r.segment_count(), 4);
+    assert_eq!(cubic_count(&r), 4);
+    assert!(r.outlines()[0].iter().all(|a| a.smooth));
+    for p in nodes(&r) {
+        assert!((p.x.hypot(p.y) - 22.0).abs() < 0.01, "{p:?}");
+    }
+    let deviation = largest_deviation(&[(c, true)], &r, 2.0);
+    assert!(deviation <= 0.01, "criterion 34: {deviation}");
 }
 
-/// Criterion 11: corner polylines on the grid, at least 0.001 mm between consecutive nodes, no node
-/// within 0.001 mm of the line between its neighbours, outer outlines positive.
-fn assert_output_rules(result: &BooleanResult) {
-    for outline in result.outlines() {
-        let grid = grid_points(outline);
-        assert!(grid.len() >= 3);
-        let n = grid.len();
-        for i in 0..n {
-            let (prev, here, next) = (grid[(i + n - 1) % n], grid[i], grid[(i + 1) % n]);
-            assert_ne!(here, next, "repeated vertex");
-            assert!(
-                distance_to_segment(here, prev, next) > 1.0,
-                "vertex {here:?} lies on the line between its neighbours"
-            );
+#[test]
+fn ac36_rounded_and_sharp_rectangles_give_few_segments() {
+    let rounded = rounded_rect(0.0, 0.0, 100.0, 50.0, 5.0);
+    let r = ok(std::slice::from_ref(&rounded), 2.0, OffsetJoin::Round);
+    assert_eq!(r.segment_count(), 8);
+    assert_eq!(cubic_count(&r), 4);
+    assert!(r.outlines()[0].iter().all(|a| a.smooth));
+    assert!(largest_deviation(&[(rounded, true)], &r, 2.0) <= 0.01);
+
+    let sharp = rect(0.0, 0.0, 20.0, 20.0);
+    let round = ok(std::slice::from_ref(&sharp), 2.0, OffsetJoin::Round);
+    assert_eq!(round.segment_count(), 8);
+    assert_eq!(cubic_count(&round), 4);
+    assert!(largest_deviation(&[(sharp.clone(), true)], &round, 2.0) <= 0.01);
+    let miter = ok(std::slice::from_ref(&sharp), 2.0, OffsetJoin::Miter);
+    assert_eq!(miter.segment_count(), 4);
+    assert_eq!(cubic_count(&miter), 0);
+    let bevel = ok(&[sharp], 2.0, OffsetJoin::Bevel);
+    assert_eq!(bevel.segment_count(), 8);
+}
+
+#[test]
+fn ac37_an_ellipse_path_gives_at_most_eight_smooth_cubics() {
+    let e = ellipse(0.0, 0.0, 20.0, 10.0);
+    for d in [2.0, -2.0, 5.0] {
+        let r = ok(std::slice::from_ref(&e), d, OffsetJoin::Round);
+        assert!(r.segment_count() <= 8, "{d}: {}", r.segment_count());
+        assert_eq!(cubic_count(&r), r.segment_count());
+        assert!(r.outlines()[0].iter().all(|a| a.smooth), "{d}");
+        let deviation = largest_deviation(&[(e.clone(), true)], &r, d);
+        assert!(deviation <= 0.01, "{d}: {deviation}");
+    }
+}
+
+#[test]
+fn ac38_the_gear_keeps_its_segment_count() {
+    let gear = wavy(200, 0.0, 0.0);
+    let r = ok(std::slice::from_ref(&gear), 2.0, OffsetJoin::Round);
+    println!(
+        "gear outset 2 mm: {} segments, {} fallback outlines",
+        r.segment_count(),
+        r.fallback_outlines()
+    );
+    assert!(r.segment_count() <= 400, "{}", r.segment_count());
+    let deviation = largest_deviation(&[(gear, true)], &r, 2.0);
+    assert!(deviation <= 0.01, "{deviation}");
+}
+
+#[test]
+fn ac39_the_fallback_count_over_the_test_shapes() {
+    let mut fired = 0;
+    let mut outlines = 0;
+    let shapes: Vec<Vec<Anchors>> = vec![
+        vec![square()],
+        vec![circle(3.0, 4.0, 7.5)],
+        vec![ellipse(0.0, 0.0, 20.0, 10.0)],
+        vec![rounded_rect(0.0, 0.0, 30.0, 10.0, 4.0)],
+        vec![l_shape()],
+        vec![star()],
+        ring(),
+        vec![wavy(200, 0.0, 0.0)],
+    ];
+    for shape in &shapes {
+        for join in JOINS {
+            for d in [-1.3, 0.01, 0.7, 3.0, 12.0] {
+                if let Ok(r) = run(&closed_all(shape), d, join, OffsetCap::Round) {
+                    check_node_rules(&r).unwrap_or_else(|e| panic!("{d} {join:?}: {e}"));
+                    fired += r.fallback_outlines();
+                    outlines += r.outlines().len();
+                }
+            }
         }
     }
-    let outer: f64 = result
-        .outlines()
-        .iter()
-        .map(|o| signed_area_mm2(o))
-        .filter(|a| *a > 0.0)
-        .sum();
-    assert!(outer > 0.0, "outer outlines have positive area");
-}
-
-// ---- criterion 15: the square ----
-
-#[test]
-fn a_square_outset_with_miter_is_a_bigger_square_of_four_nodes() {
-    let result = ok(&[square()], 5.0, OffsetJoin::Miter);
-    assert_eq!(result.outlines().len(), 1);
-    assert_eq!(
-        sorted_points(&result),
-        vec![
-            (-5000, -5000),
-            (-5000, 25000),
-            (25000, -5000),
-            (25000, 25000)
-        ]
-    );
-    assert_output_rules(&result);
+    println!("criterion 39: the fallback fired for {fired} of {outlines} outlines");
 }
 
 #[test]
-fn a_square_outset_with_round_and_bevel_has_the_spec_areas() {
-    let round = ok(&[square()], 5.0, OffsetJoin::Round);
-    let expected = 400.0 + 4.0 * 20.0 * 5.0 + PI * 25.0;
-    assert!((area(&round) - expected).abs() < 0.3, "{}", area(&round));
-    assert_output_rules(&round);
-    let bevel = ok(&[square()], 5.0, OffsetJoin::Bevel);
-    assert!((area(&bevel) - 850.0).abs() < 0.01, "{}", area(&bevel));
-    assert_eq!(node_count(&bevel), 8);
-}
-
-#[test]
-fn a_square_inset_is_the_smaller_square_with_every_join() {
-    for join in [OffsetJoin::Round, OffsetJoin::Miter, OffsetJoin::Bevel] {
-        let result = ok(&[square()], -5.0, join);
-        assert_eq!(
-            sorted_points(&result),
-            vec![(5000, 5000), (5000, 15000), (15000, 5000), (15000, 15000)],
-            "{join:?}"
-        );
-        assert!((area(&result) - 100.0).abs() < 1e-9);
+fn ac33_nodes_follow_the_output_rules() {
+    for shape in [
+        vec![star()],
+        ring(),
+        vec![l_shape()],
+        vec![circle(3.0, 4.0, 7.5)],
+    ] {
+        for join in JOINS {
+            for d in [-1.3, 0.7, 3.0] {
+                if let Ok(r) = run(&closed_all(&shape), d, join, OffsetCap::Round) {
+                    check_node_rules(&r).unwrap_or_else(|e| panic!("{d} {join:?}: {e}"));
+                }
+            }
+        }
     }
 }
 
+// ------------------------------------------------------------ kernel behaviour (28, 30, 31) ---
+
 #[test]
-fn a_square_inset_to_a_line_is_empty_and_just_short_of_it_is_a_tiny_square() {
-    assert_eq!(
-        closed(&[square()], -10.0, OffsetJoin::Miter),
-        Err(OffsetError::Empty)
-    );
-    assert_eq!(
-        closed(&[square()], -10.0, OffsetJoin::Round),
-        Err(OffsetError::Empty)
-    );
-    let tiny = ok(&[square()], -9.99, OffsetJoin::Miter);
-    assert_eq!(
-        sorted_points(&tiny),
-        vec![(9990, 9990), (9990, 10010), (10010, 9990), (10010, 10010)]
+fn ac28_outer_outlines_are_positive_and_holes_negative() {
+    let r = ok(&ring(), 1.0, OffsetJoin::Round);
+    let mut signs: Vec<bool> = r
+        .flattened(0.001)
+        .iter()
+        .map(|o| signed_area_mm2(o) > 0.0)
+        .collect();
+    signs.sort_unstable();
+    assert_eq!(signs, vec![false, true]);
+    let clockwise = ok(&[reversed(square())], 2.0, OffsetJoin::Miter);
+    assert!(
+        (bbox(&clockwise).0 + 2.0).abs() < 1e-9,
+        "a clockwise square still grows"
     );
 }
 
-// ---- criterion 16: the ring ----
+#[test]
+fn ac31_a_self_crossing_operand_gives_a_clean_outline() {
+    let bowtie = polygon(&[(0.0, 0.0), (20.0, 20.0), (20.0, 0.0), (0.0, 20.0)]);
+    let r = run(&[(bowtie, true)], 1.0, OffsetJoin::Miter, OffsetCap::Round).unwrap();
+    assert!(covers(&r, Point::new(3.0, 10.0)));
+    assert!(covers(&r, Point::new(17.0, 10.0)));
+    assert!(!covers(&r, Point::new(10.0, 2.0)));
+}
+
+#[test]
+fn ac30_an_open_line_grows_and_refuses_an_inset() {
+    let r = line(&[(0.0, 0.0), (20.0, 0.0)], 5.0, OffsetCap::Round).unwrap();
+    assert_eq!(r.fallback_outlines(), 0);
+    assert_eq!(
+        r.segment_count(),
+        6,
+        "two sides, two half circles of two cubics"
+    );
+    assert_eq!(
+        line(&[(0.0, 0.0), (20.0, 0.0)], -5.0, OffsetCap::Round),
+        Err(OffsetError::InsetOfOpenPath)
+    );
+}
+
+// ------------------------------------------------------------------ numeric tests (45 to 49) ---
+
+#[test]
+fn ac45_square_outset_inset_and_collapse() {
+    let miter = ok(&[square()], 5.0, OffsetJoin::Miter);
+    assert_eq!(miter.segment_count(), 4);
+    for (x, y) in [(-5.0, -5.0), (25.0, -5.0), (25.0, 25.0), (-5.0, 25.0)] {
+        assert!(has_node(&miter, x, y, 1e-9), "({x}, {y})");
+    }
+    let round = ok(&[square()], 5.0, OffsetJoin::Round);
+    assert_eq!(round.segment_count(), 8);
+    let expected = 400.0 + 4.0 * 20.0 * 5.0 + PI * 25.0;
+    assert!((area(&round) - expected).abs() <= 0.05, "{}", area(&round));
+    let bevel = ok(&[square()], 5.0, OffsetJoin::Bevel);
+    assert!((area(&bevel) - 850.0).abs() <= 0.01, "{}", area(&bevel));
+    for join in JOINS {
+        let inset = ok(&[square()], -5.0, join);
+        assert_eq!(inset.segment_count(), 4);
+        assert!((area(&inset) - 100.0).abs() <= 1e-6);
+        assert_eq!(
+            run(&closed_all(&[square()]), -10.0, join, OffsetCap::Round),
+            Err(OffsetError::Empty)
+        );
+        let tiny = ok(&[square()], -9.99, join);
+        let b = bbox(&tiny);
+        assert!((b.2 - b.0 - 0.02).abs() < 1e-6 && (b.3 - b.1 - 0.02).abs() < 1e-6);
+    }
+}
 
 fn ring() -> Vec<Anchors> {
     vec![circle(0.0, 0.0, 20.0), reversed(circle(0.0, 0.0, 10.0))]
 }
 
 #[test]
-fn a_ring_outset_grows_the_outline_and_shrinks_the_hole() {
-    let result = ok(&ring(), 2.0, OffsetJoin::Round);
-    assert_eq!(result.outlines().len(), 2);
-    let expected = PI * (484.0 - 64.0);
-    assert!((area(&result) - expected).abs() < 3.0, "{}", area(&result));
-    assert!(!covers(&result, Point::new(0.0, 0.0)));
-    assert!(covers(&result, Point::new(9.0, 0.0)));
-    assert!(covers(&result, Point::new(21.5, 0.0)));
-    assert_output_rules(&result);
-}
-
-#[test]
-fn a_ring_inset_shrinks_the_outline_and_grows_the_hole() {
-    let result = ok(&ring(), -2.0, OffsetJoin::Round);
-    let expected = PI * (324.0 - 144.0);
-    assert!((area(&result) - expected).abs() < 3.0, "{}", area(&result));
-    assert!(!covers(&result, Point::new(11.5, 0.0)));
-    assert!(!covers(&result, Point::new(18.5, 0.0)));
+fn ac46_ring_outset_inset_and_vanish() {
+    let out = ok(&ring(), 2.0, OffsetJoin::Round);
+    assert_eq!(out.outlines().len(), 2);
+    assert!(
+        (area(&out) - PI * (484.0 - 64.0)).abs() <= 3.0,
+        "{}",
+        area(&out)
+    );
+    assert_eq!(out.segment_count(), 8);
+    let inset = ok(&ring(), -2.0, OffsetJoin::Round);
+    assert!(
+        (area(&inset) - PI * (324.0 - 144.0)).abs() <= 3.0,
+        "{}",
+        area(&inset)
+    );
     assert_eq!(
-        closed(&ring(), -5.0, OffsetJoin::Round),
+        run(
+            &closed_all(&ring()),
+            -5.0,
+            OffsetJoin::Round,
+            OffsetCap::Round
+        ),
         Err(OffsetError::Empty)
     );
 }
 
-// ---- criterion 17: the open line ----
-
-fn line() -> Anchors {
-    polygon(&[(0.0, 0.0), (20.0, 0.0)])
-}
-
 #[test]
-fn an_open_line_grows_into_a_closed_outline_with_each_cap() {
-    let round = open(&line(), 5.0, OffsetCap::Round).unwrap();
-    assert_eq!(round.outlines().len(), 1);
-    let expected = 200.0 + PI * 25.0;
-    assert!((area(&round) - expected).abs() < 0.3, "{}", area(&round));
-    assert_output_rules(&round);
-
-    let flat = open(&line(), 5.0, OffsetCap::Flat).unwrap();
-    assert_eq!(
-        sorted_points(&flat),
-        vec![(0, -5000), (0, 5000), (20000, -5000), (20000, 5000)]
+fn ac47_open_line_caps() {
+    let points = [(0.0, 0.0), (20.0, 0.0)];
+    let round = line(&points, 5.0, OffsetCap::Round).unwrap();
+    assert!(
+        (area(&round) - (200.0 + PI * 25.0)).abs() <= 0.1,
+        "{}",
+        area(&round)
     );
-    let square = open(&line(), 5.0, OffsetCap::Square).unwrap();
-    assert_eq!(
-        sorted_points(&square),
-        vec![(-5000, -5000), (-5000, 5000), (25000, -5000), (25000, 5000)]
-    );
+    let flat = line(&points, 5.0, OffsetCap::Flat).unwrap();
+    assert!((area(&flat) - 200.0).abs() <= 1e-6);
+    assert_eq!(flat.segment_count(), 4);
+    let square_cap = line(&points, 5.0, OffsetCap::Square).unwrap();
+    assert!((area(&square_cap) - 300.0).abs() <= 1e-6);
+    let b = bbox(&square_cap);
+    assert!((b.0 + 5.0).abs() < 1e-9 && (b.2 - 25.0).abs() < 1e-9);
 }
 
-#[test]
-fn an_open_line_cannot_be_inset() {
-    assert_eq!(
-        open(&line(), -5.0, OffsetCap::Round),
-        Err(OffsetError::InsetOfOpenPath)
-    );
-}
-
-// ---- criterion 18: the reflex corner ----
-
-/// An L of arm width 10: (0,0) (30,0) (30,10) (10,10) (10,30) (0,30). Reflex corner at (10,10).
 fn l_shape() -> Anchors {
     polygon(&[
         (0.0, 0.0),
-        (30.0, 0.0),
-        (30.0, 10.0),
+        (20.0, 0.0),
+        (20.0, 10.0),
         (10.0, 10.0),
-        (10.0, 30.0),
+        (10.0, 20.0),
+        (0.0, 20.0),
+    ])
+}
+
+fn star() -> Anchors {
+    polygon(&[
         (0.0, 30.0),
+        (7.0, 9.0),
+        (29.0, 9.0),
+        (11.0, -4.0),
+        (18.0, -25.0),
+        (0.0, -12.0),
+        (-18.0, -25.0),
+        (-11.0, -4.0),
+        (-29.0, 9.0),
+        (-7.0, 9.0),
     ])
 }
 
 #[test]
-fn an_l_outset_keeps_the_reflex_corner_sharp_and_joins_the_convex_ones() {
-    for join in [OffsetJoin::Round, OffsetJoin::Miter, OffsetJoin::Bevel] {
-        let result = ok(&[l_shape()], 2.0, join);
-        let points = sorted_points(&result);
+fn ac48_the_reflex_corner_of_an_l() {
+    for join in JOINS {
+        let out = ok(&[l_shape()], 2.0, join);
         assert!(
-            points.contains(&(12000, 12000)),
-            "{join:?}: the reflex corner is one sharp node"
+            has_node(&out, 12.0, 12.0, 1e-9),
+            "{join:?}: the reflex corner stays sharp"
         );
-        let near_reflex = points
-            .iter()
-            .filter(|&&(x, y)| (x - 12000).abs() < 2000 && (y - 12000).abs() < 2000)
-            .count();
-        assert_eq!(near_reflex, 1, "{join:?}");
     }
-    let miter = ok(&[l_shape()], 2.0, OffsetJoin::Miter);
-    assert!(sorted_points(&miter).contains(&(-2000, -2000)));
-    let bevel = ok(&[l_shape()], 2.0, OffsetJoin::Bevel);
-    assert!(!sorted_points(&bevel).contains(&(-2000, -2000)));
-}
-
-#[test]
-fn an_l_inset_joins_the_reflex_corner_and_keeps_the_convex_ones_sharp() {
-    let miter = ok(&[l_shape()], -2.0, OffsetJoin::Miter);
-    let points = sorted_points(&miter);
-    assert!(points.contains(&(2000, 2000)), "convex corner stays sharp");
-    assert!(points.contains(&(8000, 8000)), "miter at the reflex corner");
-    let bevel = ok(&[l_shape()], -2.0, OffsetJoin::Bevel);
-    let points = sorted_points(&bevel);
-    assert!(points.contains(&(2000, 2000)));
+    let round_in = ok(&[l_shape()], -2.0, OffsetJoin::Round);
     assert!(
-        !points.contains(&(8000, 8000)),
-        "the reflex corner is bevelled"
+        !has_node(&round_in, 8.0, 8.0, 1e-6),
+        "the reflex corner gets an arc"
     );
-    assert!(points.contains(&(8000, 10000)) && points.contains(&(10000, 8000)));
+    assert!(
+        has_node(&round_in, 2.0, 2.0, 1e-9),
+        "the convex corner stays sharp"
+    );
+    let miter_in = ok(&[l_shape()], -2.0, OffsetJoin::Miter);
+    assert!(has_node(&miter_in, 8.0, 8.0, 1e-9));
 }
 
-// ---- criterion 19: the miter limit ----
-
 #[test]
-fn a_twenty_degree_corner_is_clipped_at_four_times_the_distance() {
-    // Apex at the origin, opening to the right, symmetric about the x axis, 20 degrees.
-    let half = 10.0_f64.to_radians();
-    let length = 60.0;
+fn ac49_the_miter_limit() {
     let triangle = polygon(&[
         (0.0, 0.0),
-        (length * half.cos(), length * half.sin()),
-        (length * half.cos(), -length * half.sin()),
+        (40.0, 0.0),
+        (20.0, 20.0 / (10f64.to_radians().tan())),
     ]);
-    let result = ok(&[triangle], 5.0, OffsetJoin::Miter);
-    let apex = Point::new(0.0, 0.0);
-    let outline = &result.outlines()[0];
-    let near: Vec<Point> = outline
-        .iter()
-        .copied()
-        .filter(|p| distance(*p, apex) < 25.0)
+    let apex = triangle[2].0;
+    let r = ok(&[triangle], 5.0, OffsetJoin::Miter);
+    let near_apex: Vec<Point> = nodes(&r)
+        .into_iter()
+        .filter(|p| (p.x - apex.x).hypot(p.y - apex.y) < 25.0)
         .collect();
-    assert_eq!(near.len(), 2, "two clip nodes at the apex: {near:?}");
-    for p in &near {
-        assert!(
-            (distance(*p, apex) - 20.0).abs() < 0.01,
-            "{p:?} is {} from the apex",
-            distance(*p, apex)
-        );
+    assert_eq!(near_apex.len(), 2, "{near_apex:?}");
+    for p in &near_apex {
+        assert!(((p.x - apex.x).hypot(p.y - apex.y) - 20.0).abs() <= 0.01);
     }
     assert!(
-        (near[0].x - near[1].x).abs() < 0.002,
-        "symmetric about the bisector"
+        (near_apex[0].x - apex.x + near_apex[1].x - apex.x).abs() < 1e-6,
+        "symmetric"
     );
-    assert!((near[0].y + near[1].y).abs() < 0.002);
-    assert!(
-        outline
+    let sq = ok(&[square()], 5.0, OffsetJoin::Miter);
+    for p in nodes(&sq) {
+        let d = [(0.0, 0.0), (20.0, 0.0), (20.0, 20.0), (0.0, 20.0)]
             .iter()
-            .all(|p| (distance(*p, apex) - 28.8).abs() > 0.5),
-        "no node at the unclipped tip"
-    );
-    // The two 80-degree corners stay single sharp nodes: 3 + 2 - 1 = 4 nodes in all.
-    assert_eq!(outline.len(), 4);
-}
-
-// ---- criterion 20: curves become polylines ----
-
-#[test]
-fn a_circle_outset_is_a_polygon_near_the_bigger_circle() {
-    let result = ok(&[circle(0.0, 0.0, 20.0)], 2.0, OffsetJoin::Round);
-    assert_eq!(result.outlines().len(), 1);
-    for p in &result.outlines()[0] {
-        let r = p.x.hypot(p.y);
-        assert!((r - 22.0).abs() <= 0.02, "node at radius {r}");
+            .map(|c| (p.x - c.0).hypot(p.y - c.1))
+            .fold(f64::MAX, f64::min);
+        assert!((d - 50f64.sqrt()).abs() <= 1e-6);
     }
-    let expected = PI * 22.0 * 22.0;
-    assert!((area(&result) - expected).abs() < 3.0, "{}", area(&result));
-    assert_output_rules(&result);
 }
 
+// ------------------------------------------------------------------ determinism (44) ----------
+
 #[test]
-fn round_joins_stay_within_the_tolerance_and_the_node_budget() {
-    // A square outset by 5 mm with Round: the corner arcs have radius 5. Every node of an arc
-    // lies within 0.01 mm of it, and a quarter arc has between the fewest chords that keep
-    // 0.01 mm and twice that.
-    let result = ok(&[square()], 5.0, OffsetJoin::Round);
-    let corner = Point::new(20.0, 20.0);
-    let arc: Vec<Point> = result.outlines()[0]
-        .iter()
-        .copied()
-        .filter(|p| p.x >= 20.0 && p.y >= 20.0)
-        .collect();
-    for p in &arc {
-        assert!((distance(*p, corner) - 5.0).abs() <= 0.01);
+fn ac44_the_start_node_and_direction_do_not_matter() {
+    let base = ellipse(0.0, 0.0, 20.0, 10.0);
+    let mut rotated = base.clone();
+    rotated.rotate_left(1);
+    for d in [2.0, -2.0] {
+        let a = ok(std::slice::from_ref(&base), d, OffsetJoin::Round);
+        let b = ok(std::slice::from_ref(&rotated), d, OffsetJoin::Round);
+        let c = ok(&[reversed(base.clone())], d, OffsetJoin::Round);
+        assert_eq!(a.segment_count(), b.segment_count());
+        assert_eq!(a.segment_count(), c.segment_count());
+        for (p, q) in nodes(&a).iter().zip(nodes(&b)) {
+            assert!((p.x - q.x).abs() < 1e-6 && (p.y - q.y).abs() < 1e-6);
+        }
     }
-    let fewest = ((PI / 2.0) / (2.0 * (1.0 - 0.01 / 5.0_f64).acos())).ceil() as usize;
-    let segments = arc.len() - 1;
-    assert!(
-        segments >= fewest && segments <= 2 * fewest,
-        "{segments} segments, fewest {fewest}"
-    );
-}
-
-// ---- criteria 9, 12, 14 ----
-
-#[test]
-fn a_self_crossing_outline_offsets_its_painted_region() {
-    // A bow-tie: two triangles meeting at (10, 10).
-    let bow = polygon(&[(0.0, 0.0), (20.0, 20.0), (20.0, 0.0), (0.0, 20.0)]);
-    let result = ok(&[bow], 1.0, OffsetJoin::Miter);
-    assert_output_rules(&result);
-    assert!(covers(&result, Point::new(10.0, 10.0)));
-    assert!(covers(&result, Point::new(-0.5, 10.0)));
 }
 
 #[test]
-fn the_result_does_not_depend_on_the_outline_order() {
-    let a = ok(&ring(), 1.5, OffsetJoin::Round);
-    let mut swapped = ring();
-    swapped.reverse();
-    let b = ok(&swapped, 1.5, OffsetJoin::Round);
-    assert_eq!(a, b);
-}
-
-#[test]
-fn a_closed_outline_without_area_is_refused() {
-    let flat = polygon(&[(0.0, 0.0), (10.0, 0.0), (20.0, 0.0)]);
+fn edge_zero_tiny_nonfinite_and_huge_distances() {
+    let sq = closed_all(&[square()]);
     assert_eq!(
-        closed(&[flat], 2.0, OffsetJoin::Round),
-        Err(OffsetError::NoArea)
-    );
-}
-
-#[test]
-fn coordinates_out_of_range_and_zero_distances_are_refused() {
-    let far = rect(0.0, 0.0, 2.0e7, 10.0);
-    assert_eq!(
-        closed(&[far], 1.0, OffsetJoin::Round),
-        Err(OffsetError::OutOfRange)
-    );
-    let mut nan = square();
-    nan[0].1 = Vec2::new(f64::NAN, 0.0);
-    assert_eq!(
-        closed(&[nan], 1.0, OffsetJoin::Round),
-        Err(OffsetError::OutOfRange)
-    );
-    let edge = rect(0.0, 0.0, 1.0e7, 10.0);
-    assert_eq!(
-        closed(&[edge], 1.0, OffsetJoin::Round),
-        Err(OffsetError::OutOfRange),
-        "a result beyond the range is refused"
-    );
-    assert_eq!(
-        closed(&[square()], 0.0004, OffsetJoin::Round),
+        run(&sq, 0.0, OffsetJoin::Round, OffsetCap::Round),
         Err(OffsetError::ZeroDistance)
     );
     assert_eq!(
-        closed(&[square()], f64::INFINITY, OffsetJoin::Round),
+        run(&sq, f64::NAN, OffsetJoin::Round, OffsetCap::Round),
         Err(OffsetError::OutOfRange)
+    );
+    let tiny = ok(&[square()], 0.01, OffsetJoin::Round);
+    assert!((bbox(&tiny).0 + 0.01).abs() < 1e-6);
+    let flat_closed = polygon(&[(0.0, 0.0), (5.0, 0.0), (9.0, 0.0)]);
+    assert_eq!(
+        run(
+            &[(flat_closed, true)],
+            1.0,
+            OffsetJoin::Round,
+            OffsetCap::Round
+        ),
+        Err(OffsetError::NoArea)
     );
 }

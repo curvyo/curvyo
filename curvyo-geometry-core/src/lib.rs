@@ -27,6 +27,8 @@ mod curve_settle;
 mod flatten;
 mod interior;
 mod offset;
+mod offset_pieces;
+mod offset_rebuild;
 mod outline_nesting;
 mod outline_touch;
 mod segment;
@@ -36,7 +38,9 @@ pub use boolean_grid::MAX_COORDINATE_MM;
 pub use curve_intersections::{CutParameter, cut_parameters};
 pub use curvyo_document_core::Tolerance;
 pub use interior::{OutlineTriple, contains_point_in_outlines};
-pub use offset::{OffsetCap, OffsetError, OffsetJoin, offset, offset_distance_is_zero};
+pub use offset::{
+    OffsetAnchor, OffsetCap, OffsetError, OffsetJoin, OffsetOutlines, offset, offset_distance_is_zero,
+};
 pub use outline_nesting::{Nesting, outline_area_mm2, outline_has_area, outline_nesting};
 pub use outline_touch::{TOUCH_DISTANCE_MM, touching_outlines};
 pub use segment::{
