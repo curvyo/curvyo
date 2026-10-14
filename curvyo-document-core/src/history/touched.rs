@@ -139,6 +139,16 @@ impl ContainerIndex {
 
     /// The touched objects of the given changes of one step.
     pub(crate) fn touched(&self, doc: &LoroDoc, changes: &[JsonChange]) -> Touched {
+        self.collect(doc, changes, true)
+    }
+
+    /// Every object the changes touched, unfiltered: an object created and deleted within them is
+    /// in both sets (applying a version, `specs/0042-history-branches` criterion 10).
+    pub(crate) fn touched_all(&self, doc: &LoroDoc, changes: &[JsonChange]) -> Touched {
+        self.collect(doc, changes, false)
+    }
+
+    fn collect(&self, doc: &LoroDoc, changes: &[JsonChange], filtered: bool) -> Touched {
         let mut created_ids = BTreeSet::new();
         let mut deleted_ids = BTreeSet::new();
         let mut moved_ids = BTreeSet::new();
@@ -175,6 +185,24 @@ impl ContainerIndex {
                     None => {}
                 },
             }
+        }
+        if !filtered {
+            // Every object any operation touched, in each set it was touched in: applying a
+            // version needs them all, also one created and then deleted since (`0042`).
+            let all = |set: &BTreeSet<TreeID>| -> Vec<TreeID> {
+                order
+                    .iter()
+                    .copied()
+                    .filter(|id| set.contains(id))
+                    .collect()
+            };
+            return Touched {
+                created: all(&created_ids),
+                deleted: all(&deleted_ids),
+                moved: all(&moved_ids),
+                changed: all(&changed_ids),
+                root,
+            };
         }
         // A created object is not also "moved" (its placement) or "changed" (its first values);
         // a deleted one is not "changed".

@@ -9,10 +9,11 @@ use super::checkout::NodeAt;
 use super::node_value::{Node, read_map};
 use super::report::{Direction, Role, SkipReason};
 use super::step_header::{
-    KEY_OBJECT_REDONE, KEY_REDONE, LABEL_OBJECT_REDO, LABEL_REDO, StepHeader,
+    KEY_OBJECT_REDONE, KEY_REDONE, KEY_UNDONE, LABEL_OBJECT_REDO, LABEL_REDO, LABEL_UNDO,
+    StepHeader,
 };
 use super::step_id::StepRef;
-use super::step_log::LogStep;
+use super::step_log::{LogStep, find_step};
 use super::touched::Touched;
 use crate::document::OBJECTS_TREE;
 
@@ -240,7 +241,37 @@ impl PlanInput<'_> {
                 };
                 (header.label == LABEL_REDO && redone(KEY_REDONE))
                     || (header.label == LABEL_OBJECT_REDO && redone(KEY_OBJECT_REDONE))
+                    || (header.label == LABEL_UNDO
+                        && header
+                            .extra_value(KEY_UNDONE)
+                            .and_then(StepRef::decode)
+                            .is_some_and(|undone| self.later_revival_of(undone, id)))
             })
+    }
+
+    /// Whether `step` came after this step and brought `id` back (an apply of a version, `0042`):
+    /// an undo of it deletes `id` again, which puts this step's delete back in effect.
+    fn later_revival_of(&self, step: StepRef, id: TreeID) -> bool {
+        let Some(later) = find_step(self.doc, step) else {
+            return false;
+        };
+        let after_this = self
+            .doc
+            .frontiers_to_vv(&later.before)
+            .and_then(|vv| vv.get(&self.log.step.peer()).copied())
+            .is_some_and(|end| end >= self.log.end);
+        after_this
+            && self
+                .doc
+                .export_json_in_id_span(later.span())
+                .iter()
+                .flat_map(|change| &change.ops)
+                .any(|op| {
+                    matches!(
+                        &op.content,
+                        loro::JsonOpContent::Tree(loro::JsonTreeOp::Move { target, .. }) if *target == id
+                    )
+                })
     }
 
     fn last_move_by_me(&self, id: TreeID) -> bool {

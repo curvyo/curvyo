@@ -238,8 +238,6 @@ Written by the ux-engineer, 2026-10-10. Component numbers are in `docs/design-sy
 ```
 [File][Droplet][History]              24 steps     strip row, subject line (0043)
 [Document|Object]                [Undo][Redo]      scope group (0041) and two reserved 28 px slots
-Mode  [Preview|Live]                               Object scope only (0042)
-A click shows the version. Nothing changes.        caption, or "Restore previous state" (0042)
 ----------------------------------------------
  Now                              a1b2c3d          pinned row, not a step
  ● [+] Draw rectangle             a1b2c3d          44 px rows, newest first

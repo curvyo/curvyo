@@ -401,9 +401,10 @@ fn c10_apply_remove_revive_remove_again_each_writes_a_step() {
     let s1 = last_step(&d);
     let b = rect(&d, 20.0);
     let s2 = last_step(&d);
+    // Taken at s2, before c exists (it was taken after s3, which holds c).
+    let at_s2 = json(&d);
     let c = rect(&d, 40.0);
     let s3 = last_step(&d);
-    let at_s2 = json(&d);
     assert!(d.go_to_version(s1, None, None).unwrap().step.is_some());
     assert!(d.go_to_version(s3, None, None).unwrap().step.is_some());
     assert!(d.contains_node(b) && d.contains_node(c));

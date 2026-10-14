@@ -356,3 +356,23 @@ fn c22_a_refused_clone_leaves_nothing_behind_for_the_next_commit() {
         "the next step touched only the rectangle"
     );
 }
+
+#[test]
+fn c10_undoing_a_remove_then_revive_then_remove_series_goes_back_to_the_start() {
+    let d = Document::new(1);
+    rect(&d);
+    let s1 = d.own_steps().last().unwrap().step;
+    rect(&d);
+    let s2 = d.own_steps().last().unwrap().step;
+    rect(&d);
+    let s3 = d.own_steps().last().unwrap().step;
+    let start = d.export_json().unwrap();
+    let applies: Vec<StepRef> = [s1, s3, s2]
+        .iter()
+        .map(|v| d.go_to_version(*v, None, None).unwrap().step.unwrap())
+        .collect();
+    for step in applies.iter().rev() {
+        d.undo_step(*step).unwrap();
+    }
+    assert_eq!(d.export_json().unwrap(), start);
+}

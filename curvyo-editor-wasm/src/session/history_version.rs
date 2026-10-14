@@ -126,7 +126,14 @@ impl Session {
             return GoToOutcome::NotARow;
         };
         self.end_history_preview();
-        let result = self.recording(|this| this.document.go_to_version(step, subject, source));
+        let result = self.recording(|this| {
+            let result = this.document.go_to_version(step, subject, source);
+            // An apply can remove a selected object: the selection keeps only what exists, as
+            // after an undo of a draw.
+            let objects = this.objects();
+            this.selection.retain_existing(&objects);
+            result
+        });
         match result {
             Ok(report) if report.step.is_some() => {
                 GoToOutcome::Went(went_to_notice(&shown_id, report.others_reverted, object))

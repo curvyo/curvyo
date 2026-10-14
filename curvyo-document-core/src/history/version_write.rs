@@ -100,7 +100,7 @@ impl Document {
             let changes = doc
                 .export_json_updates_without_peer_compression(&since, &doc.oplog_vv())
                 .changes;
-            index.touched(doc, &changes)
+            index.touched_all(doc, &changes)
         };
         if let Some(id) = object {
             touched = touched.only(tree_id(id));
