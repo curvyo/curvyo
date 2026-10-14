@@ -84,6 +84,7 @@ mod segment_bend;
 mod select_bar;
 mod select_tool;
 mod selection;
+mod shape_placement;
 mod shape_tool_common;
 mod skew_entry;
 mod skew_math;
@@ -134,7 +135,7 @@ pub use cut::{CUT_COMMIT_LABEL, CutPlan, CutRefusal, MAX_CUT_PIECES, plan_cut};
 pub use dash_text::{MAX_DASH_NUMBER, MAX_DASH_NUMBERS, dash_text, parse_dash_text};
 pub use display_unit_text::{
     content_too_large_message, document_side_message, format_cursor, format_field_length,
-    format_size, format_status_length, parse_document_side,
+    format_size, format_status_length, parse_document_side, parse_length,
 };
 pub use document_fit::fit_document_to_content;
 pub use document_presets_view::{
@@ -234,7 +235,7 @@ pub use pen_target::{EndNode, EndNodeIndex, PenTarget, continuation_of, pen_targ
 pub use pen_tool::{
     ClosingPreview, Continuation, PenTool, PointerUpOutcome as PenPointerUpOutcome, PressAction,
 };
-pub use poly_star_tool::{PolyStarMode, PolygonStarTool};
+pub use poly_star_tool::{PolyStarMode, PolyStarSettings, PolygonStarTool};
 pub use rectangle_tool::RectangleTool;
 pub use reference_point::{
     MARKS_MIN_SIDE_PX, ReferencePoint, hit_mark, mark_hit_radius_px, marks_are_shown,
@@ -253,6 +254,11 @@ pub use select_tool::{
     entry_anchor,
 };
 pub use selection::NodeSelection;
+pub use shape_placement::{
+    CANCELLED_SENTENCE, Placed, PlacementError, PlacementField, PlacementKind, PlacementNoun,
+    ShapePlacement, field_label, field_name, field_suffix, message as placement_message,
+    placed_sentence,
+};
 pub use shape_tool_common::{CreateOutcome, CreatePreview};
 pub use skew_entry::SkewEntry;
 pub use skew_math::{SkewFrame, skew_angle, skew_factor, skew_frame};

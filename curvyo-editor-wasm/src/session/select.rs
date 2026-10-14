@@ -136,6 +136,10 @@ impl Session {
     /// themselves, whatever the host re-sends.
     pub fn modifiers_changed(&mut self, shift: bool, ctrl: bool, alt: bool) {
         self.held = Modifiers::new(shift, ctrl).with_alt(alt);
+        // An unfrozen placement follows the keys with the pointer still (`0052` criterion 3).
+        if self.placement().is_some() {
+            self.placement_modifiers(Modifiers::new(shift, ctrl));
+        }
         if self.tool == Tool::Select
             && let Some(point) = self.pointer_position
         {

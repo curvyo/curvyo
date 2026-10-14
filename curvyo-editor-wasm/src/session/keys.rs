@@ -117,6 +117,9 @@ pub enum KeyOutcome {
     /// H or V flipped the selection, or found it looking the same flipped
     /// (`specs/0056-mirror-and-negative-scale/` criteria 3 and 4).
     Flipped(FlipAxis, FlipOutcome),
+    /// Enter started a click-to-create placement (`specs/0052-click-to-create-shapes`
+    /// criterion 26): the host opens the placement chip.
+    PlacementStarted,
 }
 
 impl KeyOutcome {
@@ -128,6 +131,7 @@ impl KeyOutcome {
         match self {
             Self::Ignored => "ignored",
             Self::Paused => "paused",
+            Self::PlacementStarted => "placement-started",
             Self::ToolChanged => "tool",
             Self::EntryOpened => "entry",
             Self::Deleted => "deleted",
@@ -216,7 +220,9 @@ impl Session {
             Tool::Pen => false,
         };
         // A drag of a panel value field is a drag too (`specs/0020-undo-redo` criterion 6a).
+        // A click-to-create placement is an operation in flight (`0052` criterion 8).
         in_tool
+            || self.placement().is_some()
             || self.is_panning()
             || self.style.pending_edit().is_some()
             || self.select.bar_preview().is_some()
@@ -258,6 +264,19 @@ impl Session {
         }
     }
 
+    /// The facts of the session the key table reads.
+    fn key_state(&self) -> KeyState {
+        KeyState {
+            tool: self.tool,
+            operation_in_flight: self.operation_in_flight(),
+            pen_open: self.pen_path_open(),
+            entry_open: self.select.has_entry() || self.offset_chip_open(),
+            selected: self.selected_for_keys(),
+            offset_ready: self.offset_center().is_some(),
+            offset_dragging: self.tool == Tool::Offset && self.offset_drag_in_flight(),
+        }
+    }
+
     /// One key press: the gate of criterion 55, then the key table of
     /// criterion 54. The frontend forwards the key and what the DOM alone
     /// knows and prevents the page's default for every outcome except
@@ -269,16 +288,7 @@ impl Session {
         if self.document_preview_active() {
             return KeyOutcome::Paused;
         }
-        let state = KeyState {
-            tool: self.tool,
-            operation_in_flight: self.operation_in_flight(),
-            pen_open: self.pen_path_open(),
-            entry_open: self.select.has_entry() || self.offset_chip_open(),
-            selected: self.selected_for_keys(),
-            offset_ready: self.offset_center().is_some(),
-            offset_dragging: self.tool == Tool::Offset && self.offset_drag_in_flight(),
-        };
-        match decide(&input, state) {
+        match decide(&input, self.key_state()) {
             KeyAction::Ignore => KeyOutcome::Ignored,
             KeyAction::SetTool(tool) => {
                 self.set_tool(tool);
@@ -301,6 +311,7 @@ impl Session {
                 self.delete_selected();
                 KeyOutcome::Deleted
             }
+            KeyAction::StartPlacement => self.start_placement_key(),
             KeyAction::FinishPen => {
                 self.finish_pen();
                 KeyOutcome::PenFinished
@@ -401,6 +412,11 @@ impl Session {
             return EscapeStep::ClosedEntry;
         }
         if self.cancel_drag_in_flight() {
+            return EscapeStep::CancelledDrag;
+        }
+        // A placement is step 2 too (`0052` criterion 7). It is not in `cancel_drag_in_flight`,
+        // which a lost pointer and a window blur also call: those must not cancel it.
+        if self.cancel_placement() {
             return EscapeStep::CancelledDrag;
         }
         if self.tool == Tool::Pen && self.pen.escape() {

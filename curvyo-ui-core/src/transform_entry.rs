@@ -100,6 +100,9 @@ pub enum InvalidReason {
     SkewRange,
     /// A size above the coordinate limit, or a skew that would pass it ("Too large").
     TooLarge,
+    /// A placement size of 0 or less ("Must be more than 0", `specs/0052-click-to-create-shapes/`
+    /// criterion 23): the transform chips take negative sizes (`0056`), a new shape does not.
+    NotPositive,
 }
 
 /// What [`TransformEntry::commit`] did.

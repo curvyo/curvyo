@@ -3,7 +3,7 @@
 //! editing/`, criteria 25 and 26): see [`crate::rectangle_tool`], whose
 //! pattern this follows.
 
-use curvyo_document_core::{Document, EllipseFrame, Point, Shape};
+use curvyo_document_core::{Angle, Document, EllipseFrame, Point, Shape};
 
 use crate::modifiers::Modifiers;
 use crate::shape_tool_common::{CreateDragBox, CreateOutcome, CreatePreview, create_drag_box};
@@ -51,11 +51,18 @@ impl EllipseTool {
     #[must_use]
     pub fn live_shape(&self) -> Option<CreatePreview> {
         let drag = self.drag?;
-        let (frame, b) = created_frame(drag.down_at, drag.current, drag.modifiers)?;
+        Self::shape_for(drag.down_at, drag.current, drag.modifiers)
+    }
+
+    /// The one computation of the ellipse a create-drag from `a` to `b` makes
+    /// under `modifiers`: see [`crate::RectangleTool::shape_for`].
+    #[must_use]
+    pub fn shape_for(a: Point, b: Point, modifiers: Modifiers) -> Option<CreatePreview> {
+        let (frame, b) = created_frame(a, b, modifiers)?;
         Some(CreatePreview {
             shape: Shape::Ellipse { frame },
             anchor: b.anchor,
-            centre: b.centre,
+            pivot: b.centre,
         })
     }
 
@@ -72,8 +79,10 @@ impl EllipseTool {
         let Some(drag) = self.drag.take() else {
             return CreateOutcome::NoOp;
         };
-        created_frame(drag.down_at, point, modifiers).map_or(CreateOutcome::NoOp, |(frame, _)| {
-            CreateOutcome::Created(document.create_ellipse(frame))
+        Self::shape_for(drag.down_at, point, modifiers).map_or(CreateOutcome::NoOp, |preview| {
+            CreateOutcome::Created(
+                document.create_primitive(preview.shape, Angle::from_radians(0.0)),
+            )
         })
     }
 

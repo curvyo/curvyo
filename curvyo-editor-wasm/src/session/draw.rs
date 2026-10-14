@@ -128,25 +128,7 @@ impl Session {
                 self.device_pixel_ratio,
             ));
         }
-        if let Some(preview) = self.live_preview() {
-            list.extend(curvyo_render_core::build_shape_live_preview(
-                &preview.shape,
-                curvyo_document_core::Angle::from_radians(0.0),
-                view,
-            ));
-            // Shift makes the press point the centre: the pivot marker says so
-            // (`docs/design-system.md`, "Modifiers in a rectangle or ellipse
-            // create-drag").
-            if preview.centre.is_some() {
-                list.extend(build_transform_draw_list(
-                    view,
-                    &TransformDecorationInput {
-                        pivot_marker: preview.centre,
-                        ..TransformDecorationInput::default()
-                    },
-                ));
-            }
-        }
+        list.extend(self.creation_preview_list(view));
         if self.tool == Tool::Pen
             && let Some(nodes) = self.pen.in_progress_nodes()
         {
@@ -176,6 +158,49 @@ impl Session {
                 self.document.size(),
                 self.shown_background(),
             ));
+        }
+        list
+    }
+
+    /// A placement's or a create-drag's preview, with the pivot marker where it applies
+    /// (`specs/0052-click-to-create-shapes/` criteria 2, 15, 28; `0011` for the drag's marker).
+    fn creation_preview_list(&self, view: ViewTransform) -> DrawList {
+        let mut list = DrawList::default();
+        if let Some(placement) = self.placement() {
+            // The placement's preview, turned by its angle, and the pivot marker at A for its
+            // whole duration (`0052` criteria 2, 15, 28).
+            if let Some(shown) = placement.shown() {
+                list.extend(curvyo_render_core::build_shape_live_preview(
+                    &shown.shape,
+                    shown.rotation,
+                    view,
+                ));
+            }
+            list.extend(build_transform_draw_list(
+                view,
+                &TransformDecorationInput {
+                    pivot_marker: Some(placement.a()),
+                    ..TransformDecorationInput::default()
+                },
+            ));
+        } else if let Some(preview) = self.live_preview() {
+            list.extend(curvyo_render_core::build_shape_live_preview(
+                &preview.shape,
+                curvyo_document_core::Angle::from_radians(0.0),
+                view,
+            ));
+            // Shift makes the press point the centre: the pivot marker says so
+            // (`docs/design-system.md`, "Modifiers in a rectangle or ellipse
+            // create-drag").
+            if preview.pivot.is_some() {
+                list.extend(build_transform_draw_list(
+                    view,
+                    &TransformDecorationInput {
+                        pivot_marker: preview.pivot,
+                        ..TransformDecorationInput::default()
+                    },
+                ));
+            }
         }
         list
     }

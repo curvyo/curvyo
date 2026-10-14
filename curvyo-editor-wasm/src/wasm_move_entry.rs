@@ -25,6 +25,7 @@ pub(crate) fn outcome_code(outcome: EntryOutcome) -> String {
                 InvalidReason::RatioRange => "ratio-range",
                 InvalidReason::SkewRange => "skew-range",
                 InvalidReason::TooLarge => "too-large",
+                InvalidReason::NotPositive => "not-positive",
             }
         ),
     }

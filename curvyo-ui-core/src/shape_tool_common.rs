@@ -23,11 +23,13 @@ pub struct CreatePreview {
     /// The live pointer position (point B) the numeric readout is anchored
     /// near.
     pub anchor: Point,
-    /// The press point when Shift makes it the centre of a rectangle or
-    /// ellipse: the host marks it with the pivot marker
+    /// Where the host draws the pivot marker: during a create-drag the press
+    /// point when Shift makes it the centre of a rectangle or ellipse
     /// (`docs/design-system.md`, "Modifiers in a rectangle or ellipse
-    /// create-drag"). `None` otherwise, and always for a polygon or star.
-    pub centre: Option<Point>,
+    /// create-drag"), `None` otherwise and always for a polygon or star;
+    /// during a click-to-create placement point A the whole time
+    /// (`specs/0052-click-to-create-shapes/` criterion 28).
+    pub pivot: Option<Point>,
 }
 
 /// What a creation tool's `pointer_up` did.

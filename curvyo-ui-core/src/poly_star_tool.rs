@@ -5,7 +5,7 @@
 //! and ratio persist across shapes and never change a selected shape; that is
 //! the Select bar's job.
 
-use curvyo_document_core::{Document, InnerRatio, Point, PointCount, Shape, StarFrame};
+use curvyo_document_core::{Angle, Document, InnerRatio, Point, PointCount, Shape, StarFrame};
 
 use crate::angle_snap::snap_angle;
 use crate::modifiers::Modifiers;
@@ -19,6 +19,38 @@ pub enum PolyStarMode {
     Polygon,
     /// Acceptance criterion 12: an N-pointed star.
     Star,
+}
+
+/// The polygon/star bar's settings for the next shape: mode, point count and
+/// ratio (acceptance criteria 10 to 12). A create-drag and a click-to-create
+/// placement read them when they build the shape
+/// (`specs/0052-click-to-create-shapes/` criterion 25).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PolyStarSettings {
+    /// Polygon or star.
+    pub mode: PolyStarMode,
+    /// The point count.
+    pub point_count: PointCount,
+    /// The inner ratio, used in star mode only.
+    pub ratio: InnerRatio,
+}
+
+impl PolyStarSettings {
+    /// The polygon or star these settings make with `frame`.
+    #[must_use]
+    pub const fn shape(self, frame: StarFrame) -> Shape {
+        match self.mode {
+            PolyStarMode::Polygon => Shape::Polygon {
+                frame,
+                point_count: self.point_count,
+            },
+            PolyStarMode::Star => Shape::Star {
+                frame,
+                point_count: self.point_count,
+                inner_ratio: self.ratio,
+            },
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -36,9 +68,7 @@ struct Drag {
 #[derive(Debug)]
 pub struct PolygonStarTool {
     drag: Option<Drag>,
-    mode: PolyStarMode,
-    point_count: PointCount,
-    ratio: InnerRatio,
+    settings: PolyStarSettings,
 }
 
 impl Default for PolygonStarTool {
@@ -59,48 +89,56 @@ impl PolygonStarTool {
     pub fn new() -> Self {
         Self {
             drag: None,
-            mode: PolyStarMode::Polygon,
-            // invariant: 6 is within `PointCount`'s `3..=1024` range.
-            #[allow(clippy::unwrap_used)]
-            point_count: PointCount::new(6).unwrap(),
-            // invariant: 0.5 is within `InnerRatio`'s open `(0, 1)` range.
-            #[allow(clippy::unwrap_used)]
-            ratio: InnerRatio::new(0.5).unwrap(),
+            settings: PolyStarSettings {
+                mode: PolyStarMode::Polygon,
+                // invariant: 6 is within `PointCount`'s `3..=1024` range.
+                #[allow(clippy::unwrap_used)]
+                point_count: PointCount::new(6).unwrap(),
+                // invariant: 0.5 is within `InnerRatio`'s open `(0, 1)` range.
+                #[allow(clippy::unwrap_used)]
+                ratio: InnerRatio::new(0.5).unwrap(),
+            },
         }
     }
 
     /// The mode for the next shape (acceptance criteria 11 vs. 12).
     #[must_use]
     pub const fn mode(&self) -> PolyStarMode {
-        self.mode
+        self.settings.mode
+    }
+
+    /// The bar's settings for the next shape, all three together.
+    #[must_use]
+    pub const fn settings(&self) -> PolyStarSettings {
+        self.settings
     }
 
     /// The point count for the next shape (acceptance criterion 10).
     #[must_use]
     pub const fn point_count(&self) -> PointCount {
-        self.point_count
+        self.settings.point_count
     }
 
     /// The inner ratio for the next star (acceptance criterion 12).
     #[must_use]
     pub const fn ratio(&self) -> InnerRatio {
-        self.ratio
+        self.settings.ratio
     }
 
     /// The mode toggle: only affects shapes drawn after the switch.
     pub fn set_mode(&mut self, mode: PolyStarMode) {
-        self.mode = mode;
+        self.settings.mode = mode;
     }
 
     /// The point-count setting for the next shape; it changes no selected
     /// shape (`unified-object-editing` criterion 29).
     pub fn set_point_count(&mut self, count: PointCount) {
-        self.point_count = count;
+        self.settings.point_count = count;
     }
 
     /// The ratio setting for the next star; it changes no selected shape.
     pub fn set_ratio(&mut self, ratio: InnerRatio) {
-        self.ratio = ratio;
+        self.settings.ratio = ratio;
     }
 
     /// Acceptance criteria 11, 12: a press at `point` starts a create-drag
@@ -123,32 +161,25 @@ impl PolygonStarTool {
         }
     }
 
-    /// The one computation of the shape a drag from `center` to `vertex`
-    /// makes under `modifiers`: preview and release both call it, so what is
-    /// drawn is what commits (criterion 5).
-    fn shape_at(&self, center: Point, vertex: Point, modifiers: Modifiers) -> Shape {
-        let frame = created_frame(center, vertex, modifiers);
-        match self.mode {
-            PolyStarMode::Polygon => Shape::Polygon {
-                frame,
-                point_count: self.point_count,
-            },
-            PolyStarMode::Star => Shape::Star {
-                frame,
-                point_count: self.point_count,
-                inner_ratio: self.ratio,
-            },
-        }
-    }
-
     /// The live, uncommitted preview: `None` when idle or still degenerate.
     #[must_use]
     pub fn live_shape(&self) -> Option<CreatePreview> {
         let drag = self.drag?;
-        (!is_degenerate(drag.center, drag.current)).then(|| CreatePreview {
-            shape: self.shape_at(drag.center, drag.current, drag.modifiers),
-            anchor: drag.current,
-            centre: None,
+        self.shape_for(drag.center, drag.current, drag.modifiers)
+    }
+
+    /// The one computation of the shape a create-drag from centre `a` to
+    /// first vertex `b` makes under `modifiers` with the bar's settings
+    /// (`specs/0052-click-to-create-shapes/adrs.md` decision 1): the drag's
+    /// preview and release, and a placement's preview, second click and
+    /// untouched Enter all call it, so what is drawn is what commits
+    /// (criterion 5). `None` when `a` equals `b`.
+    #[must_use]
+    pub fn shape_for(&self, a: Point, b: Point, modifiers: Modifiers) -> Option<CreatePreview> {
+        (!is_degenerate(a, b)).then(|| CreatePreview {
+            shape: self.settings.shape(created_frame(a, b, modifiers)),
+            anchor: b,
+            pivot: None,
         })
     }
 
@@ -163,14 +194,12 @@ impl PolygonStarTool {
         let Some(drag) = self.drag.take() else {
             return CreateOutcome::NoOp;
         };
-        if is_degenerate(drag.center, point) {
-            return CreateOutcome::NoOp;
-        }
-        let frame = created_frame(drag.center, point, modifiers);
-        CreateOutcome::Created(match self.mode {
-            PolyStarMode::Polygon => document.create_polygon(frame, self.point_count),
-            PolyStarMode::Star => document.create_star(frame, self.point_count, self.ratio),
-        })
+        self.shape_for(drag.center, point, modifiers)
+            .map_or(CreateOutcome::NoOp, |preview| {
+                CreateOutcome::Created(
+                    document.create_primitive(preview.shape, Angle::from_radians(0.0)),
+                )
+            })
     }
 
     /// Whether a create-drag is in flight (the button is down), also while it

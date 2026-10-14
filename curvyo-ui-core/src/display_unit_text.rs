@@ -35,6 +35,31 @@ pub fn parse_document_side(text: &str, unit: DisplayUnit) -> Option<Length> {
     validated_document_side(side).ok()
 }
 
+/// Parses a length typed into a click-to-create placement chip
+/// (`specs/0052-click-to-create-shapes/` criterion 24, `adrs.md` decision 3):
+/// a number as [`parse_entry_number`] reads it (point or comma, a leading "+",
+/// U+2212 as "-"), in `unit`, or followed by `mm`, `cm` or `in` in any letter
+/// case, with or without a space, in that unit. Any other trailing text is
+/// `None`. The sign and the range are the caller's to check.
+#[must_use]
+pub fn parse_length(text: &str, unit: DisplayUnit) -> Option<Length> {
+    let text = text.trim();
+    let (number, unit) = split_unit_suffix(text).unwrap_or((text, unit));
+    Some(Length::from_unit(parse_entry_number(number, false)?, unit))
+}
+
+/// `text` without a trailing unit symbol, and that unit; `None` when it ends
+/// in none.
+fn split_unit_suffix(text: &str) -> Option<(&str, DisplayUnit)> {
+    DisplayUnit::ALL.into_iter().find_map(|unit| {
+        let split = text.len().checked_sub(unit.symbol().len())?;
+        let suffix = text.get(split..)?;
+        suffix
+            .eq_ignore_ascii_case(unit.symbol())
+            .then(|| (&text[..split], unit))
+    })
+}
+
 /// The validation message for a refused Width or Height, with the limits in
 /// `unit` rounded inward so it never promises a value the field refuses
 /// (criterion 16): mm "Enter a number from 1 to 100000", cm "Enter a number
@@ -398,5 +423,55 @@ mod tests {
         assert_eq!(parsed_mm("0.9994", DisplayUnit::Mm), None);
         assert_eq!(parsed_mm("0.0393", DisplayUnit::In), None);
         assert_eq!(parsed_mm("0.9996", DisplayUnit::Mm), None);
+    }
+
+    fn length_mm(text: &str, unit: DisplayUnit) -> Option<f64> {
+        parse_length(text, unit).map(Length::as_mm)
+    }
+
+    /// 0052 criterion 24: a bare number is in the display unit; a trailing mm, cm or in, in any
+    /// letter case and with or without a space, names its own unit.
+    #[test]
+    fn a_length_may_carry_its_own_unit() {
+        assert_eq!(length_mm("40", DisplayUnit::Mm), Some(40.0));
+        assert_eq!(length_mm("4", DisplayUnit::Cm), Some(40.0));
+        assert!((length_mm("1in", DisplayUnit::Mm).unwrap() - 25.4).abs() < 1e-9);
+        assert_eq!(length_mm("2 cm", DisplayUnit::Mm), Some(20.0));
+        assert_eq!(length_mm("2 CM", DisplayUnit::In), Some(20.0));
+        assert_eq!(length_mm("12,5 Mm", DisplayUnit::Cm), Some(12.5));
+        assert_eq!(length_mm(" +3 mm ", DisplayUnit::Mm), Some(3.0));
+        assert_eq!(length_mm("\u{2212}5", DisplayUnit::Mm), Some(-5.0));
+    }
+
+    /// 0052 criterion 24: any other trailing text, or no number, is "Enter a number".
+    #[test]
+    fn a_length_with_other_text_is_not_a_number() {
+        for text in [
+            "", "abc", "mm", "5 px", "5pt", "5 m", "5mmm", "5 in in", "1e3", "1.2.3", "5°",
+        ] {
+            assert_eq!(length_mm(text, DisplayUnit::Mm), None, "{text:?}");
+        }
+    }
+
+    proptest::proptest! {
+        /// adrs.md decision 3: a decimal comma reads as a decimal point.
+        #[test]
+        fn a_comma_reads_as_a_point(whole in 0_u32..100_000, frac in 0_u32..1000) {
+            let point = format!("{whole}.{frac:03}");
+            let comma = format!("{whole},{frac:03}");
+            for unit in DisplayUnit::ALL {
+                proptest::prop_assert_eq!(length_mm(&point, unit), length_mm(&comma, unit));
+            }
+        }
+
+        /// adrs.md decision 3: "x in" is x * 25.4 mm, whatever the display unit.
+        #[test]
+        fn inches_are_25_4_mm(x in 0.0_f64..10_000.0) {
+            let text = format!("{x} in");
+            for unit in DisplayUnit::ALL {
+                let mm = length_mm(&text, unit).expect("a length");
+                proptest::prop_assert!((mm - x * 25.4).abs() <= 1e-9 * x.max(1.0));
+            }
+        }
     }
 }
