@@ -19,6 +19,19 @@ fn fresh() -> Session {
     session
 }
 
+/// A session on a document that already has a layer, so a drawing step touches only its own
+/// object: in a document with no layer the first drawing also makes the Initial Layer
+/// (`specs/0050-layers-and-objects-panel` criterion 35, customer feedback 2026-10-14).
+fn fresh_with_layer() -> Session {
+    let document = Document::new(1);
+    document.new_layer(None);
+    let mut session =
+        Session::open(2, &curvyo_document_core::pack(&document, "0.1.0").unwrap()).unwrap();
+    session.resize_viewport(1200.0, 800.0);
+    session.warm_history();
+    session
+}
+
 fn drag(session: &mut Session, from: Point, to: Point) {
     session.pointer_hover(from, false, false);
     session.pointer_down(from, false);
@@ -281,7 +294,7 @@ fn the_object_scope_reads_its_rows_and_subject_from_the_session() {
 
 #[test]
 fn the_wipe_hides_the_story_drops_the_stack_entries_of_this_object_only_and_stays_off_the_stack() {
-    let mut session = fresh();
+    let mut session = fresh_with_layer();
     draw_square(&mut session, 10.0); // A
     nudge(&mut session, 1_000.0); // A alone
     draw_square(&mut session, 60.0); // B

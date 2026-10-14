@@ -1,9 +1,10 @@
 //! The Layers panel's `wasm-bindgen` surface (`specs/0050-layers-and-objects-panel`): a further
 //! `impl WasmSession` block whose every method passes straight through to `Session`, which holds
 //! the rules and the words. Strings and scalars only (ADR 0001 §5); a node id travels as the JSON
-//! the rows carry, and a reply as `{"kind", "text"}`.
+//! the rows carry, and a reply as `{"kind", "text"}`, or the empty string when there is nothing to
+//! show.
 
-use curvyo_ui_core::Reorder;
+use curvyo_ui_core::{Grid, Reorder};
 use wasm_bindgen::prelude::*;
 
 use crate::session::{PanelReply, RowFlag, RowPress};
@@ -84,9 +85,11 @@ impl WasmSession {
         self.session.rename_layer_row(id, name).to_json()
     }
 
-    /// The Opacity field is dragged (percent).
-    pub fn preview_layer_opacity(&mut self, percent: f64) {
-        self.session.preview_layer_opacity(percent);
+    /// The Opacity field is dragged to position `p` of its scale; `grid` is `"normal"`,
+    /// `"coarse"` or `"fine"`.
+    pub fn preview_layer_opacity(&mut self, p: f64, grid: &str) {
+        self.session
+            .preview_layer_opacity_at(p, Grid::from_name(grid).unwrap_or(Grid::Normal));
     }
 
     /// The Opacity field's release: the previewed value is committed once.
@@ -115,7 +118,22 @@ impl WasmSession {
         self.session.new_layer_row().to_json()
     }
 
-    /// Delete layer (the footer).
+    /// Move up (`"up"`) or Move down (`"down"`) of the toolbar.
+    pub fn step_layer_target(&mut self, direction: &str) -> String {
+        let how = match direction {
+            "up" => Reorder::Forward,
+            "down" => Reorder::Backward,
+            _ => return PanelReply::Quiet.to_json(),
+        };
+        self.session.step_layer_target(how).to_json()
+    }
+
+    /// Duplicate of the toolbar.
+    pub fn duplicate_layer_target(&mut self) -> String {
+        self.session.duplicate_layer_target().to_json()
+    }
+
+    /// Delete layer (the toolbar).
     pub fn delete_active_layer(&mut self) -> String {
         self.session.delete_active_layer().to_json()
     }
@@ -148,7 +166,8 @@ impl WasmSession {
     }
 
     /// The layer notice for the canvas notice slot (drawing into a hidden or locked layer, a
-    /// refused or unchanged stacking-order key), once, as `{"kind", "text"}`.
+    /// refused or unchanged stacking-order key), once, as `{"kind", "text"}`; empty when there is
+    /// none.
     pub fn take_layer_notice(&mut self) -> String {
         self.session.take_layer_notice_json()
     }

@@ -3,9 +3,11 @@
 //! layer, and the stacking-order keys (`specs/0050-layers-and-objects-panel` criteria 14, 23, 33
 //! and 35).
 
-use curvyo_document_core::{MOVE_NODES_COMMIT_LABEL, MoveRefusal, NodeId};
+use std::collections::HashSet;
+
+use curvyo_document_core::{MOVE_NODES_COMMIT_LABEL, MoveRefusal, NodeId, ObjectSnapshot, Point};
 use curvyo_ui_core::{
-    Reorder, draw_refused_notice, move_refusal_text, reorder_plans, unchanged_text,
+    Reorder, draw_refused_notice, hit_test_object, move_refusal_text, reorder_plans, unchanged_text,
 };
 
 use super::keys::KeyOutcome;
@@ -117,6 +119,28 @@ impl Session {
         true
     }
 
+    /// Whether the front-most drawn object of the context at `point` is effectively locked, by
+    /// its own lock or an ancestor's: the cursor then shows the lock where a press would select
+    /// nothing (criterion 20, customer feedback 2026-10-14). A hidden object is not there.
+    pub(super) fn locked_at(&self, point: Point) -> bool {
+        let read = self.document_read();
+        if read.inert.is_empty() {
+            return false;
+        }
+        let shown: Vec<ObjectSnapshot> = if self.context_group().is_none() {
+            read.visible.to_vec()
+        } else {
+            let inside: HashSet<NodeId> = self.objects().iter().map(ObjectSnapshot::id).collect();
+            read.visible
+                .iter()
+                .filter(|object| inside.contains(&object.id()))
+                .cloned()
+                .collect()
+        };
+        hit_test_object(&shown, point, self.object_tolerance())
+            .is_some_and(|id| read.inert.contains(&id))
+    }
+
     /// Home, End, Page Up or Page Down on the canvas: the selected objects of the context change
     /// their stacking order among their siblings, in one step (criterion 33).
     pub(super) fn reorder_selection(&mut self, how: Reorder) -> KeyOutcome {
@@ -176,16 +200,17 @@ impl Session {
             .unwrap_or_default()
     }
 
-    /// The layer notice and its kind as the host reads it, once: `{"kind": "alert" | "status" |
-    /// "", "text"}`.
+    /// The layer notice and its kind as the host reads it, once: `{"kind": "alert" | "status",
+    /// "text"}`, or the empty string when there is none. An empty notice is never serialised
+    /// (customer feedback 2026-10-14: a press on a locked object showed `{"kind":"","text":""}`).
     pub fn take_layer_notice_json(&mut self) -> String {
-        let (text, alert) = self.layers.notice.take().unwrap_or_default();
-        let kind = match (text.is_empty(), alert) {
-            (true, _) => "",
-            (false, true) => "alert",
-            (false, false) => "status",
-        };
-        serde_json::json!({ "kind": kind, "text": text }).to_string()
+        match self.layers.notice.take() {
+            Some((text, alert)) if !text.is_empty() => {
+                let kind = if alert { "alert" } else { "status" };
+                serde_json::json!({ "kind": kind, "text": text }).to_string()
+            }
+            _ => String::new(),
+        }
     }
 }
 

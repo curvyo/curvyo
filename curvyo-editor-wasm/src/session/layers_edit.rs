@@ -1,5 +1,6 @@
 //! `Session`'s writes from the Layers panel: the eye and the lock, rename, the Opacity field,
-//! New layer, Delete layer and Delete on a row, and moves by drag and by Alt+arrow keys
+//! New layer, Delete layer and Delete on a row, and moves by drag and by Alt+arrow keys (the
+//! toolbar's Move up, Move down and Duplicate are in `layers_toolbar.rs`)
 //! (`specs/0050-layers-and-objects-panel` criteria 16, 18, 20, 26, 29 to 32, 34, 36 and 37). Each
 //! is one step; all pass the Pen gate of `layers_panel.rs`.
 
@@ -10,9 +11,9 @@ use curvyo_document_core::{
 };
 use curvyo_render_core::drawn_leaves_with;
 use curvyo_ui_core::{
-    OpacityTarget, Reorder, RowMark, delete_locked_layer_notice, deleted_layer_notice,
-    locked_object_notice, move_refusal_text, moved_announcement, opacity_caption, percent,
-    unchanged_text,
+    Grid, OpacityTarget, Reorder, RowMark, ValueScale, delete_locked_layer_notice,
+    deleted_layer_notice, locked_object_notice, move_refusal_text, moved_announcement,
+    opacity_caption, percent, unchanged_text,
 };
 use serde_json::{Value, json};
 
@@ -154,15 +155,24 @@ impl Session {
             .filter_map(|&id| self.document.node_registers(id))
             .map(|registers| percent(registers.opacity))
             .collect();
-        let value = values
+        let stored = values
             .first()
             .filter(|&&first| values.iter().all(|&v| v == first))
             .copied();
+        // While the field is dragged it shows the dragged value (customer feedback 2026-10-14).
+        let value = match &self.panel.opacity_preview {
+            Some((_, opacity)) if !targets.is_empty() => Some(percent(*opacity)),
+            _ => stored,
+        };
+        let bar = value.map_or(0.0, |value| {
+            ValueScale::Opacity.position_of(f64::from(value))
+        });
         json!({
             "caption": opacity_caption(&target),
             "field": !targets.is_empty(),
             "layer": matches!(target, OpacityTarget::Layer(_)),
             "value": value,
+            "bar": bar,
         })
     }
 
@@ -178,6 +188,13 @@ impl Session {
         if let Ok(opacity) = Opacity::new((value / 100.0).clamp(0.0, 1.0)) {
             self.panel.opacity_preview = Some((targets.into_iter().collect(), opacity));
         }
+    }
+
+    /// The Opacity field is dragged to position `p` of its scale (`ValueScale::Opacity`, the
+    /// Style tab's), rounded to `grid`: [`Session::preview_layer_opacity`] of that value.
+    pub fn preview_layer_opacity_at(&mut self, p: f64, grid: Grid) {
+        let scale = ValueScale::Opacity;
+        self.preview_layer_opacity(scale.round(scale.value_at_drag(p), grid));
     }
 
     /// Escape in the Opacity field: the preview ends and the stored value shows again.

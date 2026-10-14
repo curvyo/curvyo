@@ -177,3 +177,83 @@ fn the_pen_and_the_node_tool_see_no_hidden_or_locked_path() {
         "what the Node tool and the Pen read"
     );
 }
+
+/// Draws a rectangle with the Rectangle tool from `from` to `to`.
+fn draw_rect(session: &mut Session, from: Point, to: Point) {
+    session.set_tool(Tool::Rectangle);
+    session.pointer_hover(from, false, false);
+    session.pointer_down(from, false);
+    session.pointer_hover(to, false, false);
+    session.pointer_up(to, false, false);
+}
+
+/// Customer feedback 2026-10-14 (criterion 35 amended): the first drawn object of a document
+/// with no layer makes the layer "Initial Layer" and goes into it, in the object's one step.
+#[test]
+fn drawing_into_a_document_with_no_layer_makes_the_initial_layer_in_the_same_step() {
+    let mut session = Session::new(1);
+    let steps = session.document.own_step_count();
+    draw_rect(&mut session, pt(10.0, 10.0), pt(40.0, 40.0));
+    assert_eq!(session.document.own_step_count(), steps + 1);
+    let roots = session.document.children(None);
+    assert_eq!(roots.len(), 1);
+    let layer = roots[0];
+    assert!(session.document.is_layer(layer));
+    assert_eq!(
+        session
+            .document
+            .node_registers(layer)
+            .unwrap()
+            .name
+            .as_deref(),
+        Some("Initial Layer")
+    );
+    assert_eq!(session.document.children(Some(layer)).len(), 1);
+    assert_eq!(session.active_layer(), Some(layer));
+    // One Ctrl+Z removes both.
+    session.undo();
+    assert_eq!(session.document.children(None), Vec::<NodeId>::new());
+}
+
+/// A document that already has loose objects keeps them where they are (no migration); only the
+/// new drawn object goes into the Initial Layer. An object made by another route (here a write
+/// with the Select tool active) makes no layer.
+#[test]
+fn a_document_with_loose_objects_keeps_them_and_only_the_drawn_object_goes_in() {
+    let mut session = Session::new(1);
+    let loose = rect(&session, 0.0);
+    assert_eq!(session.document.parent_node(loose), None);
+    draw_rect(&mut session, pt(10.0, 10.0), pt(40.0, 40.0));
+    let roots = session.document.children(None);
+    assert_eq!(roots.len(), 2);
+    assert_eq!(roots[0], loose, "the loose object stays at the top level");
+    assert!(session.document.is_layer(roots[1]));
+}
+
+/// Criterion 20, customer feedback 2026-10-14: a press on a locked object shows no message, and
+/// the cursor shows the lock while it hovers a locked object, its own or its layer's lock.
+#[test]
+fn a_locked_object_shows_the_lock_cursor_and_a_press_on_it_posts_no_notice() {
+    let mut t = table();
+    t.session.pointer_hover(pt(40.0, 5.0), false, false);
+    assert_eq!(t.session.cursor_hint(), "locked");
+    t.session.pointer_hover(pt(60.0, 5.0), false, false);
+    assert_eq!(t.session.cursor_hint(), "default");
+    click(&mut t.session, pt(40.0, 5.0), false);
+    assert!(t.session.selection.is_empty());
+    assert_eq!(t.session.take_layer_notice_json(), "", "no empty notice");
+    assert_eq!(super::layers_panel::PanelReply::Quiet.to_json(), "");
+    // Locked through its layer.
+    let layer = t.session.document.parent_node(t.plain).unwrap();
+    t.session.document.set_node_locked(&[layer], true).unwrap();
+    t.session.pointer_hover(pt(60.0, 5.0), false, false);
+    assert_eq!(t.session.cursor_hint(), "locked");
+    // The Offset tool hit-tests for its press too.
+    t.session.set_tool(Tool::Offset);
+    t.session.pointer_hover(pt(40.0, 5.0), false, false);
+    assert_eq!(t.session.cursor_hint(), "locked");
+    // A hidden object is not there: no lock over it.
+    t.session.set_tool(Tool::Select);
+    t.session.pointer_hover(pt(20.0, 5.0), false, false);
+    assert_eq!(t.session.cursor_hint(), "default");
+}

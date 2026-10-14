@@ -34,11 +34,13 @@ pub enum PanelReply {
 }
 
 impl PanelReply {
-    /// `{"kind": "hint" | "notice" | "refusal" | "announce" | "", "text": ...}` for the host.
+    /// `{"kind": "hint" | "notice" | "refusal" | "announce", "text": ...}` for the host, or the
+    /// empty string for [`PanelReply::Quiet`]: an empty notice is never serialised (customer
+    /// feedback 2026-10-14).
     #[must_use]
     pub fn to_json(&self) -> String {
         let (kind, text) = match self {
-            Self::Quiet => ("", ""),
+            Self::Quiet => return String::new(),
             Self::Hint(text) => ("hint", text.as_str()),
             Self::Notice(text) => ("notice", text.as_str()),
             Self::Refusal(text) => ("refusal", text.as_str()),
@@ -232,6 +234,7 @@ impl Session {
             "opacity": self.layer_opacity_json(),
             "activeLayer": self.active_layer(),
             "canDeleteLayer": self.active_layer().is_some(),
+            "toolbar": self.layer_toolbar_json(),
             "firstSelected": first_selected,
             "rows": window,
         })

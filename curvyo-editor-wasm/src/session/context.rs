@@ -181,6 +181,12 @@ impl Session {
         self.drop_inert_selection();
         self.follow_selection_with_active_layer();
         self.document.set_draw_parent(self.draw_parent(live));
+        // A drawing tool's first object in a document with no layer makes the Initial Layer
+        // (`specs/0050-layers-and-objects-panel` criterion 35, customer feedback 2026-10-14).
+        self.document.set_draw_into_initial_layer(matches!(
+            self.tool,
+            Tool::Pen | Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar
+        ));
     }
 
     /// Tells the Select tool which leaves belong together in the current context. Called before

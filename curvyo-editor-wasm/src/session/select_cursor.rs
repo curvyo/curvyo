@@ -37,8 +37,10 @@ impl Session {
     /// object), `"pointer"` (a parameter handle, hover and drag, whatever the
     /// modifiers), `"crosshair"` (a marquee is armed or running) or `"lasso"`
     /// (a lasso is armed or running, or Alt is held with no drag: the next
-    /// press would arm one). A handle cursor never changes with Shift or Ctrl;
-    /// the move cursor follows the press, which Shift changes.
+    /// press would arm one) or `"locked"` (a locked object is under the pointer and a press
+    /// there selects nothing, `specs/0050-layers-and-objects-panel` criterion 20). A handle
+    /// cursor never changes with Shift or Ctrl; the move cursor follows the press, which Shift
+    /// changes.
     #[must_use]
     pub fn cursor_hint(&self) -> String {
         if self.colour_pick_target().is_some() {
@@ -111,6 +113,8 @@ impl Session {
             // The 8 px band around the outline of the sole selected object:
             // a press there selects it again and a drag moves it, as inside.
             PressTarget::Object(id) if self.selection.ids() == [id] => "move",
+            // A locked object under the pointer that the press passes through (criterion 20).
+            PressTarget::Empty if self.locked_at(pointer) => "locked",
             _ => "default",
         }
     }

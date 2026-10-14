@@ -482,3 +482,132 @@ fn the_first_selected_row_falls_back_to_the_shown_ancestor() {
         serde_json::to_value(group).unwrap()
     );
 }
+
+/// Customer feedback 2026-10-14: the toolbar at the top of the Layers tab. Each button says
+/// whether it applies to the panel target, so the host disables it instead of hiding it.
+#[test]
+fn the_toolbar_says_which_buttons_apply_to_the_panel_target() {
+    let (mut session, layer, [a, _, c, _]) = cut_layer();
+    let bar = &view(&mut session)["toolbar"];
+    assert_eq!(bar["newLayer"], true);
+    assert_eq!(
+        bar["deleteLayer"], true,
+        "the front-most layer is active at New"
+    );
+    assert_eq!(bar["moveUp"], false, "no target");
+    assert_eq!(bar["moveDown"], false);
+    assert_eq!(bar["duplicate"], false);
+    session.press_layer_row(&key(c), RowPress::Plain);
+    let bar = &view(&mut session)["toolbar"];
+    assert_eq!(bar["moveUp"], false, "c is the front-most child of Cut");
+    assert_eq!(bar["moveDown"], true);
+    assert_eq!(bar["duplicate"], true);
+    session.press_layer_row(&key(a), RowPress::Plain);
+    let bar = &view(&mut session)["toolbar"];
+    assert_eq!(bar["moveUp"], true, "a is at the back of Cut");
+    assert_eq!(bar["moveDown"], false);
+    session.press_layer_row(&key(layer), RowPress::Plain);
+    let bar = &view(&mut session)["toolbar"];
+    assert_eq!(
+        bar["moveUp"], true,
+        "the loose d lies in front of the layer"
+    );
+    assert_eq!(bar["moveDown"], false, "the layer is at the back");
+    assert_eq!(bar["duplicate"], true);
+    session.document.set_node_locked(&[layer], true).unwrap();
+    let bar = &view(&mut session)["toolbar"];
+    assert_eq!(bar["moveUp"], false, "a locked layer cannot move");
+    assert_eq!(bar["duplicate"], true);
+}
+
+#[test]
+fn move_up_and_down_step_the_panel_target_within_its_level_in_one_step() {
+    let (mut session, layer, [a, b, c, d]) = cut_layer();
+    session.press_layer_row(&key(a), RowPress::Plain);
+    let steps = session.document.own_step_count();
+    assert_eq!(
+        session.step_layer_target(Reorder::Forward),
+        PanelReply::Quiet
+    );
+    assert_eq!(session.document.own_step_count(), steps + 1);
+    assert_eq!(session.document.children(Some(layer)), [b, a, c]);
+    session.step_layer_target(Reorder::Backward);
+    assert_eq!(session.document.children(Some(layer)), [a, b, c]);
+    assert_eq!(session.selection.ids(), &[a], "the selection stays");
+    // A layer target steps among the top-level rows.
+    session.press_layer_row(&key(layer), RowPress::Plain);
+    session.step_layer_target(Reorder::Forward);
+    assert_eq!(session.document.children(None), [d, layer]);
+    assert_eq!(session.active_layer(), Some(layer));
+}
+
+#[test]
+fn duplicate_copies_the_selection_in_place_or_the_target_layer_with_its_content() {
+    let (mut session, layer, [a, b, c, d]) = cut_layer();
+    session.press_layer_row(&key(a), RowPress::Plain);
+    let steps = session.document.own_step_count();
+    session.duplicate_layer_target();
+    assert_eq!(session.document.own_step_count(), steps + 1);
+    let kids = session.document.children(Some(layer));
+    assert_eq!(kids.len(), 4);
+    let copy = kids[1];
+    assert_eq!(
+        (kids[0], kids[2], kids[3]),
+        (a, b, c),
+        "the copy lies directly above a"
+    );
+    assert_eq!(session.selection.ids(), &[copy], "the copy is selected");
+    let corners = |id| {
+        curvyo_ui_core::oriented_bounds(&session.document.object(id).unwrap()).document_corners()
+    };
+    assert_eq!(corners(copy), corners(a), "in place");
+    session.press_layer_row(&key(layer), RowPress::Plain);
+    session.duplicate_layer_target();
+    let roots = session.document.children(None);
+    assert_eq!(roots.len(), 3);
+    assert_eq!((roots[0], roots[2]), (layer, d));
+    let copied = roots[1];
+    assert!(session.document.is_layer(copied));
+    assert_eq!(session.document.children(Some(copied)).len(), 4);
+    assert_eq!(
+        session.active_layer(),
+        Some(copied),
+        "the copy is the target now"
+    );
+}
+
+/// Customer feedback 2026-10-14: the canvas follows the Opacity drag live, the field shows the
+/// dragged value, and the release is one step. The host sends the position, Rust maps it.
+#[test]
+fn the_opacity_drag_shows_live_on_the_canvas_and_commits_once() {
+    let (mut session, _, [a, ..]) = cut_layer();
+    session.press_layer_row(&key(a), RowPress::Plain);
+    let steps = session.document.own_step_count();
+    // p = 0.5 on 100 (4^p - 1) / 3 is 33 percent.
+    session.preview_layer_opacity_at(0.5, curvyo_ui_core::Grid::Normal);
+    assert_eq!(
+        session.document.own_step_count(),
+        steps,
+        "nothing written while dragging"
+    );
+    assert_eq!(
+        view(&mut session)["opacity"]["value"],
+        33,
+        "the field follows"
+    );
+    let drawn = session.render_objects();
+    let shown = drawn.iter().find(|object| object.id() == a).unwrap();
+    assert!(
+        (shown.style().stroke.opacity.get() - 0.33).abs() < 1e-9,
+        "the canvas follows: {:?}",
+        shown.style()
+    );
+    session.preview_layer_opacity_at(0.75, curvyo_ui_core::Grid::Normal);
+    session.commit_layer_opacity_preview();
+    assert_eq!(
+        session.document.own_step_count(),
+        steps + 1,
+        "one step on release"
+    );
+    assert_eq!(view(&mut session)["opacity"]["value"], 61);
+}

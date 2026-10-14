@@ -132,6 +132,20 @@ fn selects(state: KeyState) -> bool {
     matches!(state.tool, Tool::Select | Tool::Offset)
 }
 
+/// Group and Ungroup (`0023` criterion 7): Ctrl+G and Shift+Ctrl+G, once per press, gated like
+/// every shortcut. `None` for any other key.
+fn group_action(input: &KeyInput<'_>, state: KeyState, gate_open: bool) -> Option<KeyAction> {
+    if !(input.ctrl && input.key.eq_ignore_ascii_case("g")) {
+        return None;
+    }
+    let acts = gate_open && !input.alt && !input.repeat && state.tool == Tool::Select;
+    Some(match (acts, input.shift) {
+        (true, false) => KeyAction::Group,
+        (true, true) => KeyAction::Ungroup,
+        (false, _) => KeyAction::Ignore,
+    })
+}
+
 /// The key table and its gate (criteria 54, 55, 60, 61) as a pure function:
 /// the one place that says what a key does in which state.
 pub(super) fn decide(input: &KeyInput<'_>, state: KeyState) -> KeyAction {
@@ -184,14 +198,8 @@ pub(super) fn decide(input: &KeyInput<'_>, state: KeyState) -> KeyAction {
             KeyAction::Ignore
         };
     }
-    // Group and Ungroup (`0023` criterion 7): once per press, gated like every shortcut.
-    if input.ctrl && input.key.eq_ignore_ascii_case("g") {
-        let acts = gate_open && !input.alt && !input.repeat && state.tool == Tool::Select;
-        return match (acts, input.shift) {
-            (true, false) => KeyAction::Group,
-            (true, true) => KeyAction::Ungroup,
-            (false, _) => KeyAction::Ignore,
-        };
+    if let Some(action) = group_action(input, state, gate_open) {
+        return action;
     }
     // Letters are matched without regard to Caps Lock.
     let letter = match input.key.chars().collect::<Vec<_>>().as_slice() {

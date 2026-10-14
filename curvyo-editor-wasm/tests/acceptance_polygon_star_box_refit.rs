@@ -1375,6 +1375,9 @@ fn ac14_no_new_stored_key_format_version_5_and_one_commit_per_gesture() {
     // a reference through the document API a build from before this change
     // also has: rotation is written by `rotate_object`
     let d = Document::new(1);
+    // The session draws into the Initial Layer of a document with no layer (`0050` criterion 35,
+    // customer feedback 2026-10-14); the reference does the same.
+    d.set_draw_into_initial_layer(true);
     let id = d.create_star(
         StarFrame {
             center: c,

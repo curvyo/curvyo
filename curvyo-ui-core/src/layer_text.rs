@@ -172,11 +172,12 @@ pub enum OpacityTarget {
     Layer(String),
 }
 
-/// "Select an object or a layer.", "Locked", "3 objects", "1 object", "Layer Cut".
+/// "Locked", "3 objects", "1 object", "Layer Cut"; nothing when nothing is targeted (the hint
+/// "Select an object or a layer." was removed, customer feedback 2026-10-14).
 #[must_use]
 pub fn opacity_caption(target: &OpacityTarget) -> String {
     match target {
-        OpacityTarget::Nothing => "Select an object or a layer.".to_owned(),
+        OpacityTarget::Nothing => String::new(),
         OpacityTarget::Locked => "Locked".to_owned(),
         OpacityTarget::Objects(count) => objects_count_text(*count),
         OpacityTarget::Layer(name) => format!("Layer {name}"),
@@ -285,10 +286,7 @@ mod tests {
             moved_announcement("Rectangle 3f9a1c", 2, 5),
             "Moved Rectangle 3f9a1c to position 2 of 5"
         );
-        assert_eq!(
-            opacity_caption(&OpacityTarget::Nothing),
-            "Select an object or a layer."
-        );
+        assert_eq!(opacity_caption(&OpacityTarget::Nothing), "");
         assert_eq!(opacity_caption(&OpacityTarget::Objects(3)), "3 objects");
         assert_eq!(
             opacity_caption(&OpacityTarget::Layer("Cut".into())),

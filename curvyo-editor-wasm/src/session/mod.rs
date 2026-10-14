@@ -52,6 +52,7 @@ mod layers_panel;
 mod layers_panel_tests;
 #[cfg(test)]
 mod layers_tests;
+mod layers_toolbar;
 mod move_entry;
 mod move_indicators;
 mod navigation;
