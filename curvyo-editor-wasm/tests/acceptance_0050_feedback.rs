@@ -598,8 +598,7 @@ fn ac36_delete_layer_button_is_one_step_without_confirm_and_undo_restores() {
     assert_eq!(commit_count(&s), n + 1);
     assert_eq!(names(&mut s).len(), 0);
     assert!(
-        notice.contains("Deleted layer Initial Layer and 2 objects.")
-            && !notice.contains("No undo"),
+        notice.contains("Deleted Initial Layer and 2 objects.") && !notice.contains("No undo"),
         "{notice}"
     );
     undo(&mut s);

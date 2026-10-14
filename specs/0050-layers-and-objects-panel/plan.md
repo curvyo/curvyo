@@ -220,6 +220,12 @@ Affected: `curvyo-document-core` (`groups.rs`, `layers.rs`, `shapes.rs`, `paths.
   from `fresh()` again; the layer stays in the document (AC 35, `0041` criterion 31)
 - [x] 45. A refused Duplicate posts "Could not duplicate. Nothing was changed." (AC 57)
 
+- [x] 46. UX review of the feedback: one tooltip on the Opacity field (the per-paint line joins
+  the field's own), the toolbar as one Tab stop with roving focus, Move up and Move down
+  announced, the canvas notice not repeated in the tab's status region; no "Layer Layer 1" in
+  captions and notices; the Object history row does not count a layer the step created as
+  another object (AC 26, 32, 35, 55, 56; `0041` criterion 31)
+
 ## Decisions taken in this plan (reversible in this PR)
 
 - **`document.json` form.** Recorded in `adrs.md` as the note of 2026-10-12 that supersedes

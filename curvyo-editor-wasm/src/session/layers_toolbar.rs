@@ -47,7 +47,8 @@ impl Session {
     }
 
     /// Move up (`Reorder::Forward`) or Move down (`Reorder::Backward`): the panel target steps
-    /// one place among its siblings, one step (`move_nodes`, criterion 32's rules).
+    /// one place among its siblings, one step (`move_nodes`, criterion 32's rules), announced
+    /// as Alt+Up and Alt+Down are.
     pub fn step_layer_target(&mut self, how: Reorder) -> PanelReply {
         self.panel_action(|this| {
             this.panel.fresh_layer = None;
@@ -56,7 +57,8 @@ impl Session {
                 return PanelReply::Quiet;
             }
             match this.run_reorder(&targets, how) {
-                Ok(true) => PanelReply::Quiet,
+                // Announced as Alt+Up and Alt+Down are (criterion 32): the first target.
+                Ok(true) => this.moved_reply(targets[0]),
                 Ok(false) => unchanged_text(how).map_or(PanelReply::Quiet, |text| {
                     PanelReply::Announce(text.to_owned())
                 }),

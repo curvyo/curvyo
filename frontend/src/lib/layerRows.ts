@@ -263,3 +263,24 @@ export function edgeScroll(pointerY: number, top: number, height: number, rowHei
 export function dragBadge(count: number): string {
   return count > 1 ? String(count) : "";
 }
+
+/** The button of the toolbar a key moves the roving focus to: Left and Right one place without
+ * wrapping, Home and End to the ends; `null` for any other key (UX review of 2026-10-14,
+ * must-fix 2). */
+export function toolbarStep(key: string, index: number, count: number): number | null {
+  if (count <= 0) {
+    return null;
+  }
+  switch (key) {
+    case "ArrowLeft":
+      return Math.max(0, index - 1);
+    case "ArrowRight":
+      return Math.min(count - 1, index + 1);
+    case "Home":
+      return 0;
+    case "End":
+      return count - 1;
+    default:
+      return null;
+  }
+}

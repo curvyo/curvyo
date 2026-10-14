@@ -111,7 +111,7 @@ fn a_layer_row_activates_the_layer_and_clears_the_selection() {
     assert!(session.selection.is_empty());
     assert_eq!(session.active_layer(), Some(layer));
     assert_eq!(row(&mut session, layer)["mark"], "active");
-    assert_eq!(view(&mut session)["opacity"]["caption"], "Layer Cut");
+    assert_eq!(view(&mut session)["opacity"]["caption"], "Cut");
     session.press_layer_row(&key(a), RowPress::Plain);
     assert_eq!(session.active_layer(), Some(layer));
     let _ = other;
@@ -209,7 +209,7 @@ fn delete_layer_takes_everything_says_so_and_activates_the_next_layer_back() {
     session.press_layer_row(&key(front), RowPress::Plain);
     assert_eq!(
         session.delete_active_layer(),
-        PanelReply::Notice(format!("Deleted layer {}.", "Layer 1"))
+        PanelReply::Notice("Deleted Layer 1.".to_owned())
     );
     assert_eq!(
         session.active_layer(),
@@ -525,10 +525,10 @@ fn move_up_and_down_step_the_panel_target_within_its_level_in_one_step() {
     let (mut session, layer, [a, b, c, d]) = cut_layer();
     session.press_layer_row(&key(a), RowPress::Plain);
     let steps = session.document.own_step_count();
-    assert_eq!(
+    assert!(matches!(
         session.step_layer_target(Reorder::Forward),
-        PanelReply::Quiet
-    );
+        PanelReply::Announce(_)
+    ));
     assert_eq!(session.document.own_step_count(), steps + 1);
     assert_eq!(session.document.children(Some(layer)), [b, a, c]);
     session.step_layer_target(Reorder::Backward);
@@ -610,4 +610,22 @@ fn the_opacity_drag_shows_live_on_the_canvas_and_commits_once() {
         "one step on release"
     );
     assert_eq!(view(&mut session)["opacity"]["value"], 61);
+}
+
+/// UX review of the customer feedback 2026-10-14, must-fix 3: the toolbar's moves are announced
+/// as Alt+Up and Alt+Down are, and a move that changes nothing says so.
+#[test]
+fn the_toolbar_moves_are_announced_like_the_keys() {
+    let (mut session, _, [a, ..]) = cut_layer();
+    session.press_layer_row(&key(a), RowPress::Plain);
+    let PanelReply::Announce(text) = session.step_layer_target(Reorder::Forward) else {
+        panic!("a move is announced");
+    };
+    assert!(text.starts_with("Moved Rectangle "), "{text}");
+    assert!(text.ends_with("to position 2 of 3"), "{text}");
+    session.step_layer_target(Reorder::Backward);
+    assert_eq!(
+        session.step_layer_target(Reorder::Backward),
+        PanelReply::Announce("Already at the back".into())
+    );
 }

@@ -2,14 +2,26 @@
 //! (`specs/0050-layers-and-objects-panel` criteria 4, 14, 23, 26, 32, 36 and 41, the UX notes).
 //! Every name is plain text; the host never reads one as markup (criterion 17).
 
+/// The layer as a sentence names it: "Layer Cut", or the name alone when it already starts with
+/// "Layer" ("Layer 1", "Initial Layer" is kept as it is too), so a default name never reads
+/// "Layer Layer 1" (UX review of the customer feedback 2026-10-14).
+fn layer_words(layer: &str, noun: &str) -> String {
+    if layer.starts_with("Layer ") || layer.ends_with(" Layer") || layer == "Layer" {
+        layer.to_owned()
+    } else {
+        format!("{noun} {layer}")
+    }
+}
+
 /// "Layer Cut is locked. Unlock it or choose another layer." or the hidden counterpart: drawing
 /// into the active layer is refused (criterion 23).
 #[must_use]
 pub fn draw_refused_notice(layer: &str, locked: bool) -> String {
+    let layer = layer_words(layer, "Layer");
     if locked {
-        format!("Layer {layer} is locked. Unlock it or choose another layer.")
+        format!("{layer} is locked. Unlock it or choose another layer.")
     } else {
-        format!("Layer {layer} is hidden. Show it or choose another layer.")
+        format!("{layer} is hidden. Show it or choose another layer.")
     }
 }
 
@@ -17,7 +29,11 @@ use crate::layer_rows::{Cause, LayerRow, percent};
 
 /// "Hidden by layer Cut": the state an ancestor gives a row.
 fn by(cause: &Cause) -> String {
-    format!("by {} {}", cause.kind, cause.name)
+    if cause.kind == "layer" {
+        format!("by {}", layer_words(&cause.name, "layer"))
+    } else {
+        format!("by {} {}", cause.kind, cause.name)
+    }
 }
 
 /// The state words of a row, each when it applies: "hidden" or "hidden by layer Cut",
@@ -111,17 +127,21 @@ pub fn objects_count_text(count: usize) -> String {
 /// "Deleted layer Cut and 12 objects." (criterion 36).
 #[must_use]
 pub fn deleted_layer_notice(layer: &str, objects: usize) -> String {
+    let layer = layer_words(layer, "layer");
     match objects {
-        0 => format!("Deleted layer {layer}."),
-        1 => format!("Deleted layer {layer} and 1 object."),
-        n => format!("Deleted layer {layer} and {n} objects."),
+        0 => format!("Deleted {layer}."),
+        1 => format!("Deleted {layer} and 1 object."),
+        n => format!("Deleted {layer} and {n} objects."),
     }
 }
 
 /// "Layer Cut is locked. Unlock it first." (criterion 36).
 #[must_use]
 pub fn delete_locked_layer_notice(layer: &str) -> String {
-    format!("Layer {layer} is locked. Unlock it first.")
+    format!(
+        "{} is locked. Unlock it first.",
+        layer_words(layer, "Layer")
+    )
 }
 
 /// "Could not duplicate. Nothing was changed.": Duplicate of the Layers toolbar was refused
@@ -153,7 +173,7 @@ pub fn nothing_to_select_notice(layer: &str, why: NothingToSelect) -> String {
         NothingToSelect::Hidden => "hidden",
         NothingToSelect::Locked => "locked",
     };
-    format!("Layer {layer} is {word}.")
+    format!("{} is {word}.", layer_words(layer, "Layer"))
 }
 
 /// "Moved Rectangle 3f9a1c to position 2 of 5" (criterion 32): what a screen reader hears after a
@@ -176,7 +196,7 @@ pub enum OpacityTarget {
     Layer(String),
 }
 
-/// "Locked", "3 objects", "1 object", "Layer Cut"; nothing when nothing is targeted (the hint
+/// "Locked", "3 objects", "1 object", "Cut" (after the `Layers` glyph); nothing when nothing is targeted (the hint
 /// "Select an object or a layer." was removed, customer feedback 2026-10-14).
 #[must_use]
 pub fn opacity_caption(target: &OpacityTarget) -> String {
@@ -184,7 +204,8 @@ pub fn opacity_caption(target: &OpacityTarget) -> String {
         OpacityTarget::Nothing => String::new(),
         OpacityTarget::Locked => "Locked".to_owned(),
         OpacityTarget::Objects(count) => objects_count_text(*count),
-        OpacityTarget::Layer(name) => format!("Layer {name}"),
+        // The caption's `Layers` glyph says layer: the name alone.
+        OpacityTarget::Layer(name) => name.clone(),
     }
 }
 
@@ -292,10 +313,30 @@ mod tests {
         );
         assert_eq!(opacity_caption(&OpacityTarget::Nothing), "");
         assert_eq!(opacity_caption(&OpacityTarget::Objects(3)), "3 objects");
+    }
+
+    #[test]
+    fn a_default_layer_name_is_not_preceded_by_the_word_layer_again() {
+        // UX review of the customer feedback 2026-10-14, should-fix 5.
+        assert_eq!(deleted_layer_notice("Layer 1", 0), "Deleted Layer 1.");
         assert_eq!(
-            opacity_caption(&OpacityTarget::Layer("Cut".into())),
-            "Layer Cut"
+            delete_locked_layer_notice("Initial Layer"),
+            "Initial Layer is locked. Unlock it first."
         );
+        assert_eq!(
+            draw_refused_notice("Layer 2", true),
+            "Layer 2 is locked. Unlock it or choose another layer."
+        );
+        assert_eq!(
+            nothing_to_select_notice("Layer 1", NothingToSelect::Empty),
+            "Layer 1 is empty."
+        );
+        assert_eq!(
+            opacity_caption(&OpacityTarget::Layer("Layer 1".into())),
+            "Layer 1",
+            "the caption's Layers glyph says layer"
+        );
+        assert_eq!(opacity_caption(&OpacityTarget::Layer("Cut".into())), "Cut");
     }
 
     #[test]

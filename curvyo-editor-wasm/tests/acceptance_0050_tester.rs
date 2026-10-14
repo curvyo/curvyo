@@ -1258,7 +1258,8 @@ fn ac26_the_opacity_field_targets_the_layer_after_a_layer_row_press() {
     let mut s = open(&d);
     s.press_layer_row(&rid(l), RowPress::Plain);
     let v = view(&mut s);
-    assert_eq!(v["opacity"]["caption"], "Layer Cut");
+    // The caption is the name after the Layers glyph (UX review of 2026-10-14, should-fix 5).
+    assert_eq!(v["opacity"]["caption"], "Cut");
     assert_eq!(v["opacity"]["layer"], true);
     s.commit_layer_opacity(50.0);
     let dd = doc_of(&s);

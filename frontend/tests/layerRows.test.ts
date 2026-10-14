@@ -14,6 +14,7 @@ import {
   parseLayersView,
   parseReply,
   reorderFor,
+  toolbarStep,
   windowRange,
 } from "../src/lib/layerRows.ts";
 
@@ -114,4 +115,13 @@ test("the view carries the toolbar and the opacity bar, with safe defaults", () 
     duplicate: false,
   });
   assert.equal(empty.opacity.bar, 0);
+});
+
+test("the toolbar's roving focus moves with Left, Right, Home and End, without wrapping", () => {
+  assert.equal(toolbarStep("ArrowRight", 0, 5), 1);
+  assert.equal(toolbarStep("ArrowRight", 4, 5), 4, "no wrap at the end");
+  assert.equal(toolbarStep("ArrowLeft", 0, 5), 0, "no wrap at the start");
+  assert.equal(toolbarStep("Home", 3, 5), 0);
+  assert.equal(toolbarStep("End", 1, 5), 4);
+  assert.equal(toolbarStep("ArrowDown", 1, 5), null);
 });

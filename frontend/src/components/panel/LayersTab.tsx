@@ -1,5 +1,5 @@
 import { ArrowDown, ArrowUp, Copy, Layers, LayersPlus, Trash2 } from "lucide-react";
-import type { ComponentType } from "react";
+import { Fragment, type ComponentType } from "react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { LayerRow, type RowCell } from "@/components/panel/LayerRow";
@@ -23,6 +23,7 @@ import {
   nextRow,
   reorderFor,
   rowKey,
+  toolbarStep,
   windowRange,
 } from "@/lib/layerRows";
 import { OPACITY_CLICK_MIN_P, VALUE_FIELD_SCALE_END } from "@/lib/sliderNames";
@@ -67,17 +68,27 @@ function ToolbarButton({
   name,
   glyph: Glyph,
   applies,
+  tabbable,
+  buttonRef,
+  onFocus,
   onPress,
 }: {
   name: string;
   glyph: ToolGlyph;
   applies: boolean;
+  /** The toolbar's one Tab stop (roving focus). */
+  tabbable: boolean;
+  buttonRef: (element: HTMLButtonElement | null) => void;
+  onFocus: () => void;
   onPress: () => void;
 }) {
   return (
     <Tooltip side="bottom" content={name}>
       <button
+        ref={buttonRef}
         type="button"
+        tabIndex={tabbable ? 0 : -1}
+        onFocus={onFocus}
         aria-label={name}
         aria-disabled={!applies}
         onClick={() => {
@@ -191,8 +202,9 @@ export function LayersTab({
       if (answer.kind === "hint") {
         setHint(answer.text);
       } else if (answer.kind === "notice") {
+        // The canvas notice slot is a status region already: not repeated here (UX review of
+        // 2026-10-14, must-fix 3).
         showNotice(answer.text, undefined, "canvas", "status");
-        setAnnounce(answer.text);
       } else if (answer.kind === "refusal") {
         showNotice(answer.text, undefined, "canvas", "alert");
       } else if (answer.kind === "announce") {
@@ -518,6 +530,31 @@ export function LayersTab({
     reply(act((session) => session.commit_layer_opacity(percent)));
   const stepSize = (grid: GridName) => (grid === "coarse" ? 10 : 1);
   const toolbar = view.toolbar;
+  // The toolbar is one Tab stop with roving focus; dimmed buttons stay in the order.
+  const [toolFocus, setToolFocus] = useState(0);
+  const toolRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const tools: { name: string; glyph: ToolGlyph; applies: boolean; press: () => void }[] = [
+    { name: "New layer", glyph: LayersPlus, applies: toolbar.newLayer, press: newLayer },
+    {
+      name: "Duplicate",
+      glyph: Copy,
+      applies: toolbar.duplicate,
+      press: () => reply(act((session) => session.duplicate_layer_target())),
+    },
+    {
+      name: "Move up",
+      glyph: ArrowUp,
+      applies: toolbar.moveUp,
+      press: () => reply(act((session) => session.step_layer_target("up"))),
+    },
+    {
+      name: "Move down",
+      glyph: ArrowDown,
+      applies: toolbar.moveDown,
+      press: () => reply(act((session) => session.step_layer_target("down"))),
+    },
+    { name: "Delete layer", glyph: Trash2, applies: toolbar.deleteLayer, press: deleteLayer },
+  ];
 
   const rows = view.rows.map((row) => (
     <LayerRow
@@ -561,28 +598,36 @@ export function LayersTab({
     <div className="flex min-h-0 flex-1 flex-col pr-3">
       {/* The toolbar: operations are buttons with a visible trigger, never sections that appear
           (customer feedback 2026-10-14). */}
-      <div role="toolbar" aria-label="Layers" className="flex shrink-0 items-center gap-1 pb-2">
-        <ToolbarButton name="New layer" glyph={LayersPlus} applies={toolbar.newLayer} onPress={newLayer} />
-        <ToolbarButton
-          name="Duplicate"
-          glyph={Copy}
-          applies={toolbar.duplicate}
-          onPress={() => reply(act((session) => session.duplicate_layer_target()))}
-        />
-        <ToolbarButton
-          name="Move up"
-          glyph={ArrowUp}
-          applies={toolbar.moveUp}
-          onPress={() => reply(act((session) => session.step_layer_target("up")))}
-        />
-        <ToolbarButton
-          name="Move down"
-          glyph={ArrowDown}
-          applies={toolbar.moveDown}
-          onPress={() => reply(act((session) => session.step_layer_target("down")))}
-        />
-        <span className="flex-1" />
-        <ToolbarButton name="Delete layer" glyph={Trash2} applies={toolbar.deleteLayer} onPress={deleteLayer} />
+      <div
+        role="toolbar"
+        aria-label="Layers"
+        aria-orientation="horizontal"
+        onKeyDown={(event) => {
+          const to = toolbarStep(event.key, toolFocus, tools.length);
+          if (to !== null) {
+            event.preventDefault();
+            setToolFocus(to);
+            toolRefs.current[to]?.focus();
+          }
+        }}
+        className="flex shrink-0 items-center gap-1 pb-2"
+      >
+        {tools.map((tool, index) => (
+          <Fragment key={tool.name}>
+            {index === tools.length - 1 ? <span className="flex-1" /> : null}
+            <ToolbarButton
+              name={tool.name}
+              glyph={tool.glyph}
+              applies={tool.applies}
+              tabbable={index === toolFocus}
+              buttonRef={(element) => {
+                toolRefs.current[index] = element;
+              }}
+              onFocus={() => setToolFocus(index)}
+              onPress={tool.press}
+            />
+          </Fragment>
+        ))}
       </div>
       {view.count === 0 ? (
         // The empty state fills the list's place, so the Opacity slot stays at the bottom (UX item 9).
@@ -641,9 +686,11 @@ export function LayersTab({
         </div>
         <div className="flex h-7 items-center">
           {opacity.field ? (
-            <Tooltip side="left" content={OPACITY_TOOLTIP}>
-              <div className="min-w-0 flex-1">
+            // One tooltip: the field's own, with the per-paint rule as its last line (UX review
+            // of 2026-10-14, must-fix 1).
+            <div className="min-w-0 flex-1">
                 <ValueField
+                  note={OPACITY_TOOLTIP}
                   label="Opacity"
                   name="Layer or object opacity"
                   text={String(value)}
@@ -681,8 +728,7 @@ export function LayersTab({
                   }}
                   onReturnFocus={onReturnFocus}
                 />
-              </div>
-            </Tooltip>
+            </div>
           ) : null}
         </div>
         <p className="flex h-4 items-center gap-1 truncate text-xs text-[var(--panel-muted-fg)]">

@@ -395,6 +395,23 @@ impl Session {
         })
     }
 
+    /// After a move of `node`: its parent is opened and a screen reader hears where it went,
+    /// "Moved Rectangle 3f9a1c to position 2 of 5" (criterion 32).
+    pub(super) fn moved_reply(&mut self, node: NodeId) -> PanelReply {
+        if let Some(parent) = self.document.parent_node(node) {
+            let kind = if self.document.is_layer(parent) {
+                curvyo_ui_core::RowKind::Layer
+            } else {
+                curvyo_ui_core::RowKind::Group
+            };
+            self.panel.expansion.set(parent, kind, true);
+        }
+        let rows = self.layer_rows();
+        rows.row(node).map_or(PanelReply::Quiet, |row| {
+            PanelReply::Announce(moved_announcement(&row.name, row.position, row.siblings))
+        })
+    }
+
     /// Alt+Up, Alt+Down, Alt+Home, Alt+End, Alt+Left and Alt+Right on the focused row: the
     /// selected rows (or the focused one) move, one step, and a screen reader hears where to
     /// (criterion 32).
@@ -406,24 +423,7 @@ impl Session {
             this.panel.fresh_layer = None;
             let nodes = this.row_targets(focused);
             match this.run_reorder(&nodes, how) {
-                Ok(true) => {
-                    if let Some(parent) = this.document.parent_node(focused) {
-                        let kind = if this.document.is_layer(parent) {
-                            curvyo_ui_core::RowKind::Layer
-                        } else {
-                            curvyo_ui_core::RowKind::Group
-                        };
-                        this.panel.expansion.set(parent, kind, true);
-                    }
-                    let rows = this.layer_rows();
-                    rows.row(focused).map_or(PanelReply::Quiet, |row| {
-                        PanelReply::Announce(moved_announcement(
-                            &row.name,
-                            row.position,
-                            row.siblings,
-                        ))
-                    })
-                }
+                Ok(true) => this.moved_reply(focused),
                 // A press that changes nothing is said (criterion 32, amended 2026-10-12).
                 Ok(false) => unchanged_text(how).map_or(PanelReply::Quiet, |text| {
                     PanelReply::Announce(text.to_owned())
