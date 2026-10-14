@@ -170,7 +170,10 @@ export function Canvas({ editor }: CanvasProps) {
       />
       <KeyHintChip hint={editor.keyHint} containerRef={editor.containerRef} />
       <NudgeReadout feedback={editor.nudgeFeedback} containerRef={editor.containerRef} />
-      <SelectionAnnouncer text={editor.selectionAnnouncement} />
+      <SelectionAnnouncer
+        text={editor.selectionAnnouncement}
+        seq={editor.selectionAnnouncementSeq}
+      />
       <EditHintChip
         hint={editor.editHint}
         polygon={editor.selectBar.pointsShown && !editor.selectBar.ratioShown}
@@ -296,7 +299,8 @@ function ReadoutChip({ text, second, third, thirdInvalid, x, y, containerRef }: 
   return (
     <div
       ref={chipRef}
-      className="pointer-events-none absolute z-40 whitespace-nowrap rounded-md px-1.5 py-0.5 text-xs"
+      aria-hidden="true"
+      className="pointer-events-none absolute z-40 whitespace-nowrap rounded-md px-1.5 py-0.5 text-xs tabular-nums"
       style={{
         left: Math.max(placement.left, TOOL_RAIL_CLEAR_PX),
         top: placement.top,

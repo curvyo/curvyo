@@ -59,6 +59,14 @@ export interface NodeToolbarState {
    * cannot be edited yet (`0016-boolean-operations` criterion 38). */
   compoundOnly: boolean;
   cloneOnly: boolean;
+  /** Why Join is disabled (`0053` criterion 19): 0 enabled, 1 count, 2 not end nodes, 3 other. */
+  joinBlock: number;
+  /** With `joinBlock` 2: how many selected nodes are not an end node. */
+  joinNotEnd: number;
+  /** The count of `0053` criterion 23. */
+  selectedNodes: number;
+  totalNodes: number;
+  segmentSelected: boolean;
 }
 
 const EMPTY_TOOLBAR_STATE: NodeToolbarState = {
@@ -73,6 +81,11 @@ const EMPTY_TOOLBAR_STATE: NodeToolbarState = {
   canSplit: false,
   compoundOnly: false,
   cloneOnly: false,
+  joinBlock: 0,
+  joinNotEnd: 0,
+  selectedNodes: 0,
+  totalNodes: 0,
+  segmentSelected: false,
 };
 
 /** A plain-JS copy of the Rust `SelectBarView` (`specs/0009-unified-object-editing/`
@@ -238,6 +251,11 @@ function readToolbarState(raw: {
   can_split: boolean;
   compound_only: boolean;
   clone_only: boolean;
+  join_block: number;
+  join_not_end: number;
+  selected_nodes: number;
+  total_nodes: number;
+  segment_selected: boolean;
   free(): void;
 }): NodeToolbarState {
   const state: NodeToolbarState = {
@@ -252,6 +270,11 @@ function readToolbarState(raw: {
     canSplit: raw.can_split,
     compoundOnly: raw.compound_only,
     cloneOnly: raw.clone_only,
+    joinBlock: raw.join_block,
+    joinNotEnd: raw.join_not_end,
+    selectedNodes: raw.selected_nodes,
+    totalNodes: raw.total_nodes,
+    segmentSelected: raw.segment_selected,
   };
   raw.free();
   return state;
@@ -613,6 +636,8 @@ export interface EditorSession {
   /** What a screen reader says about a multi-selection: the count and the group
    * box size, empty for fewer than two objects. */
   selectionAnnouncement: string;
+  /** Changes with every node announcement, so a repeated sentence is spoken again. */
+  selectionAnnouncementSeq: number;
   /** The one-line message of a key that could not act ("Select one object to
    * type a value"), or `null`; it clears itself after 2 s. */
   keyHint: KeyHint | null;
@@ -861,6 +886,7 @@ export function useEditorSession(
   const [isSpaceHeld, setIsSpaceHeld] = useState(false);
   const [selectionCount, setSelectionCount] = useState(0);
   const [selectionAnnouncement, setSelectionAnnouncement] = useState("");
+  const [selectionAnnouncementSeq, setSelectionAnnouncementSeq] = useState(0);
   const [keyHint, setKeyHint] = useState<KeyHint | null>(null);
   const keyHintCounter = useRef(0);
   const nudgeFeedback = useNudgeFeedback();
@@ -944,6 +970,7 @@ export function useEditorSession(
     setSelectionCount(session.selection_count());
     // One polite message at a time: the context announcement wins over the selection one.
     setSelectionAnnouncement(contextAnnounced ? "" : session.selection_announcement());
+    setSelectionAnnouncementSeq(session.selection_announcement_seq());
     setSyncRevision((revision) => revision + 1);
     syncEntry(session);
     syncBadges(session);
@@ -2104,6 +2131,7 @@ export function useEditorSession(
     deleteSelected,
     selectionCount,
     selectionAnnouncement,
+    selectionAnnouncementSeq,
     keyHint,
     canvasNotice: history.notice,
     grouping,
