@@ -6,7 +6,7 @@
 //! [`curvyo_document_core::Document`] commit on release, a zero-movement
 //! press writes nothing and leaves the selection alone.
 
-use curvyo_document_core::{CornerRadii, Document, Length, Point, RectBounds, Shape};
+use curvyo_document_core::{Angle, CornerRadii, Document, Length, Point, RectBounds, Shape};
 
 use crate::modifiers::Modifiers;
 use crate::shape_tool_common::{CreateDragBox, CreateOutcome, CreatePreview, create_drag_box};
@@ -59,11 +59,21 @@ impl RectangleTool {
     #[must_use]
     pub fn live_shape(&self) -> Option<CreatePreview> {
         let drag = self.drag?;
-        let (bounds, b) = created_bounds(drag.down_at, drag.current, drag.modifiers)?;
+        Self::shape_for(drag.down_at, drag.current, drag.modifiers)
+    }
+
+    /// The one computation of the rectangle a create-drag from `a` to `b`
+    /// makes under `modifiers` (`specs/0052-click-to-create-shapes/adrs.md`
+    /// decision 1): the drag's preview and release, and a placement's preview,
+    /// second click and untouched Enter all call it. `None` when it makes
+    /// none.
+    #[must_use]
+    pub fn shape_for(a: Point, b: Point, modifiers: Modifiers) -> Option<CreatePreview> {
+        let (bounds, b) = created_bounds(a, b, modifiers)?;
         Some(CreatePreview {
             shape: rect_shape(bounds),
             anchor: b.anchor,
-            centre: b.centre,
+            pivot: b.centre,
         })
     }
 
@@ -80,8 +90,10 @@ impl RectangleTool {
         let Some(drag) = self.drag.take() else {
             return CreateOutcome::NoOp;
         };
-        created_bounds(drag.down_at, point, modifiers).map_or(CreateOutcome::NoOp, |(bounds, _)| {
-            CreateOutcome::Created(document.create_rect(bounds))
+        Self::shape_for(drag.down_at, point, modifiers).map_or(CreateOutcome::NoOp, |preview| {
+            CreateOutcome::Created(
+                document.create_primitive(preview.shape, Angle::from_radians(0.0)),
+            )
         })
     }
 

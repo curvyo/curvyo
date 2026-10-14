@@ -489,8 +489,13 @@ fn ac26_a_press_without_movement_creates_nothing_and_leaves_selection_empty_and_
                 s.pointer_hover(p, shift, false);
                 s.pointer_down(p, shift);
                 s.pointer_up(p, shift, false);
-                s.pointer_hover(far, false, false);
                 let label = format!("{tool:?} shift={shift} spot {spot}");
+                // Since `0052` criterion 1 the click starts a placement; Escape cancels it
+                // and writes nothing (criterion 7).
+                assert!(s.placement().is_some(), "{label}: a placement runs");
+                s.escape();
+                assert!(s.placement().is_none(), "{label}: Escape cancels it");
+                s.pointer_hover(far, false, false);
                 assert_eq!(s.tool(), tool, "{label}: tool unchanged");
                 assert_eq!(change_count(&s), changes_before, "{label}: no commit");
                 assert_eq!(bytes(&s), bytes_before, "{label}: nothing written");
@@ -520,6 +525,9 @@ fn ac26_a_press_without_movement_with_nothing_selected_keeps_it_that_way() {
         s.set_tool(tool);
         let p = outline_point(&s, 0);
         click(&mut s, p, false); // must not select
+        // Since `0052` criterion 1 the click starts a placement; Escape cancels it.
+        assert!(s.placement().is_some(), "{tool:?}: a placement runs");
+        s.escape();
         s.pointer_hover(pt(900.0, 900.0), false, false);
         assert!(
             decoration(&s, tool).is_empty(),
@@ -1159,6 +1167,10 @@ fn ac25_a_double_click_in_a_creation_tool_creates_nothing_and_changes_nothing() 
                 !dbl(&mut s, p, p),
                 "{tool:?}: no hint chip in a creation tool"
             );
+            // Since `0052` the first click starts a placement and the second, within 3 px of
+            // A, is ignored (criterion 5); Escape cancels it (criterion 7).
+            assert!(s.placement().is_some(), "{tool:?}: a placement runs");
+            s.escape();
             assert_eq!(s.tool(), tool);
             assert_eq!(bytes(&s), before, "{tool:?}: nothing created");
         }

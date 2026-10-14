@@ -260,49 +260,63 @@ fn numbers_of(object: &ObjectSnapshot) -> (Vec<f64>, f64) {
         }
         ObjectSnapshot::Primitive(p) => {
             let mut v = vec![p.style.stroke.width.as_mm()];
-            match p.shape {
-                Shape::Rect {
-                    bounds,
-                    corner_radii,
-                } => v.extend([
-                    bounds.origin.x,
-                    bounds.origin.y,
-                    bounds.width.as_mm(),
-                    bounds.height.as_mm(),
-                    corner_radii.tl.as_mm(),
-                    corner_radii.tr.as_mm(),
-                    corner_radii.br.as_mm(),
-                    corner_radii.bl.as_mm(),
-                ]),
-                Shape::Ellipse { frame } => v.extend([
-                    frame.center.x,
-                    frame.center.y,
-                    frame.rx.as_mm(),
-                    frame.ry.as_mm(),
-                ]),
-                Shape::Polygon { frame, point_count } => v.extend([
-                    frame.center.x,
-                    frame.center.y,
-                    frame.radius.as_mm(),
-                    frame.angle.as_radians(),
-                    f64::from(point_count.get()),
-                ]),
-                Shape::Star {
-                    frame,
-                    point_count,
-                    inner_ratio,
-                } => v.extend([
-                    frame.center.x,
-                    frame.center.y,
-                    frame.radius.as_mm(),
-                    frame.angle.as_radians(),
-                    f64::from(point_count.get()),
-                    inner_ratio.get(),
-                ]),
-            }
+            v.extend(shape_numbers(&p.shape));
             (v, p.rotation.as_radians())
         }
     }
+}
+
+/// Every number of a primitive's own parameters, as [`is_sane`] checks them.
+fn shape_numbers(shape: &Shape) -> Vec<f64> {
+    match *shape {
+        Shape::Rect {
+            bounds,
+            corner_radii,
+        } => vec![
+            bounds.origin.x,
+            bounds.origin.y,
+            bounds.width.as_mm(),
+            bounds.height.as_mm(),
+            corner_radii.tl.as_mm(),
+            corner_radii.tr.as_mm(),
+            corner_radii.br.as_mm(),
+            corner_radii.bl.as_mm(),
+        ],
+        Shape::Ellipse { frame } => vec![
+            frame.center.x,
+            frame.center.y,
+            frame.rx.as_mm(),
+            frame.ry.as_mm(),
+        ],
+        Shape::Polygon { frame, point_count } => vec![
+            frame.center.x,
+            frame.center.y,
+            frame.radius.as_mm(),
+            frame.angle.as_radians(),
+            f64::from(point_count.get()),
+        ],
+        Shape::Star {
+            frame,
+            point_count,
+            inner_ratio,
+        } => vec![
+            frame.center.x,
+            frame.center.y,
+            frame.radius.as_mm(),
+            frame.angle.as_radians(),
+            f64::from(point_count.get()),
+            inner_ratio.get(),
+        ],
+    }
+}
+
+/// Whether every number of `shape` is finite and within [`MAX_COORDINATE_MM`]: the "Too large"
+/// rule of a click-to-create placement (`specs/0052-click-to-create-shapes/` criterion 23), the
+/// same limit as [`is_sane`].
+pub(crate) fn shape_is_sane(shape: &Shape) -> bool {
+    shape_numbers(shape)
+        .into_iter()
+        .all(|v| v.is_finite() && v.abs() <= MAX_COORDINATE_MM)
 }
 
 #[cfg(test)]

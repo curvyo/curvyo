@@ -57,6 +57,10 @@ impl Session {
     /// Every other outcome, a press without movement included, leaves the tool
     /// and the selection alone (criterion 26).
     pub(super) fn shape_pointer_up(&mut self, point: Point, modifiers: Modifiers) {
+        // A release under the click threshold starts a placement instead (`0052` criterion 1).
+        if self.release_starts_placement(point, modifiers) {
+            return;
+        }
         let outcome = match self.tool {
             Tool::Rectangle => self.rectangle.pointer_up(&self.document, point, modifiers),
             Tool::Ellipse => self.ellipse.pointer_up(&self.document, point, modifiers),
@@ -102,6 +106,7 @@ impl Session {
     /// drawn after the switch.
     pub fn set_poly_star_mode(&mut self, mode: PolyStarMode) {
         self.poly_star.set_mode(mode);
+        self.refresh_placement();
     }
 
     /// The point-count setting for the next shape (acceptance criterion 10):
@@ -109,11 +114,13 @@ impl Session {
     /// the Select bar's "Points" (`unified-object-editing` criteria 21, 29).
     pub fn set_poly_star_point_count(&mut self, count: PointCount) {
         self.poly_star.set_point_count(count);
+        self.refresh_placement();
     }
 
     /// The ratio setting for the next star; it never changes a selected star.
     pub fn set_poly_star_ratio(&mut self, ratio: InnerRatio) {
         self.poly_star.set_ratio(ratio);
+        self.refresh_placement();
     }
 
     /// The active creation tool's live, uncommitted preview — `None` outside a
@@ -140,6 +147,10 @@ impl Session {
         }
         if self.tool == Tool::Node {
             return self.node_marquee_readout().or_else(|| self.bend_readout());
+        }
+        // The placement chip replaces the readout (`0052` criterion 11).
+        if self.placement().is_some() {
+            return None;
         }
         let CreatePreview { shape, anchor, .. } = self.live_preview()?;
         let text = match shape {
@@ -227,9 +238,10 @@ mod tests {
         assert_eq!(session.selection.ids(), &[session.document.object_ids()[0]]);
     }
 
-    /// Criterion 26: a press and release without moving creates nothing,
-    /// keeps the tool, and leaves the selection as it was (empty: choosing a
-    /// creation tool clears it), even on another object's outline.
+    /// Criterion 26, as `0052` criterion 1 changes it: a press and release
+    /// without moving creates nothing, starts a placement, keeps the tool, and
+    /// leaves the selection as it was (empty: choosing a creation tool clears
+    /// it), even on another object's outline; Escape cancels the placement.
     #[test]
     fn a_press_without_movement_creates_nothing_and_keeps_the_selection() {
         let mut session = Session::new(1);
@@ -241,6 +253,9 @@ mod tests {
         for at in [Point::new(200.0, 200.0), Point::new(0.0, 15.0)] {
             session.pointer_down(at, false);
             session.pointer_up(at, false, false);
+            assert!(session.placement().is_some(), "a placement runs");
+            session.escape();
+            assert!(session.placement().is_none(), "Escape cancels it");
         }
         assert_eq!(session.document.object_ids().len(), 1);
         assert_eq!(session.tool(), Tool::Ellipse);

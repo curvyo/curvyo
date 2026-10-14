@@ -61,6 +61,7 @@ pub(super) enum KeyAction {
     /// H or V in the Select tool with a selection (`specs/0056-mirror-and-negative-scale/`
     /// criterion 4, Proposal).
     Flip(FlipAxis),
+    StartPlacement,
 }
 
 /// Whether Enter may enter a group: the Select tool, a plain press, nothing in flight.
@@ -108,6 +109,8 @@ fn enter_action(input: &KeyInput<'_>, state: KeyState) -> KeyAction {
         KeyAction::FinishPen
     } else if offset_enter_acts(input, state) {
         KeyAction::OpenOffsetChip
+    } else if placement_enter_acts(input, state) {
+        KeyAction::StartPlacement
     } else if enter_acts(input, state) {
         KeyAction::EnterGroup
     } else {
@@ -121,6 +124,22 @@ fn offset_enter_acts(input: &KeyInput<'_>, state: KeyState) -> bool {
     state.tool == Tool::Offset
         && state.offset_ready
         && !input.repeat
+        && !input.dom_blocked
+        && !input.ctrl
+        && !input.alt
+        && !input.shift
+        && !state.operation_in_flight
+        && !state.entry_open
+}
+
+/// Whether Enter starts a click-to-create placement (`specs/0052-click-to-create-shapes`
+/// criterion 26): a creation tool, a plain press, nothing in flight (a running placement
+/// included) and no chip open.
+fn placement_enter_acts(input: &KeyInput<'_>, state: KeyState) -> bool {
+    matches!(
+        state.tool,
+        Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar
+    ) && !input.repeat
         && !input.dom_blocked
         && !input.ctrl
         && !input.alt

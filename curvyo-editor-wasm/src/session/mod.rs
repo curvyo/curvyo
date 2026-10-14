@@ -77,6 +77,8 @@ mod offset_view;
 mod open_error;
 mod panel_tabs;
 mod pen;
+mod placement;
+mod placement_view;
 mod project;
 mod reference_view;
 mod refusal;
@@ -140,6 +142,8 @@ pub use open_error::map_open_error;
 // a host build does not see an unused public re-export.
 #[cfg(target_arch = "wasm32")]
 pub use move_entry::MoveEntryView;
+#[cfg(target_arch = "wasm32")]
+pub use placement_view::{PlacementChipView, PlacementFieldView};
 #[cfg(target_arch = "wasm32")]
 pub use shapes::LiveReadout;
 #[cfg(target_arch = "wasm32")]
@@ -322,6 +326,8 @@ pub struct Session {
     /// The DOM chips over the canvas, as the host reported them, which a tag of the clone marks
     /// may not meet (`clone_view.rs`).
     dom_chips: Vec<curvyo_ui_core::MarkRect>,
+    /// The click-to-create placement and its press (`placement.rs`).
+    placements: placement::PlacementState,
 }
 
 impl Session {
@@ -387,6 +393,7 @@ impl Session {
             skip_notice: None,
             deleted_objects: 0,
             dom_chips: Vec::new(),
+            placements: placement::PlacementState::default(),
         }
     }
 
@@ -448,6 +455,7 @@ impl Session {
             skip_notice: None,
             deleted_objects: 0,
             dom_chips: Vec::new(),
+            placements: placement::PlacementState::default(),
         };
         // A file another tool wrote can hold clones whose original is gone (`0049` criterion 35).
         session.remove_orphans_after_open();
@@ -494,6 +502,8 @@ impl Session {
             this.select.cancel_entry();
             this.select.forget_press();
             this.select.cancel_gesture();
+            // Any tool switch, by any route, cancels a placement (`0052` criterion 7).
+            this.cancel_placement();
             // Leaving the Pen ends its path as drawn (a lone node is dropped): no
             // unfinished path stays behind that the Document section's resize would
             // not move (`specs/0015-document-size-and-rulers/` criterion 14a).
@@ -553,6 +563,14 @@ impl Session {
             if this.colour_pick_press(point) {
                 return;
             }
+            // During a placement a press places or is ignored; it starts no drag (`0052`
+            // criteria 4, 5, 22).
+            if this.placement().is_some() {
+                this.button_down = true;
+                let modifiers = Modifiers { shift, ..this.held };
+                this.placement_press(point, modifiers);
+                return;
+            }
             if this.refuse_drawing_into_layer() {
                 return;
             }
@@ -571,6 +589,7 @@ impl Session {
                     this.node.pointer_down(&paths, point, tolerances, shift);
                 }
                 Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar => {
+                    this.note_shape_press(point);
                     this.shape_pointer_down(point);
                 }
                 Tool::Offset => {
@@ -625,7 +644,11 @@ impl Session {
                 }
             }
             Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar => {
-                self.shape_pointer_move(point, Modifiers::new(shift, constrain));
+                if self.placement().is_some() {
+                    self.placement_follow(point, Modifiers::new(shift, constrain));
+                } else {
+                    self.shape_pointer_move(point, Modifiers::new(shift, constrain));
+                }
             }
             Tool::Offset => {
                 self.offset_hover(point);

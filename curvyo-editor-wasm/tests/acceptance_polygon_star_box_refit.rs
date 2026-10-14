@@ -122,7 +122,9 @@ fn drag(s: &mut Session, a: Point, b: Point, shift: bool, ctrl: bool) {
     s.pointer_up(b, shift, ctrl);
 }
 
-/// A polygon or star at centre `c`, radius `r`, created by a drag at `deg`.
+/// A polygon or star at centre `c`, radius `r`, created by a drag at `deg`. A drag shorter
+/// than 3 px is a click since `specs/0052-click-to-create-shapes` criterion 1: the radius and
+/// the angle are then typed into its placement, which gives the same frame.
 fn scene(mode: PolyStarMode, n: u32, ratio: f64, c: Point, r: f64, deg: f64) -> Session {
     let mut s = make_session(mode, n, ratio);
     let t = deg.to_radians();
@@ -133,6 +135,11 @@ fn scene(mode: PolyStarMode, n: u32, ratio: f64, c: Point, r: f64, deg: f64) -> 
         false,
         false,
     );
+    if s.placement().is_some() {
+        s.placement_edit(0, &format!("{r}"));
+        s.placement_edit(1, &format!("{deg}"));
+        assert!(s.place_placement());
+    }
     assert_eq!(s.tool(), Tool::Select);
     assert_eq!(s.selected_object_count(), 1);
     s
