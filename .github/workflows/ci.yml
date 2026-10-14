@@ -37,7 +37,9 @@
 #                        wasm32-unknown-unknown, lints it, and asserts the
 #                        ADR 0011 §6 dependency ban list. Ubuntu only, per the
 #                        ADR.
-#   boolean-budgets   — the boolean kernel's performance budgets in a release build, ubuntu only.
+#   performance-budgets — the performance budgets in a release build, ubuntu only: the boolean
+#                        kernel and the commands of 0035, 0036, 0048, and the linked clones of
+#                        0049 (read, frame, commands, hostile sizes, the no-cycle property test).
 #   boolean-wasm-golden — the kernel's golden results in the wasm build, run in Node, ubuntu only.
 #   deny              — `cargo deny check`, once, over the whole workspace
 #                        (ADR 0011 §7: not matrixed — it inspects the
@@ -351,8 +353,8 @@ jobs:
   # defined for a release build; the host gate above builds debug, where the tests only print.
   # The kernel's budgets, the document write and edits of a big result, and the editor frame of a
   # drag over one; ubuntu only, so it stays cheap.
-  boolean-budgets:
-    name: boolean budgets (release)
+  performance-budgets:
+    name: performance budgets (release)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -366,6 +368,10 @@ jobs:
         run: |
           cargo test --release -p curvyo-geometry-core --test boolean_performance -- --nocapture
           cargo test --release -p curvyo-document-core --test compound_write_cost -- --nocapture
+          cargo test --release -p curvyo-document-core --test clone_hostile_sizes -- --nocapture
+          cargo test --release -p curvyo-document-core --test clone_history ac53 -- --nocapture
+          cargo test --release -p curvyo-document-core --test clone_budget -- --nocapture
+          cargo test --release -p curvyo-editor-wasm --test clone_budget -- --nocapture --test-threads=1
           cargo test --release -p curvyo-editor-wasm --test compound_path_interactivity -- --nocapture
           cargo test --release -p curvyo-editor-wasm --test boolean_interactivity -- --nocapture
           cargo test --release -p curvyo-geometry-core --test outline_touch_nesting -- --nocapture
