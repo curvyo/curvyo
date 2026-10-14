@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { COMPOUND_NODES_TEXT } from "@/lib/booleanText";
+import { CLONE_NODES_TEXT } from "@/lib/cloneText";
 import { placeReadout } from "@/lib/readoutPlacement";
 
 /** How long the hint stays, unless a press, a key or the pointer leaving
@@ -33,6 +34,9 @@ export interface EditHint {
   /** The double-click was on a compound path: the chip gives the one line of
    * `0016-boolean-operations` criterion 38 instead of the shape hint. */
   compound?: boolean;
+  /** The double-click was on a linked clone: the chip says it has no nodes
+   * (`specs/0049-linked-clone` criterion 26). */
+  clone?: boolean;
 }
 
 interface EditHintChipProps {
@@ -111,7 +115,14 @@ export function EditHintChip({ hint, containerRef, polygon, onDismiss }: EditHin
         color: "var(--toolbar-icon)",
       }}
     >
-      {(hint.compound ? [COMPOUND_NODES_TEXT] : polygon ? POLYGON_LINES : LINES).map((line, index) => (
+      {(hint.clone
+        ? [CLONE_NODES_TEXT]
+        : hint.compound
+          ? [COMPOUND_NODES_TEXT]
+          : polygon
+            ? POLYGON_LINES
+            : LINES
+      ).map((line, index) => (
         <div key={line} className={index === 0 ? "font-medium" : undefined}>
           {line}
         </div>

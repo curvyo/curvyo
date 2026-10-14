@@ -6,6 +6,8 @@ import { RatioSlider } from "@/components/RatioSlider";
 import { RATIO_SLIDER_NAMES } from "@/lib/sliderNames";
 import { ToolbarSwitch } from "@/components/ToolbarSwitch";
 import type { SelectBarState } from "@/hooks/useEditorSession";
+import type { CloneBarNotice } from "@/hooks/useClones";
+import { LINKED_CLONE_TOOLTIP } from "@/lib/cloneText";
 
 export interface SelectToolbarProps {
   scaleStrokeWidth: boolean;
@@ -32,6 +34,11 @@ export interface SelectToolbarProps {
   /** Escape in the middle of a slider drag: the preview is dropped. */
   onCancelRatio: () => void;
   onConvertToPaths: () => void;
+  /** The Linked clone button is shown (`specs/0049-linked-clone` criterion 4). */
+  linkedCloneShown: boolean;
+  onLinkedClone: () => void;
+  /** The notice of the last Linked clone, 4 px under the button (UX notes). */
+  linkedCloneNotice: CloneBarNotice | null;
   /** Returns the keyboard focus to the canvas (after Enter or Escape in a
    * field). */
   onReturnFocus: () => void;
@@ -407,6 +414,87 @@ function LinkCornersToggle({ linked, onLinkedChange }: LinkCornersToggleProps) {
   );
 }
 
+/** The Linked clone button with its three-line tooltip below (UX notes). */
+function LinkedCloneButton({
+  onLinkedClone,
+  onReturnFocus,
+  notice,
+}: {
+  onLinkedClone: () => void;
+  onReturnFocus: () => void;
+  notice: CloneBarNotice | null;
+}) {
+  // Right-aligned to the button, but never left of the tool rail (`--rail-right` + 12) or off
+  // the canvas: the shift that keeps it there (`0049` UX re-check).
+  const noticeRef = useRef<HTMLDivElement>(null);
+  const [shift, setShift] = useState(0);
+  useLayoutEffect(() => {
+    const element = noticeRef.current;
+    if (!notice || !element) {
+      setShift(0);
+      return;
+    }
+    const rail = parseFloat(getComputedStyle(element).getPropertyValue("--rail-right")) || 0;
+    const left = element.getBoundingClientRect().left - shift;
+    setShift(Math.max(0, rail + 12 - left));
+    // `shift` is read to undo the last one; the measure runs once per notice.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notice]);
+  return (
+    <div className="relative">
+    <Tooltip.Provider delayDuration={400}>
+      <Tooltip.Root>
+        <Tooltip.Trigger asChild>
+          <button
+            type="button"
+            onClick={(event) => {
+              onLinkedClone();
+              if (event.detail > 0) {
+                onReturnFocus();
+              }
+            }}
+            className={`${BUTTON_CLASS} my-1`}
+          >
+            Linked clone
+          </button>
+        </Tooltip.Trigger>
+        <Tooltip.Portal>
+          <Tooltip.Content
+            side="bottom"
+            sideOffset={6}
+            className="z-50 rounded-md px-2 py-1 text-xs"
+            style={{ background: "var(--toolbar-bg)", color: "var(--toolbar-icon)", boxShadow: "var(--panel-elevation-shadow)" }}
+          >
+            {LINKED_CLONE_TOOLTIP.map((line) => (
+              <div key={line}>{line}</div>
+            ))}
+          </Tooltip.Content>
+        </Tooltip.Portal>
+      </Tooltip.Root>
+    </Tooltip.Provider>
+    {/* Takes no focus; a refusal is an alert (criteria 5 and 52). */}
+    <div
+      ref={noticeRef}
+      role={notice?.alert ? "alert" : "status"}
+      // At most 320 px wide, wrapping, right-aligned to the button (UX review must-fix 8).
+      className="absolute top-full right-0 mt-1 w-max max-w-[320px] break-words rounded-md px-2 py-1 text-xs"
+      style={
+        notice
+          ? {
+              background: "var(--toolbar-bg)",
+              color: "var(--toolbar-icon)",
+              boxShadow: "var(--panel-elevation-shadow)",
+              transform: shift > 0 ? `translateX(${shift}px)` : undefined,
+            }
+          : { display: "none" }
+      }
+    >
+      {notice?.text}
+    </div>
+    </div>
+  );
+}
+
 /**
  * The Select tool's contextual bar (`docs/design-system.md`, "Select bar
  * layout"; `specs/0009-unified-object-editing/` criteria 21 to 23): left-aligned
@@ -434,6 +522,9 @@ export function SelectToolbar({
   onSetRatio,
   onCancelRatio,
   onConvertToPaths,
+  linkedCloneShown,
+  onLinkedClone,
+  linkedCloneNotice,
   onReturnFocus,
 }: SelectToolbarProps) {
   const barRef = useRef<HTMLDivElement>(null);
@@ -495,6 +586,18 @@ export function SelectToolbar({
       </button>,
     );
   }
+  if (linkedCloneShown) {
+    // Last, in a group of its own, so no earlier control moves (UX notes, "The button in the
+    // Select bar"); no link glyph, which the Link corners toggle already uses.
+    groups.push(
+      <LinkedCloneButton
+        key="linked-clone"
+        onLinkedClone={onLinkedClone}
+        onReturnFocus={onReturnFocus}
+        notice={linkedCloneNotice}
+      />,
+    );
+  }
   return (
     <div
       ref={barRef}
@@ -510,6 +613,9 @@ export function SelectToolbar({
     >
       {/* The two switches wrap inside their group in a bar too narrow for both (the 356px row
        * of a window of 800px with the second rail column); the first row keeps its y. */}
+      {/* With only linked clones selected the switches would do nothing: they leave the bar
+       * (`specs/0049-linked-clone` criterion 18). */}
+      {bar.scaleSwitchesShown && (
       <div className="flex min-h-9 flex-wrap content-start items-center gap-x-1 gap-y-0 py-1">
         <ToolbarSwitch
           label="Scale stroke width"
@@ -526,6 +632,7 @@ export function SelectToolbar({
           onCheckedChange={onSetScaleCornerRadius}
         />
       </div>
+      )}
       {groups.map((group, index) => (
         <div key={index} className="group/row flex min-h-9 items-start gap-3">
           <Divider />

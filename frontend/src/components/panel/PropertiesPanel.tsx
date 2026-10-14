@@ -292,7 +292,7 @@ export function PropertiesPanel({
                 onReturnFocus={returnFocus}
               />
             ) : doc.view.content === "style" ? (
-              <StyleSection panel={panel} onReturnFocus={returnFocus} />
+              <StyleSection panel={panel} clones={editor.clones} onReturnFocus={returnFocus} />
             ) : doc.view.content === "layers" ? (
               <LayersTab
                 getSession={getSession}
@@ -301,6 +301,7 @@ export function PropertiesPanel({
                 shown={open}
                 showNotice={editor.showHistoryNotice}
                 onReturnFocus={returnFocus}
+                onLinkedClone={() => editor.clones.apply("linked-clone", "layers")}
               />
             ) : doc.view.content === "history" ? (
               <HistoryTab
@@ -339,14 +340,15 @@ function ObjectSubject({ kind, id, fullId }: { kind: string; id: string; fullId:
 }
 
 /** The subject line at the right of the header row: 12 px muted, one line, the
- * full text in a tooltip. */
+ * full text in a tooltip. Its slot is 80 px since the Layers tab joined the strip
+ * (`specs/0049-linked-clone` criterion 21: "Clone of Path 3f9a1c" is cut there). */
 function PanelSubject({ text }: { text: string }) {
   if (text === "") {
     return null;
   }
   return (
     <Tooltip side="left" content={text}>
-      <p className="min-w-0 truncate text-xs text-[var(--panel-muted-fg)]">{text}</p>
+      <p className="min-w-0 max-w-[80px] truncate text-xs text-[var(--panel-muted-fg)]">{text}</p>
     </Tooltip>
   );
 }

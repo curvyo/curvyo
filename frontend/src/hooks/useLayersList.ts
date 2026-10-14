@@ -5,6 +5,7 @@ import {
   type PanelReplyData,
   parseLayersView,
   parseReply,
+  withExtraRow,
 } from "@/lib/layerRows";
 import type { WasmSession } from "@/lib/editorSession";
 
@@ -32,15 +33,22 @@ export function useLayersList(
   sync: () => void,
   first: number,
   count: number,
+  /** A row outside the window to read as well (the focused one), or null. */
+  extra: number | null = null,
 ): LayersListApi {
   const [local, setLocal] = useState(0);
 
   const view = useMemo(() => {
     const session = getSession();
-    return session ? parseLayersView(session.layers_view(first, count)) : EMPTY;
+    if (!session) {
+      return EMPTY;
+    }
+    const window = parseLayersView(session.layers_view(first, count));
+    const focused = extra === null ? null : parseLayersView(session.layers_view(extra, 1));
+    return withExtraRow(window, focused);
     // `syncRevision` and `local` name the changes of the session the read depends on.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [getSession, syncRevision, local, first, count]);
+  }, [getSession, syncRevision, local, first, count, extra]);
 
   const refresh = useCallback(() => setLocal((n) => n + 1), []);
 

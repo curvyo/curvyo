@@ -7,7 +7,9 @@ import {
   Group,
   Hexagon,
   Layers,
+  Link2,
   ListChecks,
+  Locate,
   Lock,
   LockOpen,
   Spline,
@@ -45,6 +47,8 @@ const KIND_GLYPHS: Record<string, Glyph> = {
   ellipse: Circle,
   polygon: Hexagon,
   star: Star,
+  // A linked clone (`specs/0049-linked-clone`, UX notes "The Layers list").
+  clone: Link2,
 };
 
 /** The four cells of a row, in order (criterion 38, customer feedback 2026-10-14). */
@@ -195,12 +199,17 @@ export function LayerRow({
   const tooltip = (
     <span className="flex flex-col">
       <span>{row.name}</span>
+      {row.chainLine ? (
+        <span className="text-[var(--panel-muted-fg)]">{row.chainLine}</span>
+      ) : null}
       {row.stateLine !== "" ? (
         <span className="text-[var(--panel-muted-fg)]">{row.stateLine}</span>
       ) : null}
     </span>
   );
   const showAction = row.rowAction !== "";
+  // A clone row selects its original, a group or layer row its contents (`0049`, `0050`).
+  const actionLabel = row.rowAction === "select-original" ? "Select original" : "Select contents";
   const nameClass = `min-w-0 flex-1 truncate ${active ? "font-semibold" : ""} ${
     hidden ? "text-[var(--panel-muted-fg)]" : "text-[var(--toolbar-icon)]"
   }`;
@@ -323,12 +332,12 @@ export function LayerRow({
         // Its own 24 px slot after the opacity readout, before the eye and the lock (customer
         // feedback 2026-10-14); the slot stays when the button is not shown, so nothing reflows.
         <span role="gridcell" className="flex w-6 shrink-0 items-center">
-          <Tooltip side="left" content="Select contents">
+          <Tooltip side="left" content={actionLabel}>
             <button
               ref={actionRef}
               type="button"
               tabIndex={-1}
-              aria-label="Select contents"
+              aria-label={actionLabel}
               onPointerDown={(event) => event.stopPropagation()}
               onClick={(event) => {
                 event.stopPropagation();
@@ -341,7 +350,11 @@ export function LayerRow({
                   : "invisible group-hover/row:visible group-focus-within/row:visible"
               }`}
             >
-              <ListChecks size={16} strokeWidth={1.5} aria-hidden />
+              {row.rowAction === "select-original" ? (
+                <Locate size={16} strokeWidth={1.5} aria-hidden />
+              ) : (
+                <ListChecks size={16} strokeWidth={1.5} aria-hidden />
+              )}
             </button>
           </Tooltip>
         </span>

@@ -52,7 +52,7 @@ export interface RailCommands {
 }
 
 /** Resolves after `count` painted frames. */
-function afterFrames(count: number): Promise<void> {
+export function afterFrames(count: number): Promise<void> {
   return new Promise((resolve) => {
     const step = (left: number) => {
       if (left <= 0) {
@@ -171,6 +171,20 @@ export function useRailCommands(editor: EditorSession): RailCommands {
   }, [getSession]);
   const { notice, show } = useActionNotice(tool, selectionCount, clearOutline);
 
+  /** `text` with the sentence of the clone repair the command made, if any
+   * (`specs/0049-linked-clone` criterion 31: "Union: 3 objects became 1 path. 2 clones became
+   * paths."). */
+  const withRepair = useCallback(
+    (text: string | null): string | null => {
+      const repaired = getSession()?.take_clone_repair_notice() ?? "";
+      if (text === null || repaired === "") {
+        return text;
+      }
+      return `${text} ${repaired}`;
+    },
+    [getSession],
+  );
+
   /** Runs `run` after the busy state has reached the screen, then shows its notice. */
   const runBusy = useCallback((run: () => void) => {
     busyRef.current = true;
@@ -196,25 +210,26 @@ export function useRailCommands(editor: EditorSession): RailCommands {
         const result = applyBoolean(op);
         outlinedRef.current = refusalOutlinesObjects(result);
         const applied = result.kind === "applied";
-        const text = applied ? successText(op, result) : refusalText(op, result);
+        const text = applied ? withRepair(successText(op, result)) : refusalText(op, result);
         if (text !== null) {
           show(applied ? "success" : "refusal", text);
         }
       });
     },
-    [applyBoolean, runBusy, show],
+    [applyBoolean, runBusy, show, withRepair],
   );
 
   /** The notice of a Path command: the success sentence, else the refusal sentence. */
   const showPath = useCallback(
     (success: string | null, refusal: string | null) => {
       if (success !== null) {
-        show("success", success, noticeMs(success), "path");
+        const text = withRepair(success) ?? success;
+        show("success", text, noticeMs(text), "path");
       } else if (refusal !== null) {
         show("refusal", refusal, undefined, "path");
       }
     },
-    [show],
+    [show, withRepair],
   );
 
   const applyPath = useCallback(

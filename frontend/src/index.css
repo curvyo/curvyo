@@ -138,6 +138,9 @@
        numeric-entry field whose content was refused; 4.8:1 on
        --toolbar-bg, always paired with a message and aria-invalid. */
     --field-invalid: #B3261E;
+    /* The violet of the marks of a selected linked clone and of what it follows
+     * (`docs/design-system.md`, "Linked clone marks"; `specs/0049-linked-clone` criterion 60). */
+    --clone-link: #7B3FD6;
 
     /* 0007 stroke-and-fill-styling (docs/design-system.md, "Properties panel:
        Style section"): the docked panel's ground, muted text, field states,

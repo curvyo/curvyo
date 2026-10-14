@@ -14,7 +14,9 @@ import {
   parseLayersView,
   parseReply,
   reorderFor,
+  listWindow,
   toolbarStep,
+  withExtraRow,
   windowRange,
 } from "../src/lib/layerRows.ts";
 
@@ -113,6 +115,7 @@ test("the view carries the toolbar and the opacity bar, with safe defaults", () 
     moveUp: false,
     moveDown: false,
     duplicate: false,
+    linkedClone: false,
   });
   assert.equal(empty.opacity.bar, 0);
 });
@@ -124,4 +127,25 @@ test("the toolbar's roving focus moves with Left, Right, Home and End, without w
   assert.equal(toolbarStep("Home", 3, 5), 0);
   assert.equal(toolbarStep("End", 1, 5), 4);
   assert.equal(toolbarStep("ArrowDown", 1, 5), null);
+});
+
+test("the window follows the scroll and the focused row comes on its own (0049 UX must-fix 9)", () => {
+  // 4,096 rows, scrolled to the end, the focus on row 1: the rows on screen are read.
+  const range = windowRange(4096 * 28 - 400, 400, 4096, 28);
+  const window = listWindow(range, 1, 4096);
+  assert.equal(window.first, range.first);
+  assert.ok(window.first + window.count >= 4096 - 14, "the window holds the rows on screen");
+  assert.equal(window.extra, 1, "the focused row is read on its own");
+  assert.ok(window.count + 1 <= 60, "never more than 60 row elements");
+  // With the focus inside the window nothing extra is read.
+  assert.equal(listWindow(range, range.first + 2, 4096).extra, null);
+  const row = (index: number) => ({ index }) as never;
+  const merged = withExtraRow(
+    { ...parseLayersView(""), rows: [row(4090), row(4091)] },
+    { ...parseLayersView(""), rows: [row(1)] },
+  );
+  assert.deepEqual(
+    merged.rows.map((r) => (r as { index: number }).index),
+    [4090, 4091, 1],
+  );
 });

@@ -55,8 +55,8 @@ const ROW = {
   rowAction: "select_contents",
 };
 
-const TOOLBAR_ON = { newLayer: true, deleteLayer: true, moveUp: true, moveDown: true, duplicate: true };
-const TOOLBAR_OFF = { newLayer: true, deleteLayer: false, moveUp: false, moveDown: false, duplicate: false };
+const TOOLBAR_ON = { newLayer: true, deleteLayer: true, moveUp: true, moveDown: true, duplicate: true, linkedClone: true };
+const TOOLBAR_OFF = { newLayer: true, deleteLayer: false, moveUp: false, moveDown: false, duplicate: false, linkedClone: false };
 
 async function tab(view: Record<string, unknown>): Promise<string> {
   const react = await import("react");

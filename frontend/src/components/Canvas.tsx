@@ -3,6 +3,7 @@ import { useLayoutEffect, useRef, useState } from "react";
 import { EditHintChip } from "@/components/EditHintChip";
 import { HandleHintChip } from "@/components/HandleHintChip";
 import { KeyHintChip } from "@/components/KeyHintChip";
+import { CloneTags } from "@/components/CloneTags";
 import { MoveBadges } from "@/components/MoveBadges";
 import { NudgeReadout } from "@/components/NudgeReadout";
 import { NodeContextMenu } from "@/components/NodeToolbar";
@@ -178,6 +179,7 @@ export function Canvas({ editor }: CanvasProps) {
       />
       <PenHintChip cue={penCue} containerRef={editor.containerRef} />
       <MoveBadges badges={editor.moveBadges} containerRef={editor.containerRef} />
+      <CloneTags tags={editor.clones.tags} />
       <ColourPickChip
         active={editor.cursorHint === "eyedropper"}
         getSession={editor.getSession}

@@ -121,6 +121,9 @@ function Editor() {
               onSetRatio={editor.setSelectedRatio}
               onCancelRatio={editor.cancelSelectedRatio}
               onConvertToPaths={editor.convertSelectedToPaths}
+              linkedCloneShown={editor.clones.shown}
+              onLinkedClone={() => editor.clones.apply("linked-clone")}
+              linkedCloneNotice={editor.clones.barNotice}
               onReturnFocus={() => editor.containerRef.current?.focus()}
             />
           ) : null}
