@@ -32,7 +32,7 @@ import {
   objectsHeight,
   SUB_ROW_HEIGHT_PX,
 } from "@/lib/historyItems";
-import { rowHintAriaName, rowHintTooltip } from "@/lib/historyPreview";
+import { pressOnId, rowHintAriaName, rowHintTooltip, rowKeyAction } from "@/lib/historyPreview";
 import {
   type HistoryRowData,
   isUndone,
@@ -225,7 +225,7 @@ export function StepRow({
   const undone = isUndone(row);
   const lead = leadWords(row);
   const muted = undone ? "text-[var(--panel-muted-fg)]" : "text-[var(--toolbar-icon)]";
-  const main = useRef<HTMLButtonElement>(null);
+  const main = useRef<HTMLDivElement>(null);
   const side = useRef<HTMLButtonElement>(null);
   const continuation = row.gutter
     .filter((segment) => segment[0] === "line" && segment[3] === "bottom")
@@ -240,38 +240,44 @@ export function StepRow({
     >
       <div className="flex shrink-0 items-stretch" style={{ height: ROW_HEIGHT_PX }}>
         <Tooltip side="left" content={rowHintTooltip(rowTooltip(row))}>
-          <button
+          <div
             ref={main}
-            type="button"
+            role="button"
             data-row-index={index}
             tabIndex={tabbable ? 0 : -1}
             aria-label={rowHintAriaName(rowAriaName(row, now))}
             onFocus={onFocusRow}
-            onClick={onPress}
-            onDoubleClick={(event) => {
-              // A double-click on the id selects the id (criterion 27) and applies nothing.
-              if (event.target instanceof Element && event.target.closest("[data-step-id]")) {
-                return;
+            // A press on the id neither previews nor applies: a double-click there selects the id
+            // (criterion 27). The row is a `div` so that the browser lets its text be selected.
+            onClick={(event) => {
+              if (!pressOnId(event.target instanceof Element ? event.target : null)) {
+                onPress();
               }
-              onApply();
+            }}
+            onDoubleClick={(event) => {
+              if (!pressOnId(event.target instanceof Element ? event.target : null)) {
+                onApply();
+              }
             }}
             onKeyDown={(event) => {
-              if (event.key === "ArrowRight" && side.current) {
-                event.preventDefault();
-                side.current.focus();
-              } else if (event.key === "Enter") {
-                event.preventDefault();
+              const action = rowKeyAction(event, side.current !== null);
+              if (action === null) {
+                return;
+              }
+              event.preventDefault();
+              if (action === "apply") {
                 onApply();
-              } else if (event.key === " ") {
-                event.preventDefault();
+              } else if (action === "preview") {
                 onPress();
+              } else {
+                side.current?.focus();
               }
             }}
             onBlur={() => onHover("")}
             onMouseEnter={() => onHover(row.step)}
             onMouseLeave={() => onHover("")}
             aria-current={selected ? "true" : undefined}
-            className={`flex h-full min-w-0 flex-1 items-stretch gap-1 rounded-[5px] text-left outline-none hover:bg-[var(--row-hover)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)] ${
+            className={`flex h-full min-w-0 flex-1 cursor-default select-none items-stretch gap-1 rounded-[5px] text-left outline-none hover:bg-[var(--row-hover)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)] ${
               selected ? "bg-[var(--value-fill)] shadow-[inset_3px_0_0_var(--editor-accent)]" : ""
             }`}
           >
@@ -293,7 +299,7 @@ export function StepRow({
                 {secondLineRest(row, now)}
               </span>
             </span>
-          </button>
+          </div>
         </Tooltip>
         {action !== null ? (
           <span className="flex w-7 shrink-0 items-center justify-center">

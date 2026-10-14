@@ -15,7 +15,7 @@ import type { EditorSession } from "@/hooks/useEditorSession";
 import { FoldRow, StepRow } from "@/components/panel/HistoryRow";
 import { useHistoryList } from "@/hooks/useHistoryList";
 import { useBusyWindow } from "@/hooks/useRailCommands";
-import { NO_PREVIEW, historyButtonsPaused, parsePreview } from "@/lib/historyPreview";
+import { NO_PREVIEW, applyNotice, historyButtonsPaused, parsePreview } from "@/lib/historyPreview";
 import { setPreviewState, usePreviewState } from "@/lib/historyPreviewStore";
 import {
   itemHeight,
@@ -127,10 +127,15 @@ export function HistoryTab({ editor, shown, onReturnFocus, historyScope }: Histo
       if (!session || busy) {
         return;
       }
+      const item = list.itemAt(index);
+      const id = item?.type === "row" ? item.id : "";
       const apply = () =>
         editor.runHistoryAction((s) => {
-          const result = JSON.parse(s.history_apply_item(object, index)) as { notice: string };
-          return result.notice;
+          const result = JSON.parse(s.history_apply_item(object, index)) as {
+            kind: string;
+            notice: string;
+          };
+          return applyNotice(result, id);
         });
       if (session.history_apply_needs_busy_state(object, index)) {
         setBusy(true);
@@ -149,7 +154,7 @@ export function HistoryTab({ editor, shown, onReturnFocus, historyScope }: Histo
       apply();
       readPreview();
     },
-    [busy, editor, getSession, object, readPreview],
+    [busy, editor, getSession, list, object, readPreview],
   );
 
   useLayoutEffect(() => {

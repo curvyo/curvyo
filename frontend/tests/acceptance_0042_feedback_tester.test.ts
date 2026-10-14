@@ -50,11 +50,18 @@ test("c14 the History tab source has no Mode row, switch, caption or help line",
 });
 
 test("c14 Enter and double-click apply, Space and click preview, a double-click on the id applies nothing", () => {
+  // Changed with the UX review of 2026-10-14: the keys and the id test moved into pure functions
+  // of `lib/historyPreview.ts` (checked by behaviour here), and a click on the id previews nothing,
+  // so a double-click there only selects it.
   const row = readFileSync(new URL("../src/components/panel/HistoryRow.tsx", import.meta.url), "utf8");
-  assert.match(row, /event\.key === "Enter"[\s\S]{0,80}onApply\(\)/);
-  assert.match(row, /event\.key === " "[\s\S]{0,80}onPress\(\)/);
-  assert.match(row, /onClick=\{onPress\}/);
-  assert.match(row, /onDoubleClick/);
-  assert.match(row, /closest\("\[data-step-id\]"\)/);
+  const enter = { key: "Enter", ctrlKey: false, metaKey: false, altKey: false };
+  assert.equal(preview.rowKeyAction(enter, true), "apply");
+  assert.equal(preview.rowKeyAction({ ...enter, key: " " }, true), "preview");
+  assert.match(row, /rowKeyAction\(event/);
+  assert.match(row, /action === "apply"\)[\s\S]{0,40}onApply\(\)/);
+  assert.match(row, /action === "preview"\)[\s\S]{0,40}onPress\(\)/);
+  assert.match(row, /onClick=\{[\s\S]{0,120}pressOnId[\s\S]{0,80}onPress\(\)/);
+  assert.match(row, /onDoubleClick=\{[\s\S]{0,120}pressOnId[\s\S]{0,80}onApply\(\)/);
+  assert.equal(preview.pressOnId({ closest: (sel: string) => (sel === "[data-step-id]" ? {} : null) }), true);
   assert.match(row, /data-step-id/);
 });

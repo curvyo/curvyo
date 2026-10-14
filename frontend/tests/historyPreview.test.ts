@@ -63,3 +63,30 @@ test("a go-to or clone row keeps the full version id on line 2", async () => {
   const clone = { ...base, id: "q1w2e3r", label: "clone_version", class: "clone-start" as const, name: "Clone of 3f9a1c at version a1b2c3d", summary: "", version: "a1b2c3d" };
   assert.deepEqual(rowDisplay(clone), { name: "Clone of 3f9a1c", summary: "at version a1b2c3d" });
 });
+
+test("a row's keys: Enter applies, Space previews, Right goes to the action, the rest is left alone", async () => {
+  const { rowKeyAction } = await import("../src/lib/historyPreview.ts");
+  const key = (k: string, ctrl = false, shift = false) => ({ key: k, ctrlKey: ctrl, metaKey: false, shiftKey: shift, altKey: false });
+  assert.equal(rowKeyAction(key("Enter"), true), "apply");
+  assert.equal(rowKeyAction(key(" "), true), "preview");
+  assert.equal(rowKeyAction(key("ArrowRight"), true), "action");
+  assert.equal(rowKeyAction(key("ArrowRight"), false), null);
+  // Ctrl+Z and Ctrl+Shift+Z go on to the window's undo and redo.
+  assert.equal(rowKeyAction(key("z", true), true), null);
+  assert.equal(rowKeyAction(key("Z", true, true), true), null);
+  assert.equal(rowKeyAction(key("Enter", true), true), null);
+});
+
+test("a press on the step id neither previews nor applies, so a double-click only selects it", async () => {
+  const { pressOnId } = await import("../src/lib/historyPreview.ts");
+  assert.equal(pressOnId({ closest: (selector: string) => (selector === "[data-step-id]" ? {} : null) }), true);
+  assert.equal(pressOnId({ closest: () => null }), false);
+  assert.equal(pressOnId(null), false);
+});
+
+test("an apply of the version the document or object already has says so", async () => {
+  const { applyNotice } = await import("../src/lib/historyPreview.ts");
+  assert.equal(applyNotice({ kind: "went", notice: "Went to a1b2c3d." }, "a1b2c3d"), "Went to a1b2c3d.");
+  assert.equal(applyNotice({ kind: "same", notice: "" }, "d3vvarw"), "Already at d3vvarw.");
+  assert.equal(applyNotice({ kind: "ignored", notice: "" }, "d3vvarw"), "");
+});

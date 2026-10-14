@@ -62,3 +62,38 @@ export function rowHintAriaName(name: string): string {
 export function historyButtonsPaused(state: PreviewState): boolean {
   return state.kind === "document";
 }
+
+/** What a key does on a row of the History list (criteria 9, 10 and 14): Enter applies the
+ * version, Space previews it, Right moves into the row's action. Every other key, Ctrl+Z and
+ * Ctrl+Shift+Z included, is left to the list and the window. */
+export function rowKeyAction(
+  event: { key: string; ctrlKey: boolean; metaKey: boolean; altKey: boolean },
+  hasAction: boolean,
+): "apply" | "preview" | "action" | null {
+  if (event.ctrlKey || event.metaKey || event.altKey) {
+    return null;
+  }
+  switch (event.key) {
+    case "Enter":
+      return "apply";
+    case " ":
+      return "preview";
+    case "ArrowRight":
+      return hasAction ? "action" : null;
+    default:
+      return null;
+  }
+}
+
+/** Whether a press landed on the step id: it neither previews nor applies, so a double-click
+ * there selects the id for copying (criterion 27). */
+export function pressOnId(target: { closest: (selector: string) => unknown } | null): boolean {
+  return target !== null && target.closest("[data-step-id]") !== null;
+}
+
+/** The notice after Enter or a double-click on a row: the session's ("Went to a1b2c3d."), or
+ * "Already at a1b2c3d." when the document or the object already matches that version and nothing
+ * was written (criterion 10). */
+export function applyNotice(result: { kind: string; notice: string }, id: string): string {
+  return result.kind === "same" ? `Already at ${id}.` : result.notice;
+}

@@ -222,3 +222,11 @@ Decisions: `adrs.md` note "customer feedback 2026-10-14", ADR 0014 §8 amendment
 - [x] F.7 `docs/design-system.md`: History tab layout, Mode row, Preview and apply, footer, the
   preview look.
 - [x] F.8 Full gate, WebKitGTK smoke run (`target/0042-smoke/fb-*`): the object preview hides the current object, Escape brings it back, Enter applies in the Object scope, a double-click applies in the Document scope (the drawn rectangle goes, the resized one is back), Ctrl+Z undoes each apply.
+
+UX review of the feedback changes (2026-10-14): a step row is a `div role="button"` (WebKit does
+not select text inside a `<button>`), so a double-click on the id selects it; a press on the id
+neither previews nor applies (`pressOnId`). The row keys are `rowKeyAction`: Enter applies, Space
+previews, Right moves to the row action, and every other key, Ctrl+Z and Ctrl+Shift+Z included,
+goes on to the window. Ctrl+Z in the list worked before and works now (`target/0042-smoke/fb-08`
+to `fb-10`); during a Document preview it is ignored by design (AC 19). Enter or a double-click on
+the version that is already there shows "Already at d3vvarw." and writes nothing.
