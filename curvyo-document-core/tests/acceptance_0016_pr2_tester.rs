@@ -71,7 +71,7 @@ fn rect(document: &Document, x: f64, y: f64, w: f64, h: f64) -> NodeId {
 fn path_of(document: &Document, id: NodeId) -> PathSnapshot {
     match document.object(id).expect("object exists") {
         ObjectSnapshot::Path(p) => p,
-        ObjectSnapshot::Primitive(_) => panic!("expected a path"),
+        ObjectSnapshot::Primitive(_) | ObjectSnapshot::Clone(_) => panic!("expected a path"),
     }
 }
 

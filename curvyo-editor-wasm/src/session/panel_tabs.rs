@@ -23,7 +23,9 @@ impl Session {
     /// Whether the active tool's style scope holds objects: the "selection
     /// state" of the tab rules (`adrs.md` decision 2).
     fn panel_scope_non_empty(&self) -> bool {
-        !self.style_scope().ids.is_empty()
+        // Clones have no style of their own and stay out of the style scope, but the Style tab
+        // shows their clone block (`0049` criteria 22 and 24, UX review must-fix 1).
+        !self.style_scope().ids.is_empty() || self.clone_subject().is_some()
     }
 
     /// Runs `change` on the tab state. The state is a `Cell` because a read of

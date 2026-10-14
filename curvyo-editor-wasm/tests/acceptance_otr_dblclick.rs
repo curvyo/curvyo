@@ -429,7 +429,8 @@ fn double_click_on_a_converted_polygons_segment_hands_off_without_inserting_a_no
             .filter_map(|id| d.object(*id))
             .map(|o| match o {
                 curvyo_document_core::ObjectSnapshot::Path(p) => p.anchors.len(),
-                curvyo_document_core::ObjectSnapshot::Primitive(_) => 0,
+                curvyo_document_core::ObjectSnapshot::Primitive(_)
+                | curvyo_document_core::ObjectSnapshot::Clone(_) => 0,
             })
             .sum::<usize>()
     };

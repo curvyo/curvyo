@@ -56,6 +56,8 @@ pub struct SelectBarView {
     pub ratio: f64,
     /// "Object to path" is shown.
     pub object_to_path_shown: bool,
+    /// "Scale stroke width" and "Scale corner radius" are shown (not with only linked clones).
+    pub scale_switches_shown: bool,
 }
 
 impl From<SelectBarState> for SelectBarView {
@@ -97,6 +99,7 @@ impl From<SelectBarState> for SelectBarView {
             ratio_mixed,
             ratio,
             object_to_path_shown: state.object_to_path,
+            scale_switches_shown: state.scale_switches_shown,
         }
     }
 }

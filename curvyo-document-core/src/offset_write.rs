@@ -11,8 +11,9 @@ use crate::corner_radii_codec::write_corner_radii_if_changed;
 use crate::document::{Document, OBJECTS_TREE};
 use crate::objects::ObjectEditError;
 use crate::path_codec::{self, insert_anchors_container, leaf_exists, push_anchor};
-use crate::path_model::{AnchorId, NodeId};
+use crate::path_model::{AnchorId, NodeId, SubpathSnapshot};
 use crate::paths::tree_id_of;
+use crate::primitive_model::ObjectSnapshot;
 use crate::primitive_model::Shape;
 use crate::replace::{PieceOutlines, check_new_anchor_ids};
 use crate::shape_codec::{self, SHAPE_ELLIPSE, SHAPE_POLYGON, SHAPE_RECT, SHAPE_STAR};
@@ -70,6 +71,8 @@ impl Document {
     ///
     /// # Errors
     /// [`ObjectEditError::NoSuchObject`] if a source or target no longer exists;
+    /// [`ObjectEditError::CloneOutOfRange`] if a changed object would push a clone that follows it
+    /// past the limits of `0049` criterion 17;
     /// [`ObjectEditError::NoOutlines`] if there is no write, or a path has no outline or an
     /// outline no anchor; [`ObjectEditError::AnchorIds`] if two anchors share an id or an id
     /// belongs to an object that keeps its anchors; [`ObjectEditError::InvalidConversion`] if a
@@ -85,6 +88,7 @@ impl Document {
     ) -> Result<Vec<NodeId>, ObjectEditError> {
         let tree = self.loro().get_tree(OBJECTS_TREE);
         validate(&tree, writes)?;
+        self.offset_clone_limits(writes)?;
 
         tree.enable_fractional_index(0);
         let mut ids = Vec::with_capacity(writes.len());
@@ -101,7 +105,11 @@ impl Document {
                     let source_id = tree_id_of(*source);
                     // invariant: resolved above.
                     #[allow(clippy::unwrap_used)]
-                    let style = style_codec::read_style(&tree.get_meta(source_id).unwrap());
+                    let style = crate::clone_write::leaf_style(
+                        &tree,
+                        *source,
+                        &tree.get_meta(source_id).unwrap(),
+                    );
                     let created = create_object(&tree, geometry, &style);
                     let placed = if *below { &mut lowest } else { &mut highest };
                     let next_to = placed
@@ -123,6 +131,13 @@ impl Document {
                     // invariant: resolved above.
                     #[allow(clippy::unwrap_used)]
                     let meta = tree.get_meta(tree_id_of(*target)).unwrap();
+                    // A clone is consumed like any operand (`0049` criterion 33): it becomes a
+                    // path in place with its root's style, and the clones behind it follow it.
+                    if crate::clone_codec::is_clone_meta(&meta) {
+                        let style = crate::clone_write::leaf_style(&tree, *target, &meta);
+                        crate::clone_write::clear_clone_keys(&meta);
+                        style_codec::write_style(&meta, &style);
+                    }
                     change_geometry(&meta, geometry);
                     ids.push(*target);
                 }
@@ -130,6 +145,48 @@ impl Document {
         }
         self.commit_with_label(label);
         Ok(ids)
+    }
+}
+
+impl Document {
+    /// Criterion 17 of `0049` for an offset: a changed object that clones follow, directly or
+    /// through a chain, must not push one of them past the limits. Reads nothing when no clone
+    /// follows a changed object.
+    fn offset_clone_limits(&self, writes: &[OffsetWrite]) -> Result<(), ObjectEditError> {
+        let links = self.clone_links();
+        let origins: HashSet<NodeId> = links.values().map(|&(origin, _)| origin).collect();
+        let changed: Vec<ObjectSnapshot> = writes
+            .iter()
+            .filter_map(|write| match write {
+                OffsetWrite::Change {
+                    target,
+                    geometry: OffsetGeometry::Path(outlines),
+                } if origins.contains(target) => {
+                    let mut path = match self.object(*target)? {
+                        ObjectSnapshot::Path(path) => path,
+                        ObjectSnapshot::Clone(clone) => clone.resolved,
+                        ObjectSnapshot::Primitive(_) => return None,
+                    };
+                    path.id = *target;
+                    let (first, rest) = outlines.split_first()?;
+                    (path.anchors, path.closed) = (first.0.clone(), first.1);
+                    path.extra_subpaths = rest
+                        .iter()
+                        .map(|(anchors, closed)| SubpathSnapshot {
+                            closed: *closed,
+                            anchors: anchors.clone(),
+                        })
+                        .collect();
+                    Some(ObjectSnapshot::Path(path))
+                }
+                _ => None,
+            })
+            .collect();
+        if changed.is_empty() {
+            return Ok(());
+        }
+        self.clone_limits_hold(&links, &changed)
+            .map_err(ObjectEditError::CloneOutOfRange)
     }
 }
 

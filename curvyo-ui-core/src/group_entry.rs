@@ -445,11 +445,18 @@ impl GroupEntry {
         if !current {
             return EntryOutcome::Unchanged;
         }
+        let map = self.map_of(texts, last_edited).ok().flatten();
         match self.resolve(texts, last_edited) {
             Err((field, reason)) => EntryOutcome::Invalid { field, reason },
             Ok(None) => EntryOutcome::Unchanged,
             Ok(Some(results)) => {
-                if commit_group(document, &results, self.modes.stroke, self.handle) {
+                if commit_group(
+                    document,
+                    &results,
+                    self.modes.stroke,
+                    self.handle,
+                    map.as_ref(),
+                ) {
                     EntryOutcome::Committed
                 } else {
                     EntryOutcome::Unchanged

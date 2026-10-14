@@ -59,6 +59,8 @@ pub enum ObjectShape {
     Star,
     /// A group (`specs/0023-groups`).
     Group,
+    /// A linked clone (`specs/0049-linked-clone`).
+    Clone,
 }
 
 /// The outcome for one object.

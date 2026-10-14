@@ -117,6 +117,28 @@ pub(crate) fn read_shape_tag_checked(meta: &LoroMap) -> ShapeTag {
     }
 }
 
+/// What kind of leaf a meta map holds: the one dispatch point that tells a clone apart from a
+/// primitive (both carry a `shape` tag), so the compiler lists every site that must decide
+/// (`specs/0049-linked-clone/review-architect-m1.md`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum LeafKind {
+    /// No `shape` tag: a path or compound path.
+    Path,
+    /// A primitive with this `shape` tag.
+    Primitive(String),
+    /// A linked clone (`shape = "clone"`).
+    Clone,
+}
+
+/// The kind of the leaf `meta` holds.
+pub(crate) fn leaf_kind(meta: &LoroMap) -> LeafKind {
+    match read_shape_tag(meta) {
+        None => LeafKind::Path,
+        Some(tag) if tag == crate::clone_codec::SHAPE_CLONE => LeafKind::Clone,
+        Some(tag) => LeafKind::Primitive(tag),
+    }
+}
+
 pub(crate) fn write_shape_tag(meta: &LoroMap, shape: &str) {
     // invariant: inserting a plain string under a known key on an
     // attached, freshly created meta map cannot fail.

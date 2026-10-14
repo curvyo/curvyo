@@ -32,6 +32,19 @@ enum Planned<'a> {
         anchors: Vec<(loro::LoroMovableList, usize, &'a AnchorSnapshot)>,
         result: &'a ObjectSnapshot,
     },
+    /// A clone whose result is a clone: only its link is written, with the origin it was
+    /// computed for (`specs/0049-linked-clone` criterion 15).
+    Clone {
+        meta: loro::LoroMap,
+        result: &'a ObjectSnapshot,
+    },
+    /// A clone whose result is a path: it is unlinked into that path, under the same id and tree
+    /// position (`0049` criterion 16, the singular case).
+    Unlink {
+        meta: loro::LoroMap,
+        path: &'a PathSnapshot,
+        result: &'a ObjectSnapshot,
+    },
     /// A primitive whose result is a path: its shape keys go and the outline is
     /// written, under the same id and tree position.
     Convert {
@@ -96,60 +109,29 @@ impl Document {
         let tree = self.loro().get_tree(OBJECTS_TREE);
         let planned = results
             .iter()
-            .map(|result| {
-                let tree_id = TreeID::new(result.id().peer, result.id().counter);
-                if !leaf_exists(&tree, tree_id) {
-                    return Err(ObjectEditError::NoSuchObject);
-                }
-                let meta = tree
-                    .get_meta(tree_id)
-                    .map_err(|_| ObjectEditError::NoSuchObject)?;
-                match (result, shape_codec::read_shape_tag(&meta)) {
-                    (ObjectSnapshot::Primitive(primitive), Some(tag)) => {
-                        let current = shape_codec::read_shape(&meta, &tag)
-                            .filter(|current| same_kind(current, &primitive.shape))
-                            .ok_or(ObjectEditError::NoSuchObject)?;
-                        if let Shape::Rect { corner_radii, .. } = primitive.shape {
-                            checked(corner_radii).map_err(|_| ObjectEditError::InvalidRadius)?;
-                        }
-                        Ok(Planned::Primitive {
-                            meta,
-                            current,
-                            result,
-                        })
-                    }
-                    (ObjectSnapshot::Path(path), Some(_)) => {
-                        // The conversion of `0019` criterion 53.
-                        Ok(Planned::Convert {
-                            meta,
-                            anchors: converted_outline(path)?,
-                            result,
-                        })
-                    }
-                    (ObjectSnapshot::Path(path), None) => {
-                        let positions = anchor_positions(&meta);
-                        let anchors = path
-                            .all_anchors()
-                            .map(|anchor| {
-                                positions
-                                    .get(anchor.id)
-                                    .map(|(list, index)| (list, index, anchor))
-                                    .ok_or(ObjectEditError::NoSuchObject)
-                            })
-                            .collect::<Result<_, _>>()?;
-                        Ok(Planned::Path {
-                            meta,
-                            anchors,
-                            result,
-                        })
-                    }
-                    _ => Err(ObjectEditError::NoSuchObject),
-                }
-            })
+            .map(|result| plan_one(&tree, result))
             .collect::<Result<Vec<_>, ObjectEditError>>()?;
         self.converted_ids_are_free(&tree, &planned)?;
+        let links = self.clone_links();
+        self.clone_limits_hold(&links, results)
+            .map_err(ObjectEditError::CloneOutOfRange)?;
         for plan in &planned {
             let (meta, result) = match plan {
+                Planned::Clone { meta, result } => {
+                    if let ObjectSnapshot::Clone(clone) = result {
+                        crate::clone_write::write_matrix(
+                            meta,
+                            clone.chain.origin,
+                            clone.chain.matrix,
+                        );
+                    }
+                    // A clone has no rotation and no stroke of its own.
+                    continue;
+                }
+                Planned::Unlink { meta, path, result } => {
+                    crate::clone_write::unlink_meta(meta, path);
+                    (meta, result)
+                }
                 Planned::Primitive {
                     meta,
                     current,
@@ -217,11 +199,13 @@ impl Document {
     ) -> Result<(), ObjectEditError> {
         let converted: Vec<&NewAnchor> = planned
             .iter()
-            .filter_map(|plan| match plan {
-                Planned::Convert { anchors, .. } => Some(anchors),
-                _ => None,
+            .flat_map(|plan| -> Vec<&NewAnchor> {
+                match plan {
+                    Planned::Convert { anchors, .. } => anchors.iter().collect(),
+                    Planned::Unlink { path, .. } => path.all_anchors().collect(),
+                    _ => Vec::new(),
+                }
             })
-            .flatten()
             .collect();
         if converted.is_empty() {
             return Ok(());
@@ -239,6 +223,90 @@ impl Document {
             }
         }
         Ok(())
+    }
+}
+
+/// The plan for one result, resolved against the document before any write.
+fn plan_one<'a>(
+    tree: &loro::LoroTree,
+    result: &'a ObjectSnapshot,
+) -> Result<Planned<'a>, ObjectEditError> {
+    let tree_id = TreeID::new(result.id().peer, result.id().counter);
+    if !leaf_exists(tree, tree_id) {
+        return Err(ObjectEditError::NoSuchObject);
+    }
+    let meta = tree
+        .get_meta(tree_id)
+        .map_err(|_| ObjectEditError::NoSuchObject)?;
+    if crate::clone_codec::is_clone_meta(&meta) {
+        return plan_clone(meta, result);
+    }
+    match (result, shape_codec::read_shape_tag(&meta)) {
+        (ObjectSnapshot::Primitive(primitive), Some(tag)) => {
+            let current = shape_codec::read_shape(&meta, &tag)
+                .filter(|current| same_kind(current, &primitive.shape))
+                .ok_or(ObjectEditError::NoSuchObject)?;
+            if let Shape::Rect { corner_radii, .. } = primitive.shape {
+                checked(corner_radii).map_err(|_| ObjectEditError::InvalidRadius)?;
+            }
+            Ok(Planned::Primitive {
+                meta,
+                current,
+                result,
+            })
+        }
+        (ObjectSnapshot::Path(path), Some(_)) => {
+            // The conversion of `0019` criterion 53.
+            Ok(Planned::Convert {
+                meta,
+                anchors: converted_outline(path)?,
+                result,
+            })
+        }
+        (ObjectSnapshot::Path(path), None) => {
+            let positions = anchor_positions(&meta);
+            let anchors = path
+                .all_anchors()
+                .map(|anchor| {
+                    positions
+                        .get(anchor.id)
+                        .map(|(list, index)| (list, index, anchor))
+                        .ok_or(ObjectEditError::NoSuchObject)
+                })
+                .collect::<Result<_, _>>()?;
+            Ok(Planned::Path {
+                meta,
+                anchors,
+                result,
+            })
+        }
+        _ => Err(ObjectEditError::NoSuchObject),
+    }
+}
+
+/// The plan for a clone node: a clone result keeps the link (refused when a peer re-pointed the
+/// clone since the read), a path result unlinks it (refused unless its anchor ids are all
+/// different).
+fn plan_clone(
+    meta: loro::LoroMap,
+    result: &ObjectSnapshot,
+) -> Result<Planned<'_>, ObjectEditError> {
+    match result {
+        ObjectSnapshot::Clone(clone) => {
+            match crate::clone_codec::read_clone_link(&meta) {
+                Some(link) if link.origin == clone.chain.origin => {}
+                _ => return Err(ObjectEditError::NoSuchObject),
+            }
+            Ok(Planned::Clone { meta, result })
+        }
+        ObjectSnapshot::Path(path) => {
+            let mut ids = std::collections::HashSet::new();
+            if path.anchors.is_empty() || !path.all_anchors().all(|a| ids.insert(a.id)) {
+                return Err(ObjectEditError::InvalidConversion);
+            }
+            Ok(Planned::Unlink { meta, path, result })
+        }
+        ObjectSnapshot::Primitive(_) => Err(ObjectEditError::NoSuchObject),
     }
 }
 
@@ -294,6 +362,7 @@ fn is_finite(object: &ObjectSnapshot) -> bool {
                     }
                 }
         }
+        ObjectSnapshot::Clone(clone) => rotation && clone.chain.matrix.is_finite(),
         ObjectSnapshot::Path(path) => {
             rotation
                 && path.all_anchors().all(|a| {

@@ -440,6 +440,7 @@ fn hit_outcome(object: &ObjectSnapshot) -> SelectDoubleClickOutcome {
         ObjectSnapshot::Path(path) if path.is_compound() => SelectDoubleClickOutcome::CompoundPath,
         ObjectSnapshot::Path(_) => SelectDoubleClickOutcome::Hit(object.clone()),
         ObjectSnapshot::Primitive(_) => SelectDoubleClickOutcome::EditHint,
+        ObjectSnapshot::Clone(_) => SelectDoubleClickOutcome::Clone,
     }
 }
 

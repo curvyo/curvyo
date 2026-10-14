@@ -81,7 +81,7 @@ fn conversion(d: &Document, id: NodeId, n: u64, base: u64) -> PathSnapshot {
 fn kind(d: &Document, id: NodeId) -> &'static str {
     match d.object(id).unwrap() {
         ObjectSnapshot::Path(_) => "path",
-        ObjectSnapshot::Primitive(_) => "primitive",
+        ObjectSnapshot::Primitive(_) | ObjectSnapshot::Clone(_) => "primitive",
     }
 }
 
@@ -98,6 +98,7 @@ fn a_conversion_keeps_id_position_and_style_in_one_commit() {
     d.edit_style(&[s], &StyleEdit::FillEnabled(true)).unwrap();
     let style_before = match d.object(s).unwrap() {
         ObjectSnapshot::Primitive(p) => format!("{:?}", p.style),
+        ObjectSnapshot::Clone(p) => format!("{:?}", p.resolved.style),
         ObjectSnapshot::Path(_) => panic!(),
     };
     let order = d.object_ids();

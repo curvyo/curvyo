@@ -61,6 +61,7 @@ fn style_of(doc: &Document, id: curvyo_document_core::NodeId) -> Style {
     match doc.object(id).expect("object exists") {
         ObjectSnapshot::Path(p) => p.style,
         ObjectSnapshot::Primitive(p) => p.style,
+        ObjectSnapshot::Clone(p) => p.resolved.style,
     }
 }
 
@@ -181,6 +182,7 @@ fn legacy() -> Legacy {
     for id in doc.object_ids() {
         match doc.object(id).unwrap() {
             ObjectSnapshot::Path(_) => linear_path = Some(id),
+            ObjectSnapshot::Clone(_) => panic!("no clone here"),
             ObjectSnapshot::Primitive(p) => match format!("{:?}", p.shape) {
                 s if s.starts_with("Rect") => radial_rect = Some(id),
                 s if s.starts_with("Ellipse") => solid_ellipse = Some(id),
@@ -231,7 +233,7 @@ fn legacy_gradient_file_opens_without_error_and_keeps_geometry_and_stroke() {
             assert_eq!(p.anchors.len(), 3);
             assert!(!p.closed);
         }
-        ObjectSnapshot::Primitive(_) => panic!("expected path"),
+        ObjectSnapshot::Primitive(_) | ObjectSnapshot::Clone(_) => panic!("expected path"),
     }
 
     // The radial rectangle: fill off, stroke off with its stored width.
@@ -532,6 +534,10 @@ fn every_older_fixture_still_opens_with_the_styles_it_stored() {
         "groups_leaf_child_v11.curvyo",
         // The damaged-register file of `0050-layers-and-objects-panel`.
         "layers_opacity_damaged_v12.curvyo",
+        // The damaged-link file of `0049-linked-clone`.
+        "clone_matrix_five_v13.curvyo",
+        // Orphan clones, which have no style to read until the repair after Open removes them.
+        "clone_orphan_and_ring_v13.curvyo",
     ];
     let mut opened = 0;
     for entry in std::fs::read_dir(dir).unwrap() {

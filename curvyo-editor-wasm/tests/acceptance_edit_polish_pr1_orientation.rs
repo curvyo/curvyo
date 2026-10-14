@@ -998,6 +998,7 @@ fn old_style_doc() -> Document {
     for (id, deg) in [(poly, 30.0), (star, -50.0), (odd, 190.0)] {
         let o = d.object(id).unwrap();
         let c = match &o {
+            ObjectSnapshot::Clone(_) => panic!("no clone here"),
             ObjectSnapshot::Primitive(p) => frame_of(p).center,
             ObjectSnapshot::Path(_) => unreachable!(),
         };

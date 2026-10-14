@@ -79,21 +79,18 @@ impl Session {
         }
         // The blue half of blue-new, black-old: the geometry a release would
         // commit, over the committed objects drawn above and under the boxes
-        // and handles below (`specs/0009-unified-object-editing` criterion 10).
-        if let Some(live) = &live {
-            list.extend(curvyo_render_core::build_live_edit_preview(
-                &live.objects,
-                view,
-            ));
-        }
+        // and handles below (`specs/0009-unified-object-editing` criterion 10),
+        // with the linked clones behind it and the link marks (`0049`).
+        let (clone_previews, previewing) = self.clone_layers(
+            view,
+            &objects,
+            &paths,
+            live.as_ref().map(|l| &l.objects[..]),
+        );
+        list.extend(clone_previews);
         // The Offset tool: the blue hollow result, the box and its four handles
         // (`specs/0038-path-offset` criteria 9, 14, 18).
         list.extend(self.offset_draw_list(view));
-        // The red hollow outline of the objects a refused boolean operation names.
-        let refused = self.refusal_objects(&objects);
-        if !refused.is_empty() {
-            list.extend(curvyo_render_core::build_refusal_outlines(&refused, view));
-        }
         // The pale red box of a move drag or the open typed move (`0047` criteria 33, 36): above
         // the blue preview, whose white casing would otherwise cover it where the two coincide
         // (an unrotated object), and below the selection box and the handles.
@@ -103,6 +100,15 @@ impl Session {
         list.extend(build_select_draw_list(
             view,
             &self.select_decoration_input_in(&live_objects),
+        ));
+        // The marks of a selected clone: over the selection and hover boxes, so a box that
+        // coincides with an outline never hides its trace, and under the handles (`0049`).
+        list.extend(self.clone_mark_layer(view, &objects, previewing));
+        // The red hollow outline of the objects a refused command names: over the clone marks,
+        // so a refusal at depth 8 stays visible (`0049` UX re-check).
+        list.extend(curvyo_render_core::build_refusal_outlines(
+            &self.refusal_objects(&objects),
+            view,
         ));
         if let Some(group) = self.group_decoration_input_in(&live_objects) {
             list.extend(build_group_draw_list(view, &group));
@@ -196,7 +202,7 @@ impl Session {
                         .unwrap_or(original)
                         .clone(),
                 ),
-                ObjectSnapshot::Primitive(_) => object.clone(),
+                ObjectSnapshot::Primitive(_) | ObjectSnapshot::Clone(_) => object.clone(),
             })
             .collect()
     }

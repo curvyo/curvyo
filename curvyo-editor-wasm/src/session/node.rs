@@ -31,7 +31,7 @@ impl Session {
             .iter()
             .filter_map(|object| match object {
                 ObjectSnapshot::Path(path) => Some(path.clone()),
-                ObjectSnapshot::Primitive(_) => None,
+                ObjectSnapshot::Primitive(_) | ObjectSnapshot::Clone(_) => None,
             })
             .collect();
         if self.tool == Tool::Node {
@@ -178,6 +178,7 @@ impl Session {
         let mut state = self.node.toolbar_state(&self.document);
         state.compound_only = matches!(self.selection.ids(), [only]
             if self.document.path(*only).is_some_and(|path| path.is_compound()));
+        state.clone_only = self.node_selection_is_clones();
         state
     }
 

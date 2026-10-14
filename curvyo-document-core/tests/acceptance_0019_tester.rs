@@ -179,6 +179,7 @@ fn the_stroke_width_rule() {
     let mut rb = moved(&d.object(b).unwrap(), 2.0);
     let set = |o: &mut ObjectSnapshot, w: f64| match o {
         ObjectSnapshot::Primitive(p) => p.style.stroke.width = Length::from_mm(w),
+        ObjectSnapshot::Clone(p) => p.resolved.style.stroke.width = Length::from_mm(w),
         ObjectSnapshot::Path(p) => p.style.stroke.width = Length::from_mm(w),
     };
     set(&mut ra, 3.0);
@@ -190,6 +191,7 @@ fn the_stroke_width_rule() {
     for o in all(&d) {
         let w = match &o {
             ObjectSnapshot::Primitive(p) => p.style.stroke.width.as_mm(),
+            ObjectSnapshot::Clone(p) => p.resolved.style.stroke.width.as_mm(),
             ObjectSnapshot::Path(p) => p.style.stroke.width.as_mm(),
         };
         assert_eq!(w, 0.25, "width untouched");
@@ -202,6 +204,7 @@ fn the_stroke_width_rule() {
         .iter()
         .map(|o| match o {
             ObjectSnapshot::Primitive(p) => p.style.stroke.width.as_mm(),
+            ObjectSnapshot::Clone(p) => p.resolved.style.stroke.width.as_mm(),
             ObjectSnapshot::Path(p) => p.style.stroke.width.as_mm(),
         })
         .collect();

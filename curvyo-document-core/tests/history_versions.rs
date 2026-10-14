@@ -30,6 +30,7 @@ fn stroke(d: &Document, id: NodeId) -> f64 {
     match d.object(id).unwrap() {
         curvyo_document_core::ObjectSnapshot::Primitive(p) => p.style.stroke.width.as_mm(),
         curvyo_document_core::ObjectSnapshot::Path(p) => p.style.stroke.width.as_mm(),
+        curvyo_document_core::ObjectSnapshot::Clone(c) => c.resolved.style.stroke.width.as_mm(),
     }
 }
 
@@ -320,8 +321,8 @@ fn c33_only_a_clone_writes_clone_of_and_the_format_version_stays() {
     )
     .unwrap();
     let manifest: serde_json::Value = serde_json::from_str(&manifest).unwrap();
-    // 12 since `0050` (layers); 0042 adds no bump (criterion 33).
-    assert_eq!(manifest["format_version"], 12);
+    // 13 since `0049` (linked clones); 0042 adds no bump (criterion 33).
+    assert_eq!(manifest["format_version"], 13);
     assert_eq!(
         manifest["format_version"],
         curvyo_document_core::CURRENT_FORMAT_VERSION

@@ -11,6 +11,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::affine::Affine;
+use crate::clone_model::CloneSnapshot;
 use crate::corner_radii::CornerRadii;
 use crate::path_model::{NodeId, PathSnapshot};
 use crate::style_model::Style;
@@ -285,6 +287,9 @@ pub enum ObjectSnapshot {
     Path(PathSnapshot),
     /// A primitive node.
     Primitive(PrimitiveSnapshot),
+    /// A linked clone, resolved through its chain (`specs/0049-linked-clone`): readers that
+    /// draw, hit, measure or output it use [`CloneSnapshot::resolved`].
+    Clone(CloneSnapshot),
 }
 
 impl ObjectSnapshot {
@@ -294,6 +299,7 @@ impl ObjectSnapshot {
         match self {
             Self::Path(snapshot) => &snapshot.style,
             Self::Primitive(snapshot) => &snapshot.style,
+            Self::Clone(snapshot) => &snapshot.resolved.style,
         }
     }
 
@@ -303,6 +309,7 @@ impl ObjectSnapshot {
         match self {
             Self::Path(snapshot) => &mut snapshot.style,
             Self::Primitive(snapshot) => &mut snapshot.style,
+            Self::Clone(snapshot) => &mut snapshot.resolved.style,
         }
     }
 
@@ -312,6 +319,7 @@ impl ObjectSnapshot {
         match self {
             Self::Path(snapshot) => snapshot.id,
             Self::Primitive(snapshot) => snapshot.id,
+            Self::Clone(snapshot) => snapshot.id(),
         }
     }
 
@@ -324,6 +332,7 @@ impl ObjectSnapshot {
         match self {
             Self::Path(snapshot) => snapshot.rotation,
             Self::Primitive(snapshot) => snapshot.rotation,
+            Self::Clone(snapshot) => snapshot.resolved.rotation,
         }
     }
 
@@ -377,6 +386,9 @@ impl ObjectSnapshot {
                         .normalized();
                 Self::Primitive(primitive)
             }
+            Self::Clone(clone) => {
+                Self::Clone(clone.mapped_by(Affine::rotation_about(pivot, angle)))
+            }
         }
     }
 
@@ -404,6 +416,7 @@ impl ObjectSnapshot {
                 primitive.shape = translate_shape(primitive.shape, offset);
                 Self::Primitive(primitive)
             }
+            Self::Clone(clone) => Self::Clone(clone.mapped_by(Affine::translation(offset))),
         }
     }
 }

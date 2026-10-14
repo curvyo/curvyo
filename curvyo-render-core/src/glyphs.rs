@@ -137,6 +137,23 @@ impl DrawList {
         self.close_layer();
     }
 
+    /// Appends `layer`'s triangles mapped by `m`, every vertex in `color`, as a new artwork layer:
+    /// the shared tessellation of a linked clone's root (`crate::shared_outline`).
+    pub(crate) fn extend_artwork_mapped(
+        &mut self,
+        layer: &Self,
+        m: curvyo_document_core::Affine,
+        color: RgbaColor,
+    ) {
+        self.triangles.reserve(layer.triangles.len());
+        self.triangles
+            .extend(layer.triangles.iter().map(|vertex| Vertex {
+                position: m.apply_point(vertex.position),
+                color,
+            }));
+        self.close_layer();
+    }
+
     /// A list of overlay triangles from a flat vertex list (tests).
     #[cfg(test)]
     pub(crate) fn from_triangles(triangles: Vec<Vertex>) -> Self {

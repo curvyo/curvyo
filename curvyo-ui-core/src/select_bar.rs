@@ -107,6 +107,10 @@ pub struct SelectBarState {
     /// "Object to path" is shown: the selection holds a rectangle, ellipse,
     /// polygon or star. Always enabled.
     pub object_to_path: bool,
+    /// "Scale stroke width" and "Scale corner radius" are shown: always, except when the
+    /// selection holds only linked clones, on which they would do nothing
+    /// (`specs/0049-linked-clone` criterion 18).
+    pub scale_switches_shown: bool,
 }
 
 /// The one value of `values` if they all agree within `eps`, else `Mixed`.
@@ -127,7 +131,7 @@ fn shapes_of<'a>(
         .into_iter()
         .filter_map(|object| match object {
             ObjectSnapshot::Primitive(primitive) => Some(&primitive.shape),
-            ObjectSnapshot::Path(_) => None,
+            ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_) => None,
         })
 }
 
@@ -247,7 +251,17 @@ pub fn select_bar_state(
         points,
         ratio,
         object_to_path: !ids_of_kind(objects, selection, ObjectKind::Primitive).is_empty(),
+        scale_switches_shown: !only_clones(objects, selection),
     }
+}
+
+/// Whether the selection holds at least one object and every one is a linked clone.
+fn only_clones(objects: &[ObjectSnapshot], selection: &ObjectSelection) -> bool {
+    let held = objects_with_ids(objects, selection.ids());
+    !held.is_empty()
+        && held
+            .iter()
+            .all(|object| matches!(object, ObjectSnapshot::Clone(_)))
 }
 
 #[cfg(test)]

@@ -629,3 +629,119 @@ fn the_toolbar_moves_are_announced_like_the_keys() {
         PanelReply::Announce("Already at the back".into())
     );
 }
+
+/// The clone `id` follows: its direct original, or `None` when `id` is not a clone.
+fn origin_of(session: &Session, id: NodeId) -> Option<NodeId> {
+    match session.document.object(id) {
+        Some(curvyo_document_core::ObjectSnapshot::Clone(clone)) => Some(clone.chain.origin),
+        _ => None,
+    }
+}
+
+/// `0049` criteria 47 and 48 through the toolbar's Duplicate: a copy of a clone is a clone of
+/// the same original, directly above it, and selected.
+#[test]
+fn duplicate_of_a_clone_is_a_clone_of_the_same_original() {
+    let (mut session, layer, [a, ..]) = cut_layer();
+    session.selection.set(&[a]);
+    session.linked_clone();
+    let clone = session.selection.ids()[0];
+    session.press_layer_row(&key(clone), RowPress::Plain);
+    let reply = session.duplicate_layer_target();
+    assert_eq!(reply, PanelReply::Quiet);
+    let copy = session.selection.ids()[0];
+    assert_ne!(copy, clone);
+    assert_eq!(origin_of(&session, copy), Some(a));
+    let kids = session.document.children(Some(layer));
+    let at = kids.iter().position(|&k| k == clone).unwrap();
+    assert_eq!(kids[at + 1], copy, "directly above the clone");
+}
+
+/// `0049` criteria 47 and 48 through the toolbar's Duplicate of a layer: a clone whose original
+/// is copied too follows the copy, a clone of an object outside the layer keeps its original.
+#[test]
+fn duplicate_of_a_layer_with_originals_and_clones_relinks_inside_the_copy() {
+    let (mut session, layer, [a, b, _, d]) = cut_layer();
+    session.selection.set(&[a]);
+    session.linked_clone();
+    let inner = session.selection.ids()[0];
+    session.selection.set(&[d]);
+    session.linked_clone();
+    let outer = session.selection.ids()[0];
+    into(&session, &[outer], layer);
+    session.press_layer_row(&key(layer), RowPress::Plain);
+    assert_eq!(session.duplicate_layer_target(), PanelReply::Quiet);
+    let copied = session.active_layer().unwrap();
+    assert_ne!(copied, layer);
+    let original_kids = session.document.children(Some(layer));
+    let copy_kids = session.document.children(Some(copied));
+    assert_eq!(copy_kids.len(), original_kids.len());
+    let copy_of = |id: NodeId| copy_kids[original_kids.iter().position(|&k| k == id).unwrap()];
+    assert_eq!(origin_of(&session, copy_of(inner)), Some(copy_of(a)));
+    assert_eq!(origin_of(&session, copy_of(outer)), Some(d));
+    assert_eq!(origin_of(&session, copy_of(b)), None, "a path stays a path");
+    assert_eq!(
+        session.document.read_objects().orphans,
+        Vec::<NodeId>::new()
+    );
+}
+
+/// `0050` criterion 35 with `0049`: Linked clone never makes the Initial Layer; the clone lies
+/// directly above its original, at the top level for a loose object and in the Initial Layer
+/// when the original was drawn into it.
+#[test]
+fn linked_clone_stays_next_to_its_original_and_makes_no_initial_layer() {
+    let mut session = Session::new(1);
+    let loose = rect(&session, 0.0);
+    session.selection.set(&[loose]);
+    session.linked_clone();
+    let roots = session.document.children(None);
+    assert_eq!(roots.len(), 2, "no layer appears");
+    assert!(roots.iter().all(|&r| !session.document.is_layer(r)));
+    assert_eq!(origin_of(&session, roots[1]), Some(loose));
+
+    let mut session = Session::new(1);
+    session.set_tool(Tool::Rectangle);
+    session.sync_context();
+    let drawn = rect(&session, 0.0);
+    let initial = session.document.children(None)[0];
+    assert!(session.document.is_layer(initial), "the Initial Layer");
+    session.set_tool(Tool::Select);
+    session.selection.set(&[drawn]);
+    session.linked_clone();
+    assert_eq!(session.document.children(None), [initial]);
+    let kids = session.document.children(Some(initial));
+    assert_eq!(kids.len(), 2);
+    assert_eq!(origin_of(&session, kids[1]), Some(drawn));
+}
+
+/// `0049` with `0050` criterion 55: the toolbar's Linked clone applies by the Select bar's rule,
+/// so it is dimmed for a layer target, an empty selection or a drawing tool.
+#[test]
+fn the_toolbar_linked_clone_applies_where_the_select_bar_button_shows() {
+    let (mut session, layer, [a, ..]) = cut_layer();
+    let applies = |session: &Session| session.layer_toolbar_json()["linkedClone"] == true;
+    assert!(!applies(&session), "nothing selected");
+    session.press_layer_row(&key(a), RowPress::Plain);
+    assert!(applies(&session));
+    session.press_layer_row(&key(layer), RowPress::Plain);
+    assert!(!applies(&session), "a layer is not cloned");
+    session.press_layer_row(&key(a), RowPress::Plain);
+    session.set_tool(Tool::Pen);
+    assert!(!applies(&session), "only with the Select tool");
+}
+
+/// UX review should-fix 17: the row's Select original refused for a hidden original is an alert.
+#[test]
+fn the_row_select_original_refusal_is_an_alert() {
+    let (mut session, _, [a, ..]) = cut_layer();
+    session.selection.set(&[a]);
+    session.linked_clone();
+    let clone = session.selection.ids()[0];
+    session.document.set_node_visible(&[a], false).unwrap();
+    session.sync_context();
+    assert!(matches!(
+        session.select_row_original(&key(clone)),
+        PanelReply::Refusal(_)
+    ));
+}

@@ -179,11 +179,32 @@ impl Document {
     }
 
     /// Moves every object by `offset` without committing; the caller commits.
+    /// A linked clone moves with everything else: its matrix becomes `t·M·t⁻¹`
+    /// (`specs/0049-linked-clone` criterion 16, every object selected).
     fn translate_all_objects(&self, offset: Vec2) {
         let tree = self.loro().get_tree(OBJECTS_TREE);
-        for id in self.object_ids() {
+        let ids = self.object_ids();
+        let links = self.clone_links();
+        let clones: std::collections::HashMap<_, _> = if links.is_empty() {
+            std::collections::HashMap::new()
+        } else {
+            crate::clone_transform::clone_matrices_after(
+                &links,
+                &ids,
+                crate::affine::Affine::translation(offset),
+            )
+            .matrices
+            .into_iter()
+            .collect()
+        };
+        for id in ids {
             if let Ok(meta) = tree.get_meta(tree_id_of(id)) {
-                translate_meta(&meta, offset);
+                match (clones.get(&id), links.get(&id)) {
+                    (Some(&matrix), Some(&(origin, _))) => {
+                        crate::clone_write::write_matrix(&meta, origin, matrix);
+                    }
+                    _ => translate_meta(&meta, offset),
+                }
             }
         }
     }

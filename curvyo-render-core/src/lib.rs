@@ -14,6 +14,7 @@
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
 mod artwork;
+mod clone_marks;
 mod color;
 mod context_dim;
 mod dash;
@@ -38,10 +39,12 @@ mod refusal_outline;
 mod select_box;
 mod select_decoration;
 mod shape_preview;
+mod shared_outline;
 mod stroke;
 mod theme;
 
 pub use artwork::build_artwork;
+pub use clone_marks::{CloneTrace, build_clone_marks};
 pub use color::RgbaColor;
 pub use context_dim::{CONTEXT_DIM, dim_outside};
 pub use decorations::{DecorationInput, Hovered};

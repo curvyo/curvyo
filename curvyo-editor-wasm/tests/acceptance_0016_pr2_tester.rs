@@ -120,7 +120,7 @@ fn paths(s: &Session) -> Vec<PathSnapshot> {
         .into_iter()
         .filter_map(|id| match d.object(id).unwrap() {
             ObjectSnapshot::Path(p) => Some(p),
-            ObjectSnapshot::Primitive(_) => None,
+            ObjectSnapshot::Primitive(_) | ObjectSnapshot::Clone(_) => None,
         })
         .collect()
 }

@@ -667,7 +667,9 @@ fn ac17_converting_a_rect_replaces_its_parameters_with_only_path_anchors() {
             assert_eq!(path.anchors.len(), 4);
             assert!(path.closed);
         }
-        ObjectSnapshot::Primitive(_) => panic!("must be a path after conversion"),
+        ObjectSnapshot::Primitive(_) | ObjectSnapshot::Clone(_) => {
+            panic!("must be a path after conversion")
+        }
     }
 }
 
@@ -724,7 +726,9 @@ fn ac22_each_selected_primitive_converts_independently_in_one_call() {
     for id in [rect_id, ellipse_id] {
         match document.object(id).unwrap() {
             ObjectSnapshot::Path(_) => {}
-            ObjectSnapshot::Primitive(_) => panic!("{id:?} must have converted to a path"),
+            ObjectSnapshot::Primitive(_) | ObjectSnapshot::Clone(_) => {
+                panic!("{id:?} must have converted to a path")
+            }
         }
     }
 }

@@ -21,6 +21,9 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     // `specs/0042-history-branches` criteria 10 and 22; the row adds the version's id.
     ("go_to_version", "Go to version"),
     ("clone_version", "Clone version"),
+    ("linked_clone", "Linked clone"),
+    ("unlink_clone", "Unlink clone"),
+    ("remove_orphan_clones", "Remove orphan clones"),
     ("resize_path", "Resize"),
     ("resize_rect", "Resize"),
     ("resize_ellipse", "Resize"),

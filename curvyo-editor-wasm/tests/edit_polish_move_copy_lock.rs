@@ -75,6 +75,7 @@ fn change_count(session: &Session) -> usize {
 
 fn origin_of(object: &ObjectSnapshot) -> Point {
     match object {
+        ObjectSnapshot::Clone(_) => panic!("no clone here"),
         ObjectSnapshot::Primitive(p) => match p.shape {
             Shape::Rect { bounds, .. } => bounds.origin,
             _ => panic!("a rectangle"),

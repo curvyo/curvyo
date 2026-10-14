@@ -2205,6 +2205,7 @@ fn ac19_the_eyedropper_skips_hidden_nodes_and_samples_locked_ones() {
         match doc_of(s).object(id).unwrap() {
             curvyo_document_core::ObjectSnapshot::Path(p) => p.style.fill.color,
             curvyo_document_core::ObjectSnapshot::Primitive(p) => p.style.fill.color,
+            curvyo_document_core::ObjectSnapshot::Clone(p) => p.resolved.style.fill.color,
         }
     };
     let mut s = open(&d);

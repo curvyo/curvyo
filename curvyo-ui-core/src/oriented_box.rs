@@ -132,7 +132,10 @@ pub fn oriented_bounds(object: &ObjectSnapshot) -> OrientedBox {
                 pivot: shape_center(&primitive.shape),
             }
         }
-        ObjectSnapshot::Path(path) => path_oriented_bounds(path),
+        ObjectSnapshot::Path(path)
+        | ObjectSnapshot::Clone(curvyo_document_core::CloneSnapshot { resolved: path, .. }) => {
+            path_oriented_bounds(path)
+        }
     }
 }
 

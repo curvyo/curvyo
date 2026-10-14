@@ -63,6 +63,7 @@ fn markers_of(document: &Document, id: NodeId) -> Markers {
     match document.object(id).unwrap() {
         ObjectSnapshot::Path(p) => p.style.stroke.markers,
         ObjectSnapshot::Primitive(p) => p.style.stroke.markers,
+        ObjectSnapshot::Clone(p) => p.resolved.style.stroke.markers,
     }
 }
 

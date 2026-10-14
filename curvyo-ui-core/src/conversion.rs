@@ -91,7 +91,7 @@ pub fn primitive_as_path(
 /// conversion carries from the press (built before a minter was at hand) become the
 /// session's own before anything is previewed or written.
 pub(crate) fn with_fresh_anchor_ids(path: &mut PathSnapshot, minter: &mut AnchorIdMinter) {
-    for anchor in &mut path.anchors {
+    for anchor in path.all_anchors_mut() {
         anchor.id = minter.mint();
     }
 }
@@ -145,6 +145,14 @@ pub(crate) fn converted_for_handle(
                 if converts_for(object, handle, Angle::from_radians(0.0)) =>
             {
                 Some(primitive_as_path(primitive, &mut placeholder))
+            }
+            // A clone whose chain moves with it is unlinked by a singular scale or skew
+            // (`specs/0049-linked-clone` criterion 16): its path is ready from the press.
+            ObjectSnapshot::Clone(clone)
+                if matches!(handle, EditHandle::Resize(_) | EditHandle::Skew(_))
+                    && crate::clone_gesture::chain_moves(clone, starts) =>
+            {
+                Some(crate::clone_gesture::unlinked_placeholder(clone))
             }
             _ => None,
         })
@@ -271,7 +279,7 @@ mod tests {
                 rotation: Angle::from_radians(radians),
                 ..p
             }),
-            ObjectSnapshot::Path(_) => panic!("a primitive"),
+            ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_) => panic!("a primitive"),
         };
         let zero = Angle::from_radians(0.0);
         let quarter = std::f64::consts::FRAC_PI_2;
@@ -299,7 +307,7 @@ mod tests {
                 rotation: Angle::from_radians(0.5),
                 ..p
             }),
-            ObjectSnapshot::Path(_) => panic!("a primitive"),
+            ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_) => panic!("a primitive"),
         };
         assert!(converts_on_stretch(&wider, zero));
     }

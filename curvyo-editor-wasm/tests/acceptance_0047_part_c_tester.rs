@@ -165,6 +165,7 @@ fn polyline(o: &ObjectSnapshot) -> Vec<Point> {
         out
     }
     match o {
+        ObjectSnapshot::Clone(_) => panic!("no clone here"),
         ObjectSnapshot::Primitive(p) => {
             let out = outline_of_rotated(&p.shape, p.rotation);
             let a: Vec<NewAnchor> = out
@@ -220,6 +221,7 @@ fn ref_point(b: (Point, Point), r: ReferencePoint) -> Point {
 
 fn rect_origin(o: &ObjectSnapshot) -> Point {
     match o {
+        ObjectSnapshot::Clone(_) => panic!("no clone here"),
         ObjectSnapshot::Primitive(p) => match p.shape {
             Shape::Rect { bounds, .. } => bounds.origin,
             other => panic!("rect expected, got {other:?}"),
@@ -230,6 +232,7 @@ fn rect_origin(o: &ObjectSnapshot) -> Point {
 
 fn rect_centre(o: &ObjectSnapshot) -> Point {
     match o {
+        ObjectSnapshot::Clone(_) => panic!("no clone here"),
         ObjectSnapshot::Primitive(p) => match p.shape {
             Shape::Rect { bounds, .. } => pt(
                 bounds.origin.x + bounds.width.as_mm() / 2.0,

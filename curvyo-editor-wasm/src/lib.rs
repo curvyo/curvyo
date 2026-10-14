@@ -30,6 +30,8 @@ mod wasm_background;
 #[cfg(target_arch = "wasm32")]
 mod wasm_boolean;
 #[cfg(target_arch = "wasm32")]
+mod wasm_clone;
+#[cfg(target_arch = "wasm32")]
 mod wasm_combine;
 #[cfg(target_arch = "wasm32")]
 mod wasm_cut;

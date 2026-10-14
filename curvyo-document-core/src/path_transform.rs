@@ -2,10 +2,26 @@
 //! the anchors and handles (`specs/0005-object-transform`, `specs/0008-object-transform-refinements`,
 //! `specs/0019-multi-object-transform`). Split out of `path_model.rs`.
 
+use crate::affine::Affine;
 use crate::path_model::PathSnapshot;
 use crate::units::{Angle, Point, Vec2};
 
 impl PathSnapshot {
+    /// This path under the affine map `m`: every anchor point `p` becomes `m·p`, every handle
+    /// vector `v` the linear part applied to `v`, in every outline; ids, kinds, `closed`, style
+    /// and `rotation` are kept. Exact for cubic Béziers (`specs/0049-linked-clone`, "resolved
+    /// outline").
+    #[must_use]
+    pub fn mapped(&self, m: Affine) -> Self {
+        let mut mapped = self.clone();
+        for anchor in mapped.all_anchors_mut() {
+            anchor.point = m.apply_point(anchor.point);
+            anchor.handle_in = m.apply_vector(anchor.handle_in);
+            anchor.handle_out = m.apply_vector(anchor.handle_out);
+        }
+        mapped
+    }
+
     /// This path rotated by `angle` about `pivot`: every anchor's `point`
     /// rotates about `pivot`; every `handle_in`/`handle_out` rotates by
     /// `angle` alone (already relative to its own anchor, so it needs no

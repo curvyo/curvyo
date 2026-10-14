@@ -32,6 +32,9 @@ use curvyo_ui_core::{BooleanOp, EntryOutcome, Grid, MoveEntryMode, StyleField, V
 
 static NOW: AtomicU64 = AtomicU64::new(1_900_000_000);
 
+/// The orphan file of `0049-linked-clone`, whose Open repairs it by design (criterion 35).
+const ORPHAN_FIXTURE: &str = "clone_orphan_and_ring_v13.curvyo";
+
 fn clock() -> Timestamp {
     Timestamp::from_secs(NOW.fetch_add(3, Ordering::SeqCst))
 }
@@ -101,6 +104,7 @@ fn one_rect() -> Session {
 fn left_edge_x(s: &Session) -> f64 {
     let d = reread(s);
     match d.object(d.object_ids()[0]).unwrap() {
+        curvyo_document_core::ObjectSnapshot::Clone(_) => panic!("no clone here"),
         curvyo_document_core::ObjectSnapshot::Primitive(p) => match p.shape {
             curvyo_document_core::Shape::Rect { bounds, .. } => bounds.origin.x,
             _ => panic!("rect"),
@@ -331,6 +335,11 @@ fn old_files_open_with_empty_stacks_a_readable_history_and_working_undo() {
     for path in dir {
         let bytes = std::fs::read(&path).unwrap();
         let name = path.file_name().unwrap().to_string_lossy().into_owned();
+        // The orphan file of `0049`: its Open removes the orphans in one step, by design
+        // (`specs/0049-linked-clone` criterion 35).
+        if name == ORPHAN_FIXTURE {
+            continue;
+        }
         let Ok(mut s) = Session::open(5, &bytes) else {
             continue;
         };

@@ -154,6 +154,16 @@ pub(crate) fn commit_resize(
                 |w| document.resize_star_frame(id, frame, w),
             ),
         },
+        // A clone's result is its matrix, which the multi-object commit writes.
+        ObjectSnapshot::Clone(_) => {
+            let _ = commit_group(
+                document,
+                std::slice::from_ref(result),
+                stroke_scaling,
+                EditHandle::Move,
+                None,
+            );
+        }
         ObjectSnapshot::Path(_) if document.primitive(id).is_some() => {
             // A path result for an object that is still a primitive is a
             // conversion (`specs/0019-multi-object-transform/` criterion 56).
@@ -162,6 +172,7 @@ pub(crate) fn commit_resize(
                 std::slice::from_ref(result),
                 stroke_scaling,
                 EditHandle::Move,
+                None,
             );
         }
         ObjectSnapshot::Path(path) => {
@@ -232,7 +243,8 @@ const SAME_ANGLE_EPSILON_RAD: f64 = 1e-12;
 /// order, and its rotation in radians.
 fn numbers_of(object: &ObjectSnapshot) -> (Vec<f64>, f64) {
     match object {
-        ObjectSnapshot::Path(path) => {
+        ObjectSnapshot::Path(path)
+        | ObjectSnapshot::Clone(curvyo_document_core::CloneSnapshot { resolved: path, .. }) => {
             let mut v = vec![path.style.stroke.width.as_mm()];
             for a in path.all_anchors() {
                 v.extend([

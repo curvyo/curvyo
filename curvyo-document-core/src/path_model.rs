@@ -329,7 +329,7 @@ impl PathSnapshot {
     }
 
     /// Every anchor of every outline, mutably, in the same order.
-    pub(crate) fn all_anchors_mut(&mut self) -> impl Iterator<Item = &mut AnchorSnapshot> {
+    pub fn all_anchors_mut(&mut self) -> impl Iterator<Item = &mut AnchorSnapshot> {
         self.anchors.iter_mut().chain(
             self.extra_subpaths
                 .iter_mut()
@@ -389,4 +389,8 @@ pub enum PathEditError {
     /// so a clash with an unrelated object cannot arise in a session.
     #[error("an anchor id is used twice")]
     DuplicateAnchorId,
+    /// The edit would put this linked clone, which follows the edited path, beyond ±1e7 in an
+    /// outline coordinate (`specs/0049-linked-clone` criterion 17): nothing was written.
+    #[error("a linked clone would move beyond the limit of 10 km")]
+    CloneOutOfRange(NodeId),
 }

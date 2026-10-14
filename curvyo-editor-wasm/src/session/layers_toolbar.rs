@@ -1,5 +1,6 @@
 //! `Session`'s Layers toolbar on the panel target (`specs/0050-layers-and-objects-panel`, customer
-//! feedback 2026-10-14): which of its buttons apply, and Move up, Move down and Duplicate. New
+//! feedback 2026-10-14): which of its buttons apply, and Move up, Move down and Duplicate (Linked
+//! clone, `0049`, runs the Select bar's command). New
 //! layer and Delete layer are in `layers_edit.rs`. Each action is one step and passes the Pen gate
 //! of `layers_panel.rs`.
 
@@ -43,6 +44,9 @@ impl Session {
             "moveUp": self.can_step(&targets, Reorder::Forward),
             "moveDown": self.can_step(&targets, Reorder::Backward),
             "duplicate": !targets.is_empty(),
+            // The Select bar's rule (`0049` criteria 1 and 4): the Select tool and a selection
+            // of paths, shapes and clones.
+            "linkedClone": self.linked_clone_shown(),
         })
     }
 

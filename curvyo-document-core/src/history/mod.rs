@@ -35,7 +35,9 @@ pub(crate) use commit::CommitState;
 pub use commit::OwnStep;
 pub use cost::{FAR_STEP_OPS, SMALL_STEP_OPS};
 pub use error::{HistoryError, SyncError};
-pub(crate) use lineage::{KEY_CLONE_OF, KEY_HISTORY_FLOOR, encode_clone_of};
+pub(crate) use lineage::{
+    KEY_CLONE_OF, KEY_HISTORY_FLOOR, decode_node, encode_clone_of, encode_node,
+};
 pub(crate) use object_index::ObjectIndex;
 pub use object_restore::ObjectRestore;
 pub(crate) use object_restore::WritableUndo;

@@ -170,7 +170,7 @@ impl Document {
     pub fn primitive(&self, id: NodeId) -> Option<PrimitiveSnapshot> {
         match self.object(id)? {
             ObjectSnapshot::Primitive(snapshot) => Some(snapshot),
-            ObjectSnapshot::Path(_) => None,
+            ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_) => None,
         }
     }
 
@@ -337,6 +337,18 @@ impl Document {
         &self,
         conversions: &[(NodeId, Vec<NewAnchor>)],
     ) -> Result<(), ShapeEditError> {
+        self.convert_to_paths_uncommitted(conversions)?;
+        self.commit_with_label("convert_to_paths");
+        Ok(())
+    }
+
+    /// [`Document::convert_to_paths`] without the commit, for a command that converts as one part
+    /// of its own commit (Linked clone, `specs/0049-linked-clone` criterion 2). Writes nothing
+    /// when it refuses.
+    pub(crate) fn convert_to_paths_uncommitted(
+        &self,
+        conversions: &[(NodeId, Vec<NewAnchor>)],
+    ) -> Result<(), ShapeEditError> {
         let tree = self.loro().get_tree(OBJECTS_TREE);
         let metas: Vec<_> = conversions
             .iter()
@@ -348,7 +360,9 @@ impl Document {
                 let meta = tree
                     .get_meta(tree_id)
                     .map_err(|_| ShapeEditError::NoSuchObject)?;
-                if shape_codec::read_shape_tag(&meta).is_none() {
+                if shape_codec::read_shape_tag(&meta).is_none()
+                    || crate::clone_codec::is_clone_meta(&meta)
+                {
                     return Err(ShapeEditError::NotAPrimitive);
                 }
                 Ok(meta)
@@ -372,7 +386,6 @@ impl Document {
                 path_codec::write_rotation(&meta, orientation);
             }
         }
-        self.commit_with_label("convert_to_paths");
         Ok(())
     }
 
@@ -449,6 +462,9 @@ pub(crate) fn object_in(tree: &loro::LoroTree, id: NodeId) -> Option<ObjectSnaps
         return None;
     }
     let meta = tree.get_meta(tree_id).ok()?;
+    if crate::clone_codec::is_clone_meta(&meta) {
+        return crate::object_read::read_one_clone(tree, id).map(ObjectSnapshot::Clone);
+    }
     match shape_codec::read_shape_tag(&meta) {
         Some(shape) => Some(ObjectSnapshot::Primitive(
             shape_codec::read_primitive_snapshot(id, &meta, &shape),

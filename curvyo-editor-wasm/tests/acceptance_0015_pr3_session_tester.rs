@@ -94,6 +94,7 @@ fn points(d: &Document) -> Vec<(f64, f64)> {
     let mut out = Vec::new();
     for id in d.object_ids() {
         match d.object(id).unwrap() {
+            ObjectSnapshot::Clone(_) => panic!("no clone here"),
             ObjectSnapshot::Path(p) => {
                 out.extend(p.anchors.iter().map(|a| (a.point.x, a.point.y)));
             }

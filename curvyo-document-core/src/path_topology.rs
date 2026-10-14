@@ -267,6 +267,7 @@ impl Document {
 
         let tree = self.loro().get_tree(OBJECTS_TREE);
         let b_tree_id = crate::paths::tree_id_of(b_path);
+        self.repair_clones_of_removed(&tree, &[b_tree_id]);
         let parents = crate::group_tree::parents_of(&tree, &[b_tree_id]);
         // invariant: `self.path(b_path)` resolved this same node moments
         // ago in `join_endpoints`.

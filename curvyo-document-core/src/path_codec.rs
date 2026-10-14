@@ -458,13 +458,16 @@ fn validate_object_node(tree: &LoroTree, id: loro::TreeID) -> bool {
     // review) instead of being silently read as "absent" and validated
     // as a plain path.
     match crate::shape_codec::read_shape_tag_checked(&meta) {
+        ShapeTag::Present(shape) if shape == crate::clone_codec::SHAPE_CLONE => {
+            crate::clone_codec::validate_clone_node(&meta)
+        }
         ShapeTag::Present(shape) => crate::shape_codec::validate_primitive_node(&meta, &shape),
         ShapeTag::Absent => validate_path_node(&meta),
         ShapeTag::Mistyped => false,
     }
 }
 
-fn validate_path_node(meta: &LoroMap) -> bool {
+pub(crate) fn validate_path_node(meta: &LoroMap) -> bool {
     let Some(ValueOrContainer::Container(Container::MovableList(anchors))) = meta.get(KEY_ANCHORS)
     else {
         return false;

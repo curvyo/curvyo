@@ -971,7 +971,7 @@ fn a_closed_path_has_no_start_or_end_marker_and_keeps_the_settings() {
             assert_eq!(path.style.stroke.markers.start, Shape::Arrow);
             assert_eq!(path.style.stroke.markers.end, Shape::Dot);
         }
-        ObjectSnapshot::Primitive(_) => panic!(),
+        ObjectSnapshot::Primitive(_) | ObjectSnapshot::Clone(_) => panic!(),
     }
 }
 
@@ -1454,6 +1454,7 @@ fn a_primitive_snapshot_with_marker_settings_draws_no_marker() {
     let plain = build_artwork(&[obj(&doc, r)], view());
     let mut snap = obj(&doc, r);
     match &mut snap {
+        ObjectSnapshot::Clone(_) => panic!("no clone here"),
         ObjectSnapshot::Primitive(p) => {
             p.style.stroke.markers = Markers {
                 start: Shape::Arrow,
@@ -1608,7 +1609,7 @@ fn compound_paths_get_markers_per_outline() {
             let n: usize = p.subpaths().map(|s| s.anchors.len()).sum();
             (n, p.subpaths().count(), p.closed)
         }
-        ObjectSnapshot::Primitive(_) => unreachable!(),
+        ObjectSnapshot::Primitive(_) | ObjectSnapshot::Clone(_) => unreachable!(),
     };
     assert!(subpaths >= 2);
     // Calibrate a dot at this stroke width.

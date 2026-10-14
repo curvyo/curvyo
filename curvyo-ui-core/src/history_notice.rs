@@ -52,6 +52,7 @@ pub fn objects_summary(shapes: &[ObjectShape]) -> Option<String> {
             ObjectShape::Polygon => ("polygon", "polygons"),
             ObjectShape::Star => ("star", "stars"),
             ObjectShape::Group => ("group", "groups"),
+            ObjectShape::Clone => ("clone", "clones"),
         };
         Some(format!("{count} {}", if count == 1 { one } else { many }))
     } else {

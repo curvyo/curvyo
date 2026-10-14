@@ -32,6 +32,7 @@ fn body(d: &Document, id: NodeId) -> String {
             format!("{:?}|{:?}|{:?}", p.shape, p.style, p.rotation)
         }
         Some(ObjectSnapshot::Path(p)) => format!("{p:?}"),
+        Some(ObjectSnapshot::Clone(c)) => format!("{c:?}"),
         None => "gone".to_owned(),
     }
 }
@@ -309,17 +310,18 @@ fn c15_document_apply_counts_other_peers_reverted_steps() {
 }
 
 #[test]
-fn c10_save_and_open_after_an_apply_keep_format_12_and_the_state() {
+fn c10_save_and_open_after_an_apply_keep_format_13_and_the_state() {
     let d = Document::new(1);
     let a = rect(&d, 0.0);
     let s1 = last_step(&d);
     let b = rect(&d, 30.0);
     d.delete_objects(&[a]).unwrap();
     let go = d.go_to_version(s1, None, None).unwrap().step.unwrap();
-    assert_eq!(CURRENT_FORMAT_VERSION, 12);
+    // 0042 adds no format change; 13 is the version `0049-linked-clone` introduced.
+    assert_eq!(CURRENT_FORMAT_VERSION, 13);
     let packed = pack(&d, "t").unwrap();
     let mut zip = zip_manifest_version(&packed);
-    assert_eq!(zip.take().unwrap(), 12);
+    assert_eq!(zip.take().unwrap(), 13);
     let again = unpack(5, &packed).unwrap();
     assert_eq!(json(&again), json(&d));
     assert!(!again.contains_node(b));

@@ -385,6 +385,26 @@ impl Session {
         self.panel.from_list = true;
     }
 
+    /// Select original on the clone row `id` (`0050` criterion 38): one step up its chain, under
+    /// the hidden-or-locked rule of `0049` criterion 25.
+    pub fn select_row_original(&mut self, id: &str) -> PanelReply {
+        let Some(clone) = parse_id(id) else {
+            return PanelReply::Quiet;
+        };
+        self.panel_action(|this| {
+            this.selection.set(&[clone]);
+            let result = this.select_original();
+            if result.notice.is_empty() {
+                PanelReply::Quiet
+            } else if result.kind == super::clones::CloneKind::Refused {
+                // The hidden-or-locked refusal is an alert (UX review should-fix 17).
+                PanelReply::Refusal(result.notice)
+            } else {
+                PanelReply::Notice(result.notice)
+            }
+        })
+    }
+
     /// Select contents on the layer row `id`: its top-level children that are not hidden or
     /// locked, at once (criterion 13); a notice when there is nothing to select.
     pub fn select_layer_contents(&mut self, id: &str) -> PanelReply {
@@ -470,7 +490,13 @@ fn row_json(row: &LayerRow, index: usize) -> Value {
         "setsize": row.siblings,
         "label": row_accessible_name(row),
         "stateLine": row_state_line(row),
+        "chainLine": row.chain_line,
         "refusal": row_refusal(row).unwrap_or(""),
-        "rowAction": if row.kind == RowKind::Layer { "select-contents" } else { "" },
+        "rowAction": match row.kind {
+            RowKind::Layer => "select-contents",
+            // `0050` criterion 38: a clone row's action is Select original (`0049`).
+            RowKind::Clone => "select-original",
+            _ => "",
+        },
     })
 }

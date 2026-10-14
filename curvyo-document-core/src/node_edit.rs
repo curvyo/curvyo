@@ -121,6 +121,20 @@ impl Document {
         if nodes.iter().any(|&node| locked_through(&tree, node)) {
             return Err(ObjectEditError::Locked);
         }
+        // A linked clone has no opacity of its own (ADR 0015 §3): it is skipped.
+        let ids: Vec<NodeId> = ids
+            .iter()
+            .copied()
+            .filter(|&id| {
+                !tree
+                    .get_meta(crate::paths::tree_id_of(id))
+                    .is_ok_and(|meta| crate::clone_codec::is_clone_meta(&meta))
+            })
+            .collect();
+        if ids.is_empty() {
+            return Ok(());
+        }
+        let ids = &ids[..];
         self.write_register(
             ids,
             KEY_OPACITY,

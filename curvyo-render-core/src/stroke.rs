@@ -96,7 +96,7 @@ pub(crate) fn build_fill_path(outlines: &[OutlineRef<'_>]) -> Option<Path> {
 
 /// One path holding a sub-path per outline that has two or more anchors;
 /// `None` if none has.
-fn build_outlines(outlines: &[OutlineRef<'_>], chord_close: bool) -> Option<Path> {
+pub(crate) fn build_outlines(outlines: &[OutlineRef<'_>], chord_close: bool) -> Option<Path> {
     let mut builder = Path::builder();
     let mut any = false;
     for outline in outlines {
@@ -193,6 +193,17 @@ pub fn path_stroke(
     build_path(anchors, closed).map_or_else(DrawList::default, |path| {
         stroke(&path, &plain(width_mm, color, tolerance_mm))
     })
+}
+
+/// Tessellates the stroke of an already built `path` (the dashes of a clone trace) as
+/// [`path_stroke`] would.
+pub(crate) fn path_stroke_of(
+    path: &Path,
+    width_mm: f64,
+    color: RgbaColor,
+    tolerance_mm: f64,
+) -> DrawList {
+    stroke(path, &plain(width_mm, color, tolerance_mm))
 }
 
 /// Tessellates one segment's stroke in isolation — the selected-segment

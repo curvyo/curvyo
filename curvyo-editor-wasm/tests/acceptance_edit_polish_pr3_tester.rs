@@ -174,6 +174,7 @@ fn rotate_doc_object(d: &Document, radians: f64) {
     let id = d.object_ids()[0];
     let o = d.object(id).unwrap();
     let c = match &o {
+        ObjectSnapshot::Clone(_) => panic!("no clone here"),
         ObjectSnapshot::Primitive(p) => match p.shape {
             Shape::Rect { bounds, .. } => pt(
                 bounds.origin.x + bounds.width.as_mm() / 2.0,
@@ -517,6 +518,7 @@ fn select_path(d: &Document) -> (Session, Bx) {
 /// here: curve-accurate for a path, the rotated outline for a primitive.
 fn tight_of(o: &ObjectSnapshot) -> (f64, f64, f64, f64) {
     match o {
+        ObjectSnapshot::Clone(_) => panic!("no clone here"),
         ObjectSnapshot::Path(p) => {
             let (u0, u1, v0, v1) = tight_box(p, 0.0);
             (u0, v0, u1, v1)
@@ -1210,6 +1212,7 @@ fn c14_primitives_have_skew_handles_and_k_opens_the_chip() {
 /// or would be.
 fn ctr_of(o: &ObjectSnapshot) -> Point {
     match o {
+        ObjectSnapshot::Clone(_) => panic!("no clone here"),
         ObjectSnapshot::Path(p) => path_bx(p).c,
         ObjectSnapshot::Primitive(p) => {
             let (x0, y0, x1, y1) = frame_centre_box(p);
@@ -1635,7 +1638,7 @@ fn c21_absolute_puts_the_top_left_of_the_tight_drawn_outline_at_x_y_for_every_ki
             // select via the first anchor / outline
             let on = match obj_of(&s, 0) {
                 ObjectSnapshot::Path(p) => p.anchors[0].point,
-                ObjectSnapshot::Primitive(_) => on,
+                ObjectSnapshot::Primitive(_) | ObjectSnapshot::Clone(_) => on,
             };
             click(&mut s, on);
             assert_eq!(s.selected_object_count(), 1, "{name}");
@@ -2578,12 +2581,13 @@ fn c57a_key_s_equals_a_shift_drag_of_the_se_corner_for_rect_ellipse_path_at_seve
                 let mut a = open_in_session(&d);
                 let on = match obj_of(&a, 0) {
                     ObjectSnapshot::Path(p) => p.anchors[0].point,
-                    ObjectSnapshot::Primitive(_) => {
+                    ObjectSnapshot::Primitive(_) | ObjectSnapshot::Clone(_) => {
                         // a point on the rotated outline: the top-edge midpoint
                         // of the oriented box
                         let o = obj_of(&a, 0);
                         let c = ctr_of(&o);
                         let (x0, y0, x1, y1) = frame_centre_box(match &o {
+                            ObjectSnapshot::Clone(_) => panic!("no clone here"),
                             ObjectSnapshot::Primitive(p) => p,
                             ObjectSnapshot::Path(_) => unreachable!(),
                         });
@@ -2596,6 +2600,7 @@ fn c57a_key_s_equals_a_shift_drag_of_the_se_corner_for_rect_ellipse_path_at_seve
                 a.set_scale_stroke_width(stroke);
                 let o = obj_of(&a, 0);
                 let bx = match &o {
+                    ObjectSnapshot::Clone(_) => panic!("no clone here"),
                     ObjectSnapshot::Path(p) => path_bx(p),
                     ObjectSnapshot::Primitive(p) => {
                         let (x0, y0, x1, y1) = frame_centre_box(p);
@@ -2851,6 +2856,7 @@ fn c57_s_and_r_chips_open_at_the_bottom_right_resize_and_top_right_rotate_corner
         let mut s = select_at(&d, on);
         let o = obj_of(&s, 0);
         let (c, hw, hh) = match &o {
+            ObjectSnapshot::Clone(_) => panic!("no clone here"),
             ObjectSnapshot::Path(p) => {
                 let b = path_bx(p);
                 (b.c, b.hw, b.hh)

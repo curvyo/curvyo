@@ -83,6 +83,7 @@ fn style_of(snapshot: &ObjectSnapshot) -> &Style {
     match snapshot {
         ObjectSnapshot::Path(p) => &p.style,
         ObjectSnapshot::Primitive(p) => &p.style,
+        ObjectSnapshot::Clone(p) => &p.resolved.style,
     }
 }
 

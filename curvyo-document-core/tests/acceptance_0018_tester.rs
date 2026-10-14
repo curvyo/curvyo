@@ -95,6 +95,7 @@ fn style_of(doc: &Document, id: NodeId) -> Style {
     match doc.object(id).expect("object exists") {
         ObjectSnapshot::Path(p) => p.style,
         ObjectSnapshot::Primitive(p) => p.style,
+        ObjectSnapshot::Clone(p) => p.resolved.style,
     }
 }
 
@@ -479,7 +480,7 @@ fn object_to_path_gives_a_path_without_markers() {
     for id in prims {
         match doc.object(id).unwrap() {
             ObjectSnapshot::Path(p) => assert_eq!(p.style.stroke.markers, Markers::default()),
-            ObjectSnapshot::Primitive(_) => panic!("converted"),
+            ObjectSnapshot::Primitive(_) | ObjectSnapshot::Clone(_) => panic!("converted"),
         }
     }
     for meta in metas(&doc) {
@@ -549,7 +550,7 @@ fn splitting_an_open_path_keeps_the_settings_on_both_halves() {
     for id in [a, b] {
         match doc.object(id).unwrap() {
             ObjectSnapshot::Path(path) => assert!(!path.closed),
-            ObjectSnapshot::Primitive(_) => panic!(),
+            ObjectSnapshot::Primitive(_) | ObjectSnapshot::Clone(_) => panic!(),
         }
     }
 }
@@ -624,7 +625,7 @@ fn closing_a_path_onto_itself_keeps_its_settings() {
         .unwrap();
     match doc.object(id).unwrap() {
         ObjectSnapshot::Path(path) => assert!(path.closed),
-        ObjectSnapshot::Primitive(_) => panic!(),
+        ObjectSnapshot::Primitive(_) | ObjectSnapshot::Clone(_) => panic!(),
     }
     assert_eq!(markers_of(&doc, id), want);
 }

@@ -93,8 +93,18 @@ pub fn style_scope_in(
         selection.ids().to_vec()
     };
     let held = objects_with_ids(objects, &wanted);
-    let ids: Vec<NodeId> = held.iter().map(|object| object.id()).collect();
-    let subject = group_subject(tool, &ids, units).unwrap_or_else(|| subject_line(&held));
+    let all: Vec<NodeId> = held.iter().map(|object| object.id()).collect();
+    let subject = group_subject(tool, &all, units).unwrap_or_else(|| match held.as_slice() {
+        [ObjectSnapshot::Clone(clone)] => clone_subject(objects, clone),
+        _ => subject_line(&held),
+    });
+    // A linked clone has no style of its own: an edit never goes to it, and "Mixed" is read
+    // from the other objects (`specs/0049-linked-clone` criterion 24).
+    let ids = held
+        .iter()
+        .filter(|object| !matches!(object, ObjectSnapshot::Clone(_)))
+        .map(|object| object.id())
+        .collect();
     StyleScope { ids, subject }
 }
 
@@ -139,10 +149,34 @@ fn node_owners(nodes: &NodeSelection) -> Vec<NodeId> {
     owners
 }
 
+/// The subject line of one selected clone: "Clone of " and its direct original's name
+/// (`specs/0049-linked-clone` criterion 21), each step of the chain found by id.
+fn clone_subject(
+    objects: &[ObjectSnapshot],
+    clone: &curvyo_document_core::CloneSnapshot,
+) -> String {
+    let mut prefix = String::from("Clone of ");
+    let mut current = clone.chain.origin;
+    for _ in 0..curvyo_document_core::MAX_CLONE_DEPTH {
+        match objects.iter().find(|object| object.id() == current) {
+            Some(ObjectSnapshot::Clone(next)) => {
+                prefix.push_str("Clone of ");
+                current = next.chain.origin;
+            }
+            Some(object) => {
+                return format!("{prefix}{} {}", kind_name(object).0, current.short_id());
+            }
+            None => return format!("{prefix}Object {}", current.short_id()),
+        }
+    }
+    format!("{prefix}…")
+}
+
 fn kind_name(object: &ObjectSnapshot) -> (&'static str, &'static str) {
     match object {
         ObjectSnapshot::Path(path) if path.is_compound() => ("Compound path", "compound paths"),
         ObjectSnapshot::Path(_) => ("Path", "paths"),
+        ObjectSnapshot::Clone(_) => ("Clone", "clones"),
         ObjectSnapshot::Primitive(PrimitiveSnapshot { shape, .. }) => match shape {
             Shape::Rect { .. } => ("Rectangle", "rectangles"),
             Shape::Ellipse { .. } => ("Ellipse", "ellipses"),

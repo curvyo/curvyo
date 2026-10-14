@@ -658,11 +658,9 @@ fn rich_document() -> (Document, Vec<NodeId>) {
 fn ac46_a_project_with_layers_groups_names_and_flags_round_trips_exactly() {
     let (d, ids) = rich_document();
     let bytes = pack(&d, "t").unwrap();
-    assert_eq!(manifest(&bytes)["format_version"], 12);
-    assert_eq!(
-        CURRENT_FORMAT_VERSION, 12,
-        "the next free number after 0023's 11"
-    );
+    // 0050 took 12; 0049 took 13 after it, so the writer names the current one.
+    assert_eq!(manifest(&bytes)["format_version"], CURRENT_FORMAT_VERSION);
+    const _: () = assert!(CURRENT_FORMAT_VERSION >= 12);
     let r = unpack(5, &bytes).unwrap();
     assert_eq!(r.export_json().unwrap(), d.export_json().unwrap());
     assert_eq!(r.children(None), d.children(None));

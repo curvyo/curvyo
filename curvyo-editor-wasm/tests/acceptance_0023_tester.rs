@@ -915,6 +915,7 @@ fn ac13_ctrl_drag_copies_the_group_with_new_ids_for_everything() {
     // The copy sits 100 mm to the right.
     let copy_leaves = d2.leaves_of(copy);
     let moved = copy_leaves.iter().any(|id| match d2.object(*id).unwrap() {
+        ObjectSnapshot::Clone(_) => panic!("no clone here"),
         ObjectSnapshot::Primitive(pr) => format!("{:?}", pr.shape).contains("120"),
         ObjectSnapshot::Path(_) => false,
     });

@@ -130,7 +130,7 @@ fn points(o: &ObjectSnapshot) -> Vec<(Point, Vec2, Vec2)> {
             .iter()
             .map(|a| (a.point, a.handle_in, a.handle_out))
             .collect(),
-        ObjectSnapshot::Primitive(_) => unreachable!(),
+        ObjectSnapshot::Primitive(_) | ObjectSnapshot::Clone(_) => unreachable!(),
     }
 }
 

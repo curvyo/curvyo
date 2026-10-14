@@ -122,6 +122,7 @@ impl Rig {
 
     fn origin_of(&self, id: NodeId) -> Point {
         match self.document.object(id).unwrap() {
+            ObjectSnapshot::Clone(_) => panic!("no clone here"),
             ObjectSnapshot::Primitive(p) => match p.shape {
                 curvyo_document_core::Shape::Rect { bounds, .. } => bounds.origin,
                 _ => panic!("a rectangle"),

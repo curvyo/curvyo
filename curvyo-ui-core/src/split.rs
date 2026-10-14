@@ -253,7 +253,8 @@ pub fn plan_split(
 /// rule of the Boolean operations, Combine and Cut).
 pub(crate) fn in_range(object: &ObjectSnapshot) -> bool {
     match object {
-        ObjectSnapshot::Path(path) => path
+        ObjectSnapshot::Path(path)
+        | ObjectSnapshot::Clone(curvyo_document_core::CloneSnapshot { resolved: path, .. }) => path
             .subpaths()
             .all(|outline| !out_of_range(outline.anchors)),
         ObjectSnapshot::Primitive(_) => true,

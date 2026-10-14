@@ -68,8 +68,19 @@ impl GroupDrag {
     /// Writes `results` (from [`GroupDrag::resolve`]) as one commit
     /// (criterion 31). A width the document refuses costs the maker nothing
     /// else: the write is repeated without widths.
-    pub(super) fn commit(&self, document: &Document, results: &[ObjectSnapshot]) {
-        commit_group(document, results, self.modes.stroke, self.handle);
+    pub(super) fn commit(
+        &self,
+        document: &Document,
+        results: &[ObjectSnapshot],
+        map: Option<GroupMap>,
+    ) {
+        commit_group(
+            document,
+            results,
+            self.modes.stroke,
+            self.handle,
+            map.as_ref(),
+        );
     }
 }
 

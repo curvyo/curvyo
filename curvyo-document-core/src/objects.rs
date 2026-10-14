@@ -11,6 +11,7 @@ use std::collections::HashSet;
 
 use loro::{Container, TreeID, ValueOrContainer};
 
+use crate::clone_copy::{Copying, Place};
 use crate::document::{Document, OBJECTS_TREE};
 use crate::history::{KEY_CLONE_OF, KEY_HISTORY_FLOOR, encode_clone_of};
 use crate::path_codec::{
@@ -87,6 +88,11 @@ pub enum ObjectEditError {
     /// (`specs/0050-layers-and-objects-panel/adrs.md` decision 1).
     #[error("a layer cannot be grouped, ungrouped or deleted as an object")]
     IsALayer,
+    /// The write would put this linked clone (changed, or following a changed object) beyond
+    /// ±1e7 in a matrix entry or an outline coordinate (`specs/0049-linked-clone` criterion 17):
+    /// nothing was written.
+    #[error("a linked clone would move beyond the limit of 10 km")]
+    CloneOutOfRange(NodeId),
 }
 
 /// One object to duplicate with [`Document::duplicate_objects`], and the
@@ -151,12 +157,57 @@ impl Document {
                     .map_err(|_| ObjectEditError::NoSuchObject)
             })
             .collect::<Result<_, _>>()?;
-
-        for meta in &metas {
-            translate_meta(meta, offset);
+        let clones = self.moved_clone_matrices(&ids, crate::affine::Affine::translation(offset))?;
+        for (meta, id) in metas.iter().zip(&ids) {
+            match clones.get(id) {
+                Some(&(origin, matrix)) => {
+                    crate::clone_write::write_matrix(meta, origin, matrix);
+                }
+                None => translate_meta(meta, offset),
+            }
         }
         self.commit_with_label("translate_objects");
         Ok(())
+    }
+
+    /// The new links of the clones among `ids` when every object of `ids` is mapped by `g`
+    /// (`specs/0049-linked-clone` criteria 15 and 16), after the limit check of criterion 17 on
+    /// everything the map changes. Empty, and nothing read, when the document has no clone.
+    pub(crate) fn moved_clone_matrices(
+        &self,
+        ids: &[NodeId],
+        g: crate::affine::Affine,
+    ) -> Result<std::collections::HashMap<NodeId, (NodeId, crate::affine::Affine)>, ObjectEditError>
+    {
+        let links = self.clone_links();
+        if links.is_empty() {
+            return Ok(std::collections::HashMap::new());
+        }
+        let decided = crate::clone_transform::clone_matrices_after(&links, ids, g);
+        let new: std::collections::HashMap<NodeId, (NodeId, crate::affine::Affine)> = decided
+            .matrices
+            .into_iter()
+            .map(|(id, matrix)| (id, (links[&id].0, matrix)))
+            .collect();
+        // Only the moved objects a clone follows, and the moved clones, can push a clone past
+        // the limit: the outlines of the others are not read (review F2).
+        let origins: HashSet<NodeId> = links.values().map(|&(origin, _)| origin).collect();
+        let changed: Vec<ObjectSnapshot> = ids
+            .iter()
+            .filter(|id| links.contains_key(id) || origins.contains(id))
+            .filter_map(|&id| match self.object(id)? {
+                ObjectSnapshot::Clone(mut clone) => {
+                    let &(_, matrix) = new.get(&id)?;
+                    clone.chain.matrix = matrix;
+                    Some(ObjectSnapshot::Clone(clone))
+                }
+                ObjectSnapshot::Path(path) => Some(ObjectSnapshot::Path(path.mapped(g))),
+                ObjectSnapshot::Primitive(_) => None,
+            })
+            .collect();
+        self.clone_limits_hold(&links, &changed)
+            .map_err(ObjectEditError::CloneOutOfRange)?;
+        Ok(new)
     }
 
     /// Copies every named object, displaced by `offset`, in **one commit**
@@ -210,24 +261,78 @@ impl Document {
         // The version the copies are made from: the lineage of `specs/0041-object-history` reads
         // the source's steps in its causal past.
         let version = self.loro().oplog_frontiers();
-        let mut created = Vec::with_capacity(sources.len());
-        for source in &sources {
+        // Linked clones are copied after every other node, shallow chains first, so each
+        // original's copy exists before the copies of its clones (`specs/0049-linked-clone`
+        // decision 8, ADR 0015 §3).
+        let links = self.clone_links();
+        let mut copying = Copying::default();
+        let mut created: Vec<Option<TreeID>> = vec![None; sources.len()];
+        for (index, source) in sources.iter().enumerate() {
+            let source_id = tree_id_of(source.id);
+            if links.contains_key(&source.id) {
+                copying.waiting.push((source_id, Place::After(source_id)));
+                continue;
+            }
             let mut anchor_ids = source.anchor_ids.iter();
             let new_tree_id = copy_subtree(
                 &tree,
-                tree_id_of(source.id),
+                source_id,
                 loro::TreeParentId::Root,
                 &mut anchor_ids,
                 (offset, &version),
+                (&links, &mut copying),
             );
             // invariant: the source was resolved above and the new node was
             // just created: `mov_after` puts it next to its original.
             #[allow(clippy::unwrap_used)]
-            tree.mov_after(new_tree_id, tree_id_of(source.id)).unwrap();
-            created.push(NodeId::from_parts(new_tree_id.peer, new_tree_id.counter));
+            tree.mov_after(new_tree_id, source_id).unwrap();
+            created[index] = Some(new_tree_id);
         }
+        let mut waiting = std::mem::take(&mut copying.waiting);
+        crate::clone_copy::creation_order(&links, &mut waiting);
+        let position: std::collections::HashMap<TreeID, usize> = sources
+            .iter()
+            .enumerate()
+            .map(|(index, source)| (tree_id_of(source.id), index))
+            .collect();
+        let mut nested = Vec::new();
+        for (source, place) in waiting {
+            let new_tree_id = copy_subtree(
+                &tree,
+                source,
+                loro::TreeParentId::Root,
+                &mut [].iter(),
+                (offset, &version),
+                (&links, &mut copying),
+            );
+            match place {
+                Place::After(after) => {
+                    // invariant: as above.
+                    #[allow(clippy::unwrap_used)]
+                    tree.mov_after(new_tree_id, after).unwrap();
+                    if let Some(&index) = position.get(&source) {
+                        created[index] = Some(new_tree_id);
+                    }
+                }
+                Place::Into(group, child) => nested.push((group, child, new_tree_id)),
+            }
+        }
+        // Each group's waiting children go to their own index, lowest first, so every index is
+        // counted among the children already placed.
+        nested.sort_unstable_by_key(|&(group, child, _)| (group.peer, group.counter, child));
+        for (group, child, node) in nested {
+            // invariant: the group copy and the node were created by this call.
+            #[allow(clippy::unwrap_used)]
+            tree.mov_to(node, loro::TreeParentId::Node(group), child)
+                .unwrap();
+        }
+        crate::clone_copy::relink_copied_clones(&tree, &copying.made, offset);
         self.commit_with_label("duplicate_objects");
-        Ok(created)
+        Ok(created
+            .into_iter()
+            .flatten()
+            .map(|node| NodeId::from_parts(node.peer, node.counter))
+            .collect())
     }
 
     /// Writes a resolved rotation — the object after
@@ -262,6 +367,18 @@ impl Document {
             .get_meta(tree_id)
             .map_err(|_| ObjectEditError::NoSuchObject)?;
 
+        self.clone_limits_hold(&self.clone_links(), std::slice::from_ref(rotated))
+            .map_err(ObjectEditError::CloneOutOfRange)?;
+        if crate::clone_codec::is_clone_meta(&meta) {
+            let ObjectSnapshot::Clone(clone) = rotated else {
+                return Err(ObjectEditError::NoSuchObject);
+            };
+            if !crate::clone_write::write_matrix(&meta, clone.chain.origin, clone.chain.matrix) {
+                return Err(ObjectEditError::NoSuchObject);
+            }
+            self.commit_with_label("rotate_object");
+            return Ok(());
+        }
         match (rotated, shape_codec::read_shape_tag(&meta)) {
             (ObjectSnapshot::Primitive(primitive), Some(tag)) => {
                 let current = shape_codec::read_shape(&meta, &tag);
@@ -339,6 +456,7 @@ impl Document {
             .copied()
             .filter(|&id| !crate::group_tree::has_ancestor_in(&tree, id, &tree_ids))
             .collect();
+        self.repair_clones_of_removed(&tree, &doomed);
         let parents = crate::group_tree::parents_of(&tree, &doomed);
         for tree_id in doomed {
             // invariant: every id here was just confirmed present above.
@@ -371,12 +489,16 @@ fn check_anchor_ids(
 /// meta maps as it is, a path's anchors renumbered from `anchor_ids` (one per anchor, in paint
 /// order), the geometry of each leaf displaced by `offset`. A group's copy is a new group with
 /// copies of its children in their order. Returns the copy.
+///
+/// A linked clone among the children of a copied group is not copied here: it waits in
+/// `copying` with its place, and its copy is made after every other node.
 fn copy_subtree(
     tree: &loro::LoroTree,
     source: TreeID,
     parent: loro::TreeParentId,
     anchor_ids: &mut std::slice::Iter<'_, AnchorId>,
     (offset, version): (Vec2, &loro::Frontiers),
+    (links, copying): (&crate::clone_transform::CloneLinks, &mut Copying),
 ) -> TreeID {
     // invariant: creating a node under the root or under a node this call just created cannot
     // fail, and reading the meta map of a node just created cannot fail.
@@ -394,14 +516,27 @@ fn copy_subtree(
     #[allow(clippy::unwrap_used)]
     meta.insert(KEY_CLONE_OF, encode_clone_of(source, version))
         .unwrap();
+    copying.made.push((source, new_tree_id));
     if crate::group_tree::meta_is_group(&source_meta) {
-        for child in tree.children(source).unwrap_or_default() {
+        for (index, child) in tree
+            .children(source)
+            .unwrap_or_default()
+            .into_iter()
+            .enumerate()
+        {
+            if links.contains_key(&NodeId::from_parts(child.peer, child.counter)) {
+                copying
+                    .waiting
+                    .push((child, Place::Into(new_tree_id, index)));
+                continue;
+            }
             copy_subtree(
                 tree,
                 child,
                 loro::TreeParentId::Node(new_tree_id),
                 anchor_ids,
                 (offset, version),
+                (links, copying),
             );
         }
         return new_tree_id;
@@ -490,10 +625,14 @@ pub(crate) fn renumber_anchors(meta: &loro::LoroMap, anchor_ids: &[AnchorId]) {
 /// [`Document::duplicate_objects`], [`Document::resize`] and
 /// [`Document::fit_to_content`] all move objects through it. Writes nothing
 /// to the commit log by itself; the caller commits.
+///
+/// A linked clone is not moved here: its matrix depends on the whole set that moves, which
+/// [`crate::clone_transform::clone_matrices_after`] decides.
 pub(crate) fn translate_meta(meta: &loro::LoroMap, offset: Vec2) {
-    match shape_codec::read_shape_tag(meta) {
-        Some(tag) => translate_primitive_meta(meta, &tag, offset),
-        None => translate_path_meta(meta, offset),
+    match shape_codec::leaf_kind(meta) {
+        shape_codec::LeafKind::Primitive(tag) => translate_primitive_meta(meta, &tag, offset),
+        shape_codec::LeafKind::Path => translate_path_meta(meta, offset),
+        shape_codec::LeafKind::Clone => {}
     }
 }
 

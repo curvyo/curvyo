@@ -132,7 +132,8 @@ struct Contour {
 /// would write; its anchor ids are placeholders, replaced when the plan is made.
 fn contours_of(owner: usize, object: &ObjectSnapshot) -> Vec<Contour> {
     match object {
-        ObjectSnapshot::Path(path) => path
+        ObjectSnapshot::Path(path)
+        | ObjectSnapshot::Clone(curvyo_document_core::CloneSnapshot { resolved: path, .. }) => path
             .subpaths()
             .map(|subpath| Contour {
                 owner,

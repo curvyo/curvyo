@@ -114,7 +114,7 @@ fn sources(document: &Document, ids: &[NodeId], start: u64) -> Vec<CopySource> {
         .map(|&id| {
             let count = match document.object(id).unwrap() {
                 ObjectSnapshot::Path(path) => path.anchors.len(),
-                ObjectSnapshot::Primitive(_) => 0,
+                ObjectSnapshot::Primitive(_) | ObjectSnapshot::Clone(_) => 0,
             };
             let anchor_ids = fresh(next, count);
             next += count as u64;
@@ -139,6 +139,11 @@ fn reidentified(object: &ObjectSnapshot, id: NodeId, anchor_ids: &[AnchorId]) ->
             let mut primitive = primitive.clone();
             primitive.id = id;
             ObjectSnapshot::Primitive(primitive)
+        }
+        ObjectSnapshot::Clone(clone) => {
+            let mut clone = clone.clone();
+            clone.resolved.id = id;
+            ObjectSnapshot::Clone(clone)
         }
     }
 }

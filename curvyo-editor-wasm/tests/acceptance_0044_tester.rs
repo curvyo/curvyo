@@ -103,6 +103,7 @@ fn labels(s: &Session) -> Vec<String> {
 
 fn origin_of(o: &ObjectSnapshot) -> Point {
     match o {
+        ObjectSnapshot::Clone(_) => panic!("no clone here"),
         ObjectSnapshot::Primitive(p) => match p.shape {
             Shape::Rect { bounds, .. } => bounds.origin,
             _ => panic!("a rectangle"),
@@ -1426,7 +1427,7 @@ fn edge_node_tool_drag_twice_without_a_frame_in_between() {
         s.pointer_up(to, false, false);
         let path = match &objects(&s)[0] {
             ObjectSnapshot::Path(p) => p.clone(),
-            ObjectSnapshot::Primitive(_) => panic!("path"),
+            ObjectSnapshot::Primitive(_) | ObjectSnapshot::Clone(_) => panic!("path"),
         };
         assert_eq!(
             path.anchors[0].point.x,

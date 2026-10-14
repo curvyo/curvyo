@@ -119,6 +119,9 @@ pub enum SelectDoubleClickOutcome {
     /// operations` criterion 38). The caller may show the sentence "Nodes of
     /// compound paths cannot be edited yet."
     CompoundPath,
+    /// A linked clone was hit: it has no nodes, the tool stays and a hint names the way out
+    /// (`specs/0049-linked-clone` criterion 26).
+    Clone,
     /// A rotate, resize, skew or parameter handle, or the centre handle, was
     /// double-clicked: the numeric entry is open (criteria 18, 25, 26; 9 and
     /// 15 of `edit-interaction-polish`), and there is no handoff.
@@ -440,7 +443,8 @@ impl SelectTool {
                     .zip(&drag.starts)
                     .all(|(new, old)| same_within_tolerance(new, old));
                 if !unchanged {
-                    drag.commit(document, &results);
+                    let map = drag.map_at(point, modifiers.shift, modifiers.ctrl);
+                    drag.commit(document, &results, map);
                 }
             }
             SelectDrag::Marquee(drag) => {
@@ -1215,6 +1219,7 @@ mod tests {
                 let width = |o: &ObjectSnapshot| match o {
                     ObjectSnapshot::Primitive(p) => p.style.stroke.width,
                     ObjectSnapshot::Path(p) => p.style.stroke.width,
+                    ObjectSnapshot::Clone(p) => p.resolved.style.stroke.width,
                 };
                 assert_eq!(width(&after), width(&before), "{direction:?} on {id:?}");
             }

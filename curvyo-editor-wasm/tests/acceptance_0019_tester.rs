@@ -59,6 +59,7 @@ fn anchor(n: u64, x: f64, y: f64) -> NewAnchor {
 fn rotate_about_centre(d: &Document, id: NodeId, radians: f64) {
     let o = d.object(id).unwrap();
     let c = match &o {
+        ObjectSnapshot::Clone(_) => panic!("no clone here"),
         ObjectSnapshot::Primitive(p) => match p.shape {
             Shape::Rect { bounds, .. } => pt(
                 bounds.origin.x + bounds.width.as_mm() / 2.0,
@@ -149,6 +150,7 @@ fn key(s: &mut Session, key: &str, shift: bool) -> KeyOutcome {
 fn outline_point(d: &Document, index: usize) -> Point {
     let id = d.object_ids()[index];
     match d.object(id).unwrap() {
+        ObjectSnapshot::Clone(_) => panic!("no clone here"),
         ObjectSnapshot::Primitive(p) => {
             let o = outline_of_rotated(&p.shape, p.rotation);
             // The midpoint of the first outline segment: always on the outline,
@@ -242,6 +244,7 @@ impl GBox {
 
 fn rect_of(o: &ObjectSnapshot) -> (RectBounds, f64) {
     match o {
+        ObjectSnapshot::Clone(_) => panic!("no clone here"),
         ObjectSnapshot::Primitive(p) => match p.shape {
             Shape::Rect { bounds, .. } => (bounds, p.rotation.as_radians()),
             other => panic!("rect expected, got {other:?}"),
@@ -252,6 +255,7 @@ fn rect_of(o: &ObjectSnapshot) -> (RectBounds, f64) {
 
 fn ellipse_of(o: &ObjectSnapshot) -> (EllipseFrame, f64) {
     match o {
+        ObjectSnapshot::Clone(_) => panic!("no clone here"),
         ObjectSnapshot::Primitive(p) => match p.shape {
             Shape::Ellipse { frame } => (frame, p.rotation.as_radians()),
             other => panic!("ellipse expected, got {other:?}"),
@@ -262,6 +266,7 @@ fn ellipse_of(o: &ObjectSnapshot) -> (EllipseFrame, f64) {
 
 fn rotation_of(o: &ObjectSnapshot) -> f64 {
     match o {
+        ObjectSnapshot::Clone(_) => panic!("no clone here"),
         ObjectSnapshot::Primitive(p) => p.rotation.as_radians(),
         ObjectSnapshot::Path(p) => p.rotation.as_radians(),
     }
@@ -270,7 +275,7 @@ fn rotation_of(o: &ObjectSnapshot) -> f64 {
 fn path_points(o: &ObjectSnapshot) -> Vec<Point> {
     match o {
         ObjectSnapshot::Path(p) => p.anchors.iter().map(|a| a.point).collect(),
-        ObjectSnapshot::Primitive(_) => panic!("path expected"),
+        ObjectSnapshot::Primitive(_) | ObjectSnapshot::Clone(_) => panic!("path expected"),
     }
 }
 
@@ -281,7 +286,7 @@ fn path_handles(o: &ObjectSnapshot) -> Vec<(Vec2, Vec2)> {
             .iter()
             .map(|a| (a.handle_in, a.handle_out))
             .collect(),
-        ObjectSnapshot::Primitive(_) => panic!("path expected"),
+        ObjectSnapshot::Primitive(_) | ObjectSnapshot::Clone(_) => panic!("path expected"),
     }
 }
 
@@ -413,6 +418,7 @@ fn ac2_stroke_width_is_not_part_of_the_group_box() {
     let mut o = d2.object(ids[1]).unwrap();
     match &mut o {
         ObjectSnapshot::Primitive(p) => p.style.stroke.width = Length::from_mm(10.0),
+        ObjectSnapshot::Clone(p) => p.resolved.style.stroke.width = Length::from_mm(10.0),
         ObjectSnapshot::Path(_) => unreachable!(),
     }
     d2.transform_objects(&[o], true).unwrap();
@@ -906,10 +912,12 @@ fn ac26_every_kind_turns_rigidly_with_rotation_added() {
     // Polygon and star: frame centre turned, radius unchanged, rotation +delta.
     for i in [3, 4] {
         let (bs, br) = match &before[i] {
+            ObjectSnapshot::Clone(_) => panic!("no clone here"),
             ObjectSnapshot::Primitive(p) => (p.shape, p.rotation.as_radians()),
             ObjectSnapshot::Path(_) => unreachable!(),
         };
         let (as_, ar) = match &after[i] {
+            ObjectSnapshot::Clone(_) => panic!("no clone here"),
             ObjectSnapshot::Primitive(p) => (p.shape, p.rotation.as_radians()),
             ObjectSnapshot::Path(_) => unreachable!(),
         };
@@ -925,6 +933,7 @@ fn ac26_every_kind_turns_rigidly_with_rotation_added() {
     }
     // Rigid: distances between the frame centres are unchanged.
     let centre_of = |o: &ObjectSnapshot| match o {
+        ObjectSnapshot::Clone(_) => panic!("no clone here"),
         ObjectSnapshot::Path(_) => pt(0.0, 0.0),
         ObjectSnapshot::Primitive(p) => match p.shape {
             Shape::Rect { bounds, .. } => rect_centre(bounds),
@@ -1540,6 +1549,7 @@ fn ac43_ctrl_drag_from_an_unselected_object_copies_it_alone() {
 fn style_width(o: &ObjectSnapshot) -> f64 {
     match o {
         ObjectSnapshot::Primitive(p) => p.style.stroke.width.as_mm(),
+        ObjectSnapshot::Clone(p) => p.resolved.style.stroke.width.as_mm(),
         ObjectSnapshot::Path(p) => p.style.stroke.width.as_mm(),
     }
 }
@@ -1808,6 +1818,7 @@ fn ac37_keys_with_nothing_selected() {
 
 fn radii_of(o: &ObjectSnapshot) -> [f64; 4] {
     match o {
+        ObjectSnapshot::Clone(_) => panic!("no clone here"),
         ObjectSnapshot::Primitive(p) => match p.shape {
             Shape::Rect {
                 corner_radii: r, ..
@@ -2116,7 +2127,7 @@ fn all_points(o: &ObjectSnapshot) -> Vec<Point> {
             .subpaths()
             .flat_map(|sp| sp.anchors.iter().map(|a| a.point).collect::<Vec<_>>())
             .collect(),
-        ObjectSnapshot::Primitive(_) => panic!("path expected"),
+        ObjectSnapshot::Primitive(_) | ObjectSnapshot::Clone(_) => panic!("path expected"),
     }
 }
 
@@ -3052,6 +3063,7 @@ fn ac51_style_fields_are_untouched() {
             .iter()
             .map(|o| match o {
                 ObjectSnapshot::Primitive(p) => format!("{:?}", p.style),
+                ObjectSnapshot::Clone(p) => format!("{:?}", p.resolved.style),
                 ObjectSnapshot::Path(p) => format!("{:?}", p.style),
             })
             .collect()
@@ -3280,6 +3292,7 @@ fn ac21_ctrl_corner_drag_is_proportional() {
     // Polygon: radius * f, centre mapped, rotation unchanged.
     for i in [1, 2] {
         let get = |o: &ObjectSnapshot| match o {
+            ObjectSnapshot::Clone(_) => panic!("no clone here"),
             ObjectSnapshot::Primitive(p) => match p.shape {
                 Shape::Polygon { frame, .. } | Shape::Star { frame, .. } => {
                     (frame, p.rotation.as_radians())
@@ -3326,6 +3339,7 @@ fn ac21_ctrl_corner_drag_is_proportional() {
 
 fn all_finite(s: &Session) -> bool {
     objects(s).iter().all(|o| match o {
+        ObjectSnapshot::Clone(_) => panic!("no clone here"),
         ObjectSnapshot::Path(p) => {
             p.subpaths().all(|sp| {
                 sp.anchors.iter().all(|a| {

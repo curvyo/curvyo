@@ -69,6 +69,11 @@ impl Session {
             .map_or_else(StylePanelView::empty, |state| {
                 StylePanelView::new(&state, key)
             });
+        // A selection of clones only has no style scope; the subject names the clones
+        // (`0049` criterion 21).
+        if let Some(subject) = self.clone_subject() {
+            view.subject = subject;
+        }
         view.pick_target = self
             .colour_pick_target()
             .map_or_else(String::new, |target| target.name().to_string());

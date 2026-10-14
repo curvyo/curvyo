@@ -99,6 +99,7 @@ fn styles(session: &Session) -> Vec<Style> {
         .map(|o| match o {
             ObjectSnapshot::Path(p) => p.style,
             ObjectSnapshot::Primitive(p) => p.style,
+            ObjectSnapshot::Clone(p) => p.resolved.style,
         })
         .collect()
 }

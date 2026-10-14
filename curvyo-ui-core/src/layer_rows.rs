@@ -29,6 +29,8 @@ pub enum RowKind {
     Polygon,
     /// A star.
     Star,
+    /// A linked clone (`specs/0049-linked-clone`).
+    Clone,
 }
 
 impl RowKind {
@@ -38,6 +40,7 @@ impl RowKind {
             NodeKind::Group => Self::Group,
             NodeKind::Leaf(ObjectSnapshot::Path(path)) if path.is_compound() => Self::CompoundPath,
             NodeKind::Leaf(ObjectSnapshot::Path(_)) => Self::Path,
+            NodeKind::Leaf(ObjectSnapshot::Clone(_)) => Self::Clone,
             NodeKind::Leaf(ObjectSnapshot::Primitive(primitive)) => match primitive.shape {
                 Shape::Rect { .. } => Self::Rectangle,
                 Shape::Ellipse { .. } => Self::Ellipse,
@@ -59,6 +62,7 @@ impl RowKind {
             Self::Ellipse => "Ellipse",
             Self::Polygon => "Polygon",
             Self::Star => "Star",
+            Self::Clone => "Clone",
         }
     }
 
@@ -74,6 +78,7 @@ impl RowKind {
             Self::Ellipse => "ellipse",
             Self::Polygon => "polygon",
             Self::Star => "star",
+            Self::Clone => "clone",
         }
     }
 }
@@ -156,6 +161,10 @@ pub struct LayerRow {
     pub position: usize,
     /// How many siblings it has, itself included (`aria-setsize`).
     pub siblings: usize,
+    /// For a linked clone, the muted second line of its tooltip: "Linked clone", or from depth 2
+    /// "Linked clone, chain of 3. Root: Path 3f9a1c" (`0049` UX notes "The Layers list"); empty
+    /// for every other row.
+    pub chain_line: String,
 }
 
 impl LayerRow {
@@ -242,6 +251,30 @@ fn shown_name(read: &NodeRead, kind: RowKind) -> (String, bool) {
     }
 }
 
+/// "Clone of " and the name of the clone's direct original: its own name, or for a clone without
+/// one "Clone of " again, at most eight times.
+fn clone_row_name(
+    nodes: &[NodeRead],
+    index: &std::collections::HashMap<NodeId, usize>,
+    names: &[(String, bool)],
+    at: usize,
+) -> String {
+    let mut prefix = String::new();
+    let mut current = at;
+    for _ in 0..curvyo_document_core::MAX_CLONE_DEPTH {
+        let NodeKind::Leaf(ObjectSnapshot::Clone(clone)) = &nodes[current].kind else {
+            break;
+        };
+        prefix.push_str("Clone of ");
+        match index.get(&clone.chain.origin) {
+            Some(&origin) if names[origin].1 => return format!("{prefix}{}", names[origin].0),
+            Some(&origin) => current = origin,
+            None => return format!("{prefix}Object {}", clone.chain.origin.short_id()),
+        }
+    }
+    format!("{prefix}{}", names[current].0)
+}
+
 /// The node read as a tree, made once per build: the children of each node, the top level, and
 /// what each node shows.
 struct Tree<'a> {
@@ -278,11 +311,20 @@ impl<'a> Tree<'a> {
             }
         }
         let kinds: Vec<RowKind> = nodes.iter().map(|read| RowKind::of(&read.kind)).collect();
-        let names = nodes
+        let mut names: Vec<(String, bool)> = nodes
             .iter()
             .zip(&kinds)
             .map(|(read, &kind)| shown_name(read, kind))
             .collect();
+        // A clone without a name of its own is "Clone of <its direct original's name>"
+        // (`0050` criterion 7, `0049` UX notes "The Layers list").
+        for at in 0..nodes.len() {
+            if !names[at].1
+                && let NodeKind::Leaf(ObjectSnapshot::Clone(_)) = &nodes[at].kind
+            {
+                names[at].0 = clone_row_name(nodes, &index, &names, at);
+            }
+        }
         Self {
             nodes,
             index,
@@ -292,6 +334,35 @@ impl<'a> Tree<'a> {
             kinds,
             names,
         }
+    }
+
+    /// The opacity a row reads: its own, or for a linked clone its root's, read only (`0050`
+    /// criterion 28).
+    fn shown_opacity(&self, at: usize) -> Opacity {
+        match &self.nodes[at].kind {
+            NodeKind::Leaf(ObjectSnapshot::Clone(clone)) => self
+                .index
+                .get(&clone.chain.root)
+                .map_or(self.nodes[at].registers.opacity, |&root| {
+                    self.nodes[root].registers.opacity
+                }),
+            _ => self.nodes[at].registers.opacity,
+        }
+    }
+
+    /// The chain line of a clone row's tooltip, empty for other rows.
+    fn chain_line(&self, at: usize) -> String {
+        let NodeKind::Leaf(ObjectSnapshot::Clone(clone)) = &self.nodes[at].kind else {
+            return String::new();
+        };
+        if clone.chain.depth < 2 {
+            return "Linked clone".to_owned();
+        }
+        let root = self.index.get(&clone.chain.root).map_or_else(
+            || format!("Object {}", clone.chain.root.short_id()),
+            |&root| self.names[root].0.clone(),
+        );
+        format!("Linked clone, chain of {}. Root: {root}", clone.chain.depth)
     }
 
     /// The ancestor `id` as a cause of an inherited state.
@@ -341,11 +412,12 @@ impl<'a> Tree<'a> {
             },
             hidden_by: self.cause(read.hidden_by),
             locked_by: self.cause(read.locked_by),
-            opacity: read.registers.opacity,
+            opacity: self.shown_opacity(at),
             container,
             mark: row_mark(facts, read.id, kind),
             position,
             siblings,
+            chain_line: self.chain_line(at),
         }
     }
 }

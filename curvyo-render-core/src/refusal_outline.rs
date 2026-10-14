@@ -28,7 +28,11 @@ pub fn build_refusal_outlines(objects: &[ObjectSnapshot], view: ViewTransform) -
         };
         for object in objects {
             match object {
-                ObjectSnapshot::Path(path) => {
+                ObjectSnapshot::Path(path)
+                | ObjectSnapshot::Clone(curvyo_document_core::CloneSnapshot {
+                    resolved: path,
+                    ..
+                }) => {
                     for subpath in path.subpaths() {
                         list.extend(stroke::path_stroke(
                             subpath.anchors,

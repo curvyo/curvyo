@@ -466,6 +466,8 @@ impl Session {
             match this.tool {
                 Tool::Select => {
                     let objects = this.objects();
+                    // What the notice counts: the selected objects and groups (criterion 31).
+                    this.deleted_objects = this.selected_units().len();
                     this.select
                         .delete_selected(&this.document, &objects, &mut this.selection);
                 }

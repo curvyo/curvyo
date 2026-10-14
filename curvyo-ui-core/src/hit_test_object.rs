@@ -61,7 +61,8 @@ where
 /// objects rejects almost all of them here, before any outline is built.
 fn certainly_farther_than(object: &ObjectSnapshot, point: Point, margin: f64) -> bool {
     match object {
-        ObjectSnapshot::Path(path) => {
+        ObjectSnapshot::Path(path)
+        | ObjectSnapshot::Clone(curvyo_document_core::CloneSnapshot { resolved: path, .. }) => {
             let mut hull = (
                 f64::INFINITY,
                 f64::INFINITY,
@@ -107,7 +108,8 @@ pub(crate) fn distance_to_object(
     match object {
         // Every outline of a compound path counts: the stroke of any of them
         // picks the object (criterion 33).
-        ObjectSnapshot::Path(path) => path
+        ObjectSnapshot::Path(path)
+        | ObjectSnapshot::Clone(curvyo_document_core::CloneSnapshot { resolved: path, .. }) => path
             .subpaths()
             .filter_map(|subpath| {
                 nearest_distance_on_run(
@@ -137,7 +139,8 @@ pub(crate) fn distance_to_object(
 /// path), a primitive's rotation-aware outline.
 fn outlines_of(object: &ObjectSnapshot) -> Vec<(Vec<OutlineTriple>, bool)> {
     match object {
-        ObjectSnapshot::Path(path) => path
+        ObjectSnapshot::Path(path)
+        | ObjectSnapshot::Clone(curvyo_document_core::CloneSnapshot { resolved: path, .. }) => path
             .subpaths()
             .map(|subpath| {
                 (

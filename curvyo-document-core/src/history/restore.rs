@@ -9,12 +9,13 @@
 
 use std::collections::BTreeMap;
 
-use loro::{LoroDoc, TreeID};
+use loro::{LoroDoc, LoroMap, LoroTree, TreeID};
 
 use super::checkout::{Detached, NodeAt};
 use super::error::HistoryError;
 use super::lineage::encode_node;
 use super::merge::{Tally, restore_map};
+use super::node_value::Node;
 use super::report::{
     Direction, ObjectReport, ObjectResult, ObjectShape, RestoreReport, Role, SkipReason,
 };
@@ -27,6 +28,7 @@ use super::step_header::{
 use super::step_id::StepRef;
 use super::step_log::{LogStep, find_step};
 use super::touched::Touched;
+use crate::clone_codec::{KEY_CLONE_LINK, link_from_value};
 use crate::document::{Document, OBJECTS_TREE, ROOT_MAP};
 use crate::path_model::NodeId;
 
@@ -220,6 +222,17 @@ impl Document {
             Action::Delete(id) => std::cmp::Reverse(depth_of(&tree, id)),
             _ => std::cmp::Reverse(0),
         });
+        // The clones that follow what the restore removes are repaired in the same step, never
+        // left as orphans (`specs/0049-linked-clone` criterion 36 b).
+        // Every deleted node, groups too: the repair expands a subtree itself.
+        let removed: Vec<TreeID> = deletes
+            .iter()
+            .filter_map(|&at| match plan.items[at].action {
+                Action::Delete(id) => Some(id),
+                _ => None,
+            })
+            .collect();
+        self.repair_clones_of_removed(&tree, &removed);
         for at in deletes {
             if let Action::Delete(id) = plan.items[at].action {
                 // Taking back a created group must not hide members that stayed in it.
@@ -242,10 +255,14 @@ impl Document {
                     (Action::Merge(id), _) => {
                         let nodes = (from.nodes.get(id), to.nodes.get(id), tree.get_meta(*id));
                         let result = if let (Some(f), Some(t), Ok(meta)) = nodes {
-                            let mut tally = Tally::default();
-                            restore_map(&meta, &f.meta, &t.meta, &mut tally);
-                            kept = tally.kept;
-                            result_of(tally)
+                            if writes_a_dead_link(&tree, &meta, &f.meta, &t.meta) {
+                                ObjectResult::Skipped(SkipReason::ChangedLater)
+                            } else {
+                                let mut tally = Tally::default();
+                                restore_map(&meta, &f.meta, &t.meta, &mut tally);
+                                kept = tally.kept;
+                                result_of(tally)
+                            }
                         } else {
                             ObjectResult::Skipped(SkipReason::DeletedLater)
                         };
@@ -411,6 +428,7 @@ pub(crate) fn kind_of(doc: &LoroDoc, id: TreeID) -> ObjectShape {
         return ObjectShape::Group;
     }
     match crate::shape_codec::read_shape_tag(&meta).as_deref() {
+        Some(crate::clone_codec::SHAPE_CLONE) => ObjectShape::Clone,
         Some(crate::shape_codec::SHAPE_RECT) => ObjectShape::Rectangle,
         Some(crate::shape_codec::SHAPE_ELLIPSE) => ObjectShape::Ellipse,
         Some(crate::shape_codec::SHAPE_POLYGON) => ObjectShape::Polygon,
@@ -476,4 +494,26 @@ pub(super) fn read_versions_between(
     guard.goto(after)?;
     let after = read(&guard);
     Ok((before, after))
+}
+
+/// Undo rule (a) of `0049` criterion 36: the restore would write back a `clone_link` whose origin
+/// is not a live path, compound path or clone after the restore. Such a node is left out of the
+/// restore whole: it keeps the link it has now, or stays the path it is. Restoring only the other
+/// fields would leave a clone tag with no link, a node no reader accepts.
+fn writes_a_dead_link(
+    tree: &LoroTree,
+    meta: &LoroMap,
+    from: &BTreeMap<String, Node>,
+    to: &BTreeMap<String, Node>,
+) -> bool {
+    let (from_link, to_link) = (from.get(KEY_CLONE_LINK), to.get(KEY_CLONE_LINK));
+    let now = meta.get(KEY_CLONE_LINK).as_ref().map(Node::read);
+    if from_link == to_link || now.as_ref() != from_link {
+        return false;
+    }
+    match to_link {
+        Some(Node::Value(value)) => link_from_value(value)
+            .is_some_and(|link| !crate::clone_write::origin_is_live(tree, link.origin)),
+        _ => false,
+    }
 }
