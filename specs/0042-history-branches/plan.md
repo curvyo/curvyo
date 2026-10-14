@@ -193,3 +193,32 @@ Fixes of 2026-10-14: the session also refuses the panel's Undo, Redo, object Und
 both wipes during a Document preview, so no entry point writes while editing is paused. A go-to or
 clone row shows "Go to version" (or "Clone of 3f9a1c") on line 1 and the full version id first on
 line 2; the accessible name and the tooltip keep the full name.
+
+## Customer feedback 2026-10-14
+
+Decisions: `adrs.md` note "customer feedback 2026-10-14", ADR 0014 §8 amendment, criteria 10, 14,
+17, 19 rewritten, 11 to 13 withdrawn.
+
+- [x] F.1 Test first: apply in the Object scope (one step, Ctrl+Z back to the state before, no
+  other object touched) and in the Document scope (a drawn object removed, a deleted one back with
+  its id, groups, order and page back), every apply its own step, nothing written when equal
+  (AC 10, 15, 31, 33).
+- [x] F.2 `version_write::go_to_version` is one run of the restore engine from the version to
+  now (`restore_plan::plan_return`, `restore::read_versions_between`, `revive_planned`,
+  `apply_plan`); the wipe mark, the format version, `clone_of` and `history_floor` stay
+  (AC 10).
+- [x] F.3 Session: `apply_history_item` for Enter and double-click in both scopes, with the
+  long-operation state from `step_distance` (AC 10, 16); an object preview draws only the
+  version, without the object, its box and handles; an edit, undo or redo ends it first
+  (AC 17, 18).
+- [x] F.4 Dead code removed: `step_header::continues`, `last_step_if_current`,
+  `commit_joining`, `GoToReport::continued`, the `explore` parameter, the old go-to body,
+  `VersionState` and exploring, Restore, the Mode flag and its bindings, `RESTORED_NOTICE`,
+  `HistoryModeRow.tsx`, `modeCaption`, `MODE_TOOLTIP`, `SAVED_IN_FILE_LINE` and their tests.
+- [x] F.5 Frontend: Space previews, Enter and double-click apply, a double-click on the id
+  selects it; the hint only in each row's tooltip and accessible name (AC 14, 27).
+- [x] F.6 Tester tests adapted to the changed criteria; the ones for withdrawn criteria 11 to 13
+  and the Mode switch deleted.
+- [x] F.7 `docs/design-system.md`: History tab layout, Mode row, Preview and apply, footer, the
+  preview look.
+- [ ] F.8 Full gate, WebKitGTK smoke run (`target/0042-smoke/fb-*`).

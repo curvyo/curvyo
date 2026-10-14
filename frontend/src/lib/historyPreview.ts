@@ -1,5 +1,5 @@
 // Previews from the History list (`specs/0042-history-branches` criteria 14, 17 to 19): what the
-// session says a preview shows, the readout and banner words, and the Mode switch's texts. Pure,
+// session says a preview shows, the readout and banner words, and a row's preview and apply hint. Pure,
 // so `tests/historyPreview.test.ts` covers it. The words need the local clock time, which only the
 // browser knows, so they are built here and not in the session.
 
@@ -47,15 +47,14 @@ export function sinceText(state: PreviewState): string {
   return `(${n} new ${n === 1 ? "step" : "steps"} since)`;
 }
 
-/** The tooltip of the Mode switch (criterion 14). */
-export const MODE_TOOLTIP =
-  "Preview shows a version over the canvas and changes nothing. Live puts the object into the version you click.";
+/** A row's tooltip with the hint of criterion 14: how to preview and how to apply. */
+export function rowHintTooltip(tooltip: string): string {
+  return `${tooltip} Click to preview. Double-click or Enter to apply this version.`;
+}
 
-/** The caption under the Mode row in each position (criterion 14). */
-export function modeCaption(live: boolean): string {
-  return live
-    ? "A click puts the object into that version. Ctrl+Z undoes it."
-    : "A click shows the version. Nothing changes.";
+/** A row's accessible name with the hint of criterion 14 at its end. */
+export function rowHintAriaName(name: string): string {
+  return `${name}, Enter applies this version`;
 }
 
 /** Whether the panel's Undo, Redo and Wipe are disabled: a document preview pauses editing

@@ -2,9 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  MODE_TOOLTIP,
   historyButtonsPaused,
-  modeCaption,
   parsePreview,
   previewBanner,
   previewReadout,
@@ -33,10 +31,13 @@ test("no preview reads as an empty kind", () => {
   assert.deepEqual(parsePreview(JSON.stringify({ kind: "" })), { kind: "" });
 });
 
-test("the Mode captions and tooltip are the words of criterion 14", () => {
-  assert.equal(modeCaption(false), "A click shows the version. Nothing changes.");
-  assert.equal(modeCaption(true), "A click puts the object into that version. Ctrl+Z undoes it.");
-  assert.match(MODE_TOOLTIP, /^Preview shows a version over the canvas and changes nothing\./);
+test("each row carries the preview and apply hint in its tooltip and accessible name", async () => {
+  const { rowHintTooltip, rowHintAriaName } = await import("../src/lib/historyPreview.ts");
+  assert.equal(
+    rowHintTooltip("Move."),
+    "Move. Click to preview. Double-click or Enter to apply this version.",
+  );
+  assert.equal(rowHintAriaName("Move, You"), "Move, You, Enter applies this version");
 });
 
 test("a document preview disables Undo, Redo and Wipe in the panel; an object preview does not", () => {

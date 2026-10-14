@@ -25,7 +25,6 @@ import {
   type SpecialItem,
 } from "../src/lib/historyItems.ts";
 import {
-  modeCaption,
   parsePreview,
   previewBanner,
   previewReadout,
@@ -52,11 +51,6 @@ test("c17 and c19 words are exactly those of the specification", () => {
 test("a preview with an unknown kind or broken data reads as no preview", () => {
   assert.equal(parsePreview(JSON.stringify({ kind: "weird" })).kind, "");
   assert.equal(parsePreview("{}").kind, "");
-});
-
-test("c14 captions", () => {
-  assert.equal(modeCaption(false), "A click shows the version. Nothing changes.");
-  assert.equal(modeCaption(true), "A click puts the object into that version. Ctrl+Z undoes it.");
 });
 
 test("the gutter numbers of the UX notes", () => {

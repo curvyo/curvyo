@@ -260,9 +260,6 @@ export function scrollAfterInsert(scrollTop: number, added: number): number {
   return scrollTop <= 0 ? 0 : scrollTop + added * ROW_HEIGHT_PX;
 }
 
-/** The text of the footer line (criterion 45). */
-export const SAVED_IN_FILE_LINE = "The history is saved in the project file.";
-
 /** The question of the inline confirm that replaces the "Wipe history" button (criterion 47). */
 export function wipeQuestion(steps: number): string {
   const what = steps === 1 ? "the 1 step" : `all ${steps} steps`;

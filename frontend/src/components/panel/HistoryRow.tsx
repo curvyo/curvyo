@@ -32,6 +32,7 @@ import {
   objectsHeight,
   SUB_ROW_HEIGHT_PX,
 } from "@/lib/historyItems";
+import { rowHintAriaName, rowHintTooltip } from "@/lib/historyPreview";
 import {
   type HistoryRowData,
   isUndone,
@@ -174,8 +175,11 @@ interface StepRowProps {
   tabbable: boolean;
   onFocusRow: () => void;
   onHover: (step: string) => void;
+  /** A press or Space: preview the version. */
   onPress: () => void;
-  /** The row an exploration went to last, or the row a preview shows: the selected look. */
+  /** Enter or a double-click: apply the version (`0042` criterion 10). */
+  onApply: () => void;
+  /** The row a preview shows: the selected look. */
   selected?: boolean;
   /** The row's action (`specs/0042-history-branches` criteria 22 and 24): Clone in the Object
    * scope, the objects disclosure in the Document scope; none for a row without one. */
@@ -210,6 +214,7 @@ export function StepRow({
   onFocusRow,
   onHover,
   onPress,
+  onApply,
   selected = false,
   action,
   objectsOpen = false,
@@ -234,19 +239,32 @@ export function StepRow({
       style={place}
     >
       <div className="flex shrink-0 items-stretch" style={{ height: ROW_HEIGHT_PX }}>
-        <Tooltip side="left" content={rowTooltip(row)}>
+        <Tooltip side="left" content={rowHintTooltip(rowTooltip(row))}>
           <button
             ref={main}
             type="button"
             data-row-index={index}
             tabIndex={tabbable ? 0 : -1}
-            aria-label={rowAriaName(row, now)}
+            aria-label={rowHintAriaName(rowAriaName(row, now))}
             onFocus={onFocusRow}
             onClick={onPress}
+            onDoubleClick={(event) => {
+              // A double-click on the id selects the id (criterion 27) and applies nothing.
+              if (event.target instanceof Element && event.target.closest("[data-step-id]")) {
+                return;
+              }
+              onApply();
+            }}
             onKeyDown={(event) => {
               if (event.key === "ArrowRight" && side.current) {
                 event.preventDefault();
                 side.current.focus();
+              } else if (event.key === "Enter") {
+                event.preventDefault();
+                onApply();
+              } else if (event.key === " ") {
+                event.preventDefault();
+                onPress();
               }
             }}
             onBlur={() => onHover("")}
@@ -262,7 +280,10 @@ export function StepRow({
               <span className={`flex h-5 items-center gap-1.5 text-sm ${muted}`}>
                 <Glyph size={16} strokeWidth={1.5} aria-hidden />
                 <span className="min-w-0 flex-1 truncate">{rowDisplay(row).name}</span>
-                <span className="select-text font-mono text-xs text-[var(--panel-muted-fg)]">
+                <span
+                  data-step-id
+                  className="select-text font-mono text-xs text-[var(--panel-muted-fg)]"
+                >
                   {row.id}
                 </span>
               </span>

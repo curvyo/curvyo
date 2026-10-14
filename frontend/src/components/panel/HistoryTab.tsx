@@ -12,7 +12,6 @@ import {
 import { ToggleGroup, type ToggleOption } from "@/components/ui/toggle-group";
 import { Tooltip } from "@/components/ui/tooltip";
 import type { EditorSession } from "@/hooks/useEditorSession";
-import { HistoryModeRow } from "@/components/panel/HistoryModeRow";
 import { FoldRow, StepRow } from "@/components/panel/HistoryRow";
 import { useHistoryList } from "@/hooks/useHistoryList";
 import { useBusyWindow } from "@/hooks/useRailCommands";
@@ -34,7 +33,6 @@ import {
   objectButtonTooltip,
   objectWipeQuestion,
   ROW_HEIGHT_PX,
-  SAVED_IN_FILE_LINE,
   WIPE_ARM_MS,
   WIPE_SHARED_LINE,
   wipeQuestion,
@@ -69,18 +67,8 @@ export function HistoryTab({ editor, shown, onReturnFocus, historyScope }: Histo
   const now = list.readAt;
   const object = scope === "object";
   const preview = usePreviewState();
-  const [live, setLive] = useState(() => getSession()?.history_live() ?? false);
   const [busy, setBusy] = useState(false);
   useBusyWindow(busy);
-  // An exploration in Live mode: Restore previous state is offered and the pressed row looks
-  // selected (criteria 11 and 12).
-  const [explored, setExplored] = useState<string | null>(null);
-  const exploring = useMemo(
-    () => object && (getSession()?.history_exploring() ?? false),
-    // The session's state follows every change it reports.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [getSession, object, syncRevision, list.total],
-  );
 
   // The session holds the preview; read it again whenever the session changed (a press on the
   // canvas or another selection ends an object preview there).
@@ -95,34 +83,20 @@ export function HistoryTab({ editor, shown, onReturnFocus, historyScope }: Histo
     getSession()?.history_preview_end();
     readPreview();
   }, [getSession, readPreview]);
-  // A change of tab, a collapsed panel or another scope ends a preview (criteria 18 and 19) and an
-  // exploration (criterion 13).
+  // A change of tab, a collapsed panel or another scope ends a preview (criteria 18 and 19).
   useEffect(() => {
     if (!shown) {
       endPreview();
-      getSession()?.history_end_exploration();
     }
     return endPreview;
-  }, [shown, scope, endPreview, getSession]);
+  }, [shown, scope, endPreview]);
 
-  /** A press, Enter or Space on the row at `index`: Preview shows the version (criteria 17 to
-   * 21). A row far back shows the long-operation state first. */
+  /** A press or Space on the row at `index`: the version shows (criteria 17 to 21). A row far
+   * back shows the long-operation state first. */
   const pressRow = useCallback(
     (index: number) => {
       const session = getSession();
       if (!session || busy) {
-        return;
-      }
-      if (object && live) {
-        // Live: the object goes to the version as one step (criteria 10 and 11).
-        const row = list.itemAt(index);
-        editor.runHistoryAction((s) => {
-          const result = JSON.parse(s.history_go_to_item(index)) as { kind: string; notice: string };
-          if (result.kind === "went" && row?.type === "row") {
-            setExplored(row.step);
-          }
-          return result.notice;
-        });
         return;
       }
       if (session.history_item_is_far(object, index)) {
@@ -142,7 +116,40 @@ export function HistoryTab({ editor, shown, onReturnFocus, historyScope }: Histo
       session.history_preview_item(object, index);
       readPreview();
     },
-    [busy, editor, getSession, list, live, object, readPreview],
+    [busy, getSession, object, readPreview],
+  );
+
+  /** Enter or a double-click on the row at `index`: its version is applied as one step
+   * (criterion 10). A version far back shows the long-operation state first. */
+  const applyRow = useCallback(
+    (index: number) => {
+      const session = getSession();
+      if (!session || busy) {
+        return;
+      }
+      const apply = () =>
+        editor.runHistoryAction((s) => {
+          const result = JSON.parse(s.history_apply_item(object, index)) as { notice: string };
+          return result.notice;
+        });
+      if (session.history_apply_needs_busy_state(object, index)) {
+        setBusy(true);
+        requestAnimationFrame(() =>
+          requestAnimationFrame(() => {
+            try {
+              apply();
+            } finally {
+              setBusy(false);
+              readPreview();
+            }
+          }),
+        );
+        return;
+      }
+      apply();
+      readPreview();
+    },
+    [busy, editor, getSession, object, readPreview],
   );
 
   useLayoutEffect(() => {
@@ -332,10 +339,11 @@ export function HistoryTab({ editor, shown, onReturnFocus, historyScope }: Histo
           setFocused(index);
           pressRow(index);
         }}
-        selected={
-          (exploring && explored !== null && item.step === explored) ||
-          (preview.kind !== "" && preview.step === item.step)
-        }
+        selected={preview.kind !== "" && preview.step === item.step}
+        onApply={() => {
+          setFocused(index);
+          applyRow(index);
+        }}
         action={object ? "clone" : item.objects.length > 0 ? "objects" : null}
         objectsOpen={open?.index === index}
         onToggleObjects={() =>
@@ -362,33 +370,6 @@ export function HistoryTab({ editor, shown, onReturnFocus, historyScope }: Histo
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto">
       <HistoryHeader editor={editor} historyScope={historyScope} onReturnFocus={onReturnFocus} />
-      {object && info !== null ? (
-        <HistoryModeRow
-          live={live}
-          onChange={(next) => {
-            getSession()?.set_history_live(next);
-            setLive(next);
-            readPreview();
-          }}
-          onReturnFocus={onReturnFocus}
-          action={
-            exploring ? (
-              <Tooltip side="left" content="Put the object back as it was before you started clicking through versions">
-                <button
-                  type="button"
-                  onClick={() => {
-                    editor.runHistoryAction((s) => s.history_restore_exploration());
-                    setExplored(null);
-                  }}
-                  className="h-7 w-full rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_25%,transparent)] text-sm text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
-                >
-                  Restore previous state
-                </button>
-              </Tooltip>
-            ) : undefined
-          }
-        />
-      ) : null}
       <button
         type="button"
         onClick={endPreview}
@@ -441,7 +422,6 @@ export function HistoryTab({ editor, shown, onReturnFocus, historyScope }: Histo
           {rows}
         </div>
       </div>
-      <p className="shrink-0 pt-2 text-xs text-[var(--panel-muted-fg)]">{SAVED_IN_FILE_LINE}</p>
       <WipeFooter
         editor={editor}
         scope={scope}
