@@ -221,4 +221,4 @@ Decisions: `adrs.md` note "customer feedback 2026-10-14", ADR 0014 §8 amendment
   and the Mode switch deleted.
 - [x] F.7 `docs/design-system.md`: History tab layout, Mode row, Preview and apply, footer, the
   preview look.
-- [ ] F.8 Full gate, WebKitGTK smoke run (`target/0042-smoke/fb-*`).
+- [x] F.8 Full gate, WebKitGTK smoke run (`target/0042-smoke/fb-*`): the object preview hides the current object, Escape brings it back, Enter applies in the Object scope, a double-click applies in the Document scope (the drawn rectangle goes, the resized one is back), Ctrl+Z undoes each apply.
