@@ -35,7 +35,7 @@ use curvyo_document_core::{
     unpack,
 };
 use curvyo_editor_wasm::{
-    CloneOutcome, DocumentSide, GoToOutcome, KeyInput, KeyOutcome, RowPress, Session, Tool,
+    CloneOutcome, DocumentSide, GoToOutcome, HistoryRowPress, KeyInput, KeyOutcome, Session, Tool,
 };
 use serde_json::Value;
 
@@ -430,7 +430,7 @@ fn c8_header_rows_are_list_items_the_press_on_a_row_ignores() {
     let (mut l, _) = lab_with_branches(1);
     let all = items(&mut l.s, false);
     let h = all.iter().position(|i| i["type"] == "header").unwrap();
-    assert_eq!(l.s.preview_history_item(false, h), RowPress::NotARow);
+    assert_eq!(l.s.preview_history_item(false, h), HistoryRowPress::NotARow);
     assert!(!l.document_preview_active());
     assert_eq!(l.s.clone_history_item(false, h, 0), CloneOutcome::Refused);
     l.s.set_history_live(true);
@@ -655,7 +655,7 @@ fn c16_the_gate_ignores_a_press_during_a_drag_a_chip_or_an_unfinished_pen_path()
     l.s.set_history_live(true);
     assert_eq!(l.s.go_to_history_item(i), GoToOutcome::Ignored);
     l.s.set_history_live(false);
-    assert_eq!(l.s.preview_history_item(true, i), RowPress::Ignored);
+    assert_eq!(l.s.preview_history_item(true, i), HistoryRowPress::Ignored);
     assert_eq!(l.s.clone_history_item(true, i, 0), CloneOutcome::Ignored);
     l.s.pointer_up(pt(60.0, l.y + 5.0), false, false);
     // Undo the drag's own step so the comparisons are against the old state.
@@ -668,7 +668,7 @@ fn c16_the_gate_ignores_a_press_during_a_drag_a_chip_or_an_unfinished_pen_path()
     l.s.set_history_live(true);
     assert_eq!(l.s.go_to_history_item(i), GoToOutcome::Ignored);
     l.s.set_history_live(false);
-    assert_eq!(l.s.preview_history_item(true, i), RowPress::Ignored);
+    assert_eq!(l.s.preview_history_item(true, i), HistoryRowPress::Ignored);
     assert_eq!(l.s.clone_history_item(true, i, 0), CloneOutcome::Ignored);
     key_in(&mut l.s, "Escape", false, false);
     // An unfinished Pen path.
@@ -678,7 +678,10 @@ fn c16_the_gate_ignores_a_press_during_a_drag_a_chip_or_an_unfinished_pen_path()
     l.s.pointer_up(pt(300.0, 300.0), false, false);
     let rows = items(&mut l.s, false);
     let any_row = rows.iter().position(|r| r["type"] == "row").unwrap();
-    assert_eq!(l.s.preview_history_item(false, any_row), RowPress::Ignored);
+    assert_eq!(
+        l.s.preview_history_item(false, any_row),
+        HistoryRowPress::Ignored
+    );
     assert_eq!(
         l.s.clone_history_item(false, any_row, 0),
         CloneOutcome::Ignored
@@ -700,7 +703,10 @@ fn c17_object_preview_changes_nothing_and_reads_as_a_status_line() {
     let hist = l.s.history_len();
     let plain = l.s.draw_list();
     let i = item_of(&mut l.s, true, &s1);
-    assert_eq!(l.s.preview_history_item(true, i), RowPress::Previewed);
+    assert_eq!(
+        l.s.preview_history_item(true, i),
+        HistoryRowPress::Previewed
+    );
     let v: Value = serde_json::from_str(&l.s.history_preview_json()).unwrap();
     assert_eq!(v["kind"], "object");
     let id1 = shown_id(&mut l.s, true, &s1);
@@ -749,7 +755,10 @@ fn c18_a_preview_ends_on_the_listed_events() {
     l.select();
     let preview = |l: &mut Lab| {
         let i = item_of(&mut l.s, true, &s1);
-        assert_eq!(l.s.preview_history_item(true, i), RowPress::Previewed);
+        assert_eq!(
+            l.s.preview_history_item(true, i),
+            HistoryRowPress::Previewed
+        );
         assert_eq!(preview_kind(&mut l.s), "object");
     };
     // Escape in the list is the host's call of end_history_preview.
@@ -782,7 +791,7 @@ fn c18_a_preview_ends_on_the_listed_events() {
     let newest = obj_rows(&mut l.s)[0]["step"].as_str().unwrap().to_owned();
     preview(&mut l);
     let i = item_of(&mut l.s, true, &newest);
-    assert_eq!(l.s.preview_history_item(true, i), RowPress::Ended);
+    assert_eq!(l.s.preview_history_item(true, i), HistoryRowPress::Ended);
     assert_eq!(preview_kind(&mut l.s), "");
 }
 
@@ -829,12 +838,18 @@ fn c17_preview_of_a_deleted_object_via_the_document_row_and_the_object_scope() {
         .unwrap()
         .to_owned();
     let i = item_of(&mut l.s, false, &before_del);
-    assert_eq!(l.s.preview_history_item(false, i), RowPress::Previewed);
+    assert_eq!(
+        l.s.preview_history_item(false, i),
+        HistoryRowPress::Previewed
+    );
     assert!(l.s.document_preview_active());
     let with_obj = l.s.frame_draw_list();
     l.s.end_history_preview();
     let i = item_of(&mut l.s, false, &del);
-    assert_eq!(l.s.preview_history_item(false, i), RowPress::Previewed);
+    assert_eq!(
+        l.s.preview_history_item(false, i),
+        HistoryRowPress::Previewed
+    );
     let without_obj = l.s.frame_draw_list();
     assert_ne!(
         with_obj, without_obj,
@@ -845,7 +860,10 @@ fn c17_preview_of_a_deleted_object_via_the_document_row_and_the_object_scope() {
     ctrl_z(&mut l.s);
     assert_eq!(l.s.selected_object_count(), 1);
     let i = item_of(&mut l.s, true, &s1);
-    assert_eq!(l.s.preview_history_item(true, i), RowPress::Previewed);
+    assert_eq!(
+        l.s.preview_history_item(true, i),
+        HistoryRowPress::Previewed
+    );
 }
 
 // ---------------------------------------------------------------------
@@ -862,7 +880,10 @@ fn c19_document_preview_pauses_editing_but_not_pan_and_zoom() {
     let sel = l.s.selected_object_count();
     let live_frame = l.s.frame_draw_list();
     let i = item_of(&mut l.s, false, &s1);
-    assert_eq!(l.s.preview_history_item(false, i), RowPress::Previewed);
+    assert_eq!(
+        l.s.preview_history_item(false, i),
+        HistoryRowPress::Previewed
+    );
     assert!(l.s.document_preview_active());
     assert_eq!(preview_kind(&mut l.s), "document");
     assert_ne!(
@@ -941,7 +962,10 @@ fn c19_the_document_preview_shows_page_size_and_background_of_that_version() {
         "setup: the live page changed"
     );
     let i = item_of(&mut l.s, false, &s1);
-    assert_eq!(l.s.preview_history_item(false, i), RowPress::Previewed);
+    assert_eq!(
+        l.s.preview_history_item(false, i),
+        HistoryRowPress::Previewed
+    );
     assert_eq!(
         page(&l.s),
         (w0, h0, c0),
@@ -1042,13 +1066,19 @@ fn c8_c21_a_list_with_50_branches_and_10000_steps_opens_and_previews_inside_the_
             "{back}"
         );
         let t = Instant::now();
-        assert_eq!(s.preview_history_item(false, idx), RowPress::Previewed);
+        assert_eq!(
+            s.preview_history_item(false, idx),
+            HistoryRowPress::Previewed
+        );
         let took = t.elapsed();
         eprintln!("session preview {back} rows back: {took:?}");
         assert!(took.as_millis() <= 300 * 4 * scale, "{back} back: {took:?}");
         for k in 1..=5 {
             let t = Instant::now();
-            assert_eq!(s.preview_history_item(false, idx + k), RowPress::Previewed);
+            assert_eq!(
+                s.preview_history_item(false, idx + k),
+                HistoryRowPress::Previewed
+            );
             assert!(
                 t.elapsed().as_millis() <= 300 * 4 * scale,
                 "moving along: {:?}",
@@ -1061,7 +1091,10 @@ fn c8_c21_a_list_with_50_branches_and_10000_steps_opens_and_previews_inside_the_
     let far = items_window(&mut s, 10_030).len() - 3;
     assert!(s.history_item_is_far(false, far));
     let t = Instant::now();
-    assert_eq!(s.preview_history_item(false, far), RowPress::Previewed);
+    assert_eq!(
+        s.preview_history_item(false, far),
+        HistoryRowPress::Previewed
+    );
     eprintln!("session preview 10,000 rows back: {:?}", t.elapsed());
     assert!(
         t.elapsed().as_millis() <= 1_500 * 4 * scale,
@@ -1321,7 +1354,10 @@ fn c6_c33_save_and_open_keep_the_branches_and_the_format_version() {
         m["format_version"].as_u64().unwrap(),
         u64::from(CURRENT_FORMAT_VERSION)
     );
-    assert_eq!(CURRENT_FORMAT_VERSION, 11);
+    assert_eq!(
+        CURRENT_FORMAT_VERSION, 12,
+        "0042 adds no bump; 12 is main after 0050"
+    );
 }
 
 #[test]
@@ -1329,13 +1365,13 @@ fn c9_the_row_actions_are_not_rows_without_a_selection() {
     let mut s = fresh();
     // Object scope without an object: no list, nothing to press.
     assert_eq!(s.object_history_len(), 0);
-    assert_eq!(s.preview_history_item(true, 0), RowPress::NotARow);
+    assert_eq!(s.preview_history_item(true, 0), HistoryRowPress::NotARow);
     s.set_history_live(true);
     assert_eq!(s.go_to_history_item(0), GoToOutcome::NotARow);
     assert_eq!(s.clone_history_item(true, 0, 0), CloneOutcome::Refused);
     assert!(s.restore_exploration().is_none());
     // Document scope of an empty document.
-    assert_eq!(s.preview_history_item(false, 99), RowPress::NotARow);
+    assert_eq!(s.preview_history_item(false, 99), HistoryRowPress::NotARow);
     assert_eq!(s.clone_history_item(false, 99, 0), CloneOutcome::Refused);
     assert_eq!(items(&mut s, false).len(), s.history_len());
 }
@@ -1357,7 +1393,10 @@ fn w_inherited_rows_of_a_clone_preview_and_go_to_the_original_object() {
     let clone = l.s.history_object().unwrap();
     // The clone's list has the inherited row s1: pressing it previews the original's version.
     let at = item_of(&mut l.s, true, &s1);
-    assert_eq!(l.s.preview_history_item(true, at), RowPress::Previewed);
+    assert_eq!(
+        l.s.preview_history_item(true, at),
+        HistoryRowPress::Previewed
+    );
     assert_eq!(preview_kind(&mut l.s), "object");
     l.s.end_history_preview();
     // Live: the clone goes to the original's version of s1 (it already has it: nothing written).
@@ -1381,9 +1420,15 @@ fn w_a_document_preview_replaces_an_object_preview_and_ends_cleanly() {
     let _ = l.step();
     l.select();
     let i = item_of(&mut l.s, true, &s1);
-    assert_eq!(l.s.preview_history_item(true, i), RowPress::Previewed);
+    assert_eq!(
+        l.s.preview_history_item(true, i),
+        HistoryRowPress::Previewed
+    );
     let j = item_of(&mut l.s, false, &s1);
-    assert_eq!(l.s.preview_history_item(false, j), RowPress::Previewed);
+    assert_eq!(
+        l.s.preview_history_item(false, j),
+        HistoryRowPress::Previewed
+    );
     assert_eq!(preview_kind(&mut l.s), "document");
     assert!(l.s.document_preview_active());
     l.s.end_history_preview();

@@ -106,7 +106,7 @@ pub use document_presets::DocumentPresetsRecord;
 pub use formats::{FormTexts, FormatEdit};
 pub use grouping::{GroupingKind, GroupingResult};
 pub use history::HistoryResult;
-pub use history_preview::{FAR_PREVIEW_ROWS, RowPress};
+pub use history_preview::{FAR_PREVIEW_ROWS, HistoryRowPress};
 pub use history_rows::{WipeOutcome, WipeState};
 pub use history_version::{CloneOutcome, GoToOutcome};
 pub use keys::{EscapeStep, KeyHint, KeyInput, KeyOutcome};

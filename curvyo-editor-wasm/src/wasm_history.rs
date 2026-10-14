@@ -140,10 +140,10 @@ impl WasmSession {
     /// `"none"` (no step row).
     pub fn history_preview_item(&mut self, object: bool, index: u32) -> String {
         match self.session.preview_history_item(object, index as usize) {
-            crate::RowPress::Ignored => "ignored",
-            crate::RowPress::NotARow => "none",
-            crate::RowPress::Previewed => "previewed",
-            crate::RowPress::Ended => "ended",
+            crate::HistoryRowPress::Ignored => "ignored",
+            crate::HistoryRowPress::NotARow => "none",
+            crate::HistoryRowPress::Previewed => "previewed",
+            crate::HistoryRowPress::Ended => "ended",
         }
         .to_owned()
     }

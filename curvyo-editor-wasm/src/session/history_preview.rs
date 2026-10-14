@@ -35,7 +35,7 @@ pub(super) struct PreviewState {
 
 /// What a press on a row of the History list did.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum RowPress {
+pub enum HistoryRowPress {
     /// A drag, a chip, a long operation or an unfinished Pen path: ignored (criterion 16).
     Ignored,
     /// The item is no step row, or the scope has no subject.
@@ -69,29 +69,29 @@ impl Session {
     }
 
     /// A press, Enter or Space on item `index` of the list in Preview mode: shows that version.
-    pub fn preview_history_item(&mut self, object: bool, index: usize) -> RowPress {
+    pub fn preview_history_item(&mut self, object: bool, index: usize) -> HistoryRowPress {
         if self.operation_in_flight() || self.select.has_entry() || self.pen_path_open() {
-            return RowPress::Ignored;
+            return HistoryRowPress::Ignored;
         }
         let Some(row) = self.history_row_at(object, index) else {
-            return RowPress::NotARow;
+            return HistoryRowPress::NotARow;
         };
         let steps_then = self.document.history_len();
         let shown = if object {
             let Some(subject) = self.history_object() else {
-                return RowPress::NotARow;
+                return HistoryRowPress::NotARow;
             };
             let Some(typed) = self.document.object_history_page(subject, row, 1).pop() else {
-                return RowPress::NotARow;
+                return HistoryRowPress::NotARow;
             };
             let target = typed.inherited_from.unwrap_or(subject);
             let Ok(version) = self.document.preview_object_at(typed.step, target) else {
-                return RowPress::NotARow;
+                return HistoryRowPress::NotARow;
             };
             let current: Vec<ObjectSnapshot> = self.document.object(subject).into_iter().collect();
             if target == subject && version.objects == current {
                 self.end_history_preview();
-                return RowPress::Ended;
+                return HistoryRowPress::Ended;
             }
             Shown {
                 subject: Some(subject),
@@ -104,10 +104,10 @@ impl Session {
             }
         } else {
             let Some(typed) = self.document.history_page(row, 1).pop() else {
-                return RowPress::NotARow;
+                return HistoryRowPress::NotARow;
             };
             let Ok(version) = self.document.preview_document_at(typed.step) else {
-                return RowPress::NotARow;
+                return HistoryRowPress::NotARow;
             };
             Shown {
                 subject: None,
@@ -117,7 +117,7 @@ impl Session {
             }
         };
         self.history.preview.shown = Some(shown);
-        RowPress::Previewed
+        HistoryRowPress::Previewed
     }
 
     /// Ends the preview: Escape in the list, the "Now" row, Back to live, a change of tab or a

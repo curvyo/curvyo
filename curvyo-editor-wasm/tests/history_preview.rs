@@ -5,7 +5,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, missing_docs)]
 
 use curvyo_document_core::{Point, Timestamp};
-use curvyo_editor_wasm::{KeyInput, KeyOutcome, RowPress, Session, Tool};
+use curvyo_editor_wasm::{HistoryRowPress, KeyInput, KeyOutcome, Session, Tool};
 use curvyo_ui_core::StyleField;
 use serde_json::Value;
 
@@ -67,7 +67,7 @@ fn c17_c20_an_object_preview_draws_the_version_and_writes_nothing() {
     let rows = s.history_len();
     let plain = s.frame_draw_list().triangle_count();
     // Rows of the Object scope: 0 is width 3, 2 is width 1.
-    assert_eq!(s.preview_history_item(true, 2), RowPress::Previewed);
+    assert_eq!(s.preview_history_item(true, 2), HistoryRowPress::Previewed);
     let shown = preview(&mut s);
     assert_eq!(shown["kind"], "object");
     assert_eq!(shown["since"], 0);
@@ -83,7 +83,7 @@ fn c17_c20_an_object_preview_draws_the_version_and_writes_nothing() {
 #[test]
 fn c18_a_press_on_the_canvas_ends_the_preview_and_does_nothing_else() {
     let mut s = widths();
-    assert_eq!(s.preview_history_item(true, 2), RowPress::Previewed);
+    assert_eq!(s.preview_history_item(true, 2), HistoryRowPress::Previewed);
     let selected = s.selected_object_count();
     s.pointer_down(Point::new(500.0, 500.0), false);
     s.pointer_up(Point::new(500.0, 500.0), false, false);
@@ -98,15 +98,15 @@ fn c18_a_press_on_the_canvas_ends_the_preview_and_does_nothing_else() {
 #[test]
 fn c18_the_row_of_the_current_version_selecting_another_object_and_live_end_it() {
     let mut s = widths();
-    assert_eq!(s.preview_history_item(true, 0), RowPress::Ended);
-    assert_eq!(s.preview_history_item(true, 2), RowPress::Previewed);
+    assert_eq!(s.preview_history_item(true, 0), HistoryRowPress::Ended);
+    assert_eq!(s.preview_history_item(true, 2), HistoryRowPress::Previewed);
     s.set_history_live(true);
     assert_eq!(preview(&mut s)["kind"], "");
     s.set_history_live(false);
-    assert_eq!(s.preview_history_item(true, 2), RowPress::Previewed);
+    assert_eq!(s.preview_history_item(true, 2), HistoryRowPress::Previewed);
     draw_rect(&mut s, 200.0);
     assert_eq!(preview(&mut s)["kind"], "", "another object is selected");
-    assert_eq!(s.preview_history_item(false, 1), RowPress::Previewed);
+    assert_eq!(s.preview_history_item(false, 1), HistoryRowPress::Previewed);
     s.end_history_preview();
     assert_eq!(preview(&mut s)["kind"], "");
 }
@@ -117,7 +117,10 @@ fn c19_a_document_preview_pauses_editing_until_back_to_live() {
     let before = doc_json(&s);
     // The oldest row of the Document scope: the rectangle alone, before any width.
     let last = s.history_len() - 1;
-    assert_eq!(s.preview_history_item(false, last), RowPress::Previewed);
+    assert_eq!(
+        s.preview_history_item(false, last),
+        HistoryRowPress::Previewed
+    );
     assert_eq!(preview(&mut s)["kind"], "document");
     assert_eq!(key(&mut s, "z", true, false), KeyOutcome::Paused);
     assert_eq!(key(&mut s, "Delete", false, false), KeyOutcome::Paused);
@@ -135,7 +138,7 @@ fn c16_a_press_during_a_drag_is_ignored() {
     s.pointer_hover(Point::new(400.0, 400.0), false, false);
     s.pointer_down(Point::new(400.0, 400.0), false);
     s.pointer_hover(Point::new(450.0, 450.0), false, false);
-    assert_eq!(s.preview_history_item(false, 1), RowPress::Ignored);
+    assert_eq!(s.preview_history_item(false, 1), HistoryRowPress::Ignored);
 }
 
 #[test]
@@ -161,7 +164,10 @@ fn c19_a_document_preview_draws_the_page_of_that_version() {
         "the page changed"
     );
     let last = s.history_len() - 1;
-    assert_eq!(s.preview_history_item(false, last), RowPress::Previewed);
+    assert_eq!(
+        s.preview_history_item(false, last),
+        HistoryRowPress::Previewed
+    );
     assert!(
         (area_width(&s) - width_then).abs() < 0.5,
         "the page as it was then"
@@ -175,7 +181,10 @@ fn c19_the_panel_undo_redo_and_wipe_do_nothing_during_a_document_preview() {
     let mut s = widths();
     let before = doc_json(&s);
     let last = s.history_len() - 1;
-    assert_eq!(s.preview_history_item(false, last), RowPress::Previewed);
+    assert_eq!(
+        s.preview_history_item(false, last),
+        HistoryRowPress::Previewed
+    );
     assert!(!s.undo().changed, "the Undo button writes nothing");
     assert!(!s.redo().changed);
     assert_eq!(s.wipe_history(), curvyo_editor_wasm::WipeOutcome::Ignored);
