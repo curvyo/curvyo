@@ -115,7 +115,10 @@ fn gap_near(b: Contour<'_>, same: bool, point: Point, guess: f64) -> f64 {
 }
 
 /// Whether the curves stay within `limit` of each other between two meetings, judged at the
-/// quarter points of the first contour.
+/// quarter points of both stretches: each curve's stretch must stay near the other curve. One
+/// direction is not enough: a curve that passes close to where another crosses itself meets both
+/// passes of it, and stays near the other curve all the way, while the stretch of the other curve
+/// between the two meetings is its whole loop.
 /// `same` says the two contours are one (a contour meeting itself): then the distance is measured
 /// on the guessed segment only, from the guessed place, so that it finds the other pass and not
 /// the point itself.
@@ -130,6 +133,23 @@ fn stays_within(
         // distance would find the point itself.
         return false;
     }
+    let swap = |m: Unrolled| Unrolled {
+        a: m.b,
+        b: m.a,
+        ..m
+    };
+    stretch_near((a, b, same), from, to, limit)
+        && stretch_near((b, a, same), swap(from), swap(to), limit)
+}
+
+/// Whether the stretch of contour `a` between two meetings stays within `limit` of contour `b`,
+/// judged at its quarter points.
+fn stretch_near(
+    (a, b, same): (Contour<'_>, Contour<'_>, bool),
+    from: Unrolled,
+    to: Unrolled,
+    limit: f64,
+) -> bool {
     [0.25, 0.5, 0.75].iter().all(|&f| {
         let (segment, t) = place_of(between(from.a, to.a, f, a.0.len(), a.1), a.0.len(), a.1);
         let on_a = a.0[segment].point_at(t);

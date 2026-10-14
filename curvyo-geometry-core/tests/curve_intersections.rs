@@ -432,6 +432,43 @@ fn brute_force_crossings(a: &Anchors, b: &Anchors) -> Vec<Point> {
     found
 }
 
+/// The clear crossings of the cubics `a` and `b`, found by brute force, at which a curve is not
+/// cut: `(curve index, crossing, cuts of that curve)`.
+fn missed_crossings(
+    a: [(f64, f64); 4],
+    b: [(f64, f64); 4],
+) -> Vec<(usize, Point, Vec<CutParameter>)> {
+    let all = [(cubic_open(a), false), (cubic_open(b), false)];
+    let result = cut_parameters(&outlines(&all));
+    let mut missed = Vec::new();
+    for crossing in brute_force_crossings(&all[0].0, &all[1].0) {
+        for index in 0..2 {
+            // A crossing at an end of an open curve is no cut of it (it adds no piece).
+            let anchors = &all[index].0;
+            let at_end = near(anchors[0].0, crossing, 0.05) || near(anchors[1].0, crossing, 0.05);
+            let hit = at_end
+                || result[index]
+                    .iter()
+                    .any(|cut| near(position(anchors, false, *cut), crossing, 0.05));
+            if !hit {
+                missed.push((index, crossing, result[index].clone()));
+            }
+        }
+    }
+    missed
+}
+
+/// Issue #113: the minimal input on which `recall::clear_crossings_are_found` failed. Curve 1
+/// was not cut at its crossing near (-9.335, 5.648).
+#[test]
+fn issue_113_clear_crossing_is_found() {
+    let missed = missed_crossings(
+        [(-14.9, 3.8), (16.0, 14.8), (0.0, -1.3), (0.0, -5.3)],
+        [(18.9, 6.3), (-8.1, -0.2), (-16.8, 10.7), (-6.6, 4.0)],
+    );
+    assert!(missed.is_empty(), "{missed:?}");
+}
+
 mod recall {
     use super::*;
     use proptest::prelude::*;
@@ -449,21 +486,8 @@ mod recall {
             a in proptest::array::uniform4((coordinate(), coordinate())),
             b in proptest::array::uniform4((coordinate(), coordinate())),
         ) {
-            let all = [(cubic_open(a), false), (cubic_open(b), false)];
-            let result = cut_parameters(&outlines(&all));
-            for crossing in brute_force_crossings(&all[0].0, &all[1].0) {
-                for index in 0..2 {
-                    // A crossing at an end of an open curve is no cut of it (it adds no piece).
-                    let anchors = &all[index].0;
-                    let at_end = near(anchors[0].0, crossing, 0.05)
-                        || near(anchors[1].0, crossing, 0.05);
-                    let hit = at_end
-                        || result[index].iter().any(|cut| {
-                            near(position(anchors, false, *cut), crossing, 0.05)
-                        });
-                    prop_assert!(hit, "curve {index} is not cut at {crossing:?}: {:?}", result[index]);
-                }
-            }
+            let missed = missed_crossings(a, b);
+            prop_assert!(missed.is_empty(), "missed (curve, crossing, cuts): {missed:?}");
         }
     }
 }
