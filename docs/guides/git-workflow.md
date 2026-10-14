@@ -58,27 +58,21 @@ origin/main` into a story branch.
 **Safety rules**
 - Rewrite only your own `story/`, `fix/` or `chore/` branch, in your own
   worktree. Never `main`, never a branch another agent works on.
-- Force pushes use `--force-with-lease` and name the branch. Never `--force`
-  or `-f`. Never a wildcard refspec.
+- Force pushes name the branch, prefer `--force-with-lease`, and only ever
+  target your own `story/`, `fix/` or `chore/` branch. Never `main`, never a
+  wildcard refspec, never a branch someone else pushes to.
 - Before any rewrite, `git branch backup/<slug>` locally. Delete it after the
   PR is merged.
 - If a PR has a human review in progress (the customer commented on a
   commit), prefer new fixup commits and squash them only at the end.
 
-**Settings change needed.** `.claude/settings.json` denies
-`Bash(git push --force:*)`, which is a prefix match and also blocks
-`--force-with-lease`; the separate `--force-with-lease` deny line blocks it
-again. The fixup path and stack retargeting need it. Proposed change (lead
-applies it, customer approves):
-
-- deny: `Bash(git push --force)`, `Bash(git push --force *)`,
-  `Bash(git push -f)`, `Bash(git push -f *)` (the space makes the match end at
-  the word, so `--force-with-lease` is not caught), keep `git reset --hard`.
-- remove the `Bash(git push --force-with-lease:*)` deny line.
-- ask: `Bash(git push --force-with-lease*)`, so every force push is confirmed.
-
-Until applied, agents clean up before the first push and add fixup commits
-only; the lead squashes with one confirmed `--force-with-lease` at the end.
+**Settings (customer decision FORCE-LEASE, 2026-10-14).** `.claude/settings.json`
+no longer denies `git push --force`, `-f` or `--force-with-lease`; `git push`
+is allowed like any other push. The safety rules above are the guard: it is
+the agent's own branch, and the agent is responsible for what it rewrites.
+Prefer `--force-with-lease`; a plain `--force` is allowed on your own branch
+when the lease keeps failing for a reason you understand (for example after
+you rewrote the branch from another worktree). `git reset --hard` stays denied.
 
 ## 3. Merging
 
