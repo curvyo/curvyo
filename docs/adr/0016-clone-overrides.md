@@ -1,6 +1,6 @@
 # ADR 0016: Clone overrides
 
-**Status:** Proposed 2026-10-14, `needs-customer` (document model and file format). Extends
+**Status:** Accepted 2026-10-14 by the customer (proposed the same day; document model and file format). Extends
 [ADR 0015](0015-node-references-and-ancestor-resolved-state.md) §3 (what a clone reads), §4
 (residue) and §5 (repair); ADR 0015 said overrides need a new ADR. Asked by
 `specs/0057-clone-overrides`.

@@ -1,6 +1,6 @@
 # Clone overrides: own placement and own style
 
-Status: Draft (UX notes and `adrs.md` exist, customer answers of 2026-10-14 applied; becomes Ready when the customer accepts ADR 0016 and answers or leaves the default of Frage 5 CHAIN-STYLE)
+Status: Ready (2026-10-14: UX notes and `adrs.md` exist, ADR 0016 accepted by the customer, Frage 5 CHAIN-STYLE answered A). Build after `0049` (#121) is merged.
 Priority: Should
 Origin: Customer (feedback of 2026-10-14 after trying the linked clone of PR #121, translated: "Looks extremely good already, but a few things are missing: you must be able to override things, e.g. the position, so the clone no longer moves with the original when I want that. It should also be possible to override the style. But then you always have to override the whole style. I have no idea right now what this should look like in the UI, but several colours (fill, stroke) must be possible, e.g. for embroidery. Also having its own origin would be important for rotation; for scale we don't need it."). The last sentence was a miscommunication, see "Reading of the feedback". Customer answers of 2026-10-14 are listed in "Decided by the product owner". Every criterion marked **Proposal** is my own idea and is not accepted until the customer says so.
 
@@ -63,7 +63,7 @@ The numbers are stable: a criterion that the customer's answers removed stays as
 12. Given a clone with own style, then every edit in the Stroke, Fill and Markers sections (`0017`, `0018`), every edit of its opacity and the eyedropper writes to that clone only. Later changes of the original's style or opacity do not reach it. Test: the root's stroke goes green and its opacity 50 %: the clone with own style stays red and at 80 %; a clone of the same root with "Original's" turns green and shows 50 %.
 13. Given twelve clones of one original, each with its own style, then each can have a different fill colour and a different stroke colour (any RGBA, independent of each other and of the original), for example the colours of a rainbow for embroidery threads. After save and reopen every fill and stroke colour is the same to the last bit (`0049` criterion 37 extended).
 14. Given a clone with own style, when the maker switches it to "Original's", then the clone shows its original's effective style and opacity again, its own style and opacity are removed (not kept in the background), and the notice reads "Shows its original's style again. Its own style was removed." (status, 3 seconds). One commit, `original_style`. Undo restores the own style and opacity with every value (criterion 33).
-15. Given a chain B → A → O, then a clone with "Original's" shows the effective style of its direct original (the definition in "Words used below"). Test: A has own style blue; B (Original's) is blue; the style of O is changed: A and B stay blue; A is switched back to "Original's": A and B show O's style. **Default pending the customer** (Frage 5).
+15. Given a chain B → A → O, then a clone with "Original's" shows the effective style of its direct original (the definition in "Words used below"). Test: A has own style blue; B (Original's) is blue; the style of O is changed: A and B stay blue; A is switched back to "Original's": A and B show O's style. Customer decision 2026-10-14 (Frage 5: A).
 16. Given a clone with own style, then its object opacity register is its own, a number in 0..1 (the value copied at the switch, criterion 11), and the Opacity field of `0050` writes to it; the canvas shows it times the opacities of the clone's own ancestors, and nothing of the original's opacity or of the original's ancestors. Given a clone with "Original's", then its opacity is the `opacity` register of the object it reads from (criterion 15's rule; for B → A → O with A Own, A's register, not A's register times A's layers), times the opacities of the clone's own ancestors (`0049` criterion 49), and the Opacity field of `0050` shows a read-only readout and writes nothing; the tooltip says "Set Style to Own to change it." Given a selection of clones in both states, the Opacity field writes to the Own ones and the notice of criterion 18 names the others. Test: root P opacity 50 %, clone C Original's in a layer of opacity 50 %: C is shown at 25 %; C switched to Own (it copies P's 50 %, shown at 25 %) and set to 100 %: C is shown at 50 %; P is set to 10 %: C is unchanged. Chain: A Own at 40 % in a layer of 50 %, B Original's of A in a layer of 100 %: B is shown at 40 %, not 20 %.
 17. Given a clone with own style, then stroke width, dash lengths and marker size are document millimetres and are not scaled by any matrix of the chain (`0049` criterion 9). The switches "Scale stroke width" and "Scale corner radius" do not apply to a clone.
 18. Given a style edit, an opacity edit or an eyedropper apply on a selection that holds clones and other objects, then the edit is written to every selected object that owns its style (paths, compound paths and clones with own style); clones with "Original's" are left alone (`0049` criterion 24, extended), and a status notice (3 seconds) reads "2 clones show their original's style and were not changed." when at least one was left alone. The "Mixed" values of `0017` are computed from the objects that were written. A selection of only clones with "Original's" shows no style controls (criterion 10), so the panel has nothing to edit; the eyedropper leaves them alone with the same notice.
@@ -138,7 +138,7 @@ Change any of these if you disagree. Lines marked "Customer" were decided by the
 2. **Style means the Style tab's style plus the opacity.** Fill, stroke (colour, width, cap, join, miter, dash), markers and opacity. Everything in it is owned or inherited together.
 3. **Customer, 2026-10-14 (Frage 4, B): the own style includes the opacity.** A clone with Own style has its own opacity; with "Original's" it shows its original's. This changes accepted text; see "Changes to accepted specs". It replaces my earlier decision that opacity stays out.
 4. **Back to the original's style discards the own style and opacity.** Keeping it dormant would be a hidden state that comes back unasked on the next switch. Undo restores it (criterion 14).
-5. **A clone without own style shows the effective style of its direct original** (criterion 15), so a restyled middle clone of a chain passes its look on. Without overrides this is the root's style, as in `0049`. **Default pending the customer** (Frage 5); ADR 0016 follows the default.
+5. **A clone without own style shows the effective style of its direct original** (criterion 15), so a restyled middle clone of a chain passes its look on. Without overrides this is the root's style, as in `0049`. Customer decision 2026-10-14 (Frage 5: A); ADR 0016 follows it.
 6. **Removed.** (The pivot as a page point.) Customer, 2026-10-14: no rotation pivot.
 7. **Removed.** (The pivot for rotation of one clone.)
 8. **Removed.** (Inheriting the pivot, the ring by Duplicate.)
@@ -176,11 +176,11 @@ Frage 1 to 4 are answered (below). One question is open and has a default.
 
 **Frage 4 (OPACITY): Does the own style include the opacity?** Answered 2026-10-14: B, yes (criteria 11, 14, 16).
 
-**Frage 5 (CHAIN-STYLE): What a clone without own style shows when its original is a clone with own style**
+**Frage 5 (CHAIN-STYLE): What a clone without own style shows when its original is a clone with own style.** Answered 2026-10-14: A.
 
 - *A (default, recommended):* the style (and opacity) of the nearest clone on its chain that has one (decision 5). A new clone of a blue tab is blue; deleting a blue middle clone copies its style onto the clone behind it.
 - *B:* always the root's style. Simpler, but a clone of a blue tab turns up in the root's colour.
-- Recommendation A. Default if unanswered: A (ADR 0016). **Default pending customer.**
+- Answered 2026-10-14: **A**.
 
 ## UX notes
 
