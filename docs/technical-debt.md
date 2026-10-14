@@ -1521,3 +1521,16 @@ their own module the next time a slice changes the Node tool (likely `0055`).
 mesh drawn as GPU instances, which belongs with the renderer item "Canvas performance on
 Linux/WebKitGTK" above. Each frame also builds a map of all anchors to find ringed positions;
 passing positions with `ringed_nodes` would skip that.
+
+## Image decoding blocks the webview's main thread, and a decoder panic ends the editor (`0058`, ADR 0017, 2026-10-14)
+
+The editor core runs as wasm in the webview on desktop and in the browser (ADR 0001 §3), without
+threads. A 12 Mpx JPEG decodes in the frame loop's thread, so the canvas stops for the length of the
+decode (the import shows the `wait` cursor; opening a project with several large images decodes
+them one per task). A panic inside a decoder aborts the wasm module and loses unsaved work,
+because `catch_unwind` does not work on `wasm32-unknown-unknown`; the defences are the header
+pre-checks, the decoder limits and a time-boxed fuzz run before the PR. The decoder tree
+(`image` and its format crates) may contain `unsafe` in dependencies, counted by the spike of ADR
+0017. **Resolution:** decode in a Web Worker with its own wasm instance (needs a second module
+and a message protocol), or a streaming decoder with a deadline. Not needed before images are a
+daily workflow.
