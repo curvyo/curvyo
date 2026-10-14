@@ -2689,7 +2689,9 @@ fn ac23_the_radius_switch_does_not_change_star_or_ellipse_resizes() {
         sc.s.set_scale_corner_radius(on);
         let h = sc.fr.corner(1.0, 1.0);
         drag(&mut sc.s, h, pt(h.x + 30.0 / sc.k, h.y + 30.0 / sc.k));
-        doc_of(&sc.s).export_loro_snapshot().unwrap()
+        // Compare the stored content (`document.json`), not the Loro snapshot
+        // bytes: two runs with equal content may encode differently (#123).
+        String::from_utf8(doc_of(&sc.s).export_json().unwrap()).unwrap()
     };
     assert_eq!(run(false), run(true));
 }
