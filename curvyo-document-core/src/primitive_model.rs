@@ -263,8 +263,10 @@ pub struct PrimitiveSnapshot {
     pub style: Style,
     /// The angle of this primitive's local x-axis in document space
     /// (`specs/0005-object-transform/adrs.md`: "one `rotation` register
-    /// per object"). `0` for every shape this crate creates; a Select-
-    /// tool rotate drag is the only writer. The stored frame
+    /// per object"). `0` for a shape created by a create-drag; written by a
+    /// Select-tool rotate and by a turned click-to-create placement
+    /// ([`crate::Document::create_primitive`],
+    /// `specs/0052-click-to-create-shapes/adrs.md` decision 2). The stored frame
     /// (`RectBounds`/`EllipseFrame`/`StarFrame`) is always this
     /// primitive's shape in its own *local* frame — [`crate::outline_of`]
     /// draws it unrotated; [`crate::outline_of_rotated`] rotates that outline
