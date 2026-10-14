@@ -47,3 +47,11 @@ worktree has its own index: if your worktree has no `.projectatlas/projectatlas.
 yet, run `projectatlas init` in it once (about 40 s). After a milestone run
 `projectatlas scan` there; the index does not follow edits. If a call fails,
 fall back to grep and read and carry on.
+
+**Keep `base/` current.** `base/` is `main` and holds `.claude/` (the agent
+definitions every session reads) and the index that atlas calls without
+`project_path` use. After every merge, and at the start of each task, run
+`git -C base pull --ff-only` and then `projectatlas scan` inside `base/`. A
+stale `base/` means old agent definitions and an index of an old checkout. A
+session that was started before the ProjectAtlas version changed keeps its old
+server process (`schema_version_mismatch` in the answers): it needs a restart.

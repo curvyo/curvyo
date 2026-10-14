@@ -254,6 +254,8 @@ Its tools are deferred (load them with ToolSearch first), every call takes
 `project_path=<absolute worktree path>`, and each new worktree needs one
 `projectatlas init` (details in the "Finding code: ProjectAtlas" section of
 `.claude/agents/implementer.md`).
+Keep `base/` at `origin/main` on every machine (`git -C base pull --ff-only`, then
+`projectatlas scan` in `base/`) after each merge and at the start of a task.
 
 ## 9. Git and GitHub
 
