@@ -59,15 +59,27 @@ export interface LayerRowData {
   rowAction: string;
 }
 
-/** The Opacity header (criterion 26). */
+/** The Opacity field at the bottom of the tab (criterion 26). */
 export interface LayerOpacityData {
+  /** "3 objects", "Layer Cut", "Locked", or empty when nothing is targeted. */
   caption: string;
   /** Whether the field is in the tree. */
   field: boolean;
   /** Whether the target is a layer: the caption starts with the Layers glyph. */
   layer: boolean;
-  /** The percentage, or null for Mixed. */
+  /** The percentage (the dragged one while a drag runs), or null for Mixed. */
   value: number | null;
+  /** Where the value lies on the field's scale, 0 to 1 (Rust's mapping). */
+  bar: number;
+}
+
+/** Which buttons of the toolbar apply; the others are dimmed, never hidden. */
+export interface LayerToolbarData {
+  newLayer: boolean;
+  deleteLayer: boolean;
+  moveUp: boolean;
+  moveDown: boolean;
+  duplicate: boolean;
 }
 
 /** The whole tab as the session returns it. */
@@ -77,6 +89,7 @@ export interface LayersViewData {
   opacity: LayerOpacityData;
   activeLayer: { peer: string; counter: number } | null;
   canDeleteLayer: boolean;
+  toolbar: LayerToolbarData;
   /** The first selected row, or null (Shift+Ctrl+L scrolls to it). */
   firstSelected: number | null;
   rows: LayerRowData[];
@@ -91,9 +104,10 @@ export interface PanelReplyData {
 const EMPTY_VIEW: LayersViewData = {
   count: 0,
   subject: "0 objects",
-  opacity: { caption: "", field: false, layer: false, value: null },
+  opacity: { caption: "", field: false, layer: false, value: null, bar: 0 },
   activeLayer: null,
   canDeleteLayer: false,
+  toolbar: { newLayer: true, deleteLayer: false, moveUp: false, moveDown: false, duplicate: false },
   firstSelected: null,
   rows: [],
 };
@@ -107,7 +121,30 @@ export function parseLayersView(json: string): LayersViewData {
   }
 }
 
-/** Reads a reply JSON; anything else is a quiet reply. */
+/** A line for the canvas notice slot, as `take_layer_notice` returns it. */
+export interface LayerNoticeData {
+  kind: "alert" | "status";
+  text: string;
+}
+
+/** Reads the layer notice; the empty string (no notice) and anything without text are `null`, so
+ * an empty notice is never shown. */
+export function parseLayerNotice(json: string): LayerNoticeData | null {
+  if (json === "") {
+    return null;
+  }
+  try {
+    const value = JSON.parse(json) as Partial<LayerNoticeData>;
+    if (typeof value.text !== "string" || value.text === "") {
+      return null;
+    }
+    return { kind: value.kind === "status" ? "status" : "alert", text: value.text };
+  } catch {
+    return null;
+  }
+}
+
+/** Reads a reply JSON; the empty string and anything else are a quiet reply. */
 export function parseReply(json: string): PanelReplyData {
   try {
     const value = JSON.parse(json) as Partial<PanelReplyData>;

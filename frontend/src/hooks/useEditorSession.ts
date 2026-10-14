@@ -8,6 +8,7 @@ import type { HistoryDirection } from "@/lib/historyText";
 import { type NudgeFeedback, useNudgeFeedback } from "@/hooks/useNudgeFeedback";
 import { type BackingBuffer, backingBufferFor, sameBackingBuffer } from "@/lib/canvasSize";
 import { ModifierTracker } from "@/lib/keyModifiers";
+import { parseLayerNotice } from "@/lib/layerRows";
 import { TOO_FAR_HINT } from "@/lib/nudgeText";
 import { createSession, openSession } from "@/lib/editorSession";
 import type { WasmSession } from "@/lib/editorSession";
@@ -1553,9 +1554,9 @@ export function useEditorSession(
         event.altKey,
       );
       // Drawing into a hidden or locked layer is refused with a notice (`0050` criterion 23).
-      const layerNotice = session.take_layer_notice();
-      if (layerNotice !== "") {
-        history.showNotice(layerNotice, undefined, "canvas", "alert");
+      const layerNotice = parseLayerNotice(session.take_layer_notice());
+      if (layerNotice) {
+        history.showNotice(layerNotice.text, undefined, "canvas", layerNotice.kind);
       }
       setCursorHint(session.cursor_hint());
       syncFromSession();
@@ -1886,10 +1887,10 @@ export function useEditorSession(
       // Group and Ungroup say what they did in the canvas notice slot, as the buttons do.
       handleGroupingOutcome(outcome);
       if (outcome === "reordered") {
-        // A refused stacking-order key says why (`0050` criterion 33).
-        const layerNotice = session.take_layer_notice();
-        if (layerNotice !== "") {
-          history.showNotice(layerNotice, undefined, "canvas", "alert");
+        // A refused or unchanged stacking-order key says why (`0050` criterion 33).
+        const layerNotice = parseLayerNotice(session.take_layer_notice());
+        if (layerNotice) {
+          history.showNotice(layerNotice.text, undefined, "canvas", layerNotice.kind);
         }
       }
       if (outcome === "select-all") {

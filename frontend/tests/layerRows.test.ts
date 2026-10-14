@@ -10,6 +10,7 @@ import {
   idText,
   indentPx,
   nextRow,
+  parseLayerNotice,
   parseLayersView,
   parseReply,
   reorderFor,
@@ -87,4 +88,30 @@ test("a name with markup is data, never markup (criterion 17)", () => {
     JSON.stringify({ count: 1, rows: [{ name: "<img src=x onerror=alert(1)>" }] }),
   );
   assert.equal(view.rows[0]?.name, "<img src=x onerror=alert(1)>");
+});
+
+test("an empty layer notice is never shown (customer feedback 2026-10-14)", () => {
+  assert.equal(parseLayerNotice(""), null, "no notice");
+  assert.equal(parseLayerNotice('{"kind":"","text":""}'), null, "an empty one is dropped too");
+  assert.equal(parseLayerNotice("not json"), null);
+  assert.deepEqual(parseLayerNotice('{"kind":"status","text":"Already at the front"}'), {
+    kind: "status",
+    text: "Already at the front",
+  });
+  assert.deepEqual(
+    parseLayerNotice('{"kind":"alert","text":"Layer Cut is locked. Unlock it or choose another layer."}'),
+    { kind: "alert", text: "Layer Cut is locked. Unlock it or choose another layer." },
+  );
+});
+
+test("the view carries the toolbar and the opacity bar, with safe defaults", () => {
+  const empty = parseLayersView("");
+  assert.deepEqual(empty.toolbar, {
+    newLayer: true,
+    deleteLayer: false,
+    moveUp: false,
+    moveDown: false,
+    duplicate: false,
+  });
+  assert.equal(empty.opacity.bar, 0);
 });

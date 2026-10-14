@@ -1,4 +1,5 @@
-import { Layers, Plus, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Copy, Layers, LayersPlus, Trash2 } from "lucide-react";
+import type { ComponentType } from "react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { LayerRow, type RowCell } from "@/components/panel/LayerRow";
@@ -20,7 +21,6 @@ import {
   edgeScroll,
   idText,
   nextRow,
-  parseReply,
   reorderFor,
   rowKey,
   windowRange,
@@ -29,7 +29,7 @@ import { OPACITY_CLICK_MIN_P, VALUE_FIELD_SCALE_END } from "@/lib/sliderNames";
 import { isTauri } from "@/platform/host";
 import { Tooltip } from "@/components/ui/tooltip";
 
-const CELLS: RowCell[] = ["name", "eye", "lock", "action"];
+const CELLS: RowCell[] = ["name", "action", "eye", "lock"];
 const PERCENT_MESSAGES = { percent: "Enter a number from 0 to 100" } as const;
 const OPACITY_TOOLTIP = "Fades fill and stroke separately. Overlapping parts show through.";
 
@@ -59,11 +59,50 @@ interface RowDrag {
   y: number;
 }
 
+type ToolGlyph = ComponentType<{ size: number; strokeWidth: number; "aria-hidden": boolean }>;
+
+/** One icon button of the toolbar: a tooltip and an accessible name, dimmed (`aria-disabled`,
+ * still focusable, a press does nothing) when it does not apply, never hidden. */
+function ToolbarButton({
+  name,
+  glyph: Glyph,
+  applies,
+  onPress,
+}: {
+  name: string;
+  glyph: ToolGlyph;
+  applies: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Tooltip side="bottom" content={name}>
+      <button
+        type="button"
+        aria-label={name}
+        aria-disabled={!applies}
+        onClick={() => {
+          if (applies) {
+            onPress();
+          }
+        }}
+        className={`flex size-7 shrink-0 items-center justify-center rounded-[5px] text-[var(--toolbar-icon)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] pointer-coarse:size-9 ${
+          applies ? "hover:bg-[var(--editor-accent-hover)]" : ""
+        }`}
+      >
+        <span className={applies ? "flex" : "flex opacity-40"}>
+          <Glyph size={16} strokeWidth={1.5} aria-hidden />
+        </span>
+      </button>
+    </Tooltip>
+  );
+}
+
 /**
  * The Layers tab (`specs/0050-layers-and-objects-panel` criteria 3, 9, 26, 29 to 32, 34, 36, 38 to
- * 41 and 53, UX notes): the Opacity header, the virtualised treegrid of layers and objects, and
- * the footer with New layer and Delete layer. Every rule and word is the session's; this file
- * holds the focus, the scroll, the drag gesture and the text field of a rename.
+ * 41 and 53, UX notes, customer feedback 2026-10-14): the toolbar at the top, the virtualised
+ * treegrid of layers and objects, and the Opacity field at the bottom. Every rule and word is the
+ * session's; this file holds the focus, the scroll, the drag gesture and the text field of a
+ * rename.
  */
 export function LayersTab({
   getSession,
@@ -461,15 +500,16 @@ export function LayersTab({
     return () => session?.set_layer_hover("");
   }, [getSession]);
 
-  // The Opacity field: a drag previews, the release commits once, Escape restores (criterion 26).
+  // The Opacity field: a drag previews on the canvas, the release commits once, Escape restores
+  // (criterion 26). The field sends the position; Rust maps it on the opacity scale.
   const ends = useMemo(
     () => ({
-      commit: (session: WasmSession) => {
-        reply(parseReply(session.commit_layer_opacity_preview()));
+      commit: () => {
+        reply(act((session) => session.commit_layer_opacity_preview()));
       },
       cancel: (session: WasmSession) => session.cancel_layer_opacity(),
     }),
-    [reply],
+    [reply, act],
   );
   const gesture = usePreviewGesture(getSession, refresh, ends);
   const opacity = view.opacity;
@@ -477,6 +517,7 @@ export function LayersTab({
   const commitValue = (percent: number) =>
     reply(act((session) => session.commit_layer_opacity(percent)));
   const stepSize = (grid: GridName) => (grid === "coarse" ? 10 : 1);
+  const toolbar = view.toolbar;
 
   const rows = view.rows.map((row) => (
     <LayerRow
@@ -518,60 +559,33 @@ export function LayersTab({
     // A 12 px inset at the right keeps the rows 244 px wide and clear of an overlay scrollbar
     // (UX review item 5).
     <div className="flex min-h-0 flex-1 flex-col pr-3">
-      <div className="shrink-0" style={{ height: 52 }}>
-        <div className="flex h-7 items-center">
-          {opacity.field ? (
-            <Tooltip side="left" content={OPACITY_TOOLTIP}>
-              <div className="min-w-0 flex-1">
-                <ValueField
-                  label="Opacity"
-                  name="Layer or object opacity"
-                  text={String(value)}
-                  bar={value / 100}
-                  mixed={opacity.value === null}
-                  resettable={opacity.value !== 100}
-                  unit="%"
-                  valueNow={value}
-                  unitWords="percent"
-                  valueMax={VALUE_FIELD_SCALE_END.opacity}
-                  clickMinP={OPACITY_CLICK_MIN_P}
-                  defaultText="100 %"
-                  messages={PERCENT_MESSAGES}
-                  onPreview={(p) => {
-                    const blocked = getSession()?.layers_pen_hint() ?? "";
-                    if (blocked !== "") {
-                      setHint(blocked);
-                      return;
-                    }
-                    gesture.queue((session) => session.preview_layer_opacity(Math.round(p * 100)));
-                  }}
-                  onSettle={gesture.settle}
-                  onStep={(steps, grid) => commitValue(Math.max(0, Math.min(100, value + steps * stepSize(grid))))}
-                  onReset={() => commitValue(100)}
-                  onSubmit={(text) => {
-                    const number = Number(text.replace(",", ".").replace("%", "").trim());
-                    if (!Number.isFinite(number) || number < 0 || number > 100) {
-                      return "invalid:percent";
-                    }
-                    if (opacity.value === Math.round(number)) {
-                      return "unchanged";
-                    }
-                    commitValue(Math.round(number));
-                    return "committed";
-                  }}
-                  onReturnFocus={onReturnFocus}
-                />
-              </div>
-            </Tooltip>
-          ) : null}
-        </div>
-        <p className="mt-1 flex h-4 items-center gap-1 truncate text-xs text-[var(--panel-muted-fg)]">
-          {opacity.layer ? <Layers size={12} strokeWidth={1.5} aria-hidden /> : null}
-          {opacity.caption}
-        </p>
+      {/* The toolbar: operations are buttons with a visible trigger, never sections that appear
+          (customer feedback 2026-10-14). */}
+      <div role="toolbar" aria-label="Layers" className="flex shrink-0 items-center gap-1 pb-2">
+        <ToolbarButton name="New layer" glyph={LayersPlus} applies={toolbar.newLayer} onPress={newLayer} />
+        <ToolbarButton
+          name="Duplicate"
+          glyph={Copy}
+          applies={toolbar.duplicate}
+          onPress={() => reply(act((session) => session.duplicate_layer_target()))}
+        />
+        <ToolbarButton
+          name="Move up"
+          glyph={ArrowUp}
+          applies={toolbar.moveUp}
+          onPress={() => reply(act((session) => session.step_layer_target("up")))}
+        />
+        <ToolbarButton
+          name="Move down"
+          glyph={ArrowDown}
+          applies={toolbar.moveDown}
+          onPress={() => reply(act((session) => session.step_layer_target("down")))}
+        />
+        <span className="flex-1" />
+        <ToolbarButton name="Delete layer" glyph={Trash2} applies={toolbar.deleteLayer} onPress={deleteLayer} />
       </div>
       {view.count === 0 ? (
-        // The empty state fills the list's place, so the footer stays at the bottom (UX item 9).
+        // The empty state fills the list's place, so the Opacity slot stays at the bottom (UX item 9).
         <div className="min-h-[120px] flex-1 px-2 pt-4 text-center">
           <p className="text-sm text-[var(--toolbar-icon)]">No objects yet.</p>
           <p className="text-xs text-[var(--panel-muted-fg)]">Draw something or add a layer.</p>
@@ -618,30 +632,63 @@ export function LayersTab({
           ) : null}
         </div>
       ) : null}
-      <div className="flex shrink-0 items-center justify-between pt-3">
-        <button
-          type="button"
-          onClick={newLayer}
-          className="flex h-7 w-[118px] items-center justify-center gap-1 rounded-[5px] border border-[var(--field-border)] text-sm text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] pointer-coarse:h-9"
-        >
-          <Plus size={16} strokeWidth={1.5} aria-hidden />
-          New layer
-        </button>
-        {view.canDeleteLayer ? (
-          <button
-            type="button"
-            onClick={deleteLayer}
-            className="flex h-7 w-[118px] items-center justify-center gap-1 rounded-[5px] border border-[var(--field-border)] text-sm text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] pointer-coarse:h-9"
-          >
-            <Trash2 size={16} strokeWidth={1.5} aria-hidden />
-            Delete layer
-          </button>
-        ) : (
-          <span aria-hidden className="w-[118px]" />
-        )}
-      </div>
-      <div role="status" className="mt-1 h-4 text-xs text-[var(--panel-muted-fg)]">
-        {hint}
+      {/* The Opacity field of the panel target, at the bottom of the tab where the other tabs keep
+          their properties (customer feedback 2026-10-14). The slot is kept when nothing is
+          targeted, so the list never jumps. */}
+      <div className="shrink-0 pt-1">
+        <div role="status" className="h-4 truncate text-xs text-[var(--panel-muted-fg)]">
+          {hint}
+        </div>
+        <div className="flex h-7 items-center">
+          {opacity.field ? (
+            <Tooltip side="left" content={OPACITY_TOOLTIP}>
+              <div className="min-w-0 flex-1">
+                <ValueField
+                  label="Opacity"
+                  name="Layer or object opacity"
+                  text={String(value)}
+                  bar={opacity.bar}
+                  mixed={opacity.value === null}
+                  resettable={opacity.value !== 100}
+                  unit="%"
+                  valueNow={value}
+                  unitWords="percent"
+                  valueMax={VALUE_FIELD_SCALE_END.opacity}
+                  clickMinP={OPACITY_CLICK_MIN_P}
+                  defaultText="100 %"
+                  messages={PERCENT_MESSAGES}
+                  onPreview={(p, grid) => {
+                    const blocked = getSession()?.layers_pen_hint() ?? "";
+                    if (blocked !== "") {
+                      setHint(blocked);
+                      return;
+                    }
+                    gesture.queue((session) => session.preview_layer_opacity(p, grid));
+                  }}
+                  onSettle={gesture.settle}
+                  onStep={(steps, grid) => commitValue(Math.max(0, Math.min(100, value + steps * stepSize(grid))))}
+                  onReset={() => commitValue(100)}
+                  onSubmit={(text) => {
+                    const number = Number(text.replace(",", ".").replace("%", "").trim());
+                    if (!Number.isFinite(number) || number < 0 || number > 100) {
+                      return "invalid:percent";
+                    }
+                    if (opacity.value === Math.round(number)) {
+                      return "unchanged";
+                    }
+                    commitValue(Math.round(number));
+                    return "committed";
+                  }}
+                  onReturnFocus={onReturnFocus}
+                />
+              </div>
+            </Tooltip>
+          ) : null}
+        </div>
+        <p className="flex h-4 items-center gap-1 truncate text-xs text-[var(--panel-muted-fg)]">
+          {opacity.layer ? <Layers size={12} strokeWidth={1.5} aria-hidden /> : null}
+          {opacity.caption}
+        </p>
       </div>
       <div role="status" aria-live="polite" className="sr-only">
         {announce}

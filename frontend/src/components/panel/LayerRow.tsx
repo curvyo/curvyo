@@ -47,8 +47,8 @@ const KIND_GLYPHS: Record<string, Glyph> = {
   star: Star,
 };
 
-/** The four cells of a row, in order (criterion 38). */
-export type RowCell = "name" | "eye" | "lock" | "action";
+/** The four cells of a row, in order (criterion 38, customer feedback 2026-10-14). */
+export type RowCell = "name" | "action" | "eye" | "lock";
 
 export interface LayerRowProps {
   row: LayerRowData;
@@ -147,8 +147,8 @@ function FlagButton({
 
 /**
  * One row of the Layers list (`specs/0050-layers-and-objects-panel` criteria 6 to 8, 22, 38 and
- * 41, UX notes "Rows"): the indent, the chevron, the kind glyph, the name, the opacity readout,
- * the eye and the lock, and the row action over the end of the name. Every word is the session's;
+ * 41, UX notes "Rows"): the indent, the chevron, the kind glyph, the name, then the opacity
+ * readout, the row action, the eye and the lock (customer feedback 2026-10-14). Every word is the session's;
  * a name is text, never markup (criterion 17).
  */
 export function LayerRow({
@@ -313,38 +313,37 @@ export function LayerRow({
             </Tooltip>
           ) : null}
         </span>
-        {showAction && !renaming ? (
-          <span
-            role="gridcell"
-            className={`absolute top-0 right-0 bottom-0 items-center ${
-              selected || active || (tabbable && cell === "action")
-                ? "flex"
-                : "hidden group-hover/row:flex group-focus-within/row:flex"
-            }`}
-          >
-            <Tooltip side="left" content="Select contents">
-              <button
-                ref={actionRef}
-                type="button"
-                tabIndex={-1}
-                aria-label="Select contents"
-                onPointerDown={(event) => event.stopPropagation()}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onAction();
-                }}
-                onFocus={() => onFocusCell("action")}
-                className={`${ICON_BUTTON} bg-[var(--panel-bg)] text-[var(--toolbar-icon)]`}
-              >
-                <ListChecks size={16} strokeWidth={1.5} aria-hidden />
-              </button>
-            </Tooltip>
-          </span>
-        ) : null}
       </span>
       {row.readout !== null ? (
         <span className="w-7 shrink-0 text-right text-xs tabular-nums text-[var(--panel-muted-fg)]">
           {row.readout}
+        </span>
+      ) : null}
+      {showAction ? (
+        // Its own 24 px slot after the opacity readout, before the eye and the lock (customer
+        // feedback 2026-10-14); the slot stays when the button is not shown, so nothing reflows.
+        <span role="gridcell" className="flex w-6 shrink-0 items-center">
+          <Tooltip side="left" content="Select contents">
+            <button
+              ref={actionRef}
+              type="button"
+              tabIndex={-1}
+              aria-label="Select contents"
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={(event) => {
+                event.stopPropagation();
+                onAction();
+              }}
+              onFocus={() => onFocusCell("action")}
+              className={`${ICON_BUTTON} text-[var(--toolbar-icon)] ${
+                selected || active || (tabbable && cell === "action")
+                  ? ""
+                  : "invisible group-hover/row:visible group-focus-within/row:visible"
+              }`}
+            >
+              <ListChecks size={16} strokeWidth={1.5} aria-hidden />
+            </button>
+          </Tooltip>
         </span>
       ) : null}
       <span role="gridcell" className="flex shrink-0 items-center">
