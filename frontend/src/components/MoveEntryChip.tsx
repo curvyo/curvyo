@@ -1,6 +1,7 @@
 import { CircleAlert } from "lucide-react";
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 
+import { EntryField } from "@/components/EntryField";
 import { HandleHintChip } from "@/components/HandleHintChip";
 import { type MoveEntryState, REFERENCE_COUNT } from "@/hooks/useEditorSession";
 import { fieldText, submittedTexts } from "@/lib/moveEntryText";
@@ -301,47 +302,26 @@ export function MoveEntryChip({
               const axis = index as 0 | 1;
               const isInvalid = invalid === axis;
               return (
-                <div key={field.label} className="relative" style={{ width: 100 }}>
-                  <span
-                    aria-hidden
-                    className="pointer-events-none absolute top-1/2 left-1.5 -translate-y-1/2 text-xs"
-                  >
-                    {field.label}
-                  </span>
-                  <input
-                    ref={(node) => {
-                      inputRefs.current[axis] = node;
-                    }}
-                    type="text"
-                    inputMode="decimal"
-                    autoComplete="off"
-                    spellCheck={false}
-                    aria-label={absolute ? field.absolute : field.relative}
-                    aria-invalid={isInvalid ? true : undefined}
-                    aria-describedby={isInvalid ? messageId : undefined}
-                    value={textOf(axis)}
-                    onChange={(event) => onChange(axis, event.target.value)}
-                    onKeyDown={(event) => {
-                      if (!(axis === 0 && loopFocus(event, true))) {
-                        onKeyDown(event);
-                      }
-                    }}
-                    onBlur={onBlur}
-                    className={`h-7 w-full rounded-[5px] border bg-white pr-8 pl-5 text-right text-sm tabular-nums outline-none ${
-                      isInvalid
-                        ? "border-[var(--field-invalid)] shadow-[inset_0_0_0_1px_var(--field-invalid)]"
-                        : "border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] focus:border-[var(--editor-accent)] focus:shadow-[inset_0_0_0_1px_var(--editor-accent)]"
-                    }`}
-                    style={{ color: "var(--toolbar-icon)" }}
-                  />
-                  <span
-                    aria-hidden
-                    className="pointer-events-none absolute top-1/2 right-1.5 -translate-y-1/2 text-xs"
-                    style={{ opacity: 0.7 }}
-                  >
-                    mm
-                  </span>
-                </div>
+                <EntryField
+                  key={field.label}
+                  label={field.label}
+                  width={100}
+                  suffix="mm"
+                  ariaLabel={absolute ? field.absolute : field.relative}
+                  invalid={isInvalid}
+                  messageId={messageId}
+                  value={textOf(axis)}
+                  inputRef={(node) => {
+                    inputRefs.current[axis] = node;
+                  }}
+                  onChange={(text) => onChange(axis, text)}
+                  onKeyDown={(event) => {
+                    if (!(axis === 0 && loopFocus(event, true))) {
+                      onKeyDown(event);
+                    }
+                  }}
+                  onBlur={onBlur}
+                />
               );
             })}
           </div>

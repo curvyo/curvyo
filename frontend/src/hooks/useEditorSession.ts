@@ -4,6 +4,7 @@ import { type CanvasNotice, type HistoryNames, MAC, useHistory } from "@/hooks/u
 import { type ClonesApi, useClones } from "@/hooks/useClones";
 import { type GroupingApi, useGrouping } from "@/hooks/useGrouping";
 import { type OffsetApi, readOffsetView, useOffset } from "@/hooks/useOffset";
+import { type PlacementApi, usePlacement } from "@/hooks/usePlacement";
 import { offsetKeyOutcome, offsetReadout } from "@/lib/offsetText";
 import type { HistoryDirection } from "@/lib/historyText";
 import { type NudgeFeedback, useNudgeFeedback } from "@/hooks/useNudgeFeedback";
@@ -287,6 +288,32 @@ function readToolbarState(raw: {
  * canvas shortcuts must ignore those. The Style panel sits outside the canvas
  * container, so its keys never get here; the roles are a second guard
  * (`specs/0007-stroke-and-fill-styling` criterion 38). */
+/**
+ * A wheel step or a pan moves the document under a still pointer: a running placement is told
+ * the pointer's screen point again, so the preview and the chip follow its new document position
+ * (`specs/0052-click-to-create-shapes/` criterion 9). Nothing for any other tool.
+ */
+function followPlacementAfterView(
+  session: WasmSession,
+  x: number,
+  y: number,
+  modifiers: { shiftKey: boolean; ctrlKey: boolean; metaKey: boolean; altKey: boolean },
+): boolean {
+  const chip = session.placement_chip();
+  if (!chip) {
+    return false;
+  }
+  chip.free();
+  session.pointer_hover(
+    x,
+    y,
+    modifiers.shiftKey,
+    modifiers.ctrlKey || modifiers.metaKey,
+    modifiers.altKey,
+  );
+  return true;
+}
+
 function isFormControl(target: EventTarget): boolean {
   return (
     target instanceof HTMLElement &&
@@ -661,6 +688,8 @@ export interface EditorSession {
   flipEnabled: boolean;
   /** The size chip's note line for the typed texts ("Mirrored left to right"), or "". */
   transformEntryMirrorLine: (first: string, second: string, lastEdited: number) => string;
+  /** The click-to-create placement and its chip (`specs/0052-click-to-create-shapes`). */
+  placement: PlacementApi;
   /** A large undo or redo is running. */
   historyBusy: boolean;
   /** The names of the next undo and redo; `null` for an empty stack. */
@@ -957,6 +986,8 @@ export function useEditorSession(
   const refreshHistoryRef = useRef<() => void>(() => {});
   const refreshGroupingRef = useRef<() => boolean>(() => false);
   const refreshClonesRef = useRef<() => void>(() => {});
+  const refreshPlacementRef = useRef<() => void>(() => {});
+  const placementKeyDownRef = useRef<PlacementApi["keyDown"]>(() => {});
   const syncFromSession = useCallback(() => {
     const session = sessionRef.current;
     if (!session) {
@@ -986,6 +1017,7 @@ export function useEditorSession(
     setSyncRevision((revision) => revision + 1);
     syncEntry(session);
     syncBadges(session);
+    refreshPlacementRef.current();
   }, [syncEntry, syncBadges]);
 
   const getSession = useCallback(() => sessionRef.current, []);
@@ -998,6 +1030,14 @@ export function useEditorSession(
   const offset = useOffset(getSession, syncFromSession, syncRevision, history.showNotice);
   const { showReleaseOutcome: showOffsetOutcome } = offset;
   const { refresh: refreshGrouping, handleKeyOutcome: handleGroupingOutcome } = grouping;
+  const placement = usePlacement(getSession, syncFromSession, containerRef);
+  const { refresh: refreshPlacement, notePointer, keyDown: placementKeyDown } = placement;
+  useEffect(() => {
+    placementKeyDownRef.current = placementKeyDown;
+  }, [placementKeyDown]);
+  useEffect(() => {
+    refreshPlacementRef.current = refreshPlacement;
+  }, [refreshPlacement]);
   useEffect(() => {
     refreshGroupingRef.current = refreshGrouping;
   }, [refreshGrouping]);
@@ -1193,6 +1233,9 @@ export function useEditorSession(
       onCursorMove(readDocumentPoint(session.screen_to_document(x, y)));
       if (entryOpenRef.current) {
         syncEntry(session);
+      }
+      if (followPlacementAfterView(session, x, y, event)) {
+        refreshPlacementRef.current();
       }
     };
     canvas?.addEventListener("wheel", onWheel, { passive: false });
@@ -1581,6 +1624,16 @@ export function useEditorSession(
         return;
       }
 
+      // A secondary press in a creation tool creates nothing and starts no placement; during a
+      // placement the window listener of `usePlacement` has cancelled it (`0052` criterion 7).
+      const pressedTool = session.tool();
+      if (
+        event.button === 2 &&
+        (pressedTool === "rectangle" || pressedTool === "ellipse" || pressedTool === "polygon-star")
+      ) {
+        return;
+      }
+
       // A press on a mark of the open typed move belongs to its chip: it does not cancel the
       // chip, select, move or start a marquee, and acts at the release
       // (`specs/0047-transform-polish/` criterion 40). Cancelling the default keeps the focus
@@ -1634,6 +1687,8 @@ export function useEditorSession(
           // works while the pointer stays over the canvas.
         }
       }
+      // A tap is 8 px, a click 3 px (`0052` criteria 1 and 31).
+      notePointer(event.pointerType);
       session.pointer_down(
         x,
         y,
@@ -1649,7 +1704,7 @@ export function useEditorSession(
       setCursorHint(session.cursor_hint());
       syncFromSession();
     },
-    [canvasPoint, history, isSpaceHeld, syncFromSession, syncTrackedModifiers],
+    [canvasPoint, history, isSpaceHeld, notePointer, syncFromSession, syncTrackedModifiers],
   );
 
   const onPointerMove = useCallback(
@@ -1673,6 +1728,9 @@ export function useEditorSession(
         if (entryOpenRef.current && session) {
           syncEntry(session);
         }
+        if (session && followPlacementAfterView(session, x, y, event)) {
+          refreshPlacement();
+        }
         return;
       }
       session?.pointer_hover(
@@ -1695,8 +1753,18 @@ export function useEditorSession(
       if (session) {
         syncBadges(session);
       }
+      // The placement chip follows the pointer until the freeze (`0052` criterion 11).
+      refreshPlacement();
     },
-    [canvasPoint, onCursorMove, syncEntry, syncBadges, syncTrackedModifiers, syncFromSession],
+    [
+      canvasPoint,
+      onCursorMove,
+      syncEntry,
+      syncBadges,
+      syncTrackedModifiers,
+      syncFromSession,
+      refreshPlacement,
+    ],
   );
 
   const onPointerUp = useCallback(
@@ -1715,6 +1783,9 @@ export function useEditorSession(
         panningRef.current = false;
         setIsPanning(false);
         session.end_pan();
+        if (followPlacementAfterView(session, x, y, event)) {
+          refreshPlacementRef.current();
+        }
         try {
           event.currentTarget.releasePointerCapture(event.pointerId);
         } catch {
@@ -1859,6 +1930,8 @@ export function useEditorSession(
     }
     setCursorHint(session.cursor_hint());
     syncBadges(session);
+    // An unfrozen placement follows the keys with the pointer still (`0052` criterion 3).
+    refreshPlacementRef.current();
   }, [syncBadges]);
 
   useEffect(() => {
@@ -1876,6 +1949,15 @@ export function useEditorSession(
       }
       // Tracked by key, not read from the event's flags (`lib/keyModifiers.ts`).
       const held = modifierTrackerRef.current.keyEvent(event);
+      // In a placement Shift and Ctrl are taps, not holds (`0052` criterion 32): a key event
+      // reports them up; the pointer events carry the keys that are really down.
+      if (sessionRef.current?.placement_running()) {
+        if (event.type === "keydown") {
+          placementKeyDownRef.current(event);
+        }
+        applyModifiers(false, false, held.alt);
+        return;
+      }
       applyModifiers(held.shift, held.ctrl, held.alt);
     };
     // A key released outside the window must not leave Shift stuck: the
@@ -2182,6 +2264,7 @@ export function useEditorSession(
     clones,
     flip,
     flipEnabled,
+    placement,
     historyBusy: history.busy,
     historyNames: history.names,
     pressHistory: history.press,

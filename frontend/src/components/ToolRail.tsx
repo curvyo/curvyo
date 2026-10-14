@@ -43,6 +43,9 @@ interface ToolRailProps {
   paused?: boolean;
 }
 
+/** The muted last tooltip line of the creation tools (`specs/0052-click-to-create-shapes/`
+ * criterion 29). */
+
 interface ToolButtonProps {
   tool: Tool;
   active: boolean;
