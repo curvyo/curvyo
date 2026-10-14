@@ -6,7 +6,12 @@
 //! `Session`.
 
 use curvyo_document_core::AnchorKind;
-use curvyo_ui_core::NodeToolbarState as SessionNodeToolbarState;
+use curvyo_ui_core::{JoinBlock, NodeToolbarState as SessionNodeToolbarState};
+
+/// A count as JS reads it; a count past `u32::MAX` cannot occur in a real document.
+fn saturating_u32(count: usize) -> u32 {
+    u32::try_from(count).unwrap_or(u32::MAX)
+}
 use wasm_bindgen::prelude::*;
 
 use crate::wasm_api::WasmSession;
@@ -44,6 +49,16 @@ pub struct NodeToolbarState {
     pub can_split: bool,
     pub compound_only: bool,
     pub clone_only: bool,
+    /// Why Join is disabled (`specs/0053-node-marquee-selection/` criterion 19): 0 enabled,
+    /// 1 not exactly two nodes, 2 not end nodes, 3 another reason (no reason line).
+    pub join_block: u8,
+    /// With `join_block` 2: how many of the selected nodes are not an end node.
+    pub join_not_end: u32,
+    /// Selected nodes and nodes in the editing set (criterion 23).
+    pub selected_nodes: u32,
+    pub total_nodes: u32,
+    /// A segment, not nodes, is selected (criterion 23).
+    pub segment_selected: bool,
 }
 
 impl From<SessionNodeToolbarState> for NodeToolbarState {
@@ -60,6 +75,19 @@ impl From<SessionNodeToolbarState> for NodeToolbarState {
             can_split: state.can_split,
             compound_only: state.compound_only,
             clone_only: state.clone_only,
+            join_block: match state.join_block {
+                None => 0,
+                Some(JoinBlock::Count(_)) => 1,
+                Some(JoinBlock::NotEndNodes { .. }) => 2,
+                Some(JoinBlock::Other) => 3,
+            },
+            join_not_end: match state.join_block {
+                Some(JoinBlock::NotEndNodes { not_end, .. }) => saturating_u32(not_end),
+                _ => 0,
+            },
+            selected_nodes: saturating_u32(state.selected_nodes),
+            total_nodes: saturating_u32(state.total_nodes),
+            segment_selected: state.segment_selected,
         }
     }
 }

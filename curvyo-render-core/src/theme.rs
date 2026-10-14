@@ -407,6 +407,11 @@ pub const GROUP_POINT_MARKER_PX: f64 = 6.0;
 /// to 1.3:1 on every fill. `--accent-hover` stays for rings, buttons and rows.
 pub const HOVER_BOX: RgbaColor = ACCENT.with_alpha(166); // 65% of 255, rounded
 
+/// The width of a node marquee's pre-selection ring, screen pixels
+/// (`specs/0053-node-marquee-selection/` UX notes, design-system row "Node marquee"): drawn in
+/// [`HOVER_BOX`] with [`HOVER_BOX_CASING`], at [`HOVER_RING_DIAMETER_PX`].
+pub const MARQUEE_RING_WIDTH_PX: f64 = 1.5;
+
 /// The hover box's casing: `--selection-casing` at the same 65%. Both must be
 /// 65%: with the line at 65% over a 60% casing, red stays at 1.96:1.
 pub const HOVER_BOX_CASING: RgbaColor = SELECTION_CASING.with_alpha(166);

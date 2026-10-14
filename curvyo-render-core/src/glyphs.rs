@@ -472,6 +472,45 @@ pub fn ring(center: Point, diameter_mm: f64, thickness_mm: f64, color: RgbaColor
     ring_or_disc(center, diameter_mm, Some(thickness_mm), color)
 }
 
+/// Many rings of one size and colour appended to `list` at once: the unit circle is computed
+/// once and the list grows once, so thousands of rings (a node marquee's pre-selection rings,
+/// `specs/0053-node-marquee-selection/` criterion 25) cost no trigonometry per ring. The same
+/// shape as [`ring`].
+pub fn rings(
+    list: &mut DrawList,
+    centers: &[Point],
+    diameter_mm: f64,
+    thickness_mm: f64,
+    color: RgbaColor,
+) {
+    const SEGMENTS: usize = crate::theme::CIRCLE_SEGMENTS;
+    let outer = diameter_mm / 2.0;
+    let inner = (outer - thickness_mm).max(0.0);
+    // `SEGMENTS` is a small compile-time constant, nowhere near `f64`'s mantissa limit.
+    #[allow(clippy::cast_precision_loss)]
+    let unit: Vec<(f64, f64)> = (0..=SEGMENTS)
+        .map(|i| {
+            let angle = (i as f64) / (SEGMENTS as f64) * std::f64::consts::TAU;
+            (angle.cos(), angle.sin())
+        })
+        .collect();
+    list.triangles.reserve(centers.len() * SEGMENTS * 6);
+    for &center in centers {
+        let at = |radius: f64, (cos, sin): (f64, f64)| {
+            Point::new(center.x + cos * radius, center.y + sin * radius)
+        };
+        for pair in unit.windows(2) {
+            list.push_quad(
+                at(outer, pair[0]),
+                at(outer, pair[1]),
+                at(inner, pair[1]),
+                at(inner, pair[0]),
+                color,
+            );
+        }
+    }
+}
+
 fn ring_or_disc(
     center: Point,
     diameter_mm: f64,

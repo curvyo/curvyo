@@ -13,7 +13,13 @@ impl Session {
     /// only: nothing is written. An empty document is still a handled key. Layers are
     /// transparent, and hidden and locked objects are left out; a group takes all its members
     /// along (`specs/0050-layers-and-objects-panel` criteria 21 and 42).
+    ///
+    /// In the Node tool it selects every node of the editing set instead
+    /// (`specs/0053-node-marquee-selection/` criterion 22).
     pub(super) fn select_all(&mut self) -> KeyOutcome {
+        if self.tool == super::Tool::Node {
+            return self.node_select_all();
+        }
         let ids: Vec<_> = self
             .pickable_objects()
             .iter()
@@ -156,8 +162,6 @@ mod tests {
         let (mut session, ids) = session_with_rects(3);
         session.selection.select_single(ids[0]);
         session.set_tool(Tool::Pen);
-        assert_eq!(ctrl_a(&mut session), KeyOutcome::Ignored);
-        session.set_tool(Tool::Node);
         assert_eq!(ctrl_a(&mut session), KeyOutcome::Ignored);
         assert_eq!(session.selection.ids(), &ids[..1]);
     }

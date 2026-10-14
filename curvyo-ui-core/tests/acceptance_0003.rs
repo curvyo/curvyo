@@ -258,12 +258,12 @@ fn ac21_selecting_and_deselecting_a_primitive_never_converts_it() {
 /// `Session::convert_selected_to_paths` does with this crate's public
 /// API (mint anchors via `outline_of`, call `Document::convert_to_paths`
 /// once for the whole selection, then hand each converted path to
-/// `NodeTool::select_all_anchors`), to check whether "selected together"
+/// `NodeTool::select_all`), to check whether "selected together"
 /// actually holds afterward.
 ///
 /// It does not: [`NodeSelection`]/[`NodeTool`] carries a single
 /// `path: Option<NodeId>` (see `curvyo-ui-core/src/selection.rs`), so a
-/// second `select_all_anchors` call for the second converted path wipes
+/// second `select_all` call for the second converted path wipes
 /// out the first path's selection entirely. After a 2-object conversion,
 /// at most one of the two resulting paths has anything selected — not
 /// "together", not even "both, separately". This is a real AC22 gap,
@@ -315,8 +315,8 @@ fn ac22_multi_object_conversion_cannot_keep_both_paths_selected_together() {
     // Reproduce `Session::convert_selected_to_paths`'s own reselection:
     // each converted path in turn gets its anchors selected.
     let mut node = NodeTool::new();
-    node.select_all_anchors(&rect_path);
-    node.select_all_anchors(&ellipse_path);
+    node.select_all(std::slice::from_ref(&rect_path));
+    node.select_all(std::slice::from_ref(&ellipse_path));
 
     // AC22 asks for both paths "selected together". What actually
     // happens: only the *last* one retains any selection at all.
@@ -330,8 +330,8 @@ fn ac22_multi_object_conversion_cannot_keep_both_paths_selected_together() {
     // instead — proving this is a structural "last write wins", not an
     // incidental test-order artifact.
     let mut node2 = NodeTool::new();
-    node2.select_all_anchors(&ellipse_path);
-    node2.select_all_anchors(&rect_path);
+    node2.select_all(std::slice::from_ref(&ellipse_path));
+    node2.select_all(std::slice::from_ref(&rect_path));
     assert_eq!(node2.selection().path(), Some(rect_id));
 
     // There is no representation, in this crate's selection model, of

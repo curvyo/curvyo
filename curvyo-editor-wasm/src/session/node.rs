@@ -175,7 +175,8 @@ impl Session {
         if self.tool != Tool::Node {
             return NodeToolbarState::default();
         }
-        let mut state = self.node.toolbar_state(&self.document);
+        let paths = self.paths();
+        let mut state = self.node.toolbar_state(&self.document, &paths);
         state.compound_only = matches!(self.selection.ids(), [only]
             if self.document.path(*only).is_some_and(|path| path.is_compound()));
         state.clone_only = self.node_selection_is_clones();
@@ -277,12 +278,20 @@ impl Session {
             .iter()
             .flat_map(|bend| bend.ends.iter().map(|end| (bend.path, end.id)))
             .collect();
+        // The nodes a marquee in flight would select get the pre-selection ring (`0053`
+        // criterion 10); the hover state is empty during any drag.
+        let ringed_nodes = self
+            .node
+            .marquee()
+            .map(|marquee| marquee.inside().to_vec())
+            .unwrap_or_default();
         DecorationInput {
             show_nodes: true,
             selected_nodes,
             selected_segment,
             hovered,
             handle_nodes,
+            ringed_nodes,
         }
     }
 }

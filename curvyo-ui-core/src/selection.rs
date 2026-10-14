@@ -31,17 +31,15 @@
 //! `toggle_node` below) can build a selection spanning any number of
 //! paths, not just Split's own output.
 //!
-//! [`NodeSelection::path`] still reports the *common* path when every
-//! selected node (or the one selected segment) shares one — `None` for
-//! an empty selection or one that genuinely spans several paths. The
-//! single-path-only actions (convert/delete/make-line/make-curve) key
-//! off this, so they stay correctly disabled for a true multi-path
-//! selection exactly as they did for `SplitPair` before — seeing more
-//! than one path is not reason enough to build cross-path convert/delete
-//! for this slice (no acceptance criterion here asks for it; Join is the
-//! one action that already works across paths by construction, via
-//! [`NodeSelection::join_pairs`]).
+//! [`NodeSelection::path`] still reports the *common* path when every selected node (or the
+//! one selected segment) shares one, for the segment actions. Delete and Convert act on
+//! [`NodeSelection::node_pairs`] across paths (`specs/0053-node-marquee-selection/adrs.md`
+//! decision 4); a marquee and Ctrl+A combine a result with the selection through
+//! [`NodeSelection::apply`] (decision 3).
 
+use std::collections::HashSet;
+
+use crate::SelectionCombine;
 use curvyo_document_core::{AnchorId, NodeId};
 
 /// The node tool's current selection: nothing, one or more nodes
@@ -223,6 +221,57 @@ impl NodeSelection {
     }
 }
 
+impl NodeSelection {
+    /// Combines `result` (a marquee's or Ctrl+A's anchors, in document order) with the
+    /// selection (`specs/0053-node-marquee-selection/` criteria 6 to 8):
+    /// - [`SelectionCombine::Replace`]: the selection becomes exactly `result`; an empty
+    ///   `result` leaves nothing selected, and a segment selection is dropped either way.
+    /// - [`SelectionCombine::Add`]: selected nodes stay in their order; the nodes of `result`
+    ///   not yet selected are appended in `result`'s order. A segment selection is replaced
+    ///   only by a non-empty `result`.
+    /// - [`SelectionCombine::Remove`]: the nodes of `result` are deselected, nothing is added,
+    ///   and a segment selection is left as it is.
+    ///
+    /// A pair listed twice in `result` is taken once. Membership uses a hash set built once
+    /// per call, so the cost is linear in both lists (criterion 25).
+    pub fn apply(&mut self, combine: SelectionCombine, result: &[(NodeId, AnchorId)]) {
+        match combine {
+            SelectionCombine::Replace => {
+                self.clear();
+                self.append_new(Vec::new(), result);
+            }
+            SelectionCombine::Add => {
+                if result.is_empty() {
+                    return;
+                }
+                let current = match std::mem::take(&mut self.kind) {
+                    SelectionKind::Nodes(pairs) => pairs,
+                    SelectionKind::None | SelectionKind::Segment(..) => Vec::new(),
+                };
+                self.append_new(current, result);
+            }
+            SelectionCombine::Remove => {
+                let SelectionKind::Nodes(pairs) = &mut self.kind else {
+                    return;
+                };
+                let gone: HashSet<(NodeId, AnchorId)> = result.iter().copied().collect();
+                pairs.retain(|pair| !gone.contains(pair));
+                if pairs.is_empty() {
+                    self.clear();
+                }
+            }
+        }
+    }
+
+    /// Sets the node selection to `current` followed by every pair of `result` not in it yet,
+    /// in `result`'s order; nothing selected when both are empty.
+    fn append_new(&mut self, mut current: Vec<(NodeId, AnchorId)>, result: &[(NodeId, AnchorId)]) {
+        let mut seen: HashSet<(NodeId, AnchorId)> = current.iter().copied().collect();
+        current.extend(result.iter().copied().filter(|&pair| seen.insert(pair)));
+        self.select_nodes(current);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use curvyo_document_core::{Document, NewAnchor, Point};
@@ -392,5 +441,84 @@ mod tests {
         assert_eq!(selection.join_pairs(), None, "nothing selected");
         selection.select_single_node(path, a);
         assert_eq!(selection.join_pairs(), None, "only one node selected");
+    }
+
+    /// `0053` criterion 6: Replace sets exactly the result and drops a segment selection.
+    #[test]
+    fn apply_replace_sets_exactly_the_result() {
+        let (path_p, path_q) = two_distinct_paths();
+        let (first, second, third) = (
+            AnchorId::new(1, 1),
+            AnchorId::new(1, 2),
+            AnchorId::new(1, 3),
+        );
+        let mut selection = NodeSelection::new();
+        selection.select_segment(path_p, first, second);
+        selection.apply(
+            SelectionCombine::Replace,
+            &[(path_q, third), (path_p, first)],
+        );
+        assert_eq!(selection.node_pairs(), &[(path_q, third), (path_p, first)]);
+        selection.apply(SelectionCombine::Replace, &[]);
+        assert!(selection.is_empty());
+    }
+
+    /// `0053` criterion 7: Add keeps the old order and appends the new nodes in result order;
+    /// an empty result changes nothing; a segment is replaced only by a non-empty result.
+    #[test]
+    fn apply_add_appends_new_nodes_in_result_order() {
+        let (path_p, path_q) = two_distinct_paths();
+        let (first, second, third) = (
+            AnchorId::new(1, 1),
+            AnchorId::new(1, 2),
+            AnchorId::new(1, 3),
+        );
+        let mut selection = NodeSelection::new();
+        selection.select_nodes(vec![(path_q, third), (path_p, first)]);
+        selection.apply(
+            SelectionCombine::Add,
+            &[(path_p, first), (path_p, second), (path_p, second)],
+        );
+        assert_eq!(
+            selection.node_pairs(),
+            &[(path_q, third), (path_p, first), (path_p, second)]
+        );
+
+        selection.select_segment(path_p, first, second);
+        selection.apply(SelectionCombine::Add, &[]);
+        assert_eq!(
+            selection.segment(),
+            Some((first, second)),
+            "empty result: unchanged"
+        );
+        selection.apply(SelectionCombine::Add, &[(path_q, third)]);
+        assert_eq!(selection.node_pairs(), &[(path_q, third)]);
+    }
+
+    /// `0053` criterion 8: Remove deselects strictly, never adds, and leaves a segment.
+    #[test]
+    fn apply_remove_deselects_and_never_adds() {
+        let (path_p, path_q) = two_distinct_paths();
+        let (first, second, third) = (
+            AnchorId::new(1, 1),
+            AnchorId::new(1, 2),
+            AnchorId::new(1, 3),
+        );
+        let mut selection = NodeSelection::new();
+        selection.select_nodes(vec![(path_p, first), (path_q, third), (path_p, second)]);
+        selection.apply(
+            SelectionCombine::Remove,
+            &[(path_q, third), (path_q, second)],
+        );
+        assert_eq!(selection.node_pairs(), &[(path_p, first), (path_p, second)]);
+        selection.apply(
+            SelectionCombine::Remove,
+            &[(path_p, first), (path_p, second)],
+        );
+        assert!(selection.is_empty());
+
+        selection.select_segment(path_p, first, second);
+        selection.apply(SelectionCombine::Remove, &[(path_p, first)]);
+        assert_eq!(selection.segment(), Some((first, second)));
     }
 }

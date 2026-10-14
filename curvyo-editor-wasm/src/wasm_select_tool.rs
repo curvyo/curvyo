@@ -144,6 +144,13 @@ impl WasmSession {
         self.session.selection_announcement()
     }
 
+    /// Changes with every node announcement, so the host speaks the same sentence again
+    /// (`specs/0053-node-marquee-selection/` criterion 24); 0 otherwise.
+    #[must_use]
+    pub fn selection_announcement_seq(&self) -> u32 {
+        self.session.selection_announcement_seq()
+    }
+
     /// Whether releasing the drag in flight may take long (a move or group
     /// transform of many objects): the host shows the `wait` cursor and lets it
     /// paint before it calls `pointer_up`.

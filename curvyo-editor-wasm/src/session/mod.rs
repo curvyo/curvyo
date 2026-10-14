@@ -64,6 +64,7 @@ mod move_entry;
 mod move_indicators;
 mod navigation;
 mod node;
+mod node_marquee;
 mod nudge;
 mod object_cache;
 mod object_history;
@@ -241,6 +242,15 @@ pub struct Session {
     /// `None` before the first move, or once [`Session::pointer_leave`]
     /// says the pointer is off the canvas.
     pointer_position: Option<Point>,
+    /// The Node tool's hit test found no node, handle or segment at the pointer, so a press
+    /// there would start a node marquee (`specs/0053-node-marquee-selection/` UX notes: the
+    /// minus badge with Ctrl held).
+    node_hover_on_nothing: bool,
+    /// The polite live region after a node marquee or Ctrl+A ("5 nodes selected."), valid
+    /// while the node selection is the one it described (`0053` criterion 24).
+    node_announcement: Option<node_marquee::NodeAnnouncement>,
+    /// Counts node announcements, so the host speaks a repeated sentence again.
+    node_announcement_seq: u32,
     /// The Shift, Ctrl and Alt modifiers' live state, as of the most recent
     /// [`Session::pointer_hover`] or [`Session::modifiers_changed`] call —
     /// the Select tool's resize/rotate live preview needs them at *render*
@@ -341,6 +351,9 @@ impl Session {
             hovered_object: None,
             history_hover: Vec::new(),
             pointer_position: None,
+            node_hover_on_nothing: false,
+            node_announcement: None,
+            node_announcement_seq: 0,
             held: Modifiers::NONE,
             object_cache: object_cache::ObjectCache::default(),
             device_pixel_ratio: 1.0,
@@ -396,6 +409,9 @@ impl Session {
             hovered_object: None,
             history_hover: Vec::new(),
             pointer_position: None,
+            node_hover_on_nothing: false,
+            node_announcement: None,
+            node_announcement_seq: 0,
             held: Modifiers::NONE,
             object_cache: object_cache::ObjectCache::default(),
             device_pixel_ratio: 1.0,
@@ -477,6 +493,7 @@ impl Session {
             }
             if tool != this.tool {
                 this.command_refusal = None;
+                this.node_announcement = None;
                 this.leave_offset_tool();
             }
             this.tool = tool;
@@ -533,6 +550,7 @@ impl Session {
                 Tool::Node => {
                     let paths = this.paths();
                     let tolerances = this.hit_tolerances();
+                    this.node_announcement = None;
                     this.node.pointer_down(&paths, point, tolerances, shift);
                 }
                 Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar => {
@@ -578,11 +596,14 @@ impl Session {
                 self.select_hover(point, self.held);
             }
             Tool::Node => {
-                // A bend in flight follows the pointer; no hover test runs during any drag
-                // (`0031` criterion 17).
-                self.node.pointer_moved(point, shift);
+                // A bend or a marquee in flight follows the pointer; no hover test runs during
+                // any drag (`0031` criterion 17, `0053` criterion 10).
+                let paths = self.paths();
+                let threshold = self.hit_tolerances().drag_threshold;
+                self.node.pointer_moved(&paths, point, shift, threshold);
+                self.node_hover_on_nothing = false;
                 if !self.node.drag_in_flight() {
-                    let paths = self.paths();
+                    self.node_hover_on_nothing = self.node_hit_is_nothing(&paths, point);
                     self.hovered = self.hovered_segment_hit(&paths, point);
                 }
             }
@@ -633,8 +654,7 @@ impl Session {
                     this.pen_cue.release();
                 }
                 Tool::Node => {
-                    this.node.pointer_moved(point, shift);
-                    this.node.pointer_up(&this.document, point);
+                    this.node_pointer_up(point, Modifiers::new(shift, constrain));
                 }
                 Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar => {
                     this.shape_pointer_up(point, Modifiers::new(shift, constrain));
@@ -1093,7 +1113,15 @@ mod tests {
 
         session.insert_selected();
         assert_eq!(session.paths()[0].anchors.len(), 3);
-        assert_eq!(session.node_toolbar_state(), NodeToolbarState::default());
+        // Nothing is selected after the insert; only the counts of `0053` criterion 23 remain.
+        assert_eq!(
+            session.node_toolbar_state(),
+            NodeToolbarState {
+                join_block: Some(curvyo_ui_core::JoinBlock::Count(0)),
+                total_nodes: 3,
+                ..NodeToolbarState::default()
+            }
+        );
     }
 
     /// Acceptance criteria 8-11: selecting the two ends of one open path

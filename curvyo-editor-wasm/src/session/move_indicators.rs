@@ -44,8 +44,10 @@ impl Session {
         };
         if self.tool == Tool::Node {
             // The lock badge of a segment bend (`0031` criterion 13).
+            // The minus badge of a Ctrl node marquee (`0053` UX notes).
             return MoveIndicators {
                 lock: self.live_bend().and_then(|bend| bend.axis),
+                remove_badge: self.node_remove_badge(),
                 ..none
             };
         }

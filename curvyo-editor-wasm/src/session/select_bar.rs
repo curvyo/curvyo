@@ -149,7 +149,7 @@ impl Session {
             if this.document.convert_to_paths(&conversions).is_ok() {
                 this.tool = Tool::Node;
                 if let Some(path) = this.document.path(first_converted) {
-                    this.node.select_all_anchors(&path);
+                    this.node.select_all(std::slice::from_ref(&path));
                 }
             }
         });

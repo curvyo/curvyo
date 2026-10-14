@@ -321,7 +321,13 @@ impl PathSnapshot {
         }))
     }
 
-    /// Every anchor of every outline, in [`PathSnapshot::subpaths`] order.
+    /// Every anchor of every outline, each exactly once, in this fixed order: the first
+    /// outline (`anchors`) from its first anchor to its last, then each outline of
+    /// `extra_subpaths` in storage order, each from its first anchor to its last. A closed
+    /// outline does not repeat its first anchor. The order depends only on the stored lists,
+    /// never on positions, so a caller may rely on it as the path's "document order" of
+    /// anchors (`specs/0053-node-marquee-selection/` criterion 9, used by
+    /// `specs/0055-compound-path-node-editing/` for outlines).
     pub fn all_anchors(&self) -> impl Iterator<Item = &AnchorSnapshot> {
         self.anchors
             .iter()
@@ -393,4 +399,49 @@ pub enum PathEditError {
     /// outline coordinate (`specs/0049-linked-clone` criterion 17): nothing was written.
     #[error("a linked clone would move beyond the limit of 10 km")]
     CloneOutOfRange(NodeId),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::document::Document;
+    use crate::units::Point;
+
+    fn corner(tag: u64, i: u64) -> NewAnchor {
+        #[allow(clippy::cast_precision_loss)]
+        NewAnchor::corner(AnchorId::new(tag, i), Point::new(i as f64, 0.0))
+    }
+
+    /// The order guarantee of [`PathSnapshot::all_anchors`]: the first outline, then each
+    /// further outline in storage order, every anchor once, a closed outline included.
+    #[test]
+    fn all_anchors_walks_the_outlines_in_storage_order() {
+        let document = Document::new(1);
+        let id = document.create_path(&[corner(1, 0), corner(1, 1), corner(1, 2)], true);
+        let mut path = document.path(id).unwrap();
+        path.extra_subpaths = vec![
+            SubpathSnapshot {
+                closed: false,
+                anchors: vec![corner(2, 0), corner(2, 1)],
+            },
+            SubpathSnapshot {
+                closed: true,
+                anchors: vec![corner(3, 0), corner(3, 1), corner(3, 2)],
+            },
+        ];
+        let order: Vec<AnchorId> = path.all_anchors().map(|a| a.id).collect();
+        assert_eq!(
+            order,
+            vec![
+                AnchorId::new(1, 0),
+                AnchorId::new(1, 1),
+                AnchorId::new(1, 2),
+                AnchorId::new(2, 0),
+                AnchorId::new(2, 1),
+                AnchorId::new(3, 0),
+                AnchorId::new(3, 1),
+                AnchorId::new(3, 2),
+            ]
+        );
+    }
 }

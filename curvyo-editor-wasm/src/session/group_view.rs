@@ -269,6 +269,10 @@ impl Session {
     /// (`specs/0019-multi-object-transform/` UX notes, section 13).
     #[must_use]
     pub fn selection_announcement(&self) -> String {
+        // The Node tool's count after a marquee or Ctrl+A (`0053` criterion 24).
+        if self.tool == Tool::Node {
+            return self.node_selection_announcement();
+        }
         // Before the document read: this runs on every sync.
         if self.tool != Tool::Select || self.selection.ids().is_empty() {
             return String::new();

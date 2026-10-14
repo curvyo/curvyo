@@ -49,6 +49,11 @@ impl Session {
         if self.tool == Tool::Offset {
             return self.offset_cursor_hint().to_string();
         }
+        if self.tool == Tool::Node
+            && let Some(hint) = self.node_marquee_cursor()
+        {
+            return hint.to_string();
+        }
         if self.tool != Tool::Select {
             return "default".to_string();
         }

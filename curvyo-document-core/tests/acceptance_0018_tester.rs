@@ -970,6 +970,6 @@ fn markers_follow_geometry_edits_without_touching_settings() {
     let want = markers_of(&doc, p);
     doc.translate_objects(&[p], Vec2::new(5.0, 5.0)).unwrap();
     assert_eq!(markers_of(&doc, p), want);
-    doc.delete_anchors(p, &[AnchorId::new(1, 2)]).unwrap();
+    doc.delete_anchors(&[(p, AnchorId::new(1, 2))]);
     assert_eq!(markers_of(&doc, p), want);
 }
