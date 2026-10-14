@@ -12,7 +12,8 @@ use crate::document::{Document, OBJECTS_TREE};
 use crate::path_codec::{self, leaf_exists};
 use crate::path_model::{NewAnchor, NodeId};
 use crate::primitive_model::{
-    EllipseFrame, InnerRatio, ObjectSnapshot, PointCount, PrimitiveSnapshot, RectBounds, StarFrame,
+    EllipseFrame, InnerRatio, ObjectSnapshot, PointCount, PrimitiveSnapshot, RectBounds, Shape,
+    StarFrame,
 };
 use crate::shape_codec::{self, SHAPE_ELLIPSE, SHAPE_POLYGON, SHAPE_RECT, SHAPE_STAR};
 use crate::units::{Angle, Length};
@@ -50,68 +51,94 @@ pub enum ShapeEditError {
 }
 
 impl Document {
-    /// Creates a new rectangle primitive with four zero corner radii
-    /// (acceptance criterion 1), becoming the selected object is the
-    /// caller's job (ADR 0009 §2: selection is ephemeral `curvyo-ui-
-    /// core` state).
+    /// Creates a new primitive of `shape`'s kind, turned by `rotation` about its frame's own
+    /// centre, in one commit with the kind's label (`create_rect`, `create_ellipse`,
+    /// `create_polygon`, `create_star`): the keys the kind's create-drag writes, plus the
+    /// `rotation` register when `rotation` is not zero, stored normalized
+    /// (`specs/0052-click-to-create-shapes/adrs.md` decision 2). A rectangle keeps the corner
+    /// radii `shape` carries. Becoming the selected object is the caller's job (ADR 0009 §2:
+    /// selection is ephemeral `curvyo-ui-core` state).
     ///
     /// # Panics
     /// Does not panic in practice: see [`crate::paths::Document::
-    /// create_path`]'s own doc comment — the same reasoning applies to
-    /// every `create_*` method below.
+    /// create_path`]'s own doc comment — the same reasoning applies here.
     #[must_use]
-    pub fn create_rect(&self, bounds: RectBounds) -> NodeId {
-        let id = self.create_primitive_node(SHAPE_RECT);
+    pub fn create_primitive(&self, shape: Shape, rotation: Angle) -> NodeId {
+        let (tag, label) = match shape {
+            Shape::Rect { .. } => (SHAPE_RECT, "create_rect"),
+            Shape::Ellipse { .. } => (SHAPE_ELLIPSE, "create_ellipse"),
+            Shape::Polygon { .. } => (SHAPE_POLYGON, "create_polygon"),
+            Shape::Star { .. } => (SHAPE_STAR, "create_star"),
+        };
+        let id = self.create_primitive_node(tag);
         let tree = self.loro().get_tree(OBJECTS_TREE);
         // invariant: this node was just created by `create_primitive_node`.
         #[allow(clippy::unwrap_used)]
         let meta = tree.get_meta(tree_id_of(id)).unwrap();
-        shape_codec::write_rect_bounds(&meta, bounds);
-        write_corner_radii_if_changed(&meta, CornerRadii::uniform(Length::from_mm(0.0)));
-        self.commit_with_label("create_rect");
+        match shape {
+            Shape::Rect {
+                bounds,
+                corner_radii,
+            } => {
+                shape_codec::write_rect_bounds(&meta, bounds);
+                write_corner_radii_if_changed(&meta, corner_radii);
+            }
+            Shape::Ellipse { frame } => shape_codec::write_ellipse_frame(&meta, frame),
+            Shape::Polygon { frame, point_count } => {
+                shape_codec::write_star_frame(&meta, frame);
+                shape_codec::write_point_count(&meta, point_count);
+            }
+            Shape::Star {
+                frame,
+                point_count,
+                inner_ratio,
+            } => {
+                shape_codec::write_star_frame(&meta, frame);
+                shape_codec::write_point_count(&meta, point_count);
+                shape_codec::write_inner_ratio(&meta, inner_ratio);
+            }
+        }
+        // As `convert_to_paths`: an absent register reads as 0, so a zero turn writes nothing.
+        if rotation.normalized() != Angle::from_radians(0.0) {
+            path_codec::write_rotation(&meta, rotation);
+        }
+        self.commit_with_label(label);
         id
     }
 
-    /// Creates a new ellipse/circle primitive (acceptance criteria 7, 8).
-    ///
-    /// # Panics
-    /// Does not panic in practice: see [`Document::create_rect`]'s own
-    /// doc comment.
+    /// Creates a new rectangle primitive with four zero corner radii
+    /// (acceptance criterion 1): [`Document::create_primitive`] with no turn.
+    #[must_use]
+    pub fn create_rect(&self, bounds: RectBounds) -> NodeId {
+        let corner_radii = CornerRadii::uniform(Length::from_mm(0.0));
+        self.create_primitive(
+            Shape::Rect {
+                bounds,
+                corner_radii,
+            },
+            Angle::from_radians(0.0),
+        )
+    }
+
+    /// Creates a new ellipse/circle primitive (acceptance criteria 7, 8):
+    /// [`Document::create_primitive`] with no turn.
     #[must_use]
     pub fn create_ellipse(&self, frame: EllipseFrame) -> NodeId {
-        let id = self.create_primitive_node(SHAPE_ELLIPSE);
-        let tree = self.loro().get_tree(OBJECTS_TREE);
-        // invariant: see `create_rect`.
-        #[allow(clippy::unwrap_used)]
-        let meta = tree.get_meta(tree_id_of(id)).unwrap();
-        shape_codec::write_ellipse_frame(&meta, frame);
-        self.commit_with_label("create_ellipse");
-        id
+        self.create_primitive(Shape::Ellipse { frame }, Angle::from_radians(0.0))
     }
 
-    /// Creates a new regular polygon primitive (acceptance criterion 11).
-    ///
-    /// # Panics
-    /// Does not panic in practice: see [`Document::create_rect`]'s own
-    /// doc comment.
+    /// Creates a new regular polygon primitive (acceptance criterion 11):
+    /// [`Document::create_primitive`] with no turn.
     #[must_use]
     pub fn create_polygon(&self, frame: StarFrame, point_count: PointCount) -> NodeId {
-        let id = self.create_primitive_node(SHAPE_POLYGON);
-        let tree = self.loro().get_tree(OBJECTS_TREE);
-        // invariant: see `create_rect`.
-        #[allow(clippy::unwrap_used)]
-        let meta = tree.get_meta(tree_id_of(id)).unwrap();
-        shape_codec::write_star_frame(&meta, frame);
-        shape_codec::write_point_count(&meta, point_count);
-        self.commit_with_label("create_polygon");
-        id
+        self.create_primitive(
+            Shape::Polygon { frame, point_count },
+            Angle::from_radians(0.0),
+        )
     }
 
-    /// Creates a new star primitive (acceptance criterion 12).
-    ///
-    /// # Panics
-    /// Does not panic in practice: see [`Document::create_rect`]'s own
-    /// doc comment.
+    /// Creates a new star primitive (acceptance criterion 12):
+    /// [`Document::create_primitive`] with no turn.
     #[must_use]
     pub fn create_star(
         &self,
@@ -119,21 +146,17 @@ impl Document {
         point_count: PointCount,
         inner_ratio: InnerRatio,
     ) -> NodeId {
-        let id = self.create_primitive_node(SHAPE_STAR);
-        let tree = self.loro().get_tree(OBJECTS_TREE);
-        // invariant: see `create_rect`.
-        #[allow(clippy::unwrap_used)]
-        let meta = tree.get_meta(tree_id_of(id)).unwrap();
-        shape_codec::write_star_frame(&meta, frame);
-        shape_codec::write_point_count(&meta, point_count);
-        shape_codec::write_inner_ratio(&meta, inner_ratio);
-        self.commit_with_label("create_star");
-        id
+        let shape = Shape::Star {
+            frame,
+            point_count,
+            inner_ratio,
+        };
+        self.create_primitive(shape, Angle::from_radians(0.0))
     }
 
     /// Creates a root tree node tagged `shape` and carrying this slice's
     /// shared placeholder style (acceptance criterion 16), common to
-    /// every `create_*` method above. Leaves the commit to its caller,
+    /// [`Document::create_primitive`]. Leaves the commit to its caller,
     /// which still has shape-specific fields left to write.
     ///
     /// # Panics
@@ -996,5 +1019,138 @@ mod tests {
         for id in ids {
             assert!(document.path(id).is_some());
         }
+    }
+
+    /// The stored `rotation` key of `id`, if present (`specs/0052-click-to-create-shapes/adrs.md`
+    /// decision 2: written only when not zero).
+    fn stored_rotation(document: &Document, id: NodeId) -> Option<loro::LoroValue> {
+        let tree = document.loro().get_tree(OBJECTS_TREE);
+        let meta = tree.get_meta(tree_id_of(id)).expect("meta");
+        meta.get(crate::path_codec::KEY_ROTATION)
+            .map(|v| v.get_deep_value())
+    }
+
+    fn star_frame() -> StarFrame {
+        StarFrame {
+            center: Point::new(100.0, 100.0),
+            radius: Length::from_mm(25.0),
+            angle: Angle::from_radians(-std::f64::consts::FRAC_PI_2),
+        }
+    }
+
+    /// One shape of each kind, as `create_primitive` takes it.
+    fn one_of_each_kind() -> [(Shape, &'static str); 4] {
+        let point_count = PointCount::new(6).expect("valid");
+        [
+            (
+                Shape::Rect {
+                    bounds: rect_bounds(100.0, 30.0, 40.0, 20.0),
+                    corner_radii: CornerRadii::uniform(Length::from_mm(0.0)),
+                },
+                "create_rect",
+            ),
+            (
+                Shape::Ellipse {
+                    frame: EllipseFrame {
+                        center: Point::new(60.0, 60.0),
+                        rx: Length::from_mm(10.0),
+                        ry: Length::from_mm(10.0),
+                    },
+                },
+                "create_ellipse",
+            ),
+            (
+                Shape::Polygon {
+                    frame: star_frame(),
+                    point_count,
+                },
+                "create_polygon",
+            ),
+            (
+                Shape::Star {
+                    frame: star_frame(),
+                    point_count,
+                    inner_ratio: InnerRatio::new(0.5).expect("valid"),
+                },
+                "create_star",
+            ),
+        ]
+    }
+
+    /// 0052 criteria 6 and 36: with no rotation, `create_primitive` writes exactly what the
+    /// kind's `create_*` writes (the same object read back, no `rotation` key) as one step with
+    /// the kind's existing label.
+    #[test]
+    fn create_primitive_without_rotation_writes_what_create_star_and_its_siblings_write() {
+        for (shape, label) in one_of_each_kind() {
+            let placed = Document::new(1);
+            let id = placed.create_primitive(shape, Angle::from_radians(0.0));
+            let dragged = Document::new(1);
+            let reference = match shape {
+                Shape::Rect { bounds, .. } => dragged.create_rect(bounds),
+                Shape::Ellipse { frame } => dragged.create_ellipse(frame),
+                Shape::Polygon { frame, point_count } => dragged.create_polygon(frame, point_count),
+                Shape::Star {
+                    frame,
+                    point_count,
+                    inner_ratio,
+                } => dragged.create_star(frame, point_count, inner_ratio),
+            };
+            assert_eq!(placed.object(id), dragged.object(reference), "{label}");
+            assert_eq!(stored_rotation(&placed, id), None, "{label}");
+            let steps = placed.own_steps();
+            assert_eq!(steps.len(), 1, "{label}: one commit, one step");
+            assert_eq!(steps[0].label, label);
+        }
+    }
+
+    /// 0052 criterion 16 (b): a rectangle placed turned by 90° stores its unturned box and the
+    /// `rotation` register, in the same single step.
+    #[test]
+    fn create_primitive_stores_a_non_zero_rotation_in_the_same_step() {
+        let document = Document::new(1);
+        let bounds = rect_bounds(90.0, 60.0, 40.0, 20.0);
+        let shape = Shape::Rect {
+            bounds,
+            corner_radii: CornerRadii::uniform(Length::from_mm(0.0)),
+        };
+        let id = document.create_primitive(shape, Angle::from_radians(std::f64::consts::FRAC_PI_2));
+        let snapshot = document.primitive(id).expect("exists");
+        assert_eq!(snapshot.shape, shape);
+        assert!((snapshot.rotation.as_radians() - std::f64::consts::FRAC_PI_2).abs() < 1e-12);
+        assert!(stored_rotation(&document, id).is_some());
+        let steps = document.own_steps();
+        assert_eq!(steps.len(), 1);
+        assert_eq!(steps[0].label, "create_rect");
+    }
+
+    /// The register is written normalized to (-π, π], as every other writer does; a full turn
+    /// reads as no turn.
+    #[test]
+    fn create_primitive_normalizes_the_rotation() {
+        let document = Document::new(1);
+        let frame = EllipseFrame {
+            center: Point::new(40.0, 60.0),
+            rx: Length::from_mm(10.0),
+            ry: Length::from_mm(5.0),
+        };
+        let id = document.create_primitive(
+            Shape::Ellipse { frame },
+            Angle::from_radians(450_f64.to_radians()),
+        );
+        let rotation = document.primitive(id).expect("exists").rotation;
+        assert!((rotation.as_radians() - std::f64::consts::FRAC_PI_2).abs() < 1e-12);
+    }
+
+    /// A rectangle's own corner radii are written as the shape carries them.
+    #[test]
+    fn create_primitive_keeps_a_rectangles_corner_radii() {
+        let document = Document::new(1);
+        let shape = Shape::Rect {
+            bounds: rect_bounds(0.0, 0.0, 40.0, 20.0),
+            corner_radii: CornerRadii::uniform(Length::from_mm(3.0)),
+        };
+        let id = document.create_primitive(shape, Angle::from_radians(0.0));
+        assert_eq!(document.primitive(id).expect("exists").shape, shape);
     }
 }
