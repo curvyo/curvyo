@@ -644,6 +644,7 @@ dependencies = [
  "curvyo-render-core",
  "curvyo-ui-core",
  "loro",
+ "rustix",
  "serde_json",
  "wasm-bindgen",
  "wasm-bindgen-futures",
