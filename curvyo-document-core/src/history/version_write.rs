@@ -1,10 +1,12 @@
-//! Writes an object's state at a past version as a new step: go to version into the object itself,
-//! clone version into a new object (`specs/0042-history-branches` criteria 10, 11, 15, 22 to 25
-//! and 31). The version is read under the checkout guard (ADR 0014 §12) and written through the
-//! restore write path (`merge.rs`), with no three-way check: a go to is a deliberate return, so
-//! every field takes the version's value.
+//! Writes a past version as a new step: applying it to the document or to one object, and cloning
+//! an object's version into a new object (`specs/0042-history-branches` criteria 10, 15, 22 to 25
+//! and 31). Versions are read under the checkout guard (ADR 0014 §12) and written through the
+//! restore engine (`restore_plan.rs`, `restore.rs`, `revive.rs`, `merge.rs`); an apply has no
+//! three-way check: it is a deliberate return, so every field takes the version's value.
 
 use std::collections::BTreeMap;
+
+use loro::VersionVector;
 
 use super::checkout::Detached;
 use super::error::HistoryError;
@@ -13,25 +15,27 @@ use super::merge::{Tally, restore_map};
 use super::node_value::{Node, read_map};
 use super::object_rows::{node_id, tree_id};
 use super::object_timeline::EntryClass;
+use super::restore::read_versions_between;
+use super::restore_plan::{Snapshot, plan_return};
 use super::stack_machine::Status;
 use super::step_header::{KEY_OBJECT, KEY_VERSION, LABEL_CLONE_VERSION, LABEL_GO_TO_VERSION};
 use super::step_id::StepRef;
+use super::step_index::is_row;
 use super::step_log::find_step;
-use crate::document::{Document, OBJECTS_TREE};
+use super::wipe::KEY_HISTORY_WIPED;
+use crate::document::{Document, KEY_FORMAT_VERSION, OBJECTS_TREE, ROOT_MAP};
 use crate::group_tree::KEY_GROUP;
 use crate::objects::renumber_anchors;
 use crate::path_model::{AnchorId, NodeId};
 use crate::shape_codec::read_shape_tag;
 use crate::subpath_codec::total_anchor_count;
 
-/// What a go to version did.
+/// What applying a version did.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct GoToReport {
-    /// The step written or continued; `None` when the object already had that version.
+    /// The step written; `None` when the document or the object already matched the version.
     pub step: Option<StepRef>,
-    /// Whether the press continued the exploration step instead of starting one.
-    pub continued: bool,
-    /// How many later steps of other authors on the object it went back over (criterion 15).
+    /// How many later steps of other authors it went back over (criterion 15).
     pub others_reverted: usize,
 }
 
@@ -43,73 +47,123 @@ fn own_fields(mut meta: BTreeMap<String, Node>) -> BTreeMap<String, Node> {
     meta
 }
 
+/// The root keys an apply leaves as they are: the history wipe mark and the format version
+/// (ADR 0014 §8, amendment of 2026-10-14).
+fn settings(mut root: BTreeMap<String, Node>) -> BTreeMap<String, Node> {
+    root.remove(KEY_HISTORY_WIPED);
+    root.remove(KEY_FORMAT_VERSION);
+    root
+}
+
+/// The snapshot with the lineage keys and the kept root keys taken out.
+fn comparable(snapshot: &mut Snapshot) {
+    for node in snapshot.nodes.values_mut() {
+        node.meta = own_fields(std::mem::take(&mut node.meta));
+    }
+    snapshot.root = settings(std::mem::take(&mut snapshot.root));
+}
+
 impl Document {
-    /// Sets the fields of `id` to what they were right after `version`, read from `source` (the
-    /// object an inherited row belongs to) or from `id` itself, as one step "Go to version"
-    /// (criterion 10). With `explore`, a press that follows this session's go to of the same object
-    /// with nothing committed in between continues that step (criterion 11).
+    /// Applies the version right after `version` (`specs/0042-history-branches` criterion 10):
+    /// to the whole document, or with `object` to that object only, as one step "Go to version"
+    /// that Ctrl+Z takes back. It is one run of the restore engine with the version as "before"
+    /// and now as "after", over every object a step since the version touched (ADR 0014 §8):
+    /// objects created since are removed, objects deleted since come back with their id, fields,
+    /// parents, order and document settings go back. `source` is the object an inherited row of
+    /// `object` belongs to: its fields at the version stand for the object's.
     ///
     /// # Errors
     /// [`HistoryError::NoSuchStep`] if `version` is not in the log, [`HistoryError::NoSuchObject`]
-    /// if `id` does not exist or the version holds no such object, [`HistoryError::Unreadable`] if
-    /// the version cannot be checked out.
+    /// if `object` does not exist, [`HistoryError::Unreadable`] if a version cannot be checked
+    /// out, [`HistoryError::Revive`] if a deleted object could not
+    /// come back (then nothing was written).
     pub fn go_to_version(
         &self,
-        id: NodeId,
         version: StepRef,
+        object: Option<NodeId>,
         source: Option<NodeId>,
-        explore: bool,
     ) -> Result<GoToReport, HistoryError> {
         let doc = self.loro();
         self.assert_outside_batch();
         doc.commit();
         let log = find_step(doc, version).ok_or(HistoryError::NoSuchStep)?;
-        let subject = tree_id(id);
-        let tree = doc.get_tree(OBJECTS_TREE);
-        let meta = tree
-            .get_meta(subject)
-            .map_err(|_| HistoryError::NoSuchObject)?;
-        if !matches!(tree.is_node_deleted(&subject), Ok(false)) {
+        if let Some(id) = object
+            && !super::restore_plan::alive(doc, tree_id(id))
+        {
             return Err(HistoryError::NoSuchObject);
         }
-        let at = {
-            let guard = Detached::at(doc, &log.after())?;
-            guard.node(tree_id(source.unwrap_or(id)))
+        let then = log.after();
+        let since = doc.frontiers_to_vv(&then).ok_or(HistoryError::Unreadable)?;
+        let mut touched = {
+            let mut index = self.container_index.borrow_mut();
+            index.extend(doc);
+            let changes = doc
+                .export_json_updates_without_peer_compression(&since, &doc.oplog_vv())
+                .changes;
+            index.touched(doc, &changes)
         };
-        if at.meta.is_empty() {
-            return Err(HistoryError::NoSuchObject);
+        if let Some(id) = object {
+            touched = touched.only(tree_id(id));
         }
-        let (now, to) = (own_fields(read_map(&meta)), own_fields(at.meta));
-        if now == to {
+        let (mut before, mut after) =
+            read_versions_between(doc, &then, &doc.oplog_frontiers(), &touched)?;
+        if let (Some(id), Some(source)) = (object, source.filter(|s| Some(*s) != object)) {
+            // An inherited row: the source's fields at the version, in the object's place now.
+            let at = Detached::at(doc, &then)?.node(tree_id(source));
+            let place = after.nodes.get(&tree_id(id)).cloned();
+            if let Some(mut node) = place {
+                node.meta = at.meta;
+                before.nodes.insert(tree_id(id), node);
+            }
+        }
+        // A deleted object reads as empty at a version; it comes back with the fields it had when
+        // it went, so those are what "now" holds for it.
+        let tree = doc.get_tree(OBJECTS_TREE);
+        for (id, node) in &mut after.nodes {
+            if node.meta.is_empty()
+                && let Ok(meta) = tree.get_meta(*id)
+            {
+                node.meta = read_map(&meta);
+            }
+        }
+        comparable(&mut before);
+        comparable(&mut after);
+        let plan = plan_return(doc, &touched, &before, &after);
+        let root = touched.root && before.root != after.root;
+        if !plan.writes() && !root {
             return Ok(GoToReport {
                 step: None,
-                continued: false,
                 others_reverted: 0,
             });
         }
-        let others_reverted = self.later_steps_of_others(id, version);
-        let joinable = explore
-            .then(|| self.last_step_if_current())
-            .flatten()
-            .filter(|(_, header)| {
-                header.label == LABEL_GO_TO_VERSION
-                    && header.extra_value(KEY_OBJECT) == Some(encode_node(subject).as_str())
-            });
-        let mut tally = Tally::default();
-        restore_map(&meta, &now, &to, &mut tally);
-        let (step, continued) = if let Some((step, mut header)) = joinable {
-            header.set(KEY_VERSION, version.encode());
-            (self.commit_joining(step, &header), true)
-        } else {
-            let extra = [
-                (KEY_OBJECT, encode_node(subject)),
-                (KEY_VERSION, version.encode()),
-            ];
-            (self.commit_step(LABEL_GO_TO_VERSION, &extra), false)
-        };
+        let others_reverted = self.later_steps_of_others(object, &since);
+        let mut extra = vec![(KEY_VERSION, version.encode())];
+        if let Some(id) = object {
+            extra.push((KEY_OBJECT, encode_node(tree_id(id))));
+        }
+        let header = self.next_header(LABEL_GO_TO_VERSION, &extra);
+        let first = doc.oplog_vv().get(&doc.peer_id()).copied().unwrap_or(0);
+        let revived = self.revive_planned(&plan, &before, &after, &header)?;
+        self.apply_plan(&plan, &after, &before);
+        if root {
+            let mut tally = Tally::default();
+            restore_map(
+                &doc.get_map(ROOT_MAP),
+                &after.root,
+                &before.root,
+                &mut tally,
+            );
+        }
+        let wrote = revived || doc.get_pending_txn_len() > 0;
+        self.commit_with_header(&header);
+        let step = wrote.then(|| {
+            let step = StepRef::new(doc.peer_id(), first);
+            self.commit_state
+                .register_own(step, LABEL_GO_TO_VERSION, None);
+            step
+        });
         Ok(GoToReport {
             step,
-            continued,
             others_reverted,
         })
     }
@@ -182,108 +236,31 @@ impl Document {
         Ok(node_id(created))
     }
 
-    /// The steps of other authors on `id`, in effect, that came after `version`.
-    fn later_steps_of_others(&self, id: NodeId, version: StepRef) -> usize {
+    /// The steps of other authors, in effect, that are not in the past of `since`: on `object`
+    /// only, or on the whole document.
+    fn later_steps_of_others(&self, object: Option<NodeId>, since: &VersionVector) -> usize {
         self.with_reader(|reader, me| {
-            let Some(from) = reader.steps.position(version) else {
-                return 0;
+            let later = |step: StepRef| {
+                step.peer() != me
+                    && reader.steps.status(step) == Status::Applied
+                    && reader
+                        .steps
+                        .get(step)
+                        .is_some_and(|log| since.get(&step.peer()).is_none_or(|end| *end < log.end))
             };
-            let timeline = reader.timeline(tree_id(id));
-            timeline
-                .entries
-                .iter()
-                .filter(|entry| entry.class == EntryClass::Do && entry.step.peer() != me)
-                .filter(|entry| reader.steps.status(entry.step) == Status::Applied)
-                .filter(|entry| reader.steps.position(entry.step).is_some_and(|p| p > from))
-                .count()
+            match object {
+                Some(id) => reader
+                    .timeline(tree_id(id))
+                    .entries
+                    .iter()
+                    .filter(|entry| entry.class == EntryClass::Do && later(entry.step))
+                    .count(),
+                None => reader
+                    .steps
+                    .steps()
+                    .filter(|log| is_row(log) && later(log.step))
+                    .count(),
+            }
         })
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::{Document, Length, NodeId, Point, RectBounds, StepRef, StyleEdit};
-
-    fn rect(d: &Document) -> NodeId {
-        d.create_rect(RectBounds {
-            origin: Point::new(0.0, 0.0),
-            width: Length::from_mm(10.0),
-            height: Length::from_mm(10.0),
-        })
-    }
-
-    fn width(d: &Document, id: NodeId, mm: f64) -> StepRef {
-        d.edit_style(&[id], &StyleEdit::StrokeWidth(Length::from_mm(mm)))
-            .unwrap();
-        d.own_steps().last().unwrap().step
-    }
-
-    fn stroke(d: &Document, id: NodeId) -> f64 {
-        match d.object(id).unwrap() {
-            crate::ObjectSnapshot::Primitive(p) => p.style.stroke.width.as_mm(),
-            crate::ObjectSnapshot::Path(p) => p.style.stroke.width.as_mm(),
-        }
-    }
-
-    #[test]
-    fn going_to_a_version_writes_one_step_and_an_equal_object_writes_none() {
-        let d = Document::new(1);
-        let r = rect(&d);
-        let s1 = width(&d, r, 1.0);
-        width(&d, r, 3.0);
-        let steps = d.own_step_count();
-        let report = d.go_to_version(r, s1, None, false).unwrap();
-        assert!(report.step.is_some());
-        assert!(!report.continued);
-        assert!((stroke(&d, r) - 1.0).abs() < 1e-9);
-        assert_eq!(d.own_step_count(), steps + 1);
-        let again = d.go_to_version(r, s1, None, false).unwrap();
-        assert_eq!(again.step, None, "nothing written");
-        assert_eq!(d.own_step_count(), steps + 1);
-    }
-
-    #[test]
-    fn further_presses_of_an_exploration_are_one_step_that_undo_takes_back_whole() {
-        let d = Document::new(1);
-        let r = rect(&d);
-        let s = [1.0, 2.0, 3.0, 4.0].map(|mm| width(&d, r, mm));
-        let before = d.export_json().unwrap();
-        let rows = d.history_len();
-        let first = d.go_to_version(r, s[0], None, true).unwrap();
-        for version in [s[1], s[2], s[0], s[1]] {
-            let report = d.go_to_version(r, version, None, true).unwrap();
-            assert!(report.continued);
-            assert_eq!(report.step, first.step);
-        }
-        assert!((stroke(&d, r) - 2.0).abs() < 1e-9);
-        assert_eq!(d.history_len(), rows + 1, "one row");
-        let row = d.history_page(0, 1).pop().unwrap();
-        assert_eq!(row.label, "go_to_version");
-        assert_eq!(
-            row.version.map(|v| v.step),
-            Some(s[1]),
-            "names the latest version"
-        );
-        d.undo_step(first.step.unwrap()).unwrap();
-        assert_eq!(
-            d.export_json().unwrap(),
-            before,
-            "back before the first press"
-        );
-    }
-
-    #[test]
-    fn without_explore_or_after_another_edit_a_press_starts_a_new_step() {
-        let d = Document::new(1);
-        let r = rect(&d);
-        let s1 = width(&d, r, 1.0);
-        let s2 = width(&d, r, 2.0);
-        let first = d.go_to_version(r, s1, None, true).unwrap();
-        let second = d.go_to_version(r, s2, None, false).unwrap();
-        assert_ne!(first.step, second.step);
-        d.translate_objects(&[r], crate::Vec2::new(1.0, 0.0))
-            .unwrap();
-        let third = d.go_to_version(r, s1, None, true).unwrap();
-        assert!(!third.continued);
     }
 }

@@ -53,14 +53,6 @@ fn doc_json(s: &Session) -> Vec<u8> {
 }
 
 #[test]
-fn c14_the_mode_starts_at_preview_and_stays_where_it_is_put() {
-    let mut s = widths();
-    assert!(!s.history_live());
-    s.set_history_live(true);
-    assert!(s.history_live());
-}
-
-#[test]
 fn c17_c20_an_object_preview_draws_the_version_and_writes_nothing() {
     let mut s = widths();
     let before = doc_json(&s);
@@ -71,9 +63,10 @@ fn c17_c20_an_object_preview_draws_the_version_and_writes_nothing() {
     let shown = preview(&mut s);
     assert_eq!(shown["kind"], "object");
     assert_eq!(shown["since"], 0);
-    assert!(
-        s.frame_draw_list().triangle_count() > plain,
-        "ghost and outline drawn"
+    assert_ne!(
+        s.frame_draw_list().triangle_count(),
+        plain,
+        "the version is drawn in place of the object"
     );
     assert_eq!(doc_json(&s), before, "the document did not change");
     assert_eq!(s.history_len(), rows, "no step");
@@ -96,13 +89,9 @@ fn c18_a_press_on_the_canvas_ends_the_preview_and_does_nothing_else() {
 }
 
 #[test]
-fn c18_the_row_of_the_current_version_selecting_another_object_and_live_end_it() {
+fn c18_the_row_of_the_current_version_and_selecting_another_object_end_it() {
     let mut s = widths();
     assert_eq!(s.preview_history_item(true, 0), HistoryRowPress::Ended);
-    assert_eq!(s.preview_history_item(true, 2), HistoryRowPress::Previewed);
-    s.set_history_live(true);
-    assert_eq!(preview(&mut s)["kind"], "");
-    s.set_history_live(false);
     assert_eq!(s.preview_history_item(true, 2), HistoryRowPress::Previewed);
     draw_rect(&mut s, 200.0);
     assert_eq!(preview(&mut s)["kind"], "", "another object is selected");

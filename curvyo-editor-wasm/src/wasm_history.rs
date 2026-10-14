@@ -119,17 +119,6 @@ impl WasmSession {
         self.session.toggle_history_item(object, index as usize)
     }
 
-    /// The Mode switch of the Object scope: `true` for Live (`specs/0042-history-branches`).
-    pub fn set_history_live(&mut self, live: bool) {
-        self.session.set_history_live(live);
-    }
-
-    /// Whether the Mode switch stands at Live.
-    #[must_use]
-    pub fn history_live(&self) -> bool {
-        self.session.history_live()
-    }
-
     /// Whether a press on item `index` needs the long-operation state first.
     pub fn history_item_is_far(&mut self, object: bool, index: u32) -> bool {
         self.session.history_item_is_far(object, index as usize)
@@ -148,18 +137,6 @@ impl WasmSession {
         .to_owned()
     }
 
-    /// A press, Enter or Space on item `index` of the Object scope in Live mode, as JSON:
-    /// `{"kind": "went" | "same" | "ignored" | "none", "notice"}`.
-    pub fn history_go_to_item(&mut self, index: u32) -> String {
-        let (kind, notice) = match self.session.go_to_history_item(index as usize) {
-            crate::GoToOutcome::Ignored => ("ignored", String::new()),
-            crate::GoToOutcome::NotARow => ("none", String::new()),
-            crate::GoToOutcome::Same => ("same", String::new()),
-            crate::GoToOutcome::Went(notice) => ("went", notice),
-        };
-        serde_json::json!({"kind": kind, "notice": notice}).to_string()
-    }
-
     /// Clone on item `index` (`touched`: which object of a Document-scope row); returns the
     /// notice, empty when the press was ignored or refused.
     pub fn history_clone_item(&mut self, object: bool, index: u32, touched: u32) -> String {
@@ -172,19 +149,23 @@ impl WasmSession {
         }
     }
 
-    /// Whether Restore previous state is offered: an exploration lasts.
-    pub fn history_exploring(&mut self) -> bool {
-        self.session.history_exploring()
+    /// Enter or a double-click on item `index`: applies its version, as JSON
+    /// `{"kind": "went" | "same" | "ignored" | "none", "notice"}` (`specs/0042-history-branches`
+    /// criterion 10).
+    pub fn history_apply_item(&mut self, object: bool, index: u32) -> String {
+        let (kind, notice) = match self.session.apply_history_item(object, index as usize) {
+            crate::GoToOutcome::Ignored => ("ignored", String::new()),
+            crate::GoToOutcome::NotARow => ("none", String::new()),
+            crate::GoToOutcome::Same => ("same", String::new()),
+            crate::GoToOutcome::Went(notice) => ("went", notice),
+        };
+        serde_json::json!({"kind": kind, "notice": notice}).to_string()
     }
 
-    /// Restore previous state; returns the notice, empty when nothing was restored.
-    pub fn history_restore_exploration(&mut self) -> String {
-        self.session.restore_exploration().unwrap_or_default()
-    }
-
-    /// A change of tab ends the exploration.
-    pub fn history_end_exploration(&mut self) {
-        self.session.end_exploration();
+    /// Whether applying item `index` needs the long-operation state first.
+    pub fn history_apply_needs_busy_state(&mut self, object: bool, index: u32) -> bool {
+        self.session
+            .history_apply_needs_busy_state(object, index as usize)
     }
 
     /// Ends the preview.

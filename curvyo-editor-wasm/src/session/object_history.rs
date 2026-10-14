@@ -124,6 +124,7 @@ impl Session {
         if self.operation_in_flight() || self.select.has_entry() || self.document_preview_active() {
             return nothing("");
         }
+        self.end_object_preview();
         if self.pen_path_open() {
             return nothing(FINISH_PEN_FIRST);
         }

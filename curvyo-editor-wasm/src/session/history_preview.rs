@@ -1,9 +1,7 @@
 //! `Session`'s preview of a version from the History list: a press on a row in Preview mode reads
 //! the version as plain copies and the canvas draws them; nothing is written, replicated or saved
 //! (`specs/0042-history-branches` criteria 14 and 16 to 21).
-
-use curvyo_document_core::{HistoricalDocument, NodeId, ObjectSnapshot, StepRef, ViewTransform};
-use curvyo_render_core::{DrawList, build_history_preview};
+use curvyo_document_core::{HistoricalDocument, NodeId, ObjectSnapshot, StepRef};
 use curvyo_ui_core::HistoryItem;
 use serde_json::{Value, json};
 
@@ -28,8 +26,6 @@ struct Shown {
 /// The preview state of a session. View state: never saved.
 #[derive(Debug, Default)]
 pub(super) struct PreviewState {
-    /// The Mode switch: Live instead of Preview (criterion 14). Kept for the session.
-    pub(super) live: bool,
     shown: Option<Shown>,
 }
 
@@ -47,20 +43,6 @@ pub enum HistoryRowPress {
 }
 
 impl Session {
-    /// The Mode switch of the Object scope: `true` for Live.
-    pub fn set_history_live(&mut self, live: bool) {
-        self.history.preview.live = live;
-        if live {
-            self.end_history_preview();
-        }
-    }
-
-    /// Whether the Mode switch stands at Live.
-    #[must_use]
-    pub fn history_live(&self) -> bool {
-        self.history.preview.live
-    }
-
     /// Whether a press on item `index` reads a version far enough back that the long-operation
     /// state shows first (criterion 21).
     pub fn history_item_is_far(&mut self, object: bool, index: usize) -> bool {
@@ -130,9 +112,6 @@ impl Session {
     /// "id", "name", "author", "time", "since"}`, or `{"kind": ""}` without one. An Object-scope
     /// preview ends here once its object is no longer the one selected (criterion 18).
     pub fn history_preview_json(&mut self) -> String {
-        // Read on every change of the session: another selection ends an exploration here too
-        // (criterion 13).
-        self.history_exploring();
         if self
             .history
             .preview
@@ -188,14 +167,23 @@ impl Session {
         shown.subject.is_none().then_some(&shown.version)
     }
 
-    /// An Object-scope preview over the selected object: the version's ghost and its blue outline
-    /// (criterion 17); empty without one.
-    pub(super) fn object_preview_list(&self, view: ViewTransform) -> DrawList {
-        match self.history.preview.shown.as_ref() {
-            Some(shown) if shown.subject.is_some() && shown.subject == self.history_object() => {
-                build_history_preview(&shown.version.objects, view)
-            }
-            _ => DrawList::default(),
+    /// The version an Object-scope preview draws in place of the selected object (criterion 17).
+    pub(super) fn object_preview(&self) -> Option<(NodeId, &HistoricalDocument)> {
+        let shown = self.history.preview.shown.as_ref()?;
+        let subject = shown.subject?;
+        (Some(subject) == self.history_object()).then_some((subject, &shown.version))
+    }
+
+    /// An edit, an undo or a redo ends an Object-scope preview first (criterion 18).
+    pub(super) fn end_object_preview(&mut self) {
+        if self
+            .history
+            .preview
+            .shown
+            .as_ref()
+            .is_some_and(|shown| shown.subject.is_some())
+        {
+            self.end_history_preview();
         }
     }
 

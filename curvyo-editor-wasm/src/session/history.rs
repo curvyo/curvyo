@@ -55,8 +55,6 @@ pub(super) struct HistoryState {
     pub(super) list: super::history_list::ListState,
     /// The Mode switch and the version a preview shows (`history_preview.rs`).
     pub(super) preview: super::history_preview::PreviewState,
-    /// The go-to step the maker is exploring in (`history_version.rs`).
-    pub(super) version: super::history_version::VersionState,
 }
 
 impl HistoryState {
@@ -68,7 +66,6 @@ impl HistoryState {
             notice: None,
             list: super::history_list::ListState::default(),
             preview: super::history_preview::PreviewState::default(),
-            version: super::history_version::VersionState::default(),
         }
     }
 }
@@ -107,6 +104,8 @@ impl Session {
         let before = self.selection_snapshot();
         self.document.set_step_time((self.history.clock)());
         let result = body(self);
+        // An edit ends an object preview; the object is drawn as it now is (`0042` criterion 18).
+        self.end_object_preview();
         self.record_new_steps(&before);
         // An entered group the step removed is left now, and a screen reader is told (`0023`
         // criterion 20).
@@ -247,6 +246,8 @@ impl Session {
                 changed: false,
             };
         }
+        // An undo or redo ends an object preview first (`0042` criterion 18).
+        self.end_object_preview();
         if self.pen_path_open() {
             return HistoryResult {
                 notice: FINISH_PEN_FIRST.to_owned(),

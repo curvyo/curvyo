@@ -152,7 +152,7 @@ pub struct DocumentVersion(pub(crate) loro::Frontiers);
 pub const CURRENT_FORMAT_VERSION: u32 = 12;
 
 pub(crate) const ROOT_MAP: &str = "root";
-const KEY_FORMAT_VERSION: &str = "format_version";
+pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";
 pub(crate) const KEY_WIDTH_MM: &str = "size_width_mm";
 pub(crate) const KEY_HEIGHT_MM: &str = "size_height_mm";
 /// The root register holding the display unit's symbol. Added without a

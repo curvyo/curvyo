@@ -41,7 +41,7 @@ fn merge(a: &Document, b: &Document) {
 }
 
 #[test]
-fn c15_going_back_over_a_peers_later_steps_writes_them_anyway_and_counts_them() {
+fn c15_applying_over_a_peers_later_steps_writes_them_anyway_and_counts_them() {
     let a = Document::new(1);
     let r = rect(&a);
     let s1 = width(&a, r, 1.0);
@@ -49,19 +49,103 @@ fn c15_going_back_over_a_peers_later_steps_writes_them_anyway_and_counts_them() 
     width(&b, r, 5.0);
     width(&b, r, 6.0);
     merge(&a, &b);
-    let report = a.go_to_version(r, s1, None, false).unwrap();
+    let report = a.go_to_version(s1, Some(r), None).unwrap();
     assert!(report.step.is_some());
     assert_eq!(report.others_reverted, 2);
     assert_eq!(stroke(&a, r), 1.0);
+    let document = a.go_to_version(s1, None, None).unwrap();
+    assert_eq!(document.step, None, "the document already matches");
 }
 
 #[test]
-fn c1_c10_a_new_step_after_undoing_a_go_to_forks_like_any_step() {
+fn c10_an_object_apply_is_one_step_that_ctrl_z_takes_back() {
+    let d = Document::new(1);
+    let r = rect(&d);
+    let s1 = width(&d, r, 1.0);
+    for mm in [2.0, 3.0, 4.0] {
+        width(&d, r, mm);
+    }
+    let at_s4 = d.export_json().unwrap();
+    let steps = d.own_step_count();
+    let applied = d.go_to_version(s1, Some(r), None).unwrap().step.unwrap();
+    assert_eq!(stroke(&d, r), 1.0, "s1's state");
+    assert_eq!(d.own_step_count(), steps + 1);
+    d.undo_step(applied).unwrap();
+    assert_eq!(d.export_json().unwrap(), at_s4, "s4's state again");
+}
+
+#[test]
+fn c10_an_object_apply_touches_no_other_object() {
+    let d = Document::new(1);
+    let r = rect(&d);
+    let other = rect(&d);
+    let s1 = width(&d, r, 1.0);
+    width(&d, r, 2.0);
+    width(&d, other, 9.0);
+    d.go_to_version(s1, Some(r), None).unwrap();
+    assert_eq!(stroke(&d, r), 1.0);
+    assert_eq!(stroke(&d, other), 9.0);
+}
+
+#[test]
+fn c10_a_document_apply_removes_drawn_objects_and_revives_deleted_ones_with_their_id() {
+    let d = Document::new(1);
+    let a = rect(&d);
+    let v = width(&d, a, 1.0);
+    let at_v = d.export_json().unwrap();
+    let drawn = rect(&d);
+    width(&d, a, 3.0);
+    d.delete_objects(&[a]).unwrap();
+    let report = d.go_to_version(v, None, None).unwrap();
+    let step = report.step.unwrap();
+    assert!(d.object(drawn).is_none(), "the drawn object is removed");
+    assert_eq!(stroke(&d, a), 1.0, "the deleted object is back with its id");
+    assert_eq!(d.export_json().unwrap(), at_v);
+    d.undo_step(step).unwrap();
+    assert!(d.object(a).is_none());
+    assert!(d.object(drawn).is_some());
+}
+
+#[test]
+fn c10_a_document_apply_puts_groups_order_and_settings_back() {
+    let d = Document::new(1);
+    let a = rect(&d);
+    let b = rect(&d);
+    let v = width(&d, a, 1.0);
+    let at_v = d.export_json().unwrap();
+    d.group_objects(&[a, b]).unwrap();
+    d.resize(curvyo_document_core::DocumentSize::new(
+        Length::from_mm(300.0),
+        Length::from_mm(200.0),
+    ))
+    .unwrap();
+    d.go_to_version(v, None, None).unwrap();
+    assert_eq!(d.export_json().unwrap(), at_v, "no group, the old page");
+}
+
+#[test]
+fn c10_every_apply_is_its_own_step_and_an_equal_version_writes_nothing() {
+    let d = Document::new(1);
+    let r = rect(&d);
+    let s1 = width(&d, r, 1.0);
+    let s2 = width(&d, r, 2.0);
+    width(&d, r, 3.0);
+    let rows = d.history_len();
+    d.go_to_version(s1, Some(r), None).unwrap();
+    d.go_to_version(s2, Some(r), None).unwrap();
+    d.go_to_version(s1, Some(r), None).unwrap();
+    assert_eq!(d.history_len(), rows + 3, "three applies, three rows");
+    assert_eq!(d.go_to_version(s1, Some(r), None).unwrap().step, None);
+    assert_eq!(d.history_len(), rows + 3);
+}
+
+#[test]
+fn c1_c10_a_new_step_after_undoing_an_apply_forks_like_any_step() {
     let d = Document::new(1);
     let r = rect(&d);
     let s1 = width(&d, r, 1.0);
     width(&d, r, 2.0);
-    let go = d.go_to_version(r, s1, None, false).unwrap().step.unwrap();
+    let go = d.go_to_version(s1, Some(r), None).unwrap().step.unwrap();
     d.undo_step(go).unwrap();
     width(&d, r, 7.0);
     let branches = d.object_history_branches(r);
@@ -73,16 +157,20 @@ fn c1_c10_a_new_step_after_undoing_a_go_to_forks_like_any_step() {
 }
 
 #[test]
-fn c31_c33_a_go_to_is_a_header_and_saves_like_any_step() {
+fn c31_c33_an_apply_is_a_header_and_saves_like_any_step() {
     let d = Document::new(1);
     let r = rect(&d);
     let s1 = width(&d, r, 1.0);
     width(&d, r, 2.0);
-    d.go_to_version(r, s1, None, false).unwrap();
+    d.go_to_version(s1, Some(r), None).unwrap();
+    width(&d, r, 5.0);
+    d.go_to_version(s1, None, None).unwrap();
     let reopened = unpack(3, &pack(&d, "t").unwrap()).unwrap();
-    let row = reopened.history_page(0, 1).pop().unwrap();
-    assert_eq!(row.label, "go_to_version");
-    assert_eq!(row.version.unwrap().step, s1);
+    let rows = reopened.history_page(0, 3);
+    for row in [&rows[0], &rows[2]] {
+        assert_eq!(row.label, "go_to_version");
+        assert_eq!(row.version.as_ref().unwrap().step, s1);
+    }
     assert_eq!(reopened.export_json().unwrap(), d.export_json().unwrap());
 }
 

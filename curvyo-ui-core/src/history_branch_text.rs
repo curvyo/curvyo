@@ -1,6 +1,6 @@
 //! The words of branches and versions in the History list (`specs/0042-history-branches` criteria
-//! 3, 4, 8, 9, 12, 15 and 22): the header row, the "N more branches" row, the row status word, the
-//! lane part of a row's accessible name, and the notices of a go to, a restore and a clone.
+//! 3, 4, 8, 9, 10, 15 and 22): the header row, the "N more branches" row, the row status word, the
+//! lane part of a row's accessible name, and the notices of an apply and a clone.
 
 /// The semibold word that starts line 2 of a row on a branch (criterion 4).
 pub const BRANCH_STATUS_WORD: &str = "Branch";
@@ -32,21 +32,17 @@ pub fn branch_lane_name(fork: Option<&str>, step: usize, of: usize) -> String {
     format!("on branch from {}, step {step} of {of}", fork_name(fork))
 }
 
-/// The notice after a go to version (criteria 10 and 15): "Went to a1b2c3d.", plus the later
-/// steps of other authors it went back over.
+/// The notice after applying a version (criteria 10 and 15): "Went to a1b2c3d.", plus the later
+/// steps of other authors it went back over, "for this object" in the Object scope.
 #[must_use]
-pub fn went_to_notice(id: &str, others_reverted: usize) -> String {
+pub fn went_to_notice(id: &str, others_reverted: usize, object: bool) -> String {
+    let scope = if object { " for this object" } else { "" };
     match others_reverted {
         0 => format!("Went to {id}."),
-        1 => format!("Went to {id}. Earlier session's later step was reverted for this object."),
-        n => format!(
-            "Went to {id}. Earlier session's {n} later steps were reverted for this object."
-        ),
+        1 => format!("Went to {id}. Earlier session's later step was reverted{scope}."),
+        n => format!("Went to {id}. Earlier session's {n} later steps were reverted{scope}."),
     }
 }
-
-/// The notice after Restore previous state (criterion 12).
-pub const RESTORED_NOTICE: &str = "Object restored to the state before the first click.";
 
 /// The notice after a clone of a version (criterion 22).
 #[must_use]
@@ -76,10 +72,14 @@ mod tests {
 
     #[test]
     fn the_go_to_notice_names_the_later_steps_it_reverted() {
-        assert_eq!(went_to_notice("a1b2c3d", 0), "Went to a1b2c3d.");
+        assert_eq!(went_to_notice("a1b2c3d", 0, true), "Went to a1b2c3d.");
         assert_eq!(
-            went_to_notice("a1b2c3d", 2),
+            went_to_notice("a1b2c3d", 2, true),
             "Went to a1b2c3d. Earlier session's 2 later steps were reverted for this object."
+        );
+        assert_eq!(
+            went_to_notice("a1b2c3d", 2, false),
+            "Went to a1b2c3d. Earlier session's 2 later steps were reverted."
         );
         assert_eq!(
             cloned_notice("a1b2c3d"),

@@ -1,6 +1,6 @@
 //! Independent tester acceptance tests for `specs/0042-history-branches/specification.md`,
-//! document level: branches derived from the log (criteria 1 to 7, 28, 29), go to a version and
-//! its exploration (10, 11, 13, 15, 30), previews (17, 19, 20, 21, 30, 32), clones of any state
+//! document level: branches derived from the log (criteria 1 to 7, 28, 29), applying a version
+//! (10, 15, 30; criteria 11 to 13 withdrawn 2026-10-14), previews (17, 19, 20, 21, 30, 32), clones of any state
 //! (22 to 25, 31) and the file footprint (6, 33).
 //!
 //! Written from the specification and the public `Document` API before the implementation diff was
@@ -487,7 +487,7 @@ fn c33_c6_the_format_version_is_unchanged_and_branches_add_no_data() {
     let _ = d.preview_document_at(sc.s[1]).unwrap();
     let _ = d.preview_object_at(sc.s[1], sc.a).unwrap();
     assert_eq!(d.version(), v0, "a preview writes no operation");
-    d.go_to_version(sc.a, sc.s[1], None, false).unwrap();
+    d.go_to_version(sc.s[1], Some(sc.a), None).unwrap();
     let packed = pack(d, "t").unwrap();
     assert_eq!(manifest_version(&packed), u64::from(CURRENT_FORMAT_VERSION));
     // Root keys of document.json are the same as before any of it.
@@ -576,8 +576,8 @@ fn c29_c30_every_replica_has_the_same_list_order_and_versions() {
     }
     // Go to of one row gives equal fields on both.
     let target = all_rows(&a).iter().rev().nth(2).unwrap().step;
-    a.go_to_version(o1, target, None, false).unwrap();
-    b.go_to_version(o1, target, None, false).unwrap();
+    a.go_to_version(target, Some(o1), None).unwrap();
+    b.go_to_version(target, Some(o1), None).unwrap();
     assert_eq!(body(&a, o1), body(&b, o1));
     // Each row has the version right after the step: a preview of the newest step equals live.
     let newest = all_rows(&a)[0].step;
@@ -586,7 +586,7 @@ fn c29_c30_every_replica_has_the_same_list_order_and_versions() {
 }
 
 // ---------------------------------------------------------------------
-// Criteria 10, 11, 13, 15: go to a version
+// Criteria 10, 15: applying a version (11 to 13 withdrawn, customer feedback 2026-10-14)
 // ---------------------------------------------------------------------
 
 #[test]
@@ -594,8 +594,8 @@ fn c10_go_to_sets_the_fields_in_one_new_step_main_line_and_branch() {
     let sc = scene();
     let d = &sc.d;
     let rows_before = d.history_len();
-    let r = d.go_to_version(sc.a, sc.s[1], None, false).unwrap();
-    assert!(r.step.is_some() && !r.continued);
+    let r = d.go_to_version(sc.s[1], Some(sc.a), None).unwrap();
+    assert!(r.step.is_some());
     assert_eq!(body(d, sc.a), sc.bodies[1]);
     assert_eq!(d.history_len(), rows_before + 1, "exactly one new step");
     let top = &all_rows(d)[0];
@@ -613,7 +613,7 @@ fn c10_go_to_sets_the_fields_in_one_new_step_main_line_and_branch() {
     // Same values: nothing is written.
     let n = d.history_len();
     let v = d.version();
-    let again = d.go_to_version(sc.a, sc.s[1], None, false).unwrap();
+    let again = d.go_to_version(sc.s[1], Some(sc.a), None).unwrap();
     assert_eq!(again.step, None);
     assert_eq!(d.history_len(), n);
     assert_eq!(d.version(), v, "nothing written");
@@ -630,7 +630,7 @@ fn c10_go_to_a_version_on_a_branch_and_the_next_step_forks() {
     d.undo_step(sc.s[2]).unwrap();
     set_width(d, sc.a, 7.0);
     // s2 is on a branch: go to it.
-    let r = d.go_to_version(sc.a, sc.s[2], None, false).unwrap();
+    let r = d.go_to_version(sc.s[2], Some(sc.a), None).unwrap();
     assert_eq!(body(d, sc.a), sc.bodies[2], "the state right after s2");
     let go = r.step.unwrap();
     // Take the go-to back and do something else: the go-to is a branch, like any step.
@@ -646,103 +646,14 @@ fn c10_go_to_a_version_that_does_not_exist_or_an_object_that_is_gone_is_refused(
     let bogus = StepRef::new(999, 12345);
     let v = d.version();
     assert_eq!(
-        d.go_to_version(sc.a, bogus, None, false).unwrap_err(),
+        d.go_to_version(bogus, Some(sc.a), None).unwrap_err(),
         HistoryError::NoSuchStep
     );
     assert_eq!(d.version(), v);
     d.delete_objects(&[sc.a]).unwrap();
     let v = d.version();
-    assert!(d.go_to_version(sc.a, sc.s[1], None, false).is_err());
+    assert!(d.go_to_version(sc.s[1], Some(sc.a), None).is_err());
     assert_eq!(d.version(), v, "nothing written on a refusal");
-}
-
-#[test]
-fn c11_five_presses_are_one_step_and_one_row_and_ctrl_z_restores_the_state_before_the_first() {
-    let sc = scene();
-    let d = &sc.d;
-    let before = body(d, sc.a);
-    let before_json = json(d);
-    let n = d.history_len();
-    let own = d.own_steps().len();
-    let order = [1, 2, 0, 2, 1];
-    let mut first_step = None;
-    for (k, i) in order.iter().enumerate() {
-        let r = d.go_to_version(sc.a, sc.s[*i], None, k > 0).unwrap();
-        if k == 0 {
-            first_step = r.step;
-            assert!(!r.continued);
-        } else {
-            assert!(r.continued, "press {k} continues the exploration");
-        }
-        assert_eq!(body(d, sc.a), sc.bodies[*i]);
-    }
-    assert_eq!(d.history_len(), n + 1, "the list shows one row");
-    let top = &all_rows(d)[0];
-    assert_eq!(top.label, LABEL_GO_TO_VERSION);
-    assert_eq!(
-        top.version.as_ref().unwrap().step,
-        sc.s[1],
-        "named after the latest version"
-    );
-    assert_eq!(d.own_steps().len(), own + 1, "the stack gets one entry");
-    let step = first_step.unwrap();
-    d.undo_step(step).unwrap();
-    assert_eq!(body(d, sc.a), before);
-    assert_eq!(
-        json(d),
-        before_json,
-        "document.json equal to before the first press"
-    );
-}
-
-#[test]
-fn c11_a_press_with_the_same_values_in_the_middle_does_not_break_the_exploration() {
-    let sc = scene();
-    let d = &sc.d;
-    let n = d.history_len();
-    let r = d.go_to_version(sc.a, sc.s[1], None, false).unwrap();
-    let same = d.go_to_version(sc.a, sc.s[1], None, true).unwrap();
-    assert_eq!(same.step, None);
-    d.go_to_version(sc.a, sc.s[2], None, true).unwrap();
-    assert_eq!(d.history_len(), n + 1);
-    d.undo_step(r.step.unwrap()).unwrap();
-    assert_eq!(body(d, sc.a), sc.bodies[3]);
-}
-
-#[test]
-fn c13_c31_another_edit_ends_the_exploration() {
-    let sc = scene();
-    let d = &sc.d;
-    let first = d.go_to_version(sc.a, sc.s[1], None, false).unwrap();
-    let n = d.history_len();
-    mv(d, &[sc.a], 20.0);
-    let n_after_edit = d.history_len();
-    assert_eq!(n_after_edit, n + 1);
-    // A further go to, even asked as exploring, is a new step: the document version moved on.
-    let second = d.go_to_version(sc.a, sc.s[2], None, true).unwrap();
-    assert!(!second.continued, "an edit in between ends the exploration");
-    assert_eq!(d.history_len(), n_after_edit + 1);
-    assert_ne!(first.step, second.step);
-}
-
-#[test]
-fn c13_exploring_press_on_another_object_is_its_own_step() {
-    let d = Document::new(1);
-    let a = rect(&d, 0.0);
-    let b = rect(&d, 40.0);
-    mv(&d, &[a], 1.0);
-    let sa1 = last_step(&d);
-    mv(&d, &[b], 1.0);
-    let sb1 = last_step(&d);
-    set_width(&d, a, 3.0);
-    set_width(&d, b, 3.0);
-    let first = d.go_to_version(a, sa1, None, false).unwrap();
-    let other = d.go_to_version(b, sb1, None, true).unwrap();
-    assert!(
-        !other.continued,
-        "another object cannot continue the exploration of the first"
-    );
-    assert_ne!(first.step, other.step);
 }
 
 #[test]
@@ -757,7 +668,7 @@ fn c15_go_to_writes_over_another_peers_later_steps_and_counts_them() {
     mv(&b, &[o], 5.0);
     merge(&a, &b);
     assert_ne!(body(&a, o), state1);
-    let r = a.go_to_version(o, s1, None, false).unwrap();
+    let r = a.go_to_version(s1, Some(o), None).unwrap();
     assert_eq!(r.others_reverted, 2, "two later steps by the other peer");
     assert_eq!(body(&a, o), state1, "written anyway");
     // Own later steps are not counted.
@@ -766,7 +677,7 @@ fn c15_go_to_writes_over_another_peers_later_steps_and_counts_them() {
     mv(&c, &[oc], 1.0);
     let c1 = last_step(&c);
     set_width(&c, oc, 3.0);
-    let r = c.go_to_version(oc, c1, None, false).unwrap();
+    let r = c.go_to_version(c1, Some(oc), None).unwrap();
     assert_eq!(r.others_reverted, 0);
 }
 
@@ -817,7 +728,7 @@ fn c17_preview_at_every_row_matches_the_state_at_that_row() {
         };
         let probe = {
             // Put the live object there and compare the body text.
-            let r = d.go_to_version(sc.a, sc.s[i], None, false).unwrap();
+            let r = d.go_to_version(sc.s[i], Some(sc.a), None).unwrap();
             let b = body(d, sc.a);
             if let Some(s) = r.step {
                 d.undo_step(s).unwrap();
@@ -1291,7 +1202,7 @@ fn c27_rows_and_versions_use_the_shown_step_id() {
                 .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit())
         );
     }
-    d.go_to_version(sc.a, sc.s[1], None, false).unwrap();
+    d.go_to_version(sc.s[1], Some(sc.a), None).unwrap();
     let go = &all_rows(d)[0];
     assert_eq!(
         go.version.as_ref().unwrap().shown_id,
@@ -1378,7 +1289,7 @@ fn w_go_to_and_clone_work_for_a_path_and_a_clone_gets_fresh_anchor_ids() {
     let at1 = body(&d, p);
     assert_ne!(at0, at1);
     // Go to the first version: geometry is back exactly.
-    d.go_to_version(p, s0, None, false).unwrap();
+    d.go_to_version(s0, Some(p), None).unwrap();
     assert_eq!(body(&d, p), at0);
     // Clone of the moved version has the moved geometry and its own anchor ids.
     let mut mint = minter();
@@ -1453,7 +1364,7 @@ fn w_go_to_keeps_the_lineage_of_a_clone() {
     mv(d, &[c], 5.0);
     let before_rows = object_rows(d, c).len();
     // Go to an inherited row of the original (source = the original).
-    let r = d.go_to_version(c, sc.s[1], Some(sc.a), false).unwrap();
+    let r = d.go_to_version(sc.s[1], Some(c), Some(sc.a)).unwrap();
     assert!(r.step.is_some());
     assert_eq!(body(d, c), sc.bodies[1]);
     let rows = object_rows(d, c);
@@ -1474,7 +1385,7 @@ fn w_after_a_document_wipe_old_versions_are_gone_and_nothing_breaks() {
         let p = d.preview_document_at(*s);
         assert!(p.is_err(), "a wiped step cannot be previewed: {p:?}");
         assert!(d.preview_object_at(*s, sc.a).is_err());
-        assert!(d.go_to_version(sc.a, *s, None, false).is_err());
+        assert!(d.go_to_version(*s, Some(sc.a), None).is_err());
         assert!(d.clone_version(sc.a, *s, &mut minter()).is_err());
     }
     mv(&d, &[sc.a], 1.0);
@@ -1500,7 +1411,7 @@ fn w_a_preview_at_an_undone_row_still_shows_the_state_right_after_that_step() {
     // The live object is at s2's state; going to the undone version writes the step and changes it.
     assert_eq!(body(d, sc.a), sc.bodies[2]);
     assert!(
-        d.go_to_version(sc.a, sc.s[3], None, false)
+        d.go_to_version(sc.s[3], Some(sc.a), None)
             .unwrap()
             .step
             .is_some()
@@ -1540,19 +1451,21 @@ fn w_a_concurrent_step_of_a_peer_is_not_in_the_version_of_my_step() {
 }
 
 #[test]
-fn w_two_hundred_exploring_presses_stay_one_step_and_fast() {
+fn w_two_hundred_applies_are_two_hundred_steps_and_fast() {
+    // Since the customer feedback of 2026-10-14 every apply is its own step (criterion 10).
     let sc = scene();
     let d = &sc.d;
     let n = d.history_len();
     let t = Instant::now();
     for k in 0..200 {
         let v = sc.s[1 + k % 3];
-        d.go_to_version(sc.a, v, None, k > 0).unwrap();
+        d.go_to_version(v, Some(sc.a), None).unwrap();
     }
     assert!(t.elapsed().as_secs() < if cfg!(debug_assertions) { 20 } else { 4 });
-    assert_eq!(d.history_len(), n + 1);
+    assert_eq!(d.history_len(), n + 200);
     d.undo_step(last_step(d)).unwrap();
-    assert_eq!(body(d, sc.a), sc.bodies[3]);
+    // The 199th apply (k = 198) went to s1 + 198 % 3 = s1.
+    assert_eq!(body(d, sc.a), sc.bodies[1]);
 }
 
 #[test]
@@ -1566,7 +1479,7 @@ fn w_branch_derivation_survives_hostile_sequences() {
     d.redo_step(sc.s[1]).unwrap();
     set_width(d, sc.a, 2.0);
     let s5 = last_step(d);
-    d.go_to_version(sc.a, sc.s[3], None, false).unwrap();
+    d.go_to_version(sc.s[3], Some(sc.a), None).unwrap();
     let go = last_step(d);
     let c = d.clone_version(sc.a, sc.s[2], &mut minter()).unwrap();
     let cs = last_step(d);

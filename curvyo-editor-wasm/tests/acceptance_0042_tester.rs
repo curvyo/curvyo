@@ -1,7 +1,8 @@
 //! Independent tester acceptance tests for `specs/0042-history-branches/specification.md`, session
 //! level: forks and redo with the keys (criteria 1 to 4), the list items, lanes and folding (3, 4,
-//! 8, 9), Live mode with exploration and Restore (10 to 14, 16), previews of an object and of the
-//! document with their gates (14, 16 to 21), clones (22 to 26) and Save/Open.
+//! 8, 9), applying a version (10, 16; criteria 11 to 13 and the Mode switch withdrawn by the
+//! customer feedback of 2026-10-14), previews of an object and of the document with their gates
+//! (14, 16 to 21), clones (22 to 26) and Save/Open.
 //!
 //! Written from the specification and the public `Session` seam before the implementation diff was
 //! read. Everything goes through `Session`; documents are compared through the `document.json`
@@ -433,8 +434,7 @@ fn c8_header_rows_are_list_items_the_press_on_a_row_ignores() {
     assert_eq!(l.s.preview_history_item(false, h), HistoryRowPress::NotARow);
     assert!(!l.document_preview_active());
     assert_eq!(l.s.clone_history_item(false, h, 0), CloneOutcome::Refused);
-    l.s.set_history_live(true);
-    assert_eq!(l.s.go_to_history_item(h), GoToOutcome::NotARow);
+    assert_eq!(l.s.apply_history_item(true, h), GoToOutcome::NotARow);
 }
 
 trait LabExt {
@@ -447,23 +447,11 @@ impl LabExt for Lab {
 }
 
 // ---------------------------------------------------------------------
-// Criteria 10 to 14, 16: Live, exploration, Restore
+// Criteria 10, 16: applying a version (11 to 13 withdrawn, customer feedback 2026-10-14)
 // ---------------------------------------------------------------------
 
 #[test]
-fn c14_the_default_is_preview_and_the_position_is_kept() {
-    let mut s = fresh();
-    assert!(!s.history_live());
-    s.set_history_live(true);
-    assert!(s.history_live());
-    click(&mut s, pt(500.0, 500.0));
-    assert!(s.history_live(), "kept for the session");
-    s.set_history_live(false);
-    assert!(!s.history_live());
-}
-
-#[test]
-fn c10_live_press_goes_to_the_version_as_one_step_and_ctrl_z_takes_it_back() {
+fn c10_enter_applies_the_version_as_one_step_and_ctrl_z_takes_it_back() {
     let mut l = Lab::new();
     let s1 = l.step();
     let at_s1 = json(&l.s);
@@ -471,11 +459,10 @@ fn c10_live_press_goes_to_the_version_as_one_step_and_ctrl_z_takes_it_back() {
     let _s3 = l.step();
     let at_s3 = json(&l.s);
     l.select();
-    l.s.set_history_live(true);
     let undo_before = l.s.undo_len();
     let i1 = item_of(&mut l.s, true, &s1);
     let id1 = shown_id(&mut l.s, true, &s1);
-    let GoToOutcome::Went(notice) = l.s.go_to_history_item(i1) else {
+    let GoToOutcome::Went(notice) = l.s.apply_history_item(true, i1) else {
         panic!("went")
     };
     assert_eq!(notice, format!("Went to {id1}."));
@@ -490,7 +477,7 @@ fn c10_live_press_goes_to_the_version_as_one_step_and_ctrl_z_takes_it_back() {
     // Pressing the row of the version it already has writes nothing.
     let n = l.s.history_len();
     let i1 = item_of(&mut l.s, true, &s1);
-    assert_eq!(l.s.go_to_history_item(i1), GoToOutcome::Same);
+    assert_eq!(l.s.apply_history_item(true, i1), GoToOutcome::Same);
     assert_eq!(l.s.history_len(), n);
     // Going to a version and then Ctrl+Z restores the state from before.
     let (out, _) = ctrl_z(&mut l.s);
@@ -499,144 +486,6 @@ fn c10_live_press_goes_to_the_version_as_one_step_and_ctrl_z_takes_it_back() {
     // And Ctrl+Shift+Z brings the go-to back.
     ctrl_shift_z(&mut l.s);
     assert_eq!(json(&l.s), at_s1);
-}
-
-#[test]
-fn c11_c12_exploring_is_one_stack_entry_and_restore_puts_everything_back() {
-    let mut l = Lab::new();
-    let s1 = l.step();
-    let s2 = l.step();
-    let s3 = l.step();
-    l.select();
-    let before = json(&l.s);
-    let undo_before = l.s.undo_len();
-    let rows_before = obj_rows(&mut l.s).len();
-    l.s.set_history_live(true);
-    assert!(!l.s.history_exploring());
-    for step in [&s1, &s2, &s1, &s3, &s2] {
-        let i = item_of(&mut l.s, true, step);
-        let GoToOutcome::Went(_) = l.s.go_to_history_item(i) else {
-            panic!("went")
-        };
-    }
-    assert!(l.s.history_exploring());
-    assert_eq!(
-        l.s.undo_len(),
-        undo_before + 1,
-        "one stack entry for five presses"
-    );
-    let rows = obj_rows(&mut l.s);
-    assert_eq!(rows.len(), rows_before + 1, "one list row");
-    assert!(
-        rows[0]["name"]
-            .as_str()
-            .unwrap()
-            .starts_with("Go to version")
-    );
-    // The exploration row names the latest version.
-    let id2 = shown_id(&mut l.s, true, &s2);
-    assert!(
-        rows[0]["name"].as_str().unwrap().ends_with(&id2),
-        "{}",
-        rows[0]["name"]
-    );
-    // Restore previous state.
-    let notice = l.s.restore_exploration().expect("a restore");
-    assert_eq!(
-        notice,
-        "Object restored to the state before the first click."
-    );
-    assert_eq!(
-        json(&l.s),
-        before,
-        "document.json equal to before the first press"
-    );
-    assert!(!l.s.history_exploring());
-    let rows = obj_rows(&mut l.s);
-    assert_eq!(
-        rows[0]["status"], "undone",
-        "the exploration step is marked Undone"
-    );
-    assert!(
-        l.s.restore_exploration().is_none(),
-        "the button left the tree"
-    );
-}
-
-#[test]
-fn c12_restore_is_offered_only_while_the_exploration_step_is_on_top_and_the_object_selected() {
-    let mut l = Lab::new();
-    let s1 = l.step();
-    let _s2 = l.step();
-    l.select();
-    l.s.set_history_live(true);
-    let i = item_of(&mut l.s, true, &s1);
-    l.s.go_to_history_item(i);
-    assert!(l.s.history_exploring());
-    // Another object selected, or nothing: no exploration, no button.
-    click(&mut l.s, pt(900.0, 700.0));
-    assert!(!l.s.history_exploring());
-    assert!(l.s.restore_exploration().is_none());
-}
-
-#[test]
-fn c13_leaving_keeps_the_state_as_a_normal_step_that_ctrl_z_takes_back_as_a_whole() {
-    let mut l = Lab::new();
-    let s1 = l.step();
-    let s2 = l.step();
-    // A second object to select later.
-    drag(&mut l.s, Tool::Rectangle, pt(300.0, 20.0), pt(340.0, 60.0));
-    l.select();
-    let before = json(&l.s);
-    l.s.set_history_live(true);
-    for st in [&s1, &s2, &s1] {
-        let i = item_of(&mut l.s, true, st);
-        l.s.go_to_history_item(i);
-    }
-    assert!(l.s.history_exploring());
-    // Select the other object: the exploration is over.
-    click(&mut l.s, pt(310.0, 20.0));
-    assert_eq!(l.s.selected_object_count(), 1);
-    // The host reads the preview line on every change of the session; that read ends the exploration.
-    let _ = l.s.history_preview_json();
-    assert!(!l.s.history_exploring());
-    l.y = 30.0; // the first object is in s1's version
-    l.select();
-    assert!(
-        !l.s.history_exploring(),
-        "selecting another object ended it"
-    );
-    let undo_len = l.s.undo_len();
-    // A further press is a new step.
-    let i = item_of(&mut l.s, true, &s2);
-    l.s.go_to_history_item(i);
-    assert_eq!(
-        l.s.undo_len(),
-        undo_len + 1,
-        "a new entry, not a continuation"
-    );
-    ctrl_z(&mut l.s);
-    ctrl_z(&mut l.s);
-    assert_eq!(
-        json(&l.s),
-        before,
-        "the earlier exploration is one step as a whole"
-    );
-}
-
-#[test]
-fn c13_any_other_edit_ends_the_exploration() {
-    let mut l = Lab::new();
-    let s1 = l.step();
-    let _s2 = l.step();
-    l.select();
-    l.s.set_history_live(true);
-    let i = item_of(&mut l.s, true, &s1);
-    l.s.go_to_history_item(i);
-    assert!(l.s.history_exploring());
-    l.y = 30.0;
-    drag_move(&mut l.s, pt(30.0, l.y), 40.0, 0.0);
-    assert!(!l.s.history_exploring());
 }
 
 #[test]
@@ -652,9 +501,7 @@ fn c16_the_gate_ignores_a_press_during_a_drag_a_chip_or_an_unfinished_pen_path()
     l.s.pointer_hover(pt(30.0, l.y), false, false);
     l.s.pointer_down(pt(30.0, l.y), false);
     l.s.pointer_hover(pt(60.0, l.y + 5.0), false, false);
-    l.s.set_history_live(true);
-    assert_eq!(l.s.go_to_history_item(i), GoToOutcome::Ignored);
-    l.s.set_history_live(false);
+    assert_eq!(l.s.apply_history_item(true, i), GoToOutcome::Ignored);
     assert_eq!(l.s.preview_history_item(true, i), HistoryRowPress::Ignored);
     assert_eq!(l.s.clone_history_item(true, i, 0), CloneOutcome::Ignored);
     l.s.pointer_up(pt(60.0, l.y + 5.0), false, false);
@@ -665,9 +512,7 @@ fn c16_the_gate_ignores_a_press_during_a_drag_a_chip_or_an_unfinished_pen_path()
     // A chip (move entry) is open.
     assert_eq!(key_in(&mut l.s, "m", false, false), KeyOutcome::EntryOpened);
     let i = item_of(&mut l.s, true, &s1);
-    l.s.set_history_live(true);
-    assert_eq!(l.s.go_to_history_item(i), GoToOutcome::Ignored);
-    l.s.set_history_live(false);
+    assert_eq!(l.s.apply_history_item(true, i), GoToOutcome::Ignored);
     assert_eq!(l.s.preview_history_item(true, i), HistoryRowPress::Ignored);
     assert_eq!(l.s.clone_history_item(true, i, 0), CloneOutcome::Ignored);
     key_in(&mut l.s, "Escape", false, false);
@@ -701,7 +546,7 @@ fn c17_object_preview_changes_nothing_and_reads_as_a_status_line() {
     let before = json(&l.s);
     let undo = l.s.undo_len();
     let hist = l.s.history_len();
-    let plain = l.s.draw_list();
+    let plain = l.s.frame_draw_list();
     let i = item_of(&mut l.s, true, &s1);
     assert_eq!(
         l.s.preview_history_item(true, i),
@@ -719,15 +564,19 @@ fn c17_object_preview_changes_nothing_and_reads_as_a_status_line() {
     assert_eq!(l.s.undo_len(), undo);
     assert_eq!(l.s.history_len(), hist);
     assert_eq!(l.s.selected_object_count(), 1);
-    // The canvas draws more than before (the version over the current one).
-    let previewing = l.s.draw_list();
-    assert_ne!(previewing, plain, "the version is drawn over the object");
+    // The canvas draws the version in place of the current object (criterion 17 as changed by the
+    // customer feedback of 2026-10-14).
+    let previewing = l.s.frame_draw_list();
+    assert_ne!(
+        previewing, plain,
+        "the version is drawn in place of the object"
+    );
     // The editing keys still work (an Object preview does not pause editing).
     assert!(!l.s.document_preview_active());
     // Ending it removes the drawing.
     l.s.end_history_preview();
     assert_eq!(preview_kind(&mut l.s), "");
-    assert_eq!(l.s.draw_list(), plain);
+    assert_eq!(l.s.frame_draw_list(), plain);
 }
 
 #[test]
@@ -782,11 +631,6 @@ fn c18_a_preview_ends_on_the_listed_events() {
     click(&mut l.s, pt(500.0, 700.0));
     assert_eq!(preview_kind(&mut l.s), "");
     l.select();
-    // Switching to Live ends it.
-    preview(&mut l);
-    l.s.set_history_live(true);
-    assert_eq!(preview_kind(&mut l.s), "");
-    l.s.set_history_live(false);
     // The row of the version the object already has ends it.
     let newest = obj_rows(&mut l.s)[0]["step"].as_str().unwrap().to_owned();
     preview(&mut l);
@@ -1139,9 +983,11 @@ fn c22_clone_in_the_object_scope_makes_a_new_selected_object_in_one_step() {
     let undo = l.s.undo_len();
     let i = item_of(&mut l.s, true, &s1);
     let id1 = shown_id(&mut l.s, true, &s1);
-    // Not gated by Live or Preview.
-    for live in [false, true] {
-        l.s.set_history_live(live);
+    // Not gated by a preview.
+    for previewing in [false, true] {
+        if previewing {
+            let _ = l.s.preview_history_item(true, i);
+        }
         let CloneOutcome::Cloned(notice) = l.s.clone_history_item(true, i, 0) else {
             panic!("cloned")
         };
@@ -1366,10 +1212,8 @@ fn c9_the_row_actions_are_not_rows_without_a_selection() {
     // Object scope without an object: no list, nothing to press.
     assert_eq!(s.object_history_len(), 0);
     assert_eq!(s.preview_history_item(true, 0), HistoryRowPress::NotARow);
-    s.set_history_live(true);
-    assert_eq!(s.go_to_history_item(0), GoToOutcome::NotARow);
+    assert_eq!(s.apply_history_item(true, 0), GoToOutcome::NotARow);
     assert_eq!(s.clone_history_item(true, 0, 0), CloneOutcome::Refused);
-    assert!(s.restore_exploration().is_none());
     // Document scope of an empty document.
     assert_eq!(s.preview_history_item(false, 99), HistoryRowPress::NotARow);
     assert_eq!(s.clone_history_item(false, 99, 0), CloneOutcome::Refused);
@@ -1399,10 +1243,9 @@ fn w_inherited_rows_of_a_clone_preview_and_go_to_the_original_object() {
     );
     assert_eq!(preview_kind(&mut l.s), "object");
     l.s.end_history_preview();
-    // Live: the clone goes to the original's version of s1 (it already has it: nothing written).
-    l.s.set_history_live(true);
+    // Enter: the clone goes to the original's version of s1 (it already has it: nothing written).
     let n = l.s.history_len();
-    let outcome = l.s.go_to_history_item(at);
+    let outcome = l.s.apply_history_item(true, at);
     assert!(
         matches!(outcome, GoToOutcome::Same | GoToOutcome::Went(_)),
         "{outcome:?}"

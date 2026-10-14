@@ -73,14 +73,6 @@ impl StepHeader {
         self
     }
 
-    /// The same header with `key` set to `value`, in place when it is there.
-    pub(crate) fn set(&mut self, key: &str, value: String) {
-        match self.extra.iter_mut().find(|(k, _)| k == key) {
-            Some((_, v)) => *v = value,
-            None => self.extra.push((key.to_owned(), value)),
-        }
-    }
-
     /// The value of the extra key `key`.
     pub(crate) fn extra_value(&self, key: &str) -> Option<&str> {
         self.extra
@@ -132,41 +124,9 @@ impl StepHeader {
     }
 }
 
-/// Whether a commit with the message `next` continues the step whose last commit had `prev`: the
-/// same message, or a further press of one go-to exploration, which repeats the header with a new
-/// `v` (same label, step counter and object; `specs/0042-history-branches` criterion 11).
-pub(crate) fn continues(prev: &str, next: &str) -> bool {
-    if prev == next {
-        return true;
-    }
-    let (Some(a), Some(b)) = (StepHeader::parse(prev), StepHeader::parse(next)) else {
-        return false;
-    };
-    a.label == LABEL_GO_TO_VERSION
-        && b.label == LABEL_GO_TO_VERSION
-        && a.seq == b.seq
-        && a.extra_value(KEY_OBJECT) == b.extra_value(KEY_OBJECT)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn a_further_go_to_press_on_the_same_object_continues_the_step() {
-        let first = "go_to_version;s=4;t=9;o=1:2;v=1@5";
-        assert!(continues(first, first));
-        assert!(continues(first, "go_to_version;s=4;t=9;o=1:2;v=1@9"));
-        assert!(
-            !continues(first, "go_to_version;s=5;t=9;o=1:2;v=1@9"),
-            "a new step"
-        );
-        assert!(
-            !continues(first, "go_to_version;s=4;t=9;o=1:3;v=1@9"),
-            "another object"
-        );
-        assert!(!continues("move;s=4;t=9", "move;s=4;t=9;x=1"));
-    }
 
     #[test]
     fn a_header_round_trips_with_extra_keys() {

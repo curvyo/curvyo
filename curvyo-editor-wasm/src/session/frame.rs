@@ -35,6 +35,22 @@ impl Session {
             self.view(),
             self.device_pixel_ratio,
         );
+        // An object preview draws the object only as it was at the version, in its place: its
+        // current drawing, selection box and handles are left out (criterion 17).
+        if let Some((subject, version)) = self.object_preview() {
+            let others: Vec<_> = self
+                .render_objects()
+                .iter()
+                .filter(|object| object.id() != subject)
+                .cloned()
+                .collect();
+            list.extend(curvyo_render_core::build_artwork(&others, self.view()));
+            list.extend(curvyo_render_core::build_history_preview(
+                &version.objects,
+                self.view(),
+            ));
+            return list;
+        }
         list.extend(self.draw_list());
         list
     }

@@ -1,28 +1,22 @@
-//! `Session`'s writes of a past version from the History list: Live mode's go to version (one
-//! step, explored by further presses, taken back by Restore previous state) and Clone of any
-//! version (`specs/0042-history-branches` criteria 10 to 13, 15, 16, 22 to 26 and 31).
+//! `Session`'s writes of a past version from the History list: applying a version to the document
+//! or the selected object (Enter or a double-click on a row), and Clone of any version
+//! (`specs/0042-history-branches` criteria 10, 15, 16, 22 to 26 and 31).
 
-use curvyo_document_core::{NodeId, StepRef};
-use curvyo_ui_core::{RESTORED_NOTICE, cloned_notice, went_to_notice};
+use curvyo_document_core::SMALL_STEP_OPS;
+use curvyo_ui_core::{cloned_notice, went_to_notice};
 
 use super::Session;
 
-/// The go-to step the maker is exploring in. View state: never saved.
-#[derive(Debug, Default)]
-pub(super) struct VersionState {
-    exploring: Option<(NodeId, StepRef)>,
-}
-
-/// What a press on a row in Live mode did.
+/// What Enter or a double-click on a row did.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum GoToOutcome {
     /// A drag, a chip, a long operation or an unfinished Pen path: ignored (criterion 16).
     Ignored,
     /// The item is no step row, or no single object is selected.
     NotARow,
-    /// The object already has that version: nothing was written.
+    /// The document or the object already has that version: nothing was written.
     Same,
-    /// The object went to the version; the notice says so.
+    /// The version was applied as one step; the notice says so.
     Went(String),
 }
 
@@ -85,71 +79,60 @@ impl Session {
         }
     }
 
-    /// A press, Enter or Space on item `index` of the Object scope in Live mode: the selected
-    /// object goes to that version (criterion 10), continuing the exploration step while it is the
-    /// top of the stack (criterion 11).
-    pub fn go_to_history_item(&mut self, index: usize) -> GoToOutcome {
+    /// The step of item `index` and, in the Object scope, the selected object and the object an
+    /// inherited row came from.
+    fn version_of_item(
+        &mut self,
+        object: bool,
+        index: usize,
+    ) -> Option<(
+        curvyo_document_core::StepRef,
+        String,
+        Option<curvyo_document_core::NodeId>,
+        Option<curvyo_document_core::NodeId>,
+    )> {
+        let row = self.history_row_at(object, index)?;
+        if object {
+            let subject = self.history_object()?;
+            let typed = self.document.object_history_page(subject, row, 1).pop()?;
+            Some((
+                typed.step,
+                typed.shown_id,
+                Some(subject),
+                typed.inherited_from,
+            ))
+        } else {
+            let typed = self.document.history_page(row, 1).pop()?;
+            Some((typed.step, typed.shown_id, None, None))
+        }
+    }
+
+    /// Whether applying item `index` needs the long-operation state first: the version lies more
+    /// than a small step's operations behind (criterion 10, ADR 0014 §1).
+    pub fn history_apply_needs_busy_state(&mut self, object: bool, index: usize) -> bool {
+        self.version_of_item(object, index)
+            .and_then(|(step, ..)| self.document.step_distance(step))
+            .is_some_and(|ops| ops > SMALL_STEP_OPS)
+    }
+
+    /// Enter or a double-click on item `index`: applies its version to the whole document, or in
+    /// the Object scope to the selected object, as one step "Go to version" that Ctrl+Z takes
+    /// back (criterion 10). A preview that shows ends.
+    pub fn apply_history_item(&mut self, object: bool, index: usize) -> GoToOutcome {
         if self.operation_in_flight() || self.select.has_entry() || self.pen_path_open() {
             return GoToOutcome::Ignored;
         }
-        let Some(row) = self.history_row_at(true, index) else {
+        let Some((step, shown_id, subject, source)) = self.version_of_item(object, index) else {
             return GoToOutcome::NotARow;
         };
-        let Some(subject) = self.history_object() else {
-            return GoToOutcome::NotARow;
-        };
-        let Some(typed) = self.document.object_history_page(subject, row, 1).pop() else {
-            return GoToOutcome::NotARow;
-        };
-        let explore = self.history_exploring();
-        let result = self.recording(|this| {
-            this.document
-                .go_to_version(subject, typed.step, typed.inherited_from, explore)
-        });
+        self.end_history_preview();
+        let result = self.recording(|this| this.document.go_to_version(step, subject, source));
         match result {
-            Ok(report) => match report.step {
-                Some(step) => {
-                    self.history.version.exploring = Some((subject, step));
-                    GoToOutcome::Went(went_to_notice(&typed.shown_id, report.others_reverted))
-                }
-                None => GoToOutcome::Same,
-            },
+            Ok(report) if report.step.is_some() => {
+                GoToOutcome::Went(went_to_notice(&shown_id, report.others_reverted, object))
+            }
+            Ok(_) => GoToOutcome::Same,
             Err(_) => GoToOutcome::NotARow,
         }
-    }
-
-    /// Whether an exploration lasts: its step is the top of the maker's stack and its object is
-    /// the one selected (criterion 12). Restore previous state is offered only then.
-    pub fn history_exploring(&mut self) -> bool {
-        self.sync_history();
-        let Some((object, step)) = self.history.version.exploring else {
-            return false;
-        };
-        let lasts = self.history_object() == Some(object)
-            && self
-                .history
-                .stack
-                .undo_target()
-                .is_some_and(|top| top.step == step);
-        if !lasts {
-            self.history.version.exploring = None;
-        }
-        lasts
-    }
-
-    /// Restore previous state: Ctrl+Z on the exploration step, with the notice of criterion 12.
-    /// Returns the notice, or `None` when no exploration lasts.
-    pub fn restore_exploration(&mut self) -> Option<String> {
-        if !self.history_exploring() {
-            return None;
-        }
-        let result = self.undo();
-        self.history.version.exploring = None;
-        result.changed.then(|| RESTORED_NOTICE.to_owned())
-    }
-
-    /// A change of tab ends the exploration: the step stays a normal step (criterion 13).
-    pub fn end_exploration(&mut self) {
-        self.history.version.exploring = None;
     }
 }

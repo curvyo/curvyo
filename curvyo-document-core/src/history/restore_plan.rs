@@ -67,6 +67,50 @@ impl Plan {
     }
 }
 
+/// The plan of applying a version (`specs/0042-history-branches` criterion 10, ADR 0014 §8): with
+/// `before` the version and `after` now, every touched object goes to what it was at the version.
+/// One alive now and absent then is deleted; one absent now and alive then comes back with its id;
+/// one alive at both gets the version's fields and, when its parent or place changed, its old place.
+/// No three-way check: `after` is the live state, so nobody changed anything since.
+pub(super) fn plan_return(
+    doc: &LoroDoc,
+    touched: &Touched,
+    before: &Snapshot,
+    after: &Snapshot,
+) -> Plan {
+    let mut plan = Plan::default();
+    let mut seen = HashSet::new();
+    let moved: HashSet<TreeID> = touched.moved.iter().copied().collect();
+    for id in touched.nodes() {
+        if !seen.insert(id) {
+            continue;
+        }
+        let then = before.nodes.get(&id).filter(|node| !node.meta.is_empty());
+        match (alive(doc, id), then) {
+            (true, None) => plan.push(Role::Created, Action::Delete(id)),
+            (false, Some(then)) => {
+                plan.push(Role::Deleted, Action::Revive(id));
+                plan.revive_from_before.push(id);
+                // A deleted object keeps the fields it had when it went; they go back too.
+                if after.nodes.get(&id).is_none_or(|now| now.meta != then.meta) {
+                    plan.push(Role::Changed, Action::Merge(id));
+                }
+            }
+            (true, Some(then)) => {
+                let now = after.nodes.get(&id);
+                if now.is_none_or(|now| now.meta != then.meta) {
+                    plan.push(Role::Changed, Action::Merge(id));
+                }
+                if moved.contains(&id) || now.is_none_or(|now| now.parent != then.parent) {
+                    plan.push(Role::Moved, Action::Move(id, then.parent));
+                }
+            }
+            (false, None) => {}
+        }
+    }
+    plan
+}
+
 /// A meta map without the floor register of an object wipe.
 fn without_floor(mut meta: BTreeMap<String, Node>) -> BTreeMap<String, Node> {
     meta.remove(super::lineage::KEY_HISTORY_FLOOR);
