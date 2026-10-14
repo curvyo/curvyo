@@ -87,7 +87,8 @@ full convention in `specs/README.md`:
    dependencies or the document model changed.
 4. **Demo** — lead posts to the customer: what changed, how to try it
    (command or screenshot), open issues. One short message.
-5. **Done** — customer accepts; PR is squash-merged; `specification.md` gets
+5. **Done** — customer accepts; PR is rebase-merged (linear history,
+   `docs/guides/git-workflow.md`); `specification.md` gets
    `Status: Done` and the PR link.
 
 **Definition of Done:** all acceptance criteria covered by tests, gate green,
@@ -264,7 +265,9 @@ Its tools are deferred (load them with ToolSearch first), every call takes
 - One PR per feature (see §4: one PR per slice, opened when the slice is testable). PR description: starts with "What changes in the demo" and then the Review guide (§4), then link to `specs/<NNNN-feature-slug>/`, what
   changed, ADRs touched, new dependencies with license and reason, how to
   try it.
-- Squash-merge after green CI and customer acceptance. **Standing permission
+- Rebase-merge (`gh pr merge --rebase`) after green CI and customer acceptance;
+  1-5 self-contained commits per PR, history tidied before the PR, stacks of
+  at most 3 PRs allowed. Details and commands: `docs/guides/git-workflow.md`. **Standing permission
   granted 2026-10-03: `chore/` and `fix/` PRs merge without asking.** `story/`
   (feature) PRs still need customer acceptance first, every time.
 - Renovate updates dependencies; the lead batches them into one weekly PR.
