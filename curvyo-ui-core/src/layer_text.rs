@@ -124,6 +124,10 @@ pub fn delete_locked_layer_notice(layer: &str) -> String {
     format!("Layer {layer} is locked. Unlock it first.")
 }
 
+/// "Could not duplicate. Nothing was changed.": Duplicate of the Layers toolbar was refused
+/// (customer feedback 2026-10-14, criterion 57).
+pub const DUPLICATE_FAILED_NOTICE: &str = "Could not duplicate. Nothing was changed.";
+
 /// "Rectangle 3f9a1c is locked. Unlock it first." (criterion 37, amended 2026-10-12).
 #[must_use]
 pub fn locked_object_notice(name: &str) -> String {

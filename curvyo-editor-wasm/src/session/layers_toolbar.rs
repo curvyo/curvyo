@@ -4,7 +4,9 @@
 //! of `layers_panel.rs`.
 
 use curvyo_document_core::{CopySource, NodeId, Vec2};
-use curvyo_ui_core::{Reorder, move_refusal_text, reorder_plans, unchanged_text};
+use curvyo_ui_core::{
+    DUPLICATE_FAILED_NOTICE, Reorder, move_refusal_text, reorder_plans, unchanged_text,
+};
 use serde_json::{Value, json};
 
 use super::Session;
@@ -83,7 +85,7 @@ impl Session {
                 })
                 .collect();
             let Ok(copies) = this.document.duplicate_objects(&sources, Vec2::ZERO) else {
-                return PanelReply::Quiet;
+                return duplicate_refused();
             };
             if this.panel.target_layer && this.active_layer().is_some() {
                 this.layers.active = ActiveLayer::Chosen(copies.first().copied());
@@ -96,5 +98,26 @@ impl Session {
             }
             PanelReply::Quiet
         })
+    }
+}
+
+/// What a refused Duplicate tells the maker: the alert "Could not duplicate. Nothing was changed."
+/// (the document writes nothing when it refuses, `Document::duplicate_objects`).
+fn duplicate_refused() -> PanelReply {
+    PanelReply::Refusal(DUPLICATE_FAILED_NOTICE.to_owned())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_refused_duplicate_shows_an_alert_and_never_an_empty_notice() {
+        let reply = duplicate_refused();
+        assert_eq!(
+            reply,
+            PanelReply::Refusal("Could not duplicate. Nothing was changed.".into())
+        );
+        assert!(reply.to_json().contains(r#""kind":"refusal""#));
     }
 }

@@ -215,6 +215,11 @@ Affected: `curvyo-document-core` (`groups.rs`, `layers.rs`, `shapes.rs`, `paths.
   `acceptance_polygon_star_box_refit` ac14, `object_history_session` wipe); spec, `adrs.md`,
   design system updated
 
+- [x] 44. Tester finding 1: the Object history's wipe counts a layer the step created with the
+  object as part of the object's own step (`Document::created_objects`); the wipe test starts
+  from `fresh()` again; the layer stays in the document (AC 35, `0041` criterion 31)
+- [x] 45. A refused Duplicate posts "Could not duplicate. Nothing was changed." (AC 57)
+
 ## Decisions taken in this plan (reversible in this PR)
 
 - **`document.json` form.** Recorded in `adrs.md` as the note of 2026-10-12 that supersedes
