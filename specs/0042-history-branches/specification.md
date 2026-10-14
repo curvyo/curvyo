@@ -90,9 +90,9 @@ All terms of `0020-undo-redo` and `0041-object-history`. In addition:
 - "Amend" in criterion 11 is a list and stack rule, not a log rewrite: it is the continuation of criterion 31.
 - Risks the architect measures: the first-frame cost of a checkout read against the budgets of criterion 21 (ADR 0014 §13), and checkout distance for old rows at 10,000 steps.
 
-## Open customer question (demo)
+## Customer question (decided 2026-10-14)
 
-Raised by the architect's review of 2026-10-12 (`adrs.md`, Notes). Asked with the demo; the build follows the default.
+Raised by the architect's review of 2026-10-12 (`adrs.md`, Notes). **Decided: A** (customer, 2026-10-14); `0041` criterion 24 is reworded to match.
 
 1. **Duplicate lineage.** Clone version and Duplicate now follow one lineage rule (criterion 23, ADR 0014): the inherited rows follow the path to the copied state. So the inherited rows of a Duplicate no longer show steps its author had taken back before the copy. This changes `0041` criterion 24, which the customer already accepted. *A (default, built):* a Duplicate shows only the steps in effect at the copy. *B:* a Duplicate keeps those steps, marked "Undone"; only Clone version follows the path. Recommendation A: one rule for both copies, and a copy's history lists only what made the copied shape. If unanswered, A stays and `0041` criterion 24 is reworded to match.
 
