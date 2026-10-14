@@ -133,7 +133,7 @@ Tested with two document replicas A and B that merge in the test; no network is 
 42. Keyboard: the list is one Tab stop with roving focus (`ToggleGroup` rule of the design system): Up and Down move, Home and End jump, Page Up and Page Down move by a page; Enter or Space presses the row (preview, `0042`); Right moves into the row's action button (`0042`) and Left back to the row; Escape ends a preview, a second Escape returns focus to the canvas. Each row has an accessible name in the form "Move, 3 objects, You, 12:03, id a1b2c3d, undone". A step by another peer does not announce itself (no live region for the list); the notice of criterion 1 is the only announcement.
 43. **Scale.** Given a document with 10,000 steps, then the first 50 rows show within 200 ms of opening the tab and the list loads further rows while scrolling. Rows outside the viewport are not in the DOM. The list is the one inner scroll area of the panel: the tab strip, the header (Undo, Redo, scope) and the footer (the saved-in-file line and the wipe control) stay in view while the list scrolls; every other tab scrolls as a whole. Test: 10,000 steps built through the core API.
 44. Given a new step of this session, then its row appears at the top in the frame of the commit. A list that has been scrolled away from the top keeps its scroll position.
-45. Given a new document, then the list says "No steps yet." and, under it, in a muted line, "Steps appear here as you edit." (the Now row stays pinned). Given the tab, then a line below the list says "The history is saved in the project file." (it tells the maker what a shared file contains; Question 9).
+45. Given a new document, then the list says "No steps yet." and, under it, in a muted line, "Steps appear here as you edit." (the Now row stays pinned). (The footer line "The history is saved in the project file." was removed by customer feedback 2026-10-14, `0042`; nothing replaces it.)
 46. Given Ctrl+Z or Ctrl+Shift+Z, then Shift+Ctrl+H (Proposal, Inkscape's key for its Undo History) shows the panel's History tab, expands the panel when collapsed, and moves focus to the list. Ignored during a drag.
 
 ### Wipe the document history
@@ -246,7 +246,6 @@ A click shows the version. Nothing changes.        caption, or "Restore previous
        1 rectangle · You · 12:03
  ...                                               the one scroll area, virtualised
 ----------------------------------------------
-The history is saved in the project file.          footer, always in view
 [ Wipe history ]
 ```
 
