@@ -239,3 +239,65 @@ export function placeOffsetEntryChip(
   const clamped = clampInside(left, top, chip, canvas);
   return { ...clamped, left: Math.max(clamped.left, railClear) };
 }
+
+/** The placement chip's gap from the pointer, and from the pivot marker when it flips
+ * (`docs/design-system.md`, "Placement chip"). */
+const PLACEMENT_CHIP_GAP_PX = 12;
+/** Half the 6 px pivot marker. */
+const PIVOT_MARKER_HALF_PX = 3;
+
+/**
+ * The click-to-create placement chip (`specs/0052-click-to-create-shapes/` criteria 11, 33): its
+ * corner nearest the pointer 12 px from the pointer on the side away from A on each axis (an axis
+ * with no offset counts as right or down). On an axis without room the chip goes to the other
+ * side of A only when the other axis does not already keep it clear of A; otherwise it is clamped
+ * on that axis, so it stays next to the pointer. It keeps right of `railClear` when it fits there
+ * (at 800 px the rectangle chip cannot, which is accepted), and off `avoid`, the active tool's
+ * bar, by moving to the pointer's other vertical side or below the bar.
+ */
+export function placePlacementChip(
+  pointer: { x: number; y: number },
+  a: { x: number; y: number },
+  chip: Size,
+  canvas: Size,
+  avoid?: Rect,
+  railClear = 0,
+): Placement {
+  const clear = PLACEMENT_CHIP_GAP_PX + PIVOT_MARKER_HALF_PX;
+  const minLeft = canvas.width - railClear >= chip.width ? railClear : 0;
+  const near = (p: number, at: number, size: number) =>
+    p >= at ? p + PLACEMENT_CHIP_GAP_PX : p - PLACEMENT_CHIP_GAP_PX - size;
+  const otherSide = (p: number, at: number, size: number) =>
+    p >= at ? at - clear - size : at + clear;
+  const fits = (start: number, size: number, low: number, room: number) =>
+    start >= low && start + size <= room;
+  const keepsClear = (start: number, size: number, at: number) =>
+    start > at + PIVOT_MARKER_HALF_PX || start + size < at - PIVOT_MARKER_HALF_PX;
+  const clampAxis = (start: number, size: number, low: number, room: number) =>
+    Math.max(low, Math.min(start, room - size));
+
+  let left = near(pointer.x, a.x, chip.width);
+  let top = near(pointer.y, a.y, chip.height);
+  if (!fits(left, chip.width, minLeft, canvas.width)) {
+    left = keepsClear(top, chip.height, a.y)
+      ? clampAxis(left, chip.width, minLeft, canvas.width)
+      : otherSide(pointer.x, a.x, chip.width);
+  }
+  if (!fits(top, chip.height, 0, canvas.height)) {
+    top = keepsClear(left, chip.width, a.x)
+      ? clampAxis(top, chip.height, 0, canvas.height)
+      : otherSide(pointer.y, a.y, chip.height);
+  }
+  if (avoid && meets({ left, top }, chip, avoid)) {
+    const flipped =
+      pointer.y >= a.y
+        ? pointer.y - PLACEMENT_CHIP_GAP_PX - chip.height
+        : pointer.y + PLACEMENT_CHIP_GAP_PX;
+    top =
+      fits(flipped, chip.height, 0, canvas.height) && !meets({ left, top: flipped }, chip, avoid)
+        ? flipped
+        : avoid.bottom + AVOID_GAP_PX;
+  }
+  const clamped = clampInside(left, top, chip, canvas);
+  return { ...clamped, left: Math.max(clamped.left, minLeft) };
+}

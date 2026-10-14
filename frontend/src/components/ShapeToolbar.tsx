@@ -40,6 +40,8 @@ export function ShapeToolbar({
   }
   return (
     <div
+      // A press here does not cancel a click-to-create placement (`0052` criterion 25).
+      data-placement-keeps
       className="flex pointer-events-auto h-9 min-w-0 items-center gap-3 rounded-lg px-2 text-sm"
       style={{
         background: "var(--toolbar-bg)",

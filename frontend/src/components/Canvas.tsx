@@ -9,6 +9,7 @@ import { NudgeReadout } from "@/components/NudgeReadout";
 import { NodeContextMenu } from "@/components/NodeToolbar";
 import { MoveEntryChip } from "@/components/MoveEntryChip";
 import { OffsetEntryChip } from "@/components/OffsetEntryChip";
+import { PlacementChip } from "@/components/PlacementChip";
 import { SelectionAnnouncer } from "@/components/SelectionAnnouncer";
 import { TransformEntryChip } from "@/components/TransformEntryChip";
 import type { EditorSession } from "@/hooks/useEditorSession";
@@ -160,6 +161,17 @@ export function Canvas({ editor }: CanvasProps) {
           onMarkClick={editor.setMarkClickHandler}
         />
       )}
+      {editor.placement.chip && (
+        <PlacementChip
+          placement={editor.placement}
+          chip={editor.placement.chip}
+          containerRef={editor.containerRef}
+        />
+      )}
+      {/* The placement's polite live region, always mounted (`0052` criterion 30). */}
+      <div aria-live="polite" role="status" className="sr-only">
+        <span key={editor.placement.announcement.id}>{editor.placement.announcement.text}</span>
+      </div>
       {editor.tool === "offset" && editor.offset.view.chipOpen && (
         <OffsetEntryChip offset={editor.offset} containerRef={editor.containerRef} />
       )}
