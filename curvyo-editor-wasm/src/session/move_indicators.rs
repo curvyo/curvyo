@@ -49,6 +49,14 @@ impl Session {
                 ..none
             };
         }
+        if self.tool == Tool::Offset {
+            // A drag that makes a new object shows the copy's plus (`specs/0038-path-offset`
+            // criterion 15).
+            return MoveIndicators {
+                copy_badge: self.offset_drag_makes_copy(),
+                ..none
+            };
+        }
         if self.tool != Tool::Select {
             return none;
         }

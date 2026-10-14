@@ -37,6 +37,7 @@ mod history;
 mod junction;
 mod legacy_fill;
 mod objects;
+mod offset_write;
 mod path_codec;
 mod path_extend;
 mod path_model;
@@ -92,6 +93,7 @@ pub use history::{
 };
 pub use junction::{COINCIDENT_MM, interior_handle, merged_junction};
 pub use objects::{CopySource, ObjectEditError};
+pub use offset_write::{OffsetGeometry, OffsetWrite};
 pub use path_extend::{PathEnd, PathGrowth};
 pub use path_model::{
     AnchorId, AnchorKind, AnchorSnapshot, Color, HandleSlot, NewAnchor, NodeId, PathEditError,

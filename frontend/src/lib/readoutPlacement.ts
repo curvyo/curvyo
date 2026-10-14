@@ -206,3 +206,36 @@ export function placeMoveEntryChip(
   }
   return clampInside(left, top, chip, canvas);
 }
+
+/** The Offset chip's gap below or above the result box, in CSS pixels: the bottom corner handles
+ * reach 13.5px below the box (`specs/0038-path-offset/ux-rework.md` 2.4). */
+const OFFSET_CHIP_GAP_PX = 20;
+
+/**
+ * Where to put the Offset entry chip (`specs/0038-path-offset/ux-rework.md` 2.4): its left edge
+ * 16px right of the centre glyph and its top 20px below the box around the selection and its
+ * standing preview; left of the centre at the right edge and above the box (not over it) at the
+ * bottom edge, so the outline being judged stays visible; then clamped inside the canvas and right
+ * of the tool rail (`railClear`).
+ */
+export function placeOffsetEntryChip(
+  anchor: {
+    center: { x: number; y: number };
+    box: { left: number; top: number; right: number; bottom: number };
+  },
+  chip: Size,
+  canvas: Size,
+  railClear: number,
+): Placement {
+  const { center, box } = anchor;
+  let left = center.x + MOVE_CHIP_OFFSET_PX;
+  let top = box.bottom + OFFSET_CHIP_GAP_PX;
+  if (left + chip.width > canvas.width) {
+    left = center.x - MOVE_CHIP_OFFSET_PX - chip.width;
+  }
+  if (top + chip.height > canvas.height) {
+    top = box.top - OFFSET_CHIP_GAP_PX - chip.height;
+  }
+  const clamped = clampInside(left, top, chip, canvas);
+  return { ...clamped, left: Math.max(clamped.left, railClear) };
+}

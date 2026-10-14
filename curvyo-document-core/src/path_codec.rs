@@ -125,8 +125,10 @@ pub(crate) fn anchors_container(meta: &LoroMap) -> LoroMovableList {
 }
 
 pub(crate) fn insert_anchors_container(meta: &LoroMap) -> LoroMovableList {
-    // invariant: inserting a brand-new container under a fresh key on a
-    // freshly created meta map cannot fail.
+    // invariant: inserting a new container under the `anchors` key of an
+    // attached meta map cannot fail, whether the key is fresh (a new path) or
+    // holds the list it replaces (an offset that changes a path in place,
+    // `offset_write::change_geometry`).
     #[allow(clippy::unwrap_used)]
     meta.insert_container(KEY_ANCHORS, LoroMovableList::new())
         .unwrap()

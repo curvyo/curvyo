@@ -137,6 +137,17 @@ pub(crate) fn write_extra_subpaths(meta: &LoroMap, outlines: &[(Vec<NewAnchor>, 
     }
 }
 
+/// Replaces the further outlines of a path (or of a primitive becoming one) by `outlines`; an
+/// empty slice leaves none.
+pub(crate) fn replace_extra_subpaths(meta: &LoroMap, outlines: &[(Vec<NewAnchor>, bool)]) {
+    if meta.get(KEY_EXTRA_SUBPATHS).is_some() {
+        // invariant: deleting a key just confirmed present on an attached map cannot fail.
+        #[allow(clippy::unwrap_used)]
+        meta.delete(KEY_EXTRA_SUBPATHS).unwrap();
+    }
+    write_extra_subpaths(meta, outlines);
+}
+
 /// The further outlines as a read model; empty for an ordinary path.
 pub(crate) fn read_extra_subpaths(meta: &LoroMap) -> Vec<SubpathSnapshot> {
     let Some(extra) = extra_list(meta) else {

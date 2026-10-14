@@ -69,7 +69,7 @@ function Divider() {
 /** Marks every group of `container` that starts a wrapped row, so no divider
  * is drawn at the start of a row. Measured, not guessed: re-run after every
  * render and every resize. */
-function useRowStarts(container: React.RefObject<HTMLDivElement | null>) {
+export function useRowStarts(container: React.RefObject<HTMLDivElement | null>) {
   useLayoutEffect(() => {
     const element = container.current;
     if (!element) {

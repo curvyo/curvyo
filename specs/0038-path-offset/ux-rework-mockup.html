@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Offset Tool Mockup</title>
+<style>
+  :root {
+    --canvas-bg: #E8E8EB;
+    --pasteboard-bg: #B8B8BE;
+    --toolbar-bg: #DCDCE0;
+    --toolbar-icon: #3A3A3F;
+    --toolbar-icon-active-bg: #2F6FEE;
+    --toolbar-icon-active-fg: #FFFFFF;
+    --accent: #2F6FEE;
+    --accent-hover: rgba(47, 111, 238, 0.2);
+    --preview-new: #2F6FEE;
+    --muted: #5A5A5F;
+    --field-invalid: #B3261E;
+    --shadow: 0 2px 8px rgba(0, 0, 0, 0.24);
+    --font: system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #F4F4F6; color: var(--toolbar-icon); font: 14px/1.4 var(--font); padding: 16px; }
+  h1 { font-size: 16px; margin: 0 0 4px; }
+  p.lead { margin: 0 0 12px; color: var(--muted); font-size: 13px; max-width: 1100px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(540px, 540px)); gap: 16px; overflow-x: auto; }
+  figure { margin: 0; }
+  figcaption { font-size: 13px; margin: 6px 0 0; max-width: 540px; }
+  figcaption b { display: block; }
+  .frame { position: relative; width: 540px; height: 360px; background: var(--canvas-bg); border: 1px solid #C4C4C9; overflow: hidden; }
+  .frame svg.art { position: absolute; inset: 0; }
+
+  /* Rail: only the Path tools card is shown */
+  .card { position: absolute; left: 12px; top: 12px; width: 48px; background: var(--toolbar-bg); border-radius: 8px; box-shadow: var(--shadow); padding: 4px; }
+  .btn { width: 40px; height: 40px; border-radius: 6px; display: grid; place-items: center; background: var(--toolbar-icon-active-bg); color: var(--toolbar-icon-active-fg); }
+  .btn svg { width: 20px; height: 20px; }
+
+  /* Pointer-anchored chips: readout and hint */
+  .readout { position: absolute; background: var(--toolbar-bg); color: var(--toolbar-icon); border-radius: 8px; padding: 6px 8px; font-size: 12px; line-height: 1.35; box-shadow: var(--shadow); white-space: nowrap; }
+  .readout .l1 { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .readout .l2 { color: var(--muted); }
+
+  /* Offset entry chip: 168 x 108 px */
+  .chip { position: absolute; width: 168px; padding: 6px; background: var(--toolbar-bg); border-radius: 8px; box-shadow: var(--shadow); color: var(--toolbar-icon); }
+  .row { display: flex; align-items: center; height: 28px; }
+  .row + .row { margin-top: 6px; }
+  .lbl { width: 52px; font-size: 12px; }
+  .field { position: relative; width: 100px; height: 28px; margin-left: 4px; background: #fff; border-radius: 5px; border: 2px solid var(--accent); display: flex; align-items: center; justify-content: flex-end; padding-right: 30px; font-size: 14px; font-variant-numeric: tabular-nums; }
+  .field .sel { background: #B4CCFA; padding: 0 1px; }
+  .field .u { position: absolute; right: 6px; font-size: 12px; opacity: 0.7; }
+  .pill { display: flex; height: 28px; border-radius: 7px; padding: 1.5px; box-shadow: inset 0 0 0 1.5px var(--toolbar-icon); }
+  .pill span { flex: 1; display: grid; place-items: center; font-size: 12px; border-radius: 5px; }
+  .pill span.on { background: var(--toolbar-icon-active-bg); color: var(--toolbar-icon-active-fg); }
+  .pill.icons span { width: 25px; flex: none; }
+  .pill svg { width: 16px; height: 16px; }
+  .w156 { width: 156px; }
+  .w84 { width: 84px; } .w56 { width: 56px; margin-left: auto; }
+
+  .notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-top: 16px; max-width: 1100px; }
+  .notes div { background: #fff; border: 1px solid #DDDDE2; border-radius: 8px; padding: 10px 12px; font-size: 13px; }
+  .notes b { display: block; margin-bottom: 4px; }
+  kbd { font: 12px var(--font); border: 1px solid #BDBDC3; border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; background: #fafafa; }
+</style>
+</head>
+<body>
+<h1>Offset tool: mockup after the customer feedback of 2026-10-13 (0038)</h1>
+<p class="lead">Static sketch at 100 % zoom (1 mm is about 3.8 px), not a build reference; <code>ux-rework.md</code> and the spec hold the numbers. No bar at the top, no Apply button, no status hint. The selected object is a 42 x 26 mm rectangle with sharp corners, so the corner style shows. Only the Path tools card of the rail is drawn.</p>
+
+<div class="grid">
+
+<!-- 1: tool active, handles only (no preview), center handle hovered -->
+<figure>
+<div class="frame">
+  <div class="card" aria-label="Path tools"><div class="btn" title="Offset tool (O)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.5" y="1.5" width="13" height="13" rx="3" stroke-dasharray="2.2 1.8"/><rect x="5" y="5" width="6" height="6" rx="1" fill="currentColor"/></svg></div></div>
+  <svg class="art" width="540" height="360" aria-label="Rectangle with offset handles and no preview">
+    <rect x="170" y="100" width="160" height="100" fill="#F5D9A8" stroke="#000" stroke-width="1.5"/>
+    <rect x="169.5" y="99.5" width="161" height="101" fill="none" stroke="#2F6FEE" stroke-width="1" stroke-dasharray="4 3"/>
+    <!-- no preview: only the handles are drawn when an object is selected -->
+    <g stroke="#2F6FEE" stroke-width="1.5">
+      <circle cx="161.5" cy="91.5" r="5" fill="#fff"/><circle cx="161.5" cy="91.5" r="2" fill="#2F6FEE" stroke="none"/>
+      <circle cx="338.5" cy="91.5" r="5" fill="#fff"/><circle cx="338.5" cy="91.5" r="2" fill="#2F6FEE" stroke="none"/>
+      <circle cx="161.5" cy="208.5" r="5" fill="#fff"/><circle cx="161.5" cy="208.5" r="2" fill="#2F6FEE" stroke="none"/>
+      <circle cx="338.5" cy="208.5" r="5" fill="#fff"/><circle cx="338.5" cy="208.5" r="2" fill="#2F6FEE" stroke="none"/>
+    </g>
+    <!-- center handle, hover -->
+    <rect x="242.5" y="142.5" width="16" height="16" rx="3" fill="#fff" stroke="#2F6FEE" stroke-width="1"/>
+    <rect x="242.5" y="142.5" width="16" height="16" rx="3" fill="rgba(47,111,238,0.2)"/>
+    <rect x="246.25" y="146.25" width="8.5" height="8.5" rx="2" fill="none" stroke="#2F6FEE" stroke-width="1.5"/>
+    <rect x="248.5" y="148.5" width="4" height="4" fill="#2F6FEE"/>
+    <!-- pointer -->
+    <path d="M253 153l0 14 4-4 3 6 2-1-3-6 5 0z" fill="#000" stroke="#fff" stroke-width="1"/>
+  </svg>
+  <div class="readout" style="left:265px; top:115px"><div>Double-click, O or Enter: type a distance</div></div>
+</div>
+<figcaption><b>1. Tool active, no preview</b>Selecting the rectangle draws only the handles; no preview is shown until a handle is dragged or the chip is open. Four corner handles 12 px outside the corners, the center handle in the middle (Move shell, Offset glyph). Pointer resting on the center handle: hint chip after 600 ms.</figcaption>
+</figure>
+
+<!-- 2: drag with readout -->
+<figure>
+<div class="frame">
+  <div class="card" aria-label="Path tools"><div class="btn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.5" y="1.5" width="13" height="13" rx="3" stroke-dasharray="2.2 1.8"/><rect x="5" y="5" width="6" height="6" rx="1" fill="currentColor"/></svg></div></div>
+  <svg class="art" width="540" height="360" aria-label="Dragging the bottom right handle outward">
+    <rect x="170" y="100" width="160" height="100" fill="#F5D9A8" stroke="#000" stroke-width="1.5"/>
+    <rect x="169.5" y="99.5" width="161" height="101" fill="none" stroke="#2F6FEE" stroke-width="1" stroke-dasharray="4 3"/>
+    <!-- drag preview: Outset 5 mm, Round -->
+    <rect x="151" y="81" width="198" height="138" rx="19" fill="none" stroke="#fff" stroke-width="4.5"/>
+    <rect x="151" y="81" width="198" height="138" rx="19" fill="none" stroke="#2F6FEE" stroke-width="1.5"/>
+    <g stroke="#2F6FEE" stroke-width="1.5">
+      <circle cx="161.5" cy="91.5" r="5" fill="#fff"/><circle cx="161.5" cy="91.5" r="2" fill="#2F6FEE" stroke="none"/>
+      <circle cx="338.5" cy="91.5" r="5" fill="#fff"/><circle cx="338.5" cy="91.5" r="2" fill="#2F6FEE" stroke="none"/>
+      <circle cx="161.5" cy="208.5" r="5" fill="#fff"/><circle cx="161.5" cy="208.5" r="2" fill="#2F6FEE" stroke="none"/>
+      <!-- dragged handle at the grown box corner + 12 px -->
+      <circle cx="357.5" cy="227.5" r="5" fill="#2F6FEE"/><circle cx="357.5" cy="227.5" r="2" fill="#fff" stroke="none"/>
+    </g>
+    <path d="M357.5 227.5l0 14 4-4 3 6 2-1-3-6 5 0z" fill="#000" stroke="#fff" stroke-width="1"/>
+    <!-- no plus badge: no modifier = Change original, no new object (the badge shows with Ctrl or Shift) -->
+  </svg>
+  <div class="readout" style="left:370px; top:171px"><div class="l1">Outset 5 mm · Round</div><div class="l2">Changes the original</div></div>
+</div>
+<figcaption><b>2. Dragging a corner handle</b>The drag preview appears once the pointer leaves the 3 px dead zone. Readout line 1: side, distance, corner style (always). Line 2: the effective result; with no modifier the original is changed, so no plus badge. <kbd>Shift</kbd> both sides (original becomes the outset, one new inner object), <kbd>Ctrl</kbd> new object (plus badge, "New object"), <kbd>Ctrl</kbd>+<kbd>Shift</kbd> both sides as two new objects, <kbd>Esc</kbd> cancels, release writes.</figcaption>
+</figure>
+
+<!-- 3: Alt while dragging a corner handle (fourth round; texts only, the art still shows the handles and not the drag preview) -->
+<figure>
+<div class="frame">
+  <div class="card" aria-label="Path tools"><div class="btn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.5" y="1.5" width="13" height="13" rx="3" stroke-dasharray="2.2 1.8"/><rect x="5" y="5" width="6" height="6" rx="1" fill="currentColor"/></svg></div></div>
+  <svg class="art" width="540" height="360" aria-label="Corner style stepped to Miter by pressing Alt while dragging">
+    <rect x="170" y="100" width="160" height="100" fill="#F5D9A8" stroke="#000" stroke-width="1.5"/>
+    <rect x="169.5" y="99.5" width="161" height="101" fill="none" stroke="#2F6FEE" stroke-width="1" stroke-dasharray="4 3"/>
+    <!-- fourth round: the preview of the drag (as in figure 2) is not redrawn here; only the texts changed -->
+    <g stroke="#2F6FEE" stroke-width="1.5">
+      <circle cx="161.5" cy="91.5" r="5" fill="#fff"/><circle cx="161.5" cy="91.5" r="2" fill="#2F6FEE" stroke="none"/>
+      <circle cx="338.5" cy="91.5" r="5" fill="#D5E2FC"/><circle cx="338.5" cy="91.5" r="2" fill="#2F6FEE" stroke="none"/>
+      <circle cx="161.5" cy="208.5" r="5" fill="#fff"/><circle cx="161.5" cy="208.5" r="2" fill="#2F6FEE" stroke="none"/>
+      <circle cx="338.5" cy="208.5" r="5" fill="#fff"/><circle cx="338.5" cy="208.5" r="2" fill="#2F6FEE" stroke="none"/>
+    </g>
+    <rect x="242.5" y="142.5" width="16" height="16" rx="3" fill="#fff" stroke="#2F6FEE" stroke-width="1"/>
+    <rect x="246.25" y="146.25" width="8.5" height="8.5" rx="2" fill="none" stroke="#2F6FEE" stroke-width="1.5"/>
+    <rect x="248.5" y="148.5" width="4" height="4" fill="#2F6FEE"/>
+    <path d="M338.5 91.5l0 14 4-4 3 6 2-1-3-6 5 0z" fill="#000" stroke="#fff" stroke-width="1"/>
+  </svg>
+  <div class="readout" style="left:351px; top:36px"><div class="l1">Outset 2 mm · Miter</div><div class="l2">Changes the original</div></div>
+</div>
+<figcaption><b>3. Alt while dragging a corner handle</b>Each <kbd>Alt</kbd> press during the drag steps the corner style Round, Miter, Bevel, Round; the preview and line 1 of the readout change in the same frame. The press starts without Alt; only the keydown counts, key repeat is ignored. A written drag stores the style as the remembered one, the next drag starts with it, and the chip's Corners control shows and sets the same value (first ever: Round). A cancelled drag stores nothing (default pending customer). The corner handle's hint line says "Alt: corner style". There is no double-click on corner handles. The drawing of this figure shows the handles only, not the drag preview.</figcaption>
+</figure>
+
+<!-- 4: chip open -->
+<figure>
+<div class="frame">
+  <div class="card" aria-label="Path tools"><div class="btn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.5" y="1.5" width="13" height="13" rx="3" stroke-dasharray="2.2 1.8"/><rect x="5" y="5" width="6" height="6" rx="1" fill="currentColor"/></svg></div></div>
+  <svg class="art" width="540" height="360" aria-label="Offset entry chip open below the result">
+    <rect x="170" y="100" width="160" height="100" fill="#F5D9A8" stroke="#000" stroke-width="1.5"/>
+    <rect x="169.5" y="99.5" width="161" height="101" fill="none" stroke="#2F6FEE" stroke-width="1" stroke-dasharray="4 3"/>
+    <!-- preview of the chip values: Outset 2 mm, Round -->
+    <rect x="162" y="92" width="176" height="116" rx="8" fill="none" stroke="#fff" stroke-width="4.5"/>
+    <rect x="162" y="92" width="176" height="116" rx="8" fill="none" stroke="#2F6FEE" stroke-width="1.5"/>
+    <g stroke="#2F6FEE" stroke-width="1.5">
+      <circle cx="161.5" cy="91.5" r="5" fill="#fff"/><circle cx="161.5" cy="91.5" r="2" fill="#2F6FEE" stroke="none"/>
+      <circle cx="338.5" cy="91.5" r="5" fill="#fff"/><circle cx="338.5" cy="91.5" r="2" fill="#2F6FEE" stroke="none"/>
+      <circle cx="161.5" cy="208.5" r="5" fill="#fff"/><circle cx="161.5" cy="208.5" r="2" fill="#2F6FEE" stroke="none"/>
+      <circle cx="338.5" cy="208.5" r="5" fill="#fff"/><circle cx="338.5" cy="208.5" r="2" fill="#2F6FEE" stroke="none"/>
+    </g>
+    <!-- center handle, chip open: active look -->
+    <rect x="242.5" y="142.5" width="16" height="16" rx="3" fill="#2F6FEE" stroke="#2F6FEE" stroke-width="1"/>
+    <rect x="246.25" y="146.25" width="8.5" height="8.5" rx="2" fill="none" stroke="#fff" stroke-width="1.5"/>
+    <rect x="248.5" y="148.5" width="4" height="4" fill="#fff"/>
+  </svg>
+  <!-- chip: left = center + 16, top = anchor bottom (208) + 20 -->
+  <div class="chip" role="group" aria-label="Offset" style="left:266px; top:228px">
+    <div class="row"><span class="lbl">Distance</span><span class="field" aria-label="Distance, millimetres"><span class="sel">2</span><span class="u">mm</span></span></div>
+    <div class="row"><div class="pill w156" role="radiogroup" aria-label="Direction"><span class="on">Out</span><span>In</span><span>Both</span></div></div>
+    <div class="row">
+      <div class="pill icons w84" role="radiogroup" aria-label="Corners">
+        <span class="on" title="Round"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 14V8a5 5 0 0 1 5-5h6"/></svg></span>
+        <span title="Miter"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 14V3h11"/></svg></span>
+        <span title="Bevel"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 14V7l4-4h7"/></svg></span>
+      </div>
+      <div class="pill icons w56" role="radiogroup" aria-label="Mode">
+        <span title="New object: the original stays"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M12 5v14"/></svg></span>
+        <span class="on" title="Change original: no copy is made"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg></span>
+      </div>
+    </div>
+  </div>
+</div>
+<figcaption><b>4. Offset entry chip open</b>Opened by a double-click on the center handle (<kbd>Shift</kbd> preselects Both, <kbd>Ctrl</kbd> New object), or <kbd>O</kbd> / <kbd>Enter</kbd> with the remembered values; Mode defaults to Change original. Placed 16 px right of the center and 20 px below the result, focus in Distance with the text selected. Tab: Distance, Direction, Corners, Mode. <kbd>Enter</kbd> writes one undo step, <kbd>Esc</kbd> closes without writing. The preview is shown only while the chip is open and follows its values.</figcaption>
+</figure>
+
+</div>
+
+<div class="notes">
+  <div><b>Mode icons</b>Plus = New object (the original stays). Default is Change original. Two arrows in a circle (Lucide RefreshCw) = Change original. Not RotateCcw, which is the reset glyph of the panel's value fields.</div>
+  <div><b>Modifiers while dragging</b>None: the original is changed. <kbd>Shift</kbd> Both sides: the original becomes the outset, one new object for the inset. <kbd>Ctrl</kbd> New object. <kbd>Ctrl</kbd>+<kbd>Shift</kbd> New object, both sides (two new objects).</div>
+  <div><b>Not there</b>No bar at the top, no Apply button, no "Stays a rectangle" / "Becomes a path" text, no Ends. Open paths get no handles and no preview.</div>
+  <div><b>Defaults pending customer</b>Center handle as the double-click target and its glyph; O and Enter; Corners in the chip; Escape keeps the values; chip below the result; drag starts from 0 at the operand box; readout always names the corner style; a cancelled drag does not change the remembered corner style (Alt steps the style while dragging, customer decision of the fourth round).</div>
+</div>
+</body>
+</html>

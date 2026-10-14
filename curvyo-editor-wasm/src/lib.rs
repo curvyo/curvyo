@@ -52,6 +52,8 @@ mod wasm_navigation;
 #[cfg(target_arch = "wasm32")]
 mod wasm_node_tool;
 #[cfg(target_arch = "wasm32")]
+mod wasm_offset;
+#[cfg(target_arch = "wasm32")]
 mod wasm_pen;
 #[cfg(target_arch = "wasm32")]
 mod wasm_properties_panel;
@@ -75,6 +77,7 @@ pub use session::{
     KeyInput, KeyOutcome, MoveIndicators, ObjectWipeOutcome, PanelTabsRecord, PanelView, Session,
     SizeOutcome, SplitOutcome, Tool, WipeOutcome, WipeState,
 };
+pub use session::{DragStop, OFFSET_COMMIT_LABEL, OffsetOutcome, OffsetView};
 
 #[cfg(target_arch = "wasm32")]
 pub use wasm_api::{WasmSession, init_panic_hook};

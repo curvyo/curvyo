@@ -49,6 +49,10 @@ mod nudge;
 mod object_bounds;
 mod object_history_text;
 mod object_selection;
+mod offset_drag;
+mod offset_entry;
+mod offset_plan;
+mod offset_primitive;
 mod oriented_box;
 mod panel_content;
 mod panel_tabs;
@@ -151,6 +155,17 @@ pub use nudge::{
 pub use object_bounds::{content_bounds, object_bounds, object_outline_bounds};
 pub use object_history_text::{object_row_name, object_row_summary};
 pub use object_selection::{ObjectSelection, SelectionCombine};
+pub use offset_drag::{
+    CORNER_SIGNS, HANDLE_HIT_RADIUS_PX, drag_distance, handle_positions, offset_box, snap_distance,
+};
+pub use offset_entry::{
+    OFFSET_DEFAULT_MM, OFFSET_MAX_MM, OFFSET_MIN_MM, OffsetDirection, OffsetJoin,
+    OffsetResultChoice, OffsetRole, OffsetSide, OffsetSides, OffsetValues, next_offset_join,
+    offset_direction_from_code, offset_join_from_code, offset_result_from_code,
+};
+pub use offset_plan::{
+    OffsetItem, OffsetPlan, OffsetRefusal, OffsetRequest, OffsetShape, offset_operands, plan_offset,
+};
 pub use oriented_box::{OrientedBox, oriented_bounds};
 pub use panel_content::{PanelContent, panel_body};
 pub use panel_tabs::{
