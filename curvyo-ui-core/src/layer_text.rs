@@ -76,7 +76,11 @@ pub fn inherited_lines(row: &LayerRow) -> (String, String) {
 /// (criterion 41); a collapsed container with a selected descendant adds "contains the selection".
 #[must_use]
 pub fn row_accessible_name(row: &LayerRow) -> String {
-    let mut parts = vec![row.name.clone(), row.kind.word().to_lowercase()];
+    let kind = match row.kind {
+        crate::layer_rows::RowKind::Clone => "linked clone".to_owned(),
+        other => other.word().to_lowercase(),
+    };
+    let mut parts = vec![row.name.clone(), kind];
     parts.extend(state_words(row));
     if row.container.is_some_and(|c| c.contains_selection) {
         parts.push("contains the selection".to_owned());
@@ -194,6 +198,8 @@ pub enum OpacityTarget {
     Objects(usize),
     /// A layer, by name.
     Layer(String),
+    /// Only linked clones, which show their original's opacity (`0050` criterion 26).
+    OnlyClones,
 }
 
 /// "Locked", "3 objects", "1 object", "Cut" (after the `Layers` glyph); nothing when nothing is targeted (the hint
@@ -206,6 +212,7 @@ pub fn opacity_caption(target: &OpacityTarget) -> String {
         OpacityTarget::Objects(count) => objects_count_text(*count),
         // The caption's `Layers` glyph says layer: the name alone.
         OpacityTarget::Layer(name) => name.clone(),
+        OpacityTarget::OnlyClones => "Linked clones show the opacity of their original.".to_owned(),
     }
 }
 
@@ -232,6 +239,17 @@ mod tests {
         .row(id)
         .unwrap()
         .clone()
+    }
+
+    /// UX review should-fix 14: a clone row says "linked clone".
+    #[test]
+    fn a_clone_row_is_named_a_linked_clone() {
+        use curvyo_document_core::{AnchorId, NewAnchor};
+        let document = Document::new(1);
+        let corner = |k: u64, x: f64| NewAnchor::corner(AnchorId::new(1, k), Point::new(x, x));
+        let a = document.create_path(&[corner(0, 0.0), corner(1, 5.0), corner(2, 9.0)], true);
+        let c = document.linked_clone(&[a], &[]).unwrap()[0];
+        assert!(row_accessible_name(&row_of(&document, c)).ends_with(", linked clone"));
     }
 
     #[test]

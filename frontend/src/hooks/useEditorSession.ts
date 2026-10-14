@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { type CanvasNotice, type HistoryNames, MAC, useHistory } from "@/hooks/useHistory";
+import { type ClonesApi, useClones } from "@/hooks/useClones";
 import { type GroupingApi, useGrouping } from "@/hooks/useGrouping";
 import { type OffsetApi, readOffsetView, useOffset } from "@/hooks/useOffset";
 import { offsetKeyOutcome, offsetReadout } from "@/lib/offsetText";
@@ -57,6 +58,7 @@ export interface NodeToolbarState {
   /** The only selected object is a compound path: the bar says its nodes
    * cannot be edited yet (`0016-boolean-operations` criterion 38). */
   compoundOnly: boolean;
+  cloneOnly: boolean;
 }
 
 const EMPTY_TOOLBAR_STATE: NodeToolbarState = {
@@ -70,6 +72,7 @@ const EMPTY_TOOLBAR_STATE: NodeToolbarState = {
   canJoin: false,
   canSplit: false,
   compoundOnly: false,
+  cloneOnly: false,
 };
 
 /** A plain-JS copy of the Rust `SelectBarView` (`specs/0009-unified-object-editing/`
@@ -99,6 +102,7 @@ export interface SelectBarState {
   ratioMixed: boolean;
   ratio: number;
   objectToPathShown: boolean;
+  scaleSwitchesShown: boolean;
 }
 
 const EMPTY_SELECT_BAR_STATE: SelectBarState = {
@@ -117,6 +121,7 @@ const EMPTY_SELECT_BAR_STATE: SelectBarState = {
   ratioMixed: false,
   ratio: 0,
   objectToPathShown: false,
+  scaleSwitchesShown: true,
 };
 
 function readSelectBar(raw: {
@@ -139,6 +144,7 @@ function readSelectBar(raw: {
   ratio_mixed: boolean;
   ratio: number;
   object_to_path_shown: boolean;
+  scale_switches_shown: boolean;
   free(): void;
 }): SelectBarState {
   const state: SelectBarState = {
@@ -159,6 +165,7 @@ function readSelectBar(raw: {
     ratioMixed: raw.ratio_mixed,
     ratio: raw.ratio,
     objectToPathShown: raw.object_to_path_shown,
+    scaleSwitchesShown: raw.scale_switches_shown,
   };
   raw.free();
   return state;
@@ -230,6 +237,7 @@ function readToolbarState(raw: {
   can_join: boolean;
   can_split: boolean;
   compound_only: boolean;
+  clone_only: boolean;
   free(): void;
 }): NodeToolbarState {
   const state: NodeToolbarState = {
@@ -243,6 +251,7 @@ function readToolbarState(raw: {
     canJoin: raw.can_join,
     canSplit: raw.can_split,
     compoundOnly: raw.compound_only,
+    cloneOnly: raw.clone_only,
   };
   raw.free();
   return state;
@@ -615,6 +624,8 @@ export interface EditorSession {
   /** The Offset tool (`specs/0038-path-offset`): its view, the entry chip's values and Enter,
    * and the notice after a release. */
   offset: OffsetApi;
+  /** Linked clones: the button, the panel block, the canvas tags (`specs/0049-linked-clone`). */
+  clones: ClonesApi;
   /** A large undo or redo is running. */
   historyBusy: boolean;
   /** The names of the next undo and redo; `null` for an empty stack. */
@@ -908,6 +919,7 @@ export function useEditorSession(
    * site know which ones to refresh. */
   const refreshHistoryRef = useRef<() => void>(() => {});
   const refreshGroupingRef = useRef<() => boolean>(() => false);
+  const refreshClonesRef = useRef<() => void>(() => {});
   const syncFromSession = useCallback(() => {
     const session = sessionRef.current;
     if (!session) {
@@ -915,6 +927,7 @@ export function useEditorSession(
     }
     refreshHistoryRef.current();
     const contextAnnounced = refreshGroupingRef.current();
+    refreshClonesRef.current();
     setToolState(session.tool() as Tool);
     setNodeToolbarState(readToolbarState(session.node_toolbar_state()));
     setPolyStarModeState(session.poly_star_mode() as PolyStarMode);
@@ -949,6 +962,11 @@ export function useEditorSession(
   useEffect(() => {
     refreshGroupingRef.current = refreshGrouping;
   }, [refreshGrouping]);
+  const clones = useClones(getSession, syncFromSession, history.showNotice, containerRef);
+  const { refresh: refreshClones, handleKeyOutcome: handleCloneOutcome } = clones;
+  useEffect(() => {
+    refreshClonesRef.current = refreshClones;
+  }, [refreshClones]);
 
   const refreshCursor = useCallback(() => {
     const session = sessionRef.current;
@@ -1125,9 +1143,19 @@ export function useEditorSession(
     // over one session instance) so a New/Open swap underneath it is
     // picked up on the very next frame, with no need to restart the
     // loop itself.
+    // The view the clone tags were last placed for: they follow every pan and zoom, whatever
+    // moved the view (`0049` UX review must-fix 7).
+    let tagView = "";
     let frame = requestAnimationFrame(function renderLoop() {
       const session = sessionRef.current;
       session?.render();
+      if (session) {
+        const view = `${session.view_origin_x()},${session.view_origin_y()},${session.view_scale()}`;
+        if (view !== tagView) {
+          tagView = view;
+          refreshClonesRef.current();
+        }
+      }
       // An open typed entry follows every pan, zoom and resize, whatever moved the view: the
       // chip stays where its placement rule puts it (`0047` UX review N1). A re-read that
       // changed nothing sets no state.
@@ -1682,6 +1710,7 @@ export function useEditorSession(
             y: press.y,
             id: editHintCounter.current,
             compound: hintCode === "compound_path",
+            clone: hintCode === "clone",
           });
         }
         // Re-run the hover so the cursor describes the handle under the
@@ -1895,6 +1924,7 @@ export function useEditorSession(
           history.showNotice(layerNotice.text, undefined, "canvas", layerNotice.kind);
         }
       }
+      handleCloneOutcome(outcome);
       if (outcome === "select-all") {
         onSelectAll(session.selection_count());
       } else if (outcome === "nudge" || outcome === "nudge-new") {
@@ -1915,6 +1945,7 @@ export function useEditorSession(
       handleKeyOutcome,
       handleGroupingOutcome,
       history,
+      handleCloneOutcome,
       isSpaceHeld,
       syncFromSession,
       onNudge,
@@ -2077,6 +2108,7 @@ export function useEditorSession(
     canvasNotice: history.notice,
     grouping,
     offset,
+    clones,
     historyBusy: history.busy,
     historyNames: history.names,
     pressHistory: history.press,

@@ -27,6 +27,9 @@ pub(super) struct DocumentRead {
     pub(super) inert: Arc<HashSet<NodeId>>,
     /// The front-most layer, if the document has one.
     pub(super) front_layer: Option<NodeId>,
+    /// Every leaf with an index by id and the direct clones of each: what the panel of linked
+    /// clones reads (`specs/0049-linked-clone` decision 3).
+    pub(super) clones: Arc<curvyo_document_core::ObjectRead>,
 }
 
 impl DocumentRead {
@@ -59,7 +62,11 @@ impl DocumentRead {
             .rev()
             .find(|read| read.kind == curvyo_document_core::NodeKind::Layer)
             .map(|read| read.id);
+        let clones = Arc::new(curvyo_document_core::ObjectRead::from_objects(Arc::clone(
+            &leaves,
+        )));
         Self {
+            clones,
             front_layer,
             nodes,
             leaves,
@@ -180,6 +187,26 @@ mod tests {
             &after[..],
             "the read after the drag sees the move"
         );
+    }
+
+    /// A linked clone is in the read resolved, and follows its original on the next read.
+    #[test]
+    fn the_read_holds_clones_resolved() {
+        let document = Document::new(1);
+        add_path(&document, 1);
+        let original = document.object_ids()[0];
+        let clone = document.linked_clone(&[original], &[]).unwrap()[0];
+        let cache = ObjectCache::default();
+        let read = cache.read(&document, false).leaves.clone();
+        assert!(
+            matches!(&read[1], ObjectSnapshot::Clone(c) if c.id() == clone && c.chain.origin == original)
+        );
+        let _ = document.translate_objects(&[original], curvyo_document_core::Vec2::new(5.0, 0.0));
+        let after = cache.read(&document, false).leaves.clone();
+        let ObjectSnapshot::Clone(moved) = &after[1] else {
+            panic!("a clone")
+        };
+        assert_eq!(moved.resolved.anchors[0].point, Point::new(5.0, 0.0));
     }
 
     #[test]

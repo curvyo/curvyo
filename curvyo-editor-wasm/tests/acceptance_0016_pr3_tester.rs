@@ -404,6 +404,7 @@ fn style_of(o: &ObjectSnapshot) -> curvyo_document_core::Style {
     match o {
         ObjectSnapshot::Path(p) => p.style.clone(),
         ObjectSnapshot::Primitive(p) => p.style.clone(),
+        ObjectSnapshot::Clone(p) => p.resolved.style.clone(),
     }
 }
 

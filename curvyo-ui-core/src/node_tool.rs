@@ -83,6 +83,9 @@ pub struct NodeToolbarState {
     /// outline but no node, and the host says why (`0016-boolean-operations` criterion 38).
     /// Set by the session, which sees the object selection; the node tool does not.
     pub compound_only: bool,
+    /// The selection holds linked clones (and compound paths) only: the bar holds the sentence that
+    /// a clone has no nodes (`specs/0049-linked-clone` criterion 26).
+    pub clone_only: bool,
     /// Join: the current selection is exactly two endpoint nodes of
     /// open paths (same path or two different objects), not the two
     /// ends of a 2-anchor open path (acceptance criterion 8).
@@ -623,6 +626,7 @@ impl NodeTool {
             can_make_line: segment_is_line == Some(false),
             can_make_curve: segment_is_line == Some(true),
             compound_only: false,
+            clone_only: false,
             can_join: self.can_join(document),
             can_split: self.can_split(document),
         }

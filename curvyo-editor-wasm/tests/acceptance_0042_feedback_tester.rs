@@ -253,7 +253,7 @@ fn c10_far_back_apply_asks_for_the_long_operation_state_and_near_apply_does_not(
 }
 
 #[test]
-fn c10_save_and_open_after_an_apply_keep_state_history_and_format_12() {
+fn c10_save_and_open_after_an_apply_keep_state_history_and_format_13() {
     let mut s = fresh();
     draw_rect(&mut s, 20.0);
     draw_rect(&mut s, 200.0);
@@ -273,8 +273,9 @@ fn c10_save_and_open_after_an_apply_keep_state_history_and_format_12() {
     let mut text = String::new();
     std::io::Read::read_to_string(&mut z.by_name("manifest.json").unwrap(), &mut text).unwrap();
     let m: Value = serde_json::from_str(&text).unwrap();
-    assert_eq!(m["format_version"].as_u64().unwrap(), 12);
-    assert_eq!(CURRENT_FORMAT_VERSION, 12);
+    // 0042 adds no bump; 13 is the version `0049-linked-clone` introduced.
+    assert_eq!(m["format_version"].as_u64().unwrap(), 13);
+    assert_eq!(CURRENT_FORMAT_VERSION, 13);
 }
 
 // ---------------------------------------------------------------------

@@ -77,12 +77,17 @@ struct Contour {
 
 fn contour_of(object: &ObjectSnapshot) -> Option<Contour> {
     match object {
-        ObjectSnapshot::Path(path) if !path.is_compound() => Some(Contour {
-            id: path.id,
-            anchors: path.anchors.clone(),
-            closed: path.closed,
-        }),
-        ObjectSnapshot::Path(_) => None,
+        ObjectSnapshot::Path(path)
+        | ObjectSnapshot::Clone(curvyo_document_core::CloneSnapshot { resolved: path, .. })
+            if !path.is_compound() =>
+        {
+            Some(Contour {
+                id: path.id,
+                anchors: path.anchors.clone(),
+                closed: path.closed,
+            })
+        }
+        ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_) => None,
         ObjectSnapshot::Primitive(primitive) => {
             let placeholder = AnchorId::new(0, 0);
             let anchors = outline_of_rotated(&primitive.shape, primitive.rotation)

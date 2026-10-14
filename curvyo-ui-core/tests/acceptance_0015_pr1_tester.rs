@@ -560,7 +560,7 @@ fn first_path_points(d: &Document) -> Vec<(f64, f64)> {
         .into_iter()
         .filter_map(|id| match d.object(id).unwrap() {
             ObjectSnapshot::Path(p) => Some(p),
-            ObjectSnapshot::Primitive(_) => None,
+            ObjectSnapshot::Primitive(_) | ObjectSnapshot::Clone(_) => None,
         })
         .flat_map(|p| p.anchors.into_iter().map(|a| (a.point.x, a.point.y)))
         .collect()

@@ -96,7 +96,10 @@ pub(crate) fn operands_in_order<'a>(
 
 pub(crate) fn is_open(object: &ObjectSnapshot) -> bool {
     match object {
-        ObjectSnapshot::Path(path) => path.subpaths().any(|subpath| !subpath.closed),
+        ObjectSnapshot::Path(path)
+        | ObjectSnapshot::Clone(curvyo_document_core::CloneSnapshot { resolved: path, .. }) => {
+            path.subpaths().any(|subpath| !subpath.closed)
+        }
         ObjectSnapshot::Primitive(_) => false,
     }
 }
@@ -181,7 +184,8 @@ pub struct BooleanPlan {
 /// rotated outline.
 pub(crate) fn outlines_of(object: &ObjectSnapshot) -> Vec<(Vec<OutlineTriple>, bool)> {
     match object {
-        ObjectSnapshot::Path(path) => path
+        ObjectSnapshot::Path(path)
+        | ObjectSnapshot::Clone(curvyo_document_core::CloneSnapshot { resolved: path, .. }) => path
             .subpaths()
             .map(|subpath| {
                 (

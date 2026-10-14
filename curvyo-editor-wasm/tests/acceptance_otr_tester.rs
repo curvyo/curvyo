@@ -157,6 +157,7 @@ fn rotate_doc_object(d: &Document, radians: f64) {
     let id = d.object_ids()[0];
     let o = d.object(id).unwrap();
     let c = match &o {
+        ObjectSnapshot::Clone(_) => panic!("no clone here"),
         ObjectSnapshot::Primitive(p) => match p.shape {
             Shape::Rect { bounds, .. } => pt(
                 bounds.origin.x + bounds.width.as_mm() / 2.0,
@@ -1506,6 +1507,7 @@ fn ac16_ac17_pivot_rule_is_identical_for_every_kind_and_writes_frame_or_anchors(
         let alpha = 27.0_f64.to_radians();
         let want_c = rot(c0, pivot, alpha);
         match doc_of(&s).object(doc_of(&s).object_ids()[0]).unwrap() {
+            ObjectSnapshot::Clone(_) => panic!("no clone here"),
             ObjectSnapshot::Primitive(p) => {
                 let Shape::Ellipse { frame } = p.shape else {
                     panic!()
@@ -3589,6 +3591,7 @@ fn finite_and_reopenable(s: &Session, ctx: &str) {
     let d = doc_of(&re);
     for id in d.object_ids() {
         match d.object(id).unwrap() {
+            ObjectSnapshot::Clone(_) => panic!("no clone here"),
             ObjectSnapshot::Primitive(p) => {
                 assert!(p.rotation.as_radians().is_finite(), "{ctx}");
                 match p.shape {

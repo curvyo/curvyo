@@ -53,6 +53,8 @@ export interface LayerRowData {
   label: string;
   /** The tooltip's second line. */
   stateLine: string;
+  /** A clone row's chain line for its tooltip (`0049`); empty otherwise. */
+  chainLine?: string;
   /** "Hidden" or "Locked" when a press selects nothing. */
   refusal: string;
   /** "select-contents" for a layer row, else "". */
@@ -80,6 +82,8 @@ export interface LayerToolbarData {
   moveUp: boolean;
   moveDown: boolean;
   duplicate: boolean;
+  /** Linked clone (`specs/0049-linked-clone`): the Select bar's rule. */
+  linkedClone: boolean;
 }
 
 /** The whole tab as the session returns it. */
@@ -107,7 +111,14 @@ const EMPTY_VIEW: LayersViewData = {
   opacity: { caption: "", field: false, layer: false, value: null, bar: 0 },
   activeLayer: null,
   canDeleteLayer: false,
-  toolbar: { newLayer: true, deleteLayer: false, moveUp: false, moveDown: false, duplicate: false },
+  toolbar: {
+    newLayer: true,
+    deleteLayer: false,
+    moveUp: false,
+    moveDown: false,
+    duplicate: false,
+    linkedClone: false,
+  },
   firstSelected: null,
   rows: [],
 };
@@ -186,6 +197,33 @@ export function windowRange(
   const first = Math.max(0, Math.floor(top / rowHeight) - overscan);
   const count = Math.min(total - first, Math.min(MAX_ROW_ELEMENTS - 1, shown + 2 * overscan));
   return { first, count };
+}
+
+/** The rows the list reads: the scroll window, and the focused row on its own when it lies
+ * outside, so focus is never lost (criterion 48) and the window always follows the scroll. The
+ * window used to stretch from the focused row, capped at 60 rows, and with the focus on row 1
+ * and the list scrolled far down it rendered nothing on screen (`0049` UX review must-fix 9). */
+export function listWindow(
+  range: { first: number; count: number },
+  focused: number,
+  total: number,
+): { first: number; count: number; extra: number | null } {
+  const inside = focused >= range.first && focused < range.first + range.count;
+  return {
+    first: range.first,
+    count: range.count,
+    extra: inside || focused >= total || total === 0 ? null : focused,
+  };
+}
+
+/** `view` with the focused row read on its own (`extra`, from [`listWindow`]) added. */
+export function withExtraRow(view: LayersViewData, extra: LayersViewData | null): LayersViewData {
+  if (!extra || extra.rows.length === 0) {
+    return view;
+  }
+  const known = new Set(view.rows.map((row) => row.index));
+  const added = extra.rows.filter((row) => !known.has(row.index));
+  return added.length === 0 ? view : { ...view, rows: [...view.rows, ...added] };
 }
 
 /** The row a key moves the roving focus to, or null for another key (criterion 38). */

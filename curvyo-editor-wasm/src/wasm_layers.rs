@@ -57,6 +57,11 @@ impl WasmSession {
         }
     }
 
+    /// Select original on a clone row.
+    pub fn select_row_original(&mut self, id: &str) -> String {
+        self.session.select_row_original(id).to_json()
+    }
+
     /// Select contents on a layer row.
     pub fn select_layer_contents(&mut self, id: &str) -> String {
         self.session.select_layer_contents(id).to_json()

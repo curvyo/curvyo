@@ -270,8 +270,11 @@ impl Session {
     #[must_use]
     pub fn selection_announcement(&self) -> String {
         // Before the document read: this runs on every sync.
-        if self.tool != Tool::Select || self.selection.ids().len() < 2 {
+        if self.tool != Tool::Select || self.selection.ids().is_empty() {
             return String::new();
+        }
+        if let [only] = self.selection.ids() {
+            return self.clone_announcement(*only);
         }
         let objects = self.objects();
         let Some(group) = self.group_in(&objects) else {

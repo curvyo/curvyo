@@ -83,6 +83,7 @@ fn styles(s: &Session) -> Vec<Style> {
         .map(|o| match o {
             ObjectSnapshot::Path(p) => p.style,
             ObjectSnapshot::Primitive(p) => p.style,
+            ObjectSnapshot::Clone(p) => p.resolved.style,
         })
         .collect()
 }
@@ -359,7 +360,7 @@ fn a_mixed_selection_of_paths_and_primitives_edits_the_paths_in_one_commit() {
     for (id, style) in d.object_ids().into_iter().zip(st) {
         match d.object(id).unwrap() {
             ObjectSnapshot::Path(_) => assert_eq!(style.stroke.markers.end, MarkerShape::Arrow),
-            ObjectSnapshot::Primitive(_) => {
+            ObjectSnapshot::Primitive(_) | ObjectSnapshot::Clone(_) => {
                 assert_eq!(
                     style.stroke.markers,
                     Markers::default(),
@@ -766,7 +767,7 @@ fn a_resize_moves_the_markers_with_the_geometry_without_stretching_them() {
     let d = doc_of(&s);
     let end_x = match d.object(d.object_ids()[0]).unwrap() {
         ObjectSnapshot::Path(p) => p.anchors.last().unwrap().point.x,
-        ObjectSnapshot::Primitive(_) => unreachable!(),
+        ObjectSnapshot::Primitive(_) | ObjectSnapshot::Clone(_) => unreachable!(),
     };
     assert!((end_x - 200.0).abs() < 1e-6, "resized to x = {end_x}");
     let list = s.draw_list();

@@ -15,6 +15,7 @@ import type { ReactNode } from "react";
 import type { NodeToolbarState } from "@/hooks/useEditorSession";
 import { ClosePathGroup } from "@/components/ClosePathGroup";
 import { COMPOUND_NODES_TEXT } from "@/lib/booleanText";
+import { CLONE_NODES_TEXT } from "@/lib/cloneText";
 
 export interface NodeActions {
   insertSelected: () => void;
@@ -154,7 +155,7 @@ interface NodeToolbarProps {
  * specification.md`'s UX notes).
  */
 export function NodeToolbar({ state, actions, closePath }: NodeToolbarProps) {
-  if (state.compoundOnly) {
+  if (state.compoundOnly || state.cloneOnly) {
     // Text only, no controls (`0016-boolean-operations` criterion 38).
     return (
       <div
@@ -166,7 +167,7 @@ export function NodeToolbar({ state, actions, closePath }: NodeToolbarProps) {
           color: "var(--toolbar-icon)",
         }}
       >
-        {COMPOUND_NODES_TEXT}
+        {state.cloneOnly ? CLONE_NODES_TEXT : COMPOUND_NODES_TEXT}
       </div>
     );
   }

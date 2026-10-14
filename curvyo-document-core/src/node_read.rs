@@ -7,9 +7,11 @@
 
 use loro::{LoroTree, TreeID};
 
+use crate::clone_read::{RawLeaf, resolve};
 use crate::document::{Document, OBJECTS_TREE};
 use crate::group_tree::{children_of, is_group_node, is_layer_node, node_id};
 use crate::node_registers::{NodeRegisters, read_registers};
+use crate::object_read::raw_leaf;
 use crate::path_model::NodeId;
 use crate::primitive_model::ObjectSnapshot;
 use crate::style_model::Opacity;
@@ -89,41 +91,52 @@ impl Inherited {
     };
 }
 
-/// The read of one node, or `None` for a leaf whose data does not decode (merge residue only:
-/// open refuses such a file), which the read leaves out with everything it would hold.
-fn read_node(
-    document: &Document,
-    tree: &LoroTree,
-    id: TreeID,
+/// One node met by the walk, before the clones among the leaves are resolved.
+struct Walked {
+    node: NodeId,
     from: Inherited,
-) -> Option<NodeRead> {
-    let node = node_id(id);
-    let registers = tree
-        .get_meta(id)
-        .map(|meta| read_registers(&meta))
-        .unwrap_or_default();
-    let kind = if is_layer_node(tree, id) {
-        NodeKind::Layer
-    } else if is_group_node(tree, id) {
-        NodeKind::Group
-    } else {
-        NodeKind::Leaf(document.object(node)?)
-    };
-    let product = from.opacity * registers.opacity.get();
-    // invariant: a product of numbers in 0..=1 lies in 0..=1.
-    let opacity = Opacity::new(product).unwrap_or(Opacity::OPAQUE);
-    Some(NodeRead {
-        id: node,
-        parent: from.parent,
-        depth: from.depth,
-        kind,
-        visible: registers.visible && from.hidden_by.is_none(),
-        locked: registers.locked || from.locked_by.is_some(),
-        opacity,
-        hidden_by: from.hidden_by,
-        locked_by: from.locked_by,
-        registers,
-    })
+    registers: NodeRegisters,
+    /// A layer or a group; `None` for a leaf, whose data comes from the resolver.
+    container: Option<NodeKind>,
+    /// The index of the leaf in the resolver's input.
+    leaf: Option<usize>,
+}
+
+impl Walked {
+    /// The node's read with its data, or `None` for a leaf the resolver left out (an orphan) or
+    /// that does not decode. A linked clone's opacity is its root's own `opacity` register times
+    /// the clone's own ancestors'; the clone's own `opacity` key is residue (ADR 0015 §3).
+    fn read(
+        self,
+        leaves: &mut [Option<ObjectSnapshot>],
+        own_opacity: &std::collections::HashMap<NodeId, f64>,
+    ) -> Option<NodeRead> {
+        let kind = match (self.container, self.leaf) {
+            (Some(kind), _) => kind,
+            (None, Some(at)) => NodeKind::Leaf(leaves[at].take()?),
+            (None, None) => return None,
+        };
+        let own = match &kind {
+            NodeKind::Leaf(ObjectSnapshot::Clone(clone)) => {
+                own_opacity.get(&clone.chain.root).copied().unwrap_or(1.0)
+            }
+            _ => self.registers.opacity.get(),
+        };
+        // invariant: a product of numbers in 0..=1 lies in 0..=1.
+        let opacity = Opacity::new(self.from.opacity * own).unwrap_or(Opacity::OPAQUE);
+        Some(NodeRead {
+            id: self.node,
+            parent: self.from.parent,
+            depth: self.from.depth,
+            kind,
+            visible: self.registers.visible && self.from.hidden_by.is_none(),
+            locked: self.registers.locked || self.from.locked_by.is_some(),
+            opacity,
+            hidden_by: self.from.hidden_by,
+            locked_by: self.from.locked_by,
+            registers: self.registers,
+        })
+    }
 }
 
 impl Document {
@@ -135,28 +148,39 @@ impl Document {
     #[must_use]
     pub fn read_nodes(&self) -> Vec<NodeRead> {
         let tree = self.loro().get_tree(OBJECTS_TREE);
-        let mut reads = Vec::new();
+        let mut walked: Vec<Walked> = Vec::new();
+        let mut raws: Vec<RawLeaf> = Vec::new();
         let mut stack: Vec<(TreeID, Inherited)> = children_of(&tree, None)
             .into_iter()
             .rev()
             .map(|id| (id, Inherited::TOP))
             .collect();
         while let Some((id, from)) = stack.pop() {
-            let Some(read) = read_node(self, &tree, id, from) else {
-                continue;
+            let node = node_id(id);
+            let registers = tree
+                .get_meta(id)
+                .map(|meta| read_registers(&meta))
+                .unwrap_or_default();
+            let container = if is_layer_node(&tree, id) {
+                Some(NodeKind::Layer)
+            } else if is_group_node(&tree, id) {
+                Some(NodeKind::Group)
+            } else {
+                None
             };
-            if read.is_container() {
+            if container.is_some() {
+                let opacity = from.opacity * registers.opacity.get();
                 let down = Inherited {
-                    parent: Some(read.id),
+                    parent: Some(node),
                     depth: from.depth + 1,
-                    opacity: read.opacity.get(),
-                    hidden_by: if read.registers.visible {
+                    opacity,
+                    hidden_by: if registers.visible {
                         from.hidden_by
                     } else {
-                        Some(read.id)
+                        Some(node)
                     },
-                    locked_by: if read.registers.locked {
-                        Some(read.id)
+                    locked_by: if registers.locked {
+                        Some(node)
                     } else {
                         from.locked_by
                     },
@@ -168,9 +192,34 @@ impl Document {
                         .map(|child| (child, down)),
                 );
             }
-            reads.push(read);
+            let leaf = if container.is_none() {
+                raw_leaf(&tree, id).map(|raw| {
+                    raws.push(raw);
+                    raws.len() - 1
+                })
+            } else {
+                None
+            };
+            walked.push(Walked {
+                node,
+                from,
+                registers,
+                container,
+                leaf,
+            });
         }
-        reads
+        // One resolution of every clone, in the stacking order of the walk (`specs/0049-linked-
+        // clone/adrs.md` decision 3 as amended: result i belongs to leaf i).
+        let own_opacity: std::collections::HashMap<NodeId, f64> = walked
+            .iter()
+            .filter(|w| w.leaf.is_some())
+            .map(|w| (w.node, w.registers.opacity.get()))
+            .collect();
+        let mut leaves = resolve(raws).leaves;
+        walked
+            .into_iter()
+            .filter_map(|w| w.read(&mut leaves, &own_opacity))
+            .collect()
     }
 
     /// The own registers of `id`, or `None` when it does not exist.

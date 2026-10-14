@@ -292,7 +292,7 @@ fn markers_panel(
         .into_iter()
         .filter_map(|object| match object {
             ObjectSnapshot::Path(path) => Some(path),
-            ObjectSnapshot::Primitive(_) => None,
+            ObjectSnapshot::Primitive(_) | ObjectSnapshot::Clone(_) => None,
         })
         .collect();
     if !rows_shown || paths.is_empty() {

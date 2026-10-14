@@ -25,6 +25,7 @@ fn shape_word(shape: ObjectShape) -> &'static str {
         ObjectShape::Polygon => "polygon",
         ObjectShape::Star => "star",
         ObjectShape::Group => "group",
+        ObjectShape::Clone => "clone",
     }
 }
 
@@ -91,6 +92,7 @@ fn shape_name(shape: ObjectShape) -> &'static str {
         ObjectShape::Polygon => "Polygon",
         ObjectShape::Star => "Star",
         ObjectShape::Group => "Group",
+        ObjectShape::Clone => "Clone",
     }
 }
 

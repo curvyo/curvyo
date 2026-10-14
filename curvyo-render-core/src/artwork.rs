@@ -17,6 +17,7 @@ use crate::glyphs::DrawList;
 use crate::marker_place::marker_placements;
 use crate::markers::{MarkerBudget, marker_triangles};
 use crate::shape_preview::outline_to_anchors;
+use crate::shared_outline::SharedOutlines;
 use crate::stroke::{self, OutlineRef, StrokeParams};
 use crate::theme;
 
@@ -55,9 +56,16 @@ pub fn build_artwork(objects: &[ObjectSnapshot], view: ViewTransform) -> DrawLis
         markers: MarkerBudget::per_frame(),
     };
     let mut list = DrawList::default();
+    let mut shared = SharedOutlines::default();
     for object in objects {
         match object {
-            ObjectSnapshot::Path(path) => {
+            // A clone with a rigid map of a plain root reuses the root's tessellation
+            // (`specs/0049-linked-clone` criterion 44).
+            ObjectSnapshot::Clone(clone) if shared.draw(&mut list, clone, view) => {}
+            ObjectSnapshot::Path(path)
+            | ObjectSnapshot::Clone(curvyo_document_core::CloneSnapshot {
+                resolved: path, ..
+            }) => {
                 draw_path(&mut list, path, view, &mut budgets);
             }
             ObjectSnapshot::Primitive(primitive) => {
@@ -132,11 +140,64 @@ fn draw_fill(list: &mut DrawList, outlines: &[OutlineRef<'_>], style: &Style, vi
     if color.a == 0 {
         return;
     }
-    let Some(path) = stroke::build_fill_path(outlines) else {
-        return;
-    };
+    if let Some(layer) = fill_layer(outlines, color, view) {
+        list.extend_artwork(layer);
+    }
+}
+
+/// The triangles of the fill of `outlines` in `color`.
+pub(crate) fn fill_layer(
+    outlines: &[OutlineRef<'_>],
+    color: RgbaColor,
+    view: ViewTransform,
+) -> Option<DrawList> {
+    let path = stroke::build_fill_path(outlines)?;
     let tolerance_mm = screen_px_to_mm(view, theme::DISPLAY_TOLERANCE_PX);
-    list.extend_artwork(fill::fill(&path, color, tolerance_mm));
+    Some(fill::fill(&path, color, tolerance_mm))
+}
+
+/// The parameters of an object's stroke at this view, `None` when it draws nothing.
+pub(crate) fn stroke_params(
+    stroke_style: &Stroke,
+    color: RgbaColor,
+    view: ViewTransform,
+) -> Option<StrokeParams> {
+    let document_width_mm = stroke_style.width.as_mm();
+    if color.a == 0 || !document_width_mm.is_finite() || document_width_mm <= 0.0 {
+        return None;
+    }
+    let tolerance_mm = screen_px_to_mm(view, theme::DISPLAY_TOLERANCE_PX);
+    let min_width_mm = screen_px_to_mm(view, theme::MIN_DISPLAY_STROKE_WIDTH_PX);
+    Some(StrokeParams {
+        width_mm: document_width_mm
+            .max(min_width_mm)
+            .min(MAX_DISPLAY_STROKE_WIDTH_MM),
+        color,
+        tolerance_mm,
+        join: stroke_style.join,
+        cap: stroke_style.cap,
+    })
+}
+
+/// The triangles of the solid stroke of `outlines`, all outlines in one layer.
+pub(crate) fn solid_stroke_layer(
+    outlines: &[OutlineRef<'_>],
+    params: &StrokeParams,
+) -> Option<DrawList> {
+    let mut parts: Vec<Path> = outlines
+        .iter()
+        .filter_map(|outline| stroke::build_path(outline.anchors, outline.closed))
+        .collect();
+    let combined = match parts.len() {
+        0 => return None,
+        1 => parts.remove(0),
+        _ => {
+            let mut builder = Path::builder();
+            builder.extend_from_paths(&parts.iter().map(Path::as_slice).collect::<Vec<_>>());
+            builder.build()
+        }
+    };
+    Some(stroke::stroke(&combined, params))
 }
 
 /// The stroke layer of an object. Every outline is dashed on its own, so a
@@ -157,20 +218,10 @@ fn draw_stroke(
     let stroke_style = &style.stroke;
     let color = paint(stroke_style.color, stroke_style.opacity);
     let document_width_mm = stroke_style.width.as_mm();
-    if color.a == 0 || !document_width_mm.is_finite() || document_width_mm <= 0.0 {
+    let Some(params) = stroke_params(stroke_style, color, view) else {
         return;
-    }
-    let tolerance_mm = screen_px_to_mm(view, theme::DISPLAY_TOLERANCE_PX);
-    let min_width_mm = screen_px_to_mm(view, theme::MIN_DISPLAY_STROKE_WIDTH_PX);
-    let params = StrokeParams {
-        width_mm: document_width_mm
-            .max(min_width_mm)
-            .min(MAX_DISPLAY_STROKE_WIDTH_MM),
-        color,
-        tolerance_mm,
-        join: stroke_style.join,
-        cap: stroke_style.cap,
     };
+    let tolerance_mm = params.tolerance_mm;
     let solid: Vec<Path> = outlines
         .iter()
         .filter_map(|outline| stroke::build_path(outline.anchors, outline.closed))

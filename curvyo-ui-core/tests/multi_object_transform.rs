@@ -401,10 +401,12 @@ fn a_typed_angle_and_its_negative_restore_the_selection() {
     for (old, new) in before.iter().zip(rig.objects()) {
         let (Shape::Rect { bounds: x, .. }, Shape::Rect { bounds: y, .. }) = (
             match old {
+                ObjectSnapshot::Clone(_) => panic!("no clone here"),
                 ObjectSnapshot::Primitive(p) => p.shape,
                 ObjectSnapshot::Path(_) => panic!("a primitive"),
             },
             match &new {
+                ObjectSnapshot::Clone(_) => panic!("no clone here"),
                 ObjectSnapshot::Primitive(p) => p.shape,
                 ObjectSnapshot::Path(_) => panic!("a primitive"),
             },

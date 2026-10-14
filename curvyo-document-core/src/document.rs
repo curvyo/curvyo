@@ -149,7 +149,15 @@ pub struct DocumentVersion(pub(crate) loro::Frontiers);
 /// rewritten. A mistyped register, an opacity outside 0..=1 and `layer` on a leaf are refused as
 /// damaged (`crate::node_registers`); a `layer` marker below the top level reads as a plain group.
 /// Golden: `layers_v12.curvyo`.
-pub const CURRENT_FORMAT_VERSION: u32 = 12;
+/// Bumped to 13 in `linked-clone` (`specs/0049-linked-clone/adrs.md` decisions 1 and 11): a leaf
+/// may be a clone, `shape = "clone"` with one `clone_link` register `{origin, matrix}` and no
+/// outline of its own. A build that stops at version 12 would read the clone as a primitive of an
+/// unknown shape and refuse it as damaged, or draw nothing where the maker sees an object, so it
+/// must refuse the file as too new. Migration from version 12 is none: a file from an earlier
+/// build has no clone and opens unchanged and is not rewritten. A clone without a readable link,
+/// or with a matrix entry that is not finite or lies beyond ±1e7, is refused as damaged; a clone
+/// whose original is missing or of the wrong kind is an orphan, not damage. Golden: `clone_v13.curvyo`.
+pub const CURRENT_FORMAT_VERSION: u32 = 13;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";
@@ -193,6 +201,14 @@ pub struct Document {
     /// Whether a new object drawn into a document with no layer makes the Initial Layer
     /// (`crate::groups`); view state of the caller, never stored.
     pub(crate) initial_layer: std::cell::Cell<bool>,
+    /// What the clone repair of the last removing command did (`crate::clone_repair`); view
+    /// state for its notice, never stored.
+    pub(crate) clone_repair: std::cell::Cell<crate::clone_repair::CloneRepair>,
+    /// The next counter of the anchor ids the clone repair takes (`crate::clone_repair`).
+    pub(crate) repair_ids: std::cell::Cell<u64>,
+    /// The clone named by the last refusal of the limit check (`crate::clone_write`); view state
+    /// for its notice, never stored.
+    pub(crate) clone_refusal: std::cell::Cell<Option<crate::path_model::NodeId>>,
     /// The steps that touched each object, for the Object scope of the history.
     pub(crate) object_index: std::cell::RefCell<crate::history::ObjectIndex>,
     /// The step an object undo of one object would really write, until the log changes.
@@ -243,6 +259,9 @@ impl Document {
             step_index: std::cell::RefCell::default(),
             draw_parent: std::cell::Cell::default(),
             initial_layer: std::cell::Cell::default(),
+            clone_repair: std::cell::Cell::default(),
+            repair_ids: std::cell::Cell::default(),
+            clone_refusal: std::cell::Cell::default(),
             object_index: std::cell::RefCell::default(),
             writable_cache: std::cell::RefCell::default(),
         };
@@ -294,6 +313,9 @@ impl Document {
             step_index: std::cell::RefCell::default(),
             draw_parent: std::cell::Cell::default(),
             initial_layer: std::cell::Cell::default(),
+            clone_repair: std::cell::Cell::default(),
+            repair_ids: std::cell::Cell::default(),
+            clone_refusal: std::cell::Cell::default(),
             object_index: std::cell::RefCell::default(),
             writable_cache: std::cell::RefCell::default(),
         })
@@ -406,6 +428,12 @@ impl Document {
                         id,
                         objects: self.json_children(Some(id)),
                     }
+                } else if let Some(link) = self.clone_link_of(id) {
+                    ObjectJson::Clone {
+                        id,
+                        origin: link.origin,
+                        matrix: link.matrix,
+                    }
                 } else {
                     ObjectJson::from(self.object(id)?)
                 };
@@ -489,6 +517,13 @@ enum ObjectJson {
         id: crate::path_model::NodeId,
         objects: Vec<NodeJson>,
     },
+    /// A linked clone (`specs/0049-linked-clone` criterion 40): the original it follows and its
+    /// matrix `[a, b, c, d, e, f]`, no outline. Listed whether or not its chain resolves.
+    Clone {
+        id: crate::path_model::NodeId,
+        origin: crate::path_model::NodeId,
+        matrix: crate::affine::Affine,
+    },
     Path {
         id: crate::path_model::NodeId,
         closed: bool,
@@ -544,6 +579,11 @@ impl From<crate::primitive_model::ObjectSnapshot> for ObjectJson {
                 anchors: path.anchors,
                 extra_subpaths: path.extra_subpaths,
                 rotation: path.rotation,
+            },
+            ObjectSnapshot::Clone(clone) => Self::Clone {
+                id: clone.id(),
+                origin: clone.chain.origin,
+                matrix: clone.chain.matrix,
             },
             ObjectSnapshot::Primitive(primitive) => {
                 let id = primitive.id;

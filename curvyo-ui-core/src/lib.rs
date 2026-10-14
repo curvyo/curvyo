@@ -17,6 +17,9 @@ mod anchor_id_minter;
 mod angle_snap;
 mod boolean;
 mod break_apart;
+mod clone_gesture;
+mod clone_marks;
+mod clone_panel;
 mod close_path;
 mod closing_join;
 mod colour_hsv;
@@ -46,6 +49,7 @@ mod hit_test_object;
 mod layer_move;
 mod layer_rows;
 mod layer_text;
+mod linked_clone;
 mod marquee;
 mod modifiers;
 mod move_entry;
@@ -101,6 +105,13 @@ pub use boolean::{
 };
 pub use break_apart::{
     BREAK_APART_COMMIT_LABEL, BreakApartPlan, BreakApartRefusal, plan_break_apart,
+};
+pub use clone_marks::{
+    CloneMarks, EdgeChip, MarkForm, MarkFrame, MarkRect, MarkRole, MarkTag, MarkTrace, clone_marks,
+};
+pub use clone_panel::{
+    CloneBlock, clone_block, followers_of, object_name, select_clones, select_originals,
+    select_root_originals,
 };
 pub use close_path::{
     ClosableCounts, ClosePlan, closable_counts, close_path_set, plan_close_paths,
@@ -164,6 +175,9 @@ pub use layer_text::{
     deleted_layer_notice, draw_refused_notice, inherited_lines, locked_object_notice,
     moved_announcement, nothing_to_select_notice, objects_count_text, opacity_caption,
     row_accessible_name, row_refusal, row_state_line,
+};
+pub use linked_clone::{
+    LinkedClonePlan, MAX_REFUSAL_OUTLINES, linked_clone_shown, plan_linked_clone,
 };
 pub use marquee::{MarqueeMode, objects_in_marquee, units_in_marquee};
 pub use modifiers::Modifiers;

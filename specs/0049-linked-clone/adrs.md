@@ -48,6 +48,19 @@ trait, no generic.
    `origin` id string and a `matrix` of six finite numbers within ±1e7, or if the clone node has
    children. Other keys on a clone, and `clone_link` on any other node, are ignored residue
    (ADR 0015 §4); `set_node_opacity` of `0050` skips clones.
+
+   *Amended 2026-10-14 (architect, AC 53 merge case): a clone without a link is an orphan, not
+   damage.* Unlinking on one peer while the other peer unlinks and then undoes can merge, key by
+   key, into `shape = "clone"` with anchors but no `clone_link`. That node was refused as
+   Malformed, and the refusal rejected the whole import. Now a clone node with no `clone_link`
+   key at all reads as an orphan (ADR 0015 §6, tolerance of merge residue), on Open and on import.
+   A `clone_link` that is present but malformed is still damage: the link is written whole, so no
+   merge can produce one. Our writers do not change: Unlink still removes `shape` and
+   `clone_link`, and a restore still writes its fields.
+   Rejected: (A) Unlink keeps `clone_link` and a restore keeps the anchors. That changes the stored
+   form and leaves residue in our own files. It also protects only against this one sequence, while
+   per-key merges of independent registers can produce other combinations too, so the reader must
+   tolerate them anyway.
 2. **The read is a new variant (2026-10-10, extended 2026-10-11).**
    `ObjectSnapshot::Clone(CloneSnapshot { id, origin, root, depth, matrix, composed, resolved })`.
    `composed` is the matrix from the root's coordinates to the clone's (M_B·M_A for B → A → O).
@@ -63,6 +76,15 @@ trait, no generic.
    site. The writers get `Planned::Clone`, which writes only `clone_link`. Node edits, Join, Split,
    segment bending, the Pen's continue and connect, and Object to path refuse a clone with the
    refusal pattern of `0016` and `0023`.
+
+   *Amended 2026-10-14 (architect review of M1): the layout is two parts.*
+   `CloneSnapshot { resolved: PathSnapshot, chain: Box<CloneChain> }`, where `CloneChain` holds
+   `origin`, `root`, `depth`, `matrix` and `composed`, and the id is `resolved.id`. The fields are
+   the ones above. Why: flat, the variant made every `ObjectSnapshot` 304 bytes instead of 168 and
+   tripped `large_enum_variant`; boxed, a clone is 160 bytes and no other type grows. Rejected:
+   boxing the whole variant (`Clone(Box<CloneSnapshot>)`), which adds an indirection to every
+   reader of `resolved`, the hot path for drawing and hit testing, while the chain is read only by
+   the panel, the marks and the writers.
 3. **Resolving chains, and the cost (criteria 43, 44, 50, 63).** *2026-10-11.* In the one read
    pass the object cache of `0044` makes per document version:
    - The tree walk reads every node once. Roots (paths, compound paths) are read whatever their
@@ -86,6 +108,52 @@ trait, no generic.
      5 ms). If criterion 43 or 44 fails, the next step is sharing the root outline and transforming
      at tessellation; measured first, not built ahead. `Document::object(id)` on one clone walks
      its chain alone.
+
+   *Amended 2026-10-14 (architect review of M1): one rule, one result per leaf, and the read
+   with `0050`.*
+   - `resolve(leaves)` is the only place that follows links. It returns one
+     `Option<ObjectSnapshot>` per input leaf, in input order (`None` for an orphan), next to
+     `clones_of` and `orphans`. `Document::read_objects` flattens it. `Document::object(id)` on a
+     clone collects the leaves of its own chain and calls `resolve` on that list, so it always
+     equals the entry of the full read.
+   - A clone is an orphan when its composed matrix *or its mapped outline* has a non-finite
+     number, and so is every clone behind it. Links within ±1e7 can compose to a finite matrix
+     that still maps an anchor to infinity; nothing downstream may receive inf or NaN. The rule
+     depends only on the graph, so it stays independent of the walk order.
+   - With `0050`, `read_nodes()` does not call `object()` per leaf. It collects one `RawLeaf` per
+     leaf in its pre-order walk, calls `resolve` once, and puts result *i* into leaf *i*'s
+     `NodeRead`; a `None` drops that leaf, as an undecodable leaf is dropped today. The pre-order
+     of `read_nodes()` and the leaf order of `leaves_under` are the same stacking order; a test
+     pins it.
+   - A clone's effective opacity in `NodeRead` is the root's own `opacity` register times the
+     product of the clone's own ancestors (ADR 0015 §3). The clone's own `opacity` key is residue
+     and never enters the product; its `visible`, `locked` and name are its own and resolve
+     through its own ancestors. A hidden or locked root still feeds its clones.
+
+   Rejected: `read_nodes()` calling `object()` per clone. It walks each chain again (O(depth) per
+   clone), keeps a second resolver, and breaks the one-transform-per-clone count of criterion 63.
+
+   *Amended 2026-10-14 (architect review of M2 to M6): the shared root tessellation is built in
+   this slice.* Milestone 6 measured 181 to 234 ms for criterion 44 (budget 150 ms), about 85 ms of
+   it tessellating the same outline 10,000 times.
+   - `CloneChain` gets `root_outline: Arc<PathSnapshot>`: the root as read, unmapped, one `Arc`
+     per root shared by all its clones, `#[serde(skip)]`. Invariant: `resolved`'s anchors are
+     `root_outline`'s under `composed`.
+   - `curvyo-render-core` `shared_outline.rs`: `build_artwork` (same signature) tessellates each
+     root once per call and maps the triangles onto every clone whose `composed` is rigid
+     (orthonormal within 1e-9), whose root stroke has no dashes or markers, and whose
+     `resolved.style` equals the root's apart from the two paint opacities. The clone's own paint
+     colours are written into the mapped vertices. Every other clone is tessellated from `resolved`.
+   - With `0050`: no change to `read_nodes` or `drawn_leaves`. The `Arc` arrives through `resolve`.
+     `faded` changes only opacities, so the clone still shares, and a hidden root still feeds the
+     tessellation through the `Arc`.
+   - If the frame is still over 150 ms, the per-frame copies of the object list in `draw_list` go
+     next. After that, the numbers go to the PO.
+
+   Rejected: GPU instancing, which changes the draw-list contract with the host (ADR 0001 §5); it
+   is the next step if this is not enough. A cross-version tessellation cache, which misses on
+   every clone at exactly the frame after a root edit. Reusing the root's draw from the object
+   list, which fails for a hidden root and follows the Node tool's uncommitted drag.
 4. **One matrix type and one rule for transforming a set (criteria 15, 16, 34).** *2026-10-10,
    generalised 2026-10-11.* `curvyo-document-core` `units.rs` gets `Affine` (compose, `inverse()
    -> Option`, `None` when |det| < 1e-9, apply to point and vector). For a command that maps
@@ -101,6 +169,20 @@ trait, no generic.
    transform of `0023`. Check of criterion 16 (c): O and B selected, A not, gives
    M_B' = translate (30, 30). The limit check of criterion 17 runs on every composed matrix and
    resolved outline downstream before the first write.
+
+   *Amended 2026-10-14 (architect review of M1): `Affine` lives in its own module
+   `curvyo-document-core/src/affine.rs`, not in `units.rs`.* The public name and the crate are the
+   same. Why: `units.rs` is already 558 lines (`CLAUDE.md` §5, ~500 per module), and a 2x3 map is
+   one responsibility of its own. Its translation entries `e` and `f` are millimetres as `f64`,
+   the convention of `Point` and `Vec2` in this crate.
+
+   *Amended 2026-10-14 (architect review of M2 to M6): where G and the links come from.*
+   `transform_objects` keeps its signature and writes the settled clone matrices it is given. The
+   ui-core gesture settles them with the G it already knows (`map_affine` of the `GroupMap`), passed
+   into `commit_group`. It never reads G back from a result, and it reads the links with the public
+   `Document::clone_links()` (metas only), not with a full read. The limit check of criterion 17
+   resolves only the clones that follow a changed object, and the leaves of their chains, never the
+   whole document.
 5. **Unlink and repair on removal (criteria 28 to 31, 54, 55).** *2026-10-10, changed 2026-10-11
    for chains.* Module `clones.rs` in `curvyo-document-core`.
    - `unlink_clones(ids, minted_anchor_ids)` (label `unlink_clone`) writes under the same id and
@@ -118,6 +200,16 @@ trait, no generic.
      `replace_with_path`, Break apart, Split, Fracture, Flatten), `0050`'s Delete layer, and
      `0020`'s restore when undo, redo, object undo or go to version removes a node (decision 9).
      One test lists the callers of both helpers.
+
+   *Amended 2026-10-14 (architect review of M2 to M6): the repair mints its own anchor ids.* The
+   one exception to "the caller mints" (`0002` `adrs.md`). An unlink made by the repair gets anchor
+   ids `(peer, 2^63 | n)`, with `n` counting up from the peer's operation count in the document. The
+   session's `AnchorIdMinter` counts from 0 and must stay below 2^63 (debug assertion). Anchor ids
+   are stored as 128-bit hex text and do not cross the wasm boundary as numbers. Why: Delete, the
+   Booleans, Break apart, Split and the history restore cannot know before they run how many anchors
+   their repair needs, and passing a minter into each of them (and into `0037`, `0038` and `0054`)
+   changes about ten public signatures. Rejected: keeping the root's anchor ids, which breaks their
+   global uniqueness. A test pins distinct ids across repairs and undo in one session.
 6. **The orphan repair (criteria 35, 38, 39).** *2026-10-10, changed 2026-10-11.*
    `Document::remove_orphan_clones() -> usize` (label `remove_orphan_clones`) deletes every clone
    the read of decision 3 marks `Orphan`: a missing or wrong-kind node in its chain, a ring, or a
@@ -129,6 +221,16 @@ trait, no generic.
    is an ordinary history step; the notice of criterion 35 shows when the count is above 0. It
    deletes and never unlinks (criterion 35). With chains, a deleted clone's tombstone can still
    give a way to the root; using it is left to the sharing story (ADR 0015, Consequences).
+
+   *Amended 2026-10-14 (architect, AC 53 merge case):* a clone node without `clone_link` whose
+   stored outline reads as a valid path is turned into that path by the same repair commit
+   (`remove_orphan_clones`): `shape` is removed and the anchors, style and opacity stay. It is the
+   outline both unlinks wrote, and deleting it would lose work both peers can see. Every peer that
+   repairs the same state writes the same key removal, so the repair still converges. Such a node
+   without a valid outline is deleted like every other orphan. The notice counts the two parts
+   separately. The deletes use criterion 35's sentence, and the converted nodes use criterion 31's
+   "1 clone became a path." / "N clones became paths.". Clones behind such a node now follow a
+   path and resolve.
 7. **Merge cases (criteria 13, 53).** *2026-10-10, extended 2026-10-11.* Tests in the
    `acceptance_0005_peers.rs` style:
    - *P deletes the root O and unlinks clone C, while Q transforms C.* C is a path with P's
@@ -190,6 +292,12 @@ trait, no generic.
     `clones_of`. The renderer draws a trace from the outline already in the read by `NodeId`; no
     outline is copied. It is recomputed on a selection, version or viewport change, not per frame,
     and is empty during a canvas drag (criterion 59).
+
+    *Amended 2026-10-14 (architect review of M2 to M6):* the build computes the marks in each
+    frame from the frame's one read. Accepted while the cost stays O(objects) plus the caps of
+    criterion 61, with lookups by id through an index, never a scan per mark. The panel data of
+    criteria 22, 23 and 25 reads `clones_of` from the cached read, never a scan per selected
+    object.
 
 ## Shared files and order
 

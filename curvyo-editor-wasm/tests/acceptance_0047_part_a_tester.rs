@@ -94,6 +94,7 @@ fn objects(s: &Session) -> Vec<ObjectSnapshot> {
 
 fn oid(o: &ObjectSnapshot) -> NodeId {
     match o {
+        ObjectSnapshot::Clone(_) => panic!("no clone here"),
         ObjectSnapshot::Primitive(p) => p.id,
         ObjectSnapshot::Path(p) => p.id,
     }
@@ -179,6 +180,7 @@ fn is_path(o: &ObjectSnapshot) -> bool {
 fn style_debug(o: &ObjectSnapshot) -> String {
     match o {
         ObjectSnapshot::Primitive(p) => format!("{:?}", p.style),
+        ObjectSnapshot::Clone(p) => format!("{:?}", p.resolved.style),
         ObjectSnapshot::Path(p) => format!("{:?}", p.style),
     }
 }
@@ -187,13 +189,16 @@ fn style_debug(o: &ObjectSnapshot) -> String {
 fn anchors_of(o: &ObjectSnapshot) -> Vec<NewAnchor> {
     match o {
         ObjectSnapshot::Path(p) => p.subpaths().flat_map(|sp| sp.anchors.to_vec()).collect(),
-        ObjectSnapshot::Primitive(_) => panic!("a path was expected, got {o:?}"),
+        ObjectSnapshot::Primitive(_) | ObjectSnapshot::Clone(_) => {
+            panic!("a path was expected, got {o:?}")
+        }
     }
 }
 
 fn rotate_about_centre(d: &Document, id: NodeId, radians: f64) {
     let o = d.object(id).unwrap();
     let c = match &o {
+        ObjectSnapshot::Clone(_) => panic!("no clone here"),
         ObjectSnapshot::Primitive(p) => match p.shape {
             Shape::Rect { bounds, .. } => pt(
                 bounds.origin.x + bounds.width.as_mm() / 2.0,
@@ -374,6 +379,7 @@ fn bezier_samples(a: &[NewAnchor], closed: bool, per: usize) -> Vec<Point> {
 /// Dense polyline of the drawn outline of an object (primitives through their path form).
 fn polyline(o: &ObjectSnapshot) -> Vec<Point> {
     match o {
+        ObjectSnapshot::Clone(_) => panic!("no clone here"),
         ObjectSnapshot::Primitive(p) => {
             let out = curvyo_document_core::outline_of_rotated(&p.shape, p.rotation);
             let a: Vec<NewAnchor> = out
@@ -1058,6 +1064,7 @@ fn otp_markers(o: &ObjectSnapshot) -> curvyo_document_core::Markers {
     match o {
         ObjectSnapshot::Path(p) => p.style.stroke.markers,
         ObjectSnapshot::Primitive(p) => p.style.stroke.markers,
+        ObjectSnapshot::Clone(p) => p.resolved.style.stroke.markers,
     }
 }
 
@@ -2205,8 +2212,8 @@ fn ac14_save_close_reopen() {
     assert!(!is_path(&again[0]) && is_path(&again[1]) && is_path(&again[2]) && !is_path(&again[3]));
     assert_eq!(
         curvyo_document_core::CURRENT_FORMAT_VERSION,
-        12,
-        "a path is an existing kind: the conversion adds no bump of its own (0023 took 11, 0050 took 12)"
+        13,
+        "a path is an existing kind: the conversion adds no bump of its own (0023 took 11, 0050 took 12, 0049 took 13)"
     );
     // A skew conversion as well.
     let mut s = open(&d);
@@ -2430,6 +2437,7 @@ fn hostile_typed_skew_input_writes_nothing() {
 fn stroke_mm(o: &ObjectSnapshot) -> f64 {
     match o {
         ObjectSnapshot::Primitive(p) => p.style.stroke.width.as_mm(),
+        ObjectSnapshot::Clone(p) => p.resolved.style.stroke.width.as_mm(),
         ObjectSnapshot::Path(p) => p.style.stroke.width.as_mm(),
     }
 }

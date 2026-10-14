@@ -13,7 +13,6 @@ use crate::objects::ObjectEditError;
 use crate::path_codec::{self, anchor_map_at, insert_anchors_container, leaf_exists, push_anchor};
 use crate::path_model::{AnchorId, NewAnchor, NodeId};
 use crate::paths::tree_id_of;
-use crate::style_codec;
 use crate::style_model::Style;
 use crate::subpath_codec::{all_anchor_lists, write_extra_subpaths};
 
@@ -86,10 +85,11 @@ impl Document {
         let base_meta = tree
             .get_meta(tree_id_of(base))
             .map_err(|_| ObjectEditError::NoSuchObject)?;
-        let style = style_codec::read_style(&base_meta);
+        let style = crate::clone_write::leaf_style(&tree, base, &base_meta);
 
         tree.enable_fractional_index(0);
         let new_tree_id = create_path_after(&tree, tree_id_of(base), &style, outlines);
+        self.repair_clones_of_removed(&tree, &doomed);
         let parents = crate::group_tree::parents_of(&tree, &doomed);
         for tree_id in doomed {
             // invariant: every id here was just confirmed present above.
@@ -173,6 +173,7 @@ impl Document {
             created.push(NodeId::from_parts(piece.peer, piece.counter));
             after.insert(*source, piece);
         }
+        self.repair_clones_of_removed(&tree, &doomed);
         let parents = crate::group_tree::parents_of(&tree, &doomed);
         for tree_id in doomed {
             // invariant: every id here was just confirmed present above.
@@ -218,7 +219,7 @@ fn resolve_sources(
         let meta = tree
             .get_meta(tree_id)
             .map_err(|_| ObjectEditError::NoSuchObject)?;
-        let mut style = style_codec::read_style(&meta);
+        let mut style = crate::clone_write::leaf_style(tree, *source, &meta);
         if fill == PieceFill::None {
             style.fill.enabled = false;
         }

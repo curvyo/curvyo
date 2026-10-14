@@ -48,7 +48,7 @@ fn lists(document: &Document) -> Vec<Vec<f64>> {
         .into_iter()
         .map(|id| match document.object(id).unwrap() {
             ObjectSnapshot::Path(p) => p.style.stroke.dash.as_slice().to_vec(),
-            ObjectSnapshot::Primitive(p) => p.style.stroke.dash.as_slice().to_vec(),
+            other => other.style().stroke.dash.as_slice().to_vec(),
         })
         .collect()
 }

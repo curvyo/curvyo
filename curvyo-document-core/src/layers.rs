@@ -118,6 +118,9 @@ impl Document {
             inside += 1;
             stack.extend(children_of(&tree, Some(node)));
         }
+        // The clones outside the layer that follow something in it are repaired in the same
+        // commit (`0050` criterion 36, `0049` criterion 31).
+        self.repair_clones_of_removed(&tree, &[layer]);
         tree.delete(layer)
             .map_err(|_| ObjectEditError::NoSuchObject)?;
         // The rule of `specs/0023-groups` that every delete sweeps emptied groups; it never

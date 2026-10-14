@@ -54,6 +54,7 @@ fn body(d: &Document, id: NodeId) -> String {
             format!("{:?}|{:?}|{:?}", p.shape, p.style, p.rotation)
         }
         Some(ObjectSnapshot::Path(p)) => format!("{p:?}"),
+        Some(ObjectSnapshot::Clone(c)) => format!("{c:?}"),
         None => "gone".to_owned(),
     }
 }
@@ -476,8 +477,8 @@ fn c33_c6_the_format_version_is_unchanged_and_branches_add_no_data() {
     let plain = pack(d, "t").unwrap();
     assert_eq!(manifest_version(&plain), u64::from(CURRENT_FORMAT_VERSION));
     assert_eq!(
-        CURRENT_FORMAT_VERSION, 12,
-        "0042 must not bump format_version (ADR 0014 Q2 A); 12 is main after 0050"
+        CURRENT_FORMAT_VERSION, 13,
+        "0042 must not bump format_version (ADR 0014 Q2 A); 13 is main after 0049"
     );
     d.undo_step(sc.s[3]).unwrap();
     d.undo_step(sc.s[2]).unwrap();
@@ -803,6 +804,7 @@ fn c19_preview_in_paint_order() {
         .map(|o| match o {
             ObjectSnapshot::Primitive(x) => x.id,
             ObjectSnapshot::Path(x) => x.id,
+            ObjectSnapshot::Clone(x) => x.resolved.id,
         })
         .collect();
     assert_eq!(ids, vec![a, b, c], "paint order of the live document");
@@ -1436,6 +1438,7 @@ fn w_a_concurrent_step_of_a_peer_is_not_in_the_version_of_my_step() {
             .map(|o| match o {
                 ObjectSnapshot::Primitive(x) => x.id,
                 ObjectSnapshot::Path(x) => x.id,
+                ObjectSnapshot::Clone(x) => x.resolved.id,
             })
             .collect();
         assert!(ids.contains(&mine));

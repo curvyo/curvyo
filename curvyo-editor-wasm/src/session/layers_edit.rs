@@ -142,8 +142,23 @@ impl Session {
         if units.is_empty() {
             return (Vec::new(), OpacityTarget::Nothing);
         }
-        let count = units.len();
-        (units, OpacityTarget::Objects(count))
+        // A linked clone has no opacity of its own: the field never writes to it, and "Mixed" is
+        // read from the others (`0050` criterion 26, `0049` criterion 24).
+        let read = self.object_read();
+        let targets: Vec<NodeId> = units
+            .into_iter()
+            .filter(|id| {
+                !matches!(
+                    read.get(*id),
+                    Some(curvyo_document_core::ObjectSnapshot::Clone(_))
+                )
+            })
+            .collect();
+        if targets.is_empty() {
+            return (Vec::new(), OpacityTarget::OnlyClones);
+        }
+        let count = targets.len();
+        (targets, OpacityTarget::Objects(count))
     }
 
     /// The Opacity header as the host reads it: the caption, whether the field is in the tree,

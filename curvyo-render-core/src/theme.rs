@@ -342,6 +342,10 @@ pub const REFUSAL_OUTLINE: RgbaColor = RgbaColor::opaque(0xB3, 0x26, 0x1E);
 /// Its width on screen, whatever the object's own stroke width.
 pub const REFUSAL_OUTLINE_STROKE_PX: f64 = 2.0;
 
+/// `--clone-link` (`docs/design-system.md`, "Linked clone marks"): the violet of the traces of a
+/// selected linked clone and of what it follows (`specs/0049-linked-clone` criterion 60).
+pub const CLONE_LINK: RgbaColor = RgbaColor::opaque(0x7B, 0x3F, 0xD6);
+
 /// `--preview-new` (`docs/design-system.md`): the "new" half of blue-new,
 /// black-old, the hollow outline of the geometry a release would commit. An
 /// alias of [`ACCENT`], named so the preview can be re-coloured without

@@ -98,6 +98,7 @@ fn ratios_of(s: &Session) -> Vec<f64> {
     objects(s)
         .iter()
         .filter_map(|o| match o {
+            ObjectSnapshot::Clone(_) => panic!("no clone here"),
             ObjectSnapshot::Primitive(p) => match p.shape {
                 Shape::Star { inner_ratio, .. } => Some(inner_ratio.get()),
                 _ => None,

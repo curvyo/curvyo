@@ -42,6 +42,7 @@ fn rotated_about_centre(document: &Document, radians: f64) {
     let id = document.object_ids()[0];
     let object = document.object(id).unwrap();
     let centre = match &object {
+        ObjectSnapshot::Clone(_) => panic!("no clone here"),
         ObjectSnapshot::Primitive(p) => match p.shape {
             Shape::Rect { bounds, .. } => pt(
                 bounds.origin.x + bounds.width.as_mm() / 2.0,

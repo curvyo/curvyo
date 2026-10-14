@@ -59,6 +59,14 @@ impl Session {
         self.held_context().pickable
     }
 
+    /// The whole cached read of the document: the objects with the direct clones of each and an
+    /// index by id (`specs/0049-linked-clone`).
+    pub(super) fn object_read(&self) -> Arc<curvyo_document_core::ObjectRead> {
+        let drag = (self.tool == Tool::Select && self.select.drag_in_flight())
+            || (self.tool == Tool::Node && self.node.drag_in_flight());
+        Arc::clone(&self.object_cache.read(&self.document, drag).clones)
+    }
+
     /// The objects the tools work on: the leaves inside the entered group, or every leaf at the
     /// root. Everything outside the entered group is inert (criterion 15).
     pub(super) fn objects(&self) -> Arc<[ObjectSnapshot]> {

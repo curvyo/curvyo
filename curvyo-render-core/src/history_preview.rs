@@ -31,6 +31,7 @@ pub fn build_history_preview(objects: &[ObjectSnapshot], view: ViewTransform) ->
             match &mut object {
                 ObjectSnapshot::Path(path) => ghost_style(&mut path.style),
                 ObjectSnapshot::Primitive(primitive) => ghost_style(&mut primitive.style),
+                ObjectSnapshot::Clone(clone) => ghost_style(&mut clone.resolved.style),
             }
             object
         })

@@ -34,6 +34,9 @@ use curvyo_ui_core::{FileCommand, Platform};
 
 static NOW: AtomicU64 = AtomicU64::new(1_800_000_000);
 
+/// The orphan file of `0049-linked-clone`, whose Open repairs it by design (criterion 35).
+const ORPHAN_FIXTURE: &str = "clone_orphan_and_ring_v13.curvyo";
+
 fn clock() -> Timestamp {
     Timestamp::from_secs(NOW.fetch_add(7, Ordering::SeqCst))
 }
@@ -464,6 +467,11 @@ fn c43_every_fixture_that_opens_is_clean_after_one_idle_callback() {
     for p in files {
         let bytes = fs::read(&p).unwrap();
         let name = p.file_name().unwrap().to_string_lossy().into_owned();
+        // The orphan file of `0049` is marked changed by the orphan repair of its Open, by design
+        // (`specs/0049-linked-clone` criterion 35).
+        if name == ORPHAN_FIXTURE {
+            continue;
+        }
         match Session::open(5, &bytes) {
             Ok(mut s) => {
                 opened += 1;

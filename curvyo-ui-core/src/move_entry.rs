@@ -753,6 +753,7 @@ mod tests {
         );
         assert_eq!(outcome, EntryOutcome::Committed);
         let centre = match document.object(id).expect("exists") {
+            ObjectSnapshot::Clone(_) => panic!("no clone here"),
             ObjectSnapshot::Primitive(p) => match p.shape {
                 curvyo_document_core::Shape::Rect { bounds, .. } => Point::new(
                     bounds.origin.x + bounds.width.as_mm() / 2.0,

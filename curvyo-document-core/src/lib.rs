@@ -18,6 +18,16 @@
 // to the stricter rule.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
+mod affine;
+mod clone_codec;
+mod clone_copy;
+mod clone_model;
+mod clone_preview;
+mod clone_read;
+mod clone_repair;
+mod clone_transform;
+mod clone_write;
+mod clones;
 mod container;
 mod corner_radii;
 mod corner_radii_codec;
@@ -41,6 +51,7 @@ mod node_edit;
 mod node_move;
 mod node_read;
 mod node_registers;
+mod object_read;
 mod objects;
 mod offset_write;
 mod path_codec;
@@ -67,6 +78,16 @@ mod subpath_codec;
 mod transform_objects;
 mod units;
 
+pub use affine::{Affine, MATRIX_ENTRY_LIMIT, SINGULAR_DETERMINANT};
+pub use clone_model::{CloneChain, CloneSnapshot, MAX_CLONE_DEPTH};
+pub use clone_preview::clone_previews;
+pub use clone_read::ObjectRead;
+pub use clone_repair::CloneRepair;
+pub use clone_transform::{CloneLinks, CloneMatrices, clone_matrices_after};
+pub use clones::{
+    CloneError, LINKED_CLONE_COMMIT_LABEL, REMOVE_ORPHAN_CLONES_COMMIT_LABEL,
+    UNLINK_CLONE_COMMIT_LABEL,
+};
 pub use container::{CURRENT_LORO_SNAPSHOT_VERSION, pack, unpack};
 pub use corner_radii::{Corner, CornerRadii, SHARP_CORNER_EPSILON_MM, effective_corner_radii};
 pub use display_unit::DisplayUnit;

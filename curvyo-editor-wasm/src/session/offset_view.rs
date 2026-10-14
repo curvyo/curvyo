@@ -58,6 +58,7 @@ impl Session {
             .iter()
             .map(|object| match object {
                 ObjectSnapshot::Path(path) => path.all_anchors().count(),
+                ObjectSnapshot::Clone(clone) => clone.resolved.all_anchors().count(),
                 ObjectSnapshot::Primitive(_) => PRIMITIVE_NODES,
             })
             .sum();

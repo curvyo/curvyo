@@ -33,6 +33,10 @@ impl AnchorIdMinter {
 
     /// Mints the next fresh [`AnchorId`] for this session.
     pub fn mint(&mut self) -> AnchorId {
+        // The upper half of the counter space belongs to the anchor ids the clone repair gives
+        // unlinked clones (`specs/0049-linked-clone/adrs.md` decision 5): a session never mints
+        // that many.
+        debug_assert!(self.next < 1 << 63, "the minter reached the repair's half");
         let id = AnchorId::new(self.peer, self.next);
         self.next += 1;
         id

@@ -1258,6 +1258,7 @@ fn a_huge_or_tiny_stored_width_is_displayed_bounded_and_the_stored_width_is_kept
             let stored = match obj(&doc, id) {
                 ObjectSnapshot::Path(p) => p.style.stroke.width.as_mm(),
                 ObjectSnapshot::Primitive(p) => p.style.stroke.width.as_mm(),
+                ObjectSnapshot::Clone(p) => p.resolved.style.stroke.width.as_mm(),
             };
             assert_eq!(stored, w, "display clamps never rewrite the document");
             // With dashes and caps on top.

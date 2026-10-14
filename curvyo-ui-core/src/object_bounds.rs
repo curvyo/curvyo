@@ -67,7 +67,10 @@ fn path_bounds(path: &PathSnapshot) -> (Point, Point) {
 #[must_use]
 pub fn object_bounds(object: &ObjectSnapshot) -> (Point, Point) {
     match object {
-        ObjectSnapshot::Path(path) => path_bounds(path),
+        ObjectSnapshot::Path(path)
+        | ObjectSnapshot::Clone(curvyo_document_core::CloneSnapshot { resolved: path, .. }) => {
+            path_bounds(path)
+        }
         ObjectSnapshot::Primitive(primitive) => shape_frame_bounds(&primitive.shape),
     }
 }
@@ -81,7 +84,10 @@ pub fn object_bounds(object: &ObjectSnapshot) -> (Point, Point) {
 #[must_use]
 pub fn object_outline_bounds(object: &ObjectSnapshot) -> (Point, Point) {
     match object {
-        ObjectSnapshot::Path(path) => path_bounds(path),
+        ObjectSnapshot::Path(path)
+        | ObjectSnapshot::Clone(curvyo_document_core::CloneSnapshot { resolved: path, .. }) => {
+            path_bounds(path)
+        }
         ObjectSnapshot::Primitive(primitive) => {
             let anchors: Vec<_> = outline_of_rotated(&primitive.shape, primitive.rotation)
                 .iter()

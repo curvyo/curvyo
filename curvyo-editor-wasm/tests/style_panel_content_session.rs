@@ -44,6 +44,7 @@ fn stored_styles(session: &Session) -> Vec<Style> {
         .map(|object| match object {
             ObjectSnapshot::Path(p) => p.style,
             ObjectSnapshot::Primitive(p) => p.style,
+            ObjectSnapshot::Clone(p) => p.resolved.style,
         })
         .collect()
 }

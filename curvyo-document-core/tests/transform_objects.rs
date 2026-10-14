@@ -346,7 +346,7 @@ fn only_a_primitive_becomes_a_path_never_the_reverse() {
         id: p,
         ..match document.object(r).unwrap() {
             ObjectSnapshot::Primitive(x) => x,
-            ObjectSnapshot::Path(_) => panic!(),
+            ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_) => panic!(),
         }
     });
     assert_eq!(

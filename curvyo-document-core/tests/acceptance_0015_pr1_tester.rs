@@ -76,6 +76,7 @@ fn sig_of(d: &Document, id: NodeId) -> Sig {
                 .collect(),
             rotation: p.rotation.as_radians(),
         },
+        ObjectSnapshot::Clone(_) => panic!("no clone here"),
         ObjectSnapshot::Primitive(p) => {
             let o = outline_of_rotated(&p.shape, p.rotation);
             Sig {

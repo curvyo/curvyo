@@ -474,11 +474,20 @@ impl Session {
         let (added, changed) = (plan.added(), plan.changed());
         let (vanished, of) = (plan.vanished, plan.of);
         let writes = plan.into_writes(&mut self.minter);
-        let Ok(ids) = self.document.write_offset(&writes, OFFSET_COMMIT_LABEL) else {
-            // invariant: the plan was computed from the objects of this document version, with
-            // fresh anchor ids, so the write cannot fail.
-            debug_assert!(false, "a computed offset could not be written");
-            return OffsetOutcome::Ignored;
+        let ids = match self.document.write_offset(&writes, OFFSET_COMMIT_LABEL) {
+            Ok(ids) => ids,
+            // A clone that follows a changed object would pass the limit (`0049` criterion 17):
+            // nothing was written, and the host shows the limit notice
+            // (`Session::take_clone_limit_notice`) as after a node edit.
+            Err(curvyo_document_core::ObjectEditError::CloneOutOfRange(_)) => {
+                return OffsetOutcome::Ignored;
+            }
+            Err(_) => {
+                // invariant: the plan was computed from the objects of this document version,
+                // with fresh anchor ids, so no other refusal can come.
+                debug_assert!(false, "a computed offset could not be written");
+                return OffsetOutcome::Ignored;
+            }
         };
         self.selection.set(&ids);
         self.hovered_object = None;
@@ -584,6 +593,35 @@ mod tests {
         assert!(
             (session.offset_values().distance_mm() - 2.0).abs() < 1e-9,
             "the written distance is remembered"
+        );
+    }
+
+    /// `0049` criterion 17: a release that changes a root and would push a clone that follows
+    /// it past the limit changes nothing and says so with the notice of a node edit.
+    #[test]
+    fn a_change_that_pushes_a_clone_past_the_limit_is_refused_with_the_limit_notice() {
+        let mut session = Session::new(1);
+        let square = square_path(&session, 0.0, 20.0, 0);
+        let clone = session.document.linked_clone(&[square], &[]).unwrap()[0];
+        session
+            .document
+            .translate_objects(&[clone], Vec2::new(9_999_975.0, 0.0))
+            .unwrap();
+        session.set_tool(Tool::Offset);
+        session.selection.select_single(square);
+        let (steps, before) = (session.undo_len(), session.document.object(square));
+        drag(&mut session, 10.0, false, false);
+        assert_eq!(session.undo_len(), steps, "nothing was written");
+        assert_eq!(session.document.object(square), before);
+        assert!(!matches!(
+            session.take_offset_outcome(),
+            Some(OffsetOutcome::Applied { .. })
+        ));
+        let notice = session.take_clone_limit_notice();
+        assert!(
+            notice.starts_with("Nothing was changed: Clone of ")
+                && notice.ends_with("would move beyond the limit of 10 km."),
+            "{notice}"
         );
     }
 

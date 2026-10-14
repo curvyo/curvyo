@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, Copy, Layers, LayersPlus, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Copy, Layers, LayersPlus, Link2, Trash2 } from "lucide-react";
 import { Fragment, type ComponentType } from "react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
@@ -23,6 +23,7 @@ import {
   nextRow,
   reorderFor,
   rowKey,
+  listWindow,
   toolbarStep,
   windowRange,
 } from "@/lib/layerRows";
@@ -45,6 +46,8 @@ interface LayersTabProps {
   /** Shows a line in the canvas notice slot. */
   showNotice: (text: string, ms?: number, source?: "canvas" | "panel", kind?: "status" | "alert") => void;
   onReturnFocus: () => void;
+  /** Runs Linked clone on the selection (`specs/0049-linked-clone`), as the Select bar does. */
+  onLinkedClone: () => void;
 }
 
 /** A drag of rows in flight (criterion 29). */
@@ -122,6 +125,7 @@ export function LayersTab({
   shown,
   showNotice,
   onReturnFocus,
+  onLinkedClone,
 }: LayersTabProps) {
   const scroller = useRef<HTMLDivElement>(null);
   const coarse = useMemo(() => window.matchMedia?.("(pointer: coarse)").matches ?? false, []);
@@ -155,9 +159,8 @@ export function LayersTab({
   // focused row, so focus is never lost when it scrolls away (criterion 48).
   const [total, setTotal] = useState(0);
   const range = windowRange(scrollTop, viewport, total, rowHeight);
-  const first = Math.min(range.first, focusedRaw);
-  const count = Math.min(Math.max(range.first + range.count, focusedRaw + 1) - first, 60);
-  const { view, act, refresh } = useLayersList(getSession, syncRevision, sync, first, count);
+  const { first, count, extra } = listWindow(range, focusedRaw, total);
+  const { view, act, refresh } = useLayersList(getSession, syncRevision, sync, first, count, extra);
   if (view.count !== total) {
     // A change of the row count during render, the pattern React documents for derived state.
     setTotal(view.count);
@@ -338,7 +341,13 @@ export function LayersTab({
       } else if (cell === "lock") {
         flag(row, "locked");
       } else if (cell === "action") {
-        reply(act((session) => session.select_layer_contents(idText(row.id))));
+        reply(
+          act((session) =>
+            row.rowAction === "select-original"
+              ? session.select_row_original(idText(row.id))
+              : session.select_layer_contents(idText(row.id)),
+          ),
+        );
       } else {
         press(row, event.ctrlKey || event.metaKey ? "toggle" : "plain");
       }
@@ -541,6 +550,9 @@ export function LayersTab({
       applies: toolbar.duplicate,
       press: () => reply(act((session) => session.duplicate_layer_target())),
     },
+    // `specs/0049-linked-clone`: the Select bar's command, with its notice in the panel.
+    // `Link2`, the clone glyph of the rows, tags and block, never the Select bar's Link corners.
+    { name: "Linked clone", glyph: Link2, applies: toolbar.linkedClone, press: onLinkedClone },
     {
       name: "Move up",
       glyph: ArrowUp,
@@ -579,7 +591,15 @@ export function LayersTab({
       }}
       onFlag={(which) => flag(row, which)}
       onExpand={(expanded) => expand(row, expanded)}
-      onAction={() => reply(act((session) => session.select_layer_contents(idText(row.id))))}
+      onAction={() =>
+        reply(
+          act((session) =>
+            row.rowAction === "select-original"
+              ? session.select_row_original(idText(row.id))
+              : session.select_layer_contents(idText(row.id)),
+          ),
+        )
+      }
       onRename={(name) => finishRename(row, name)}
       onStartRename={() => startRename(row)}
       onDragStart={onDragStart(row)}

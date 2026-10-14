@@ -126,6 +126,10 @@ impl Document {
     /// rely on staying stable. Renamed from `path_ids` in
     /// `primitive-shapes` (architect review). [`Document::path`] and
     /// [`Document::primitive`] each filter the result to their own kind.
+    ///
+    /// It lists orphan linked clones too, for which [`Document::object`] returns `None`: between
+    /// a merge or an Open and the orphan repair they exist (`specs/0049-linked-clone`
+    /// criterion 35). [`Document::read_objects`] leaves them out.
     #[must_use]
     pub fn object_ids(&self) -> Vec<NodeId> {
         let tree = self.loro().get_tree(OBJECTS_TREE);
@@ -176,6 +180,20 @@ impl Document {
     /// [`PathEditError::NoSuchAnchor`] if any named anchor no longer
     /// exists.
     pub fn move_anchors(&self, moves: &[(NodeId, AnchorId, Point)]) -> Result<(), PathEditError> {
+        let mut paths: Vec<NodeId> = moves.iter().map(|&(path, _, _)| path).collect();
+        paths.dedup();
+        for path in paths {
+            self.path_edit_limits(path, |edited| {
+                for anchor in edited.all_anchors_mut() {
+                    if let Some(&(_, _, point)) = moves
+                        .iter()
+                        .find(|&&(p, id, _)| p == path && id == anchor.id)
+                    {
+                        anchor.point = point;
+                    }
+                }
+            })?;
+        }
         let resolved: Vec<(LoroMovableList, usize, Point)> = moves
             .iter()
             .map(|&(path, anchor_id, point)| {
@@ -216,6 +234,17 @@ impl Document {
             return Err(PathEditError::InvalidStrokeWidth);
         }
         let (meta, _) = self.path_parts(path)?;
+        self.path_edit_limits(path, |edited| {
+            for anchor in edited.all_anchors_mut() {
+                if let Some(&(_, point, handle_in, handle_out)) =
+                    anchors.iter().find(|&&(id, ..)| id == anchor.id)
+                {
+                    anchor.point = point;
+                    anchor.handle_in = handle_in;
+                    anchor.handle_out = handle_out;
+                }
+            }
+        })?;
         let positions = crate::subpath_codec::anchor_positions(&meta);
         let resolved: Vec<_> = anchors
             .iter()
@@ -282,6 +311,17 @@ impl Document {
         let current_handle_out = read_vec2(&map, KEY_HANDLE_OUT);
         let (new_in, new_out) =
             resolve_handle_pair(kind, slot, value, current_handle_in, current_handle_out);
+        let mirrored = kind == AnchorKind::Symmetric || kind == AnchorKind::Asymmetric;
+        self.path_edit_limits(path, |edited| {
+            if let Some(edited) = edited.all_anchors_mut().find(|a| a.id == anchor) {
+                if slot == HandleSlot::In || mirrored {
+                    edited.handle_in = new_in;
+                }
+                if slot == HandleSlot::Out || mirrored {
+                    edited.handle_out = new_out;
+                }
+            }
+        })?;
         let own_value = match slot {
             HandleSlot::In => new_in,
             HandleSlot::Out => new_out,
@@ -464,6 +504,7 @@ impl Document {
         if remaining < 2 {
             let tree = self.loro().get_tree(OBJECTS_TREE);
             let tree_id = tree_id_of(path);
+            self.repair_clones_of_removed(&tree, &[tree_id]);
             let parents = crate::group_tree::parents_of(&tree, &[tree_id]);
             // invariant: `path_parts` above already confirmed this node
             // exists.
@@ -612,6 +653,11 @@ impl Document {
         let meta = tree
             .get_meta(tree_id)
             .map_err(|_| PathEditError::NoSuchPath)?;
+        // A primitive or a linked clone has no anchors to edit (`specs/0049-linked-clone`
+        // criterion 26: node edits, Join, Split and segment bending refuse a clone).
+        if crate::shape_codec::leaf_kind(&meta) != crate::shape_codec::LeafKind::Path {
+            return Err(PathEditError::NoSuchPath);
+        }
         let anchors = anchors_container(&meta);
         Ok((meta, anchors))
     }

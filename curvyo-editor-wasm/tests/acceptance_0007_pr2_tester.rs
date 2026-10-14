@@ -170,6 +170,7 @@ fn objects(s: &Session) -> Vec<ObjectSnapshot> {
 
 fn centre_of(o: &ObjectSnapshot) -> Point {
     match o {
+        ObjectSnapshot::Clone(_) => panic!("no clone here"),
         ObjectSnapshot::Primitive(p) => match &p.shape {
             Shape::Rect { bounds, .. } => pt(
                 bounds.origin.x + bounds.width.as_mm() / 2.0,

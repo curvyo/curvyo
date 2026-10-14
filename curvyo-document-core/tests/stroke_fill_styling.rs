@@ -85,6 +85,7 @@ fn style_of(document: &Document, id: NodeId) -> Style {
     match document.object(id).expect("object exists") {
         ObjectSnapshot::Path(p) => p.style,
         ObjectSnapshot::Primitive(p) => p.style,
+        ObjectSnapshot::Clone(p) => p.resolved.style,
     }
 }
 

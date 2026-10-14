@@ -67,8 +67,8 @@ pub(crate) const PLACE_NODES: &str = "nodes";
 
 /// Every style key of an object's meta map, none of them a shape-parameter
 /// key: "object to path" strips `shape_codec::ALL_PRIMITIVE_KEYS` only, so
-/// the style carries over to the converted path unchanged.
-#[cfg(test)]
+/// the style carries over to the converted path unchanged. Unlink clone removes them all from a
+/// clone node before it writes the root's style (`specs/0049-linked-clone` criterion 28).
 pub(crate) const ALL_STYLE_KEYS: &[&str] = &[
     KEY_STROKE_ENABLED,
     KEY_STROKE_WIDTH,

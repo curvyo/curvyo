@@ -84,6 +84,7 @@ mod tests {
         match d.object(id).unwrap() {
             crate::ObjectSnapshot::Primitive(p) => p.style.stroke.width.as_mm(),
             crate::ObjectSnapshot::Path(p) => p.style.stroke.width.as_mm(),
+            crate::ObjectSnapshot::Clone(c) => c.resolved.style.stroke.width.as_mm(),
         }
     }
 
@@ -91,6 +92,7 @@ mod tests {
         match object {
             crate::ObjectSnapshot::Primitive(p) => p.style.stroke.width.as_mm(),
             crate::ObjectSnapshot::Path(p) => p.style.stroke.width.as_mm(),
+            crate::ObjectSnapshot::Clone(c) => c.resolved.style.stroke.width.as_mm(),
         }
     }
 
@@ -144,6 +146,30 @@ mod tests {
         let b = rect(&d, 20.0);
         assert_eq!(d.preview_object_at(first, b).unwrap().objects, []);
         assert_eq!(d.preview_object_at(first, a).unwrap().objects.len(), 1);
+    }
+
+    #[test]
+    fn a_linked_clone_previews_as_a_clone_of_its_original_then() {
+        let d = Document::new(1);
+        let corner = |k: u64, x: f64, y: f64| {
+            crate::NewAnchor::corner(crate::AnchorId::new(1, k), Point::new(x, y))
+        };
+        let original = d.create_path(
+            &[
+                corner(1, 0.0, 0.0),
+                corner(2, 10.0, 0.0),
+                corner(3, 10.0, 10.0),
+            ],
+            true,
+        );
+        let clone = d.linked_clone(&[original], &[]).unwrap()[0];
+        let step = d.own_steps().last().unwrap().step;
+        let preview = d.preview_object_at(step, clone).unwrap();
+        let [crate::ObjectSnapshot::Clone(c)] = preview.objects.as_slice() else {
+            panic!("a clone: {:?}", preview.objects);
+        };
+        assert_eq!(c.chain.origin, original);
+        assert_eq!(c.resolved.id, clone);
     }
 
     #[test]

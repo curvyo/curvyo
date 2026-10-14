@@ -272,7 +272,7 @@ fn a_compound_path_in_a_selection_transforms_as_one_path() {
                     .flat_map(|s| s.anchors.iter().map(|a| a.point).collect::<Vec<_>>())
                     .collect(),
             ),
-            ObjectSnapshot::Primitive(_) => None,
+            ObjectSnapshot::Primitive(_) | ObjectSnapshot::Clone(_) => None,
         })
         .collect();
     assert_eq!(moved.len(), 1, "one compound path");

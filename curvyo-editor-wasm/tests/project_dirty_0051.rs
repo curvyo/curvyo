@@ -10,6 +10,9 @@ use std::path::PathBuf;
 use curvyo_document_core::{DisplayUnit, Point};
 use curvyo_editor_wasm::{APP_VERSION, DocumentSide, Session, SizeOutcome, Tool, WipeOutcome};
 
+/// The orphan file of `0049-linked-clone`, whose Open repairs it by design (criterion 35).
+const ORPHAN_FIXTURE: &str = "clone_orphan_and_ring_v13.curvyo";
+
 fn pt(x: f64, y: f64) -> Point {
     Point::new(x, y)
 }
@@ -189,7 +192,11 @@ fn every_fixture_opens_clean() {
     for directory in directories {
         for entry in std::fs::read_dir(directory).unwrap() {
             let path = entry.unwrap().path();
-            if path.extension().and_then(|e| e.to_str()) != Some("curvyo") {
+            // The orphan file of `0049` is marked changed by the orphan repair of its Open
+            // (`specs/0049-linked-clone` criterion 35).
+            if path.extension().and_then(|e| e.to_str()) != Some("curvyo")
+                || path.file_name().is_some_and(|name| name == ORPHAN_FIXTURE)
+            {
                 continue;
             }
             let bytes = std::fs::read(&path).unwrap();

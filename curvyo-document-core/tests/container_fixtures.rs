@@ -125,6 +125,7 @@ fn primitives_v3_project_round_trips_every_shape_kind() {
                 saw_path = true;
                 assert_eq!(path.anchors.len(), 2);
             }
+            ObjectSnapshot::Clone(_) => panic!("this fixture holds no clone"),
             ObjectSnapshot::Primitive(primitive) => match primitive.shape {
                 Shape::Rect { corner_radii, .. } => {
                     saw_rect = true;

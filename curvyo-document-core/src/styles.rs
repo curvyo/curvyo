@@ -238,10 +238,7 @@ mod tests {
     }
 
     fn style_of(document: &Document, id: NodeId) -> Style {
-        match document.object(id).unwrap() {
-            crate::ObjectSnapshot::Path(p) => p.style,
-            crate::ObjectSnapshot::Primitive(p) => p.style,
-        }
+        document.object(id).unwrap().style().clone()
     }
 
     fn red() -> Color {

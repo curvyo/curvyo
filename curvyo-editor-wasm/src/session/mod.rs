@@ -25,6 +25,10 @@ mod background_view;
 mod boolean;
 #[cfg(test)]
 mod box_refit_tests;
+#[cfg(test)]
+mod clone_tests;
+mod clone_view;
+mod clones;
 mod close_path;
 mod colour_pick;
 mod combine;
@@ -98,6 +102,8 @@ use curvyo_ui_core::{
 #[cfg(target_arch = "wasm32")]
 pub use background_view::BackgroundView;
 pub use boolean::BooleanOutcome;
+#[cfg(target_arch = "wasm32")]
+pub use clones::CloneResult;
 pub use close_path::{ClosePathOutcome, ClosePathState};
 pub use combine::CombineOutcome;
 pub use cut::CutOutcome;
@@ -225,7 +231,8 @@ pub struct Session {
     /// the Select-tool counterpart to `hovered` above (acceptance criteria
     /// 14, 15's hover box). A creation tool has no hover highlight.
     hovered_object: Option<NodeId>,
-    /// The objects of the History row the pointer or focus rests on (`history.rs`).
+    /// The objects of the History row, or the targets of Select original, the pointer or focus
+    /// rests on (`history.rs`, `clone_view.rs`): they show the hover box.
     history_hover: Vec<NodeId>,
     /// The live pointer position in document space, tracked regardless
     /// of the active tool — the pen tool's rubber-band preview
@@ -286,6 +293,14 @@ pub struct Session {
     /// The Offset tool: its bar's values (session memory), drag and preview
     /// (`specs/0038-path-offset`).
     offset: offset::OffsetTool,
+    /// The notice of the orphan repair after the Open, until the host has taken it
+    /// (`clones.rs`).
+    orphan_notice: Option<String>,
+    /// How many objects the last Delete key removed, for its notice (`clones.rs`).
+    deleted_objects: usize,
+    /// The DOM chips over the canvas, as the host reported them, which a tag of the clone marks
+    /// may not meet (`clone_view.rs`).
+    dom_chips: Vec<curvyo_ui_core::MarkRect>,
 }
 
 impl Session {
@@ -342,6 +357,9 @@ impl Session {
             layers: layers::LayerState::default(),
             panel: layers_panel::PanelState::default(),
             offset: offset::OffsetTool::default(),
+            orphan_notice: None,
+            deleted_objects: 0,
+            dom_chips: Vec::new(),
         }
     }
 
@@ -352,7 +370,7 @@ impl Session {
     /// See [`curvyo_document_core::unpack`].
     pub fn open(peer: u64, bytes: &[u8]) -> Result<Self, OpenError> {
         let document = curvyo_document_core::unpack(peer, bytes)?;
-        Ok(Self {
+        let mut session = Self {
             saved: document.version(),
             packed: None,
             document,
@@ -394,7 +412,13 @@ impl Session {
             layers: layers::LayerState::default(),
             panel: layers_panel::PanelState::default(),
             offset: offset::OffsetTool::default(),
-        })
+            orphan_notice: None,
+            deleted_objects: 0,
+            dom_chips: Vec::new(),
+        };
+        // A file another tool wrote can hold clones whose original is gone (`0049` criterion 35).
+        session.remove_orphans_after_open();
+        Ok(session)
     }
 
     /// Packs the current document into `.curvyo` container bytes. Not for a save: use

@@ -572,7 +572,8 @@ fn ac27_the_manifest_says_format_version_11_and_a_newer_file_is_refused() {
     let bytes = pack(&d, "t").unwrap();
     let manifest: serde_json::Value =
         serde_json::from_slice(&read_member(&bytes, "manifest.json")).unwrap();
-    // Format 11 was this slice's number; `0050` took 12, so the writer names the current one.
+    // Format 11 was this slice's number; later slices took 12 and 13, so the writer names the
+    // current one.
     const _: () = assert!(curvyo_document_core::CURRENT_FORMAT_VERSION >= 11);
     let current = curvyo_document_core::CURRENT_FORMAT_VERSION;
     assert_eq!(manifest["format_version"], current);
@@ -870,6 +871,7 @@ fn replicas_one_peer_groups_while_another_moves_a_member() {
     let _ = orig;
     // The member really moved by (7, 3) relative to where it was grouped.
     match moved {
+        curvyo_document_core::ObjectSnapshot::Clone(_) => panic!("no clone here"),
         curvyo_document_core::ObjectSnapshot::Primitive(p) => match p.shape {
             curvyo_document_core::Shape::Rect { bounds, .. } => {
                 assert!((bounds.origin.x - 27.0).abs() < 1e-9, "{:?}", bounds.origin);

@@ -402,6 +402,23 @@ pub(crate) fn resize_by_local_delta(
                     stroke_or_radius_factor(resized.sx, resized.sy),
                 )
             }
+            ObjectSnapshot::Clone(clone) => {
+                let resized = resize_local_box(
+                    start_box.min,
+                    start_box.max,
+                    direction,
+                    local_delta,
+                    shift,
+                    ctrl,
+                );
+                let anchor_local =
+                    resize_anchor_local_position(start_box.min, start_box.max, direction, shift);
+                let pivot = start_box.to_document(anchor_local);
+                let g = crate::clone_gesture::affine_of(clone.id(), &|path: &PathSnapshot| {
+                    path.scaled(pivot, resized.sx, resized.sy)
+                });
+                (ObjectSnapshot::Clone(clone.mapped_by(g)), 1.0)
+            }
         }
     };
     if modes.stroke == StrokeScaling::Proportional {
@@ -447,16 +464,24 @@ pub(crate) fn skewed_unchecked(
     angle: Angle,
     converted: Option<&PathSnapshot>,
 ) -> ObjectSnapshot {
-    let path = match (start, converted) {
-        (ObjectSnapshot::Path(path), _) | (ObjectSnapshot::Primitive(_), Some(path)) => path,
-        (ObjectSnapshot::Primitive(_), None) => return start.clone(),
-    };
     let frame = skew_frame(start_box, side, shift);
     let k = skew_factor(&frame, angle);
     if k.abs() <= 0.0 {
         return start.clone();
     }
     let (ku, kv) = if frame.along_u { (k, 0.0) } else { (0.0, k) };
+    let path = match (start, converted) {
+        (ObjectSnapshot::Path(path), _) | (ObjectSnapshot::Primitive(_), Some(path)) => path,
+        (ObjectSnapshot::Primitive(_), None) => return start.clone(),
+        // A clone is skewed by its matrix and never converts (`0049` criterion 14).
+        (ObjectSnapshot::Clone(clone), _) => {
+            let fixed = frame.fixed_point;
+            let g = crate::clone_gesture::affine_of(clone.id(), &|path: &PathSnapshot| {
+                path.sheared(fixed, ku, kv)
+            });
+            return ObjectSnapshot::Clone(clone.mapped_by(g));
+        }
+    };
     ObjectSnapshot::Path(path.sheared(frame.fixed_point, ku, kv))
 }
 
@@ -470,5 +495,7 @@ pub(crate) fn scale_stroke(object: &mut ObjectSnapshot, factor: f64) {
         ObjectSnapshot::Path(p) => {
             p.style.stroke.width = scaled_and_floored(p.style.stroke.width, factor, floor);
         }
+        // A clone shows its root's stroke width, never scaled (`0049` criterion 9).
+        ObjectSnapshot::Clone(_) => {}
     }
 }

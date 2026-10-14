@@ -56,6 +56,9 @@ pub(crate) fn apply(
     modes: ScaleModes,
     converted: Option<&PathSnapshot>,
 ) -> ObjectSnapshot {
+    if let ObjectSnapshot::Clone(clone) = object {
+        return crate::clone_gesture::map_clone(clone, map_affine(clone.id(), map), converted);
+    }
     match *map {
         GroupMap::Scale { pivot, sx, sy } => {
             scale_object(object, pivot, (sx, sy), modes, converted)
@@ -67,10 +70,26 @@ pub(crate) fn apply(
                 (ObjectSnapshot::Path(path), _) | (ObjectSnapshot::Primitive(_), Some(path)) => {
                     ObjectSnapshot::Path(path.sheared_along(fixed, ku, kv, axes))
                 }
-                (ObjectSnapshot::Primitive(_), None) => object.clone(),
+                (ObjectSnapshot::Primitive(_), None) | (ObjectSnapshot::Clone(_), _) => {
+                    object.clone()
+                }
             }
         }
     }
+}
+
+/// `map` as one affine map of the document (`id` only names the probe).
+pub(crate) fn map_affine(
+    id: curvyo_document_core::NodeId,
+    map: &GroupMap,
+) -> curvyo_document_core::Affine {
+    let axes = Angle::from_radians(0.0);
+    let map = *map;
+    crate::clone_gesture::affine_of(id, &move |path: &PathSnapshot| match map {
+        GroupMap::Scale { pivot, sx, sy } => path.scaled_along(pivot, sx, sy, axes),
+        GroupMap::Rotate { pivot, delta } => path.rotated(pivot, delta),
+        GroupMap::Shear { fixed, ku, kv } => path.sheared_along(fixed, ku, kv, axes),
+    })
 }
 
 fn scale_object(
@@ -86,6 +105,7 @@ fn scale_object(
         (ObjectSnapshot::Path(path), _) => {
             ObjectSnapshot::Path(path.scaled_along(pivot, sx, sy, axes))
         }
+        (ObjectSnapshot::Clone(_), _) => object.clone(),
         (ObjectSnapshot::Primitive(_), Some(path)) if is_stretch(sx, sy) => {
             ObjectSnapshot::Path(path.scaled_along(pivot, sx, sy, axes))
         }
@@ -318,13 +338,28 @@ pub(crate) fn group_pivot(box_: &OrientedBox, handle: EditHandle, shift: bool) -
 /// Writes a resolved group gesture with `transform_objects`; a stroke width the
 /// document refuses is left out and the geometry still lands. `true` if the
 /// document took the write (an object that is gone refuses it all).
+///
+/// `map` is the gesture's one map of the document, when it moved a set: the matrices of the
+/// clones among `results` are settled with it (`specs/0049-linked-clone` criterion 16). A single
+/// result never moves its own chain and passes `None`.
 pub(crate) fn commit_group(
     document: &Document,
     results: &[ObjectSnapshot],
     stroke: StrokeScaling,
     handle: EditHandle,
+    map: Option<&GroupMap>,
 ) -> bool {
     let with_width = stroke == StrokeScaling::Proportional;
+    let mut results = results.to_vec();
+    if let (Some(map), Some(first)) = (map, results.first())
+        && results
+            .iter()
+            .any(|r| matches!(r, ObjectSnapshot::Clone(_)))
+    {
+        let g = map_affine(first.id(), map);
+        crate::clone_gesture::settle_clone_matrices(&document.clone_links(), &mut results, g);
+    }
+    let results = &results;
     document.batch(group_label(handle), |document| {
         let outcome = document.transform_objects(results, with_width);
         if with_width && outcome == Err(ObjectEditError::InvalidStrokeWidth) {

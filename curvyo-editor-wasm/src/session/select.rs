@@ -30,6 +30,8 @@ pub enum DoubleClickHint {
     /// The center handle of the Offset tool opened the Offset entry chip: the host focuses its
     /// Distance field (`specs/0038-path-offset` criterion 53).
     OffsetChip,
+    /// The sentence that a linked clone has no nodes (`0049-linked-clone` criterion 26).
+    Clone,
 }
 
 impl DoubleClickHint {
@@ -42,6 +44,7 @@ impl DoubleClickHint {
             Self::EditHint => "edit_hint",
             Self::CompoundPath => "compound_path",
             Self::OffsetChip => "offset_chip",
+            Self::Clone => "clone",
         }
     }
 }
@@ -263,6 +266,7 @@ impl Session {
             }
             SelectDoubleClickOutcome::EditHint => DoubleClickHint::EditHint,
             SelectDoubleClickOutcome::CompoundPath => DoubleClickHint::CompoundPath,
+            SelectDoubleClickOutcome::Clone => DoubleClickHint::Clone,
             // A group opens: everything outside it recedes (`0023` criterion 15).
             SelectDoubleClickOutcome::EnterGroup { group, leaf } => {
                 self.enter_group(group, Some(leaf));
