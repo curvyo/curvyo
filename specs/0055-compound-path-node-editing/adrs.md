@@ -54,6 +54,16 @@ generic, no `format_version` bump.**
   the join/close commands commit per call today. The multi-path Delete is `0053` point 4; whichever
   of `0053` and `0055` builds first adds a `delete_anchors_many(&[(NodeId, &[AnchorId])])` with one
   commit, and the other reuses it. Close path already takes a list (`close_paths`).
+  - *Superseded 2026-10-14 by `0053` decision 4.*
+    - **No `delete_anchors_many`.** `0053` built first and changed `delete_anchors` itself to
+      `delete_anchors(&[(NodeId, AnchorId)])` in `paths/anchor_edits.rs`: one commit across
+      paths, missing paths and stale ids skipped. `convert_anchor_kind` takes the same pairs and
+      refuses on a stale id. There are no twin methods.
+    - **What this slice changes.** It swaps `path_parts` for the per-anchor outline resolver in
+      both commands.
+    - **Removal rule.** It replaces "fewer than two anchors: remove the node" with the outline
+      removal and promotion above. Today a Delete that empties the first outline of a compound
+      path would remove the whole object.
 - **2026-10-12: Join across objects (criterion 5 c, 9).** The survivor's joined outline is written
   where its outline stood; the other object's remaining outlines are appended to `extra_subpaths`
   with their anchor ids (globally unique, so the node selection stays valid); the other object is
