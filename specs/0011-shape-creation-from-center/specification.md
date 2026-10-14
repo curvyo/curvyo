@@ -188,7 +188,9 @@ reports them (Ctrl is Cmd on macOS, as everywhere else in the product).
   predates this spec and is unchanged by it. (Superseded:
   `specs/0009-unified-object-editing/` criterion 28 selects the new shape and
   switches to the Select tool after a create-drag.)
-- A drag threshold for shape creation: only A equal to B is refused.
+- A drag threshold for shape creation: only A equal to B is refused. (Changed by
+  `specs/0052-click-to-create-shapes/` criterion 1: a press and release under 3 px is a click and starts
+  a placement; a create-drag needs 3 px.)
 - Numeric entry of size or position, snapping, a persistent "draw from
   center" option or toggle.
 - Any document-model or file-format change, new crate, or ADR.
