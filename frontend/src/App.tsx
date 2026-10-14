@@ -96,6 +96,8 @@ function Editor() {
         <div
           inert={historyPreview.kind === "document"}
           className={`pointer-events-none absolute top-3 right-3 left-[calc(var(--rail-right)+12px)] z-20 flex ${
+            historyPreview.kind === "document" ? "opacity-40" : ""
+          } ${
             // The Select bar is left-aligned so its two switches never move
             // when the selection changes; the Node and Shape bars stay
             // centred (`docs/design-system.md`, "Select bar layout").

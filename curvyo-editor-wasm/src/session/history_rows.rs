@@ -133,6 +133,7 @@ impl Session {
             "time": row.time.as_secs(),
             "status": status,
             "undoneBy": undone_by,
+            "version": row.version.as_ref().map(|v| v.shown_id.clone()),
             "class": class,
             "kind": kind_word(row.kind),
             "summary": summary,
@@ -236,7 +237,11 @@ impl Session {
     /// "Wipe" was confirmed: cuts the history, empties both stacks and writes the one step
     /// "History wiped". The drawing is unchanged.
     pub fn wipe_history(&mut self) -> WipeOutcome {
-        if self.operation_in_flight() || self.select.has_entry() || self.pen_path_open() {
+        if self.operation_in_flight()
+            || self.select.has_entry()
+            || self.pen_path_open()
+            || self.document_preview_active()
+        {
             return WipeOutcome::Ignored;
         }
         self.sync_history();

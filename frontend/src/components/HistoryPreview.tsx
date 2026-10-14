@@ -46,7 +46,7 @@ export function HistoryPreviewLine({ getSession }: { getSession: () => WasmSessi
           getSession()?.history_preview_end();
           setPreviewState(NO_PREVIEW);
         }}
-        className="h-7 rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_25%,transparent)] px-2 text-xs text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+        className="h-7 shrink-0 whitespace-nowrap rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_25%,transparent)] px-2 text-xs text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
       >
         Back to live
       </button>

@@ -16,7 +16,7 @@ import { HistoryModeRow } from "@/components/panel/HistoryModeRow";
 import { FoldRow, StepRow } from "@/components/panel/HistoryRow";
 import { useHistoryList } from "@/hooks/useHistoryList";
 import { useBusyWindow } from "@/hooks/useRailCommands";
-import { NO_PREVIEW, parsePreview } from "@/lib/historyPreview";
+import { NO_PREVIEW, historyButtonsPaused, parsePreview } from "@/lib/historyPreview";
 import { setPreviewState, usePreviewState } from "@/lib/historyPreviewStore";
 import {
   itemHeight,
@@ -332,7 +332,10 @@ export function HistoryTab({ editor, shown, onReturnFocus, historyScope }: Histo
           setFocused(index);
           pressRow(index);
         }}
-        selected={exploring && explored !== null && item.step === explored}
+        selected={
+          (exploring && explored !== null && item.step === explored) ||
+          (preview.kind !== "" && preview.step === item.step)
+        }
         action={object ? "clone" : item.objects.length > 0 ? "objects" : null}
         objectsOpen={open?.index === index}
         onToggleObjects={() =>
@@ -373,7 +376,6 @@ export function HistoryTab({ editor, shown, onReturnFocus, historyScope }: Histo
               <Tooltip side="left" content="Put the object back as it was before you started clicking through versions">
                 <button
                   type="button"
-                  tabIndex={-1}
                   onClick={() => {
                     editor.runHistoryAction((s) => s.history_restore_exploration());
                     setExplored(null);
@@ -482,6 +484,8 @@ function HistoryHeader({
   onReturnFocus: () => void;
 }) {
   const { historyNames, pressHistory, canvasNotice, historyBusy } = editor;
+  // A document preview pauses editing: Undo and Redo are disabled (`0042` criterion 19).
+  const paused = historyButtonsPaused(usePreviewState());
   const { scope, info, hasGroup, choose } = historyScope;
   const [now] = useState(() => new Date());
   const objectScope = scope === "object" && info !== null;
@@ -499,14 +503,14 @@ function HistoryHeader({
             type="button"
             aria-label={tooltip.replace(/ \(.*\)$/, "")}
             aria-keyshortcuts={keys}
-            disabled={historyBusy}
+            disabled={historyBusy || paused}
             onClick={(event) => {
               pressHistory(objectScope ? `object-${direction}` : direction, "panel");
               if (event.detail > 0) {
                 onReturnFocus();
               }
             }}
-            className="flex h-7 w-7 items-center justify-center rounded-[5px] text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+            className="flex h-7 w-7 items-center justify-center rounded-[5px] text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] disabled:opacity-40 disabled:hover:bg-transparent"
           >
             <Icon size={16} strokeWidth={1.5} aria-hidden />
           </button>
@@ -608,6 +612,8 @@ function WipeFooter({
     showHistoryNotice,
   } = editor;
   const objectScope = scope === "object";
+  // A document preview pauses editing: Wipe is disabled (`0042` criterion 19).
+  const paused = historyButtonsPaused(usePreviewState());
   const question = objectScope ? objectWipeQuestion(total) : wipeQuestion(total);
   const showNotice = showHistoryNotice;
   const [confirming, setConfirming] = useState(false);
@@ -659,6 +665,7 @@ function WipeFooter({
       <button
         ref={opener}
         type="button"
+        disabled={paused}
         onClick={() => {
           // An unfinished Pen path: ignored with the hint, like the keys (criteria 6e and 51).
           if (getSession()?.history_wipe_blocked()) {
@@ -668,7 +675,7 @@ function WipeFooter({
           restoreToOpener.current = true;
           setConfirming(true);
         }}
-        className="mt-2 h-7 w-full shrink-0 rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_25%,transparent)] text-sm text-[var(--destructive)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+        className="mt-2 h-7 w-full shrink-0 rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_25%,transparent)] text-sm text-[var(--destructive)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] disabled:opacity-40 disabled:hover:bg-transparent"
       >
         {objectScope ? "Wipe object history" : "Wipe history"}
       </button>

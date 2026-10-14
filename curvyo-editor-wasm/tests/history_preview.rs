@@ -169,3 +169,16 @@ fn c19_a_document_preview_draws_the_page_of_that_version() {
     s.end_history_preview();
     assert!((area_width(&s) - width_then).abs() > 1.0);
 }
+
+#[test]
+fn c19_the_panel_undo_redo_and_wipe_do_nothing_during_a_document_preview() {
+    let mut s = widths();
+    let before = doc_json(&s);
+    let last = s.history_len() - 1;
+    assert_eq!(s.preview_history_item(false, last), RowPress::Previewed);
+    assert!(!s.undo().changed, "the Undo button writes nothing");
+    assert!(!s.redo().changed);
+    assert_eq!(s.wipe_history(), curvyo_editor_wasm::WipeOutcome::Ignored);
+    assert_eq!(doc_json(&s), before);
+    assert_eq!(preview(&mut s)["kind"], "document", "the preview stays");
+}

@@ -240,8 +240,8 @@ impl Session {
 
     fn press_history(&mut self, direction: Direction) -> HistoryResult {
         // The gate of the keys (criterion 6) holds for every entry point: the History buttons come
-        // here too.
-        if self.operation_in_flight() || self.select.has_entry() {
+        // here too. A document preview pauses editing (`0042` criterion 19).
+        if self.operation_in_flight() || self.select.has_entry() || self.document_preview_active() {
             return HistoryResult {
                 notice: String::new(),
                 changed: false,

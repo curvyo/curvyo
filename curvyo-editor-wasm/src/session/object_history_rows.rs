@@ -131,6 +131,7 @@ fn object_row_json(row: &ObjectRow) -> Value {
         "summary": object_row_summary(row),
         "status": status,
         "undoneBy": undone_by,
+        "version": row.version.as_ref().map(|v| v.shown_id.clone()),
         "from": row.inherited_from.map(NodeId::short_id).unwrap_or_default(),
         "sources": row.sources.iter().map(|id| id.full_id()).collect::<Vec<_>>(),
         "objects": [],

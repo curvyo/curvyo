@@ -175,7 +175,7 @@ interface StepRowProps {
   onFocusRow: () => void;
   onHover: (step: string) => void;
   onPress: () => void;
-  /** The row an exploration went to last: the selected look. */
+  /** The row an exploration went to last, or the row a preview shows: the selected look. */
   selected?: boolean;
   /** The row's action (`specs/0042-history-branches` criteria 22 and 24): Clone in the Object
    * scope, the objects disclosure in the Document scope; none for a row without one. */

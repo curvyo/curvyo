@@ -46,6 +46,8 @@ export interface HistoryRowData {
   status: "applied" | "undone" | "undone-by" | "branch";
   /** For a row on a branch: "on branch from a1b2c3d, step 2 of 2" (criterion 9). */
   lane?: string;
+  /** For a go to or a clone of a version: the version's shown id (`0042` criteria 10 and 22). */
+  version?: string;
   undoneBy?: "you" | "earlier" | "";
   class?: RowClass;
   /** What the step did to the selected object (Object scope rows). */
@@ -143,7 +145,7 @@ export function secondLineRest(row: HistoryRowData, now: Date): string {
     row.status === "undone-by" && row.undoneBy === row.author ? "" : authorWord(row);
   const time = formatRowTime(row.time, now);
   const parts =
-    row.status === "undone-by" || row.from
+    (row.status === "undone-by" || row.from) && !row.version
       ? [author, time, summary]
       : [summary, author, time];
   return parts.filter((part) => part !== "").join(" · ");
@@ -152,6 +154,16 @@ export function secondLineRest(row: HistoryRowData, now: Date): string {
 /** What a row shows as its name and summary. The wipe of one object's history is titled "Wipe
  * history" with the object on line 2, so the id is not the part an ellipsis cuts. */
 export function rowDisplay(row: HistoryRowData): { name: string; summary: string } {
+  // A go to or a clone keeps the version's full id on line 2, where an ellipsis does not reach it
+  // (`0042` UX review): "Go to version" over "a1b2c3d · Resize".
+  if (row.version) {
+    const v = row.version;
+    if (row.class === "clone-start") {
+      return { name: row.name.replace(` at version ${v}`, ""), summary: `at version ${v}` };
+    }
+    const name = row.name.endsWith(` ${v}`) ? row.name.slice(0, -(v.length + 1)) : row.name;
+    return { name, summary: [v, row.summary].filter((part) => part !== "").join(" · ") };
+  }
   const wiped = /^Wipe history of (.+)$/.exec(row.name);
   if (row.label === "wipe_object_history" && wiped) {
     return { name: "Wipe history", summary: (wiped[1] ?? "").replace(", ", " ") };

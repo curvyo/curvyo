@@ -57,3 +57,9 @@ export function modeCaption(live: boolean): string {
     ? "A click puts the object into that version. Ctrl+Z undoes it."
     : "A click shows the version. Nothing changes.";
 }
+
+/** Whether the panel's Undo, Redo and Wipe are disabled: a document preview pauses editing
+ * (criterion 19). */
+export function historyButtonsPaused(state: PreviewState): boolean {
+  return state.kind === "document";
+}
