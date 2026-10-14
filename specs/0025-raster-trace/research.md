@@ -4,6 +4,13 @@ Author: product-owner. Date: 2026-10-14. Status: input for the customer and the 
 
 Customer request (2026-10-14): 0025 needs more thought. A new tool, with its settings in the top-middle area (not a property, not the right side). Start with the vectorisation functions Inkscape has, but check Illustrator, "VectorCraft" and Affinity. Inkscape's results should be beaten: smoother, fewer nodes, fewer wobbly lines, fewer micro paths. Bitmap import comes first (spec 0058).
 
+**Decided by the customer (2026-10-14):**
+- Compute time of 2 to 4 s for a 2000 x 2000 px image is acceptable (section 6, CPU budget).
+- The UX mockup of the Trace tool is accepted (section 6, UI shape).
+- Our licence is AGPL-3.0-or-later ([ADR 0006](../../docs/adr/0006-license.md)). GPL-2.0-or-later code is compatible with it; only GPL-2.0-only is not. Section 4 has the licence matrix.
+- The product named "VectorCraft" is the GitHub project `storytold/vectorcraft` (section 3). It is by the same organisation as ArtCraft.
+- Tracing should be extensible with other methods (algorithms, an MCP server, machine learning). Not in the first slice; ideas are collected in section 10.
+
 Labels: **Fact** = read in a source named next to it. **From memory** = my knowledge, not re-checked today. **Uncertain** = sources conflict or I found none. **Proposal** = my idea, not a customer requirement.
 
 Fetch problems today: inkscape.org and helpx.adobe.com (main pages) returned HTTP 403, so Inkscape and Illustrator details rest on search snippets, mirrors and memory.
@@ -61,12 +68,37 @@ Sources: [Adobe: Image Trace panel options](https://helpx.adobe.com/lv/illustrat
 
 ## 3. "VectorCraft" and Affinity
 
-**Which "VectorCraft" did the customer mean?** I could not find a Corel product with that name. Candidates found (searches today):
-1. A Figma plugin "VectorCraft" (AI credits, licence key). [Gumroad](https://merahburam.gumroad.com/l/vectorcraft-starter-package).
-2. An open-source vector editor "VectorCraft" in pure Rust, which also runs in WebAssembly, with an image-tracing feature. [SourceForge mirror](https://sourceforge.net/projects/vectorcraft.mirror/), [FileCR listing](https://filecr.com/windows/vectorcraft/) (snippet cut off; Uncertain).
-3. Products with similar jobs that the customer may have meant: **CorelDRAW PowerTRACE** (Outline, Centerline, Quick Trace, preview, an AI-assisted trace in the 2025 suite, a redesigned workflow in the 2026 update) ([Corel tutorial](https://learn.corel.com/tutorials/convert-images-to-vector-files-quickly-and-easily-with-powertrace/), [Corel AI trace](https://www.coreldraw.com/en/pages/items/1600148.html), [itechguides review](https://www.itechguides.com/?p=978757)); **Vectorizer.ai** and **Vector Magic**.
+### 3.1 VectorCraft (storytold/vectorcraft)
 
-**What I took:** PowerTRACE (a mature, maker-relevant trace with centerline), Vectorizer.ai and Vector Magic as quality benchmarks. Candidate 2 (the Rust editor) might be worth a look for code ideas, but I did not review its code or licence. **Frage 1 asks the customer to name the product.**
+The customer named [github.com/storytold/vectorcraft](https://github.com/storytold/vectorcraft) ("VectorCraft, in front of ArtCraft"). Read 2026-10-14: the repo page, the root `Cargo.toml`, `crates/trace/Cargo.toml`, `crates/trace/src/lib.rs` and the directory listings. I did **not** read the algorithm files (`contour.rs`, `fit.rs`, `subpixel.rs`, ...), run the code, or measure output quality. Everything below is Fact from those files unless marked.
+
+**ArtCraft.** Yes, the same organisation (`storytold`) has `artcraft`: "an intentional crafting engine for artists, designers, and filmmakers", Rust, about 27.8k stars (org page). The VectorCraft README says it is "built by the ArtCraft team". The org also hosts a family of Rust "clean-room reimplementation" apps (wordcraft, photocraft, pdfcraft, filmcraft, designcraft, figcraft, deckcraft, effectcraft, craft-libs), Apache-2.0 where the licence was shown. The ArtCraft licence was not shown on the org page (Uncertain).
+
+**What it is.** An open-source vector editor, "a clean-room reimplementation of Adobe Illustrator, rebuilt in pure Rust". Native on macOS, Windows, Linux and FreeBSD, and in the browser via WebAssembly (`apps/vectorcraft-web`, Trunk). egui-based UI. Status: alpha, version 0.11.0, 2,839 commits, 8.9k stars, 4.2k forks, 263 open issues, status date 2026-10-10 (very active). Self-assessed parity "about 88 % of Illustrator 2026's menu items", about 65 % "ready for real work" (the README says these scores are self-assessed). It has an MCP server (`vectorcraft-cli mcp`, stdio) and a JSON control channel, so agents can draw and export. No built-in ML or generative AI. It also has a `pathops` crate (curve booleans), `plugins`, `format`, `svg`, `eps` crates. It overlaps with Curvyo's drawing side, so it is also a competitor to watch, not only a source for tracing.
+
+**Licence.** `MIT OR Apache-2.0` (root `Cargo.toml`, README: dual-licensed "at your option"). Copyright "(c) 2026 ArtCraft Team and the VectorCraft contributors". Bundled assets have their own licences (ASSETS.md, not read). The ArtCraft name and logos are trademarks and excluded. Both licences are on the ADR 0006 allow-list, so code can be used if we keep notices.
+
+**The tracer: crate `crates/trace` (`vectorcraft-trace`).** Doc comment: "A clean-room tracer built from the published ideas behind bitmap tracers."
+- Dependencies: `vectorcraft-geom` (their own), **kurbo** (same as ours), `image`, `serde`, `thiserror`. No C code, no potrace, no ML. Workspace lint `unsafe_code = "deny"`. Whether the crate builds for wasm32: the app does, so likely yes (Uncertain for the crate alone). `image` is a decoding dependency; for us decoding is not core (0058).
+- Interface: input `Raster` (RGBA8); `trace(raster, TraceParams) -> TraceResult` and `trace_within`, which takes an anchor limit and returns `TooComplex` when exceeded. This is the "node budget" idea from section 4 (item 9), as a hard stop and not a refit loop (Uncertain which).
+- Modes: Black and White (threshold, default 128), Grayscale (1-D k-means, 2 to 256 grays), Color (Limited, Full Tone, Automatic, Document Library palettes), Logo (flat-colour logos).
+- Layer methods: Abutting and Overlapping. These are Illustrator's names; the tracer mirrors Illustrator's Image Trace panel (Paths, Corners, Noise, Method, Snap Curves To Lines, Create fills/strokes), plus presets (Default, Auto Color, photo, N colours, Shades of Gray, line art, Outline, Flat Logo).
+- Pipeline (crate docs): quantise (anti-aliasing blends do not create palette colours) -> merge same-colour components smaller than `noise` pixels into their most common neighbour -> follow pixel-crack boundaries into closed loops (outer clockwise, holes counter-clockwise) -> move cracks to **sub-pixel** edge positions -> cut outlines at junctions and fit piece by piece, **so abutting regions share one curve along their edge**.
+- Corners (0 to 100) map to a turn angle of 35 degrees (at 100) to 90 degrees (at 0), with corners the pixels rounded off restored. Paths (0 to 100) set the curve tolerance from about 0.08 px to 0.78 px. Straight runs become lines, round outlines true circles, the rest "as few cubic Béziers as tolerance allows".
+- Extras: centerline strokes (`centerline.rs`), recognition of circle, ellipse, rectangle and regular polygon as exact shapes (`shapes.rs`), linear gradients as one path (`gradient.rs`), auto grouping, snapping lines to level/upright within 2.5 degrees, a `mosaic` module (not documented).
+- Tests: a `tests/quality/` harness (`measure.rs`, `inputs.rs`, `raster.rs`). Contents not read. The README gives no tracing quality numbers, and I found no comparison with Inkscape or Vectorizer.ai (Uncertain). The only quality claims are rendering speed and parity, which are not about tracing.
+
+**What this means for us.**
+1. **It is nearly the pipeline of approach C** (section 8): sub-pixel contours, shared borders, kurbo fitting, corner restoration, primitive recognition, centerline. It validates that design, in the same language and with the same curve library.
+2. **Reusable, as an idea (yes).** The stage order, the junction-cut-then-fit trick for shared edges, "anti-aliasing blends do not count as palette colours", merging specks into their most common neighbour instead of deleting them (no holes), the Corners/Paths parameter mapping, the TooComplex anchor limit.
+3. **Reusable, as code (possible, with care).** MIT OR Apache-2.0 is compatible with AGPL-3.0-or-later; we may copy or depend on it if notices are kept. Practical limits: it is an internal workspace crate tied to their `vectorcraft-geom` types and `image` (our units are newtypes per CLAUDE.md §5 and decoding is outside core), so a drop-in dependency is unlikely; adaption means a fork of a few files. I do not know if it is published on crates.io (Uncertain; check). A new crate or vendored code needs an ADR.
+4. **Benchmark (yes, first).** Build it as a dev tool and run it through our metric harness (section 5) next to Inkscape and VTracer. Its tracing quality is unproven until we measure it. At 2,839 commits in an alpha product that describes itself as 65 % ready, I would not assume it is good; I also do not know how much of it was written by hand or generated (Uncertain; not a reason to reject, but a reason to measure).
+5. **What we should not do.** Do not copy its feature parity goals ("Illustrator clone": Illustrator names, Illustrator presets). Our mm-based, cutting-oriented presets and units are the difference. Do not take its code without reading and testing it; do not depend on an alpha, fast-moving, 0.x internal crate whose API will change weekly; do not use the "VectorCraft"/"ArtCraft" names or logos (trademarks). Do not treat its MCP server as part of our tracer (see section 10).
+6. **The earlier candidates for the name** (a Figma plugin "VectorCraft" with AI credits, [Gumroad](https://merahburam.gumroad.com/l/vectorcraft-starter-package), and the Rust editor) are now resolved: the customer meant the Rust project. The Figma plugin is irrelevant.
+
+### 3.2 Other references
+
+I keep **CorelDRAW PowerTRACE** (Outline, Centerline, Quick Trace, preview, AI-assisted trace in the 2025 suite, redesigned workflow in 2026; [Corel tutorial](https://learn.corel.com/tutorials/convert-images-to-vector-files-quickly-and-easily-with-powertrace/), [Corel AI trace](https://www.coreldraw.com/en/pages/items/1600148.html), [itechguides review](https://www.itechguides.com/?p=978757)), **Vectorizer.ai** and **Vector Magic** as quality benchmarks.
 
 **Vectorizer.ai** ([site](https://vectorizer.ai/)). Vendor claims only: sub-pixel boundary placement from anti-aliasing values, neighbouring shapes kept aligned (gap-free), fits circles, ellipses, rounded rectangles and stars as true shapes, arcs plus quadratic and cubic Béziers, corner control, palette size, symmetry, SVG/EPS/DXF/PDF output, 3 MP and 30 MB limit, pay per use. The service is closed and cloud-based; it is a benchmark, not something we can use (data leaves the machine, CLAUDE.md §3).
 
@@ -76,16 +108,54 @@ Sources: [Adobe: Image Trace panel options](https://helpx.adobe.com/lv/illustrat
 
 **CorelDRAW PowerTRACE** (taken as the third reference). Modes: Outline (filled shapes), Centerline (strokes for line art, which matters for plotters and engraving), Quick Trace; live preview before/after with colour count and node/object count shown. Fact (Corel tutorials); the node/object count display is from memory.
 
+### 3.3 Comparison
+
+| | Inkscape | Illustrator | PowerTRACE | Vectorizer.ai | VectorCraft (trace crate) | Affinity |
+|---|---|---|---|---|---|---|
+| Engine | potrace (+ autotrace) | closed | closed | closed, cloud | own, Rust (Fact) | none |
+| Licence | GPL-2.0-or-later | closed | closed | closed | MIT OR Apache-2.0 | closed |
+| Colour | stacked threshold passes | palette modes | yes | yes | palettes, Abutting/Overlapping | - |
+| Sub-pixel edges | no | unknown | unknown | claimed | yes (docs) | - |
+| Shared edges, gap-free | no (Stack option) | Abutting | unknown | claimed | yes (docs) | - |
+| Centerline | autotrace mode | no (strokes option) | yes | no | yes (docs) | - |
+| Primitives (circle, rect) | no | no | no | claimed | yes (docs) | - |
+| Size units | px | px | px | px | px | - |
+| Runs offline | yes | yes | yes | no | yes | - |
+| Quality measured by us | no | no | no | no | no | - |
+
+"Fact (docs)" for VectorCraft means stated in its crate docs, not measured.
+
 **What we do better (Proposal).** Show node and path counts live; sizes in mm instead of pixels; cutting presets; a stacked and a gap-free (cutout) result as a choice; trace happens in a tool next to the canvas.
 
 ## 4. Libraries and algorithms for a core crate
 
-Hard rules: `*-core` builds for wasm32, no I/O, no threads, no `unsafe` (CLAUDE.md §5, §6). Licence is AGPL-3.0-or-later ([ADR 0006](../../docs/adr/0006-license.md)), which can include GPL code, but the allow-list in the ADR and `cargo deny` still decide per dependency.
+Hard rules: `*-core` builds for wasm32, no I/O, no threads, no `unsafe` (CLAUDE.md §5, §6). Licence is AGPL-3.0-or-later ([ADR 0006](../../docs/adr/0006-license.md)). GPL-2.0-or-later and GPL-3.0 code can be combined with it; GPL-2.0-only cannot. The ADR's `cargo deny` allow-list currently names only permissive licences (MIT, Apache-2.0, BSD, ISC, Zlib, MPL-2.0, ...), so a GPL-2.0-or-later dependency would need an allow-list change (a decision, not a waiver, per ADR 0006 item 2). That is a process step, not an incompatibility.
+
+### 4.1 Licence matrix
+
+| Candidate | SPDX identifier | Compatible with AGPL-3.0-or-later? | Note |
+|---|---|---|---|
+| potrace (Selinger) | GPL-2.0-or-later (Fact, section 1) | **Yes** | "or later" lets the combined work be under GPL-3.0 / AGPL-3.0. Verify the header in the version we port; some old files may say otherwise (needs check). |
+| Python `potracer`, npm `potrace` (ports) | GPL-2.0-or-later or GPL-2.0-only? Not verified ("GPL-style" only) | **Needs check** | Compatible only if the port says "or later". Check each before reading it. |
+| VTracer | MIT OR Apache-2.0 (Fact, section 4 table) | Yes | Allow-listed. |
+| visioncortex | MIT OR Apache-2.0 (Fact; some bundled files MIT/BSD-2-Clause) | Yes | Allow-listed. |
+| VectorCraft `trace` | MIT OR Apache-2.0 (Fact, root `Cargo.toml`) | Yes | Allow-listed; keep notices; names and logos excluded. |
+| kurbo | Apache-2.0 OR MIT (in workspace) | Yes | Allow-listed. |
+| autotrace | GPL-2.0-or-later or LGPL-2.1-or-later (From memory) | **Needs check** | Wording per version; only the "or later" variants work. Not planned for use. |
+| ImageTracer (JS) | Unlicense (From memory) | Yes if so (needs check) | Reading aid only. |
+| Inkscape (as offline baseline tool) | GPL-2.0-or-later (Fact, via potrace) / GPL-3.0 (From memory) | Not linked, no issue | Only run to measure; nothing shipped. |
+| Vectorizer.ai, Vector Magic | proprietary | No (not usable) | Manual benchmark only. |
+| ML models (section 10) | varies: Apache-2.0, MIT, CC-BY-NC, OpenRAIL, "research only" | **Needs check per model** | Model weights are not code; non-commercial or use-restricted licences conflict with "everything else is deliberately free" (ADR 0006). |
+
+Rule for the matrix: only the identifier counts, not the project's name. "GPL-2.0-only" and "GPL-2.0" without "or later" are a **no**.
+
+### 4.2 Options
 
 | Option | Licence | wasm | Notes |
 |---|---|---|---|
-| **potrace** (C) | GPL-2.0-or-later (Fact, see section 1) | not as C | Quality reference. "or later" allows GPL-3, so it is AGPL-compatible. We cannot link C into a core crate. |
-| Rust or JS ports of potrace | GPL-style (Fact for the Python `potracer` and the npm `potrace`, [licenses.dev](https://licenses.dev/npm/potrace/2.1.8), [PyPI](https://pypi.org/project/potracer/0.0.1)) | possible | I found **no Rust crate port** in today's search (Uncertain; check crates.io). A port written by us is a derivative work of GPL code. |
+| **potrace** (C) | GPL-2.0-or-later (Fact, see section 1) | not as C | Quality reference. License is compatible. The blocker for the C code is technical: no C in a `*-core` crate (wasm32, no `unsafe`), so only a Rust port is an option. |
+| Rust or JS ports of potrace | GPL-style (Fact for the Python `potracer` and the npm `potrace`, [licenses.dev](https://licenses.dev/npm/potrace/2.1.8), [PyPI](https://pypi.org/project/potracer/0.0.1)); exact identifier not checked | possible | I found **no Rust crate port** in today's search (Uncertain; check crates.io). A port is a derivative work of potrace: it must stay GPL-2.0-or-later-compatible, keep Selinger's copyright notices, and carry the source-offer obligations of the AGPL as a whole (which we already accept). The real costs are those obligations and that the algorithm's limits (binary input, no sub-pixel) stay. |
+| **VectorCraft `trace`** | MIT OR Apache-2.0 (Fact, section 3.1) | the app builds for wasm; crate alone Uncertain | Rust, kurbo-based, sub-pixel, shared edges, colour, centerline, shapes. Internal alpha crate; quality unmeasured. Idea source and benchmark first, code reuse possible by fork of a few files. |
 | **VTracer / visioncortex** | MIT or Apache-2.0 (Fact: [Debian review of visioncortex](https://dfsg-new-queue.debian.org/reviews/rust-visioncortex), [vtracer](https://dfsg-new-queue.debian.org/reviews/rust-vtracer); some bundled files under MIT/BSD-2-Clause) | yes, it ships a wasm webapp ([docs.rs](https://docs.rs/vtracer-webapp)) | Rust, colour, stacked or cutout hierarchy, speckle filter, corner/splice/length thresholds, `simplify`. Pipeline: colour clustering, region tree, path walking, spline fit. Readme: [VTracer](https://github.com/visioncortex/vtracer). Unknown: whether `visioncortex` has `unsafe` or std-only I/O deps; the crate version I saw was 0.8.x (Uncertain). |
 | autotrace | GPL-2 or LGPL (From memory, Uncertain) | C | Discontinued per [AlternativeTo](https://alternativeto.net/software/vtracer/?p=2). Centerline mode is its unique feature. |
 | ImageTracer (JS) | Unlicense (From memory, Uncertain) | JS only | Simple, low quality; useful only as a reading aid. |
@@ -162,6 +232,8 @@ The metrics run in a test binary in the tracer crate (no UI), on fixtures in `te
 
 **UI shape (the UX engineer proposes the details):** A new **Trace tool** in the toolbox. When active with an image selected, the top-middle context area (the place the customer named) shows the preset menu, mode, the two or three sliders, a live preview toggle, a node/path counter, **Apply** and **Cancel**. No Properties panel entry. Preview draws as an overlay, the document changes only on Apply (one undo step). The UX engineer should also propose: what happens to the source image (keep, hide, lock), and what the preview looks like on a dark theme.
 
+**Decided (customer, 2026-10-14):** the UX mockup of the Trace tool is accepted, and 2 to 4 s of compute for a 2000 x 2000 px image is acceptable. The targets below are therefore comfortable for the full-resolution run; the live-preview rules still apply (a 2 to 4 s preview while dragging a slider would feel stuck).
+
 **CPU budget (Proposal; not measured, estimates from memory of VTracer and potrace performance; Uncertain).**
 - 2000 x 2000 px (4 MP), B/W, no upscale: target at most 0.5 s on a 2020 laptop, single thread. Marching squares and fitting are linear; the fit dominates and scales with node count.
 - Colour, 8 colours: target at most 2 s. Clustering is the cost.
@@ -171,7 +243,7 @@ The metrics run in a test binary in the tracer crate (no UI), on fixtures in `te
 
 ## 7. Licensing and dependency risks (for the architect)
 
-1. **Potrace is GPL-2.0-or-later.** AGPL-3.0-or-later (ADR 0006) can include it, but a port makes our tracer a derivative work and the "or later" check must pass `cargo deny`. We also lose the option to relicense or dual-license the core (ADR 0006 mentions the customer as sole copyright holder). Recommend not porting potrace; write our own pipeline (Candidate B/C).
+1. **Potrace is GPL-2.0-or-later, which is compatible with AGPL-3.0-or-later** (ADR 0006); licence is not a blocker for a port. What a port costs: (a) the ported part is a derivative work of Selinger's code and must stay under GPL-compatible terms; (b) ADR 0006 keeps dual-licensing open because the customer is sole copyright holder, and a potrace-derived module cannot be relicensed without Selinger's agreement, so that option is lost for that module (the rest of the code stays ours); (c) `cargo deny` and the ADR 0006 allow-list have to be extended for a vendored GPL source (or the code lives in our crate, where it is covered by our own licence and needs only notices); (d) the algorithm limits remain (binary input, no sub-pixel). Section 8 weighs these.
 2. **VTracer/visioncortex is MIT or Apache-2.0**: compatible with the ADR 0006 allow-list. Check: transitive dependencies, `unsafe` use (core crates forbid it only in our own code; `cargo deny` plus the ADR rule on dependencies decide), wasm32 build in CI, crate maintenance (last release seen 2025-10-17, Uncertain), API stability.
 3. **A new crate needs an ADR** (CLAUDE.md §5). `trace-core` is a new crate. Alternative: a module in an existing geometry crate. Architect decides.
 4. **Image decoding is not core** (0058 owns it). Tracing takes a plain pixel buffer.
@@ -182,7 +254,7 @@ The metrics run in a test binary in the tracer crate (no UI), on fixtures in `te
 
 ## 8. Candidate approaches
 
-**A. Port potrace.** Best known quality baseline, same engine as Inkscape. Needs a GPL port, binary only; no colour or sub-pixel; this is what the customer is "not 100 % satisfied" with. Cost: medium. Licence risk: high. Does not beat Inkscape. **Not recommended.**
+**A. Port potrace.** Best known quality baseline, same engine as Inkscape. Binary only; no colour or sub-pixel; this is what the customer is "not 100 % satisfied" with. Cost: medium. Licence risk: **low** (GPL-2.0-or-later is compatible; costs are derivative-work notices and losing dual-licensing for that module). Quality risk: high, because it reproduces Inkscape's behaviour. Does not beat Inkscape by itself. Still **not recommended as the base**; reasonable as a reference for the optimal-polygon and corner-smoothing ideas (`alphamax`, `opttolerance`), which we can study and re-implement.
 
 **B. Adopt VTracer/visioncortex as a dependency, add pre- and post-processing.** Fastest to a working colour trace (days to a first demo). MIT/Apache. Already stacked and cutout, speckle filter, `simplify`. Weakness: its curve fitting is its own and its output is not smoother by nature; pixel-based region boundaries, so wobble must be fixed by us in a post-pass (re-fit with kurbo, merge). Cost: low to medium. Risk: depends on a third-party crate's maturity and `unsafe`. Quality unknown until measured (Uncertain).
 
@@ -190,23 +262,25 @@ The metrics run in a test binary in the tracer crate (no UI), on fixtures in `te
 
 **Recommendation (Proposal): C in two steps, with B as a measured benchmark and fallback.** Step 1 (the slice for 0025): B/W and colour-count trace with the Trace tool, top-middle settings, presets, preview, node counter, and the metric harness from section 5 against Inkscape. Build the contour and fit stages ourselves. Step 2 (later): shared-border gap-free colour layers, centerline, primitive recognition. Run VTracer once through the metric harness (as a dev tool, not a shipped dependency) to see whether it already beats Inkscape; if it does, the architect can reconsider B for the colour path. This keeps the MVP honest: one machine family, one clean B/W silhouette flow first.
 
+**Re-check after the licence correction and the VectorCraft finding (2026-10-14).** Does the recommendation change? **No, but its reasons shift and the first task changes.**
+- Licence: an earlier draft of this document treated a potrace port as a licence risk. That was wrong: GPL-2.0-or-later is compatible, so A is a legitimate choice. A still loses on quality (binary input, no sub-pixel, no shared borders), not on licence. Reason for not choosing A: changed. Result: unchanged.
+- B (VTracer): unchanged, MIT/Apache, benchmark and fallback.
+- VectorCraft `trace` is a new data point: an independent Rust implementation that has already chosen the same architecture as C (sub-pixel, junction-cut shared edges, kurbo). That lowers the design risk of C. It does not remove the work: its quality is unmeasured, and it is tied to their types. New step 0 before building: run VectorCraft and VTracer through the metric harness (section 5) on the 12 test images, with Inkscape as baseline. Then decide: (i) C from scratch using their stage order as a checklist, (ii) fork selected files of VectorCraft `trace` (MIT/Apache, notices kept) if it measures well, (iii) B for colour. The step costs one to two days of harness work that C needs anyway.
+- Honest caveat: if step 0 shows VectorCraft beating Inkscape on the targets, "own pipeline from scratch" gets harder to justify, and (ii) becomes the likely path. That is a change to the how, not to the approach (sub-pixel, shared borders, kurbo, mm tolerances).
+
 ## 9. Questions for the customer
 
-**Frage 1 (VEC-NAME): Which product is "VectorCraft"?**
-Options: (a) Corel's tool (CorelDRAW PowerTRACE, which I could not find under that name); (b) the AI Figma plugin or the Rust editor of that name; (c) Vectorizer.ai or Vector Magic; (d) you do not remember.
-Recommendation: (a)/(c), taken as quality benchmarks. Default: I use PowerTRACE, Vectorizer.ai and Vector Magic as references; Affinity has no trace.
+**Frage 1 (VEC-NAME): answered.** "VectorCraft" is `storytold/vectorcraft` (section 3.1). PowerTRACE, Vectorizer.ai and Vector Magic stay as benchmarks; Affinity has no trace.
 
-**Frage 2 (VEC-APPR): Which approach?**
-Options: A (port potrace), B (VTracer as dependency), C (own pipeline), C with B as benchmark.
-Recommendation: C with B as measured benchmark. Default: that one; the architect writes the ADR for the new crate.
+**Frage 2 (VEC-APPR): Which approach?** (revised 2026-10-14 after the licence correction and VectorCraft)
+Options: A (port potrace; licence is no blocker, quality is), B (VTracer as dependency), C (own pipeline), C with a step 0 that measures VectorCraft `trace` and VTracer first and may fork parts of VectorCraft (MIT/Apache).
+Recommendation: C with step 0. Default: that one; the architect writes the ADR for the new crate (or for vendored code).
 
 **Frage 3 (VEC-SCOPE): What is in the first slice of 0025?**
 Options: (a) B/W only plus presets; (b) B/W plus colour count (R-VEC-001 as written); (c) also gap-free colour layers and centerline.
 Recommendation: (b), with gap-free layers and centerline in a follow-up. Default: (b).
 
-**Frage 4 (VEC-UI): Settings in the top-middle bar of a new Trace tool, with an Advanced expander?**
-Options: (a) as proposed in section 6; (b) a floating panel over the canvas; (c) both bar and live counter only.
-Recommendation: (a), the UX engineer details it. Default: (a) and I ask `ux-engineer` for a proposal before Ready.
+**Frage 4 (VEC-UI): answered.** The UX mockup of the Trace tool (settings in the top-middle bar) is accepted (customer, 2026-10-14).
 
 **Frage 5 (VEC-UNITS): Units for the despeckle and tolerance settings?**
 Options: (a) mm, using the image's physical size (needs dpi from 0058; ask when missing); (b) pixels like Inkscape and Illustrator; (c) mm with a pixel hint next to it.
@@ -223,3 +297,91 @@ Recommendation: (a) plus your visual check on 5 of your own images. Default: (a)
 **Frage 8 (VEC-SOURCE): After Apply, what happens to the source image?**
 Options: (a) it stays, the traced paths sit on top; (b) the image is hidden; (c) the maker chooses in the bar.
 Recommendation: (b), with a visible hide/show toggle in the Layers panel. Default: (b).
+
+## 10. Extension points (collected, not in the first slice)
+
+Customer, 2026-10-14 (translated): extensions have not been discussed yet and are left out for now, but ideas are collected here, because tracing should be extensible with other methods. Really cool algorithms could be developed, or an MCP connected. AI, or at least machine learning, could help a lot.
+
+Everything here is a **Proposal** unless marked. Nothing in this section is an acceptance criterion of 0025.
+
+### 10.1 What the seam could look like
+
+A tracer backend is a pure function with a stable shape, matching ADR 0005 item 4 ("paths in, paths out, plus a declared parameter set"):
+
+- **In:** an RGBA8 image, the pixel-to-mm map (size of one pixel in mm, origin, orientation; from 0058), optional selection mask or crop, the parameter values, a cancel check.
+- **Out:** vector outlines: closed or open paths in mm with a fill colour or stroke, hole structure, layer order and the method (stacked/abutting), plus a small report (node count, path count, warnings).
+- **Parameters:** a typed schema (name, type, unit, range, default, step, group, "advanced" flag, preset values). The top bar of the Trace tool renders it, as ADR 0005 item 8 requires ("plugins declare parameters; the application renders the controls"). So the built-in tracer uses the same schema as an extension would; this also keeps the accepted mockup valid if a second backend appears.
+- **Capabilities:** a backend declares what it supports (colour, centerline, needs network, deterministic yes/no), so the tool can hide controls that do not apply.
+- **Preview:** the same call on a downscaled image; results are compared by the metric harness (section 5), whichever backend produced them.
+
+### 10.2 Who could plug in
+
+| Source | Fit | Constraints |
+|---|---|---|
+| Built-in algorithms | The first tracer, and later variants (centerline, logo mode, VTracer-style colour). | Core crate, wasm32, deterministic. |
+| Plugin per [ADR 0005](../../docs/adr/0005-extension-and-plugin-model.md) | Wasm component, Rust SDK, paths in/out, schema rendered by the app. Natural fit for algorithm experiments by the customer. | Sandbox has no network or filesystem at MVP; ADR 0005 is `0.x` and the host ships with the first machine family. A plugin receives an image, which the ADR's "document subset in, document subset out" wording does not yet cover. The WIT interface needs an image type (architect). |
+| MCP server as remote tracer | A server (local or remote) that takes an image and returns an SVG or paths. The tool would be an MCP client. | Needs network access, which plugins do not have (ADR 0005 item 7: connectors are not plugins). Data leaves the machine when remote (see 10.4). VectorCraft ships an MCP server the other way round (agents drive the editor); that is a different direction from "tracer as a service". |
+| Local ML model | A model run on the machine (ONNX via a Rust runtime, or a wasm-friendly runtime) as a pre-processing or tracing step. | Model size (tens to hundreds of MB), distribution, GPU or CPU time, browser limits, model licence (see 10.5). |
+| External command (ADR 0005 item 6) | Call a foreign tool that reads a file and writes SVG (potrace CLI, Inkscape, Vectorizer client). | A separate "interop" story; not a tracer plugin. Offline-capable. |
+
+### 10.3 Where ML or AI would help most (ranked by value for makers, Proposal)
+
+1. **Denoise and upscale before tracing** (JPEG ringing, low-res logos, scans). A learned upscaler removes staircase better than bicubic. Fits as a pre-processing stage, output is still an image, so the deterministic tracer remains in charge. Smallest risk, clearest gain.
+2. **Foreground/background segmentation for silhouettes.** A user-facing "Remove background" before a laser silhouette; photos of a pet or a tool traced to a clean outline. High value for cutting. The model output (mask) feeds a normal threshold trace.
+3. **Classification: line art vs logo vs photo vs pencil sketch.** A small classifier picks a preset or sets the initial parameters (Illustrator and Vector Magic auto-detect settings). Cheap and small; a rule-based heuristic (colour count, edge histogram) comes first and may be enough.
+4. **Node-budget-aware curve fitting.** A search or learned fit that minimises nodes under a deviation bound. This is classic optimisation first (section 4, items 5, 6 and 9), ML only if that falls short.
+5. **Shape recognition into primitives** (circles, rectangles, rounded rectangles, text). Primitives are classic geometry (VectorCraft's `shapes.rs` does it without ML). Text recognition to real text (OCR plus font match) is a bigger, separate feature (font classification is already a core concern per CLAUDE.md §6).
+6. **End-to-end neural vectorisation** (image to paths). Research quality varies, output is hard to bound by a tolerance, usually not reproducible. Lowest priority for makers who need cut-ready geometry.
+
+Rule for any ML stage: the final geometry still comes through the tolerance-bounded, mm-based fitting stage, so node count, deviation and closed-ness stay measurable by the section 5 metrics.
+
+### 10.4 Privacy and offline
+
+- **Default is offline.** Every built-in step and every default extension works without network.
+- **Image leaves the machine = customer rule: ask first** (CLAUDE.md §3, data leaving the machine). A remote MCP tracer or a cloud ML service needs an explicit, per-extension consent shown before the first upload, and the fact that a remote step ran shown in the result. Not a global "allow all".
+- A local MCP server on the same machine is not "leaving the machine", but the app should say where it runs; a remote URL looks like a local one to a user.
+- No telemetry about traced images, ever, without a separate customer decision.
+- Browser build: a remote call is possible there, but the same consent applies.
+
+### 10.5 Reproducibility, licensing, performance
+
+- **Determinism.** The built-in tracer must give the same output for the same input on host and wasm (section 7 item 8; compare with a tolerance). ML output may differ between runtimes, GPUs and model versions. Proposal: an ML or remote step is marked "non-deterministic"; the document stores the *result* (paths), never the recipe to re-run it, so a project opens identically later; golden tests use fixed model files and a tolerance, or test only the contract (schema, units, closed paths) and not the geometry.
+- **Model licences.** Weights are not code. Check each: Apache-2.0 and MIT are fine; CC-BY-NC, "research only" and use-restricted (OpenRAIL-style) licences conflict with ADR 0006's "no paid, everything else deliberately free" spirit and with redistribution. Training data origin is a second question (Uncertain, per model). Shipping a model inside the app needs its own licence record, like fonts and assets in ADR 0006 item 5.
+- **Performance.** Customer-confirmed budget: 2 to 4 s for 2000 x 2000 px is fine. An ML pre-step eats into that: a small CPU model on 4 MP may take seconds alone (Uncertain, not measured). Extensions run on a background worker with cancel; a backend declares an expected cost class so the UI can show progress instead of a frozen bar. The live preview uses the built-in tracer only unless the extension says it is fast enough.
+- **Browser.** A wasm plugin has no GPU and no threads; a large model is unrealistic there. Extensions may be desktop-only or export-only, as with machine drivers (CLAUDE.md §6).
+
+### 10.6 The trait rule (CLAUDE.md §5: no trait without a second implementation)
+
+The first slice has exactly one tracer. So **no trait, registry or plugin type for tracers is written in 0025.** The seam is a design note: the tracer is one pure function `trace(image, pixel_map, params, cancel) -> result`, with a parameter schema as plain data that the top bar renders, which is already needed for the UI. When a second implementation exists, the trait (or enum) is extracted by a refactoring in the same PR as that second implementation.
+
+Candidate second implementations, in order of likelihood:
+1. **VTracer** (MIT/Apache), as an alternate backend if step 0 shows it wins on colour; first used as a benchmark in the metric harness (dev tool, no shipped dependency).
+2. **A second built-in mode** with a different algorithm (centerline, logo mode), which would count if it has its own entry point.
+3. **A test double** for the Trace tool UI (a fake tracer that returns a fixed result), which the rule also allows if actually used by UI tests. Only if the UI tests need it.
+4. The first real *extension*: a plugin (ADR 0005 host) or an MCP client, after the host story exists.
+
+### 10.7 Questions for the customer (extension points)
+
+**Frage 1 (EXT-SEAM): How much of the extension seam do we build in 0025?**
+Options: (a) nothing; this section is a design note, the tracer is one function with a parameter schema, which the UI needs anyway; (b) also write the WIT image type into the ADR 0005 interface now; (c) a tracer trait now, with the built-in tracer as the only implementation.
+Recommendation: (a). (c) breaks the rule in CLAUDE.md §5 and (b) belongs to the plugin-host story. Default: (a).
+
+**Frage 2 (EXT-FIRST): Which extension would you want first?**
+Options: (a) a local ML pre-step (denoise/upscale or background removal); (b) an MCP tracer; (c) a plugin with your own algorithm; (d) VTracer as alternate backend; (e) none yet.
+Recommendation: (d) as benchmark first, then (c) once the plugin host exists, because it needs no network or model. Default: (e); the order above in the research stays, no story is written.
+
+**Frage 3 (EXT-PRIVACY): May a remote tracer (MCP or cloud ML) exist at all?**
+Options: (a) never in the product, only local; (b) yes, per extension with a consent dialog before the first upload and a visible mark; (c) yes, with a single global setting.
+Recommendation: (b), if remote ever comes. Default: (a) until you decide; no story proposes remote.
+
+**Frage 4 (EXT-ML): Should ML be an extension only, or may the product ship its own model?**
+Options: (a) extension only; the app ships no model; (b) the app ships one small model for background removal or classification, licence permitting; (c) decide later per model.
+Recommendation: (c), and when it comes, 10.3 items 1 and 2 first. Default: (a) for now.
+
+**Frage 5 (EXT-DETERM): May ML steps make results non-reproducible?**
+Options: (a) yes, marked non-deterministic, the result (paths) is stored, never re-run; (b) no, only deterministic steps are allowed; (c) deterministic by default, ML allowed with an explicit mark.
+Recommendation: (c). Default: (c).
+
+**Frage 6 (EXT-VCRAFT): May we fork parts of VectorCraft's tracer (MIT/Apache) after measuring?**
+Options: (a) yes, after step 0 and an ADR, with notices kept; (b) idea source and benchmark only, we write everything ourselves; (c) depend on it as a crate.
+Recommendation: (a) only if it beats Inkscape in the harness; otherwise (b). (c) not recommended: alpha, internal types, weekly API changes. Default: (b) until step 0 has numbers.
