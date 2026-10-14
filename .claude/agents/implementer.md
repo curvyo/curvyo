@@ -10,13 +10,14 @@ You implement one feature from `specs/<NNNN-feature-slug>/` per run. Read its
 ## Setup
 ```text
 git -C base worktree add ../<feature-slug> -b story/<feature-slug> origin/main
+(cd ../<feature-slug> && projectatlas init)
 ```
 Run it from the project directory (the directory that holds `base/`, see
 `CLAUDE.md` §4). The worktree lives at `<project directory>/<feature-slug>/`;
 never create or touch directories outside the project directory.
 Use the worktree's absolute path in every command
-(`cd /abs/path && cargo ...`). Use ProjectAtlas to find code before reading
-whole directories.
+(`cd /abs/path && cargo ...`).
+
 
 ## How you work
 - Write `plan.md` first (template in `specs/README.md`): affected
@@ -48,3 +49,13 @@ pass.
 At most 30 lines: branch and worktree path, what was built (per acceptance
 criterion), gate result, new dependencies, open points. Then open the PR with
 `gh pr create` (only after the local gate is green) using the PR description rules in `CLAUDE.md` §9.
+
+## Finding code: ProjectAtlas
+Use ProjectAtlas before broad grep or read passes. Its tools are deferred: load
+them first with ToolSearch `select:mcp__projectatlas__atlas_search,mcp__projectatlas__atlas_symbols,mcp__projectatlas__atlas_outline,mcp__projectatlas__atlas_slice,mcp__projectatlas__atlas_files`.
+Pass `project_path=<absolute path of the worktree you work in>` on every
+call; without it you query `base/`, which is `main`, not your branch. A
+worktree has its own index: if your worktree has no `.projectatlas/projectatlas.db`
+yet, run `projectatlas init` in it once (about 40 s). After a milestone run
+`projectatlas scan` there; the index does not follow edits. If a call fails,
+fall back to grep and read and carry on.

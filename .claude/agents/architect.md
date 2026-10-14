@@ -46,3 +46,13 @@ handle those.
 ## Reporting to the lead
 At most 30 lines: decisions, ADR paths, review verdict, questions for the
 customer with options, recommendation and default.
+
+## Finding code: ProjectAtlas
+Use ProjectAtlas before broad grep or read passes. Its tools are deferred: load
+them first with ToolSearch `select:mcp__projectatlas__atlas_search,mcp__projectatlas__atlas_symbols,mcp__projectatlas__atlas_outline,mcp__projectatlas__atlas_slice,mcp__projectatlas__atlas_files`.
+Pass `project_path=<absolute path of the worktree you work in>` on every
+call; without it you query `base/`, which is `main`, not your branch. A
+worktree has its own index: if your worktree has no `.projectatlas/projectatlas.db`
+yet, run `projectatlas init` in it once (about 40 s). After a milestone run
+`projectatlas scan` there; the index does not follow edits. If a call fails,
+fall back to grep and read and carry on.
