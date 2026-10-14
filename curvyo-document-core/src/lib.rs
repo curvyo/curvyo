@@ -35,7 +35,12 @@ mod group_tree;
 mod groups;
 mod history;
 mod junction;
+mod layers;
 mod legacy_fill;
+mod node_edit;
+mod node_move;
+mod node_read;
+mod node_registers;
 mod objects;
 mod offset_write;
 mod path_codec;
@@ -92,6 +97,14 @@ pub use history::{
     SyncError, TouchedObject, WIPE_LABEL, is_document_level_label, shown_ids,
 };
 pub use junction::{COINCIDENT_MM, interior_handle, merged_junction};
+pub use layers::{DELETE_LAYER_COMMIT_LABEL, INITIAL_LAYER_NAME, NEW_LAYER_COMMIT_LABEL};
+pub use node_edit::{
+    RENAME_NODE_COMMIT_LABEL, SET_NODE_LOCKED_COMMIT_LABEL, SET_NODE_OPACITY_COMMIT_LABEL,
+    SET_NODE_VISIBLE_COMMIT_LABEL,
+};
+pub use node_move::{MOVE_NODES_COMMIT_LABEL, MovePlan, MoveRefusal, MoveTarget};
+pub use node_read::{NodeKind, NodeRead};
+pub use node_registers::{MAX_NAME_CHARS, NodeRegisters, clean_name};
 pub use objects::{CopySource, ObjectEditError};
 pub use offset_write::{OffsetGeometry, OffsetWrite};
 pub use path_extend::{PathEnd, PathGrowth};

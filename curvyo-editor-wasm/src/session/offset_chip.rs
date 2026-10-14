@@ -59,6 +59,13 @@ impl Session {
         if self.offset.drag.is_some() || self.offset.hovered.is_some() || self.offset.center_hovered
         {
             "pointer"
+        } else if self
+            .pointer_position
+            .is_some_and(|pointer| self.locked_at(pointer))
+        {
+            // A press passes through a locked object (`specs/0050-layers-and-objects-panel`
+            // criterion 20).
+            "locked"
         } else {
             "default"
         }

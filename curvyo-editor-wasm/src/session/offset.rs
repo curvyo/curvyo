@@ -257,8 +257,9 @@ impl Session {
             return;
         }
         let objects = self.objects();
+        let pickable = self.pickable_objects();
         let tolerance = self.object_tolerance();
-        if let Some(&hit) = hit_test_objects(&objects, point, tolerance).first() {
+        if let Some(&hit) = hit_test_objects(&pickable, point, tolerance).first() {
             let units = self.units();
             let members = units.leaves_with(&hit);
             if shift {
@@ -275,6 +276,7 @@ impl Session {
         let handle_tolerances = self.transform_handle_tolerances();
         let target = classify_press(
             &objects,
+            &pickable,
             &nothing,
             point,
             tolerance,

@@ -75,6 +75,18 @@ pub enum ObjectEditError {
     /// [`Document::ungroup`] was given an object that is not a group.
     #[error("the object is not a group")]
     NotAGroup,
+    /// The node, or a container above it, is locked (`specs/0050-layers-and-objects-panel`
+    /// criterion 20): nothing was written.
+    #[error("the node is locked")]
+    Locked,
+    /// [`Document::delete_layer`] was given a node that is not a layer.
+    #[error("the node is not a layer")]
+    NotALayer,
+    /// A layer was given to a command that does not take layers (Group, Ungroup, Delete): a
+    /// layer stays a layer at the top level and goes only by [`Document::delete_layer`]
+    /// (`specs/0050-layers-and-objects-panel/adrs.md` decision 1).
+    #[error("a layer cannot be grouped, ungrouped or deleted as an object")]
+    IsALayer,
 }
 
 /// One object to duplicate with [`Document::duplicate_objects`], and the
@@ -293,7 +305,9 @@ impl Document {
     /// anywhere in `ids` refuses the whole call.
     ///
     /// # Errors
-    /// [`ObjectEditError::NoSuchObject`] if any named id no longer exists.
+    /// [`ObjectEditError::NoSuchObject`] if any named id no longer exists;
+    /// [`ObjectEditError::IsALayer`] if an id is a layer, which only
+    /// [`Document::delete_layer`] deletes (it checks the lock).
     ///
     /// # Panics
     /// Does not panic in practice: every tree id deleted below was just
@@ -312,6 +326,12 @@ impl Document {
                 }
             })
             .collect::<Result<_, _>>()?;
+        if tree_ids
+            .iter()
+            .any(|&id| crate::group_tree::is_layer_node(&tree, id))
+        {
+            return Err(ObjectEditError::IsALayer);
+        }
 
         // A node under another named node goes with it.
         let doomed: Vec<TreeID> = tree_ids

@@ -209,6 +209,7 @@ impl Session {
         } else {
             match curvyo_ui_core::classify_press(
                 &objects,
+                &self.pickable_objects(),
                 &self.selection,
                 point,
                 self.object_tolerance(),

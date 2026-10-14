@@ -15,6 +15,8 @@ pub enum PanelContent {
     Document,
     /// The Style area: the tool's scope holds objects to style.
     Style,
+    /// The Layers list (`specs/0050-layers-and-objects-panel` criterion 3).
+    Layers,
     /// The History list (`specs/0020-undo-redo` criterion 39).
     History,
     /// Nothing: no heading, no text, no control (`specs/0017-style-panel-
@@ -42,6 +44,7 @@ pub fn panel_body(
         PanelTab::Document => PanelContent::Document,
         PanelTab::Style if style_has_objects => PanelContent::Style,
         PanelTab::Style => PanelContent::Empty,
+        PanelTab::Layers => PanelContent::Layers,
         PanelTab::History => PanelContent::History,
         PanelTab::File => PanelContent::File,
     }
@@ -68,6 +71,9 @@ mod tests {
             // History shows its list whatever the tool and the scope are.
             (PanelTab::History, false, false, PanelContent::History),
             (PanelTab::History, true, true, PanelContent::History),
+            // So does Layers: the Pen gate is on its actions, not its list (`0050` criterion 53).
+            (PanelTab::Layers, false, false, PanelContent::Layers),
+            (PanelTab::Layers, true, true, PanelContent::Layers),
             // So does File (`0051`).
             (PanelTab::File, false, false, PanelContent::File),
             (PanelTab::File, true, true, PanelContent::File),

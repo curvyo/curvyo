@@ -16,6 +16,7 @@ use super::rows::{Author, StepKind, kind_of_step};
 use super::step_id::StepRef;
 use super::touched::Touched;
 use crate::document::Document;
+use crate::group_tree::is_layer_node;
 use crate::path_model::NodeId;
 use crate::units::Timestamp;
 
@@ -289,7 +290,11 @@ impl Document {
             class,
             kind: kind_of_step(&log.map_or(String::new(), |l| l.label.clone()), &touched),
             role: role_of(&touched, subject),
-            others: other_objects(&touched, subject),
+            others: other_objects(
+                &touched,
+                subject,
+                &reader.doc.get_tree(crate::document::OBJECTS_TREE),
+            ),
             sources: if created_here {
                 touched.deleted.iter().map(|id| node_id(*id)).collect()
             } else {
@@ -326,11 +331,14 @@ fn role_of(touched: &Touched, subject: TreeID) -> Role {
     }
 }
 
-/// How many objects other than `subject` the step touched.
-fn other_objects(touched: &Touched, subject: TreeID) -> usize {
+/// How many objects other than `subject` the step touched. A layer the step created is not
+/// counted: it is the Initial Layer made with the object (`specs/0050-layers-and-objects-panel`
+/// criterion 35), part of the object's own step.
+fn other_objects(touched: &Touched, subject: TreeID, tree: &loro::LoroTree) -> usize {
     touched
         .nodes()
         .filter(|id| *id != subject)
+        .filter(|id| !(touched.created.contains(id) && is_layer_node(tree, *id)))
         .collect::<HashSet<_>>()
         .len()
 }

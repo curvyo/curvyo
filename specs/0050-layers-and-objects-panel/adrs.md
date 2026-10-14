@@ -118,6 +118,15 @@ new dependency, no trait, no generic.
        descendant and every id (criterion 45).
      - It does **not** delete each descendant on its own. That would turn one undo into N
        revives.
+   - **2026-10-12 (amends decisions 8 and 14).** The rules of criterion 30 live once in
+     `curvyo-document-core` `Document::check_move`; `move_nodes` runs it before the first write.
+     ui-core `reorder_plans` (`layer_move.rs`) only turns a gesture into `MovePlan`s, each asked
+     of `check_move`, and `move_refusal_text` maps `MoveRefusal` to the texts of criterion 30. `parent_group`, `ancestor_groups` and
+     `child_groups(None)` treat layers as the top level (criterion 42); `parent_node` and
+     `children` give the raw tree. Layers count toward the 32-level limit of `0023` criterion 5,
+     in the reader and in every writer alike, so a layer holds at most 31 nested groups. Group,
+     Ungroup and Delete of objects refuse a layer (`ObjectEditError::IsALayer`); a layer goes
+     only by `delete_layer`, which checks its lock.
 9. **2026-10-10: Delete layer never confirms (criterion 36), and the Pen gate (criterion
    53).** Delete layer is reversible by Ctrl+Z (decision 8), so it writes at once; there is no
     confirm state in the session. Every panel action that writes or selects passes the
@@ -127,8 +136,9 @@ new dependency, no trait, no generic.
     collapsing do not pass through it. One test per action listed in criterion 53, done as a
     table.
 10. **2026-10-10: opacity per paint (criterion 27, Question 5 A).**
-   - The render change is in `curvyo-render-core` `artwork.rs`: each paint's alpha is multiplied
-     by the effective opacity.
+   - The render change is in `curvyo-render-core` `node_opacity.rs` (`faded`, `drawn_leaves`,
+     and `drawn_leaves_with` for the Opacity preview; corrected 2026-10-12): each paint's alpha is
+     multiplied by the effective opacity.
    - The cost of option B is in ADR 0015's Consequences: one more render pass and texture per
      faded container per frame.
 11. **2026-10-10: the tree form of `document.json` (decided once for groups and layers).**
@@ -138,6 +148,15 @@ new dependency, no trait, no generic.
     - Registers at their defaults are omitted.
     - `0023` did not fix this form, so the first of `0023` and `0050` to merge writes it. `0023`
       leaves out the registers.
+    - **Superseded 2026-10-12 (implementer, by the lead's decision):** `0023` merged first and
+      wrote groups as `{ "shape": "group", "id", "objects": [...] }`, the key its leaves already
+      use (`"shape": "path" | "rect" | ...`). That form stays. A layer is written as
+      `{ "shape": "layer", "id", "objects": [...] }`, and every node, layer, group or leaf, may
+      carry the optional keys `"name"` (string), `"visible": false`, `"locked": true` and
+      `"opacity"` (number below 1), each left out at its default. Reason: renaming `shape` to
+      `kind` and `objects` to `children` would change a merged view for no reader's gain, and
+      one key that names what a node is (`shape`) reads the same for leaves, groups and layers.
+      `document.json` is non-authoritative (ADR 0004 §1), so no format version depends on it.
 12. **2026-10-10: duplicate.** `copy_map` copies every key, so a copy keeps its name and flags
     (the product owner's default: the same name). Copied clones are relinked by `0049` decision 8, chains included.
 13. **2026-10-10: concurrency.**
@@ -156,8 +175,8 @@ new dependency, no trait, no generic.
       effective values, `move_nodes`, `new_layer`, `delete_layer`, the setters
       (`set_node_visible`, `set_node_locked`, `set_node_opacity`, `rename_node`; each takes many
       ids and makes one commit; `set_node_opacity` skips clones, criterion 26), and the format bump.
-    - `curvyo-ui-core`: `layer_rows`, `plan_move`, the selection filter and the transparent
-      context.
+    - `curvyo-ui-core`: `layer_rows`, `layer_move` (`reorder_plans`, `move_refusal_text`;
+      corrected 2026-10-12), `layer_text`, the selection filter and the transparent context.
     - `curvyo-render-core`: alpha.
     - `curvyo-editor-wasm`: the row window, the commands and the key gate (Shift+Ctrl+L, Alt+arrows
       and the Proposal keys of criterion 33).
@@ -172,6 +191,30 @@ new dependency, no trait, no generic.
         names with markup, and a loose object;
       - one damaged file (opacity 1.5);
       - one file with a `layer` marker inside a group, which reads as a plain group.
+
+16. **2026-10-14: Initial Layer (customer feedback 2026-10-14).**
+    - `Document::set_draw_into_initial_layer(bool)` is a new public method of
+      `curvyo-document-core`, view state of the caller like `set_draw_parent`, never stored.
+      When it is on, the draw parent is the root and the top level holds no layer,
+      `create_path` and the `create_*` primitives first write a layer node named
+      `INITIAL_LAYER_NAME` ("Initial Layer") at the front of the top level and create the
+      object in it, both inside the object's one commit, so one undo removes both. The layer is
+      the node of decision 1; no new key, no format change.
+    - Only the drawing entry points take it (`drawing_parent`); `split_at_anchor`, Duplicate,
+      the Boolean results and every other write that places a node next to an operand keep
+      `creation_parent`. No file is migrated: loose objects stay where they are.
+    - The session turns it on while a drawing tool (Pen, Rectangle, Ellipse, Polygon/star) is
+      active (`sync_context`), so writes by other routes and the tests that build documents
+      through the document API are unchanged.
+    - Architect, 2026-10-14: a mode setter, not a per-call argument, because it is the same kind of
+      caller view state as `set_draw_parent`, which every `create_*` already reads, and an
+      argument would change five public signatures and every caller for one rule. The session
+      must keep calling it from `sync_context` before each input. If a third view-state flag
+      appears, fold them into one draw-target value passed to `set_draw_parent`.
+17. **2026-10-14: no empty notice.** `PanelReply::Quiet` and a missing layer notice serialise
+    as the empty string; the host reads the empty string as "nothing to show". Before, the
+    quiet reply was `{"kind":"","text":""}` and the host showed that text when the canvas
+    notice was compared with "" (customer feedback 2026-10-14).
 
 ## Shared files and order
 

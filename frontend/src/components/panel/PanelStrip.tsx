@@ -1,4 +1,12 @@
-import { Droplet, File, FolderOpen, History, PanelRightClose, PanelRightOpen } from "lucide-react";
+import {
+  Droplet,
+  File,
+  FolderOpen,
+  History,
+  Layers,
+  PanelRightClose,
+  PanelRightOpen,
+} from "lucide-react";
 import { type ComponentType, useEffect, useRef, useState } from "react";
 
 import { TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -19,6 +27,7 @@ const GLYPHS: Record<string, Glyph> = {
   file: FolderOpen,
   document: File,
   style: Droplet,
+  layers: Layers,
   history: History,
 };
 

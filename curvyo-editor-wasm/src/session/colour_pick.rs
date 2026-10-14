@@ -111,7 +111,9 @@ impl Session {
     /// background. The stored one, not a drag's preview: `begin_colour_pick` flushed it.
     fn pick_at(&self, point: Point) -> Option<PickedColour> {
         pick_colour(
-            &self.all_objects(),
+            // A hidden object is not sampled; a locked one is
+            // (`specs/0050-layers-and-objects-panel` criteria 19 and 20).
+            &self.document_read().visible,
             point,
             self.object_tolerance(),
             self.document.size(),

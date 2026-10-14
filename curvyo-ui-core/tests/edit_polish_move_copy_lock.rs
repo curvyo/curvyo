@@ -505,6 +505,7 @@ fn the_press_classification_agrees_with_pointer_down_everywhere() {
                     rig.selection.set(&selection);
                     let target = classify_press(
                         &objects,
+                        &objects,
                         &rig.selection,
                         at,
                         SEGMENT_TOLERANCE,

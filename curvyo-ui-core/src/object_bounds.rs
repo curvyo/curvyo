@@ -92,18 +92,20 @@ pub fn object_outline_bounds(object: &ObjectSnapshot) -> (Point, Point) {
     }
 }
 
-/// The box around the outlines of every object of `document`, on the
-/// pasteboard or not: the union of [`object_outline_bounds`] (curve extremes,
-/// rotated outlines, no stroke width). `None` for a document without objects.
-/// The reference of Fit to content (`specs/0015-document-size-and-rulers/`
-/// criterion 23).
+/// The box around the outlines of every effectively visible object of
+/// `document`, on the pasteboard or not: the union of [`object_outline_bounds`]
+/// (curve extremes, rotated outlines, no stroke width). `None` for a document
+/// without visible objects. The reference of Fit to content
+/// (`specs/0015-document-size-and-rulers/` criterion 23); a hidden object is
+/// not part of it (`specs/0050-layers-and-objects-panel` criterion 19).
 #[must_use]
 pub fn content_bounds(document: &Document) -> Option<(Point, Point)> {
     document
-        .object_ids()
-        .into_iter()
-        .filter_map(|id| document.object(id))
-        .map(|object| object_outline_bounds(&object))
+        .read_nodes()
+        .iter()
+        .filter(|read| read.visible)
+        .filter_map(|read| read.object())
+        .map(object_outline_bounds)
         .reduce(|(min, max), (other_min, other_max)| {
             (
                 Point::new(min.x.min(other_min.x), min.y.min(other_min.y)),

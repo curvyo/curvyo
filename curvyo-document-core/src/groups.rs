@@ -9,8 +9,9 @@ use loro::{LoroTree, TreeID, TreeParentId};
 use crate::document::{Document, OBJECTS_TREE};
 use crate::group_tree::{
     KEY_GROUP, MAX_GROUP_DEPTH, children_of, group_parent, groups_above, groups_in, is_group_node,
-    node_id,
+    is_layer_node, node_id,
 };
+use crate::layers::INITIAL_LAYER_NAME;
 use crate::objects::ObjectEditError;
 use crate::path_codec::node_exists;
 use crate::path_model::NodeId;
@@ -30,17 +31,27 @@ pub const UNGROUP_COMMIT_LABEL: &str = "ungroup";
 /// reader tolerates) go too: every group without a child that is a child of one of `parents`
 /// (`None` is the document root) is removed before the walk upwards, so the next local command
 /// that touches a parent cleans up what lies in it.
+///
+/// A layer is never removed: a new layer is empty, and a maker empties a layer on purpose
+/// (`specs/0050-layers-and-objects-panel/adrs.md` decision 2).
 pub(crate) fn remove_emptied_groups(tree: &LoroTree, parents: &[Option<TreeID>]) {
     for &start in parents {
         for child in children_of(tree, start) {
-            if tree.children_num(child).unwrap_or(0) == 0 && is_group_node(tree, child) {
+            if tree.children_num(child).unwrap_or(0) == 0
+                && is_group_node(tree, child)
+                && !is_layer_node(tree, child)
+            {
                 let _ = tree.delete(child);
             }
         }
         let mut current = start;
         while let Some(group) = current {
             let alive = tree.contains(group) && matches!(tree.is_node_deleted(&group), Ok(false));
-            if !alive || !is_group_node(tree, group) || tree.children_num(group).unwrap_or(0) != 0 {
+            if !alive
+                || !is_group_node(tree, group)
+                || is_layer_node(tree, group)
+                || tree.children_num(group).unwrap_or(0) != 0
+            {
                 break;
             }
             let above = group_parent(tree, group);
@@ -58,6 +69,34 @@ impl Document {
     /// exist (any more) means the root. View state of the caller: it is not stored.
     pub fn set_draw_parent(&self, parent: Option<NodeId>) {
         self.draw_parent.set(parent.map(tree_id_of));
+    }
+
+    /// Whether the `create_*` methods put a new object into a new layer named
+    /// [`INITIAL_LAYER_NAME`] when the draw parent is the root and the document has no layer
+    /// (`specs/0050-layers-and-objects-panel` criterion 35, customer feedback 2026-10-14). The
+    /// layer and the object are written in the object's one commit, so one undo removes both.
+    /// Objects already in the document stay where they are. Off by default; view state of the
+    /// caller: it is not stored.
+    pub fn set_draw_into_initial_layer(&self, on: bool) {
+        self.initial_layer.set(on);
+    }
+
+    /// The node a drawn object (`create_path`, `create_rect` and the other public `create_*`
+    /// methods) is created under: [`Document::creation_parent`], or a new Initial Layer at the
+    /// front of the top level when [`Document::set_draw_into_initial_layer`] is on, that is the
+    /// root and no layer exists. Writes the layer without committing: the caller's commit takes
+    /// both.
+    pub(crate) fn drawing_parent(&self, tree: &LoroTree) -> TreeParentId {
+        let parent = self.creation_parent(tree);
+        if parent != TreeParentId::Root
+            || !self.initial_layer.get()
+            || children_of(tree, None)
+                .iter()
+                .any(|&id| is_layer_node(tree, id))
+        {
+            return parent;
+        }
+        TreeParentId::Node(crate::layers::create_layer_node(tree, INITIAL_LAYER_NAME))
     }
 
     /// The node a new object is created under: the draw parent while it is a live group.
@@ -80,7 +119,7 @@ impl Document {
     /// [`ObjectEditError::NotEnoughObjects`] for fewer than two different ids;
     /// [`ObjectEditError::NotSiblings`] if the objects do not share one parent;
     /// [`ObjectEditError::TooDeep`] if the group would put more than [`MAX_GROUP_DEPTH`] groups on
-    /// one chain.
+    /// one chain; [`ObjectEditError::IsALayer`] if an id is a layer.
     ///
     /// # Panics
     /// Does not panic in practice: every tree operation below acts on nodes just confirmed live.
@@ -94,6 +133,9 @@ impl Document {
             .collect();
         if members.iter().any(|&id| !node_exists(&tree, id)) {
             return Err(ObjectEditError::NoSuchObject);
+        }
+        if members.iter().any(|&id| is_layer_node(&tree, id)) {
+            return Err(ObjectEditError::IsALayer);
         }
         if members.len() < 2 {
             return Err(ObjectEditError::NotEnoughObjects);
@@ -148,7 +190,7 @@ impl Document {
     ///
     /// # Errors
     /// [`ObjectEditError::NoSuchObject`] if an id does not exist; [`ObjectEditError::NotAGroup`] if
-    /// an id is a leaf (nothing is written).
+    /// an id is a leaf; [`ObjectEditError::IsALayer`] if an id is a layer (nothing is written).
     ///
     /// # Panics
     /// Does not panic in practice: every tree operation below acts on nodes just confirmed live.
@@ -162,6 +204,9 @@ impl Document {
             .collect();
         if groups.iter().any(|&id| !node_exists(&tree, id)) {
             return Err(ObjectEditError::NoSuchObject);
+        }
+        if groups.iter().any(|&id| is_layer_node(&tree, id)) {
+            return Err(ObjectEditError::IsALayer);
         }
         if groups.is_empty() || groups.iter().any(|&id| !is_group_node(&tree, id)) {
             return Err(ObjectEditError::NotAGroup);

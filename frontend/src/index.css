@@ -122,6 +122,11 @@
     /* The ground of a list row under the pointer: lighter than the control hover so the muted
        text on it keeps 4.5:1 (4.58:1 at 8 %). */
     --row-hover: color-mix(in srgb, #2F6FEE 8%, transparent);
+    /* docs/design-system.md, "Color tokens": the lines of branch lanes and the calm eye and lock of
+       the Layers list (`--toolbar-icon` at 60 % on `--panel-bg`, 3.1:1). */
+    --lane-line: #7B7B7F;
+    /* The 1px border of a panel button or text field (the "Fit to content" button). */
+    --field-border: color-mix(in srgb, var(--toolbar-icon) 60%, transparent);
     /* docs/design-system.md, 2026-10-05: drop shadow on every floating
        chrome surface (the left tool panel, the per-selection contextual
        mini-toolbar) — what makes them read as "floating over" the

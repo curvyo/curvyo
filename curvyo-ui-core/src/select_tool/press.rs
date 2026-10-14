@@ -72,9 +72,14 @@ impl PressTarget {
 /// arms the marquee: Shift adds, Ctrl removes (`edit-interaction-polish`
 /// criterion 37, `unified-object-editing` criterion 35). Ctrl on an outline or
 /// on the centre handle is still a move, which Ctrl turns into a copy.
+///
+/// `objects` are the objects of the context; `pickable` those a press may hit, without the
+/// hidden and locked ones (`specs/0050-layers-and-objects-panel` criteria 19 and 20,
+/// [`crate::Units::pickable`]). The handles and boxes of the selection use `objects`.
 #[must_use]
 pub fn classify_press(
     objects: &[ObjectSnapshot],
+    pickable: &[ObjectSnapshot],
     selection: &ObjectSelection,
     point: Point,
     tolerance: Tolerance,
@@ -100,7 +105,7 @@ pub fn classify_press(
         ) {
             Some((_, EditHandle::Move)) => PressTarget::CentreHandle,
             Some((_, handle)) => PressTarget::Handle(handle),
-            None => hit_test_object(objects, point, tolerance)
+            None => hit_test_object(pickable, point, tolerance)
                 .map_or(PressTarget::Empty, PressTarget::Object),
         };
     }
@@ -124,10 +129,10 @@ pub fn classify_press(
     // deselecting first (`0007` criterion 29).
     if !shift && !modifiers.ctrl && SelectTool::is_inside_selected_box(objects, selection, point) {
         let above = sole_selected(objects, selection)
-            .and_then(|selected| filled_interior_above(objects, selected.id(), point));
+            .and_then(|selected| filled_interior_above(pickable, selected.id(), point));
         return above.map_or(PressTarget::InsideSelectedBox, PressTarget::Object);
     }
-    hit_test_object(objects, point, tolerance).map_or(PressTarget::Empty, PressTarget::Object)
+    hit_test_object(pickable, point, tolerance).map_or(PressTarget::Empty, PressTarget::Object)
 }
 
 /// The move a press on `hit`'s outline or body begins, with the selection

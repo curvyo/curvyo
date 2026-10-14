@@ -28,6 +28,7 @@ mod marker_place;
 mod markers;
 mod marquee_overlay;
 mod move_axes;
+mod node_opacity;
 mod offset_preview;
 mod pen_cue;
 mod pen_preview;
@@ -51,6 +52,7 @@ pub use group_box::{GroupBoxKind, GroupDecorationInput};
 pub use live_preview::build_live_edit_preview;
 pub use marquee_overlay::{MarqueeOverlay, build_marquee_overlay};
 pub use move_axes::{LockedAxis, MoveAxes, build_move_axes};
+pub use node_opacity::{drawn_leaves, drawn_leaves_with, faded};
 pub use offset_preview::{
     OffsetCenterState, OffsetHandleState, PreviewAnchor, build_offset_center_handle,
     build_offset_grown_box, build_offset_handles, build_offset_preview,

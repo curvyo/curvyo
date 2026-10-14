@@ -2205,8 +2205,8 @@ fn ac14_save_close_reopen() {
     assert!(!is_path(&again[0]) && is_path(&again[1]) && is_path(&again[2]) && !is_path(&again[3]));
     assert_eq!(
         curvyo_document_core::CURRENT_FORMAT_VERSION,
-        11,
-        "a path is an existing kind: the conversion adds no bump of its own (0023 took 11)"
+        12,
+        "a path is an existing kind: the conversion adds no bump of its own (0023 took 11, 0050 took 12)"
     );
     // A skew conversion as well.
     let mut s = open(&d);

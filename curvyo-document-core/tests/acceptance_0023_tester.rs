@@ -572,16 +572,16 @@ fn ac27_the_manifest_says_format_version_11_and_a_newer_file_is_refused() {
     let bytes = pack(&d, "t").unwrap();
     let manifest: serde_json::Value =
         serde_json::from_slice(&read_member(&bytes, "manifest.json")).unwrap();
-    assert_eq!(manifest["format_version"], 11);
+    // Format 11 was this slice's number; `0050` took 12, so the writer names the current one.
+    const _: () = assert!(curvyo_document_core::CURRENT_FORMAT_VERSION >= 11);
+    let current = curvyo_document_core::CURRENT_FORMAT_VERSION;
+    assert_eq!(manifest["format_version"], current);
     let mut newer = manifest.clone();
-    newer["format_version"] = 12.into();
+    newer["format_version"] = (current + 1).into();
     let r = unpack(1, &rebuild_zip(&bytes, &newer, None));
     assert!(matches!(
         r,
-        Err(OpenError::FormatTooNew {
-            found: 12,
-            supported: 11
-        })
+        Err(OpenError::FormatTooNew { found, supported }) if found == current + 1 && supported == current
     ));
 }
 
@@ -594,7 +594,11 @@ fn ac27_files_of_earlier_builds_open_unchanged() {
     for entry in std::fs::read_dir(dir).unwrap() {
         let path = entry.unwrap().path();
         let name = path.file_name().unwrap().to_string_lossy().to_string();
-        if path.extension().is_none_or(|e| e != "curvyo") || name.contains("group") {
+        // `layers_*` are the files of `0050`, which hold groups too.
+        if path.extension().is_none_or(|e| e != "curvyo")
+            || name.contains("group")
+            || name.starts_with("layers")
+        {
             continue;
         }
         let bytes = std::fs::read(&path).unwrap();

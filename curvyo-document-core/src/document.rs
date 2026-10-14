@@ -138,7 +138,18 @@ pub struct DocumentVersion(pub(crate) loro::Frontiers);
 /// from an earlier build is a tree of depth 0 and opens unchanged and is not rewritten. A group
 /// nested deeper than 32, a leaf with children, and a group that carries anchors or a shape tag
 /// are refused as damaged (`crate::groups`). Golden: `groups_v11.curvyo`.
-pub const CURRENT_FORMAT_VERSION: u32 = 11;
+///
+/// Bumped to 12 in `layers-and-objects-panel` (`specs/0050-layers-and-objects-panel/adrs.md`
+/// decisions 1 and 15): every object-tree node may carry the registers `name` (string), `visible`
+/// and `locked` (bool) and `opacity` (number in 0..=1), and a top-level group may carry
+/// `layer: true`. A build that stops at version 11 would draw a hidden node, ignore a lock and an
+/// opacity, and lose them on its next save, a silent partial read, so it must refuse every file of
+/// this build as too new. Migration from version 11 is none: absent registers read as no name,
+/// visible, unlocked and opacity 1, and a file from an earlier build opens unchanged and is not
+/// rewritten. A mistyped register, an opacity outside 0..=1 and `layer` on a leaf are refused as
+/// damaged (`crate::node_registers`); a `layer` marker below the top level reads as a plain group.
+/// Golden: `layers_v12.curvyo`.
+pub const CURRENT_FORMAT_VERSION: u32 = 12;
 
 pub(crate) const ROOT_MAP: &str = "root";
 const KEY_FORMAT_VERSION: &str = "format_version";
@@ -179,6 +190,9 @@ pub struct Document {
     pub(crate) step_index: std::cell::RefCell<crate::history::StepIndex>,
     /// The group new objects are created in (`crate::groups`); view state, never stored.
     pub(crate) draw_parent: std::cell::Cell<Option<loro::TreeID>>,
+    /// Whether a new object drawn into a document with no layer makes the Initial Layer
+    /// (`crate::groups`); view state of the caller, never stored.
+    pub(crate) initial_layer: std::cell::Cell<bool>,
     /// The steps that touched each object, for the Object scope of the history.
     pub(crate) object_index: std::cell::RefCell<crate::history::ObjectIndex>,
     /// The step an object undo of one object would really write, until the log changes.
@@ -228,6 +242,7 @@ impl Document {
             container_index: std::cell::RefCell::default(),
             step_index: std::cell::RefCell::default(),
             draw_parent: std::cell::Cell::default(),
+            initial_layer: std::cell::Cell::default(),
             object_index: std::cell::RefCell::default(),
             writable_cache: std::cell::RefCell::default(),
         };
@@ -278,6 +293,7 @@ impl Document {
             container_index: std::cell::RefCell::default(),
             step_index: std::cell::RefCell::default(),
             draw_parent: std::cell::Cell::default(),
+            initial_layer: std::cell::Cell::default(),
             object_index: std::cell::RefCell::default(),
             writable_cache: std::cell::RefCell::default(),
         })
@@ -371,18 +387,28 @@ impl Document {
 impl Document {
     /// The `document.json` entries of the children of `parent` (`None` is the document root), in
     /// z-order; a group nests its own children.
-    fn json_children(&self, parent: Option<crate::path_model::NodeId>) -> Vec<ObjectJson> {
+    fn json_children(&self, parent: Option<crate::path_model::NodeId>) -> Vec<NodeJson> {
         self.children(parent)
             .into_iter()
             .filter_map(|id| {
-                if self.is_group(id) {
-                    Some(ObjectJson::Group {
+                let object = if self.is_layer(id) {
+                    ObjectJson::Layer {
                         id,
                         objects: self.json_children(Some(id)),
-                    })
+                    }
+                } else if self.is_group(id) {
+                    ObjectJson::Group {
+                        id,
+                        objects: self.json_children(Some(id)),
+                    }
                 } else {
-                    self.object(id).map(ObjectJson::from)
-                }
+                    ObjectJson::from(self.object(id)?)
+                };
+                let registers = self
+                    .node_registers(id)
+                    .map(RegistersJson::from)
+                    .unwrap_or_default();
+                Some(NodeJson { object, registers })
             })
             .collect()
     }
@@ -401,7 +427,43 @@ struct DocumentJsonView {
     size: DocumentSize,
     display_unit: DisplayUnit,
     background: crate::document_background::BackgroundJson,
-    objects: Vec<ObjectJson>,
+    objects: Vec<NodeJson>,
+}
+
+/// One node of `document.json`: its kind and data, and its registers where they are not at their
+/// defaults (`specs/0050-layers-and-objects-panel/adrs.md`, the note of 2026-10-12 on decision 11).
+#[derive(Serialize)]
+struct NodeJson {
+    #[serde(flatten)]
+    object: ObjectJson,
+    #[serde(flatten)]
+    registers: RegistersJson,
+}
+
+/// The registers of one node in `document.json`; each is left out at its default.
+#[derive(Serialize, Default)]
+struct RegistersJson {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    visible: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    locked: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    opacity: Option<f64>,
+}
+
+impl From<crate::node_registers::NodeRegisters> for RegistersJson {
+    fn from(registers: crate::node_registers::NodeRegisters) -> Self {
+        let opacity = registers.opacity.get();
+        Self {
+            name: registers.name,
+            visible: (!registers.visible).then_some(false),
+            locked: registers.locked.then_some(true),
+            #[allow(clippy::float_cmp)] // exactly the stored default
+            opacity: (opacity != 1.0).then_some(opacity),
+        }
+    }
 }
 
 /// One `document.json` object entry, tagged by its own `shape`
@@ -414,7 +476,13 @@ enum ObjectJson {
     /// A group (`specs/0023-groups`): no geometry and no style, only its children in z-order.
     Group {
         id: crate::path_model::NodeId,
-        objects: Vec<ObjectJson>,
+        objects: Vec<NodeJson>,
+    },
+    /// A layer (`specs/0050-layers-and-objects-panel`): a group at the top level with the layer
+    /// marker, its children in z-order.
+    Layer {
+        id: crate::path_model::NodeId,
+        objects: Vec<NodeJson>,
     },
     Path {
         id: crate::path_model::NodeId,

@@ -64,6 +64,13 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     ("offset_path", "Offset"),
     ("group", "Group"),
     ("ungroup", "Ungroup"),
+    ("rename_node", "Rename"),
+    ("set_node_visible", "Hide or show"),
+    ("set_node_locked", "Lock or unlock"),
+    ("set_node_opacity", "Change opacity"),
+    ("move_nodes", "Reorder"),
+    ("new_layer", "New layer"),
+    ("delete_layer", "Delete layer"),
 ];
 
 /// The labels the engine writes itself. They are no step of the maker's: the setup of a new

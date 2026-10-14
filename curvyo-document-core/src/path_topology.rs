@@ -387,6 +387,7 @@ impl Document {
         .chain(snapshot.anchors[index + 1..].iter().copied())
         .collect();
         let new_path = self.create_path_uncommitted(
+            self.creation_parent(&self.loro().get_tree(OBJECTS_TREE)),
             &new_path_anchors,
             false,
             &snapshot.style,

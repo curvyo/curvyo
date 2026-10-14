@@ -3,66 +3,120 @@
 //! (`specs/0044-editing-quick-wins/adrs.md`, decision 5).
 
 use std::cell::RefCell;
+use std::collections::HashSet;
 use std::sync::Arc;
 
-use curvyo_document_core::{Document, DocumentVersion, ObjectSnapshot};
+use curvyo_document_core::{Document, DocumentVersion, NodeId, NodeRead, ObjectSnapshot};
+
+/// One read of the document: every node with its effective flags
+/// (`specs/0050-layers-and-objects-panel/adrs.md` decision 3) and the lists the session derives
+/// from it once, so no consumer filters or walks on its own (decision 4).
+#[derive(Debug)]
+pub(super) struct DocumentRead {
+    /// Every node, pre-order, back to front: what the Layers list shows.
+    pub(super) nodes: Arc<[NodeRead]>,
+    /// Every leaf in stacking order, hidden and locked ones included: what the tools act on.
+    pub(super) leaves: Arc<[ObjectSnapshot]>,
+    /// The effectively visible leaves, unfaded: what the eyedropper samples and Fit to content
+    /// measures (criterion 19).
+    pub(super) visible: Arc<[ObjectSnapshot]>,
+    /// The effectively visible leaves with their effective opacity applied to each paint: what
+    /// the canvas draws (criteria 24 and 27).
+    pub(super) drawn: Arc<[ObjectSnapshot]>,
+    /// The nodes, leaves and containers, that are effectively hidden or locked.
+    pub(super) inert: Arc<HashSet<NodeId>>,
+    /// The front-most layer, if the document has one.
+    pub(super) front_layer: Option<NodeId>,
+}
+
+impl DocumentRead {
+    fn of(document: &Document) -> Self {
+        let nodes: Arc<[NodeRead]> = document.read_nodes().into();
+        let leaves: Arc<[ObjectSnapshot]> = nodes
+            .iter()
+            .filter_map(|read| read.object().cloned())
+            .collect();
+        let plain = nodes
+            .iter()
+            .all(|read| read.visible && read.opacity == curvyo_document_core::Opacity::OPAQUE);
+        let (visible, drawn) = if plain {
+            (Arc::clone(&leaves), Arc::clone(&leaves))
+        } else {
+            let visible: Arc<[ObjectSnapshot]> = nodes
+                .iter()
+                .filter(|read| read.visible)
+                .filter_map(|read| read.object().cloned())
+                .collect();
+            (visible, curvyo_render_core::drawn_leaves(&nodes).into())
+        };
+        let inert: HashSet<NodeId> = nodes
+            .iter()
+            .filter(|read| !read.visible || read.locked)
+            .map(|read| read.id)
+            .collect();
+        let front_layer = nodes
+            .iter()
+            .rev()
+            .find(|read| read.kind == curvyo_document_core::NodeKind::Layer)
+            .map(|read| read.id);
+        Self {
+            front_layer,
+            nodes,
+            leaves,
+            visible,
+            drawn,
+            inert: Arc::new(inert),
+        }
+    }
+}
 
 /// The cached read and whether a drag holds it.
 #[derive(Debug, Default)]
 struct Held {
-    read: Option<(DocumentVersion, Arc<[ObjectSnapshot]>)>,
+    read: Option<(DocumentVersion, Arc<DocumentRead>)>,
     /// A Select or Node-tool drag keeps its first read for its whole life, whatever the document
     /// does: it writes nothing until its release, so only a merge could change the document
     /// under it, and that is seen by the first read after the drag (`0031` criterion 17).
     pinned: bool,
 }
 
-/// Every object in z-order, read once per document version.
+/// The document read once per document version.
 #[derive(Debug, Default)]
 pub(super) struct ObjectCache {
     held: RefCell<Held>,
 }
 
 impl ObjectCache {
-    /// The objects of `document`. With `pin` (a drag is in flight) the read already held is
+    /// The read of `document`. With `pin` (a drag is in flight) the read already held is
     /// returned unchanged, so a frame of a drag never reads the document; without it the read is
     /// returned only if the document is still at the version it was made at. Everything else
     /// (`New`, `Open`) builds a new `Session` and with it an empty cache.
-    pub(super) fn get(&self, document: &Document, pin: bool) -> Arc<[ObjectSnapshot]> {
+    pub(super) fn read(&self, document: &Document, pin: bool) -> Arc<DocumentRead> {
         let mut held = self.held.borrow_mut();
         if pin
             && held.pinned
-            && let Some((_, objects)) = &held.read
+            && let Some((_, read)) = &held.read
         {
-            return Arc::clone(objects);
+            return Arc::clone(read);
         }
         held.pinned = pin;
         let version = document.version();
-        let objects = match &held.read {
-            Some((read_at, objects)) if *read_at == version => Arc::clone(objects),
+        let read = match &held.read {
+            Some((read_at, read)) if *read_at == version => Arc::clone(read),
             _ => {
-                let objects = read_objects(document);
-                held.read = Some((version, Arc::clone(&objects)));
-                objects
+                let read = Arc::new(DocumentRead::of(document));
+                held.read = Some((version, Arc::clone(&read)));
+                read
             }
         };
         #[cfg(test)]
         assert_eq!(
-            format!("{objects:?}"),
-            format!("{:?}", read_objects(document)),
-            "the cached objects differ from the document: a write did not change its version"
+            format!("{:?}", read.leaves),
+            format!("{:?}", DocumentRead::of(document).leaves),
+            "the cached read differs from the document: a write did not change its version"
         );
-        objects
+        read
     }
-}
-
-/// Reads every object out of the document, in z-order.
-fn read_objects(document: &Document) -> Arc<[ObjectSnapshot]> {
-    document
-        .object_ids()
-        .into_iter()
-        .filter_map(|id| document.object(id))
-        .collect()
 }
 
 #[cfg(test)]
@@ -86,8 +140,8 @@ mod tests {
         let document = Document::new(1);
         add_path(&document, 1);
         let cache = ObjectCache::default();
-        let first = cache.get(&document, false);
-        let second = cache.get(&document, false);
+        let first = Arc::clone(&cache.read(&document, false).leaves);
+        let second = Arc::clone(&cache.read(&document, false).leaves);
         assert!(Arc::ptr_eq(&first, &second));
         assert_eq!(first.len(), 1);
     }
@@ -97,9 +151,9 @@ mod tests {
         let document = Document::new(1);
         add_path(&document, 1);
         let cache = ObjectCache::default();
-        let before = cache.get(&document, false);
+        let before = Arc::clone(&cache.read(&document, false).leaves);
         add_path(&document, 3);
-        let after = cache.get(&document, false);
+        let after = Arc::clone(&cache.read(&document, false).leaves);
         assert!(!Arc::ptr_eq(&before, &after));
         assert_eq!((before.len(), after.len()), (1, 2));
     }
@@ -110,16 +164,16 @@ mod tests {
         let document = Document::new(1);
         add_path(&document, 1);
         let cache = ObjectCache::default();
-        let start = cache.get(&document, true);
-        let during = cache.get(&document, true);
+        let start = Arc::clone(&cache.read(&document, true).leaves);
+        let during = Arc::clone(&cache.read(&document, true).leaves);
         assert!(Arc::ptr_eq(&start, &during));
         let ids = document.object_ids();
         let _ = document.translate_objects(&ids, curvyo_document_core::Vec2::new(5.0, 0.0));
         assert!(
-            Arc::ptr_eq(&start, &cache.get(&document, true)),
+            Arc::ptr_eq(&start, &cache.read(&document, true).leaves),
             "a drag keeps its read"
         );
-        let after = cache.get(&document, false);
+        let after = Arc::clone(&cache.read(&document, false).leaves);
         assert!(!Arc::ptr_eq(&start, &after));
         assert_ne!(
             &start[..],

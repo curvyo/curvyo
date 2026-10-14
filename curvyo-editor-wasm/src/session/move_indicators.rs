@@ -80,6 +80,7 @@ impl Session {
         } else {
             let target = classify_press(
                 &self.objects(),
+                &self.pickable_objects(),
                 &self.selection,
                 pointer,
                 self.object_tolerance(),

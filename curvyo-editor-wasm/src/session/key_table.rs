@@ -4,7 +4,7 @@
 //! is in `keys.rs`.
 
 use curvyo_document_core::Direction;
-use curvyo_ui_core::{Arrow, EntryKey};
+use curvyo_ui_core::{Arrow, EntryKey, Reorder};
 
 use super::Tool;
 use super::keys::{KeyHint, KeyInput};
@@ -55,6 +55,7 @@ pub(super) enum KeyAction {
     Group,
     Ungroup,
     EnterGroup,
+    Reorder(Reorder),
     OpenOffsetChip,
     StepOffsetCornerStyle,
 }
@@ -70,6 +71,31 @@ fn enter_acts(input: &KeyInput<'_>, state: KeyState) -> bool {
         && !state.operation_in_flight
         && !state.pen_open
         && !state.entry_open
+}
+
+/// The stacking-order keys (`specs/0050-layers-and-objects-panel` criterion 33): Home, End,
+/// Page Up and Page Down act in the Select tool with a selection, plain presses, gated like every
+/// letter. `None` for any other key.
+fn reorder_action(input: &KeyInput<'_>, state: KeyState, gate_open: bool) -> Option<KeyAction> {
+    let how = match input.key {
+        "Home" => Reorder::Front,
+        "End" => Reorder::Back,
+        "PageUp" => Reorder::Forward,
+        "PageDown" => Reorder::Backward,
+        _ => return None,
+    };
+    let acts = gate_open
+        && !input.ctrl
+        && !input.alt
+        && !input.shift
+        && !input.repeat
+        && state.tool == Tool::Select
+        && state.selected != Selected::None;
+    Some(if acts {
+        KeyAction::Reorder(how)
+    } else {
+        KeyAction::Ignore
+    })
 }
 
 /// What Enter does: finish the Pen path, open the Offset entry chip, or enter the one selected
@@ -104,6 +130,20 @@ fn offset_enter_acts(input: &KeyInput<'_>, state: KeyState) -> bool {
 /// (`specs/0038-path-offset` criterion 27) take Ctrl+A and the arrows.
 fn selects(state: KeyState) -> bool {
     matches!(state.tool, Tool::Select | Tool::Offset)
+}
+
+/// Group and Ungroup (`0023` criterion 7): Ctrl+G and Shift+Ctrl+G, once per press, gated like
+/// every shortcut. `None` for any other key.
+fn group_action(input: &KeyInput<'_>, state: KeyState, gate_open: bool) -> Option<KeyAction> {
+    if !(input.ctrl && input.key.eq_ignore_ascii_case("g")) {
+        return None;
+    }
+    let acts = gate_open && !input.alt && !input.repeat && state.tool == Tool::Select;
+    Some(match (acts, input.shift) {
+        (true, false) => KeyAction::Group,
+        (true, true) => KeyAction::Ungroup,
+        (false, _) => KeyAction::Ignore,
+    })
 }
 
 /// The key table and its gate (criteria 54, 55, 60, 61) as a pure function:
@@ -147,6 +187,9 @@ pub(super) fn decide(input: &KeyInput<'_>, state: KeyState) -> KeyAction {
             KeyAction::Ignore
         };
     }
+    if let Some(action) = reorder_action(input, state, gate_open) {
+        return action;
+    }
     if input.ctrl && input.key.eq_ignore_ascii_case("a") {
         let acts = gate_open && !input.alt && !input.shift && !input.repeat && selects(state);
         return if acts {
@@ -155,14 +198,8 @@ pub(super) fn decide(input: &KeyInput<'_>, state: KeyState) -> KeyAction {
             KeyAction::Ignore
         };
     }
-    // Group and Ungroup (`0023` criterion 7): once per press, gated like every shortcut.
-    if input.ctrl && input.key.eq_ignore_ascii_case("g") {
-        let acts = gate_open && !input.alt && !input.repeat && state.tool == Tool::Select;
-        return match (acts, input.shift) {
-            (true, false) => KeyAction::Group,
-            (true, true) => KeyAction::Ungroup,
-            (false, _) => KeyAction::Ignore,
-        };
+    if let Some(action) = group_action(input, state, gate_open) {
+        return action;
     }
     // Letters are matched without regard to Caps Lock.
     let letter = match input.key.chars().collect::<Vec<_>>().as_slice() {

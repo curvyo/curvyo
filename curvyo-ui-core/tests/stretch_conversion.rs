@@ -158,8 +158,10 @@ impl Rig {
     }
 
     fn target(&self, at: Point) -> PressTarget {
+        let objects = self.objects();
         classify_press(
-            &self.objects(),
+            &objects,
+            &objects,
             &self.selection,
             at,
             tol(),

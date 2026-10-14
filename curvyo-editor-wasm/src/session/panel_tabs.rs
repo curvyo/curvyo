@@ -1,7 +1,7 @@
 //! `Session`'s glue for the Properties panel's tabs
 //! (`specs/0043-properties-tabs/`, `adrs.md` decision 4): the active tab as
 //! session view state, updated whenever the panel view is read, and the
-//! ways a tab is chosen (a press, Shift+Ctrl+F, Shift+Ctrl+D, Shift+Ctrl+H). The rules are
+//! ways a tab is chosen (a press, Shift+Ctrl+F, Shift+Ctrl+D, Shift+Ctrl+H, Shift+Ctrl+L). The rules are
 //! `curvyo_ui_core::panel_tabs`'s and `panel_content`'s.
 
 use curvyo_ui_core::{
@@ -100,6 +100,15 @@ impl Session {
         });
     }
 
+    /// Shift+Ctrl+L (`specs/0050-layers-and-objects-panel` criterion 2): the Layers tab.
+    pub fn panel_shortcut_layers(&mut self) {
+        let non_empty = self.panel_scope_non_empty();
+        self.update_panel_tabs(|tabs| {
+            tabs.observe(non_empty);
+            tabs.shortcut_layers();
+        });
+    }
+
     /// Shift+Ctrl+D (criterion 14): the Document tab.
     pub fn panel_shortcut_document(&mut self) {
         let non_empty = self.panel_scope_non_empty();
@@ -115,7 +124,7 @@ impl Session {
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PanelTabsRecord {
-    /// `"file"`, `"document"`, `"style"`, `"history"` or `"empty"`.
+    /// `"file"`, `"document"`, `"style"`, `"layers"`, `"history"` or `"empty"`.
     #[cfg_attr(target_arch = "wasm32", wasm_bindgen(getter_with_clone))]
     pub content: String,
     /// The active tab's name.
@@ -143,6 +152,7 @@ impl PanelTabsRecord {
             PanelContent::File => "file",
             PanelContent::Document => "document",
             PanelContent::Style => "style",
+            PanelContent::Layers => "layers",
             PanelContent::History => "history",
             PanelContent::Empty => "empty",
         };
@@ -225,7 +235,10 @@ mod tests {
         assert!(!session.press_panel_tab("style"));
         assert!(!session.press_panel_tab("unknown"));
         let record = PanelTabsRecord::new(&session.panel_view());
-        assert_eq!(record.tab_names, ["file", "document", "style", "history"]);
+        assert_eq!(
+            record.tab_names,
+            ["file", "document", "style", "layers", "history"]
+        );
         assert_eq!(record.tab_enabled[at(&record, "style")], 0);
         assert!(
             ["file", "document", "history"]

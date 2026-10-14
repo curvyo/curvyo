@@ -44,6 +44,8 @@ mod wasm_history;
 #[cfg(target_arch = "wasm32")]
 mod wasm_keys;
 #[cfg(target_arch = "wasm32")]
+mod wasm_layers;
+#[cfg(target_arch = "wasm32")]
 mod wasm_move;
 #[cfg(target_arch = "wasm32")]
 mod wasm_move_entry;
@@ -72,10 +74,10 @@ mod wasm_split;
 
 pub use session::{
     APP_VERSION, BooleanOutcome, BreakApartOutcome, ClosePathOutcome, ClosePathState,
-    CombineOutcome, CutOutcome, DocumentPresetsRecord, DocumentSide, DoubleClickHint, EscapeStep,
-    FitOutcome, FormTexts, FormatEdit, GroupingKind, GroupingResult, HistoryResult, KeyHint,
-    KeyInput, KeyOutcome, MoveIndicators, ObjectWipeOutcome, PanelTabsRecord, PanelView, Session,
-    SizeOutcome, SplitOutcome, Tool, WipeOutcome, WipeState,
+    CombineOutcome, CutOutcome, DocumentPresetsRecord, DocumentSide, DoubleClickHint, DropPlace,
+    EscapeStep, FitOutcome, FormTexts, FormatEdit, GroupingKind, GroupingResult, HistoryResult,
+    KeyHint, KeyInput, KeyOutcome, MoveIndicators, ObjectWipeOutcome, PanelReply, PanelTabsRecord,
+    PanelView, RowFlag, RowPress, Session, SizeOutcome, SplitOutcome, Tool, WipeOutcome, WipeState,
 };
 pub use session::{DragStop, OFFSET_COMMIT_LABEL, OffsetOutcome, OffsetView};
 

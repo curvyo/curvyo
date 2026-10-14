@@ -38,6 +38,16 @@ pub(crate) fn is_group_node(tree: &LoroTree, id: TreeID) -> bool {
     tree.get_meta(id).is_ok_and(|meta| meta_is_group(&meta))
 }
 
+/// Whether `id` is a layer: a group at the top level of the tree with the `layer` marker
+/// (`specs/0050-layers-and-objects-panel/adrs.md` decision 1). A marker deeper down is merge
+/// residue and the node is a plain group (ADR 0015 §4).
+pub(crate) fn is_layer_node(tree: &LoroTree, id: TreeID) -> bool {
+    group_parent(tree, id).is_none()
+        && tree.get_meta(id).is_ok_and(|meta| {
+            meta_is_group(&meta) && crate::node_registers::meta_has_layer_marker(&meta)
+        })
+}
+
 /// The group that holds `id`, or `None` for a node at the document root.
 pub(crate) fn group_parent(tree: &LoroTree, id: TreeID) -> Option<TreeID> {
     match tree.parent(id)? {
@@ -158,6 +168,9 @@ pub(crate) fn validate_tree(tree: &LoroTree, node_ok: fn(&LoroTree, TreeID) -> b
         let Ok(meta) = tree.get_meta(node) else {
             return false;
         };
+        if !crate::node_registers::registers_are_valid(&meta, meta_is_group(&meta)) {
+            return false;
+        }
         match meta.get(KEY_GROUP) {
             None => {
                 if !children.is_empty() || !node_ok(tree, node) {
@@ -211,10 +224,28 @@ impl Document {
             .collect()
     }
 
-    /// The group that directly holds `id`, or `None` for a node at the document root or one that
-    /// does not exist.
+    /// The group that directly holds `id`, or `None` for a node at the document root, a node
+    /// directly in a layer, and one that does not exist. Layers are transparent here: their
+    /// children are top-level objects of the document for selecting and entering
+    /// (`specs/0050-layers-and-objects-panel` criterion 42). [`Document::parent_node`] gives the
+    /// layer.
     #[must_use]
     pub fn parent_group(&self, id: NodeId) -> Option<NodeId> {
+        let tree = self.loro().get_tree(OBJECTS_TREE);
+        let tree_id = tree_id_of(id);
+        if !node_exists(&tree, tree_id) {
+            return None;
+        }
+        group_parent(&tree, tree_id)
+            .filter(|&parent| !is_layer_node(&tree, parent))
+            .map(node_id)
+    }
+
+    /// The node that directly holds `id` (a layer or a group), `None` at the top level or for a
+    /// node that does not exist: the raw tree, where [`Document::parent_group`] sees through
+    /// layers.
+    #[must_use]
+    pub fn parent_node(&self, id: NodeId) -> Option<NodeId> {
         let tree = self.loro().get_tree(OBJECTS_TREE);
         let tree_id = tree_id_of(id);
         if !node_exists(&tree, tree_id) {
@@ -258,7 +289,9 @@ impl Document {
 
     /// The groups among the children of `parent` (`None` is the document root), each with its
     /// leaves in paint order: what the Select tool needs to treat a group as one object. A leaf
-    /// child is not listed; an empty group lists no leaf.
+    /// child is not listed; an empty group lists no leaf. At the document root layers are
+    /// transparent: a layer is not listed, and the groups directly in it are
+    /// (`specs/0050-layers-and-objects-panel` criterion 42).
     #[must_use]
     pub fn child_groups(&self, parent: Option<NodeId>) -> Vec<(NodeId, Vec<NodeId>)> {
         let tree = self.loro().get_tree(OBJECTS_TREE);
@@ -267,7 +300,22 @@ impl Document {
         {
             return Vec::new();
         }
-        children_of(&tree, parent.map(tree_id_of))
+        let children = children_of(&tree, parent.map(tree_id_of));
+        let children: Vec<TreeID> = if parent.is_none() {
+            children
+                .into_iter()
+                .flat_map(|child| {
+                    if is_layer_node(&tree, child) {
+                        children_of(&tree, Some(child))
+                    } else {
+                        vec![child]
+                    }
+                })
+                .collect()
+        } else {
+            children
+        };
+        children
             .into_iter()
             .filter(|&child| is_group_node(&tree, child))
             .map(|child| {
