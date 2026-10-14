@@ -18,6 +18,37 @@ pub const NEW_LAYER_COMMIT_LABEL: &str = "new_layer";
 /// The label of Delete layer's commit.
 pub const DELETE_LAYER_COMMIT_LABEL: &str = "delete_layer";
 
+/// The name of the layer the first drawn object of a document with no layer makes
+/// ([`Document::set_draw_into_initial_layer`], customer feedback 2026-10-14).
+pub const INITIAL_LAYER_NAME: &str = "Initial Layer";
+
+/// Writes a new layer node named `name` at the front of the top level, without a commit, and
+/// returns it. The callers commit.
+///
+/// # Panics
+/// Does not panic in practice: the tree operations act on the root and a node just created.
+pub(crate) fn create_layer_node(tree: &loro::LoroTree, name: &str) -> loro::TreeID {
+    let index = children_of(tree, None).len();
+    create_layer_node_at(tree, index, name)
+}
+
+/// [`create_layer_node`] at the top-level position `index`.
+fn create_layer_node_at(tree: &loro::LoroTree, index: usize, name: &str) -> loro::TreeID {
+    tree.enable_fractional_index(0);
+    // invariant: the root exists and the index is at most the number of its children.
+    #[allow(clippy::unwrap_used)]
+    let layer = tree.create_at(TreeParentId::Root, index).unwrap();
+    // invariant: the node was just created, so its meta map exists.
+    #[allow(clippy::unwrap_used)]
+    {
+        let meta = tree.get_meta(layer).unwrap();
+        meta.insert(KEY_GROUP, true).unwrap();
+        meta.insert(KEY_LAYER, true).unwrap();
+        meta.insert(KEY_NAME, LoroValue::from(name)).unwrap();
+    }
+    layer
+}
+
 /// "Layer N" with the smallest positive N that no name of `taken` uses (criterion 7).
 #[must_use]
 pub(crate) fn next_layer_name<'a>(taken: impl IntoIterator<Item = &'a str>) -> String {
@@ -38,8 +69,6 @@ impl Document {
     /// the front of the top level when that is `None` or no live layer, in one commit labelled
     /// [`NEW_LAYER_COMMIT_LABEL`] (criterion 34). Returns its id.
     ///
-    /// # Panics
-    /// Does not panic in practice: the tree operations act on the root and a node just created.
     pub fn new_layer(&self, in_front_of: Option<NodeId>) -> NodeId {
         let tree = self.loro().get_tree(OBJECTS_TREE);
         let roots = children_of(&tree, None);
@@ -55,18 +84,7 @@ impl Document {
             .filter(|&id| node_exists(&tree, id) && is_layer_node(&tree, id))
             .and_then(|id| roots.iter().position(|&root| root == id))
             .map_or(roots.len(), |at| at + 1);
-        tree.enable_fractional_index(0);
-        // invariant: the root exists and the index is at most the number of its children.
-        #[allow(clippy::unwrap_used)]
-        let layer = tree.create_at(TreeParentId::Root, index).unwrap();
-        // invariant: the node was just created, so its meta map exists.
-        #[allow(clippy::unwrap_used)]
-        {
-            let meta = tree.get_meta(layer).unwrap();
-            meta.insert(KEY_GROUP, true).unwrap();
-            meta.insert(KEY_LAYER, true).unwrap();
-            meta.insert(KEY_NAME, LoroValue::from(name)).unwrap();
-        }
+        let layer = create_layer_node_at(&tree, index, &name);
         self.commit_with_label(NEW_LAYER_COMMIT_LABEL);
         node_id(layer)
     }

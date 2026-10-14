@@ -190,6 +190,9 @@ pub struct Document {
     pub(crate) step_index: std::cell::RefCell<crate::history::StepIndex>,
     /// The group new objects are created in (`crate::groups`); view state, never stored.
     pub(crate) draw_parent: std::cell::Cell<Option<loro::TreeID>>,
+    /// Whether a new object drawn into a document with no layer makes the Initial Layer
+    /// (`crate::groups`); view state of the caller, never stored.
+    pub(crate) initial_layer: std::cell::Cell<bool>,
     /// The steps that touched each object, for the Object scope of the history.
     pub(crate) object_index: std::cell::RefCell<crate::history::ObjectIndex>,
     /// The step an object undo of one object would really write, until the log changes.
@@ -239,6 +242,7 @@ impl Document {
             container_index: std::cell::RefCell::default(),
             step_index: std::cell::RefCell::default(),
             draw_parent: std::cell::Cell::default(),
+            initial_layer: std::cell::Cell::default(),
             object_index: std::cell::RefCell::default(),
             writable_cache: std::cell::RefCell::default(),
         };
@@ -289,6 +293,7 @@ impl Document {
             container_index: std::cell::RefCell::default(),
             step_index: std::cell::RefCell::default(),
             draw_parent: std::cell::Cell::default(),
+            initial_layer: std::cell::Cell::default(),
             object_index: std::cell::RefCell::default(),
             writable_cache: std::cell::RefCell::default(),
         })

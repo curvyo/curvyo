@@ -606,3 +606,86 @@ fn the_read_of_a_deep_chain_carries_flags_and_opacity_to_the_bottom() {
     assert_eq!(read.opacity.get(), 0.5);
     assert_eq!(document.read_nodes().len(), 1 + 31 + 32 + 1);
 }
+
+/// The names of the top-level layers, back first.
+fn layer_names(document: &Document) -> Vec<String> {
+    document
+        .children(None)
+        .into_iter()
+        .filter(|&id| document.is_layer(id))
+        .filter_map(|id| document.node_registers(id).and_then(|r| r.name))
+        .collect()
+}
+
+#[test]
+fn the_first_new_object_of_a_document_with_no_layer_goes_into_an_initial_layer_in_one_step() {
+    // Customer feedback 2026-10-14, criterion 35 amended.
+    let document = Document::new(1);
+    document.set_draw_into_initial_layer(true);
+    let steps = document.own_step_count();
+    let a = rect(&document, 0.0);
+    assert_eq!(document.own_step_count(), steps + 1, "one step for both");
+    let roots = document.children(None);
+    assert_eq!(roots.len(), 1);
+    let layer = roots[0];
+    assert!(document.is_layer(layer));
+    assert_eq!(layer_names(&document), ["Initial Layer"]);
+    assert_eq!(document.children(Some(layer)), [a]);
+    // The next object finds a layer: no second Initial Layer.
+    let b = rect(&document, 20.0);
+    assert_eq!(layer_names(&document), ["Initial Layer"]);
+    assert_eq!(
+        document.parent_node(b),
+        None,
+        "the draw parent decides, here the root"
+    );
+    // One undo of the first step removes the layer and the object together.
+    let first = document.own_steps()[steps].step;
+    document.undo_step(first).unwrap();
+    assert!(!document.contains_node(a));
+    assert!(!document.contains_node(layer));
+}
+
+#[test]
+fn a_document_with_objects_but_no_layer_keeps_them_and_only_the_new_object_goes_in() {
+    let document = Document::new(1);
+    let loose = rect(&document, 0.0);
+    document.set_draw_into_initial_layer(true);
+    let path = document.create_path(
+        &[
+            curvyo_document_core::NewAnchor::corner(
+                curvyo_document_core::AnchorId::new(1, 900),
+                Point::new(0.0, 0.0),
+            ),
+            curvyo_document_core::NewAnchor::corner(
+                curvyo_document_core::AnchorId::new(1, 901),
+                Point::new(10.0, 10.0),
+            ),
+        ],
+        false,
+    );
+    let roots = document.children(None);
+    assert_eq!(roots.len(), 2, "no migration: the loose object stays");
+    assert_eq!(roots[0], loose);
+    assert!(document.is_layer(roots[1]), "the layer is at the front");
+    assert_eq!(document.children(Some(roots[1])), [path]);
+    assert_eq!(document.parent_node(loose), None);
+}
+
+#[test]
+fn without_the_switch_or_with_a_layer_or_a_draw_group_no_initial_layer_is_made() {
+    let document = Document::new(1);
+    let a = rect(&document, 0.0);
+    assert_eq!(document.parent_node(a), None, "off by default");
+    document.set_draw_into_initial_layer(true);
+    let layer = document.new_layer(None);
+    let b = rect(&document, 20.0);
+    assert_eq!(document.parent_node(b), None);
+    assert_eq!(layer_names(&document), ["Layer 1"]);
+    document.delete_layer(layer).unwrap();
+    let group = document.group_objects(&[a, b]).unwrap();
+    document.set_draw_parent(Some(group));
+    let c = rect(&document, 40.0);
+    assert_eq!(document.parent_node(c), Some(group));
+    assert_eq!(layer_names(&document), Vec::<String>::new());
+}

@@ -11,6 +11,7 @@ use crate::group_tree::{
     KEY_GROUP, MAX_GROUP_DEPTH, children_of, group_parent, groups_above, groups_in, is_group_node,
     is_layer_node, node_id,
 };
+use crate::layers::INITIAL_LAYER_NAME;
 use crate::objects::ObjectEditError;
 use crate::path_codec::node_exists;
 use crate::path_model::NodeId;
@@ -68,6 +69,34 @@ impl Document {
     /// exist (any more) means the root. View state of the caller: it is not stored.
     pub fn set_draw_parent(&self, parent: Option<NodeId>) {
         self.draw_parent.set(parent.map(tree_id_of));
+    }
+
+    /// Whether the `create_*` methods put a new object into a new layer named
+    /// [`INITIAL_LAYER_NAME`] when the draw parent is the root and the document has no layer
+    /// (`specs/0050-layers-and-objects-panel` criterion 35, customer feedback 2026-10-14). The
+    /// layer and the object are written in the object's one commit, so one undo removes both.
+    /// Objects already in the document stay where they are. Off by default; view state of the
+    /// caller: it is not stored.
+    pub fn set_draw_into_initial_layer(&self, on: bool) {
+        self.initial_layer.set(on);
+    }
+
+    /// The node a drawn object (`create_path`, `create_rect` and the other public `create_*`
+    /// methods) is created under: [`Document::creation_parent`], or a new Initial Layer at the
+    /// front of the top level when [`Document::set_draw_into_initial_layer`] is on, that is the
+    /// root and no layer exists. Writes the layer without committing: the caller's commit takes
+    /// both.
+    pub(crate) fn drawing_parent(&self, tree: &LoroTree) -> TreeParentId {
+        let parent = self.creation_parent(tree);
+        if parent != TreeParentId::Root
+            || !self.initial_layer.get()
+            || children_of(tree, None)
+                .iter()
+                .any(|&id| is_layer_node(tree, id))
+        {
+            return parent;
+        }
+        TreeParentId::Node(crate::layers::create_layer_node(tree, INITIAL_LAYER_NAME))
     }
 
     /// The node a new object is created under: the draw parent while it is a live group.
