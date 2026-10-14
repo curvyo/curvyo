@@ -46,7 +46,9 @@ per criterion below and in "Out of scope", not silently dropped.
    opposite corners of its axis-aligned bounding box (width = |Bx − Ax|,
    height = |By − Ay|), zero corner radius, and it becomes the selected
    object. A drag where A equals B (including a plain click with no movement)
-   creates nothing.
+   creates nothing. (Changed by `specs/0052-click-to-create-shapes/` criterion 1: a press and release
+   under 3 px is a click; it creates nothing and starts a placement, and a
+   create-drag needs 3 px of movement.)
 2. Given the rectangle tool is active, when the maker holds the constrain
    modifier (Ctrl) while dragging, then the created rectangle is a square,
    sized to the larger of the drag's horizontal and vertical extents — this
@@ -108,7 +110,8 @@ per criterion below and in "Out of scope", not silently dropped.
     centered at A, with one vertex at B and the remaining N − 1 vertices
     spaced evenly around A at the same radius |AB|, and it becomes the
     selected object. A drag where A equals B (including a plain click with no
-    movement) creates nothing, same as criteria 1 and 7.
+    movement) creates nothing, same as criteria 1 and 7. (Changed by
+    `specs/0052-click-to-create-shapes/` criterion 1, as criterion 1 here.)
 12. Given the polygon/star tool is active in "star" mode with an inner/outer
     radius ratio R set (0 < R < 1), when the maker presses the mouse button
     down at center point A and drags to point B before releasing, then a star
@@ -116,7 +119,7 @@ per criterion below and in "Out of scope", not silently dropped.
     alternating around center A — outer radius = |AB| with one outer vertex
     at B, inner radius = R × outer radius — and it becomes the selected
     object. A drag where A equals B creates nothing, same as criteria 1, 7
-    and 11.
+    and 11. (Changed by `specs/0052-click-to-create-shapes/` criterion 1, as criterion 1 here.)
 13. Given a selected polygon or star and the tool active, when the maker
     drags one of its resize handles, then the whole shape scales uniformly
     (outer radius changes; for a star, inner radius scales with it so ratio R

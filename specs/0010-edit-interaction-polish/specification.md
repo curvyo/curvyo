@@ -614,7 +614,9 @@ on the centre handle) and has left the 3 px dead zone.
     it (unchanged).
 44. Rectangle, Ellipse and Polygon/Star tools have no step 3 (their selection is
     empty, `unified-object-editing` criterion 27): the first Escape after a
-    cancelled drag, or with no drag, switches to the Select tool.
+    cancelled drag, or with no drag, switches to the Select tool. (Changed by
+    `specs/0052-click-to-create-shapes/` criterion 7: a running placement is step 2; Escape cancels it,
+    the next Escape leaves the tool.)
 45. Node tool: step 3 is the node and segment selection: if at least one node or
     segment is selected, Escape clears it (the path stays as it is, the tool
     stays Node); with none selected ("nothing actively selected") the next
@@ -764,6 +766,7 @@ system are in "UX notes round 2", section 1.
       or an entry chip is open;
     - a drag is in flight in any tool: move, resize, rotate, skew, parameter
       handle, marquee, lasso, create-drag, node or handle drag, or a pan;
+    - a click-to-create placement runs (`specs/0052-click-to-create-shapes/` criterion 8);
     - the Pen tool has an unfinished path;
     - Space is held.
     Escape, Space (pan while held, never interrupting an operation), Enter
@@ -909,6 +912,8 @@ skew guide (criterion 68).
   decision P1 stood here; reversed by `specs/0047-transform-polish/`, which converts).
 - Any other angle behaviour of polygon and star creation (the press-centre,
   pointer-vertex rule stays); a default size or angle for a click without a drag.
+  (Still out: `specs/0052-click-to-create-shapes/` gives a click a placement, whose size comes from the
+  pointer or the typed value, not a default.)
 - Re-Join or undo of Split; `undo-redo` is its own slice.
 - Escape closing dialogs or menus, Escape in the browser build outside the
   canvas, a different key for returning to the Select tool.

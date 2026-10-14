@@ -245,7 +245,8 @@ the parameter-handle threshold).
     preview, which redraws the object itself at the new place, is replaced by
     this. The "Points" and "Ratio" sliders of criterion 21 use the same
     preview during a slider drag; typed values (entry chip, bar fields) do not
-    preview and commit on Enter.
+    preview and commit on Enter. (Exception: the placement chip of
+    `specs/0052-click-to-create-shapes/` previews its typed values, criterion 15 there.)
 11. Given a drag of a multi-object selection (a move), then every selected
     object shows both renderings.
 12. Given the pointer is released, then exactly one commit is made, the blue
@@ -420,7 +421,8 @@ the parameter-handle threshold).
     highlight, hint chip or hit state on existing objects.
 26. Given a creation tool is active, when the maker presses and releases without
     moving, then nothing is created and the selection is unchanged (it is empty
-    by criterion 27).
+    by criterion 27). (Changed by `specs/0052-click-to-create-shapes/` criterion 1: the click also starts
+    a placement; nothing is created until it is placed.)
 27. Given a creation tool (Rectangle, Ellipse or Polygon/Star) becomes active by
     any route (tool rail, `R`, `E`, `*`), then the selection is cleared in the
     same step: nothing is selected, and no selection box, handle, hover
