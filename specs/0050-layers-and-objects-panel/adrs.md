@@ -192,7 +192,7 @@ new dependency, no trait, no generic.
       - one damaged file (opacity 1.5);
       - one file with a `layer` marker inside a group, which reads as a plain group.
 
-16. **2026-10-14: Initial Layer (customer feedback 2026-10-14) (architect to confirm).**
+16. **2026-10-14: Initial Layer (customer feedback 2026-10-14).**
     - `Document::set_draw_into_initial_layer(bool)` is a new public method of
       `curvyo-document-core`, view state of the caller like `set_draw_parent`, never stored.
       When it is on, the draw parent is the root and the top level holds no layer,
@@ -206,6 +206,11 @@ new dependency, no trait, no generic.
     - The session turns it on while a drawing tool (Pen, Rectangle, Ellipse, Polygon/star) is
       active (`sync_context`), so writes by other routes and the tests that build documents
       through the document API are unchanged.
+    - Architect, 2026-10-14: a mode setter, not a per-call argument, because it is the same kind of
+      caller view state as `set_draw_parent`, which every `create_*` already reads, and an
+      argument would change five public signatures and every caller for one rule. The session
+      must keep calling it from `sync_context` before each input. If a third view-state flag
+      appears, fold them into one draw-target value passed to `set_draw_parent`.
 17. **2026-10-14: no empty notice.** `PanelReply::Quiet` and a missing layer notice serialise
     as the empty string; the host reads the empty string as "nothing to show". Before, the
     quiet reply was `{"kind":"","text":""}` and the host showed that text when the canvas
