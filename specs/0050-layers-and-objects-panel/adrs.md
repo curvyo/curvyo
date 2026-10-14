@@ -192,6 +192,25 @@ new dependency, no trait, no generic.
       - one damaged file (opacity 1.5);
       - one file with a `layer` marker inside a group, which reads as a plain group.
 
+16. **2026-10-14: Initial Layer (customer feedback 2026-10-14) (architect to confirm).**
+    - `Document::set_draw_into_initial_layer(bool)` is a new public method of
+      `curvyo-document-core`, view state of the caller like `set_draw_parent`, never stored.
+      When it is on, the draw parent is the root and the top level holds no layer,
+      `create_path` and the `create_*` primitives first write a layer node named
+      `INITIAL_LAYER_NAME` ("Initial Layer") at the front of the top level and create the
+      object in it, both inside the object's one commit, so one undo removes both. The layer is
+      the node of decision 1; no new key, no format change.
+    - Only the drawing entry points take it (`drawing_parent`); `split_at_anchor`, Duplicate,
+      the Boolean results and every other write that places a node next to an operand keep
+      `creation_parent`. No file is migrated: loose objects stay where they are.
+    - The session turns it on while a drawing tool (Pen, Rectangle, Ellipse, Polygon/star) is
+      active (`sync_context`), so writes by other routes and the tests that build documents
+      through the document API are unchanged.
+17. **2026-10-14: no empty notice.** `PanelReply::Quiet` and a missing layer notice serialise
+    as the empty string; the host reads the empty string as "nothing to show". Before, the
+    quiet reply was `{"kind":"","text":""}` and the host showed that text when the canvas
+    notice was compared with "" (customer feedback 2026-10-14).
+
 ## Shared files and order
 
 Built after `0023`, and after `0043` for the tab strip. It runs alone among `0023`, `0049` and

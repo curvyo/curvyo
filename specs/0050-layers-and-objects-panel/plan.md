@@ -181,6 +181,40 @@ supply its root's register.
 - [x] 33. Spec status line, design-system numbers if changed, `/no-slop` on new UI text; full
       gate (§7); PR with "What changes in the demo" and the Review guide
 
+### Customer feedback 2026-10-14 (after trying PR #118)
+
+Affected: `curvyo-document-core` (`groups.rs`, `layers.rs`, `shapes.rs`, `paths.rs`),
+`curvyo-ui-core` (`layer_text.rs`), `curvyo-editor-wasm` (`context.rs`, `layers.rs`,
+`layers_edit.rs`, `layers_panel.rs`, new `layers_toolbar.rs`, `select_cursor.rs`,
+`offset_chip.rs`, `wasm_layers.rs`), `frontend` (`LayersTab.tsx`, `LayerRow.tsx`,
+`layerRows.ts`, `cursors.ts`, `useEditorSession.ts`).
+
+- [x] 34. Remove the caption "Select an object or a layer."; nothing replaces it (AC 26)
+- [x] 35. Test first in document-core: `set_draw_into_initial_layer`; the drawing `create_*`
+  entry points make "Initial Layer" in the object's commit when the document has no layer;
+  split keeps the plain creation parent; no migration (AC 35, `adrs.md` decision 16)
+- [x] 36. Session: the drawing tools turn it on in `sync_context`; test: one step, one undo
+  removes both, loose objects stay (AC 35)
+- [x] 37. Opacity drag: the host sends the position, the session maps it on the Style tab's
+  opacity scale; the field shows the dragged value, the canvas draws it, one step on release;
+  session test through `render_objects` (AC 26)
+- [x] 38. No empty notice: `PanelReply::Quiet` and a missing layer notice are the empty string;
+  the host parses the layer notice and drops an empty one; Rust and TS tests (AC 20,
+  `adrs.md` decision 17)
+- [x] 39. Lock cursor: `"locked"` from the Select tool's press cursor and the Offset tool's
+  hover where a press passes through an effectively locked object; the padlock cursor in
+  `cursors.ts`; session test incl. a lock through the layer and the Offset tool (AC 20)
+- [x] 40. Row cells: opacity readout, row action (own slot), eye, lock; keyboard cell order
+  (AC 6, 38)
+- [x] 41. Toolbar at the top: New layer, Duplicate, Move up, Move down, Delete layer, icon
+  buttons with tooltip and accessible name, dimmed when they do not apply; the session's
+  `toolbar` view, `step_layer_target`, `duplicate_layer_target`; session tests (AC 3, 34, 36,
+  53, 55 to 57)
+- [x] 42. Opacity field at the bottom of the tab, footer removed (AC 3, 26)
+- [x] 43. Tests amended for the Initial Layer (`acceptance_0040_tester` ac41,
+  `acceptance_polygon_star_box_refit` ac14, `object_history_session` wipe); spec, `adrs.md`,
+  design system updated
+
 ## Decisions taken in this plan (reversible in this PR)
 
 - **`document.json` form.** Recorded in `adrs.md` as the note of 2026-10-12 that supersedes
