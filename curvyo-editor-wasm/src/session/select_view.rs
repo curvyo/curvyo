@@ -119,6 +119,15 @@ impl Session {
                 history_hovered.push((hovered, shown));
             }
         }
+        if self.tool == Tool::Offset {
+            // Selected objects the Offset tool ignores (open paths) stay drawn as selected
+            // (`specs/0038-path-offset/ux-rework.md` section 8).
+            return SelectDecorationInput {
+                history_hovered,
+                selected: self.offset_ignored_boxes(objects),
+                ..SelectDecorationInput::default()
+            };
+        }
         if self.tool != Tool::Select {
             return SelectDecorationInput {
                 history_hovered,

@@ -101,6 +101,11 @@ pub enum KeyOutcome {
     /// Home, End, Page Up or Page Down changed the stacking order of the selection (or found it
     /// already there); a refusal is in [`Session::take_layer_notice`].
     Reordered,
+    /// O or Enter opened the Offset entry chip (`specs/0038-path-offset` criterion 25).
+    OffsetChipOpened,
+    /// Alt stepped the corner style of the Offset corner drag (`specs/0038-path-offset`
+    /// criterion 13).
+    OffsetCornerStyle,
     /// An arrow key moved the selection; `new_run` is true when the event
     /// opened a new run of held-key events (a new step once `0020` exists).
     Nudged {
@@ -144,6 +149,8 @@ impl KeyOutcome {
             Self::Ungroup => "ungroup",
             Self::EnteredGroup => "enter-group",
             Self::Reordered => "reordered",
+            Self::OffsetChipOpened => "offset-chip",
+            Self::OffsetCornerStyle => "offset-corner-style",
             Self::Nudged { new_run: false } => "nudge",
             Self::Nudged { new_run: true } => "nudge-new",
         }
@@ -175,7 +182,7 @@ impl Session {
     /// The selection as the key table sees it: only the Select tool's
     /// object selection counts.
     fn selected_for_keys(&self) -> Selected {
-        if self.tool != Tool::Select {
+        if !matches!(self.tool, Tool::Select | Tool::Offset) {
             return Selected::None;
         }
         match self.selection.ids().len() {
@@ -196,6 +203,7 @@ impl Session {
             Tool::Rectangle => self.rectangle.drag_in_flight(),
             Tool::Ellipse => self.ellipse.drag_in_flight(),
             Tool::PolygonStar => self.poly_star.drag_in_flight(),
+            Tool::Offset => self.offset_drag_in_flight() || self.select.drag_in_flight(),
             Tool::Pen => false,
         };
         // A drag of a panel value field is a drag too (`specs/0020-undo-redo` criterion 6a).
@@ -226,8 +234,10 @@ impl Session {
             tool: self.tool,
             operation_in_flight: self.operation_in_flight(),
             pen_open: self.pen_path_open(),
-            entry_open: self.select.has_entry(),
+            entry_open: self.select.has_entry() || self.offset_chip_open(),
             selected: self.selected_for_keys(),
+            offset_ready: self.offset_center().is_some(),
+            offset_dragging: self.tool == Tool::Offset && self.offset_drag_in_flight(),
         };
         match decide(&input, state) {
             KeyAction::Ignore => KeyOutcome::Ignored,
@@ -288,6 +298,20 @@ impl Session {
                     KeyOutcome::Ignored
                 }
             }
+            KeyAction::OpenOffsetChip => {
+                if self.open_offset_chip() {
+                    KeyOutcome::OffsetChipOpened
+                } else {
+                    KeyOutcome::Ignored
+                }
+            }
+            KeyAction::StepOffsetCornerStyle => {
+                if self.offset_step_drag_join() {
+                    KeyOutcome::OffsetCornerStyle
+                } else {
+                    KeyOutcome::Ignored
+                }
+            }
             KeyAction::EnterGroup => {
                 self.sync_context();
                 if self.enter_selected_group() {
@@ -321,6 +345,13 @@ impl Session {
             }
             Tool::Node => self.node.cancel_drag(),
             Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar => self.shape_escape(),
+            Tool::Offset => {
+                let marquee = self.select.drag_in_flight();
+                if marquee {
+                    self.select.escape();
+                }
+                self.cancel_offset_drag() || marquee
+            }
             Tool::Pen => false,
         }
     }
@@ -349,6 +380,11 @@ impl Session {
             self.select.cancel_entry();
             return EscapeStep::ClosedEntry;
         }
+        // The Offset entry chip closes without writing; the selection stays (`0038` criterion 54).
+        if self.offset_chip_open() {
+            self.close_offset_chip();
+            return EscapeStep::ClosedEntry;
+        }
         if self.cancel_drag_in_flight() {
             return EscapeStep::CancelledDrag;
         }
@@ -367,7 +403,7 @@ impl Session {
         let cleared = match self.tool {
             Tool::Pen | Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar => false,
             Tool::Node => self.node.clear_selection(),
-            Tool::Select => {
+            Tool::Select | Tool::Offset => {
                 let had = !self.selection.is_empty();
                 self.selection.clear();
                 self.select.end_cycle();
@@ -426,7 +462,7 @@ impl Session {
                         .delete_selected(&this.document, &objects, &mut this.selection);
                 }
                 Tool::Node => this.node.delete_selected(&this.document),
-                Tool::Pen | Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar => {}
+                Tool::Pen | Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar | Tool::Offset => {}
             }
         });
     }
@@ -458,6 +494,8 @@ mod tests {
             pen_open: false,
             entry_open: false,
             selected,
+            offset_ready: false,
+            offset_dragging: false,
         }
     }
 
@@ -468,7 +506,76 @@ mod tests {
         }
     }
 
-    /// Criterion 54: B, N, E and `*` select their tool in every state.
+    /// `specs/0038-path-offset` criteria 25, 53: in the Offset tool with an operand, O and Enter
+    /// open the chip, gated like every shortcut; without one O stays the tool letter.
+    /// `specs/0038-path-offset` criterion 13 (fourth round): Alt steps the corner style only
+    /// during an Offset corner drag, once per press, with or without Shift and Ctrl.
+    #[test]
+    fn alt_steps_the_offset_corner_style_only_during_a_corner_drag() {
+        let dragging = KeyState {
+            offset_dragging: true,
+            operation_in_flight: true,
+            ..state(Tool::Offset, Selected::One)
+        };
+        let alt = KeyInput {
+            alt: true,
+            ..key("Alt")
+        };
+        assert_eq!(decide(&alt, dragging), KeyAction::StepOffsetCornerStyle);
+        let held = KeyInput {
+            shift: true,
+            ctrl: true,
+            ..alt
+        };
+        assert_eq!(decide(&held, dragging), KeyAction::StepOffsetCornerStyle);
+        let repeat = KeyInput {
+            repeat: true,
+            ..alt
+        };
+        assert_eq!(decide(&repeat, dragging), KeyAction::Ignore);
+        for tool in TOOLS {
+            assert_eq!(decide(&alt, state(tool, Selected::One)), KeyAction::Ignore);
+        }
+        assert_eq!(
+            decide(&alt, state(Tool::Offset, Selected::One)),
+            KeyAction::Ignore,
+            "no drag: not intercepted"
+        );
+    }
+
+    #[test]
+    fn o_and_enter_open_the_offset_chip_in_the_offset_tool() {
+        let ready = KeyState {
+            offset_ready: true,
+            ..state(Tool::Offset, Selected::One)
+        };
+        assert_eq!(decide(&key("o"), ready), KeyAction::OpenOffsetChip);
+        assert_eq!(decide(&key("Enter"), ready), KeyAction::OpenOffsetChip);
+        assert_eq!(
+            decide(&key("o"), state(Tool::Offset, Selected::One)),
+            KeyAction::SetTool(Tool::Offset)
+        );
+        assert_eq!(
+            decide(&key("o"), state(Tool::Select, Selected::One)),
+            KeyAction::SetTool(Tool::Offset)
+        );
+        let blocked: [Blocker; 4] = [
+            Box::new(|k, _| k.repeat = true),
+            Box::new(|k, _| k.dom_blocked = true),
+            Box::new(|_, s| s.entry_open = true),
+            Box::new(|_, s| s.operation_in_flight = true),
+        ];
+        for block in &blocked {
+            for name in ["o", "Enter"] {
+                let (mut k, mut s) = (key(name), ready);
+                block(&mut k, &mut s);
+                assert_ne!(decide(&k, s), KeyAction::OpenOffsetChip, "{name}");
+            }
+        }
+    }
+
+    /// Criterion 54: B, N, E and `*` select their tool in every state; so does O
+    /// (`specs/0038-path-offset` criterion 2).
     #[test]
     fn b_n_e_and_star_select_their_tool_in_every_state() {
         for tool in TOOLS {
@@ -478,6 +585,7 @@ mod tests {
                     ("n", Tool::Node),
                     ("e", Tool::Ellipse),
                     ("*", Tool::PolygonStar),
+                    ("o", Tool::Offset),
                 ] {
                     assert_eq!(
                         decide(&key(k), state(tool, selected)),

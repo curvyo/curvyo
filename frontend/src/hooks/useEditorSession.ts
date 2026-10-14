@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { type CanvasNotice, type HistoryNames, MAC, useHistory } from "@/hooks/useHistory";
 import { type GroupingApi, useGrouping } from "@/hooks/useGrouping";
+import { type OffsetApi, readOffsetView, useOffset } from "@/hooks/useOffset";
+import { offsetKeyOutcome, offsetReadout } from "@/lib/offsetText";
 import type { HistoryDirection } from "@/lib/historyText";
 import { type NudgeFeedback, useNudgeFeedback } from "@/hooks/useNudgeFeedback";
 import { type BackingBuffer, backingBufferFor, sameBackingBuffer } from "@/lib/canvasSize";
@@ -23,7 +25,14 @@ function backingBufferSize(cssWidth: number, cssHeight: number): BackingBuffer {
 /** Which tool is active (`specification.md`'s tool rail: Select is first
  * — `canvas-navigation-and-selection`'s launch default, acceptance
  * criterion 13 — then Pen, Node, Rectangle, Ellipse, Polygon/Star). */
-export type Tool = "select" | "pen" | "node" | "rectangle" | "ellipse" | "polygon-star";
+export type Tool =
+  | "select"
+  | "pen"
+  | "node"
+  | "rectangle"
+  | "ellipse"
+  | "polygon-star"
+  | "offset";
 
 /** The polygon/star tool-options bar's mode toggle (acceptance criteria
  * 11 vs. 12). */
@@ -266,6 +275,18 @@ function readLiveReadout(
   return readout;
 }
 
+/** The Offset tool's readout chip during a drag (`specs/0038-path-offset` criteria 12, 15, 18),
+ * at the pointer; `null` without a drag. */
+function offsetLiveReadout(session: WasmSession, x: number, y: number): LiveReadout | null {
+  const view = readOffsetView(session);
+  if (!view.dragging) {
+    return null;
+  }
+  const { lines, invalid } = offsetReadout(view);
+  const [text = "", second, third] = lines;
+  return { text, second, third, thirdInvalid: invalid, x, y };
+}
+
 /** Reads a wasm-bindgen `DocumentPoint` instance once, immediately, so
  * it can be `free()`d rather than held onto — same reasoning as
  * `readToolbarState`. */
@@ -288,6 +309,12 @@ export interface LiveReadout {
   text: string;
   x: number;
   y: number;
+  /** A muted second line (the Offset tool's mode). */
+  second?: string;
+  /** A third line (the Offset tool's message). */
+  third?: string;
+  /** The third line is in the invalid colour (the Offset tool's stop). */
+  thirdInvalid?: boolean;
 }
 
 /** One field of the typed numeric entry chip (`object-transform-
@@ -584,6 +611,9 @@ export interface EditorSession {
   /** Groups (`specs/0023-groups`): the Grouping card, the entered group's depth and its
    * announcements. */
   grouping: GroupingApi;
+  /** The Offset tool (`specs/0038-path-offset`): its view, the entry chip's values and Enter,
+   * and the notice after a release. */
+  offset: OffsetApi;
   /** A large undo or redo is running. */
   historyBusy: boolean;
   /** The names of the next undo and redo; `null` for an empty stack. */
@@ -910,6 +940,8 @@ export function useEditorSession(
     refreshHistoryRef.current = refreshHistory;
   }, [refreshHistory]);
   const grouping = useGrouping(getSession, syncFromSession, history.showNotice);
+  const offset = useOffset(getSession, syncFromSession, syncRevision, history.showNotice);
+  const { showReleaseOutcome: showOffsetOutcome } = offset;
   const { refresh: refreshGrouping, handleKeyOutcome: handleGroupingOutcome } = grouping;
   useEffect(() => {
     refreshGroupingRef.current = refreshGrouping;
@@ -1441,6 +1473,14 @@ export function useEditorSession(
         return;
       }
 
+      // The other button during an Offset drag cancels it (`0038` criterion 17).
+      if (event.button !== 0 && session.cancel_offset_drag()) {
+        event.preventDefault();
+        setLiveReadout(null);
+        syncFromSession();
+        return;
+      }
+
       // A right press while the eyedropper is picking ends picking and writes
       // nothing; no tool sees it and no context menu opens
       // (`specs/0017-style-panel-rework` criterion 26).
@@ -1553,7 +1593,12 @@ export function useEditorSession(
         event.ctrlKey || event.metaKey,
         event.altKey,
       );
-      setLiveReadout(readLiveReadout(session?.live_readout()));
+      const offsetReadout = session?.tool() === "offset" ? offsetLiveReadout(session, x, y) : null;
+      setLiveReadout(offsetReadout ?? readLiveReadout(session?.live_readout()));
+      if (offsetReadout) {
+        // The handles and the preview follow an Offset drag live (`0038` criterion 15).
+        syncFromSession();
+      }
       setCursorHint(session?.cursor_hint() ?? "default");
       setHandleHint(session?.handle_hint() ?? "");
       setCornerHintLines(session?.corner_hint_lines() ?? []);
@@ -1562,7 +1607,7 @@ export function useEditorSession(
         syncBadges(session);
       }
     },
-    [canvasPoint, onCursorMove, syncEntry, syncBadges, syncTrackedModifiers],
+    [canvasPoint, onCursorMove, syncEntry, syncBadges, syncTrackedModifiers, syncFromSession],
   );
 
   const onPointerUp = useCallback(
@@ -1622,7 +1667,9 @@ export function useEditorSession(
         };
         doubleClickPressRef.current = null;
         const hintCode = session.double_click(press.x, press.y, press.shift, press.ctrl);
-        if (hintCode) {
+        if (hintCode === "offset_chip") {
+          // The chip mounts with the next sync and takes the focus (`0038` criterion 53).
+        } else if (hintCode) {
           // A double-click on a primitive changes nothing; the hint says how
           // to edit it (criterion 32), on every such double-click. On a
           // compound path it says why there are no nodes (`0016` criterion 38).
@@ -1656,6 +1703,7 @@ export function useEditorSession(
             window.setTimeout(() => {
               try {
                 session.pointer_up(x, y, shift, ctrl, alt);
+                showOffsetOutcome();
                 setLiveReadout(null);
                 setCursorHint(session.cursor_hint());
                 syncFromSession();
@@ -1667,12 +1715,13 @@ export function useEditorSession(
           return;
         }
         session.pointer_up(x, y, shift, ctrl, alt);
+        showOffsetOutcome();
       }
       setLiveReadout(null);
       setCursorHint(session.cursor_hint());
       syncFromSession();
     },
-    [canvasPoint, syncFromSession, syncTrackedModifiers],
+    [canvasPoint, syncFromSession, syncTrackedModifiers, showOffsetOutcome],
   );
 
   const onPointerCancel = useCallback(() => {
@@ -1710,7 +1759,10 @@ export function useEditorSession(
     const last = lastPointerRef.current;
     if (last) {
       session.pointer_hover(last.x, last.y, shift, ctrl, alt);
-      setLiveReadout(readLiveReadout(session?.live_readout()));
+      // An Offset drag keeps its own readout through a modifier change (`0038` criteria 15, 19).
+      const offsetReadout =
+        session.tool() === "offset" ? offsetLiveReadout(session, last.x, last.y) : null;
+      setLiveReadout(offsetReadout ?? readLiveReadout(session?.live_readout()));
       setHandleHint("");
     }
     setCursorHint(session.cursor_hint());
@@ -1810,10 +1862,21 @@ export function useEditorSession(
         MAC,
         event.timeStamp,
       );
-      if (outcome === "ignored") {
+      const offsetKey = offsetKeyOutcome(outcome);
+      if (offsetKey.ignored) {
         return;
       }
       event.preventDefault();
+      if (offsetKey.cornerStyle) {
+        // Alt stepped the corner style of an Offset drag: the readout and the preview show it
+        // now (`0038` criterion 13).
+        const at = lastPointerRef.current;
+        if (at) {
+          setLiveReadout(offsetLiveReadout(session, at.x, at.y));
+        }
+        syncFromSession();
+        return;
+      }
       if (handleKeyOutcome(outcome)) {
         setLiveReadout(readLiveReadout(session.live_readout()));
         setCursorHint(session.cursor_hint());
@@ -2010,6 +2073,7 @@ export function useEditorSession(
     keyHint,
     canvasNotice: history.notice,
     grouping,
+    offset,
     historyBusy: history.busy,
     historyNames: history.names,
     pressHistory: history.press,

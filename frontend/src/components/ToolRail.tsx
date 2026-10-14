@@ -53,6 +53,8 @@ interface ToolButtonProps {
   icon: React.ReactNode;
   onSelect: (tool: Tool) => void;
   onReturnFocus: () => void;
+  /** The accessible name, if not "label (shortcut)". */
+  name?: string;
 }
 
 /**
@@ -70,13 +72,14 @@ function ToolButton({
   icon,
   onSelect,
   onReturnFocus,
+  name,
 }: ToolButtonProps) {
   return (
     <Tooltip.Root delayDuration={400}>
       <Tooltip.Trigger asChild>
         <button
           type="button"
-          aria-label={`${label} (${shortcut})`}
+          aria-label={name ?? `${label} (${shortcut})`}
           aria-pressed={active}
           onClick={(event) => {
             onSelect(tool);
@@ -111,6 +114,26 @@ function ToolButton({
   );
 }
 
+/** The Offset tool's glyph: a solid rounded square inside a dashed concentric outline (the result
+ * around the source). */
+function OffsetGlyph() {
+  return (
+    <svg width={20} height={20} viewBox="0 0 20 20" fill="none" aria-hidden>
+      <rect x={6} y={6} width={8} height={8} rx={1.5} fill="currentColor" />
+      <rect
+        x={2}
+        y={2}
+        width={16}
+        height={16}
+        rx={4}
+        stroke="currentColor"
+        strokeWidth={1.5}
+        strokeDasharray="3 2"
+      />
+    </svg>
+  );
+}
+
 /**
  * The tool rail (`docs/design-system.md`, rows "Tool rail architecture", "Toolbox card",
  * "Group toolbox", "Boolean toolbox" and "Path toolbox"): two columns of cards that float over
@@ -119,7 +142,7 @@ function ToolButton({
  * it, the Grouping card; column B holds the Path card and, 8px below it, the Boolean card. Select
  * is first, a deliberate, one-time exception to "new tools append in ship order" (acceptance
  * criterion 12), then Pen, Node, Rectangle, Ellipse, Polygon-star. The canvas is never resized or
- * repositioned to make room for it.
+ * repositioned to make room for it. Column A ends with the Path tools card (the Offset tool).
  *
  * The root keeps 4px clear under the columns; it passes no pointer event through to itself, so
  * the canvas around the cards stays usable. Each column is at most 368px high, which fits the
@@ -206,6 +229,26 @@ export function ToolRail({
             mac={MAC}
             onReturnFocus={onReturnFocus}
           />
+          {/* The Path tools card (`specs/0038-path-offset` criterion 1): tools, not commands. */}
+          <div
+            role="toolbar"
+            aria-label="Path tools"
+            aria-orientation="vertical"
+            className={RAIL_CARD_CLASS}
+            style={RAIL_CARD_STYLE}
+          >
+            <ToolButton
+              tool="offset"
+              active={tool === "offset"}
+              label="Offset tool"
+              name="Offset tool"
+              shortcut="O"
+              hint="Drag a corner handle. Shift: both sides. Ctrl: new object."
+              icon={<OffsetGlyph />}
+              onSelect={onSelect}
+              onReturnFocus={onReturnFocus}
+            />
+          </div>
         </div>
         {/* Column B: the Path card and, 8px below it, the Boolean card. */}
         <div className="flex w-12 flex-col gap-2">

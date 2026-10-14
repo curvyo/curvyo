@@ -1,4 +1,4 @@
-//! The two commands that replace objects by new paths in a single commit: several objects by one
+//! The commands that write paths computed by the caller in a single commit: several objects by one
 //! path with one or more outlines (Combine, the Boolean operations,
 //! `specs/0016-boolean-operations/adrs.md`), and objects by pieces that take the place and style
 //! of the object they come from (Split, Break apart, Cut, `specs/0048-split-compound-path`). They
@@ -261,7 +261,7 @@ fn create_path_after(
 /// An anchor id names a node across the whole document: none of `seen`, the ids a command is
 /// about to write, may belong to an object that stays (`doomed` are the objects the command
 /// deletes).
-fn check_new_anchor_ids(
+pub(crate) fn check_new_anchor_ids(
     tree: &loro::LoroTree,
     doomed: &[loro::TreeID],
     seen: &HashSet<AnchorId>,

@@ -42,6 +42,7 @@ mod node_move;
 mod node_read;
 mod node_registers;
 mod objects;
+mod offset_write;
 mod path_codec;
 mod path_extend;
 mod path_model;
@@ -105,6 +106,7 @@ pub use node_move::{MOVE_NODES_COMMIT_LABEL, MovePlan, MoveRefusal, MoveTarget};
 pub use node_read::{NodeKind, NodeRead};
 pub use node_registers::{MAX_NAME_CHARS, NodeRegisters, clean_name};
 pub use objects::{CopySource, ObjectEditError};
+pub use offset_write::{OffsetGeometry, OffsetWrite};
 pub use path_extend::{PathEnd, PathGrowth};
 pub use path_model::{
     AnchorId, AnchorKind, AnchorSnapshot, Color, HandleSlot, NewAnchor, NodeId, PathEditError,

@@ -163,7 +163,7 @@ pub(crate) fn canonical_millimetres(paths: &Paths64) -> Vec<Vec<Point>> {
 }
 
 #[allow(clippy::cast_precision_loss)] // |units| <= 10^10, exact in an f64
-fn to_millimetres(point: &Point64) -> Point {
+pub(crate) fn to_millimetres(point: &Point64) -> Point {
     Point::new(point.x as f64 / UNITS_PER_MM, point.y as f64 / UNITS_PER_MM)
 }
 

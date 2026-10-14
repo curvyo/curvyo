@@ -90,6 +90,133 @@ compound paths), no trait, no generic. The customer chose the library on
   Budget (criterion 3): 200 nodes in under 50 ms, release build, in the
   `boolean-budgets` CI job.
 
+- **2026-10-12 (architect review): accepted deviations from the notes above.**
+  - The kernel signature takes `distance: Length`, not `distance_mm: f64`
+    (CLAUDE.md §5, units are types). The host-facing entry values in
+    `curvyo-ui-core` stay `f64` millimetres, as elsewhere in that crate.
+  - `curvyo-ui-core` holds two modules instead of one: `offset_entry.rs` (the
+    entry's values, ranges and codes) and `offset_plan.rs` (availability,
+    refusals, per-operand kernel calls, anchor ids for the write). One
+    responsibility each (§5).
+  - `history_names.rs` maps the commit label `offset_path` to "Offset", so the
+    history panel names the step (criterion 13).
+  - The kernel drops result outlines whose width estimate (2 x area /
+    perimeter) is below the flattening tolerance (0.008 mm at the 0.01 mm
+    kernel tolerance). Such slivers come from chords of two flattened curves
+    meeting under an inset; they are below the kernel's own accuracy and far
+    below any kerf or tool width, so they are not part of the exact result
+    (criterion 16). Criterion 15's 0.02 mm square (width 0.01 mm by the
+    estimate) stays.
+  - Criterion 3's 50 ms budget is missed at a 5 mm outset of the 200-node
+    gear (about 55 ms; 2 mm and -1 mm are within). Accepted for this slice
+    and logged in `docs/technical-debt.md` ("Offset preview runs on the main
+    thread").
+
+- **2026-10-12 (rework, customer review of #115): ADR 0003 §4 amendment
+  approved by the customer.** Offset results are curves rebuilt from exact
+  pieces (parallel lines, `kurbo` `offset_cubic`, true arcs for Round joins and
+  caps, miter and bevel lines); `i_overlay` decides topology only; the polyline
+  is the per-outline fallback. Primitives stay primitives where the exact
+  offset is one. No new dependency, no `format_version` bump, no precision
+  setting. Details: `geometry-rework.md`; criteria 33 to 44 of the reworked
+  `specification.md`. The "results are polylines" lines above are superseded
+  for offsetting by this entry.
+
+- **2026-10-13 (implementer, rework M1): how the pieces are mapped back.** The
+  architect's plan ran `i_overlay`'s offsetter on the flattened operand and
+  labelled result vertices by their distance to the pieces. Built instead, with
+  the same split of work: the raw offset loops (`offset_pieces.rs`) are
+  flattened with a tag per vertex (loop, piece, parameter) and handed to
+  `i_overlay`'s integer overlay with the Positive fill rule, which is what its
+  offsetter does internally; `i_overlay` still decides every survivor, hole and
+  vanishing part. Each result ring edge is labelled with the flattened chord it
+  lies on (exact grid lookup, then a collinearity check), so no distance
+  heuristic decides a label; runs of consecutive chords become the exact pieces,
+  and crossings between runs are solved by Newton's method on the two exact
+  pieces. The polyline route of the first build stays as the fallback, for
+  operands whose outlines cross or touch and for any ring that cannot be mapped
+  within 0.01 mm. Measured: the 200-node gear takes about 1 ms at 2 mm, -1 mm and
+  5 mm (release), 180 segments at 2 mm, no fallback on the test shapes. The
+  technical-debt entry "Offset preview runs on the main thread" is resolved by
+  this and removed.
+
+- **2026-10-13 (implementer, rework M4 to M6): the tool's plumbing.**
+  `curvyo-ui-core` holds `offset_entry.rs` (bar values, the modifier table),
+  `offset_drag.rs` (handle placement, the diagonal projection, snapping) and
+  `offset_plan.rs` (per operand and side a primitive or a curve path, the
+  writes); `curvyo-document-core` has one `write_offset` command in
+  `offset_write.rs` that replaces `add_paths_above` (copies below or above,
+  changed originals in place, a primitive turned into a path keeps its id).
+  The session keeps the bar's values for its life; the preview is cached by
+  document version, selection and request, so a release writes what the last
+  frame showed. At the inset stop the handle stays at the last distance at which
+  something was left, and a release there writes nothing (criterion 12;
+  architect ruling 2026-10-13). A primitive counts 8 nodes towards the
+  2,000-node preview limit. Selecting in the tool uses the Select tool's
+  object hit test and its marquee, armed against an empty selection so the
+  invisible transform handles of the Select tool never catch a press. The
+  tester's session tests of the first build
+  (`curvyo-editor-wasm/tests/acceptance_0038_tester.rs`) tested the removed
+  Select-bar entry and are deleted with it; the tester writes new ones from the
+  reworked criteria.
+
+- **2026-10-13 (architect review of the rework, HEAD 8e06cd6): rulings.**
+  - **Mapping by tagged flattening, approved.** Overlaying the flattened exact
+    raw loops (Positive rule, the construction `i_overlay`'s own offsetter
+    uses internally) and labelling ring edges by exact grid lookup replaces
+    the distance heuristic of `geometry-rework.md` §2 (c) step 3. It keeps
+    `i_overlay` as the only judge of topology, as the ADR 0003 §4 amendment of
+    2026-10-12 requires, and it removes the one non-deterministic-looking step
+    of the plan. The amendment text needs no change. The polyline route stays
+    the fallback for crossing or touching outlines and unmappable rings.
+  - **Smooth result nodes are `AnchorKind::Asymmetric`, approved.** The two
+    sides of an offset node have the same tangent but different handle lengths
+    (an arc meeting a line, a cubic of another curvature), which is exactly
+    Asymmetric; Symmetric would move a handle on the first edit, Corner would
+    drop the tangent constraint. No format impact.
+  - **Determinism.** The kernel uses `kurbo` `offset_cubic` and `hypot`; the
+    `offset_golden` test runs natively and in Node on wasm32 at 1e-6 mm and
+    with segment counts, which is the check `geometry-rework.md` asked for.
+    If it ever fails, replace `offset_cubic` as written there.
+  - **The miter limit is one rule.** `ui-core/src/offset_primitive.rs` must
+    not hold its own copy of the limit; the kernel exports it.
+
+- **2026-10-13 (implementer, tester finding): criterion 37 is open for narrow
+  ellipses.** Measured on the cubic ellipse paths of the tester (Round,
+  kernel tolerance 0.01 mm, `kurbo` cubic offset at 0.004 mm):
+
+  | Ellipse, d | Cubics | Largest deviation |
+  |---|---|---|
+  | 40 x 10, +5 | 16 | 0.0032 mm |
+  | 40 x 10, -3 | 16 | 0.0041 mm |
+  | 40 x 10, +2 | 12 | 0.0056 mm |
+  | 50 x 5, +3 | 16 | 0.0039 mm |
+  | 20 x 10, +/-2 | 4 | 0.0045 / 0.0029 mm |
+
+  With the `kurbo` tolerance raised to 0.008 mm, 40 x 10 at +5 still needs 12
+  cubics and the -3 inset leaves 0.0102 mm. The best single cubic per quarter
+  (end points and tangents fixed, handle lengths searched) misses the exact
+  offset by about 0.040 mm (40 x 10, +5), 0.027 mm (40 x 10, +2) and 0.13 mm
+  (50 x 5, +3), so at most 8 smooth cubics within 0.01 mm is not reachable
+  for ellipses this narrow; the -3 inset is past ry²/rx = 2.5 mm and has
+  cusps besides. The criterion holds for the 40 x 20 ellipse of criteria 37
+  and 51. The lead decided on 2026-10-13 (option a) and criterion 37 is
+  amended: ry/rx ≥ 0.5 at most 8 cubics, narrower at most 16, within 0.01 mm
+  everywhere; the tester's narrow-ellipse test checks that budget.
+
+- **2026-10-13 (implementer, amendment M5' to M8'): open paths, the chip, the corner style.**
+  `curvyo_geometry_core::offset` loses its `cap` parameter and `OffsetCap`; an open outline is
+  refused with `OffsetError::OpenPath` (criterion 55), in the place of the old
+  `InsetOfOpenPath` in the refusal order. The open-line pieces, caps, the stroke route of the
+  polyline fallback and `flatten_open` are deleted; closed results are bit-identical to before
+  (checked on the golden cases plus crossing and Bevel-inset cases, f64 bits compared).
+  `curvyo-ui-core`: `offset_operands` keeps closed objects only, `OffsetBar` becomes
+  `OffsetValues` (the chip's remembered values) and `next_offset_join` is the double-click cycle.
+  The session owns the chip's open state (so O, Enter, the center handle's look and the key gate
+  agree), the pending corner style (moved into the remembered Corners when the chip opens,
+  consumed by a written drag, dropped by a tool switch) and the chip's anchor; the frontend owns
+  the typed text, its validation messages and the focus, as for the Move chip.
+
 ## Flagged to the PO (criterion changes the spec invites)
 
 1. **Criterion 19 and "Miter limit": `i_overlay` clips the miter, it does

@@ -1,6 +1,6 @@
 # ADR 0003: Geometry kernel, boolean operations, offsetting and V-carving
 
-**Status:** Accepted (customer sign-off, 2026-10-02); §3 kernel library amendment of 2026-10-09 in effect since PR #69 merged on 2026-10-09 (`i_overlay` `=9.0.1` replaces `clipper2-rust`); §4 offsetting amendment of 2026-10-10 (customer decision: `i_overlay`'s integer offsetter, no new dependency)
+**Status:** Accepted (customer sign-off, 2026-10-02); §3 kernel library amendment of 2026-10-09 in effect since PR #69 merged on 2026-10-09 (`i_overlay` `=9.0.1` replaces `clipper2-rust`); §4 offsetting amendment of 2026-10-10 (customer decision: `i_overlay`'s integer offsetter, no new dependency); §4 amended again 2026-10-12 (offset results are curves, customer approved)
 
 ## Context
 
@@ -225,6 +225,16 @@ foundation.
    >
    > What stays: polyline results, a dedicated module, golden and property
    > tests. Details: `specs/0038-path-offset/adrs.md`.
+   >
+   > **Amended 2026-10-12 (customer approved, review of `specs/0038-path-offset`
+   > PR #115).** "Polyline results" no longer holds for offsetting. Offset
+   > results are curves rebuilt from exact pieces: parallel lines, `kurbo`
+   > cubic offsets, circular arcs for Round joins and caps, miter and bevel
+   > lines. `i_overlay` decides topology only (what survives, holes, vanishing
+   > parts); its rings are mapped back onto the pieces. An outline that cannot
+   > be mapped within the kernel tolerance is written as a polyline (the
+   > fallback). Primitives stay primitives where the exact offset is one. No new
+   > dependency. Boolean results stay polylines (§6).
 5. **V-carving uses an approximate medial axis derived from a constrained
    Delaunay triangulation** of the flattened boundary (`spade`, pure Rust,
    robust predicates), not an exact Voronoi diagram of curve segments. Carve

@@ -33,6 +33,7 @@ fn tool_from_str(name: &str) -> Result<Tool, JsValue> {
         "rectangle" => Ok(Tool::Rectangle),
         "ellipse" => Ok(Tool::Ellipse),
         "polygon-star" => Ok(Tool::PolygonStar),
+        "offset" => Ok(Tool::Offset),
         other => Err(JsValue::from_str(&format!("unknown tool: {other}"))),
     }
 }
@@ -190,6 +191,7 @@ impl WasmSession {
             Tool::Rectangle => "rectangle".to_string(),
             Tool::Ellipse => "ellipse".to_string(),
             Tool::PolygonStar => "polygon-star".to_string(),
+            Tool::Offset => "offset".to_string(),
         }
     }
 

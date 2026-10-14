@@ -98,7 +98,7 @@ impl Session {
         let starts_object = match self.tool {
             Tool::Pen => !self.pen_path_unfinished(),
             Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar => true,
-            Tool::Select | Tool::Node => false,
+            Tool::Select | Tool::Node | Tool::Offset => false,
         };
         if !starts_object || self.context_group().is_some() {
             return false;

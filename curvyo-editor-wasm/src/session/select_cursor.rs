@@ -44,6 +44,9 @@ impl Session {
         if self.colour_pick_target().is_some() {
             return "eyedropper".to_string();
         }
+        if self.tool == Tool::Offset {
+            return self.offset_cursor_hint().to_string();
+        }
         if self.tool != Tool::Select {
             return "default".to_string();
         }
@@ -123,6 +126,9 @@ impl Session {
     /// move is open.
     #[must_use]
     pub fn handle_hint(&self) -> String {
+        if self.tool == Tool::Offset {
+            return self.offset_handle_hint().to_string();
+        }
         if self.tool != Tool::Select || self.colour_pick_target().is_some() {
             return String::new();
         }
