@@ -121,9 +121,10 @@ impl Session {
     }
 
     fn press_object_history(&mut self, direction: Direction) -> HistoryResult {
-        if self.operation_in_flight() || self.select.has_entry() {
+        if self.operation_in_flight() || self.select.has_entry() || self.document_preview_active() {
             return nothing("");
         }
+        self.end_object_preview();
         if self.pen_path_open() {
             return nothing(FINISH_PEN_FIRST);
         }
@@ -181,7 +182,11 @@ impl Session {
     /// Hides everything before now from the history of the selected object and drops the stack
     /// entries that touched only this object (`specs/0041-object-history` criteria 30 and 31).
     pub fn wipe_object_history(&mut self) -> ObjectWipeOutcome {
-        if self.operation_in_flight() || self.select.has_entry() || self.pen_path_open() {
+        if self.operation_in_flight()
+            || self.select.has_entry()
+            || self.pen_path_open()
+            || self.document_preview_active()
+        {
             return ObjectWipeOutcome::Ignored;
         }
         let Some(id) = self.history_object() else {

@@ -9,10 +9,11 @@ use super::checkout::NodeAt;
 use super::node_value::{Node, read_map};
 use super::report::{Direction, Role, SkipReason};
 use super::step_header::{
-    KEY_OBJECT_REDONE, KEY_REDONE, LABEL_OBJECT_REDO, LABEL_REDO, StepHeader,
+    KEY_OBJECT_REDONE, KEY_REDONE, KEY_UNDONE, LABEL_OBJECT_REDO, LABEL_REDO, LABEL_UNDO,
+    StepHeader,
 };
 use super::step_id::StepRef;
-use super::step_log::LogStep;
+use super::step_log::{LogStep, find_step};
 use super::touched::Touched;
 use crate::document::OBJECTS_TREE;
 
@@ -65,6 +66,50 @@ impl Plan {
             .iter()
             .any(|p| !matches!(p.action, Action::Skip(..)))
     }
+}
+
+/// The plan of applying a version (`specs/0042-history-branches` criterion 10, ADR 0014 §8): with
+/// `before` the version and `after` now, every touched object goes to what it was at the version.
+/// One alive now and absent then is deleted; one absent now and alive then comes back with its id;
+/// one alive at both gets the version's fields and, when its parent or place changed, its old place.
+/// No three-way check: `after` is the live state, so nobody changed anything since.
+pub(super) fn plan_return(
+    doc: &LoroDoc,
+    touched: &Touched,
+    before: &Snapshot,
+    after: &Snapshot,
+) -> Plan {
+    let mut plan = Plan::default();
+    let mut seen = HashSet::new();
+    let moved: HashSet<TreeID> = touched.moved.iter().copied().collect();
+    for id in touched.nodes() {
+        if !seen.insert(id) {
+            continue;
+        }
+        let then = before.nodes.get(&id).filter(|node| !node.meta.is_empty());
+        match (alive(doc, id), then) {
+            (true, None) => plan.push(Role::Created, Action::Delete(id)),
+            (false, Some(then)) => {
+                plan.push(Role::Deleted, Action::Revive(id));
+                plan.revive_from_before.push(id);
+                // A deleted object keeps the fields it had when it went; they go back too.
+                if after.nodes.get(&id).is_none_or(|now| now.meta != then.meta) {
+                    plan.push(Role::Changed, Action::Merge(id));
+                }
+            }
+            (true, Some(then)) => {
+                let now = after.nodes.get(&id);
+                if now.is_none_or(|now| now.meta != then.meta) {
+                    plan.push(Role::Changed, Action::Merge(id));
+                }
+                if moved.contains(&id) || now.is_none_or(|now| now.parent != then.parent) {
+                    plan.push(Role::Moved, Action::Move(id, then.parent));
+                }
+            }
+            (false, None) => {}
+        }
+    }
+    plan
 }
 
 /// A meta map without the floor register of an object wipe.
@@ -196,7 +241,37 @@ impl PlanInput<'_> {
                 };
                 (header.label == LABEL_REDO && redone(KEY_REDONE))
                     || (header.label == LABEL_OBJECT_REDO && redone(KEY_OBJECT_REDONE))
+                    || (header.label == LABEL_UNDO
+                        && header
+                            .extra_value(KEY_UNDONE)
+                            .and_then(StepRef::decode)
+                            .is_some_and(|undone| self.later_revival_of(undone, id)))
             })
+    }
+
+    /// Whether `step` came after this step and brought `id` back (an apply of a version, `0042`):
+    /// an undo of it deletes `id` again, which puts this step's delete back in effect.
+    fn later_revival_of(&self, step: StepRef, id: TreeID) -> bool {
+        let Some(later) = find_step(self.doc, step) else {
+            return false;
+        };
+        let after_this = self
+            .doc
+            .frontiers_to_vv(&later.before)
+            .and_then(|vv| vv.get(&self.log.step.peer()).copied())
+            .is_some_and(|end| end >= self.log.end);
+        after_this
+            && self
+                .doc
+                .export_json_in_id_span(later.span())
+                .iter()
+                .flat_map(|change| &change.ops)
+                .any(|op| {
+                    matches!(
+                        &op.content,
+                        loro::JsonOpContent::Tree(loro::JsonTreeOp::Move { target, .. }) if *target == id
+                    )
+                })
     }
 
     fn last_move_by_me(&self, id: TreeID) -> bool {

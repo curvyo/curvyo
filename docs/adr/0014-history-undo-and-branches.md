@@ -59,8 +59,8 @@ version are the same read with a different write rule. One engine, rules we own 
 inverses.
 
 **C. `revert_to(version)`.** Reverts every peer's later work and re-creates deleted nodes under new
-ids. Rejected for undo (ADR 0009 option A); it is also why the Document scope gets no Live mode
-(0042 Q3).
+ids. Rejected for undo (ADR 0009 option A) and for going to a document-wide version (§8
+amendment of 2026-10-14).
 
 ### Options: restoring a deleted object with its `NodeId`
 
@@ -109,7 +109,7 @@ and a marker a peer could edit concurrently.
    `ou`/`od` object undo/redo, with `o` the object), a go-to or clone version (`v`), and are
    ignored when unknown. A **continuation** repeats the header of the peer's last step verbatim and
    joins it (its time is the step's start); it is allowed only while the document version is still
-   that step's last version (0044 held nudge, 0042 exploring go-to). A message without `;` is a
+   that step's last version (0044 held nudge). A message without `;` is a
    legacy label: consecutive same-peer changes with that label are one step. Identical messages
    merging into one Loro change and large commits splitting are both harmless under this rule.
 3. **Step identity.** `StepRef` = the id (peer, counter) of the step's first op, the same on every
@@ -156,6 +156,18 @@ and a marker a peer could edit concurrently.
    cannot be edited), and returns to latest in the same call. The live document keeps editing and
    merging between rows. Measured: 125 to 250 ms for a row 1,000 steps back with all 5,000
    objects; far rows take longer (budgets, §13).
+   *Amended 2026-10-14 (customer feedback on `0042`, replaces Q3 A of that spec):* **apply a
+   version.** Enter or a double-click on a row applies its version `V` in the Document scope (all
+   objects) or the Object scope (one object). It is one run of the §1 engine with `B` = `V`,
+   `A` = now and the objects touched by any step not in `V`'s past (one object in the Object
+   scope), written as one step `go_to_version;s=;t=;v=<StepRef>[;o=<NodeId>]` (no `o`: the
+   document). Because `A` = `N`, every field takes `V`'s value, other peers' later steps
+   included (Q6 A; the notice counts them); an object created since `V` is removed; an object
+   deleted since `V` is revived with its `NodeId` (§11); tree parent, sibling order and the
+   layer and group flags of ADR 0015 are fields and go back too. Root keys go back to `V`
+   except `history_wiped`; `clone_of` and `history_floor` stay as they are. Ctrl+Z is the
+   ordinary undo of that step. `revert_to` stays unused. No continuation: every apply is its own
+   step.
 9. **Document wipe** = `export(shallow_snapshot(current frontiers))`, re-imported in place under the
    same peer; object ids, tombstones and state unchanged, older ops gone, stacks emptied. Offered
    only for a document without a keyring (Q3). *Amended 2026-10-10:* the wipe step writes the root

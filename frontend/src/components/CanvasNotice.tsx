@@ -9,6 +9,8 @@ interface CanvasNoticeProps {
   onLeaveToLevel: (level: number) => void;
   /** What a screen reader hears when a group is entered or left. */
   announcement: ContextAnnouncement;
+  /** A persistent line under the notices: the History preview's readout or banner (`0042`). */
+  persistent?: React.ReactNode;
 }
 
 /**
@@ -25,6 +27,7 @@ export function CanvasNotice({
   groupDepth,
   onLeaveToLevel,
   announcement,
+  persistent,
 }: CanvasNoticeProps) {
   const shown = notice !== null && notice.source === "canvas" ? notice : null;
   const box = (
@@ -50,6 +53,7 @@ export function CanvasNotice({
       </div>
       <div role="alert">{shown && shown.kind === "alert" ? box : null}</div>
       <OpenGroups depth={groupDepth} onLeaveToLevel={onLeaveToLevel} />
+      {persistent}
       <div role="status" aria-live="polite" className="sr-only">
         {announcement.text}
       </div>

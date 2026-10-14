@@ -51,6 +51,10 @@ pub(super) struct HistoryState {
     recorded: usize,
     clock: Clock,
     pub(super) notice: Option<String>,
+    /// The folded and unfolded branches of the History list (`history_list.rs`).
+    pub(super) list: super::history_list::ListState,
+    /// The Mode switch and the version a preview shows (`history_preview.rs`).
+    pub(super) preview: super::history_preview::PreviewState,
 }
 
 impl HistoryState {
@@ -60,6 +64,8 @@ impl HistoryState {
             recorded: 0,
             clock: wall_clock,
             notice: None,
+            list: super::history_list::ListState::default(),
+            preview: super::history_preview::PreviewState::default(),
         }
     }
 }
@@ -98,6 +104,8 @@ impl Session {
         let before = self.selection_snapshot();
         self.document.set_step_time((self.history.clock)());
         let result = body(self);
+        // An edit ends an object preview; the object is drawn as it now is (`0042` criterion 18).
+        self.end_object_preview();
         self.record_new_steps(&before);
         // An entered group the step removed is left now, and a screen reader is told (`0023`
         // criterion 20).
@@ -231,13 +239,15 @@ impl Session {
 
     fn press_history(&mut self, direction: Direction) -> HistoryResult {
         // The gate of the keys (criterion 6) holds for every entry point: the History buttons come
-        // here too.
-        if self.operation_in_flight() || self.select.has_entry() {
+        // here too. A document preview pauses editing (`0042` criterion 19).
+        if self.operation_in_flight() || self.select.has_entry() || self.document_preview_active() {
             return HistoryResult {
                 notice: String::new(),
                 changed: false,
             };
         }
+        // An undo or redo ends an object preview first (`0042` criterion 18).
+        self.end_object_preview();
         if self.pen_path_open() {
             return HistoryResult {
                 notice: FINISH_PEN_FIRST.to_owned(),

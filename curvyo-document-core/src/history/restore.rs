@@ -160,7 +160,7 @@ impl Document {
     }
 
     /// Brings every object the plan revives back, in one change. Returns whether there was one.
-    fn revive_planned(
+    pub(super) fn revive_planned(
         &self,
         plan: &Plan,
         before: &Snapshot,
@@ -191,7 +191,12 @@ impl Document {
     /// Moves come first, so a group is empty when its own delete comes; deletes go deepest first,
     /// so a copied group's leaves go before the group; a node that still has children is never
     /// deleted.
-    fn apply_plan(&self, plan: &Plan, from: &Snapshot, to: &Snapshot) -> Vec<ObjectReport> {
+    pub(super) fn apply_plan(
+        &self,
+        plan: &Plan,
+        from: &Snapshot,
+        to: &Snapshot,
+    ) -> Vec<ObjectReport> {
         let doc = self.loro();
         let tree = doc.get_tree(OBJECTS_TREE);
         tree.enable_fractional_index(0);
@@ -428,6 +433,16 @@ fn read_versions(
     log: &LogStep,
     touched: &Touched,
 ) -> Result<(Snapshot, Snapshot), HistoryError> {
+    read_versions_between(doc, &log.before, &log.after(), touched)
+}
+
+/// The touched objects at the versions `before` and `after`, read under one checkout guard.
+pub(super) fn read_versions_between(
+    doc: &LoroDoc,
+    before: &loro::Frontiers,
+    after: &loro::Frontiers,
+    touched: &Touched,
+) -> Result<(Snapshot, Snapshot), HistoryError> {
     let ids: Vec<TreeID> = touched.nodes().collect();
     let read = |guard: &Detached<'_>| {
         let nodes: BTreeMap<TreeID, NodeAt> = ids.iter().map(|&id| (id, guard.node(id))).collect();
@@ -456,9 +471,9 @@ fn read_versions(
             siblings,
         }
     };
-    let guard = Detached::at(doc, &log.before)?;
+    let guard = Detached::at(doc, before)?;
     let before = read(&guard);
-    guard.goto(&log.after())?;
+    guard.goto(after)?;
     let after = read(&guard);
     Ok((before, after))
 }

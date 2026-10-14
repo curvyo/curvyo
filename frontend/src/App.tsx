@@ -11,6 +11,8 @@ import { SelectToolbar } from "@/components/SelectToolbar";
 import { ShapeToolbar } from "@/components/ShapeToolbar";
 import { StatusBar } from "@/components/StatusBar";
 import { ToolRail } from "@/components/ToolRail";
+import { HistoryPreviewFrame, HistoryPreviewLine } from "@/components/HistoryPreview";
+import { usePreviewState } from "@/lib/historyPreviewStore";
 import { useRailCommands } from "@/hooks/useRailCommands";
 import { useEditorSession } from "@/hooks/useEditorSession";
 import { useClosePathState } from "@/hooks/usePenCue";
@@ -36,6 +38,7 @@ function App() {
 function Editor() {
   const [cursorMm, setCursorMm] = useState({ x: 0, y: 0 });
   const editor = useEditorSession(setCursorMm);
+  const historyPreview = usePreviewState();
   const railCommands = useRailCommands(editor);
   const closePathState = useClosePathState(editor);
   const documentPanel = useDocumentPanel(editor);
@@ -83,13 +86,18 @@ function Editor() {
           onReturnFocus={() => editor.containerRef.current?.focus()}
           commands={railCommands}
           grouping={editor.grouping.commands}
+          paused={historyPreview.kind === "document"}
         />
         <Canvas editor={editor} />
+        <HistoryPreviewFrame />
         {/* Contextual tool bar: floats over the canvas, right of the tool
          * rail, so showing/hiding it never resizes the canvas
          * (`docs/design-system.md`, "no layout shift on tool switch"). */}
         <div
+          inert={historyPreview.kind === "document"}
           className={`pointer-events-none absolute top-3 right-3 left-[calc(var(--rail-right)+12px)] z-20 flex ${
+            historyPreview.kind === "document" ? "opacity-40" : ""
+          } ${
             // The Select bar is left-aligned so its two switches never move
             // when the selection changes; the Node and Shape bars stay
             // centred (`docs/design-system.md`, "Select bar layout").
@@ -160,6 +168,7 @@ function Editor() {
             editor.containerRef.current?.focus();
           }}
           announcement={editor.grouping.announcement}
+          persistent={<HistoryPreviewLine getSession={editor.getSession} />}
         />
         </div>
         </div>

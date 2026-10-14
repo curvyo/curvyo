@@ -1,4 +1,4 @@
-import { Copy, Eraser, File, Minus, Pencil, Plus, Redo2, Replace, Undo2 } from "lucide-react";
+import { Redo2, Undo2 } from "lucide-react";
 import {
   type ComponentType,
   useCallback,
@@ -12,68 +12,37 @@ import {
 import { ToggleGroup, type ToggleOption } from "@/components/ui/toggle-group";
 import { Tooltip } from "@/components/ui/tooltip";
 import type { EditorSession } from "@/hooks/useEditorSession";
+import { FoldRow, StepRow } from "@/components/panel/HistoryRow";
 import { useHistoryList } from "@/hooks/useHistoryList";
+import { useBusyWindow } from "@/hooks/useRailCommands";
+import { NO_PREVIEW, applyNotice, historyButtonsPaused, parsePreview } from "@/lib/historyPreview";
+import { setPreviewState, usePreviewState } from "@/lib/historyPreviewStore";
+import {
+  itemHeight,
+  itemRange,
+  itemTop,
+  listHeight,
+  objectsHeight,
+  withRowHeight,
+} from "@/lib/historyItems";
 import type { HistoryScopeState } from "@/hooks/useHistoryScope";
 import {
-  type HistoryRowData,
   type HistoryScope,
-  isUndone,
-  leadWords,
   NO_OBJECT_STEPS_LINE,
   NOW_ROW_HEIGHT_PX,
   objectButtonTooltip,
   objectWipeQuestion,
   ROW_HEIGHT_PX,
-  SAVED_IN_FILE_LINE,
   WIPE_ARM_MS,
   WIPE_SHARED_LINE,
   wipeQuestion,
   nextFocus,
-  rowAriaName,
-  rowDisplay,
-  rowTooltip,
   scrollAfterInsert,
-  secondLineRest,
-  visibleRange,
   canRestoreScroll,
   wipeConfirmKey,
 } from "@/lib/historyRows";
 
 type Glyph = ComponentType<{ size: number; strokeWidth: number; "aria-hidden": boolean }>;
-
-type GlyphKey = "create" | "delete" | "replace" | "change" | "document" | "undoes" | "redoes" | "clone-start" | "floor";
-
-/** The glyph of each kind of step and of each row that exists only in the Object scope (criterion
- * 32, `0041` UX notes): a shape, never a colour. */
-const GLYPHS: Record<GlyphKey, Glyph> = {
-  create: Plus,
-  delete: Minus,
-  replace: Replace,
-  change: Pencil,
-  document: File,
-  undoes: Undo2,
-  redoes: Redo2,
-  "clone-start": Copy,
-  floor: Eraser,
-};
-
-/** Which glyph a row has: by class, then by what a replacing step did to the object, then by
- * kind. */
-function glyphKey(row: HistoryRowData): GlyphKey {
-  if (row.label === "wipe_history") {
-    return "floor";
-  }
-  if (row.class && row.class !== "step") {
-    return row.class;
-  }
-  if (row.kind === "replace" && row.role === "created") {
-    return "create";
-  }
-  if (row.kind === "replace" && row.role === "deleted") {
-    return "delete";
-  }
-  return row.kind;
-}
 
 interface HistoryTabProps {
   editor: EditorSession;
@@ -84,35 +53,6 @@ interface HistoryTabProps {
   historyScope: HistoryScopeState;
 }
 
-/** The mark of a step on the lane: a filled disc while in effect, an open ring with a dotted line
- * once taken back (criterion 39); the line of an inherited row is dashed and keeps the disc. */
-function Lane({ undone, last, dashed }: { undone: boolean; last: boolean; dashed: boolean }) {
-  return (
-    <svg width={16} height={ROW_HEIGHT_PX} aria-hidden className="shrink-0 text-[var(--panel-muted-fg)]">
-      <line
-        x1={8}
-        x2={8}
-        y1={0}
-        y2={last ? 22 : ROW_HEIGHT_PX}
-        stroke="currentColor"
-        strokeWidth={1.5}
-        strokeDasharray={undone ? "2 3" : dashed ? "6 3" : undefined}
-      />
-      {undone ? (
-        <circle cx={8} cy={22} r={3.5} fill="var(--panel-bg)" stroke="currentColor" strokeWidth={1.5} />
-      ) : (
-        <circle cx={8} cy={22} r={4} fill="currentColor" />
-      )}
-    </svg>
-  );
-}
-
-/**
- * The History tab (`specs/0020-undo-redo` criteria 9 and 39 to 46): the Undo and Redo buttons, the
- * pinned "Now" row, the global history as one virtualised list (newest first, 44 px rows, only the
- * rows in view are in the DOM) and the line that says the history is saved in the file. The header
- * and the footer stay in view; only the list scrolls.
- */
 export function HistoryTab({ editor, shown, onReturnFocus, historyScope }: HistoryTabProps) {
   const { getSession, syncRevision } = editor;
   const { scope, info, scrollMemory } = historyScope;
@@ -125,6 +65,97 @@ export function HistoryTab({ editor, shown, onReturnFocus, historyScope }: Histo
   const focused = Math.min(focusedRaw, Math.max(0, list.total - 1));
   const refocus = useRef(false);
   const now = list.readAt;
+  const object = scope === "object";
+  const preview = usePreviewState();
+  const [busy, setBusy] = useState(false);
+  useBusyWindow(busy);
+
+  // The session holds the preview; read it again whenever the session changed (a press on the
+  // canvas or another selection ends an object preview there).
+  const readPreview = useCallback(() => {
+    const session = getSession();
+    setPreviewState(session ? parsePreview(session.history_preview()) : NO_PREVIEW);
+  }, [getSession]);
+  useEffect(() => {
+    readPreview();
+  }, [readPreview, syncRevision]);
+  const endPreview = useCallback(() => {
+    getSession()?.history_preview_end();
+    readPreview();
+  }, [getSession, readPreview]);
+  // A change of tab, a collapsed panel or another scope ends a preview (criteria 18 and 19).
+  useEffect(() => {
+    if (!shown) {
+      endPreview();
+    }
+    return endPreview;
+  }, [shown, scope, endPreview]);
+
+  /** A press or Space on the row at `index`: the version shows (criteria 17 to 21). A row far
+   * back shows the long-operation state first. */
+  const pressRow = useCallback(
+    (index: number) => {
+      const session = getSession();
+      if (!session || busy) {
+        return;
+      }
+      if (session.history_item_is_far(object, index)) {
+        setBusy(true);
+        requestAnimationFrame(() =>
+          requestAnimationFrame(() => {
+            try {
+              session.history_preview_item(object, index);
+            } finally {
+              setBusy(false);
+              readPreview();
+            }
+          }),
+        );
+        return;
+      }
+      session.history_preview_item(object, index);
+      readPreview();
+    },
+    [busy, getSession, object, readPreview],
+  );
+
+  /** Enter or a double-click on the row at `index`: its version is applied as one step
+   * (criterion 10). A version far back shows the long-operation state first. */
+  const applyRow = useCallback(
+    (index: number) => {
+      const session = getSession();
+      if (!session || busy) {
+        return;
+      }
+      const item = list.itemAt(index);
+      const id = item?.type === "row" ? item.id : "";
+      const apply = () =>
+        editor.runHistoryAction((s) => {
+          const result = JSON.parse(s.history_apply_item(object, index)) as {
+            kind: string;
+            notice: string;
+          };
+          return applyNotice(result, id);
+        });
+      if (session.history_apply_needs_busy_state(object, index)) {
+        setBusy(true);
+        requestAnimationFrame(() =>
+          requestAnimationFrame(() => {
+            try {
+              apply();
+            } finally {
+              setBusy(false);
+              readPreview();
+            }
+          }),
+        );
+        return;
+      }
+      apply();
+      readPreview();
+    },
+    [busy, editor, getSession, list, object, readPreview],
+  );
 
   useLayoutEffect(() => {
     const element = scroller.current;
@@ -163,7 +194,18 @@ export function HistoryTab({ editor, shown, onReturnFocus, historyScope }: Histo
     }
   }, [wanted, list.total, list.loadedFor]);
 
-  const range = visibleRange(scrollTop, viewport, list.total);
+  // One objects disclosure open at a time, in the Document scope (criterion 24); it closes when
+  // the list changes under it.
+  const [openObjects, setOpenObjects] = useState<{ step: string; index: number } | null>(null);
+  const openItem = openObjects ? list.itemAt(openObjects.index) : undefined;
+  const open =
+    openObjects && !object && openItem?.type === "row" && openItem.step === openObjects.step
+      ? { index: openObjects.index, row: openItem }
+      : null;
+  const shape = open
+    ? withRowHeight(list.shape, open.index, 44 + objectsHeight(open.row))
+    : list.shape;
+  const range = itemRange(scrollTop, viewport, shape);
   const { ensure } = list;
   useEffect(() => {
     ensure(range.first, range.last);
@@ -213,11 +255,12 @@ export function HistoryTab({ editor, shown, onReturnFocus, historyScope }: Histo
     if (!element) {
       return;
     }
-    const top = to * ROW_HEIGHT_PX;
+    const top = itemTop(to, shape);
+    const height = itemHeight(to, shape);
     if (top < element.scrollTop) {
       element.scrollTop = top;
-    } else if (top + ROW_HEIGHT_PX > element.scrollTop + element.clientHeight) {
-      element.scrollTop = top + ROW_HEIGHT_PX - element.clientHeight;
+    } else if (top + height > element.scrollTop + element.clientHeight) {
+      element.scrollTop = top + height - element.clientHeight;
     }
     refocus.current = true;
     setFocused(to);
@@ -230,11 +273,23 @@ export function HistoryTab({ editor, shown, onReturnFocus, historyScope }: Histo
   };
 
   const onListKeyDown = (event: React.KeyboardEvent) => {
+    // The first Escape ends a preview; the next one leaves the list (criterion 18).
+    if (event.key === "Escape" && preview.kind !== "") {
+      event.preventDefault();
+      event.stopPropagation();
+      endPreview();
+      return;
+    }
     const pageRows = Math.max(1, Math.floor(viewport / ROW_HEIGHT_PX));
     const to = nextFocus(event.key, focused, list.total, pageRows);
     if (to !== null) {
       event.preventDefault();
       moveFocus(to);
+      // While a preview shows, the preview moves along with the focus; without one, focus alone
+      // reads nothing (criterion 21).
+      if (preview.kind !== "" && list.itemAt(to)?.type === "row") {
+        pressRow(to);
+      }
     }
   };
 
@@ -246,20 +301,62 @@ export function HistoryTab({ editor, shown, onReturnFocus, historyScope }: Histo
     }
   }
   const rows = indices.map((index) => {
-    const row = list.rowAt(index);
-    return row ? (
+    const item = list.itemAt(index);
+    const place = { top: itemTop(index, shape), height: itemHeight(index, shape) };
+    if (item && item.type !== "row") {
+      return (
+        <FoldRow
+          key={`fold-${item.key}`}
+          item={item}
+          index={index}
+          total={list.total}
+          lanes={shape.lanes}
+          place={place}
+          tabbable={index === focused}
+          onFocusRow={() => {
+            setFocused(index);
+            setHover("");
+          }}
+          onToggle={() => {
+            refocus.current = true;
+            setFocused(index);
+            list.toggle(index);
+          }}
+        />
+      );
+    }
+    return item ? (
       <StepRow
-        key={row.step}
-        row={row}
+        key={item.step}
+        row={item}
         index={index}
         total={list.total}
+        lanes={shape.lanes}
+        place={place}
         now={now}
         tabbable={index === focused}
         onFocusRow={() => {
           setFocused(index);
-          setHover(row.step);
+          setHover(item.step);
         }}
         onHover={setHover}
+        onPress={() => {
+          setFocused(index);
+          pressRow(index);
+        }}
+        selected={preview.kind !== "" && preview.step === item.step}
+        onApply={() => {
+          setFocused(index);
+          applyRow(index);
+        }}
+        action={object ? "clone" : item.objects.length > 0 ? "objects" : null}
+        objectsOpen={open?.index === index}
+        onToggleObjects={() =>
+          setOpenObjects(open?.index === index ? null : { step: item.step, index })
+        }
+        onClone={(touched) =>
+          editor.runHistoryAction((s) => s.history_clone_item(object, index, touched ?? 0))
+        }
       />
     ) : (
       <div
@@ -267,7 +364,7 @@ export function HistoryTab({ editor, shown, onReturnFocus, historyScope }: Histo
         role="listitem"
         aria-hidden
         className="absolute right-0 left-0 flex flex-col justify-center gap-1 px-2"
-        style={{ top: index * ROW_HEIGHT_PX, height: ROW_HEIGHT_PX }}
+        style={place}
       >
         <span className="h-2 w-2/3 rounded bg-[var(--value-fill)]" />
         <span className="h-2 w-1/3 rounded bg-[var(--value-fill)]" />
@@ -278,8 +375,10 @@ export function HistoryTab({ editor, shown, onReturnFocus, historyScope }: Histo
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto">
       <HistoryHeader editor={editor} historyScope={historyScope} onReturnFocus={onReturnFocus} />
-      <div
-        className="flex shrink-0 items-center justify-between rounded-[5px] bg-[var(--value-fill)] px-2 text-sm text-[var(--toolbar-icon)]"
+      <button
+        type="button"
+        onClick={endPreview}
+        className="flex shrink-0 items-center justify-between rounded-[5px] bg-[var(--value-fill)] px-2 text-left text-sm text-[var(--toolbar-icon)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
         style={{ height: NOW_ROW_HEIGHT_PX }}
         aria-current="true"
       >
@@ -290,7 +389,7 @@ export function HistoryTab({ editor, shown, onReturnFocus, historyScope }: Histo
           Now
         </span>
         <span className="select-text font-mono text-xs text-[var(--toolbar-icon)]">{list.nowId}</span>
-      </div>
+      </button>
       {list.total === 0 && scope === "object" ? (
         <div className="px-2 pt-4 text-center outline-none" data-first-focus tabIndex={-1}>
           <p className="text-xs text-[var(--panel-muted-fg)]">{NO_OBJECT_STEPS_LINE}</p>
@@ -324,11 +423,10 @@ export function HistoryTab({ editor, shown, onReturnFocus, historyScope }: Histo
         className="history-list relative min-h-[120px] flex-1 overflow-x-hidden overflow-y-auto outline-none"
         style={{ overscrollBehavior: "contain", scrollbarWidth: "thin" }}
       >
-        <div className="relative" style={{ height: list.total * ROW_HEIGHT_PX }}>
+        <div className="relative" style={{ height: listHeight(shape) }}>
           {rows}
         </div>
       </div>
-      <p className="shrink-0 pt-2 text-xs text-[var(--panel-muted-fg)]">{SAVED_IN_FILE_LINE}</p>
       <WipeFooter
         editor={editor}
         scope={scope}
@@ -336,63 +434,6 @@ export function HistoryTab({ editor, shown, onReturnFocus, historyScope }: Histo
         total={scope === "object" ? (info?.wipeCount ?? 0) : list.total}
         onReturnFocus={onReturnFocus}
       />
-    </div>
-  );
-}
-
-interface StepRowProps {
-  row: HistoryRowData;
-  index: number;
-  total: number;
-  now: Date;
-  tabbable: boolean;
-  onFocusRow: () => void;
-  onHover: (step: string) => void;
-}
-
-/** One step: kind glyph, operation name, step id, and the second line (criterion 39). */
-function StepRow({ row, index, total, now, tabbable, onFocusRow, onHover }: StepRowProps) {
-  const Glyph = GLYPHS[glyphKey(row)] ?? Pencil;
-  const undone = isUndone(row);
-  const lead = leadWords(row);
-  const muted = undone ? "text-[var(--panel-muted-fg)]" : "text-[var(--toolbar-icon)]";
-  return (
-    <div
-      role="listitem"
-      aria-posinset={index + 1}
-      aria-setsize={total}
-      className="absolute right-0 left-0"
-      style={{ top: index * ROW_HEIGHT_PX, height: ROW_HEIGHT_PX }}
-    >
-      <Tooltip side="left" content={rowTooltip(row)}>
-        <button
-          type="button"
-          data-row-index={index}
-          tabIndex={tabbable ? 0 : -1}
-          aria-label={rowAriaName(row, now)}
-          onFocus={onFocusRow}
-          onBlur={() => onHover("")}
-          onMouseEnter={() => onHover(row.step)}
-          onMouseLeave={() => onHover("")}
-          className="flex h-full w-full items-stretch gap-1 rounded-[5px] text-left outline-none hover:bg-[var(--row-hover)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)]"
-        >
-          <Lane undone={undone} last={index === total - 1} dashed={Boolean(row.from)} />
-          <span className="flex min-w-0 flex-1 flex-col justify-center pr-2">
-            <span className={`flex h-5 items-center gap-1.5 text-sm ${muted}`}>
-              <Glyph size={16} strokeWidth={1.5} aria-hidden />
-              <span className="min-w-0 flex-1 truncate">{rowDisplay(row).name}</span>
-              <span className="select-text font-mono text-xs text-[var(--panel-muted-fg)]">
-                {row.id}
-              </span>
-            </span>
-            <span className="h-4 truncate text-xs text-[var(--panel-muted-fg)]">
-              {lead !== "" ? <strong className="font-semibold">{lead}</strong> : null}
-              {lead !== "" ? " · " : null}
-              {secondLineRest(row, now)}
-            </span>
-          </span>
-        </button>
-      </Tooltip>
     </div>
   );
 }
@@ -428,6 +469,8 @@ function HistoryHeader({
   onReturnFocus: () => void;
 }) {
   const { historyNames, pressHistory, canvasNotice, historyBusy } = editor;
+  // A document preview pauses editing: Undo and Redo are disabled (`0042` criterion 19).
+  const paused = historyButtonsPaused(usePreviewState());
   const { scope, info, hasGroup, choose } = historyScope;
   const [now] = useState(() => new Date());
   const objectScope = scope === "object" && info !== null;
@@ -445,14 +488,14 @@ function HistoryHeader({
             type="button"
             aria-label={tooltip.replace(/ \(.*\)$/, "")}
             aria-keyshortcuts={keys}
-            disabled={historyBusy}
+            disabled={historyBusy || paused}
             onClick={(event) => {
               pressHistory(objectScope ? `object-${direction}` : direction, "panel");
               if (event.detail > 0) {
                 onReturnFocus();
               }
             }}
-            className="flex h-7 w-7 items-center justify-center rounded-[5px] text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+            className="flex h-7 w-7 items-center justify-center rounded-[5px] text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] disabled:opacity-40 disabled:hover:bg-transparent"
           >
             <Icon size={16} strokeWidth={1.5} aria-hidden />
           </button>
@@ -554,6 +597,8 @@ function WipeFooter({
     showHistoryNotice,
   } = editor;
   const objectScope = scope === "object";
+  // A document preview pauses editing: Wipe is disabled (`0042` criterion 19).
+  const paused = historyButtonsPaused(usePreviewState());
   const question = objectScope ? objectWipeQuestion(total) : wipeQuestion(total);
   const showNotice = showHistoryNotice;
   const [confirming, setConfirming] = useState(false);
@@ -605,6 +650,7 @@ function WipeFooter({
       <button
         ref={opener}
         type="button"
+        disabled={paused}
         onClick={() => {
           // An unfinished Pen path: ignored with the hint, like the keys (criteria 6e and 51).
           if (getSession()?.history_wipe_blocked()) {
@@ -614,7 +660,7 @@ function WipeFooter({
           restoreToOpener.current = true;
           setConfirming(true);
         }}
-        className="mt-2 h-7 w-full shrink-0 rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_25%,transparent)] text-sm text-[var(--destructive)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+        className="mt-2 h-7 w-full shrink-0 rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_25%,transparent)] text-sm text-[var(--destructive)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] disabled:opacity-40 disabled:hover:bg-transparent"
       >
         {objectScope ? "Wipe object history" : "Wipe history"}
       </button>

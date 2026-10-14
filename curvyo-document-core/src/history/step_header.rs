@@ -18,6 +18,14 @@ pub const LABEL_OBJECT_REDO: &str = "object_redo";
 /// The reserved label of the wipe of one object's history (`o` names the object).
 pub const LABEL_WIPE_OBJECT: &str = "wipe_object_history";
 
+/// The label of a go to version (`specs/0042-history-branches` criterion 10; `o` the object, `v`
+/// the step whose version it went to).
+pub const LABEL_GO_TO_VERSION: &str = "go_to_version";
+/// The label of a clone of a version (criterion 22; `o` the source, `v` the step).
+pub const LABEL_CLONE_VERSION: &str = "clone_version";
+/// The key of the step whose version a go to or a clone names.
+pub(crate) const KEY_VERSION: &str = "v";
+
 /// The key of the step counter.
 const KEY_SEQ: &str = "s";
 /// The key of the step time.

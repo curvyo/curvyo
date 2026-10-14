@@ -57,6 +57,10 @@ export interface HistoryApi {
   /** Hides the selected object's earlier history: the notice says how many rows went. Returns
    * the rows hidden, -1 when the session ignored it and -3 when the log could not take the step. */
   wipeObject: () => number;
+  /** Runs a History-list action that may change the document (go to or clone a version,
+   * `specs/0042-history-branches`): shows the notice it returns, if any, then re-reads the
+   * session. */
+  runAction: (action: (session: WasmSession) => string) => void;
   /** Handles the outcome string `key_down` returned when it belongs to history; `false`
    * for every other outcome. */
   handleKeyOutcome: (outcome: string) => boolean;
@@ -302,6 +306,21 @@ export function useHistory(
     return hidden;
   }, [getSession, showNotice]);
 
+  const runAction = useCallback(
+    (action: (session: WasmSession) => string) => {
+      const session = getSession();
+      if (!session) {
+        return;
+      }
+      const text = action(session);
+      if (text !== "") {
+        showNotice(text, undefined, "canvas");
+      }
+      onChangeRef.current();
+    },
+    [getSession, showNotice],
+  );
+
   return {
     notice,
     busy,
@@ -311,6 +330,7 @@ export function useHistory(
     press,
     wipe,
     wipeObject,
+    runAction,
     handleKeyOutcome,
   };
 }

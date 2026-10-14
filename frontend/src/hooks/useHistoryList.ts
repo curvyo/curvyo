@@ -1,22 +1,27 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
-  type HistoryRowData,
-  type HistoryScope,
-  PAGE_SIZE,
-  pagesFor,
-  parseRows,
-  rowsAdded,
-} from "@/lib/historyRows";
+  EMPTY_SHAPE,
+  type HistoryItemData,
+  type ListShape,
+  parseItems,
+  parseShape,
+} from "@/lib/historyItems";
+import { type HistoryScope, PAGE_SIZE, pagesFor, rowsAdded } from "@/lib/historyRows";
 import type { WasmSession } from "@/lib/editorSession";
 
 export interface HistoryList {
-  /** The number of rows: the steps of the global history, or the rows of the selected object. */
+  /** The number of items: the step rows of the global history or of the selected object, with
+   * the header rows of its branches and the "more" row (`specs/0042-history-branches`). */
   total: number;
+  /** The heights and lanes of the items. */
+  shape: ListShape;
   /** The shown id of the newest step in effect, for the "Now" row; empty without a step. */
   nowId: string;
-  /** The row at `index` (0 is the newest), or `undefined` while its page has not arrived. */
-  rowAt: (index: number) => HistoryRowData | undefined;
+  /** The item at `index` (0 is the top), or `undefined` while its page has not arrived. */
+  itemAt: (index: number) => HistoryItemData | undefined;
+  /** A press or Enter on a header row or the "more" row: folds or unfolds it. */
+  toggle: (index: number) => void;
   /** Asks for the pages that hold rows `first` to `last`. */
   ensure: (first: number, last: number) => void;
   /** The `scope:object` the pages hold rows for: it differs from what is wanted until the rows of
@@ -44,13 +49,22 @@ export function useHistoryList(
   scope: HistoryScope,
   source: string,
 ): HistoryList {
-  const pages = useRef(new Map<number, HistoryRowData[]>());
+  const pages = useRef(new Map<number, HistoryItemData[]>());
   const wanted = useRef({ first: 0, last: PAGE_SIZE - 1 });
   const stamp = useRef<number | null>(null);
   const reading = useRef("");
   const added = useRef(0);
   const totalSeen = useRef(0);
-  const [state, setState] = useState(() => ({ total: 0, nowId: "", version: 0, readAt: new Date(), loadedFor: "" }));
+  const [folds, setFolds] = useState(0);
+  const [state, setState] = useState(() => ({
+    total: 0,
+    shape: EMPTY_SHAPE,
+    nowId: "",
+    version: 0,
+    readAt: new Date(),
+    loadedFor: "",
+  }));
+  const object = scope === "object";
 
   const load = useCallback(
     (first: number, last: number) => {
@@ -61,11 +75,7 @@ export function useHistoryList(
       let changed = false;
       for (const page of pagesFor(first, last)) {
         if (!pages.current.has(page)) {
-          const json =
-            scope === "object"
-              ? session.object_history_rows(page * PAGE_SIZE, PAGE_SIZE)
-              : session.history_rows(page * PAGE_SIZE, PAGE_SIZE);
-          pages.current.set(page, parseRows(json));
+          pages.current.set(page, parseItems(session.history_items(object, page * PAGE_SIZE, PAGE_SIZE)));
           changed = true;
         }
       }
@@ -73,7 +83,7 @@ export function useHistoryList(
         setState((previous) => ({ ...previous, version: previous.version + 1 }));
       }
     },
-    [getSession, scope],
+    [getSession, object],
   );
 
   // The log changed: read the count and the visible pages again.
@@ -84,34 +94,39 @@ export function useHistoryList(
     }
     const now = session.history_stamp();
     const reads = `${scope}:${source}`;
-    if (stamp.current === now && reading.current === reads) {
+    const foldKey = `${reads}:${folds}`;
+    if (stamp.current === now && reading.current === foldKey) {
       return;
     }
-    const sourceChanged = reading.current !== reads;
+    const sourceChanged = !reading.current.startsWith(`${reads}:`);
+    const folded = !sourceChanged && stamp.current === now;
     stamp.current = now;
-    reading.current = reads;
+    reading.current = foldKey;
     pages.current.clear();
-    const total = scope === "object" ? session.object_history_len() : session.history_len();
+    const shape = parseShape(session.history_layout(object));
+    const total = shape.total;
     // Counted outside the updater: React calls an updater twice in development. Another scope
     // or object starts a new list: nothing "arrived" at its top.
     if (sourceChanged) {
       added.current = 0;
       totalSeen.current = total;
     }
-    added.current += rowsAdded(totalSeen.current, total);
+    // A fold changes the count without a new step: nothing arrived.
+    added.current += folded ? 0 : rowsAdded(totalSeen.current, total);
     totalSeen.current = total;
     const nowId = session.history_now_id();
     setState((previous) => ({
       total,
+      shape,
       nowId,
       version: previous.version + 1,
       readAt: new Date(),
       loadedFor: reads,
     }));
     load(wanted.current.first, wanted.current.last);
-  }, [shown, syncRevision, getSession, load, scope, source]);
+  }, [shown, syncRevision, getSession, load, scope, source, object, folds]);
 
-  const rowAt = useCallback((index: number) => {
+  const itemAt = useCallback((index: number) => {
     return pages.current.get(Math.floor(index / PAGE_SIZE))?.[index % PAGE_SIZE];
     // `state.version` is what makes a caller read again after pages arrived.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -125,6 +140,15 @@ export function useHistoryList(
     [load],
   );
 
+  const toggle = useCallback(
+    (index: number) => {
+      if (getSession()?.history_toggle(object, index)) {
+        setFolds((n) => n + 1);
+      }
+    },
+    [getSession, object],
+  );
+
   const takeAdded = useCallback(() => {
     const count = added.current;
     added.current = 0;
@@ -133,10 +157,12 @@ export function useHistoryList(
 
   return {
     total: state.total,
+    shape: state.shape,
     nowId: state.nowId,
     readAt: state.readAt,
     loadedFor: state.loadedFor,
-    rowAt,
+    itemAt,
+    toggle,
     ensure,
     takeAdded,
   };

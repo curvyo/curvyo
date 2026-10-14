@@ -37,6 +37,8 @@ mod group_box;
 mod group_entry;
 mod group_transform;
 mod grouping;
+mod history_branch_text;
+mod history_lanes;
 mod history_names;
 mod history_notice;
 mod hit_test;
@@ -135,6 +137,14 @@ pub use group_entry::GroupEntry;
 pub use grouping::{
     GroupingAvailability, TOO_DEEP_NOTICE, context_announcement, grouped_notice,
     grouping_availability, groups_refusal_notice, selection_announcement, ungrouped_notice,
+};
+pub use history_branch_text::{
+    BRANCH_STATUS_WORD, branch_header_text, branch_lane_name, cloned_notice, more_branches_text,
+    went_to_notice,
+};
+pub use history_lanes::{
+    BranchSpan, DRAWN_BRANCHES, Edge, HistoryItem, LineStyle, ListLayout, MAX_LANE, RowLook,
+    Segment,
 };
 pub use history_names::{
     OPERATION_NAMES, RESERVED_LABELS, UNKNOWN_OPERATION_NAME, known_operation_name, operation_name,

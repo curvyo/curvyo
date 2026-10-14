@@ -349,6 +349,10 @@ pub const REFUSAL_OUTLINE_STROKE_PX: f64 = 2.0;
 /// committed object in its own style.
 pub const PREVIEW_NEW: RgbaColor = ACCENT;
 
+/// `--preview-ghost` (`specs/0042-history-branches` criterion 17): a previewed version's own fill
+/// and stroke are drawn at this share of their opacity under its `--preview-new` outline.
+pub const PREVIEW_GHOST_OPACITY: f64 = 0.4;
+
 /// A parameter handle's knob, screen-space pixels: a 10 px circle
 /// (`docs/design-system.md`, "Parameter handle"). `curvyo-ui-core`'s own
 /// `KNOB_DIAMETER_PX` is the same number, which its 4 px clearance property

@@ -11,7 +11,12 @@ use loro::{FractionalIndex, Frontiers, LoroDoc, TreeID, TreeParentId};
 
 use super::error::HistoryError;
 use super::node_value::{Node, read_map};
-use crate::document::{OBJECTS_TREE, ROOT_MAP};
+use crate::document::{Document, OBJECTS_TREE, ROOT_MAP};
+use crate::document_background::{DocumentBackground, background_of_root};
+use crate::path_model::NodeId;
+use crate::primitive_model::ObjectSnapshot;
+use crate::shapes::object_in;
+use crate::units::DocumentSize;
 
 /// One tree node as it was at a version.
 #[derive(Debug, Clone)]
@@ -76,6 +81,27 @@ impl<'a> Detached<'a> {
     /// The root map at this version.
     pub(crate) fn root(&self) -> BTreeMap<String, Node> {
         read_map(&self.doc.get_map(ROOT_MAP))
+    }
+
+    /// Every object at this version, in paint order, as plain copies
+    /// (`specs/0042-history-branches` criterion 19).
+    pub(crate) fn objects(&self) -> Vec<ObjectSnapshot> {
+        let tree = self.doc.get_tree(OBJECTS_TREE);
+        crate::group_tree::leaves_under(&tree, None)
+            .into_iter()
+            .filter_map(|id| object_in(&tree, NodeId::from_parts(id.peer, id.counter)))
+            .collect()
+    }
+
+    /// The object `id` at this version, as a plain copy; `None` when it does not exist.
+    pub(crate) fn object(&self, id: NodeId) -> Option<ObjectSnapshot> {
+        object_in(&self.doc.get_tree(OBJECTS_TREE), id)
+    }
+
+    /// The page at this version: its size and background.
+    pub(crate) fn page(&self) -> (DocumentSize, DocumentBackground) {
+        let root = self.doc.get_map(ROOT_MAP);
+        (Document::size_of_root(&root), background_of_root(&root))
     }
 
     /// The children of `parent` (`None` is the document root) in z-order at this version.

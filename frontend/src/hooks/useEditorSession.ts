@@ -632,6 +632,8 @@ export interface EditorSession {
   wipeHistory: () => number;
   /** Hides the selected object's earlier history; the rows hidden, -1 when ignored. */
   wipeObjectHistory: () => number;
+  /** Runs a History-list action that may change the document (`useHistory`'s `runAction`). */
+  runHistoryAction: (action: (session: WasmSession) => string) => void;
   /** The move readout and hidden announcements of a nudge and of select all. */
   nudgeFeedback: NudgeFeedback;
   convertSelected: (kind: "corner" | "symmetric" | "asymmetric") => void;
@@ -2080,6 +2082,7 @@ export function useEditorSession(
     pressHistory: history.press,
     wipeHistory: history.wipe,
     wipeObjectHistory: history.wipeObject,
+    runHistoryAction: history.runAction,
     showHistoryNotice: history.showNotice,
     nudgeFeedback,
     convertSelected,

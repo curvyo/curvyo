@@ -14,12 +14,43 @@ impl Session {
     /// `draw_list` so the area is not mistaken for artwork of the document.
     #[must_use]
     pub fn frame_draw_list(&self) -> DrawList {
+        // A document preview draws the version, its page included, plain, with nothing over it
+        // (`specs/0042-history-branches` criterion 19).
+        if let Some(version) = self.document_preview() {
+            let mut list = build_document_area(
+                version.size,
+                version.background,
+                self.view(),
+                self.device_pixel_ratio,
+            );
+            list.extend(curvyo_render_core::build_artwork(
+                &version.objects,
+                self.view(),
+            ));
+            return list;
+        }
         let mut list = build_document_area(
             self.document.size(),
             self.shown_background(),
             self.view(),
             self.device_pixel_ratio,
         );
+        // An object preview draws the object only as it was at the version, in its place: its
+        // current drawing, selection box and handles are left out (criterion 17).
+        if let Some((subject, version)) = self.object_preview() {
+            let others: Vec<_> = self
+                .render_objects()
+                .iter()
+                .filter(|object| object.id() != subject)
+                .cloned()
+                .collect();
+            list.extend(curvyo_render_core::build_artwork(&others, self.view()));
+            list.extend(curvyo_render_core::build_history_preview(
+                &version.objects,
+                self.view(),
+            ));
+            return list;
+        }
         list.extend(self.draw_list());
         list
     }

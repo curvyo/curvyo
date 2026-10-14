@@ -18,6 +18,9 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     ("create_star", "Draw star"),
     ("translate_objects", "Move"),
     ("duplicate_objects", "Duplicate"),
+    // `specs/0042-history-branches` criteria 10 and 22; the row adds the version's id.
+    ("go_to_version", "Go to version"),
+    ("clone_version", "Clone version"),
     ("resize_path", "Resize"),
     ("resize_rect", "Resize"),
     ("resize_ellipse", "Resize"),

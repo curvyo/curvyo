@@ -101,6 +101,83 @@ impl WasmSession {
             .history_rows_json(start as usize, count as usize)
     }
 
+    /// The shape of the History list of the Document scope (`object` false) or the selected
+    /// object's, as JSON (`Session::history_layout_json`).
+    pub fn history_layout(&mut self, object: bool) -> String {
+        self.session.history_layout_json(object)
+    }
+
+    /// `count` items of the History list from the `start`-th, as a JSON array: step rows, branch
+    /// header rows and the "more" row, each with its lane gutter (`Session::history_items_json`).
+    pub fn history_items(&mut self, object: bool, start: u32, count: u32) -> String {
+        self.session
+            .history_items_json(object, start as usize, count as usize)
+    }
+
+    /// A press or Enter on the header row or the "more" row at `index`: folds or unfolds it.
+    pub fn history_toggle(&mut self, object: bool, index: u32) -> bool {
+        self.session.toggle_history_item(object, index as usize)
+    }
+
+    /// Whether a press on item `index` needs the long-operation state first.
+    pub fn history_item_is_far(&mut self, object: bool, index: u32) -> bool {
+        self.session.history_item_is_far(object, index as usize)
+    }
+
+    /// A press, Enter or Space on item `index` in Preview mode: `"previewed"`, `"ended"` (the
+    /// object already has that version), `"ignored"` (a drag, a chip or an unfinished Pen path) or
+    /// `"none"` (no step row).
+    pub fn history_preview_item(&mut self, object: bool, index: u32) -> String {
+        match self.session.preview_history_item(object, index as usize) {
+            crate::HistoryRowPress::Ignored => "ignored",
+            crate::HistoryRowPress::NotARow => "none",
+            crate::HistoryRowPress::Previewed => "previewed",
+            crate::HistoryRowPress::Ended => "ended",
+        }
+        .to_owned()
+    }
+
+    /// Clone on item `index` (`touched`: which object of a Document-scope row); returns the
+    /// notice, empty when the press was ignored or refused.
+    pub fn history_clone_item(&mut self, object: bool, index: u32, touched: u32) -> String {
+        match self
+            .session
+            .clone_history_item(object, index as usize, touched as usize)
+        {
+            crate::CloneOutcome::Cloned(notice) => notice,
+            crate::CloneOutcome::Ignored | crate::CloneOutcome::Refused => String::new(),
+        }
+    }
+
+    /// Enter or a double-click on item `index`: applies its version, as JSON
+    /// `{"kind": "went" | "same" | "ignored" | "none", "notice"}` (`specs/0042-history-branches`
+    /// criterion 10).
+    pub fn history_apply_item(&mut self, object: bool, index: u32) -> String {
+        let (kind, notice) = match self.session.apply_history_item(object, index as usize) {
+            crate::GoToOutcome::Ignored => ("ignored", String::new()),
+            crate::GoToOutcome::NotARow => ("none", String::new()),
+            crate::GoToOutcome::Same => ("same", String::new()),
+            crate::GoToOutcome::Went(notice) => ("went", notice),
+        };
+        serde_json::json!({"kind": kind, "notice": notice}).to_string()
+    }
+
+    /// Whether applying item `index` needs the long-operation state first.
+    pub fn history_apply_needs_busy_state(&mut self, object: bool, index: u32) -> bool {
+        self.session
+            .history_apply_needs_busy_state(object, index as usize)
+    }
+
+    /// Ends the preview.
+    pub fn history_preview_end(&mut self) {
+        self.session.end_history_preview();
+    }
+
+    /// The preview as JSON (`Session::history_preview_json`).
+    pub fn history_preview(&mut self) -> String {
+        self.session.history_preview_json()
+    }
+
     /// The shown id of the newest step in effect (the "Now" row), empty without a step.
     pub fn history_now_id(&mut self) -> String {
         self.session.history_now_id()

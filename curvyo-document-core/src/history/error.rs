@@ -24,6 +24,9 @@ pub enum HistoryError {
     /// The object does not exist (any more).
     #[error("no such object")]
     NoSuchObject,
+    /// A group's version is not cloned yet (`specs/0042-history-branches` criterion 25).
+    #[error("a group's version cannot be cloned")]
+    Group,
 }
 
 /// Why an exchange of updates between two replicas failed. The document is not changed by a

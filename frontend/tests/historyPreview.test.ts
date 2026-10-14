@@ -1,0 +1,92 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import {
+  historyButtonsPaused,
+  parsePreview,
+  previewBanner,
+  previewReadout,
+  sinceText,
+} from "../src/lib/historyPreview.ts";
+
+const now = new Date(2026, 9, 10, 15, 0, 0);
+const time = new Date(2026, 9, 10, 12, 3, 0).getTime() / 1000;
+
+test("the readout names the id, the step, the author and the time", () => {
+  const state = parsePreview(
+    JSON.stringify({ kind: "object", id: "a1b2c3d", name: "Resize", author: "you", time, since: 0 }),
+  );
+  assert.equal(previewReadout(state, now), "Preview a1b2c3d, Resize, You, 12:03");
+});
+
+test("the banner says editing is paused and counts the steps that arrived", () => {
+  const state = parsePreview(JSON.stringify({ kind: "document", id: "a1b2c3d", time, since: 3 }));
+  assert.equal(previewBanner(state, now), "Previewing a1b2c3d, 12:03. Editing is paused.");
+  assert.equal(sinceText(state), "(3 new steps since)");
+  assert.equal(sinceText({ kind: "document", since: 1 }), "(1 new step since)");
+  assert.equal(sinceText({ kind: "document", since: 0 }), "");
+});
+
+test("no preview reads as an empty kind", () => {
+  assert.deepEqual(parsePreview(JSON.stringify({ kind: "" })), { kind: "" });
+});
+
+test("each row carries the preview and apply hint in its tooltip and accessible name", async () => {
+  const { rowHintTooltip, rowHintAriaName } = await import("../src/lib/historyPreview.ts");
+  assert.equal(
+    rowHintTooltip("Move."),
+    "Move. Click to preview. Double-click or Enter to apply this version.",
+  );
+  assert.equal(rowHintAriaName("Move, You"), "Move, You, Enter applies this version");
+});
+
+test("a document preview disables Undo, Redo and Wipe in the panel; an object preview does not", () => {
+  assert.equal(historyButtonsPaused({ kind: "document" }), true);
+  assert.equal(historyButtonsPaused({ kind: "object" }), false);
+  assert.equal(historyButtonsPaused({ kind: "" }), false);
+});
+
+test("a go-to or clone row keeps the full version id on line 2", async () => {
+  const { rowDisplay, secondLine } = await import("../src/lib/historyRows.ts");
+  const base = {
+    step: "1@9",
+    known: true,
+    author: "you" as const,
+    time: new Date(2026, 9, 10, 12, 6, 0).getTime() / 1000,
+    kind: "change" as const,
+    status: "applied" as const,
+    objects: [],
+  };
+  const goTo = { ...base, id: "x9y8z7w", label: "go_to_version", name: "Go to version a1b2c3d", summary: "Resize", version: "a1b2c3d" };
+  assert.deepEqual(rowDisplay(goTo), { name: "Go to version", summary: "a1b2c3d · Resize" });
+  assert.equal(secondLine(goTo, new Date(2026, 9, 10, 15)).startsWith("a1b2c3d"), true);
+  const clone = { ...base, id: "q1w2e3r", label: "clone_version", class: "clone-start" as const, name: "Clone of 3f9a1c at version a1b2c3d", summary: "", version: "a1b2c3d" };
+  assert.deepEqual(rowDisplay(clone), { name: "Clone of 3f9a1c", summary: "at version a1b2c3d" });
+});
+
+test("a row's keys: Enter applies, Space previews, Right goes to the action, the rest is left alone", async () => {
+  const { rowKeyAction } = await import("../src/lib/historyPreview.ts");
+  const key = (k: string, ctrl = false, shift = false) => ({ key: k, ctrlKey: ctrl, metaKey: false, shiftKey: shift, altKey: false });
+  assert.equal(rowKeyAction(key("Enter"), true), "apply");
+  assert.equal(rowKeyAction(key(" "), true), "preview");
+  assert.equal(rowKeyAction(key("ArrowRight"), true), "action");
+  assert.equal(rowKeyAction(key("ArrowRight"), false), null);
+  // Ctrl+Z and Ctrl+Shift+Z go on to the window's undo and redo.
+  assert.equal(rowKeyAction(key("z", true), true), null);
+  assert.equal(rowKeyAction(key("Z", true, true), true), null);
+  assert.equal(rowKeyAction(key("Enter", true), true), null);
+});
+
+test("a press on the step id neither previews nor applies, so a double-click only selects it", async () => {
+  const { pressOnId } = await import("../src/lib/historyPreview.ts");
+  assert.equal(pressOnId({ closest: (selector: string) => (selector === "[data-step-id]" ? {} : null) }), true);
+  assert.equal(pressOnId({ closest: () => null }), false);
+  assert.equal(pressOnId(null), false);
+});
+
+test("an apply of the version the document or object already has says so", async () => {
+  const { applyNotice } = await import("../src/lib/historyPreview.ts");
+  assert.equal(applyNotice({ kind: "went", notice: "Went to a1b2c3d." }, "a1b2c3d"), "Went to a1b2c3d.");
+  assert.equal(applyNotice({ kind: "same", notice: "" }, "d3vvarw"), "Already at d3vvarw.");
+  assert.equal(applyNotice({ kind: "ignored", notice: "" }, "d3vvarw"), "");
+});

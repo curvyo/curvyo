@@ -127,6 +127,8 @@
     --lane-line: #7B7B7F;
     /* The 1px border of a panel button or text field (the "Fit to content" button). */
     --field-border: color-mix(in srgb, var(--toolbar-icon) 60%, transparent);
+    /* `0042`: the blue of a previewed version (alias of the accent, design-system "--preview-new"). */
+    --preview-new: var(--editor-accent);
     /* docs/design-system.md, 2026-10-05: drop shadow on every floating
        chrome surface (the left tool panel, the per-selection contextual
        mini-toolbar) — what makes them read as "floating over" the
@@ -296,4 +298,9 @@ html[data-boolean-busy] * {
 html[data-value-drag],
 html[data-value-drag] * {
   cursor: ew-resize !important;
+}
+
+/* `0042` criterion 19: during a document preview the pointer over the canvas is the plain arrow. */
+body[data-history-preview="document"] canvas {
+  cursor: default !important;
 }

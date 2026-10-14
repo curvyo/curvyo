@@ -39,6 +39,8 @@ interface ToolRailProps {
   commands: RailCommands;
   /** The Grouping card below the tools card in column A (`specs/0023-groups/`). */
   grouping: GroupingCommands;
+  /** A document preview pauses editing: the rail is dimmed and inert (`0042` criterion 19). */
+  paused?: boolean;
 }
 
 interface ToolButtonProps {
@@ -155,12 +157,16 @@ export function ToolRail({
   onReturnFocus,
   commands,
   grouping,
+  paused = false,
 }: ToolRailProps) {
   // The one state that changes a letter: the Select tool with a selection.
   const letterActsOnSelection = tool === "select" && selectionCount > 0;
   return (
     <Tooltip.Provider>
-      <div className="pointer-events-none absolute top-3 right-3 bottom-1 left-3 z-30 flex gap-2">
+      <div
+        inert={paused}
+        className={`pointer-events-none absolute top-3 right-3 bottom-1 left-3 z-30 flex gap-2 ${paused ? "opacity-40" : ""}`}
+      >
         <div className="flex min-h-0 w-12 flex-col gap-2">
           <div className={RAIL_CARD_CLASS} style={RAIL_CARD_STYLE}>
             <ToolButton

@@ -9,10 +9,11 @@ use std::collections::HashSet;
 
 use loro::TreeID;
 
+use super::branches::{HistoryBranch, Listed, derive};
 use super::lineage::clone_origin;
 use super::object_timeline::{Entry, EntryClass, Reader, Targets, TimelineStatus};
 use super::report::Role;
-use super::rows::{Author, StepKind, kind_of_step};
+use super::rows::{Author, RowVersion, StepKind, kind_of_step, version_of};
 use super::step_id::StepRef;
 use super::touched::Touched;
 use crate::document::Document;
@@ -50,8 +51,10 @@ pub enum ObjectRowClass {
 pub enum ObjectStatus {
     /// In effect.
     Applied,
-    /// Taken back with Ctrl+Z (or replaced after that).
+    /// Taken back with Ctrl+Z or an object undo, and still redoable.
     Undone,
+    /// Taken back and then left by a newer step: on a branch (`specs/0042-history-branches`).
+    OnBranch,
     /// Taken back by an object undo of this author.
     UndoneBy(Author),
 }
@@ -83,6 +86,8 @@ pub struct ObjectRow {
     pub inherited_from: Option<NodeId>,
     /// Whether the step is in effect.
     pub status: ObjectStatus,
+    /// For a go to version or a clone of a version: the step whose version it named.
+    pub version: Option<RowVersion>,
 }
 
 /// A step an object undo or redo would act on.
@@ -149,6 +154,25 @@ impl Document {
                     self.object_row(reader, me, subject, entry, status)
                 })
                 .collect()
+        })
+    }
+
+    /// The branches of the timeline of `id`, newest first (`specs/0042-history-branches` criteria 1
+    /// to 3). Row indices count like [`Document::object_history_page`].
+    #[must_use]
+    pub fn object_history_branches(&self, id: NodeId) -> Vec<HistoryBranch> {
+        self.with_reader(|reader, _| {
+            let timeline = reader.timeline(tree_id(id));
+            let list: Vec<Listed> = timeline
+                .entries
+                .iter()
+                .map(|entry| Listed {
+                    step: entry.step,
+                    position: reader.steps.position(entry.step).unwrap_or_default(),
+                    mark: timeline.branch_mark(entry, reader.steps),
+                })
+                .collect();
+            derive(&list, |step| reader.steps.position(step))
         })
     }
 
@@ -227,7 +251,7 @@ impl Document {
     }
 
     /// Runs `read` with the three indexes brought up to the log.
-    fn with_reader<R>(&self, read: impl FnOnce(&Reader<'_>, u64) -> R) -> R {
+    pub(super) fn with_reader<R>(&self, read: impl FnOnce(&Reader<'_>, u64) -> R) -> R {
         self.sync_object_index();
         let steps = self.step_index.borrow();
         let objects = self.object_index.borrow();
@@ -301,9 +325,11 @@ impl Document {
                 Vec::new()
             },
             inherited_from: entry.from.map(node_id),
+            version: version_of(log.and_then(|log| log.header.as_ref()), reader.steps),
             status: match status {
                 TimelineStatus::Applied => ObjectStatus::Applied,
                 TimelineStatus::Undone => ObjectStatus::Undone,
+                TimelineStatus::OnBranch => ObjectStatus::OnBranch,
                 TimelineStatus::UndoneBy(by) => ObjectStatus::UndoneBy(author_of(by, me)),
             },
         }

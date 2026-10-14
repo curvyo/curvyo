@@ -630,11 +630,11 @@ fn c11_a_new_do_step_clears_the_redo_side_for_that_object() {
     let n = d.history_len();
     assert!(d.redo_object_step(a).unwrap().is_none());
     assert_eq!(d.history_len(), n, "nothing written");
-    // The undone step stays in the list.
+    // The undone step stays in the list, on a branch since `0042` (criteria 1 and 4).
     assert!(
         rows(&d, a)
             .iter()
-            .any(|r| r.status == ObjectStatus::UndoneBy(Author::You))
+            .any(|r| r.status == ObjectStatus::OnBranch)
     );
 }
 

@@ -98,3 +98,78 @@ mode (spec Q3 A) because a document-wide go-to would be `revert_to`, which rever
 - Lamport order for concurrent steps can differ from wall-clock order; the list shows times, so a
   row may look out of order by a few seconds. Accepted: the same order on every replica matters
   more.
+
+## Notes
+
+**2026-10-12, architect review of milestone 1** (`58914d3`):
+
+- **Peers in the Object scope.** Decision 2 holds for the Document scope only. The Object scope
+  runs the one machine of `0041` over the object's timeline, every author's steps included (ADR
+  0014 §6 "per object", `0041` criterion 11 "a new do step on the same object (by anyone)", this
+  spec's criterion 28). So a peer's step on an object does end a pending object redo and leaves the
+  object-undone step on a branch of that object's list; a row reading "Undone" there would promise
+  a Ctrl+Shift+U that `0041` criterion 11 already refuses. Steps taken back with Ctrl+Z keep the
+  author's own machine in both scopes, so a peer never branches someone else's Ctrl+Z. No ADR
+  change. Criterion 5 is read as "in the Document scope"; the product owner adds that qualifier
+  and one sentence for the Object scope.
+- **Placement.** Go to version and clone version get their own module
+  `curvyo-document-core/src/history/version_write.rs` instead of `restore.rs` (464 lines), with
+  one responsibility: write an object's state at a past version as a new step. It reuses the
+  guarded checkout read (§12), `revive.rs` (§11) and the restore write path; it adds no second
+  write engine (ADR 0014 §1: one read, different write rules).
+- **Branch marks are not stored.** `BranchMark` and `HistoryBranch` are derived per call;
+  `format_version` and the saved file are unchanged (criterion 33).
+
+**2026-10-12, architect review of milestones 2 to 4** (`6571ba9..d224ab9`):
+
+- **Exploration continuation.** A further go-to press repeats the header with a new `v` (same
+  label, `s` and `o`); `step_header::continues` joins it in the step index and in `find_step`, and
+  the step names its latest version. This is what decision 5 says; ADR 0014 §2 ("repeats the header
+  verbatim") gets a one-line amendment for this one exception. An older build reads each press as
+  its own step with an unknown label: a longer list there, never a wrong drawing.
+- **One write engine.** `version_write.rs` reads through the checkout guard (`Detached`) and
+  writes through `merge::restore_map`, the restore write path, with "now" as the from-side so every
+  field takes the version's value. A clone creates a new node, so `revive.rs` has nothing to do; a
+  go to on a deleted object is refused. The condition of the milestone 1 note is met. A go to sets
+  the object's meta map only; its tree parent and z-position stay where they are now.
+- **Inherited rows along the path.** Inherited rows leave out steps their author had taken back by
+  the copy's version (`StepIndex::machine_within`), for a clone of a version and for `0041`'s
+  Duplicate alike: one lineage rule, as criterion 23 asks. For Duplicate this hides rows that
+  `0041` criterion 24 listed; it goes to the customer with the demo (default: keep the new rule).
+- **No format change.** Go to and clone are ordinary commits with headers; clone writes the
+  existing `clone_of`; `format_version` is unchanged.
+
+**2026-10-14, customer feedback 2026-10-14** (PR #119; ADR 0014 §8 amended the same day):
+
+- **(a) Apply.** Enter or a double-click on a row applies its version `V`, in the Document scope
+  to the whole document and in the Object scope to the selected object; there is no Live mode and
+  no Mode switch. An apply is one run of the existing restore engine (`restore_plan.rs`,
+  `restore.rs`, `revive.rs`) with before = `V`, after = now, over the objects touched by any step
+  not in `V`'s past (one object in the Object scope), committed as one step
+  `go_to_version;s=;t=;v=[;o=]` (no `o` for the document) that Ctrl+Z takes back. Since after =
+  now, every field takes `V`'s value: other peers' later steps are overwritten (ADR 0014 Q6 A),
+  and the notice counts them as in criterion 15. Objects created since `V` are removed, objects
+  deleted since `V` are revived with their `NodeId`, tree parent, order and the layer and group
+  flags of `0050` (ADR 0015) go back to `V`. Root keys go back except `history_wiped`; `clone_of`
+  and `history_floor` are not touched. The apply is an ordinary do step: rows after `V` keep their
+  state, the new row reads "Go to version a1b2c3d", and a later Ctrl+Z, new step and redo follow
+  the stack machine as for any step. Long-operation state as for undo: `V` more than
+  `FAR_STEP_OPS` operations behind, or more than `SMALL_STEP_OPS` operations to write; budgets of
+  ADR 0014 §13 for large steps. `go_to_version` in `version_write.rs` is replaced by this run; Clone
+  version stays there.
+- **(b) Exploration is dead.** Every apply is its own step. The `continues` exception, its uses in
+  `step_index.rs` and `step_log.rs`, and the ADR 0014 §2 amendment of 2026-10-12 are removed (the
+  amendment never reached `main`). This supersedes decision 5 and the "Exploration continuation"
+  bullet of the 2026-10-12 note. Decision 4's header loses nothing; `o` becomes optional.
+- **(c) Stored form.** Unchanged: ordinary commits with a header, revives through the existing
+  injected move, no new key, no `format_version` bump.
+- **(d) Dead code to delete.** Core: `step_header::continues` (back to plain message equality),
+  `Document::last_step_if_current`, `Document::commit_joining`, `GoToReport::continued`, the
+  `explore` parameter and the go-to body of `version_write.rs`. editor-wasm: `VersionState` and
+  exploring, the Restore path, the Mode flag in `PreviewState` and the Mode getters and setters in
+  `wasm_history.rs`, a single-press go to. ui-core: `RESTORED_NOTICE` and any Mode text. Frontend:
+  `HistoryModeRow.tsx`, `modeCaption` and the Mode tooltip in `lib/historyPreview.ts`, the Restore
+  button and the caption slot, `SAVED_IN_FILE_LINE` in `lib/historyRows.ts` and its row. The tests
+  of all of these go with them. The PO rewrites criteria 10 to 14, 17 and 19 and spec Q2 and Q3.
+- **Object preview** draws only the previewed version: the session leaves the live object out of
+  the draw list while the preview lasts (render and session only, no API in core).

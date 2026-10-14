@@ -57,6 +57,16 @@ fn row_words(row: &HistoryRow, summary: Option<String>) -> (String, bool, &'stat
         let name = format!("Wipe history of {object}");
         return (name, true, "floor", summary);
     }
+    if let Some(version) = &row.version {
+        // "Go to version a1b2c3d", line 2 "Resize" (`specs/0042-history-branches` criterion 11).
+        let name = format!("{} {}", operation_name(&row.label), version.shown_id);
+        return (
+            name,
+            true,
+            "step",
+            operation_name(&version.label).to_owned(),
+        );
+    }
     if let Some(revert) = &row.reverts {
         let verb = if revert.redo { "Redo" } else { "Undo" };
         let name = format!("{verb} {}", operation_name(&revert.label));
@@ -100,6 +110,7 @@ impl Session {
             .map(|o| {
                 json!({
                     "id": serde_json::to_value(o.id).unwrap_or_default(),
+                    "short": o.id.short_id(),
                     "shape": shape_word(o.shape),
                     "role": role_word(o.role),
                     "alive": self.document.object(o.id).is_some(),
@@ -109,8 +120,8 @@ impl Session {
         let (status, undone_by) = match (row.status, row.undone_by) {
             (Status::Applied, Some(author)) => ("undone-by", author_word(author)),
             (Status::Applied, None) => ("applied", ""),
-            // An undone step and a step on a branch both read "Undone" until `0042` shows branches.
-            _ => ("undone", ""),
+            (Status::Undone, _) => ("undone", ""),
+            (Status::OnBranch, _) => ("branch", ""),
         };
         json!({
             "id": row.shown_id,
@@ -122,6 +133,7 @@ impl Session {
             "time": row.time.as_secs(),
             "status": status,
             "undoneBy": undone_by,
+            "version": row.version.as_ref().map(|v| v.shown_id.clone()),
             "class": class,
             "kind": kind_word(row.kind),
             "summary": summary,
@@ -142,14 +154,17 @@ impl Session {
 
     /// `count` rows of the history from the `start`-th newest, newest first, as one JSON array.
     pub fn history_rows_json(&mut self, start: usize, count: usize) -> String {
+        Value::Array(self.history_row_values(start, count)).to_string()
+    }
+
+    /// `count` rows of the history from the `start`-th newest, newest first.
+    pub(super) fn history_row_values(&mut self, start: usize, count: usize) -> Vec<Value> {
         self.sync_history();
-        let rows: Vec<Value> = self
-            .document
+        self.document
             .history_page(start, count)
             .iter()
             .map(|row| self.row_json(row))
-            .collect();
-        Value::Array(rows).to_string()
+            .collect()
     }
 
     /// The shown id of the newest step in effect, for the pinned "Now" row; empty without a step.
@@ -222,7 +237,11 @@ impl Session {
     /// "Wipe" was confirmed: cuts the history, empties both stacks and writes the one step
     /// "History wiped". The drawing is unchanged.
     pub fn wipe_history(&mut self) -> WipeOutcome {
-        if self.operation_in_flight() || self.select.has_entry() || self.pen_path_open() {
+        if self.operation_in_flight()
+            || self.select.has_entry()
+            || self.pen_path_open()
+            || self.document_preview_active()
+        {
             return WipeOutcome::Ignored;
         }
         self.sync_history();

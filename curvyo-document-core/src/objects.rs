@@ -469,7 +469,7 @@ fn copy_map(from: &loro::LoroMap, into: &loro::LoroMap, skip: &[&str]) {
 
 /// Gives a freshly copied path its own anchor ids, one per anchor in order,
 /// over all its outlines (the first outline first).
-fn renumber_anchors(meta: &loro::LoroMap, anchor_ids: &[AnchorId]) {
+pub(crate) fn renumber_anchors(meta: &loro::LoroMap, anchor_ids: &[AnchorId]) {
     let mut ids = anchor_ids.iter();
     for list in all_anchor_lists(meta) {
         for index in 0..list.len() {

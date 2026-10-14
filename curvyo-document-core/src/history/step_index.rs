@@ -6,7 +6,7 @@ use std::collections::{BTreeMap, HashMap};
 
 use loro::{LoroDoc, VersionVector};
 
-use super::stack_machine::{Event, StackMachine, Status};
+use super::stack_machine::{BranchMark, Event, StackMachine, Status};
 use super::step_header::{
     KEY_OBJECT, KEY_OBJECT_REDONE, KEY_OBJECT_UNDONE, KEY_REDONE, KEY_UNDONE, LABEL_NEW_DOCUMENT,
     LABEL_OBJECT_REDO, LABEL_OBJECT_UNDO, LABEL_REDO, LABEL_UNDO, LABEL_WIPE, LABEL_WIPE_OBJECT,
@@ -190,6 +190,33 @@ impl StepIndex {
             .get(&peer)
             .cloned()
             .unwrap_or_else(|| StackMachine::new(usize::MAX))
+    }
+
+    /// The branch a step's own peer left it on, while it is on one.
+    pub(crate) fn branch_of(&self, step: StepRef) -> Option<BranchMark> {
+        self.machines.get(&step.peer())?.branch_of(step)
+    }
+
+    /// The stacks of `peer` as its commits up to `within` tell them: which of its steps were in
+    /// effect at that version (`specs/0042-history-branches` criterion 23).
+    pub(crate) fn machine_within(&self, peer: u64, within: &VersionVector) -> StackMachine {
+        let end = within.get(&peer).copied().unwrap_or(0);
+        let mut machine = StackMachine::new(usize::MAX);
+        let Some(starts) = self.by_peer.get(&peer) else {
+            return machine;
+        };
+        for position in starts.values() {
+            let Some(step) = self.steps.get(position) else {
+                continue;
+            };
+            if step.end > end {
+                break;
+            }
+            if let Some(event) = event_of(step.header.as_ref(), step.step) {
+                machine.apply(event);
+            }
+        }
+        machine
     }
 
     /// The status of a step.

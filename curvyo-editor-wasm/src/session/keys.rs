@@ -112,6 +112,8 @@ pub enum KeyOutcome {
         /// The event opened a new run.
         new_run: bool,
     },
+    /// A document preview pauses editing: the key did nothing, and its page default is prevented.
+    Paused,
 }
 
 impl KeyOutcome {
@@ -122,6 +124,7 @@ impl KeyOutcome {
     pub const fn code(self) -> &'static str {
         match self {
             Self::Ignored => "ignored",
+            Self::Paused => "paused",
             Self::ToolChanged => "tool",
             Self::EntryOpened => "entry",
             Self::Deleted => "deleted",
@@ -230,6 +233,11 @@ impl Session {
     /// [`KeyOutcome::Ignored`], so Ctrl+R and Ctrl+S keep their page and menu
     /// behaviour.
     pub fn key_down(&mut self, input: KeyInput<'_>) -> KeyOutcome {
+        // A document preview pauses editing: every key of the table, undo and redo included
+        // (`specs/0042-history-branches` criterion 19).
+        if self.document_preview_active() {
+            return KeyOutcome::Paused;
+        }
         let state = KeyState {
             tool: self.tool,
             operation_in_flight: self.operation_in_flight(),
