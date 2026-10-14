@@ -109,13 +109,13 @@ own entry when the customer schedules it.
 | [0022](0022-color-management/) | `color-management` | Palettes, thread palettes for embroidery, colour history, other colour models. A sketch for the customer, after the MVP. | Draft | Could | R-EDIT-017 | - |
 | [0046](0046-document-shapes/) | `document-shapes` | Non-rectangular document areas: ellipse and circle, rounded rectangle, and an outline loaded from SVG or DXF (key rings, labels, hoops); the size is the bounding box, the area is a guide and not a mask. A sketch with open questions. Needs a document-model decision, the SVG import of `0024`, and a DXF importer nobody has specified (`0040` and `0045` are built). | Draft (sketch; the document-model ADR is `needs-customer` and not yet written) | Should | R-EDIT-028 | - |
 | [0033](0033-stroke-brushes/) | `stroke-brushes` | Brushes for the stroke (width profile, stamp, pattern along path), a picker in the Stroke section, brushes as data files the maker can add, plugin brushes later; expanded to paths for jobs. After the MVP, 0017, 0018 and the plugin host. | Draft | Could | R-EDIT-021 | - |
+| [0025](0025-raster-trace/research.md) | `raster-trace` | Trace a raster image to vector paths (threshold, colour count, presets) with smoother, lighter results than Inkscape's "Trace Bitmap"; a Trace tool with settings in the top-middle bar. Research and 8 customer questions are in `research.md`; no `specification.md` yet. Needs bitmap import (0058). | Draft (research; waiting for the customer) | Must | R-VEC-001 | 12 |
 
 ### MVP slices not yet specified (no folder, number reserved)
 
 | No. | Slug | What it delivers | Status | Priority | Requirements | MVP slice |
 |---|---|---|---|---|---|---|
 | 0024 | `svg-import-export` | Open a plain SVG from Inkscape and export it again without hand-fixing geometry; a named, listed loss report for anything outside our supported subset. | Not started | Must | R-SYS-006 | 11 |
-| 0025 | `raster-trace` | Trace a raster image to vector paths with adjustable threshold and colour count, on par with Inkscape's "Trace Bitmap". | Not started | Must | R-VEC-001 | 12 |
 | 0026 | `machine-profile` | Define and reuse a machine profile (work area, connection, limits) for a laser cutter; select it for a project. | Not started | Must | R-MFG-001 | 13 |
 | 0027 | `manufacturing-roles` | Assign a cut or engrave role to geometry (by layer) within one file. | Not started | Must | R-MFG-002 | 14 |
 | 0028 | `material-test-library` | Generate a power/speed test-cut grid for the selected machine, record which cell worked, store it as a reusable material record. | Not started | Must | R-MAT-001, R-MAT-002, R-MAT-003 | 15 |
