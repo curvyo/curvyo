@@ -75,8 +75,10 @@ fn press(
     point: Point,
     shift: bool,
 ) -> PressTarget {
+    let objects = objects(document);
     classify_press(
-        &objects(document),
+        &objects,
+        &objects,
         selection,
         point,
         tolerance(),

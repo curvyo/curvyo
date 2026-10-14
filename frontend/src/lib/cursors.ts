@@ -30,6 +30,10 @@
  *   criteria 28, 46, 49).
  * - `"eyedropper"`: a pipette with its tip as the hotspot, picking a colour
  *   from the drawing (`specs/0017-style-panel-rework`).
+ * - `"locked"`: the pointer arrow with a padlock at its lower right, over a
+ *   locked object that a press passes through (`specs/0050-layers-and-objects-panel`
+ *   criterion 20); hotspot at the arrow tip, `not-allowed` where custom cursor
+ *   images are ignored.
  * - anything else: no override (the tool's normal cursor).
  */
 
@@ -68,6 +72,10 @@ const LASSO_TRAIL = "M13 18 C15 14 17 14 18 17 C19 20 21 20 22.5 16";
 /** The pipette glyph, tip at (2, 22). */
 const EYEDROPPER =
   "m2 22 1-1h3l9-9 M3 21v-3l9-9 M15 6 l3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3l.4.4Z";
+
+/** A padlock at the lower right: the body and the shackle. */
+const PADLOCK_BODY = "M13.5 16.5h8v6h-8z";
+const PADLOCK_SHACKLE = "M15.5 16.5v-2a2 2 0 0 1 4 0v2";
 
 /** The built-in resize cursor nearest to a double arrow at `degrees`. */
 export function nearestBuiltInResizeCursor(degrees: number): string {
@@ -111,6 +119,21 @@ export function cursorForHint(hint: string): string | undefined {
         arrow +
         `</svg>`,
     )}") 3 3, crosshair`;
+  }
+  if (hint === "locked") {
+    const arrow =
+      `<path d="${POINTER_ARROW}" fill="white" stroke="white" stroke-width="3" stroke-linejoin="round"/>` +
+      `<path d="${POINTER_ARROW}" fill="white" stroke="black" stroke-width="1.2" stroke-linejoin="round"/>`;
+    const lock =
+      `<path d="${PADLOCK_SHACKLE}" fill="none" stroke="white" stroke-width="3.5"/>` +
+      `<path d="${PADLOCK_BODY}" fill="black" stroke="white" stroke-width="2" stroke-linejoin="round"/>` +
+      `<path d="${PADLOCK_SHACKLE}" fill="none" stroke="black" stroke-width="1.5"/>`;
+    return `url("data:image/svg+xml,${encodeURIComponent(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${SIZE}" height="${SIZE}" viewBox="0 0 ${SIZE} ${SIZE}">` +
+        arrow +
+        lock +
+        `</svg>`,
+    )}") 3 3, not-allowed`;
   }
   if (hint === "pointer") {
     return "pointer";

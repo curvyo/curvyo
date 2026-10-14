@@ -96,7 +96,7 @@ impl Session {
         // the selection, customer decision 2026-10-06 reversing criterion 27);
         // the Pen and Node tools draw their own.
         // The objects of a hovered History row get their hover box under every tool.
-        let history_hovered: Vec<_> = self
+        let mut history_hovered: Vec<_> = self
             .history_hover
             .iter()
             .filter_map(|&id| {
@@ -106,6 +106,28 @@ impl Session {
                     .map(|object| (id, oriented_bounds(object).document_corners()))
             })
             .collect();
+        // The row under the pointer or the focus in the Layers list: its node's box, a group's
+        // box for a group (`specs/0050-layers-and-objects-panel` criterion 15).
+        if let Some((hovered, leaves)) = &self.panel.hover {
+            let hovered = *hovered;
+            let corners: Vec<_> = objects
+                .iter()
+                .filter(|object| leaves.contains(&object.id()))
+                .map(|object| oriented_bounds(object).document_corners())
+                .collect();
+            if let Some(shown) = merged_corners(&corners) {
+                history_hovered.push((hovered, shown));
+            }
+        }
+        if self.tool == Tool::Offset {
+            // Selected objects the Offset tool ignores (open paths) stay drawn as selected
+            // (`specs/0038-path-offset/ux-rework.md` section 8).
+            return SelectDecorationInput {
+                history_hovered,
+                selected: self.offset_ignored_boxes(objects),
+                ..SelectDecorationInput::default()
+            };
+        }
         if self.tool != Tool::Select {
             return SelectDecorationInput {
                 history_hovered,

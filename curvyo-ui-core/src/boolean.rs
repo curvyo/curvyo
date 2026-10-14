@@ -179,7 +179,7 @@ pub struct BooleanPlan {
 
 /// The outlines of one object as the kernel reads them: a path's own outlines, a primitive's
 /// rotated outline.
-fn outlines_of(object: &ObjectSnapshot) -> Vec<(Vec<OutlineTriple>, bool)> {
+pub(crate) fn outlines_of(object: &ObjectSnapshot) -> Vec<(Vec<OutlineTriple>, bool)> {
     match object {
         ObjectSnapshot::Path(path) => path
             .subpaths()

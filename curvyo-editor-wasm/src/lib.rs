@@ -44,6 +44,8 @@ mod wasm_history;
 #[cfg(target_arch = "wasm32")]
 mod wasm_keys;
 #[cfg(target_arch = "wasm32")]
+mod wasm_layers;
+#[cfg(target_arch = "wasm32")]
 mod wasm_move;
 #[cfg(target_arch = "wasm32")]
 mod wasm_move_entry;
@@ -51,6 +53,8 @@ mod wasm_move_entry;
 mod wasm_navigation;
 #[cfg(target_arch = "wasm32")]
 mod wasm_node_tool;
+#[cfg(target_arch = "wasm32")]
+mod wasm_offset;
 #[cfg(target_arch = "wasm32")]
 mod wasm_pen;
 #[cfg(target_arch = "wasm32")]
@@ -70,12 +74,13 @@ mod wasm_split;
 
 pub use session::{
     APP_VERSION, BooleanOutcome, BreakApartOutcome, CloneOutcome, ClosePathOutcome, ClosePathState,
-    CombineOutcome, CutOutcome, DocumentPresetsRecord, DocumentSide, DoubleClickHint, EscapeStep,
-    FAR_PREVIEW_ROWS, FitOutcome, FormTexts, FormatEdit, GoToOutcome, GroupingKind, GroupingResult,
-    HistoryResult, KeyHint, KeyInput, KeyOutcome, MoveIndicators, ObjectWipeOutcome,
-    PanelTabsRecord, PanelView, RowPress, Session, SizeOutcome, SplitOutcome, Tool, WipeOutcome,
-    WipeState,
+    CombineOutcome, CutOutcome, DocumentPresetsRecord, DocumentSide, DoubleClickHint, DropPlace,
+    EscapeStep, FAR_PREVIEW_ROWS, FitOutcome, FormTexts, FormatEdit, GoToOutcome, GroupingKind,
+    GroupingResult, HistoryResult, KeyHint, KeyInput, KeyOutcome, MoveIndicators,
+    ObjectWipeOutcome, PanelReply, PanelTabsRecord, PanelView, RowFlag, RowPress, Session,
+    SizeOutcome, SplitOutcome, Tool, WipeOutcome, WipeState,
 };
+pub use session::{DragStop, OFFSET_COMMIT_LABEL, OffsetOutcome, OffsetView};
 
 #[cfg(target_arch = "wasm32")]
 pub use wasm_api::{WasmSession, init_panic_hook};

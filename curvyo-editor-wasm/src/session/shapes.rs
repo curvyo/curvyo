@@ -35,7 +35,7 @@ impl Session {
             Tool::Rectangle => self.rectangle.pointer_down(point),
             Tool::Ellipse => self.ellipse.pointer_down(point),
             Tool::PolygonStar => self.poly_star.pointer_down(point),
-            Tool::Select | Tool::Pen | Tool::Node => {}
+            Tool::Select | Tool::Pen | Tool::Node | Tool::Offset => {}
         }
     }
 
@@ -46,7 +46,7 @@ impl Session {
             Tool::Rectangle => self.rectangle.pointer_move(point, modifiers),
             Tool::Ellipse => self.ellipse.pointer_move(point, modifiers),
             Tool::PolygonStar => self.poly_star.pointer_move(point, modifiers),
-            Tool::Select | Tool::Pen | Tool::Node => {}
+            Tool::Select | Tool::Pen | Tool::Node | Tool::Offset => {}
         }
     }
 
@@ -61,7 +61,7 @@ impl Session {
             Tool::Rectangle => self.rectangle.pointer_up(&self.document, point, modifiers),
             Tool::Ellipse => self.ellipse.pointer_up(&self.document, point, modifiers),
             Tool::PolygonStar => self.poly_star.pointer_up(&self.document, point, modifiers),
-            Tool::Select | Tool::Pen | Tool::Node => CreateOutcome::NoOp,
+            Tool::Select | Tool::Pen | Tool::Node | Tool::Offset => CreateOutcome::NoOp,
         };
         if let CreateOutcome::Created(id) = outcome {
             self.selection.select_single(id);
@@ -76,7 +76,7 @@ impl Session {
             Tool::Rectangle => self.rectangle.escape(),
             Tool::Ellipse => self.ellipse.escape(),
             Tool::PolygonStar => self.poly_star.escape(),
-            Tool::Select | Tool::Pen | Tool::Node => false,
+            Tool::Select | Tool::Pen | Tool::Node | Tool::Offset => false,
         }
     }
 
@@ -124,7 +124,7 @@ impl Session {
             Tool::Rectangle => self.rectangle.live_shape(),
             Tool::Ellipse => self.ellipse.live_shape(),
             Tool::PolygonStar => self.poly_star.live_shape(),
-            Tool::Select | Tool::Pen | Tool::Node => None,
+            Tool::Select | Tool::Pen | Tool::Node | Tool::Offset => None,
         }
     }
 

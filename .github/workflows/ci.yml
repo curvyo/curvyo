@@ -402,7 +402,7 @@ jobs:
       - name: Run the golden comparison on wasm32-unknown-unknown
         env:
           CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUNNER: wasm-bindgen-test-runner
-        run: cargo test --target wasm32-unknown-unknown -p curvyo-geometry-core --test boolean_golden_wasm
+        run: cargo test --target wasm32-unknown-unknown -p curvyo-geometry-core --test boolean_golden_wasm --test offset_golden
 
   # Dependency-graph/license check, not compiled code — one run sees every
   # target deny.toml's [graph] lists (including wasm32-unknown-unknown),

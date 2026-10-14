@@ -9,15 +9,17 @@ use super::move_indicators::move_readout_text;
 use super::shapes::LiveReadout;
 
 impl Session {
-    /// Ctrl+A: every object of the document root becomes the selection, bottom to top. View
-    /// state only: nothing is written. An empty document is still a handled key.
+    /// Ctrl+A: every object of the context becomes the selection, bottom to top. View state
+    /// only: nothing is written. An empty document is still a handled key. Layers are
+    /// transparent, and hidden and locked objects are left out; a group takes all its members
+    /// along (`specs/0050-layers-and-objects-panel` criteria 21 and 42).
     pub(super) fn select_all(&mut self) -> KeyOutcome {
-        // The leaves of the context: at the root every object, inside a group those of the group.
         let ids: Vec<_> = self
-            .objects()
+            .pickable_objects()
             .iter()
             .map(curvyo_document_core::ObjectSnapshot::id)
             .collect();
+        let ids = self.units().widen(&ids);
         self.selection.set(&ids);
         KeyOutcome::SelectedAll
     }

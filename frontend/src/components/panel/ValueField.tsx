@@ -47,6 +47,8 @@ interface ValueFieldProps {
   clickMinP?: number;
   /** The reset target as text ("0.25 mm", "100 %"). */
   defaultText: string;
+  /** A further muted line of the field's one tooltip, or nothing. */
+  note?: string;
   /** The message of a refused typed value. */
   messages: Readonly<Record<string, string>>;
   /** A tick of a drag: position `p` (0 to 1) on the field's scale, rounded to `grid`. */
@@ -95,6 +97,7 @@ export function ValueField({
   clickMinP = 0,
   defaultText,
   messages,
+  note,
   onPreview,
   onSettle,
   onStep,
@@ -181,6 +184,7 @@ export function ValueField({
           name={name}
           valueText={mixed ? "Mixed" : `${text}${unit ? ` ${unit}` : ""}`}
           help={HELP}
+          note={note}
         >
           <div
             role="spinbutton"

@@ -4,7 +4,7 @@
 //! is in `keys.rs`.
 
 use curvyo_document_core::Direction;
-use curvyo_ui_core::{Arrow, EntryKey};
+use curvyo_ui_core::{Arrow, EntryKey, Reorder};
 
 use super::Tool;
 use super::keys::{KeyHint, KeyInput};
@@ -20,6 +20,7 @@ pub(super) enum Selected {
 
 /// Everything about the session the key table reads.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(clippy::struct_excessive_bools)] // one flag per session fact the table reads
 pub(super) struct KeyState {
     pub(super) tool: Tool,
     /// A drag is in flight in the active tool, or the canvas is panned.
@@ -29,6 +30,12 @@ pub(super) struct KeyState {
     /// An entry chip is open.
     pub(super) entry_open: bool,
     pub(super) selected: Selected,
+    /// The Offset tool has a closed operand selected and no drag: O and Enter open its chip
+    /// (`specs/0038-path-offset` criteria 25, 53).
+    pub(super) offset_ready: bool,
+    /// A corner drag of the Offset tool is in flight: Alt steps its corner style
+    /// (`specs/0038-path-offset` criterion 13).
+    pub(super) offset_dragging: bool,
 }
 
 /// What the key table decided.
@@ -48,6 +55,9 @@ pub(super) enum KeyAction {
     Group,
     Ungroup,
     EnterGroup,
+    Reorder(Reorder),
+    OpenOffsetChip,
+    StepOffsetCornerStyle,
 }
 
 /// Whether Enter may enter a group: the Select tool, a plain press, nothing in flight.
@@ -63,6 +73,79 @@ fn enter_acts(input: &KeyInput<'_>, state: KeyState) -> bool {
         && !state.entry_open
 }
 
+/// The stacking-order keys (`specs/0050-layers-and-objects-panel` criterion 33): Home, End,
+/// Page Up and Page Down act in the Select tool with a selection, plain presses, gated like every
+/// letter. `None` for any other key.
+fn reorder_action(input: &KeyInput<'_>, state: KeyState, gate_open: bool) -> Option<KeyAction> {
+    let how = match input.key {
+        "Home" => Reorder::Front,
+        "End" => Reorder::Back,
+        "PageUp" => Reorder::Forward,
+        "PageDown" => Reorder::Backward,
+        _ => return None,
+    };
+    let acts = gate_open
+        && !input.ctrl
+        && !input.alt
+        && !input.shift
+        && !input.repeat
+        && state.tool == Tool::Select
+        && state.selected != Selected::None;
+    Some(if acts {
+        KeyAction::Reorder(how)
+    } else {
+        KeyAction::Ignore
+    })
+}
+
+/// What Enter does: finish the Pen path, open the Offset entry chip, or enter the one selected
+/// group (the session says whether there is one).
+fn enter_action(input: &KeyInput<'_>, state: KeyState) -> KeyAction {
+    if state.tool == Tool::Pen && state.pen_open {
+        KeyAction::FinishPen
+    } else if offset_enter_acts(input, state) {
+        KeyAction::OpenOffsetChip
+    } else if enter_acts(input, state) {
+        KeyAction::EnterGroup
+    } else {
+        KeyAction::Ignore
+    }
+}
+
+/// Whether Enter opens the Offset entry chip: the Offset tool with an operand, a plain press,
+/// nothing in flight and no chip open.
+fn offset_enter_acts(input: &KeyInput<'_>, state: KeyState) -> bool {
+    state.tool == Tool::Offset
+        && state.offset_ready
+        && !input.repeat
+        && !input.dom_blocked
+        && !input.ctrl
+        && !input.alt
+        && !input.shift
+        && !state.operation_in_flight
+        && !state.entry_open
+}
+
+/// Whether the active tool selects objects: the Select tool and the Offset tool
+/// (`specs/0038-path-offset` criterion 27) take Ctrl+A and the arrows.
+fn selects(state: KeyState) -> bool {
+    matches!(state.tool, Tool::Select | Tool::Offset)
+}
+
+/// Group and Ungroup (`0023` criterion 7): Ctrl+G and Shift+Ctrl+G, once per press, gated like
+/// every shortcut. `None` for any other key.
+fn group_action(input: &KeyInput<'_>, state: KeyState, gate_open: bool) -> Option<KeyAction> {
+    if !(input.ctrl && input.key.eq_ignore_ascii_case("g")) {
+        return None;
+    }
+    let acts = gate_open && !input.alt && !input.repeat && state.tool == Tool::Select;
+    Some(match (acts, input.shift) {
+        (true, false) => KeyAction::Group,
+        (true, true) => KeyAction::Ungroup,
+        (false, _) => KeyAction::Ignore,
+    })
+}
+
 /// The key table and its gate (criteria 54, 55, 60, 61) as a pure function:
 /// the one place that says what a key does in which state.
 pub(super) fn decide(input: &KeyInput<'_>, state: KeyState) -> KeyAction {
@@ -75,12 +158,12 @@ pub(super) fn decide(input: &KeyInput<'_>, state: KeyState) -> KeyAction {
                 KeyAction::Escape
             };
         }
-        "Enter" => {
-            return if state.tool == Tool::Pen && state.pen_open {
-                KeyAction::FinishPen
-            } else if enter_acts(input, state) {
-                // Enter opens the one selected group; the session says whether there is one.
-                KeyAction::EnterGroup
+        "Enter" => return enter_action(input, state),
+        // Alt during an Offset corner drag steps its corner style; held Alt steps once
+        // (`specs/0038-path-offset` criterion 13). Elsewhere Alt is not intercepted.
+        "Alt" => {
+            return if state.offset_dragging && !input.repeat {
+                KeyAction::StepOffsetCornerStyle
             } else {
                 KeyAction::Ignore
             };
@@ -96,7 +179,7 @@ pub(super) fn decide(input: &KeyInput<'_>, state: KeyState) -> KeyAction {
         let acts = gate_open
             && !input.ctrl
             && !input.alt
-            && state.tool == Tool::Select
+            && selects(state)
             && state.selected != Selected::None;
         return if acts {
             KeyAction::Nudge(arrow)
@@ -104,23 +187,19 @@ pub(super) fn decide(input: &KeyInput<'_>, state: KeyState) -> KeyAction {
             KeyAction::Ignore
         };
     }
+    if let Some(action) = reorder_action(input, state, gate_open) {
+        return action;
+    }
     if input.ctrl && input.key.eq_ignore_ascii_case("a") {
-        let acts =
-            gate_open && !input.alt && !input.shift && !input.repeat && state.tool == Tool::Select;
+        let acts = gate_open && !input.alt && !input.shift && !input.repeat && selects(state);
         return if acts {
             KeyAction::SelectAll
         } else {
             KeyAction::Ignore
         };
     }
-    // Group and Ungroup (`0023` criterion 7): once per press, gated like every shortcut.
-    if input.ctrl && input.key.eq_ignore_ascii_case("g") {
-        let acts = gate_open && !input.alt && !input.repeat && state.tool == Tool::Select;
-        return match (acts, input.shift) {
-            (true, false) => KeyAction::Group,
-            (true, true) => KeyAction::Ungroup,
-            (false, _) => KeyAction::Ignore,
-        };
+    if let Some(action) = group_action(input, state, gate_open) {
+        return action;
     }
     // Letters are matched without regard to Caps Lock.
     let letter = match input.key.chars().collect::<Vec<_>>().as_slice() {
@@ -140,6 +219,7 @@ pub(super) fn decide(input: &KeyInput<'_>, state: KeyState) -> KeyAction {
         (Some('b'), _) => Binding::Tool(Tool::Pen),
         (Some('n'), _) => Binding::Tool(Tool::Node),
         (Some('e'), _) => Binding::Tool(Tool::Ellipse),
+        (Some('o'), _) => Binding::Tool(Tool::Offset),
         (_, "*") => Binding::Tool(Tool::PolygonStar),
         (Some('r'), _) => Binding::Entry(EntryKey::Angle, Tool::Rectangle),
         (Some('s'), _) => Binding::Entry(EntryKey::Size, Tool::Select),
@@ -160,6 +240,10 @@ pub(super) fn decide(input: &KeyInput<'_>, state: KeyState) -> KeyAction {
         return KeyAction::Ignore;
     }
     match binding {
+        // O in the Offset tool with an operand opens the chip; otherwise it is the tool letter.
+        Binding::Tool(Tool::Offset) if state.tool == Tool::Offset && state.offset_ready => {
+            KeyAction::OpenOffsetChip
+        }
         Binding::Tool(tool) => KeyAction::SetTool(tool),
         Binding::Delete => KeyAction::Delete,
         // The one state that changes a letter: the Select tool with an

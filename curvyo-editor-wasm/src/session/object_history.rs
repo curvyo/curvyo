@@ -196,9 +196,17 @@ impl Session {
         match self.document.wipe_object_history(id) {
             Ok(hidden) => {
                 let document = &self.document;
+                // A layer the step created with the object (the Initial Layer, `0050` criterion
+                // 35) is part of the object's own step, not another object: the step goes from
+                // the stack. The wipe writes nothing, so the layer stays in the document.
                 self.history.stack.retain_steps(|step| {
                     let touched = document.touched_objects(step);
-                    touched.is_empty() || touched.iter().any(|object| *object != id)
+                    let created = document.created_objects(step);
+                    touched.is_empty()
+                        || touched.iter().any(|&object| {
+                            object != id
+                                && !(created.contains(&object) && document.is_layer(object))
+                        })
                 });
                 self.history_hover.clear();
                 ObjectWipeOutcome::Wiped(hidden)

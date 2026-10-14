@@ -48,6 +48,14 @@ mod history_rows;
 mod history_version;
 mod key_table;
 mod keys;
+mod layers;
+mod layers_edit;
+mod layers_panel;
+#[cfg(test)]
+mod layers_panel_tests;
+#[cfg(test)]
+mod layers_tests;
+mod layers_toolbar;
 mod move_entry;
 mod move_indicators;
 mod navigation;
@@ -56,6 +64,9 @@ mod nudge;
 mod object_cache;
 mod object_history;
 mod object_history_rows;
+mod offset;
+mod offset_chip;
+mod offset_view;
 mod open_error;
 mod panel_tabs;
 mod pen;
@@ -99,8 +110,12 @@ pub use history_preview::{FAR_PREVIEW_ROWS, RowPress};
 pub use history_rows::{WipeOutcome, WipeState};
 pub use history_version::{CloneOutcome, GoToOutcome};
 pub use keys::{EscapeStep, KeyHint, KeyInput, KeyOutcome};
+pub use layers_edit::{DropPlace, RowFlag};
+pub use layers_panel::{PanelReply, RowPress};
 pub use move_indicators::MoveIndicators;
 pub use object_history::ObjectWipeOutcome;
+pub use offset::{DragStop, OFFSET_COMMIT_LABEL, OffsetOutcome};
+pub use offset_view::OffsetView;
 pub use panel_tabs::{PanelTabsRecord, PanelView};
 pub use project::APP_VERSION;
 pub use select::DoubleClickHint;
@@ -161,6 +176,9 @@ pub enum Tool {
     Ellipse,
     /// The polygon/star tool (acceptance criteria 10-15).
     PolygonStar,
+    /// The Offset tool (`specs/0038-path-offset` criteria 1, 2): handles on the selection box,
+    /// its options in the Offset bar.
+    Offset,
 }
 
 /// One open document's whole editing session.
@@ -261,6 +279,13 @@ pub struct Session {
     grouping_result: Option<grouping::GroupingResult>,
     /// What a screen reader hears about the context, until the host has taken it.
     context_announcement: Option<String>,
+    /// The active layer and the layer notice (`layers.rs`).
+    layers: layers::LayerState,
+    /// The Layers list's view state (`layers_panel.rs`).
+    panel: layers_panel::PanelState,
+    /// The Offset tool: its bar's values (session memory), drag and preview
+    /// (`specs/0038-path-offset`).
+    offset: offset::OffsetTool,
 }
 
 impl Session {
@@ -314,6 +339,9 @@ impl Session {
             context_cache: context::ContextCache::default(),
             grouping_result: None,
             context_announcement: None,
+            layers: layers::LayerState::default(),
+            panel: layers_panel::PanelState::default(),
+            offset: offset::OffsetTool::default(),
         }
     }
 
@@ -363,6 +391,9 @@ impl Session {
             context_cache: context::ContextCache::default(),
             grouping_result: None,
             context_announcement: None,
+            layers: layers::LayerState::default(),
+            panel: layers_panel::PanelState::default(),
+            offset: offset::OffsetTool::default(),
         })
     }
 
@@ -422,6 +453,7 @@ impl Session {
             }
             if tool != this.tool {
                 this.command_refusal = None;
+                this.leave_offset_tool();
             }
             this.tool = tool;
         });
@@ -432,7 +464,9 @@ impl Session {
     /// (`specs/0016-boolean-operations` criteria 38 and 38a), so it contributes no node, handle or
     /// segment.
     fn paths(&self) -> Vec<curvyo_document_core::PathSnapshot> {
-        self.objects()
+        // A hidden or locked path is no target of the Node tool or the Pen
+        // (`specs/0050-layers-and-objects-panel` criteria 19 and 20).
+        self.pickable_objects()
             .iter()
             .filter_map(|object| match object {
                 ObjectSnapshot::Path(path) if !path.is_compound() => Some(path.clone()),
@@ -461,6 +495,9 @@ impl Session {
             if this.colour_pick_press(point) {
                 return;
             }
+            if this.refuse_drawing_into_layer() {
+                return;
+            }
             this.button_down = true;
             match this.tool {
                 Tool::Select => {
@@ -476,6 +513,9 @@ impl Session {
                 }
                 Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar => {
                     this.shape_pointer_down(point);
+                }
+                Tool::Offset => {
+                    this.offset_pointer_down(point, shift);
                 }
             }
         });
@@ -525,6 +565,9 @@ impl Session {
             Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar => {
                 self.shape_pointer_move(point, Modifiers::new(shift, constrain));
             }
+            Tool::Offset => {
+                self.offset_hover(point);
+            }
             Tool::Pen => {}
         }
     }
@@ -572,6 +615,9 @@ impl Session {
                 Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar => {
                     this.shape_pointer_up(point, Modifiers::new(shift, constrain));
                 }
+                Tool::Offset => {
+                    this.offset_pointer_up(point, shift, constrain);
+                }
             }
         });
     }
@@ -603,6 +649,7 @@ impl Session {
                 Tool::Pen => this.finish_pen(),
                 Tool::Node => this.insert_at(point),
                 Tool::Select => return this.select_double_click(point, shift, ctrl),
+                Tool::Offset => return this.offset_double_click(point, shift, ctrl),
                 Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar => {}
             }
             DoubleClickHint::None

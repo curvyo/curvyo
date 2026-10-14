@@ -1311,6 +1311,16 @@ fn ac40_delete_move_and_the_keys_find_nothing_to_act_on() {
     assert_eq!(stored(&s), solid(255, 0, 0, 1.0));
 }
 
+/// Removes the ids from `document.json` entries and the entries nested in them.
+fn drop_ids(nodes: &mut serde_json::Value) {
+    for o in nodes.as_array_mut().unwrap() {
+        o.as_object_mut().unwrap().remove("id");
+        if let Some(children) = o.get_mut("objects") {
+            drop_ids(children);
+        }
+    }
+}
+
 #[test]
 fn ac41_tools_work_over_a_background_exactly_as_over_the_default() {
     let run = |hex: Option<&str>, paint_none: bool| {
@@ -1335,13 +1345,14 @@ fn ac41_tools_work_over_a_background_exactly_as_over_the_default() {
         let mut j: serde_json::Value = serde_json::from_slice(&d.export_json().unwrap()).unwrap();
         j.as_object_mut().unwrap().remove("background");
         // the background edit itself consumes one operation counter, so ids shift; compare the rest
-        for o in j["objects"].as_array_mut().unwrap() {
-            o.as_object_mut().unwrap().remove("id");
-        }
+        drop_ids(&mut j["objects"]);
         j
     };
     let base = run(None, false);
-    assert_eq!(base["objects"].as_array().unwrap().len(), 3);
+    // The three objects go into the Initial Layer of the empty document (`0050` criterion 35,
+    // customer feedback 2026-10-14).
+    assert_eq!(base["objects"].as_array().unwrap().len(), 1);
+    assert_eq!(base["objects"][0]["objects"].as_array().unwrap().len(), 3);
     assert_eq!(run(Some("FF0000FF"), false), base);
     assert_eq!(run(Some("00000080"), false), base);
     assert_eq!(run(None, true), base);

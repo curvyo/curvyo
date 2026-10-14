@@ -4,6 +4,7 @@ import { useCallback, useEffect, useId, useRef } from "react";
 import { DocumentSection } from "@/components/panel/DocumentSection";
 import { FileTab } from "@/components/panel/FileTab";
 import { HistoryTab } from "@/components/panel/HistoryTab";
+import { LayersTab } from "@/components/panel/LayersTab";
 import { PanelStrip } from "@/components/panel/PanelStrip";
 import { StyleSection } from "@/components/panel/StyleSection";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
@@ -36,7 +37,7 @@ interface PropertiesPanelProps {
  * strip stays. A hidden body is out of the tab order and the canvas region takes its width; the
  * document does not move on screen because the resize keeps the view's top-left origin.
  * `Shift+Ctrl+F` (Style, or Document with nothing selected), `Shift+Ctrl+D` (Document) and
- * `Shift+Ctrl+H` (History) show the body, choose the tab and move focus to its first control; they
+ * `Shift+Ctrl+H` (History) and `Shift+Ctrl+L` (Layers) show the body, choose the tab and move focus to its first control; they
  * never hide it and are ignored during a canvas drag.
  *
  * The header row (the active tab's name and the subject line) does not scroll; the body below it
@@ -97,7 +98,7 @@ export function PropertiesPanel({
       const key = event.key.toLowerCase();
       if (
         !(event.shiftKey && (event.ctrlKey || event.metaKey)) ||
-        (key !== "f" && key !== "d" && key !== "h")
+        (key !== "f" && key !== "d" && key !== "h" && key !== "l")
       ) {
         return;
       }
@@ -106,7 +107,9 @@ export function PropertiesPanel({
         return;
       }
       focusAfterShortcut.current = true;
-      shortcut(key === "f" ? "style" : key === "h" ? "history" : "document");
+      shortcut(
+        key === "f" ? "style" : key === "h" ? "history" : key === "l" ? "layers" : "document",
+      );
       setOpen(true);
     };
     window.addEventListener("keydown", onKey);
@@ -149,6 +152,8 @@ export function PropertiesPanel({
         : ""
       : doc.view.content === "history"
       ? `${historyTotal} ${historyTotal === 1 ? "step" : "steps"}`
+      : doc.view.content === "layers"
+      ? (getSession()?.layers_subject() ?? "")
       : doc.view.content === "document"
       ? doc.view.presets.subject
       : doc.view.content === "style"
@@ -255,9 +260,9 @@ export function PropertiesPanel({
         <div
           key={doc.view.activeTab}
           className={
-            doc.view.content === "history"
-              ? // The one tab with an inner scroll area, the list: the header, the buttons
-                // and the footer stay in view (`0020` criterion 43).
+            doc.view.content === "history" || doc.view.content === "layers"
+              ? // The tabs with an inner scroll area, the list: the header, the buttons
+                // and the footer stay in view (`0020` criterion 43, `0050` criterion 3).
                 "flex min-h-0 flex-1 flex-col px-3 pb-3"
               : "properties-panel-body min-h-0 flex-1 px-3 pb-3"
           }
@@ -266,7 +271,7 @@ export function PropertiesPanel({
             value={doc.view.activeTab}
             tabIndex={-1}
             className={
-              doc.view.content === "history"
+              doc.view.content === "history" || doc.view.content === "layers"
                 ? "flex min-h-0 flex-1 flex-col outline-none"
                 : "outline-none"
             }
@@ -288,6 +293,15 @@ export function PropertiesPanel({
               />
             ) : doc.view.content === "style" ? (
               <StyleSection panel={panel} onReturnFocus={returnFocus} />
+            ) : doc.view.content === "layers" ? (
+              <LayersTab
+                getSession={getSession}
+                syncRevision={editor.syncRevision}
+                sync={editor.sync}
+                shown={open}
+                showNotice={editor.showHistoryNotice}
+                onReturnFocus={returnFocus}
+              />
             ) : doc.view.content === "history" ? (
               <HistoryTab
                 editor={editor}

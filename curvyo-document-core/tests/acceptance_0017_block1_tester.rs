@@ -530,6 +530,8 @@ fn every_older_fixture_still_opens_with_the_styles_it_stored() {
         // The damaged-group files of `0023-groups`.
         "groups_too_deep_v11.curvyo",
         "groups_leaf_child_v11.curvyo",
+        // The damaged-register file of `0050-layers-and-objects-panel`.
+        "layers_opacity_damaged_v12.curvyo",
     ];
     let mut opened = 0;
     for entry in std::fs::read_dir(dir).unwrap() {

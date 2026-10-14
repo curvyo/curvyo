@@ -242,7 +242,7 @@ fn c45_tabs_found_by_name_order_file_document_style_history() {
         ] {
             let entries = tab_entries(active, non_empty);
             let names: Vec<_> = entries.iter().map(|e| e.name).collect();
-            assert_eq!(names, ["file", "document", "style", "history"]);
+            assert_eq!(names, ["file", "document", "style", "layers", "history"]);
             // exactly one selected; it is the active tab
             let sel: Vec<_> = entries
                 .iter()
@@ -267,14 +267,15 @@ fn c45_tabs_found_by_name_order_file_document_style_history() {
         PanelTab::File,
         PanelTab::Document,
         PanelTab::Style,
+        PanelTab::Layers,
         PanelTab::History,
     ] {
         assert_eq!(PanelTab::from_name(t.name()), Some(t));
     }
     assert_eq!(
         PanelTab::from_name("layers"),
-        None,
-        "Layers is not built until 0050 ships"
+        Some(PanelTab::Layers),
+        "Layers is built since 0050 shipped"
     );
     assert_eq!(PanelTab::from_name("File"), None);
 }

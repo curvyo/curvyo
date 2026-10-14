@@ -64,8 +64,16 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     ("split", "Split"),
     ("break_apart", "Break apart"),
     ("cut_at_crossings", "Cut"),
+    ("offset_path", "Offset"),
     ("group", "Group"),
     ("ungroup", "Ungroup"),
+    ("rename_node", "Rename"),
+    ("set_node_visible", "Hide or show"),
+    ("set_node_locked", "Lock or unlock"),
+    ("set_node_opacity", "Change opacity"),
+    ("move_nodes", "Reorder"),
+    ("new_layer", "New layer"),
+    ("delete_layer", "Delete layer"),
 ];
 
 /// The labels the engine writes itself. They are no step of the maker's: the setup of a new
@@ -105,6 +113,7 @@ mod tests {
     fn a_known_label_has_its_name_and_an_unknown_one_is_edit() {
         assert_eq!(operation_name("translate_objects"), "Move");
         assert_eq!(operation_name("boolean_union"), "Union");
+        assert_eq!(operation_name("offset_path"), "Offset");
         assert_eq!(operation_name("something_old"), "Edit");
         assert_eq!(known_operation_name("something_old"), None);
     }

@@ -229,6 +229,27 @@ impl Document {
             .collect()
     }
 
+    /// The nodes `step` created: a subset of [`Document::touched_objects`]. The Object history's
+    /// wipe counts a layer the step created with the object (the Initial Layer of
+    /// `specs/0050-layers-and-objects-panel` criterion 35) as part of that object's own step.
+    #[must_use]
+    pub fn created_objects(&self, step: StepRef) -> Vec<NodeId> {
+        let doc = self.loro();
+        self.assert_outside_batch();
+        doc.commit();
+        self.container_index.borrow_mut().extend(doc);
+        let Some(log) = super::step_log::find_step(doc, step) else {
+            return Vec::new();
+        };
+        let changes = doc.export_json_in_id_span(log.span());
+        let touched = self.container_index.borrow().touched(doc, &changes);
+        touched
+            .created
+            .iter()
+            .map(|id| NodeId::from_parts(id.peer, id.counter))
+            .collect()
+    }
+
     /// The shown id of the newest step that is in effect: what the pinned "Now" row names.
     #[must_use]
     pub fn history_newest_applied_id(&self) -> Option<String> {

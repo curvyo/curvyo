@@ -10,6 +10,8 @@ interface SliderTipProps {
   valueText: string | null;
   /** The gesture help, muted on the second line. */
   help: string;
+  /** A further muted line about what the value does, or nothing. */
+  note?: string;
   /** The side that does not cover the neighbouring fields: left in the panel, below a bar. */
   side: "top" | "right" | "bottom" | "left";
   children: ReactElement;
@@ -21,7 +23,7 @@ interface SliderTipProps {
  * on the first line, the gesture help muted on the second. The timing and the house style are
  * those of `Tooltip`.
  */
-export function SliderTip({ name, valueText, help, side, children }: SliderTipProps) {
+export function SliderTip({ name, valueText, help, note, side, children }: SliderTipProps) {
   return (
     <Tooltip
       side={side}
@@ -29,6 +31,7 @@ export function SliderTip({ name, valueText, help, side, children }: SliderTipPr
         <>
           <span className="block font-medium">{tipHeading(name, valueText)}</span>
           <span className="block opacity-70">{help}</span>
+          {note ? <span className="block opacity-70">{note}</span> : null}
         </>
       }
     >

@@ -164,9 +164,23 @@ pub struct SelectTool {
     /// Shift-click, marquee, lasso and the Alt-click cycle select a group as one. Set by the host
     /// before it dispatches an event; a flat default means every leaf is its own object.
     units: std::sync::Arc<crate::units::Units>,
+    /// The objects of the context a press, a marquee, a lasso or the Alt-click cycle may hit:
+    /// without the hidden and locked ones (`specs/0050-layers-and-objects-panel` criteria 19 and
+    /// 20). Set by the host with the units, from its own cache; `None` means every object.
+    pickable: Option<std::sync::Arc<[ObjectSnapshot]>>,
 }
 
 impl SelectTool {
+    /// Sets the objects the next events may hit (see the field `pickable`).
+    pub fn set_pickable(&mut self, pickable: Option<std::sync::Arc<[ObjectSnapshot]>>) {
+        self.pickable = pickable;
+    }
+
+    /// The objects a hit test of the next event reads: the host's pickable list, else `objects`.
+    pub(crate) fn hit_objects<'a>(&'a self, objects: &'a [ObjectSnapshot]) -> &'a [ObjectSnapshot] {
+        self.pickable.as_deref().unwrap_or(objects)
+    }
+
     /// A tool with no drag in flight.
     #[must_use]
     pub fn new() -> Self {
@@ -287,8 +301,10 @@ impl SelectTool {
         selection.retain_existing(objects);
         let shift = modifiers.shift;
         let origin = DragOrigin::new(point, handle_tolerances.drag_threshold_mm, shift);
+        let pickable = self.hit_objects(objects);
         let target = classify_press(
             objects,
+            pickable,
             selection,
             point,
             tolerance,

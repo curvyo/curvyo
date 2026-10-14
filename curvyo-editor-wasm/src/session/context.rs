@@ -15,6 +15,7 @@ use curvyo_document_core::{NodeId, ObjectSnapshot};
 use curvyo_render_core::dim_outside;
 use curvyo_ui_core::{Units, context_announcement};
 
+use super::object_cache::DocumentRead;
 use super::{Session, Tool};
 
 /// The objects and units of one context at one document read.
@@ -22,8 +23,14 @@ use super::{Session, Tool};
 struct Held {
     /// The whole document's objects this entry was made from (compared by identity).
     all: Arc<[ObjectSnapshot]>,
+    /// What the canvas draws of the whole document (`specs/0050-layers-and-objects-panel`
+    /// criteria 24 and 27).
+    drawn: Arc<[ObjectSnapshot]>,
     context: Option<NodeId>,
     objects: Arc<[ObjectSnapshot]>,
+    /// The objects of the context a press, a marquee or a lasso may hit: without the hidden and
+    /// locked ones (criteria 19 and 20).
+    pickable: Arc<[ObjectSnapshot]>,
     units: Arc<Units>,
     /// The whole document with the outside of the context dimmed, made when first drawn.
     dimmed: Option<Arc<[ObjectSnapshot]>>,
@@ -37,13 +44,19 @@ pub(super) struct ContextCache {
 }
 
 impl Session {
-    /// Every object of the document as the document held it at its current version: what is
-    /// drawn. A Select or Node-tool drag keeps its first read for its whole life
+    /// The read of the document with every node's effective flags, read once per
+    /// document version. A Select or Node-tool drag keeps its first read for its whole life
     /// (`specs/0031` criterion 17).
-    pub(super) fn all_objects(&self) -> Arc<[ObjectSnapshot]> {
+    pub(super) fn document_read(&self) -> Arc<DocumentRead> {
         let drag = (self.tool == Tool::Select && self.select.drag_in_flight())
             || (self.tool == Tool::Node && self.node.drag_in_flight());
-        self.object_cache.get(&self.document, drag)
+        self.object_cache.read(&self.document, drag)
+    }
+
+    /// The objects of the context a press may hit: [`Session::objects`] without the hidden and
+    /// locked ones (`specs/0050-layers-and-objects-panel` criteria 19 and 20).
+    pub(super) fn pickable_objects(&self) -> Arc<[ObjectSnapshot]> {
+        self.held_context().pickable
     }
 
     /// The objects the tools work on: the leaves inside the entered group, or every leaf at the
@@ -57,19 +70,27 @@ impl Session {
         self.held_context().units
     }
 
-    /// The objects to draw: the whole document, with everything outside the entered group dimmed
-    /// (criterion 15). Without an entered group, [`Session::all_objects`].
+    /// The objects to draw: the effectively visible leaves of the document with their opacity,
+    /// with everything outside the entered group dimmed on top (criterion 15 and
+    /// `specs/0050-layers-and-objects-panel` criterion 27).
     pub(super) fn render_objects(&self) -> Arc<[ObjectSnapshot]> {
         let held = self.held_context();
+        if let Some(previewed) = self.previewed_drawn() {
+            let inside: HashSet<NodeId> = held.objects.iter().map(ObjectSnapshot::id).collect();
+            return match held.context {
+                None => previewed,
+                Some(_) => dim_outside(&previewed, &|id| inside.contains(&id)).into(),
+            };
+        }
         if held.context.is_none() {
-            return held.all;
+            return held.drawn;
         }
         if let Some(dimmed) = held.dimmed {
             return dimmed;
         }
         let inside: HashSet<NodeId> = held.objects.iter().map(ObjectSnapshot::id).collect();
         let dimmed: Arc<[ObjectSnapshot]> =
-            dim_outside(&held.all, &|id| inside.contains(&id)).into();
+            dim_outside(&held.drawn, &|id| inside.contains(&id)).into();
         if let Some(entry) = self.context_cache.held.borrow_mut().as_mut() {
             entry.dimmed = Some(Arc::clone(&dimmed));
         }
@@ -77,7 +98,8 @@ impl Session {
     }
 
     fn held_context(&self) -> Held {
-        let all = self.all_objects();
+        let read = self.document_read();
+        let all = Arc::clone(&read.leaves);
         let context = self.context_group();
         if let Some(held) = self.context_cache.held.borrow().as_ref()
             && Arc::ptr_eq(&held.all, &all)
@@ -85,7 +107,8 @@ impl Session {
         {
             return held.clone();
         }
-        let units = Arc::new(Units::build(&self.document, context));
+        let units =
+            Arc::new(Units::build(&self.document, context).with_inert(Arc::clone(&read.inert)));
         let objects = match context {
             None => Arc::clone(&all),
             Some(group) => {
@@ -96,10 +119,13 @@ impl Session {
                     .collect()
             }
         };
+        let pickable: Arc<[ObjectSnapshot]> = units.pickable(&objects).into_owned().into();
         let held = Held {
             all,
+            drawn: Arc::clone(&read.drawn),
             context,
             objects,
+            pickable,
             units,
             dimmed: None,
         };
@@ -110,11 +136,11 @@ impl Session {
     /// The group the Select tool works in: the innermost entered group that still exists, `None`
     /// at the document root (criterion 20).
     pub(super) fn context_group(&self) -> Option<NodeId> {
-        self.context
-            .iter()
-            .rev()
-            .copied()
-            .find(|&group| self.document.is_group(group))
+        // A group that became hidden or locked is left too
+        // (`specs/0050-layers-and-objects-panel` criterion 14). Nothing is read at the root.
+        self.context.iter().rev().copied().find(|&group| {
+            self.document.is_group(group) && !self.document_read().inert.contains(&group)
+        })
     }
 
     /// The entered groups from the outermost to the innermost, as the document holds them now.
@@ -149,7 +175,18 @@ impl Session {
                 self.context_announcement = Some(context_announcement(self.context.len(), false));
             }
         }
-        self.document.set_draw_parent(live);
+        // A selected object that became hidden or locked leaves the selection, and the
+        // selection decides the active layer (`specs/0050-layers-and-objects-panel` criteria 14
+        // and 35).
+        self.drop_inert_selection();
+        self.follow_selection_with_active_layer();
+        self.document.set_draw_parent(self.draw_parent(live));
+        // A drawing tool's first object in a document with no layer makes the Initial Layer
+        // (`specs/0050-layers-and-objects-panel` criterion 35, customer feedback 2026-10-14).
+        self.document.set_draw_into_initial_layer(matches!(
+            self.tool,
+            Tool::Pen | Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar
+        ));
     }
 
     /// Tells the Select tool which leaves belong together in the current context. Called before
@@ -158,12 +195,14 @@ impl Session {
         self.sync_context();
         let units = self.units();
         self.select.set_units(units);
+        self.select.set_pickable(Some(self.pickable_objects()));
     }
 
     /// Makes `chain` the entered groups and starts from an empty selection and no hover.
     fn set_context(&mut self, chain: Vec<NodeId>, entered: bool) {
         self.context = chain;
-        self.document.set_draw_parent(self.context.last().copied());
+        self.document
+            .set_draw_parent(self.draw_parent(self.context.last().copied()));
         self.selection.clear();
         self.select.forget_press();
         self.hovered_object = None;
@@ -172,6 +211,7 @@ impl Session {
         self.node.clear_selection();
         let units = self.units();
         self.select.set_units(units);
+        self.select.set_pickable(Some(self.pickable_objects()));
         self.context_announcement = Some(context_announcement(self.context.len(), entered));
     }
 

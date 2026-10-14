@@ -181,9 +181,9 @@ fn stored_loro(bytes: &[u8]) -> Vec<u8> {
 
 #[test]
 fn this_slice_took_its_format_version_and_the_writer_declares_it() {
-    assert_eq!(CURRENT_FORMAT_VERSION, THIS_SLICE_VERSION);
+    const _: () = assert!(CURRENT_FORMAT_VERSION >= THIS_SLICE_VERSION);
     let bytes = pack(&Document::new(1), "t").unwrap();
-    assert_eq!(manifest_version(&bytes), THIS_SLICE_VERSION);
+    assert_eq!(manifest_version(&bytes), CURRENT_FORMAT_VERSION);
 }
 
 #[test]

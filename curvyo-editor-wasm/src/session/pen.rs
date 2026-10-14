@@ -69,7 +69,8 @@ impl Session {
             let paths: Vec<_> = self
                 .paths()
                 .into_iter()
-                .filter(|path| units.group_of(path.id).is_none())
+                // A hidden or locked path is no target (`0050` criterion 19).
+                .filter(|path| units.group_of(path.id).is_none() && !units.is_inert(path.id))
                 .collect();
             *cache = Some((key, EndNodeIndex::from_paths(&paths)));
         }

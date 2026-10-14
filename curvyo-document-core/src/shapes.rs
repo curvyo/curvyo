@@ -145,7 +145,7 @@ impl Document {
         // invariant: creating a node under the root or a live group on a
         // freshly obtained tree handle cannot fail.
         #[allow(clippy::unwrap_used)]
-        let tree_id = tree.create(self.creation_parent(&tree)).unwrap();
+        let tree_id = tree.create(self.drawing_parent(&tree)).unwrap();
         // invariant: reading the meta map of a node this call just
         // created cannot fail.
         #[allow(clippy::unwrap_used)]

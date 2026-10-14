@@ -13,6 +13,8 @@ pub enum PanelTab {
     Document,
     /// The style of the objects in the active tool's scope.
     Style,
+    /// The tree of layers and objects (`specs/0050-layers-and-objects-panel` criterion 1).
+    Layers,
     /// The history of every step in the document (`specs/0020-undo-redo` criterion 39).
     History,
 }
@@ -25,6 +27,7 @@ impl PanelTab {
             Self::File => "file",
             Self::Document => "document",
             Self::Style => "style",
+            Self::Layers => "layers",
             Self::History => "history",
         }
     }
@@ -40,6 +43,7 @@ impl PanelTab {
             Self::File => "File",
             Self::Document => "Document",
             Self::Style => "Style",
+            Self::Layers => "Layers",
             Self::History => "History",
         }
     }
@@ -50,6 +54,7 @@ impl PanelTab {
             (Self::Document, _) => "Document (Shift+Ctrl+D)",
             (Self::Style, None) => "Style (Shift+Ctrl+F)",
             (Self::Style, Some(blocker)) => blocker.tooltip(),
+            (Self::Layers, _) => "Layers (Shift+Ctrl+L)",
             (Self::History, _) => "History (Shift+Ctrl+H)",
         }
     }
@@ -80,10 +85,11 @@ impl StyleBlocker {
 
 /// The strip's tabs, in order (`0051` criterion 2). A tab whose feature has not shipped is not
 /// built; the order never changes.
-const TABS: [PanelTab; 4] = [
+const TABS: [PanelTab; 5] = [
     PanelTab::File,
     PanelTab::Document,
     PanelTab::Style,
+    PanelTab::Layers,
     PanelTab::History,
 ];
 
@@ -154,6 +160,12 @@ impl PanelTabs {
     /// Shift+Ctrl+H (`specs/0020-undo-redo` criterion 46): History, whatever the scope.
     pub fn shortcut_history(&mut self) {
         self.active = PanelTab::History;
+    }
+
+    /// Shift+Ctrl+L (`specs/0050-layers-and-objects-panel` criterion 2): Layers, whatever the
+    /// scope. Like History it is never left or entered by a selection change.
+    pub fn shortcut_layers(&mut self) {
+        self.active = PanelTab::Layers;
     }
 
     /// Shift+Ctrl+D (criterion 14): Document, whatever the scope.
@@ -326,7 +338,7 @@ mod tests {
 
     /// `0051` criterion 2 and `0043` criterion 4: names, order, tooltips, the dimmed tab.
     #[test]
-    fn the_strip_has_four_tabs_with_tooltips_and_a_dimmed_style() {
+    fn the_strip_has_five_tabs_with_tooltips_and_a_dimmed_style() {
         let empty = tab_entries(Document, false);
         let names: Vec<_> = empty.iter().map(|e| (e.name, e.label)).collect();
         assert_eq!(
@@ -335,10 +347,13 @@ mod tests {
                 ("file", "File"),
                 ("document", "Document"),
                 ("style", "Style"),
+                ("layers", "Layers"),
                 ("history", "History")
             ]
         );
         assert_eq!(entry(&empty, "file").tooltip, "File");
+        assert_eq!(entry(&empty, "layers").tooltip, "Layers (Shift+Ctrl+L)");
+        assert!(entry(&empty, "layers").enabled, "Layers is never dimmed");
         assert_eq!(entry(&empty, "history").tooltip, "History (Shift+Ctrl+H)");
         assert_eq!(entry(&empty, "document").tooltip, "Document (Shift+Ctrl+D)");
         assert_eq!(

@@ -8,7 +8,7 @@
 //! deferred is that each mutating method ends in exactly one Loro commit"
 //! (ADR 0002 §9).
 
-use loro::{LoroMap, LoroMovableList, TreeID};
+use loro::{LoroMap, LoroMovableList, TreeID, TreeParentId};
 
 use crate::document::{Document, OBJECTS_TREE};
 use crate::path_codec::{
@@ -107,7 +107,9 @@ impl Document {
     /// meta map and movable list, none of which Loro's API can reject.
     #[must_use]
     pub fn create_path(&self, anchors: &[NewAnchor], closed: bool) -> NodeId {
+        let tree = self.loro().get_tree(OBJECTS_TREE);
         let id = self.create_path_uncommitted(
+            self.drawing_parent(&tree),
             anchors,
             closed,
             &Style::default(),
@@ -568,6 +570,7 @@ impl Document {
     /// object (open path) copies the original's rotation").
     pub(crate) fn create_path_uncommitted(
         &self,
+        parent: TreeParentId,
         anchors: &[NewAnchor],
         closed: bool,
         style: &Style,
@@ -577,7 +580,7 @@ impl Document {
         // invariant: creating a node under the root or a live group on a
         // freshly obtained tree handle cannot fail.
         #[allow(clippy::unwrap_used)]
-        let tree_id = tree.create(self.creation_parent(&tree)).unwrap();
+        let tree_id = tree.create(parent).unwrap();
         // invariant: reading the meta map of a node this call just
         // created cannot fail.
         #[allow(clippy::unwrap_used)]

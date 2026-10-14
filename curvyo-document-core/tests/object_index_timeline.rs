@@ -180,3 +180,15 @@ fn the_page_of_a_long_timeline_is_cut_where_asked() {
     let all = document.object_history_page(id, 0, 10);
     assert_eq!(page, all[3..7]);
 }
+
+#[test]
+fn an_initial_layer_made_in_the_drawing_step_is_not_another_object_of_that_row() {
+    // `specs/0050-layers-and-objects-panel` criterion 35 with `0041` criterion 31 (UX review of
+    // the customer feedback 2026-10-14, should-fix 6).
+    let document = Document::new(1);
+    document.set_draw_into_initial_layer(true);
+    let a = rect(&document, 0.0);
+    let rows = document.object_history_page(a, 0, 10);
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].others, 0, "the layer made with it does not count");
+}

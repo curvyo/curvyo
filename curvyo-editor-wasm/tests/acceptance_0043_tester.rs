@@ -104,11 +104,11 @@ fn doc_of(s: &Session) -> Document {
 }
 
 fn assert_consistent(v: &PanelView, ctx: &str) {
-    assert_eq!(v.tabs.len(), 4, "{ctx}");
+    assert_eq!(v.tabs.len(), 5, "{ctx}");
     assert_eq!(v.tabs.iter().filter(|t| t.selected).count(), 1, "{ctx}");
     assert_eq!(
         v.tabs.iter().map(|t| t.name).collect::<Vec<_>>(),
-        ["file", "document", "style", "history"],
+        ["file", "document", "style", "layers", "history"],
         "{ctx}"
     );
     let style = tab(v, "style");
@@ -281,7 +281,7 @@ fn c4_pressing_the_dimmed_style_tab_changes_nothing_and_reports_false() {
 fn c4_unknown_tab_names_are_refused() {
     let mut s = session_with_rect();
     pick1(&mut s);
-    for name in ["History", "", "Style", "layers", "document "] {
+    for name in ["History", "", "Style", "Layers", "document "] {
         assert!(!s.press_panel_tab(name), "{name:?}");
         assert_eq!(active(&s.panel_view()), "style");
     }
@@ -407,7 +407,7 @@ fn c10_an_unfinished_pen_path_empties_the_body_and_keeps_the_strip() {
     assert!(s.pen_in_progress().is_some(), "an unfinished path");
     let v = s.panel_view();
     assert_eq!(v.content, PanelContent::Empty);
-    assert_eq!(v.tabs.len(), 4, "the strip stays");
+    assert_eq!(v.tabs.len(), 5, "the strip stays");
     assert_eq!(active(&v), "document");
     // A press on a tab sets the active tab.
     assert!(
