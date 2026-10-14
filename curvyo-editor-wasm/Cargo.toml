@@ -26,6 +26,11 @@ loro.workspace = true
 
 zip.workspace = true
 
+# `tests/node_marquee_interactivity.rs` times the marquee frame by the thread's CPU time, so a
+# busy CI runner does not fail the 16.7 ms budget (`specs/0053-node-marquee-selection/` crit. 25).
+[target.'cfg(unix)'.dev-dependencies]
+rustix = { version = "1.1", features = ["time"] }
+
 # `session.rs` (this crate's actual orchestration logic) is plain Rust,
 # host-independent and tested by ordinary `cargo test`. Everything below
 # is wasm32-only: the `wasm-bindgen` surface and the `wgpu` device/
