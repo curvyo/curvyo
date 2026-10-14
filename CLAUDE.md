@@ -131,7 +131,8 @@ directory also holds the symlinks `CLAUDE.md` and `.claude` into `base/`, and
 the sessions start there. Every agent that needs its own copy (implementer,
 tester, fix branches) gets a git worktree next to `base/`, at `../<slug>/`
 relative to `base/` (`git -C base worktree add ../<slug> -b <branch> origin/main`,
-run from the project directory), and the lead removes it after the PR is merged.
+run from the project directory, then `projectatlas init` inside the new worktree), and the lead removes it after the PR is merged
+(`git -C base worktree remove --force ../<slug>`: `--force` because of the ignored index).
 Nothing is ever created outside the project directory, and no agent reads or
 writes outside it. No machine-specific absolute path goes into the repo.
 
@@ -248,6 +249,10 @@ and CI structure. Adaptations for this project:
   design system.
 
 Use the ProjectAtlas MCP for code navigation before broad grep/read passes.
+Its tools are deferred (load them with ToolSearch first), every call takes
+`project_path=<absolute worktree path>`, and each new worktree needs one
+`projectatlas init` (details in the "Finding code: ProjectAtlas" section of
+`.claude/agents/implementer.md`).
 
 ## 9. Git and GitHub
 

@@ -19,3 +19,5 @@ curvyo-app/gen/
 .projectatlas/projectatlas.claude.mcp.json
 .projectatlas/projectatlas.mcp.json
 .projectatlas/projectatlas.opencode.json
+# ProjectAtlas runtime lock
+.projectatlas/repository-graph-stage.lock

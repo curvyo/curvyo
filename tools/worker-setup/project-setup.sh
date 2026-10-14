@@ -30,7 +30,7 @@ if [ "$ROLE" != "lead" ]; then
     (cd base && projectatlas init --force-rescan >/dev/null 2>&1; projectatlas root verify | grep -E "verified" || true)
     # Local scope: the MCP entry belongs to this project directory only.
     (cd "$W" && "$HOME/.local/bin/claude" mcp remove --scope local projectatlas >/dev/null 2>&1 || true
-     cd "$W" && "$HOME/.local/bin/claude" mcp add --scope local projectatlas -- "$HOME/.cargo/bin/projectatlas" --require-version 0.4.5 --db "$W/base/.projectatlas/projectatlas.db" --config "$W/base/.projectatlas/config.toml" mcp)
+     cd "$W" && "$HOME/.local/bin/claude" mcp add --scope local projectatlas -- "$HOME/.cargo/bin/projectatlas" --db "$W/base/.projectatlas/projectatlas.db" --config "$W/base/.projectatlas/config.toml" mcp)
   fi
 fi
 systemctl --user daemon-reload

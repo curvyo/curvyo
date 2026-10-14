@@ -26,7 +26,7 @@ if [ "$ROLE" != "lead" ]; then
     || cargo +1.99.0 install wasm-bindgen-cli --version 0.2.129 --locked
 
   # 5. ProjectAtlas (code navigation MCP server).
-  command -v projectatlas >/dev/null && projectatlas --version | grep -q 0.4.5 \
+  command -v projectatlas >/dev/null \
     || cargo +1.99.0 install --locked --git https://github.com/styler-ai/ProjectAtlas --tag v0.4.5 projectatlas-cli
 fi
 

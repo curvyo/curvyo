@@ -37,3 +37,13 @@ inputs nobody thought of.
 ## Reporting to the lead
 Verdict `PASS` or `FAIL`, then a table: criterion number, test name, result.
 Then findings with reproduction steps. At most 30 lines plus the table.
+
+## Finding code: ProjectAtlas
+Use ProjectAtlas before broad grep or read passes. Its tools are deferred: load
+them first with ToolSearch `select:mcp__projectatlas__atlas_search,mcp__projectatlas__atlas_symbols,mcp__projectatlas__atlas_outline,mcp__projectatlas__atlas_slice,mcp__projectatlas__atlas_files`.
+Pass `project_path=<absolute path of the worktree you work in>` on every
+call; without it you query `base/`, which is `main`, not your branch. A
+worktree has its own index: if your worktree has no `.projectatlas/projectatlas.db`
+yet, run `projectatlas init` in it once (about 40 s). After a milestone run
+`projectatlas scan` there; the index does not follow edits. If a call fails,
+fall back to grep and read and carry on.
