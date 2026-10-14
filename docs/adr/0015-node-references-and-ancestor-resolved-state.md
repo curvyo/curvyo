@@ -1,7 +1,7 @@
 # ADR 0015: Node references and ancestor-resolved node state
 
 **Status:** Accepted (customer, 2026-10-11; see "Customer decisions 2026-10-11"). Proposed
-2026-10-10, revised before acceptance on 2026-10-11 for clone chains and for leaving output open.
+2026-10-10, revised before acceptance on 2026-10-11 for clone chains and for leaving output open. [ADR 0016](0016-clone-overrides.md) (Proposed) extends §3 to §5 with clone overrides.
 It supersedes one sentence of [ADR 0002](0002-document-model-units-and-svg-round-trip.md) §5
 ("Each node carries its own affine transform and its own fully resolved style: no CSS cascade, no
 inheritance"), and 0002's Status line points here. Asked by `specs/0049-linked-clone` and
