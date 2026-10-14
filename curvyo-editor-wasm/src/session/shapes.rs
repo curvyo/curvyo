@@ -139,7 +139,7 @@ impl Session {
             return self.select_live_readout();
         }
         if self.tool == Tool::Node {
-            return self.bend_readout();
+            return self.node_marquee_readout().or_else(|| self.bend_readout());
         }
         let CreatePreview { shape, anchor, .. } = self.live_preview()?;
         let text = match shape {

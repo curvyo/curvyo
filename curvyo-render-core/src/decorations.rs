@@ -6,7 +6,11 @@
 //! selection, since this crate cannot read `curvyo-ui-core` directly
 //! (`specs/0002-path-node-editing/adrs.md`, "the path/node crate boundary").
 
-use curvyo_document_core::{AnchorKind, HandleSlot, NodeId, PathSnapshot, Vec2, ViewTransform};
+use std::collections::{HashMap, HashSet};
+
+use curvyo_document_core::{
+    AnchorKind, HandleSlot, NodeId, PathSnapshot, Point, Vec2, ViewTransform,
+};
 
 use crate::color::RgbaColor;
 use crate::glyphs::{self, DrawList};
@@ -54,21 +58,35 @@ pub struct DecorationInput {
     /// Nodes whose handles are drawn in the idle look without the node being selected: the two
     /// ends of a segment being bent (`0031` criterion 16).
     pub handle_nodes: Vec<(NodeId, curvyo_document_core::AnchorId)>,
+    /// Nodes a node marquee in flight would select: each gets the pre-selection ring
+    /// (`specs/0053-node-marquee-selection/` criterion 10, design-system row "Node marquee").
+    pub ringed_nodes: Vec<(NodeId, curvyo_document_core::AnchorId)>,
 }
 
-impl DecorationInput {
+type NodeKey = (NodeId, curvyo_document_core::AnchorId);
+
+/// The node lists of a [`DecorationInput`] as hash sets, built once per [`build`] so the per-node
+/// tests stay constant time when a marquee or Ctrl+A selects thousands of nodes
+/// (`specs/0053-node-marquee-selection/` criterion 25).
+struct NodeSets {
+    selected: HashSet<NodeKey>,
+    handles: HashSet<NodeKey>,
+}
+
+impl NodeSets {
+    fn of(input: &DecorationInput) -> Self {
+        Self {
+            selected: input.selected_nodes.iter().copied().collect(),
+            handles: input.handle_nodes.iter().copied().collect(),
+        }
+    }
+
     fn is_node_selected(&self, path: NodeId, anchor: curvyo_document_core::AnchorId) -> bool {
-        self.selected_nodes
-            .iter()
-            .any(|&(p, a)| p == path && a == anchor)
+        self.selected.contains(&(path, anchor))
     }
 
     fn shows_handles(&self, path: NodeId, anchor: curvyo_document_core::AnchorId) -> bool {
-        self.is_node_selected(path, anchor)
-            || self
-                .handle_nodes
-                .iter()
-                .any(|&(p, a)| p == path && a == anchor)
+        self.is_node_selected(path, anchor) || self.handles.contains(&(path, anchor))
     }
 }
 
@@ -117,15 +135,27 @@ pub fn build(paths: &[PathSnapshot], view: ViewTransform, input: &DecorationInpu
     // same spot (after a Split) the selected glyph is drawn above the other
     // and its accent fill stays visible (`specs/0010-edit-interaction-polish/`
     // criterion 50).
+    let sets = NodeSets::of(input);
     for draw_selected in [false, true] {
         for path in drawn_paths {
             for anchor in &path.anchors {
-                let selected = input.is_node_selected(path.id, anchor.id);
+                let selected = sets.is_node_selected(path.id, anchor.id);
                 if selected == draw_selected {
-                    push_node(&mut list, &sizes, input, path.id, anchor, selected);
+                    let handles = sets.shows_handles(path.id, anchor.id);
+                    push_node(
+                        &mut list,
+                        &sizes,
+                        input,
+                        path.id,
+                        anchor,
+                        (selected, handles),
+                    );
                 }
             }
         }
+    }
+    if input.show_nodes {
+        push_marquee_rings(&mut list, &sizes, drawn_paths, &input.ringed_nodes);
     }
 
     if let Some(overlay) = selected_segment_overlay(paths, view, input.selected_segment) {
@@ -143,9 +173,9 @@ fn push_node(
     input: &DecorationInput,
     path: NodeId,
     anchor: &curvyo_document_core::AnchorSnapshot,
-    selected: bool,
+    (selected, shows_handles): (bool, bool),
 ) {
-    if input.shows_handles(path, anchor.id) {
+    if shows_handles {
         for (slot, handle) in [
             (HandleSlot::Out, anchor.handle_out),
             (HandleSlot::In, anchor.handle_in),
@@ -217,6 +247,45 @@ fn push_node(
             theme::ACCENT_HOVER,
         ));
     }
+}
+
+/// The pre-selection rings of a node marquee (`specs/0053-node-marquee-selection/` UX notes):
+/// the node hover ring's size, 1.5 px in [`theme::HOVER_BOX`] over a white casing, above every
+/// node glyph. Only the ringed nodes are visited, through one lookup map per path.
+fn push_marquee_rings(
+    list: &mut DrawList,
+    sizes: &Sizes,
+    paths: &[PathSnapshot],
+    ringed: &[NodeKey],
+) {
+    if ringed.is_empty() {
+        return;
+    }
+    let points: HashMap<NodeKey, Point> = paths
+        .iter()
+        .flat_map(|path| path.all_anchors().map(move |a| ((path.id, a.id), a.point)))
+        .collect();
+    let thickness = sizes.ring_thickness * theme::MARQUEE_RING_WIDTH_PX;
+    let centers: Vec<Point> = ringed
+        .iter()
+        .filter_map(|key| points.get(key).copied())
+        .collect();
+    // The casing reaches half a ring width past the ring on both sides; all casings first, so
+    // no ring is covered by a neighbour's casing.
+    glyphs::rings(
+        list,
+        &centers,
+        sizes.hover_ring_diameter + thickness,
+        2.0 * thickness,
+        theme::HOVER_BOX_CASING,
+    );
+    glyphs::rings(
+        list,
+        &centers,
+        sizes.hover_ring_diameter,
+        thickness,
+        theme::HOVER_BOX,
+    );
 }
 
 /// The hover band of the hovered segment (`0031` criterion 15), or `None` when no segment is
@@ -604,6 +673,29 @@ mod tests {
         assert!(
             first_casing < first_accent,
             "a casing comes before the line it sits under"
+        );
+    }
+
+    /// `0053` criterion 10: a ringed node draws its pre-selection ring (casing and ring) on
+    /// top of its glyph; a ringed id that does not resolve draws nothing.
+    #[test]
+    fn ringed_nodes_get_the_pre_selection_ring() {
+        let (document, path, a, _b) = two_node_path();
+        let paths = vec![document.path(path).expect("exists")];
+        let plain = build(&paths, ViewTransform::identity(), &nodes_on());
+        let ringed = build(
+            &paths,
+            ViewTransform::identity(),
+            &DecorationInput {
+                ringed_nodes: vec![(path, a), (path, AnchorId::new(9, 9))],
+                ..nodes_on()
+            },
+        );
+        let one_ring =
+            glyphs::ring(Point::new(0.0, 0.0), 1.0, 0.1, theme::HOVER_BOX).triangle_count();
+        assert_eq!(
+            ringed.triangle_count(),
+            plain.triangle_count() + 2 * one_ring
         );
     }
 }

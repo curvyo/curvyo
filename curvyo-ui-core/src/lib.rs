@@ -53,6 +53,7 @@ mod linked_clone;
 mod marquee;
 mod modifiers;
 mod move_entry;
+mod node_marquee;
 mod node_tool;
 mod nudge;
 mod object_bounds;
@@ -182,8 +183,12 @@ pub use linked_clone::{
 pub use marquee::{MarqueeMode, objects_in_marquee, units_in_marquee};
 pub use modifiers::Modifiers;
 pub use move_entry::MoveEntry;
+pub use node_marquee::{
+    NodeMarquee, anchors_in_box, editing_set_anchors, node_marquee_legend_text,
+    nodes_selected_announcement,
+};
 pub use node_tool::{
-    HitTolerances, LiveNodeDrag, NodeTool, NodeToolbarState,
+    HitTolerances, JoinBlock, LiveNodeDrag, NodeTool, NodeToolbarState,
     PointerDownOutcome as NodePointerDownOutcome, PointerUpOutcome as NodePointerUpOutcome,
 };
 pub use nudge::{

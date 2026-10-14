@@ -432,12 +432,12 @@ fn ac14_the_last_node_delete_of_a_path_removes_the_emptied_group() {
     let q = path(&d, 2, 20.0);
     let g = d.group_objects(&[p, q]).unwrap();
     let anchors: Vec<AnchorId> = d.path(p).unwrap().anchors.iter().map(|a| a.id).collect();
-    d.delete_anchors(p, &anchors[..1]).unwrap();
+    d.delete_anchors(&anchors[..1].iter().map(|&a| (p, a)).collect::<Vec<_>>());
     assert!(d.path(p).is_none(), "fewer than two anchors: the path goes");
     assert!(d.contains_node(g), "q is still in the group");
     let n = d.own_step_count();
     let anchors: Vec<AnchorId> = d.path(q).unwrap().anchors.iter().map(|a| a.id).collect();
-    d.delete_anchors(q, &anchors[..1]).unwrap();
+    d.delete_anchors(&anchors[..1].iter().map(|&a| (q, a)).collect::<Vec<_>>());
     assert_eq!(d.own_step_count(), n + 1);
     assert!(d.path(q).is_none());
     assert!(!d.contains_node(g), "the empty group is removed with it");

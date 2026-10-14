@@ -11,9 +11,9 @@
 use std::collections::HashMap;
 
 use curvyo_document_core::{
-    Affine, AnchorId, CloneError, CloneLinks, CloneRepair, CloneSnapshot, Color, CopySource,
-    Document, NewAnchor, NodeId, ObjectEditError, ObjectSnapshot, PathEditError, PathSnapshot,
-    Point, StyleEdit, UNLINK_CLONE_COMMIT_LABEL, Vec2, clone_matrices_after,
+    Affine, AnchorId, AnchorKind, CloneError, CloneLinks, CloneRepair, CloneSnapshot, Color,
+    CopySource, Document, NewAnchor, NodeId, ObjectEditError, ObjectSnapshot, PathEditError,
+    PathSnapshot, Point, StyleEdit, UNLINK_CLONE_COMMIT_LABEL, Vec2, clone_matrices_after,
 };
 
 /// A square of side `size` with its top-left corner at `at`.
@@ -709,8 +709,14 @@ fn ac26_node_edits_refuse_a_clone() {
         d.move_anchors(&[(c, anchor, Point::new(1.0, 1.0))]),
         Err(PathEditError::NoSuchPath)
     );
+    // `delete_anchors` takes pairs and skips a pair whose path is no editable path
+    // (`specs/0053-node-marquee-selection/adrs.md` decision 4, note of 2026-10-14): a clone's
+    // pair writes nothing and adds no step; Convert still refuses it.
+    let steps = d.own_step_count();
+    d.delete_anchors(&[(c, anchor)]);
+    assert_eq!(d.own_step_count(), steps);
     assert_eq!(
-        d.delete_anchors(c, &[anchor]),
+        d.convert_anchor_kind(&[(c, anchor)], AnchorKind::Symmetric),
         Err(PathEditError::NoSuchPath)
     );
     assert!(matches!(d.object(c), Some(ObjectSnapshot::Clone(_))));

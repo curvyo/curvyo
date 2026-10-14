@@ -13,7 +13,7 @@ use curvyo_geometry_core::{nearest_point_on_segment, subdivide_at_parameter};
 
 use crate::hit_test::{Hit, hit_test};
 use crate::segment_bend::{BendResolution, SegmentBend};
-use crate::{AnchorIdMinter, NodeSelection};
+use crate::{AnchorIdMinter, Modifiers, NodeMarquee, NodeSelection, SelectionCombine};
 
 /// The three hit-test tolerances the node tool needs — 8px node, 16px
 /// handle, 4px segment per `docs/design-system.md` (the handle radius
@@ -94,6 +94,34 @@ pub struct NodeToolbarState {
     /// interior node of an open path or any node of a closed path
     /// (acceptance criterion 12).
     pub can_split: bool,
+    /// Why Join is disabled, for its tooltip's reason line (`specs/0053-node-marquee-
+    /// selection/` criterion 19); `None` when Join is enabled.
+    pub join_block: Option<JoinBlock>,
+    /// How many nodes are selected (criterion 23).
+    pub selected_nodes: usize,
+    /// How many nodes the editing set has (criterion 23).
+    pub total_nodes: usize,
+    /// Whether a segment, not nodes, is selected (criterion 23: "Segment, 120 nodes").
+    pub segment_selected: bool,
+}
+
+/// Why Join refuses the current node selection (`specs/0053-node-marquee-selection/adrs.md`
+/// decision 7). The host turns the first two into the reason line of Join's tooltip.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum JoinBlock {
+    /// Not exactly two nodes are selected; the count.
+    Count(usize),
+    /// Two nodes are selected and `not_end` of them are not an end node of an open path (the
+    /// first or last anchor of an open path).
+    NotEndNodes {
+        /// How many selected nodes are not an end node.
+        not_end: usize,
+        /// How many nodes are selected.
+        of: usize,
+    },
+    /// Two end nodes, but the document refuses them for another reason (the two ends of a
+    /// two-node path). No reason line.
+    Other,
 }
 
 /// The node tool's state: its persistent [`NodeSelection`] plus whatever
@@ -145,6 +173,9 @@ enum Drag {
     /// Bending a segment: a press on it that has not left the drag threshold is only a click
     /// (`specs/0031-segment-drag-bending`).
     Bend(Box<SegmentBend>),
+    /// A press on nothing: a click until it leaves the drag threshold, then a node marquee
+    /// (`specs/0053-node-marquee-selection/` criteria 1, 12).
+    Marquee(NodeMarquee),
 }
 
 /// What [`NodeTool::live_drag`] resolves a drag in flight to — mirrors
@@ -193,8 +224,8 @@ pub enum LiveNodeDrag {
 /// What [`NodeTool::pointer_down`] did.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PointerDownOutcome {
-    /// Nothing was hit; the selection was cleared (unless `shift` was
-    /// held, in which case it is left as-is).
+    /// Nothing was hit; a click or a node marquee began. The selection is unchanged until the
+    /// release (`specs/0053-node-marquee-selection/` criterion 12).
     Missed,
     /// A node (or the start of a multi-node drag) was hit.
     Node,
@@ -216,6 +247,8 @@ pub enum PointerUpOutcome {
     HandleMoved,
     /// `0031` criterion 18: a segment was bent, one `bend_segment` commit.
     SegmentBent,
+    /// `0053` criterion 5: a node marquee combined its box with the node selection. No commit.
+    NodesSelected,
 }
 
 impl NodeTool {
@@ -237,20 +270,16 @@ impl NodeTool {
         self.selection.select_nodes(pairs);
     }
 
-    /// Selects every anchor of `path` as one multi-node selection —
-    /// `primitive-shapes`' "object to path" (acceptance criterion 17)
-    /// uses this so a freshly converted primitive is immediately
-    /// editable with the node tool, exactly as if the maker had drawn
-    /// it with the pen tool and then selected every node by hand.
-    pub fn select_all_anchors(&mut self, path: &PathSnapshot) {
-        self.selection.clear();
-        let Some((first, rest)) = path.anchors.split_first() else {
-            return;
-        };
-        self.selection.select_single_node(path.id, first.id);
-        for anchor in rest {
-            self.selection.toggle_node(path.id, anchor.id);
-        }
+    /// Selects every anchor of `paths` in document order, replacing the selection and dropping
+    /// a segment selection (`specs/0053-node-marquee-selection/` criterion 22; the order is
+    /// [`crate::editing_set_anchors`]'s). With one path it is `primitive-shapes`' "object to
+    /// path" (criterion 17 there): a converted primitive is at once editable with every node
+    /// selected.
+    pub fn select_all(&mut self, paths: &[PathSnapshot]) {
+        let all: Vec<(NodeId, curvyo_document_core::AnchorId)> = crate::editing_set_anchors(paths)
+            .map(|(path, anchor)| (path, anchor.id))
+            .collect();
+        self.selection.apply(SelectionCombine::Replace, &all);
     }
 
     /// Escape, step 2 of `specs/0010-edit-interaction-polish/` criterion 42: cancels
@@ -290,8 +319,10 @@ impl NodeTool {
     /// (`specs/0006-.../adrs.md`'s architect review: "Rejected: collapsing
     /// a cross-path selection on a plain press. It breaks AC 10 across
     /// paths"). Only a click on a node that is *not* already selected
-    /// replaces the selection with that one node; a click that hits
-    /// nothing clears the selection unless `shift` is held.
+    /// replaces the selection with that one node. A press that hits nothing changes no
+    /// selection: it starts a click or a node marquee, decided at the release
+    /// (`specs/0053-node-marquee-selection/` criteria 1, 12). Alt has no meaning here
+    /// (criterion 13).
     pub fn pointer_down(
         &mut self,
         paths: &[PathSnapshot],
@@ -339,9 +370,7 @@ impl NodeTool {
                 PointerDownOutcome::Segment
             }
             None => {
-                if !shift {
-                    self.selection.clear();
-                }
+                self.drag = Drag::Marquee(NodeMarquee::new(point));
                 PointerDownOutcome::Missed
             }
         }
@@ -449,7 +478,7 @@ impl NodeTool {
     #[must_use]
     pub fn live_drag(&self, cursor: Point, shift: bool) -> Option<LiveNodeDrag> {
         match &self.drag {
-            Drag::None => None,
+            Drag::None | Drag::Marquee(_) => None,
             Drag::Bend(bend) => bend.resolve(cursor, shift).map(LiveNodeDrag::Bend),
             Drag::Nodes { down_at, starts } => Some(LiveNodeDrag::Nodes {
                 positions: Self::resolve_node_positions(*down_at, starts, cursor),
@@ -481,20 +510,59 @@ impl NodeTool {
     }
 
     /// The pointer moved to `point` with `shift` as given: a bend in flight records it (the drag
-    /// threshold, once left, stays left; Shift decides the axis lock). A no-op for every other
-    /// drag and when none runs.
-    pub fn pointer_moved(&mut self, point: Point, shift: bool) {
-        if let Drag::Bend(bend) = &mut self.drag {
-            bend.pointer_moved(point, shift);
+    /// threshold, once left, stays left; Shift decides the axis lock), and a marquee in flight
+    /// arms at `drag_threshold` and refreshes the anchors of `paths` inside its box. A no-op for
+    /// every other drag and when none runs.
+    pub fn pointer_moved(
+        &mut self,
+        paths: &[PathSnapshot],
+        point: Point,
+        shift: bool,
+        drag_threshold: Tolerance,
+    ) {
+        match &mut self.drag {
+            Drag::Bend(bend) => bend.pointer_moved(point, shift),
+            Drag::Marquee(marquee) => marquee.pointer_moved(paths, point, drag_threshold),
+            Drag::None | Drag::Nodes { .. } | Drag::Handle { .. } => {}
         }
     }
 
-    /// The maker released the mouse button at `point`, ending whatever
-    /// drag [`NodeTool::pointer_down`] began. Commits the drag as exactly
-    /// one command.
-    pub fn pointer_up(&mut self, document: &Document, point: Point) -> PointerUpOutcome {
+    /// The node marquee in flight, armed or not (`specs/0053-node-marquee-selection/`
+    /// criteria 2, 10).
+    #[must_use]
+    pub const fn marquee(&self) -> Option<&NodeMarquee> {
+        match &self.drag {
+            Drag::Marquee(marquee) => Some(marquee),
+            _ => None,
+        }
+    }
+
+    /// The maker released the mouse button at `point` with `modifiers` held, ending whatever
+    /// drag [`NodeTool::pointer_down`] began. Commits a node, handle or bend drag as exactly
+    /// one command. A marquee commits nothing (`specs/0053-node-marquee-selection/`
+    /// criterion 17): armed, its box combines with the selection by Shift and Ctrl (criterion
+    /// 5; the caller has passed the release point to [`NodeTool::pointer_moved`] first);
+    /// not armed, it is a click on nothing that clears the node and segment selection unless
+    /// Shift or Ctrl is held (criterion 12). Alt is ignored.
+    pub fn pointer_up(
+        &mut self,
+        document: &Document,
+        point: Point,
+        modifiers: Modifiers,
+    ) -> PointerUpOutcome {
         match std::mem::take(&mut self.drag) {
             Drag::None => PointerUpOutcome::NoOp,
+            Drag::Marquee(marquee) => {
+                if marquee.armed() {
+                    let combine = SelectionCombine::from_modifiers(modifiers.shift, modifiers.ctrl);
+                    self.selection.apply(combine, marquee.inside());
+                    return PointerUpOutcome::NodesSelected;
+                }
+                if !modifiers.shift && !modifiers.ctrl {
+                    self.selection.clear();
+                }
+                PointerUpOutcome::NoOp
+            }
             Drag::Bend(mut bend) => {
                 if bend.commit(document, point) {
                     PointerUpOutcome::SegmentBent
@@ -543,32 +611,26 @@ impl NodeTool {
         }
     }
 
-    /// Acceptance criterion 11: converts every currently selected node to
-    /// `kind`, as one commit for the whole multi-selection. A no-op when
-    /// the selection is not a node selection.
+    /// Acceptance criterion 11: converts every currently selected node to `kind`, on however
+    /// many paths, as one commit (`specs/0053-node-marquee-selection/` criterion 20). A no-op
+    /// when no node is selected.
     pub fn convert_selected(&self, document: &Document, kind: AnchorKind) {
-        let Some(path) = self.selection.path() else {
-            return;
-        };
-        let ids = self.selection.nodes();
-        if ids.is_empty() {
+        let pairs = self.selection.node_pairs();
+        if pairs.is_empty() {
             return;
         }
-        let _ = document.convert_anchor_kind(path, &ids, kind);
+        let _ = document.convert_anchor_kind(pairs, kind);
     }
 
-    /// Acceptance criterion 13: deletes every currently selected node,
-    /// then clears the selection (the deleted ids can no longer resolve).
-    /// A no-op when the selection is not a node selection.
+    /// Acceptance criterion 13: deletes every currently selected node, on however many paths,
+    /// as one commit (`specs/0053-node-marquee-selection/` criterion 18), then clears the
+    /// selection (the deleted ids can no longer resolve). A no-op when no node is selected.
     pub fn delete_selected(&mut self, document: &Document) {
-        let Some(path) = self.selection.path() else {
-            return;
-        };
-        let ids = self.selection.nodes();
-        if ids.is_empty() {
+        let pairs = self.selection.node_pairs();
+        if pairs.is_empty() {
             return;
         }
-        let _ = document.delete_anchors(path, &ids);
+        document.delete_anchors(pairs);
         self.selection.clear();
     }
 
@@ -604,8 +666,11 @@ impl NodeTool {
     /// this tool's current selection against `document`'s live state —
     /// the facade (`curvyo-editor-wasm`'s `Session`) just calls this
     /// rather than re-deriving the same booleans itself.
+    ///
+    /// `paths` is the editing set: it gives the node count and the end-node test of
+    /// [`NodeTool::join_check`].
     #[must_use]
-    pub fn toolbar_state(&self, document: &Document) -> NodeToolbarState {
+    pub fn toolbar_state(&self, document: &Document, paths: &[PathSnapshot]) -> NodeToolbarState {
         let has_nodes = !self.selection.nodes().is_empty();
         let segment_is_line = self
             .selection
@@ -617,6 +682,7 @@ impl NodeTool {
                 let end_anchor = snapshot.anchors.iter().find(|a| a.id == end)?;
                 Some(start_anchor.handle_out == Vec2::ZERO && end_anchor.handle_in == Vec2::ZERO)
             });
+        let join_block = self.join_check(document, paths).err();
         NodeToolbarState {
             can_insert: segment_is_line.is_some(),
             can_delete: has_nodes,
@@ -627,13 +693,46 @@ impl NodeTool {
             can_make_curve: segment_is_line == Some(true),
             compound_only: false,
             clone_only: false,
-            can_join: self.can_join(document),
+            can_join: join_block.is_none(),
             can_split: self.can_split(document),
+            join_block,
+            selected_nodes: self.selection.node_pairs().len(),
+            total_nodes: crate::editing_set_anchors(paths).count(),
+            segment_selected: self.selection.segment().is_some(),
+        }
+    }
+
+    /// Whether Join would act on the current selection, and if not, why
+    /// (`specs/0053-node-marquee-selection/adrs.md` decision 7): one function for the enabled
+    /// state and the tooltip text. The end-node test reads `paths`; the final word is
+    /// `document.check_join`, the rule `Document::join_endpoints` runs.
+    ///
+    /// # Errors
+    /// The [`JoinBlock`] that names why Join is disabled.
+    pub fn join_check(&self, document: &Document, paths: &[PathSnapshot]) -> Result<(), JoinBlock> {
+        let pairs = self.selection.node_pairs();
+        let Some((a, b)) = self.selection.join_pairs() else {
+            return Err(JoinBlock::Count(pairs.len()));
+        };
+        let not_end = pairs
+            .iter()
+            .filter(|&&(path, anchor)| !is_open_end(paths, path, anchor))
+            .count();
+        if not_end > 0 {
+            return Err(JoinBlock::NotEndNodes {
+                not_end,
+                of: pairs.len(),
+            });
+        }
+        if document.check_join(a.0, a.1, b.0, b.1) {
+            Ok(())
+        } else {
+            Err(JoinBlock::Other)
         }
     }
 
     /// Acceptance criteria 8-11: Join. A no-op (no commit) when the
-    /// current selection does not qualify — [`NodeTool::can_join`]'s own
+    /// current selection does not qualify — [`NodeTool::join_check`]'s own
     /// condition, which `Document::join_endpoints` independently refuses
     /// on too. On success, selects only the merged node (criterion 11),
     /// so the maker can immediately continue working at the junction.
@@ -645,22 +744,6 @@ impl NodeTool {
             return;
         };
         self.selection.select_single_node(path, anchor);
-    }
-
-    /// Whether [`NodeTool::join_selected`] would do anything right now
-    /// (acceptance criterion 8): the current selection names exactly two
-    /// `(path, anchor)` pairs (same-path AC 10, or Split's own two-
-    /// object result AC 15 — see [`NodeSelection::join_pairs`] for why
-    /// those are the only two sources), and `document.check_join` — the
-    /// same refusal rule `Document::join_endpoints` itself runs,
-    /// checked here rather than re-derived independently (architect
-    /// review: the same "one rule, one place" principle
-    /// `resolve_handle_pair` already follows) — accepts them.
-    #[must_use]
-    pub fn can_join(&self, document: &Document) -> bool {
-        self.selection
-            .join_pairs()
-            .is_some_and(|(a, b)| document.check_join(a.0, a.1, b.0, b.1))
     }
 
     /// Acceptance criteria 12-15: Split. A no-op (no commit, and
@@ -692,7 +775,7 @@ impl NodeTool {
     /// (acceptance criterion 12): the current selection is exactly one
     /// node, and `document.check_split` — the same refusal rule
     /// `Document::split_at_anchor` itself runs — accepts it (see
-    /// [`NodeTool::can_join`]'s own doc comment for why this checks the
+    /// [`NodeTool::join_check`]'s own doc comment for why this checks the
     /// document-core rule rather than a local copy of it).
     #[must_use]
     pub fn can_split(&self, document: &Document) -> bool {
@@ -833,6 +916,22 @@ impl NodeTool {
     }
 }
 
+/// Whether `anchor` is the first or last anchor of `path`'s outline in `paths`, and that
+/// outline is open.
+fn is_open_end(
+    paths: &[PathSnapshot],
+    path: NodeId,
+    anchor: curvyo_document_core::AnchorId,
+) -> bool {
+    paths.iter().find(|p| p.id == path).is_some_and(|p| {
+        p.subpaths().any(|outline| {
+            !outline.closed
+                && (outline.anchors.first().is_some_and(|a| a.id == anchor)
+                    || outline.anchors.last().is_some_and(|a| a.id == anchor))
+        })
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use curvyo_document_core::{AnchorId, NewAnchor, Vec2};
@@ -845,6 +944,15 @@ mod tests {
         segment: Tolerance::from_mm(1.0),
         drag_threshold: Tolerance::from_mm(0.5),
     };
+
+    /// Every path of `document`, as the session's editing set would give them.
+    fn editing_set(document: &Document) -> Vec<PathSnapshot> {
+        document
+            .object_ids()
+            .into_iter()
+            .filter_map(|id| document.path(id))
+            .collect()
+    }
 
     fn open_two_node_path(document: &Document, a: AnchorId, b: AnchorId) -> NodeId {
         document.create_path(
@@ -894,7 +1002,7 @@ mod tests {
         let paths = vec![document.path(path).expect("exists")];
         let mut tool = NodeTool::new();
         tool.pointer_down(&paths, Point::new(0.0, 0.0), TOLERANCES, false);
-        let outcome = tool.pointer_up(&document, Point::new(5.0, 7.0));
+        let outcome = tool.pointer_up(&document, Point::new(5.0, 7.0), Modifiers::NONE);
         assert_eq!(outcome, PointerUpOutcome::NodesMoved);
 
         let snapshot = document.path(path).expect("exists");
@@ -933,7 +1041,7 @@ mod tests {
         );
 
         // The commit, at the same release point, must match.
-        tool.pointer_up(&document, Point::new(5.0, 7.0));
+        tool.pointer_up(&document, Point::new(5.0, 7.0), Modifiers::NONE);
         let snapshot = document.path(path).expect("exists");
         assert_eq!(snapshot.anchors[0].point, Point::new(5.0, 7.0));
         assert_eq!(
@@ -967,12 +1075,12 @@ mod tests {
         let mut tool = NodeTool::new();
         // Select the node first (handles are only hittable once selected).
         tool.pointer_down(&paths, Point::new(0.0, 0.0), TOLERANCES, false);
-        tool.pointer_up(&document, Point::new(0.0, 0.0));
+        tool.pointer_up(&document, Point::new(0.0, 0.0), Modifiers::NONE);
 
         let paths = vec![document.path(path).expect("exists")];
         let outcome = tool.pointer_down(&paths, Point::new(5.0, 0.0), TOLERANCES, false);
         assert_eq!(outcome, PointerDownOutcome::Handle);
-        tool.pointer_up(&document, Point::new(3.0, 4.0));
+        tool.pointer_up(&document, Point::new(3.0, 4.0), Modifiers::NONE);
 
         let snapshot = document.path(path).expect("exists");
         let anchor = &snapshot.anchors[0];
@@ -1001,11 +1109,11 @@ mod tests {
         let paths = vec![document.path(path).expect("exists")];
         let mut tool = NodeTool::new();
         tool.pointer_down(&paths, Point::new(0.0, 0.0), TOLERANCES, false);
-        tool.pointer_up(&document, Point::new(0.0, 0.0));
+        tool.pointer_up(&document, Point::new(0.0, 0.0), Modifiers::NONE);
 
         let paths = vec![document.path(path).expect("exists")];
         tool.pointer_down(&paths, Point::new(5.0, 0.0), TOLERANCES, false);
-        tool.pointer_up(&document, Point::new(3.0, 4.0));
+        tool.pointer_up(&document, Point::new(3.0, 4.0), Modifiers::NONE);
 
         let snapshot = document.path(path).expect("exists");
         let anchor = &snapshot.anchors[0];
@@ -1037,7 +1145,7 @@ mod tests {
         let paths = vec![document.path(path).expect("exists")];
         let mut tool = NodeTool::new();
         tool.pointer_down(&paths, Point::new(0.0, 0.0), TOLERANCES, false);
-        tool.pointer_up(&document, Point::new(0.0, 0.0));
+        tool.pointer_up(&document, Point::new(0.0, 0.0), Modifiers::NONE);
 
         let paths = vec![document.path(path).expect("exists")];
         tool.pointer_down(&paths, Point::new(5.0, 0.0), TOLERANCES, false);
@@ -1053,7 +1161,7 @@ mod tests {
         );
 
         // The commit, at the same release point, must match.
-        tool.pointer_up(&document, Point::new(3.0, 4.0));
+        tool.pointer_up(&document, Point::new(3.0, 4.0), Modifiers::NONE);
         let snapshot = document.path(path).expect("exists");
         assert_eq!(snapshot.anchors[0].handle_out, Vec2::new(3.0, 4.0));
         assert_eq!(snapshot.anchors[0].handle_in, Vec2::new(-3.0, -4.0));
@@ -1082,7 +1190,7 @@ mod tests {
         let paths = vec![document.path(path).expect("exists")];
         let mut tool = NodeTool::new();
         tool.pointer_down(&paths, Point::new(0.0, 0.0), TOLERANCES, false);
-        tool.pointer_up(&document, Point::new(0.0, 0.0));
+        tool.pointer_up(&document, Point::new(0.0, 0.0), Modifiers::NONE);
 
         let paths = vec![document.path(path).expect("exists")];
         tool.pointer_down(&paths, Point::new(5.0, 0.0), TOLERANCES, false);
@@ -1116,7 +1224,7 @@ mod tests {
         let paths = vec![document.path(path).expect("exists")];
         let mut tool = NodeTool::new();
         tool.pointer_down(&paths, Point::new(0.0, 0.0), TOLERANCES, false);
-        tool.pointer_up(&document, Point::new(0.0, 0.0));
+        tool.pointer_up(&document, Point::new(0.0, 0.0), Modifiers::NONE);
 
         let paths = vec![document.path(path).expect("exists")];
         tool.pointer_down(&paths, Point::new(20.0, 0.0), TOLERANCES, true);
@@ -1124,7 +1232,7 @@ mod tests {
 
         let paths = vec![document.path(path).expect("exists")];
         tool.pointer_down(&paths, Point::new(20.0, 0.0), TOLERANCES, false);
-        tool.pointer_up(&document, Point::new(25.0, 5.0));
+        tool.pointer_up(&document, Point::new(25.0, 5.0), Modifiers::NONE);
 
         let snapshot = document.path(path).expect("exists");
         let by_id = |id: AnchorId| snapshot.anchors.iter().find(|x| x.id == id).unwrap().point;
@@ -1399,7 +1507,7 @@ mod tests {
 
         // Select the node first, then start a second, real drag on it.
         tool.pointer_down(&paths, Point::new(0.0, 0.0), TOLERANCES, false);
-        tool.pointer_up(&document, Point::new(0.0, 0.0));
+        tool.pointer_up(&document, Point::new(0.0, 0.0), Modifiers::NONE);
         let paths = vec![document.path(path).expect("exists")];
         tool.pointer_down(&paths, Point::new(0.0, 0.0), TOLERANCES, false);
         assert!(tool.drag_in_flight());
@@ -1412,7 +1520,7 @@ mod tests {
         );
         assert!(!tool.cancel_drag(), "nothing more to cancel");
 
-        let outcome = tool.pointer_up(&document, Point::new(50.0, 50.0));
+        let outcome = tool.pointer_up(&document, Point::new(50.0, 50.0), Modifiers::NONE);
         assert_eq!(outcome, PointerUpOutcome::NoOp, "the drag was cancelled");
         let snapshot = document.path(path).expect("exists");
         assert_eq!(snapshot.anchors[0].point, Point::new(0.0, 0.0), "unmoved");
@@ -1429,7 +1537,7 @@ mod tests {
         let paths = vec![document.path(path).expect("exists")];
         let mut tool = NodeTool::new();
         tool.pointer_down(&paths, Point::new(0.0, 0.0), TOLERANCES, false);
-        tool.pointer_up(&document, Point::new(0.0, 0.0));
+        tool.pointer_up(&document, Point::new(0.0, 0.0), Modifiers::NONE);
 
         assert!(tool.clear_selection());
         assert!(tool.selection().is_empty(), "the selection is cleared");
@@ -1448,11 +1556,13 @@ mod tests {
         let mut tool = NodeTool::new();
         let outcome = tool.pointer_down(&paths, Point::new(10.0, 0.0), TOLERANCES, false);
         assert_eq!(outcome, PointerDownOutcome::Segment);
-        tool.pointer_up(&document, Point::new(10.0, 0.0));
+        tool.pointer_up(&document, Point::new(10.0, 0.0), Modifiers::NONE);
         assert!(tool.clear_selection());
         assert!(tool.selection().is_empty());
     }
 
+    /// `0053` criterion 12 (rewritten from "clears at the press", `adrs.md` decision 2): a
+    /// click on empty space clears at the release, and Shift or Ctrl keeps the selection.
     #[test]
     fn clicking_empty_space_clears_the_selection() {
         let document = Document::new(1);
@@ -1462,14 +1572,147 @@ mod tests {
         let paths = vec![document.path(path).expect("exists")];
         let mut tool = NodeTool::new();
         tool.pointer_down(&paths, Point::new(0.0, 0.0), TOLERANCES, false);
+        tool.pointer_up(&document, Point::new(0.0, 0.0), Modifiers::NONE);
         assert!(!tool.selection().is_empty(), "clicking the node selects it");
 
-        let outcome = tool.pointer_down(&paths, Point::new(1000.0, 1000.0), TOLERANCES, false);
+        let far = Point::new(1000.0, 1000.0);
+        for held in [Modifiers::new(true, false), Modifiers::new(false, true)] {
+            tool.pointer_down(&paths, far, TOLERANCES, held.shift);
+            tool.pointer_up(&document, far, held);
+            assert_eq!(tool.selection().nodes(), vec![a], "{held:?} keeps it");
+        }
+
+        let outcome = tool.pointer_down(&paths, far, TOLERANCES, false);
         assert_eq!(outcome, PointerDownOutcome::Missed);
+        assert!(!tool.selection().is_empty(), "nothing changes at the press");
+        assert_eq!(
+            tool.pointer_up(&document, far, Modifiers::NONE),
+            PointerUpOutcome::NoOp
+        );
         assert!(
             tool.selection().is_empty(),
-            "clicking empty space clears the selection"
+            "clicking empty space clears the selection at the release"
         );
+    }
+
+    /// `0053` criteria 1, 5 and 9 through the tool: press on nothing, move past the threshold,
+    /// release; Replace, Add and Remove; no commit.
+    #[test]
+    fn a_node_marquee_combines_its_box_with_the_selection() {
+        let document = Document::new(1);
+        let p1 = open_two_node_path(&document, AnchorId::new(1, 1), AnchorId::new(1, 2));
+        let p2 = document.create_path(
+            &[
+                NewAnchor::corner(AnchorId::new(2, 1), Point::new(20.0, 0.0)),
+                NewAnchor::corner(AnchorId::new(2, 2), Point::new(40.0, 0.0)),
+            ],
+            false,
+        );
+        let paths = editing_set(&document);
+        let steps = document.own_step_count();
+        let mut tool = NodeTool::new();
+        let drag = |tool: &mut NodeTool, from: Point, to: Point, held: Modifiers| {
+            tool.pointer_down(&paths, from, TOLERANCES, held.shift);
+            tool.pointer_moved(&paths, to, held.shift, TOLERANCES.drag_threshold);
+            tool.pointer_up(&document, to, held)
+        };
+        let outcome = drag(
+            &mut tool,
+            Point::new(15.0, -5.0),
+            Point::new(25.0, 5.0),
+            Modifiers::NONE,
+        );
+        assert_eq!(outcome, PointerUpOutcome::NodesSelected);
+        assert_eq!(
+            tool.selection().node_pairs(),
+            &[(p1, AnchorId::new(1, 2)), (p2, AnchorId::new(2, 1))],
+            "P1's last node, then P2's first (criterion 9)"
+        );
+        drag(
+            &mut tool,
+            Point::new(-5.0, -5.0),
+            Point::new(5.0, 5.0),
+            Modifiers::new(true, false),
+        );
+        assert_eq!(tool.selection().node_pairs().len(), 3, "Shift adds");
+        drag(
+            &mut tool,
+            Point::new(15.0, -5.0),
+            Point::new(25.0, 5.0),
+            Modifiers::new(true, true),
+        );
+        assert_eq!(
+            tool.selection().node_pairs(),
+            &[(p1, AnchorId::new(1, 1))],
+            "Ctrl removes and wins over Shift"
+        );
+        assert_eq!(document.own_step_count(), steps, "criterion 17: no commit");
+    }
+
+    /// `0053` criterion 11: Escape during a marquee drops it; the selection is untouched and
+    /// the release that follows does nothing.
+    #[test]
+    fn escape_cancels_a_node_marquee() {
+        let document = Document::new(1);
+        let a = AnchorId::new(1, 1);
+        let path = open_two_node_path(&document, a, AnchorId::new(1, 2));
+        let paths = editing_set(&document);
+        let mut tool = NodeTool::new();
+        tool.select_nodes(vec![(path, a)]);
+        tool.pointer_down(&paths, Point::new(-5.0, -5.0), TOLERANCES, false);
+        tool.pointer_moved(
+            &paths,
+            Point::new(30.0, 5.0),
+            false,
+            TOLERANCES.drag_threshold,
+        );
+        assert!(tool.marquee().is_some_and(NodeMarquee::armed));
+        assert!(tool.cancel_drag());
+        assert_eq!(tool.marquee(), None);
+        assert_eq!(
+            tool.pointer_up(&document, Point::new(30.0, 5.0), Modifiers::NONE),
+            PointerUpOutcome::NoOp
+        );
+        assert_eq!(tool.selection().node_pairs(), &[(path, a)]);
+    }
+
+    /// `0053` criterion 19: the reason Join is disabled.
+    #[test]
+    fn join_check_names_why_join_is_disabled() {
+        let document = Document::new(1);
+        let line = document.create_path(
+            &[
+                NewAnchor::corner(AnchorId::new(1, 1), Point::new(0.0, 0.0)),
+                NewAnchor::corner(AnchorId::new(1, 2), Point::new(10.0, 0.0)),
+                NewAnchor::corner(AnchorId::new(1, 3), Point::new(20.0, 0.0)),
+            ],
+            false,
+        );
+        let pair = open_two_node_path(&document, AnchorId::new(2, 1), AnchorId::new(2, 2));
+        let paths = editing_set(&document);
+        let mut tool = NodeTool::new();
+        assert_eq!(tool.join_check(&document, &paths), Err(JoinBlock::Count(0)));
+        tool.select_nodes(vec![
+            (line, AnchorId::new(1, 1)),
+            (line, AnchorId::new(1, 2)),
+        ]);
+        assert_eq!(
+            tool.join_check(&document, &paths),
+            Err(JoinBlock::NotEndNodes { not_end: 1, of: 2 })
+        );
+        tool.select_nodes(vec![
+            (pair, AnchorId::new(2, 1)),
+            (pair, AnchorId::new(2, 2)),
+        ]);
+        assert_eq!(tool.join_check(&document, &paths), Err(JoinBlock::Other));
+        tool.select_nodes(vec![
+            (line, AnchorId::new(1, 3)),
+            (pair, AnchorId::new(2, 1)),
+        ]);
+        assert_eq!(tool.join_check(&document, &paths), Ok(()));
+        let state = tool.toolbar_state(&document, &paths);
+        assert!(state.can_join && state.join_block.is_none());
+        assert_eq!((state.selected_nodes, state.total_nodes), (2, 5));
     }
 
     /// Acceptance criterion 1: the existing two-kind toggle is renamed
@@ -1485,7 +1728,7 @@ mod tests {
         let mut tool = NodeTool::new();
         tool.pointer_down(&paths, Point::new(0.0, 0.0), TOLERANCES, false);
 
-        let state = tool.toolbar_state(&document);
+        let state = tool.toolbar_state(&document, &editing_set(&document));
         assert!(state.can_convert_to_corner);
         assert!(state.can_convert_to_symmetric);
         assert!(state.can_convert_to_asymmetric);
@@ -1519,7 +1762,10 @@ mod tests {
         let paths = vec![document.path(path).expect("exists")];
         tool.pointer_down(&paths, Point::new(5.0, 10.0), TOLERANCES, true);
         assert_eq!(tool.selection().nodes(), &[a, c]);
-        assert!(tool.toolbar_state(&document).can_join);
+        assert!(
+            tool.toolbar_state(&document, &editing_set(&document))
+                .can_join
+        );
 
         tool.join_selected(&document);
 
@@ -1578,7 +1824,10 @@ mod tests {
 
         // AC 9 (via AC 8's shared rule): both are endpoint nodes of open
         // paths, so Join applies to this selection too.
-        assert!(tool.toolbar_state(&document).can_join);
+        assert!(
+            tool.toolbar_state(&document, &editing_set(&document))
+                .can_join
+        );
     }
 
     /// Architect review of the AC 6/7 follow-up
@@ -1633,7 +1882,7 @@ mod tests {
 
         // Dragging from there moves both selected nodes, on both paths,
         // as one commit.
-        let outcome = tool.pointer_up(&document, Point::new(3.0, 4.0));
+        let outcome = tool.pointer_up(&document, Point::new(3.0, 4.0), Modifiers::NONE);
         assert_eq!(outcome, PointerUpOutcome::NodesMoved);
 
         let moved_one = document.path(path_one).expect("exists");
@@ -1666,7 +1915,7 @@ mod tests {
         let paths = vec![document.path(path).expect("exists")];
         let mut tool = NodeTool::new();
         tool.pointer_down(&paths, Point::new(10.0, 0.0), TOLERANCES, false);
-        tool.pointer_up(&document, Point::new(10.0, 0.0));
+        tool.pointer_up(&document, Point::new(10.0, 0.0), Modifiers::NONE);
         (document, path, tool)
     }
 
@@ -1686,7 +1935,10 @@ mod tests {
     fn split_selected_on_an_interior_node_selects_only_the_second_node() {
         let (document, path, mut tool) = open_path_with_the_middle_selected();
         let mut minter = AnchorIdMinter::new(9);
-        assert!(tool.toolbar_state(&document).can_split);
+        assert!(
+            tool.toolbar_state(&document, &editing_set(&document))
+                .can_split
+        );
 
         tool.split_selected(&mut minter, &document);
 
@@ -1704,7 +1956,7 @@ mod tests {
             "the first node, left on the original, is not selected"
         );
         // Criterion 52: one selected end node, so Split and Join are off.
-        let state = tool.toolbar_state(&document);
+        let state = tool.toolbar_state(&document, &editing_set(&document));
         assert!(!state.can_split && !state.can_join);
         assert!(state.can_convert_to_corner && state.can_delete);
     }
@@ -1728,7 +1980,7 @@ mod tests {
             selected_before,
             "the press hit the selected node and kept the selection"
         );
-        tool.pointer_up(&document, Point::new(10.0, 8.0));
+        tool.pointer_up(&document, Point::new(10.0, 8.0), Modifiers::NONE);
 
         let original = document.path(path).expect("exists");
         assert_eq!(
@@ -1771,8 +2023,11 @@ mod tests {
         let mut tool = NodeTool::new();
         let mut minter = AnchorIdMinter::new(9);
         tool.pointer_down(&paths, Point::new(0.0, 0.0), TOLERANCES, false);
-        tool.pointer_up(&document, Point::new(0.0, 0.0));
-        assert!(tool.toolbar_state(&document).can_split);
+        tool.pointer_up(&document, Point::new(0.0, 0.0), Modifiers::NONE);
+        assert!(
+            tool.toolbar_state(&document, &editing_set(&document))
+                .can_split
+        );
 
         tool.split_selected(&mut minter, &document);
 
@@ -1789,7 +2044,7 @@ mod tests {
 
         let paths = vec![snapshot];
         tool.pointer_down(&paths, Point::new(0.0, 0.0), TOLERANCES, false);
-        tool.pointer_up(&document, Point::new(-3.0, 4.0));
+        tool.pointer_up(&document, Point::new(-3.0, 4.0), Modifiers::NONE);
         let moved = document.path(path).expect("exists");
         assert_eq!(moved.anchors[0].point, Point::new(-3.0, 4.0));
         assert_eq!(
@@ -1824,7 +2079,7 @@ mod tests {
             let mut tool = NodeTool::new();
             let mut minter = AnchorIdMinter::new(9);
             tool.pointer_down(&paths, Point::new(10.0, 0.0), TOLERANCES, false);
-            tool.pointer_up(&document, Point::new(10.0, 0.0));
+            tool.pointer_up(&document, Point::new(10.0, 0.0), Modifiers::NONE);
             tool.split_selected(&mut minter, &document);
             let [(selected_path, selected)] = tool.selection().node_pairs() else {
                 panic!("one selected node");
@@ -1850,20 +2105,87 @@ mod tests {
         tool.split_selected(&mut minter, &document);
         assert_eq!(document.object_ids().len(), 2);
         assert!(
-            !tool.toolbar_state(&document).can_join,
+            !tool
+                .toolbar_state(&document, &editing_set(&document))
+                .can_join,
             "one selected node cannot be joined"
         );
 
         // Pull the selected end away, then select the end left at (10, 0).
         let paths = all_paths(&document);
         tool.pointer_down(&paths, Point::new(10.0, 0.0), TOLERANCES, false);
-        tool.pointer_up(&document, Point::new(10.0, 8.0));
+        tool.pointer_up(&document, Point::new(10.0, 8.0), Modifiers::NONE);
         let paths = all_paths(&document);
         tool.pointer_down(&paths, Point::new(10.0, 0.0), TOLERANCES, true);
-        tool.pointer_up(&document, Point::new(10.0, 0.0));
-        assert!(tool.toolbar_state(&document).can_join, "two selected ends");
+        tool.pointer_up(&document, Point::new(10.0, 0.0), Modifiers::NONE);
+        assert!(
+            tool.toolbar_state(&document, &editing_set(&document))
+                .can_join,
+            "two selected ends"
+        );
 
         tool.join_selected(&document);
         assert_eq!(document.object_ids().len(), 1, "back to one object");
+    }
+
+    /// `0053` criteria 18 and 20, the cross-path bug of `adrs.md` decision 4: a node selection
+    /// on two paths is deleted and converted in one step each.
+    #[test]
+    fn delete_and_convert_act_on_a_selection_across_two_paths() {
+        let document = Document::new(1);
+        let line = |tag: u64| {
+            document.create_path(
+                &[
+                    NewAnchor::corner(AnchorId::new(tag, 0), Point::new(0.0, 0.0)),
+                    NewAnchor::corner(AnchorId::new(tag, 1), Point::new(10.0, 0.0)),
+                    NewAnchor::corner(AnchorId::new(tag, 2), Point::new(20.0, 0.0)),
+                ],
+                false,
+            )
+        };
+        let (p, q) = (line(7), line(8));
+        let mut tool = NodeTool::new();
+        tool.select_nodes(vec![(p, AnchorId::new(7, 1)), (q, AnchorId::new(8, 1))]);
+
+        let before = document.own_step_count();
+        tool.convert_selected(&document, AnchorKind::Symmetric);
+        assert_eq!(document.own_step_count(), before + 1);
+        for path in [p, q] {
+            assert_eq!(
+                document.path(path).unwrap().anchors[1].kind,
+                AnchorKind::Symmetric
+            );
+        }
+
+        tool.delete_selected(&document);
+        assert_eq!(document.own_step_count(), before + 2);
+        assert!(tool.selection().is_empty());
+        for path in [p, q] {
+            assert_eq!(document.path(path).unwrap().anchors.len(), 2);
+        }
+    }
+
+    /// `0053` criterion 22: select all takes every node of every path in document order and
+    /// drops a segment selection.
+    #[test]
+    fn select_all_takes_every_node_in_document_order() {
+        let document = Document::new(1);
+        let a = open_two_node_path(&document, AnchorId::new(1, 1), AnchorId::new(1, 2));
+        let b = open_two_node_path(&document, AnchorId::new(2, 1), AnchorId::new(2, 2));
+        let paths = vec![document.path(a).unwrap(), document.path(b).unwrap()];
+        let mut tool = NodeTool::new();
+        tool.select_nodes(vec![(b, AnchorId::new(2, 2))]);
+        tool.select_all(&paths);
+        assert_eq!(
+            tool.selection().node_pairs(),
+            &[
+                (a, AnchorId::new(1, 1)),
+                (a, AnchorId::new(1, 2)),
+                (b, AnchorId::new(2, 1)),
+                (b, AnchorId::new(2, 2)),
+            ]
+        );
+        tool.select_all(&[]);
+        assert!(tool.selection().is_empty());
     }
 }

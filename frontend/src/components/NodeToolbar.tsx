@@ -14,8 +14,10 @@ import type { ReactNode } from "react";
 
 import type { NodeToolbarState } from "@/hooks/useEditorSession";
 import { ClosePathGroup } from "@/components/ClosePathGroup";
+import { Tooltip } from "@/components/ui/tooltip";
 import { COMPOUND_NODES_TEXT } from "@/lib/booleanText";
 import { CLONE_NODES_TEXT } from "@/lib/cloneText";
+import { joinReasonLines } from "@/lib/nodeText";
 
 export interface NodeActions {
   insertSelected: () => void;
@@ -160,6 +162,7 @@ export function NodeToolbar({ state, actions, closePath }: NodeToolbarProps) {
     return (
       <div
         role="status"
+        data-context-bar=""
         className="pointer-events-auto flex h-9 min-w-0 items-center rounded-lg px-3 text-sm"
         style={{
           background: "var(--toolbar-bg)",
@@ -173,6 +176,7 @@ export function NodeToolbar({ state, actions, closePath }: NodeToolbarProps) {
   }
   return (
     <div
+      data-context-bar=""
       className="pointer-events-auto flex min-h-9 max-w-full min-w-0 flex-wrap items-center gap-x-1 gap-y-1 rounded-lg px-2 py-1"
       style={{
         background: "var(--toolbar-bg)",
@@ -185,36 +189,40 @@ export function NodeToolbar({ state, actions, closePath }: NodeToolbarProps) {
         className="flex overflow-hidden rounded-md ring-1 ring-border"
       >
         {KIND_ACTIONS.map((kind) => (
-          <button
-            key={kind.key}
-            type="button"
-            aria-label={kind.label}
-            title={kind.label}
-            disabled={!kind.enabled(state)}
-            onClick={() => actions.convertSelected(kind.key)}
-            className="flex size-7 items-center justify-center text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40"
-          >
-            {kind.icon}
-          </button>
+          <Tooltip key={kind.key} side="bottom" content={<BarTip label={kind.label} />}>
+            <button
+              type="button"
+              aria-label={kind.label}
+              disabled={!kind.enabled(state)}
+              onClick={() => actions.convertSelected(kind.key)}
+              className="flex size-7 items-center justify-center text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40"
+            >
+              {kind.icon}
+            </button>
+          </Tooltip>
         ))}
       </div>
 
       <div className="mx-1 h-5 w-px bg-border" aria-hidden />
 
       <div className="flex items-center gap-1">
-        {OTHER_ACTIONS.map((action) => (
-          <button
-            key={action.key}
-            type="button"
-            aria-label={action.label}
-            title={action.label}
-            disabled={!action.enabled(state)}
-            onClick={() => action.run(actions)}
-            className="flex size-7 items-center justify-center rounded-md text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40"
-          >
-            {action.icon}
-          </button>
-        ))}
+        {OTHER_ACTIONS.map((action) =>
+          action.key === "join" ? (
+            <JoinButton key={action.key} state={state} action={action} actions={actions} />
+          ) : (
+          <Tooltip key={action.key} side="bottom" content={<BarTip label={action.label} />}>
+            <button
+              type="button"
+              aria-label={action.label}
+              disabled={!action.enabled(state)}
+              onClick={() => action.run(actions)}
+              className="flex size-7 items-center justify-center rounded-md text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40"
+            >
+              {action.icon}
+            </button>
+          </Tooltip>
+          ),
+        )}
       </div>
 
       {closePath && (
@@ -223,6 +231,67 @@ export function NodeToolbar({ state, actions, closePath }: NodeToolbarProps) {
           <ClosePathGroup {...closePath} />
         </>
       )}
+    </div>
+  );
+}
+
+/**
+ * Join keeps its tooltip while disabled (`specs/0053-node-marquee-selection/` UX notes): it is
+ * dimmed with `aria-disabled` and stays focusable, and the tooltip's muted line says why.
+ */
+function JoinButton({
+  state,
+  action,
+  actions,
+}: {
+  state: NodeToolbarState;
+  action: (typeof OTHER_ACTIONS)[number];
+  actions: NodeActions;
+}) {
+  const enabled = action.enabled(state);
+  const reason = enabled ? null : joinReasonLines(state);
+  return (
+    <Tooltip
+      side="bottom"
+      content={
+        <BarTip label={action.label}>
+          {reason?.map((line) => (
+            <div key={line} style={{ color: "var(--panel-muted-fg)" }}>
+              {line}
+            </div>
+          ))}
+        </BarTip>
+      }
+    >
+      <button
+        type="button"
+        aria-label={action.label}
+        aria-disabled={!enabled}
+        onClick={(event) => {
+          if (!enabled) {
+            event.preventDefault();
+            return;
+          }
+          action.run(actions);
+        }}
+        // The dimming is on the icon only, so the focus ring keeps its contrast on a disabled
+        // Join (UX review of 2026-10-14, finding 3).
+        className={`flex size-7 items-center justify-center rounded-md text-[var(--toolbar-icon)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] ${
+          enabled ? "hover:bg-[var(--editor-accent-hover)]" : ""
+        }`}
+      >
+        <span className={enabled ? "flex" : "flex opacity-40"}>{action.icon}</span>
+      </button>
+    </Tooltip>
+  );
+}
+
+/** The Node bar's tooltip: the button's name, then any further lines. */
+function BarTip({ label, children }: { label: string; children?: ReactNode }) {
+  return (
+    <div className="max-w-[260px]">
+      <div className="font-semibold whitespace-nowrap">{label}</div>
+      {children}
     </div>
   );
 }

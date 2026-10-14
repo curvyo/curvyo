@@ -176,7 +176,7 @@ fn a_node_tool_delete_of_the_last_nodes_removes_the_emptied_group() {
     let b = rect(&document, 40.0);
     let group = document.group_objects(&[a, b]).unwrap();
     let ids = anchor_ids(&document, a);
-    document.delete_anchors(a, &ids).unwrap();
+    document.delete_anchors(&ids.iter().map(|&id| (a, id)).collect::<Vec<_>>());
     assert!(document.is_group(group), "the rectangle is still in it");
     document.delete_objects(&[b]).unwrap();
     assert!(!document.contains_node(group));

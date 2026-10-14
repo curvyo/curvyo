@@ -153,6 +153,18 @@ first list of points.
   single-path Delete does today.
 - The debt item "Node selection holds one path" in `docs/technical-debt.md` is updated. This slice
   resolves it.
+- **2026-10-14, M1 review (`review-architect-m1.md` finding 1).**
+  - **Delete skips stale pairs.** A pair whose path no longer exists is skipped, the same way as
+    a stale anchor id. Its nodes are already gone. This replaces "a missing path refuses the
+    whole call".
+  - **`delete_anchors` returns `()`.** It has no error case left.
+  - **Why Delete and Convert differ:** removal is idempotent. Convert writes values to named
+    nodes and stays strict, as `move_anchors` does.
+  - **First outline only.** Both commands search only a path's first outline until `0055`.
+- **2026-10-14, architect review of M1.** `delete_anchors` skips a pair whose path no longer
+  exists, the same way it skips a stale anchor id (ADR 0009 §2), so it has no error case and
+  returns `()`. Convert stays strict, like `move_anchors`. Both commands search only a path's
+  first outline until `specs/0055-compound-path-node-editing/`.
 
 ### 5. The key gate and Ctrl+A (2026-10-12; criteria 21, 22)
 
@@ -203,6 +215,16 @@ first list of points.
   - `NodeSelection::apply` for 5,000 nodes against 5,000 takes under 5 ms;
   - the marquee frame of `Session::draw_list()` takes at most 1.1 times the plain Node-tool frame with
     the same paths.
+- **2026-10-14, the frame ratio is replaced.** The marquee frame of `Session::draw_list()` must
+  take under 16.7 ms. The ratio to the plain Node-tool frame is printed and not asserted.
+  - Why: the 1.1 ratio left out that the rings add geometry in proportion to the ringed nodes.
+    5,000 rings, each a casing and a ring of 16 segments, are about 320,000 triangles, many times
+    the plain node glyphs. Measured: 10.6 ms against 3.2 ms (3.3 times).
+  - The ring code already computes the unit circle once per frame.
+  - Fewer segments or no casing would break the UX notes.
+  - The remaining fix belongs to the renderer: one ring mesh drawn as GPU instances. It goes
+    under the debt item named below and is not built in this slice.
+  - The PO amends criterion 25's wording to match.
 - There is no spatial index. A linear scan is enough at this size.
 - A miss of the absolute 16.7 ms in the real window is recorded under "Canvas performance on
   Linux/WebKitGTK: measured once, renderer not cached". It does not block this slice.

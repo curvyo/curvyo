@@ -892,13 +892,14 @@ mod tests {
         }
     }
 
-    /// `0044` criteria 1 and 3: Ctrl+A selects all in the Select tool only, whatever is selected.
+    /// `0044` criteria 1 and 3, amended by `0053` criterion 22: Ctrl+A selects all in the
+    /// Select tool and the Node tool, whatever is selected, and is ignored in every other.
     #[test]
-    fn ctrl_a_selects_all_in_the_select_tool_and_is_ignored_in_every_other() {
+    fn ctrl_a_selects_all_in_the_select_and_node_tools_and_is_ignored_in_every_other() {
         for tool in TOOLS {
             for selected in SELECTIONS {
                 for k in ["a", "A"] {
-                    let expected = if tool == Tool::Select {
+                    let expected = if matches!(tool, Tool::Select | Tool::Node) {
                         KeyAction::SelectAll
                     } else {
                         KeyAction::Ignore

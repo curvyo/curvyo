@@ -654,7 +654,17 @@ fn the_legend_is_gone_after_release_escape_and_in_other_tools() {
         hold(&mut s, from, ALT_CTRL);
         s.pointer_down(from, false);
         hold(&mut s, pt(600.0, 350.0), ALT_CTRL);
-        assert!(legend(&s).is_none(), "{tool:?}: no marquee or lasso legend");
+        // `0053` criterion 10 amends this for the Node tool: its own node marquee legend
+        // shows (no lasso, no touch or contain mode); every other tool has none.
+        let shown = legend(&s);
+        if tool == Tool::Node {
+            assert!(
+                shown.as_deref().is_some_and(|t| t.contains("nodes")),
+                "Node: the node marquee legend, {shown:?}"
+            );
+        } else {
+            assert!(shown.is_none(), "{tool:?}: no marquee or lasso legend");
+        }
         s.pointer_up(pt(600.0, 350.0), false, true);
         hold(&mut s, pt(600.0, 350.0), NONE);
     }
@@ -881,7 +891,13 @@ fn the_minus_badge_is_a_select_tool_thing() {
     for tool in [Tool::Node, Tool::Pen, Tool::Rectangle] {
         s.set_tool(tool);
         hold(&mut s, pt(450.0, 300.0), CTRL);
-        assert!(!s.move_indicators().remove_badge, "{tool:?}");
+        // `0053` UX notes amend this for the Node tool: Ctrl over empty canvas, where a press
+        // would start a node marquee, shows the minus badge.
+        assert_eq!(
+            s.move_indicators().remove_badge,
+            tool == Tool::Node,
+            "{tool:?}"
+        );
         hold(&mut s, pt(450.0, 300.0), NONE);
     }
 }

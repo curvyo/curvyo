@@ -1093,7 +1093,7 @@ fn node_commands_on_extra_outline_anchors_leave_the_extra_outlines_valid() {
     let p = path_of(&d, r);
     let extra_ids: Vec<AnchorId> = p.extra_subpaths[0].anchors.iter().map(|a| a.id).collect();
     let _ = d.move_anchors(&[(r, extra_ids[0], pt(1.0, 1.0))]);
-    let _ = d.delete_anchors(r, &extra_ids[..1]);
+    d.delete_anchors(&extra_ids[..1].iter().map(|&a| (r, a)).collect::<Vec<_>>());
     let bytes = pack(&d, "t").unwrap();
     let back = unpack(2, &bytes).unwrap();
     assert_eq!(path_of(&back, r), path_of(&d, r));
@@ -1105,9 +1105,9 @@ fn deleting_every_anchor_of_the_first_outline_through_the_model_does_not_corrupt
     let r = compound(&d);
     let p = path_of(&d, r);
     let first: Vec<AnchorId> = p.anchors.iter().map(|a| a.id).collect();
-    let res = d.delete_anchors(r, &first);
+    d.delete_anchors(&first.iter().map(|&a| (r, a)).collect::<Vec<_>>());
     println!(
-        "delete all first-outline anchors: {res:?}, object kept: {}",
+        "delete all first-outline anchors, object kept: {}",
         d.object(r).is_some()
     );
     let back = unpack(2, &pack(&d, "t").unwrap()).unwrap();

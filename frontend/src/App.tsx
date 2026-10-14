@@ -20,6 +20,7 @@ import { useDocumentPanel } from "@/hooks/useDocumentPanel";
 import { usePanelOpen } from "@/hooks/usePanelOpen";
 import { useProject } from "@/hooks/useProject";
 import { RULER_THICKNESS_PX } from "@/lib/rulerDraw";
+import { nodeCountText } from "@/lib/nodeText";
 import { isTauri, unsupportedReason } from "@/platform/host";
 
 /** The editor, or the reason this browser cannot run it. */
@@ -186,6 +187,7 @@ function Editor() {
         cursorText={documentPanel.cursorText(cursorMm.x, cursorMm.y)}
         sizeText={documentPanel.view.sizeText}
         zoomPercent={editor.zoomPercent}
+        nodeCountText={editor.tool === "node" ? nodeCountText(editor.nodeToolbarState) : null}
       />
       <ErrorDialog
         title="Can't open project"

@@ -8,19 +8,19 @@
 //! deferred is that each mutating method ends in exactly one Loro commit"
 //! (ADR 0002 §9).
 
+mod anchor_edits;
+
 use loro::{LoroMap, LoroMovableList, TreeID, TreeParentId};
 
 use crate::document::{Document, OBJECTS_TREE};
 use crate::path_codec::{
     self, KEY_HANDLE_IN, KEY_HANDLE_OUT, KEY_POINT, adjacent_segment_indices, anchor_index,
     anchor_map_at, anchors_container, insert_anchor_at, insert_anchors_container, leaf_exists,
-    neighbour_tangent, push_anchor, read_closed, read_kind, read_point, read_vec2, write_kind,
-    write_point, write_vec2,
+    push_anchor, read_closed, read_kind, read_point, read_vec2, write_point, write_vec2,
 };
 use crate::path_model::{
     AnchorId, AnchorKind, HandleSlot, NewAnchor, NodeId, PathEditError, PathSnapshot,
 };
-use crate::smooth_handles::smooth_corner_handles;
 use crate::style_model::Style;
 use crate::units::{Length, Point, Vec2};
 
@@ -338,99 +338,6 @@ impl Document {
         Ok(())
     }
 
-    /// Converts every named anchor to `kind` as one commit — a multi-node
-    /// selection's convert is one interaction, not `anchors.len()` of them
-    /// (`specs/0002-path-node-editing/specification.md` acceptance
-    /// criterion 11).
-    ///
-    /// Every id is resolved to an index before any of them is written, so
-    /// one stale id anywhere in `anchors` refuses the whole call rather
-    /// than converting a prefix of it.
-    ///
-    /// Per-anchor rule (`specs/0006-path-merge-split-and-node-types/
-    /// adrs.md`'s conversion table):
-    /// - **to the kind the anchor already has: no write at all**
-    ///   (acceptance criterion 16 — this amends
-    ///   `specs/0002-path-node-editing/specification.md` AC 11, under
-    ///   which re-applying "make smooth" to an already-smooth node used
-    ///   to reset its handles every time).
-    /// - **to [`AnchorKind::Symmetric`]** (from any other kind): both
-    ///   handles reset to `DEFAULT_HANDLE_LENGTH_MM`, collinear through
-    ///   the anchor along the chord between its neighbours — any existing
-    ///   independent lengths are discarded, not averaged (acceptance
-    ///   criteria 5 and `path-node-editing`'s own AC 11).
-    /// - **[`AnchorKind::Corner`] → [`AnchorKind::Asymmetric`]**: same
-    ///   tangent direction, but each side keeps its own current length if
-    ///   it was already non-zero, otherwise the default (acceptance
-    ///   criterion 2).
-    /// - **every other conversion** (`Symmetric`→`Corner`, `Asymmetric`→
-    ///   `Corner`, `Symmetric`→`Asymmetric`): both handles stay exactly
-    ///   where they are, shape-preserving — geometry cannot tell the
-    ///   kinds apart, which is exactly why `kind` is a stored field
-    ///   (`specs/0002-path-node-editing/adrs.md` decision 3; acceptance
-    ///   criterion 4).
-    ///
-    /// If every named anchor already has `kind`, nothing is written and
-    /// no commit happens at all — not even an empty one — matching
-    /// `specs/0002-path-node-editing/adrs.md`'s "a click must not be able
-    /// to [win against a collaborator's concurrent edit]" rule, now
-    /// extended from a pure no-move click to a pure no-op convert.
-    ///
-    /// # Errors
-    /// [`PathEditError::NoSuchPath`] if `path` no longer exists;
-    /// [`PathEditError::NoSuchAnchor`] if any named anchor no longer
-    /// exists.
-    pub fn convert_anchor_kind(
-        &self,
-        path: NodeId,
-        anchors_to_convert: &[AnchorId],
-        kind: AnchorKind,
-    ) -> Result<(), PathEditError> {
-        let (meta, anchors) = self.path_parts(path)?;
-        let closed = read_closed(&meta);
-        let indices: Vec<usize> = anchors_to_convert
-            .iter()
-            .map(|&id| anchor_index(&anchors, id))
-            .collect::<Result<_, _>>()?;
-        let mut changed = false;
-        for index in indices {
-            let map = anchor_map_at(&anchors, index);
-            let current = read_kind(&map);
-            if current == kind {
-                // Acceptance criterion 16: converting to the kind the
-                // anchor already has is a no-op, not a reset.
-                continue;
-            }
-            changed = true;
-            match kind {
-                AnchorKind::Symmetric => {
-                    let point = read_point(&map, KEY_POINT);
-                    let tangent = neighbour_tangent(&anchors, closed, index, point)
-                        .normalized_to(DEFAULT_HANDLE_LENGTH_MM);
-                    write_vec2(&map, KEY_HANDLE_OUT, tangent);
-                    write_vec2(&map, KEY_HANDLE_IN, tangent.negated());
-                }
-                AnchorKind::Asymmetric if current == AnchorKind::Corner => {
-                    let point = read_point(&map, KEY_POINT);
-                    let handle_in = read_vec2(&map, KEY_HANDLE_IN);
-                    let handle_out = read_vec2(&map, KEY_HANDLE_OUT);
-                    let tangent = neighbour_tangent(&anchors, closed, index, point);
-                    let (new_in, new_out) = smooth_corner_handles(tangent, handle_in, handle_out);
-                    write_vec2(&map, KEY_HANDLE_OUT, new_out);
-                    write_vec2(&map, KEY_HANDLE_IN, new_in);
-                }
-                // `Symmetric`→`Corner`, `Asymmetric`→`Corner`,
-                // `Symmetric`→`Asymmetric`: shape-preserving, kind only.
-                AnchorKind::Corner | AnchorKind::Asymmetric => {}
-            }
-            write_kind(&map, kind);
-        }
-        if changed {
-            self.commit_with_label("convert_anchor_kind");
-        }
-        Ok(())
-    }
-
     /// Inserts a new anchor right after `after`, carrying the caller-
     /// resolved subdivision geometry for the two adjoining handles
     /// (`specs/0002-path-node-editing/adrs.md`, "commands carry resolved
@@ -474,54 +381,6 @@ impl Document {
 
         insert_anchor_at(&anchors, after_index + 1, &new_anchor);
         self.commit_with_label("insert_anchor");
-        Ok(())
-    }
-
-    /// Removes the named anchors, or the entire path object if fewer than
-    /// two anchors would remain (acceptance criterion 13).
-    ///
-    /// Anchor ids that no longer exist are silently ignored rather than
-    /// refused: local selection can hold ids a collaborator has already
-    /// deleted, and ADR 0009 §2 asks for that case to resolve lazily
-    /// rather than error.
-    ///
-    /// # Errors
-    /// [`PathEditError::NoSuchPath`] if `path` no longer exists.
-    ///
-    /// # Panics
-    /// Does not panic in practice: every index this deletes was just
-    /// confirmed present in the same movable list.
-    pub fn delete_anchors(&self, path: NodeId, ids: &[AnchorId]) -> Result<(), PathEditError> {
-        let (_, anchors) = self.path_parts(path)?;
-        let mut indices: Vec<usize> = ids
-            .iter()
-            .filter_map(|&id| anchor_index(&anchors, id).ok())
-            .collect();
-        indices.sort_unstable();
-        indices.dedup();
-
-        let remaining = anchors.len().saturating_sub(indices.len());
-        if remaining < 2 {
-            let tree = self.loro().get_tree(OBJECTS_TREE);
-            let tree_id = tree_id_of(path);
-            self.repair_clones_of_removed(&tree, &[tree_id]);
-            let parents = crate::group_tree::parents_of(&tree, &[tree_id]);
-            // invariant: `path_parts` above already confirmed this node
-            // exists.
-            #[allow(clippy::unwrap_used)]
-            tree.delete(tree_id).unwrap();
-            crate::groups::remove_emptied_groups(&tree, &parents);
-            self.commit_with_label("delete_anchors");
-            return Ok(());
-        }
-
-        // Delete from the highest index down so earlier indices stay valid.
-        for index in indices.into_iter().rev() {
-            // invariant: `index` was found in this same list just above.
-            #[allow(clippy::unwrap_used)]
-            anchors.delete(index, 1).unwrap();
-        }
-        self.commit_with_label("delete_anchors");
         Ok(())
     }
 
@@ -719,9 +578,7 @@ mod tests {
     fn path_returns_none_for_an_unknown_id() {
         let document = Document::new(1);
         let id = document.create_path(&[anchor(1, 0.0, 0.0), anchor(2, 1.0, 0.0)], false);
-        document
-            .delete_anchors(id, &[AnchorId::new(1, 1), AnchorId::new(1, 2)])
-            .expect("delete");
+        document.delete_anchors(&[(id, AnchorId::new(1, 1)), (id, AnchorId::new(1, 2))]);
         assert_eq!(document.path(id), None);
     }
 
@@ -987,7 +844,7 @@ mod tests {
             false,
         );
         document
-            .convert_anchor_kind(id, &[AnchorId::new(1, 2)], AnchorKind::Symmetric)
+            .convert_anchor_kind(&[(id, AnchorId::new(1, 2))], AnchorKind::Symmetric)
             .expect("convert");
         let snapshot = document.path(id).expect("path exists");
         let middle = &snapshot.anchors[1];
@@ -1009,7 +866,7 @@ mod tests {
             false,
         );
         document
-            .convert_anchor_kind(id, &[AnchorId::new(1, 1)], AnchorKind::Corner)
+            .convert_anchor_kind(&[(id, AnchorId::new(1, 1))], AnchorKind::Corner)
             .expect("convert");
         let snapshot = document.path(id).expect("path exists");
         assert_eq!(snapshot.anchors[0].kind, AnchorKind::Corner);
@@ -1043,8 +900,7 @@ mod tests {
         );
         document
             .convert_anchor_kind(
-                id,
-                &[AnchorId::new(1, 1), AnchorId::new(1, 3)],
+                &[(id, AnchorId::new(1, 1)), (id, AnchorId::new(1, 3))],
                 AnchorKind::Symmetric,
             )
             .expect("convert");
@@ -1070,8 +926,7 @@ mod tests {
             false,
         );
         let result = document.convert_anchor_kind(
-            id,
-            &[AnchorId::new(1, 1), AnchorId::new(9, 9)],
+            &[(id, AnchorId::new(1, 1)), (id, AnchorId::new(9, 9))],
             AnchorKind::Symmetric,
         );
         assert_eq!(result, Err(PathEditError::NoSuchAnchor));
@@ -1098,7 +953,7 @@ mod tests {
         );
         let before = document.path(id).expect("exists");
         document
-            .convert_anchor_kind(id, &[AnchorId::new(1, 1)], AnchorKind::Symmetric)
+            .convert_anchor_kind(&[(id, AnchorId::new(1, 1))], AnchorKind::Symmetric)
             .expect("convert");
         let after = document.path(id).expect("exists");
         assert_eq!(before, after, "no-op: nothing changed, not even a reset");
@@ -1118,17 +973,17 @@ mod tests {
             false,
         );
         document
-            .convert_anchor_kind(id, &[AnchorId::new(1, 2)], AnchorKind::Asymmetric)
+            .convert_anchor_kind(&[(id, AnchorId::new(1, 2))], AnchorKind::Asymmetric)
             .expect("convert to asymmetric");
         let after_first = document.path(id).expect("exists");
 
         document
-            .convert_anchor_kind(id, &[AnchorId::new(1, 2)], AnchorKind::Asymmetric)
+            .convert_anchor_kind(&[(id, AnchorId::new(1, 2))], AnchorKind::Asymmetric)
             .expect("re-convert to asymmetric is a no-op");
         assert_eq!(document.path(id).expect("exists"), after_first);
 
         document
-            .convert_anchor_kind(id, &[AnchorId::new(1, 1)], AnchorKind::Corner)
+            .convert_anchor_kind(&[(id, AnchorId::new(1, 1))], AnchorKind::Corner)
             .expect("corner to corner is a no-op");
         assert_eq!(
             document.path(id).expect("exists").anchors[0].kind,
@@ -1157,7 +1012,7 @@ mod tests {
             false,
         );
         document
-            .convert_anchor_kind(id, &[AnchorId::new(1, 2)], AnchorKind::Asymmetric)
+            .convert_anchor_kind(&[(id, AnchorId::new(1, 2))], AnchorKind::Asymmetric)
             .expect("convert");
         let snapshot = document.path(id).expect("exists");
         let middle = &snapshot.anchors[1];
@@ -1189,7 +1044,7 @@ mod tests {
             false,
         );
         document
-            .convert_anchor_kind(id, &[AnchorId::new(1, 2)], AnchorKind::Asymmetric)
+            .convert_anchor_kind(&[(id, AnchorId::new(1, 2))], AnchorKind::Asymmetric)
             .expect("convert");
         let middle = &document.path(id).expect("exists").anchors[1];
         assert!((middle.handle_out.length() - DEFAULT_HANDLE_LENGTH_MM).abs() < 1e-9);
@@ -1210,7 +1065,7 @@ mod tests {
             false,
         );
         document
-            .convert_anchor_kind(id, &[AnchorId::new(1, 1)], AnchorKind::Asymmetric)
+            .convert_anchor_kind(&[(id, AnchorId::new(1, 1))], AnchorKind::Asymmetric)
             .expect("convert to asymmetric");
         let snapshot = document.path(id).expect("exists");
         assert_eq!(snapshot.anchors[0].kind, AnchorKind::Asymmetric);
@@ -1218,7 +1073,7 @@ mod tests {
         assert_eq!(snapshot.anchors[0].handle_in, Vec2::new(-5.0, 0.0));
 
         document
-            .convert_anchor_kind(id, &[AnchorId::new(1, 1)], AnchorKind::Corner)
+            .convert_anchor_kind(&[(id, AnchorId::new(1, 1))], AnchorKind::Corner)
             .expect("convert to corner");
         let snapshot = document.path(id).expect("exists");
         assert_eq!(snapshot.anchors[0].kind, AnchorKind::Corner);
@@ -1247,7 +1102,7 @@ mod tests {
             false,
         );
         document
-            .convert_anchor_kind(id, &[AnchorId::new(1, 2)], AnchorKind::Symmetric)
+            .convert_anchor_kind(&[(id, AnchorId::new(1, 2))], AnchorKind::Symmetric)
             .expect("convert");
         let middle = &document.path(id).expect("exists").anchors[1];
         assert_eq!(middle.kind, AnchorKind::Symmetric);
@@ -1371,9 +1226,7 @@ mod tests {
             ],
             false,
         );
-        document
-            .delete_anchors(id, &[AnchorId::new(1, 2)])
-            .expect("delete");
+        document.delete_anchors(&[(id, AnchorId::new(1, 2))]);
         let snapshot = document.path(id).expect("path exists");
         assert_eq!(snapshot.anchors.len(), 2);
         assert_eq!(snapshot.anchors[0].point, Point::new(0.0, 0.0));
@@ -1384,9 +1237,7 @@ mod tests {
     fn delete_anchors_removes_the_whole_path_below_two_anchors() {
         let document = Document::new(1);
         let id = document.create_path(&[anchor(1, 0.0, 0.0), anchor(2, 10.0, 0.0)], false);
-        document
-            .delete_anchors(id, &[AnchorId::new(1, 1)])
-            .expect("delete");
+        document.delete_anchors(&[(id, AnchorId::new(1, 1))]);
         assert_eq!(document.path(id), None);
         assert_eq!(document.object_ids(), Vec::new());
     }
@@ -1402,9 +1253,7 @@ mod tests {
             ],
             false,
         );
-        document
-            .delete_anchors(id, &[AnchorId::new(1, 2), AnchorId::new(9, 9)])
-            .expect("delete tolerates a stale id alongside a real one");
+        document.delete_anchors(&[(id, AnchorId::new(1, 2)), (id, AnchorId::new(9, 9))]);
         assert_eq!(document.path(id).expect("still exists").anchors.len(), 2);
     }
 
@@ -1480,9 +1329,7 @@ mod tests {
     fn operations_on_an_unknown_path_are_refused() {
         let document = Document::new(1);
         let other = document.create_path(&[anchor(1, 0.0, 0.0), anchor(2, 1.0, 0.0)], false);
-        document
-            .delete_anchors(other, &[AnchorId::new(1, 1), AnchorId::new(1, 2)])
-            .expect("delete");
+        document.delete_anchors(&[(other, AnchorId::new(1, 1)), (other, AnchorId::new(1, 2))]);
         let unknown = other;
         assert_eq!(
             document.move_anchors(&[(unknown, AnchorId::new(1, 1), Point::new(0.0, 0.0))]),

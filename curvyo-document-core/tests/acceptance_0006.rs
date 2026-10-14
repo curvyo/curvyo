@@ -63,7 +63,7 @@ fn ac2_corner_to_asymmetric_keeps_each_sides_own_nonzero_length_and_sets_default
     );
 
     document
-        .convert_anchor_kind(path, &[b], AnchorKind::Asymmetric)
+        .convert_anchor_kind(&[(path, b)], AnchorKind::Asymmetric)
         .expect("convert");
 
     let snapshot = document.path(path).expect("path exists");
@@ -105,7 +105,7 @@ fn ac2_corner_to_asymmetric_the_two_resulting_lengths_may_differ() {
         false,
     );
     document
-        .convert_anchor_kind(path, &[b], AnchorKind::Asymmetric)
+        .convert_anchor_kind(&[(path, b)], AnchorKind::Asymmetric)
         .expect("convert");
     let anchor = document.path(path).expect("exists").anchors[1];
     assert!(approx_eq(anchor.handle_in.length(), 3.0));
@@ -267,7 +267,7 @@ fn ac4_symmetric_to_asymmetric_preserves_handles_exactly() {
         false,
     );
     document
-        .convert_anchor_kind(path, &[anchor_id], AnchorKind::Asymmetric)
+        .convert_anchor_kind(&[(path, anchor_id)], AnchorKind::Asymmetric)
         .expect("convert");
     let anchor = document.path(path).expect("exists").anchors[0];
     assert_eq!(anchor.kind, AnchorKind::Asymmetric);
@@ -290,7 +290,7 @@ fn ac4_asymmetric_to_corner_preserves_handles_exactly() {
         false,
     );
     document
-        .convert_anchor_kind(path, &[anchor_id], AnchorKind::Corner)
+        .convert_anchor_kind(&[(path, anchor_id)], AnchorKind::Corner)
         .expect("convert");
     let anchor = document.path(path).expect("exists").anchors[0];
     assert_eq!(anchor.kind, AnchorKind::Corner);
@@ -324,7 +324,7 @@ fn ac5_asymmetric_to_symmetric_resets_to_equal_default_length_discarding_old_len
         false,
     );
     document
-        .convert_anchor_kind(path, &[b], AnchorKind::Symmetric)
+        .convert_anchor_kind(&[(path, b)], AnchorKind::Symmetric)
         .expect("convert");
     let anchor = document.path(path).expect("exists").anchors[1];
     assert_eq!(anchor.kind, AnchorKind::Symmetric);
@@ -371,7 +371,7 @@ fn ac16_reconverting_to_the_same_kind_changes_nothing() {
     let before = document.path(path).expect("exists");
 
     document
-        .convert_anchor_kind(path, &[anchor_id], AnchorKind::Asymmetric)
+        .convert_anchor_kind(&[(path, anchor_id)], AnchorKind::Asymmetric)
         .expect("no-op convert must still return Ok");
 
     let after = document.path(path).expect("exists");
@@ -404,7 +404,7 @@ fn ac16_reconverting_to_the_same_kind_makes_no_commit() {
     let before_bytes = document.export_loro_snapshot().expect("export");
 
     document
-        .convert_anchor_kind(path, &[anchor_id], AnchorKind::Corner)
+        .convert_anchor_kind(&[(path, anchor_id)], AnchorKind::Corner)
         .expect("no-op convert");
 
     let after_bytes = document.export_loro_snapshot().expect("export");
@@ -434,8 +434,7 @@ fn ac16_mixed_selection_converts_only_the_differing_anchors_in_one_commit() {
     );
     document
         .convert_anchor_kind(
-            path,
-            &[already_symmetric, needs_conversion],
+            &[(path, already_symmetric), (path, needs_conversion)],
             AnchorKind::Symmetric,
         )
         .expect("convert");

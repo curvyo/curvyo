@@ -22,8 +22,12 @@ impl Session {
     }
 
     /// The marquee box or lasso line to draw this frame, once the drag has
-    /// left its 3 px dead zone.
+    /// left its 3 px dead zone; in the Node tool the node marquee's box
+    /// (`specs/0053-node-marquee-selection/` criterion 2).
     pub(super) fn marquee_overlay(&self) -> Option<MarqueeOverlay> {
+        if self.tool == Tool::Node {
+            return self.node_marquee_overlay();
+        }
         Some(match self.live_gesture()?.shape {
             GestureShape::Box { from, to, mode } => MarqueeOverlay::Box {
                 from,

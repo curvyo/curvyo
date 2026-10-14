@@ -275,7 +275,14 @@ fn c3_other_tools_ignore_ctrl_a() {
         let d = row_doc(3);
         let mut s = open(&d);
         s.set_tool(tool);
-        assert_eq!(ctrl_a(&mut s), KeyOutcome::Ignored, "{tool:?}");
+        // `0053` criterion 22 amends criterion 3 for the Node tool: Ctrl+A selects every node
+        // there (consumed), and the object selection stays empty either way.
+        let expected = if tool == Tool::Node {
+            KeyOutcome::SelectedAll
+        } else {
+            KeyOutcome::Ignored
+        };
+        assert_eq!(ctrl_a(&mut s), expected, "{tool:?}");
         assert_eq!(s.selected_object_count(), 0, "{tool:?}");
     }
 }

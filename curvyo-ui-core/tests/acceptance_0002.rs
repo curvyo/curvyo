@@ -11,7 +11,9 @@
 use curvyo_document_core::{
     AnchorId, AnchorKind, Document, HandleSlot, NewAnchor, Point, Tolerance, Vec2,
 };
-use curvyo_ui_core::{AnchorIdMinter, HitTolerances, NodeTool, PenPointerUpOutcome, PenTool};
+use curvyo_ui_core::{
+    AnchorIdMinter, HitTolerances, Modifiers, NodeTool, PenPointerUpOutcome, PenTool,
+};
 
 const CLOSE_TOLERANCE: curvyo_document_core::Length = curvyo_document_core::Length::from_mm(2.0);
 const DRAG_THRESHOLD: curvyo_document_core::Length = curvyo_document_core::Length::from_mm(1.0);
@@ -259,7 +261,7 @@ fn ac10_shift_click_toggle_off_then_drag_only_moves_what_remains_selected() {
 
     let paths = vec![document.path(path).unwrap()];
     tool.pointer_down(&paths, Point::new(20.0, 0.0), TOLERANCES, false);
-    tool.pointer_up(&document, Point::new(25.0, 3.0));
+    tool.pointer_up(&document, Point::new(25.0, 3.0), Modifiers::NONE);
 
     let snapshot = document.path(path).unwrap();
     let by_id = |id: AnchorId| snapshot.anchors.iter().find(|x| x.id == id).unwrap().point;
@@ -294,7 +296,7 @@ fn ac8_zero_delta_node_drag_is_a_no_op() {
     // selected, rather than itself being the selecting click.
     let paths = vec![document.path(path).unwrap()];
     tool.pointer_down(&paths, Point::new(0.0, 0.0), TOLERANCES, false);
-    tool.pointer_up(&document, Point::new(1.0, 0.0));
+    tool.pointer_up(&document, Point::new(1.0, 0.0), Modifiers::NONE);
     assert!(tool.selection().contains_node(a), "must be selected now");
 
     // Sanity check, called out explicitly by the architect: confirm
@@ -313,7 +315,7 @@ fn ac8_zero_delta_node_drag_is_a_no_op() {
     // Press and release at the same point on the already-selected node.
     let paths = vec![document.path(path).unwrap()];
     tool.pointer_down(&paths, point_before, TOLERANCES, false);
-    let outcome = tool.pointer_up(&document, point_before);
+    let outcome = tool.pointer_up(&document, point_before, Modifiers::NONE);
 
     let after = document.export_loro_snapshot().expect("snapshot");
 
@@ -359,7 +361,7 @@ fn ac9_zero_delta_handle_drag_off_tip_is_a_no_op() {
     // zero-delta drag under test.
     let paths = vec![document.path(path).unwrap()];
     tool.pointer_down(&paths, Point::new(0.0, 0.0), TOLERANCES, false);
-    tool.pointer_up(&document, Point::new(1.0, 0.0));
+    tool.pointer_up(&document, Point::new(1.0, 0.0), Modifiers::NONE);
     assert!(tool.selection().contains_node(a), "must be selected now");
 
     // handle_out is a relative offset, unaffected by the node's own
@@ -380,7 +382,7 @@ fn ac9_zero_delta_handle_drag_off_tip_is_a_no_op() {
         curvyo_ui_core::NodePointerDownOutcome::Handle,
         "the press must land on the handle, not the node or nothing"
     );
-    let outcome = tool.pointer_up(&document, press_point);
+    let outcome = tool.pointer_up(&document, press_point, Modifiers::NONE);
 
     let after = document.export_loro_snapshot().expect("snapshot");
 
@@ -421,12 +423,12 @@ fn ac9_dragging_a_handle_to_zero_retracts_it_without_changing_kind() {
     let mut tool = NodeTool::new();
     let paths = vec![document.path(path).unwrap()];
     tool.pointer_down(&paths, Point::new(0.0, 0.0), TOLERANCES, false);
-    tool.pointer_up(&document, Point::new(0.0, 0.0));
+    tool.pointer_up(&document, Point::new(0.0, 0.0), Modifiers::NONE);
 
     let paths = vec![document.path(path).unwrap()];
     tool.pointer_down(&paths, Point::new(5.0, 0.0), TOLERANCES, false);
     // Drag the handle all the way back onto the node itself.
-    tool.pointer_up(&document, Point::new(0.0, 0.0));
+    tool.pointer_up(&document, Point::new(0.0, 0.0), Modifiers::NONE);
 
     let snapshot = document.path(path).unwrap();
     let anchor = &snapshot.anchors[0];

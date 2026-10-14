@@ -162,34 +162,6 @@ route to what OpenVoronoi does, and still not free: `centerline` depends on
 V-carve a desktop-only capability or force a reimplementation of that filter.
 That trade is what makes it an escalation rather than the first choice.
 
-## Node selection holds one path
-
-**Update 2026-10-12.** `NodeSelection` has held an ordered `(path, anchor)`
-list across paths since `0006`, and a multi-path node drag is one commit.
-Two gaps remain. `NodeTool::delete_selected` and `convert_selected` act
-only when `NodeSelection::path()` names one path. So on a cross-path
-selection, Delete, Backspace, the Delete node button and Make
-corner/symmetric/asymmetric do nothing, although their buttons are
-enabled. `specs/0053-node-marquee-selection/adrs.md` decision 4 resolves
-this with pair-based `Document::delete_anchors` and `convert_anchor_kind`,
-each one commit. Remove this item when that slice merges.
-
-The original text follows. `curvyo-ui-core`'s `NodeSelection` referred to
-a single path. After "object to path" on several primitives, only the
-first converted path was selected in the node tool
-(`specs/0003-primitive-shapes/adrs.md`, 2026-10-04 PR #10 review note).
-Node editing across several paths at once, as Inkscape allows, was not
-possible.
-
-**Resolution:** a story that asks for node editing across several paths.
-`canvas-navigation-and-selection` (slice 4) does not: its Select tool hands
-one path to the node tool. Since that slice, the converted objects stay
-selected together at object level, because the object selection is shared
-(`specs/0004-canvas-navigation-and-selection/adrs.md`). Multi-path node
-editing still needs multi-path node commands that make one commit per
-interaction (ADR 0002 §9). Selection is ephemeral (ADR 0009 §2), so no file
-format change is involved.
-
 ## SVG round-trip is lossy
 
 We own a documented SVG subset; unmodelled attributes survive in a per-node
@@ -1534,3 +1506,18 @@ at the strip. The browser build has no minimum: below about 640 px of window wid
 narrower than the bars and the Select bar is drawn over the strip and the body. **Resolution:** a
 minimum width for the editor in the browser build, or a wrap rule for the overlay row. Not needed
 for the desktop app.
+
+## `node_tool.rs` is over the module size guide (`0053`, 2026-10-14)
+
+`curvyo-ui-core/src/node_tool.rs` has about 930 production lines after `0053` added the node
+marquee, against the ~500-line guide in `CLAUDE.md` §5. The Join rules (which pairs of end nodes
+can be joined, and the reason line when they cannot) are a separate responsibility. Move them into
+their own module the next time a slice changes the Node tool (likely `0055`).
+
+## Node marquee rings are drawn as one mesh per ring (`0053`, 2026-10-14)
+
+5,000 ringed nodes cost about 10.6 ms per frame against 3.2 ms for the plain Node-tool frame
+(release, dev VM). This is inside the 16.7 ms budget of `0053` criterion 25. The fix is one ring
+mesh drawn as GPU instances, which belongs with the renderer item "Canvas performance on
+Linux/WebKitGTK" above. Each frame also builds a map of all anchors to find ringed positions;
+passing positions with `ringed_nodes` would skip that.

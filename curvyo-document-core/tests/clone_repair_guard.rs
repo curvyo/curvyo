@@ -77,7 +77,8 @@ fn every_removal_of_objects_repairs_their_clones() {
         "replace.rs",
         "path_topology.rs",
         "path_extend.rs",
-        "paths.rs",
+        // The node Delete moved from `paths.rs` with `0053` (multi-path `delete_anchors`).
+        "anchor_edits.rs",
     ] {
         assert!(
             files.contains(&expected),

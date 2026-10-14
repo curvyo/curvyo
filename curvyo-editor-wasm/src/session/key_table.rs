@@ -191,7 +191,9 @@ pub(super) fn decide(input: &KeyInput<'_>, state: KeyState) -> KeyAction {
         return action;
     }
     if input.ctrl && input.key.eq_ignore_ascii_case("a") {
-        let acts = gate_open && !input.alt && !input.shift && !input.repeat && selects(state);
+        // The Node tool selects every node of its editing set (`0053` criterion 22).
+        let tool_acts = selects(state) || state.tool == Tool::Node;
+        let acts = gate_open && !input.alt && !input.shift && !input.repeat && tool_acts;
         return if acts {
             KeyAction::SelectAll
         } else {
