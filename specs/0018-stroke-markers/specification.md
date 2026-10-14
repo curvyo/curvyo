@@ -1,6 +1,6 @@
 # Stroke markers: arrows and dots at the start, end, along and on the nodes of a path
 
-Status: In progress
+Status: Done (#78, one PR with `0017` and `0030`)
 Priority: Should
 Origin: Customer
 

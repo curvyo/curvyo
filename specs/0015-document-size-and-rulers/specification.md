@@ -1,6 +1,6 @@
 # Document size and rulers
 
-Status: Ready
+Status: Done (#67, #72)
 Priority: Must
 Origin: Customer (rulers, resize, fit to content, drawing outside the document). The display unit (Part C) is a **Proposal** and is not accepted until the customer says so.
 

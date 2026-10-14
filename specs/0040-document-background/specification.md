@@ -1,6 +1,6 @@
 # Document background: a fill for the document, and the eyedropper that picks it
 
-Status: In progress (`story/document-background`; `adrs.md` and the UX notes of 2026-10-10 exist; delivery: one PR, four milestones, on top of #80 and #84)
+Status: Done (#90, 2026-10-10; `format_version` 10). Criterion 44 (copy and paste) has no test: the app has no object clipboard yet; it is checked when one is built.
 Priority: Should
 Origin: Customer (the document may have a fill; the eyedropper for objects picks the background; the eyedropper for the background itself; request of 2026-10-10). Proposals, marked where they occur and in the decisions below (defaults taken by the lead, 2026-10-10): "none" drawn as a checkerboard, the pasteboard is not pickable, the Opacity row, the default colour kept at today's value, the label `set_document_background`.
 
@@ -191,4 +191,4 @@ Builds on: `specs/0017-style-panel-rework/` (colour block: hex, inline picker, O
 Related: `docs/design-system.md` (`--canvas-bg`, `--pasteboard-bg`, `--checker-a`, `--checker-b`, "Casing over artwork"), `specs/README.md` ("`format_version` plan": next free at merge)
 ADRs: `adrs.md` (architect, 2026-10-10: no new ADR; the module `document_background.rs`, the encoding of criterion 3, one commit `set_document_background`, strict validation on open, checkerboard in the fragment shader)
 Delivery: one PR on `story/document-background`, four milestones (`document-core`; `render-core` and GPU; `ui-core` and `editor-wasm` session; frontend), started after #79 and #80 merge because of the `background_at` signature in `pen_cue.rs`. Not built in parallel with 0023 (format number, `colour_pick.rs`).
-PR: not started
+PR: #90

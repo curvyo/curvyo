@@ -1,6 +1,6 @@
 # Properties panel tabs: Document, Style, History
 
-Status: Ready (the criteria are complete and testable; `adrs.md` confirms that no new ADR is needed; the UX notes are in; one branch `story/properties-tabs`, one PR, can start from `main`, `CLAUDE.md` §4) **Amended by `0051-sidebar-and-no-menu`** (2026-10-11): the strip is a vertical column of icon tabs on the panel's inner edge (criteria 1, 12, 18, 20 to 22 and Question 1 are replaced by criteria 1 to 14 of `0051`), with the File tab first; the other criteria hold unchanged.
+Status: Done (#84, one PR with `0045`; the History tab and Shift+Ctrl+H came with `0020`, #95). **Amended by `0051-sidebar-and-no-menu`** (2026-10-11): the strip is a vertical column of icon tabs on the panel's inner edge (criteria 1, 12, 18, 20 to 22 and Question 1 are replaced by criteria 1 to 14 of `0051`), with the File tab first; the other criteria hold unchanged.
 Priority: Should (it is the first thing `0020-undo-redo` builds on: the History tab needs it, so it is built first)
 Origin: Customer (request of 2026-10-10, final: the right side needs microtabs like Blender's; it was already "rather sexy" that the right context, Document or Style, had to be chosen, and now there are Style and History). The strip's orientation, the auto-switch rules and the details are my proposals and are marked.
 
@@ -152,4 +152,4 @@ Requirements: R-EDIT-025
 Builds on: `specs/0015-document-size-and-rulers/`, `specs/0017-style-panel-rework/`, `specs/0030-document-size-presets/`, `specs/0040-document-background/`
 Needed by: `specs/0020-undo-redo/` (History tab), `specs/0045-document-formats-library/`
 ADRs: `adrs.md` confirms none are needed (rule in `curvyo-ui-core/src/panel_tabs.rs`, state in `Session`); build order with 0040 and 0045 is in `adrs.md` ("Collisions and order")
-PR: -
+PR: #84 (with `0045`); History tab in #95

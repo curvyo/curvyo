@@ -1,6 +1,6 @@
 # Cut at crossings: cut paths open wherever they cross
 
-Status: Built on `story/split-and-cut` (PR to come; one PR with `0048`; no format change). Ready since 2026-10-10: `adrs.md` and the UX notes exist; the customer's naming of 2026-10-10 settles what the command is called
+Status: Done (#105, 2026-10-12, one PR with `0048`; no format change). Criteria 5, 7, 8 and 12 were reworded during the build (#105): a figure eight gives two pieces, one per lobe.
 Priority: Should
 Origin: Customer. He asked for "Split" on 2026-10-09 without saying what it splits. On 2026-10-10 he decided that **Split** is Inkscape's Split Path (`0048-split-compound-path`) and that this operation, cutting the paths where they cross or touch, is called **Cut**. The folder was `0036-split-at-crossings` until then; the number stays. The rules below are my proposals as before.
 
@@ -117,5 +117,5 @@ Nothing is added to the viewport: the button joins a card that already exists. 1
 Requirements: R-EDIT-023 (`docs/requirements.md`)
 Builds on: `specs/0016-boolean-operations/` (rail command pattern, refusals, kernel tolerance, determinism), `specs/0006-path-merge-split-and-node-types/` (node-level Split)
 Related: `specs/0048-split-compound-path/` (the table of Split, Break apart and Cut), `specs/0035-combine-and-break-apart/`, `specs/0037-fracture-and-flatten/`, `specs/0023-groups/` (groups refused), `specs/0032-pen-tablet-input/` (eraser, Question 3)
-ADRs: `adrs.md` (architect, to come; a curve-curve intersection routine in `curvyo-geometry-core`)
-PR: TBD
+ADRs: `adrs.md` (architect; a curve-curve intersection routine in `curvyo-geometry-core`)
+PR: #105 (with `0048`)

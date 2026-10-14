@@ -1,0 +1,17 @@
+# One Remote Control service per project and VM: claude-rc@<project>.service
+# runs in ~/<project> and names its sessions <host>-<project>.
+# Several projects can share a VM; leads dispatch only to a VM whose sessions are all idle.
+[Unit]
+Description=Claude Code Remote Control (%i)
+
+[Service]
+WorkingDirectory=%h/%i
+ExecStart=%h/.local/bin/claude remote-control --name %H-%i --spawn same-dir --permission-mode bypassPermissions
+Restart=always
+RestartSec=15
+# Agent VMs (16 GB): cap per project service. On the 4 GB lead VM use MemoryHigh=3G, MemoryMax=3500M.
+MemoryHigh=12G
+MemoryMax=13G
+
+[Install]
+WantedBy=default.target

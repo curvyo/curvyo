@@ -1290,4 +1290,4 @@ block.
 
 ## Links
 Requirements: R-EDIT-005, R-EDIT-006 (`docs/requirements.md`)
-PR: TBD
+PR: #54 (style model), #55 (render and hit test), #58 (properties panel), #59 (gradient fills, removed again by `0017`, #78)

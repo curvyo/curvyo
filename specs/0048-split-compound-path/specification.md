@@ -1,6 +1,6 @@
 # Split: separate the unconnected parts of a compound path, holes stay with their part
 
-Status: Built on `story/split-and-cut` (PR to come; one PR with `0036`; no format change). Ready since 2026-10-10: (`adrs.md` and the UX notes exist; the customer's decision of 2026-10-10 settles what Split means; built on the default of Question 1: the built Break apart is renamed Split, and Break apart becomes the every-outline command, unless the customer vetoes)
+Status: Done (#105, 2026-10-12, one PR with `0036`; no format change). Built on the default of Question 1, accepted with the PR: the Break apart of `0035` is renamed Split, and Break apart is the every-outline command. Criterion 2 was amended after the UX review (another tool shows only "Use the Select tool.").
 Priority: Should
 Origin: Customer (2026-10-10: "Split works like Inkscape's Split Path: it separates the parts that are not connected or overlapping; an outer outline with the holes inside it stays one object. Break apart separates every subpath, including holes. The operation that cuts paths where they cross is Cut."). The texts, numbers and tests are mine.
 
@@ -165,5 +165,5 @@ The Path card is 180 px of the 546 px height of column B (the card grows by 44 p
 Requirements: R-EDIT-023 (`docs/requirements.md`)
 Amends: `specs/0035-combine-and-break-apart/` (the command named Break apart there becomes Split; criteria 13 to 18 and Question 2 change, once Question 1 is confirmed)
 Related: `specs/0036-cut-at-crossings/`, `specs/0037-fracture-and-flatten/`, `specs/0016-boolean-operations/` (compound path, winding, refusals), `specs/0023-groups/` (groups refused)
-ADRs: `adrs.md` (architect, to come; small: the part search reuses the region plan of `0035`)
-PR: TBD
+ADRs: `adrs.md` (architect; small: the part search reuses the region plan of `0035`)
+PR: #105 (with `0036`)

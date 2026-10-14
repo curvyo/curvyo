@@ -1,6 +1,6 @@
 # Document size presets: paper sizes A0 to A6 and slide formats
 
-Status: In progress (`adrs.md` and the UX notes exist, both 2026-10-10)
+Status: Done (#78, the last milestone of the `0017` PR). The format list became user-extendable in `0045` (#84).
 Priority: Should
 Origin: Customer (the request, the paper and slide groups, the data file, inline choice, portrait/landscape, round trip). The slide list, the pixel rule and the orientation rule are my proposals, marked in "Decided by the product owner" and in the open questions.
 
