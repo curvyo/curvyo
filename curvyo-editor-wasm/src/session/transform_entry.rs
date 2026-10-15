@@ -310,9 +310,25 @@ impl Session {
                 let knob = this.param_entry_view(entry)?.handle;
                 limited.then(|| (entry.clone(), knob))
             });
+            // A typed 0 becomes 0.01 mm and says so after the Enter (`0056` criterion 15).
+            let recovery = this
+                .open_entry()
+                .map(|entry| entry.zero_recovery([first, second], last_edited))
+                .or_else(|| {
+                    this.open_group_entry()
+                        .map(|entry| entry.zero_recovery([first, second], last_edited))
+                })
+                .unwrap_or_default();
+            let mirror = this.transform_entry_mirror_line(first, second, last_edited);
             let outcome = this
                 .select
                 .commit_entry(&this.document, [first, second], last_edited);
+            if outcome == EntryOutcome::Committed {
+                this.transform_notice = curvyo_ui_core::zero_recovery_notice(recovery);
+                // A typed negative size is announced with its mirror (`0056` UX notes).
+                this.transform_announcement =
+                    (!mirror.is_empty()).then(|| super::select::resized_announcement(&mirror));
+            }
             if outcome == EntryOutcome::Committed
                 && let Some((entry, anchor)) = notice
                 && let Some(object) = this.document.object(entry.object().id())
@@ -330,6 +346,26 @@ impl Session {
             }
             outcome
         })
+    }
+
+    /// The chip's note line while a size field holds a negative number ("Mirrored left to
+    /// right", "Mirrored top to bottom", "Turned 180°"), or an empty string
+    /// (`specs/0056-mirror-and-negative-scale/` UX notes).
+    #[must_use]
+    pub fn transform_entry_mirror_line(
+        &self,
+        first: &str,
+        second: &str,
+        last_edited: usize,
+    ) -> String {
+        self.open_entry()
+            .and_then(|entry| entry.mirror_line([first, second], last_edited))
+            .or_else(|| {
+                self.open_group_entry()
+                    .and_then(|entry| entry.mirror_line([first, second], last_edited))
+            })
+            .unwrap_or_default()
+            .to_string()
     }
 
     /// Closes the entry without writing (criterion 20): Escape in the chip,

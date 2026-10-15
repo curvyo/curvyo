@@ -1,12 +1,9 @@
-//! The words a mirror shows the maker (`specs/0056-mirror-and-negative-scale/` criteria
-//! 3, 10 and 15 and the UX notes): the signed size in the live readout, the line that
-//! names the mirror, the flip announcement and the two notices.
+//! The words a resize through zero shows the maker (`specs/0056-mirror-and-negative-scale/`
+//! criteria 10 and 15 and the UX notes): the signed size in the live readout, the line
+//! that names the mirror, and the notice of a size set to 0.01 mm. The flip's own words
+//! are the frontend's, as the key hints are.
 
-use crate::flip::FlipAxis;
 use crate::transform_math::ZeroRecovery;
-
-/// The notice of a flip that changes nothing (criterion 3).
-pub const FLIP_UNCHANGED_NOTICE: &str = "The selection looks the same flipped. Nothing changed.";
 
 /// `magnitude` millimetres with a real minus sign (U+2212) when `negative`, without the
 /// unit: one decimal, two under 0.1 mm (criterion 10: "0.01", "−0.01", and "−0.0" just
@@ -28,15 +25,6 @@ pub fn mirror_line(sx: f64, sy: f64) -> Option<&'static str> {
         (true, false) => Some("Mirrored left to right"),
         (false, true) => Some("Mirrored top to bottom"),
         (false, false) => None,
-    }
-}
-
-/// The polite announcement of a flip (criterion 2).
-#[must_use]
-pub const fn flip_announcement(axis: FlipAxis) -> &'static str {
-    match axis {
-        FlipAxis::Horizontal => "Flipped horizontally",
-        FlipAxis::Vertical => "Flipped vertically",
     }
 }
 
@@ -82,6 +70,5 @@ mod tests {
             assert!(text.chars().count() <= 70, "{text}");
         }
         assert_eq!(zero_recovery_notice(ZeroRecovery::default()), None);
-        assert!(FLIP_UNCHANGED_NOTICE.chars().count() <= 70);
     }
 }

@@ -12,6 +12,7 @@ use crate::ResizeDirection;
 use crate::conversion::converted_for_handle;
 use crate::group_box::GroupSelection;
 use crate::group_transform::{GroupMap, commit_group, group_label, group_pivot, map_all_checked};
+use crate::mirror_text::mirror_line;
 use crate::oriented_box::OrientedBox;
 use crate::skew_math::{MIN_SKEW_LEVER_MM, skew_factor, skew_frame};
 use crate::transform_commit::{MAX_COORDINATE_MM, same_within_tolerance};
@@ -400,6 +401,16 @@ impl GroupEntry {
             pivot: self.pivot,
             sx,
             sy,
+        }
+    }
+
+    /// The chip's note line for the typed `texts` (`specs/0056-mirror-and-negative-scale/`
+    /// UX notes): the mirror the typed size means, `None` for none.
+    #[must_use]
+    pub fn mirror_line(&self, texts: [&str; 2], last_edited: usize) -> Option<&'static str> {
+        match self.map_of(texts, last_edited).ok().flatten()? {
+            GroupMap::Scale { sx, sy, .. } => mirror_line(sx, sy),
+            GroupMap::Rotate { .. } | GroupMap::Shear { .. } => None,
         }
     }
 

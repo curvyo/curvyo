@@ -10,6 +10,7 @@ use curvyo_document_core::{Angle, Document, ObjectSnapshot, PathSnapshot, Point,
 
 use crate::ResizeDirection;
 use crate::conversion::converted_for_object;
+use crate::mirror_text::mirror_line;
 use crate::oriented_box::OrientedBox;
 use crate::transform_commit::{MAX_COORDINATE_MM, commit_gesture};
 use crate::transform_drag::{
@@ -458,6 +459,20 @@ impl TransformEntry {
                     .recovered
             })
             .unwrap_or_default()
+    }
+
+    /// The chip's note line for the typed `texts` (`specs/0056-mirror-and-negative-scale/`
+    /// UX notes, "Showing that the entry will mirror"): "Mirrored left to right" and so on
+    /// while a size field holds a negative number, `None` otherwise. Along the object's own
+    /// box axes.
+    #[must_use]
+    pub fn mirror_line(&self, texts: [&str; 2], last_edited: usize) -> Option<&'static str> {
+        let targets = self.targets(texts, last_edited).ok()?;
+        let (direction, delta) = self.resize_inputs(&targets)?;
+        let resized = self
+            .resize_options()
+            .resized_box(&self.start_box, direction, delta);
+        mirror_line(resized.sx, resized.sy)
     }
 
     /// The typed targets: every edited field, or with linked fields the field edited

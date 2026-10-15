@@ -224,6 +224,18 @@ impl Session {
         self.select_transform_decoration_input_in(&Self::live_objects_in(&objects, live.as_ref()))
     }
 
+    /// The handle a drag in flight holds, by position after a resize through zero
+    /// (`0056` criterion 11, `review-ux.md` finding 5): the one drawn in the dragging look.
+    pub(super) fn dragging_handle_by_position(&self) -> Option<EditHandle> {
+        match self.pointer_position {
+            Some(pointer) => {
+                self.select
+                    .dragging_handle_at(pointer, self.held.shift, self.held.ctrl)
+            }
+            None => self.select.dragging_handle(),
+        }
+    }
+
     /// [`Session::select_transform_decoration_input`] over the live objects
     /// the caller already built, so a frame reads and substitutes once.
     pub(super) fn select_transform_decoration_input_in(
@@ -234,7 +246,7 @@ impl Session {
             return TransformDecorationInput::default();
         }
         let tolerances = self.transform_handle_tolerances();
-        let dragging = self.select.dragging_handle();
+        let dragging = self.dragging_handle_by_position();
         let entry_handle = self.select.entry_handle();
         let highlighted = dragging.or(entry_handle);
         let hover = self.select_hovered_handle(objects);
@@ -264,7 +276,8 @@ impl Session {
             SelectTool::transform_handles(objects, &self.selection, tolerances, side_rotate)
                 .into_iter()
                 .filter(|(handle, _)| {
-                    is_drawn_handle(*handle, &box_, &tolerances)
+                    // The grabbed handle is never left out by the size tiers (`0056`).
+                    (is_drawn_handle(*handle, &box_, &tolerances) || dragging == Some(*handle))
                         && !(hide_center && *handle == EditHandle::Move)
                         && (params_visible || !matches!(handle, EditHandle::Param(_)))
                 })
@@ -385,6 +398,31 @@ mod tests {
         session.modifiers_changed(false, false, false);
         session.pointer_hover(to, false, false);
         assert_eq!(session.select_decoration_input().selected[0].1, moved);
+    }
+
+    /// `0056` review-ux finding 5: after a drag crosses zero, the handle under the pointer
+    /// is drawn in the dragging look, also while the box is too small for its tier.
+    #[test]
+    fn the_grabbed_handle_keeps_its_dragging_look_through_zero() {
+        for to in [Point::new(-20.0, 5.0), Point::new(-0.5, 5.0)] {
+            let (mut session, _) = session_with_selected_rect();
+            session.pointer_hover(Point::new(10.0, 5.0), false, false);
+            session.pointer_down(Point::new(10.0, 5.0), false);
+            session.pointer_hover(Point::new(4.0, 5.0), false, false);
+            session.pointer_hover(to, false, false);
+            let decoration = session.select_transform_decoration_input();
+            let dragging: Vec<_> = decoration
+                .handles
+                .iter()
+                .filter(|glyph| glyph.dragging)
+                .collect();
+            assert_eq!(dragging.len(), 1, "{to:?}");
+            let at = dragging[0].position;
+            assert!(
+                (at.x - to.x).abs() < 1e-6 && (at.y - to.y).abs() < 1e-6,
+                "{to:?}: the dragging handle is at {at:?}"
+            );
+        }
     }
 
     /// `edit-interaction-polish` criterion 65: the device pixel ratio the host

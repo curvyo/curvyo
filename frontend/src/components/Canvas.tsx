@@ -143,6 +143,7 @@ export function Canvas({ editor }: CanvasProps) {
           onCommit={editor.commitTransformEntry}
           onCancel={editor.cancelTransformEntry}
           onLinked={editor.transformEntryLinked}
+          onMirrorLine={editor.transformEntryMirrorLine}
         />
       )}
       {editor.moveEntry && (

@@ -16,7 +16,6 @@ const MESSAGE_CARD_PX = 28;
  * UX notes, "Validation"). */
 const MESSAGES = {
   number: "Enter a number",
-  positive: "Must be above 0",
   negative: "Must be 0 or more",
   "ratio-range": "Must be 0.01 to 0.99",
   "skew-range": "Must be between -90 and 90",
@@ -24,6 +23,10 @@ const MESSAGES = {
 } as const;
 
 type Reason = keyof typeof MESSAGES;
+
+/** The accessible description of a size field (`specs/0056-mirror-and-negative-scale/` UX
+ * notes): millimetres only, and a minus sign mirrors. */
+const SIZE_FIELD_DESCRIPTION = "Millimetres. A minus sign mirrors.";
 
 function asReason(text: string | undefined): Reason {
   return text !== undefined && text in MESSAGES ? (text as Reason) : "number";
@@ -38,6 +41,9 @@ interface TransformEntryChipProps {
   onCommit: (first: string, second: string, lastEdited: number) => string;
   onCancel: () => void;
   onLinked: (field: number, text: string) => string | undefined;
+  /** The note line for the typed texts while a size is negative ("Mirrored left to right"),
+   * or "" (`specs/0056-mirror-and-negative-scale/` UX notes). */
+  onMirrorLine: (first: string, second: string, lastEdited: number) => string;
 }
 
 /**
@@ -57,11 +63,14 @@ export function TransformEntryChip({
   onCommit,
   onCancel,
   onLinked,
+  onMirrorLine,
 }: TransformEntryChipProps) {
   const chipRef = useRef<HTMLDivElement>(null);
   const rowRef = useRef<HTMLDivElement>(null);
   const inputRefs = useRef<Array<HTMLInputElement | null>>([]);
   const messageId = useId();
+  const noteId = useId();
+  const descriptionId = useId();
   const [texts, setTexts] = useState<string[]>(() => entry.fields.map((f) => f.prefill));
   const [lastEdited, setLastEdited] = useState(0);
   const [invalid, setInvalid] = useState<{ field: number; reason: Reason } | null>(null);
@@ -191,6 +200,9 @@ export function TransformEntryChip({
   const visibleLabel = (field: { label: string; name: string }) =>
     entry.kind === "skew" ? field.name.replace("Skew angle ", "Skew ") : field.label;
   const isRatio = entry.kind === "inner-ratio";
+  const isSize = entry.kind === "size";
+  // A negative size mirrors: the chip says how, under the fields (`0056` UX notes).
+  const mirrorNote = isSize ? onMirrorLine(texts[0] ?? "", texts[1] ?? "", lastEdited) : "";
   const isSkew = entry.kind === "skew";
   // The skew chip names its axis inside the field ("Skew x"), so it differs
   // from the angle chip even where the handle itself is hidden.
@@ -253,7 +265,10 @@ export function TransformEntryChip({
                   spellCheck={false}
                   aria-label={field.name}
                   aria-invalid={isInvalid ? true : undefined}
-                  aria-describedby={isInvalid ? messageId : undefined}
+                  aria-describedby={
+                    isInvalid ? messageId : isSize ? `${descriptionId} ${noteId}` : undefined
+                  }
+                  title={isSize ? SIZE_FIELD_DESCRIPTION : undefined}
                   readOnly={!field.editable}
                   value={texts[index] ?? ""}
                   onChange={(event) => onChange(index, event.target.value)}
@@ -278,6 +293,22 @@ export function TransformEntryChip({
           );
         })}
       </div>
+      {isSize && (
+        <>
+          <span id={descriptionId} className="sr-only">
+            {SIZE_FIELD_DESCRIPTION}
+          </span>
+          <div
+            id={noteId}
+            role="status"
+            aria-live="polite"
+            className={mirrorNote ? "mt-1.5 px-1 text-xs" : "h-0 overflow-hidden text-xs"}
+            style={{ opacity: 0.8 }}
+          >
+            {mirrorNote}
+          </div>
+        </>
+      )}
       {entry.scope !== "" && (
         // The scope of a corner radius value, fixed when the field opened; the
         // field's accessible name carries it too, so this row is not read twice.

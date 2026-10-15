@@ -3,7 +3,9 @@
 //! `specs/0009-unified-object-editing`). Split out of `session/select_view.rs`.
 
 use curvyo_document_core::{ObjectSnapshot, Shape};
-use curvyo_ui_core::{EditHandle, Side, format_degrees, oriented_bounds};
+use curvyo_ui_core::{
+    EditHandle, Side, format_degrees, mirror_line, oriented_bounds, signed_size_text,
+};
 
 use super::{Session, Tool};
 
@@ -59,20 +61,34 @@ impl Session {
                 let live = self.select_live_transform()?;
                 format_degrees(live.orientation().as_radians().to_degrees())
             }
-            EditHandle::Resize(_) => match &self.select_live_transform()? {
-                ObjectSnapshot::Primitive(p)
-                    if matches!(p.shape, Shape::Polygon { .. } | Shape::Star { .. }) =>
-                {
-                    let (Shape::Polygon { frame, .. } | Shape::Star { frame, .. }) = p.shape else {
-                        return None;
-                    };
-                    format!("r {:.1} mm", frame.radius.as_mm())
-                }
-                other => {
-                    let b = oriented_bounds(other);
-                    format!("{:.1} × {:.1} mm", b.width(), b.height())
-                }
-            },
+            EditHandle::Resize(_) => {
+                // The signed factors of the box axes: a minus on a turned-over axis and
+                // the line that names the mirror (`0056` criterion 10).
+                let (sx, sy) = self
+                    .select
+                    .live_resize_factors(anchor, self.held.shift, self.held.ctrl)
+                    .unwrap_or((1.0, 1.0));
+                let size = match &self.select_live_transform()? {
+                    ObjectSnapshot::Primitive(p)
+                        if matches!(p.shape, Shape::Polygon { .. } | Shape::Star { .. }) =>
+                    {
+                        let (Shape::Polygon { frame, .. } | Shape::Star { frame, .. }) = p.shape
+                        else {
+                            return None;
+                        };
+                        format!("r {} mm", signed_size_text(frame.radius.as_mm(), false))
+                    }
+                    other => {
+                        let b = oriented_bounds(other);
+                        format!(
+                            "{} × {} mm",
+                            signed_size_text(b.width(), sx < 0.0),
+                            signed_size_text(b.height(), sy < 0.0)
+                        )
+                    }
+                };
+                with_mirror_line(size, sx, sy)
+            }
             EditHandle::Param(param) => super::corner_readout::param_readout(
                 &self.select_live_transform()?,
                 param,
@@ -97,4 +113,13 @@ pub(super) fn skew_readout(side: Side, degrees: f64) -> String {
         "+"
     };
     format!("Skew {axis} {sign}{magnitude}")
+}
+
+/// `size` with the line that names the mirror of `(sx, sy)` under it, when there is one
+/// (`specs/0056-mirror-and-negative-scale/` UX notes: the frontend splits the lines).
+pub(super) fn with_mirror_line(size: String, sx: f64, sy: f64) -> String {
+    match mirror_line(sx, sy) {
+        Some(line) => format!("{size}\n{line}"),
+        None => size,
+    }
 }

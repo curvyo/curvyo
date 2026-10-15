@@ -12,7 +12,7 @@ use curvyo_render_core::{
 };
 use curvyo_ui_core::{
     EditHandle, GroupBoxShape, GroupSelection, OrientedBox, SelectTool, format_degrees,
-    group_handles, is_corner, is_drawn_group_handle, oriented_bounds,
+    group_handles, is_corner, is_drawn_group_handle, oriented_bounds, signed_size_text,
 };
 
 use super::select_readout::skew_readout;
@@ -161,10 +161,8 @@ impl Session {
         };
         let tolerances = self.transform_handle_tolerances();
         let box_ = self.group_box_shown(&group);
-        let highlighted = self
-            .select
-            .dragging_handle()
-            .or_else(|| self.select.entry_handle());
+        let dragging = self.dragging_handle_by_position();
+        let highlighted = dragging.or_else(|| self.select.entry_handle());
         let hover = self.group_hovered_handle(objects);
         let hovered = hover.as_ref().map(|(_, handle)| *handle);
         let side_rotate = self.select.side_rotate_revealed(self.held.shift);
@@ -173,7 +171,8 @@ impl Session {
         let handles = group_handles(&group, &box_, &tolerances, side_rotate)
             .into_iter()
             .filter(|(handle, _)| {
-                is_drawn_group_handle(*handle, &group, &tolerances)
+                // The grabbed handle is never left out by the size tiers (`0056`).
+                (is_drawn_group_handle(*handle, &group, &tolerances) || dragging == Some(*handle))
                     && !(hide_center && *handle == EditHandle::Move)
             })
             .map(|(handle, position)| TransformHandleGlyph {
@@ -318,10 +317,18 @@ impl Session {
                 let live = self.select_live_edit_in(&objects);
                 let live_objects = Self::live_objects_in(&objects, live.as_ref());
                 let group = SelectTool::group_of(&live_objects, &self.selection)?;
-                format!(
-                    "{:.1} mm \u{d7} {:.1} mm",
-                    group.bounds().width(),
-                    group.bounds().height()
+                let (sx, sy) = self
+                    .select
+                    .live_resize_factors(anchor, shift, ctrl)
+                    .unwrap_or((1.0, 1.0));
+                super::select_readout::with_mirror_line(
+                    format!(
+                        "{} mm \u{d7} {} mm",
+                        signed_size_text(group.bounds().width(), sx < 0.0),
+                        signed_size_text(group.bounds().height(), sy < 0.0)
+                    ),
+                    sx,
+                    sy,
                 )
             }
             EditHandle::Rotate(_) => {

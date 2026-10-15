@@ -4,7 +4,7 @@
 //! is in `keys.rs`.
 
 use curvyo_document_core::Direction;
-use curvyo_ui_core::{Arrow, EntryKey, Reorder};
+use curvyo_ui_core::{Arrow, EntryKey, FlipAxis, Reorder};
 
 use super::Tool;
 use super::keys::{KeyHint, KeyInput};
@@ -58,6 +58,9 @@ pub(super) enum KeyAction {
     Reorder(Reorder),
     OpenOffsetChip,
     StepOffsetCornerStyle,
+    /// H or V in the Select tool with a selection (`specs/0056-mirror-and-negative-scale/`
+    /// criterion 4, Proposal).
+    Flip(FlipAxis),
 }
 
 /// Whether Enter may enter a group: the Select tool, a plain press, nothing in flight.
@@ -217,6 +220,11 @@ pub(super) fn decide(input: &KeyInput<'_>, state: KeyState) -> KeyAction {
     if input.repeat || input.ctrl || input.alt || input.dom_blocked {
         return KeyAction::Ignore;
     }
+    letter_action(input, state, letter)
+}
+
+/// The action of a plain letter, `*`, Delete or Backspace that passed the gate.
+fn letter_action(input: &KeyInput<'_>, state: KeyState, letter: Option<char>) -> KeyAction {
     let binding = match (letter, input.key) {
         (Some('b'), _) => Binding::Tool(Tool::Pen),
         (Some('n'), _) => Binding::Tool(Tool::Node),
@@ -231,6 +239,8 @@ pub(super) fn decide(input: &KeyInput<'_>, state: KeyState) -> KeyAction {
         } else {
             EntryKey::SkewX
         }),
+        (Some('h'), _) => Binding::Flip(FlipAxis::Horizontal),
+        (Some('v'), _) => Binding::Flip(FlipAxis::Vertical),
         (_, "Delete" | "Backspace") => Binding::Delete,
         _ => return KeyAction::Ignore,
     };
@@ -260,6 +270,13 @@ pub(super) fn decide(input: &KeyInput<'_>, state: KeyState) -> KeyAction {
             (Tool::Select, Selected::One | Selected::Many) => KeyAction::OpenEntry(entry),
             _ => KeyAction::Hint(KeyHint::SelectFirst),
         },
+        // H and V flip in the Select tool only; with nothing selected they explain
+        // themselves as M and K do, and every other tool ignores them (`0056` criterion 4).
+        Binding::Flip(axis) => match (state.tool, state.selected) {
+            (Tool::Select, Selected::One | Selected::Many) => KeyAction::Flip(axis),
+            (Tool::Select, Selected::None) => KeyAction::Hint(KeyHint::SelectFirst),
+            _ => KeyAction::Ignore,
+        },
     }
 }
 
@@ -271,5 +288,7 @@ enum Binding {
     Entry(EntryKey, Tool),
     /// The typed entry in the Select tool with a selection, else a hint.
     EntryOnly(EntryKey),
+    /// A flip in the Select tool with a selection, else a hint (Select) or nothing.
+    Flip(FlipAxis),
     Delete,
 }

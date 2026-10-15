@@ -40,6 +40,7 @@ mod document;
 mod document_presets;
 mod draw;
 mod file_chord;
+mod flip;
 mod formats;
 mod frame;
 mod group_view;
@@ -282,6 +283,12 @@ pub struct Session {
     /// The objects a refused rail command is drawn around (red, hollow, never stored), and
     /// the selection it was refused for: the outline ends with the selection or the tool.
     command_refusal: Option<refusal::RefusalMarks>,
+    /// The notice of the last resize or typed size that set an axis to 0.01 mm instead of
+    /// 0 (`specs/0056-mirror-and-negative-scale/` criterion 15), until the host takes it.
+    transform_notice: Option<&'static str>,
+    /// The announcement of the last resize that mirrored ("Resized. Mirrored left to
+    /// right."), until the host takes it (`specs/0056-mirror-and-negative-scale/`).
+    transform_announcement: Option<String>,
     /// The Pen's end-node cache and the target of the press in flight (`0034`).
     pen_cue: pen::PenCueState,
     /// The maker's undo and redo stacks of this session (`history.rs`).
@@ -364,6 +371,8 @@ impl Session {
             button_down: false,
             limit_notice: None,
             command_refusal: None,
+            transform_notice: None,
+            transform_announcement: None,
             pen_cue: pen::PenCueState::default(),
             history: history::HistoryState::new(),
             nudge_run: None,
@@ -423,6 +432,8 @@ impl Session {
             button_down: false,
             limit_notice: None,
             command_refusal: None,
+            transform_notice: None,
+            transform_announcement: None,
             pen_cue: pen::PenCueState::default(),
             history: history::HistoryState::new(),
             nudge_run: None,

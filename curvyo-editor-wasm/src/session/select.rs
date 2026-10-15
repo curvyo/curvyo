@@ -183,7 +183,12 @@ impl Session {
     pub(super) fn select_pointer_up(&mut self, point: Point, shift: bool, ctrl: bool) {
         self.sync_select_units();
         let objects = self.objects();
-        self.select.pointer_up(
+        // A resize released through zero is announced with its mirror (`0056` UX notes).
+        let mirror = self
+            .select
+            .live_resize_factors(point, shift, ctrl)
+            .and_then(|(sx, sy)| curvyo_ui_core::mirror_line(sx, sy));
+        let recovery = self.select.pointer_up(
             &self.document,
             &objects,
             &mut self.selection,
@@ -191,6 +196,25 @@ impl Session {
             Modifiers::new(shift, ctrl).with_alt(self.held.alt),
             &mut self.minter,
         );
+        // A release that set an axis to 0.01 mm says so (`0056` criterion 15).
+        self.transform_notice = curvyo_ui_core::zero_recovery_notice(recovery);
+        if self.has_unrecorded_steps() {
+            self.transform_announcement = mirror.map(resized_announcement);
+        }
+    }
+
+    /// The polite announcement of the last resize that mirrored, by a release or an Enter
+    /// ("Resized. Mirrored left to right."), once; an empty string when there is none
+    /// (`specs/0056-mirror-and-negative-scale/` UX notes, `review-ux.md` finding 3).
+    pub fn take_transform_announcement(&mut self) -> String {
+        self.transform_announcement.take().unwrap_or_default()
+    }
+
+    /// The notice of the last release or typed size that set an axis to 0.01 mm instead
+    /// of 0 (`specs/0056-mirror-and-negative-scale/` criterion 15), once: an empty string
+    /// when there is none. The host shows it in the canvas notice slot for 3 s.
+    pub fn take_transform_notice(&mut self) -> String {
+        self.transform_notice.take().unwrap_or_default().to_string()
     }
 
     /// Updates the Select tool's own hover state (UX notes: "Hover, tool
@@ -280,4 +304,9 @@ impl Session {
             SelectDoubleClickOutcome::EntryOpened => DoubleClickHint::None,
         }
     }
+}
+
+/// "Resized. " and the mirror `line` of a resize that turned an axis over.
+pub(super) fn resized_announcement(line: &str) -> String {
+    format!("Resized. {line}.")
 }

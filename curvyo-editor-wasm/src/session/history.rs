@@ -116,6 +116,15 @@ impl Session {
         result
     }
 
+    /// Whether the command running now has written a step that is not on the undo stack
+    /// yet: something was committed.
+    pub(super) fn has_unrecorded_steps(&self) -> bool {
+        !self
+            .document
+            .own_steps_from(self.history.recorded)
+            .is_empty()
+    }
+
     /// Puts the steps the document started since the last look on the undo stack.
     pub(super) fn record_new_steps(&mut self, before: &SelectionSnapshot) {
         let new = self.document.own_steps_from(self.history.recorded);

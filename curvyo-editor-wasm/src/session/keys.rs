@@ -2,7 +2,7 @@
 //! Delete (`specs/0010-edit-interaction-polish/`, Parts D and F; `adrs.md`
 //! decisions 4 and 6).
 
-use curvyo_ui_core::{KeyEntryRefusal, NudgeEvent};
+use curvyo_ui_core::{FlipAxis, FlipOutcome, KeyEntryRefusal, NudgeEvent};
 
 use super::key_table::{KeyAction, KeyState, Selected, decide};
 use super::{Session, Tool};
@@ -114,6 +114,9 @@ pub enum KeyOutcome {
     },
     /// A document preview pauses editing: the key did nothing, and its page default is prevented.
     Paused,
+    /// H or V flipped the selection, or found it looking the same flipped
+    /// (`specs/0056-mirror-and-negative-scale/` criteria 3 and 4).
+    Flipped(FlipAxis, FlipOutcome),
 }
 
 impl KeyOutcome {
@@ -156,6 +159,9 @@ impl KeyOutcome {
             Self::OffsetCornerStyle => "offset-corner-style",
             Self::Nudged { new_run: false } => "nudge",
             Self::Nudged { new_run: true } => "nudge-new",
+            Self::Flipped(_, FlipOutcome::LooksTheSame) => "flip-unchanged",
+            Self::Flipped(FlipAxis::Horizontal, _) => "flip-horizontal",
+            Self::Flipped(FlipAxis::Vertical, _) => "flip-vertical",
         }
     }
 }
@@ -227,6 +233,31 @@ impl Session {
         self.selection.ids().len()
     }
 
+    /// Ctrl+G (`group`) or Ctrl+Shift+G: acts only when the command is available;
+    /// otherwise the page keeps the chord.
+    fn grouping_key(&mut self, group: bool) -> KeyOutcome {
+        let availability = self.grouping_availability();
+        if !(if group {
+            availability.group
+        } else {
+            availability.ungroup
+        }) {
+            return KeyOutcome::Ignored;
+        }
+        let result = if group {
+            self.group_selection()
+        } else {
+            self.ungroup_selection()
+        };
+        let acted = result.kind != super::grouping::GroupingKind::Ignored;
+        self.grouping_result = Some(result);
+        match (acted, group) {
+            (false, _) => KeyOutcome::Ignored,
+            (true, true) => KeyOutcome::Group,
+            (true, false) => KeyOutcome::Ungroup,
+        }
+    }
+
     /// One key press: the gate of criterion 55, then the key table of
     /// criterion 54. The frontend forwards the key and what the DOM alone
     /// knows and prevents the page's default for every outcome except
@@ -279,33 +310,8 @@ impl Session {
             KeyAction::History(direction) => self.history_key(direction),
             KeyAction::ObjectHistory(direction) => self.object_history_key(direction),
             KeyAction::SelectAll => self.select_all(),
-            KeyAction::Group => {
-                // The chord acts only when the command is available; otherwise the page keeps it.
-                if !self.grouping_availability().group {
-                    return KeyOutcome::Ignored;
-                }
-                let result = self.group_selection();
-                let acted = result.kind != super::grouping::GroupingKind::Ignored;
-                self.grouping_result = Some(result);
-                if acted {
-                    KeyOutcome::Group
-                } else {
-                    KeyOutcome::Ignored
-                }
-            }
-            KeyAction::Ungroup => {
-                if !self.grouping_availability().ungroup {
-                    return KeyOutcome::Ignored;
-                }
-                let result = self.ungroup_selection();
-                let acted = result.kind != super::grouping::GroupingKind::Ignored;
-                self.grouping_result = Some(result);
-                if acted {
-                    KeyOutcome::Ungroup
-                } else {
-                    KeyOutcome::Ignored
-                }
-            }
+            KeyAction::Group => self.grouping_key(true),
+            KeyAction::Ungroup => self.grouping_key(false),
             KeyAction::OpenOffsetChip => {
                 if self.open_offset_chip() {
                     KeyOutcome::OffsetChipOpened
@@ -320,6 +326,7 @@ impl Session {
                     KeyOutcome::Ignored
                 }
             }
+            KeyAction::Flip(axis) => KeyOutcome::Flipped(axis, self.flip_selection(axis)),
             KeyAction::EnterGroup => {
                 self.sync_context();
                 if self.enter_selected_group() {

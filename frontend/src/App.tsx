@@ -125,6 +125,8 @@ function Editor() {
               linkedCloneShown={editor.clones.shown}
               onLinkedClone={() => editor.clones.apply("linked-clone")}
               linkedCloneNotice={editor.clones.barNotice}
+              flipEnabled={editor.flipEnabled}
+              flip={editor.flip}
               onReturnFocus={() => editor.containerRef.current?.focus()}
             />
           ) : null}

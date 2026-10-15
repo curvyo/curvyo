@@ -4,7 +4,9 @@
 //! direct pass-through to `Session`, which holds the orchestration, over
 //! `curvyo-ui-core`'s rules.
 
-use curvyo_ui_core::{BarValue, EntryOutcome, InvalidReason, SelectBarState, clamped_ratio};
+use curvyo_ui_core::{
+    BarValue, EntryOutcome, FlipAxis, FlipOutcome, InvalidReason, SelectBarState, clamped_ratio,
+};
 use wasm_bindgen::prelude::*;
 
 use crate::wasm_api::WasmSession;
@@ -139,6 +141,24 @@ impl WasmSession {
         self.session.set_link_corners(on);
     }
 
+    /// Whether the two flip buttons act (`specs/0056-mirror-and-negative-scale/` criterion
+    /// 1): something is selected. The buttons are shown in every selection state.
+    #[must_use]
+    pub fn flip_enabled(&self) -> bool {
+        self.session.flip_enabled()
+    }
+
+    /// "Flip horizontally" (criterion 2): `"flipped"`, `"unchanged"` (the selection looks
+    /// the same flipped, nothing was written, criterion 3) or `"nothing"`.
+    pub fn flip_horizontally(&mut self) -> String {
+        flip_code(self.session.flip_selection(FlipAxis::Horizontal))
+    }
+
+    /// "Flip vertically": as [`WasmSession::flip_horizontally`].
+    pub fn flip_vertically(&mut self) -> String {
+        flip_code(self.session.flip_selection(FlipAxis::Vertical))
+    }
+
     /// Removes the "max" notice of a limited typed radius, 1.5 s after it
     /// appeared.
     pub fn clear_limit_notice(&mut self) {
@@ -197,4 +217,14 @@ impl WasmSession {
     pub fn commit_selected_ratio(&mut self) {
         self.session.commit_selected_ratio();
     }
+}
+
+/// The string a flip reports to the host.
+fn flip_code(outcome: FlipOutcome) -> String {
+    match outcome {
+        FlipOutcome::Flipped => "flipped",
+        FlipOutcome::LooksTheSame => "unchanged",
+        FlipOutcome::NothingSelected => "nothing",
+    }
+    .to_string()
 }
