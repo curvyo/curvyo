@@ -1,6 +1,7 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { usePreviewGesture } from "@/hooks/usePreviewGesture";
+import { CLONE_STATUS_MS } from "@/lib/cloneText";
 import type { WasmSession } from "@/lib/editorSession";
 
 /** A property edited with typed text or a colour area; the names
@@ -247,8 +248,17 @@ export type TextOutcome = string;
 /** The hue (degrees, `-1` for none), saturation and value (0 to 1) of a colour. */
 export type HsvTriple = readonly [hue: number, saturation: number, value: number];
 
+/** The notice of `specs/0057-clone-overrides` criterion 18 after a style edit of the panel. */
+export interface StyleSkipNotice {
+  id: number;
+  text: string;
+}
+
 export interface StylePanelApi {
   view: StyleView;
+  /** "2 clones show their original's style and were not changed." for 3 s after an edit of the
+   * panel (typed, pressed or dragged) that left clones alone; null otherwise. */
+  skipNotice: StyleSkipNotice | null;
   /** A panel drag is running. */
   previewing: boolean;
   /** Escapes that dropped a preview; a picker that kept following the pointer
@@ -309,31 +319,55 @@ export function useStylePanel(editor: EditorHandle): StylePanelApi {
   // (`syncRevision`) or this panel changed something (`local`).
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const view = useMemo(() => readView(getSession()), [getSession, syncRevision, local]);
-  const { queue: preview, settle, previewing, cancels } = usePreviewGesture(getSession, refresh);
-
-  const setText = useCallback(
-    (field: StyleFieldName, text: string): TextOutcome => {
-      const session = getSession();
-      if (!session) {
-        return "unchanged";
-      }
-      const outcome = session.set_style_text(field, text);
-      refresh();
-      return outcome;
-    },
-    [getSession, refresh],
+  // Every commit of the panel reads the notice of criterion 18 right after it, before a sync
+  // could hand it to the canvas slot (UX review of 0057, must-fix 4).
+  const [skipNotice, setSkipNotice] = useState<StyleSkipNotice | null>(null);
+  const skipCount = useRef(0);
+  const drainSkip = useCallback((session: WasmSession) => {
+    const text = session.take_style_skip_notice();
+    if (text !== "") {
+      skipCount.current += 1;
+      setSkipNotice({ id: skipCount.current, text });
+    }
+  }, []);
+  useEffect(() => {
+    if (!skipNotice) {
+      return undefined;
+    }
+    const timer = window.setTimeout(() => setSkipNotice(null), CLONE_STATUS_MS);
+    return () => window.clearTimeout(timer);
+  }, [skipNotice]);
+  const ends = useMemo(
+    () => ({
+      commit: (session: WasmSession) => {
+        session.commit_style_preview();
+        drainSkip(session);
+      },
+      cancel: (session: WasmSession) => session.cancel_style_preview(),
+    }),
+    [drainSkip],
   );
+  const { queue: preview, settle, previewing, cancels } = usePreviewGesture(getSession, refresh, ends);
 
   const act = useCallback(
-    (run: (session: WasmSession) => void) => {
+    <T,>(run: (session: WasmSession) => T, none: T): T => {
       const session = getSession();
-      if (session) {
-        run(session);
-        refresh();
+      if (!session) {
+        return none;
       }
+      const result = run(session);
+      drainSkip(session);
+      refresh();
+      return result;
     },
-    [getSession, refresh],
+    [getSession, refresh, drainSkip],
   );
+  const setText = useCallback(
+    (field: StyleFieldName, text: string): TextOutcome =>
+      act((session) => session.set_style_text(field, text), "unchanged"),
+    [act],
+  );
+  const run = useCallback((call: (session: WasmSession) => void) => act(call, undefined), [act]);
 
   const hsvOf = useCallback(
     (rgb: number): HsvTriple => {
@@ -350,6 +384,7 @@ export function useStylePanel(editor: EditorHandle): StylePanelApi {
 
   return {
     view,
+    skipNotice,
     previewing,
     cancels,
     setText,
@@ -360,24 +395,16 @@ export function useStylePanel(editor: EditorHandle): StylePanelApi {
     rgbOf,
     previewValue: (field, p, grid) => preview((s) => s.preview_value_field(field, p, grid)),
     stepValue: (field, steps, grid) => preview((s) => s.step_value_field(field, steps, grid)),
-    resetValue: (field) => act((s) => void s.reset_value_field(field)),
-    setStrokePaint: (on) => act((s) => s.set_stroke_paint(on)),
-    setFillPaint: (on) => act((s) => s.set_fill_paint(on)),
-    setStrokeDash: (name) => act((s) => s.set_stroke_dash(name)),
-    setStrokeDashText: (text) => {
-      const session = getSession();
-      if (!session) {
-        return "unchanged";
-      }
-      const outcome = session.set_stroke_dash_text(text);
-      refresh();
-      return outcome;
-    },
-    beginPick: (target) => act((s) => s.begin_colour_pick(target)),
-    endPick: () => act((s) => s.end_colour_pick()),
-    setMarkerShape: (slot, shape) => act((s) => s.set_marker_shape(slot, shape)),
-    setMarkerPlace: (place) => act((s) => s.set_marker_place(place)),
-    setStrokeJoin: (name) => act((s) => s.set_stroke_join(name)),
-    setStrokeCap: (name) => act((s) => s.set_stroke_cap(name)),
+    resetValue: (field) => run((s) => void s.reset_value_field(field)),
+    setStrokePaint: (on) => run((s) => s.set_stroke_paint(on)),
+    setFillPaint: (on) => run((s) => s.set_fill_paint(on)),
+    setStrokeDash: (name) => run((s) => s.set_stroke_dash(name)),
+    setStrokeDashText: (text) => act((s) => s.set_stroke_dash_text(text), "unchanged"),
+    beginPick: (target) => run((s) => s.begin_colour_pick(target)),
+    endPick: () => run((s) => s.end_colour_pick()),
+    setMarkerShape: (slot, shape) => run((s) => s.set_marker_shape(slot, shape)),
+    setMarkerPlace: (place) => run((s) => s.set_marker_place(place)),
+    setStrokeJoin: (name) => run((s) => s.set_stroke_join(name)),
+    setStrokeCap: (name) => run((s) => s.set_stroke_cap(name)),
   };
 }
