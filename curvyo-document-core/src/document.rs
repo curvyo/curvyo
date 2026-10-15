@@ -157,7 +157,18 @@ pub struct DocumentVersion(pub(crate) loro::Frontiers);
 /// build has no clone and opens unchanged and is not rewritten. A clone without a readable link,
 /// or with a matrix entry that is not finite or lies beyond ±1e7, is refused as damaged; a clone
 /// whose original is missing or of the wrong kind is an orphan, not damage. Golden: `clone_v13.curvyo`.
-pub const CURRENT_FORMAT_VERSION: u32 = 13;
+///
+/// Bumped to 14 in `clone-overrides` (`specs/0057-clone-overrides`, ADR 0016 §1 and §6): a clone
+/// may carry `own_placement: true` and `own_style: true`, and with `own_style` the ordinary style
+/// keys and `opacity`. A build that stops at version 13 would draw a clone with own style in its
+/// original's colours (wrong thread colours in an embroidery job) and would move a clone with own
+/// placement along with its original, so it must refuse every file of this build as too new.
+/// Migration from version 13 is none: absent flags read as false, and a file from an earlier build
+/// opens unchanged and is not rewritten. A flag on a clone that is not a boolean, and a damaged
+/// style on a clone with own style, are refused as damaged (`crate::clone_codec`); flags on other
+/// nodes, and style keys or `opacity` on a clone without own style, are residue.
+/// Golden: `clone_overrides_v14.curvyo`.
+pub const CURRENT_FORMAT_VERSION: u32 = 14;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";
@@ -204,6 +215,8 @@ pub struct Document {
     /// What the clone repair of the last removing command did (`crate::clone_repair`); view
     /// state for its notice, never stored.
     pub(crate) clone_repair: std::cell::Cell<crate::clone_repair::CloneRepair>,
+    /// What the held-back rule of the last transform did (`crate::clone_hold`); view state.
+    pub(crate) clone_hold: std::cell::Cell<crate::clone_hold::CloneHold>,
     /// The next counter of the anchor ids the clone repair takes (`crate::clone_repair`).
     pub(crate) repair_ids: std::cell::Cell<u64>,
     /// The clone named by the last refusal of the limit check (`crate::clone_write`); view state
@@ -260,6 +273,7 @@ impl Document {
             draw_parent: std::cell::Cell::default(),
             initial_layer: std::cell::Cell::default(),
             clone_repair: std::cell::Cell::default(),
+            clone_hold: std::cell::Cell::default(),
             repair_ids: std::cell::Cell::default(),
             clone_refusal: std::cell::Cell::default(),
             object_index: std::cell::RefCell::default(),
@@ -314,6 +328,7 @@ impl Document {
             draw_parent: std::cell::Cell::default(),
             initial_layer: std::cell::Cell::default(),
             clone_repair: std::cell::Cell::default(),
+            clone_hold: std::cell::Cell::default(),
             repair_ids: std::cell::Cell::default(),
             clone_refusal: std::cell::Cell::default(),
             object_index: std::cell::RefCell::default(),
@@ -428,19 +443,29 @@ impl Document {
                         id,
                         objects: self.json_children(Some(id)),
                     }
-                } else if let Some(link) = self.clone_link_of(id) {
+                } else if let Some((link, overrides, style)) = self.clone_stored(id) {
                     ObjectJson::Clone {
                         id,
                         origin: link.origin,
                         matrix: link.matrix,
+                        own_placement: overrides.own_placement,
+                        own_style: overrides.own_style,
+                        style,
                     }
                 } else {
                     ObjectJson::from(self.object(id)?)
                 };
-                let registers = self
+                let mut registers = self
                     .node_registers(id)
                     .map(RegistersJson::from)
                     .unwrap_or_default();
+                if let ObjectJson::Clone {
+                    own_style: false, ..
+                } = object
+                {
+                    // Residue on a clone without own style (ADR 0016 §5).
+                    registers.opacity = None;
+                }
                 Some(NodeJson { object, registers })
             })
             .collect()
@@ -518,11 +543,19 @@ enum ObjectJson {
         objects: Vec<NodeJson>,
     },
     /// A linked clone (`specs/0049-linked-clone` criterion 40): the original it follows and its
-    /// matrix `[a, b, c, d, e, f]`, no outline. Listed whether or not its chain resolves.
+    /// matrix `[a, b, c, d, e, f]`, no outline. Listed whether or not its chain resolves. The
+    /// override flags are listed only when set, and `style` only with `own_style`; its own
+    /// `opacity` is the node register (`specs/0057-clone-overrides` criterion 39).
     Clone {
         id: crate::path_model::NodeId,
         origin: crate::path_model::NodeId,
         matrix: crate::affine::Affine,
+        #[serde(skip_serializing_if = "std::ops::Not::not")]
+        own_placement: bool,
+        #[serde(skip_serializing_if = "std::ops::Not::not")]
+        own_style: bool,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        style: Option<crate::style_model::Style>,
     },
     Path {
         id: crate::path_model::NodeId,
@@ -584,6 +617,9 @@ impl From<crate::primitive_model::ObjectSnapshot> for ObjectJson {
                 id: clone.id(),
                 origin: clone.chain.origin,
                 matrix: clone.chain.matrix,
+                own_placement: clone.chain.own_placement,
+                own_style: clone.chain.own_style,
+                style: clone.chain.own_style.then_some(clone.resolved.style),
             },
             ObjectSnapshot::Primitive(primitive) => {
                 let id = primitive.id;

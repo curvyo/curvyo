@@ -11,14 +11,14 @@ use crate::units::Angle;
 /// command only: the reader resolves deeper chains.
 pub const MAX_CLONE_DEPTH: usize = 8;
 
-/// One resolved clone. It has no outline or style of its own: `resolved` is the root's outline
-/// under the composed matrix, with the root's style. The chain data sits behind a box so that a
+/// One resolved clone. It has no outline of its own: `resolved` is the root's outline under the
+/// composed matrix, with the style of its style source (ADR 0016 §3). The chain data sits behind a box so that a
 /// clone is no larger than a path or a primitive in every object list.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct CloneSnapshot {
     /// What the clone shows: the clone's own id, the root's anchors under
     /// [`CloneChain::composed`] (anchor ids kept), the root's `closed` flags and further outlines,
-    /// the root's style, rotation 0.
+    /// the style of [`CloneChain::style_source`] (its effective style), rotation 0.
     pub resolved: PathSnapshot,
     /// What the clone follows and how.
     pub chain: Box<CloneChain>,
@@ -52,6 +52,13 @@ pub struct CloneChain {
     /// The matrix from the root's coordinates to this clone's: M times the original's composed
     /// matrix (`M_B · M_A` for B → A → O).
     pub composed: Affine,
+    /// Whether it is held back when its original is transformed (`0057` criterion 3).
+    pub own_placement: bool,
+    /// Whether it owns its style and opacity (`0057` criterion 11).
+    pub own_style: bool,
+    /// The node its style and opacity register are read from (ADR 0016 §3): itself with own
+    /// style, else the nearest clone on its chain with own style, else the root.
+    pub style_source: NodeId,
     /// The root's own snapshot as read, unmapped, one allocation shared by every clone of that
     /// root, so the renderer can tessellate it once (`adrs.md` decision 3, criterion 44).
     /// Invariant: [`CloneSnapshot::resolved`]'s anchors are this outline's under `composed`.

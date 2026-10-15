@@ -81,6 +81,10 @@ pub fn row_accessible_name(row: &LayerRow) -> String {
         other => other.word().to_lowercase(),
     };
     let mut parts = vec![row.name.clone(), kind];
+    if !row.overrides_line.is_empty() {
+        // `specs/0057-clone-overrides` criterion 28: the name appends the overrides.
+        parts.push(row.overrides_line.to_lowercase());
+    }
     parts.extend(state_words(row));
     if row.container.is_some_and(|c| c.contains_selection) {
         parts.push("contains the selection".to_owned());

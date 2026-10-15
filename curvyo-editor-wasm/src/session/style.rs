@@ -141,10 +141,15 @@ impl Session {
     }
 
     /// The release (or key-up): writes the previewed edit as one commit to the
-    /// objects the drag started on. Writes nothing after Escape.
+    /// objects the drag started on. Writes nothing after Escape. Like a typed edit it notes the
+    /// clones it left alone (`specs/0057-clone-overrides` criterion 18).
     pub fn commit_style_preview(&mut self) {
         self.recording(|this| {
-            this.flush_style_preview();
+            // The commit also ends a gesture that Escape cancelled, so it always runs.
+            let pending = this.style.is_active();
+            let wrote = this.style.commit(&this.document).is_ok() && pending;
+            this.commit_background_preview();
+            this.note_skipped_clones(wrote);
         });
     }
 
@@ -254,7 +259,9 @@ impl Session {
         self.recording(|this| -> bool {
             this.flush_style_preview();
             let ids = this.edit_ids(edit);
-            !ids.is_empty() && this.document.edit_style(&ids, edit).is_ok()
+            let wrote = !ids.is_empty() && this.document.edit_style(&ids, edit).is_ok();
+            this.note_skipped_clones(wrote);
+            wrote
         })
     }
 }

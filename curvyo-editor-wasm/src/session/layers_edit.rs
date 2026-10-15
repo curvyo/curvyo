@@ -142,17 +142,12 @@ impl Session {
         if units.is_empty() {
             return (Vec::new(), OpacityTarget::Nothing);
         }
-        // A linked clone has no opacity of its own: the field never writes to it, and "Mixed" is
-        // read from the others (`0050` criterion 26, `0049` criterion 24).
+        // A linked clone without its own style has no opacity of its own: the field never writes
+        // to it, and "Mixed" is read from the others (`0050` criterion 26, `0057` criterion 16).
         let read = self.object_read();
         let targets: Vec<NodeId> = units
             .into_iter()
-            .filter(|id| {
-                !matches!(
-                    read.get(*id),
-                    Some(curvyo_document_core::ObjectSnapshot::Clone(_))
-                )
-            })
+            .filter(|id| read.get(*id).is_none_or(curvyo_ui_core::owns_style))
             .collect();
         if targets.is_empty() {
             return (Vec::new(), OpacityTarget::OnlyClones);
@@ -184,6 +179,12 @@ impl Session {
         });
         json!({
             "caption": opacity_caption(&target),
+            // `specs/0057-clone-overrides` criterion 16: the read-only readout says how to edit.
+            "tooltip": if matches!(target, OpacityTarget::OnlyClones) {
+                "Set Style to Own to change it."
+            } else {
+                ""
+            },
             "field": !targets.is_empty(),
             "layer": matches!(target, OpacityTarget::Layer(_)),
             "value": value,
@@ -234,7 +235,8 @@ impl Session {
                     .is_some_and(|registers| percent(registers.opacity) == percent(opacity))
             });
             if !unchanged {
-                let _ = this.document.set_node_opacity(&targets, opacity);
+                let wrote = this.document.set_node_opacity(&targets, opacity).is_ok();
+                this.note_skipped_clones(wrote);
             }
             PanelReply::Quiet
         })

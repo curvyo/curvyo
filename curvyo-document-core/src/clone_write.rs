@@ -21,12 +21,16 @@ use crate::subpath_codec::{KEY_EXTRA_SUBPATHS, write_extra_subpaths};
 /// The largest coordinate a clone's drawn outline may reach after an edit (`0049` criterion 17).
 pub(crate) const OUTLINE_LIMIT_MM: f64 = 1e7;
 
-/// Every key a clone node may carry that an unlink replaces: its tag and link, and any outline,
-/// style or rotation residue (ADR 0015 §4).
+/// Every key a clone node may carry that an unlink replaces: its tag, link and override flags,
+/// its own style and `opacity`, and any outline, style, opacity or rotation residue (ADR 0015 §4,
+/// ADR 0016 §4).
 fn keys_replaced_by_unlink() -> impl Iterator<Item = &'static str> {
     [
         crate::shape_codec::KEY_SHAPE,
         KEY_CLONE_LINK,
+        crate::clone_codec::KEY_OWN_PLACEMENT,
+        crate::clone_codec::KEY_OWN_STYLE,
+        crate::node_registers::KEY_OPACITY,
         KEY_ANCHORS,
         KEY_CLOSED,
         KEY_EXTRA_SUBPATHS,
@@ -36,11 +40,14 @@ fn keys_replaced_by_unlink() -> impl Iterator<Item = &'static str> {
     .chain(crate::style_codec::ALL_STYLE_KEYS.iter().copied())
 }
 
-/// Writes `path` (its outlines, `closed` flags and style; rotation 0) into the clone node `meta`
-/// under the same id and tree position, and removes the clone's tag and link: the unlink of
-/// criterion 28. `path` carries the anchor ids the unlinked path takes. Uncommitted.
-pub(crate) fn unlink_meta(meta: &LoroMap, path: &PathSnapshot) {
+/// Writes `path` (its outlines, `closed` flags and style; rotation 0) and the `opacity` register
+/// value into the clone node `meta` under the same id and tree position, and removes the clone's
+/// tag, link and overrides: the unlink of `0049` criterion 28 as changed by `0057` criterion 30.
+/// `path` carries the anchor ids the unlinked path takes and the clone's effective style;
+/// `opacity` is its style source's register ([`source_opacity`]). Uncommitted.
+pub(crate) fn unlink_meta(meta: &LoroMap, path: &PathSnapshot, opacity: f64) {
     clear_clone_keys(meta);
+    write_opacity_register(meta, opacity);
     path_codec::write_path_style(meta, path.closed, &path.style);
     let list = path_codec::insert_anchors_container(meta);
     for anchor in &path.anchors {
@@ -54,8 +61,29 @@ pub(crate) fn unlink_meta(meta: &LoroMap, path: &PathSnapshot) {
     write_extra_subpaths(meta, &extras);
 }
 
-/// Removes from the clone node `meta` its tag and link and any outline, style or rotation
-/// residue, so the caller can write it as a path. Uncommitted.
+/// Writes a node's `opacity` register; 1 is the absent key. Uncommitted.
+pub(crate) fn write_opacity_register(meta: &LoroMap, opacity: f64) {
+    #[allow(clippy::float_cmp)] // exactly the absent default
+    if opacity != 1.0 {
+        // invariant: inserting a number under a known key on an attached map cannot fail.
+        #[allow(clippy::unwrap_used)]
+        meta.insert(crate::node_registers::KEY_OPACITY, opacity)
+            .unwrap();
+    }
+}
+
+/// The `opacity` register of a resolved clone's style source (ADR 0016 §3): what the clone shows
+/// before its own ancestors, and what an unlinked clone keeps.
+pub(crate) fn source_opacity(tree: &LoroTree, clone: &crate::clone_model::CloneSnapshot) -> f64 {
+    let source = clone.chain.style_source;
+    tree.get_meta(TreeID::new(source.peer, source.counter))
+        .map_or(1.0, |meta| {
+            crate::node_registers::read_registers(&meta).opacity.get()
+        })
+}
+
+/// Removes from the clone node `meta` its tag, link, overrides and `opacity` and any outline,
+/// style or rotation residue, so the caller can write it as a path. Uncommitted.
 pub(crate) fn clear_clone_keys(meta: &LoroMap) {
     for key in keys_replaced_by_unlink() {
         if meta.get(key).is_some() {
@@ -66,8 +94,9 @@ pub(crate) fn clear_clone_keys(meta: &LoroMap) {
     }
 }
 
-/// The style an object shows: its own, or for a clone its root's (`0049` criterion 33: a result
-/// that takes the base operand's style takes the root's when the base is a clone).
+/// The style an object shows: its own, or for a clone its effective style (ADR 0016 §3; `0049`
+/// criterion 33: a result that takes the base operand's style takes the base clone's effective
+/// style, as `0057` criterion 40 wants).
 pub(crate) fn leaf_style(tree: &LoroTree, id: NodeId, meta: &LoroMap) -> crate::style_model::Style {
     if is_clone_meta(meta)
         && let Some(clone) = crate::object_read::read_one_clone(tree, id)
@@ -184,13 +213,7 @@ impl Document {
                 }
                 match by_id.get(&id).copied() {
                     Some(ObjectSnapshot::Path(path)) => Some(RawLeaf::Path(path.clone())),
-                    Some(ObjectSnapshot::Clone(clone)) => Some(RawLeaf::Clone(
-                        id,
-                        CloneLink {
-                            origin: clone.chain.origin,
-                            matrix: clone.chain.matrix,
-                        },
-                    )),
+                    Some(ObjectSnapshot::Clone(clone)) => Some(RawLeaf::of_clone(clone)),
                     _ => raw_leaf_of(&tree, leaf),
                 }
             })

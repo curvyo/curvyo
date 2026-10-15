@@ -22,7 +22,8 @@ pub enum StyleTool {
 /// The objects the panel edits and the line that says so.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StyleScope {
-    /// The objects an edit goes to; empty when the panel has nothing to edit.
+    /// The objects an edit goes to; empty when the panel has nothing to edit. A linked clone is
+    /// among them only with its own style (`specs/0057-clone-overrides` criterion 18).
     pub ids: Vec<NodeId>,
     /// A kind ("Rectangle") or a count ("3 rectangles", "4 objects", "2
     /// paths"); empty when there is nothing to edit.
@@ -43,13 +44,34 @@ impl StyleScope {
     }
 }
 
-/// The ids in `ids` that are paths, in order.
+/// The ids in `ids` that are paths, or clones with their own style (they take markers like a
+/// path), in order.
 fn paths_among(ids: &[NodeId], objects: &[ObjectSnapshot]) -> Vec<NodeId> {
     objects_with_ids(objects, ids)
         .into_iter()
-        .filter(|object| matches!(object, ObjectSnapshot::Path(_)))
+        .filter(|object| match object {
+            ObjectSnapshot::Path(_) => true,
+            ObjectSnapshot::Clone(clone) => clone.chain.own_style,
+            ObjectSnapshot::Primitive(_) => false,
+        })
         .map(ObjectSnapshot::id)
         .collect()
+}
+
+/// How many of `ids` are clones that show their original's style, which a style or opacity edit
+/// leaves alone: the count of the notice of `specs/0057-clone-overrides` criterion 18.
+#[must_use]
+pub fn skipped_clones(objects: &[ObjectSnapshot], ids: &[NodeId]) -> usize {
+    objects_with_ids(objects, ids)
+        .into_iter()
+        .filter(|object| !owns_style(object))
+        .count()
+}
+
+/// Whether an object owns the style it shows: every object but a clone without own style.
+#[must_use]
+pub fn owns_style(object: &ObjectSnapshot) -> bool {
+    !matches!(object, ObjectSnapshot::Clone(clone) if !clone.chain.own_style)
 }
 
 /// The scope of the panel for `tool` (criterion 37). Ids the document no
@@ -98,11 +120,12 @@ pub fn style_scope_in(
         [ObjectSnapshot::Clone(clone)] => clone_subject(objects, clone),
         _ => subject_line(&held),
     });
-    // A linked clone has no style of its own: an edit never goes to it, and "Mixed" is read
-    // from the other objects (`specs/0049-linked-clone` criterion 24).
+    // A linked clone without its own style shows its original's: an edit never goes to it, and
+    // "Mixed" is read from the other objects (`specs/0049-linked-clone` criterion 24 as extended
+    // by `specs/0057-clone-overrides` criterion 18).
     let ids = held
         .iter()
-        .filter(|object| !matches!(object, ObjectSnapshot::Clone(_)))
+        .filter(|object| owns_style(object))
         .map(|object| object.id())
         .collect();
     StyleScope { ids, subject }

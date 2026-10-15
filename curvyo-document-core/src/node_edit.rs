@@ -106,7 +106,8 @@ impl Document {
     }
 
     /// Sets the own `opacity` of every node of `ids`, in one commit labelled
-    /// [`SET_NODE_OPACITY_COMMIT_LABEL`] (criterion 26).
+    /// [`SET_NODE_OPACITY_COMMIT_LABEL`] (criterion 26). A linked clone is written only when it
+    /// has its own style (`specs/0057-clone-overrides` criterion 16); the others are left alone.
     ///
     /// # Errors
     /// [`ObjectEditError::NoSuchObject`] if an id does not exist; [`ObjectEditError::Locked`] if
@@ -121,14 +122,18 @@ impl Document {
         if nodes.iter().any(|&node| locked_through(&tree, node)) {
             return Err(ObjectEditError::Locked);
         }
-        // A linked clone has no opacity of its own (ADR 0015 §3): it is skipped.
+        // A linked clone has an opacity of its own only with its own style (ADR 0016 §3); the
+        // others are skipped.
         let ids: Vec<NodeId> = ids
             .iter()
             .copied()
             .filter(|&id| {
                 !tree
                     .get_meta(crate::paths::tree_id_of(id))
-                    .is_ok_and(|meta| crate::clone_codec::is_clone_meta(&meta))
+                    .is_ok_and(|meta| {
+                        crate::clone_codec::is_clone_meta(&meta)
+                            && !crate::clone_codec::read_overrides(&meta).own_style
+                    })
             })
             .collect();
         if ids.is_empty() {

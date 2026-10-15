@@ -2,7 +2,8 @@
 //! criteria 43, 46 and 63): 10,000 clones of one path of 100 nodes, and 1,250 chains of depth 8
 //! on it, read with every clone resolved within 300 ms (a second read of the same version is the
 //! session's cached read, pinned by `object_cache.rs`); the bytes a clone adds to the file are
-//! printed for the PR. Budgets are asserted in release builds only; a debug build runs a tenth of
+//! printed for the PR; the switches of `specs/0057-clone-overrides` for 10,000 clones within
+//! 250 ms each. Budgets are asserted in release builds only; a debug build runs a tenth of
 //! the size and prints the numbers.
 //! Run: `cargo test --release -p curvyo-document-core --test clone_budget -- --nocapture`.
 
@@ -18,6 +19,9 @@ const CLONES: usize = if cfg!(debug_assertions) {
     10_000
 };
 const READ_BUDGET: Duration = Duration::from_millis(300);
+/// The busy threshold of `0016` (review L4 of `specs/0057-clone-overrides`): a switch of 10,000
+/// clones stays below it.
+const SWITCH_BUDGET: Duration = Duration::from_millis(250);
 
 fn check(label: &str, took: Duration, budget: Duration) {
     println!("{label}: {took:?} (budget {budget:?})");
@@ -102,4 +106,50 @@ fn ac46_the_bytes_a_clone_adds_to_the_file() {
         per_clone < 1_000.0,
         "a few hundred bytes per clone, not {per_clone:.0}"
     );
+}
+
+/// `specs/0057-clone-overrides` criterion 41 and review L4: switching 10,000 clones to own style
+/// and own placement (each one commit), and reading them all with own styles within 300 ms.
+#[test]
+fn ac41_switching_and_reading_ten_thousand_clones_with_overrides() {
+    let document = direct_clones();
+    let clones: Vec<NodeId> = document
+        .read_objects()
+        .objects
+        .iter()
+        .skip(1)
+        .map(curvyo_document_core::ObjectSnapshot::id)
+        .collect();
+    let started = Instant::now();
+    assert_eq!(document.set_own_style(&clones, true).unwrap(), CLONES);
+    check(
+        &format!("own style for {CLONES} clones"),
+        started.elapsed(),
+        SWITCH_BUDGET,
+    );
+    let started = Instant::now();
+    assert_eq!(document.set_own_placement(&clones, true).unwrap(), CLONES);
+    check(
+        &format!("own placement for {CLONES} clones"),
+        started.elapsed(),
+        SWITCH_BUDGET,
+    );
+    let started = Instant::now();
+    let read = document.read_objects();
+    check(
+        &format!("read of {CLONES} clones with own style"),
+        started.elapsed(),
+        READ_BUDGET,
+    );
+    assert_eq!(read.objects.len(), CLONES + 1);
+    let started = Instant::now();
+    document
+        .translate_objects(&[read.objects[0].id()], Vec2::new(1.0, 0.0))
+        .unwrap();
+    // Not gated before the first measurement (criterion 41): printed for the PR.
+    println!(
+        "move of the original holding back {CLONES} clones: {:?} (target 3 s)",
+        started.elapsed()
+    );
+    assert_eq!(document.take_clone_hold().held, CLONES);
 }

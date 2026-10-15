@@ -1,8 +1,10 @@
 //! The tessellation of a linked clone's root, made once per artwork build and mapped onto each
 //! clone that may share it (`specs/0049-linked-clone/adrs.md` decision 3, criterion 44): a clone
-//! whose composed map is rigid, whose root stroke has no dashes and no markers, and whose style is
-//! the root's apart from the paint opacities. Every other clone is tessellated from its resolved
-//! outline as before.
+//! whose composed map is rigid, whose root stroke has no dashes and no markers, and whose style
+//! has the root's geometry: the same stroke width, cap, join, dash and markers and the same fill
+//! and stroke on or off. Colours and opacities may differ (a clone with its own colours,
+//! ADR 0016 §3, `specs/0057-clone-overrides` criterion 41): they are painted into the mapped
+//! vertices. Every other clone is tessellated from its resolved outline as before.
 
 use std::collections::HashMap;
 
@@ -47,7 +49,7 @@ impl SharedOutlines {
         let composed = clone.chain.composed;
         if !is_rigid(composed)
             || !plain_root(&root.style)
-            || !same_but_opacity(&clone.resolved.style, &root.style)
+            || !same_geometry(&clone.resolved.style, &root.style)
         {
             return false;
         }
@@ -97,10 +99,14 @@ fn plain_root(style: &Style) -> bool {
     style.stroke.dash.is_solid() && style.stroke.markers == curvyo_document_core::Markers::default()
 }
 
-/// Whether two styles differ at most in the fill and stroke opacity.
-fn same_but_opacity(a: &Style, b: &Style) -> bool {
+/// Whether two styles differ at most in the colours and opacities of fill and stroke: the fields
+/// that change the tessellation (width, cap, join, dash, markers, and which paints are on) are the
+/// same.
+fn same_geometry(a: &Style, b: &Style) -> bool {
     let mut a = a.clone();
+    a.fill.color = b.fill.color;
     a.fill.opacity = b.fill.opacity;
+    a.stroke.color = b.stroke.color;
     a.stroke.opacity = b.stroke.opacity;
     a == *b
 }
@@ -346,5 +352,53 @@ mod tests {
             panic!("a clone")
         };
         assert!(!shared.draw(&mut list, &dashed, view()));
+    }
+
+    /// `0057` criterion 41: clones with own colours share the root's tessellation and draw as
+    /// their unshared outlines do; a stroke the root does not draw falls back.
+    #[test]
+    fn clones_with_their_own_colours_share_and_paint_their_colours() {
+        let d = Document::new(1);
+        let root = circle(&d, 1, 20.0, true);
+        d.edit_style(&[root], &StyleEdit::FillEnabled(true))
+            .unwrap();
+        let clones: Vec<NodeId> = (0..12)
+            .map(|k| {
+                let c = d.linked_clone(&[root], &[]).unwrap()[0];
+                d.translate_objects(&[c], Vec2::new(12.0 * f64::from(k), 20.0))
+                    .unwrap();
+                c
+            })
+            .collect();
+        d.set_own_style(&clones, true).unwrap();
+        for (k, &c) in clones.iter().enumerate() {
+            let k = u8::try_from(k).unwrap();
+            let colour = Color {
+                r: k * 20,
+                g: 255 - k * 20,
+                b: 9,
+            };
+            d.edit_style(&[c], &StyleEdit::FillColor(colour)).unwrap();
+            d.edit_style(&[c], &StyleEdit::StrokeColor(colour)).unwrap();
+        }
+        let objects = d.read_objects().objects;
+        let before = root_tessellations();
+        let shared = build_artwork(&objects, view());
+        assert_eq!(
+            root_tessellations() - before,
+            1,
+            "one tessellation for all twelve"
+        );
+        assert_same(&shared, &build_artwork(&unshared(&objects), view()));
+        let ObjectSnapshot::Clone(mut clone) = d.object(clones[0]).unwrap() else {
+            panic!("a clone")
+        };
+        let mut outlines = SharedOutlines::default();
+        let mut list = DrawList::default();
+        clone.resolved.style.fill.enabled = false;
+        assert!(
+            !outlines.draw(&mut list, &clone, view()),
+            "another paint is on"
+        );
     }
 }

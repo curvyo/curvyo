@@ -43,6 +43,8 @@ enum Planned<'a> {
     Unlink {
         meta: loro::LoroMap,
         path: &'a PathSnapshot,
+        /// The style source's `opacity` register, which the path keeps (`0057` criterion 30).
+        opacity: f64,
         result: &'a ObjectSnapshot,
     },
     /// A primitive whose result is a path: its shape keys go and the outline is
@@ -115,6 +117,7 @@ impl Document {
         let links = self.clone_links();
         self.clone_limits_hold(&links, results)
             .map_err(ObjectEditError::CloneOutOfRange)?;
+        let hold = self.hold_for_results(&links, results)?;
         for plan in &planned {
             let (meta, result) = match plan {
                 Planned::Clone { meta, result } => {
@@ -128,8 +131,13 @@ impl Document {
                     // A clone has no rotation and no stroke of its own.
                     continue;
                 }
-                Planned::Unlink { meta, path, result } => {
-                    crate::clone_write::unlink_meta(meta, path);
+                Planned::Unlink {
+                    meta,
+                    path,
+                    opacity,
+                    result,
+                } => {
+                    crate::clone_write::unlink_meta(meta, path, *opacity);
                     (meta, result)
                 }
                 Planned::Primitive {
@@ -165,6 +173,7 @@ impl Document {
                 write_stroke_width_if_changed(meta, Some(result.style().stroke.width));
             }
         }
+        self.write_hold(&tree, hold);
         self.commit_with_label("transform_objects");
         Ok(())
     }
@@ -239,7 +248,7 @@ fn plan_one<'a>(
         .get_meta(tree_id)
         .map_err(|_| ObjectEditError::NoSuchObject)?;
     if crate::clone_codec::is_clone_meta(&meta) {
-        return plan_clone(meta, result);
+        return plan_clone(tree, meta, result);
     }
     match (result, shape_codec::read_shape_tag(&meta)) {
         (ObjectSnapshot::Primitive(primitive), Some(tag)) => {
@@ -287,10 +296,11 @@ fn plan_one<'a>(
 /// The plan for a clone node: a clone result keeps the link (refused when a peer re-pointed the
 /// clone since the read), a path result unlinks it (refused unless its anchor ids are all
 /// different).
-fn plan_clone(
+fn plan_clone<'a>(
+    tree: &loro::LoroTree,
     meta: loro::LoroMap,
-    result: &ObjectSnapshot,
-) -> Result<Planned<'_>, ObjectEditError> {
+    result: &'a ObjectSnapshot,
+) -> Result<Planned<'a>, ObjectEditError> {
     match result {
         ObjectSnapshot::Clone(clone) => {
             match crate::clone_codec::read_clone_link(&meta) {
@@ -304,7 +314,16 @@ fn plan_clone(
             if path.anchors.is_empty() || !path.all_anchors().all(|a| ids.insert(a.id)) {
                 return Err(ObjectEditError::InvalidConversion);
             }
-            Ok(Planned::Unlink { meta, path, result })
+            let opacity = crate::object_read::read_one_clone(tree, result.id())
+                .map_or(1.0, |clone| {
+                    crate::clone_write::source_opacity(tree, &clone)
+                });
+            Ok(Planned::Unlink {
+                meta,
+                path,
+                opacity,
+                result,
+            })
         }
         ObjectSnapshot::Primitive(_) => Err(ObjectEditError::NoSuchObject),
     }

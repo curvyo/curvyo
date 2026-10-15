@@ -63,11 +63,18 @@ pub(crate) fn chain_moves(clone: &CloneSnapshot, starts: &[ObjectSnapshot]) -> b
 
 /// Settles the matrices of the clones among `results` before they are written: when the
 /// gesture's map `g` also moves objects on a clone's chain, the matrix is the one that keeps the
-/// clone's drawn outline where the gesture put it (`clone_matrices_after`, criterion 16). `links`
-/// is [`curvyo_document_core::Document::clone_links`].
-pub(crate) fn settle_clone_matrices(links: &CloneLinks, results: &mut [ObjectSnapshot], g: Affine) {
+/// clone's drawn outline where the gesture put it (`clone_matrices_after`, criterion 16; an
+/// unselected clone with own placement on the chain does not move, `0057` criterion 5). `links`
+/// is [`curvyo_document_core::Document::clone_links`], `held`
+/// [`curvyo_document_core::Document::own_placement_clones`].
+pub(crate) fn settle_clone_matrices(
+    links: &CloneLinks,
+    held: &std::collections::HashSet<NodeId>,
+    results: &mut [ObjectSnapshot],
+    g: Affine,
+) {
     let ids: Vec<NodeId> = results.iter().map(ObjectSnapshot::id).collect();
-    let settled: HashMap<NodeId, Affine> = clone_matrices_after(links, &ids, g)
+    let settled: HashMap<NodeId, Affine> = clone_matrices_after(links, held, &ids, g)
         .matrices
         .into_iter()
         .collect();
@@ -140,7 +147,12 @@ mod tests {
                 other @ ObjectSnapshot::Primitive(_) => other,
             })
             .collect();
-        settle_clone_matrices(&document.clone_links(), &mut results, g);
+        settle_clone_matrices(
+            &document.clone_links(),
+            &document.own_placement_clones(),
+            &mut results,
+            g,
+        );
         let ObjectSnapshot::Clone(settled) = &results[1] else {
             panic!("a clone")
         };
@@ -183,7 +195,12 @@ mod tests {
                 other @ ObjectSnapshot::Primitive(_) => other,
             })
             .collect();
-        settle_clone_matrices(&document.clone_links(), &mut results, g);
+        settle_clone_matrices(
+            &document.clone_links(),
+            &document.own_placement_clones(),
+            &mut results,
+            g,
+        );
         document.transform_objects(&results, false).unwrap();
         let ObjectSnapshot::Clone(after) = snapshot(&document, c) else {
             panic!("a clone")

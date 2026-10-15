@@ -357,7 +357,12 @@ pub(crate) fn commit_group(
             .any(|r| matches!(r, ObjectSnapshot::Clone(_)))
     {
         let g = map_affine(first.id(), map);
-        crate::clone_gesture::settle_clone_matrices(&document.clone_links(), &mut results, g);
+        crate::clone_gesture::settle_clone_matrices(
+            &document.clone_links(),
+            &document.own_placement_clones(),
+            &mut results,
+            g,
+        );
     }
     let results = &results;
     document.batch(group_label(handle), |document| {
