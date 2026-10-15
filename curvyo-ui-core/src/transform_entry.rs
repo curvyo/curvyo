@@ -6,7 +6,7 @@
 //! (`adrs.md`, "one resolving function per gesture"). The DOM chip only
 //! holds the text, the caret and the focus; every rule lives here.
 
-use curvyo_document_core::{Angle, Document, ObjectSnapshot, PathSnapshot, Point};
+use curvyo_document_core::{Angle, Document, ObjectSnapshot, PathSnapshot, Point, Vec2};
 
 use crate::ResizeDirection;
 use crate::conversion::converted_for_object;
@@ -16,7 +16,9 @@ use crate::transform_drag::{
     ResizeOptions, ScaleModes, pivot_for, resize_by_local_delta, rotate_by,
 };
 use crate::transform_handle_layout::{EditHandle, is_corner};
-use crate::transform_math::{ANGLE_EQUAL_EPSILON_RAD, ExtentSigns, local_delta_for_size};
+use crate::transform_math::{
+    ANGLE_EQUAL_EPSILON_RAD, ExtentSigns, ZeroRecovery, local_delta_for_size,
+};
 
 /// A typed size within this (millimetres) of the current one is "equal":
 /// nothing is written (criteria 19, 31). The prefill is the readout's
@@ -89,8 +91,6 @@ pub struct EntryField {
 pub enum InvalidReason {
     /// Empty, letters, more than one separator, or not finite ("Enter a number").
     NotANumber,
-    /// A size of zero or less ("Must be above 0").
-    NotPositive,
     /// A corner radius below zero ("Must be 0 or more").
     Negative,
     /// An inner ratio outside 0.01 to 0.99 ("Must be 0.01 to 0.99").
@@ -361,21 +361,30 @@ impl TransformEntry {
 
     /// The text for the *other* field after field `edited` changed to
     /// `text`, when the fields are linked (criterion 29): the aspect ratio
-    /// the box had when the entry opened is kept. `None` if not linked or
-    /// `text` is not a positive number yet.
+    /// the box had when the entry opened is kept, and the sign is carried
+    /// (`specs/0056-mirror-and-negative-scale/` criterion 17: W −30 on a
+    /// 30 × 10 box shows H −10.0). `None` if not linked or `text` is not a
+    /// number yet.
     #[must_use]
     pub fn linked_text(&self, edited: usize, text: &str) -> Option<String> {
         if !self.linked {
             return None;
         }
-        let value = parse_entry_number(text, false).filter(|v| *v > 0.0)?;
+        let value = parse_entry_number(text, false)?;
+        Some(format_mm(
+            self.linked_value(self.fields.get(edited)?.axis, value)?,
+        ))
+    }
+
+    /// The other axis's value when `axis` takes `value` with the fields linked: the
+    /// aspect ratio of the box when the entry opened, the sign of `value`.
+    fn linked_value(&self, axis: FieldAxis, value: f64) -> Option<f64> {
         let (width, height) = (self.start_box.width(), self.start_box.height());
-        let other = match self.fields.get(edited)?.axis {
-            FieldAxis::Width => value * height / width,
-            FieldAxis::Height => value * width / height,
-            FieldAxis::Angle | FieldAxis::Radius => return None,
-        };
-        Some(format_mm(other))
+        match axis {
+            FieldAxis::Width => Some(value * height / width),
+            FieldAxis::Height => Some(value * width / height),
+            FieldAxis::Angle | FieldAxis::Radius => None,
+        }
     }
 
     /// The start value a field edits, in the unit of its text (degrees or
@@ -405,10 +414,9 @@ impl TransformEntry {
             let wrapped = Angle::from_radians(change).normalized().as_radians();
             return Ok((wrapped.abs() > ANGLE_EQUAL_EPSILON_RAD).then_some(value));
         }
-        if value <= 0.0 {
-            return Err(InvalidReason::NotPositive);
-        }
-        if value > MAX_COORDINATE_MM {
+        // Any finite size, negative and zero included: a negative one mirrors, a zero
+        // becomes 0.01 mm (`specs/0056-mirror-and-negative-scale/` criteria 14, 15).
+        if value.abs() > MAX_COORDINATE_MM {
             return Err(InvalidReason::TooLarge);
         }
         let equal = (value - self.start_value(field.axis)).abs() <= SIZE_EQUAL_EPSILON_MM;
@@ -427,8 +435,38 @@ impl TransformEntry {
         texts: [&str; 2],
         last_edited: usize,
     ) -> Result<Option<ObjectSnapshot>, (usize, InvalidReason)> {
-        // Linked fields: only the field edited last carries a target; the
-        // other one is derived from it and not read.
+        let targets = self.targets(texts, last_edited)?;
+        if targets.is_empty() {
+            return Ok(None);
+        }
+        let result = self.apply(&targets);
+        Ok((result != self.start).then_some(result))
+    }
+
+    /// The axes the typed `texts` set to 0.01 mm because they mean a size of 0
+    /// (`specs/0056-mirror-and-negative-scale/` criterion 15), for the notice after
+    /// the Enter. The default for refused text and for an entry that is no size.
+    #[must_use]
+    pub fn zero_recovery(&self, texts: [&str; 2], last_edited: usize) -> ZeroRecovery {
+        let Ok(targets) = self.targets(texts, last_edited) else {
+            return ZeroRecovery::default();
+        };
+        self.resize_inputs(&targets)
+            .map(|(direction, delta)| {
+                self.resize_options()
+                    .resized_box(&self.start_box, direction, delta)
+                    .recovered
+            })
+            .unwrap_or_default()
+    }
+
+    /// The typed targets: every edited field, or with linked fields the field edited
+    /// last and the other axis derived from it with the same sign (criterion 17).
+    fn targets(
+        &self,
+        texts: [&str; 2],
+        last_edited: usize,
+    ) -> Result<Vec<(FieldAxis, f64)>, (usize, InvalidReason)> {
         let considered: Vec<usize> = if self.linked {
             vec![last_edited.min(self.fields.len() - 1)]
         } else {
@@ -442,11 +480,52 @@ impl TransformEntry {
                 Err(reason) => return Err((index, reason)),
             }
         }
-        if targets.is_empty() {
-            return Ok(None);
+        if self.linked
+            && let Some(&(axis, value)) = targets.first()
+            && let Some(other) = self.linked_value(axis, value)
+        {
+            let other_axis = if axis == FieldAxis::Width {
+                FieldAxis::Height
+            } else {
+                FieldAxis::Width
+            };
+            targets.push((other_axis, other));
         }
-        let result = self.apply(&targets);
-        Ok((result != self.start).then_some(result))
+        Ok(targets)
+    }
+
+    /// The handle and the local delta a size entry with `targets` means: the same inputs
+    /// a drag to that size produces. `None` for an entry that is no size.
+    fn resize_inputs(&self, targets: &[(FieldAxis, f64)]) -> Option<(ResizeDirection, Vec2)> {
+        let EditHandle::Resize(direction) = self.handle else {
+            return None;
+        };
+        let target = |wanted: FieldAxis| {
+            targets
+                .iter()
+                .find(|(axis, _)| *axis == wanted)
+                .map(|(_, value)| *value)
+        };
+        Some((
+            direction,
+            local_delta_for_size(
+                &self.start_box,
+                direction,
+                target(FieldAxis::Width),
+                target(FieldAxis::Height),
+                self.shift,
+            ),
+        ))
+    }
+
+    fn resize_options(&self) -> ResizeOptions<'_> {
+        ResizeOptions {
+            shift: self.shift,
+            ctrl: self.linked,
+            modes: self.modes,
+            converted: self.converted.as_ref(),
+            prior: ExtentSigns::default(),
+        }
     }
 
     /// The typed `targets` turned into the same inputs a drag produces.
@@ -469,26 +548,16 @@ impl TransformEntry {
                     Angle::from_radians(change).normalized(),
                 )
             }
-            EditHandle::Resize(direction) => {
-                let delta = local_delta_for_size(
-                    &self.start_box,
-                    direction,
-                    target(FieldAxis::Width),
-                    target(FieldAxis::Height),
-                    self.shift,
-                );
+            EditHandle::Resize(_) => {
+                let Some((direction, delta)) = self.resize_inputs(targets) else {
+                    return self.start.clone();
+                };
                 resize_by_local_delta(
                     &self.start,
                     &self.start_box,
                     direction,
                     delta,
-                    ResizeOptions {
-                        shift: self.shift,
-                        ctrl: self.linked,
-                        modes: self.modes,
-                        converted: self.converted.as_ref(),
-                        prior: ExtentSigns::default(),
-                    },
+                    self.resize_options(),
                 )
             }
             EditHandle::Skew(_) | EditHandle::Move | EditHandle::Param(_) => self.start.clone(),

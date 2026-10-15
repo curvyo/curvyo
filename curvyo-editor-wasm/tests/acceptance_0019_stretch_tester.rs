@@ -1389,11 +1389,8 @@ fn ac34_typed_size_equal_vs_unequal_factors() {
 #[test]
 fn ac34_ac22_typed_refusals_convert_nothing() {
     let d = mixed_scene();
+    // Zero and negative sizes are valid since `0056` criteria 14 and 15.
     for (w, h, why) in [
-        ("0", "30", "zero width"),
-        ("120", "0", "zero height"),
-        ("-50", "30", "negative width"),
-        ("120", "-1", "negative height"),
         ("1e9", "30", "too large"),
         ("abc", "30", "not a number"),
         ("NaN", "30", "NaN"),

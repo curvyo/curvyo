@@ -2425,12 +2425,8 @@ fn ac34_the_size_chip() {
     );
     let (b0, _) = rect_of(&objects(&s)[0]);
     assert_pt(b0.origin, 35.0, 50.0, 1e-6, "about the centre");
-    // Refusals.
-    for (w, h, why) in [
-        ("0", "10", "zero"),
-        ("-5", "10", "negative"),
-        ("30", "0", "zero h"),
-    ] {
+    // Refusals. Zero and negative sizes are valid since `0056` criteria 14 and 15.
+    for (w, h, why) in [("abc", "10", "not a number"), ("30", "x", "not a number h")] {
         let mut s = open(&d);
         select_all(&mut s);
         key(&mut s, "s", false);

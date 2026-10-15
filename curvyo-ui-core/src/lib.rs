@@ -34,6 +34,7 @@ mod document_fit;
 mod document_presets_view;
 mod ellipse_tool;
 mod file_chords;
+mod flip;
 mod format_form;
 mod format_list_view;
 mod group_box;
@@ -52,6 +53,7 @@ mod layer_text;
 mod linked_clone;
 mod marquee;
 mod mirror;
+mod mirror_text;
 mod modifiers;
 mod move_entry;
 mod node_marquee;
@@ -138,6 +140,7 @@ pub use document_presets_view::{
 };
 pub use ellipse_tool::EllipseTool;
 pub use file_chords::{FileCommand, Platform, chord_label, command_tooltip, file_chord};
+pub use flip::{FlipAxis, FlipOutcome, flip_selection};
 pub use format_form::{
     FieldError, FormDraft, FormField, FormPrefill, add_prefill, added_notice, check_format_form,
     edit_prefill, field_error, import_notice, import_refusal, saved_notice,
@@ -182,6 +185,9 @@ pub use linked_clone::{
     LinkedClonePlan, MAX_REFUSAL_OUTLINES, linked_clone_shown, plan_linked_clone,
 };
 pub use marquee::{MarqueeMode, objects_in_marquee, units_in_marquee};
+pub use mirror_text::{
+    FLIP_UNCHANGED_NOTICE, flip_announcement, mirror_line, signed_size_text, zero_recovery_notice,
+};
 pub use modifiers::Modifiers;
 pub use move_entry::MoveEntry;
 pub use node_marquee::{

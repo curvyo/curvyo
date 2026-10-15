@@ -815,4 +815,86 @@ mod tests {
             ObjectSnapshot::Primitive(_)
         ));
     }
+
+    /// `specs/0056-mirror-and-negative-scale/` criterion 28 d: a scale by (-s, -s) about
+    /// a point is a half turn about it followed by a scale by (s, s), outline for outline.
+    #[test]
+    fn a_negative_uniform_scale_is_a_half_turn_and_a_scale() {
+        use curvyo_document_core::{CornerRadii, StarFrame, outline_of_rotated};
+        let document = Document::new(1);
+        let r = rect(&document, 3.0, 4.0, 30.0, 10.0);
+        document
+            .set_corner_radii(&[(
+                r.id(),
+                CornerRadii {
+                    tl: Length::from_mm(1.0),
+                    tr: Length::from_mm(2.0),
+                    br: Length::from_mm(3.0),
+                    bl: Length::from_mm(4.0),
+                },
+            )])
+            .unwrap();
+        let r = turned(&document, r.id(), 25.0);
+        let star = document.create_star(
+            StarFrame {
+                center: Point::new(40.0, 20.0),
+                radius: Length::from_mm(6.0),
+                angle: Angle::from_radians(0.2),
+            },
+            PointCount::new(5).unwrap(),
+            InnerRatio::new(0.5).unwrap(),
+        );
+        let star = turned(&document, star, 10.0);
+        let pivot = Point::new(7.0, -2.0);
+        let points = |object: &ObjectSnapshot| -> Vec<Point> {
+            match object {
+                ObjectSnapshot::Primitive(p) => outline_of_rotated(&p.shape, p.rotation)
+                    .iter()
+                    .map(|a| a.point)
+                    .collect(),
+                ObjectSnapshot::Path(p) => p.all_anchors().map(|a| a.point).collect(),
+                ObjectSnapshot::Clone(_) => Vec::new(),
+            }
+        };
+        for object in [r, star] {
+            let s = 1.7;
+            let negative = apply(
+                &object,
+                &GroupMap::Scale {
+                    pivot,
+                    sx: -s,
+                    sy: -s,
+                },
+                ScaleModes::default(),
+                None,
+            );
+            let turned_then_scaled = apply(
+                &apply(
+                    &object,
+                    &GroupMap::Rotate {
+                        pivot,
+                        delta: Angle::from_radians(std::f64::consts::PI),
+                    },
+                    ScaleModes::default(),
+                    None,
+                ),
+                &GroupMap::Scale {
+                    pivot,
+                    sx: s,
+                    sy: s,
+                },
+                ScaleModes::default(),
+                None,
+            );
+            let (a, b) = (points(&negative), points(&turned_then_scaled));
+            assert_eq!(a.len(), b.len());
+            for p in &a {
+                assert!(
+                    b.iter()
+                        .any(|q| (p.x - q.x).abs() < 1e-6 && (p.y - q.y).abs() < 1e-6),
+                    "{p:?} not in {b:?}"
+                );
+            }
+        }
+    }
 }

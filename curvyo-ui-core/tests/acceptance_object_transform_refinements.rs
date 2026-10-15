@@ -1014,24 +1014,12 @@ fn a_size_entry_keeps_the_hand_drags_fixed_point_and_shift_uses_the_centre() {
 }
 
 #[test]
-fn a_size_that_is_zero_negative_or_not_a_number_keeps_the_group_open() {
+fn a_size_that_is_not_a_number_keeps_the_group_open() {
+    // A zero or negative size is no longer refused (`0056` criteria 14 and 15: a
+    // negative size mirrors, 0 becomes 0.01 mm); `tests/negative_scale_entry.rs`.
     let mut rig = Rig::new(Kind::Rect);
     open_size(&mut rig, ResizeDirection::Se, false, false);
     let before = rig.object();
-    assert_eq!(
-        commit(&mut rig, ["0", "60.0"], 0),
-        EntryOutcome::Invalid {
-            field: 0,
-            reason: InvalidReason::NotPositive
-        }
-    );
-    assert_eq!(
-        commit(&mut rig, ["100.0", "-5"], 1),
-        EntryOutcome::Invalid {
-            field: 1,
-            reason: InvalidReason::NotPositive
-        }
-    );
     assert_eq!(
         commit(&mut rig, ["100.0", "x"], 1),
         EntryOutcome::Invalid {

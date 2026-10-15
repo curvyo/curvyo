@@ -421,9 +421,10 @@ fn a_typed_angle_and_its_negative_restore_the_selection() {
     }
 }
 
-/// Criterion 34: typed sizes are validated; zero is refused, a huge one is too
-/// large, an unedited Enter writes nothing; the two fields are independent for any
-/// selection, also one that holds a star (criterion 34).
+/// Criterion 34: typed sizes are validated; a huge one is too large, an unedited
+/// Enter writes nothing; the two fields are independent for any selection, also one
+/// that holds a star (criterion 34). Since `0056` criteria 14 and 15 a negative size
+/// mirrors and a zero becomes 0.01 mm.
 #[test]
 fn the_size_entry_validates_and_its_fields_are_independent() {
     let (mut rig, a, b, _) = two_big_rects();
@@ -431,20 +432,10 @@ fn the_size_entry_validates_and_its_fields_are_independent() {
     let entry = group_entry_of(&rig, curvyo_ui_core::EntryKey::Size);
     assert_eq!(entry.fields()[0].prefill, "240.0");
     assert!(!entry.linked());
-    assert_eq!(
-        entry.commit(&rig.document, ["0", "60.0"], 0),
-        EntryOutcome::Invalid {
-            field: 0,
-            reason: InvalidReason::NotPositive
-        }
-    );
-    assert_eq!(
-        entry.commit(&rig.document, ["240.0", "-5"], 1),
-        EntryOutcome::Invalid {
-            field: 1,
-            reason: InvalidReason::NotPositive
-        }
-    );
+    assert!(matches!(entry.resolve(["0", "60.0"], 0), Ok(Some(_))));
+    assert!(entry.zero_recovery(["0", "60.0"], 0).width);
+    assert!(matches!(entry.resolve(["240.0", "-5"], 1), Ok(Some(_))));
+    assert!(!entry.zero_recovery(["240.0", "-5"], 1).any());
     assert_eq!(
         entry.commit(&rig.document, ["240.0", "60.0"], 0),
         EntryOutcome::Unchanged

@@ -2276,11 +2276,9 @@ fn ac29_linked_entry_equals_a_ctrl_drag() {
 
 #[test]
 fn ac30_invalid_sizes_are_refused_atomically_and_the_group_stays_open() {
-    let cases: [(&str, &str, usize, InvalidReason); 9] = [
-        ("0", "20", 0, InvalidReason::NotPositive),
-        ("-5", "20", 0, InvalidReason::NotPositive),
-        ("50", "0", 1, InvalidReason::NotPositive),
-        ("50", "-0,1", 1, InvalidReason::NotPositive),
+    // Zero and negative sizes are valid since `0056` criteria 14 and 15 (a negative size
+    // mirrors, 0 becomes 0.01 mm); what is left is text that is not a number.
+    let cases: [(&str, &str, usize, InvalidReason); 5] = [
         ("abc", "20", 0, InvalidReason::NotANumber),
         ("50", "", 1, InvalidReason::NotANumber),
         ("", "", 0, InvalidReason::NotANumber),

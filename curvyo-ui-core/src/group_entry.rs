@@ -20,7 +20,9 @@ use crate::transform_entry::{
     EntryField, EntryKind, EntryOutcome, InvalidReason, format_mm, parse_entry_number,
 };
 use crate::transform_handle_layout::{EditHandle, Side, is_corner};
-use crate::transform_math::ANGLE_EQUAL_EPSILON_RAD;
+use crate::transform_math::{
+    ANGLE_EQUAL_EPSILON_RAD, RECOVERED_EXTENT_MM, ZERO_EXTENT_MM, ZeroRecovery,
+};
 
 /// A typed size within this (millimetres) of the current one is "equal": nothing
 /// is written.
@@ -267,13 +269,14 @@ impl GroupEntry {
 
     /// The text for the other field after field `edited` changed to `text`, when
     /// the fields are linked: the aspect ratio of the box when the entry opened
-    /// is kept. `None` if not linked or `text` is not a positive number yet.
+    /// is kept and the sign carried (`specs/0056-mirror-and-negative-scale/`
+    /// criterion 17). `None` if not linked or `text` is not a number yet.
     #[must_use]
     pub fn linked_text(&self, edited: usize, text: &str) -> Option<String> {
         if !self.linked {
             return None;
         }
-        let value = parse_entry_number(text, false).filter(|v| *v > 0.0)?;
+        let value = parse_entry_number(text, false)?;
         let (width, height) = (self.start_box.width(), self.start_box.height());
         let other = match self.axes.get(edited)? {
             Axis::Width => value * height / width,
@@ -296,10 +299,9 @@ impl GroupEntry {
         match axis {
             Axis::Angle | Axis::Skew => Ok(Some(value)),
             Axis::Width | Axis::Height => {
-                if value <= 0.0 {
-                    return Err(InvalidReason::NotPositive);
-                }
-                if value > MAX_COORDINATE_MM {
+                // Any finite size: negative mirrors, 0 becomes 0.01 mm (`0056`
+                // criteria 14 and 15, applied in `scale_map`).
+                if value.abs() > MAX_COORDINATE_MM {
                     return Err(InvalidReason::TooLarge);
                 }
                 let start = if axis == Axis::Width {
@@ -373,17 +375,20 @@ impl GroupEntry {
     }
 
     /// The scale a typed size means: about the fixed point, linked fields by the
-    /// one factor of the field edited last.
+    /// one factor of the field edited last. A typed size of 0 is 0.01 mm
+    /// ([`recovered_size`]).
     fn scale_map(&self, targets: &[(Axis, f64)], axis: Axis, value: f64) -> GroupMap {
         let (width, height) = (self.start_box.width(), self.start_box.height());
         let factor_of = |wanted: Axis| {
+            let start = if wanted == Axis::Width { width } else { height };
             targets
                 .iter()
                 .find(|(a, _)| *a == wanted)
-                .map(|(_, v)| *v / if wanted == Axis::Width { width } else { height })
+                .map(|(_, v)| recovered_size(*v, start).0 / start)
         };
         let (sx, sy) = if self.linked {
-            let factor = value / if axis == Axis::Width { width } else { height };
+            let start = if axis == Axis::Width { width } else { height };
+            let factor = recovered_size(value, start).0 / start;
             (factor, factor)
         } else {
             (
@@ -396,6 +401,35 @@ impl GroupEntry {
             sx,
             sy,
         }
+    }
+
+    /// The axes the typed `texts` set to 0.01 mm because they mean a size of 0
+    /// (`specs/0056-mirror-and-negative-scale/` criterion 15), for the notice after
+    /// the Enter: with linked fields only the field edited last.
+    #[must_use]
+    pub fn zero_recovery(&self, texts: [&str; 2], last_edited: usize) -> ZeroRecovery {
+        if self.kind != EntryKind::Size {
+            return ZeroRecovery::default();
+        }
+        let considered: Vec<usize> = if self.linked {
+            vec![last_edited.min(self.fields.len() - 1)]
+        } else {
+            (0..self.fields.len()).collect()
+        };
+        let mut recovery = ZeroRecovery::default();
+        for index in considered {
+            let Ok(Some(value)) = self.target_of(index, texts[index]) else {
+                continue;
+            };
+            match self.axes[index] {
+                Axis::Width => recovery.width = recovered_size(value, self.start_box.width()).1,
+                Axis::Height => {
+                    recovery.height = recovered_size(value, self.start_box.height()).1;
+                }
+                Axis::Angle | Axis::Skew => {}
+            }
+        }
+        recovery
     }
 
     /// The paths this entry would convert shapes into (`None` per object that keeps
@@ -463,5 +497,16 @@ impl GroupEntry {
                 }
             }
         }
+    }
+}
+
+/// A typed size `value` of an axis whose extent is `start`, and whether it was set to
+/// [`RECOVERED_EXTENT_MM`] because it means 0 (`specs/0056-mirror-and-negative-scale/`
+/// criterion 15: positive for a typed 0; never for an axis already under the threshold).
+fn recovered_size(value: f64, start: f64) -> (f64, bool) {
+    if value.abs() < ZERO_EXTENT_MM && start >= ZERO_EXTENT_MM {
+        (RECOVERED_EXTENT_MM, true)
+    } else {
+        (value, false)
     }
 }
