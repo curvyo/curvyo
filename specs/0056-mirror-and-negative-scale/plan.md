@@ -95,11 +95,11 @@ resized local box (which is why the box must be normalised and the mirror applie
 
 ### Milestone 4: file, budget and docs
 
-- [ ] 4.1 File round trip: flipped, scaled-over-zero and typed-negative objects save and reopen
+- [x] 4.1 File round trip: flipped, scaled-over-zero and typed-negative objects save and reopen
   equal, no negative stored length, no `format_version` change (AC 26).
-- [ ] 4.2 `#[ignore]` benchmarks of AC 27 (group box, preview step, flip and release commit
+- [x] 4.2 `#[ignore]` benchmarks of AC 27 (group box, preview step, flip and release commit
   against a move); WASM times measured for the PR description (AC 27).
-- [ ] 4.3 `docs/design-system.md` rows of AC 30 and the shortcut table; spec status line.
+- [x] 4.3 `docs/design-system.md` rows of AC 30 and the shortcut table; spec status line.
 
 ## Validation
 
@@ -117,3 +117,21 @@ resized local box (which is why the box must be normalised and the mirror applie
 `tests/clone_held_back.rs`). The flip is a new writer, built here against `main` as it is
 today: it writes through `group_transform::commit_group`, as a drag does. Whichever of
 0056 and 0057 merges second wires the flip into the hold rule and adds it to `every_writer`.
+
+## Measured (2026-10-15, release build, build host)
+
+Criterion 27, `curvyo-ui-core/tests/mirror_budgets.rs` (5,000 objects): group box 1.8 ms
+(budget 10 ms); one preview step through zero 4.2 ms (25 ms); median commits: move 89 ms,
+uniform scale (Ctrl corner drag) 121 ms, flip 123 ms, release beyond zero 125 ms (2.5 s).
+Criterion 27 as amended (pending the customer, FLIP-BUDGET) gates at most 1.1 times the uniform
+scale: 1.02 and 1.04. Against a plain move the factor is about 1.4 (printed): the move has its
+own lighter writer. WASM times are not measured in this session.
+
+## Review fixes (2026-10-15)
+
+- Tester: the stretch through zero (`acceptance_0019_stretch_tester` ac22) checks exact
+  positions and handles again; the radii ratio is checked for flipped corners too.
+- UX must-fix 1 to 5: the live region is keyed and cleared; the no-op notice is left-aligned
+  and kept inside; "Resized. Mirrored …" is announced after a release and an Enter; the glyph
+  paths; the grabbed handle keeps its dragging look through zero and under the size tiers
+  (`SelectTool::dragging_handle_at`, `transform_math::mirrored_direction`).
