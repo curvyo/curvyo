@@ -17,6 +17,7 @@ mod anchor_id_minter;
 mod angle_snap;
 mod boolean;
 mod break_apart;
+mod clone_colours;
 mod clone_gesture;
 mod clone_marks;
 mod clone_panel;
@@ -107,12 +108,13 @@ pub use boolean::{
 pub use break_apart::{
     BREAK_APART_COMMIT_LABEL, BreakApartPlan, BreakApartRefusal, plan_break_apart,
 };
+pub use clone_colours::spread_colours;
 pub use clone_marks::{
     CloneMarks, EdgeChip, MarkForm, MarkFrame, MarkRect, MarkRole, MarkTag, MarkTrace, clone_marks,
 };
 pub use clone_panel::{
-    CloneBlock, clone_block, followers_of, object_name, select_clones, select_originals,
-    select_root_originals,
+    CloneBlock, OverrideState, clone_block, followers_of, object_name, overrides_line,
+    overrides_words, select_clones, select_originals, select_root_originals,
 };
 pub use close_path::{
     ClosableCounts, ClosePlan, closable_counts, close_path_set, plan_close_paths,
@@ -260,7 +262,10 @@ pub use style_panel::{
     DashChoice, DashShown, FillPanel, MarkersPanel, Rgba, StrokePanel, StylePanelState,
     style_panel_state,
 };
-pub use style_scope::{StyleScope, StyleTool, object_kind_name, style_scope, style_scope_in};
+pub use style_scope::{
+    StyleScope, StyleTool, object_kind_name, owns_style, skipped_clones, style_scope,
+    style_scope_in,
+};
 pub use transform_drag::{
     CornerLinking, CornerRadiusScaling, ParamDragInfo, ScaleModes, StrokeScaling,
 };

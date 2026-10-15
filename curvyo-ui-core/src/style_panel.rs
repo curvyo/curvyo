@@ -127,8 +127,8 @@ pub struct StrokePanel {
     pub markers: Option<MarkersPanel>,
 }
 
-/// What the Markers group shows, over the paths of the scope only (a primitive
-/// has no markers, criteria 21 and 22).
+/// What the Markers group shows, over the paths and own-style clones of the scope only (a
+/// primitive has no markers, criteria 21 and 22).
 #[derive(Debug, Clone, PartialEq)]
 pub struct MarkersPanel {
     /// The Start slot.
@@ -292,7 +292,10 @@ fn markers_panel(
         .into_iter()
         .filter_map(|object| match object {
             ObjectSnapshot::Path(path) => Some(path),
-            ObjectSnapshot::Primitive(_) | ObjectSnapshot::Clone(_) => None,
+            // A clone in the scope has its own style and takes markers like a path
+            // (`specs/0057-clone-overrides` criterion 12).
+            ObjectSnapshot::Clone(clone) => Some(&clone.resolved),
+            ObjectSnapshot::Primitive(_) => None,
         })
         .collect();
     if !rows_shown || paths.is_empty() {

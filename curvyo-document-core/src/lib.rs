@@ -21,7 +21,9 @@
 mod affine;
 mod clone_codec;
 mod clone_copy;
+mod clone_hold;
 mod clone_model;
+mod clone_overrides;
 mod clone_preview;
 mod clone_read;
 mod clone_repair;
@@ -54,6 +56,7 @@ mod node_registers;
 mod object_read;
 mod objects;
 mod offset_write;
+mod outline_map;
 mod path_codec;
 mod path_extend;
 mod path_model;
@@ -79,7 +82,12 @@ mod transform_objects;
 mod units;
 
 pub use affine::{Affine, MATRIX_ENTRY_LIMIT, SINGULAR_DETERMINANT};
+pub use clone_hold::CloneHold;
 pub use clone_model::{CloneChain, CloneSnapshot, MAX_CLONE_DEPTH};
+pub use clone_overrides::{
+    CloneColours, FOLLOW_PLACEMENT_COMMIT_LABEL, ORIGINAL_STYLE_COMMIT_LABEL,
+    OWN_PLACEMENT_COMMIT_LABEL, OWN_STYLE_COMMIT_LABEL, SPREAD_COLOURS_COMMIT_LABEL,
+};
 pub use clone_preview::clone_previews;
 pub use clone_read::ObjectRead;
 pub use clone_repair::CloneRepair;

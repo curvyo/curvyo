@@ -230,3 +230,28 @@ fn a_marker_edit_goes_to_the_paths_of_the_scope_and_any_other_edit_to_all_of_it(
     );
     assert_eq!(only_rect.targets(&objects, &marker), Vec::<NodeId>::new());
 }
+
+#[test]
+fn a_clone_with_own_style_shows_the_group_like_a_path_and_a_following_one_does_not() {
+    // `specs/0057-clone-overrides` criterion 12: an own style edits the Markers section too.
+    let document = Document::new(1);
+    let p = path(&document, 1, false);
+    let own = document.linked_clone(&[p], &[]).unwrap()[0];
+    let following = document.linked_clone(&[p], &[]).unwrap()[0];
+    document.set_own_style(&[own], true).unwrap();
+    set(
+        &document,
+        &[own],
+        &StyleEdit::MarkerStart(MarkerShape::Arrow),
+    );
+    let markers = panel(&document, &[own]).unwrap();
+    assert_eq!(markers.start, BarValue::Uniform(MarkerShape::Arrow));
+    assert_eq!(markers.end, BarValue::Uniform(MarkerShape::None));
+    let mixed = panel(&document, &[p, own]).unwrap();
+    assert_eq!(mixed.start, BarValue::Mixed, "over the path and the clone");
+    assert_eq!(
+        panel(&document, &[p, following]),
+        panel(&document, &[p]),
+        "a following clone is not edited"
+    );
+}

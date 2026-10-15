@@ -157,7 +157,8 @@ impl Document {
                     .map_err(|_| ObjectEditError::NoSuchObject)
             })
             .collect::<Result<_, _>>()?;
-        let clones = self.moved_clone_matrices(&ids, crate::affine::Affine::translation(offset))?;
+        let (clones, hold) =
+            self.moved_clone_matrices(&ids, crate::affine::Affine::translation(offset))?;
         for (meta, id) in metas.iter().zip(&ids) {
             match clones.get(id) {
                 Some(&(origin, matrix)) => {
@@ -166,24 +167,40 @@ impl Document {
                 None => translate_meta(meta, offset),
             }
         }
+        self.write_hold(&tree, hold);
         self.commit_with_label("translate_objects");
         Ok(())
     }
 
     /// The new links of the clones among `ids` when every object of `ids` is mapped by `g`
     /// (`specs/0049-linked-clone` criteria 15 and 16), after the limit check of criterion 17 on
-    /// everything the map changes. Empty, and nothing read, when the document has no clone.
+    /// everything the map changes, and the held-back writes of the clones with own placement
+    /// (`specs/0057-clone-overrides` criterion 3). Empty, and nothing read, when the document has
+    /// no clone.
+    #[allow(clippy::type_complexity)]
     pub(crate) fn moved_clone_matrices(
         &self,
         ids: &[NodeId],
         g: crate::affine::Affine,
-    ) -> Result<std::collections::HashMap<NodeId, (NodeId, crate::affine::Affine)>, ObjectEditError>
-    {
+    ) -> Result<
+        (
+            std::collections::HashMap<NodeId, (NodeId, crate::affine::Affine)>,
+            crate::clone_hold::HoldPlan,
+        ),
+        ObjectEditError,
+    > {
         let links = self.clone_links();
         if links.is_empty() {
-            return Ok(std::collections::HashMap::new());
+            return Ok((
+                std::collections::HashMap::new(),
+                crate::clone_hold::HoldPlan::default(),
+            ));
         }
-        let decided = crate::clone_transform::clone_matrices_after(&links, ids, g);
+        let own_placement = self.own_placement_clones();
+        let decided = crate::clone_transform::clone_matrices_after(&links, &own_placement, ids, g);
+        let hold = self
+            .plan_hold(&links, &decided)
+            .map_err(ObjectEditError::CloneOutOfRange)?;
         let new: std::collections::HashMap<NodeId, (NodeId, crate::affine::Affine)> = decided
             .matrices
             .into_iter()
@@ -207,7 +224,7 @@ impl Document {
             .collect();
         self.clone_limits_hold(&links, &changed)
             .map_err(ObjectEditError::CloneOutOfRange)?;
-        Ok(new)
+        Ok((new, hold))
     }
 
     /// Copies every named object, displaced by `offset`, in **one commit**
@@ -367,8 +384,10 @@ impl Document {
             .get_meta(tree_id)
             .map_err(|_| ObjectEditError::NoSuchObject)?;
 
-        self.clone_limits_hold(&self.clone_links(), std::slice::from_ref(rotated))
+        let links = self.clone_links();
+        self.clone_limits_hold(&links, std::slice::from_ref(rotated))
             .map_err(ObjectEditError::CloneOutOfRange)?;
+        let hold = self.hold_for_results(&links, std::slice::from_ref(rotated))?;
         if crate::clone_codec::is_clone_meta(&meta) {
             let ObjectSnapshot::Clone(clone) = rotated else {
                 return Err(ObjectEditError::NoSuchObject);
@@ -376,6 +395,7 @@ impl Document {
             if !crate::clone_write::write_matrix(&meta, clone.chain.origin, clone.chain.matrix) {
                 return Err(ObjectEditError::NoSuchObject);
             }
+            self.write_hold(&tree, hold);
             self.commit_with_label("rotate_object");
             return Ok(());
         }
@@ -407,6 +427,7 @@ impl Document {
             _ => return Err(ObjectEditError::NoSuchObject),
         }
         path_codec::write_rotation(&meta, rotated.rotation());
+        self.write_hold(&tree, hold);
         self.commit_with_label("rotate_object");
         Ok(())
     }

@@ -538,6 +538,8 @@ fn every_older_fixture_still_opens_with_the_styles_it_stored() {
         "clone_matrix_five_v13.curvyo",
         // Orphan clones, which have no style to read until the repair after Open removes them.
         "clone_orphan_and_ring_v13.curvyo",
+        // The damaged-flag file of `0057-clone-overrides`.
+        "clone_overrides_flag_damaged_v14.curvyo",
     ];
     let mut opened = 0;
     for entry in std::fs::read_dir(dir).unwrap() {

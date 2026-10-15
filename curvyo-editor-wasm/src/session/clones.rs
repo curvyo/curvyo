@@ -37,14 +37,14 @@ pub struct CloneResult {
 }
 
 impl CloneResult {
-    fn ignored() -> Self {
+    pub(super) fn ignored() -> Self {
         Self {
             kind: CloneKind::Ignored,
             notice: String::new(),
         }
     }
 
-    fn done(notice: String) -> Self {
+    pub(super) fn done(notice: String) -> Self {
         Self {
             kind: CloneKind::Done,
             notice,
@@ -63,7 +63,7 @@ impl CloneResult {
 }
 
 /// What the Style tab shows about linked clones (criteria 22, 23, 56).
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct ClonePanel {
     /// The clone block, when the selection holds only clones.
     pub block: Option<CloneBlock>,

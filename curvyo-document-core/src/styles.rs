@@ -158,7 +158,8 @@ impl Document {
     /// Applies one style property change to every named object, in **one
     /// commit** for the whole batch (acceptance criteria 24, 2 to 6, 9). An
     /// object whose stored value already equals the new one is not written,
-    /// and a batch that changes nothing makes no commit.
+    /// and a batch that changes nothing makes no commit. A linked clone is written only when it
+    /// has its own style (it then takes marker edits like a path); the others are skipped.
     ///
     /// # Errors
     /// [`StyleEditError::NoSuchObject`] if any id is gone;
@@ -166,11 +167,21 @@ impl Document {
     /// [`StyleEditError::NotAPath`] for a marker edit that names a primitive.
     /// Either refuses the whole call.
     pub fn edit_style(&self, ids: &[NodeId], edit: &StyleEdit) -> Result<(), StyleEditError> {
-        let metas = self.style_metas(ids)?;
+        // A linked clone owns a style only with own style; the others are left alone
+        // (`specs/0057-clone-overrides` criterion 18).
+        let metas: Vec<LoroMap> = self
+            .style_metas(ids)?
+            .into_iter()
+            .filter(|meta| {
+                !crate::clone_codec::is_clone_meta(meta)
+                    || crate::clone_codec::read_overrides(meta).own_style
+            })
+            .collect();
         if edit.is_marker_edit()
-            && metas
-                .iter()
-                .any(|meta| !matches!(read_shape_tag_checked(meta), ShapeTag::Absent))
+            && metas.iter().any(|meta| {
+                !matches!(read_shape_tag_checked(meta), ShapeTag::Absent)
+                    && !crate::clone_codec::is_clone_meta(meta)
+            })
         {
             return Err(StyleEditError::NotAPath);
         }

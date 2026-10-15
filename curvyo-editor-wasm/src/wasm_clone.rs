@@ -50,6 +50,49 @@ pub struct ClonePanelView {
     pub followers: usize,
     /// How many selected objects clones follow ("these objects" from 2).
     pub followed: usize,
+    /// The Placement row: `"original"` (Follows original), `"own"` or `"mixed"`
+    /// (`specs/0057-clone-overrides` criterion 1).
+    #[wasm_bindgen(getter_with_clone)]
+    pub placement: String,
+    /// The Style row: `"original"`, `"own"` or `"mixed"` (criterion 10).
+    #[wasm_bindgen(getter_with_clone)]
+    pub style: String,
+    /// Spread colours is enabled: two or more clones are selected (criterion 42).
+    pub spread_ready: bool,
+    /// The muted summary of the greyed Stroke header: "0.5 mm", or "None" when off.
+    #[wasm_bindgen(getter_with_clone)]
+    pub stroke_summary: String,
+    /// The stroke colour as `#rrggbb`, empty when the stroke is off.
+    #[wasm_bindgen(getter_with_clone)]
+    pub stroke_hex: String,
+    /// The fill colour as `#rrggbb`, empty when the fill is off.
+    #[wasm_bindgen(getter_with_clone)]
+    pub fill_hex: String,
+    /// The muted summary of the greyed Markers header: "None" or the marker names; empty when the
+    /// stroke is off, and the header is then not shown.
+    #[wasm_bindgen(getter_with_clone)]
+    pub markers_summary: String,
+}
+
+fn hex(color: curvyo_document_core::Color) -> String {
+    format!("#{:02x}{:02x}{:02x}", color.r, color.g, color.b)
+}
+
+fn markers_text(markers: curvyo_document_core::Markers) -> String {
+    let name = |shape: curvyo_document_core::MarkerShape| match shape {
+        curvyo_document_core::MarkerShape::None => None,
+        curvyo_document_core::MarkerShape::Arrow => Some("Arrow"),
+        curvyo_document_core::MarkerShape::Dot => Some("Dot"),
+    };
+    let names: Vec<&str> = [markers.start, markers.mid, markers.end]
+        .into_iter()
+        .filter_map(name)
+        .collect();
+    if names.is_empty() {
+        "None".to_owned()
+    } else {
+        names.join(", ")
+    }
 }
 
 /// A tag or an edge chip of the canvas marks, in canvas px: `kind` is `"tag"` or `"chip"`.
@@ -118,10 +161,67 @@ impl WasmSession {
                 .map(|b| b.original.clone())
                 .unwrap_or_default(),
             deepest: block.as_ref().map_or(0, |b| b.deepest),
-            root: block.map(|b| b.root).unwrap_or_default(),
+            root: block.as_ref().map(|b| b.root.clone()).unwrap_or_default(),
             followers: panel.followers,
             followed: panel.followed,
+            placement: block
+                .as_ref()
+                .map_or("original", |b| b.placement.code())
+                .to_owned(),
+            style: block
+                .as_ref()
+                .map_or("original", |b| b.style.code())
+                .to_owned(),
+            spread_ready: self.session.spread_colours_ready(),
+            stroke_summary: block.as_ref().map_or_else(String::new, |b| {
+                if b.summary.stroke.enabled {
+                    format!("{} mm", b.summary.stroke.width.as_mm())
+                } else {
+                    "None".to_owned()
+                }
+            }),
+            stroke_hex: block
+                .as_ref()
+                .filter(|b| b.summary.stroke.enabled)
+                .map(|b| hex(b.summary.stroke.color))
+                .unwrap_or_default(),
+            fill_hex: block
+                .as_ref()
+                .filter(|b| b.summary.fill.enabled)
+                .map(|b| hex(b.summary.fill.color))
+                .unwrap_or_default(),
+            // The open state shows Markers rows only with a stroke (`0018`), so the greyed header
+            // goes with it (UX review of 0057, must-fix 1).
+            markers_summary: block
+                .filter(|b| b.summary.stroke.enabled)
+                .map(|b| markers_text(b.summary.stroke.markers))
+                .unwrap_or_default(),
         }
+    }
+
+    /// The Placement row of the clone block: `own` true is "Own placement".
+    pub fn set_clone_placement(&mut self, own: bool) -> CloneResultView {
+        self.session.set_clone_placement(own).into()
+    }
+
+    /// The Style row of the clone block: `own` true is "Own".
+    pub fn set_clone_style(&mut self, own: bool) -> CloneResultView {
+        self.session.set_clone_style(own).into()
+    }
+
+    /// Spread colours: evenly spaced hues over the selected clones, one commit.
+    pub fn spread_colours(&mut self) -> CloneResultView {
+        self.session.spread_colours().into()
+    }
+
+    /// The sentence of the last transform that held clones with own placement back, once.
+    pub fn take_clone_hold_notice(&mut self) -> String {
+        self.session.take_clone_hold_notice()
+    }
+
+    /// The notice of the last style or opacity edit that left clones alone, once.
+    pub fn take_style_skip_notice(&mut self) -> String {
+        self.session.take_style_skip_notice()
     }
 
     /// The notice of the last Delete key when it repaired clones, once: "Deleted 1 object. 1

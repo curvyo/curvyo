@@ -104,8 +104,10 @@ struct Walked {
 
 impl Walked {
     /// The node's read with its data, or `None` for a leaf the resolver left out (an orphan) or
-    /// that does not decode. A linked clone's opacity is its root's own `opacity` register times
-    /// the clone's own ancestors'; the clone's own `opacity` key is residue (ADR 0015 §3).
+    /// that does not decode. A linked clone's opacity is its style source's own `opacity` register
+    /// times the clone's own ancestors' (ADR 0016 §3): its own with own style, else the nearest
+    /// own-style clone's on its chain, else the root's; the key on a clone without own style is
+    /// residue.
     fn read(
         self,
         leaves: &mut [Option<ObjectSnapshot>],
@@ -117,9 +119,10 @@ impl Walked {
             (None, None) => return None,
         };
         let own = match &kind {
-            NodeKind::Leaf(ObjectSnapshot::Clone(clone)) => {
-                own_opacity.get(&clone.chain.root).copied().unwrap_or(1.0)
-            }
+            NodeKind::Leaf(ObjectSnapshot::Clone(clone)) => own_opacity
+                .get(&clone.chain.style_source)
+                .copied()
+                .unwrap_or(1.0),
             _ => self.registers.opacity.get(),
         };
         // invariant: a product of numbers in 0..=1 lies in 0..=1.

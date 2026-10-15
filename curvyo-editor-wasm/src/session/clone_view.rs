@@ -98,7 +98,9 @@ impl Session {
             None => Vec::new(),
         };
         if !changed.is_empty() {
-            let behind = Self::clone_previews_in(objects, &changed);
+            // A Select drag maps its objects as a whole: clones with own placement stay
+            // (`specs/0057-clone-overrides` criterion 9); a Node drag edits the shape.
+            let behind = Self::clone_previews_in(objects, &changed, live.is_some());
             list.extend(curvyo_render_core::build_live_edit_preview(&behind, view));
         }
         (list, !changed.is_empty())
@@ -182,8 +184,9 @@ impl Session {
     pub(super) fn clone_previews_in(
         objects: &[ObjectSnapshot],
         changed: &[ObjectSnapshot],
+        transform: bool,
     ) -> Vec<ObjectSnapshot> {
-        clone_previews(objects, changed, MAX_CLONE_PREVIEWS)
+        clone_previews(objects, changed, MAX_CLONE_PREVIEWS, transform)
             .unwrap_or_default()
             .into_iter()
             .map(ObjectSnapshot::Path)

@@ -491,6 +491,7 @@ fn row_json(row: &LayerRow, index: usize) -> Value {
         "label": row_accessible_name(row),
         "stateLine": row_state_line(row),
         "chainLine": row.chain_line,
+        "overridesLine": row.overrides_line,
         "refusal": row_refusal(row).unwrap_or(""),
         "rowAction": match row.kind {
             RowKind::Layer => "select-contents",

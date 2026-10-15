@@ -165,6 +165,9 @@ pub struct LayerRow {
     /// "Linked clone, chain of 3. Root: Path 3f9a1c" (`0049` UX notes "The Layers list"); empty
     /// for every other row.
     pub chain_line: String,
+    /// For a linked clone with overrides, the next muted line: "Own placement, own style", only
+    /// the parts that apply (`specs/0057-clone-overrides` criterion 28); empty otherwise.
+    pub overrides_line: String,
 }
 
 impl LayerRow {
@@ -336,13 +339,14 @@ impl<'a> Tree<'a> {
         }
     }
 
-    /// The opacity a row reads: its own, or for a linked clone its root's, read only (`0050`
-    /// criterion 28).
+    /// The opacity a row reads: its own, or for a linked clone its style source's (itself with
+    /// own style, else the nearest own-style clone on its chain, else the root; `0050` criterion
+    /// 28, `0057` criterion 16).
     fn shown_opacity(&self, at: usize) -> Opacity {
         match &self.nodes[at].kind {
             NodeKind::Leaf(ObjectSnapshot::Clone(clone)) => self
                 .index
-                .get(&clone.chain.root)
+                .get(&clone.chain.style_source)
                 .map_or(self.nodes[at].registers.opacity, |&root| {
                     self.nodes[root].registers.opacity
                 }),
@@ -418,6 +422,12 @@ impl<'a> Tree<'a> {
             position,
             siblings,
             chain_line: self.chain_line(at),
+            overrides_line: match &self.nodes[at].kind {
+                NodeKind::Leaf(ObjectSnapshot::Clone(clone)) => {
+                    crate::clone_panel::overrides_line(clone)
+                }
+                _ => String::new(),
+            },
         }
     }
 }

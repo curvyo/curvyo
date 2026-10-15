@@ -1,16 +1,21 @@
 //! The stored shape of a linked clone (`specs/0049-linked-clone/adrs.md` decision 1): the
-//! `shape = "clone"` tag and the one `clone_link` register, read, written and validated here.
+//! `shape = "clone"` tag, the one `clone_link` register and the two override flags of ADR 0016
+//! §1, read, written and validated here.
 //!
 //! ```text
 //! meta map of a clone:
-//!   shape      : "clone"
-//!   clone_link : { "origin": "<peer>:<counter>", "matrix": [a, b, c, d, e, f] }
-//!                ONE LWW register holding a map *value*, written whole with `insert`,
-//!                never as a container, so a merge keeps an origin with its own matrix.
+//!   shape         : "clone"
+//!   clone_link    : { "origin": "<peer>:<counter>", "matrix": [a, b, c, d, e, f] }
+//!                   ONE LWW register holding a map *value*, written whole with `insert`,
+//!                   never as a container, so a merge keeps an origin with its own matrix.
+//!   own_placement : true        absent = false; held back when its original is transformed
+//!   own_style     : true        absent = false; then the ordinary style keys (`style_codec`,
+//!                               absent key = default) and `opacity` (absent = 1) are its own
 //! ```
 //!
-//! A clone carries no anchors, style, `opacity` or `rotation`; such keys on a clone, and a
-//! `clone_link` on any other node, are ignored residue (ADR 0015 §4).
+//! A clone carries no anchors or `rotation`, and without `own_style` no style and no `opacity`;
+//! such keys on a clone, and a `clone_link` or override flag on any other node, are ignored
+//! residue (ADR 0015 §4, ADR 0016 §5).
 
 use std::collections::HashMap;
 
@@ -25,6 +30,10 @@ use crate::path_model::NodeId;
 pub(crate) const SHAPE_CLONE: &str = "clone";
 /// The meta key of the link register.
 pub(crate) const KEY_CLONE_LINK: &str = "clone_link";
+/// The meta key of the own-placement flag (ADR 0016 §1).
+pub(crate) const KEY_OWN_PLACEMENT: &str = "own_placement";
+/// The meta key of the own-style marker (ADR 0016 §1).
+pub(crate) const KEY_OWN_STYLE: &str = "own_style";
 const KEY_ORIGIN: &str = "origin";
 const KEY_MATRIX: &str = "matrix";
 
@@ -35,6 +44,43 @@ pub(crate) struct CloneLink {
     pub(crate) origin: NodeId,
     /// The clone matrix M.
     pub(crate) matrix: Affine,
+}
+
+/// The two override flags of one clone node as stored, absent or mistyped ones `false` (a file
+/// that opened has passed [`validate_clone_node`], so only merge residue reads a default).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub(crate) struct CloneOverrides {
+    /// Held back when its original is transformed (`0057` criterion 3).
+    pub(crate) own_placement: bool,
+    /// Its style keys and `opacity` are its own (`0057` criterion 11).
+    pub(crate) own_style: bool,
+}
+
+/// Reads the override flags of a clone node.
+pub(crate) fn read_overrides(meta: &LoroMap) -> CloneOverrides {
+    let flag = |key| {
+        matches!(
+            meta.get(key),
+            Some(ValueOrContainer::Value(LoroValue::Bool(true)))
+        )
+    };
+    CloneOverrides {
+        own_placement: flag(KEY_OWN_PLACEMENT),
+        own_style: flag(KEY_OWN_STYLE),
+    }
+}
+
+/// Sets or removes one override flag: `true` is stored, `false` is the absent key.
+pub(crate) fn write_flag(meta: &LoroMap, key: &str, on: bool) {
+    if on {
+        // invariant: inserting a bool under a known key on an attached map cannot fail.
+        #[allow(clippy::unwrap_used)]
+        meta.insert(key, true).unwrap();
+    } else if meta.get(key).is_some() {
+        // invariant: deleting a key just confirmed present on an attached map cannot fail.
+        #[allow(clippy::unwrap_used)]
+        meta.delete(key).unwrap();
+    }
 }
 
 /// Whether this meta map is tagged as a clone.
@@ -112,10 +158,22 @@ pub(crate) fn link_from_value(value: &LoroValue) -> Option<CloneLink> {
 /// string as origin and six finite numbers within ±1e7 as matrix. What the origin names is not
 /// checked here: a missing or wrong-kind original makes an orphan, not a damaged file. No link at
 /// all is merge residue and an orphan too (`adrs.md` decision 1, amended 2026-10-14): the link is
-/// written whole, so only a malformed one is damage.
+/// written whole, so only a malformed one is damage. The override flags are booleans when present;
+/// with `own_style` true the style keys must be valid as on a path (`0057` criterion 38); without
+/// it they are residue and not checked.
 pub(crate) fn validate_clone_node(meta: &LoroMap) -> bool {
-    meta.get(KEY_CLONE_LINK).is_none()
-        || read_clone_link(meta).is_some_and(|link| link.matrix.is_within_limit())
+    let link_ok = meta.get(KEY_CLONE_LINK).is_none()
+        || read_clone_link(meta).is_some_and(|link| link.matrix.is_within_limit());
+    let flag_ok = |key| {
+        matches!(
+            meta.get(key),
+            None | Some(ValueOrContainer::Value(LoroValue::Bool(_)))
+        )
+    };
+    link_ok
+        && flag_ok(KEY_OWN_PLACEMENT)
+        && flag_ok(KEY_OWN_STYLE)
+        && (!read_overrides(meta).own_style || crate::style_validation::style_is_valid(meta))
 }
 
 #[cfg(test)]
@@ -262,6 +320,59 @@ mod tests {
         let (_doc, meta) = meta();
         crate::shape_codec::write_shape_tag(&meta, SHAPE_CLONE);
         assert!(validate_clone_node(&meta));
+    }
+
+    #[test]
+    fn override_flags_read_write_and_validate() {
+        let (_doc, meta) = with_link(link(
+            LoroValue::from("1:2"),
+            numbers(&[1.0, 0.0, 0.0, 1.0, 0.0, 0.0]),
+        ));
+        assert_eq!(read_overrides(&meta), CloneOverrides::default());
+        write_flag(&meta, KEY_OWN_PLACEMENT, true);
+        write_flag(&meta, KEY_OWN_STYLE, true);
+        assert_eq!(
+            read_overrides(&meta),
+            CloneOverrides {
+                own_placement: true,
+                own_style: true
+            }
+        );
+        assert!(validate_clone_node(&meta));
+        write_flag(&meta, KEY_OWN_PLACEMENT, false);
+        assert!(
+            meta.get(KEY_OWN_PLACEMENT).is_none(),
+            "false is the absent key"
+        );
+        write_flag(&meta, KEY_OWN_PLACEMENT, false);
+        assert!(meta.get(KEY_OWN_PLACEMENT).is_none());
+    }
+
+    #[test]
+    fn a_mistyped_flag_or_a_damaged_own_style_is_refused() {
+        let good = || {
+            link(
+                LoroValue::from("1:2"),
+                numbers(&[1.0, 0.0, 0.0, 1.0, 0.0, 0.0]),
+            )
+        };
+        for (key, value) in [
+            (KEY_OWN_PLACEMENT, LoroValue::I64(1)),
+            (KEY_OWN_STYLE, LoroValue::from("true")),
+            (KEY_OWN_STYLE, LoroValue::Double(1.0)),
+        ] {
+            let (_doc, meta) = with_link(good());
+            meta.insert(key, value.clone()).unwrap();
+            assert!(!validate_clone_node(&meta), "{key} = {value:?}");
+        }
+        let (_doc, meta) = with_link(good());
+        meta.insert(crate::style_codec::KEY_STROKE_WIDTH, -1.0)
+            .unwrap();
+        assert!(validate_clone_node(&meta), "residue without own style");
+        meta.insert(KEY_OWN_STYLE, true).unwrap();
+        assert!(!validate_clone_node(&meta), "a damaged own style");
+        meta.insert(KEY_OWN_STYLE, false).unwrap();
+        assert!(validate_clone_node(&meta), "a stored false is not damage");
     }
 
     #[test]

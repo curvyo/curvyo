@@ -7,7 +7,7 @@ use loro::{LoroMap, LoroTree, TreeID};
 
 use crate::clone_codec::{is_clone_meta, read_clone_link};
 use crate::clone_model::CloneSnapshot;
-use crate::clone_read::{ObjectRead, RawLeaf, resolve};
+use crate::clone_read::{ObjectRead, RawLeaf, RawOverrides, resolve};
 use crate::document::{Document, OBJECTS_TREE};
 use crate::path_codec::{leaf_exists, read_path_snapshot};
 use crate::path_model::NodeId;
@@ -42,6 +42,27 @@ impl Document {
         }
         read_clone_link(&meta)
     }
+
+    /// The stored link, override flags and (with `own_style`) own style of the clone `id`, or
+    /// `None` when `id` is not a live clone leaf with a readable link: what `document.json`
+    /// lists, whether or not the chain resolves.
+    pub(crate) fn clone_stored(
+        &self,
+        id: NodeId,
+    ) -> Option<(
+        crate::clone_codec::CloneLink,
+        crate::clone_codec::CloneOverrides,
+        Option<crate::style_model::Style>,
+    )> {
+        let tree = self.loro().get_tree(OBJECTS_TREE);
+        let meta = tree.get_meta(TreeID::new(id.peer, id.counter)).ok()?;
+        let link = self.clone_link_of(id)?;
+        let overrides = crate::clone_codec::read_overrides(&meta);
+        let style = overrides
+            .own_style
+            .then(|| crate::style_codec::read_style(&meta));
+        Some((link, overrides, style))
+    }
 }
 
 /// One leaf as stored, or `None` when it has no meta map.
@@ -65,8 +86,19 @@ pub(crate) fn path_reads() -> usize {
 
 fn raw_from_meta(id: NodeId, meta: &LoroMap) -> RawLeaf {
     if is_clone_meta(meta) {
-        return read_clone_link(meta)
-            .map_or(RawLeaf::BrokenClone(id), |link| RawLeaf::Clone(id, link));
+        return read_clone_link(meta).map_or(RawLeaf::BrokenClone(id), |link| {
+            let overrides = crate::clone_codec::read_overrides(meta);
+            RawLeaf::Clone(
+                id,
+                link,
+                RawOverrides {
+                    own_placement: overrides.own_placement,
+                    own_style: overrides
+                        .own_style
+                        .then(|| crate::style_codec::read_style(meta)),
+                },
+            )
+        });
     }
     if let Some(tag) = read_shape_tag(meta) {
         return RawLeaf::Primitive(read_primitive_snapshot(id, meta, &tag));
@@ -92,7 +124,7 @@ pub(crate) fn read_one_clone(tree: &LoroTree, id: NodeId) -> Option<CloneSnapsho
             break;
         };
         let next = match &leaf {
-            RawLeaf::Clone(_, link) => Some(link.origin),
+            RawLeaf::Clone(_, link, _) => Some(link.origin),
             _ => None,
         };
         chain.push(leaf);

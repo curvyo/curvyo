@@ -220,6 +220,12 @@ pub fn clone_marks(
                 && frame.hidden.contains(&clone.chain.origin)
             {
                 "Clone (original hidden)".clone_into(&mut text);
+            } else if text == "Clone"
+                && let Some(ObjectSnapshot::Clone(clone)) = by_id.get(id)
+                && let Some(own) = crate::clone_panel::overrides_words(clone)
+            {
+                // `specs/0057-clone-overrides` criterion 29: "Clone, own placement and style".
+                text = format!("Clone, {own}");
             }
             if let Some(rect) = place_tag(&text, min, max, frame, &placed) {
                 placed.push(rect);

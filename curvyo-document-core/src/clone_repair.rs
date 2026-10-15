@@ -30,7 +30,7 @@ const REPAIR_ID_SPACE: u64 = 1 << 63;
 /// One decided repair, read before any write.
 enum Fix {
     Repoint(NodeId, CloneLink),
-    Unlink(NodeId, PathSnapshot),
+    Unlink(NodeId, PathSnapshot, f64),
 }
 
 impl Document {
@@ -79,10 +79,17 @@ impl Document {
             } else if !links.contains_key(&node)
                 && let Some(read) = read_one_clone(tree, clone)
             {
-                fixes.push(Fix::Unlink(clone, read.resolved));
+                let opacity = crate::clone_write::source_opacity(tree, &read);
+                fixes.push(Fix::Unlink(clone, read.resolved, opacity));
             }
         }
+        let copies = self.style_copies(&gone, &fixes);
         let mut repair = self.clone_repair.get();
+        for (clone, style, opacity) in copies {
+            if let Some(meta) = meta_of(tree, clone) {
+                crate::clone_overrides::write_own_style(&meta, &style, opacity);
+            }
+        }
         for fix in fixes {
             match fix {
                 Fix::Repoint(clone, link) => {
@@ -91,19 +98,53 @@ impl Document {
                         repair.repointed += 1;
                     }
                 }
-                Fix::Unlink(clone, mut path) => {
+                Fix::Unlink(clone, mut path, opacity) => {
                     let ids = self.repair_anchor_ids(path.all_anchors().count());
                     for (anchor, id) in path.all_anchors_mut().zip(ids) {
                         anchor.id = id;
                     }
                     if let Some(meta) = meta_of(tree, clone) {
-                        unlink_meta(&meta, &path);
+                        unlink_meta(&meta, &path, opacity);
                         repair.unlinked += 1;
                     }
                 }
             }
         }
         self.clone_repair.set(repair);
+    }
+
+    /// The clones that stay clones, have no own style and lose their style source to the removal,
+    /// with the style and `opacity` register they show: they get them as their own, so their look
+    /// does not change (ADR 0016 §4, `specs/0057-clone-overrides` criterion 31 (b)).
+    fn style_copies(
+        &self,
+        gone: &HashSet<NodeId>,
+        fixes: &[Fix],
+    ) -> Vec<(NodeId, crate::style_model::Style, f64)> {
+        let unlinked: HashSet<NodeId> = fixes
+            .iter()
+            .filter_map(|fix| match fix {
+                Fix::Unlink(id, ..) => Some(*id),
+                Fix::Repoint(..) => None,
+            })
+            .collect();
+        let tree = self.loro().get_tree(crate::document::OBJECTS_TREE);
+        let read = self.read_objects();
+        read.objects
+            .iter()
+            .filter_map(|object| match object {
+                crate::primitive_model::ObjectSnapshot::Clone(clone)
+                    if !clone.chain.own_style
+                        && gone.contains(&clone.chain.style_source)
+                        && !gone.contains(&clone.id())
+                        && !unlinked.contains(&clone.id()) =>
+                {
+                    let opacity = crate::clone_write::source_opacity(&tree, clone);
+                    Some((clone.id(), clone.resolved.style.clone(), opacity))
+                }
+                _ => None,
+            })
+            .collect()
     }
 
     /// What the clone repairs since the last call did, and resets the count: the session reads it

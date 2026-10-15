@@ -122,7 +122,8 @@ impl Document {
     /// Turns each clone of `unlinks` into an independent path, in **one commit** labelled
     /// [`UNLINK_CLONE_COMMIT_LABEL`] (`0049` criterion 28): the same id and place, the anchors of
     /// its resolved outline with the given fresh ids (one per anchor, all outlines, in order;
-    /// the caller mints them), its root's style, rotation 0. Clones that follow an unlinked
+    /// the caller mints them), its effective style and its style source's `opacity` register
+    /// (`0057` criterion 30), no override, rotation 0. Clones that follow an unlinked
     /// clone keep following it (criterion 55). Everything is checked before the first write.
     ///
     /// # Errors
@@ -143,9 +144,9 @@ impl Document {
             if !is_clone_meta(&meta) {
                 return Err(CloneError::NotAClone);
             }
-            let mut path = read_one_clone(&tree, unlink.id)
-                .ok_or(CloneError::NotAClone)?
-                .resolved;
+            let clone = read_one_clone(&tree, unlink.id).ok_or(CloneError::NotAClone)?;
+            let opacity = crate::clone_write::source_opacity(&tree, &clone);
+            let mut path = clone.resolved;
             if path.all_anchors().count() != unlink.anchor_ids.len()
                 || !unlink.anchor_ids.iter().all(|id| fresh.insert(*id))
             {
@@ -154,11 +155,11 @@ impl Document {
             for (anchor, id) in path.all_anchors_mut().zip(&unlink.anchor_ids) {
                 anchor.id = *id;
             }
-            planned.push((meta, path));
+            planned.push((meta, path, opacity));
         }
         // Clones that follow an unlinked clone read it before it changes, and keep following it.
-        for (meta, path) in &planned {
-            crate::clone_write::unlink_meta(meta, path);
+        for (meta, path, opacity) in &planned {
+            crate::clone_write::unlink_meta(meta, path, *opacity);
         }
         self.commit_with_label(UNLINK_CLONE_COMMIT_LABEL);
         Ok(())

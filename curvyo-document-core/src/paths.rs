@@ -234,7 +234,7 @@ impl Document {
             return Err(PathEditError::InvalidStrokeWidth);
         }
         let (meta, _) = self.path_parts(path)?;
-        self.path_edit_limits(path, |edited| {
+        let apply = |edited: &mut PathSnapshot| {
             for anchor in edited.all_anchors_mut() {
                 if let Some(&(_, point, handle_in, handle_out)) =
                     anchors.iter().find(|&&(id, ..)| id == anchor.id)
@@ -244,7 +244,28 @@ impl Document {
                     anchor.handle_out = handle_out;
                 }
             }
-        })?;
+        };
+        self.path_edit_limits(path, apply)?;
+        // A resize or skew of a path is a transform: clones with own placement are held back
+        // (`specs/0057-clone-overrides` criterion 3).
+        let links = self.clone_links();
+        let hold = match self.path(path) {
+            Some(before) if links.values().any(|&(origin, _)| origin == path) => {
+                let mut after = before;
+                apply(&mut after);
+                self.hold_for_results(
+                    &links,
+                    &[crate::primitive_model::ObjectSnapshot::Path(after)],
+                )
+                .map_err(|e| match e {
+                    crate::objects::ObjectEditError::CloneOutOfRange(id) => {
+                        PathEditError::CloneOutOfRange(id)
+                    }
+                    _ => PathEditError::NoSuchPath,
+                })?
+            }
+            _ => crate::clone_hold::HoldPlan::default(),
+        };
         let positions = crate::subpath_codec::anchor_positions(&meta);
         let resolved: Vec<_> = anchors
             .iter()
@@ -260,6 +281,7 @@ impl Document {
             write_vec2(&map, KEY_HANDLE_OUT, handle_out);
         }
         crate::shapes::write_stroke_width_if_changed(&meta, stroke_width);
+        self.write_hold(&self.loro().get_tree(crate::document::OBJECTS_TREE), hold);
         self.commit_with_label("resize_path");
         Ok(())
     }

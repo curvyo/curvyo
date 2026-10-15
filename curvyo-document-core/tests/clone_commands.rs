@@ -122,10 +122,11 @@ fn mapped_results(d: &Document, ids: &[NodeId], g: Affine) -> Vec<ObjectSnapshot
             _ => None,
         })
         .collect();
-    let matrices: HashMap<NodeId, Affine> = clone_matrices_after(&links, ids, g)
-        .matrices
-        .into_iter()
-        .collect();
+    let matrices: HashMap<NodeId, Affine> =
+        clone_matrices_after(&links, &d.own_placement_clones(), ids, g)
+            .matrices
+            .into_iter()
+            .collect();
     ids.iter()
         .map(|&id| match d.object(id).unwrap() {
             ObjectSnapshot::Path(path) => ObjectSnapshot::Path(path.mapped(g)),
@@ -284,7 +285,7 @@ fn ac16_singular_case_unlinks_the_clone_and_maps_it_as_a_path() {
     let c = moved_clone(&d, p, 30.0, 0.0);
     let flat = Affine::scale(1.0, 0.0);
     let links: CloneLinks = HashMap::from([(c, (p, translate(30.0, 0.0)))]);
-    let decided = clone_matrices_after(&links, &[p, c], flat);
+    let decided = clone_matrices_after(&links, &d.own_placement_clones(), &[p, c], flat);
     assert_eq!(decided.singular, vec![c]);
     // The gesture layer turns it into its unlinked path (fresh ids) mapped by G.
     let mut as_path = clone_of(&d, c).resolved.mapped(flat);

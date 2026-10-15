@@ -211,3 +211,55 @@ fn ac61_ctrl_a_over_ten_thousand_clones_draws_the_capped_marks() {
         );
     }
 }
+
+/// `specs/0057-clone-overrides` criterion 41: 10,000 clones with own styles that differ from the
+/// root's only in fill and stroke colour keep the frame after the original moved within 150 ms
+/// (the root tessellation stays shared); with own placement too, the move holds them all back.
+#[test]
+fn ac41_a_frame_with_ten_thousand_own_colours() {
+    let document = scene(true);
+    let clones: Vec<NodeId> = document
+        .read_objects()
+        .objects
+        .iter()
+        .skip(1)
+        .map(curvyo_document_core::ObjectSnapshot::id)
+        .collect();
+    let root = document.read_objects().objects[0].id();
+    document
+        .edit_style(&[root], &curvyo_document_core::StyleEdit::FillEnabled(true))
+        .unwrap();
+    document.set_own_style(&clones, true).unwrap();
+    for hue in 0..12_u8 {
+        let batch: Vec<NodeId> = clones
+            .iter()
+            .copied()
+            .skip(usize::from(hue))
+            .step_by(12)
+            .collect();
+        let colour = curvyo_document_core::Color {
+            r: hue * 20,
+            g: 255 - hue * 20,
+            b: 40,
+        };
+        document
+            .edit_style(&batch, &curvyo_document_core::StyleEdit::FillColor(colour))
+            .unwrap();
+        document
+            .edit_style(
+                &batch,
+                &curvyo_document_core::StyleEdit::StrokeColor(colour),
+            )
+            .unwrap();
+    }
+    breakdown(&document);
+    check(
+        &format!("frame after the original of {COUNT} clones with own colours moved"),
+        frame_after_moving_the_first(&document),
+        FRAME_AFTER_COMMIT_BUDGET,
+    );
+    document.set_own_placement(&clones, true).unwrap();
+    let frame = frame_after_moving_the_first(&document);
+    // Not gated before the first measurement (criterion 41): printed for the PR.
+    println!("frame after the original of {COUNT} held-back clones moved: {frame:?}");
+}

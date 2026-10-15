@@ -25,6 +25,7 @@ mod background_view;
 mod boolean;
 #[cfg(test)]
 mod box_refit_tests;
+mod clone_overrides;
 #[cfg(test)]
 mod clone_tests;
 mod clone_view;
@@ -306,6 +307,9 @@ pub struct Session {
     /// The notice of the orphan repair after the Open, until the host has taken it
     /// (`clones.rs`).
     orphan_notice: Option<String>,
+    /// The notice of the last style or opacity edit that left clones with their original's style
+    /// alone, until the host has taken it (`clone_overrides.rs`).
+    skip_notice: Option<String>,
     /// How many objects the last Delete key removed, for its notice (`clones.rs`).
     deleted_objects: usize,
     /// The DOM chips over the canvas, as the host reported them, which a tag of the clone marks
@@ -371,6 +375,7 @@ impl Session {
             panel: layers_panel::PanelState::default(),
             offset: offset::OffsetTool::default(),
             orphan_notice: None,
+            skip_notice: None,
             deleted_objects: 0,
             dom_chips: Vec::new(),
         }
@@ -429,6 +434,7 @@ impl Session {
             panel: layers_panel::PanelState::default(),
             offset: offset::OffsetTool::default(),
             orphan_notice: None,
+            skip_notice: None,
             deleted_objects: 0,
             dom_chips: Vec::new(),
         };

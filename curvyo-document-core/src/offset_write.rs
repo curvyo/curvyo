@@ -132,11 +132,17 @@ impl Document {
                     #[allow(clippy::unwrap_used)]
                     let meta = tree.get_meta(tree_id_of(*target)).unwrap();
                     // A clone is consumed like any operand (`0049` criterion 33): it becomes a
-                    // path in place with its root's style, and the clones behind it follow it.
+                    // path in place with its effective style and opacity (`0057` criterion 30),
+                    // and the clones behind it follow it.
                     if crate::clone_codec::is_clone_meta(&meta) {
                         let style = crate::clone_write::leaf_style(&tree, *target, &meta);
+                        let opacity = crate::object_read::read_one_clone(&tree, *target)
+                            .map_or(1.0, |clone| {
+                                crate::clone_write::source_opacity(&tree, &clone)
+                            });
                         crate::clone_write::clear_clone_keys(&meta);
                         style_codec::write_style(&meta, &style);
+                        crate::clone_write::write_opacity_register(&meta, opacity);
                     }
                     change_geometry(&meta, geometry);
                     ids.push(*target);

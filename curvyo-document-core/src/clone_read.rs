@@ -1,6 +1,7 @@
 //! The one read of every object with its linked clones resolved (`specs/0049-linked-clone/adrs.md`
-//! decision 3, ADR 0015 §6): chains are followed with an explicit stack, each composed matrix is
-//! computed once from its original's, and the root's outline is transformed once per clone.
+//! decision 3, ADR 0015 §6): chains are followed with an explicit stack, each composed matrix and
+//! style source (ADR 0016 §3) is computed once from its original's, and the root's outline is
+//! transformed once per clone.
 
 use std::collections::HashMap;
 
@@ -9,6 +10,7 @@ use crate::clone_codec::CloneLink;
 use crate::clone_model::{CloneChain, CloneSnapshot};
 use crate::path_model::{NodeId, PathSnapshot};
 use crate::primitive_model::{ObjectSnapshot, PrimitiveSnapshot};
+use crate::style_model::Style;
 
 /// One leaf as stored, before any clone is resolved.
 #[derive(Debug, Clone)]
@@ -17,10 +19,19 @@ pub(crate) enum RawLeaf {
     Path(PathSnapshot),
     /// A primitive: never an original.
     Primitive(PrimitiveSnapshot),
-    /// A clone node and its link.
-    Clone(NodeId, CloneLink),
+    /// A clone node, its link and its overrides.
+    Clone(NodeId, CloneLink, RawOverrides),
     /// A clone node whose link cannot be read (merge residue): always an orphan.
     BrokenClone(NodeId),
+}
+
+/// What a clone node stores besides its link (ADR 0016 §1).
+#[derive(Debug, Clone, PartialEq, Default)]
+pub(crate) struct RawOverrides {
+    /// The own-placement flag.
+    pub(crate) own_placement: bool,
+    /// Its own style when it has the `own_style` marker.
+    pub(crate) own_style: Option<Style>,
 }
 
 impl RawLeaf {
@@ -28,8 +39,23 @@ impl RawLeaf {
         match self {
             Self::Path(path) => path.id,
             Self::Primitive(primitive) => primitive.id,
-            Self::Clone(id, _) | Self::BrokenClone(id) => *id,
+            Self::Clone(id, ..) | Self::BrokenClone(id) => *id,
         }
+    }
+
+    /// The leaf a resolved clone was read from: its link and overrides, as stored.
+    pub(crate) fn of_clone(clone: &CloneSnapshot) -> Self {
+        Self::Clone(
+            clone.id(),
+            CloneLink {
+                origin: clone.chain.origin,
+                matrix: clone.chain.matrix,
+            },
+            RawOverrides {
+                own_placement: clone.chain.own_placement,
+                own_style: clone.chain.own_style.then(|| clone.resolved.style.clone()),
+            },
+        )
     }
 }
 
@@ -121,8 +147,9 @@ enum State {
     Pending,
     /// A clone on the stack of the walk in progress.
     OnStack,
-    /// A resolved clone: the index of its root, its depth and its composed matrix.
-    Resolved(usize, usize, Affine),
+    /// A resolved clone: the index of its root, its depth, its composed matrix and the index of
+    /// its style source (`None`: the root).
+    Resolved(usize, usize, Affine, Option<usize>),
     /// A clone that cannot be resolved.
     Orphan,
 }
@@ -159,15 +186,17 @@ fn walk(start: usize, leaves: &[RawLeaf], index: &HashMap<NodeId, usize>, states
     states[start] = State::OnStack;
     let base = loop {
         // invariant: only clones are pushed, and the top of the stack is always a clone.
-        let RawLeaf::Clone(_, link) = &leaves[stack[stack.len() - 1]] else {
+        let RawLeaf::Clone(_, link, _) = &leaves[stack[stack.len() - 1]] else {
             break None;
         };
         let Some(&next) = index.get(&link.origin) else {
             break None;
         };
         match states[next] {
-            State::Root => break Some((next, 0, Affine::IDENTITY)),
-            State::Resolved(root, depth, composed) => break Some((root, depth, composed)),
+            State::Root => break Some((next, 0, Affine::IDENTITY, None)),
+            State::Resolved(root, depth, composed, source) => {
+                break Some((root, depth, composed, source));
+            }
             State::Pending => {
                 states[next] = State::OnStack;
                 stack.push(next);
@@ -177,15 +206,20 @@ fn walk(start: usize, leaves: &[RawLeaf], index: &HashMap<NodeId, usize>, states
     };
     let mut base = base;
     while let Some(clone) = stack.pop() {
-        base = base.and_then(|(root, depth, composed)| {
-            let RawLeaf::Clone(_, link) = &leaves[clone] else {
+        base = base.and_then(|(root, depth, composed, source)| {
+            let RawLeaf::Clone(_, link, overrides) = &leaves[clone] else {
                 return None;
             };
             let own = link.matrix.compose(composed);
-            own.is_finite().then_some((root, depth + 1, own))
+            let source = if overrides.own_style.is_some() {
+                Some(clone)
+            } else {
+                source
+            };
+            own.is_finite().then_some((root, depth + 1, own, source))
         });
         states[clone] = match base {
-            Some((root, depth, composed)) => State::Resolved(root, depth, composed),
+            Some((root, depth, composed, source)) => State::Resolved(root, depth, composed, source),
             None => State::Orphan,
         };
     }
@@ -199,14 +233,26 @@ fn assemble(leaves: Vec<RawLeaf>, states: &[State], index: &HashMap<NodeId, usiz
     let mut by_depth: Vec<(usize, usize)> = Vec::new();
     let mut shared: HashMap<usize, std::sync::Arc<PathSnapshot>> = HashMap::new();
     for (i, (leaf, state)) in leaves.iter().zip(states).enumerate() {
-        if let (RawLeaf::Clone(id, link), State::Resolved(root, depth, composed)) = (leaf, *state)
+        if let (RawLeaf::Clone(id, link, overrides), State::Resolved(root, depth, composed, source)) =
+            (leaf, *state)
             && let RawLeaf::Path(root_path) = &leaves[root]
         {
             let root_outline = shared
                 .entry(root)
                 .or_insert_with(|| std::sync::Arc::new(root_path.clone()))
                 .clone();
-            let clone = CloneSnapshot::new(
+            let (style_source, style) = match source.map(|s| &leaves[s]) {
+                Some(RawLeaf::Clone(
+                    source_id,
+                    _,
+                    RawOverrides {
+                        own_style: Some(style),
+                        ..
+                    },
+                )) => (*source_id, Some(style)),
+                _ => (root_path.id, None),
+            };
+            let mut clone = CloneSnapshot::new(
                 *id,
                 CloneChain {
                     origin: link.origin,
@@ -214,9 +260,15 @@ fn assemble(leaves: Vec<RawLeaf>, states: &[State], index: &HashMap<NodeId, usiz
                     depth,
                     matrix: link.matrix,
                     composed,
+                    own_placement: overrides.own_placement,
+                    own_style: overrides.own_style.is_some(),
+                    style_source,
                     root_outline,
                 },
             );
+            if let Some(style) = style {
+                clone.resolved.style = style.clone();
+            }
             if outline_is_finite(&clone.resolved) {
                 clones[i] = Some(clone);
                 by_depth.push((depth, i));
@@ -225,7 +277,7 @@ fn assemble(leaves: Vec<RawLeaf>, states: &[State], index: &HashMap<NodeId, usiz
     }
     by_depth.sort_unstable();
     for (_, i) in by_depth {
-        let RawLeaf::Clone(_, link) = &leaves[i] else {
+        let RawLeaf::Clone(_, link, _) = &leaves[i] else {
             continue;
         };
         let origin_lost = index
@@ -244,7 +296,7 @@ fn assemble(leaves: Vec<RawLeaf>, states: &[State], index: &HashMap<NodeId, usiz
         let object = match leaf {
             RawLeaf::Path(path) => Some(ObjectSnapshot::Path(path)),
             RawLeaf::Primitive(primitive) => Some(ObjectSnapshot::Primitive(primitive)),
-            RawLeaf::Clone(id, _) | RawLeaf::BrokenClone(id) => {
+            RawLeaf::Clone(id, ..) | RawLeaf::BrokenClone(id) => {
                 if let Some(clone) = clones[i].take() {
                     result
                         .clones_of
@@ -316,6 +368,28 @@ pub(crate) mod tests_support {
                 origin: id(origin),
                 matrix,
             },
+            RawOverrides::default(),
+        )
+    }
+
+    /// A clone with its own style (and optionally own placement).
+    pub(crate) fn styled_clone(
+        n: i32,
+        origin: i32,
+        matrix: Affine,
+        style: Style,
+        own_placement: bool,
+    ) -> RawLeaf {
+        RawLeaf::Clone(
+            id(n),
+            CloneLink {
+                origin: id(origin),
+                matrix,
+            },
+            RawOverrides {
+                own_placement,
+                own_style: Some(style),
+            },
         )
     }
 }
@@ -374,6 +448,69 @@ mod tests {
         assert_eq!(read.clones_of[&id(1)], vec![id(2)]);
         assert_eq!(read.clones_of[&id(2)], vec![id(3)]);
         assert_eq!(read.orphans, Vec::<NodeId>::new());
+    }
+
+    fn blue() -> Style {
+        let mut style = Style::default();
+        style.fill.enabled = true;
+        style.fill.color = crate::path_model::Color { r: 0, g: 0, b: 255 };
+        style
+    }
+
+    #[test]
+    fn a_clone_reads_the_style_of_the_nearest_own_style_clone_on_its_chain() {
+        // `0057` criterion 15: B → A → O, A own style blue, B Original's; C a clone of O.
+        let read = resolve_read(vec![
+            square(1),
+            super::tests_support::styled_clone(2, 1, Affine::IDENTITY, blue(), true),
+            clone(3, 2, Affine::IDENTITY),
+            clone(4, 1, Affine::IDENTITY),
+        ]);
+        let (a, b, c) = (clone_of(&read, 2), clone_of(&read, 3), clone_of(&read, 4));
+        assert_eq!(a.resolved.style, blue());
+        assert_eq!(b.resolved.style, blue());
+        assert_eq!(c.resolved.style, Style::default());
+        assert_eq!(
+            (
+                a.chain.style_source,
+                b.chain.style_source,
+                c.chain.style_source
+            ),
+            (id(2), id(2), id(1))
+        );
+        assert!(a.chain.own_style && !b.chain.own_style && !c.chain.own_style);
+        assert!(a.chain.own_placement && !b.chain.own_placement);
+        assert_eq!(
+            b.chain.root_outline.style,
+            Style::default(),
+            "the outline stays shared"
+        );
+    }
+
+    #[test]
+    fn the_nearest_own_style_wins_over_one_further_down() {
+        let mut red = Style::default();
+        red.stroke.color = crate::path_model::Color { r: 255, g: 0, b: 0 };
+        let objects = resolve_read(vec![
+            super::tests_support::styled_clone(3, 2, Affine::IDENTITY, red.clone(), false),
+            clone(4, 3, Affine::IDENTITY),
+            super::tests_support::styled_clone(2, 1, Affine::IDENTITY, blue(), false),
+            square(1),
+        ]);
+        assert_eq!(clone_of(&objects, 4).resolved.style, red);
+        assert_eq!(clone_of(&objects, 4).chain.style_source, id(3));
+        assert_eq!(clone_of(&objects, 2).resolved.style, blue());
+    }
+
+    #[test]
+    fn a_resolved_clone_converts_back_to_the_leaf_it_was_read_from() {
+        let leaf = super::tests_support::styled_clone(2, 1, Affine::scale(2.0, 1.0), blue(), true);
+        let read = resolve_read(vec![square(1), leaf.clone()]);
+        let back = RawLeaf::of_clone(clone_of(&read, 2));
+        let (RawLeaf::Clone(a, la, oa), RawLeaf::Clone(b, lb, ob)) = (&leaf, &back) else {
+            panic!("clones")
+        };
+        assert_eq!((a, la, oa), (b, lb, ob));
     }
 
     #[test]
