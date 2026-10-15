@@ -152,6 +152,15 @@ test("the Select bar's Ratio slider renders with the provider", async () => {
       onSetRatio: noop,
       onCancelRatio: noop,
       onConvertToPaths: noop,
+      flipEnabled: false,
+      flip: {
+        flip: noop,
+        notice: null,
+        announcement: { id: 0, text: "" },
+        handleKeyOutcome: () => false,
+        announceText: noop,
+        clearAnnouncement: noop,
+      },
       onReturnFocus: noop,
     });
   const html = await render(element as never, true);

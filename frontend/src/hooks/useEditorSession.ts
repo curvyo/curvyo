@@ -10,6 +10,8 @@ import { type NudgeFeedback, useNudgeFeedback } from "@/hooks/useNudgeFeedback";
 import { type BackingBuffer, backingBufferFor, sameBackingBuffer } from "@/lib/canvasSize";
 import { ModifierTracker } from "@/lib/keyModifiers";
 import { parseLayerNotice } from "@/lib/layerRows";
+import { FLIP_NOTICE_MS } from "@/lib/flipText";
+import { type FlipApi, useFlip } from "@/hooks/useFlip";
 import { TOO_FAR_HINT } from "@/lib/nudgeText";
 import { createSession, openSession } from "@/lib/editorSession";
 import type { WasmSession } from "@/lib/editorSession";
@@ -303,7 +305,9 @@ function readLiveReadout(
   if (!raw) {
     return null;
   }
-  const readout: LiveReadout = { text: raw.text, x: raw.anchor_x, y: raw.anchor_y };
+  // A resize through zero adds the line that names the mirror (`0056` criterion 10).
+  const [text = "", second, third] = raw.text.split("\n");
+  const readout: LiveReadout = { text, second, third, x: raw.anchor_x, y: raw.anchor_y };
   raw.free();
   return readout;
 }
@@ -609,7 +613,7 @@ export interface EditorSession {
   /** The chip registers what a click on a mark does while it is open; `null` when it closes. */
   setMarkClickHandler: (handler: ((mark: number) => void) | null) => void;
   /** Enter in the entry chip: `"committed"`, `"unchanged"` (both close it)
-   * or `"invalid:<field>:number|positive|negative|ratio-range|skew-range|too-large"`
+   * or `"invalid:<field>:number|negative|ratio-range|skew-range|too-large"`
    * (it stays
    * open). */
   commitTransformEntry: (first: string, second: string, lastEdited: number) => string;
@@ -651,6 +655,12 @@ export interface EditorSession {
   offset: OffsetApi;
   /** Linked clones: the button, the panel block, the canvas tags (`specs/0049-linked-clone`). */
   clones: ClonesApi;
+  /** The flip buttons and the keys H and V (`specs/0056-mirror-and-negative-scale/`). */
+  flip: FlipApi;
+  /** The flip buttons act: something is selected in the Select tool. */
+  flipEnabled: boolean;
+  /** The size chip's note line for the typed texts ("Mirrored left to right"), or "". */
+  transformEntryMirrorLine: (first: string, second: string, lastEdited: number) => string;
   /** A large undo or redo is running. */
   historyBusy: boolean;
   /** The names of the next undo and redo; `null` for an empty stack. */
@@ -888,6 +898,7 @@ export function useEditorSession(
   const [selectionAnnouncement, setSelectionAnnouncement] = useState("");
   const [selectionAnnouncementSeq, setSelectionAnnouncementSeq] = useState(0);
   const [keyHint, setKeyHint] = useState<KeyHint | null>(null);
+  const [flipEnabled, setFlipEnabled] = useState(false);
   const keyHintCounter = useRef(0);
   const nudgeFeedback = useNudgeFeedback();
   const {
@@ -964,6 +975,7 @@ export function useEditorSession(
     setScaleStrokeWidthState(session.scale_stroke_width());
     setScaleCornerRadiusState(session.scale_corner_radius());
     setLinkCornersState(session.link_corners());
+    setFlipEnabled(session.flip_enabled());
     const nextBar = readSelectBar(session.select_bar_state());
     setSelectBar((previous) => (sameSelectBar(previous, nextBar) ? previous : nextBar));
     setZoomPercent(session.zoom_percent());
@@ -991,6 +1003,25 @@ export function useEditorSession(
   }, [refreshGrouping]);
   const clones = useClones(getSession, syncFromSession, history.showNotice, containerRef);
   const { refresh: refreshClones, handleKeyOutcome: handleCloneOutcome } = clones;
+  const flip = useFlip(getSession, syncFromSession, history.showNotice);
+  const { handleKeyOutcome: handleFlipOutcome } = flip;
+  // A release or an Enter that set a size to 0.01 mm says so in the canvas notice slot
+  // (`0056` criterion 15).
+  const { announceText } = flip;
+  const showTransformNotice = useCallback(
+    (session: WasmSession) => {
+      const notice = session.take_transform_notice();
+      if (notice !== "") {
+        history.showNotice(notice, FLIP_NOTICE_MS, "canvas");
+      }
+      // A resize that mirrored says so politely: "Resized. Mirrored left to right."
+      const announcement = session.take_transform_announcement();
+      if (announcement !== "") {
+        announceText(announcement);
+      }
+    },
+    [history, announceText],
+  );
   useEffect(() => {
     refreshClonesRef.current = refreshClones;
   }, [refreshClones]);
@@ -1763,6 +1794,7 @@ export function useEditorSession(
               try {
                 session.pointer_up(x, y, shift, ctrl, alt);
                 showOffsetOutcome();
+                showTransformNotice(session);
                 setLiveReadout(null);
                 setCursorHint(session.cursor_hint());
                 syncFromSession();
@@ -1775,12 +1807,13 @@ export function useEditorSession(
         }
         session.pointer_up(x, y, shift, ctrl, alt);
         showOffsetOutcome();
+        showTransformNotice(session);
       }
       setLiveReadout(null);
       setCursorHint(session.cursor_hint());
       syncFromSession();
     },
-    [canvasPoint, syncFromSession, syncTrackedModifiers, showOffsetOutcome],
+    [canvasPoint, syncFromSession, syncTrackedModifiers, showOffsetOutcome, showTransformNotice],
   );
 
   const onPointerCancel = useCallback(() => {
@@ -1952,6 +1985,7 @@ export function useEditorSession(
         }
       }
       handleCloneOutcome(outcome);
+      handleFlipOutcome(outcome);
       if (outcome === "select-all") {
         onSelectAll(session.selection_count());
       } else if (outcome === "nudge" || outcome === "nudge-new") {
@@ -1973,6 +2007,7 @@ export function useEditorSession(
       handleGroupingOutcome,
       history,
       handleCloneOutcome,
+      handleFlipOutcome,
       isSpaceHeld,
       syncFromSession,
       onNudge,
@@ -2010,6 +2045,7 @@ export function useEditorSession(
         return "unchanged";
       }
       const outcome = session.commit_transform_entry(first, second, lastEdited);
+      showTransformNotice(session);
       syncFromSession();
       // A typed corner radius past its limit is committed limited and says
       // "r 12.0 mm max" at the knob for 1.5 s: a limit is never silent.
@@ -2024,7 +2060,13 @@ export function useEditorSession(
       }
       return outcome;
     },
-    [syncFromSession],
+    [syncFromSession, showTransformNotice],
+  );
+
+  const transformEntryMirrorLine = useCallback(
+    (first: string, second: string, lastEdited: number): string =>
+      sessionRef.current?.transform_entry_mirror_line(first, second, lastEdited) ?? "",
+    [],
   );
 
   const commitMoveEntry = useCallback(
@@ -2123,6 +2165,7 @@ export function useEditorSession(
     commitTransformEntry,
     cancelTransformEntry,
     transformEntryLinked,
+    transformEntryMirrorLine,
     onContainerBlur,
     zoomPercent,
     isPanning,
@@ -2137,6 +2180,8 @@ export function useEditorSession(
     grouping,
     offset,
     clones,
+    flip,
+    flipEnabled,
     historyBusy: history.busy,
     historyNames: history.names,
     pressHistory: history.press,

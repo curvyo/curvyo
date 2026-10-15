@@ -185,9 +185,7 @@ pub use linked_clone::{
     LinkedClonePlan, MAX_REFUSAL_OUTLINES, linked_clone_shown, plan_linked_clone,
 };
 pub use marquee::{MarqueeMode, objects_in_marquee, units_in_marquee};
-pub use mirror_text::{
-    FLIP_UNCHANGED_NOTICE, flip_announcement, mirror_line, signed_size_text, zero_recovery_notice,
-};
+pub use mirror_text::{mirror_line, signed_size_text, zero_recovery_notice};
 pub use modifiers::Modifiers;
 pub use move_entry::MoveEntry;
 pub use node_marquee::{

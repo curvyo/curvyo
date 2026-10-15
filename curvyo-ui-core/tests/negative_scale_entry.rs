@@ -353,3 +353,34 @@ fn a_drag_a_typed_size_and_the_flip_button_agree() {
         assert_eq!(format!("{x:.6?}"), format!("{y:.6?}"));
     }
 }
+
+/// The UX notes' chip note: the mirror a negative typed size means, single and group.
+#[test]
+fn the_chip_names_the_mirror() {
+    let mut rig = Rig::new();
+    let id = rig.triangle();
+    rig.select(&[id]);
+    rig.key_s();
+    let entry = rig.tool.entry().unwrap();
+    assert_eq!(entry.mirror_line(["30.0", "10.0"], 0), None);
+    assert_eq!(
+        entry.mirror_line(["-30", "10.0"], 0),
+        Some("Mirrored left to right")
+    );
+    assert_eq!(
+        entry.mirror_line(["30.0", "-10"], 1),
+        Some("Mirrored top to bottom")
+    );
+    assert_eq!(entry.mirror_line(["-30", "-10"], 1), Some("Turned 180°"));
+
+    let mut rig = Rig::new();
+    let a = rig.rect(0.0, 10.0);
+    let b = rig.rect(20.0, 10.0);
+    rig.select(&[a, b]);
+    rig.key_s();
+    let entry = rig.tool.group_entry().unwrap();
+    assert_eq!(
+        entry.mirror_line(["-30", "10.0"], 0),
+        Some("Mirrored left to right")
+    );
+}

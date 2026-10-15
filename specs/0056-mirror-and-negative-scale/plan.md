@@ -83,14 +83,14 @@ resized local box (which is why the box must be normalised and the mirror applie
 
 ### Milestone 3: the Select bar, keys, readout and chip (`curvyo-editor-wasm`, `frontend`)
 
-- [ ] 3.1 wasm: `flip_horizontal`, `flip_vertical`, `flip_enabled`, the notice and the
+- [x] 3.1 wasm: `flip_horizontal`, `flip_vertical`, `flip_enabled`, the notice and the
   announcement; a flip closes an open chip without writing (AC 2, 3, 5).
-- [ ] 3.2 Keys H and V in the Select tool through the `0010` gate; hint "Select an object
+- [x] 3.2 Keys H and V in the Select tool through the `0010` gate; hint "Select an object
   first" with nothing selected; nothing in other tools (AC 4).
-- [ ] 3.3 Readout: signed sizes and the mirror line for one object and a group (AC 10).
-- [ ] 3.4 Chip: no "Must be above 0", note line for a negative value, field description;
+- [x] 3.3 Readout: signed sizes and the mirror line for one object and a group (AC 10).
+- [x] 3.4 Chip: no "Must be above 0", note line for a negative value, field description;
   notice after Enter with a typed 0 and after a release on 0 (AC 14, 15).
-- [ ] 3.5 Frontend Flip group: placement after the switches, glyphs, `aria-disabled`,
+- [x] 3.5 Frontend Flip group: placement after the switches, glyphs, `aria-disabled`,
   tooltips, announcements, no-op notice under the button (AC 1, 2, 3).
 
 ### Milestone 4: file, budget and docs

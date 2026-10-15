@@ -178,9 +178,36 @@ impl WasmSession {
             .transform_entry_linked(usize::try_from(field).ok()?, text)
     }
 
+    /// The size chip's note line for the typed texts ("Mirrored left to right" and so on,
+    /// `specs/0056-mirror-and-negative-scale/` UX notes), or an empty string.
+    #[must_use]
+    pub fn transform_entry_mirror_line(
+        &self,
+        first: &str,
+        second: &str,
+        last_edited: u32,
+    ) -> String {
+        let last = usize::try_from(last_edited).unwrap_or(0);
+        self.session
+            .transform_entry_mirror_line(first, second, last)
+    }
+
+    /// The notice of the last release or Enter that set a width or height to 0.01 mm
+    /// instead of 0 (`0056` criterion 15), once; an empty string when there is none. Call
+    /// after `pointer_up` and `commit_transform_entry`.
+    pub fn take_transform_notice(&mut self) -> String {
+        self.session.take_transform_notice()
+    }
+
+    /// The polite announcement of the last release or Enter whose resize mirrored
+    /// ("Resized. Mirrored left to right."), once; an empty string when there is none.
+    pub fn take_transform_announcement(&mut self) -> String {
+        self.session.take_transform_announcement()
+    }
+
     /// Enter in the entry chip: `"committed"`, `"unchanged"` (both close the
     /// chip), or `"invalid:<field>:<reason>"` with the reason `number`,
-    /// `positive`, `negative`, `ratio-range`, `skew-range` or `too-large` (the
+    /// `negative`, `ratio-range`, `skew-range` or `too-large` (the
     /// chip stays open; criteria 19, 21, 27, 30, 31; 18, 19 of
     /// `unified-object-editing`; 11 of `edit-interaction-polish`).
     /// `last_edited` is the index of the field edited last.

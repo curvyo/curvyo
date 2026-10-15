@@ -2,11 +2,13 @@ import { CircleAlert, Link, Unlink } from "lucide-react";
 import { Toggle, Tooltip } from "radix-ui";
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 
+import { FlipGroup } from "@/components/FlipGroup";
 import { RatioSlider } from "@/components/RatioSlider";
 import { RATIO_SLIDER_NAMES } from "@/lib/sliderNames";
 import { ToolbarSwitch } from "@/components/ToolbarSwitch";
 import type { SelectBarState } from "@/hooks/useEditorSession";
 import type { CloneBarNotice } from "@/hooks/useClones";
+import type { FlipApi } from "@/hooks/useFlip";
 import { LINKED_CLONE_TOOLTIP } from "@/lib/cloneText";
 
 export interface SelectToolbarProps {
@@ -39,6 +41,10 @@ export interface SelectToolbarProps {
   onLinkedClone: () => void;
   /** The notice of the last Linked clone, 4 px under the button (UX notes). */
   linkedCloneNotice: CloneBarNotice | null;
+  /** The flip buttons act: something is selected (`specs/0056-mirror-and-negative-scale/`
+   * criterion 1). */
+  flipEnabled: boolean;
+  flip: FlipApi;
   /** Returns the keyboard focus to the canvas (after Enter or Escape in a
    * field). */
   onReturnFocus: () => void;
@@ -500,7 +506,9 @@ function LinkedCloneButton({
  * layout"; `specs/0009-unified-object-editing/` criteria 21 to 23): left-aligned
  * after the tool rail so the switches never move. Left to right: the two
  * switches ("Scale stroke width", "Scale corner radius"), shown with or
- * without a selection and never disabled or dimmed; the kind groups, each
+ * without a selection and never disabled or dimmed; the Flip group, always shown and
+ * disabled only while nothing is selected (`specs/0056-mirror-and-negative-scale/`
+ * criterion 1); the kind groups, each
  * shown when the selection contains the kind it acts on (Radius and Remove
  * rounding for a rectangle, Points for a polygon or star, Ratio for a star),
  * acting on exactly those objects; and "Object to path" last. Wraps by whole
@@ -525,6 +533,8 @@ export function SelectToolbar({
   linkedCloneShown,
   onLinkedClone,
   linkedCloneNotice,
+  flipEnabled,
+  flip,
   onReturnFocus,
 }: SelectToolbarProps) {
   const barRef = useRef<HTMLDivElement>(null);
@@ -633,6 +643,12 @@ export function SelectToolbar({
         />
       </div>
       )}
+      {/* The Flip group: second, after the switches, in every selection state, so the first
+       * row does not move with the selection (`specs/0056-mirror-and-negative-scale/` D7). */}
+      <div className="group/row flex min-h-9 items-start gap-3">
+        {bar.scaleSwitchesShown && <Divider />}
+        <FlipGroup enabled={flipEnabled} flip={flip} onReturnFocus={onReturnFocus} />
+      </div>
       {groups.map((group, index) => (
         <div key={index} className="group/row flex min-h-9 items-start gap-3">
           <Divider />
