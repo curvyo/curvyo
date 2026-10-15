@@ -516,7 +516,8 @@ fn the_angle_chip_turns_the_selection_by_the_typed_angle() {
 }
 
 /// Criterion 34: S opens the size chip with the group box size; Enter scales the
-/// selection to it about the box centre; a size of zero is refused.
+/// selection to it about the box centre; a size of zero is no longer refused (`0056`
+/// criterion 15), it is checked in `negative_scale_entry.rs` of `curvyo-ui-core`.
 #[test]
 fn the_size_chip_scales_the_selection_to_the_typed_size() {
     let mut session = session_of(&rects());
@@ -529,13 +530,6 @@ fn the_size_chip_scales_the_selection_to_the_typed_size() {
     assert_eq!(view.fields[1].prefill, "60.0");
     assert!(view.at_centre);
     assert!(!view.linked);
-    assert_eq!(
-        session.commit_transform_entry("0", "60.0", 0),
-        EntryOutcome::Invalid {
-            field: 0,
-            reason: curvyo_ui_core::InvalidReason::NotPositive
-        }
-    );
     assert_eq!(
         session.commit_transform_entry("480", "60.0", 0),
         EntryOutcome::Committed

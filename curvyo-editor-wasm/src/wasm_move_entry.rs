@@ -21,7 +21,6 @@ pub(crate) fn outcome_code(outcome: EntryOutcome) -> String {
             "invalid:{field}:{}",
             match reason {
                 InvalidReason::NotANumber => "number",
-                InvalidReason::NotPositive => "positive",
                 InvalidReason::Negative => "negative",
                 InvalidReason::RatioRange => "ratio-range",
                 InvalidReason::SkewRange => "skew-range",

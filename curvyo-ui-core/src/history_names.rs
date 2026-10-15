@@ -44,6 +44,9 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     ("skew_path", "Skew"),
     ("transform_skew", "Skew"),
     ("transform_objects", "Transform"),
+    // `specs/0056-mirror-and-negative-scale` criterion 29.
+    ("flip_horizontal", "Flip horizontally"),
+    ("flip_vertical", "Flip vertically"),
     ("set_corner_radius", "Change corner radius"),
     ("set_corner_radii", "Change corner radius"),
     ("convert_to_paths", "Object to path"),

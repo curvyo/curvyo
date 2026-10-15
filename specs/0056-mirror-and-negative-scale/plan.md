@@ -72,13 +72,13 @@ resized local box (which is why the box must be normalised and the mirror applie
 
 ### Milestone 2: the flip command and typed values (`curvyo-ui-core`)
 
-- [ ] 2.1 Test first, `flip.rs`: map about the TBB centre, AC 2 example (two rectangles), AC 3
+- [x] 2.1 Test first, `flip.rs`: map about the TBB centre, AC 2 example (two rectangles), AC 3
   no-op (circle, horizontal line, symmetric path), AC 22 triangle example, AC 25 clone
   example; one commit with the History names (AC 2, 3, 22, 25, 29).
-- [ ] 2.2 Typed W/H: negative and zero, linked sign, prefill positive, "Too large" on the
+- [x] 2.2 Typed W/H: negative and zero, linked sign, prefill positive, "Too large" on the
   magnitude; AC 14 and 17 examples, single and group entry (AC 14, 15, 17).
-- [ ] 2.3 Arithmetic properties of AC 28 a to f over every kind, at ±1e5 mm (AC 28).
-- [ ] 2.4 Text: signed size readout (U+2212, two decimals under 0.1 mm), mirror line, notices
+- [x] 2.3 Arithmetic properties of AC 28 a to f over every kind, at ±1e5 mm (AC 28).
+- [x] 2.4 Text: signed size readout (U+2212, two decimals under 0.1 mm), mirror line, notices
   of AC 3 and 15 (AC 10, 15).
 
 ### Milestone 3: the Select bar, keys, readout and chip (`curvyo-editor-wasm`, `frontend`)
