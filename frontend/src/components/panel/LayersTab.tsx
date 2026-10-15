@@ -7,6 +7,7 @@ import { ValueField } from "@/components/panel/ValueField";
 import { useLayersList } from "@/hooks/useLayersList";
 import type { GridName } from "@/hooks/useStylePanel";
 import { usePreviewGesture } from "@/hooks/usePreviewGesture";
+import { CLONE_STATUS_MS } from "@/lib/cloneText";
 import type { WasmSession } from "@/lib/editorSession";
 import {
   COARSE_ROW_HEIGHT_PX,
@@ -523,20 +524,44 @@ export function LayersTab({
 
   // The Opacity field: a drag previews on the canvas, the release commits once, Escape restores
   // (criterion 26). The field sends the position; Rust maps it on the opacity scale.
+  // The notice of `0057` criterion 18 for an opacity edit, read inside the call, before the sync
+  // of `act` hands it to the canvas slot, and shown here, above the field (UX review must-fix 4).
+  const [skipNotice, setSkipNotice] = useState<{ id: number; text: string } | null>(null);
+  const skipCount = useRef(0);
+  useEffect(() => {
+    if (!skipNotice) {
+      return undefined;
+    }
+    const timer = window.setTimeout(() => setSkipNotice(null), CLONE_STATUS_MS);
+    return () => window.clearTimeout(timer);
+  }, [skipNotice]);
+  const opacityAct = useCallback(
+    (call: (session: WasmSession) => string) =>
+      act((session) => {
+        const answer = call(session);
+        const text = session.take_style_skip_notice();
+        if (text !== "") {
+          skipCount.current += 1;
+          setSkipNotice({ id: skipCount.current, text });
+        }
+        return answer;
+      }),
+    [act],
+  );
   const ends = useMemo(
     () => ({
       commit: () => {
-        reply(act((session) => session.commit_layer_opacity_preview()));
+        reply(opacityAct((session) => session.commit_layer_opacity_preview()));
       },
       cancel: (session: WasmSession) => session.cancel_layer_opacity(),
     }),
-    [reply, act],
+    [reply, opacityAct],
   );
   const gesture = usePreviewGesture(getSession, refresh, ends);
   const opacity = view.opacity;
   const value = opacity.value ?? 100;
   const commitValue = (percent: number) =>
-    reply(act((session) => session.commit_layer_opacity(percent)));
+    reply(opacityAct((session) => session.commit_layer_opacity(percent)));
   const stepSize = (grid: GridName) => (grid === "coarse" ? 10 : 1);
   const toolbar = view.toolbar;
   // The toolbar is one Tab stop with roving focus; dimmed buttons stay in the order.
@@ -700,7 +725,21 @@ export function LayersTab({
       {/* The Opacity field of the panel target, at the bottom of the tab where the other tabs keep
           their properties (customer feedback 2026-10-14). The slot is kept when nothing is
           targeted, so the list never jumps. */}
-      <div className="shrink-0 pt-1">
+      <div className="relative shrink-0 pt-1">
+        {skipNotice ? (
+          <p
+            key={skipNotice.id}
+            role="status"
+            className="pointer-events-none absolute right-0 bottom-full z-10 mb-1 max-w-[256px] rounded-md px-2 py-1 text-right text-xs"
+            style={{
+              background: "var(--toolbar-bg)",
+              color: "var(--toolbar-icon)",
+              boxShadow: "var(--panel-elevation-shadow)",
+            }}
+          >
+            {skipNotice.text}
+          </p>
+        ) : null}
         <div role="status" className="h-4 truncate text-xs text-[var(--panel-muted-fg)]">
           {hint}
         </div>
@@ -751,7 +790,10 @@ export function LayersTab({
             </div>
           ) : null}
         </div>
-        <p className="flex h-4 items-center gap-1 truncate text-xs text-[var(--panel-muted-fg)]">
+        <p
+          className="flex h-4 items-center gap-1 truncate text-xs text-[var(--panel-muted-fg)]"
+          title={opacity.tooltip || undefined}
+        >
           {opacity.layer ? <Layers size={12} strokeWidth={1.5} aria-hidden /> : null}
           {opacity.caption}
         </p>

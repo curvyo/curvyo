@@ -202,6 +202,9 @@ export function LayerRow({
       {row.chainLine ? (
         <span className="text-[var(--panel-muted-fg)]">{row.chainLine}</span>
       ) : null}
+      {row.overridesLine ? (
+        <span className="text-[var(--panel-muted-fg)]">{row.overridesLine}</span>
+      ) : null}
       {row.stateLine !== "" ? (
         <span className="text-[var(--panel-muted-fg)]">{row.stateLine}</span>
       ) : null}

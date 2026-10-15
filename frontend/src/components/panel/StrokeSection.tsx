@@ -37,7 +37,7 @@ export function StrokeSection({ panel, onReturnFocus }: StrokeSectionProps) {
   const rowsFocus = useRowsFocus(view.strokeRows, section);
   const markersFocus = useRowsFocus(view.markersShown, section);
   return (
-    <div ref={section} className="flex flex-col gap-2">
+    <div ref={section} data-style-section className="flex flex-col gap-2">
       <PaintRow
         title="Stroke"
         groupLabel="Stroke paint"

@@ -23,7 +23,17 @@ type ShowNotice = (
   kind?: "status" | "alert",
 ) => void;
 
-export type CloneCommand = "linked-clone" | "unlink" | "select-original" | "select-root" | "select-clones";
+export type CloneCommand =
+  | "linked-clone"
+  | "unlink"
+  | "select-original"
+  | "select-root"
+  | "select-clones"
+  | "own-placement"
+  | "follow-placement"
+  | "own-style"
+  | "original-style"
+  | "spread-colours";
 
 /** The notice of Linked clone, shown 4 px under its button (UX notes "Focus"). */
 export interface CloneBarNotice {
@@ -64,6 +74,32 @@ export interface ClonesApi {
   hover: (kind: "original" | "root" | "") => void;
   /** A Delete key says how the clones that followed what it removed were repaired. */
   handleKeyOutcome: (outcome: string) => void;
+}
+
+/** One clone command on the session. */
+function runCommand(session: WasmSession, command: CloneCommand) {
+  switch (command) {
+    case "linked-clone":
+      return session.linked_clone();
+    case "unlink":
+      return session.unlink_clones();
+    case "select-original":
+      return session.select_original();
+    case "select-root":
+      return session.select_root_original();
+    case "select-clones":
+      return session.select_clones();
+    case "own-placement":
+      return session.set_clone_placement(true);
+    case "follow-placement":
+      return session.set_clone_placement(false);
+    case "own-style":
+      return session.set_clone_style(true);
+    case "original-style":
+      return session.set_clone_style(false);
+    case "spread-colours":
+      return session.spread_colours();
+  }
 }
 
 function samePanel(a: ClonePanelState, b: ClonePanelState): boolean {
@@ -136,6 +172,13 @@ export function useClones(
       root: raw.root,
       followers: raw.followers,
       followed: raw.followed,
+      placement: raw.placement as ClonePanelState["placement"],
+      style: raw.style as ClonePanelState["style"],
+      spreadReady: raw.spread_ready,
+      strokeSummary: raw.stroke_summary,
+      strokeHex: raw.stroke_hex,
+      fillHex: raw.fill_hex,
+      markersSummary: raw.markers_summary,
     };
     raw.free();
     setPanel((previous) => (samePanel(previous, next) ? previous : next));
@@ -180,6 +223,18 @@ export function useClones(
     if (limit !== "") {
       showNotice(limit, CLONE_REFUSAL_MS, "canvas", "alert");
     }
+    // A transform that held clones with own placement back says so (`0057` criteria 7 and 8).
+    const held = session.take_clone_hold_notice();
+    if (held !== "") {
+      showNotice(held, CLONE_STATUS_MS, "canvas", "status");
+    }
+    // An edit that left clones with their original's style alone (criterion 18) and was not made
+    // in a tab: the eyedropper's pick on the canvas, in the canvas notice slot. The Style and
+    // Layers tabs read their own edits' notice first and show it where the edit was made.
+    const skipped = session.take_style_skip_notice();
+    if (skipped !== "") {
+      showNotice(skipped, CLONE_STATUS_MS, "canvas", "status");
+    }
     const orphans = session.take_orphan_notice();
     if (orphans !== "") {
       showNotice(orphans, ORPHAN_NOTICE_MS);
@@ -192,16 +247,7 @@ export function useClones(
       if (!session) {
         return;
       }
-      const raw =
-        command === "linked-clone"
-          ? session.linked_clone()
-          : command === "unlink"
-            ? session.unlink_clones()
-            : command === "select-original"
-              ? session.select_original()
-              : command === "select-root"
-                ? session.select_root_original()
-                : session.select_clones();
+      const raw = runCommand(session, command);
       const result = { kind: raw.kind, notice: raw.notice };
       raw.free();
       if (result.kind !== "ignored" && result.notice !== "") {
@@ -219,7 +265,8 @@ export function useClones(
           showNotice(result.notice, refused ? CLONE_REFUSAL_MS : undefined, "canvas", refused ? "alert" : "status");
         }
       }
-      if (keyboard && source === "panel" && result.kind === "done") {
+      const switches = command.endsWith("-placement") || command.endsWith("-style") || command === "spread-colours";
+      if (keyboard && source === "panel" && result.kind === "done" && !switches) {
         noticeCounter.current += 1;
         setFocusRequest({ id: noticeCounter.current, target: command === "unlink" ? "stroke" : "first" });
       }

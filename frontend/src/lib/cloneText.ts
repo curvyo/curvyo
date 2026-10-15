@@ -18,6 +18,9 @@ export const LINKED_CLONE_TOOLTIP = [
   "Edit the original and every clone changes.",
 ];
 
+/** The state of one override row over the selected clones (`specs/0057-clone-overrides`). */
+export type OverrideState = "original" | "own" | "mixed";
+
 /** What the Style tab shows about linked clones, as the session reads it. */
 export interface ClonePanelState {
   clonesOnly: boolean;
@@ -27,6 +30,17 @@ export interface ClonePanelState {
   root: string;
   followers: number;
   followed: number;
+  /** The Placement row: "original" is Follows original. */
+  placement: OverrideState;
+  /** The Style row: "original" is Original's. */
+  style: OverrideState;
+  /** Spread colours is enabled (two or more clones). */
+  spreadReady: boolean;
+  /** The greyed headers' summaries (the first clone's effective style). */
+  strokeSummary: string;
+  strokeHex: string;
+  fillHex: string;
+  markersSummary: string;
 }
 
 export const NO_CLONE_PANEL: ClonePanelState = {
@@ -37,7 +51,46 @@ export const NO_CLONE_PANEL: ClonePanelState = {
   root: "",
   followers: 0,
   followed: 0,
+  placement: "original",
+  style: "original",
+  spreadReady: false,
+  strokeSummary: "",
+  strokeHex: "",
+  fillHex: "",
+  markersSummary: "",
 };
+
+/** The two segments of an override row: label, accessible name and tooltip (`0057` UX notes). */
+export interface OverrideSegment {
+  own: boolean;
+  label: string;
+  name: string;
+  title: string;
+}
+
+export const PLACEMENT_SEGMENTS: OverrideSegment[] = [
+  {
+    own: false,
+    label: "Follows original",
+    name: "Follows original",
+    title: "Moves, turns and scales with the original.",
+  },
+  { own: true, label: "Own", name: "Own placement", title: "Stays where it is when the original is moved." },
+];
+
+export const STYLE_SEGMENTS: OverrideSegment[] = [
+  {
+    own: false,
+    label: "Original's",
+    name: "Original's style",
+    title: "Shows the original's fill, stroke, markers and opacity.",
+  },
+  { own: true, label: "Own", name: "Own style", title: "Has its own fill, stroke, markers and opacity." },
+];
+
+/** The tooltip of Spread colours, enabled and disabled (criterion 42). */
+export const SPREAD_COLOURS_TITLE = "Gives the selected clones evenly spaced hues, in stacking order.";
+export const SPREAD_COLOURS_DISABLED_TITLE = "Select two or more clones to spread colours.";
 
 /** A tag or an edge chip of the canvas marks, in canvas px. */
 export interface CloneTag {

@@ -55,6 +55,8 @@ export interface LayerRowData {
   stateLine: string;
   /** A clone row's chain line for its tooltip (`0049`); empty otherwise. */
   chainLine?: string;
+  /** "Own placement, own style" for a clone with overrides (`0057` criterion 28). */
+  overridesLine?: string;
   /** "Hidden" or "Locked" when a press selects nothing. */
   refusal: string;
   /** "select-contents" for a layer row, else "". */
@@ -73,6 +75,8 @@ export interface LayerOpacityData {
   value: number | null;
   /** Where the value lies on the field's scale, 0 to 1 (Rust's mapping). */
   bar: number;
+  /** The caption's tooltip ("Set Style to Own to change it." for clones, `0057` criterion 16). */
+  tooltip?: string;
 }
 
 /** Which buttons of the toolbar apply; the others are dimmed, never hidden. */

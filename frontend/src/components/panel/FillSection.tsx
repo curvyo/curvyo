@@ -30,7 +30,7 @@ export function FillSection({ panel, onReturnFocus }: FillSectionProps) {
   const hexEntry = useHexEntry(hex, onReturnFocus);
   const rowsFocus = useRowsFocus(view.fillRows, section);
   return (
-    <div ref={section} className="flex flex-col gap-2">
+    <div ref={section} data-style-section className="flex flex-col gap-2">
       <PaintRow
         title="Fill"
         groupLabel="Fill paint"
