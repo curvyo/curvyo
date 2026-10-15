@@ -46,3 +46,14 @@ generic.
    does not change. SVG export (`0024`): a clone with any override is an ordinary `<path>` with
    its effective style, as criterion 40 says; if `0049` Question 7 ever writes plain clones as
    `<use>`, a clone with own style stays a `<path>`.
+4. **M1 review notes (2026-10-14, [review-architect-m1.md](review-architect-m1.md)).**
+   - *"All style keys" (ADR 0016 §1)* means a complete style as the path writer stores it:
+     `style_codec::write_style` (width and colour always, other keys only when not default),
+     after every style key and `opacity` on the clone has been removed. Absent = default, so the
+     read is the same as writing every key.
+   - *`document.json` (plan Frage 1):* flags only when true, `style` only with `own_style`,
+     `opacity` from the registers, residue `opacity` left out. Non-authoritative.
+   - *Flag type check (plan Frage 2):* only on clone nodes. No writer produces a mistyped flag, a
+     path never becomes a clone, and validation keeps its one dispatch on `shape`.
+   - *Locked clones (plan Frage 3):* both switches are allowed on a locked clone; neither changes
+     the drawn result, which is what the lock guards.
