@@ -1913,8 +1913,9 @@ fn ac24_the_two_switches() {
         0.0
     ));
     assert!(near(radii_of(&only_radius[1])[3], 4.0 * f, 1e-9));
-    // The floor: a collapse takes the stroke to 0.01 mm, never below.
-    let collapsed = run(true, true, pt(-100.0, 80.0));
+    // The floor: a release on the fixed edge sets the width to 0.01 mm (`0056`
+    // criterion 15) and takes the stroke to 0.01 mm, never below.
+    let collapsed = run(true, true, pt(50.0, 80.0));
     for o in &collapsed {
         assert!(
             near(style_width(o), 0.01, 1e-12),
@@ -1944,26 +1945,21 @@ fn ac24_switches_are_read_at_the_press() {
     assert_eq!(radii_of(&o[0]), [1.0, 2.0, 3.0, 4.0]);
 }
 
-/// Criterion 22: a factor below zero clamps to zero and stays there: nothing is
-/// negative, nothing flips.
+/// Criterion 22, superseded by `0056` criteria 6 and 12: a factor below zero turns the
+/// selection over about the fixed corner; no stored length is negative.
 #[test]
-fn ac22_a_negative_factor_clamps_to_zero() {
+fn ac22_a_negative_factor_turns_the_selection_over() {
     let (d, _) = two_squares();
     let mut s = open(&d);
     select_all(&mut s);
     let g = two_squares_box(&s);
+    // The fixed corner is (50, 50): sx = (20 - 50) / 30 = -1, sy = (30 - 50) / 10 = -2.
     drag(&mut s, g.corner(1.0, 1.0), pt(20.0, 30.0));
-    for o in objects(&s) {
-        let (b, _) = rect_of(&o);
-        assert!(b.width.as_mm() >= 0.0 && b.height.as_mm() >= 0.0);
-        assert!(
-            near(b.width.as_mm(), 0.0, 1e-9),
-            "x collapsed: {}",
-            b.width.as_mm()
-        );
-        assert!(near(rect_centre(b).x, 50.0, 1e-9), "all at the pivot x");
-        // y: 30 -> sy = (30 - 50) / 10 < 0 -> 0 as well.
-        assert!(near(b.height.as_mm(), 0.0, 1e-9));
+    let turned = objects(&s);
+    for (o, x0) in turned.iter().zip([40.0, 20.0]) {
+        let (b, _) = rect_of(o);
+        assert!(near(b.width.as_mm(), 10.0, 1e-9) && near(b.height.as_mm(), 20.0, 1e-9));
+        assert!(near(b.origin.x, x0, 1e-9) && near(b.origin.y, 30.0, 1e-9));
     }
     // A drag that goes negative and comes back past the zero crossing: the
     // result is computed from the final pointer only.

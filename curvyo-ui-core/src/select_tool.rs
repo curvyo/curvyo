@@ -27,6 +27,7 @@ use crate::transform_drag::{
 };
 use crate::transform_handle_layout::EditHandle;
 pub use crate::transform_handle_layout::TransformHandleTolerances;
+use crate::transform_math::{ExtentSigns, ZeroRecovery};
 
 mod bar;
 mod cycle;
@@ -392,6 +393,7 @@ impl SelectTool {
             // (`0047` criteria 2 and 12), built at the press so that the preview and
             // the commit are the same snapshot.
             converted: converted_for_object(object, handle).map(Box::new),
+            signs: ExtentSigns::default(),
         }
     }
 
@@ -402,7 +404,9 @@ impl SelectTool {
     /// a rotate or a skew (one commit each) — a no-op (writes nothing) if no
     /// drag was in flight, or the pointer never left the dead zone, or the
     /// result equals the start. `shift`/`ctrl` are the modifiers' state at
-    /// release.
+    /// release. Returns the axes a committed resize set to 0.01 mm instead of 0
+    /// (`specs/0056-mirror-and-negative-scale/` criterion 15), for the notice; the
+    /// default when nothing was set so or nothing was written.
     pub fn pointer_up(
         &mut self,
         document: &Document,
@@ -411,7 +415,8 @@ impl SelectTool {
         point: Point,
         modifiers: Modifiers,
         minter: &mut AnchorIdMinter,
-    ) {
+    ) -> ZeroRecovery {
+        let (shift, ctrl) = (modifiers.shift, modifiers.ctrl);
         match std::mem::take(&mut self.drag) {
             SelectDrag::None => {}
             SelectDrag::Moving(drag) => {
@@ -426,25 +431,30 @@ impl SelectTool {
             }
             SelectDrag::Transforming(drag) => {
                 if !drag.origin.is_active_at(point) {
-                    return;
+                    return ZeroRecovery::default();
                 }
-                let result = drag.resolve(point, modifiers.shift, modifiers.ctrl);
+                let result = drag.resolve(point, shift, ctrl);
                 if !same_within_tolerance(&result, &drag.start) {
                     drag.commit(document, &result);
+                    return drag.recovery_at(point, shift, ctrl);
                 }
             }
             SelectDrag::GroupTransforming(drag) => {
                 if !drag.origin.is_active_at(point) {
-                    return;
+                    return ZeroRecovery::default();
                 }
-                let results = drag.resolve(point, modifiers.shift, modifiers.ctrl);
+                let results = drag.resolve(point, shift, ctrl);
                 let unchanged = results
                     .iter()
                     .zip(&drag.starts)
                     .all(|(new, old)| same_within_tolerance(new, old));
                 if !unchanged {
-                    let map = drag.map_at(point, modifiers.shift, modifiers.ctrl);
+                    let map = drag.map_at(point, shift, ctrl);
                     drag.commit(document, &results, map);
+                    return drag
+                        .resized_box_at(point, shift, ctrl)
+                        .map(|resized| resized.recovered)
+                        .unwrap_or_default();
                 }
             }
             SelectDrag::Marquee(drag) => {
@@ -454,6 +464,55 @@ impl SelectTool {
                 self.finish_lasso(&drag, objects, selection, point, modifiers);
             }
         }
+        ZeroRecovery::default()
+    }
+
+    /// The handle the drag in flight holds, by position with the pointer at `pointer`: a
+    /// resize handle that has crossed zero is the handle now at the pointer (the E handle
+    /// past the W edge is the W handle), so it keeps its dragging look
+    /// (`specs/0056-mirror-and-negative-scale/` criterion 11). Otherwise
+    /// [`SelectTool::dragging_handle`].
+    #[must_use]
+    pub fn dragging_handle_at(
+        &self,
+        pointer: Point,
+        shift: bool,
+        ctrl: bool,
+    ) -> Option<EditHandle> {
+        let handle = self.dragging_handle()?;
+        let EditHandle::Resize(direction) = handle else {
+            return Some(handle);
+        };
+        let Some((sx, sy)) = self.live_resize_factors(pointer, shift, ctrl) else {
+            return Some(handle);
+        };
+        Some(EditHandle::Resize(
+            crate::transform_math::mirrored_direction(direction, sx < 0.0, sy < 0.0),
+        ))
+    }
+
+    /// The signed factors `(sx, sy)` of the resize drag in flight with the pointer at
+    /// `pointer`, along the box's own axes for one object and the document axes for a
+    /// group: a negative factor means that axis is turned over (the readout's minus sign,
+    /// `specs/0056-mirror-and-negative-scale/` criterion 10). `None` outside a resize
+    /// drag past its dead zone.
+    #[must_use]
+    pub fn live_resize_factors(
+        &self,
+        pointer: Point,
+        shift: bool,
+        ctrl: bool,
+    ) -> Option<(f64, f64)> {
+        let resized = match &self.drag {
+            SelectDrag::Transforming(drag) if drag.origin.is_active_at(pointer) => {
+                drag.resized_box_at(pointer, shift, ctrl)
+            }
+            SelectDrag::GroupTransforming(drag) if drag.origin.is_active_at(pointer) => {
+                drag.resized_box_at(pointer, shift, ctrl)
+            }
+            _ => None,
+        }?;
+        Some((resized.sx, resized.sy))
     }
 
     /// Cancels whichever drag is in flight, writing nothing, and ends the
@@ -1267,11 +1326,13 @@ mod tests {
         );
         let document = Document::new(1);
         let id = rect(&document, 0.0);
+        // A release on the fixed edge sets the width to 0.01 mm (`0056` criterion 15):
+        // the factor 0.001 floors the stroke.
         resize_drag(
             &document,
             id,
             EditHandle::Resize(ResizeDirection::E),
-            Point::new(-80.0, 5.0),
+            Point::new(0.0, 5.0),
             on,
         );
         let w = document.primitive(id).unwrap().style.stroke.width.as_mm();
@@ -1671,10 +1732,10 @@ mod tests {
         assert!((far_corner.point.x - 20.0).abs() < 1e-6);
     }
 
-    /// Acceptance criterion 13: a resize drag past the opposite edge
-    /// clamps the dimension to zero rather than flipping negative.
+    /// Acceptance criterion 13, superseded by `0056` criterion 7: a resize drag past
+    /// the opposite edge turns the rectangle over, the fixed edge stays.
     #[test]
-    fn ac13_resize_clamps_at_zero() {
+    fn ac13_a_resize_past_the_opposite_edge_turns_the_object_over() {
         let document = Document::new(1);
         let id = rect(&document, 0.0);
         let objects = vec![document.object(id).expect("exists")];
@@ -1700,7 +1761,11 @@ mod tests {
         let Shape::Rect { bounds, .. } = document.primitive(id).expect("exists").shape else {
             panic!("expected rect");
         };
-        assert!(bounds.width.as_mm().abs() < 1e-9, "clamped to zero");
+        assert!((bounds.width.as_mm() - 100.0).abs() < 1e-9, "turned over");
+        assert!(
+            (bounds.origin.x + 100.0).abs() < 1e-9,
+            "fixed edge at x = 0"
+        );
     }
 
     /// Acceptance criterion 15: dragging the rotate handle rotates about
@@ -2019,7 +2084,7 @@ mod tests {
             &document,
             &objects,
             &mut selection,
-            Point::new(-80.0, 5.0),
+            Point::new(0.0, 5.0),
             Modifiers::new(false, false),
             &mut AnchorIdMinter::new(99),
         );

@@ -52,6 +52,7 @@ mod layer_rows;
 mod layer_text;
 mod linked_clone;
 mod marquee;
+mod mirror;
 mod modifiers;
 mod move_entry;
 mod node_marquee;
@@ -279,7 +280,8 @@ pub use transform_handle_layout::{
     transform_handles,
 };
 pub use transform_math::{
-    ResizedBox, opposite_direction, resize_anchor_local_position, resize_local_box,
+    ExtentSigns, RECOVERED_EXTENT_MM, ResizedBox, ZERO_EXTENT_MM, ZeroRecovery, opposite_direction,
+    resize_anchor_local_position, resize_local_box, resize_local_box_with_prior,
     rotate_delta_angle, rotate_delta_for, rotate_pivot, scaled_and_floored,
     stroke_or_radius_factor,
 };

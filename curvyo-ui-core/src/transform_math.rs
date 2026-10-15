@@ -42,34 +42,88 @@ const fn touches_y(direction: ResizeDirection) -> bool {
     !matches!(direction, ResizeDirection::E | ResizeDirection::W)
 }
 
+/// A resolved extent whose magnitude is under this (millimetres) is "exactly 0"
+/// (`specs/0056-mirror-and-negative-scale/` criterion 15): half the 0.001 mm the app
+/// rounds to. A constant of the zero rule, not a stored grid.
+pub const ZERO_EXTENT_MM: f64 = 0.0005;
+
+/// The extent an axis that would land on 0 is given instead (criterion 15), with the
+/// sign of the last step.
+pub const RECOVERED_EXTENT_MM: f64 = 0.01;
+
+/// The sign each axis's extent had in the last preview frame whose extent was not 0
+/// (`specs/0056-mirror-and-negative-scale/` criterion 15): what an extent that lands on 0
+/// takes. The default, positive on both axes, is the sign at the press and of a typed 0.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct ExtentSigns {
+    /// The last non-zero width was negative.
+    pub x_negative: bool,
+    /// The last non-zero height was negative.
+    pub y_negative: bool,
+}
+
+/// Which axes of a resize landed on 0 and were set to [`RECOVERED_EXTENT_MM`] instead
+/// (criterion 15): what the notice after the release or the Enter says.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct ZeroRecovery {
+    /// The width was set to 0.01 mm.
+    pub width: bool,
+    /// The height was set to 0.01 mm.
+    pub height: bool,
+}
+
+impl ZeroRecovery {
+    /// Whether any axis was set to 0.01 mm.
+    #[must_use]
+    pub const fn any(self) -> bool {
+        self.width || self.height
+    }
+}
+
 /// A resize's resulting local-frame box plus the per-axis scale factors
 /// relative to the starting box — the factors feed stroke-width/corner-
 /// radius scaling (acceptance criteria 8, 9) without this function
 /// knowing anything about either.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ResizedBox {
-    /// The new local-frame minimum corner.
+    /// The new local-frame minimum corner (never above `max`: the box is drawn
+    /// normalised even when the resize has turned the object over).
     pub min: Point,
     /// The new local-frame maximum corner.
     pub max: Point,
-    /// The new width divided by the starting width (1.0 if the
-    /// direction never touched X).
+    /// The signed new width divided by the starting width (1.0 if the
+    /// direction never touched X): negative when the dragged side has passed the
+    /// fixed point (`specs/0056-mirror-and-negative-scale/` Terms, "Signed factor").
     pub sx: f64,
-    /// The new height divided by the starting height (1.0 if the
+    /// The signed new height divided by the starting height (1.0 if the
     /// direction never touched Y).
     pub sy: f64,
+    /// The axes whose extent landed on 0 and were set to 0.01 mm.
+    pub recovered: ZeroRecovery,
 }
 
-/// Resizes a local-frame box (acceptance criteria 4-7, 13): `direction`'s
-/// handle moves by `local_delta` (already mapped into the box's own
-/// local frame); the opposite corner/edge stays fixed, or — under
-/// `shift` — the box's own center stays fixed and both edges on a
-/// touched axis move symmetrically (acceptance criterion 7); `ctrl` on a
-/// corner handle (acceptance criterion 5) forces both axes to the same
-/// factor, taken from whichever axis `local_delta` moved further along
-/// (`specification.md`: "matching the drag's dominant axis"). Every
-/// dimension clamps at zero rather than crossing into negative
-/// (acceptance criterion 13).
+impl ResizedBox {
+    /// The signs a later frame that lands on 0 takes after this one: each axis keeps
+    /// `prior` where this frame was set to 0.01 mm, and takes this frame's sign
+    /// otherwise.
+    #[must_use]
+    pub fn signs_after(&self, prior: ExtentSigns) -> ExtentSigns {
+        let next = |recovered: bool, factor: f64, prior: bool| {
+            if recovered || factor == 0.0 {
+                prior
+            } else {
+                factor < 0.0
+            }
+        };
+        ExtentSigns {
+            x_negative: next(self.recovered.width, self.sx, prior.x_negative),
+            y_negative: next(self.recovered.height, self.sy, prior.y_negative),
+        }
+    }
+}
+
+/// [`resize_local_box_with_prior`] for a gesture with no earlier frame (a first frame,
+/// a typed size): an extent that lands on 0 becomes +0.01 mm.
 #[must_use]
 pub fn resize_local_box(
     start_min: Point,
@@ -79,35 +133,100 @@ pub fn resize_local_box(
     shift: bool,
     ctrl: bool,
 ) -> ResizedBox {
+    resize_local_box_with_prior(
+        start_min,
+        start_max,
+        direction,
+        local_delta,
+        (shift, ctrl),
+        ExtentSigns::default(),
+    )
+}
+
+/// Resizes a local-frame box (`0005` acceptance criteria 4-7; `0056` criteria 6 to 9
+/// and 15): `direction`'s handle moves by `local_delta` (already mapped into the box's
+/// own local frame); the opposite corner/edge stays fixed, or — under `shift` — the
+/// box's own center stays fixed and both edges on a touched axis move symmetrically;
+/// `ctrl` on a corner handle forces both axes to the magnitude of whichever axis
+/// `local_delta` moved further along, and each axis keeps the sign its free factor has
+/// (a free factor of 0 counts as positive). A dimension passes through zero: the factor
+/// turns negative and the box is returned normalised. An extent that would land under
+/// [`ZERO_EXTENT_MM`] is set to [`RECOVERED_EXTENT_MM`] with the sign in `prior`
+/// (under Ctrl only the dominant axis; an axis whose start extent is already under
+/// [`ZERO_EXTENT_MM`] never).
+#[must_use]
+pub fn resize_local_box_with_prior(
+    start_min: Point,
+    start_max: Point,
+    direction: ResizeDirection,
+    local_delta: Vec2,
+    (shift, ctrl): (bool, bool),
+    prior: ExtentSigns,
+) -> ResizedBox {
     let start_width = start_max.x - start_min.x;
     let start_height = start_max.y - start_min.y;
     let center = Point::new(
         f64::midpoint(start_min.x, start_max.x),
         f64::midpoint(start_min.y, start_max.y),
     );
+    let mut recovered = ZeroRecovery::default();
 
-    let (mut new_width, mut x_touched) = (start_width, false);
-    let (mut new_height, mut y_touched) = (start_height, false);
-    if touches_x(direction) {
-        x_touched = true;
-        let dragged_sign = x_sign(direction);
-        new_width = resized_extent(start_width, shift, dragged_sign, local_delta.x);
-    }
-    if touches_y(direction) {
-        y_touched = true;
-        let dragged_sign = y_sign(direction);
-        new_height = resized_extent(start_height, shift, dragged_sign, local_delta.y);
-    }
+    let x_touched = touches_x(direction);
+    let y_touched = touches_y(direction);
+    let mut new_width = if x_touched {
+        resized_extent(start_width, shift, x_sign(direction), local_delta.x)
+    } else {
+        start_width
+    };
+    let mut new_height = if y_touched {
+        resized_extent(start_height, shift, y_sign(direction), local_delta.y)
+    } else {
+        start_height
+    };
 
     if ctrl && is_corner(direction) {
         let dominant_is_x = local_delta.x.abs() >= local_delta.y.abs();
-        let factor = if dominant_is_x {
-            safe_factor(new_width, start_width)
+        let sign_of = |extent: f64| if extent < 0.0 { -1.0 } else { 1.0 };
+        let magnitude = if dominant_is_x {
+            new_width = recover_zero(
+                new_width,
+                start_width,
+                prior.x_negative,
+                &mut recovered.width,
+            );
+            safe_factor(new_width, start_width).abs()
         } else {
-            safe_factor(new_height, start_height)
+            new_height = recover_zero(
+                new_height,
+                start_height,
+                prior.y_negative,
+                &mut recovered.height,
+            );
+            safe_factor(new_height, start_height).abs()
         };
-        new_width = (start_width * factor).max(0.0);
-        new_height = (start_height * factor).max(0.0);
+        let (x_sign_of, y_sign_of) = (sign_of(new_width), sign_of(new_height));
+        if dominant_is_x {
+            new_height = start_height * magnitude * y_sign_of;
+        } else {
+            new_width = start_width * magnitude * x_sign_of;
+        }
+    } else {
+        if x_touched {
+            new_width = recover_zero(
+                new_width,
+                start_width,
+                prior.x_negative,
+                &mut recovered.width,
+            );
+        }
+        if y_touched {
+            new_height = recover_zero(
+                new_height,
+                start_height,
+                prior.y_negative,
+                &mut recovered.height,
+            );
+        }
     }
 
     let (min, max) = rebuild_box(
@@ -123,8 +242,8 @@ pub fn resize_local_box(
         shift,
     );
     ResizedBox {
-        min,
-        max,
+        min: Point::new(min.x.min(max.x), min.y.min(max.y)),
+        max: Point::new(min.x.max(max.x), min.y.max(max.y)),
         sx: if x_touched {
             safe_factor(new_width, start_width)
         } else {
@@ -135,6 +254,22 @@ pub fn resize_local_box(
         } else {
             1.0
         },
+        recovered,
+    }
+}
+
+/// `extent`, or [`RECOVERED_EXTENT_MM`] with the sign of `prior_negative` when it lands
+/// on 0 (its magnitude under [`ZERO_EXTENT_MM`]) from a `start` extent that was not
+/// already that small (criterion 15); `flag` notes the recovery.
+fn recover_zero(extent: f64, start: f64, prior_negative: bool, flag: &mut bool) -> f64 {
+    if start.abs() < ZERO_EXTENT_MM || extent.abs() >= ZERO_EXTENT_MM {
+        return extent;
+    }
+    *flag = true;
+    if prior_negative {
+        -RECOVERED_EXTENT_MM
+    } else {
+        RECOVERED_EXTENT_MM
     }
 }
 
@@ -197,19 +332,17 @@ const fn y_sign(direction: ResizeDirection) -> f64 {
     }
 }
 
-/// One touched axis's new extent (acceptance criterion 13: clamped at
-/// zero, never negative): the dragged side's own signed delta component
-/// (`dragged_sign * delta_component`) is added to the starting extent
-/// (the fixed-opposite-side case, `!shift`) or to half of it, doubled
-/// back (the symmetric-about-center case, `shift` — both sides move the
-/// same clamped half-extent).
+/// One touched axis's new signed extent (`specs/0056-mirror-and-negative-scale/`
+/// criteria 6, 7, 9: negative once the dragged side has passed the fixed point): the
+/// dragged side's own signed delta component (`dragged_sign * delta_component`) is
+/// added to the starting extent (the fixed-opposite-side case, `!shift`) or to half of
+/// it, doubled back (the symmetric-about-center case, `shift`).
 fn resized_extent(start_extent: f64, shift: bool, dragged_sign: f64, delta_component: f64) -> f64 {
     if shift {
         let half = start_extent / 2.0;
-        let new_half = (half + dragged_sign * delta_component).max(0.0);
-        new_half * 2.0
+        (half + dragged_sign * delta_component) * 2.0
     } else {
-        (start_extent + dragged_sign * delta_component).max(0.0)
+        start_extent + dragged_sign * delta_component
     }
 }
 
@@ -298,16 +431,14 @@ fn anchor_edge(start_min: f64, start_max: f64, new_extent: f64, dragged_sign: f6
 }
 
 /// The stroke-width/corner-radius scale factor for a resize with
-/// per-axis factors `sx`/`sy` (acceptance criteria 8, 9): `√(sx·sy)` —
-/// Inkscape's own rule, which collapses to plain `sx` whenever `sx ==
-/// sy` (a proportional resize), so one formula covers both of the
-/// specification's two stated cases. Negative inputs (never expected
-/// from this module's own resize factors, which are always `>= 0`) are
-/// defended against by clamping to zero before the square root, rather
-/// than ever producing a `NaN`.
+/// per-axis factors `sx`/`sy` (acceptance criteria 8, 9): `√|sx·sy|` —
+/// Inkscape's own rule, which collapses to plain `|sx|` whenever `|sx| ==
+/// |sy|` (a proportional resize), so one formula covers both of the
+/// specification's two stated cases. A negative factor is a mirror, which
+/// changes no width (`specs/0056-mirror-and-negative-scale/` criterion 23).
 #[must_use]
 pub fn stroke_or_radius_factor(sx: f64, sy: f64) -> f64 {
-    (sx.max(0.0) * sy.max(0.0)).sqrt()
+    (sx * sy).abs().sqrt()
 }
 
 /// The handle opposite `grabbed` across the box center: corner to opposite
@@ -324,6 +455,43 @@ pub const fn opposite_direction(grabbed: ResizeDirection) -> ResizeDirection {
         ResizeDirection::Sw => ResizeDirection::Ne,
         ResizeDirection::W => ResizeDirection::E,
         ResizeDirection::Nw => ResizeDirection::Se,
+    }
+}
+
+/// `direction` reflected along local x (`x`: east and west swap) and/or local y (`y`:
+/// north and south swap): the handle at the position the grabbed one has reached after a
+/// resize through zero (`specs/0056-mirror-and-negative-scale/` criterion 11). Both is
+/// [`opposite_direction`].
+#[must_use]
+pub const fn mirrored_direction(direction: ResizeDirection, x: bool, y: bool) -> ResizeDirection {
+    use ResizeDirection::{E, N, Ne, Nw, S, Se, Sw, W};
+    let direction = if x {
+        match direction {
+            E => W,
+            W => E,
+            Ne => Nw,
+            Nw => Ne,
+            Se => Sw,
+            Sw => Se,
+            N => N,
+            S => S,
+        }
+    } else {
+        direction
+    };
+    if y {
+        match direction {
+            N => S,
+            S => N,
+            Ne => Se,
+            Se => Ne,
+            Nw => Sw,
+            Sw => Nw,
+            E => E,
+            W => W,
+        }
+    } else {
+        direction
     }
 }
 
@@ -590,23 +758,6 @@ mod tests {
             false,
         );
         assert_eq!(with_ctrl, without_ctrl);
-    }
-
-    /// Acceptance criterion 13: a drag past the opposite edge clamps to
-    /// zero width, never flips negative.
-    #[test]
-    fn resize_local_box_clamps_at_zero_never_flips() {
-        let resized = resize_local_box(
-            Point::new(0.0, 0.0),
-            Point::new(10.0, 10.0),
-            ResizeDirection::E,
-            Vec2::new(-100.0, 0.0),
-            false,
-            false,
-        );
-        assert_eq!(resized.max.x, 0.0, "clamped, not flipped");
-        assert_eq!(resized.min.x, 0.0, "anchor side untouched");
-        assert!((resized.sx - 0.0).abs() < 1e-9);
     }
 
     /// Shift + Ctrl combine: proportional, from the center.

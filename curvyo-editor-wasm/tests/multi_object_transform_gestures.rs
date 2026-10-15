@@ -246,14 +246,16 @@ fn a_cancelled_or_null_scale_writes_nothing() {
     assert_eq!(change_count(&session), commits, "back to the start");
 }
 
-/// Criterion 22: a factor below zero stops at zero.
+/// Criterion 22, superseded by `0056` criterion 6: a factor below zero turns the
+/// selection over about the fixed edge x = 20 (sx = -120 / 240).
 #[test]
-fn a_scale_below_zero_stops_at_zero() {
+fn a_scale_below_zero_turns_the_selection_over() {
     let mut session = session_of(&rects());
     select_rects(&mut session);
     drag(&mut session, pt(260.0, 80.0), pt(-100.0, 80.0));
     let a = bounds_of(&objects(&session)[0]);
-    assert!(near(a.width.as_mm(), 0.0), "{a:?}");
+    assert!(near(a.width.as_mm(), 50.0), "{a:?}");
+    assert!(near(a.origin.x, -30.0), "{a:?}");
     assert!(near(a.height.as_mm(), 60.0));
 }
 

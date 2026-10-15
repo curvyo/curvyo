@@ -128,7 +128,7 @@ fn ac26_switch_on_scales_by_the_geometric_mean_and_floors() {
     let mut s = rect_session();
     s.set_scale_stroke_width(true);
     click(&mut s, pt(20.0, 0.0));
-    drag(&mut s, pt(40.0, 10.0), pt(-80.0, 10.0)); // collapses
+    drag(&mut s, pt(40.0, 10.0), pt(0.0, 10.0)); // onto the W edge: 0.01 mm wide (`0056`)
     let w = stroke(&only_object(&s));
     assert!((w - 0.01).abs() < 1e-12, "floor, got {w}");
 }

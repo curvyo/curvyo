@@ -16,7 +16,7 @@ use crate::transform_drag::{
     ResizeOptions, ScaleModes, pivot_for, resize_by_local_delta, rotate_by,
 };
 use crate::transform_handle_layout::{EditHandle, is_corner};
-use crate::transform_math::{ANGLE_EQUAL_EPSILON_RAD, local_delta_for_size};
+use crate::transform_math::{ANGLE_EQUAL_EPSILON_RAD, ExtentSigns, local_delta_for_size};
 
 /// A typed size within this (millimetres) of the current one is "equal":
 /// nothing is written (criteria 19, 31). The prefill is the readout's
@@ -487,6 +487,7 @@ impl TransformEntry {
                         ctrl: self.linked,
                         modes: self.modes,
                         converted: self.converted.as_ref(),
+                        prior: ExtentSigns::default(),
                     },
                 )
             }

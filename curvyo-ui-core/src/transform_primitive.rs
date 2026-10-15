@@ -4,16 +4,17 @@
 //! Split out of [`crate::transform_drag`], which resolves the gestures.
 
 use curvyo_document_core::{
-    Angle, Corner, EllipseFrame, Length, ObjectSnapshot, Point, PrimitiveSnapshot, RectBounds,
-    Shape, Vec2, shape_center, translate_shape,
+    Angle, Corner, EllipseFrame, Length, ObjectSnapshot, PathSnapshot, Point, PrimitiveSnapshot,
+    RectBounds, Shape, shape_center, translate_shape,
 };
 
 use crate::ResizeDirection;
 use crate::group_transform::{is_stretch, scale_primitive};
+use crate::mirror::{Mirror, mirrored};
 use crate::oriented_box::OrientedBox;
-use crate::transform_drag::{CornerRadiusScaling, ResizeOptions};
+use crate::transform_drag::CornerRadiusScaling;
 use crate::transform_math::{
-    is_polygon_or_star, resize_anchor_local_position, resize_local_box, scaled_and_floored,
+    ResizedBox, is_polygon_or_star, resize_anchor_local_position, scaled_and_floored,
     stroke_or_radius_factor,
 };
 
@@ -22,30 +23,23 @@ use crate::transform_math::{
 /// radius scales with the factor only under [`CornerRadiusScaling::Proportional`],
 /// acceptance criterion 9 of slice 5, criterion 23 of `unified-object-editing`); a polygon or
 /// star that is not stretched is a uniform scale about the resize's anchor, outer radius
-/// times the factor (`0047` criterion 10; a stretch is [`polygon_star_stretch`]).
+/// times the factor (`0047` criterion 10; a stretch is [`polygon_star_stretch`]). A negative
+/// factor is the resize by the magnitudes, mirrored about the anchor along the box's own axes
+/// (`specs/0056-mirror-and-negative-scale/` criteria 12 and 18).
 pub(crate) fn resize_primitive(
     primitive: &PrimitiveSnapshot,
     start_box: &OrientedBox,
-    direction: ResizeDirection,
-    local_delta: Vec2,
-    modifiers: (bool, bool),
+    resized: &ResizedBox,
+    (direction, shift): (ResizeDirection, bool),
     radius_scaling: CornerRadiusScaling,
 ) -> (PrimitiveSnapshot, f64) {
-    let (shift, ctrl) = modifiers;
-    let box_resize = || {
-        resize_local_box(
-            start_box.min,
-            start_box.max,
-            direction,
-            local_delta,
-            shift,
-            ctrl,
-        )
-    };
-    let (shape, factor) = match primitive.shape {
+    let anchor_local = resize_anchor_local_position(start_box.min, start_box.max, direction, shift);
+    let anchor = start_box.to_document(anchor_local);
+    let mirror = Mirror::of_factors(anchor, start_box.angle, resized.sx, resized.sy);
+    let factor = stroke_or_radius_factor(resized.sx, resized.sy);
+    let (min, max) = magnitude_box(resized, anchor_local);
+    let shape = match primitive.shape {
         Shape::Rect { corner_radii, .. } => {
-            let resized = box_resize();
-            let factor = stroke_or_radius_factor(resized.sx, resized.sy);
             // `Keep` hands the stored radii back untouched, so no register is
             // rewritten and a concurrent radius edit is not beaten.
             // `Proportional` multiplies all four stored radii by the one factor.
@@ -64,86 +58,85 @@ pub(crate) fn resize_primitive(
                     })
                 }
             };
-            let shape = Shape::Rect {
+            Shape::Rect {
                 bounds: RectBounds {
-                    origin: resized.min,
-                    width: Length::from_mm(resized.max.x - resized.min.x),
-                    height: Length::from_mm(resized.max.y - resized.min.y),
+                    origin: min,
+                    width: Length::from_mm(max.x - min.x),
+                    height: Length::from_mm(max.y - min.y),
                 },
                 corner_radii: radii,
-            };
-            (shape, factor)
+            }
         }
-        Shape::Ellipse { .. } => {
-            let resized = box_resize();
-            let shape = Shape::Ellipse {
-                frame: EllipseFrame {
-                    center: Point::new(
-                        f64::midpoint(resized.min.x, resized.max.x),
-                        f64::midpoint(resized.min.y, resized.max.y),
-                    ),
-                    rx: Length::from_mm((resized.max.x - resized.min.x) / 2.0),
-                    ry: Length::from_mm((resized.max.y - resized.min.y) / 2.0),
-                },
-            };
-            (shape, stroke_or_radius_factor(resized.sx, resized.sy))
-        }
+        Shape::Ellipse { .. } => Shape::Ellipse {
+            frame: EllipseFrame {
+                center: Point::new(f64::midpoint(min.x, max.x), f64::midpoint(min.y, max.y)),
+                rx: Length::from_mm((max.x - min.x) / 2.0),
+                ry: Length::from_mm((max.y - min.y) / 2.0),
+            },
+        },
         Shape::Polygon { .. } | Shape::Star { .. } => {
-            let sx = box_resize().sx;
-            let anchor =
-                resize_anchor_local_position(start_box.min, start_box.max, direction, shift);
-            let scaled = scale_primitive(
-                primitive,
-                start_box.to_document(anchor),
-                (sx, sx),
-                radius_scaling,
-            );
-            return (scaled, sx);
+            let magnitude = resized.sx.abs();
+            let scaled = scale_primitive(primitive, anchor, (magnitude, magnitude), radius_scaling);
+            return (mirrored_primitive_of(&scaled, mirror), magnitude);
         }
     };
-    let anchor_local = resize_anchor_local_position(start_box.min, start_box.max, direction, shift);
     let pinned = pin_resize_anchor(shape, start_box.pivot, start_box.angle, anchor_local);
-    (
-        PrimitiveSnapshot {
-            shape: pinned,
-            ..primitive.clone()
-        },
-        factor,
-    )
+    let scaled = PrimitiveSnapshot {
+        shape: pinned,
+        ..primitive.clone()
+    };
+    (mirrored_primitive_of(&scaled, mirror), factor)
+}
+
+/// `primitive` reflected by `mirror` (a primitive stays a primitive).
+fn mirrored_primitive_of(primitive: &PrimitiveSnapshot, mirror: Mirror) -> PrimitiveSnapshot {
+    match mirrored(&ObjectSnapshot::Primitive(primitive.clone()), mirror) {
+        ObjectSnapshot::Primitive(mirrored) => mirrored,
+        // invariant: `mirrored` keeps the kind of its object.
+        ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_) => primitive.clone(),
+    }
+}
+
+/// The local box the resize by the magnitudes of `resized`'s factors gives: `resized`'s
+/// normalised box with each axis whose factor is negative reflected back across the
+/// anchor (the mirror is applied after, criterion 18).
+fn magnitude_box(resized: &ResizedBox, anchor: Point) -> (Point, Point) {
+    let axis = |min: f64, max: f64, anchor: f64, factor: f64| {
+        if factor < 0.0 {
+            (2.0 * anchor - max, 2.0 * anchor - min)
+        } else {
+            (min, max)
+        }
+    };
+    let (min_x, max_x) = axis(resized.min.x, resized.max.x, anchor.x, resized.sx);
+    let (min_y, max_y) = axis(resized.min.y, resized.max.y, anchor.y, resized.sy);
+    (Point::new(min_x, min_y), Point::new(max_x, max_y))
 }
 
 /// A polygon's or star's stretch along its box axes (`specs/0047-transform-polish/`
 /// criterion 12): any resize handle or a typed size, with the opposite corner or side
-/// (or the centre under Shift) fixed. Unequal factors are a stretch: the shape becomes
-/// its `converted` path, scaled along the box's axes. `None` for any other object and
-/// for equal factors, which [`resize_primitive`] scales uniformly and keeps the shape.
+/// (or the centre under Shift) fixed. Unequal magnitudes are a stretch: the shape becomes
+/// its `converted` path, scaled along the box's axes with the signed factors. `None` for
+/// any other object and for equal magnitudes, which [`resize_primitive`] scales uniformly
+/// and keeps the shape.
 pub(crate) fn polygon_star_stretch(
     start: &ObjectSnapshot,
     start_box: &OrientedBox,
-    direction: ResizeDirection,
-    local_delta: Vec2,
-    options: &ResizeOptions,
+    resized: &ResizedBox,
+    (direction, shift): (ResizeDirection, bool),
+    converted: Option<&PathSnapshot>,
 ) -> Option<(ObjectSnapshot, f64)> {
     if !is_polygon_or_star(start) {
         return None;
     }
-    let resized = resize_local_box(
-        start_box.min,
-        start_box.max,
-        direction,
-        local_delta,
-        options.shift,
-        options.ctrl,
-    );
     let (sx, sy) = (resized.sx, resized.sy);
     if !is_stretch(sx, sy) {
         return None;
     }
-    let Some(path) = options.converted else {
+    let Some(path) = converted else {
         return Some((start.clone(), 1.0));
     };
-    let pivot_local =
-        resize_anchor_local_position(start_box.min, start_box.max, direction, options.shift);
+    let pivot_local = resize_anchor_local_position(start_box.min, start_box.max, direction, shift);
     let scaled = path.scaled_along(start_box.to_document(pivot_local), sx, sy, start_box.angle);
     Some((
         ObjectSnapshot::Path(scaled),

@@ -178,6 +178,19 @@ fn gesture(
     (rot(handle, c, a), rot(to, c, a))
 }
 
+/// Which local axes gesture `f` on handle `h` turns over (`0056` criterion 6).
+fn flips_of(h: (&str, Point, Point, bool, bool), f: (f64, f64)) -> (bool, bool) {
+    let (_, _, _, hx, vy) = h;
+    (hx && f.0 < 0.0, vy && f.1 < 0.0)
+}
+
+/// Radii `[tl, tr, br, bl]` of a rectangle mirrored along its local x axis (left and
+/// right swap) and/or y axis (top and bottom swap), `0056` criterion 20.
+fn mirrored(r: [f64; 4], (x, y): (bool, bool)) -> [f64; 4] {
+    let r = if x { [r[1], r[0], r[3], r[2]] } else { r };
+    if y { [r[3], r[2], r[1], r[0]] } else { r }
+}
+
 // ---- loro helpers ----------------------------------------------------
 
 fn loro_of(s: &Session) -> loro::LoroDoc {
@@ -255,18 +268,28 @@ fn ac15_default_is_off_and_keep_never_writes_a_radius_register() {
                 drag(&mut s, press, release, shift, ctrl);
                 let (b1, r1, _) = rect_of(&s);
                 let ctx = format!("rot {rotated} handle {hi} gesture {gi}");
+                // `0056` criterion 20: a drag through the opposite edge mirrors the
+                // rectangle, and each radius stays at its physical corner unscaled.
+                let flips = flips_of(h, f);
                 assert!(
                     (b1.width.as_mm() - b0.width.as_mm()).abs() > 1e-6
-                        || (b1.height.as_mm() - b0.height.as_mm()).abs() > 1e-6,
+                        || (b1.height.as_mm() - b0.height.as_mm()).abs() > 1e-6
+                        || flips != (false, false),
                     "the drag must resize ({ctx})"
                 );
-                assert_eq!(arr(r1), STORED, "stored radii exactly as before ({ctx})");
-                let ops = ops_since(&s, &before);
                 assert_eq!(
-                    corner_writes(&ops),
-                    [0; 4],
-                    "no register written ({ctx}): {ops}"
+                    arr(r1),
+                    mirrored(STORED, flips),
+                    "stored radii as before, at their corners ({ctx})"
                 );
+                let ops = ops_since(&s, &before);
+                if flips == (false, false) {
+                    assert_eq!(
+                        corner_writes(&ops),
+                        [0; 4],
+                        "no register written ({ctx}): {ops}"
+                    );
+                }
                 assert!(!ops.contains("\"corner_radius\""), "{ctx}");
             }
         }
@@ -287,7 +310,7 @@ fn ac12_proportional_multiplies_all_four_stored_radii_by_the_one_factor() {
                 let sx = b1.width.as_mm() / b0.width.as_mm();
                 let sy = b1.height.as_mm() / b0.height.as_mm();
                 let k = (sx * sy).sqrt();
-                let want = STORED.map(|r| r * k);
+                let want = mirrored(STORED, flips_of(h, f)).map(|r| r * k);
                 let ctx = format!("rot {rotated} handle {hi} gesture {gi} sx {sx} sy {sy}");
                 for i in 0..4 {
                     assert!(
@@ -298,7 +321,16 @@ fn ac12_proportional_multiplies_all_four_stored_radii_by_the_one_factor() {
                 }
                 // Ratios between corners stay.
                 if k > 1e-9 {
-                    assert!(close(arr(r1)[1] / arr(r1)[0], 2.0), "{ctx}");
+                    // STORED is [2, 4, 6, 8] (tl, tr, br, bl): tr / tl is 2, 0.5 after a
+                    // mirror along x, 0.75 after one along y, 8/6 after both.
+                    let want_ratio = match flips_of(h, f) {
+                        (false, false) => 2.0,
+                        (true, false) => 0.5,
+                        (false, true) => 0.75,
+                        (true, true) => 8.0 / 6.0,
+                    };
+                    let ratio = arr(r1)[1] / arr(r1)[0];
+                    assert!(close(ratio, want_ratio), "{ctx}: ratio {ratio}");
                 } else {
                     assert_eq!(
                         arr(r1),

@@ -11,25 +11,28 @@ use curvyo_document_core::{
     Point, PrimitiveSnapshot, RectBounds, Shape, StarFrame,
 };
 
+use crate::ResizeDirection;
 use crate::conversion::is_circle;
+use crate::mirror::{Mirror, mirrored};
 use crate::oriented_box::OrientedBox;
 use crate::skew_math::{skew_angle, skew_factor, skew_frame};
 use crate::transform_commit::is_sane;
 use crate::transform_drag::{CornerRadiusScaling, ScaleModes, StrokeScaling, scale_stroke};
 use crate::transform_handle_layout::EditHandle;
 use crate::transform_math::{
-    resize_anchor_local_position, resize_local_box, rotate_delta_angle, rotate_pivot,
-    scaled_and_floored, stroke_or_radius_factor,
+    ExtentSigns, ResizedBox, resize_anchor_local_position, resize_local_box_with_prior,
+    rotate_delta_angle, rotate_pivot, scaled_and_floored, stroke_or_radius_factor,
 };
 
-/// Two scale factors whose difference is below this fraction of the larger are one
-/// factor (`specs/0019-multi-object-transform/` Terms, "Stretch").
+/// Two scale magnitudes whose difference is below this fraction of the larger are one
+/// factor (`specs/0056-mirror-and-negative-scale/` Terms, "Stretch").
 const UNIFORM_EPSILON: f64 = 1e-9;
 
-/// Whether a scale by `(sx, sy)` is a stretch: the factors differ. A scale with
-/// equal factors, or one that is the identity, is not, and converts nothing.
+/// Whether a scale by `(sx, sy)` is a stretch: the magnitudes differ. A scale with
+/// equal magnitudes (a uniform scale, a mirror, a half turn, the identity) is not, and
+/// converts nothing (`specs/0056-mirror-and-negative-scale/` criterion 18).
 pub(crate) fn is_stretch(sx: f64, sy: f64) -> bool {
-    (sx - sy).abs() > UNIFORM_EPSILON * sx.abs().max(sy.abs())
+    (sx.abs() - sy.abs()).abs() > UNIFORM_EPSILON * sx.abs().max(sy.abs())
 }
 
 /// What a group gesture does to every selected object, in the document axes.
@@ -92,7 +95,25 @@ pub(crate) fn map_affine(
     })
 }
 
+/// `object` scaled by `(sx, sy)` about `pivot` in the document axes: by the magnitudes
+/// with the rules of `0019` criterion 20 and `0047`, then mirrored once per negative
+/// factor about the same point (`specs/0056-mirror-and-negative-scale/` criterion 18).
 fn scale_object(
+    object: &ObjectSnapshot,
+    pivot: Point,
+    (sx, sy): (f64, f64),
+    modes: ScaleModes,
+    converted: Option<&PathSnapshot>,
+) -> ObjectSnapshot {
+    let scaled = scale_by_magnitudes(object, pivot, (sx.abs(), sy.abs()), modes, converted);
+    mirrored(
+        &scaled,
+        Mirror::of_factors(pivot, Angle::from_radians(0.0), sx, sy),
+    )
+}
+
+/// [`scale_object`] for factors that are not negative.
+fn scale_by_magnitudes(
     object: &ObjectSnapshot,
     pivot: Point,
     (sx, sy): (f64, f64),
@@ -236,23 +257,51 @@ fn scaled_star_frame(frame: StarFrame, centre: Point, factor: f64) -> StarFrame 
     }
 }
 
+/// The resized group box of a resize of `direction` with the pointer going from `down_at`
+/// to `current` and the `(shift, ctrl)` modifiers; `prior` holds the signs of the drag's
+/// last frame whose extent was not 0 (`specs/0056-mirror-and-negative-scale/` criterion
+/// 15). `None` for a non-finite pointer.
+pub(crate) fn group_resized_box(
+    start_box: &OrientedBox,
+    direction: ResizeDirection,
+    (down_at, current): (Point, Point),
+    modifiers: (bool, bool),
+    prior: ExtentSigns,
+) -> Option<ResizedBox> {
+    let delta = down_at.vector_to(current);
+    // A non-finite pointer is refused before any arithmetic.
+    if !(delta.x.is_finite() && delta.y.is_finite()) {
+        return None;
+    }
+    Some(resize_local_box_with_prior(
+        start_box.min,
+        start_box.max,
+        direction,
+        delta,
+        modifiers,
+        prior,
+    ))
+}
+
 /// The map of a group gesture on `handle` of `start_box`, with the pointer going
-/// from `down_at` to `current` (a pair) and the `(shift, ctrl)` modifiers.
+/// from `down_at` to `current` (a pair), the `(shift, ctrl)` modifiers and, for a
+/// resize, the `prior` signs of [`group_resized_box`].
 pub(crate) fn group_map(
     start_box: &OrientedBox,
     handle: EditHandle,
     (down_at, current): (Point, Point),
     (shift, ctrl): (bool, bool),
+    prior: ExtentSigns,
 ) -> Option<GroupMap> {
     match handle {
         EditHandle::Resize(direction) => {
-            let delta = down_at.vector_to(current);
-            // `f64::max` and `clamp` swallow a NaN, so a non-finite pointer is refused first.
-            if !(delta.x.is_finite() && delta.y.is_finite()) {
-                return None;
-            }
-            let resized =
-                resize_local_box(start_box.min, start_box.max, direction, delta, shift, ctrl);
+            let resized = group_resized_box(
+                start_box,
+                direction,
+                (down_at, current),
+                (shift, ctrl),
+                prior,
+            )?;
             let anchor =
                 resize_anchor_local_position(start_box.min, start_box.max, direction, shift);
             Some(GroupMap::Scale {
@@ -346,7 +395,7 @@ pub(crate) fn commit_group(
     document: &Document,
     results: &[ObjectSnapshot],
     stroke: StrokeScaling,
-    handle: EditHandle,
+    label: &'static str,
     map: Option<&GroupMap>,
 ) -> bool {
     let with_width = stroke == StrokeScaling::Proportional;
@@ -365,7 +414,7 @@ pub(crate) fn commit_group(
         );
     }
     let results = &results;
-    document.batch(group_label(handle), |document| {
+    document.batch(label, |document| {
         let outcome = document.transform_objects(results, with_width);
         if with_width && outcome == Err(ObjectEditError::InvalidStrokeWidth) {
             // Anything else means an object is gone: nothing is left to write.
@@ -382,7 +431,7 @@ const TRANSFORM_OBJECTS_COMMIT_LABEL: &str = "transform_objects";
 
 /// The commit label of a group gesture on `handle`: one step for all objects, named after the
 /// gesture (`specs/0020-undo-redo` criteria 10 and 58).
-const fn group_label(handle: EditHandle) -> &'static str {
+pub(crate) const fn group_label(handle: EditHandle) -> &'static str {
     match handle {
         EditHandle::Resize(_) => TRANSFORM_RESIZE_COMMIT_LABEL,
         EditHandle::Rotate(_) => TRANSFORM_ROTATE_COMMIT_LABEL,

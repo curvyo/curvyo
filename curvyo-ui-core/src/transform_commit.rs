@@ -10,7 +10,7 @@ use curvyo_document_core::{
 };
 
 use crate::anchor_id_minter::AnchorIdMinter;
-use crate::group_transform::commit_group;
+use crate::group_transform::{commit_group, group_label};
 use crate::param_edit::commit_param;
 use crate::transform_drag::{ScaleModes, StrokeScaling};
 use crate::transform_handle_layout::EditHandle;
@@ -160,7 +160,7 @@ pub(crate) fn commit_resize(
                 document,
                 std::slice::from_ref(result),
                 stroke_scaling,
-                EditHandle::Move,
+                group_label(EditHandle::Move),
                 None,
             );
         }
@@ -171,7 +171,7 @@ pub(crate) fn commit_resize(
                 document,
                 std::slice::from_ref(result),
                 stroke_scaling,
-                EditHandle::Move,
+                group_label(EditHandle::Move),
                 None,
             );
         }

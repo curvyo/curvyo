@@ -1470,42 +1470,42 @@ fn ac22_a_huge_drag_factor_writes_and_converts_nothing() {
     assert!(bytes_of(&s) == before);
 }
 
-/// Criterion 22 / D5: a factor below 0 clamps to 0 (no flip, no negative size). A
-/// converting object becomes a path collapsed onto the line through the fixed
-/// side; an aligned rectangle gets width 0.
+/// Criterion 22 / D5, superseded by `0056` criteria 6 and 18: a factor below 0 turns
+/// the selection over about the fixed side. A converting object becomes a path on the
+/// other side of it, its y unchanged; an aligned rectangle stays a rectangle with the
+/// magnitude of the factor.
 #[test]
-fn ac22_a_negative_factor_clamps_to_zero_and_collapses_onto_the_fixed_side() {
+fn ac22_a_negative_factor_turns_over_onto_the_other_side_of_the_fixed_side() {
     let (d, st, rc) = spec_example();
     let mut s = open(&d);
     select_everything(&mut s);
     let g = GBox::of(&s);
-    // Drag the right edge to the left of the left side.
+    // Drag the right edge 30 mm to the left of the left side: sx = -30 / width.
     edge_drag(&mut s, &g, 1.0, 0.0, g.min.x - 30.0, false, false);
+    let k = 30.0 / (g.max.x - g.min.x);
     let o = objects(&s);
     assert!(
         is_path(&o[0]),
-        "a stretch to factor 0 is a stretch like any other"
+        "a stretch through zero is a stretch like any other"
     );
     let ObjectSnapshot::Path(p) = &o[0] else {
         unreachable!()
     };
-    for a in &p.anchors {
-        assert!(
-            near(a.point.x, 50.0, 1e-6),
-            "x collapsed onto the fixed side, got {}",
-            a.point.x
-        );
-        assert!(a.point.x.is_finite() && a.point.y.is_finite());
-        assert!(near(a.handle_in.x, 0.0, 1e-9) && near(a.handle_out.x, 0.0, 1e-9));
-    }
-    let ys: Vec<f64> = p.anchors.iter().map(|a| a.point.y).collect();
+    // Exact positions: x' = min.x - k (x - min.x), the handles' x times -k, y unchanged.
     let before = d.object(st).unwrap();
     let ObjectSnapshot::Primitive(pb) = &before else {
         panic!()
     };
     let outl = outline_of_rotated(&pb.shape, pb.rotation);
-    for (y, a) in ys.iter().zip(&outl) {
-        assert!(near(*y, a.point.y, 1e-9), "y unchanged");
+    assert_eq!(p.anchors.len(), outl.len());
+    for (a, b) in p.anchors.iter().zip(&outl) {
+        let x = g.min.x - k * (b.point.x - g.min.x);
+        assert!(near(a.point.x, x, 1e-6), "x {} want {x}", a.point.x);
+        assert!(near(a.point.y, b.point.y, 1e-9), "y unchanged");
+        assert!(near(a.handle_in.x, -k * b.handle_in.x, 1e-9));
+        assert!(near(a.handle_out.x, -k * b.handle_out.x, 1e-9));
+        assert!(near(a.handle_in.y, b.handle_in.y, 1e-9));
+        assert!(near(a.handle_out.y, b.handle_out.y, 1e-9));
     }
     let ObjectSnapshot::Primitive(pr) = &o[1] else {
         panic!("rect stays a rect")
@@ -1513,27 +1513,39 @@ fn ac22_a_negative_factor_clamps_to_zero_and_collapses_onto_the_fixed_side() {
     let Shape::Rect { bounds, .. } = pr.shape else {
         panic!()
     };
+    let ObjectSnapshot::Primitive(rect_before) = d.object(rc).unwrap() else {
+        panic!()
+    };
+    let Shape::Rect { bounds: b0, .. } = rect_before.shape else {
+        panic!()
+    };
     assert!(
-        bounds.width.as_mm() >= 0.0 && near(bounds.width.as_mm(), 0.0, 1e-9),
+        near(bounds.width.as_mm(), b0.width.as_mm() * k, 1e-9),
         "width {}",
         bounds.width.as_mm()
     );
-    let _ = rc;
-    // A top edge dragged below the bottom edge: the same for y.
-    let (d, ..) = spec_example();
+    let right = g.min.x - k * (b0.origin.x - g.min.x);
+    assert!(near(bounds.origin.x + bounds.width.as_mm(), right, 1e-9));
+    assert!(near(bounds.origin.y, b0.origin.y, 1e-9));
+    // A top edge dragged below the bottom edge: the same for y, exactly.
+    let (d, st, _) = spec_example();
     let mut s = open(&d);
     select_everything(&mut s);
     let g = GBox::of(&s);
     edge_drag(&mut s, &g, 0.0, -1.0, g.max.y + 25.0, false, false);
+    let ky = 25.0 / (g.max.y - g.min.y);
     let ObjectSnapshot::Path(p) = &objects(&s)[0] else {
         panic!("star converts")
     };
-    for a in &p.anchors {
-        assert!(
-            near(a.point.y, 60.0, 1e-6),
-            "y collapsed onto the bottom side, got {}",
-            a.point.y
-        );
+    let ObjectSnapshot::Primitive(pb) = d.object(st).unwrap() else {
+        panic!()
+    };
+    let outl = outline_of_rotated(&pb.shape, pb.rotation);
+    for (a, b) in p.anchors.iter().zip(&outl) {
+        let y = g.max.y + ky * (g.max.y - b.point.y);
+        assert!(near(a.point.y, y, 1e-6), "y {} want {y}", a.point.y);
+        assert!(near(a.point.x, b.point.x, 1e-9), "x unchanged");
+        assert!(near(a.handle_out.y, -ky * b.handle_out.y, 1e-9));
     }
 }
 
@@ -2471,11 +2483,11 @@ fn ac23_the_readout_of_an_edge_stretch_is_the_box_size_at_the_pointer() {
     s.pointer_up(pt(140.0, from.y), false, false);
 }
 
-/// Criterion 22 at factor 0 for a circle in the selection: it becomes an ellipse
-/// with a zero radius in the stretched axis (not a path, not invalid, no notice); the
-/// document stays finite and reopens.
+/// Criterion 22 for a circle in the selection, superseded by `0056` criteria 18 and 21:
+/// a stretch through zero makes it an ellipse along the document axes with the magnitude
+/// of the factor (not a path, not invalid); the document stays finite and reopens.
 #[test]
-fn ac22_a_circle_at_factor_zero_stays_an_ellipse() {
+fn ac22_a_circle_turned_over_by_a_stretch_becomes_an_ellipse() {
     let d = Document::new(1);
     let _ = curved_path(&d, 1, 60.0, 60.0);
     let c = ellipse(&d, 110.0, 56.0, 8.0, 8.0);
@@ -2484,6 +2496,7 @@ fn ac22_a_circle_at_factor_zero_stays_an_ellipse() {
     select_everything(&mut s);
     let g = GBox::of(&s);
     edge_drag(&mut s, &g, 1.0, 0.0, g.min.x - 40.0, false, false);
+    let k = 40.0 / (g.max.x - g.min.x);
     let ObjectSnapshot::Primitive(p) = &objects(&s)[1] else {
         panic!("an ellipse")
     };
@@ -2491,11 +2504,12 @@ fn ac22_a_circle_at_factor_zero_stays_an_ellipse() {
         panic!()
     };
     assert!(
-        frame.rx.as_mm() >= 0.0 && frame.rx.as_mm() < 1e-9 && near(frame.ry.as_mm(), 8.0, 1e-9),
+        near(frame.rx.as_mm(), 8.0 * k, 1e-9) && near(frame.ry.as_mm(), 8.0, 1e-9),
         "rx {} ry {}",
         frame.rx.as_mm(),
         frame.ry.as_mm()
     );
+    assert!(p.rotation.as_radians().abs() < 1e-12);
     assert!(unpack(4, &s.pack("0.1.0").unwrap()).is_ok());
 }
 

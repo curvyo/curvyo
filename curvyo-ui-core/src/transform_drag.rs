@@ -21,8 +21,9 @@ use crate::skew_math::{skew_angle, skew_factor, skew_frame};
 use crate::transform_commit::{commit_gesture, sane_or};
 use crate::transform_handle_layout::{EditHandle, Side};
 use crate::transform_math::{
-    resize_anchor_local_position, resize_local_box, rotate_delta_for, rotate_pivot,
-    scaled_and_floored, stroke_or_radius_factor,
+    ExtentSigns, ResizedBox, ZeroRecovery, resize_anchor_local_position,
+    resize_local_box_with_prior, rotate_delta_for, rotate_pivot, scaled_and_floored,
+    stroke_or_radius_factor,
 };
 use crate::transform_primitive::{polygon_star_stretch, resize_primitive};
 
@@ -114,6 +115,30 @@ pub(crate) struct ResizeOptions<'a> {
     /// The path a polygon or star becomes if the resize is a stretch
     /// (`specs/0047-transform-polish/` criterion 12).
     pub(crate) converted: Option<&'a PathSnapshot>,
+    /// The signs of the drag's last frame whose extent was not 0, which a frame that
+    /// lands on 0 takes (`specs/0056-mirror-and-negative-scale/` criterion 15); positive
+    /// for a typed size.
+    pub(crate) prior: ExtentSigns,
+}
+
+impl ResizeOptions<'_> {
+    /// The resized box of `direction`'s handle moved by `local_delta` with these modifiers
+    /// and prior signs.
+    pub(crate) fn resized_box(
+        &self,
+        start_box: &OrientedBox,
+        direction: ResizeDirection,
+        local_delta: Vec2,
+    ) -> ResizedBox {
+        resize_local_box_with_prior(
+            start_box.min,
+            start_box.max,
+            direction,
+            local_delta,
+            (self.shift, self.ctrl),
+            self.prior,
+        )
+    }
 }
 
 /// The press point of a Select-tool drag, its dead zone and the handle
@@ -195,6 +220,10 @@ pub(crate) struct TransformDrag {
     /// becomes (`0047` criteria 2 and 12), built at the press so that the preview and
     /// the commit are the same snapshot.
     pub(crate) converted: Option<Box<PathSnapshot>>,
+    /// The signs of the last frame of a resize whose extent was not 0
+    /// (`specs/0056-mirror-and-negative-scale/` criterion 15), noted by
+    /// [`TransformDrag::note_frame`]; positive at the press.
+    pub(crate) signs: ExtentSigns,
 }
 
 /// What the live readout of a corner radius drag needs beyond the resolved
@@ -264,12 +293,7 @@ impl TransformDrag {
                     start_box,
                     direction,
                     local_delta,
-                    ResizeOptions {
-                        shift,
-                        ctrl,
-                        modes: self.modes,
-                        converted: self.converted.as_deref(),
-                    },
+                    self.resize_options(shift, ctrl),
                 )
             }
             EditHandle::Rotate(direction) => {
@@ -297,6 +321,52 @@ impl TransformDrag {
             }
             EditHandle::Move => start.clone(),
         }
+    }
+
+    fn resize_options(&self, shift: bool, ctrl: bool) -> ResizeOptions<'_> {
+        ResizeOptions {
+            shift,
+            ctrl,
+            modes: self.modes,
+            converted: self.converted.as_deref(),
+            prior: self.signs,
+        }
+    }
+
+    /// The resized box of a resize drag with the pointer at `current`: its signed factors
+    /// and the axes set to 0.01 mm. `None` for another handle or a non-finite pointer.
+    pub(crate) fn resized_box_at(
+        &self,
+        current: Point,
+        shift: bool,
+        ctrl: bool,
+    ) -> Option<ResizedBox> {
+        let EditHandle::Resize(direction) = self.handle else {
+            return None;
+        };
+        let local_delta = local_delta_of(&self.start_box, self.origin.down_at, current);
+        (local_delta.x.is_finite() && local_delta.y.is_finite()).then(|| {
+            self.resize_options(shift, ctrl)
+                .resized_box(&self.start_box, direction, local_delta)
+        })
+    }
+
+    /// Notes a preview frame at `current`: a resize remembers the sign each axis had where
+    /// its extent was not 0 (criterion 15).
+    pub(crate) fn note_frame(&mut self, current: Point, shift: bool, ctrl: bool) {
+        if !self.origin.is_active_at(current) {
+            return;
+        }
+        if let Some(resized) = self.resized_box_at(current, shift, ctrl) {
+            self.signs = resized.signs_after(self.signs);
+        }
+    }
+
+    /// The axes a release at `current` sets to 0.01 mm.
+    pub(crate) fn recovery_at(&self, current: Point, shift: bool, ctrl: bool) -> ZeroRecovery {
+        self.resized_box_at(current, shift, ctrl)
+            .map(|resized| resized.recovered)
+            .unwrap_or_default()
     }
 
     /// The skew angle of the drag at `current` (the readout's value), for a
@@ -364,12 +434,31 @@ pub(crate) fn resize_by_local_delta(
     local_delta: Vec2,
     options: ResizeOptions,
 ) -> ObjectSnapshot {
-    let ResizeOptions {
-        shift, ctrl, modes, ..
-    } = options;
-    let (mut resized, factor) = if let Some(stretched) =
-        polygon_star_stretch(start, start_box, direction, local_delta, &options)
-    {
+    let resized = options.resized_box(start_box, direction, local_delta);
+    resize_by_box(start, start_box, direction, &resized, options)
+}
+
+/// [`resize_by_local_delta`] for a resize already resolved into `resized` (signed factors,
+/// `specs/0056-mirror-and-negative-scale/` criteria 6 to 12): a path and a clone take the
+/// signed map about the anchor along the box's axes, a primitive is resized by the
+/// magnitudes and mirrored ([`resize_primitive`]).
+fn resize_by_box(
+    start: &ObjectSnapshot,
+    start_box: &OrientedBox,
+    direction: ResizeDirection,
+    resized: &ResizedBox,
+    options: ResizeOptions,
+) -> ObjectSnapshot {
+    let ResizeOptions { shift, modes, .. } = options;
+    let anchor_local = resize_anchor_local_position(start_box.min, start_box.max, direction, shift);
+    let pivot = start_box.to_document(anchor_local);
+    let (mut resized, factor) = if let Some(stretched) = polygon_star_stretch(
+        start,
+        start_box,
+        resized,
+        (direction, shift),
+        options.converted,
+    ) {
         stretched
     } else {
         match start {
@@ -377,43 +466,17 @@ pub(crate) fn resize_by_local_delta(
                 let (resized, factor) = resize_primitive(
                     primitive,
                     start_box,
-                    direction,
-                    local_delta,
-                    (shift, ctrl),
+                    resized,
+                    (direction, shift),
                     modes.radius,
                 );
                 (ObjectSnapshot::Primitive(resized), factor)
             }
-            ObjectSnapshot::Path(path) => {
-                let resized = resize_local_box(
-                    start_box.min,
-                    start_box.max,
-                    direction,
-                    local_delta,
-                    shift,
-                    ctrl,
-                );
-                let anchor_local =
-                    resize_anchor_local_position(start_box.min, start_box.max, direction, shift);
-                let scaled =
-                    path.scaled(start_box.to_document(anchor_local), resized.sx, resized.sy);
-                (
-                    ObjectSnapshot::Path(scaled),
-                    stroke_or_radius_factor(resized.sx, resized.sy),
-                )
-            }
+            ObjectSnapshot::Path(path) => (
+                ObjectSnapshot::Path(path.scaled(pivot, resized.sx, resized.sy)),
+                stroke_or_radius_factor(resized.sx, resized.sy),
+            ),
             ObjectSnapshot::Clone(clone) => {
-                let resized = resize_local_box(
-                    start_box.min,
-                    start_box.max,
-                    direction,
-                    local_delta,
-                    shift,
-                    ctrl,
-                );
-                let anchor_local =
-                    resize_anchor_local_position(start_box.min, start_box.max, direction, shift);
-                let pivot = start_box.to_document(anchor_local);
                 let g = crate::clone_gesture::affine_of(clone.id(), &|path: &PathSnapshot| {
                     path.scaled(pivot, resized.sx, resized.sy)
                 });

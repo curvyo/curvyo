@@ -11,7 +11,7 @@ use curvyo_document_core::{Angle, Document, NodeId, ObjectSnapshot, PathSnapshot
 use crate::ResizeDirection;
 use crate::conversion::converted_for_handle;
 use crate::group_box::GroupSelection;
-use crate::group_transform::{GroupMap, commit_group, group_pivot, map_all_checked};
+use crate::group_transform::{GroupMap, commit_group, group_label, group_pivot, map_all_checked};
 use crate::oriented_box::OrientedBox;
 use crate::skew_math::{MIN_SKEW_LEVER_MM, skew_factor, skew_frame};
 use crate::transform_commit::{MAX_COORDINATE_MM, same_within_tolerance};
@@ -454,7 +454,7 @@ impl GroupEntry {
                     document,
                     &results,
                     self.modes.stroke,
-                    self.handle,
+                    group_label(self.handle),
                     map.as_ref(),
                 ) {
                     EntryOutcome::Committed

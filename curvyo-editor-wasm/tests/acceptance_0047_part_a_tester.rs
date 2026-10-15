@@ -1581,26 +1581,27 @@ fn ac08_clamp_and_limit() {
         let _ = polygon(&d, 125.0, 105.0, 5.0, -FRAC_PI_2, 4);
         d
     };
-    // Past the opposite edge: clamps at 0.
+    // Past the opposite edge (`0056` criterion 6 supersedes the clamp): the selection is
+    // turned over onto the left of the fixed edge, 50 mm wide; the stretch converts.
     let mut s = open(&make());
     select_everything(&mut s);
     let g = GBox::of(&s);
     let from = g.mid(1.0, 0.0);
     drag(&mut s, from, pt(g.min.x - 50.0, from.y));
     let after = objects(&s);
+    let mut leftmost = f64::INFINITY;
     for o in &after {
-        assert!(
-            is_path(o),
-            "the polygon converted even at the clamped factor"
-        );
+        assert!(is_path(o), "the polygon converted by the stretch");
         for a in anchors_of(o) {
             assert!(
-                near(a.point.x, g.min.x, 1e-6),
-                "clamped at 0: x = {}",
+                a.point.x <= g.min.x + 1e-6,
+                "turned over: x = {}",
                 a.point.x
             );
+            leftmost = leftmost.min(a.point.x);
         }
     }
+    assert!(near(leftmost, g.min.x - 50.0, 1e-6), "{leftmost}");
     // Beyond 1e7 mm by the typed size: no change at all.
     let mut s = open(&make());
     select_everything(&mut s);
