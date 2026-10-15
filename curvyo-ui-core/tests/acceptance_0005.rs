@@ -466,7 +466,10 @@ proptest! {
         for v in [r.min.x, r.min.y, r.max.x, r.max.y, r.sx, r.sy] {
             prop_assert!(v.is_finite(), "non-finite {v}");
         }
-        prop_assert!(r.sx >= 0.0 && r.sy >= 0.0);
+        // `0056` criterion 6 supersedes the clamp: the box is drawn normalised and
+        // its extent is the magnitude of the signed factor.
+        if w > 1e-6 { prop_assert!((r.max.x - r.min.x - (r.sx * w).abs()).abs() < 1e-6); }
+        if h > 1e-6 { prop_assert!((r.max.y - r.min.y - (r.sy * h).abs()).abs() < 1e-6); }
     }
 
     #[test]
@@ -479,14 +482,14 @@ proptest! {
         let (min, max) = (pt(x0, y0), pt(x0 + w, y0 + h));
         let r = resize_local_box(min, max, d, Vec2::new(dx, dy), false, false);
         let before = opposite_point(min, max, d);
-        let after = opposite_point(r.min, r.max, d);
-        // Corner: both coordinates pinned; edge: only the touched axis is pinned.
-        let corner = matches!(d, ResizeDirection::Ne | ResizeDirection::Se | ResizeDirection::Sw | ResizeDirection::Nw);
+        // Corner: both coordinates pinned; edge: only the touched axis is pinned. After
+        // a drag through the fixed side (`0056` criterion 6) the pinned edge is the
+        // other side of the normalised box.
         let touches_x = !matches!(d, ResizeDirection::N | ResizeDirection::S);
         let touches_y = !matches!(d, ResizeDirection::E | ResizeDirection::W);
-        if touches_x { prop_assert!((before.x - after.x).abs() < 1e-9, "x pinned {before:?} {after:?}"); }
-        if touches_y { prop_assert!((before.y - after.y).abs() < 1e-9, "y pinned {before:?} {after:?}"); }
-        let _ = corner;
+        let pinned = |fixed: f64, low: f64, high: f64| (fixed - low).abs() < 1e-9 || (fixed - high).abs() < 1e-9;
+        if touches_x { prop_assert!(pinned(before.x, r.min.x, r.max.x), "x pinned {before:?} {r:?}"); }
+        if touches_y { prop_assert!(pinned(before.y, r.min.y, r.max.y), "y pinned {before:?} {r:?}"); }
     }
 
     #[test]
@@ -524,7 +527,8 @@ proptest! {
     ) {
         for d in CORNERS_FOUR {
             let r = resize_local_box(pt(0.0, 0.0), pt(w, h), d, Vec2::new(dx, dy), shift, true);
-            prop_assert!((r.sx - r.sy).abs() < 1e-9, "{d:?}: sx {} sy {}", r.sx, r.sy);
+            // `0056` criterion 8: the magnitudes are equal, each axis keeps its sign.
+            prop_assert!((r.sx.abs() - r.sy.abs()).abs() < 1e-9, "{d:?}: sx {} sy {}", r.sx, r.sy);
         }
         for d in [ResizeDirection::N, ResizeDirection::E, ResizeDirection::S, ResizeDirection::W] {
             let with = resize_local_box(pt(0.0, 0.0), pt(w, h), d, Vec2::new(dx, dy), shift, true);
@@ -561,8 +565,9 @@ proptest! {
 }
 
 #[test]
-fn flip_through_clamps_to_zero_and_the_far_edge_does_not_follow() {
-    // 40 wide, drag the E handle 100 to the left: width 0, W edge stays at x = 0.
+fn a_drag_through_the_fixed_edge_turns_over_and_the_far_edge_stays() {
+    // `0056` criteria 6, 7, 9 supersede the clamp of criterion 13. 40 wide, drag the E
+    // handle 100 to the left: width 60 on the other side, the W edge stays at x = 0.
     let r = resize_local_box(
         pt(0.0, 0.0),
         pt(40.0, 20.0),
@@ -571,9 +576,11 @@ fn flip_through_clamps_to_zero_and_the_far_edge_does_not_follow() {
         false,
         false,
     );
-    assert!(close(r.max.x - r.min.x, 0.0));
-    assert!(close(r.min.x, 0.0) && close(r.max.x, 0.0), "no flip: {r:?}");
-    assert!(close(r.sx, 0.0));
+    assert!(
+        close(r.min.x, -60.0) && close(r.max.x, 0.0),
+        "turned over: {r:?}"
+    );
+    assert!(close(r.sx, -1.5));
     // Same for W handle dragged right past E.
     let r = resize_local_box(
         pt(0.0, 0.0),
@@ -583,8 +590,8 @@ fn flip_through_clamps_to_zero_and_the_far_edge_does_not_follow() {
         false,
         false,
     );
-    assert!(close(r.min.x, 40.0) && close(r.max.x, 40.0), "{r:?}");
-    // Shift: symmetric, so over-shrinking collapses onto the centre.
+    assert!(close(r.min.x, 40.0) && close(r.max.x, 100.0), "{r:?}");
+    // Shift: symmetric about the centre x = 20, signed width 40 - 200 = -160.
     let r = resize_local_box(
         pt(0.0, 0.0),
         pt(40.0, 20.0),
@@ -593,8 +600,8 @@ fn flip_through_clamps_to_zero_and_the_far_edge_does_not_follow() {
         true,
         false,
     );
-    assert!(close(r.min.x, 20.0) && close(r.max.x, 20.0), "{r:?}");
-    // Coming back after the clamp: the same function of the *start* box, not of history.
+    assert!(close(r.min.x, -60.0) && close(r.max.x, 100.0), "{r:?}");
+    // Coming back: the same function of the *start* box, not of history.
     let r = resize_local_box(
         pt(0.0, 0.0),
         pt(40.0, 20.0),
@@ -713,7 +720,8 @@ proptest! {
 
 #[test]
 fn stroke_factor_with_a_negative_or_nan_input_never_panics_or_goes_negative() {
-    assert_eq!(stroke_or_radius_factor(-1.0, 4.0), 0.0);
+    // `0056` criterion 23: a negative factor is a mirror, √|sx·sy|.
+    assert_eq!(stroke_or_radius_factor(-1.0, 4.0), 2.0);
     assert!(
         stroke_or_radius_factor(f64::NAN, 1.0).is_nan()
             || stroke_or_radius_factor(f64::NAN, 1.0) == 0.0

@@ -288,18 +288,21 @@ fn a_scale_beyond_the_limit_changes_nothing() {
     assert_eq!(rig.objects(), before);
 }
 
-/// Criterion 22 and 18: a factor below zero stops at zero.
+/// Criterion 22 and 18, superseded by `0056` criteria 6 and 12: a factor below zero
+/// turns the selection over about the fixed corner.
 #[test]
-fn a_negative_factor_clamps_to_zero() {
+fn a_negative_factor_turns_the_selection_over() {
     let (mut rig, a, b, _) = two_big_rects();
     rig.select(&[a, b]);
     rig.drag(pt(240.0, 60.0), pt(-500.0, 60.0), NONE);
-    for id in [a, b] {
+    let factor = 500.0 / 240.0;
+    for (id, right) in [(a, 0.0), (b, -140.0 * factor)] {
         let Shape::Rect { bounds, .. } = rig.shape(id) else {
             panic!("a rectangle");
         };
-        assert_eq!(bounds.width.as_mm(), 0.0);
-        assert_eq!(bounds.height.as_mm(), 60.0);
+        assert!((bounds.width.as_mm() - 100.0 * factor).abs() < 1e-9);
+        assert!((bounds.height.as_mm() - 60.0).abs() < 1e-9);
+        assert!((bounds.origin.x + bounds.width.as_mm() - right).abs() < 1e-9);
     }
 }
 

@@ -12,11 +12,14 @@ use super::{SelectDrag, SelectTool};
 use crate::anchor_id_minter::AnchorIdMinter;
 use crate::conversion::{converted_for_handle, with_fresh_anchor_ids};
 use crate::group_box::GroupSelection;
-use crate::group_transform::{GroupMap, commit_group, group_map, group_pivot, map_all};
+use crate::group_transform::{
+    GroupMap, commit_group, group_label, group_map, group_pivot, group_resized_box, map_all,
+};
 use crate::object_selection::ObjectSelection;
 use crate::oriented_box::OrientedBox;
 use crate::transform_drag::{DragOrigin, ScaleModes};
 use crate::transform_handle_layout::EditHandle;
+use crate::transform_math::{ExtentSigns, ResizedBox};
 
 /// A resize, rotate or skew drag on the group box in flight.
 #[derive(Debug, Clone)]
@@ -34,6 +37,9 @@ pub(super) struct GroupDrag {
     /// keeps its kind. Built once, at the press, so that the preview and the commit are
     /// the same snapshots (criterion 5).
     pub(super) converted: Vec<Option<PathSnapshot>>,
+    /// The signs of the last frame of a resize whose extent was not 0
+    /// (`specs/0056-mirror-and-negative-scale/` criterion 15); positive at the press.
+    pub(super) signs: ExtentSigns,
 }
 
 impl GroupDrag {
@@ -47,7 +53,38 @@ impl GroupDrag {
             self.handle,
             (self.origin.down_at, current),
             (shift, ctrl),
+            self.signs,
         )
+    }
+
+    /// The resized group box of a resize drag with the pointer at `current`; `None` for
+    /// another handle.
+    pub(super) fn resized_box_at(
+        &self,
+        current: Point,
+        shift: bool,
+        ctrl: bool,
+    ) -> Option<ResizedBox> {
+        let EditHandle::Resize(direction) = self.handle else {
+            return None;
+        };
+        group_resized_box(
+            &self.start_box,
+            direction,
+            (self.origin.down_at, current),
+            (shift, ctrl),
+            self.signs,
+        )
+    }
+
+    /// Notes a preview frame at `current` (the signs of criterion 15).
+    pub(super) fn note_frame(&mut self, current: Point, shift: bool, ctrl: bool) {
+        if !self.origin.is_active_at(current) {
+            return;
+        }
+        if let Some(resized) = self.resized_box_at(current, shift, ctrl) {
+            self.signs = resized.signs_after(self.signs);
+        }
     }
 
     /// What a release at `current` would commit: every start snapshot mapped, or
@@ -78,7 +115,7 @@ impl GroupDrag {
             document,
             results,
             self.modes.stroke,
-            self.handle,
+            group_label(self.handle),
             map.as_ref(),
         );
     }
@@ -128,6 +165,7 @@ impl SelectTool {
             handle,
             modes: self.modes,
             converted,
+            signs: ExtentSigns::default(),
         }
     }
 

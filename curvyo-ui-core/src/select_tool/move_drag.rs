@@ -148,8 +148,14 @@ impl SelectTool {
                     drag.last_axis = drag.resolve(point, modifiers).axis.or(drag.last_axis);
                 }
             }
-            SelectDrag::Transforming(drag) => drag.origin.note(point),
-            SelectDrag::GroupTransforming(drag) => drag.origin.note(point),
+            SelectDrag::Transforming(drag) => {
+                drag.origin.note(point);
+                drag.note_frame(point, modifiers.shift, modifiers.ctrl);
+            }
+            SelectDrag::GroupTransforming(drag) => {
+                drag.origin.note(point);
+                drag.note_frame(point, modifiers.shift, modifiers.ctrl);
+            }
             SelectDrag::Marquee(_) | SelectDrag::Lasso(_) => self.gesture_pointer_moved(point),
             SelectDrag::None => {}
         }

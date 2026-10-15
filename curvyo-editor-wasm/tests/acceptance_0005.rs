@@ -842,10 +842,10 @@ fn ac8_stroke_scales_for_ellipse_path_polygon_and_star_too() {
 #[test]
 fn ac8_stroke_never_becomes_zero_or_negative_when_collapsing_a_resize() {
     for (grab, to) in [
-        (pt(40.0, 20.0), pt(-30.0, -30.0)), // corner past the opposite corner
-        (pt(40.0, 20.0), pt(0.0, 0.0)),     // exactly to zero
-        (pt(40.0, 10.0), pt(-20.0, 10.0)),  // edge past the opposite edge
-        (pt(20.0, 20.0), pt(20.0, -9.0)),   // edge past
+        (pt(40.0, 20.0), pt(-10.0, -5.0)), // corner past the opposite corner, smaller
+        (pt(40.0, 20.0), pt(0.0, 0.0)),    // exactly to zero
+        (pt(40.0, 10.0), pt(-20.0, 10.0)), // edge past the opposite edge
+        (pt(20.0, 20.0), pt(20.0, -9.0)),  // edge past
     ] {
         let mut s = open_in_session(&rect_doc(0.0, 0.0, 40.0, 20.0, 0.0));
         s.set_scale_stroke_width(true);
@@ -1150,38 +1150,39 @@ fn ac12_a_scaled_curve_still_passes_through_the_scaled_midpoint() {
 }
 
 // ---------------------------------------------------------------------
-// AC 13: zero clamp, no flip-through, recover when the pointer returns
+// AC 13, superseded by `0056` criteria 6, 7 and 15: through zero to the other side,
+// 0.01 mm instead of 0, recover when the pointer returns
 // ---------------------------------------------------------------------
 
 #[test]
-fn ac13_dragging_past_the_opposite_edge_clamps_to_zero_and_never_goes_negative() {
+fn ac13_dragging_past_the_opposite_corner_turns_over_and_never_goes_negative() {
     let mut s = open_in_session(&rect_doc(0.0, 0.0, 40.0, 20.0, 0.0));
     select_at(&mut s, pt(20.0, 0.0));
     drag(&mut s, pt(40.0, 20.0), pt(-25.0, -25.0), false, false);
     let (b, ..) = rect_of(&s);
     assert!(
-        close(b.width.as_mm(), 0.0) && close(b.height.as_mm(), 0.0),
+        close(b.width.as_mm(), 25.0) && close(b.height.as_mm(), 25.0),
         "{b:?}"
     );
-    // Opposite (NW) corner stays where it was: no flip-through to the other side.
-    assert!(pclose(b.origin, pt(0.0, 0.0)), "{:?}", b.origin);
+    // The opposite (NW) corner stays fixed at (0, 0); the rectangle is on its other side.
+    assert!(pclose(b.origin, pt(-25.0, -25.0)), "{:?}", b.origin);
 }
 
 #[test]
-fn ac13_each_axis_clamps_independently_in_a_free_corner_drag() {
+fn ac13_each_axis_turns_over_independently_in_a_free_corner_drag() {
     let mut s = open_in_session(&rect_doc(0.0, 0.0, 40.0, 20.0, 0.0));
     select_at(&mut s, pt(20.0, 0.0));
     drag(&mut s, pt(40.0, 20.0), pt(-5.0, 30.0), false, false);
-    assert_rect(&s, 0.0, 0.0, 0.0, 30.0);
+    assert_rect(&s, -5.0, 0.0, 5.0, 30.0);
 }
 
 #[test]
-fn ac13_edge_handle_clamps_at_zero_for_each_edge() {
+fn ac13_edge_handle_turns_over_at_each_edge() {
     for (grab, to, expect) in [
-        (pt(40.0, 10.0), pt(-10.0, 10.0), (0.0, 0.0, 0.0, 20.0)),
-        (pt(0.0, 10.0), pt(60.0, 10.0), (40.0, 0.0, 0.0, 20.0)),
-        (pt(20.0, 20.0), pt(20.0, -7.0), (0.0, 0.0, 40.0, 0.0)),
-        (pt(20.0, 0.0), pt(20.0, 33.0), (0.0, 20.0, 40.0, 0.0)),
+        (pt(40.0, 10.0), pt(-10.0, 10.0), (-10.0, 0.0, 10.0, 20.0)),
+        (pt(0.0, 10.0), pt(60.0, 10.0), (40.0, 0.0, 20.0, 20.0)),
+        (pt(20.0, 20.0), pt(20.0, -7.0), (0.0, -7.0, 40.0, 7.0)),
+        (pt(20.0, 0.0), pt(20.0, 33.0), (0.0, 20.0, 40.0, 13.0)),
     ] {
         let mut s = open_in_session(&rect_doc(0.0, 0.0, 40.0, 20.0, 0.0));
         select_at(&mut s, pt(20.0, 0.0));
@@ -1224,12 +1225,13 @@ fn ac13_ellipse_and_polygon_never_report_negative_radii() {
 
 #[test]
 fn ac13_a_zero_size_object_can_still_be_resized_back_up() {
-    // Collapse a rect to w = 0 via E edge, then a *new* drag from the (now
-    // coincident) handle position must not divide by zero or produce NaN.
+    // Drag a rect's E edge onto the W edge: 0.01 mm wide (`0056` criterion 15), then a
+    // *new* drag from the (now nearly coincident) handle position must not divide by
+    // zero or produce NaN.
     let mut s = open_in_session(&rect_doc(0.0, 0.0, 40.0, 20.0, 0.0));
     select_at(&mut s, pt(20.0, 0.0));
     drag(&mut s, pt(40.0, 10.0), pt(0.0, 10.0), false, false);
-    assert_rect(&s, 0.0, 0.0, 0.0, 20.0);
+    assert_rect(&s, 0.0, 0.0, 0.01, 20.0);
     drag(&mut s, pt(0.0, 10.0), pt(30.0, 10.0), false, false);
     let (b, r, stroke, rotation) = rect_of(&s);
     for v in [

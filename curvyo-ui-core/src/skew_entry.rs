@@ -300,6 +300,7 @@ mod tests {
                             param_gain: 1.0,
                             unlinked: false,
                             converted: None,
+                            signs: crate::transform_math::ExtentSigns::default(),
                         };
                         let angle = skew_angle(&box_, side, down, current, shift, false);
                         assert!((angle.as_radians().to_degrees() - degrees).abs() < 1e-9);

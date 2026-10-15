@@ -3228,6 +3228,10 @@ fn hostile_pointer_values_on_a_star_polygon_and_ellipse() {
                 sc.s.pointer_up(pt(3.0, bad), false, false);
             }
             if mk == 0 {
+                // A tiny finite value is a real drag to near the origin, which since
+                // `0056` turns the star over and stretches it into a path: the inner
+                // handle is checked on a fresh star.
+                let mut sc = star_scene(100, 60.0, 8, Some(0.5), 0.3);
                 let v = inner_vertex(&sc);
                 sc.s.pointer_hover(v, false, false);
                 sc.s.pointer_down(v, false);
