@@ -1,10 +1,12 @@
-# ADRs for "SVG import and export"
+# ADRs for "SVG import" (export later)
 
-Architect review, 2026-10-14, of the Draft specification (77 criteria) and Fragen 1 to 6. The
-slice adds the first importer and exporter. **One new ADR (0018, proposed, not `needs-customer`
-for the crate and dependencies; the one decision that is, Frage 4, is recorded in it as a
-separate section), one new crate (`curvyo-svg-core`), three new dependencies, no
-`format_version` bump** (criterion 77 holds: no register, no node kind, no schema change).
+Architect review, 2026-10-14, of the Draft specification and its six questions; reworked 2026-10-16 for
+the customer's decisions (see the specification, "Decided (customer, 2026-10-16)"): first slice is the
+import, export is a later slice, no loss report, no passthrough bag, `<use>` becomes a linked clone where
+it can. The slice adds the first importer (and, later, the first exporter). **One new ADR (0018,
+proposed), one new crate (`curvyo-svg-core`), three new dependencies, no `format_version` bump**
+(criterion 77 holds: no register, no node kind, no schema change; a linked clone uses the register of
+`0049`). The one `needs-customer` item of the draft, the passthrough bag, is decided (BAG A, below).
 
 ## Depends on
 
@@ -15,26 +17,36 @@ separate section), one new crate (`curvyo-svg-core`), three new dependencies, no
     the named tolerances (1e-6 mm, `TOUCH_DISTANCE_MM` 0.001).
   - §5: a style is resolved per leaf (so the importer resolves the CSS cascade itself; there is
     no inheritance in the model, ADR 0015 notwithstanding for ancestor-resolved state).
-  - §10: SVG strategy: own subset, named listed loss, golden files. Its **passthrough bag is not
-    built here** (Frage 4, ADR 0018 §4). Gradient amendment of 2026-10-08 is what criterion 38
-    implements.
+  - §10: SVG strategy: own subset, golden files. Two customer amendments of 2026-10-16 (ADR 0018 §4):
+    the **named listed loss is dropped** (no report) and the **passthrough bag is not built** (BAG A).
+    Gradient amendment of 2026-10-08 is what criterion 38 implements.
   - §11 with [ADR 0004](../../docs/adr/0004-persistence-and-cross-machine-sync.md) §9: no
     `format_version` change (criterion 77). The importer writes through the existing document
     API, so the project file is whatever the model writes (current format 13).
 - [ADR 0001](../../docs/adr/0001-ui-framework-and-canvas-rendering.md) §5: the browser boundary
   carries strings and scalars. The importer is called from `curvyo-editor-wasm` with the file
-  bytes and returns the report as one JSON text (like the History rows); the 50 MiB limit is
-  checked before the call.
+  bytes; the 50 MiB limit is checked before the call. There is no report to return.
 - [ADR 0011](../../docs/adr/0011-workspace-and-crate-layout.md) §2: its table gives
   `curvyo-document-core` "SVG import/export" in one sentence. That sentence is superseded by
   ADR 0018 (reason below).
 - [ADR 0003](../../docs/adr/0003-geometry-kernel-booleans-offsetting-vcarving.md) and
   [`0054` adrs.md](../0054-combine-open-paths/adrs.md): `touching_outlines`, `outline_nesting`
   and `TOUCH_DISTANCE_MM` of `curvyo-geometry-core` decide the even-odd re-winding (criteria
-  50 and 51); `kurbo` (already a workspace dependency) converts arcs.
+  50 and 51, EVENODD A); `kurbo` (already a workspace dependency) converts arcs.
 - [ADR 0015](../../docs/adr/0015-node-references-and-ancestor-resolved-state.md),
-  [ADR 0016](../../docs/adr/0016-clone-overrides.md), `0049` and `0057` adrs: a clone is read as
-  its resolved outline on export (`clone-as-path`); import creates no clone (Frage 2 A).
+  [ADR 0016](../../docs/adr/0016-clone-overrides.md), `0049`, `0056` and `0057` adrs: **USE-CLONE B.**
+  A `<use>` becomes a clone and (later) a clone is written as `<use>` where the relation to its
+  original is a move, rotation or flip only (criteria 47 and 59). Checked against the model:
+  a clone's `clone_link = { origin, matrix }` holds a relative matrix of any affine kind (ADR 0015
+  §3); the matrix that the importer computes is `C_use · translate(x, y) · A_target⁻¹` (the target's
+  own transform is baked into its anchors and cancels), so ADR 0016's rule that a transform of an
+  original is baked and the clone stays relative is met without a new register. A clone's stroke
+  and dashes are not scaled by M (`0049` criterion 9) whereas SVG scales a `use`'s stroke, hence only
+  isometries (orthogonal linear part within 1e-6; the determinant may be -1, `0056`) are linked, in
+  both directions. `own_placement` and `own_style` (ADR 0016 §1) are never set by an import and make
+  a clone a `<path>` on export (`0057` criterion 40). Primitives are not clone origins (`0049`
+  criterion 2 would convert them silently), so a `use` of a primitive is a copy. Chain depth 8
+  (`0049` criterion 52) applies at import.
 - `0050` adrs (layers are top-level groups with a marker) and `0023` (depth 32): criteria 44 and 45.
 - `0046` stage 2 calls the same importer (criterion 73): it depends on `curvyo-svg-core`, not
   on a second parser.
@@ -45,8 +57,10 @@ Needed because `CLAUDE.md` §5 says no new crate without an ADR and ADR 0011 is 
 row cannot be edited. It records the following, which are the architect's proposals here.
 
 1. **Crate `curvyo-svg-core`** (pure, `forbid(unsafe_code)`, builds for wasm32, no I/O; bytes in,
-   `SvgImport { page, display unit, background, tree, report }` out, and
-   `export(&ObjectRead snapshot, page) -> (String, Report)`). Depends on `curvyo-document-core`
+   `SvgImport { page, display unit, background, tree }` out; the tree has a clone leaf that names
+   another leaf of the same tree and carries its matrix, which `document-core` resolves to ids when
+   it applies the drawing. The second slice adds `export(&ObjectRead snapshot, page) -> String`;
+   there is no report type anywhere). Depends on `curvyo-document-core`
    and `curvyo-geometry-core`. *Why not a module in `curvyo-document-core` (ADR 0011's row):*
    the re-winding needs `touching_outlines` and `outline_nesting`, which live in
    `geometry-core`, and `geometry-core` depends on `document-core`, so the module cannot exist
@@ -59,11 +73,11 @@ row cannot be edited. It records the following, which are the architect's propos
 2. **Dependencies** (all permissive, in the `cargo deny` allow list; to be confirmed by the
    ADR's spike on `spike/svg-parser`, checklist below): `roxmltree` (MIT or Apache-2.0, no
    dependencies, `forbid(unsafe_code)`, takes `&str`, resolves namespaces by URI, gives line and
-   column for the report), `svgtypes` (MIT or Apache-2.0: path data, transform, colour, length
+   column for the refusal text of criterion 6), `svgtypes` (MIT or Apache-2.0: path data, transform, colour, length
    and paint grammar; stops at the first path error, as criterion 23 needs), `simplecss`
    (MIT or Apache-2.0: the `<style>` subset of criterion 36; selectors with combinators are
-   parsed, then skipped by us). *Rejected:* `usvg` (it normalises away what the report needs:
-   line numbers, `sodipodi:*`, `inkscape:label`, `use` as clone, per-element counts; pulls font
+   parsed, then skipped by us). *Rejected:* `usvg` (it normalises away what we read:
+   `sodipodi:*`, `inkscape:label`, `use` as clone; pulls font
    and image crates; resolves text), `quick-xml` (streaming, no tree: we would rebuild a DOM,
    find entity declarations ourselves and compute line numbers from byte offsets),
    `xml-rs` (slow, no wasm story needed), and writing all grammars ourselves (about 800 lines
@@ -78,13 +92,22 @@ row cannot be edited. It records the following, which are the architect's propos
    internal entities only; at most 64, 256 bytes each, 100,000 references). Only then
    `roxmltree` with `allow_dtd` on and a `nodes_limit` of 500,000. Element depth 256 is
    enforced by our own walk; every tree walk is iterative or bounded by that depth.
-4. **Frage 4, passthrough bag: `needs-customer` (document model).** ADR 0002 §10 is
-   customer-signed. Answer A (default) defers the bag: the ADR gets an amendment line like
-   the gradient one of 2026-10-08, and `foreign-data` is the visible cost. Answer B would
-   need its own ADR; one more risk for B that the spec does not name: attributes kept
-   verbatim and written back are untrusted input in the export (`onclick`, `href`, script),
-   so a bag needs an allowlist of namespaces, and merge semantics in the CRDT (ADR 0009 §3).
-5. **Floating point** (criteria 54, 57, 62, 63, 72). All text is produced with Rust's own
+4. **BAG A and no report: amendments to ADR 0002 §10, customer-decided 2026-10-16.**
+   (a) *No passthrough bag in this slice.* The bag is built only if Curvyo later adopts SVG as a
+   native file format (open, edit, save), because only then does foreign data have to survive a
+   save. When an SVG is imported to be used as a composition, the other information (for example
+   `inkstitch:` attributes) simply disappears. Recorded like the gradient amendment of 2026-10-08.
+   It also removes the risks of a bag: attributes written back verbatim are untrusted input in an
+   export (`onclick`, `href`, script), a bag needs a namespace allowlist, and merge semantics in
+   the CRDT (ADR 0009 §3). A later bag takes the next free `format_version` and its own ADR.
+   (b) *No loss report.* The "named, listed loss" of §10 is replaced by "unsupported content is
+   ignored silently" (customer: "a report of what could not be imported has no added value; we
+   will try to import as well as Inkscape over time and until then we simply try"). The importer
+   has no counters, no entry catalogue, no line numbers kept, nothing to hold in editor state. The
+   cost, accepted by the customer: a file that hits a limit (criterion 69) imports partially
+   without a message; a maker cannot see what was left out.
+5. **Floating point** (criteria 54, 57, 62, 63, 72; mostly the later export, and the clone
+   matrix text of criterion 59). All text is produced with Rust's own
    `f64` formatting (`{:.6}` for lengths, `{}` shortest round trip for `curvyo:` data, opacities,
    ratios and radians); both are exact and independent of locale. Rounding to 6 decimals is
    idempotent, which is why export(import(export(d))) is byte-identical. The
@@ -102,8 +125,8 @@ row cannot be edited. It records the following, which are the architect's propos
 - **2026-10-14: no new `format_version`, no new register.** Imported content is created with the
   existing constructors (`create_path`, `create_rect`, `create_ellipse`, `create_polygon`,
   `create_star`, groups, layers, styles). Shadow data lives in the SVG, not in the project.
-  Report and notes are session state in the editor facade, never in the Loro document.
-- **2026-10-14: even-odd (Frage 1, A) agrees with `0054`'s `adrs.md` "Flagged" and its
+  A linked clone is created with the `0049` command, not a new one.
+- **2026-10-14: even-odd (EVENODD A) agrees with `0054`'s `adrs.md` "Flagged" and its
   decision 3 (nonzero stays the one fill rule; `fill-rule` must not enter a bag).** Differences to
   `0054` criterion 27, which `0024` criterion 76 amends in the building PR: re-winding by
   depth parity instead of "unchanged", and the listing only for non-reproducible paths. The
@@ -141,21 +164,27 @@ row cannot be edited. It records the following, which are the architect's propos
   from bytes to document may not hold. The first plan task is a benchmark of
   `create_path` over generated input; if it misses, the budget is restated from the
   measurement (the PO agrees), not hidden.
-- **Report counts versus noise.** Figma and Illustrator wrap whole drawings in a clip
-  rectangle, so `clip-path` fires on nearly every such file. Proposal for Frage 5 A: a clip
-  whose region contains the bounds of everything it clips goes to the silent list of criterion
-  13 (it changes nothing the maker sees or cuts). Default if unanswered: take it.
+- **Silent partial import.** Without a report, a file over the limits of criterion 69 imports
+  as far as it goes and says nothing. Accepted by the customer; the limits are far above real files
+  (500,000 elements, 5,000,000 path commands).
+- **`use` needs two passes.** A target may stand after its `use` and a clone's original must exist
+  first; the importer builds the tree first, then `document-core` creates originals before clones
+  in one commit. If `0049` is not merged when this is built, criterion 47 (a) is deferred and a
+  `use` is a copy; the lead decides the order.
 - **Re-wound outlines change direction**, which matters for dash start and for cutting
-  direction. Accepted by Frage 1 A; the fixture `even_odd.svg` pins the stored directions.
+  direction. Accepted (EVENODD A); the fixture `even_odd.svg` pins the stored directions.
 - **`svgtypes` and `simplecss` drift.** Both are pinned in `Cargo.toml` with `=` like
   `i_overlay`, because the golden files depend on their error behaviour.
 
-## Fragen reviewed
+## Questions decided (customer, 2026-10-16)
 
-- Frage 1 (EVENODD): sound, with the tightening above. Default A stays.
-- Frage 2 (USE-CLONE): sound. Default A. B is also fine structurally (original's id is
-  exported) but is a second feature.
-- Frage 3 (REPORT-PLACE): UI only, no structural issue. Default A.
-- Frage 4 (BAG): `needs-customer`, see ADR 0018 point 4.
-- Frage 5 (CLIP): sound. A, with the silent-list proposal. B needs the kernel, which the crate has.
-- Frage 6 (PIXEL-SIZE): sound. A. Detection reads resolved namespaces and comments only.
+- EVENODD A: sound, with the tightening above.
+- USE-CLONE B: structurally sound, see the dependency note on ADR 0015/0016 (matrix formula,
+  isometries only, overrides give a path on export). Primitive originals and the `symbol` case stay copies.
+- REPORT-PLACE: no report; ADR 0018 point 4(b).
+- BAG A: ADR 0018 point 4(a).
+- CLIP A: ignored; no kernel use in the importer.
+- PIXEL-SIZE A: detection reads resolved namespaces and comments only.
+- SVG-EXPORT-LATER A: export is a later slice; the crate and ADR 0018 cover both halves so the
+  crate name and boundary do not change. The export slice adds its own `plan.md` and a review of
+  criterion 59 against `0049`/`0057` as built then.
