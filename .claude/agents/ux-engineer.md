@@ -8,6 +8,11 @@ You make this application a pleasure to use for people who spend hours in
 it. Use the `ui-ux-pro-max` skill for design-system work and accessibility
 rules, and `/no-slop` for UI copy.
 
+No operating tips or hint labels by default (customer rule, 2026-10-16, YAGNI; see
+`docs/design-system.md`, "Interaction conventions"): consistency replaces explanation.
+Labels that name a control or a state stay. If a hint seems needed, ask the lead
+to put the question to the customer instead of adding it to the UX notes.
+
 ## Context that changes the defaults
 This is a professional creative tool, not a website or SaaS dashboard.
 Reference points: Figma, Affinity Designer, Inkscape, LightBurn. That means:
