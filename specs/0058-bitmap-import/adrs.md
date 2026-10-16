@@ -2,14 +2,14 @@
 
 Architect review 2026-10-14, written without the product owner's access to the code and checked
 against `base/` at `0c23fff`. The spec needs **one new ADR, [0017](../../docs/adr/0017-image-nodes-and-embedded-assets.md)**
-(Proposed, `needs-customer`: new node kind, assets in the file format, one new crate, new
-dependencies). It must be Accepted, after its spike, before this spec is Ready.
+(Accepted 2026-10-16 by the customer for the `image` crate and the node/asset design; the spike
+must confirm the numbers before the build, else the ADR is reopened).
 
 ## Depends on
 
 - [ADR 0017](../../docs/adr/0017-image-nodes-and-embedded-assets.md): the image leaf (`shape = "image"`,
   `image_asset`, `image_placement` over the unit square); bytes in `assets/<sha256>.<ext>`, only the
-  hash in the document; `curvyo-image-core` on the pinned `image` crate; premultiplied texture
+  hash in the document; `curvyo-image-core` on the pinned `image` crate (features `png`, `jpeg`, `webp`, no default features, no `kamadak-exif`); premultiplied texture
   upload and the `ImageQuad` list in `DrawList`; the 512 MiB project cap; the format bump.
 - [ADR 0004](../../docs/adr/0004-persistence-and-cross-machine-sync.md) §1 (`assets/`), §9 (refuse a
   newer file): the container writes only three members today, so `pack` and `unpack` are extended.
@@ -34,13 +34,13 @@ dependencies). It must be Accepted, after its spike, before this spec is Ready.
    - "The container already has room": it does not in code. `pack(&Document)` writes `manifest.json`,
      `document.loro`, `document.json` only; there is no `assets/` and no `thumbnail.png`. ADR 0004
      §1 only names the place. Reworded; the API change is ADR 0017 §2.
-   - Criterion 23: BMP is uncompressed, so its entry is Deflated; only PNG, JPEG, GIF, WebP are Stored.
+   - Criterion 23: PNG, JPEG, WebP are Stored (BMP and GIF were dropped by the customer 2026-10-16).
    - Criterion 19: `catch_unwind` does not work on `wasm32-unknown-unknown` (panic aborts the
      module) and a core crate has no clock to enforce 10 s. The panic clause is dropped; the time is
      a test bound; a time-boxed fuzz run becomes part of the PR.
-   - Criteria 18 and 44: "byte-identical on every platform" holds for PNG, BMP, GIF and for our
+   - Criteria 18 and 44: "byte-identical on every platform" holds for PNG and for our
      scaling step; a JPEG or lossy WebP decode may differ by 1 per channel between SIMD and scalar
-     paths or wasm and native. Reworded.
+     paths or wasm and native. Reworded (PNG is exact; BMP and GIF are gone).
    - Criterion 25: the asset store is pruned by the document wipe only (ADR 0017 §2); "saving never
      keeps an asset that nothing refers to" would need the oplog scanned on every save.
    - Criterion 38: Linked clone (0049) is built, so the refusal is part of this slice, not of "the
@@ -51,7 +51,7 @@ dependencies). It must be Accepted, after its spike, before this spec is Ready.
    - D5: WebGL2 guarantees only 2048 for the texture side and `gpu.rs` takes the adapter's limits, so
      8192 is a working-image limit, not a texture limit (ADR 0017 §5). "32-bit WASM heap can hold"
      was loose: wasm32 addresses 4 GiB, the browser's limit is lower.
-   - Criterion 16/17: a project total of 512 MiB is added as a Proposal (customer question 2).
+   - Criterion 16/17: a project total of 512 MiB (customer decision IMG-TOTAL = A).
    - Criterion 7, CMYK JPEG: supported only if the pinned decoder converts it; the spike decides the
      fixture's expectation.
 2. **Placement is stored over the unit square, not over pixels.** The working copy's size, the
@@ -72,6 +72,8 @@ dependencies). It must be Accepted, after its spike, before this spec is Ready.
    inventing a new field.
 
 ## Dated notes
+
+- 2026-10-16: customer decisions applied. `kamadak-exif` dropped: `image` 0.25 reports orientation for JPEG, WebP, TIFF and (via the `eXIf` chunk) PNG, so criterion 8 now covers all three formats; the density comes from our own `pHYs`/JFIF reads and the EXIF `XResolution` fallback is dropped (criterion 9). The image goes on top of the active layer (criterion 14), so no "insert at bottom" operation is needed in `document-core`; `add_image` appends like every new object. TIFF is in only if the spike finds `image`'s `tiff` feature free; default out.
 
 - 2026-10-14: ADR number 0017 is the next free one on `main`; a branch that takes it first makes
   the other renumber (rule of the ADR index). Format number: 14 if this merges before `0057`, else 15.
