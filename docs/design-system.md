@@ -328,6 +328,13 @@ values, not an implementation site, for those four rows.
 
 ## Interaction conventions (apply to every later tool, not just this one)
 
+- **No operating tips by default (customer, 2026-10-16, YAGNI).** Controls are
+  kept consistent so that they need no explanation: no hint lines such as
+  "Esc: cancel.", "Click or Enter ...", "Space switches ...", no explanatory
+  captions in panels. Labels that name a control or a state (a check
+  "Square (Ctrl)", a value readout) stay. A hint is added deliberately and
+  selectively later, when a control has become too complex, after asking the
+  customer.
 - **All canvas editing-UI** — node/handle glyphs, handle lines, selection and
   hover highlights, and anything like them a later tool adds (primitive
   resize handles, alignment guides) — is drawn in the WebGL draw list
