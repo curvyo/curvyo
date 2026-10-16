@@ -1,6 +1,6 @@
 # Arc and curve handles: ellipse arcs, and a Curve handle on ellipse, polygon and star
 
-Status: Draft
+Status: Ready (2026-10-17)
 Priority: Should
 Origin: Customer (Part A); Customer (Part B: reading confirmed 2026-10-06, extended to polygon and star)
 
@@ -20,6 +20,19 @@ into a [star]." The word before "squash" was unreadable; the customer then sent
 two screenshots of Affinity Designer's Polygon tool (Sides: 4, option "Curve"),
 which Part B is built from. He confirmed the reading and asked for Curve on
 polygon and star right away: "polygon und stern auch gleich" (2026-10-06).
+
+**Reference state (2026-10-17).** `main` has `CURRENT_FORMAT_VERSION` 14. The
+primitives are `Shape::Rect`, `Shape::Ellipse { frame }`, `Shape::Polygon` and
+`Shape::Star`, each with its own `rotation`; mirror and negative scale
+(`specs/0056-mirror-and-negative-scale/`), the linked clone
+(`specs/0049-linked-clone/`, `specs/0057-clone-overrides/`), click-to-create
+(`specs/0052-click-to-create-shapes/`), layers (`specs/0050-layers-and-objects-panel/`)
+and history branches (`specs/0042-history-branches/`) are specified or built
+beside this slice. Where one of them is not merged when this slice is built,
+the criteria that name it (53 to 66) are tested in the later of the two PRs.
+**Customer rule (2026-10-16): a primitive stays a primitive wherever the result
+is exact.** Arc and curve are parameters of the primitive, never a reason to
+convert it (criterion 63).
 
 **Depends on `specs/0009-unified-object-editing/`.** The arc handles and the curve
 handle are parameter handles of the one edit mode, the Select tool, not a
@@ -83,40 +96,57 @@ ellipse with a curve other than 100% has no arc (Part B criterion 31).
    72 px on screen, the parameter-handle threshold T), then two arc handles are
    shown, a start handle and an end handle, on the outline at the arc's start
    and end angles, together with the transform handles. They are shown on a
-   whole ellipse as well, so the maker finds them without a manual; where
-   exactly (both would sit at the same point as a resize handle) is the
-   `ux-engineer`'s decision, and the two are always distinguishable from each
-   other and reachable. They use the parameter-handle rules of
+   whole ellipse as well, so the maker finds them without a manual. Their
+   positions are the "Arc handle layout" of the UX notes: on a whole ellipse
+   both rest at the seam of 45° (lower right on screen), 14 px apart along the
+   outline, never on a resize handle; they are always distinguishable from
+   each other (the end handle comes first, the start handle second, clockwise)
+   and reachable. They use the parameter-handle rules of
    `specs/0009-unified-object-editing/` (UX notes sections 1 and 2): the "knob"
    glyph, a hit radius of 12 px, the built-in pointer cursor, not drawn during
    a move, resize, rotate or skew drag of the same object, and no drawn glyph
    closer than 4 px to another (an arc handle that would land within that
-   distance of a resize or rotate glyph is placed by the `ux-engineer`'s rule,
-   not by overlapping it). Below T the arc is set by the bar (criterion 3).
+   distance of a resize or rotate glyph is drawn displaced along the outline,
+   by the "Knob displacement" rule of the UX notes, never overlapping it). Below T the arc is set by the bar (criterion 3).
 2. Given the maker drags an arc handle, then that handle's angle follows the
    pointer: with the pointer at (x, y) in the ellipse's own frame relative to
    its centre, the angle is atan2(y / ry, x / rx), whether the pointer is
    inside or outside the ellipse (for a circle, the plain direction from the
    centre to the pointer). The
    other angle and the kind do not change. The first drag of a handle on a
-   whole ellipse starts an arc of the kind in criterion 3. Escape cancels and
+   whole ellipse starts an arc of the kind in
+   criterion 3; the other angle then has the value both handles rest at on a
+   whole ellipse, the seam of 45° (so the arc starts almost whole and the
+   sweep is continuous from 360°). Escape cancels and
    writes nothing; a press and release without 3 screen pixels of movement
    writes nothing.
-3. Given the Select tool's bar shows, for a selected ellipse, a three-way
-   choice "Pie / Arc / Chord" and a button "Whole ellipse", then choosing a
-   kind changes the selected arc's kind in one commit and keeps the angles;
-   "Whole ellipse" makes the ellipse whole again in one commit (start and end
-   angle no longer stored). A new arc, made by dragging a handle on a whole
-   ellipse, has the kind "Arc" (default of question 1). The kind choice and
-   the button are shown only while a single ellipse is selected, and the kind
-   choice is disabled on a whole ellipse.
+3. Given the Select tool and a selection that contains at least one ellipse
+   (`specs/0009-unified-object-editing/` criterion 21: a control acts on
+   exactly the objects of its kind), then the bar shows one ellipse group with
+   always-present controls: a three-way choice "Pie / Arc / Chord", a button
+   "Whole ellipse" and two number fields "Start" and "End" (degrees). Choosing
+   a kind changes the arc's kind in one commit and keeps the angles; "Whole
+   ellipse" makes every selected ellipse whole in one commit (the arc is no
+   longer stored). Typing a value in "Start" or "End" sets that angle in one
+   commit with the rules of criterion 8; on a whole ellipse the other angle is
+   the resting seam of 45° and the new arc has the kind "Arc" (default of
+   question 1), the same result as dragging that handle (criterion 2). The
+   kind choice and "Whole ellipse" are greyed (`aria-disabled`, still in the
+   Tab order) while no selected ellipse has an arc; all four controls are
+   greyed for an ellipse whose curve is not 100% (criterion 31) and skip such
+   an ellipse in a mixed selection. "Start" and "End" show "Mixed" when the
+   selected ellipses differ. A new arc, made by dragging a handle on a whole
+   ellipse, has the kind "Arc".
 4. Given an arc, then what is drawn and stroked is: Pie, the closed outline
    arc, line to the centre, line to the arc's start; Arc, only the arc, not
    closed; Chord, the arc and the straight chord, closed. Nothing of the rest of
    the ellipse is drawn. Given a fill (`specs/0007-stroke-and-fill-styling/`),
    then a Pie and a Chord are filled inside their outline, and an open Arc is
    filled as if closed by a straight line from its end to its start while only
-   the arc itself is stroked (the SVG rule).
+   the arc itself is stroked (the SVG rule). The dash pattern, and the start
+   and end markers of an open Arc (`specs/0018-stroke-markers/`, where
+   primitives carry them), begin at the start angle and run in the direction
+   of increasing angle, the same as on the converted path (criterion 13).
 5. Given an arc whose sweep from start to end is S degrees, then S is between
    0 and 360 and is never negative: dragging a handle past the other handle
    gives the sweep the pointer's position implies (an end handle that crosses
@@ -179,13 +209,12 @@ ellipse with a curve other than 100% has no arc (Part B criterion 31).
 `kind` (three values). Absent means whole. This is a stored-field change and
 a `format_version` increase, even though whole ellipses are written as before,
 because an older build would otherwise show an arc as a whole ellipse
-(criterion 15). The architect decides: field layout (three LWW registers or
-one), the writer's rule for "whole" (absent fields), validation on open
-(finite angles; a kind outside the three values is damaged), the next free
-`format_version` at merge time (coordinate with `specs/0013-rectangle-corner-
-radii/` and `specs/0007-stroke-and-fill-styling/`), the tight-box computation
-in `oriented_bounds`, the shared evaluation function every consumer calls,
-and golden fixtures for all three kinds (`CLAUDE.md` §5).
+(criterion 15). Decided in `adrs.md` (2026-10-17): one list register `ellipse_arc`
+`[start, end, kind]`, deleted for "whole"; validation on open (finite angles, a
+kind outside the three values is damaged, an arc together with a curve is
+damaged); the `format_version` is the next free one at merge; the tight box in
+`oriented_bounds`; the one shared evaluation every consumer calls; golden
+fixtures for all three kinds (`CLAUDE.md` §5).
 
 ## Part B: Curve handle, from circle to star
 
@@ -272,10 +301,11 @@ holds on an ellipse with per-axis radii.
     outline at 45°), together with the transform handles (and, on a whole
     ellipse, the arc handles of Part A). It is drawn with the same parameter-
     handle silhouette as the other parameter handles, and the hit order is that
-    of `specs/0009-unified-object-editing/` criterion 5. The curve handle and an arc
-    handle can sit at the same point (an arc at -45°); then the arc handle,
-    which is on the outline, wins the tie and the curve handle is reached after
-    moving the arc handle. The `ux-engineer` may choose a different resolution.
+    of `specs/0009-unified-object-editing/` criterion 5. The curve handle and the arc handles never
+    meet: an ellipse with an arc has no curve handle and an ellipse with a
+    curve other than 100% has no arc handles (criterion 31), and on a whole
+    ellipse at 100% the curve handle (upper right, 315°) and the resting arc
+    handles (seam 45°) are 90° apart.
     The curve handle follows the same parameter-handle rules as the arc handles
     (criterion 1: knob glyph, threshold T = 72 px, hit radius 12 px, the 4 px
     clearance, not drawn during other drags of the same object); the centre
@@ -310,8 +340,8 @@ holds on an ellipse with per-axis radii.
     stars join the selection in criterion 44), then the Select tool's top bar shows a "Curve" number field (-100 to 100, "%"),
     with the rules of `specs/0009-unified-object-editing/` criterion 21: it updates
     every selected ellipse live, commits once per interaction, shows "Mixed"
-    when the values differ, and a typed value applies to all. It is disabled,
-    with a hint, for an ellipse that has an arc (criterion 31). Typing 100 makes
+    when the values differ, and a typed value applies to all. It is greyed
+    (the tooltip says why) for an ellipse that has an arc (criterion 31). Typing 100 makes
     the shape an ellipse again; there is no separate reset button.
 27. Given a resize by any transform handle and any modifier, or a typed W and
     H, then `rx`, `ry` and position change by the affine map the drag defines
@@ -474,14 +504,15 @@ on screen), for the ellipse E.
     release would commit is drawn in blue, hollow, and a readout at the pointer
     shows "curve -35.0 %".
 44. Given a selection that consists only of ellipses, polygons and stars in any
-    mix, then the Select tool's top bar shows the "Curve" field of criterion 26
-    (next to "Points" and "Ratio" where those apply). A typed value or a drag
+    mix, then the Select tool's top bar shows the "Curve" field of criterion 26, in a
+    group of its own right after the kind groups (the polygon/star group with
+    "Points" and "Ratio" comes before it). A typed value or a drag
     of the field is limited per shape to that shape's own range (a triangle in
     the selection stops at -50% while a hexagon goes to -100%); the field shows
     the effective value and "Mixed" when the effective values differ; typing
     100 gives an ellipse its ellipse shape back and a polygon its circle. For a
-    selection that contains an ellipse with an arc the field is disabled with
-    the hint of criterion 26. There is no reset button; 0 resets a polygon or
+    selection that contains an ellipse with an arc the field is greyed with
+    the tooltip of criterion 26 and skips that ellipse. There is no reset button; 0 resets a polygon or
     star to straight sides.
 45. Given a resize of a polygon or star (always uniform and about the centre,
     `specs/0009-unified-object-editing/` criterion 16) or a typed r, then the outer
@@ -548,6 +579,126 @@ on screen), for the ellipse E.
     no curve handle exists for that object (a rectangle's rounded corners are
     `specs/0013-rectangle-corner-radii/`, not a curve).
 
+### Interaction with the rest of the product (added for Ready)
+
+Criteria 53 to 67 apply to arcs (Part A), to the curve of all three shapes
+(Part B) or to both, as each says. They add no new feature; they pin down what
+happens where this slice meets the specs that were written or built after it
+was drafted.
+
+53. **Rotated ellipse.** Given an ellipse with an arc and a rotation (a circle
+    too: its rotation, invisible on a whole circle, now turns the arc), then
+    the drawn arc, the two arc handles, the selection box and the hit area are
+    the unrotated ones turned about the centre; a handle drag reads the
+    pointer in the ellipse's own frame (criterion 2), so the handle stays under
+    the pointer at any rotation. Rotating or moving writes only rotation and
+    centre (criterion 11).
+54. **Mirror and negative scale (`0056`).** Given a flip, a half turn, or a
+    resize drag or typed W or H that passes through zero, applied to an ellipse
+    with an arc, then it stays an ellipse with an arc whose drawn outline is
+    the exact mirror image of the old one: centre, `rx`, `ry` and `rotation`
+    are what `0056` criterion 21 gives, the kind and the sweep are unchanged,
+    and a reflection reverses the direction of increasing angle, so the new
+    start is the image of the old end and the new end the image of the old
+    start. Angles are written in [0°, 360°). Example in the ellipse's own
+    frame: a mirror along its own horizontal axis gives `start' = −end`,
+    `end' = −start`; along its own vertical axis `start' = 180° − end`,
+    `end' = 180° − start`; a document-axes flip negates the rotation and uses
+    the first formula for a vertical flip and the second for a horizontal one.
+    Test: the mirrored arc equals the mirror image of the old one at 64 equally
+    spaced samples within 1e-9 mm, for a flip twice (identity within 1e-9° and
+    1e-9 mm), and for rotations of 0°, 30° and 90°. A curve is scale-free and
+    the ring of every curved shape is symmetric, so a mirror leaves the curve
+    value unchanged on an ellipse, a polygon and a star (the drawn outline is
+    the mirror image, as `0056` criterion 22 requires for the straight shape).
+55. **Linked clone (`0049`, `0057`).** Given a selected ellipse with an arc or
+    a curve, or a polygon or star with a curve, when the maker makes a linked
+    clone, then the primitive is converted to a path in the same commit, with
+    no notice (`0049` criterion 2), and the path is the one "Object to path"
+    gives (criteria 13, 29, 48), so the clone shows the arc or the curved
+    shape. A clone has no arc or curve field of its own, no handles of this
+    spec, and the Select bar's ellipse group and "Curve" field are not shown
+    for a clone; `0057`'s overrides change style and placement only.
+56. **Stretch and conversion (`0019`, `0047`).** Given a group stretch that
+    converts an ellipse (a not-aligned ellipse in a multi-selection) or a
+    polygon or star, then the path it becomes is the one of criteria 13, 29
+    and 48 for the shape's current arc or curve, and the stretch maps that path.
+    A single ellipse resized in its own frame (criteria 10 and 27) is not
+    converted. A uniform scale, a rotation, a move and a mirror never convert
+    (criterion 63).
+57. **Copies.** Given Duplicate, a Ctrl-drag copy or a copy made by a transform
+    entry, then the copy has the same arc or curve as the original (the whole
+    parameter set is copied) and is the same kind of primitive.
+58. **Layers (`0050`).** Given an ellipse, polygon or star that is hidden, on a
+    hidden layer, locked or on a locked layer, then it is never in the
+    selection, so it gets no handle of this spec and no bar control writes to
+    it (`0050`'s selection filter); the bar fields skip it in a selection that
+    reaches it through a group. Its arc or curve is drawn, hit-tested (when
+    visible and unlocked) and converted like any other.
+59. **History (`0020`, `0041`, `0042`).** Given any change of this spec, then it
+    is one commit with one undo step and one entry in the History tab named
+    "Change arc" (angles, kind, "Whole ellipse") or "Change curve" (handle,
+    field, double-click entry). A bar field drag or typed value on a selection
+    of several objects is one commit and one step for all of them. The object
+    history of `0041` lists the same names. A branch, a Preview and a clone of
+    an earlier state (`0042`) draw the arc or curve by the same evaluation;
+    going to a state from before the arc reads a whole ellipse without any
+    notice.
+60. **Other consumers of the outline.** Given an ellipse with an arc, a curved
+    ellipse, or a curved polygon or star as an operand of a Boolean operation
+    (`0016`), Offset (`0038`), Combine (`0035`, `0054`), Cut at crossings
+    (`0036`) or Fracture and Flatten (`0037`), then the operand is its drawn
+    outline, converted as a primitive is today; an open Arc is handled as any
+    open path is by that feature. This spec adds no rule to any of them.
+61. **Determinism.** Given the same shape parameters, then the shared evaluation
+    returns the same outline, box, handle positions and converted path every
+    time and in any order of calls: a pure function, no clock, no random
+    number, no map iteration, no global. Native and `wasm32-unknown-unknown`
+    agree within 1e-9 mm on the golden fixtures (the trigonometric functions
+    may differ in the last bits; the tests compare with that tolerance, and the
+    stored values are compared exactly after a save and open).
+62. **Budgets** (native release build, `#[ignore]` benchmarks on the build
+    host, as `0019` criteria 48 and 49). (a) One evaluation of an ellipse with
+    an arc, a curved ellipse, or a curved hexagon, including the box and the
+    converted path: 50 µs at most. (b) A curved polygon with 1024 sides: 2 ms
+    at most. (c) One frame of a handle drag (apply, outline, preview, readout)
+    on a 1024-sided curved polygon: 4 ms at most, so the drag keeps 60 frames
+    per second with the renderer's share. (d) A typed "Curve" over a selection
+    of 5,000 mixed ellipses, polygons and stars in one commit: 250 ms at most.
+    (e) Opening a file with 5,000 curved shapes adds at most 100 ms to the open
+    time of the same file without curves.
+63. **Primitives stay primitives.** Given any operation of this spec or of a
+    transform whose result is exact, then the object stays the primitive it
+    is: a curve of 100% on a polygon stays a polygon (it draws a circle) and a
+    curve of 0% on an ellipse stays an ellipse (it draws a diamond); a pie of
+    360° is a whole ellipse (criterion 5), not a path; a mirror, half turn,
+    uniform scale, rotation, move and typed size never convert. Only "Object to
+    path", a linked clone (criterion 55) and a group stretch (criterion 56)
+    convert.
+64. **Angle input.** Given a typed or dragged angle, then it is written in
+    [0°, 360°): −90 becomes 270, 360 becomes 0, 450 becomes 90. An input that
+    makes start and end equal within 0.1° makes the ellipse whole
+    (criterion 5), one commit.
+65. **Keyboard and screen reader.** Given the canvas handles are pointer
+    controls, then every value they set is also reachable by keyboard in the
+    bar: the kind choice, "Whole ellipse", "Start", "End" and "Curve" have a
+    Tab stop, an accessible name and a tooltip; a release or a bar commit
+    announces the new value in a polite live region ("Arc start 30.0°, end
+    150.0°, pie"; "Curve −35.0%"). No new shortcut key is added (Proposals
+    below).
+66. **No hint text.** Given the handles and bar controls of this spec, then
+    there is no hint chip, tip line or explanatory label by default (customer
+    decision 2026-10-16); the pointer readout (criteria 6, 25) and the
+    tooltips of the bar controls are the only text. A greyed control keeps its
+    tooltip, which names the reason ("Not available while the curve is not
+    100%").
+67. **Rendering and export tolerance.** Given the renderer and every exporter
+    (now: none; later `0024`, machine output), then an arc and a curved side
+    are flattened with the document's kernel tolerance of 0.01 mm at most and
+    never from the cubic of "Object to path" alone: the true circular arc is
+    flattened, so the drawn outline and the converted path differ by at most
+    the 0.1% bound of criteria 13, 29 and 48.
+
 ### Document-model impact (Part B)
 
 `Shape::Ellipse { frame }` gains an optional `curve` register (a unit-carrying
@@ -561,20 +712,19 @@ and star (criterion 38), like the rectangle's radius; validation on open only
 rejects non-finite values and values outside -100% to 100%. A shared ring
 evaluation (vertices, `φ`, `c`, side arc, middle, cubic control points,
 `k_min`) is called by the ellipse and by polygon and star, so criterion 51
-holds by construction; the architect decides where it lives and the property
+holds by construction; it lives in `curvyo-document-core` (`adrs.md`), with the property
 test of criterion 38 (no self-crossing for N from 3 to 1024, ratio from 0.01 to
-0.99, any allowed curve value). It is a new stored field and a `format_version` increase, even though
-untouched ellipses are written as before (criterion 33). The half-axes `rx`,
+0.99, any allowed curve value). The half-axes `rx`,
 `ry` are unchanged, so nothing about the frame or `oriented_bounds` changes for
-Part B (criterion 20). The architect decides: field layout; the writer's rule
-for 100% (absent); validation on open (finite, within the range, not together
-with an arc); what evaluation does when two peers set an arc and a curve
-concurrently and a merge yields both (suggestion: a file with both is damaged
-on open, but a live merge is not refused; there the arc wins and the curve is
-ignored until the arc is made whole);
-the one evaluation function every consumer (outline, render, hit test, handle
-layout, "Object to path") calls, so the drawn outline and the converted path
-agree; the true-arc-to-cubic construction of criterion 29; golden fixtures for
+Part B (criterion 20). Decided in `adrs.md`: one flat `curve` register per shape
+(a fraction from -1 to 1), deleted when the value returns to the shape's
+default; validation on open (finite, within the range, not together with an
+arc); a live merge that yields both an arc and a curve is not refused (the arc
+wins and the curve is ignored until the arc is made whole), a file with both is
+damaged; the one evaluation function every consumer (outline, render, hit
+test, handle layout, "Object to path") calls, so the drawn outline and the
+converted path agree; the true-arc-to-cubic construction of criterion 29;
+golden fixtures for
 curve 100%, 50%, 0%, -50% and -100% on a circle and one ellipse, and for the
 polygon and star on a triangle (limit -50%), a hexagon and a pentagram star at
 100%, 50%, 0%, -50% and the limit, plus the triangle at 100% (6 nodes)
@@ -594,56 +744,204 @@ any of the three shapes.
   the Select tool edits).
 - A donut or ring (inner radius, Affinity's "Donut"), Inkscape's "pointer
   inside or outside decides the kind", moving both arc handles together with
-  one drag, arcs on rectangles, stars or polygons (a polygon's curve is not an arc), elliptical arcs tilted
-  against the shape's own rotation.
-- Rotating the arc inside the ellipse by a modifier (the start and end handles
-  do it by two drags or by typing).
-- Skewing primitives (`specs/0009-unified-object-editing/` question 5), undo and
-  redo, keyboard nudging.
+  one drag, arcs on rectangles, stars or polygons (a polygon's curve is not an
+  arc), elliptical arcs tilted against the shape's own rotation, rotating the
+  arc inside the ellipse by a modifier (two drags or typing do it).
+- Arc or curve in the Ellipse tool or in the click-to-create chip of `0052`: a
+  new shape is whole (criteria 16, 34); `0052`'s chip stays r and angle.
+- SVG: `0024` imports `<ellipse>` and arc commands as paths, as it imports
+  every shape; an exported arc or curve is its path outline, and a round trip
+  gives a path, not an arc. Native SVG arcs as primitives are a later story.
+- A keyboard route to the handles on the canvas (the bar fields are the
+  keyboard route, criterion 65), new shortcut keys (Proposals below), an
+  animation of the handles.
+- Skewing primitives (`specs/0009-unified-object-editing/` question 5),
+  keyboard nudging beyond `0044`. Undo and redo are in scope as one step per
+  change (criterion 59), not as a feature of their own.
 - Stroke offsetting and boolean operations on the shape (their own slices; the
-  shape is an ordinary closed path through "Object to path").
+  shape is an ordinary closed path through "Object to path", criterion 60).
+
+## Decided by the product owner
+
+Change any of these if you disagree; none of them blocks the build.
+
+- Priority Should; one slice: Parts A and B on the branch `story/ellipse-arcs-and-shaping`
+  as milestones (Part A, Part B ellipse, Part B polygon and star), **one pull
+  request** when the whole slice can be tried (customer rule 2026-10-09), one
+  `format_version` increase.
+- Angles run clockwise on screen from the ellipse's own right-hand axis; equal
+  angles within 0.1° are a whole ellipse; angles are stored in [0°, 360°)
+  (criteria 5 and 64).
+- On a whole ellipse the arc handles rest at the seam of 45° so they never sit
+  on a resize handle and the first drag is continuous (criteria 1, 2).
+- The ellipse group of the Select bar is always complete while an ellipse is
+  selected: the controls are greyed where they do not apply and never appear
+  or vanish (customer rules on the bar and on permitting over refusing), with
+  "Start" and "End" fields as the keyboard route (criteria 3, 65).
+- Polygon and star default to curve 0%, ellipse to 100% (criteria 17, 35); the
+  stored curve is kept when Points or Ratio change (criterion 46).
+- Budgets of criterion 62 are my estimates from the other specs' benchmarks;
+  the implementer may propose other numbers with a measurement.
+- No hint chip, tip line or Apply button anywhere in this slice (criteria 66,
+  8, 24).
+- Licence and dependencies: no new dependency, nothing to check with
+  `cargo deny`; the circular-arc-to-cubic construction is written here from the
+  standard formulas and is our own code.
 
 ## Questions for the customer
 
-1. **Which kinds of arc, and which one first?** (a) Three kinds with a switch,
-   a new arc starts as an open arc (default, recommended; you asked for a
-   "circular arc"; a wedge is one click on "Pie"); (b) three kinds, a new arc
-   starts as a pie (what Inkscape does when you drag outside); (c) only the open
-   arc for now.
-2. **Is this what you meant by the Affinity screenshots?** Resolved by the
-   customer (2026-10-06): yes, option (b). Curve (circle 100%, diamond 0%,
-   four-pointed star -100%) is accepted and goes onto polygon and star in the
-   same slice ("polygon und stern auch gleich"; criteria 35 to 52). Arc and
-   curve stay mutually exclusive on an ellipse (criterion 31).
-3. **Selection box of a half circle.** The box around only the drawn half (a
-   half circle of radius 20 mm is 40 × 20 mm, default, recommended; it is the
-   size of the part you cut) or around the whole circle behind it (40 × 40 mm).
-   The first also moves the pivot of a rotation to the middle of the drawn part.
+Each has a default that is taken without an answer. Questions 1, 3 and 4 are open;
+2 was resolved earlier.
+
+**Frage 1 (ARC-KIND): What kind is a new arc?** When you drag an arc handle on
+a whole circle:
+- A (default, recommended): an open arc (a curve line, you asked for a
+  "circular arc"); a wedge is one click on "Pie".
+- B: a pie (what Inkscape does when you drag outside the circle).
+- C: only the open arc exists for now (no Pie, no Chord).
+If you do not answer: A.
+
+**Frage 2 (CURVE-READING): Is this what you meant by the Affinity screenshots?**
+Resolved by the customer (2026-10-06): yes, curve on circle and ellipse, and on
+polygon and star in the same slice ("polygon und stern auch gleich"; criteria
+17 to 52). Arc and curve stay exclusive on one ellipse (criterion 31).
+
+**Frage 3 (ARC-BOX): How big is the selection box of a half circle?**
+- A (default, recommended): around only the drawn half, 40 x 20 mm for a
+  radius of 20 mm: the size of the part you cut. The pivot of a rotation moves
+  to the middle of that part.
+- B: around the whole circle behind it (40 x 40 mm); the pivot stays at the
+  circle's centre.
+If you do not answer: A.
+
+**Frage 4 (ARC-VS-CURVE): What happens when you want an arc on a curved
+ellipse, or a curve on an arc?**
+- A (default, recommended): the controls for the other are greyed with a
+  tooltip; you make the ellipse whole (arc) or type 100 (curve) first. This is
+  what you confirmed on 2026-10-06.
+- B: permit: using an arc control on a curved ellipse sets its curve to 100% in
+  the same step (and a curve control on an arc makes it whole). One step, undo
+  gives both back; the loss of the other setting is silent.
+If you do not answer: A.
+
+## Proposals (vetoable at the demo, no question)
+
+- No keyboard shortcut for arc or curve; nothing is bound by this slice. A key
+  for "Whole ellipse" is a later Proposal if the maker asks.
+- The tooltip of the curve handle's bar field names the three stops
+  ("100% circle, 0% diamond, -100% star"); it is the only place that says so.
 
 ## UX notes
 
-(filled in by ux-engineer before Ready)
+Written to `docs/design-system.md` (rows "Parameter handle", "Parameter handle
+layout", "Select bar layout", "Bar number field", "Limited tag") and the
+customer rules of 2026-10-06 to 2026-10-16; the implementer adds the new rows
+named below to the design system in the same PR. No new colour token, glyph
+shape or font size: arc and curve add a knob position and a readout, as the
+design system says for a new parameter kind.
 
-Open points: (Part B, polygon and star) the curve handle's side
-(counter-clockwise of vertex 0) and how it stays clear of a star's
-inner-radius handle and of a polygon's resize handles, the position of the
-effective value when the stored one is below the limit (a hint in the bar
-field, for example "limited to -44.4 % by Points/Ratio"), the "Curve" field
-in the bar next to "Points" and "Ratio"; and, for Part A: where two arc handles sit on a whole ellipse and how they differ
-from the resize handle at the same point; the look of "Pie / Arc / Chord" and
-"Whole ellipse" in the Select bar; the readout text; how the shape tool's old
-preview and the blue preview look on a partly drawn outline; (Part B) the
-curve handle's glyph and position (inside the shape on the diagonal, up to
-0.7071 of the half-axes from the centre, so it can sit close to the centre
-handle at -100% and close to an arc handle at 45°: no two glyphs closer than
-4 px, `specs/0009-unified-object-editing/` criterion 8; the parameter-handle size
-threshold), the "Curve" field's place in a Select bar that also carries two
-switches and, for ellipses, the arc controls, and how a shape that looks like a
-star but is an "ellipse" is labelled in the interface.
+**Arc handle layout.**
+- Two knobs, the standard 10 px parameter handle, both on the outline at the
+  start and end angle, in the ellipse's own rotated frame, drawn above the
+  transform handles; shown from a shorter box side of 72 px (`T`).
+- Whole ellipse: both rest at the seam of 45° (lower right on screen), the end
+  knob 7 px before the seam and the start knob 7 px after it along the outline
+  (14 px apart, the 4 px clearance rule). Dragging either takes the pointer's
+  angle at once; the other stays at 45° (criterion 2).
+- Arc: the knobs sit on the true angles. A pie or chord shows the same two
+  knobs; the straight edges have no handle.
+- The "Knob displacement" rule below keeps a knob off a resize
+  square and off the other knob.
+- Hover: the knob takes the hover ground; the cursor is the built-in `pointer`;
+  no hint chip. During a drag the readout "start 30.0° · sweep 120.0°"
+  (criterion 6) sits at the pointer by the existing readout rule; the old shape
+  stays black, the new arc is blue and hollow, over any fill with the white
+  casing of the "Live preview outline" row.
+
+**Knob displacement (one rule for the arc, curve and inner-radius knobs).** A
+knob keeps its true position unless a drawn glyph (resize square, another knob,
+the centre handle where it does not yield) is closer than 14 px to its centre.
+It is then drawn displaced along its own travel line (the outline for an arc
+knob, the perpendicular bisector of the side towards the centre for a curve
+knob) by the shortfall, at most 14 px, away from the other glyph; if both ways
+are blocked, towards the shape's centre. The value, the hit area and the
+readout follow the drawn position; the value is only recomputed from the
+pointer once the drag starts, so no jump beyond the 14 px. Two knobs closer
+than 14 px (a sliver arc) are pushed apart symmetrically about their middle.
+
+**Curve handle.** One knob at the middle of the side counter-clockwise of
+vertex 0 (criteria 22 and 40), at the effective curve; on an ellipse at 100%
+it sits on the outline at 315° (upper right). A star's curve knob and its
+inner-radius knob lie on opposite sides of vertex 0 and are separated by the
+displacement rule. At small curve values or on a small shape the curve knob can
+be near the centre handle; the centre handle yields within 20 px
+(`0009` criterion 8).
+
+**Select bar.** Groups follow the existing order: settings, Flip, kind groups,
+then the curve group, then "Object to path" and "Linked clone".
+- Ellipse group (shown while the selection holds an ellipse), two 36 px rows
+  because the group is wider than the 324 px bar that an 800 px window with the
+  panel open leaves: row 1 the "Arc kind" segmented group (three 28 x 28 px
+  icon buttons Pie, Arc, Chord; 16 px glyph, 1.5 px stroke, `currentColor`;
+  `role="radiogroup"` named "Arc kind", `aria-pressed` on the active one by
+  fill and glyph, not by colour alone), 12 px gap, then the "Whole ellipse"
+  icon button (a full circle outline, 28 x 28 px). Row 2 the number fields
+  "Start" and "End", each 104 px, 4 px apart, the label inside the left edge
+  (12 px `--toolbar-icon` at 70%), the "°" suffix inside the right edge, one
+  decimal. Accessible names "Arc start" and "Arc end". The row heights of the
+  bar are measured at the build, as the Flip and rectangle groups were, and
+  recorded in the design-system row.
+- Tooltips (Radix, 400 ms, bottom, name semibold, one muted line): "Pie" /
+  "Arc" / "Chord" with "The arc and straight lines to the centre." / "The arc
+  only. Open." / "The arc closed by a straight line."; "Whole ellipse" with
+  "Remove the arc."; "Start" and "End" with "Angle from the right-hand axis,
+  clockwise." A greyed control adds a second muted line with the reason.
+  Greyed = `aria-disabled`, glyph at 40%, no hover, Tab stop and tooltip kept
+  (the Flip rule), never hidden.
+- Curve group (shown while the selection holds an ellipse, polygon or star):
+  one field "Curve", 96 px, the label "Curve" inside the left edge, "%" suffix,
+  right-aligned one-decimal value, "Mixed" when the effective values differ,
+  the "limited" tag and its tooltip of the Limited tag row when a polygon's
+  or star's stored value is below its limit ("Stored -80 %, limited to -44.4 %
+  by Points and Ratio; changing them brings it back."). Greyed with a tooltip
+  for an ellipse with an arc. Tooltip line: "100 % circle, 0 % diamond, -100 %
+  star." (Proposal 2.)
+- Fields: Enter commits once; Escape or a press elsewhere restores and writes
+  nothing; invalid input is marked by the 2 px `--field-invalid` border and the
+  12 px message line "Enter a number" under the field (the Radius field's
+  rule).
+- Entry chips (double-click on a knob): the existing entry chip surface with
+  one field ("Arc start", "Arc end", "Curve"), the "°" or "%" suffix, no
+  Apply button, Enter commits, Escape closes (criteria 8, 24, 42).
+
+**Not present, by rule.** No hint chip or tip line on the canvas or in the bar
+(customer 2026-10-16); no section in the right panel (the panel gets nothing
+new; an arc or curve is not a style); no new toolbar button in the rail; no
+tool switch; no Apply or Reset button (typing 100 or 0, or "Whole ellipse",
+resets); nothing appears that the selection did not already imply (the
+ellipse group is shown for any ellipse, whole or not).
+
+**Accessibility and contrast.** The knob and bar controls reuse the tokens of
+the existing parameter handle and Flip buttons, which meet 3:1 (glyph) and 4.5:1
+(text) already; the tooltips and the "limited" tag are 12 px text at
+`--toolbar-icon` on the bar ground as in the Limited tag row. Focus order in
+the bar: kind group, Whole ellipse, Start, End, Curve.
+
+**Open for the build review** (measured, not decided here): the real row
+heights of the bar with an ellipse, a polygon and a mixed selection at
+800 x 600; the 7 px offset of the resting knobs against hover target overlap;
+the look of the old shape under a partly drawn blue arc on a filled shape.
 
 ## Links
 Requirements: R-EDIT-002 (`docs/requirements.md`)
 Builds on: `specs/0009-unified-object-editing/` (must come first),
 `specs/0003-primitive-shapes/` (criteria 7 to 9, 10 to 15, 19, 20),
 `specs/0008-object-transform-refinements/` (criteria 19 to 21, 33 and 34)
+Meets: `specs/0013-rectangle-corner-radii/` (the register and bar pattern),
+`specs/0049-linked-clone/` and `specs/0057-clone-overrides/` (criterion 55),
+`specs/0050-layers-and-objects-panel/` (58), `specs/0056-mirror-and-negative-scale/` (54),
+`specs/0042-history-branches/` (59), `specs/0052-click-to-create-shapes/`, `specs/0053-node-marquee-selection/`
+and `specs/0055-compound-path-node-editing/` (nodes of the converted path),
+`specs/0058-bitmap-import/` (no interaction)
+Decisions: `adrs.md`
 PR:
