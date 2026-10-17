@@ -114,8 +114,8 @@ file, `format = 1`) and turns on the `toml` writer. Reference state: `main` at
    0004 §6), so two machines that edit formats at the same time leave a
    conflict copy, and ADR 0004 §7's detection reports it once it exists.
    Revisit (one file per group) if settings ever merge automatically.
-9. **0046 hook, nothing built:** a format entry is a struct; 0046 adds a
-   `shape` field and the next schema numbers (built-in 3, user 2).
+9. **No shape in a format** (customer, 2026-10-17): a format is a name and a size; `0046`
+   became guide paths and takes no schema number here.
 10. **Project format: no change** (criterion 28). A project stores millimetres
     only.
 

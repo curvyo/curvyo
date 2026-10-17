@@ -1,124 +1,144 @@
-# Document shapes: a circle, a rounded rectangle or an outline from a file as the document area
+# Document template and guide paths: mark outlines as guides, load a template from a file
 
-Status: Draft (a sketch with numbered criteria; not Ready: it needs the customer's document-model decision, the architect's ADR, the UX notes, and for parts of it the SVG importer of `0024` and a DXF importer that nobody has specified yet)
+Status: Ready (2026-10-17) for stage 1 (mark paths as guides, load outlines from another Curvyo document). Stage 2 (load from an SVG file) waits for the importer of `0024`.
 Priority: Should
-Origin: Customer (request of 2026-10-10, final: templates that are not square, custom shapes with a circle or a path loaded from SVG or DXF, again no popup, an add and save button inside the sidebar). Everything about how a shape behaves is the product owner's proposal and is marked in the questions.
+Origin: Customer (request of 2026-10-10: templates that are not square, key rings, labels, hoops). Redesigned by the customer's answers of 2026-10-17: no shaped page; a template is a set of outlines placed in the document and shown in a marking colour; the same thing serves as guide lines. The folder keeps its number and slug (`document-shapes`); the earlier design (ellipse and rounded-rectangle area, shape in formats) is dropped.
 
 ## User value
 
-As a maker who cuts key rings, coasters, labels and boards, or embroiders inside a hoop, I want the document area itself to have the shape of my blank (a circle, a rounded rectangle, or the outline of a key ring loaded from a file) so that I draw inside the real material, see what falls outside it, and pick the blank from my formats like any other size.
+As a maker who cuts key rings, coasters, labels and discs, or embroiders inside a hoop, I want the outline of my blank on the canvas as paths I can see, move and edit, so that I draw inside the real material. I draw the outline with the tools I know (a circle, two circles for a donut), mark it as a guide, and it stays out of the cut. I can also load the outlines from an SVG or from another Curvyo document. Guide lines for alignment are the same thing.
 
-**Reference tools.** Inkscape and Illustrator have a rectangular page only; a non-rectangular blank is drawn as an object and used as a guide or a clipping path. LightBurn shows the machine bed as a rectangle and has no document shape. Ink/Stitch takes the hoop from a template or a preference. Cricut and Silhouette design spaces offer mat and material templates. Here the area is part of the document and comes from the formats library, the same list the rectangles come from.
+**Reference tools.** Inkscape and Illustrator let a maker turn any path into a guide (Edit, Objects to Guides; View, Guides, Make Guides) and keep the page a rectangle. LightBurn shows the bed as a rectangle and has no template. Cricut and Silhouette offer mat and material templates. Here a guide is an ordinary object with a flag, so every tool works on it.
 
 ## Words used below
 
-- **Area:** the part of the plane that belongs to the document. Today it is the rectangle of the document size.
-- **Shape:** the kind of area: **Rectangle** (today's), **Rounded rectangle** (corner radius), **Ellipse** (a circle is an ellipse with equal sides), **Outline** (a closed path, possibly with holes, loaded from a file).
-- **Size:** the width and height of the area's **bounding box**. The document size of `0015` is the size of that box, whatever the shape.
-- **Pasteboard:** everything outside the area (`0015`). Objects there are drawn and edited as now.
+- **Guide:** a path, compound path, rectangle, ellipse, polygon or star that carries the flag `guide` (ADR 0019). It is drawn in the **marking style** and is not output.
+- **Template:** the guides that came from a file or from another document. It has no identity of its own; after loading it is guides.
+- **Marking style:** green, dashed 2 px on / 2 px off, one screen pixel wide at any zoom, no fill (**Proposal** for the exact green: token `--guide`, about `#15803D`, at least 3:1 on `--canvas-bg` and `--pasteboard-bg`, measured at build).
+- **Document area:** the page rectangle (`0015`) plus any guides. Only "zoom to document" uses it; the page itself stays the rectangle.
+- **Frame:** the page of a source: a Curvyo document's page rectangle; an SVG's `width`/`height` or `viewBox` (`0024`).
 
 ## Dependencies and stages
 
-| Stage | Delivers | Needs first |
-|---|---|---|
-| 1 | Ellipse (circle) and rounded rectangle as the area; shape in a format; the Shape row in the Document section | `0045` formats library, `0040` background (the fill of the area), a customer and architect decision on the document model (Question 1) |
-| 2 | Outline from an **SVG** file | Stage 1 and `0024-svg-import-export` (the importer; not started) |
-| 3 | Outline from a **DXF** file | Stage 1 and a DXF importer. **There is no spec, no number and no requirement for DXF import yet**; `R-SYS-006` covers SVG only. It becomes its own entry when the customer schedules it (Question 3) |
+| Stage | Delivers | Needs first | State |
+|---|---|---|---|
+| 1 | The Select-bar command, the marking style, guides out of output, loading from another Curvyo document (File tab button **Template**), file format version | `0050` (layers), `0049` (clones), `0051` (File tab); all built | **Ready** |
+| 2 | Loading from an **SVG** file through the same button | Stage 1 and the importer of `0024-svg-import-export` (Draft; an API that returns the file's drawing and its frame is agreed in `0024`'s plan) | Not Ready: waits for `0024` Ready |
 
-Stage 1 can ship without any importer. Stages 2 and 3 are separate PRs in the sense of "one story per PR", each with its own milestones.
+DXF is not planned (customer, 2026-10-17: SVG first, DXF waits; no requirement exists). Criteria carry "(stage 2)" when they are not stage 1. Numbers of criteria that fell away stay as "Removed" placeholders.
 
 ## Acceptance criteria
 
-Sizes in millimetres. "Bounding box" is the tight box of the area's outline (for a rounded rectangle and an ellipse, their own box).
+### Part A: the guide flag
 
-### Part A: the document has a shape
+1. Given a document without guides (every file before this slice), then it opens and draws exactly as before, nothing is written by opening it, and saving it writes no `guide` key.
+2. Given a node marked as guide, then the node stores the register `guide` = true (ADR 0019) on its node; a path, compound path, rectangle, ellipse, polygon or star can carry it; unmarking removes the key. `format_version` goes to the next free number at merge; an older build refuses the file as "saved by a newer version" (it would otherwise cut the template).
+3. Removed (was: the document has a shape).
+4. Removed (was: kinds of shape).
 
-1. Given a document without a stored shape (every file before this slice), then its shape is Rectangle and it opens and draws exactly as before; nothing is written by opening it.
-2. Given a document with a shape, then the document size (width, height) is the bounding box of the shape and the document stores the shape beside the size: the kind, the corner radius for a rounded rectangle, and the outline's anchors (the compound path model of `0016`) for an Outline. This is a document-model and file-format change: `format_version` goes to the next free number at merge, and an older build refuses the file as "saved by a newer version" (it would otherwise draw a rectangle where a key ring is). **`needs-customer`** (`CLAUDE.md` §3, Question 1).
-3. Given a shape, then the document edge, the rulers and the status bar use the bounding box: the ruler origin is its top-left corner, the size readout is its width and height, as in `0015`.
-4. Given an Ellipse, then it fills its bounding box (a circle when width and height are equal); a Rounded rectangle has one corner radius, 0 to half of the shorter side; an Outline is a closed path, or a compound path whose holes are not part of the area.
+### Part B: how a guide is drawn and picked
 
-### Part B: how the area is drawn
+5. Given a guide, then it is drawn in the marking style at its place in the tree, above the nodes below it and below the ones above, with its geometry only: its own fill and stroke are kept in the node and not drawn. Given its layer is hidden, it is not drawn (`0050`).
+6. Removed (was: objects not clipped by a shaped area).
+7. Given the pointer, then a guide is selected, moved, deleted, grouped, locked and hidden like any node: a click on its line selects it, the marquee and lasso select it as any object, and Select all includes it. Because it has no drawn fill, a click inside a closed guide does not select it; the line is the hit area. The Select, Node, Shape and Transform tools work on it unchanged (an ellipse guide keeps its radius handles).
+8. Given a zoom from 1 % to 6400 %, then the marking style stays one screen pixel wide with dashes of 2 px on and 2 px off, measured on the screen, restarting at the start of each path; it is snapped to whole device pixels like the transform guide (`docs/design-system.md`).
 
-5. Given a shape, then the area is filled with the document background (`0040`: a colour with alpha, or the checkerboard for None) and the pasteboard around it, and the holes of an Outline, show the canvas colour. The edge of the area is drawn as the document edge is today (`0015`), along the outline, one constant screen width.
-6. Given a shape that is not a rectangle, then objects are **not clipped**: an object, or part of one, outside the area is drawn in full, as on a rectangular document's pasteboard. The area is a guide and a manufacturing boundary, not a mask. (Question 4: dimming what lies outside.)
-7. Given the pointer, then a click on an object outside the area selects it as on the pasteboard; the area is not an object and cannot be selected or moved (`0040` criterion on the background).
-8. Given a zoom from 1 % to 6400 %, then the edge of the area stays one line wide and the outline of a circle stays smooth (flattened to within 0.01 mm at 100 %, the tolerance of the render pipeline).
+### Part C: the command in the Select tool
 
-### Part C: the Document section
+9. Given the Select tool, then its bar has one **Guide** button: an icon button (28 × 28 px, 16 px Lucide `SquareDashed`, 1.5 px stroke, no label), always in the bar, directly after the Flip group, with the tooltip "Guide" and the accessible name "Guide". It is disabled when the selection contains no node that can be a guide (nothing selected, or only an image or text). Pressing it marks every such node of the selection (for a group: its paths and shapes) as a guide, in one commit `set_guide`, one undo step named "Guide". The selection stays.
+10. Given a selection whose markable nodes are all guides, then the Guide button is pressed (`aria-pressed`); pressing it turns them back into ordinary nodes, in one commit `set_guide`, undo step "Guide". Given a mixed selection, then it is not pressed and a press marks all. A guide turned back keeps its geometry, fill and stroke exactly.
+11. Removed (was: Radius field).
+12. Removed (was: scaling an outline with the box).
+13. Given **Fit to content** (`0015`), then it measures artwork only: guides do not count, and Fit leaves the tree when the document holds guides only (as with no objects). **Zoom to document** and the first view of a loaded template include the guides, so an overhanging template can be seen.
+14. Given the Guide button and the File tab button of this slice, then they are in the panel or bar column: no popup, no Apply button, no operating hints or helper text, nothing appears out of nowhere; the tooltip is the name only (customer rules 2026-10-16 and 2026-10-17).
 
-9. Given the Document section, then it has a **Shape** row with a segmented group: Rectangle, Rounded, Ellipse, and, once stage 2 exists, Outline (an inline group, no dropdown). The pressed item is the document's shape. Pressing another item changes the shape and keeps the bounding box: width and height stay, the centre stays, no object moves, one commit `set_document_shape`.
-10. Given Rounded, then a **Radius** value field (`0017` value field, 0 to half of the shorter side, mm) is in the tree, otherwise it is not. Given Ellipse with unequal sides, then nothing links them; the format library offers a **Circle** that has one size (criterion 17).
-11. Given Width or Height edited on an Ellipse or Rounded rectangle, then it resizes about the centre as `0015` criteria 17 to 19 say, and the corner radius is clamped to half of the shorter side.
-12. Given an Outline, then Width and Height still resize it, but the outline is **scaled** with the box and keeps its proportions: changing one field sets the other (**Proposal**, Question 5: the alternative is a fixed outline with only a Scale field). Objects move about the centre as in `0015`, the outline scales; nothing else changes. The scale is one commit, `resize_document`.
-13. Given **Fit to content** (`0015`), then it is offered for Rectangle and Rounded rectangle only and is not in the tree for Ellipse and Outline: a fitted circle or key ring has no obvious meaning (the smallest enclosing circle is not what a maker means). The rule is stated in the tooltip of the Shape row.
-14. Given the shape controls, then all of this is in the panel's own column: no popup, nothing disabled, hidden when it does not apply (`0017`).
+### Part D: formats
 
-### Part D: shapes in the formats library (`0045`)
+15. Removed (was: shape in a format).
+16. Removed.
+17. Removed.
+18. Removed. The document size formats of `0045` are unchanged: rectangular A0 to A6 and slides.
 
-15. Given a format, then it is a name, a size and a **shape**: `rectangle` (the default, so every existing file is unchanged), `rounded` with `corner_radius`, `ellipse`, or `outline` with `outline` (an SVG path `d` string in millimetres, origin at the top-left of its bounding box, at most 64 KiB and 2,000 anchors). A new optional key is added to the file schema, so the built-in file goes to schema 3 and the user file to `format = 2` (`0045`, `adrs.md` decision 9). A pick applies the size and the shape in one `resize_document` commit; `0030` criterion 11 (objects move about the centre) holds.
-16. Given the selected state of `0030`, then a document matches a format when size **and shape** match. A circle and a square of the same box are two formats and may coexist (this lifts `0045` criterion 5's size-only duplicate rule to size plus shape).
-17. Given the Add format form of `0045`, then it gains a **Shape** row after Unit: a group of four glyph-only items (Rectangle, Rounded, Circle, Outline from file), 36 px each, each with a tooltip and an accessible name. Circle replaces the Width and Height rows by one number, **Diameter**, and stores an ellipse with equal sides. Rounded adds **Radius**. Outline from file replaces the size rows by the **Choose file** button of criterion 19.
-18. Given a document whose shape and size match no format, then the Document tab has the button **Save as format** that opens the same inline form of `0045`, prefilled from the document (shape, size, outline), so the maker can name what he has just built. It shares the row of **Fit to content**: two half-width buttons of 118 px each, Fit on the left. The row exists whenever either button is in the tree and each keeps its slot, so neither jumps when the other leaves. The button is not in the tree when a format already matches, and it is never placed above Width, because its coming and going while the maker types a size would move the field he is typing in.
+### Part E: loading a template
 
-### Part E: an outline from a file (stages 2 and 3)
-
-19. Given the Add format form with Shape set to Outline, then the form has a button **Choose file** that opens the OS file dialog (the only layer, as Open). The dialog accepts `.svg` (stage 2) and `.dxf` (stage 3). The chosen file is read by a platform crate and parsed by the importer (`0024`; a DXF reader) in a core crate; the core crate opens no file.
-20. Given a chosen file, then the importer finds the closed outlines: for an SVG every closed path, rectangle, ellipse, polygon in the file's first level and inside groups, flattened to the model of `0016`; for a DXF every closed `LWPOLYLINE`, `POLYLINE`, `CIRCLE`, `ELLIPSE` and closed chain of `LINE` and `ARC` (stage 3). Units: SVG user units at 96 per inch (ADR 0002); DXF `$INSUNITS` when present, otherwise the form's **File units** group (mm, in, px) which is shown in the tree only when the file does not say (**Proposal**).
-21. Given the outlines, then the **outermost** closed outline is the area and every outline inside it is a hole. When the file has several outermost outlines, the largest by area is used and the form says "The file has 3 outlines. The largest is used." (Question 6: choose one.) A file with no closed outline is refused with "No closed outline found. Nothing was changed." An open path is never closed implicitly (`0016` criterion 15's rule).
-22. Given an outline, then it is normalised: moved so its bounding box starts at 0, 0 and kept in millimetres; text, images, strokes and fills of the file are ignored; limits 2,000 anchors (curves kept) and a size from 1 to 100 000 mm per side, otherwise "The outline is too complex (limit 2,000 nodes)." or the size message of `0015`.
-23. Given Add with a valid outline, then the format is stored with the outline inline in the user file (criterion 15) and picking it applies the shape. The source file is not referenced afterwards: moving or deleting it changes nothing.
-24. Every importer gets golden-file tests in `tests/fixtures/` (`CLAUDE.md` §5): at least a key ring with a hole, a circle, a rounded rectangle, a file with three outlines, a file without a closed outline, and for DXF one file per entity kind.
+19. Given the File tab (`0051`), then it has a **Template** outline text button (28 px high, in the row after Save as… and Close, as the five others) that opens the OS file dialog (the only layer, as Open). Stage 1 accepts `.curvyo`; stage 2 also `.svg`. It is enabled whenever Open is. The file is read by a platform crate; the core crates open no file. The tooltip is "Template". It never replaces the project and runs no unsaved-changes check (`0051`).
+20. Given a `.curvyo` file, then every node of its tree that is a guide in that document comes in as a guide; if it has no guide, **everything** comes in: every path, compound path, rectangle, ellipse, polygon and star that is visible (`0050`), with its geometry. Nothing else comes in (no images, no text, no fills or strokes drawn, no clones: a clone comes in as its resolved geometry). The nodes are copied with their coordinates: the source's top-left is our top-left. Given the source is the open document's own file, then it loads from the saved copy.
+21. (Stage 2) Given an `.svg` file, then the importer of `0024` reads its paths and shapes and the nodes come in with the SVG's frame's top-left at the document's top-left corner (0 mm, 0 mm). Given the SVG has no frame (no `viewBox`, no `width`/`height`), then the top-left of the horizontally aligned (axis-aligned) bounding box of everything is placed at the document's top-left. The scale is the SVG's own (user units at 96 per inch, ADR 0002); nothing is fitted or scaled, an overhang is allowed.
+22. Given any source, then **everything goes in**: any number of outlines (four lines, odd shapes, two circles for a donut), open or closed, nested or not, in any size; there is no check of closedness, count, size or fit and no message about them. Limits that protect the program stay: a file over 64 MiB, or one that is not a valid Curvyo document or SVG, is refused with a plain message and nothing changes. (stage 2 for the SVG part)
+23. Given a load, then it is one commit (`load_template`) and one undo step named "Template": the new nodes are guides, sit in the active layer at the top (`0050`), keep their names where the source had them, and are selected afterwards, so the maker can move them as a group at once. The source is not stored: no link, no path; moving or deleting the file changes nothing. Loading again adds again.
+24. Golden-file tests in `tests/fixtures/` (`CLAUDE.md` §5): stage 1: a `.curvyo` with a key ring (a path with a hole), two concentric circles, four lines, and one with guides and ordinary paths (only the guides come in). Stage 2: an SVG with a frame, one without, an overhanging one, one with groups and a `<use>`, and one that is not an SVG.
 
 ### Part F: links to manufacturing (stated, not built)
 
-25. The area is a boundary for later work and nothing in this slice uses it for output: a job whose cut paths lie outside the area gets a warning in the job preview (`0029`); export clips nothing (`0024`); a laser bed (`machine-profile`, `0026`) is a separate rectangle and the shape sits inside it; an embroidery hoop (a circle or a rectangle with a safe margin) is a format in the library; nesting parts on a blank (R-MFG-004) can use the area as its container. Each is a later entry that reads the stored shape; none changes this spec's model.
+25. Guides are never part of manufacturing output: the job preview and every machine output (`0029`) leave them out; artwork export (`0024` export, a later slice) leaves them out by default, and an option to include them is that slice's decision; nesting (R-MFG-004) may use guides as the container; an embroidery hoop is a template of the maker's own. Each is a later entry that reads `guide`; none changes this spec's model. Importing an SVG into a project never marks anything as guide. Snapping to guides is `0060` (draft); this slice does not snap.
 
-### Part G: how the shape is stored (direction from `adrs.md`; `needs-customer`, Question 1)
+### Part G: how the guide is stored (ADR 0019)
 
-26. Given a document with an Outline, then the outline is stored relative to its bounding box (normalised to a unit box), and the size registers stay the bounding box; a resize writes only width and height. Test: two replicas, one resizes the document while the other changes the shape, merge: box and outline agree on both. The outline is replaced as a whole value, never mixed across peers. The proportion lock of criterion 12 is a rule of the resize command for an Outline only.
-27. Given the area is drawn, then the background fill, the eyedropper and "is this point on the document" use a point-in-shape test on the real outline, not the bounding box (`0040` background pick); a pick on a hole of an Outline reads the pasteboard.
+26. Given two replicas of one document, when one marks a path as guide while the other moves it or edits its nodes, then after merge the path is a guide at its edited place (the flag is its own node register; geometry registers merge as before). Given both mark and unmark the same node, then the last writer wins. Test: merge both ways, same result.
+27. Removed (was: point-in-shape test).
+
+### Part H: undo, history, determinism, limits
+
+28. Given `set_guide` or `load_template`, then each is one commit and one undo step (`0020`) named "Guide" and "Template" in the history list (`0041`, `0042`). Ctrl+Z reverses it in one press and redo restores it. Undoing after a concurrent edit by another replica keeps that edit (ADR 0009).
+29. Given the History tab (`0042`) with Preview, then the preview of an older version draws the guides that version had, in the marking style; "Go to this version" and "Clone" restore them; a version before this slice has none.
+30. Given a document with guides, then saving it twice, or saving, opening and saving again, gives byte-identical project files; the `guide` key is written only on nodes that are guides. Golden: `guide_v<N>.curvyo` (a path, a circle, a compound path with a hole, a clone of a guide).
+31. Given damaged data, then opening reports the file as damaged with the key name and does not draw: a `guide` value that is not a bool. A version number above the build's is refused first as "saved by a newer version". One golden fixture per rule.
+32. Removed (was: Radius field limits).
+33. Given a template of 5,000 nodes or one 100 000 mm wide, then it loads and draws without NaN or empty output, and the marking style adds at most one stroke run per guide to the draw list (stage 1 test: counts; the frame budget of the canvas is not touched).
+34. Given any other feature, then none changes because a guide exists beyond what this spec states: Select all, Duplicate, Group, Boolean, Align and Transform treat a guide as the node it is; Duplicate and a copy-paste keep the flag. **A new path made from inputs by Boolean, Combine or Merge is a guide only when every input was a guide**, otherwise a normal path. A clone (`0049`, `0057`) of a guide is drawn as a guide and is not output; the origin's flag is read at draw time.
+35. Removed.
+36. Removed.
+37. Given keyboard use, then the Guide button is one Tab stop in the Select bar, operable by Space and Enter, with `aria-pressed` and the accessible name "Guide"; the Template button is a separate stop in the File tab. Focus returns to the canvas after a mouse press.
+38. Removed.
+39. Removed.
+40. Removed.
+
+### Part I: guides out of output (new)
+
+41. Given a document with guides, then the machine outputs of the slices that exist now and later (`0029`, G-code, HPGL, embroidery) and the artwork export of `0024` do not contain them, and the Layers tab (`0050`) lists them as ordinary rows. Test: the same drawing with and without a guide gives the same output bytes (the output function filters on `guide`).
 
 ## Out of scope
 
-- Clipping or masking export, print or jobs to the area; warnings about objects outside it (criterion 25).
-- Snapping to the edge of the area, "keep inside" constraints, margins and safe areas.
-- Several areas in one document, one area per page; several pages are dropped (2026-10-05).
-- Editing the outline's nodes in the document. The area is not an object (`0040`). To change it, load another outline or draw the object and use it as a template later.
-- Using a drawn object as the area ("make this path the document shape"). A natural follow-up (**Proposal**); not now.
-- A DXF importer in general (any entity, layers, blocks, 3D). Stage 3 reads outlines only.
-- First-party shape formats (hoop diameters, coaster sizes): the customer's list (Question 2).
-- Per-material or per-machine shapes from the material database (R-MAT).
-- A perspective, bleed or a second, inner area.
+- A shaped page (circle, rounded rectangle, outline as the document area), shape formats, scaling or fitting an outline: dropped by the customer (2026-10-17).
+- Checks of any kind on a template: closedness, count, size, overhang (customer: "we do no checking").
+- Drawing the circle and the rounded rectangle with a dedicated Template tool, or a Circle/Diameter shape for the template: "later, out of scope for this slice" (customer). The existing Ellipse and Rectangle tools make them now.
+- DXF, and any importer beyond `0024`'s SVG.
+- Snapping to guides, magnetic guides, ruler-dragged guide lines: `0060` (draft) and later. Multi-page (`0059`, draft): a guide is an object at coordinates and belongs to the page whose rectangle holds it, as any object does; nothing here changes when pages exist.
+- Per-guide colour or style, guide layers, locking all guides at once, a "show guides" switch.
+- Including guides in an export; a "Template" in the formats library.
 
-## Open questions (customer; each has a default)
+## Decided by the product owner (2026-10-17)
 
-1. **The document model (criterion 2).** A shape register next to the size, a `format_version` bump, the outline stored in the document, older builds refusing the file. *A (default, recommended):* one register `page_shape` (kind, radius, outline anchors) absent for Rectangle. *B:* the shape is not stored; it is a view setting and the file stays a rectangle. Rejected: the shape would be lost on reopening, and the next maker would not see the blank. Needs the customer and the architect.
-2. **The customer's real list.** Which first-party shape formats ship: hoop diameters (for example 100, 130, 180 mm), coaster sizes (90, 100 mm), key rings, label sizes? *Default:* none beyond A0 to A6 and the slides; the maker adds his own. Send the list and each becomes one block in the built-in file.
-3. **DXF timing.** DXF import is not specified anywhere. *A (default):* stage 3 waits until the customer schedules a DXF importer (its own spec with entity coverage and golden files); stages 1 and 2 ship without it. *B:* DXF outlines come first, before SVG, because the customer's blanks come from DXF. Tell me which file type the real templates are.
-4. **Outside the area.** *A (default):* objects outside are drawn normally (criterion 6). *B:* the part outside is dimmed to 35 % like outside an entered group (`0023`), a quiet warning for a laser job; it costs a clip pass in the renderer.
-5. **Resizing an outline (criterion 12).** *A (default):* Width and Height scale it, proportions kept. *B:* the outline is fixed; Width and Height are replaced by a read-only size and a Scale value field. Recommendation A for one mental model.
-6. **A file with several outlines (criterion 21).** *A (default):* the largest is the area, the others ignored with a notice. *B:* an inline list with a thumbnail per outline to choose from. *C:* every outermost outline is an area (disconnected areas). Recommendation A for the first version.
-7. **Ellipse versus circle.** *A (default):* one Ellipse shape; "Circle" is a format with equal sides. *B:* a separate Circle shape that keeps width and height equal when edited. Recommendation A.
-8. **Fit to content on a circle (criterion 13).** *A (default):* not offered. *B:* the smallest enclosing circle. Recommendation A.
+1. One concept: template paths and guide lines are the same thing, the `guide` flag. No second register, no separate "template" object.
+2. The flag applies to paths, compound paths and the parametric shapes (a circle is an ellipse node, so it must), and it is kept when the shape is edited.
+3. Fit to content ignores guides; zoom to document includes them. The page stays the rectangle.
+4. Loading from a Curvyo document takes the source's guides, and everything visible when it has none ("load directly from the document"); there is no picker (permit over refuse).
+5. Pressing Guide on a mixed selection marks all; the button is pressed only when everything markable is already a guide (a toggle with a clear state).
+6. A path made from inputs by an operation is a guide only when all inputs were.
+7. The Template button sits in the File tab beside Open: it is an action on the file, a text button like its neighbours.
+8. Not asked of the customer: his answers decide SHAPE-ADR (yes), SHAPE-LIST, SHAPE-MULTI, SHAPE-CIRCLE and SHAPE-SCALE; no question is open.
+
+## Open questions
+
+None for the customer. Defaults taken: the green is `#15803D` pending measurement; the Template button is in the File tab (alternative: a button in the Select bar, not chosen because it is a file action).
 
 ## UX notes
 
-A short note by the ux-engineer, 2026-10-10, written against `0045`'s UX notes. It is a sketch: the full notes follow when the customer has decided Question 1 (the document model) and the stages are scheduled.
+Revised for the new design on 2026-10-17 against `docs/design-system.md` ("Select bar layout", "Flip buttons", File tab) and the customer rules: the right panel never grows a section for an operation; nothing appears out of nowhere; operations are tools or actions with a visible trigger; symbols only; permit over refuse; no hint labels; no Apply button.
 
-- **Shape glyphs.** One set of 16 px Lucide glyphs, 1.5 px stroke, used everywhere a shape is named: Rectangle `Square`, Rounded `SquareRoundCorner`, Circle and Ellipse `Circle`, Outline `Spline` (a freeform curve). Glyph only, with a tooltip and an accessible name.
-- **A shape format in the list and the strips.** A format row shows the glyph (12 px) before the size when the shape is not a rectangle; a circle's size reads "⌀ 130 mm" (diameter sign, one number), an ellipse "130 × 90 mm", a rounded rectangle "100 × 60 mm, r 8". A cell of the quick selection shows the same 12 px glyph before the name ("◯ Hoop 130"); the cell keeps its 32 px minimum. The pressed and selected look follows size **and** shape (criterion 16).
-- **Add format form.** After Unit, a **Shape** row: a `ToggleGroup` of four glyph-only items (Rectangle, Rounded, Circle, Outline), 36 px each. Circle replaces the Width and Height rows by one **Diameter** row; Rounded adds a **Radius** row (value field, as the Document tab's Radius). Outline replaces the size rows by a **Choose file** button (outline, 244 × 28, opens the OS file dialog, the only layer) and, once a file is read, a muted line "Outline: 42 × 30 mm, 38 nodes" and the validation chips of criteria 20 to 22. The form is cancelled and kept as a draft like any form of `0045`.
-- **Document tab Shape row** (criterion 9): the same glyph group, 36 px items (four with Outline), label "Shape", directly above Width. Radius appears under it only for Rounded. Width and Height keep their place; for a circle the two fields stay editable and unlinked (Question 7 A).
-- **Save as format** (criterion 18): placed in the row of **Fit to content**, the two as half-width buttons (118 px each, Fit on the left). The row exists whenever either is in the tree and each keeps its slot, so neither jumps when the other leaves. It must not sit above Width: its coming and going while the maker types a size would move the field he is typing in.
-- **The area on the canvas.** The edge is the document edge of `0015` along the outline, one constant screen width; the inside is the background (`0040`), the outside and holes the pasteboard colour. Nothing is clipped; no cursor change over the area (the area is not an object). The canvas shows the shape; the status bar and rulers show the bounding box.
+- **Guide button.** In the Select bar, after the Flip group, one 28 × 28 px icon button, Lucide `SquareDashed` 16 px, 1.5 px stroke, `currentColor` (`--toolbar-icon`), `rounded-md`, hover as the Flip buttons. Always present; disabled (greyed) only when the selection holds nothing that can be a guide. Pressed (`aria-pressed`, `--editor-accent` ground as other toggles) when every markable node of the selection is a guide. Tooltip "Guide" (Radix, after 400 ms), accessible name "Guide". No label, no caption, no tip. It does not move: the Select bar keeps its two-row layout.
+- **Marking style on the canvas.** `--guide` stroke, one device pixel, dashes 2 / 2 device-aligned as the transform guide; no fill; no casing; selection overlay, handles and node glyphs as for any node. Hover and selected looks are the normal ones, drawn on top. The colour and the dash are the same everywhere a guide shows (canvas, history preview).
+- **Panel.** The Document section and the Style tab are not touched. The Layers tab (`0050`) shows a guide as an ordinary row; no new glyph, no new column. Style shows the guide's own fill and stroke as stored.
+- **Template button.** In the File tab, an outline text button like New and Open… (28 px high, 118 px where it pairs, otherwise full width in its own row after Close), label "Template", tooltip "Template". It opens the OS file dialog and nothing else. After the load the canvas notice slot (3 s, `role="status"`) reads "Template loaded." and the new guides are selected.
+- **No inline form, no dialog, no preview.** The result is the preview; Undo is the way back.
+- **Design system.** The implementer adds a row "Guide (`0046`)" to `docs/design-system.md` (the token `--guide`, the button, the dash) in the PR; the earlier rows for the shape glyphs and the shape formats are removed with this spec.
 
-Criteria changes requested and applied by the product owner on 2026-10-10: **18** (the button shares the Fit row); **17** (the Shape group is glyph-only, 36 px items).
+Criteria changes applied on 2026-10-17: **1, 2, 5, 7, 8, 9, 10, 13, 14, 19 to 25, 26, 28 to 31, 33, 34, 37** rewritten for the new design; **41** added; **3, 4, 6, 11, 12, 15 to 18, 27, 32, 35, 36, 38 to 40** removed; staging reduced to two stages.
 
 ## Links
 
 Requirements: R-EDIT-028
-Depends on: `specs/0045-document-formats-library/`, `specs/0040-document-background/`, `specs/0015-document-size-and-rulers/`; stage 2 `0024-svg-import-export` (not started); stage 3 a DXF importer (no spec)
-Related: `specs/0016-boolean-operations/` (compound path model), ADR 0002 (units, SVG at 96 dpi), ADR 0004 §9 (format versioning)
-ADRs: `adrs.md` (architect, a sketch; a short ADR, `needs-customer`, is written when stage 1 is scheduled)
+Depends on: `specs/0050-layers-and-objects-panel/`, `specs/0051-sidebar-and-no-menu/` (File tab), `specs/0049-linked-clone/`, `specs/0042-history-branches/`, `specs/0015-document-size-and-rulers/`; stage 2 `specs/0024-svg-import-export/` (Draft)
+Related: `specs/0045-document-formats-library/` (formats unchanged), `specs/0016-boolean-operations/`, `0057`, `0058` (unaffected), `0059` and `0060` (drafts: pages, snapping), ADR 0002 (units, SVG at 96 dpi), ADR 0004 §9 (format versioning)
+ADRs: `adrs.md`; [ADR 0019](../../docs/adr/0019-document-template-and-guide-paths.md) (Accepted 2026-10-17)
 PR: -
