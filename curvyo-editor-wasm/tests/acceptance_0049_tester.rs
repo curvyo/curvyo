@@ -137,7 +137,7 @@ fn forge(d: &Document, edits: &[(NodeId, [f64; 6])]) -> Document {
         let mut zout = zip::ZipWriter::new(std::io::Cursor::new(&mut buf));
         for i in 0..zin.len() {
             let mut f = zin.by_index(i).unwrap();
-            let name = f.name().to_owned();
+            let name = f.name().unwrap().into_owned();
             let mut data = Vec::new();
             f.read_to_end(&mut data).unwrap();
             if name == "document.loro" {
@@ -1186,7 +1186,7 @@ fn ac35_open_removes_orphans_in_one_step_and_says_so() {
             let mut zout = zip::ZipWriter::new(std::io::Cursor::new(&mut buf));
             for i in 0..zin.len() {
                 let mut f = zin.by_index(i).unwrap();
-                let name = f.name().to_owned();
+                let name = f.name().unwrap().into_owned();
                 let mut data = Vec::new();
                 f.read_to_end(&mut data).unwrap();
                 if name == "document.loro" {

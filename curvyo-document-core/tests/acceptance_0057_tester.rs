@@ -145,7 +145,7 @@ fn reopen(peer: u64, loro_bytes: &[u8]) -> Result<Document, OpenError> {
         let mut zout = zip::ZipWriter::new(std::io::Cursor::new(&mut buf));
         for i in 0..zin.len() {
             let mut f = zin.by_index(i).unwrap();
-            let name = f.name().to_owned();
+            let name = f.name().unwrap().into_owned();
             let mut data = Vec::new();
             f.read_to_end(&mut data).unwrap();
             if name == "document.loro" {
@@ -167,7 +167,7 @@ fn rezip_manifest(bytes: &[u8], version: u32) -> Vec<u8> {
         let mut zout = zip::ZipWriter::new(std::io::Cursor::new(&mut buf));
         for i in 0..zin.len() {
             let mut f = zin.by_index(i).unwrap();
-            let name = f.name().to_owned();
+            let name = f.name().unwrap().into_owned();
             let mut data = Vec::new();
             f.read_to_end(&mut data).unwrap();
             if name == "manifest.json" {

@@ -517,7 +517,7 @@ fn manifest_text(bytes: &[u8]) -> String {
     let mut all = String::new();
     for i in 0..zip.len() {
         let mut f = zip.by_index(i).unwrap();
-        if f.name().ends_with(".json") {
+        if f.name().unwrap().ends_with(".json") {
             let mut t = String::new();
             let _ = f.read_to_string(&mut t);
             all.push_str(&t);

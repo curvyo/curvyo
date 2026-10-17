@@ -681,9 +681,15 @@ fn c37_c59_no_format_version_bump_and_optional_keys_load_in_a_reader_that_ignore
     let v: serde_json::Value = serde_json::from_str(&manifest).unwrap();
     assert_eq!(v["format_version"], CURRENT_FORMAT_VERSION);
     // No new member in the container.
-    let names: Vec<String> = archive.file_names().map(str::to_owned).collect();
+    let names: Vec<String> = archive
+        .file_names()
+        .map(|n| n.unwrap().into_owned())
+        .collect();
     let plain_archive = zip::ZipArchive::new(std::io::Cursor::new(pack(&a, "t").unwrap())).unwrap();
-    let mut plain_names: Vec<String> = plain_archive.file_names().map(str::to_owned).collect();
+    let mut plain_names: Vec<String> = plain_archive
+        .file_names()
+        .map(|n| n.unwrap().into_owned())
+        .collect();
     let mut names_sorted = names;
     names_sorted.sort();
     plain_names.sort();
