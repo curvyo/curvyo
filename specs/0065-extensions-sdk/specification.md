@@ -83,6 +83,8 @@ Frage 1 (EXT-UI): Is a declarative contribution (schema plus display list) enoug
 
 The customer has a first extension in mind ("something simple"), which he will name when it comes back to him. This sketch reserves the place; the extension is chosen, specified and built as the first user of the SDK. Until then, the built-in tracer and the laser workbench are the contract's first users.
 
+**Candidate:** the constraint sketcher (`0066`) was a guess, and the customer decided it is a core feature (2026-10-17), so it is not the first extension. A small generator such as Honeycomb or Voronoi of `0071` is a cheap first extension if the forgotten idea does not return.
+
 ## Links
 
 Requirements: R-EXT-001, R-EXT-002 (existing); R-EXT-003 to R-EXT-005 (new)
