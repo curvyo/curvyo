@@ -27,16 +27,16 @@ Summary: **yes for closed overlapping outlines (cases 1 and 2); no for monoline 
 
 ## The smallest new tool or workflow (Proposal)
 
-1. **Weld**, one symbol button in the Select bar and in the Boolean toolbox group (next to Union), working on a selection of any number of closed and open objects: it first turns open strokes into outlines (using the stroke width, the fix for Gap 1), then unions everything, and closes gaps and slivers smaller than the tolerance field in the top bar (default 0.1 mm; fixed per use, not stored in the project). One history step "Weld". Result: one compound path with the outer outlines and the holes, selected, in the style of the lowest object.
+1. **Weld**, one symbol button in the Select bar and in the Boolean toolbox group (next to Union), working on a selection of any number of closed and open objects: it first turns open strokes into outlines (using the stroke width, the fix for Gap 1), closes gaps and slivers smaller than the tolerance, then runs the shared Flatten engine of `0037` and joins the result into one object. It closes gaps and slivers smaller than the tolerance field in the top bar (default 0.1 mm; fixed per use, not stored in the project). One history step "Weld". Result: one compound path with the outer outlines and the holes, selected, in the style of the lowest object.
 2. **Bridges** (Gap 3): a second tool, **Bridge islands**: the Bridge tool shows each island of the selection in the marking style; a click on an island adds a bridge of the width set in the top bar at the nearest point of the outer outline (draggable before committing, as the Offset handle is); the Enter key commits (a bridge is a subtracted gap in the island's outline, so the island stays attached to the stencil). No automatic placement in the first version (Question 2).
 3. Everything is a pure geometry function over paths, so it belongs in `geometry-core` or the Boolean crate and builds for `wasm32`. Cuttable tagging of fonts (`0062` criterion 12) can later use "Weld gives at most N pieces" as its test.
 
 ## Acceptance criteria (as far as clear)
 
-1. Given a selection of closed paths that overlap or touch, then Weld gives the same region as Union (`0016`) and is not a second algorithm.
+1. Given a selection of closed paths that overlap or touch, then Weld gives the same region as Flatten (`0037`) on the same selection, joined into one compound object; it calls the Flatten engine and is not a second algorithm.
 2. Given open paths with a stroke width, then Weld first expands them to closed outlines (round joins and caps by default, the stroke's own joins and caps honoured) and then welds; the stroke becomes part of the result; the fill of the result is the lowest object's fill.
-3. Given a tolerance of t, then two outlines closer than t (and slivers narrower than t) become one region; the result differs from a plain Union by no more than t/2 anywhere on the outline except at the closed gap.
-4. Given a tolerance of 0, then Weld equals Union plus stroke expansion.
+3. Given a tolerance of t, then two outlines closer than t (and slivers narrower than t) become one region; the result differs from a plain Flatten join by no more than t/2 anywhere on the outline except at the closed gap.
+4. Given a tolerance of 0, then Weld equals Flatten plus stroke expansion and join.
 5. Given the same input twice, then the same output node for node (as `0016` criterion 43).
 6. Given a result with N separate outlines, then the tool shows "N pieces" quietly in the top bar so the maker sees whether the word is connected; no popup.
 7. Given Bridge islands, then a bridge never crosses another outline and its width is a length with unit; undo is one step per bridge.
@@ -52,16 +52,10 @@ Summary: **yes for closed overlapping outlines (cases 1 and 2); no for monoline 
 
 ## Decided (customer, 2026-10-17)
 
-- **WELD-SCOPE: a new command.** Weld is its own command with the definition in "The smallest new tool" (stacking order decides, covered parts of lower objects are removed, uncovered parts stay, one new object). The comparison with Flatten is Frage 1.
+- **WELD-SCOPE: a new command.** Weld is its own command with the definition in "The smallest new tool" (stacking order decides, covered parts of lower objects are removed, uncovered parts stay, one new object).
+- **WELD-VS-FLATTEN: A** (customer, 2026-10-17). Weld is a thin command on the shared Flatten engine (`0037`): two buttons, one algorithm. Weld adds only (1) the join of the result into one compound object, (2) stroke expansion for open and stroked paths (later text), (3) the gap tolerance. `0037` is not changed.
 
 ## Open questions (customer; each has a default)
-
-Frage 1 (WELD-VS-FLATTEN): Is Weld a second algorithm next to Flatten (`0037`) and Union (`0016`)?
-Finding: no. Flatten already does "trim every shape to its visible part and remove hidden shapes" by stacking order. Weld's trimming is the same computation. Weld differs in three places only: (1) it returns **one** compound object instead of one object per shape (each Flatten result keeps its own style and place in the stack); (2) it also accepts open and stroked paths (Flatten refuses open paths) and, later, text, by expanding strokes first; (3) it closes gaps smaller than a tolerance first. Against Union the difference is real: Union keeps only the outer outline of the combined area, Weld keeps the upper object's whole contour.
-- A (default, recommended): Weld is a thin command on the **shared Flatten engine** (one kernel routine, the Fracture/Flatten code of `0037`), adding the join into one object, stroke expansion and the tolerance. Two buttons, one algorithm; `0037` is not changed, the extras live in the new spec.
-- B: no Weld button; extend Flatten itself with the three extras (a "Join" switch in the bar). One command less, but Flatten's tooltip and its refusal of open paths change in an accepted spec.
-- C: Weld as an independent implementation. Not recommended (two algorithms that must agree).
-- Default if unanswered: A.
 
 Frage 2 (WELD-BRIDGE): Bridges at all in the first version?
 - A (default): no; first Weld, bridges follow when the customer cuts a stencil. B: manual Bridge tool (above). C: automatic bridges with a rule (minimum island size).
