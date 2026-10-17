@@ -1,6 +1,6 @@
 # Arc and curve handles: ellipse arcs, and a Curve handle on ellipse, polygon and star
 
-Status: Ready (2026-10-17)
+Status: Ready (2026-10-17); customer answers of 2026-10-17 recorded (no open questions)
 Priority: Should
 Origin: Customer (Part A); Customer (Part B: reading confirmed 2026-10-06, extended to polygon and star)
 
@@ -129,8 +129,8 @@ ellipse with a curve other than 100% has no arc (Part B criterion 31).
    ellipse" makes every selected ellipse whole in one commit (the arc is no
    longer stored). Typing a value in "Start" or "End" sets that angle in one
    commit with the rules of criterion 8; on a whole ellipse the other angle is
-   the resting seam of 45° and the new arc has the kind "Arc" (default of
-   question 1), the same result as dragging that handle (criterion 2). The
+   the resting seam of 45° and the new arc has the kind "Arc" (decided by the
+   customer, 2026-10-17), the same result as dragging that handle (criterion 2). The
    kind choice and "Whole ellipse" are greyed (`aria-disabled`, still in the
    Tab order) while no selected ellipse has an arc; all four controls are
    greyed for an ellipse whose curve is not 100% (criterion 31) and skip such
@@ -170,7 +170,7 @@ ellipse with a curve other than 100% has no arc (Part B criterion 31).
    is drawn (a half circle of radius 20 mm has a box of 40 × 20 mm; a pie
    includes its centre), in the ellipse's own rotated frame. Resize handles,
    the centre handle, the live size readouts, typed W and H, the marquee and
-   the pivot all use that box (question 3).
+   the pivot all use that box (decided by the customer, 2026-10-17).
 10. Given a resize of an arc by any transform handle and any modifier, then the
     ellipse's size and position change by the affine map the drag defines in
     the local frame and the angles do not change (parametric angles survive a
@@ -619,13 +619,35 @@ was drafted.
     shape. A clone has no arc or curve field of its own, no handles of this
     spec, and the Select bar's ellipse group and "Curve" field are not shown
     for a clone; `0057`'s overrides change style and placement only.
-56. **Stretch and conversion (`0019`, `0047`).** Given a group stretch that
-    converts an ellipse (a not-aligned ellipse in a multi-selection) or a
-    polygon or star, then the path it becomes is the one of criteria 13, 29
-    and 48 for the shape's current arc or curve, and the stretch maps that path.
-    A single ellipse resized in its own frame (criteria 10 and 27) is not
-    converted. A uniform scale, a rotation, a move and a mirror never convert
-    (criterion 63).
+56. **Stretch, skew and conversion (`0019`, `0047`; customer, 2026-10-17).**
+    Given a non-uniform scale (squash or stretch) of an ellipse with an arc,
+    including a group stretch in a multi-selection and a stretch of a rotated
+    ellipse, then it stays an ellipse with an arc; nothing is converted. The
+    image of an ellipse under any affine map is an ellipse, so this is exact
+    and needs no new parametrisation: with the ellipse's frame `F = R(rotation)
+    * diag(rx, ry)` and the map's linear part `M`, take the singular value
+    decomposition `M F = U S V^T`; the new rotation is that of `U`, the new
+    `rx`, `ry` are the singular values `S`, the new centre is the image of the
+    old one, and a point at parameter `t` goes to parameter `t - beta` where
+    `V = R(beta)`. So the start and end angles both move by `-beta` and the
+    sweep and the kind are unchanged. If `M` reflects (negative determinant),
+    the angle rule of criterion 54 is applied on top. Singular values equal
+    within 1e-9 (a circle result) are written with rotation 0 and the same
+    shift. Test: stretch a 30° rotated half circle by (2, 0.5) in the document
+    axes; the new arc equals the image of the old one at 64 equally spaced
+    samples within 1e-9 mm; a stretch by (2, 0.5) then (0.5, 2) restores the
+    angles within 1e-9°. Given a **skew** (also in a multi-selection), then
+    the ellipse becomes a path of the drawn outline, as criterion 13 and
+    `0047` criterion 2 say, the arc control and the Select bar's ellipse group
+    no longer apply to it, and the result is not an arc again. A curved
+    ellipse (curve other than 100%), a polygon and a star stay as `0047`
+    criterion 7 says (a stretch converts them): their ring is not the image of
+    the old ring under a general affine map. **Proposal (vetoable):** a whole
+    ellipse at curve 100% follows the same rule, so `0047` criterion 7 no
+    longer converts a rotated whole ellipse on stretch; the same function
+    handles both. A single ellipse resized in its own frame (criteria 10 and
+    27) is not converted and is not changed by this criterion. A uniform scale,
+    a rotation, a move and a mirror never convert (criterion 63).
 57. **Copies.** Given Duplicate, a Ctrl-drag copy or a copy made by a transform
     entry, then the copy has the same arc or curve as the original (the whole
     parameter set is copied) and is the same kind of primitive.
@@ -788,41 +810,32 @@ Change any of these if you disagree; none of them blocks the build.
   `cargo deny`; the circular-arc-to-cubic construction is written here from the
   standard formulas and is our own code.
 
-## Questions for the customer
+## Decided (customer, 2026-10-17)
 
-Each has a default that is taken without an answer. Questions 1, 3 and 4 are open;
-2 was resolved earlier.
+The customer answered the three open questions. The wording of the questions is
+kept short below so the reasons stay readable.
 
-**Frage 1 (ARC-KIND): What kind is a new arc?** When you drag an arc handle on
-a whole circle:
-- A (default, recommended): an open arc (a curve line, you asked for a
-  "circular arc"); a wedge is one click on "Pie".
-- B: a pie (what Inkscape does when you drag outside the circle).
-- C: only the open arc exists for now (no Pie, no Chord).
-If you do not answer: A.
+- **ARC-KIND = A.** A new arc, made by dragging an arc handle on a whole
+  circle, is an open arc; a wedge is one click on "Pie". (Rejected: B pie as
+  the first kind, C open arc only.)
+- **ARC-BOX = A.** The selection box of an arc is the box around the drawn
+  part only (a half circle of radius 20 mm is 40 x 20 mm); the pivot of a
+  rotation moves to the middle of that part. (Rejected: B the whole circle.)
+- **ARC-VS-CURVE: the customer's reply addressed skew and scaling, not the
+  Curve control.** The reply (translated): "I assume you mean skew: on skew we
+  convert to a path, after that an arc of course no longer works. If you mean
+  squashed or stretched by scaling: that should simply work; it should be
+  solvable through the transformation." Result, see criterion 56:
+  - A non-uniform scale (squash or stretch), also after a rotation, keeps an
+    ellipse with an arc an ellipse with an arc; the arc follows the transform.
+  - A skew converts the ellipse to a path (as 0047 already does for every
+    primitive); the arc control does not apply to a path.
+  - The Curve-versus-Arc interplay stays at the default **A**: the controls of
+    the other are greyed with a tooltip (confirmed by the customer on
+    2026-10-06; criterion 31). The customer's reply did not ask for B, so B
+    (permit and set the other to whole) is not built.
 
-**Frage 2 (CURVE-READING): Is this what you meant by the Affinity screenshots?**
-Resolved by the customer (2026-10-06): yes, curve on circle and ellipse, and on
-polygon and star in the same slice ("polygon und stern auch gleich"; criteria
-17 to 52). Arc and curve stay exclusive on one ellipse (criterion 31).
-
-**Frage 3 (ARC-BOX): How big is the selection box of a half circle?**
-- A (default, recommended): around only the drawn half, 40 x 20 mm for a
-  radius of 20 mm: the size of the part you cut. The pivot of a rotation moves
-  to the middle of that part.
-- B: around the whole circle behind it (40 x 40 mm); the pivot stays at the
-  circle's centre.
-If you do not answer: A.
-
-**Frage 4 (ARC-VS-CURVE): What happens when you want an arc on a curved
-ellipse, or a curve on an arc?**
-- A (default, recommended): the controls for the other are greyed with a
-  tooltip; you make the ellipse whole (arc) or type 100 (curve) first. This is
-  what you confirmed on 2026-10-06.
-- B: permit: using an arc control on a curved ellipse sets its curve to 100% in
-  the same step (and a curve control on an arc makes it whole). One step, undo
-  gives both back; the loss of the other setting is silent.
-If you do not answer: A.
+Question 2 (CURVE-READING) was resolved on 2026-10-06 (criteria 17 to 52).
 
 ## Proposals (vetoable at the demo, no question)
 
