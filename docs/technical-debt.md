@@ -1363,7 +1363,7 @@ of the Select bar (click-through, 3 s or 8 s).
 ids and sizes are unique across built-in and user entries). A later release that adds a
 built-in format with the id or the size of a maker's format, or removes a built-in group id that
 the file appends to, turns a valid user file into the broken-file state, and every edit is locked.
-Nothing triggers this today; `0045` Question 2 B (shipping a Laser or Embroidery group) and `0046`
+Nothing triggers this today; `0045` Question 2 B (shipping a Laser or Embroidery group)
 would. **Resolution (before the first built-in addition):** built-in group ids are never removed;
 decide with the product owner how the loader resolves a user and built-in collision (for example the
 user's duplicate is hidden with a notice and the built-in wins); add a test against a "future"

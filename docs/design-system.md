@@ -1277,7 +1277,7 @@ Decisions: `specs/0049-linked-clone/specification.md`, criteria 57 to 63 and "UX
 | 800 x 600 | The marks are canvas overlays, so no layout changes; the canvas is 520px wide. A tag that finds no free candidate is dropped, as anywhere. Edge chips stack along an edge, at most 8 |
 | Test | 200 generated selections (one clone, two side by side, clones in the corner of the viewport, with the move chip of `0047` open, a rectangle clone whose outline equals its bounds, a chain of 8): no tag rectangle meets a drawn glyph, a reference mark, a chip or another tag; every trace measures at least 3:1 against `--canvas-bg` and `--pasteboard-bg`; Ctrl+A over 10,000 clones draws 200 traces, one original trace and no tags |
 
-## Document formats library (`0045`, `0046`, 2026-10-10)
+## Document formats library (`0045`, 2026-10-10)
 
 Decisions: `specs/0045-document-formats-library/specification.md`, "UX notes". Inside the Document tab; no popup.
 
@@ -1292,7 +1292,6 @@ Decisions: `specs/0045-document-formats-library/specification.md`, "UX notes". I
 | Import, Export | Two full-width 28px outline buttons under Add format, 8px apart: "Import formats", "Export my formats" (not in the tree without a user format). OS file dialog only. Notices 4px under the button |
 | Broken file | Block at the top of the format area: 1px `--field-invalid` border, alert glyph, `--field-invalid` 12px text, outline button "Set file aside". Stars, edit, delete, Add, Import, Export and the Show switches are not in the tree while it shows |
 | Keyboard | The list body is one Tab stop with roving focus; Up and Down between headers and rows, Left and Right between a row's controls, Enter or Space presses (the switch: Space). Add format, Import and Export are separate stops |
-| Shape formats (`0046`) | 16px shape glyphs (`Square`, `SquareRoundCorner`, `Circle`, `Spline`); a row and a strip cell show a 12px glyph before a non-rectangular format; a circle reads "⌀ 130 mm"; the Add form gets a glyph-only Shape group after Unit; "Save as format" shares the Fit-to-content row (two 118px buttons) |
 
 ## Keyboard shortcuts established so far
 

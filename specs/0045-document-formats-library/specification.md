@@ -17,7 +17,7 @@ As a maker who lasers key rings, breakfast boards and coasters, or embroiders in
 
 ## Words used below
 
-- **Format:** a named document size (called a preset in `0030` and in the code). Later also a shape (`0046`).
+- **Format:** a named document size (called a preset in `0030` and in the code).
 - **Group:** a heading with formats and a default orientation. Built-in groups: Paper, Slides. User groups: made by the maker.
 - **Favourite:** a format the maker starred. The quick selection shows the favourites of the groups that are on.
 - **Quick selection:** the strips of `0030`, now filled from the favourites.
@@ -116,7 +116,7 @@ Sizes in millimetres unless a criterion names a unit. The rules of `0030` (orien
 
 ## Out of scope
 
-- Shapes (circle, rounded rectangle, an outline from SVG or DXF): `0046-document-shapes`. A format here is a rectangle.
+- Shapes: a format is a rectangle and stays one (customer, 2026-10-17); outlines of a blank are guide paths, `0046-document-shapes`.
 - A search or filter field for a long list. A Proposal for later; with 200 formats the groups can be folded.
 - Reordering formats or groups; user groups are in creation order, formats in creation order within a group.
 - Hiding a single built-in format; renaming or editing built-ins.
@@ -152,7 +152,7 @@ Written by the ux-engineer, 2026-10-10. Numbers and component rules: `docs/desig
 2. Quick selection: per group that is on and has a favourite, heading plus strip (`0030`, unchanged: Paper A0 to A6 by default).
 3. Orientation.
 4. **"All formats"** disclosure row (28 px, 8 px gap above) and, expanded, the list.
-5. Rule, Width, Height, Unit, Fit to content (and "Save as format", `0046`), Background.
+5. Rule, Width, Height, Unit, Fit to content, Background.
 
 The disclosure sits under Orientation, not between the strips and Orientation: the quick block (strips plus Orientation) stays one compact unit, and the list is the "more" below it. The subject line in the fixed strip row ("A3, portrait") shows what a press in the list did even when the quick selection is scrolled away. The default tab is as tall as `0030`'s: Slides (60 px) are off and the disclosure row (36 px) comes in.
 
