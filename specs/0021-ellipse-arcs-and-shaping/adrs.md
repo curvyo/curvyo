@@ -42,8 +42,8 @@ Reference state: `main` with `CURRENT_FORMAT_VERSION` 14; `Shape::Ellipse
 - [`specs/0056-mirror-and-negative-scale/adrs.md`](../0056-mirror-and-negative-scale/adrs.md)
   (D3: a mirrored primitive stays a primitive) and
   [`specs/0047-transform-polish/adrs.md`](../0047-transform-polish/adrs.md): the arc
-  is mirrored by the angle rule of criterion 54; stretch converts through the
-  evaluation of decision 4.
+  is mirrored by the angle rule of criterion 54; skew converts through the
+  evaluation of decision 4; a non-uniform scale keeps an arc (decision 9).
 - [`specs/0050-layers-and-objects-panel/adrs.md`](../0050-layers-and-objects-panel/adrs.md):
   hidden and locked objects are never in the selection; nothing to build here.
 
@@ -116,6 +116,18 @@ Reference state: `main` with `CURRENT_FORMAT_VERSION` 14; `Shape::Ellipse
   `mirror_arc(arc, flip)` (start' = image of end, end' = image of start; own-axis
   and document-axis cases of criterion 54) and leaves the curve alone. Tested by
   sampling the outline (64 points) and by flipping twice.
+- **9. 2026-10-17: non-uniform scale keeps the arc, skew converts (customer).**
+  The ellipse model (centre, `rx`, `ry`, rotation) represents the image of an
+  ellipse under any affine map exactly, so no new parametrisation is needed. A
+  pure function `ellipse_arc_under_affine(frame, rotation, arc, linear_part)`
+  does the singular value decomposition of `M * R * diag(rx, ry)` and returns
+  the new frame, rotation and arc (both angles shifted by the angle of `V`;
+  `mirror_arc` on top when the determinant is negative). Called by the group
+  stretch of `0019`/`0047` for an ellipse with an arc instead of the conversion
+  of decision 4; skew still converts (`0047`). Curved ellipse, polygon, star
+  keep converting on stretch. Rejected: converting on any stretch of a rotated
+  arc (loses the arc, the customer asked for it to work); storing a skew in the
+  ellipse (a new concept in the document model, against the skew rule of `0008`).
 - **8. Not decided here, left to the build:** the real bar row heights (UX notes,
   "Open for the build review"), the file split of `shape_codec.rs` if the new
   keys push it over 500 lines (move the arc and curve codec to `shape_arc_codec.rs`
