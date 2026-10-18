@@ -76,20 +76,20 @@ new crate, no new dependency, no trait, no generic.
 
 ### Milestone 1: kernel (`curvyo-geometry-core`)
 
-- [ ] 1.1 `flatten(anchors, closed, tol)`: open outline = polyline of its segments, no closing cubic;
+- [x] 1.1 `flatten(anchors, closed, tol)`: open outline = polyline of its segments, no closing cubic;
   closed unchanged; tests for the U of criterion 2 (no vertex on the chord between (10, 0) and
   (0, 0) except the ends) and bit-identical repeat (AC 3, 21, 33)
-- [ ] 1.2 `Flat` carries `closed`: `chord()`, `self_touches`, `distance_to_polyline` do not wrap for
+- [x] 1.2 `Flat` carries `closed`: `chord()`, `self_touches`, `distance_to_polyline` do not wrap for
   an open outline; `touching_outlines` documented for open outlines; tests: an open U does not touch
   itself across its gap, an open line across a closed plate touches it (AC 1, 12, 15)
-- [ ] 1.3 Boolean kernel accepts open outlines: `OpenOperands` removed, region = fill area; tests: U
+- [x] 1.3 Boolean kernel accepts open outlines: `OpenOperands` removed, region = fill area; tests: U
   plus far square gives 2 outlines with the straight edge (10, 0) to (0, 0) and 100 mm²; a straight
   open outline in a plate adds nothing; an operand of straight lines only stays `EmptyOperands`
   (AC 21, 22)
-- [ ] 1.4 `outline_nesting` by contains for touching or crossing pairs: tests 7b (touch from inside
+- [x] 1.4 `outline_nesting` by contains for touching or crossing pairs: tests 7b (touch from inside
   is a hole), 7c (crossing, both shapes), 7d (coincident, both shapes), 7g (two crossing holes in a
   square), concave A with B across its notch, figure eight (AC 7, 33)
-- [ ] 1.5 Fill-area pins on the kernel side: point-in-fill of the U alone and inside a square in
+- [x] 1.5 Fill-area pins on the kernel side: point-in-fill of the U alone and inside a square in
   both directions (`interior.rs` tests), area of 7c = 700 mm² within 1 mm² via a Union (AC 3, 7c)
 
 ### Milestone 2: file and model (`curvyo-document-core`)
@@ -155,6 +155,9 @@ new crate, no new dependency, no trait, no generic.
 
 - [ ] 7.1 Amendment marks in `0035`, `0016`, `0048` specs; `specs/README.md` status cell; this plan
   checked off; `docs/design-system.md` rows by the ux-engineer in the PR (no AC; Definition of Done)
+- [ ] 7.2 Amend criterion 27 and the matching `adrs.md` line to "how an imported even-odd fill is
+  handled is decided by 0024 (re-wind by depth, no report)", with a dated note (2026-10-18; lead
+  approved, `0024` decided re-wind by depth on import, no loss report, SVG import first)
 
 ## Validation
 

@@ -117,16 +117,17 @@ fn a_huge_handle_is_refused() {
     );
 }
 
-/// Open outlines are reported before anything else about an operand.
+/// A bad coordinate is reported whether or not the outline is open (`0054` criterion 21 withdrew
+/// the open refusal that used to come first).
 #[test]
-fn an_open_outline_is_reported_before_a_bad_coordinate() {
+fn a_bad_coordinate_is_reported_beside_an_open_outline() {
     let square = rect(0.0, 0.0, 10.0, 10.0);
     let broken = rect(0.0, 0.0, f64::NAN, 10.0);
     let a = [Outline::new(&square, false)];
     let b = [Outline::new(&broken, true)];
     assert_eq!(
         boolean(BooleanOp::Union, &[&a, &b], common::KERNEL_TOLERANCE),
-        Err(BooleanError::OpenOperands(vec![0]))
+        Err(BooleanError::OutOfRange(vec![1]))
     );
 }
 

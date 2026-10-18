@@ -239,10 +239,6 @@ fn refusal_of(error: BooleanError, order: &[&ObjectSnapshot], of: usize) -> Bool
     let ids_at =
         |indices: &[usize]| -> Vec<NodeId> { indices.iter().map(|&i| order[i].id()).collect() };
     match error {
-        BooleanError::OpenOperands(indices) => BooleanRefusal::OpenPaths {
-            offenders: ids_at(&indices),
-            of,
-        },
         BooleanError::EmptyOperands(indices) => BooleanRefusal::NoArea {
             offenders: ids_at(&indices),
             of,

@@ -1,4 +1,4 @@
-//! Flattens a closed outline of cubic Bézier segments to a polyline whose chords stay within a
+//! Flattens an open or closed outline of cubic Bézier segments to a polyline whose chords stay within a
 //! given distance of the curve, using only `+ - * /` and `sqrt` so the points are bit-identical on
 //! every target.
 //!
@@ -88,18 +88,29 @@ fn eval(control: &[Point; 4], t: f64) -> Point {
     )
 }
 
-/// The vertices of the closed outline through `anchors`, in order, without repeating the first
-/// vertex at the end. The closing segment from the last anchor back to the first is the real
-/// cubic through their handles, as the canvas paints it.
+/// The vertices of the outline through `anchors`, in order, without repeating the first vertex
+/// at the end.
+///
+/// A closed outline (`closed`) ends with the segment from the last anchor back to the first, the
+/// real cubic through their handles, as the canvas paints it. An open outline ends at its last
+/// anchor: the last anchor's out-handle and the first anchor's in-handle are not part of its
+/// shape. A caller that reads the polyline as a polygon closes an open outline by the straight
+/// chord from its last vertex to its first, which is how the fill closes it
+/// (`specs/0054-combine-open-paths`, "Closing line").
 ///
 /// Every anchor is a vertex; between two anchors there are as many extra vertices as `tolerance_mm`
 /// needs. `tolerance_mm` must be finite and greater than zero, and all control points finite; the
 /// caller checks both (`boolean` does). Fewer than two anchors give just those anchors.
-pub(crate) fn flatten_closed(anchors: &[OutlineTriple], tolerance_mm: f64) -> Vec<Point> {
+pub(crate) fn flatten(anchors: &[OutlineTriple], closed: bool, tolerance_mm: f64) -> Vec<Point> {
     let mut points = Vec::with_capacity(anchors.len());
+    let segments = if closed || anchors.is_empty() {
+        anchors.len()
+    } else {
+        anchors.len() - 1
+    };
     for (index, anchor) in anchors.iter().enumerate() {
         points.push(anchor.0);
-        if anchors.len() < 2 {
+        if anchors.len() < 2 || index >= segments {
             continue;
         }
         let next = anchors[(index + 1) % anchors.len()];
@@ -130,7 +141,7 @@ mod tests {
                 (Point::new(1.0, 1.0), Vec2::new(5.0, 0.0), Vec2::ZERO),
                 (Point::new(5.0, 10.0), Vec2::ZERO, Vec2::ZERO),
             ];
-            let points = flatten_closed(&outline, 0.0005);
+            let points = flatten(&outline, true, 0.0005);
             assert!(points.len() <= 3 * (262_144 + 1), "{x}: {}", points.len());
         }
     }
@@ -166,7 +177,7 @@ mod tests {
     fn straight_segments_add_no_vertices() {
         let square = [(0.0, 0.0), (10.0, 0.0), (10.0, 10.0), (0.0, 10.0)]
             .map(|(x, y)| (Point::new(x, y), Vec2::ZERO, Vec2::ZERO));
-        let points = flatten_closed(&square, 0.008);
+        let points = flatten(&square, true, 0.008);
         assert_eq!(points.len(), 4);
     }
 
@@ -174,7 +185,7 @@ mod tests {
     /// deviation, and the budget is twice that.
     #[test]
     fn a_disc_of_radius_ten_stays_inside_the_node_budget() {
-        let points = flatten_closed(&circle(10.0), 0.008);
+        let points = flatten(&circle(10.0), true, 0.008);
         assert!(
             (71..=142).contains(&points.len()),
             "got {} nodes",
@@ -188,7 +199,7 @@ mod tests {
     fn chords_of_a_disc_stay_within_the_tolerance() {
         let radius = 10.0;
         let tolerance = 0.008;
-        let points = flatten_closed(&circle(radius), tolerance);
+        let points = flatten(&circle(radius), true, tolerance);
         for (index, a) in points.iter().enumerate() {
             let b = points[(index + 1) % points.len()];
             let mid = Point::new(f64::midpoint(a.x, b.x), f64::midpoint(a.y, b.y));
@@ -203,14 +214,67 @@ mod tests {
     #[test]
     fn a_single_anchor_gives_itself() {
         let one = [(Point::new(1.0, 2.0), Vec2::new(5.0, 5.0), Vec2::ZERO)];
-        assert_eq!(flatten_closed(&one, 0.008), vec![Point::new(1.0, 2.0)]);
-        assert_eq!(flatten_closed(&[], 0.008), Vec::<Point>::new());
+        assert_eq!(flatten(&one, true, 0.008), vec![Point::new(1.0, 2.0)]);
+        assert_eq!(flatten(&[], true, 0.008), Vec::<Point>::new());
     }
 
     #[test]
     fn flattening_is_deterministic() {
-        let a = flatten_closed(&circle(37.3), 0.008);
-        let b = flatten_closed(&circle(37.3), 0.008);
+        let a = flatten(&circle(37.3), true, 0.008);
+        let b = flatten(&circle(37.3), true, 0.008);
         assert_eq!(a, b);
+    }
+
+    /// The open "U" of `specs/0054-combine-open-paths` criterion 2 with curved end handles that
+    /// would bulge the closing segment if it were a cubic.
+    fn open_u() -> Vec<OutlineTriple> {
+        vec![
+            (Point::new(0.0, 0.0), Vec2::new(-5.0, -5.0), Vec2::ZERO),
+            (Point::new(0.0, 10.0), Vec2::ZERO, Vec2::ZERO),
+            (Point::new(10.0, 10.0), Vec2::ZERO, Vec2::ZERO),
+            (Point::new(10.0, 0.0), Vec2::ZERO, Vec2::new(5.0, -5.0)),
+        ]
+    }
+
+    /// 0054 criteria 3, 21: an open outline has no closing segment, so no vertex lies between its
+    /// last and first anchor; a polygon reader closes it by the straight chord.
+    #[test]
+    fn an_open_outline_ends_at_its_last_anchor() {
+        let points = flatten(&open_u(), false, 0.0005);
+        assert_eq!(points.first(), Some(&Point::new(0.0, 0.0)));
+        assert_eq!(points.last(), Some(&Point::new(10.0, 0.0)));
+        assert_eq!(points.len(), 4, "straight segments add no vertices");
+    }
+
+    /// The same anchors closed keep today's closing cubic through the end handles.
+    #[test]
+    fn a_closed_outline_keeps_its_closing_cubic() {
+        let points = flatten(&open_u(), true, 0.0005);
+        assert!(points.len() > 4, "the closing cubic adds vertices");
+        assert!(
+            points.iter().skip(4).all(|p| p.y < 0.0),
+            "it bulges below y = 0"
+        );
+    }
+
+    /// 0054 criterion 9: a zero-length open outline gives its nodes and nothing else.
+    #[test]
+    fn a_zero_length_open_outline_gives_its_nodes() {
+        let dot = [(Point::new(5.0, 5.0), Vec2::ZERO, Vec2::ZERO); 2];
+        assert_eq!(flatten(&dot, false, 0.0005), vec![Point::new(5.0, 5.0); 2]);
+        let one = [(Point::new(1.0, 2.0), Vec2::new(5.0, 5.0), Vec2::ZERO)];
+        assert_eq!(flatten(&one, false, 0.008), vec![Point::new(1.0, 2.0)]);
+        assert_eq!(flatten(&[], false, 0.008), Vec::<Point>::new());
+    }
+
+    /// 0054 criterion 33: an open outline flattens bit for bit the same every time.
+    #[test]
+    fn open_flattening_is_deterministic() {
+        let mut curved = circle(37.3);
+        curved.pop();
+        assert_eq!(
+            flatten(&curved, false, 0.008),
+            flatten(&curved, false, 0.008)
+        );
     }
 }

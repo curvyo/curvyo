@@ -149,6 +149,50 @@ fn a_rectangle_with_a_thousand_circles_is_decided_quickly() {
     }
 }
 
+/// A circle as a polygon of `nodes` straight segments, the first node at angle 0.
+fn polygon_circle(cx: f64, cy: f64, radius: f64, nodes: usize) -> Anchors {
+    let points: Vec<(f64, f64)> = (0..nodes)
+        .map(|k| {
+            let angle = std::f64::consts::TAU * k as f64 / nodes as f64;
+            (cx + radius * angle.cos(), cy + radius * angle.sin())
+        })
+        .collect();
+    polygon(&points)
+}
+
+/// Budget input (e) of `specs/0054-combine-open-paths` (architect review of M1): two closed
+/// outlines of 20,000 nodes each, one tangent to the other from inside, and the same pair
+/// crossing: depths [0, 1] and [0, 0], each within 200 ms in a release build.
+#[test]
+fn two_touching_outlines_of_twenty_thousand_nodes_are_decided_quickly() {
+    let outer = polygon_circle(0.0, 0.0, 100.0, 20_000);
+    for (name, inner, expected) in [
+        (
+            "tangent from inside",
+            polygon_circle(50.0, 0.0, 50.0, 20_000),
+            vec![0, 1],
+        ),
+        (
+            "crossing",
+            polygon_circle(60.0, 0.0, 50.0, 20_000),
+            vec![0, 0],
+        ),
+    ] {
+        let all = [outer.clone(), inner];
+        let list = outlines(&all);
+        assert_eq!(touching_outlines(&list), vec![(0, 1)], "{name}");
+        let started = Instant::now();
+        let nesting = outline_nesting(&list);
+        let took = started.elapsed();
+        println!("nesting of two touching 20,000-node outlines, {name}: {took:?}");
+        let depths: Vec<usize> = nesting.iter().map(|n| n.depth).collect();
+        assert_eq!(depths, expected, "{name}");
+        if !cfg!(debug_assertions) {
+            assert!(took <= Duration::from_millis(200), "{name}: {took:?}");
+        }
+    }
+}
+
 /// Criterion 19 (c): 500 squares each inside the previous: depths 0 to 499, none touching.
 #[test]
 fn five_hundred_nested_squares() {

@@ -1,5 +1,6 @@
-//! Which closed outlines touch or cross (`specs/0035-combine-and-break-apart` criteria 10 and
-//! 10a). Every outline is flattened with the kernel's own deterministic [`flatten_closed`] to
+//! Which outlines touch or cross (`specs/0035-combine-and-break-apart` criteria 10 and 10a,
+//! `specs/0054-combine-open-paths` "Touch"). Every outline is flattened with the kernel's own
+//! deterministic [`flatten`] to
 //! [`TOUCH_FLATTEN_MM`], so each polyline lies within that distance of its curve. Pairs of
 //! outlines whose bounding boxes are far apart are skipped; for the others the chords are swept
 //! by their minimum x, so disjoint inputs cost about a sort and nested ones about their
@@ -12,12 +13,13 @@
 //! 0.01 mm apart pass, and a shared edge is reported. An outline touches itself when two chords
 //! that are not neighbours are within reach; chords are neighbours when the polyline between them
 //! is at most 0.002 mm long, so zero-length segments (a clamped corner radius, a duplicated node)
-//! are no self-touch.
+//! are no self-touch. An open outline is flattened without a closing segment and has no chord
+//! from its last vertex back to its first: its gap touches nothing.
 
 use curvyo_document_core::Point;
 
 use crate::Outline;
-use crate::flatten::flatten_closed;
+use crate::flatten::flatten;
 
 /// Outlines this close (millimetres), or crossing, touch (the kernel grid, `0016` criterion 39).
 pub const TOUCH_DISTANCE_MM: f64 = 0.001;
@@ -31,23 +33,40 @@ const CHORD_REACH_MM: f64 = 0.002;
 /// One outline as a polyline with its bounding box.
 pub(crate) struct Flat {
     pub(crate) points: Vec<Point>,
+    /// Whether the last point is joined back to the first by a chord.
+    pub(crate) closed: bool,
     pub(crate) min: Point,
     pub(crate) max: Point,
 }
 
 impl Flat {
     pub(crate) fn of(outline: &Outline<'_>) -> Self {
-        let points = flatten_closed(outline.anchors, TOUCH_FLATTEN_MM);
+        let points = flatten(outline.anchors, outline.closed, TOUCH_FLATTEN_MM);
         let mut min = Point::new(f64::INFINITY, f64::INFINITY);
         let mut max = Point::new(f64::NEG_INFINITY, f64::NEG_INFINITY);
         for point in &points {
             min = Point::new(min.x.min(point.x), min.y.min(point.y));
             max = Point::new(max.x.max(point.x), max.y.max(point.y));
         }
-        Self { points, min, max }
+        Self {
+            points,
+            closed: outline.closed,
+            min,
+            max,
+        }
     }
 
-    fn chord(&self, index: usize) -> (Point, Point) {
+    /// How many chords the polyline has: one per point when closed, one fewer when open.
+    pub(crate) fn chord_count(&self) -> usize {
+        if self.closed {
+            self.points.len()
+        } else {
+            self.points.len().saturating_sub(1)
+        }
+    }
+
+    /// Chord `index`, `index < chord_count()`.
+    pub(crate) fn chord(&self, index: usize) -> (Point, Point) {
         (
             self.points[index],
             self.points[(index + 1) % self.points.len()],
@@ -56,11 +75,16 @@ impl Flat {
 }
 
 /// The pairs `(i, j)` with `i <= j` of `outlines` that touch or cross, sorted. `(i, i)` means the
-/// outline touches or crosses itself (non-adjacent chords within reach). Open outlines are not
-/// expected; they are treated as closed.
+/// outline touches or crosses itself (non-adjacent chords within reach). An open outline is read
+/// open: nothing joins its last node to its first.
 #[must_use]
 pub fn touching_outlines(outlines: &[Outline<'_>]) -> Vec<(usize, usize)> {
     let flats: Vec<Flat> = outlines.iter().map(Flat::of).collect();
+    touching_pairs(&flats)
+}
+
+/// [`touching_outlines`] on outlines already flattened by [`Flat::of`].
+pub(crate) fn touching_pairs(flats: &[Flat]) -> Vec<(usize, usize)> {
     let mut pairs = Vec::new();
     for (index, flat) in flats.iter().enumerate() {
         if self_touches(flat) {
@@ -101,30 +125,33 @@ fn chord_box(a: Point, b: Point) -> (f64, f64, f64, f64) {
 /// Whether any chord of `a` is within reach of any chord of `b`: a sweep over the chords of both
 /// restricted to the overlap of their bounding boxes.
 fn pair_touches(a: &Flat, b: &Flat) -> bool {
-    let (low_x, high_x) = (
-        a.min.x.max(b.min.x) - CHORD_REACH_MM,
-        a.max.x.min(b.max.x) + CHORD_REACH_MM,
-    );
-    let (low_y, high_y) = (
-        a.min.y.max(b.min.y) - CHORD_REACH_MM,
-        a.max.y.min(b.max.y) + CHORD_REACH_MM,
-    );
-    let near = |flat: &Flat| -> Vec<(f64, f64, f64, f64, Point, Point)> {
-        let mut chords: Vec<_> = (0..flat.points.len())
-            .filter_map(|index| {
-                let (p, q) = flat.chord(index);
-                let (x0, x1, y0, y1) = chord_box(p, q);
-                (x1 >= low_x && x0 <= high_x && y1 >= low_y && y0 <= high_y)
-                    .then_some((x0, x1, y0, y1, p, q))
-            })
-            .collect();
-        chords.sort_by(|left, right| left.0.total_cmp(&right.0));
-        chords
-    };
-    let (chords_a, chords_b) = (near(a), near(b));
+    let (chords_a, chords_b) = (chords_near(a, b), chords_near(b, a));
     sweep(&chords_a, &chords_b, |left, right| {
         segment_distance(left.4, left.5, right.4, right.5) <= CHORD_REACH_MM
     })
+}
+
+/// The chords of `flat` whose boxes, widened by the reach, meet the overlap of the two outlines'
+/// boxes (also widened by the reach), sorted by their minimum x, as [`sweep`] takes them.
+pub(crate) fn chords_near(flat: &Flat, other: &Flat) -> Vec<Chord> {
+    let (low_x, high_x) = (
+        flat.min.x.max(other.min.x) - CHORD_REACH_MM,
+        flat.max.x.min(other.max.x) + CHORD_REACH_MM,
+    );
+    let (low_y, high_y) = (
+        flat.min.y.max(other.min.y) - CHORD_REACH_MM,
+        flat.max.y.min(other.max.y) + CHORD_REACH_MM,
+    );
+    let mut chords: Vec<Chord> = (0..flat.chord_count())
+        .filter_map(|index| {
+            let (p, q) = flat.chord(index);
+            let (x0, x1, y0, y1) = chord_box(p, q);
+            (x1 >= low_x && x0 <= high_x && y1 >= low_y && y0 <= high_y)
+                .then_some((x0, x1, y0, y1, p, q, index))
+        })
+        .collect();
+    chords.sort_by(|left, right| left.0.total_cmp(&right.0));
+    chords
 }
 
 /// Whether two chords of the same outline that are not neighbours are within reach. Two chords are
@@ -133,8 +160,8 @@ fn pair_touches(a: &Flat, b: &Flat) -> bool {
 /// two arcs of a slot meet at a point, a node dragged onto its neighbour). A real crossing has a
 /// longer loop between its chords.
 fn self_touches(flat: &Flat) -> bool {
-    let count = flat.points.len();
-    if count < 3 {
+    let count = flat.chord_count();
+    if count < 2 {
         return false;
     }
     // `along[k]` is the length of the polyline from point 0 to point k; `along[count]` is the whole.
@@ -142,10 +169,13 @@ fn self_touches(flat: &Flat) -> bool {
     along.push(0.0_f64);
     for index in 0..count {
         let (p, q) = flat.chord(index);
-        along.push(along[index] + (q.x - p.x).hypot(q.y - p.y));
+        // IEEE `sqrt` of a sum of squares, not `hypot`, which platform libraries may round
+        // differently (criterion 33).
+        let (dx, dy) = (q.x - p.x, q.y - p.y);
+        along.push(along[index] + (dx * dx + dy * dy).sqrt());
     }
     let whole = along[count];
-    let mut chords: Vec<(f64, f64, f64, f64, Point, Point, usize)> = (0..count)
+    let mut chords: Vec<Chord> = (0..count)
         .map(|index| {
             let (p, q) = flat.chord(index);
             let (x0, x1, y0, y1) = chord_box(p, q);
@@ -161,8 +191,13 @@ fn self_touches(flat: &Flat) -> bool {
             let (low, high) = (left.6.min(right.6), left.6.max(right.6));
             // From the end of chord `low` to the start of chord `high`, and from the end of `high`
             // round to the start of `low`.
+            // An open outline has no way round: only the forward run joins two chords.
             let forward = along[high] - along[low + 1];
-            let backward = whole - along[high + 1] + along[low];
+            let backward = if flat.closed {
+                whole - along[high + 1] + along[low]
+            } else {
+                f64::INFINITY
+            };
             let neighbours = forward.min(backward) <= CHORD_REACH_MM;
             if !neighbours
                 && left.2 <= right.3
@@ -177,11 +212,17 @@ fn self_touches(flat: &Flat) -> bool {
     false
 }
 
-type Chord = (f64, f64, f64, f64, Point, Point);
+/// One chord: its box widened by the reach (`x0, x1, y0, y1`), its ends and its index.
+pub(crate) type Chord = (f64, f64, f64, f64, Point, Point, usize);
 
 /// Whether `test` holds for any pair of one chord of `a` and one of `b` whose boxes overlap; both
-/// lists are sorted by their minimum x.
-fn sweep(a: &[Chord], b: &[Chord], test: impl Fn(&Chord, &Chord) -> bool) -> bool {
+/// lists are sorted by their minimum x. A `test` that always returns false visits every such
+/// pair.
+pub(crate) fn sweep(
+    a: &[Chord],
+    b: &[Chord],
+    mut test: impl FnMut(&Chord, &Chord) -> bool,
+) -> bool {
     let mut active_a: Vec<usize> = Vec::new();
     let mut active_b: Vec<usize> = Vec::new();
     let (mut next_a, mut next_b) = (0, 0);
@@ -245,5 +286,7 @@ pub(crate) fn point_segment_distance(point: Point, a: Point, b: Point) -> f64 {
     } else {
         (((point.x - a.x) * abx + (point.y - a.y) * aby) / length_sq).clamp(0.0, 1.0)
     };
-    (point.x - (a.x + abx * t)).hypot(point.y - (a.y + aby * t))
+    // IEEE `sqrt` of a sum of squares, not `hypot` (criterion 33 of `0054`).
+    let (dx, dy) = (point.x - (a.x + abx * t), point.y - (a.y + aby * t));
+    (dx * dx + dy * dy).sqrt()
 }
