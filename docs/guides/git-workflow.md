@@ -85,6 +85,9 @@ keeps the history linear and every commit separate (the repo has
    commits where GitHub allows it; if main moved, the SHAs change and that is
    fine.
 2. `gh pr merge <n> --rebase --delete-branch`.
+   `tools/lead/strict-merge.sh <n>` does the wait-and-check in one step: it refuses to
+   merge unless at least 10 checks exist and all passed (an empty check list is not green);
+   `tools/lead/merge-chain.sh` does it for a series of PRs (see `tools/lead/README.md`).
 3. Customer rules stay: `story/` PRs need customer acceptance each time;
    `chore/` and `fix/` PRs merge on green CI without asking (standing
    permission of 2026-10-03). `gh pr merge` stays in the `ask` list.
