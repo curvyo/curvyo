@@ -19,10 +19,10 @@
 
 use std::collections::HashMap;
 
-use loro::{Container, LoroMap, LoroMovableList, ValueOrContainer};
+use loro::{Container, LoroMap, LoroMovableList, LoroValue, ValueOrContainer};
 
 use crate::path_codec::{
-    KEY_ANCHORS, anchor_map_at, anchors_container, push_anchor, read_anchor_id,
+    KEY_ANCHORS, KEY_CLOSED, anchor_map_at, anchors_container, push_anchor, read_anchor_id,
     read_anchor_snapshot, read_closed, validate_anchor, write_closed,
 };
 use crate::path_model::{AnchorId, NewAnchor, SubpathSnapshot};
@@ -168,8 +168,10 @@ pub(crate) fn read_extra_subpaths(meta: &LoroMap) -> Vec<SubpathSnapshot> {
 }
 
 /// Whether a present `extra_subpaths` has the shape this module writes: a
-/// movable list of maps, each with an `anchors` movable list whose elements
-/// are anchor maps with a valid id; an outline has at least one anchor. Absent is valid. Anything else is damage
+/// movable list of maps, each with a boolean `closed` and an `anchors` movable
+/// list whose elements are anchor maps with a valid id; an outline has at least
+/// one anchor (a single anchor is valid: a foreign file may hold one,
+/// `specs/0054-combine-open-paths` criterion 30). Absent is valid. Anything else is damage
 /// (`OpenError::Damaged`), checked at open so the readers above can trust the
 /// shape.
 pub(crate) fn validate_extra_subpaths(meta: &LoroMap) -> bool {
@@ -178,14 +180,21 @@ pub(crate) fn validate_extra_subpaths(meta: &LoroMap) -> bool {
         Some(ValueOrContainer::Container(Container::MovableList(list))) => {
             (0..list.len()).all(|i| match list.get(i) {
                 Some(ValueOrContainer::Container(Container::Map(map))) => {
-                    match map.get(KEY_ANCHORS) {
-                        // An outline without an anchor is damage: a writer never writes one.
-                        Some(ValueOrContainer::Container(Container::MovableList(anchors))) => {
-                            !anchors.is_empty()
-                                && (0..anchors.len()).all(|k| validate_anchor(&anchors, k))
+                    // Every writer writes the state; open or closed is never guessed for an
+                    // outline of a compound path (`0054` criterion 30).
+                    let closed_is_bool = matches!(
+                        map.get(KEY_CLOSED),
+                        Some(ValueOrContainer::Value(LoroValue::Bool(_)))
+                    );
+                    closed_is_bool
+                        && match map.get(KEY_ANCHORS) {
+                            // An outline without an anchor is damage: a writer never writes one.
+                            Some(ValueOrContainer::Container(Container::MovableList(anchors))) => {
+                                !anchors.is_empty()
+                                    && (0..anchors.len()).all(|k| validate_anchor(&anchors, k))
+                            }
+                            _ => false,
                         }
-                        _ => false,
-                    }
                 }
                 _ => false,
             })

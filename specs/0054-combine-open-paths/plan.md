@@ -94,10 +94,11 @@ new crate, no new dependency, no trait, no generic.
 
 ### Milestone 2: file and model (`curvyo-document-core`)
 
-- [ ] 2.1 `validate_extra_subpaths` requires `closed` to be a boolean on every extra outline; the
-  first outline keeps "absent = open" unless every golden file holds it (checked, decided in the
-  commit); damaged-file tests (AC 30)
-- [ ] 2.2 Golden file `compound_open.curvyo` (closed, open, zero-length open, closed crossing the
+- [x] 2.1 `validate_extra_subpaths` requires `closed` to be a boolean on every extra outline; the
+  first outline keeps "absent = open" (decided 2026-10-18: it is the register every ordinary path
+  shares with formats before compound paths, so it is not made stricter in a slice without a
+  bump); damaged-file tests (AC 30)
+- [x] 2.2 Golden file `compound_open.curvyo` (closed, open, zero-length open, closed crossing the
   first): open, read, save, reopen node for node; earlier golden files open unchanged and are not
   rewritten; single-node outline opens and draws nothing; `document.json` lists `closed` (AC 28, 29,
   30)
