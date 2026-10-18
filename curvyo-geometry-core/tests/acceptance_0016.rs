@@ -807,35 +807,43 @@ fn membership_matches_winding_reference_for_two_to_four_operands() {
 
 // ============================================================ AC 15 - 17
 
+/// `0016` criterion 15 is withdrawn by `0054` criterion 21: an open operand is no longer refused;
+/// its region is its fill area, closed by the straight line from its last node to its first, so it
+/// gives exactly what the same nodes closed by a straight segment give.
 #[test]
-fn ac15_open_operands_are_refused_with_all_indexes_and_nothing_else_checked_first() {
+fn ac15_withdrawn_open_operands_are_closed_with_a_straight_line() {
     let sq = one(rect(0.0, 0.0, 10.0, 10.0));
     let open = one(poly(&[(0.0, 0.0), (5.0, 5.0), (10.0, 0.0)]));
     for op in ALL_OPS {
-        let outs: Vec<Vec<Outline>> = [&open, &sq, &open, &sq, &open]
-            .iter()
-            .enumerate()
-            .map(|(i, o)| o.iter().map(|a| Outline::new(a, i % 2 == 1)).collect())
-            .collect();
-        let refs: Vec<&[Outline]> = outs.iter().map(|v| v.as_slice()).collect();
-        assert_eq!(
-            boolean(op, &refs, TOL),
-            Err(BooleanError::OpenOperands(vec![0, 2, 4])),
-            "{op:?}"
-        );
+        let with_closed = |closed_open: bool| {
+            let outs: Vec<Vec<Outline>> = [&open, &sq, &open, &sq, &open]
+                .iter()
+                .enumerate()
+                .map(|(i, o)| {
+                    o.iter()
+                        .map(|a| Outline::new(a, i % 2 == 1 || closed_open))
+                        .collect()
+                })
+                .collect();
+            let refs: Vec<&[Outline]> = outs.iter().map(|v| v.as_slice()).collect();
+            boolean(op, &refs, TOL)
+        };
+        assert_eq!(with_closed(false), with_closed(true), "{op:?}");
     }
 }
 
+/// `0054` criterion 21: a compound operand with an open outline is an operand like any other.
 #[test]
-fn ac15_a_compound_operand_with_one_open_outline_is_open() {
+fn ac15_withdrawn_a_compound_operand_with_one_open_outline_is_closed() {
     let a = rect(0.0, 0.0, 10.0, 10.0);
     let b = rect(20.0, 0.0, 30.0, 10.0);
-    let outs = vec![vec![Outline::new(&a, true), Outline::new(&b, false)]];
-    let refs: Vec<&[Outline]> = outs.iter().map(|v| v.as_slice()).collect();
-    assert_eq!(
-        boolean(BooleanOp::Union, &refs, TOL),
-        Err(BooleanError::OpenOperands(vec![0]))
-    );
+    let union = |closed: bool| {
+        let outs = vec![vec![Outline::new(&a, true), Outline::new(&b, closed)]];
+        let refs: Vec<&[Outline]> = outs.iter().map(|v| v.as_slice()).collect();
+        boolean(BooleanOp::Union, &refs, TOL)
+    };
+    assert_eq!(union(false), union(true));
+    assert_eq!(union(false).map(|r| r.outlines().len()), Ok(2));
 }
 
 #[test]
@@ -985,13 +993,14 @@ fn input_errors_have_the_documented_priority() {
             "{v}"
         );
     }
-    // Open outranks out of range, which outranks empty operands.
+    // Out of range outranks empty operands; an open outline is checked like a closed one
+    // (`0054` criterion 21 withdrew the open refusal that used to come first).
     let open_nan = vec![vec![Outline::new(&nan[0], false)]];
     let outs = vec![open_nan[0].clone(), vec![Outline::new(&nan[0], true)]];
     let refs: Vec<&[Outline]> = outs.iter().map(|v| v.as_slice()).collect();
     assert_eq!(
         boolean(BooleanOp::Union, &refs, TOL),
-        Err(BooleanError::OpenOperands(vec![0]))
+        Err(BooleanError::OutOfRange(vec![0, 1]))
     );
 }
 

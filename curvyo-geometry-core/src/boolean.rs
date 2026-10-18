@@ -1,11 +1,14 @@
-//! Boolean operations on closed outlines: union, difference, intersection and exclusion of any
+//! Boolean operations on the regions of outlines: union, difference, intersection and exclusion of any
 //! number of operands (`specs/0016-boolean-operations`, ADR 0003 §3).
 //!
 //! # Pipeline
 //!
-//! 1. Open outlines, non-finite coordinates and coordinates beyond 10⁷ mm are refused.
+//! 1. Non-finite coordinates and coordinates beyond 10⁷ mm are refused.
 //! 2. Every outline is flattened to a polyline that stays within the tolerance minus two grid
-//!    pitches of its curve (the rest of the budget goes to snapping and cleanup).
+//!    pitches of its curve (the rest of the budget goes to snapping and cleanup). An open outline
+//!    has no closing segment: its polygon is closed by the straight line from its last vertex to
+//!    its first, which is its fill area (`specs/0054-combine-open-paths` criterion 21); a straight
+//!    or zero-length one is a polygon without area that step 4 drops.
 //! 3. Vertices are snapped to the 0.001 mm integer grid.
 //! 4. Each operand is normalized on its own by a nonzero self-union. That gives its painted
 //!    region (a self-intersecting outline paints its crossing, a compound operand keeps its
@@ -29,7 +32,7 @@ use crate::boolean_cleanup::cleanup;
 use crate::boolean_grid::{
     GRID_MM, MAX_COORDINATE_MM, Paths64, canonical_millimetres, normalize, run, snap_polygon,
 };
-use crate::flatten::flatten_closed;
+use crate::flatten::flatten;
 use i_overlay::core::overlay_rule::OverlayRule;
 
 /// What to compute over the operands' regions.
@@ -47,8 +50,9 @@ pub enum BooleanOp {
 }
 
 /// One outline of an operand: anchors as `(point, handle_in, handle_out)`, handles relative to
-/// the point, exactly as `curvyo-ui-core` reads a path. Only closed outlines are accepted; the
-/// `closed` flag is carried so the kernel itself refuses an open path.
+/// the point, exactly as `curvyo-ui-core` reads a path. An open outline (`closed` false) has no
+/// segment from its last anchor back to its first; its region is closed by the straight line
+/// between them, as the fill closes it (`specs/0054-combine-open-paths` criterion 21).
 #[derive(Debug, Clone, Copy)]
 pub struct Outline<'a> {
     /// The anchors in path order.
@@ -74,9 +78,6 @@ pub enum BooleanError {
     /// The tolerance leaves no room for the grid: it must exceed two grid pitches (0.002 mm).
     #[error("tolerance too small for the 0.001 mm grid")]
     ToleranceTooSmall,
-    /// These operands (indices into the operand list) contain an open outline.
-    #[error("operands {0:?} contain an open outline")]
-    OpenOperands(Vec<usize>),
     /// These operands have a coordinate or handle that is not finite or lies beyond 10⁷ mm.
     #[error("operands {0:?} have a coordinate that is not finite or out of range")]
     OutOfRange(Vec<usize>),
@@ -173,7 +174,13 @@ fn operands_where(operands: &[&[Outline<'_>]], bad: impl Fn(&Outline<'_>) -> boo
 pub(crate) fn grid_paths(operand: &[Outline<'_>], flatten_tolerance_mm: f64) -> Paths64 {
     operand
         .iter()
-        .map(|outline| snap_polygon(&flatten_closed(outline.anchors, flatten_tolerance_mm)))
+        .map(|outline| {
+            snap_polygon(&flatten(
+                outline.anchors,
+                outline.closed,
+                flatten_tolerance_mm,
+            ))
+        })
         .collect()
 }
 
@@ -188,8 +195,9 @@ pub(crate) fn grid_paths(operand: &[Outline<'_>], flatten_tolerance_mm: f64) -> 
 /// # Errors
 ///
 /// Refuses, changing nothing, when there are no operands, the tolerance is not above 0.002 mm,
-/// an operand has an open outline, a non-finite or out-of-range coordinate, or no area, or the
-/// result is empty. The checks run in that order, and a refusal lists every offending operand.
+/// an operand has a non-finite or out-of-range coordinate or no area, or the result is empty. An
+/// open outline is closed by its straight closing line; one whose closed form encloses no area
+/// adds nothing. The checks run in that order, and a refusal lists every offending operand.
 pub fn boolean(
     op: BooleanOp,
     operands: &[&[Outline<'_>]],
@@ -201,10 +209,6 @@ pub fn boolean(
     let flatten_tolerance_mm = tolerance.as_mm() - 2.0 * GRID_MM;
     if !(flatten_tolerance_mm > 0.0 && flatten_tolerance_mm.is_finite()) {
         return Err(BooleanError::ToleranceTooSmall);
-    }
-    let open = operands_where(operands, |outline| !outline.closed);
-    if !open.is_empty() {
-        return Err(BooleanError::OpenOperands(open));
     }
     let out_of_range = operands_where(operands, |outline| !outline_in_range(outline));
     if !out_of_range.is_empty() {

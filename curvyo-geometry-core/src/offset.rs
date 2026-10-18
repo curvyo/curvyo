@@ -22,7 +22,7 @@ use crate::boolean::{Outline, grid_paths, outline_in_range};
 use crate::boolean_grid::{
     GRID_MM, MAX_COORDINATE_MM, Paths64, Point64, double_area, normalize, snap, to_millimetres,
 };
-use crate::flatten::flatten_closed;
+use crate::flatten::flatten;
 use crate::offset_finish::{canonical, lines_of_mm};
 use crate::offset_pieces::{RawStyle, closed_loop, segments_of};
 use crate::offset_polyline::{polyline_offset, without_flattening_noise};
@@ -200,7 +200,7 @@ fn without_inverted_rings(
     }
     let polylines: Vec<Vec<Point>> = operand
         .iter()
-        .map(|outline| flatten_closed(outline.anchors, flatten_mm))
+        .map(|outline| flatten(outline.anchors, outline.closed, flatten_mm))
         .collect();
     let near = |point: Point| {
         polylines.iter().any(|points| {

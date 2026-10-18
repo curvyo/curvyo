@@ -240,7 +240,9 @@ fn an_empty_result_is_refused() {
     );
 }
 
-/// Criteria 15 and 16: open paths and operands without area are refused with every offender.
+/// Criterion 16: operands without area are refused with every offender. Criterion 15 (open paths
+/// refused) is withdrawn by `0054` criterion 21: an open square is closed by its closing line and
+/// unites like the closed one.
 #[test]
 fn open_and_arealess_operands_are_refused_with_all_offenders() {
     use curvyo_geometry_core::{Outline, boolean};
@@ -252,9 +254,10 @@ fn open_and_arealess_operands_are_refused_with_all_offenders() {
     let closed_square = [Outline::new(&square, true)];
     let open_square = [Outline::new(&square, false)];
     let operands: [&[Outline<'_>]; 3] = [&open_square, &closed_square, &open_square];
+    let all_closed: [&[Outline<'_>]; 3] = [&closed_square, &closed_square, &closed_square];
     assert_eq!(
         boolean(BooleanOp::Union, &operands, tol),
-        Err(BooleanError::OpenOperands(vec![0, 2]))
+        boolean(BooleanOp::Union, &all_closed, tol)
     );
 
     let flat = [Outline::new(&line, true)];
