@@ -45,6 +45,7 @@ mod format_library_file;
 mod format_library_import;
 mod group_tree;
 mod groups;
+mod guides;
 mod history;
 mod junction;
 mod layers;
@@ -117,6 +118,7 @@ pub use format_library_file::{
 pub use format_library_import::ImportReport;
 pub use group_tree::MAX_GROUP_DEPTH;
 pub use groups::{GROUP_COMMIT_LABEL, UNGROUP_COMMIT_LABEL};
+pub use guides::{GuideMarking, SET_GUIDE_COMMIT_LABEL};
 pub use history::{
     Author, BranchMark, Direction, Event, FAR_STEP_OPS, GoToReport, HistoricalDocument,
     HistoryBranch, HistoryError, HistoryRow, LABEL_CLONE_VERSION, LABEL_GO_TO_VERSION,

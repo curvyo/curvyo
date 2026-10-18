@@ -24,6 +24,9 @@ pub struct HistoricalDocument {
     pub size: DocumentSize,
     /// The background at that version.
     pub background: DocumentBackground,
+    /// The objects among `objects` that were guides at that version, drawn in the marking style
+    /// (`specs/0046-document-shapes` criterion 29).
+    pub guides: std::collections::HashSet<NodeId>,
 }
 
 impl Document {
@@ -66,12 +69,14 @@ impl Document {
             None => guard.objects(),
         };
         let (size, background) = guard.page();
+        let guides = guard.guides(&objects);
         drop(guard);
         Ok(HistoricalDocument {
             step,
             objects,
             size,
             background,
+            guides,
         })
     }
 }

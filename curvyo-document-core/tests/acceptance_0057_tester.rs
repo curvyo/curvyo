@@ -963,7 +963,8 @@ fn ac40_path_read_equals_unlink_for_overrides() {
 
 #[test]
 fn ac37_every_save_is_format_14_and_a_newer_one_is_refused() {
-    assert_eq!(CURRENT_FORMAT_VERSION, 14);
+    // 14 is the version of 0057; `0046-document-shapes` took 15 after it, so a file of 14 opens.
+    assert_eq!(CURRENT_FORMAT_VERSION, 15);
     let d = Document::new(1);
     let o = square(&d, 0.0, 0.0, 10.0);
     mk(&d, o);
@@ -972,11 +973,11 @@ fn ac37_every_save_is_format_14_and_a_newer_one_is_refused() {
     let mut text = String::new();
     std::io::Read::read_to_string(&mut z.by_name("manifest.json").unwrap(), &mut text).unwrap();
     let m: serde_json::Value = serde_json::from_str(&text).unwrap();
-    assert_eq!(m["format_version"], 14, "also without overrides");
+    assert_eq!(m["format_version"], 15, "also without overrides");
     // What an older build (13) sees: a version above its own, so it refuses. We model the older
     // build by the same check one version up.
     assert!(matches!(
-        unpack(2, &rezip_manifest(&bytes, 15)),
+        unpack(2, &rezip_manifest(&bytes, 16)),
         Err(OpenError::FormatTooNew { .. })
     ));
     assert!(unpack(2, &rezip_manifest(&bytes, 14)).is_ok());

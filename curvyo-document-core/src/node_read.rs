@@ -52,6 +52,10 @@ pub struct NodeRead {
     /// The nearest ancestor whose own flag locks it (not the node itself); `None` when no
     /// ancestor locks it.
     pub locked_by: Option<NodeId>,
+    /// Whether it is drawn and treated as a guide (ADR 0019 §2 and §3): a path's or shape's own
+    /// `guide` register, a linked clone's root's (`specs/0046-document-shapes` criterion 34).
+    /// Always `false` for a layer or a group.
+    pub guide: bool,
 }
 
 impl NodeRead {
@@ -68,6 +72,14 @@ impl NodeRead {
     #[must_use]
     pub const fn is_container(&self) -> bool {
         matches!(self.kind, NodeKind::Layer | NodeKind::Group)
+    }
+
+    /// Whether it is part of what is produced: a leaf that is shown and is not a guide. The one
+    /// rule every machine output and artwork export filters on (`specs/0046-document-shapes`
+    /// criteria 25 and 41, `adrs.md` decision 2).
+    #[must_use]
+    pub const fn is_output_node(&self) -> bool {
+        self.object().is_some() && self.visible && !self.guide
     }
 }
 
@@ -91,6 +103,13 @@ impl Inherited {
     };
 }
 
+/// The own registers of every leaf that a linked clone reads from another leaf of its chain: the
+/// opacity of its style source and the guide flag of its root.
+struct OwnLeafRegisters {
+    opacity: std::collections::HashMap<NodeId, f64>,
+    guides: std::collections::HashSet<NodeId>,
+}
+
 /// One node met by the walk, before the clones among the leaves are resolved.
 struct Walked {
     node: NodeId,
@@ -111,22 +130,26 @@ impl Walked {
     fn read(
         self,
         leaves: &mut [Option<ObjectSnapshot>],
-        own_opacity: &std::collections::HashMap<NodeId, f64>,
+        own: &OwnLeafRegisters,
     ) -> Option<NodeRead> {
         let kind = match (self.container, self.leaf) {
             (Some(kind), _) => kind,
             (None, Some(at)) => NodeKind::Leaf(leaves[at].take()?),
             (None, None) => return None,
         };
-        let own = match &kind {
-            NodeKind::Leaf(ObjectSnapshot::Clone(clone)) => own_opacity
-                .get(&clone.chain.style_source)
-                .copied()
-                .unwrap_or(1.0),
-            _ => self.registers.opacity.get(),
+        let (own_opacity, guide) = match &kind {
+            NodeKind::Leaf(ObjectSnapshot::Clone(clone)) => (
+                own.opacity
+                    .get(&clone.chain.style_source)
+                    .copied()
+                    .unwrap_or(1.0),
+                own.guides.contains(&clone.chain.root),
+            ),
+            NodeKind::Leaf(_) => (self.registers.opacity.get(), self.registers.guide),
+            NodeKind::Layer | NodeKind::Group => (self.registers.opacity.get(), false),
         };
         // invariant: a product of numbers in 0..=1 lies in 0..=1.
-        let opacity = Opacity::new(self.from.opacity * own).unwrap_or(Opacity::OPAQUE);
+        let opacity = Opacity::new(self.from.opacity * own_opacity).unwrap_or(Opacity::OPAQUE);
         Some(NodeRead {
             id: self.node,
             parent: self.from.parent,
@@ -137,6 +160,7 @@ impl Walked {
             opacity,
             hidden_by: self.from.hidden_by,
             locked_by: self.from.locked_by,
+            guide,
             registers: self.registers,
         })
     }
@@ -213,15 +237,22 @@ impl Document {
         }
         // One resolution of every clone, in the stacking order of the walk (`specs/0049-linked-
         // clone/adrs.md` decision 3 as amended: result i belongs to leaf i).
-        let own_opacity: std::collections::HashMap<NodeId, f64> = walked
-            .iter()
-            .filter(|w| w.leaf.is_some())
-            .map(|w| (w.node, w.registers.opacity.get()))
-            .collect();
+        let own = OwnLeafRegisters {
+            opacity: walked
+                .iter()
+                .filter(|w| w.leaf.is_some())
+                .map(|w| (w.node, w.registers.opacity.get()))
+                .collect(),
+            guides: walked
+                .iter()
+                .filter(|w| w.leaf.is_some() && w.registers.guide)
+                .map(|w| w.node)
+                .collect(),
+        };
         let mut leaves = resolve(raws).leaves;
         walked
             .into_iter()
-            .filter_map(|w| w.read(&mut leaves, &own_opacity))
+            .filter_map(|w| w.read(&mut leaves, &own))
             .collect()
     }
 

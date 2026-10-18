@@ -317,11 +317,11 @@ fn c10_save_and_open_after_an_apply_keep_format_13_and_the_state() {
     let b = rect(&d, 30.0);
     d.delete_objects(&[a]).unwrap();
     let go = d.go_to_version(s1, None, None).unwrap().step.unwrap();
-    // 0042 adds no format change; 14 is the version `0057-clone-overrides` introduced.
-    assert_eq!(CURRENT_FORMAT_VERSION, 14);
+    // 0042 adds no format change; 15 is the version `0046-document-shapes` introduced.
+    assert_eq!(CURRENT_FORMAT_VERSION, 15);
     let packed = pack(&d, "t").unwrap();
     let mut zip = zip_manifest_version(&packed);
-    assert_eq!(zip.take().unwrap(), 14);
+    assert_eq!(zip.take().unwrap(), 15);
     let again = unpack(5, &packed).unwrap();
     assert_eq!(json(&again), json(&d));
     assert!(!again.contains_node(b));
