@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from "react";
 
 import { Tooltip } from "@/components/ui/tooltip";
 import type { FileCommandName, InlineCheck, ProjectApi } from "@/hooks/useProject";
+import { TEMPLATE_NAME } from "@/lib/guideText";
 import { checkSentence, projectName, projectStatus } from "@/lib/projectText";
 
 /** Discard ignores presses for this long after the check appears (a double-click on the button
@@ -92,7 +93,8 @@ function ProjectBlock({
   );
 }
 
-/** The five buttons: New and Open, Save and Save as, Close. The browser build has no Save as. */
+/** The buttons: New and Open, Save and Save as, Close and Template. The browser build has no Save
+ * as. */
 function Buttons(props: ButtonProps) {
   const { desktop } = props;
   const button = (command: FileCommandName, label: string) => (
@@ -108,8 +110,33 @@ function Buttons(props: ButtonProps) {
         {button("save", "Save")}
         {desktop ? button("save-as", "Save as…") : null}
       </div>
-      <div className="flex gap-2">{button("close", "Close")}</div>
+      <div className="flex gap-2">
+        {button("close", "Close")}
+        <TemplateButton {...props} />
+      </div>
     </div>
+  );
+}
+
+/** The Template button (`specs/0046-document-shapes` criterion 19): beside Close, an outline text
+ * button like its neighbours. Its tooltip is its name; it has no chord. */
+function TemplateButton({ project, onReturnFocus }: ButtonProps) {
+  return (
+    <Tooltip side="left" content={TEMPLATE_NAME}>
+      <button
+        type="button"
+        data-file-command="template"
+        onClick={(event) => {
+          project.loadTemplate();
+          if (event.detail > 0) {
+            onReturnFocus();
+          }
+        }}
+        className={`${BUTTON} ${OUTLINE} w-[118px]`}
+      >
+        {TEMPLATE_NAME}
+      </button>
+    </Tooltip>
   );
 }
 

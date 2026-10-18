@@ -119,6 +119,9 @@
     --toolbar-icon-active-fg: #FFFFFF;
     --editor-accent: #2F6FEE;
     --editor-accent-hover: color-mix(in srgb, #2F6FEE 20%, transparent);
+    /* docs/design-system.md, "Guide (`0046`)": the marking colour of guide paths (drawn by
+       curvyo-render-core's theme::GUIDE; kept here so the two stay one value). */
+    --guide: #166534;
     /* The ground of a list row under the pointer: lighter than the control hover so the muted
        text on it keeps 4.5:1 (4.58:1 at 8 %). */
     --row-hover: color-mix(in srgb, #2F6FEE 8%, transparent);

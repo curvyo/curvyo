@@ -73,7 +73,7 @@ test("an untitled clean project: name, status, five buttons, Quit, version", asy
   const html = await render();
   assert.match(html, />Untitled</);
   assert.match(html, />Not saved yet</);
-  assert.deepEqual(buttons(html), ["New", "Open…", "Save", "Save as…", "Close", "Quit"]);
+  assert.deepEqual(buttons(html), ["New", "Open…", "Save", "Save as…", "Close", "Template", "Quit"]);
   assert.match(html, />Curvyo 0.4.0</);
 });
 
@@ -87,7 +87,7 @@ test("a saved project shows its file name and whether it changed", async () => {
 
 test("the browser build has no Save as, Quit or divider", async () => {
   const html = await render({ desktop: false });
-  assert.deepEqual(buttons(html), ["New", "Open…", "Save", "Close"]);
+  assert.deepEqual(buttons(html), ["New", "Open…", "Save", "Close", "Template"]);
   assert.doesNotMatch(html, /Quit/);
   assert.doesNotMatch(html, /Save as/);
 });
