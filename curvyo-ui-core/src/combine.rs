@@ -1,13 +1,13 @@
-//! Planning Combine on the selected objects: which outlines go into the one compound path, how
-//! each must run so that inner shapes become holes, and why the command was refused
-//! (`specs/0035-combine-and-break-apart`).
+//! Planning Combine on the selected objects: which outlines go into the one compound path and how
+//! each must run so that inner shapes become holes (`specs/0035-combine-and-break-apart`,
+//! `specs/0054-combine-open-paths`).
 //!
 //! Pure: it reads snapshots and the selection and returns a plan or a refusal. The one write
 //! (`Document::replace_with_path`) is the session's. Nothing is flattened or moved: the plan holds
 //! the operands' own nodes, only reversed where the winding needs it.
 
 use curvyo_document_core::{
-    AnchorId, NewAnchor, NodeId, ObjectSnapshot, outline_of_rotated, reversed_anchors,
+    AnchorId, MarkerShape, NewAnchor, NodeId, ObjectSnapshot, outline_of_rotated, reversed_anchors,
 };
 use curvyo_geometry_core::{
     MAX_COORDINATE_MM, Outline, OutlineTriple, outline_area_mm2, outline_has_area, outline_nesting,
@@ -15,7 +15,7 @@ use curvyo_geometry_core::{
 };
 
 use crate::anchor_id_minter::AnchorIdMinter;
-use crate::boolean::{BooleanAvailability, boolean_availability, is_open, operands_in_order};
+use crate::boolean::{BooleanAvailability, boolean_availability, operands_in_order};
 use crate::object_selection::ObjectSelection;
 
 /// The commit label of Combine; the undo slice maps it to display text.
@@ -24,8 +24,8 @@ pub const COMBINE_COMMIT_LABEL: &str = "combine_paths";
 /// What the buttons of the Path card show.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PathAvailability {
-    /// Combine follows the rule of the Boolean buttons: two or more selected objects, an open
-    /// path among them enabling the button but refusing the press.
+    /// Combine is enabled with two or more selected objects, open ones included
+    /// (`specs/0054-combine-open-paths` criterion 13): `NeedsTwo` or `Ready`.
     pub combine: BooleanAvailability,
     /// Split and Break apart are enabled when the selection holds a compound path: one rule, so
     /// the two are never dimmed differently (`specs/0048-split-compound-path` criterion 1).
@@ -45,7 +45,10 @@ pub fn path_availability(
 ) -> PathAvailability {
     let operands = operands_in_order(objects, selection);
     PathAvailability {
-        combine: boolean_availability(objects, selection),
+        combine: match boolean_availability(objects, selection) {
+            BooleanAvailability::NeedsTwo => BooleanAvailability::NeedsTwo,
+            _ => BooleanAvailability::Ready,
+        },
         compound: operands.iter().any(|object| is_compound(object)),
         cut: !operands.is_empty(),
     }
@@ -67,13 +70,6 @@ pub enum CombineRefusal {
         /// The leaves of the selected groups, to outline.
         offenders: Vec<NodeId>,
     },
-    /// `offenders` of the `of` selected objects are open paths.
-    OpenPaths {
-        /// The open paths, to outline.
-        offenders: Vec<NodeId>,
-        /// How many objects are selected.
-        of: usize,
-    },
     /// `offenders` of the `of` selected objects have a coordinate that is not finite or beyond
     /// [`MAX_COORDINATE_MM`].
     OutOfRange {
@@ -82,28 +78,9 @@ pub enum CombineRefusal {
         /// How many objects are selected.
         of: usize,
     },
-    /// `offenders` of the `of` selected objects have an outline that encloses no area.
-    NoArea {
-        /// The objects without area, to outline.
-        offenders: Vec<NodeId>,
-        /// How many objects are selected.
-        of: usize,
-    },
-    /// `offenders` of the `of` selected objects touch or cross another selected object.
-    Touching {
-        /// Every object that touches another, to outline.
-        offenders: Vec<NodeId>,
-        /// How many objects are selected.
-        of: usize,
-    },
-    /// No two objects touch, but `offenders` of the `of` selected objects touch or cross
-    /// themselves (a figure eight, or a compound path whose outlines touch).
-    SelfTouching {
-        /// The objects that touch themselves, to outline.
-        offenders: Vec<NodeId>,
-        /// How many objects are selected.
-        of: usize,
-    },
+    /// Every outline of every selected object has a single node (`0054` criterion 10); nothing is
+    /// outlined.
+    SingleNodesOnly,
 }
 
 /// What [`plan_combine`] decided, ready for `Document::replace_with_path`.
@@ -113,19 +90,30 @@ pub struct CombinePlan {
     pub operands: Vec<NodeId>,
     /// The operand the result takes its style and place from: the bottom-most.
     pub base: NodeId,
-    /// Every outline of every operand with fresh anchor ids, in stacking order and each
-    /// operand's own order, reversed where the winding needs it.
+    /// Every outline of two or more nodes of every operand with fresh anchor ids, in stacking
+    /// order and each operand's own order, closed ones reversed where the winding needs it.
     pub outlines: Vec<(Vec<NewAnchor>, bool)>,
-    /// How many outlines are holes (odd depth).
+    /// How many outlines are holes (closed, odd depth).
     pub holes: usize,
+    /// How many outlines are open.
+    pub open: usize,
+    /// How many closed outlines touch or cross another closed outline or themselves.
+    pub touching: usize,
+    /// How many holes touch or cross another hole.
+    pub touching_holes: usize,
+    /// How many outlines with a single node were left out.
+    pub single_nodes_removed: usize,
+    /// Whether an operand has a start, middle or end marker on (the result draws none).
+    pub markers: bool,
     /// Whether the operands' complete styles are not all equal.
     pub styles_differ: bool,
 }
 
-/// One closed outline of an operand, with the index of the operand it belongs to.
+/// One outline of an operand, with the index of the operand it belongs to.
 struct Contour {
     owner: usize,
     anchors: Vec<NewAnchor>,
+    closed: bool,
 }
 
 /// The outlines of `object` with their own nodes. A primitive gives the outline "Object to path"
@@ -138,6 +126,7 @@ fn contours_of(owner: usize, object: &ObjectSnapshot) -> Vec<Contour> {
             .map(|subpath| Contour {
                 owner,
                 anchors: subpath.anchors.to_vec(),
+                closed: subpath.closed,
             })
             .collect(),
         ObjectSnapshot::Primitive(primitive) => {
@@ -154,6 +143,7 @@ fn contours_of(owner: usize, object: &ObjectSnapshot) -> Vec<Contour> {
                         kind: a.kind,
                     })
                     .collect(),
+                closed: true,
             }]
         }
     }
@@ -209,14 +199,19 @@ fn owners_where(
     ids_flagged(operands, &flagged)
 }
 
+/// A closed outline whose enclosed area is at most this (mm²) keeps its stored direction
+/// (`0054` criterion 7: a closed path of two nodes, a figure eight whose lobes cancel).
+const NO_AREA_MM2: f64 = 0.001;
+
 /// Plans Combine over the selected objects.
 ///
 /// The stacking order decides the outline order and the base operand, never the order of the
-/// selection (criterion 8). Checks run in a fixed order and list every offender: open paths,
-/// range, no area, then touching (different objects first, an object touching itself second).
+/// selection (criterion 8). Open, touching and crossing outlines are all allowed
+/// (`specs/0054-combine-open-paths`); outlines with a single node are left out and counted.
 ///
 /// # Errors
-/// A [`CombineRefusal`] with the objects to outline.
+/// A [`CombineRefusal`]: fewer than two objects, a coordinate out of range (the objects to
+/// outline), or nothing but single-node outlines.
 pub fn plan_combine(
     objects: &[ObjectSnapshot],
     selection: &ObjectSelection,
@@ -227,91 +222,101 @@ pub fn plan_combine(
     if of < 2 {
         return Err(CombineRefusal::NeedsTwo);
     }
-    let open: Vec<NodeId> = operands
-        .iter()
-        .filter(|object| is_open(object))
-        .map(|object| object.id())
-        .collect();
-    if !open.is_empty() {
-        return Err(CombineRefusal::OpenPaths {
-            offenders: open,
-            of,
-        });
-    }
-    let contours: Vec<Contour> = operands
+    let all: Vec<Contour> = operands
         .iter()
         .enumerate()
         .flat_map(|(owner, object)| contours_of(owner, object))
         .collect();
-    let offenders = owners_where(&operands, &contours, |_, c| out_of_range(&c.anchors));
+    let offenders = owners_where(&operands, &all, |_, c| out_of_range(&c.anchors));
     if !offenders.is_empty() {
         return Err(CombineRefusal::OutOfRange { offenders, of });
     }
-    let owned: Vec<Vec<OutlineTriple>> = contours.iter().map(|c| triples(&c.anchors)).collect();
-    let outlines: Vec<Outline<'_>> = owned.iter().map(|t| Outline::new(t, true)).collect();
-    let areas: Vec<f64> = outlines.iter().map(outline_area_mm2).collect();
-    let offenders = owners_where(&operands, &contours, |index, _| {
-        !outline_has_area(&outlines[index])
-    });
-    if !offenders.is_empty() {
-        return Err(CombineRefusal::NoArea { offenders, of });
+    let (contours, single): (Vec<Contour>, Vec<Contour>) =
+        all.into_iter().partition(|c| c.anchors.len() >= 2);
+    if contours.is_empty() {
+        return Err(CombineRefusal::SingleNodesOnly);
     }
-    check_touches(&operands, &contours, &outlines, of)?;
-
-    let nesting = outline_nesting(&outlines);
-    let holes = nesting.iter().filter(|n| n.depth % 2 == 1).count();
-    let result: Vec<(Vec<NewAnchor>, bool)> = contours
+    let windings = closed_windings(&contours);
+    let outlines: Vec<(Vec<NewAnchor>, bool)> = contours
         .iter()
-        .zip(&nesting)
-        .zip(&areas)
-        .map(|((contour, nest), &area)| {
-            let wants_shape = nest.depth % 2 == 0;
-            let anchors = if (area > 0.0) == wants_shape {
-                contour.anchors.clone()
-            } else {
+        .zip(&windings.reverse)
+        .map(|(contour, &reverse)| {
+            let anchors = if reverse {
                 reversed_anchors(&contour.anchors)
+            } else {
+                contour.anchors.clone()
             };
-            (fresh_ids(anchors, minter), true)
+            (fresh_ids(anchors, minter), contour.closed)
         })
         .collect();
     let first_style = operands[0].style();
     Ok(CombinePlan {
         operands: operands.iter().map(|object| object.id()).collect(),
         base: operands[0].id(),
-        outlines: result,
-        holes,
+        outlines,
+        holes: windings.holes,
+        open: contours.iter().filter(|c| !c.closed).count(),
+        touching: windings.touching,
+        touching_holes: windings.touching_holes,
+        single_nodes_removed: single.len(),
+        markers: operands.iter().any(|object| {
+            let markers = object.style().stroke.markers;
+            [markers.start, markers.mid, markers.end]
+                .iter()
+                .any(|shape| *shape != MarkerShape::None)
+        }),
         styles_differ: operands.iter().any(|object| object.style() != first_style),
     })
 }
 
-/// Refuses when two outlines touch or cross: different objects first, then one object alone.
-fn check_touches(
-    operands: &[&ObjectSnapshot],
-    contours: &[Contour],
-    outlines: &[Outline<'_>],
-    of: usize,
-) -> Result<(), CombineRefusal> {
-    let pairs = touching_outlines(outlines);
-    let mut across = vec![false; operands.len()];
-    let mut alone = vec![false; operands.len()];
+/// What the closed outlines of a Combine decide: which outline to reverse and the counts of the
+/// notice. Open outlines are never reversed and take part in none of it.
+struct Windings {
+    /// Per contour: whether it is reversed.
+    reverse: Vec<bool>,
+    holes: usize,
+    touching: usize,
+    touching_holes: usize,
+}
+
+/// Windings by depth (`0054` criterion 7): even depth runs as a shape, odd depth as a hole, by
+/// the sign of the area it encloses; a closed outline with no area keeps its direction.
+fn closed_windings(contours: &[Contour]) -> Windings {
+    let closed: Vec<usize> = (0..contours.len())
+        .filter(|&index| contours[index].closed)
+        .collect();
+    let owned: Vec<Vec<OutlineTriple>> = closed
+        .iter()
+        .map(|&index| triples(&contours[index].anchors))
+        .collect();
+    let outlines: Vec<Outline<'_>> = owned.iter().map(|t| Outline::new(t, true)).collect();
+    let nesting = outline_nesting(&outlines);
+    let is_hole: Vec<bool> = nesting.iter().map(|n| n.depth % 2 == 1).collect();
+    let mut reverse = vec![false; contours.len()];
+    for (k, &index) in closed.iter().enumerate() {
+        let area = outline_area_mm2(&outlines[k]);
+        if !outline_has_area(&outlines[k]) || area.abs() <= NO_AREA_MM2 {
+            continue;
+        }
+        reverse[index] = (area > 0.0) == is_hole[k];
+    }
+    let pairs = touching_outlines(&outlines);
+    let mut touches = vec![false; outlines.len()];
+    let mut hole_touches = vec![false; outlines.len()];
     for &(a, b) in &pairs {
-        let (owner_a, owner_b) = (contours[a].owner, contours[b].owner);
-        if owner_a == owner_b {
-            alone[owner_a] = true;
-        } else {
-            across[owner_a] = true;
-            across[owner_b] = true;
+        touches[a] = true;
+        touches[b] = true;
+        if a != b && is_hole[a] && is_hole[b] {
+            hole_touches[a] = true;
+            hole_touches[b] = true;
         }
     }
-    let offenders = ids_flagged(operands, &across);
-    if !offenders.is_empty() {
-        return Err(CombineRefusal::Touching { offenders, of });
+    Windings {
+        reverse,
+        holes: is_hole.iter().filter(|&&hole| hole).count(),
+        touching: touches.iter().filter(|&&t| t).count(),
+        touching_holes: hole_touches.iter().filter(|&&t| t).count(),
     }
-    let offenders = ids_flagged(operands, &alone);
-    if !offenders.is_empty() {
-        return Err(CombineRefusal::SelfTouching { offenders, of });
-    }
-    Ok(())
 }
 
 /// `anchors` with a fresh id on each.

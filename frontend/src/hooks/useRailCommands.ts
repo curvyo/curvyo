@@ -110,8 +110,6 @@ export function useBusyWindow(busy: boolean) {
 
 const NO_PATH_AVAILABILITY: PathAvailabilityState = {
   needsTwo: true,
-  open: 0,
-  of: 0,
   hasCompound: false,
   canCut: false,
 };
@@ -134,9 +132,9 @@ export function useRailCommands(editor: EditorSession): RailCommands {
   const booleanAvailability = useMemo<BooleanAvailabilityState>(() => {
     const raw = getSession()?.boolean_availability();
     if (!raw) {
-      return { needsTwo: true, open: 0, of: 0 };
+      return { needsTwo: true, open: 0 };
     }
-    const state = { needsTwo: raw.needs_two, open: raw.open, of: raw.of };
+    const state = { needsTwo: raw.needs_two, open: raw.open };
     raw.free();
     return state;
     // The session is read again after every sync (`syncRevision`).
@@ -149,8 +147,6 @@ export function useRailCommands(editor: EditorSession): RailCommands {
     }
     const state = {
       needsTwo: raw.needs_two,
-      open: raw.open,
-      of: raw.of,
       hasCompound: raw.has_compound,
       canCut: raw.can_cut,
     };
@@ -212,7 +208,7 @@ export function useRailCommands(editor: EditorSession): RailCommands {
         const applied = result.kind === "applied";
         const text = applied ? withRepair(successText(op, result)) : refusalText(op, result);
         if (text !== null) {
-          show(applied ? "success" : "refusal", text);
+          show(applied ? "success" : "refusal", text, applied ? noticeMs(text) : undefined);
         }
       });
     },

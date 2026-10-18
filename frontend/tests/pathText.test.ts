@@ -31,8 +31,6 @@ import {
 
 const available = (patch: Partial<PathAvailabilityState>): PathAvailabilityState => ({
   needsTwo: false,
-  open: 0,
-  of: 3,
   hasCompound: true,
   canCut: true,
   ...patch,
@@ -43,6 +41,11 @@ const combined = (patch: Partial<CombineResult>): CombineResult => ({
   count: 4,
   of: 4,
   holes: 3,
+  open: 0,
+  touching: 0,
+  touchingHoles: 0,
+  singleNodesRemoved: 0,
+  markers: false,
   stylesDiffer: false,
   ...patch,
 });
@@ -61,6 +64,7 @@ const broken = (patch: Partial<BreakApartResult>): BreakApartResult => ({
   compounds: 1,
   pieces: 3,
   withHoles: false,
+  singleNodesRemoved: 0,
   ...patch,
 });
 
@@ -83,20 +87,12 @@ test("names and rules are those of 0048 criterion 2, and no rule wraps", () => {
   }
 });
 
-test("the Combine note: fewer than two, another tool, an open path, else the effect", () => {
-  const none = available({ needsTwo: true, of: 0 });
-  assert.equal(commandNote("combine", none, true), "Select two or more closed shapes.");
+test("the Combine note: fewer than two, another tool, else the effect (0054 criterion 13)", () => {
+  const none = available({ needsTwo: true });
+  assert.equal(commandNote("combine", none, true), "Select two or more paths or shapes.");
   assert.equal(
     commandNote("combine", none, false),
     "Use the Select tool.",
-  );
-  assert.equal(
-    commandNote("combine", available({ open: 1 }), true),
-    "Needs closed paths: 1 of 3 selected is open.",
-  );
-  assert.equal(
-    commandNote("combine", available({ open: 2 }), true),
-    "Needs closed paths: 2 of 3 selected are open.",
   );
   assert.equal(
     commandNote("combine", available({}), true),
@@ -120,9 +116,9 @@ test("the Split and Break apart notes: no compound path, another tool, else the 
   );
 });
 
-test("dimming follows the session: an open path or touching shapes do not dim Combine", () => {
+test("dimming follows the session: only fewer than two objects dim Combine", () => {
   assert.equal(commandDimmed("combine", available({ needsTwo: true })), true);
-  assert.equal(commandDimmed("combine", available({ open: 1 })), false);
+  assert.equal(commandDimmed("combine", available({})), false);
   for (const command of ["split", "break_apart"] as const) {
     assert.equal(commandDimmed(command, available({ hasCompound: false })), true, command);
     assert.equal(commandDimmed(command, available({})), false, command);
@@ -142,7 +138,7 @@ test("the Combine notice counts the objects and the holes", () => {
     combineSuccessText(combined({ holes: 0, count: 2 })),
     "Combine: 2 objects became 1 compound path.",
   );
-  assert.equal(combineSuccessText(combined({ kind: "touching" })), null);
+  assert.equal(combineSuccessText(combined({ kind: "out_of_range" })), null);
 });
 
 test("the Combine notice names the style that was used when the styles differed", () => {
@@ -152,33 +148,51 @@ test("the Combine notice names the style that was used when the styles differed"
   );
 });
 
-test("a notice over 70 characters lasts 5 seconds, a shorter one the default 3", () => {
+test("a notice over 70 characters lasts 5 seconds, over 140 8 seconds, a shorter one 3", () => {
   assert.equal(noticeMs(combineSuccessText(combined({ holes: 0, count: 2 })) ?? ""), undefined);
   assert.equal(noticeMs(combineSuccessText(combined({ stylesDiffer: true })) ?? ""), 5000);
   assert.equal(noticeMs("x".repeat(70)), undefined);
   assert.equal(noticeMs("x".repeat(71)), 5000);
+  assert.equal(noticeMs("x".repeat(140)), 5000);
+  assert.equal(noticeMs("x".repeat(141)), 8000);
 });
 
-test("the Combine refusals are the sentences of criteria 9 to 11", () => {
+test("0054 criterion 12: the Combine notice counts open, touching and crossing outlines", () => {
   assert.equal(
-    combineRefusalText(combined({ kind: "open_paths", count: 1, of: 3 })),
-    "Combine needs closed paths. 1 of 3 selected objects is open. Nothing was changed.",
+    combineSuccessText(combined({ count: 3, holes: 1, open: 2 })),
+    "Combine: 3 objects became 1 compound path with 1 hole and 2 open outlines.",
   );
   assert.equal(
-    combineRefusalText(combined({ kind: "touching", count: 2, of: 3 })),
-    "Combine needs shapes that do not touch. 2 of 3 selected objects touch each other. Use Union to merge overlapping shapes. Nothing was changed.",
+    combineSuccessText(combined({ count: 3, holes: 0, open: 1 })),
+    "Combine: 3 objects became 1 compound path with 1 open outline.",
   );
   assert.equal(
-    combineRefusalText(combined({ kind: "self_touching", count: 1, of: 3 })),
-    "Combine needs shapes that do not cross themselves. 1 of 3 selected objects does. Nothing was changed.",
+    combineSuccessText(combined({ count: 2, holes: 0, touching: 4 })),
+    "Combine: 2 objects became 1 compound path. 4 closed outlines touch or cross.",
   );
   assert.equal(
-    combineRefusalText(combined({ kind: "self_touching", count: 2, of: 3 })),
-    "Combine needs shapes that do not cross themselves. 2 of 3 selected objects do. Nothing was changed.",
+    combineSuccessText(combined({ count: 2, holes: 0, touching: 1 })),
+    "Combine: 2 objects became 1 compound path. 1 closed outline touches or crosses itself.",
+  );
+  // 7g: the order of the UX notes, the holes sentence after the touch count.
+  const text = combineSuccessText(
+    combined({ count: 3, holes: 2, touching: 2, touchingHoles: 2, singleNodesRemoved: 1, stylesDiffer: true, markers: true }),
   );
   assert.equal(
-    combineRefusalText(combined({ kind: "no_area", count: 1, of: 2 })),
-    "Combine needs shapes that enclose an area. 1 of 2 selected objects has no area. Nothing was changed.",
+    text,
+    "Combine: 3 objects became 1 compound path with 2 holes. 2 closed outlines touch or cross. 2 holes touch or cross; where they overlap, it stays filled. Undo and Union them first for one hole. 1 outline with a single node was removed. It uses the style of the lowest object. Markers are not drawn on compound paths.",
+  );
+  assert.equal(noticeMs(text ?? ""), 8000);
+  assert.match(
+    combineSuccessText(combined({ singleNodesRemoved: 2 })) ?? "",
+    / 2 outlines with a single node were removed\.$/,
+  );
+});
+
+test("the Combine refusals: range (0035 criterion 11) and single nodes (0054 criterion 10)", () => {
+  assert.equal(
+    combineRefusalText(combined({ kind: "single_nodes_only" })),
+    "Combine needs outlines with two or more nodes. Every selected outline has a single node. Nothing was changed.",
   );
   assert.equal(
     combineRefusalText(combined({ kind: "out_of_range", count: 2, of: 3 })),
@@ -188,10 +202,11 @@ test("the Combine refusals are the sentences of criteria 9 to 11", () => {
   assert.equal(combineRefusalText(combined({ kind: "needs_two" })), null);
 });
 
-test("every refusal of Combine outlines its offenders, a success none", () => {
-  for (const kind of ["open_paths", "no_area", "out_of_range", "touching", "self_touching"]) {
+test("a Combine refusal outlines objects out of range and groups only", () => {
+  for (const kind of ["out_of_range", "groups"]) {
     assert.equal(combineOutlinesObjects(combined({ kind })), true, kind);
   }
+  assert.equal(combineOutlinesObjects(combined({ kind: "single_nodes_only" })), false);
   assert.equal(combineOutlinesObjects(combined({ kind: "applied" })), false);
   assert.equal(combineOutlinesObjects(combined({ kind: "needs_two" })), false);
 });
@@ -227,12 +242,21 @@ test("the Split refusals are the sentences of criteria 7 and 9", () => {
     "Split does not work on groups. Ungroup first. Nothing was changed.",
   );
   assert.equal(
-    splitRefusalText(split({ kind: "one_piece", compounds: 1 })),
+    splitRefusalText(split({ kind: "one_piece", compounds: 1, withHoles: true })),
     "Nothing to split. The compound path is one piece with its holes. Use Break apart to release the holes. Nothing was changed.",
   );
   assert.equal(
-    splitRefusalText(split({ kind: "one_piece", compounds: 2 })),
+    splitRefusalText(split({ kind: "one_piece", compounds: 2, withHoles: true })),
     "Nothing to split. The 2 selected compound paths are one piece each, with their holes. Use Break apart to release the holes. Nothing was changed.",
+  );
+  // 0054 criterion 17: no hole, no word about holes.
+  assert.equal(
+    splitRefusalText(split({ kind: "one_piece", compounds: 1 })),
+    "Nothing to split. The compound path is one piece. Use Break apart to separate every outline. Nothing was changed.",
+  );
+  assert.equal(
+    splitRefusalText(split({ kind: "one_piece", compounds: 2 })),
+    "Nothing to split. The 2 selected compound paths are one piece each. Use Break apart to separate every outline. Nothing was changed.",
   );
   assert.equal(splitRefusalText(split({ kind: "applied" })), null);
 });
@@ -320,4 +344,11 @@ test("a refused Cut outlines groups, compound paths and objects out of range, no
   for (const kind of ["no_crossing", "too_many", "applied"]) {
     assert.equal(cutOutlinesObjects(cut({ kind })), false, kind);
   }
+});
+
+test("0054 criterion 18: Break apart names removed single-node outlines after the count", () => {
+  assert.equal(
+    breakApartSuccessText(broken({ singleNodesRemoved: 1, withHoles: true })),
+    "Break apart: 1 compound path became 3 objects. 1 outline with a single node was removed. Holes became filled shapes.",
+  );
 });

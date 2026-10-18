@@ -25,8 +25,6 @@ import {
 
 const avail = (patch: Partial<PathAvailabilityState>): PathAvailabilityState => ({
   needsTwo: true,
-  open: 0,
-  of: 0,
   hasCompound: false,
   canCut: false,
   ...patch,
@@ -43,6 +41,7 @@ const brk = (kind: string, compounds = 0, pieces = 0, withHoles = false) => ({
   compounds,
   pieces,
   withHoles,
+  singleNodesRemoved: 0,
 });
 const cut = (kind: string, count = 0, of = 0, pieces = 0) => ({ kind, count, of, pieces });
 
@@ -64,7 +63,7 @@ test("0048 c2 / 0036 c1: rule lines verbatim and at most 45 characters", () => {
 });
 
 test("States: no compound path dims Split and Break apart, never Cut when something is selected", () => {
-  const ordinary = avail({ needsTwo: true, of: 0, hasCompound: false, canCut: true });
+  const ordinary = avail({ needsTwo: true, hasCompound: false, canCut: true });
   assert.equal(commandDimmed("split", ordinary), true);
   assert.equal(commandDimmed("break_apart", ordinary), true);
   assert.equal(commandDimmed("cut", ordinary), false);
@@ -89,7 +88,7 @@ test("States: Split and Break apart are dimmed in exactly the same cases", () =>
   for (const hasCompound of [false, true]) {
     for (const canCut of [false, true]) {
       for (const needsTwo of [false, true]) {
-        const a = avail({ hasCompound, canCut, needsTwo, of: needsTwo ? 0 : 2 });
+        const a = avail({ hasCompound, canCut, needsTwo });
         assert.equal(commandDimmed("split", a), commandDimmed("break_apart", a));
       }
     }
@@ -147,13 +146,14 @@ test("0048 c8: Split success notices", () => {
 });
 
 test("0048 c7, c9: Split refusals", () => {
+  // A compound path with a hole (0054 criterion 17 keeps this wording for it).
   assert.equal(
-    splitRefusalText(split("one_piece", 1)),
+    splitRefusalText(split("one_piece", 1, 0, true)),
     "Nothing to split. The compound path is one piece with its holes. Use Break apart to " +
       "release the holes. Nothing was changed.",
   );
   assert.equal(
-    splitRefusalText(split("one_piece", 2)),
+    splitRefusalText(split("one_piece", 2, 0, true)),
     "Nothing to split. The 2 selected compound paths are one piece each, with their holes. " +
       "Use Break apart to release the holes. Nothing was changed.",
   );

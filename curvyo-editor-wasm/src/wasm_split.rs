@@ -15,7 +15,7 @@ fn count(n: usize) -> u32 {
 /// What `apply_split` did. `kind` is `"ignored"`, `"applied"` (`compounds` compound paths became
 /// `pieces` objects; `with_holes` says a piece has a hole; `left_alone` compound paths were one
 /// piece already) or a refusal: `"no_compound"`, `"groups"`, `"one_piece"` (`compounds` selected
-/// compound paths are one piece each) or `"out_of_range"` (`compounds` of the `of` selected objects
+/// compound paths are one piece each; `with_holes` says one of them has a hole) or `"out_of_range"` (`compounds` of the `of` selected objects
 /// reach beyond the kernel's range). Nothing was changed by anything but `"applied"`.
 #[wasm_bindgen]
 #[derive(Debug, Clone)]
@@ -55,9 +55,10 @@ impl From<SplitOutcome> for SplitResultView {
                 left_alone,
             } => view("applied", compounds, pieces, with_holes, left_alone),
             SplitOutcome::Refused(SplitRefusal::NoCompound) => view("no_compound", 0, 0, false, 0),
-            SplitOutcome::Refused(SplitRefusal::OnePiece { compounds }) => {
-                view("one_piece", compounds, 0, false, 0)
-            }
+            SplitOutcome::Refused(SplitRefusal::OnePiece {
+                compounds,
+                with_holes,
+            }) => view("one_piece", compounds, 0, with_holes, 0),
             SplitOutcome::Refused(SplitRefusal::Groups { offenders }) => {
                 view("groups", offenders.len(), 0, false, 0)
             }
@@ -70,7 +71,8 @@ impl From<SplitOutcome> for SplitResultView {
 }
 
 /// What `apply_break_apart` did. `kind` is `"ignored"`, `"applied"` (`compounds` compound paths
-/// became `pieces` objects; `with_holes` says a hole became a filled shape) or a refusal:
+/// became `pieces` objects; `with_holes` says a hole became a filled shape; `single_nodes_removed`
+/// outlines of a single node were left out) or a refusal:
 /// `"no_compound"` or `"groups"`. Nothing was changed by anything but `"applied"`.
 #[wasm_bindgen]
 #[derive(Debug, Clone)]
@@ -84,6 +86,8 @@ pub struct BreakApartResultView {
     pub pieces: u32,
     /// A hole became a filled shape.
     pub with_holes: bool,
+    /// Outlines with a single node that were left out.
+    pub single_nodes_removed: u32,
 }
 
 impl From<BreakApartOutcome> for BreakApartResultView {
@@ -93,6 +97,7 @@ impl From<BreakApartOutcome> for BreakApartResultView {
             compounds: count(compounds),
             pieces: count(pieces),
             with_holes,
+            single_nodes_removed: 0,
         };
         match outcome {
             BreakApartOutcome::Ignored => view("ignored", 0, 0, false),
@@ -100,7 +105,11 @@ impl From<BreakApartOutcome> for BreakApartResultView {
                 compounds,
                 pieces,
                 with_holes,
-            } => view("applied", compounds, pieces, with_holes),
+                single_nodes_removed,
+            } => Self {
+                single_nodes_removed: count(single_nodes_removed),
+                ..view("applied", compounds, pieces, with_holes)
+            },
             BreakApartOutcome::Refused(BreakApartRefusal::NoCompound) => {
                 view("no_compound", 0, 0, false)
             }
@@ -118,7 +127,7 @@ impl WasmSession {
         self.session.apply_split().into()
     }
 
-    /// Breaks the selected compound paths apart into one closed path per outline, in one commit.
+    /// Breaks the selected compound paths apart into one path per outline, in one commit.
     pub fn apply_break_apart(&mut self) -> BreakApartResultView {
         self.session.apply_break_apart().into()
     }

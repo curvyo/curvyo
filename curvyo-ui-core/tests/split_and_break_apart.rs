@@ -90,7 +90,10 @@ fn e1_a_ring() {
 
     assert_eq!(
         plan_split(&all, &select(&[ring]), &mut minter()),
-        Err(SplitRefusal::OnePiece { compounds: 1 })
+        Err(SplitRefusal::OnePiece {
+            compounds: 1,
+            with_holes: true
+        })
     );
     let broken = plan_break_apart(&all, &select(&[ring]), &mut minter()).unwrap();
     assert_eq!(broken.removed, vec![ring]);
@@ -204,7 +207,10 @@ fn touching_regions_are_one_part_and_near_ones_are_two() {
 
     assert_eq!(
         plan_split(&all, &select(&[overlapping]), &mut minter()),
-        Err(SplitRefusal::OnePiece { compounds: 1 })
+        Err(SplitRefusal::OnePiece {
+            compounds: 1,
+            with_holes: false
+        })
     );
     assert_eq!(
         plan_split(&all, &select(&[apart]), &mut minter())

@@ -22,6 +22,10 @@ pub enum BooleanOutcome {
         operands: usize,
         /// Whether the result is a compound path.
         compound: bool,
+        /// How many open outlines were closed with a straight line.
+        closed_open: usize,
+        /// How many open outlines enclosed no area and were removed.
+        removed_open: usize,
     },
     /// Refused; nothing was changed. The offending objects, if any, are outlined until the
     /// selection or the tool changes or the host clears them.
@@ -80,8 +84,7 @@ impl Session {
                 Ok(plan) => plan,
                 Err(refusal) => {
                     this.command_refusal = match &refusal {
-                        BooleanRefusal::OpenPaths { offenders, .. }
-                        | BooleanRefusal::NoArea { offenders, .. }
+                        BooleanRefusal::NoArea { offenders, .. }
                         | BooleanRefusal::OutOfRange { offenders, .. }
                         | BooleanRefusal::Groups { offenders } => {
                             Some(RefusalMarks::new(offenders.clone(), &selection))
@@ -111,6 +114,8 @@ impl Session {
             BooleanOutcome::Applied {
                 operands: plan.operands.len(),
                 compound: plan.compound,
+                closed_open: plan.closed_open,
+                removed_open: plan.removed_open,
             }
         })
     }

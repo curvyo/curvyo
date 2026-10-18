@@ -13,6 +13,7 @@ use curvyo_document_core::{
 };
 use curvyo_geometry_core::{
     BooleanError, BooleanOp as KernelOp, Outline, OutlineTriple, boolean as run_kernel,
+    outline_has_area,
 };
 
 use crate::anchor_id_minter::AnchorIdMinter;
@@ -70,15 +71,14 @@ impl BooleanOp {
 pub enum BooleanAvailability {
     /// Fewer than two objects are selected: the buttons are dimmed.
     NeedsTwo,
-    /// Two or more are selected and `open` of the `of` selected objects are open paths: the
-    /// buttons are enabled and an activation is refused with the count.
-    OpenPaths {
-        /// How many of the selected objects are open paths.
-        open: usize,
-        /// How many objects are selected.
-        of: usize,
+    /// Two or more are selected and they hold `outlines` open outlines that enclose an area once
+    /// closed: the buttons are enabled and an operation closes each with a straight line
+    /// (`specs/0054-combine-open-paths` criteria 21, 23).
+    ClosesOpen {
+        /// How many open outlines of the selected objects enclose an area once closed.
+        outlines: usize,
     },
-    /// Two or more closed objects are selected.
+    /// Two or more objects without an open outline are selected.
     Ready,
 }
 
@@ -116,12 +116,13 @@ pub fn boolean_availability(
     if operands.len() < 2 {
         return BooleanAvailability::NeedsTwo;
     }
-    let open = operands.iter().filter(|object| is_open(object)).count();
+    // The rule of the plan's `closed_open`, so the note and the notice say the same thing: an
+    // open outline whose closed form encloses no area is not counted.
+    let owned: Vec<Vec<(Vec<OutlineTriple>, bool)>> =
+        operands.iter().map(|object| outlines_of(object)).collect();
+    let (open, _) = open_counts(&owned);
     if open > 0 {
-        BooleanAvailability::OpenPaths {
-            open,
-            of: operands.len(),
-        }
+        BooleanAvailability::ClosesOpen { outlines: open }
     } else {
         BooleanAvailability::Ready
     }
@@ -132,13 +133,6 @@ pub fn boolean_availability(
 pub enum BooleanRefusal {
     /// Fewer than two objects are selected.
     NeedsTwo,
-    /// `offenders` of the `of` selected objects are open paths.
-    OpenPaths {
-        /// The open paths, to outline.
-        offenders: Vec<NodeId>,
-        /// How many objects are selected.
-        of: usize,
-    },
     /// `offenders` of the `of` selected objects enclose no area.
     NoArea {
         /// The objects without area, to outline.
@@ -178,6 +172,12 @@ pub struct BooleanPlan {
     pub outlines: Vec<(Vec<NewAnchor>, bool)>,
     /// Whether the result has several outlines (a compound path).
     pub compound: bool,
+    /// How many open outlines of the operands were closed with a straight line and enclosed an
+    /// area (`0054` criterion 21).
+    pub closed_open: usize,
+    /// How many open outlines of the operands enclosed no area once closed and were removed
+    /// (`0054` criterion 22).
+    pub removed_open: usize,
 }
 
 /// The outlines of one object as the kernel reads them: a path's own outlines, a primitive's
@@ -261,8 +261,8 @@ fn refusal_of(error: BooleanError, order: &[&ObjectSnapshot], of: usize) -> Bool
 /// Plans `op` over the selected objects.
 ///
 /// The stacking order decides which operand is which, never the order of the selection
-/// (criterion 9). Open paths are refused before the kernel runs (criterion 15), so the counts
-/// match [`boolean_availability`]'s.
+/// (criterion 9). An open outline is closed with a straight line (`0054` criterion 21); one that
+/// encloses no area then adds nothing and is counted as removed (criterion 22).
 ///
 /// # Errors
 /// A [`BooleanRefusal`] with the objects to outline.
@@ -274,19 +274,8 @@ pub fn plan_boolean(
 ) -> Result<BooleanPlan, BooleanRefusal> {
     let operands = operands_in_order(objects, selection);
     let of = operands.len();
-    match boolean_availability(objects, selection) {
-        BooleanAvailability::NeedsTwo => return Err(BooleanRefusal::NeedsTwo),
-        BooleanAvailability::OpenPaths { .. } => {
-            return Err(BooleanRefusal::OpenPaths {
-                offenders: operands
-                    .iter()
-                    .filter(|object| is_open(object))
-                    .map(|object| object.id())
-                    .collect(),
-                of,
-            });
-        }
-        BooleanAvailability::Ready => {}
+    if boolean_availability(objects, selection) == BooleanAvailability::NeedsTwo {
+        return Err(BooleanRefusal::NeedsTwo);
     }
     let (order, kernel_op, base) = kernel_order(op, &operands);
     let owned: Vec<Vec<(Vec<OutlineTriple>, bool)>> =
@@ -308,12 +297,34 @@ pub fn plan_boolean(
         .into_iter()
         .map(|points| (corner_anchors(&points, minter), true))
         .collect();
+    let (closed_open, removed_open) = open_counts(&owned);
     Ok(BooleanPlan {
         operands: operands.iter().map(|object| object.id()).collect(),
         base: base.id(),
         compound: outlines.len() > 1,
         outlines,
+        closed_open,
+        removed_open,
     })
+}
+
+/// How many open outlines of two or more nodes enclose an area once closed by their straight
+/// closing line, and how many do not.
+fn open_counts(operands: &[Vec<(Vec<OutlineTriple>, bool)>]) -> (usize, usize) {
+    let mut with_area = 0;
+    let mut without = 0;
+    for (anchors, _) in operands
+        .iter()
+        .flatten()
+        .filter(|(anchors, closed)| !closed && anchors.len() >= 2)
+    {
+        if outline_has_area(&Outline::new(anchors, false)) {
+            with_area += 1;
+        } else {
+            without += 1;
+        }
+    }
+    (with_area, without)
 }
 
 /// A closed outline of corner anchors with no handles and fresh ids.
@@ -379,8 +390,10 @@ mod tests {
         );
     }
 
+    /// `0054` criteria 21 to 23: an open path is an operand; the buttons count its open outline,
+    /// the plan closes it with a straight line and counts it.
     #[test]
-    fn an_open_path_makes_the_buttons_name_the_count() {
+    fn an_open_path_is_closed_and_counted() {
         let document = Document::new(1);
         let a = rect(&document, 0.0, 0.0, 10.0);
         let open = document.create_path(
@@ -395,21 +408,17 @@ mod tests {
         let all = objects(&document);
         assert_eq!(
             boolean_availability(&all, &selection_of(&[a, open, b])),
-            BooleanAvailability::OpenPaths { open: 1, of: 3 }
+            BooleanAvailability::ClosesOpen { outlines: 1 }
         );
         let mut minter = AnchorIdMinter::new(5);
-        assert_eq!(
-            plan_boolean(
-                &all,
-                &selection_of(&[a, open, b]),
-                BooleanOp::Union,
-                &mut minter
-            ),
-            Err(BooleanRefusal::OpenPaths {
-                offenders: vec![open],
-                of: 3
-            })
-        );
+        let plan = plan_boolean(
+            &all,
+            &selection_of(&[a, open, b]),
+            BooleanOp::Union,
+            &mut minter,
+        )
+        .unwrap();
+        assert_eq!((plan.closed_open, plan.removed_open), (1, 0));
     }
 
     #[test]

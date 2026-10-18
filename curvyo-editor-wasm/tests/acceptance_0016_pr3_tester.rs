@@ -523,13 +523,15 @@ fn ac1_open_paths_count_and_closed_degenerate_are_ready() {
     assert_eq!(s.selected_object_count(), 2);
     assert_eq!(
         s.boolean_availability(),
-        BooleanAvailability::OpenPaths { open: 1, of: 2 }
+        BooleanAvailability::ClosesOpen { outlines: 1 },
+        "0054 criterion 23: the open outline is counted, the buttons stay enabled"
     );
     click(&mut s, pt(130.0, 120.0), true);
     assert_eq!(s.selected_object_count(), 3);
     assert_eq!(
         s.boolean_availability(),
-        BooleanAvailability::OpenPaths { open: 2, of: 3 }
+        BooleanAvailability::ClosesOpen { outlines: 1 },
+        "0054 UX review finding 3: the straight o2 encloses nothing and is not counted"
     );
     let _ = (o1, o2);
     // only the two-node closed path and the rectangle: Ready
@@ -649,7 +651,9 @@ fn ac6_to_28_every_pair_of_kinds_every_operation() {
                 let outcome = p.s.apply_boolean(op);
                 let after = reread(&p.s);
                 match outcome {
-                    BooleanOutcome::Applied { operands, compound } => {
+                    BooleanOutcome::Applied {
+                        operands, compound, ..
+                    } => {
                         ran += 1;
                         assert_eq!(operands, 2, "{tag} {op:?}");
                         let ids = after.object_ids();
@@ -850,7 +854,9 @@ fn ac10_two_offset_squares_union_is_700_mm2_with_8_nodes() {
         s.apply_boolean(BooleanOp::Union),
         BooleanOutcome::Applied {
             operands: 2,
-            compound: false
+            compound: false,
+            closed_open: 0,
+            removed_open: 0,
         }
     );
     let p = only_path(&s);
@@ -1096,7 +1102,9 @@ fn ac8_ring_plus_island_and_ac20_compound_results() {
         out,
         BooleanOutcome::Applied {
             operands: 2,
-            compound: true
+            compound: true,
+            closed_open: 0,
+            removed_open: 0,
         }
     );
     assert_eq!(s.selected_object_count(), 1);
@@ -1117,7 +1125,9 @@ fn ac8_ring_plus_island_and_ac20_compound_results() {
         out,
         BooleanOutcome::Applied {
             operands: 2,
-            compound: true
+            compound: true,
+            closed_open: 0,
+            removed_open: 0,
         }
     );
     let p = only_path(&s);
@@ -1211,7 +1221,9 @@ fn assert_unchanged(s: &Session, before: &Snapshot, what: &str) {
 }
 
 #[test]
-fn ac15_open_paths_are_refused_for_every_operation_and_name_every_offender() {
+/// `0016` criterion 15 is withdrawn by `0054` criterion 21: no operation refuses the open paths;
+/// each closes both with a straight line or finds an empty result.
+fn ac15_withdrawn_open_paths_are_closed_for_every_operation() {
     let d = Document::new(1);
     let _sq = square(&d, 0.0, 0.0, 20.0);
     let o1 = d.create_path(
@@ -1231,17 +1243,21 @@ fn ac15_open_paths_are_refused_for_every_operation_and_name_every_offender() {
     click(&mut s, pt(130.0, 20.0), true);
     click(&mut s, pt(130.0, 120.0), true);
     assert_eq!(s.selected_object_count(), 3);
-    let before = snap(&s);
+    let _ = (o1, o2);
     for op in ALL_OPS {
-        let out = s.apply_boolean(op);
-        let BooleanOutcome::Refused(BooleanRefusal::OpenPaths { offenders, of }) = out else {
-            panic!("{op:?}: {out:?}")
-        };
-        assert_eq!(of, 3);
-        let set: HashSet<_> = offenders.iter().copied().collect();
-        assert_eq!(set, [o1, o2].into_iter().collect::<HashSet<_>>(), "{op:?}");
-        assert_eq!(offenders.len(), 2);
-        assert_unchanged(&s, &before, &format!("{op:?} open"));
+        let mut s = session_of(&d);
+        click(&mut s, pt(0.0, 10.0), false);
+        click(&mut s, pt(130.0, 20.0), true);
+        click(&mut s, pt(130.0, 120.0), true);
+        match s.apply_boolean(op) {
+            BooleanOutcome::Applied {
+                closed_open,
+                removed_open,
+                ..
+            } => assert_eq!((closed_open, removed_open), (2, 0), "{op:?}"),
+            BooleanOutcome::Refused(BooleanRefusal::Empty) => {}
+            other => panic!("{op:?}: {other:?}"),
+        }
     }
 }
 
@@ -1304,10 +1320,9 @@ fn ac16_a_zero_area_operand_beside_open_path_reports_the_open_path_first_or_both
     assert_eq!(s.selected_object_count(), 3);
     let before = snap(&s);
     let out = s.apply_boolean(BooleanOp::Union);
+    // `0054` criterion 21: the open path is an operand with an area; only the flat one is named.
+    let _ = open;
     match out {
-        BooleanOutcome::Refused(BooleanRefusal::OpenPaths { offenders, .. }) => {
-            assert_eq!(offenders, vec![open]);
-        }
         BooleanOutcome::Refused(BooleanRefusal::NoArea { offenders, .. }) => {
             assert_eq!(offenders, vec![line2]);
         }
@@ -1566,7 +1581,9 @@ fn repeated_operations_keep_working_and_keep_one_commit_each() {
         s.apply_boolean(BooleanOp::Exclusion),
         BooleanOutcome::Applied {
             operands: 2,
-            compound: true
+            compound: true,
+            closed_open: 0,
+            removed_open: 0,
         }
     );
     assert_eq!(
@@ -1579,7 +1596,9 @@ fn repeated_operations_keep_working_and_keep_one_commit_each() {
         s.apply_boolean(BooleanOp::Union),
         BooleanOutcome::Applied {
             operands: 2,
-            compound: true
+            compound: true,
+            closed_open: 0,
+            removed_open: 0,
         }
     );
     let after = labels(&reread(&s));
@@ -1605,7 +1624,9 @@ fn a_refusal_then_a_fix_then_success() {
         s.apply_boolean(BooleanOp::Exclusion),
         BooleanOutcome::Applied {
             operands: 2,
-            compound: true
+            compound: true,
+            closed_open: 0,
+            removed_open: 0,
         }
     );
 }
@@ -2055,7 +2076,9 @@ fn ac8_a_compound_operand_keeps_its_hole_in_every_operation() {
             s.apply_boolean(BooleanOp::Difference),
             BooleanOutcome::Applied {
                 operands: 2,
-                compound: true
+                compound: true,
+                closed_open: 0,
+                removed_open: 0,
             }
         );
         click(&mut s, pt(45.0, -12.0), true); // the rectangle right edge
@@ -2123,7 +2146,9 @@ fn ac46_a_thousand_rectangles_unite_to_one_four_node_outline() {
         out,
         BooleanOutcome::Applied {
             operands: 1000,
-            compound: false
+            compound: false,
+            closed_open: 0,
+            removed_open: 0,
         }
     );
     let p = only_path(&s);
@@ -2500,7 +2525,9 @@ fn ac40_degenerate_fixtures_complete_with_a_result_or_a_refusal() {
         s.apply_boolean(BooleanOp::Union),
         BooleanOutcome::Applied {
             operands: 2,
-            compound: true
+            compound: true,
+            closed_open: 0,
+            removed_open: 0,
         },
         "(c): union is one compound path of two outlines"
     );

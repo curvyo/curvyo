@@ -246,6 +246,7 @@ fn applied_combine(o: &CombineOutcome) -> (usize, usize, bool) {
             operands,
             holes,
             styles_differ,
+            ..
         } => (*operands, *holes, *styles_differ),
         other => panic!("not applied: {other:?}"),
     }
@@ -275,8 +276,8 @@ fn c1_availability_follows_the_selection_and_the_tool() {
     let a = s.path_availability();
     assert_eq!(
         a.combine,
-        BooleanAvailability::OpenPaths { open: 1, of: 3 },
-        "an open path leaves Combine enabled in spirit: pressing refuses"
+        BooleanAvailability::Ready,
+        "an open path is an operand of Combine (0054 criterion 13)"
     );
 
     // Any tool other than Select: everything dimmed.
@@ -556,141 +557,117 @@ fn assert_nothing_changed(s: &Session, before: &[u8], n_labels: usize, selected:
     assert_eq!(s.selected_object_count(), selected, "the same selection");
 }
 
+/// (operands, holes, open outlines, touching closed outlines) of an applied Combine.
+fn combined(o: &CombineOutcome) -> (usize, usize, usize, usize) {
+    match o {
+        CombineOutcome::Applied {
+            operands,
+            holes,
+            open,
+            touching,
+            ..
+        } => (*operands, *holes, *open, *touching),
+        other => panic!("not applied: {other:?}"),
+    }
+}
+
+/// `0035` criterion 9 is withdrawn by `0054` criteria 6, 8 and 13: an open path combines, the
+/// button is enabled as for any selection of two or more.
 #[test]
-fn c9_an_open_path_refuses_and_names_it() {
+fn c9_withdrawn_an_open_path_combines() {
     let d = Document::new(1);
     d.create_path(&square(0.0, 0.0, 20.0), true);
     d.create_path(&square(100.0, 0.0, 20.0), true);
-    let open = d.create_path(
+    d.create_path(
         &[corner(200.0, 0.0), corner(240.0, 0.0), corner(240.0, 30.0)],
         false,
     );
     let mut s = session_of(&d);
     select_all(&mut s);
-    let before = json(&s);
+    assert_eq!(s.path_availability().combine, BooleanAvailability::Ready);
     let n = labels(&reread(&s)).len();
-    match refused(&mut s) {
-        CombineRefusal::OpenPaths { offenders, of } => {
-            assert_eq!(of, 3);
-            assert_eq!(offenders, vec![open]);
-        }
-        other => panic!("{other:?}"),
-    }
-    assert_nothing_changed(&s, &before, n, 3);
-    // A second activation gives the same result.
-    assert!(matches!(refused(&mut s), CombineRefusal::OpenPaths { .. }));
-    assert_nothing_changed(&s, &before, n, 3);
-    assert_eq!(
-        s.path_availability().combine,
-        BooleanAvailability::OpenPaths { open: 1, of: 3 }
-    );
+    assert_eq!(combined(&s.apply_combine()), (3, 0, 1, 0));
+    assert_eq!(labels(&reread(&s)).len(), n + 1, "one commit");
 }
 
+/// `0035` criterion 10 is withdrawn by `0054` criteria 8 and 12: overlapping and edge-sharing
+/// squares combine and are counted as touching; a small gap is not counted.
 #[test]
-fn c10_overlapping_and_edge_sharing_squares_are_refused_a_small_gap_combines() {
-    // Overlap.
+fn c10_withdrawn_overlapping_and_edge_sharing_squares_combine_and_are_counted() {
     let d = Document::new(1);
-    let a = d.create_path(&square(0.0, 0.0, 20.0), true);
-    let b = d.create_path(&square(10.0, 10.0, 20.0), true);
+    d.create_path(&square(0.0, 0.0, 20.0), true);
+    d.create_path(&square(10.0, 10.0, 20.0), true);
     d.create_path(&square(200.0, 0.0, 20.0), true);
     let mut s = session_of(&d);
     select_all(&mut s);
-    let before = json(&s);
-    let n = labels(&reread(&s)).len();
-    match refused(&mut s) {
-        CombineRefusal::Touching { offenders, of } => {
-            assert_eq!(of, 3);
-            let set: HashSet<NodeId> = offenders.into_iter().collect();
-            assert_eq!(
-                set,
-                HashSet::from([a, b]),
-                "both of the pair, not the third"
-            );
-        }
-        other => panic!("{other:?}"),
-    }
-    assert_nothing_changed(&s, &before, n, 3);
+    assert_eq!(
+        combined(&s.apply_combine()),
+        (3, 0, 0, 2),
+        "both of the pair, not the third"
+    );
 
-    // Shared edge.
     let d = Document::new(1);
     d.create_path(&square(0.0, 0.0, 20.0), true);
     d.create_path(&square(20.0, 0.0, 20.0), true);
     let mut s = session_of(&d);
     select_all(&mut s);
-    assert!(
-        matches!(refused(&mut s), CombineRefusal::Touching { .. }),
-        "shared edge"
-    );
+    assert_eq!(combined(&s.apply_combine()), (2, 0, 0, 2), "shared edge");
 
-    // 0.01 mm apart combines.
     let d = Document::new(1);
     d.create_path(&square(0.0, 0.0, 20.0), true);
     d.create_path(&square(20.01, 0.0, 20.0), true);
     let mut s = session_of(&d);
     select_all(&mut s);
-    let (n, _, _) = applied_combine(&s.apply_combine());
-    assert_eq!(n, 2);
+    assert_eq!(combined(&s.apply_combine()), (2, 0, 0, 0));
 }
 
+/// The touch distance of `0054` "Touch" (0.001 mm) decides the count, as it decided the refusal.
 #[test]
-fn c10_the_touch_threshold_is_about_a_micrometre() {
-    // 0.0005 mm: touching. 0.0035 mm: not touching (the kernel's guarantee is 0.001 / 0.003).
+fn c10_withdrawn_the_touch_threshold_is_about_a_micrometre() {
     for (gap, touches) in [(0.0005, true), (0.0035, false), (0.05, false)] {
         let d = Document::new(1);
         d.create_path(&square(0.0, 0.0, 20.0), true);
         d.create_path(&square(20.0 + gap, 0.0, 20.0), true);
         let mut s = session_of(&d);
         select_all(&mut s);
-        let out = s.apply_combine();
-        assert_eq!(
-            matches!(
-                out,
-                CombineOutcome::Refused(CombineRefusal::Touching { .. })
-            ),
-            touches,
-            "gap {gap}: {out:?}"
-        );
+        let (_, _, _, touching) = combined(&s.apply_combine());
+        assert_eq!(touching > 0, touches, "gap {gap}");
     }
 }
 
 #[test]
-fn c10_curved_outlines_tangent_or_crossing_are_refused() {
+fn c10_withdrawn_curved_outlines_tangent_or_crossing_are_counted() {
     for (dist, touches) in [(20.0, true), (19.0, true), (20.0005, true), (20.05, false)] {
         let d = Document::new(1);
         d.create_path(&circle(0.0, 0.0, 10.0, false), true);
         d.create_path(&circle(dist, 0.0, 10.0, false), true);
         let mut s = session_of(&d);
         select_all(&mut s);
-        let out = s.apply_combine();
-        assert_eq!(
-            matches!(
-                out,
-                CombineOutcome::Refused(CombineRefusal::Touching { .. })
-            ),
-            touches,
-            "centre distance {dist}: {out:?}"
-        );
+        let (_, holes, _, touching) = combined(&s.apply_combine());
+        assert_eq!(touching > 0, touches, "centre distance {dist}");
+        assert_eq!(holes, 0, "neither contains the other");
     }
 }
 
+/// `0054` criterion 7b: a square touching its plate's edge from inside is a hole.
 #[test]
-fn c10_a_hole_touching_its_plate_is_refused() {
-    // The inner square touches the outer's edge from inside.
+fn c10_withdrawn_a_hole_touching_its_plate_is_a_hole() {
     let d = Document::new(1);
     d.create_path(&square(0.0, 0.0, 100.0), true);
     d.create_path(&square(0.0, 40.0, 20.0), true);
     let mut s = session_of(&d);
     select_all(&mut s);
-    assert!(matches!(refused(&mut s), CombineRefusal::Touching { .. }));
+    assert_eq!(combined(&s.apply_combine()), (2, 1, 0, 2));
 }
 
+/// `0035` criterion 10a is withdrawn by `0054` criteria 7e and 12: a figure eight combines, counted
+/// as one closed outline crossing itself.
 #[test]
-fn c10a_a_figure_eight_is_refused_with_its_own_sentence_and_only_it_is_named() {
+fn c10a_withdrawn_a_figure_eight_combines_and_is_counted() {
     let d = Document::new(1);
     d.create_path(&square(0.0, 0.0, 20.0), true);
     d.create_path(&square(300.0, 0.0, 20.0), true);
-    // A bowtie: the two diagonals cross.
-    let eight = d.create_path(
+    d.create_path(
         &[
             corner(100.0, 0.0),
             corner(140.0, 40.0),
@@ -701,20 +678,11 @@ fn c10a_a_figure_eight_is_refused_with_its_own_sentence_and_only_it_is_named() {
     );
     let mut s = session_of(&d);
     select_all(&mut s);
-    let before = json(&s);
-    let n = labels(&reread(&s)).len();
-    match refused(&mut s) {
-        CombineRefusal::SelfTouching { offenders, of } => {
-            assert_eq!(of, 3);
-            assert_eq!(offenders, vec![eight]);
-        }
-        other => panic!("{other:?}"),
-    }
-    assert_nothing_changed(&s, &before, n, 3);
+    assert_eq!(combined(&s.apply_combine()), (3, 0, 0, 1));
 }
 
 #[test]
-fn c10a_touching_wins_over_self_crossing_when_both_occur() {
+fn c10a_withdrawn_touching_and_self_crossing_are_counted_together() {
     let d = Document::new(1);
     d.create_path(&square(0.0, 0.0, 20.0), true);
     d.create_path(&square(10.0, 10.0, 20.0), true);
@@ -729,26 +697,22 @@ fn c10a_touching_wins_over_self_crossing_when_both_occur() {
     );
     let mut s = session_of(&d);
     select_all(&mut s);
-    assert!(matches!(refused(&mut s), CombineRefusal::Touching { .. }));
+    assert_eq!(combined(&s.apply_combine()), (3, 0, 0, 3));
 }
 
+/// The no-area part of `0035` criterion 11 is withdrawn by `0054` criterion 8: a flat closed
+/// shape combines and keeps its direction; out-of-range coordinates stay refused.
 #[test]
-fn c11_a_flat_shape_and_out_of_range_coordinates_are_refused() {
+fn c11_a_flat_shape_combines_and_out_of_range_coordinates_are_refused() {
     let d = Document::new(1);
     d.create_path(&square(0.0, 0.0, 20.0), true);
-    let flat = d.create_path(
+    d.create_path(
         &[corner(100.0, 0.0), corner(120.0, 0.0), corner(140.0, 0.0)],
         true,
     );
     let mut s = session_of(&d);
     select_all(&mut s);
-    let before = json(&s);
-    let n = labels(&reread(&s)).len();
-    match refused(&mut s) {
-        CombineRefusal::NoArea { offenders, .. } => assert_eq!(offenders, vec![flat]),
-        other => panic!("{other:?}"),
-    }
-    assert_nothing_changed(&s, &before, n, 2);
+    assert_eq!(combined(&s.apply_combine()), (2, 0, 0, 0));
 
     let d = Document::new(1);
     d.create_path(&square(0.0, 0.0, 20.0), true);
@@ -913,7 +877,7 @@ fn c13_c16_a_one_region_compound_path_is_left_alone_and_the_press_is_refused() {
     let id = reread(&s).object_ids()[0];
     let out = s.apply_split();
     match out {
-        SplitOutcome::Refused(SplitRefusal::OnePiece { compounds }) => {
+        SplitOutcome::Refused(SplitRefusal::OnePiece { compounds, .. }) => {
             assert_eq!(compounds, 1);
         }
         other => panic!("{other:?}"),
@@ -938,7 +902,7 @@ fn c16_plural_one_piece_refusal_counts_the_selected_compound_paths() {
     select_all(&mut s);
     assert_eq!(s.selected_object_count(), 2);
     match s.apply_split() {
-        SplitOutcome::Refused(SplitRefusal::OnePiece { compounds }) => {
+        SplitOutcome::Refused(SplitRefusal::OnePiece { compounds, .. }) => {
             assert_eq!(compounds, 2);
         }
         other => panic!("{other:?}"),
@@ -1195,7 +1159,10 @@ fn c19_a_rectangle_with_1000_circles() {
     assert!(
         matches!(
             out,
-            SplitOutcome::Refused(SplitRefusal::OnePiece { compounds: 1 })
+            SplitOutcome::Refused(SplitRefusal::OnePiece {
+                compounds: 1,
+                with_holes: true
+            })
         ),
         "a plate with holes is one piece: {out:?}"
     );
@@ -1304,21 +1271,13 @@ fn compound(d: &Document, outlines: Vec<Vec<NewAnchor>>) -> NodeId {
 }
 
 #[test]
-fn c10a_a_compound_path_whose_own_outlines_touch_is_refused_as_self_touching() {
+fn c10a_withdrawn_a_compound_path_whose_own_outlines_cross_combines() {
     let d = Document::new(1);
-    let c = compound(&d, vec![square(0.0, 0.0, 20.0), square(10.0, 10.0, 20.0)]);
+    compound(&d, vec![square(0.0, 0.0, 20.0), square(10.0, 10.0, 20.0)]);
     d.create_path(&square(200.0, 0.0, 20.0), true);
     let mut s = session_of(&d);
     select_all(&mut s);
-    let before = json(&s);
-    match refused(&mut s) {
-        CombineRefusal::SelfTouching { offenders, of } => {
-            assert_eq!(of, 2);
-            assert_eq!(offenders, vec![c]);
-        }
-        other => panic!("{other:?}"),
-    }
-    assert_eq!(json(&s), before);
+    assert_eq!(combined(&s.apply_combine()), (2, 0, 0, 2));
 }
 
 #[test]
@@ -1356,13 +1315,17 @@ fn c4_a_compound_operand_and_a_loose_shape_nest_together_by_depth() {
 }
 
 #[test]
-fn c10_two_identical_shapes_on_top_of_each_other_are_refused() {
+fn c10_withdrawn_two_identical_shapes_on_top_of_each_other_are_both_shapes() {
     let d = Document::new(1);
     d.create_path(&square(0.0, 0.0, 20.0), true);
     d.create_path(&square(0.0, 0.0, 20.0), true);
     let mut s = session_of(&d);
     select_all(&mut s);
-    assert!(matches!(refused(&mut s), CombineRefusal::Touching { .. }));
+    assert_eq!(
+        combined(&s.apply_combine()),
+        (2, 0, 0, 2),
+        "0054 criterion 7d"
+    );
 }
 
 #[test]
@@ -1402,15 +1365,14 @@ fn m1_boolean_availability_is_unchanged_by_the_card_move_and_the_boolean_ops_sti
     assert_eq!(s.boolean_availability(), BooleanAvailability::Ready);
     assert_eq!(s.path_availability().combine, s.boolean_availability());
     select_all(&mut s);
-    assert_eq!(
-        s.boolean_availability(),
-        BooleanAvailability::OpenPaths { open: 1, of: 3 }
-    );
-    assert_eq!(s.path_availability().combine, s.boolean_availability());
+    // 0054 (UX review finding 3): a straight open line encloses nothing; no open outline to close.
+    assert_eq!(s.boolean_availability(), BooleanAvailability::Ready);
+    // 0054 criterion 13: Combine takes the open path; only the Boolean buttons count it.
+    assert_eq!(s.path_availability().combine, BooleanAvailability::Ready);
     s.set_tool(Tool::Node);
     assert_eq!(s.boolean_availability(), BooleanAvailability::NeedsTwo);
     s.set_tool(Tool::Select);
-    // Union of the two overlapping squares still works (and Combine would refuse them).
+    // Union of the two overlapping squares still works.
     marquee(&mut s, pt(-10.0, -10.0), pt(60.0, 60.0));
     assert!(matches!(
         s.apply_boolean(BooleanOp::Union),

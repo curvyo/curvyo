@@ -22,6 +22,16 @@ pub enum CombineOutcome {
         operands: usize,
         /// How many of the result's outlines are holes.
         holes: usize,
+        /// How many of the result's outlines are open.
+        open: usize,
+        /// How many closed outlines touch or cross another closed outline or themselves.
+        touching: usize,
+        /// How many holes touch or cross another hole.
+        touching_holes: usize,
+        /// How many outlines with a single node were left out.
+        single_nodes_removed: usize,
+        /// Whether an operand had a marker on (the result draws none).
+        markers: bool,
         /// Whether the operands' styles were not all equal (the result has the lowest one).
         styles_differ: bool,
     },
@@ -62,15 +72,11 @@ impl Session {
                 Ok(plan) => plan,
                 Err(refusal) => {
                     this.command_refusal = match &refusal {
-                        CombineRefusal::OpenPaths { offenders, .. }
-                        | CombineRefusal::OutOfRange { offenders, .. }
-                        | CombineRefusal::NoArea { offenders, .. }
-                        | CombineRefusal::Touching { offenders, .. }
-                        | CombineRefusal::SelfTouching { offenders, .. }
+                        CombineRefusal::OutOfRange { offenders, .. }
                         | CombineRefusal::Groups { offenders } => {
                             Some(RefusalMarks::new(offenders.clone(), &selection))
                         }
-                        CombineRefusal::NeedsTwo => None,
+                        CombineRefusal::NeedsTwo | CombineRefusal::SingleNodesOnly => None,
                     };
                     return CombineOutcome::Refused(refusal);
                 }
@@ -95,6 +101,11 @@ impl Session {
             CombineOutcome::Applied {
                 operands: plan.operands.len(),
                 holes: plan.holes,
+                open: plan.open,
+                touching: plan.touching,
+                touching_holes: plan.touching_holes,
+                single_nodes_removed: plan.single_nodes_removed,
+                markers: plan.markers,
                 styles_differ: plan.styles_differ,
             }
         })

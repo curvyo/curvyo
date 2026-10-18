@@ -298,7 +298,9 @@ fn markers_panel(
             ObjectSnapshot::Primitive(_) => None,
         })
         .collect();
-    if !rows_shown || paths.is_empty() {
+    // A compound path draws no markers (`0016` criterion 38b, `0054` criterion 5): with one in
+    // the scope the block is not shown.
+    if !rows_shown || paths.is_empty() || paths.iter().any(|path| path.is_compound()) {
         return None;
     }
     let markers: Vec<_> = paths.iter().map(|p| p.style.stroke.markers).collect();

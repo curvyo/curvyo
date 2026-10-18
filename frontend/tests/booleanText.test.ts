@@ -22,6 +22,8 @@ const result = (kind: string, count = 0, of = 0, compound = false): BooleanResul
   count,
   of,
   compound,
+  closedOpen: 0,
+  removedOpen: 0,
 });
 
 test("the five operations come in the rail order with their names and rules", () => {
@@ -37,20 +39,20 @@ test("the five operations come in the rail order with their names and rules", ()
   assert.equal(operationRule("exclusion"), "Areas covered an odd number of times.");
 });
 
-test("the tooltip note follows criteria 1 and 2", () => {
-  const ready = { needsTwo: false, open: 0, of: 0 };
+test("the tooltip note follows criteria 1 and 2 and 0054 criterion 23", () => {
+  const ready = { needsTwo: false, open: 0 };
   assert.equal(tooltipNote(ready, true), "Replaces the selection.");
   assert.equal(
-    tooltipNote({ needsTwo: false, open: 2, of: 3 }, true),
-    "Needs closed paths: 2 of 3 selected are open.",
+    tooltipNote({ needsTwo: false, open: 2 }, true),
+    "Closes 2 open outlines with a straight line.",
   );
   assert.equal(
-    tooltipNote({ needsTwo: false, open: 1, of: 3 }, true),
-    "Needs closed paths: 1 of 3 selected is open.",
+    tooltipNote({ needsTwo: false, open: 1 }, true),
+    "Closes 1 open outline with a straight line.",
   );
-  const dimmed = { needsTwo: true, open: 0, of: 0 };
-  assert.equal(tooltipNote(dimmed, true), "Select two or more closed objects.");
-  assert.equal(tooltipNote(dimmed, false), "Select two or more closed objects. Use the Select tool.");
+  const dimmed = { needsTwo: true, open: 0 };
+  assert.equal(tooltipNote(dimmed, true), "Select two or more objects.");
+  assert.equal(tooltipNote(dimmed, false), "Select two or more objects. Use the Select tool.");
 });
 
 test("a success names the operation and the counts (criterion 29)", () => {
@@ -62,18 +64,25 @@ test("a success names the operation and the counts (criterion 29)", () => {
     successText("difference", result("applied", 2, 2, true)),
     "Difference: 2 objects became 1 compound path.",
   );
-  assert.equal(successText("union", result("open_paths", 1, 3)), null);
+  assert.equal(successText("union", result("no_area", 1, 3)), null);
 });
 
-test("open paths and objects without area are refused with their counts (criteria 15, 16)", () => {
+test("0054 criteria 21 and 22: the notice says which open outlines were closed or removed", () => {
   assert.equal(
-    refusalText("union", result("open_paths", 1, 3)),
-    "Union needs closed paths. 1 of 3 selected objects is open. Nothing was changed.",
+    successText("union", { ...result("applied", 2, 2, true), closedOpen: 1 }),
+    "Union: 2 objects became 1 compound path. 1 open outline was closed with a straight line.",
   );
   assert.equal(
-    refusalText("intersection", result("open_paths", 2, 3)),
-    "Intersection needs closed paths. 2 of 3 selected objects are open. Nothing was changed.",
+    successText("difference", { ...result("applied", 2, 2, true), closedOpen: 3, removedOpen: 1 }),
+    "Difference: 2 objects became 1 compound path. 3 open outlines were closed with a straight line. 1 open outline enclosed no area and was removed.",
   );
+  assert.equal(
+    successText("union", { ...result("applied", 2, 2, false), removedOpen: 2 }),
+    "Union: 2 objects became 1 path. 2 open outlines enclosed no area and were removed.",
+  );
+});
+
+test("objects without area are refused with their counts (criterion 16)", () => {
   assert.equal(
     refusalText("reverse_difference", result("no_area", 1, 3)),
     "Reverse difference needs shapes that enclose an area. 1 of 3 selected objects has no area. Nothing was changed.",
@@ -118,7 +127,6 @@ test("results that are no refusal have no refusal text, and only some outline ob
   assert.equal(refusalText("union", result("applied", 2, 2)), null);
   assert.equal(refusalText("union", result("ignored")), null);
   assert.equal(refusalText("union", result("needs_two")), null);
-  assert.equal(refusalOutlinesObjects(result("open_paths", 1, 2)), true);
   assert.equal(refusalOutlinesObjects(result("no_area", 1, 2)), true);
   assert.equal(refusalOutlinesObjects(result("empty")), false);
 });

@@ -195,3 +195,56 @@ fn the_group_leaves_with_the_stroke_and_the_settings_stay() {
     s.set_stroke_paint(true);
     assert_eq!(s.style_panel_view().marker_start, "arrow");
 }
+
+/// `0016` criterion 38b, `0054` criterion 5: no Markers block when a compound path is in the
+/// selection, alone or with an ordinary path; an ordinary path alone keeps it.
+#[test]
+fn a_compound_path_in_the_selection_hides_the_group() {
+    let document = Document::new(1);
+    let line = document.create_path(
+        &[
+            NewAnchor::corner(AnchorId::new(1, 1), Point::new(0.0, 0.0)),
+            NewAnchor::corner(AnchorId::new(1, 2), Point::new(50.0, 0.0)),
+        ],
+        false,
+    );
+    let _ = document.create_path(
+        &[
+            NewAnchor::corner(AnchorId::new(1, 3), Point::new(0.0, 100.0)),
+            NewAnchor::corner(AnchorId::new(1, 4), Point::new(50.0, 100.0)),
+        ],
+        false,
+    );
+    let outlines = vec![
+        (
+            vec![
+                NewAnchor::corner(AnchorId::new(1, 10), Point::new(100.0, 0.0)),
+                NewAnchor::corner(AnchorId::new(1, 11), Point::new(150.0, 0.0)),
+            ],
+            false,
+        ),
+        (
+            vec![
+                NewAnchor::corner(AnchorId::new(1, 12), Point::new(200.0, 0.0)),
+                NewAnchor::corner(AnchorId::new(1, 13), Point::new(240.0, 0.0)),
+                NewAnchor::corner(AnchorId::new(1, 14), Point::new(240.0, 40.0)),
+            ],
+            true,
+        ),
+    ];
+    let _ = document
+        .replace_with_path(&[line], line, &outlines, "combine_paths")
+        .unwrap();
+    let mut s = Session::open(2, &curvyo_document_core::pack(&document, "0.1.0").unwrap()).unwrap();
+    select(&mut s, &[(125.0, 0.0)]);
+    assert_eq!(s.selected_object_count(), 1);
+    assert!(!s.style_panel_view().markers_shown, "a compound path alone");
+    select(&mut s, &[(125.0, 0.0), (25.0, 100.0)]);
+    assert_eq!(s.selected_object_count(), 2);
+    assert!(!s.style_panel_view().markers_shown, "with an ordinary path");
+    // A click on empty canvas first: a click on a member of a selection keeps the selection.
+    select(&mut s, &[(500.0, 500.0)]);
+    select(&mut s, &[(25.0, 100.0)]);
+    assert_eq!(s.selected_object_count(), 1);
+    assert!(s.style_panel_view().markers_shown, "an ordinary path alone");
+}

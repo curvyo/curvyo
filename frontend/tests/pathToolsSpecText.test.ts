@@ -92,7 +92,18 @@ test("0034 criterion 20: the Close path notices and their durations", () => {
 });
 
 test("0035 criterion 7: the Combine notice", () => {
-  const base = { kind: "applied", count: 4, of: 4, holes: 3, stylesDiffer: false };
+  const base = {
+    kind: "applied",
+    count: 4,
+    of: 4,
+    holes: 3,
+    open: 0,
+    touching: 0,
+    touchingHoles: 0,
+    singleNodesRemoved: 0,
+    markers: false,
+    stylesDiffer: false,
+  };
   assert.equal(
     combineSuccessText(base),
     "Combine: 4 objects became 1 compound path with 3 holes.",
@@ -113,21 +124,23 @@ test("0035 criterion 7: the Combine notice", () => {
   assert.equal(noticeMs("x".repeat(71)), 5000);
 });
 
-test("0035 criteria 9 to 11: the Combine refusals", () => {
+test("0035 criteria 9, 10, 10a withdrawn by 0054 criterion 8: those refusals have no text", () => {
   const r = (kind: string, count: number, of: number) =>
-    combineRefusalText({ kind, count, of, holes: 0, stylesDiffer: false });
-  assert.equal(
-    r("open_paths", 1, 3),
-    "Combine needs closed paths. 1 of 3 selected objects is open. Nothing was changed.",
-  );
-  assert.equal(
-    r("touching", 2, 3),
-    "Combine needs shapes that do not touch. 2 of 3 selected objects touch each other. Use Union to merge overlapping shapes. Nothing was changed.",
-  );
-  assert.equal(
-    r("self_touching", 1, 3),
-    "Combine needs shapes that do not cross themselves. 1 of 3 selected objects does. Nothing was changed.",
-  );
+    combineRefusalText({
+      kind,
+      count,
+      of,
+      holes: 0,
+      open: 0,
+      touching: 0,
+      touchingHoles: 0,
+      singleNodesRemoved: 0,
+      markers: false,
+      stylesDiffer: false,
+    });
+  for (const kind of ["open_paths", "touching", "self_touching"]) {
+    assert.equal(r(kind, 1, 3), null, kind);
+  }
 });
 
 test("0035 criteria 16 and 17 as renamed by 0048: Split notices and refusals", () => {
@@ -150,7 +163,7 @@ test("0035 criteria 16 and 17 as renamed by 0048: Split notices and refusals", (
     "Split: 1 compound path became 3 objects. 2 compound paths are one piece each and were left as they are.",
   );
   const no = (kind: string, compounds: number) =>
-    splitRefusalText({ kind, compounds, pieces: 0, withHoles: false, leftAlone: 0 });
+    splitRefusalText({ kind, compounds, pieces: 0, withHoles: true, leftAlone: 0 });
   assert.equal(no("no_compound", 0), "Split needs a compound path. Nothing was changed.");
   assert.equal(
     no("one_piece", 1),
@@ -163,20 +176,18 @@ test("0035 criteria 16 and 17 as renamed by 0048: Split notices and refusals", (
 });
 
 test("0035 criterion 2: tooltip notes, first match wins", () => {
-  const st = (p: Partial<{ needsTwo: boolean; open: number; of: number; hasCompound: boolean; canCut: boolean }>) => ({
+  const st = (p: Partial<{ needsTwo: boolean; hasCompound: boolean; canCut: boolean }>) => ({
     needsTwo: false,
-    open: 0,
-    of: 3,
     hasCompound: true,
     canCut: true,
     ...p,
   });
-  assert.equal(commandNote("combine", st({ needsTwo: true, of: 0 }), true), "Select two or more closed shapes.");
+  // 0054 criterion 13: the dimmed note names paths and shapes, the open-path note is gone.
+  assert.equal(commandNote("combine", st({ needsTwo: true }), true), "Select two or more paths or shapes.");
   assert.equal(
-    commandNote("combine", st({ needsTwo: true, of: 0 }), false),
+    commandNote("combine", st({ needsTwo: true }), false),
     "Use the Select tool.",
   );
-  assert.equal(commandNote("combine", st({ open: 1 }), true), "Needs closed paths: 1 of 3 selected is open.");
   assert.equal(commandNote("combine", st({}), true), "Replaces the selection.");
   assert.equal(commandNote("split", st({ hasCompound: false }), true), "Select a compound path.");
   assert.equal(
