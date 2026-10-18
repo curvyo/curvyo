@@ -11,7 +11,9 @@ min=${MIN_CHECKS:-10}
 
 sleep 45   # give a fresh push time to register its runs
 gh -R "$repo" pr checks "$pr" --watch --interval 30 >/dev/null 2>&1
-out=$(gh -R "$repo" pr checks "$pr" 2>/dev/null | cut -f2)
+# A cancelled sibling run (push and pull_request both trigger CI) leaves two entries with an
+# unexpanded matrix name ("${{ matrix... }}") that stay "fail"; they carry no information.
+out=$(gh -R "$repo" pr checks "$pr" 2>/dev/null | grep -vF '${{' | cut -f2)
 total=$(printf '%s\n' "$out" | grep -c .)
 pass=$(printf '%s\n' "$out" | grep -c '^pass$')
 echo "#$pr checks total=$total pass=$pass"
@@ -20,6 +22,6 @@ if [ "$total" -ge "$min" ] && [ "$total" = "$pass" ]; then
   gh -R "$repo" pr view "$pr" --json state -q .state
 else
   echo NOT-MERGED
-  gh -R "$repo" pr checks "$pr" | grep -v pass
+  gh -R "$repo" pr checks "$pr" | grep -vF '${{' | grep -v pass
   exit 1
 fi
