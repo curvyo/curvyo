@@ -64,11 +64,25 @@ impl Document {
     /// create_path`]'s own doc comment — the same reasoning applies here.
     #[must_use]
     pub fn create_primitive(&self, shape: Shape, rotation: Angle) -> NodeId {
-        let (tag, label) = match shape {
-            Shape::Rect { .. } => (SHAPE_RECT, "create_rect"),
-            Shape::Ellipse { .. } => (SHAPE_ELLIPSE, "create_ellipse"),
-            Shape::Polygon { .. } => (SHAPE_POLYGON, "create_polygon"),
-            Shape::Star { .. } => (SHAPE_STAR, "create_star"),
+        let label = match shape {
+            Shape::Rect { .. } => "create_rect",
+            Shape::Ellipse { .. } => "create_ellipse",
+            Shape::Polygon { .. } => "create_polygon",
+            Shape::Star { .. } => "create_star",
+        };
+        let id = self.create_primitive_uncommitted(shape, rotation);
+        self.commit_with_label(label);
+        id
+    }
+
+    /// [`Document::create_primitive`] without the commit: the caller commits, so several new
+    /// objects can be one step (`specs/0046-document-shapes` criterion 23).
+    pub(crate) fn create_primitive_uncommitted(&self, shape: Shape, rotation: Angle) -> NodeId {
+        let tag = match shape {
+            Shape::Rect { .. } => SHAPE_RECT,
+            Shape::Ellipse { .. } => SHAPE_ELLIPSE,
+            Shape::Polygon { .. } => SHAPE_POLYGON,
+            Shape::Star { .. } => SHAPE_STAR,
         };
         let id = self.create_primitive_node(tag);
         let tree = self.loro().get_tree(OBJECTS_TREE);
@@ -102,7 +116,6 @@ impl Document {
         if rotation.normalized() != Angle::from_radians(0.0) {
             path_codec::write_rotation(&meta, rotation);
         }
-        self.commit_with_label(label);
         id
     }
 

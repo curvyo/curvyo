@@ -79,6 +79,7 @@ mod style_model;
 mod style_validation;
 mod styles;
 mod subpath_codec;
+mod template;
 mod transform_objects;
 mod units;
 
@@ -163,4 +164,5 @@ pub use style_model::{
     Stroke, Style, StyleParamError,
 };
 pub use styles::{StyleEdit, StyleEditError};
+pub use template::{LOAD_TEMPLATE_COMMIT_LABEL, TemplateNode};
 pub use units::{Angle, DocumentSize, Length, Point, Timestamp, Tolerance, Vec2, ViewTransform};
