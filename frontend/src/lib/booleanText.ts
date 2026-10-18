@@ -1,6 +1,7 @@
 /**
  * The words of the boolean operations (`specs/0016-boolean-operations/`
- * criteria 1, 2, 15 to 17, 29, 38): names, rules, tooltip notes and notices.
+ * criteria 1, 2, 16, 17, 29, 38; `specs/0054-combine-open-paths/` criteria
+ * 21 to 23): names, rules, tooltip notes and notices.
  * Rust sends codes and counts; the sentences are written here, once.
  */
 
@@ -29,10 +30,8 @@ export const COMPOUND_NODES_TEXT = "Nodes of compound paths cannot be edited yet
 export interface BooleanAvailabilityState {
   /** Dimmed: fewer than two objects selected, or not the Select tool. */
   needsTwo: boolean;
-  /** How many selected objects are open paths. */
+  /** How many open outlines a press closes with a straight line. */
   open: number;
-  /** How many objects are selected (0 when `needsTwo`). */
-  of: number;
 }
 
 /** What `WasmSession.apply_boolean` did (`kind` is the outcome code). */
@@ -41,6 +40,10 @@ export interface BooleanResult {
   count: number;
   of: number;
   compound: boolean;
+  /** Open outlines closed with a straight line. */
+  closedOpen: number;
+  /** Open outlines that enclosed no area and were removed. */
+  removedOpen: number;
 }
 
 const NAMES: Record<BooleanOp, string> = {
@@ -84,12 +87,11 @@ export function operationRule(op: BooleanOp): string {
  * note says which tool to take. */
 export function tooltipNote(availability: BooleanAvailabilityState, selectTool: boolean): string {
   if (availability.needsTwo) {
-    const note = "Select two or more closed objects.";
+    const note = "Select two or more objects.";
     return selectTool ? note : `${note} Use the Select tool.`;
   }
   if (availability.open > 0) {
-    const verb = availability.open === 1 ? "is" : "are";
-    return `Needs closed paths: ${availability.open} of ${availability.of} selected ${verb} open.`;
+    return `Closes ${plural(availability.open, "open outline", "open outlines")} with a straight line.`;
   }
   return "Replaces the selection.";
 }
@@ -104,22 +106,34 @@ export function successText(op: BooleanOp, result: BooleanResult): string | null
     return null;
   }
   const became = result.compound ? "1 compound path" : "1 path";
-  return `${NAMES[op]}: ${result.count} objects became ${became}.`;
+  return `${NAMES[op]}: ${result.count} objects became ${became}.${openOutlineSentences(result.closedOpen, result.removedOpen)}`;
 }
 
-/** The refusals every rail command that needs closed shapes shares (`0016` criteria 15 to 17,
- * `0035` criterion 11): open paths, no area, out of range. `name` is the command's name. `null`
- * for any other result. */
+/** The sentences about open outlines a Boolean operation closed (`0054` criteria 21 and 22), each
+ * with a leading space, or "" for none. */
+export function openOutlineSentences(closed: number, removed: number): string {
+  let text = "";
+  if (closed === 1) {
+    text += " 1 open outline was closed with a straight line.";
+  } else if (closed > 1) {
+    text += ` ${closed} open outlines were closed with a straight line.`;
+  }
+  if (removed === 1) {
+    text += " 1 open outline enclosed no area and was removed.";
+  } else if (removed > 1) {
+    text += ` ${removed} open outlines enclosed no area and were removed.`;
+  }
+  return text;
+}
+
+/** The refusals the rail commands share (`0016` criteria 16 and 17, `0035` criterion 11): no
+ * area, out of range, groups. `name` is the command's name. `null` for any other result. */
 export function sharedRefusalText(
   name: string,
   result: { kind: string; count: number; of: number },
 ): string | null {
   const objects = plural(result.of, "selected object", "selected objects");
   switch (result.kind) {
-    case "open_paths": {
-      const verb = result.count === 1 ? "is" : "are";
-      return `${name} needs closed paths. ${result.count} of ${objects} ${verb} open. ${NOTHING_CHANGED}`;
-    }
     case "no_area": {
       const verb = result.count === 1 ? "has" : "have";
       return `${name} needs shapes that enclose an area. ${result.count} of ${objects} ${verb} no area. ${NOTHING_CHANGED}`;
@@ -145,10 +159,9 @@ export function refusalText(op: BooleanOp, result: BooleanResult): string | null
   return sharedRefusalText(NAMES[op], result);
 }
 
-/** Whether a refusal outlines objects on the canvas (criteria 15 and 16). */
+/** Whether a refusal outlines objects on the canvas (criterion 16). */
 export function refusalOutlinesObjects(result: BooleanResult): boolean {
   return (
-    result.kind === "open_paths" ||
     result.kind === "no_area" ||
     result.kind === "out_of_range" ||
     result.kind === "groups"

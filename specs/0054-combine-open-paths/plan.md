@@ -105,51 +105,51 @@ new crate, no new dependency, no trait, no generic.
 
 ### Milestone 3: Combine (`curvyo-ui-core`)
 
-- [ ] 3.1 Remove `OpenPaths`, `NoArea`, `Touching`, `SelfTouching`, `check_touches`; each outline
+- [x] 3.1 Remove `OpenPaths`, `NoArea`, `Touching`, `SelfTouching`, `check_touches`; each outline
   keeps its own `closed`; open outlines copied with fresh ids, direction kept; tests of criterion 8's
   five inputs and criterion 6's 2 + 2 + 4 nodes (AC 6, 8, 9, 11)
-- [ ] 3.2 Windings from depth for closed outlines with area; no-area closed outlines and open
+- [x] 3.2 Windings from depth for closed outlines with area; no-area closed outlines and open
   outlines keep direction; tests 7a to 7g through the plan (AC 7, 19)
-- [ ] 3.3 Single-node outlines dropped and counted; all single-node refusal `SingleNodesOnly` (AC 10)
-- [ ] 3.4 Notice counts in `CombinePlan`: holes, open, touching closed outlines (self-crossing
+- [x] 3.3 Single-node outlines dropped and counted; all single-node refusal `SingleNodesOnly` (AC 10)
+- [x] 3.4 Notice counts in `CombinePlan`: holes, open, touching closed outlines (self-crossing
   singular case), touching holes, markers on any operand (AC 12, 14)
 
 ### Milestone 4: Split and Break apart (`curvyo-ui-core`)
 
-- [ ] 4.1 `split.rs`: parts from closed outlines with the new depth and touch; open outlines join by
+- [x] 4.1 `split.rs`: parts from closed outlines with the new depth and touch; open outlines join by
   rule (a) touch, (b) first node in the painted area of a part's closed outlines, (c) own set;
   skip-same-set; tests of criterion 15's two inputs (AC 15, 16)
-- [ ] 4.2 One-piece refusal with a `with_holes` flag for the two wordings (AC 17)
-- [ ] 4.3 `break_apart.rs`: open outline gives an open path, closed a closed path, direction kept;
+- [x] 4.2 One-piece refusal with a `with_holes` flag for the two wordings (AC 17)
+- [x] 4.3 `break_apart.rs`: open outline gives an open path, closed a closed path, direction kept;
   single-node outlines dropped and counted; test of criterion 18 (AC 18, 19)
 
 ### Milestone 5: Booleans, Cut, Offset (`curvyo-ui-core`)
 
-- [ ] 5.1 `boolean_availability`: open outlines are usable operands; `Ready` carries the open count
+- [x] 5.1 `boolean_availability`: open outlines are usable operands; `Ready` carries the open count
   for the tooltip note (AC 23)
-- [ ] 5.2 Boolean outcome counts `closed_open` and `removed_open` (open outlines with 2+ nodes, split
+- [x] 5.2 Boolean outcome counts `closed_open` and `removed_open` (open outlines with 2+ nodes, split
   by `outline_has_area` of the closed form); test of criterion 22's plate, score line and disc (AC 21,
   22)
-- [ ] 5.3 Cut: test that a compound path with open outlines is refused as every compound path (AC 20)
-- [ ] 5.4 Offset: today's behaviour kept and pinned by a test (compound path with an open outline is
+- [x] 5.3 Cut: test that a compound path with open outlines is refused as every compound path (AC 20)
+- [x] 5.4 Offset: today's behaviour kept and pinned by a test (compound path with an open outline is
   ignored like an open path), unless OFFSET-OPEN is answered otherwise (AC 24, as far as `0038` as
   built allows)
 
 ### Milestone 6: the slice in the app (`curvyo-editor-wasm`, `frontend`, `curvyo-render-core`)
 
-- [ ] 6.1 `editor-wasm`: new counts through `wasm_combine.rs`, `wasm_split.rs`, `wasm_boolean.rs`;
+- [x] 6.1 `editor-wasm`: new counts through `wasm_combine.rs`, `wasm_split.rs`, `wasm_boolean.rs`;
   removed refusal variants; one undo step per command with its label, undo restores ids, direction
   and `closed` (AC 12, 31)
-- [ ] 6.2 Frontend texts: Combine notice sentences in the order of the UX notes, single-node and
+- [x] 6.2 Frontend texts: Combine notice sentences in the order of the UX notes, single-node and
   markers sentences, Split one-piece wording, Break apart removed-outline sentence, Boolean notice and
   tooltip note, Combine note "Replaces the selection." with an open path selected; 8 s above 140
   characters (AC 10, 12, 13, 14, 17, 18, 21, 22, 23)
-- [ ] 6.3 Render and hit tests: open outline stroked open (criterion 2 pixels), fill of the U in both
+- [x] 6.3 Render and hit tests: open outline stroked open (criterion 2 pixels), fill of the U in both
   directions (criterion 3), hit and selection box (criterion 4), no closing line in the refusal and
   drag preview outlines (UX notes); Node tool unchanged for compound paths (AC 2, 3, 4, 5, 25)
-- [ ] 6.4 Rewrite the tests of withdrawn criteria to their `0054` replacements, list them for the PR
+- [x] 6.4 Rewrite the tests of withdrawn criteria to their `0054` replacements, list them for the PR
   (AC 8, 21)
-- [ ] 6.5 Budget tests with the four generated inputs and golden counts, release build, in the
+- [x] 6.5 Budget tests with the four generated inputs and golden counts, release build, in the
   `boolean-budgets` job (AC 32, 33)
 
 ### Milestone 7: docs

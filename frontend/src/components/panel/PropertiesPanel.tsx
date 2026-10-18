@@ -340,15 +340,16 @@ function ObjectSubject({ kind, id, fullId }: { kind: string; id: string; fullId:
 }
 
 /** The subject line at the right of the header row: 12 px muted, one line, the
- * full text in a tooltip. Its slot is 80 px since the Layers tab joined the strip
- * (`specs/0049-linked-clone` criterion 21: "Clone of Path 3f9a1c" is cut there). */
+ * full text in a tooltip. It takes the rest of the header after the tabs (design
+ * system, "Properties panel: tabs"), so "Compound path" fits at 800 px (`0054` UX
+ * review); a longer text such as "Clone of Path 3f9a1c" is still cut with an ellipsis. */
 function PanelSubject({ text }: { text: string }) {
   if (text === "") {
     return null;
   }
   return (
     <Tooltip side="left" content={text}>
-      <p className="min-w-0 max-w-[80px] truncate text-xs text-[var(--panel-muted-fg)]">{text}</p>
+      <p className="min-w-0 flex-1 truncate text-right text-xs text-[var(--panel-muted-fg)]">{text}</p>
     </Tooltip>
   );
 }

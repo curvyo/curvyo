@@ -123,8 +123,8 @@ fn availability_follows_the_selection() {
     let with_open = path_availability(&all, &select(&[a, open]));
     assert_eq!(
         with_open.combine,
-        BooleanAvailability::OpenPaths { open: 1, of: 2 },
-        "an open path leaves Combine enabled"
+        BooleanAvailability::Ready,
+        "an open path is an operand of Combine (0054 criterion 13)"
     );
 }
 
@@ -204,9 +204,11 @@ fn the_selection_order_does_not_matter_and_ids_are_fresh() {
     assert_eq!(ids.len(), total);
 }
 
-/// Criteria 9, 10, 10a, 11: each refusal lists exactly its offenders.
+/// 0035 criteria 9, 10, 10a and the no-area part of 11 are withdrawn by `0054` criterion 8: open,
+/// touching, crossing, self-crossing and flat operands combine and are counted; only a coordinate
+/// out of range and fewer than two objects stay refused (criterion 6).
 #[test]
-fn refusals_name_their_offenders() {
+fn only_range_and_count_refuse_and_the_rest_is_counted() {
     let document = Document::new(1);
     let a = rect(&document, 0.0, 0.0, 10.0);
     let overlapping = rect(&document, 5.0, 5.0, 10.0);
@@ -237,57 +239,27 @@ fn refusals_name_their_offenders() {
 
     assert_eq!(plan(&[a]), Err(CombineRefusal::NeedsTwo));
     assert_eq!(
-        plan(&[a, open, apart]),
-        Err(CombineRefusal::OpenPaths {
-            offenders: vec![open],
-            of: 3
-        })
-    );
-    assert_eq!(
         plan(&[a, far]),
         Err(CombineRefusal::OutOfRange {
             offenders: vec![far],
             of: 2
         })
     );
+    let with_open = plan(&[a, open, apart]).unwrap();
+    assert_eq!((with_open.open, with_open.touching), (1, 0));
+    assert!(with_open.outlines.iter().any(|(_, closed)| !closed));
+    let with_flat = plan(&[a, flat]).unwrap();
+    assert_eq!((with_flat.outlines.len(), with_flat.touching), (2, 0));
+    assert_eq!(plan(&[a, overlapping, apart]).unwrap().touching, 2);
     assert_eq!(
-        plan(&[a, flat]),
-        Err(CombineRefusal::NoArea {
-            offenders: vec![flat],
-            of: 2
-        })
-    );
-    assert_eq!(
-        plan(&[a, overlapping, apart]),
-        Err(CombineRefusal::Touching {
-            offenders: vec![a, overlapping],
-            of: 3
-        })
-    );
-    assert_eq!(
-        plan(&[a, sharing]),
-        Err(CombineRefusal::Touching {
-            offenders: vec![a, sharing],
-            of: 2
-        }),
+        plan(&[a, sharing]).unwrap().touching,
+        2,
         "a shared edge touches"
     );
-    assert!(plan(&[apart, near]).is_ok(), "0.01 mm apart combine");
-    assert_eq!(
-        plan(&[a, eight, apart]),
-        Err(CombineRefusal::SelfTouching {
-            offenders: vec![eight],
-            of: 3
-        })
-    );
-    assert_eq!(
-        plan(&[a, overlapping, eight]),
-        Err(CombineRefusal::Touching {
-            offenders: vec![a, overlapping],
-            of: 3
-        }),
-        "the touching sentence comes first"
-    );
+    assert_eq!(plan(&[apart, near]).unwrap().touching, 0, "0.01 mm apart");
+    let eight_plan = plan(&[a, eight, apart]).unwrap();
+    assert_eq!((eight_plan.touching, eight_plan.holes), (1, 0));
+    assert_eq!(plan(&[a, overlapping, eight]).unwrap().touching, 3);
 }
 
 /// 0048 criteria 3 and 5: Split keeps holes with their piece.
@@ -351,7 +323,10 @@ fn split_refusals() {
     );
     assert_eq!(
         plan_split(&all, &select(&[ring_id, plain]), &mut minter()),
-        Err(SplitRefusal::OnePiece { compounds: 1 })
+        Err(SplitRefusal::OnePiece {
+            compounds: 1,
+            with_holes: true
+        })
     );
     assert_eq!(
         plan_break_apart(&all, &select(&[plain]), &mut minter()),
@@ -501,6 +476,12 @@ fn split_never_drops_an_outline() {
             let kept: usize = plan.pieces.iter().map(|(_, piece)| piece.len()).sum();
             assert_eq!(kept, outlines.len(), "a split must keep every outline");
         }
-        Err(refusal) => assert_eq!(refusal, SplitRefusal::OnePiece { compounds: 1 }),
+        Err(refusal) => assert_eq!(
+            refusal,
+            SplitRefusal::OnePiece {
+                compounds: 1,
+                with_holes: true
+            }
+        ),
     }
 }

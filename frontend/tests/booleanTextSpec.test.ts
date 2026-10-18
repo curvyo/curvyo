@@ -34,29 +34,26 @@ test("criterion 2: rule lines", () => {
 });
 
 test("criteria 1 and 2: tooltip notes", () => {
-  const dim = { needsTwo: true, open: 0, of: 0 };
-  assert.equal(tooltipNote(dim, true), "Select two or more closed objects.");
-  assert.equal(tooltipNote(dim, false), "Select two or more closed objects. Use the Select tool.");
+  const dim = { needsTwo: true, open: 0 };
+  assert.equal(tooltipNote(dim, true), "Select two or more objects.");
+  assert.equal(tooltipNote(dim, false), "Select two or more objects. Use the Select tool.");
+  // 0054 criterion 23 replaces the open-path note of criterion 2.
   assert.equal(
-    tooltipNote({ needsTwo: false, open: 2, of: 3 }, true),
-    "Needs closed paths: 2 of 3 selected are open.",
+    tooltipNote({ needsTwo: false, open: 2 }, true),
+    "Closes 2 open outlines with a straight line.",
   );
   assert.equal(
-    tooltipNote({ needsTwo: false, open: 0, of: 3 }, true),
+    tooltipNote({ needsTwo: false, open: 0 }, true),
     "Replaces the selection.",
   );
   // another tool wins over an open path
-  assert.match(tooltipNote({ needsTwo: true, open: 1, of: 2 }, false), /Use the Select tool\.$/);
+  assert.match(tooltipNote({ needsTwo: true, open: 1 }, false), /Use the Select tool\.$/);
 });
 
-test("criterion 15: open path refusal, singular and plural", () => {
+test("criterion 15 is withdrawn by 0054 criterion 21: no open-path refusal is left", () => {
   assert.equal(
-    refusalText("union", { kind: "open_paths", count: 1, of: 3, compound: false }),
-    "Union needs closed paths. 1 of 3 selected objects is open. Nothing was changed.",
-  );
-  assert.equal(
-    refusalText("reverse_difference", { kind: "open_paths", count: 2, of: 3, compound: false }),
-    "Reverse difference needs closed paths. 2 of 3 selected objects are open. Nothing was changed.",
+    refusalText("union", { kind: "open_paths", count: 1, of: 3, compound: false, closedOpen: 0, removedOpen: 0 }),
+    null,
   );
 });
 
@@ -107,14 +104,14 @@ test("a refusal is never a success text and vice versa; ignored results say noth
   for (const kind of ["ignored", "needs_two", "applied"]) {
     assert.equal(refusalText("union", { kind, count: 2, of: 2, compound: false }), null, kind);
   }
-  for (const kind of ["empty", "open_paths", "no_area", "ignored", "needs_two", "out_of_range"]) {
+  for (const kind of ["empty", "no_area", "ignored", "needs_two", "out_of_range"]) {
     assert.equal(successText("union", { kind, count: 2, of: 2, compound: false }), null, kind);
   }
 });
 
-test("criteria 15 and 16: which refusals outline objects", () => {
+test("criterion 16: which refusals outline objects", () => {
   const r = (kind: string) => refusalOutlinesObjects({ kind, count: 1, of: 2, compound: false });
-  assert.equal(r("open_paths"), true);
+  assert.equal(r("open_paths"), false, "0054: no open-path refusal");
   assert.equal(r("no_area"), true);
   assert.equal(r("empty"), false);
   assert.equal(r("applied"), false);
@@ -127,7 +124,7 @@ test("criterion 38: the compound path sentence", () => {
 
 test("every refusal text ends with Nothing was changed. and has no placeholder left", () => {
   for (const op of BOOLEAN_OPS) {
-    for (const kind of ["open_paths", "no_area", "empty", "out_of_range"]) {
+    for (const kind of ["no_area", "empty", "out_of_range"]) {
       const text = refusalText(op, { kind, count: 2, of: 4, compound: false });
       assert.ok(text !== null, `${op}/${kind}`);
       assert.ok(text.endsWith("Nothing was changed."), text);

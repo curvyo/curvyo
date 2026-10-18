@@ -9,7 +9,7 @@ use curvyo_document_core::{
     Document, Length, NodeId, ObjectSnapshot, Point, RectBounds, pack, unpack,
 };
 use curvyo_editor_wasm::{CombineOutcome, Session, SplitOutcome, Tool};
-use curvyo_ui_core::{BooleanAvailability, CombineRefusal, SplitRefusal};
+use curvyo_ui_core::{BooleanAvailability, SplitRefusal};
 
 fn pt(x: f64, y: f64) -> Point {
     Point::new(x, y)
@@ -128,6 +128,11 @@ fn combine_and_break_apart_round_trip_with_one_commit_each() {
         CombineOutcome::Applied {
             operands: 3,
             holes: 1,
+            open: 0,
+            touching: 0,
+            touching_holes: 0,
+            single_nodes_removed: 0,
+            markers: false,
             styles_differ: false
         }
     );
@@ -172,6 +177,11 @@ fn combine_and_break_apart_round_trip_with_one_commit_each() {
         CombineOutcome::Applied {
             operands: 2,
             holes: 1,
+            open: 0,
+            touching: 0,
+            touching_holes: 0,
+            single_nodes_removed: 0,
+            markers: false,
             styles_differ: false
         }
     );
@@ -184,37 +194,39 @@ fn combine_and_break_apart_round_trip_with_one_commit_each() {
     assert_eq!(outlines_after, outlines_before);
 }
 
-/// Criteria 9, 10, 12: a refusal changes nothing, outlines its offenders, and repeats.
+/// `0035` criterion 10 (touching refused) is withdrawn by `0054` criteria 7c and 12: crossing
+/// squares combine in one commit, both stay shapes and the notice counts them.
 #[test]
-fn touching_shapes_are_refused_and_outlined_without_changing_anything() {
+fn crossing_shapes_combine_and_are_counted() {
     let document = Document::new(1);
-    let a = rect(&document, 0.0, 0.0, 20.0);
-    let b = rect(&document, 10.0, 10.0, 20.0);
+    let _a = rect(&document, 0.0, 0.0, 20.0);
+    let _b = rect(&document, 10.0, 10.0, 20.0);
     let _far = rect(&document, 100.0, 0.0, 20.0);
     let mut session = session_of(&document);
     select_all(&mut session, pt(200.0, 200.0));
     assert_eq!(session.selected_object_count(), 3);
-    let before = json(&session);
     let labels = commit_labels(&session);
-    let plain = session.draw_list().triangle_count();
 
-    let first = session.apply_combine();
     assert_eq!(
-        first,
-        CombineOutcome::Refused(CombineRefusal::Touching {
-            offenders: vec![a, b],
-            of: 3
-        })
+        session.apply_combine(),
+        CombineOutcome::Applied {
+            operands: 3,
+            holes: 0,
+            open: 0,
+            touching: 2,
+            touching_holes: 0,
+            single_nodes_removed: 0,
+            markers: false,
+            styles_differ: false
+        }
     );
-    assert_eq!(json(&session), before, "nothing changed");
-    assert_eq!(commit_labels(&session), labels, "no commit");
-    assert_eq!(session.selected_object_count(), 3);
-    assert_eq!(session.tool(), Tool::Select);
-    assert!(session.draw_list().triangle_count() > plain, "outlined");
-    assert_eq!(session.apply_combine(), first, "a second press: the same");
-
-    session.clear_boolean_refusal();
-    assert_eq!(session.draw_list().triangle_count(), plain);
+    assert_eq!(
+        commit_labels(&session).len(),
+        labels.len() + 1,
+        "one commit"
+    );
+    assert_eq!(paths(&session).len(), 1);
+    assert_eq!(session.selected_object_count(), 1);
 }
 
 /// Criterion 16: a ring alone is one piece; the refusal draws no outline and writes nothing.
@@ -233,7 +245,10 @@ fn a_ring_alone_is_one_piece_and_the_defensive_refusal_needs_no_compound() {
 
     assert_eq!(
         session.apply_split(),
-        SplitOutcome::Refused(SplitRefusal::OnePiece { compounds: 1 })
+        SplitOutcome::Refused(SplitRefusal::OnePiece {
+            compounds: 1,
+            with_holes: true
+        })
     );
     assert_eq!(json(&session), before);
     assert_eq!(commit_labels(&session), labels);

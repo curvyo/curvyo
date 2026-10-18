@@ -1,7 +1,8 @@
 /**
- * The words of the Path card (`specs/0035-combine-and-break-apart/` criteria 2, 7, 9 to 11,
+ * The words of the Path card (`specs/0035-combine-and-break-apart/` criteria 2, 7, 11,
  * `specs/0048-split-compound-path/` criteria 2, 7 to 9, 12 and 13, `specs/0036-cut-at-crossings/`
- * criteria 1, 7 to 10): names, rules, tooltip notes and notices. Rust sends codes and counts; the sentences are written here, once.
+ * criteria 1, 7 to 10, `specs/0054-combine-open-paths/` criteria 10, 12 to 14, 17, 18): names,
+ * rules, tooltip notes and notices. Rust sends codes and counts; the sentences are written here, once.
  */
 
 import { NOTHING_CHANGED, plural, sharedRefusalText } from "./booleanText.ts";
@@ -15,10 +16,6 @@ export const PATH_COMMANDS: readonly PathCommand[] = ["combine", "split", "break
 export interface PathAvailabilityState {
   /** Combine is dimmed: fewer than two objects selected, or not the Select tool. */
   needsTwo: boolean;
-  /** How many selected objects are open paths. */
-  open: number;
-  /** How many objects are selected (0 when `needsTwo`). */
-  of: number;
   /** Split and Break apart are enabled: the selection holds a compound path. */
   hasCompound: boolean;
   /** Cut is enabled: something is selected. */
@@ -31,6 +28,16 @@ export interface CombineResult {
   count: number;
   of: number;
   holes: number;
+  /** Open outlines in the result. */
+  open: number;
+  /** Closed outlines that touch or cross another closed outline or themselves. */
+  touching: number;
+  /** Holes that touch or cross another hole. */
+  touchingHoles: number;
+  /** Outlines with a single node that were left out. */
+  singleNodesRemoved: number;
+  /** An operand had a marker on; the result draws none. */
+  markers: boolean;
   stylesDiffer: boolean;
 }
 
@@ -51,6 +58,8 @@ export interface BreakApartResult {
   compounds: number;
   pieces: number;
   withHoles: boolean;
+  /** Outlines with a single node that were left out. */
+  singleNodesRemoved: number;
 }
 
 /** What `WasmSession.apply_cut` did (`kind` is the outcome code). `count` paths became `pieces`
@@ -114,14 +123,9 @@ export function commandNote(
     return USE_SELECT;
   }
   if (command === "combine") {
-    if (availability.needsTwo) {
-      return "Select two or more closed shapes.";
-    }
-    if (availability.open > 0) {
-      const verb = availability.open === 1 ? "is" : "are";
-      return `Needs closed paths: ${availability.open} of ${availability.of} selected ${verb} open.`;
-    }
-    return "Replaces the selection.";
+    return availability.needsTwo
+      ? "Select two or more paths or shapes."
+      : "Replaces the selection.";
   }
   if (command === "cut") {
     return availability.canCut
@@ -136,43 +140,72 @@ export function commandNote(
     : "Holes become filled shapes. Use Split to keep them.";
 }
 
-/** A success notice lasts 3 s, or 5 s when its sentence is longer than 70 characters (criterion
- * 7); `undefined` is the default of the kind. */
+/** A success notice lasts 3 s, 5 s when its text is longer than 70 characters (`0035` criterion
+ * 7) and 8 s when it is longer than 140 (`0054` UX notes); `undefined` is the default of the kind. */
 export function noticeMs(text: string): number | undefined {
+  if (text.length > 140) {
+    return 8000;
+  }
   return text.length > 70 ? 5000 : undefined;
 }
 
-/** The notice after a Combine, or `null` if nothing was done (criterion 7). */
+/** "1 outline with a single node was removed." (`0054` criteria 10 and 18), or "" for none. */
+function singleNodesSentence(count: number): string {
+  if (!(count > 0)) {
+    return "";
+  }
+  return count === 1
+    ? " 1 outline with a single node was removed."
+    : ` ${count} outlines with a single node were removed.`;
+}
+
+/** The notice after a Combine, or `null` if nothing was done (`0035` criterion 7, `0054`
+ * criteria 10, 12 and 14). Sentences in the order of the `0054` UX notes: the result, the touch
+ * count, the crossing holes, the removed single nodes, the style, the markers. */
 export function combineSuccessText(result: CombineResult): string | null {
   if (result.kind !== "applied") {
     return null;
   }
-  const holes = result.holes === 0 ? "" : ` with ${plural(result.holes, "hole", "holes")}`;
-  const style = result.stylesDiffer ? " It uses the style of the lowest object." : "";
-  return `Combine: ${result.count} objects became 1 compound path${holes}.${style}`;
-}
-
-/** The notice after a refused Combine (criteria 9 to 11), or `null` for a result that is no
- * refusal (`applied`, `ignored`, `needs_two`). */
-export function combineRefusalText(result: CombineResult): string | null {
-  const objects = plural(result.of, "selected object", "selected objects");
-  switch (result.kind) {
-    case "touching":
-      return `Combine needs shapes that do not touch. ${result.count} of ${objects} touch each other. Use Union to merge overlapping shapes. ${NOTHING_CHANGED}`;
-    case "self_touching": {
-      const verb = result.count === 1 ? "does" : "do";
-      return `Combine needs shapes that do not cross themselves. ${result.count} of ${objects} ${verb}. ${NOTHING_CHANGED}`;
-    }
-    default:
-      return sharedRefusalText("Combine", result);
+  const parts: string[] = [];
+  if (result.holes > 0) {
+    parts.push(plural(result.holes, "hole", "holes"));
   }
+  if (result.open > 0) {
+    parts.push(plural(result.open, "open outline", "open outlines"));
+  }
+  const with_ = parts.length === 0 ? "" : ` with ${parts.join(" and ")}`;
+  let text = `Combine: ${result.count} objects became 1 compound path${with_}.`;
+  if (result.touching === 1) {
+    text += " 1 closed outline touches or crosses itself.";
+  } else if (result.touching > 1) {
+    text += ` ${result.touching} closed outlines touch or cross.`;
+  }
+  if (result.touchingHoles > 1) {
+    text += ` ${result.touchingHoles} holes touch or cross; where they overlap, it stays filled. Undo and Union them first for one hole.`;
+  }
+  text += singleNodesSentence(result.singleNodesRemoved);
+  if (result.stylesDiffer) {
+    text += " It uses the style of the lowest object.";
+  }
+  if (result.markers) {
+    text += " Markers are not drawn on compound paths.";
+  }
+  return text;
 }
 
-/** Whether a refused Combine outlines objects on the canvas (criteria 9 to 11). */
+/** The notice after a refused Combine (`0035` criterion 11, `0054` criterion 10), or `null` for a
+ * result that is no refusal (`applied`, `ignored`, `needs_two`). */
+export function combineRefusalText(result: CombineResult): string | null {
+  if (result.kind === "single_nodes_only") {
+    return `Combine needs outlines with two or more nodes. Every selected outline has a single node. ${NOTHING_CHANGED}`;
+  }
+  return sharedRefusalText("Combine", result);
+}
+
+/** Whether a refused Combine outlines objects on the canvas: objects out of range and the
+ * leaves of groups. */
 export function combineOutlinesObjects(result: CombineResult): boolean {
-  return ["open_paths", "no_area", "out_of_range", "touching", "self_touching", "groups"].includes(
-    result.kind,
-  );
+  return ["out_of_range", "groups"].includes(result.kind);
 }
 
 const NO_COMPOUND = "needs a compound path.";
@@ -205,6 +238,12 @@ export function splitRefusalText(result: SplitResult): string | null {
     case "groups":
       return `Split does not work on groups. Ungroup first. ${NOTHING_CHANGED}`;
     case "one_piece":
+      // `0054` criterion 17: "with its holes" and "release the holes" only when there is a hole.
+      if (!result.withHoles) {
+        return result.compounds === 1
+          ? `Nothing to split. The compound path is one piece. Use Break apart to separate every outline. ${NOTHING_CHANGED}`
+          : `Nothing to split. The ${result.compounds} selected compound paths are one piece each. Use Break apart to separate every outline. ${NOTHING_CHANGED}`;
+      }
       return result.compounds === 1
         ? `Nothing to split. The compound path is one piece with its holes. Use Break apart to release the holes. ${NOTHING_CHANGED}`
         : `Nothing to split. The ${result.compounds} selected compound paths are one piece each, with their holes. Use Break apart to release the holes. ${NOTHING_CHANGED}`;
@@ -219,13 +258,14 @@ export function splitRefusalText(result: SplitResult): string | null {
   }
 }
 
-/** The notice after a Break apart, or `null` if nothing was done (`0048` criterion 12). */
+/** The notice after a Break apart, or `null` if nothing was done (`0048` criterion 12, `0054`
+ * criterion 18: the removed single nodes come after the count). */
 export function breakApartSuccessText(result: BreakApartResult): string | null {
   if (result.kind !== "applied") {
     return null;
   }
   const compounds = plural(result.compounds, "compound path", "compound paths");
-  const text = `Break apart: ${compounds} became ${result.pieces} objects.`;
+  const text = `Break apart: ${compounds} became ${result.pieces} objects.${singleNodesSentence(result.singleNodesRemoved)}`;
   return result.withHoles ? `${text} Holes became filled shapes.` : text;
 }
 

@@ -10,18 +10,14 @@ use wasm_bindgen::prelude::*;
 use crate::session::CombineOutcome;
 use crate::wasm_api::WasmSession;
 
-/// What the Path card shows: Combine as the Boolean buttons (`needs_two` dimmed; else enabled,
-/// with `open` of the `of` selected objects open paths), whether Split and Break apart are
-/// enabled (one flag: the selection holds a compound path) and whether Cut is.
+/// What the Path card shows: whether Combine is dimmed (`needs_two`; else enabled, open paths
+/// included), whether Split and Break apart are enabled (one flag: the selection holds a compound
+/// path) and whether Cut is.
 #[wasm_bindgen]
 #[derive(Debug, Clone, Copy)]
 pub struct PathAvailabilityView {
     /// Fewer than two objects are selected, or the Select tool is not active.
     pub needs_two: bool,
-    /// How many selected objects are open paths.
-    pub open: u32,
-    /// How many objects are selected (0 when `needs_two`).
-    pub of: u32,
     /// The selection holds a compound path: Split and Break apart are enabled.
     pub has_compound: bool,
     /// Something is selected: Cut is enabled.
@@ -34,15 +30,8 @@ fn count(n: usize) -> u32 {
 
 impl From<PathAvailability> for PathAvailabilityView {
     fn from(availability: PathAvailability) -> Self {
-        let (needs_two, open, of) = match availability.combine {
-            BooleanAvailability::NeedsTwo => (true, 0, 0),
-            BooleanAvailability::OpenPaths { open, of } => (false, count(open), count(of)),
-            BooleanAvailability::Ready => (false, 0, 0),
-        };
         Self {
-            needs_two,
-            open,
-            of,
+            needs_two: availability.combine == BooleanAvailability::NeedsTwo,
             has_compound: availability.compound,
             can_cut: availability.cut,
         }
@@ -50,12 +39,14 @@ impl From<PathAvailability> for PathAvailabilityView {
 }
 
 /// What `apply_combine` did. `kind` is `"ignored"`, `"applied"` (`count` objects became one
-/// compound path with `holes` holes; `styles_differ` says the lowest object's style was used) or a
-/// refusal: `"needs_two"`, `"open_paths"`, `"out_of_range"`, `"no_area"`, `"touching"`,
-/// `"self_touching"` or `"groups"` (`count` of the `of` selected objects are to blame). Nothing was changed by
+/// compound path with `holes` holes and `open` open outlines; `touching` closed outlines touch or
+/// cross, `touching_holes` holes touch or cross each other, `single_nodes_removed` single-node
+/// outlines were left out, `markers` says an operand had markers, `styles_differ` says the lowest
+/// object's style was used) or a refusal: `"needs_two"`, `"out_of_range"` or `"groups"` (`count`
+/// of the `of` selected objects are to blame), or `"single_nodes_only"`. Nothing was changed by
 /// anything but `"applied"`.
 #[wasm_bindgen]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct CombineResultView {
     /// The outcome code.
     #[wasm_bindgen(getter_with_clone)]
@@ -66,46 +57,60 @@ pub struct CombineResultView {
     pub of: u32,
     /// Holes in the result.
     pub holes: u32,
+    /// Open outlines in the result.
+    pub open: u32,
+    /// Closed outlines that touch or cross another closed outline or themselves.
+    pub touching: u32,
+    /// Holes that touch or cross another hole.
+    pub touching_holes: u32,
+    /// Outlines with a single node that were left out.
+    pub single_nodes_removed: u32,
+    /// An operand had a marker on; the result draws none.
+    pub markers: bool,
     /// The operands' styles were not all equal.
     pub styles_differ: bool,
 }
 
 impl From<CombineOutcome> for CombineResultView {
     fn from(outcome: CombineOutcome) -> Self {
-        let view = |kind: &str, n: usize, of: usize, holes: usize, styles_differ: bool| Self {
+        let refused = |kind: &str, n: usize, of: usize| Self {
             kind: kind.to_string(),
             count: count(n),
             of: count(of),
-            holes: count(holes),
-            styles_differ,
+            ..Self::default()
         };
         match outcome {
-            CombineOutcome::Ignored => view("ignored", 0, 0, 0, false),
+            CombineOutcome::Ignored => refused("ignored", 0, 0),
             CombineOutcome::Applied {
                 operands,
                 holes,
+                open,
+                touching,
+                touching_holes,
+                single_nodes_removed,
+                markers,
                 styles_differ,
-            } => view("applied", operands, operands, holes, styles_differ),
+            } => Self {
+                kind: "applied".to_string(),
+                count: count(operands),
+                of: count(operands),
+                holes: count(holes),
+                open: count(open),
+                touching: count(touching),
+                touching_holes: count(touching_holes),
+                single_nodes_removed: count(single_nodes_removed),
+                markers,
+                styles_differ,
+            },
             CombineOutcome::Refused(refusal) => match refusal {
-                CombineRefusal::NeedsTwo => view("needs_two", 0, 0, 0, false),
-                CombineRefusal::OpenPaths { offenders, of } => {
-                    view("open_paths", offenders.len(), of, 0, false)
-                }
+                CombineRefusal::NeedsTwo => refused("needs_two", 0, 0),
                 CombineRefusal::OutOfRange { offenders, of } => {
-                    view("out_of_range", offenders.len(), of, 0, false)
-                }
-                CombineRefusal::NoArea { offenders, of } => {
-                    view("no_area", offenders.len(), of, 0, false)
-                }
-                CombineRefusal::Touching { offenders, of } => {
-                    view("touching", offenders.len(), of, 0, false)
-                }
-                CombineRefusal::SelfTouching { offenders, of } => {
-                    view("self_touching", offenders.len(), of, 0, false)
+                    refused("out_of_range", offenders.len(), of)
                 }
                 CombineRefusal::Groups { offenders } => {
-                    view("groups", offenders.len(), offenders.len(), 0, false)
+                    refused("groups", offenders.len(), offenders.len())
                 }
+                CombineRefusal::SingleNodesOnly => refused("single_nodes_only", 0, 0),
             },
         }
     }

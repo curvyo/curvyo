@@ -10,17 +10,15 @@ use crate::session::BooleanOutcome;
 use crate::wasm_api::WasmSession;
 
 /// `wasm-bindgen`'s JS-facing mirror of [`curvyo_ui_core::BooleanAvailability`]: `needs_two`
-/// dimmed; else enabled, with `open` of the `of` selected objects open paths (0 when all are
-/// closed).
+/// dimmed; else enabled, with `open` open outlines that an operation closes with a straight line
+/// (0 when there are none, `specs/0054-combine-open-paths` criterion 23).
 #[wasm_bindgen]
 #[derive(Debug, Clone, Copy)]
 pub struct BooleanAvailabilityView {
     /// Fewer than two objects are selected, or the Select tool is not active.
     pub needs_two: bool,
-    /// How many selected objects are open paths.
+    /// How many open outlines of two or more nodes the selected objects hold.
     pub open: u32,
-    /// How many objects are selected (0 when `needs_two`).
-    pub of: u32,
 }
 
 impl From<BooleanAvailability> for BooleanAvailabilityView {
@@ -29,17 +27,14 @@ impl From<BooleanAvailability> for BooleanAvailabilityView {
             BooleanAvailability::NeedsTwo => Self {
                 needs_two: true,
                 open: 0,
-                of: 0,
             },
-            BooleanAvailability::OpenPaths { open, of } => Self {
+            BooleanAvailability::ClosesOpen { outlines } => Self {
                 needs_two: false,
-                open: count(open),
-                of: count(of),
+                open: count(outlines),
             },
             BooleanAvailability::Ready => Self {
                 needs_two: false,
                 open: 0,
-                of: 0,
             },
         }
     }
@@ -50,11 +45,12 @@ fn count(n: usize) -> u32 {
 }
 
 /// What `apply_boolean` did. `kind` is `"ignored"`, `"applied"` (`count` objects became one;
-/// `compound` says whether it is a compound path) or a refusal: `"needs_two"`, `"open_paths"`,
+/// `compound` says whether it is a compound path; `closed_open` open outlines were closed with a
+/// straight line, `removed_open` enclosed no area and were removed) or a refusal: `"needs_two"`,
 /// `"no_area"`, `"groups"`, `"out_of_range"` (`count` of the `of` selected objects are to blame) or
 /// `"empty"`. Nothing was changed by anything but `"applied"`.
 #[wasm_bindgen]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct BooleanResultView {
     /// The outcome code.
     #[wasm_bindgen(getter_with_clone)]
@@ -65,36 +61,43 @@ pub struct BooleanResultView {
     pub of: u32,
     /// The result is a compound path.
     pub compound: bool,
+    /// Open outlines closed with a straight line.
+    pub closed_open: u32,
+    /// Open outlines that enclosed no area and were removed.
+    pub removed_open: u32,
 }
 
 impl From<BooleanOutcome> for BooleanResultView {
     fn from(outcome: BooleanOutcome) -> Self {
-        let view = |kind: &str, count: usize, of: usize, compound: bool| Self {
+        let view = |kind: &str, count: usize, of: usize| Self {
             kind: kind.to_string(),
             count: self::count(count),
             of: self::count(of),
-            compound,
+            ..Self::default()
         };
         match outcome {
-            BooleanOutcome::Ignored => view("ignored", 0, 0, false),
-            BooleanOutcome::Applied { operands, compound } => {
-                view("applied", operands, operands, compound)
-            }
+            BooleanOutcome::Ignored => view("ignored", 0, 0),
+            BooleanOutcome::Applied {
+                operands,
+                compound,
+                closed_open,
+                removed_open,
+            } => Self {
+                compound,
+                closed_open: count(closed_open),
+                removed_open: count(removed_open),
+                ..view("applied", operands, operands)
+            },
             BooleanOutcome::Refused(refusal) => match refusal {
-                BooleanRefusal::NeedsTwo => view("needs_two", 0, 0, false),
-                BooleanRefusal::OpenPaths { offenders, of } => {
-                    view("open_paths", offenders.len(), of, false)
-                }
-                BooleanRefusal::NoArea { offenders, of } => {
-                    view("no_area", offenders.len(), of, false)
-                }
+                BooleanRefusal::NeedsTwo => view("needs_two", 0, 0),
+                BooleanRefusal::NoArea { offenders, of } => view("no_area", offenders.len(), of),
                 BooleanRefusal::OutOfRange { offenders, of } => {
-                    view("out_of_range", offenders.len(), of, false)
+                    view("out_of_range", offenders.len(), of)
                 }
                 BooleanRefusal::Groups { offenders } => {
-                    view("groups", offenders.len(), offenders.len(), false)
+                    view("groups", offenders.len(), offenders.len())
                 }
-                BooleanRefusal::Empty => view("empty", 0, 0, false),
+                BooleanRefusal::Empty => view("empty", 0, 0),
             },
         }
     }

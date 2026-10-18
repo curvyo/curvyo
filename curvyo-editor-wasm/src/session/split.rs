@@ -37,7 +37,7 @@ pub enum SplitOutcome {
 pub enum BreakApartOutcome {
     /// Nothing, as for [`SplitOutcome::Ignored`].
     Ignored,
-    /// Compound paths were replaced by one closed path per outline.
+    /// Compound paths were replaced by one path per outline.
     Applied {
         /// How many compound paths were broken apart.
         compounds: usize,
@@ -45,6 +45,8 @@ pub enum BreakApartOutcome {
         pieces: usize,
         /// Whether an outline was a hole and is now a filled shape.
         with_holes: bool,
+        /// How many outlines with a single node were left out.
+        single_nodes_removed: usize,
     },
     /// Refused; nothing was changed.
     Refused(BreakApartRefusal),
@@ -146,6 +148,7 @@ impl Session {
                 compounds: plan.removed.len(),
                 pieces: created.len(),
                 with_holes: plan.with_holes,
+                single_nodes_removed: plan.single_nodes_removed,
             }
         })
     }

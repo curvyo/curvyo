@@ -138,7 +138,10 @@ fn e1_a_ring() {
     assert!(state.compound && state.cut);
     assert_eq!(
         input(Input::E1).apply_split(),
-        SplitOutcome::Refused(SplitRefusal::OnePiece { compounds: 1 })
+        SplitOutcome::Refused(SplitRefusal::OnePiece {
+            compounds: 1,
+            with_holes: true
+        })
     );
     let mut broken = input(Input::E1);
     assert!(matches!(

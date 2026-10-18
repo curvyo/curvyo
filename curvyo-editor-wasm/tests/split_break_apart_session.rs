@@ -107,7 +107,8 @@ fn break_apart_gives_one_closed_path_per_outline() {
         BreakApartOutcome::Applied {
             compounds: 1,
             pieces: 3,
-            with_holes: true
+            with_holes: true,
+            single_nodes_removed: 0,
         }
     );
     let labels = commit_labels(&session);
@@ -136,7 +137,10 @@ fn a_ring_is_one_part_for_split_and_two_outlines_for_break_apart() {
     let ids = doc(&session).object_ids();
     assert_eq!(
         session.apply_split(),
-        SplitOutcome::Refused(SplitRefusal::OnePiece { compounds: 1 })
+        SplitOutcome::Refused(SplitRefusal::OnePiece {
+            compounds: 1,
+            with_holes: true
+        })
     );
     assert_eq!(doc(&session).object_ids(), ids, "same object, same ids");
     assert_eq!(
@@ -144,7 +148,8 @@ fn a_ring_is_one_part_for_split_and_two_outlines_for_break_apart() {
         BreakApartOutcome::Applied {
             compounds: 1,
             pieces: 2,
-            with_holes: true
+            with_holes: true,
+            single_nodes_removed: 0,
         }
     );
 }
@@ -248,7 +253,10 @@ fn the_golden_overlapping_squares_are_one_part_but_two_outlines() {
     assert_eq!(ids.len(), 1);
     assert_eq!(
         session.apply_split(),
-        SplitOutcome::Refused(SplitRefusal::OnePiece { compounds: 1 })
+        SplitOutcome::Refused(SplitRefusal::OnePiece {
+            compounds: 1,
+            with_holes: false
+        })
     );
     assert_eq!(doc(&session).object_ids(), ids);
     assert_eq!(
@@ -256,7 +264,8 @@ fn the_golden_overlapping_squares_are_one_part_but_two_outlines() {
         BreakApartOutcome::Applied {
             compounds: 1,
             pieces: 2,
-            with_holes: false
+            with_holes: false,
+            single_nodes_removed: 0,
         }
     );
 }

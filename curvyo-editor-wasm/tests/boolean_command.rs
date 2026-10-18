@@ -94,7 +94,9 @@ fn an_operation_replaces_the_operands_and_selects_the_result() {
         outcome,
         BooleanOutcome::Applied {
             operands: 2,
-            compound: false
+            compound: false,
+            closed_open: 0,
+            removed_open: 0,
         }
     );
     let document = doc(&session);
@@ -122,7 +124,9 @@ fn a_difference_with_a_hole_is_one_compound_path() {
         session.apply_boolean(BooleanOp::Difference),
         BooleanOutcome::Applied {
             operands: 2,
-            compound: true
+            compound: true,
+            closed_open: 0,
+            removed_open: 0,
         }
     );
     let after = doc(&session);
@@ -143,11 +147,13 @@ fn a_difference_with_a_hole_is_one_compound_path() {
 
 /// Criteria 15 and 18: an open path is refused; nothing changes, the offender is outlined in
 /// red, the buttons stay usable and a second activation gives the same result.
+/// `0016` criterion 15 is withdrawn by `0054` criteria 21 and 23: an open path is an operand,
+/// closed with a straight line, in one commit.
 #[test]
-fn an_open_path_is_refused_and_outlined_without_changing_anything() {
+fn an_open_path_is_closed_with_a_straight_line() {
     let document = Document::new(1);
     let _ = rect(&document, 0.0, 0.0, 20.0);
-    let open = document.create_path(
+    let _ = document.create_path(
         &[
             NewAnchor::corner(AnchorId::new(1, 1), pt(100.0, 0.0)),
             NewAnchor::corner(AnchorId::new(1, 2), pt(130.0, 20.0)),
@@ -161,44 +167,18 @@ fn an_open_path_is_refused_and_outlined_without_changing_anything() {
     assert_eq!(session.selected_object_count(), 2);
     assert_eq!(
         session.boolean_availability(),
-        BooleanAvailability::OpenPaths { open: 1, of: 2 }
-    );
-    let before = json(&session);
-    let plain = session.draw_list().triangle_count();
-
-    let first = session.apply_boolean(BooleanOp::Union);
-    assert_eq!(
-        first,
-        BooleanOutcome::Refused(BooleanRefusal::OpenPaths {
-            offenders: vec![open],
-            of: 2
-        })
-    );
-    assert_eq!(json(&session), before, "nothing changed");
-    assert_eq!(session.selected_object_count(), 2, "the selection stays");
-    assert_eq!(session.tool(), Tool::Select);
-    assert!(
-        session.draw_list().triangle_count() > plain,
-        "the offender is outlined"
+        BooleanAvailability::ClosesOpen { outlines: 1 }
     );
     assert_eq!(
         session.apply_boolean(BooleanOp::Union),
-        first,
-        "a second time, the same"
+        BooleanOutcome::Applied {
+            operands: 2,
+            compound: true,
+            closed_open: 1,
+            removed_open: 0
+        }
     );
-
-    // The outline ends with the selection ...
-    click(&mut session, pt(500.0, 500.0), false);
-    click(&mut session, pt(0.0, 10.0), false);
     assert_eq!(session.selected_object_count(), 1);
-    let one_selected = session.draw_list().triangle_count();
-    click(&mut session, pt(0.0, 10.0), false);
-    session.clear_boolean_refusal();
-    assert_eq!(
-        session.draw_list().triangle_count(),
-        one_selected,
-        "a changed selection shows no outline"
-    );
 }
 
 /// The outline is not stored, selects nothing, and goes with the tool.

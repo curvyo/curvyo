@@ -1525,9 +1525,23 @@ export function useEditorSession(
       const raw = sessionRef.current?.apply_boolean(op);
       syncFromSession();
       if (!raw) {
-        return { kind: "ignored", count: 0, of: 0, compound: false };
+        return {
+          kind: "ignored",
+          count: 0,
+          of: 0,
+          compound: false,
+          closedOpen: 0,
+          removedOpen: 0,
+        };
       }
-      const result = { kind: raw.kind, count: raw.count, of: raw.of, compound: raw.compound };
+      const result = {
+        kind: raw.kind,
+        count: raw.count,
+        of: raw.of,
+        compound: raw.compound,
+        closedOpen: raw.closed_open,
+        removedOpen: raw.removed_open,
+      };
       raw.free();
       return result;
     },
@@ -1538,13 +1552,29 @@ export function useEditorSession(
     const raw = sessionRef.current?.apply_combine();
     syncFromSession();
     if (!raw) {
-      return { kind: "ignored", count: 0, of: 0, holes: 0, stylesDiffer: false };
+      return {
+        kind: "ignored",
+        count: 0,
+        of: 0,
+        holes: 0,
+        open: 0,
+        touching: 0,
+        touchingHoles: 0,
+        singleNodesRemoved: 0,
+        markers: false,
+        stylesDiffer: false,
+      };
     }
     const result = {
       kind: raw.kind,
       count: raw.count,
       of: raw.of,
       holes: raw.holes,
+      open: raw.open,
+      touching: raw.touching,
+      touchingHoles: raw.touching_holes,
+      singleNodesRemoved: raw.single_nodes_removed,
+      markers: raw.markers,
       stylesDiffer: raw.styles_differ,
     };
     raw.free();
@@ -1573,13 +1603,14 @@ export function useEditorSession(
     const raw = sessionRef.current?.apply_break_apart();
     syncFromSession();
     if (!raw) {
-      return { kind: "ignored", compounds: 0, pieces: 0, withHoles: false };
+      return { kind: "ignored", compounds: 0, pieces: 0, withHoles: false, singleNodesRemoved: 0 };
     }
     const result = {
       kind: raw.kind,
       compounds: raw.compounds,
       pieces: raw.pieces,
       withHoles: raw.with_holes,
+      singleNodesRemoved: raw.single_nodes_removed,
     };
     raw.free();
     return result;

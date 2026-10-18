@@ -141,7 +141,10 @@ fn a_rectangle_with_a_thousand_circles() {
     check_within("split (a)", started.elapsed(), PART_SEARCH_BUDGET);
     assert_eq!(
         outcome,
-        SplitOutcome::Refused(SplitRefusal::OnePiece { compounds: 1 })
+        SplitOutcome::Refused(SplitRefusal::OnePiece {
+            compounds: 1,
+            with_holes: true
+        })
     );
 }
 

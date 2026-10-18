@@ -1,5 +1,6 @@
-//! Planning Break apart on the selected compound paths: every outline becomes a closed path of
-//! its own, holes included (`specs/0048-split-compound-path`, criteria 11 to 13).
+//! Planning Break apart on the selected compound paths: every outline becomes a path of its own,
+//! open or closed as it was, holes included (`specs/0048-split-compound-path`, criteria 11 to 13;
+//! `specs/0054-combine-open-paths` criterion 18).
 //!
 //! Pure: it reads snapshots and the selection and returns a plan or a refusal. The one write
 //! (`Document::replace_with_pieces`) is the session's. Nodes are copied as they are, not reversed:
@@ -35,13 +36,16 @@ pub enum BreakApartRefusal {
 pub struct BreakApartPlan {
     /// The compound paths to replace, bottom-most first.
     pub removed: Vec<NodeId>,
-    /// One closed path per outline, each with the compound path it takes its place and style
-    /// from, in the compound path's outline order, with fresh anchor ids.
+    /// One path per outline of two or more nodes, open or closed as the outline was, each with
+    /// the compound path it takes its place and style from, in the compound path's outline order,
+    /// with fresh anchor ids.
     pub pieces: Vec<(NodeId, PieceOutlines)>,
     /// Whether an outline was a hole (odd depth), which is now a filled shape.
     pub with_holes: bool,
     /// The selected objects that were no compound path and stay as they are.
     pub kept: Vec<NodeId>,
+    /// How many outlines with a single node were left out (`0054` criterion 18).
+    pub single_nodes_removed: usize,
 }
 
 /// Plans Break apart over the selected objects.
@@ -61,6 +65,7 @@ pub fn plan_break_apart(
     let mut pieces = Vec::new();
     let mut kept = Vec::new();
     let mut with_holes = false;
+    let mut single_nodes_removed = 0;
     for object in &operands {
         let ObjectSnapshot::Path(path) = object else {
             kept.push(object.id());
@@ -73,11 +78,17 @@ pub fn plan_break_apart(
         let outlines: Vec<SubpathRef<'_>> = path.subpaths().collect();
         // The hole flag needs the nesting, which cannot measure a coordinate out of range; such a
         // compound path is still broken apart (no arithmetic), only the flag is not set for it.
+        // Open outlines have no depth; only the closed ones are measured.
+        let closed: Vec<SubpathRef<'_>> = outlines.iter().copied().filter(|o| o.closed).collect();
         if in_range(object) {
-            with_holes |= nesting_of(&outlines).iter().any(|nest| nest.depth % 2 == 1);
+            with_holes |= nesting_of(&closed).iter().any(|nest| nest.depth % 2 == 1);
         }
         removed.push(object.id());
         for outline in &outlines {
+            if outline.anchors.len() < 2 {
+                single_nodes_removed += 1;
+                continue;
+            }
             let piece = vec![fresh_outline(outline.anchors, outline.closed, minter)];
             pieces.push((object.id(), piece));
         }
@@ -87,5 +98,6 @@ pub fn plan_break_apart(
         pieces,
         with_holes,
         kept,
+        single_nodes_removed,
     })
 }

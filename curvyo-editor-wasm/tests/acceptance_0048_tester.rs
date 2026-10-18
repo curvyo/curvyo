@@ -80,6 +80,7 @@ fn break_applied(o: &BreakApartOutcome) -> (usize, usize, bool) {
             compounds,
             pieces,
             with_holes,
+            ..
         } => (*compounds, *pieces, *with_holes),
         other => panic!("break apart not applied: {other:?}"),
     }
@@ -392,14 +393,20 @@ fn c4_overlapping_squares_in_one_compound_path_are_one_part_and_refused() {
     let n = label_count(&s);
     assert_eq!(
         split_refusal(s.apply_split()),
-        SplitRefusal::OnePiece { compounds: 1 }
+        SplitRefusal::OnePiece {
+            compounds: 1,
+            with_holes: false
+        }
     );
     assert_nothing_changed(&s, &before, n, 1);
     assert_eq!(object_ids(&s), vec![c], "same object, same id");
     // A second press gives the same result.
     assert_eq!(
         split_refusal(s.apply_split()),
-        SplitRefusal::OnePiece { compounds: 1 }
+        SplitRefusal::OnePiece {
+            compounds: 1,
+            with_holes: false
+        }
     );
     assert_nothing_changed(&s, &before, n, 1);
 }
@@ -418,7 +425,10 @@ fn c4_the_golden_file_of_overlapping_squares_loads_and_is_one_part() {
     assert!(s.path_availability().compound);
     assert_eq!(
         split_refusal(s.apply_split()),
-        SplitRefusal::OnePiece { compounds: 1 }
+        SplitRefusal::OnePiece {
+            compounds: 1,
+            with_holes: false
+        }
     );
 }
 
@@ -444,7 +454,10 @@ fn c4_the_touch_threshold_is_about_a_micrometre() {
         match parts {
             1 => assert_eq!(
                 split_refusal(out),
-                SplitRefusal::OnePiece { compounds: 1 },
+                SplitRefusal::OnePiece {
+                    compounds: 1,
+                    with_holes: false
+                },
                 "gap {gap}"
             ),
             _ => assert_eq!(split_applied(&out), (1, 2, false, 0), "gap {gap}"),
@@ -723,7 +736,10 @@ fn c7_a_one_piece_compound_path_is_refused_with_its_count_and_nothing_changes() 
         let labels_before = label_count(&s);
         assert_eq!(
             split_refusal(s.apply_split()),
-            SplitRefusal::OnePiece { compounds: n }
+            SplitRefusal::OnePiece {
+                compounds: n,
+                with_holes: true
+            }
         );
         assert_nothing_changed(&s, &before, labels_before, n);
     }
@@ -1124,7 +1140,10 @@ fn c14_e1_ring() {
     let before = json(&s);
     assert_eq!(
         split_refusal(s.apply_split()),
-        SplitRefusal::OnePiece { compounds: 1 }
+        SplitRefusal::OnePiece {
+            compounds: 1,
+            with_holes: true
+        }
     );
     assert_eq!(json(&s), before);
     match s.apply_cut() {
@@ -1414,8 +1433,15 @@ fn hostile_degenerate_outlines_do_not_panic_and_nothing_is_lost() {
         select_all(&mut s2);
         let out = s2.apply_break_apart();
         let (_, n, _) = break_applied(&out);
-        assert_eq!(n, 3, "{name}: one piece per outline");
-        assert_eq!(total_nodes(&s2), want, "{name}: no node lost");
+        // `0054` criterion 18: an outline of a single node is dropped (and counted); every other
+        // outline becomes one piece with all its nodes.
+        let dropped = usize::from(bad.len() < 2);
+        assert_eq!(n, 3 - dropped, "{name}: one piece per outline");
+        assert_eq!(
+            total_nodes(&s2),
+            want - dropped,
+            "{name}: no node lost but a single one"
+        );
     }
 }
 
@@ -1560,7 +1586,13 @@ fn c15_split_golden_counts_and_budgets() {
         assert!(ms < 2000, "split ({which}) took {ms} ms");
         match expect {
             None => {
-                assert_eq!(split_refusal(out), SplitRefusal::OnePiece { compounds: 1 });
+                assert_eq!(
+                    split_refusal(out),
+                    SplitRefusal::OnePiece {
+                        compounds: 1,
+                        with_holes: true
+                    }
+                );
                 assert!(ms < 500, "the part search of (a) alone took {ms} ms");
             }
             Some(n) => assert_eq!(split_applied(&out).1, n, "({which})"),
