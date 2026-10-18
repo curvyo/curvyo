@@ -103,13 +103,14 @@ pub fn object_outline_bounds(object: &ObjectSnapshot) -> (Point, Point) {
 /// (curve extremes, rotated outlines, no stroke width). `None` for a document
 /// without visible objects. The reference of Fit to content
 /// (`specs/0015-document-size-and-rulers/` criterion 23); a hidden object is
-/// not part of it (`specs/0050-layers-and-objects-panel` criterion 19).
+/// not part of it (`specs/0050-layers-and-objects-panel` criterion 19), nor is a guide
+/// (`specs/0046-document-shapes` criterion 13): Fit to content measures artwork only.
 #[must_use]
 pub fn content_bounds(document: &Document) -> Option<(Point, Point)> {
     document
         .read_nodes()
         .iter()
-        .filter(|read| read.visible)
+        .filter(|read| read.visible && !read.guide)
         .filter_map(|read| read.object())
         .map(object_outline_bounds)
         .reduce(|(min, max), (other_min, other_max)| {
@@ -124,6 +125,30 @@ pub fn content_bounds(document: &Document) -> Option<(Point, Point)> {
 mod tests {
     use super::*;
     use curvyo_document_core::{AnchorId, Document, Length, NewAnchor, RectBounds};
+
+    #[test]
+    fn guides_do_not_count_for_the_content_box() {
+        let document = Document::new(1);
+        let art = document.create_rect(RectBounds::from_corners(
+            Point::new(10.0, 10.0),
+            Point::new(20.0, 20.0),
+        ));
+        let guide = document.create_rect(RectBounds::from_corners(
+            Point::new(-50.0, -50.0),
+            Point::new(200.0, 200.0),
+        ));
+        document.set_guide(&[guide], true).unwrap();
+        assert_eq!(
+            content_bounds(&document),
+            Some((Point::new(10.0, 10.0), Point::new(20.0, 20.0)))
+        );
+        document.delete_objects(&[art]).unwrap();
+        assert_eq!(
+            content_bounds(&document),
+            None,
+            "guides only: as no objects"
+        );
+    }
 
     #[test]
     fn a_straight_path_bounds_to_its_own_extent() {

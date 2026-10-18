@@ -395,3 +395,26 @@ fn a_panel_toggle_ends_the_centred_default_view() {
         corner
     );
 }
+
+/// `specs/0046-document-shapes` criterion 13: an overhanging template is shown whole.
+#[test]
+fn show_area_zooms_out_to_a_box_off_the_canvas_and_leaves_a_visible_one() {
+    let mut viewport = Viewport::new();
+    viewport.resize(1000.0, 800.0);
+    let before = viewport.view();
+    viewport.show_area(Point::new(10.0, 10.0), Point::new(50.0, 50.0));
+    assert_eq!(viewport.view(), before, "already on the canvas");
+    viewport.show_area(Point::new(-400.0, -100.0), Point::new(600.0, 900.0));
+    assert!(viewport.zoom_percent() < 100);
+    let view = viewport.view();
+    for corner in [Point::new(-400.0, -100.0), Point::new(600.0, 900.0)] {
+        let (x, y) = view.document_to_screen(corner);
+        assert!(
+            (0.0..=1000.0).contains(&x) && (0.0..=800.0).contains(&y),
+            "{x} {y}"
+        );
+    }
+    let mut unknown = Viewport::new();
+    unknown.show_area(Point::new(-400.0, 0.0), Point::new(600.0, 900.0));
+    assert_eq!(unknown, Viewport::new(), "no canvas size yet");
+}

@@ -242,6 +242,49 @@ impl Viewport {
         self.origin = Point::new(-left / scale, -top / scale);
     }
 
+    /// Shows the box `min`..`max` (document millimetres) whole, for the first view after a
+    /// template load (`specs/0046-document-shapes` criterion 13): when part of it is off the
+    /// canvas, the view zooms out as far as needed (never in) and centres it in the space right of
+    /// the tool rail. A box already on the canvas leaves the view as it is; so does an unknown
+    /// canvas size or a box that is not finite.
+    pub fn show_area(&mut self, min: Point, max: Point) {
+        let (canvas_width, canvas_height) = self.canvas_size;
+        let finite = [min.x, min.y, max.x, max.y].iter().all(|v| v.is_finite());
+        let room_width = canvas_width - DOCUMENT_INSET_PX - DOCUMENT_TOP_MARGIN_PX;
+        let room_height = canvas_height - 2.0 * DOCUMENT_TOP_MARGIN_PX;
+        if !finite || room_width <= 0.0 || room_height <= 0.0 {
+            return;
+        }
+        let view = self.view();
+        let (left, top) = view.document_to_screen(min);
+        let (right, bottom) = view.document_to_screen(max);
+        if left >= 0.0 && top >= 0.0 && right <= canvas_width && bottom <= canvas_height {
+            return;
+        }
+        let (width_mm, height_mm) = ((max.x - min.x).max(0.0), (max.y - min.y).max(0.0));
+        let fit = |room: f64, mm: f64| {
+            if mm > 0.0 {
+                room / (mm * PX_PER_MM_AT_100)
+            } else {
+                f64::INFINITY
+            }
+        };
+        let factor = self
+            .zoom
+            .factor()
+            .min(fit(room_width, width_mm))
+            .min(fit(room_height, height_mm));
+        self.inset_view = false;
+        self.zoom = Zoom::new(factor);
+        let scale = self.zoom.scale();
+        let centre_x = DOCUMENT_INSET_PX + room_width / 2.0;
+        let centre_y = canvas_height / 2.0;
+        self.origin = Point::new(
+            f64::midpoint(min.x, max.x) - centre_x / scale,
+            f64::midpoint(min.y, max.y) - centre_y / scale,
+        );
+    }
+
     /// Starts a drag-pan gesture (acceptance criteria 3, 4): records the
     /// document point currently under `(screen_x, screen_y)` as the
     /// anchor [`Viewport::continue_drag_pan`] keeps fixed under the

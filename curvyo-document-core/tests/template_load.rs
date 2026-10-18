@@ -66,7 +66,9 @@ fn key_ring() -> Document {
 /// Two concentric circles, a donut.
 fn two_circles() -> Document {
     let d = Document::new(1);
-    circle(&d, 50.0, 50.0, 40.0);
+    // Never two adjacent steps with one label: an older file shows those as one row.
+    let outer = circle(&d, 50.0, 50.0, 40.0);
+    d.rename_node(outer, "Outer").unwrap();
     circle(&d, 50.0, 50.0, 10.0);
     d
 }
@@ -75,10 +77,17 @@ fn two_circles() -> Document {
 fn four_lines() -> Document {
     let d = Document::new(1);
     let p = |x, y| Point::new(x, y);
-    line(&d, 1, p(0.0, 0.0), p(80.0, 0.0));
-    line(&d, 2, p(80.0, 0.0), p(80.0, 50.0));
-    line(&d, 3, p(80.0, 50.0), p(0.0, 50.0));
-    line(&d, 4, p(0.0, 50.0), p(0.0, 0.0));
+    let ends = [
+        (p(0.0, 0.0), p(80.0, 0.0)),
+        (p(80.0, 0.0), p(80.0, 50.0)),
+        (p(80.0, 50.0), p(0.0, 50.0)),
+        (p(0.0, 50.0), p(0.0, 0.0)),
+    ];
+    // Never two adjacent steps with one label: each line is named after it is drawn.
+    for ((a, b), n) in ends.into_iter().zip(1_u64..) {
+        let id = line(&d, n, a, b);
+        d.rename_node(id, &format!("Side {n}")).unwrap();
+    }
     d
 }
 
@@ -86,10 +95,10 @@ fn four_lines() -> Document {
 fn mixed() -> Document {
     let d = Document::new(1);
     let guide = d.create_path(&square(1, 10.0, 10.0, 30.0), true);
+    d.rename_node(guide, "Label").unwrap();
     let _ordinary = d.create_path(&square(2, 60.0, 10.0, 30.0), true);
     let disc = circle(&d, 25.0, 80.0, 15.0);
     d.set_guide(&[guide, disc], true).unwrap();
-    d.rename_node(guide, "Label").unwrap();
     d
 }
 

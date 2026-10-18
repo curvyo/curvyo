@@ -131,6 +131,16 @@ impl WasmSession {
         }
     }
 
+    /// The File tab's Template button (`specs/0046-document-shapes` criteria 19 and 22): adds the
+    /// outlines of the Curvyo document `bytes` as selected guides in one step. `"loaded:<n>"`
+    /// with how many came in, or `"error:<message>"` when nothing changed.
+    pub fn load_template(&mut self, bytes: &[u8]) -> String {
+        match self.session.load_template(bytes) {
+            Ok(count) => format!("loaded:{count}"),
+            Err(error) => format!("error:{}", error.message()),
+        }
+    }
+
     /// The status bar's cursor readout for a document point in millimetres,
     /// for example `"x: 12.3  y: 45.6 mm"`.
     #[must_use]

@@ -159,6 +159,28 @@ impl WasmSession {
         flip_code(self.session.flip_selection(FlipAxis::Vertical))
     }
 
+    /// The Guide button (`specs/0046-document-shapes` criteria 9 and 10): `"disabled"` when
+    /// nothing selected can be a guide, `"pressed"` when everything that can is one, else
+    /// `"off"`.
+    #[must_use]
+    pub fn guide_state(&self) -> String {
+        let marking = self.session.guide_marking();
+        if !marking.enabled() {
+            "disabled"
+        } else if marking.all_guides() {
+            "pressed"
+        } else {
+            "off"
+        }
+        .to_string()
+    }
+
+    /// A press of the Guide button: marks the selection as guides or turns them back, one step
+    /// "Guide". Whether anything was written.
+    pub fn toggle_guide(&mut self) -> bool {
+        self.session.toggle_guide()
+    }
+
     /// Removes the "max" notice of a limited typed radius, 1.5 s after it
     /// appeared.
     pub fn clear_limit_notice(&mut self) {

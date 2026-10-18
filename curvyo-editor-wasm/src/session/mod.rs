@@ -47,6 +47,7 @@ mod group_view;
 mod grouping;
 #[cfg(test)]
 mod grouping_tests;
+mod guides;
 mod history;
 mod history_list;
 mod history_preview;
