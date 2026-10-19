@@ -24,6 +24,7 @@ pub use text::{
     CANCELLED_SENTENCE, PlacementNoun, field_label, field_name, field_suffix, message,
     placed_sentence,
 };
+pub(crate) use text::{number as sentence_number, unit_words};
 
 /// A size at or below this is "Must be more than 0" (criterion 23).
 const SIZE_TOLERANCE: Tolerance = Tolerance::from_mm(GEOMETRIC_TOLERANCE_MM);

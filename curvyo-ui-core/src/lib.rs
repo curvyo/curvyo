@@ -73,6 +73,9 @@ mod panel_tabs;
 mod param_edit;
 mod param_entry;
 mod param_handles;
+mod pen_constraint;
+mod pen_entry;
+mod pen_entry_text;
 mod pen_target;
 mod pen_tool;
 mod poly_star_tool;
@@ -234,6 +237,12 @@ pub use param_handles::{
     Corner, HandleTiers, KNOB_DIAMETER_PX, KNOB_INSET_PX, KNOB_PITCH_PX, PARAM_HIT_PX,
     PARAM_MIN_SIDE_PX, ParamHandle, centre_drawn, corner_local_position, handle_tiers, knob_rho,
     param_handles, radius_gain, radius_travel,
+};
+pub use pen_constraint::constrain_segment;
+pub use pen_entry::{LengthNotPositive, PenEntry, PenEntryField, PenEntryNotice, PenEntryPlaced};
+pub use pen_entry_text::{
+    PEN_ENTRY_GROUP_NAME, PEN_ENTRY_LENGTH_NOT_POSITIVE, PEN_ENTRY_OPENED_SENTENCE,
+    pen_entry_added_sentence, pen_entry_label, pen_entry_name, pen_entry_notice, pen_entry_suffix,
 };
 pub use pen_target::{EndNode, EndNodeIndex, PenTarget, continuation_of, pen_target};
 pub use pen_tool::{
