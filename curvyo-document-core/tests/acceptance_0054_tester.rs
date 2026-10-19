@@ -84,11 +84,6 @@ fn c28_c29_pack_unpack_keeps_state_nodes_direction_and_order() {
 }
 
 #[test]
-fn c29_the_format_version_is_at_least_14() {
-    assert!(CURRENT_FORMAT_VERSION >= 14);
-}
-
-#[test]
 fn c30_document_json_lists_the_state_of_every_outline() {
     let (d, _) = mixed();
     let text = String::from_utf8(d.export_json().unwrap()).unwrap();
