@@ -83,3 +83,8 @@ wildcards = "deny"
 [sources]
 unknown-registry = "deny"
 unknown-git = "deny"
+
+# Spike for ADR 0020 (branch spike/text-engine only, never merged).
+[[licenses.exceptions]]
+allow = ["AGPL-3.0-or-later"]
+name = "spike-text"
