@@ -22,6 +22,7 @@ import { freeCanvasArea, type GuideState, readGuideState } from "@/lib/guideText
 import type { EditHint } from "@/components/EditHintChip";
 import type { BooleanOp, BooleanResult } from "@/lib/booleanText";
 import type { BreakApartResult, CombineResult, CutResult, SplitResult } from "@/lib/pathText";
+import type { StackCommand, StackResult } from "@/lib/stackText";
 import type { ClosePathResult } from "@/lib/penText";
 
 /** The canvas's backing-buffer size for a CSS size at the window's current
@@ -812,6 +813,8 @@ export interface EditorSession {
   applyBreakApart: () => BreakApartResult;
   /** Cut on the selection, in one commit (`0036-cut-at-crossings`). */
   applyCut: () => CutResult;
+  /** Fracture or Flatten on the selection, in one commit (`0037-fracture-and-flatten`). */
+  applyStack: (command: StackCommand) => StackResult;
   /** The Node bar's Close path buttons (`0034-pen-path-extension`): closes the open paths of
    * the editing set with `join` (`"sharp"` or `"smooth"`) in one commit. */
   closePath: (join: "sharp" | "smooth") => ClosePathResult;
@@ -1653,6 +1656,41 @@ export function useEditorSession(
     return result;
   }, [syncFromSession]);
 
+  const applyStack = useCallback(
+    (command: StackCommand): StackResult => {
+      const session = sessionRef.current;
+      const raw = command === "fracture" ? session?.apply_fracture() : session?.apply_flatten();
+      syncFromSession();
+      if (!raw) {
+        return {
+          kind: "ignored",
+          count: 0,
+          of: 0,
+          removed: 0,
+          pieces: 0,
+          hidden: 0,
+          strokesFollow: false,
+          closedOpen: 0,
+          removedOpen: 0,
+        };
+      }
+      const result = {
+        kind: raw.kind,
+        count: raw.count,
+        of: raw.of,
+        removed: raw.removed,
+        pieces: raw.pieces,
+        hidden: raw.hidden,
+        strokesFollow: raw.strokes_follow,
+        closedOpen: raw.closed_open,
+        removedOpen: raw.removed_open,
+      };
+      raw.free();
+      return result;
+    },
+    [syncFromSession],
+  );
+
   /** The event's canvas-relative CSS pixel position — pure DOM geometry,
    * no wasm call and no document-space conversion (that happens inside
    * `Session` now, `specs/0004-canvas-navigation-and-selection/adrs.md`).
@@ -2427,6 +2465,7 @@ export function useEditorSession(
     applySplit,
     applyBreakApart,
     applyCut,
+    applyStack,
     closePath,
     onPointerDown,
     onPointerMove,

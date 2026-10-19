@@ -150,8 +150,8 @@ function OffsetGlyph() {
  * repositioned to make room for it. Column A ends with the Path tools card (the Offset tool).
  *
  * The root keeps 4px clear under the columns; it passes no pointer event through to itself, so
- * the canvas around the cards stays usable. Each column is at most 368px high, which fits the
- * 546px viewport of the smallest window.
+ * the canvas around the cards stays usable. Column B, the taller one, is 500px high with the
+ * seven-button Boolean card, which fits the 546px viewport of the smallest window.
  */
 export function ToolRail({
   tool,

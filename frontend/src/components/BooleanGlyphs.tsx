@@ -1,8 +1,8 @@
-import type { BooleanOp } from "@/lib/booleanText";
+import type { BooleanCardCommand } from "@/lib/stackText";
 
 /**
- * The glyphs of the five boolean operations (`docs/design-system.md`, row
- * "Boolean glyphs"): two 9 x 9 squares on a 16 x 16 viewBox, the first-drawn
+ * The glyphs of the Boolean card (`docs/design-system.md`, row
+ * "Boolean glyphs"; Fracture and Flatten, `specs/0037-fracture-and-flatten/`): two 9 x 9 squares on a 16 x 16 viewBox, the first-drawn
  * (the lower object) at (1.75, 1.75), the second at (5.25, 5.25), so the
  * overlap is 5.5 x 5.5. Solid is the result, outline only is what
  * disappears. Drawn at 20px; the stroke is 1.5px on screen at any scale.
@@ -42,7 +42,22 @@ function Outline({ square }: { square: typeof LOWER }) {
   return <rect {...square} fill="none" {...STROKE} />;
 }
 
-function glyphShapes(op: BooleanOp) {
+/** How far the outer pieces of Fracture and the trimmed square of Flatten move away from the
+ * rest, along both axes. Their pieces are filled without a stroke, so the geometric gap is the
+ * visible gap: 1.6 units, 2px at 20px, the smallest visible feature of "Command glyphs"; the
+ * pieces stay inside the viewBox. */
+const GAP = 1.6;
+
+/** A piece filled without a stroke, moved by `shift` along both axes. */
+function Piece({ d, shift = 0 }: { d: string; shift?: number }) {
+  return <path d={d} fill="currentColor" transform={`translate(${shift} ${shift})`} />;
+}
+
+/** The upper square as a path, for a piece without a stroke. */
+const UPPER_SQUARE =
+  "M6.25 5.25H13.25A1 1 0 0 1 14.25 6.25V13.25A1 1 0 0 1 13.25 14.25H6.25A1 1 0 0 1 5.25 13.25V6.25A1 1 0 0 1 6.25 5.25Z";
+
+function glyphShapes(op: BooleanCardCommand) {
   switch (op) {
     case "union":
       return (
@@ -80,11 +95,28 @@ function glyphShapes(op: BooleanOp) {
           <Solid d={UPPER_MINUS_OVERLAP} />
         </>
       );
+    case "fracture":
+      // Three solid pieces with gaps between them.
+      return (
+        <>
+          <Piece d={LOWER_MINUS_OVERLAP} shift={-GAP} />
+          <Piece d={OVERLAP} />
+          <Piece d={UPPER_MINUS_OVERLAP} shift={GAP} />
+        </>
+      );
+    case "flatten":
+      // The upper square whole, the lower one trimmed to its visible L, a gap along the trim.
+      return (
+        <>
+          <Piece d={LOWER_MINUS_OVERLAP} shift={-GAP} />
+          <Piece d={UPPER_SQUARE} />
+        </>
+      );
   }
 }
 
 /** The glyph of `op`, 20px, in the colour of the text around it. */
-export function BooleanGlyph({ op }: { op: BooleanOp }) {
+export function BooleanGlyph({ op }: { op: BooleanCardCommand }) {
   return (
     <svg width={20} height={20} viewBox="0 0 16 16" aria-hidden="true" focusable="false">
       {glyphShapes(op)}
