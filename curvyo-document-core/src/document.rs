@@ -168,8 +168,18 @@ pub struct DocumentVersion(pub(crate) loro::Frontiers);
 /// style on a clone with own style, are refused as damaged (`crate::clone_codec`); flags on other
 /// nodes, and style keys or `opacity` on a clone without own style, are residue.
 /// Golden: `clone_overrides_v14.curvyo`.
-
-pub const CURRENT_FORMAT_VERSION: u32 = 14;
+///
+/// Bumped to 15 in `ellipse-arcs-and-shaping` (`specs/0021-ellipse-arcs-and-shaping/adrs.md`
+/// decisions 1 to 3): an ellipse may carry the list register `ellipse_arc` = `[start°, end°,
+/// kind]`, and an ellipse, polygon or star the register `curve` (a fraction from -1 to 1). A
+/// build that stops at version 14 would cut an arc as a whole ellipse and a curved polygon with
+/// straight sides, so it must refuse every file of this build as too new. Migration from version
+/// 14 is none: absent registers read as the whole ellipse and the shape's default curve, and a
+/// file from an earlier build opens unchanged and is not rewritten. A non-finite or out-of-range
+/// curve, an arc that is not two finite angles and a known kind, and an arc together with a curve
+/// other than 100 % are refused as damaged (`crate::shape_arc_codec`). Golden: `arc_pie_v15`,
+/// `arc_arc_v15`, `arc_chord_v15`, `curve_ellipse_v15` and `curve_polygon_star_v15.curvyo`.
+pub const CURRENT_FORMAT_VERSION: u32 = 15;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";

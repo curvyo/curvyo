@@ -273,9 +273,9 @@ fn c10_save_and_open_after_an_apply_keep_state_history_and_format_13() {
     let mut text = String::new();
     std::io::Read::read_to_string(&mut z.by_name("manifest.json").unwrap(), &mut text).unwrap();
     let m: Value = serde_json::from_str(&text).unwrap();
-    // 0042 adds no bump; 14 is the version `0057-clone-overrides` introduced.
-    assert_eq!(m["format_version"].as_u64().unwrap(), 14);
-    assert_eq!(CURRENT_FORMAT_VERSION, 14);
+    // 0042 adds no bump; 15 is the version `0021-ellipse-arcs-and-shaping` introduced.
+    assert_eq!(m["format_version"].as_u64().unwrap(), 15);
+    assert_eq!(CURRENT_FORMAT_VERSION, 15);
 }
 
 // ---------------------------------------------------------------------
