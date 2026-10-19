@@ -5,8 +5,9 @@
 //! (0.01 mm) of each other, wherever the segments start and end. Curves that only come near each
 //! other (tangent circles, inside or outside) touch along a stretch; two curves that cross at a
 //! shallow angle come within reach of each other before and after the crossing, also in the
-//! neighbouring segments. Such a contact is cut once: at its crossings, where crossings of a lens
-//! thinner than 0.01 mm count as one, or in the middle of its touches when it has no crossing.
+//! neighbouring segments. Such a contact is cut once: at its crossings, where a lens thinner than
+//! 0.01 mm is cut at its clear crossings, or once in its middle when all its crossings are
+//! shallow, or in the middle of its touches when it has no crossing.
 //! Only `+ - * /` and `sqrt` are used, and every sort has a total order, so the result does not
 //! depend on the platform.
 
@@ -14,6 +15,10 @@ use curvyo_document_core::Point;
 
 use crate::curve_chords::{CUT_MERGE_MM, dist};
 use crate::curve_intersections::Seg;
+
+/// Two curves cross at a clear angle when the sine of the angle between them is at least this
+/// (about 5.7 degrees): such a crossing is a cut even inside a lens.
+const CLEAR_SINE: f64 = 0.1;
 
 /// A place on a contour: the segment and the parameter on it.
 pub(crate) type Place = (usize, f64);
@@ -186,8 +191,8 @@ fn middle(a: Contour<'_>, b: Contour<'_>, first: Unrolled, last: Unrolled) -> (P
     )
 }
 
-/// The cuts one contact makes: its crossings, a lens of crossings counting as one (cut in its
-/// middle), or the middle of its touches when it has no crossing.
+/// The cuts one contact makes: its crossings, where the crossings of a lens count as one lens,
+/// or the middle of its touches when it has no crossing.
 fn cuts_of(
     (a, b, same): (Contour<'_>, Contour<'_>, bool),
     contact: &[Unrolled],
@@ -198,19 +203,41 @@ fn cuts_of(
         out.push(middle(a, b, contact[0], contact[contact.len() - 1]));
         return;
     }
-    let mut first = crossings[0];
-    let mut last = first;
+    let mut lens = vec![crossings[0]];
     for &next in &crossings[1..] {
         // A contour that crosses itself twice close by has two crossings, not a lens.
-        if !same && stays_within((a, b, same), last, next, CUT_MERGE_MM) {
-            last = next;
+        if !same && stays_within((a, b, same), lens[lens.len() - 1], next, CUT_MERGE_MM) {
+            lens.push(next);
         } else {
-            out.push(middle(a, b, first, last));
-            first = next;
-            last = next;
+            lens_cuts(a, b, &lens, out);
+            lens = vec![next];
         }
     }
-    out.push(middle(a, b, first, last));
+    lens_cuts(a, b, &lens, out);
+}
+
+/// The cuts of a lens (crossings between which the curves stay within 0.01 mm of each other):
+/// each clear crossing, as the curves really part there; a lens of shallow crossings only (two
+/// curves that nearly touch) is cut once, in its middle.
+fn lens_cuts(a: Contour<'_>, b: Contour<'_>, lens: &[Unrolled], out: &mut Vec<(Place, Place)>) {
+    let before = out.len();
+    for &m in lens {
+        let (at_a, at_b) = (place_of(m.a, a.0.len(), a.1), place_of(m.b, b.0.len(), b.1));
+        if clear(&a.0[at_a.0], &b.0[at_b.0], at_a.1, at_b.1) {
+            out.push((at_a, at_b));
+        }
+    }
+    if out.len() == before {
+        out.push(middle(a, b, lens[0], lens[lens.len() - 1]));
+    }
+}
+
+/// Whether two segments cross at a clear angle at the parameters `ta` and `tb`: the sine of the
+/// angle between their directions is at least [`CLEAR_SINE`].
+fn clear(a: &Seg, b: &Seg, ta: f64, tb: f64) -> bool {
+    let (da, db) = (a.velocity_at(ta), b.velocity_at(tb));
+    let scale = (da.0 * da.0 + da.1 * da.1).sqrt() * (db.0 * db.0 + db.1 * db.1).sqrt();
+    scale > 0.0 && (da.0 * db.1 - da.1 * db.0).abs() >= CLEAR_SINE * scale
 }
 
 /// The cuts that the meetings `list` of the contours `a` and `b` make, one or more per contact.

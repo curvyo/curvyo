@@ -469,6 +469,27 @@ fn issue_113_clear_crossing_is_found() {
     assert!(missed.is_empty(), "{missed:?}");
 }
 
+/// The minimal input on which `recall::clear_crossings_are_found` failed after issue #113:
+/// curve 0 was not cut at its crossing near (-8.469, -4.582).
+#[test]
+fn second_recall_regression_clear_crossing_is_found() {
+    let missed = missed_crossings(
+        [
+            (-2.9000000000000004, 2.3000000000000003),
+            (11.3, 15.200000000000001),
+            (-19.3, -19.8),
+            (-9.8, 1.2000000000000002),
+        ],
+        [
+            (10.9, 18.6),
+            (-16.400000000000002, -12.700000000000001),
+            (-11.600000000000001, -9.8),
+            (5.300000000000001, 12.4),
+        ],
+    );
+    assert!(missed.is_empty(), "{missed:?}");
+}
+
 mod recall {
     use super::*;
     use proptest::prelude::*;
