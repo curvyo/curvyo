@@ -9,6 +9,7 @@
 //! (ADR 0002 §9).
 
 mod anchor_edits;
+mod outlines;
 
 use loro::{LoroMap, LoroMovableList, TreeID, TreeParentId};
 
@@ -22,6 +23,7 @@ use crate::path_model::{
     AnchorId, AnchorKind, HandleSlot, NewAnchor, NodeId, PathEditError, PathSnapshot,
 };
 use crate::style_model::Style;
+use crate::subpath_codec::{AnchorPositions, anchor_positions};
 use crate::units::{Length, Point, Vec2};
 
 /// Default handle length a corner→symmetric/asymmetric conversion pulls
@@ -194,12 +196,21 @@ impl Document {
                 }
             })?;
         }
+        // One position map per path, so a drag of thousands of nodes stays linear and finds each
+        // node in whichever outline holds it (`specs/0055-compound-path-node-editing` criterion 3).
+        let mut positions: std::collections::HashMap<NodeId, AnchorPositions> =
+            std::collections::HashMap::new();
         let resolved: Vec<(LoroMovableList, usize, Point)> = moves
             .iter()
             .map(|&(path, anchor_id, point)| {
-                let (_, anchors) = self.path_parts(path)?;
-                let index = anchor_index(&anchors, anchor_id)?;
-                Ok((anchors, index, point))
+                let of_path = match positions.entry(path) {
+                    std::collections::hash_map::Entry::Occupied(held) => held.into_mut(),
+                    std::collections::hash_map::Entry::Vacant(slot) => {
+                        slot.insert(anchor_positions(&self.path_parts(path)?.0))
+                    }
+                };
+                let (list, index) = of_path.get(anchor_id).ok_or(PathEditError::NoSuchAnchor)?;
+                Ok((list, index, point))
             })
             .collect::<Result<_, PathEditError>>()?;
         for (anchors, index, point) in &resolved {
@@ -306,7 +317,7 @@ impl Document {
         slot: HandleSlot,
         value: Vec2,
     ) -> Result<(), PathEditError> {
-        let (_, anchors) = self.path_parts(path)?;
+        let (_, anchors) = self.outline_parts(path, anchor)?;
         let index = anchor_index(&anchors, anchor)?;
         let map = anchor_map_at(&anchors, index);
         let kind = read_kind(&map);
@@ -380,8 +391,8 @@ impl Document {
         prev_out: Vec2,
         next_in: Vec2,
     ) -> Result<(), PathEditError> {
-        let (meta, anchors) = self.path_parts(path)?;
-        let closed = read_closed(&meta);
+        let (outline, anchors) = self.outline_parts(path, after)?;
+        let closed = read_closed(&outline);
         let after_index = anchor_index(&anchors, after)?;
         write_vec2(
             &anchor_map_at(&anchors, after_index),
@@ -420,8 +431,8 @@ impl Document {
         start: AnchorId,
         end: AnchorId,
     ) -> Result<(), PathEditError> {
-        let (meta, anchors) = self.path_parts(path)?;
-        let closed = read_closed(&meta);
+        let (outline, anchors) = self.segment_outline(path, start, end)?;
+        let closed = read_closed(&outline);
         let (start_index, end_index) = adjacent_segment_indices(&anchors, closed, start, end)?;
         write_vec2(
             &anchor_map_at(&anchors, start_index),
@@ -452,8 +463,8 @@ impl Document {
         start: AnchorId,
         end: AnchorId,
     ) -> Result<(), PathEditError> {
-        let (meta, anchors) = self.path_parts(path)?;
-        let closed = read_closed(&meta);
+        let (outline, anchors) = self.segment_outline(path, start, end)?;
+        let closed = read_closed(&outline);
         let (start_index, end_index) = adjacent_segment_indices(&anchors, closed, start, end)?;
         let start_map = anchor_map_at(&anchors, start_index);
         let end_map = anchor_map_at(&anchors, end_index);

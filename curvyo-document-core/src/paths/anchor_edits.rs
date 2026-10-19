@@ -3,15 +3,16 @@
 
 use std::collections::HashMap;
 
-use loro::LoroMovableList;
+use loro::{LoroMap, LoroMovableList};
 
 use crate::document::{Document, OBJECTS_TREE};
 use crate::path_codec::{
-    KEY_HANDLE_IN, KEY_HANDLE_OUT, KEY_POINT, anchor_index, anchor_map_at, neighbour_tangent,
-    read_closed, read_kind, read_point, read_vec2, write_kind, write_vec2,
+    KEY_HANDLE_IN, KEY_HANDLE_OUT, KEY_POINT, anchor_map_at, neighbour_tangent, read_closed,
+    read_kind, read_point, read_vec2, write_kind, write_vec2,
 };
 use crate::path_model::{AnchorId, AnchorKind, NodeId, PathEditError};
 use crate::smooth_handles::smooth_corner_handles;
+use crate::subpath_codec::{AnchorPositions, anchor_positions, remove_outlines};
 
 use super::{DEFAULT_HANDLE_LENGTH_MM, tree_id_of};
 
@@ -53,8 +54,8 @@ impl Document {
     /// If every named anchor already has `kind`, or `anchors` is empty, nothing is written and
     /// no commit happens.
     ///
-    /// Only the first outline of a path is searched until
-    /// `specs/0055-compound-path-node-editing/`.
+    /// Each anchor is found in whichever outline of its path holds it, and its neighbours are
+    /// those of that outline (`specs/0055-compound-path-node-editing/` criterion 3).
     ///
     /// # Errors
     /// [`PathEditError::NoSuchPath`] if any named path no longer exists;
@@ -64,20 +65,18 @@ impl Document {
         anchors: &[(NodeId, AnchorId)],
         kind: AnchorKind,
     ) -> Result<(), PathEditError> {
-        let mut resolved: Vec<(LoroMovableList, bool, Vec<usize>)> = Vec::new();
+        let mut resolved: Vec<(LoroMovableList, bool, usize)> = Vec::new();
         for (path, ids) in group_by_path(anchors) {
-            let (meta, list) = self.path_parts(path)?;
-            let indices = ids
-                .iter()
-                .map(|&id| anchor_index(&list, id))
-                .collect::<Result<Vec<_>, _>>()?;
-            resolved.push((list, read_closed(&meta), indices));
+            let (meta, _) = self.path_parts(path)?;
+            let positions = anchor_positions(&meta);
+            for id in ids {
+                let at = positions.at(id).ok_or(PathEditError::NoSuchAnchor)?;
+                resolved.push((at.list, read_closed(&at.map), at.index));
+            }
         }
         let mut changed = false;
-        for (list, closed, indices) in &resolved {
-            for &index in indices {
-                changed |= convert_one(list, *closed, index, kind);
-            }
+        for (list, closed, index) in &resolved {
+            changed |= convert_one(list, *closed, *index, kind);
         }
         if changed {
             self.commit_with_label("convert_anchor_kind");
@@ -100,26 +99,23 @@ impl Document {
     /// An empty `anchors`, or one whose pairs are all stale, writes nothing and commits
     /// nothing. So this command has no error case.
     ///
-    /// Only the first outline of a path is searched until
-    /// `specs/0055-compound-path-node-editing/`.
+    /// On a compound path the rule applies per outline (`specs/0055-compound-path-node-editing/`
+    /// criterion 4): an outline left with fewer than two anchors is removed (the next outline
+    /// takes the first one's place), a compound path left with one outline is an ordinary path
+    /// with the same id, style and place, and a path left with no outline is removed.
     ///
     /// # Panics
     /// Does not panic in practice: every index this deletes was just confirmed present in the
     /// same movable list, and every removed path was just confirmed to exist.
     pub fn delete_anchors(&self, anchors: &[(NodeId, AnchorId)]) {
-        let mut resolved: Vec<(NodeId, LoroMovableList, Vec<usize>)> = Vec::new();
+        let mut resolved: Vec<(NodeId, LoroMap, OutlineCuts)> = Vec::new();
         for (path, ids) in group_by_path(anchors) {
-            let Ok((_, list)) = self.path_parts(path) else {
+            let Ok((meta, _)) = self.path_parts(path) else {
                 continue;
             };
-            let mut indices: Vec<usize> = ids
-                .iter()
-                .filter_map(|&id| anchor_index(&list, id).ok())
-                .collect();
-            indices.sort_unstable();
-            indices.dedup();
-            if !indices.is_empty() {
-                resolved.push((path, list, indices));
+            let cuts = outline_cuts(&anchor_positions(&meta), &ids);
+            if !cuts.is_empty() {
+                resolved.push((path, meta, cuts));
             }
         }
         if resolved.is_empty() {
@@ -127,17 +123,25 @@ impl Document {
         }
         let tree = self.loro().get_tree(OBJECTS_TREE);
         let mut removed = Vec::new();
-        for (path, list, indices) in resolved {
-            if list.len().saturating_sub(indices.len()) < 2 {
+        for (path, meta, cuts) in resolved {
+            if cuts.removes_every_outline() {
                 removed.push(tree_id_of(path));
                 continue;
             }
-            // Delete from the highest index down so earlier indices stay valid.
-            for index in indices.into_iter().rev() {
-                // invariant: `index` was found in this same list just above.
-                #[allow(clippy::unwrap_used)]
-                list.delete(index, 1).unwrap();
+            let mut doomed = Vec::new();
+            for (outline, list, indices) in cuts.outlines {
+                if list.len().saturating_sub(indices.len()) < 2 {
+                    doomed.push(outline);
+                    continue;
+                }
+                // Delete from the highest index down so earlier indices stay valid.
+                for index in indices.into_iter().rev() {
+                    // invariant: `index` was found in this same list just above.
+                    #[allow(clippy::unwrap_used)]
+                    list.delete(index, 1).unwrap();
+                }
             }
+            remove_outlines(&meta, &doomed);
         }
         if !removed.is_empty() {
             // A clone of a removed path keeps its look (`specs/0049-linked-clone/`).
@@ -152,6 +156,51 @@ impl Document {
             crate::groups::remove_emptied_groups(&tree, &parents);
         }
         self.commit_with_label("delete_anchors");
+    }
+}
+
+/// What a Delete takes from one path: per outline that loses a node, its number, its list and the
+/// sorted indices of the nodes it loses; and how many outlines the path has.
+struct OutlineCuts {
+    outlines: Vec<(usize, LoroMovableList, Vec<usize>)>,
+    outline_count: usize,
+}
+
+impl OutlineCuts {
+    fn is_empty(&self) -> bool {
+        self.outlines.is_empty()
+    }
+
+    /// Whether every outline is left with fewer than two nodes: the object goes.
+    fn removes_every_outline(&self) -> bool {
+        self.outlines.len() == self.outline_count
+            && self
+                .outlines
+                .iter()
+                .all(|(_, list, indices)| list.len().saturating_sub(indices.len()) < 2)
+    }
+}
+
+/// The anchors of `ids` that still exist, grouped by the outline that holds them.
+fn outline_cuts(positions: &AnchorPositions, ids: &[AnchorId]) -> OutlineCuts {
+    let mut by_outline: HashMap<usize, Vec<usize>> = HashMap::new();
+    for &id in ids {
+        if let Some(at) = positions.at(id) {
+            by_outline.entry(at.outline).or_default().push(at.index);
+        }
+    }
+    let mut outlines: Vec<(usize, LoroMovableList, Vec<usize>)> = by_outline
+        .into_iter()
+        .map(|(outline, mut indices)| {
+            indices.sort_unstable();
+            indices.dedup();
+            (outline, positions.list(outline).clone(), indices)
+        })
+        .collect();
+    outlines.sort_unstable_by_key(|(outline, ..)| *outline);
+    OutlineCuts {
+        outlines,
+        outline_count: positions.outline_count(),
     }
 }
 

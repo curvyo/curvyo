@@ -1044,6 +1044,10 @@ fn ac36_delete_style_edits_and_duplicate_and_delete_work_as_on_any_object() {
     assert!(d.object_ids().len() == 1 || d.object_ids().is_empty());
 }
 
+/// Criterion 38a is withdrawn by `specs/0055-compound-path-node-editing` (criteria 5 and 6): Join
+/// and Split act on compound paths now. What stays true for this plate, whose outlines are all
+/// closed: no node is an end node of an open outline, so Join is refused and changes nothing.
+/// Split of a closed outline opens it (`0055` criterion 6), tested in `compound_node_editing.rs`.
 #[test]
 fn ac38a_join_and_split_refuse_a_compound_path_and_change_nothing() {
     let d = Document::new(1);
@@ -1059,9 +1063,6 @@ fn ac38a_join_and_split_refuse_a_compound_path_and_change_nothing() {
     let before_ids = d.object_ids();
     let before = changes(&d);
     let all: Vec<AnchorId> = p.all_anchors().map(|a| a.id).collect();
-    for &aid in &all {
-        assert!(!d.check_split(r, aid), "split offered for {aid:?}");
-    }
     // Join with every combination of its anchors and the open path's ends,
     // in both directions, and the compound path with itself.
     for &aid in &all {
@@ -1077,7 +1078,6 @@ fn ac38a_join_and_split_refuse_a_compound_path_and_change_nothing() {
             assert!(!d.check_join(r, aid, r, bid));
             assert!(d.join_endpoints(r, aid, r, bid).is_err());
         }
-        assert!(d.split_at_anchor(r, aid, AnchorId::new(88, 1)).is_err());
     }
     assert_eq!(d.object_ids(), before_ids);
     assert_eq!(changes(&d), before, "a refused join/split wrote a commit");

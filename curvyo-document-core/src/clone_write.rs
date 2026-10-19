@@ -16,7 +16,7 @@ use crate::document::{Document, OBJECTS_TREE};
 use crate::path_codec::{self, KEY_ANCHORS, KEY_CLOSED, KEY_ROTATION};
 use crate::path_model::{NewAnchor, NodeId, PathSnapshot};
 use crate::primitive_model::ObjectSnapshot;
-use crate::subpath_codec::{KEY_EXTRA_SUBPATHS, write_extra_subpaths};
+use crate::subpath_codec::{KEY_EXTRA_SUBPATHS, append_outlines};
 
 /// The largest coordinate a clone's drawn outline may reach after an edit (`0049` criterion 17).
 pub(crate) const OUTLINE_LIMIT_MM: f64 = 1e7;
@@ -58,7 +58,7 @@ pub(crate) fn unlink_meta(meta: &LoroMap, path: &PathSnapshot, opacity: f64) {
         .iter()
         .map(|outline| (outline.anchors.clone(), outline.closed))
         .collect();
-    write_extra_subpaths(meta, &extras);
+    append_outlines(meta, &extras);
 }
 
 /// Writes a node's `opacity` register; 1 is the absent key. Uncommitted.

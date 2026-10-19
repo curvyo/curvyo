@@ -61,10 +61,20 @@ fn labels(document: &Document) -> Vec<String> {
     changes.into_iter().map(|(_, label)| label).collect()
 }
 
-fn growth(path: NodeId, end: PathEnd, added: Vec<NewAnchor>) -> PathGrowth {
+/// The node of `path` at `end` (an ordinary path has one outline).
+fn end_of(document: &Document, path: NodeId, end: PathEnd) -> AnchorId {
+    let anchors = document.path(path).unwrap().anchors;
+    match end {
+        PathEnd::First => anchors[0].id,
+        PathEnd::Last => anchors[anchors.len() - 1].id,
+    }
+}
+
+fn growth(document: &Document, path: NodeId, end: PathEnd, added: Vec<NewAnchor>) -> PathGrowth {
     PathGrowth {
         path,
         end,
+        at: end_of(document, path, end),
         added,
         absorb: None,
         replace: Vec::new(),
@@ -83,6 +93,7 @@ fn extending_keeps_the_existing_order_at_either_end() {
     );
     document
         .extend_path(&growth(
+            &document,
             path,
             PathEnd::Last,
             vec![node(4, 30.0, 0.0), node(5, 40.0, 0.0)],
@@ -106,6 +117,7 @@ fn extending_keeps_the_existing_order_at_either_end() {
     // Drawn from (0, 0): first (0, 10) then (0, 20); stored order puts the node drawn last first.
     document
         .extend_path(&growth(
+            &document,
             other,
             PathEnd::First,
             vec![node(15, 0.0, 20.0), node(14, 0.0, 10.0)],
@@ -138,7 +150,12 @@ fn extending_is_one_labelled_commit_and_keeps_style_and_ids() {
     let style = document.path(path).unwrap().style;
     let before = labels(&document);
     document
-        .extend_path(&growth(path, PathEnd::Last, vec![node(3, 20.0, 5.0)]))
+        .extend_path(&growth(
+            &document,
+            path,
+            PathEnd::Last,
+            vec![node(3, 20.0, 5.0)],
+        ))
         .unwrap();
     let after = labels(&document);
     assert_eq!(after.len(), before.len() + 1);
@@ -176,8 +193,8 @@ fn connecting_orders_the_absorbed_nodes_so_the_ends_meet() {
         let document = Document::new(1);
         let p = path_of(&document, &[node(1, 0.0, 0.0), node(2, 10.0, 0.0)]);
         let q = path_of(&document, &[node(3, 30.0, 0.0), node(4, 40.0, 0.0)]);
-        let mut g = growth(p, PathEnd::Last, Vec::new());
-        g.absorb = Some((q, qend));
+        let mut g = growth(&document, p, PathEnd::Last, Vec::new());
+        g.absorb = Some((q, qend, end_of(&document, q, qend)));
         document.connect_paths(&g).unwrap();
         assert_eq!(order(&document, p), expected);
         assert!(document.path(q).is_none(), "Q is removed");
@@ -195,8 +212,8 @@ fn connecting_at_the_first_end_puts_the_absorbed_nodes_before_the_new_ones() {
     let p = path_of(&document, &[node(1, 100.0, 0.0), node(2, 110.0, 0.0)]);
     let q = path_of(&document, &[node(3, 60.0, 0.0), node(4, 70.0, 0.0)]);
     // Drawn from P's first node (100, 0) through (80, 0), then onto Q's last node (70, 0).
-    let mut g = growth(p, PathEnd::First, vec![node(5, 80.0, 0.0)]);
-    g.absorb = Some((q, PathEnd::Last));
+    let mut g = growth(&document, p, PathEnd::First, vec![node(5, 80.0, 0.0)]);
+    g.absorb = Some((q, PathEnd::Last, end_of(&document, q, PathEnd::Last)));
     document.connect_paths(&g).unwrap();
     assert_eq!(
         order(&document, p),
@@ -219,8 +236,8 @@ fn a_reversed_absorbed_path_swaps_each_nodes_handles() {
     q3.handle_in = Vec2::new(-1.0, 0.0);
     q3.handle_out = Vec2::new(2.0, 0.0);
     let q = path_of(&document, &[q3, node(4, 40.0, 0.0)]);
-    let mut g = growth(p, PathEnd::Last, Vec::new());
-    g.absorb = Some((q, PathEnd::Last));
+    let mut g = growth(&document, p, PathEnd::Last, Vec::new());
+    g.absorb = Some((q, PathEnd::Last, end_of(&document, q, PathEnd::Last)));
     document.connect_paths(&g).unwrap();
     let snapshot = document.path(p).unwrap();
     let third = snapshot.anchors.iter().find(|a| a.id == id(3)).unwrap();
@@ -239,8 +256,8 @@ fn coincident_ends_are_merged_through_replace_and_drop() {
         kind: AnchorKind::Corner,
         ..node(2, 10.0, 0.0)
     };
-    let mut g = growth(p, PathEnd::Last, Vec::new());
-    g.absorb = Some((q, PathEnd::First));
+    let mut g = growth(&document, p, PathEnd::Last, Vec::new());
+    g.absorb = Some((q, PathEnd::First, end_of(&document, q, PathEnd::First)));
     g.replace = vec![merged];
     g.drop = vec![id(3)];
     document.connect_paths(&g).unwrap();
@@ -263,8 +280,8 @@ fn the_surviving_path_keeps_its_style_on_connect() {
         .edit_style(&[q], &StyleEdit::StrokeColor(Color { r: 0, g: 0, b: 200 }))
         .unwrap();
     let red = document.path(p).unwrap().style;
-    let mut g = growth(p, PathEnd::Last, Vec::new());
-    g.absorb = Some((q, PathEnd::First));
+    let mut g = growth(&document, p, PathEnd::Last, Vec::new());
+    g.absorb = Some((q, PathEnd::First, end_of(&document, q, PathEnd::First)));
     document.connect_paths(&g).unwrap();
     assert_eq!(document.path(p).unwrap().style, red);
 }
@@ -286,10 +303,10 @@ fn closing_is_one_commit_for_every_path_with_the_join_applied() {
         kind: AnchorKind::Asymmetric,
         ..node(1, 0.0, 0.0)
     };
-    let mut first = growth(a, PathEnd::Last, Vec::new());
+    let mut first = growth(&document, a, PathEnd::Last, Vec::new());
     first.replace = vec![smooth];
     // b gets a third node and closes in the same commit.
-    let second = growth(b, PathEnd::Last, vec![node(13, 120.0, 20.0)]);
+    let second = growth(&document, b, PathEnd::Last, vec![node(13, 120.0, 20.0)]);
     document.close_paths(&[first, second]).unwrap();
     let after = labels(&document);
     assert_eq!(after.len(), before.len() + 1, "one commit for both");
@@ -315,8 +332,8 @@ fn a_refusal_writes_nothing() {
     let version = document.version();
     assert_eq!(
         document.close_paths(&[
-            growth(a, PathEnd::Last, Vec::new()),
-            growth(two, PathEnd::Last, Vec::new())
+            growth(&document, a, PathEnd::Last, Vec::new()),
+            growth(&document, two, PathEnd::Last, Vec::new())
         ]),
         Err(PathEditError::TooFewToClose)
     );
@@ -325,17 +342,23 @@ fn a_refusal_writes_nothing() {
         "the valid growth was not applied either"
     );
     assert_eq!(
-        document.extend_path(&growth(a, PathEnd::Last, vec![node(2, 30.0, 0.0)])),
+        document.extend_path(&growth(
+            &document,
+            a,
+            PathEnd::Last,
+            vec![node(2, 30.0, 0.0)]
+        )),
         Err(PathEditError::DuplicateAnchorId)
     );
-    let mut absorbs_itself = growth(a, PathEnd::Last, Vec::new());
-    absorbs_itself.absorb = Some((a, PathEnd::First));
+    let mut absorbs_itself = growth(&document, a, PathEnd::Last, Vec::new());
+    absorbs_itself.absorb = Some((a, PathEnd::First, end_of(&document, a, PathEnd::First)));
     assert_eq!(
         document.connect_paths(&absorbs_itself),
         Err(PathEditError::NotExtendable)
     );
-    let mut extends_with_absorb = growth(a, PathEnd::Last, Vec::new());
-    extends_with_absorb.absorb = Some((two, PathEnd::First));
+    let mut extends_with_absorb = growth(&document, a, PathEnd::Last, Vec::new());
+    extends_with_absorb.absorb =
+        Some((two, PathEnd::First, end_of(&document, two, PathEnd::First)));
     assert_eq!(
         document.extend_path(&extends_with_absorb),
         Err(PathEditError::NotExtendable)
@@ -343,11 +366,16 @@ fn a_refusal_writes_nothing() {
     assert_eq!(labels(&document), before);
     assert_eq!(document.version(), version, "nothing changed");
     document
-        .close_paths(&[growth(a, PathEnd::Last, Vec::new())])
+        .close_paths(&[growth(&document, a, PathEnd::Last, Vec::new())])
         .unwrap();
     assert_ne!(document.version(), version, "a commit changes the version");
     assert_eq!(
-        document.extend_path(&growth(a, PathEnd::Last, vec![node(21, 0.0, 5.0)])),
+        document.extend_path(&growth(
+            &document,
+            a,
+            PathEnd::Last,
+            vec![node(21, 0.0, 5.0)]
+        )),
         Err(PathEditError::NotExtendable),
         "a closed path cannot be extended"
     );

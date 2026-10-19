@@ -87,6 +87,7 @@ impl PenTool {
                 let growth = PathGrowth {
                     path: continuation.path,
                     end,
+                    at: continuation.end_node(),
                     added,
                     absorb: None,
                     replace: vec![closing],
@@ -169,8 +170,9 @@ impl PenTool {
         Some(PathGrowth {
             path: continuation.path,
             end: continuation.end,
+            at: continuation.end_node(),
             added,
-            absorb: Some((target.path, target.end)),
+            absorb: Some((target.path, target.end, target.anchor.id)),
             replace,
             drop,
         })
@@ -201,6 +203,7 @@ impl PenTool {
         Some(PathGrowth {
             path: target.path,
             end: target.end,
+            at: target.anchor.id,
             added,
             absorb: None,
             replace,

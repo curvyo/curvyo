@@ -35,8 +35,8 @@ impl Document {
         start_handle_out: Vec2,
         end_handle_in: Vec2,
     ) -> Result<(), PathEditError> {
-        let (meta, anchors) = self.path_parts(path)?;
-        let closed = read_closed(&meta);
+        let (outline, anchors) = self.segment_outline(path, start, end)?;
+        let closed = read_closed(&outline);
         let (start_index, end_index) = adjacent_segment_indices(&anchors, closed, start, end)?;
         let start_map = anchor_map_at(&anchors, start_index);
         let end_map = anchor_map_at(&anchors, end_index);

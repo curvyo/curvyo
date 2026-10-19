@@ -46,6 +46,20 @@ pub struct Continuation {
     pub original: Vec<AnchorSnapshot>,
 }
 
+impl Continuation {
+    /// The id of the end node the maker pressed: it names the continued outline in a
+    /// [`curvyo_document_core::PathGrowth`].
+    #[must_use]
+    pub fn end_node(&self) -> curvyo_document_core::AnchorId {
+        // invariant: `original` is an outline of two or more nodes: `EndNodeIndex` skips shorter
+        // outlines, so no continuation starts from one.
+        match self.end {
+            PathEnd::First => self.original[0].id,
+            PathEnd::Last => self.original[self.original.len() - 1].id,
+        }
+    }
+}
+
 /// What a press does, decided at the press and run at the release (a drag is ignored for every
 /// action but [`PressAction::Place`]).
 #[derive(Debug, Clone, PartialEq)]
@@ -360,6 +374,7 @@ impl PenTool {
                 let growth = PathGrowth {
                     path: continuation.path,
                     end: continuation.end,
+                    at: continuation.end_node(),
                     added,
                     absorb: None,
                     replace: Vec::new(),

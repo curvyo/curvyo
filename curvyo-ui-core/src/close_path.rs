@@ -127,6 +127,7 @@ pub fn plan_close_paths(paths: &[&PathSnapshot], join: JoinType) -> ClosePlan {
         growths.push(PathGrowth {
             path: path.id,
             end: PathEnd::Last,
+            at: path.anchors[len - 1].id,
             added: Vec::new(),
             absorb: None,
             replace: vec![resolved],
