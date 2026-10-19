@@ -828,9 +828,13 @@ fn ac37_a_newer_format_is_refused_and_this_one_is_13() {
     mk(&d, o);
     let bytes = pack(&d, "0.1.0").unwrap();
     let j: serde_json::Value = serde_json::from_slice(&d.export_json().unwrap()).unwrap();
-    // 0049 took 13; `0057-clone-overrides` took 14 after it, so a file of 13 still opens.
-    assert_eq!(j["format_version"], 14);
-    let newer = rezip_manifest(&bytes, 15);
+    // 0049 took 13; `0057-clone-overrides` took 14 and `0046-document-shapes` 15 after it, so a
+    // file of 13 still opens.
+    assert_eq!(
+        j["format_version"],
+        curvyo_document_core::CURRENT_FORMAT_VERSION
+    );
+    let newer = rezip_manifest(&bytes, curvyo_document_core::CURRENT_FORMAT_VERSION + 1);
     assert!(matches!(
         unpack(2, &newer),
         Err(OpenError::FormatTooNew { .. })
