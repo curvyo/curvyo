@@ -7,8 +7,12 @@ use std::cell::RefCell;
 
 use curvyo_document_core::{DocumentVersion, Length, NodeId, Point};
 use curvyo_render_core::{ClosingCue, PenCue};
-use curvyo_ui_core::{EndNodeIndex, JoinType, PenTarget, PressAction, continuation_of, pen_target};
+use curvyo_ui_core::{
+    EndNodeIndex, JoinType, PenTarget, PressAction, constrain_segment, continuation_of,
+    format_degrees, format_status_length, pen_target,
+};
 
+use super::shapes::LiveReadout;
 use super::{Session, Tool};
 
 /// What the end-node index was built for: the document read and the entered group.
@@ -22,12 +26,16 @@ type EndIndexKey = (DocumentVersion, Option<NodeId>);
 pub(super) struct PenCueState {
     ends: RefCell<Option<(EndIndexKey, EndNodeIndex)>>,
     press: Option<PenTarget>,
+    /// Where a node-placing press put the new node N: the handle snap turns about it
+    /// (`specs/0072-pen-angle-snap-and-typed-values/` criterion 3).
+    node: Option<Point>,
 }
 
 impl PenCueState {
     /// Forgets the target of a press that ended.
     pub(super) fn release(&mut self) {
         self.press = None;
+        self.node = None;
     }
 }
 
@@ -39,6 +47,8 @@ impl Session {
     /// Acceptance criterion 3 / the dedicated "finish path" action
     /// (Enter, or a double-click the host has already recognized).
     pub fn finish_pen(&mut self) {
+        // A finish closes an open entry chip without adding (`0072` criterion 22).
+        self.cancel_pen_entry();
         self.recording(|this| {
             this.pen.finish(&this.document);
         });
@@ -117,8 +127,82 @@ impl Session {
             PenTarget::Close { join, .. } => PressAction::Close(*join),
             PenTarget::Place | PenTarget::NewPathAt | PenTarget::PlaceOverEnd => PressAction::Place,
         };
+        // The target test ran on the raw pointer; only a placed node is snapped (`0072`
+        // criteria 2, 5), with Ctrl as the press event reported it.
+        let point = if action == PressAction::Place {
+            let node = self.pen_constrained(point, self.held.ctrl);
+            self.pen_cue.node = Some(node);
+            node
+        } else {
+            point
+        };
         self.pen_cue.press = Some(target);
         self.pen.pointer_down_action(point, action);
+    }
+
+    /// The last node L of the path in progress, `None` before the first node is placed.
+    pub(super) fn pen_last_node(&self) -> Option<Point> {
+        self.pen.in_progress_nodes()?.last().map(|node| node.point)
+    }
+
+    /// `point` with the Ctrl rule from the last node when `ctrl` is held and there is one
+    /// (`0072` criteria 1, 7); otherwise `point`.
+    fn pen_constrained(&self, point: Point, ctrl: bool) -> Point {
+        match self.pen_last_node() {
+            Some(last) if ctrl => constrain_segment(last, point),
+            _ => point,
+        }
+    }
+
+    /// The pointer of a node drag as the handle end: snapped about the new node N while Ctrl is
+    /// held, read live (`0072` criterion 3). The node itself never moves.
+    pub(super) fn pen_handle_point(&self, pointer: Point, ctrl: bool) -> Point {
+        match self.pen_cue.node {
+            Some(node) if ctrl => constrain_segment(node, pointer),
+            _ => pointer,
+        }
+    }
+
+    /// The readout of a node drag: the handle's length and angle, "30.1 mm, 0°" (`0072`
+    /// criterion 8). `None` with the button up or before the drag passes the threshold. The host
+    /// shows it in the create-drag readout's place; [`Session::live_readout`] stays the
+    /// marquee's and the creation tools'.
+    #[must_use]
+    pub fn pen_drag_readout(&self) -> Option<LiveReadout> {
+        if !self.button_down {
+            return None;
+        }
+        let pointer = self.pointer_position?;
+        let handle = self.pen_handle_point(pointer, self.held.ctrl);
+        let anchor = self
+            .pen
+            .pending_anchor(self.minter.peek(), handle, self.drag_threshold())?;
+        let vector = anchor.handle_out;
+        if vector.length() <= self.drag_threshold().as_mm() {
+            return None;
+        }
+        let unit = self.display_unit();
+        let text = format!(
+            "{} {}, {}",
+            format_status_length(curvyo_document_core::Length::from_mm(vector.length()), unit),
+            unit.symbol(),
+            format_degrees(vector.y.atan2(vector.x).to_degrees())
+        );
+        Some(LiveReadout {
+            text,
+            anchor: pointer,
+        })
+    }
+
+    /// A secondary press with the Pen (`0072` criterion 19a, customer 2026-10-19): with a path in
+    /// progress it finishes the path as Enter does and places nothing. Returns whether it did;
+    /// with no path the press goes on as before.
+    pub fn pen_secondary_press(&mut self) -> bool {
+        if self.tool != Tool::Pen || !self.pen_path_open() {
+            return false;
+        }
+        self.finish_pen();
+        true
     }
 
     /// The Pen's cue as render data: the end node a press would continue or join, and the closing
@@ -179,10 +263,22 @@ impl Session {
     /// The point the rubber band runs to: the target's node centre over a join target, nothing
     /// over a close target (the closing segment replaces it), else the pointer.
     pub(super) fn pen_rubber_band_end(&self) -> Option<Point> {
+        // An open entry chip draws the typed point (`0072` criterion 17).
+        if self.pen_entry().is_some() {
+            return self.pen_entry_preview_end();
+        }
+        self.pen_segment_end()
+    }
+
+    /// The end of the live segment: the target's node over a join target, nothing over a close
+    /// target, else the pointer, Ctrl-constrained with the button up (`0072` criteria 1, 5).
+    pub(super) fn pen_segment_end(&self) -> Option<Point> {
         match self.pen_target() {
             Some(PenTarget::Join(end)) => Some(end.anchor.point),
             Some(PenTarget::Close { .. }) => None,
-            _ => self.pointer_position,
+            _ => self
+                .pointer_position
+                .map(|pointer| self.pen_constrained(pointer, self.held.ctrl && !self.button_down)),
         }
     }
 
@@ -216,5 +312,101 @@ impl Session {
             } => Some((join, as_drawn, shift)),
             _ => None,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use curvyo_document_core::Point;
+
+    use super::super::{Session, Tool};
+
+    const L: Point = Point::new(100.0, 50.0);
+
+    fn ctrl_click(session: &mut Session, at: Point, ctrl: bool) {
+        session.modifiers_changed(false, ctrl, false);
+        session.pointer_down(at, false);
+        session.pointer_up(at, false, ctrl);
+    }
+
+    fn pen_at_l() -> Session {
+        let mut session = Session::new(1);
+        session.set_tool(Tool::Pen);
+        ctrl_click(&mut session, L, true);
+        session
+    }
+
+    fn near(a: Point, x: f64, y: f64) -> bool {
+        (a.x - x).abs() < 0.005 && (a.y - y).abs() < 0.005
+    }
+
+    fn nodes(session: &Session) -> Vec<Point> {
+        session
+            .pen_in_progress()
+            .unwrap_or_default()
+            .iter()
+            .map(|node| node.point)
+            .collect()
+    }
+
+    /// Criteria 1, 7: the first node ignores Ctrl; the rubber band follows Ctrl live.
+    #[test]
+    fn ctrl_constrains_the_rubber_band_from_the_last_node() {
+        let mut session = pen_at_l();
+        assert_eq!(nodes(&session), [L]);
+        session.pointer_hover(Point::new(130.0, 52.0), false, true);
+        let end = session.pen_rubber_band_end().expect("a rubber band");
+        assert!(near(end, 130.067, 50.0), "{end:?}");
+        session.modifiers_changed(false, false, false);
+        assert_eq!(session.pen_rubber_band_end(), Some(Point::new(130.0, 52.0)));
+    }
+
+    /// Criterion 2: three Ctrl-clicks off by up to 3 degrees give exact horizontals and verticals.
+    #[test]
+    fn ctrl_clicks_place_nodes_at_the_constrained_point() {
+        let mut session = pen_at_l();
+        for at in [
+            Point::new(130.0, 52.0),
+            Point::new(131.0, 80.0),
+            Point::new(101.0, 81.0),
+        ] {
+            ctrl_click(&mut session, at, true);
+        }
+        let placed = nodes(&session);
+        assert!(near(placed[1], 130.067, 50.0));
+        assert!((placed[2].x - placed[1].x).abs() < 1e-9);
+        assert!((placed[3].y - placed[2].y).abs() < 1e-9);
+    }
+
+    /// Criteria 3, 8: the node stays at the press, Ctrl snaps the handle direction live, the
+    /// readout shows the handle.
+    #[test]
+    fn ctrl_snaps_the_handle_direction_and_never_moves_the_node() {
+        let mut session = pen_at_l();
+        let n = Point::new(130.0, 50.0);
+        session.modifiers_changed(false, false, false);
+        session.pointer_down(n, false);
+        session.pointer_hover(Point::new(150.0, 52.0), false, true);
+        let readout = session.pen_drag_readout().expect("a readout").text;
+        assert_eq!(readout, "20.1 mm, 0°");
+        session.pointer_up(Point::new(150.0, 52.0), false, true);
+        let node = session.pen_in_progress().unwrap()[1];
+        assert_eq!(node.point, n);
+        assert!(near(n.translated(node.handle_out), 150.1, 50.0));
+        assert!(near(n.translated(node.handle_in), 109.9, 50.0));
+        assert!(session.pen_drag_readout().is_none());
+    }
+
+    /// Criterion 5: the target test runs on the raw pointer, so a Ctrl-click on the first node
+    /// closes the path.
+    #[test]
+    fn a_ctrl_click_on_the_first_node_still_closes() {
+        let mut session = pen_at_l();
+        ctrl_click(&mut session, Point::new(140.0, 50.0), false);
+        ctrl_click(&mut session, Point::new(140.0, 90.0), false);
+        ctrl_click(&mut session, Point::new(100.5, 50.5), true);
+        assert!(session.pen_in_progress().is_none());
+        let path = session.document.object_ids()[0];
+        assert!(session.document.path(path).unwrap().closed);
     }
 }
