@@ -40,6 +40,8 @@ mod wasm_document;
 #[cfg(target_arch = "wasm32")]
 mod wasm_formats;
 #[cfg(target_arch = "wasm32")]
+mod wasm_fracture;
+#[cfg(target_arch = "wasm32")]
 mod wasm_group;
 #[cfg(target_arch = "wasm32")]
 mod wasm_history;
@@ -84,7 +86,7 @@ pub use session::{
     EscapeStep, FAR_PREVIEW_ROWS, FitOutcome, FormTexts, FormatEdit, GoToOutcome, GroupingKind,
     GroupingResult, HistoryResult, HistoryRowPress, KeyHint, KeyInput, KeyOutcome, MoveIndicators,
     ObjectWipeOutcome, PanelReply, PanelTabsRecord, PanelView, RowFlag, RowPress, Session,
-    SizeOutcome, SplitOutcome, Tool, WipeOutcome, WipeState,
+    SizeOutcome, SplitOutcome, StackOutcome, Tool, WipeOutcome, WipeState,
 };
 pub use session::{DragStop, OFFSET_COMMIT_LABEL, OffsetOutcome, OffsetView};
 

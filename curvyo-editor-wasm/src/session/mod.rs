@@ -44,6 +44,7 @@ mod draw;
 mod file_chord;
 mod flip;
 mod formats;
+mod fracture;
 mod frame;
 mod group_view;
 mod grouping;
@@ -120,6 +121,7 @@ pub use cut::CutOutcome;
 pub use document::{DocumentSide, FitOutcome, SizeOutcome};
 pub use document_presets::DocumentPresetsRecord;
 pub use formats::{FormTexts, FormatEdit};
+pub use fracture::StackOutcome;
 pub use grouping::{GroupingKind, GroupingResult};
 #[cfg(target_arch = "wasm32")]
 pub use guides::GuideButtonState;

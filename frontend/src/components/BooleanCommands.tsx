@@ -8,13 +8,14 @@ import {
   RAIL_CARD_STYLE,
 } from "@/components/railCard";
 import type { BooleanCommands as BooleanCommandsState } from "@/hooks/useRailCommands";
+import { operationName, operationRule, tooltipNote } from "@/lib/booleanText";
 import {
-  BOOLEAN_OPS,
-  type BooleanOp,
-  operationName,
-  operationRule,
-  tooltipNote,
-} from "@/lib/booleanText";
+  BOOLEAN_CARD_COMMANDS,
+  type BooleanCardCommand,
+  isStackCommand,
+  stackName,
+  stackRule,
+} from "@/lib/stackText";
 
 interface BooleanCommandsProps {
   commands: BooleanCommandsState;
@@ -28,7 +29,7 @@ interface BooleanCommandsProps {
 
 /** The index a navigation key moves the focus to (no wrap), or `null` for any other key. */
 function targetIndex(key: string, index: number): number | null {
-  const last = BOOLEAN_OPS.length - 1;
+  const last = BOOLEAN_CARD_COMMANDS.length - 1;
   switch (key) {
     case "ArrowDown":
       return Math.min(index + 1, last);
@@ -45,15 +46,16 @@ function targetIndex(key: string, index: number): number | null {
 
 /**
  * The Boolean toolbox of the tool rail (`docs/design-system.md`, rows "Boolean toolbox" and
- * "Toolbox card"): a card of its own below the Path card in column B, five commands, not tools, one
- * column. One Tab stop with roving focus. It shows what the session says is available and
+ * "Toolbox card"): a card of its own below the Path card in column B, seven commands, not tools,
+ * one column: the five operations, then Fracture and Flatten (`specs/0037-fracture-and-flatten/`).
+ * One Tab stop with roving focus. It shows what the session says is available and
  * decides nothing. Its notice is drawn by the rail (`BooleanNotice`).
  */
 export function BooleanCommands({ commands, selectTool, onReturnFocus }: BooleanCommandsProps) {
   const { availability, busy, apply } = commands;
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
   const [stop, setStop] = useState(0);
-  const [pressed, setPressed] = useState<BooleanOp | null>(null);
+  const [pressed, setPressed] = useState<BooleanCardCommand | null>(null);
 
   return (
     <div
@@ -64,14 +66,14 @@ export function BooleanCommands({ commands, selectTool, onReturnFocus }: Boolean
       className={RAIL_CARD_CLASS}
       style={RAIL_CARD_STYLE}
     >
-      {BOOLEAN_OPS.map((op, index) => (
+      {BOOLEAN_CARD_COMMANDS.map((op, index) => (
         <CommandButton
           key={op}
           ref={(element) => {
             buttons.current[index] = element;
           }}
-          name={operationName(op)}
-          rule={operationRule(op)}
+          name={isStackCommand(op) ? stackName(op) : operationName(op)}
+          rule={isStackCommand(op) ? stackRule(op) : operationRule(op)}
           note={tooltipNote(availability, selectTool)}
           glyph={<BooleanGlyph op={op} />}
           dimmed={availability.needsTwo}

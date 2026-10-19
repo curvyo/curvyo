@@ -25,13 +25,20 @@ import {
   refusalText,
   successText,
 } from "@/lib/booleanText";
+import {
+  type BooleanCardCommand,
+  isStackCommand,
+  stackRefusalOutlinesObjects,
+  stackRefusalText,
+  stackSuccessText,
+} from "@/lib/stackText";
 
 export interface BooleanCommands {
   availability: BooleanAvailabilityState;
   /** A kernel call is about to run or running: wait cursor, input ignored. */
   busy: boolean;
-  /** Runs `op` on the selection. Does nothing while dimmed or busy. */
-  apply: (op: BooleanOp) => void;
+  /** Runs `command` on the selection. Does nothing while dimmed or busy. */
+  apply: (command: BooleanCardCommand) => void;
 }
 
 /** What the Path card shows and does (`specs/0035-combine-and-break-apart/`). */
@@ -121,7 +128,7 @@ const NO_PATH_AVAILABILITY: PathAvailabilityState = {
  * command does, why it was refused) are the session's; this hook only displays them.
  */
 export function useRailCommands(editor: EditorSession): RailCommands {
-  const { getSession, syncRevision, tool, selectionCount, applyBoolean } = editor;
+  const { getSession, syncRevision, tool, selectionCount, applyBoolean, applyStack } = editor;
   const { applyCombine, applySplit, applyBreakApart, applyCut } = editor;
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
@@ -198,10 +205,25 @@ export function useRailCommands(editor: EditorSession): RailCommands {
   }, []);
 
   const apply = useCallback(
-    (op: BooleanOp) => {
+    (command: BooleanCardCommand) => {
       if (busyRef.current || booleanRef.current.needsTwo) {
         return;
       }
+      if (isStackCommand(command)) {
+        runBusy(() => {
+          const result = applyStack(command);
+          outlinedRef.current = stackRefusalOutlinesObjects(result);
+          const applied = result.kind === "applied";
+          const text = applied
+            ? withRepair(stackSuccessText(command, result))
+            : stackRefusalText(command, result);
+          if (text !== null) {
+            show(applied ? "success" : "refusal", text, applied ? noticeMs(text) : undefined);
+          }
+        });
+        return;
+      }
+      const op: BooleanOp = command;
       runBusy(() => {
         const result = applyBoolean(op);
         outlinedRef.current = refusalOutlinesObjects(result);
@@ -212,7 +234,7 @@ export function useRailCommands(editor: EditorSession): RailCommands {
         }
       });
     },
-    [applyBoolean, runBusy, show, withRepair],
+    [applyBoolean, applyStack, runBusy, show, withRepair],
   );
 
   /** The notice of a Path command: the success sentence, else the refusal sentence. */
