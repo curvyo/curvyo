@@ -4,6 +4,7 @@ import { type CanvasNotice, type HistoryNames, MAC, useHistory } from "@/hooks/u
 import { type ClonesApi, useClones } from "@/hooks/useClones";
 import { type GroupingApi, useGrouping } from "@/hooks/useGrouping";
 import { type OffsetApi, readOffsetView, useOffset } from "@/hooks/useOffset";
+import { type PenEntryApi, usePenEntry } from "@/hooks/usePenEntry";
 import { type PlacementApi, usePlacement } from "@/hooks/usePlacement";
 import { offsetKeyOutcome, offsetReadout } from "@/lib/offsetText";
 import type { HistoryDirection } from "@/lib/historyText";
@@ -709,6 +710,8 @@ export interface EditorSession {
   transformEntryMirrorLine: (first: string, second: string, lastEdited: number) => string;
   /** The click-to-create placement and its chip (`specs/0052-click-to-create-shapes`). */
   placement: PlacementApi;
+  /** The Pen's typed Length and Angle entry (`specs/0072-pen-angle-snap-and-typed-values`). */
+  penEntry: PenEntryApi;
   /** A large undo or redo is running. */
   historyBusy: boolean;
   /** The names of the next undo and redo; `null` for an empty stack. */
@@ -1007,6 +1010,7 @@ export function useEditorSession(
   const refreshGroupingRef = useRef<() => boolean>(() => false);
   const refreshClonesRef = useRef<() => void>(() => {});
   const refreshPlacementRef = useRef<() => void>(() => {});
+  const refreshPenEntryRef = useRef<() => void>(() => {});
   const placementKeyDownRef = useRef<PlacementApi["keyDown"]>(() => {});
   const syncFromSession = useCallback(() => {
     const session = sessionRef.current;
@@ -1039,6 +1043,7 @@ export function useEditorSession(
     syncEntry(session);
     syncBadges(session);
     refreshPlacementRef.current();
+    refreshPenEntryRef.current();
   }, [syncEntry, syncBadges]);
 
   const getSession = useCallback(() => sessionRef.current, []);
@@ -1059,6 +1064,15 @@ export function useEditorSession(
   useEffect(() => {
     refreshPlacementRef.current = refreshPlacement;
   }, [refreshPlacement]);
+  const showPenEntryNotice = useCallback(
+    (text: string) => history.showNotice(text, undefined, "canvas", "status"),
+    [history],
+  );
+  const penEntry = usePenEntry(getSession, syncFromSession, showPenEntryNotice, containerRef);
+  const { refresh: refreshPenEntry } = penEntry;
+  useEffect(() => {
+    refreshPenEntryRef.current = refreshPenEntry;
+  }, [refreshPenEntry]);
   useEffect(() => {
     refreshGroupingRef.current = refreshGrouping;
   }, [refreshGrouping]);
@@ -1712,6 +1726,14 @@ export function useEditorSession(
         return;
       }
 
+      // A secondary press with the Pen finishes the path in progress as Enter does and places
+      // nothing (`0072` criterion 19a, customer 2026-10-19).
+      if (event.button === 2 && session.pen_secondary_press()) {
+        event.preventDefault();
+        syncFromSession();
+        return;
+      }
+
       // A secondary press in a creation tool creates nothing and starts no placement; during a
       // placement the window listener of `usePlacement` has cancelled it (`0052` criterion 7).
       const pressedTool = session.tool();
@@ -1843,6 +1865,8 @@ export function useEditorSession(
       }
       // The placement chip follows the pointer until the freeze (`0052` criterion 11).
       refreshPlacement();
+      // The Pen entry chip follows the pointer until the freeze (`0072` criterion 15).
+      refreshPenEntry();
     },
     [
       canvasPoint,
@@ -1852,6 +1876,7 @@ export function useEditorSession(
       syncTrackedModifiers,
       syncFromSession,
       refreshPlacement,
+      refreshPenEntry,
     ],
   );
 
@@ -2020,6 +2045,8 @@ export function useEditorSession(
     syncBadges(session);
     // An unfrozen placement follows the keys with the pointer still (`0052` criterion 3).
     refreshPlacementRef.current();
+    // An unfrozen Pen entry chip follows Ctrl too (`0072` criterion 15).
+    refreshPenEntryRef.current();
   }, [syncBadges]);
 
   useEffect(() => {
@@ -2357,6 +2384,7 @@ export function useEditorSession(
     loadTemplate,
     arcBar,
     placement,
+    penEntry,
     historyBusy: history.busy,
     historyNames: history.names,
     pressHistory: history.press,

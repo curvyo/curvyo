@@ -60,6 +60,8 @@ mod wasm_offset;
 #[cfg(target_arch = "wasm32")]
 mod wasm_pen;
 #[cfg(target_arch = "wasm32")]
+mod wasm_pen_entry;
+#[cfg(target_arch = "wasm32")]
 mod wasm_properties_panel;
 #[cfg(target_arch = "wasm32")]
 mod wasm_render;

@@ -80,6 +80,7 @@ mod offset_view;
 mod open_error;
 mod panel_tabs;
 mod pen;
+mod pen_entry;
 mod placement;
 mod placement_view;
 mod project;
@@ -148,6 +149,8 @@ pub use open_error::map_open_error;
 // a host build does not see an unused public re-export.
 #[cfg(target_arch = "wasm32")]
 pub use move_entry::MoveEntryView;
+#[cfg(target_arch = "wasm32")]
+pub use pen_entry::{PenEntryChipView, PenEntryFieldView};
 #[cfg(target_arch = "wasm32")]
 pub use placement_view::{PlacementChipView, PlacementFieldView};
 #[cfg(target_arch = "wasm32")]
@@ -334,6 +337,8 @@ pub struct Session {
     dom_chips: Vec<curvyo_ui_core::MarkRect>,
     /// The click-to-create placement and its press (`placement.rs`).
     placements: placement::PlacementState,
+    /// The Pen's typed Length and Angle entry (`pen_entry.rs`).
+    pen_entries: pen_entry::PenEntryState,
 }
 
 impl Session {
@@ -400,6 +405,7 @@ impl Session {
             deleted_objects: 0,
             dom_chips: Vec::new(),
             placements: placement::PlacementState::default(),
+            pen_entries: pen_entry::PenEntryState::default(),
         }
     }
 
@@ -462,6 +468,7 @@ impl Session {
             deleted_objects: 0,
             dom_chips: Vec::new(),
             placements: placement::PlacementState::default(),
+            pen_entries: pen_entry::PenEntryState::default(),
         };
         // A file another tool wrote can hold clones whose original is gone (`0049` criterion 35).
         session.remove_orphans_after_open();
@@ -510,6 +517,8 @@ impl Session {
             this.select.cancel_gesture();
             // Any tool switch, by any route, cancels a placement (`0052` criterion 7).
             this.cancel_placement();
+            // And the Pen entry chip (`0072` criterion 22).
+            this.cancel_pen_entry();
             // Leaving the Pen ends its path as drawn (a lone node is dropped): no
             // unfinished path stays behind that the Document section's resize would
             // not move (`specs/0015-document-size-and-rulers/` criterion 14a).
@@ -586,7 +595,10 @@ impl Session {
                     this.select_pointer_down(point, shift);
                 }
                 Tool::Pen => {
-                    this.pen_pointer_down(point, shift);
+                    // A frozen entry chip takes the press (`0072` criterion 20).
+                    if !this.pen_entry_press() {
+                        this.pen_pointer_down(point, shift);
+                    }
                 }
                 Tool::Node => {
                     let paths = this.paths();
@@ -695,6 +707,7 @@ impl Session {
                 }
                 Tool::Pen => {
                     let threshold = this.drag_threshold();
+                    let point = this.pen_handle_point(point, constrain);
                     this.pen
                         .pointer_up(&mut this.minter, &this.document, point, threshold);
                     this.pen_cue.release();

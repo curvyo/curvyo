@@ -293,8 +293,10 @@ impl WasmSession {
     #[must_use]
     pub fn live_readout(&self) -> Option<LiveReadout> {
         let view = self.session.view();
+        // A Pen node drag shows its handle there too (`0072` criterion 8).
         self.session
             .live_readout()
+            .or_else(|| self.session.pen_drag_readout())
             .map(|readout| LiveReadout::from_document_space(readout, view))
     }
 

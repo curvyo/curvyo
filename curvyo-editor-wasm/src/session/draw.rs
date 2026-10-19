@@ -142,8 +142,10 @@ impl Session {
             // what might still be escaped or turn into a close gesture
             // instead (`AnchorIdMinter::peek`'s own doc comment).
             let pending = self.pointer_position.and_then(|cursor| {
+                // Ctrl snaps the handle direction, read live (`0072` criterion 3).
+                let handle = self.pen_handle_point(cursor, self.held.ctrl);
                 self.pen
-                    .pending_anchor(self.minter.peek(), cursor, self.drag_threshold())
+                    .pending_anchor(self.minter.peek(), handle, self.drag_threshold())
             });
             list.extend(build_pen_preview(
                 nodes,

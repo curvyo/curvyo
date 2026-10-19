@@ -301,3 +301,57 @@ export function placePlacementChip(
   const clamped = clampInside(left, top, chip, canvas);
   return { ...clamped, left: Math.max(clamped.left, minLeft) };
 }
+
+/** Whether the segment from `a` to `b` crosses the chip's rectangle at `at` (Liang-Barsky). */
+function segmentMeets(
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+  at: Placement,
+  chip: Size,
+): boolean {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  let low = 0;
+  let high = 1;
+  const edges: [number, number][] = [
+    [-dx, a.x - at.left],
+    [dx, at.left + chip.width - a.x],
+    [-dy, a.y - at.top],
+    [dy, at.top + chip.height - a.y],
+  ];
+  for (const [p, q] of edges) {
+    if (p === 0) {
+      if (q < 0) {
+        return false;
+      }
+    } else if (p < 0) {
+      low = Math.max(low, q / p);
+    } else {
+      high = Math.min(high, q / p);
+    }
+  }
+  return low <= high;
+}
+
+/**
+ * The Pen entry chip (`specs/0072-pen-angle-snap-and-typed-values/`): the placement chip's rule
+ * with the last node L as A. With `end`, the typed point of a frozen chip, a chip that would
+ * cover the segment from L to it goes to the other side of L vertically, the rule's own
+ * fallback, clamped in the canvas.
+ */
+export function placePenEntryChip(
+  pointer: { x: number; y: number },
+  last: { x: number; y: number },
+  end: { x: number; y: number } | null,
+  chip: Size,
+  canvas: Size,
+  railClear = 0,
+): Placement {
+  const at = placePlacementChip(pointer, last, chip, canvas, undefined, railClear);
+  if (!end || !segmentMeets(last, end, at, chip)) {
+    return at;
+  }
+  const clear = PLACEMENT_CHIP_GAP_PX + PIVOT_MARKER_HALF_PX;
+  const top = at.top >= last.y ? last.y - clear - chip.height : last.y + clear;
+  return { left: at.left, top: Math.max(0, Math.min(top, canvas.height - chip.height)) };
+}

@@ -27,6 +27,14 @@ pub(super) struct KeyState {
     pub(super) operation_in_flight: bool,
     /// The Pen has an unfinished path.
     pub(super) pen_open: bool,
+    /// The Pen's path in progress has a last node and the Pen entry chip is closed: Tab opens it
+    /// (`specs/0072-pen-angle-snap-and-typed-values` criterion 12).
+    pub(super) pen_entry_ready: bool,
+    /// The Pen entry chip is open: a stray Enter on the canvas does not finish the path
+    /// (`0072` criterion 19).
+    pub(super) pen_entry_open: bool,
+    /// A pointer button is held: Tab is consumed and opens nothing (`0072` criterion 14).
+    pub(super) button_held: bool,
     /// An entry chip is open.
     pub(super) entry_open: bool,
     pub(super) selected: Selected,
@@ -62,6 +70,24 @@ pub(super) enum KeyAction {
     /// criterion 4, Proposal).
     Flip(FlipAxis),
     StartPlacement,
+    /// Tab in the Pen with a last node (`0072` criterion 12).
+    OpenPenEntry,
+    /// The key is taken from the page and does nothing (`0072` criterion 14).
+    Consume,
+}
+
+/// What Tab does: in the Pen with a path in progress it opens the entry chip or, with a button
+/// held or as a repeat, is consumed so focus stays on the canvas (`0072` criteria 12, 14).
+/// Elsewhere, and with Ctrl, Alt or Cmd, it is not handled.
+fn tab_action(input: &KeyInput<'_>, state: KeyState) -> KeyAction {
+    if state.tool != Tool::Pen || !state.pen_open || input.ctrl || input.alt || input.dom_blocked {
+        return KeyAction::Ignore;
+    }
+    if state.pen_entry_ready && !state.button_held && !input.repeat {
+        KeyAction::OpenPenEntry
+    } else {
+        KeyAction::Consume
+    }
 }
 
 /// Whether Enter may enter a group: the Select tool, a plain press, nothing in flight.
@@ -105,7 +131,11 @@ fn reorder_action(input: &KeyInput<'_>, state: KeyState, gate_open: bool) -> Opt
 /// What Enter does: finish the Pen path, open the Offset entry chip, or enter the one selected
 /// group (the session says whether there is one).
 fn enter_action(input: &KeyInput<'_>, state: KeyState) -> KeyAction {
-    if state.tool == Tool::Pen && state.pen_open {
+    // With the Pen entry chip open a stray Enter on the canvas does not finish the path (`0072`
+    // criterion 19); the chip's own Enter places.
+    if state.tool == Tool::Pen && state.pen_entry_open {
+        KeyAction::Ignore
+    } else if state.tool == Tool::Pen && state.pen_open {
         KeyAction::FinishPen
     } else if offset_enter_acts(input, state) {
         KeyAction::OpenOffsetChip
@@ -181,6 +211,7 @@ pub(super) fn decide(input: &KeyInput<'_>, state: KeyState) -> KeyAction {
             };
         }
         "Enter" => return enter_action(input, state),
+        "Tab" => return tab_action(input, state),
         // Alt during an Offset corner drag steps its corner style; held Alt steps once
         // (`specs/0038-path-offset` criterion 13). Elsewhere Alt is not intercepted.
         "Alt" => {

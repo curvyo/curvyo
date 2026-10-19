@@ -120,6 +120,11 @@ pub enum KeyOutcome {
     /// Enter started a click-to-create placement (`specs/0052-click-to-create-shapes`
     /// criterion 26): the host opens the placement chip.
     PlacementStarted,
+    /// Tab opened the Pen entry chip (`specs/0072-pen-angle-snap-and-typed-values` criterion 12).
+    PenEntryOpened,
+    /// The key was taken from the page and did nothing (Tab during a Pen drag, `0072` criterion
+    /// 14).
+    Consumed,
 }
 
 impl KeyOutcome {
@@ -132,6 +137,8 @@ impl KeyOutcome {
             Self::Ignored => "ignored",
             Self::Paused => "paused",
             Self::PlacementStarted => "placement-started",
+            Self::PenEntryOpened => "pen-entry",
+            Self::Consumed => "consumed",
             Self::ToolChanged => "tool",
             Self::EntryOpened => "entry",
             Self::Deleted => "deleted",
@@ -221,8 +228,10 @@ impl Session {
         };
         // A drag of a panel value field is a drag too (`specs/0020-undo-redo` criterion 6a).
         // A click-to-create placement is an operation in flight (`0052` criterion 8).
+        // So is an open Pen entry chip (`0072` criterion 23).
         in_tool
             || self.placement().is_some()
+            || self.pen_entry().is_some()
             || self.is_panning()
             || self.style.pending_edit().is_some()
             || self.select.bar_preview().is_some()
@@ -270,7 +279,12 @@ impl Session {
             tool: self.tool,
             operation_in_flight: self.operation_in_flight(),
             pen_open: self.pen_path_open(),
-            entry_open: self.select.has_entry() || self.offset_chip_open(),
+            pen_entry_ready: self.pen_last_node().is_some() && self.pen_entry().is_none(),
+            pen_entry_open: self.pen_entry().is_some(),
+            button_held: self.button_down,
+            entry_open: self.select.has_entry()
+                || self.offset_chip_open()
+                || self.pen_entry().is_some(),
             selected: self.selected_for_keys(),
             offset_ready: self.offset_center().is_some(),
             offset_dragging: self.tool == Tool::Offset && self.offset_drag_in_flight(),
@@ -312,6 +326,14 @@ impl Session {
                 KeyOutcome::Deleted
             }
             KeyAction::StartPlacement => self.start_placement_key(),
+            KeyAction::OpenPenEntry => {
+                if self.open_pen_entry() {
+                    KeyOutcome::PenEntryOpened
+                } else {
+                    KeyOutcome::Consumed
+                }
+            }
+            KeyAction::Consume => KeyOutcome::Consumed,
             KeyAction::FinishPen => {
                 self.finish_pen();
                 KeyOutcome::PenFinished
@@ -409,6 +431,10 @@ impl Session {
         // The Offset entry chip closes without writing; the selection stays (`0038` criterion 54).
         if self.offset_chip_open() {
             self.close_offset_chip();
+            return EscapeStep::ClosedEntry;
+        }
+        // The Pen entry chip closes alone; the path stays (`0072` criterion 22).
+        if self.cancel_pen_entry() {
             return EscapeStep::ClosedEntry;
         }
         if self.cancel_drag_in_flight() {
@@ -525,6 +551,9 @@ mod tests {
             tool,
             operation_in_flight: false,
             pen_open: false,
+            pen_entry_ready: false,
+            pen_entry_open: false,
+            button_held: false,
             entry_open: false,
             selected,
             offset_ready: false,
