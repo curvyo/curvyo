@@ -203,6 +203,22 @@ pub fn boolean(
     operands: &[&[Outline<'_>]],
     tolerance: Tolerance,
 ) -> Result<BooleanResult, BooleanError> {
+    let regions = operand_regions(operands, tolerance)?;
+    let raw = combine(op, regions);
+    let outlines = canonical_millimetres(&cleanup(&raw));
+    if outlines.is_empty() {
+        return Err(BooleanError::EmptyResult);
+    }
+    Ok(BooleanResult { outlines })
+}
+
+/// Steps 1 to 4 for every operand: the checks, in the order [`boolean`] documents, and each
+/// operand's normalized region on the grid. Shared with Fracture and Flatten
+/// (`specs/0037-fracture-and-flatten/adrs.md`).
+pub(crate) fn operand_regions(
+    operands: &[&[Outline<'_>]],
+    tolerance: Tolerance,
+) -> Result<Vec<Paths64>, BooleanError> {
     if operands.is_empty() {
         return Err(BooleanError::NoOperands);
     }
@@ -227,13 +243,7 @@ pub fn boolean(
     if !empty.is_empty() {
         return Err(BooleanError::EmptyOperands(empty));
     }
-
-    let raw = combine(op, regions);
-    let outlines = canonical_millimetres(&cleanup(&raw));
-    if outlines.is_empty() {
-        return Err(BooleanError::EmptyResult);
-    }
-    Ok(BooleanResult { outlines })
+    Ok(regions)
 }
 
 /// Step 5: the operation on normalized regions, at least one.

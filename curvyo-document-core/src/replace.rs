@@ -121,7 +121,9 @@ impl Document {
     /// consecutively directly after it, in the order given. With [`PieceFill::None`] the fill of
     /// every piece is off (its colour and opacity stay stored); with [`PieceFill::Keep`] a piece
     /// has the source's style as it is. A piece of a guide is a guide. Every object of `removed`
-    /// is deleted, and a group that loses its last child with it.
+    /// is deleted, and a group that loses its last child with it. A removed object may have no
+    /// piece (Fracture and Flatten remove covered objects, `specs/0037-fracture-and-flatten`), so
+    /// `pieces` may be empty when `removed` is not.
     ///
     /// Every id is resolved and every anchor id checked before the first write, so a refusal
     /// changes nothing. Returns the new objects' ids in the order of `pieces`.
@@ -129,8 +131,8 @@ impl Document {
     /// # Errors
     /// [`ObjectEditError::NoSuchObject`] if a source or a removed object no longer exists;
     /// [`ObjectEditError::BaseNotAnOperand`] if a piece's source is not in `removed`;
-    /// [`ObjectEditError::NoOutlines`] if there is no piece, a piece has no outline or an outline
-    /// no anchor; [`ObjectEditError::AnchorIds`] as for [`Document::replace_with_path`].
+    /// [`ObjectEditError::NoOutlines`] if there is neither a piece nor a removed object, a piece has
+    /// no outline or an outline no anchor; [`ObjectEditError::AnchorIds`] as for [`Document::replace_with_path`].
     ///
     /// # Panics
     /// Does not panic in practice, for the reasons given at [`Document::replace_with_path`].
@@ -141,7 +143,7 @@ impl Document {
         fill: PieceFill,
         label: &str,
     ) -> Result<Vec<NodeId>, ObjectEditError> {
-        if pieces.is_empty() {
+        if pieces.is_empty() && removed.is_empty() {
             return Err(ObjectEditError::NoOutlines);
         }
         if pieces.iter().any(|(source, _)| !removed.contains(source)) {

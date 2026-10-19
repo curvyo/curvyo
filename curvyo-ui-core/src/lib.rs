@@ -35,9 +35,11 @@ mod document_fit;
 mod document_presets_view;
 mod ellipse_tool;
 mod file_chords;
+mod flatten_command;
 mod flip;
 mod format_form;
 mod format_list_view;
+mod fracture;
 mod group_box;
 mod group_entry;
 mod group_transform;
@@ -96,6 +98,7 @@ mod shape_tool_common;
 mod skew_entry;
 mod skew_math;
 mod split;
+mod stack_plan;
 mod style_edit;
 mod style_entry;
 mod style_panel;
@@ -150,12 +153,14 @@ pub use document_presets_view::{
 };
 pub use ellipse_tool::EllipseTool;
 pub use file_chords::{FileCommand, Platform, chord_label, command_tooltip, file_chord};
+pub use flatten_command::{FLATTEN_COMMIT_LABEL, plan_flatten};
 pub use flip::{FlipAxis, FlipOutcome, flip_selection};
 pub use format_form::{
     FieldError, FormDraft, FormField, FormPrefill, add_prefill, added_notice, check_format_form,
     edit_prefill, field_error, import_notice, import_refusal, saved_notice,
 };
 pub use format_list_view::{FormatGroupView, FormatListView, FormatRowView, format_list_view};
+pub use fracture::{FRACTURE_COMMIT_LABEL, plan_fracture};
 pub use group_box::{
     GroupBoxShape, GroupSelection, group_handles, hit_group_handle, is_drawn_group_handle,
 };
@@ -281,6 +286,7 @@ pub use shape_tool_common::{CreateOutcome, CreatePreview};
 pub use skew_entry::SkewEntry;
 pub use skew_math::{SkewFrame, skew_angle, skew_factor, skew_frame};
 pub use split::{SPLIT_COMMIT_LABEL, SplitPlan, SplitRefusal, plan_split};
+pub use stack_plan::{MAX_STACK_PIECES, StackPlan, StackRefusal};
 pub use style_edit::StyleEditor;
 pub use style_entry::{
     HexColour, MAX_STROKE_WIDTH_MM, MarkerSlot, StyleEntryError, StyleField, cap_from_name,
