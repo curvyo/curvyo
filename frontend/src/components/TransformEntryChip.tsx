@@ -196,7 +196,9 @@ export function TransformEntryChip({
     onCancel();
   };
 
-  const isAngle = entry.kind === "angle" || entry.kind === "skew";
+  const isAngle = entry.kind === "angle" || entry.kind === "skew" || entry.kind === "arc-angle";
+  // `specs/0021-ellipse-arcs-and-shaping/` criteria 24 and 42: the curve chip has a "%".
+  const isCurve = entry.kind === "curve";
   const visibleLabel = (field: { label: string; name: string }) =>
     entry.kind === "skew" ? field.name.replace("Skew angle ", "Skew ") : field.label;
   const isRatio = entry.kind === "inner-ratio";
@@ -206,7 +208,7 @@ export function TransformEntryChip({
   const isSkew = entry.kind === "skew";
   // The skew chip names its axis inside the field ("Skew x"), so it differs
   // from the angle chip even where the handle itself is hidden.
-  const fieldWidth = isSkew ? 120 : isAngle ? 80 : isRatio ? 96 : 100;
+  const fieldWidth = isSkew ? 120 : isAngle ? 80 : isRatio || isCurve ? 96 : 100;
   const groupName =
     entry.kind === "angle"
       ? entry.selection
@@ -216,7 +218,11 @@ export function TransformEntryChip({
         ? "Skew"
         : entry.kind === "corner-radius"
         ? "Corner radius"
-        : isRatio
+        : entry.kind === "arc-angle"
+          ? (entry.fields[0]?.name ?? "Arc")
+          : isCurve
+            ? "Curve"
+            : isRatio
           ? "Inner ratio"
           : entry.selection
             ? "Resize selection"
@@ -274,7 +280,7 @@ export function TransformEntryChip({
                   onChange={(event) => onChange(index, event.target.value)}
                   onKeyDown={(event) => onKeyDown(event, index)}
                   onBlur={onBlur}
-                  className={`h-7 w-full rounded-[5px] border bg-white ${isAngle ? "pr-6" : isRatio ? "pr-2" : "pr-8"} ${visibleLabel(field).length > 1 ? "pl-12" : "pl-5"} text-right text-sm tabular-nums outline-none ${
+                  className={`h-7 w-full rounded-[5px] border bg-white ${isAngle || isCurve ? "pr-6" : isRatio ? "pr-2" : "pr-8"} ${visibleLabel(field).length > 1 ? "pl-12" : "pl-5"} text-right text-sm tabular-nums outline-none ${
                     isInvalid
                       ? "border-[var(--field-invalid)] shadow-[inset_0_0_0_1px_var(--field-invalid)]"
                       : "border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] focus:border-[var(--editor-accent)] focus:shadow-[inset_0_0_0_1px_var(--editor-accent)]"
@@ -286,7 +292,7 @@ export function TransformEntryChip({
                   className="pointer-events-none absolute top-1/2 right-1.5 -translate-y-1/2 text-xs"
                   style={{ opacity: 0.7 }}
                 >
-                  {isAngle ? "°" : isRatio ? "" : "mm"}
+                  {isAngle ? "°" : isCurve ? "%" : isRatio ? "" : "mm"}
                 </span>
               </div>
             </div>

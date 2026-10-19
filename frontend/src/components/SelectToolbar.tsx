@@ -2,6 +2,7 @@ import { CircleAlert, Link, Unlink } from "lucide-react";
 import { Toggle, Tooltip } from "radix-ui";
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 
+import { ArcFieldGroup, CurveGroup, EllipseKindGroup } from "@/components/ArcCurveGroups";
 import { FlipGroup } from "@/components/FlipGroup";
 import { GuideButton } from "@/components/GuideButton";
 import { RatioSlider } from "@/components/RatioSlider";
@@ -9,6 +10,7 @@ import { RATIO_SLIDER_NAMES } from "@/lib/sliderNames";
 import { ToolbarSwitch } from "@/components/ToolbarSwitch";
 import type { SelectBarState } from "@/hooks/useEditorSession";
 import type { CloneBarNotice } from "@/hooks/useClones";
+import type { ArcBarApi } from "@/hooks/useArcBar";
 import type { FlipApi } from "@/hooks/useFlip";
 import type { GuideState } from "@/lib/guideText";
 import { LINKED_CLONE_TOOLTIP } from "@/lib/cloneText";
@@ -50,6 +52,8 @@ export interface SelectToolbarProps {
   /** The Guide button (`specs/0046-document-shapes` criteria 9 and 10). */
   guideState: GuideState;
   onToggleGuide: () => void;
+  /** The ellipse group and the Curve field (`specs/0021-ellipse-arcs-and-shaping/`). */
+  arcBar: ArcBarApi;
   /** Returns the keyboard focus to the canvas (after Enter or Escape in a
    * field). */
   onReturnFocus: () => void;
@@ -542,6 +546,7 @@ export function SelectToolbar({
   flip,
   guideState,
   onToggleGuide,
+  arcBar,
   onReturnFocus,
 }: SelectToolbarProps) {
   const barRef = useRef<HTMLDivElement>(null);
@@ -589,6 +594,14 @@ export function SelectToolbar({
         )}
       </div>,
     );
+  }
+  // After the kind groups: the ellipse group, then the curve group (UX notes, "Select bar").
+  if (arcBar.state.ellipseShown) {
+    groups.push(<EllipseKindGroup key="ellipse" arc={arcBar} onReturnFocus={onReturnFocus} />);
+    groups.push(<ArcFieldGroup key="arc-fields" arc={arcBar} onReturnFocus={onReturnFocus} />);
+  }
+  if (arcBar.state.curveShown && !arcBar.state.ellipseShown) {
+    groups.push(<CurveGroup key="curve" arc={arcBar} onReturnFocus={onReturnFocus} />);
   }
   if (bar.objectToPathShown) {
     groups.push(
