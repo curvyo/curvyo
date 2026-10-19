@@ -9,6 +9,7 @@ use curvyo_ui_core::{
 };
 use wasm_bindgen::prelude::*;
 
+use crate::session::GuideButtonState;
 use crate::wasm_api::WasmSession;
 
 /// `wasm-bindgen`'s JS-facing mirror of [`curvyo_ui_core::SelectBarState`]:
@@ -157,6 +158,26 @@ impl WasmSession {
     /// "Flip vertically": as [`WasmSession::flip_horizontally`].
     pub fn flip_vertically(&mut self) -> String {
         flip_code(self.session.flip_selection(FlipAxis::Vertical))
+    }
+
+    /// The Guide button (`specs/0046-document-shapes` criteria 9, 10 and 34): `"disabled"` when
+    /// nothing selected can be a guide, `"pressed"` when everything that can is one,
+    /// `"pressed-inert"` when only linked clones of guides are selected, else `"off"`.
+    #[must_use]
+    pub fn guide_state(&self) -> String {
+        match self.session.guide_button_state() {
+            GuideButtonState::Disabled => "disabled",
+            GuideButtonState::Off => "off",
+            GuideButtonState::Pressed => "pressed",
+            GuideButtonState::PressedInert => "pressed-inert",
+        }
+        .to_string()
+    }
+
+    /// A press of the Guide button: marks the selection as guides or turns them back, one step
+    /// "Guide". Whether anything was written.
+    pub fn toggle_guide(&mut self) -> bool {
+        self.session.toggle_guide()
     }
 
     /// Removes the "max" notice of a limited typed radius, 1.5 s after it

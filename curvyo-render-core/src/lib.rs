@@ -24,6 +24,7 @@ mod document_area;
 mod fill;
 mod glyphs;
 mod group_box;
+mod guide_style;
 mod history_preview;
 mod live_preview;
 mod marker_place;
@@ -43,7 +44,7 @@ mod shared_outline;
 mod stroke;
 mod theme;
 
-pub use artwork::build_artwork;
+pub use artwork::{build_artwork, build_artwork_with_guides};
 pub use clone_marks::{CloneTrace, build_clone_marks};
 pub use color::RgbaColor;
 pub use context_dim::{CONTEXT_DIM, dim_outside};

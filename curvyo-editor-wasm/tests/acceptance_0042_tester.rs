@@ -1201,8 +1201,8 @@ fn c6_c33_save_and_open_keep_the_branches_and_the_format_version() {
         u64::from(CURRENT_FORMAT_VERSION)
     );
     assert_eq!(
-        CURRENT_FORMAT_VERSION, 14,
-        "0042 adds no bump; 14 is main after 0057"
+        CURRENT_FORMAT_VERSION, 15,
+        "0042 adds no bump; 15 is main after 0046"
     );
 }
 

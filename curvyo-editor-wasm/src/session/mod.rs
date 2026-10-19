@@ -47,6 +47,7 @@ mod group_view;
 mod grouping;
 #[cfg(test)]
 mod grouping_tests;
+mod guides;
 mod history;
 mod history_list;
 mod history_preview;
@@ -116,6 +117,8 @@ pub use document::{DocumentSide, FitOutcome, SizeOutcome};
 pub use document_presets::DocumentPresetsRecord;
 pub use formats::{FormTexts, FormatEdit};
 pub use grouping::{GroupingKind, GroupingResult};
+#[cfg(target_arch = "wasm32")]
+pub use guides::GuideButtonState;
 pub use history::HistoryResult;
 pub use history_preview::{FAR_PREVIEW_ROWS, HistoryRowPress};
 pub use history_rows::{WipeOutcome, WipeState};
