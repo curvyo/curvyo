@@ -1512,7 +1512,9 @@ for the desktop app.
 `curvyo-ui-core/src/node_tool.rs` has about 930 production lines after `0053` added the node
 marquee, against the ~500-line guide in `CLAUDE.md` §5. The Join rules (which pairs of end nodes
 can be joined, and the reason line when they cannot) are a separate responsibility. Move them into
-their own module the next time a slice changes the Node tool (likely `0055`).
+their own module the next time a slice changes the Node tool (likely `0055`). Update 2026-10-19:
+`0055` brought it to about 967 production lines (Join and Split outcomes for the notices) without
+the split; it stays open.
 
 ## Node marquee rings are drawn as one mesh per ring (`0053`, 2026-10-14)
 

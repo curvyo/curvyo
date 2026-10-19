@@ -22,10 +22,6 @@ export const BOOLEAN_OPS: readonly BooleanOp[] = [
   "reverse_difference",
 ];
 
-/** The line of the Node bar slot and of the hint chip after a double-click
- * on a compound path (criterion 38). */
-export const COMPOUND_NODES_TEXT = "Nodes of compound paths cannot be edited yet.";
-
 /** What the rail section shows (`WasmSession.boolean_availability`). */
 export interface BooleanAvailabilityState {
   /** Dimmed: fewer than two objects selected, or not the Select tool. */

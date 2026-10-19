@@ -1,5 +1,5 @@
 // Independent check of the sentences in `specs/0016-boolean-operations/specification.md`
-// (criteria 1, 2, 15 to 17, 29, 38), written from the specification before reading the
+// (criteria 1, 2, 15 to 17, 29; 38 is withdrawn by `specs/0055-compound-path-node-editing/`), written from the specification before reading the
 // implementation. Every expected string is copied from the specification, not from the code.
 
 import assert from "node:assert/strict";
@@ -7,7 +7,6 @@ import { test } from "node:test";
 
 import {
   BOOLEAN_OPS,
-  COMPOUND_NODES_TEXT,
   operationName,
   operationRule,
   refusalOutlinesObjects,
@@ -116,10 +115,6 @@ test("criterion 16: which refusals outline objects", () => {
   assert.equal(r("empty"), false);
   assert.equal(r("applied"), false);
   assert.equal(r("needs_two"), false);
-});
-
-test("criterion 38: the compound path sentence", () => {
-  assert.equal(COMPOUND_NODES_TEXT, "Nodes of compound paths cannot be edited yet.");
 });
 
 test("every refusal text ends with Nothing was changed. and has no placeholder left", () => {

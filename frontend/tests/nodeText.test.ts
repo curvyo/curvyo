@@ -34,15 +34,15 @@ test("the status-bar count reads k of n, n, or Segment, n (criterion 23)", () =>
 test("the Join reason names the count or the non-end nodes (criterion 19)", () => {
   assert.equal(
     joinReasonText({ ...base, selectedNodes: 5 }),
-    "Needs exactly two end nodes of open paths. 5 nodes selected.",
+    "Needs exactly two end nodes of open paths or outlines. 5 nodes selected.",
   );
   assert.equal(
     joinReasonText({ ...base, selectedNodes: 1 }),
-    "Needs exactly two end nodes of open paths. 1 node selected.",
+    "Needs exactly two end nodes of open paths or outlines. 1 node selected.",
   );
   assert.equal(
     joinReasonText({ ...base, joinBlock: 2, joinNotEnd: 1, selectedNodes: 2 }),
-    "Needs end nodes of open paths. 1 of 2 selected nodes is not an end node.",
+    "Needs end nodes of open paths or outlines. 1 of 2 selected nodes is not an end node.",
   );
   assert.equal(joinReasonText({ ...base, joinBlock: 3, selectedNodes: 2 }), null);
   assert.equal(joinReasonText({ ...base, joinBlock: 0, selectedNodes: 2 }), null);
@@ -51,11 +51,11 @@ test("the Join reason names the count or the non-end nodes (criterion 19)", () =
 
 test("the Join reason splits into a rule line and a count line", () => {
   assert.deepEqual(joinReasonLines({ ...base, selectedNodes: 5 }), [
-    "Needs exactly two end nodes of open paths.",
+    "Needs exactly two end nodes of open paths or outlines.",
     "5 nodes selected.",
   ]);
   assert.deepEqual(joinReasonLines({ ...base, joinBlock: 2, joinNotEnd: 1, selectedNodes: 2 }), [
-    "Needs end nodes of open paths.",
+    "Needs end nodes of open paths or outlines.",
     "1 of 2 selected nodes is not an end node.",
   ]);
   assert.equal(joinReasonLines(base), null);

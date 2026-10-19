@@ -1,6 +1,6 @@
 # Pen path extension: continue an open path, connect two paths, choose how a path closes, close a selected path
 
-Status: Done (#79, milestone M3 of the path-tools PR). Amended by `0020-undo-redo`: the sentence "No undo yet." and the statements that no undo exists are removed; Ctrl+Z takes the step back.
+Status: Done (#79, milestone M3 of the path-tools PR). Amended by `0020-undo-redo`: the sentence "No undo yet." and the statements that no undo exists are removed; Ctrl+Z takes the step back. Amended by `0055-compound-path-node-editing` (2026-10-19, built on `story/compound-path-node-editing`): criteria 1 and 12 include the open outline ends of compound paths, criterion 21 counts their open outlines (`0055` criteria 7 to 9).
 Priority: Should
 Origin: Customer (the four requests: extend an open path from either end, connect two paths with the Pen, choose a sharp or smooth closing node, an auto-close helper). The modifier, the defaults, the preview, the labels and the "Shift means the alternative" rule are my proposals, marked in "Decided by the product owner" and in the open questions.
 

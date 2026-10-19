@@ -1,6 +1,6 @@
 # Path merge/split and a third node type
 
-Status: Done
+Status: Done Amended by `0055-compound-path-node-editing` (2026-10-19, built on `story/compound-path-node-editing`): Join and Split at a node act on the open outlines of compound paths (`0055` criteria 5 and 6).
 Done, with: criterion 15 (both nodes selected after Split) is superseded by `edit-interaction-polish` criteria 50 to 52 (one node selected).
 Priority: Must
 Origin: Customer

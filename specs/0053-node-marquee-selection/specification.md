@@ -1,6 +1,6 @@
 # Node marquee selection: drag a box in the Node tool to select many nodes
 
-Status: Ready (architect decisions in `adrs.md` (2026-10-12): no new ADR, no new crate or dependency, no `format_version` change, one `curvyo-document-core` API change; UX notes confirmed 2026-10-12; the open questions use their recorded defaults; criteria marked (Proposal) can be vetoed by the customer at the demo)
+Status: Ready (architect decisions in `adrs.md` (2026-10-12): no new ADR, no new crate or dependency, no `format_version` change, one `curvyo-document-core` API change; UX notes confirmed 2026-10-12; the open questions use their recorded defaults; criteria marked (Proposal) can be vetoed by the customer at the demo) Amended by `0055-compound-path-node-editing` (2026-10-19, built on `story/compound-path-node-editing`): criterion 4 loses "compound paths contribute no node"; every outline of a compound path contributes its nodes (`0055` UX notes, "With the node marquee").
 Priority: Should
 Origin: Customer (request of 2026-10-12). Criteria marked (Proposal) are product-owner additions, built with the slice and vetoable at the demo.
 

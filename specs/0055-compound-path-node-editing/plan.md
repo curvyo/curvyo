@@ -45,33 +45,33 @@ crate, no new dependency, no trait, no generic.
 Milestone 1: document model commands work per outline (commit
 `feat(curvyo-document-core): node commands act on the outline that holds the anchor`).
 
-- [ ] 1. Outline resolver in `subpath_codec.rs`, `outline_parts` in `paths.rs`; move, handle,
+- [x] 1. Outline resolver in `subpath_codec.rs`, `outline_parts` in `paths.rs`; move, handle,
   insert, make line/curve, bend and convert per outline; a segment of two outlines is
   `NotAnAdjacentSegment` (AC 3).
-- [ ] 2. Delete per outline with removal, promotion and the drop to an ordinary path (AC 4, 10).
-- [ ] 3. Join (a), (b), (c) and Split at a node on compound paths (AC 5, 6, 10).
-- [ ] 4. `PathGrowth.at` and the absorbed outline; extend, connect and close per outline (AC 7, 8,
+- [x] 2. Delete per outline with removal, promotion and the drop to an ordinary path (AC 4, 10).
+- [x] 3. Join (a), (b), (c) and Split at a node on compound paths (AC 5, 6, 10).
+- [x] 4. `PathGrowth.at` and the absorbed outline; extend, connect and close per outline (AC 7, 8,
   9, 10).
-- [ ] 5. Save and reopen of an edited compound path keeps outlines, states, directions, ids; no
+- [x] 5. Save and reopen of an edited compound path keeps outlines, states, directions, ids; no
   format change (AC 12).
 
 Milestone 2: the Node tool, Close path and the Pen on compound paths (commit
 `feat(curvyo-ui-core): the Node tool, Close path and the Pen edit compound paths`).
 
-- [ ] 6. Editing set keeps compound paths; overlay, hit test, drag, handles, insert, bend per
+- [x] 6. Editing set keeps compound paths; overlay, hit test, drag, handles, insert, bend per
   outline; `compound_only` and the compound double-click hint removed (AC 1, 2, 3).
-- [ ] 7. Join and Split through the Node tool with the moved-outline and split counts (AC 5, 6).
-- [ ] 8. Close path: outline candidates, selected-node rule, counts of paths and outlines apart
+- [x] 7. Join and Split through the Node tool with the moved-outline and split counts (AC 5, 6).
+- [x] 8. Close path: outline candidates, selected-node rule, counts of paths and outlines apart
   (AC 7).
-- [ ] 9. Pen: open outline ends are continue, close and connect targets; moved-outline count for
+- [x] 9. Pen: open outline ends are continue, close and connect targets; moved-outline count for
   the notice (AC 8, 9).
-- [ ] 10. Undo restores each command (AC 10).
-- [ ] 11. Release budget test on the 4004-node plate, added to `ci.yml` (AC 11).
+- [x] 10. Undo restores each command (AC 10).
+- [x] 11. Release budget test on the 4004-node plate, added to `ci.yml` (AC 11).
 
 Milestone 3: the frontend (commit `feat(frontend): node editing of compound paths in the Node bar
 and the Pen`).
 
-- [ ] 12. Node bar without the compound pill and hint chip; Join tooltip words "open paths or
+- [x] 12. Node bar without the compound pill and hint chip; Join tooltip words "open paths or
   outlines"; Join and Split notices; Close path notes and notice with outline counts; the Pen's
   Join notice in the Edit hint chip surface (AC 1, 5, 6, 7, 9).
 
@@ -96,6 +96,23 @@ and the Pen`).
   `ac38a_...`, `compound_path.rs` `join_and_split_refuse_a_compound_path`, the editor-wasm tests that
   check the compound pill and the compound double-click hint) assert behaviour this spec withdraws.
   They are rewritten to the amended criteria (Join and Split now act), not deleted. Reported.
+
+## Notes from the build
+
+- **Join and Split keep their Node-tool signatures for the tests.** `Session::join_selected` returns
+  the moved-outline count; `Session::split_selected` stays `()` (a tester test passes it as a
+  `FnMut(&mut Session)`), and `Session::split_selected_outcome` returns the `NodeSplitOutcome`.
+- **The Join and Split notices** appear under the Node bar's buttons. A Join or Split run from the
+  canvas context menu shows no notice (the notice has no button to sit under there).
+- **The clone pill** shows for a selection of linked clones only; clones together with compound
+  paths now show the ordinary Node bar (compound paths have nodes).
+- **The Pen's Join notice** sits at the release point in the Edit hint chip surface (within the
+  16 px target radius of the joined node), 3 s.
+- **Withdrawn criteria in older tests:** the tests of `0016` criteria 38 and 38a, of the `0031`
+  criterion 6 compound exclusion and of the `0053` criterion 4 compound exclusion (tester and
+  implementer files) are rewritten to the amended behaviour, each with a comment naming `0055`.
+- **`docs/design-system.md`** rows named in the UX notes are for the `ux-engineer` in the slice's
+  PR (spec UX notes, "Design system"); not changed here.
 
 ## Validation
 

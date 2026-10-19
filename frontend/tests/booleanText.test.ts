@@ -7,7 +7,6 @@ import { test } from "node:test";
 
 import {
   BOOLEAN_OPS,
-  COMPOUND_NODES_TEXT,
   operationName,
   operationRule,
   refusalOutlinesObjects,
@@ -129,8 +128,4 @@ test("results that are no refusal have no refusal text, and only some outline ob
   assert.equal(refusalText("union", result("needs_two")), null);
   assert.equal(refusalOutlinesObjects(result("no_area", 1, 2)), true);
   assert.equal(refusalOutlinesObjects(result("empty")), false);
-});
-
-test("the compound path sentence is the one of criterion 38", () => {
-  assert.equal(COMPOUND_NODES_TEXT, "Nodes of compound paths cannot be edited yet.");
 });
