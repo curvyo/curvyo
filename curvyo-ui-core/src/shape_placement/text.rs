@@ -148,13 +148,13 @@ pub fn placed_sentence(shape: &Shape, unit: DisplayUnit) -> String {
 }
 
 /// A length for a sentence: the status bar's decimals without trailing zeros.
-fn number(length: Length, unit: DisplayUnit) -> String {
+pub(crate) fn number(length: Length, unit: DisplayUnit) -> String {
     let fixed = format_status_length(length, unit);
     let decimals = fixed.split_once('.').map_or(0, |(_, d)| d.len());
     decimal_text(length.in_unit(unit), decimals)
 }
 
-const fn unit_words(unit: DisplayUnit) -> &'static str {
+pub(crate) const fn unit_words(unit: DisplayUnit) -> &'static str {
     match unit {
         DisplayUnit::Mm => "millimetres",
         DisplayUnit::Cm => "centimetres",
