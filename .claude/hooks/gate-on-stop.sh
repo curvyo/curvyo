@@ -11,7 +11,7 @@ input=$(cat)
 # CI and the tester still catch what is left.
 [[ "$(jq -r '.stop_hook_active // false' <<<"$input")" == "true" ]] && exit 0
 
-# Run in the agent's working directory (may be a worktree).
+# Run in the agent's working directory (the project checkout).
 cwd=$(jq -r '.cwd // empty' <<<"$input")
 cd "${cwd:-$CLAUDE_PROJECT_DIR}" 2>/dev/null || exit 0
 root=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0

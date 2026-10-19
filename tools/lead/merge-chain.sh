@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 # Rebase, push and merge a series of docs or chore PRs one after another.
-# Usage: tools/lead/merge-chain.sh <pr>:<worktree>:<branch> ...
-#   run from the project directory (the one that holds base/); each worktree is
-#   a path relative to it. For every entry: rebase onto origin/main, push with
+# Usage: tools/lead/merge-chain.sh <pr>:<checkout>:<branch> ...
+#   run from the project directory (the clone); <checkout> is a path relative
+#   to it, normally `.`. For every entry: rebase onto origin/main, push with
 #   --force-with-lease, retarget the PR to main, then tools/lead/strict-merge.sh.
 #   Stops at the first conflict, red check or missing check; resolve it by hand.
 # Start it detached so a restart of the session does not kill it:
-#   setsid nohup tools/lead/merge-chain.sh 143:refine-0033:chore/x ... > chain.log 2>&1 &
+#   setsid nohup tools/lead/merge-chain.sh 143:.:chore/x ... > chain.log 2>&1 &
 set -u
 here=$(cd "$(dirname "$0")" && pwd)
 repo=${GH_REPO:-curvyo/curvyo}
-[ "$#" -gt 0 ] || { echo "usage: merge-chain.sh <pr>:<worktree>:<branch> ..."; exit 2; }
+[ "$#" -gt 0 ] || { echo "usage: merge-chain.sh <pr>:<checkout>:<branch> ..."; exit 2; }
 
 for entry in "$@"; do
   IFS=: read -r pr wt branch <<<"$entry"
