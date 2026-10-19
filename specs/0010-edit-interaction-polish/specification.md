@@ -576,7 +576,8 @@ on the centre handle) and has left the 3 px dead zone.
     first a route that `advanced-selection`'s marquee rule does not take.
 39. Given the Node tool, the Pen tool or a creation tool, then Shift and Ctrl have
     no new meaning in this part; only the Select tool's move drags are
-    concerned.
+    concerned. (Since `0072`, 2026-10-19: Ctrl locks the segment angle in the Pen
+    once the path in progress has a last node.)
 40. Given a drag of a resize, rotate, skew or parameter handle, then Ctrl and Shift
     keep exactly the meaning they have there; no copy is made by those drags.
 41. Given a copy of 200 selected objects (100 paths with 50 nodes each, 100

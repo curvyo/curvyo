@@ -91,7 +91,7 @@ Distances are document millimetres unless a criterion says "px" (screen pixels).
 - **Snapping a finished path's end to a nearby end** without a click on it, and closing by distance when the path is finished with Enter.
 - **Reversing a path's direction** as a command, and choosing the direction on connect.
 - **Compound paths, primitives and groups** as targets (a path inside a group becomes a target only if `0023-groups` says so).
-- **Alt and Ctrl at the targets.** Ctrl is kept for angle constraint in the Pen, which the product does not have yet.
+- **Alt and Ctrl at the targets.** Ctrl is kept for angle constraint in the Pen, which the product does not have yet. (Since `0072`, 2026-10-19: Ctrl locks the angle away from the targets; at a target it still has no meaning.)
 - **A keyboard way to close** (a "C" key), a shortcut for Close path.
 - **Close path in the Select bar or the left rail.** The command lives in the Node bar only (UX decision, 2026-10-10).
 - **Merging Q's style into P**, choosing the surviving style in a prompt.

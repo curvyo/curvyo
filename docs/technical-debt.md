@@ -1392,7 +1392,8 @@ built-in list.
 - **List semantics:** the formats list is a `group` with buttons; `role="list"` and `listitem` rows would
   let a screen reader announce the count (UX N13).
 - **`session/mod.rs` is over 500 lines** (537 non-test lines before the slice; 571 after `0020`; `session/keys.rs` has 506); split the glue calls out
-  when the next slice touches it.
+  when the next slice touches it. *2026-10-19 (`0072`):* `session/mod.rs` is at 1391 lines in
+  total after `0072` (it gained the Pen entry field and its press routing).
 - **The Select bar overlaps the properties panel below about 600 px window width** (UX review of `0040`, found at 420 px; below the 800 x 600 minimum, so not fixed there).
 
 ## The click on a reference mark is decided in TypeScript (0047)
