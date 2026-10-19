@@ -26,7 +26,7 @@ This file is loaded into every session. Keep it short. Detail belongs in
 | **Lead** (main session) | Plans, delegates to subagents, integrates, reports to customer | Write product code beyond trivial glue |
 | `product-owner` | Vision, backlog, `specification.md` per feature with acceptance criteria, proposes features that make the product great | Touch `src/` |
 | `architect` | ADRs, `adrs.md` per feature, crate layout, reviews structural changes, guards the rules in §5 | Implement features |
-| `implementer` | Writes `plan.md`, implements one feature at a time, test-first, in its own worktree | Change scope or acceptance criteria |
+| `implementer` | Writes `plan.md`, implements one feature at a time, test-first, on its own branch | Change scope or acceptance criteria |
 | `ux-engineer` | Design system, interaction design, UI review of every feature with UI | Change domain logic |
 | `tester` | Tests against acceptance criteria, edge cases, regressions; reports PASS/FAIL | Fix production code |
 
@@ -80,7 +80,7 @@ full convention in `specs/README.md`:
 1. **Ready** — `specification.md` and `adrs.md` exist. UX notes attached
    (in `specification.md` or linked from it) if the feature has UI.
 2. **Build** — implementer writes `plan.md` first, then works on branch
-   `story/<feature-slug>` in a git worktree. Tests first for core logic.
+   `story/<feature-slug>` in the project checkout. Tests first for core logic.
 3. **Verify** — tester writes acceptance tests from `specification.md`
    without reading the implementation first, then runs the full gate (§7).
    `ux-engineer` reviews UI. `architect` reviews if crates, public APIs,
@@ -120,22 +120,22 @@ guide": the 3-8 central Rust files and what to look for in each, every
 dependency change with licence and reason, every docs/spec/ADR change, the
 format version change (if any), and how to try the slice (the command).
 
-Parallel work: at most two implementers at once, each in its own worktree,
-on features that do not touch the same crates.
+Parallel work: at most one implementer per VM (one checkout, one branch at a
+time). Streams on different VMs run in parallel.
 
-**Where agents work (customer rule, 2026-10-06; paths relative since 2026-10-12):**
-everything happens inside the **project directory**: the directory that holds
-the main checkout `base/` (on the customer's laptop
-`~/workbench/vecmanf-claude/`, on the VMs `~/<project>/`, set up by
-`tools/worker-setup/`). The project
-directory also holds the symlinks `CLAUDE.md` and `.claude` into `base/`, and
-the sessions start there. Every agent that needs its own copy (implementer,
-tester, fix branches) gets a git worktree next to `base/`, at `../<slug>/`
-relative to `base/` (`git -C base worktree add ../<slug> -b <branch> origin/main`,
-run from the project directory, then `projectatlas init` inside the new worktree), and the lead removes it after the PR is merged
-(`git -C base worktree remove --force ../<slug>`: `--force` because of the ignored index).
-Nothing is ever created outside the project directory, and no agent reads or
-writes outside it. No machine-specific absolute path goes into the repo.
+**Where agents work (customer rule, 2026-10-19; replaces the worktree layout):**
+every VM has ONE plain checkout. The **project directory** is the git clone
+itself (on the customer's laptop `~/workbench/vecmanf-claude/`, on the VMs
+`~/<project>/`, set up by `tools/worker-setup/`). There is no `base/`, no
+worktree next to it and no symlink; sessions start in the clone. One
+implementer per VM works there on one branch at a time
+(`git switch -c story/<slug> origin/main`). The tester and the UX review use
+the same checkout on the same branch, one after the other; acceptance tests
+are written on a branch `test/<slug>-acceptance` only if needed, or as a commit
+on the story branch before the implementation is read. After a merge:
+`git switch main && git pull --ff-only && git branch -d <branch>`. Nothing is
+ever created outside the project directory, and no agent reads or writes
+outside it. No machine-specific absolute path goes into the repo.
 
 ## 5. Engineering rules
 
@@ -251,11 +251,9 @@ and CI structure. Adaptations for this project:
 
 Use the ProjectAtlas MCP for code navigation before broad grep/read passes.
 Its tools are deferred (load them with ToolSearch first), every call takes
-`project_path=<absolute worktree path>`, and each new worktree needs one
-`projectatlas init` (details in the "Finding code: ProjectAtlas" section of
-`.claude/agents/implementer.md`).
-Keep `base/` at `origin/main` on every machine (`git -C base pull --ff-only`, then
-`projectatlas scan` in `base/`) after each merge and at the start of a task.
+`project_path=<absolute path of the checkout>`. Run `projectatlas init` once in
+the checkout and `projectatlas scan` after every pull or branch switch (details
+in the "Finding code: ProjectAtlas" section of `.claude/agents/implementer.md`).
 
 ## 9. Git and GitHub
 

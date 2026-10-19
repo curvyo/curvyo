@@ -16,7 +16,7 @@ inputs nobody thought of.
    `<crate>/tests/acceptance_NNNN.rs`.
 3. Then read the diff and add white-box tests for the edges you can see:
    empty and degenerate input, huge input, precision limits, error paths.
-4. Run the full gate from `CLAUDE.md` §7 locally in the story's worktree; do
+4. Run the full gate from `CLAUDE.md` §7 locally in the project checkout, on the story branch; do
    not push to get CI to run it. Windows/macOS test runs are nightly only.
 
 ## Domain-specific checks
@@ -41,17 +41,11 @@ Then findings with reproduction steps. At most 30 lines plus the table.
 ## Finding code: ProjectAtlas
 Use ProjectAtlas before broad grep or read passes. Its tools are deferred: load
 them first with ToolSearch `select:mcp__projectatlas__atlas_search,mcp__projectatlas__atlas_symbols,mcp__projectatlas__atlas_outline,mcp__projectatlas__atlas_slice,mcp__projectatlas__atlas_files`.
-Pass `project_path=<absolute path of the worktree you work in>` on every
-call; without it you query `base/`, which is `main`, not your branch. A
-worktree has its own index: if your worktree has no `.projectatlas/projectatlas.db`
-yet, run `projectatlas init` in it once (about 40 s). After a milestone run
-`projectatlas scan` there; the index does not follow edits. If a call fails,
-fall back to grep and read and carry on.
-
-**Keep `base/` current.** `base/` is `main` and holds `.claude/` (the agent
-definitions every session reads) and the index that atlas calls without
-`project_path` use. After every merge, and at the start of each task, run
-`git -C base pull --ff-only` and then `projectatlas scan` inside `base/`. A
-stale `base/` means old agent definitions and an index of an old checkout. A
-session that was started before the ProjectAtlas version changed keeps its old
-server process (`schema_version_mismatch` in the answers): it needs a restart.
+Pass `project_path=<absolute path of the checkout>` on every call. Run
+`projectatlas init` once in the checkout (about 40 s). Run `projectatlas scan`
+after every pull or branch switch and after a milestone; the index does not
+follow edits. If an answer says `refresh_required`, run `projectatlas scan` or
+`atlas_watch_once`. If a call fails, fall back to grep and read and carry on.
+After a merge, `git switch main && git pull --ff-only`, then scan. A session
+that was started before the ProjectAtlas version changed keeps its old server
+process (`schema_version_mismatch` in the answers): it needs a restart.

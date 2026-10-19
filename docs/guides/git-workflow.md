@@ -56,8 +56,8 @@ branch (section 4); `git rebase origin/main` to catch up. Never `git merge
 origin/main` into a story branch.
 
 **Safety rules**
-- Rewrite only your own `story/`, `fix/` or `chore/` branch, in your own
-  worktree. Never `main`, never a branch another agent works on.
+- Rewrite only your own `story/`, `fix/` or `chore/` branch, in the
+  project checkout. Never `main`, never a branch another agent works on.
 - Force pushes name the branch, prefer `--force-with-lease`, and only ever
   target your own `story/`, `fix/` or `chore/` branch. Never `main`, never a
   wildcard refspec, never a branch someone else pushes to.
@@ -72,7 +72,7 @@ is allowed like any other push. The safety rules above are the guard: it is
 the agent's own branch, and the agent is responsible for what it rewrites.
 Prefer `--force-with-lease`; a plain `--force` is allowed on your own branch
 when the lease keeps failing for a reason you understand (for example after
-you rewrote the branch from another worktree). `git reset --hard` stays denied.
+you rewrote the branch from another machine). `git reset --hard` stays denied.
 
 ## 3. Merging
 
@@ -96,11 +96,11 @@ keeps the history linear and every commit separate (the repo has
 
 Allowed so work can continue while the customer is away. **Maximum depth 3**
 (one PR on main, two on top). Any number of parallel PRs from `main` stays
-allowed (two implementers at once, `CLAUDE.md` §4).
+allowed (one implementer per VM, `CLAUDE.md` §4).
 
 **Build**
 ```text
-git worktree add ../<upper-slug> -b story/<upper> story/<lower>
+git switch -c story/<upper> story/<lower>
 gh pr create --base story/<lower> --head story/<upper> ...
 ```
 The upper PR's base is the lower story branch, so its diff shows only its own
