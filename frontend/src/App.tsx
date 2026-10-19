@@ -127,6 +127,7 @@ function Editor() {
               linkedCloneNotice={editor.clones.barNotice}
               flipEnabled={editor.flipEnabled}
               flip={editor.flip}
+              arcBar={editor.arcBar}
               onReturnFocus={() => editor.containerRef.current?.focus()}
             />
           ) : null}

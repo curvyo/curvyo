@@ -2,12 +2,14 @@ import { CircleAlert, Link, Unlink } from "lucide-react";
 import { Toggle, Tooltip } from "radix-ui";
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 
+import { CurveGroup, EllipseGroup } from "@/components/ArcCurveGroups";
 import { FlipGroup } from "@/components/FlipGroup";
 import { RatioSlider } from "@/components/RatioSlider";
 import { RATIO_SLIDER_NAMES } from "@/lib/sliderNames";
 import { ToolbarSwitch } from "@/components/ToolbarSwitch";
 import type { SelectBarState } from "@/hooks/useEditorSession";
 import type { CloneBarNotice } from "@/hooks/useClones";
+import type { ArcBarApi } from "@/hooks/useArcBar";
 import type { FlipApi } from "@/hooks/useFlip";
 import { LINKED_CLONE_TOOLTIP } from "@/lib/cloneText";
 
@@ -45,6 +47,8 @@ export interface SelectToolbarProps {
    * criterion 1). */
   flipEnabled: boolean;
   flip: FlipApi;
+  /** The ellipse group and the Curve field (`specs/0021-ellipse-arcs-and-shaping/`). */
+  arcBar: ArcBarApi;
   /** Returns the keyboard focus to the canvas (after Enter or Escape in a
    * field). */
   onReturnFocus: () => void;
@@ -535,6 +539,7 @@ export function SelectToolbar({
   linkedCloneNotice,
   flipEnabled,
   flip,
+  arcBar,
   onReturnFocus,
 }: SelectToolbarProps) {
   const barRef = useRef<HTMLDivElement>(null);
@@ -582,6 +587,13 @@ export function SelectToolbar({
         )}
       </div>,
     );
+  }
+  // After the kind groups: the ellipse group, then the curve group (UX notes, "Select bar").
+  if (arcBar.state.ellipseShown) {
+    groups.push(<EllipseGroup key="ellipse" arc={arcBar} onReturnFocus={onReturnFocus} />);
+  }
+  if (arcBar.state.curveShown) {
+    groups.push(<CurveGroup key="curve" arc={arcBar} onReturnFocus={onReturnFocus} />);
   }
   if (bar.objectToPathShown) {
     groups.push(

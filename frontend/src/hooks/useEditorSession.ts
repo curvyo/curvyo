@@ -12,6 +12,7 @@ import { type BackingBuffer, backingBufferFor, sameBackingBuffer } from "@/lib/c
 import { ModifierTracker } from "@/lib/keyModifiers";
 import { parseLayerNotice } from "@/lib/layerRows";
 import { FLIP_NOTICE_MS } from "@/lib/flipText";
+import { type ArcBarApi, useArcBar } from "@/hooks/useArcBar";
 import { type FlipApi, useFlip } from "@/hooks/useFlip";
 import { TOO_FAR_HINT } from "@/lib/nudgeText";
 import { createSession, openSession } from "@/lib/editorSession";
@@ -686,6 +687,8 @@ export interface EditorSession {
   flip: FlipApi;
   /** The flip buttons act: something is selected in the Select tool. */
   flipEnabled: boolean;
+  /** The Select bar's ellipse group and Curve field (`specs/0021-ellipse-arcs-and-shaping/`). */
+  arcBar: ArcBarApi;
   /** The size chip's note line for the typed texts ("Mirrored left to right"), or "". */
   transformEntryMirrorLine: (first: string, second: string, lastEdited: number) => string;
   /** The click-to-create placement and its chip (`specs/0052-click-to-create-shapes`). */
@@ -1048,6 +1051,7 @@ export function useEditorSession(
   // A release or an Enter that set a size to 0.01 mm says so in the canvas notice slot
   // (`0056` criterion 15).
   const { announceText } = flip;
+  const arcBar = useArcBar(getSession, syncFromSession, announceText, syncRevision);
   const showTransformNotice = useCallback(
     (session: WasmSession) => {
       const notice = session.take_transform_notice();
@@ -2264,6 +2268,7 @@ export function useEditorSession(
     clones,
     flip,
     flipEnabled,
+    arcBar,
     placement,
     historyBusy: history.busy,
     historyNames: history.names,

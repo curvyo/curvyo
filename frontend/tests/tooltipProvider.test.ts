@@ -161,10 +161,38 @@ test("the Select bar's Ratio slider renders with the provider", async () => {
         announceText: noop,
         clearAnnouncement: noop,
       },
+      // The ellipse group and Curve field of `specs/0021-ellipse-arcs-and-shaping/`.
+      arcBar: {
+        state: {
+          ellipseShown: true,
+          kind: "",
+          kindGrey: "no-arc",
+          start: 45,
+          startMixed: false,
+          end: 45,
+          endMixed: false,
+          anglesGrey: "",
+          curveShown: true,
+          curve: 100,
+          curveMixed: false,
+          curveGrey: "",
+          curveLimited: false,
+          curveStored: 0,
+        },
+        setKind: noop,
+        makeWhole: noop,
+        setAngle: () => "committed",
+        setCurve: () => "committed",
+        previewCurve: noop,
+        commitCurve: noop,
+        cancelCurve: noop,
+      },
       onReturnFocus: noop,
     });
   const html = await render(element as never, true);
   assert.match(html, /aria-label="Star inner ratio"/);
+  assert.match(html, /aria-label="Arc kind"/);
+  assert.match(html, /aria-label="Curve"/);
   await assert.rejects(render(element as never, false), /TooltipProvider/);
 });
 
