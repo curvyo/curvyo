@@ -9,10 +9,11 @@
 //! at their closest points, and collinear chords give the two ends of their shared stretch.
 //! Overlap ends that chain along both curves merge into one stretch whose two ends are the cut
 //! points, if the curves coincide along it. Curves that only come near each other (tangent
-//! circles) touch instead: the meetings of one contact, crossings of a lens thinner than 0.01 mm
-//! included, are one cut in the middle. Only `+ - * /` and `sqrt` are used, so the same input gives bit-identical cuts on every
-//! target (`0036` criterion 11; primitive outlines come from `sin` and `cos` of the platform, so the
-//! input itself can differ by an ulp).
+//! circles) touch instead: the meetings of one contact are one cut in the middle, and so are the
+//! shallow crossings of a lens thinner than 0.01 mm (its clear crossings are cut). Only `+ - * /`
+//! and `sqrt` are used, so the same input gives bit-identical cuts on every target (`0036`
+//! criterion 11; primitive outlines come from `sin` and `cos` of the platform, so the input itself
+//! can differ by an ulp).
 //!
 //! The hit on a chord is off the true curve by at most the flat tolerance (0.0005 mm), far inside
 //! the 0.01 mm the cut is promised to. Splitting at the reported parameter is exact: the halves
