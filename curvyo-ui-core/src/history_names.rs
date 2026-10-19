@@ -49,6 +49,9 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     ("flip_vertical", "Flip vertically"),
     ("set_corner_radius", "Change corner radius"),
     ("set_corner_radii", "Change corner radius"),
+    // `specs/0021-ellipse-arcs-and-shaping` criterion 59.
+    ("set_ellipse_arc", "Change arc"),
+    ("set_curve", "Change curve"),
     ("convert_to_paths", "Object to path"),
     ("delete_objects", "Delete"),
     ("edit_style", "Change style"),

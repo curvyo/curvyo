@@ -100,7 +100,10 @@ pub(crate) fn is_open(object: &ObjectSnapshot) -> bool {
         | ObjectSnapshot::Clone(curvyo_document_core::CloneSnapshot { resolved: path, .. }) => {
             path.subpaths().any(|subpath| !subpath.closed)
         }
-        ObjectSnapshot::Primitive(_) => false,
+        // An open Arc (`specs/0021-ellipse-arcs-and-shaping/` criterion 60).
+        ObjectSnapshot::Primitive(primitive) => {
+            !outline_of_rotated(&primitive.shape, primitive.rotation).closed
+        }
     }
 }
 
@@ -198,13 +201,16 @@ pub(crate) fn outlines_of(object: &ObjectSnapshot) -> Vec<(Vec<OutlineTriple>, b
                 )
             })
             .collect(),
-        ObjectSnapshot::Primitive(primitive) => vec![(
-            outline_of_rotated(&primitive.shape, primitive.rotation)
-                .iter()
-                .map(|a| (a.point, a.handle_in, a.handle_out))
-                .collect(),
-            true,
-        )],
+        ObjectSnapshot::Primitive(primitive) => {
+            let outline = outline_of_rotated(&primitive.shape, primitive.rotation);
+            vec![(
+                outline
+                    .iter()
+                    .map(|a| (a.point, a.handle_in, a.handle_out))
+                    .collect(),
+                outline.closed,
+            )]
+        }
     }
 }
 

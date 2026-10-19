@@ -163,7 +163,7 @@ fn rotate_doc_object(d: &Document, radians: f64) {
                 bounds.origin.x + bounds.width.as_mm() / 2.0,
                 bounds.origin.y + bounds.height.as_mm() / 2.0,
             ),
-            Shape::Ellipse { frame } => frame.center,
+            Shape::Ellipse { frame, .. } => frame.center,
             Shape::Polygon { frame, .. } | Shape::Star { frame, .. } => frame.center,
         },
         ObjectSnapshot::Path(p) => {
@@ -1509,7 +1509,7 @@ fn ac16_ac17_pivot_rule_is_identical_for_every_kind_and_writes_frame_or_anchors(
         match doc_of(&s).object(doc_of(&s).object_ids()[0]).unwrap() {
             ObjectSnapshot::Clone(_) => panic!("no clone here"),
             ObjectSnapshot::Primitive(p) => {
-                let Shape::Ellipse { frame } = p.shape else {
+                let Shape::Ellipse { frame, .. } = p.shape else {
                     panic!()
                 };
                 assert!(
@@ -2585,7 +2585,7 @@ fn ac25_ellipse_entry_agrees_with_what_the_resize_readout_shows() {
         da.primitive(da.object_ids()[0]).unwrap().shape,
         dd.primitive(dd.object_ids()[0]).unwrap().shape,
     ) {
-        (Shape::Ellipse { frame: x }, Shape::Ellipse { frame: y }) => (x, y),
+        (Shape::Ellipse { frame: x, .. }, Shape::Ellipse { frame: y, .. }) => (x, y),
         _ => panic!(),
     };
     assert!(
@@ -3607,7 +3607,7 @@ fn finite_and_reopenable(s: &Session, ctx: &str) {
                             "{ctx}"
                         );
                     }
-                    Shape::Ellipse { frame } => assert!(
+                    Shape::Ellipse { frame, .. } => assert!(
                         frame.rx.as_mm().is_finite() && frame.ry.as_mm().is_finite(),
                         "{ctx}"
                     ),
@@ -4067,7 +4067,7 @@ fn ac19_an_entry_for_a_rotated_ellipse_and_polygon_matches_a_drag() {
         }
         let doc = doc_of(&s);
         let p = doc.primitive(doc.object_ids()[0]).unwrap();
-        let Shape::Ellipse { frame } = p.shape else {
+        let Shape::Ellipse { frame, .. } = p.shape else {
             panic!()
         };
         (frame, p.rotation.as_radians())
@@ -4219,7 +4219,7 @@ fn ac16_a_typed_angle_equals_a_dragged_angle_for_paths_ellipses_and_stars() {
                 }
                 (ObjectSnapshot::Primitive(x), ObjectSnapshot::Primitive(y)) => {
                     match (x.shape, y.shape) {
-                        (Shape::Ellipse { frame: f }, Shape::Ellipse { frame: g }) => {
+                        (Shape::Ellipse { frame: f, .. }, Shape::Ellipse { frame: g, .. }) => {
                             assert!(pnear(f.center, g.center, 1e-9), "ellipse centre");
                             assert!(near(f.rx.as_mm(), g.rx.as_mm(), 1e-9));
                         }

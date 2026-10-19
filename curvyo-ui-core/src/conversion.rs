@@ -10,8 +10,8 @@
 //! to `Document::convert_to_paths`.
 
 use curvyo_document_core::{
-    AnchorSnapshot, Angle, Document, EllipseFrame, NewAnchor, NodeId, ObjectSnapshot, PathSnapshot,
-    PrimitiveSnapshot, Shape, outline_of_rotated,
+    AnchorSnapshot, Angle, Curve, Document, EllipseFrame, NewAnchor, NodeId, ObjectSnapshot,
+    PathSnapshot, PrimitiveSnapshot, Shape, outline_of_rotated,
 };
 
 use crate::AnchorIdMinter;
@@ -41,7 +41,8 @@ pub(crate) fn is_circle(frame: &EllipseFrame) -> bool {
 /// (`specs/0047-transform-polish/` criterion 7, `adrs.md` point 2: the one predicate that
 /// decides). A path never converts; a polygon and a star always do (they store one
 /// radius); a rectangle or ellipse does unless its `rotation` minus `axes` is a quarter
-/// turn; a circle never does (it becomes an ellipse). A group passes `axes` 0; a single
+/// turn; a circle never does (it becomes an ellipse); an ellipse with an arc never does
+/// and a curved one converts like a rectangle. A group passes `axes` 0; a single
 /// object passes its own box angle, which a rectangle or ellipse shares, so it never
 /// converts.
 #[must_use]
@@ -53,13 +54,20 @@ pub(crate) fn converts_on_stretch(object: &ObjectSnapshot, axes: Angle) -> bool 
     match &primitive.shape {
         Shape::Polygon { .. } | Shape::Star { .. } => true,
         Shape::Rect { .. } => !is_quarter_turn(relative),
-        Shape::Ellipse { frame } => !is_quarter_turn(relative) && !is_circle(frame),
+        // An arc is the image of an arc under any linear map: it stays
+        // (`specs/0021-ellipse-arcs-and-shaping/` criterion 56). A curved ellipse's ring is
+        // not, unless the stretch runs along its own axes.
+        Shape::Ellipse { arc: Some(_), .. } => false,
+        Shape::Ellipse { curve, .. } if *curve != Curve::ELLIPSE_DEFAULT => {
+            !is_quarter_turn(relative)
+        }
+        Shape::Ellipse { frame, .. } => !is_quarter_turn(relative) && !is_circle(frame),
     }
 }
 
 /// The path a primitive becomes: the outline "Object to path" gives it, under the
-/// same id and with the same style, its anchors minted by `minter`, one closed
-/// outline, and the shown angle (a polygon's or star's frame angle plus its
+/// same id and with the same style, its anchors minted by `minter`, one outline (open
+/// only for an open Arc), and the shown angle (a polygon's or star's frame angle plus its
 /// register) as `rotation`. The one function behind "Object to path" and the
 /// conversion of a stretch, so the two cannot differ (`adrs.md` decision 8).
 #[must_use]
@@ -67,8 +75,9 @@ pub fn primitive_as_path(
     primitive: &PrimitiveSnapshot,
     minter: &mut AnchorIdMinter,
 ) -> PathSnapshot {
-    let anchors = outline_of_rotated(&primitive.shape, primitive.rotation)
-        .into_iter()
+    let outline = outline_of_rotated(&primitive.shape, primitive.rotation);
+    let anchors = outline
+        .iter()
         .map(|anchor| AnchorSnapshot {
             id: minter.mint(),
             point: anchor.point,
@@ -79,7 +88,7 @@ pub fn primitive_as_path(
         .collect();
     PathSnapshot {
         id: primitive.id,
-        closed: true,
+        closed: outline.closed,
         style: primitive.style.clone(),
         anchors,
         extra_subpaths: Vec::new(),
@@ -303,6 +312,8 @@ mod tests {
                         rx: Length::from_mm(5.0),
                         ry: Length::from_mm(5.0 + 1e-5),
                     },
+                    arc: None,
+                    curve: curvyo_document_core::Curve::ELLIPSE_DEFAULT,
                 },
                 rotation: Angle::from_radians(0.5),
                 ..p

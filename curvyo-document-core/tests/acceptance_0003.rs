@@ -195,7 +195,7 @@ fn ac7_ellipse_frame_from_corners_centers_and_halves() {
     let document = Document::new(1);
     let frame = EllipseFrame::from_corners(pt(0.0, 0.0), pt(20.0, 40.0));
     let id = document.create_ellipse(frame);
-    let Shape::Ellipse { frame } = document.primitive(id).unwrap().shape else {
+    let Shape::Ellipse { frame, .. } = document.primitive(id).unwrap().shape else {
         panic!("expected ellipse");
     };
     assert_eq!(frame.center, pt(10.0, 20.0));
@@ -222,7 +222,7 @@ fn ac9_circle_can_be_reshaped_into_a_non_circular_ellipse_after_creation() {
             },
         )
         .unwrap();
-    let Shape::Ellipse { frame } = document.primitive(id).unwrap().shape else {
+    let Shape::Ellipse { frame, .. } = document.primitive(id).unwrap().shape else {
         panic!("expected ellipse");
     };
     assert!((frame.rx.as_mm() - 10.0).abs() < 1e-9);
@@ -551,6 +551,7 @@ fn ac13_scaling_a_star_keeps_point_count_and_ratio_the_relationship() {
         frame,
         point_count,
         inner_ratio,
+        ..
     } = document.primitive(id).unwrap().shape
     else {
         panic!("expected star");
@@ -604,6 +605,7 @@ fn ac15_point_count_change_keeps_size_ratio_and_orientation() {
         frame: after,
         point_count,
         inner_ratio,
+        ..
     } = document.primitive(id).unwrap().shape
     else {
         panic!("expected star");

@@ -68,6 +68,8 @@ mod wasm_ruler;
 #[cfg(target_arch = "wasm32")]
 mod wasm_select_bar;
 #[cfg(target_arch = "wasm32")]
+mod wasm_select_bar_arc;
+#[cfg(target_arch = "wasm32")]
 mod wasm_select_tool;
 #[cfg(target_arch = "wasm32")]
 mod wasm_shape_tools;

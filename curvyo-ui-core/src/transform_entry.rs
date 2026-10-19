@@ -60,6 +60,11 @@ pub enum EntryKind {
     InnerRatio,
     /// One field: a path's skew angle in degrees.
     Skew,
+    /// One field: an ellipse's arc start or end angle in degrees
+    /// (`specs/0021-ellipse-arcs-and-shaping/` criterion 8).
+    ArcAngle,
+    /// One field: a shape's curve in percent (criteria 24 and 42).
+    Curve,
 }
 
 /// What a field edits.

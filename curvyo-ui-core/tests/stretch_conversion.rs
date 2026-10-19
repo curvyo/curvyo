@@ -306,7 +306,7 @@ fn a_stretched_circle_becomes_an_ellipse_not_a_path() {
     rig.drag(east, pt(east.x + 40.0, east.y), NONE);
     assert!(rig.document.primitive(circle).is_some(), "an ellipse");
     let ObjectSnapshot::Primitive(PrimitiveSnapshot {
-        shape: Shape::Ellipse { frame },
+        shape: Shape::Ellipse { frame, .. },
         rotation,
         ..
     }) = rig.document.object(circle).unwrap()

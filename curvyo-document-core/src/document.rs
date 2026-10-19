@@ -178,6 +178,7 @@ pub struct DocumentVersion(pub(crate) loro::Frontiers);
 /// the key. A `guide` value that is not a boolean is refused as damaged
 /// (`crate::node_registers`); the key on a group or a linked clone is residue (a clone reads its
 /// root's flag). The number is provisional by the rule above. Golden: `guide_v15.curvyo`.
+
 pub const CURRENT_FORMAT_VERSION: u32 = 15;
 
 pub(crate) const ROOT_MAP: &str = "root";
@@ -594,6 +595,12 @@ enum ObjectJson {
     Ellipse {
         id: crate::path_model::NodeId,
         frame: crate::primitive_model::EllipseFrame,
+        /// The arc; left out for a whole ellipse, so it exports as before.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        arc: Option<crate::ellipse_arc::EllipseArc>,
+        /// The curve as a fraction; left out at the default.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        curve: Option<f64>,
         style: crate::style_model::Style,
         rotation: crate::units::Angle,
     },
@@ -601,6 +608,9 @@ enum ObjectJson {
         id: crate::path_model::NodeId,
         frame: crate::primitive_model::StarFrame,
         point_count: u32,
+        /// The curve as a fraction; left out at the default.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        curve: Option<f64>,
         style: crate::style_model::Style,
         rotation: crate::units::Angle,
     },
@@ -609,9 +619,17 @@ enum ObjectJson {
         frame: crate::primitive_model::StarFrame,
         point_count: u32,
         inner_ratio: f64,
+        /// The curve as a fraction; left out at the default.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        curve: Option<f64>,
         style: crate::style_model::Style,
         rotation: crate::units::Angle,
     },
+}
+
+/// A curve as `document.json` shows it: `None` at the shape's default.
+fn stored_curve(curve: crate::ring_curve::Curve, default: crate::ring_curve::Curve) -> Option<f64> {
+    (curve != default).then_some(curve.get())
 }
 
 impl From<crate::primitive_model::ObjectSnapshot> for ObjectJson {
@@ -649,16 +667,23 @@ impl From<crate::primitive_model::ObjectSnapshot> for ObjectJson {
                         style,
                         rotation,
                     },
-                    Shape::Ellipse { frame } => Self::Ellipse {
+                    Shape::Ellipse { frame, arc, curve } => Self::Ellipse {
                         id,
                         frame,
+                        arc,
+                        curve: stored_curve(curve, crate::ring_curve::Curve::ELLIPSE_DEFAULT),
                         style,
                         rotation,
                     },
-                    Shape::Polygon { frame, point_count } => Self::Polygon {
+                    Shape::Polygon {
+                        frame,
+                        point_count,
+                        curve,
+                    } => Self::Polygon {
                         id,
                         frame,
                         point_count: point_count.get(),
+                        curve: stored_curve(curve, crate::ring_curve::Curve::POLYGON_DEFAULT),
                         style,
                         rotation,
                     },
@@ -666,7 +691,9 @@ impl From<crate::primitive_model::ObjectSnapshot> for ObjectJson {
                         frame,
                         point_count,
                         inner_ratio,
+                        curve,
                     } => Self::Star {
+                        curve: stored_curve(curve, crate::ring_curve::Curve::POLYGON_DEFAULT),
                         id,
                         frame,
                         point_count: point_count.get(),

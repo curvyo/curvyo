@@ -361,7 +361,7 @@ fn ac25_creation_drags_follow_the_constraint_and_create_exactly_as_0003() {
     s.set_tool(Tool::Ellipse);
     drag(&mut s, a, b, false, false);
     match prim(&s, 0).shape {
-        Shape::Ellipse { frame } => {
+        Shape::Ellipse { frame, .. } => {
             assert!(near(frame.rx.as_mm(), 45.0 / k, 1e-9));
             assert!(near(frame.ry.as_mm(), 20.0 / k, 1e-9));
             assert!(near(frame.center.x, a.x + 45.0 / k, 1e-9));
@@ -372,7 +372,7 @@ fn ac25_creation_drags_follow_the_constraint_and_create_exactly_as_0003() {
     s.set_tool(Tool::Ellipse);
     drag(&mut s, a, b, false, true);
     match prim(&s, 0).shape {
-        Shape::Ellipse { frame } => assert!(near(frame.rx.as_mm(), frame.ry.as_mm(), 1e-9)),
+        Shape::Ellipse { frame, .. } => assert!(near(frame.rx.as_mm(), frame.ry.as_mm(), 1e-9)),
         other => panic!("ellipse expected {other:?}"),
     }
     // Polygon and star: centre A, one vertex at B.
@@ -385,6 +385,7 @@ fn ac25_creation_drags_follow_the_constraint_and_create_exactly_as_0003() {
         Shape::Polygon {
             frame,
             point_count: count,
+            ..
         } => {
             assert_eq!(count.get(), 6);
             assert!(near(frame.center.x, a.x, 1e-9) && near(frame.center.y, a.y, 1e-9));
@@ -942,8 +943,13 @@ fn primitive_docs(k: f64) -> Vec<(&'static str, Document, Point)> {
     // top edge of a rectangle, 45 degrees on an ellipse, the middle of the
     // first edge of a polygon or star.
     let rect_pt = pt(40.0 + 50.0 / k, 30.0);
+    // Rewritten for `0021` criteria 1 and 22: the old spot was the ellipse's 45 degree point
+    // (lower right), which is now where the two resting arc handles sit, so a second
+    // double-click there opens the angle entry instead of asking for the hint. The spot is
+    // now the 135 degree point (lower left), clear of the arc handles (45 degrees) and the
+    // curve handle (315 degrees).
     let ell_pt = pt(
-        40.0 + 100.0 / k + 100.0 / k * std::f64::consts::FRAC_1_SQRT_2,
+        40.0 + 100.0 / k - 100.0 / k * std::f64::consts::FRAC_1_SQRT_2,
         30.0 + 70.0 / k + 70.0 / k * std::f64::consts::FRAC_1_SQRT_2,
     );
     let mid = |d: &Document| {

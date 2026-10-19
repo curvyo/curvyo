@@ -126,7 +126,7 @@ pub(crate) fn distance_to_object(
             .min_by(f64::total_cmp),
         ObjectSnapshot::Primitive(primitive) => {
             let outline = outline_of_rotated(&primitive.shape, primitive.rotation);
-            nearest_distance_on_run(outline.len(), true, point, tolerance, |i| {
+            nearest_distance_on_run(outline.len(), outline.closed, point, tolerance, |i| {
                 let anchor = &outline[i];
                 (anchor.point, anchor.handle_in, anchor.handle_out)
             })
@@ -153,13 +153,16 @@ fn outlines_of(object: &ObjectSnapshot) -> Vec<(Vec<OutlineTriple>, bool)> {
                 )
             })
             .collect(),
-        ObjectSnapshot::Primitive(primitive) => vec![(
-            outline_of_rotated(&primitive.shape, primitive.rotation)
-                .iter()
-                .map(|a| (a.point, a.handle_in, a.handle_out))
-                .collect(),
-            true,
-        )],
+        ObjectSnapshot::Primitive(primitive) => {
+            let outline = outline_of_rotated(&primitive.shape, primitive.rotation);
+            vec![(
+                outline
+                    .iter()
+                    .map(|a| (a.point, a.handle_in, a.handle_out))
+                    .collect(),
+                outline.closed,
+            )]
+        }
     }
 }
 

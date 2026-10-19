@@ -43,11 +43,13 @@ impl PolyStarSettings {
             PolyStarMode::Polygon => Shape::Polygon {
                 frame,
                 point_count: self.point_count,
+                curve: curvyo_document_core::Curve::POLYGON_DEFAULT,
             },
             PolyStarMode::Star => Shape::Star {
                 frame,
                 point_count: self.point_count,
                 inner_ratio: self.ratio,
+                curve: curvyo_document_core::Curve::POLYGON_DEFAULT,
             },
         }
     }
@@ -289,7 +291,10 @@ mod tests {
         };
         let shape = document.primitive(id).expect("exists").shape;
         assert_eq!(shape, preview.shape);
-        let Shape::Polygon { frame, point_count } = shape else {
+        let Shape::Polygon {
+            frame, point_count, ..
+        } = shape
+        else {
             panic!("a polygon");
         };
         assert_eq!(frame.center, Point::new(5.0, 5.0));

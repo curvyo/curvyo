@@ -178,7 +178,9 @@ fn the_triangle_of_criterion_22() {
     );
     flip(&document, &[id], H);
     let Some(ObjectSnapshot::Primitive(PrimitiveSnapshot {
-        shape: Shape::Polygon { frame, point_count },
+        shape: Shape::Polygon {
+            frame, point_count, ..
+        },
         ..
     })) = document.object(id)
     else {

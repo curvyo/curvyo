@@ -13,6 +13,8 @@ use curvyo_document_core::{
 
 use crate::object_selection::{ObjectSelection, objects_with_ids};
 use crate::param_edit::{PARAM_EQUAL_EPSILON, ParamValue};
+use crate::select_bar_arc::{CurveBarState, EllipseBarState, curve_bar_state, ellipse_bar_state};
+use crate::shape_arc_edit::{arc_capable, curve_capable};
 
 /// The kinds of object a bar control acts on.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -25,6 +27,11 @@ pub enum ObjectKind {
     Star,
     /// A rectangle, ellipse, polygon or star: "Object to path".
     Primitive,
+    /// An ellipse whose curve is 100 %: the ellipse group's arc controls
+    /// (`specs/0021-ellipse-arcs-and-shaping/` criteria 3 and 31).
+    ArcEllipse,
+    /// An ellipse without an arc, a polygon or a star: "Curve" (criteria 26 and 44).
+    Curved,
 }
 
 impl ObjectKind {
@@ -37,6 +44,8 @@ impl ObjectKind {
             Self::PolygonOrStar => matches!(shape, Shape::Polygon { .. } | Shape::Star { .. }),
             Self::Star => matches!(shape, Shape::Star { .. }),
             Self::Primitive => true,
+            Self::ArcEllipse => arc_capable(shape).is_some(),
+            Self::Curved => curve_capable(shape),
         }
     }
 }
@@ -111,6 +120,11 @@ pub struct SelectBarState {
     /// selection holds only linked clones, on which they would do nothing
     /// (`specs/0049-linked-clone` criterion 18).
     pub scale_switches_shown: bool,
+    /// The ellipse group (`specs/0021-ellipse-arcs-and-shaping/` criterion 3), `None`
+    /// while the selection holds no ellipse.
+    pub ellipse: Option<EllipseBarState>,
+    /// The "Curve" field (criteria 26 and 44), `None` while it is not shown.
+    pub curve: Option<CurveBarState>,
 }
 
 /// The one value of `values` if they all agree within `eps`, else `Mixed`.
@@ -252,6 +266,8 @@ pub fn select_bar_state(
         ratio,
         object_to_path: !ids_of_kind(objects, selection, ObjectKind::Primitive).is_empty(),
         scale_switches_shown: !only_clones(objects, selection),
+        ellipse: ellipse_bar_state(objects, selection),
+        curve: curve_bar_state(objects, selection, preview),
     }
 }
 

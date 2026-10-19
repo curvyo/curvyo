@@ -131,7 +131,7 @@ fn primitives_v3_project_round_trips_every_shape_kind() {
                     saw_rect = true;
                     assert!((corner_radii.tl.as_mm() - 2.0).abs() < f64::EPSILON);
                 }
-                Shape::Ellipse { frame } => {
+                Shape::Ellipse { frame, .. } => {
                     saw_ellipse = true;
                     assert!((frame.rx.as_mm() - frame.ry.as_mm()).abs() < f64::EPSILON);
                 }

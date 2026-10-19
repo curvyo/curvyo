@@ -19,8 +19,8 @@
 use std::collections::HashMap;
 
 use curvyo_document_core::{
-    AnchorId, Color, CopySource, Document, NewAnchor, NodeId, ObjectSnapshot, OpenError, Point,
-    StyleEdit, Vec2, pack, unpack,
+    AnchorId, CURRENT_FORMAT_VERSION, Color, CopySource, Document, NewAnchor, NodeId,
+    ObjectSnapshot, OpenError, Point, StyleEdit, Vec2, pack, unpack,
 };
 use loro::{LoroDoc, LoroValue, TreeID};
 
@@ -828,13 +828,10 @@ fn ac37_a_newer_format_is_refused_and_this_one_is_13() {
     mk(&d, o);
     let bytes = pack(&d, "0.1.0").unwrap();
     let j: serde_json::Value = serde_json::from_slice(&d.export_json().unwrap()).unwrap();
-    // 0049 took 13; `0057-clone-overrides` took 14 and `0046-document-shapes` 15 after it, so a
-    // file of 13 still opens.
-    assert_eq!(
-        j["format_version"],
-        curvyo_document_core::CURRENT_FORMAT_VERSION
-    );
-    let newer = rezip_manifest(&bytes, curvyo_document_core::CURRENT_FORMAT_VERSION + 1);
+    // 0049 took 13; later slices bumped it, so a file of 13 still opens and one above the
+    // current version is refused.
+    assert_eq!(j["format_version"], CURRENT_FORMAT_VERSION);
+    let newer = rezip_manifest(&bytes, CURRENT_FORMAT_VERSION + 1);
     assert!(matches!(
         unpack(2, &newer),
         Err(OpenError::FormatTooNew { .. })

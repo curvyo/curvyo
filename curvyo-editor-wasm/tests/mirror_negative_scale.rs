@@ -241,7 +241,7 @@ fn a_mirrored_project_reopens_unchanged() {
                 Shape::Polygon { frame, .. } | Shape::Star { frame, .. } => {
                     assert!(frame.radius.as_mm() > 0.0);
                 }
-                Shape::Ellipse { frame } => {
+                Shape::Ellipse { frame, .. } => {
                     assert!(frame.rx.as_mm() > 0.0 && frame.ry.as_mm() > 0.0);
                 }
             }

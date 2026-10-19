@@ -161,7 +161,7 @@ impl Session {
                     bounds.height.as_mm()
                 )
             }
-            Shape::Ellipse { frame } => {
+            Shape::Ellipse { frame, .. } => {
                 format!("{:.1} × {:.1} mm", frame.rx.as_mm(), frame.ry.as_mm())
             }
             Shape::Polygon { frame, .. } => format!(

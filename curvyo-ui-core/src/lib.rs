@@ -82,8 +82,12 @@ mod resize_direction;
 mod ruler;
 mod segment_bend;
 mod select_bar;
+mod select_bar_arc;
 mod select_tool;
 mod selection;
+mod shape_arc_edit;
+mod shape_arc_text;
+mod shape_knobs;
 mod shape_placement;
 mod shape_tool_common;
 mod skew_entry;
@@ -247,6 +251,7 @@ pub use segment_bend::{BendResolution, segment_is_bendable};
 pub use select_bar::{
     BarPreview, BarValue, ObjectKind, SelectBarState, ids_of_kind, select_bar_state,
 };
+pub use select_bar_arc::{CurveBarState, EllipseBarState, GreyReason};
 pub use select_tool::{
     Axis, EntryKey, GestureKind, GestureShape, KeyEntryRefusal, LiveEdit, LiveGesture,
     MoveEntryMode, MoveResolution, PressTarget, SelectDoubleClickOutcome, SelectPointerDownOutcome,
@@ -254,6 +259,10 @@ pub use select_tool::{
     entry_anchor,
 };
 pub use selection::NodeSelection;
+pub use shape_arc_edit::{
+    ARC_SEAM, ArcEnd, arc_angle_from_pointer, arc_capable, curve_capable, curve_from_pointer,
+};
+pub use shape_arc_text::{arc_announcement, arc_readout, curve_announcement, curve_readout};
 pub use shape_placement::{
     CANCELLED_SENTENCE, Placed, PlacementError, PlacementField, PlacementKind, PlacementNoun,
     ShapePlacement, field_label, field_name, field_suffix, message as placement_message,

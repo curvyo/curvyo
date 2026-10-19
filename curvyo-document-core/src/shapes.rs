@@ -15,6 +15,7 @@ use crate::primitive_model::{
     EllipseFrame, InnerRatio, ObjectSnapshot, PointCount, PrimitiveSnapshot, RectBounds, Shape,
     StarFrame,
 };
+use crate::shape_arc_codec::write_arc_and_curve;
 use crate::shape_codec::{self, SHAPE_ELLIPSE, SHAPE_POLYGON, SHAPE_RECT, SHAPE_STAR};
 use crate::units::{Angle, Length};
 
@@ -48,6 +49,11 @@ pub enum ShapeEditError {
     /// make the file refuse to open.
     #[error("a stroke width must be a finite number greater than zero")]
     InvalidStrokeWidth,
+    /// An arc on an ellipse whose curve is not 100 %, or a curve on an ellipse with an
+    /// arc (`specs/0021-ellipse-arcs-and-shaping/` criterion 31): the two never coexist,
+    /// so nothing is written.
+    #[error("an ellipse cannot have both an arc and a curve")]
+    ArcWithCurve,
 }
 
 impl Document {
@@ -97,8 +103,10 @@ impl Document {
                 shape_codec::write_rect_bounds(&meta, bounds);
                 write_corner_radii_if_changed(&meta, corner_radii);
             }
-            Shape::Ellipse { frame } => shape_codec::write_ellipse_frame(&meta, frame),
-            Shape::Polygon { frame, point_count } => {
+            Shape::Ellipse { frame, .. } => shape_codec::write_ellipse_frame(&meta, frame),
+            Shape::Polygon {
+                frame, point_count, ..
+            } => {
                 shape_codec::write_star_frame(&meta, frame);
                 shape_codec::write_point_count(&meta, point_count);
             }
@@ -106,12 +114,14 @@ impl Document {
                 frame,
                 point_count,
                 inner_ratio,
+                ..
             } => {
                 shape_codec::write_star_frame(&meta, frame);
                 shape_codec::write_point_count(&meta, point_count);
                 shape_codec::write_inner_ratio(&meta, inner_ratio);
             }
         }
+        write_arc_and_curve(&meta, &shape);
         // As `convert_to_paths`: an absent register reads as 0, so a zero turn writes nothing.
         if rotation.normalized() != Angle::from_radians(0.0) {
             path_codec::write_rotation(&meta, rotation);
@@ -137,7 +147,14 @@ impl Document {
     /// [`Document::create_primitive`] with no turn.
     #[must_use]
     pub fn create_ellipse(&self, frame: EllipseFrame) -> NodeId {
-        self.create_primitive(Shape::Ellipse { frame }, Angle::from_radians(0.0))
+        self.create_primitive(
+            Shape::Ellipse {
+                frame,
+                arc: None,
+                curve: crate::Curve::ELLIPSE_DEFAULT,
+            },
+            Angle::from_radians(0.0),
+        )
     }
 
     /// Creates a new regular polygon primitive (acceptance criterion 11):
@@ -145,7 +162,11 @@ impl Document {
     #[must_use]
     pub fn create_polygon(&self, frame: StarFrame, point_count: PointCount) -> NodeId {
         self.create_primitive(
-            Shape::Polygon { frame, point_count },
+            Shape::Polygon {
+                frame,
+                point_count,
+                curve: crate::Curve::POLYGON_DEFAULT,
+            },
             Angle::from_radians(0.0),
         )
     }
@@ -163,6 +184,7 @@ impl Document {
             frame,
             point_count,
             inner_ratio,
+            curve: crate::Curve::POLYGON_DEFAULT,
         };
         self.create_primitive(shape, Angle::from_radians(0.0))
     }
@@ -408,16 +430,12 @@ impl Document {
         // The shown angle (a polygon's or star's frame angle plus its register)
         // is what the converted path keeps as its `rotation`, read before the
         // primitive keys go, so that its readout and box direction do not change.
-        let orientations: Vec<Angle> = conversions
-            .iter()
-            .map(|(id, _)| self.object(*id).map(|o| o.orientation()))
-            .collect::<Option<_>>()
-            .ok_or(ShapeEditError::NoSuchObject)?;
-        for ((meta, (_, anchors)), orientation) in
-            metas.into_iter().zip(conversions.iter()).zip(orientations)
+        let read = self.conversion_reads(conversions)?;
+        for ((meta, (_, anchors)), (orientation, closed)) in
+            metas.into_iter().zip(conversions.iter()).zip(read)
         {
             shape_codec::strip_primitive_keys(&meta);
-            shape_codec::write_converted_path_fields(&meta, anchors);
+            shape_codec::write_converted_path_fields(&meta, anchors, closed);
             if path_codec::read_rotation(&meta) != orientation.normalized() {
                 path_codec::write_rotation(&meta, orientation);
             }
@@ -452,7 +470,7 @@ impl Document {
         }
     }
 
-    fn require_primitive(&self, id: NodeId) -> Result<loro::LoroMap, ShapeEditError> {
+    pub(crate) fn require_primitive(&self, id: NodeId) -> Result<loro::LoroMap, ShapeEditError> {
         let tree = self.loro().get_tree(OBJECTS_TREE);
         let tree_id = tree_id_of(id);
         if !leaf_exists(&tree, tree_id) {
@@ -625,7 +643,7 @@ mod tests {
             )
             .expect("resize");
         let snapshot = document.primitive(id).expect("exists");
-        let Shape::Ellipse { frame } = snapshot.shape else {
+        let Shape::Ellipse { frame, .. } = snapshot.shape else {
             panic!("expected ellipse");
         };
         assert!((frame.rx.as_mm() - 10.0).abs() < 1e-9);
@@ -825,6 +843,7 @@ mod tests {
             frame: new_frame,
             point_count,
             inner_ratio,
+            ..
         } = snapshot.shape
         else {
             panic!("expected a star");
@@ -1069,6 +1088,8 @@ mod tests {
                         rx: Length::from_mm(10.0),
                         ry: Length::from_mm(10.0),
                     },
+                    arc: None,
+                    curve: crate::Curve::ELLIPSE_DEFAULT,
                 },
                 "create_ellipse",
             ),
@@ -1076,6 +1097,7 @@ mod tests {
                 Shape::Polygon {
                     frame: star_frame(),
                     point_count,
+                    curve: crate::Curve::POLYGON_DEFAULT,
                 },
                 "create_polygon",
             ),
@@ -1084,6 +1106,7 @@ mod tests {
                     frame: star_frame(),
                     point_count,
                     inner_ratio: InnerRatio::new(0.5).expect("valid"),
+                    curve: crate::Curve::POLYGON_DEFAULT,
                 },
                 "create_star",
             ),
@@ -1101,12 +1124,15 @@ mod tests {
             let dragged = Document::new(1);
             let reference = match shape {
                 Shape::Rect { bounds, .. } => dragged.create_rect(bounds),
-                Shape::Ellipse { frame } => dragged.create_ellipse(frame),
-                Shape::Polygon { frame, point_count } => dragged.create_polygon(frame, point_count),
+                Shape::Ellipse { frame, .. } => dragged.create_ellipse(frame),
+                Shape::Polygon {
+                    frame, point_count, ..
+                } => dragged.create_polygon(frame, point_count),
                 Shape::Star {
                     frame,
                     point_count,
                     inner_ratio,
+                    ..
                 } => dragged.create_star(frame, point_count, inner_ratio),
             };
             assert_eq!(placed.object(id), dragged.object(reference), "{label}");
@@ -1148,7 +1174,11 @@ mod tests {
             ry: Length::from_mm(5.0),
         };
         let id = document.create_primitive(
-            Shape::Ellipse { frame },
+            Shape::Ellipse {
+                frame,
+                arc: None,
+                curve: crate::Curve::ELLIPSE_DEFAULT,
+            },
             Angle::from_radians(450_f64.to_radians()),
         );
         let rotation = document.primitive(id).expect("exists").rotation;

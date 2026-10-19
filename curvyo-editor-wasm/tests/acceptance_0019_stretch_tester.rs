@@ -72,7 +72,7 @@ fn frame_centre(o: &ObjectSnapshot) -> Point {
         ObjectSnapshot::Clone(_) => panic!("no clone here"),
         ObjectSnapshot::Primitive(p) => match p.shape {
             Shape::Rect { bounds, .. } => rect_centre(bounds),
-            Shape::Ellipse { frame } => frame.center,
+            Shape::Ellipse { frame, .. } => frame.center,
             Shape::Polygon { frame, .. } | Shape::Star { frame, .. } => frame.center,
         },
         ObjectSnapshot::Path(_) => panic!("primitives only"),
@@ -832,7 +832,7 @@ fn check_kinds_after(d: &Document, s: &Session, m: Map, otp: &[ObjectSnapshot], 
                 let ObjectSnapshot::Primitive(pn) = new else {
                     panic!("{w}: an aligned ellipse must stay an ellipse")
                 };
-                let (Shape::Ellipse { frame: fo }, Shape::Ellipse { frame: fnw }) =
+                let (Shape::Ellipse { frame: fo, .. }, Shape::Ellipse { frame: fnw, .. }) =
                     (po.shape, pn.shape)
                 else {
                     panic!("{w}: ellipse expected")
@@ -857,7 +857,7 @@ fn check_kinds_after(d: &Document, s: &Session, m: Map, otp: &[ObjectSnapshot], 
                 let ObjectSnapshot::Primitive(pn) = new else {
                     panic!("{w}: a circle must not become a path")
                 };
-                let (Shape::Ellipse { frame: fo }, Shape::Ellipse { frame: fnw }) =
+                let (Shape::Ellipse { frame: fo, .. }, Shape::Ellipse { frame: fnw, .. }) =
                     (po.shape, pn.shape)
                 else {
                     panic!("{w}: ellipse expected")
@@ -889,7 +889,7 @@ fn check_kinds_after(d: &Document, s: &Session, m: Map, otp: &[ObjectSnapshot], 
                 let ObjectSnapshot::Primitive(po) = old else {
                     panic!()
                 };
-                let Shape::Ellipse { frame } = po.shape else {
+                let Shape::Ellipse { frame, .. } = po.shape else {
                     panic!()
                 };
                 if m.sx > 1e-6 && m.sy > 1e-6 {
@@ -1123,7 +1123,7 @@ fn ac18_corner_drag_without_converting_objects_stretches_and_converts_nothing() 
     let ObjectSnapshot::Primitive(pc) = &o[2] else {
         panic!("circle must not become a path")
     };
-    let Shape::Ellipse { frame } = pc.shape else {
+    let Shape::Ellipse { frame, .. } = pc.shape else {
         panic!()
     };
     assert!(near(frame.rx.as_mm(), 8.0 * m.sx, 1e-6) && near(frame.ry.as_mm(), 8.0 * m.sy, 1e-6));
@@ -2497,7 +2497,7 @@ fn ac22_a_circle_turned_over_by_a_stretch_becomes_an_ellipse() {
     let ObjectSnapshot::Primitive(p) = &objects(&s)[1] else {
         panic!("an ellipse")
     };
-    let Shape::Ellipse { frame } = p.shape else {
+    let Shape::Ellipse { frame, .. } = p.shape else {
         panic!()
     };
     assert!(

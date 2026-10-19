@@ -38,6 +38,7 @@ mod document;
 mod document_background;
 mod document_presets;
 mod document_size;
+mod ellipse_arc;
 mod error;
 mod format_edit;
 mod format_library;
@@ -69,7 +70,10 @@ mod preset_units;
 mod primitive_model;
 mod primitive_outline;
 mod replace;
+mod ring_curve;
 mod segment_bend;
+mod shape_arc;
+mod shape_arc_codec;
 mod shape_codec;
 mod shape_radii;
 mod shapes;
@@ -109,6 +113,10 @@ pub use document_presets::{
 };
 pub use document_size::{
     DocumentSizeError, MAX_DOCUMENT_MM, MIN_DOCUMENT_MM, validated_document_side,
+};
+pub use ellipse_arc::{
+    ArcKind, EllipseArc, EllipseAxes, Linear, WHOLE_ARC_TOLERANCE_DEG, arc_after_linear_map,
+    arc_bounds, ellipse_after_linear_map, ellipse_point, rotated_arc_bounds, wrapped_angle,
 };
 pub use error::{OpenError, SaveError};
 pub use format_edit::{FormatError, FormatField, FormatReason, FormatSpec, GroupTarget};
@@ -150,13 +158,18 @@ pub use paths::resolve_handle_pair;
 pub use preset_units::{AuthoredSize, Orientation, PresetUnit};
 pub use primitive_model::{
     EllipseFrame, InnerRatio, ObjectSnapshot, PointCount, PrimitiveSnapshot, RectBounds, Shape,
-    ShapeParamError, StarFrame, shape_center, shape_frame_bounds, translate_shape,
+    ShapeParamError, StarFrame, is_beyond_ellipse, shape_center, shape_frame_bounds,
+    translate_shape,
 };
 pub use primitive_outline::{
-    KAPPA, OutlineAnchor, ellipse_outline, outline_of, outline_of_rotated, polygon_outline,
-    rect_outline, star_outline,
+    KAPPA, OutlineAnchor, PrimitiveOutline, drawing_outline_of, drawing_outline_of_rotated,
+    ellipse_outline, outline_of, outline_of_rotated, polygon_outline, rect_outline, star_outline,
 };
 pub use replace::{PieceFill, PieceOutlines};
+pub use ring_curve::{
+    Curve, curve_from_position, curve_handle_position, curve_limit, curve_max, effective_curve,
+    ring_bounds, ring_extent,
+};
 pub use shapes::ShapeEditError;
 pub use smooth_handles::smooth_corner_handles;
 pub use style_model::{

@@ -19,10 +19,12 @@
 //!                           the legacy `corner_radius` of format_version <= 5
 //!                           is read as a fallback, never written)
 //!   ellipse:  ellipse_frame  [cx, cy, rx, ry]       ONE LWW register
+//!             ellipse_arc, curve  (`crate::shape_arc_codec`)
 //!   polygon:  star_frame     [cx, cy, r, theta]     ONE LWW register
 //!             point_count    integer >= 3           LWW register
 //!   star:     star_frame, point_count as polygon, plus
 //!             inner_ratio    0 < r < 1               LWW register
+//!   polygon, star: curve     (`crate::shape_arc_codec`)
 //! ```
 //!
 //! **Unknown extra keys are tolerated** on both a path and a primitive
@@ -44,6 +46,11 @@ use crate::path_codec;
 use crate::path_model::NewAnchor;
 use crate::primitive_model::{
     EllipseFrame, InnerRatio, PointCount, PrimitiveSnapshot, RectBounds, Shape, StarFrame,
+};
+use crate::ring_curve::Curve;
+use crate::shape_arc_codec::{
+    KEY_CURVE, KEY_ELLIPSE_ARC, ellipse_arc_and_curve_are_valid, polygon_curve_is_valid, read_arc,
+    read_curve,
 };
 use crate::units::{Angle, Length, Point};
 
@@ -75,6 +82,8 @@ pub(crate) const ALL_PRIMITIVE_KEYS: &[&str] = &[
     KEY_STAR_FRAME,
     KEY_POINT_COUNT,
     KEY_INNER_RATIO,
+    KEY_ELLIPSE_ARC,
+    KEY_CURVE,
 ];
 
 /// This node's `shape` tag, or `None` if absent (a path) or mistyped —
@@ -226,7 +235,7 @@ pub(crate) fn read_star_frame(meta: &LoroMap) -> Option<StarFrame> {
 pub(crate) fn write_shape_frame(meta: &LoroMap, shape: &Shape) {
     match *shape {
         Shape::Rect { bounds, .. } => write_rect_bounds(meta, bounds),
-        Shape::Ellipse { frame } => write_ellipse_frame(meta, frame),
+        Shape::Ellipse { frame, .. } => write_ellipse_frame(meta, frame),
         Shape::Polygon { frame, .. } | Shape::Star { frame, .. } => write_star_frame(meta, frame),
     }
 }
@@ -314,15 +323,19 @@ pub(crate) fn read_shape(meta: &LoroMap, shape_tag: &str) -> Option<Shape> {
         }),
         SHAPE_ELLIPSE => Some(Shape::Ellipse {
             frame: read_ellipse_frame(meta)?,
+            arc: read_arc(meta),
+            curve: read_curve(meta, Curve::ELLIPSE_DEFAULT),
         }),
         SHAPE_POLYGON => Some(Shape::Polygon {
             frame: read_star_frame(meta)?,
             point_count: read_point_count(meta)?,
+            curve: read_curve(meta, Curve::POLYGON_DEFAULT),
         }),
         SHAPE_STAR => Some(Shape::Star {
             frame: read_star_frame(meta)?,
             point_count: read_point_count(meta)?,
             inner_ratio: read_inner_ratio(meta)?,
+            curve: read_curve(meta, Curve::POLYGON_DEFAULT),
         }),
         _ => None,
     }
@@ -370,6 +383,7 @@ fn validate_ellipse(meta: &LoroMap) -> bool {
         && frame.center.y.is_finite()
         && finite_non_negative(frame.rx.as_mm())
         && finite_non_negative(frame.ry.as_mm())
+        && ellipse_arc_and_curve_are_valid(meta)
 }
 
 fn validate_star_frame(frame: StarFrame) -> bool {
@@ -386,7 +400,7 @@ fn validate_polygon(meta: &LoroMap) -> bool {
     // `read_point_count` already applies `PointCount::new`'s own
     // `3..=1024` range check (acceptance criterion 10's file-open
     // refusal) and `None`s out on a mistyped or missing value.
-    read_point_count(meta).is_some() && validate_star_frame(frame)
+    read_point_count(meta).is_some() && validate_star_frame(frame) && polygon_curve_is_valid(meta)
 }
 
 fn validate_star(meta: &LoroMap) -> bool {
@@ -396,17 +410,18 @@ fn validate_star(meta: &LoroMap) -> bool {
     read_point_count(meta).is_some()
         && read_inner_ratio(meta).is_some()
         && validate_star_frame(frame)
+        && polygon_curve_is_valid(meta)
 }
 
-/// Builds the movable `anchors` list and `closed = true` flag "object to
-/// path" writes, reusing [`crate::path_codec`]'s own anchor writer so a
+/// Builds the movable `anchors` list and the `closed` flag "object to
+/// path" writes (`false` only for an open Arc), reusing [`crate::path_codec`]'s own anchor writer so a
 /// converted primitive's path shape is byte-for-byte what
 /// [`crate::Document::create_path`] would have written for the same
 /// anchors.
-pub(crate) fn write_converted_path_fields(meta: &LoroMap, anchors: &[NewAnchor]) {
+pub(crate) fn write_converted_path_fields(meta: &LoroMap, anchors: &[NewAnchor], closed: bool) {
     // invariant: see `write_shape_tag`; `closed` is a plain bool insert.
     #[allow(clippy::unwrap_used)]
-    meta.insert(path_codec::KEY_CLOSED, true).unwrap();
+    meta.insert(path_codec::KEY_CLOSED, closed).unwrap();
     let list = path_codec::insert_anchors_container(meta);
     for anchor in anchors {
         path_codec::push_anchor(&list, anchor);

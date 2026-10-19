@@ -144,7 +144,7 @@ fn origin_x_of_first(s: &Session) -> f64 {
     let d = doc_of(s);
     match d.primitive(d.object_ids()[0]).unwrap().shape {
         Shape::Rect { bounds, .. } => bounds.origin.x,
-        Shape::Ellipse { frame } => frame.center.x,
+        Shape::Ellipse { frame, .. } => frame.center.x,
         Shape::Polygon { frame, .. } | Shape::Star { frame, .. } => frame.center.x,
     }
 }
@@ -177,7 +177,7 @@ fn f1_a_selected_object_of_any_small_size_moves_from_its_centre() {
                         assert!((b0.width.as_mm() - b1.width.as_mm()).abs() < 1e-9);
                         assert!((b0.height.as_mm() - b1.height.as_mm()).abs() < 1e-9);
                     }
-                    (Shape::Ellipse { frame: f0 }, Shape::Ellipse { frame: f1 }) => {
+                    (Shape::Ellipse { frame: f0, .. }, Shape::Ellipse { frame: f1, .. }) => {
                         assert!((f0.rx.as_mm() - f1.rx.as_mm()).abs() < 1e-9);
                     }
                     (Shape::Polygon { frame: f0, .. }, Shape::Polygon { frame: f1, .. })

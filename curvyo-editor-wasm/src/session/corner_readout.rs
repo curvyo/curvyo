@@ -5,7 +5,7 @@ use curvyo_document_core::{
     Corner, ObjectSnapshot, PrimitiveSnapshot, SHARP_CORNER_EPSILON_MM, Shape,
     effective_corner_radii,
 };
-use curvyo_ui_core::{EditHandle, ParamDragInfo, ParamHandle, knob_rho, oriented_bounds};
+use curvyo_ui_core::{ArcEnd, EditHandle, ParamDragInfo, ParamHandle, knob_rho, oriented_bounds};
 
 use super::{Session, Tool};
 
@@ -146,6 +146,10 @@ pub(super) fn param_readout(
         (Shape::Star { inner_ratio, .. }, ParamHandle::InnerRadius) => {
             Some(format!("ratio {:.2}", inner_ratio.get()))
         }
+        // `specs/0021-ellipse-arcs-and-shaping/` criteria 6, 25 and 43.
+        (shape, ParamHandle::ArcStart) => curvyo_ui_core::arc_readout(&shape, ArcEnd::Start),
+        (shape, ParamHandle::ArcEnd) => curvyo_ui_core::arc_readout(&shape, ArcEnd::End),
+        (shape, ParamHandle::Curve) => curvyo_ui_core::curve_readout(&shape),
         _ => None,
     }
 }
