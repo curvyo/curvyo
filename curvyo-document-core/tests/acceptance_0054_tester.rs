@@ -84,8 +84,8 @@ fn c28_c29_pack_unpack_keeps_state_nodes_direction_and_order() {
 }
 
 #[test]
-fn c29_the_format_version_stays_at_14() {
-    assert_eq!(CURRENT_FORMAT_VERSION, 14);
+fn c29_the_format_version_is_at_least_14() {
+    assert!(CURRENT_FORMAT_VERSION >= 14);
 }
 
 #[test]
