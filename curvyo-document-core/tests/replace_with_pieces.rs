@@ -187,7 +187,7 @@ fn a_refusal_changes_nothing() {
             write(&[whole, ghost], &[(ghost, piece())]),
             ObjectEditError::NoSuchObject,
         ),
-        (write(&[whole], &[]), ObjectEditError::NoOutlines),
+        (write(&[], &[]), ObjectEditError::NoOutlines),
         (
             write(&[other], &[(whole, piece())]),
             ObjectEditError::BaseNotAnOperand,
@@ -283,4 +283,22 @@ fn fill_none_keeps_the_stored_colour_and_open_pieces_stay_open() {
             }
         );
     }
+}
+
+/// `specs/0037-fracture-and-flatten` criterion 11: Flatten that only hides objects removes them
+/// with no piece, in one commit with its label.
+#[test]
+fn removed_objects_without_a_piece_are_deleted_in_one_commit() {
+    let document = Document::new(1);
+    let hidden = rect(&document, 0.0);
+    let kept = rect(&document, 20.0);
+    let changes = labels(&document).len();
+    let created = document
+        .replace_with_pieces(&[hidden], &[], PieceFill::Keep, "flatten")
+        .unwrap();
+    assert_eq!(created, Vec::<NodeId>::new());
+    assert_eq!(document.object_ids(), vec![kept]);
+    let after = labels(&document);
+    assert_eq!(after.len(), changes + 1);
+    assert_eq!(after.last().map(String::as_str), Some("flatten"));
 }

@@ -78,6 +78,8 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     ("split", "Split"),
     ("break_apart", "Break apart"),
     ("cut_at_crossings", "Cut"),
+    ("fracture", "Fracture"),
+    ("flatten", "Flatten"),
     ("offset_path", "Offset"),
     ("group", "Group"),
     ("ungroup", "Ungroup"),

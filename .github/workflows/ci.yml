@@ -368,6 +368,7 @@ jobs:
       - name: Run the boolean performance tests in release
         run: |
           cargo test --release -p curvyo-geometry-core --test boolean_performance -- --nocapture
+          cargo test --release -p curvyo-geometry-core --test fracture_flatten -- --nocapture
           cargo test --release -p curvyo-document-core --test compound_write_cost -- --nocapture
           cargo test --release -p curvyo-document-core --test clone_hostile_sizes -- --nocapture
           cargo test --release -p curvyo-document-core --test clone_history ac53 -- --nocapture

@@ -218,7 +218,7 @@ fn without_slivers(mut paths: Paths64) -> Paths64 {
 /// Whether an outline is thinner than one grid pitch on average, which is rounding noise: its
 /// width, estimated as twice the area over the perimeter (exact for a long strip, half the side
 /// for a square), is below what the grid can place.
-fn is_sliver(path: &[Point64]) -> bool {
+pub(crate) fn is_sliver(path: &[Point64]) -> bool {
     let mut perimeter = 0.0_f64;
     let mut previous = path[path.len() - 1];
     for point in path {

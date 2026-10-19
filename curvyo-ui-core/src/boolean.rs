@@ -21,7 +21,7 @@ use crate::object_selection::ObjectSelection;
 
 /// The kernel tolerance: curves are flattened to straight segments that stay within 0.01 mm of
 /// the true curve. Fixed, not a setting, and not the display tolerance (ADR 0003 §7).
-const BOOLEAN_TOLERANCE: Tolerance = Tolerance::from_mm(0.01);
+pub(crate) const BOOLEAN_TOLERANCE: Tolerance = Tolerance::from_mm(0.01);
 
 /// The five operations a maker can start.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -241,7 +241,11 @@ fn kernel_order<'a>(
 
 /// The refusal the kernel's `error` stands for. `order` is the operand order the kernel was
 /// given (its indices name operands in it); `of` is how many objects are selected.
-fn refusal_of(error: BooleanError, order: &[&ObjectSnapshot], of: usize) -> BooleanRefusal {
+pub(crate) fn refusal_of(
+    error: BooleanError,
+    order: &[&ObjectSnapshot],
+    of: usize,
+) -> BooleanRefusal {
     let ids_at =
         |indices: &[usize]| -> Vec<NodeId> { indices.iter().map(|&i| order[i].id()).collect() };
     match error {
@@ -255,8 +259,8 @@ fn refusal_of(error: BooleanError, order: &[&ObjectSnapshot], of: usize) -> Bool
         },
         BooleanError::EmptyResult => BooleanRefusal::Empty,
         BooleanError::NoOperands | BooleanError::ToleranceTooSmall => {
-            // invariant: `plan_boolean` passes two or more operands and a constant tolerance
-            // above two grid pitches. Shown as "empty" if a change ever makes them reachable,
+            // invariant: the plans pass two or more operands and a constant tolerance above two
+            // grid pitches. Shown as "empty" if a change ever makes them reachable,
             // after failing every test that gets here.
             debug_assert!(false, "unreachable kernel refusal: {error:?}");
             BooleanRefusal::Empty
@@ -316,7 +320,7 @@ pub fn plan_boolean(
 
 /// How many open outlines of two or more nodes enclose an area once closed by their straight
 /// closing line, and how many do not.
-fn open_counts(operands: &[Vec<(Vec<OutlineTriple>, bool)>]) -> (usize, usize) {
+pub(crate) fn open_counts(operands: &[Vec<(Vec<OutlineTriple>, bool)>]) -> (usize, usize) {
     let mut with_area = 0;
     let mut without = 0;
     for (anchors, _) in operands
@@ -334,7 +338,7 @@ fn open_counts(operands: &[Vec<(Vec<OutlineTriple>, bool)>]) -> (usize, usize) {
 }
 
 /// A closed outline of corner anchors with no handles and fresh ids.
-fn corner_anchors(points: &[Point], minter: &mut AnchorIdMinter) -> Vec<NewAnchor> {
+pub(crate) fn corner_anchors(points: &[Point], minter: &mut AnchorIdMinter) -> Vec<NewAnchor> {
     points
         .iter()
         .map(|&point| NewAnchor::corner(minter.mint(), point))

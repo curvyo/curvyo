@@ -25,6 +25,7 @@ mod curve_contacts;
 mod curve_intersections;
 mod curve_settle;
 mod flatten;
+mod fracture;
 mod interior;
 mod offset;
 mod offset_finish;
@@ -33,12 +34,16 @@ mod offset_polyline;
 mod offset_rebuild;
 mod outline_nesting;
 mod outline_touch;
+mod region_contact;
 mod segment;
+mod stack_regions;
+mod visible_region;
 
 pub use boolean::{BooleanError, BooleanOp, BooleanResult, Outline, boolean, signed_area_mm2};
 pub use boolean_grid::MAX_COORDINATE_MM;
 pub use curve_intersections::{CutParameter, cut_parameters};
 pub use curvyo_document_core::Tolerance;
+pub use fracture::{Fracture, fracture_cells};
 pub use interior::{OutlineTriple, contains_point_in_outlines};
 pub use offset::{
     OffsetAnchor, OffsetError, OffsetJoin, OffsetOutlines, offset, offset_distance_is_zero,
@@ -50,3 +55,5 @@ pub use segment::{
     BentHandles, Subdivision, bend_segment_handles, nearest_point_on_segment, segment_bounds,
     subdivide_at_parameter,
 };
+pub use stack_regions::StackError;
+pub use visible_region::{Visible, visible_regions};
