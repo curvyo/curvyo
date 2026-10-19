@@ -178,8 +178,18 @@ pub struct DocumentVersion(pub(crate) loro::Frontiers);
 /// the key. A `guide` value that is not a boolean is refused as damaged
 /// (`crate::node_registers`); the key on a group or a linked clone is residue (a clone reads its
 /// root's flag). The number is provisional by the rule above. Golden: `guide_v15.curvyo`.
-
-pub const CURRENT_FORMAT_VERSION: u32 = 15;
+///
+/// Bumped to 16 in `ellipse-arcs-and-shaping` (`specs/0021-ellipse-arcs-and-shaping/adrs.md`
+/// decisions 1 to 3): an ellipse may carry the list register `ellipse_arc` = `[start°, end°,
+/// kind]`, and an ellipse, polygon or star the register `curve` (a fraction from -4 to 4). A
+/// build that stops at version 15 would cut an arc as a whole ellipse and a curved polygon with
+/// straight sides, so it must refuse every file of this build as too new. Migration from version
+/// 15 is none: absent registers read as the whole ellipse and the shape's default curve, and a
+/// file from an earlier build opens unchanged and is not rewritten. A non-finite or out-of-range
+/// curve, an arc that is not two finite angles and a known kind, and an arc together with a curve
+/// other than 100 % are refused as damaged (`crate::shape_arc_codec`). Golden: `arc_pie_v16`,
+/// `arc_arc_v16`, `arc_chord_v16`, `curve_ellipse_v16` and `curve_polygon_star_v16.curvyo`.
+pub const CURRENT_FORMAT_VERSION: u32 = 16;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";
