@@ -830,7 +830,7 @@ fn c34_every_kind_is_copied_with_every_field_and_the_selection_is_the_copies() {
                         assert_eq!((x.width, x.height), (y.width, y.height));
                         assert!(pnear(plus(x.origin, off.x, off.y), y.origin));
                     }
-                    (Shape::Ellipse { frame: x }, Shape::Ellipse { frame: y }) => {
+                    (Shape::Ellipse { frame: x, .. }, Shape::Ellipse { frame: y, .. }) => {
                         assert!(pnear(plus(x.center, off.x, off.y), y.center));
                         assert_eq!((x.rx, x.ry), (y.rx, y.ry));
                     }
@@ -838,10 +838,12 @@ fn c34_every_kind_is_copied_with_every_field_and_the_selection_is_the_copies() {
                         Shape::Polygon {
                             frame: x,
                             point_count: a1,
+                            ..
                         },
                         Shape::Polygon {
                             frame: y,
                             point_count: a2,
+                            ..
                         },
                     ) => {
                         assert_eq!(a1, a2);
@@ -853,11 +855,13 @@ fn c34_every_kind_is_copied_with_every_field_and_the_selection_is_the_copies() {
                             frame: x,
                             point_count: a1,
                             inner_ratio: r1,
+                            ..
                         },
                         Shape::Star {
                             frame: y,
                             point_count: a2,
                             inner_ratio: r2,
+                            ..
                         },
                     ) => {
                         assert_eq!((a1, r1), (a2, r2));
@@ -1613,7 +1617,7 @@ fn c23_a_typed_copy_of_a_rotated_primitive_uses_the_drawn_bounds_for_absolute() 
     let ObjectSnapshot::Primitive(c) = &all_[1] else {
         panic!()
     };
-    let Shape::Ellipse { frame } = c.shape else {
+    let Shape::Ellipse { frame, .. } = c.shape else {
         panic!()
     };
     assert!((frame.center.x - hw - 100.0).abs() < 0.01);

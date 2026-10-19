@@ -92,6 +92,8 @@ pub(crate) fn placed_ellipse(at: BoxAtA, angle: Angle) -> Shape {
             rx: Length::from_mm(at.width.as_mm() / 2.0),
             ry: Length::from_mm(at.height.as_mm() / 2.0),
         },
+        arc: None,
+        curve: curvyo_document_core::Curve::ELLIPSE_DEFAULT,
     }
 }
 
@@ -139,7 +141,7 @@ mod tests {
     }
 
     fn ellipse_centre(shape: Shape) -> (Point, f64, f64) {
-        let Shape::Ellipse { frame } = shape else {
+        let Shape::Ellipse { frame, .. } = shape else {
             panic!("an ellipse");
         };
         (frame.center, frame.rx.as_mm(), frame.ry.as_mm())

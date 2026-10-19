@@ -900,7 +900,7 @@ fn ac08_rectangle_and_ellipse_creation_unchanged() {
     let mut s = Session::new(1);
     s.set_tool(Tool::Ellipse);
     create(&mut s, pt(10.0, 10.0), pt(40.0, 20.0), false, true);
-    let Shape::Ellipse { frame } = prim_of(&s, 0).shape else {
+    let Shape::Ellipse { frame, .. } = prim_of(&s, 0).shape else {
         panic!()
     };
     assert!((frame.rx.as_mm() - frame.ry.as_mm()).abs() < 1e-9);

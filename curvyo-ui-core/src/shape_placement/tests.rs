@@ -68,7 +68,7 @@ fn close4(got: (f64, f64, f64, f64), want: (f64, f64, f64, f64)) -> bool {
 }
 
 fn ellipse_of(placed: Placed) -> (f64, f64, f64, f64) {
-    let Shape::Ellipse { frame } = placed.shape else {
+    let Shape::Ellipse { frame, .. } = placed.shape else {
         panic!("an ellipse");
     };
     (

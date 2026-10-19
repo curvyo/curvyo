@@ -49,7 +49,7 @@ impl ShapePlacement {
             return None;
         }
         match self.kept_or(live)?.shape {
-            Shape::Ellipse { frame } if !is_circle(&frame) => Some(format!(
+            Shape::Ellipse { frame, .. } if !is_circle(&frame) => Some(format!(
                 "{} \u{d7} {}",
                 format_status_length(frame.rx, unit),
                 format_status_length(frame.ry, unit)
@@ -78,7 +78,7 @@ impl ShapePlacement {
     /// The value an untouched length field shows, in the current r/⌀ mode; `None` for an
     /// ellipse that is not a circle (its field is empty).
     fn untouched_length(&self, field: PlacementField, shape: Option<&Shape>) -> Option<Length> {
-        if let (PlacementField::Size, Some(Shape::Ellipse { frame })) = (field, shape)
+        if let (PlacementField::Size, Some(Shape::Ellipse { frame, .. })) = (field, shape)
             && !is_circle(frame)
         {
             return None;

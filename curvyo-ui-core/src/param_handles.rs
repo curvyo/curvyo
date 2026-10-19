@@ -66,6 +66,12 @@ pub enum ParamHandle {
     CornerRadius(Corner),
     /// A star's inner-radius handle at its first inner vertex.
     InnerRadius,
+    /// An ellipse's arc start handle (`specs/0021-ellipse-arcs-and-shaping/` criterion 1).
+    ArcStart,
+    /// An ellipse's arc end handle.
+    ArcEnd,
+    /// The curve handle of an ellipse, polygon or star (criteria 22 and 40).
+    Curve,
 }
 
 /// Which handle families a box of a given shorter side draws (criterion 7).
@@ -174,7 +180,7 @@ pub(crate) fn star_inner_vertex(
 }
 
 /// Every parameter handle `object` draws, in document space: empty below the
-/// parameter threshold of its box, for a path, an ellipse and a polygon.
+/// parameter threshold of its box and for a path.
 /// A handle that is not returned is not drawn and has no hit area
 /// (criterion 6).
 #[must_use]
@@ -209,15 +215,11 @@ pub fn param_handles(
                 })
                 .collect()
         }
-        Shape::Star {
-            frame,
-            point_count,
-            inner_ratio,
-        } => vec![(
-            ParamHandle::InnerRadius,
-            box_.to_document(star_inner_vertex(frame, point_count, inner_ratio)),
-        )],
-        Shape::Ellipse { .. } | Shape::Polygon { .. } => Vec::new(),
+        // The arc, curve and inner-radius knobs (`specs/0021-ellipse-arcs-and-shaping/`
+        // criteria 1, 22 and 40).
+        shape @ (Shape::Ellipse { .. } | Shape::Polygon { .. } | Shape::Star { .. }) => {
+            crate::shape_knobs::shape_knobs(&shape, box_, tolerances)
+        }
     }
 }
 
@@ -374,6 +376,7 @@ mod tests {
                 },
                 point_count: PointCount::new(points).unwrap(),
                 inner_ratio: InnerRatio::new(ratio).unwrap(),
+                curve: curvyo_document_core::Curve::POLYGON_DEFAULT,
             },
             style: curvyo_document_core::Style::default(),
             rotation: Angle::from_radians(rotation),
@@ -483,12 +486,13 @@ mod tests {
     }
 
     #[test]
-    fn a_star_has_one_handle_at_its_first_inner_vertex() {
+    fn a_star_has_one_inner_radius_handle_at_its_first_inner_vertex() {
         let t = tolerances(1.0);
         let object = star_object(50.0, 5, 0.5, 0.0, 0.0);
         let handles = param_handles(&object, &oriented_bounds(&object), &t);
-        let [(ParamHandle::InnerRadius, at)] = handles.as_slice() else {
-            panic!("one inner-radius handle, got {handles:?}");
+        // Since `specs/0021-ellipse-arcs-and-shaping/` a star also has a curve handle.
+        let [(ParamHandle::InnerRadius, at), (ParamHandle::Curve, _)] = handles.as_slice() else {
+            panic!("an inner-radius and a curve handle, got {handles:?}");
         };
         let theta = std::f64::consts::PI / 5.0;
         assert!((at.x - (50.0 + 25.0 * theta.cos())).abs() < 1e-9);
@@ -496,7 +500,7 @@ mod tests {
     }
 
     #[test]
-    fn ellipses_polygons_and_paths_show_no_parameter_handle() {
+    fn an_ellipse_shows_its_arc_and_curve_handles() {
         let t = tolerances(1.0);
         let ellipse = ObjectSnapshot::Primitive(PrimitiveSnapshot {
             id: id(),
@@ -506,13 +510,25 @@ mod tests {
                     rx: Length::from_mm(100.0),
                     ry: Length::from_mm(80.0),
                 },
+                arc: None,
+                curve: curvyo_document_core::Curve::ELLIPSE_DEFAULT,
             },
             style: curvyo_document_core::Style::default(),
             rotation: Angle::from_radians(0.0),
         });
+        // Since `specs/0021-ellipse-arcs-and-shaping/` (criteria 1 and 22) a whole ellipse
+        // has two arc handles and a curve handle.
+        let kinds: Vec<ParamHandle> = param_handles(&ellipse, &oriented_bounds(&ellipse), &t)
+            .into_iter()
+            .map(|(handle, _)| handle)
+            .collect();
         assert_eq!(
-            param_handles(&ellipse, &oriented_bounds(&ellipse), &t),
-            Vec::<(ParamHandle, Point)>::new()
+            kinds,
+            [
+                ParamHandle::ArcStart,
+                ParamHandle::ArcEnd,
+                ParamHandle::Curve
+            ]
         );
     }
 

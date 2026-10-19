@@ -3,7 +3,8 @@
 //! fields, exact, in its own unrotated frame, so the caller keeps its rotation.
 
 use curvyo_document_core::{
-    CornerRadii, EllipseFrame, Length, Point, RectBounds, Shape, StarFrame, effective_corner_radii,
+    CornerRadii, Curve, EllipseFrame, Length, Point, RectBounds, Shape, StarFrame,
+    effective_corner_radii,
 };
 
 use curvyo_geometry_core::miter_within_limit;
@@ -39,18 +40,27 @@ pub(crate) fn offset_primitive(
     join: OffsetJoin,
 ) -> PrimitiveOffset {
     let d = distance.as_mm();
+    // An arc or a curved side has no primitive offset: the drawn outline is offset as a
+    // path (`specs/0021-ellipse-arcs-and-shaping/` criterion 60).
+    if !has_default_sides(shape) {
+        return PrimitiveOffset::Path;
+    }
     match *shape {
         Shape::Rect {
             bounds,
             corner_radii,
         } => offset_rect(bounds, corner_radii, d, join),
-        Shape::Ellipse { frame } => offset_ellipse(frame, d),
-        Shape::Polygon { frame, point_count } => {
+        Shape::Ellipse { frame, .. } => offset_ellipse(frame, d),
+        Shape::Polygon {
+            frame, point_count, ..
+        } => {
             let n = f64::from(point_count.get());
             match scaled_frame(frame, &regular_vertices(n, 1.0), d, join) {
-                Scaled::Stays(frame) => {
-                    PrimitiveOffset::Stays(Shape::Polygon { frame, point_count })
-                }
+                Scaled::Stays(frame) => PrimitiveOffset::Stays(Shape::Polygon {
+                    frame,
+                    point_count,
+                    curve: Curve::POLYGON_DEFAULT,
+                }),
                 Scaled::Vanishes => PrimitiveOffset::Vanishes,
                 Scaled::Path => PrimitiveOffset::Path,
             }
@@ -59,6 +69,7 @@ pub(crate) fn offset_primitive(
             frame,
             point_count,
             inner_ratio,
+            ..
         } => {
             let n = f64::from(point_count.get());
             match scaled_frame(frame, &star_vertices(n, inner_ratio.get()), d, join) {
@@ -66,6 +77,7 @@ pub(crate) fn offset_primitive(
                     frame,
                     point_count,
                     inner_ratio,
+                    curve: Curve::POLYGON_DEFAULT,
                 }),
                 Scaled::Vanishes => PrimitiveOffset::Vanishes,
                 Scaled::Path => PrimitiveOffset::Path,
@@ -114,6 +126,18 @@ fn offset_rect(
     })
 }
 
+/// Whether `shape` draws the sides its kind has without an arc or curve: a whole ellipse
+/// at 100 %, a polygon or star at an effective curve of 0, any rectangle.
+fn has_default_sides(shape: &Shape) -> bool {
+    match shape {
+        Shape::Rect { .. } => true,
+        Shape::Ellipse { arc, curve, .. } => arc.is_none() && *curve == Curve::ELLIPSE_DEFAULT,
+        Shape::Polygon { .. } | Shape::Star { .. } => {
+            curvyo_document_core::effective_curve(shape).is_some_and(|k| k.get() == 0.0)
+        }
+    }
+}
+
 /// A circle stays a circle; an ellipse stays one only when the ellipse `(rx + d, ry + d)` is
 /// within the tolerance of the exact offset, sampled deterministically.
 fn offset_ellipse(frame: EllipseFrame, d: f64) -> PrimitiveOffset {
@@ -127,7 +151,11 @@ fn offset_ellipse(frame: EllipseFrame, d: f64) -> PrimitiveOffset {
         ry: Length::from_mm(ry + d),
     };
     if (rx - ry).abs() <= ZERO_MM || ellipse_deviation(rx, ry, d) <= STAYS_TOLERANCE_MM {
-        PrimitiveOffset::Stays(Shape::Ellipse { frame: grown })
+        PrimitiveOffset::Stays(Shape::Ellipse {
+            frame: grown,
+            arc: None,
+            curve: Curve::ELLIPSE_DEFAULT,
+        })
     } else {
         PrimitiveOffset::Path
     }
@@ -316,15 +344,18 @@ mod tests {
                 rx: Length::from_mm(20.0),
                 ry: Length::from_mm(20.0),
             },
+            arc: None,
+            curve: curvyo_document_core::Curve::ELLIPSE_DEFAULT,
         };
         for join in [OffsetJoin::Round, OffsetJoin::Miter, OffsetJoin::Bevel] {
-            let PrimitiveOffset::Stays(Shape::Ellipse { frame }) = off(&circle, 2.0, join) else {
+            let PrimitiveOffset::Stays(Shape::Ellipse { frame, .. }) = off(&circle, 2.0, join)
+            else {
                 panic!("a circle");
             };
             assert_eq!((frame.rx.as_mm(), frame.ry.as_mm()), (22.0, 22.0));
             assert_eq!(frame.center, Point::new(5.0, 5.0));
         }
-        let PrimitiveOffset::Stays(Shape::Ellipse { frame }) =
+        let PrimitiveOffset::Stays(Shape::Ellipse { frame, .. }) =
             off(&circle, -2.0, OffsetJoin::Round)
         else {
             panic!("a circle");
@@ -344,6 +375,8 @@ mod tests {
                 rx: Length::from_mm(rx),
                 ry: Length::from_mm(ry),
             },
+            arc: None,
+            curve: curvyo_document_core::Curve::ELLIPSE_DEFAULT,
         };
         assert_eq!(
             off(&ellipse(20.0, 10.0), 2.0, OffsetJoin::Round),
@@ -365,6 +398,7 @@ mod tests {
                 angle: Angle::from_radians(0.3),
             },
             point_count: PointCount::new(6).unwrap(),
+            curve: curvyo_document_core::Curve::POLYGON_DEFAULT,
         };
         let PrimitiveOffset::Stays(Shape::Polygon { frame, .. }) =
             off(&hexagon, 2.0, OffsetJoin::Miter)
@@ -401,6 +435,7 @@ mod tests {
             },
             point_count: PointCount::new(5).unwrap(),
             inner_ratio: InnerRatio::new(ratio).unwrap(),
+            curve: curvyo_document_core::Curve::POLYGON_DEFAULT,
         };
         // A plump star: tips of about 108°, inside the limit.
         let PrimitiveOffset::Stays(Shape::Star {

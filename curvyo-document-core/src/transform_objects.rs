@@ -65,7 +65,7 @@ fn same_kind(a: &Shape, b: &Shape) -> bool {
 fn same_frame(a: &Shape, b: &Shape) -> bool {
     match (a, b) {
         (Shape::Rect { bounds: x, .. }, Shape::Rect { bounds: y, .. }) => x == y,
-        (Shape::Ellipse { frame: x }, Shape::Ellipse { frame: y }) => x == y,
+        (Shape::Ellipse { frame: x, .. }, Shape::Ellipse { frame: y, .. }) => x == y,
         (Shape::Polygon { frame: x, .. }, Shape::Polygon { frame: y, .. })
         | (Shape::Star { frame: x, .. }, Shape::Star { frame: y, .. }) => x == y,
         _ => false,
@@ -162,7 +162,12 @@ impl Document {
                     result,
                 } => {
                     shape_codec::strip_primitive_keys(meta);
-                    shape_codec::write_converted_path_fields(meta, anchors);
+                    // The result is a path: an open Arc stays open.
+                    let closed = match result {
+                        ObjectSnapshot::Path(path) => path.closed,
+                        ObjectSnapshot::Primitive(_) | ObjectSnapshot::Clone(_) => true,
+                    };
+                    shape_codec::write_converted_path_fields(meta, anchors, closed);
                     (meta, result)
                 }
             };
@@ -369,7 +374,7 @@ fn is_finite(object: &ObjectSnapshot) -> bool {
                             && bounds.width.as_mm().is_finite()
                             && bounds.height.as_mm().is_finite()
                     }
-                    Shape::Ellipse { frame } => {
+                    Shape::Ellipse { frame, .. } => {
                         point(frame.center)
                             && frame.rx.as_mm().is_finite()
                             && frame.ry.as_mm().is_finite()
@@ -407,6 +412,14 @@ fn write_primitive(meta: &loro::LoroMap, current: &Shape, result: &ObjectSnapsho
         && let Ok(radii) = checked(corner_radii)
     {
         crate::corner_radii_codec::write_corner_radii_if_changed(meta, radii);
+    }
+    // A mirror or a stretch moves an arc's angles (`specs/0021-ellipse-arcs-and-shaping/`
+    // criteria 54 and 56).
+    if let (Shape::Ellipse { arc: old, .. }, Shape::Ellipse { arc, .. }) =
+        (current, &primitive.shape)
+        && old != arc
+    {
+        crate::shape_arc_codec::write_arc_if_changed(meta, *arc);
     }
 }
 

@@ -565,7 +565,10 @@ fn ac22_triangle_example() {
     let ObjectSnapshot::Primitive(p) = &after[0] else {
         panic!()
     };
-    let Shape::Polygon { frame, point_count } = p.shape else {
+    let Shape::Polygon {
+        frame, point_count, ..
+    } = p.shape
+    else {
         panic!("still a polygon: {:?}", p.shape)
     };
     assert_eq!(point_count.get(), 3);
@@ -662,11 +665,13 @@ fn ac21_ac22_primitives_mirror_image_and_involution() {
                             point_count: pa,
                             inner_ratio: ia,
                             frame: fa,
+                            ..
                         },
                         Shape::Star {
                             point_count: pb,
                             inner_ratio: ib,
                             frame: fb,
+                            ..
                         },
                     ) = (a.shape, b.shape)
                     {
@@ -1833,7 +1838,7 @@ fn ac26_file_round_trip_no_negative_lengths() {
                     assert!(bounds.width.as_mm() > 0.0 && bounds.height.as_mm() > 0.0);
                     assert!(radii4(corner_radii).iter().all(|r| *r >= 0.0));
                 }
-                Shape::Ellipse { frame } => {
+                Shape::Ellipse { frame, .. } => {
                     assert!(frame.rx.as_mm() > 0.0 && frame.ry.as_mm() > 0.0);
                 }
                 Shape::Polygon { frame, .. } | Shape::Star { frame, .. } => {

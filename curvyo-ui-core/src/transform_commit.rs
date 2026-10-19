@@ -5,8 +5,8 @@
 //! [`crate::transform_drag`], which resolves the gestures.
 
 use curvyo_document_core::{
-    AnchorId, CopySource, Document, Length, NodeId, ObjectSnapshot, PathEditError, Point, Shape,
-    ShapeEditError, Vec2,
+    AnchorId, ArcKind, CopySource, Document, Length, NodeId, ObjectSnapshot, PathEditError, Point,
+    Shape, ShapeEditError, Vec2,
 };
 
 use crate::anchor_id_minter::AnchorIdMinter;
@@ -143,10 +143,10 @@ pub(crate) fn commit_resize(
                 ShapeEditError::InvalidStrokeWidth,
                 |w| document.resize_rect(id, bounds, corner_radii, w),
             ),
-            Shape::Ellipse { frame } => write_with_width_fallback(
+            Shape::Ellipse { frame, arc, .. } => write_with_width_fallback(
                 width(primitive.style.stroke.width),
                 ShapeEditError::InvalidStrokeWidth,
-                |w| document.resize_ellipse(id, frame, w),
+                |w| document.resize_ellipse_with_arc(id, frame, arc, w),
             ),
             Shape::Polygon { frame, .. } | Shape::Star { frame, .. } => write_with_width_fallback(
                 width(primitive.style.stroke.width),
@@ -282,23 +282,46 @@ fn shape_numbers(shape: &Shape) -> Vec<f64> {
             corner_radii.br.as_mm(),
             corner_radii.bl.as_mm(),
         ],
-        Shape::Ellipse { frame } => vec![
-            frame.center.x,
-            frame.center.y,
-            frame.rx.as_mm(),
-            frame.ry.as_mm(),
-        ],
-        Shape::Polygon { frame, point_count } => vec![
+        // The arc (whole: four zeros) and the curve take part
+        // (`specs/0021-ellipse-arcs-and-shaping/`), so their edits are not "unchanged".
+        Shape::Ellipse { frame, arc, curve } => {
+            let (whole, start, end, kind) = arc.map_or((0.0, 0.0, 0.0, 0.0), |arc| {
+                let kind = match arc.kind {
+                    ArcKind::Pie => 1.0,
+                    ArcKind::Arc => 2.0,
+                    ArcKind::Chord => 3.0,
+                };
+                (1.0, arc.start().as_radians(), arc.end().as_radians(), kind)
+            });
+            vec![
+                frame.center.x,
+                frame.center.y,
+                frame.rx.as_mm(),
+                frame.ry.as_mm(),
+                whole,
+                start,
+                end,
+                kind,
+                curve.get(),
+            ]
+        }
+        Shape::Polygon {
+            frame,
+            point_count,
+            curve,
+        } => vec![
             frame.center.x,
             frame.center.y,
             frame.radius.as_mm(),
             frame.angle.as_radians(),
             f64::from(point_count.get()),
+            curve.get(),
         ],
         Shape::Star {
             frame,
             point_count,
             inner_ratio,
+            curve,
         } => vec![
             frame.center.x,
             frame.center.y,
@@ -306,6 +329,7 @@ fn shape_numbers(shape: &Shape) -> Vec<f64> {
             frame.angle.as_radians(),
             f64::from(point_count.get()),
             inner_ratio.get(),
+            curve.get(),
         ],
     }
 }

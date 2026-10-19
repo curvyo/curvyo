@@ -1071,7 +1071,7 @@ fn ac40_circle_stays_a_circle() {
         let ObjectSnapshot::Primitive(p) = &objs[0] else {
             panic!("outset goes below: {objs:?}")
         };
-        let Shape::Ellipse { frame } = p.shape else {
+        let Shape::Ellipse { frame, .. } = p.shape else {
             panic!("{:?}", p.shape)
         };
         assert!((frame.rx.as_mm() - 22.0).abs() < 1e-6 && (frame.ry.as_mm() - 22.0).abs() < 1e-6);
@@ -1214,7 +1214,10 @@ fn ac40_hexagon_miter_stays_a_hexagon_round_becomes_a_path() {
     let ObjectSnapshot::Primitive(p) = &objs[0] else {
         panic!("{objs:?}")
     };
-    let Shape::Polygon { frame, point_count } = p.shape else {
+    let Shape::Polygon {
+        frame, point_count, ..
+    } = p.shape
+    else {
         panic!("{:?}", p.shape)
     };
     assert_eq!(point_count.get(), 6);
@@ -1290,6 +1293,7 @@ fn ac40_star_miter_is_a_scaled_star() {
             frame,
             point_count,
             inner_ratio,
+            ..
         } = p.shape
         else {
             panic!("{:?}", p.shape)

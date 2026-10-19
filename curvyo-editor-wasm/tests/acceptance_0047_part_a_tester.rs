@@ -204,7 +204,7 @@ fn rotate_about_centre(d: &Document, id: NodeId, radians: f64) {
                 bounds.origin.x + bounds.width.as_mm() / 2.0,
                 bounds.origin.y + bounds.height.as_mm() / 2.0,
             ),
-            Shape::Ellipse { frame } => frame.center,
+            Shape::Ellipse { frame, .. } => frame.center,
             Shape::Polygon { frame, .. } | Shape::Star { frame, .. } => frame.center,
         },
         ObjectSnapshot::Path(_) => panic!("primitives only"),

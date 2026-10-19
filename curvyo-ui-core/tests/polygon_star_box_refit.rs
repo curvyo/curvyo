@@ -61,6 +61,7 @@ fn polygon(
         Shape::Polygon {
             frame: frame(center, radius, frame_angle),
             point_count: PointCount::new(n).unwrap(),
+            curve: curvyo_document_core::Curve::POLYGON_DEFAULT,
         },
         rotation,
     )
@@ -79,6 +80,7 @@ fn star(
             frame: frame(center, radius, frame_angle),
             point_count: PointCount::new(n).unwrap(),
             inner_ratio: InnerRatio::new(ratio).unwrap(),
+            curve: curvyo_document_core::Curve::POLYGON_DEFAULT,
         },
         rotation,
     )
@@ -202,6 +204,8 @@ fn rectangle_ellipse_and_path_keep_the_rotation_register_as_box_direction() {
                 rx: Length::from_mm(6.0),
                 ry: Length::from_mm(3.0),
             },
+            arc: None,
+            curve: curvyo_document_core::Curve::ELLIPSE_DEFAULT,
         },
         deg(-120.0),
     );
@@ -255,8 +259,12 @@ fn handle_position(object: &ObjectSnapshot) -> Point {
         &oriented_bounds(object),
         &TransformHandleTolerances::at_scale(20.0),
     );
-    let [(ParamHandle::InnerRadius, at)] = handles.as_slice() else {
-        panic!("one inner-radius handle, got {handles:?}");
+    // Since `specs/0021-ellipse-arcs-and-shaping/` a star also has a curve handle.
+    let Some((_, at)) = handles
+        .iter()
+        .find(|(handle, _)| *handle == ParamHandle::InnerRadius)
+    else {
+        panic!("an inner-radius handle, got {handles:?}");
     };
     *at
 }

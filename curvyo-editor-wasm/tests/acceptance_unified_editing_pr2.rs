@@ -361,7 +361,7 @@ fn ac25_creation_drags_follow_the_constraint_and_create_exactly_as_0003() {
     s.set_tool(Tool::Ellipse);
     drag(&mut s, a, b, false, false);
     match prim(&s, 0).shape {
-        Shape::Ellipse { frame } => {
+        Shape::Ellipse { frame, .. } => {
             assert!(near(frame.rx.as_mm(), 45.0 / k, 1e-9));
             assert!(near(frame.ry.as_mm(), 20.0 / k, 1e-9));
             assert!(near(frame.center.x, a.x + 45.0 / k, 1e-9));
@@ -372,7 +372,7 @@ fn ac25_creation_drags_follow_the_constraint_and_create_exactly_as_0003() {
     s.set_tool(Tool::Ellipse);
     drag(&mut s, a, b, false, true);
     match prim(&s, 0).shape {
-        Shape::Ellipse { frame } => assert!(near(frame.rx.as_mm(), frame.ry.as_mm(), 1e-9)),
+        Shape::Ellipse { frame, .. } => assert!(near(frame.rx.as_mm(), frame.ry.as_mm(), 1e-9)),
         other => panic!("ellipse expected {other:?}"),
     }
     // Polygon and star: centre A, one vertex at B.
@@ -385,6 +385,7 @@ fn ac25_creation_drags_follow_the_constraint_and_create_exactly_as_0003() {
         Shape::Polygon {
             frame,
             point_count: count,
+            ..
         } => {
             assert_eq!(count.get(), 6);
             assert!(near(frame.center.x, a.x, 1e-9) && near(frame.center.y, a.y, 1e-9));

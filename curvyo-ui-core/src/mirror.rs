@@ -15,8 +15,8 @@
 //! right radii (or top and bottom radii) swap, so each stays at its physical corner.
 
 use curvyo_document_core::{
-    Angle, CornerRadii, ObjectSnapshot, PathSnapshot, Point, PrimitiveSnapshot, RectBounds, Shape,
-    StarFrame,
+    Angle, CornerRadii, EllipseAxes, Linear, ObjectSnapshot, PathSnapshot, Point,
+    PrimitiveSnapshot, RectBounds, Shape, StarFrame, arc_after_linear_map,
 };
 
 /// A reflection about `pivot` along the axes turned by `axes`: `x` negates the component
@@ -51,6 +51,16 @@ impl Mirror {
             if self.x { -1.0 } else { 1.0 },
             if self.y { -1.0 } else { 1.0 },
         )
+    }
+
+    /// The reflection's linear part, `R(φ) · diag(fx, fy) · R(−φ)`.
+    fn linear(self) -> Linear {
+        let (fx, fy) = self.factors();
+        let (sin, cos) = self.axes.as_radians().sin_cos();
+        [
+            [fx * cos * cos + fy * sin * sin, (fx - fy) * cos * sin],
+            [(fx - fy) * cos * sin, fx * sin * sin + fy * cos * cos],
+        ]
     }
 
     /// `point` reflected.
@@ -140,14 +150,39 @@ fn mirrored_primitive(primitive: &PrimitiveSnapshot, mirror: Mirror) -> Primitiv
             };
             (shape, mirror.orientation(rotation))
         }
-        Shape::Ellipse { mut frame } => {
+        Shape::Ellipse {
+            mut frame,
+            arc,
+            curve,
+        } => {
             frame.center = mirror.point(frame.center);
-            (Shape::Ellipse { frame }, mirror.orientation(rotation))
+            let mirrored_rotation = mirror.orientation(rotation);
+            // The arc is the mirror image: start and end swap (criterion 54).
+            let arc = arc.map(|arc| {
+                let axes = |rotation: Angle| EllipseAxes {
+                    rx: frame.rx.as_mm(),
+                    ry: frame.ry.as_mm(),
+                    rotation: rotation.as_radians(),
+                };
+                arc_after_linear_map(
+                    arc,
+                    axes(rotation),
+                    axes(mirrored_rotation),
+                    mirror.linear(),
+                )
+            });
+            (Shape::Ellipse { frame, arc, curve }, mirrored_rotation)
         }
-        Shape::Polygon { frame, point_count } => (
+        // The ring is symmetric, so the curve is unchanged (criterion 54).
+        Shape::Polygon {
+            frame,
+            point_count,
+            curve,
+        } => (
             Shape::Polygon {
                 frame: mirrored_star_frame(frame, rotation, mirror),
                 point_count,
+                curve,
             },
             rotation,
         ),
@@ -155,11 +190,13 @@ fn mirrored_primitive(primitive: &PrimitiveSnapshot, mirror: Mirror) -> Primitiv
             frame,
             point_count,
             inner_ratio,
+            curve,
         } => (
             Shape::Star {
                 frame: mirrored_star_frame(frame, rotation, mirror),
                 point_count,
                 inner_ratio,
+                curve,
             },
             rotation,
         ),
@@ -425,7 +462,9 @@ mod tests {
         );
         let flipped = mirrored(&document.object(id).expect("exists"), h_flip(26.25));
         let ObjectSnapshot::Primitive(PrimitiveSnapshot {
-            shape: Shape::Polygon { frame, point_count },
+            shape: Shape::Polygon {
+                frame, point_count, ..
+            },
             ..
         }) = &flipped
         else {

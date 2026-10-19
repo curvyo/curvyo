@@ -6,7 +6,7 @@
 //! shape being created. Selection boxes and handles are the Select tool's
 //! (`crate::select_decoration`); the shape tools only create.
 
-use curvyo_document_core::{Angle, Point, Shape, ViewTransform, outline_of_rotated};
+use curvyo_document_core::{Angle, Point, Shape, ViewTransform, drawing_outline_of_rotated};
 
 use crate::color::RgbaColor;
 use crate::glyphs::{self, DrawList};
@@ -67,20 +67,21 @@ pub(crate) fn shape_live_outline(
     view: ViewTransform,
     casing: bool,
 ) -> DrawList {
-    let outline = outline_of_rotated(shape, rotation);
+    let outline = drawing_outline_of_rotated(shape, rotation);
     let anchors = outline_to_anchors(&outline);
+    let closed = outline.closed;
     let width = screen_px_to_mm(view, theme::LIVE_PREVIEW_STROKE_PX);
     let tolerance_mm = screen_px_to_mm(view, theme::DISPLAY_TOLERANCE_PX);
     if casing {
         stroke::path_stroke(
             &anchors,
-            true,
+            closed,
             width * theme::CASING_WIDTH_FACTOR,
             theme::SELECTION_CASING,
             tolerance_mm,
         )
     } else {
-        stroke::path_stroke(&anchors, true, width, theme::ACCENT, tolerance_mm)
+        stroke::path_stroke(&anchors, closed, width, theme::ACCENT, tolerance_mm)
     }
 }
 

@@ -600,7 +600,7 @@ fn ac4_free_corner_resize_on_ellipse_pins_opposite_corner() {
     select_at(&mut s, ell());
     // SE corner (40,20) -> (60, 40): box (0,0)-(60,40).
     drag(&mut s, pt(40.0, 20.0), pt(60.0, 40.0), false, false);
-    let Shape::Ellipse { frame } = prim(&s).shape else {
+    let Shape::Ellipse { frame, .. } = prim(&s).shape else {
         panic!()
     };
     assert!(pclose(frame.center, pt(30.0, 20.0)), "{:?}", frame.center);
@@ -688,7 +688,7 @@ fn ac6_edge_handle_resizes_ellipse_and_path_on_one_axis_only() {
     let mut s = open_in_session(&ellipse_doc(20.0, 10.0, 20.0, 10.0));
     select_at(&mut s, ell());
     drag(&mut s, pt(40.0, 10.0), pt(60.0, 100.0), false, false);
-    let Shape::Ellipse { frame } = prim(&s).shape else {
+    let Shape::Ellipse { frame, .. } = prim(&s).shape else {
         panic!()
     };
     // box (0,0)-(60,20)
@@ -969,7 +969,7 @@ fn ac10_ellipse_corner_and_edge_resizes_set_rx_ry_from_the_box() {
     let mut s = open_in_session(&ellipse_doc(20.0, 10.0, 20.0, 10.0));
     select_at(&mut s, click_at);
     drag(&mut s, pt(0.0, 0.0), pt(-10.0, -10.0), false, false);
-    let Shape::Ellipse { frame } = prim(&s).shape else {
+    let Shape::Ellipse { frame, .. } = prim(&s).shape else {
         panic!()
     };
     assert!(pclose(frame.center, pt(15.0, 5.0)), "{:?}", frame.center);
@@ -978,7 +978,7 @@ fn ac10_ellipse_corner_and_edge_resizes_set_rx_ry_from_the_box() {
     let mut s = open_in_session(&ellipse_doc(20.0, 10.0, 20.0, 10.0));
     select_at(&mut s, click_at);
     drag(&mut s, pt(40.0, 20.0), pt(60.0, 21.0), false, true);
-    let Shape::Ellipse { frame } = prim(&s).shape else {
+    let Shape::Ellipse { frame, .. } = prim(&s).shape else {
         panic!()
     };
     assert!(close(frame.rx.as_mm(), 30.0) && close(frame.ry.as_mm(), 15.0));
@@ -991,7 +991,9 @@ fn ac10_ellipse_corner_and_edge_resizes_set_rx_ry_from_the_box() {
 fn star_like(session: &Session) -> (StarFrame, PointCount, Option<InnerRatio>, f64, f64) {
     let p = prim(session);
     match p.shape {
-        Shape::Polygon { frame, point_count } => (
+        Shape::Polygon {
+            frame, point_count, ..
+        } => (
             frame,
             point_count,
             None,
@@ -1002,6 +1004,7 @@ fn star_like(session: &Session) -> (StarFrame, PointCount, Option<InnerRatio>, f
             frame,
             point_count,
             inner_ratio,
+            ..
         } => (
             frame,
             point_count,
@@ -1208,7 +1211,7 @@ fn ac13_ellipse_and_polygon_never_report_negative_radii() {
     let mut s = open_in_session(&ellipse_doc(20.0, 10.0, 20.0, 10.0));
     select_at(&mut s, ell());
     drag(&mut s, pt(40.0, 20.0), pt(-30.0, -30.0), false, false);
-    let Shape::Ellipse { frame } = prim(&s).shape else {
+    let Shape::Ellipse { frame, .. } = prim(&s).shape else {
         panic!()
     };
     assert!(frame.rx.as_mm() >= 0.0 && frame.ry.as_mm() >= 0.0);
@@ -2668,7 +2671,7 @@ fn ac25_a_rotated_ellipse_edge_handle_follows_the_rotation() {
     // Local E handle (40,10) -> rotated 90 deg: (20,30). Drag 6 along local x = document +y.
     let e = rot(pt(40.0, 10.0), c, FRAC_PI_2);
     drag(&mut s, e, pt(e.x, e.y + 6.0), false, false);
-    let Shape::Ellipse { frame } = prim(&s).shape else {
+    let Shape::Ellipse { frame, .. } = prim(&s).shape else {
         panic!()
     };
     assert!(
@@ -2837,7 +2840,7 @@ fn assert_all_finite_and_reopenable(session: &Session) {
                             assert!(v.is_finite(), "non-finite rect value {v}");
                         }
                     }
-                    Shape::Ellipse { frame } => {
+                    Shape::Ellipse { frame, .. } => {
                         for v in [
                             frame.center.x,
                             frame.center.y,

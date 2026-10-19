@@ -20,6 +20,8 @@
 //! methods join this type's `impl Session` the same way any other
 //! `impl` block in the same crate would.
 
+#[cfg(test)]
+mod arc_tests;
 mod background;
 mod background_view;
 mod boolean;
@@ -85,6 +87,7 @@ mod refusal;
 mod ruler;
 mod select;
 mod select_bar;
+mod select_bar_arc;
 mod select_cursor;
 mod select_gesture;
 mod select_readout;

@@ -128,10 +128,10 @@ pub fn placed_sentence(shape: &Shape, unit: DisplayUnit) -> String {
             n(bounds.width),
             n(bounds.height)
         ),
-        Shape::Ellipse { frame } if is_circle(frame) => {
+        Shape::Ellipse { frame, .. } if is_circle(frame) => {
             format!("Circle placed, radius {} {words}.", n(frame.rx))
         }
-        Shape::Ellipse { frame } => {
+        Shape::Ellipse { frame, .. } => {
             format!(
                 "Ellipse placed, {} by {} {words}.",
                 n(frame.rx),
@@ -199,6 +199,8 @@ mod tests {
                 rx: Length::from_mm(10.0),
                 ry: Length::from_mm(10.0),
             },
+            arc: None,
+            curve: curvyo_document_core::Curve::ELLIPSE_DEFAULT,
         };
         assert_eq!(
             placed_sentence(&circle, DisplayUnit::Mm),
@@ -210,6 +212,8 @@ mod tests {
                 rx: Length::from_mm(15.0),
                 ry: Length::from_mm(5.0),
             },
+            arc: None,
+            curve: curvyo_document_core::Curve::ELLIPSE_DEFAULT,
         };
         assert_eq!(
             placed_sentence(&ellipse, DisplayUnit::Cm),

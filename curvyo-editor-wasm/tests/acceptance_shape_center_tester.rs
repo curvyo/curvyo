@@ -53,7 +53,7 @@ fn rect_box(p: &PrimitiveSnapshot) -> (f64, f64, f64, f64) {
 }
 
 fn ell(p: &PrimitiveSnapshot) -> (f64, f64, f64, f64) {
-    let Shape::Ellipse { frame } = p.shape else {
+    let Shape::Ellipse { frame, .. } = p.shape else {
         panic!("ellipse expected")
     };
     (
@@ -655,7 +655,7 @@ fn hostile_pointer_values_through_session_never_panic_and_keep_the_file_openable
                                     && bounds.width.as_mm().is_finite()
                                     && bounds.height.as_mm().is_finite()
                             }
-                            Shape::Ellipse { frame } => {
+                            Shape::Ellipse { frame, .. } => {
                                 frame.center.x.is_finite()
                                     && frame.center.y.is_finite()
                                     && frame.rx.as_mm().is_finite()

@@ -8,11 +8,12 @@
 //! already used.
 
 use curvyo_document_core::{
-    CornerRadii, Document, InnerRatio, Length, NodeId, ObjectSnapshot, PointCount,
+    Angle, ArcKind, CornerRadii, Document, InnerRatio, Length, NodeId, ObjectSnapshot, PointCount,
     PrimitiveSnapshot, RectBounds, Shape, ShapeEditError, Vec2, effective_corner_radii,
 };
 
 use crate::param_handles::{Corner, ParamHandle};
+use crate::shape_arc_edit::{ArcEnd, made_whole, with_arc_angle, with_arc_kind, with_curve};
 
 /// A value within this (millimetres, or a ratio) of the current one is "equal":
 /// nothing is written (criteria 9, 12, 18).
@@ -37,6 +38,16 @@ pub enum ParamValue {
     Ratio(InnerRatio),
     /// A polygon or star's point count.
     PointCount(PointCount),
+    /// An ellipse's arc start or end angle (`specs/0021-ellipse-arcs-and-shaping/`
+    /// criteria 2, 3 and 8).
+    ArcAngle(ArcEnd, Angle),
+    /// An ellipse's arc kind (criterion 3).
+    ArcKind(ArcKind),
+    /// "Whole ellipse" (criterion 3).
+    WholeEllipse,
+    /// The curve of an ellipse, polygon or star as a fraction, limited per shape when
+    /// applied (criteria 23, 24, 26, 42 and 44).
+    Curve(f64),
 }
 
 /// The largest corner radius a rectangle allows: half its shorter side.
@@ -85,7 +96,7 @@ pub(crate) fn radius_is_limited(start: &ObjectSnapshot, value: ParamValue) -> bo
                 corner_radius_limit(*bounds, effective, corner),
             )
         }
-        ParamValue::Ratio(_) | ParamValue::PointCount(_) => return false,
+        _ => return false,
     };
     asked >= limit - PARAM_EQUAL_EPSILON
 }
@@ -158,6 +169,7 @@ pub fn value_from_pointer(
                 frame,
                 point_count,
                 inner_ratio,
+                ..
             },
         ) => {
             let step = std::f64::consts::TAU / f64::from(point_count.get());
@@ -227,6 +239,21 @@ fn apply_corner_radius(
     Some(current.with(corner, Length::from_mm(limited)))
 }
 
+/// `shape` with an arc or curve `value` applied (`specs/0021-ellipse-arcs-and-shaping/`);
+/// `None` when nothing changes or `value` is of another kind.
+fn arc_or_curve_shape(shape: &Shape, value: ParamValue) -> Option<Shape> {
+    match value {
+        ParamValue::ArcAngle(end, angle) => with_arc_angle(shape, end, angle),
+        ParamValue::ArcKind(kind) => with_arc_kind(shape, kind),
+        ParamValue::WholeEllipse => made_whole(shape),
+        ParamValue::Curve(fraction) => with_curve(shape, fraction),
+        ParamValue::Radius(_)
+        | ParamValue::CornerRadius(..)
+        | ParamValue::Ratio(_)
+        | ParamValue::PointCount(_) => None,
+    }
+}
+
 fn apply_to_primitive(start: &PrimitiveSnapshot, value: ParamValue) -> PrimitiveSnapshot {
     let shape = match (start.shape, value) {
         (
@@ -265,6 +292,7 @@ fn apply_to_primitive(start: &PrimitiveSnapshot, value: ParamValue) -> Primitive
                 frame,
                 point_count,
                 inner_ratio,
+                curve,
             },
             ParamValue::Ratio(ratio),
         ) => {
@@ -276,15 +304,24 @@ fn apply_to_primitive(start: &PrimitiveSnapshot, value: ParamValue) -> Primitive
                 frame,
                 point_count,
                 inner_ratio: limited,
+                curve,
             }
         }
-        (Shape::Polygon { frame, point_count }, ParamValue::PointCount(count)) => {
+        (
+            Shape::Polygon {
+                frame,
+                point_count,
+                curve,
+            },
+            ParamValue::PointCount(count),
+        ) => {
             if count == point_count {
                 return start.clone();
             }
             Shape::Polygon {
                 frame,
                 point_count: count,
+                curve,
             }
         }
         (
@@ -292,6 +329,7 @@ fn apply_to_primitive(start: &PrimitiveSnapshot, value: ParamValue) -> Primitive
                 frame,
                 point_count,
                 inner_ratio,
+                curve,
             },
             ParamValue::PointCount(count),
         ) => {
@@ -302,9 +340,15 @@ fn apply_to_primitive(start: &PrimitiveSnapshot, value: ParamValue) -> Primitive
                 frame,
                 point_count: count,
                 inner_ratio,
+                curve,
             }
         }
-        _ => return start.clone(),
+        (shape, value) => {
+            let Some(shape) = arc_or_curve_shape(&shape, value) else {
+                return start.clone();
+            };
+            shape
+        }
     };
     PrimitiveSnapshot {
         shape,
@@ -326,8 +370,57 @@ pub(crate) fn commit_param(document: &Document, handle: ParamHandle, result: &Ob
         (ParamHandle::InnerRadius, Shape::Star { inner_ratio, .. }) => {
             let _ = document.set_inner_ratio(&[primitive.id], inner_ratio);
         }
+        (ParamHandle::ArcStart | ParamHandle::ArcEnd, Shape::Ellipse { arc, .. }) => {
+            let _ = document.set_ellipse_arcs(&[(primitive.id, arc)]);
+        }
+        (
+            ParamHandle::Curve,
+            Shape::Ellipse { curve, .. } | Shape::Polygon { curve, .. } | Shape::Star { curve, .. },
+        ) => {
+            let _ = document.set_curves(&[(primitive.id, curve)]);
+        }
         _ => {}
     }
+}
+
+/// The arcs or curves `value` gives each object of `ids`, written as one commit: each
+/// object's own result of [`apply_param`] (the other angle of a new arc, the limit of a
+/// curve are per object). Objects it leaves unchanged are not written.
+fn commit_arc_or_curve_batch(
+    document: &Document,
+    ids: &[NodeId],
+    value: ParamValue,
+) -> Result<(), ShapeEditError> {
+    let mut arcs = Vec::new();
+    let mut curves = Vec::new();
+    for &id in ids {
+        let old = document.object(id).ok_or(ShapeEditError::NoSuchObject)?;
+        let ObjectSnapshot::Primitive(new) = apply_param(&old, value) else {
+            return Err(ShapeEditError::NotAPrimitive);
+        };
+        if ObjectSnapshot::Primitive(new.clone()) == old {
+            continue;
+        }
+        match (value, new.shape) {
+            (
+                ParamValue::Curve(_),
+                Shape::Ellipse { curve, .. }
+                | Shape::Polygon { curve, .. }
+                | Shape::Star { curve, .. },
+            ) => {
+                curves.push((id, curve));
+            }
+            (_, Shape::Ellipse { arc, .. }) => arcs.push((id, arc)),
+            _ => {}
+        }
+    }
+    if !arcs.is_empty() {
+        document.set_ellipse_arcs(&arcs)?;
+    }
+    if !curves.is_empty() {
+        document.set_curves(&curves)?;
+    }
+    Ok(())
 }
 
 /// Writes `value` to every primitive in `ids` as one commit: the bar's
@@ -352,6 +445,10 @@ pub fn commit_param_batch(
         ParamValue::CornerRadius(..) => Ok(()),
         ParamValue::Ratio(ratio) => document.set_inner_ratio(ids, ratio),
         ParamValue::PointCount(count) => document.set_point_count(ids, count),
+        ParamValue::ArcAngle(..)
+        | ParamValue::ArcKind(_)
+        | ParamValue::WholeEllipse
+        | ParamValue::Curve(_) => commit_arc_or_curve_batch(document, ids, value),
     }
 }
 

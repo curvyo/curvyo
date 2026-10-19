@@ -14,7 +14,9 @@ use serde::{Deserialize, Serialize};
 use crate::affine::Affine;
 use crate::clone_model::CloneSnapshot;
 use crate::corner_radii::CornerRadii;
+use crate::ellipse_arc::EllipseArc;
 use crate::path_model::{NodeId, PathSnapshot};
+use crate::ring_curve::Curve;
 use crate::style_model::Style;
 use crate::units::{Angle, Length, Point, Tolerance, Vec2};
 
@@ -228,6 +230,12 @@ pub enum Shape {
     Ellipse {
         /// The ellipse's frame.
         frame: EllipseFrame,
+        /// The arc (`specs/0021-ellipse-arcs-and-shaping/` Part A); `None` is the
+        /// whole ellipse.
+        arc: Option<EllipseArc>,
+        /// The curve of its four sides (Part B), [`Curve::ELLIPSE_DEFAULT`] the
+        /// ellipse itself.
+        curve: Curve,
     },
     /// Acceptance criteria 10, 11, 13, 15.
     Polygon {
@@ -235,6 +243,9 @@ pub enum Shape {
         frame: StarFrame,
         /// Always `3..=1024`.
         point_count: PointCount,
+        /// The curve of its sides (`specs/0021-ellipse-arcs-and-shaping/` criterion
+        /// 35), stored raw, [`Curve::POLYGON_DEFAULT`] straight.
+        curve: Curve,
     },
     /// Acceptance criteria 10, 12, 13, 14, 15.
     Star {
@@ -244,6 +255,8 @@ pub enum Shape {
         point_count: PointCount,
         /// Always strictly between 0 and 1.
         inner_ratio: InnerRatio,
+        /// The curve of its sides, as on the polygon.
+        curve: Curve,
     },
 }
 
@@ -443,23 +456,31 @@ pub fn translate_shape(shape: Shape, offset: Vec2) -> Shape {
             },
             corner_radii,
         },
-        Shape::Ellipse { frame } => Shape::Ellipse {
+        Shape::Ellipse { frame, arc, curve } => Shape::Ellipse {
             frame: EllipseFrame {
                 center: frame.center.translated(offset),
                 ..frame
             },
+            arc,
+            curve,
         },
-        Shape::Polygon { frame, point_count } => Shape::Polygon {
+        Shape::Polygon {
+            frame,
+            point_count,
+            curve,
+        } => Shape::Polygon {
             frame: StarFrame {
                 center: frame.center.translated(offset),
                 ..frame
             },
             point_count,
+            curve,
         },
         Shape::Star {
             frame,
             point_count,
             inner_ratio,
+            curve,
         } => Shape::Star {
             frame: StarFrame {
                 center: frame.center.translated(offset),
@@ -467,6 +488,7 @@ pub fn translate_shape(shape: Shape, offset: Vec2) -> Shape {
             },
             point_count,
             inner_ratio,
+            curve,
         },
     }
 }
@@ -483,7 +505,7 @@ pub fn shape_center(shape: &Shape) -> Point {
             bounds.origin.x + bounds.width.as_mm() / 2.0,
             bounds.origin.y + bounds.height.as_mm() / 2.0,
         ),
-        Shape::Ellipse { frame } => frame.center,
+        Shape::Ellipse { frame, .. } => frame.center,
         Shape::Polygon { frame, .. } | Shape::Star { frame, .. } => frame.center,
     }
 }
@@ -520,7 +542,8 @@ pub(crate) fn rotate_shape(shape: Shape, pivot: Point, angle: Angle) -> Shape {
 /// (`specs/0004-canvas-navigation-and-selection/adrs.md`: "the primitive box
 /// that `render-core/src/shape_preview.rs` computes privately... moves to
 /// `document-core` as plain arithmetic on its own types"). A star keeps its
-/// circumscribed-frame box, matching `primitive-shapes`' own convention.
+/// circumscribed-frame box, matching `primitive-shapes`' own convention. An ellipse
+/// with an arc has the tight box of the drawn part.
 #[must_use]
 pub fn shape_frame_bounds(shape: &Shape) -> (Point, Point) {
     match *shape {
@@ -530,7 +553,14 @@ pub fn shape_frame_bounds(shape: &Shape) -> (Point, Point) {
                 .origin
                 .translated(Vec2::new(bounds.width.as_mm(), bounds.height.as_mm())),
         ),
-        Shape::Ellipse { frame } => (
+        // An arc's box is the box of what it draws
+        // (`specs/0021-ellipse-arcs-and-shaping/` criterion 9).
+        Shape::Ellipse {
+            frame,
+            arc: Some(arc),
+            ..
+        } => crate::ellipse_arc::arc_bounds(frame, arc),
+        Shape::Ellipse { frame, .. } => (
             Point::new(
                 frame.center.x - frame.rx.as_mm(),
                 frame.center.y - frame.ry.as_mm(),
@@ -540,16 +570,15 @@ pub fn shape_frame_bounds(shape: &Shape) -> (Point, Point) {
                 frame.center.y + frame.ry.as_mm(),
             ),
         ),
-        Shape::Polygon { frame, .. } | Shape::Star { frame, .. } => (
-            Point::new(
-                frame.center.x - frame.radius.as_mm(),
-                frame.center.y - frame.radius.as_mm(),
-            ),
-            Point::new(
-                frame.center.x + frame.radius.as_mm(),
-                frame.center.y + frame.radius.as_mm(),
-            ),
-        ),
+        Shape::Polygon { frame, .. } | Shape::Star { frame, .. } => {
+            // The circumscribed box of the curved outline (criterion 47): it grows where a
+            // star's sides bulge past the outer radius.
+            let radius = crate::ring_curve::ring_extent(shape).max(frame.radius.as_mm());
+            (
+                Point::new(frame.center.x - radius, frame.center.y - radius),
+                Point::new(frame.center.x + radius, frame.center.y + radius),
+            )
+        }
     }
 }
 
@@ -607,6 +636,8 @@ mod tests {
                 rx: Length::from_mm(5.0),
                 ry: Length::from_mm(5.0),
             },
+            arc: None,
+            curve: crate::Curve::ELLIPSE_DEFAULT,
         };
         assert_eq!(shape_center(&shape), Point::new(3.0, 4.0));
     }
@@ -725,6 +756,7 @@ mod tests {
                     angle: Angle::from_radians(frame_angle.to_radians()),
                 },
                 point_count: PointCount::new(5).unwrap(),
+                curve: crate::Curve::POLYGON_DEFAULT,
             },
             style: Style::default(),
             rotation: Angle::from_radians(rotation.to_radians()),
@@ -845,6 +877,44 @@ mod tests {
         assert!((corner_radii.tl.as_mm() - 2.0).abs() < f64::EPSILON);
     }
 
+    /// `specs/0021-ellipse-arcs-and-shaping/` criteria 11 and 27: a move keeps the arc and
+    /// the curve.
+    #[test]
+    fn a_move_keeps_arc_and_curve() {
+        let arc = crate::ellipse_arc::EllipseArc::new(
+            Angle::from_radians(0.2),
+            Angle::from_radians(1.2),
+            crate::ellipse_arc::ArcKind::Chord,
+        );
+        let shape = Shape::Ellipse {
+            frame: EllipseFrame {
+                center: Point::new(0.0, 0.0),
+                rx: Length::from_mm(3.0),
+                ry: Length::from_mm(2.0),
+            },
+            arc,
+            curve: Curve::ELLIPSE_DEFAULT,
+        };
+        let Shape::Ellipse { arc: moved, .. } = translate_shape(shape, Vec2::new(1.0, 1.0)) else {
+            panic!("an ellipse");
+        };
+        assert_eq!(moved, arc);
+        let star = Shape::Star {
+            frame: StarFrame {
+                center: Point::new(0.0, 0.0),
+                radius: Length::from_mm(10.0),
+                angle: Angle::from_radians(0.0),
+            },
+            point_count: PointCount::new(5).unwrap(),
+            inner_ratio: InnerRatio::new(0.5).unwrap(),
+            curve: Curve::new(-0.3).unwrap(),
+        };
+        let Shape::Star { curve, .. } = translate_shape(star, Vec2::new(1.0, 1.0)) else {
+            panic!("a star");
+        };
+        assert_eq!(curve, Curve::new(-0.3).unwrap());
+    }
+
     #[test]
     fn translated_path_moves_every_anchor_point_but_not_its_handles() {
         use crate::path_model::{AnchorId, AnchorKind, NewAnchor};
@@ -897,6 +967,7 @@ mod tests {
             },
             point_count: PointCount::new(5).unwrap(),
             inner_ratio: InnerRatio::new(0.5).unwrap(),
+            curve: crate::Curve::POLYGON_DEFAULT,
         };
         let (min, max) = shape_frame_bounds(&shape);
         assert_eq!(min, Point::new(-10.0, -10.0));

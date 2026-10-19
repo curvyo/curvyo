@@ -258,6 +258,8 @@ impl Session {
                 EntryKind::Size => "size",
                 EntryKind::CornerRadius => "corner-radius",
                 EntryKind::InnerRatio => "inner-ratio",
+                EntryKind::ArcAngle => "arc-angle",
+                EntryKind::Curve => "curve",
                 EntryKind::Skew => "skew",
             },
             fields: entry.fields().iter().map(EntryFieldView::of).collect(),
@@ -320,14 +322,18 @@ impl Session {
                 })
                 .unwrap_or_default();
             let mirror = this.transform_entry_mirror_line(first, second, last_edited);
+            let entry_handle = this.select.entry_handle();
             let outcome = this
                 .select
                 .commit_entry(&this.document, [first, second], last_edited);
             if outcome == EntryOutcome::Committed {
                 this.transform_notice = curvyo_ui_core::zero_recovery_notice(recovery);
                 // A typed negative size is announced with its mirror (`0056` UX notes).
-                this.transform_announcement =
-                    (!mirror.is_empty()).then(|| super::select::resized_announcement(&mirror));
+                this.transform_announcement = (!mirror.is_empty())
+                    .then(|| super::select::resized_announcement(&mirror))
+                    .or_else(|| {
+                        entry_handle.and_then(|handle| this.arc_or_curve_announcement(handle))
+                    });
             }
             if outcome == EntryOutcome::Committed
                 && let Some((entry, anchor)) = notice

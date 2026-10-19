@@ -49,13 +49,14 @@ fn selected(
         angle: Angle::from_radians(deg.to_radians()),
     };
     let id = match shape(frame) {
-        Shape::Polygon { frame, point_count } => {
-            session.document.create_polygon(frame, point_count)
-        }
+        Shape::Polygon {
+            frame, point_count, ..
+        } => session.document.create_polygon(frame, point_count),
         Shape::Star {
             frame,
             point_count,
             inner_ratio,
+            ..
         } => session
             .document
             .create_star(frame, point_count, inner_ratio),
@@ -77,6 +78,7 @@ fn hexagon(c: Point, r: f64, deg: f64) -> (Session, NodeId) {
         |frame| Shape::Polygon {
             frame,
             point_count: PointCount::new(6).unwrap(),
+            curve: curvyo_document_core::Curve::POLYGON_DEFAULT,
         },
         c,
         r,
@@ -90,6 +92,7 @@ fn star(c: Point, r: f64, deg: f64) -> (Session, NodeId) {
             frame,
             point_count: PointCount::new(5).unwrap(),
             inner_ratio: InnerRatio::new(0.5).unwrap(),
+            curve: curvyo_document_core::Curve::POLYGON_DEFAULT,
         },
         c,
         r,

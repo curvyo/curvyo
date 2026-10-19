@@ -89,11 +89,12 @@ pub fn object_outline_bounds(object: &ObjectSnapshot) -> (Point, Point) {
             path_bounds(path)
         }
         ObjectSnapshot::Primitive(primitive) => {
-            let anchors: Vec<_> = outline_of_rotated(&primitive.shape, primitive.rotation)
+            let outline = outline_of_rotated(&primitive.shape, primitive.rotation);
+            let anchors: Vec<_> = outline
                 .iter()
                 .map(|a| (a.point, a.handle_in, a.handle_out))
                 .collect();
-            anchors_bounds(&anchors, true)
+            anchors_bounds(&anchors, outline.closed)
         }
     }
 }

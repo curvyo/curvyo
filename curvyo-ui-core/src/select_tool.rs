@@ -1678,6 +1678,7 @@ mod tests {
             frame: new_frame,
             point_count,
             inner_ratio,
+            ..
         } = document.primitive(id).expect("exists").shape
         else {
             panic!("expected star");
@@ -2131,7 +2132,7 @@ mod tests {
             Modifiers::new(false, false),
             &mut AnchorIdMinter::new(99),
         );
-        let Shape::Ellipse { frame } = document.primitive(id).expect("exists").shape else {
+        let Shape::Ellipse { frame, .. } = document.primitive(id).expect("exists").shape else {
             panic!("still an ellipse");
         };
         assert!((frame.rx.as_mm() - 7.0).abs() < 1e-9);

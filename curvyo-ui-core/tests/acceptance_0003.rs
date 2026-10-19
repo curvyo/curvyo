@@ -91,7 +91,7 @@ fn ac7_drag_creates_an_ellipse_with_half_extent_radii() {
     let CreateOutcome::Created(id) = up else {
         panic!("expected Created")
     };
-    let Shape::Ellipse { frame } = document.primitive(id).unwrap().shape else {
+    let Shape::Ellipse { frame, .. } = document.primitive(id).unwrap().shape else {
         panic!("expected ellipse")
     };
     assert_eq!(frame.center, pt(10.0, 5.0));
@@ -118,7 +118,7 @@ fn ac8_ctrl_constrain_makes_a_circle() {
     let CreateOutcome::Created(id) = up else {
         panic!("expected Created")
     };
-    let Shape::Ellipse { frame } = document.primitive(id).unwrap().shape else {
+    let Shape::Ellipse { frame, .. } = document.primitive(id).unwrap().shape else {
         panic!("expected ellipse")
     };
     assert!((frame.rx.as_mm() - frame.ry.as_mm()).abs() < 1e-9);

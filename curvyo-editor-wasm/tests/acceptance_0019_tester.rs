@@ -65,7 +65,7 @@ fn rotate_about_centre(d: &Document, id: NodeId, radians: f64) {
                 bounds.origin.x + bounds.width.as_mm() / 2.0,
                 bounds.origin.y + bounds.height.as_mm() / 2.0,
             ),
-            Shape::Ellipse { frame } => frame.center,
+            Shape::Ellipse { frame, .. } => frame.center,
             Shape::Polygon { frame, .. } | Shape::Star { frame, .. } => frame.center,
         },
         ObjectSnapshot::Path(_) => panic!("primitives only"),
@@ -257,7 +257,7 @@ fn ellipse_of(o: &ObjectSnapshot) -> (EllipseFrame, f64) {
     match o {
         ObjectSnapshot::Clone(_) => panic!("no clone here"),
         ObjectSnapshot::Primitive(p) => match p.shape {
-            Shape::Ellipse { frame } => (frame, p.rotation.as_radians()),
+            Shape::Ellipse { frame, .. } => (frame, p.rotation.as_radians()),
             other => panic!("ellipse expected, got {other:?}"),
         },
         ObjectSnapshot::Path(_) => panic!("ellipse expected"),
@@ -937,7 +937,7 @@ fn ac26_every_kind_turns_rigidly_with_rotation_added() {
         ObjectSnapshot::Path(_) => pt(0.0, 0.0),
         ObjectSnapshot::Primitive(p) => match p.shape {
             Shape::Rect { bounds, .. } => rect_centre(bounds),
-            Shape::Ellipse { frame } => frame.center,
+            Shape::Ellipse { frame, .. } => frame.center,
             Shape::Polygon { frame, .. } | Shape::Star { frame, .. } => frame.center,
         },
     };
@@ -3349,7 +3349,7 @@ fn all_finite(s: &Session) -> bool {
                 Shape::Rect { bounds, .. } => {
                     (bounds.origin, bounds.width.as_mm() + bounds.height.as_mm())
                 }
-                Shape::Ellipse { frame } => (frame.center, frame.rx.as_mm() + frame.ry.as_mm()),
+                Shape::Ellipse { frame, .. } => (frame.center, frame.rx.as_mm() + frame.ry.as_mm()),
                 Shape::Polygon { frame, .. } | Shape::Star { frame, .. } => {
                     (frame.center, frame.radius.as_mm())
                 }

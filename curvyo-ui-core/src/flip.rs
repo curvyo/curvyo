@@ -137,7 +137,8 @@ fn looks_the_same(a: &ObjectSnapshot, b: &ObjectSnapshot) -> bool {
         return true;
     }
     if let (ObjectSnapshot::Primitive(pa), ObjectSnapshot::Primitive(pb)) = (a, b)
-        && let (Shape::Ellipse { frame: fa }, Shape::Ellipse { frame: fb }) = (pa.shape, pb.shape)
+        && let (Shape::Ellipse { frame: fa, .. }, Shape::Ellipse { frame: fb, .. }) =
+            (pa.shape, pb.shape)
         && is_circle(&fa)
         && is_circle(&fb)
     {
@@ -157,12 +158,12 @@ struct Outline {
 fn outlines(object: &ObjectSnapshot) -> Vec<Outline> {
     match object {
         ObjectSnapshot::Primitive(primitive) => {
-            let anchors: Vec<(Point, Vec2, Vec2)> =
-                outline_of_rotated(&primitive.shape, primitive.rotation)
-                    .iter()
-                    .map(|a: &OutlineAnchor| (a.point, a.handle_in, a.handle_out))
-                    .collect();
-            vec![outline_of(&anchors, true)]
+            let outline = outline_of_rotated(&primitive.shape, primitive.rotation);
+            let anchors: Vec<(Point, Vec2, Vec2)> = outline
+                .iter()
+                .map(|a: &OutlineAnchor| (a.point, a.handle_in, a.handle_out))
+                .collect();
+            vec![outline_of(&anchors, outline.closed)]
         }
         ObjectSnapshot::Path(path)
         | ObjectSnapshot::Clone(curvyo_document_core::CloneSnapshot { resolved: path, .. }) => path

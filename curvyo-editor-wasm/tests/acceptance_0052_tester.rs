@@ -56,7 +56,7 @@ fn rect(s: &Session, i: usize) -> (f64, f64, f64, f64, f64) {
 fn ellipse(s: &Session, i: usize) -> (f64, f64, f64, f64, f64) {
     let p = prim(s, i);
     match p.shape {
-        Shape::Ellipse { frame } => (
+        Shape::Ellipse { frame, .. } => (
             frame.center.x,
             frame.center.y,
             frame.rx.as_mm(),

@@ -8,15 +8,18 @@
 //! `curvyo-ui-core` (hit-testing and "object to path", acceptance
 //! criteria 17-20), and a later SVG exporter.
 //!
-//! Every outline here is closed, and direction is increasing angle in
+//! Every outline here is closed except an open Arc
+//! (`specs/0021-ellipse-arcs-and-shaping/`), and direction is increasing angle in
 //! Y-down document space — clockwise on screen, matching Inkscape's own
 //! rect/ellipse/polygon → path conversion (`adrs.md`).
 
 use crate::corner_radii::{Corner, CornerRadii, SHARP_CORNER_EPSILON_MM, effective_corner_radii};
+use crate::ellipse_arc::{DRAWING_PIECE_RAD, arc_outline};
 use crate::path_model::AnchorKind;
 use crate::primitive_model::{
     EllipseFrame, PointCount, RectBounds, Shape, StarFrame, shape_center,
 };
+use crate::ring_curve::{CONVERSION_PIECE_RAD, Curve, Ring, effective_curve, ring_outline};
 use crate::units::{Angle, Point, Vec2};
 
 /// The standard cubic-Bézier approximation of a quarter circle:
@@ -279,24 +282,115 @@ pub fn star_outline(
     anchors
 }
 
+/// A primitive's outline: its nodes and whether the last joins the first
+/// (`specs/0021-ellipse-arcs-and-shaping/adrs.md` decision 4: an open Arc is the one
+/// primitive outline that is not closed).
+#[derive(Debug, Clone, PartialEq)]
+pub struct PrimitiveOutline {
+    /// The nodes in path order.
+    pub anchors: Vec<OutlineAnchor>,
+    /// Whether a segment joins the last node to the first.
+    pub closed: bool,
+}
+
+/// Read access to the nodes, for the many callers that only walk them; a caller that
+/// draws, hits or converts the outline also reads its `closed` field.
+impl std::ops::Deref for PrimitiveOutline {
+    type Target = [OutlineAnchor];
+
+    fn deref(&self) -> &[OutlineAnchor] {
+        &self.anchors
+    }
+}
+
+impl IntoIterator for PrimitiveOutline {
+    type Item = OutlineAnchor;
+    type IntoIter = std::vec::IntoIter<OutlineAnchor>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.anchors.into_iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a PrimitiveOutline {
+    type Item = &'a OutlineAnchor;
+    type IntoIter = std::slice::Iter<'a, OutlineAnchor>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.anchors.iter()
+    }
+}
+
+impl PrimitiveOutline {
+    const fn closed(anchors: Vec<OutlineAnchor>) -> Self {
+        Self {
+            anchors,
+            closed: true,
+        }
+    }
+}
+
 /// Dispatches to the right outline function for `shape` — the one call
 /// every consumer actually needs (acceptance criterion 17's conversion,
-/// rendering, hit-testing).
+/// rendering, hit-testing). An arc or a curve other than the shape's default goes
+/// through the shared evaluation of `ellipse_arc` and `ring_curve`
+/// (`specs/0021-ellipse-arcs-and-shaping/` criteria 13, 29 and 48).
 #[must_use]
-pub fn outline_of(shape: &Shape) -> Vec<OutlineAnchor> {
+pub fn outline_of(shape: &Shape) -> PrimitiveOutline {
+    outline_with_pieces(shape, CONVERSION_PIECE_RAD)
+}
+
+/// The outline drawn on screen and by every exporter (criterion 67): the same curve as
+/// [`outline_of`] with arcs split into pieces of at most 22.5°, so the cubics deviate
+/// from the true arcs by far less than the 0.01 mm kernel tolerance. Equal to
+/// [`outline_of`] for every shape without an arc or curve.
+#[must_use]
+pub fn drawing_outline_of(shape: &Shape) -> PrimitiveOutline {
+    outline_with_pieces(shape, DRAWING_PIECE_RAD)
+}
+
+fn outline_with_pieces(shape: &Shape, piece: f64) -> PrimitiveOutline {
     match *shape {
         Shape::Rect {
             bounds,
             corner_radii,
-        } => rect_outline(bounds, corner_radii),
-        Shape::Ellipse { frame } => ellipse_outline(frame),
-        Shape::Polygon { frame, point_count } => polygon_outline(frame, point_count),
+        } => PrimitiveOutline::closed(rect_outline(bounds, corner_radii)),
+        Shape::Ellipse {
+            frame,
+            arc: Some(arc),
+            ..
+        } => {
+            let (anchors, closed) = arc_outline(frame, arc, piece);
+            PrimitiveOutline { anchors, closed }
+        }
+        Shape::Ellipse { frame, curve, .. } if curve == Curve::ELLIPSE_DEFAULT => {
+            PrimitiveOutline::closed(ellipse_outline(frame))
+        }
+        Shape::Polygon {
+            frame, point_count, ..
+        } if is_straight(shape) => PrimitiveOutline::closed(polygon_outline(frame, point_count)),
         Shape::Star {
             frame,
             point_count,
             inner_ratio,
-        } => star_outline(frame, point_count, inner_ratio),
+            ..
+        } if is_straight(shape) => {
+            PrimitiveOutline::closed(star_outline(frame, point_count, inner_ratio))
+        }
+        Shape::Ellipse { .. } | Shape::Polygon { .. } | Shape::Star { .. } => {
+            // invariant: every shape but a rectangle has a ring and a curve.
+            #[allow(clippy::unwrap_used)]
+            let ring = Ring::of(shape, true).unwrap();
+            #[allow(clippy::unwrap_used)]
+            let k = effective_curve(shape).unwrap().get();
+            PrimitiveOutline::closed(ring_outline(&ring, k, piece))
+        }
     }
+}
+
+/// Whether a polygon or star draws straight sides (its effective curve is 0).
+fn is_straight(shape: &Shape) -> bool {
+    effective_curve(shape).is_some_and(|k| k.get() == 0.0)
 }
 
 /// `shape`'s outline, rotated about its own frame center by `rotation` —
@@ -306,21 +400,34 @@ pub fn outline_of(shape: &Shape) -> Vec<OutlineAnchor> {
 /// object to path and later export all read that outline, so none of
 /// them changes."). Identical to [`outline_of`] when `rotation` is zero.
 #[must_use]
-pub fn outline_of_rotated(shape: &Shape, rotation: Angle) -> Vec<OutlineAnchor> {
-    let anchors = outline_of(shape);
+pub fn outline_of_rotated(shape: &Shape, rotation: Angle) -> PrimitiveOutline {
+    rotated(shape, outline_of(shape), rotation)
+}
+
+/// [`drawing_outline_of`], rotated as [`outline_of_rotated`] rotates.
+#[must_use]
+pub fn drawing_outline_of_rotated(shape: &Shape, rotation: Angle) -> PrimitiveOutline {
+    rotated(shape, drawing_outline_of(shape), rotation)
+}
+
+fn rotated(shape: &Shape, outline: PrimitiveOutline, rotation: Angle) -> PrimitiveOutline {
     if rotation.as_radians() == 0.0 {
-        return anchors;
+        return outline;
     }
     let center = shape_center(shape);
-    anchors
-        .into_iter()
-        .map(|anchor| OutlineAnchor {
-            point: anchor.point.rotated_around(center, rotation),
-            handle_in: anchor.handle_in.rotated(rotation),
-            handle_out: anchor.handle_out.rotated(rotation),
-            kind: anchor.kind,
-        })
-        .collect()
+    PrimitiveOutline {
+        anchors: outline
+            .anchors
+            .into_iter()
+            .map(|anchor| OutlineAnchor {
+                point: anchor.point.rotated_around(center, rotation),
+                handle_in: anchor.handle_in.rotated(rotation),
+                handle_out: anchor.handle_out.rotated(rotation),
+                kind: anchor.kind,
+            })
+            .collect(),
+        closed: outline.closed,
+    }
 }
 
 #[cfg(test)]
