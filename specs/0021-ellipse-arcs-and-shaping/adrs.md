@@ -20,7 +20,8 @@ Reference state: `main` with `CURRENT_FORMAT_VERSION` 14; `Shape::Ellipse
 
 - [ADR 0002 §3, §5, §9](../../docs/adr/0002-document-model-units-and-svg-round-trip.md):
   units are types (the arc angles use the existing angle newtype, the curve a
-  new dimensionless `Curve` newtype holding a fraction from -1 to 1); a primitive's
+  new dimensionless `Curve` newtype holding a fraction from -4 to 4, the customer's range of
+  2026-10-19); a primitive's
   parameters are keys in its meta map; one interaction is one commit.
 - [ADR 0004 §9](../../docs/adr/0004-persistence-and-cross-machine-sync.md): a newer
   file is refused, never partly read (decision 3).

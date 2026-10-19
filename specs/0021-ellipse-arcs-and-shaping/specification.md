@@ -239,8 +239,8 @@ Considered and dropped (customer: none of these): a standing or lying oval
 axis), a rounder or squarer shape by node tension. The screenshots show one
 curvature parameter, not node pulling.
 
-Terms. **Curve** `k` is a value from -100% to 100%; below, `k` is the same
-value as a fraction (-1 to 1). The ellipse has centre `C`, half-axes `rx` and
+Terms. **Curve** `k` is a value from -400% to 400% (decided 2026-10-19, each shape limited to its range, see the criteria); below, `k` is the same
+value as a fraction (-4 to 4). The ellipse has centre `C`, half-axes `rx` and
 `ry` in its own frame, and cross nodes E (`rx`, 0), S, W and N. A **side** joins
 two neighbouring cross nodes (E to S, S to W, W to N, N to E). The **unit
 shape** is the shape for `rx = ry = 1`; every ellipse is its image under the
@@ -249,8 +249,22 @@ holds on an ellipse with per-axis radii.
 
 ### Acceptance criteria
 
+**Range, decided by the customer 2026-10-19 (CURVE-FINAL): ±400 %.** The stored curve
+is a fraction from -4 to 4. Each shape is held to its own geometric range
+`[k_min, k_max]` with `k_min = −A_min/(2·φ)` and `k_max = (360° − A_max)/(2·φ)`, both
+within ±400 % (`A_min`, `A_max` the smallest and largest interior angle of the straight
+shape, `φ = 180°/M`). At `k_min` the sharpest tip becomes a cusp; at `k_max` a corner's
+interior angle reaches 360°; beyond either the outline would cross itself. So: ellipse
+-100 % to 300 %; triangle -50 % to 250 %; square -100 % to 300 %; pentagon -150 % to
+350 %; polygons from 6 sides -200 % (N = 6) to -400 % and up to 400 %; a star by its tip
+and notch angles (5 points, ratio 0.382: about -100 % to 300 %). Above 100 % every corner
+becomes an inward notch and the sides bulge past the circle (flowers and suns), every side
+always bulging outward. Wherever a criterion below says -100 % or 100 % as a limit, it
+reads as this range; the formulas (`d(k)`, the sagitta, the handle's inverse, the cubic
+construction) hold unchanged over the whole range.
+
 17. Given an ellipse (or circle), then it has one curve value, from -100% to
-    100%, 100% by default. A circle or ellipse made by the Ellipse tool has
+    300% (the range above), 100% by default. A circle or ellipse made by the Ellipse tool has
     100% (criterion 34). Curve 100% is the ellipse as it exists today.
 18. Given curve `k`, then every side of the unit shape is a circular arc
     through its two cross nodes whose tangent at each end makes an angle of
@@ -279,10 +293,12 @@ holds on an ellipse with per-axis radii.
     radius 20 mm). Example, ellipse `rx = 30`, `ry = 10` mm at -100%: the
     middle of the side E to N is at (8.79, 2.93) mm.
 20. Given any curve value, then the shape is one closed outline that does not
-    cross itself, passes through the four cross nodes, and stays inside the
-    ellipse's bounding box. Its selection box is therefore the box of the
-    ellipse, `2·rx × 2·ry`, for every curve value; typed W and H mean
-    `2·rx` and `2·ry`.
+    cross itself and passes through the four cross nodes. Up to 100 % it stays
+    inside the ellipse's bounding box, so its selection box is the box of the
+    ellipse, `2·rx × 2·ry`, and typed W and H mean `2·rx` and `2·ry`. Above
+    100 % the sides bulge past that box: the selection box, typed W and H and a
+    resize use the tight box of the drawn outline, as for an arc (criteria 9
+    and 10).
 21. Given a circle, then the interior angle at each cross node is
     `90° · (1 + k/100%)`: 180° at 100% (smooth), 90° at 0% (corner), 0° at
     -100% (cusp, a needle tip). For an ellipse the angle at -100% is 0° and at
@@ -315,11 +331,11 @@ holds on an ellipse with per-axis radii.
     ellipse's own frame relative to its centre, then with `u = x / rx` and
     `v = -y / ry` (screen y down, so `u`, `v` are positive towards the handle's
     corner) the curve becomes `k = atan((u + v) − 1) / 22.5°`, limited to
-    -100% to 100% (`atan` in degrees; it is the exact inverse of criterion 19:
+    the ellipse's range, -100% to 300% (`atan` in degrees; it is the exact inverse of criterion 19:
     the handle stays under the pointer until a limit is reached). Dragging
     towards the centre gives negative values, away from it towards the
-    outline's diagonal point gives 100%. Within 1 percentage point of 100%, 0%
-    or -100% the value snaps to exactly that value, with no modifier. With Ctrl
+    outline's diagonal point gives 100%, further out more. Within 1 percentage
+    point of 100%, 0% or the limit the value snaps to exactly that value, with no modifier. With Ctrl
     held the value snaps to the nearest multiple of 25 percentage points
     (Ctrl has no effect on a numeric entry). Escape cancels and writes
     nothing; a press and release under 3 screen pixels of movement writes
@@ -327,7 +343,7 @@ holds on an ellipse with per-axis radii.
 24. Given a double-click on the curve handle, then a field with a "%" suffix,
     accessible name "Curve", opens next to it, pre-filled with the current
     value (one decimal), and Enter writes the value in one commit. A value
-    above 100 or below -100 is limited and the limited value is written; an
+    outside the shape's range is limited and the limited value is written; an
     empty or non-numeric value keeps the field open and marked invalid; Escape,
     an unedited Enter, a click elsewhere, a tool switch and a selection change
     close it and write nothing (`specs/0008-object-transform-refinements/`
@@ -337,7 +353,7 @@ holds on an ellipse with per-axis radii.
     (`specs/0009-unified-object-editing/` criteria 10 to 13), and a readout at the
     pointer shows "curve -35.0 %".
 26. Given a selection that consists only of ellipses (one or more; polygons and
-    stars join the selection in criterion 44), then the Select tool's top bar shows a "Curve" number field (-100 to 100, "%"),
+    stars join the selection in criterion 44), then the Select tool's top bar shows a "Curve" number field (-400 to 400, "%", each shape limited to its range),
     with the rules of `specs/0009-unified-object-editing/` criterion 21: it updates
     every selected ellipse live, commits once per interaction, shows "Mixed"
     when the values differ, and a typed value applies to all. It is greyed
@@ -388,7 +404,7 @@ holds on an ellipse with per-axis radii.
     opens it, then it is refused with the "saved by a newer version" message
     and never shown as a plain ellipse; the `format_version` increases (once
     for Part A and Part B if they ship in one PR). Given a file with a curve
-    that is not finite or outside -100% to 100%, or with a curve and an arc on
+    that is not finite or outside -400% to 400%, or with a curve and an arc on
     one ellipse, then it is refused as damaged with a named error, not clamped.
 34. Given an ellipse made by the Ellipse tool (Shift and Ctrl rules of
     `specs/0011-shape-creation-from-center/` included), then its curve is 100%;
@@ -409,12 +425,13 @@ for a star, `M = 4` for the ellipse); a **side** joins two neighbouring
 vertices; its chord has length `c` (polygon `c = 2·R·sin(180°/N)`; star
 `c = R·√(1 + ρ² − 2·ρ·cos(180°/N))`). The **full angle** is `φ = 180°/M`
 (polygon `180°/N`, star `90°/N`, ellipse 45°). **Curve** `k` is a fraction from
--1 to 1 as in Part B above. **Vertex 0** is the shape's first vertex: for a
+-4 to 4 as in Part B above. **Vertex 0** is the shape's first vertex: for a
 polygon the vertex the creation drag put at B, for a star the first outer
 vertex (the one the inner-radius handle's first inner vertex follows, clockwise
 on screen), for the ellipse E.
 
-35. Given a polygon or a star, then it has one curve value from -100% to 100%,
+35. Given a polygon or a star, then it has one curve value within its range
+    (at most -400% to 400%),
     **0% by default** (straight sides: every polygon and star made so far, and
     every one the Polygon/Star tool makes). The default differs from the
     ellipse's 100% on purpose, so no existing shape changes its look. A shape
@@ -446,22 +463,25 @@ on screen), for the ellipse E.
     20.00 mm (on the circle, area 1256.6 mm²), at 0%: 17.32 mm (area
     1039.2 mm²), at -100%: 14.64 mm; triangle at 0%: 10.00 mm, at -50%
     (its limit): 5.36 mm; square (N = 4) at 0%: 14.14 mm, at 100%: 20.00 mm.
-38. Given a shape, then the lowest allowed curve is `k_min = max(-1, −A/(2·φ))`
+38. Given a shape, then the lowest allowed curve is `k_min = max(-4, −A/(2·φ))`
     with `A` the smallest interior angle of the straight shape (polygon:
     `180° − 360°/N`; star: the smaller of its outer and inner interior angle).
     At `k_min` the sharpest tips become cusps (interior angle 0°); below it the
-    outline would cross itself. So: every polygon with N ≥ 4 has `k_min = -100%`;
+    outline would cross itself. So: a polygon with N sides has
+    `k_min = −(N/2 − 1)`, at most -400% (a square -100%, a hexagon -200%);
     a triangle has -50%; a star with N = 3, ρ = 0.5 (hexagram) has -100%; a
     star with N = 5, ρ = 0.382 (pentagram) has -100%; a star with N = 5,
     ρ = 0.2 has about -44.4% (tip angle 15.97°, `φ = 18°`). The value written by
-    a drag, a typed entry or the bar field is limited to `[k_min, 100%]` for that
-    shape and the limited value is written. A stored value below `k_min`
-    (the maker later lowers Points or the ratio) is valid and kept as saved;
-    the **effective** curve is `max(stored, k_min)` and everything drawn, shown
+    a drag, a typed entry or the bar field is limited to `[k_min, k_max]` for that
+    shape (`k_max` from the range above) and the limited value is written. A
+    stored value outside it (the maker later changes Points or the ratio) is
+    valid and kept as saved; the **effective** curve is the stored value held
+    to `[k_min, k_max]`, the field shows it with the "limited" tag, and everything drawn, shown
     and converted uses the effective curve. Restoring the Points or ratio
     brings the stored value back. For every N from 3 to 1024, every ratio from
     0.01 to 0.99 and every effective curve value the outline is one closed
-    curve without self-crossings (touching only at cusps at `k_min`).
+    curve without self-crossings (touching only at cusps at `k_min` and at the
+    notches at `k_max`).
 39. Given a polygon or star at curve `k`, then the interior angle at every
     vertex is the straight shape's interior angle plus `2·k·φ`, so polygon
     corners are smooth (180°) at 100% and a star's outer tips widen as `k`
@@ -486,7 +506,7 @@ on screen), for the ellipse E.
     the perpendicular bisector of that side's chord (in the shape's own frame,
     unaffected by rotation), `t` is its signed distance from the chord's middle
     (positive outward) and the curve becomes `k = 2·atan(2·t/c) / φ`, limited
-    to `[k_min, 100%]` (it is the exact inverse of criterion 37: the handle
+    to `[k_min, k_max]` (it is the exact inverse of criterion 37: the handle
     stays under the pointer's projection until a limit is reached; for the
     ellipse it equals criterion 23). Snapping and cancelling are as in
     criterion 23: within 1 percentage point of 100%, 0% or `k_min` the value
@@ -497,7 +517,7 @@ on screen), for the ellipse E.
 42. Given a double-click on the curve handle of a polygon or star, then the
     field of criterion 24 opens ("%" suffix, accessible name "Curve",
     pre-filled with the effective value to one decimal); a value outside
-    `[k_min, 100%]` is limited to the nearest bound and the limited value is
+    `[k_min, k_max]` is limited to the nearest bound and the limited value is
     written; every other rule is criterion 24's.
 43. Given a curve-handle drag on a polygon or star, then the preview and the
     readout are criterion 25's: the old shape stays in black, the shape the
@@ -508,7 +528,7 @@ on screen), for the ellipse E.
     group of its own right after the kind groups (the polygon/star group with
     "Points" and "Ratio" comes before it). A typed value or a drag
     of the field is limited per shape to that shape's own range (a triangle in
-    the selection stops at -50% while a hexagon goes to -100%); the field shows
+    the selection stops at -50% and 250% while a hexagon goes to -200% and 400%); the field shows
     the effective value and "Mixed" when the effective values differ; typing
     100 gives an ellipse its ellipse shape back and a polygon its circle. For a
     selection that contains an ellipse with an arc the field is greyed with
@@ -528,8 +548,8 @@ on screen), for the ellipse E.
 47. Given a polygon or star at any curve value, then its selection box is the
     tight oriented box around the drawn outline, by the rule the box has for
     these shapes today applied to the curved outline (it grows when sides bulge
-    outward, up to the circle's box for a polygon at 100%, and is never
-    smaller than the straight shape's box when `k > 0`), and the resize
+    outward, up to the circle's box for a polygon at 100% and past it above,
+    and is never smaller than the straight shape's box when `k > 0`), and the resize
     handles, centre handle, readouts, marquee and pivot use that box. The
     pivot of a rotation and of a resize stays the shape's centre
     (`specs/0009-unified-object-editing/` criterion 16). Hit-testing (click, hover,
@@ -566,8 +586,8 @@ on screen), for the ellipse E.
     message and never shown with straight sides; the `format_version` is the
     one increase shared with the ellipse register of criterion 33 (once for
     Part A and Part B if they ship in one PR). Given a file with a curve that is
-    not finite or outside -100% to 100%, then it is refused as damaged with a
-    named error, not clamped; a value below that shape's `k_min` is not damaged
+    not finite or outside -400% to 400%, then it is refused as damaged with a
+    named error, not clamped; a value outside that shape's `[k_min, k_max]` is not damaged
     (criterion 38).
 51. Given a 4-sided polygon with vertex 0 at the ellipse's E, or a circle, then
     at every curve value from -100% to 100% (steps of 12.5 percentage points
@@ -731,7 +751,7 @@ stored field and one `format_version` increase cover all three shapes, which
 the ellipse register and the polygon/star register share (criterion 50). The
 stored value is raw and clamped on evaluation to `[k_min, 100%]` for polygon
 and star (criterion 38), like the rectangle's radius; validation on open only
-rejects non-finite values and values outside -100% to 100%. A shared ring
+rejects non-finite values and values outside -400% to 400% (decided 2026-10-19). A shared ring
 evaluation (vertices, `φ`, `c`, side arc, middle, cubic control points,
 `k_min`) is called by the ellipse and by polygon and star, so criterion 51
 holds by construction; it lives in `curvyo-document-core` (`adrs.md`), with the property
@@ -739,7 +759,7 @@ test of criterion 38 (no self-crossing for N from 3 to 1024, ratio from 0.01 to
 0.99, any allowed curve value). The half-axes `rx`,
 `ry` are unchanged, so nothing about the frame or `oriented_bounds` changes for
 Part B (criterion 20). Decided in `adrs.md`: one flat `curve` register per shape
-(a fraction from -1 to 1), deleted when the value returns to the shape's
+(a fraction from -4 to 4, decided 2026-10-19), deleted when the value returns to the shape's
 default; validation on open (finite, within the range, not together with an
 arc); a live merge that yields both an arc and a curve is not refused (the arc
 wins and the curve is ignored until the arc is made whole), a file with both is
@@ -913,7 +933,7 @@ then the curve group, then "Object to path" and "Linked clone".
   (the Flip rule), never hidden.
 - Curve group (shown while the selection holds an ellipse, polygon or star):
   one field "Curve", 96 px, the label "Curve" inside the left edge, "%" suffix,
-  right-aligned one-decimal value, "Mixed" when the effective values differ,
+  right-aligned one-decimal value up to ±400 (decided 2026-10-19), "Mixed" when the effective values differ,
   the "limited" tag and its tooltip of the Limited tag row when a polygon's
   or star's stored value is below its limit ("Stored -80 %, limited to -44.4 %
   by Points and Ratio; changing them brings it back."). Greyed with a tooltip
@@ -926,6 +946,23 @@ then the curve group, then "Object to path" and "Linked clone".
 - Entry chips (double-click on a knob): the existing entry chip surface with
   one field ("Arc start", "Arc end", "Curve"), the "°" or "%" suffix, no
   Apply button, Enter commits, Escape closes (criteria 8, 24, 42).
+
+**Build notes (2026-10-19, after the architect, tester and UX reviews).**
+- Kind buttons: a `role="group"` named "Arc kind" of toggle buttons with `aria-pressed`,
+  not a `radiogroup` (which needs `role="radio"` children); replaces the `radiogroup`
+  wording above.
+- Knob displacement: a knob is moved by the shortest distance that clears, at most two
+  pitches (28 px), not at most 14 px: one pitch cannot clear a knob lying exactly on a
+  corner glyph. Observed about 15 px; the 28 px bound did not occur. An arc's end knobs
+  move only into the drawn arc. The resting knobs on a whole ellipse are exactly 14 px
+  apart (chord), symmetric in angle about 45°.
+- The 72 px threshold of an arc's knobs is measured on its whole ellipse (`2·rx`,
+  `2·ry`), not on the box of the drawn part.
+- Bar layout: the kind buttons and the fields "Start", "End", "Curve" are two groups, so
+  the kinds sit beside Flip. Start and End 93 px, Curve 99 px. Measured: 4 rows (144 px)
+  at the 324 px bar of 800 x 600 (a rectangle takes 172 px there), 2 rows (72 px) at
+  1280 x 800. The Curve tooltip line of Proposal 2 is not shown until the customer
+  decides.
 
 **Not present, by rule.** No hint chip or tip line on the canvas or in the bar
 (customer 2026-10-16); no section in the right panel (the panel gets nothing
