@@ -168,7 +168,17 @@ pub struct DocumentVersion(pub(crate) loro::Frontiers);
 /// style on a clone with own style, are refused as damaged (`crate::clone_codec`); flags on other
 /// nodes, and style keys or `opacity` on a clone without own style, are residue.
 /// Golden: `clone_overrides_v14.curvyo`.
-pub const CURRENT_FORMAT_VERSION: u32 = 14;
+///
+/// Bumped to 15 in `document-shapes` (`specs/0046-document-shapes`, ADR 0019 §2 and §4): a path,
+/// compound path or shape may carry the register `guide: true`, which draws it in the marking
+/// style and keeps it out of every output. A build that stops at version 14 would draw the guide
+/// as an ordinary path and a laser job would cut the template, so it must refuse every file of
+/// this build as too new. Migration from version 14 is none: an absent register reads as not a
+/// guide, a file from an earlier build opens unchanged and is not rewritten, and unmarking removes
+/// the key. A `guide` value that is not a boolean is refused as damaged
+/// (`crate::node_registers`); the key on a group or a linked clone is residue (a clone reads its
+/// root's flag). The number is provisional by the rule above. Golden: `guide_v15.curvyo`.
+pub const CURRENT_FORMAT_VERSION: u32 = 15;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";
@@ -509,6 +519,8 @@ struct RegistersJson {
     locked: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     opacity: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    guide: Option<bool>,
 }
 
 impl From<crate::node_registers::NodeRegisters> for RegistersJson {
@@ -520,6 +532,7 @@ impl From<crate::node_registers::NodeRegisters> for RegistersJson {
             locked: registers.locked.then_some(true),
             #[allow(clippy::float_cmp)] // exactly the stored default
             opacity: (opacity != 1.0).then_some(opacity),
+            guide: registers.guide.then_some(true),
         }
     }
 }

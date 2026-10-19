@@ -26,6 +26,8 @@ impl Document {
     ///   that were not replaced keep their places;
     /// - it takes `base`'s complete style, whichever kind `base` is, and no
     ///   rotation (the register is absent, so it reads as 0);
+    /// - it is a guide only when every operand is one (`specs/0046-document-shapes`
+    ///   criterion 34);
     /// - the first outline is stored in the ordinary keys and the others as
     ///   [`crate::PathSnapshot::extra_subpaths`], so one outline gives an
     ///   ordinary path;
@@ -87,8 +89,17 @@ impl Document {
             .map_err(|_| ObjectEditError::NoSuchObject)?;
         let style = crate::clone_write::leaf_style(&tree, base, &base_meta);
 
+        // The result is a guide only when every operand is one (`specs/0046-document-shapes`
+        // criterion 34).
+        let guide = crate::guides::all_guides(&tree, &doomed);
+
         tree.enable_fractional_index(0);
         let new_tree_id = create_path_after(&tree, tree_id_of(base), &style, outlines);
+        if guide {
+            // invariant: the node was just created.
+            #[allow(clippy::unwrap_used)]
+            crate::guides::write_guide(&tree.get_meta(new_tree_id).unwrap(), true);
+        }
         self.repair_clones_of_removed(&tree, &doomed);
         let parents = crate::group_tree::parents_of(&tree, &doomed);
         for tree_id in doomed {
@@ -109,8 +120,8 @@ impl Document {
     /// others as extra subpaths. A piece has no rotation. The pieces of one source sit
     /// consecutively directly after it, in the order given. With [`PieceFill::None`] the fill of
     /// every piece is off (its colour and opacity stay stored); with [`PieceFill::Keep`] a piece
-    /// has the source's style as it is. Every object of `removed` is deleted, and a group that
-    /// loses its last child with it.
+    /// has the source's style as it is. A piece of a guide is a guide. Every object of `removed`
+    /// is deleted, and a group that loses its last child with it.
     ///
     /// Every id is resolved and every anchor id checked before the first write, so a refusal
     /// changes nothing. Returns the new objects' ids in the order of `pieces`.
@@ -170,6 +181,12 @@ impl Document {
             let (place, style) = sources.get(source).unwrap();
             let anchor = *after.get(source).unwrap_or(place);
             let piece = create_path_after(&tree, anchor, style, outlines);
+            // A piece of a guide is a guide: its one input was (criterion 34).
+            if crate::guides::all_guides(&tree, &[*place]) {
+                // invariant: the node was just created.
+                #[allow(clippy::unwrap_used)]
+                crate::guides::write_guide(&tree.get_meta(piece).unwrap(), true);
+            }
             created.push(NodeId::from_parts(piece.peer, piece.counter));
             after.insert(*source, piece);
         }

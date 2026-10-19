@@ -267,6 +267,15 @@ impl Document {
 
         let tree = self.loro().get_tree(OBJECTS_TREE);
         let b_tree_id = crate::paths::tree_id_of(b_path);
+        // The joined path is a guide only when both were (`specs/0046-document-shapes`
+        // criterion 34); `a` keeps its node, so only a guide `a` joined to an ordinary `b` changes.
+        let a_tree_id = crate::paths::tree_id_of(a_path);
+        if !crate::guides::all_guides(&tree, &[a_tree_id, b_tree_id])
+            && let Ok(a_meta) = tree.get_meta(a_tree_id)
+            && crate::node_registers::read_registers(&a_meta).guide
+        {
+            crate::guides::write_guide(&a_meta, false);
+        }
         self.repair_clones_of_removed(&tree, &[b_tree_id]);
         let parents = crate::group_tree::parents_of(&tree, &[b_tree_id]);
         // invariant: `self.path(b_path)` resolved this same node moments
@@ -412,6 +421,14 @@ impl Document {
             crate::paths::tree_id_of(path),
         )
         .unwrap();
+        // The part split off a guide is a guide: its one input was (`specs/0046-document-shapes`
+        // criterion 34).
+        let original = crate::paths::tree_id_of(path);
+        if crate::guides::all_guides(&tree, &[original])
+            && let Ok(meta) = tree.get_meta(crate::paths::tree_id_of(new_path))
+        {
+            crate::guides::write_guide(&meta, true);
+        }
 
         self.commit_with_label("split_at_anchor");
         Ok(((path, split_anchor.id), (new_path, new_id)))

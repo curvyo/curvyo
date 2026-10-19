@@ -93,6 +93,21 @@ impl<'a> Detached<'a> {
             .collect()
     }
 
+    /// The ids among `objects` that are guides at this version: a leaf's own `guide` register,
+    /// a linked clone's root's (`specs/0046-document-shapes` criterion 29).
+    pub(crate) fn guides(&self, objects: &[ObjectSnapshot]) -> std::collections::HashSet<NodeId> {
+        let tree = self.doc.get_tree(OBJECTS_TREE);
+        let own = |id: NodeId| {
+            tree.get_meta(crate::paths::tree_id_of(id))
+                .is_ok_and(|meta| crate::node_registers::read_registers(&meta).guide)
+        };
+        objects
+            .iter()
+            .filter(|object| crate::guides::effective_guide(object, own))
+            .map(ObjectSnapshot::id)
+            .collect()
+    }
+
     /// The object `id` at this version, as a plain copy; `None` when it does not exist.
     pub(crate) fn object(&self, id: NodeId) -> Option<ObjectSnapshot> {
         object_in(&self.doc.get_tree(OBJECTS_TREE), id)

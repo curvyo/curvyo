@@ -1,10 +1,10 @@
-//! The four registers every node of the object tree may carry, `name`, `visible`, `locked` and
-//! `opacity`, plus the `layer` marker of a group: their keys, their defaults, the cleaning of a
-//! name and their validation on open (`specs/0050-layers-and-objects-panel/adrs.md` decision 1,
-//! ADR 0015 §2).
+//! The registers every node of the object tree may carry, `name`, `visible`, `locked`,
+//! `opacity` and `guide`, plus the `layer` marker of a group: their keys, their defaults, the
+//! cleaning of a name and their validation on open (`specs/0050-layers-and-objects-panel/adrs.md`
+//! decision 1, ADR 0015 §2, ADR 0019 §2).
 //!
-//! An absent key reads as its default (no name, visible, unlocked, opacity 1, not a layer), so a
-//! file from an earlier build opens unchanged.
+//! An absent key reads as its default (no name, visible, unlocked, opacity 1, not a guide, not a
+//! layer), so a file from an earlier build opens unchanged.
 
 use loro::{LoroMap, LoroValue, ValueOrContainer};
 
@@ -18,6 +18,8 @@ pub(crate) const KEY_VISIBLE: &str = "visible";
 pub(crate) const KEY_LOCKED: &str = "locked";
 /// The register that holds a node's opacity (a number in 0..=1; absent is 1).
 pub(crate) const KEY_OPACITY: &str = "opacity";
+/// The register that marks a path or shape as a guide (a bool; absent is `false`, ADR 0019 §2).
+pub(crate) const KEY_GUIDE: &str = "guide";
 /// The register that marks a top-level group as a layer (a bool).
 pub(crate) const KEY_LAYER: &str = "layer";
 
@@ -35,6 +37,8 @@ pub struct NodeRegisters {
     pub locked: bool,
     /// The node's own opacity.
     pub opacity: Opacity,
+    /// Whether the node itself is marked as a guide (`specs/0046-document-shapes`).
+    pub guide: bool,
 }
 
 impl Default for NodeRegisters {
@@ -44,6 +48,7 @@ impl Default for NodeRegisters {
             visible: true,
             locked: false,
             opacity: Opacity::OPAQUE,
+            guide: false,
         }
     }
 }
@@ -103,6 +108,7 @@ pub(crate) fn read_registers(meta: &LoroMap) -> NodeRegisters {
         visible: bool_register(meta, KEY_VISIBLE).unwrap_or(true),
         locked: bool_register(meta, KEY_LOCKED).unwrap_or(false),
         opacity,
+        guide: bool_register(meta, KEY_GUIDE).unwrap_or(false),
     }
 }
 
@@ -113,7 +119,7 @@ pub(crate) fn meta_has_layer_marker(meta: &LoroMap) -> bool {
 }
 
 /// Whether the registers of one node are well formed (criterion 47): `name` a string, `visible`,
-/// `locked` and `layer` booleans, `opacity` a finite number in 0..=1, and `layer: true` only on a
+/// `locked`, `guide` and `layer` booleans, `opacity` a finite number in 0..=1, and `layer: true` only on a
 /// group. Absent keys are valid.
 pub(crate) fn registers_are_valid(meta: &LoroMap, is_group: bool) -> bool {
     let name_ok = match meta.get(KEY_NAME) {
@@ -133,6 +139,7 @@ pub(crate) fn registers_are_valid(meta: &LoroMap, is_group: bool) -> bool {
     name_ok
         && flag_ok(KEY_VISIBLE)
         && flag_ok(KEY_LOCKED)
+        && flag_ok(KEY_GUIDE)
         && flag_ok(KEY_LAYER)
         && opacity_ok
         && layer_ok
@@ -176,7 +183,9 @@ mod tests {
 
     #[test]
     fn mistyped_or_out_of_range_registers_are_invalid() {
-        let cases: [(&str, LoroValue); 7] = [
+        let cases: [(&str, LoroValue); 9] = [
+            (KEY_GUIDE, LoroValue::I64(1)),
+            (KEY_GUIDE, LoroValue::from("true")),
             (KEY_NAME, LoroValue::I64(3)),
             (KEY_VISIBLE, LoroValue::from("yes")),
             (KEY_LOCKED, LoroValue::Double(1.0)),
@@ -191,6 +200,17 @@ mod tests {
             meta.insert(key, value.clone()).unwrap();
             assert!(!registers_are_valid(&meta, true), "{key} = {value:?}");
         }
+    }
+
+    #[test]
+    fn a_stored_guide_flag_reads_as_it_is() {
+        let doc = loro::LoroDoc::new();
+        let meta = doc.get_map("m");
+        meta.insert(KEY_GUIDE, true).unwrap();
+        assert!(read_registers(&meta).guide);
+        assert!(registers_are_valid(&meta, false));
+        meta.insert(KEY_GUIDE, false).unwrap();
+        assert!(!read_registers(&meta).guide);
     }
 
     #[test]

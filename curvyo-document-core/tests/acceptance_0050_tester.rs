@@ -709,6 +709,8 @@ fn ac46_files_of_earlier_builds_open_without_layers_or_flags() {
             || name.starts_with("layers")
             // `0057-clone-overrides` (format 14) is a later build: its golden stores opacities.
             || name.starts_with("clone_overrides")
+            // `0046-document-shapes` (format 15) is a later build: its template sources store names.
+            || name.starts_with("template_")
             || name.contains("damaged")
             || name.contains("truncated")
             || name.contains("too_deep")
