@@ -351,6 +351,14 @@ the tool or the style scope as a third input. **Resolution:** 0017 extends
 `panel_content`, the one place for this; no second decision is made in
 TypeScript.
 
+## A rotated whole ellipse still converts on a group stretch (offered follow-up)
+
+`specs/0021-ellipse-arcs-and-shaping/` criterion 56 keeps an ellipse with an arc an ellipse
+under any stretch by the singular value decomposition. Its vetoable Proposal, the same rule
+for a rotated whole ellipse (so `0047` criterion 7 would no longer convert it), is not
+built: it changes accepted 0047 behaviour and its tests. **Resolution:** offered to the
+customer as a follow-up; the function `ellipse_after_linear_map` already does the work.
+
 ## Check the arrow keys of the radio groups in the real Tauri window
 
 In the browser harness, the arrow keys move focus in the Unit group (and in
