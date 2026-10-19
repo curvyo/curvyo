@@ -943,8 +943,13 @@ fn primitive_docs(k: f64) -> Vec<(&'static str, Document, Point)> {
     // top edge of a rectangle, 45 degrees on an ellipse, the middle of the
     // first edge of a polygon or star.
     let rect_pt = pt(40.0 + 50.0 / k, 30.0);
+    // Rewritten for `0021` criteria 1 and 22: the old spot was the ellipse's 45 degree point
+    // (lower right), which is now where the two resting arc handles sit, so a second
+    // double-click there opens the angle entry instead of asking for the hint. The spot is
+    // now the 135 degree point (lower left), clear of the arc handles (45 degrees) and the
+    // curve handle (315 degrees).
     let ell_pt = pt(
-        40.0 + 100.0 / k + 100.0 / k * std::f64::consts::FRAC_1_SQRT_2,
+        40.0 + 100.0 / k - 100.0 / k * std::f64::consts::FRAC_1_SQRT_2,
         30.0 + 70.0 / k + 70.0 / k * std::f64::consts::FRAC_1_SQRT_2,
     );
     let mid = |d: &Document| {
