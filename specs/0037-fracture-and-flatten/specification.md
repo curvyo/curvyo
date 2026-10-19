@@ -1,6 +1,6 @@
 # Fracture and Flatten: cut overlapping shapes into pieces, or remove the hidden parts
 
-Status: Ready (2026-10-10: `adrs.md` and the UX notes exist; no customer question blocks (Flatten means trim to the visible part, decided 2026-10-10); criterion 7 reworded the same day) Amended by `0020-undo-redo`: the sentence "No undo yet." and the statements that no undo exists are removed; Ctrl+Z takes the step back.
+Status: Ready (2026-10-10: `adrs.md` and the UX notes exist; Flatten means trim to the visible part, decided 2026-10-10; criterion 7 reworded the same day). Amended by `0020-undo-redo` (Ctrl+Z takes the step back) and by `0054-combine-open-paths` criterion 24 (open outlines are closed with a straight line, not refused). UX notes re-checked against `main` on 2026-10-19 (after `0038`, `0051`, `0052`, `0054`): placement unchanged, tooltips aligned with the built Boolean buttons, no customer question open.
 Priority: Should
 Origin: Customer asked for "Fracture" (cut overlapping shapes into non-overlapping pieces, like Affinity's Divide) and "Flatten" (request of 2026-10-09), and left the exact meaning to me. **The definitions below are my proposals** (Question 1 asks about Flatten in particular).
 
@@ -64,7 +64,6 @@ Both are one idea. Take all outlines of the selected shapes and cut the plane al
 - **Groups** (`0023-groups` criterion 28), **open paths**, text.
 - **Using one shape as a cutter that is used up** (Inkscape's Division): fracture, then delete the pieces not wanted.
 - **Hover preview of the result** (see "Specified but not built" in `specs/README.md`).
-- **Undo and redo** (`0020`).
 
 ## Open questions
 
@@ -78,55 +77,67 @@ Each has a default; nothing blocks.
 
 Decided by the product owner (change if you disagree): cells and owners as defined; untouched operands stay exactly as they were; hidden operands are removed with a notice; commit labels `fracture` and `flatten`; the 5,000 limit; piece order by first node.
 
+## UX notes" (up to "## Links")
+
 ## UX notes
 
-By `ux-engineer`, 2026-10-10. Numbers and rows are in `docs/design-system.md`: "Tool rail architecture", "Boolean toolbox", "Boolean tooltip", "Command glyphs", "Action notice", "Refusal outline". The rail rules are those of the Boolean toolbox and are not repeated here. Reference tools: Illustrator's Pathfinder panel holds Divide and Trim in the same panel as Unite and Minus Front; Affinity's Divide sits with Add and Subtract. Neither separates them from the Boolean operations.
+By `ux-engineer`, 2026-10-10, re-checked against `main` 2026-10-19. Rows in `docs/design-system.md`: "Tool rail architecture", "Boolean toolbox", "Boolean tooltip", "Command glyphs", "Action notice", "Refusal outline". Illustrator's Pathfinder and Affinity keep Divide and Trim with the Boolean operations; so do we.
 
-### Placement: the Boolean card, buttons six and seven
+### Placement
 
-Fracture and Flatten join the Boolean card, below Reverse difference: **Union, Difference, Intersection, Exclusion, Reverse difference, Fracture, Flatten**. Reasons: they take the same selection (two or more closed shapes, Select tool) and so dim and enable exactly as the five already there; they work on areas and not on a path's own nodes; and their results are straight segments, like the Boolean operations (criterion 15), where the Path card keeps curves. The card grows from 224 px to 312 px; the toolbar keeps the accessible name "Boolean operations". With this release the Boolean card has to be in column B (below Path, where it ends 512 px below the viewport top); if the Group release or the Pencil release has not moved it yet, this release does (row "Tool rail architecture"). In column A it would end 556 px down a 546 px viewport. The criterion 1 sentence "Where they sit is the ux-engineer's decision" is replaced by this placement.
+Buttons six and seven of the Boolean card, appended after Reverse difference: **Union, Difference, Intersection, Exclusion, Reverse difference, Fracture, Flatten**. Same selection, same dimming, results in straight segments like the Boolean operations (criterion 15); the Path card keeps curves. The Boolean card is already the second card of column B on `main` (it moved with `0035`/`0023`); nothing else moves. The card grows from 224 to 312 px, column B from 412 to 500 px and ends 536 px below the viewport top (40 px clear of the status bar at 800 x 600, measured 2026-10-19; the browser build scrolls the column as the row "Tool rail architecture" says). The toolbar keeps the name "Boolean operations".
+
+**Rail budget after this release:** 20 buttons (column A: Tools 6, Group 2, Path tools 1; column B: Path 4, Boolean 7). Column B is full. A later command for the selection (for example Weld of `0068`) goes to the Select bar, not to this card.
 
 ### States
 
 | Situation | Fracture, Flatten |
 |---|---|
-| Fewer than two objects selected | dimmed, "Select two or more closed objects." |
-| Another tool than Select | dimmed, adds "Use the Select tool." |
-| Two or more objects, any kinds | enabled |
-| An open path, a group, an object without area | enabled; pressing refuses with the sentences of criterion 2, the offenders in the red outline |
-| Closed shapes that do not overlap | enabled; pressing refuses (criterion 3), no outline: whether shapes overlap needs the kernel, so it is not a dimmed state |
+| Fewer than two objects selected, or another tool than Select | dimmed (as the five Boolean buttons) |
+| Two or more objects, open outlines among them | enabled; open outlines are closed with a straight line (`0054` criteria 21, 22, 24) |
+| A group, an object without area, a non-finite or out-of-range coordinate | enabled; pressing refuses with the sentences of criterion 2, offenders in the red outline |
+| Closed shapes that do not overlap | enabled; pressing refuses (criterion 3), no outline |
 
-Dimming is the rail's: `aria-disabled="true"` at 40 % opacity, focusable, tooltip stays open, activation does nothing.
-
-### Telling the two apart, and from Union
-
-Rule lines: Fracture "Cuts overlapping shapes into pieces." / Flatten "Trims each shape to what shows." (both under 45 characters). The result on the canvas looks the same for fills in both (the picture does not change); what differs is the object count: Fracture ends with more objects than it started with, Flatten with the same or fewer. The notices say it: "Fracture: 3 objects became 7 pieces." and "Flatten: 2 objects became 1. 1 hidden object was removed." The glyphs: Fracture is three solid pieces separated by gaps, Flatten is the upper square whole and the lower one trimmed to its visible L, two interlocking solid pieces with a gap along the trim edge. Union has no gap at all; Exclusion has a hole where the others have gaps.
+Dimming is the rail's: `aria-disabled="true"`, 40 % opacity, focusable, tooltip stays open, activation does nothing.
 
 ### Tooltips
 
-Fracture: "Fracture" / "Cuts overlapping shapes into pieces." / note "Each piece keeps the style of the shape on top. Replaces the selection." Flatten: "Flatten" / "Trims each shape to what shows." / note "Hidden shapes are removed. Fill does not matter. Strokes follow the trim." (two lines; the note carries the three surprises: removal, fill, and stroke, which criterion 13 says the tooltip must warn about). When dimmed or open paths are selected the notes of the Boolean tooltip row apply first. The criterion 1 tooltip texts are replaced by these (the old rule lines were 59 and 87 characters and would have wrapped; the stroke warning was missing). The hover preview is out of scope here, so there is no preview line in the note.
+The three lines of the built Boolean buttons, with the same functions (`booleanText.ts`): name, rule line, state note.
 
-### Interaction
+- Fracture: "Fracture" / "Cuts overlapping shapes into pieces." / state note
+- Flatten: "Flatten" / "Trims each shape to what shows." / state note
 
-One press, no dialog. All pieces and untouched shapes are selected afterwards; the tool is unchanged; a notice beside the Boolean card (level with Union) names the counts, 3 s, or 5 s above 70 characters, `role="status"`. Pieces of one owner sit consecutively at the owner's place in the stacking order (criterion 8), so what the maker did not select stays above or below as before. A result piece with holes is a compound path, which the Node tool does not edit yet (criterion 18, row "Compound path in the UI"). Fill None hides what is below (Question 2, default A): a drawing of fill-less cut lines loses its lower lines under Flatten, and the notice "1 hidden object was removed." makes that visible and not silent.
+The state note is the shared one: "Select two or more objects." (plus " Use the Select tool." with another tool), "Closes 2 open outlines with a straight line." with open outlines, else "Replaces the selection.". The rule line describes the command, as the five Boolean rule lines do; it is a name-level description, not an operating tip. The earlier extra sentences ("Each piece keeps the style of the shape on top.", "Hidden shapes are removed. Fill does not matter. Strokes follow the trim.") are dropped (no hint labels, 2026-10-16): the notice reports what happened instead. This replaces the tooltip texts of criterion 1 and the sentence "The Flatten tooltip is the only warning" of criterion 13.
+
+### Interaction and notices
+
+One press, no dialog. All pieces and untouched shapes are selected; the tool stays Select; one undo step. The notice is the Boolean card's (level with Union), `role="status"`, 3 s, 5 s above 70 characters, 8 s above 140 (`0054`). It reports counts and consequences, in this order, each sentence only when it applies:
+
+- "Fracture: 3 objects became 7 pieces." / "Flatten: 2 objects became 1."
+- "1 hidden object was removed." (Flatten)
+- "Strokes follow the trimmed outlines." (Flatten, when a trimmed object has a stroke; this carries the warning of criterion 13)
+- the open-outline sentences of `0054` criteria 21 and 22
+
+Fill None hides what is below (Question 2, A); the removal sentence makes that visible. A piece with holes is a compound path; the Node tool's rule for compound paths applies as built.
+
+### Glyphs
+
+Fracture: three solid pieces separated by gaps. Flatten: the upper square whole, the lower one trimmed to its visible L, a gap along the trim edge. Union has no gap; Exclusion has a hole.
 
 ### Keyboard, accessibility, contrast
 
-No shortcut. One Tab stop for the toolbox, Up and Down move, Space or Enter presses, focus stays on the button after a key press and returns to the canvas after a mouse press. The accessible names are "Fracture" and "Flatten"; the rule line is the description. Refusal text `--field-invalid` 6.5:1 on its ground, the red outline 5.3:1 on the canvas, and the sentence names the count, so colour is not the only cue. Success text `--toolbar-icon` on `--toolbar-bg` 8.3:1.
+No shortcut. The Boolean card stays one Tab stop; Up and Down reach the new buttons; Space or Enter presses; focus stays on the button after a key press and returns to the canvas after a mouse press. Accessible names "Fracture" and "Flatten"; the rule line is the description. Contrast as the Boolean card (refusal text 6.5:1, red outline 5.3:1, notice 8.3:1); counts in the sentence, so colour is never the only cue.
 
-### At 800 x 600, large documents
+### Large documents
 
-Column B is 500 px of 546 px with both new buttons (34 px clear); nothing else in the viewport changes. 2,000 overlapping squares (fixture b) give 2,001 selected pieces: the group box shows, member boxes do not (above 500, row "Member box"). The kernel call runs on the UI thread, so the toolbox is `aria-busy` with the wait cursor, as for the Boolean operations (`docs/technical-debt.md`); both commands must finish within 2 s (criterion 17).
+Fixture (b) gives 2,001 selected pieces: group box only, no member boxes (above 500, row "Member box"). The kernel runs on the UI thread: `aria-busy` on the card and the wait cursor, as for the Boolean operations; both commands finish within 2 s (criterion 17).
 
-### Questions for the customer
-
-1. **Names (Question 5).** Default stays "Fracture" and "Flatten" (his words); the rule lines say what each does, which "Divide" and "Trim" would have said by name. Say if you want Illustrator's names.
-2. **The Boolean card now holds seven buttons and two kinds of command** (area combination, and cutting or trimming a stack). *Default:* one card, as Illustrator and Affinity do; the alternative is a separate three-button card, which does not fit column B.
+No customer question: the names stay "Fracture" and "Flatten" (his words), one card as Illustrator and Affinity do.
 
 ## Links
 
 Requirements: R-EDIT-023 (`docs/requirements.md`); related R-EDIT-003
 Builds on: `specs/0016-boolean-operations/` (the kernel, compound paths, region, refusals, determinism; must be merged first)
 Related: `specs/0035-combine-and-break-apart/`, `specs/0036-cut-at-crossings/`, `specs/0048-split-compound-path/`, `specs/0038-path-offset/`, `specs/0023-groups/`
-ADRs: `adrs.md` (architect, to come; whether Flatten and Fracture are built from the pairwise kernel operations of `0016` or from a planar-arrangement routine)
+ADRs: `adrs.md`
 PR: TBD
