@@ -542,6 +542,10 @@ fn every_older_fixture_still_opens_with_the_styles_it_stored() {
         "clone_overrides_flag_damaged_v14.curvyo",
         // The damaged-flag file of `0046-document-shapes`.
         "guide_damaged_v15.curvyo",
+        // The damaged arc and curve files of `0021-ellipse-arcs-and-shaping`.
+        "arc_with_curve_damaged_v16.curvyo",
+        "curve_five_damaged_v16.curvyo",
+        "arc_unknown_kind_damaged_v16.curvyo",
     ];
     let mut opened = 0;
     for entry in std::fs::read_dir(dir).unwrap() {
