@@ -25,6 +25,10 @@ const fn kind_of(value: ParamValue) -> ObjectKind {
         ParamValue::Radius(_) | ParamValue::CornerRadius(..) => ObjectKind::Rectangle,
         ParamValue::Ratio(_) => ObjectKind::Star,
         ParamValue::PointCount(_) => ObjectKind::PolygonOrStar,
+        ParamValue::ArcAngle(..) | ParamValue::ArcKind(_) | ParamValue::WholeEllipse => {
+            ObjectKind::ArcEllipse
+        }
+        ParamValue::Curve(_) => ObjectKind::Curved,
     }
 }
 

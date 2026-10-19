@@ -191,7 +191,9 @@ fn ac1_a_rectangle_shows_four_radius_handles_with_its_transform_handles() {
 fn ac1_a_star_shows_one_inner_radius_handle_and_a_polygon_none() {
     let star = Rig::star(40.0, 5, 0.5);
     let handles = star.handles();
-    assert_eq!(count_params(&handles), 1);
+    // Since `specs/0021-ellipse-arcs-and-shaping/` (criterion 40) a star and a polygon
+    // also have a curve handle.
+    assert_eq!(count_params(&handles), 2);
     assert!(
         handles
             .iter()
@@ -206,7 +208,7 @@ fn ac1_a_star_shows_one_inner_radius_handle_and_a_polygon_none() {
         },
         PointCount::new(6).unwrap(),
     );
-    assert_eq!(count_params(&Rig::selected(document, id).handles()), 0);
+    assert_eq!(count_params(&Rig::selected(document, id).handles()), 1);
 }
 
 /// Criterion 7: the tiers 24, 48, 72 on the shorter side, and the order in
@@ -883,7 +885,7 @@ fn ported_ac9_resizing_an_ellipse_can_break_rx_eq_ry() {
     let mut rig = Zoomed::new(document, id);
     let e = rig.handle(EditHandle::Resize(ResizeDirection::E));
     rig.drag(e, Vec2::new(15.0, 0.0));
-    let Shape::Ellipse { frame } = rig.shape() else {
+    let Shape::Ellipse { frame, .. } = rig.shape() else {
         panic!("an ellipse");
     };
     assert!((frame.rx.as_mm() - 17.5).abs() < 1e-6);
@@ -911,6 +913,7 @@ fn ported_ac13_a_corner_handle_scales_a_star_uniformly_keeping_count_and_ratio()
         frame,
         point_count,
         inner_ratio,
+        ..
     } = rig.shape()
     else {
         panic!("a star");
@@ -972,6 +975,7 @@ fn ported_ac15_a_point_count_change_keeps_size_and_ratio() {
         frame,
         point_count,
         inner_ratio,
+        ..
     } = rig.shape()
     else {
         panic!("a star");

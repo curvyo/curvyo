@@ -353,7 +353,7 @@ impl ShapePlacement {
                     (r, r)
                 } else {
                     match kept_shape {
-                        Some(Shape::Ellipse { frame })
+                        Some(Shape::Ellipse { frame, .. })
                             if positive(frame.rx) && positive(frame.ry) =>
                         {
                             (frame.rx, frame.ry)
@@ -435,7 +435,9 @@ impl ShapePlacement {
         match (field, shape) {
             (PlacementField::Width, Some(Shape::Rect { bounds, .. })) => bounds.width,
             (PlacementField::Height, Some(Shape::Rect { bounds, .. })) => bounds.height,
-            (PlacementField::Size, Some(Shape::Ellipse { frame })) if is_circle(frame) => frame.rx,
+            (PlacementField::Size, Some(Shape::Ellipse { frame, .. })) if is_circle(frame) => {
+                frame.rx
+            }
             (
                 PlacementField::Size,
                 Some(Shape::Polygon { frame, .. } | Shape::Star { frame, .. }),

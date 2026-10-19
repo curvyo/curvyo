@@ -7,8 +7,9 @@
 //! it with its own frame (`adrs.md`, forward note).
 
 use curvyo_document_core::{
-    Angle, Corner, Document, EllipseFrame, Length, ObjectEditError, ObjectSnapshot, PathSnapshot,
-    Point, PrimitiveSnapshot, RectBounds, Shape, StarFrame,
+    Angle, Corner, Curve, Document, EllipseAxes, EllipseFrame, Length, ObjectEditError,
+    ObjectSnapshot, PathSnapshot, Point, PrimitiveSnapshot, RectBounds, Shape, StarFrame,
+    arc_after_linear_map, ellipse_after_linear_map,
 };
 
 use crate::ResizeDirection;
@@ -157,8 +158,9 @@ fn extent_factors(primitive: &PrimitiveSnapshot, (sx, sy): (f64, f64)) -> ((f64,
     if !is_stretch(sx, sy) {
         return ((sx, sx), rotation);
     }
-    if let Shape::Ellipse { frame } = &primitive.shape
+    if let Shape::Ellipse { frame, curve, .. } = &primitive.shape
         && is_circle(frame)
+        && *curve == Curve::ELLIPSE_DEFAULT
     {
         // A circle becomes an ellipse along the document axes, whatever its
         // rotation: the one write beyond a single object's resize (criterion 31).
@@ -169,6 +171,47 @@ fn extent_factors(primitive: &PrimitiveSnapshot, (sx, sy): (f64, f64)) -> ((f64,
     } else {
         ((sx, sy), rotation)
     }
+}
+
+/// An ellipse with an arc under a stretch: the image ellipse and its arc
+/// (`specs/0021-ellipse-arcs-and-shaping/` criterion 56, `adrs.md` decision 9). `None` for
+/// any other shape and for a uniform scale.
+fn stretched_arc(
+    primitive: &PrimitiveSnapshot,
+    map_point: &impl Fn(Point) -> Point,
+    (sx, sy): (f64, f64),
+) -> Option<PrimitiveSnapshot> {
+    let Shape::Ellipse {
+        frame,
+        arc: Some(arc),
+        curve,
+    } = primitive.shape
+    else {
+        return None;
+    };
+    if !is_stretch(sx, sy) {
+        return None;
+    }
+    let before = EllipseAxes {
+        rx: frame.rx.as_mm(),
+        ry: frame.ry.as_mm(),
+        rotation: primitive.rotation.as_radians(),
+    };
+    let map = [[sx, 0.0], [0.0, sy]];
+    let after = ellipse_after_linear_map(before, map);
+    Some(PrimitiveSnapshot {
+        shape: Shape::Ellipse {
+            frame: EllipseFrame {
+                center: map_point(frame.center),
+                rx: Length::from_mm(after.rx),
+                ry: Length::from_mm(after.ry),
+            },
+            arc: Some(arc_after_linear_map(arc, before, after, map)),
+            curve,
+        },
+        rotation: Angle::from_radians(after.rotation),
+        ..primitive.clone()
+    })
 }
 
 pub(crate) fn scale_primitive(
@@ -184,6 +227,9 @@ pub(crate) fn scale_primitive(
         )
     };
     let factor = stroke_or_radius_factor(sx, sy);
+    if let Some(stretched) = stretched_arc(primitive, &map_point, (sx, sy)) {
+        return stretched;
+    }
     let ((kx, ky), rotation) = extent_factors(primitive, (sx, sy));
     let shape = match primitive.shape {
         Shape::Rect {
@@ -219,25 +265,36 @@ pub(crate) fn scale_primitive(
                 corner_radii: radii,
             }
         }
-        Shape::Ellipse { frame } => Shape::Ellipse {
+        // A scale along the ellipse's own axes keeps its parametric angles and its curve
+        // (`specs/0021-ellipse-arcs-and-shaping/` criteria 10 and 27).
+        Shape::Ellipse { frame, arc, curve } => Shape::Ellipse {
             frame: EllipseFrame {
                 center: map_point(frame.center),
                 rx: Length::from_mm(frame.rx.as_mm() * kx),
                 ry: Length::from_mm(frame.ry.as_mm() * ky),
             },
+            arc,
+            curve,
         },
-        Shape::Polygon { frame, point_count } => Shape::Polygon {
+        Shape::Polygon {
+            frame,
+            point_count,
+            curve,
+        } => Shape::Polygon {
             frame: scaled_star_frame(frame, map_point(frame.center), factor),
             point_count,
+            curve,
         },
         Shape::Star {
             frame,
             point_count,
             inner_ratio,
+            curve,
         } => Shape::Star {
             frame: scaled_star_frame(frame, map_point(frame.center), factor),
             point_count,
             inner_ratio,
+            curve,
         },
     };
     PrimitiveSnapshot {
@@ -530,7 +587,7 @@ mod tests {
         let object = turned(&document, id, 30.0);
         let result = apply(&object, &scale(2.0, 3.0), ScaleModes::default(), None);
         let ObjectSnapshot::Primitive(PrimitiveSnapshot {
-            shape: Shape::Ellipse { frame },
+            shape: Shape::Ellipse { frame, .. },
             rotation,
             ..
         }) = result
@@ -566,6 +623,7 @@ mod tests {
                     frame,
                     point_count,
                     inner_ratio,
+                    ..
                 },
             ..
         }) = result
@@ -901,5 +959,60 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// `specs/0021-ellipse-arcs-and-shaping/` criterion 56: a 30° rotated half circle
+    /// stretched by (2, 0.5) stays an arc and is the image of the old one at 64 samples.
+    #[test]
+    fn a_stretched_rotated_arc_stays_an_arc_and_is_the_image() {
+        use curvyo_document_core::{ArcKind, EllipseArc, outline_of_rotated};
+        let document = Document::new(1);
+        let id = document.create_ellipse(EllipseFrame {
+            center: Point::new(10.0, 4.0),
+            rx: Length::from_mm(20.0),
+            ry: Length::from_mm(20.0),
+        });
+        document
+            .set_ellipse_arcs(&[(
+                id,
+                EllipseArc::new(
+                    Angle::from_radians(0.0),
+                    Angle::from_radians(std::f64::consts::PI),
+                    ArcKind::Arc,
+                ),
+            )])
+            .expect("arc");
+        let object = turned(&document, id, 30.0);
+        assert!(!crate::conversion::converts_on_stretch(
+            &object,
+            Angle::from_radians(0.0)
+        ));
+        let result = apply(&object, &scale(2.0, 0.5), ScaleModes::default(), None);
+        let (ObjectSnapshot::Primitive(before), ObjectSnapshot::Primitive(after)) =
+            (&object, &result)
+        else {
+            panic!("primitives");
+        };
+        let Shape::Ellipse { arc: Some(_), .. } = after.shape else {
+            panic!("still an arc");
+        };
+        let sample = |p: &PrimitiveSnapshot, i: u32| {
+            let Shape::Ellipse {
+                frame,
+                arc: Some(arc),
+                ..
+            } = p.shape
+            else {
+                unreachable!()
+            };
+            let t = arc.start().as_radians() + arc.sweep().as_radians() * f64::from(i) / 63.0;
+            curvyo_document_core::ellipse_point(frame, t).rotated_around(frame.center, p.rotation)
+        };
+        for i in 0..64 {
+            let old = sample(before, i);
+            let expected = Point::new(old.x * 2.0, old.y * 0.5);
+            assert!(expected.vector_to(sample(after, i)).length() < 1e-9, "{i}");
+        }
+        assert!(!outline_of_rotated(&after.shape, after.rotation).closed);
     }
 }

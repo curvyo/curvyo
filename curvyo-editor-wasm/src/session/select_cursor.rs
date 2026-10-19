@@ -166,6 +166,9 @@ impl Session {
             EditHandle::Move => "move",
             EditHandle::Param(ParamHandle::CornerRadius(_)) => "param-radius",
             EditHandle::Param(ParamHandle::InnerRadius) => "param-inner",
+            EditHandle::Param(ParamHandle::ArcStart) => "param-arc-start",
+            EditHandle::Param(ParamHandle::ArcEnd) => "param-arc-end",
+            EditHandle::Param(ParamHandle::Curve) => "param-curve",
         }
         .to_string()
     }

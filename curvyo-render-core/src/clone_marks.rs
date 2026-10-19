@@ -144,13 +144,16 @@ fn outlines_of(object: &ObjectSnapshot) -> Vec<(Vec<curvyo_document_core::Anchor
             .subpaths()
             .map(|subpath| (subpath.anchors.to_vec(), subpath.closed))
             .collect(),
-        (None, ObjectSnapshot::Primitive(primitive)) => vec![(
-            crate::shape_preview::outline_to_anchors(&curvyo_document_core::outline_of_rotated(
+        (None, ObjectSnapshot::Primitive(primitive)) => {
+            let outline = curvyo_document_core::drawing_outline_of_rotated(
                 &primitive.shape,
                 primitive.rotation,
-            )),
-            true,
-        )],
+            );
+            vec![(
+                crate::shape_preview::outline_to_anchors(&outline),
+                outline.closed,
+            )]
+        }
         (None, _) => Vec::new(),
     }
 }

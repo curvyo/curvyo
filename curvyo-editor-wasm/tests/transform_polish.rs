@@ -666,7 +666,7 @@ fn the_multi_selection_example_moves_every_object_by_one_offset() {
     let ObjectSnapshot::Primitive(circle) = &all[1] else {
         panic!("a circle")
     };
-    let curvyo_document_core::Shape::Ellipse { frame } = circle.shape else {
+    let curvyo_document_core::Shape::Ellipse { frame, .. } = circle.shape else {
         panic!("a circle")
     };
     assert!(

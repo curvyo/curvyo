@@ -90,8 +90,9 @@ fn contour_of(object: &ObjectSnapshot) -> Option<Contour> {
         ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_) => None,
         ObjectSnapshot::Primitive(primitive) => {
             let placeholder = AnchorId::new(0, 0);
-            let anchors = outline_of_rotated(&primitive.shape, primitive.rotation)
-                .into_iter()
+            let outline = outline_of_rotated(&primitive.shape, primitive.rotation);
+            let anchors = outline
+                .iter()
                 .map(|a| NewAnchor {
                     id: placeholder,
                     point: a.point,
@@ -103,7 +104,7 @@ fn contour_of(object: &ObjectSnapshot) -> Option<Contour> {
             Some(Contour {
                 id: primitive.id,
                 anchors,
-                closed: true,
+                closed: outline.closed,
             })
         }
     }

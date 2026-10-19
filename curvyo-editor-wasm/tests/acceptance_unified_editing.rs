@@ -79,7 +79,7 @@ fn rotate_object_about_center(d: &Document, index: usize, radians: f64) {
                 bounds.origin.x + bounds.width.as_mm() / 2.0,
                 bounds.origin.y + bounds.height.as_mm() / 2.0,
             ),
-            Shape::Ellipse { frame } => frame.center,
+            Shape::Ellipse { frame, .. } => frame.center,
             Shape::Polygon { frame, .. } | Shape::Star { frame, .. } => frame.center,
         },
         ObjectSnapshot::Path(_) => panic!("primitives only"),
@@ -518,22 +518,35 @@ fn ac07_rectangle_tiers_zoomed_in_and_out_and_rotated_and_wide() {
     assert_tiers("rect with radius", &series, true, true, true);
 }
 
+/// Rewritten for `0021` criteria 1 and 22: this test used to say an ellipse has no
+/// parameter handle (`param = false`). Now a whole ellipse shows two arc handles and a
+/// curve handle from a shorter side of 72 px, so the parameter tier steps at 72 like a
+/// rectangle's; the edge and centre tiers are unchanged.
 #[test]
-fn ac07_ellipse_tiers_edge_and_centre_but_no_parameter_handle() {
+fn ac07_ellipse_tiers_edge_centre_and_the_arc_and_curve_handles_from_72() {
     let series = decor_series(|s| ellipse_scene(100, s, s, 0.0));
-    assert_tiers("ellipse", &series, true, true, false);
+    assert_tiers("ellipse", &series, true, true, true);
     let series = decor_series(|s| ellipse_scene(400, s * 1.5, s, 0.4));
-    assert_tiers("ellipse wide rotated", &series, true, true, false);
+    assert_tiers("ellipse wide rotated", &series, true, true, true);
 }
 
+/// Rewritten for `0021` criterion 40: a polygon had no parameter handle ("A polygon had
+/// no parameter handle before this; the curve handle is its only one"). It now has the
+/// curve handle from 72 px, so `param = true`; no edge-tier change.
 #[test]
-fn ac07_polygon_tiers_no_edge_no_parameter_handle() {
+fn ac07_polygon_tiers_edge_centre_and_the_curve_handle_from_72() {
     let series = decor_series(|s| star_scene(100, s / 2.0, 8, None, 0.0));
-    assert_tiers("polygon 8", &series, true, true, false);
+    assert_tiers("polygon 8", &series, true, true, true);
     let series = decor_series(|s| star_scene(300, s / 2.0, 12, None, 1.1));
-    assert_tiers("polygon 12 rotated", &series, true, true, false);
+    assert_tiers("polygon 12 rotated", &series, true, true, true);
 }
 
+/// Rewritten for `0021` criteria 40 and "Knob displacement": the star's inner-radius
+/// handle and the new curve handle crowd each other, and the displacement rule may push
+/// a knob towards the centre, where the centre handle yields (`0009` criterion 8, within
+/// 20 px). So "constant from 72 px" holds for the two roomy stars as before; for the
+/// crowded 16-point star the count may differ between 73 px and 160 px by exactly the
+/// centre handle (its glyph size is measured from the centre tier of the same series).
 #[test]
 fn ac07_star_tiers_inner_handle_from_72() {
     let series = decor_series(|s| star_scene(100, s / 2.0, 8, Some(0.9), 0.0));
@@ -541,7 +554,22 @@ fn ac07_star_tiers_inner_handle_from_72() {
     let series = decor_series(|s| star_scene(100, s / 2.0, 4, Some(0.99), 0.0));
     assert_tiers("star 4 ratio .99", &series, true, true, true);
     let series = decor_series(|s| star_scene(800, s / 2.0, 16, Some(0.6), 2.0));
-    assert_tiers("star 16 ratio .6 rotated 800%", &series, true, true, true);
+    let d = |s| dec_at(&series, s);
+    assert_eq!(d(6.0), d(23.5), "crowded star: below 24 constant");
+    assert_eq!(d(24.0), d(47.5), "crowded star: 24..48 constant");
+    assert_eq!(d(48.0), d(71.5), "crowded star: 48..72 constant");
+    assert_eq!(
+        d(72.0),
+        d(73.0),
+        "crowded star: 72 and up constant at the step"
+    );
+    assert!(d(71.9) < d(72.0), "crowded star: parameter tier at 72");
+    let centre_glyph = d(48.0) - d(47.9);
+    let drift = d(160.0) - d(73.0);
+    assert!(
+        drift == 0 || drift == centre_glyph,
+        "crowded star: 73 px and 160 px differ by {drift}, only the centre handle ({centre_glyph}) may yield"
+    );
 }
 
 // ---- Criterion 1/2: four knobs at radius 0, at the position rule ----

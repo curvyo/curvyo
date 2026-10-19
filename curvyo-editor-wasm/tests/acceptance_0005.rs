@@ -409,6 +409,13 @@ fn ac1_closed_path_shows_eight_resize_handles_and_a_rotate_handle() {
 #[test]
 /// `0019` criterion 56 supersedes `0005` criterion 11 here: a polygon or star shows
 /// the four edge resize handles too (they stretch it and turn it into a path).
+///
+/// Rewritten for `0021` criterion 40: the old assertion "the middle of the first side
+/// (vertex 0 to vertex 1) is not a handle" held because a polygon had no parameter
+/// handle at all. Now the middle of the side counter-clockwise of vertex 0 (the one from
+/// the last vertex to vertex 0) carries the curve handle, so (a) that spot answers
+/// "pointer" and (b) the middle of a side far from it still is "not a handle" (a press
+/// moves the object).
 fn ac1_polygon_and_star_have_eight_resize_handles_plus_rotate_0019_c56() {
     for doc in [
         polygon_doc(30.0, 30.0, 10.0, 6),
@@ -417,22 +424,47 @@ fn ac1_polygon_and_star_have_eight_resize_handles_plus_rotate_0019_c56() {
         let mut s = open_in_session(&doc);
         let p = prim(&s);
         let (min, max) = shape_frame_bounds(&p.shape);
-        // Select by clicking a point on the outline: the first vertex at the top.
         let outline = outline_of_rotated(&p.shape, p.rotation);
-        let first = outline[0].point;
-        // Nudge along the outline toward the second vertex to avoid handles.
-        let second = outline[1].point;
-        let mid = pt(
-            f64::midpoint(first.x, second.x),
-            f64::midpoint(first.y, second.y),
-        );
-        select_at(&mut s, mid);
+        let mid_of = |a: usize, b: usize| {
+            pt(
+                f64::midpoint(outline[a].point.x, outline[b].point.x),
+                f64::midpoint(outline[a].point.y, outline[b].point.y),
+            )
+        };
+        // A side far from vertex 0 (the 3rd side), not a handle: a press moves.
+        select_at(&mut s, mid_of(2, 3));
         assert_eq!(
             s.cursor_hint(),
             "move", // not a handle; a press here moves the object (`0007` 28)
-            "pointer on outline mid is not a handle"
+            "pointer on a far side's middle is not a handle"
         );
         assert_full_handle_set(&mut s, min.x, min.y, max.x, max.y, false);
+        // The curve handle (`0021` criterion 40): at 0% it sits on the middle of the side
+        // counter-clockwise of vertex 0, within the 14 px displacement of a crowded knob.
+        let object = document_of(&s)
+            .object(document_of(&s).object_ids()[0])
+            .unwrap();
+        let knobs = curvyo_ui_core::param_handles(
+            &object,
+            &curvyo_ui_core::oriented_bounds(&object),
+            &curvyo_ui_core::TransformHandleTolerances::at_scale(s.view().scale()),
+        );
+        let (_, curve_at) = knobs
+            .iter()
+            .find(|(h, _)| *h == curvyo_ui_core::ParamHandle::Curve)
+            .expect("a curve handle at 72 px and up");
+        let true_mid = mid_of(outline.len() - 1, 0);
+        assert!(
+            ((curve_at.x - true_mid.x).hypot(curve_at.y - true_mid.y)) * s.view().scale()
+                <= 14.0 + 1e-6,
+            "the curve handle sits at the middle of the side before vertex 0"
+        );
+        assert_eq!(
+            hint_at(&mut s, *curve_at),
+            "pointer",
+            "curve handle answers"
+        );
+        assert_eq!(s.handle_hint(), "param-curve");
     }
 }
 
@@ -600,7 +632,7 @@ fn ac4_free_corner_resize_on_ellipse_pins_opposite_corner() {
     select_at(&mut s, ell());
     // SE corner (40,20) -> (60, 40): box (0,0)-(60,40).
     drag(&mut s, pt(40.0, 20.0), pt(60.0, 40.0), false, false);
-    let Shape::Ellipse { frame } = prim(&s).shape else {
+    let Shape::Ellipse { frame, .. } = prim(&s).shape else {
         panic!()
     };
     assert!(pclose(frame.center, pt(30.0, 20.0)), "{:?}", frame.center);
@@ -688,7 +720,7 @@ fn ac6_edge_handle_resizes_ellipse_and_path_on_one_axis_only() {
     let mut s = open_in_session(&ellipse_doc(20.0, 10.0, 20.0, 10.0));
     select_at(&mut s, ell());
     drag(&mut s, pt(40.0, 10.0), pt(60.0, 100.0), false, false);
-    let Shape::Ellipse { frame } = prim(&s).shape else {
+    let Shape::Ellipse { frame, .. } = prim(&s).shape else {
         panic!()
     };
     // box (0,0)-(60,20)
@@ -969,7 +1001,7 @@ fn ac10_ellipse_corner_and_edge_resizes_set_rx_ry_from_the_box() {
     let mut s = open_in_session(&ellipse_doc(20.0, 10.0, 20.0, 10.0));
     select_at(&mut s, click_at);
     drag(&mut s, pt(0.0, 0.0), pt(-10.0, -10.0), false, false);
-    let Shape::Ellipse { frame } = prim(&s).shape else {
+    let Shape::Ellipse { frame, .. } = prim(&s).shape else {
         panic!()
     };
     assert!(pclose(frame.center, pt(15.0, 5.0)), "{:?}", frame.center);
@@ -978,7 +1010,7 @@ fn ac10_ellipse_corner_and_edge_resizes_set_rx_ry_from_the_box() {
     let mut s = open_in_session(&ellipse_doc(20.0, 10.0, 20.0, 10.0));
     select_at(&mut s, click_at);
     drag(&mut s, pt(40.0, 20.0), pt(60.0, 21.0), false, true);
-    let Shape::Ellipse { frame } = prim(&s).shape else {
+    let Shape::Ellipse { frame, .. } = prim(&s).shape else {
         panic!()
     };
     assert!(close(frame.rx.as_mm(), 30.0) && close(frame.ry.as_mm(), 15.0));
@@ -991,7 +1023,9 @@ fn ac10_ellipse_corner_and_edge_resizes_set_rx_ry_from_the_box() {
 fn star_like(session: &Session) -> (StarFrame, PointCount, Option<InnerRatio>, f64, f64) {
     let p = prim(session);
     match p.shape {
-        Shape::Polygon { frame, point_count } => (
+        Shape::Polygon {
+            frame, point_count, ..
+        } => (
             frame,
             point_count,
             None,
@@ -1002,6 +1036,7 @@ fn star_like(session: &Session) -> (StarFrame, PointCount, Option<InnerRatio>, f
             frame,
             point_count,
             inner_ratio,
+            ..
         } => (
             frame,
             point_count,
@@ -1208,7 +1243,7 @@ fn ac13_ellipse_and_polygon_never_report_negative_radii() {
     let mut s = open_in_session(&ellipse_doc(20.0, 10.0, 20.0, 10.0));
     select_at(&mut s, ell());
     drag(&mut s, pt(40.0, 20.0), pt(-30.0, -30.0), false, false);
-    let Shape::Ellipse { frame } = prim(&s).shape else {
+    let Shape::Ellipse { frame, .. } = prim(&s).shape else {
         panic!()
     };
     assert!(frame.rx.as_mm() >= 0.0 && frame.ry.as_mm() >= 0.0);
@@ -2668,7 +2703,7 @@ fn ac25_a_rotated_ellipse_edge_handle_follows_the_rotation() {
     // Local E handle (40,10) -> rotated 90 deg: (20,30). Drag 6 along local x = document +y.
     let e = rot(pt(40.0, 10.0), c, FRAC_PI_2);
     drag(&mut s, e, pt(e.x, e.y + 6.0), false, false);
-    let Shape::Ellipse { frame } = prim(&s).shape else {
+    let Shape::Ellipse { frame, .. } = prim(&s).shape else {
         panic!()
     };
     assert!(
@@ -2837,7 +2872,7 @@ fn assert_all_finite_and_reopenable(session: &Session) {
                             assert!(v.is_finite(), "non-finite rect value {v}");
                         }
                     }
-                    Shape::Ellipse { frame } => {
+                    Shape::Ellipse { frame, .. } => {
                         for v in [
                             frame.center.x,
                             frame.center.y,

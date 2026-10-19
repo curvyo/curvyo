@@ -66,7 +66,7 @@ fn drag_ellipse(a: Point, b: Point, m: Modifiers) -> (f64, f64, f64, f64) {
     };
     let shape = document.primitive(id).unwrap().shape;
     assert_eq!(shape, preview, "AC 9: the commit is the last preview");
-    let Shape::Ellipse { frame } = shape else {
+    let Shape::Ellipse { frame, .. } = shape else {
         panic!("an ellipse");
     };
     (
@@ -165,7 +165,7 @@ fn ac10_the_release_modifiers_win_over_the_last_preview() {
     let CreateOutcome::Created(id) = tool.pointer_up(&document, pt(130.0, 40.0), BOTH) else {
         panic!("expected Created");
     };
-    let Shape::Ellipse { frame } = document.primitive(id).unwrap().shape else {
+    let Shape::Ellipse { frame, .. } = document.primitive(id).unwrap().shape else {
         panic!("an ellipse");
     };
     assert!(near(frame.center.x, 100.0) && near(frame.rx.as_mm(), 30.0));

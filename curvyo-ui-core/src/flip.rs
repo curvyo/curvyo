@@ -122,7 +122,20 @@ fn flip_results(
                     Point::new(a_max.x.max(b_max.x), a_max.y.max(b_max.y)),
                 )
             })?;
-    let centre = Point::new(f64::midpoint(min.x, max.x), f64::midpoint(min.y, max.y));
+    let mut centre = Point::new(f64::midpoint(min.x, max.x), f64::midpoint(min.y, max.y));
+    // One ellipse with an arc flips about the middle of its own selection box, the box of
+    // the drawn part (`specs/0021-ellipse-arcs-and-shaping/` criteria 9 and 54), so the
+    // flipped arc keeps its box.
+    if let [
+        object @ ObjectSnapshot::Primitive(curvyo_document_core::PrimitiveSnapshot {
+            shape: Shape::Ellipse { arc: Some(_), .. },
+            ..
+        }),
+    ] = starts.as_slice()
+    {
+        let box_ = crate::oriented_box::oriented_bounds(object);
+        centre = box_.to_document(box_.local_center());
+    }
     let map = axis.map(centre);
     let converted = vec![None; starts.len()];
     let results = map_all(&starts, &converted, &map, ScaleModes::default());
@@ -137,7 +150,8 @@ fn looks_the_same(a: &ObjectSnapshot, b: &ObjectSnapshot) -> bool {
         return true;
     }
     if let (ObjectSnapshot::Primitive(pa), ObjectSnapshot::Primitive(pb)) = (a, b)
-        && let (Shape::Ellipse { frame: fa }, Shape::Ellipse { frame: fb }) = (pa.shape, pb.shape)
+        && let (Shape::Ellipse { frame: fa, .. }, Shape::Ellipse { frame: fb, .. }) =
+            (pa.shape, pb.shape)
         && is_circle(&fa)
         && is_circle(&fb)
     {
@@ -157,12 +171,12 @@ struct Outline {
 fn outlines(object: &ObjectSnapshot) -> Vec<Outline> {
     match object {
         ObjectSnapshot::Primitive(primitive) => {
-            let anchors: Vec<(Point, Vec2, Vec2)> =
-                outline_of_rotated(&primitive.shape, primitive.rotation)
-                    .iter()
-                    .map(|a: &OutlineAnchor| (a.point, a.handle_in, a.handle_out))
-                    .collect();
-            vec![outline_of(&anchors, true)]
+            let outline = outline_of_rotated(&primitive.shape, primitive.rotation);
+            let anchors: Vec<(Point, Vec2, Vec2)> = outline
+                .iter()
+                .map(|a: &OutlineAnchor| (a.point, a.handle_in, a.handle_out))
+                .collect();
+            vec![outline_of(&anchors, outline.closed)]
         }
         ObjectSnapshot::Path(path)
         | ObjectSnapshot::Clone(curvyo_document_core::CloneSnapshot { resolved: path, .. }) => path

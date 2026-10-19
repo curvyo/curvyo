@@ -11,8 +11,8 @@
 
 use curvyo_document_core::Point;
 use curvyo_ui_core::{
-    CornerLinking, CornerRadiusScaling, Modifiers, SelectDoubleClickOutcome, StrokeScaling,
-    TransformHandleTolerances,
+    CornerLinking, CornerRadiusScaling, EditHandle, Modifiers, ParamHandle,
+    SelectDoubleClickOutcome, StrokeScaling, TransformHandleTolerances,
 };
 
 use super::{Session, Tool};
@@ -192,6 +192,7 @@ impl Session {
             .select
             .live_resize_factors(point, shift, ctrl)
             .and_then(|(sx, sy)| curvyo_ui_core::mirror_line(sx, sy));
+        let dragged = self.select.dragging_handle();
         let recovery = self.select.pointer_up(
             &self.document,
             &objects,
@@ -203,7 +204,25 @@ impl Session {
         // A release that set an axis to 0.01 mm says so (`0056` criterion 15).
         self.transform_notice = curvyo_ui_core::zero_recovery_notice(recovery);
         if self.has_unrecorded_steps() {
-            self.transform_announcement = mirror.map(resized_announcement);
+            self.transform_announcement = mirror
+                .map(resized_announcement)
+                .or_else(|| dragged.and_then(|handle| self.arc_or_curve_announcement(handle)));
+        }
+    }
+
+    /// The announcement of the selected primitive's arc or curve after an edit through
+    /// `handle` (`specs/0021-ellipse-arcs-and-shaping/` criterion 65); `None` for any other
+    /// handle.
+    pub(super) fn arc_or_curve_announcement(&self, handle: EditHandle) -> Option<String> {
+        let EditHandle::Param(param) = handle else {
+            return None;
+        };
+        let id = *self.selection.ids().first()?;
+        let shape = self.document.primitive(id)?.shape;
+        match param {
+            ParamHandle::ArcStart | ParamHandle::ArcEnd => curvyo_ui_core::arc_announcement(&shape),
+            ParamHandle::Curve => curvyo_ui_core::curve_announcement(&shape),
+            ParamHandle::CornerRadius(_) | ParamHandle::InnerRadius => None,
         }
     }
 

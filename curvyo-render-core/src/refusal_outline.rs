@@ -2,7 +2,7 @@
 //! (`specs/0016-boolean-operations` criteria 15 and 16): drawn over the artwork while the
 //! refusal notice is shown, stored nowhere, selecting nothing.
 
-use curvyo_document_core::{ObjectSnapshot, ViewTransform, outline_of_rotated};
+use curvyo_document_core::{ObjectSnapshot, ViewTransform, drawing_outline_of_rotated};
 
 use crate::glyphs::DrawList;
 use crate::shape_preview::outline_to_anchors;
@@ -44,13 +44,11 @@ pub fn build_refusal_outlines(objects: &[ObjectSnapshot], view: ViewTransform) -
                     }
                 }
                 ObjectSnapshot::Primitive(primitive) => {
-                    let anchors = outline_to_anchors(&outline_of_rotated(
-                        &primitive.shape,
-                        primitive.rotation,
-                    ));
+                    let outline = drawing_outline_of_rotated(&primitive.shape, primitive.rotation);
+                    let anchors = outline_to_anchors(&outline);
                     list.extend(stroke::path_stroke(
                         &anchors,
-                        true,
+                        outline.closed,
                         width,
                         color,
                         tolerance_mm,

@@ -145,7 +145,7 @@ fn ac10_the_release_modifiers_win() {
     let mut session = started(Tool::Ellipse);
     session.pointer_hover(pt(130.0, 40.0), false, false);
     session.pointer_up(pt(130.0, 40.0), true, true);
-    let Shape::Ellipse { frame } = shapes(&session)[0] else {
+    let Shape::Ellipse { frame, .. } = shapes(&session)[0] else {
         panic!("an ellipse");
     };
     assert!((frame.center.x - 100.0).abs() < TOL && (frame.center.y - 50.0).abs() < TOL);

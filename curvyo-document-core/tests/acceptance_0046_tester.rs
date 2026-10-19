@@ -454,7 +454,8 @@ fn c41_guide_in_a_hidden_layer_or_group_is_still_not_output() {
 
 #[test]
 fn c2_format_version_is_15_and_a_newer_file_is_refused() {
-    assert_eq!(CURRENT_FORMAT_VERSION, 15);
+    // 0046 took 15; `0021-ellipse-arcs-and-shaping` took 16 after it.
+    assert!(std::hint::black_box(CURRENT_FORMAT_VERSION) >= 15);
     let d = Document::new(1);
     let l = loro_of(&d);
     let bytes = file_from_loro(&l, CURRENT_FORMAT_VERSION + 1);

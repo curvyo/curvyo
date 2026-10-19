@@ -750,7 +750,7 @@ fn ac16_outline_of_a_shape_goes_through_the_same_function() {
         bounds: b,
         corner_radii: r,
     };
-    assert_eq!(outline_of(&shape), rect_outline(b, r));
+    assert_eq!(outline_of(&shape).anchors, rect_outline(b, r));
 }
 
 // ---------------------------------------------------------------------
@@ -1102,7 +1102,7 @@ fn legacy_fixture_opens_as_four_equal_corners_and_outlines_like_the_old_code() {
         seen.push(r);
         // Old code oracle on the opened parameters (outline_of_rotated applies rotation).
         let old = oracle_rect_outline(bounds, mm(r));
-        let new = outline_of(&p.shape);
+        let new = outline_of(&p.shape).anchors;
         assert_eq!(new, old);
     }
     seen.sort_by(f64::total_cmp);

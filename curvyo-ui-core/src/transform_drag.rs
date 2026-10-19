@@ -15,8 +15,11 @@ use curvyo_document_core::{
 
 use crate::ResizeDirection;
 use crate::oriented_box::OrientedBox;
-use crate::param_edit::{PARAM_EQUAL_EPSILON, apply_param, radius_is_limited, value_from_pointer};
+use crate::param_edit::{
+    PARAM_EQUAL_EPSILON, ParamValue, apply_param, radius_is_limited, value_from_pointer,
+};
 use crate::param_handles::ParamHandle;
+use crate::shape_arc_edit::{ArcEnd, arc_angle_from_pointer, curve_from_pointer};
 use crate::skew_math::{skew_angle, skew_factor, skew_frame};
 use crate::transform_commit::{commit_gesture, sane_or};
 use crate::transform_handle_layout::{EditHandle, Side};
@@ -226,6 +229,29 @@ pub(crate) struct TransformDrag {
     pub(crate) signs: ExtentSigns,
 }
 
+/// The value a drag of an arc or curve handle asks for with the pointer at `local` (the
+/// box-local frame): the angle or curve under it, Ctrl-snapped.
+pub(crate) fn arc_or_curve_value(
+    start: &ObjectSnapshot,
+    handle: ParamHandle,
+    local: Point,
+    ctrl: bool,
+) -> Option<ParamValue> {
+    let ObjectSnapshot::Primitive(primitive) = start else {
+        return None;
+    };
+    match handle {
+        ParamHandle::ArcStart => arc_angle_from_pointer(&primitive.shape, local, ctrl)
+            .map(|angle| ParamValue::ArcAngle(ArcEnd::Start, angle)),
+        ParamHandle::ArcEnd => arc_angle_from_pointer(&primitive.shape, local, ctrl)
+            .map(|angle| ParamValue::ArcAngle(ArcEnd::End, angle)),
+        ParamHandle::Curve => {
+            curve_from_pointer(&primitive.shape, local, ctrl).map(ParamValue::Curve)
+        }
+        ParamHandle::CornerRadius(_) | ParamHandle::InnerRadius => None,
+    }
+}
+
 /// What the live readout of a corner radius drag needs beyond the resolved
 /// object (who follows is [`crate::SelectTool::corner_drag_changes_all`]) (`specs/0013-rectangle-corner-radii/` criteria 4, 7,
 /// 23).
@@ -311,6 +337,15 @@ impl TransformDrag {
                 skew_angle(start_box, side, down_at, current, shift, ctrl),
                 self.converted.as_deref(),
             ),
+            EditHandle::Param(
+                handle @ (ParamHandle::ArcStart | ParamHandle::ArcEnd | ParamHandle::Curve),
+            ) => {
+                // The pointer's own position decides the value (criteria 2, 23 and 41).
+                arc_or_curve_value(start, handle, start_box.to_local(current), ctrl).map_or_else(
+                    || start.clone(),
+                    |value| sane_or(start, apply_param(start, value)),
+                )
+            }
             EditHandle::Param(handle) => {
                 let local_delta = local_delta_of(start_box, down_at, current);
                 value_from_pointer(start, handle, local_delta, self.param_gain, self.unlinked)

@@ -6,7 +6,8 @@
 //! every close path of the refinements entry writes nothing here too.
 
 use curvyo_document_core::{
-    Document, Length, ObjectSnapshot, PrimitiveSnapshot, Shape, effective_corner_radii,
+    Angle, Document, Length, ObjectSnapshot, PrimitiveSnapshot, Shape, effective_corner_radii,
+    effective_curve, wrapped_angle,
 };
 
 use crate::oriented_box::OrientedBox;
@@ -15,6 +16,7 @@ use crate::param_edit::{
     radius_is_limited,
 };
 use crate::param_handles::{Corner, ParamHandle};
+use crate::shape_arc_edit::{ARC_SEAM, ArcEnd, arc_capable, curve_capable};
 use crate::transform_commit::MAX_COORDINATE_MM;
 use crate::transform_entry::{
     EntryField, EntryKind, EntryOutcome, InvalidReason, format_mm, parse_entry_number,
@@ -38,6 +40,24 @@ const fn radius_field_name(corner: Corner, unlinked: bool) -> &'static str {
         Corner::Br => "Bottom-right corner radius",
         Corner::Bl => "Bottom-left corner radius",
     }
+}
+
+/// An angle in degrees as an [`Angle`].
+fn degrees(value: f64) -> Angle {
+    Angle::from_radians(value.to_radians())
+}
+
+/// The start and end angles a whole ellipse's or an arc's handles show, degrees in
+/// `[0, 360)` (a whole ellipse rests both at the seam, criterion 1). `None` for a shape
+/// without arc handles.
+#[must_use]
+pub fn shown_arc_angles(shape: &Shape) -> Option<(f64, f64)> {
+    let arc = arc_capable(shape)?;
+    let shown = |angle: Angle| wrapped_angle(angle).as_radians().to_degrees();
+    Some(arc.map_or_else(
+        || (shown(ARC_SEAM), shown(ARC_SEAM)),
+        |arc| (shown(arc.start()), shown(arc.end())),
+    ))
 }
 
 /// An open entry on a parameter handle: the primitive and box as they were
@@ -91,6 +111,20 @@ impl ParamEntry {
             (ParamHandle::InnerRadius, Shape::Star { inner_ratio, .. }) => {
                 EntryField::for_param("ratio", "Inner ratio", format!("{:.2}", inner_ratio.get()))
             }
+            (ParamHandle::ArcStart | ParamHandle::ArcEnd, _) => {
+                let (start, end) = shown_arc_angles(shape)?;
+                let (name, angle) = if handle == ParamHandle::ArcStart {
+                    ("Arc start", start)
+                } else {
+                    ("Arc end", end)
+                };
+                EntryField::for_param("", name, format!("{angle:.1}"))
+            }
+            (ParamHandle::Curve, _) if curve_capable(shape) => EntryField::for_param(
+                "",
+                "Curve",
+                format!("{:.1}", effective_curve(shape)?.percent()),
+            ),
             _ => return None,
         };
         Some(Self {
@@ -109,7 +143,10 @@ impl ParamEntry {
         match self.handle {
             ParamHandle::CornerRadius(_) if self.unlinked => Some(SCOPE_ONE_CORNER),
             ParamHandle::CornerRadius(_) => Some(SCOPE_ALL_FOUR),
-            ParamHandle::InnerRadius => None,
+            ParamHandle::InnerRadius
+            | ParamHandle::ArcStart
+            | ParamHandle::ArcEnd
+            | ParamHandle::Curve => None,
         }
     }
 
@@ -145,6 +182,8 @@ impl ParamEntry {
         match self.handle {
             ParamHandle::CornerRadius(_) => EntryKind::CornerRadius,
             ParamHandle::InnerRadius => EntryKind::InnerRatio,
+            ParamHandle::ArcStart | ParamHandle::ArcEnd => EntryKind::ArcAngle,
+            ParamHandle::Curve => EntryKind::Curve,
         }
     }
 
@@ -204,6 +243,11 @@ impl ParamEntry {
                 // 1e-9, which `clamped_ratio` brings inside `(0, 1)`.
                 ParamValue::Ratio(crate::param_edit::clamped_ratio(value))
             }
+            // Any finite angle; it is wrapped into [0°, 360°) (criterion 64).
+            ParamHandle::ArcStart => ParamValue::ArcAngle(ArcEnd::Start, degrees(value)),
+            ParamHandle::ArcEnd => ParamValue::ArcAngle(ArcEnd::End, degrees(value)),
+            // Limited to the shape's range by `apply_param` (criteria 24 and 42).
+            ParamHandle::Curve => ParamValue::Curve(value / 100.0),
         };
         let result = apply_param(&self.start, typed);
         Ok((result != self.start).then_some(result))

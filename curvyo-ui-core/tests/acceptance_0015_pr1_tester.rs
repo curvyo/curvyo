@@ -692,11 +692,13 @@ fn fit_moves_without_scaling_rotating_or_restyling() {
             frame: fb,
             point_count: pb,
             inner_ratio: ib,
+            ..
         },
         curvyo_document_core::Shape::Star {
             frame: fa,
             point_count: pa,
             inner_ratio: ia,
+            ..
         },
     ) = (before.shape, after.shape)
     else {

@@ -67,12 +67,38 @@ pub(crate) fn resize_primitive(
                 corner_radii: radii,
             }
         }
-        Shape::Ellipse { .. } => Shape::Ellipse {
+        // Above 100 % the box is the drawn outline's: map the frame as an arc's.
+        Shape::Ellipse {
+            frame,
+            arc: None,
+            curve,
+        } if curvyo_document_core::is_beyond_ellipse(&primitive.shape) => Shape::Ellipse {
+            frame: arc_frame_in_box(frame, (start_box.min, start_box.max), (min, max)),
+            arc: None,
+            curve,
+        },
+        Shape::Ellipse {
+            arc: None, curve, ..
+        } => Shape::Ellipse {
             frame: EllipseFrame {
                 center: Point::new(f64::midpoint(min.x, max.x), f64::midpoint(min.y, max.y)),
                 rx: Length::from_mm((max.x - min.x) / 2.0),
                 ry: Length::from_mm((max.y - min.y) / 2.0),
             },
+            arc: None,
+            curve,
+        },
+        // An arc's box is the box of the drawn part (`specs/0021-ellipse-arcs-and-shaping/`
+        // criteria 9 and 10): the frame follows the map from the old box to the new one and
+        // the parametric angles stay.
+        Shape::Ellipse {
+            frame,
+            arc: Some(arc),
+            curve,
+        } => Shape::Ellipse {
+            frame: arc_frame_in_box(frame, (start_box.min, start_box.max), (min, max)),
+            arc: Some(arc),
+            curve,
         },
         Shape::Polygon { .. } | Shape::Star { .. } => {
             let magnitude = resized.sx.abs();
@@ -86,6 +112,37 @@ pub(crate) fn resize_primitive(
         ..primitive.clone()
     };
     (mirrored_primitive_of(&scaled, mirror), factor)
+}
+
+/// The ellipse frame whose arc box `old` becomes `new` under the per-axis map between the
+/// two boxes (both in the frame's local, unrotated coordinates). A box side of zero
+/// length keeps that axis's radius.
+fn arc_frame_in_box(frame: EllipseFrame, old: (Point, Point), new: (Point, Point)) -> EllipseFrame {
+    let axis = |centre: f64, radius: f64, old: (f64, f64), new: (f64, f64)| {
+        let span = old.1 - old.0;
+        if span.abs() <= f64::EPSILON {
+            return (centre - old.0 + new.0, radius);
+        }
+        let factor = (new.1 - new.0) / span;
+        (new.0 + (centre - old.0) * factor, radius * factor)
+    };
+    let (cx, rx) = axis(
+        frame.center.x,
+        frame.rx.as_mm(),
+        (old.0.x, old.1.x),
+        (new.0.x, new.1.x),
+    );
+    let (cy, ry) = axis(
+        frame.center.y,
+        frame.ry.as_mm(),
+        (old.0.y, old.1.y),
+        (new.0.y, new.1.y),
+    );
+    EllipseFrame {
+        center: Point::new(cx, cy),
+        rx: Length::from_mm(rx),
+        ry: Length::from_mm(ry),
+    }
 }
 
 /// `primitive` reflected by `mirror` (a primitive stays a primitive).

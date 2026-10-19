@@ -48,7 +48,7 @@ fn rotated_about_centre(document: &Document, radians: f64) {
                 bounds.origin.x + bounds.width.as_mm() / 2.0,
                 bounds.origin.y + bounds.height.as_mm() / 2.0,
             ),
-            Shape::Ellipse { frame } => frame.center,
+            Shape::Ellipse { frame, .. } => frame.center,
             _ => panic!("unsupported"),
         },
         ObjectSnapshot::Path(_) => panic!("unsupported"),

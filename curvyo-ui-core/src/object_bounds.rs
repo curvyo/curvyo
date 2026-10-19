@@ -88,12 +88,25 @@ pub fn object_outline_bounds(object: &ObjectSnapshot) -> (Point, Point) {
         | ObjectSnapshot::Clone(curvyo_document_core::CloneSnapshot { resolved: path, .. }) => {
             path_bounds(path)
         }
+        // The exact box of an arc's drawn part, not of its cubics
+        // (`specs/0021-ellipse-arcs-and-shaping/` criteria 9 and 54).
+        ObjectSnapshot::Primitive(curvyo_document_core::PrimitiveSnapshot {
+            shape:
+                curvyo_document_core::Shape::Ellipse {
+                    frame,
+                    arc: Some(arc),
+                    ..
+                },
+            rotation,
+            ..
+        }) => curvyo_document_core::rotated_arc_bounds(*frame, *arc, *rotation),
         ObjectSnapshot::Primitive(primitive) => {
-            let anchors: Vec<_> = outline_of_rotated(&primitive.shape, primitive.rotation)
+            let outline = outline_of_rotated(&primitive.shape, primitive.rotation);
+            let anchors: Vec<_> = outline
                 .iter()
                 .map(|a| (a.point, a.handle_in, a.handle_out))
                 .collect();
-            anchors_bounds(&anchors, true)
+            anchors_bounds(&anchors, outline.closed)
         }
     }
 }

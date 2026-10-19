@@ -155,7 +155,7 @@ fn ac37_chip_labels() {
 fn placed_radius(s: &Session) -> f64 {
     let d = unpack(99, &s.pack("0.1.0").unwrap()).unwrap();
     match d.primitive(d.object_ids()[0]).unwrap().shape {
-        Shape::Ellipse { frame } => frame.rx.as_mm(),
+        Shape::Ellipse { frame, .. } => frame.rx.as_mm(),
         other => panic!("ellipse expected, got {other:?}"),
     }
 }

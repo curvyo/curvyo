@@ -371,7 +371,10 @@ impl GroupEntry {
                     kv,
                 }))
             }
-            EntryKind::CornerRadius | EntryKind::InnerRatio => Ok(None),
+            EntryKind::CornerRadius
+            | EntryKind::InnerRatio
+            | EntryKind::ArcAngle
+            | EntryKind::Curve => Ok(None),
         }
     }
 

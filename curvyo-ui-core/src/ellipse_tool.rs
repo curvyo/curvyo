@@ -60,7 +60,11 @@ impl EllipseTool {
     pub fn shape_for(a: Point, b: Point, modifiers: Modifiers) -> Option<CreatePreview> {
         let (frame, b) = created_frame(a, b, modifiers)?;
         Some(CreatePreview {
-            shape: Shape::Ellipse { frame },
+            shape: Shape::Ellipse {
+                frame,
+                arc: None,
+                curve: curvyo_document_core::Curve::ELLIPSE_DEFAULT,
+            },
             anchor: b.anchor,
             pivot: b.centre,
         })
@@ -133,7 +137,7 @@ mod tests {
         };
         let shape = document.primitive(id).expect("exists").shape;
         assert_eq!(shape, preview.shape);
-        let Shape::Ellipse { frame } = shape else {
+        let Shape::Ellipse { frame, .. } = shape else {
             panic!("an ellipse");
         };
         assert_eq!(frame.rx.as_mm(), 10.0);
@@ -147,7 +151,7 @@ mod tests {
         ) else {
             panic!("expected Created");
         };
-        let Shape::Ellipse { frame } = document.primitive(circle).expect("exists").shape else {
+        let Shape::Ellipse { frame, .. } = document.primitive(circle).expect("exists").shape else {
             panic!("an ellipse");
         };
         assert_eq!(frame.rx, frame.ry);

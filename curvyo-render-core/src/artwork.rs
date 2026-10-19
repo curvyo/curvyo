@@ -7,7 +7,7 @@ use std::collections::HashSet;
 
 use curvyo_document_core::{
     NodeId, ObjectSnapshot, Opacity, PathSnapshot, PrimitiveSnapshot, Stroke, Style, ViewTransform,
-    outline_of_rotated,
+    drawing_outline_of_rotated,
 };
 
 use lyon::path::Path;
@@ -149,10 +149,13 @@ fn draw_primitive(
     view: ViewTransform,
     budgets: &mut FrameBudgets,
 ) {
-    let anchors = outline_to_anchors(&outline_of_rotated(&primitive.shape, primitive.rotation));
+    // The fine outline (`specs/0021-ellipse-arcs-and-shaping/` criterion 67); an open Arc
+    // is stroked open and filled as if closed by its chord (criterion 4).
+    let drawn = drawing_outline_of_rotated(&primitive.shape, primitive.rotation);
+    let anchors = outline_to_anchors(&drawn);
     let outline = [OutlineRef {
         anchors: &anchors,
-        closed: true,
+        closed: drawn.closed,
     }];
     // A primitive has no markers and draws none (`0018` criterion 21).
     draw_object(list, &outline, &primitive.style, false, view, budgets);

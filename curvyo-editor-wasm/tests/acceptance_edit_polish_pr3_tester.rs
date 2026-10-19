@@ -180,7 +180,7 @@ fn rotate_doc_object(d: &Document, radians: f64) {
                 bounds.origin.x + bounds.width.as_mm() / 2.0,
                 bounds.origin.y + bounds.height.as_mm() / 2.0,
             ),
-            Shape::Ellipse { frame } => frame.center,
+            Shape::Ellipse { frame, .. } => frame.center,
             Shape::Polygon { frame, .. } | Shape::Star { frame, .. } => frame.center,
         },
         ObjectSnapshot::Path(p) => {
@@ -546,7 +546,9 @@ fn tight_of(o: &ObjectSnapshot) -> (f64, f64, f64, f64) {
                     (c.x - hx, c.y - hy, c.x + hx, c.y + hy)
                 }
                 Shape::Ellipse { .. } => tight_drawn(&p.shape, p.rotation),
-                Shape::Polygon { frame, point_count } => {
+                Shape::Polygon {
+                    frame, point_count, ..
+                } => {
                     let n = point_count.get();
                     let mut pts = vec![];
                     for i in 0..n {
@@ -563,6 +565,7 @@ fn tight_of(o: &ObjectSnapshot) -> (f64, f64, f64, f64) {
                     frame,
                     point_count,
                     inner_ratio,
+                    ..
                 } => {
                     let n = point_count.get();
                     let mut pts = vec![];
@@ -722,7 +725,7 @@ fn same_object(a: &ObjectSnapshot, b: &ObjectSnapshot, eps: f64, ctx: &str) {
                         "{ctx}: corner radius"
                     );
                 }
-                (Shape::Ellipse { frame: fx }, Shape::Ellipse { frame: fy }) => {
+                (Shape::Ellipse { frame: fx, .. }, Shape::Ellipse { frame: fy, .. }) => {
                     assert!(pnear(fx.center, fy.center, eps), "{ctx}: centre");
                     assert!(near(fx.rx.as_mm(), fy.rx.as_mm(), eps), "{ctx}: rx");
                     assert!(near(fx.ry.as_mm(), fy.ry.as_mm(), eps), "{ctx}: ry");
@@ -1231,7 +1234,7 @@ fn frame_centre_box(p: &curvyo_document_core::PrimitiveSnapshot) -> (f64, f64, f
             b.origin.x + b.width.as_mm(),
             b.origin.y + b.height.as_mm(),
         ),
-        Shape::Ellipse { frame } => (
+        Shape::Ellipse { frame, .. } => (
             frame.center.x - frame.rx.as_mm(),
             frame.center.y - frame.ry.as_mm(),
             frame.center.x + frame.rx.as_mm(),

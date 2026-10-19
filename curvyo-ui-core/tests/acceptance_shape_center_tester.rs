@@ -95,7 +95,7 @@ fn ellipse_of(d: &Document, o: CreateOutcome) -> (f64, f64, f64, f64, f64) {
         panic!("expected Created, got {o:?}");
     };
     let p = d.primitive(id).unwrap();
-    let Shape::Ellipse { frame } = p.shape else {
+    let Shape::Ellipse { frame, .. } = p.shape else {
         panic!("ellipse expected")
     };
     (
@@ -342,7 +342,7 @@ proptest! {
             (None, CreateOutcome::NoOp) => {}
             (Some(p), CreateOutcome::Created(id)) => {
                 let committed = d.primitive(id).unwrap().shape;
-                let (Shape::Ellipse { frame: pf }, Shape::Ellipse { frame: cf }) = (p.shape, committed) else {
+                let (Shape::Ellipse { frame: pf, .. }, Shape::Ellipse { frame: cf, .. }) = (p.shape, committed) else {
                     panic!("ellipse expected")
                 };
                 prop_assert!((pf.center.x - cf.center.x).abs() < EPS);
@@ -626,7 +626,7 @@ fn hostile_run() -> std::collections::BTreeMap<(bool, bool, &'static str), usize
                     e.pointer_move(pt(x, y), m(s, c));
                     let _ = e.live_shape();
                     if let CreateOutcome::Created(id) = e.pointer_up(&d, pt(x, y), m(s, c)) {
-                        let Shape::Ellipse { frame } = d.primitive(id).unwrap().shape else {
+                        let Shape::Ellipse { frame, .. } = d.primitive(id).unwrap().shape else {
                             panic!()
                         };
                         if !(frame.center.x.is_finite()

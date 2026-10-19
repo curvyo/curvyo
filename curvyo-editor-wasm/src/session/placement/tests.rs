@@ -224,7 +224,7 @@ fn criteria_21_23_enter_refuses_an_invalid_field() {
     s.placement_edit(0, "10");
     assert_eq!(s.placement_chip().and_then(|chip| chip.error), None);
     assert!(s.place_placement());
-    let Shape::Ellipse { frame } = only_shape(&s).0 else {
+    let Shape::Ellipse { frame, .. } = only_shape(&s).0 else {
         panic!("an ellipse");
     };
     assert!((frame.center.x - 60.0).abs() < TOL && (frame.center.y - 60.0).abs() < TOL);
@@ -243,7 +243,7 @@ fn criterion_20_space_gives_a_diameter() {
     s.placement_edit(0, "20");
     s.placement_toggle_diameter();
     assert!(s.place_placement());
-    let Shape::Ellipse { frame } = only_shape(&s).0 else {
+    let Shape::Ellipse { frame, .. } = only_shape(&s).0 else {
         panic!("an ellipse");
     };
     assert!((frame.rx.as_mm() - 10.0).abs() < TOL);

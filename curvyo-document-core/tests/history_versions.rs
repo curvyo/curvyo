@@ -321,7 +321,7 @@ fn c33_only_a_clone_writes_clone_of_and_the_format_version_stays() {
     )
     .unwrap();
     let manifest: serde_json::Value = serde_json::from_str(&manifest).unwrap();
-    // 15 since `0046` (guides); 0042 adds no bump (criterion 33).
+    // 0042 adds no bump (criterion 33): the saved version is the current one.
     assert_eq!(
         manifest["format_version"],
         curvyo_document_core::CURRENT_FORMAT_VERSION

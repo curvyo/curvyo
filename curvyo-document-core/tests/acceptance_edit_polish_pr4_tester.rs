@@ -184,7 +184,7 @@ fn assert_is_moved_copy(orig: &ObjectSnapshot, copy: &ObjectSnapshot, off: Vec2)
                     assert_eq!(ba.height, bb.height);
                     assert_eq!(ra, rb);
                 }
-                (Shape::Ellipse { frame: fa }, Shape::Ellipse { frame: fb }) => {
+                (Shape::Ellipse { frame: fa, .. }, Shape::Ellipse { frame: fb, .. }) => {
                     assert!(pclose(
                         Point::new(fa.center.x + off.x, fa.center.y + off.y),
                         fb.center
@@ -195,10 +195,12 @@ fn assert_is_moved_copy(orig: &ObjectSnapshot, copy: &ObjectSnapshot, off: Vec2)
                     Shape::Polygon {
                         frame: fa,
                         point_count: na,
+                        ..
                     },
                     Shape::Polygon {
                         frame: fb,
                         point_count: nb,
+                        ..
                     },
                 ) => {
                     assert_eq!(na, nb);
@@ -214,11 +216,13 @@ fn assert_is_moved_copy(orig: &ObjectSnapshot, copy: &ObjectSnapshot, off: Vec2)
                         frame: fa,
                         point_count: na,
                         inner_ratio: ia,
+                        ..
                     },
                     Shape::Star {
                         frame: fb,
                         point_count: nb,
                         inner_ratio: ib,
+                        ..
                     },
                 ) => {
                     assert_eq!((na, ia), (nb, ib));

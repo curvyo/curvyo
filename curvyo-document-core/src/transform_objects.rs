@@ -65,7 +65,7 @@ fn same_kind(a: &Shape, b: &Shape) -> bool {
 fn same_frame(a: &Shape, b: &Shape) -> bool {
     match (a, b) {
         (Shape::Rect { bounds: x, .. }, Shape::Rect { bounds: y, .. }) => x == y,
-        (Shape::Ellipse { frame: x }, Shape::Ellipse { frame: y }) => x == y,
+        (Shape::Ellipse { frame: x, .. }, Shape::Ellipse { frame: y, .. }) => x == y,
         (Shape::Polygon { frame: x, .. }, Shape::Polygon { frame: y, .. })
         | (Shape::Star { frame: x, .. }, Shape::Star { frame: y, .. }) => x == y,
         _ => false,
@@ -94,7 +94,8 @@ impl Document {
     /// above zero (only when `write_stroke_width`);
     /// [`ObjectEditError::InvalidRadius`] for a corner radius that is not finite;
     /// [`ObjectEditError::InvalidConversion`] for a path result of an object that is
-    /// still a primitive (the conversion) that is not one closed outline of at
+    /// still a primitive (the conversion) that is not one outline (closed unless the
+    /// primitive is an open Arc) of at
     /// least two anchors with different ids, or that takes an anchor id another path
     /// holds;
     /// [`ObjectEditError::NonFiniteGeometry`] for any other number of a result (a
@@ -162,7 +163,12 @@ impl Document {
                     result,
                 } => {
                     shape_codec::strip_primitive_keys(meta);
-                    shape_codec::write_converted_path_fields(meta, anchors);
+                    // The result is a path: an open Arc stays open.
+                    let closed = match result {
+                        ObjectSnapshot::Path(path) => path.closed,
+                        ObjectSnapshot::Primitive(_) | ObjectSnapshot::Clone(_) => true,
+                    };
+                    shape_codec::write_converted_path_fields(meta, anchors, closed);
                     (meta, result)
                 }
             };
@@ -264,11 +270,14 @@ fn plan_one<'a>(
                 result,
             })
         }
-        (ObjectSnapshot::Path(path), Some(_)) => {
-            // The conversion of `0019` criterion 53.
+        (ObjectSnapshot::Path(path), Some(tag)) => {
+            // The conversion of `0019` criterion 53; an open Arc becomes an open path
+            // (`specs/0021-ellipse-arcs-and-shaping/` criterion 56).
+            let closed = shape_codec::read_shape(&meta, &tag)
+                .is_none_or(|current| crate::outline_of(&current).closed);
             Ok(Planned::Convert {
+                anchors: converted_outline(path, closed)?,
                 meta,
-                anchors: converted_outline(path)?,
                 result,
             })
         }
@@ -330,11 +339,12 @@ fn plan_clone<'a>(
 }
 
 /// The anchors of the outline a converted primitive becomes, or
-/// [`ObjectEditError::InvalidConversion`] unless it is one closed outline of at
-/// least two anchors with different ids.
-fn converted_outline(path: &PathSnapshot) -> Result<Vec<NewAnchor>, ObjectEditError> {
+/// [`ObjectEditError::InvalidConversion`] unless it is one outline, closed as the
+/// primitive's own outline is (`closed`; open only for an open Arc), of at least two
+/// anchors with different ids.
+fn converted_outline(path: &PathSnapshot, closed: bool) -> Result<Vec<NewAnchor>, ObjectEditError> {
     let mut ids = std::collections::HashSet::new();
-    if !path.closed
+    if path.closed != closed
         || !path.extra_subpaths.is_empty()
         || path.anchors.len() < 2
         || !path.anchors.iter().all(|a| ids.insert(a.id))
@@ -369,7 +379,7 @@ fn is_finite(object: &ObjectSnapshot) -> bool {
                             && bounds.width.as_mm().is_finite()
                             && bounds.height.as_mm().is_finite()
                     }
-                    Shape::Ellipse { frame } => {
+                    Shape::Ellipse { frame, .. } => {
                         point(frame.center)
                             && frame.rx.as_mm().is_finite()
                             && frame.ry.as_mm().is_finite()
@@ -407,6 +417,14 @@ fn write_primitive(meta: &loro::LoroMap, current: &Shape, result: &ObjectSnapsho
         && let Ok(radii) = checked(corner_radii)
     {
         crate::corner_radii_codec::write_corner_radii_if_changed(meta, radii);
+    }
+    // A mirror or a stretch moves an arc's angles (`specs/0021-ellipse-arcs-and-shaping/`
+    // criteria 54 and 56).
+    if let (Shape::Ellipse { arc: old, .. }, Shape::Ellipse { arc, .. }) =
+        (current, &primitive.shape)
+        && old != arc
+    {
+        crate::shape_arc_codec::write_arc_if_changed(meta, *arc);
     }
 }
 

@@ -398,11 +398,34 @@ fn ac02_selection_decoration_of_a_hexagon_is_the_box_decoration_of_a_turned_squa
         let dp = decoration(&poly);
         let dr = decoration(&rect);
         assert!(!dp.is_empty(), "deg {deg}: polygon decoration drawn");
-        let missing: Vec<_> = dp.difference(&dr).take(5).collect();
+        // `0021` criterion 40: the polygon now also draws its curve handle, which a square
+        // rectangle does not have (its corner-radius knobs sit elsewhere). Everything else
+        // must still be the turned square's box decoration, so the only vertices allowed
+        // outside are those of that one knob glyph (radius 5 px; it may be displaced up to
+        // 14 px from the middle of the side before vertex 0).
+        let o = prim_of(&poly, 0).shape_outline();
+        let spot = pt(
+            f64::midpoint(o[o.len() - 1].x, o[0].x),
+            f64::midpoint(o[o.len() - 1].y, o[0].y),
+        );
+        let k = k_of(&poly);
+        let at = |v: &String| {
+            let xy: Vec<f64> = v
+                .split('|')
+                .next()
+                .unwrap()
+                .split(',')
+                .map(|x| x.parse().unwrap())
+                .collect();
+            (xy[0] - spot.x).hypot(xy[1] - spot.y) * k
+        };
+        let extra: Vec<_> = dp.difference(&dr).collect();
+        let missing: Vec<_> = extra.iter().filter(|v| at(v) > 20.0).take(5).collect();
         assert!(
             missing.is_empty(),
             "deg {deg}: polygon decoration vertices not in the turned-square's: {missing:?}"
         );
+        assert!(!extra.is_empty(), "deg {deg}: the curve handle is drawn");
     }
 }
 
@@ -643,6 +666,11 @@ fn ac05_live_box_equals_the_box_of_the_shape_committed_at_that_angle_at_every_fr
             let hh = rot_handle(c, r, alpha, k, 1.0, -1.0);
             // (and a star's inner-radius knob, hidden while dragging)
             let knob = prim_of(&at, 0).shape_outline()[1];
+            let curve_spot = {
+                let o = prim_of(&at, 0).shape_outline();
+                let (a, b) = (o[o.len() - 1], o[0]);
+                pt(f64::midpoint(a.x, b.x), f64::midpoint(a.y, b.y))
+            };
             let missing: Vec<String> = missing
                 .into_iter()
                 .filter(|v| {
@@ -655,7 +683,13 @@ fn ac05_live_box_equals_the_box_of_the_shape_committed_at_that_angle_at_every_fr
                         .collect();
                     let p = pt(xy[0], xy[1]);
                     let d = |q: Point| (p.x - q.x).hypot(p.y - q.y) * k;
-                    d(c) > 16.0 && d(hh) > 24.0 && (mode == PolyStarMode::Polygon || d(knob) > 14.0)
+                    // `0021` criterion 1/40: the curve handle is not drawn during a rotate
+                    // drag of the same object either (it may sit up to 14 px from the middle
+                    // of the side before vertex 0 by the displacement rule, glyph radius 5 px).
+                    d(c) > 16.0
+                        && d(hh) > 24.0
+                        && d(curve_spot) > 20.0
+                        && (mode == PolyStarMode::Polygon || d(knob) > 14.0)
                 })
                 .collect();
             assert!(
@@ -900,8 +934,11 @@ fn ac08_star_inner_handle_stays_on_the_inner_vertex_at_every_angle_and_drags_mm_
     }
 }
 
+/// Reworded for `0021` criterion 40: a polygon's only parameter handle is now the curve
+/// handle at the middle of one side. No vertex of the outline is a parameter handle (the
+/// old assertion, kept), and the curve handle is the one that exists.
 #[test]
-fn ac08_a_polygon_has_no_parameter_handle_and_a_point_count_change_keeps_the_box() {
+fn ac08_a_polygons_vertices_are_no_parameter_handle_and_a_point_count_change_keeps_the_box() {
     let c = pt(100.0, 50.0);
     let r = 30.0;
     let mut s = scene(PolyStarMode::Polygon, 6, 0.5, c, r, 30.0);
