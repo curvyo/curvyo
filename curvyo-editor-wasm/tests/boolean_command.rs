@@ -133,15 +133,12 @@ fn a_difference_with_a_hole_is_one_compound_path() {
     let ids = after.object_ids();
     assert_eq!(ids.len(), 1);
     assert!(after.path(ids[0]).unwrap().is_compound());
-    // The Node tool says why it shows no node (criterion 38).
-    session.set_tool(Tool::Node);
-    assert!(session.node_toolbar_state().compound_only);
-    session.set_tool(Tool::Select);
+    // The Node tool edits its nodes (criterion 38 withdrawn by `0055` criterion 1).
     session.set_tool(Tool::Node);
     click(&mut session, pt(0.0, 0.0), false);
     assert!(
-        !session.node_toolbar_state().can_delete,
-        "no node to delete"
+        session.node_toolbar_state().can_delete,
+        "a node of the compound path is selected"
     );
 }
 
@@ -254,10 +251,10 @@ fn the_command_is_ignored_outside_the_select_tool() {
     );
 }
 
-/// Criterion 38: a double-click on a compound path stays in the Select tool and asks for the
-/// sentence.
+/// Criterion 38, withdrawn by `0055` criterion 1: a double-click on a compound path hands it to the
+/// Node tool.
 #[test]
-fn a_double_click_on_a_compound_path_asks_for_the_sentence() {
+fn a_double_click_on_a_compound_path_enters_the_node_tool() {
     let document = Document::new(1);
     let _ = rect(&document, 0.0, 0.0, 40.0);
     let _ = rect(&document, 10.0, 10.0, 20.0);
@@ -269,9 +266,8 @@ fn a_double_click_on_a_compound_path_asks_for_the_sentence() {
     let at = pt(10.0, 15.0);
     click(&mut session, at, false);
     let hint = session.double_click_hint(at, false, false);
-    assert_eq!(hint, DoubleClickHint::CompoundPath);
-    assert_eq!(hint.code(), "compound_path");
-    assert_eq!(session.tool(), Tool::Select);
+    assert_eq!(hint, DoubleClickHint::None);
+    assert_eq!(session.tool(), Tool::Node);
 }
 
 /// The commit messages of a document, oldest first (the labels the undo slice keys on).
@@ -345,10 +341,9 @@ fn every_operation_writes_one_labelled_commit_and_a_refusal_none() {
     assert_eq!(commit_labels(&session), before, "no commit");
 }
 
-/// Criterion 38: in the Node tool a compound path shows no node, handle or segment overlay, so
-/// the frame is the artwork alone (the one the Select tool draws with nothing selected).
+/// `0055` criterion 1: the Node tool draws the nodes of every outline of a compound path.
 #[test]
-fn the_node_tool_draws_no_overlay_for_a_compound_path() {
+fn the_node_tool_draws_the_overlay_of_a_compound_path() {
     let document = Document::new(1);
     let _ = rect(&document, 0.0, 0.0, 40.0);
     let _ = rect(&document, 10.0, 10.0, 20.0);
@@ -362,8 +357,8 @@ fn the_node_tool_draws_no_overlay_for_a_compound_path() {
     click(&mut session, pt(0.0, 20.0), false);
     assert_eq!(session.selected_object_count(), 1);
     session.set_tool(Tool::Node);
-    assert!(session.node_toolbar_state().compound_only);
-    assert_eq!(session.draw_list().triangle_count(), artwork);
+    assert_eq!(session.node_toolbar_state().total_nodes, 8);
+    assert!(session.draw_list().triangle_count() > artwork);
 }
 
 /// Copy of a ring made by a boolean through the typed move entry's Copy check (the other route to

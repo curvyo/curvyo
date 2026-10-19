@@ -65,8 +65,7 @@ pub struct BendResolution {
 /// is not a zero-length line). Used by the hover, so the band shows only what a press would bend.
 #[must_use]
 pub fn segment_is_bendable(path: &PathSnapshot, start: AnchorId, end: AnchorId) -> bool {
-    let find = |id: AnchorId| path.anchors.iter().find(|anchor| anchor.id == id);
-    match (find(start), find(end)) {
+    match (path.anchor(start), path.anchor(end)) {
         (Some(start), Some(end)) => bend_segment_handles(
             start.point,
             start.handle_out,
@@ -92,19 +91,23 @@ impl SegmentBend {
         dead_zone: Tolerance,
         tolerance: Tolerance,
     ) -> Option<Self> {
-        let count = path.anchors.len();
-        let start_index = path.anchors.iter().position(|a| a.id == start)?;
-        let end_index = path.anchors.iter().position(|a| a.id == end)?;
-        let (s, e) = (path.anchors[start_index], path.anchors[end_index]);
+        // The segment's outline: its neighbours are those of that outline
+        // (`specs/0055-compound-path-node-editing` criterion 3).
+        let outline = path.outline_of(start)?;
+        let anchors = outline.anchors;
+        let count = anchors.len();
+        let start_index = anchors.iter().position(|a| a.id == start)?;
+        let end_index = anchors.iter().position(|a| a.id == end)?;
+        let (s, e) = (anchors[start_index], anchors[end_index]);
         bend_segment_handles(s.point, s.handle_out, e.handle_in, e.point, 0.5, Vec2::ZERO)?;
         let before = (start_index > 0)
             .then(|| start_index - 1)
-            .or_else(|| (path.closed && count > 1).then(|| count - 1))
-            .map(|i| path.anchors[i]);
+            .or_else(|| (outline.closed && count > 1).then(|| count - 1))
+            .map(|i| anchors[i]);
         let after = (end_index + 1 < count)
             .then(|| end_index + 1)
-            .or_else(|| (path.closed && count > 1).then_some(0))
-            .map(|i| path.anchors[i]);
+            .or_else(|| (outline.closed && count > 1).then_some(0))
+            .map(|i| anchors[i]);
         let (t0, _, _) = nearest_point_on_segment(
             s.point,
             s.handle_out,

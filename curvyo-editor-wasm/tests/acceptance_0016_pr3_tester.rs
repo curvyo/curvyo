@@ -1159,9 +1159,9 @@ fn ac20_one_outline_result_is_an_ordinary_path() {
     assert_eq!(p.anchors.len(), 4);
     assert!((net_area(&p) - 100.0).abs() < 1e-6);
     assert_eq!(s.style_scope().subject, "Path");
-    // the Node tool edits it: it shows nodes, not the compound sentence
+    // the Node tool edits it: it shows its nodes (`0055` removed the compound sentence)
     s.set_tool(Tool::Node);
-    assert!(!s.node_toolbar_state().compound_only);
+    assert_eq!(s.node_toolbar_state().total_nodes, 4);
 }
 
 #[test]
@@ -1698,112 +1698,46 @@ fn compound_result_moves_copies_and_stays_a_ring() {
     );
 }
 
+/// `0016` criteria 38 and 38a are withdrawn by `specs/0055-compound-path-node-editing` (criterion
+/// 1): the Node tool edits the nodes of a compound path like those of any path.
 #[test]
-fn node_tool_shows_the_sentence_and_changes_nothing_for_compound_paths() {
+fn node_tool_edits_the_nodes_of_a_compound_path() {
     let d = Document::new(1);
     square(&d, 0.0, 0.0, 40.0);
     square(&d, 10.0, 10.0, 20.0);
-    let open = d.create_path(
-        &[corner(100.0, 0.0), corner(130.0, 20.0), corner(160.0, 0.0)],
-        false,
-    );
-    let open2 = d.create_path(
-        &[
-            corner(100.0, 50.0),
-            corner(130.0, 70.0),
-            corner(160.0, 50.0),
-        ],
-        false,
-    );
-    let _ = (open, open2);
     let mut s = session_of(&d);
     click(&mut s, pt(0.0, 20.0), false);
     click(&mut s, pt(10.0, 20.0), true);
     assert_eq!(s.selected_object_count(), 2);
     s.apply_boolean(BooleanOp::Difference);
     s.set_tool(Tool::Node);
-    let st = s.node_toolbar_state();
-    assert!(
-        st.compound_only,
-        "only selected object is the compound path"
-    );
-    assert!(!st.can_delete && !st.can_split && !st.can_join && !st.can_insert);
-    let before = snap(&s);
-    // click and marquee over the ring's corners, edges and hole
-    for p in [
-        pt(0.0, 0.0),
-        pt(40.0, 0.0),
-        pt(10.0, 10.0),
-        pt(20.0, 0.0),
-        pt(0.0, 20.0),
-        pt(20.0, 20.0),
-    ] {
-        click(&mut s, p, false);
-        let st = s.node_toolbar_state();
-        assert!(
-            !st.can_delete && !st.can_split && !st.can_insert,
-            "{p:?}: {st:?}"
-        );
-    }
-    marquee(&mut s, pt(-5.0, -5.0), pt(50.0, 50.0), false);
-    let st = s.node_toolbar_state();
-    assert!(!st.can_delete && !st.can_split && !st.can_join);
-    s.join_selected();
-    s.split_selected();
-    s.delete_selected();
-    s.insert_selected();
-    s.insert_at(pt(20.0, 0.0));
-    s.make_line();
-    s.make_curve();
-    s.convert_selected(AnchorKind::Corner);
     assert_eq!(
-        json(&s),
-        before.json,
-        "Node tool commands on a compound path write nothing"
+        s.node_toolbar_state().total_nodes,
+        8,
+        "both outlines' nodes"
     );
-    // two selected objects, the compound path and an open path: the compound one adds no node
-    s.set_tool(Tool::Select);
-    click(&mut s, pt(0.0, 20.0), false);
-    click(&mut s, pt(130.0, 20.0), true);
-    assert_eq!(s.selected_object_count(), 2);
-    s.set_tool(Tool::Node);
-    assert!(
-        !s.node_toolbar_state().compound_only,
-        "two objects selected"
-    );
+    click(&mut s, pt(10.0, 10.0), false);
+    let st = s.node_toolbar_state();
+    assert!(st.can_delete && st.can_split, "{st:?}");
     let before = json(&s);
-    s.join_selected();
-    s.split_selected();
-    assert_eq!(json(&s), before);
+    s.convert_selected(AnchorKind::Symmetric);
+    assert_ne!(json(&s), before, "a node of the hole was converted");
 }
 
+/// `0055` criterion 1: a double-click on a compound path hands it to the Node tool, as on any
+/// path (the `0016` criterion 38 sentence is withdrawn).
 #[test]
-fn double_click_on_a_compound_path_gives_the_code_and_keeps_the_tool() {
+fn double_click_on_a_compound_path_enters_the_node_tool() {
     let d = Document::new(1);
     square(&d, 0.0, 0.0, 40.0);
     square(&d, 10.0, 10.0, 20.0);
     let mut s = session_of(&d);
     marquee(&mut s, pt(-5.0, -5.0), pt(50.0, 50.0), false);
     s.apply_boolean(BooleanOp::Difference);
-    for at in [pt(0.0, 25.0), pt(10.0, 15.0), pt(5.0, 5.0), pt(25.0, 5.0)] {
-        click(&mut s, at, false);
-        let hint = s.double_click_hint(at, false, false);
-        assert_eq!(hint, DoubleClickHint::CompoundPath, "{at:?}");
-        assert_eq!(hint.code(), "compound_path");
-        assert_eq!(s.tool(), Tool::Select);
-    }
-    // an ordinary path result gives no such hint
-    let d = Document::new(1);
-    square(&d, 0.0, 0.0, 20.0);
-    square(&d, 10.0, 10.0, 20.0);
-    let mut s = session_of(&d);
-    marquee(&mut s, pt(-5.0, -5.0), pt(40.0, 40.0), false);
-    s.apply_boolean(BooleanOp::Union);
-    click(&mut s, pt(0.0, 10.0), false);
-    assert_ne!(
-        s.double_click_hint(pt(0.0, 10.0), false, false),
-        DoubleClickHint::CompoundPath
-    );
+    click(&mut s, pt(0.0, 25.0), false);
+    let hint = s.double_click_hint(pt(0.0, 25.0), false, false);
+    assert_eq!(hint, DoubleClickHint::None);
+    assert_eq!(s.tool(), Tool::Node);
 }
 
 #[test]

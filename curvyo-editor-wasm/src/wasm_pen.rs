@@ -48,7 +48,8 @@ fn join_code(join: JoinType) -> String {
     .to_string()
 }
 
-/// How many open paths the Close path buttons would close and skip.
+/// How many open paths and open outlines of compound paths the Close path buttons would close
+/// and skip.
 #[wasm_bindgen]
 #[derive(Debug, Clone, Copy)]
 pub struct ClosePathStateView {
@@ -58,6 +59,12 @@ pub struct ClosePathStateView {
     pub skipped: u32,
     /// How many of the skipped paths have three nodes with coinciding ends.
     pub same_ends: u32,
+    /// Open outlines of compound paths with three or more nodes.
+    pub closable_outlines: u32,
+    /// Open outlines of compound paths skipped, by the same rule as `skipped`.
+    pub skipped_outlines: u32,
+    /// How many of the skipped outlines have three nodes with coinciding ends.
+    pub same_ends_outlines: u32,
 }
 
 /// What a Close path press did.
@@ -70,6 +77,12 @@ pub struct ClosePathResultView {
     pub skipped: u32,
     /// How many of the skipped paths have three nodes with coinciding ends.
     pub same_ends: u32,
+    /// How many outlines of compound paths were closed.
+    pub closed_outlines: u32,
+    /// How many open outlines of compound paths were skipped.
+    pub skipped_outlines: u32,
+    /// How many of the skipped outlines have three nodes with coinciding ends.
+    pub same_ends_outlines: u32,
 }
 
 fn count(n: usize) -> u32 {
@@ -98,11 +111,11 @@ impl WasmSession {
             PenTarget::Place => "place",
             PenTarget::NewPathAt => "new_path",
             PenTarget::Continue(end) => {
-                view.target = format!("{:?}:{:?}", end.path, end.end);
+                view.target = format!("{:?}:{:?}", end.path, end.anchor.id);
                 "continue"
             }
             PenTarget::Join(end) => {
-                view.target = format!("{:?}:{:?}", end.path, end.end);
+                view.target = format!("{:?}:{:?}", end.path, end.anchor.id);
                 view.style_differs = self.session.pen_join_style_differs();
                 "join"
             }
@@ -123,6 +136,24 @@ impl WasmSession {
         view
     }
 
+    /// The sequence number of the latest Pen join that moved outlines of the removed object into
+    /// the survivor (`specs/0055-compound-path-node-editing` criterion 9), 0 when there was none:
+    /// a new number after a release means the host shows the Join notice there.
+    #[must_use]
+    pub fn pen_join_notice_seq(&self) -> u32 {
+        self.session
+            .pen_join_notice()
+            .map_or(0, |notice| notice.seq)
+    }
+
+    /// How many outlines that latest Pen join moved besides the joined one.
+    #[must_use]
+    pub fn pen_join_moved_outlines(&self) -> u32 {
+        self.session
+            .pen_join_notice()
+            .map_or(0, |notice| count(notice.moved_outlines))
+    }
+
     /// What the Close path buttons would do now.
     #[must_use]
     pub fn close_path_state(&self) -> ClosePathStateView {
@@ -131,6 +162,9 @@ impl WasmSession {
             closable: count(state.closable),
             skipped: count(state.skipped),
             same_ends: count(state.same_ends),
+            closable_outlines: count(state.closable_outlines),
+            skipped_outlines: count(state.skipped_outlines),
+            same_ends_outlines: count(state.same_ends_outlines),
         }
     }
 
@@ -149,6 +183,9 @@ impl WasmSession {
             closed: count(outcome.closed),
             skipped: count(outcome.skipped),
             same_ends: count(outcome.same_ends),
+            closed_outlines: count(outcome.closed_outlines),
+            skipped_outlines: count(outcome.skipped_outlines),
+            same_ends_outlines: count(outcome.same_ends_outlines),
         })
     }
 }

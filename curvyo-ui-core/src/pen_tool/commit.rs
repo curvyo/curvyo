@@ -119,8 +119,17 @@ impl PenTool {
         };
         let outcome = growth.map_or(PointerUpOutcome::Ignored, |growth| {
             let survivor = growth.path;
+            // The absorbed object's outlines besides the joined one move into the survivor
+            // (`0055` criterion 9), counted before the commit removes it.
+            let moved_outlines = growth
+                .absorb
+                .and_then(|(other, _, _)| document.path(other))
+                .map_or(0, |other| other.subpaths().count() - 1);
             match document.connect_paths(&growth) {
-                Ok(()) => PointerUpOutcome::Joined(survivor),
+                Ok(()) => PointerUpOutcome::Joined {
+                    path: survivor,
+                    moved_outlines,
+                },
                 Err(_) => PointerUpOutcome::Ignored,
             }
         });

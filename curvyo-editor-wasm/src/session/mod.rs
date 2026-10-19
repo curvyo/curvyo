@@ -128,6 +128,7 @@ pub use object_history::ObjectWipeOutcome;
 pub use offset::{DragStop, OFFSET_COMMIT_LABEL, OffsetOutcome};
 pub use offset_view::OffsetView;
 pub use panel_tabs::{PanelTabsRecord, PanelView};
+pub use pen::PenJoinNotice;
 pub use project::APP_VERSION;
 pub use select::DoubleClickHint;
 pub use split::{BreakApartOutcome, SplitOutcome};
@@ -528,16 +529,15 @@ impl Session {
     }
 
     /// The paths the Node and Pen tools work on: those of the entered group, or of the whole
-    /// document at the root. A compound path is left out: its nodes cannot be edited yet
-    /// (`specs/0016-boolean-operations` criteria 38 and 38a), so it contributes no node, handle or
-    /// segment.
+    /// document at the root, compound paths included: every outline contributes its nodes,
+    /// handles and segments (`specs/0055-compound-path-node-editing` criterion 1).
     fn paths(&self) -> Vec<curvyo_document_core::PathSnapshot> {
         // A hidden or locked path is no target of the Node tool or the Pen
         // (`specs/0050-layers-and-objects-panel` criteria 19 and 20).
         self.pickable_objects()
             .iter()
             .filter_map(|object| match object {
-                ObjectSnapshot::Path(path) if !path.is_compound() => Some(path.clone()),
+                ObjectSnapshot::Path(path) => Some(path.clone()),
                 _ => None,
             })
             .collect()
@@ -688,10 +688,7 @@ impl Session {
                     this.select_pointer_up(point, shift, constrain);
                 }
                 Tool::Pen => {
-                    let threshold = this.drag_threshold();
-                    this.pen
-                        .pointer_up(&mut this.minter, &this.document, point, threshold);
-                    this.pen_cue.release();
+                    this.pen_pointer_up(point);
                 }
                 Tool::Node => {
                     this.node_pointer_up(point, Modifiers::new(shift, constrain));

@@ -79,8 +79,8 @@ pub use session::{
     CombineOutcome, CutOutcome, DocumentPresetsRecord, DocumentSide, DoubleClickHint, DropPlace,
     EscapeStep, FAR_PREVIEW_ROWS, FitOutcome, FormTexts, FormatEdit, GoToOutcome, GroupingKind,
     GroupingResult, HistoryResult, HistoryRowPress, KeyHint, KeyInput, KeyOutcome, MoveIndicators,
-    ObjectWipeOutcome, PanelReply, PanelTabsRecord, PanelView, RowFlag, RowPress, Session,
-    SizeOutcome, SplitOutcome, Tool, WipeOutcome, WipeState,
+    ObjectWipeOutcome, PanelReply, PanelTabsRecord, PanelView, PenJoinNotice, RowFlag, RowPress,
+    Session, SizeOutcome, SplitOutcome, Tool, WipeOutcome, WipeState,
 };
 pub use session::{DragStop, OFFSET_COMMIT_LABEL, OffsetOutcome, OffsetView};
 

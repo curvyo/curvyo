@@ -7,7 +7,10 @@ use std::cell::RefCell;
 
 use curvyo_document_core::{DocumentVersion, Length, NodeId, Point};
 use curvyo_render_core::{ClosingCue, PenCue};
-use curvyo_ui_core::{EndNodeIndex, JoinType, PenTarget, PressAction, continuation_of, pen_target};
+use curvyo_ui_core::{
+    EndNodeIndex, JoinType, PenPointerUpOutcome as PointerUpOutcome, PenTarget, PressAction,
+    continuation_of, pen_target,
+};
 
 use super::{Session, Tool};
 
@@ -22,6 +25,18 @@ type EndIndexKey = (DocumentVersion, Option<NodeId>);
 pub(super) struct PenCueState {
     ends: RefCell<Option<(EndIndexKey, EndNodeIndex)>>,
     press: Option<PenTarget>,
+    join_notice: Option<PenJoinNotice>,
+}
+
+/// The notice after a Pen join that moved outlines of the removed object into the survivor
+/// (`specs/0055-compound-path-node-editing` criterion 9): how many, and a sequence number that
+/// changes with every such join, so the host shows it once per join, at the release.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PenJoinNotice {
+    /// How many outlines moved besides the joined one.
+    pub moved_outlines: usize,
+    /// Changes with every join that moved outlines; never 0.
+    pub seq: u32,
 }
 
 impl PenCueState {
@@ -42,6 +57,34 @@ impl Session {
         self.recording(|this| {
             this.pen.finish(&this.document);
         });
+    }
+
+    /// A Pen release: commits what the press decided, remembers the notice of a join that moved
+    /// outlines (`0055` criterion 9), and forgets the press.
+    pub(super) fn pen_pointer_up(&mut self, point: Point) {
+        let threshold = self.drag_threshold();
+        let outcome = self
+            .pen
+            .pointer_up(&mut self.minter, &self.document, point, threshold);
+        if let PointerUpOutcome::Joined { moved_outlines, .. } = outcome
+            && moved_outlines > 0
+        {
+            let seq = self
+                .pen_cue
+                .join_notice
+                .map_or(1, |notice| notice.seq.wrapping_add(1).max(1));
+            self.pen_cue.join_notice = Some(PenJoinNotice {
+                moved_outlines,
+                seq,
+            });
+        }
+        self.pen_cue.release();
+    }
+
+    /// The notice of the latest Pen join that moved outlines into the survivor, if any.
+    #[must_use]
+    pub fn pen_join_notice(&self) -> Option<PenJoinNotice> {
+        self.pen_cue.join_notice
     }
 
     /// The in-progress pen path's placed nodes, for the host's

@@ -24,9 +24,6 @@ pub enum DoubleClickHint {
     None,
     /// The edit hint of a primitive (`unified-object-editing` criterion 32).
     EditHint,
-    /// The sentence that a compound path's nodes cannot be edited yet
-    /// (`0016-boolean-operations` criterion 38).
-    CompoundPath,
     /// The center handle of the Offset tool opened the Offset entry chip: the host focuses its
     /// Distance field (`specs/0038-path-offset` criterion 53).
     OffsetChip,
@@ -35,14 +32,13 @@ pub enum DoubleClickHint {
 }
 
 impl DoubleClickHint {
-    /// The code the host keys its text or action on: `""`, `"edit_hint"`, `"compound_path"` or
-    /// `"offset_chip"`.
+    /// The code the host keys its text or action on: `""`, `"edit_hint"`, `"offset_chip"` or
+    /// `"clone"`.
     #[must_use]
     pub const fn code(self) -> &'static str {
         match self {
             Self::None => "",
             Self::EditHint => "edit_hint",
-            Self::CompoundPath => "compound_path",
             Self::OffsetChip => "offset_chip",
             Self::Clone => "clone",
         }
@@ -293,7 +289,6 @@ impl Session {
                 DoubleClickHint::None
             }
             SelectDoubleClickOutcome::EditHint => DoubleClickHint::EditHint,
-            SelectDoubleClickOutcome::CompoundPath => DoubleClickHint::CompoundPath,
             SelectDoubleClickOutcome::Clone => DoubleClickHint::Clone,
             // A group opens: everything outside it recedes (`0023` criterion 15).
             SelectDoubleClickOutcome::EnterGroup { group, leaf } => {

@@ -6,7 +6,7 @@
 //! `Session`.
 
 use curvyo_document_core::AnchorKind;
-use curvyo_ui_core::{JoinBlock, NodeToolbarState as SessionNodeToolbarState};
+use curvyo_ui_core::{JoinBlock, NodeSplitOutcome, NodeToolbarState as SessionNodeToolbarState};
 
 /// A count as JS reads it; a count past `u32::MAX` cannot occur in a real document.
 fn saturating_u32(count: usize) -> u32 {
@@ -47,7 +47,6 @@ pub struct NodeToolbarState {
     pub can_make_curve: bool,
     pub can_join: bool,
     pub can_split: bool,
-    pub compound_only: bool,
     pub clone_only: bool,
     /// Why Join is disabled (`specs/0053-node-marquee-selection/` criterion 19): 0 enabled,
     /// 1 not exactly two nodes, 2 not end nodes, 3 another reason (no reason line).
@@ -73,7 +72,6 @@ impl From<SessionNodeToolbarState> for NodeToolbarState {
             can_make_curve: state.can_make_curve,
             can_join: state.can_join,
             can_split: state.can_split,
-            compound_only: state.compound_only,
             clone_only: state.clone_only,
             join_block: match state.join_block {
                 None => 0,
@@ -115,15 +113,25 @@ impl WasmSession {
         self.session.make_curve();
     }
 
-    /// Acceptance criteria 8-11: the "Join" toolbar/context-menu button.
-    pub fn join_selected(&mut self) {
-        self.session.join_selected();
+    /// Acceptance criteria 8-11: the "Join" toolbar/context-menu button. Returns how many
+    /// outlines moved into the surviving object besides the joined one (0 when none, or nothing
+    /// was joined), for the Join notice (`specs/0055-compound-path-node-editing` criterion 5 c).
+    pub fn join_selected(&mut self) -> u32 {
+        saturating_u32(self.session.join_selected().unwrap_or(0))
     }
 
     /// Acceptance criteria 12-15: the "Split" toolbar/context-menu
-    /// button.
-    pub fn split_selected(&mut self) {
-        self.session.split_selected();
+    /// button. Returns `""` (nothing split), `"path"`, `"outline_in_two"` (an open outline of a
+    /// compound path became two of it) or `"outline_opened"` (a closed outline of a compound path
+    /// was opened), for the Split notice (`0055` criterion 6).
+    pub fn split_selected(&mut self) -> String {
+        match self.session.split_selected_outcome() {
+            NodeSplitOutcome::None => "",
+            NodeSplitOutcome::Path => "path",
+            NodeSplitOutcome::OutlineInTwo => "outline_in_two",
+            NodeSplitOutcome::OutlineOpened => "outline_opened",
+        }
+        .to_string()
     }
 
     /// The contextual toolbar's "Insert node" button: splits the

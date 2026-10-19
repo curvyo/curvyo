@@ -121,7 +121,7 @@ fn hit_test_handle(
     let path_id = selection.path()?;
     let snapshot = paths.iter().find(|p| p.id == path_id)?;
     let mut best: Option<(f64, Hit)> = None;
-    for anchor in &snapshot.anchors {
+    for anchor in snapshot.all_anchors() {
         if !selection.contains_node(anchor.id) {
             continue;
         }
@@ -161,7 +161,7 @@ fn hit_test_node(
 ) -> Option<(f64, Hit)> {
     let mut best: Option<(f64, Hit, bool)> = None;
     for snapshot in paths {
-        for anchor in &snapshot.anchors {
+        for anchor in snapshot.all_anchors() {
             let d = distance(anchor.point, point);
             if d > tolerance.as_mm() {
                 continue;
@@ -200,11 +200,15 @@ pub(crate) fn segment_pairs(len: usize, closed: bool) -> impl Iterator<Item = (u
     adjacent.chain(wraparound)
 }
 
-/// Every path-adjacent pair of anchors in traversal order, including the
-/// wraparound closing segment when the path is closed and has two or more
-/// anchors.
-fn segments(snapshot: &PathSnapshot) -> impl Iterator<Item = (usize, usize)> {
-    segment_pairs(snapshot.anchors.len(), snapshot.closed)
+/// Every segment of every outline of a path, as its two anchors in traversal order, including an
+/// outline's wraparound closing segment when that outline is closed and has two or more anchors.
+/// The closing line of an open outline is no segment (`specs/0055-compound-path-node-editing`, UX
+/// notes "Nodes across outlines").
+fn segments(snapshot: &PathSnapshot) -> impl Iterator<Item = (&AnchorSnapshot, &AnchorSnapshot)> {
+    snapshot.subpaths().flat_map(|outline| {
+        segment_pairs(outline.anchors.len(), outline.closed)
+            .map(move |(i, j)| (&outline.anchors[i], &outline.anchors[j]))
+    })
 }
 
 /// A cheap reject before the exact nearest-point search: a segment lies inside the bounding box
@@ -241,9 +245,7 @@ fn near_control_polygon(
 fn hit_test_segment(paths: &[PathSnapshot], point: Point, tolerance: Tolerance) -> Option<Hit> {
     let mut best: Option<(f64, Hit)> = None;
     for snapshot in paths {
-        for (i, j) in segments(snapshot) {
-            let start = &snapshot.anchors[i];
-            let end = &snapshot.anchors[j];
+        for (start, end) in segments(snapshot) {
             if !near_control_polygon(start, end, point, tolerance) {
                 continue;
             }

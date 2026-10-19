@@ -11,12 +11,13 @@ use curvyo_document_core::{AnchorSnapshot, Length, NodeId, PathEnd, PathSnapshot
 use crate::closing_join::JoinType;
 use crate::pen_tool::{Continuation, PenTool};
 
-/// One end node of an open ordinary path.
+/// One end node of an open outline: of an open ordinary path, or of an open outline of a
+/// compound path (`specs/0055-compound-path-node-editing` criteria 8 and 9).
 #[derive(Debug, Clone, PartialEq)]
 pub struct EndNode {
     /// The path the end belongs to.
     pub path: NodeId,
-    /// Which end of it.
+    /// Which end of its outline.
     pub end: PathEnd,
     /// The end node as stored.
     pub anchor: AnchorSnapshot,
@@ -24,7 +25,7 @@ pub struct EndNode {
     pub z: usize,
 }
 
-/// The end nodes of every open ordinary path (closed paths, compound paths and paths of fewer than
+/// The end nodes of every open outline of every path (closed outlines and outlines of fewer than
 /// two nodes have none).
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct EndNodeIndex {
@@ -37,21 +38,23 @@ impl EndNodeIndex {
     pub fn from_paths(paths: &[PathSnapshot]) -> Self {
         let mut ends = Vec::new();
         for (z, path) in paths.iter().enumerate() {
-            if path.closed || path.is_compound() || path.anchors.len() < 2 {
-                continue;
+            for outline in path.subpaths() {
+                if outline.closed || outline.anchors.len() < 2 {
+                    continue;
+                }
+                ends.push(EndNode {
+                    path: path.id,
+                    end: PathEnd::First,
+                    anchor: outline.anchors[0],
+                    z,
+                });
+                ends.push(EndNode {
+                    path: path.id,
+                    end: PathEnd::Last,
+                    anchor: outline.anchors[outline.anchors.len() - 1],
+                    z,
+                });
             }
-            ends.push(EndNode {
-                path: path.id,
-                end: PathEnd::First,
-                anchor: path.anchors[0],
-                z,
-            });
-            ends.push(EndNode {
-                path: path.id,
-                end: PathEnd::Last,
-                anchor: path.anchors[path.anchors.len() - 1],
-                z,
-            });
         }
         Self { ends }
     }
@@ -160,13 +163,16 @@ pub fn pen_target(
     }
 }
 
-/// The continuation a press on `end` starts, read from `path`, the full snapshot of its path.
+/// The continuation a press on `end` starts, read from `path`, the full snapshot of its path: the
+/// outline that ends at `end`'s node is continued (`0055` criterion 8).
 #[must_use]
 pub fn continuation_of(end: &EndNode, path: &PathSnapshot) -> Continuation {
     Continuation {
         path: end.path,
         end: end.end,
-        original: path.anchors.clone(),
+        original: path
+            .outline_of(end.anchor.id)
+            .map_or_else(|| path.anchors.clone(), |outline| outline.anchors.to_vec()),
     }
 }
 

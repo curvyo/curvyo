@@ -121,7 +121,7 @@ pub use clone_panel::{
     overrides_words, select_clones, select_originals, select_root_originals,
 };
 pub use close_path::{
-    ClosableCounts, ClosePlan, closable_counts, close_path_set, plan_close_paths,
+    ClosableCounts, ClosePlan, CloseTarget, closable_counts, close_path_set, plan_close_paths,
 };
 pub use closing_join::{JoinType, resolve_closing_node};
 pub use colour_hsv::{Hsv, hsv_to_rgb, rgb_to_hsv};
@@ -196,7 +196,7 @@ pub use node_marquee::{
     nodes_selected_announcement,
 };
 pub use node_tool::{
-    HitTolerances, JoinBlock, LiveNodeDrag, NodeTool, NodeToolbarState,
+    HitTolerances, JoinBlock, LiveNodeDrag, NodeSplitOutcome, NodeTool, NodeToolbarState,
     PointerDownOutcome as NodePointerDownOutcome, PointerUpOutcome as NodePointerUpOutcome,
 };
 pub use nudge::{
