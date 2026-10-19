@@ -14,7 +14,7 @@ As a maker who cuts key rings, coasters, labels and discs, or embroiders inside 
 
 - **Guide:** a path, compound path, rectangle, ellipse, polygon or star that carries the flag `guide` (ADR 0019). It is drawn in the **marking style** and is not output.
 - **Template:** the guides that came from a file or from another document. It has no identity of its own; after loading it is guides.
-- **Marking style:** green, dashed 2 px on / 2 px off, one screen pixel wide at any zoom, no fill (**Proposal** for the exact green: token `--guide`, about `#15803D`, at least 3:1 on `--canvas-bg` and `--pasteboard-bg`, measured at build).
+- **Marking style:** green, dashed 2 px on / 2 px off, one screen pixel wide at any zoom, no fill (token `--guide`, `#166534`: 3.6:1 on `--pasteboard-bg`, 5.8:1 on `--canvas-bg`, measured at build; the first proposal `#15803D` has only 2.5:1 on the pasteboard).
 - **Document area:** the page rectangle (`0015`) plus any guides. Only "zoom to document" uses it; the page itself stays the rectangle.
 - **Frame:** the page of a source: a Curvyo document's page rectangle; an SVG's `width`/`height` or `viewBox` (`0024`).
 
@@ -117,10 +117,11 @@ DXF is not planned (customer, 2026-10-17: SVG first, DXF waits; no requirement e
 6. A path made from inputs by an operation is a guide only when all inputs were.
 7. The Template button sits in the File tab beside Open: it is an action on the file, a text button like its neighbours.
 8. Not asked of the customer: his answers decide SHAPE-ADR (yes), SHAPE-LIST, SHAPE-MULTI, SHAPE-CIRCLE and SHAPE-SCALE; no question is open.
+9. The guide green is `#166534` (2026-10-19, measured at build): 3.6:1 on `--pasteboard-bg` and 5.8:1 on `--canvas-bg`; the proposed `#15803D` has 2.5:1 on the pasteboard, below the 3:1 this spec asks for.
 
 ## Open questions
 
-None for the customer. Defaults taken: the green is `#15803D` pending measurement; the Template button is in the File tab (alternative: a button in the Select bar, not chosen because it is a file action).
+None for the customer. Defaults taken: the green is `#166534` (measured at build, see decision 9); the Template button is in the File tab (alternative: a button in the Select bar, not chosen because it is a file action).
 
 ## UX notes
 

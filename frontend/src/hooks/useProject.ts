@@ -12,6 +12,7 @@ import {
 } from "@/lib/projectText";
 import { isMac } from "@/lib/historyText";
 import { createBusyGate } from "@/lib/busyGate";
+import { templateOutcome } from "@/lib/guideText";
 import { invoke, isTauri, listen, PLATFORM } from "@/platform/host";
 
 /** The browser build on a Mac uses Cmd as well. */
@@ -61,6 +62,9 @@ export interface ProjectApi {
   check: InlineCheck | null;
   /** A button of the File tab was pressed. */
   press: (command: FileCommandName) => void;
+  /** The Template button (`specs/0046-document-shapes` criterion 19): the file dialog, then the
+   * file's outlines as guides. It never replaces the project and raises no check. */
+  loadTemplate: () => void;
   /** Save in the check: the action goes on after a successful save. */
   saveFromCheck: () => void;
   /** Discard in the check: the action goes on and the changes are dropped. */
@@ -226,6 +230,33 @@ export function useProject(deps: ProjectDeps): ProjectApi {
       busy.leave();
     }
   }, [busy, openBytes]);
+
+  const loadTemplate = useCallback(async () => {
+    if (!busy.enter()) {
+      return;
+    }
+    const { editor, onOpenError } = depsRef.current;
+    try {
+      const picked = await invoke<OpenPayload | null>("pick_project");
+      if (!picked) {
+        return;
+      }
+      if (picked.kind === "io_error") {
+        onOpenError(picked.message);
+        return;
+      }
+      const shown = templateOutcome(editor.loadTemplate(new Uint8Array(picked.bytes)));
+      if ("notice" in shown) {
+        editor.showHistoryNotice(shown.notice);
+      } else {
+        onOpenError(shown.error);
+      }
+    } catch (error) {
+      onOpenError(String(error));
+    } finally {
+      busy.leave();
+    }
+  }, [busy]);
 
   const resetProject = useCallback(async () => {
     // The host hears "clean" only once the new session exists: if the attach fails, the project is
@@ -527,5 +558,14 @@ export function useProject(deps: ProjectDeps): ProjectApi {
     };
   }, [request]);
 
-  return { info, dirty, check, press, saveFromCheck: () => void saveFromCheck(), discard, cancel };
+  return {
+    info,
+    dirty,
+    check,
+    press,
+    loadTemplate: () => void loadTemplate(),
+    saveFromCheck: () => void saveFromCheck(),
+    discard,
+    cancel,
+  };
 }

@@ -16,6 +16,7 @@ import { type FlipApi, useFlip } from "@/hooks/useFlip";
 import { TOO_FAR_HINT } from "@/lib/nudgeText";
 import { createSession, openSession } from "@/lib/editorSession";
 import type { WasmSession } from "@/lib/editorSession";
+import { freeCanvasArea, type GuideState, readGuideState } from "@/lib/guideText";
 import type { EditHint } from "@/components/EditHintChip";
 import type { BooleanOp, BooleanResult } from "@/lib/booleanText";
 import type { BreakApartResult, CombineResult, CutResult, SplitResult } from "@/lib/pathText";
@@ -686,6 +687,13 @@ export interface EditorSession {
   flip: FlipApi;
   /** The flip buttons act: something is selected in the Select tool. */
   flipEnabled: boolean;
+  /** The Guide button of the Select bar (`specs/0046-document-shapes` criteria 9 and 10). */
+  guideState: GuideState;
+  /** A press of the Guide button: one step "Guide". */
+  toggleGuide: () => void;
+  /** The File tab's Template button, once the file is read: the session's outcome string
+   * (`"loaded:<n>"` or `"error:<message>"`). */
+  loadTemplate: (bytes: Uint8Array) => string;
   /** The size chip's note line for the typed texts ("Mirrored left to right"), or "". */
   transformEntryMirrorLine: (first: string, second: string, lastEdited: number) => string;
   /** The click-to-create placement and its chip (`specs/0052-click-to-create-shapes`). */
@@ -928,6 +936,7 @@ export function useEditorSession(
   const [selectionAnnouncementSeq, setSelectionAnnouncementSeq] = useState(0);
   const [keyHint, setKeyHint] = useState<KeyHint | null>(null);
   const [flipEnabled, setFlipEnabled] = useState(false);
+  const [guideState, setGuideState] = useState<GuideState>("disabled");
   const keyHintCounter = useRef(0);
   const nudgeFeedback = useNudgeFeedback();
   const {
@@ -1007,6 +1016,7 @@ export function useEditorSession(
     setScaleCornerRadiusState(session.scale_corner_radius());
     setLinkCornersState(session.link_corners());
     setFlipEnabled(session.flip_enabled());
+    setGuideState(readGuideState(session.guide_state()));
     const nextBar = readSelectBar(session.select_bar_state());
     setSelectBar((previous) => (sameSelectBar(previous, nextBar) ? previous : nextBar));
     setZoomPercent(session.zoom_percent());
@@ -1301,6 +1311,41 @@ export function useEditorSession(
     }
     return session.pack();
   }, []);
+
+  const toggleGuide = useCallback(() => {
+    sessionRef.current?.toggle_guide();
+    syncFromSession();
+  }, [syncFromSession]);
+
+  const loadTemplate = useCallback((bytes: Uint8Array): string => {
+    const session = sessionRef.current;
+    if (!session) {
+      return "error:";
+    }
+    const outcome = session.load_template(bytes);
+    syncFromSession();
+    if (outcome.startsWith("loaded:") && outcome !== "loaded:0") {
+      // The first view waits until the bars are laid out for the new selection, so the page and
+      // the guides are fitted into the area they leave free (`specs/0046-document-shapes`
+      // criterion 13).
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => {
+          const canvas = containerRef.current;
+          if (!canvas || sessionRef.current !== session) {
+            return;
+          }
+          const bar = canvas.parentElement?.querySelector("[data-context-bar]") ?? null;
+          const free = freeCanvasArea(
+            canvas.getBoundingClientRect(),
+            bar?.getBoundingClientRect() ?? null,
+          );
+          session.show_page_and_guides(free.left, free.top);
+          syncFromSession();
+        }),
+      );
+    }
+    return outcome;
+  }, [syncFromSession]);
 
   const markSaved = useCallback(() => {
     sessionRef.current?.mark_saved();
@@ -2264,6 +2309,9 @@ export function useEditorSession(
     clones,
     flip,
     flipEnabled,
+    guideState,
+    toggleGuide,
+    loadTemplate,
     placement,
     historyBusy: history.busy,
     historyNames: history.names,
