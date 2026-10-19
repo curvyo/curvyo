@@ -41,8 +41,9 @@ new crate, no new dependency, no trait, no generic.
   (closed outlines that touch or cross), `touching_holes`, `dropped_single_nodes`, `markers`.
 - **Booleans:** the kernel drops `BooleanError::OpenOperands` (a public-API change of
   `curvyo-geometry-core` decided in `adrs.md`). `curvyo-ui-core` `BooleanAvailability::OpenPaths`
-  becomes a count on `Ready` for the tooltip note; the success outcome gains `closed_open` and
-  `removed_open` counts.
+  becomes `ClosesOpen { outlines }` (enabled, the count for the tooltip note); the success outcome
+  gains `closed_open` and `removed_open` counts. `SplitRefusal::OnePiece` gains `with_holes`;
+  `CombineRefusal` loses four variants and gains `SingleNodesOnly`.
 - **Texts stay in the frontend** (`pathText.ts`, `booleanText.ts`); `curvyo-ui-core` returns counts
   only, as today. The notice duration rule (8 s above 140 characters) goes into the one existing
   duration function of `pathText.ts` and its Boolean twin; the other `*Text.ts` files are not touched.
@@ -154,9 +155,10 @@ new crate, no new dependency, no trait, no generic.
 
 ### Milestone 7: docs
 
-- [ ] 7.1 Amendment marks in `0035`, `0016`, `0048` specs; `specs/README.md` status cell; this plan
-  checked off; `docs/design-system.md` rows by the ux-engineer in the PR (no AC; Definition of Done)
-- [ ] 7.2 Amend criterion 27 and the matching `adrs.md` line to "how an imported even-odd fill is
+- [x] 7.1 Amendment marks in `0035`, `0016`, `0048` specs; `specs/README.md` status cell; this plan
+  checked off; `docs/design-system.md` rows by the ux-engineer in the PR (no AC; Definition of Done;
+  the `0016` `adrs.md` marks come with the architect's `adrs.md` correction)
+- [x] 7.2 Amend criterion 27 and the matching `adrs.md` line to "how an imported even-odd fill is
   handled is decided by 0024 (re-wind by depth, no report)", with a dated note (2026-10-18; lead
   approved, `0024` decided re-wind by depth on import, no loss report, SVG import first)
 
@@ -171,7 +173,7 @@ new crate, no new dependency, no trait, no generic.
 - Manual check in the browser build: plate with a score line, Combine, Split, Break apart, Union with
   an open U; screenshot for the demo.
 
-## Open questions (for the lead)
+## Open questions (for the lead, answered 2026-10-18: A and A)
 
 - **OFFSET-OPEN:** criterion 24 assumes the pre-rework `0038`. Options: A keep today (a compound path
   with an open outline is ignored by Offset like an open path, no text); B it is an operand and both
