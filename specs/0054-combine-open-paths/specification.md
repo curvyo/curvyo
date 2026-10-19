@@ -1,6 +1,6 @@
 # Combine open paths: compound paths with open, touching and crossing outlines
 
-Status: Ready (2026-10-12: customer decisions applied, `adrs.md` re-checked by the architect, UX notes re-checked by the ux-engineer; Q1 and Q2 have recorded defaults and do not block)
+Status: In progress (`story/combine-open-paths`, no PR yet; plan in `plan.md`). Ready since 2026-10-12 (customer decisions applied, `adrs.md` re-checked by the architect, UX notes re-checked by the ux-engineer; Q1 and Q2 have recorded defaults and do not block). Amended 2026-10-18: criterion 27 (even-odd import is `0024`'s).
 Priority: Should
 Origin: Customer (2026-10-12: "ja, schreib die spec" to the product owner's proposal, then the answers of 2026-10-12 to the decisions below: Booleans close open outlines, closed outlines may touch and cross, compound paths become node-editable, no format bump). This is option B of `0035` Question 1 and option B of `0035` Question 3. Customer decisions that apply: primitives are converted to paths silently (`0047`); keyboard shortcuts are reviewed once at the end (`README.md`). The rules marked **PO** in "Decisions" are mine and the customer can change them.
 
@@ -93,7 +93,7 @@ As a maker who cuts, engraves or plots line work, I want to combine any paths (s
 ### SVG import and export (requirements for `0024`)
 
 26. Given the SVG export (`0024`), then a compound path is written as one `<path>` whose `d` holds one subpath per outline in outline order, with `Z` after closed outlines only, and `fill-rule="nonzero"`. Written and read back, every outline has the same open or closed state, nodes and direction. This spec states the requirement; `0024` carries the golden-file test.
-27. Given the SVG import (`0024`), then a `<path>` with several subpaths, open or closed, touching or crossing, becomes one compound path with the same outlines, open where the subpath has no `Z`, closed where it has one. A `<path>` with `fill-rule="evenodd"` is imported with its outlines unchanged and listed in the loss report of `0024` ("fill rule even-odd drawn as nonzero"), because this editor has one fill rule. A subpath of a single `M` with no segment is dropped and counted in the loss report. This spec states the requirement; `0024` carries the golden-file test.
+27. Given the SVG import (`0024`), then a `<path>` with several subpaths, open or closed, touching or crossing, becomes one compound path with the same outlines, open where the subpath has no `Z`, closed where it has one. How an imported even-odd fill is handled is decided by `0024` (re-wind by depth, no report). A subpath of a single `M` with no segment is dropped. This spec states the requirement; `0024` carries the golden-file test. *Amended 2026-10-18 (lead, after the `0024` customer decisions of 2026-10-16: re-wind even-odd fills by depth on import, no loss report, SVG import first): the even-odd sentence and the loss-report counts are `0024`'s.*
 
 ### Saving and the file
 
@@ -131,7 +131,7 @@ Node-editing edge cases (a hole dragged outside its shape, the last nodes of an 
 
 ## Out of scope
 
-- **A choice of fill rule** (even-odd) per object. The fill stays nonzero (Decision 3); even-odd SVG input is drawn nonzero and reported (criterion 27).
+- **A choice of fill rule** (even-odd) per object. The fill stays nonzero (Decision 3); how even-odd SVG input is handled is decided by `0024` (criterion 27).
 - **A command to reverse an outline's direction**, and a notice when an open outline's fill depends on its direction (UX notes). A backlog item if makers meet it.
 - **Markers on compound paths** (`0016` criterion 38b). Criterion 14 only says so in the notice.
 - **Boolean operations that cut with an open line as a knife** (a score line splitting a plate in two). Cut (`0036`) is the command for that on ordinary paths.

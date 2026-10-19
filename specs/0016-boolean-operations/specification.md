@@ -1,6 +1,6 @@
 # Boolean operations
 
-Status: Done (kernel #69, slice #73). Amended 2026-10-10: the rail layout changes (see "Amended 2026-10-10" below); the amendment shipped as milestone M1 of the path-tools PR #79. Amended by `0020-undo-redo`: the sentence "No undo yet." and the statements that no undo exists are removed; Ctrl+Z takes the step back.
+Status: Done (kernel #69, slice #73). Amended 2026-10-10: the rail layout changes (see "Amended 2026-10-10" below); the amendment shipped as milestone M1 of the path-tools PR #79. Amended by `0020-undo-redo`: the sentence "No undo yet." and the statements that no undo exists are removed; Ctrl+Z takes the step back. Amended by `0054-combine-open-paths` (2026-10-12, built on `story/combine-open-paths`): criterion 15 is withdrawn (an open outline is closed with a straight line, `0054` criteria 21 to 23); criterion 41 holds for Boolean results only.
 Priority: Must
 Origin: Customer (R-EDIT-003, in the confirmed MVP cut). Customer decisions of 2026-10-09 (final): compound-path results are approved (Question 1, A, including the document-model and file-format change); Exclusion and Reverse difference are in (Question 2, yes), so there are five operations; all boolean operations are a command section in the left tool rail; the slice is one PR with milestones on one branch; the hover preview is not part of the slice (decided B, below). Everything marked **Proposal** (only the preview, below) is the product owner's idea and is not accepted until the customer says so.
 

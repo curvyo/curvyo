@@ -68,7 +68,10 @@ new crate, no new dependency, no trait, no generic, and no `format_version` bump
   dips into B between B's vertices). Coincident outlines have no qualifying vertex and do not
   contain each other. The inside test for this branch is the crossing count on the flattened
   polygon, `+ - * /` only, so criterion 33 holds on every target. Cost: only touching pairs from
-  the existing box sweep, linear in their vertex counts. The implementer pins: touch from
+  the existing box sweep; per pair the crossings come from the chord sweep and every test point
+  is judged in one scanline pass, `O((n + m) log(n + m))` in the vertex counts (corrected
+  2026-10-19: testing every point against every chord is `n · m`, 13 s for two touching outlines
+  of 20 000 nodes; budget in `outline_touch_nesting`). The implementer pins: touch from
   inside (7b), crossing (7c), coincident (7d), concave A with B across its notch.
 - **2026-10-12: nonzero with crossing outlines is well defined, with one consequence to know.**
   The painted area is the nonzero winding of the stored outlines, whatever their depth; depth
@@ -106,6 +109,10 @@ new crate, no new dependency, no trait, no generic, and no `format_version` bump
   lines against the rectangle by box sweep, then (b) once per line. Split of a crossing grid is
   not budgeted; the skip-same-set rule keeps the exact test linear, the box sweep remains.
 
+- **2026-10-18: criterion 27 amended (lead).** How an imported even-odd fill is handled is
+  decided by `0024` (re-wind by depth, no report); `0024` decided on 2026-10-16 to re-wind
+  even-odd fills by depth on import, to have no loss report and to build the SVG import first.
+
 ## SVG round trip (criteria 26, 27, requirements for `0024`)
 
 Well defined: SVG fills an open subpath closed by a straight line, never strokes that line, and
@@ -113,7 +120,8 @@ Well defined: SVG fills an open subpath closed by a straight line, never strokes
 included; depth is not stored, windings are, so export and re-import change nothing. Two notes
 for `0024`'s architect: (1) ADR 0002 §10 puts parsed-but-unmodelled attributes in the
 passthrough bag; `fill-rule` must **not** go there, or export would write `evenodd` while the
-canvas paints nonzero. (2) Customer question below on even-odd input.
+canvas paints nonzero. (2) How an imported even-odd fill is handled is decided by `0024`
+(re-wind by depth, no report; see "Flagged").
 
 ## Interaction with other slices
 
@@ -124,10 +132,9 @@ canvas paints nonzero. (2) Customer question below on even-odd input.
 
 ## Flagged
 
-- **Customer, for `0024` (default A):** an SVG `<path fill-rule="evenodd">`: A, re-wind its
-  closed outlines by depth on import, so the picture stays the same, and list it in the loss
-  report only when closed outlines cross; B, as criterion 27 says now: keep the windings, draw
-  nonzero and always list it (an Inkscape Combine of two same-direction circles then imports as a
-  filled disc instead of a ring). Recommendation A; decided in `0024`, not here.
+- **Decided in `0024`:** how an imported even-odd fill is handled is decided by `0024` (re-wind
+  by depth, no report). *2026-10-18 (lead, after the `0024` customer decisions of 2026-10-16:
+  re-wind even-odd fills by depth on import, no loss report, SVG import first): replaces the
+  open question A/B that stood here; criterion 27 amended the same day.*
 - No new ADR: ADR 0002 §6 already allows open and closed outlines per path; the restriction to
   closed, non-touching outlines lived in specs, which this one amends.

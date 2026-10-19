@@ -132,3 +132,7 @@ inside their budgets.
 ProjectAtlas: 4 calls (`atlas_symbols` ×2, `atlas_watch_once` ×1, `atlas_search` ×1); the first
 returned `refresh_required` and was fixed by one background `watch_once`. About 16 shell reads
 (the diff, spec, tests, CI) because the review starts from the branch diff.
+
+## Re-check 2026-10-19 (fix in `1ebb8c69`)
+
+Finding 1 resolved: `test_points` takes the crossings from `sweep`, `every_point` judges all test points in one y-sorted scanline pass with the same touch-distance and winding rules, and `outline_touch_nesting` asserts a 200 ms release budget for 2 × 20 000 nodes. Finding 2 resolved: `hypot` replaced by `sqrt` of the sum of squares. Verdict for M1 and M2: **APPROVE**; the `adrs.md` cost sentence is corrected.

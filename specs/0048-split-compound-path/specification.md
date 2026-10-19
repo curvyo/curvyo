@@ -1,6 +1,6 @@
 # Split: separate the unconnected parts of a compound path, holes stay with their part
 
-Status: Done (#105, 2026-10-12, one PR with `0036`; no format change). Built on the default of Question 1, accepted with the PR: the Break apart of `0035` is renamed Split, and Break apart is the every-outline command. Criterion 2 was amended after the UX review (another tool shows only "Use the Select tool.").
+Status: Done (#105, 2026-10-12, one PR with `0036`; no format change). Built on the default of Question 1, accepted with the PR: the Break apart of `0035` is renamed Split, and Break apart is the every-outline command. Criterion 2 was amended after the UX review (another tool shows only "Use the Select tool."). Amended by `0054-combine-open-paths` (2026-10-12, built on `story/combine-open-paths`): Split and Break apart take open, touching and crossing outlines (depth by containment, `0054` criteria 15 to 19); "Out of scope: open paths" is withdrawn.
 Priority: Should
 Origin: Customer (2026-10-10: "Split works like Inkscape's Split Path: it separates the parts that are not connected or overlapping; an outer outline with the holes inside it stays one object. Break apart separates every subpath, including holes. The operation that cuts paths where they cross is Cut."). The texts, numbers and tests are mine.
 

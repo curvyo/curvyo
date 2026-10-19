@@ -1,6 +1,6 @@
 # Combine and Break apart: several closed shapes into one compound path, and back
 
-Status: Done (#79, milestone M4 of the path-tools PR). Criterion 15's group selection box was not drawn in #79 because `0019` was not built yet; `0019` (#80) draws that box for every multi-selection, so criterion 15 should now hold, but no test checks the box after Break apart. Amended by `0020-undo-redo`: the sentence "No undo yet." and the statements that no undo exists are removed; Ctrl+Z takes the step back.
+Status: Done (#79, milestone M4 of the path-tools PR). Criterion 15's group selection box was not drawn in #79 because `0019` was not built yet; `0019` (#80) draws that box for every multi-selection, so criterion 15 should now hold, but no test checks the box after Break apart. Amended by `0020-undo-redo`: the sentence "No undo yet." and the statements that no undo exists are removed; Ctrl+Z takes the step back. Amended by `0054-combine-open-paths` (2026-10-12, built on `story/combine-open-paths`): criteria 9, 10, 10a and the no-area part of 11 are withdrawn (Combine takes open, touching, crossing and flat outlines), the Combine notes of criterion 2 and the depth definition are replaced by `0054`'s.
 Priority: Should
 Origin: Customer (Combine, and Break apart "into separate paths: what happens to the holes", request of 2026-10-09, with the wish that the UX be much better than Inkscape's). The hole rule, the refusals, the names and the defaults are my proposals, marked in "Decided by the product owner".
 
