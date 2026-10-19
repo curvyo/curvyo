@@ -82,6 +82,7 @@ to it instead of restating it.
 | R-EDIT-044 | Tiling (customer, 2026-10-17): grid and circular arrays of the selection as linked clones or copies, with variance for rotation, scale and offset, a seeded randomizer, options in the top bar, live preview only while adjusting. Draft sketch. `specs/0069-tiling/` | Should | Customer (2026-10-17) |
 | R-EDIT-045 | Measure and dimension (customer, 2026-10-17): a Measure tool; dimensions (linear, aligned, angle, radius, diameter) are thin green guide objects that are not printed or exported and can be converted back to normal paths. Draft sketch. `specs/0070-measure-and-dimension/` | Should | Customer (2026-10-17) |
 | R-EDIT-046 | Pattern fill (customer, 2026-10-17): fill a closed shape with generated vector patterns (hatch, grid, dots, honeycomb, motif) as real geometry for laser and CNC; core or extension is open. Draft sketch. `specs/0071-pattern-fill/` | Could | Customer (2026-10-17) |
+| R-EDIT-047 | Pen angle snap and typed values (customer, 2026-10-19): in the Pen, Ctrl locks the angle of the next node (and of a dragged handle) to the product's angle stops, so horizontal and vertical lines are reliable; a key (Tab, Proposal) opens an entry chip with Length and Angle, units shown, previewed live, Enter adds the node and the Pen keeps drawing. `specs/0072-pen-angle-snap-and-typed-values/` | Should | Customer (2026-10-19) |
 
 ## 3. Vectorization (raster-to-vector)
 
