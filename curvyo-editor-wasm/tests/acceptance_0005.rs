@@ -441,7 +441,9 @@ fn ac1_polygon_and_star_have_eight_resize_handles_plus_rotate_0019_c56() {
         assert_full_handle_set(&mut s, min.x, min.y, max.x, max.y, false);
         // The curve handle (`0021` criterion 40): at 0% it sits on the middle of the side
         // counter-clockwise of vertex 0, within the 14 px displacement of a crowded knob.
-        let object = document_of(&s).object(document_of(&s).object_ids()[0]).unwrap();
+        let object = document_of(&s)
+            .object(document_of(&s).object_ids()[0])
+            .unwrap();
         let knobs = curvyo_ui_core::param_handles(
             &object,
             &curvyo_ui_core::oriented_bounds(&object),
@@ -453,10 +455,15 @@ fn ac1_polygon_and_star_have_eight_resize_handles_plus_rotate_0019_c56() {
             .expect("a curve handle at 72 px and up");
         let true_mid = mid_of(outline.len() - 1, 0);
         assert!(
-            ((curve_at.x - true_mid.x).hypot(curve_at.y - true_mid.y)) * s.view().scale() <= 14.0 + 1e-6,
+            ((curve_at.x - true_mid.x).hypot(curve_at.y - true_mid.y)) * s.view().scale()
+                <= 14.0 + 1e-6,
             "the curve handle sits at the middle of the side before vertex 0"
         );
-        assert_eq!(hint_at(&mut s, *curve_at), "pointer", "curve handle answers");
+        assert_eq!(
+            hint_at(&mut s, *curve_at),
+            "pointer",
+            "curve handle answers"
+        );
         assert_eq!(s.handle_hint(), "param-curve");
     }
 }

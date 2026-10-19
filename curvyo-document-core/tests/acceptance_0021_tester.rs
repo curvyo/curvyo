@@ -5,6 +5,7 @@
 //! independently of the implementation.
 
 #![allow(
+    clippy::pedantic,
     clippy::unwrap_used,
     clippy::expect_used,
     clippy::too_many_lines,
@@ -182,7 +183,11 @@ fn c13_arc_kinds_become_the_right_paths() {
     assert_eq!(o.anchors.len(), 3, "ceil(180/90)=2 segments");
     assert_eq!(
         kinds(&o),
-        vec![AnchorKind::Corner, AnchorKind::Symmetric, AnchorKind::Corner]
+        vec![
+            AnchorKind::Corner,
+            AnchorKind::Symmetric,
+            AnchorKind::Corner
+        ]
     );
     assert!(dist(o.anchors[0].point, Point::new(70.0, 50.0)) < 1e-9);
     assert!(dist(o.anchors[2].point, Point::new(30.0, 50.0)) < 1e-9);
@@ -388,11 +393,13 @@ fn c9_box_matches_the_sampled_outline() {
         let (x, y, w, h) = bbox(&shape);
         assert!(
             (x - minx).abs() < 3e-2 && (x + w - maxx).abs() < 3e-2,
-            "{s}->{e} x: box {x}..{} sampled {minx}..{maxx}", x + w
+            "{s}->{e} x: box {x}..{} sampled {minx}..{maxx}",
+            x + w
         );
         assert!(
             (y - miny).abs() < 3e-2 && (y + h - maxy).abs() < 3e-2,
-            "{s}->{e} y: box {y}..{} sampled {miny}..{maxy}", y + h
+            "{s}->{e} y: box {y}..{} sampled {miny}..{maxy}",
+            y + h
         );
     }
 }
@@ -469,7 +476,11 @@ fn c19_side_middles_lie_at_d_of_k() {
 fn c19_published_examples() {
     let f = frame(0.0, 0.0, 20.0, 20.0);
     let area_of = |k: f64| area(&sample(&outline_of(&ellipse(f, None, k)), 200));
-    assert!((area_of(1.0) - 1256.6).abs() < 1.3, "area 100%: {}", area_of(1.0));
+    assert!(
+        (area_of(1.0) - 1256.6).abs() < 1.3,
+        "area 100%: {}",
+        area_of(1.0)
+    );
     assert!((area_of(0.0) - 800.0).abs() < 0.01);
     assert!((area_of(-1.0) - 343.4).abs() < 0.5);
     let m = side_middles(&outline_of(&ellipse(f, None, -1.0)))[0];
@@ -1174,7 +1185,10 @@ fn c14_a_non_default_value_is_stored_and_the_default_deletes_it() {
         .unwrap();
     d.set_curves(&[(p, Curve::new(0.5).unwrap())]).unwrap();
     let keys = stored_keys(&d);
-    assert!(keys.contains("ellipse_arc") && keys.contains("curve"), "{keys}");
+    assert!(
+        keys.contains("ellipse_arc") && keys.contains("curve"),
+        "{keys}"
+    );
     d.set_ellipse_arcs(&[(e, None)]).unwrap();
     d.set_curves(&[(p, Curve::POLYGON_DEFAULT)]).unwrap();
     let keys = stored_keys(&d);
@@ -1184,10 +1198,9 @@ fn c14_a_non_default_value_is_stored_and_the_default_deletes_it() {
 
 #[test]
 fn c15_c33_c50_the_format_version_increased() {
-    assert!(
-        CURRENT_FORMAT_VERSION >= 15,
-        "was 14 on main; 15 here, 16 at merge"
-    );
+    // was 14 on main; 15 here, 16 at merge. A runtime comparison, not a constant assertion.
+    let version = std::hint::black_box(CURRENT_FORMAT_VERSION);
+    assert!(version >= 15, "format version {version}");
 }
 
 fn fixture(name: &str) -> Vec<u8> {

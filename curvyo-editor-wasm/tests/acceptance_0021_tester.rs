@@ -3,6 +3,7 @@
 //! written from the spec against the public API of `curvyo-editor-wasm`.
 
 #![allow(
+    clippy::pedantic,
     clippy::unwrap_used,
     clippy::expect_used,
     clippy::too_many_lines,
@@ -66,7 +67,7 @@ fn sframe(r: f64) -> StarFrame {
 fn open(shapes: &[(Shape, f64)]) -> Session {
     let d = Document::new(1);
     for (shape, rot) in shapes {
-        d.create_primitive(*shape, ang(*rot));
+        let _ = d.create_primitive(*shape, ang(*rot));
     }
     let mut s = Session::open(2, &curvyo_document_core::pack(&d, "0.1.0").unwrap()).unwrap();
     s.set_clock(clock);
@@ -98,6 +99,17 @@ fn click(s: &mut Session, p: Point) {
 fn select_at(s: &mut Session, p: Point) {
     click(s, p);
     assert_eq!(s.selected_object_count(), 1, "selected by a click at {p:?}");
+}
+
+/// A double-click: the first press and release, then the session's `double_click`.
+fn dbl(s: &mut Session, p: Point) -> bool {
+    s.pointer_hover(p, false, false);
+    s.pointer_down(p, false);
+    s.pointer_up(p, false, false);
+    s.pointer_hover(p, false, false);
+    let hint = s.double_click(p, false, false);
+    s.pointer_hover(p, false, false);
+    hint
 }
 
 fn dist(a: Point, b: Point) -> f64 {
@@ -578,11 +590,11 @@ fn c26_c38_c44_the_curve_field_limits_per_shape_and_mixed_selections() {
 #[test]
 fn c52_a_rectangle_in_the_selection_hides_the_curve_field_and_has_no_handle() {
     let d = Document::new(1);
-    d.create_rect(curvyo_document_core::RectBounds::from_corners(
+    let _ = d.create_rect(curvyo_document_core::RectBounds::from_corners(
         pt(0.0, 0.0),
         pt(60.0, 60.0),
     ));
-    d.create_primitive(ell(30.0, 30.0, None, 1.0), ang(0.0));
+    let _ = d.create_primitive(ell(30.0, 30.0, None, 1.0), ang(0.0));
     let mut s = Session::open(2, &curvyo_document_core::pack(&d, "0.1.0").unwrap()).unwrap();
     s.set_clock(clock);
     s.set_tool(Tool::Select);
@@ -616,6 +628,202 @@ fn c26_the_polite_announcements_name_the_new_value() {
     assert_eq!(
         said, "Curve \u{2212}35.0%",
         "spec criterion 65 writes a true minus sign: {said:?}"
+    );
+}
+
+// ---- 8, 24, 42: double-click entries; 16, 34, 35: tools; 58: hidden and locked ---------------------------------------
+
+#[test]
+fn c8_c24_double_click_on_a_knob_opens_its_field_and_enter_writes_one_commit() {
+    // arc handle
+    let mut s = open(&[(
+        ell(30.0, 30.0, Some(arc(30.0, 250.0, ArcKind::Pie)), 1.0),
+        0.0,
+    )]);
+    select_at(&mut s, at_angle(30.0, 30.0, 135.0, 1.0));
+    let h = knob(&s, ParamHandle::ArcEnd);
+    let tool = s.tool();
+    dbl(&mut s, h);
+    assert_eq!(s.tool(), tool, "no double-click switches a tool");
+    let view = s
+        .transform_entry()
+        .expect("a field opens next to the handle");
+    assert_eq!(view.fields.len(), 1);
+    assert_eq!(
+        view.fields[0].prefill, "250.0",
+        "pre-filled with the handle's angle, one decimal"
+    );
+    assert!(
+        view.fields[0].accessible_name.contains("Arc end")
+            || view.fields[0].accessible_name.contains("end"),
+        "{}",
+        view.fields[0].accessible_name
+    );
+    // an unedited Enter writes nothing
+    let steps = s.undo_len();
+    assert_eq!(
+        s.commit_transform_entry("250.0", "", 0),
+        EntryOutcome::Unchanged
+    );
+    assert_eq!(s.undo_len(), steps);
+    // invalid keeps it open
+    dbl(&mut s, h);
+    assert!(matches!(
+        s.commit_transform_entry("x", "", 0),
+        EntryOutcome::Invalid { .. }
+    ));
+    assert!(
+        s.transform_entry().is_some(),
+        "the field stays open and marked invalid"
+    );
+    assert_eq!(
+        s.commit_transform_entry("-90", "", 0),
+        EntryOutcome::Committed
+    );
+    assert_eq!(s.undo_len(), steps + 1);
+    assert!((deg(arc_of(&s).unwrap().end()) - 270.0).abs() < 1e-9);
+    // Escape closes without writing
+    let h = knob(&s, ParamHandle::ArcStart);
+    dbl(&mut s, h);
+    assert!(s.transform_entry().is_some());
+    s.cancel_transform_entry();
+    assert!(s.transform_entry().is_none());
+    assert_eq!(s.undo_len(), steps + 1);
+}
+
+#[test]
+fn c24_c42_double_click_on_the_curve_knob_limits_and_names_the_field() {
+    let tri = Shape::Polygon {
+        frame: sframe(30.0),
+        point_count: PointCount::new(3).unwrap(),
+        curve: Curve::POLYGON_DEFAULT,
+    };
+    let mut s = open(&[(tri, 0.0)]);
+    let o = outline_of_rotated(&tri, ang(0.0));
+    select_at(
+        &mut s,
+        pt(
+            f64::midpoint(o[0].point.x, o[1].point.x),
+            f64::midpoint(o[0].point.y, o[1].point.y),
+        ),
+    );
+    let h = knob(&s, ParamHandle::Curve);
+    dbl(&mut s, h);
+    let view = s.transform_entry().expect("curve field");
+    assert_eq!(view.fields[0].accessible_name, "Curve");
+    assert_eq!(view.fields[0].prefill, "0.0");
+    assert_eq!(
+        s.commit_transform_entry("-300", "", 0),
+        EntryOutcome::Committed
+    );
+    assert!(
+        matches!(shape(&s, 0), Shape::Polygon { curve, .. } if (curve.get() + 0.5).abs() < 1e-9),
+        "a triangle is limited to -50%"
+    );
+    let h = knob(&s, ParamHandle::Curve);
+    dbl(&mut s, h);
+    assert_eq!(
+        s.commit_transform_entry("999", "", 0),
+        EntryOutcome::Committed
+    );
+    assert!(
+        matches!(shape(&s, 0), Shape::Polygon { curve, .. } if curve.get() == 1.0),
+        "limited to 100"
+    );
+    assert!(
+        matches!(shape(&s, 0), Shape::Polygon { .. }),
+        "a polygon at 100% stays a polygon (criterion 63)"
+    );
+}
+
+#[test]
+fn c16_c34_c35_new_shapes_from_the_tools_use_the_defaults() {
+    let mut s = Session::new(11);
+    s.set_clock(clock);
+    s.resize_viewport(1200.0, 800.0);
+    for (tool, from, to) in [
+        (Tool::Ellipse, pt(10.0, 10.0), pt(80.0, 60.0)),
+        (Tool::PolygonStar, pt(150.0, 40.0), pt(190.0, 40.0)),
+    ] {
+        s.set_tool(tool);
+        s.pointer_hover(from, false, false);
+        s.pointer_down(from, false);
+        s.pointer_hover(to, false, false);
+        s.pointer_up(to, false, false);
+    }
+    // shift and ctrl variants of the ellipse tool
+    s.set_tool(Tool::Ellipse);
+    for (shift, ctrl) in [(true, false), (false, true), (true, true)] {
+        let (a, b) = (pt(10.0, 100.0), pt(70.0, 150.0));
+        s.modifiers_changed(shift, ctrl, false);
+        s.pointer_hover(a, shift, ctrl);
+        s.pointer_down(a, shift);
+        s.pointer_hover(b, shift, ctrl);
+        s.pointer_up(b, shift, ctrl);
+        s.modifiers_changed(false, false, false);
+    }
+    let d = doc(&s);
+    let mut seen = 0;
+    for id in d.object_ids() {
+        match d.primitive(id).unwrap().shape {
+            Shape::Ellipse { arc, curve, .. } => {
+                assert_eq!(arc, None, "criterion 16");
+                assert_eq!(curve, Curve::ELLIPSE_DEFAULT, "criterion 34");
+                seen += 1;
+            }
+            Shape::Polygon { curve, .. } | Shape::Star { curve, .. } => {
+                assert_eq!(curve, Curve::POLYGON_DEFAULT, "criterion 35");
+                seen += 1;
+            }
+            Shape::Rect { .. } => {}
+        }
+    }
+    assert!(seen >= 3, "{seen} shapes were created");
+}
+
+#[test]
+fn c58_hidden_and_locked_ellipses_are_not_selectable_and_the_bar_skips_them() {
+    let d = Document::new(1);
+    let hidden = d.create_primitive(
+        ell(30.0, 30.0, Some(arc(0.0, 270.0, ArcKind::Pie)), 1.0),
+        ang(0.0),
+    );
+    let locked = d.create_primitive(
+        Shape::Ellipse {
+            frame: EllipseFrame {
+                center: pt(200.0, 80.0),
+                rx: Length::from_mm(30.0),
+                ry: Length::from_mm(30.0),
+            },
+            arc: None,
+            curve: Curve::new(0.3).unwrap(),
+        },
+        ang(0.0),
+    );
+    d.set_node_visible(&[hidden], false).unwrap();
+    d.set_node_locked(&[locked], true).unwrap();
+    let mut s = Session::open(2, &curvyo_document_core::pack(&d, "0.1.0").unwrap()).unwrap();
+    s.set_clock(clock);
+    s.resize_viewport(1200.0, 800.0);
+    s.set_tool(Tool::Select);
+    click(&mut s, at_angle(30.0, 30.0, 90.0, 1.0));
+    assert_eq!(s.selected_object_count(), 0, "hidden: not selectable");
+    click(&mut s, pt(200.0 - 30.0 * 0.5, 80.0));
+    assert_eq!(s.selected_object_count(), 0, "locked: not selectable");
+    s.key_down(curvyo_editor_wasm::KeyInput {
+        key: "a",
+        ctrl: true,
+        ..Default::default()
+    });
+    let st = s.select_bar_state();
+    assert!(
+        st.ellipse.is_none() && st.curve.is_none(),
+        "no bar control reaches them"
+    );
+    assert_eq!(s.set_selected_curve_text("50"), EntryOutcome::Unchanged);
+    assert_eq!(
+        s.set_selected_arc_angle_text(ArcEnd::Start, "10"),
+        EntryOutcome::Unchanged
     );
 }
 
@@ -661,7 +869,12 @@ fn flip_case(
     before_shape: Shape,
     rot: f64,
     axis: FlipAxis,
-) -> (Point, curvyo_document_core::PrimitiveSnapshot, Vec<(Point, Point)>, Session) {
+) -> (
+    Point,
+    curvyo_document_core::PrimitiveSnapshot,
+    Vec<(Point, Point)>,
+    Session,
+) {
     let mut s = open(&[(before_shape, rot)]);
     let o = outline_of_rotated(&before_shape, ang(rot));
     select_at(&mut s, o[1].point);
@@ -706,19 +919,27 @@ fn c54_flip_mirrors_the_arc_exactly_and_twice_is_identity() {
             let first = line(&pairs[0]);
             for (i, pair) in pairs.iter().enumerate() {
                 let l = line(pair);
-                assert!((l.0 - first.0).abs() < 1e-9 && l.1 < 1e-9, "rot {rot} {axis:?} sample {i}");
+                assert!(
+                    (l.0 - first.0).abs() < 1e-9 && l.1 < 1e-9,
+                    "rot {rot} {axis:?} sample {i}"
+                );
             }
             // flip twice: the drawn points are back within 1e-9 mm
             s.flip_selection(axis);
             let back = prim(&s, 0);
-            let Shape::Ellipse { arc: Some(ba), .. } = back.shape else { panic!() };
+            let Shape::Ellipse { arc: Some(ba), .. } = back.shape else {
+                panic!()
+            };
             let brot = back.rotation.as_radians() / DEG;
             let sweep = 170.0 * DEG;
             for i in 0..64 {
                 let f = f64::from(i) / 63.0;
                 let was = param_point(before_shape, rot, 30.0 * DEG + sweep * f);
                 let now = param_point(back.shape, brot, ba.start().as_radians() + sweep * f);
-                assert!(dist(was, now) < 1e-9, "rot {rot} {axis:?} twice, sample {i}: {was:?} {now:?}");
+                assert!(
+                    dist(was, now) < 1e-9,
+                    "rot {rot} {axis:?} twice, sample {i}: {was:?} {now:?}"
+                );
             }
         }
     }
@@ -825,13 +1046,10 @@ fn c13_object_to_path_of_an_arc_is_the_drawn_outline() {
         }
         o => panic!("{o:?}"),
     }
-    assert_eq!(
+    assert!(
         s.history_target_name(curvyo_document_core::Direction::Undo)
-            .as_deref()
-            .map(str::to_owned)
-            .unwrap_or_default()
-            .is_empty(),
-        false
+            .is_some_and(|name| !name.is_empty()),
+        "the conversion is a named step"
     );
 }
 
@@ -864,7 +1082,11 @@ fn c55_linked_clone_of_every_arc_kind_and_of_a_curved_shape_converts_without_not
         ell(30.0, 30.0, Some(arc(0.0, 270.0, ArcKind::Arc)), 1.0),
         ell(30.0, 30.0, Some(arc(0.0, 270.0, ArcKind::Chord)), 1.0),
         ell(30.0, 30.0, None, -0.4),
-        Shape::Polygon { frame: sframe(30.0), point_count: PointCount::new(5).unwrap(), curve: Curve::new(0.5).unwrap() },
+        Shape::Polygon {
+            frame: sframe(30.0),
+            point_count: PointCount::new(5).unwrap(),
+            curve: Curve::new(0.5).unwrap(),
+        },
     ];
     for shape in shapes {
         let mut s = open(&[(shape, 0.0)]);
@@ -874,8 +1096,16 @@ fn c55_linked_clone_of_every_arc_kind_and_of_a_curved_shape_converts_without_not
         s.linked_clone();
         let d = doc(&s);
         assert_eq!(d.object_ids().len(), 2, "{shape:?}: original and clone");
-        assert!(d.object_ids().iter().all(|id| d.primitive(id.to_owned()).is_none()), "{shape:?}: both are paths/clones");
-        assert!(s.take_clone_repair_notice().is_empty() && s.take_delete_notice().is_empty(), "no notice (0049 criterion 2)");
+        assert!(
+            d.object_ids()
+                .iter()
+                .all(|id| d.primitive(id.to_owned()).is_none()),
+            "{shape:?}: both are paths/clones"
+        );
+        assert!(
+            s.take_clone_repair_notice().is_empty() && s.take_delete_notice().is_empty(),
+            "no notice (0049 criterion 2)"
+        );
     }
 }
 
@@ -905,12 +1135,12 @@ fn c14_the_session_save_round_trips_arc_and_curve() {
 /// (0, 0) by exactly (new width / 40, new height / 40).
 fn rect_and_arc(rot: f64) -> (Session, Shape) {
     let d = Document::new(1);
-    d.create_rect(curvyo_document_core::RectBounds::from_corners(
+    let _ = d.create_rect(curvyo_document_core::RectBounds::from_corners(
         pt(0.0, 0.0),
         pt(40.0, 40.0),
     ));
     let e = ell(30.0, 30.0, Some(arc(0.0, 180.0, ArcKind::Arc)), 1.0);
-    d.create_primitive(e, ang(rot));
+    let _ = d.create_primitive(e, ang(rot));
     let mut s = Session::open(2, &curvyo_document_core::pack(&d, "0.1.0").unwrap()).unwrap();
     s.set_clock(clock);
     s.resize_viewport(1200.0, 800.0);
@@ -930,7 +1160,10 @@ fn group_box(e: &Shape, rot: f64) -> (Point, Point) {
     let mut min = pt(0.0, 0.0);
     let mut max = pt(40.0, 40.0);
     for a in o.iter() {
-        for q in [a.point, pt(a.point.x + a.handle_out.x, a.point.y + a.handle_out.y)] {
+        for q in [
+            a.point,
+            pt(a.point.x + a.handle_out.x, a.point.y + a.handle_out.y),
+        ] {
             min = pt(min.x.min(q.x), min.y.min(q.y));
             max = pt(max.x.max(q.x), max.y.max(q.y));
         }
@@ -944,7 +1177,10 @@ fn c56_a_group_stretch_keeps_a_rotated_arc_an_arc_and_it_is_exact() {
         let (mut s, e) = rect_and_arc(rot);
         let (min, max) = group_box(&e, rot);
         let corner = pt(max.x, max.y);
-        let target = pt(max.x + 0.6 * (max.x - min.x), max.y - 0.35 * (max.y - min.y));
+        let target = pt(
+            max.x + 0.6 * (max.x - min.x),
+            max.y - 0.35 * (max.y - min.y),
+        );
         drag(&mut s, corner, target, false);
         let d = doc(&s);
         let ids = d.object_ids();
@@ -956,44 +1192,78 @@ fn c56_a_group_stretch_keeps_a_rotated_arc_an_arc_and_it_is_exact() {
             o => panic!("{o:?}"),
         };
         let (sx, sy) = (rect.width.as_mm() / 40.0, rect.height.as_mm() / 40.0);
-        assert!((sx - 1.0).abs() > 0.1 && (sy - 1.0).abs() > 0.1, "it did stretch: {sx} {sy}");
-        let after = d.primitive(ids[1]).expect("the ellipse stays a primitive (customer 2026-10-17)");
-        let Shape::Ellipse { arc: Some(na), .. } = after.shape else { panic!("still an ellipse with an arc") };
+        assert!(
+            (sx - 1.0).abs() > 0.1 && (sy - 1.0).abs() > 0.1,
+            "it did stretch: {sx} {sy}"
+        );
+        let after = d
+            .primitive(ids[1])
+            .expect("the ellipse stays a primitive (customer 2026-10-17)");
+        let Shape::Ellipse { arc: Some(na), .. } = after.shape else {
+            panic!("still an ellipse with an arc")
+        };
         assert_eq!(na.kind, ArcKind::Arc);
-        assert!((deg(na.sweep()) - 180.0).abs() < 1e-6, "rot {rot}: sweep unchanged");
+        assert!(
+            (deg(na.sweep()) - 180.0).abs() < 1e-6,
+            "rot {rot}: sweep unchanged"
+        );
         let arot = after.rotation.as_radians() / DEG;
         for i in 0..64 {
             let f = f64::from(i) / 63.0;
             let old = param_point(e, rot, 180.0 * DEG * f);
             let image = pt(old.x * sx, old.y * sy);
             let det = sx * sy;
-            let t = if det > 0.0 { na.start().as_radians() + 180.0 * DEG * f } else { na.end().as_radians() - 180.0 * DEG * f };
+            let t = if det > 0.0 {
+                na.start().as_radians() + 180.0 * DEG * f
+            } else {
+                na.end().as_radians() - 180.0 * DEG * f
+            };
             let new = param_point(after.shape, arot, t);
-            assert!(dist(image, new) < 1e-9, "rot {rot} sample {i}: {image:?} vs {new:?}");
+            assert!(
+                dist(image, new) < 1e-9,
+                "rot {rot} sample {i}: {image:?} vs {new:?}"
+            );
         }
     }
 }
 
 fn skew_case(kind: ArcKind, via_chip: bool) {
     let d = Document::new(1);
-    d.create_rect(curvyo_document_core::RectBounds::from_corners(pt(0.0, 0.0), pt(40.0, 40.0)));
+    let _ = d.create_rect(curvyo_document_core::RectBounds::from_corners(
+        pt(0.0, 0.0),
+        pt(40.0, 40.0),
+    ));
     let e = ell(30.0, 30.0, Some(arc(0.0, 180.0, kind)), 1.0);
-    d.create_primitive(e, ang(0.0));
+    let _ = d.create_primitive(e, ang(0.0));
     let mut s = Session::open(2, &curvyo_document_core::pack(&d, "0.1.0").unwrap()).unwrap();
     s.set_clock(clock);
     s.resize_viewport(1200.0, 800.0);
     s.set_tool(Tool::Select);
-    s.key_down(curvyo_editor_wasm::KeyInput { key: "a", ctrl: true, ..Default::default() });
+    s.key_down(curvyo_editor_wasm::KeyInput {
+        key: "a",
+        ctrl: true,
+        ..Default::default()
+    });
     assert_eq!(s.selected_object_count(), 2);
     let steps = s.undo_len();
     if via_chip {
-        s.key_down(curvyo_editor_wasm::KeyInput { key: "k", ..Default::default() });
-        assert_eq!(s.commit_transform_entry("30", "", 0), EntryOutcome::Committed);
+        s.key_down(curvyo_editor_wasm::KeyInput {
+            key: "k",
+            ..Default::default()
+        });
+        assert_eq!(
+            s.commit_transform_entry("30", "", 0),
+            EntryOutcome::Committed
+        );
     } else {
         let (min, max) = group_box(&e, 0.0);
         let handle = pt(f64::midpoint(min.x, max.x), min.y - 16.0 / s.view().scale());
         s.pointer_hover(handle, false, false);
-        assert!(s.cursor_hint().starts_with("skew"), "a skew handle: {}", s.cursor_hint());
+        assert!(
+            s.cursor_hint().starts_with("skew"),
+            "a skew handle: {}",
+            s.cursor_hint()
+        );
         s.pointer_down(handle, false);
         for i in 1..=6 {
             s.pointer_hover(pt(handle.x + 5.0 * f64::from(i), handle.y), false, false);
@@ -1001,14 +1271,21 @@ fn skew_case(kind: ArcKind, via_chip: bool) {
         s.pointer_up(pt(handle.x + 30.0, handle.y), false, false);
     }
     let d = doc(&s);
-    let still: Vec<_> = d.object_ids().into_iter().filter(|id| d.primitive(*id).is_some()).collect();
+    let still: Vec<_> = d
+        .object_ids()
+        .into_iter()
+        .filter(|id| d.primitive(*id).is_some())
+        .collect();
     assert!(
         still.is_empty(),
         "{kind:?} chip={via_chip}: a skew converts every primitive of the selection to a path (criterion 56, 0047); still primitives: {still:?} (undo steps {steps} -> {})",
         s.undo_len()
     );
     assert_eq!(s.undo_len(), steps + 1, "one commit");
-    assert!(s.select_bar_state().ellipse.is_none(), "the bar's ellipse group no longer applies to a path");
+    assert!(
+        s.select_bar_state().ellipse.is_none(),
+        "the bar's ellipse group no longer applies to a path"
+    );
 }
 
 #[test]
@@ -1035,8 +1312,15 @@ fn c56_a_skew_converts_an_open_arc_ellipse_in_a_multi_selection_by_chip() {
 fn c56_a_skew_converts_a_single_open_arc_ellipse() {
     for kind in [ArcKind::Pie, ArcKind::Chord, ArcKind::Arc] {
         let mut s = open(&[(ell(30.0, 30.0, Some(arc(0.0, 180.0, kind)), 1.0), 0.0)]);
-        s.key_down(curvyo_editor_wasm::KeyInput { key: "a", ctrl: true, ..Default::default() });
-        s.key_down(curvyo_editor_wasm::KeyInput { key: "k", ..Default::default() });
+        s.key_down(curvyo_editor_wasm::KeyInput {
+            key: "a",
+            ctrl: true,
+            ..Default::default()
+        });
+        s.key_down(curvyo_editor_wasm::KeyInput {
+            key: "k",
+            ..Default::default()
+        });
         let steps = s.undo_len();
         s.commit_transform_entry("30", "", 0);
         let d = doc(&s);
@@ -1058,10 +1342,21 @@ fn path_area(p: &curvyo_document_core::PathSnapshot) -> f64 {
             let (u, v) = (&a[i], &a[(i + 1) % a.len()]);
             for k in 0..24 {
                 let t = f64::from(k) / 24.0;
-                let w = [(1.0 - t).powi(3), 3.0 * (1.0 - t).powi(2) * t, 3.0 * (1.0 - t) * t * t, t.powi(3)];
+                let w = [
+                    (1.0 - t).powi(3),
+                    3.0 * (1.0 - t).powi(2) * t,
+                    3.0 * (1.0 - t) * t * t,
+                    t.powi(3),
+                ];
                 pts.push((
-                    w[0] * u.point.x + w[1] * (u.point.x + u.handle_out.x) + w[2] * (v.point.x + v.handle_in.x) + w[3] * v.point.x,
-                    w[0] * u.point.y + w[1] * (u.point.y + u.handle_out.y) + w[2] * (v.point.y + v.handle_in.y) + w[3] * v.point.y,
+                    w[0] * u.point.x
+                        + w[1] * (u.point.x + u.handle_out.x)
+                        + w[2] * (v.point.x + v.handle_in.x)
+                        + w[3] * v.point.x,
+                    w[0] * u.point.y
+                        + w[1] * (u.point.y + u.handle_out.y)
+                        + w[2] * (v.point.y + v.handle_in.y)
+                        + w[3] * v.point.y,
                 ));
             }
         }
@@ -1079,7 +1374,10 @@ fn path_area(p: &curvyo_document_core::PathSnapshot) -> f64 {
 fn c60_boolean_union_of_a_pie_and_a_curved_hexagon_uses_the_drawn_outline() {
     let pie = ell(30.0, 30.0, Some(arc(0.0, 270.0, ArcKind::Pie)), 1.0);
     let hex = Shape::Polygon {
-        frame: StarFrame { center: pt(130.0, 80.0), ..sframe(25.0) },
+        frame: StarFrame {
+            center: pt(130.0, 80.0),
+            ..sframe(25.0)
+        },
         point_count: PointCount::new(6).unwrap(),
         curve: Curve::new(-0.6).unwrap(),
     };
@@ -1092,12 +1390,20 @@ fn c60_boolean_union_of_a_pie_and_a_curved_hexagon_uses_the_drawn_outline() {
     assert_eq!(s.selected_object_count(), 2);
     let area_pie = std::f64::consts::PI * 900.0 * 0.75;
     let outcome = s.apply_boolean(curvyo_ui_core::BooleanOp::Union);
-    assert!(matches!(outcome, curvyo_editor_wasm::BooleanOutcome::Applied { .. }), "{outcome:?}");
+    assert!(
+        matches!(outcome, curvyo_editor_wasm::BooleanOutcome::Applied { .. }),
+        "{outcome:?}"
+    );
     let d = doc(&s);
     assert_eq!(d.object_ids().len(), 1);
-    let ObjectSnapshot::Path(p) = d.object(d.object_ids()[0]).unwrap() else { panic!() };
+    let ObjectSnapshot::Path(p) = d.object(d.object_ids()[0]).unwrap() else {
+        panic!()
+    };
     let a = path_area(&p);
-    assert!(a >= area_pie - 1.0, "A union B covers at least the pie: {a} vs {area_pie}");
+    assert!(
+        a >= area_pie - 1.0,
+        "A union B covers at least the pie: {a} vs {area_pie}"
+    );
 }
 
 // ---- 62c: one frame of a curve drag on a 1024-gon (release build) -----------------------------------------------------------------

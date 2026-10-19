@@ -558,7 +558,11 @@ fn ac07_star_tiers_inner_handle_from_72() {
     assert_eq!(d(6.0), d(23.5), "crowded star: below 24 constant");
     assert_eq!(d(24.0), d(47.5), "crowded star: 24..48 constant");
     assert_eq!(d(48.0), d(71.5), "crowded star: 48..72 constant");
-    assert_eq!(d(72.0), d(73.0), "crowded star: 72 and up constant at the step");
+    assert_eq!(
+        d(72.0),
+        d(73.0),
+        "crowded star: 72 and up constant at the step"
+    );
     assert!(d(71.9) < d(72.0), "crowded star: parameter tier at 72");
     let centre_glyph = d(48.0) - d(47.9);
     let drift = d(160.0) - d(73.0);

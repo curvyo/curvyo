@@ -3,6 +3,7 @@
 //! written from the spec against the public API of `curvyo-ui-core`.
 
 #![allow(
+    clippy::pedantic,
     clippy::unwrap_used,
     clippy::expect_used,
     clippy::too_many_lines,
@@ -12,9 +13,8 @@
 )]
 
 use curvyo_document_core::{
-    Angle, ArcKind, Curve, EllipseArc, EllipseFrame, InnerRatio, Length, ObjectSnapshot,
-    Point, PointCount, Shape, StarFrame, curve_handle_position,
-    ellipse_point,
+    Angle, ArcKind, Curve, EllipseArc, EllipseFrame, InnerRatio, Length, ObjectSnapshot, Point,
+    PointCount, Shape, StarFrame, curve_handle_position, ellipse_point,
 };
 use curvyo_ui_core::{
     ArcEnd, ParamHandle, ParamValue, TransformHandleTolerances, apply_param,
@@ -250,9 +250,15 @@ fn c1_c22_no_knobs_below_72_px_of_shorter_side() {
     // an arc's threshold is measured on the drawn part (criteria 1 and 9): a half circle of
     // radius 10 mm is 20 x 10 mm = 40 px high -> no knobs; of radius 20 mm it is 80 px
     // high -> both arc knobs
-    let small = obj(ell(10.0, 10.0, Some(arc(0.0, 180.0, ArcKind::Arc)), 1.0), 0.0);
+    let small = obj(
+        ell(10.0, 10.0, Some(arc(0.0, 180.0, ArcKind::Arc)), 1.0),
+        0.0,
+    );
     assert!(knobs(&small).is_empty(), "half circle r=10: 40 px");
-    let half = obj(ell(20.0, 20.0, Some(arc(0.0, 180.0, ArcKind::Arc)), 1.0), 0.0);
+    let half = obj(
+        ell(20.0, 20.0, Some(arc(0.0, 180.0, ArcKind::Arc)), 1.0),
+        0.0,
+    );
     assert_eq!(knobs(&half).len(), 2, "half circle r=20: 80 px");
 }
 

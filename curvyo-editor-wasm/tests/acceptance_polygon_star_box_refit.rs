@@ -410,7 +410,13 @@ fn ac02_selection_decoration_of_a_hexagon_is_the_box_decoration_of_a_turned_squa
         );
         let k = k_of(&poly);
         let at = |v: &String| {
-            let xy: Vec<f64> = v.split('|').next().unwrap().split(',').map(|x| x.parse().unwrap()).collect();
+            let xy: Vec<f64> = v
+                .split('|')
+                .next()
+                .unwrap()
+                .split(',')
+                .map(|x| x.parse().unwrap())
+                .collect();
             (xy[0] - spot.x).hypot(xy[1] - spot.y) * k
         };
         let extra: Vec<_> = dp.difference(&dr).collect();
