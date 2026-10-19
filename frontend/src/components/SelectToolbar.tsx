@@ -3,12 +3,14 @@ import { Toggle, Tooltip } from "radix-ui";
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 
 import { FlipGroup } from "@/components/FlipGroup";
+import { GuideButton } from "@/components/GuideButton";
 import { RatioSlider } from "@/components/RatioSlider";
 import { RATIO_SLIDER_NAMES } from "@/lib/sliderNames";
 import { ToolbarSwitch } from "@/components/ToolbarSwitch";
 import type { SelectBarState } from "@/hooks/useEditorSession";
 import type { CloneBarNotice } from "@/hooks/useClones";
 import type { FlipApi } from "@/hooks/useFlip";
+import type { GuideState } from "@/lib/guideText";
 import { LINKED_CLONE_TOOLTIP } from "@/lib/cloneText";
 
 export interface SelectToolbarProps {
@@ -45,6 +47,9 @@ export interface SelectToolbarProps {
    * criterion 1). */
   flipEnabled: boolean;
   flip: FlipApi;
+  /** The Guide button (`specs/0046-document-shapes` criteria 9 and 10). */
+  guideState: GuideState;
+  onToggleGuide: () => void;
   /** Returns the keyboard focus to the canvas (after Enter or Escape in a
    * field). */
   onReturnFocus: () => void;
@@ -535,6 +540,8 @@ export function SelectToolbar({
   linkedCloneNotice,
   flipEnabled,
   flip,
+  guideState,
+  onToggleGuide,
   onReturnFocus,
 }: SelectToolbarProps) {
   const barRef = useRef<HTMLDivElement>(null);
@@ -647,7 +654,15 @@ export function SelectToolbar({
        * row does not move with the selection (`specs/0056-mirror-and-negative-scale/` D7). */}
       <div className="group/row flex min-h-9 items-start gap-3">
         {bar.scaleSwitchesShown && <Divider />}
-        <FlipGroup enabled={flipEnabled} flip={flip} onReturnFocus={onReturnFocus} />
+        {/* The Guide button directly after the Flip group, in every selection state, 4 px from
+         * it like the two flip buttons from each other, so the row stays as narrow as it can
+         * (`specs/0046-document-shapes` criterion 9, UX review 2). */}
+        <div className="flex items-start gap-1">
+          <FlipGroup enabled={flipEnabled} flip={flip} onReturnFocus={onReturnFocus} />
+          <div className="py-1">
+            <GuideButton state={guideState} onToggle={onToggleGuide} onReturnFocus={onReturnFocus} />
+          </div>
+        </div>
       </div>
       {groups.map((group, index) => (
         <div key={index} className="group/row flex min-h-9 items-start gap-3">

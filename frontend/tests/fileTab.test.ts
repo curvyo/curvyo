@@ -1,6 +1,6 @@
 // The File tab (`specs/0051-sidebar-and-no-menu/` criteria 15, 16, 24, 25) rendered on the server
 // through the vite harness: the project block, the buttons of each build, the version line and the
-// inline check that replaces the five buttons.
+// inline check that replaces the six buttons.
 
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
@@ -69,11 +69,11 @@ function buttons(html: string): string[] {
   return [...html.matchAll(/<button[^>]*>([^<]*)<\/button>/g)].map((m) => m[1]);
 }
 
-test("an untitled clean project: name, status, five buttons, Quit, version", async () => {
+test("an untitled clean project: name, status, six buttons, Quit, version", async () => {
   const html = await render();
   assert.match(html, />Untitled</);
   assert.match(html, />Not saved yet</);
-  assert.deepEqual(buttons(html), ["New", "Open…", "Save", "Save as…", "Close", "Quit"]);
+  assert.deepEqual(buttons(html), ["New", "Open…", "Save", "Save as…", "Close", "Template", "Quit"]);
   assert.match(html, />Curvyo 0.4.0</);
 });
 
@@ -87,7 +87,7 @@ test("a saved project shows its file name and whether it changed", async () => {
 
 test("the browser build has no Save as, Quit or divider", async () => {
   const html = await render({ desktop: false });
-  assert.deepEqual(buttons(html), ["New", "Open…", "Save", "Close"]);
+  assert.deepEqual(buttons(html), ["New", "Open…", "Save", "Close", "Template"]);
   assert.doesNotMatch(html, /Quit/);
   assert.doesNotMatch(html, /Save as/);
 });
@@ -107,7 +107,7 @@ test("the File tab holds no popup, menu or dialog (criterion 24)", async () => {
   }
 });
 
-test("the check replaces the five buttons in place with a sentence and three buttons", async () => {
+test("the check replaces the six buttons in place with a sentence and three buttons", async () => {
   const html = await render({
     fileName: "Poster.curvyo",
     path: "/home/m/Poster.curvyo",

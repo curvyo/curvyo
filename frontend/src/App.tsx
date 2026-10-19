@@ -127,6 +127,8 @@ function Editor() {
               linkedCloneNotice={editor.clones.barNotice}
               flipEnabled={editor.flipEnabled}
               flip={editor.flip}
+              guideState={editor.guideState}
+              onToggleGuide={editor.toggleGuide}
               onReturnFocus={() => editor.containerRef.current?.focus()}
             />
           ) : null}

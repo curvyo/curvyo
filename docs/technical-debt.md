@@ -1534,3 +1534,13 @@ pre-checks, the decoder limits and a time-boxed fuzz run before the PR. The deco
 0017. **Resolution:** decode in a Web Worker with its own wasm instance (needs a second module
 and a message protocol), or a streaming decoder with a deadline. Not needed before images are a
 daily workflow.
+
+## A template's size limit covers the packed file only
+
+`specs/0046-document-shapes` criterion 22 refuses a template file over 64 MiB
+(`curvyo-editor-wasm` `MAX_TEMPLATE_BYTES`). The limit is on the packed `.curvyo` bytes; what
+`unpack` expands them to is bounded only as on the Open path (the container reader's own limits),
+not by a template-specific cap. And the desktop host's `pick_project` (`curvyo-app`) reads the
+whole file into memory before the core sees the length, so a much larger file is read in full
+before it is refused. **Resolution:** check the file size in `pick_project` before reading (one
+`metadata` call), and give `unpack` an expanded-size cap shared by Open and Template.

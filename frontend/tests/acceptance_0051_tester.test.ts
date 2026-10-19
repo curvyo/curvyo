@@ -384,16 +384,16 @@ const text = (html: string) => html.replace(/<[^>]+>/g, "|").replace(/\|+/g, "|"
 const buttonLabels = (html: string) =>
   [...html.matchAll(/<button[^>]*>([^<]*)<\/button>/g)].map((m) => m[1]);
 
-test("c15 desktop File tab: five buttons, then Quit, then the version", async () => {
+test("c15 desktop File tab: six buttons, then Quit, then the version", async () => {
   const html = await renderFile({ desktop: true, project: {} });
-  assert.deepEqual(buttonLabels(html), ["New", "Open…", "Save", "Save as…", "Close", "Quit"]);
+  assert.deepEqual(buttonLabels(html), ["New", "Open…", "Save", "Save as…", "Close", "Template", "Quit"]);
   assert.match(html, /Curvyo 9\.8\.7/);
   assert.ok(html.indexOf("Quit") < html.indexOf("Curvyo 9.8.7"));
 });
 
 test("c15 browser File tab: no Save as, no Quit, no divider", async () => {
   const html = await renderFile({ desktop: false, project: {} });
-  assert.deepEqual(buttonLabels(html), ["New", "Open…", "Save", "Close"]);
+  assert.deepEqual(buttonLabels(html), ["New", "Open…", "Save", "Close", "Template"]);
   assert.doesNotMatch(html, /Quit|Save as/);
   assert.match(html, /Curvyo 9\.8\.7/);
 });
@@ -406,7 +406,7 @@ test("c15 the buttons are never dimmed or hidden by the state of the project", a
     { dirty: true, info: { fileName: "a.curvyo", path: "/x/a.curvyo" } },
   ]) {
     const html = await renderFile({ desktop: true, project });
-    assert.deepEqual(buttonLabels(html), ["New", "Open…", "Save", "Save as…", "Close", "Quit"]);
+    assert.deepEqual(buttonLabels(html), ["New", "Open…", "Save", "Save as…", "Close", "Template", "Quit"]);
     assert.doesNotMatch(html, /\sdisabled=/);
     assert.doesNotMatch(html, /aria-disabled/);
   }
@@ -438,7 +438,7 @@ test("c24 c25 the inline check: a group named by its sentence, three buttons, no
     );
     const labels = buttonLabels(html);
     assert.deepEqual(labels.slice(0, 3), ["Cancel", "Discard", "Save"]);
-    // the five buttons are replaced in place
+    // the six buttons are replaced in place
     for (const gone of ["New", "Open…", "Save as…", "Close"]) {
       assert.ok(!labels.includes(gone), gone);
     }
@@ -446,7 +446,7 @@ test("c24 c25 the inline check: a group named by its sentence, three buttons, no
       assert.equal(elementsWithRole(html, role).length, 0, role);
     }
     assert.doesNotMatch(html, /<dialog/);
-    // the block keeps the 100 px of the five buttons so nothing below moves
+    // the block keeps the 100 px of the six buttons so nothing below moves
     assert.match(html, /h-\[100px\]/);
   }
 });
