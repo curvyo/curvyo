@@ -25,6 +25,9 @@ pub(super) struct DocumentRead {
     pub(super) drawn: Arc<[ObjectSnapshot]>,
     /// The nodes, leaves and containers, that are effectively hidden or locked.
     pub(super) inert: Arc<HashSet<NodeId>>,
+    /// The leaves drawn and picked as guides: their own flag, or a clone's root's
+    /// (`specs/0046-document-shapes` criteria 5, 7 and 34).
+    pub(super) guides: Arc<HashSet<NodeId>>,
     /// The front-most layer, if the document has one.
     pub(super) front_layer: Option<NodeId>,
     /// Every leaf with an index by id and the direct clones of each: what the panel of linked
@@ -57,6 +60,11 @@ impl DocumentRead {
             .filter(|read| !read.visible || read.locked)
             .map(|read| read.id)
             .collect();
+        let guides: HashSet<NodeId> = nodes
+            .iter()
+            .filter(|read| read.guide && read.object().is_some())
+            .map(|read| read.id)
+            .collect();
         let front_layer = nodes
             .iter()
             .rev()
@@ -73,6 +81,7 @@ impl DocumentRead {
             visible,
             drawn,
             inert: Arc::new(inert),
+            guides: Arc::new(guides),
         }
     }
 }

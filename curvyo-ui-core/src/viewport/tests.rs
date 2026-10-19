@@ -395,3 +395,63 @@ fn a_panel_toggle_ends_the_centred_default_view() {
         corner
     );
 }
+
+/// `specs/0046-document-shapes` criterion 13: an overhanging template is shown whole, inside the
+/// part of the canvas the tool rail and the bars leave free.
+#[test]
+fn show_area_zooms_out_to_a_box_off_the_free_area_and_leaves_a_visible_one() {
+    let (free_left, free_top) = (128.0, 120.0);
+    let mut viewport = Viewport::new();
+    viewport.resize(1000.0, 800.0);
+    viewport.pan_by_screen_delta(-200.0, -200.0);
+    let before = viewport.view();
+    viewport.show_area(
+        Point::new(10.0, 10.0),
+        Point::new(50.0, 50.0),
+        free_left,
+        free_top,
+    );
+    assert_eq!(viewport.view(), before, "already in the free area");
+    viewport.show_area(
+        Point::new(-400.0, -100.0),
+        Point::new(600.0, 900.0),
+        free_left,
+        free_top,
+    );
+    assert!(viewport.zoom_percent() < 100);
+    let view = viewport.view();
+    let (x, y) = view.document_to_screen(Point::new(-400.0, -100.0));
+    assert!(
+        x >= free_left - 1e-6 && y >= free_top - 1e-6,
+        "top-left {x} {y}"
+    );
+    let (x, y) = view.document_to_screen(Point::new(600.0, 900.0));
+    assert!(
+        x <= 1000.0 - 24.0 + 1e-6 && y <= 800.0 - 24.0 + 1e-6,
+        "bottom-right {x} {y}"
+    );
+    let mut unknown = Viewport::new();
+    unknown.show_area(
+        Point::new(-400.0, 0.0),
+        Point::new(600.0, 900.0),
+        free_left,
+        free_top,
+    );
+    assert_eq!(unknown, Viewport::new(), "no canvas size yet");
+}
+
+/// A box that is on the canvas but under the bar overlay is not "visible": the view moves.
+#[test]
+fn show_area_moves_a_box_out_from_under_the_bars() {
+    let mut viewport = Viewport::new();
+    viewport.resize(1000.0, 800.0);
+    let top_mm = 2.0;
+    viewport.show_area(
+        Point::new(50.0, top_mm),
+        Point::new(100.0, 50.0),
+        128.0,
+        120.0,
+    );
+    let (_, y) = viewport.view().document_to_screen(Point::new(50.0, top_mm));
+    assert!(y >= 120.0 - 1e-6, "{y}");
+}

@@ -240,6 +240,20 @@ pub const GUIDE_DASH_PX: f64 = 4.0;
 /// The gap between two dashes, screen-space pixels.
 pub const GUIDE_GAP_PX: f64 = 3.0;
 
+/// `--guide` (`docs/design-system.md`, "Guide (`0046`)"): the colour a guide path is drawn in
+/// (`specs/0046-document-shapes`, marking style). `#166534`, not the proposed `#15803D`: that
+/// one has 2.5:1 on `--pasteboard-bg`; this one 3.6:1 there and 5.8:1 on `--canvas-bg`.
+pub const GUIDE: RgbaColor = RgbaColor::opaque(0x16, 0x65, 0x34);
+
+/// The width of a guide path's line, screen-space pixels.
+pub const GUIDE_LINE_PX: f64 = 1.0;
+
+/// One dash's length of a guide path, screen-space pixels.
+pub const GUIDE_MARK_DASH_PX: f64 = 2.0;
+
+/// The gap between two dashes of a guide path, screen-space pixels.
+pub const GUIDE_MARK_GAP_PX: f64 = 2.0;
+
 /// One dash's length of the skew fixed-line guide, screen-space pixels
 /// (`edit-interaction-polish` criterion 68: 2 on / 2 off, so the guide does
 /// not look like the 4 / 3 selection box it runs along).

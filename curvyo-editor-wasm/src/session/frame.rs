@@ -23,8 +23,9 @@ impl Session {
                 self.view(),
                 self.device_pixel_ratio,
             );
-            list.extend(curvyo_render_core::build_artwork(
+            list.extend(curvyo_render_core::build_artwork_with_guides(
                 &version.objects,
+                &version.guides,
                 self.view(),
             ));
             return list;
@@ -44,7 +45,11 @@ impl Session {
                 .filter(|object| object.id() != subject)
                 .cloned()
                 .collect();
-            list.extend(curvyo_render_core::build_artwork(&others, self.view()));
+            list.extend(curvyo_render_core::build_artwork_with_guides(
+                &others,
+                &self.document_read().guides,
+                self.view(),
+            ));
             list.extend(curvyo_render_core::build_history_preview(
                 &version.objects,
                 self.view(),

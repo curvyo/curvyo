@@ -85,6 +85,9 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     ("move_nodes", "Reorder"),
     ("new_layer", "New layer"),
     ("delete_layer", "Delete layer"),
+    // `specs/0046-document-shapes` criterion 28.
+    ("set_guide", "Guide"),
+    ("load_template", "Template"),
 ];
 
 /// The labels the engine writes itself. They are no step of the maker's: the setup of a new
@@ -119,6 +122,12 @@ pub fn operation_name(label: &str) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_guide_commands_are_named_guide_and_template() {
+        assert_eq!(operation_name("set_guide"), "Guide");
+        assert_eq!(operation_name("load_template"), "Template");
+    }
 
     #[test]
     fn a_known_label_has_its_name_and_an_unknown_one_is_edit() {

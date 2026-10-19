@@ -131,6 +131,24 @@ impl WasmSession {
         }
     }
 
+    /// The File tab's Template button (`specs/0046-document-shapes` criteria 19 and 22): adds the
+    /// outlines of the Curvyo document `bytes` as selected guides in one step. `"loaded:<n>"`
+    /// with how many came in, or `"error:<message>"` when nothing changed.
+    pub fn load_template(&mut self, bytes: &[u8]) -> String {
+        match self.session.load_template(bytes) {
+            Ok(count) => format!("loaded:{count}"),
+            Err(error) => format!("error:{}", error.message()),
+        }
+    }
+
+    /// The first view after a template load (`specs/0046-document-shapes` criterion 13), called
+    /// once the bars are laid out for the new selection: zooms out to the page and the guides when
+    /// part of them is outside the canvas area right of `free_left` and below `free_top` (CSS
+    /// pixels from the canvas's top-left corner: the tool rail and the bar overlay).
+    pub fn show_page_and_guides(&mut self, free_left: f64, free_top: f64) {
+        self.session.show_page_and_guides(free_left, free_top);
+    }
+
     /// The status bar's cursor readout for a document point in millimetres,
     /// for example `"x: 12.3  y: 45.6 mm"`.
     #[must_use]

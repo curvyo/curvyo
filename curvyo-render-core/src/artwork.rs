@@ -3,8 +3,10 @@
 //! (`specs/0007-stroke-and-fill-styling/specification.md`, criterion 26).
 //! Editor decorations are not artwork; they are drawn after it.
 
+use std::collections::HashSet;
+
 use curvyo_document_core::{
-    ObjectSnapshot, Opacity, PathSnapshot, PrimitiveSnapshot, Stroke, Style, ViewTransform,
+    NodeId, ObjectSnapshot, Opacity, PathSnapshot, PrimitiveSnapshot, Stroke, Style, ViewTransform,
     outline_of_rotated,
 };
 
@@ -51,6 +53,21 @@ pub(crate) fn paint(color: curvyo_document_core::Color, opacity: Opacity) -> Rgb
 /// visually identical.
 #[must_use]
 pub fn build_artwork(objects: &[ObjectSnapshot], view: ViewTransform) -> DrawList {
+    build_artwork_with_guides(objects, &HashSet::new(), view)
+}
+
+/// [`build_artwork`] where the objects whose ids are in `guides` are drawn in the marking style
+/// (`specs/0046-document-shapes` criterion 5): their outlines only, one layer each, at their
+/// place in the order; their own fill and stroke are not drawn.
+#[must_use]
+// One hasher is used (`CLAUDE.md` §5: no generic parameter for a single type).
+#[allow(clippy::implicit_hasher)]
+pub fn build_artwork_with_guides(
+    objects: &[ObjectSnapshot],
+    guides: &HashSet<NodeId>,
+    view: ViewTransform,
+) -> DrawList {
+    let marking = (!guides.is_empty()).then(|| crate::guide_style::marking_style(view));
     let mut budgets = FrameBudgets {
         dashes: DashBudget::per_frame(),
         markers: MarkerBudget::per_frame(),
@@ -58,6 +75,10 @@ pub fn build_artwork(objects: &[ObjectSnapshot], view: ViewTransform) -> DrawLis
     let mut list = DrawList::default();
     let mut shared = SharedOutlines::default();
     for object in objects {
+        if let Some(style) = marking.as_ref().filter(|_| guides.contains(&object.id())) {
+            draw_guide(&mut list, object, style, view, &mut budgets);
+            continue;
+        }
         match object {
             // A clone with a rigid map of a plain root reuses the root's tessellation
             // (`specs/0049-linked-clone` criterion 44).
@@ -74,6 +95,36 @@ pub fn build_artwork(objects: &[ObjectSnapshot], view: ViewTransform) -> DrawLis
         }
     }
     list
+}
+
+/// One guide: the outlines of `object` stroked with the marking `style`, no markers.
+fn draw_guide(
+    list: &mut DrawList,
+    object: &ObjectSnapshot,
+    style: &Style,
+    view: ViewTransform,
+    budgets: &mut FrameBudgets,
+) {
+    match object {
+        ObjectSnapshot::Path(path)
+        | ObjectSnapshot::Clone(curvyo_document_core::CloneSnapshot { resolved: path, .. }) => {
+            let outlines: Vec<OutlineRef<'_>> = path
+                .subpaths()
+                .map(|subpath| OutlineRef {
+                    anchors: subpath.anchors,
+                    closed: subpath.closed,
+                })
+                .collect();
+            draw_object(list, &outlines, style, false, view, budgets);
+        }
+        ObjectSnapshot::Primitive(primitive) => {
+            let marked = PrimitiveSnapshot {
+                style: style.clone(),
+                ..primitive.clone()
+            };
+            draw_primitive(list, &marked, view, budgets);
+        }
+    }
 }
 
 fn draw_path(

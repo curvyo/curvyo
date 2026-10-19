@@ -127,7 +127,23 @@ impl Session {
                     .collect()
             }
         };
-        let pickable: Arc<[ObjectSnapshot]> = units.pickable(&objects).into_owned().into();
+        let pickable: Arc<[ObjectSnapshot]> = if read.guides.is_empty() {
+            units.pickable(&objects).into_owned().into()
+        } else {
+            // A guide has no drawn fill, so its line is its only hit area
+            // (`specs/0046-document-shapes` criterion 7).
+            units
+                .pickable(&objects)
+                .iter()
+                .map(|object| {
+                    let mut picked = object.clone();
+                    if read.guides.contains(&object.id()) {
+                        picked.style_mut().fill.enabled = false;
+                    }
+                    picked
+                })
+                .collect()
+        };
         let held = Held {
             all,
             drawn: Arc::clone(&read.drawn),

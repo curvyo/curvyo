@@ -4,10 +4,12 @@
 //! past the size limit").
 
 use std::borrow::Cow;
+use std::sync::Arc;
 
 use curvyo_render_core::{
-    DrawList, TransformDecorationInput, build_artwork, build_decorations, build_group_draw_list,
-    build_marquee_overlay, build_pen_preview, build_select_draw_list, build_transform_draw_list,
+    DrawList, TransformDecorationInput, build_artwork_with_guides, build_decorations,
+    build_group_draw_list, build_marquee_overlay, build_pen_preview, build_select_draw_list,
+    build_transform_draw_list,
 };
 
 use curvyo_document_core::{ObjectSnapshot, PathSnapshot, ViewTransform};
@@ -62,7 +64,9 @@ impl Session {
         if self.style.is_active() {
             self.style.apply_to(artwork_objects.to_mut());
         }
-        let mut list = build_artwork(&artwork_objects, view);
+        // Guides in the marking style (`specs/0046-document-shapes` criterion 5).
+        let guides = Arc::clone(&self.document_read().guides);
+        let mut list = build_artwork_with_guides(&artwork_objects, &guides, view);
         // The blue half of a segment bend, over the artwork and under the nodes and handles.
         list.extend(self.bend_preview_list(view, &objects));
         // A compound path shows no node, handle or segment (`0016-boolean-operations` criterion 38).

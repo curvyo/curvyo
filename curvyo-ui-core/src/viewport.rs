@@ -242,6 +242,55 @@ impl Viewport {
         self.origin = Point::new(-left / scale, -top / scale);
     }
 
+    /// Shows the box `min`..`max` (document millimetres) whole, for the first view after a
+    /// template load (`specs/0046-document-shapes` criterion 13), inside the part of the canvas
+    /// the bars leave free: right of `free_left` and below `free_top` (CSS pixels from the
+    /// canvas's top-left corner: the tool rail and the bar overlay), with a 24 px margin on the
+    /// other two sides. When part of the box is outside that area the view zooms out as far as
+    /// needed (never in) and centres the box in it. A box already inside leaves the view as it
+    /// is; so does an unknown canvas size, an area with no room or a box that is not finite.
+    pub fn show_area(&mut self, min: Point, max: Point, free_left: f64, free_top: f64) {
+        let (canvas_width, canvas_height) = self.canvas_size;
+        let finite = [min.x, min.y, max.x, max.y, free_left, free_top]
+            .iter()
+            .all(|v| v.is_finite());
+        let (free_left, free_top) = (free_left.max(0.0), free_top.max(0.0));
+        let free_right = canvas_width - DOCUMENT_TOP_MARGIN_PX;
+        let free_bottom = canvas_height - DOCUMENT_TOP_MARGIN_PX;
+        let (room_width, room_height) = (free_right - free_left, free_bottom - free_top);
+        if !finite || room_width <= 0.0 || room_height <= 0.0 {
+            return;
+        }
+        let view = self.view();
+        let (left, top) = view.document_to_screen(min);
+        let (right, bottom) = view.document_to_screen(max);
+        if left >= free_left && top >= free_top && right <= free_right && bottom <= free_bottom {
+            return;
+        }
+        let (width_mm, height_mm) = ((max.x - min.x).max(0.0), (max.y - min.y).max(0.0));
+        let fit = |room: f64, mm: f64| {
+            if mm > 0.0 {
+                room / (mm * PX_PER_MM_AT_100)
+            } else {
+                f64::INFINITY
+            }
+        };
+        let factor = self
+            .zoom
+            .factor()
+            .min(fit(room_width, width_mm))
+            .min(fit(room_height, height_mm));
+        self.inset_view = false;
+        self.zoom = Zoom::new(factor);
+        let scale = self.zoom.scale();
+        let centre_x = free_left + room_width / 2.0;
+        let centre_y = free_top + room_height / 2.0;
+        self.origin = Point::new(
+            f64::midpoint(min.x, max.x) - centre_x / scale,
+            f64::midpoint(min.y, max.y) - centre_y / scale,
+        );
+    }
+
     /// Starts a drag-pan gesture (acceptance criteria 3, 4): records the
     /// document point currently under `(screen_x, screen_y)` as the
     /// anchor [`Viewport::continue_drag_pan`] keeps fixed under the
