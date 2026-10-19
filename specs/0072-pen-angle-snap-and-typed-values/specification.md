@@ -1,8 +1,8 @@
 # Pen angle snap and typed values: Ctrl locks the angle of the next node, a key opens a Length and Angle entry
 
-Status: Ready (2026-10-19; adrs.md of the architect and the PO draft of the UX notes below; the UX notes are to be confirmed by the ux-engineer; the open questions use their recorded defaults, criteria marked (Proposal) can be vetoed by the customer at the demo)
+Status: Ready (2026-10-19; adrs.md of the architect and the PO draft of the UX notes below; the UX notes are to be confirmed by the ux-engineer; the four open questions are decided, see "Decided by the customer 2026-10-19"; criteria marked (Proposal) can be vetoed by the customer at the demo)
 Priority: Should (pulled forward at the customer's request, 2026-10-19)
-Origin: Customer (request of 2026-10-19: Ctrl snaps the angle in the Pen; typed values while drawing). The entry key, the readout while Ctrl is held and the notices are Proposals, marked as such.
+Origin: Customer (request of 2026-10-19: Ctrl snaps the angle in the Pen; typed values while drawing). The entry key (Tab) is accepted; the drag readout and the notices are Proposals, marked as such.
 
 ## User value
 
@@ -40,7 +40,7 @@ Facts from the specs and the code on `main` (2026-10-19); the implementer verifi
 - **Stops**: the table of `snap_angle`, measured from the x axis (absolute), not from the previous segment.
 - **Constrained point**: L plus the vector of length |raw point - L| at the stop nearest to the raw segment angle. The length is kept, only the angle changes.
 - **Target**: as `0034` (a continue, join or close target within 16 px of the raw pointer).
-- **Entry key**: the key that opens the Pen entry chip. Tab (Proposal, Question 1).
+- **Entry key**: the key that opens the Pen entry chip. Tab (customer decision 2026-10-19).
 - **Pen entry chip**: the chip of Part B. **Freeze**: the first edit of any field, as in `0052` criterion 14.
 - **Display unit**: the document's length unit (`0015` Part C); angles are degrees.
 
@@ -68,16 +68,16 @@ All lengths are document millimetres in a document whose display unit is mm, X t
 5. Given a target under the raw pointer (a continue, join or close target of `0034`, within 16 px), then Ctrl changes nothing there: the rubber band ends on the target's centre, the cue, the chip, the cursor and the press are those of `0034`, with or without Ctrl, and a Ctrl-click on the first node closes the path. The target test uses the raw pointer, before the snap. Given Shift held over a continue or join target (the plain node alternative of `0034` criterion 7), then the node is placed as anywhere else, so Ctrl snaps it. Over the close target Shift keeps flipping sharp and smooth (`0034` criterion 15) and Ctrl has no effect.
 6. Given Ctrl and Shift held together away from every target, then the result is that of Ctrl alone. Given Ctrl held and Shift pressed or released over a target, then `0034` criteria 1, 7 and 16 apply unchanged (the chip follows Shift, Ctrl is ignored).
 7. Given the Pen with no node placed yet (the first node of a new path), then Ctrl has no effect: the click places a node at the pointer. Given a continuation (`0034`), then L is the end node E, and Ctrl snaps the first new node relative to E. Given a click that is the first node and Ctrl was held, then the next node is snapped relative to it as in criterion 2.
-8. Given Ctrl held in the Pen with a path in progress and no chip open, then a readout at the pointer shows the length and the angle of the constrained segment, in the display unit and degrees, with units: "30.1 mm, 0°" (the formatter of the create-drag readout of `0010` criterion 6: one decimal for mm, two for cm, three for in; the angle one decimal at most, "22.5°"). It appears and disappears with Ctrl in the same frame, is text only, takes no focus and is not shown without Ctrl (Proposal). During a handle drag with Ctrl held the readout shows the handle's length and angle the same way.
-9. Given a pen on a drawing tablet, a mouse or touch input, then the pointer kind changes nothing in this part: the modifier comes from the keyboard as for a mouse (`0032` criterion 5: a pen in range moves the pointer as a mouse does). A maker with a tablet and no keyboard has no route to Ctrl (Question 4).
+8. Given a click-drag in the Pen (criterion 3), then a readout at the pointer shows the length and the angle of the handle (the vector from N to the pointer), in the display unit and degrees, with units: "30.1 mm, 0°" (the formatter and placement of the create-drag readout of `0010` criterion 6: one decimal for mm, two for cm, three for in; the angle one decimal at most, "22.5°"). It exists only while the button is held, with or without Ctrl, shows the snapped values when Ctrl is held, is text only and takes no focus. With the button up there is no readout: Ctrl at rest changes only the rubber band, and the numbers of the segment are in the entry chip (criterion 15).
+9. Given a pen on a drawing tablet, a mouse or touch input, then the pointer kind changes nothing in this part: the modifier comes from the keyboard as for a mouse (`0032` criterion 5: a pen in range moves the pointer as a mouse does). A maker with a tablet and no keyboard has no route to Ctrl; there is no on-screen switch and no snap toggle (customer decision).
 10. Given the Pen is idle with 5000 open paths in the document, then the hover cost of `0034` criterion 24 (under 2 ms per pointer move) is unchanged; the snap adds no more than 0.1 ms to a pointer move with a path in progress, measured in a release build.
 11. Given the Select, Node, shape and Pencil tools, then Ctrl keeps the meaning it has there; nothing outside the Pen changes.
 
 ### Part B: typed length and angle
 
-12. Given the Pen, the canvas focused, a path in progress with a last node L and no mouse button held, when the maker presses the entry key (Tab, Proposal), then the Pen entry chip opens in the same frame, the key's default action is prevented, focus is in the Length field and its text is selected. Key repeat opens nothing. Tab with Ctrl, Alt or Cmd is not handled. With no path in progress, or with no node placed, the key is not consumed and does what it does without the Pen (no chip, no notice).
+12. Given the Pen, the canvas focused, a path in progress with a last node L and no mouse button held, when the maker presses the entry key (Tab), then the Pen entry chip opens in the same frame, the key's default action is prevented, focus is in the Length field and its text is selected. Key repeat opens nothing. Tab with Ctrl, Alt or Cmd is not handled. With no path in progress, or with no node placed, the key is not consumed and does what it does without the Pen (no chip, no notice).
 13. Given the chip, then it has two fields in Tab order, each with its unit visible inside the field at all times: "Length" with the display unit as suffix ("mm", "cm" or "in") and "Angle" with "°" as suffix. Accessible names: "Length, millimetres" (the unit word of the document) and "Angle, degrees". The chip is a group named "Next node". It is the surface and the field style of the placement chip of `0052`, not a new style, with no hint line (customer decision 2026-10-16).
-14. Given the entry key is pressed with a mouse button held (a node drag in progress), then nothing opens, the key is consumed (focus does not leave the canvas) and the drag continues unchanged. Typed handle values are out of scope (Question 3).
+14. Given the entry key is pressed with a mouse button held (a node drag in progress), then nothing opens, the key is consumed (focus does not leave the canvas) and the drag continues unchanged. Typed handle values are out of scope (customer decision).
 15. Given the chip is open and no field is edited, then the fields show the values of the live segment from L to the pointer, as the rubber band draws it (so with Ctrl held they show the constrained values), updated in the frame of every pointer and key event; the chip follows the pointer as the placement chip does. Length uses the decimals of criterion 8, Angle one decimal at most. Example: L = (100, 50), pointer (130, 40): Length "31.6", Angle "-18.4".
 16. Given the chip is open, when the maker first edits any field (types, deletes, cuts or pastes), then the chip freezes, as the placement chip does (`0052` criterion 14): the pointer and Ctrl change nothing from then on, an untouched field keeps the value it showed at that moment, and the chip stays where it is on screen (the same placement rule as the row "Placement chip", with L in the role of A, so the chip never covers L, its ring or the rubber band, flipping and clamping inside the viewport; recomputed on pan, zoom and window resize). Example: pointer (130, 40), the maker types "40" in Length: Length is 40, Angle stays -18.4, and moving the pointer to (0, 0) changes nothing.
 17. Given a frozen or unfrozen chip, then the rubber band is drawn from L to the point the chip's values give, updated within one frame of each keystroke (the Pen is, with `0052`, the second place where typed values preview). The point is L + Length x (cos Angle, sin Angle) in the convention of the table (y down, so Angle 90 points straight down). Examples from L = (100, 50): Length 30, Angle 0 gives (130, 50); Length 30, Angle 90 gives (100, 80); Length 30, Angle -90 gives (100, 20); Length 30, Angle 45 gives (121.21, 71.21); Length 30, Angle 180 gives (70, 50).
@@ -103,47 +103,29 @@ All lengths are document millimetres in a document whose display unit is mm, X t
 
 ### Part D: accessibility and feedback
 
-34. Given the chip opens, then a visually hidden polite live region says "Next node. Type the length, Tab for the angle. Enter adds it, Escape closes." and, after Enter, "Node added, 40 millimetres at 0 degrees." (the document's unit word). The notices of Part C are read by their own live region (criterion 29). The fields are real text inputs with the names of criterion 13.
-35. Given the Ctrl readout (criterion 8) and the chip, then every number on screen has its unit next to it: the chip suffixes and the readout text. No field or readout shows a bare number.
+34. Given the chip opens, then a visually hidden polite live region says "Next node." and, after Enter, "Node added, 40 millimetres at 0 degrees." (the document's unit word). The live region names the chip and the result and gives no instructions. The notices of Part C are read by their own live region (criterion 29). The fields are real text inputs with the names of criterion 13.
+35. Given the drag readout (criterion 8) and the chip, then every number on screen has its unit next to it: the chip suffixes (inside the field, always visible, also when the field is empty) and the readout text. No field or readout shows a bare number.
 36. Given the rail tooltip of the Pen tool, then it gets no new line ("Ctrl: angle", "Tab: type values"): no operating hints (customer decision 2026-10-16). Both functions are listed in the shortcut table of `docs/design-system.md` in the PR that builds this slice.
 
 ## Out of scope
 
-- **Typed handle values while the button is held** (handle length and angle). Reason: the node is already placed at the press, the other hand is on the mouse, and a symmetric handle is rarely a round number; the same chip cannot be opened without freezing the drag. Question 3.
+- **Typed handle values while the button is held** (handle length and angle). Reason: the node is already placed at the press, the other hand is on the mouse, and a symmetric handle is rarely a round number; the same chip cannot be opened without freezing the drag. Decided by the customer 2026-10-19.
 - **Typing the position of the first node** (X and Y fields), and **closing the path from the chip**: the maker closes by clicking the first node, which a frozen chip does not allow (a press places the typed node); Escape closes the chip first.
 - **A chip that stays open for the next segment** ("keep going" mode, as in AutoCAD). Tab opens it again; one key is cheap and Enter keeps one meaning.
-- **Angle relative to the previous segment** (turn angle). Question 2.
+- **Angle relative to the previous segment** (turn angle). Decided by the customer 2026-10-19: the typed angle is absolute.
 - **Snap to the intersection of two angle lines** (for example the fourth corner of a rectangle aligned with the third and the first node), snap to the grid, to nodes, to guides or to bounding boxes (`0060-snapping` is a draft and decides how an object snap and this angle lock combine; until then there is no grid and no object snap in the Pen).
-- **An on-screen angle-lock switch** for a tablet without a keyboard, or any Pen bar. Question 4.
+- **An on-screen angle-lock switch** for a tablet without a keyboard, or any Pen bar. Decided by the customer 2026-10-19.
 - **Ctrl angle lock in the Node tool** (segment bending, handle drags), the Pencil, or **Alt** in the Pen.
 - **Polar tracking guides** drawn across the canvas, an angle grid, and a preference for the step (the table of `0008` is the one table).
 - **Backspace to remove the last placed node**, arithmetic in fields ("20+5"), and a remembered last length.
 - **Undo of single nodes** (there is none: the path in progress is one step, `0034` criterion 27).
 
-## Open questions
+## Decided by the customer 2026-10-19
 
-The lead batches these in one German message. Each has a default; none blocks the build.
-
-**Frage 1 (PEN-ENTRY-KEY): Which key opens the entry while drawing?**
-- A (default, Proposal): **Tab**. CAD tools use it (Fusion 360, AutoCAD dynamic input); it is not a letter, so it needs no change to the letter gate and works on a German keyboard; it is free in the canvas; the same key switches fields inside the chip, so one key does the whole job. Cost: while a Pen path is unfinished, Tab is taken from the browser's focus order (Escape or Enter ends the path and gives it back).
-- B: **E**, the customer's suggestion. Conflict: E is the Ellipse tool letter in every state; with the Pen idle it still switches to the Ellipse, so one key has two meanings, told apart only by "a path is in progress". Also, letters are gated during a drag, so it would need an exception in the gate.
-- C: **L** (Length). Free (reserved: M, K, H, V, `?`), gated like any letter, same state problem as E but without a tool conflict.
-- Recommendation: A. If unanswered: A.
-
-**Frage 2 (PEN-ANGLE-REF): What does the typed angle mean?**
-- A (default): **absolute**, from the x axis, in the product's convention: 0 degrees = right, 90 = down, -90 = up, clockwise on screen (as the rotate readout, the polygon angle and the Ctrl stops). Reason: it is the same number the Ctrl lock uses and the readout shows, so "what I see is what I type", and a horizontal line is always 0 or 180.
-- B: **relative to the previous segment** (a turn angle; 90 = turn right by 90 degrees): easier for a closed polygon with a known interior angle, but the first segment then has no reference, and the number differs from the readout.
-- Recommendation: A. If unanswered: A. Counter-clockwise positive (the mathematical convention) is not offered: nothing else in the product uses it.
-
-**Frage 3 (PEN-HANDLE-TYPED): Typed handle length and angle while the button is held?**
-- A (default): not built (Out of scope).
-- B: the entry key with the button held opens a Handle-length and Angle chip for the node being dragged. Roughly one more day plus a freeze rule for a held button.
-- Recommendation: A. If unanswered: A.
-
-**Frage 4 (PEN-SNAP-TOGGLE): Angle lock without a keyboard (tablet only)?**
-- A (default): no; Ctrl and Tab come from the keyboard.
-- B: a toggle button in a new Pen bar. A new bar for one switch.
-- Recommendation: A, until a tablet user without a keyboard reports it. If unanswered: A.
+- **Entry key: Tab** (PEN-ENTRY-KEY A). No letter key is used, so the letter gate is unchanged. While a Pen path is unfinished Tab is taken from the browser's focus order; Enter or Escape gives it back.
+- **Typed angle is absolute** (PEN-ANGLE-REF A): from the x axis, 0 degrees right, 90 down, -90 up, clockwise on screen; the same number the Ctrl lock uses and the readout shows. No turn angle.
+- **No typed handle values** (PEN-HANDLE-TYPED A): the entry key with a button held does nothing (criterion 14).
+- **No angle-lock toggle for keyboard-less use** (PEN-SNAP-TOGGLE A): Ctrl and Tab come from the keyboard; no Pen bar.
 
 Decided by the product owner (change if you disagree): the stops are the existing table of 15 and 22.5 degrees (a 15-degree-only table would be a second table; horizontal, vertical and 45 degrees are in both); the lock keeps the length and changes the angle (Inkscape's behaviour); the lock is absolute, not relative to the previous segment; targets win over the snap; a handle snap leaves the node where it was placed; a typed node is a corner node as a click is; Enter in the chip never finishes the path; zero length is the one refusal; the chip does not stay open.
 
@@ -153,12 +135,12 @@ Draft of the product owner on 2026-10-19 from `docs/design-system.md` (rows "Pla
 
 - **No new entry-box style.** The Pen entry chip is the "Placement chip" surface (`PlacementChip.tsx`): fields 28 px high, 4 px apart, 14 px tabular figures, the label inside the left padding at 12 px, the unit suffix inside the right edge. Two fields: "Length" (the label needs a wider left padding than "W"; the field is as wide as the Angle field, 132 px) and "Angle" (132 px, "°"). No r/diameter button, no modifier checks, no link slot, no hint row. The chip is as wide as its fields (about 292 px, the ellipse chip's width).
 - **Place.** Until the freeze the chip's corner nearest the pointer is 12 px from the pointer on the side away from L on each axis (the Placement chip rule with L as the anchor); from the freeze it stays put on screen and the rule runs again on pan, zoom and resize. It never covers L, L's ring or the rubber band's start. No transition.
-- **Preview.** The existing rubber band, dashed as in the Pen, runs to the typed point; no extra marker (L already carries the permanent ring of the most recent node, `0002`). With Ctrl held and no chip, the rubber band is the constrained one and a readout "30.1 mm, 0°" sits 12 px up and right of the pointer (the create-drag readout's placement and formatter). It carries the units.
+- **Preview.** The existing rubber band, dashed as in the Pen, runs to the typed point; no extra marker (L already carries the permanent ring of the most recent node, `0002`). With Ctrl held and no chip, only the existing rubber band changes (it is the constrained one); nothing new appears at rest. While a node is dragged, a readout "30.1 mm, 0°" sits 12 px up and right of the pointer (the create-drag readout's placement and formatter, units included) and is gone on release. The only previews are the rubber band, the handles while dragging, and the chip's typed point while the chip is open.
 - **Cursor.** The Pen nib throughout, also with the chip open and frozen (a press still adds the node). Over the chip: the text cursor in a field.
 - **Focus.** The Length field is focused with its text selected in the frame the chip opens. Every end of the chip (Enter, Escape, a press, a tool switch) returns focus to the canvas. The chip is rendered inside the canvas container so Ctrl tracking keeps working (`0052` adrs decision 5).
 - **Notices.** The canvas notice slot, bottom centre, 3 s, `role="status"`, as the keyboard actions of `0020` and `0044`. No error row in the chip: the one refusal (zero length) is a notice, the chip stays open.
-- **Shortcut table rows to add** (same PR): "Lock the angle of the next node" (hold Ctrl in the Pen with a path in progress; read live; also the handle direction while dragging; targets win) and "Type the next node" (Tab in the Pen with a path in progress and no button held; Tab switches Length and Angle; Enter adds the node and keeps drawing; Escape closes the chip; Proposal).
-- **No new right-panel section, no new bar, no toolbar glyph, no hint label, no popup.** The only new visible elements are the chip and the Ctrl readout.
+- **Shortcut table rows to add** (same PR): "Lock the angle of the next node" (hold Ctrl in the Pen with a path in progress; read live; also the handle direction while dragging; targets win) and "Type the next node" (Tab in the Pen with a path in progress and no button held; Tab switches Length and Angle; Enter applies and keeps drawing; Escape closes the chip; Tab accepted by the customer).
+- **No new right-panel section, no new bar, no toolbar glyph, no hint label, no popup, no Apply or Cancel button, no snap toggle, no handle fields.** Enter applies, Escape cancels. The only new visible elements are the chip (opened by Tab) and the drag readout (only while the button is held). The UX notes were confirmed by the ux-engineer on 2026-10-19 against the rows "Placement chip", "Action notice" and "Interaction conventions".
 
 ## Delivery
 
@@ -166,7 +148,7 @@ One PR on `story/pen-angle-snap-and-typed-values`, as one slice (customer rule 2
 
 1. **Ctrl angle lock** (criteria 1 to 11): the constraint function in `curvyo-ui-core` on top of `snap_angle` (tests first, with the examples), the Ctrl flag passed through the Pen's move, down and up, the rubber band and handle preview, the Ctrl readout. The customer can try it at once in the app.
 2. **Typed entry in the core** (criteria 15 to 17, 19, 21, 24 to 28, 30 to 32): the Pen entry state (live, frozen, result) as a pure module next to `shape_placement.rs`, reusing `parse_length` and `parse_entry_number`, with the polar resolution and the permit rules; the wasm calls.
-3. **The chip** (criteria 12 to 14, 18, 20, 22, 23, 33 to 36): the Tab key in the key table, the chip on the shared component, the Escape step, the live region, the notices. The slice is complete here.
+3. **The chip** (criteria 12 to 14, 18, 20, 22, 23, 33 to 36): the Tab key in the key table, the chip (`PenEntryChip.tsx` on the shared `EntryField`), the Escape step, the live region, the notices. The slice is complete here.
 4. **Docs and review**: the design-system rows, the shortcut table, the corrections named in "Changes to accepted behaviour", the tester pass and the UX review once on the finished slice, the architect's check of the key-table change.
 
 Builds on code already on `main`: `angle_snap.rs`, `shape_placement.rs`, `display_unit_text.rs` (`parse_length`), `PlacementChip.tsx`. Collides with `0055` (`pen_tool.rs`) and `0032` (key gate, tool rail); not built beside them.
