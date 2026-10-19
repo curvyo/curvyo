@@ -1,6 +1,6 @@
 # Pen angle snap and typed values: Ctrl locks the angle of the next node, a key opens a Length and Angle entry
 
-Status: Ready (2026-10-19; adrs.md of the architect and the PO draft of the UX notes below; the UX notes are to be confirmed by the ux-engineer; the four open questions are decided, see "Decided by the customer 2026-10-19"; criteria marked (Proposal) can be vetoed by the customer at the demo)
+Status: Done (PR #159, merged 2026-10-19)
 Priority: Should (pulled forward at the customer's request, 2026-10-19)
 Origin: Customer (request of 2026-10-19: Ctrl snaps the angle in the Pen; typed values while drawing). The entry key (Tab) is accepted; the drag readout and the notices are Proposals, marked as such.
 
