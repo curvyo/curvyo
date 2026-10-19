@@ -129,6 +129,7 @@ function Editor() {
               flip={editor.flip}
               guideState={editor.guideState}
               onToggleGuide={editor.toggleGuide}
+              arcBar={editor.arcBar}
               onReturnFocus={() => editor.containerRef.current?.focus()}
             />
           ) : null}

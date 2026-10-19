@@ -12,6 +12,7 @@ import { type BackingBuffer, backingBufferFor, sameBackingBuffer } from "@/lib/c
 import { ModifierTracker } from "@/lib/keyModifiers";
 import { parseLayerNotice } from "@/lib/layerRows";
 import { FLIP_NOTICE_MS } from "@/lib/flipText";
+import { type ArcBarApi, useArcBar } from "@/hooks/useArcBar";
 import { type FlipApi, useFlip } from "@/hooks/useFlip";
 import { TOO_FAR_HINT } from "@/lib/nudgeText";
 import { createSession, openSession } from "@/lib/editorSession";
@@ -398,7 +399,15 @@ export interface TransformEntryField {
 /** The open numeric entry: what to show and where. Positions are canvas-
  * relative CSS pixels, already converted by Rust. */
 export interface TransformEntryState {
-  kind: "angle" | "size" | "radius" | "corner-radius" | "inner-ratio" | "skew";
+  kind:
+    | "angle"
+    | "size"
+    | "radius"
+    | "corner-radius"
+    | "inner-ratio"
+    | "skew"
+    | "arc-angle"
+    | "curve";
   fields: TransformEntryField[];
   /** The muted second row of a corner radius entry ("All four corners" or "This
    * corner only", `specs/0013-rectangle-corner-radii/` criterion 6); empty for every
@@ -694,6 +703,8 @@ export interface EditorSession {
   /** The File tab's Template button, once the file is read: the session's outcome string
    * (`"loaded:<n>"` or `"error:<message>"`). */
   loadTemplate: (bytes: Uint8Array) => string;
+  /** The Select bar's ellipse group and Curve field (`specs/0021-ellipse-arcs-and-shaping/`). */
+  arcBar: ArcBarApi;
   /** The size chip's note line for the typed texts ("Mirrored left to right"), or "". */
   transformEntryMirrorLine: (first: string, second: string, lastEdited: number) => string;
   /** The click-to-create placement and its chip (`specs/0052-click-to-create-shapes`). */
@@ -1058,6 +1069,7 @@ export function useEditorSession(
   // A release or an Enter that set a size to 0.01 mm says so in the canvas notice slot
   // (`0056` criterion 15).
   const { announceText } = flip;
+  const arcBar = useArcBar(getSession, syncFromSession, announceText, syncRevision);
   const showTransformNotice = useCallback(
     (session: WasmSession) => {
       const notice = session.take_transform_notice();
@@ -2343,6 +2355,7 @@ export function useEditorSession(
     guideState,
     toggleGuide,
     loadTemplate,
+    arcBar,
     placement,
     historyBusy: history.busy,
     historyNames: history.names,
