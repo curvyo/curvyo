@@ -86,9 +86,10 @@ impl Session {
                     this.command_refusal = match &refusal {
                         BooleanRefusal::NoArea { offenders, .. }
                         | BooleanRefusal::OutOfRange { offenders, .. }
-                        | BooleanRefusal::Groups { offenders } => {
-                            Some(RefusalMarks::new(offenders.clone(), &selection))
-                        }
+                        | BooleanRefusal::Groups { offenders }
+                        | BooleanRefusal::Texts(curvyo_ui_core::TextRefusal {
+                            offenders, ..
+                        }) => Some(RefusalMarks::new(offenders.clone(), &selection)),
                         BooleanRefusal::NeedsTwo | BooleanRefusal::Empty => None,
                     };
                     return BooleanOutcome::Refused(refusal);

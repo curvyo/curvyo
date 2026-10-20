@@ -24,6 +24,9 @@ pub const SPLIT_COMMIT_LABEL: &str = "split";
 /// Why Split was refused. Nothing was changed in any of these cases.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SplitRefusal {
+    /// Texts of the selection use a missing face or are not laid out yet: nothing is converted
+    /// (`specs/0074-text-objects` criteria 24 and 29).
+    Texts(crate::text_convert::TextRefusal),
     /// The selection holds no compound path (the button is dimmed then; reachable only through
     /// the session function).
     NoCompound,
@@ -262,6 +265,11 @@ pub fn plan_split(
     selection: &ObjectSelection,
     minter: &mut AnchorIdMinter,
 ) -> Result<SplitPlan, SplitRefusal> {
+    if let Some(refusal) = crate::text_convert::texts_refusal(objects, selection.ids()) {
+        return Err(SplitRefusal::Texts(refusal));
+    }
+    let converted = crate::text_convert::texts_as_paths(objects);
+    let objects: &[ObjectSnapshot] = &converted;
     let operands = operands_in_order(objects, selection);
     let compounds = operands.iter().filter(|object| is_compound(object)).count();
     if compounds == 0 {
@@ -342,11 +350,13 @@ pub fn plan_split(
 /// rule of the Boolean operations, Combine and Cut).
 pub(crate) fn in_range(object: &ObjectSnapshot) -> bool {
     match object {
-        ObjectSnapshot::Path(path)
-        | ObjectSnapshot::Clone(curvyo_document_core::CloneSnapshot { resolved: path, .. }) => path
-            .subpaths()
-            .all(|outline| !out_of_range(outline.anchors)),
-        ObjectSnapshot::Primitive(_) => true,
+        ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_)
+            if let Some(path) = object.drawn_path() =>
+        {
+            path.subpaths()
+                .all(|outline| !out_of_range(outline.anchors))
+        }
+        _ => true,
     }
 }
 

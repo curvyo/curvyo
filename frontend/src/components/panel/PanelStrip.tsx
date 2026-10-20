@@ -1,4 +1,5 @@
 import {
+  CaseSensitive,
   Droplet,
   File,
   FolderOpen,
@@ -29,11 +30,18 @@ const GLYPHS: Record<string, Glyph> = {
   style: Droplet,
   layers: Layers,
   history: History,
+  fonts: CaseSensitive,
 };
 
 /** The tooltips come from the session with the Ctrl key; macOS says Cmd (criterion 4). */
 const MAC = isMac(navigator.platform);
-const tooltipText = (text: string) => (MAC ? text.replace("Shift+Ctrl+", "Shift+Cmd+") : text);
+const tooltipText = (text: string, desktop: boolean) =>
+  // The browser build has no key for the Fonts tab: Chrome reserves Ctrl+Shift+T (`0074`).
+  !desktop && text.startsWith("Fonts (")
+    ? "Fonts"
+    : MAC
+      ? text.replace("Shift+Ctrl+", "Shift+Cmd+")
+      : text;
 
 interface PanelStripProps {
   tabs: readonly PanelTabView[];
@@ -43,6 +51,8 @@ interface PanelStripProps {
   open: boolean;
   /** The id of the body, for `aria-controls` of the collapse control. */
   bodyId: string;
+  /** The desktop build (the Fonts tab's key exists only there, `specs/0074-text-objects`). */
+  desktop?: boolean;
   /** The project has unsaved changes: the File tab carries a dot, also while the body is hidden. */
   fileDirty: boolean;
   /** The collapse control was pressed. */
@@ -78,6 +88,7 @@ export function PanelStrip({
   open,
   bodyId,
   fileDirty,
+  desktop = false,
   onToggle,
   onActivate,
   onReturnFocus,
@@ -168,7 +179,7 @@ export function PanelStrip({
             </TabsTrigger>
           );
           return (
-            <Tooltip key={tab.name} side="left" content={tooltipText(tab.tooltip)}>
+            <Tooltip key={tab.name} side="left" content={tooltipText(tab.tooltip, desktop)}>
               {tab.enabled ? trigger : <span className="inline-flex">{trigger}</span>}
             </Tooltip>
           );

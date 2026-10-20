@@ -128,6 +128,22 @@ impl Session {
                 ..SelectDecorationInput::default()
             };
         }
+        if self.tool == Tool::Text {
+            // The Text tool shows the hover box of the text a click would edit, never a selected
+            // box or a handle (`specs/0074-text-objects`, UX notes §1 "Hover").
+            let hovered = self.hovered_object.and_then(|id| {
+                objects
+                    .iter()
+                    .find(|object| object.id() == id)
+                    .map(|object| (id, oriented_bounds(object).document_corners()))
+            });
+            return SelectDecorationInput {
+                hovered,
+                history_hovered,
+                device_pixel_ratio: self.device_pixel_ratio,
+                ..SelectDecorationInput::default()
+            };
+        }
         if self.tool != Tool::Select {
             return SelectDecorationInput {
                 history_hovered,

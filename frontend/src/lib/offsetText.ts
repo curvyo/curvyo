@@ -3,6 +3,7 @@
 // refusal sentences. Pure, so they are tested without a session.
 
 import { NOTHING_CHANGED, plural, sharedRefusalText } from "./booleanText.ts";
+import { textRefusalText } from "./textText.ts";
 
 export type OffsetDirectionName = "out" | "in" | "both";
 export type OffsetJoinName = "round" | "miter" | "bevel";
@@ -51,6 +52,8 @@ export interface OffsetOutcome {
   vanished: number;
   distanceMm: number;
   direction: string;
+  /** The one missing face of a refusal of texts (`specs/0074-text-objects` criterion 29). */
+  face?: string;
 }
 
 export const OFFSET_IDLE: OffsetView = {
@@ -167,6 +170,10 @@ export function offsetSuccessText(outcome: OffsetOutcome): string | null {
 
 /** The refusal after a release or the chip's Enter (criteria 29, 32), or `null` for no refusal. */
 export function offsetRefusalText(outcome: OffsetOutcome): string | null {
+  const texts = textRefusalText(outcome);
+  if (texts) {
+    return texts;
+  }
   switch (outcome.kind) {
     case "empty":
       return `Inset is empty: nothing is left at ${formatDistance(outcome.distanceMm)} mm. ${NOTHING_CHANGED}`;

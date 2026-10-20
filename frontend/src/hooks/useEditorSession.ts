@@ -4,6 +4,7 @@ import { type CanvasNotice, type HistoryNames, MAC, useHistory } from "@/hooks/u
 import { type ClonesApi, useClones } from "@/hooks/useClones";
 import { type GroupingApi, useGrouping } from "@/hooks/useGrouping";
 import { type OffsetApi, readOffsetView, useOffset } from "@/hooks/useOffset";
+import { type TextApi, useText } from "@/hooks/useText";
 import { type PenEntryApi, usePenEntry } from "@/hooks/usePenEntry";
 import { type PlacementApi, usePlacement } from "@/hooks/usePlacement";
 import { offsetKeyOutcome, offsetReadout } from "@/lib/offsetText";
@@ -41,7 +42,8 @@ export type Tool =
   | "rectangle"
   | "ellipse"
   | "polygon-star"
-  | "offset";
+  | "offset"
+  | "text";
 
 /** The polygon/star tool-options bar's mode toggle (acceptance criteria
  * 11 vs. 12). */
@@ -692,6 +694,9 @@ export interface EditorSession {
   /** The Offset tool (`specs/0038-path-offset`): its view, the entry chip's values and Enter,
    * and the notice after a release. */
   offset: OffsetApi;
+  /** The Text tool (`specs/0074-text-objects`): the input sink, the Text bar, the Fonts tab and
+   * the fonts the host hands in. */
+  text: TextApi;
   /** Linked clones: the button, the panel block, the canvas tags (`specs/0049-linked-clone`). */
   clones: ClonesApi;
   /** The flip buttons and the keys H and V (`specs/0056-mirror-and-negative-scale/`). */
@@ -1057,6 +1062,8 @@ export function useEditorSession(
   }, [refreshHistory]);
   const grouping = useGrouping(getSession, syncFromSession, history.showNotice);
   const offset = useOffset(getSession, syncFromSession, syncRevision, history.showNotice);
+  const text = useText(getSession, syncFromSession, syncRevision, history.showNotice, containerRef);
+  const { focusSinkNow } = text;
   const { showReleaseOutcome: showOffsetOutcome } = offset;
   const { refresh: refreshGrouping, handleKeyOutcome: handleGroupingOutcome } = grouping;
   const placement = usePlacement(getSession, syncFromSession, containerRef);
@@ -1338,6 +1345,9 @@ export function useEditorSession(
     if (!session) {
       throw new Error("no editing session is attached yet");
     }
+    // A save in text edit mode writes the session as its step and edit mode goes on, so the file
+    // holds what is on screen (`specs/0074-text-objects`, UX notes §2).
+    session.checkpoint_text_edit();
     return session.pack();
   }, []);
 
@@ -1549,6 +1559,13 @@ export function useEditorSession(
     [syncFromSession],
   );
 
+  /** The one missing face a command's refusal of texts names (`specs/0074-text-objects`). */
+  const refusedFace = useCallback(
+    (kind: string) =>
+      kind === "missing_fonts" ? (sessionRef.current?.text_refusal_face() ?? "") : "",
+    [],
+  );
+
   const applyBoolean = useCallback(
     (op: BooleanOp): BooleanResult => {
       const raw = sessionRef.current?.apply_boolean(op);
@@ -1570,11 +1587,12 @@ export function useEditorSession(
         compound: raw.compound,
         closedOpen: raw.closed_open,
         removedOpen: raw.removed_open,
+        face: refusedFace(raw.kind),
       };
       raw.free();
       return result;
     },
-    [syncFromSession],
+    [syncFromSession, refusedFace],
   );
 
   const applyCombine = useCallback((): CombineResult => {
@@ -1605,10 +1623,11 @@ export function useEditorSession(
       singleNodesRemoved: raw.single_nodes_removed,
       markers: raw.markers,
       stylesDiffer: raw.styles_differ,
+      face: refusedFace(raw.kind),
     };
     raw.free();
     return result;
-  }, [syncFromSession]);
+  }, [syncFromSession, refusedFace]);
 
   const applySplit = useCallback((): SplitResult => {
     const raw = sessionRef.current?.apply_split();
@@ -1623,10 +1642,11 @@ export function useEditorSession(
       withHoles: raw.with_holes,
       leftAlone: raw.left_alone,
       of: raw.of,
+      face: refusedFace(raw.kind),
     };
     raw.free();
     return result;
-  }, [syncFromSession]);
+  }, [syncFromSession, refusedFace]);
 
   const applyBreakApart = useCallback((): BreakApartResult => {
     const raw = sessionRef.current?.apply_break_apart();
@@ -1640,10 +1660,11 @@ export function useEditorSession(
       pieces: raw.pieces,
       withHoles: raw.with_holes,
       singleNodesRemoved: raw.single_nodes_removed,
+      face: refusedFace(raw.kind),
     };
     raw.free();
     return result;
-  }, [syncFromSession]);
+  }, [syncFromSession, refusedFace]);
 
   const applyCut = useCallback((): CutResult => {
     const raw = sessionRef.current?.apply_cut();
@@ -1651,10 +1672,16 @@ export function useEditorSession(
     if (!raw) {
       return { kind: "ignored", count: 0, of: 0, pieces: 0 };
     }
-    const result = { kind: raw.kind, count: raw.count, of: raw.of, pieces: raw.pieces };
+    const result = {
+      kind: raw.kind,
+      count: raw.count,
+      of: raw.of,
+      pieces: raw.pieces,
+      face: refusedFace(raw.kind),
+    };
     raw.free();
     return result;
-  }, [syncFromSession]);
+  }, [syncFromSession, refusedFace]);
 
   const applyStack = useCallback(
     (command: StackCommand): StackResult => {
@@ -1684,11 +1711,12 @@ export function useEditorSession(
         strokesFollow: raw.strokes_follow,
         closedOpen: raw.closed_open,
         removedOpen: raw.removed_open,
+        face: refusedFace(raw.kind),
       };
       raw.free();
       return result;
     },
-    [syncFromSession],
+    [syncFromSession, refusedFace],
   );
 
   /** The event's canvas-relative CSS pixel position — pure DOM geometry,
@@ -2034,8 +2062,18 @@ export function useEditorSession(
       setLiveReadout(null);
       setCursorHint(session.cursor_hint());
       syncFromSession();
+      // A press in the Text tool starts edit mode: the keys typed right after the release must
+      // reach the sink, not the canvas, where they are tool letters (`0074` UX review).
+      focusSinkNow();
     },
-    [canvasPoint, syncFromSession, syncTrackedModifiers, showOffsetOutcome, showTransformNotice],
+    [
+      canvasPoint,
+      syncFromSession,
+      syncTrackedModifiers,
+      showOffsetOutcome,
+      showTransformNotice,
+      focusSinkNow,
+    ],
   );
 
   const onPointerCancel = useCallback(() => {
@@ -2414,6 +2452,7 @@ export function useEditorSession(
     canvasNotice: history.notice,
     grouping,
     offset,
+    text,
     clones,
     flip,
     flipEnabled,

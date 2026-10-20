@@ -18,6 +18,7 @@ use crate::ellipse_arc::EllipseArc;
 use crate::path_model::{NodeId, PathSnapshot};
 use crate::ring_curve::Curve;
 use crate::style_model::Style;
+use crate::text_model::TextSnapshot;
 use crate::units::{Angle, Length, Point, Tolerance, Vec2};
 
 /// A rectangle's bounding box, normalized so `origin` is always the
@@ -305,6 +306,10 @@ pub enum ObjectSnapshot {
     /// A linked clone, resolved through its chain (`specs/0049-linked-clone`): readers that
     /// draw, hit, measure or output it use [`CloneSnapshot::resolved`].
     Clone(CloneSnapshot),
+    /// A text object (`specs/0074-text-objects`, ADR 0020 §1): drawn through the text engine;
+    /// commands that work on paths convert it first. Boxed, so a text is no larger than the
+    /// other kinds in every object list.
+    Text(Box<TextSnapshot>),
 }
 
 impl ObjectSnapshot {
@@ -315,6 +320,7 @@ impl ObjectSnapshot {
             Self::Path(snapshot) => &snapshot.style,
             Self::Primitive(snapshot) => &snapshot.style,
             Self::Clone(snapshot) => &snapshot.resolved.style,
+            Self::Text(snapshot) => &snapshot.style,
         }
     }
 
@@ -325,6 +331,20 @@ impl ObjectSnapshot {
             Self::Path(snapshot) => &mut snapshot.style,
             Self::Primitive(snapshot) => &mut snapshot.style,
             Self::Clone(snapshot) => &mut snapshot.resolved.style,
+            Self::Text(snapshot) => &mut snapshot.style,
+        }
+    }
+
+    /// The outline this object is drawn, hit and traced by when it has one of its own: a path's,
+    /// a clone's resolved outline, a text's laid-out glyphs ([`TextSnapshot::outline`]); `None` for
+    /// a primitive (drawn from its shape) and a text not laid out yet.
+    #[must_use]
+    pub fn drawn_path(&self) -> Option<&PathSnapshot> {
+        match self {
+            Self::Path(path) => Some(path),
+            Self::Clone(clone) => Some(&clone.resolved),
+            Self::Text(text) => text.outline.as_deref().map(|outline| &outline.glyphs),
+            Self::Primitive(_) => None,
         }
     }
 
@@ -335,6 +355,7 @@ impl ObjectSnapshot {
             Self::Path(snapshot) => snapshot.id,
             Self::Primitive(snapshot) => snapshot.id,
             Self::Clone(snapshot) => snapshot.id(),
+            Self::Text(snapshot) => snapshot.id,
         }
     }
 
@@ -343,11 +364,12 @@ impl ObjectSnapshot {
     /// (`specs/0005-object-transform/adrs.md`: "the meaning is the same
     /// for both kinds").
     #[must_use]
-    pub const fn rotation(&self) -> Angle {
+    pub fn rotation(&self) -> Angle {
         match self {
             Self::Path(snapshot) => snapshot.rotation,
             Self::Primitive(snapshot) => snapshot.rotation,
             Self::Clone(snapshot) => snapshot.resolved.rotation,
+            Self::Text(snapshot) => snapshot.rotation(),
         }
     }
 
@@ -404,6 +426,9 @@ impl ObjectSnapshot {
             Self::Clone(clone) => {
                 Self::Clone(clone.mapped_by(Affine::rotation_about(pivot, angle)))
             }
+            Self::Text(text) => Self::Text(Box::new(
+                text.mapped_by(Affine::rotation_about(pivot, angle)),
+            )),
         }
     }
 
@@ -432,6 +457,7 @@ impl ObjectSnapshot {
                 Self::Primitive(primitive)
             }
             Self::Clone(clone) => Self::Clone(clone.mapped_by(Affine::translation(offset))),
+            Self::Text(text) => Self::Text(Box::new(text.mapped_by(Affine::translation(offset)))),
         }
     }
 }

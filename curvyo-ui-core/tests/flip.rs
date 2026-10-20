@@ -380,6 +380,7 @@ fn assert_same(a: &[ObjectSnapshot], b: &[ObjectSnapshot]) {
 /// The drawn outline's anchor points of `object`.
 fn drawn(object: &ObjectSnapshot) -> Vec<Point> {
     match object {
+        ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Primitive(p) => outline_of_rotated(&p.shape, p.rotation)
             .iter()
             .map(|a| a.point)

@@ -1,4 +1,6 @@
 import { CircleAlert, Link, Unlink } from "lucide-react";
+import { TextControls } from "@/components/TextBar";
+import type { TextBarState } from "@/hooks/useText";
 import { Toggle, Tooltip } from "radix-ui";
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 
@@ -40,6 +42,15 @@ export interface SelectToolbarProps {
   /** Escape in the middle of a slider drag: the preview is dropped. */
   onCancelRatio: () => void;
   onConvertToPaths: () => void;
+  /** The refusal of Object to path for texts with a missing face, 4 px under the button
+   * (`specs/0074-text-objects`, UX notes §4). */
+  objectToPathNotice?: string | null;
+  /** The Text group (`specs/0074-text-objects` criterion 11): shown while the selection holds a
+   * text, acting on the texts only. */
+  textBar?: TextBarState;
+  onShowFonts?: () => void;
+  onSetTextSize?: (mm: number) => string | null;
+  onPreviewTextSize?: (mm: number | null) => void;
   /** The Linked clone button is shown (`specs/0049-linked-clone` criterion 4). */
   linkedCloneShown: boolean;
   onLinkedClone: () => void;
@@ -539,6 +550,11 @@ export function SelectToolbar({
   onSetRatio,
   onCancelRatio,
   onConvertToPaths,
+  objectToPathNotice = null,
+  textBar,
+  onShowFonts,
+  onSetTextSize,
+  onPreviewTextSize,
   linkedCloneShown,
   onLinkedClone,
   linkedCloneNotice,
@@ -603,17 +619,43 @@ export function SelectToolbar({
   if (arcBar.state.curveShown && !arcBar.state.ellipseShown) {
     groups.push(<CurveGroup key="curve" arc={arcBar} onReturnFocus={onReturnFocus} />);
   }
+  if (textBar?.shown && onShowFonts && onSetTextSize && onPreviewTextSize) {
+    groups.push(
+      <div key="text" role="group" aria-label="Text" className={GROUP_CLASS}>
+        <TextControls
+          bar={textBar}
+          onShowFonts={onShowFonts}
+          onSetSize={onSetTextSize}
+          onPreviewSize={onPreviewTextSize}
+          onReturnFocus={onReturnFocus}
+        />
+      </div>,
+    );
+  }
   if (bar.objectToPathShown) {
     groups.push(
-      <button
-        key="object-to-path"
-        type="button"
-        title="Convert the selected shapes to paths"
-        onClick={onConvertToPaths}
-        className={`${BUTTON_CLASS} my-1`}
-      >
-        Object to path
-      </button>,
+      <div key="object-to-path" className="relative">
+        <button
+          type="button"
+          title="Convert the selected shapes and texts to paths"
+          onClick={onConvertToPaths}
+          className={`${BUTTON_CLASS} my-1`}
+        >
+          Object to path
+        </button>
+        {/* Takes no focus; the refusal look of the design system ("Action notice"). */}
+        <div
+          role="alert"
+          className="absolute top-full right-0 mt-1 w-max max-w-[320px] break-words rounded-md px-2 py-1 text-xs ring-1 ring-[var(--field-invalid)]"
+          style={
+            objectToPathNotice
+              ? { background: "var(--popover)", color: "var(--field-invalid)" }
+              : { display: "none" }
+          }
+        >
+          {objectToPathNotice}
+        </div>
+      </div>,
     );
   }
   if (linkedCloneShown) {

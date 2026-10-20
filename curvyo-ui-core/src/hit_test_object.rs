@@ -61,8 +61,12 @@ where
 /// objects rejects almost all of them here, before any outline is built.
 fn certainly_farther_than(object: &ObjectSnapshot, point: Point, margin: f64) -> bool {
     match object {
-        ObjectSnapshot::Path(path)
-        | ObjectSnapshot::Clone(curvyo_document_core::CloneSnapshot { resolved: path, .. }) => {
+        // A text is hit anywhere inside the box of its lines (`specs/0074-text-objects`
+        // criterion 25).
+        ObjectSnapshot::Text(text) => !crate::text_box::line_box_contains(text, point, margin),
+        ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_)
+            if let Some(path) = object.drawn_path() =>
+        {
             let mut hull = (
                 f64::INFINITY,
                 f64::INFINITY,
@@ -88,6 +92,7 @@ fn certainly_farther_than(object: &ObjectSnapshot, point: Point, margin: f64) ->
                 || point.y < hull.1 - margin
                 || point.y > hull.3 + margin
         }
+        ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_) => true,
         ObjectSnapshot::Primitive(primitive) => {
             let (min, max) = shape_frame_bounds(&primitive.shape);
             let centre = Point::new(f64::midpoint(min.x, max.x), f64::midpoint(min.y, max.y));
@@ -108,22 +113,28 @@ pub(crate) fn distance_to_object(
     match object {
         // Every outline of a compound path counts: the stroke of any of them
         // picks the object (criterion 33).
-        ObjectSnapshot::Path(path)
-        | ObjectSnapshot::Clone(curvyo_document_core::CloneSnapshot { resolved: path, .. }) => path
-            .subpaths()
-            .filter_map(|subpath| {
-                nearest_distance_on_run(
-                    subpath.anchors.len(),
-                    subpath.closed,
-                    point,
-                    tolerance,
-                    |i| {
-                        let anchor = &subpath.anchors[i];
-                        (anchor.point, anchor.handle_in, anchor.handle_out)
-                    },
-                )
-            })
-            .min_by(f64::total_cmp),
+        ObjectSnapshot::Text(text) => {
+            crate::text_box::line_box_contains(text, point, tolerance.as_mm()).then_some(0.0)
+        }
+        ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_)
+            if let Some(path) = object.drawn_path() =>
+        {
+            path.subpaths()
+                .filter_map(|subpath| {
+                    nearest_distance_on_run(
+                        subpath.anchors.len(),
+                        subpath.closed,
+                        point,
+                        tolerance,
+                        |i| {
+                            let anchor = &subpath.anchors[i];
+                            (anchor.point, anchor.handle_in, anchor.handle_out)
+                        },
+                    )
+                })
+                .min_by(f64::total_cmp)
+        }
+        ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_) => None,
         ObjectSnapshot::Primitive(primitive) => {
             let outline = outline_of_rotated(&primitive.shape, primitive.rotation);
             nearest_distance_on_run(outline.len(), outline.closed, point, tolerance, |i| {
@@ -139,20 +150,31 @@ pub(crate) fn distance_to_object(
 /// path), a primitive's rotation-aware outline.
 fn outlines_of(object: &ObjectSnapshot) -> Vec<(Vec<OutlineTriple>, bool)> {
     match object {
-        ObjectSnapshot::Path(path)
-        | ObjectSnapshot::Clone(curvyo_document_core::CloneSnapshot { resolved: path, .. }) => path
-            .subpaths()
-            .map(|subpath| {
-                (
-                    subpath
-                        .anchors
-                        .iter()
-                        .map(|a| (a.point, a.handle_in, a.handle_out))
-                        .collect(),
-                    subpath.closed,
-                )
-            })
-            .collect(),
+        // Marquee and lasso take a text by its line box (criterion 25).
+        ObjectSnapshot::Text(text) => vec![(
+            crate::text_box::line_box_corners(text)
+                .iter()
+                .map(|corner| (*corner, Vec2::ZERO, Vec2::ZERO))
+                .collect(),
+            true,
+        )],
+        ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_)
+            if let Some(path) = object.drawn_path() =>
+        {
+            path.subpaths()
+                .map(|subpath| {
+                    (
+                        subpath
+                            .anchors
+                            .iter()
+                            .map(|a| (a.point, a.handle_in, a.handle_out))
+                            .collect(),
+                        subpath.closed,
+                    )
+                })
+                .collect()
+        }
+        ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_) => Vec::new(),
         ObjectSnapshot::Primitive(primitive) => {
             let outline = outline_of_rotated(&primitive.shape, primitive.rotation);
             vec![(

@@ -1,4 +1,6 @@
 import { panelHandlesEscape } from "@/lib/panelEscape";
+import { FontsTab } from "@/components/panel/FontsTab";
+import { focusCurrentFont, fontsSubject } from "@/lib/textText";
 import { useCallback, useEffect, useId, useRef } from "react";
 
 import { DocumentSection } from "@/components/panel/DocumentSection";
@@ -98,12 +100,22 @@ export function PropertiesPanel({
       const key = event.key.toLowerCase();
       if (
         !(event.shiftKey && (event.ctrlKey || event.metaKey)) ||
-        (key !== "f" && key !== "d" && key !== "h" && key !== "l")
+        (key !== "f" && key !== "d" && key !== "h" && key !== "l" && key !== "t")
       ) {
+        return;
+      }
+      // Shift+Ctrl+T is the desktop's only: the browser keeps Chrome's key (`0074` criterion 15).
+      if (key === "t" && !isTauri) {
         return;
       }
       event.preventDefault();
       if (getSession()?.pointer_is_down()) {
+        return;
+      }
+      if (key === "t") {
+        shortcut("fonts");
+        setOpen(true);
+        focusCurrentFont();
         return;
       }
       focusAfterShortcut.current = true;
@@ -158,7 +170,9 @@ export function PropertiesPanel({
       ? doc.view.presets.subject
       : doc.view.content === "style"
         ? panel.view.subject
-        : "";
+        : doc.view.content === "fonts"
+          ? fontsSubject(editor.text.fonts)
+          : "";
   const activeLabel = doc.view.tabs.find((tab) => tab.name === doc.view.activeTab)?.label ?? "";
   /** A press on a tab (or Enter, Space on a focused one) shows the body with that tab. */
   const activate = (name: string) => {
@@ -180,6 +194,7 @@ export function PropertiesPanel({
         open={open}
         bodyId={panelId}
         fileDirty={project.dirty}
+        desktop={isTauri}
         onToggle={(event) => {
           // A press on the collapse control ends picking too (`0040` UX notes).
           if (picking) {
@@ -260,7 +275,9 @@ export function PropertiesPanel({
         <div
           key={doc.view.activeTab}
           className={
-            doc.view.content === "history" || doc.view.content === "layers"
+            doc.view.content === "history" ||
+            doc.view.content === "layers" ||
+            doc.view.content === "fonts"
               ? // The tabs with an inner scroll area, the list: the header, the buttons
                 // and the footer stay in view (`0020` criterion 43, `0050` criterion 3).
                 "flex min-h-0 flex-1 flex-col px-3 pb-3"
@@ -271,7 +288,9 @@ export function PropertiesPanel({
             value={doc.view.activeTab}
             tabIndex={-1}
             className={
-              doc.view.content === "history" || doc.view.content === "layers"
+              doc.view.content === "history" ||
+              doc.view.content === "layers" ||
+              doc.view.content === "fonts"
                 ? "flex min-h-0 flex-1 flex-col outline-none"
                 : "outline-none"
             }
@@ -302,6 +321,19 @@ export function PropertiesPanel({
                 showNotice={editor.showHistoryNotice}
                 onReturnFocus={returnFocus}
                 onLinkedClone={() => editor.clones.apply("linked-clone", "layers")}
+              />
+            ) : doc.view.content === "fonts" ? (
+              <FontsTab
+                data={editor.text.fonts}
+                onPick={editor.text.pickFont}
+                onReturnFocus={() => {
+                  if (editor.text.editing) {
+                    editor.text.sinkRef.current?.focus();
+                  } else {
+                    returnFocus();
+                  }
+                }}
+                onShown={editor.text.listHostFonts}
               />
             ) : doc.view.content === "history" ? (
               <HistoryTab

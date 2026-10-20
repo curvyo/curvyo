@@ -104,6 +104,7 @@ fn one_rect() -> Session {
 fn left_edge_x(s: &Session) -> f64 {
     let d = reread(s);
     match d.object(d.object_ids()[0]).unwrap() {
+        curvyo_document_core::ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         curvyo_document_core::ObjectSnapshot::Clone(_) => panic!("no clone here"),
         curvyo_document_core::ObjectSnapshot::Primitive(p) => match p.shape {
             curvyo_document_core::Shape::Rect { bounds, .. } => bounds.origin.x,

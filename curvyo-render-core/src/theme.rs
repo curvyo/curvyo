@@ -466,3 +466,19 @@ pub const REFERENCE_MARK_LINE_PX: f64 = 1.0;
 
 /// A mark under the pointer, or whose radio has the focus, is this much larger, screen pixels.
 pub const REFERENCE_MARK_HOVER_GROWTH_PX: f64 = 2.0;
+
+/// `--text-caret`: the caret of a text in edit mode (`specs/0074-text-objects`, UX notes §2), an
+/// alias of the accent over the white casing.
+pub const TEXT_CARET: RgbaColor = ACCENT;
+/// The caret's width, screen px.
+pub const TEXT_CARET_PX: f64 = 1.5;
+/// The caret's white casing on each side, screen px.
+pub const TEXT_CARET_CASING_PX: f64 = 1.0;
+/// The shortest caret, screen px, so it reads on a small text when zoomed out.
+pub const TEXT_CARET_MIN_PX: f64 = 12.0;
+/// `--text-selection`: the selected range, the accent at 30 %.
+pub const TEXT_SELECTION: RgbaColor = ACCENT.with_alpha(77); // 30% of 255, rounded
+/// `--text-preedit`: the IME composition's underline, an alias of the accent.
+pub const TEXT_PREEDIT: RgbaColor = ACCENT;
+/// The composition's underline width, screen px.
+pub const TEXT_PREEDIT_PX: f64 = 1.0;

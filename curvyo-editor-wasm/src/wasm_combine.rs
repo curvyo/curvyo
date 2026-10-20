@@ -111,6 +111,11 @@ impl From<CombineOutcome> for CombineResultView {
                     refused("groups", offenders.len(), offenders.len())
                 }
                 CombineRefusal::SingleNodesOnly => refused("single_nodes_only", 0, 0),
+                CombineRefusal::Texts(texts) => refused(
+                    crate::wasm_text::refusal_kind(&texts),
+                    texts.offenders.len(),
+                    0,
+                ),
             },
         }
     }

@@ -96,11 +96,15 @@ pub(crate) fn operands_in_order<'a>(
 
 pub(crate) fn is_open(object: &ObjectSnapshot) -> bool {
     match object {
-        ObjectSnapshot::Path(path)
-        | ObjectSnapshot::Clone(curvyo_document_core::CloneSnapshot { resolved: path, .. }) => {
+        ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_)
+            if let Some(path) = object.drawn_path() =>
+        {
             path.subpaths().any(|subpath| !subpath.closed)
         }
         // An open Arc (`specs/0021-ellipse-arcs-and-shaping/` criterion 60).
+        // A text arrives as its glyphs' path (`text_convert::texts_as_paths`), never here as a
+        // text: only an unconverted one, which the command refused first.
+        ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_) | ObjectSnapshot::Text(_) => false,
         ObjectSnapshot::Primitive(primitive) => {
             !outline_of_rotated(&primitive.shape, primitive.rotation).closed
         }
@@ -134,6 +138,9 @@ pub fn boolean_availability(
 /// Why an operation was refused. Nothing was changed in any of these cases.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BooleanRefusal {
+    /// Texts of the selection use a missing face or are not laid out yet: nothing is converted
+    /// (`specs/0074-text-objects` criteria 24 and 29).
+    Texts(crate::text_convert::TextRefusal),
     /// Fewer than two objects are selected.
     NeedsTwo,
     /// `offenders` of the `of` selected objects enclose no area.
@@ -187,20 +194,25 @@ pub struct BooleanPlan {
 /// rotated outline.
 pub(crate) fn outlines_of(object: &ObjectSnapshot) -> Vec<(Vec<OutlineTriple>, bool)> {
     match object {
-        ObjectSnapshot::Path(path)
-        | ObjectSnapshot::Clone(curvyo_document_core::CloneSnapshot { resolved: path, .. }) => path
-            .subpaths()
-            .map(|subpath| {
-                (
-                    subpath
-                        .anchors
-                        .iter()
-                        .map(|a| (a.point, a.handle_in, a.handle_out))
-                        .collect(),
-                    subpath.closed,
-                )
-            })
-            .collect(),
+        ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_)
+            if let Some(path) = object.drawn_path() =>
+        {
+            path.subpaths()
+                .map(|subpath| {
+                    (
+                        subpath
+                            .anchors
+                            .iter()
+                            .map(|a| (a.point, a.handle_in, a.handle_out))
+                            .collect(),
+                        subpath.closed,
+                    )
+                })
+                .collect()
+        }
+        // A text arrives as its glyphs' path (`text_convert::texts_as_paths`), never here as a
+        // text: only an unconverted one, which the command refused first.
+        ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_) | ObjectSnapshot::Text(_) => Vec::new(),
         ObjectSnapshot::Primitive(primitive) => {
             let outline = outline_of_rotated(&primitive.shape, primitive.rotation);
             vec![(
@@ -282,6 +294,11 @@ pub fn plan_boolean(
     op: BooleanOp,
     minter: &mut AnchorIdMinter,
 ) -> Result<BooleanPlan, BooleanRefusal> {
+    if let Some(refusal) = crate::text_convert::texts_refusal(objects, selection.ids()) {
+        return Err(BooleanRefusal::Texts(refusal));
+    }
+    let converted = crate::text_convert::texts_as_paths(objects);
+    let objects: &[ObjectSnapshot] = &converted;
     let operands = operands_in_order(objects, selection);
     let of = operands.len();
     if boolean_availability(objects, selection) == BooleanAvailability::NeedsTwo {

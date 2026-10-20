@@ -137,6 +137,7 @@ fn load(target: &Document, source: &Document, from: u64) -> Vec<NodeId> {
 /// The geometry of an object without ids: points, closed flags, shapes.
 fn geometry(object: &ObjectSnapshot) -> String {
     match object {
+        ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Path(path) => {
             let points = |anchors: &[NewAnchor]| -> Vec<(u64, u64)> {
                 anchors

@@ -39,7 +39,7 @@ impl TemplateNode {
                         .map(|sub| sub.anchors.len())
                         .sum::<usize>()
             }
-            ObjectSnapshot::Primitive(_) | ObjectSnapshot::Clone(_) => 0,
+            ObjectSnapshot::Primitive(_) | ObjectSnapshot::Clone(_) | ObjectSnapshot::Text(_) => 0,
         }
     }
 }
@@ -139,6 +139,7 @@ impl Document {
                 crate::style_codec::write_changes(&meta, &created, &primitive.style);
                 return id;
             }
+            ObjectSnapshot::Text(text) => return self.create_text_uncommitted(text),
             ObjectSnapshot::Path(path) => path,
             ObjectSnapshot::Clone(clone) => &clone.resolved,
         };

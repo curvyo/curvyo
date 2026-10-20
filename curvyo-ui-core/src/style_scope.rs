@@ -52,7 +52,7 @@ fn paths_among(ids: &[NodeId], objects: &[ObjectSnapshot]) -> Vec<NodeId> {
         .filter(|object| match object {
             ObjectSnapshot::Path(_) => true,
             ObjectSnapshot::Clone(clone) => clone.chain.own_style,
-            ObjectSnapshot::Primitive(_) => false,
+            ObjectSnapshot::Primitive(_) | ObjectSnapshot::Text(_) => false,
         })
         .map(ObjectSnapshot::id)
         .collect()
@@ -200,6 +200,7 @@ fn kind_name(object: &ObjectSnapshot) -> (&'static str, &'static str) {
         ObjectSnapshot::Path(path) if path.is_compound() => ("Compound path", "compound paths"),
         ObjectSnapshot::Path(_) => ("Path", "paths"),
         ObjectSnapshot::Clone(_) => ("Clone", "clones"),
+        ObjectSnapshot::Text(_) => ("Text", "texts"),
         ObjectSnapshot::Primitive(PrimitiveSnapshot { shape, .. }) => match shape {
             Shape::Rect { .. } => ("Rectangle", "rectangles"),
             Shape::Ellipse { .. } => ("Ellipse", "ellipses"),

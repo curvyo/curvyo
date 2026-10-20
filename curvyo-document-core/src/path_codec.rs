@@ -461,6 +461,9 @@ fn validate_object_node(tree: &LoroTree, id: loro::TreeID) -> bool {
         ShapeTag::Present(shape) if shape == crate::clone_codec::SHAPE_CLONE => {
             crate::clone_codec::validate_clone_node(&meta)
         }
+        ShapeTag::Present(shape) if shape == crate::text_codec::SHAPE_TEXT => {
+            crate::text_codec::validate_text_node(&meta)
+        }
         ShapeTag::Present(shape) => crate::shape_codec::validate_primitive_node(&meta, &shape),
         ShapeTag::Absent => validate_path_node(&meta),
         ShapeTag::Mistyped => false,

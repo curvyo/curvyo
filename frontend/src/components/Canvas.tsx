@@ -4,6 +4,8 @@ import { EditHintChip } from "@/components/EditHintChip";
 import { HandleHintChip } from "@/components/HandleHintChip";
 import { KeyHintChip } from "@/components/KeyHintChip";
 import { CloneTags } from "@/components/CloneTags";
+import { FontMissingTags } from "@/components/FontMissingTags";
+import { TextSink } from "@/components/TextSink";
 import { MoveBadges } from "@/components/MoveBadges";
 import { NudgeReadout } from "@/components/NudgeReadout";
 import { NodeContextMenu } from "@/components/NodeToolbar";
@@ -91,7 +93,10 @@ export function Canvas({ editor }: CanvasProps) {
                 ? // The creation tools show their crosshair everywhere, over
                   // existing objects too (`unified-object-editing` criterion 25).
                   "cursor-crosshair"
-                : "cursor-default"
+                : editor.tool === "text"
+                  ? // The I-beam everywhere in the Text tool (`0074`, UX notes §1).
+                    "cursor-text"
+                  : "cursor-default"
       }`}
     >
       {/* The context-menu wrapper stays mounted across both tools —
@@ -208,6 +213,8 @@ export function Canvas({ editor }: CanvasProps) {
       <PenHintChip cue={penCue} containerRef={editor.containerRef} />
       <MoveBadges badges={editor.moveBadges} containerRef={editor.containerRef} />
       <CloneTags tags={editor.clones.tags} />
+      <FontMissingTags marks={editor.text.missingMarks} hidden={editor.isPanning} />
+      <TextSink text={editor.text} mounted={editor.tool === "text"} />
       <ColourPickChip
         active={editor.cursorHint === "eyedropper"}
         getSession={editor.getSession}

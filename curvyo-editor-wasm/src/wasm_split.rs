@@ -55,6 +55,10 @@ impl From<SplitOutcome> for SplitResultView {
                 left_alone,
             } => view("applied", compounds, pieces, with_holes, left_alone),
             SplitOutcome::Refused(SplitRefusal::NoCompound) => view("no_compound", 0, 0, false, 0),
+            SplitOutcome::Refused(SplitRefusal::Texts(texts)) => Self {
+                of: count(texts.offenders.len()),
+                ..view(crate::wasm_text::refusal_kind(&texts), 0, 0, false, 0)
+            },
             SplitOutcome::Refused(SplitRefusal::OnePiece {
                 compounds,
                 with_holes,
@@ -113,6 +117,12 @@ impl From<BreakApartOutcome> for BreakApartResultView {
             BreakApartOutcome::Refused(BreakApartRefusal::NoCompound) => {
                 view("no_compound", 0, 0, false)
             }
+            BreakApartOutcome::Refused(BreakApartRefusal::Texts(texts)) => view(
+                crate::wasm_text::refusal_kind(&texts),
+                texts.offenders.len(),
+                0,
+                false,
+            ),
             BreakApartOutcome::Refused(BreakApartRefusal::Groups { offenders }) => {
                 view("groups", offenders.len(), 0, false)
             }

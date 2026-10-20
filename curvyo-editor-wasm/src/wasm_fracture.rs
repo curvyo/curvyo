@@ -86,6 +86,11 @@ impl From<StackOutcome> for StackResultView {
                     view("no_overlap", 0, 0)
                 }
                 StackRefusal::TooManyPieces => view("too_many", 0, 0),
+                StackRefusal::Operands(BooleanRefusal::Texts(texts)) => view(
+                    crate::wasm_text::refusal_kind(&texts),
+                    texts.offenders.len(),
+                    0,
+                ),
             },
         }
     }

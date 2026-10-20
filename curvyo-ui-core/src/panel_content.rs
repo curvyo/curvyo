@@ -19,6 +19,8 @@ pub enum PanelContent {
     Layers,
     /// The History list (`specs/0020-undo-redo` criterion 39).
     History,
+    /// The Fonts tab (`specs/0074-text-objects` criteria 15 to 19).
+    Fonts,
     /// Nothing: no heading, no text, no control (`specs/0017-style-panel-
     /// rework` criterion 1). The Document tab with an unfinished Pen path, so
     /// a resize would not move the path being drawn, or the Style tab with
@@ -47,6 +49,7 @@ pub fn panel_body(
         PanelTab::Layers => PanelContent::Layers,
         PanelTab::History => PanelContent::History,
         PanelTab::File => PanelContent::File,
+        PanelTab::Fonts => PanelContent::Fonts,
     }
 }
 

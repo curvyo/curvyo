@@ -16,6 +16,8 @@ workspace = true
 curvyo-document-core = { path = "../curvyo-document-core", version = "0.1.0" }
 curvyo-ui-core = { path = "../curvyo-ui-core", version = "0.1.0" }
 curvyo-render-core = { path = "../curvyo-render-core", version = "0.1.0" }
+curvyo-text-core = { path = "../curvyo-text-core", version = "0.1.0" }
+kurbo.workspace = true
 # The History tab's rows cross the wasm boundary as one JSON text (ADR 0001 §5: strings and scalars).
 serde_json.workspace = true
 

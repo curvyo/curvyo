@@ -63,6 +63,17 @@ pub(crate) fn apply(
     if let ObjectSnapshot::Clone(clone) = object {
         return crate::clone_gesture::map_clone(clone, map_affine(clone.id(), map), converted);
     }
+    // A text takes every map whole: a uniform scale into its size, the rest into its placement
+    // (`specs/0074-text-objects` criterion 26); it never converts.
+    if let ObjectSnapshot::Text(text) = object {
+        let mut mapped = ObjectSnapshot::Text(Box::new(text.mapped_by(map_affine(text.id, map))));
+        if let GroupMap::Scale { sx, sy, .. } = *map
+            && modes.stroke == StrokeScaling::Proportional
+        {
+            scale_stroke(&mut mapped, stroke_or_radius_factor(sx.abs(), sy.abs()));
+        }
+        return mapped;
+    }
     match *map {
         GroupMap::Scale { pivot, sx, sy } => {
             scale_object(object, pivot, (sx, sy), modes, converted)
@@ -74,9 +85,8 @@ pub(crate) fn apply(
                 (ObjectSnapshot::Path(path), _) | (ObjectSnapshot::Primitive(_), Some(path)) => {
                     ObjectSnapshot::Path(path.sheared_along(fixed, ku, kv, axes))
                 }
-                (ObjectSnapshot::Primitive(_), None) | (ObjectSnapshot::Clone(_), _) => {
-                    object.clone()
-                }
+                (ObjectSnapshot::Primitive(_), None)
+                | (ObjectSnapshot::Clone(_) | ObjectSnapshot::Text(_), _) => object.clone(),
             }
         }
     }
@@ -127,7 +137,7 @@ fn scale_by_magnitudes(
         (ObjectSnapshot::Path(path), _) => {
             ObjectSnapshot::Path(path.scaled_along(pivot, sx, sy, axes))
         }
-        (ObjectSnapshot::Clone(_), _) => object.clone(),
+        (ObjectSnapshot::Clone(_) | ObjectSnapshot::Text(_), _) => object.clone(),
         (ObjectSnapshot::Primitive(_), Some(path)) if is_stretch(sx, sy) => {
             ObjectSnapshot::Path(path.scaled_along(pivot, sx, sy, axes))
         }
@@ -911,6 +921,7 @@ mod tests {
         let pivot = Point::new(7.0, -2.0);
         let points = |object: &ObjectSnapshot| -> Vec<Point> {
             match object {
+                ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
                 ObjectSnapshot::Primitive(p) => outline_of_rotated(&p.shape, p.rotation)
                     .iter()
                     .map(|a| a.point)

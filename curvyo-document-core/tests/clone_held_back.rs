@@ -43,6 +43,7 @@ fn path_of(d: &Document, id: NodeId) -> PathSnapshot {
 
 fn drawn(d: &Document, id: NodeId) -> PathSnapshot {
     match d.object(id).unwrap() {
+        ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Path(path) => path,
         ObjectSnapshot::Clone(clone) => clone.resolved,
         ObjectSnapshot::Primitive(_) => panic!("a primitive"),

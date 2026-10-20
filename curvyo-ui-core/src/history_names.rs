@@ -16,6 +16,11 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     ("create_ellipse", "Draw ellipse"),
     ("create_polygon", "Draw polygon"),
     ("create_star", "Draw star"),
+    // `specs/0074-text-objects` criteria 7 and 13.
+    ("add_text", "Add text"),
+    ("edit_text", "Edit text"),
+    ("change_font", "Change font"),
+    ("change_text_size", "Change text size"),
     ("translate_objects", "Move"),
     ("duplicate_objects", "Duplicate"),
     // `specs/0042-history-branches` criteria 10 and 22; the row adds the version's id.

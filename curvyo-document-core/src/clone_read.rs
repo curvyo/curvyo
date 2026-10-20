@@ -23,6 +23,10 @@ pub(crate) enum RawLeaf {
     Clone(NodeId, CloneLink, RawOverrides),
     /// A clone node whose link cannot be read (merge residue): always an orphan.
     BrokenClone(NodeId),
+    /// A text object: never an original.
+    Text(Box<crate::text_model::TextSnapshot>),
+    /// A leaf whose registers cannot be read (merge residue of a text): left out.
+    Unreadable(NodeId),
 }
 
 /// What a clone node stores besides its link (ADR 0016 §1).
@@ -39,7 +43,8 @@ impl RawLeaf {
         match self {
             Self::Path(path) => path.id,
             Self::Primitive(primitive) => primitive.id,
-            Self::Clone(id, ..) | Self::BrokenClone(id) => *id,
+            Self::Text(text) => text.id,
+            Self::Clone(id, ..) | Self::BrokenClone(id) | Self::Unreadable(id) => *id,
         }
     }
 
@@ -167,7 +172,10 @@ pub(crate) fn resolve(leaves: Vec<RawLeaf>) -> Resolution {
         .iter()
         .map(|leaf| match leaf {
             RawLeaf::Path(_) => State::Root,
-            RawLeaf::Primitive(_) | RawLeaf::BrokenClone(_) => State::NotOrigin,
+            RawLeaf::Primitive(_)
+            | RawLeaf::BrokenClone(_)
+            | RawLeaf::Text(_)
+            | RawLeaf::Unreadable(_) => State::NotOrigin,
             RawLeaf::Clone(..) => State::Pending,
         })
         .collect();
@@ -296,6 +304,8 @@ fn assemble(leaves: Vec<RawLeaf>, states: &[State], index: &HashMap<NodeId, usiz
         let object = match leaf {
             RawLeaf::Path(path) => Some(ObjectSnapshot::Path(path)),
             RawLeaf::Primitive(primitive) => Some(ObjectSnapshot::Primitive(primitive)),
+            RawLeaf::Text(text) => Some(ObjectSnapshot::Text(text)),
+            RawLeaf::Unreadable(_) => None,
             RawLeaf::Clone(id, ..) | RawLeaf::BrokenClone(id) => {
                 if let Some(clone) = clones[i].take() {
                     result

@@ -26,12 +26,21 @@ pub const MAX_CUT_PIECES: usize = 10_000;
 /// Why Cut was refused. Nothing was changed in any of these cases.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CutRefusal {
+    /// Texts of the selection use a missing face or are not laid out yet: nothing is converted
+    /// (`specs/0074-text-objects` criteria 24 and 29).
+    Texts(crate::text_convert::TextRefusal),
     /// Nothing is selected (the button is dimmed then; reachable only through the session).
     NoneSelected,
     /// The selection holds a group; Cut does not look through groups (`0023` criterion 28).
     /// `offenders` are the leaves of the groups, to outline.
     Groups {
         /// The leaves of the selected groups, to outline.
+        offenders: Vec<NodeId>,
+    },
+    /// The selection holds text objects whose letters make several outlines
+    /// (`specs/0074-text-objects`), which Cut does not take.
+    TextObjects {
+        /// The texts, to outline.
         offenders: Vec<NodeId>,
     },
     /// The selection holds compound paths, which Split or Break apart must take apart first.
@@ -87,7 +96,7 @@ fn contour_of(object: &ObjectSnapshot) -> Option<Contour> {
                 closed: path.closed,
             })
         }
-        ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_) => None,
+        ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_) | ObjectSnapshot::Text(_) => None,
         ObjectSnapshot::Primitive(primitive) => {
             let placeholder = AnchorId::new(0, 0);
             let outline = outline_of_rotated(&primitive.shape, primitive.rotation);
@@ -119,6 +128,26 @@ pub fn plan_cut(
     selection: &ObjectSelection,
     minter: &mut AnchorIdMinter,
 ) -> Result<CutPlan, CutRefusal> {
+    if let Some(refusal) = crate::text_convert::texts_refusal(objects, selection.ids()) {
+        return Err(CutRefusal::Texts(refusal));
+    }
+    // Cut takes outlines of one contour: a text whose letters make several outlines is refused
+    // with its own sentence rather than as a compound path the maker never made; a text of one
+    // outline ("I") is cut like a path (`specs/0074-text-objects/adrs.md`, dated note).
+    let texts: Vec<NodeId> = operands_in_order(objects, selection)
+        .iter()
+        .filter(|object| match object {
+            ObjectSnapshot::Text(text) => crate::text_convert::text_path(text)
+                .is_some_and(curvyo_document_core::PathSnapshot::is_compound),
+            _ => false,
+        })
+        .map(|object| object.id())
+        .collect();
+    if !texts.is_empty() {
+        return Err(CutRefusal::TextObjects { offenders: texts });
+    }
+    let converted = crate::text_convert::texts_as_paths(objects);
+    let objects: &[ObjectSnapshot] = &converted;
     let operands = operands_in_order(objects, selection);
     if operands.is_empty() {
         return Err(CutRefusal::NoneSelected);

@@ -136,6 +136,9 @@ pub fn oriented_bounds(object: &ObjectSnapshot) -> OrientedBox {
         | ObjectSnapshot::Clone(curvyo_document_core::CloneSnapshot { resolved: path, .. }) => {
             path_oriented_bounds(path)
         }
+        // The oriented line box, so the box does not jump as letters with and without
+        // descenders are typed (`specs/0074-text-objects`, UX notes §5).
+        ObjectSnapshot::Text(text) => crate::text_box::line_box_oriented(text),
     }
 }
 

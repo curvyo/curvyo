@@ -26,6 +26,7 @@ fn shape_word(shape: ObjectShape) -> &'static str {
         ObjectShape::Star => "star",
         ObjectShape::Group => "group",
         ObjectShape::Clone => "clone",
+        ObjectShape::Text => "text",
     }
 }
 
@@ -93,6 +94,7 @@ fn shape_name(shape: ObjectShape) -> &'static str {
         ObjectShape::Star => "Star",
         ObjectShape::Group => "Group",
         ObjectShape::Clone => "Clone",
+        ObjectShape::Text => "Text",
     }
 }
 
@@ -246,6 +248,9 @@ impl Session {
         {
             return WipeOutcome::Ignored;
         }
+        // A history jump ends text edit mode first and writes its one step, so it acts on what
+        // is on screen (`specs/0074-text-objects` criteria 7 and 9).
+        self.finish_text_edit();
         self.sync_history();
         self.document.set_step_time(self.history_clock()());
         match self.document.wipe_history() {

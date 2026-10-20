@@ -21,6 +21,8 @@ pub(crate) enum Node {
     Map(BTreeMap<String, Node>),
     /// A movable list container.
     List(Vec<Node>),
+    /// A text container (a text object's string, `specs/0074-text-objects`).
+    Text(String),
 }
 
 impl Node {
@@ -32,6 +34,7 @@ impl Node {
             ValueOrContainer::Container(Container::MovableList(list)) => {
                 Self::List(read_list(list))
             }
+            ValueOrContainer::Container(Container::Text(text)) => Self::Text(text.to_string()),
             // No other container kind is stored; its flattened value keeps the data.
             ValueOrContainer::Container(_) => Self::Value(child.get_deep_value()),
         }
