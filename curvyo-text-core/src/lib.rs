@@ -10,6 +10,8 @@
 mod error;
 mod face;
 mod face_store;
+mod font_class;
+mod font_names;
 mod layout;
 pub mod limits;
 mod outline;
@@ -19,6 +21,8 @@ mod units;
 pub use error::TextError;
 pub use face::{Face, FaceMetrics};
 pub use face_store::{FaceHash, FaceKey, FaceStore};
+pub use font_class::{DeclaredClass, OS2_CLASS_BYTES, declared_class, os2_class_bytes};
+pub use font_names::{ListableFace, family_name, listable_faces, style_name};
 pub use layout::{LineLayout, PlacedGlyph, TextLayout, layout};
 pub use outline::GlyphOutline;
 pub use units::Mm;

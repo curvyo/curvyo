@@ -113,6 +113,27 @@ impl Session {
         .to_string()
     }
 
+    /// How many texts of the open project use a face of the family `family` from the Curvyo
+    /// fonts block: the Remove prompt's "2 texts here use it" (`specs/0075-font-library`
+    /// criterion 25).
+    #[must_use]
+    pub fn texts_using_family(&self, family: &str) -> usize {
+        let key = curvyo_ui_core::family_key(family);
+        self.document
+            .object_ids()
+            .into_iter()
+            .filter_map(|id| self.document.text(id))
+            .filter(|text| {
+                self.current_face_index(&text.font)
+                    .and_then(|index| self.fonts.faces().get(index))
+                    .is_some_and(|face| {
+                        face.block == curvyo_ui_core::FontBlock::Curvyo
+                            && curvyo_ui_core::family_key(&face.family) == key
+                    })
+            })
+            .count()
+    }
+
     /// The listed face `font` resolves to, for the current mark.
     fn current_face_index(&self, font: &FontRef) -> Option<usize> {
         match curvyo_ui_core::match_face(font, self.fonts.faces()) {

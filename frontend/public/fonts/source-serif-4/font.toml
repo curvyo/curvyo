@@ -4,6 +4,7 @@ family = "Source Serif 4"
 licence = "OFL-1.1"
 licence_file = "LICENSE.md"
 source_url = "https://github.com/adobe-fonts/source-serif/releases/tag/4.005R"
+tags = ["serif"]
 version = "4.005"
 
 [[faces]]

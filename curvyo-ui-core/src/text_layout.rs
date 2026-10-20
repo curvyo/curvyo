@@ -66,7 +66,7 @@ pub fn lay_out(text: &TextSnapshot, face: &Face, substitute: bool) -> Option<Tex
 
 /// The contours of one glyph path (cubics and lines only) as closed outlines of anchors in the
 /// document, with placeholder anchor ids (Object to path gives fresh ones).
-fn contours_of(
+pub(crate) fn contours_of(
     path: &BezPath,
     map: &impl Fn(kurbo::Point) -> Point,
     next_id: &mut u64,

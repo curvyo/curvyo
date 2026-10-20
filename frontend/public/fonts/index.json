@@ -54,5 +54,28 @@
       "file": "source-serif-4/SourceSerif4-BoldIt.ttf",
       "licence": "OFL-1.1"
     }
+  ],
+  "families": [
+    {
+      "family": "Great Vibes",
+      "tags": [
+        "script"
+      ],
+      "cuttable_pieces": 2
+    },
+    {
+      "family": "Source Sans 3",
+      "tags": [
+        "sans"
+      ],
+      "cuttable_pieces": 8
+    },
+    {
+      "family": "Source Serif 4",
+      "tags": [
+        "serif"
+      ],
+      "cuttable_pieces": 8
+    }
   ]
 }

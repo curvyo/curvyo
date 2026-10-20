@@ -4,6 +4,8 @@
 use curvyo_document_core::FontRef;
 use curvyo_text_core::FaceKey;
 
+use crate::family_key::family_key;
+
 /// The block of the Fonts tab a face is listed in, in the order of preference.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum FontBlock {
@@ -45,7 +47,7 @@ pub enum FaceMatch {
 }
 
 /// Resolves `font` over `faces`: (a) a loaded face with the stored hash and index; (b) a face of
-/// the same family and style, case-insensitive, preferring the Curvyo folder, then the included
+/// the same family (by [`family_key`]) and style, case-insensitive, preferring the Curvyo folder, then the included
 /// fonts, then the computer's, without a notice (criterion 30); (c) missing.
 #[must_use]
 pub fn match_face(font: &FontRef, faces: &[ListedFace]) -> FaceMatch {
@@ -57,7 +59,7 @@ pub fn match_face(font: &FontRef, faces: &[ListedFace]) -> FaceMatch {
         return FaceMatch::Face(key);
     }
     let same_name = |face: &&ListedFace| {
-        face.family.to_lowercase() == font.family.to_lowercase()
+        family_key(&face.family) == family_key(&font.family)
             && face.style.to_lowercase() == font.style.to_lowercase()
     };
     let best = faces

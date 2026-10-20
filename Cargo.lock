@@ -680,6 +680,7 @@ name = "curvyo-storage-io"
 version = "0.1.0"
 dependencies = [
  "curvyo-document-core",
+ "curvyo-text-core",
  "fontdb",
  "tempfile",
  "thiserror 2.0.21",
@@ -709,6 +710,10 @@ dependencies = [
  "curvyo-text-core",
  "kurbo",
  "proptest",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "toml 1.1.6+spec-1.1.0",
 ]
 
 [[package]]

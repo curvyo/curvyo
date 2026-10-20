@@ -15,6 +15,7 @@
 // to the stricter rule.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
+mod font_library;
 mod fonts;
 mod formats;
 #[cfg(any(target_os = "macos", test))]
@@ -94,6 +95,7 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .manage(AppState::default())
         .manage(fonts::FontFiles::default())
+        .manage(fonts::GrantedFontPaths::default())
         .invoke_handler(tauri::generate_handler![
             project::take_pending_open,
             project::pick_project,
@@ -110,10 +112,23 @@ fn main() {
             fonts::font_folder_list,
             fonts::system_font_list,
             fonts::font_bytes,
+            fonts::pick_font_files,
+            fonts::add_font_files,
+            fonts::remove_font_files,
+            font_library::read_font_library,
+            font_library::write_font_library,
+            font_library::set_font_library_aside,
+            font_library::read_font_checks,
+            font_library::write_font_checks,
         ])
         // The window's close button and Alt+F4: a project with unsaved changes holds the close and
         // the page asks; a clean one closes at once, with no round trip to the page.
         .on_window_event(|window, event| {
+            // Files dropped on the window may be added as fonts; no other path is
+            // (`specs/0075-font-library`, tester re-review 2026-10-20).
+            if let tauri::WindowEvent::DragDrop(tauri::DragDropEvent::Drop { paths, .. }) = event {
+                fonts::grant_font_paths(window.app_handle(), paths);
+            }
             if let tauri::WindowEvent::CloseRequested { api, .. } = event
                 && project::hold_close_for_check(window.app_handle())
             {

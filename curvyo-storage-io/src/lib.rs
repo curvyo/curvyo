@@ -9,11 +9,13 @@
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
 mod filesystem;
+mod font_files;
 mod fonts;
 
 pub use filesystem::{
     FsError, ensure_parent_dir, read_optional, read_to_vec, rename_replacing, write_atomic,
 };
+pub use font_files::{AddedFonts, RemovedFonts, add_font_files, remove_font_files};
 pub use fonts::{
     FolderFonts, FontFace, FontSource, MAX_FONT_FILE_BYTES, list_font_folder, list_system_fonts,
 };

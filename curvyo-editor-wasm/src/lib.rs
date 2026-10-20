@@ -17,6 +17,9 @@
 #![forbid(unsafe_code)]
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
+mod font_checks_glue;
+mod font_file_glue;
+mod font_library_glue;
 mod session;
 
 #[cfg(target_arch = "wasm32")]
@@ -37,6 +40,8 @@ mod wasm_combine;
 mod wasm_cut;
 #[cfg(target_arch = "wasm32")]
 mod wasm_document;
+#[cfg(target_arch = "wasm32")]
+mod wasm_font_library;
 #[cfg(target_arch = "wasm32")]
 mod wasm_formats;
 #[cfg(target_arch = "wasm32")]
@@ -82,6 +87,9 @@ mod wasm_split;
 #[cfg(target_arch = "wasm32")]
 mod wasm_text;
 
+pub use font_checks_glue::FontChecksGlue;
+pub use font_file_glue::font_file_faces;
+pub use font_library_glue::FontLibraryGlue;
 pub use session::{
     APP_VERSION, BooleanOutcome, BreakApartOutcome, CloneOutcome, ClosePathOutcome, ClosePathState,
     CombineOutcome, CutOutcome, DocumentPresetsRecord, DocumentSide, DoubleClickHint, DropPlace,
