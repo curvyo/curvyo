@@ -16,6 +16,7 @@ import { ToolRail } from "@/components/ToolRail";
 import { HistoryPreviewFrame, HistoryPreviewLine } from "@/components/HistoryPreview";
 import { usePreviewState } from "@/lib/historyPreviewStore";
 import { useRailCommands } from "@/hooks/useRailCommands";
+import { useWeld } from "@/hooks/useWeld";
 import { useEditorSession } from "@/hooks/useEditorSession";
 import { useClosePathState } from "@/hooks/usePenCue";
 import { useDocumentPanel } from "@/hooks/useDocumentPanel";
@@ -43,6 +44,7 @@ function Editor() {
   const editor = useEditorSession(setCursorMm);
   const historyPreview = usePreviewState();
   const railCommands = useRailCommands(editor);
+  const weld = useWeld(editor);
   const closePathState = useClosePathState(editor);
   const documentPanel = useDocumentPanel(editor);
   const panelOpen = usePanelOpen(editor.getSession);
@@ -143,6 +145,7 @@ function Editor() {
               flip={editor.flip}
               guideState={editor.guideState}
               onToggleGuide={editor.toggleGuide}
+              weld={weld}
               arcBar={editor.arcBar}
               onReturnFocus={() => editor.containerRef.current?.focus()}
             />

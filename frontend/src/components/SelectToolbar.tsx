@@ -7,6 +7,7 @@ import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { ArcFieldGroup, CurveGroup, EllipseKindGroup } from "@/components/ArcCurveGroups";
 import { FlipGroup } from "@/components/FlipGroup";
 import { GuideButton } from "@/components/GuideButton";
+import { WeldGroup } from "@/components/WeldGroup";
 import { RatioSlider } from "@/components/RatioSlider";
 import { RATIO_SLIDER_NAMES } from "@/lib/sliderNames";
 import { ToolbarSwitch } from "@/components/ToolbarSwitch";
@@ -14,6 +15,7 @@ import type { SelectBarState } from "@/hooks/useEditorSession";
 import type { CloneBarNotice } from "@/hooks/useClones";
 import type { ArcBarApi } from "@/hooks/useArcBar";
 import type { FlipApi } from "@/hooks/useFlip";
+import type { WeldApi } from "@/hooks/useWeld";
 import type { GuideState } from "@/lib/guideText";
 import { LINKED_CLONE_TOOLTIP } from "@/lib/cloneText";
 
@@ -63,6 +65,9 @@ export interface SelectToolbarProps {
   /** The Guide button (`specs/0046-document-shapes` criteria 9 and 10). */
   guideState: GuideState;
   onToggleGuide: () => void;
+  /** The Weld group (`specs/0068-laserable-lettering/` criteria 1 and 2): enabled with the flip
+   * buttons, while something is selected. */
+  weld: WeldApi;
   /** The ellipse group and the Curve field (`specs/0021-ellipse-arcs-and-shaping/`). */
   arcBar: ArcBarApi;
   /** Returns the keyboard focus to the canvas (after Enter or Escape in a
@@ -528,7 +533,8 @@ function LinkedCloneButton({
  * switches ("Scale stroke width", "Scale corner radius"), shown with or
  * without a selection and never disabled or dimmed; the Flip group, always shown and
  * disabled only while nothing is selected (`specs/0056-mirror-and-negative-scale/`
- * criterion 1); the kind groups, each
+ * criterion 1), with the Guide button and the Weld group (`specs/0068-laserable-lettering/`);
+ * the kind groups, each
  * shown when the selection contains the kind it acts on (Radius and Remove
  * rounding for a rectangle, Points for a polygon or star, Ratio for a star),
  * acting on exactly those objects; and "Object to path" last. Wraps by whole
@@ -562,6 +568,7 @@ export function SelectToolbar({
   flip,
   guideState,
   onToggleGuide,
+  weld,
   arcBar,
   onReturnFocus,
 }: SelectToolbarProps) {
@@ -718,6 +725,12 @@ export function SelectToolbar({
             <GuideButton state={guideState} onToggle={onToggleGuide} onReturnFocus={onReturnFocus} />
           </div>
         </div>
+      </div>
+      {/* The Weld group: the end of the always-shown zone, after Flip and Guide, so it never
+       * moves with the selection's kinds (`specs/0068-laserable-lettering/` UX notes §1). */}
+      <div className="group/row flex min-h-9 items-start gap-3">
+        <Divider />
+        <WeldGroup enabled={flipEnabled} weld={weld} onReturnFocus={onReturnFocus} />
       </div>
       {groups.map((group, index) => (
         <div key={index} className="group/row flex min-h-9 items-start gap-3">

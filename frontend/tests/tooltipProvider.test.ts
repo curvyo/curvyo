@@ -161,6 +161,8 @@ test("the Select bar's Ratio slider renders with the provider", async () => {
         announceText: noop,
         clearAnnouncement: noop,
       },
+      // The Weld group of `specs/0068-laserable-lettering/`.
+      weld: { gapMm: 0.1, setGap: () => null, weld: noop, busy: false, notice: null },
       // The ellipse group and Curve field of `specs/0021-ellipse-arcs-and-shaping/`.
       arcBar: {
         state: {

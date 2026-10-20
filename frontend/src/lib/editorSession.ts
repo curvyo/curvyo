@@ -13,6 +13,7 @@ import init, {
   WasmSession,
   file_command_tooltip,
   init_panic_hook,
+  weld_gap_in_range,
 } from "@/wasm-bindings/curvyo_editor_wasm.js";
 
 let ready: Promise<void> | null = null;
@@ -83,6 +84,16 @@ export function appVersion(): string {
 export function fileCommandTooltip(command: string, platform: string): string {
   const tooltip = file_command_tooltip(command, platform);
   return /mac|iphone|ipad/i.test(navigator.platform) ? tooltip.replace("Ctrl+", "Cmd+") : tooltip;
+}
+
+/** A typed Weld Gap within 0 to 1 mm and what the clamp did (`""`, `"largest"`, `"smallest"`),
+ * by the rule of `curvyo-ui-core` (`specs/0068-laserable-lettering/adrs.md` decision 7). The
+ * module is loaded once a session exists, which is before the Select bar shows. */
+export function weldGapInRange(mm: number): { mm: number; clamp: string } {
+  const view = weld_gap_in_range(mm);
+  const result = { mm: view.mm, clamp: view.clamp };
+  view.free();
+  return result;
 }
 
 export type { WasmSession, NodeToolbarState, FormatListRecord } from "@/wasm-bindings/curvyo_editor_wasm.js";

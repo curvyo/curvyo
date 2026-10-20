@@ -2,6 +2,7 @@ import { Tooltip } from "radix-ui";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import type { FlipApi } from "@/hooks/useFlip";
+import { dimmedPress } from "@/lib/dimmedPress";
 import { FLIP_DISABLED_LINE, FLIP_TEXT, type FlipAxis } from "@/lib/flipText";
 
 const BUTTON_CLASS =
@@ -83,7 +84,12 @@ function FlipButton({ axis, enabled, flip, onReturnFocus }: FlipButtonProps) {
             aria-label={text.name}
             // Not the `disabled` attribute: the button keeps its tooltip and its Tab stop.
             aria-disabled={!enabled}
+            // A dimmed press does nothing and keeps the tooltip open.
+            onPointerDown={(event) => {
+              dimmedPress(event, enabled);
+            }}
             onClick={(event) => {
+              dimmedPress(event, enabled);
               if (!enabled) {
                 return;
               }

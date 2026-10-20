@@ -107,6 +107,9 @@ mod text_path;
 mod text_tests;
 mod tolerances;
 mod transform_entry;
+mod weld;
+#[cfg(test)]
+mod weld_tests;
 
 use curvyo_document_core::{
     Document, DocumentVersion, NodeId, ObjectSnapshot, OpenError, Point, SaveError,
@@ -150,6 +153,7 @@ pub use split::{BreakApartOutcome, SplitOutcome};
 pub use style_view::StylePanelView;
 pub use text_bar::{TextBarView, TextSizeOutcome};
 pub use text_path::ObjectToPathOutcome;
+pub use weld::WeldOutcome;
 
 #[cfg(target_arch = "wasm32")]
 pub use open_error::map_open_error;

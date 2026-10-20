@@ -1,6 +1,7 @@
 import { SquareDashed } from "lucide-react";
 import { Tooltip } from "radix-ui";
 
+import { dimmedPress } from "@/lib/dimmedPress";
 import { GUIDE_NAME, type GuideState } from "@/lib/guideText";
 
 const BUTTON_CLASS =
@@ -37,7 +38,12 @@ export function GuideButton({
             // Not the `disabled` attribute: the button keeps its tooltip and its Tab stop.
             aria-disabled={!enabled}
             data-select-command="guide"
+            // A dimmed press does nothing and keeps the tooltip open.
+            onPointerDown={(event) => {
+              dimmedPress(event, enabled);
+            }}
             onClick={(event) => {
+              dimmedPress(event, enabled);
               if (!enabled) {
                 return;
               }

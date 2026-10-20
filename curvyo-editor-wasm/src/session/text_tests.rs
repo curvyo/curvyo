@@ -17,7 +17,7 @@ fn fonts_dir() -> PathBuf {
 
 /// A session with the included fonts listed (as `index.json` lists them) and loaded on request,
 /// as the host does after every event.
-fn session() -> Session {
+pub(super) fn session() -> Session {
     let mut session = Session::new(1);
     let index: serde_json::Value =
         serde_json::from_str(&std::fs::read_to_string(fonts_dir().join("index.json")).unwrap())
@@ -40,7 +40,7 @@ fn session() -> Session {
     session
 }
 
-fn load_wanted(session: &mut Session) {
+pub(super) fn load_wanted(session: &mut Session) {
     for file in session.wanted_font_files() {
         let bytes = std::fs::read(fonts_dir().join(&file)).unwrap();
         assert!(session.add_font_file(&file, &bytes));
@@ -65,7 +65,7 @@ fn type_text(session: &mut Session, text: &str) {
     }
 }
 
-fn labels(session: &Session) -> Vec<String> {
+pub(super) fn labels(session: &Session) -> Vec<String> {
     session
         .document
         .own_steps()
@@ -74,7 +74,7 @@ fn labels(session: &Session) -> Vec<String> {
         .collect()
 }
 
-fn texts(session: &Session) -> Vec<curvyo_document_core::TextSnapshot> {
+pub(super) fn texts(session: &Session) -> Vec<curvyo_document_core::TextSnapshot> {
     session
         .objects()
         .iter()
@@ -86,7 +86,7 @@ fn texts(session: &Session) -> Vec<curvyo_document_core::TextSnapshot> {
 }
 
 /// A session with one text "Name" at (10, 20) in the Text tool, edit mode ended.
-fn with_text(string: &str) -> Session {
+pub(super) fn with_text(string: &str) -> Session {
     let mut session = session();
     session.set_tool(Tool::Text);
     click(&mut session, Point::new(10.0, 20.0));

@@ -81,7 +81,10 @@ mod wasm_shape_tools;
 mod wasm_split;
 #[cfg(target_arch = "wasm32")]
 mod wasm_text;
+#[cfg(target_arch = "wasm32")]
+mod wasm_weld;
 
+pub use session::WeldOutcome;
 pub use session::{
     APP_VERSION, BooleanOutcome, BreakApartOutcome, CloneOutcome, ClosePathOutcome, ClosePathState,
     CombineOutcome, CutOutcome, DocumentPresetsRecord, DocumentSide, DoubleClickHint, DropPlace,
