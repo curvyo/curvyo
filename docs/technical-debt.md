@@ -1553,3 +1553,15 @@ not by a template-specific cap. And the desktop host's `pick_project` (`curvyo-a
 whole file into memory before the core sees the length, so a much larger file is read in full
 before it is refused. **Resolution:** check the file size in `pick_project` before reading (one
 `metadata` call), and give `unpack` an expanded-size cap shared by Open and Template.
+
+## The text engine adds 1.25 MiB to the editor wasm (`0074`, ADR 0020, 2026-10-20)
+
+`harfrust` + `skrifa` add 1,247 KiB (433 KiB gzip) to the release editor wasm, measured by the
+spike on branch `spike/text-engine` (`docs/spikes/text-engine.md` there). The ADR's budget was
+700 KiB. The customer raised the budget for the text engine to **1.3 MiB uncompressed** on
+2026-10-20 (Frage 6 TEXT-WASMSIZE, A); the smaller option `rustybuzz` + `ttf-parser` fails
+`cargo deny` (unmaintained) and panics on hostile fonts.
+
+**Resolution:** accepted. The build of `0074` checks the added size against 1.3 MiB; going over it
+reopens the question. Loading the text engine as a separate wasm module on first use of the Text
+tool would take it off the start-up path, if start-up time becomes a problem.

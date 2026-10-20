@@ -1,6 +1,6 @@
 # Combine open paths: compound paths with open, touching and crossing outlines
 
-Status: In progress (`story/combine-open-paths`, no PR yet; plan in `plan.md`). Ready since 2026-10-12 (customer decisions applied, `adrs.md` re-checked by the architect, UX notes re-checked by the ux-engineer; Q1 and Q2 have recorded defaults and do not block). Amended 2026-10-18: criterion 27 (even-odd import is `0024`'s).
+Status: Done (PR #154, merged 2026-10-19). Amended 2026-10-18: criterion 27 (even-odd import is `0024`'s).
 Priority: Should
 Origin: Customer (2026-10-12: "ja, schreib die spec" to the product owner's proposal, then the answers of 2026-10-12 to the decisions below: Booleans close open outlines, closed outlines may touch and cross, compound paths become node-editable, no format bump). This is option B of `0035` Question 1 and option B of `0035` Question 3. Customer decisions that apply: primitives are converted to paths silently (`0047`); keyboard shortcuts are reviewed once at the end (`README.md`). The rules marked **PO** in "Decisions" are mine and the customer can change them.
 

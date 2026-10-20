@@ -1,6 +1,6 @@
 # Clone overrides: own placement and own style
 
-Status: Ready (2026-10-14: UX notes and `adrs.md` exist, ADR 0016 accepted by the customer, Frage 5 CHAIN-STYLE answered A). Build after `0049` (#121) is merged.
+Status: Done (PR #138, merged 2026-10-16)
 Priority: Should
 Origin: Customer (feedback of 2026-10-14 after trying the linked clone of PR #121, translated: "Looks extremely good already, but a few things are missing: you must be able to override things, e.g. the position, so the clone no longer moves with the original when I want that. It should also be possible to override the style. But then you always have to override the whole style. I have no idea right now what this should look like in the UI, but several colours (fill, stroke) must be possible, e.g. for embroidery. Also having its own origin would be important for rotation; for scale we don't need it."). The last sentence was a miscommunication, see "Reading of the feedback". Customer answers of 2026-10-14 are listed in "Decided by the product owner". Every criterion marked **Proposal** is my own idea and is not accepted until the customer says so.
 

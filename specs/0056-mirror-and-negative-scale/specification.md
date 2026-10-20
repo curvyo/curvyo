@@ -1,6 +1,6 @@
 # Mirror and negative scale: two flip buttons, and scaling over to the other side
 
-Status: Ready (2026-10-14, customer decisions applied: PERCENT, ZERO-TYPED superseded by ZERO-RECOVER; no open questions)
+Status: Done (PR #139, merged 2026-10-16)
 Priority: Should
 Origin: Customer (request of 2026-10-14, decisions of 2026-10-14). Criterion 4 is marked (Proposal): it is the product owner's addition, built with the slice, and the customer can veto it at the demo, as with `0044` and `0047`. It is not needed for the request.
 Depends on: `0019-multi-object-transform` and `0047-transform-polish` merged (both are: the group box, the shared scale map, the size chip, the true bounding box) and `0020-undo-redo` merged (one gesture = one step). Not blocked by `0049-linked-clone` or `0050-layers-and-objects-panel`; the criteria that touch clones and layers say what they need (criteria 24 and 25). Touches `transform_math.rs`, `group_transform.rs`, `transform_entry.rs`, `group_entry.rs` and the Select bar, so it does not run beside another slice that changes the resize handles, the size chip or the Select bar (`adrs.md`: none of the Ready slices does today).

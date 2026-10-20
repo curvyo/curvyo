@@ -1,6 +1,6 @@
 # Path offset: Outset and Inset by dragging a handle, with curves kept as curves
 
-Status: In review (rework 2026-10-12 after customer review of #115, amended 2026-10-13, third and fourth round 2026-10-13; built on branch `story/path-offset`, PR #115 ready for the customer)
+Status: Done (PR #115, merged 2026-10-14); reworked and amended 2026-10-12 and 2026-10-13 after the customer review of #115
 Priority: Should
 Origin: Customer (Inset and Outset, request of 2026-10-09; rework decisions of 2026-10-12 and 2026-10-13, three rounds). R-EDIT-007 (outline/offset). Amended by `0020-undo-redo`: Ctrl+Z takes the step back.
 
