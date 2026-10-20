@@ -1335,6 +1335,25 @@ Decisions: `specs/0074-text-objects/specification.md`, "UX notes" section 4.
 | Keyboard | `role="tree"` "Fonts", one Tab stop, roving focus; Up, Down, Home, End, Page Up, Page Down over rows (headers skipped); Right expands or enters, Left collapses or goes to the family; Enter or Space picks; arrows never pick; a printable character goes to the search field; Escape to the canvas. Tab order: search, list |
 | Empty | "Loading fonts…" (nothing listed yet); "No font matches "vibs"." No second line |
 
+## Properties panel: Fonts tab, font library (`0075`, 2026-10-20; tags since the customer change of the same day)
+
+Decisions: `specs/0075-font-library/specification.md`, "UX notes" and "UX amendment: tags replace groups". These rows extend and, where marked, replace the `0074` rows above. The Groups button, Groups list, Groups row with Reset, the Cuttable mark, and the Tags button and Tags list (customer change 2026-10-20) are removed.
+
+| Item | Value |
+|---|---|
+| Layout (replaces) | Header row (24px + 8), tag strip (2 to 4 rows of 28px), 8px, search row (search field, full width less Add font, 4, Add font 28 x 28), 8px, the list (the one scroll area, minimum 120px, 8px gutter). At 800 x 600 the list is about 396px with a 2-row strip, 7 family rows |
+| Tag strip (replaces Group strip) | The `0045` preset strip look, one `role="radiogroup"` "Font tag", single choice: All, Favourites, Cuttable, Script, Sans, Serif, Initials, own tags A to Z; at most 4 rows, then it scrolls by rows; arrows move and choose; a mouse press returns the focus to the canvas. An own tag's cell ends with Rename (`Pencil` 12px) and Delete (`Trash2` 12px), 20 x 20 icon buttons, not Tab stops; built-in cells, All and Favourites have none. Rename turns the cell into a 24px text field (Enter or blur saves, Escape cancels, validation chip under it); Delete replaces the cell by the Inline confirm across the strip; after it the focus is on All |
+| Family row (replaces) | 52px, fixed: name line 28 (chevron 24, 4, name, current mark, star 24 x 28, face count, 8) and tag line 24 (from 28px in: chips, "+N", Add tag 20 x 20 at the right, 8px gutter). Expanded: the tag line wraps, 24px per line |
+| Favourite star | 24 x 28 button on the name line, `Star` 16px; filled `--toolbar-icon` or outline `--panel-muted-fg`; always visible; `aria-pressed`; toggles only the star, never picks, never moves the row; Ctrl+D in the list |
+| Tag chip | 20px, `rounded-[5px]`, 1px `--toolbar-icon` at 40 %, 12px text, 6px left padding, remove zone 18 x 20 with `X` 10px `--panel-muted-fg`, always shown; only the zone is a button; chips 4px apart; order Cuttable, Script, Sans, Serif, Initials, own A to Z; automatic, overridden and own tags look the same, and the tooltip names the source ("Detected: one piece", "Declared by the font: script", "Set for the included fonts", "Added by you") |
+| Tag overflow | "+N" chip, 20px, 12px tabular muted, no x; a button that expands the family; the row tooltip lists all tags |
+| Add tag | 20 x 20 outline button `Plus` 14px at the end of the tag line, always shown; it turns the line into a 20px field with inline completion (Up/Down through the matches, Right/End takes the completion), Enter adds or creates, Escape closes; the row height never changes |
+| Remove row | Curvyo-block families only: 28px outline button "Remove from Curvyo fonts", `--destructive` label, Inline confirm in place; Delete on the family row opens it |
+| Add font | 28 x 28 icon button `FilePlus`, "Add font…", busy state over 150 ms; result in the Action notice under it (names in the text, no tooltip); drop of files on the tab body: 2px dashed `--accent` inset outline, no text |
+| Cuttable progress | 2px determinate bar inside the bottom of the Cuttable cell; "checking 340/2000" in the This computer header (also above the empty Cuttable list); no width change while counting |
+| Row stability | A maker's own press never removes a row from view until the strip cell or the search changes; background additions above the first visible row keep it in place. Deleting the chosen tag, or removing its last use, switches the strip to All at once and the tag leaves the strip (2026-10-20) |
+| Empty (adds to `0074`) | "No font in Cuttable." / "No font in Cuttable yet." (while checking) / "No font in Cuttable matches "vibs"." |
+
 ## Keyboard shortcuts established so far
 
 | Action | Shortcut | Notes |
@@ -1404,6 +1423,12 @@ Decisions: `specs/0074-text-objects/specification.md`, "UX notes" section 4.
 | Leave text editing | `Escape`, a click outside the text, a tool switch | `0074`; one step "Add text" / "Edit text"; the second Escape goes to the Select tool with the text selected |
 | Type in a text | characters, Space, Enter (line), Backspace, Delete, arrows, Home, End, Ctrl+arrows (word), Shift to select, Ctrl+A, Ctrl+C, Ctrl+X, Ctrl+V, Ctrl+Z, Ctrl+Shift+Z (in the session) | `0074`; IME and dead keys through the sink; Tab goes to the Text bar |
 | Show the Fonts tab | `Shift+Ctrl+T` (`Cmd`), desktop only | `0074`; Inkscape's Text and Font key; Chrome reserves it, so the browser build has the Font button only. Focus on the current face row |
+| Favourite a font | `Ctrl+D` (`Cmd+D`) in the Fonts list | `0075`; on any row of the family; the browser's bookmark key is prevented while the list has focus |
+| Remove a Curvyo font | `Delete` on its family row, then the Inline confirm | `0075`; Curvyo fonts block only; not undoable (a file, not the document) |
+| Add a tag to a font | `F2` in the Fonts list | `0075`; on any row of the family; inline completion, Enter adds |
+| Remove a font's tag | `Shift+F2` in the Fonts list, arrows to the chip, `Delete` | `0075`; or the chip's x; not a document change, so there is no undo: add it back |
+| Rename, delete an own tag | `F2`, `Delete` on its cell in the tag strip | `0075`; or its pencil and bin; built-in tags, All and Favourites ignore both |
+| Choose a font tag | Tab to the tag strip, arrows, Home, End | `0075`; single choice; writes no history step |
 | Change text size by key | Up/Down in the Size field (1 mm, Shift 10, Ctrl 0.1) | `0074`; live, one commit on key-up |
 
 Single-letter shortcuts (tools and, since `edit-interaction-polish`, the selection entries M, R, S, K) are a different category from the file

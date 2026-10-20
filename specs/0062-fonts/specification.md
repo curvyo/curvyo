@@ -19,7 +19,7 @@ There are no text objects: the node kinds are layer, group, path and primitive. 
 | Stage | Delivers | Needs first |
 |---|---|---|
 | 1 | Text object, Text tool, font by name, Object to path; a Fonts tab with the list. Specified as [`0074-text-objects`](../0074-text-objects/) | ADR 0020 (accepted 2026-10-20) |
-| 2 | Groups, favourites, the Curvyo font folder, "cuttable" tag, adding fonts | stage 1 |
+| 2 | Groups, favourites, the Curvyo font folder, "cuttable" tag, adding fonts. Specified as [`0075-font-library`](../0075-font-library/) | stage 1 |
 | 3 | The preview page (criteria 14 to 17), split and full view | stage 2 and the pane host of `0063` |
 
 ## Acceptance criteria (as far as clear)
