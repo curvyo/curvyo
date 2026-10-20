@@ -61,6 +61,15 @@ impl GridBox {
         }
     }
 
+    /// Whether the two boxes share at least a point, a shared edge or corner included, so the
+    /// boundary of one may run along the other's (Weld, `specs/0068-laserable-lettering`).
+    pub(crate) fn touches(self, other: Self) -> bool {
+        self.min.0 <= other.max.0
+            && other.min.0 <= self.max.0
+            && self.min.1 <= other.max.1
+            && other.min.1 <= self.max.1
+    }
+
     /// Whether the two boxes share more than an edge, so the regions may overlap in area.
     pub(crate) fn meets(self, other: Self) -> bool {
         self.min.0 < other.max.0

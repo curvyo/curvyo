@@ -38,6 +38,8 @@ mod region_contact;
 mod segment;
 mod stack_regions;
 mod visible_region;
+mod weld;
+mod weld_lines;
 
 pub use boolean::{BooleanError, BooleanOp, BooleanResult, Outline, boolean, signed_area_mm2};
 pub use boolean_grid::MAX_COORDINATE_MM;
@@ -57,3 +59,4 @@ pub use segment::{
 };
 pub use stack_regions::StackError;
 pub use visible_region::{Visible, visible_regions};
+pub use weld::{Welded, weld};

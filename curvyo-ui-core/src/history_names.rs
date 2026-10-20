@@ -85,6 +85,8 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     ("cut_at_crossings", "Cut"),
     ("fracture", "Fracture"),
     ("flatten", "Flatten"),
+    // `specs/0068-laserable-lettering` criterion 20.
+    ("weld", "Weld"),
     ("offset_path", "Offset"),
     ("group", "Group"),
     ("ungroup", "Ungroup"),

@@ -1,0 +1,13 @@
+# Weld (specs/0068-laserable-lettering criterion 27 (c) to (e)).
+# Regenerate with CURVYO_UPDATE_GOLDEN=1.
+ac40a: closed 1 open 0 nodes 4 length_mm 80.000 hidden 1 hash 067d778b56c650ac
+ac40b: closed 1 open 1 nodes 6 length_mm 140.000 hidden 0 hash f3335dceffd08124
+ac40c: closed 2 open 0 nodes 8 length_mm 160.000 hidden 0 hash 656b4818517b8057
+ac40d: closed 1 open 1 nodes 8 length_mm 205.000 hidden 0 hash 245c1fabb3250dc4
+ac40e: closed 1 open 1 nodes 11 length_mm 140.000 hidden 0 hash 3ca2a3d380577de4
+ac40f: closed 1 open 1 nodes 11 length_mm 140.000 hidden 0 hash 3ca2a3d380577de4
+ac40g: closed 1 open 2 nodes 12 length_mm 108.284 hidden 0 hash 075365d9e92e49ac
+ac40h: closed 1 open 0 nodes 12 length_mm 240.000 hidden 0 hash 2fbf15c42a38629c
+ac40i: closed 3676 open 75 nodes 15154 length_mm 7616.500 hidden 0 hash 0a3bded72730dc4f
+squares20: closed 1 open 19 nodes 42 length_mm 420.000 hidden 0 hash f63549701825a2f4
+squares2000: closed 1 open 1999 nodes 4002 length_mm 40020.000 hidden 0 hash b41ce392fda96034

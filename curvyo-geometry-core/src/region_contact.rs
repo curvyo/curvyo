@@ -6,6 +6,7 @@
 //! contact of the boundaries, a shared point included, answers [`Contact::Unknown`], and the
 //! caller then runs the overlay.
 
+use crate::boolean_cleanup::distance_squared_to_segment;
 use crate::boolean_grid::{Path64, Paths64, Point64};
 use crate::stack_regions::GridBox;
 
@@ -73,6 +74,40 @@ impl<'a> EdgeIndex<'a> {
             self.strips[strip]
                 .iter()
                 .any(|&(c, d)| segments_meet(a, b, c, d))
+        })
+    }
+
+    /// Whether one edge of the region holds the segment `a b` within `reach` grid units: both
+    /// ends and the midpoint lie that close to it (Weld's doubled-line filter,
+    /// `specs/0068-laserable-lettering/adrs.md` decision 3).
+    pub(crate) fn hugs(&self, a: Point64, b: Point64, reach: i64) -> bool {
+        let middle = Point64::new(i64::midpoint(a.x, b.x), i64::midpoint(a.y, b.y));
+        #[allow(clippy::cast_precision_loss)] // a few units, exact
+        let reach_squared = (reach * reach) as f64;
+        self.strips_of(a.x.min(b.x) - reach, a.x.max(b.x) + reach)
+            .any(|strip| {
+                self.strips[strip].iter().any(|&(c, d)| {
+                    [a, b, middle]
+                        .iter()
+                        .all(|&p| distance_squared_to_segment(p, c, d) <= reach_squared)
+                })
+            })
+    }
+
+    /// Whether `p` lies within `reach` grid units of some edge of the region for which `counts`
+    /// holds.
+    pub(crate) fn near(
+        &self,
+        p: Point64,
+        reach: i64,
+        counts: impl Fn(Point64, Point64) -> bool,
+    ) -> bool {
+        #[allow(clippy::cast_precision_loss)] // a few units, exact
+        let reach_squared = (reach * reach) as f64;
+        self.strips_of(p.x - reach, p.x + reach).any(|strip| {
+            self.strips[strip].iter().any(|&(c, d)| {
+                counts(c, d) && distance_squared_to_segment(p, c, d) <= reach_squared
+            })
         })
     }
 
