@@ -15,6 +15,7 @@
 // to the stricter rule.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
+mod fonts;
 mod formats;
 #[cfg(any(target_os = "macos", test))]
 mod menu;
@@ -92,6 +93,7 @@ fn main() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(AppState::default())
+        .manage(fonts::FontFiles::default())
         .invoke_handler(tauri::generate_handler![
             project::take_pending_open,
             project::pick_project,
@@ -105,6 +107,9 @@ fn main() {
             formats::set_formats_file_aside,
             formats::import_formats_file,
             formats::export_formats_file,
+            fonts::font_folder_list,
+            fonts::system_font_list,
+            fonts::font_bytes,
         ])
         // The window's close button and Alt+F4: a project with unsaved changes holds the close and
         // the page asks; a clean one closes at once, with no round trip to the page.
