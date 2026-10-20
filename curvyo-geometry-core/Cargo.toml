@@ -20,7 +20,7 @@ thiserror.workspace = true
 # Test-only (tester-added, `specs/0002-path-node-editing` verification): property
 # tests for the geometry kernel's flatten/nearest-point/subdivide invariants
 # (`CLAUDE.md`'s tester role, "Geometry ... property tests with proptest").
-proptest = "1"
+proptest.workspace = true
 
 # The golden results are also compared in the wasm build, in Node, by `wasm-bindgen-test-runner`
 # (`tests/boolean_golden_wasm.rs`, criterion 43 of `specs/0016-boolean-operations`). Same

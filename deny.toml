@@ -50,6 +50,9 @@ name = "curvyo-app"
 [[licenses.exceptions]]
 allow = ["AGPL-3.0-or-later"]
 name = "curvyo-geometry-core"
+[[licenses.exceptions]]
+allow = ["AGPL-3.0-or-later"]
+name = "curvyo-text-core"
 
 [[licenses.exceptions]]
 allow = ["AGPL-3.0-or-later"]

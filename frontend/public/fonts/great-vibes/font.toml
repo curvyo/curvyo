@@ -1,0 +1,11 @@
+# Licence record of a shipped font family (ADR 0020 §4). The file is the upstream release,
+# unmodified. Checked by `curvyo-text-core/tests/included_fonts.rs`.
+family = "Great Vibes"
+licence = "OFL-1.1"
+licence_file = "OFL.txt"
+source_url = "https://github.com/googlefonts/great-vibes/releases/tag/v1.103"
+version = "1.103"
+
+[[faces]]
+file = "GreatVibes-Regular.ttf"
+style = "Regular"
