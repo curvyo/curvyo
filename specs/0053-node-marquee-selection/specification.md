@@ -1,6 +1,6 @@
 # Node marquee selection: drag a box in the Node tool to select many nodes
 
-Status: Ready (architect decisions in `adrs.md` (2026-10-12): no new ADR, no new crate or dependency, no `format_version` change, one `curvyo-document-core` API change; UX notes confirmed 2026-10-12; the open questions use their recorded defaults; criteria marked (Proposal) can be vetoed by the customer at the demo)
+Status: Done (PR #129, merged 2026-10-14)
 Priority: Should
 Origin: Customer (request of 2026-10-12). Criteria marked (Proposal) are product-owner additions, built with the slice and vetoable at the demo.
 

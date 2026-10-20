@@ -1,6 +1,6 @@
 # Linked clone: a second object that follows its original
 
-Status: Ready (customer decisions of 2026-10-11 applied)
+Status: Done (PR #121, merged 2026-10-14)
 Note 2026-10-14: architect decision B on merge residue (`adrs.md`, commit 885c369), PO wording: a clone with no link at all is an orphan, not damage; the repair turns it into its stored outline when that is a valid path (criteria 35 and 38).
 Priority: Should
 Origin: Customer (request of 2026-10-10: a "linked clone" is a second origin object that contains all transformations of the original and changes live with it, and can still be moved, scaled, rotated and skewed on its own; only for paths; a rectangle or other primitive is converted to a path first, silently, as decided in `0047`). Customer decisions of 2026-10-11: (1) the exceptions to "no inheritance" are accepted (a clone reads its style and opacity from its original; visibility, lock and opacity resolve through the ancestors, ADR 0015); (2) a clone of a clone is allowed, so chains exist (this replaces the earlier rule that a clone of a clone becomes a clone of the original); (3) a selected clone is marked on the canvas and so is its original, at the same time (this replaces the earlier default of no mark); (4) the keyboard shortcuts stay as proposed (this spec has none) and all shortcuts get one overall review at the end (`README.md`). Everything in "Decided by the product owner" and every criterion marked **Proposal** is my own idea and is not accepted until the customer says so.

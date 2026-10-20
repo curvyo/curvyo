@@ -1,6 +1,6 @@
 # Document template and guide paths: mark outlines as guides, load a template from a file
 
-Status: Ready (2026-10-17) for stage 1 (mark paths as guides, load outlines from another Curvyo document). Stage 2 (load from an SVG file) waits for the importer of `0024`.
+Status: Stage 1 Done (PR #150, merged 2026-10-19): mark paths as guides, load outlines from another Curvyo document. Stage 2 (load from an SVG file) waits for `0024`.
 Priority: Should
 Origin: Customer (request of 2026-10-10: templates that are not square, key rings, labels, hoops). Redesigned by the customer's answers of 2026-10-17: no shaped page; a template is a set of outlines placed in the document and shown in a marking colour; the same thing serves as guide lines. The folder keeps its number and slug (`document-shapes`); the earlier design (ellipse and rounded-rectangle area, shape in formats) is dropped.
 

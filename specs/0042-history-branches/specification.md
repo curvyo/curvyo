@@ -1,6 +1,6 @@
 # History branches: undone steps as a branch, versions to look at or go to, clone of any state
 
-Status: Ready (2026-10-10). The customer accepted ADR 0014 (`docs/adr/0014-history-undo-and-branches.md`) and every default of the open questions below on 2026-10-10 (Preview by default, Question 2 A). `adrs.md` and the UX notes exist; the criteria are complete and testable. The build starts once `0020` and `0041` have merged. Changed by the customer feedback of 2026-10-14 on PR #119 (section below): criteria 10, 14 to 19, 21 and 31 changed in substance, 1, 2, 26, 30 and 33 in wording; criteria 11, 12 and 13 withdrawn.
+Status: Done (PR #119, merged 2026-10-14). Changed by the customer feedback of 2026-10-14 on PR #119 (section below): criteria 10, 14 to 19, 21 and 31 changed in substance, 1, 2, 26, 30 and 33 in wording; criteria 11, 12 and 13 withdrawn.
 Priority: Should
 Origin: Customer (specification of 2026-10-10, final: steps carry ids like git; undo two steps and then do something makes the undone steps a branch, no linear redo until the conflicting step is taken back; branches shown in the history; a clone of the state at any point; clicking back and forth to change the version of an object, or a preview in the history window, perhaps a slider between live and preview; in live mode a switch to restore the state from before the clicking). Requirement R-HIST-003. The customer is not sure about live versus preview; the choices below are my proposals and are marked.
 

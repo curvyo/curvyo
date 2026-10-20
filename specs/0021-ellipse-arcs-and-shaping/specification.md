@@ -1,6 +1,6 @@
 # Arc and curve handles: ellipse arcs, and a Curve handle on ellipse, polygon and star
 
-Status: Ready (2026-10-17); customer answers of 2026-10-17 recorded (no open questions)
+Status: Done (PR #153, merged 2026-10-19)
 Priority: Should
 Origin: Customer (Part A); Customer (Part B: reading confirmed 2026-10-06, extended to polygon and star)
 
