@@ -20,13 +20,16 @@ export type StackCommand = "fracture" | "flatten";
 /** The rail order: buttons six and seven of the Boolean card. */
 export const STACK_COMMANDS: readonly StackCommand[] = ["fracture", "flatten"];
 
-/** A button of the Boolean card: one of the five operations or one of the two stack commands. */
-export type BooleanCardCommand = BooleanOp | StackCommand;
+/** A button of the Boolean card: one of the five operations, one of the two stack commands, or
+ * Weld (`specs/0068-laserable-lettering/`). */
+export type BooleanCardCommand = BooleanOp | StackCommand | "weld";
 
-/** The Boolean card in rail order: Union to Reverse difference, then Fracture and Flatten. */
+/** The Boolean card in rail order: Union to Reverse difference, Fracture and Flatten, then
+ * Weld. */
 export const BOOLEAN_CARD_COMMANDS: readonly BooleanCardCommand[] = [
   ...BOOLEAN_OPS,
   ...STACK_COMMANDS,
+  "weld",
 ];
 
 /** Whether `command` is Fracture or Flatten. */

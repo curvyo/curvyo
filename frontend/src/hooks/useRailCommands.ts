@@ -33,9 +33,17 @@ import {
   stackRefusalText,
   stackSuccessText,
 } from "@/lib/stackText";
+import {
+  type WeldAvailabilityState,
+  weldRefusalOutlines,
+  weldRefusalText,
+  weldSuccessText,
+} from "@/lib/weldText";
 
 export interface BooleanCommands {
   availability: BooleanAvailabilityState;
+  /** What the Weld button shows: its own rule, one or more objects (`0068`). */
+  weldAvailability: WeldAvailabilityState;
   /** A kernel call is about to run or running: wait cursor, input ignored. */
   busy: boolean;
   /** Runs `command` on the selection. Does nothing while dimmed or busy. */
@@ -129,7 +137,8 @@ const NO_PATH_AVAILABILITY: PathAvailabilityState = {
  * command does, why it was refused) are the session's; this hook only displays them.
  */
 export function useRailCommands(editor: EditorSession): RailCommands {
-  const { getSession, syncRevision, tool, selectionCount, applyBoolean, applyStack } = editor;
+  const { getSession, syncRevision, tool, selectionCount, applyBoolean, applyStack, applyWeld } =
+    editor;
   const { applyCombine, applySplit, applyBreakApart, applyCut } = editor;
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
@@ -148,6 +157,16 @@ export function useRailCommands(editor: EditorSession): RailCommands {
     // The session is read again after every sync (`syncRevision`).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [getSession, syncRevision]);
+  const weldAvailability = useMemo<WeldAvailabilityState>(() => {
+    const raw = getSession()?.weld_availability();
+    if (!raw) {
+      return { needsOne: true, open: 0 };
+    }
+    const state = { needsOne: raw.needs_one, open: raw.open };
+    raw.free();
+    return state;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [getSession, syncRevision]);
   const pathAvailability = useMemo<PathAvailabilityState>(() => {
     const raw = getSession()?.path_availability();
     if (!raw) {
@@ -164,6 +183,8 @@ export function useRailCommands(editor: EditorSession): RailCommands {
   }, [getSession, syncRevision]);
   const booleanRef = useRef(booleanAvailability);
   booleanRef.current = booleanAvailability;
+  const weldRef = useRef(weldAvailability);
+  weldRef.current = weldAvailability;
   const pathRef = useRef(pathAvailability);
   pathRef.current = pathAvailability;
 
@@ -207,7 +228,27 @@ export function useRailCommands(editor: EditorSession): RailCommands {
 
   const apply = useCallback(
     (command: BooleanCardCommand) => {
-      if (busyRef.current || booleanRef.current.needsTwo) {
+      if (busyRef.current) {
+        return;
+      }
+      if (command === "weld") {
+        if (weldRef.current.needsOne) {
+          return;
+        }
+        runBusy(() => {
+          const result = applyWeld();
+          outlinedRef.current = weldRefusalOutlines(result);
+          const applied = result.kind === "applied";
+          const text = applied
+            ? withRepair(weldSuccessText(result))
+            : weldRefusalText(result);
+          if (text !== null) {
+            show(applied ? "success" : "refusal", text, applied ? noticeMs(text) : undefined);
+          }
+        });
+        return;
+      }
+      if (booleanRef.current.needsTwo) {
         return;
       }
       if (isStackCommand(command)) {
@@ -235,7 +276,7 @@ export function useRailCommands(editor: EditorSession): RailCommands {
         }
       });
     },
-    [applyBoolean, applyStack, runBusy, show, withRepair],
+    [applyBoolean, applyStack, applyWeld, runBusy, show, withRepair],
   );
 
   /** The notice of a Path command: the success sentence, else the refusal sentence. */
@@ -283,7 +324,7 @@ export function useRailCommands(editor: EditorSession): RailCommands {
   );
 
   return {
-    booleans: { availability: booleanAvailability, busy, apply },
+    booleans: { availability: booleanAvailability, weldAvailability, busy, apply },
     path: { availability: pathAvailability, busy, apply: applyPath },
     notice,
   };
