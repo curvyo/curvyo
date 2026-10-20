@@ -1,0 +1,15 @@
+format = 1
+chosen = "Wedding"
+favourites = ["great vibes", "lobster"]
+
+[overrides.cuttable]
+added = []
+removed = ["great vibes"]
+
+[overrides.script]
+added = ["lobster"]
+removed = []
+
+[tags]
+"great vibes" = ["Signs", "Wedding"]
+"lobster" = ["Wedding"]

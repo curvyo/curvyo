@@ -4,6 +4,7 @@ family = "Source Sans 3"
 licence = "OFL-1.1"
 licence_file = "LICENSE.md"
 source_url = "https://github.com/adobe-fonts/source-sans/releases/tag/3.052R"
+tags = ["sans"]
 version = "3.052"
 
 [[faces]]

@@ -4,6 +4,7 @@ family = "Great Vibes"
 licence = "OFL-1.1"
 licence_file = "OFL.txt"
 source_url = "https://github.com/googlefonts/great-vibes/releases/tag/v1.103"
+tags = ["script"]
 version = "1.103"
 
 [[faces]]

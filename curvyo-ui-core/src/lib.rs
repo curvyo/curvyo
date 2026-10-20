@@ -29,14 +29,18 @@ mod combine;
 mod conversion;
 mod cut;
 mod cut_pieces;
+mod cuttable;
 mod dash_text;
 mod display_unit_text;
 mod document_fit;
 mod document_presets_view;
 mod ellipse_tool;
+mod family_key;
 mod file_chords;
 mod flatten_command;
 mod flip;
+mod font_library;
+mod font_library_file;
 mod font_match;
 mod format_form;
 mod format_list_view;
@@ -148,6 +152,10 @@ pub use combine::{
 };
 pub use conversion::{build_primitive_conversions, primitive_as_path};
 pub use cut::{CUT_COMMIT_LABEL, CutPlan, CutRefusal, MAX_CUT_PIECES, plan_cut};
+pub use cuttable::{
+    CUTTABLE_CHECK_VERSION, CUTTABLE_SIZE_MM, CUTTABLE_WORD, FontChecks, cuttable_pieces,
+    union_pieces,
+};
 pub use dash_text::{MAX_DASH_NUMBER, MAX_DASH_NUMBERS, dash_text, parse_dash_text};
 pub use display_unit_text::{
     content_too_large_message, document_side_message, format_cursor, format_field_length,
@@ -158,9 +166,19 @@ pub use document_presets_view::{
     PresetEntry, PresetGroupView, PresetsView, orientation_swap, preset_pick_size, presets_view,
 };
 pub use ellipse_tool::EllipseTool;
+pub use family_key::family_key;
 pub use file_chords::{FileCommand, Platform, chord_label, command_tooltip, file_chord};
 pub use flatten_command::{FLATTEN_COMMIT_LABEL, plan_flatten};
 pub use flip::{FlipAxis, FlipOutcome, flip_selection};
+pub use font_library::{
+    ALL_ID, BuiltInTag, CheckResult, FAVOURITES_ID, FamilyFacts, FontLibrary, MAX_LIST_KEYS,
+    MAX_OWN_TAGS, MAX_TAG_NAME_CHARS, MemberSource, Membership, Override, TagEntry, TagNameError,
+    automatic, check_tag_name,
+};
+pub use font_library_file::{
+    FONT_LIBRARY_FORMAT, FontLibraryFileError, MAX_FONT_LIBRARY_BYTES, read_font_library,
+    write_font_library,
+};
 pub use font_match::{FaceMatch, FontBlock, ListedFace, match_face};
 pub use format_form::{
     FieldError, FormDraft, FormField, FormPrefill, add_prefill, added_notice, check_format_form,

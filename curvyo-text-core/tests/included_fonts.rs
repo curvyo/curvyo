@@ -21,6 +21,8 @@ struct Record {
     licence: String,
     licence_file: String,
     source_url: String,
+    /// The shipped built-in tags (`specs/0075-font-library` criterion 14).
+    tags: Vec<String>,
     version: String,
     faces: Vec<FaceRecord>,
 }
@@ -52,16 +54,29 @@ struct IndexFace {
     licence: String,
 }
 
+/// A family's shipped tags and the piece count of its check (`specs/0075-font-library`
+/// criteria 14 and 17; the count is checked against the check in `curvyo-ui-core`).
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct IndexFamily {
+    family: String,
+    tags: Vec<String>,
+    #[allow(dead_code)] // checked by `curvyo-ui-core/tests/cuttable_check.rs`
+    cuttable_pieces: usize,
+}
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Index {
     faces: Vec<IndexFace>,
+    families: Vec<IndexFamily>,
 }
 
 #[test]
 fn every_included_font_has_an_allowed_licence_record() {
     let mut indexed: Vec<IndexFace> = Vec::new();
     let mut families = BTreeSet::new();
+    let mut shipped_tags = BTreeSet::new();
     for entry in std::fs::read_dir(fonts_dir()).unwrap() {
         let folder = entry.unwrap().path();
         if !folder.is_dir() {
@@ -124,6 +139,7 @@ fn every_included_font_has_an_allowed_licence_record() {
                 (record.family.as_str(), face.style.as_str())
             );
         }
+        shipped_tags.insert((record.family.clone(), record.tags.clone()));
         families.insert(record.family);
     }
     let expected: BTreeSet<String> = ["Great Vibes", "Source Sans 3", "Source Serif 4"]
@@ -135,6 +151,14 @@ fn every_included_font_has_an_allowed_licence_record() {
     let index: Index =
         serde_json::from_str(&std::fs::read_to_string(fonts_dir().join("index.json")).unwrap())
             .unwrap();
+    // Every included family has its tags in the index, and every entry names one.
+    let index_tags: BTreeSet<(String, Vec<String>)> = index
+        .families
+        .iter()
+        .map(|f| (f.family.clone(), f.tags.clone()))
+        .collect();
+    assert_eq!(index_tags, shipped_tags);
+    assert_eq!(index.families.len(), shipped_tags.len());
     let mut from_index = index.faces;
     from_index.sort();
     indexed.sort();

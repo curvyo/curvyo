@@ -17,3 +17,5 @@ fontdb.workspace = true
 # Only the test that opening an older project writes nothing to its file (`0040` criterion 4).
 curvyo-document-core = { path = "../curvyo-document-core", version = "0.1.0" }
 tempfile = "3"
+# The names and class bytes text-core reads from bytes match the listing's (`0075`).
+curvyo-text-core = { path = "../curvyo-text-core", version = "0.1.0" }
