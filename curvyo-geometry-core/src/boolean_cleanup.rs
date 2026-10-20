@@ -33,7 +33,7 @@ const MAX_CLEANUP_ROUNDS: usize = 4;
 
 /// Squared distance, in grid units squared, from `p` to the segment `a`-`b`. The products are
 /// exact in 128-bit integers; the one division is an IEEE operation, the same on every target.
-fn distance_squared_to_segment(p: Point64, a: Point64, b: Point64) -> f64 {
+pub(crate) fn distance_squared_to_segment(p: Point64, a: Point64, b: Point64) -> f64 {
     let (abx, aby) = (
         i128::from(b.x) - i128::from(a.x),
         i128::from(b.y) - i128::from(a.y),
@@ -106,7 +106,7 @@ fn distance_squared_to_line(p: Point64, a: Point64, b: Point64) -> f64 {
 /// all input vertices between those neighbours stay within a unit of that line, so the bound
 /// survives. A vertex that fails the second test stays, and then lies within a unit of its
 /// neighbours' line: criterion 24 gives way to accuracy there.
-fn remove_near_collinear(path: &Path64) -> Path64 {
+pub(crate) fn remove_near_collinear(path: &Path64) -> Path64 {
     let n = path.len();
     if n < 4 {
         return path.clone();
@@ -127,7 +127,19 @@ fn remove_near_collinear(path: &Path64) -> Path64 {
     let mut keep = vec![false; n];
     keep[first] = true;
     keep[second] = true;
-    let mut runs = vec![(first, second_unwrapped), (second_unwrapped, first + n)];
+    mark_far_vertices(
+        path,
+        &mut keep,
+        vec![(first, second_unwrapped), (second_unwrapped, first + n)],
+    );
+    drop_redundant_kept(path, &keep, true)
+}
+
+/// Step 1 of `remove_near_collinear` (Douglas-Peucker): within each run `(lo, hi)` of indices
+/// into `path` (taken modulo its length, so a closed run may wrap), keeps the farthest vertex
+/// while it is more than a unit from the run's chord, and searches the two halves in turn.
+fn mark_far_vertices(path: &Path64, keep: &mut [bool], mut runs: Vec<(usize, usize)>) {
+    let n = path.len();
     while let Some((lo, hi)) = runs.pop() {
         let mut worst = (0.0_f64, lo);
         for k in lo + 1..hi {
@@ -142,13 +154,28 @@ fn remove_near_collinear(path: &Path64) -> Path64 {
             runs.push((worst.1, hi));
         }
     }
-    drop_redundant_kept(path, &keep)
+}
+
+/// The open form of `remove_near_collinear` for a polyline (Weld's inner lines,
+/// `specs/0068-laserable-lettering/adrs.md` decision 3): both endpoints are fixed anchors and
+/// are never moved or dropped, so lines that meet there stay joined. No repairing union runs: a
+/// line has no region.
+pub(crate) fn cleanup_open(path: &Path64) -> Path64 {
+    let n = path.len();
+    if n < 3 {
+        return path.clone();
+    }
+    let mut keep = vec![false; n];
+    keep[0] = true;
+    keep[n - 1] = true;
+    mark_far_vertices(path, &mut keep, vec![(0, n - 1)]);
+    drop_redundant_kept(path, &keep, false)
 }
 
 /// Step 2 of `remove_near_collinear`: the kept vertices of `path` after removing those that are
 /// within a unit of their final neighbours' line without breaking the bound for the vertices
-/// between them.
-fn drop_redundant_kept(path: &Path64, keep: &[bool]) -> Path64 {
+/// between them. A closed path is a ring; an open one keeps its two endpoints.
+fn drop_redundant_kept(path: &Path64, keep: &[bool], closed: bool) -> Path64 {
     let n = path.len();
     let kept: Vec<usize> = (0..n).filter(|&i| keep[i]).collect();
     let count = kept.len();
@@ -162,8 +189,10 @@ fn drop_redundant_kept(path: &Path64, keep: &[bool]) -> Path64 {
     let mut alive = keep.to_vec();
     let mut remaining = count;
     let mut pending = kept;
+    let fewest = if closed { 3 } else { 2 };
     while let Some(vertex) = pending.pop() {
-        if !alive[vertex] || remaining <= 3 {
+        let endpoint = !closed && (vertex == 0 || vertex == n - 1);
+        if endpoint || !alive[vertex] || remaining <= fewest {
             continue;
         }
         let (before, after) = (previous[vertex], next[vertex]);

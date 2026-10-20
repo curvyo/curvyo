@@ -123,6 +123,7 @@ mod undo_stack;
 mod units;
 mod value_scale;
 mod viewport;
+mod weld_plan;
 
 pub use anchor_id_minter::AnchorIdMinter;
 pub use angle_snap::{MAX_SKEW_SNAP_DEG, snap_angle, snap_skew_angle};
@@ -355,3 +356,6 @@ pub use undo_stack::{SelectionSnapshot, Target as UndoTarget, UndoStack};
 pub use units::{SelectedUnit, Units};
 pub use value_scale::{FieldShown, Grid, ValueField, ValueScale};
 pub use viewport::{DOCUMENT_INSET_PX, PX_PER_MM_AT_100, Viewport, Zoom};
+pub use weld_plan::{
+    WELD_COMMIT_LABEL, WeldAvailability, WeldPlan, WeldRefusal, plan_weld, weld_availability,
+};
