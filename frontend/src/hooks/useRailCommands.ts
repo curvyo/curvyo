@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { textRefusalOutlines } from "@/lib/textText";
 import { type ActionNotice, useActionNotice } from "@/hooks/useActionNotice";
 import type { EditorSession } from "@/hooks/useEditorSession";
 import {
@@ -262,11 +263,14 @@ export function useRailCommands(editor: EditorSession): RailCommands {
           showPath(combineSuccessText(result), combineRefusalText(result));
         } else if (command === "split") {
           const result = applySplit();
-          outlinedRef.current = result.kind === "groups" || result.kind === "out_of_range";
+          outlinedRef.current =
+            result.kind === "groups" ||
+            result.kind === "out_of_range" ||
+            textRefusalOutlines(result.kind);
           showPath(splitSuccessText(result), splitRefusalText(result));
         } else if (command === "break_apart") {
           const result = applyBreakApart();
-          outlinedRef.current = result.kind === "groups";
+          outlinedRef.current = result.kind === "groups" || textRefusalOutlines(result.kind);
           showPath(breakApartSuccessText(result), breakApartRefusalText(result));
         } else {
           const result = applyCut();

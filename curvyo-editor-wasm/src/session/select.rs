@@ -314,6 +314,11 @@ impl Session {
             SelectDoubleClickOutcome::EditHint => DoubleClickHint::EditHint,
             SelectDoubleClickOutcome::CompoundPath => DoubleClickHint::CompoundPath,
             SelectDoubleClickOutcome::Clone => DoubleClickHint::Clone,
+            // A text opens for editing in the Text tool (`specs/0074-text-objects` criterion 10).
+            SelectDoubleClickOutcome::Text(id) => {
+                self.edit_text_at(id, Some(point));
+                DoubleClickHint::None
+            }
             // A group opens: everything outside it recedes (`0023` criterion 15).
             SelectDoubleClickOutcome::EnterGroup { group, leaf } => {
                 self.enter_group(group, Some(leaf));

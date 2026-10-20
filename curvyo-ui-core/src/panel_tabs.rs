@@ -17,6 +17,9 @@ pub enum PanelTab {
     Layers,
     /// The history of every step in the document (`specs/0020-undo-redo` criterion 39).
     History,
+    /// The fonts (`specs/0074-text-objects` criterion 15): always present, never dimmed, never
+    /// active by itself.
+    Fonts,
 }
 
 impl PanelTab {
@@ -29,6 +32,7 @@ impl PanelTab {
             Self::Style => "style",
             Self::Layers => "layers",
             Self::History => "history",
+            Self::Fonts => "fonts",
         }
     }
 
@@ -45,6 +49,7 @@ impl PanelTab {
             Self::Style => "Style",
             Self::Layers => "Layers",
             Self::History => "History",
+            Self::Fonts => "Fonts",
         }
     }
 
@@ -56,6 +61,9 @@ impl PanelTab {
             (Self::Style, Some(blocker)) => blocker.tooltip(),
             (Self::Layers, _) => "Layers (Shift+Ctrl+L)",
             (Self::History, _) => "History (Shift+Ctrl+H)",
+            // The browser build has no key (Chrome reserves Ctrl+Shift+T): the host drops the
+            // part in brackets there (UX notes §4).
+            (Self::Fonts, _) => "Fonts (Shift+Ctrl+T)",
         }
     }
 }
@@ -85,12 +93,13 @@ impl StyleBlocker {
 
 /// The strip's tabs, in order (`0051` criterion 2). A tab whose feature has not shipped is not
 /// built; the order never changes.
-const TABS: [PanelTab; 5] = [
+const TABS: [PanelTab; 6] = [
     PanelTab::File,
     PanelTab::Document,
     PanelTab::Style,
     PanelTab::Layers,
     PanelTab::History,
+    PanelTab::Fonts,
 ];
 
 /// The active tab and the one fact the automatic switches need: whether the
@@ -166,6 +175,12 @@ impl PanelTabs {
     /// scope. Like History it is never left or entered by a selection change.
     pub fn shortcut_layers(&mut self) {
         self.active = PanelTab::Layers;
+    }
+
+    /// Shift+Ctrl+T or the Text bar's Font button (`specs/0074-text-objects` criterion 11):
+    /// the Fonts tab.
+    pub const fn shortcut_fonts(&mut self) {
+        self.active = PanelTab::Fonts;
     }
 
     /// Shift+Ctrl+D (criterion 14): Document, whatever the scope.
@@ -338,7 +353,7 @@ mod tests {
 
     /// `0051` criterion 2 and `0043` criterion 4: names, order, tooltips, the dimmed tab.
     #[test]
-    fn the_strip_has_five_tabs_with_tooltips_and_a_dimmed_style() {
+    fn the_strip_has_six_tabs_with_tooltips_and_a_dimmed_style() {
         let empty = tab_entries(Document, false);
         let names: Vec<_> = empty.iter().map(|e| (e.name, e.label)).collect();
         assert_eq!(
@@ -348,7 +363,8 @@ mod tests {
                 ("document", "Document"),
                 ("style", "Style"),
                 ("layers", "Layers"),
-                ("history", "History")
+                ("history", "History"),
+                ("fonts", "Fonts")
             ]
         );
         assert_eq!(entry(&empty, "file").tooltip, "File");

@@ -46,7 +46,10 @@ fn the_strip_has_layers_fourth_and_never_dimmed() {
         for non_empty in [false, true] {
             let entries = tab_entries(active, non_empty);
             let names: Vec<_> = entries.iter().map(|e| e.name).collect();
-            assert_eq!(names, ["file", "document", "style", "layers", "history"]);
+            assert_eq!(
+                names,
+                ["file", "document", "style", "layers", "history", "fonts"]
+            );
             let l = &entries[3];
             assert_eq!((l.label, l.tooltip), ("Layers", "Layers (Shift+Ctrl+L)"));
             assert!(l.enabled);

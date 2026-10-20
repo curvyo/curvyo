@@ -1,0 +1,135 @@
+//! Which listed face a text's font reference names (ADR 0020 §1, "Font matching";
+//! `specs/0074-text-objects` criteria 29 and 30).
+
+use curvyo_document_core::FontRef;
+use curvyo_text_core::FaceKey;
+
+/// The block of the Fonts tab a face is listed in, in the order of preference.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum FontBlock {
+    /// The Curvyo font folder.
+    Curvyo,
+    /// Shipped with the app.
+    Included,
+    /// Installed on the computer (desktop only).
+    System,
+}
+
+/// One face the host listed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ListedFace {
+    /// Its block.
+    pub block: FontBlock,
+    /// The family name.
+    pub family: String,
+    /// The style name.
+    pub style: String,
+    /// The host's id of its file.
+    pub host_id: String,
+    /// The face's index in its file.
+    pub index: u32,
+    /// Its key in the engine's store once its bytes were handed in.
+    pub key: Option<FaceKey>,
+}
+
+/// How a font reference resolves.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FaceMatch {
+    /// A loaded face: the stored one (same hash), or one of the same family and style.
+    Face(FaceKey),
+    /// A listed face of the same family and style whose bytes are not loaded yet: the host loads
+    /// the listed face of this index, then the text is laid out again.
+    NeedsLoad(usize),
+    /// No face matches: the text is drawn with the included sans face and marked (criterion 29).
+    Missing,
+}
+
+/// Resolves `font` over `faces`: (a) a loaded face with the stored hash and index; (b) a face of
+/// the same family and style, case-insensitive, preferring the Curvyo folder, then the included
+/// fonts, then the computer's, without a notice (criterion 30); (c) missing.
+#[must_use]
+pub fn match_face(font: &FontRef, faces: &[ListedFace]) -> FaceMatch {
+    let exact = faces.iter().find_map(|face| {
+        face.key
+            .filter(|key| key.index == font.face_index && key.hash.to_hex() == font.face_hash)
+    });
+    if let Some(key) = exact {
+        return FaceMatch::Face(key);
+    }
+    let same_name = |face: &&ListedFace| {
+        face.family.to_lowercase() == font.family.to_lowercase()
+            && face.style.to_lowercase() == font.style.to_lowercase()
+    };
+    let best = faces
+        .iter()
+        .enumerate()
+        .filter(|(_, face)| same_name(face))
+        .min_by_key(|(_, face)| (face.block, face.key.is_none()));
+    match best {
+        Some((_, ListedFace { key: Some(key), .. })) => FaceMatch::Face(*key),
+        Some((index, _)) => FaceMatch::NeedsLoad(index),
+        None => FaceMatch::Missing,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use curvyo_text_core::FaceHash;
+
+    fn listed(block: FontBlock, family: &str, style: &str, hash: Option<u8>) -> ListedFace {
+        ListedFace {
+            block,
+            family: family.to_owned(),
+            style: style.to_owned(),
+            host_id: format!("{block:?}{family}"),
+            index: 0,
+            key: hash.map(|h| FaceKey {
+                hash: FaceHash([h; 32]),
+                index: 0,
+            }),
+        }
+    }
+
+    fn font(family: &str, style: &str, hash: u8) -> FontRef {
+        FontRef {
+            family: family.to_owned(),
+            style: style.to_owned(),
+            face_hash: FaceHash([hash; 32]).to_hex(),
+            face_index: 0,
+        }
+    }
+
+    /// Criteria 29 and 30: the stored face first; else the same family and style, Curvyo
+    /// before Included before This computer, without a notice; else missing.
+    #[test]
+    fn ac29_ac30_matching_rule() {
+        let faces = vec![
+            listed(FontBlock::System, "Source Serif 4", "Bold", Some(3)),
+            listed(FontBlock::Included, "Source Serif 4", "Bold", Some(2)),
+            listed(FontBlock::Curvyo, "source serif 4", "bold", None),
+        ];
+        let key = |h| {
+            FaceMatch::Face(FaceKey {
+                hash: FaceHash([h; 32]),
+                index: 0,
+            })
+        };
+        assert_eq!(
+            match_face(&font("Source Serif 4", "Bold", 3), &faces),
+            key(3)
+        );
+        assert_eq!(
+            match_face(&font("Source Serif 4", "Bold", 9), &faces),
+            FaceMatch::NeedsLoad(2)
+        );
+        assert_eq!(
+            match_face(&font("Source Serif 4", "Bold", 9), &faces[..2]),
+            key(2)
+        );
+        assert_eq!(
+            match_face(&font("Great Vibes", "Regular", 1), &faces),
+            FaceMatch::Missing
+        );
+    }
+}

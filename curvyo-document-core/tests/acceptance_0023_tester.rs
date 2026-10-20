@@ -871,6 +871,7 @@ fn replicas_one_peer_groups_while_another_moves_a_member() {
     let _ = orig;
     // The member really moved by (7, 3) relative to where it was grouped.
     match moved {
+        curvyo_document_core::ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         curvyo_document_core::ObjectSnapshot::Clone(_) => panic!("no clone here"),
         curvyo_document_core::ObjectSnapshot::Primitive(p) => match p.shape {
             curvyo_document_core::Shape::Rect { bounds, .. } => {

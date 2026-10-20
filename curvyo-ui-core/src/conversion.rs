@@ -284,6 +284,7 @@ mod tests {
             ry: Length::from_mm(5.0 + 1e-7),
         });
         let with_rotation = |id: NodeId, radians: f64| match document.object(id).unwrap() {
+            ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
             ObjectSnapshot::Primitive(p) => ObjectSnapshot::Primitive(PrimitiveSnapshot {
                 rotation: Angle::from_radians(radians),
                 ..p
@@ -305,6 +306,7 @@ mod tests {
         // 1e-7 apart is a circle, whatever its rotation; 1e-5 apart is an ellipse.
         assert!(!converts_on_stretch(&with_rotation(ellipse, 0.5), zero));
         let wider = match document.object(ellipse).unwrap() {
+            ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
             ObjectSnapshot::Primitive(p) => ObjectSnapshot::Primitive(PrimitiveSnapshot {
                 shape: Shape::Ellipse {
                     frame: EllipseFrame {

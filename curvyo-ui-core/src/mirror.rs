@@ -111,6 +111,13 @@ pub(crate) fn mirrored(object: &ObjectSnapshot, mirror: Mirror) -> ObjectSnapsho
             });
             ObjectSnapshot::Clone(clone.mapped_by(g))
         }
+        ObjectSnapshot::Text(text) => {
+            let (fx, fy) = mirror.factors();
+            let g = crate::clone_gesture::affine_of(text.id, &|path: &PathSnapshot| {
+                path.scaled_along(mirror.pivot, fx, fy, mirror.axes)
+            });
+            ObjectSnapshot::Text(Box::new(text.mapped_by(g)))
+        }
     }
 }
 
@@ -392,6 +399,7 @@ mod tests {
 
     fn samples(object: &ObjectSnapshot) -> Vec<Point> {
         match object {
+            ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
             ObjectSnapshot::Primitive(p) => outline_of_rotated(&p.shape, p.rotation)
                 .iter()
                 .map(|a| a.point)

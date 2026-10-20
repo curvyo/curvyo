@@ -38,6 +38,12 @@ enum Planned<'a> {
         meta: loro::LoroMap,
         result: &'a ObjectSnapshot,
     },
+    /// A text whose result is a text: its size and placement are written where they differ
+    /// (`specs/0074-text-objects` criterion 26).
+    Text {
+        meta: loro::LoroMap,
+        result: &'a ObjectSnapshot,
+    },
     /// A clone whose result is a path: it is unlinked into that path, under the same id and tree
     /// position (`0049` criterion 16, the singular case).
     Unlink {
@@ -132,6 +138,16 @@ impl Document {
                     // A clone has no rotation and no stroke of its own.
                     continue;
                 }
+                Planned::Text { meta, result } => {
+                    if let ObjectSnapshot::Text(text) = result {
+                        crate::text_codec::write_size_and_placement_if_changed(meta, text);
+                    }
+                    if write_stroke_width {
+                        write_stroke_width_if_changed(meta, Some(result.style().stroke.width));
+                    }
+                    // A text has no rotation register: its turn is in the placement.
+                    continue;
+                }
                 Planned::Unlink {
                     meta,
                     path,
@@ -166,7 +182,9 @@ impl Document {
                     // The result is a path: an open Arc stays open.
                     let closed = match result {
                         ObjectSnapshot::Path(path) => path.closed,
-                        ObjectSnapshot::Primitive(_) | ObjectSnapshot::Clone(_) => true,
+                        ObjectSnapshot::Primitive(_)
+                        | ObjectSnapshot::Clone(_)
+                        | ObjectSnapshot::Text(_) => true,
                     };
                     shape_codec::write_converted_path_fields(meta, anchors, closed);
                     (meta, result)
@@ -256,6 +274,20 @@ fn plan_one<'a>(
     if crate::clone_codec::is_clone_meta(&meta) {
         return plan_clone(tree, meta, result);
     }
+    if crate::text_codec::is_text_meta(&meta) {
+        return match result {
+            ObjectSnapshot::Text(text)
+                if (text.placement.is_within_limit()
+                    && text.placement.determinant().abs()
+                        > crate::affine::SINGULAR_DETERMINANT)
+                    && crate::text_model::clamp_text_size(text.size) == text.size =>
+            {
+                Ok(Planned::Text { meta, result })
+            }
+            ObjectSnapshot::Text(_) => Err(ObjectEditError::NonFiniteGeometry),
+            _ => Err(ObjectEditError::NoSuchObject),
+        };
+    }
     match (result, shape_codec::read_shape_tag(&meta)) {
         (ObjectSnapshot::Primitive(primitive), Some(tag)) => {
             let current = shape_codec::read_shape(&meta, &tag)
@@ -334,7 +366,9 @@ fn plan_clone<'a>(
                 result,
             })
         }
-        ObjectSnapshot::Primitive(_) => Err(ObjectEditError::NoSuchObject),
+        ObjectSnapshot::Primitive(_) | ObjectSnapshot::Text(_) => {
+            Err(ObjectEditError::NoSuchObject)
+        }
     }
 }
 
@@ -392,6 +426,7 @@ fn is_finite(object: &ObjectSnapshot) -> bool {
                 }
         }
         ObjectSnapshot::Clone(clone) => rotation && clone.chain.matrix.is_finite(),
+        ObjectSnapshot::Text(text) => text.placement.is_finite() && text.size.as_mm().is_finite(),
         ObjectSnapshot::Path(path) => {
             rotation
                 && path.all_anchors().all(|a| {

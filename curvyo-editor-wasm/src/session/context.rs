@@ -50,7 +50,7 @@ impl Session {
     pub(super) fn document_read(&self) -> Arc<DocumentRead> {
         let drag = (self.tool == Tool::Select && self.select.drag_in_flight())
             || (self.tool == Tool::Node && self.node.drag_in_flight());
-        self.object_cache.read(&self.document, drag)
+        self.object_cache.read(&self.document, drag, &self.fonts)
     }
 
     /// The objects of the context a press may hit: [`Session::objects`] without the hidden and
@@ -64,7 +64,12 @@ impl Session {
     pub(super) fn object_read(&self) -> Arc<curvyo_document_core::ObjectRead> {
         let drag = (self.tool == Tool::Select && self.select.drag_in_flight())
             || (self.tool == Tool::Node && self.node.drag_in_flight());
-        Arc::clone(&self.object_cache.read(&self.document, drag).clones)
+        Arc::clone(
+            &self
+                .object_cache
+                .read(&self.document, drag, &self.fonts)
+                .clones,
+        )
     }
 
     /// The objects the tools work on: the leaves inside the entered group, or every leaf at the

@@ -79,7 +79,10 @@ impl Session {
                         StackRefusal::Operands(
                             BooleanRefusal::NoArea { offenders, .. }
                             | BooleanRefusal::OutOfRange { offenders, .. }
-                            | BooleanRefusal::Groups { offenders },
+                            | BooleanRefusal::Groups { offenders }
+                            | BooleanRefusal::Texts(curvyo_ui_core::TextRefusal {
+                                offenders, ..
+                            }),
                         ) => Some(RefusalMarks::new(offenders.clone(), &selection)),
                         _ => None,
                     };

@@ -6,6 +6,7 @@
  */
 
 import { NOTHING_CHANGED, plural, sharedRefusalText } from "./booleanText.ts";
+import { textRefusalOutlines, textRefusalText } from "./textText.ts";
 
 /** The commands of the Path card, in the card's order. */
 export type PathCommand = "combine" | "split" | "break_apart" | "cut";
@@ -39,6 +40,8 @@ export interface CombineResult {
   /** An operand had a marker on; the result draws none. */
   markers: boolean;
   stylesDiffer: boolean;
+  /** The one missing face of a refusal of texts (`specs/0074-text-objects` criterion 29). */
+  face?: string;
 }
 
 /** What `WasmSession.apply_split` did (`kind` is the outcome code). */
@@ -50,6 +53,8 @@ export interface SplitResult {
   leftAlone: number;
   /** Objects selected (for the out-of-range sentence). */
   of?: number;
+  /** The one missing face of a refusal of texts (`specs/0074-text-objects` criterion 29). */
+  face?: string;
 }
 
 /** What `WasmSession.apply_break_apart` did (`kind` is the outcome code). */
@@ -60,6 +65,8 @@ export interface BreakApartResult {
   withHoles: boolean;
   /** Outlines with a single node that were left out. */
   singleNodesRemoved: number;
+  /** The one missing face of a refusal of texts (`specs/0074-text-objects` criterion 29). */
+  face?: string;
 }
 
 /** What `WasmSession.apply_cut` did (`kind` is the outcome code). `count` paths became `pieces`
@@ -69,6 +76,8 @@ export interface CutResult {
   count: number;
   of: number;
   pieces: number;
+  /** The one missing face of a refusal of texts (`specs/0074-text-objects` criterion 29). */
+  face?: string;
 }
 
 const NAMES: Record<PathCommand, string> = {
@@ -196,6 +205,10 @@ export function combineSuccessText(result: CombineResult): string | null {
 /** The notice after a refused Combine (`0035` criterion 11, `0054` criterion 10), or `null` for a
  * result that is no refusal (`applied`, `ignored`, `needs_two`). */
 export function combineRefusalText(result: CombineResult): string | null {
+  const texts = textRefusalText(result);
+  if (texts) {
+    return texts;
+  }
   if (result.kind === "single_nodes_only") {
     return `Combine needs outlines with two or more nodes. Every selected outline has a single node. ${NOTHING_CHANGED}`;
   }
@@ -205,7 +218,7 @@ export function combineRefusalText(result: CombineResult): string | null {
 /** Whether a refused Combine outlines objects on the canvas: objects out of range and the
  * leaves of groups. */
 export function combineOutlinesObjects(result: CombineResult): boolean {
-  return ["out_of_range", "groups"].includes(result.kind);
+  return ["out_of_range", "groups"].includes(result.kind) || textRefusalOutlines(result.kind);
 }
 
 const NO_COMPOUND = "needs a compound path.";
@@ -232,6 +245,10 @@ export function splitSuccessText(result: SplitResult): string | null {
  * no refusal. A compound path of one piece outlines nothing; a group is the whole selection's
  * fault, so the session outlines the leaves of the groups. */
 export function splitRefusalText(result: SplitResult): string | null {
+  const texts = textRefusalText({ ...result, count: result.of });
+  if (texts) {
+    return texts;
+  }
   switch (result.kind) {
     case "no_compound":
       return `Split ${NO_COMPOUND} ${NOTHING_CHANGED}`;
@@ -272,6 +289,10 @@ export function breakApartSuccessText(result: BreakApartResult): string | null {
 /** The notice after a refused Break apart (`0048` criterion 13), or `null` for a result that is
  * no refusal. */
 export function breakApartRefusalText(result: BreakApartResult): string | null {
+  const texts = textRefusalText({ ...result, count: result.compounds });
+  if (texts) {
+    return texts;
+  }
   switch (result.kind) {
     case "no_compound":
       return `Break apart ${NO_COMPOUND} ${NOTHING_CHANGED}`;
@@ -299,11 +320,17 @@ export function cutSuccessText(result: CutResult): string | null {
 /** The notice after a refused Cut (`0036` criteria 8 to 10), or `null` for a result that is no
  * refusal. */
 export function cutRefusalText(result: CutResult): string | null {
+  const texts = textRefusalText(result);
+  if (texts) {
+    return texts;
+  }
   switch (result.kind) {
     case "no_crossing":
       return result.of === 1
         ? `The selected path does not cross itself. ${NOTHING_CHANGED}`
         : `The selected paths do not cross each other or themselves. ${NOTHING_CHANGED}`;
+    case "texts":
+      return `Cut does not work on texts with several outlines. ${NOTHING_CHANGED}`;
     case "compound":
       return `Cut does not work on compound paths. Split or Break apart first. ${NOTHING_CHANGED}`;
     case "too_many":
@@ -318,5 +345,8 @@ export function cutRefusalText(result: CutResult): string | null {
 /** Whether a refused Cut outlines objects on the canvas: the groups' leaves, the compound paths
  * and the objects out of range; "do not cross" outlines nothing. */
 export function cutOutlinesObjects(result: CutResult): boolean {
-  return ["groups", "compound", "out_of_range"].includes(result.kind);
+  return (
+    ["groups", "compound", "texts", "out_of_range"].includes(result.kind) ||
+    textRefusalOutlines(result.kind)
+  );
 }

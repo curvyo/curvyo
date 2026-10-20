@@ -54,11 +54,13 @@ impl Session {
         // tool's live drag reshapes the paths it moves.
         // A segment bend leaves the artwork as committed ("black old"): its blue outline is
         // drawn over it below, and only the decorations read the live paths.
-        let mut artwork_objects = if self.tool == Tool::Node && self.live_bend().is_none() {
+        let artwork_objects = if self.tool == Tool::Node && self.live_bend().is_none() {
             Cow::Owned(Self::with_paths(&render, &paths))
         } else {
             Cow::Borrowed(&render[..])
         };
+        // A text in edit mode is drawn as typed (`specs/0074-text-objects` criterion 3).
+        let mut artwork_objects = self.with_text_edit(artwork_objects);
         // A panel drag draws the objects in the style being previewed
         // (criterion 36); nothing is written until the release.
         if self.style.is_active() {
@@ -133,6 +135,8 @@ impl Session {
             ));
         }
         list.extend(self.creation_preview_list(view));
+        // The text in edit mode: line box, selection, composition and caret (`0074`).
+        list.extend(self.text_overlay_list(view, self.text_caret_on()));
         if self.tool == Tool::Pen
             && let Some(nodes) = self.pen.in_progress_nodes()
         {
@@ -233,7 +237,9 @@ impl Session {
                         .unwrap_or(original)
                         .clone(),
                 ),
-                ObjectSnapshot::Primitive(_) | ObjectSnapshot::Clone(_) => object.clone(),
+                ObjectSnapshot::Primitive(_)
+                | ObjectSnapshot::Clone(_)
+                | ObjectSnapshot::Text(_) => object.clone(),
             })
             .collect()
     }

@@ -81,6 +81,7 @@ fn objects(document: &Document) -> Vec<ObjectSnapshot> {
 
 fn style_of(snapshot: &ObjectSnapshot) -> &Style {
     match snapshot {
+        ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Path(p) => &p.style,
         ObjectSnapshot::Primitive(p) => &p.style,
         ObjectSnapshot::Clone(p) => &p.resolved.style,

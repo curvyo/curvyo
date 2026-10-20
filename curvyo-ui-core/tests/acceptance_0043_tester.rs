@@ -34,9 +34,15 @@ fn c1_the_tabs_in_order_with_names_and_tooltips() {
             let entries = tab_entries(active, non_empty);
             // The File tab (`0051`) comes first; the other three keep their order.
             let names: Vec<&str> = entries.iter().map(|e| e.name).collect();
-            assert_eq!(names, ["file", "document", "style", "layers", "history"]);
+            assert_eq!(
+                names,
+                ["file", "document", "style", "layers", "history", "fonts"]
+            );
             let labels: Vec<&str> = entries.iter().map(|e| e.label).collect();
-            assert_eq!(labels, ["File", "Document", "Style", "Layers", "History"]);
+            assert_eq!(
+                labels,
+                ["File", "Document", "Style", "Layers", "History", "Fonts"]
+            );
             assert_eq!(entry(&entries, "history").tooltip, "History (Shift+Ctrl+H)");
             assert_eq!(
                 entry(&entries, "document").tooltip,

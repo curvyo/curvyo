@@ -39,6 +39,9 @@ pub struct OffsetRequest {
 /// Why an offset was refused. Nothing is written in any of these cases.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum OffsetRefusal {
+    /// Texts of the selection use a missing face or are not laid out yet: nothing is converted
+    /// (`specs/0074-text-objects` criteria 24 and 29).
+    Texts(crate::text_convert::TextRefusal),
     /// No operand is selected (open paths are not operands, criterion 55).
     NoOperands,
     /// The distance is zero: nothing is written.
@@ -221,6 +224,11 @@ pub fn plan_offset(
     selection: &ObjectSelection,
     request: &OffsetRequest,
 ) -> Result<OffsetPlan, OffsetRefusal> {
+    if let Some(refusal) = crate::text_convert::texts_refusal(objects, selection.ids()) {
+        return Err(OffsetRefusal::Texts(refusal));
+    }
+    let converted = crate::text_convert::texts_as_paths(objects);
+    let objects: &[ObjectSnapshot] = &converted;
     let operands = offset_operands(objects, selection);
     let of = operands.len();
     if operands.is_empty() {

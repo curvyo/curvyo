@@ -154,8 +154,9 @@ pub(crate) fn commit_resize(
                 |w| document.resize_star_frame(id, frame, w),
             ),
         },
-        // A clone's result is its matrix, which the multi-object commit writes.
-        ObjectSnapshot::Clone(_) => {
+        // A clone's result is its matrix, and a text's its size and placement, which the
+        // multi-object commit writes.
+        ObjectSnapshot::Clone(_) | ObjectSnapshot::Text(_) => {
             let _ = commit_group(
                 document,
                 std::slice::from_ref(result),
@@ -243,8 +244,9 @@ const SAME_ANGLE_EPSILON_RAD: f64 = 1e-12;
 /// order, and its rotation in radians.
 fn numbers_of(object: &ObjectSnapshot) -> (Vec<f64>, f64) {
     match object {
-        ObjectSnapshot::Path(path)
-        | ObjectSnapshot::Clone(curvyo_document_core::CloneSnapshot { resolved: path, .. }) => {
+        ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_) | ObjectSnapshot::Text(_)
+            if let Some(path) = object.drawn_path() =>
+        {
             let mut v = vec![path.style.stroke.width.as_mm()];
             for a in path.all_anchors() {
                 v.extend([
@@ -257,6 +259,9 @@ fn numbers_of(object: &ObjectSnapshot) -> (Vec<f64>, f64) {
                 ]);
             }
             (v, path.rotation.as_radians())
+        }
+        ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_) | ObjectSnapshot::Text(_) => {
+            (Vec::new(), 0.0)
         }
         ObjectSnapshot::Primitive(p) => {
             let mut v = vec![p.style.stroke.width.as_mm()];

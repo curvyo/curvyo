@@ -3,7 +3,7 @@ import { useCallback, useMemo, useState } from "react";
 import type { WasmSession } from "@/lib/editorSession";
 
 /** What the Properties panel's body shows (`curvyo-ui-core::panel_content`). */
-export type PanelContent = "file" | "document" | "style" | "layers" | "history" | "empty";
+export type PanelContent = "file" | "document" | "style" | "layers" | "history" | "fonts" | "empty";
 
 /** One tab of the panel's strip (`curvyo-ui-core::panel_tabs`). */
 export interface PanelTabView {
@@ -162,7 +162,7 @@ export interface DocumentPanelApi {
    * (the dimmed Style tab). */
   pressTab: (name: string) => boolean;
   /** Shift+Ctrl+F or Shift+Ctrl+D: the tab the shortcut names. */
-  shortcut: (tab: "style" | "document" | "history" | "layers") => void;
+  shortcut: (tab: "style" | "document" | "history" | "layers" | "fonts") => void;
 }
 
 interface EditorHandle {
@@ -258,7 +258,7 @@ export function useDocumentPanel(editor: EditorHandle): DocumentPanelApi {
   );
 
   const shortcut = useCallback(
-    (tab: "style" | "document" | "history" | "layers") => {
+    (tab: "style" | "document" | "history" | "layers" | "fonts") => {
       const session = getSession();
       if (tab === "style") {
         session?.panel_shortcut_style();
@@ -266,6 +266,8 @@ export function useDocumentPanel(editor: EditorHandle): DocumentPanelApi {
         session?.panel_shortcut_history();
       } else if (tab === "layers") {
         session?.panel_shortcut_layers();
+      } else if (tab === "fonts") {
+        session?.panel_shortcut_fonts();
       } else {
         session?.panel_shortcut_document();
       }

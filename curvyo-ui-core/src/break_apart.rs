@@ -20,6 +20,9 @@ pub const BREAK_APART_COMMIT_LABEL: &str = "break_apart";
 /// Why Break apart was refused. Nothing was changed in either case.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BreakApartRefusal {
+    /// Texts of the selection use a missing face or are not laid out yet: nothing is converted
+    /// (`specs/0074-text-objects` criteria 24 and 29).
+    Texts(crate::text_convert::TextRefusal),
     /// The selection holds no compound path (the button is dimmed then; reachable only through
     /// the session function).
     NoCompound,
@@ -57,6 +60,11 @@ pub fn plan_break_apart(
     selection: &ObjectSelection,
     minter: &mut AnchorIdMinter,
 ) -> Result<BreakApartPlan, BreakApartRefusal> {
+    if let Some(refusal) = crate::text_convert::texts_refusal(objects, selection.ids()) {
+        return Err(BreakApartRefusal::Texts(refusal));
+    }
+    let converted = crate::text_convert::texts_as_paths(objects);
+    let objects: &[ObjectSnapshot] = &converted;
     let operands = operands_in_order(objects, selection);
     if !operands.iter().any(|object| is_compound(object)) {
         return Err(BreakApartRefusal::NoCompound);

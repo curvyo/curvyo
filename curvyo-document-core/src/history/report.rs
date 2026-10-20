@@ -61,6 +61,8 @@ pub enum ObjectShape {
     Group,
     /// A linked clone (`specs/0049-linked-clone`).
     Clone,
+    /// A text object (`specs/0074-text-objects`).
+    Text,
 }
 
 /// The outcome for one object.

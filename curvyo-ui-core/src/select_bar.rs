@@ -32,10 +32,16 @@ pub enum ObjectKind {
     ArcEllipse,
     /// An ellipse without an arc, a polygon or a star: "Curve" (criteria 26 and 44).
     Curved,
+    /// A text object: the Text group, and "Object to path" (`specs/0074-text-objects`
+    /// criteria 11 and 22).
+    Text,
 }
 
 impl ObjectKind {
     fn matches(self, object: &ObjectSnapshot) -> bool {
+        if self == Self::Text {
+            return matches!(object, ObjectSnapshot::Text(_));
+        }
         let ObjectSnapshot::Primitive(PrimitiveSnapshot { shape, .. }) = object else {
             return false;
         };
@@ -46,6 +52,7 @@ impl ObjectKind {
             Self::Primitive => true,
             Self::ArcEllipse => arc_capable(shape).is_some(),
             Self::Curved => curve_capable(shape),
+            Self::Text => false,
         }
     }
 }
@@ -145,7 +152,7 @@ fn shapes_of<'a>(
         .into_iter()
         .filter_map(|object| match object {
             ObjectSnapshot::Primitive(primitive) => Some(&primitive.shape),
-            ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_) => None,
+            ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_) | ObjectSnapshot::Text(_) => None,
         })
 }
 
@@ -264,7 +271,8 @@ pub fn select_bar_state(
         remove_rounding_enabled: radius.rounded,
         points,
         ratio,
-        object_to_path: !ids_of_kind(objects, selection, ObjectKind::Primitive).is_empty(),
+        object_to_path: !ids_of_kind(objects, selection, ObjectKind::Primitive).is_empty()
+            || !ids_of_kind(objects, selection, ObjectKind::Text).is_empty(),
         scale_switches_shown: !only_clones(objects, selection),
         ellipse: ellipse_bar_state(objects, selection),
         curve: curve_bar_state(objects, selection, preview),

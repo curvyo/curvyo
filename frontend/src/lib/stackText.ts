@@ -4,6 +4,7 @@
  * Rust sends codes and counts; the sentences are written here, once.
  */
 
+import { textRefusalOutlines, textRefusalText } from "./textText.ts";
 import {
   BOOLEAN_OPS,
   type BooleanOp,
@@ -48,6 +49,8 @@ export interface StackResult {
   hidden: number;
   /** A trimmed object has a stroke that now follows the trim (Flatten). */
   strokesFollow: boolean;
+  /** The one missing face of a refusal of texts (`specs/0074-text-objects` criterion 29). */
+  face?: string;
   closedOpen: number;
   removedOpen: number;
 }
@@ -96,6 +99,10 @@ export function stackSuccessText(command: StackCommand, result: StackResult): st
 /** The notice after a refusal (criteria 2 to 4), or `null` for a result that is no refusal. */
 export function stackRefusalText(command: StackCommand, result: StackResult): string | null {
   const name = NAMES[command];
+  const texts = textRefusalText(result);
+  if (texts) {
+    return texts;
+  }
   switch (result.kind) {
     case "no_overlap":
       return `${name}: the selected shapes do not overlap. ${NOTHING_CHANGED}`;
@@ -108,5 +115,10 @@ export function stackRefusalText(command: StackCommand, result: StackResult): st
 
 /** Whether a refusal outlines objects on the canvas (criterion 2). */
 export function stackRefusalOutlinesObjects(result: StackResult): boolean {
-  return result.kind === "no_area" || result.kind === "out_of_range" || result.kind === "groups";
+  return (
+    result.kind === "no_area" ||
+    result.kind === "out_of_range" ||
+    result.kind === "groups" ||
+    textRefusalOutlines(result.kind)
+  );
 }

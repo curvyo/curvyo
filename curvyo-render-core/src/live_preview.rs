@@ -31,11 +31,7 @@ pub fn build_live_edit_preview(objects: &[ObjectSnapshot], view: ViewTransform) 
                 ObjectSnapshot::Primitive(primitive) => {
                     shape_live_outline(&primitive.shape, primitive.rotation, view, casing)
                 }
-                ObjectSnapshot::Path(path)
-                | ObjectSnapshot::Clone(curvyo_document_core::CloneSnapshot {
-                    resolved: path,
-                    ..
-                }) => {
+                _ => object.drawn_path().map_or_else(DrawList::default, |path| {
                     let mut outlines = DrawList::default();
                     for subpath in path.subpaths() {
                         outlines.extend(stroke::path_stroke(
@@ -55,7 +51,7 @@ pub fn build_live_edit_preview(objects: &[ObjectSnapshot], view: ViewTransform) 
                         ));
                     }
                     outlines
-                }
+                }),
             });
         }
     }

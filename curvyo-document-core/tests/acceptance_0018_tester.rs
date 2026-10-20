@@ -93,6 +93,7 @@ fn all_primitives(doc: &Document) -> Vec<NodeId> {
 
 fn style_of(doc: &Document, id: NodeId) -> Style {
     match doc.object(id).expect("object exists") {
+        ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Path(p) => p.style,
         ObjectSnapshot::Primitive(p) => p.style,
         ObjectSnapshot::Clone(p) => p.resolved.style,
@@ -479,6 +480,7 @@ fn object_to_path_gives_a_path_without_markers() {
     doc.convert_to_paths(&conversions).unwrap();
     for id in prims {
         match doc.object(id).unwrap() {
+            ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
             ObjectSnapshot::Path(p) => assert_eq!(p.style.stroke.markers, Markers::default()),
             ObjectSnapshot::Primitive(_) | ObjectSnapshot::Clone(_) => panic!("converted"),
         }
@@ -549,6 +551,7 @@ fn splitting_an_open_path_keeps_the_settings_on_both_halves() {
     // Each half is an open path with the split node at the end / the start.
     for id in [a, b] {
         match doc.object(id).unwrap() {
+            ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
             ObjectSnapshot::Path(path) => assert!(!path.closed),
             ObjectSnapshot::Primitive(_) | ObjectSnapshot::Clone(_) => panic!(),
         }
@@ -624,6 +627,7 @@ fn closing_a_path_onto_itself_keeps_its_settings() {
         .join_endpoints(p, AnchorId::new(1, 3), p, AnchorId::new(1, 1))
         .unwrap();
     match doc.object(id).unwrap() {
+        ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Path(path) => assert!(path.closed),
         ObjectSnapshot::Primitive(_) | ObjectSnapshot::Clone(_) => panic!(),
     }

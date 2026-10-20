@@ -48,6 +48,7 @@ fn clone_of(d: &Document, id: NodeId) -> CloneSnapshot {
 
 fn style_of(d: &Document, id: NodeId) -> Style {
     match d.object(id).unwrap() {
+        ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Path(path) => path.style,
         ObjectSnapshot::Clone(clone) => clone.resolved.style,
         ObjectSnapshot::Primitive(p) => p.style,

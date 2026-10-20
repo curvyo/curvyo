@@ -4,7 +4,7 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
-use loro::{Container, LoroMap, LoroMovableList, LoroResult, ValueOrContainer};
+use loro::{Container, LoroMap, LoroMovableList, LoroResult, LoroText, ValueOrContainer};
 
 use super::node_value::{Node, read_list};
 
@@ -29,6 +29,9 @@ fn write_entry(map: &LoroMap, key: &str, node: &Node) -> LoroResult<()> {
             let child = map.insert_container(key, LoroMovableList::new())?;
             fill_list(&child, items)
         }
+        Node::Text(string) => map
+            .insert_container(key, LoroText::new())?
+            .insert(0, string),
     }
 }
 
@@ -56,6 +59,9 @@ fn insert_item(list: &LoroMovableList, index: usize, item: &Node) -> LoroResult<
             let child = list.insert_container(index, LoroMovableList::new())?;
             fill_list(&child, items)
         }
+        Node::Text(string) => list
+            .insert_container(index, LoroText::new())?
+            .insert(0, string),
     }
 }
 
@@ -86,6 +92,21 @@ pub(crate) fn restore_map(
                 Some(Node::List(to_items)),
                 Some(ValueOrContainer::Container(Container::MovableList(child))),
             ) => restore_list(child, from_items, to_items, tally),
+            (
+                Some(Node::Text(from_string)),
+                Some(Node::Text(to_string)),
+                Some(ValueOrContainer::Container(Container::Text(child))),
+            ) => {
+                // As a register: back to the old string only where nobody typed since, written
+                // as the difference so the container (and a peer's merge) stays.
+                if child.to_string() == *from_string
+                    && crate::text_codec::apply_string_diff(child, to_string)
+                {
+                    tally.written += 1;
+                } else {
+                    tally.kept += 1;
+                }
+            }
             _ => {
                 let now = current.as_ref().map(Node::read);
                 if now.as_ref() == from_node && write_back(live, key, to_node) {

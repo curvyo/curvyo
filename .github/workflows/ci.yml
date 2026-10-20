@@ -376,6 +376,7 @@ jobs:
           cargo test --release -p curvyo-editor-wasm --test clone_budget -- --nocapture --test-threads=1
           cargo test --release -p curvyo-editor-wasm --test compound_path_interactivity -- --nocapture
           cargo test --release -p curvyo-editor-wasm --test boolean_interactivity -- --nocapture
+          cargo test --release -p curvyo-editor-wasm --test text_budget -- --nocapture
           cargo test --release -p curvyo-geometry-core --test outline_touch_nesting -- --nocapture
           cargo test --release -p curvyo-editor-wasm --test combine_interactivity -- --nocapture
           cargo test --release -p curvyo-editor-wasm --test open_outlines_interactivity -- --nocapture

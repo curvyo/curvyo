@@ -92,7 +92,7 @@ fn tab_action(input: &KeyInput<'_>, state: KeyState) -> KeyAction {
 
 /// Whether Enter may enter a group: the Select tool, a plain press, nothing in flight.
 fn enter_acts(input: &KeyInput<'_>, state: KeyState) -> bool {
-    state.tool == Tool::Select
+    matches!(state.tool, Tool::Select | Tool::Text)
         && !input.repeat
         && !input.dom_blocked
         && !input.ctrl
@@ -280,6 +280,7 @@ fn letter_action(input: &KeyInput<'_>, state: KeyState, letter: Option<char>) ->
         (Some('n'), _) => Binding::Tool(Tool::Node),
         (Some('e'), _) => Binding::Tool(Tool::Ellipse),
         (Some('o'), _) => Binding::Tool(Tool::Offset),
+        (Some('t'), _) => Binding::Tool(Tool::Text),
         (_, "*") => Binding::Tool(Tool::PolygonStar),
         (Some('r'), _) => Binding::Entry(EntryKey::Angle, Tool::Rectangle),
         (Some('s'), _) => Binding::Entry(EntryKey::Size, Tool::Select),

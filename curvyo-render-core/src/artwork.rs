@@ -92,6 +92,13 @@ pub fn build_artwork_with_guides(
             ObjectSnapshot::Primitive(primitive) => {
                 draw_primitive(&mut list, primitive, view, &mut budgets);
             }
+            // A text is drawn through the outlines the session laid out (ADR 0020 §2: what
+            // you see is what is cut); a text not laid out yet draws nothing.
+            ObjectSnapshot::Text(text) => {
+                if let Some(outline) = &text.outline {
+                    draw_path(&mut list, &outline.glyphs, view, &mut budgets);
+                }
+            }
         }
     }
     list
@@ -123,6 +130,18 @@ fn draw_guide(
                 ..primitive.clone()
             };
             draw_primitive(list, &marked, view, budgets);
+        }
+        ObjectSnapshot::Text(_) => {
+            if let Some(path) = object.drawn_path() {
+                let outlines: Vec<OutlineRef<'_>> = path
+                    .subpaths()
+                    .map(|subpath| OutlineRef {
+                        anchors: subpath.anchors,
+                        closed: subpath.closed,
+                    })
+                    .collect();
+                draw_object(list, &outlines, style, false, view, budgets);
+            }
         }
     }
 }

@@ -125,6 +125,11 @@ fn refusal_code(refusal: &OffsetRefusal) -> (&'static str, usize, usize) {
         OffsetRefusal::OutOfRange { offenders, of } => ("out_of_range", offenders.len(), *of),
         OffsetRefusal::NoArea { offenders, of } => ("no_area", offenders.len(), *of),
         OffsetRefusal::Empty => ("empty", 0, 0),
+        OffsetRefusal::Texts(texts) => (
+            crate::wasm_text::refusal_kind(texts),
+            texts.offenders.len(),
+            0,
+        ),
     }
 }
 

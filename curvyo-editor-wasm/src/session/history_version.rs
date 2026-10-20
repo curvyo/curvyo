@@ -47,6 +47,8 @@ impl Session {
         let Some(row) = self.history_row_at(object, index) else {
             return CloneOutcome::Refused;
         };
+        // As for "Go to version": the row first, then the edit session's step.
+        self.finish_text_edit();
         let target = if object {
             self.history_object().and_then(|subject| {
                 let typed = self.document.object_history_page(subject, row, 1).pop()?;
@@ -125,6 +127,9 @@ impl Session {
         let Some((step, shown_id, subject, source)) = self.version_of_item(object, index) else {
             return GoToOutcome::NotARow;
         };
+        // The row is resolved first: the step the edit session writes adds a row. A history jump
+        // ends text edit mode and writes its one step (`specs/0074-text-objects` criteria 7, 9).
+        self.finish_text_edit();
         self.end_history_preview();
         let result = self.recording(|this| {
             let result = this.document.go_to_version(step, subject, source);

@@ -517,6 +517,15 @@ fn resize_by_box(
                 });
                 (ObjectSnapshot::Clone(clone.mapped_by(g)), 1.0)
             }
+            ObjectSnapshot::Text(text) => {
+                let g = crate::clone_gesture::affine_of(text.id, &|path: &PathSnapshot| {
+                    path.scaled(pivot, resized.sx, resized.sy)
+                });
+                (
+                    ObjectSnapshot::Text(Box::new(text.mapped_by(g))),
+                    stroke_or_radius_factor(resized.sx, resized.sy),
+                )
+            }
         }
     };
     if modes.stroke == StrokeScaling::Proportional {
@@ -579,6 +588,14 @@ pub(crate) fn skewed_unchecked(
             });
             return ObjectSnapshot::Clone(clone.mapped_by(g));
         }
+        // A text is skewed by its placement and never converts (criterion 26).
+        (ObjectSnapshot::Text(text), _) => {
+            let fixed = frame.fixed_point;
+            let g = crate::clone_gesture::affine_of(text.id, &|path: &PathSnapshot| {
+                path.sheared(fixed, ku, kv)
+            });
+            return ObjectSnapshot::Text(Box::new(text.mapped_by(g)));
+        }
     };
     ObjectSnapshot::Path(path.sheared(frame.fixed_point, ku, kv))
 }
@@ -592,6 +609,9 @@ pub(crate) fn scale_stroke(object: &mut ObjectSnapshot, factor: f64) {
         }
         ObjectSnapshot::Path(p) => {
             p.style.stroke.width = scaled_and_floored(p.style.stroke.width, factor, floor);
+        }
+        ObjectSnapshot::Text(t) => {
+            t.style.stroke.width = scaled_and_floored(t.style.stroke.width, factor, floor);
         }
         // A clone shows its root's stroke width, never scaled (`0049` criterion 9).
         ObjectSnapshot::Clone(_) => {}

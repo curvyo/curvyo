@@ -100,6 +100,12 @@ fn raw_from_meta(id: NodeId, meta: &LoroMap) -> RawLeaf {
             )
         });
     }
+    if crate::text_codec::is_text_meta(meta) {
+        return crate::text_codec::read_text_snapshot(id, meta)
+            .map_or(RawLeaf::Unreadable(id), |text| {
+                RawLeaf::Text(Box::new(text))
+            });
+    }
     if let Some(tag) = read_shape_tag(meta) {
         return RawLeaf::Primitive(read_primitive_snapshot(id, meta, &tag));
     }

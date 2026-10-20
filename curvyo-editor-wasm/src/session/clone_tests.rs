@@ -20,6 +20,7 @@ fn kind_of(session: &Session, id: NodeId) -> &'static str {
         Some(ObjectSnapshot::Path(_)) => "path",
         Some(ObjectSnapshot::Clone(_)) => "clone",
         Some(ObjectSnapshot::Primitive(_)) => "primitive",
+        Some(ObjectSnapshot::Text(_)) => "text",
         None => "none",
     }
 }

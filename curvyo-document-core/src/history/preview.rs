@@ -90,6 +90,7 @@ mod tests {
             crate::ObjectSnapshot::Primitive(p) => p.style.stroke.width.as_mm(),
             crate::ObjectSnapshot::Path(p) => p.style.stroke.width.as_mm(),
             crate::ObjectSnapshot::Clone(c) => c.resolved.style.stroke.width.as_mm(),
+            crate::ObjectSnapshot::Text(t) => t.style.stroke.width.as_mm(),
         }
     }
 
@@ -98,6 +99,7 @@ mod tests {
             crate::ObjectSnapshot::Primitive(p) => p.style.stroke.width.as_mm(),
             crate::ObjectSnapshot::Path(p) => p.style.stroke.width.as_mm(),
             crate::ObjectSnapshot::Clone(c) => c.resolved.style.stroke.width.as_mm(),
+            crate::ObjectSnapshot::Text(t) => t.style.stroke.width.as_mm(),
         }
     }
 

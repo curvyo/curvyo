@@ -113,6 +113,7 @@ fn sources(document: &Document, ids: &[NodeId], start: u64) -> Vec<CopySource> {
     ids.iter()
         .map(|&id| {
             let count = match document.object(id).unwrap() {
+                ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
                 ObjectSnapshot::Path(path) => path.anchors.len(),
                 ObjectSnapshot::Primitive(_) | ObjectSnapshot::Clone(_) => 0,
             };
@@ -127,6 +128,7 @@ fn sources(document: &Document, ids: &[NodeId], start: u64) -> Vec<CopySource> {
 /// copy of it must read as when no offset was applied.
 fn reidentified(object: &ObjectSnapshot, id: NodeId, anchor_ids: &[AnchorId]) -> ObjectSnapshot {
     match object {
+        ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Path(path) => {
             let mut path = path.clone();
             path.id = id;

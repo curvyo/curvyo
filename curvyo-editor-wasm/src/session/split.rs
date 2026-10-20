@@ -76,7 +76,8 @@ impl Session {
                 Ok(plan) => plan,
                 Err(refusal) => {
                     this.command_refusal = match &refusal {
-                        SplitRefusal::OutOfRange { offenders, .. } => {
+                        SplitRefusal::OutOfRange { offenders, .. }
+                        | SplitRefusal::Texts(curvyo_ui_core::TextRefusal { offenders, .. }) => {
                             Some(RefusalMarks::new(offenders.clone(), &selection))
                         }
                         _ => None,
@@ -128,7 +129,12 @@ impl Session {
             let plan = match plan_break_apart(&objects, &selection, &mut this.minter) {
                 Ok(plan) => plan,
                 Err(refusal) => {
-                    this.command_refusal = None;
+                    this.command_refusal = match &refusal {
+                        BreakApartRefusal::Texts(text) => {
+                            Some(RefusalMarks::new(text.offenders.clone(), &selection))
+                        }
+                        _ => None,
+                    };
                     return BreakApartOutcome::Refused(refusal);
                 }
             };

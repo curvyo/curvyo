@@ -49,6 +49,11 @@ impl WasmSession {
         self.session.panel_shortcut_layers();
     }
 
+    /// Shift+Ctrl+T or the Font button: the Fonts tab (`specs/0074-text-objects` criterion 15).
+    pub fn panel_shortcut_fonts(&mut self) {
+        self.session.panel_shortcut_fonts();
+    }
+
     /// A press on a row: `press` is `"plain"`, `"toggle"` or `"range"`.
     pub fn press_layer_row(&mut self, id: &str, press: &str) -> String {
         match RowPress::from_name(press) {

@@ -111,6 +111,16 @@ impl Session {
         });
     }
 
+    /// Shift+Ctrl+T or the Font button (`specs/0074-text-objects` criteria 11, 15): the Fonts
+    /// tab.
+    pub fn panel_shortcut_fonts(&mut self) {
+        let non_empty = self.panel_scope_non_empty();
+        self.update_panel_tabs(|tabs| {
+            tabs.observe(non_empty);
+            tabs.shortcut_fonts();
+        });
+    }
+
     /// Shift+Ctrl+D (criterion 14): the Document tab.
     pub fn panel_shortcut_document(&mut self) {
         let non_empty = self.panel_scope_non_empty();
@@ -156,6 +166,7 @@ impl PanelTabsRecord {
             PanelContent::Style => "style",
             PanelContent::Layers => "layers",
             PanelContent::History => "history",
+            PanelContent::Fonts => "fonts",
             PanelContent::Empty => "empty",
         };
         Self {
@@ -239,7 +250,7 @@ mod tests {
         let record = PanelTabsRecord::new(&session.panel_view());
         assert_eq!(
             record.tab_names,
-            ["file", "document", "style", "layers", "history"]
+            ["file", "document", "style", "layers", "history", "fonts"]
         );
         assert_eq!(record.tab_enabled[at(&record, "style")], 0);
         assert!(

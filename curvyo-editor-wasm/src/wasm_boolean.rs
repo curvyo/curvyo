@@ -98,6 +98,11 @@ impl From<BooleanOutcome> for BooleanResultView {
                     view("groups", offenders.len(), offenders.len())
                 }
                 BooleanRefusal::Empty => view("empty", 0, 0),
+                BooleanRefusal::Texts(texts) => view(
+                    crate::wasm_text::refusal_kind(&texts),
+                    texts.offenders.len(),
+                    0,
+                ),
             },
         }
     }

@@ -31,6 +31,8 @@ pub enum RowKind {
     Star,
     /// A linked clone (`specs/0049-linked-clone`).
     Clone,
+    /// A text object (`specs/0074-text-objects`).
+    Text,
 }
 
 impl RowKind {
@@ -41,6 +43,7 @@ impl RowKind {
             NodeKind::Leaf(ObjectSnapshot::Path(path)) if path.is_compound() => Self::CompoundPath,
             NodeKind::Leaf(ObjectSnapshot::Path(_)) => Self::Path,
             NodeKind::Leaf(ObjectSnapshot::Clone(_)) => Self::Clone,
+            NodeKind::Leaf(ObjectSnapshot::Text(_)) => Self::Text,
             NodeKind::Leaf(ObjectSnapshot::Primitive(primitive)) => match primitive.shape {
                 Shape::Rect { .. } => Self::Rectangle,
                 Shape::Ellipse { .. } => Self::Ellipse,
@@ -63,6 +66,7 @@ impl RowKind {
             Self::Polygon => "Polygon",
             Self::Star => "Star",
             Self::Clone => "Clone",
+            Self::Text => "Text",
         }
     }
 
@@ -79,6 +83,7 @@ impl RowKind {
             Self::Polygon => "polygon",
             Self::Star => "star",
             Self::Clone => "clone",
+            Self::Text => "text",
         }
     }
 }
@@ -250,7 +255,14 @@ fn row_mark(facts: RowFacts<'_>, id: NodeId, kind: RowKind) -> RowMark {
 fn shown_name(read: &NodeRead, kind: RowKind) -> (String, bool) {
     match &read.registers.name {
         Some(name) => (name.clone(), true),
-        None => (format!("{} {}", kind.word(), read.id.short_id()), false),
+        // A text without a name of its own shows its first 24 characters
+        // (`specs/0074-text-objects` criterion 27).
+        None => match &read.kind {
+            curvyo_document_core::NodeKind::Leaf(ObjectSnapshot::Text(text)) => {
+                (text.default_name(), false)
+            }
+            _ => (format!("{} {}", kind.word(), read.id.short_id()), false),
+        },
     }
 }
 

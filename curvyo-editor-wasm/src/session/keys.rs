@@ -122,6 +122,9 @@ pub enum KeyOutcome {
     PlacementStarted,
     /// Tab opened the Pen entry chip (`specs/0072-pen-angle-snap-and-typed-values` criterion 12).
     PenEntryOpened,
+    /// Enter started text edit mode (`specs/0074-text-objects` criterion 10): the host focuses
+    /// the input sink.
+    TextEditStarted,
     /// The key was taken from the page and did nothing (Tab during a Pen drag, `0072` criterion
     /// 14).
     Consumed,
@@ -138,6 +141,7 @@ impl KeyOutcome {
             Self::Paused => "paused",
             Self::PlacementStarted => "placement-started",
             Self::PenEntryOpened => "pen-entry",
+            Self::TextEditStarted => "text-edit",
             Self::Consumed => "consumed",
             Self::ToolChanged => "tool",
             Self::EntryOpened => "entry",
@@ -224,7 +228,7 @@ impl Session {
             Tool::Ellipse => self.ellipse.drag_in_flight(),
             Tool::PolygonStar => self.poly_star.drag_in_flight(),
             Tool::Offset => self.offset_drag_in_flight() || self.select.drag_in_flight(),
-            Tool::Pen => false,
+            Tool::Pen | Tool::Text => false,
         };
         // A drag of a panel value field is a drag too (`specs/0020-undo-redo` criterion 6a).
         // A click-to-create placement is an operation in flight (`0052` criterion 8).
@@ -361,6 +365,11 @@ impl Session {
             }
             KeyAction::Flip(axis) => KeyOutcome::Flipped(axis, self.flip_selection(axis)),
             KeyAction::EnterGroup => {
+                // One selected text, or the Text tool with nothing selected: edit mode
+                // (`specs/0074-text-objects` criterion 10).
+                if self.text_enter() {
+                    return KeyOutcome::TextEditStarted;
+                }
                 self.sync_context();
                 if self.enter_selected_group() {
                     KeyOutcome::EnteredGroup
@@ -400,7 +409,7 @@ impl Session {
                 }
                 self.cancel_offset_drag() || marquee
             }
-            Tool::Pen => false,
+            Tool::Pen | Tool::Text => false,
         }
     }
 
@@ -457,8 +466,13 @@ impl Session {
         if self.button_down {
             return EscapeStep::Nothing;
         }
+        // The first Escape in text edit mode ends it and keeps the text: the one step of the
+        // cascade that writes (`specs/0074-text-objects` criterion 7).
+        if self.finish_text_edit() {
+            return EscapeStep::ClearedState;
+        }
         let cleared = match self.tool {
-            Tool::Pen | Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar => false,
+            Tool::Pen | Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar | Tool::Text => false,
             Tool::Node => self.node.clear_selection(),
             Tool::Select | Tool::Offset => {
                 let had = !self.selection.is_empty();
@@ -521,7 +535,12 @@ impl Session {
                         .delete_selected(&this.document, &objects, &mut this.selection);
                 }
                 Tool::Node => this.node.delete_selected(&this.document),
-                Tool::Pen | Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar | Tool::Offset => {}
+                Tool::Pen
+                | Tool::Rectangle
+                | Tool::Ellipse
+                | Tool::PolygonStar
+                | Tool::Offset
+                | Tool::Text => {}
             }
         });
     }

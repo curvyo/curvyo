@@ -919,6 +919,7 @@ fn ac8_stroke_stays_positive_for_every_object_kind_when_collapsed() {
         let id = only_id(&s);
         let d = document_of(&s);
         let stroke = match d.object(id).unwrap() {
+            ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
             ObjectSnapshot::Path(p) => p.style.stroke.width.as_mm(),
             ObjectSnapshot::Primitive(p) => p.style.stroke.width.as_mm(),
             ObjectSnapshot::Clone(p) => p.resolved.style.stroke.width.as_mm(),
@@ -2064,6 +2065,7 @@ fn ac24_scaled_and_rotated_objects_round_trip_exactly() {
             let id = only_id(&s);
             let d = document_of(&s);
             match d.object(id).unwrap() {
+                ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
                 ObjectSnapshot::Clone(_) => panic!("no clone here"),
                 ObjectSnapshot::Primitive(p) => {
                     let (mn, mx) = shape_frame_bounds(&p.shape);
@@ -2851,6 +2853,7 @@ fn assert_all_finite_and_reopenable(session: &Session) {
     let doc = document_of(&reopened);
     for id in doc.object_ids() {
         match doc.object(id).unwrap() {
+            ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
             ObjectSnapshot::Clone(_) => panic!("no clone here"),
             ObjectSnapshot::Primitive(p) => {
                 assert!(p.rotation.as_radians().is_finite());

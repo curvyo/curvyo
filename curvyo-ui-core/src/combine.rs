@@ -62,6 +62,9 @@ pub(crate) fn is_compound(object: &ObjectSnapshot) -> bool {
 /// Why Combine was refused. Nothing was changed in any of these cases.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CombineRefusal {
+    /// Texts of the selection use a missing face or are not laid out yet: nothing is converted
+    /// (`specs/0074-text-objects` criteria 24 and 29).
+    Texts(crate::text_convert::TextRefusal),
     /// Fewer than two objects are selected.
     NeedsTwo,
     /// The selection holds a group; Combine does not look through groups
@@ -120,15 +123,20 @@ struct Contour {
 /// would write; its anchor ids are placeholders, replaced when the plan is made.
 fn contours_of(owner: usize, object: &ObjectSnapshot) -> Vec<Contour> {
     match object {
-        ObjectSnapshot::Path(path)
-        | ObjectSnapshot::Clone(curvyo_document_core::CloneSnapshot { resolved: path, .. }) => path
-            .subpaths()
-            .map(|subpath| Contour {
-                owner,
-                anchors: subpath.anchors.to_vec(),
-                closed: subpath.closed,
-            })
-            .collect(),
+        ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_)
+            if let Some(path) = object.drawn_path() =>
+        {
+            path.subpaths()
+                .map(|subpath| Contour {
+                    owner,
+                    anchors: subpath.anchors.to_vec(),
+                    closed: subpath.closed,
+                })
+                .collect()
+        }
+        // A text arrives as its glyphs' path (`text_convert::texts_as_paths`), never here as a
+        // text: only an unconverted one, which the command refused first.
+        ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_) | ObjectSnapshot::Text(_) => Vec::new(),
         ObjectSnapshot::Primitive(primitive) => {
             let placeholder = AnchorId::new(0, 0);
             vec![Contour {
@@ -217,6 +225,11 @@ pub fn plan_combine(
     selection: &ObjectSelection,
     minter: &mut AnchorIdMinter,
 ) -> Result<CombinePlan, CombineRefusal> {
+    if let Some(refusal) = crate::text_convert::texts_refusal(objects, selection.ids()) {
+        return Err(CombineRefusal::Texts(refusal));
+    }
+    let converted = crate::text_convert::texts_as_paths(objects);
+    let objects: &[ObjectSnapshot] = &converted;
     let operands = operands_in_order(objects, selection);
     let of = operands.len();
     if of < 2 {

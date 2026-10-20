@@ -215,6 +215,9 @@ impl Document {
                 let meta = tree
                     .get_meta(tree_id)
                     .map_err(|_| CloneError::NoSuchObject)?;
+                if crate::text_codec::is_text_meta(&meta) {
+                    return Err(CloneError::NotClonable);
+                }
                 if is_clone_meta(&meta) {
                     let clone = read_one_clone(&tree, id).ok_or(CloneError::NotClonable)?;
                     Ok(Source::Clone(clone.chain.depth))

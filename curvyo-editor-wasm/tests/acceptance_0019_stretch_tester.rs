@@ -69,6 +69,7 @@ fn anchor(n: u64, x: f64, y: f64) -> NewAnchor {
 
 fn frame_centre(o: &ObjectSnapshot) -> Point {
     match o {
+        ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Clone(_) => panic!("no clone here"),
         ObjectSnapshot::Primitive(p) => match p.shape {
             Shape::Rect { bounds, .. } => rect_centre(bounds),
@@ -183,6 +184,7 @@ fn rect_centre(b: RectBounds) -> Point {
 
 fn rotation_of(o: &ObjectSnapshot) -> f64 {
     match o {
+        ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Clone(_) => panic!("no clone here"),
         ObjectSnapshot::Primitive(p) => p.rotation.as_radians(),
         ObjectSnapshot::Path(p) => p.rotation.as_radians(),
@@ -195,6 +197,7 @@ fn is_path(o: &ObjectSnapshot) -> bool {
 
 fn style_debug(o: &ObjectSnapshot) -> String {
     match o {
+        ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Primitive(p) => format!("{:?}", p.style),
         ObjectSnapshot::Clone(p) => format!("{:?}", p.resolved.style),
         ObjectSnapshot::Path(p) => format!("{:?}", p.style),
@@ -203,6 +206,7 @@ fn style_debug(o: &ObjectSnapshot) -> String {
 
 fn stroke_width(o: &ObjectSnapshot) -> f64 {
     match o {
+        ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Primitive(p) => p.style.stroke.width.as_mm(),
         ObjectSnapshot::Clone(p) => p.resolved.style.stroke.width.as_mm(),
         ObjectSnapshot::Path(p) => p.style.stroke.width.as_mm(),
@@ -211,6 +215,7 @@ fn stroke_width(o: &ObjectSnapshot) -> f64 {
 
 fn dash_debug(o: &ObjectSnapshot) -> String {
     match o {
+        ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Primitive(p) => format!("{:?}", p.style.stroke.dash),
         ObjectSnapshot::Clone(p) => format!("{:?}", p.resolved.style.stroke.dash),
         ObjectSnapshot::Path(p) => format!("{:?}", p.style.stroke.dash),
@@ -253,6 +258,7 @@ fn bezier_samples(anchors: &[(Point, Vec2, Vec2)], closed: bool) -> Vec<Point> {
 
 fn flat(o: &ObjectSnapshot) -> Vec<Point> {
     match o {
+        ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Clone(_) => panic!("no clone here"),
         ObjectSnapshot::Primitive(p) => {
             let out = outline_of_rotated(&p.shape, p.rotation);
@@ -1847,6 +1853,7 @@ fn ac53_3_shown_angle_polygon_and_star_convert_to_the_stretched_outline() {
             "path rotation after the stretch of object {i}: {} rad (the shown angle was {} rad)",
             rotation_of(&o[i]),
             match &before[i] {
+                ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
                 ObjectSnapshot::Clone(_) => panic!("no clone here"),
                 ObjectSnapshot::Primitive(p) => match p.shape {
                     Shape::Star { frame, .. } | Shape::Polygon { frame, .. } =>
@@ -2170,6 +2177,7 @@ fn ac56_a_single_turned_rectangle_or_ellipse_keeps_its_kind() {
 
 fn all_points(o: &ObjectSnapshot) -> Vec<(Point, Vec2, Vec2)> {
     match o {
+        ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Path(p) => p
             .subpaths()
             .flat_map(|sp| {

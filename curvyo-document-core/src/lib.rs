@@ -84,6 +84,10 @@ mod style_validation;
 mod styles;
 mod subpath_codec;
 mod template;
+mod text_codec;
+mod text_model;
+mod text_paths;
+mod texts;
 mod transform_objects;
 mod units;
 
@@ -178,4 +182,10 @@ pub use style_model::{
 };
 pub use styles::{StyleEdit, StyleEditError};
 pub use template::{LOAD_TEMPLATE_COMMIT_LABEL, TemplateNode};
+pub use text_model::{
+    FontRef, MAX_STORED_TEXT_CHARS, MAX_TEXT_CHARS, MAX_TEXT_SIZE, MIN_TEXT_SIZE, TEXT_NAME_CHARS,
+    TextOutline, TextSnapshot, UNCREATED_TEXT_ID, clamp_text_size, is_face_hash,
+};
+pub use text_paths::TextConversion;
+pub use texts::TextEditError;
 pub use units::{Angle, DocumentSize, Length, Point, Timestamp, Tolerance, Vec2, ViewTransform};

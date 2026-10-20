@@ -80,7 +80,7 @@ export function readOffsetView(session: WasmSession | null): OffsetView {
   return view;
 }
 
-function readOutcome(raw: ReturnType<WasmSession["apply_offset"]>): OffsetOutcome {
+function readOutcome(raw: ReturnType<WasmSession["apply_offset"]>, face = ""): OffsetOutcome {
   const outcome: OffsetOutcome = {
     kind: raw.kind,
     added: raw.added,
@@ -92,6 +92,9 @@ function readOutcome(raw: ReturnType<WasmSession["apply_offset"]>): OffsetOutcom
     direction: raw.direction,
   };
   raw.free();
+  if (outcome.kind === "missing_fonts") {
+    outcome.face = face;
+  }
   return outcome;
 }
 
@@ -151,7 +154,7 @@ export function useOffset(
     if (!session) {
       return null;
     }
-    const outcome = readOutcome(session.apply_offset());
+    const outcome = readOutcome(session.apply_offset(), session.text_refusal_face());
     onChange();
     const success = offsetSuccessText(outcome);
     if (success !== null) {
@@ -178,7 +181,7 @@ export function useOffset(
     if (!session) {
       return;
     }
-    const outcome = readOutcome(session.take_offset_outcome());
+    const outcome = readOutcome(session.take_offset_outcome(), session.text_refusal_face());
     if (outcome.kind !== "ignored") {
       announce(outcome);
     }

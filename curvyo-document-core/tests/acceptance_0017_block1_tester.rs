@@ -59,6 +59,7 @@ fn rect(doc: &Document, x: f64) -> curvyo_document_core::NodeId {
 
 fn style_of(doc: &Document, id: curvyo_document_core::NodeId) -> Style {
     match doc.object(id).expect("object exists") {
+        ObjectSnapshot::Text(t) => t.style,
         ObjectSnapshot::Path(p) => p.style,
         ObjectSnapshot::Primitive(p) => p.style,
         ObjectSnapshot::Clone(p) => p.resolved.style,
@@ -181,6 +182,7 @@ fn legacy() -> Legacy {
     let mut star = None;
     for id in doc.object_ids() {
         match doc.object(id).unwrap() {
+            ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
             ObjectSnapshot::Path(_) => linear_path = Some(id),
             ObjectSnapshot::Clone(_) => panic!("no clone here"),
             ObjectSnapshot::Primitive(p) => match format!("{:?}", p.shape) {
@@ -229,6 +231,7 @@ fn legacy_gradient_file_opens_without_error_and_keeps_geometry_and_stroke() {
     assert_eq!(s.stroke.opacity.get(), 0.75);
     assert_eq!(s.stroke.dash.as_slice(), &[6.0, 3.0, 1.0, 3.0]);
     match l.doc.object(l.linear_path).unwrap() {
+        ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Path(p) => {
             assert_eq!(p.anchors.len(), 3);
             assert!(!p.closed);

@@ -27,28 +27,24 @@ pub fn build_refusal_outlines(objects: &[ObjectSnapshot], view: ViewTransform) -
             (width_mm, theme::REFUSAL_OUTLINE)
         };
         for object in objects {
-            match object {
-                ObjectSnapshot::Path(path)
-                | ObjectSnapshot::Clone(curvyo_document_core::CloneSnapshot {
-                    resolved: path,
-                    ..
-                }) => {
-                    for subpath in path.subpaths() {
-                        list.extend(stroke::path_stroke(
-                            subpath.anchors,
-                            subpath.closed,
-                            width,
-                            color,
-                            tolerance_mm,
-                        ));
-                    }
-                }
-                ObjectSnapshot::Primitive(primitive) => {
-                    let outline = drawing_outline_of_rotated(&primitive.shape, primitive.rotation);
-                    let anchors = outline_to_anchors(&outline);
+            if let ObjectSnapshot::Primitive(primitive) = object {
+                let outline = drawing_outline_of_rotated(&primitive.shape, primitive.rotation);
+                let anchors = outline_to_anchors(&outline);
+                list.extend(stroke::path_stroke(
+                    &anchors,
+                    outline.closed,
+                    width,
+                    color,
+                    tolerance_mm,
+                ));
+            } else {
+                let Some(path) = object.drawn_path() else {
+                    continue;
+                };
+                for subpath in path.subpaths() {
                     list.extend(stroke::path_stroke(
-                        &anchors,
-                        outline.closed,
+                        subpath.anchors,
+                        subpath.closed,
                         width,
                         color,
                         tolerance_mm,

@@ -33,6 +33,7 @@ fn path(document: &Document, n: u64, x: f64) -> NodeId {
 
 fn anchor_ids(document: &Document, id: NodeId) -> Vec<AnchorId> {
     match document.object(id).unwrap() {
+        ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Path(path) => path.all_anchors().map(|a| a.id).collect(),
         ObjectSnapshot::Primitive(_) | ObjectSnapshot::Clone(_) => Vec::new(),
     }

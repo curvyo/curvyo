@@ -178,9 +178,10 @@ fn outlines(object: &ObjectSnapshot) -> Vec<Outline> {
                 .collect();
             vec![outline_of(&anchors, outline.closed)]
         }
-        ObjectSnapshot::Path(path)
-        | ObjectSnapshot::Clone(curvyo_document_core::CloneSnapshot { resolved: path, .. }) => path
-            .subpaths()
+        ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_) | ObjectSnapshot::Text(_) => object
+            .drawn_path()
+            .into_iter()
+            .flat_map(curvyo_document_core::PathSnapshot::subpaths)
             .map(|subpath| {
                 let anchors: Vec<(Point, Vec2, Vec2)> = subpath
                     .anchors

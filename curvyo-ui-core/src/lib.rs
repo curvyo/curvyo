@@ -37,6 +37,7 @@ mod ellipse_tool;
 mod file_chords;
 mod flatten_command;
 mod flip;
+mod font_match;
 mod format_form;
 mod format_list_view;
 mod fracture;
@@ -103,6 +104,11 @@ mod style_edit;
 mod style_entry;
 mod style_panel;
 mod style_scope;
+mod text_box;
+mod text_caret;
+mod text_convert;
+mod text_edit;
+mod text_layout;
 mod transform_commit;
 mod transform_drag;
 mod transform_entry;
@@ -155,6 +161,7 @@ pub use ellipse_tool::EllipseTool;
 pub use file_chords::{FileCommand, Platform, chord_label, command_tooltip, file_chord};
 pub use flatten_command::{FLATTEN_COMMIT_LABEL, plan_flatten};
 pub use flip::{FlipAxis, FlipOutcome, flip_selection};
+pub use font_match::{FaceMatch, FontBlock, ListedFace, match_face};
 pub use format_form::{
     FieldError, FormDraft, FormField, FormPrefill, add_prefill, added_notice, check_format_form,
     edit_prefill, field_error, import_notice, import_refusal, saved_notice,
@@ -301,6 +308,13 @@ pub use style_scope::{
     StyleScope, StyleTool, object_kind_name, owns_style, skipped_clones, style_scope,
     style_scope_in,
 };
+pub use text_box::{line_box_contains, line_box_corners};
+pub use text_caret::{TextEditGeometry, edit_geometry};
+pub use text_convert::{
+    TextRefusal, build_text_conversions, text_path, texts_as_paths, texts_refusal,
+};
+pub use text_edit::{CaretMove, EditTarget, Finished, InputOutcome, TextEdit, TextInput};
+pub use text_layout::{lay_out, text_layout};
 pub use transform_drag::{
     CornerLinking, CornerRadiusScaling, ParamDragInfo, ScaleModes, StrokeScaling,
 };

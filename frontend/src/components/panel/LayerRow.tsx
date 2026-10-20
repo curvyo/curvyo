@@ -15,6 +15,7 @@ import {
   Spline,
   Square,
   Star,
+  Type,
 } from "lucide-react";
 import type { ComponentType } from "react";
 import { useEffect, useRef } from "react";
@@ -49,6 +50,8 @@ const KIND_GLYPHS: Record<string, Glyph> = {
   star: Star,
   // A linked clone (`specs/0049-linked-clone`, UX notes "The Layers list").
   clone: Link2,
+  // A text object (`specs/0074-text-objects` criterion 27).
+  text: Type,
 };
 
 /** The four cells of a row, in order (criterion 38, customer feedback 2026-10-14). */
