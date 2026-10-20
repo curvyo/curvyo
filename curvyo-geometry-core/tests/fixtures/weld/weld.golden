@@ -1,0 +1,12 @@
+# Weld at g = 0.1 mm (specs/0068-laserable-lettering criterion 31 (c), (d)).
+# Regenerate with CURVYO_UPDATE_GOLDEN=1.
+ac40a: pieces 1 outlines 1 nodes 4 area_mm2 400.000 hash 1e8b79c112d85c85
+ac40b: pieces 1 outlines 1 nodes 4 area_mm2 800.000 hash 60bffe1c44c9af85
+ac40c: pieces 1 outlines 1 nodes 12 area_mm2 800.001 hash f494dcb78d17e8cf
+ac40d: pieces 1 outlines 1 nodes 4 area_mm2 1600.000 hash 6a617facbd009045
+ac40e: pieces 1 outlines 1 nodes 12 area_mm2 700.001 hash 76eac44db255d48f
+ac40f: pieces 1 outlines 1 nodes 12 area_mm2 700.001 hash 76eac44db255d48f
+ac40g: pieces 1 outlines 1 nodes 12 area_mm2 250.001 hash 7aedf8c2b5f3b7c7
+ac40h: pieces 1 outlines 1 nodes 20 area_mm2 400.403 hash 20957ecf17034fe3
+ac40i: pieces 3675 outlines 3675 nodes 15308 area_mm2 2263.608 hash b51f6714f0c247c7
+ac09_line_and_square: pieces 1 outlines 1 nodes 54 area_mm2 163.129 hash 03a3ad4fb1b54d65

@@ -37,7 +37,9 @@ mod outline_touch;
 mod region_contact;
 mod segment;
 mod stack_regions;
+mod stroke_band;
 mod visible_region;
+mod weld;
 
 pub use boolean::{BooleanError, BooleanOp, BooleanResult, Outline, boolean, signed_area_mm2};
 pub use boolean_grid::MAX_COORDINATE_MM;
@@ -56,4 +58,6 @@ pub use segment::{
     subdivide_at_parameter,
 };
 pub use stack_regions::StackError;
+pub use stroke_band::StrokeBand;
 pub use visible_region::{Visible, visible_regions};
+pub use weld::{Weld, WeldOperand, weld};

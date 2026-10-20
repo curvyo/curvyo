@@ -58,31 +58,38 @@ impl Document {
         outlines: &[(Vec<NewAnchor>, bool)],
         label: &str,
     ) -> Result<NodeId, ObjectEditError> {
+        self.replace_with_path_at(operands, base, base, None, outlines, label)
+    }
+
+    /// [`Document::replace_with_path`] with the place and the style taken from different nodes,
+    /// and an optional name (Weld, `specs/0068-laserable-lettering/adrs.md` decision 4): the new
+    /// path takes `style_from`'s complete style (one of `operands`) and sits directly after
+    /// `place` in `place`'s parent. `place` is `style_from` itself, another operand, or a group
+    /// whose every leaf is an operand; such a group is emptied and removed, so the result takes
+    /// its place. `name` is cleaned as [`Document::rename_node`] cleans it.
+    ///
+    /// # Errors
+    /// As [`Document::replace_with_path`]; [`ObjectEditError::BaseNotAnOperand`] also when
+    /// `place` is neither an operand nor a group of operands only.
+    ///
+    /// # Panics
+    /// Does not panic in practice, for the reasons given at [`Document::replace_with_path`].
+    pub fn replace_with_path_at(
+        &self,
+        operands: &[NodeId],
+        style_from: NodeId,
+        place: NodeId,
+        name: Option<&str>,
+        outlines: &[(Vec<NewAnchor>, bool)],
+        label: &str,
+    ) -> Result<NodeId, ObjectEditError> {
+        let base = style_from;
         if !operands.contains(&base) {
             return Err(ObjectEditError::BaseNotAnOperand);
         }
-        if outlines.is_empty() || outlines.iter().any(|(anchors, _)| anchors.is_empty()) {
-            return Err(ObjectEditError::NoOutlines);
-        }
-        let mut seen: HashSet<AnchorId> = HashSet::new();
-        if !outlines
-            .iter()
-            .flat_map(|(anchors, _)| anchors)
-            .all(|anchor| seen.insert(anchor.id))
-        {
-            return Err(ObjectEditError::AnchorIds);
-        }
+        let seen = new_anchor_ids(outlines)?;
         let tree = self.loro().get_tree(OBJECTS_TREE);
-        let mut doomed = Vec::with_capacity(operands.len());
-        for &operand in operands {
-            let tree_id = tree_id_of(operand);
-            if !leaf_exists(&tree, tree_id) {
-                return Err(ObjectEditError::NoSuchObject);
-            }
-            if !doomed.contains(&tree_id) {
-                doomed.push(tree_id);
-            }
-        }
+        let doomed = doomed_leaves(&tree, operands)?;
         check_new_anchor_ids(&tree, &doomed, &seen)?;
         let base_meta = tree
             .get_meta(tree_id_of(base))
@@ -92,13 +99,25 @@ impl Document {
         // The result is a guide only when every operand is one (`specs/0046-document-shapes`
         // criterion 34).
         let guide = crate::guides::all_guides(&tree, &doomed);
+        let place_tree_id = tree_id_of(place);
+        if place != base && !place_of_operands(&tree, place_tree_id, &doomed) {
+            return Err(ObjectEditError::BaseNotAnOperand);
+        }
 
         tree.enable_fractional_index(0);
-        let new_tree_id = create_path_after(&tree, tree_id_of(base), &style, outlines);
+        let new_tree_id = create_path_after(&tree, place_tree_id, &style, outlines);
+        // invariant: the node was just created.
+        #[allow(clippy::unwrap_used)]
+        let new_meta = tree.get_meta(new_tree_id).unwrap();
         if guide {
-            // invariant: the node was just created.
+            crate::guides::write_guide(&new_meta, true);
+        }
+        if let Some(name) = name.and_then(crate::node_registers::clean_name) {
+            // invariant: inserting a known key into a meta map just created cannot fail.
             #[allow(clippy::unwrap_used)]
-            crate::guides::write_guide(&tree.get_meta(new_tree_id).unwrap(), true);
+            new_meta
+                .insert(crate::node_registers::KEY_NAME, name.as_str())
+                .unwrap();
         }
         self.repair_clones_of_removed(&tree, &doomed);
         let parents = crate::group_tree::parents_of(&tree, &doomed);
@@ -203,6 +222,53 @@ impl Document {
         self.commit_with_label(label);
         Ok(created)
     }
+}
+
+/// The anchor ids of `outlines`, checked: at least one outline, none without anchors, no id twice.
+fn new_anchor_ids(
+    outlines: &[(Vec<NewAnchor>, bool)],
+) -> Result<HashSet<AnchorId>, ObjectEditError> {
+    if outlines.is_empty() || outlines.iter().any(|(anchors, _)| anchors.is_empty()) {
+        return Err(ObjectEditError::NoOutlines);
+    }
+    let mut seen: HashSet<AnchorId> = HashSet::new();
+    if outlines
+        .iter()
+        .flat_map(|(anchors, _)| anchors)
+        .all(|anchor| seen.insert(anchor.id))
+    {
+        Ok(seen)
+    } else {
+        Err(ObjectEditError::AnchorIds)
+    }
+}
+
+/// The tree ids of `operands`, each once, or [`ObjectEditError::NoSuchObject`] if one is not a
+/// live leaf.
+fn doomed_leaves(
+    tree: &loro::LoroTree,
+    operands: &[NodeId],
+) -> Result<Vec<loro::TreeID>, ObjectEditError> {
+    let mut doomed = Vec::with_capacity(operands.len());
+    for &operand in operands {
+        let tree_id = tree_id_of(operand);
+        if !leaf_exists(tree, tree_id) {
+            return Err(ObjectEditError::NoSuchObject);
+        }
+        if !doomed.contains(&tree_id) {
+            doomed.push(tree_id);
+        }
+    }
+    Ok(doomed)
+}
+
+/// Whether `place` is one of `doomed` or a group whose every leaf is.
+fn place_of_operands(tree: &loro::LoroTree, place: loro::TreeID, doomed: &[loro::TreeID]) -> bool {
+    doomed.contains(&place)
+        || (crate::group_tree::is_group_node(tree, place)
+            && crate::group_tree::leaves_under(tree, Some(place))
+                .iter()
+                .all(|leaf| doomed.contains(leaf)))
 }
 
 /// The outlines of one piece: `(anchors, closed)` each, the first stored in the ordinary keys.

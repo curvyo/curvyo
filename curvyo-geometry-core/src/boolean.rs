@@ -107,7 +107,7 @@ pub enum BooleanError {
 /// - Every coordinate is a whole multiple of 0.001 mm.
 #[derive(Debug, Clone, PartialEq)]
 pub struct BooleanResult {
-    outlines: Vec<Vec<Point>>,
+    pub(crate) outlines: Vec<Vec<Point>>,
 }
 
 impl BooleanResult {
@@ -204,7 +204,7 @@ pub fn boolean(
     tolerance: Tolerance,
 ) -> Result<BooleanResult, BooleanError> {
     let regions = operand_regions(operands, tolerance)?;
-    let raw = combine(op, regions);
+    let raw = combine(op, &regions);
     let outlines = canonical_millimetres(&cleanup(&raw));
     if outlines.is_empty() {
         return Err(BooleanError::EmptyResult);
@@ -247,32 +247,37 @@ pub(crate) fn operand_regions(
 }
 
 /// Step 5: the operation on normalized regions, at least one.
-fn combine(op: BooleanOp, regions: Vec<Paths64>) -> Paths64 {
-    let mut regions = regions.into_iter();
-    let first = regions.next().unwrap_or_default();
+fn combine(op: BooleanOp, regions: &[Paths64]) -> Paths64 {
+    let Some((first, rest)) = regions.split_first() else {
+        return Paths64::new();
+    };
     match op {
-        BooleanOp::Union => {
-            let all: Paths64 = std::iter::once(first).chain(regions).flatten().collect();
-            normalize(&all)
-        }
+        BooleanOp::Union => union_region(regions),
         BooleanOp::Difference => {
-            let rest: Paths64 = regions.flatten().collect();
+            let rest: Paths64 = rest.iter().flatten().cloned().collect();
             if rest.is_empty() {
-                return first;
+                return first.clone();
             }
-            run(OverlayRule::Difference, &first, &rest)
+            run(OverlayRule::Difference, first, &rest)
         }
-        BooleanOp::Intersection => fold(OverlayRule::Intersect, first, regions),
-        BooleanOp::Exclusion => fold(OverlayRule::Xor, first, regions),
+        BooleanOp::Intersection => fold(OverlayRule::Intersect, first.clone(), rest.iter()),
+        BooleanOp::Exclusion => fold(OverlayRule::Xor, first.clone(), rest.iter()),
     }
+}
+
+/// The union of normalized regions in one n-ary overlay: the one union algorithm of the project,
+/// shared by Union and Weld (`specs/0068-laserable-lettering/adrs.md` decision 1).
+pub(crate) fn union_region(regions: &[Paths64]) -> Paths64 {
+    let all: Paths64 = regions.iter().flatten().cloned().collect();
+    normalize(&all)
 }
 
 /// Applies a binary overlay operation left to right, stopping early on an empty accumulator for
 /// an intersection, where nothing can come back.
-fn fold(rule: OverlayRule, first: Paths64, rest: impl Iterator<Item = Paths64>) -> Paths64 {
+fn fold<'a>(rule: OverlayRule, first: Paths64, rest: impl Iterator<Item = &'a Paths64>) -> Paths64 {
     let mut accumulator = first;
     for next in rest {
-        accumulator = run(rule, &accumulator, &next);
+        accumulator = run(rule, &accumulator, next);
         if accumulator.is_empty() && rule == OverlayRule::Intersect {
             break;
         }

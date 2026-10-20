@@ -35,11 +35,27 @@ pub(crate) fn polyline_offset(
     join: OffsetJoin,
     flatten_tolerance_mm: f64,
 ) -> Result<Paths64, OffsetError> {
+    let region = normalize(&grid_paths(operand, flatten_tolerance_mm));
+    let raw = offset_region(&region, units, join, flatten_tolerance_mm)?;
+    Ok(without_flattening_noise(
+        cleanup(&raw),
+        flatten_tolerance_mm,
+    ))
+}
+
+/// `i_overlay`'s integer outline offset of a normalized grid region by `units` grid units, with
+/// round arcs whose chords stay within `arc_tolerance_mm`: the raw result, not cleaned up. Shared
+/// with the gap closing of Weld (`specs/0068-laserable-lettering/adrs.md` decision 2).
+pub(crate) fn offset_region(
+    region: &Paths64,
+    units: i64,
+    join: OffsetJoin,
+    arc_tolerance_mm: f64,
+) -> Result<Paths64, OffsetError> {
     #[allow(clippy::cast_precision_loss)] // |units| <= 10^10
     let radius_mm = (units as f64 * GRID_MM).abs();
-    let region = normalize(&grid_paths(operand, flatten_tolerance_mm));
     let style = IntOutlineStyle::new(units)
-        .line_join(int_join(join, radius_mm, flatten_tolerance_mm))
+        .line_join(int_join(join, radius_mm, arc_tolerance_mm))
         .miter_min_turn(miter_min_turn(radius_mm))
         .math(MathMode::Integer);
     region
@@ -48,11 +64,7 @@ pub(crate) fn polyline_offset(
     let shapes = region
         .outline(&style)
         .map_err(|_| OffsetError::OutOfRange)?;
-    let raw: Paths64 = shapes.into_iter().flatten().collect();
-    Ok(without_flattening_noise(
-        cleanup(&raw),
-        flatten_tolerance_mm,
-    ))
+    Ok(shapes.into_iter().flatten().collect())
 }
 
 /// `paths` without the outlines that are on average narrower than the flattening tolerance.
@@ -86,7 +98,7 @@ pub(crate) fn without_flattening_noise(mut paths: Paths64, flatten_tolerance_mm:
 }
 
 /// The library's join for `join` at radius `radius_mm`.
-fn int_join(join: OffsetJoin, radius_mm: f64, flatten_tolerance_mm: f64) -> IntLineJoin {
+pub(crate) fn int_join(join: OffsetJoin, radius_mm: f64, flatten_tolerance_mm: f64) -> IntLineJoin {
     match join {
         OffsetJoin::Round => IntLineJoin::Round(arc_options(radius_mm, flatten_tolerance_mm)),
         OffsetJoin::Miter => IntLineJoin::Miter(MITER_LIMIT_ANGLE),
@@ -100,7 +112,7 @@ fn int_join(join: OffsetJoin, radius_mm: f64, flatten_tolerance_mm: f64) -> IntL
 /// `θ = 2 sqrt(2 t / r)` keeps it within `t`. That is within 12 % of the exact largest step for
 /// the tolerances used, so the node count stays inside criterion 11's budget, and it needs only
 /// `sqrt`. The library clamps the step to 0.35°..45°.
-fn arc_options(radius_mm: f64, tolerance_mm: f64) -> ArcOptions {
+pub(crate) fn arc_options(radius_mm: f64, tolerance_mm: f64) -> ArcOptions {
     let step_rad = 2.0 * (2.0 * tolerance_mm / radius_mm).sqrt();
     ArcOptions {
         max_step: angle_of(step_rad, ArcOptions::MAX_STEP),
@@ -111,7 +123,7 @@ fn arc_options(radius_mm: f64, tolerance_mm: f64) -> ArcOptions {
 /// The near-straight cutoff of miters: below it the library closes a turn with a straight edge,
 /// which misses the miter by up to `r θ² / 8`. `min(5°, sqrt(8 x 0.005 mm / r))` keeps that within
 /// 0.005 mm at any distance (`adrs.md`, "near-straight miter cutoff").
-fn miter_min_turn(radius_mm: f64) -> Angle {
+pub(crate) fn miter_min_turn(radius_mm: f64) -> Angle {
     let limit_rad = (8.0 * MITER_STRAIGHT_ERROR_MM / radius_mm).sqrt();
     angle_of(
         limit_rad.min(MITER_MIN_TURN_DEFAULT_RAD),
