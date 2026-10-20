@@ -189,7 +189,16 @@ pub struct DocumentVersion(pub(crate) loro::Frontiers);
 /// curve, an arc that is not two finite angles and a known kind, and an arc together with a curve
 /// other than 100 % are refused as damaged (`crate::shape_arc_codec`). Golden: `arc_pie_v16`,
 /// `arc_arc_v16`, `arc_chord_v16`, `curve_ellipse_v16` and `curve_polygon_star_v16.curvyo`.
-pub const CURRENT_FORMAT_VERSION: u32 = 16;
+///
+/// Bumped to 17 in `text-objects` (`specs/0074-text-objects`, ADR 0020 §1): a new leaf kind,
+/// `shape = "text"`, with the registers `text_string` (a `LoroText`), `text_font` (one map value:
+/// family, style, face hash, face index), `text_size` (mm, the capital H) and `text_placement`
+/// (six numbers). A build that stops at version 16 does not know the kind, so it must refuse
+/// every file of this build as too new. Migration from version 16 is none: a file without texts
+/// opens unchanged and is not rewritten. A text with a missing or damaged register, a string over
+/// 10,000 characters, a size outside 0.1 to 2,000 mm or a placement that is not finite and
+/// invertible is refused as damaged (`crate::text_codec`). Golden: `text_v17.curvyo`.
+pub const CURRENT_FORMAT_VERSION: u32 = 17;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";
@@ -581,6 +590,16 @@ enum ObjectJson {
         #[serde(skip_serializing_if = "Option::is_none")]
         style: Option<crate::style_model::Style>,
     },
+    /// A text object (`specs/0074-text-objects`, ADR 0020 §1): string, font reference, size and
+    /// placement `[a, b, c, d, e, f]`; never outlines.
+    Text {
+        id: crate::path_model::NodeId,
+        string: String,
+        font: crate::text_model::FontRef,
+        size: crate::units::Length,
+        placement: crate::affine::Affine,
+        style: crate::style_model::Style,
+    },
     Path {
         id: crate::path_model::NodeId,
         closed: bool,
@@ -653,6 +672,14 @@ impl From<crate::primitive_model::ObjectSnapshot> for ObjectJson {
                 anchors: path.anchors,
                 extra_subpaths: path.extra_subpaths,
                 rotation: path.rotation,
+            },
+            ObjectSnapshot::Text(text) => Self::Text {
+                id: text.id,
+                string: text.string,
+                font: text.font,
+                size: text.size,
+                placement: text.placement,
+                style: text.style,
             },
             ObjectSnapshot::Clone(clone) => Self::Clone {
                 id: clone.id(),

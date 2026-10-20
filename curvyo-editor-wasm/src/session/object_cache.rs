@@ -8,6 +8,8 @@ use std::sync::Arc;
 
 use curvyo_document_core::{Document, DocumentVersion, NodeId, NodeRead, ObjectSnapshot};
 
+use super::text_fonts::TextFonts;
+
 /// One read of the document: every node with its effective flags
 /// (`specs/0050-layers-and-objects-panel/adrs.md` decision 3) and the lists the session derives
 /// from it once, so no consumer filters or walks on its own (decision 4).
@@ -36,8 +38,17 @@ pub(super) struct DocumentRead {
 }
 
 impl DocumentRead {
-    fn of(document: &Document) -> Self {
-        let nodes: Arc<[NodeRead]> = document.read_nodes().into();
+    fn of(document: &Document, fonts: &TextFonts) -> Self {
+        let mut nodes = document.read_nodes();
+        // Each text is laid out once per read: drawing, hit tests and bounds read the outline
+        // (`specs/0074-text-objects`, ADR 0020 §2).
+        for read in &mut nodes {
+            if let curvyo_document_core::NodeKind::Leaf(ObjectSnapshot::Text(text)) = &mut read.kind
+            {
+                text.outline = fonts.lay_out(text).map(Arc::new);
+            }
+        }
+        let nodes: Arc<[NodeRead]> = nodes.into();
         let leaves: Arc<[ObjectSnapshot]> = nodes
             .iter()
             .filter_map(|read| read.object().cloned())
@@ -89,7 +100,7 @@ impl DocumentRead {
 /// The cached read and whether a drag holds it.
 #[derive(Debug, Default)]
 struct Held {
-    read: Option<(DocumentVersion, Arc<DocumentRead>)>,
+    read: Option<((DocumentVersion, u64), Arc<DocumentRead>)>,
     /// A Select or Node-tool drag keeps its first read for its whole life, whatever the document
     /// does: it writes nothing until its release, so only a merge could change the document
     /// under it, and that is seen by the first read after the drag (`0031` criterion 17).
@@ -107,7 +118,12 @@ impl ObjectCache {
     /// returned unchanged, so a frame of a drag never reads the document; without it the read is
     /// returned only if the document is still at the version it was made at. Everything else
     /// (`New`, `Open`) builds a new `Session` and with it an empty cache.
-    pub(super) fn read(&self, document: &Document, pin: bool) -> Arc<DocumentRead> {
+    pub(super) fn read(
+        &self,
+        document: &Document,
+        pin: bool,
+        fonts: &TextFonts,
+    ) -> Arc<DocumentRead> {
         let mut held = self.held.borrow_mut();
         if pin
             && held.pinned
@@ -116,11 +132,11 @@ impl ObjectCache {
             return Arc::clone(read);
         }
         held.pinned = pin;
-        let version = document.version();
+        let version = (document.version(), fonts.generation());
         let read = match &held.read {
             Some((read_at, read)) if *read_at == version => Arc::clone(read),
             _ => {
-                let read = Arc::new(DocumentRead::of(document));
+                let read = Arc::new(DocumentRead::of(document, fonts));
                 held.read = Some((version, Arc::clone(&read)));
                 read
             }
@@ -128,7 +144,7 @@ impl ObjectCache {
         #[cfg(test)]
         assert_eq!(
             format!("{:?}", read.leaves),
-            format!("{:?}", DocumentRead::of(document).leaves),
+            format!("{:?}", DocumentRead::of(document, fonts).leaves),
             "the cached read differs from the document: a write did not change its version"
         );
         read
@@ -156,8 +172,8 @@ mod tests {
         let document = Document::new(1);
         add_path(&document, 1);
         let cache = ObjectCache::default();
-        let first = Arc::clone(&cache.read(&document, false).leaves);
-        let second = Arc::clone(&cache.read(&document, false).leaves);
+        let first = Arc::clone(&cache.read(&document, false, &TextFonts::default()).leaves);
+        let second = Arc::clone(&cache.read(&document, false, &TextFonts::default()).leaves);
         assert!(Arc::ptr_eq(&first, &second));
         assert_eq!(first.len(), 1);
     }
@@ -167,9 +183,9 @@ mod tests {
         let document = Document::new(1);
         add_path(&document, 1);
         let cache = ObjectCache::default();
-        let before = Arc::clone(&cache.read(&document, false).leaves);
+        let before = Arc::clone(&cache.read(&document, false, &TextFonts::default()).leaves);
         add_path(&document, 3);
-        let after = Arc::clone(&cache.read(&document, false).leaves);
+        let after = Arc::clone(&cache.read(&document, false, &TextFonts::default()).leaves);
         assert!(!Arc::ptr_eq(&before, &after));
         assert_eq!((before.len(), after.len()), (1, 2));
     }
@@ -180,16 +196,19 @@ mod tests {
         let document = Document::new(1);
         add_path(&document, 1);
         let cache = ObjectCache::default();
-        let start = Arc::clone(&cache.read(&document, true).leaves);
-        let during = Arc::clone(&cache.read(&document, true).leaves);
+        let start = Arc::clone(&cache.read(&document, true, &TextFonts::default()).leaves);
+        let during = Arc::clone(&cache.read(&document, true, &TextFonts::default()).leaves);
         assert!(Arc::ptr_eq(&start, &during));
         let ids = document.object_ids();
         let _ = document.translate_objects(&ids, curvyo_document_core::Vec2::new(5.0, 0.0));
         assert!(
-            Arc::ptr_eq(&start, &cache.read(&document, true).leaves),
+            Arc::ptr_eq(
+                &start,
+                &cache.read(&document, true, &TextFonts::default()).leaves
+            ),
             "a drag keeps its read"
         );
-        let after = Arc::clone(&cache.read(&document, false).leaves);
+        let after = Arc::clone(&cache.read(&document, false, &TextFonts::default()).leaves);
         assert!(!Arc::ptr_eq(&start, &after));
         assert_ne!(
             &start[..],
@@ -206,12 +225,18 @@ mod tests {
         let original = document.object_ids()[0];
         let clone = document.linked_clone(&[original], &[]).unwrap()[0];
         let cache = ObjectCache::default();
-        let read = cache.read(&document, false).leaves.clone();
+        let read = cache
+            .read(&document, false, &TextFonts::default())
+            .leaves
+            .clone();
         assert!(
             matches!(&read[1], ObjectSnapshot::Clone(c) if c.id() == clone && c.chain.origin == original)
         );
         let _ = document.translate_objects(&[original], curvyo_document_core::Vec2::new(5.0, 0.0));
-        let after = cache.read(&document, false).leaves.clone();
+        let after = cache
+            .read(&document, false, &TextFonts::default())
+            .leaves
+            .clone();
         let ObjectSnapshot::Clone(moved) = &after[1] else {
             panic!("a clone")
         };

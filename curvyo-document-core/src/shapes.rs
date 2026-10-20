@@ -228,7 +228,7 @@ impl Document {
     pub fn primitive(&self, id: NodeId) -> Option<PrimitiveSnapshot> {
         match self.object(id)? {
             ObjectSnapshot::Primitive(snapshot) => Some(snapshot),
-            ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_) => None,
+            ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_) | ObjectSnapshot::Text(_) => None,
         }
     }
 
@@ -420,6 +420,7 @@ impl Document {
                     .map_err(|_| ShapeEditError::NoSuchObject)?;
                 if shape_codec::read_shape_tag(&meta).is_none()
                     || crate::clone_codec::is_clone_meta(&meta)
+                    || crate::text_codec::is_text_meta(&meta)
                 {
                     return Err(ShapeEditError::NotAPrimitive);
                 }
@@ -518,6 +519,10 @@ pub(crate) fn object_in(tree: &loro::LoroTree, id: NodeId) -> Option<ObjectSnaps
     let meta = tree.get_meta(tree_id).ok()?;
     if crate::clone_codec::is_clone_meta(&meta) {
         return crate::object_read::read_one_clone(tree, id).map(ObjectSnapshot::Clone);
+    }
+    if crate::text_codec::is_text_meta(&meta) {
+        return crate::text_codec::read_text_snapshot(id, &meta)
+            .map(|text| ObjectSnapshot::Text(Box::new(text)));
     }
     match shape_codec::read_shape_tag(&meta) {
         Some(shape) => Some(ObjectSnapshot::Primitive(

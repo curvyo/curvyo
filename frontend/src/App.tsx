@@ -9,6 +9,8 @@ import { PropertiesPanel } from "@/components/panel/PropertiesPanel";
 import { Rulers } from "@/components/Rulers";
 import { SelectToolbar } from "@/components/SelectToolbar";
 import { ShapeToolbar } from "@/components/ShapeToolbar";
+import { TextBar } from "@/components/TextBar";
+import { focusCurrentFont } from "@/lib/textText";
 import { StatusBar } from "@/components/StatusBar";
 import { ToolRail } from "@/components/ToolRail";
 import { HistoryPreviewFrame, HistoryPreviewLine } from "@/components/HistoryPreview";
@@ -50,6 +52,13 @@ function Editor() {
   const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(
     null,
   );
+  // The Font button and Shift+Ctrl+T: the panel body, the Fonts tab, the current face row
+  // (`specs/0074-text-objects` criterion 11).
+  const showFonts = () => {
+    panelOpen.setOpen(true);
+    documentPanel.shortcut("fonts");
+    focusCurrentFont();
+  };
   const project = useProject({
     editor,
     panelOpen,
@@ -121,7 +130,12 @@ function Editor() {
               onCommitRatio={editor.commitSelectedRatio}
               onSetRatio={editor.setSelectedRatio}
               onCancelRatio={editor.cancelSelectedRatio}
-              onConvertToPaths={editor.convertSelectedToPaths}
+              onConvertToPaths={editor.text.objectToPath}
+              objectToPathNotice={editor.text.objectToPathNotice}
+              textBar={editor.text.bar}
+              onShowFonts={showFonts}
+              onSetTextSize={editor.text.setSize}
+              onPreviewTextSize={editor.text.previewSize}
               linkedCloneShown={editor.clones.shown}
               onLinkedClone={() => editor.clones.apply("linked-clone")}
               linkedCloneNotice={editor.clones.barNotice}
@@ -151,6 +165,21 @@ function Editor() {
                 makeCurve: editor.makeCurve,
                 joinSelected: editor.joinSelected,
                 splitSelected: editor.splitSelected,
+              }}
+            />
+          ) : null}
+          {editor.tool === "text" ? (
+            <TextBar
+              bar={editor.text.bar}
+              onShowFonts={showFonts}
+              onSetSize={editor.text.setSize}
+              onPreviewSize={editor.text.previewSize}
+              onReturnFocus={() => {
+                if (editor.text.editing) {
+                  editor.text.sinkRef.current?.focus();
+                } else {
+                  editor.containerRef.current?.focus();
+                }
               }}
             />
           ) : null}

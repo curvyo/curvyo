@@ -57,7 +57,7 @@ fn shapes<'a>(objects: &'a [ObjectSnapshot], ids: &'a [NodeId]) -> Vec<&'a Shape
         .into_iter()
         .filter_map(|object| match object {
             ObjectSnapshot::Primitive(PrimitiveSnapshot { shape, .. }) => Some(shape),
-            ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_) => None,
+            ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_) | ObjectSnapshot::Text(_) => None,
         })
         .collect()
 }

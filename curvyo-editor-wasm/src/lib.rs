@@ -79,6 +79,8 @@ mod wasm_select_tool;
 mod wasm_shape_tools;
 #[cfg(target_arch = "wasm32")]
 mod wasm_split;
+#[cfg(target_arch = "wasm32")]
+mod wasm_text;
 
 pub use session::{
     APP_VERSION, BooleanOutcome, BreakApartOutcome, CloneOutcome, ClosePathOutcome, ClosePathState,
@@ -89,6 +91,7 @@ pub use session::{
     SizeOutcome, SplitOutcome, StackOutcome, Tool, WipeOutcome, WipeState,
 };
 pub use session::{DragStop, OFFSET_COMMIT_LABEL, OffsetOutcome, OffsetView};
+pub use session::{ObjectToPathOutcome, TextBarView, TextSizeOutcome};
 
 #[cfg(target_arch = "wasm32")]
 pub use wasm_api::{WasmSession, init_panic_hook};

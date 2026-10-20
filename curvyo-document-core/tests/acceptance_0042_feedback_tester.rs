@@ -28,6 +28,7 @@ fn json(d: &Document) -> Vec<u8> {
 
 fn body(d: &Document, id: NodeId) -> String {
     match d.object(id) {
+        Some(ObjectSnapshot::Text(_)) => unreachable!("no text in this test"),
         Some(ObjectSnapshot::Primitive(p)) => {
             format!("{:?}|{:?}|{:?}", p.shape, p.style, p.rotation)
         }

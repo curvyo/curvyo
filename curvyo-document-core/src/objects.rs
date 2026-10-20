@@ -219,7 +219,7 @@ impl Document {
                     Some(ObjectSnapshot::Clone(clone))
                 }
                 ObjectSnapshot::Path(path) => Some(ObjectSnapshot::Path(path.mapped(g))),
-                ObjectSnapshot::Primitive(_) => None,
+                ObjectSnapshot::Primitive(_) | ObjectSnapshot::Text(_) => None,
             })
             .collect();
         self.clone_limits_hold(&links, &changed)
@@ -395,6 +395,18 @@ impl Document {
             if !crate::clone_write::write_matrix(&meta, clone.chain.origin, clone.chain.matrix) {
                 return Err(ObjectEditError::NoSuchObject);
             }
+            self.write_hold(&tree, hold);
+            self.commit_with_label("rotate_object");
+            return Ok(());
+        }
+        if crate::text_codec::is_text_meta(&meta) {
+            let ObjectSnapshot::Text(text) = rotated else {
+                return Err(ObjectEditError::NoSuchObject);
+            };
+            if !text.placement.is_finite() {
+                return Err(ObjectEditError::NonFiniteGeometry);
+            }
+            crate::text_codec::write_size_and_placement_if_changed(&meta, text);
             self.write_hold(&tree, hold);
             self.commit_with_label("rotate_object");
             return Ok(());
@@ -614,6 +626,10 @@ fn copy_map(from: &loro::LoroMap, into: &loro::LoroMap, skip: &[&str]) {
                     }
                 }
             }
+            ValueOrContainer::Container(Container::Text(text)) => {
+                let nested = into.insert_container(&key, loro::LoroText::new()).unwrap();
+                nested.insert(0, &text.to_string()).unwrap();
+            }
             // No other container kind is stored today; its plain value keeps
             // the data, and the deep-value test of a copy would show the loss.
             ValueOrContainer::Container(_) => {
@@ -654,6 +670,7 @@ pub(crate) fn translate_meta(meta: &loro::LoroMap, offset: Vec2) {
         shape_codec::LeafKind::Primitive(tag) => translate_primitive_meta(meta, &tag, offset),
         shape_codec::LeafKind::Path => translate_path_meta(meta, offset),
         shape_codec::LeafKind::Clone => {}
+        shape_codec::LeafKind::Text => crate::text_codec::translate_text_meta(meta, offset),
     }
 }
 

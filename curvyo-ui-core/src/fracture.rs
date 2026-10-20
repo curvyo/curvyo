@@ -25,7 +25,14 @@ pub fn plan_fracture(
     selection: &ObjectSelection,
     minter: &mut AnchorIdMinter,
 ) -> Result<StackPlan, StackRefusal> {
-    let stack = Stack::of(objects, selection)?;
+    // Texts take the one conversion of `specs/0074-text-objects` criteria 22 and 24.
+    if let Some(refusal) = crate::text_convert::texts_refusal(objects, selection.ids()) {
+        return Err(StackRefusal::Operands(
+            crate::boolean::BooleanRefusal::Texts(refusal),
+        ));
+    }
+    let converted = crate::text_convert::texts_as_paths(objects);
+    let stack = Stack::of(&converted, selection)?;
     let fracture =
         stack.run(|operands| fracture_cells(operands, BOOLEAN_TOLERANCE, MAX_STACK_PIECES))?;
     if fracture.pieces.is_empty() {

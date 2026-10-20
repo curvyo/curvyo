@@ -76,7 +76,11 @@ fn the_history_tab_exists_and_the_shortcut_selects_it() {
     assert_eq!(active.name, "history");
     let history = view.tabs.iter().find(|t| t.name == "history").unwrap();
     assert_eq!(history.tooltip, "History (Shift+Ctrl+H)");
-    assert_eq!(view.tabs.last().map(|t| t.name), Some("history"));
+    // The Fonts tab of `specs/0074-text-objects` is appended after History.
+    assert_eq!(
+        view.tabs.iter().rev().nth(1).map(|t| t.name),
+        Some("history")
+    );
 }
 
 #[test]

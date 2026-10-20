@@ -51,11 +51,20 @@ impl From<CutOutcome> for CutResultView {
                 CutRefusal::Compound { offenders } => {
                     view("compound", offenders.len(), offenders.len(), 0)
                 }
+                CutRefusal::TextObjects { offenders } => {
+                    view("texts", offenders.len(), offenders.len(), 0)
+                }
                 CutRefusal::OutOfRange { offenders, of } => {
                     view("out_of_range", offenders.len(), of, 0)
                 }
                 CutRefusal::NoCrossing => view("no_crossing", 0, 0, 0),
                 CutRefusal::TooMany { pieces } => view("too_many", 0, 0, pieces),
+                CutRefusal::Texts(texts) => view(
+                    crate::wasm_text::refusal_kind(&texts),
+                    texts.offenders.len(),
+                    0,
+                    0,
+                ),
             },
         }
     }

@@ -458,7 +458,8 @@ impl Session {
             Err(refusal) => {
                 self.command_refusal = match &refusal {
                     OffsetRefusal::OutOfRange { offenders, .. }
-                    | OffsetRefusal::NoArea { offenders, .. } => {
+                    | OffsetRefusal::NoArea { offenders, .. }
+                    | OffsetRefusal::Texts(curvyo_ui_core::TextRefusal { offenders, .. }) => {
                         Some(RefusalMarks::new(offenders.clone(), &self.selection))
                     }
                     OffsetRefusal::NoOperands

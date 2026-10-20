@@ -129,6 +129,13 @@ const browserCommands: Record<string, (args?: Record<string, unknown>) => unknow
     downloadText("curvyo-formats.toml", String(args?.text));
     return true;
   },
+  // The browser lists the included fonts only (`specs/0074-text-objects` criterion 16): no
+  // Curvyo folder, no system fonts, and no file the host could read.
+  font_folder_list: () => ({ faces: [], skipped: [] }),
+  system_font_list: () => [],
+  font_bytes: () => {
+    throw new Error("the browser build reads no font files");
+  },
 };
 
 /** Same contract as Tauri's `invoke`. */

@@ -133,7 +133,8 @@ pub(crate) fn effective_guide(
     match object {
         crate::primitive_model::ObjectSnapshot::Clone(clone) => own(clone.chain.root),
         crate::primitive_model::ObjectSnapshot::Path(_)
-        | crate::primitive_model::ObjectSnapshot::Primitive(_) => own(object.id()),
+        | crate::primitive_model::ObjectSnapshot::Primitive(_)
+        | crate::primitive_model::ObjectSnapshot::Text(_) => own(object.id()),
     }
 }
 

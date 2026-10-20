@@ -59,6 +59,9 @@ impl Session {
             .map(|object| match object {
                 ObjectSnapshot::Path(path) => path.all_anchors().count(),
                 ObjectSnapshot::Clone(clone) => clone.resolved.all_anchors().count(),
+                ObjectSnapshot::Text(_) => {
+                    object.drawn_path().map_or(0, |p| p.all_anchors().count())
+                }
                 ObjectSnapshot::Primitive(_) => PRIMITIVE_NODES,
             })
             .sum();

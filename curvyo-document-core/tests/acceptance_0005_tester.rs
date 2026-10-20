@@ -122,6 +122,7 @@ fn golden_rotation_v5_fixture_declares_version_5_and_opens_with_both_rotations()
     let mut seen_path = false;
     for id in ids {
         match document.object(id).unwrap() {
+            ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
             ObjectSnapshot::Clone(_) => panic!("no clone here"),
             ObjectSnapshot::Primitive(p) => {
                 assert!(matches!(p.shape, Shape::Rect { .. }));

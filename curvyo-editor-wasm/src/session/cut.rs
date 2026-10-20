@@ -52,7 +52,9 @@ impl Session {
                 Err(refusal) => {
                     this.command_refusal = match &refusal {
                         CutRefusal::Compound { offenders }
-                        | CutRefusal::OutOfRange { offenders, .. } => {
+                        | CutRefusal::TextObjects { offenders }
+                        | CutRefusal::OutOfRange { offenders, .. }
+                        | CutRefusal::Texts(curvyo_ui_core::TextRefusal { offenders, .. }) => {
                             Some(RefusalMarks::new(offenders.clone(), &selection))
                         }
                         _ => None,

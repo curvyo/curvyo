@@ -42,6 +42,7 @@ mod select_decoration;
 mod shape_preview;
 mod shared_outline;
 mod stroke;
+mod text_edit_overlay;
 mod theme;
 
 pub use artwork::{build_artwork, build_artwork_with_guides};
@@ -70,6 +71,7 @@ pub use refusal_outline::build_refusal_outlines;
 pub use select_box::{SelectDecorationInput, SelectionBox};
 pub use select_decoration::{TransformDecorationInput, TransformGlyphKind, TransformHandleGlyph};
 pub use shape_preview::build_shape_live_preview;
+pub use text_edit_overlay::{TextEditOverlay, build_text_edit_overlay};
 pub use theme::{CANVAS_BG, CHECKER_A, CHECKER_B, PASTEBOARD_BG};
 
 use curvyo_document_core::{PathSnapshot, ViewTransform};

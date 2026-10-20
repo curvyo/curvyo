@@ -5,6 +5,7 @@ import {
   PenTool as PenToolIcon,
   Square,
   Star,
+  Type,
 } from "lucide-react";
 import { Tooltip } from "radix-ui";
 
@@ -228,6 +229,17 @@ export function ToolRail({
               label="Polygon/star tool"
               shortcut="*"
               icon={<Star size={20} />}
+              onSelect={onSelect}
+              onReturnFocus={onReturnFocus}
+            />
+            {/* The next free slot of the Tools card (`specs/0074-text-objects` criterion 1):
+                T is a tool letter in every state. */}
+            <ToolButton
+              tool="text"
+              active={tool === "text"}
+              label="Text tool"
+              shortcut="T"
+              icon={<Type size={20} />}
               onSelect={onSelect}
               onReturnFocus={onReturnFocus}
             />

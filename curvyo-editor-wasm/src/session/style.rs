@@ -19,9 +19,12 @@ impl Session {
         match self.tool {
             Tool::Pen => StyleTool::Pen,
             Tool::Node => StyleTool::Node,
-            Tool::Select | Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar | Tool::Offset => {
-                StyleTool::Other
-            }
+            Tool::Select
+            | Tool::Rectangle
+            | Tool::Ellipse
+            | Tool::PolygonStar
+            | Tool::Offset
+            | Tool::Text => StyleTool::Other,
         }
     }
 

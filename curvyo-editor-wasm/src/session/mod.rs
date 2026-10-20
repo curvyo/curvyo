@@ -99,6 +99,12 @@ mod shapes;
 mod split;
 mod style;
 mod style_view;
+mod text;
+mod text_bar;
+mod text_fonts;
+mod text_path;
+#[cfg(test)]
+mod text_tests;
 mod tolerances;
 mod transform_entry;
 
@@ -142,6 +148,8 @@ pub use select::DoubleClickHint;
 pub use split::{BreakApartOutcome, SplitOutcome};
 #[cfg(target_arch = "wasm32")]
 pub use style_view::StylePanelView;
+pub use text_bar::{TextBarView, TextSizeOutcome};
+pub use text_path::ObjectToPathOutcome;
 
 #[cfg(target_arch = "wasm32")]
 pub use open_error::map_open_error;
@@ -203,6 +211,8 @@ pub enum Tool {
     /// The Offset tool (`specs/0038-path-offset` criteria 1, 2): handles on the selection box,
     /// its options in the Offset bar.
     Offset,
+    /// The Text tool (`specs/0074-text-objects` criteria 1 to 10): click and type.
+    Text,
 }
 
 /// One open document's whole editing session.
@@ -341,6 +351,10 @@ pub struct Session {
     placements: placement::PlacementState,
     /// The Pen's typed Length and Angle entry (`pen_entry.rs`).
     pen_entries: pen_entry::PenEntryState,
+    /// The listed fonts, the engine's faces and the layout of texts (`text_fonts.rs`).
+    fonts: text_fonts::TextFonts,
+    /// The Text tool and edit mode (`text.rs`).
+    text: text::TextState,
 }
 
 impl Session {
@@ -408,6 +422,8 @@ impl Session {
             dom_chips: Vec::new(),
             placements: placement::PlacementState::default(),
             pen_entries: pen_entry::PenEntryState::default(),
+            fonts: text_fonts::TextFonts::default(),
+            text: text::TextState::default(),
         }
     }
 
@@ -471,6 +487,8 @@ impl Session {
             dom_chips: Vec::new(),
             placements: placement::PlacementState::default(),
             pen_entries: pen_entry::PenEntryState::default(),
+            fonts: text_fonts::TextFonts::default(),
+            text: text::TextState::default(),
         };
         // A file another tool wrote can hold clones whose original is gone (`0049` criterion 35).
         session.remove_orphans_after_open();
@@ -521,6 +539,8 @@ impl Session {
             this.cancel_placement();
             // And the Pen entry chip (`0072` criterion 22).
             this.cancel_pen_entry();
+            // A tool switch ends text edit mode as its one step (`0074` criterion 7).
+            this.finish_text_edit_inner();
             // Leaving the Pen ends its path as drawn (a lone node is dropped): no
             // unfinished path stays behind that the Document section's resize would
             // not move (`specs/0015-document-size-and-rulers/` criterion 14a).
@@ -531,7 +551,10 @@ impl Session {
             // A creation tool starts from an empty selection: no selection box
             // stays behind from the Select tool. Creating a shape then selects
             // the new one (`shape_pointer_up`).
-            if matches!(tool, Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar) {
+            if matches!(
+                tool,
+                Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar | Tool::Text
+            ) {
                 this.selection.clear();
                 this.hovered_object = None;
             }
@@ -615,6 +638,7 @@ impl Session {
                 Tool::Offset => {
                     this.offset_pointer_down(point, shift);
                 }
+                Tool::Text => this.text_pointer_down(point, shift),
             }
         });
     }
@@ -673,6 +697,7 @@ impl Session {
             Tool::Offset => {
                 self.offset_hover(point);
             }
+            Tool::Text => self.text_pointer_move(point),
             Tool::Pen => {}
         }
     }
@@ -723,6 +748,7 @@ impl Session {
                 Tool::Offset => {
                     this.offset_pointer_up(point, shift, constrain);
                 }
+                Tool::Text => this.text_pointer_up(),
             }
         });
     }
@@ -755,6 +781,7 @@ impl Session {
                 Tool::Node => this.insert_at(point),
                 Tool::Select => return this.select_double_click(point, shift, ctrl),
                 Tool::Offset => return this.offset_double_click(point, shift, ctrl),
+                Tool::Text => this.text_double_click(point),
                 Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar => {}
             }
             DoubleClickHint::None

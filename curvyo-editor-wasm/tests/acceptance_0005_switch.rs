@@ -208,6 +208,7 @@ fn snapshot(s: &Session) -> ObjectSnapshot {
 
 fn stroke(o: &ObjectSnapshot) -> f64 {
     match o {
+        ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Primitive(p) => p.style.stroke.width.as_mm(),
         ObjectSnapshot::Clone(p) => p.resolved.style.stroke.width.as_mm(),
         ObjectSnapshot::Path(p) => p.style.stroke.width.as_mm(),

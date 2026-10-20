@@ -5,6 +5,8 @@
  * Rust sends codes and counts; the sentences are written here, once.
  */
 
+import { textRefusalOutlines, textRefusalText } from "./textText.ts";
+
 /** The wire code of an operation, as `WasmSession.apply_boolean` takes it. */
 export type BooleanOp =
   | "union"
@@ -44,6 +46,8 @@ export interface BooleanResult {
   closedOpen: number;
   /** Open outlines that enclosed no area and were removed. */
   removedOpen: number;
+  /** The one missing face of a refusal of texts (`specs/0074-text-objects` criterion 29). */
+  face?: string;
 }
 
 const NAMES: Record<BooleanOp, string> = {
@@ -153,6 +157,10 @@ export function sharedRefusalText(
 /** The notice after a refusal (criteria 15 to 17), or `null` for a result
  * that is no refusal (`applied`, `ignored`, `needs_two`). */
 export function refusalText(op: BooleanOp, result: BooleanResult): string | null {
+  const texts = textRefusalText(result);
+  if (texts) {
+    return texts;
+  }
   if (result.kind === "empty") {
     return `${EMPTY_TEXTS[op]} ${NOTHING_CHANGED}`;
   }
@@ -162,6 +170,7 @@ export function refusalText(op: BooleanOp, result: BooleanResult): string | null
 /** Whether a refusal outlines objects on the canvas (criterion 16). */
 export function refusalOutlinesObjects(result: BooleanResult): boolean {
   return (
+    textRefusalOutlines(result.kind) ||
     result.kind === "no_area" ||
     result.kind === "out_of_range" ||
     result.kind === "groups"

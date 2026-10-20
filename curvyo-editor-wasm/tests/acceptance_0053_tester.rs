@@ -100,6 +100,7 @@ fn doc_of(s: &Session) -> Document {
 
 fn path(d: &Document, id: NodeId) -> Option<PathSnapshot> {
     match d.object(id)? {
+        ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Path(p) => Some(p),
         ObjectSnapshot::Primitive(_) | ObjectSnapshot::Clone(_) => None,
     }

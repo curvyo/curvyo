@@ -73,9 +73,10 @@ impl Session {
                 Err(refusal) => {
                     this.command_refusal = match &refusal {
                         CombineRefusal::OutOfRange { offenders, .. }
-                        | CombineRefusal::Groups { offenders } => {
-                            Some(RefusalMarks::new(offenders.clone(), &selection))
-                        }
+                        | CombineRefusal::Groups { offenders }
+                        | CombineRefusal::Texts(curvyo_ui_core::TextRefusal {
+                            offenders, ..
+                        }) => Some(RefusalMarks::new(offenders.clone(), &selection)),
                         CombineRefusal::NeedsTwo | CombineRefusal::SingleNodesOnly => None,
                     };
                     return CombineOutcome::Refused(refusal);

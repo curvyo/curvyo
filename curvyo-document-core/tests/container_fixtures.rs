@@ -121,6 +121,7 @@ fn primitives_v3_project_round_trips_every_shape_kind() {
     let mut saw_path = false;
     for id in ids {
         match document.object(id).expect("object exists") {
+            ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
             ObjectSnapshot::Path(path) => {
                 saw_path = true;
                 assert_eq!(path.anchors.len(), 2);

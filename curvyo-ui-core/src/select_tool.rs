@@ -123,6 +123,9 @@ pub enum SelectDoubleClickOutcome {
     /// A linked clone was hit: it has no nodes, the tool stays and a hint names the way out
     /// (`specs/0049-linked-clone` criterion 26).
     Clone,
+    /// A text object was hit: the caller starts editing it in the Text tool
+    /// (`specs/0074-text-objects` criterion 10).
+    Text(curvyo_document_core::NodeId),
     /// A rotate, resize, skew or parameter handle, or the centre handle, was
     /// double-clicked: the numeric entry is open (criteria 18, 25, 26; 9 and
     /// 15 of `edit-interaction-polish`), and there is no handoff.
@@ -1276,6 +1279,7 @@ mod tests {
                 let after = document.object(id).expect("exists");
                 assert_ne!(after, before, "{direction:?}: the resize happened");
                 let width = |o: &ObjectSnapshot| match o {
+                    ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
                     ObjectSnapshot::Primitive(p) => p.style.stroke.width,
                     ObjectSnapshot::Path(p) => p.style.stroke.width,
                     ObjectSnapshot::Clone(p) => p.resolved.style.stroke.width,

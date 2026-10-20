@@ -266,6 +266,9 @@ impl Session {
                 changed: false,
             };
         }
+        // A history jump ends text edit mode first and writes its one step, so it acts on what
+        // is on screen (`specs/0074-text-objects` criteria 7 and 9).
+        self.finish_text_edit();
         self.flush_select_bar_preview();
         self.flush_style_preview();
         self.sync_history();

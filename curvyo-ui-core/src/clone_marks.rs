@@ -248,7 +248,7 @@ fn outline_of(object: &ObjectSnapshot) -> Option<&curvyo_document_core::PathSnap
     match object {
         ObjectSnapshot::Path(path) => Some(path),
         ObjectSnapshot::Clone(clone) => Some(&clone.resolved),
-        ObjectSnapshot::Primitive(_) => None,
+        ObjectSnapshot::Primitive(_) | ObjectSnapshot::Text(_) => None,
     }
 }
 

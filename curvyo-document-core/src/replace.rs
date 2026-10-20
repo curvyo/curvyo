@@ -249,20 +249,35 @@ fn resolve_sources(
 
 /// Creates a new path object directly after `after` in the stacking order, with `style`, no
 /// rotation, and `outlines` (the first stored in the ordinary keys, the rest as extra subpaths).
-fn create_path_after(
+pub(crate) fn create_path_after(
     tree: &loro::LoroTree,
     after: loro::TreeID,
     style: &crate::style_model::Style,
     outlines: &[(Vec<NewAnchor>, bool)],
 ) -> loro::TreeID {
     // `mov_after` needs the fractional-index feature on for this tree (the caller enabled it).
-    // invariant: a root-level create on a live tree cannot fail, and reading the meta map of the
-    // node just created cannot fail. `mov_after` below puts the node into the parent of `after`.
+    // invariant: a root-level create on a live tree cannot fail. `mov_after` below puts the node
+    // into the parent of `after`, which the caller resolved live.
     #[allow(clippy::unwrap_used)]
     let new_tree_id = tree.create(TreeParentId::Root).unwrap();
+    write_path_node(tree, new_tree_id, style, outlines);
     #[allow(clippy::unwrap_used)]
-    let meta = tree.get_meta(new_tree_id).unwrap();
-    // invariant: the caller checked `outlines` to be non-empty.
+    tree.mov_after(new_tree_id, after).unwrap();
+    new_tree_id
+}
+
+/// Writes `outlines` with `style` into the fresh node `node`: the first outline in the ordinary
+/// keys, the rest as extra subpaths.
+pub(crate) fn write_path_node(
+    tree: &loro::LoroTree,
+    node: loro::TreeID,
+    style: &crate::style_model::Style,
+    outlines: &[(Vec<NewAnchor>, bool)],
+) {
+    // invariant: reading the meta map of a node just created cannot fail, and the caller checked
+    // `outlines` to be non-empty.
+    #[allow(clippy::unwrap_used)]
+    let meta = tree.get_meta(node).unwrap();
     #[allow(clippy::unwrap_used)]
     let (first, rest) = outlines.split_first().unwrap();
     path_codec::write_path_style(&meta, first.1, style);
@@ -271,11 +286,6 @@ fn create_path_after(
         push_anchor(&anchor_list, anchor);
     }
     write_extra_subpaths(&meta, rest);
-    // invariant: `after` was resolved by the caller and the new node was just created: both are
-    // live.
-    #[allow(clippy::unwrap_used)]
-    tree.mov_after(new_tree_id, after).unwrap();
-    new_tree_id
 }
 
 /// An anchor id names a node across the whole document: none of `seen`, the ids a command is

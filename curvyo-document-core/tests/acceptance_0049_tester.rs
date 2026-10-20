@@ -110,6 +110,7 @@ fn set_matrix(d: &Document, clone: NodeId, m: [f64; 6]) -> Document {
 
 fn outline(o: &ObjectSnapshot) -> Vec<(f64, f64)> {
     match o {
+        ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Path(p) => p.anchors.iter().map(|a| (a.point.x, a.point.y)).collect(),
         ObjectSnapshot::Clone(c) => c
             .resolved

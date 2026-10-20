@@ -402,6 +402,7 @@ fn winding_all(outlines: &[Vec<Point>], p: Point) -> i32 {
 
 fn style_of(o: &ObjectSnapshot) -> curvyo_document_core::Style {
     match o {
+        ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Path(p) => p.style.clone(),
         ObjectSnapshot::Primitive(p) => p.style.clone(),
         ObjectSnapshot::Clone(p) => p.resolved.style.clone(),

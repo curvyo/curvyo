@@ -392,7 +392,7 @@ impl Session {
             && held.iter().all(|object| match object {
                 ObjectSnapshot::Clone(_) => true,
                 ObjectSnapshot::Path(path) => path.is_compound(),
-                ObjectSnapshot::Primitive(_) => false,
+                ObjectSnapshot::Primitive(_) | ObjectSnapshot::Text(_) => false,
             })
     }
 }
