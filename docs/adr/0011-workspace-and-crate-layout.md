@@ -1,6 +1,6 @@
 # ADR 0011: Workspace and crate layout
 
-**Status:** Accepted (architect, 2026-10-02 — no customer sign-off required); crate and directory names amended by [ADR 0013](0013-rename-to-curvyo.md) (`vecmanf-*` is now `curvyo-*`); §7 CI note of 2026-10-10 (Windows and macOS host gate nightly only, customer decision 2026-10-09)
+**Status:** Accepted (architect, 2026-10-02 — no customer sign-off required); crate and directory names amended by [ADR 0013](0013-rename-to-curvyo.md) (`vecmanf-*` is now `curvyo-*`); §7 CI note of 2026-10-10 (Windows and macOS host gate nightly only, customer decision 2026-10-09); §2/§3 note of 2026-10-20 (`curvyo-text-core`, ADR 0020)
 
 This ADR invents no architecture. ADRs 0001–0010 each authorized the crates
 their own decision needed, in the ADR that needed them; this one pulls those
@@ -165,6 +165,14 @@ for the cost of one `lib.rs`: doing it now is a speculative crate
    ui-core` carries nothing but ADR 0009 §2's awareness payloads to the relay
    socket. `render-core` and `ui-core` do not depend on each other: the view
    transform is the affine transform type from `document-core`, passed to both.
+
+   > **Note 2026-10-20 (ADR 0020 §2, accepted by the customer):** new crate
+   > `curvyo-text-core`. Its responsibility: it turns a face's bytes, a string and a size into
+   > positioned glyph outlines and line metrics. Edges: `curvyo-text-core → (external only)`,
+   > the same invariant as `crypto-core`: it never depends on `document-core`. `ui-core` may
+   > depend on it (layout, Object to path, hit box, edit session). `render-core` may depend on it
+   > if drawing the caret or selection needs the engine. `editor-wasm` may depend on it only to
+   > own the session's `FaceStore` and hand face bytes in, with no layout logic of its own.
 
    **No `*-core` crate depends on `*-io`, on `*-app`, on `vecmanf-editor-wasm`
    or on the frontend, ever.** This is the `CLAUDE.md` §6 rule, and the crate
