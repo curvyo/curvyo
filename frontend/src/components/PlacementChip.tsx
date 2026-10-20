@@ -5,9 +5,11 @@ import { EntryField } from "@/components/EntryField";
 import type { PlacementApi, PlacementChipState } from "@/hooks/usePlacement";
 import { type Rect, placePlacementChip } from "@/lib/readoutPlacement";
 
-/** Field widths and label paddings (`docs/design-system.md`, "Placement chip"). */
-const LENGTH_FIELD_PX = 132;
-const ANGLE_FIELD_PX = 132;
+/** Field widths and label paddings (`docs/design-system.md`, "Placement chip"): each field keeps
+ * 72px for the text, room for 9 digits at 14px (criterion 33), as the Pen entry chip does. */
+const LENGTH_FIELD_PX = 126;
+const SIZE_FIELD_PX = 134;
+const ANGLE_FIELD_PX = 150;
 const ANGLE_LABEL_PX = 44;
 const SIZE_LABEL_PX = 28;
 /** The tool rail's clearance from the canvas's left edge, as the other entry chips keep it. */
@@ -186,7 +188,7 @@ export function PlacementChip({ placement, chip, containerRef }: PlacementChipPr
               )}
               <EntryField
                 label={label}
-                width={angle ? ANGLE_FIELD_PX : LENGTH_FIELD_PX}
+                width={angle ? ANGLE_FIELD_PX : field.size ? SIZE_FIELD_PX : LENGTH_FIELD_PX}
                 labelWidth={angle ? ANGLE_LABEL_PX : field.size ? SIZE_LABEL_PX : undefined}
                 suffix={field.suffix}
                 ariaLabel={field.name}
