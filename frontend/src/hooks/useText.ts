@@ -53,7 +53,9 @@ const STEADY_AFTER_KEY_MS = 500;
 const MAC = /mac/i.test(navigator.platform);
 
 interface Listed {
-  faces: { id: string; family: string; style: string; index: number }[];
+  /** `os2` (24 hex digits) and `stamp` come with the Curvyo and system lists
+   * (`specs/0075-font-library` decisions 4 and 5). */
+  faces: { id: string; family: string; style: string; index: number; os2?: string | null; stamp?: string }[];
   skipped: string[];
 }
 
@@ -63,6 +65,30 @@ const lists: Partial<Record<"curvyo" | "included" | "system", Listed>> = {};
 const bytes = new Map<string, Uint8Array>();
 const loading = new Set<string>();
 const includedIds = new Set<string>();
+
+/** The host's listing of a block as it arrived, with the class bytes and stamps the session does
+ * not keep (the font library reads them). */
+export function hostListing(block: "curvyo" | "included" | "system"): Listed["faces"] {
+  return lists[block]?.faces ?? [];
+}
+
+/** The bytes of a listed file, read once per page (the cuttable check reads them too). */
+export async function listedFileBytes(id: string): Promise<Uint8Array> {
+  const cached = bytes.get(id);
+  if (cached) {
+    return cached;
+  }
+  const read = await readFile(id);
+  bytes.set(id, read);
+  return read;
+}
+
+/** Forgets the bytes of files that were removed or replaced (a Remove, an Add under a name). */
+export function forgetFileBytes(ids: string[]): void {
+  for (const id of ids) {
+    bytes.delete(id);
+  }
+}
 
 function fontsBase(): string {
   return `${import.meta.env.BASE_URL}fonts/`;
@@ -111,7 +137,10 @@ export interface TextApi {
   objectToPathNotice: string | null;
   /** The Fonts tab is shown, or the Text tool is used: the Curvyo folder is listed again and the
    * system fonts are read the first time (criteria 19, 20). */
-  listHostFonts: () => void;
+  listHostFonts: () => Promise<void>;
+  /** The texts of the open project using a face of `family` from the Curvyo fonts block
+   * (`0075` criterion 25). */
+  textsUsingFamily: (family: string) => number;
   /** Focus goes to the sink when edit mode is on (after a canvas press or Enter). */
   focusSinkIfEditing: () => void;
   /** The same, at once: the sink is mounted while the Text tool is active, so the release of a
@@ -182,15 +211,16 @@ export function useText(
   }, []);
 
   const listHostFonts = useCallback(() => {
-    if (!isTauri) {
-      return;
-    }
-    void invoke<Listed>("font_folder_list")
+    // The browser's Curvyo fonts are the files added there (`0075` criterion 28).
+    const folder = invoke<Listed>("font_folder_list")
       .then((listed) => {
         lists.curvyo = listed;
         setListsRevision((r) => r + 1);
       })
       .catch(() => {});
+    if (!isTauri) {
+      return folder;
+    }
     if (!systemAskedRef.current) {
       systemAskedRef.current = true;
       void invoke<Listed["faces"]>("system_font_list")
@@ -200,6 +230,7 @@ export function useText(
         })
         .catch(() => {});
     }
+    return folder;
   }, []);
 
   // Every sync: a new session gets the lists, the faces it asks for are read and handed in, and
@@ -270,7 +301,7 @@ export function useText(
     // on a sync: a list that arrives syncs again (criteria 19, 20).
     const tool = session.tool();
     if (listsOnToolChange(lastToolRef.current, tool)) {
-      listHostFonts();
+      void listHostFonts();
     }
     lastToolRef.current = tool;
     if (session.take_text_write_failed()) {
@@ -588,6 +619,7 @@ export function useText(
     objectToPath,
     objectToPathNotice,
     listHostFonts,
+    textsUsingFamily: (family: string) => getSession()?.texts_using_family(family) ?? 0,
     focusSinkIfEditing,
     focusSinkNow,
     refusalFace,

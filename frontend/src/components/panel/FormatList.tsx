@@ -71,6 +71,8 @@ function NoticeUnder({ notice, anchor }: { notice: FormatNotice | null; anchor: 
 
 interface ConfirmProps {
   prompt: string;
+  /** The action button's label; "Delete" by default (`0075`: "Remove"). */
+  action?: string;
   /** `keyboard` is true for Escape and for a key press on the button. */
   onCancel: (keyboard: boolean) => void;
   onDelete: (keyboard: boolean) => void;
@@ -78,7 +80,13 @@ interface ConfirmProps {
 
 /** The inline confirm that replaces a row or a header (`0045` criterion 22):
  * focus on Cancel, Delete ignores presses for 400 ms, Escape cancels. */
-function InlineConfirm({ prompt, onCancel, onDelete, onReturnFocus }: ConfirmProps & { onReturnFocus: () => void }) {
+export function InlineConfirm({
+  prompt,
+  action = "Delete",
+  onCancel,
+  onDelete,
+  onReturnFocus,
+}: ConfirmProps & { onReturnFocus: () => void }) {
   const cancel = useRef<HTMLButtonElement>(null);
   const armed = useRef(false);
   useEffect(() => {
@@ -126,7 +134,7 @@ function InlineConfirm({ prompt, onCancel, onDelete, onReturnFocus }: ConfirmPro
           }}
           className={`${OUTLINE_BUTTON} w-[109px] !text-[var(--destructive)]`}
         >
-          Delete
+          {action}
         </button>
       </div>
     </div>
