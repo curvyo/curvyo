@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "curvyo-document-core",
     "curvyo-geometry-core",
+    "curvyo-text-core",
     "curvyo-ui-core",
     "curvyo-render-core",
     "curvyo-editor-wasm",
@@ -36,6 +37,17 @@ lyon = "1"
 # update is a reviewed PR that reruns the boolean fixtures and property tests
 # (specs/0016-boolean-operations/adrs.md).
 i_overlay = { version = "=9.0.1", default-features = false }
+# Pinned exactly (ADR 0020 §2): the text engine turns hostile font bytes into outlines that become
+# cuts, inside a wasm module that cannot catch a panic. An update is a reviewed PR that reruns the
+# text-core tests and the hostile-input property test. `harfrust` is MIT; `skrifa` MIT OR Apache-2.0.
+harfrust = { version = "=0.14.0", default-features = false, features = ["std"] }
+skrifa = { version = "=0.48.0", default-features = false, features = ["std"] }
+sha2 = { version = "0.10", default-features = false }
+# The desktop font list (ADR 0020 §3): pure Rust, its own fontconfig reader, no C library.
+# Pinned exactly as the spike measured it; MIT. Without `memmap` (no `unsafe` mmap in the tree).
+fontdb = { version = "=0.24.0", default-features = false, features = ["std", "fs", "fontconfig"] }
+# Property tests (dev-dependency of the geometry, ui and text crates).
+proptest = "1"
 
 [workspace.lints.rust]
 unsafe_code = "deny"

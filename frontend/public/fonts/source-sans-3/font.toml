@@ -1,0 +1,23 @@
+# Licence record of a shipped font family (ADR 0020 §4). The files are the upstream release,
+# unmodified. Checked by `curvyo-text-core/tests/included_fonts.rs`.
+family = "Source Sans 3"
+licence = "OFL-1.1"
+licence_file = "LICENSE.md"
+source_url = "https://github.com/adobe-fonts/source-sans/releases/tag/3.052R"
+version = "3.052"
+
+[[faces]]
+file = "SourceSans3-Regular.otf"
+style = "Regular"
+
+[[faces]]
+file = "SourceSans3-It.otf"
+style = "Italic"
+
+[[faces]]
+file = "SourceSans3-Bold.otf"
+style = "Bold"
+
+[[faces]]
+file = "SourceSans3-BoldIt.otf"
+style = "Bold Italic"

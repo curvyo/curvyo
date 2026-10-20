@@ -1,0 +1,26 @@
+[package]
+name = "curvyo-text-core"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "The Curvyo text engine: turns a face's bytes, a string and a size into positioned glyph outlines and line metrics (pure, wasm-compatible)."
+
+[lints]
+workspace = true
+
+[dependencies]
+harfrust.workspace = true
+skrifa.workspace = true
+sha2.workspace = true
+kurbo.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+toml.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+# Hostile-input property test over mutated font files (spec criterion 32).
+proptest.workspace = true
