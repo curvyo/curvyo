@@ -150,9 +150,16 @@ function styleRank(style: string): number {
 
 /** The blocks of the Fonts tab in their order (criterion 16), each family A to Z
  * case-insensitive, faces Regular first, filtered by a case-insensitive substring of the family
- * name (criterion 17). A block without a family is left out, except "This computer" on the
- * desktop before the system list arrives (it shows "Reading…"). */
-export function fontBlocks(data: FontsTabData, search: string, desktop: boolean): FontBlockRows[] {
+ * name (criterion 17) and by `inGroup`, the chosen strip cell (`0075` criterion 2). A block without a
+ * family is left out, except "This computer" on the desktop before the system list arrives (it
+ * shows "Reading…") and while `keepSystem` (its fonts are being checked). */
+export function fontBlocks(
+  data: FontsTabData,
+  search: string,
+  desktop: boolean,
+  inGroup?: (family: FontFamily) => boolean,
+  keepSystem = false,
+): FontBlockRows[] {
   const needle = search.trim().toLowerCase();
   const blocks: FontBlockRows[] = [];
   for (const block of ["curvyo", "included", "system"] as const) {
@@ -172,8 +179,10 @@ export function fontBlocks(data: FontsTabData, search: string, desktop: boolean)
         faces: faces.sort((a, b) => styleRank(a.style) - styleRank(b.style) || a.style.localeCompare(b.style)),
       }))
       .sort((a, b) => a.family.toLowerCase().localeCompare(b.family.toLowerCase()));
-    const shown = needle ? all.filter((f) => f.family.toLowerCase().includes(needle)) : all;
-    const reading = block === "system" && desktop && !data.systemRead && !needle;
+    const shown = all.filter(
+      (f) => (!needle || f.family.toLowerCase().includes(needle)) && (!inGroup || inGroup(f)),
+    );
+    const reading = block === "system" && desktop && ((!data.systemRead && !needle) || keepSystem);
     if (shown.length > 0 || reading) {
       blocks.push({ block, title: BLOCK_TITLES[block], families: shown, total: all.length });
     }

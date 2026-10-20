@@ -11,6 +11,11 @@ import {
   type UnlistenFn,
 } from "@tauri-apps/api/event";
 
+import {
+  browserFontBytes,
+  listBrowserFonts,
+  removeBrowserFontFiles,
+} from "@/lib/browserFonts";
 import { detectPlatform, type PlatformKind } from "@/lib/platformKind";
 import type { OpenPayload, SaveOutcome } from "@/lib/projectState";
 
@@ -69,6 +74,9 @@ function pickProject(): Promise<OpenPayload | null> {
  * (`specs/0045-document-formats-library/` criterion 31). Every access is
  * guarded: a failure means the built-in formats only. */
 const FORMATS_KEY = "curvyo.document-formats";
+/** The font library's text and the check cache in the browser build (`0075` decisions 1, 5). */
+const FONT_LIBRARY_KEY = "curvyo.font-library";
+const FONT_CHECKS_KEY = "curvyo.font-checks";
 
 function readStored(key: string): string | null {
   try {
@@ -129,13 +137,32 @@ const browserCommands: Record<string, (args?: Record<string, unknown>) => unknow
     downloadText("curvyo-formats.toml", String(args?.text));
     return true;
   },
-  // The browser lists the included fonts only (`specs/0074-text-objects` criterion 16): no
-  // Curvyo folder, no system fonts, and no file the host could read.
-  font_folder_list: () => ({ faces: [], skipped: [] }),
+  // The browser has no system fonts (`specs/0074-text-objects` criterion 16); its Curvyo fonts
+  // are the files added in this browser, kept in IndexedDB (`specs/0075-font-library`
+  // criterion 28).
+  font_folder_list: () => listBrowserFonts(),
   system_font_list: () => [],
-  font_bytes: () => {
-    throw new Error("the browser build reads no font files");
+  font_bytes: (args) => browserFontBytes(String(args?.id)),
+  // The browser picks and adds font files through `browserFonts` (File objects, no paths).
+  pick_font_files: () => {
+    throw new Error("the browser picks font files through browserFonts");
   },
+  add_font_files: () => {
+    throw new Error("the browser adds font files through browserFonts");
+  },
+  remove_font_files: (args) => removeBrowserFontFiles(args?.faces as { id: string; index: number }[]),
+  // The font library file and the check cache sit beside the formats file (`0075` decisions 1, 5).
+  read_font_library: () => readStored(FONT_LIBRARY_KEY),
+  write_font_library: (args) => window.localStorage.setItem(FONT_LIBRARY_KEY, String(args?.text)),
+  set_font_library_aside: () => {
+    const text = readStored(FONT_LIBRARY_KEY);
+    if (text !== null) {
+      window.localStorage.setItem(`${FONT_LIBRARY_KEY}.broken`, text);
+    }
+    window.localStorage.removeItem(FONT_LIBRARY_KEY);
+  },
+  read_font_checks: () => readStored(FONT_CHECKS_KEY),
+  write_font_checks: (args) => window.localStorage.setItem(FONT_CHECKS_KEY, String(args?.text)),
 };
 
 /** Same contract as Tauri's `invoke`. */

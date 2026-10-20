@@ -42,6 +42,11 @@ function mintPeerId(): bigint {
   return value & 0x7f_ff_ff_ff_ff_ff_ff_ffn;
 }
 
+/** Resolves once the wasm module is initialised (the font library's objects need it). */
+export function wasmReady(): Promise<void> {
+  return loadOnce();
+}
+
 /** Creates a brand-new, empty editing session, ready to attach to a
  * canvas. */
 export async function createSession(): Promise<WasmSession> {

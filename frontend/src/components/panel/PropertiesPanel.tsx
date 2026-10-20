@@ -334,6 +334,7 @@ export function PropertiesPanel({
                   }
                 }}
                 onShown={editor.text.listHostFonts}
+                textsUsingFamily={editor.text.textsUsingFamily}
               />
             ) : doc.view.content === "history" ? (
               <HistoryTab
