@@ -2,7 +2,8 @@ import type { BooleanCardCommand } from "@/lib/stackText";
 
 /**
  * The glyphs of the Boolean card (`docs/design-system.md`, row
- * "Boolean glyphs"; Fracture and Flatten, `specs/0037-fracture-and-flatten/`): two 9 x 9 squares on a 16 x 16 viewBox, the first-drawn
+ * "Boolean glyphs"; Fracture and Flatten, `specs/0037-fracture-and-flatten/`; Weld,
+ * `specs/0068-laserable-lettering/`): two 9 x 9 squares on a 16 x 16 viewBox, the first-drawn
  * (the lower object) at (1.75, 1.75), the second at (5.25, 5.25), so the
  * overlap is 5.5 x 5.5. Solid is the result, outline only is what
  * disappears. Drawn at 20px; the stroke is 1.5px on screen at any scale.
@@ -57,6 +58,21 @@ function Piece({ d, shift = 0 }: { d: string; shift?: number }) {
 const UPPER_SQUARE =
   "M6.25 5.25H13.25A1 1 0 0 1 14.25 6.25V13.25A1 1 0 0 1 13.25 14.25H6.25A1 1 0 0 1 5.25 13.25V6.25A1 1 0 0 1 6.25 5.25Z";
 
+/** Weld's line art (`specs/0068-laserable-lettering/` UX notes, "Glyph"): the silhouette of both
+ * squares, outer corners rounded by 1, the two inner corners sharp. */
+const WELD_SILHOUETTE =
+  "M2.75 1.75H9.75A1 1 0 0 1 10.75 2.75V5.25H13.25A1 1 0 0 1 14.25 6.25V13.25A1 1 0 0 1 13.25 14.25H6.25A1 1 0 0 1 5.25 13.25V10.75H2.75A1 1 0 0 1 1.75 9.75V2.75A1 1 0 0 1 2.75 1.75Z";
+
+/** The trim edge: the upper square's top and left edges over the lower square, once. */
+const WELD_TRIM_LINE = "M10.75 5.25H6.25A1 1 0 0 0 5.25 6.25V10.75";
+
+/** The two joints where the trim line meets the silhouette, as solid dots of radius 1.6: without
+ * them the line art reads as the Copy glyph of the Layers toolbar's Duplicate (`review-ux.md`). */
+const WELD_JOINTS: readonly [number, number][] = [
+  [10.75, 5.25],
+  [5.25, 10.75],
+];
+
 function glyphShapes(op: BooleanCardCommand) {
   switch (op) {
     case "union":
@@ -110,6 +126,17 @@ function glyphShapes(op: BooleanCardCommand) {
         <>
           <Piece d={LOWER_MINUS_OVERLAP} shift={-GAP} />
           <Piece d={UPPER_SQUARE} />
+        </>
+      );
+    case "weld":
+      // No solid shape: the one stated exception, a line-art result (row "Boolean glyphs").
+      return (
+        <>
+          <path d={WELD_SILHOUETTE} fill="none" {...STROKE} />
+          <path d={WELD_TRIM_LINE} fill="none" strokeLinecap="round" {...STROKE} />
+          {WELD_JOINTS.map(([cx, cy]) => (
+            <circle key={`${cx},${cy}`} cx={cx} cy={cy} r={1.6} fill="currentColor" />
+          ))}
         </>
       );
   }

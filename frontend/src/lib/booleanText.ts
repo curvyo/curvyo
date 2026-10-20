@@ -95,9 +95,14 @@ export function tooltipNote(availability: BooleanAvailabilityState, selectTool: 
     return selectTool ? note : `${note} Use the Select tool.`;
   }
   if (availability.open > 0) {
-    return `Closes ${plural(availability.open, "open outline", "open outlines")} with a straight line.`;
+    return closesOpenNote(availability.open);
   }
   return "Replaces the selection.";
+}
+
+/** The tooltip note for `open` open outlines a press closes (`0054` criterion 23). */
+export function closesOpenNote(open: number): string {
+  return `Closes ${plural(open, "open outline", "open outlines")} with a straight line.`;
 }
 
 export function plural(count: number, one: string, many: string): string {
@@ -140,11 +145,14 @@ export function sharedRefusalText(
   switch (result.kind) {
     case "no_area": {
       const verb = result.count === 1 ? "has" : "have";
-      return `${name} needs shapes that enclose an area. ${result.count} of ${objects} ${verb} no area. ${NOTHING_CHANGED}`;
+      // "1 of 1" reads wrong (`0068` UX notes, "Refusals").
+      const who = result.of === 1 ? "The selected object" : `${result.count} of ${objects}`;
+      return `${name} needs shapes that enclose an area. ${who} ${verb} no area. ${NOTHING_CHANGED}`;
     }
     case "out_of_range": {
       const verb = result.count === 1 ? "reaches" : "reach";
-      return `${name} works only within 10 km of the point 0, 0. ${result.count} of ${objects} ${verb} further. ${NOTHING_CHANGED}`;
+      const who = result.of === 1 ? "The selected object" : `${result.count} of ${objects}`;
+      return `${name} works only within 10 km of the point 0, 0. ${who} ${verb} further. ${NOTHING_CHANGED}`;
     }
     case "groups":
       // The operations do not look through groups (`0023` criterion 28).

@@ -24,6 +24,7 @@ import type { EditHint } from "@/components/EditHintChip";
 import type { BooleanOp, BooleanResult } from "@/lib/booleanText";
 import type { BreakApartResult, CombineResult, CutResult, SplitResult } from "@/lib/pathText";
 import type { StackCommand, StackResult } from "@/lib/stackText";
+import type { WeldResult } from "@/lib/weldText";
 import type { ClosePathResult } from "@/lib/penText";
 
 /** The canvas's backing-buffer size for a CSS size at the window's current
@@ -820,6 +821,8 @@ export interface EditorSession {
   applyCut: () => CutResult;
   /** Fracture or Flatten on the selection, in one commit (`0037-fracture-and-flatten`). */
   applyStack: (command: StackCommand) => StackResult;
+  /** Weld on the selection, in one commit (`0068-laserable-lettering`). */
+  applyWeld: () => WeldResult;
   /** The Node bar's Close path buttons (`0034-pen-path-extension`): closes the open paths of
    * the editing set with `join` (`"sharp"` or `"smooth"`) in one commit. */
   closePath: (join: "sharp" | "smooth") => ClosePathResult;
@@ -1719,6 +1722,44 @@ export function useEditorSession(
     [syncFromSession, refusedFace],
   );
 
+  const applyWeld = useCallback((): WeldResult => {
+    const raw = sessionRef.current?.apply_weld();
+    syncFromSession();
+    if (!raw) {
+      return {
+        kind: "ignored",
+        count: 0,
+        of: 0,
+        textsOnly: false,
+        compound: false,
+        lengthText: "",
+        hidden: 0,
+        closedOpen: 0,
+        removedOpen: 0,
+        mixedStyles: false,
+        fillSwitchedOff: false,
+        strokeSwitchedOn: false,
+      };
+    }
+    const result = {
+      kind: raw.kind,
+      count: raw.count,
+      of: raw.of,
+      textsOnly: raw.texts_only,
+      compound: raw.compound,
+      lengthText: raw.length_text,
+      hidden: raw.hidden,
+      closedOpen: raw.closed_open,
+      removedOpen: raw.removed_open,
+      mixedStyles: raw.mixed_styles,
+      fillSwitchedOff: raw.fill_switched_off,
+      strokeSwitchedOn: raw.stroke_switched_on,
+      face: refusedFace(raw.kind),
+    };
+    raw.free();
+    return result;
+  }, [syncFromSession, refusedFace]);
+
   /** The event's canvas-relative CSS pixel position — pure DOM geometry,
    * no wasm call and no document-space conversion (that happens inside
    * `Session` now, `specs/0004-canvas-navigation-and-selection/adrs.md`).
@@ -2505,6 +2546,7 @@ export function useEditorSession(
     applyBreakApart,
     applyCut,
     applyStack,
+    applyWeld,
     closePath,
     onPointerDown,
     onPointerMove,

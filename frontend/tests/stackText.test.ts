@@ -30,7 +30,7 @@ function result(fields: Partial<StackResult>): StackResult {
 }
 
 test("criterion 1: buttons six and seven with their names and rule lines", () => {
-  assert.deepEqual(BOOLEAN_CARD_COMMANDS.slice(5), ["fracture", "flatten"]);
+  assert.deepEqual(BOOLEAN_CARD_COMMANDS.slice(5, 7), ["fracture", "flatten"]);
   assert.equal(stackName("fracture"), "Fracture");
   assert.equal(stackRule("fracture"), "Cuts overlapping shapes into pieces.");
   assert.equal(stackName("flatten"), "Flatten");

@@ -16,6 +16,7 @@ import {
   stackName,
   stackRule,
 } from "@/lib/stackText";
+import { WELD_NAME, WELD_RULE, weldTooltipNote } from "@/lib/weldText";
 
 interface BooleanCommandsProps {
   commands: BooleanCommandsState;
@@ -46,13 +47,14 @@ function targetIndex(key: string, index: number): number | null {
 
 /**
  * The Boolean toolbox of the tool rail (`docs/design-system.md`, rows "Boolean toolbox" and
- * "Toolbox card"): a card of its own below the Path card in column B, seven commands, not tools,
- * one column: the five operations, then Fracture and Flatten (`specs/0037-fracture-and-flatten/`).
+ * "Toolbox card"): a card of its own below the Path card in column B, eight commands, not tools,
+ * one column: the five operations, then Fracture and Flatten (`specs/0037-fracture-and-flatten/`),
+ * then Weld (`specs/0068-laserable-lettering/`), which has its own availability rule.
  * One Tab stop with roving focus. It shows what the session says is available and
  * decides nothing. Its notice is drawn by the rail (`BooleanNotice`).
  */
 export function BooleanCommands({ commands, selectTool, onReturnFocus }: BooleanCommandsProps) {
-  const { availability, busy, apply } = commands;
+  const { availability, weldAvailability, busy, apply } = commands;
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
   const [stop, setStop] = useState(0);
   const [pressed, setPressed] = useState<BooleanCardCommand | null>(null);
@@ -72,11 +74,15 @@ export function BooleanCommands({ commands, selectTool, onReturnFocus }: Boolean
           ref={(element) => {
             buttons.current[index] = element;
           }}
-          name={isStackCommand(op) ? stackName(op) : operationName(op)}
-          rule={isStackCommand(op) ? stackRule(op) : operationRule(op)}
-          note={tooltipNote(availability, selectTool)}
+          name={op === "weld" ? WELD_NAME : isStackCommand(op) ? stackName(op) : operationName(op)}
+          rule={op === "weld" ? WELD_RULE : isStackCommand(op) ? stackRule(op) : operationRule(op)}
+          note={
+            op === "weld"
+              ? weldTooltipNote(weldAvailability, selectTool)
+              : tooltipNote(availability, selectTool)
+          }
           glyph={<BooleanGlyph op={op} />}
-          dimmed={availability.needsTwo}
+          dimmed={op === "weld" ? weldAvailability.needsOne : availability.needsTwo}
           tooltipOffset={COLUMN_B_TOOLTIP_OFFSET_PX}
           tabIndex={index === stop ? 0 : -1}
           pressed={busy && pressed === op}

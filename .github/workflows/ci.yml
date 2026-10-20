@@ -39,7 +39,8 @@
 #                        ADR.
 #   performance-budgets — the performance budgets in a release build, ubuntu only: the boolean
 #                        kernel and the commands of 0035, 0036, 0048, and the linked clones of
-#                        0049 (read, frame, commands, hostile sizes, the no-cycle property test).
+#                        0049 (read, frame, commands, hostile sizes, the no-cycle property test),
+#                        Fracture, Flatten and Weld (0037, 0068).
 #   boolean-wasm-golden — the kernel's golden results in the wasm build, run in Node, ubuntu only.
 #   deny              — `cargo deny check`, once, over the whole workspace
 #                        (ADR 0011 §7: not matrixed — it inspects the
@@ -369,6 +370,8 @@ jobs:
         run: |
           cargo test --release -p curvyo-geometry-core --test boolean_performance -- --nocapture
           cargo test --release -p curvyo-geometry-core --test fracture_flatten -- --nocapture
+          cargo test --release -p curvyo-geometry-core --test weld_golden -- --nocapture
+          cargo test --release -p curvyo-editor-wasm --test weld_budget -- --nocapture
           cargo test --release -p curvyo-document-core --test compound_write_cost -- --nocapture
           cargo test --release -p curvyo-document-core --test clone_hostile_sizes -- --nocapture
           cargo test --release -p curvyo-document-core --test clone_history ac53 -- --nocapture
@@ -414,7 +417,7 @@ jobs:
       - name: Run the golden comparison on wasm32-unknown-unknown
         env:
           CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUNNER: wasm-bindgen-test-runner
-        run: cargo test --target wasm32-unknown-unknown -p curvyo-geometry-core --test boolean_golden_wasm --test offset_golden
+        run: cargo test --target wasm32-unknown-unknown -p curvyo-geometry-core --test boolean_golden_wasm --test offset_golden --test weld_golden
 
   # Dependency-graph/license check, not compiled code — one run sees every
   # target deny.toml's [graph] lists (including wasm32-unknown-unknown),
