@@ -63,3 +63,29 @@ customer on 2026-10-20.
 - 2026-10-20: ADR 0020 accepted by the customer, with the wasm budget for the text engine raised
   to 1.3 MiB uncompressed (spike: 1,247 KiB). `harfrust` is MIT only; `fontdb` 0.24 reads names
   with its own reader, not `ttf-parser`.
+- 2026-10-20 (implementer, milestone 2, for the architect review): the read model gets a derived,
+  never stored `TextSnapshot::outline` (glyphs as one compound path and the line box corners, in
+  document mm), filled by the editor session through `curvyo-text-core`, as a clone carries its
+  resolved outline. `ObjectSnapshot::Text` is boxed. The history's three-way restore learns the
+  text container (`Node::Text`) so undo keeps the string a `LoroText`. Details in `plan.md`,
+  dated notes.
+- 2026-10-20 (architect, milestone 2 review, `review-architect-m2.md`):
+  - **Two limits for the string.** `MAX_TEXT_CHARS` (10,000) caps typing and pasting
+    (criterion 31). `MAX_STORED_TEXT_CHARS` (100,000) is the bound for hostile input, used by
+    open-file validation and by the engine's shaping (`MAX_SHAPE_CHARS`). Reason: two valid
+    concurrent edits can merge to more than 10,000 characters, and such a file must still open
+    (ADR 0009 §3, ADR 0004 §9).
+  - **`face_hash` is 64 lower-case hex digits**, on write and on read.
+  - **`TextOutline::substitute`.** Path commands never read a text through `drawn_path()`. They
+    convert through criteria 22 and 24, which refuse a text that uses a substitute face or has no
+    layout yet (ADR 0009 §5).
+  - **Criterion 8 for an existing text.** Emptying it removes the node in the session's one step
+    "Edit text", and Undo brings the text back. Criterion 12's test measures the top of the H
+    above the baseline, not the height of its box. The wording for both is in the review.
+- 2026-10-20 (implementer, tester review should-fix 7): Cut converts a text like the other path
+  commands (criterion 24); a text whose letters make several outlines is refused with "Cut does
+  not work on texts with several outlines. Nothing was changed." instead of as a compound path,
+  which would name Split and Break apart for something the maker sees as a text. A text of one
+  outline ("I") is cut. Safe default until the product owner words a better rule
+  (for example: Cut acts on the letters after Object to path and Break apart).
+- 2026-10-20 (customer): the wasm budget for the text engine is 1.4 MiB (ADR 0020, dated note).

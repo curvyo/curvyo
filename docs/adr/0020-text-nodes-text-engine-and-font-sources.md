@@ -178,6 +178,12 @@ Vibes, OFL 1.1 or Apache-2.0 only), TEXT-SIZE (Size is the cap-H height in mm, e
 TEXT-TOPATH (a group with one path per letter), TEXT-ADR (this ADR accepted), TEXT-WASMSIZE (wasm
 budget for the text engine 1.3 MiB uncompressed). Details in `specs/0074-text-objects/`.
 
+## Dated notes
+
+- 2026-10-20, customer: the wasm budget for the text engine is raised from 1.3 MiB to **1.4 MiB**
+  uncompressed. The finished slice of `0074` adds 1,426 KiB (501 KiB gzip) to the release editor
+  wasm: the engine about 1,290 KiB, the slice's own code about 135 KiB (`docs/technical-debt.md`).
+
 ## Consequences
 
 - One more leaf kind: an arm in every exhaustive match, as images took.
