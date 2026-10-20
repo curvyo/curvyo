@@ -1558,10 +1558,20 @@ before it is refused. **Resolution:** check the file size in `pick_project` befo
 
 `harfrust` + `skrifa` add 1,247 KiB (433 KiB gzip) to the release editor wasm, measured by the
 spike on branch `spike/text-engine` (`docs/spikes/text-engine.md` there). The ADR's budget was
-700 KiB. The customer raised the budget for the text engine to **1.3 MiB uncompressed** on
+700 KiB. The customer raised the budget for the text engine to **1.3 MiB uncompressed**, later **1.4 MiB**, on
 2026-10-20 (Frage 6 TEXT-WASMSIZE, A); the smaller option `rustybuzz` + `ttf-parser` fails
 `cargo deny` (unmaintained) and panics on hostile fonts.
 
-**Resolution:** accepted. The build of `0074` checks the added size against 1.3 MiB; going over it
+**Resolution:** accepted. The build of `0074` checks the added size against the budget (1.4 MiB since 2026-10-20); going over it
 reopens the question. Loading the text engine as a separate wasm module on first use of the Text
 tool would take it off the start-up path, if start-up time becomes a problem.
+
+**Measured on the finished slice (2026-10-20, `story/text-objects` against `main` at `4ece1b1`,
+release editor wasm after `wasm-bindgen`, no `wasm-opt`):** 1,461,239 bytes added (1,426 KiB;
+501 KiB gzip -9). By crate from the wasm name section: `harfrust` 369 KiB, `read-fonts` 329 KiB,
+`skrifa` 133 KiB, data section +128 KiB, `core`/`alloc`/`std` +132 KiB (the engine, about
+1,290 KiB), and the slice's own code about 135 KiB (`curvyo-editor-wasm`, `curvyo-document-core`,
+`curvyo-ui-core`, `curvyo-text-core`, `sha2`). The slice was over 1.3 MiB, so the customer raised
+the budget to **1.4 MiB** (1,433.6 KiB) on 2026-10-20 (ADR 0020, dated note): the slice is inside
+it with 7 KiB to spare. The next feature on the text engine reopens the question; the levers are
+a `wasm-opt` pass over the whole module, or loading the engine as its own module on first use.
