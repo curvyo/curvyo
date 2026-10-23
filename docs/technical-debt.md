@@ -1575,3 +1575,12 @@ release editor wasm after `wasm-bindgen`, no `wasm-opt`):** 1,461,239 bytes adde
 the budget to **1.4 MiB** (1,433.6 KiB) on 2026-10-20 (ADR 0020, dated note): the slice is inside
 it with 7 KiB to spare. The next feature on the text engine reopens the question; the levers are
 a `wasm-opt` pass over the whole module, or loading the engine as its own module on first use.
+
+**Budget raised to 2 MiB (2026-10-20, customer, Frage 20 SL-WASM; ADR 0020 dated note).** Single-line
+fonts (`0076`) add the SVG font reader (`roxmltree` 0.20.0, own path-data reader). Measured on the
+finished slice (release editor wasm after `wasm-bindgen`, no `wasm-opt`): **+111,671 bytes
+(109 KiB; +41 KiB gzip -9)** against `story/font-library` (`0075`). From `4ece1b1` (before the
+text engine) to this slice the editor wasm grew by 1,828,399 bytes (1,786 KiB), which includes
+`0074` (1,426 KiB), `0075` (250 KiB, part of it the cuttable check's Union) and `0076`; that is
+inside the 2 MiB (2,048 KiB) budget with about 262 KiB left. The next feature on the text engine
+measures again; the levers stay `wasm-opt` and loading the engine on first use.

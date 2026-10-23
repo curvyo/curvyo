@@ -94,6 +94,7 @@ Their order, dependencies and conflicts are in "Proposed build order" below.
 | No. | Slug | What it delivers | Status | Priority | Requirements | MVP slice |
 |---|---|---|---|---|---|---|
 | [0032](0032-pen-tablet-input/) | `pen-tablet-input` | A minimal Pencil (freehand) tool, and pen pressure from a drawing tablet, read through browser Pointer Events in the webview, that sets the width of Pencil strokes; the result is an ordinary outline; a mouse or a pen without pressure draws a plain path. Promoted by the customer on 2026-10-10 (was a Could draft). Device and OS questions are confirmed at the demo. | Ready, on hold (PR #116 closed unmerged) | Should | R-INP-001 | - |
+| [0076](0076-single-line-fonts/) | `single-line-fonts` | A story of `0062`: single-line (stroke) fonts as live text. SVG fonts (Hershey Text v3, EMS) read in `curvyo-text-core`, listed in the Curvyo folder and by Add font, drawn as centre lines with the text's stroke and never filled; Object to path gives open paths with Fill off; area commands refuse a single-line text; built-in tag Single line; four shipped fonts (Hershey Sans 1-stroke, Hershey Script 1-stroke, EMS Readability, EMS Allure). `text_font.kind`, `format_version` 18; font library file `format = 2`. | In progress (PR #171, Ready 2026-10-20) | Should | R-FONT-002, R-FONT-003, R-FONT-004, R-EDIT-004 | - |
 | [0055](0055-compound-path-node-editing/) | `compound-path-node-editing` | The Node tool edits every compound path: nodes selected across outlines and objects, move, kind conversion, segment bending, insert and delete (an outline left with one node is removed, a compound path left with one outline becomes an ordinary path); Join of open outline ends within one object or across objects (the other object's outlines move in, with a notice); Split at a node opens or splits an outline in the same object; Close path closes selected open outlines; the Pen continues and connects open outline ends. No format change. Customer decision 7 of 2026-10-12 on `0054`, split out by the lead the same day. | Ready (2026-10-12: `adrs.md` and UX notes done; the product owner's rules are vetoable; builds right after 0054) | Should | R-EDIT-023, R-EDIT-001 | - |
 
 ### Specified but not built
@@ -238,7 +239,7 @@ Slice labels, as in the column above.
 
 ### `format_version` plan
 
-The project file's `format_version` is **17** on `main` (17 set by 0074, PR #165; the table
+The project file's `format_version` is **17** on `main` (17 set by 0074, PR #165; 0076 takes 18 with PR #171; the table
 below lists every earlier bump).
 Each change that alters the on-disk shape takes the next number at merge, and
 a reader refuses a file with a higher number ("saved by a newer version").
@@ -261,6 +262,7 @@ a reader refuses a file with a higher number ("saved by a newer version").
 | none (ADR 0014 Q2 A, accepted 2026-10-10) | 0041 `object-history` (the optional keys `history_floor` and `clone_of`, ADR 0014 §7) | Done (#103); the keys are additive and older builds ignore them (as 0015's `display_unit`) |
 | 15 | 0046 `document-shapes` (stage 1: the node register `guide`, ADR 0019; an older build would cut the template as artwork) | Done (#150) |
 | 17 | 0074 `text-objects` (a text node) | Done (#165) |
+| 18 | 0076 `single-line-fonts` (`text_font.kind`; an older build would draw a single-line text as an outline font) | In progress (PR #171) |
 | none | 0020, 0042, 0043, 0044, 0045, 0047 | 0020 saves the history that `document.loro` already holds (step headers in commit messages) and adds one optional root key, `history_wiped` (ADR 0014 §7); 0042 derives branches from the log; 0043 and 0044 write nothing; 0045 keeps formats in a user file outside the project; 0047 writes paths, an existing kind. 0042 keeps whatever version is current when it merges. A bump for history would come only with soft delete (ADR 0014 Q7 B), which the customer gets back only if a Loro upgrade breaks the canary |
 | none | 0051 | No bump: the saved file is untouched; the collapsed state of the panel is a per-user preference outside the project, and the dirty flag is view state |
 | none | 0030, 0031, 0034, 0035, 0036, 0037, 0038, 0048 | No bump: they write existing object kinds (0035 to 0037 and 0048 use the compound path of 0016) |
