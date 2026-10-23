@@ -29,5 +29,5 @@ pub use font_class::{DeclaredClass, OS2_CLASS_BYTES, declared_class, os2_class_b
 pub use font_names::{ListableFace, family_name, listable_faces, style_name, svg_listable_faces};
 pub use layout::{LineLayout, PlacedGlyph, TextLayout, layout};
 pub use outline::GlyphOutline;
-pub use preview::preview_path;
+pub use preview::{preview_path, preview_path_within};
 pub use units::Mm;

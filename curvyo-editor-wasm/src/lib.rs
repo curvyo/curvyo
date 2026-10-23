@@ -20,6 +20,7 @@
 mod font_checks_glue;
 mod font_file_glue;
 mod font_library_glue;
+mod font_preview_glue;
 mod session;
 
 #[cfg(target_arch = "wasm32")]
@@ -92,6 +93,7 @@ mod wasm_weld;
 pub use font_checks_glue::FontChecksGlue;
 pub use font_file_glue::{face_preview_path, font_file_faces};
 pub use font_library_glue::FontLibraryGlue;
+pub use font_preview_glue::PreviewFacesGlue;
 pub use session::WeldOutcome;
 pub use session::{
     APP_VERSION, BooleanOutcome, BreakApartOutcome, CloneOutcome, ClosePathOutcome, ClosePathState,
