@@ -1,9 +1,9 @@
 //! The licence record of the shipped fonts (ADR 0020 §4, ADR 0006 item 5): `cargo deny` and the
 //! npm check do not see `frontend/public/fonts/`, this test does. Every family folder has a
 //! `font.toml` with an allowed licence and a licence text that matches it; every font file is
-//! listed there, parses, and carries the family and style names the record states. The allowed
-//! licences are OFL 1.1, Apache 2.0 and the Hershey notice (`specs/0076-single-line-fonts`
-//! criterion 25, customer 2026-10-20).
+//! listed there, parses, and carries the family name and the listing's style name the record
+//! states. The allowed licences are OFL 1.1, Apache 2.0 and the Hershey notice
+//! (`specs/0076-single-line-fonts` criterion 25, customer 2026-10-20).
 #![allow(clippy::unwrap_used)]
 #![cfg(not(target_arch = "wasm32"))]
 
@@ -12,7 +12,7 @@ mod common;
 use std::collections::BTreeSet;
 
 use common::fonts_dir;
-use curvyo_text_core::{FaceKind, FaceStore, listable_faces};
+use curvyo_text_core::{FaceKind, FaceStore, listable_faces, style_name};
 use serde::Deserialize;
 use skrifa::{FontRef, MetadataProvider, string::StringId};
 
@@ -109,11 +109,9 @@ fn check_faces(folder: &std::path::Path, record: &Record) {
             StringId::TYPOGRAPHIC_FAMILY_NAME,
             StringId::FAMILY_NAME,
         );
-        let style = name(
-            &font,
-            StringId::TYPOGRAPHIC_SUBFAMILY_NAME,
-            StringId::SUBFAMILY_NAME,
-        );
+        // The style as every listing names it (`specs/0078-font-style-buttons/adrs.md` decision
+        // 1): upstream's subfamily "ExtraLight" is listed as "Extra Light".
+        let style = style_name(&bytes, 0).unwrap();
         assert_eq!(
             (family.as_str(), style.as_str()),
             (record.family.as_str(), face.style.as_str())

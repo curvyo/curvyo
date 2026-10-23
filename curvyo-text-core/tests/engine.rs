@@ -126,7 +126,7 @@ fn ac12_size_is_the_cap_height_in_every_included_face() {
             checked += 1;
         }
     }
-    assert_eq!(checked, 9);
+    assert_eq!(checked, 13);
 }
 
 /// Criterion 21: every face of a collection is read; WOFF is not.

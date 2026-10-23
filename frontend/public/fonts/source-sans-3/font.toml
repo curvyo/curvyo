@@ -22,3 +22,19 @@ style = "Bold"
 [[faces]]
 file = "SourceSans3-BoldIt.otf"
 style = "Bold Italic"
+
+[[faces]]
+file = "SourceSans3-ExtraLight.otf"
+style = "Extra Light"
+
+[[faces]]
+file = "SourceSans3-ExtraLightIt.otf"
+style = "Extra Light Italic"
+
+[[faces]]
+file = "SourceSans3-Light.otf"
+style = "Light"
+
+[[faces]]
+file = "SourceSans3-LightIt.otf"
+style = "Light Italic"
