@@ -627,6 +627,7 @@ name = "curvyo-document-core"
 version = "0.1.0"
 dependencies = [
  "loro",
+ "rustix",
  "serde",
  "serde_json",
  "thiserror 2.0.21",

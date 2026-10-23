@@ -17,8 +17,11 @@
     clippy::cast_possible_truncation
 )]
 
+mod cpu_time;
+
 use std::time::{Duration, Instant};
 
+use cpu_time::cpu_time_of;
 use curvyo_document_core::{AnchorId, Document, NewAnchor, Point, Tolerance, pack};
 use curvyo_editor_wasm::{KeyInput, Session, Tool};
 use curvyo_ui_core::{NodeSelection, SelectionCombine, anchors_in_box, editing_set_anchors};
@@ -109,31 +112,9 @@ fn anchors_in_box_and_apply_stay_within_their_budgets() {
 /// Frames timed per session for the frame budget; only the cheapest counts.
 const FRAMES: usize = 41;
 
-/// The CPU time the calling thread has used so far. Time the thread spends preempted by other
-/// processes is not in it.
-#[cfg(unix)]
-fn thread_time() -> Duration {
-    let now = rustix::time::clock_gettime(rustix::time::ClockId::ThreadCPUTime);
-    Duration::new(
-        u64::try_from(now.tv_sec).unwrap(),
-        u32::try_from(now.tv_nsec).unwrap(),
-    )
-}
-
 /// The CPU time of one `draw_list` call (wall time where no thread clock is available).
 fn frame(session: &mut Session) -> Duration {
-    #[cfg(unix)]
-    {
-        let start = thread_time();
-        let _ = session.draw_list();
-        thread_time().saturating_sub(start)
-    }
-    #[cfg(not(unix))]
-    {
-        let start = Instant::now();
-        let _ = session.draw_list();
-        start.elapsed()
-    }
+    cpu_time_of(|| session.draw_list()).1
 }
 
 /// The cheapest of `FRAMES` frames of each session, drawn alternately, as (plain, marquee).

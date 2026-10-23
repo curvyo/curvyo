@@ -1282,9 +1282,27 @@ fn twenty_thousand_anchors_in_four_outlines_round_trip_exactly() {
     println!("write {write:?}, file {} bytes", bytes.len());
 }
 
+/// The CPU time the calling thread has used so far: time the thread spends preempted by other
+/// processes (a parallel test run) is not in it. Wall time off Unix.
+fn thread_time() -> std::time::Duration {
+    #[cfg(unix)]
+    {
+        let now = rustix::time::clock_gettime(rustix::time::ClockId::ThreadCPUTime);
+        std::time::Duration::new(
+            u64::try_from(now.tv_sec).unwrap(),
+            u32::try_from(now.tv_nsec).unwrap(),
+        )
+    }
+    #[cfg(not(unix))]
+    {
+        static START: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
+        START.get_or_init(std::time::Instant::now).elapsed()
+    }
+}
+
 /// Rotating (and resizing) a compound path writes every anchor; the cost per
 /// anchor must not grow with the number of outlines. Measured on 100 and 400
-/// outlines of 4 anchors (debug build, so only the ratio is asserted).
+/// outlines of 4 anchors by thread CPU time (debug build, so only the ratio is asserted).
 #[test]
 fn rotate_commit_cost_grows_roughly_linearly_with_the_number_of_outlines() {
     let time = |n: usize| {
@@ -1297,9 +1315,9 @@ fn rotate_commit_cost_grows_roughly_linearly_with_the_number_of_outlines() {
             .object(r)
             .unwrap()
             .rotated(pt(0.0, 0.0), Angle::from_radians(0.3));
-        let t = std::time::Instant::now();
+        let start = thread_time();
         d.rotate_object(&rot).unwrap();
-        t.elapsed().as_secs_f64()
+        thread_time().saturating_sub(start).as_secs_f64()
     };
     let small = time(100).max(1e-4);
     let large = time(400);
