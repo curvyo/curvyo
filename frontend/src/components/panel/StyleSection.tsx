@@ -120,6 +120,18 @@ export function StyleSection({ panel, clones, onReturnFocus }: StyleSectionProps
       ) : null}
     </>
   );
+  // Fill and its rule are not in the tree while only single-line texts are edited: they have no
+  // fill (`specs/0076-single-line-fonts` criterion 8, UX notes §4, as Markers for a text).
+  const fill = panel.view.fillShown ? (
+    <>
+      <div
+        aria-hidden
+        className="my-1 h-px"
+        style={{ background: "color-mix(in srgb, var(--toolbar-icon) 25%, transparent)" }}
+      />
+      <FillSection panel={panel} onReturnFocus={onReturnFocus} />
+    </>
+  ) : null;
   // Switching back to Original's closes the open sections; with the panel scrolled the browser
   // would clamp the scroll and the block would jump under the pointer. A spacer of the lost
   // height keeps the scroll offset, so the pressed row stays where it was; it goes with the next
@@ -186,12 +198,7 @@ export function StyleSection({ panel, clones, onReturnFocus }: StyleSectionProps
           {own ? (
             <>
               <StrokeSection panel={panel} onReturnFocus={onReturnFocus} />
-              <div
-                aria-hidden
-                className="my-1 h-px"
-                style={{ background: "color-mix(in srgb, var(--toolbar-icon) 25%, transparent)" }}
-              />
-              <FillSection panel={panel} onReturnFocus={onReturnFocus} />
+              {fill}
             </>
           ) : (
             <GreyedStyleHeaders clones={clones} />
@@ -206,12 +213,7 @@ export function StyleSection({ panel, clones, onReturnFocus }: StyleSectionProps
       {notice}
       <OriginLine clones={clones} onReturnFocus={onReturnFocus} onPressedAt={pressedAt} />
       <StrokeSection panel={panel} onReturnFocus={onReturnFocus} />
-      <div
-        aria-hidden
-        className="my-1 h-px"
-        style={{ background: "color-mix(in srgb, var(--toolbar-icon) 25%, transparent)" }}
-      />
-      <FillSection panel={panel} onReturnFocus={onReturnFocus} />
+      {fill}
     </div>
   );
 }

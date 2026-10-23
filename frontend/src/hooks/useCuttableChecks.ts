@@ -97,7 +97,9 @@ export function useCuttableChecks(
         return 0;
       }
       let queued = 0;
-      for (const family of families.filter((f) => f.block === block)) {
+      // Single-line families are never checked: Union would close every stroke
+      // (`specs/0076-single-line-fonts` criterion 5, UX notes §1).
+      for (const family of families.filter((f) => f.block === block && !f.faces.some((face) => face.singleLine))) {
         const face = representative(family);
         const key = resultKey(face);
         if (page.results.has(key) || queue.current.some((q) => resultKey(q.face) === key)) {

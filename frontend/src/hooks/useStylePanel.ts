@@ -93,6 +93,9 @@ export interface StyleView {
   strokeCap: CapName | "mixed";
   fillPaint: "on" | "off" | "mixed";
   fillRows: boolean;
+  /** The Fill section is in the tree: false while every edited object is a single-line text
+   * (`specs/0076-single-line-fonts` criterion 8). */
+  fillShown: boolean;
   fillColorMixed: boolean;
   fillColor: number;
   fillHex: string;
@@ -154,6 +157,7 @@ const DISABLED_VIEW: StyleView = {
   strokeCap: "butt",
   fillPaint: "off",
   fillRows: false,
+  fillShown: true,
   fillColorMixed: false,
   fillColor: 0,
   fillHex: "#000000FF",
@@ -221,6 +225,7 @@ function readView(session: WasmSession | null): StyleView {
     strokeCap: raw.stroke_cap as StyleView["strokeCap"],
     fillPaint: raw.fill_paint as StyleView["fillPaint"],
     fillRows: raw.fill_rows,
+    fillShown: raw.fill_shown,
     fillColorMixed: raw.fill_color_mixed,
     fillColor: raw.fill_color,
     fillHex: raw.fill_hex,

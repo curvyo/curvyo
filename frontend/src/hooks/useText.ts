@@ -23,6 +23,9 @@ export interface TextBarState {
   /** "Source Sans 3 Regular", or "" for "Mixed". */
   font: string;
   missing: boolean;
+  /** The face a missing one is drawn in: Source Sans 3, or EMS Readability for a single-line
+   * text (`specs/0076-single-line-fonts` criterion 22). */
+  substitute: string;
   /** `null` for "Mixed". */
   sizeMm: number | null;
   /** The desktop build: Shift+Ctrl+T shows the Fonts tab (the browser has no key). */
@@ -33,6 +36,7 @@ const EMPTY_BAR: TextBarState = {
   shown: false,
   font: "",
   missing: false,
+  substitute: "Source Sans 3",
   sizeMm: null,
   desktop: isTauri,
 };
@@ -55,7 +59,16 @@ const MAC = /mac/i.test(navigator.platform);
 interface Listed {
   /** `os2` (24 hex digits) and `stamp` come with the Curvyo and system lists
    * (`specs/0075-font-library` decisions 4 and 5). */
-  faces: { id: string; family: string; style: string; index: number; os2?: string | null; stamp?: string }[];
+  faces: {
+    id: string;
+    family: string;
+    style: string;
+    index: number;
+    os2?: string | null;
+    stamp?: string;
+    /** `"single_line"` for an SVG font face (`specs/0076-single-line-fonts`). */
+    kind?: string;
+  }[];
   skipped: string[];
 }
 
@@ -187,7 +200,7 @@ export function useText(
     let live = true;
     void fetch(`${fontsBase()}index.json`)
       .then((response) => response.json())
-      .then((index: { faces: { family: string; style: string; file: string }[] }) => {
+      .then((index: { faces: { family: string; style: string; file: string; kind?: string }[] }) => {
         for (const face of index.faces) {
           includedIds.add(face.file);
         }
@@ -197,6 +210,7 @@ export function useText(
             family: face.family,
             style: face.style,
             index: 0,
+            kind: face.kind,
           })),
           skipped: [],
         };
@@ -264,19 +278,22 @@ export function useText(
         .finally(() => loading.delete(id));
     }
     const raw = session.text_bar();
+    let tab: FontsTabData = EMPTY_FONTS;
+    try {
+      tab = JSON.parse(session.fonts_tab_json()) as FontsTabData;
+    } catch {
+      tab = EMPTY_FONTS;
+    }
     setBar({
       shown: raw.shown,
       font: raw.font,
       missing: raw.missing,
+      substitute: tab.current?.substitute ?? EMPTY_BAR.substitute,
       sizeMm: Number.isFinite(raw.size_mm) ? raw.size_mm : null,
       desktop: isTauri,
     });
     raw.free();
-    try {
-      setFonts(JSON.parse(session.fonts_tab_json()) as FontsTabData);
-    } catch {
-      setFonts(EMPTY_FONTS);
-    }
+    setFonts(tab);
     const marks = session.missing_font_marks();
     const points: { x: number; y: number }[] = [];
     for (let i = 0; i + 1 < marks.length; i += 2) {

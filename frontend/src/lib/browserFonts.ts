@@ -20,13 +20,16 @@ const DB_VERSION = 2;
 export const BROWSER_FONT_PREFIX = "idb:";
 /** The largest font file read (64 MiB, ADR 0020 §2). */
 const MAX_FONT_BYTES = 64 * 1024 * 1024;
-const FONT_EXTENSIONS = [".ttf", ".otf", ".ttc"];
+/** `.svg` holds SVG fonts (`specs/0076-single-line-fonts` criterion 3). */
+const FONT_EXTENSIONS = [".ttf", ".otf", ".ttc", ".svg"];
 
 interface StoredFace {
   index: number;
   family: string;
   style: string;
   os2: string | null;
+  /** `"single_line"` for an SVG font face (`0076`); absent for an outline face. */
+  kind?: string;
 }
 
 interface StoredFile {
@@ -49,6 +52,7 @@ export interface BrowserListedFace {
   index: number;
   os2: string | null;
   stamp: string;
+  kind?: string;
 }
 
 
@@ -104,6 +108,7 @@ export async function listBrowserFonts(): Promise<{ faces: BrowserListedFace[]; 
       style: face.style,
       index: face.index,
       os2: face.os2,
+      kind: face.kind,
       // Length and content: a file removed and added again under its name with other bytes of
       // the same length is checked again (review of 2026-10-20).
       stamp: `${file.length}-${file.sha256}`,
@@ -244,7 +249,7 @@ export function pickBrowserFontFiles(): Promise<File[] | null> {
     const input = document.createElement("input");
     input.type = "file";
     input.multiple = true;
-    input.accept = FONT_EXTENSIONS.join(",");
+    input.accept = [...FONT_EXTENSIONS, "image/svg+xml"].join(",");
     input.onchange = () => resolve(input.files && input.files.length > 0 ? Array.from(input.files) : null);
     input.addEventListener("cancel", () => resolve(null));
     input.click();

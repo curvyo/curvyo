@@ -163,6 +163,7 @@ export function useFontLibrary(
         os2: os2Of(face),
         shipped: shipped ? [...shipped.tags, ...(shipped.pieces === 1 ? ["cuttable"] : [])] : null,
         pieces: pieces ?? null,
+        single_line: family.faces.some((f) => f.singleLine),
       };
     });
     library.set_families(JSON.stringify(facts));
