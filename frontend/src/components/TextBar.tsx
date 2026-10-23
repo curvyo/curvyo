@@ -1,11 +1,15 @@
 // The Text bar (`specs/0074-text-objects` criterion 11; UX notes §3): the Font button and the
-// Size field. In the Text tool it is the overlay row's bar; in the Select tool the same two
-// controls are the Select bar's Text group.
+// Size field, then the Style group (`specs/0078-font-style-buttons`). In the Text tool it is the
+// overlay row's bar; in the Select tool the same controls are the Select bar's Text and Style
+// groups.
 import { CaseSensitive, TriangleAlert } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+import { Divider, useRowStarts } from "@/components/SelectToolbar";
+import { StyleGroup } from "@/components/StyleGroup";
 import { Tooltip } from "@/components/ui/tooltip";
 import type { TextBarState } from "@/hooks/useText";
+import type { WeightCode } from "@/lib/styleText";
 import { parseSize, sizeStep, sizeText } from "@/lib/textText";
 
 /** How long the clamp notice stays under the field (Action notice, status). */
@@ -150,16 +154,40 @@ export function TextControls({ bar, onShowFonts, onSetSize, onPreviewSize, onRet
   );
 }
 
-/** The Text tool's bar in the overlay row: one pill with the two controls. */
-export function TextBar(props: TextControlsProps) {
+interface TextBarProps extends TextControlsProps {
+  /** Edit mode: Bold and Italic name their keys. */
+  editing: boolean;
+  onPressWeight: (code: WeightCode) => string | null;
+  onPressItalic: () => string | null;
+}
+
+/** The Text tool's bar in the overlay row: one pill with the Font button and the Size field,
+ * then the Style group (`specs/0078-font-style-buttons`, UX notes §1); it wraps by whole groups
+ * and draws no divider at the start of a row. */
+export function TextBar({ editing, onPressWeight, onPressItalic, ...props }: TextBarProps) {
+  const barRef = useRef<HTMLDivElement>(null);
+  useRowStarts(barRef);
   return (
     <div
+      ref={barRef}
       role="toolbar"
       aria-label="Text"
-      className="pointer-events-auto flex h-9 items-center rounded-lg px-2"
+      className="pointer-events-auto flex min-w-0 flex-wrap items-start gap-x-3 rounded-lg px-2"
       style={{ background: "var(--toolbar-bg)", boxShadow: "var(--panel-elevation-shadow)" }}
     >
-      <TextControls {...props} />
+      <div className="flex h-9 items-center">
+        <TextControls {...props} />
+      </div>
+      <div className="group/row flex h-9 items-center gap-3">
+        <Divider />
+        <StyleGroup
+          style={props.bar.style}
+          editing={editing}
+          onPressWeight={onPressWeight}
+          onPressItalic={onPressItalic}
+          onReturnFocus={props.onReturnFocus}
+        />
+      </div>
     </div>
   );
 }

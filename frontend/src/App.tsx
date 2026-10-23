@@ -107,7 +107,8 @@ function Editor() {
               resizing={resizing}
               onSwitchView={switchView}
               currentFace={editor.text.fonts.current?.index ?? null}
-              onPick={editor.text.pickFont}
+              onPick={editor.text.pickFamily}
+              tileFace={editor.text.tileFace}
               onReturnFocus={returnToText}
             />
           )}
@@ -176,6 +177,8 @@ function Editor() {
               onShowFonts={showFonts}
               onSetTextSize={editor.text.setSize}
               onPreviewTextSize={editor.text.previewSize}
+              onPressTextWeight={editor.text.pressWeight}
+              onPressTextItalic={editor.text.pressItalic}
               linkedCloneShown={editor.clones.shown}
               onLinkedClone={() => editor.clones.apply("linked-clone")}
               linkedCloneNotice={editor.clones.barNotice}
@@ -214,6 +217,9 @@ function Editor() {
               onShowFonts={showFonts}
               onSetSize={editor.text.setSize}
               onPreviewSize={editor.text.previewSize}
+              editing={editor.text.editing}
+              onPressWeight={editor.text.pressWeight}
+              onPressItalic={editor.text.pressItalic}
               onReturnFocus={() => {
                 if (editor.text.editing) {
                   editor.text.sinkRef.current?.focus();

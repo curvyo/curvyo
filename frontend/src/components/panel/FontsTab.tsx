@@ -44,6 +44,9 @@ import {
 interface FontsTabProps {
   data: FontsTabData;
   onPick: (face: ListedFace, byKeyboard: boolean) => void;
+  /** A family row: the subject texts keep their style where the family has it
+   * (`specs/0078-font-style-buttons` criterion 22); `face` is the family's Regular or first. */
+  onPickFamily: (face: ListedFace, byKeyboard: boolean) => void;
   onReturnFocus: () => void;
   /** The tab is shown: the Curvyo folder is read again (criterion 19); resolves with its list. */
   onShown: () => Promise<void>;
@@ -56,7 +59,7 @@ interface FontsTabProps {
 const DROP_OUTLINE =
   "after:pointer-events-none after:absolute after:inset-0 after:z-20 after:rounded-[5px] after:border-2 after:border-dashed after:border-[var(--editor-accent)] after:content-['']";
 
-export function FontsTab({ data, onPick, onReturnFocus, onShown, textsUsingFamily }: FontsTabProps) {
+export function FontsTab({ data, onPick, onPickFamily, onReturnFocus, onShown, textsUsingFamily }: FontsTabProps) {
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [collapsedCurrent, setCollapsedCurrent] = useState(false);
@@ -173,7 +176,7 @@ export function FontsTab({ data, onPick, onReturnFocus, onShown, textsUsingFamil
 
   const pickFamily = (family: FontFamily, byKeyboard: boolean) => {
     toggle(family, true);
-    onPick(family.faces[0], byKeyboard);
+    onPickFamily(family.faces[0], byKeyboard);
   };
 
   /** A maker's press keeps the row in view until the strip cell or the search changes. */
