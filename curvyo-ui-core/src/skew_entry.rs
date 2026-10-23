@@ -11,6 +11,7 @@ use curvyo_document_core::{Angle, Document, ObjectSnapshot, PathSnapshot, Point}
 use crate::conversion::converted_for_object;
 use crate::oriented_box::OrientedBox;
 use crate::skew_math::{MIN_SKEW_LEVER_MM, skew_frame};
+use crate::transform_commit::still_current;
 use crate::transform_commit::{commit_gesture, is_sane, same_within_tolerance};
 use crate::transform_drag::{ScaleModes, skewed_unchecked};
 use crate::transform_entry::{
@@ -157,7 +158,7 @@ impl SkewEntry {
     /// vanished since it opened writes nothing.
     #[must_use]
     pub fn commit(&self, document: &Document, text: &str) -> EntryOutcome {
-        if document.object(self.start.id()).as_ref() != Some(&self.start) {
+        if !still_current(document, &self.start) {
             return EntryOutcome::Unchanged;
         }
         match self.resolve(text) {

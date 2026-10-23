@@ -30,6 +30,20 @@ const SKEW_PATH_COMMIT_LABEL: &str = "skew_path";
 /// would call it a transform.
 const RESIZE_PATH_COMMIT_LABEL: &str = "resize_path";
 
+/// Whether `object`, read when an entry opened, is still the document's object: an entry whose
+/// object changed or went away since writes nothing. A text's laid-out outline is a cache the
+/// session adds on read and the document never holds, so it takes no part in the comparison
+/// (`specs/0074-text-objects` criterion 26).
+pub(crate) fn still_current(document: &Document, object: &ObjectSnapshot) -> bool {
+    match (document.object(object.id()), object) {
+        (Some(ObjectSnapshot::Text(mut current)), ObjectSnapshot::Text(start)) => {
+            current.outline.clone_from(&start.outline);
+            current == *start
+        }
+        (current, _) => current.as_ref() == Some(object),
+    }
+}
+
 /// A move offset within this (millimetres) of zero is no move.
 pub(crate) const MOVE_EQUAL_EPSILON_MM: f64 = 1e-9;
 
