@@ -4,12 +4,13 @@
 //! session's cached read, pinned by `object_cache.rs`); the bytes a clone adds to the file are
 //! printed for the PR; the switches of `specs/0057-clone-overrides` for 10,000 clones within
 //! 250 ms each. Budgets are asserted in release builds only; a debug build runs a tenth of
-//! the size and prints the numbers.
+//! the size and prints the numbers. Every cost is the thread CPU time of the work, so the other
+//! tests of this file running in parallel do not count against it.
 //! Run: `cargo test --release -p curvyo-document-core --test clone_budget -- --nocapture`.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::cast_precision_loss)]
 
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use curvyo_document_core::{AnchorId, Document, NewAnchor, NodeId, Point, Vec2, pack};
 
@@ -22,6 +23,27 @@ const READ_BUDGET: Duration = Duration::from_millis(300);
 /// The busy threshold of `0016` (review L4 of `specs/0057-clone-overrides`): a switch of 10,000
 /// clones stays below it.
 const SWITCH_BUDGET: Duration = Duration::from_millis(250);
+
+/// The result of `work` and the CPU time it cost this thread (`CLOCK_THREAD_CPUTIME_ID`, as in
+/// the rotate test of `acceptance_0016_pr2_tester.rs`); wall time off Unix.
+fn cpu_time_of<T>(work: impl FnOnce() -> T) -> (T, Duration) {
+    #[cfg(unix)]
+    let now = || {
+        let t = rustix::time::clock_gettime(rustix::time::ClockId::ThreadCPUTime);
+        Duration::new(
+            u64::try_from(t.tv_sec).unwrap(),
+            u32::try_from(t.tv_nsec).unwrap(),
+        )
+    };
+    #[cfg(not(unix))]
+    let now = {
+        let origin = std::time::Instant::now();
+        move || origin.elapsed()
+    };
+    let start = now();
+    let result = work();
+    (result, now().saturating_sub(start))
+}
 
 fn check(label: &str, took: Duration, budget: Duration) {
     println!("{label}: {took:?} (budget {budget:?})");
@@ -77,13 +99,8 @@ fn ac43_63_reading_ten_thousand_clones_direct_or_in_chains() {
         ("direct clones", direct_clones()),
         ("chains of 8", chains()),
     ] {
-        let started = Instant::now();
-        let read = document.read_objects();
-        check(
-            &format!("read of {CLONES} {label}"),
-            started.elapsed(),
-            READ_BUDGET,
-        );
+        let (read, took) = cpu_time_of(|| document.read_objects());
+        check(&format!("read of {CLONES} {label}"), took, READ_BUDGET);
         assert_eq!(read.objects.len(), CLONES + 1);
         assert_eq!(read.orphans, Vec::<NodeId>::new());
     }
@@ -120,36 +137,33 @@ fn ac41_switching_and_reading_ten_thousand_clones_with_overrides() {
         .skip(1)
         .map(curvyo_document_core::ObjectSnapshot::id)
         .collect();
-    let started = Instant::now();
-    assert_eq!(document.set_own_style(&clones, true).unwrap(), CLONES);
+    let (switched, took) = cpu_time_of(|| document.set_own_style(&clones, true).unwrap());
+    assert_eq!(switched, CLONES);
     check(
         &format!("own style for {CLONES} clones"),
-        started.elapsed(),
+        took,
         SWITCH_BUDGET,
     );
-    let started = Instant::now();
-    assert_eq!(document.set_own_placement(&clones, true).unwrap(), CLONES);
+    let (switched, took) = cpu_time_of(|| document.set_own_placement(&clones, true).unwrap());
+    assert_eq!(switched, CLONES);
     check(
         &format!("own placement for {CLONES} clones"),
-        started.elapsed(),
+        took,
         SWITCH_BUDGET,
     );
-    let started = Instant::now();
-    let read = document.read_objects();
+    let (read, took) = cpu_time_of(|| document.read_objects());
     check(
         &format!("read of {CLONES} clones with own style"),
-        started.elapsed(),
+        took,
         READ_BUDGET,
     );
     assert_eq!(read.objects.len(), CLONES + 1);
-    let started = Instant::now();
-    document
-        .translate_objects(&[read.objects[0].id()], Vec2::new(1.0, 0.0))
-        .unwrap();
+    let ((), took) = cpu_time_of(|| {
+        document
+            .translate_objects(&[read.objects[0].id()], Vec2::new(1.0, 0.0))
+            .unwrap();
+    });
     // Not gated before the first measurement (criterion 41): printed for the PR.
-    println!(
-        "move of the original holding back {CLONES} clones: {:?} (target 3 s)",
-        started.elapsed()
-    );
+    println!("move of the original holding back {CLONES} clones: {took:?} (target 3 s)");
     assert_eq!(document.take_clone_hold().held, CLONES);
 }

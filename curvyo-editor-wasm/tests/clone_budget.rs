@@ -2,7 +2,9 @@
 //! clone and Unlink clone of 10,000 objects within 5 s, a frame after the original of 10,000
 //! clones moved within 1.2 times the frame of 10,000 ordinary copies (its 150 ms is reported), and
 //! Ctrl+A over 10,000 clones drawn with the marks capped. Budgets are asserted in release builds
-//! only; a debug build runs a tenth of the size and prints the numbers.
+//! only; a debug build runs a tenth of the size and prints the numbers. Every cost is the thread
+//! CPU time of the work (`cpu_time`), so the other tests of this file running in parallel do not
+//! count against it.
 //! Run: `cargo test --release -p curvyo-editor-wasm --test clone_budget -- --nocapture`.
 
 #![allow(
@@ -12,7 +14,11 @@
     clippy::cast_possible_truncation
 )]
 
-use std::time::{Duration, Instant};
+mod cpu_time;
+
+use std::time::Duration;
+
+use cpu_time::cpu_time_of;
 
 use curvyo_document_core::{AnchorId, Document, NewAnchor, NodeId, Point, Vec2, pack};
 use curvyo_editor_wasm::{KeyInput, Session, Tool};
@@ -91,21 +97,11 @@ fn ac45_linked_clone_and_unlink_of_ten_thousand() {
     let mut session = session_of(&document);
     select_all(&mut session);
     assert_eq!(session.selected_object_count(), COUNT);
-    let started = Instant::now();
-    let made = session.linked_clone();
-    check(
-        &format!("Linked clone of {COUNT}"),
-        started.elapsed(),
-        COMMAND_BUDGET,
-    );
+    let (made, took) = cpu_time_of(|| session.linked_clone());
+    check(&format!("Linked clone of {COUNT}"), took, COMMAND_BUDGET);
     assert_eq!(made.notice, format!("Created {COUNT} linked clones."));
-    let started = Instant::now();
-    let unlinked = session.unlink_clones();
-    check(
-        &format!("Unlink clone of {COUNT}"),
-        started.elapsed(),
-        COMMAND_BUDGET,
-    );
+    let (unlinked, took) = cpu_time_of(|| session.unlink_clones());
+    check(&format!("Unlink clone of {COUNT}"), took, COMMAND_BUDGET);
     assert_eq!(unlinked.notice, format!("Unlinked {COUNT} clones."));
 }
 
@@ -122,22 +118,19 @@ fn frame_after_moving_the_first(document: &Document) -> Duration {
         key: "ArrowRight",
         ..KeyInput::default()
     });
-    let started = Instant::now();
-    let _ = session.draw_list();
-    started.elapsed()
+    cpu_time_of(|| session.draw_list()).1
 }
 
 /// Where the frame goes: the read of the document and the artwork of the read.
 fn breakdown(document: &Document) {
-    let started = Instant::now();
-    let read = document.read_objects();
-    let read_took = started.elapsed();
-    let started = Instant::now();
-    let _ = curvyo_render_core::build_artwork(
-        &read.objects,
-        curvyo_document_core::ViewTransform::new(1.0, Point::new(0.0, 0.0)),
-    );
-    println!("  read {read_took:?}, artwork {:?}", started.elapsed());
+    let (read, read_took) = cpu_time_of(|| document.read_objects());
+    let (_, artwork_took) = cpu_time_of(|| {
+        curvyo_render_core::build_artwork(
+            &read.objects,
+            curvyo_document_core::ViewTransform::new(1.0, Point::new(0.0, 0.0)),
+        )
+    });
+    println!("  read {read_took:?}, artwork {artwork_took:?}");
 }
 
 #[test]
@@ -165,13 +158,14 @@ fn ac43_44_a_frame_after_the_original_moved() {
 #[test]
 fn ac43_the_first_frame_after_opening() {
     let bytes = pack(&scene(true), "0.1.0").unwrap();
-    let started = Instant::now();
-    let mut session = Session::open(2, &bytes).unwrap();
-    session.resize_viewport(1600.0, 900.0);
-    let _ = session.draw_list();
+    let (_, took) = cpu_time_of(|| {
+        let mut session = Session::open(2, &bytes).unwrap();
+        session.resize_viewport(1600.0, 900.0);
+        session.draw_list()
+    });
     check(
         &format!("open and first frame of {COUNT} clones"),
-        started.elapsed(),
+        took,
         Duration::from_secs(1),
     );
 }
@@ -184,25 +178,20 @@ fn ac61_ctrl_a_over_ten_thousand_clones_draws_the_capped_marks() {
     assert_eq!(marks.tags.len(), 0, "no tags with so many marks");
     // The Style tab's counts stay exact and cheap (review F4).
     let _ = session.clone_panel();
-    let started = Instant::now();
-    let panel = session.clone_panel();
+    let (panel, took) = cpu_time_of(|| session.clone_panel());
     check(
         &format!("the clone panel over {COUNT} selected clones"),
-        started.elapsed(),
+        took,
         Duration::from_millis(5),
     );
     assert_eq!(
         panel.followers, COUNT,
         "the original is selected too: exact count"
     );
-    let started = Instant::now();
-    let _ = session.draw_list();
-    let with_marks = started.elapsed();
+    let with_marks = cpu_time_of(|| session.draw_list()).1;
     let mut plain = session_of(&scene(false));
     select_all(&mut plain);
-    let started = Instant::now();
-    let _ = plain.draw_list();
-    let without = started.elapsed();
+    let without = cpu_time_of(|| plain.draw_list()).1;
     println!("Ctrl+A over {COUNT} clones: {with_marks:?}; over {COUNT} paths: {without:?}");
     if !cfg!(debug_assertions) {
         assert!(
