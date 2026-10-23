@@ -14,6 +14,7 @@ import { type BackingBuffer, backingBufferFor, sameBackingBuffer } from "@/lib/c
 import { ModifierTracker } from "@/lib/keyModifiers";
 import { parseLayerNotice } from "@/lib/layerRows";
 import { FLIP_NOTICE_MS } from "@/lib/flipText";
+import { canvasLeavesKey } from "@/lib/fontPreviewKeys";
 import { type ArcBarApi, useArcBar } from "@/hooks/useArcBar";
 import { type FlipApi, useFlip } from "@/hooks/useFlip";
 import { TOO_FAR_HINT } from "@/lib/nudgeText";
@@ -783,6 +784,9 @@ export interface EditorSession {
    * from the view repaints there instead of one frame late. Returns the
    * function that removes it. */
   addViewResizedListener: (listener: () => void) => () => void;
+  /** A side pane now lies over the canvas's right `px` (0 for none): the canvas keeps its size,
+   * the session's fit, centring and visibility rules use the visible part. */
+  coverCanvasRight: (px: number) => void;
   /** Re-reads the cursor readout at the last pointer position: a resize or a
    * fit moves the document under a still pointer. */
   refreshCursor: () => void;
@@ -1130,6 +1134,49 @@ export function useEditorSession(
     };
   }, []);
 
+  /** The canvas's right px a side pane lies over (`specs/0077-font-preview` criterion 2). */
+  const coveredRightRef = useRef(0);
+  const coverCanvasRight = useCallback((px: number) => {
+    coveredRightRef.current = px;
+    sessionRef.current?.cover_canvas_right(px);
+  }, []);
+
+  /** The backing buffer the session last drew into; a resize to the same buffer is skipped, as
+   * setting a canvas's size clears it. `fitCanvas` measures the canvas and, if its buffer no
+   * longer matches, resizes and redraws it in the same call. */
+  const appliedBufferRef = useRef<BackingBuffer | null>(null);
+  const fitCanvas = useCallback(() => {
+    const canvas = canvasRef.current;
+    const session = sessionRef.current;
+    if (!canvas || !session) {
+      return;
+    }
+    const next = backingBufferSize(canvas.clientWidth, canvas.clientHeight);
+    const applied = appliedBufferRef.current;
+    if (applied && sameBackingBuffer(applied, next)) {
+      return;
+    }
+    appliedBufferRef.current = next;
+    canvas.width = next.width;
+    canvas.height = next.height;
+    try {
+      // Reconfigures the wgpu surface, updates the viewport's own CSS size (acceptance
+      // criterion 10) and renders the next frame, all in this one call (see
+      // `WasmSession::resize`'s own doc comment): a resize never leaves a stale or empty frame
+      // on screen waiting for the render loop's next animation-frame tick.
+      session.resize(next.width, next.height, next.devicePixelRatio);
+      if (entryOpenRef.current) {
+        syncEntry(session);
+      }
+    } catch {
+      // A dropped frame on resize (e.g. a momentarily lost surface) is not fatal: the render
+      // loop's own next tick recovers it.
+    }
+    for (const listener of viewResizedListenersRef.current) {
+      listener();
+    }
+  }, [syncEntry]);
+
   /** Runs `task` once every earlier queued task has settled. Everything
    * that frees, replaces or publishes the live session goes through this
    * one queue, so none of it can overlap an in-flight `attach_canvas`:
@@ -1162,6 +1209,8 @@ export function useEditorSession(
       enqueueSessionTask(async () => {
         sessionRef.current?.free();
         sessionRef.current = null;
+        // A new or opened project keeps the pane over the canvas (`coverCanvasRight`).
+        session.cover_canvas_right(coveredRightRef.current);
 
         const canvas = canvasRef.current;
         if (!canvas) {
@@ -1174,6 +1223,7 @@ export function useEditorSession(
         );
         canvas.width = width;
         canvas.height = height;
+        appliedBufferRef.current = { width, height, devicePixelRatio };
         try {
           // `attach_canvas` also records the canvas's CSS size on the new
           // session's viewport (acceptance criterion 10's "resize keeps
@@ -1191,6 +1241,7 @@ export function useEditorSession(
         // and hand over the real size.
         const current = backingBufferSize(canvas.clientWidth, canvas.clientHeight);
         if (!sameBackingBuffer(current, { width, height, devicePixelRatio })) {
+          appliedBufferRef.current = current;
           canvas.width = current.width;
           canvas.height = current.height;
           try {
@@ -1226,38 +1277,8 @@ export function useEditorSession(
     const canvas = canvasRef.current;
     let resizeObserver: ResizeObserver | null = null;
     if (canvas) {
-      resizeObserver = new ResizeObserver((entries) => {
-        const entry = entries[0];
-        if (!entry) {
-          return;
-        }
-        const { width, height, devicePixelRatio } = backingBufferSize(
-          entry.contentRect.width,
-          entry.contentRect.height,
-        );
-        canvas.width = width;
-        canvas.height = height;
-        try {
-          // Reconfigures the wgpu surface, updates the viewport's own
-          // CSS size (acceptance criterion 10), and renders the next
-          // frame — all in this one call (see `WasmSession::resize`'s
-          // own doc comment) — a resize never leaves a stale/empty
-          // frame on screen waiting for the render loop's next
-          // animation-frame tick.
-          sessionRef.current?.resize(width, height, devicePixelRatio);
-          if (entryOpenRef.current && sessionRef.current) {
-            syncEntry(sessionRef.current);
-          }
-        } catch {
-          // A dropped frame on resize (e.g. a momentarily lost surface)
-          // is not fatal — the render loop's own next tick recovers it;
-          // swallow rather than let it break the ResizeObserver callback
-          // for every future resize.
-        }
-        for (const listener of viewResizedListenersRef.current) {
-          listener();
-        }
-      });
+      // A window resize: resized and redrawn inside the observer, before the frame is shown.
+      resizeObserver = new ResizeObserver(() => fitCanvas());
       resizeObserver.observe(canvas);
     }
 
@@ -1328,7 +1349,7 @@ export function useEditorSession(
         sessionRef.current = null;
       });
     };
-  }, [attachSession, enqueueSessionTask, onCursorMove, syncEntry]);
+  }, [attachSession, enqueueSessionTask, fitCanvas, onCursorMove, syncEntry]);
 
   const newProject = useCallback(
     () => createSession().then(attachSession),
@@ -2272,7 +2293,10 @@ export function useEditorSession(
       if (offsetKey.ignored) {
         return;
       }
-      event.preventDefault();
+      // Escape with nothing to cancel stays unhandled: the open font preview closes on it.
+      if (!canvasLeavesKey(outcome)) {
+        event.preventDefault();
+      }
       if (offsetKey.cornerStyle) {
         // Alt stepped the corner style of an Offset drag: the readout and the preview show it
         // now (`0038` criterion 13).
@@ -2529,6 +2553,7 @@ export function useEditorSession(
     sync: syncFromSession,
     getSession,
     addViewResizedListener,
+    coverCanvasRight,
     refreshCursor,
     setSelectedRadius,
     setSelectedPointCount,

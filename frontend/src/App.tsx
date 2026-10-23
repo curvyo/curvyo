@@ -1,7 +1,10 @@
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 
 import { Canvas } from "@/components/Canvas";
+import { CanvasArea } from "@/components/CanvasArea";
+import { FontPreview } from "@/components/fontPreview/FontPreview";
+import { useFontPreview } from "@/hooks/useFontPreview";
 import { CanvasNotice } from "@/components/CanvasNotice";
 import { ErrorDialog } from "@/components/ErrorDialog";
 import { NodeToolbar } from "@/components/NodeToolbar";
@@ -59,6 +62,19 @@ function Editor() {
     documentPanel.shortcut("fonts");
     focusCurrentFont();
   };
+  const preview = useFontPreview({ node: editor.text.bar.sampleNode, sample: editor.text.bar.sample });
+  const { getSession } = editor;
+  const keepViewOrigin = useCallback(
+    (delta: number) => getSession()?.keep_view_origin_for_panel_toggle(delta),
+    [getSession],
+  );
+  const returnToText = () => {
+    if (editor.text.editing) {
+      editor.text.sinkRef.current?.focus();
+    } else {
+      editor.containerRef.current?.focus();
+    }
+  };
   const project = useProject({
     editor,
     panelOpen,
@@ -73,6 +89,30 @@ function Editor() {
     <TooltipProvider>
     <div className="flex h-screen w-screen flex-col overflow-hidden">
       <div className="flex min-h-0 flex-1">
+        {/* The canvas area: the drawing, and the font preview beside it or over it
+         * (`specs/0077-font-preview`). */}
+        <CanvasArea
+          keepViewOrigin={keepViewOrigin}
+          coverDrawing={editor.coverCanvasRight}
+          open={preview.store.open}
+          wantFull={preview.wantFull}
+          size={preview.size}
+          toggleFull={preview.toggleFull}
+          split={preview.split}
+          setSplit={preview.setSplit}
+          pane={(layout, switchView, resizing) => (
+            <FontPreview
+              preview={preview}
+              layout={layout}
+              resizing={resizing}
+              onSwitchView={switchView}
+              currentFace={editor.text.fonts.current?.index ?? null}
+              onPick={editor.text.pickFont}
+              onReturnFocus={returnToText}
+            />
+          )}
+          drawing={
+            <>
         {/* The canvas region, a grid of the rulers' corner square, the two
          * ruler strips and the viewport (`specs/0015-document-size-and-rulers`):
          * the rulers shrink the viewport and are not drawn over it. */}
@@ -210,6 +250,9 @@ function Editor() {
         />
         </div>
         </div>
+            </>
+          }
+        />
         <PropertiesPanel
           editor={editor}
           document={documentPanel}

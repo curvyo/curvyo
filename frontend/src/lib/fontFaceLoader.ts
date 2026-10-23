@@ -45,6 +45,25 @@ export function cssFamilyOf(id: string): string | undefined {
   return entry?.name;
 }
 
+/** Reads in flight, by host file id: a row and a font preview tile asking for the same file at
+ * once share one read (`specs/0077-font-preview` adrs.md decision 2). */
+const reading = new Map<string, Promise<ArrayBuffer>>();
+
+/** The bytes of the listed face's file: fetched for an included font, from the host otherwise. */
+export function readFaceBytes(face: ListedFace): Promise<ArrayBuffer> {
+  const pending = reading.get(face.id);
+  if (pending) {
+    return pending;
+  }
+  const read: Promise<ArrayBuffer> = (
+    face.block === "included"
+      ? fetch(`${import.meta.env.BASE_URL}fonts/${face.id}`).then((r) => r.arrayBuffer())
+      : invoke<ArrayBuffer>("font_bytes", { id: face.id })
+  ).finally(() => reading.delete(face.id));
+  reading.set(face.id, read);
+  return read;
+}
+
 export function loadFace(face: ListedFace, done: () => void): void {
   if (loadedFaces.has(face.id) || loadingFaces.has(face.id) || linePreviews.has(face.id)) {
     return;
@@ -52,10 +71,7 @@ export function loadFace(face: ListedFace, done: () => void): void {
   loadingFaces.add(face.id);
   faceCounter += 1;
   const name = `curvyo-face-${faceCounter}`;
-  const source: Promise<ArrayBuffer> =
-    face.block === "included"
-      ? fetch(`${import.meta.env.BASE_URL}fonts/${face.id}`).then((r) => r.arrayBuffer())
-      : invoke<ArrayBuffer>("font_bytes", { id: face.id });
+  const source = readFaceBytes(face);
   if (face.singleLine) {
     void source
       .then((buffer) => {

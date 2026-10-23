@@ -133,6 +133,8 @@ interface FontTagLineProps {
   onMore: () => void;
   /** Escape in the line: the focus goes back to the family row. */
   onLeave: () => void;
+  /** Indented under the row's name (the tree); a preview tile sets it beside the name. */
+  inset?: boolean;
 }
 
 /** The tag line. Its controls are not Tab stops; Shift+F2 or F2 then Escape enter it, Left and
@@ -151,6 +153,7 @@ export function FontTagLine({
   onRemove,
   onMore,
   onLeave,
+  inset = true,
 }: FontTagLineProps) {
   const lineRef = useRef<HTMLDivElement | null>(null);
   const visible = wrap ? tags : tags.slice(0, shown);
@@ -207,7 +210,7 @@ export function FontTagLine({
           default:
         }
       }}
-      className={`flex items-center gap-1 pr-2 pl-7 ${wrap ? "flex-wrap content-start py-0.5" : adding ? "h-6" : "h-6 overflow-hidden"}`}
+      className={`flex items-center gap-1 ${inset ? "pr-2 pl-7" : ""} ${wrap ? "flex-wrap content-start py-0.5" : adding ? "h-6" : "h-6 overflow-hidden"}`}
     >
       {adding ? (
         <AddField family={family} completions={completions} onAdd={onAdd} onClose={onCloseAdd} />

@@ -119,7 +119,9 @@ export function Canvas({ editor }: CanvasProps) {
       >
         <canvas
           ref={editor.canvasRef}
-          className="block size-full"
+          // Wider than its box by the part a side pane lies over (`specs/0077-font-preview`
+          // criterion 2): the split never resizes the canvas.
+          className="block h-full w-[calc(100%+var(--canvas-overhang,0px))] max-w-none"
           onPointerDown={editor.onPointerDown}
           onPointerMove={editor.onPointerMove}
           onPointerUp={editor.onPointerUp}

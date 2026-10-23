@@ -1,11 +1,12 @@
 // The Fonts tab's search row (`specs/0074-text-objects` UX notes §4, `specs/0075-font-library`
 // UX notes §4): the search field and the Add font… button with its busy state and notice.
-import { FilePlus, LoaderCircle, Search, X } from "lucide-react";
+import { FilePlus, LayoutGrid, LoaderCircle, Search, X } from "lucide-react";
 
 import { TabNotice } from "@/components/panel/FontTabNotice";
 import { Tooltip } from "@/components/ui/tooltip";
 import type { FontNotice } from "@/hooks/useFontLibrary";
 import { addingText } from "@/lib/fontLibraryText";
+import { PREVIEW_BUTTON_ID } from "@/lib/fontPreviewStore";
 
 interface FontSearchRowProps {
   searchRef: React.RefObject<HTMLInputElement | null>;
@@ -14,6 +15,10 @@ interface FontSearchRowProps {
   onKeyDown: (event: React.KeyboardEvent<HTMLInputElement>) => void;
   /** The number of files being added, while that takes over 150 ms. */
   busy: number | null;
+  /** The font preview is open (`specs/0077-font-preview` criterion 1). */
+  previewOpen: boolean;
+  /** The Preview button: opens or closes the preview. */
+  onPreview: (byKeyboard: boolean) => void;
   /** Files are dragged over the tab: the button shows its pressed look. */
   dropOver: boolean;
   notice: FontNotice | null;
@@ -26,6 +31,8 @@ export function FontSearchRow({
   onSearch,
   onKeyDown,
   busy,
+  previewOpen,
+  onPreview,
   dropOver,
   notice,
   onAdd,
@@ -58,6 +65,22 @@ export function FontSearchRow({
           </button>
         ) : null}
       </div>
+      <Tooltip side="left" content="Font preview">
+        <button
+          id={PREVIEW_BUTTON_ID}
+          type="button"
+          aria-label="Font preview"
+          aria-pressed={previewOpen}
+          onClick={(event) => onPreview(event.detail === 0)}
+          className={`flex size-7 shrink-0 items-center justify-center rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] ${
+            previewOpen
+              ? "border-transparent bg-[var(--toolbar-icon-active-bg)] text-[var(--toolbar-icon-active-fg)] hover:bg-[var(--toolbar-icon-active-bg)]"
+              : "text-[var(--toolbar-icon)]"
+          }`}
+        >
+          <LayoutGrid size={16} strokeWidth={1.5} aria-hidden />
+        </button>
+      </Tooltip>
       <div className="relative">
         <Tooltip side="left" content="Add font…">
           <button
