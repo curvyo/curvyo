@@ -139,11 +139,8 @@ fn ac09_ac10_the_stroke_of_a_single_line_pick() {
     d.edit_style(&[id], &StyleEdit::FillColor(Color { r: 200, g: 0, b: 0 }))
         .unwrap();
     let steps = d.own_steps().len();
-    d.set_text_font(
-        &[id],
-        &font("Hershey Sans 1-stroke", 'a', FontKind::SingleLine),
-    )
-    .unwrap();
+    d.set_text_fonts(&[(id, font("Hershey Sans 1-stroke", 'a', FontKind::SingleLine))])
+        .unwrap();
     assert_eq!(d.own_steps().len(), steps + 1, "one step: Change font");
     let stroke = d.text(id).unwrap().style.stroke;
     assert!(stroke.enabled);
@@ -151,7 +148,7 @@ fn ac09_ac10_the_stroke_of_a_single_line_pick() {
     assert_eq!(stroke.width, SINGLE_LINE_STROKE_WIDTH);
     assert_eq!((stroke.cap, stroke.join), (LineCap::Round, LineJoin::Round));
     let fill = d.text(id).unwrap().style.fill;
-    d.set_text_font(&[id], &sans).unwrap();
+    d.set_text_fonts(&[(id, sans.clone())]).unwrap();
     let back = d.text(id).unwrap().style;
     assert_eq!(
         (back.stroke, back.fill),
@@ -160,7 +157,7 @@ fn ac09_ac10_the_stroke_of_a_single_line_pick() {
     );
     d.edit_style(&[id], &StyleEdit::StrokeWidth(Length::from_mm(1.0)))
         .unwrap();
-    d.set_text_font(&[id], &font("EMS Allure", 'd', FontKind::SingleLine))
+    d.set_text_fonts(&[(id, font("EMS Allure", 'd', FontKind::SingleLine))])
         .unwrap();
     assert_eq!(
         d.text(id).unwrap().style.stroke.width,
