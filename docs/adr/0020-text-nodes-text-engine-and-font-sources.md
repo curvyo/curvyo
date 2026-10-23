@@ -184,6 +184,17 @@ budget for the text engine 1.3 MiB uncompressed). Details in `specs/0074-text-ob
   uncompressed. The finished slice of `0074` adds 1,426 KiB (501 KiB gzip) to the release editor
   wasm: the engine about 1,290 KiB, the slice's own code about 135 KiB (`docs/technical-debt.md`).
 
+- 2026-10-20, single-line fonts (`specs/0076-single-line-fonts/adrs.md`): §1 `text_font` gains the
+  optional key `kind = "single_line"` (absent: outline), matching compares faces of the same kind
+  and substitutes EMS Readability for a missing single-line face; `format_version` 18. §2
+  `curvyo-text-core` also reads SVG fonts (`roxmltree` `=0.20.0`, own path-data reader, limits in
+  `limits`), `Face` has two sources and `Face::kind()`. §3 `curvyo-storage-io` lists `.svg` in the
+  Curvyo folder through `curvyo-text-core`'s SVG-only reader entry point (amended 2026-10-23,
+  `specs/0076-single-line-fonts/adrs.md` decision 5). §4 the allowed licences include the Hershey notice
+  (`licence = "Hershey"`, `NOTICE.txt`; customer, Frage 18 SL-LICENCE A). Customer, Frage 20
+  SL-WASM: the wasm budget for the text engine is raised from 1.4 MiB to **2 MiB** uncompressed
+  (`docs/technical-debt.md`).
+
 ## Consequences
 
 - One more leaf kind: an arm in every exhaustive match, as images took.
