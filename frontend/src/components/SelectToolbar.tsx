@@ -1,4 +1,6 @@
 import { CircleAlert, Link, Unlink } from "lucide-react";
+import { StyleGroup } from "@/components/StyleGroup";
+import type { WeightCode } from "@/lib/styleText";
 import { TextControls } from "@/components/TextBar";
 import type { TextBarState } from "@/hooks/useText";
 import { Toggle, Tooltip } from "radix-ui";
@@ -51,6 +53,9 @@ export interface SelectToolbarProps {
   onShowFonts?: () => void;
   onSetTextSize?: (mm: number) => string | null;
   onPreviewTextSize?: (mm: number | null) => void;
+  /** The Style group's presses (`specs/0078-font-style-buttons`); each returns its notice. */
+  onPressTextWeight?: (code: WeightCode) => string | null;
+  onPressTextItalic?: () => string | null;
   /** The Linked clone button is shown (`specs/0049-linked-clone` criterion 4). */
   linkedCloneShown: boolean;
   onLinkedClone: () => void;
@@ -89,7 +94,7 @@ function formatMm(value: number): string {
 /** The divider before a kind group. It stays in the layout but is invisible
  * when its group starts a wrapped row (`data-row-start` on the group), so the
  * hiding cannot change the wrapping. */
-function Divider() {
+export function Divider() {
   return (
     <span
       aria-hidden
@@ -555,6 +560,8 @@ export function SelectToolbar({
   onShowFonts,
   onSetTextSize,
   onPreviewTextSize,
+  onPressTextWeight,
+  onPressTextItalic,
   linkedCloneShown,
   onLinkedClone,
   linkedCloneNotice,
@@ -631,6 +638,21 @@ export function SelectToolbar({
         />
       </div>,
     );
+    if (onPressTextWeight && onPressTextItalic) {
+      // The Style group of its own after the Text group (`specs/0078-font-style-buttons`, UX
+      // notes §1), acting on the selected texts only.
+      groups.push(
+        <div key="text-style" className={GROUP_CLASS}>
+          <StyleGroup
+            style={textBar.style}
+            editing={false}
+            onPressWeight={onPressTextWeight}
+            onPressItalic={onPressTextItalic}
+            onReturnFocus={onReturnFocus}
+          />
+        </div>,
+      );
+    }
   }
   if (bar.objectToPathShown) {
     groups.push(

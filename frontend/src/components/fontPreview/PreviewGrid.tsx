@@ -35,6 +35,9 @@ interface PreviewGridProps {
   /** The listed face index of the current face, for the current mark. */
   currentFace: number | null;
   onPick: (face: ListedFace, byKeyboard: boolean) => void;
+  /** The face a tile of `face`'s family shows: the subject texts' style where the family has it
+   * (`specs/0078-font-style-buttons` criterion 24). */
+  tileFace: (face: ListedFace) => { id: string; faceIndex: number };
   /** A printable character typed in the grid goes to the sample field. */
   onType: (character: string) => void;
   /** The divider is being dragged. */
@@ -71,6 +74,7 @@ export const PreviewGrid = memo(function PreviewGrid({
   currentFace,
   resizing,
   onPick,
+  tileFace,
   onType,
 }: PreviewGridProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -105,13 +109,24 @@ export const PreviewGrid = memo(function PreviewGrid({
     setActive(null);
   }, [listing.filter]);
 
+  /** The face a tile shows (`0078` criterion 24): one of its family's faces. */
+  const shownFace = (entry: PreviewFamily): ListedFace => {
+    const first = entry.family.faces[0];
+    const shown = tileFace(first);
+    return entry.family.faces.find((f) => f.id === shown.id && f.faceIndex === shown.faceIndex) ?? first;
+  };
+  const inPage = families.slice(firstIndex, lastIndex + 1);
+  const shown = inPage.map(shownFace);
+
   // Faces of tiles that stay in the page load after 100 ms (criterion 17), these first and the
   // next families after them, in the background; each drawn into the tile cache for the sample.
-  const pageKey = `${listing.filter}|${firstIndex}|${lastIndex}|${families.length}`;
+  const pageKey = `${listing.filter}|${firstIndex}|${lastIndex}|${families.length}|${shown
+    .map((face) => `${face.id}#${face.faceIndex}`)
+    .join(",")}`;
   useEffect(() => {
     const timer = window.setTimeout(() => {
       prerenderTiles(
-        families.map((entry) => entry.family.faces[0]),
+        families.map(shownFace),
         (face) => sample || face.family,
         { first: firstIndex, last: lastIndex },
         bump,
@@ -121,7 +136,6 @@ export const PreviewGrid = memo(function PreviewGrid({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageKey, sample]);
 
-  const inPage = families.slice(firstIndex, lastIndex + 1);
   const favourites = useMemo(
     () => favouritesAmong(inPage.map((entry) => entry.family.family)),
     // `revision` reads the stars again after a toggle.
@@ -240,8 +254,11 @@ export const PreviewGrid = memo(function PreviewGrid({
         <div style={{ position: "relative", height: 2 * GRID_PAD_PX + rowCount * rowHeight - GRID_GAP_PX }}>
           {inPage.map((entry, offset) => {
             const index = firstIndex + offset;
-            const face = entry.family.faces[0];
+            const face = shown[offset];
+            const first = entry.family.faces[0];
             const text = sample || entry.family.family;
+            // A styled face is named on the tile (`0078` criterion 25).
+            const name = face === first ? entry.family.family : `${entry.family.family} ${face.style}`;
             const drawing = previewTile(face, text);
             const column = index % columns.count;
             return (
@@ -249,7 +266,7 @@ export const PreviewGrid = memo(function PreviewGrid({
                 key={`${entry.family.block}:${entry.family.family}`}
                 index={index}
                 rowKey={familyKey(entry.family)}
-                family={entry.family.family}
+                family={name}
                 text={text}
                 drawing={drawing}
                 size={size}
@@ -268,7 +285,7 @@ export const PreviewGrid = memo(function PreviewGrid({
                   height: tile,
                 }}
                 onFocus={() => setActive(index)}
-                onPick={(byKeyboard) => onPick(face, byKeyboard)}
+                onPick={(byKeyboard) => onPick(first, byKeyboard)}
                 onStar={() => star(entry)}
               />
             );

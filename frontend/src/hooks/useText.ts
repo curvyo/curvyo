@@ -15,6 +15,15 @@ import {
   sizeNotice,
   textRefusalText,
 } from "@/lib/textText";
+import {
+  EMPTY_STYLE,
+  type StyleOutcome,
+  type StyleState,
+  type WeightCode,
+  boldKeyTarget,
+  parseStyle,
+  styleNotice,
+} from "@/lib/styleText";
 import { invoke, isTauri } from "@/platform/host";
 
 /** What the Text bar (Text tool) or the Select bar's Text group shows (criterion 11). */
@@ -35,6 +44,8 @@ export interface TextBarState {
   sampleNode: string;
   /** That text's first line, at most 200 characters. */
   sample: string;
+  /** The Style group's six buttons (`specs/0078-font-style-buttons`). */
+  style: StyleState;
 }
 
 const EMPTY_BAR: TextBarState = {
@@ -46,6 +57,7 @@ const EMPTY_BAR: TextBarState = {
   desktop: isTauri,
   sampleNode: "",
   sample: "",
+  style: EMPTY_STYLE,
 };
 
 type ShowNotice = (
@@ -62,6 +74,14 @@ const REFUSAL_MS = 8000;
 const STEADY_AFTER_KEY_MS = 500;
 
 const MAC = /mac/i.test(navigator.platform);
+
+/** A press's outcome from the session's JSON; nothing set for an empty answer (greyed). */
+function outcomeOf(json: string): StyleOutcome {
+  if (!json) {
+    return { set: 0, left: 0, upright: false };
+  }
+  return JSON.parse(json) as StyleOutcome;
+}
 
 interface Listed {
   /** `os2` (24 hex digits) and `stamp` come with the Curvyo and system lists
@@ -148,6 +168,14 @@ export interface TextApi {
     onPaste: (event: React.ClipboardEvent<HTMLTextAreaElement>) => void;
   };
   pickFont: (face: FontFace, byKeyboard: boolean) => void;
+  /** A press on a family row or a preview tile: the subject texts keep their style where the
+   * family has it (`specs/0078-font-style-buttons` criterion 22). */
+  pickFamily: (face: FontFace, byKeyboard: boolean) => void;
+  /** The face a preview tile of `face`'s family shows and applies (`0078` criterion 24). */
+  tileFace: (face: FontFace) => { id: string; faceIndex: number };
+  /** A weight or Italic press; returns the notice to show under the button, if any. */
+  pressWeight: (code: WeightCode) => string | null;
+  pressItalic: () => string | null;
   /** A typed or stepped size; returns the notice to show under the field, if any. */
   setSize: (mm: number) => string | null;
   previewSize: (mm: number | null) => void;
@@ -300,6 +328,7 @@ export function useText(
       desktop: isTauri,
       sampleNode: raw.sample_node,
       sample: raw.sample,
+      style: parseStyle(raw.style_json),
     });
     raw.free();
     setFonts(tab);
@@ -444,6 +473,28 @@ export function useText(
         afterInput(session);
         return;
       }
+      // Ctrl+B and Ctrl+I press Bold (Regular on a Bold text) and Italic, before the browser
+      // takes them (`specs/0078-font-style-buttons` criterion 19).
+      if (ctrl && !event.altKey && (key.toLowerCase() === "b" || key.toLowerCase() === "i")) {
+        event.preventDefault();
+        const raw = session.text_bar();
+        const style = parseStyle(raw.style_json);
+        raw.free();
+        let notice: string | null = null;
+        if (key.toLowerCase() === "b") {
+          const target = boldKeyTarget(style);
+          if (target) {
+            notice = styleNotice(target, outcomeOf(session.press_text_weight(target)));
+          }
+        } else if (!style.italic.greyed) {
+          notice = styleNotice("italic", outcomeOf(session.press_text_italic()));
+        }
+        if (notice) {
+          showNotice(notice, 3000, "canvas");
+        }
+        afterInput(session);
+        return;
+      }
       if (ctrl && key.toLowerCase() === "a") {
         event.preventDefault();
         session.text_select_all();
@@ -456,7 +507,7 @@ export function useText(
         afterInput(session);
       }
     },
-    [getSession, syncFromSession, returnToCanvas, afterInput],
+    [getSession, syncFromSession, returnToCanvas, afterInput, showNotice],
   );
 
   const onBeforeInput = useCallback(
@@ -583,6 +634,45 @@ export function useText(
     [getSession, syncFromSession, returnToCanvas],
   );
 
+  const pickFamily = useCallback(
+    (face: FontFace, byKeyboard: boolean) => {
+      getSession()?.pick_font_family(face.id, face.faceIndex);
+      syncFromSession();
+      if (!byKeyboard) {
+        if (getSession()?.text_editing()) {
+          sinkRef.current?.focus({ preventScroll: true });
+        } else {
+          returnToCanvas();
+        }
+      }
+    },
+    [getSession, syncFromSession, returnToCanvas],
+  );
+
+  const tileFace = useCallback(
+    (face: FontFace) => {
+      const json = getSession()?.family_tile_face(face.id, face.faceIndex) ?? "null";
+      const shown = JSON.parse(json) as { id: string; faceIndex: number } | null;
+      return shown ?? { id: face.id, faceIndex: face.faceIndex };
+    },
+    [getSession],
+  );
+
+  const pressWeight = useCallback(
+    (code: WeightCode) => {
+      const outcome = outcomeOf(getSession()?.press_text_weight(code) ?? "");
+      syncFromSession();
+      return styleNotice(code, outcome);
+    },
+    [getSession, syncFromSession],
+  );
+
+  const pressItalic = useCallback(() => {
+    const outcome = outcomeOf(getSession()?.press_text_italic() ?? "");
+    syncFromSession();
+    return styleNotice("italic", outcome);
+  }, [getSession, syncFromSession]);
+
   const setSize = useCallback(
     (mm: number): string | null => {
       const outcome = getSession()?.set_text_size(mm) ?? "invalid";
@@ -640,6 +730,10 @@ export function useText(
       onPaste,
     },
     pickFont,
+    pickFamily,
+    tileFace,
+    pressWeight,
+    pressItalic,
     setSize,
     previewSize,
     objectToPath,
