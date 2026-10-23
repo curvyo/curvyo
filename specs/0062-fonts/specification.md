@@ -1,6 +1,6 @@
 # Fonts: a Fonts card, groups and favourites, an own font folder, and a preview page of the lettering in every font
 
-Status: Draft (epic with stages; stage 1 Done #165, stage 2 Done #168, stage 2b in progress (0076, PR #171), stage 3 specified as 0077 (Draft); preview placement decided 2026-10-17)
+Status: Draft (epic with stages; stage 1 Done #165, stage 2 Done #168, stage 2b in progress (0076, PR #171), stage 3 Ready as 0077; preview placement decided 2026-10-17)
 Priority: Should (big; the customer called it "a great feature")
 Origin: Customer (request of 2026-10-17, translated): "A great feature. We need our own card in the properties and a tool to add. The font selection like the document sizes: groupable, e.g. initials, script, sans, serif, cuttable (fonts whose strokes end up connected so they laser well). Mark with * as favourites. We need our own folder under .config (directories crate) to add fonts just for Curvyo; they are shown first in the whole list. Harder: I would like a preview for fonts as seen in PewPew Studio: a page where exactly the lettering is shown with all fonts (e.g. of a group). We said no popups and honestly I do not want one. Maybe we need a new fixed panel, or a split page. It may make sense to build this together with the output, since the main canvas must be extended/switched there anyway."
 
@@ -20,8 +20,8 @@ There are no text objects: the node kinds are layer, group, path and primitive. 
 |---|---|---|---|
 | 1 | Text object, Text tool, font by name, Object to path; a Fonts tab with the list. Specified as [`0074-text-objects`](../0074-text-objects/) | ADR 0020 (accepted 2026-10-20) | Done (#165) |
 | 2 | Groups, favourites, the Curvyo font folder, "cuttable" tag, adding fonts. Specified as [`0075-font-library`](../0075-font-library/) | stage 1 | Done (#168) |
-| 2b | Single-line (stroke) fonts as live text: SVG fonts, the Single line tag, four shipped fonts. Specified as [`0076-single-line-fonts`](../0076-single-line-fonts/) | stage 2 | In progress (PR #171) |
-| 3 | The preview page (criteria 14 to 17), split and full view | stage 2 and the pane host of `0063` | Draft, specified as `0077-font-preview` |
+| 2b | Single-line (stroke) fonts as live text: SVG fonts, the Single line tag, four shipped fonts. Specified as [`0076-single-line-fonts`](../0076-single-line-fonts/) | stage 2 | Done (#171) |
+| 3 | The preview page (criteria 14 to 17), split and full view | stage 2 (the split is built in `0077` and reused by `0063`, Frage 26 A, 2026-10-23) | Ready (`0077`) |
 
 ## Acceptance criteria (as far as clear)
 

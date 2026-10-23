@@ -1,6 +1,6 @@
 # Single-line fonts: engrave and plot lettering as one line per stroke
 
-Status: In progress (PR #171; Ready 2026-10-20; customer questions 17 to 21 decided 2026-10-20, Frage 23 SL-BACK open with default A, see "Open questions")
+Status: Done (PR #171, merged 2026-10-23; Ready 2026-10-20; customer questions 17 to 21 decided 2026-10-20, Frage 23 SL-BACK open with default A, see "Open questions")
 Priority: Should (R-FONT-002 names "single-line" first among the manufacturing groups; R-MFG-CUT-001 and engraving need it; not in the laser MVP)
 Origin: Customer. A story of the fonts epic `0062` (named out of scope in `0074` and `0075` as "a later story"; ADR 0002 §7 and ADR 0020 "Consequences" keep the model open for it). Items marked **(Proposal)** are the product owner's and are vetoable at the demo.
 Depends on: `0074-text-objects` (text node, Text tool, Fonts tab, Object to path, missing-font rule), `0075-font-library` (tags, Add font, Remove, the Curvyo folder in the browser), `0054-combine-open-paths` (open outlines in a compound path, stroke and fill of open outlines), `0068` Weld v2 (PR #169, merged 2026-10-23, open operands closed by a straight line, its criterion 13).
