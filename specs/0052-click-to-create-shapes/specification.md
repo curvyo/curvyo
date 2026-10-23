@@ -198,4 +198,4 @@ Full row: "Placement chip" in the design system. In short:
 Requirements: R-EDIT-033 (new, `docs/requirements.md`), R-EDIT-002
 Builds on: `specs/0003-primitive-shapes/`, `specs/0009-unified-object-editing/` (criteria 25 to 29), `specs/0010-edit-interaction-polish/` (criteria 4, 19, 42 to 49, 55; `adrs.md` decision 3 for the entry chip parts), `specs/0011-shape-creation-from-center/`, `specs/0015-document-size-and-rulers/` (display unit)
 Touches: `specs/0020-undo-redo/` (step names, unchanged), `specs/0023-groups/` (criterion 19), `specs/0051-sidebar-and-no-menu/` (chord gate)
-PR: (set when opened)
+PR: https://github.com/curvyo/curvyo/pull/131

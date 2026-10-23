@@ -356,4 +356,4 @@ All of 2 and 3 are in PR 73. The hover preview (the old PR 4) is not a milestone
 
 Requirements: R-EDIT-003, R-EDIT-004 (Object to path), R-SYS-003 (same result on every OS).
 Related: `docs/adr/0003-geometry-kernel-booleans-offsetting-vcarving.md`, `docs/adr/0002-document-model-units-and-svg-round-trip.md`, `specs/0002-path-node-editing/specification.md` (one outline per path), `specs/0003-primitive-shapes/specification.md` (Object to path), `specs/0007-stroke-and-fill-styling/specification.md` (nonzero fill, styles), `specs/0014-advanced-selection/specification.md` (hit order), `docs/design-system.md` ("Select bar", "Blue new, black old").
-PR: #73 (kernel merged earlier as #69; the compound-path PR 71 was closed into #73). The link is final at merge.
+PR: #73 (kernel merged earlier as #69; the compound-path PR 71 was closed into #73).

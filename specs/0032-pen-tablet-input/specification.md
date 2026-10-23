@@ -1,6 +1,6 @@
 # Pen tablet input: pressure from a stylus sets the width of Pencil strokes
 
-Status: In progress (branch `story/pen-tablet-input` pushed 2026-10-12, no PR yet). Ready since 2026-10-10: customer decisions applied; the device and OS questions are confirmed at the demo, see the section of that name.
+Status: Ready, on hold (PR #116 was closed without merging on 2026-10-12; paused by the lead, see `0074` UX notes §1 "Slot"). Ready since 2026-10-10: customer decisions applied; the device and OS questions are confirmed at the demo, see the section of that name.
 Priority: Should (was Could; the customer does not want it at the back of the queue, 2026-10-10)
 Origin: Customer ("later, not now", 2026-10-09; promoted on 2026-10-10 with the defaults below). The minimal Pencil tool inside this slice, the numbers and the texts are my proposals; the customer can veto the Pencil tool at the demo.
 
@@ -152,4 +152,4 @@ Requirements: R-INP-001 (`docs/requirements.md`); related R-VEC-003, R-EDIT-021
 Builds on: `specs/0020-undo-redo/` (one stroke is one step), `specs/0047-transform-polish/` (customer's order: after it), `specs/0009-unified-object-editing/` (blue-new/black-old), `specs/0010-edit-interaction-polish/` (Escape cascade, shortcut table), `specs/0017-style-panel-rework/` (value fields)
 Related: `specs/0033-stroke-brushes/` (pressure and brushes share the width model), `specs/0036-cut-at-crossings/` (eraser, Question 3), `docs/adr/0001-ui-framework-and-canvas-rendering.md` (webview, WebKitGTK on Linux), `docs/adr/0002-document-model-units-and-svg-round-trip.md` (document model, unchanged by default)
 ADRs: `adrs.md` (architect, to come; input record and coalesced events, the variable-width outline routine in `curvyo-geometry-core`; no document-model ADR is needed on the default of Question 2, A)
-PR: TBD
+PR: #116 (closed, not merged)

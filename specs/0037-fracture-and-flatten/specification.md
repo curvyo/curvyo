@@ -1,6 +1,6 @@
 # Fracture and Flatten: cut overlapping shapes into pieces, or remove the hidden parts
 
-Status: Ready (2026-10-10: `adrs.md` and the UX notes exist; Flatten means trim to the visible part, decided 2026-10-10; criterion 7 reworded the same day). Amended by `0020-undo-redo` (Ctrl+Z takes the step back) and by `0054-combine-open-paths` criterion 24 (open outlines are closed with a straight line, not refused). UX notes re-checked against `main` on 2026-10-19 (after `0038`, `0051`, `0052`, `0054`): placement unchanged, tooltips aligned with the built Boolean buttons, no customer question open.
+Status: Done (PR #160, merged 2026-10-20). Ready 2026-10-10 (`adrs.md` and the UX notes exist; Flatten means trim to the visible part, decided 2026-10-10; criterion 7 reworded the same day). Amended by `0020-undo-redo` (Ctrl+Z takes the step back) and by `0054-combine-open-paths` criterion 24 (open outlines are closed with a straight line, not refused). UX notes re-checked against `main` on 2026-10-19 (after `0038`, `0051`, `0052`, `0054`): placement unchanged, tooltips aligned with the built Boolean buttons, no customer question open.
 Priority: Should
 Origin: Customer asked for "Fracture" (cut overlapping shapes into non-overlapping pieces, like Affinity's Divide) and "Flatten" (request of 2026-10-09), and left the exact meaning to me. **The definitions below are my proposals** (Question 1 asks about Flatten in particular).
 
@@ -140,4 +140,4 @@ Requirements: R-EDIT-023 (`docs/requirements.md`); related R-EDIT-003
 Builds on: `specs/0016-boolean-operations/` (the kernel, compound paths, region, refusals, determinism; must be merged first)
 Related: `specs/0035-combine-and-break-apart/`, `specs/0036-cut-at-crossings/`, `specs/0048-split-compound-path/`, `specs/0038-path-offset/`, `specs/0023-groups/`
 ADRs: `adrs.md`
-PR: TBD
+PR: https://github.com/curvyo/curvyo/pull/160

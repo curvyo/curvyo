@@ -211,4 +211,4 @@ Amends: `specs/0035-combine-and-break-apart/` (criteria 9, 10, 10a, the no-area 
 Followed by: `specs/0055-compound-path-node-editing/` (node editing of every compound path)
 Related: `specs/0036-cut-at-crossings/`, `specs/0007-stroke-and-fill-styling/` (fill of open paths), `specs/0031-segment-drag-bending/`, `specs/0053-node-marquee-selection/`, `specs/0050-layers-and-objects-panel/`, `specs/0049-linked-clone/` (build order), `0024` (SVG, not yet specified)
 ADRs: `adrs.md` (architect, 2026-10-12, re-checked the same day after the customer decisions: no new ADR, no `format_version` bump)
-PR: TBD
+PR: https://github.com/curvyo/curvyo/pull/154

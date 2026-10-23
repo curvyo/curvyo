@@ -153,4 +153,4 @@ Status: **confirmed by the ux-engineer (2026-10-12)**, from the product owner's 
 Requirements: R-EDIT-034 (new, `docs/requirements.md`), R-EDIT-001, R-EDIT-014
 Builds on: `specs/0002-path-node-editing/` (criteria 7, 10, 13), `specs/0006-path-merge-split-and-node-types/` (criteria 6 to 12), `specs/0014-advanced-selection/` (criteria 8, 12 to 14, UX notes), `specs/0010-edit-interaction-polish/` (criteria 42, 45, 55, 61)
 Touches: `specs/0044-editing-quick-wins/` (criterion 3), `specs/0023-groups/` (criteria 12, 14), `specs/0020-undo-redo/` (step "Delete nodes"), `specs/0050-layers-and-objects-panel/` (hidden and locked)
-PR: (set when opened)
+PR: https://github.com/curvyo/curvyo/pull/129

@@ -243,4 +243,4 @@ Amends: see "Changes to accepted specs".
 Related: `specs/0056-mirror-and-negative-scale/` (Flip, criterion 35), `specs/0042-history-branches/` and `specs/0041-object-history/` (criterion 33), `specs/0020-undo-redo/`, `specs/0022-color-management/` (thread palettes, out of scope), `specs/0024` (SVG, not yet specified)
 ADRs: [ADR 0015](../../docs/adr/0015-node-references-and-ancestor-resolved-state.md) (the link register and "named styles, style overrides or a relink command need a new ADR"); [ADR 0016](../../docs/adr/0016-clone-overrides.md) (Proposed, `needs-customer`, approval pending); see `adrs.md`.
 Format: next free `format_version` at merge (14 if `0049` takes 13).
-PR: TBD
+PR: https://github.com/curvyo/curvyo/pull/138

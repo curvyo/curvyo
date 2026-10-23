@@ -1,6 +1,6 @@
 # Weld: overlapping shapes become one object in which every visible line exists once
 
-Status: Ready (2026-10-20; reworked after the customer rejected the design of PR #167; Questions 14, 15 and 16 decided 2026-10-20)
+Status: Done (PR #169, merged 2026-10-23). Reworked after the customer rejected the design of PR #167; Questions 14, 15 and 16 decided 2026-10-20, Frage 24 WELD-STYLE 2026-10-23.
 Priority: Should
 Origin: Customer (request of 2026-10-17; correction of 2026-10-20: "Weld is a tool on the Boolean card, next to Union and Flatten. It does not make an outline, Union does that. It is more or less a Flatten, but you get ONE object. With Flatten you still have two objects, and the laser would cut the lines twice. This also handles different stroke widths, because the paths underneath no longer exist."). Items marked **(Proposal)** or **PO** are the product owner's and vetoable.
 Depends on: `0037-fracture-and-flatten` (visible region, the Flatten fold), `0016-boolean-operations` (kernel, region, refusals, determinism, Boolean card), `0054-combine-open-paths` (compound paths with open outlines; open operands closed by a straight line), `0074-text-objects` (Object to path for text), `0023-groups`, `0020-undo-redo`.
@@ -82,7 +82,7 @@ Lead's reading checked against `0016`, `0037`, `0054`: correct, with five correc
 ### The result
 
 17. Given a success, then all operands are removed (a selected group with all its members), and one new object takes the place of the lowest selected object in the stacking order; inside an entered group it stays in that group. Unselected objects keep their ids and order.
-18. Given a success, then the result's style is a copy of the base operand's style (**PO**: the rule of Union and Combine), except for Fill as Question 14 decides. Default (14 A): Fill is off; if the base had Stroke off, Stroke is on in the base's fill colour at the default stroke width of a new path.
+18. Given a success, then the result's style is a copy of the base operand's style (customer, Frage 24 WELD-STYLE A, 2026-10-23: the rule of Union and Combine), except for Fill as Question 14 decides. Default (14 A): Fill is off; if the base had Stroke off, Stroke is on in the base's fill colour at the default stroke width of a new path.
 19. Given a success, then the result is the only selected object, the tool stays Select, and the Properties panel reads "Compound path" or "Path".
 20. Given a success, then exactly one commit `weld` is written, shown as "Weld" in History; Ctrl+Z restores texts (editable), groups and objects with their ids and order.
 21. Given a success, then the notice reads "Weld: 3 objects became 1 compound path with 412.3 mm of line." (`<n>` counts the selected objects, a group once; "1 text became ..." when only texts were selected; "1 path" for a single closed outline; the length is the result's total line length in the display unit with the status bar's decimals; criterion 4 reads "with 140.0 mm of line"), followed when they apply, in this order, by: "1 hidden shape was removed." ("3 hidden shapes were removed."); the sentences of `0054` criteria 21 and 22; "It uses the style of the lowest object." when operand styles differed; under 14 A, "Fill was switched off." when the base had Fill on, and "Stroke was switched on." when the base had Stroke off (UX notes, "Notices").
@@ -107,19 +107,18 @@ Lead's reading checked against `0016`, `0037`, `0054`: correct, with five correc
 - Fill None as "does not hide" (`0037` Question 2 A applies: every operand hides what is below).
 - Joining near-coincident lines farther apart than 0.001 mm.
 - Bridges, live weld on a text, kerf, cut order, lead-ins, keeping curves (refit is a `0016` follow-up).
-- Paint for the regions between the lines (Question 14 B, if not chosen).
+- Paint for the regions between the lines (Question 14 B, not chosen).
 
 ## Needs from the architect (`adrs.md`)
 
 1. The edge arrangement from the visible regions of `0037`: merging coincident boundary segments on the grid, chaining into closed and open outlines deterministically (criteria 14, 15).
 2. Collection of operands through groups, clones and converted texts in one commit; placement when the lowest selected object is a group.
 3. What can be removed from the PR #167 branch (gap closing, stroke band, Select-bar wiring, Gap setting).
-4. If Question 14 is answered B: the stored mark and the `format_version` bump.
+4. Question 14 was answered A: no stored mark, no `format_version` bump.
 
 ## Decided by the product owner (vetoable at the demo)
 
 - Weld runs on one object or more, on texts and on groups (permit over refuse).
-- Style from the bottom-most operand, as Union and Combine; the notice says when styles differed. Alternatives (topmost operand; largest visible area) were rejected: the first breaks the one rule of the Boolean card, the second is not predictable.
 - Inner lines are kept even though cutting them separates the parts; one piece is Union's job.
 
 ## Decided by the customer 2026-10-20
@@ -127,6 +126,10 @@ Lead's reading checked against `0016`, `0037`, `0054`: correct, with five correc
 - Frage 15 WELD-DEF: the definition above is confirmed as written ("genau so"): the Boolean card, button 8; Flatten's visible regions as one object; every visible boundary line once; the union boundary closed; inner visible lines open; overlapping script letters are cut apart (one-piece plates are Union's job); the bottom-most operand's style.
 - Frage 14 WELD-FILL: **A**. Line art: fill off, stroke on (if the bottom-most shape has no stroke, the stroke takes its fill colour); no format change.
 - Frage 16 WELD-MINH: **A**. The Tauri window's minimum height rises from 600 to 640 px, so column B with eight Boolean buttons fits.
+
+## Decided by the customer 2026-10-23
+
+- Frage 24 WELD-STYLE: **A**. The result keeps the style of the lowest object, as Union and Combine; the notice says when styles differed.
 
 ## Open questions (customer; each has a default)
 
@@ -391,4 +394,4 @@ casing, not selectable, gone with the notice.
 Requirements: R-FONT-009; related R-EDIT-003, R-EDIT-023
 Depends on: `specs/0037-fracture-and-flatten/`, `specs/0016-boolean-operations/`, `specs/0054-combine-open-paths/`, `specs/0074-text-objects/`, `specs/0023-groups/`
 ADRs: ADR 0003 (kernel); none new expected under default 14 A
-PR: #167 (rejected design, closed); rebuilt on `story/weld-v2`
+PR: https://github.com/curvyo/curvyo/pull/169 (PR #167, the rejected design, was closed)

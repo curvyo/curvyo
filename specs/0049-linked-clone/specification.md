@@ -248,4 +248,4 @@ Builds on: `specs/0019-multi-object-transform/` (group box, handles, atomic comm
 Amends: the geometry-reading commands `0016`, `0035`, `0036`, `0037`, `0038`, `0048` (they read a clone's resolved outline, criterion 33), `0034`, `0031`, `0006` (a clone is no target, criterion 26)
 Related: `specs/0023-groups/` and `specs/0050-layers-and-objects-panel/` (same ADR; flags of a clone, rows), `specs/0020-undo-redo/` (steps, criterion 36), `specs/0041-object-history/` (its "clone" is a copy of an object's history with the key `clone_of`; unrelated to a linked clone, the key here is `clone_link`), `specs/0024` (SVG, not yet specified)
 ADRs: `adrs.md` and [ADR 0015](../../docs/adr/0015-node-references-and-ancestor-resolved-state.md) (architect; document model; the customer accepted the exceptions on 2026-10-11). ADR 0015 is accepted and `adrs.md` is aligned with chains (2026-10-11). The `ux-engineer` put the `--clone-link` token, the marks and the chain block into `docs/design-system.md` on 2026-10-11.
-PR: TBD
+PR: https://github.com/curvyo/curvyo/pull/121
