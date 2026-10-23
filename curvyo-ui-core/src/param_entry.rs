@@ -18,6 +18,7 @@ use crate::param_edit::{
 use crate::param_handles::{Corner, ParamHandle};
 use crate::shape_arc_edit::{ARC_SEAM, ArcEnd, arc_capable, curve_capable};
 use crate::transform_commit::MAX_COORDINATE_MM;
+use crate::transform_commit::still_current;
 use crate::transform_entry::{
     EntryField, EntryKind, EntryOutcome, InvalidReason, format_mm, parse_entry_number,
 };
@@ -258,7 +259,7 @@ impl ParamEntry {
     /// opened writes nothing.
     #[must_use]
     pub fn commit(&self, document: &Document, text: &str) -> EntryOutcome {
-        if document.object(self.start.id()).as_ref() != Some(&self.start) {
+        if !still_current(document, &self.start) {
             return EntryOutcome::Unchanged;
         }
         match self.resolve(text) {

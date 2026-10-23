@@ -15,6 +15,7 @@ use crate::group_transform::{GroupMap, commit_group, group_label, group_pivot, m
 use crate::mirror_text::mirror_line;
 use crate::oriented_box::OrientedBox;
 use crate::skew_math::{MIN_SKEW_LEVER_MM, skew_factor, skew_frame};
+use crate::transform_commit::still_current;
 use crate::transform_commit::{MAX_COORDINATE_MM, same_within_tolerance};
 use crate::transform_drag::ScaleModes;
 use crate::transform_entry::{
@@ -489,7 +490,7 @@ impl GroupEntry {
         let current = self
             .starts
             .iter()
-            .all(|object| document.object(object.id()).as_ref() == Some(object));
+            .all(|object| still_current(document, object));
         if !current {
             return EntryOutcome::Unchanged;
         }

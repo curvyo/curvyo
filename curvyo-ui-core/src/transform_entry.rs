@@ -12,6 +12,7 @@ use crate::ResizeDirection;
 use crate::conversion::converted_for_object;
 use crate::mirror_text::mirror_line;
 use crate::oriented_box::OrientedBox;
+use crate::transform_commit::still_current;
 use crate::transform_commit::{MAX_COORDINATE_MM, commit_gesture};
 use crate::transform_drag::{
     ResizeOptions, ScaleModes, pivot_for, resize_by_local_delta, rotate_by,
@@ -598,7 +599,7 @@ impl TransformEntry {
         texts: [&str; 2],
         last_edited: usize,
     ) -> EntryOutcome {
-        if document.object(self.start.id()).as_ref() != Some(&self.start) {
+        if !still_current(document, &self.start) {
             return EntryOutcome::Unchanged;
         }
         match self.resolve(texts, last_edited) {

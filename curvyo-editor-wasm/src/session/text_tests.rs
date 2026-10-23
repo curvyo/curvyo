@@ -312,3 +312,27 @@ fn ux_hover_box_in_the_text_tool() {
     session.pointer_hover(Point::new(150.0, 150.0), false, false);
     assert!(session.select_decoration_input().hovered.is_none());
 }
+
+/// Criterion 26: the typed size entry (S) resizes a text and the text stays a text. Doubling
+/// both rounded prefills is a stretch that is not exactly uniform: it goes into the transform,
+/// Size stays as set.
+#[test]
+fn ac26_typed_size_resizes_a_text() {
+    let mut session = with_text("Name");
+    session.set_text_size(10.0);
+    assert_eq!(session.escape(), EscapeStep::LeftTool);
+    assert_eq!(key(&mut session, "s"), KeyOutcome::EntryOpened);
+    let chip = session.transform_entry().unwrap();
+    let double = |text: &str| format!("{}", text.parse::<f64>().unwrap() * 2.0);
+    let (width, height) = (
+        double(&chip.fields[0].prefill),
+        double(&chip.fields[1].prefill),
+    );
+    assert_eq!(
+        session.commit_transform_entry(&width, &height, 1),
+        curvyo_ui_core::EntryOutcome::Committed
+    );
+    let text = &texts(&session)[0];
+    assert_eq!(text.size.as_mm(), 10.0);
+    assert!((text.placement.a - 2.0).abs() < 0.01 && (text.placement.d - 2.0).abs() < 0.01);
+}

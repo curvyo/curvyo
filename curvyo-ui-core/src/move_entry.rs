@@ -15,6 +15,7 @@ use crate::group_box::GroupSelection;
 use crate::object_bounds::object_outline_bounds;
 use crate::oriented_box::OrientedBox;
 use crate::reference_point::ReferencePoint;
+use crate::transform_commit::still_current;
 use crate::transform_commit::{
     MAX_COORDINATE_MM, MOVE_EQUAL_EPSILON_MM, axis_within_limit, commit_move,
 };
@@ -274,7 +275,7 @@ impl MoveEntry {
         let unchanged = self
             .start
             .iter()
-            .all(|object| document.object(object.id()).as_ref() == Some(object));
+            .all(|object| still_current(document, object));
         if !unchanged {
             return (EntryOutcome::Unchanged, None);
         }
