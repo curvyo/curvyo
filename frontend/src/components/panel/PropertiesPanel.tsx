@@ -326,6 +326,7 @@ export function PropertiesPanel({
               <FontsTab
                 data={editor.text.fonts}
                 onPick={editor.text.pickFont}
+                onPickFamily={editor.text.pickFamily}
                 onReturnFocus={() => {
                   if (editor.text.editing) {
                     editor.text.sinkRef.current?.focus();

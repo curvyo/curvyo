@@ -21,12 +21,24 @@ interface FontPreviewProps {
   /** The Full view/Split view switch. */
   onSwitchView: () => void;
   currentFace: number | null;
+  /** A press on a tile: a family pick (`specs/0078-font-style-buttons` criterion 24). */
   onPick: (face: ListedFace, byKeyboard: boolean) => void;
+  /** The face a tile of `face`'s family shows (criterion 24). */
+  tileFace: (face: ListedFace) => { id: string; faceIndex: number };
   /** The canvas, or the text sink in edit mode. */
   onReturnFocus: () => void;
 }
 
-export function FontPreview({ preview, layout, resizing, onSwitchView, currentFace, onPick, onReturnFocus }: FontPreviewProps) {
+export function FontPreview({
+  preview,
+  layout,
+  resizing,
+  onSwitchView,
+  currentFace,
+  onPick,
+  tileFace,
+  onReturnFocus,
+}: FontPreviewProps) {
   const rootRef = useRef<HTMLElement | null>(null);
   const sampleRef = useRef<HTMLInputElement | null>(null);
   const { store } = preview;
@@ -121,6 +133,7 @@ export function FontPreview({ preview, layout, resizing, onSwitchView, currentFa
         currentFace={currentFace}
         resizing={resizing}
         onPick={onPick}
+        tileFace={tileFace}
         onType={typeIntoSample}
       />
     </section>
