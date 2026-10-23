@@ -1362,6 +1362,24 @@ Decisions: `specs/0075-font-library/specification.md`, "UX notes" and "UX amendm
 | Row stability | A maker's own press never removes a row from view until the strip cell or the search changes; background additions above the first visible row keep it in place. Deleting the chosen tag, or removing its last use, switches the strip to All at once and the tag leaves the strip (2026-10-20) |
 | Empty (adds to `0074`) | "No font in Cuttable." / "No font in Cuttable yet." (while checking) / "No font in Cuttable matches "vibs"." |
 
+## Font preview (`0077`, 2026-10-23)
+
+Decisions: `specs/0077-font-preview/ux-notes.md` §1 to §6 and `adrs.md` decisions 1 and 2.
+
+| Item | Value |
+|---|---|
+| Tokens | `--tile-bg` `#FFFFFF`; `--tile-edge` `#CDCDCF` (`--toolbar-icon` at 25 % on white), decorative. Light theme only; names ready for a dark swap |
+| Fonts tab layout (amends) | Search row: search field, 4, Preview 28 x 28 (`LayoutGrid`, toggle, `aria-pressed`, pressed look of Link corners, tooltip "Font preview"), 4, Add font 28 x 28 |
+| Pane | `CanvasArea`: the canvas region's one side pane, `role="region"` "Font preview". Split: right of the drawing, half the canvas area, at least 320px, 1px `--toolbar-icon` at 25 % on its left edge, not draggable. Full: over the whole canvas area; the drawing is hidden and `inert`, not unmounted. Under 720px of canvas area always full, and the Full view button is not in the tree. Open and close are instant; the drawing's view keeps its top-left origin |
+| Header | `--panel-bg`, 8px padding, 1px bottom line. From 560px of pane width one 28px row: sample field (200 to 480px), 16, "Size" 12px, slider 120, readout "48 px", 16, subject line (12px muted, ellipsis), 8, Full view, 4, Close. Under 560px two rows: sample field, Full view, Close; then Size, slider 96, readout, subject line. Tab order: sample, Size, Full view, Close, grid |
+| Sample field | Search-field look without the icon, white, 14px, 200 characters, `aria-label="Sample text"`, no placeholder, "Clear sample" `X` 16px inside the right edge while it holds text. Escape closes the preview and keeps the sample |
+| Size slider | Ratio slider look and pointer behaviour, 16 to 160px of cap height, default 48; Arrows 4, Shift 16, Home 16, End 160, Ctrl+Backspace 48, Enter or F2 or double-click to type; tooltip "Size: 48 px", no hint line |
+| Buttons | 28 x 28, `rounded-[5px]`, 16px glyph at 1.5px stroke: `Maximize2` "Full view" / `Minimize2` "Split view" (glyph and name follow the state), `X` "Close preview"; tooltips below |
+| Grid | `--canvas-bg`, 12px padding and gap, equal columns of at least max(240px, 5 x size); `role="listbox"` "Fonts", one Tab stop, roving focus; virtualised by rows (in view plus one screen); faces load after 100ms in the page. Empty: the Fonts tab's text, 14px muted, 24px from the top, centred |
+| Tile | `--tile-bg` card, 1px `--tile-edge`, 8px radius, no shadow; padding 16 / 12 top / 8 bottom. Sample area: 1 to 3 reserved lines (from the sample's width in the UI font plus 15 %, equal for all tiles), 1.2 em per line, 0.25 em above and below, a 24px right reserve; drawn from the engine's outlines as one `<path>` (`currentColor` fill; single-line: 1px non-scaling round stroke, never filled). Footer 28px, 8px above: name 12px muted, chips Cuttable and Single line (20px, read-only), star 24 x 28. Hover `--editor-accent-hover`; current `--value-fill` with a 3px `--editor-accent` bar, `aria-selected`; focus 2px ring inside. Loading: the sample in the UI font in `--lane-line`, swapped in place |
+| Missing-glyph marker | `TriangleAlert` 14px `--panel-muted-fg`, 8px in from the top right, 24 x 24 target; tooltip "No glyph for: ä, ß" (at most 10); the same words end the tile's accessible description |
+| Keys | Arrows (Up and Down by a row), Home, End, Page Up, Page Down; Enter or Space picks; Ctrl+D stars; a printable character goes to the sample field; Escape closes. Opened by a key, the focus goes to the sample field; closed with the focus inside, to the Preview button (Fonts tab shown) or the canvas |
+
 ## Keyboard shortcuts established so far
 
 | Action | Shortcut | Notes |
