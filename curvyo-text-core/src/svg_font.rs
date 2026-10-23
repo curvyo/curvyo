@@ -12,6 +12,7 @@ use std::sync::Arc;
 use kurbo::{Affine, BezPath};
 use roxmltree::{Document, Node, ParsingOptions};
 
+use crate::face_style::{FaceStyle, NORMAL_WIDTH, Slant};
 use crate::limits::{
     MAX_GLYPH_POINTS, MAX_SVG_COORDINATE, MAX_SVG_DEPTH, MAX_SVG_FONT_BYTES, MAX_SVG_FONT_POINTS,
     MAX_SVG_GLYPHS, MAX_SVG_KERN_PAIRS, MAX_SVG_NODES,
@@ -192,13 +193,16 @@ fn style_of(face: Option<Node<'_, '_>>) -> String {
         weight == "bold" || weight == "bolder" || weight.parse::<u32>().is_ok_and(|w| w >= 600);
     let slant = attribute("font-style");
     let italic = slant.contains("italic") || slant.contains("oblique");
-    match (bold, italic) {
-        (false, false) => "Regular",
-        (true, false) => "Bold",
-        (false, true) => "Italic",
-        (true, true) => "Bold Italic",
+    FaceStyle {
+        weight: if bold { 700 } else { 400 },
+        width: NORMAL_WIDTH,
+        slant: if italic {
+            Slant::Italic
+        } else {
+            Slant::Upright
+        },
     }
-    .to_owned()
+    .name()
 }
 
 /// Parses the bytes' XML after the byte checks; `None` for anything refused.

@@ -177,18 +177,22 @@ impl Document {
         Ok(())
     }
 
-    /// Sets the font of every text in `ids` (criterion 13), in **one commit** labelled
-    /// `change_font`; a text that already has this font is not rewritten. A single-line face
-    /// switches a stroke that is off on in the same commit (`0076` criterion 9); switching back to
-    /// an outline face changes nothing else (criterion 10, Frage 23 SL-BACK default A).
+    /// Sets the font of each text to the font paired with it (criterion 13; a face per text for
+    /// the style buttons, `specs/0078-font-style-buttons/adrs.md` decision 3), in **one commit**
+    /// labelled `change_font`; a text that already has its font is not rewritten. A single-line
+    /// face switches a stroke that is off on in the same commit (`0076` criterion 9); switching
+    /// back to an outline face changes nothing else (criterion 10, Frage 23 SL-BACK default A).
     ///
     /// # Errors
     /// [`TextEditError::NoSuchText`] when an id is not a live text, or
     /// [`TextEditError::InvalidFont`]; nothing is written.
-    pub fn set_text_font(&self, ids: &[NodeId], font: &FontRef) -> Result<(), TextEditError> {
-        check_font(font)?;
-        let metas = self.text_metas(ids)?;
-        for meta in &metas {
+    pub fn set_text_fonts(&self, fonts: &[(NodeId, FontRef)]) -> Result<(), TextEditError> {
+        for (_, font) in fonts {
+            check_font(font)?;
+        }
+        let ids: Vec<NodeId> = fonts.iter().map(|(id, _)| *id).collect();
+        let metas = self.text_metas(&ids)?;
+        for (meta, (_, font)) in metas.iter().zip(fonts) {
             if text_codec::read_font(meta).as_ref() != Some(font) {
                 text_codec::write_font(meta, font);
                 if font.kind == FontKind::SingleLine {

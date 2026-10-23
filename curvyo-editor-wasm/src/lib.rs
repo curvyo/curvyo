@@ -104,7 +104,7 @@ pub use session::{
     SizeOutcome, SplitOutcome, StackOutcome, Tool, WipeOutcome, WipeState,
 };
 pub use session::{DragStop, OFFSET_COMMIT_LABEL, OffsetOutcome, OffsetView};
-pub use session::{ObjectToPathOutcome, TextBarView, TextSizeOutcome};
+pub use session::{ObjectToPathOutcome, StyleOutcome, TextBarView, TextSizeOutcome};
 
 #[cfg(target_arch = "wasm32")]
 pub use wasm_api::{WasmSession, init_panic_hook};

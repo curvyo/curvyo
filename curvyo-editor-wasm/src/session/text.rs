@@ -33,8 +33,8 @@ pub(super) struct TextState {
     pub(super) next_size: Option<Length>,
     /// A press inside the edited text selects while the button is held: its fixed end.
     pub(super) drag_anchor: Option<usize>,
-    /// A pick of a face whose bytes are loading: applied when they arrive.
-    pub(super) pending_pick: Option<(String, u32)>,
+    /// A pick or Style press whose faces are loading: applied when they arrive.
+    pub(super) pending_pick: Option<super::text_style::PendingPick>,
     /// The Size field's live value while an arrow key is held (UX notes §3), drawn, not
     /// written.
     pub(super) size_preview: Option<Length>,

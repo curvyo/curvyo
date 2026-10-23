@@ -185,7 +185,8 @@ fn ac28_damaged_text_is_refused() {
 fn ac13_ac31_commands_are_one_step_and_checked() {
     let (d, ids) = golden_document();
     let steps = d.own_steps().len();
-    d.set_text_font(&ids[..2], &font("Source Serif 4", "Bold", 'c'))
+    let serif = font("Source Serif 4", "Bold", 'c');
+    d.set_text_fonts(&[(ids[0], serif.clone()), (ids[1], serif)])
         .unwrap();
     d.set_text_size(&ids[..2], Length::from_mm(25.0)).unwrap();
     assert_eq!(d.own_steps().len(), steps + 2);
@@ -290,12 +291,45 @@ fn ac08_emptying_an_existing_text_removes_it_in_one_step() {
     assert_eq!(d.text(ids[1]).unwrap().string, "Line one\nLine two");
 }
 
+/// `specs/0078-font-style-buttons` criteria 10, 11 and 13 (`adrs.md` decision 3): a face per
+/// text in one step "Change font", a text that keeps its face not rewritten, one Undo restoring
+/// every face.
+#[test]
+fn style_press_sets_a_face_per_text_in_one_step() {
+    let (d, ids) = golden_document();
+    let before: Vec<FontRef> = ids.iter().map(|id| d.text(*id).unwrap().font).collect();
+    let steps = d.own_steps().len();
+    let bold = font("Source Sans 3", "Bold", 'b');
+    let light = font("Source Sans 3", "Light Italic", 'e');
+    d.set_text_fonts(&[
+        (ids[0], bold.clone()),
+        (ids[1], light.clone()),
+        (ids[2], before[2].clone()),
+    ])
+    .unwrap();
+    assert_eq!(d.own_steps().len(), steps + 1);
+    assert_eq!(d.own_steps().last().unwrap().label, "change_font");
+    assert_eq!(d.text(ids[0]).unwrap().font, bold);
+    assert_eq!(d.text(ids[1]).unwrap().font, light);
+    assert_eq!(d.text(ids[2]).unwrap().font, before[2]);
+    d.undo_step(d.own_steps().last().unwrap().step).unwrap();
+    for (id, font) in ids.iter().zip(&before) {
+        assert_eq!(&d.text(*id).unwrap().font, font);
+    }
+    // A refused font writes nothing for any text.
+    assert_eq!(
+        d.set_text_fonts(&[(ids[0], bold), (ids[1], font("X", "Bold", 'Z'))]),
+        Err(TextEditError::InvalidFont)
+    );
+    assert_eq!(&d.text(ids[0]).unwrap().font, &before[0]);
+}
+
 /// Architect review m2, must-fix 2: a face hash is 64 lower-case hex digits.
 #[test]
 fn ac28_upper_case_face_hash_is_refused() {
     let (d, ids) = golden_document();
     assert_eq!(
-        d.set_text_font(&ids[..1], &font("Source Sans 3", "Regular", 'A')),
+        d.set_text_fonts(&[(ids[0], font("Source Sans 3", "Regular", 'A'))]),
         Err(TextEditError::InvalidFont)
     );
 }

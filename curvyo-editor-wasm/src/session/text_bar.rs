@@ -5,6 +5,7 @@ use curvyo_document_core::{FontRef, Length, MAX_TEXT_SIZE, MIN_TEXT_SIZE, NodeId
 use curvyo_ui_core::FaceMatch;
 
 use super::text::{NEW_TEXT_ID, edit_id};
+use super::text_style::PendingPick;
 use super::{Session, Tool};
 
 /// What the Text bar (Text tool) or the Select bar's Text group shows.
@@ -23,6 +24,8 @@ pub struct TextBarView {
     pub sample_node: String,
     /// That text's first line, at most 200 characters; empty without a sample node.
     pub sample: String,
+    /// The Style group's six buttons (`specs/0078-font-style-buttons` criteria 3 to 9).
+    pub style: curvyo_ui_core::StyleButtons,
 }
 
 /// What a typed or stepped size did (criterion 12).
@@ -182,7 +185,7 @@ impl Session {
 
     /// The texts the Text bar or the Select bar's Text group act on: the edited one, else the
     /// selected texts.
-    fn bar_texts(&self) -> Vec<TextSnapshot> {
+    pub(super) fn bar_texts(&self) -> Vec<TextSnapshot> {
         if let Some(edit) = self.text.edit.as_ref() {
             return vec![edit.snapshot(edit_id(edit).unwrap_or(NEW_TEXT_ID))];
         }
@@ -227,6 +230,7 @@ impl Session {
             size_mm: size.map(Length::as_mm),
             sample_node,
             sample,
+            style: self.style_buttons(),
         }
     }
 
@@ -249,7 +253,7 @@ impl Session {
             };
             let Some(font) = this.fonts.font_of(index) else {
                 this.fonts.request(index);
-                this.text.pending_pick = Some((host_id.to_owned(), face_index));
+                this.text.pending_pick = Some(PendingPick::Face(host_id.to_owned(), face_index));
                 return;
             };
             this.text.pending_pick = None;
@@ -259,13 +263,15 @@ impl Session {
             }
             let ids = this.bar_text_ids();
             if !ids.is_empty() {
-                let _ = this.document.set_text_font(&ids, &font);
+                let fonts: Vec<(NodeId, FontRef)> =
+                    ids.into_iter().map(|id| (id, font.clone())).collect();
+                let _ = this.document.set_text_fonts(&fonts);
             }
         });
     }
 
     /// The existing texts the bar writes to.
-    fn bar_text_ids(&self) -> Vec<NodeId> {
+    pub(super) fn bar_text_ids(&self) -> Vec<NodeId> {
         match self.text.edit.as_ref() {
             Some(edit) => edit_id(edit).into_iter().collect(),
             None => self
@@ -318,11 +324,7 @@ impl Session {
     /// Hands in the bytes of a listed font file; a pick waiting for it is applied.
     pub fn add_font_file(&mut self, host_id: &str, bytes: &[u8]) -> bool {
         let added = self.fonts.add_file(host_id, bytes);
-        if let Some((pending, face_index)) = self.text.pending_pick.clone()
-            && pending == host_id
-        {
-            self.pick_font_face(&pending, face_index);
-        }
+        self.retry_pending_pick(host_id);
         added
     }
 }

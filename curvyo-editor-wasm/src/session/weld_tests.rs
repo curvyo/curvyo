@@ -81,7 +81,10 @@ fn ac23_a_missing_face_refuses() {
         face_index: 0,
         kind: FontKind::Outline,
     };
-    session.document.set_text_font(&[id], &lost).unwrap();
+    session
+        .document
+        .set_text_fonts(&[(id, lost.clone())])
+        .unwrap();
     session.set_tool(Tool::Rectangle);
     session.pointer_down(Point::new(0.0, 30.0), false);
     session.pointer_up(Point::new(20.0, 40.0), false, false);
