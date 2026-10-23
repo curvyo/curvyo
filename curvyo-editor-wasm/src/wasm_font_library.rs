@@ -5,7 +5,7 @@
 use wasm_bindgen::prelude::*;
 
 use crate::wasm_api::WasmSession;
-use crate::{FontChecksGlue, FontLibraryGlue};
+use crate::{FontChecksGlue, FontLibraryGlue, PreviewFacesGlue};
 
 /// The maker's font library (one per page, it outlives a project's session).
 #[wasm_bindgen]
@@ -134,6 +134,41 @@ impl WasmFontChecks {
     /// Checks one face (or finds it by hash) and keeps the result: pieces or `-1`.
     pub fn check(&mut self, host_id: &str, index: u32, stamp: &str, bytes: &[u8]) -> i32 {
         i32::try_from(self.glue.check(host_id, index, stamp, bytes)).unwrap_or(i32::MAX)
+    }
+}
+
+/// The faces the font preview draws (`specs/0077-font-preview`, `adrs.md` decision 2): one per
+/// page, within a byte budget.
+#[wasm_bindgen]
+#[derive(Debug, Default)]
+pub struct WasmPreviewFaces {
+    glue: PreviewFacesGlue,
+}
+
+#[wasm_bindgen]
+impl WasmPreviewFaces {
+    /// An empty store.
+    #[wasm_bindgen(constructor)]
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Keeps face `index` of `bytes` under `id`; `false` for bytes that hold no usable face.
+    pub fn add_preview_face(&mut self, id: &str, bytes: &[u8], index: u32) -> bool {
+        self.glue.add(id, bytes, index)
+    }
+
+    /// Whether the face `id` is held.
+    #[must_use]
+    pub fn has_preview_face(&self, id: &str) -> bool {
+        self.glue.has(id)
+    }
+
+    /// A tile's sample in the face `id` up to `width_caps` cap heights, as JSON (see
+    /// `PreviewFacesGlue::tile`).
+    pub fn preview_tile(&mut self, id: &str, text: &str, width_caps: f64) -> String {
+        self.glue.tile_within(id, text, width_caps)
     }
 }
 

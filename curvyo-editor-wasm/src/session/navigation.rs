@@ -133,11 +133,33 @@ impl Session {
     /// the viewport's own center fixed (acceptance criterion 10). A view that
     /// is still the untouched default keeps the document centred in the new
     /// size instead (`Viewport::centre_document`).
+    /// A side pane covering the canvas's right part (`cover_right`) is left out: the viewport
+    /// is the visible part.
     pub fn resize_viewport(&mut self, width: f64, height: f64) {
-        self.viewport.resize(width, height);
+        self.canvas_css_width = width;
+        self.viewport
+            .resize((width - self.covered_right).max(0.0), height);
         let size = self.document.size();
         self.viewport
             .centre_document(size.width.as_mm(), size.height.as_mm());
+    }
+
+    /// A side pane now lies over the canvas's right `covered` CSS px (`0` for none,
+    /// `specs/0077-font-preview` criterion 2): the canvas element keeps its size, the viewport
+    /// (fit, centring, the off-screen and placement rules) shrinks to the visible part. Announce
+    /// the width change first (`keep_view_origin_for_width_change`) to keep the top-left origin.
+    pub fn cover_right(&mut self, covered: f64) {
+        let covered = if covered.is_finite() {
+            covered.max(0.0)
+        } else {
+            0.0
+        };
+        if (covered - self.covered_right).abs() < f64::EPSILON {
+            return;
+        }
+        self.covered_right = covered;
+        let (_, height) = self.viewport.canvas_size();
+        self.resize_viewport(self.canvas_css_width, height);
     }
 
     /// The properties panel is about to open or close and change the canvas
@@ -224,5 +246,29 @@ mod tests {
 
         let after = session.screen_to_document(550.0, 625.0);
         assert!((centre.x - after.x).abs() < 1e-9 && (centre.y - after.y).abs() < 1e-9);
+    }
+
+    /// `0077` criterion 2: a pane over the canvas's right part shrinks the viewport to the
+    /// visible part, keeps the view where it was when announced, and a later canvas resize
+    /// keeps leaving the covered part out.
+    #[test]
+    fn a_pane_over_the_canvas_leaves_the_view_and_shrinks_the_viewport_to_the_visible_part() {
+        let mut session = Session::new(1);
+        session.show_default_view();
+        session.resize_viewport(1500.0, 1300.0);
+        session.wheel(30.0, 0.0, 400.0, 400.0, false, false);
+        let corner = session.screen_to_document(0.0, 0.0);
+
+        session.keep_view_origin_for_width_change(-500.0);
+        session.cover_right(500.0);
+        assert_eq!(session.viewport.canvas_size(), (1000.0, 1300.0));
+        let after = session.screen_to_document(0.0, 0.0);
+        assert!((corner.x - after.x).abs() < 1e-9 && (corner.y - after.y).abs() < 1e-9);
+
+        session.resize_viewport(1400.0, 1300.0);
+        assert_eq!(session.viewport.canvas_size(), (900.0, 1300.0));
+        session.keep_view_origin_for_width_change(500.0);
+        session.cover_right(0.0);
+        assert_eq!(session.viewport.canvas_size(), (1400.0, 1300.0));
     }
 }

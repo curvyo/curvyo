@@ -86,6 +86,8 @@ mod pen_entry_text;
 mod pen_target;
 mod pen_tool;
 mod poly_star_tool;
+mod preview_faces;
+mod preview_sample;
 mod rectangle_tool;
 mod reference_point;
 mod resize_direction;
@@ -280,6 +282,8 @@ pub use pen_tool::{
     ClosingPreview, Continuation, PenTool, PointerUpOutcome as PenPointerUpOutcome, PressAction,
 };
 pub use poly_star_tool::{PolyStarMode, PolyStarSettings, PolygonStarTool};
+pub use preview_faces::{PREVIEW_FACE_BUDGET, PreviewFaces};
+pub use preview_sample::{MAX_SAMPLE_CHARS, sample_line};
 pub use rectangle_tool::RectangleTool;
 pub use reference_point::{
     MARKS_MIN_SIDE_PX, ReferencePoint, hit_mark, mark_hit_radius_px, marks_are_shown,

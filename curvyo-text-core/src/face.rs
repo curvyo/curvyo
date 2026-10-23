@@ -195,6 +195,30 @@ impl Face {
         metrics
     }
 
+    /// The distinct characters of `text` the face has no glyph for (glyph 0: `.notdef`, or an SVG
+    /// font's `<missing-glyph>`), in first-seen order; whitespace and control characters are left
+    /// out (`specs/0077-font-preview` criterion 18, `adrs.md` decision 3).
+    #[must_use]
+    pub fn missing_chars(&self, text: &str) -> Vec<char> {
+        let mut missing = Vec::new();
+        for c in text.chars() {
+            if c.is_whitespace() || c.is_control() || missing.contains(&c) {
+                continue;
+            }
+            let glyph = match &self.source {
+                Source::OpenType { shaper, .. } => shaper
+                    .charmap()
+                    .map_unicode(c)
+                    .map_or(0, harfrust::GlyphId::to_u32),
+                Source::Svg(font) => font.glyph_of(c),
+            };
+            if glyph == 0 {
+                missing.push(c);
+            }
+        }
+        missing
+    }
+
     /// The face's metrics in em units.
     #[must_use]
     pub const fn metrics(&self) -> &FaceMetrics {

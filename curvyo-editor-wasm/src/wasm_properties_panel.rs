@@ -201,6 +201,14 @@ impl WasmSession {
             .keep_view_origin_for_width_change(width_delta_css_px);
     }
 
+    /// A side pane now lies over the canvas's right `covered_css_px` (`0` for none): the
+    /// canvas keeps its size and surface, the view's fit, centring and visibility rules use the
+    /// visible part (`specs/0077-font-preview` criterion 2). Call
+    /// [`WasmSession::keep_view_origin_for_panel_toggle`] first to keep the view where it is.
+    pub fn cover_canvas_right(&mut self, covered_css_px: f64) {
+        self.session.cover_right(covered_css_px);
+    }
+
     /// Whether a canvas pointer press is in flight.
     #[must_use]
     pub fn pointer_is_down(&self) -> bool {

@@ -106,6 +106,8 @@ mod text_bar;
 mod text_fonts;
 mod text_path;
 #[cfg(test)]
+mod text_sample_tests;
+#[cfg(test)]
 mod text_tests;
 mod tolerances;
 mod transform_entry;
@@ -260,6 +262,10 @@ pub struct Session {
     /// Pan/zoom view state (ADR 0009 §2: ephemeral — never written to
     /// the document, resets on `New`/`Open`).
     viewport: Viewport,
+    /// The canvas element's CSS width, and the px of its right part a side pane lies over
+    /// (`specs/0077-font-preview` criterion 2): the viewport is the visible part only.
+    canvas_css_width: f64,
+    covered_right: f64,
     hovered: Option<Hit>,
     /// The object currently hovered while the Select tool is active —
     /// the Select-tool counterpart to `hovered` above (acceptance criteria
@@ -397,6 +403,8 @@ impl Session {
             colour_pick: colour_pick::ColourPick::default(),
             background_preview: None,
             viewport: Viewport::new(),
+            canvas_css_width: 0.0,
+            covered_right: 0.0,
             hovered: None,
             hovered_object: None,
             history_hover: Vec::new(),
@@ -462,6 +470,8 @@ impl Session {
             colour_pick: colour_pick::ColourPick::default(),
             background_preview: None,
             viewport: Viewport::new(),
+            canvas_css_width: 0.0,
+            covered_right: 0.0,
             hovered: None,
             hovered_object: None,
             history_hover: Vec::new(),

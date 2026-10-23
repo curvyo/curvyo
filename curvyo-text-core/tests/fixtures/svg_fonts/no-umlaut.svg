@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!-- A single-line face without "ü" and without "…" (specs/0077-font-preview criterion 18). -->
+<svg xmlns="http://www.w3.org/2000/svg">
+<defs>
+<font id="NoUmlaut" horiz-adv-x="500">
+<font-face font-family="No Umlaut" units-per-em="1000" ascent="800" descent="200" cap-height="700"/>
+<missing-glyph horiz-adv-x="500" d="M 50 0 L 450 0 L 450 700 L 50 700 Z"/>
+<glyph unicode=" " horiz-adv-x="300"/>
+<glyph unicode="H" d="M 50 0 V 700 M 450 0 V 700 M 50 350 H 450"/>
+<glyph unicode="J" d="M 400 700 V 100 L 300 0 H 100 L 50 100"/>
+<glyph unicode="u" d="M 50 500 V 100 L 150 0 H 350 L 450 100 M 450 500 V 0"/>
+<glyph unicode="r" horiz-adv-x="400" d="M 50 500 V 0 M 50 300 L 250 500 H 350"/>
+<glyph unicode="g" d="M 450 500 V -100 L 350 -200 H 100 M 450 400 L 350 500 H 150 L 50 400 V 100 L 150 0 H 350 L 450 100"/>
+<glyph unicode="e" d="M 50 250 H 450 V 400 L 350 500 H 150 L 50 400 V 100 L 150 0 H 400"/>
+<glyph unicode="n" d="M 50 500 V 0 M 50 400 L 150 500 H 350 L 450 400 V 0"/>
+<glyph unicode="." horiz-adv-x="200" d="M 100 0 V 30"/>
+</font>
+</defs>
+</svg>

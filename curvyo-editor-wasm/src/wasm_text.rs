@@ -34,6 +34,12 @@ pub struct TextBarStateView {
     pub missing: bool,
     /// The size in mm; NaN for "Mixed".
     pub size_mm: f64,
+    /// The one edited or selected text the font preview follows; empty for none.
+    #[wasm_bindgen(getter_with_clone)]
+    pub sample_node: String,
+    /// That text's first line, at most 200 characters.
+    #[wasm_bindgen(getter_with_clone)]
+    pub sample: String,
 }
 
 /// What Object to path did: `kind` is `"ignored"`, `"converted"`, `"missing_fonts"` (`count`
@@ -200,6 +206,8 @@ impl WasmSession {
             font: bar.font,
             missing: bar.missing,
             size_mm: bar.size_mm.unwrap_or(f64::NAN),
+            sample_node: bar.sample_node,
+            sample: bar.sample,
         }
     }
 

@@ -18,6 +18,11 @@ pub struct TextBarView {
     pub missing: bool,
     /// The size in mm; `None` when several sizes differ ("Mixed").
     pub size_mm: Option<f64>,
+    /// The node the font preview's sample follows: the one edited or selected text (its full id),
+    /// else empty (`specs/0077-font-preview` criteria 8 and 9, `adrs.md` decision 5).
+    pub sample_node: String,
+    /// That text's first line, at most 200 characters; empty without a sample node.
+    pub sample: String,
 }
 
 /// What a typed or stepped size did (criterion 12).
@@ -205,6 +210,13 @@ impl Session {
             None => (self.next_text_font(), Some(self.next_text_size())),
         };
         let size = self.text.size_preview.or(size);
+        let (sample_node, sample) = match texts.as_slice() {
+            [one] => (
+                one.id.full_id(),
+                curvyo_ui_core::sample_line(&one.string).to_owned(),
+            ),
+            _ => (String::new(), String::new()),
+        };
         TextBarView {
             shown,
             font: font
@@ -213,6 +225,8 @@ impl Session {
                 .unwrap_or_default(),
             missing: font.as_ref().is_some_and(|f| self.fonts.is_missing(f)),
             size_mm: size.map(Length::as_mm),
+            sample_node,
+            sample,
         }
     }
 
