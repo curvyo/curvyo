@@ -16,6 +16,9 @@ interface TextSinkProps {
 export function TextSink({ text, mounted }: TextSinkProps) {
   const { sinkRef, sinkValue, sinkPoint, bar, editing } = text;
 
+  // The value is set here only, never as `defaultValue`: React writes that prop again on every
+  // render, and WebKitGTK (the Linux desktop build) then puts the caret back at 0, so Backspace
+  // found nothing to delete.
   useLayoutEffect(() => {
     const sink = sinkRef.current;
     if (!sink || !sinkValue) {
@@ -28,7 +31,8 @@ export function TextSink({ text, mounted }: TextSinkProps) {
     const units = (scalars: number) =>
       Array.from(sinkValue.text).slice(0, scalars).join("").length;
     sink.setSelectionRange(units(sinkValue.start), units(sinkValue.end));
-  }, [sinkRef, sinkValue]);
+    // `editing` and `mounted`: a sink mounted after the value arrived takes it too.
+  }, [sinkRef, sinkValue, editing, mounted]);
 
   const { onBeforeInput, ...handlers } = text.sinkHandlers;
   useEffect(() => {
@@ -54,7 +58,6 @@ export function TextSink({ text, mounted }: TextSinkProps) {
       autoCorrect="off"
       spellCheck={false}
       tabIndex={editing ? 0 : -1}
-      defaultValue={sinkValue?.text ?? ""}
       {...handlers}
       className="pointer-events-none absolute m-0 resize-none overflow-hidden border-0 p-0 opacity-0 outline-none"
       style={{

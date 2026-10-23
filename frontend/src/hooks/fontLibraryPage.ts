@@ -68,3 +68,14 @@ export function os2Of(face: ListedFace): string | null {
   const listed = hostListing(face.block).find((f) => f.id === face.id && f.index === face.faceIndex);
   return listed?.os2 ?? null;
 }
+
+/** Which of the family `names` are starred now, read from the library (the font preview's tiles,
+ * `specs/0077-font-preview` criterion 14, also while the Fonts tab is not shown). */
+export function favouritesAmong(names: string[]): Set<string> {
+  const library = page.library;
+  if (!library || names.length === 0) {
+    return new Set();
+  }
+  const raw = JSON.parse(library.view(JSON.stringify(names))) as { favourites: number[] };
+  return new Set(raw.favourites.map((at) => names[at]));
+}

@@ -30,6 +30,11 @@ export interface TextBarState {
   sizeMm: number | null;
   /** The desktop build: Shift+Ctrl+T shows the Fonts tab (the browser has no key). */
   desktop: boolean;
+  /** The one edited or selected text the font preview follows, empty for none
+   * (`specs/0077-font-preview` criteria 8 and 9). */
+  sampleNode: string;
+  /** That text's first line, at most 200 characters. */
+  sample: string;
 }
 
 const EMPTY_BAR: TextBarState = {
@@ -39,6 +44,8 @@ const EMPTY_BAR: TextBarState = {
   substitute: "Source Sans 3",
   sizeMm: null,
   desktop: isTauri,
+  sampleNode: "",
+  sample: "",
 };
 
 type ShowNotice = (
@@ -291,6 +298,8 @@ export function useText(
       substitute: tab.current?.substitute ?? EMPTY_BAR.substitute,
       sizeMm: Number.isFinite(raw.size_mm) ? raw.size_mm : null,
       desktop: isTauri,
+      sampleNode: raw.sample_node,
+      sample: raw.sample,
     });
     raw.free();
     setFonts(tab);

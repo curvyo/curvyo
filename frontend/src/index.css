@@ -128,6 +128,12 @@
     /* docs/design-system.md, "Color tokens": the lines of branch lanes and the calm eye and lock of
        the Layers list (`--toolbar-icon` at 60 % on `--panel-bg`, 3.1:1). */
     --lane-line: #7B7B7F;
+    /* docs/design-system.md, "Font preview (`0077`)": the specimen card of a preview tile and its
+       decorative 1px edge (`--toolbar-icon` at 25 % on white), and the quiet bar a tile shows until
+       its face's glyphs are drawn (`--toolbar-icon` at 8 % on white). Light theme only. */
+    --tile-bg: #FFFFFF;
+    --tile-edge: #CDCDCF;
+    --tile-skeleton: #EDEDEE;
     /* The 1px border of a panel button or text field (the "Fit to content" button). */
     --field-border: color-mix(in srgb, var(--toolbar-icon) 60%, transparent);
     /* `0042`: the blue of a previewed version (alias of the accent, design-system "--preview-new"). */

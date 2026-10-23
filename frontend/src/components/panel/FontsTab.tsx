@@ -24,6 +24,9 @@ import { useFontDrop } from "@/hooks/useFontDrop";
 import { isTauri } from "@/platform/host";
 import { checkingText, emptyTagText, removePrompt } from "@/lib/fontLibraryText";
 import { useFontTreeScroll } from "@/hooks/useFontTreeScroll";
+import { useFontPreviewState } from "@/hooks/useFontPreviewState";
+import { type PreviewListing, previewState, publishListing, setPreviewOpen } from "@/lib/fontPreviewStore";
+import { subjectLine } from "@/lib/fontPreviewText";
 import { onFontTreeKey } from "@/lib/fontTreeKeys";
 import { TabNotice } from "@/components/panel/FontTabNotice";
 import { FontSearchRow } from "@/components/panel/FontSearchRow";
@@ -212,7 +215,7 @@ export function FontsTab({ data, onPick, onReturnFocus, onShown, textsUsingFamil
   }, []);
   const drop = useFontDrop(bodyRef, onDrop);
 
-  const { adding, openAddTag, closeAddTag, focusTagLine, removeTag } = useFontTagLine(lib, focusRow, keep);
+  const { adding, openAddTag, closeAddTag, focusTagLine, removeTag } = useFontTagLine(lib, focusRow, keep, bodyRef);
 
   const onListKey = (event: React.KeyboardEvent<HTMLDivElement>) =>
     onFontTreeKey(event, {
@@ -258,6 +261,61 @@ export function FontsTab({ data, onPick, onReturnFocus, onShown, textsUsingFamil
   const pinned = pinnedHeader(rows, tops, scrollTop);
   const firstFamily = blocks.flatMap((block) => block.families)[0];
   const shownFamilies = blocks.reduce((sum, block) => sum + block.families.length, 0);
+
+  // The preview shows the same families (`specs/0077-font-preview` criteria 16 and 26).
+  const preview = useFontPreviewState();
+  const starRef = useRef(star);
+  starRef.current = star;
+  const tagEditsRef = useRef({ lib, keep });
+  tagEditsRef.current = { lib, keep };
+  const total = useMemo(
+    () =>
+      searching
+        ? fontBlocks(data, "", isTauri, chosen === "all" ? undefined : inCell).reduce((sum, b) => sum + b.families.length, 0)
+        : shownFamilies,
+    [searching, data, chosen, inCell, shownFamilies],
+  );
+  useEffect(() => {
+    const member = (id: string) => lib.tags.find((tag) => tag.id === id)?.members;
+    const cuttable = member("cuttable");
+    const singleLine = member("single_line");
+    const empty =
+      shownFamilies > 0
+        ? null
+        : data.faces.length === 0 && !(isTauri && !data.systemRead)
+          ? "Loading fonts…"
+          : chosen !== "all"
+            ? emptyTagText(chosenName, search, chosen === "cuttable" && checking)
+            : searching
+              ? `No font matches "${search.trim()}".`
+              : "Loading fonts…";
+    const next: PreviewListing = {
+      families: blocks
+        .flatMap((block) => block.families)
+        .map((family) => ({
+          family,
+          tags: tagEditsRef.current.lib.tagsOf(family.family),
+          cuttable: cuttable?.has(family.family) ?? false,
+          singleLine: singleLine?.has(family.family) ?? false,
+        })),
+      subject: subjectLine(chosen === "all" ? "All" : chosenName, shownFamilies, total, searching),
+      empty,
+      filter: `${chosen}|${search}`,
+      star: (family) => starRef.current(family),
+      addTag: (family, name) => {
+        tagEditsRef.current.keep(family);
+        return tagEditsRef.current.lib.addTag(family, name);
+      },
+      removeTag: (family, id) => {
+        tagEditsRef.current.keep(family);
+        tagEditsRef.current.lib.removeTag(family, id);
+      },
+      completions: (family, prefix) => tagEditsRef.current.lib.completions(family, prefix),
+    };
+    if (!sameListing(previewState().listing, next)) {
+      publishListing(next);
+    }
+  }, [blocks, lib.tags, chosen, chosenName, search, searching, shownFamilies, total, checking, data]);
 
   const list =
     data.faces.length === 0 && !(isTauri && !data.systemRead) ? (
@@ -448,6 +506,13 @@ export function FontsTab({ data, onPick, onReturnFocus, onShown, textsUsingFamil
               }
             }}
             busy={lib.busy}
+            previewOpen={preview.open}
+            onPreview={(byKeyboard) => {
+              setPreviewOpen(!preview.open, byKeyboard);
+              if (!byKeyboard) {
+                onReturnFocus();
+              }
+            }}
             dropOver={drop.over}
             notice={lib.notice}
             onAdd={(byKeyboard) => void addFonts(undefined, byKeyboard)}
@@ -455,5 +520,31 @@ export function FontsTab({ data, onPick, onReturnFocus, onShown, textsUsingFamil
           {list}
       </>
     </div>
+  );
+}
+
+/** Whether two listings show the same tiles, words and filter (the star is always the latest). */
+function sameListing(a: PreviewListing, b: PreviewListing): boolean {
+  return (
+    a.subject === b.subject &&
+    a.empty === b.empty &&
+    a.filter === b.filter &&
+    a.families.length === b.families.length &&
+    a.families.every(
+      (entry, at) =>
+        sameFamily(entry.family, b.families[at].family) &&
+        entry.tags.map((tag) => `${tag.id}:${tag.source}`).join("|") ===
+          b.families[at].tags.map((tag) => `${tag.id}:${tag.source}`).join("|"),
+    )
+  );
+}
+
+/** The same family with the same face for its tile. */
+function sameFamily(a: FontFamily, b: FontFamily): boolean {
+  return (
+    familyKey(a) === familyKey(b) &&
+    a.faces[0]?.id === b.faces[0]?.id &&
+    a.faces[0]?.index === b.faces[0]?.index &&
+    a.faces[0]?.loaded === b.faces[0]?.loaded
   );
 }

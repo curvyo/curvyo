@@ -1,6 +1,7 @@
-// The tag lines of the Fonts tab's families (`specs/0075-font-library` UX tags amendment §4, §5
-// and §8): which family's line holds the add field, where the focus goes when it closes, entering
-// a line with Shift+F2, and removing a tag with the focus moving on to the next chip.
+// The tag lines of the families in the Fonts tab or the font preview's tiles
+// (`specs/0075-font-library` UX tags amendment §4, §5 and §8, `specs/0077-font-preview` criterion
+// 14): which family's line holds the add field, where the focus goes when it closes, entering a
+// line with Shift+F2, and removing a tag with the focus moving on to the next chip.
 import { useRef, useState } from "react";
 
 import type { FontLibraryApi } from "@/hooks/useFontLibrary";
@@ -9,10 +10,12 @@ import { addFieldReturn, tagAfterRemove } from "@/lib/tagLineFocus";
 import type { FontFamily } from "@/lib/textText";
 
 export function useFontTagLine(
-  lib: FontLibraryApi,
+  lib: Pick<FontLibraryApi, "removeTag">,
   focusRow: (key: string) => void,
   /** A maker's press keeps the row in view until the cell or the search changes. */
   keep: (family: string) => void,
+  /** The tree or the tile grid: the rows (`data-row-key`) are looked up inside it only. */
+  scope: React.RefObject<HTMLElement | null>,
 ) {
   /** The family key whose tag line holds the add field. */
   const [adding, setAdding] = useState<string | null>(null);
@@ -20,9 +23,9 @@ export function useFontTagLine(
    * element that had it before the press. */
   const addReturnRef = useRef<HTMLElement | "add-tag" | null>(null);
 
-  /** The tag line of the family `family` in the tree. */
+  /** The tag line of the family `family` in the scope. */
   const tagLineOf = (family: FontFamily) =>
-    document.querySelector<HTMLElement>(`[data-row-key="${CSS.escape(familyKey(family))}"] [data-tag-line]`);
+    scope.current?.querySelector<HTMLElement>(`[data-row-key="${CSS.escape(familyKey(family))}"] [data-tag-line]`);
 
   const openAddTag = (family: FontFamily, byKeyboard: boolean) => {
     addReturnRef.current = byKeyboard ? "add-tag" : (document.activeElement as HTMLElement | null);
