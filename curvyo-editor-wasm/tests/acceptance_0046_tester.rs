@@ -18,6 +18,9 @@
     clippy::items_after_statements
 )]
 
+mod cpu_time;
+
+use cpu_time::cpu_time_of;
 use curvyo_document_core::{
     AnchorId, Direction, Document, EllipseFrame, Length, NewAnchor, NodeId, ObjectSnapshot, Point,
     RectBounds, pack, unpack,
@@ -374,9 +377,10 @@ fn c33_five_thousand_nodes_and_a_100_000_mm_template_draw_without_nan() {
         })
         .collect();
     let mut s = open(&Document::new(1));
-    let t = std::time::Instant::now();
-    assert_eq!(s.load_template(&source_bytes(&rects)).unwrap(), 5000);
-    let load = t.elapsed();
+    // Thread CPU time, not wall time: under a parallel test run the load took 10 to 14 s of
+    // wall time for 2.3 s of work.
+    let (loaded, load) = cpu_time_of(|| s.load_template(&source_bytes(&rects)));
+    assert_eq!(loaded.unwrap(), 5000);
     let list = s.frame_draw_list();
     assert!(
         list.triangles
@@ -384,7 +388,7 @@ fn c33_five_thousand_nodes_and_a_100_000_mm_template_draw_without_nan() {
             .all(|v| v.position.x.is_finite() && v.position.y.is_finite())
     );
     assert!(list.triangle_count() > 0);
-    eprintln!("5000-node template: load {load:?}");
+    eprintln!("5000-node template: load {load:?} (CPU time)");
     assert!(load.as_secs_f64() < 10.0);
     let mut w = open(&Document::new(1));
     w.load_template(&source_bytes(&[(0.0, 0.0, 100_000.0, 10.0)]))

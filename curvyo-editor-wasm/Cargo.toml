@@ -28,8 +28,9 @@ loro.workspace = true
 
 zip.workspace = true
 
-# `tests/node_marquee_interactivity.rs` times the marquee frame by the thread's CPU time, so a
-# busy CI runner does not fail the 16.7 ms budget (`specs/0053-node-marquee-selection/` crit. 25).
+# `tests/cpu_time/` times budget tests by the thread's CPU time, so a busy CI runner does not
+# fail them (the marquee frame of `specs/0053-node-marquee-selection/` crit. 25, the template
+# load of `specs/0046-document-shapes`).
 [target.'cfg(unix)'.dev-dependencies]
 rustix = { version = "1.1", features = ["time"] }
 
