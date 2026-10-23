@@ -163,6 +163,7 @@ to it instead of restating it.
 | R-FONT-007 | Font preview page: the given lettering set in all fonts of a group at once, as in PewPew Studio, in a fixed panel or split view and not in a popup; where it lives is open. | Should | Customer (2026-10-17) |
 | R-FONT-008 | Shipped fonts have a free licence recorded per font; the font's embedding permission is shown and does not block use. | Should | Proposal |
 | R-FONT-009 | Laserable lettering (customer, 2026-10-17): overlapping letters and monoline strokes become one clean outline for cutting: Weld with a tolerance (including stroke to path), optional bridges for islands. Analysis shows Union already covers closed overlaps. Draft sketch. `specs/0068-laserable-lettering/` | Should | Customer (2026-10-17) |
+| R-FONT-010 | Weight and italic buttons for a text (customer, 2026-10-23): Extra Light, Light, Regular, Bold, Extra Bold and Italic switch the selected text to the matching face of its family; a style the family does not have is shown greyed. `specs/0078-font-style-buttons/` | Should | Customer (2026-10-23) |
 
 **Tracked, not blocking (open research item):** unlike icons/symbols (§11,
 Iconify), no third-party asset-library service for *fonts* has been
@@ -246,7 +247,7 @@ The architect's [ADR 0014](adr/0014-history-undo-and-branches.md) (accepted by t
 | R-HIST-003 | Branches and versions: steps taken back and then not redone become a branch shown in the history, with no linear redo until the conflicting step is taken back; a version of an object can be looked at (preview) or the object set to it (live) with a switch and a way to restore the state from before; a clone of the state at any point, also of deleted objects. `specs/0042-history-branches/` | Should | Customer |
 | R-HIST-004 | Wipe: the history of one object and the history of the whole document can each be wiped by an explicit, confirmed control inside the panel. The object wipe hides and cuts; the document wipe removes the steps from the file. `specs/0020-undo-redo/` (document), `specs/0041-object-history/` (object) | Should | Customer |
 
-R-EDIT-019 to R-EDIT-036, R-EDIT-038 to R-EDIT-046, R-MFG-006 to R-MFG-011, R-FONT-005 to R-FONT-009, R-EXT-003 to R-EXT-005 (R-EDIT-031 excepted: it carries the layers half of R-EDIT-009, which is in the MVP list; R-EDIT-037 is a prerequisite of the MVP's R-VEC-001 and joins the MVP by that dependency, customer 2026-10-14), R-SYS-010, R-HIST-002 to R-HIST-004 and R-INP-001 are not in the MVP list below, which stays as confirmed; the customer schedules them (build order proposal in `specs/README.md`). R-EDIT-008 and the global history of R-HIST-001, which `0020` delivers together, are the confirmed MVP's slice 8.
+R-EDIT-019 to R-EDIT-036, R-EDIT-038 to R-EDIT-046, R-MFG-006 to R-MFG-011, R-FONT-005 to R-FONT-010, R-EXT-003 to R-EXT-005 (R-EDIT-031 excepted: it carries the layers half of R-EDIT-009, which is in the MVP list; R-EDIT-037 is a prerequisite of the MVP's R-VEC-001 and joins the MVP by that dependency, customer 2026-10-14), R-SYS-010, R-HIST-002 to R-HIST-004 and R-INP-001 are not in the MVP list below, which stays as confirmed; the customer schedules them (build order proposal in `specs/README.md`). R-EDIT-008 and the global history of R-HIST-001, which `0020` delivers together, are the confirmed MVP's slice 8.
 
 ---
 
