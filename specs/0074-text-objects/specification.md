@@ -1,6 +1,6 @@
 # Text objects: place text with the Text tool, pick a font and a size, convert it to paths
 
-Status: Ready (2026-10-20; customer decisions and UX notes applied)
+Status: Done (PR #165, merged 2026-10-20). Ready 2026-10-20 with the customer decisions and UX notes applied.
 Priority: Must (R-EDIT-004 is a Customer Must and names text; `0062`, `0068` and `0070` all build on a text object)
 Origin: Customer. Stage 1 of `0062-fonts` ("a tool to add", "our own card in the properties", 2026-10-17) and its Question 1 (FONT-TEXT, default A: the text object gets its own spec first). Items marked **(Proposal)** are the product owner's and not accepted until the customer says so.
 Depends on: `0003` and `0009` (Object to path, the Select bar), `0005`, `0019`, `0047` (transforms), `0017` (Style tab), `0020` (one step per interaction), `0023` (groups), `0043` and `0051` (panel tabs), `0050` (active layer, Layers tab rows), `0010` (Escape cascade, key gate).
@@ -109,8 +109,8 @@ The four questions put to the customer were answered on 2026-10-20 (section "Dec
 
 Not put to the customer (safe default, vetoable at the demo):
 
-5. **TEXT-MISSING:** Object to path on a text whose font is missing. Default: refused with a notice (criterion 29), because ADR 0009 §5 (accepted) forbids converting with a substitute; converting the fallback silently would change the letters the maker sees in another person's file. The alternative (convert with the fallback face after a notice) needs a new ADR.
-6. **TEXT-EDIT-EXIT:** whether the second Escape goes to the Select tool (criterion 7, Proposal) or stays in the Text tool as Inkscape does. Default: Select tool, as the other creation tools.
+5. **TEXT-MISSING** (default accepted with PR #165): Object to path on a text whose font is missing. Default: refused with a notice (criterion 29), because ADR 0009 §5 (accepted) forbids converting with a substitute; converting the fallback silently would change the letters the maker sees in another person's file. The alternative (convert with the fallback face after a notice) needs a new ADR.
+6. **TEXT-EDIT-EXIT** (default accepted with PR #165): whether the second Escape goes to the Select tool (criterion 7, Proposal) or stays in the Text tool as Inkscape does. Default: Select tool, as the other creation tools.
 
 ## Decided by the customer 2026-10-20
 
@@ -123,7 +123,7 @@ All six questions answered A:
 5. **TEXT-ADR A:** [ADR 0020](../../docs/adr/0020-text-nodes-text-engine-and-font-sources.md) is Accepted (2026-10-20, customer).
 6. **TEXT-WASMSIZE A:** the wasm budget for the text engine is raised to 1.3 MiB uncompressed (the spike measured 1,247 KiB, 433 KiB gzip; ADR 0020 "Spike results" and `docs/technical-debt.md`).
 
-## Needs from the architect (before Ready)
+## Needs from the architect (before Ready; resolved by ADR 0020 and `adrs.md`)
 
 - **Text node in the document model** (`needs-customer`, document model and file format): the node kind; the string as a Loro text (per-character merge, ADR 0009 §3); the font reference (family, style name, content hash) and its matching rule (criteria 29, 30); size, anchor and transform (criterion 26: what a uniform scale writes, what stays a matrix); `format_version`; how the Layers name and history names follow.
 - **Text engine** (new ADR, `needs-customer` for the dependencies): shaping and outlines from bytes in a `*-core` crate (a new crate such as `curvyo-text-core` needs the ADR, `CLAUDE.md` §5). Candidates: `rustybuzz` with `ttf-parser`, or `harfrust` with `skrifa`/`read-fonts`; all MIT or Apache-2.0, all build for `wasm32`. The ADR states the wasm size cost, the glyph-outline cache (per face and glyph in em units, transformed for drawing) and the hostile-file limits (criterion 32).
@@ -255,4 +255,4 @@ Applied on 2026-10-20 to criteria 1, 7, 10, 11, 15, 19 and 29 (implementer, from
 Requirements: R-EDIT-048 (new: text objects and the Text tool), R-EDIT-004 (text half), R-FONT-001 (Curvyo font folder, Must), R-FONT-005 (first part)
 Depends on: see the header. Followed by: `0062-fonts` stages 2 and 3, `0068-laserable-lettering`; used by `0070-measure-and-dimension` (Question 2 there)
 ADRs: 0001 §4 and §5, 0002 §7, 0004 §12, 0006 item 5, 0009 §3 and §5; new: text node (document model) and text engine, both `needs-customer`
-PR: -
+PR: https://github.com/curvyo/curvyo/pull/165

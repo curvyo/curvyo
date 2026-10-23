@@ -1,6 +1,6 @@
 # Fonts: a Fonts card, groups and favourites, an own font folder, and a preview page of the lettering in every font
 
-Status: Draft (a sketch for the customer; not Ready: text objects do not exist yet and glyph licensing needs the customer; preview placement decided 2026-10-17)
+Status: Draft (epic with stages; stage 1 Done #165, stage 2 Done #168, stage 2b in progress (0076, PR #171), stage 3 specified as 0077 (Draft); preview placement decided 2026-10-17)
 Priority: Should (big; the customer called it "a great feature")
 Origin: Customer (request of 2026-10-17, translated): "A great feature. We need our own card in the properties and a tool to add. The font selection like the document sizes: groupable, e.g. initials, script, sans, serif, cuttable (fonts whose strokes end up connected so they laser well). Mark with * as favourites. We need our own folder under .config (directories crate) to add fonts just for Curvyo; they are shown first in the whole list. Harder: I would like a preview for fonts as seen in PewPew Studio: a page where exactly the lettering is shown with all fonts (e.g. of a group). We said no popups and honestly I do not want one. Maybe we need a new fixed panel, or a split page. It may make sense to build this together with the output, since the main canvas must be extended/switched there anyway."
 
@@ -14,13 +14,14 @@ As a maker who cuts and engraves names, monograms and slogans, I want to type my
 
 There are no text objects: the node kinds are layer, group, path and primitive. No font code, no text tool, no spec for a Text tool. `R-EDIT-004` ("object to path converts shape or text") has no text yet. `R-FONT-001` to `004` are the only requirements. ADR 0004 item 12: fonts are referenced from a user-managed font collection directory and not copied into the project by default, with an embed option on export. ADR 0006 item 5: a font's own licence governs redistribution. So this sketch cannot be built before a text object exists (Question 1).
 
-## Stages (Proposal)
+## Stages
 
-| Stage | Delivers | Needs first |
-|---|---|---|
-| 1 | Text object, Text tool, font by name, Object to path; a Fonts tab with the list. Specified as [`0074-text-objects`](../0074-text-objects/) | ADR 0020 (accepted 2026-10-20) |
-| 2 | Groups, favourites, the Curvyo font folder, "cuttable" tag, adding fonts. Specified as [`0075-font-library`](../0075-font-library/) | stage 1 |
-| 3 | The preview page (criteria 14 to 17), split and full view | stage 2 and the pane host of `0063` |
+| Stage | Delivers | Needs first | State |
+|---|---|---|---|
+| 1 | Text object, Text tool, font by name, Object to path; a Fonts tab with the list. Specified as [`0074-text-objects`](../0074-text-objects/) | ADR 0020 (accepted 2026-10-20) | Done (#165) |
+| 2 | Groups, favourites, the Curvyo font folder, "cuttable" tag, adding fonts. Specified as [`0075-font-library`](../0075-font-library/) | stage 1 | Done (#168) |
+| 2b | Single-line fonts. Specified as `0076-single-line-fonts` | stage 2 | In progress (0076, PR #171) |
+| 3 | The preview page (criteria 14 to 17), split and full view | stage 2 and the pane host of `0063` | Draft, specified as `0077-font-preview` |
 
 ## Acceptance criteria (as far as clear)
 
@@ -43,7 +44,7 @@ There are no text objects: the node kinds are layer, group, path and primitive. 
 ### Groups and "cuttable"
 
 11. Given the built-in groups, then a curated list ships with the app (`R-FONT-004`): each shipped font has its group tags in one data file. A maker can change the tags of any font, including the shipped ones, in the card (a per-user override file, as `0045`).
-12. Given **Cuttable** (`R-FONT-002`), then it means: the font is a single-line font, or its glyph outlines overlap and join along a word so that the welded result is few closed pieces (a script font). Whether the program detects this or the maker tags it is Question 3. A first version tags by hand and by a curated list.
+12. Given **Cuttable** (`R-FONT-002`), then it means: the font is a single-line font, or its glyph outlines overlap and join along a word so that the welded result is few closed pieces (a script font). Detected and changeable by hand (`0075` Frage 11 A).
 13. Given `R-FONT-003`, then a group can be the only one shown (the others switched off), without touching any other application's font list.
 
 ### The preview page
@@ -65,26 +66,20 @@ There are no text objects: the node kinds are layer, group, path and primitive. 
 - Font editing, glyph editing.
 - Stitch fonts for embroidery (`0063` embroidery workbench).
 
-## Decided (customer, 2026-10-17)
+## Decided (customer)
 
-- **FONT-PREVIEW: split view,** and it must also switch to a complete full view of the preview, so it works on very wide and on normal monitors. The pane host of `0063` must support split and full view (criterion 16).
+- **FONT-PREVIEW (2026-10-17): split view,** and it must also switch to a complete full view of the preview, so it works on very wide and on normal monitors. The pane host of `0063` must support split and full view (criterion 16).
+- Frage 1 FONT-TEXT: A (2026-10-20), the text object became `0074`.
+- Frage 2 FONT-CUTTABLE: replaced by `0075` Frage 11 A (2026-10-20): detected by the Union check, can be changed by hand.
 
 ## Open questions (customer; each has a default)
 
-Frage 1 (FONT-TEXT): Do text objects and the Text tool come first, as their own spec?
-- A (default, recommended): yes; a Text spec (typing, size, one line, Object to path) is written next and built before the Fonts stages; the Fonts card then has something to apply to.
-- B: one big spec that includes the text object.
-- Default if unanswered: A. The lead gives the Text spec a number.
-
-Frage 2 (FONT-CUTTABLE): Is "cuttable" a tag the maker sets, or does the program detect it?
-- A (default): a tag from a curated list, editable by the maker; no detection in the first version.
-- B: detection: the program welds a sample word and counts the closed pieces; fonts under a threshold get the tag automatically (more work, can be wrong for decorative fonts).
-- Default if unanswered: A.
+None.
 
 ## Links
 
 Requirements: R-FONT-001 to R-FONT-004 (existing); R-FONT-005 to R-FONT-008 (new)
-Depends on: a Text spec (no number), `specs/0043-properties-tabs/` and `specs/0051-sidebar-and-no-menu/` (tabs), `specs/0045-document-formats-library/` (the list pattern)
+Depends on: `specs/0074-text-objects/`, `specs/0043-properties-tabs/` and `specs/0051-sidebar-and-no-menu/` (tabs), `specs/0045-document-formats-library/` (the list pattern)
 Related: `specs/0063-manufacturing-workbenches/`, `specs/0065-extensions-sdk/` (font packs as extensions), `specs/0025-raster-trace/research.md` (text recognition), `specs/0022-color-management/`; ADR 0004 item 12, ADR 0006 item 5, ADR 0007
-ADRs: a text engine ADR (shaping, layout, text object), `needs-customer` (document model); the pane host (split and full view) is part of `0063`'s workbench ADR
+ADRs: [ADR 0020](../../docs/adr/0020-text-nodes-text-engine-and-font-sources.md) (text node, text engine and font sources; accepted 2026-10-20); the pane host (split and full view) is part of `0063`'s workbench ADR
 PR: -

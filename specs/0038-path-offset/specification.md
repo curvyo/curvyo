@@ -281,4 +281,4 @@ Builds on: `specs/0016-boolean-operations/` (kernel, compound paths, region, ref
 Related: `specs/0023-groups/` (groups refused), `specs/0037-fracture-and-flatten/`, `specs/0033-stroke-brushes/`, `docs/adr/0003-geometry-kernel-booleans-offsetting-vcarving.md` §3, §4
 Design documents: `ux-rework.md`, `geometry-rework.md` in this folder
 ADRs: `adrs.md` (ADR 0003 §4 amendment of 2026-10-12, approved by the customer)
-PR: https://github.com/curvyo/curvyo/pull/115 (reworked, ready for review)
+PR: https://github.com/curvyo/curvyo/pull/115

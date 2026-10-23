@@ -188,4 +188,4 @@ New: "Flip buttons" (control, glyph rule, disabled exception, tooltip), "Signed 
 
 ## Links
 
-Requirements: R-EDIT-012 (object transform); R-EDIT-035 "Mirror and scale through zero" is in `docs/requirements.md`.  Related specs: `0005`, `0008`, `0010`, `0012`, `0013`, `0019`, `0020`, `0023`, `0047`, `0049`, `0050`.  PR: none yet.
+Requirements: R-EDIT-012 (object transform); R-EDIT-035 "Mirror and scale through zero" is in `docs/requirements.md`.  Related specs: `0005`, `0008`, `0010`, `0012`, `0013`, `0019`, `0020`, `0023`, `0047`, `0049`, `0050`.  PR: https://github.com/curvyo/curvyo/pull/139.

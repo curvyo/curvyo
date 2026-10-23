@@ -161,4 +161,4 @@ Requirements: R-EDIT-047 (new, `docs/requirements.md`), R-EDIT-001, R-EDIT-022
 Builds on: `specs/0002-path-node-editing/` (Pen, handles, finish and Escape), `specs/0034-pen-path-extension/` (targets, Shift, continuation), `specs/0008-object-transform-refinements/` (criteria 33, 34: the angle stops), `specs/0010-edit-interaction-polish/` (criterion 39, Escape cascade, key gate, readout), `specs/0014-advanced-selection/` (live modifier read), `specs/0052-click-to-create-shapes/` (the entry chip, freeze, units), `specs/0015-document-size-and-rulers/` (display unit)
 Related: `specs/0021-ellipse-arcs-and-shaping/` (criterion 7: Ctrl has no effect on a typed value), `specs/0047-transform-polish/` (typed move), `specs/0060-snapping/` (object snap, later), `specs/0055-compound-path-node-editing/` (same Pen file)
 ADRs: `adrs.md` (architect)
-PR: (set when opened)
+PR: https://github.com/curvyo/curvyo/pull/159

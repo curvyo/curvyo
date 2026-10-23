@@ -1,6 +1,6 @@
 # Font library: tags, favourites, Add font and the Cuttable tag
 
-Status: Ready (2026-10-20; customer questions 11 to 13 decided 2026-10-20, see "Open questions")
+Status: Done (PR #168, merged 2026-10-23). Ready 2026-10-20; customer questions 11 to 13 decided 2026-10-20, see "Open questions".
 Priority: Should (R-FONT-002, R-FONT-003, R-FONT-006 are Should; R-FONT-001 is a Must and already met by `0074`)
 Origin: Customer. Stage 2 of `0062-fonts` (request of 2026-10-17: "groupable like the document sizes, e.g. initials, script, sans, serif, cuttable", "mark with * as favourites", "our own folder ... to add fonts just for Curvyo", "a tool to add"). Items marked **(Proposal)** are the product owner's; they are in this slice as safe defaults and the customer can veto them at the demo (as in `0074`, "Not put to the customer").
 Depends on: `0074-text-objects` (Fonts tab, blocks, Curvyo folder, font matching), `0016-boolean-operations` (the Union kernel the cuttable check counts with), `0045-document-formats-library` (the per-user file and the strip pattern), `0051` (panel tabs), `R-SYS-010` (inline confirmation). No longer depends on `0068` (Weld was redefined, 2026-10-20).
@@ -410,4 +410,4 @@ Decided by the customer 2026-10-20:
 Requirements: R-FONT-002, R-FONT-003, R-FONT-004, R-FONT-005 (groups, favourites), R-FONT-006, R-SYS-007, R-SYS-010
 Depends on: `specs/0074-text-objects/`, `specs/0016-boolean-operations/`, `specs/0045-document-formats-library/`, `specs/0062-fonts/` (stage 2 of it)
 ADRs: 0020 §2 and §3, 0004 §6, §7 and §12, 0006 item 5
-PR: -
+PR: https://github.com/curvyo/curvyo/pull/168
