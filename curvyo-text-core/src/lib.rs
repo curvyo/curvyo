@@ -11,6 +11,7 @@
 mod error;
 mod face;
 mod face_store;
+mod face_style;
 mod font_class;
 mod font_names;
 mod layout;
@@ -25,6 +26,7 @@ mod units;
 pub use error::TextError;
 pub use face::{Face, FaceKind, FaceMetrics};
 pub use face_store::{FaceHash, FaceKey, FaceStore};
+pub use face_style::{FaceStyle, NORMAL_WIDTH, Slant, WeightBand};
 pub use font_class::{DeclaredClass, OS2_CLASS_BYTES, declared_class, os2_class_bytes};
 pub use font_names::{ListableFace, family_name, listable_faces, style_name, svg_listable_faces};
 pub use layout::{LineLayout, PlacedGlyph, TextLayout, layout};

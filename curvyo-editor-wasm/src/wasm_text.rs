@@ -2,10 +2,11 @@
 //! the Text bar, the Fonts tab, the fonts the host lists and hands in, and Object to path. Every
 //! method is a pass-through to `Session`; strings and scalars only (ADR 0001 §5).
 
-use curvyo_ui_core::{CaretMove, FontBlock, TextInput, TextRefusal};
+use curvyo_text_core::WeightBand;
+use curvyo_ui_core::{CaretMove, FontBlock, Greyed, Pressed, StyleButton, TextInput, TextRefusal};
 use wasm_bindgen::prelude::*;
 
-use crate::session::{ObjectToPathOutcome, TextSizeOutcome};
+use crate::session::{ObjectToPathOutcome, StyleOutcome, TextSizeOutcome};
 use crate::wasm_api::WasmSession;
 
 /// The code of a refusal for texts that do not convert (criteria 24, 29): `"fonts_loading"`
@@ -40,6 +41,51 @@ pub struct TextBarStateView {
     /// That text's first line, at most 200 characters.
     #[wasm_bindgen(getter_with_clone)]
     pub sample: String,
+    /// The Style group (`specs/0078-font-style-buttons`), as JSON: `{"weights": [button; 5],
+    /// "italic": button}`, a button `{"pressed": "off"|"on"|"mixed", "greyed": null | {"kind":
+    /// "not_in"|"not_in_as_italic"|"not_in_as_upright"|"not_in_any"|"font_missing", "name",
+    /// "count"}}`.
+    #[wasm_bindgen(getter_with_clone)]
+    pub style_json: String,
+}
+
+/// A Style button as JSON.
+fn style_button_json(button: &StyleButton) -> serde_json::Value {
+    let pressed = match button.pressed {
+        Pressed::Off => "off",
+        Pressed::On => "on",
+        Pressed::Mixed => "mixed",
+    };
+    let greyed = button.greyed.as_ref().map(|greyed| {
+        let (kind, name, count) = match greyed {
+            Greyed::NotIn(name) => ("not_in", name.as_str(), 0),
+            Greyed::NotInAsItalic(name) => ("not_in_as_italic", name.as_str(), 0),
+            Greyed::NotInAsUpright(name) => ("not_in_as_upright", name.as_str(), 0),
+            Greyed::NotInAny(count) => ("not_in_any", "", *count),
+            Greyed::FontMissing => ("font_missing", "", 0),
+        };
+        serde_json::json!({ "kind": kind, "name": name, "count": count })
+    });
+    serde_json::json!({ "pressed": pressed, "greyed": greyed })
+}
+
+/// The weight band of a button's code.
+fn weight_band(code: &str) -> Option<WeightBand> {
+    Some(match code {
+        "extra-light" => WeightBand::ExtraLight,
+        "light" => WeightBand::Light,
+        "regular" => WeightBand::Regular,
+        "bold" => WeightBand::Bold,
+        "extra-bold" => WeightBand::ExtraBold,
+        _ => return None,
+    })
+}
+
+/// A press's outcome as JSON `{"set", "left", "upright"}`, or empty when nothing happened.
+fn style_outcome_json(outcome: Option<StyleOutcome>) -> String {
+    outcome.map_or_else(String::new, |o| {
+        serde_json::json!({ "set": o.set, "left": o.left, "upright": o.upright }).to_string()
+    })
 }
 
 /// What Object to path did: `kind` is `"ignored"`, `"converted"`, `"missing_fonts"` (`count`
@@ -208,7 +254,38 @@ impl WasmSession {
             size_mm: bar.size_mm.unwrap_or(f64::NAN),
             sample_node: bar.sample_node,
             sample: bar.sample,
+            style_json: serde_json::json!({
+                "weights": bar.style.weights.iter().map(style_button_json).collect::<Vec<_>>(),
+                "italic": style_button_json(&bar.style.italic),
+            })
+            .to_string(),
         }
+    }
+
+    /// A press on a weight button: `"extra-light"`, `"light"`, `"regular"`, `"bold"`,
+    /// `"extra-bold"`. Returns the outcome JSON, empty when it was greyed or already pressed.
+    pub fn press_text_weight(&mut self, code: &str) -> String {
+        style_outcome_json(weight_band(code).and_then(|band| self.session.press_weight(band)))
+    }
+
+    /// A press on Italic; the outcome JSON, empty when it was greyed.
+    pub fn press_text_italic(&mut self) -> String {
+        style_outcome_json(self.session.press_italic())
+    }
+
+    /// A press on a family row or a preview tile whose face is `face_index` of the listed file
+    /// `id`: the subject texts keep their style where the family has it (`0078` criterion 22).
+    pub fn pick_font_family(&mut self, id: &str, face_index: u32) {
+        self.session.pick_font_family(id, face_index);
+    }
+
+    /// The face a preview tile of that family shows, as JSON `{"id", "faceIndex"}`, or `"null"`.
+    #[must_use]
+    pub fn family_tile_face(&self, id: &str, face_index: u32) -> String {
+        self.session.family_tile_face(id, face_index).map_or_else(
+            || "null".to_owned(),
+            |(id, index)| serde_json::json!({ "id": id, "faceIndex": index }).to_string(),
+        )
     }
 
     /// The Size field's value: `"set"`, `"max"`, `"min"` (the notices of criterion 12) or

@@ -35,6 +35,7 @@ mod display_unit_text;
 mod document_fit;
 mod document_presets_view;
 mod ellipse_tool;
+mod face_style_pick;
 mod family_key;
 mod file_chords;
 mod flatten_command;
@@ -169,6 +170,10 @@ pub use document_presets_view::{
     PresetEntry, PresetGroupView, PresetsView, orientation_swap, preset_pick_size, presets_view,
 };
 pub use ellipse_tool::EllipseTool;
+pub use face_style_pick::{
+    Greyed, Pressed, StyleButton, StyleButtons, StylePress, WEIGHT_STEPS, family_target,
+    family_tile, italic_target, press_italic, press_weight, style_buttons, weight_target,
+};
 pub use family_key::family_key;
 pub use file_chords::{FileCommand, Platform, chord_label, command_tooltip, file_chord};
 pub use flatten_command::{FLATTEN_COMMIT_LABEL, plan_flatten};

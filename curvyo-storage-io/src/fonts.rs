@@ -6,6 +6,8 @@
 
 use std::path::{Path, PathBuf};
 
+use curvyo_text_core::{FaceStyle, Slant};
+
 /// Where a face was found.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FontSource {
@@ -148,45 +150,19 @@ fn small_enough(path: &Path) -> bool {
     std::fs::metadata(path).is_ok_and(|meta| meta.len() <= MAX_FONT_FILE_BYTES)
 }
 
-/// The style name of a face from its weight, stretch and slant, in the usual English words
-/// (`plan.md`, dated notes: `fontdb` states no subfamily name).
+/// The style name of a face from its weight, stretch and slant, in the words every listing uses
+/// (`curvyo_text_core::FaceStyle`; `fontdb` states no subfamily name).
 fn style_name(face: &fontdb::FaceInfo) -> String {
-    let stretch = match face.stretch {
-        fontdb::Stretch::UltraCondensed => "Ultra Condensed",
-        fontdb::Stretch::ExtraCondensed => "Extra Condensed",
-        fontdb::Stretch::Condensed => "Condensed",
-        fontdb::Stretch::SemiCondensed => "Semi Condensed",
-        fontdb::Stretch::Normal => "",
-        fontdb::Stretch::SemiExpanded => "Semi Expanded",
-        fontdb::Stretch::Expanded => "Expanded",
-        fontdb::Stretch::ExtraExpanded => "Extra Expanded",
-        fontdb::Stretch::UltraExpanded => "Ultra Expanded",
-    };
-    let weight = match face.weight.0 {
-        0..=149 => "Thin",
-        150..=249 => "Extra Light",
-        250..=349 => "Light",
-        350..=449 => "",
-        450..=549 => "Medium",
-        550..=649 => "Semibold",
-        650..=749 => "Bold",
-        750..=849 => "Extra Bold",
-        _ => "Black",
-    };
-    let slant = match face.style {
-        fontdb::Style::Normal => "",
-        fontdb::Style::Italic => "Italic",
-        fontdb::Style::Oblique => "Oblique",
-    };
-    let words: Vec<&str> = [stretch, weight, slant]
-        .into_iter()
-        .filter(|w| !w.is_empty())
-        .collect();
-    if words.is_empty() {
-        "Regular".to_owned()
-    } else {
-        words.join(" ")
+    FaceStyle {
+        weight: face.weight.0,
+        width: face.stretch.to_number(),
+        slant: match face.style {
+            fontdb::Style::Normal => Slant::Upright,
+            fontdb::Style::Italic => Slant::Italic,
+            fontdb::Style::Oblique => Slant::Oblique,
+        },
     }
+    .name()
 }
 
 fn faces_of(db: &fontdb::Database, source: FontSource) -> Vec<FontFace> {
