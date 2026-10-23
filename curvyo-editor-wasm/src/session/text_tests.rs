@@ -274,7 +274,10 @@ fn ac29_missing_face() {
         face_index: 0,
         kind: curvyo_document_core::FontKind::Outline,
     };
-    session.document.set_text_font(&[id], &lost).unwrap();
+    session
+        .document
+        .set_text_fonts(&[(id, lost.clone())])
+        .unwrap();
     let text = &texts(&session)[0];
     assert!(text.outline.as_ref().unwrap().substitute);
     assert_eq!(text.font, lost);

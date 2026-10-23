@@ -294,7 +294,10 @@ fn ac19_ac22_weld_refuses() {
         face_index: 0,
         kind: FontKind::SingleLine,
     };
-    session.document.set_text_font(&[id], &lost).unwrap();
+    session
+        .document
+        .set_text_fonts(&[(id, lost.clone())])
+        .unwrap();
     select_all(&mut session);
     let WeldOutcome::Refused(WeldRefusal::Texts(refusal)) = session.apply_weld() else {
         panic!("refused")
@@ -315,7 +318,10 @@ fn ac22_missing_single_line_face() {
         face_index: 0,
         kind: FontKind::SingleLine,
     };
-    session.document.set_text_font(&[id], &lost).unwrap();
+    session
+        .document
+        .set_text_fonts(&[(id, lost.clone())])
+        .unwrap();
     let text = &texts(&session)[0];
     let outline = text.outline.as_ref().unwrap();
     assert!(outline.substitute);

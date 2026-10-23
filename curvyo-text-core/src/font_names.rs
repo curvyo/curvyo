@@ -6,6 +6,8 @@
 use skrifa::string::StringId;
 use skrifa::{FontRef, MetadataProvider, Tag};
 
+use crate::face_style::FaceStyle;
+
 use std::sync::Arc;
 
 use crate::face::{Face, FaceKind};
@@ -47,70 +49,12 @@ fn be_u16(bytes: &[u8], at: usize) -> Option<u16> {
     Some(u16::from_be_bytes(bytes.get(at..at + 2)?.try_into().ok()?))
 }
 
-/// The style word of an OS/2 weight class, as the desktop listing words it.
-const fn weight_word(weight: u16) -> &'static str {
-    match weight {
-        0..=149 => "Thin",
-        150..=249 => "Extra Light",
-        250..=349 => "Light",
-        350..=449 => "",
-        450..=549 => "Medium",
-        550..=649 => "Semibold",
-        650..=749 => "Bold",
-        750..=849 => "Extra Bold",
-        _ => "Black",
-    }
-}
-
-/// The style word of an OS/2 width class (1 to 9; anything else is normal).
-const fn width_word(width: u16) -> &'static str {
-    match width {
-        1 => "Ultra Condensed",
-        2 => "Extra Condensed",
-        3 => "Condensed",
-        4 => "Semi Condensed",
-        6 => "Semi Expanded",
-        7 => "Expanded",
-        8 => "Extra Expanded",
-        9 => "Ultra Expanded",
-        _ => "",
-    }
-}
-
 /// The style name of face `index` from its OS/2 weight, width and slant, in the words the
 /// desktop listing uses (`curvyo-storage-io`): "Regular", "Bold Italic", "Condensed Light". A
-/// face without OS/2 is "Regular" unless `post` states an italic angle.
+/// face without OS/2 is "Regular" unless `post` states an italic angle ([`FaceStyle`]).
 #[must_use]
 pub fn style_name(bytes: &[u8], index: u32) -> Option<String> {
-    let font = FontRef::from_index(bytes, index).ok()?;
-    let os2 = font.table_data(Tag::new(b"OS/2"));
-    let os2 = os2.as_ref().map(skrifa::raw::FontData::as_bytes);
-    let weight = os2.and_then(|t| be_u16(t, 4)).unwrap_or(400);
-    let width = os2.and_then(|t| be_u16(t, 6)).unwrap_or(5);
-    let version = os2.and_then(|t| be_u16(t, 0)).unwrap_or(0);
-    let selection = os2.and_then(|t| be_u16(t, 62)).unwrap_or(0);
-    let post_italic = font
-        .table_data(Tag::new(b"post"))
-        .and_then(|post| post.as_bytes().get(4..8).map(|angle| angle != [0, 0, 0, 0]))
-        .unwrap_or(false);
-    let slant = if selection & 1 != 0 {
-        "Italic"
-    } else if version >= 4 && selection & (1 << 9) != 0 {
-        "Oblique"
-    } else if post_italic {
-        "Italic"
-    } else {
-        ""
-    };
-    let words: Vec<&str> = [width_word(width), weight_word(weight), slant]
-        .into_iter()
-        .filter(|w| !w.is_empty())
-        .collect();
-    Some(if words.is_empty() {
-        "Regular".to_owned()
-    } else {
-        words.join(" ")
-    })
+    FaceStyle::from_bytes(bytes, index).map(|style| style.name())
 }
 
 /// Whether face `index` has vector outlines and no colour or bitmap tables, the rule of the
