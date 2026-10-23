@@ -1,0 +1,13 @@
+# Licence record of a shipped font family (ADR 0020 §4). The file is the upstream file of the EMS
+# svg-fonts repository at commit 8c71f2d9, unmodified. Checked by
+# `curvyo-text-core/tests/included_fonts.rs`.
+family = "EMS Readability"
+licence = "OFL-1.1"
+licence_file = "OFL.txt"
+source_url = "https://gitlab.com/oskay/svg-fonts/-/blob/8c71f2d9e1a5292047bb88e5595a766241b82cc6/fonts/EMS/EMSReadability.svg"
+tags = ["single_line", "sans"]
+version = "svg-fonts 8c71f2d9 (2024-07-12)"
+
+[[faces]]
+file = "EMSReadability.svg"
+style = "Regular"

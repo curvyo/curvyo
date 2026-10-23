@@ -1,7 +1,8 @@
 //! Which listed face a text's font reference names (ADR 0020 §1, "Font matching";
-//! `specs/0074-text-objects` criteria 29 and 30).
+//! `specs/0074-text-objects` criteria 29 and 30): only faces of the text's stored kind count
+//! (`specs/0076-single-line-fonts/adrs.md` decision 1).
 
-use curvyo_document_core::FontRef;
+use curvyo_document_core::{FontKind, FontRef};
 use curvyo_text_core::FaceKey;
 
 use crate::family_key::family_key;
@@ -32,6 +33,8 @@ pub struct ListedFace {
     pub index: u32,
     /// Its key in the engine's store once its bytes were handed in.
     pub key: Option<FaceKey>,
+    /// Outline or single-line, as the host listed it.
+    pub kind: FontKind,
 }
 
 /// How a font reference resolves.
@@ -46,20 +49,25 @@ pub enum FaceMatch {
     Missing,
 }
 
-/// Resolves `font` over `faces`: (a) a loaded face with the stored hash and index; (b) a face of
+/// Resolves `font` over the faces of its kind among `faces`: (a) a loaded face with the stored
+/// hash and index; (b) a face of
 /// the same family (by [`family_key`]) and style, case-insensitive, preferring the Curvyo folder, then the included
 /// fonts, then the computer's, without a notice (criterion 30); (c) missing.
 #[must_use]
 pub fn match_face(font: &FontRef, faces: &[ListedFace]) -> FaceMatch {
-    let exact = faces.iter().find_map(|face| {
-        face.key
-            .filter(|key| key.index == font.face_index && key.hash.to_hex() == font.face_hash)
-    });
+    let exact = faces
+        .iter()
+        .filter(|face| face.kind == font.kind)
+        .find_map(|face| {
+            face.key
+                .filter(|key| key.index == font.face_index && key.hash.to_hex() == font.face_hash)
+        });
     if let Some(key) = exact {
         return FaceMatch::Face(key);
     }
     let same_name = |face: &&ListedFace| {
-        family_key(&face.family) == family_key(&font.family)
+        face.kind == font.kind
+            && family_key(&face.family) == family_key(&font.family)
             && face.style.to_lowercase() == font.style.to_lowercase()
     };
     let best = faces
@@ -90,6 +98,7 @@ mod tests {
                 hash: FaceHash([h; 32]),
                 index: 0,
             }),
+            kind: FontKind::Outline,
         }
     }
 
@@ -99,6 +108,7 @@ mod tests {
             style: style.to_owned(),
             face_hash: FaceHash([hash; 32]).to_hex(),
             face_index: 0,
+            kind: FontKind::Outline,
         }
     }
 
@@ -133,5 +143,37 @@ mod tests {
             match_face(&font("Great Vibes", "Regular", 1), &faces),
             FaceMatch::Missing
         );
+    }
+
+    /// `specs/0076-single-line-fonts` criterion 22: a face of the other kind never matches, by
+    /// hash or by name.
+    #[test]
+    fn ac22_matching_is_kind_aware() {
+        let mut single = listed(
+            FontBlock::Curvyo,
+            "Hershey Sans 1-stroke",
+            "Regular",
+            Some(5),
+        );
+        single.kind = FontKind::SingleLine;
+        let outline = listed(
+            FontBlock::Curvyo,
+            "Hershey Sans 1-stroke",
+            "Regular",
+            Some(6),
+        );
+        let mut text = font("Hershey Sans 1-stroke", "Regular", 6);
+        text.kind = FontKind::SingleLine;
+        assert_eq!(
+            match_face(&text, std::slice::from_ref(&outline)),
+            FaceMatch::Missing
+        );
+        assert!(matches!(
+            match_face(&text, &[outline, single]),
+            FaceMatch::Face(FaceKey {
+                hash: FaceHash([5, ..]),
+                ..
+            })
+        ));
     }
 }

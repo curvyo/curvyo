@@ -12,10 +12,12 @@ workspace = true
 [dependencies]
 thiserror.workspace = true
 fontdb.workspace = true
+# The text engine's SVG font reader decides what the folder lists and Add font accepts
+# (`specs/0076-single-line-fonts` criteria 1, 3, 23); only its SVG-only entry point
+# `svg_listable_faces` is called (`adrs.md` decision 5, architect note 2026-10-23).
+curvyo-text-core = { path = "../curvyo-text-core", version = "0.1.0" }
 
 [dev-dependencies]
 # Only the test that opening an older project writes nothing to its file (`0040` criterion 4).
 curvyo-document-core = { path = "../curvyo-document-core", version = "0.1.0" }
 tempfile = "3"
-# The names and class bytes text-core reads from bytes match the listing's (`0075`).
-curvyo-text-core = { path = "../curvyo-text-core", version = "0.1.0" }

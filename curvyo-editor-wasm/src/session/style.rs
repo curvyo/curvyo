@@ -150,9 +150,13 @@ impl Session {
         self.recording(|this| {
             // The commit also ends a gesture that Escape cancelled, so it always runs.
             let pending = this.style.is_active();
+            let edit = this.style.pending_edit().cloned();
             let wrote = this.style.commit(&this.document).is_ok() && pending;
             this.commit_background_preview();
             this.note_skipped_clones(wrote);
+            if let Some(edit) = edit {
+                this.note_skipped_single_line(&edit, wrote);
+            }
         });
     }
 
@@ -264,6 +268,7 @@ impl Session {
             let ids = this.edit_ids(edit);
             let wrote = !ids.is_empty() && this.document.edit_style(&ids, edit).is_ok();
             this.note_skipped_clones(wrote);
+            this.note_skipped_single_line(edit, wrote);
             wrote
         })
     }

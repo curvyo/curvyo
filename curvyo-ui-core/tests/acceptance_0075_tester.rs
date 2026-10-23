@@ -49,9 +49,17 @@ fn round_trip(lib: &FontLibrary) -> FontLibrary {
 #[test]
 fn ac1_ac6_strip_order_builtins_first_then_own_a_to_z() {
     let mut lib = FontLibrary::default();
+    // `specs/0076-single-line-fonts` criterion 4 puts Single line after Cuttable.
     assert_eq!(
         strip(&lib),
-        ["Cuttable", "Script", "Sans", "Serif", "Initials"]
+        [
+            "Cuttable",
+            "Single line",
+            "Script",
+            "Sans",
+            "Serif",
+            "Initials"
+        ]
     );
     lib.add_tag("lobster", "wedding", &nothing()).unwrap();
     lib.add_tag("lobster", "Arabic", &nothing()).unwrap();
@@ -59,7 +67,15 @@ fn ac1_ac6_strip_order_builtins_first_then_own_a_to_z() {
     assert_eq!(
         strip(&lib),
         [
-            "Cuttable", "Script", "Sans", "Serif", "Initials", "Arabic", "wedding", "Zebra"
+            "Cuttable",
+            "Single line",
+            "Script",
+            "Sans",
+            "Serif",
+            "Initials",
+            "Arabic",
+            "wedding",
+            "Zebra"
         ]
     );
 }

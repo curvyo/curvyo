@@ -484,6 +484,7 @@ mod tests {
             style: "Regular".to_owned(),
             face_hash: "a".repeat(64),
             face_index: 0,
+            kind: curvyo_document_core::FontKind::Outline,
         }
     }
 

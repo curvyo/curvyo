@@ -44,6 +44,7 @@ fn font(family: &str, style: &str, hash_digit: char) -> FontRef {
         style: style.to_owned(),
         face_hash: hash_digit.to_string().repeat(64),
         face_index: 0,
+        kind: curvyo_document_core::FontKind::Outline,
     }
 }
 

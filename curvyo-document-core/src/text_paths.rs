@@ -137,7 +137,14 @@ fn write_group(
     // to nodes this function just created.
     #[allow(clippy::unwrap_used)]
     let text_meta = tree.get_meta(text_node).unwrap();
-    let style = crate::style_codec::read_style(&text_meta);
+    let mut style = crate::style_codec::read_style(&text_meta);
+    // A single-line text's paths are open centre lines: Fill off, so no closing line is ever
+    // filled (`specs/0076-single-line-fonts` criterion 17).
+    if crate::text_codec::read_font(&text_meta)
+        .is_some_and(|font| font.kind == crate::text_model::FontKind::SingleLine)
+    {
+        style.fill.enabled = false;
+    }
     let guide = crate::guides::all_guides(tree, &[text_node]);
     #[allow(clippy::unwrap_used)]
     let group = tree.create(TreeParentId::Root).unwrap();

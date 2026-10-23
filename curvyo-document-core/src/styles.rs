@@ -152,6 +152,16 @@ impl StyleEdit {
                 | Self::MarkerCount(_)
         )
     }
+
+    /// Whether the edit changes the fill (a single-line text has none,
+    /// `specs/0076-single-line-fonts` criterion 8).
+    #[must_use]
+    pub const fn is_fill_edit(&self) -> bool {
+        matches!(
+            self,
+            Self::FillEnabled(_) | Self::FillColor(_) | Self::FillRgba(..) | Self::FillOpacity(_)
+        )
+    }
 }
 
 impl Document {

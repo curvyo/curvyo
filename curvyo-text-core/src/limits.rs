@@ -12,3 +12,28 @@ pub const MAX_GLYPH_POINTS: usize = 65_535;
 /// this crate depends on no workspace crate, so it holds its own constant. A merged text longer
 /// than the typing limit still draws and converts in full.
 pub const MAX_SHAPE_CHARS: usize = 100_000;
+
+/// The largest SVG font file the engine reads, in bytes (16 MiB), checked before parsing
+/// (`specs/0076-single-line-fonts` criterion 23).
+pub const MAX_SVG_FONT_BYTES: usize = 16 * 1024 * 1024;
+
+/// The most XML nodes one SVG font file may have.
+pub const MAX_SVG_NODES: u32 = 262_144;
+
+/// The deepest element nesting an SVG font file may have, checked on the bytes before parsing
+/// (the XML reader recurses per level).
+pub const MAX_SVG_DEPTH: usize = 256;
+
+/// The most glyphs one SVG font may have.
+pub const MAX_SVG_GLYPHS: usize = 65_535;
+
+/// The most points all glyphs of one SVG font may have together, so a 16 MiB file of arcs cannot
+/// fill the memory.
+pub const MAX_SVG_FONT_POINTS: usize = 1 << 20;
+
+/// The most kerning pairs one SVG font may state (the product of its `hkern` lists).
+pub const MAX_SVG_KERN_PAIRS: usize = 1 << 20;
+
+/// The largest absolute value of a number in an SVG font (font units). A real em is at most
+/// 16,384 units; a larger number is hostile and would make arcs split into billions of curves.
+pub const MAX_SVG_COORDINATE: f64 = 1.0e6;

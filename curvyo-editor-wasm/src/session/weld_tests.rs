@@ -1,7 +1,7 @@
 //! Weld in the session (`specs/0068-laserable-lettering` criteria 1, 11, 19, 20 and 23): one
 //! text becomes one path in one step that undo takes back; a missing face refuses.
 
-use curvyo_document_core::{FontRef, Length, ObjectSnapshot, Point, RectBounds, unpack};
+use curvyo_document_core::{FontKind, FontRef, Length, ObjectSnapshot, Point, RectBounds, unpack};
 use curvyo_ui_core::{WeldAvailability, WeldRefusal};
 
 use super::text_tests::{labels, texts, with_text};
@@ -79,6 +79,7 @@ fn ac23_a_missing_face_refuses() {
         style: "Bold".to_owned(),
         face_hash: "c".repeat(64),
         face_index: 0,
+        kind: FontKind::Outline,
     };
     session.document.set_text_font(&[id], &lost).unwrap();
     session.set_tool(Tool::Rectangle);

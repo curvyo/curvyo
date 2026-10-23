@@ -164,6 +164,9 @@ pub struct FillPanel {
     pub rgba: BarValue<Rgba>,
     /// The opacity.
     pub opacity: BarValue<Opacity>,
+    /// The Fill section is shown: false while every edited object is a single-line text, which
+    /// has no fill (`specs/0076-single-line-fonts` criterion 8).
+    pub shown: bool,
 }
 
 /// Everything the panel shows for a selection it can edit.
@@ -239,6 +242,16 @@ fn styles_of<'a>(objects: &'a [ObjectSnapshot], scope: &StyleScope) -> Vec<&'a S
         .collect()
 }
 
+/// The styles a fill edit goes to: every object of the scope but single-line texts
+/// (`specs/0076-single-line-fonts` criterion 8).
+fn fill_styles_of<'a>(objects: &'a [ObjectSnapshot], scope: &StyleScope) -> Vec<&'a Style> {
+    objects_with_ids(objects, &scope.ids)
+        .into_iter()
+        .filter(|object| !crate::style_scope::is_single_line_text(object))
+        .map(ObjectSnapshot::style)
+        .collect()
+}
+
 /// What the panel shows for the objects of `scope`, or `None` when there is
 /// nothing to edit (the panel body is then empty or the Document section).
 ///
@@ -257,6 +270,8 @@ pub fn style_panel_state(
         return None;
     }
     let held = styles_of(committed, scope);
+    let fill_styles = fill_styles_of(shown, scope);
+    let fill_held = fill_styles_of(committed, scope);
     Some(StylePanelState {
         subject: scope.subject.clone(),
         stroke: StrokePanel {
@@ -274,11 +289,12 @@ pub fn style_panel_state(
             markers: markers_panel(shown, scope, held.iter().any(|s| s.stroke.enabled)),
         },
         fill: FillPanel {
-            paint: shared(&column(&styles, |s| s.fill.paints())),
-            rows_shown: held.iter().any(|s| s.fill.paints()),
-            color: shared(&column(&styles, |s| s.fill.color)),
-            rgba: shared(&column(&styles, |s| (s.fill.color, s.fill.opacity))),
-            opacity: shared(&column(&styles, |s| s.fill.opacity)),
+            paint: shared(&column(&fill_styles, |s| s.fill.paints())),
+            rows_shown: fill_held.iter().any(|s| s.fill.paints()),
+            color: shared(&column(&fill_styles, |s| s.fill.color)),
+            rgba: shared(&column(&fill_styles, |s| (s.fill.color, s.fill.opacity))),
+            opacity: shared(&column(&fill_styles, |s| s.fill.opacity)),
+            shown: !fill_styles.is_empty(),
         },
     })
 }

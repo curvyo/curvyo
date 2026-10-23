@@ -26,7 +26,7 @@ pub fn plan_fracture(
     minter: &mut AnchorIdMinter,
 ) -> Result<StackPlan, StackRefusal> {
     // Texts take the one conversion of `specs/0074-text-objects` criteria 22 and 24.
-    if let Some(refusal) = crate::text_convert::texts_refusal(objects, selection.ids()) {
+    if let Some(refusal) = crate::text_convert::area_refusal(objects, selection.ids()) {
         return Err(StackRefusal::Operands(
             crate::boolean::BooleanRefusal::Texts(refusal),
         ));

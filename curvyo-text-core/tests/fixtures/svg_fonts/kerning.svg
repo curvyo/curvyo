@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd" >
+<!-- A test font for specs/0076-single-line-fonts: kerning by characters and by glyph names,
+     a missing glyph with a drawing, a ligature glyph that is never used, every path command. -->
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1">
+<defs>
+<font id="Kern" horiz-adv-x="500">
+<font-face font-family="Curvyo Kerning Test" font-weight="bold" font-style="italic"
+  units-per-em="1000" ascent="800" descent="200" cap-height="650"/>
+<missing-glyph horiz-adv-x="400" d="M 50 0 L 350 0 L 350 700 L 50 700 Z"/>
+<glyph unicode=" " glyph-name="space" horiz-adv-x="300"/>
+<glyph unicode="A" glyph-name="A" horiz-adv-x="600" d="M 0 0 L 300 700 L 600 0 M 120 280 L 480 280"/>
+<glyph unicode="V" glyph-name="V" horiz-adv-x="600" d="M0,700 300,0 600,700"/>
+<glyph unicode="H" glyph-name="H" horiz-adv-x="600" d="M 100 0 V 700 M 500 0 v 700 M 100 350 H 500"/>
+<glyph unicode="O" glyph-name="O" horiz-adv-x="700" d="M 50 350 A 300 350 0 1 1 650 350 a300 350 0 1 1 -600 0 Z"/>
+<glyph unicode="S" glyph-name="S" horiz-adv-x="550" d="m 450 600 c -50 80 -300 80 -350 0 s 50 -200 175 -250 S 500 50 450 0 Q 275 -80 100 50 T 50 150"/>
+<glyph unicode="T" glyph-name="T" horiz-adv-x="500" d="M 0 700 h 500 m -250 0 V 0"/>
+<glyph unicode="fi" glyph-name="f_i" horiz-adv-x="900" d="M 0 0 L 900 700"/>
+<glyph unicode="L" glyph-name="L" d="M 100 700 L 100 0 L 450 0"/>
+<hkern u1="A" u2="V" k="120"/>
+<hkern g1="T" g2="A,O" k="80"/>
+<hkern u1="L" u2="U+0054" k="999"/>
+</font>
+</defs>
+</svg>

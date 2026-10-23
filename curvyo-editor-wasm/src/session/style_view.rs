@@ -82,6 +82,9 @@ pub struct StylePanelView {
     pub fill_paint: String,
     /// The fill rows under the Paint switch are shown.
     pub fill_rows: bool,
+    /// The Fill section is shown: false while every edited object is a single-line text
+    /// (`specs/0076-single-line-fonts` criterion 8).
+    pub fill_shown: bool,
     /// The fill colours differ in red, green or blue.
     pub fill_color_mixed: bool,
     /// The fill colour.
@@ -269,6 +272,7 @@ impl StylePanelView {
             }),
             fill_paint: word(state.fill.paint, |on| if on { "on" } else { "off" }),
             fill_rows: state.fill.rows_shown,
+            fill_shown: state.fill.shown,
             fill_color_mixed,
             fill_color,
             fill_hex,
@@ -376,6 +380,7 @@ impl StylePanelView {
             stroke_cap: "butt".to_string(),
             fill_paint: "off".to_string(),
             fill_rows: false,
+            fill_shown: true,
             fill_color_mixed: false,
             fill_color: pack_rgb(defaults.fill.color),
             fill_hex: hex_text(defaults.fill.color, defaults.fill.opacity),

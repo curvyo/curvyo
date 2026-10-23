@@ -144,6 +144,14 @@ pub fn font_file_faces(bytes: &[u8]) -> String {
     crate::font_file_faces(bytes)
 }
 
+/// A single-line face's name drawn in its own centre lines, for its Fonts-tab row, as JSON
+/// (`specs/0076-single-line-fonts` criterion 6).
+#[wasm_bindgen]
+#[must_use]
+pub fn face_preview_path(bytes: &[u8], index: u32, text: &str) -> String {
+    crate::face_preview_path(bytes, index, text)
+}
+
 #[wasm_bindgen]
 impl WasmSession {
     /// The texts of the open project using a face of `family` from the Curvyo fonts block.

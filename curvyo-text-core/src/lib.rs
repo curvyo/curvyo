@@ -1,5 +1,6 @@
 //! The Curvyo text engine (ADR 0020 §2): turns a face's bytes, a string and a size into
-//! positioned glyph outlines and line metrics.
+//! positioned glyph outlines and line metrics. Reads OpenType faces and SVG fonts
+//! (`specs/0076-single-line-fonts`).
 //!
 //! Pure: no file, font enumeration, clock or thread. A platform crate finds the fonts and passes
 //! the bytes of a face in once per face per session ([`FaceStore::add`]); everything here is
@@ -15,14 +16,18 @@ mod font_names;
 mod layout;
 pub mod limits;
 mod outline;
+mod path_data;
+mod preview;
 mod shape;
+mod svg_font;
 mod units;
 
 pub use error::TextError;
-pub use face::{Face, FaceMetrics};
+pub use face::{Face, FaceKind, FaceMetrics};
 pub use face_store::{FaceHash, FaceKey, FaceStore};
 pub use font_class::{DeclaredClass, OS2_CLASS_BYTES, declared_class, os2_class_bytes};
-pub use font_names::{ListableFace, family_name, listable_faces, style_name};
+pub use font_names::{ListableFace, family_name, listable_faces, style_name, svg_listable_faces};
 pub use layout::{LineLayout, PlacedGlyph, TextLayout, layout};
 pub use outline::GlyphOutline;
+pub use preview::preview_path;
 pub use units::Mm;

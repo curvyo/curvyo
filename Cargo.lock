@@ -693,6 +693,7 @@ dependencies = [
  "harfrust",
  "kurbo",
  "proptest",
+ "roxmltree",
  "serde",
  "serde_json",
  "sha2",

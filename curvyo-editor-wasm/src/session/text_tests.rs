@@ -272,6 +272,7 @@ fn ac29_missing_face() {
         style: "Bold".to_owned(),
         face_hash: "c".repeat(64),
         face_index: 0,
+        kind: curvyo_document_core::FontKind::Outline,
     };
     session.document.set_text_font(&[id], &lost).unwrap();
     let text = &texts(&session)[0];

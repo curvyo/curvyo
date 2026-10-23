@@ -6,7 +6,9 @@
 //!   text_string    : LoroText container    per-character merge (ADR 0009 §3), at most
 //!                                          MAX_TEXT_CHARS Unicode scalar values
 //!   text_font      : { "family": "...", "style": "...", "face_hash": "<64 hex>",
-//!                      "face_index": 0 }
+//!                      "face_index": 0, "kind": "single_line" }
+//!                    `kind` is optional (format 18, `specs/0076-single-line-fonts`): absent or
+//!                    any other value is an outline face
 //!                    ONE LWW register holding a map *value*, written whole by a maker's pick
 //!   text_size      : 20.0                  mm, the capital H, 0.1 ..= 2000
 //!   text_placement : [a, b, c, d, e, f]    text space to document, one list value
@@ -23,7 +25,7 @@ use crate::affine::Affine;
 use crate::path_codec::as_f64;
 use crate::path_model::NodeId;
 use crate::text_model::{
-    FontRef, MAX_STORED_TEXT_CHARS, MAX_TEXT_SIZE, MIN_TEXT_SIZE, TextSnapshot,
+    FontKind, FontRef, MAX_STORED_TEXT_CHARS, MAX_TEXT_SIZE, MIN_TEXT_SIZE, TextSnapshot,
 };
 use crate::units::Length;
 
@@ -37,6 +39,8 @@ const KEY_FAMILY: &str = "family";
 const KEY_STYLE: &str = "style";
 const KEY_FACE_HASH: &str = "face_hash";
 const KEY_FACE_INDEX: &str = "face_index";
+const KEY_KIND: &str = "kind";
+const KIND_SINGLE_LINE: &str = "single_line";
 
 /// Whether `meta` is a text node's.
 pub(crate) fn is_text_meta(meta: &LoroMap) -> bool {
@@ -89,7 +93,7 @@ pub(crate) fn apply_string_diff(container: &LoroText, string: &str) -> bool {
 
 /// Writes the font register as one value.
 pub(crate) fn write_font(meta: &LoroMap, font: &FontRef) {
-    let value: HashMap<String, LoroValue> = HashMap::from([
+    let mut value: HashMap<String, LoroValue> = HashMap::from([
         (KEY_FAMILY.to_owned(), LoroValue::from(font.family.as_str())),
         (KEY_STYLE.to_owned(), LoroValue::from(font.style.as_str())),
         (
@@ -101,6 +105,9 @@ pub(crate) fn write_font(meta: &LoroMap, font: &FontRef) {
             LoroValue::I64(i64::from(font.face_index)),
         ),
     ]);
+    if font.kind == FontKind::SingleLine {
+        value.insert(KEY_KIND.to_owned(), LoroValue::from(KIND_SINGLE_LINE));
+    }
     // invariant: inserting a plain value under a known key on an attached map cannot fail.
     #[allow(clippy::unwrap_used)]
     meta.insert(KEY_FONT, LoroValue::from(value)).unwrap();
@@ -139,6 +146,11 @@ pub(crate) fn read_font(meta: &LoroMap) -> Option<FontRef> {
         style: text(KEY_STYLE)?,
         face_hash: hex.then_some(face_hash)?,
         face_index: u32::try_from(*index).ok()?,
+        kind: if text(KEY_KIND).as_deref() == Some(KIND_SINGLE_LINE) {
+            FontKind::SingleLine
+        } else {
+            FontKind::Outline
+        },
     })
 }
 
@@ -228,6 +240,7 @@ mod tests {
                 style: "Bold".to_owned(),
                 face_hash: "ab".repeat(32),
                 face_index: 2,
+                kind: FontKind::SingleLine,
             },
             size: Length::from_mm(12.5),
             placement: Affine::new(0.0, 1.0, -1.0, 0.0, 3.0, 4.0),
@@ -253,6 +266,20 @@ mod tests {
             read_text_snapshot(NodeId::from_parts(1, 0), &meta),
             Some(sample())
         );
+    }
+
+    /// `specs/0076-single-line-fonts` criterion 21: an unknown kind reads as outline.
+    #[test]
+    fn an_unknown_kind_reads_as_outline() {
+        let (_doc, meta) = written();
+        let Some(ValueOrContainer::Value(LoroValue::Map(map))) = meta.get(KEY_FONT) else {
+            unreachable!()
+        };
+        let mut map = (*map).clone();
+        map.insert(KEY_KIND.to_owned(), LoroValue::from("engraved"));
+        meta.insert(KEY_FONT, LoroValue::from(map)).unwrap();
+        assert_eq!(read_font(&meta).unwrap().kind, FontKind::Outline);
+        assert!(validate_text_node(&meta));
     }
 
     #[test]

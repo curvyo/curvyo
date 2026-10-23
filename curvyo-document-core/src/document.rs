@@ -198,7 +198,15 @@ pub struct DocumentVersion(pub(crate) loro::Frontiers);
 /// opens unchanged and is not rewritten. A text with a missing or damaged register, a string over
 /// 10,000 characters, a size outside 0.1 to 2,000 mm or a placement that is not finite and
 /// invertible is refused as damaged (`crate::text_codec`). Golden: `text_v17.curvyo`.
-pub const CURRENT_FORMAT_VERSION: u32 = 17;
+///
+/// Bumped to 18 in `single-line-fonts` (`specs/0076-single-line-fonts/adrs.md` decision 1, Frage
+/// 21 SL-KIND A): `text_font` may carry the key `kind = "single_line"`. A build that stops at
+/// version 17 ignores the key and could match an outline face of the same name, drawing the
+/// letters filled without the "Font missing" mark, so it must refuse every file of this build as
+/// too new. Migration from version 17 is none: no key reads as an outline face, and a file from an
+/// earlier build opens unchanged. Any other value of `kind` reads as outline. Golden:
+/// `text_single_line_v18.curvyo`.
+pub const CURRENT_FORMAT_VERSION: u32 = 18;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";

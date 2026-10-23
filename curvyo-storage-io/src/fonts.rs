@@ -1,7 +1,8 @@
 //! Lists the font faces of the Curvyo font folder and of the operating system with `fontdb`
 //! (`specs/0074-text-objects` criteria 16, 19 to 21; ADR 0020 §3). Names, the 12 OS/2 class bytes
 //! and a file stamp only (`specs/0075-font-library/adrs.md` decisions 4 and 5): the bytes are read
-//! by path when a face is needed, and shaping and classifying happen in the core crates.
+//! by path when a face is needed, and shaping and classifying happen in the core crates. SVG fonts
+//! in the Curvyo folder are named by [`crate::svg_fonts`] (`specs/0076-single-line-fonts`).
 
 use std::path::{Path, PathBuf};
 
@@ -32,18 +33,31 @@ pub struct FontFace {
     /// `<length>-<modified seconds>` of the file: a cached check result still holds while it
     /// matches.
     pub stamp: String,
+    /// A single-line face (an SVG font, `specs/0076-single-line-fonts` criterion 1).
+    pub single_line: bool,
 }
 
 /// The faces of the Curvyo font folder and the files in it that are not readable fonts.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct FolderFonts {
-    /// Every face of every readable `.ttf`, `.otf` and `.ttc` file, by family and style.
+    /// Every face of every readable `.ttf`, `.otf`, `.ttc` and `.svg` font file, by family and
+    /// style.
     pub faces: Vec<FontFace>,
     /// The names of the font files that could not be read (criterion 19, "2 skipped").
     pub skipped: Vec<String>,
 }
 
 pub(crate) const FONT_EXTENSIONS: [&str; 3] = ["ttf", "otf", "ttc"];
+
+/// The extension of an SVG font file (only in the Curvyo folder; the system lists none).
+pub(crate) const SVG_EXTENSION: &str = "svg";
+
+/// Whether `path` ends in `.svg`, any case.
+pub(crate) fn is_svg(path: &Path) -> bool {
+    path.extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|e| e.eq_ignore_ascii_case(SVG_EXTENSION))
+}
 
 /// The largest font file read (64 MiB): text-core's `MAX_FACE_BYTES` (ADR 0020 §2), checked
 /// before the bytes are read, so a stray huge file never goes through memory or the IPC.
@@ -193,9 +207,16 @@ fn faces_of(db: &fontdb::Database, source: FontSource) -> Vec<FontFace> {
                 path,
                 index: face.index,
                 os2: tables.os2,
+                single_line: false,
             })
         })
         .collect();
+    sort_faces(&mut faces);
+    faces
+}
+
+/// Family (case-insensitive), style, file, index.
+fn sort_faces(faces: &mut [FontFace]) {
     faces.sort_by(|a, b| {
         (a.family.to_lowercase(), &a.style, &a.path, a.index).cmp(&(
             b.family.to_lowercase(),
@@ -204,12 +225,11 @@ fn faces_of(db: &fontdb::Database, source: FontSource) -> Vec<FontFace> {
             b.index,
         ))
     });
-    faces
 }
 
 /// Lists the font files directly in `dir` (not in sub-folders), creating the folder when it is
-/// missing (criterion 19). A file with a font extension that holds no readable face is counted
-/// as skipped; other files are ignored.
+/// missing (criterion 19). A file with a font extension (`.svg` included) that holds no readable
+/// face is counted as skipped; other files are ignored.
 #[must_use]
 pub fn list_font_folder(dir: &Path) -> FolderFonts {
     let _ = std::fs::create_dir_all(dir);
@@ -223,26 +243,60 @@ pub fn list_font_folder(dir: &Path) -> FolderFonts {
         .map(|entry| entry.path())
         .filter(|path| path.is_file())
         .filter(|path| {
-            path.extension()
-                .and_then(|e| e.to_str())
-                .is_some_and(|e| FONT_EXTENSIONS.contains(&e.to_ascii_lowercase().as_str()))
+            is_svg(path)
+                || path
+                    .extension()
+                    .and_then(|e| e.to_str())
+                    .is_some_and(|e| FONT_EXTENSIONS.contains(&e.to_ascii_lowercase().as_str()))
         })
         .collect();
     files.sort();
+    let name = |path: &Path| {
+        path.file_name()
+            .map(|name| name.to_string_lossy().into_owned())
+            .unwrap_or_default()
+    };
+    let mut svg_faces = Vec::new();
     for path in files {
+        if is_svg(&path) {
+            let faces = svg_faces_of(&path);
+            if faces.is_empty() {
+                skipped.push(name(&path));
+            }
+            svg_faces.extend(faces);
+            continue;
+        }
         let before = db.len();
         if !small_enough(&path) || db.load_font_file(&path).is_err() || db.len() == before {
-            skipped.push(
-                path.file_name()
-                    .map(|name| name.to_string_lossy().into_owned())
-                    .unwrap_or_default(),
-            );
+            skipped.push(name(&path));
         }
     }
-    FolderFonts {
-        faces: faces_of(&db, FontSource::Curvyo),
-        skipped,
-    }
+    let mut faces = faces_of(&db, FontSource::Curvyo);
+    faces.extend(svg_faces);
+    sort_faces(&mut faces);
+    FolderFonts { faces, skipped }
+}
+
+/// The faces of the SVG font at `path` (empty when it is larger than 16 MiB or not a font).
+fn svg_faces_of(path: &Path) -> Vec<FontFace> {
+    let small = std::fs::metadata(path)
+        .is_ok_and(|meta| meta.len() <= crate::svg_fonts::MAX_SVG_FONT_BYTES as u64);
+    let Some(bytes) = small.then(|| std::fs::read(path).ok()).flatten() else {
+        return Vec::new();
+    };
+    crate::svg_fonts::svg_font_faces(&bytes)
+        .into_iter()
+        .map(|face| FontFace {
+            source: FontSource::Curvyo,
+            family: face.family,
+            style: face.style,
+            path: path.to_path_buf(),
+            index: face.index,
+            os2: None,
+            stamp: stamp_of(path),
+            single_line: true,
+        })
+        .collect()
 }
 
 /// Lists the installed fonts the operating system's font configuration names (criterion 20).
@@ -322,6 +376,52 @@ mod tests {
         );
         assert_eq!(listed.skipped, ["broken.ttf"]);
         assert!(listed.faces.iter().all(|f| f.source == FontSource::Curvyo));
+    }
+
+    /// `specs/0076-single-line-fonts` criterion 1: an SVG font in the folder is listed by family
+    /// and style as single-line, with the names text-core reads; an `.svg` that is not a font is
+    /// skipped.
+    #[test]
+    fn ac01_svg_fonts_in_the_folder() {
+        let dir = tempfile::tempdir().unwrap();
+        let fonts = dir.path().join("fonts");
+        std::fs::create_dir(&fonts).unwrap();
+        let fixtures = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../curvyo-text-core/tests/fixtures/svg_fonts");
+        std::fs::copy(
+            included("hershey-sans-1/HersheySans1.svg"),
+            fonts.join("a.svg"),
+        )
+        .unwrap();
+        std::fs::copy(fixtures.join("two-fonts.svg"), fonts.join("b.SVG")).unwrap();
+        std::fs::copy(fixtures.join("kerning.svg"), fonts.join("c.svg")).unwrap();
+        std::fs::copy(fixtures.join("not-a-font.svg"), fonts.join("logo.svg")).unwrap();
+        std::fs::copy(fixtures.join("entity.svg"), fonts.join("entity.svg")).unwrap();
+        let listed = list_font_folder(&fonts);
+        assert_eq!(listed.skipped, ["entity.svg", "logo.svg"]);
+        let names: Vec<(&str, &str, u32)> = listed
+            .faces
+            .iter()
+            .map(|f| (f.family.as_str(), f.style.as_str(), f.index))
+            .collect();
+        assert_eq!(
+            names,
+            [
+                ("Curvyo Kerning Test", "Bold Italic", 0),
+                ("Hershey Sans 1-stroke", "Regular", 0),
+                ("Two One", "Regular", 1),
+                ("Two Two", "Bold", 2)
+            ]
+        );
+        for face in &listed.faces {
+            assert!(face.single_line && face.os2.is_none());
+            let bytes = std::fs::read(&face.path).unwrap();
+            let read: Vec<(u32, String, String)> = curvyo_text_core::listable_faces(&bytes)
+                .into_iter()
+                .map(|f| (f.index, f.family, f.style))
+                .collect();
+            assert!(read.contains(&(face.index, face.family.clone(), face.style.clone())));
+        }
     }
 
     /// `specs/0075-font-library` decisions 3 and 4: the browser and Add font name a face as the

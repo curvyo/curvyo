@@ -37,7 +37,7 @@ impl From<WeldAvailability> for WeldAvailabilityView {
 /// What `apply_weld` did. `kind` is `"ignored"`, `"applied"` (`of` selected objects became one
 /// path, `compound` or not, `length_text` of line, and the notice's counts and flags) or a refusal:
 /// `"no_area"`, `"out_of_range"` (`count` of the `of` selected objects are to blame),
-/// `"missing_fonts"` or `"fonts_loading"` (`count` texts). Nothing was changed by anything but
+/// `"missing_fonts"`, `"fonts_loading"` or `"single_line_texts"` (`count` texts). Nothing was changed by anything but
 /// `"applied"`.
 #[wasm_bindgen]
 #[derive(Debug, Clone, Default)]

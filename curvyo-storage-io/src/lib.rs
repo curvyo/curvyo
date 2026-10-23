@@ -11,6 +11,7 @@
 mod filesystem;
 mod font_files;
 mod fonts;
+mod svg_fonts;
 
 pub use filesystem::{
     FsError, ensure_parent_dir, read_optional, read_to_vec, rename_replacing, write_atomic,

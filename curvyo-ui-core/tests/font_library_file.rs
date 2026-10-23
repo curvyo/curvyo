@@ -31,6 +31,10 @@ fn ac12_the_valid_file_reads_and_writes_back_to_itself() {
         read_font_library(&write_font_library(&library)).unwrap(),
         library
     );
+    // `specs/0076-single-line-fonts` decision 7: a format-1 file (before Single line) reads the
+    // same and is written as format 2.
+    let old = text.replacen("format = 2", "format = 1", 1);
+    assert_eq!(read_font_library(&old).unwrap(), library);
 }
 
 /// Every rule has a failing fixture; a newer format is its own error, read before any other.

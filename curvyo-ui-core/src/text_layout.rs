@@ -1,9 +1,10 @@
 //! A text object laid out through the engine into what the canvas draws, hits and converts:
 //! its glyphs as one compound path in the document and its line box (`specs/0074-text-objects`
-//! criteria 4, 22, 23, 25).
+//! criteria 4, 22, 23, 25). A single-line text's glyphs are open centre lines drawn with the
+//! stroke and never filled (`specs/0076-single-line-fonts` criteria 7, 16, 17).
 
 use curvyo_document_core::{
-    AnchorId, AnchorKind, NewAnchor, PathSnapshot, Point, SubpathSnapshot, TextOutline,
+    AnchorId, AnchorKind, FontKind, NewAnchor, PathSnapshot, Point, SubpathSnapshot, TextOutline,
     TextSnapshot, Vec2,
 };
 use curvyo_text_core::{Face, Mm, TextLayout, layout};
@@ -48,10 +49,15 @@ pub fn lay_out(text: &TextSnapshot, face: &Face, substitute: bool) -> Option<Tex
         closed: true,
         anchors: Vec::new(),
     });
+    let mut style = text.style.clone();
+    if text.font.kind == FontKind::SingleLine {
+        // The text's own fill register is kept; it is not applied (criterion 8).
+        style.fill.enabled = false;
+    }
     let glyphs = PathSnapshot {
         id: text.id,
         closed: first.closed,
-        style: text.style.clone(),
+        style,
         anchors: first.anchors,
         extra_subpaths: outlines.collect(),
         rotation: text.rotation(),
@@ -64,8 +70,10 @@ pub fn lay_out(text: &TextSnapshot, face: &Face, substitute: bool) -> Option<Tex
     })
 }
 
-/// The contours of one glyph path (cubics and lines only) as closed outlines of anchors in the
-/// document, with placeholder anchor ids (Object to path gives fresh ones).
+/// The contours of one glyph path (cubics and lines only) as outlines of anchors in the
+/// document, with placeholder anchor ids (Object to path gives fresh ones). A contour is closed
+/// only when it ends with `ClosePath` (every OpenType contour does); an open one is kept open even
+/// when its ends meet (`0076` criterion 16).
 pub(crate) fn contours_of(
     path: &BezPath,
     map: &impl Fn(kurbo::Point) -> Point,
@@ -73,8 +81,8 @@ pub(crate) fn contours_of(
 ) -> Vec<SubpathSnapshot> {
     let mut contours = Vec::new();
     let mut anchors: Vec<NewAnchor> = Vec::new();
-    let mut finish = |anchors: &mut Vec<NewAnchor>| {
-        if anchors.len() > 1 {
+    let mut finish = |anchors: &mut Vec<NewAnchor>, closed: bool| {
+        if closed && anchors.len() > 1 {
             let (first, last) = (anchors[0].point, anchors[anchors.len() - 1].point);
             if first.vector_to(last).length() <= SAME_POINT_MM {
                 // invariant: at least two anchors, checked above.
@@ -83,9 +91,13 @@ pub(crate) fn contours_of(
                 anchors[0].handle_in = last.handle_in;
             }
         }
+        // A lone point of an open contour draws nothing and is no path.
+        if !closed && anchors.len() < 2 {
+            anchors.clear();
+        }
         if !anchors.is_empty() {
             contours.push(SubpathSnapshot {
-                closed: true,
+                closed,
                 anchors: std::mem::take(anchors),
             });
         }
@@ -103,7 +115,7 @@ pub(crate) fn contours_of(
     for element in path.elements() {
         match *element {
             PathEl::MoveTo(p) => {
-                finish(&mut anchors);
+                finish(&mut anchors, false);
                 anchors.push(anchor(map(p), next_id));
             }
             // The engine writes cubics only; a quadratic never arrives, its end is kept.
@@ -117,10 +129,10 @@ pub(crate) fn contours_of(
                 new.handle_in = end.vector_to(map(c2));
                 anchors.push(new);
             }
-            PathEl::ClosePath => finish(&mut anchors),
+            PathEl::ClosePath => finish(&mut anchors, true),
         }
     }
-    finish(&mut anchors);
+    finish(&mut anchors, false);
     contours
 }
 

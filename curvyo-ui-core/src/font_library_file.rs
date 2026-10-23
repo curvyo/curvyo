@@ -14,8 +14,9 @@ use crate::font_library::{
 };
 
 /// The schema of the file. Tags replaced groups before the file was ever released, so `format`
-/// stays 1 (2026-10-20).
-pub const FONT_LIBRARY_FORMAT: i64 = 1;
+/// stayed 1 (2026-10-20). Format 2 adds the built-in tag `single_line`
+/// (`specs/0076-single-line-fonts/adrs.md` decision 7); format 1 reads unchanged.
+pub const FONT_LIBRARY_FORMAT: i64 = 2;
 /// The largest file, in bytes, checked on the text before parsing.
 pub const MAX_FONT_LIBRARY_BYTES: usize = 256 * 1024;
 
@@ -122,7 +123,7 @@ pub fn read_font_library(text: &str) -> Result<FontLibrary, FontLibraryFileError
     // The version first and alone: a newer file may carry keys this version does not know.
     let header: RawHeader = toml::from_str(text).map_err(|e| broken(e.message()))?;
     match header.format {
-        Some(FONT_LIBRARY_FORMAT) => {}
+        Some(1 | FONT_LIBRARY_FORMAT) => {}
         Some(format) if format > FONT_LIBRARY_FORMAT => return Err(FontLibraryFileError::Newer),
         Some(format) => return Err(broken(format!("format {format} is not valid"))),
         None => return Err(broken("format is missing")),

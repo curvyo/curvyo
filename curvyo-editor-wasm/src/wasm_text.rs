@@ -9,9 +9,12 @@ use crate::session::{ObjectToPathOutcome, TextSizeOutcome};
 use crate::wasm_api::WasmSession;
 
 /// The code of a refusal for texts that do not convert (criteria 24, 29): `"fonts_loading"`
-/// when a face's bytes have not arrived, else `"missing_fonts"`.
+/// when a face's bytes have not arrived, `"single_line_texts"` for single-line texts refused by
+/// a command on areas (`0076` criterion 19), else `"missing_fonts"`.
 pub(crate) const fn refusal_kind(refusal: &TextRefusal) -> &'static str {
-    if refusal.loading {
+    if refusal.no_area {
+        "single_line_texts"
+    } else if refusal.loading {
         "fonts_loading"
     } else {
         "missing_fonts"
@@ -223,7 +226,8 @@ impl WasmSession {
     }
 
     /// The faces the host listed for `block` (`"curvyo"`, `"included"`, `"system"`), as JSON:
-    /// `{"faces": [{"id", "family", "style", "index"}], "skipped": ["name"]}`.
+    /// `{"faces": [{"id", "family", "style", "index", "kind"?}], "skipped": ["name"]}`; `kind` is
+    /// `"single_line"` for a single-line face, else absent.
     pub fn set_font_list(&mut self, block_code: &str, json: &str) {
         let Some(block) = block(block_code) else {
             return;
@@ -246,6 +250,11 @@ impl WasmSession {
                                 .as_u64()
                                 .and_then(|i| u32::try_from(i).ok())
                                 .unwrap_or(0),
+                            if face["kind"].as_str() == Some("single_line") {
+                                curvyo_document_core::FontKind::SingleLine
+                            } else {
+                                curvyo_document_core::FontKind::Outline
+                            },
                         )
                     })
                     .collect()
@@ -255,7 +264,7 @@ impl WasmSession {
             .as_array()
             .map(|names| names.iter().map(text).collect())
             .unwrap_or_default();
-        self.session.set_font_list(block, faces, skipped);
+        self.session.set_font_list_with_kinds(block, faces, skipped);
     }
 
     /// The host ids of the font files to read and hand in with [`WasmSession::add_font_file`].

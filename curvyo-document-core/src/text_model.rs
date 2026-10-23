@@ -32,6 +32,29 @@ pub const UNCREATED_TEXT_ID: NodeId = NodeId::from_parts(0, i32::MIN);
 /// The relative tolerance within which a linear map counts as a uniform scale (ADR 0020 §1).
 const UNIFORM_TOLERANCE: f64 = 1e-9;
 
+/// How a text's face draws (`specs/0076-single-line-fonts/adrs.md` decision 1): stored with the
+/// pick, so drawing, conversion and refusals agree on every peer even without the face.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FontKind {
+    /// Closed areas, filled and stroked as a path (absent key).
+    #[default]
+    Outline,
+    /// Open centre lines: stroke only, never filled (`text_font.kind = "single_line"`).
+    SingleLine,
+}
+
+impl FontKind {
+    /// Whether this is the outline kind (the key is then not written).
+    #[must_use]
+    pub const fn is_outline(&self) -> bool {
+        matches!(self, Self::Outline)
+    }
+}
+
+/// The stroke width a single-line text gets when its stroke was off (criterion 9).
+pub const SINGLE_LINE_STROKE_WIDTH: Length = Length::from_mm(0.25);
+
 /// The face a text uses: written only by a maker's pick (ADR 0020 §1, `text_font`).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct FontRef {
@@ -41,8 +64,28 @@ pub struct FontRef {
     pub style: String,
     /// The SHA-256 of the font file's bytes, 64 lower-case hex digits.
     pub face_hash: String,
-    /// The face's index in a collection file, else 0.
+    /// The face's index in a collection file (the `<font>` ordinal of an SVG font), else 0.
     pub face_index: u32,
+    /// Outline or single-line; absent in the file means outline.
+    #[serde(skip_serializing_if = "FontKind::is_outline")]
+    pub kind: FontKind,
+}
+
+/// `style` for a text in a single-line face (criterion 9): a stroke that is off is switched on in
+/// the fill colour at [`SINGLE_LINE_STROKE_WIDTH`] with round caps and joins; a stroke that is on
+/// is kept. `None` when nothing changes.
+#[must_use]
+pub fn single_line_style(style: &Style) -> Option<Style> {
+    if style.stroke.enabled {
+        return None;
+    }
+    let mut style = style.clone();
+    style.stroke.enabled = true;
+    style.stroke.color = style.fill.color;
+    style.stroke.width = SINGLE_LINE_STROKE_WIDTH;
+    style.stroke.cap = crate::style_model::LineCap::Round;
+    style.stroke.join = crate::style_model::LineJoin::Round;
+    Some(style)
 }
 
 /// One text object as read from the document.
@@ -199,6 +242,7 @@ mod tests {
                 style: "Regular".to_owned(),
                 face_hash: "0".repeat(64),
                 face_index: 0,
+                kind: FontKind::Outline,
             },
             size: Length::from_mm(size),
             placement,

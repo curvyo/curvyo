@@ -11,7 +11,7 @@ use curvyo_geometry_core::{BooleanError, Outline, OutlineTriple, Welded, outline
 
 use crate::anchor_id_minter::AnchorIdMinter;
 use crate::boolean::{BOOLEAN_TOLERANCE, corner_anchors, open_counts, outlines_of};
-use crate::text_convert::{TextRefusal, text_path, texts_refusal};
+use crate::text_convert::{TextRefusal, area_refusal, text_path};
 use crate::units::SelectedUnit;
 
 /// The commit label of Weld; the undo slice maps it to "Weld".
@@ -20,7 +20,8 @@ pub const WELD_COMMIT_LABEL: &str = "weld";
 /// Why Weld was refused. Nothing was changed in any of these cases.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum WeldRefusal {
-    /// Texts of the selection use a missing face or are not laid out yet (criterion 23).
+    /// Texts of the selection use a missing face or are not laid out yet (criterion 23), or are
+    /// single-line texts, which have no area (`0076` criterion 19).
     Texts(TextRefusal),
     /// No operand encloses an area (criterion 24); every leaf is outlined.
     NoArea {
@@ -274,7 +275,7 @@ pub fn plan_weld(
 ) -> Result<WeldPlan, WeldRefusal> {
     let leaves = leaves_in_order(objects, units);
     let ids: Vec<NodeId> = leaves.iter().map(|leaf| leaf.id()).collect();
-    if let Some(refusal) = texts_refusal(objects, &ids) {
+    if let Some(refusal) = area_refusal(objects, &ids) {
         return Err(WeldRefusal::Texts(refusal));
     }
     let of = units.len();

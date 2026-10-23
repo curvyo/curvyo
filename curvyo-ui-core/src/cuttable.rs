@@ -93,7 +93,7 @@ pub fn union_pieces(glyphs: &[Vec<Vec<OutlineTriple>>]) -> usize {
 
 /// The pieces [`CUTTABLE_WORD`] in face `index` of `bytes` makes at [`CUTTABLE_SIZE_MM`]: the
 /// Union of its glyphs with no gap ([`union_pieces`]). Glyphs a face lacks draw as `.notdef` or
-/// nothing; no area at all is 0 pieces.
+/// nothing; no area at all is 0 pieces, and a single-line face is 0 without running Union.
 ///
 /// # Errors
 /// The engine's error for bytes that hold no usable face.
@@ -101,6 +101,11 @@ pub fn cuttable_pieces(bytes: &[u8], index: u32) -> Result<usize, TextError> {
     let mut store = FaceStore::new();
     let key = store.add(bytes.to_vec(), index)?;
     let face = store.get(&key).ok_or(TextError::UnknownFace(key))?;
+    // A single-line face has no glyph with area: Union would close every stroke
+    // (`specs/0076-single-line-fonts` criterion 5).
+    if face.kind() == curvyo_text_core::FaceKind::SingleLine {
+        return Ok(0);
+    }
     Ok(union_pieces(&glyph_contours(face)?))
 }
 
