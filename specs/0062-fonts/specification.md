@@ -21,7 +21,7 @@ There are no text objects: the node kinds are layer, group, path and primitive. 
 | 1 | Text object, Text tool, font by name, Object to path; a Fonts tab with the list. Specified as [`0074-text-objects`](../0074-text-objects/) | ADR 0020 (accepted 2026-10-20) | Done (#165) |
 | 2 | Groups, favourites, the Curvyo font folder, "cuttable" tag, adding fonts. Specified as [`0075-font-library`](../0075-font-library/) | stage 1 | Done (#168) |
 | 2b | Single-line (stroke) fonts as live text: SVG fonts, the Single line tag, four shipped fonts. Specified as [`0076-single-line-fonts`](../0076-single-line-fonts/) | stage 2 | Done (#171) |
-| 3 | The preview page (criteria 14 to 17), split and full view | stage 2 (the split is built in `0077` and reused by `0063`, Frage 26 A, 2026-10-23) | Ready (`0077`) |
+| 3 | The preview page (criteria 14 to 17), split and full view | stage 2 (the split is built in `0077` and reused by `0063`, Frage 26 A, 2026-10-23) | Done (#175, `0077`) |
 
 ## Acceptance criteria (as far as clear)
 

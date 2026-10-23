@@ -1,6 +1,6 @@
 # Font preview: the maker's lettering in every listed font, beside the drawing
 
-Status: Ready (2026-10-23; Frage 25 to 28 decided A; UX notes and adrs.md done)
+Status: Done (PR #175, merged 2026-10-23; Ready 2026-10-23; Frage 25 to 28 decided A; UX notes and adrs.md done)
 Priority: Should (R-FONT-007)
 Origin: Customer. A story of the fonts epic `0062` (stage 3, its criteria 14 to 17 and the decision FONT-PREVIEW of 2026-10-17: split view next to the drawing, switchable to a full view, no popup). Request of 2026-10-23 (translated): "I'd like to keep going and finish fonts, with a good-looking font preview panel." Items marked **(Proposal)** are the product owner's; they are in this slice as safe defaults and the customer can veto them at the demo.
 Depends on: `0074-text-objects` (text node, Fonts tab, picking a face, "Change font"), `0075-font-library` (tag strip, search, favourites, the font library file), `0076-single-line-fonts` (single-line faces drawn from the engine's outlines). Builds after `0076` is merged.
@@ -158,4 +158,4 @@ Requirements: R-FONT-007 (preview page), R-FONT-002 and R-FONT-003 (the filter i
 Depends on: `specs/0074-text-objects/`, `specs/0075-font-library/`, `specs/0076-single-line-fonts/`, `specs/0062-fonts/` (stage 3, decision FONT-PREVIEW), `specs/0047-transform-polish/` (slider behaviour)
 Related: `specs/0063-manufacturing-workbenches/` (pane host), `specs/0068-laserable-lettering/`
 ADRs: 0020 (text engine), 0001 (UI and canvas); the canvas area split is the architect's (decision 1)
-PR: -
+PR: https://github.com/curvyo/curvyo/pull/175
