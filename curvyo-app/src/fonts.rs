@@ -33,6 +33,9 @@ pub(crate) struct ListedFace {
     os2: Option<String>,
     /// The file's `<length>-<modified seconds>`, for the check cache (`0075` decision 5).
     stamp: String,
+    /// `"single_line"` for an SVG font (`0076` criterion 1), else absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    kind: Option<&'static str>,
 }
 
 /// The Curvyo folder's faces and the names of its unreadable files.
@@ -67,6 +70,7 @@ fn listed(files: &FontFiles, faces: Vec<FontFace>) -> Vec<ListedFace> {
                     })
                 }),
                 stamp: face.stamp,
+                kind: face.single_line.then_some("single_line"),
             }
         })
         .collect()
@@ -155,9 +159,9 @@ pub(crate) fn grant_font_paths(app: &AppHandle, paths: &[PathBuf]) {
         .extend(paths.iter().cloned());
 }
 
-/// The file types the dialog offers (`0075` criterion 20).
+/// The file types the dialog offers (`0075` criterion 20; SVG fonts, `0076` criterion 3).
 const FONT_FILTER_NAME: &str = "Fonts";
-const FONT_FILTER: [&str; 3] = ["ttf", "otf", "ttc"];
+const FONT_FILTER: [&str; 4] = ["ttf", "otf", "ttc", "svg"];
 
 /// The file dialog of Add font (`0075` criterion 20): several files, fonts only; `None` when
 /// cancelled. The chosen paths go to the page as a drop's do, so it can count them while

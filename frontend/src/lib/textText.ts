@@ -31,6 +31,9 @@ export function shortFace(face: string): string {
  * named, several texts are counted; a face still loading says so. `null` for any other kind. */
 export function textRefusalText(result: { kind: string; count?: number; of?: number; face?: string }): string | null {
   const count = result.count || result.of || 0;
+  if (result.kind === "single_line_texts") {
+    return singleLineRefusalText(count);
+  }
   if (result.kind === "fonts_loading") {
     return `Fonts are still loading. ${NOTHING_CHANGED}`;
   }
@@ -45,9 +48,17 @@ export function textRefusalText(result: { kind: string; count?: number; of?: num
     : `${count} texts use missing fonts. ${NOTHING_CHANGED}`;
 }
 
+/** The refusal of a command on areas for single-line texts (`specs/0076-single-line-fonts`
+ * criterion 19). */
+export function singleLineRefusalText(count: number): string {
+  return count <= 1
+    ? `Single-line text has no area. ${NOTHING_CHANGED}`
+    : `${count} single-line texts have no area. ${NOTHING_CHANGED}`;
+}
+
 /** Whether a refusal outlines the texts it blames on the canvas. */
 export function textRefusalOutlines(kind: string): boolean {
-  return kind === "missing_fonts" || kind === "fonts_loading";
+  return kind === "missing_fonts" || kind === "fonts_loading" || kind === "single_line_texts";
 }
 
 /** The notice under the Size field after a clamped value (criterion 12), or `null`. */
@@ -98,6 +109,8 @@ export interface FontFace {
   /** The face's index in its file (a collection holds several). */
   faceIndex: number;
   loaded: boolean;
+  /** A single-line face: its row draws the name in its own centre lines (`0076` criterion 6). */
+  singleLine?: boolean;
 }
 
 /** What the Fonts tab shows (criteria 15 to 19, 29). */
@@ -105,7 +118,14 @@ export interface FontsTabData {
   faces: FontFace[];
   skipped: string[];
   systemRead: boolean;
-  current: { family: string; style: string; missing: boolean; index: number | null } | null;
+  current: {
+    family: string;
+    style: string;
+    missing: boolean;
+    index: number | null;
+    /** The face a missing one is drawn in (`0076` criterion 22). */
+    substitute?: string;
+  } | null;
   mixed: boolean;
   next: boolean;
 }

@@ -54,7 +54,7 @@ export function TextControls({ bar, onShowFonts, onSetSize, onPreviewSize, onRet
           <span>
             {tooltip}
             {bar.font ? <span className="block">{bar.font}</span> : null}
-            {bar.missing ? <span className="block">Missing on this computer. Shown in Source Sans 3.</span> : null}
+            {bar.missing ? <span className="block">{`Missing on this computer. Shown in ${bar.substitute}.`}</span> : null}
           </span>
         }
       >

@@ -6,7 +6,33 @@ import { ChevronDown, ChevronRight, Star, TriangleAlert } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { Tooltip } from "@/components/ui/tooltip";
-import { cssFamilyOf } from "@/lib/fontFaceLoader";
+import { cssFamilyOf, type LinePreview, linePreviewOf } from "@/lib/fontFaceLoader";
+
+/** A name drawn in a single-line face's own centre lines (`specs/0076-single-line-fonts`
+ * criterion 6, design system "Single-line name"): 1 em = `em` px, 1 CSS px round lines in the
+ * row's text colour, clipped to the slot. */
+function LineName({ preview, em }: { preview: LinePreview; em: number }) {
+  const [x, y, width, height] = preview.box;
+  return (
+    <svg
+      aria-hidden
+      viewBox={`${x} ${y} ${width} ${height}`}
+      width={width * em}
+      height={height * em}
+      className="block shrink-0"
+    >
+      <path
+        d={preview.d}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        vectorEffect="non-scaling-stroke"
+      />
+    </svg>
+  );
+}
 import { tagsLine } from "@/lib/fontLibraryText";
 import { type FontFace as ListedFace, type FontFamily, familyName } from "@/lib/textText";
 
@@ -44,6 +70,7 @@ export function FamilyRow({
   onStar,
 }: FamilyRowProps) {
   const cssFamily = cssFamilyOf(family.faces[0].id);
+  const lines = family.faces[0].singleLine ? linePreviewOf(family.faces[0].id)?.family : undefined;
   const faces = family.faces.length;
   const tagsPart = tagNames.length > 0 ? `, tags ${tagNames.join(", ")}` : "";
   const name = `${familyName(family)}${favourite ? ", favourite" : ""}${tagsPart}`;
@@ -79,12 +106,19 @@ export function FamilyRow({
         >
           {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
         </span>
-        <span
-          className="min-w-0 flex-1 truncate"
-          style={cssFamily ? { fontFamily: cssFamily, fontSize: 16 } : { fontSize: 14 }}
-        >
-          {family.family}
-        </span>
+        {lines ? (
+          <span className="min-w-0 flex-1 overflow-hidden">
+            <span className="sr-only">{family.family}</span>
+            <LineName preview={lines} em={16} />
+          </span>
+        ) : (
+          <span
+            className="min-w-0 flex-1 truncate"
+            style={cssFamily ? { fontFamily: cssFamily, fontSize: 16 } : { fontSize: 14 }}
+          >
+            {family.family}
+          </span>
+        )}
         {holdsCurrent && !open ? <span aria-hidden className="size-1.5 rotate-45 bg-[var(--editor-accent)]" /> : null}
         <Tooltip side="left" content="Favourite">
           <button
@@ -126,6 +160,7 @@ interface FaceRowProps {
 
 export function FaceRow({ rowKey, face, current, focused, style, onFocus, onPick }: FaceRowProps) {
   const cssFamily = cssFamilyOf(face.id);
+  const lines = face.singleLine ? linePreviewOf(face.id)?.style : undefined;
   return (
     <div
       role="treeitem"
@@ -140,9 +175,16 @@ export function FaceRow({ rowKey, face, current, focused, style, onFocus, onPick
         current ? "border-l-[3px] border-[var(--editor-accent)] bg-[var(--value-fill)] pl-[17px]" : ""
       }`}
     >
-      <span className="min-w-0 truncate" style={cssFamily ? { fontFamily: cssFamily, fontSize: 14 } : { fontSize: 14 }}>
-        {face.style}
-      </span>
+      {lines ? (
+        <span className="min-w-0 overflow-hidden">
+          <span className="sr-only">{face.style}</span>
+          <LineName preview={lines} em={14} />
+        </span>
+      ) : (
+        <span className="min-w-0 truncate" style={cssFamily ? { fontFamily: cssFamily, fontSize: 14 } : { fontSize: 14 }}>
+          {face.style}
+        </span>
+      )}
     </div>
   );
 }

@@ -122,6 +122,9 @@ export function chipTooltip(source: string): string | null {
   if (source.startsWith("declared:")) {
     return `Declared by the font: ${source.slice("declared:".length)}`;
   }
+  if (source === "detected:single_line") {
+    return "Detected: single-line font";
+  }
   if (source.startsWith("detected:")) {
     const pieces = Number(source.slice("detected:".length));
     return pieces === 1 ? "Detected: one piece" : `Detected: ${pieces} pieces`;
