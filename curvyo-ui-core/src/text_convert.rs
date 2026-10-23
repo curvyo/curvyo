@@ -1,12 +1,13 @@
 //! The one conversion of text objects into paths (`specs/0074-text-objects` criteria 22, 24, 29):
 //! Object to path makes a group of one compound path per glyph; the path commands take a text
 //! as the compound path of all its glyphs. A text drawn with a substitute face, or not laid out
-//! yet, is refused, never converted to the wrong letters or to nothing.
+//! yet, is refused, never converted to the wrong letters or to nothing. Commands that work on
+//! areas also refuse single-line texts (`specs/0076-single-line-fonts` criterion 19).
 
 use std::borrow::Cow;
 
 use curvyo_document_core::{
-    NewAnchor, NodeId, ObjectSnapshot, PathSnapshot, TextConversion, TextSnapshot,
+    FontKind, NewAnchor, NodeId, ObjectSnapshot, PathSnapshot, TextConversion, TextSnapshot,
 };
 
 use crate::anchor_id_minter::AnchorIdMinter;
@@ -20,6 +21,8 @@ pub struct TextRefusal {
     pub missing_faces: Vec<String>,
     /// Some offender is not laid out yet (its face is still loading).
     pub loading: bool,
+    /// The offenders are single-line texts, which have no area (`0076` criterion 19).
+    pub no_area: bool,
 }
 
 /// The compound path of all glyphs of `text`, or `None` when it uses a substitute face or is not
@@ -40,6 +43,7 @@ pub fn texts_refusal(objects: &[ObjectSnapshot], ids: &[NodeId]) -> Option<TextR
         offenders: Vec::new(),
         missing_faces: Vec::new(),
         loading: false,
+        no_area: false,
     };
     for object in objects.iter().filter(|o| ids.contains(&o.id())) {
         let ObjectSnapshot::Text(text) = object else {
@@ -59,6 +63,30 @@ pub fn texts_refusal(objects: &[ObjectSnapshot], ids: &[NodeId]) -> Option<TextR
         }
     }
     (!refusal.offenders.is_empty()).then_some(refusal)
+}
+
+/// The refusal of a command that works on areas (the Boolean operations, Fracture, Flatten,
+/// Weld, Offset) for the texts among `ids`: a missing or loading face first ([`texts_refusal`]),
+/// then every single-line text, by its stored kind. All or nothing.
+#[must_use]
+pub fn area_refusal(objects: &[ObjectSnapshot], ids: &[NodeId]) -> Option<TextRefusal> {
+    if let Some(refusal) = texts_refusal(objects, ids) {
+        return Some(refusal);
+    }
+    let offenders: Vec<NodeId> = objects
+        .iter()
+        .filter(|o| ids.contains(&o.id()))
+        .filter_map(|object| match object {
+            ObjectSnapshot::Text(text) if text.font.kind == FontKind::SingleLine => Some(text.id),
+            _ => None,
+        })
+        .collect();
+    (!offenders.is_empty()).then_some(TextRefusal {
+        offenders,
+        missing_faces: Vec::new(),
+        loading: false,
+        no_area: true,
+    })
 }
 
 /// `objects` with every convertible text replaced by the compound path of its glyphs, under the

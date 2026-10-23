@@ -294,7 +294,7 @@ pub fn plan_boolean(
     op: BooleanOp,
     minter: &mut AnchorIdMinter,
 ) -> Result<BooleanPlan, BooleanRefusal> {
-    if let Some(refusal) = crate::text_convert::texts_refusal(objects, selection.ids()) {
+    if let Some(refusal) = crate::text_convert::area_refusal(objects, selection.ids()) {
         return Err(BooleanRefusal::Texts(refusal));
     }
     let converted = crate::text_convert::texts_as_paths(objects);

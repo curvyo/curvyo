@@ -9,7 +9,9 @@ use crate::path_codec::leaf_exists;
 use crate::path_model::NodeId;
 use crate::style_model::Style;
 use crate::text_codec::{self, SHAPE_TEXT};
-use crate::text_model::{FontRef, MAX_TEXT_CHARS, MAX_TEXT_SIZE, MIN_TEXT_SIZE, TextSnapshot};
+use crate::text_model::{
+    FontKind, FontRef, MAX_TEXT_CHARS, MAX_TEXT_SIZE, MIN_TEXT_SIZE, TextSnapshot,
+};
 use crate::units::Length;
 
 /// Why a text command wrote nothing.
@@ -59,9 +61,19 @@ fn check_font(font: &FontRef) -> Result<(), TextEditError> {
     }
 }
 
+/// Switches a text's stroke on for a single-line face (`specs/0076-single-line-fonts` criterion
+/// 9), in the caller's commit.
+fn apply_single_line_stroke(meta: &LoroMap) {
+    let style = crate::style_codec::read_style(meta);
+    if let Some(stroked) = crate::text_model::single_line_style(&style) {
+        crate::style_codec::write_changes(meta, &style, &stroked);
+    }
+}
+
 impl Document {
     /// Creates a text object in the drawing parent with the creation style, in **one commit**
-    /// labelled `add_text` (criteria 2, 7, 14).
+    /// labelled `add_text` (criteria 2, 7, 14). A single-line face switches a stroke that is off
+    /// on (`0076` criterion 9).
     ///
     /// # Errors
     /// [`TextEditError::Empty`], [`TextEditError::TooLong`], [`TextEditError::SizeOutOfRange`],
@@ -93,6 +105,11 @@ impl Document {
             style: Style::default(),
             outline: None,
         });
+        if font.kind == FontKind::SingleLine
+            && let Ok(meta) = self.text_meta(id)
+        {
+            apply_single_line_stroke(&meta);
+        }
         self.commit_with_label("add_text");
         Ok(id)
     }
@@ -161,7 +178,9 @@ impl Document {
     }
 
     /// Sets the font of every text in `ids` (criterion 13), in **one commit** labelled
-    /// `change_font`; a text that already has this font is not rewritten.
+    /// `change_font`; a text that already has this font is not rewritten. A single-line face
+    /// switches a stroke that is off on in the same commit (`0076` criterion 9); switching back to
+    /// an outline face changes nothing else (criterion 10, Frage 23 SL-BACK default A).
     ///
     /// # Errors
     /// [`TextEditError::NoSuchText`] when an id is not a live text, or
@@ -172,6 +191,9 @@ impl Document {
         for meta in &metas {
             if text_codec::read_font(meta).as_ref() != Some(font) {
                 text_codec::write_font(meta, font);
+                if font.kind == FontKind::SingleLine {
+                    apply_single_line_stroke(meta);
+                }
             }
         }
         self.commit_with_label("change_font");

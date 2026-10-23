@@ -1,10 +1,38 @@
 {
   "faces": [
     {
+      "family": "EMS Allure",
+      "style": "Regular",
+      "file": "ems-allure/EMSAllure.svg",
+      "licence": "OFL-1.1",
+      "kind": "single_line"
+    },
+    {
+      "family": "EMS Readability",
+      "style": "Regular",
+      "file": "ems-readability/EMSReadability.svg",
+      "licence": "OFL-1.1",
+      "kind": "single_line"
+    },
+    {
       "family": "Great Vibes",
       "style": "Regular",
       "file": "great-vibes/GreatVibes-Regular.ttf",
       "licence": "OFL-1.1"
+    },
+    {
+      "family": "Hershey Sans 1-stroke",
+      "style": "Regular",
+      "file": "hershey-sans-1/HersheySans1.svg",
+      "licence": "Hershey",
+      "kind": "single_line"
+    },
+    {
+      "family": "Hershey Script 1-stroke",
+      "style": "Regular",
+      "file": "hershey-script-1/HersheyScript1.svg",
+      "licence": "Hershey",
+      "kind": "single_line"
     },
     {
       "family": "Source Sans 3",
@@ -57,11 +85,43 @@
   ],
   "families": [
     {
+      "family": "EMS Allure",
+      "tags": [
+        "single_line",
+        "script"
+      ],
+      "cuttable_pieces": 0
+    },
+    {
+      "family": "EMS Readability",
+      "tags": [
+        "single_line",
+        "sans"
+      ],
+      "cuttable_pieces": 0
+    },
+    {
       "family": "Great Vibes",
       "tags": [
         "script"
       ],
       "cuttable_pieces": 2
+    },
+    {
+      "family": "Hershey Sans 1-stroke",
+      "tags": [
+        "single_line",
+        "sans"
+      ],
+      "cuttable_pieces": 0
+    },
+    {
+      "family": "Hershey Script 1-stroke",
+      "tags": [
+        "single_line",
+        "script"
+      ],
+      "cuttable_pieces": 0
     },
     {
       "family": "Source Sans 3",

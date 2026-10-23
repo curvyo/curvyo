@@ -44,6 +44,7 @@ fn source_code(source: MemberSource) -> String {
         MemberSource::Shipped => "shipped".to_owned(),
         MemberSource::Declared(class) => format!("declared:{}", class_code(class)),
         MemberSource::Detected(pieces) => format!("detected:{pieces}"),
+        MemberSource::SingleLine => "detected:single_line".to_owned(),
         MemberSource::Nothing => String::new(),
     }
 }
@@ -79,7 +80,8 @@ impl FontLibraryGlue {
     }
 
     /// Replaces what is known of the listed families, from JSON
-    /// `[{"name", "os2": hex|null, "shipped": [ids]|null, "pieces": n|-1|null}]`.
+    /// `[{"name", "os2": hex|null, "shipped": [ids]|null, "pieces": n|-1|null,
+    /// "single_line": bool?}]`.
     pub fn set_families(&mut self, json: &str) {
         let Ok(Value::Array(families)) = serde_json::from_str::<Value>(json) else {
             return;
@@ -99,6 +101,7 @@ impl FontLibraryGlue {
                     .and_then(declared_class),
                 check: check_of(family["pieces"].as_i64()),
                 shipped,
+                single_line: family["single_line"].as_bool().unwrap_or(false),
             };
             self.facts.insert(key, facts);
         }
@@ -276,7 +279,7 @@ mod tests {
         );
         assert_eq!(
             glue.completions("Lobster", "s"),
-            r#"["Script","Sans","Serif"]"#
+            r#"["Single line","Script","Sans","Serif"]"#
         );
     }
 }

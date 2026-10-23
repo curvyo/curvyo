@@ -139,6 +139,32 @@ impl Session {
         });
     }
 
+    /// Adds the sentence of a fill edit that left single-line texts alone
+    /// (`specs/0076-single-line-fonts`, UX notes §4) after the clone sentence, if any.
+    pub(super) fn note_skipped_single_line(
+        &mut self,
+        edit: &curvyo_document_core::StyleEdit,
+        wrote_any: bool,
+    ) {
+        if !wrote_any || !edit.is_fill_edit() {
+            return;
+        }
+        let skipped =
+            curvyo_ui_core::skipped_single_line_texts(&self.objects(), &self.style_scope().ids);
+        if skipped == 0 {
+            return;
+        }
+        let sentence = if skipped == 1 {
+            "1 single-line text has no fill and was not changed.".to_owned()
+        } else {
+            format!("{skipped} single-line texts have no fill and were not changed.")
+        };
+        self.skip_notice = Some(match self.skip_notice.take() {
+            Some(clones) => format!("{clones} {sentence}"),
+            None => sentence,
+        });
+    }
+
     /// The notice of criterion 18 of the last style or opacity edit, once; empty when it left no
     /// clone alone.
     pub fn take_style_skip_notice(&mut self) -> String {

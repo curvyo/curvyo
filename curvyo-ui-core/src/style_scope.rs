@@ -1,7 +1,7 @@
 //! Which objects the Style panel edits for the active tool, and the line that
 //! says so (`specs/0007-stroke-and-fill-styling` criterion 37).
 
-use curvyo_document_core::{NodeId, ObjectSnapshot, PrimitiveSnapshot, Shape, StyleEdit};
+use curvyo_document_core::{FontKind, NodeId, ObjectSnapshot, PrimitiveSnapshot, Shape, StyleEdit};
 
 use crate::object_selection::{ObjectSelection, objects_with_ids};
 use crate::selection::NodeSelection;
@@ -34,14 +34,37 @@ impl StyleScope {
     /// The objects `edit` goes to: all of the scope, or for a marker edit only
     /// its paths, since a primitive has no markers (`specs/0018-stroke-markers`
     /// criterion 22).
+    /// A fill edit leaves single-line texts alone (`specs/0076-single-line-fonts` criterion 8).
     #[must_use]
     pub fn targets(&self, objects: &[ObjectSnapshot], edit: &StyleEdit) -> Vec<NodeId> {
         if edit.is_marker_edit() {
             paths_among(&self.ids, objects)
+        } else if edit.is_fill_edit() {
+            objects_with_ids(objects, &self.ids)
+                .into_iter()
+                .filter(|object| !is_single_line_text(object))
+                .map(ObjectSnapshot::id)
+                .collect()
         } else {
             self.ids.clone()
         }
     }
+}
+
+/// Whether `object` is a text in a single-line face (by its stored kind), which has no fill.
+#[must_use]
+pub fn is_single_line_text(object: &ObjectSnapshot) -> bool {
+    matches!(object, ObjectSnapshot::Text(text) if text.font.kind == FontKind::SingleLine)
+}
+
+/// How many of `ids` are single-line texts a fill edit leaves alone: the count of the style skip
+/// notice (`specs/0076-single-line-fonts`, UX notes §4).
+#[must_use]
+pub fn skipped_single_line_texts(objects: &[ObjectSnapshot], ids: &[NodeId]) -> usize {
+    objects_with_ids(objects, ids)
+        .into_iter()
+        .filter(|object| is_single_line_text(object))
+        .count()
 }
 
 /// The ids in `ids` that are paths, or clones with their own style (they take markers like a

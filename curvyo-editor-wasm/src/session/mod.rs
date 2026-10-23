@@ -96,6 +96,8 @@ mod select_gesture;
 mod select_readout;
 mod select_view;
 mod shapes;
+#[cfg(test)]
+mod single_line_tests;
 mod split;
 mod style;
 mod style_view;

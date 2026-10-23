@@ -324,13 +324,13 @@ pub use style_panel::{
     style_panel_state,
 };
 pub use style_scope::{
-    StyleScope, StyleTool, object_kind_name, owns_style, skipped_clones, style_scope,
-    style_scope_in,
+    StyleScope, StyleTool, is_single_line_text, object_kind_name, owns_style, skipped_clones,
+    skipped_single_line_texts, style_scope, style_scope_in,
 };
 pub use text_box::{line_box_contains, line_box_corners};
 pub use text_caret::{TextEditGeometry, edit_geometry};
 pub use text_convert::{
-    TextRefusal, build_text_conversions, text_path, texts_as_paths, texts_refusal,
+    TextRefusal, area_refusal, build_text_conversions, text_path, texts_as_paths, texts_refusal,
 };
 pub use text_edit::{CaretMove, EditTarget, Finished, InputOutcome, TextEdit, TextInput};
 pub use text_layout::{lay_out, text_layout};

@@ -224,7 +224,7 @@ pub fn plan_offset(
     selection: &ObjectSelection,
     request: &OffsetRequest,
 ) -> Result<OffsetPlan, OffsetRefusal> {
-    if let Some(refusal) = crate::text_convert::texts_refusal(objects, selection.ids()) {
+    if let Some(refusal) = crate::text_convert::area_refusal(objects, selection.ids()) {
         return Err(OffsetRefusal::Texts(refusal));
     }
     let converted = crate::text_convert::texts_as_paths(objects);

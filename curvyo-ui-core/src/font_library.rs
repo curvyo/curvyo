@@ -4,7 +4,8 @@
 //!
 //! Families are named by their [`crate::family_key`]. A built-in tag's member is decided by the
 //! maker's override, else the shipped list (included fonts), else the automatic result (the
-//! declared class for Sans, Serif and Script, the cuttable check for Cuttable). Own tags are names
+//! declared class for Sans, Serif and Script, the cuttable check for Cuttable, the face kind for
+//! Single line, `specs/0076-single-line-fonts` criterion 4). Own tags are names
 //! the maker put on families; a tag exists while a family carries it. Nothing here is a document
 //! change (criterion 13).
 
@@ -28,6 +29,8 @@ pub const MAX_LIST_KEYS: usize = 10_000;
 pub enum BuiltInTag {
     /// Faces whose test word is one piece.
     Cuttable,
+    /// Single-line faces (`0076`).
+    SingleLine,
     /// Script faces.
     Script,
     /// Sans serif faces.
@@ -40,8 +43,9 @@ pub enum BuiltInTag {
 
 impl BuiltInTag {
     /// The tags in chip and strip order.
-    pub const ALL: [Self; 5] = [
+    pub const ALL: [Self; 6] = [
         Self::Cuttable,
+        Self::SingleLine,
         Self::Script,
         Self::Sans,
         Self::Serif,
@@ -53,6 +57,7 @@ impl BuiltInTag {
     pub const fn id(self) -> &'static str {
         match self {
             Self::Cuttable => "cuttable",
+            Self::SingleLine => "single_line",
             Self::Script => "script",
             Self::Sans => "sans",
             Self::Serif => "serif",
@@ -65,6 +70,7 @@ impl BuiltInTag {
     pub const fn name(self) -> &'static str {
         match self {
             Self::Cuttable => "Cuttable",
+            Self::SingleLine => "Single line",
             Self::Script => "Script",
             Self::Sans => "Sans",
             Self::Serif => "Serif",
@@ -78,11 +84,13 @@ impl BuiltInTag {
         Self::ALL.into_iter().find(|tag| tag.id() == id)
     }
 
-    /// The tag named `name`, ignoring case.
+    /// The tag named `name` (or its id), ignoring case.
     #[must_use]
     pub fn from_name(name: &str) -> Option<Self> {
         let lower = name.trim().to_lowercase();
-        Self::ALL.into_iter().find(|tag| tag.id() == lower)
+        Self::ALL
+            .into_iter()
+            .find(|tag| tag.id() == lower || tag.name().to_lowercase() == lower)
     }
 
     const fn declared(self) -> Option<DeclaredClass> {
@@ -90,7 +98,7 @@ impl BuiltInTag {
             Self::Script => Some(DeclaredClass::Script),
             Self::Sans => Some(DeclaredClass::Sans),
             Self::Serif => Some(DeclaredClass::Serif),
-            Self::Initials | Self::Cuttable => None,
+            Self::Initials | Self::Cuttable | Self::SingleLine => None,
         }
     }
 }
@@ -113,6 +121,8 @@ pub struct FamilyFacts {
     pub check: Option<CheckResult>,
     /// The shipped tags of an included family (criterion 14); `None` for any other family.
     pub shipped: Option<BTreeSet<BuiltInTag>>,
+    /// Its faces are single-line (`0076` criterion 4).
+    pub single_line: bool,
 }
 
 /// Why a family carries a tag: what its chip's tooltip names.
@@ -126,6 +136,8 @@ pub enum MemberSource {
     Declared(DeclaredClass),
     /// The cuttable check, with its piece count.
     Detected(usize),
+    /// The face kind: a single-line font (`0076` criterion 4).
+    SingleLine,
     /// No source: not a member.
     Nothing,
 }
@@ -200,9 +212,13 @@ pub fn automatic(tag: BuiltInTag, facts: &FamilyFacts) -> Membership {
     }
     let source = match tag {
         BuiltInTag::Cuttable => match facts.check {
-            Some(CheckResult::Pieces(pieces)) => MemberSource::Detected(pieces),
+            // A single-line face is never cuttable automatically (`0076` criterion 5).
+            Some(CheckResult::Pieces(pieces)) if !facts.single_line => {
+                MemberSource::Detected(pieces)
+            }
             _ => MemberSource::Nothing,
         },
+        BuiltInTag::SingleLine if facts.single_line => MemberSource::SingleLine,
         _ => match (tag.declared(), facts.declared) {
             (Some(wanted), Some(declared)) if wanted == declared => {
                 MemberSource::Declared(declared)
@@ -212,7 +228,7 @@ pub fn automatic(tag: BuiltInTag, facts: &FamilyFacts) -> Membership {
     };
     let member = match source {
         MemberSource::Detected(pieces) => pieces == 1,
-        MemberSource::Declared(_) => true,
+        MemberSource::Declared(_) | MemberSource::SingleLine => true,
         _ => false,
     };
     Membership { member, source }
@@ -546,7 +562,51 @@ mod tests {
             declared,
             check: pieces.map(CheckResult::Pieces),
             shipped: None,
+            single_line: false,
         }
+    }
+
+    /// `0076` criteria 4 and 5: a single-line family is in Single line, after Cuttable in the
+    /// strip, never Cuttable by itself; the maker can remove and add both tags.
+    #[test]
+    fn ac4_ac5_single_line_tag() {
+        let mut library = FontLibrary::default();
+        let facts = FamilyFacts {
+            single_line: true,
+            ..facts(Some(DeclaredClass::Sans), Some(1))
+        };
+        let names: Vec<String> = library.all_tags().into_iter().map(|t| t.name).collect();
+        assert_eq!(
+            names[..4],
+            ["Cuttable", "Single line", "Script", "Sans"].map(String::from)
+        );
+        assert_eq!(
+            library.tags_of("hershey", &facts),
+            [
+                (
+                    TagEntry {
+                        id: "single_line".into(),
+                        name: "Single line".into(),
+                        builtin: true
+                    },
+                    MemberSource::SingleLine
+                ),
+                (
+                    TagEntry {
+                        id: "sans".into(),
+                        name: "Sans".into(),
+                        builtin: true
+                    },
+                    MemberSource::Declared(DeclaredClass::Sans)
+                )
+            ]
+        );
+        assert!(library.remove_tag("hershey", "single_line", &facts));
+        assert!(!library.is_member("single_line", "hershey", &facts));
+        assert_eq!(library.add_tag("hershey", "single line", &facts), Ok(true));
+        assert!(library.overrides.is_empty());
+        assert_eq!(library.add_tag("hershey", "Cuttable", &facts), Ok(true));
+        assert!(library.is_member("cuttable", "hershey", &facts));
     }
 
     /// Criteria 10, 14, 15, 17: override beats shipped beats automatic; the check tags Cuttable

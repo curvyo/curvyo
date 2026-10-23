@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!-- Two fonts in one file and a font without drawn glyphs (specs/0076 criterion 1, 21). -->
+<svg xmlns="http://www.w3.org/2000/svg">
+<defs>
+<font id="Empty"><font-face font-family="No Glyphs"/><glyph unicode="a"/></font>
+<font id="Plain"><font-face font-family="Two One"/><glyph unicode="I" d="M 0 0 V 700"/></font>
+<font id="Second" horiz-adv-x="400"><font-face font-family="Two Two" font-weight="700"
+  units-per-em="2048"/><glyph unicode="I" d="M 0 0 V 1400"/></font>
+</defs>
+</svg>

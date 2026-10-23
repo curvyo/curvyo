@@ -90,7 +90,7 @@ mod wasm_text;
 mod wasm_weld;
 
 pub use font_checks_glue::FontChecksGlue;
-pub use font_file_glue::font_file_faces;
+pub use font_file_glue::{face_preview_path, font_file_faces};
 pub use font_library_glue::FontLibraryGlue;
 pub use session::WeldOutcome;
 pub use session::{

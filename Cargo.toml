@@ -43,6 +43,10 @@ i_overlay = { version = "=9.0.1", default-features = false }
 harfrust = { version = "=0.14.0", default-features = false, features = ["std"] }
 skrifa = { version = "=0.48.0", default-features = false, features = ["std"] }
 sha2 = { version = "0.10", default-features = false }
+# Pinned exactly (`specs/0076-single-line-fonts/adrs.md` decision 2): the XML reader of SVG fonts,
+# hostile input in wasm. MIT OR Apache-2.0, no dependencies, no `unsafe`, no I/O; already in
+# `Cargo.lock` through `fontdb`. Without `positions`.
+roxmltree = { version = "=0.20.0", default-features = false, features = ["std"] }
 # The desktop font list (ADR 0020 §3): pure Rust, its own fontconfig reader, no C library.
 # Pinned exactly as the spike measured it; MIT. Without `memmap` (no `unsafe` mmap in the tree).
 fontdb = { version = "=0.24.0", default-features = false, features = ["std", "fs", "fontconfig"] }

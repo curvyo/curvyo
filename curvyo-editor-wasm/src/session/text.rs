@@ -65,10 +65,11 @@ impl Session {
 
     /// The face of the next new text: the last one set, else the included sans Regular.
     pub(super) fn next_text_font(&self) -> Option<FontRef> {
-        self.text
-            .next_font
-            .clone()
-            .or_else(|| self.fonts.fallback().map(|(_, font)| font))
+        self.text.next_font.clone().or_else(|| {
+            self.fonts
+                .fallback(curvyo_document_core::FontKind::Outline)
+                .map(|(_, font)| font)
+        })
     }
 
     pub(super) fn next_text_size(&self) -> Length {
@@ -87,7 +88,7 @@ impl Session {
     ) -> Option<TextLayout> {
         let key = match self.fonts.resolve(font) {
             FaceMatch::Face(key) => key,
-            FaceMatch::Missing => self.fonts.fallback()?.0,
+            FaceMatch::Missing => self.fonts.fallback(font.kind)?.0,
             FaceMatch::NeedsLoad(_) => return None,
         };
         curvyo_text_core::layout(self.fonts.face(&key)?, string, Mm(size.as_mm())).ok()

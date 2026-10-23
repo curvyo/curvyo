@@ -6,7 +6,7 @@
 use std::path::{Path, PathBuf};
 
 use crate::filesystem::write_atomic;
-use crate::fonts::{FONT_EXTENSIONS, MAX_FONT_FILE_BYTES, face_tables};
+use crate::fonts::{FONT_EXTENSIONS, MAX_FONT_FILE_BYTES, face_tables, is_svg};
 
 /// What an Add did, by the chosen files' names.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -36,14 +36,20 @@ fn name_of(path: &Path) -> String {
 }
 
 fn has_font_extension(path: &Path) -> bool {
-    path.extension()
-        .and_then(|e| e.to_str())
-        .is_some_and(|e| FONT_EXTENSIONS.contains(&e.to_ascii_lowercase().as_str()))
+    is_svg(path)
+        || path
+            .extension()
+            .and_then(|e| e.to_str())
+            .is_some_and(|e| FONT_EXTENSIONS.contains(&e.to_ascii_lowercase().as_str()))
 }
 
 /// Whether `bytes` hold a face the folder listing lists: `fontdb` reads it with a family name
-/// and it has outlines and no colour tables.
+/// and it has outlines and no colour tables, or it is an SVG font with a drawn glyph
+/// (`specs/0076-single-line-fonts` criterion 3).
 fn is_listable(bytes: &[u8]) -> bool {
+    if !crate::svg_fonts::svg_font_faces(bytes).is_empty() {
+        return true;
+    }
     let mut db = fontdb::Database::new();
     db.load_font_data(bytes.to_vec());
     db.faces().any(|face| {
@@ -161,13 +167,21 @@ pub fn remove_font_files(dir: &Path, faces: &[(PathBuf, u32)]) -> RemovedFonts {
             .and_then(|real| real.parent().map(|parent| parent == folder))
             .unwrap_or(false);
         let mut db = fontdb::Database::new();
-        if inside {
+        let mut indices: Vec<u32> = Vec::new();
+        if inside && is_svg(file) {
+            let bytes = std::fs::read(file).unwrap_or_default();
+            indices = crate::svg_fonts::svg_font_faces(&bytes)
+                .iter()
+                .map(|face| face.index)
+                .collect();
+        } else if inside {
             let _ = db.load_font_file(file);
+            indices = db.faces().map(|face| face.index).collect();
         }
-        let all_faces = !db.is_empty()
-            && db
-                .faces()
-                .all(|face| faces.iter().any(|(p, i)| p == file && *i == face.index));
+        let all_faces = !indices.is_empty()
+            && indices
+                .iter()
+                .all(|index| faces.iter().any(|(p, i)| p == file && i == index));
         if inside && all_faces && std::fs::remove_file(file).is_ok() {
             report.removed.push(name_of(file));
         } else {
@@ -185,6 +199,28 @@ mod tests {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../frontend/public/fonts")
             .join(path)
+    }
+
+    /// `specs/0076-single-line-fonts` criterion 3: an SVG font is added like a TTF and removed
+    /// with its family; an SVG that is not a font is "not a font".
+    #[test]
+    fn ac03_svg_fonts_are_added_and_removed() {
+        let dir = tempfile::tempdir().unwrap();
+        let folder = dir.path().join("fonts");
+        let hershey = dir.path().join("Hershey.svg");
+        std::fs::copy(included("hershey-sans-1/HersheySans1.svg"), &hershey).unwrap();
+        let logo = dir.path().join("logo.svg");
+        std::fs::write(
+            &logo,
+            br#"<svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>"#,
+        )
+        .unwrap();
+        let added = add_font_files(&folder, &[hershey.clone(), logo]);
+        assert_eq!(added.added, ["Hershey.svg"]);
+        assert_eq!(added.not_fonts, ["logo.svg"]);
+        assert_eq!(add_font_files(&folder, &[hershey]).present, ["Hershey.svg"]);
+        let removed = remove_font_files(&folder, &[(folder.join("Hershey.svg"), 0)]);
+        assert_eq!(removed.removed, ["Hershey.svg"]);
     }
 
     /// Criteria 21, 22 and 32: a font is copied, the same bytes again are present, another font

@@ -35,11 +35,35 @@ pub enum TextSizeOutcome {
 
 impl Session {
     /// Replaces the faces the host listed for `block` (the Curvyo folder with its unreadable
-    /// files, the included fonts, the system fonts): `(host id, family, style, index)`.
+    /// files, the included fonts, the system fonts): `(host id, family, style, index)`, all
+    /// outline faces.
     pub fn set_font_list(
         &mut self,
         block: curvyo_ui_core::FontBlock,
         faces: Vec<(String, String, String, u32)>,
+        skipped: Vec<String>,
+    ) {
+        let faces = faces
+            .into_iter()
+            .map(|(id, family, style, index)| {
+                (
+                    id,
+                    family,
+                    style,
+                    index,
+                    curvyo_document_core::FontKind::Outline,
+                )
+            })
+            .collect();
+        self.fonts.set_block(block, faces, skipped);
+    }
+
+    /// [`Session::set_font_list`] with each face's kind (`specs/0076-single-line-fonts`
+    /// criterion 1): `(host id, family, style, index, kind)`.
+    pub fn set_font_list_with_kinds(
+        &mut self,
+        block: curvyo_ui_core::FontBlock,
+        faces: Vec<(String, String, String, u32, curvyo_document_core::FontKind)>,
         skipped: Vec<String>,
     ) {
         self.fonts.set_block(block, faces, skipped);
@@ -78,6 +102,13 @@ impl Session {
                 "style": font.style,
                 "missing": self.fonts.is_missing(font),
                 "index": self.current_face_index(font),
+                // The face a missing one is drawn in (`0076` criterion 22, UX notes §6).
+                "substitute": match font.kind {
+                    curvyo_document_core::FontKind::Outline => super::text_fonts::FALLBACK_FAMILY,
+                    curvyo_document_core::FontKind::SingleLine => {
+                        super::text_fonts::SINGLE_LINE_FALLBACK_FAMILY
+                    }
+                },
             })
         });
         let block = |block: curvyo_ui_core::FontBlock| match block {
@@ -99,6 +130,7 @@ impl Session {
                     "id": face.host_id,
                     "loaded": face.key.is_some(),
                     "faceIndex": face.index,
+                    "singleLine": face.kind == curvyo_document_core::FontKind::SingleLine,
                 })
             })
             .collect();

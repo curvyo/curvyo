@@ -4,8 +4,8 @@
 
 use std::cell::RefCell;
 
-use curvyo_document_core::{FontRef, TextOutline, TextSnapshot};
-use curvyo_text_core::{FaceKey, FaceStore};
+use curvyo_document_core::{FontKind, FontRef, TextOutline, TextSnapshot};
+use curvyo_text_core::{FaceKey, FaceKind, FaceStore};
 use curvyo_ui_core::{FaceMatch, FontBlock, ListedFace, lay_out, match_face};
 
 /// The face a text whose face is missing is drawn in (criterion 29), and the first face of a new
@@ -13,6 +13,20 @@ use curvyo_ui_core::{FaceMatch, FontBlock, ListedFace, lay_out, match_face};
 pub(crate) const FALLBACK_FAMILY: &str = "Source Sans 3";
 /// See [`FALLBACK_FAMILY`].
 pub(crate) const FALLBACK_STYLE: &str = "Regular";
+/// The face a single-line text whose face is missing is drawn in, stroke only
+/// (`specs/0076-single-line-fonts` criterion 22).
+pub(crate) const SINGLE_LINE_FALLBACK_FAMILY: &str = "EMS Readability";
+
+/// One face as the host lists it: `(host id, family, style, index in the file, kind)`.
+pub(crate) type ListedEntry = (String, String, String, u32, FontKind);
+
+/// The document's kind of an engine face.
+pub(crate) const fn font_kind(kind: FaceKind) -> FontKind {
+    match kind {
+        FaceKind::Outline => FontKind::Outline,
+        FaceKind::SingleLine => FontKind::SingleLine,
+    }
+}
 
 /// The fonts of the session.
 #[derive(Debug, Default)]
@@ -53,7 +67,7 @@ impl TextFonts {
     pub(crate) fn set_block(
         &mut self,
         block: FontBlock,
-        listed: Vec<(String, String, String, u32)>,
+        listed: Vec<ListedEntry>,
         skipped: Vec<String>,
     ) {
         let old: Vec<ListedFace> = self
@@ -66,11 +80,12 @@ impl TextFonts {
             && old
                 .iter()
                 .zip(&listed)
-                .all(|(face, (host_id, family, style, index))| {
+                .all(|(face, (host_id, family, style, index, kind))| {
                     face.host_id == *host_id
                         && face.family == *family
                         && face.style == *style
                         && face.index == *index
+                        && face.kind == *kind
                 });
         // A listing that changes nothing changes no index and lays nothing out again.
         if same && (block != FontBlock::Curvyo || self.skipped == skipped) {
@@ -80,7 +95,7 @@ impl TextFonts {
             return;
         }
         self.faces.retain(|face| face.block != block);
-        for (host_id, family, style, index) in listed {
+        for (host_id, family, style, index, kind) in listed {
             let key = old
                 .iter()
                 .find(|f| f.host_id == host_id && f.index == index)
@@ -92,6 +107,7 @@ impl TextFonts {
                 host_id,
                 index,
                 key,
+                kind,
             });
         }
         // The blocks stay in their order (Curvyo, Included, This computer), so a fresh listing of
@@ -115,6 +131,11 @@ impl TextFonts {
         for face in self.faces.iter_mut().filter(|f| f.host_id == host_id) {
             if let Ok(key) = self.store.add(bytes.to_vec(), face.index) {
                 face.key = Some(key);
+                // The engine knows the kind from the bytes; a listing that guessed wrong is
+                // corrected, so matching compares the real kinds.
+                if let Some(read) = self.store.get(&key) {
+                    face.kind = font_kind(read.kind());
+                }
                 any = true;
             }
         }
@@ -154,11 +175,16 @@ impl TextFonts {
         found
     }
 
-    /// The included sans Regular, as a font reference once it is loaded.
-    pub(crate) fn fallback(&self) -> Option<(FaceKey, FontRef)> {
+    /// The included sans Regular, or EMS Readability for a single-line text, as a font reference
+    /// once it is loaded.
+    pub(crate) fn fallback(&self, kind: FontKind) -> Option<(FaceKey, FontRef)> {
+        let family = match kind {
+            FontKind::Outline => FALLBACK_FAMILY,
+            FontKind::SingleLine => SINGLE_LINE_FALLBACK_FAMILY,
+        };
         let index = self.faces.iter().position(|face| {
             face.block == FontBlock::Included
-                && face.family == FALLBACK_FAMILY
+                && face.family == family
                 && face.style == FALLBACK_STYLE
         })?;
         let font = self.font_of(index);
@@ -185,6 +211,7 @@ impl TextFonts {
             style: face.style.clone(),
             face_hash: key.hash.to_hex(),
             face_index: key.index,
+            kind: face.kind,
         })
     }
 
@@ -200,14 +227,15 @@ impl TextFonts {
         self.store.get(key).map(AsRef::as_ref)
     }
 
-    /// `text` laid out: in its face, or, when that is missing, in the included sans and marked as
-    /// a substitute; `None` while a face it needs is loading.
+    /// `text` laid out: in its face, or, when that is missing, in the included sans (EMS
+    /// Readability for a single-line text) and marked as a substitute; `None` while a face it
+    /// needs is loading.
     pub(crate) fn lay_out(&self, text: &TextSnapshot) -> Option<TextOutline> {
         match self.resolve(&text.font) {
             FaceMatch::Face(key) => lay_out(text, self.face(&key)?, false),
             FaceMatch::NeedsLoad(_) => None,
             FaceMatch::Missing => {
-                let (key, _) = self.fallback()?;
+                let (key, _) = self.fallback(text.font.kind)?;
                 lay_out(text, self.face(&key)?, true)
             }
         }
