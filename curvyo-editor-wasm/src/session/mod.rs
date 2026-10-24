@@ -46,6 +46,7 @@ mod flip;
 mod formats;
 mod fracture;
 mod frame;
+mod glyph_insert;
 mod group_view;
 mod grouping;
 #[cfg(test)]
