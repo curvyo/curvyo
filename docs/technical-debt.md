@@ -1554,47 +1554,38 @@ whole file into memory before the core sees the length, so a much larger file is
 before it is refused. **Resolution:** check the file size in `pick_project` before reading (one
 `metadata` call), and give `unpack` an expanded-size cap shared by Open and Template.
 
-## The text engine adds 1.25 MiB to the editor wasm (`0074`, ADR 0020, 2026-10-20)
+## Editor wasm size (`0074` onward, ADR 0020, 2026-10-24)
 
-`harfrust` + `skrifa` add 1,247 KiB (433 KiB gzip) to the release editor wasm, measured by the
-spike on branch `spike/text-engine` (`docs/spikes/text-engine.md` there). The ADR's budget was
-700 KiB. The customer raised the budget for the text engine to **1.3 MiB uncompressed**, later **1.4 MiB**, on
-2026-10-20 (Frage 6 TEXT-WASMSIZE, A); the smaller option `rustybuzz` + `ttf-parser` fails
-`cargo deny` (unmaintained) and panics on hostile fonts.
+The release editor wasm (`curvyo_editor_wasm_bg.wasm` after `wasm-bindgen`, no `wasm-opt`) is
+large and grows with every text feature. Measured 2026-10-24, release build as in
+`frontend/scripts/build-wasm.sh`, Rust 1.99.0, `wasm-bindgen` 0.2.129:
 
-**Resolution:** accepted. The build of `0074` checks the added size against the budget (1.4 MiB since 2026-10-20); going over it
-reopens the question. Loading the text engine as a separate wasm module on first use of the Text
-tool would take it off the start-up path, if start-up time becomes a problem.
+| Revision | Bytes | gzip -9 | Since `4ece1b1` |
+|---|---|---|---|
+| `4ece1b1` (before the text engine) | 10,373,991 | 3,405,489 | |
+| `main` at `3ff03cf` | 12,670,295 | 4,202,645 | +2,296,304 (2,242 KiB) |
+| `story/text-kerning` (`0079` slice 4) | 12,763,446 | 4,227,451 | +2,389,455 (2,333 KiB) |
+| `story/text-on-path` (`0080` slice 1) | 12,866,733 | 4,268,422 | +2,492,742 (2,434 KiB) |
 
-**Measured on the finished slice (2026-10-20, `story/text-objects` against `main` at `4ece1b1`,
-release editor wasm after `wasm-bindgen`, no `wasm-opt`):** 1,461,239 bytes added (1,426 KiB;
-501 KiB gzip -9). By crate from the wasm name section: `harfrust` 369 KiB, `read-fonts` 329 KiB,
-`skrifa` 133 KiB, data section +128 KiB, `core`/`alloc`/`std` +132 KiB (the engine, about
-1,290 KiB), and the slice's own code about 135 KiB (`curvyo-editor-wasm`, `curvyo-document-core`,
-`curvyo-ui-core`, `curvyo-text-core`, `sha2`). The slice was over 1.3 MiB, so the customer raised
-the budget to **1.4 MiB** (1,433.6 KiB) on 2026-10-20 (ADR 0020, dated note): the slice is inside
-it with 7 KiB to spare. The next feature on the text engine reopens the question; the levers are
-a `wasm-opt` pass over the whole module, or loading the engine as its own module on first use.
+Most of the growth is the text engine (`harfrust`, `read-fonts`, `skrifa`, about 1,290 KiB when
+it came in with `0074`); the rest is the text features and other slices since. The earlier
+per-slice running totals in this entry undercounted: `main` at `5535342` was already 2,105,496
+bytes above `4ece1b1`.
 
-**Budget raised to 2 MiB (2026-10-20, customer, Frage 20 SL-WASM; ADR 0020 dated note).** Single-line
-fonts (`0076`) add the SVG font reader (`roxmltree` 0.20.0, own path-data reader). Measured on the
-finished slice (release editor wasm after `wasm-bindgen`, no `wasm-opt`): **+111,671 bytes
-(109 KiB; +41 KiB gzip -9)** against `story/font-library` (`0075`). From `4ece1b1` (before the
-text engine) to this slice the editor wasm grew by 1,828,399 bytes (1,786 KiB), which includes
-`0074` (1,426 KiB), `0075` (250 KiB, part of it the cuttable check's Union) and `0076`; that is
-inside the 2 MiB (2,048 KiB) budget with about 262 KiB left. The next feature on the text engine
-measures again; the levers stay `wasm-opt` and loading the engine on first use.
+`wasm-opt -Oz` (binaryen version 132, default features) on the `0080` build: 9,905,609 bytes
+(-2,961,124, -23 %), gzip 3,916,280 (-352,142, -8 %). Most of the raw saving is the name
+section: stripping only debug info and producers gives 10,713,444 bytes (gzip 3,938,676). The
+optimized module gave byte-identical results to the plain one for `font_file_faces`,
+`WasmFontChecks::check` and `face_preview_path` over the 17 bundled font files; the pass takes
+about 3 minutes.
 
-**Glyph table (`0082`, 2026-10-24).** Listing a face's characters, the Unicode 17.0.0 block table,
-the names decoder, the cell drawing and the search add **+84,556 bytes (82.6 KiB; +29,706 bytes
-gzip -9)** to the release editor wasm after `wasm-bindgen`, no `wasm-opt` (12,479,487 to 12,564,043
-bytes, measured against `main` at `5535342`). The character names stay outside the wasm
-(`frontend/public/unicode/names-17.0.0.bin`, 370,854 bytes, fetched on the first Glyphs open). About
-179 KiB of the 2 MiB budget are left.
+**No hard budget (customer, 2026-10-24).** The size budgets of ADR 0020 (700 KiB, then 1.3,
+1.4 and 2 MiB) are withdrawn: the size is not squeezed unless it becomes a problem. Features keep
+reporting the size they add.
 
-**Vertical text (`0079` slice 3, 2026-10-24):** +23,269 bytes (22.7 KiB; +5.4 KiB gzip -9) against
-`main` at `90de814` (after `0082`), measured the same way; the UAX #50 table is 792 bytes of it. About
-156 KiB of the 2 MiB budget remain.
+**Resolution:** open. Levers when start-up time or download size matters: a `wasm-opt -Oz` pass
+in the release build (keeping the name section in development builds), and loading the text
+engine as its own wasm module on first use of the Text tool.
 
 ## The clone frame budget is not asserted on CI (`0049` criterion 44, 2026-10-24)
 
