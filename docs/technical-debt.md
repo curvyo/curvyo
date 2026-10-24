@@ -1584,3 +1584,15 @@ text engine) to this slice the editor wasm grew by 1,828,399 bytes (1,786 KiB), 
 `0074` (1,426 KiB), `0075` (250 KiB, part of it the cuttable check's Union) and `0076`; that is
 inside the 2 MiB (2,048 KiB) budget with about 262 KiB left. The next feature on the text engine
 measures again; the levers stay `wasm-opt` and loading the engine on first use.
+
+## The clone frame budget is not asserted on CI (`0049` criterion 44, 2026-10-24)
+
+The absolute frame budget of 150 ms after the original of 10,000 clones moved (`0049` criterion 44,
+also `0057` criterion 41) is checked on a developer machine in a release build only. CI runners
+measured 152 to 206 ms of CPU time for it, depending on the runner. Customer decision 2026-10-24
+(B): `curvyo-editor-wasm/tests/clone_budget.rs` asserts the 150 ms only when the `CI` environment
+variable is not set and prints it on CI; the hardware-independent ratio (clones at most 1.2 times
+ordinary copies plus 5 ms) stays asserted everywhere in release.
+
+**Resolution:** open. A dedicated benchmark runner with stable hardware would let CI assert the
+absolute budget again.

@@ -4,7 +4,10 @@
 //! Ctrl+A over 10,000 clones drawn with the marks capped. Budgets are asserted in release builds
 //! only; a debug build runs a tenth of the size and prints the numbers. Every cost is the thread
 //! CPU time of the work (`cpu_time`), so the other tests of this file running in parallel do not
-//! count against it.
+//! count against it. The absolute 150 ms frame budget (criterion 44) is asserted only outside CI
+//! (the `CI` environment variable is not set; GitHub Actions sets it): on CI it is printed, and the
+//! hardware-independent ratio against ordinary copies stays asserted everywhere in release
+//! (customer decision 2026-10-24, B; CI runners measured 152 to 206 ms of CPU time).
 //! Run: `cargo test --release -p curvyo-editor-wasm --test clone_budget -- --nocapture`.
 
 #![allow(
@@ -35,6 +38,15 @@ fn check(label: &str, took: Duration, budget: Duration) {
     println!("{label}: {took:?} (budget {budget:?})");
     if !cfg!(debug_assertions) {
         assert!(took <= budget, "{label}: {took:?} is over {budget:?}");
+    }
+}
+
+/// Like [`check`], but the budget is asserted only off CI (the frame budget, see the module doc).
+fn check_off_ci(label: &str, took: Duration, budget: Duration) {
+    if std::env::var_os("CI").is_some() {
+        println!("{label}: {took:?} (budget {budget:?}, printed only on CI)");
+    } else {
+        check(label, took, budget);
     }
 }
 
@@ -140,7 +152,7 @@ fn ac43_44_a_frame_after_the_original_moved() {
     let clones = scene(true);
     breakdown(&clones);
     let with_clones = frame_after_moving_the_first(&clones);
-    check(
+    check_off_ci(
         &format!("frame after the original of {COUNT} clones moved"),
         with_clones,
         FRAME_AFTER_COMMIT_BUDGET,
@@ -242,7 +254,7 @@ fn ac41_a_frame_with_ten_thousand_own_colours() {
             .unwrap();
     }
     breakdown(&document);
-    check(
+    check_off_ci(
         &format!("frame after the original of {COUNT} clones with own colours moved"),
         frame_after_moving_the_first(&document),
         FRAME_AFTER_COMMIT_BUDGET,
