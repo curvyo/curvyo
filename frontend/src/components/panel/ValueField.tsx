@@ -19,8 +19,21 @@ interface ValueFieldProps {
   name: string;
   /** The value as shown, without the unit; ignored when mixed. */
   text: string;
-  /** The share of the field's width the bar fills, 0 to 1. */
+  /** The share of the field's width the bar fills, 0 to 1: its right end. */
   bar: number;
+  /** Where the bar starts, 0 to 1 (0 unless the track crosses zero: the signed bar of
+   * `specs/0079-text-layout-controls` UX notes §6 runs from the zero mark to the value). */
+  barFrom?: number;
+  /** The zero mark's position on a track that crosses 0, or nothing. */
+  zero?: number | null;
+  /** The smallest position of a drag: 0, or less where a drag past the left end keeps lowering
+   * the value down to the typed minimum. */
+  dragMin?: number;
+  /** The value is the automatic one (Line spacing Auto): drawn muted. */
+  muted?: boolean;
+  /** `aria-valuetext` and the tooltip's value when the field words them itself. */
+  valueText?: string;
+  tipValue?: string;
   /** Where a drag starts from: `bar`, or beyond 1 for a value past the track. */
   dragBase?: number;
   /** The largest position of a drag: 1, or more where a drag past the right end keeps raising
@@ -84,8 +97,14 @@ export function ValueField({
   name,
   text,
   bar,
+  barFrom = 0,
+  zero = null,
   dragBase,
   dragLimit = 1,
+  dragMin = 0,
+  muted = false,
+  valueText,
+  tipValue,
   mixed,
   resettable,
   unit,
@@ -110,6 +129,7 @@ export function ValueField({
   const { modifier, handlers } = useValueDrag({
     bar: mixed ? 0 : (dragBase ?? bar),
     limit: dragLimit,
+    min: dragMin,
     mixed,
     onTick: onPreview,
     // A click sets the value at the pointer and commits it; a double-click types
@@ -182,7 +202,7 @@ export function ValueField({
         <SliderTip
           side="left"
           name={name}
-          valueText={mixed ? "Mixed" : `${text}${unit ? ` ${unit}` : ""}`}
+          valueText={tipValue ?? (mixed ? "Mixed" : `${text}${unit ? ` ${unit}` : ""}`)}
           help={HELP}
           note={note}
         >
@@ -194,7 +214,8 @@ export function ValueField({
             aria-valuemax={valueMax}
             aria-valuenow={mixed ? undefined : Math.min(valueMax, roundedNow(valueNow))}
             aria-valuetext={
-              mixed ? "Mixed" : `${text} ${text === "1" && unitWordOne ? unitWordOne : unitWords}`
+              valueText ??
+              (mixed ? "Mixed" : `${text} ${text === "1" && unitWordOne ? unitWordOne : unitWords}`)
             }
             aria-keyshortcuts="Control+Backspace Enter F2"
             onKeyDown={onKeyDown}
@@ -202,11 +223,23 @@ export function ValueField({
             className="relative h-7 w-[244px] cursor-ew-resize overflow-hidden rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] bg-white outline-none hover:border-[var(--toolbar-icon)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)]"
             style={{ touchAction: "pan-y" }}
           >
-            {!mixed && bar > 0 && (
+            {!mixed && bar > barFrom && (
               <span
                 aria-hidden
-                className="absolute inset-y-0 left-0 border-r-2 border-[var(--value-edge)] bg-[var(--value-fill)]"
-                style={{ width: `${Math.min(1, bar) * 100}%` }}
+                className={`absolute inset-y-0 ${
+                  zero !== null && barFrom < zero ? "border-l-2" : "border-r-2"
+                } border-[var(--value-edge)] bg-[var(--value-fill)]`}
+                style={{
+                  left: `${Math.max(0, barFrom) * 100}%`,
+                  width: `${(Math.min(1, bar) - Math.max(0, barFrom)) * 100}%`,
+                }}
+              />
+            )}
+            {zero !== null && (
+              <span
+                aria-hidden
+                className="absolute inset-y-[3px] w-px bg-[color-mix(in_srgb,var(--toolbar-icon)_40%,transparent)]"
+                style={{ left: `${zero * 100}%` }}
               />
             )}
             <span
@@ -231,9 +264,11 @@ export function ValueField({
                 <span className="text-[var(--field-placeholder)]">Mixed</span>
               ) : (
                 <>
-                  <span className="text-[var(--toolbar-icon)]">{text}</span>
+                  <span className={muted ? "text-[var(--panel-muted-fg)]" : "text-[var(--toolbar-icon)]"}>
+                    {text}
+                  </span>
                   {unitText && (
-                    <span className="ml-1 text-[var(--panel-muted-fg)]">{unitText}</span>
+                    <span className={`${unitText === "°" ? "" : "ml-1 "}text-[var(--panel-muted-fg)]`}>{unitText}</span>
                   )}
                 </>
               )}

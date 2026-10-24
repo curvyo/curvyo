@@ -1,6 +1,8 @@
 import { CircleAlert, Link, Unlink } from "lucide-react";
+import { AlignmentGroup } from "@/components/AlignmentGroup";
 import { StyleGroup } from "@/components/StyleGroup";
 import type { WeightCode } from "@/lib/styleText";
+import type { AlignCode } from "@/lib/textLayoutText";
 import { TextControls } from "@/components/TextBar";
 import type { TextBarState } from "@/hooks/useText";
 import { Toggle, Tooltip } from "radix-ui";
@@ -56,6 +58,8 @@ export interface SelectToolbarProps {
   /** The Style group's presses (`specs/0078-font-style-buttons`); each returns its notice. */
   onPressTextWeight?: (code: WeightCode) => string | null;
   onPressTextItalic?: () => string | null;
+  /** The Alignment group's press (`specs/0079-text-layout-controls` criterion 1). */
+  onSetTextAlign?: (align: AlignCode) => void;
   /** The Linked clone button is shown (`specs/0049-linked-clone` criterion 4). */
   linkedCloneShown: boolean;
   onLinkedClone: () => void;
@@ -562,6 +566,7 @@ export function SelectToolbar({
   onPreviewTextSize,
   onPressTextWeight,
   onPressTextItalic,
+  onSetTextAlign,
   linkedCloneShown,
   onLinkedClone,
   linkedCloneNotice,
@@ -650,6 +655,15 @@ export function SelectToolbar({
             onPressItalic={onPressTextItalic}
             onReturnFocus={onReturnFocus}
           />
+        </div>,
+      );
+    }
+    if (onSetTextAlign) {
+      // The Alignment group of its own after Style, before Object to path
+      // (`specs/0079-text-layout-controls` UX notes §2).
+      groups.push(
+        <div key="text-align" className={GROUP_CLASS}>
+          <AlignmentGroup align={textBar.align} onPress={onSetTextAlign} onReturnFocus={onReturnFocus} />
         </div>,
       );
     }

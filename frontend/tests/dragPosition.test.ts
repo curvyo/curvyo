@@ -38,3 +38,11 @@ test("a relative drag clamps at the ends", () => {
   assert.equal(dragPosition(relative, 5000), 1);
   assert.equal(dragPosition(relative, -5000), 0);
 });
+
+test("a field whose typed range goes below its track drags past the left end down to its minimum", () => {
+  // `specs/0079-text-layout-controls` UX notes §6: letter spacing overshoots at either end.
+  const signed = frame({ baseP: 0.2, baseX: 200, min: -0.2, limit: 2.2 });
+  assert.ok(Math.abs(dragPosition(signed, 200 - 0.3 * 244) + 0.1) < 1e-12);
+  assert.equal(dragPosition(signed, -5000), -0.2);
+  assert.equal(dragPosition(frame({ baseP: 0.2, baseX: 200 }), -5000), 0, "0 without a minimum");
+});

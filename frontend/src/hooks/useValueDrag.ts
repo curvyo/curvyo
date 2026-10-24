@@ -39,6 +39,7 @@ interface Drag {
   left: number;
   width: number;
   limit: number;
+  min: number;
 }
 
 interface ValueDragOptions {
@@ -46,6 +47,8 @@ interface ValueDragOptions {
   bar: number;
   /** The largest position of a drag (1 unless the value may grow beyond the track). */
   limit: number;
+  /** The smallest position of a drag (0 unless the value may go below the track). */
+  min?: number;
   /** The edited objects differ: the pointer's own position is the value. */
   mixed: boolean;
   /** A tick: position `p` on the field's scale and the grid. */
@@ -72,6 +75,7 @@ interface ValueDragOptions {
 export function useValueDrag({
   bar,
   limit,
+  min = 0,
   mixed,
   onTick,
   onClickAt,
@@ -178,6 +182,7 @@ export function useValueDrag({
       left: box.left,
       width: box.width,
       limit,
+      min,
     };
     pointer.onPointerDown(event);
   };

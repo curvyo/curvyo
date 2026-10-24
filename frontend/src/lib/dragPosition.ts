@@ -16,6 +16,9 @@ export interface DragFrame {
   /** The largest position: 1 at the end of the track, more for a field whose typed range goes
    * beyond it (a width, a count), where overshooting the right edge keeps the value growing. */
   limit?: number;
+  /** The smallest position: 0 at the start of the track, less for a field whose typed range goes
+   * below it (a text's letter spacing, `specs/0079-text-layout-controls` UX notes §6). */
+  min?: number;
 }
 
 /** The position `p`, 0 to 1, for the pointer at `clientX`. A mixed drag takes
@@ -25,7 +28,7 @@ export function dragPosition(frame: DragFrame, clientX: number): number {
   const raw = frame.mixed
     ? (clientX - frame.left) / frame.width
     : frame.baseP + (frame.factor * (clientX - frame.baseX)) / frame.width;
-  return Math.min(frame.limit ?? 1, Math.max(0, raw));
+  return Math.min(frame.limit ?? 1, Math.max(frame.min ?? 0, raw));
 }
 
 /** The position `p`, 0 to 1, a click at `x` px from the left edge of a field `width` px wide

@@ -179,6 +179,7 @@ function Editor() {
               onPreviewTextSize={editor.text.previewSize}
               onPressTextWeight={editor.text.pressWeight}
               onPressTextItalic={editor.text.pressItalic}
+              onSetTextAlign={editor.text.setAlign}
               linkedCloneShown={editor.clones.shown}
               onLinkedClone={() => editor.clones.apply("linked-clone")}
               linkedCloneNotice={editor.clones.barNotice}
@@ -220,6 +221,7 @@ function Editor() {
               editing={editor.text.editing}
               onPressWeight={editor.text.pressWeight}
               onPressItalic={editor.text.pressItalic}
+              onSetAlign={editor.text.setAlign}
               onReturnFocus={() => {
                 if (editor.text.editing) {
                   editor.text.sinkRef.current?.focus({ preventScroll: true });

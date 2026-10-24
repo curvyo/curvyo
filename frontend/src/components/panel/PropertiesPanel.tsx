@@ -1,5 +1,6 @@
 import { panelHandlesEscape } from "@/lib/panelEscape";
 import { FontsTab } from "@/components/panel/FontsTab";
+import { useTextLayout } from "@/hooks/useTextLayout";
 import { focusCurrentFont, fontsSubject } from "@/lib/textText";
 import { useCallback, useEffect, useId, useRef } from "react";
 
@@ -60,6 +61,7 @@ export function PropertiesPanel({
   const focusAfterShortcut = useRef(false);
   const panel = useStylePanel(editor);
   const background = useBackgroundPanel(editor);
+  const textLayout = useTextLayout(editor.getSession, editor.sync, editor.syncRevision);
   const { getSession } = editor;
   const formats = useFormats(getSession, doc);
   const { shortcut } = doc;
@@ -336,6 +338,7 @@ export function PropertiesPanel({
                 }}
                 onShown={editor.text.listHostFonts}
                 textsUsingFamily={editor.text.textsUsingFamily}
+                layout={textLayout}
               />
             ) : doc.view.content === "history" ? (
               <HistoryTab

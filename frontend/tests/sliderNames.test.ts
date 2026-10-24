@@ -19,7 +19,8 @@ const src = (path: string) => readFileSync(new URL(`../src/${path}`, import.meta
 
 test("every slider and value field has a non-empty, distinct name", () => {
   const names = allSliderNames();
-  assert.equal(names.length, 5 + 2 + 6);
+  // Five panel value fields, four text layout fields (`0079`), two ratio sliders, six colour.
+  assert.equal(names.length, 5 + 4 + 2 + 6);
   for (const name of names) {
     assert.ok(name.trim().length > 0, "a name is empty");
   }
