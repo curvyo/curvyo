@@ -8,7 +8,7 @@ or a spike.
 **Slice 1: no new ADR, no new crate, no new external dependency, `format_version` 19.** It adds
 five optional registers to the text node of ADR 0020 §1; the build PR adds a dated note there, the
 same way `0076` added `text_font.kind`. **Slice 4 needs a new ADR (0021, `needs-customer`:
-document model, a per-character register).** Slices 2 and 3 need no ADR; slice 3 needs a spike
+document model, a per-character register; written 2026-10-24, decision 14).** Slices 2 and 3 need no ADR; slice 3 needs a spike
 first.
 
 ## Depends on
@@ -261,25 +261,37 @@ Build decisions (feature-local):
 - **JSON mirror:** `writing_mode` and `orientation` are left out of `document.json` at their
   defaults, so a text of format 19 mirrors byte for byte as before.
 
-## Slice 4 (kerning): needs a new ADR, `needs-customer`
+## Slice 4 (kerning): ADR 0021, `needs-customer`
 
-14. **ADR 0021 "Per-character values on a text" (`needs-customer`, document model).** Criteria 30
-    and 31 ask for a value that travels with its character through local edits and merges per
-    character between peers. Options for the ADR:
-    - **A. Loro rich-text marks on `text_string`** (`LoroText::mark(range, "kern_x", factor)`,
-      style configured `ExpandType::None`, so a character typed next to a kerned one gets no
-      kern). Deleting the character deletes the mark's span; concurrent kerns on different
-      characters both survive; on the same character the later write wins (as any register).
-      **Recommendation.** Risks for the spike: the expand config is per `LoroDoc` instance and
-      must be set on every open and import before any edit; `apply_string_diff` must keep marks on
-      the common prefix and suffix; undo (ADR 0014, own restore engine on `diff`) must restore
-      marks; `document.json` must mirror them; the pinned Loro `=1.16.2` and its revival canary.
-    - B. A map `text_kerns` keyed by Loro stable cursors (`get_cursor`): merges per record, but a
-      deleted character leaves an orphan record that every reader must skip and someone must
-      collect.
-    - C. Offsets into the string, remapped on each local edit: breaks under concurrent edits (two
-      peers' offsets disagree after a merge), so criterion 31 fails. Rejected now.
-    The file format change and the format bump follow the ADR.
+14. **[ADR 0021](../../docs/adr/0021-per-character-values-on-a-text.md) "Per-character values on a
+    text"** (Proposed — needs-customer; default A per Frage 42 KERN-MODEL, asked 2026-10-24,
+    unanswered). Supersedes the option list of the earlier draft of this decision; Frage 42 letters
+    the options A Loro text marks, B an offset-keyed list remapped on edit, C per-character records
+    with references. What it decides for this slice:
+    - **Storage (criteria 26, 30, 37):** `kern_x` (along, factor of Size, −1 to 1) and `kern_y`
+      (across, positive up, −2 to 2) as Loro marks on `text_string`, `ExpandType::None`, one mark
+      per character, absent = 0. `text_string` is already a `LoroText` (format 17): no migration,
+      only the next free `format_version` (21 if nothing merges first) and golden file
+      `text_layout_v<N>.curvyo`.
+    - **Merge (criterion 31):** per character and key, by the CRDT; checked against `loro
+      =1.16.2` (both peers' kerns on different characters survive).
+    - **Edits (criteria 27, 29, 30):** the edit session carries the values with its characters;
+      the commit diffs the string, then writes value differences, so a typed character never
+      inherits a kern. Plain-text copy and paste carries none; copying the text object carries all.
+    - **Undo (criterion 29):** the restore engine's `Node::Text` gains the values, three-way per
+      character (ADR 0014 §1).
+    - **Object to path, Split, Break apart:** read the laid-out outlines, kerns included.
+    - **API:** `TextSnapshot.chars: TextChars` (new `document-core/src/text_chars.rs`),
+      `Document::set_text_chars(&[(NodeId, TextChars)], label)` for "Change kerning" and "Clear
+      kerning", the session commit takes the values with the string; `LayoutOptions.char_offsets`
+      in mm (new `text-core/src/char_offsets.rs`), mapped once in `ui-core::text_layout`.
+    - **First plan task:** tests for the four risks of ADR 0021 "Before the build" (config on both
+      `Document` constructors, marks through `apply_string_diff`, undo, `copy_map`).
+    - **Customer feedback on PR #189 (2026-10-24, dated note):** `kern_y` is cumulative (it and
+      the rest of the line move, criterion 27); a third key `rot` (degrees, the character's own
+      turn, criterion 27b) with its own steps "Change per-character rotation" and "Clear
+      per-character rotation"; "All characters" (27c) writes through `set_text_chars`. All in
+      format 21 (unmerged), ADR 0021 §1 and §6 amended.
 
 ## For the product owner
 
