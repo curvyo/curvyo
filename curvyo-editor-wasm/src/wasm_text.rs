@@ -31,8 +31,12 @@ pub struct TextBarStateView {
     /// "Source Sans 3 Regular"; empty for "Mixed".
     #[wasm_bindgen(getter_with_clone)]
     pub font: String,
-    /// The face is missing on this computer.
+    /// A subject face is missing on this computer.
     pub missing: bool,
+    /// How many different faces the subject texts use.
+    pub faces: u32,
+    /// How many of them are missing.
+    pub missing_faces: u32,
     /// The size in mm; NaN for "Mixed".
     pub size_mm: f64,
     /// The one edited or selected text the font preview follows; empty for none.
@@ -276,6 +280,8 @@ impl WasmSession {
             shown: bar.shown,
             font: bar.font,
             missing: bar.missing,
+            faces: bar.faces,
+            missing_faces: bar.missing_faces,
             size_mm: bar.size_mm.unwrap_or(f64::NAN),
             sample_node: bar.sample_node,
             sample: bar.sample,
