@@ -174,6 +174,8 @@ pub struct TextEdit {
     /// The carrier the text is on, with its resolved outline (`specs/0080-text-on-path`
     /// criterion 27): typing lays the letters out along it.
     pub on_path: Option<curvyo_document_core::TextOnPath>,
+    /// The source the edited text clone follows (`0080` slice 2): the string is shared with it.
+    pub source: Option<curvyo_document_core::TextSource>,
 }
 
 /// Normalises typed or pasted text: CR LF and CR to LF, a tab to [`TAB_SPACES`] spaces, other
@@ -222,6 +224,7 @@ impl TextEdit {
             placement,
             style,
             on_path: None,
+            source: None,
         }
     }
 
@@ -248,6 +251,7 @@ impl TextEdit {
             placement: text.placement,
             style: text.style.clone(),
             on_path: text.on_path.clone(),
+            source: text.source,
         }
     }
 
@@ -363,6 +367,7 @@ impl TextEdit {
             style: self.style.clone(),
             outline: None,
             on_path: self.on_path.clone(),
+            source: self.source,
         }
     }
 

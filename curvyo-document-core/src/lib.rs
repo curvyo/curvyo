@@ -86,6 +86,9 @@ mod subpath_codec;
 mod template;
 mod text_carrier;
 mod text_chars;
+mod text_clone_codec;
+mod text_clone_commands;
+mod text_clone_read;
 mod text_codec;
 mod text_model;
 mod text_path_codec;
@@ -189,6 +192,8 @@ pub use styles::{StyleEdit, StyleEditError};
 pub use template::{LOAD_TEMPLATE_COMMIT_LABEL, TemplateNode};
 pub use text_carrier::{DUPLICATE_TEXT_SHIFT, carrier_curve, text_path_previews};
 pub use text_chars::{CharValues, KERN_X_FACTORS, KERN_Y_FACTORS, TextChars};
+pub use text_clone_codec::TextSource;
+pub use text_clone_commands::PUT_ON_PATHS_LABEL;
 pub use text_model::{
     FontKind, FontRef, LETTER_SPACING_FACTORS, LINE_SPACING_FACTORS, MAX_STORED_TEXT_CHARS,
     MAX_TEXT_CHARS, MAX_TEXT_SIZE, MIN_TEXT_SIZE, SINGLE_LINE_STROKE_WIDTH, TEXT_NAME_CHARS,

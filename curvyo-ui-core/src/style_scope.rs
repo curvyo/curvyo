@@ -94,7 +94,12 @@ pub fn skipped_clones(objects: &[ObjectSnapshot], ids: &[NodeId]) -> usize {
 /// Whether an object owns the style it shows: every object but a clone without own style.
 #[must_use]
 pub fn owns_style(object: &ObjectSnapshot) -> bool {
-    !matches!(object, ObjectSnapshot::Clone(clone) if !clone.chain.own_style)
+    match object {
+        ObjectSnapshot::Clone(clone) => clone.chain.own_style,
+        // A text clone without own style shows its source's (`specs/0080-text-on-path` 40).
+        ObjectSnapshot::Text(text) => text.source.is_none_or(|source| source.own_style),
+        _ => true,
+    }
 }
 
 /// The scope of the panel for `tool` (criterion 37). Ids the document no

@@ -22,7 +22,8 @@ impl Document {
     ///
     /// # Errors
     /// [`TextEditError::NoSuchText`] when `text` is not a live text or `carrier` is not a live
-    /// node; nothing is written.
+    /// object a text can be put on (a group or a text is none, the rule of
+    /// [`Document::put_text_on_paths`]); nothing is written.
     pub fn put_text_on_path(
         &self,
         text: NodeId,
@@ -33,17 +34,13 @@ impl Document {
         let meta = self.text_meta(text)?;
         let tree = self.loro().get_tree(OBJECTS_TREE);
         let carrier_tree = TreeID::new(carrier.node.peer, carrier.node.counter);
-        if !crate::path_codec::leaf_exists(&tree, carrier_tree) || carrier.node == text {
+        if carrier.node == text || !crate::text_clone_commands::is_carrier(&tree, carrier.node) {
             return Err(TextEditError::NoSuchText);
         }
         crate::text_path_codec::write_carrier(&meta, carrier);
         crate::text_path_codec::write_values(&meta, values);
-        if mark_guide
-            && !crate::node_read::locked_through(&tree, carrier_tree)
-            && let Ok(carrier_meta) = tree.get_meta(carrier_tree)
-            && !crate::node_registers::read_registers(&carrier_meta).guide
-        {
-            crate::guides::write_guide(&carrier_meta, true);
+        if mark_guide {
+            mark_carrier_guide(&tree, carrier_tree);
         }
         self.commit_with_label(PUT_ON_PATH_LABEL);
         Ok(())
@@ -105,5 +102,16 @@ impl Document {
             self.commit_with_label(RELEASE_FROM_PATH_LABEL);
         }
         Ok(())
+    }
+}
+
+/// Makes the carrier `carrier` a guide unless it lies on a locked layer or group (criterion 7) or
+/// is one already. Uncommitted.
+pub(crate) fn mark_carrier_guide(tree: &loro::LoroTree, carrier: TreeID) {
+    if !crate::node_read::locked_through(tree, carrier)
+        && let Ok(meta) = tree.get_meta(carrier)
+        && !crate::node_registers::read_registers(&meta).guide
+    {
+        crate::guides::write_guide(&meta, true);
     }
 }

@@ -268,6 +268,11 @@ pub struct TextSnapshot {
     /// placement from before and is not what draws the text.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub on_path: Option<crate::text_path_model::TextOnPath>,
+    /// The source text this text clone follows (`specs/0080-text-on-path` slice 2, ADR 0022 §4);
+    /// `None` for a source or an ordinary text. A clone shows its source's string, kerns, face,
+    /// size, layout and (without own style) style; placement and on-path values are its own.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source: Option<crate::text_clone_codec::TextSource>,
 }
 
 /// A text as laid out, in document mm.
@@ -419,6 +424,7 @@ mod tests {
             style: Style::default(),
             outline: None,
             on_path: None,
+            source: None,
         }
     }
 

@@ -183,8 +183,9 @@ impl Document {
             .style_metas(ids)?
             .into_iter()
             .filter(|meta| {
-                !crate::clone_codec::is_clone_meta(meta)
-                    || crate::clone_codec::read_overrides(meta).own_style
+                (!crate::clone_codec::is_clone_meta(meta)
+                    || crate::clone_codec::read_overrides(meta).own_style)
+                    && crate::text_clone_commands::owns_style_keys(meta)
             })
             .collect();
         if edit.is_marker_edit()

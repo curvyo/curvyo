@@ -42,6 +42,9 @@ impl Document {
     pub(crate) fn repair_clones_of_removed(&self, tree: &LoroTree, removed: &[TreeID]) {
         // The texts on a removed carrier keep its outline (`specs/0080-text-on-path` criterion 25).
         self.keep_carriers_of_removed(tree, removed);
+        // The text clones of a removed source become texts (`specs/0080-text-on-path` criterion
+        // 41).
+        self.unlink_text_clones_of_removed(tree, removed);
         let links = self.clone_links();
         if links.is_empty() {
             return;

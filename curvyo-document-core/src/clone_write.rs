@@ -103,6 +103,11 @@ pub(crate) fn leaf_style(tree: &LoroTree, id: NodeId, meta: &LoroMap) -> crate::
     {
         return clone.resolved.style;
     }
+    if crate::text_clone_codec::has_source_key(meta)
+        && let Some(text) = crate::text_clone_read::read_text_node(tree, id, meta)
+    {
+        return text.style;
+    }
     crate::style_codec::read_style(meta)
 }
 

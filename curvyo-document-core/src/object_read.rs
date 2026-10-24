@@ -100,6 +100,12 @@ fn raw_from_meta(id: NodeId, meta: &LoroMap) -> RawLeaf {
             )
         });
     }
+    if crate::text_codec::is_text_meta(meta) && crate::text_clone_codec::has_source_key(meta) {
+        return crate::text_clone_codec::read_parts(id, meta)
+            .map_or(RawLeaf::Unreadable(id), |parts| {
+                RawLeaf::TextClone(Box::new(parts))
+            });
+    }
     if crate::text_codec::is_text_meta(meta) {
         return crate::text_codec::read_text_snapshot(id, meta)
             .map_or(RawLeaf::Unreadable(id), |text| {

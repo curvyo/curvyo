@@ -1,7 +1,8 @@
 //! Spread colours (`specs/0057-clone-overrides` criterion 42, Proposal): evenly spaced hues for
-//! the selected clones in stacking order, each colour keeping its saturation and lightness.
+//! the selected clones (linked or text) in stacking order, each colour keeping its saturation
+//! and lightness.
 
-use curvyo_document_core::{CloneColours, Color, NodeId, ObjectRead, ObjectSnapshot};
+use curvyo_document_core::{CloneColours, Color, NodeId, ObjectRead, ObjectSnapshot, Style};
 
 /// The colours Spread colours gives the selected clones of `selected`, back to front: the first
 /// keeps its hue (that of its fill colour, or of its stroke colour when the fill is off), the
@@ -9,10 +10,16 @@ use curvyo_document_core::{CloneColours, Color, NodeId, ObjectRead, ObjectSnapsh
 /// on. Empty with fewer than two selected clones (the button is disabled then).
 #[must_use]
 pub fn spread_colours(read: &ObjectRead, selected: &[NodeId]) -> Vec<CloneColours> {
-    let mut clones: Vec<(usize, &curvyo_document_core::CloneSnapshot)> = selected
+    // Linked clones and text clones alike (`specs/0080-text-on-path` criterion 40).
+    let mut clones: Vec<(usize, (NodeId, &Style))> = selected
         .iter()
         .filter_map(|id| match read.get(*id) {
-            Some(ObjectSnapshot::Clone(clone)) => Some((read.index[id], clone)),
+            Some(ObjectSnapshot::Clone(clone)) => {
+                Some((read.index[id], (*id, &clone.resolved.style)))
+            }
+            Some(ObjectSnapshot::Text(text)) if text.source.is_some() => {
+                Some((read.index[id], (*id, &text.style)))
+            }
             _ => None,
         })
         .collect();
@@ -21,7 +28,7 @@ pub fn spread_colours(read: &ObjectRead, selected: &[NodeId]) -> Vec<CloneColour
     if clones.len() < 2 {
         return Vec::new();
     }
-    let first = &clones[0].1.resolved.style;
+    let first = clones[0].1.1;
     let start = if first.fill.enabled {
         hue_of(first.fill.color)
     } else {
@@ -32,12 +39,11 @@ pub fn spread_colours(read: &ObjectRead, selected: &[NodeId]) -> Vec<CloneColour
     clones
         .iter()
         .enumerate()
-        .map(|(k, (_, clone))| {
+        .map(|(k, (_, (id, style)))| {
             #[allow(clippy::cast_precision_loss)]
             let hue = (start + step * k as f64).rem_euclid(360.0);
-            let style = &clone.resolved.style;
             CloneColours {
-                clone: clone.id(),
+                clone: *id,
                 fill: with_hue(style.fill.color, hue),
                 stroke: style
                     .stroke

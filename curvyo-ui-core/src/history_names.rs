@@ -31,6 +31,7 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     ("change_glyph_orientation", "Change glyph orientation"),
     ("change_kerning", "Change kerning"),
     ("put_text_on_path", "Put text on path"),
+    ("put_text_on_paths", "Put text on paths"),
     ("release_from_path", "Release from path"),
     ("change_text_side", "Change text side"),
     ("change_line_on_path", "Change line on path"),

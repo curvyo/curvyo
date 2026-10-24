@@ -52,6 +52,7 @@ fn stairs(mode: TextWritingMode, kern_y: f64, rotation: f64) -> TextSnapshot {
         style: Style::default(),
         outline: None,
         on_path: None,
+        source: None,
     };
     text.outline = lay_out(&text, &sans(), false).map(std::sync::Arc::new);
     text

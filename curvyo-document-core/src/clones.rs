@@ -130,6 +130,22 @@ impl Document {
     /// [`CloneError::NoSuchObject`] for an id that does not exist; [`CloneError::NotAClone`] for
     /// one that is not a resolvable clone; [`CloneError::AnchorIds`] when the ids do not fit.
     pub fn unlink_clones(&self, unlinks: &[crate::CopySource]) -> Result<(), CloneError> {
+        self.unlink_clones_and_texts(unlinks, &[]).map(|_| ())
+    }
+
+    /// [`Document::unlink_clones`] for the linked clones of `unlinks` and, in the **same
+    /// commit**, each text clone of `texts` made an independent text with the string, kerns,
+    /// face, size, layout and style it shows, its placement and carrier kept (`specs/0080-text-on-path`
+    /// criterion 41, lead decision 2). Returns how many were unlinked.
+    ///
+    /// # Errors
+    /// As [`Document::unlink_clones`]; [`CloneError::NotAClone`] for an id of `texts` that is not
+    /// a text clone with a live source. Checked before the first write.
+    pub fn unlink_clones_and_texts(
+        &self,
+        unlinks: &[crate::CopySource],
+        texts: &[NodeId],
+    ) -> Result<usize, CloneError> {
         let tree = self.loro().get_tree(OBJECTS_TREE);
         let mut planned = Vec::with_capacity(unlinks.len());
         let mut fresh = HashSet::new();
@@ -157,12 +173,18 @@ impl Document {
             }
             planned.push((meta, path, opacity));
         }
+        let text_plan = self
+            .plan_text_unlinks(texts)
+            .map_err(|_| CloneError::NotAClone)?;
         // Clones that follow an unlinked clone read it before it changes, and keep following it.
         for (meta, path, opacity) in &planned {
             crate::clone_write::unlink_meta(meta, path, *opacity);
         }
+        for (meta, shown) in &text_plan {
+            crate::text_clone_codec::unlink_meta(meta, shown);
+        }
         self.commit_with_label(UNLINK_CLONE_COMMIT_LABEL);
-        Ok(())
+        Ok(planned.len() + text_plan.len())
     }
 
     /// Repairs every orphan clone (`0049` criterion 35) in one commit labelled

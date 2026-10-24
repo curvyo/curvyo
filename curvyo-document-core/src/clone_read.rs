@@ -25,6 +25,8 @@ pub(crate) enum RawLeaf {
     BrokenClone(NodeId),
     /// A text object: never an original.
     Text(Box<crate::text_model::TextSnapshot>),
+    /// A text clone as stored, filled from its source text after the walk (ADR 0022 §4).
+    TextClone(Box<crate::text_clone_codec::TextCloneParts>),
     /// A leaf whose registers cannot be read (merge residue of a text): left out.
     Unreadable(NodeId),
 }
@@ -44,6 +46,7 @@ impl RawLeaf {
             Self::Path(path) => path.id,
             Self::Primitive(primitive) => primitive.id,
             Self::Text(text) => text.id,
+            Self::TextClone(parts) => parts.id,
             Self::Clone(id, ..) | Self::BrokenClone(id) | Self::Unreadable(id) => *id,
         }
     }
@@ -97,6 +100,11 @@ impl ObjectRead {
                     .entry(clone.chain.origin)
                     .or_default()
                     .push(clone.id());
+            }
+            if let ObjectSnapshot::Text(text) = object
+                && let Some(source) = text.source
+            {
+                clones_of.entry(source.node).or_default().push(text.id);
             }
             if let ObjectSnapshot::Text(text) = object
                 && let Some(on_path) = &text.on_path
@@ -192,6 +200,7 @@ pub(crate) fn resolve(leaves: Vec<RawLeaf>) -> Resolution {
             RawLeaf::Primitive(_)
             | RawLeaf::BrokenClone(_)
             | RawLeaf::Text(_)
+            | RawLeaf::TextClone(_)
             | RawLeaf::Unreadable(_) => State::NotOrigin,
             RawLeaf::Clone(..) => State::Pending,
         })
@@ -318,11 +327,16 @@ fn assemble(leaves: Vec<RawLeaf>, states: &[State], index: &HashMap<NodeId, usiz
         orphans: Vec::new(),
         texts_on: HashMap::new(),
     };
+    let mut text_clones = Vec::new();
     for (i, leaf) in leaves.into_iter().enumerate() {
         let object = match leaf {
             RawLeaf::Path(path) => Some(ObjectSnapshot::Path(path)),
             RawLeaf::Primitive(primitive) => Some(ObjectSnapshot::Primitive(primitive)),
             RawLeaf::Text(text) => Some(ObjectSnapshot::Text(text)),
+            RawLeaf::TextClone(parts) => {
+                text_clones.push((i, *parts));
+                None
+            }
             RawLeaf::Unreadable(_) => None,
             RawLeaf::Clone(id, ..) | RawLeaf::BrokenClone(id) => {
                 if let Some(clone) = clones[i].take() {
@@ -340,7 +354,12 @@ fn assemble(leaves: Vec<RawLeaf>, states: &[State], index: &HashMap<NodeId, usiz
         };
         result.leaves.push(object);
     }
-    // Texts on path read their carriers' outlines in the same pass (ADR 0022 §3).
+    // Text clones read their sources (ADR 0022 §4), then every text on path its carrier (§3).
+    let filled = crate::text_clone_read::fill_clones(&mut result.leaves, text_clones);
+    for (source, clone) in filled.links {
+        result.clones_of.entry(source).or_default().push(clone);
+    }
+    result.orphans.extend(filled.orphans);
     result.texts_on = crate::text_carrier::resolve_carriers(&mut result.leaves);
     result
 }

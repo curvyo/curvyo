@@ -289,23 +289,24 @@ fn roles_of(
     let mut clones = 0;
     let mut originals: Vec<NodeId> = Vec::new();
     let mut any_clone = false;
+    let mut text_sources: Vec<NodeId> = Vec::new();
     for object in objects {
-        let ObjectSnapshot::Clone(clone) = object else {
+        let Some((id, origin, root)) = link_of(object) else {
             continue;
         };
-        if !chosen.contains(&clone.id()) {
+        if !chosen.contains(&id) {
             continue;
         }
         any_clone = true;
         if clones < MAX_CLONE_TRACES && on_screen(object) {
             clones += 1;
-            roles.entry(clone.id()).or_default().push(MarkRole::Clone);
+            roles.entry(id).or_default().push(MarkRole::Clone);
         }
-        for (target, role) in [
-            (clone.chain.origin, MarkRole::Original),
-            (clone.chain.root, MarkRole::Root),
-        ] {
-            if role == MarkRole::Root && target == clone.chain.origin {
+        if matches!(object, ObjectSnapshot::Text(_)) && !text_sources.contains(&origin) {
+            text_sources.push(origin);
+        }
+        for (target, role) in [(origin, MarkRole::Original), (root, MarkRole::Root)] {
+            if role == MarkRole::Root && target == origin {
                 continue;
             }
             if !originals.contains(&target) {
@@ -320,23 +321,21 @@ fn roles_of(
             }
         }
     }
-    if !any_clone {
-        let mut faint = 0;
-        for object in objects {
-            if let ObjectSnapshot::Clone(clone) = object
-                && chosen.contains(&clone.chain.origin)
-                && faint < MAX_FAINT_TRACES
-                && on_screen(object)
-            {
-                faint += 1;
-                roles
-                    .entry(clone.id())
-                    .or_default()
-                    .push(MarkRole::FaintClone);
-                let entry = roles.entry(clone.chain.origin).or_default();
-                if !entry.contains(&MarkRole::Original) {
-                    entry.push(MarkRole::Original);
-                }
+    // The faint clones: of a selected original, and the siblings of a selected text clone (UX
+    // notes of `specs/0080-text-on-path` §9).
+    let mut faint = 0;
+    for object in objects {
+        if let Some((id, origin, _)) = link_of(object)
+            && ((!any_clone && chosen.contains(&origin)) || text_sources.contains(&origin))
+            && !chosen.contains(&id)
+            && faint < MAX_FAINT_TRACES
+            && on_screen(object)
+        {
+            faint += 1;
+            roles.entry(id).or_default().push(MarkRole::FaintClone);
+            let entry = roles.entry(origin).or_default();
+            if !entry.contains(&MarkRole::Original) {
+                entry.push(MarkRole::Original);
             }
         }
     }
@@ -353,6 +352,17 @@ fn roles_of(
     ordered
 }
 
+/// A linked clone's or a text clone's id, direct original and root original.
+fn link_of(object: &ObjectSnapshot) -> Option<(NodeId, NodeId, NodeId)> {
+    match object {
+        ObjectSnapshot::Clone(clone) => Some((clone.id(), clone.chain.origin, clone.chain.root)),
+        ObjectSnapshot::Text(text) => text
+            .source
+            .map(|source| (text.id, source.node, source.node)),
+        _ => None,
+    }
+}
+
 /// The text of a tag: the roles, joined ("Clone + Original"); a selected original that clones
 /// follow and no selected clone reads "Original (12 clones)".
 fn tag_text(
@@ -364,7 +374,7 @@ fn tag_text(
     if kinds == [MarkRole::Original] && chosen.contains(&id) {
         let count = objects
             .iter()
-            .filter(|object| matches!(object, ObjectSnapshot::Clone(c) if c.chain.origin == id))
+            .filter(|object| link_of(object).is_some_and(|(_, origin, _)| origin == id))
             .count();
         return format!(
             "Original ({count} {})",

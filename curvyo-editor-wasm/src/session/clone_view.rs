@@ -28,9 +28,11 @@ impl Session {
     ) -> CloneMarks {
         if !matches!(self.tool, Tool::Select | Tool::Node)
             || self.selection.ids().is_empty()
-            || !objects
-                .iter()
-                .any(|object| matches!(object, ObjectSnapshot::Clone(_)))
+            || !objects.iter().any(|object| match object {
+                ObjectSnapshot::Clone(_) => true,
+                ObjectSnapshot::Text(text) => text.source.is_some(),
+                _ => false,
+            })
         {
             return CloneMarks::default();
         }

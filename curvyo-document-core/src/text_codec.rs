@@ -45,7 +45,7 @@ use crate::units::{Angle, Length};
 
 /// The `shape` tag of a text node.
 pub(crate) const SHAPE_TEXT: &str = "text";
-const KEY_STRING: &str = "text_string";
+pub(crate) const KEY_STRING: &str = "text_string";
 const KEY_FONT: &str = "text_font";
 const KEY_SIZE: &str = "text_size";
 const KEY_PLACEMENT: &str = "text_placement";
@@ -348,6 +348,7 @@ pub(crate) fn read_text_snapshot(id: NodeId, meta: &LoroMap) -> Option<TextSnaps
         style: crate::style_codec::read_style(meta),
         outline: None,
         on_path: crate::text_path_codec::read_on_path(meta),
+        source: None,
     })
 }
 
@@ -373,6 +374,9 @@ pub(crate) fn translate_text_meta(meta: &LoroMap, offset: crate::units::Vec2) {
 /// string at most [`MAX_TEXT_CHARS`] long, the size in range, the placement finite, within the
 /// matrix limit and invertible, and the style keys valid as on a path.
 pub(crate) fn validate_text_node(meta: &LoroMap) -> bool {
+    if crate::text_clone_codec::has_source_key(meta) {
+        return crate::text_clone_codec::validate_text_clone(meta);
+    }
     string_container(meta).is_some_and(|string| string.len_unicode() <= MAX_STORED_TEXT_CHARS)
         && read_font(meta).is_some()
         && read_size(meta).is_some()
@@ -405,6 +409,7 @@ mod tests {
             style: Style::default(),
             outline: None,
             on_path: None,
+            source: None,
         }
     }
 

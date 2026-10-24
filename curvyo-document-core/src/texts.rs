@@ -189,6 +189,7 @@ impl Document {
             style: Style::default(),
             outline: None,
             on_path: None,
+            source: None,
         });
         if font.kind == FontKind::SingleLine
             && let Ok(meta) = self.text_meta(id)
@@ -221,8 +222,9 @@ impl Document {
     #[must_use]
     pub fn text(&self, id: NodeId) -> Option<TextSnapshot> {
         let meta = self.text_meta(id).ok()?;
-        let mut text = text_codec::read_text_snapshot(id, &meta)?;
-        crate::text_carrier::resolve_one(&self.loro().get_tree(OBJECTS_TREE), &mut text);
+        let tree = self.loro().get_tree(OBJECTS_TREE);
+        let mut text = crate::text_clone_read::read_text_node(&tree, id, &meta)?;
+        crate::text_carrier::resolve_one(&tree, &mut text);
         Some(text)
     }
 
@@ -232,7 +234,8 @@ impl Document {
     /// (of `string`) where they differ from the stored ones (ADR 0021 §2: a typed character never
     /// inherits a kern). One commit labelled `edit_text`; nothing when neither changed (criterion
     /// 7). An empty `string` removes the text in that same commit, so Undo brings it back with its
-    /// string (criterion 8). A string longer than [`MAX_TEXT_CHARS`] is refused unless it is no
+    /// string (criterion 8); only that text goes: a text clone alone, or a source whose clones
+    /// become texts with the string they showed (`0080` lead decision 1). A string longer than [`MAX_TEXT_CHARS`] is refused unless it is no
     /// longer than the stored one (a merge may have made it longer; deleting from it is allowed).
     ///
     /// # Errors
@@ -243,18 +246,20 @@ impl Document {
         string: &str,
         chars: &TextChars,
     ) -> Result<(), TextEditError> {
-        let meta = self.text_meta(id)?;
+        let meta = self.text_content_meta(id)?;
         let container = text_codec::string_container(&meta).ok_or(TextEditError::NoSuchText)?;
         let old = container.to_string();
         if string.chars().count() > old.chars().count() {
             check_string(string)?;
         }
         if string.is_empty() {
+            // Only the edited text goes; the clones of a removed source become texts with the
+            // string they showed (`0080` slice 2, lead decision 1).
             let tree = self.loro().get_tree(OBJECTS_TREE);
-            let tree_id = TreeID::new(id.peer, id.counter);
-            let parents = crate::group_tree::parents_of(&tree, &[tree_id]);
-            self.repair_clones_of_removed(&tree, &[tree_id]);
-            tree.delete(tree_id)
+            let doomed = [TreeID::new(id.peer, id.counter)];
+            let parents = crate::group_tree::parents_of(&tree, &doomed);
+            self.repair_clones_of_removed(&tree, &doomed);
+            tree.delete(doomed[0])
                 .map_err(|_| TextEditError::NoSuchText)?;
             crate::groups::remove_emptied_groups(&tree, &parents);
             self.commit_with_label("edit_text");
@@ -282,7 +287,7 @@ impl Document {
         label: TextCharsLabel,
     ) -> Result<(), TextEditError> {
         let ids: Vec<NodeId> = texts.iter().map(|(id, _)| *id).collect();
-        let metas = self.text_metas(&ids)?;
+        let metas = self.text_content_metas(&ids)?;
         let containers: Vec<_> = metas
             .iter()
             .map(|meta| text_codec::string_container(meta).ok_or(TextEditError::NoSuchText))
@@ -311,7 +316,7 @@ impl Document {
             check_font(font)?;
         }
         let ids: Vec<NodeId> = fonts.iter().map(|(id, _)| *id).collect();
-        let metas = self.text_metas(&ids)?;
+        let metas = self.text_content_metas(&ids)?;
         for (meta, (_, font)) in metas.iter().zip(fonts) {
             if text_codec::read_font(meta).as_ref() != Some(font) {
                 text_codec::write_font(meta, font);
@@ -331,7 +336,7 @@ impl Document {
     /// [`TextEditError::NoSuchText`] or [`TextEditError::SizeOutOfRange`]; nothing is written.
     pub fn set_text_size(&self, ids: &[NodeId], size: Length) -> Result<(), TextEditError> {
         check_size(size)?;
-        let metas = self.text_metas(ids)?;
+        let metas = self.text_content_metas(ids)?;
         for meta in &metas {
             if text_codec::read_size(meta) != Some(size) {
                 text_codec::write_size(meta, size);
@@ -364,9 +369,10 @@ impl Document {
         }
         let ids: Vec<NodeId> = texts.iter().map(|(id, _, _)| *id).collect();
         let metas = self.text_metas(&ids)?;
+        let contents = self.text_content_metas(&ids)?;
         let mut wrote = false;
-        for (meta, (_, layout, placement)) in metas.iter().zip(texts) {
-            wrote |= text_codec::write_layout(meta, layout);
+        for ((meta, content), (_, layout, placement)) in metas.iter().zip(&contents).zip(texts) {
+            wrote |= text_codec::write_layout(content, layout);
             if text_codec::read_placement(meta) != Some(*placement) {
                 text_codec::write_placement(meta, *placement);
                 wrote = true;
@@ -380,6 +386,11 @@ impl Document {
 
     fn text_metas(&self, ids: &[NodeId]) -> Result<Vec<LoroMap>, TextEditError> {
         ids.iter().map(|id| self.text_meta(*id)).collect()
+    }
+
+    /// The meta maps content edits of `ids` write: a text clone's source's (`0080` slice 2).
+    fn text_content_metas(&self, ids: &[NodeId]) -> Result<Vec<LoroMap>, TextEditError> {
+        ids.iter().map(|id| self.text_content_meta(*id)).collect()
     }
 
     pub(crate) fn text_meta(&self, id: NodeId) -> Result<LoroMap, TextEditError> {

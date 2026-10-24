@@ -140,7 +140,7 @@ impl Document {
                 }
                 Planned::Text { meta, result } => {
                     if let ObjectSnapshot::Text(text) = result {
-                        crate::text_codec::write_size_and_placement_if_changed(meta, text);
+                        crate::text_clone_commands::write_transformed(&tree, meta, text);
                     }
                     if write_stroke_width {
                         write_stroke_width_if_changed(meta, Some(result.style().stroke.width));

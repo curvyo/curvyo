@@ -138,3 +138,51 @@ Milestone 4, gate
 - [x] Bug "text slides after double-click, Escape twice, V": regression test
   `bug_no_slide_after_edit_mode_escape_and_v`; not reproducible on this branch at session or
   browser level after the change.
+
+# Plan for text on path, slice 2: several paths
+
+Implementer, 2026-10-24, on `story/text-on-several-paths` (stacked on `story/text-on-path`, PR
+#190). Criteria 37 to 42 and 44; ADR 0022 §4 (accepted) and `adrs.md` decision 12; UX notes §9.
+
+## Affected crates/modules (slice 2)
+
+- `curvyo-document-core`: new `text_clone_codec.rs` (the `text_source` key, the stored parts of a
+  text clone, validation), new `text_clone_read.rs` (each text clone filled from its source in the
+  one read pass and in single reads), new `text_clone_commands.rs` (Put text on paths, Unlink
+  clone, the Style row, the unlink of the clones of a removed source, the content meta a content
+  edit writes to); `TextSnapshot::source`; `clones_of` lists text clones; content commands
+  (string, kerns, font, size, layout) write to the source; Duplicate remaps `text_source` to a
+  copied source; `CURRENT_FORMAT_VERSION` 23, golden `text_clones_v23.curvyo`.
+- `curvyo-ui-core`: clone panel, names, marks and the style scope treat a text clone as a clone
+  (no Placement row); history name "Put text on paths".
+- `curvyo-editor-wasm`: pick set (Shift+click, Enter, second press), the "1" badge, the Select
+  route with several carriers, edit mode on a clone shows the string on every member, Unlink clone
+  and the Style row on text clones, the notices.
+- `frontend`: the clone block hides the Placement row for text clones and words Unlink for a text.
+
+## Tasks (slice 2)
+
+Milestone 5, core (test first)
+- [ ] 14. document-core: `text_source` codec and validation; read pass fills a clone from its
+  source (string, kerns, font, size, layout, style unless own style), own placement and on-path
+  values; orphan when the source is missing or a clone; `clones_of`; single reads (AC 37, 38, 39)
+- [ ] 15. document-core: Put text on paths (first carrier on the text, a clone per further
+  carrier, every carrier a guide, one commit); content commands write to the source; transforms
+  write the size to the source; Unlink clone; the Style row (own style); removal of a source
+  unlinks its clones in the same commit with the count; Object to path of a clone; Duplicate;
+  Undo; two-peer merge; format 23 and golden file (AC 37 to 42)
+- [ ] 16. ui-core: clone block (no Placement row), names "Clone of Text", Select original and
+  Select clones, marks of a selected text clone, style scope skips a clone without own style;
+  timing of 20 clones of 100 characters (AC 40, 44)
+
+Milestone 6, session and frontend
+- [ ] 17. Session: pick set with Shift+click (toggle), Enter and the second press put on the set,
+  the "1" badge and selected look of the picked carriers, the Select route with several carriers,
+  notice "Put text on 3 paths."; edit mode on a clone shows the edit on every member; Unlink clone
+  and Style row on text clones; notice "3 text clones became texts." (AC 37 to 41)
+- [ ] 18. Frontend: clone block without Placement row for text clones, Unlink tooltip; node
+  tests (AC 40)
+
+Milestone 7, gate
+- [ ] 19. Full gate, frontend tsc, npm test, oxlint; Chromium screenshots: one text on three
+  circles, the source text edited, one clone's handle moved, one clone in its own colour.

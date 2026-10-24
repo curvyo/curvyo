@@ -22,6 +22,11 @@ pub fn object_name(read: &ObjectRead, id: NodeId) -> String {
                 prefix.push_str("Clone of ");
                 current = clone.chain.origin;
             }
+            // A text clone follows its source (`specs/0080-text-on-path` criterion 40).
+            Some(ObjectSnapshot::Text(text)) if text.source.is_some() => {
+                prefix.push_str("Clone of ");
+                current = text.source.map_or(current, |source| source.node);
+            }
             Some(object) => {
                 return format!(
                     "{prefix}{} {}",
@@ -110,8 +115,13 @@ pub struct CloneBlock {
     pub deepest: usize,
     /// The name of the deepest selected clone's root original.
     pub root: String,
-    /// The Placement row (`0057` criterion 1).
+    /// The Placement row (`0057` criterion 1), over the path clones.
     pub placement: OverrideState,
+    /// Whether the Placement row is shown: not for text clones, whose placement is always their
+    /// own (`specs/0080-text-on-path` criterion 40).
+    pub placement_row: bool,
+    /// Whether every selected clone is a text clone (Unlink makes texts, criterion 41).
+    pub texts: bool,
     /// The Style row (`0057` criterion 10).
     pub style: OverrideState,
     /// The effective style of the first selected clone, for the greyed Stroke, Fill and Markers
@@ -119,33 +129,64 @@ pub struct CloneBlock {
     pub summary: curvyo_document_core::Style,
 }
 
-/// The block for `selected`, or `None` unless every selected object is a clone.
+/// One selected clone as the block reads it: a linked clone or a text clone.
+struct BlockClone<'a> {
+    id: NodeId,
+    origin: NodeId,
+    root: NodeId,
+    depth: usize,
+    own_placement: Option<bool>,
+    own_style: bool,
+    style: &'a curvyo_document_core::Style,
+}
+
+fn block_clone(object: &ObjectSnapshot) -> Option<BlockClone<'_>> {
+    match object {
+        ObjectSnapshot::Clone(clone) => Some(BlockClone {
+            id: clone.id(),
+            origin: clone.chain.origin,
+            root: clone.chain.root,
+            depth: clone.chain.depth,
+            own_placement: Some(clone.chain.own_placement),
+            own_style: clone.chain.own_style,
+            style: &clone.resolved.style,
+        }),
+        ObjectSnapshot::Text(text) => text.source.map(|source| BlockClone {
+            id: text.id,
+            origin: source.node,
+            root: source.node,
+            depth: 1,
+            own_placement: None,
+            own_style: source.own_style,
+            style: &text.style,
+        }),
+        _ => None,
+    }
+}
+
+/// The block for `selected`, or `None` unless every selected object is a linked clone or a text
+/// clone.
 #[must_use]
 pub fn clone_block(read: &ObjectRead, selected: &[NodeId]) -> Option<CloneBlock> {
     let held: Vec<&ObjectSnapshot> = selected.iter().filter_map(|id| read.get(*id)).collect();
-    let clones: Vec<&CloneSnapshot> = held
-        .iter()
-        .filter_map(|object| match object {
-            ObjectSnapshot::Clone(clone) => Some(clone),
-            _ => None,
-        })
-        .collect();
+    let clones: Vec<BlockClone<'_>> = held.iter().filter_map(|o| block_clone(o)).collect();
     if clones.is_empty() || clones.len() != held.len() {
         return None;
     }
     let first = clones
         .iter()
-        .min_by_key(|clone| read.index.get(&clone.id()))
-        .copied()?;
-    let deepest = clones.iter().max_by_key(|clone| clone.chain.depth)?;
+        .min_by_key(|clone| read.index.get(&clone.id))?;
+    let deepest = clones.iter().max_by_key(|clone| clone.depth)?;
     Some(CloneBlock {
         count: clones.len(),
-        original: object_name(read, first.chain.origin),
-        deepest: deepest.chain.depth,
-        root: object_name(read, deepest.chain.root),
-        placement: OverrideState::of(clones.iter().map(|clone| clone.chain.own_placement)),
-        style: OverrideState::of(clones.iter().map(|clone| clone.chain.own_style)),
-        summary: first.resolved.style.clone(),
+        original: object_name(read, first.origin),
+        deepest: deepest.depth,
+        root: object_name(read, deepest.root),
+        placement: OverrideState::of(clones.iter().filter_map(|clone| clone.own_placement)),
+        placement_row: clones.iter().all(|clone| clone.own_placement.is_some()),
+        texts: clones.iter().all(|clone| clone.own_placement.is_none()),
+        style: OverrideState::of(clones.iter().map(|clone| clone.own_style)),
+        summary: first.style.clone(),
     })
 }
 
@@ -168,8 +209,8 @@ pub fn followers_of(read: &ObjectRead, selected: &[NodeId]) -> (usize, usize) {
 pub fn select_originals(read: &ObjectRead, selected: &[NodeId]) -> Vec<NodeId> {
     in_stacking_order(
         read,
-        selected_clones(read, selected)
-            .map(|clone| clone.chain.origin)
+        selected_links(read, selected)
+            .map(|(origin, _)| origin)
             .collect(),
     )
 }
@@ -179,8 +220,8 @@ pub fn select_originals(read: &ObjectRead, selected: &[NodeId]) -> Vec<NodeId> {
 pub fn select_root_originals(read: &ObjectRead, selected: &[NodeId]) -> Vec<NodeId> {
     in_stacking_order(
         read,
-        selected_clones(read, selected)
-            .map(|clone| clone.chain.root)
+        selected_links(read, selected)
+            .map(|(_, root)| root)
             .collect(),
     )
 }
@@ -201,14 +242,15 @@ pub fn select_clones(read: &ObjectRead, selected: &[NodeId]) -> Vec<NodeId> {
     )
 }
 
-fn selected_clones<'a>(
+/// The direct and root original of each selected linked clone or text clone.
+fn selected_links<'a>(
     read: &'a ObjectRead,
     selected: &'a [NodeId],
-) -> impl Iterator<Item = &'a CloneSnapshot> + 'a {
-    selected.iter().filter_map(|id| match read.get(*id) {
-        Some(ObjectSnapshot::Clone(clone)) => Some(clone),
-        _ => None,
-    })
+) -> impl Iterator<Item = (NodeId, NodeId)> + 'a {
+    selected
+        .iter()
+        .filter_map(|id| read.get(*id).and_then(block_clone))
+        .map(|clone| (clone.origin, clone.root))
 }
 
 /// `ids` once each, in the stacking order of the read.
