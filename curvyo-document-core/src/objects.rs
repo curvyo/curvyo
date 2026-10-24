@@ -626,9 +626,10 @@ fn copy_map(from: &loro::LoroMap, into: &loro::LoroMap, skip: &[&str]) {
                     }
                 }
             }
+            // The string with its per-character values (ADR 0021 §4).
             ValueOrContainer::Container(Container::Text(text)) => {
                 let nested = into.insert_container(&key, loro::LoroText::new()).unwrap();
-                nested.insert(0, &text.to_string()).unwrap();
+                crate::text_chars::copy_text(text, &nested).unwrap();
             }
             // No other container kind is stored today; its plain value keeps
             // the data, and the deep-value test of a copy would show the loss.

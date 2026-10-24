@@ -21,8 +21,14 @@ pub(crate) enum Node {
     Map(BTreeMap<String, Node>),
     /// A movable list container.
     List(Vec<Node>),
-    /// A text container (a text object's string, `specs/0074-text-objects`).
-    Text(String),
+    /// A text container (a text object's string, `specs/0074-text-objects`) with its
+    /// per-character values (ADR 0021 §5).
+    Text {
+        /// The string.
+        string: String,
+        /// Its characters' values.
+        chars: crate::text_chars::TextChars,
+    },
 }
 
 impl Node {
@@ -34,7 +40,10 @@ impl Node {
             ValueOrContainer::Container(Container::MovableList(list)) => {
                 Self::List(read_list(list))
             }
-            ValueOrContainer::Container(Container::Text(text)) => Self::Text(text.to_string()),
+            ValueOrContainer::Container(Container::Text(text)) => Self::Text {
+                string: text.to_string(),
+                chars: crate::text_chars::read_chars(text),
+            },
             // No other container kind is stored; its flattened value keeps the data.
             ValueOrContainer::Container(_) => Self::Value(child.get_deep_value()),
         }

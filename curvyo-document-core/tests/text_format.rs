@@ -9,8 +9,8 @@ use std::path::PathBuf;
 
 use curvyo_document_core::{
     Affine, Angle, CURRENT_FORMAT_VERSION, CURRENT_LORO_SNAPSHOT_VERSION, Document, FontRef,
-    Length, NodeId, ObjectSnapshot, OpenError, TextEditError, TextLayoutValues, TextSnapshot, pack,
-    unpack,
+    Length, NodeId, ObjectSnapshot, OpenError, TextChars, TextEditError, TextLayoutValues,
+    TextSnapshot, pack, unpack,
 };
 use loro::{LoroDoc, TreeID};
 
@@ -205,7 +205,7 @@ fn ac13_ac31_commands_are_one_step_and_checked() {
     );
     let long = "x".repeat(curvyo_document_core::MAX_TEXT_CHARS + 1);
     assert_eq!(
-        d.edit_text_string(ids[0], &long),
+        d.edit_text(ids[0], &long, &TextChars::default()),
         Err(TextEditError::TooLong)
     );
     let placement = Affine::IDENTITY;
@@ -228,12 +228,15 @@ fn ac13_ac31_commands_are_one_step_and_checked() {
 #[test]
 fn ac09_undo_of_an_edit_and_per_character_merge() {
     let (a, ids) = golden_document();
-    a.edit_text_string(ids[0], "Curvyo text").unwrap();
+    a.edit_text(ids[0], "Curvyo text", &TextChars::default())
+        .unwrap();
     a.undo_step(a.own_steps().last().unwrap().step).unwrap();
     assert_eq!(a.text(ids[0]).unwrap().string, "Curvyo");
     let b = unpack(9, &pack(&a, "t").unwrap()).unwrap();
-    a.edit_text_string(ids[0], "My Curvyo").unwrap();
-    b.edit_text_string(ids[0], "Curvyo!").unwrap();
+    a.edit_text(ids[0], "My Curvyo", &TextChars::default())
+        .unwrap();
+    b.edit_text(ids[0], "Curvyo!", &TextChars::default())
+        .unwrap();
     for (from, to) in [(&a, &b), (&b, &a)] {
         to.import_updates(&from.export_updates(&to.version()).unwrap())
             .unwrap();
@@ -249,20 +252,30 @@ fn ac09_undo_of_an_edit_and_per_character_merge() {
 fn ac31_a_merge_past_the_typing_limit_opens() {
     let (a, ids) = golden_document();
     let b = unpack(9, &pack(&a, "t").unwrap()).unwrap();
-    a.edit_text_string(ids[0], &format!("{}Curvyo", "a".repeat(6000)))
-        .unwrap();
-    b.edit_text_string(ids[0], &format!("Curvyo{}", "b".repeat(6000)))
-        .unwrap();
+    a.edit_text(
+        ids[0],
+        &format!("{}Curvyo", "a".repeat(6000)),
+        &TextChars::default(),
+    )
+    .unwrap();
+    b.edit_text(
+        ids[0],
+        &format!("Curvyo{}", "b".repeat(6000)),
+        &TextChars::default(),
+    )
+    .unwrap();
     sync(&a, &b);
     let merged = a.text(ids[0]).unwrap().string;
     assert_eq!(merged.chars().count(), 12_006);
     let opened = unpack(3, &pack(&a, "t").unwrap()).unwrap();
     assert_eq!(opened.text(ids[0]).unwrap().string, merged);
     assert_eq!(
-        opened.edit_text_string(ids[0], &format!("{merged}c")),
+        opened.edit_text(ids[0], &format!("{merged}c"), &TextChars::default()),
         Err(TextEditError::TooLong)
     );
-    opened.edit_text_string(ids[0], &merged[1..]).unwrap();
+    opened
+        .edit_text(ids[0], &merged[1..], &TextChars::default())
+        .unwrap();
 }
 
 /// Architect review m2, must-fix 3: a turn writes the placement, never the size register.
@@ -296,7 +309,7 @@ fn ac26_rotations_leave_the_size_register_alone() {
 fn ac08_emptying_an_existing_text_removes_it_in_one_step() {
     let (d, ids) = golden_document();
     let steps = d.own_steps().len();
-    d.edit_text_string(ids[1], "").unwrap();
+    d.edit_text(ids[1], "", &TextChars::default()).unwrap();
     assert!(d.text(ids[1]).is_none());
     assert_eq!(d.own_steps().len(), steps + 1);
     assert_eq!(d.own_steps().last().unwrap().label, "edit_text");

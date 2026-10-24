@@ -220,7 +220,7 @@ fn ac08_ligatures_off_kerning_on() {
         let d = LayoutOptions::default();
         let o = LayoutOptions {
             letter_spacing: Mm(1.0),
-            ..d
+            ..d.clone()
         };
         let tight = lay(face, "fi", 10.0, &d);
         let spaced = lay(face, "fi", 10.0, &o);
@@ -254,7 +254,7 @@ fn ac09_word_spacing() {
         let d = LayoutOptions::default();
         let o = LayoutOptions {
             word_spacing: Mm(3.0),
-            ..d
+            ..d.clone()
         };
         let w = |l: &TextLayout| {
             let (a, b) = ext(l, 0);
@@ -451,7 +451,7 @@ fn edge_degenerate_strings() {
         };
         for text in ["", " ", "   ", "\n\n", " \n ", "A", "A\n"] {
             for align in [Align::Left, Align::Centre, Align::Right, Align::Justify] {
-                let l = lay(face, text, 10.0, &LayoutOptions { align, ..o });
+                let l = lay(face, text, 10.0, &LayoutOptions { align, ..o.clone() });
                 assert!(!l.lines.is_empty(), "{text:?}");
                 let b = l.line_box();
                 assert!(b.is_finite(), "{text:?} {align:?}: {b:?}");

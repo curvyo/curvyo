@@ -43,7 +43,9 @@ mod tests {
             cluster: 0,
             centre_x: Mm(5.0),
             centre_y: Mm(-5.0),
+            baseline: Mm(0.0),
             upright: false,
+            rotation_rad: 0.0,
         };
         let map = glyph_to_text(&placed, Affine::IDENTITY, 10.0, std::f64::consts::FRAC_PI_2);
         // The em point (0.5, -1.0) is (5, -10) in text space, 5 mm above the pivot (5, -5).

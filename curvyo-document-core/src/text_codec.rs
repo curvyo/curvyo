@@ -24,6 +24,7 @@
 //!                    its default is deleted, never written; an unknown code reads as the
 //!                    default, a non-finite number as the default, a factor out of range is
 //!                    clamped
+//!   text_string marks kern_x, kern_y: per character (format 21, ADR 0021, `crate::text_chars`)
 //!   + the style keys of a path (`style_codec`), `name`, `visible`, `locked`, `opacity`
 //! ```
 //!
@@ -84,6 +85,7 @@ pub(crate) fn write_text(meta: &LoroMap, text: &TextSnapshot) {
     // invariant: inserting into a fresh attached text at position 0 cannot fail.
     #[allow(clippy::unwrap_used)]
     string.insert(0, &text.string).unwrap();
+    crate::text_chars::write_chars(&string, &text.chars);
     write_font(meta, &text.font);
     write_size(meta, text.size);
     write_placement(meta, text.placement);
@@ -331,12 +333,14 @@ pub(crate) fn read_placement(meta: &LoroMap) -> Option<Affine> {
 /// The text node `id` as stored, or `None` when a register is missing or damaged (merge residue
 /// after open-file validation; the readers skip such a node).
 pub(crate) fn read_text_snapshot(id: NodeId, meta: &LoroMap) -> Option<TextSnapshot> {
+    let string = string_container(meta)?;
     Some(TextSnapshot {
         id,
-        string: string_container(meta)?.to_string(),
+        string: string.to_string(),
         font: read_font(meta)?,
         size: read_size(meta)?,
         layout: read_layout(meta),
+        chars: crate::text_chars::read_chars(&string),
         placement: read_placement(meta)?,
         style: crate::style_codec::read_style(meta),
         outline: None,
@@ -392,6 +396,7 @@ mod tests {
             },
             size: Length::from_mm(12.5),
             layout: TextLayoutValues::DEFAULT,
+            chars: crate::text_chars::TextChars::default(),
             placement: Affine::new(0.0, 1.0, -1.0, 0.0, 3.0, 4.0),
             style: Style::default(),
             outline: None,

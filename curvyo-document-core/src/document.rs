@@ -225,7 +225,14 @@ pub struct DocumentVersion(pub(crate) loro::Frontiers);
 /// file of this build as too new. Migration from version 19 is none: absent keys are horizontal
 /// and auto, a value at its default is never written, an unknown code reads as the default. The
 /// number is provisional by the rule above. Golden: `text_layout_v20.curvyo`.
-pub const CURRENT_FORMAT_VERSION: u32 = 20;
+///
+/// Bumped to 21 in `text-kerning` (ADR 0021 §7): a text's string may carry the per-character marks
+/// `kern_x` and `kern_y` (factors of the size, one mark per character). A build that stops at
+/// version 20 reads the string without its marks and would draw a kerned text unkerned without a
+/// word, so it must refuse every file of this build as too new. Migration from version 20 is none:
+/// a string without marks reads as before. The number is provisional by the rule above. Golden:
+/// `text_layout_v21.curvyo`.
+pub const CURRENT_FORMAT_VERSION: u32 = 21;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";
@@ -311,6 +318,7 @@ impl Document {
         // recorded operations yet cannot fail.
         #[allow(clippy::unwrap_used)]
         loro.set_peer_id(peer_id).unwrap();
+        crate::text_chars::configure(&loro);
         let root = loro.get_map(ROOT_MAP);
         let size = DocumentSize::default();
         // invariant: inserting known-valid keys into a freshly created,
@@ -371,6 +379,7 @@ impl Document {
         // recorded operations yet cannot fail.
         #[allow(clippy::unwrap_used)]
         loro.set_peer_id(peer_id).unwrap();
+        crate::text_chars::configure(&loro);
         loro.import(bytes).map_err(|_| OpenError::Damaged)?;
         if !crate::path_codec::validate_path_tree(&loro, OBJECTS_TREE)
             || !crate::document_background::validate(&loro)
@@ -627,6 +636,9 @@ enum ObjectJson {
         /// The layout values (`specs/0079-text-layout-controls`); left out at their defaults.
         #[serde(skip_serializing_if = "crate::text_model::TextLayoutValues::is_default")]
         layout: crate::text_model::TextLayoutValues,
+        /// The per-character values (ADR 0021); left out when there are none.
+        #[serde(skip_serializing_if = "crate::text_chars::TextChars::is_empty")]
+        chars: crate::text_chars::TextChars,
         placement: crate::affine::Affine,
         style: crate::style_model::Style,
     },
@@ -709,6 +721,7 @@ impl From<crate::primitive_model::ObjectSnapshot> for ObjectJson {
                 font: text.font,
                 size: text.size,
                 layout: text.layout,
+                chars: text.chars,
                 placement: text.placement,
                 style: text.style,
             },

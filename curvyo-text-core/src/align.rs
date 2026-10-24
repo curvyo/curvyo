@@ -1,6 +1,7 @@
 //! The per-line shift and the justify widths of a laid-out text (`specs/0079-text-layout-controls`
 //! criteria 2 and 3).
 
+use crate::layout::LineLayout;
 use crate::units::Mm;
 
 /// How the lines of a text sit on the anchor's x.
@@ -44,6 +45,25 @@ pub(crate) fn shift(align: Align, start: Mm, end: Mm) -> f64 {
         Align::Left | Align::Justify => 0.0,
         Align::Centre => -(start.0 + end.0) / 2.0,
         Align::Right => -end.0,
+    }
+}
+
+impl LineLayout {
+    /// Moves the line by `dx` along its baseline: glyphs, extent and caret boundaries alike, so
+    /// caret and drawing never disagree.
+    pub(crate) fn shift(&mut self, dx: f64) {
+        if dx == 0.0 {
+            return;
+        }
+        self.start.0 += dx;
+        self.extent = Mm(self.extent.start.0 + dx)..Mm(self.extent.end.0 + dx);
+        for glyph in &mut self.glyphs {
+            glyph.origin.x += dx;
+            glyph.centre_x.0 += dx;
+        }
+        for (_, x) in &mut self.boundaries {
+            x.0 += dx;
+        }
     }
 }
 

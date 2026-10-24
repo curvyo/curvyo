@@ -75,6 +75,7 @@ impl Document {
             .map_err(|_| HistoryError::Wipe)?;
         let fresh = LoroDoc::new();
         fresh.set_peer_id(peer).map_err(|_| HistoryError::Wipe)?;
+        crate::text_chars::configure(&fresh);
         fresh.import(&bytes).map_err(|_| HistoryError::Wipe)?;
         if !crate::path_codec::validate_path_tree(&fresh, OBJECTS_TREE) {
             return Err(HistoryError::Wipe);

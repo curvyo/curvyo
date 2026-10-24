@@ -9,6 +9,7 @@
 #![forbid(unsafe_code)]
 
 mod align;
+mod char_offsets;
 mod error;
 mod face;
 mod face_store;
@@ -32,6 +33,7 @@ mod vertical_orientation;
 mod writing_mode;
 
 pub use align::Align;
+pub use char_offsets::CharOffset;
 pub use error::TextError;
 pub use face::{Face, FaceKind, FaceMetrics};
 pub use face_store::{FaceHash, FaceKey, FaceStore};
