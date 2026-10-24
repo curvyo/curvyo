@@ -2,12 +2,13 @@
 //! metrics and its glyph outlines.
 
 use std::collections::BTreeMap;
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, Mutex, OnceLock, PoisonError};
 
 use harfrust::font::Kind;
 use skrifa::{FontRef, MetadataProvider};
 
 use crate::error::TextError;
+use crate::glyph_list::ListedChar;
 use crate::outline::{GlyphOutline, draw_glyph};
 use crate::svg_font::{SvgFont, parse_svg_font};
 
@@ -67,6 +68,8 @@ pub struct Face {
     index: u32,
     units_per_em: f64,
     metrics: FaceMetrics,
+    /// The characters the face lists, built on first use (`glyph_list.rs`).
+    pub(crate) listed: OnceLock<Arc<[ListedChar]>>,
 }
 
 impl std::fmt::Debug for Face {
@@ -117,6 +120,7 @@ impl Face {
             index,
             units_per_em,
             metrics: DEFAULT_METRICS,
+            listed: OnceLock::new(),
         };
         face.metrics = face.read_metrics();
         Ok(face)
@@ -148,6 +152,7 @@ impl Face {
             index,
             units_per_em: upem,
             metrics,
+            listed: OnceLock::new(),
         })
     }
 
@@ -205,18 +210,33 @@ impl Face {
             if c.is_whitespace() || c.is_control() || missing.contains(&c) {
                 continue;
             }
-            let glyph = match &self.source {
-                Source::OpenType { shaper, .. } => shaper
-                    .charmap()
-                    .map_unicode(c)
-                    .map_or(0, harfrust::GlyphId::to_u32),
-                Source::Svg(font) => font.glyph_of(c),
-            };
-            if glyph == 0 {
+            if self.glyph_for(c) == 0 {
                 missing.push(c);
             }
         }
         missing
+    }
+
+    /// The glyph the face draws `c` with, 0 when it has none (`.notdef`, or an SVG font's
+    /// `<missing-glyph>`): the one presence check of the missing-glyph marker and the glyph table
+    /// (`specs/0082-glyph-table` criterion 9, `adrs.md` decision 1).
+    #[must_use]
+    pub fn glyph_for(&self, c: char) -> u32 {
+        match &self.source {
+            Source::OpenType { shaper, .. } => shaper
+                .charmap()
+                .map_unicode(c)
+                .map_or(0, harfrust::GlyphId::to_u32),
+            Source::Svg(font) => font.glyph_of(c),
+        }
+    }
+
+    /// The bytes of an OpenType face; `None` for an SVG font.
+    pub(crate) fn open_type_bytes(&self) -> Option<&[u8]> {
+        match &self.source {
+            Source::OpenType { bytes, .. } => Some(bytes),
+            Source::Svg(_) => None,
+        }
     }
 
     /// The face's metrics in em units.

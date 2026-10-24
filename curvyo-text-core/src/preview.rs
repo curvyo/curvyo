@@ -33,21 +33,38 @@ pub fn preview_path_within(face: &Face, text: &str, width_caps: f64) -> Option<(
     }
     let mut d = String::new();
     for path in laid.glyph_paths(face) {
-        for element in path.elements() {
-            let _ = match *element {
-                PathEl::MoveTo(p) => write!(d, "M{:.4} {:.4}", p.x, p.y),
-                PathEl::LineTo(p) => write!(d, "L{:.4} {:.4}", p.x, p.y),
-                PathEl::QuadTo(a, p) => write!(d, "Q{:.4} {:.4} {:.4} {:.4}", a.x, a.y, p.x, p.y),
-                PathEl::CurveTo(a, b, p) => write!(
-                    d,
-                    "C{:.4} {:.4} {:.4} {:.4} {:.4} {:.4}",
-                    a.x, a.y, b.x, b.y, p.x, p.y
-                ),
-                PathEl::ClosePath => write!(d, "Z"),
-            };
-        }
+        push_path_data(&mut d, &path, 1.0);
     }
     Some((d, laid.line_box()))
+}
+
+/// Appends `path` scaled by `scale` to `d` as SVG path data, four decimals.
+pub(crate) fn push_path_data(d: &mut String, path: &kurbo::BezPath, scale: f64) {
+    for element in path.elements() {
+        let _ = match *element {
+            PathEl::MoveTo(p) => write!(d, "M{:.4} {:.4}", p.x * scale, p.y * scale),
+            PathEl::LineTo(p) => write!(d, "L{:.4} {:.4}", p.x * scale, p.y * scale),
+            PathEl::QuadTo(a, p) => write!(
+                d,
+                "Q{:.4} {:.4} {:.4} {:.4}",
+                a.x * scale,
+                a.y * scale,
+                p.x * scale,
+                p.y * scale
+            ),
+            PathEl::CurveTo(a, b, p) => write!(
+                d,
+                "C{:.4} {:.4} {:.4} {:.4} {:.4} {:.4}",
+                a.x * scale,
+                a.y * scale,
+                b.x * scale,
+                b.y * scale,
+                p.x * scale,
+                p.y * scale
+            ),
+            PathEl::ClosePath => write!(d, "Z"),
+        };
+    }
 }
 
 #[cfg(test)]
