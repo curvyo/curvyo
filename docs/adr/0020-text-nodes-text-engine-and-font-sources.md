@@ -212,6 +212,10 @@ budget for the text engine 1.3 MiB uncompressed). Details in `specs/0074-text-ob
   letter spacing turns `liga`, `clig` and `calt` off, glyphs turn about their cluster's centre;
   drawing, the edit session, the hit box and Object to path share that one layout.
 
+- 2026-10-24, customer: the wasm size budget for the text engine (2 MiB since 2026-10-20) is
+  withdrawn; there is no hard budget. The size is tracked as the open entry "Editor wasm size" in
+  `docs/technical-debt.md`, with `wasm-opt -Oz` and loading the engine on first use as the levers.
+
 ## Consequences
 
 - One more leaf kind: an arm in every exhaustive match, as images took.
