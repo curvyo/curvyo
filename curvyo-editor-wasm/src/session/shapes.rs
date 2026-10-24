@@ -144,6 +144,9 @@ impl Session {
     /// own. `None` otherwise.
     #[must_use]
     pub fn live_readout(&self) -> Option<LiveReadout> {
+        if let Some(readout) = self.text_path_readout() {
+            return Some(readout);
+        }
         if self.tool == Tool::Select {
             return self.select_live_readout();
         }

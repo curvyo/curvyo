@@ -258,6 +258,10 @@ impl Session {
         &self,
         objects: &[ObjectSnapshot],
     ) -> TransformDecorationInput {
+        // A text on path has its own handles (`0080` criteria 15, 20, 21), also in the Text tool.
+        if let Some(handles) = self.text_path_handles() {
+            return handles;
+        }
         if self.tool != Tool::Select {
             return TransformDecorationInput::default();
         }

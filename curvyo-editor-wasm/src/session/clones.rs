@@ -278,11 +278,22 @@ impl Session {
     }
 
     /// The sentence the clone repair of the last command adds to its notice (criterion 31):
-    /// "3 clones became paths.", "2 clones now follow their next original.", both, or empty.
+    /// "3 clones became paths.", "2 clones now follow their next original.", both, or empty;
+    /// before them "1 text kept its path." when a removed carrier left its outline to texts
+    /// (`specs/0080-text-on-path` criterion 25).
     /// Read it once after a command that removes objects.
     pub fn take_clone_repair_notice(&mut self) -> String {
         let repair = self.document.take_clone_repair();
+        let kept = self.document.take_kept_carriers();
         let mut parts = Vec::new();
+        // The texts on a removed carrier keep its outline (`specs/0080-text-on-path` criterion 25).
+        if kept > 0 {
+            parts.push(if kept == 1 {
+                "1 text kept its path.".to_owned()
+            } else {
+                format!("{kept} texts kept their paths.")
+            });
+        }
         if repair.unlinked > 0 {
             parts.push(if repair.unlinked == 1 {
                 "1 clone became a path.".to_owned()

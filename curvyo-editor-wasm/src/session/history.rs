@@ -103,6 +103,7 @@ impl Session {
         self.sync_context();
         // The repair count belongs to this command alone (review S2).
         let _ = self.document.take_clone_repair();
+        let _ = self.document.take_kept_carriers();
         let _ = self.document.take_clone_refusal();
         let before = self.selection_snapshot();
         self.document.set_step_time((self.history.clock)());

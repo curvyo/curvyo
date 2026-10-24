@@ -94,6 +94,15 @@ impl Session {
             live.as_ref().map(|l| &l.objects[..]),
         );
         list.extend(clone_previews);
+        // The texts on a dragged carrier follow it in the same frame (`0080` criterion 24).
+        list.extend(self.text_path_follower_list(
+            view,
+            &objects,
+            &paths,
+            live.as_ref().map(|l| &l.objects[..]),
+        ));
+        // Carrier lines, pick mode's hover and preview, a text dragged along its carrier.
+        list.extend(self.text_path_draw_list(view));
         // The Offset tool: the blue hollow result, the box and its four handles
         // (`specs/0038-path-offset` criteria 9, 14, 18).
         list.extend(self.offset_draw_list(view));
