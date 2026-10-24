@@ -1592,6 +1592,10 @@ bytes, measured against `main` at `5535342`). The character names stay outside t
 (`frontend/public/unicode/names-17.0.0.bin`, 370,854 bytes, fetched on the first Glyphs open). About
 179 KiB of the 2 MiB budget are left.
 
+**Vertical text (`0079` slice 3, 2026-10-24):** +23,269 bytes (22.7 KiB; +5.4 KiB gzip -9) against
+`main` at `90de814` (after `0082`), measured the same way; the UAX #50 table is 792 bytes of it. About
+156 KiB of the 2 MiB budget remain.
+
 ## The clone frame budget is not asserted on CI (`0049` criterion 44, 2026-10-24)
 
 The absolute frame budget of 150 ms after the original of 10,000 clones moved (`0049` criterion 44,
