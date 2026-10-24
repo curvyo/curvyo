@@ -1,0 +1,183 @@
+# Size of the release editor wasm (docs/technical-debt.md "Editor wasm size").
+#
+#   wasm-size         — pull requests: builds curvyo_editor_wasm_bg.wasm with
+#                        frontend/scripts/build-wasm.sh, measures raw and
+#                        `gzip -9` bytes and writes them, with the delta
+#                        against the newest main row of branch
+#                        metrics/wasm-size, to the job summary. Never fails
+#                        on size.
+#   wasm-size-record  — push to main: the same measurement, then appends a row
+#                        to wasm-size.csv on metrics/wasm-size and regenerates
+#                        wasm-size.md and wasm-size.svg there
+#                        (tools/metrics/wasm_size_report.py, standard library
+#                        only). The only job with `contents: write`.
+#
+# Own file rather than ci.yml so its write permission and its queueing
+# concurrency group stay apart from the gate. The wasm-bindgen CLI is installed
+# the same way as in ci.yml's frontend job; Swatinem/rust-cache keeps
+# ~/.cargo/bin, so a cached run skips the install.
+name: wasm size
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wasm-size-${{ github.event_name }}-${{ github.ref }}
+  # A push to main never cancels a running record. GitHub keeps only the
+  # newest pending run of a group, so a burst of three pushes can skip the
+  # middle row; the push retry below covers runs that still overlap.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  wasm-size:
+    name: wasm size
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the pinned Rust toolchain
+        run: rustup show
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install wasm-bindgen CLI matching Cargo.lock
+        run: |
+          set -euo pipefail
+          version=$(grep -A1 '^name = "wasm-bindgen"$' Cargo.lock | grep '^version' | head -1 | sed -E 's/version = "(.*)"/\1/')
+          echo "wasm-bindgen crate version: $version"
+          cargo install wasm-bindgen-cli --version "$version" --locked
+
+      - name: Build the release editor wasm
+        run: bash frontend/scripts/build-wasm.sh
+
+      - name: Measure
+        id: measure
+        run: |
+          set -euo pipefail
+          wasm=frontend/src/wasm-bindings/curvyo_editor_wasm_bg.wasm
+          echo "raw=$(stat -c %s "$wasm")" >> "$GITHUB_OUTPUT"
+          echo "gzip=$(gzip -9 -c "$wasm" | wc -c)" >> "$GITHUB_OUTPUT"
+
+      - name: Read the recorded main values
+        # A missing branch or file only drops the delta from the summary.
+        run: |
+          git fetch --depth=1 origin metrics/wasm-size \
+            && git show FETCH_HEAD:wasm-size.csv > "$RUNNER_TEMP/wasm-size.csv" \
+            || echo "metrics/wasm-size not readable, no delta"
+
+      - name: Job summary
+        run: |
+          python3 tools/metrics/wasm_size_report.py summary \
+            --csv "$RUNNER_TEMP/wasm-size.csv" \
+            --raw "${{ steps.measure.outputs.raw }}" \
+            --gzip "${{ steps.measure.outputs.gzip }}" \
+            --commit "${{ github.event.pull_request.head.sha }}" \
+            >> "$GITHUB_STEP_SUMMARY"
+
+  wasm-size-record:
+    name: wasm size (record)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the pinned Rust toolchain
+        run: rustup show
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install wasm-bindgen CLI matching Cargo.lock
+        run: |
+          set -euo pipefail
+          version=$(grep -A1 '^name = "wasm-bindgen"$' Cargo.lock | grep '^version' | head -1 | sed -E 's/version = "(.*)"/\1/')
+          echo "wasm-bindgen crate version: $version"
+          cargo install wasm-bindgen-cli --version "$version" --locked
+
+      - name: Build the release editor wasm
+        run: bash frontend/scripts/build-wasm.sh
+
+      - name: Measure
+        id: measure
+        run: |
+          set -euo pipefail
+          wasm=frontend/src/wasm-bindings/curvyo_editor_wasm_bg.wasm
+          echo "raw=$(stat -c %s "$wasm")" >> "$GITHUB_OUTPUT"
+          echo "gzip=$(gzip -9 -c "$wasm" | wc -c)" >> "$GITHUB_OUTPUT"
+
+      - name: Find the pull request
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+        # Rebase merges keep the original messages, so ask the API first and
+        # fall back to a "(#123)" or "Merge pull request #123" in the message.
+        run: |
+          set -uo pipefail
+          number=$(gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/pulls" --jq '.[0].number // empty' 2>/dev/null)
+          if [ -z "$number" ]; then
+            number=$(python3 tools/metrics/wasm_size_report.py pr --message "$(git log -1 --format=%B)")
+          fi
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+
+      - name: Job summary
+        run: |
+          set -euo pipefail
+          git fetch --depth=1 origin metrics/wasm-size
+          git show FETCH_HEAD:wasm-size.csv > "$RUNNER_TEMP/wasm-size.csv"
+          python3 tools/metrics/wasm_size_report.py summary \
+            --csv "$RUNNER_TEMP/wasm-size.csv" \
+            --raw "${{ steps.measure.outputs.raw }}" \
+            --gzip "${{ steps.measure.outputs.gzip }}" \
+            --commit "${{ github.sha }}" \
+            >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: metrics/wasm-size
+          path: .metrics
+
+      - name: Record on metrics/wasm-size
+        working-directory: .metrics
+        env:
+          RAW: ${{ steps.measure.outputs.raw }}
+          GZIP: ${{ steps.measure.outputs.gzip }}
+          PR: ${{ steps.pr.outputs.number }}
+          SHA: ${{ github.sha }}
+        # Rebuilt from the remote tip on every attempt, so a row pushed in
+        # between is kept (retry on non-fast-forward). A re-run of the same
+        # commit adds no second row.
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          report="$GITHUB_WORKSPACE/tools/metrics/wasm_size_report.py"
+          for attempt in 1 2 3 4 5; do
+            git fetch origin metrics/wasm-size
+            git reset --hard FETCH_HEAD
+            if grep -q ",$SHA," wasm-size.csv; then
+              echo "row for $SHA already recorded"
+              exit 0
+            fi
+            python3 "$report" append --csv wasm-size.csv --date "$(date -u +%F)" \
+              --commit "$SHA" --pr "$PR" --raw "$RAW" --gzip "$GZIP" --ref main
+            python3 "$report" render --csv wasm-size.csv --md wasm-size.md --svg wasm-size.svg
+            git add wasm-size.csv wasm-size.md wasm-size.svg
+            git commit -q -m "chore: wasm size of ${SHA::7}"
+            if git push origin HEAD:metrics/wasm-size; then
+              exit 0
+            fi
+            echo "push rejected (attempt $attempt), retrying"
+            sleep $((attempt * 5))
+          done
+          exit 1

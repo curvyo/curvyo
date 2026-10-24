@@ -1579,6 +1579,11 @@ optimized module gave byte-identical results to the plain one for `font_file_fac
 `WasmFontChecks::check` and `face_preview_path` over the 17 bundled font files; the pass takes
 about 3 minutes.
 
+**History:** the CI job `wasm size` (`.github/workflows/wasm-size.yml`) writes the size and the
+delta against main to the job summary of every pull request and records a row on every push to
+`main` on branch `metrics/wasm-size`: [table](https://github.com/curvyo/curvyo/blob/metrics/wasm-size/wasm-size.md),
+[chart](https://github.com/curvyo/curvyo/blob/metrics/wasm-size/wasm-size.svg). The rows above seed it.
+
 **No hard budget (customer, 2026-10-24).** The size budgets of ADR 0020 (700 KiB, then 1.3,
 1.4 and 2 MiB) are withdrawn: the size is not squeezed unless it becomes a problem. Features keep
 reporting the size they add.

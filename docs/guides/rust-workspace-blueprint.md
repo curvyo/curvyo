@@ -336,6 +336,10 @@ race each other.
 every crate's artifact and assembles the landing page, then
 `configure-pages` → `upload-pages-artifact` → `deploy-pages`.
 
+**`wasm-size.yml`** (Curvyo) — measures the release editor wasm, reports it in the pull request's
+job summary and records it on push to `main` on branch `metrics/wasm-size`
+(`tools/metrics/wasm_size_report.py`).
+
 **`renovate.yml`** — self-hosted Renovate on a daily cron, reading the
 repo-root `renovate.json` (`{"extends": ["config:recommended"]}` is a
 perfectly good starting point).
