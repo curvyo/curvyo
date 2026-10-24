@@ -24,6 +24,10 @@ impl Session {
             return FlipOutcome::NothingSelected;
         }
         self.select.cancel_entry();
+        // Texts on path alone toggle Mirror letters (`specs/0080-text-on-path` criterion 19).
+        if self.selection_is_texts_on_path() && self.flip_text_paths() {
+            return FlipOutcome::Flipped;
+        }
         self.recording(|this| {
             let objects = this.objects();
             flip_selection(&this.document, &objects, &this.selection, axis)

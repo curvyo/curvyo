@@ -111,6 +111,15 @@ mod text_kerning_tests;
 mod text_layout;
 #[cfg(test)]
 mod text_layout_tests;
+mod text_on_path;
+mod text_on_path_canvas;
+mod text_on_path_drag;
+mod text_on_path_entry;
+mod text_on_path_handle_entry;
+mod text_on_path_options;
+mod text_on_path_pick;
+#[cfg(test)]
+mod text_on_path_tests;
 mod text_path;
 #[cfg(test)]
 mod text_sample_tests;
@@ -170,6 +179,10 @@ pub use split::{BreakApartOutcome, SplitOutcome};
 pub use style_view::StylePanelView;
 pub use text_bar::{TextBarView, TextSizeOutcome};
 pub use text_layout::LayoutOutcome;
+#[cfg(target_arch = "wasm32")]
+pub use text_on_path_handle_entry::TextPathEntryView;
+pub use text_on_path_options::TextPathView;
+pub use text_on_path_pick::TextPathPress;
 pub use text_path::ObjectToPathOutcome;
 pub use text_style::StyleOutcome;
 pub use weld::WeldOutcome;
@@ -382,6 +395,8 @@ pub struct Session {
     fonts: text_fonts::TextFonts,
     /// The Text tool and edit mode (`text.rs`).
     text: text::TextState,
+    /// Pick mode and the drags of a text on path (`text_on_path.rs`).
+    text_path: text_on_path::TextPathState,
 }
 
 impl Session {
@@ -453,6 +468,7 @@ impl Session {
             pen_entries: pen_entry::PenEntryState::default(),
             fonts: text_fonts::TextFonts::default(),
             text: text::TextState::default(),
+            text_path: text_on_path::TextPathState::default(),
         }
     }
 
@@ -520,6 +536,7 @@ impl Session {
             pen_entries: pen_entry::PenEntryState::default(),
             fonts: text_fonts::TextFonts::default(),
             text: text::TextState::default(),
+            text_path: text_on_path::TextPathState::default(),
         };
         // A file another tool wrote can hold clones whose original is gone (`0049` criterion 35).
         session.remove_orphans_after_open();
@@ -570,7 +587,11 @@ impl Session {
             this.cancel_placement();
             // And the Pen entry chip (`0072` criterion 22).
             this.cancel_pen_entry();
-            // A tool switch ends text edit mode as its one step (`0074` criterion 7).
+            // A tool switch ends pick mode without a change (`0080` UX notes §2) and text
+            // edit mode as its one step (`0074` criterion 7).
+            this.text_path.pick = None;
+            this.cancel_text_path_drag();
+            this.cancel_text_path_entry();
             this.finish_text_edit_inner();
             // Leaving the Pen ends its path as drawn (a lone node is dropped): no
             // unfinished path stays behind that the Document section's resize would
@@ -642,6 +663,11 @@ impl Session {
                 this.placement_press(point, modifiers);
                 return;
             }
+            // Pick mode and the drags of a selected text on path take the press (`0080`).
+            if this.text_path_pointer_down(point, shift) {
+                this.button_down = true;
+                return;
+            }
             if this.refuse_drawing_into_layer() {
                 return;
             }
@@ -702,6 +728,9 @@ impl Session {
         if self.colour_pick_move(point) {
             return;
         }
+        if self.text_path_pointer_move(point) {
+            return;
+        }
         match self.tool {
             Tool::Select => {
                 self.select_hover(point, self.held);
@@ -751,6 +780,9 @@ impl Session {
         self.recording(|this| {
             this.button_down = false;
             if this.colour_pick_release() {
+                return;
+            }
+            if this.text_path_pointer_up() {
                 return;
             }
             let Some(point) = sanitized_point(point) else {
@@ -807,6 +839,12 @@ impl Session {
             let Some(point) = sanitized_point(point) else {
                 return DoubleClickHint::None;
             };
+            // On the position handle of a text on path: its entry box (`0080`, customer
+            // 2026-10-24).
+            if matches!(this.tool, Tool::Select | Tool::Text) && this.open_text_path_entry_at(point)
+            {
+                return DoubleClickHint::None;
+            }
             match this.tool {
                 Tool::Pen => this.finish_pen(),
                 Tool::Node => this.insert_at(point),

@@ -240,6 +240,7 @@ impl Session {
             || self.style.pending_edit().is_some()
             || self.select.bar_preview().is_some()
             || self.background_preview.is_some()
+            || self.text_path_dragging()
     }
 
     pub(super) fn pen_path_open(&self) -> bool {
@@ -378,12 +379,19 @@ impl Session {
                 }
             }
             KeyAction::Reorder(how) => self.reorder_selection(how),
-            KeyAction::Nudge(arrow) => self.nudge_selection(NudgeEvent {
-                arrow,
-                shift: input.shift,
-                repeat: input.repeat,
-                time_ms: input.time_ms,
-            }),
+            KeyAction::Nudge(arrow) => {
+                let event = NudgeEvent {
+                    arrow,
+                    shift: input.shift,
+                    repeat: input.repeat,
+                    time_ms: input.time_ms,
+                };
+                // One text on path moves along its carrier (`0080` criterion 21).
+                if self.nudge_text_path(event) {
+                    return KeyOutcome::Nudged { new_run: true };
+                }
+                self.nudge_selection(event)
+            }
         }
     }
 
@@ -446,8 +454,15 @@ impl Session {
         if self.cancel_pen_entry() {
             return EscapeStep::ClosedEntry;
         }
+        if self.cancel_text_path_drag() {
+            return EscapeStep::CancelledDrag;
+        }
         if self.cancel_drag_in_flight() {
             return EscapeStep::CancelledDrag;
+        }
+        // Pick mode ends before the selection clears (`0080` UX notes §2).
+        if self.cancel_text_path_pick() {
+            return EscapeStep::ClearedState;
         }
         // A placement is step 2 too (`0052` criterion 7). It is not in `cancel_drag_in_flight`,
         // which a lost pointer and a window blur also call: those must not cancel it.

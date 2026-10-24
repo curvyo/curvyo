@@ -46,6 +46,10 @@ impl Session {
         if self.colour_pick_target().is_some() {
             return "eyedropper".to_string();
         }
+        // Pick mode and the position handle of a text on path (`0080` UX notes §2, §3.1).
+        if let Some(hint) = self.text_path_cursor() {
+            return hint.to_string();
+        }
         if self.tool == Tool::Offset {
             return self.offset_cursor_hint().to_string();
         }

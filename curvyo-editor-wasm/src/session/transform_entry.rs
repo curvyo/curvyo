@@ -77,7 +77,7 @@ impl EntryFieldView {
 impl Session {
     /// The open entry, if the Select tool is active and its object is still
     /// the sole selection.
-    fn open_entry(&self) -> Option<&TransformEntry> {
+    pub(super) fn open_entry(&self) -> Option<&TransformEntry> {
         if self.tool != Tool::Select {
             return None;
         }
@@ -307,6 +307,10 @@ impl Session {
             {
                 this.select.cancel_entry();
                 return EntryOutcome::Unchanged;
+            }
+            // On a text on an ellipse carrier the angle moves the start (`0080` criterion 20).
+            if let Some(outcome) = this.commit_text_path_rotate_entry(first) {
+                return outcome;
             }
             // A typed corner radius past its limit is committed limited, and says
             // so at the knob for a moment (criterion 6): the notice is built from

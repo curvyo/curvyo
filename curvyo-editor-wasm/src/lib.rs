@@ -90,6 +90,8 @@ mod wasm_text;
 #[cfg(target_arch = "wasm32")]
 mod wasm_text_layout;
 #[cfg(target_arch = "wasm32")]
+mod wasm_text_path;
+#[cfg(target_arch = "wasm32")]
 mod wasm_weld;
 
 pub use font_checks_glue::FontChecksGlue;
@@ -107,6 +109,7 @@ pub use session::{
 };
 pub use session::{DragStop, OFFSET_COMMIT_LABEL, OffsetOutcome, OffsetView};
 pub use session::{LayoutOutcome, ObjectToPathOutcome, StyleOutcome, TextBarView, TextSizeOutcome};
+pub use session::{TextPathPress, TextPathView};
 
 #[cfg(target_arch = "wasm32")]
 pub use wasm_api::{WasmSession, init_panic_hook};

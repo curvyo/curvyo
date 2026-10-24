@@ -136,6 +136,9 @@ impl Session {
 
     /// The caret position of `text` nearest to the document point `point`.
     fn caret_near(&self, text: &TextSnapshot, point: Point) -> usize {
+        if let Some(caret) = self.caret_on_path(text, point) {
+            return caret;
+        }
         let Some(inverse) = text.placement.inverse() else {
             return text.string.len();
         };
@@ -290,6 +293,9 @@ impl Session {
         if !line_box_contains(&snapshot, point, tolerance) {
             return None;
         }
+        if let Some(caret) = self.caret_on_path(&snapshot, point) {
+            return Some(caret);
+        }
         let local = edit.placement.inverse()?.apply_point(point);
         self.layout_of(
             &edit.font,
@@ -308,14 +314,19 @@ impl Session {
             && let Some(edit) = self.text.edit.as_ref()
         {
             let local = edit.placement.inverse().map(|i| i.apply_point(point));
-            let caret = local.and_then(|local| {
-                self.layout_of(
-                    &edit.font,
-                    edit.size,
-                    (&self.edit_layout(edit), &edit.chars()),
-                    edit.string(),
-                )
-                .map(|l| nearest_boundary(&l, local))
+            let on_path = self
+                .laid_out_edit()
+                .and_then(|snapshot| self.caret_on_path(&snapshot, point));
+            let caret = on_path.or_else(|| {
+                local.and_then(|local| {
+                    self.layout_of(
+                        &edit.font,
+                        edit.size,
+                        (&self.edit_layout(edit), &edit.chars()),
+                        edit.string(),
+                    )
+                    .map(|l| nearest_boundary(&l, local))
+                })
             });
             if let Some(caret) = caret {
                 self.text_input(TextInput::Select { anchor, caret });
@@ -501,8 +512,16 @@ impl Session {
         } else {
             edit.selection()
         };
-        let geometry = edit_geometry(&layout, edit.placement, caret, &selection, preedit.as_ref());
         let id = edit_id(edit).unwrap_or(NEW_TEXT_ID);
+        // Along the carrier: the caret and the selection turn with their letters (`0080` criterion
+        // 27).
+        let mut shown_snapshot = edit.snapshot(id);
+        shown_snapshot.layout = self.edit_layout(edit);
+        let geometry = self
+            .edit_geometry_on_path(&shown_snapshot, caret, &selection, preedit.as_ref())
+            .unwrap_or_else(|| {
+                edit_geometry(&layout, edit.placement, caret, &selection, preedit.as_ref())
+            });
         build_text_edit_overlay(
             view,
             &TextEditOverlay {
@@ -528,13 +547,18 @@ impl Session {
             (&self.edit_layout(edit), &edit.shown_chars()),
             &shown,
         )?;
-        let geometry = edit_geometry(
-            &layout,
-            edit.placement,
-            caret,
-            &(caret..caret),
-            preedit.as_ref(),
-        );
+        let snapshot = edit.snapshot(edit_id(edit).unwrap_or(NEW_TEXT_ID));
+        let geometry = self
+            .edit_geometry_on_path(&snapshot, caret, &(caret..caret), preedit.as_ref())
+            .unwrap_or_else(|| {
+                edit_geometry(
+                    &layout,
+                    edit.placement,
+                    caret,
+                    &(caret..caret),
+                    preedit.as_ref(),
+                )
+            });
         let [_, bottom] = geometry.caret?;
         Some(self.view().document_to_screen(bottom))
     }
