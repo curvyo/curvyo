@@ -63,11 +63,18 @@ pub fn layout_options(size: Length, values: &TextLayoutValues, chars: &TextChars
 /// space; `None` when the string is beyond the engine's bound.
 #[must_use]
 pub fn text_layout(text: &TextSnapshot, face: &Face) -> Option<TextLayout> {
+    let mut values = text.layout;
+    if text.on_path.as_ref().is_some_and(|p| p.curve.is_some()) {
+        // A vertical text is set horizontally along a path; its stored mode is kept
+        // (`specs/0080-text-on-path` criterion 48).
+        values.writing_mode = TextWritingMode::Horizontal;
+        values.orientation = TextGlyphOrientation::Auto;
+    }
     layout(
         face,
         &text.string,
         Mm(text.size.as_mm()),
-        &layout_options(text.size, &text.layout, &text.chars),
+        &layout_options(text.size, &values, &text.chars),
     )
     .ok()
 }
@@ -135,6 +142,15 @@ pub fn kept_placement(text: &TextSnapshot, face: &Face, values: &TextLayoutValue
 #[must_use]
 pub fn lay_out(text: &TextSnapshot, face: &Face, substitute: bool) -> Option<TextOutline> {
     let laid = text_layout(text, face)?;
+    if let Some(placement) = text
+        .on_path
+        .as_ref()
+        .and_then(|on_path| crate::text_on_path::PathPlacement::new(&laid, on_path))
+    {
+        return Some(crate::text_on_path::lay_out_on_path(
+            text, face, &laid, &placement, substitute,
+        ));
+    }
     let placement = text.placement;
     let map = |p: kurbo::Point| placement.apply_point(Point::new(p.x, p.y));
     let mut outlines: Vec<SubpathSnapshot> = Vec::new();
@@ -168,6 +184,23 @@ pub fn lay_out(text: &TextSnapshot, face: &Face, substitute: bool) -> Option<Tex
         (line_box.x0, line_box.y1),
     ]
     .map(|(x, y)| placement.apply_point(Point::new(x, y)));
+    let glyphs = glyph_path(text, outlines, text.rotation());
+    Some(TextOutline {
+        glyphs,
+        line_box: corners,
+        glyph_outlines,
+        letter_boxes: Vec::new(),
+        substitute,
+    })
+}
+
+/// The glyphs of `text` as one compound path with its id and style: a single-line text keeps its
+/// fill register but does not apply it (`0076` criterion 8).
+pub(crate) fn glyph_path(
+    text: &TextSnapshot,
+    outlines: Vec<SubpathSnapshot>,
+    rotation: curvyo_document_core::Angle,
+) -> PathSnapshot {
     let mut outlines = outlines.into_iter();
     let first = outlines.next().unwrap_or(SubpathSnapshot {
         closed: true,
@@ -175,23 +208,16 @@ pub fn lay_out(text: &TextSnapshot, face: &Face, substitute: bool) -> Option<Tex
     });
     let mut style = text.style.clone();
     if text.font.kind == FontKind::SingleLine {
-        // The text's own fill register is kept; it is not applied (criterion 8).
         style.fill.enabled = false;
     }
-    let glyphs = PathSnapshot {
+    PathSnapshot {
         id: text.id,
         closed: first.closed,
         style,
         anchors: first.anchors,
         extra_subpaths: outlines.collect(),
-        rotation: text.rotation(),
-    };
-    Some(TextOutline {
-        glyphs,
-        line_box: corners,
-        glyph_outlines,
-        substitute,
-    })
+        rotation,
+    }
 }
 
 /// The contours of one glyph path (cubics and lines only) as outlines of anchors in the
@@ -296,6 +322,7 @@ mod tests {
             placement: Affine::translation(Vec2::new(30.0, 40.0)),
             style: Style::default(),
             outline: None,
+            on_path: None,
         }
     }
 

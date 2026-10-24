@@ -33,11 +33,16 @@ pub fn line_box_bounds(text: &TextSnapshot) -> (Point, Point) {
     )
 }
 
-/// The line box as an oriented box turned by the baseline's angle about its first corner.
+/// The line box as an oriented box turned by the baseline's angle about its first corner; a text
+/// on path has the axis-parallel box of its letters (`specs/0080-text-on-path` criterion 28).
 #[must_use]
 pub fn line_box_oriented(text: &TextSnapshot) -> OrientedBox {
     let corners = line_box_corners(text);
-    let angle = text.rotation();
+    let angle = if on_path_boxes(text).is_some() {
+        Angle::from_radians(0.0)
+    } else {
+        text.rotation()
+    };
     let pivot = corners[0];
     let back = Angle::from_radians(-angle.as_radians());
     let local: Vec<Point> = corners
@@ -62,11 +67,31 @@ pub fn line_box_oriented(text: &TextSnapshot) -> OrientedBox {
     }
 }
 
+/// The turned letter boxes of a text on path, or `None` for a straight text.
+#[must_use]
+pub fn on_path_boxes(text: &TextSnapshot) -> Option<&[[Point; 4]]> {
+    text.outline
+        .as_ref()
+        .map(|outline| outline.letter_boxes.as_slice())
+        .filter(|boxes| !boxes.is_empty())
+}
+
 /// Whether `point` lies inside the line box (a parallelogram once skewed), or within `margin` of
-/// it: a text is hit anywhere inside the box of its lines (criterion 25).
+/// it: a text is hit anywhere inside the box of its lines (criterion 25); a text on path inside
+/// any of its turned letter boxes (`specs/0080-text-on-path` criterion 28).
 #[must_use]
 pub fn line_box_contains(text: &TextSnapshot, point: Point, margin: f64) -> bool {
-    let corners = line_box_corners(text);
+    if let Some(boxes) = on_path_boxes(text) {
+        return boxes
+            .iter()
+            .any(|corners| quad_contains(corners, point, margin));
+    }
+    quad_contains(&line_box_corners(text), point, margin)
+}
+
+/// Whether `point` lies inside the quad `corners` or within `margin` of it.
+fn quad_contains(corners: &[Point; 4], point: Point, margin: f64) -> bool {
+    let corners = *corners;
     let mut sign = 0.0_f64;
     let mut inside = true;
     for i in 0..4 {

@@ -119,6 +119,9 @@ mod text_edit;
 mod text_edit_chars;
 mod text_layout;
 mod text_layout_fields;
+mod text_on_path;
+mod text_path_caret;
+mod text_path_edit;
 mod transform_commit;
 mod transform_drag;
 mod transform_entry;
@@ -340,7 +343,7 @@ pub use style_scope::{
     StyleScope, StyleTool, is_single_line_text, object_kind_name, owns_style, skipped_clones,
     skipped_single_line_texts, style_scope, style_scope_in,
 };
-pub use text_box::{line_box_contains, line_box_corners};
+pub use text_box::{line_box_contains, line_box_corners, on_path_boxes};
 pub use text_caret::{TextEditGeometry, edit_geometry, nearest_boundary};
 pub use text_convert::{
     TextRefusal, area_refusal, build_text_conversions, text_path, texts_as_paths, texts_refusal,
@@ -350,6 +353,13 @@ pub use text_layout::{kept_placement, lay_out, layout_options, realigned_placeme
 pub use text_layout_fields::{
     LayoutChange, LayoutField, LayoutFieldView, LayoutSubject, field_view, parse_field_text,
     set_field, stepped, value_at,
+};
+pub use text_on_path::{PathPlacement, lay_out_on_path, measure_of};
+pub use text_path_caret::{edit_geometry_on_path, nearest_boundary_on_path};
+pub use text_path_edit::{
+    default_position, dragged_values, ellipse_degrees, ellipse_point, handle_points,
+    nearest_outline, nudged_values, position_at_degrees, projected_values, release_placement,
+    rotated_position, shift_along, slid_values, snap_stops, stored_vertical_layout,
 };
 pub use transform_drag::{
     CornerLinking, CornerRadiusScaling, ParamDragInfo, ScaleModes, StrokeScaling,
