@@ -196,7 +196,12 @@ impl Session {
                     self.selection.select_single(id);
                 }
             }
-            Ok(Finished::Removed(_)) => self.selection.clear(),
+            Ok(Finished::Removed(_)) => {
+                self.selection.clear();
+                // "2 text clones became texts." when the emptied text was a source (lead
+                // decision 1, `0080` criterion 41).
+                self.text_path.notice = self.text_clones_unlinked_sentence();
+            }
             // The node went meanwhile (a peer removed it): what was typed is kept as a new text,
             // and a write that still fails is said, never dropped silently.
             Err(_) => {
@@ -241,6 +246,16 @@ impl Session {
             let Some(caret) = this.text.edit.as_ref().map(TextEdit::caret) else {
                 return;
             };
+            // An emptied text stays in edit mode, unwritten, until edit mode ends (lead decision
+            // 1 of `0080` slice 2): a Save never removes it.
+            if this
+                .text
+                .edit
+                .as_ref()
+                .is_some_and(|e| e.string().is_empty())
+            {
+                return;
+            }
             this.finish_text_edit_inner();
             if let Some(&id) = this.selection.ids().first()
                 && let Some(text) = this.document.text(id)
@@ -467,6 +482,11 @@ impl Session {
             return objects;
         }
         let mut objects = objects.into_owned();
+        if let Some(edited) = &edited {
+            // The source and its text clones show the edit in the same frame (`0080` criterion
+            // 38).
+            self.show_edit_on_members(&mut objects, edited);
+        }
         if previewing {
             for object in &mut objects {
                 if let ObjectSnapshot::Text(text) = object

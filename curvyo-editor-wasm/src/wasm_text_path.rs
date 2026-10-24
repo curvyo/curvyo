@@ -71,6 +71,24 @@ impl WasmSession {
         self.session.text_path_picking()
     }
 
+    /// Enter in pick mode: puts the text on the pick set (slice 2). Returns whether pick mode ran.
+    pub fn confirm_text_path_pick(&mut self) -> bool {
+        self.session.confirm_text_path_pick()
+    }
+
+    /// The canvas notice of the last put on several paths ("Put text on 3 paths."), once.
+    pub fn take_text_path_notice(&mut self) -> String {
+        self.session.take_text_path_notice()
+    }
+
+    /// Where the "1" badge of the pick set sits, canvas px as `[x, y]`; empty without one.
+    #[must_use]
+    pub fn text_path_pick_badge(&self) -> Vec<f64> {
+        self.session
+            .text_path_pick_badge()
+            .map_or_else(Vec::new, |(x, y)| vec![x, y])
+    }
+
     /// A right click or Escape in pick mode: it ends without a change. Returns whether it ran.
     pub fn cancel_text_path_pick(&mut self) -> bool {
         self.session.cancel_text_path_pick()

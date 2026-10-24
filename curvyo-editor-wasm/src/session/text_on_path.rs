@@ -23,6 +23,9 @@ pub(super) struct TextPathState {
     pub(super) entry: Option<HandleEntry>,
     /// The polite announcement after a put ("Put on path"), until the host takes it.
     pub(super) announcement: Option<&'static str>,
+    /// The canvas notice of a put on several carriers ("Put text on 3 paths.", criterion 37),
+    /// until the host takes it.
+    pub(super) notice: Option<String>,
 }
 
 /// The layout and the placement of a text on its carrier.

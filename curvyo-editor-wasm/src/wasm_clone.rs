@@ -31,6 +31,7 @@ impl From<CloneResult> for CloneResultView {
 }
 
 /// What the Style tab shows about linked clones (criteria 22, 23, 56).
+#[allow(clippy::struct_excessive_bools)] // independent shown/ready flags, read by name
 #[wasm_bindgen]
 #[derive(Debug, Clone)]
 pub struct ClonePanelView {
@@ -57,6 +58,10 @@ pub struct ClonePanelView {
     /// The Style row: `"original"`, `"own"` or `"mixed"` (criterion 10).
     #[wasm_bindgen(getter_with_clone)]
     pub style: String,
+    /// Whether the Placement row is shown: not for text clones (`0080` criterion 40).
+    pub placement_row: bool,
+    /// Whether every selected clone is a text clone (Unlink makes texts).
+    pub texts: bool,
     /// Spread colours is enabled: two or more clones are selected (criterion 42).
     pub spread_ready: bool,
     /// The muted summary of the greyed Stroke header: "0.5 mm", or "None" when off.
@@ -172,6 +177,8 @@ impl WasmSession {
                 .as_ref()
                 .map_or("original", |b| b.style.code())
                 .to_owned(),
+            placement_row: block.as_ref().is_none_or(|b| b.placement_row),
+            texts: block.as_ref().is_some_and(|b| b.texts),
             spread_ready: self.session.spread_colours_ready(),
             stroke_summary: block.as_ref().map_or_else(String::new, |b| {
                 if b.summary.stroke.enabled {

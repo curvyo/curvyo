@@ -47,7 +47,7 @@ mod text_edit_overlay;
 mod theme;
 
 pub use artwork::{build_artwork, build_artwork_with_guides};
-pub use carrier_line::{build_carrier_hover, build_carrier_lines};
+pub use carrier_line::{build_carrier_hover, build_carrier_lines, build_carrier_picked};
 pub use clone_marks::{CloneTrace, build_clone_marks};
 pub use color::RgbaColor;
 pub use context_dim::{CONTEXT_DIM, dim_outside};

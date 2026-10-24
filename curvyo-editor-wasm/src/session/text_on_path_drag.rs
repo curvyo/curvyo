@@ -77,7 +77,7 @@ impl Session {
     /// (criteria 15, 20, 21). Returns whether the press was taken.
     pub(super) fn text_path_pointer_down(&mut self, point: Point, shift: bool) -> bool {
         if self.text_path.pick.is_some() {
-            self.pick_press(point);
+            self.pick_press(point, shift);
             return true;
         }
         if shift || !matches!(self.tool, Tool::Select | Tool::Text) {
@@ -182,8 +182,8 @@ impl Session {
     /// The pointer moved: pick mode tracks the carrier under it; a drag follows the pointer.
     /// Returns whether the move was taken.
     pub(super) fn text_path_pointer_move(&mut self, point: Point) -> bool {
-        if let Some(pick) = self.text_path.pick {
-            self.text_path.hover = self.carrier_at(point, pick.text);
+        if let Some(text) = self.text_path.pick.as_ref().map(|pick| pick.text) {
+            self.text_path.hover = self.carrier_at(point, text);
             return true;
         }
         let Some(mut drag) = self.text_path.drag else {

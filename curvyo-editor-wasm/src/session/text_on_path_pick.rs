@@ -10,12 +10,16 @@ use curvyo_ui_core::measure_of;
 
 use super::{Session, Tool};
 
-/// Pick mode: the text to put and where edit mode resumes after it.
-#[derive(Debug, Clone, Copy)]
+/// Pick mode: the text to put, the carriers picked with Shift (slice 2) and where edit mode
+/// resumes after it.
+#[derive(Debug, Clone)]
 pub(super) struct Pick {
     pub(super) text: NodeId,
     /// The caret of the edit mode pick mode was started from (UX notes §0.4).
-    resume: Option<usize>,
+    pub(super) resume: Option<usize>,
+    /// The pick set in the order picked; the first gets the text, the others text clones
+    /// (criterion 37).
+    pub(super) set: Vec<CarrierRef>,
 }
 
 /// What a press of On path did.
@@ -51,8 +55,14 @@ impl Session {
     /// first and resumes after the put.
     pub fn text_path_press(&mut self) -> TextPathPress {
         self.recording(|this| {
-            if this.text_path.pick.take().is_some() {
+            if let Some(pick) = this.text_path.pick.take() {
                 this.text_path.hover = None;
+                // A second press puts the text on the pick set (criterion 2).
+                if !pick.set.is_empty() {
+                    this.put_on_set(pick.text, &pick.set);
+                    this.resume_after_pick(Some(&pick));
+                    return TextPathPress::Put;
+                }
                 this.resume_after_pick(None);
                 return TextPathPress::Ended;
             }
@@ -72,36 +82,31 @@ impl Session {
                 return TextPathPress::Ignored;
             };
             if this.text_locked(text.id) {
-                this.resume_after_pick(editing.map(|caret| Pick {
+                let pick = editing.map(|caret| Pick {
                     text: text.id,
                     resume: Some(caret),
-                }));
+                    set: Vec::new(),
+                });
+                this.resume_after_pick(pick.as_ref());
                 return TextPathPress::Locked;
             }
-            let carriers: Vec<NodeId> = this
-                .selection
-                .ids()
-                .iter()
-                .copied()
-                .filter(|id| *id != text.id && this.is_carrier(*id))
-                .collect();
-            if this.tool == Tool::Select
-                && editing.is_none()
-                && let Some(&carrier) = carriers.first()
-            {
+            let carriers = this.selected_carriers(text.id);
+            if this.tool == Tool::Select && editing.is_none() && !carriers.is_empty() {
                 let id = text.id;
-                this.put_on(
-                    id,
-                    CarrierRef {
-                        node: carrier,
-                        outline: 0,
-                    },
-                );
+                if let [carrier] = carriers.as_slice() {
+                    this.put_on(id, *carrier);
+                } else {
+                    this.put_on_set(id, &carriers);
+                }
                 return TextPathPress::Put;
             }
             let id = text.id;
             let resume = editing;
-            this.text_path.pick = Some(Pick { text: id, resume });
+            this.text_path.pick = Some(Pick {
+                text: id,
+                resume,
+                set: Vec::new(),
+            });
             TextPathPress::Picking
         })
     }
@@ -113,14 +118,15 @@ impl Session {
             return false;
         };
         self.text_path.hover = None;
-        self.resume_after_pick(Some(pick));
+        self.resume_after_pick(Some(&pick));
         true
     }
 
-    fn resume_after_pick(&mut self, pick: Option<Pick>) {
-        if let Some(Pick {
+    pub(super) fn resume_after_pick(&mut self, pick: Option<&Pick>) {
+        if let Some(&Pick {
             text,
             resume: Some(caret),
+            ..
         }) = pick
         {
             self.edit_text_with_caret(text, caret);
@@ -149,7 +155,7 @@ impl Session {
     }
 
     /// Whether `id` is an object a text can be put on: a path, a primitive or a resolved clone.
-    fn is_carrier(&self, id: NodeId) -> bool {
+    pub(super) fn is_carrier(&self, id: NodeId) -> bool {
         self.document_read()
             .leaves
             .iter()
@@ -183,7 +189,7 @@ impl Session {
     }
 
     /// Puts text `id` on `carrier` as one step, selects the text and ends pick mode.
-    fn put_on(&mut self, id: NodeId, carrier: CarrierRef) {
+    pub(super) fn put_on(&mut self, id: NodeId, carrier: CarrierRef) {
         let Some(text) = self.read_text(id) else {
             return;
         };
@@ -232,18 +238,34 @@ impl Session {
         Some(CarrierRef { node: id, outline })
     }
 
-    /// A press in pick mode: on a carrier it puts the text there (one step); elsewhere nothing.
-    pub(super) fn pick_press(&mut self, point: Point) {
-        let Some(pick) = self.text_path.pick else {
+    /// A press in pick mode: with Shift it adds the carrier under the pointer to the pick set or
+    /// takes it out (criterion 2); without, it puts the text on the pick set and that carrier
+    /// (one step); elsewhere nothing.
+    pub(super) fn pick_press(&mut self, point: Point, shift: bool) {
+        let Some(pick) = self.text_path.pick.as_mut() else {
             return;
         };
-        let Some(carrier) = self.carrier_at(point, pick.text) else {
+        let text = pick.text;
+        let Some(carrier) = self.carrier_at(point, text) else {
             return;
         };
-        self.text_path.pick = None;
+        if shift {
+            self.toggle_picked(carrier);
+            return;
+        }
+        let Some(mut pick) = self.text_path.pick.take() else {
+            return;
+        };
         self.text_path.hover = None;
-        self.put_on(pick.text, carrier);
-        self.resume_after_pick(Some(pick));
+        if !pick.set.contains(&carrier) {
+            pick.set.push(carrier);
+        }
+        if let [one] = pick.set.as_slice() {
+            self.put_on(text, *one);
+        } else {
+            self.put_on_set(text, &pick.set);
+        }
+        self.resume_after_pick(Some(&pick));
     }
 
     /// Edit mode on text `id` with the caret at byte `caret`.

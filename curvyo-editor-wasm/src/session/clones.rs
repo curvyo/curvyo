@@ -161,11 +161,14 @@ impl Session {
                     _ => None,
                 })
                 .collect();
-            if unlinks.is_empty() {
+            // Text clones become texts (`specs/0080-text-on-path` criterion 41).
+            let texts = this.selected_text_clones();
+            if unlinks.is_empty() && texts.is_empty() {
                 return CloneResult::ignored();
             }
-            match this.document.unlink_clones(&unlinks) {
-                Ok(()) => CloneResult::done(format!("Unlinked {}.", clones_word(unlinks.len()))),
+            // One step for both kinds (lead decision 2).
+            match this.document.unlink_clones_and_texts(&unlinks, &texts) {
+                Ok(n) => CloneResult::done(format!("Unlinked {}.", clones_word(n))),
                 Err(_) => CloneResult::ignored(),
             }
         })
@@ -252,10 +255,12 @@ impl Session {
             return None;
         }
         let read = self.object_read();
-        if !ids
-            .iter()
-            .all(|&id| matches!(read.get(id), Some(ObjectSnapshot::Clone(_))))
-        {
+        let clone = |id: NodeId| match read.get(id) {
+            Some(ObjectSnapshot::Clone(_)) => true,
+            Some(ObjectSnapshot::Text(text)) => text.source.is_some(),
+            _ => false,
+        };
+        if !ids.iter().all(|&id| clone(id)) {
             return None;
         }
         Some(match ids {
@@ -300,6 +305,9 @@ impl Session {
             } else {
                 format!("{} clones became paths.", repair.unlinked)
             });
+        }
+        if let Some(sentence) = self.text_clones_unlinked_sentence() {
+            parts.push(sentence);
         }
         if repair.repointed > 0 {
             parts.push(if repair.repointed == 1 {
