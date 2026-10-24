@@ -9,7 +9,7 @@ use std::fmt::Write as _;
 use kurbo::{PathEl, Rect};
 
 use crate::face::Face;
-use crate::layout::layout;
+use crate::layout::{LayoutOptions, layout};
 use crate::units::Mm;
 
 /// `text` in `face` at 1 em as path data (em units, y down, origin on the baseline) and its line
@@ -26,7 +26,7 @@ pub fn preview_path(face: &Face, text: &str) -> Option<(String, Rect)> {
 #[must_use]
 pub fn preview_path_within(face: &Face, text: &str, width_caps: f64) -> Option<(String, Rect)> {
     let cap = face.metrics().cap_height;
-    let mut laid = layout(face, text, Mm(cap)).ok()?;
+    let mut laid = layout(face, text, Mm(cap), &LayoutOptions::default()).ok()?;
     let edge = width_caps * cap;
     for line in &mut laid.lines {
         line.glyphs.retain(|placed| placed.origin.x <= edge);

@@ -13,7 +13,7 @@ use common::font_bytes;
 use curvyo_text_core::limits::{
     MAX_GLYPH_POINTS, MAX_SVG_DEPTH, MAX_SVG_FONT_BYTES, MAX_SVG_GLYPHS,
 };
-use curvyo_text_core::{FaceKind, FaceStore, Mm, TextError, layout, listable_faces};
+use curvyo_text_core::{FaceKind, FaceStore, LayoutOptions, Mm, TextError, layout, listable_faces};
 use kurbo::{PathEl, Shape};
 use proptest::prelude::*;
 
@@ -40,7 +40,7 @@ fn dump(bytes: Vec<u8>, index: u32, text: &str) -> String {
     let mut store = FaceStore::new();
     let key = store.add(bytes, index).unwrap();
     let face = store.get(&key).unwrap();
-    let laid = layout(face, text, Mm(20.0)).unwrap();
+    let laid = layout(face, text, Mm(20.0), &LayoutOptions::default()).unwrap();
     let mut out = String::new();
     for path in laid.glyph_paths(face) {
         for element in path.elements() {
@@ -147,7 +147,7 @@ fn ac12_size_is_the_centre_line_of_h() {
         let mut store = FaceStore::new();
         let key = store.add(bytes, 0).unwrap();
         let face = store.get(&key).unwrap();
-        let laid = layout(face, "H", Mm(20.0)).unwrap();
+        let laid = layout(face, "H", Mm(20.0), &LayoutOptions::default()).unwrap();
         let top = -laid.glyph_paths(face)[0].bounding_box().y0;
         assert!((top - 20.0).abs() < TOLERANCE_MM, "{top}");
     }
@@ -168,8 +168,17 @@ fn ac14_glyphs_advances_and_kerning() {
     let key = store.add(fixture("kerning.svg"), 0).unwrap();
     let face = store.get(&key).unwrap();
     let size = Mm(20.0);
-    let mm_per_unit = layout(face, "H", size).unwrap().mm_per_em / 1000.0;
-    let width = |text: &str| layout(face, text, size).unwrap().lines[0].width.0;
+    let mm_per_unit = layout(face, "H", size, &LayoutOptions::default())
+        .unwrap()
+        .mm_per_em
+        / 1000.0;
+    let width = |text: &str| {
+        layout(face, text, size, &LayoutOptions::default())
+            .unwrap()
+            .lines[0]
+            .width
+            .0
+    };
     assert!((width("AV") - (1200.0 - 120.0) * mm_per_unit).abs() < TOLERANCE_MM);
     assert!((width("TA") - (1100.0 - 80.0) * mm_per_unit).abs() < TOLERANCE_MM);
     assert!((width("TO") - (1200.0 - 80.0) * mm_per_unit).abs() < TOLERANCE_MM);
@@ -177,7 +186,7 @@ fn ac14_glyphs_advances_and_kerning() {
         (width("LT") - 1000.0 * mm_per_unit).abs() < TOLERANCE_MM,
         "range ignored"
     );
-    let fi = layout(face, "fi", size).unwrap();
+    let fi = layout(face, "fi", size, &LayoutOptions::default()).unwrap();
     assert_eq!(fi.lines[0].glyphs.len(), 2, "no ligature");
     assert!(fi.lines[0].glyphs.iter().all(|g| g.glyph == 0));
     assert!((fi.lines[0].width.0 - 800.0 * mm_per_unit).abs() < TOLERANCE_MM);
@@ -186,7 +195,7 @@ fn ac14_glyphs_advances_and_kerning() {
         let mut store = FaceStore::new();
         let key = store.add(font_bytes(SHIPPED[0]), 0).unwrap();
         let face = store.get(&key).unwrap();
-        layout(face, "\u{E000}", size)
+        layout(face, "\u{E000}", size, &LayoutOptions::default())
             .unwrap()
             .glyph_paths(face)
             .len()
@@ -200,7 +209,7 @@ fn ac15_line_height() {
     let mut store = FaceStore::new();
     let key = store.add(fixture("kerning.svg"), 0).unwrap();
     let face = store.get(&key).unwrap();
-    let laid = layout(face, "H\nH", Mm(20.0)).unwrap();
+    let laid = layout(face, "H\nH", Mm(20.0), &LayoutOptions::default()).unwrap();
     assert!((laid.lines[1].baseline.0 - laid.mm_per_em).abs() < 1e-9);
     let metrics = face.metrics();
     assert!((metrics.ascender - 0.8).abs() < 1e-12 && (metrics.descender + 0.2).abs() < 1e-12);
@@ -215,7 +224,7 @@ fn ac16_open_unless_z() {
     let key = store.add(fixture("kerning.svg"), 0).unwrap();
     let face = store.get(&key).unwrap();
     let closes = |text: &str| {
-        let laid = layout(face, text, Mm(20.0)).unwrap();
+        let laid = layout(face, text, Mm(20.0), &LayoutOptions::default()).unwrap();
         laid.glyph_paths(face)[0]
             .elements()
             .iter()
@@ -240,7 +249,12 @@ fn exercise(bytes: Vec<u8>) -> bool {
         return false;
     };
     let face = store.get(&key).unwrap();
-    if let Ok(laid) = layout(face, "AVfi Hxg\u{E000}\nÅß0", Mm(5.0)) {
+    if let Ok(laid) = layout(
+        face,
+        "AVfi Hxg\u{E000}\nÅß0",
+        Mm(5.0),
+        &LayoutOptions::default(),
+    ) {
         let _ = laid.glyph_paths(face);
     }
     true

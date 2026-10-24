@@ -1,8 +1,9 @@
 //! Shaping one line: an OpenType face with its own tables (`GSUB`, `GPOS`; `kern`, `liga` and
-//! `calt` on, as the defaults of `HarfBuzz`; `0074` criterion 5), an SVG font one glyph per
-//! character with its `hkern` pairs (`0076` criterion 14).
+//! `calt` on, as the defaults of `HarfBuzz`; `0074` criterion 5; the optional ligatures off on
+//! request, `0079` criterion 8), an SVG font one glyph per character with its `hkern` pairs
+//! (`0076` criterion 14).
 
-use harfrust::{Buffer, Direction, ShapeOptions, ShaperFont};
+use harfrust::{Buffer, Direction, Feature, ShapeOptions, ShaperFont, Tag};
 
 use crate::face::{Face, Source};
 use crate::svg_font::SvgFont;
@@ -22,9 +23,14 @@ pub(crate) struct ShapedGlyph {
     pub y_offset: f64,
 }
 
+/// The optional ligature features a letter spacing turns off, as CSS does (`0079` criterion 8);
+/// `kern` stays on.
+const LIGATURE_FEATURES: [&[u8; 4]; 3] = [b"liga", b"clig", b"calt"];
+
 /// Shapes `line` (no line break inside) left to right. Bidi and right-to-left layout are out of
 /// scope (spec "Out of scope"), so the direction is fixed and clusters grow along the line.
-pub(crate) fn shape_line(face: &Face, line: &str) -> Vec<ShapedGlyph> {
+/// Without `ligatures` the optional ligatures are not applied (an SVG font has none).
+pub(crate) fn shape_line(face: &Face, line: &str, ligatures: bool) -> Vec<ShapedGlyph> {
     if line.is_empty() {
         return Vec::new();
     }
@@ -37,7 +43,15 @@ pub(crate) fn shape_line(face: &Face, line: &str) -> Vec<ShapedGlyph> {
     buffer.push_str(line);
     buffer.guess_segment_properties();
     buffer.set_direction(Direction::LeftToRight);
-    if harfrust::shape(&shaper, &mut buffer, ShapeOptions::new()).is_err() {
+    let off: Vec<Feature> = if ligatures {
+        Vec::new()
+    } else {
+        LIGATURE_FEATURES
+            .iter()
+            .map(|tag| Feature::new(Tag::new(tag), 0, ..))
+            .collect()
+    };
+    if harfrust::shape(&shaper, &mut buffer, ShapeOptions::new().features(&off)).is_err() {
         return Vec::new();
     }
     let scale = 1.0 / face.units_per_em();

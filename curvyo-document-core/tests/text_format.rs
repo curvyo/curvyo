@@ -9,7 +9,8 @@ use std::path::PathBuf;
 
 use curvyo_document_core::{
     Affine, Angle, CURRENT_FORMAT_VERSION, CURRENT_LORO_SNAPSHOT_VERSION, Document, FontRef,
-    Length, NodeId, ObjectSnapshot, OpenError, TextEditError, TextSnapshot, pack, unpack,
+    Length, NodeId, ObjectSnapshot, OpenError, TextEditError, TextLayoutValues, TextSnapshot, pack,
+    unpack,
 };
 use loro::{LoroDoc, TreeID};
 
@@ -92,7 +93,13 @@ fn golden_document() -> (Document, Vec<NodeId>) {
         .iter()
         .map(|(string, font, size, placement)| {
             let id = d
-                .create_text(string, font, Length::from_mm(size + 1.0), *placement)
+                .create_text(
+                    string,
+                    font,
+                    Length::from_mm(size + 1.0),
+                    *placement,
+                    &TextLayoutValues::DEFAULT,
+                )
                 .unwrap();
             d.set_text_size(&[id], Length::from_mm(*size)).unwrap();
             id
@@ -204,7 +211,13 @@ fn ac13_ac31_commands_are_one_step_and_checked() {
     let placement = Affine::IDENTITY;
     let sans = font("Source Sans 3", "Regular", 'a');
     assert_eq!(
-        d.create_text("", &sans, Length::from_mm(10.0), placement),
+        d.create_text(
+            "",
+            &sans,
+            Length::from_mm(10.0),
+            placement,
+            &TextLayoutValues::DEFAULT
+        ),
         Err(TextEditError::Empty)
     );
     assert_eq!(d.own_steps().len(), steps + 2, "refusals write nothing");

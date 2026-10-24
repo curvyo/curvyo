@@ -206,7 +206,18 @@ pub struct DocumentVersion(pub(crate) loro::Frontiers);
 /// too new. Migration from version 17 is none: no key reads as an outline face, and a file from an
 /// earlier build opens unchanged. Any other value of `kind` reads as outline. Golden:
 /// `text_single_line_v18.curvyo`.
-pub const CURRENT_FORMAT_VERSION: u32 = 18;
+///
+/// Bumped to 19 in `text-layout-controls` (`specs/0079-text-layout-controls/adrs.md` decisions 1
+/// and 2): a text may carry the optional keys `text_align` ("centre", "right", "justify"),
+/// `text_letter_space`, `text_word_space`, `text_line_space` (factors of `text_size`) and
+/// `text_rotation` (degrees). A build that stops at version 18 ignores them and would draw a
+/// centred, spaced or turned text left-aligned, tight and upright without a word, so it must
+/// refuse every file of this build as too new. Migration from version 18 is none: absent keys are
+/// the defaults, and a value at its default is never written. An unknown alignment reads as
+/// left, a non-finite number as its default, a factor out of range is clamped and a rotation is
+/// wrapped; nothing of it is refused (`crate::text_codec`). The number is provisional by the rule
+/// above (`0080` text on path takes the next one). Golden: `text_layout_v19.curvyo`.
+pub const CURRENT_FORMAT_VERSION: u32 = 19;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";
@@ -605,6 +616,9 @@ enum ObjectJson {
         string: String,
         font: crate::text_model::FontRef,
         size: crate::units::Length,
+        /// The layout values (`specs/0079-text-layout-controls`); left out at their defaults.
+        #[serde(skip_serializing_if = "crate::text_model::TextLayoutValues::is_default")]
+        layout: crate::text_model::TextLayoutValues,
         placement: crate::affine::Affine,
         style: crate::style_model::Style,
     },
@@ -686,6 +700,7 @@ impl From<crate::primitive_model::ObjectSnapshot> for ObjectJson {
                 string: text.string,
                 font: text.font,
                 size: text.size,
+                layout: text.layout,
                 placement: text.placement,
                 style: text.style,
             },

@@ -3,7 +3,7 @@
 #![allow(clippy::unwrap_used, missing_docs)]
 #![cfg(not(target_arch = "wasm32"))]
 
-use curvyo_text_core::{FaceStore, Mm, layout};
+use curvyo_text_core::{FaceStore, LayoutOptions, Mm, layout};
 use kurbo::{ParamCurve, PathEl, Point};
 
 /// Criterion 16: a circle of two arcs in a glyph, laid out at Size 2,000 mm (the largest), stays
@@ -19,7 +19,7 @@ fn ac16_arcs_within_a_micrometre_at_the_largest_size() {
     let key = store.add(bytes, 0).unwrap();
     let face = store.get(&key).unwrap();
     let size = 2000.0;
-    let laid = layout(face, "O", Mm(size)).unwrap();
+    let laid = layout(face, "O", Mm(size), &LayoutOptions::default()).unwrap();
     let paths = laid.glyph_paths(face);
     assert_eq!(paths.len(), 1);
     // H is 700 units = Size, so the radius is 350 units = Size / 2.
