@@ -1,12 +1,12 @@
-//! The four value fields of the text layout block (`specs/0079-text-layout-controls` criteria 7,
-//! 10, 12, 13; UX notes §0 and §6): their scales relative to Size, what they show for one or
-//! several texts, and the per-text values a change sets.
+//! The value fields of the text layout block (`specs/0079-text-layout-controls` criteria 7, 10,
+//! 12, 13, 26 to 28, 27b; UX notes §0, §6 and §10.3): their scales relative to Size, what they show
+//! for one or several subjects, and the values a change sets.
 
 use std::ops::RangeInclusive;
 
 use curvyo_document_core::{
-    Angle, LETTER_SPACING_FACTORS, LINE_SPACING_FACTORS, TextLayoutLabel, TextLayoutValues,
-    WORD_SPACING_FACTORS,
+    Angle, CharValues, KERN_X_FACTORS, KERN_Y_FACTORS, LETTER_SPACING_FACTORS,
+    LINE_SPACING_FACTORS, TextCharsLabel, TextLayoutLabel, TextLayoutValues, WORD_SPACING_FACTORS,
 };
 
 use crate::display_unit_text::parse_length;
@@ -32,9 +32,15 @@ pub enum LayoutField {
     LineSpacing,
     /// Character rotation, degrees.
     CharacterRotation,
+    /// Horizontal kerning of single characters, mm (criterion 26).
+    HorizontalKerning,
+    /// Vertical kerning of single characters, mm (criterion 26).
+    VerticalKerning,
+    /// The own rotation of single characters, degrees (criterion 27b).
+    CharRotation,
 }
 
-/// One subject text as the fields see it.
+/// One subject as the fields see it: a text, or for the kerning fields one character of a text.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct LayoutSubject {
     /// The text's Size, mm.
@@ -43,6 +49,8 @@ pub struct LayoutSubject {
     pub values: TextLayoutValues,
     /// Its face's natural line spacing at that size, mm (the Auto readout).
     pub natural_line_mm: f64,
+    /// The character's values (the kerning fields).
+    pub kern: CharValues,
 }
 
 /// What a field shows (criteria 7, 10, 13).
@@ -81,6 +89,8 @@ pub struct LayoutFieldView {
 pub struct LayoutChange {
     /// Each subject's new values, in order.
     pub values: Vec<TextLayoutValues>,
+    /// Each subject's new character values, in order.
+    pub kerns: Vec<CharValues>,
     /// How many texts were held to their own limit.
     pub limited: usize,
     /// When any was: whether at the top (`true`) or the bottom of the range, and that text's
@@ -90,15 +100,19 @@ pub struct LayoutChange {
 
 impl LayoutField {
     /// Every field, in the block's order.
-    pub const ALL: [Self; 4] = [
+    pub const ALL: [Self; 7] = [
         Self::LetterSpacing,
         Self::WordSpacing,
         Self::LineSpacing,
         Self::CharacterRotation,
+        Self::HorizontalKerning,
+        Self::VerticalKerning,
+        Self::CharRotation,
     ];
 
     /// The field named by the host (`"letter-spacing"`, `"word-spacing"`, `"line-spacing"`,
-    /// `"character-rotation"`).
+    /// `"character-rotation"`, `"horizontal-kerning"`, `"vertical-kerning"`,
+    /// `"char-rotation"`).
     #[must_use]
     pub fn from_name(name: &str) -> Option<Self> {
         match name {
@@ -106,28 +120,67 @@ impl LayoutField {
             "word-spacing" => Some(Self::WordSpacing),
             "line-spacing" => Some(Self::LineSpacing),
             "character-rotation" => Some(Self::CharacterRotation),
+            "horizontal-kerning" => Some(Self::HorizontalKerning),
+            "vertical-kerning" => Some(Self::VerticalKerning),
+            "char-rotation" => Some(Self::CharRotation),
             _ => None,
         }
     }
 
-    /// The step a change of this field is.
+    /// Whether the field acts on single characters (criteria 26, 27b).
     #[must_use]
-    pub const fn label(self) -> TextLayoutLabel {
-        match self {
-            Self::LetterSpacing => TextLayoutLabel::LetterSpacing,
-            Self::WordSpacing => TextLayoutLabel::WordSpacing,
-            Self::LineSpacing => TextLayoutLabel::LineSpacing,
-            Self::CharacterRotation => TextLayoutLabel::CharacterRotation,
+    pub const fn is_per_character(self) -> bool {
+        matches!(
+            self,
+            Self::HorizontalKerning | Self::VerticalKerning | Self::CharRotation
+        )
+    }
+
+    /// Whether the field holds degrees.
+    const fn is_rotation(self) -> bool {
+        matches!(self, Self::CharacterRotation | Self::CharRotation)
+    }
+
+    /// The step a change (or, with `clear`, the reset outside edit mode) of a per-character field
+    /// is: "Change kerning", "Clear kerning", "Change per-character rotation", "Clear
+    /// per-character rotation"; `None` for the other fields.
+    #[must_use]
+    pub const fn chars_label(self, clear: bool) -> Option<TextCharsLabel> {
+        match (self, clear) {
+            (Self::HorizontalKerning | Self::VerticalKerning, false) => {
+                Some(TextCharsLabel::Kerning)
+            }
+            (Self::HorizontalKerning | Self::VerticalKerning, true) => {
+                Some(TextCharsLabel::ClearKerning)
+            }
+            (Self::CharRotation, false) => Some(TextCharsLabel::CharRotation),
+            (Self::CharRotation, true) => Some(TextCharsLabel::ClearCharRotation),
+            _ => None,
         }
     }
 
-    /// The typed range as factors of Size (criterion 7); `None` for the rotation.
+    /// The step a change of this field is; `None` for the per-character fields
+    /// ([`Self::chars_label`]).
+    #[must_use]
+    pub const fn label(self) -> Option<TextLayoutLabel> {
+        match self {
+            Self::LetterSpacing => Some(TextLayoutLabel::LetterSpacing),
+            Self::WordSpacing => Some(TextLayoutLabel::WordSpacing),
+            Self::LineSpacing => Some(TextLayoutLabel::LineSpacing),
+            Self::CharacterRotation => Some(TextLayoutLabel::CharacterRotation),
+            Self::HorizontalKerning | Self::VerticalKerning | Self::CharRotation => None,
+        }
+    }
+
+    /// The typed range as factors of Size (criterion 7); `None` for the rotations.
     fn typed_factors(self) -> Option<RangeInclusive<f64>> {
         match self {
             Self::LetterSpacing => Some(LETTER_SPACING_FACTORS),
             Self::WordSpacing => Some(WORD_SPACING_FACTORS),
             Self::LineSpacing => Some(LINE_SPACING_FACTORS),
-            Self::CharacterRotation => None,
+            Self::HorizontalKerning => Some(KERN_X_FACTORS),
+            Self::VerticalKerning => Some(KERN_Y_FACTORS),
+            Self::CharacterRotation | Self::CharRotation => None,
         }
     }
 
@@ -137,7 +190,9 @@ impl LayoutField {
             Self::LetterSpacing => (-0.25 * size_mm, size_mm),
             Self::WordSpacing => (-0.5 * size_mm, 2.0 * size_mm),
             Self::LineSpacing => (0.0, 3.0 * size_mm),
-            Self::CharacterRotation => (-180.0, 180.0),
+            Self::CharacterRotation | Self::CharRotation => (-180.0, 180.0),
+            Self::HorizontalKerning => (-0.25 * size_mm, 0.25 * size_mm),
+            Self::VerticalKerning => (-0.5 * size_mm, 0.5 * size_mm),
         }
     }
 
@@ -149,6 +204,9 @@ impl LayoutField {
             Self::WordSpacing => Some(values.word_spacing * subject.size_mm),
             Self::LineSpacing => values.line_spacing.map(|f| f * subject.size_mm),
             Self::CharacterRotation => Some(values.rotation.as_radians().to_degrees()),
+            Self::HorizontalKerning => Some(subject.kern.kern_x * subject.size_mm),
+            Self::VerticalKerning => Some(subject.kern.kern_y * subject.size_mm),
+            Self::CharRotation => Some(subject.kern.rotation),
         }
     }
 
@@ -161,11 +219,7 @@ impl LayoutField {
     /// zeros trimmed, U+2212 for minus.
     #[must_use]
     pub fn text(self, value: f64) -> String {
-        let scale = if self == Self::CharacterRotation {
-            10.0
-        } else {
-            100.0
-        };
+        let scale = if self.is_rotation() { 10.0 } else { 100.0 };
         let rounded = (value * scale).round() / scale + 0.0;
         format!("{rounded}").replace('-', "\u{2212}")
     }
@@ -243,7 +297,7 @@ fn one_two_five(at_least: f64) -> f64 {
 /// The drag grid of `field` (UX notes §0.1): spacing on the smallest 1-2-5 step of at least one
 /// track span per field width, Shift ten times, Ctrl a tenth; rotation 1°, Shift 15°, Ctrl 0.1°.
 fn drag_grid(field: LayoutField, subjects: &[LayoutSubject], grid: Grid) -> f64 {
-    if field == LayoutField::CharacterRotation {
+    if field.is_rotation() {
         return match grid {
             Grid::Normal => 1.0,
             Grid::Coarse => 15.0,
@@ -278,7 +332,7 @@ pub fn value_at(field: LayoutField, subjects: &[LayoutSubject], p: f64, grid: Gr
 /// Ctrl 0.01 mm; rotation 1°, Shift 15°, Ctrl 0.1°.
 #[must_use]
 pub fn stepped(field: LayoutField, shown: f64, steps: i32, grid: Grid) -> f64 {
-    let (normal, coarse, fine) = if field == LayoutField::CharacterRotation {
+    let (normal, coarse, fine) = if field.is_rotation() {
         (1.0, 15.0, 0.1)
     } else {
         (0.1, 1.0, 0.01)
@@ -289,7 +343,7 @@ pub fn stepped(field: LayoutField, shown: f64, steps: i32, grid: Grid) -> f64 {
         Grid::Fine => fine,
     };
     let value = snapped(shown + f64::from(steps) * step, step);
-    if field == LayoutField::CharacterRotation {
+    if field.is_rotation() {
         value.clamp(-180.0, 180.0)
     } else {
         value
@@ -301,7 +355,9 @@ pub fn stepped(field: LayoutField, shown: f64, steps: i32, grid: Grid) -> f64 {
 #[must_use]
 pub fn parse_field_text(field: LayoutField, text: &str) -> Option<f64> {
     match field {
-        LayoutField::CharacterRotation => parse_entry_number(text, true),
+        LayoutField::CharacterRotation | LayoutField::CharRotation => {
+            parse_entry_number(text, true)
+        }
         _ => parse_length(text, curvyo_document_core::DisplayUnit::Mm)
             .map(curvyo_document_core::Length::as_mm),
     }
@@ -319,13 +375,21 @@ pub fn set_field(
 ) -> LayoutChange {
     let mut limited = 0;
     let mut limit = None;
+    let mut kerns = Vec::with_capacity(subjects.len());
     let values = subjects
         .iter()
         .map(|subject| {
             let mut values = subject.values;
+            let mut kern = subject.kern;
             if field == LayoutField::CharacterRotation {
                 let degrees = value.unwrap_or(0.0);
                 values.rotation = Angle::from_radians(degrees.to_radians()).normalized();
+                kerns.push(kern);
+                return values;
+            }
+            if field == LayoutField::CharRotation {
+                kern.rotation = value.unwrap_or(0.0);
+                kerns.push(kern.held());
                 return values;
             }
             let factor = value.map(|mm| {
@@ -342,13 +406,17 @@ pub fn set_field(
                 LayoutField::LetterSpacing => values.letter_spacing = factor.unwrap_or(0.0),
                 LayoutField::WordSpacing => values.word_spacing = factor.unwrap_or(0.0),
                 LayoutField::LineSpacing => values.line_spacing = factor,
-                LayoutField::CharacterRotation => {}
+                LayoutField::HorizontalKerning => kern.kern_x = factor.unwrap_or(0.0),
+                LayoutField::VerticalKerning => kern.kern_y = factor.unwrap_or(0.0),
+                LayoutField::CharacterRotation | LayoutField::CharRotation => {}
             }
+            kerns.push(kern);
             values
         })
         .collect();
     LayoutChange {
         values,
+        kerns,
         limited,
         limit,
     }
@@ -363,6 +431,7 @@ mod tests {
             size_mm: size,
             values: TextLayoutValues::DEFAULT,
             natural_line_mm: size * 1.25,
+            kern: CharValues::DEFAULT,
         }
     }
 
@@ -463,5 +532,82 @@ mod tests {
             Some(12.0)
         );
         assert_eq!(parse_field_text(LayoutField::WordSpacing, "wide"), None);
+    }
+
+    /// Criteria 26 and 27: the kerning tracks and typed ranges relative to Size; characters with
+    /// different kerns show Mixed; a change sets every subject, held to its range.
+    #[test]
+    fn ac26_kerning_fields() {
+        let at = |x: f64, y: f64| LayoutSubject {
+            kern: CharValues {
+                kern_x: x,
+                kern_y: y,
+                rotation: 0.0,
+            },
+            ..subject(10.0)
+        };
+        let view = field_view(LayoutField::HorizontalKerning, &[at(-0.05, 0.0)]);
+        assert!((view.track_min + 2.5).abs() < 1e-9 && (view.track_max - 2.5).abs() < 1e-9);
+        assert_eq!(view.text, "\u{2212}0.5");
+        assert!(view.resettable && view.zero.is_some());
+        let vertical = field_view(LayoutField::VerticalKerning, &[at(0.0, 0.0)]);
+        assert!((vertical.track_max - 5.0).abs() < 1e-9 && !vertical.resettable);
+        assert!(
+            field_view(
+                LayoutField::HorizontalKerning,
+                &[at(0.1, 0.0), at(0.0, 0.0)]
+            )
+            .mixed
+        );
+        let change = set_field(
+            LayoutField::VerticalKerning,
+            &[at(0.1, 0.0), at(0.0, 0.3)],
+            Some(30.0),
+        );
+        assert_eq!(change.limited, 2);
+        assert_eq!(
+            change.kerns,
+            [
+                CharValues {
+                    kern_x: 0.1,
+                    kern_y: 2.0,
+                    rotation: 0.0,
+                },
+                CharValues {
+                    kern_x: 0.0,
+                    kern_y: 2.0,
+                    rotation: 0.0,
+                }
+            ]
+        );
+        assert_eq!(change.limit, Some((true, 20.0)));
+    }
+
+    /// Criterion 27b: the per-character rotation reads and steps in degrees as Character rotation,
+    /// a change wraps into (-180°, 180°] and keeps the kerns; its steps have their own labels.
+    #[test]
+    fn ac27b_char_rotation_field() {
+        let mut turned = subject(10.0);
+        turned.kern = CharValues {
+            kern_x: 0.1,
+            rotation: -12.34,
+            ..CharValues::DEFAULT
+        };
+        let view = field_view(LayoutField::CharRotation, &[turned]);
+        assert_eq!(view.text, "\u{2212}12.3");
+        assert!((view.track_min + 180.0).abs() < 1e-9 && view.resettable);
+        assert!((stepped(LayoutField::CharRotation, 10.0, 1, Grid::Coarse) - 30.0).abs() < 1e-9);
+        let change = set_field(LayoutField::CharRotation, &[turned], Some(270.0));
+        assert!((change.kerns[0].rotation + 90.0).abs() < 1e-9);
+        assert!((change.kerns[0].kern_x - 0.1).abs() < 1e-12);
+        assert_eq!(change.values[0], turned.values);
+        assert_eq!(
+            LayoutField::CharRotation.chars_label(true),
+            Some(TextCharsLabel::ClearCharRotation)
+        );
+        assert_eq!(
+            LayoutField::from_name("char-rotation"),
+            Some(LayoutField::CharRotation)
+        );
     }
 }

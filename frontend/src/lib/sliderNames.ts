@@ -21,6 +21,9 @@ export const TEXT_LAYOUT_FIELD_NAMES = {
   wordSpacing: "Word spacing",
   lineSpacing: "Line spacing",
   characterRotation: "Character rotation",
+  horizontalKerning: "Horizontal kerning",
+  verticalKerning: "Vertical kerning",
+  charRotation: "Per-character rotation",
 } as const;
 
 /** The two ratio sliders (`RatioSlider`): the selected stars' and the tool setting for new ones. */

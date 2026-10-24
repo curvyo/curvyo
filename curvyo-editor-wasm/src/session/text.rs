@@ -6,13 +6,14 @@
 use std::borrow::Cow;
 
 use curvyo_document_core::{
-    Affine, FontRef, Length, NodeId, ObjectSnapshot, Point, TextAlign, TextLayoutValues,
+    Affine, FontRef, Length, NodeId, ObjectSnapshot, Point, TextAlign, TextChars, TextLayoutValues,
     TextSnapshot, Vec2, ViewTransform,
 };
 use curvyo_render_core::{DrawList, TextEditOverlay, build_text_edit_overlay};
 use curvyo_text_core::{Mm, TextLayout};
 use curvyo_ui_core::{
     FaceMatch, Finished, InputOutcome, TextEdit, TextInput, edit_geometry, line_box_contains,
+    nearest_boundary,
 };
 
 use super::{Session, Tool};
@@ -106,10 +107,10 @@ impl Session {
         &self,
         font: &FontRef,
         size: Length,
-        layout: &TextLayoutValues,
+        (layout, chars): (&TextLayoutValues, &TextChars),
         string: &str,
     ) -> Option<TextLayout> {
-        let options = curvyo_ui_core::layout_options(size, layout);
+        let options = curvyo_ui_core::layout_options(size, layout, chars);
         curvyo_text_core::layout(self.face_of(font)?, string, Mm(size.as_mm()), &options).ok()
     }
 
@@ -139,10 +140,13 @@ impl Session {
             return text.string.len();
         };
         let local = inverse.apply_point(point);
-        self.layout_of(&text.font, text.size, &text.layout, &text.string)
-            .map_or(text.string.len(), |layout| {
-                layout.nearest_boundary(kurbo_point(local))
-            })
+        self.layout_of(
+            &text.font,
+            text.size,
+            (&text.layout, &text.chars),
+            &text.string,
+        )
+        .map_or(text.string.len(), |layout| nearest_boundary(&layout, local))
     }
 
     /// Starts edit mode on the text `id` in the Text tool: the caret nearest to `point`, or at the
@@ -290,10 +294,10 @@ impl Session {
         self.layout_of(
             &edit.font,
             edit.size,
-            &self.edit_layout(edit),
+            (&self.edit_layout(edit), &edit.chars()),
             edit.string(),
         )
-        .map(|layout| layout.nearest_boundary(kurbo_point(local)))
+        .map(|layout| nearest_boundary(&layout, local))
     }
 
     /// The pointer moved with the Text tool: a held press in the edited text extends the
@@ -308,10 +312,10 @@ impl Session {
                 self.layout_of(
                     &edit.font,
                     edit.size,
-                    &self.edit_layout(edit),
+                    (&self.edit_layout(edit), &edit.chars()),
                     edit.string(),
                 )
-                .map(|l| l.nearest_boundary(kurbo_point(local)))
+                .map(|l| nearest_boundary(&l, local))
             });
             if let Some(caret) = caret {
                 self.text_input(TextInput::Select { anchor, caret });
@@ -382,7 +386,7 @@ impl Session {
             self.layout_of(
                 &edit.font,
                 edit.size,
-                &self.edit_layout(edit),
+                (&self.edit_layout(edit), &edit.chars()),
                 edit.string(),
             )
         });
@@ -434,6 +438,7 @@ impl Session {
             snapshot.size = size;
         }
         snapshot.layout = self.edit_layout(edit);
+        snapshot.chars = self.previewed_chars(&snapshot);
         snapshot.outline = self.fonts.lay_out(&snapshot).map(std::sync::Arc::new);
         Some(snapshot)
     }
@@ -461,6 +466,7 @@ impl Session {
                         shown.size = size;
                     }
                     shown.layout = self.previewed_layout(shown.size, &shown.layout);
+                    shown.chars = self.previewed_chars(&shown);
                     shown.outline = self.fonts.lay_out(&shown).map(std::sync::Arc::new);
                     **text = shown;
                 }
@@ -482,8 +488,12 @@ impl Session {
             return DrawList::default();
         };
         let (shown, preedit, caret) = edit.shown();
-        let Some(layout) = self.layout_of(&edit.font, edit.size, &self.edit_layout(edit), &shown)
-        else {
+        let Some(layout) = self.layout_of(
+            &edit.font,
+            edit.size,
+            (&self.edit_layout(edit), &edit.shown_chars()),
+            &shown,
+        ) else {
             return DrawList::default();
         };
         let selection = if preedit.is_some() {
@@ -512,7 +522,12 @@ impl Session {
     pub fn text_caret_screen_point(&self) -> Option<(f64, f64)> {
         let edit = self.text.edit.as_ref()?;
         let (shown, preedit, caret) = edit.shown();
-        let layout = self.layout_of(&edit.font, edit.size, &self.edit_layout(edit), &shown)?;
+        let layout = self.layout_of(
+            &edit.font,
+            edit.size,
+            (&self.edit_layout(edit), &edit.shown_chars()),
+            &shown,
+        )?;
         let geometry = edit_geometry(
             &layout,
             edit.placement,
@@ -537,8 +552,4 @@ pub(super) fn edit_id(edit: &TextEdit) -> Option<NodeId> {
         curvyo_ui_core::EditTarget::Existing(id) => Some(id),
         curvyo_ui_core::EditTarget::New => None,
     }
-}
-
-fn kurbo_point(point: Point) -> kurbo::Point {
-    kurbo::Point::new(point.x, point.y)
 }

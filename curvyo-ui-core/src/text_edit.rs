@@ -5,9 +5,11 @@
 use std::ops::Range;
 
 use curvyo_document_core::{
-    Affine, Document, FontRef, Length, MAX_TEXT_CHARS, NodeId, Style, TextEditError,
-    TextLayoutValues, TextSnapshot,
+    Affine, CharValues, Document, FontRef, Length, MAX_TEXT_CHARS, NodeId, Style, TextChars,
+    TextEditError, TextLayoutValues, TextSnapshot,
 };
+
+use crate::text_edit_chars::{kerned, splice, subject};
 use curvyo_text_core::{TextLayout, WritingMode};
 
 /// A tab in typed or pasted text becomes this many spaces (criterion 3; `adrs.md` decision 4).
@@ -59,7 +61,7 @@ const fn along_the_lines(mode: WritingMode, key: CaretMove) -> CaretMove {
 }
 
 /// One message of the input sink.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum TextInput {
     /// Typed or pasted characters replace the selection.
     Insert(String),
@@ -91,6 +93,14 @@ pub enum TextInput {
         /// The IME's caret in it.
         caret: usize,
     },
+    /// Alt+arrows (`specs/0079-text-layout-controls` criterion 29): the kern of the character
+    /// after the caret, or of each character of the selection, changes by these millimetres.
+    Kern {
+        /// Along the line, positive in reading direction.
+        along_mm: f64,
+        /// Across the line, positive up.
+        across_mm: f64,
+    },
     /// Ctrl+Z inside the session (criterion 9).
     Undo,
     /// Ctrl+Shift+Z inside the session.
@@ -119,25 +129,37 @@ pub enum Finished {
     Removed(NodeId),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 struct State {
     string: String,
+    /// One value per character of `string` (ADR 0021 §2).
+    chars: Vec<CharValues>,
     caret: usize,
     anchor: usize,
+}
+
+/// What the last change was, so the next one of the same run joins its undo step.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Run {
+    /// A change of its own.
+    None,
+    /// Typing single characters.
+    Typing,
+    /// Alt+arrow kerning.
+    Kerning,
 }
 
 /// One edit session.
 #[derive(Debug, Clone, PartialEq)]
 pub struct TextEdit {
     target: EditTarget,
-    original: String,
+    original: (String, TextChars),
     state: State,
     preedit: Option<(String, usize)>,
     undo: Vec<State>,
     redo: Vec<State>,
-    /// Whether the last change was a run of typing, so the next typed character joins its undo
-    /// step.
-    typing: bool,
+    /// The run the last change belongs to.
+    run: Run,
     /// The text's face, size, placement and style while it is edited.
     pub font: FontRef,
     /// The text's size.
@@ -180,16 +202,17 @@ impl TextEdit {
     pub fn new_text(font: FontRef, size: Length, placement: Affine, style: Style) -> Self {
         Self {
             target: EditTarget::New,
-            original: String::new(),
+            original: (String::new(), TextChars::default()),
             state: State {
                 string: String::new(),
+                chars: Vec::new(),
                 caret: 0,
                 anchor: 0,
             },
             preedit: None,
             undo: Vec::new(),
             redo: Vec::new(),
-            typing: false,
+            run: Run::None,
             font,
             size,
             layout: TextLayoutValues::DEFAULT,
@@ -204,16 +227,17 @@ impl TextEdit {
         let caret = floor_char(&text.string, caret);
         Self {
             target: EditTarget::Existing(text.id),
-            original: text.string.clone(),
+            original: (text.string.clone(), text.chars.clone()),
             state: State {
                 string: text.string.clone(),
+                chars: text.chars.to_dense(text.string.chars().count()),
                 caret,
                 anchor: caret,
             },
             preedit: None,
             undo: Vec::new(),
             redo: Vec::new(),
-            typing: false,
+            run: Run::None,
             font: text.font.clone(),
             size: text.size,
             layout: text.layout,
@@ -267,6 +291,58 @@ impl TextEdit {
         }
     }
 
+    /// The values of the characters of [`TextEdit::string`].
+    #[must_use]
+    pub fn chars(&self) -> TextChars {
+        TextChars::from_dense(&self.state.chars)
+    }
+
+    /// The values of the characters of the string as drawn ([`TextEdit::shown`]): the
+    /// composition's characters have none.
+    #[must_use]
+    pub fn shown_chars(&self) -> TextChars {
+        match &self.preedit {
+            Some((text, _)) => {
+                let mut chars = self.state.chars.clone();
+                splice(
+                    &mut chars,
+                    &self.state.string,
+                    self.selection(),
+                    text.chars().count(),
+                );
+                TextChars::from_dense(&chars)
+            }
+            None => self.chars(),
+        }
+    }
+
+    /// The characters kerning acts on and their values (criterion 27): the selection's, else
+    /// the one after the caret; none at the end of a line.
+    #[must_use]
+    pub fn kern_subject(&self) -> Vec<(usize, CharValues)> {
+        subject(&self.state.string, self.selection())
+            .into_iter()
+            .filter_map(|index| Some((index, *self.state.chars.get(index)?)))
+            .collect()
+    }
+
+    /// Sets the values of single characters (a kerning field's change in edit mode, its own
+    /// document step): not a step of the session's undo.
+    pub fn set_chars(&mut self, values: &[(usize, CharValues)]) {
+        for (index, value) in values {
+            if let Some(slot) = self.state.chars.get_mut(*index) {
+                *slot = value.held();
+            }
+        }
+    }
+
+    /// Marks the session's string and values as written to its node (a kerning field's step in
+    /// edit mode): [`Self::finish`] writes what differs from them, so a later session undo that
+    /// takes back earlier typing still ends with the node as shown.
+    pub fn mark_written(&mut self) {
+        self.original = (self.state.string.clone(), self.chars());
+    }
+
     /// The text as drawn while it is edited: the session's string, face, size, placement and
     /// style under `id` (the node's, or a placeholder for a new text).
     #[must_use]
@@ -277,6 +353,7 @@ impl TextEdit {
             font: self.font.clone(),
             size: self.size,
             layout: self.layout,
+            chars: self.shown_chars(),
             placement: self.placement,
             style: self.style.clone(),
             outline: None,
@@ -289,8 +366,13 @@ impl TextEdit {
         let before = (self.state.clone(), self.preedit.clone());
         let mut limited = false;
         let typing = matches!(&input, TextInput::Insert(text) if text.chars().count() == 1);
+        let kerning = matches!(input, TextInput::Kern { .. });
         match input {
             TextInput::Insert(text) => limited = self.insert(&normalised(&text), typing),
+            TextInput::Kern {
+                along_mm,
+                across_mm,
+            } => self.kern(along_mm, across_mm),
             TextInput::DeleteBackward => self.delete(true, layout),
             TextInput::DeleteForward => self.delete(false, layout),
             TextInput::Move { to, extend } => self.move_caret(to, extend, layout),
@@ -315,8 +397,8 @@ impl TextEdit {
             TextInput::Undo => self.step(true),
             TextInput::Redo => self.step(false),
         }
-        if !typing {
-            self.typing = false;
+        if !typing && !kerning {
+            self.run = Run::None;
         }
         InputOutcome {
             changed: (self.state.clone(), self.preedit.clone()) != before,
@@ -324,12 +406,29 @@ impl TextEdit {
         }
     }
 
-    fn record(&mut self, typing: bool) {
-        if !(typing && self.typing) {
+    fn record(&mut self, run: Run) {
+        if run == Run::None || run != self.run {
             self.undo.push(self.state.clone());
         }
         self.redo.clear();
-        self.typing = typing;
+        self.run = run;
+    }
+
+    /// Alt+arrows (criterion 29): each subject character's kern moves, held to its range; a run
+    /// of presses is one session undo step.
+    fn kern(&mut self, along_mm: f64, across_mm: f64) {
+        let subject = self.kern_subject();
+        let size = self.size.as_mm();
+        let changed: Vec<(usize, CharValues)> = subject
+            .into_iter()
+            .map(|(index, values)| (index, kerned(values, along_mm, across_mm, size)))
+            .filter(|(index, values)| self.state.chars.get(*index) != Some(values))
+            .collect();
+        if changed.is_empty() {
+            return;
+        }
+        self.record(Run::Kerning);
+        self.set_chars(&changed);
     }
 
     /// Replaces the selection by `text`, cut at the character limit; true when it was cut.
@@ -343,8 +442,14 @@ impl TextEdit {
         if fitting.is_empty() && range.is_empty() {
             return limited;
         }
-        self.record(typing);
+        self.record(if typing { Run::Typing } else { Run::None });
         self.preedit = None;
+        splice(
+            &mut self.state.chars,
+            &self.state.string,
+            range.clone(),
+            fitting.chars().count(),
+        );
         self.state.string.replace_range(range.clone(), &fitting);
         self.state.caret = range.start + fitting.len();
         self.state.anchor = self.state.caret;
@@ -368,7 +473,8 @@ impl TextEdit {
         if range.is_empty() {
             return;
         }
-        self.record(false);
+        self.record(Run::None);
+        splice(&mut self.state.chars, &self.state.string, range.clone(), 0);
         self.state.string.replace_range(range.clone(), "");
         self.state.caret = range.start;
         self.state.anchor = range.start;
@@ -432,14 +538,24 @@ impl TextEdit {
     /// The document's refusal (a text deleted by a peer meanwhile, an invalid placement).
     pub fn finish(&self, document: &Document) -> Result<Finished, TextEditError> {
         let string = &self.state.string;
+        let chars = self.chars();
         match self.target {
             EditTarget::New if string.is_empty() => Ok(Finished::Nothing),
             EditTarget::New => document
-                .create_text(string, &self.font, self.size, self.placement, &self.layout)
+                .create_text_with_chars(
+                    string,
+                    &self.font,
+                    self.size,
+                    self.placement,
+                    &self.layout,
+                    &chars,
+                )
                 .map(Finished::Created),
-            EditTarget::Existing(_) if *string == self.original => Ok(Finished::Nothing),
+            EditTarget::Existing(_) if (string, &chars) == (&self.original.0, &self.original.1) => {
+                Ok(Finished::Nothing)
+            }
             EditTarget::Existing(id) => {
-                document.edit_text_string(id, string)?;
+                document.edit_text(id, string, &chars)?;
                 Ok(if string.is_empty() {
                     Finished::Removed(id)
                 } else {
@@ -633,5 +749,83 @@ mod tests {
         assert_eq!(edit.string(), "ab");
         edit.apply(TextInput::Insert("ü".to_owned()), None);
         assert_eq!(edit.shown(), ("abü".to_owned(), None, 4));
+    }
+
+    fn kern_at(edit: &TextEdit, index: usize) -> CharValues {
+        edit.chars().get(index)
+    }
+
+    /// Criteria 29 and 30: Alt+arrows kern the character after the caret (or each of the
+    /// selection), a run of them is one session undo step; typed characters next to a kerned one
+    /// get none, deleting it deletes its kern; the end of a line has no subject.
+    #[test]
+    fn ac29_ac30_kerning_in_the_session() {
+        let mut edit = session();
+        typed(&mut edit, "AV");
+        edit.apply(
+            TextInput::Move {
+                to: CaretMove::Left,
+                extend: false,
+            },
+            None,
+        );
+        for _ in 0..3 {
+            edit.apply(
+                TextInput::Kern {
+                    along_mm: -0.1,
+                    across_mm: 0.0,
+                },
+                None,
+            );
+        }
+        assert!((kern_at(&edit, 1).kern_x + 0.03).abs() < 1e-12);
+        typed(&mut edit, "x");
+        assert_eq!(
+            kern_at(&edit, 1),
+            CharValues::DEFAULT,
+            "typed before it: none"
+        );
+        assert!(
+            (kern_at(&edit, 2).kern_x + 0.03).abs() < 1e-12,
+            "moved along"
+        );
+        edit.apply(TextInput::Undo, None);
+        edit.apply(TextInput::Undo, None);
+        assert!(edit.chars().is_empty(), "the run of kerns is one step");
+        edit.apply(TextInput::Redo, None);
+        edit.apply(
+            TextInput::Move {
+                to: CaretMove::LineEnd,
+                extend: false,
+            },
+            None,
+        );
+        assert_eq!(edit.kern_subject(), []);
+        edit.apply(
+            TextInput::Kern {
+                along_mm: 1.0,
+                across_mm: 0.0,
+            },
+            None,
+        );
+        edit.apply(TextInput::DeleteBackward, None);
+        assert!(
+            edit.chars().is_empty(),
+            "deleting the character deletes its kern"
+        );
+        edit.apply(TextInput::SelectAll, None);
+        edit.apply(
+            TextInput::Kern {
+                along_mm: 0.0,
+                across_mm: 1.0,
+            },
+            None,
+        );
+        assert_eq!(edit.chars().entries().len(), 1);
+        let document = Document::new(1);
+        let Ok(Finished::Created(id)) = edit.finish(&document) else {
+            panic!("created")
+        };
+        assert!((document.text(id).unwrap().chars.get(0).kern_y - 0.1).abs() < 1e-12);
     }
 }

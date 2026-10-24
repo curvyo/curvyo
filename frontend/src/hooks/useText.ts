@@ -24,7 +24,9 @@ import {
   parseStyle,
   styleNotice,
 } from "@/lib/styleText";
-import { type AlignCode, parseAlign } from "@/lib/textLayoutText";
+import type { NudgeReadout } from "@/hooks/useNudgeFeedback";
+import { NUDGE_READOUT_MS } from "@/lib/nudgeText";
+import { type AlignCode, kernKey, parseAlign } from "@/lib/textLayoutText";
 import {
   type OrientationCode,
   type WritingModeCode,
@@ -181,6 +183,9 @@ export interface GlyphSubject {
 
 export interface TextApi {
   editing: boolean;
+  /** The readout of an Alt+arrow kern at the caret ("Kern +0.3, 0.0 mm"), canvas CSS px; gone
+   * 800 ms after the last key (`0079` UX notes §10.3). */
+  kernReadout: NudgeReadout | null;
   /** The glyph table's subject face; `null` before any font is listed. */
   glyphSubject: GlyphSubject | null;
   /** A cell's character inserted (`0082` criteria 12 to 14); unless `keepFocus`, the focus goes
@@ -257,6 +262,8 @@ export function useText(
   const [listsRevision, setListsRevision] = useState(0);
   const [objectToPathNotice, setObjectToPathNotice] = useState<string | null>(null);
   const [glyphSubject, setGlyphSubject] = useState<GlyphSubject | null>(null);
+  const [kernReadout, setKernReadout] = useState<NudgeReadout | null>(null);
+  const kernTimer = useRef<number | undefined>(undefined);
   const sinkRef = useRef<HTMLTextAreaElement | null>(null);
   const lastKeyRef = useRef(0);
   const composingRef = useRef(false);
@@ -530,6 +537,21 @@ export function useText(
         // Tab goes to the Text bar's Font button; edit mode stays (UX notes §2).
         event.preventDefault();
         document.querySelector<HTMLElement>("[data-text-font-button]")?.focus();
+        return;
+      }
+      const kern = kernKey(key, event.altKey, event.shiftKey, ctrl);
+      if (kern) {
+        event.preventDefault();
+        const readout = session.text_kern(kern[0], kern[1], kern[2]);
+        afterInput(session);
+        if (readout) {
+          const caret = session.text_caret_point();
+          if (caret.length === 2) {
+            setKernReadout({ text: readout, x: caret[0], y: caret[1] });
+            window.clearTimeout(kernTimer.current);
+            kernTimer.current = window.setTimeout(() => setKernReadout(null), NUDGE_READOUT_MS);
+          }
+        }
         return;
       }
       const moves: Record<string, string> = {
@@ -826,6 +848,7 @@ export function useText(
 
   return {
     editing,
+    kernReadout,
     glyphSubject,
     insertGlyph,
     bar,

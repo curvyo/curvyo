@@ -129,7 +129,7 @@ impl WasmSession {
         self.session.set_text_glyph_orientation(orientation);
     }
 
-    /// The text layout block, as JSON: `null` when it is not shown, else the four fields in
+    /// The text layout block, as JSON: `null` when it is not shown, else the seven fields in
     /// order (`{"text", "value", "mixed", "auto", "barFrom", "barTo", "zero", "dragBase",
     /// "dragMin", "dragLimit", "trackMin", "trackMax", "resettable"}`).
     #[must_use]
@@ -144,7 +144,8 @@ impl WasmSession {
     }
 
     /// A tick of a drag or a click on the field `field` (`"letter-spacing"`, `"word-spacing"`,
-    /// `"line-spacing"`, `"character-rotation"`) at position `p`, grid `"normal"`, `"coarse"` or
+    /// `"line-spacing"`, `"character-rotation"`, `"horizontal-kerning"`, `"vertical-kerning"`,
+    /// `"char-rotation"`) at position `p`, grid `"normal"`, `"coarse"` or
     /// `"fine"`.
     pub fn preview_text_layout(&mut self, field: &str, p: f64, grid: &str) {
         if let (Some(field), Some(grid)) = (LayoutField::from_name(field), Grid::from_name(grid)) {
@@ -168,6 +169,15 @@ impl WasmSession {
     /// Escape during a drag: nothing is written.
     pub fn cancel_text_layout_preview(&mut self) {
         self.session.cancel_text_layout_preview();
+    }
+
+    /// "All characters" next to a per-character field (`specs/0079-text-layout-controls`
+    /// criterion 27c): its value set on every character of the subject texts; the outcome JSON.
+    pub fn apply_text_layout_to_all(&mut self, field: &str) -> String {
+        LayoutField::from_name(field).map_or_else(
+            || outcome_json(LayoutOutcome::Unchanged),
+            |field| outcome_json(self.session.apply_text_layout_to_all(field)),
+        )
     }
 
     /// The reset slot or Ctrl+Backspace of a field; the outcome JSON.

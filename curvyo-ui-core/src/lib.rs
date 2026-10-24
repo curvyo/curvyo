@@ -116,6 +116,7 @@ mod text_box;
 mod text_caret;
 mod text_convert;
 mod text_edit;
+mod text_edit_chars;
 mod text_layout;
 mod text_layout_fields;
 mod transform_commit;
@@ -340,7 +341,7 @@ pub use style_scope::{
     skipped_single_line_texts, style_scope, style_scope_in,
 };
 pub use text_box::{line_box_contains, line_box_corners};
-pub use text_caret::{TextEditGeometry, edit_geometry};
+pub use text_caret::{TextEditGeometry, edit_geometry, nearest_boundary};
 pub use text_convert::{
     TextRefusal, area_refusal, build_text_conversions, text_path, texts_as_paths, texts_refusal,
 };

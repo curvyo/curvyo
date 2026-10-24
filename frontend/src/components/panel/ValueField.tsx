@@ -58,6 +58,10 @@ interface ValueFieldProps {
   /** The smallest position a plain click sets, 0 to 1 (0 unless a click at the far left must
    * not set the minimum, as for an opacity). A drag and the keys still reach the end. */
   clickMinP?: number;
+  /** The reset slot's name when it is not "Reset <name> to <default>" (tooltip and label). */
+  resetLabel?: string;
+  /** 224 px wide instead of 244 px, to leave room for a 28 px button beside it in the panel. */
+  narrow?: boolean;
   /** The reset target as text ("0.25 mm", "100 %"). */
   defaultText: string;
   /** A further muted line of the field's one tooltip, or nothing. */
@@ -115,6 +119,8 @@ export function ValueField({
   valueMax,
   clickMinP = 0,
   defaultText,
+  resetLabel,
+  narrow = false,
   messages,
   note,
   onPreview,
@@ -173,7 +179,7 @@ export function ValueField({
 
   const unitText = mixed ? "" : unit;
   return (
-    <div className="relative h-7 w-[244px]">
+    <div className={`relative h-7 ${narrow ? "w-[224px]" : "w-[244px]"}`}>
       {typing ? (
         <>
           <EntryField
@@ -183,7 +189,7 @@ export function ValueField({
             suffix={unit}
             suffixRight={30}
             gutter={30 + (unit.length > 1 ? 24 : 12) + 4}
-            width={244}
+            width={narrow ? 224 : 244}
             autoFocus
             initialText={typing.initial}
             onSubmit={onSubmit}
@@ -220,7 +226,7 @@ export function ValueField({
             aria-keyshortcuts="Control+Backspace Enter F2"
             onKeyDown={onKeyDown}
             {...handlers}
-            className="relative h-7 w-[244px] cursor-ew-resize overflow-hidden rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] bg-white outline-none hover:border-[var(--toolbar-icon)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)]"
+            className={`relative h-7 ${narrow ? "w-[224px]" : "w-[244px]"} cursor-ew-resize overflow-hidden rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] bg-white outline-none hover:border-[var(--toolbar-icon)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)]`}
             style={{ touchAction: "pan-y" }}
           >
             {!mixed && bar > barFrom && (
@@ -277,11 +283,11 @@ export function ValueField({
         </SliderTip>
       )}
       {resettable && !typing && (
-        <Tooltip side="left" content={`Reset to ${defaultText} (${TOOLTIP_KEY}+Backspace)`}>
+        <Tooltip side="left" content={`${resetLabel ?? `Reset to ${defaultText}`} (${TOOLTIP_KEY}+Backspace)`}>
           <button
             type="button"
             tabIndex={-1}
-            aria-label={`Reset ${name.toLowerCase()} to ${defaultText}`}
+            aria-label={resetLabel ?? `Reset ${name.toLowerCase()} to ${defaultText}`}
             onClick={(event) => {
               onReset();
               // `detail` is 0 for keyboard activation, 1 or more for a click.

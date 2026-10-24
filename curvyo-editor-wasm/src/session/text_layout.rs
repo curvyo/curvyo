@@ -1,10 +1,11 @@
 //! `Session`'s glue for the text layout controls (`specs/0079-text-layout-controls` slice 1,
-//! `adrs.md` decision 3): the Alignment group, and the four fields of the text layout block with
+//! `adrs.md` decision 3): the Alignment group, and the fields of the text layout block with
 //! their live preview, commit, reset and typed values. The rules live in `curvyo_ui_core`
 //! (`realigned_placement`, `text_layout_fields`).
 
 use curvyo_document_core::{
-    Affine, Length, NodeId, TextAlign, TextLayoutLabel, TextLayoutValues, TextWritingMode,
+    Affine, CharValues, Length, NodeId, TextAlign, TextLayoutLabel, TextLayoutValues,
+    TextWritingMode,
 };
 use curvyo_ui_core::{
     Grid, LayoutChange, LayoutField, LayoutFieldView, LayoutSubject, field_view, parse_field_text,
@@ -48,6 +49,7 @@ impl Session {
                     size_mm: size.as_mm(),
                     values: *values,
                     natural_line_mm: 0.0,
+                    kern: CharValues::DEFAULT,
                 };
                 set_field(field, &[subject], value)
                     .values
@@ -131,22 +133,42 @@ impl Session {
                         * text.size.as_mm()
                         / metrics.cap_height
                 }),
+                kern: CharValues::DEFAULT,
             })
             .collect()
     }
 
-    /// The text layout block's four fields, in order, or `None` when it is not shown: no text
-    /// is selected and none is in edit mode (criterion 6).
+    /// The subjects of `field`: the texts, or for a kerning field their characters.
+    fn field_subjects(&self, field: LayoutField) -> Vec<LayoutSubject> {
+        if field.is_per_character() {
+            self.kern_layout_subjects()
+        } else {
+            self.layout_subjects()
+        }
+    }
+
+    /// The text layout block's seven fields, in order, or `None` when it is not shown: no text
+    /// is selected and none is in edit mode (criteria 6, 26).
     #[must_use]
     pub fn text_layout_block(&self) -> Option<Vec<LayoutFieldView>> {
         let subjects = self.layout_subjects();
         if subjects.is_empty() {
             return None;
         }
+        let kerns = self.kern_layout_subjects();
         Some(
             LayoutField::ALL
                 .iter()
-                .map(|field| field_view(*field, &subjects))
+                .map(|field| {
+                    field_view(
+                        *field,
+                        if field.is_per_character() {
+                            &kerns
+                        } else {
+                            &subjects
+                        },
+                    )
+                })
                 .collect(),
         )
     }
@@ -158,7 +180,7 @@ impl Session {
             return;
         }
         self.text.layout_preview = None;
-        let subjects = self.layout_subjects();
+        let subjects = self.field_subjects(field);
         if subjects.is_empty() {
             return;
         }
@@ -195,6 +217,9 @@ impl Session {
 
     /// The reset slot or Ctrl+Backspace: 0, or Auto for Line spacing, in one step.
     pub fn reset_text_layout(&mut self, field: LayoutField) -> LayoutOutcome {
+        if field.is_per_character() {
+            return self.reset_kerning(field);
+        }
         let value = match field {
             LayoutField::LineSpacing => None,
             _ => Some(0.0),
@@ -212,6 +237,9 @@ impl Session {
 
     /// Sets `field` to `value` on every subject text in one step (criteria 12 to 14).
     fn set_text_layout_value(&mut self, field: LayoutField, value: Option<f64>) -> LayoutOutcome {
+        let Some(label) = field.label() else {
+            return self.set_kerning_value(field, value, false);
+        };
         self.text.layout_preview = None;
         self.recording(|this| {
             let texts = this.bar_texts();
@@ -224,12 +252,14 @@ impl Session {
                     size_mm: text.size.as_mm(),
                     values: text.layout,
                     natural_line_mm: 0.0,
+                    kern: CharValues::DEFAULT,
                 })
                 .collect();
             let LayoutChange {
                 values,
                 limited,
                 limit,
+                ..
             } = set_field(field, &subjects, value);
             let writes: Vec<(NodeId, TextLayoutValues, Affine)> = texts
                 .iter()
@@ -240,7 +270,7 @@ impl Session {
             if writes.is_empty() && limited == 0 {
                 return LayoutOutcome::Unchanged;
             }
-            this.write_layout(&writes, field.label());
+            this.write_layout(&writes, label);
             match (limit, texts.len()) {
                 (Some((top, mm)), 1) => LayoutOutcome::Clamped(top, mm),
                 (Some(_), of) => LayoutOutcome::Limited { limited, of },
@@ -280,5 +310,8 @@ const fn field_index(field: LayoutField) -> usize {
         LayoutField::WordSpacing => 1,
         LayoutField::LineSpacing => 2,
         LayoutField::CharacterRotation => 3,
+        LayoutField::HorizontalKerning => 4,
+        LayoutField::VerticalKerning => 5,
+        LayoutField::CharRotation => 6,
     }
 }
