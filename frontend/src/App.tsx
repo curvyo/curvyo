@@ -70,7 +70,7 @@ function Editor() {
   );
   const returnToText = () => {
     if (editor.text.editing) {
-      editor.text.sinkRef.current?.focus();
+      editor.text.sinkRef.current?.focus({ preventScroll: true });
     } else {
       editor.containerRef.current?.focus();
     }
@@ -87,7 +87,7 @@ function Editor() {
     // The one tooltip provider of the app: every `Tooltip` and `SliderTip` below needs it, and a
     // component that renders one without it throws (`frontend/tests/tooltipProvider.test.ts`).
     <TooltipProvider>
-    <div className="flex h-screen w-screen flex-col overflow-hidden">
+    <div className="flex h-screen w-screen flex-col overflow-clip" data-scroll-lock="">
       <div className="flex min-h-0 flex-1">
         {/* The canvas area: the drawing, and the font preview beside it or over it
          * (`specs/0077-font-preview`). */}
@@ -222,7 +222,7 @@ function Editor() {
               onPressItalic={editor.text.pressItalic}
               onReturnFocus={() => {
                 if (editor.text.editing) {
-                  editor.text.sinkRef.current?.focus();
+                  editor.text.sinkRef.current?.focus({ preventScroll: true });
                 } else {
                   editor.containerRef.current?.focus();
                 }

@@ -262,6 +262,19 @@
   }
 }
 
+/* The app is one fixed screen: the page itself never scrolls, not even to reveal a focused field
+   or the text caret past the view (customer report 2026-10-24, `src/lib/pageScroll.ts`). */
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+body {
+  position: fixed;
+  inset: 0;
+}
+
 /* 0007: a panel field shows the "Mixed" placeholder in its own token, not the
    browser default grey (4.6:1; this one is 5.3:1 on white). */
 .style-field::placeholder {
