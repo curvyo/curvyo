@@ -164,6 +164,7 @@ to it instead of restating it.
 | R-FONT-008 | Shipped fonts have a free licence recorded per font; the font's embedding permission is shown and does not block use. | Should | Proposal |
 | R-FONT-009 | Laserable lettering (customer, 2026-10-17): overlapping letters and monoline strokes become one clean outline for cutting: Weld with a tolerance (including stroke to path), optional bridges for islands. Analysis shows Union already covers closed overlaps. Draft sketch. `specs/0068-laserable-lettering/` | Should | Customer (2026-10-17) |
 | R-FONT-010 | Weight and italic buttons for a text (customer, 2026-10-23): Extra Light, Light, Regular, Bold, Extra Bold and Italic switch the selected text to the matching face of its family; a style the family does not have is shown greyed. `specs/0078-font-style-buttons/` | Should | Customer (2026-10-23) |
+| R-FONT-011 | Text layout controls (customer, 2026-10-23): alignment left, centre, right and justify; letter, word and line spacing in mm held relative to the size; character rotation; a taper of each letter, vertical writing and per-character kerning in later slices. `specs/0079-text-layout-controls/` | Should | Customer (2026-10-23) |
 
 **Tracked, not blocking (open research item):** unlike icons/symbols (§11,
 Iconify), no third-party asset-library service for *fonts* has been

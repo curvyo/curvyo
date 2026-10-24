@@ -195,6 +195,15 @@ budget for the text engine 1.3 MiB uncompressed). Details in `specs/0074-text-ob
   SL-WASM: the wasm budget for the text engine is raised from 1.4 MiB to **2 MiB** uncompressed
   (`docs/technical-debt.md`).
 
+- 2026-10-24, text layout controls slice 1 (`specs/0079-text-layout-controls/adrs.md` decisions 1
+  to 6): §1 the text node gains five optional registers, `text_align`, `text_letter_space`,
+  `text_word_space`, `text_line_space` (factors of `text_size`) and `text_rotation` (degrees);
+  absent is the default and a default is never written; `format_version` 19. Still no measured
+  layout is stored. §2 `curvyo-text-core::layout` takes `LayoutOptions` (alignment, spacing in
+  mm, line spacing, rotation): lines are aligned on their extent, justified to the widest line,
+  letter spacing turns `liga`, `clig` and `calt` off, glyphs turn about their cluster's centre;
+  drawing, the edit session, the hit box and Object to path share that one layout.
+
 ## Consequences
 
 - One more leaf kind: an arm in every exhaustive match, as images took.
