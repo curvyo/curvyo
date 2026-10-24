@@ -364,6 +364,7 @@ impl Document {
         }
         crate::clone_copy::relink_copied_clones(&tree, &copying.made, offset);
         crate::text_carrier::relink_copied_texts(&tree, &copying.made, text_shifts);
+        crate::text_clone_commands::relink_copied_text_clones(&tree, &copying.made);
         self.commit_with_label("duplicate_objects");
         Ok(created
             .into_iter()
@@ -426,7 +427,7 @@ impl Document {
             if !text.placement.is_finite() {
                 return Err(ObjectEditError::NonFiniteGeometry);
             }
-            crate::text_codec::write_size_and_placement_if_changed(&meta, text);
+            crate::text_clone_commands::write_transformed(&tree, &meta, text);
             self.write_hold(&tree, hold);
             self.commit_with_label("rotate_object");
             return Ok(());

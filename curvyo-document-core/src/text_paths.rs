@@ -137,11 +137,21 @@ fn write_group(
     // to nodes this function just created.
     #[allow(clippy::unwrap_used)]
     let text_meta = tree.get_meta(text_node).unwrap();
-    let mut style = crate::style_codec::read_style(&text_meta);
+    // A text clone's style and face are those it shows (`specs/0080-text-on-path` criterion 42).
+    let shown = crate::text_clone_read::read_text_node(
+        tree,
+        NodeId::from_parts(text_node.peer, text_node.counter),
+        &text_meta,
+    );
+    let mut style = shown.as_ref().map_or_else(
+        || crate::style_codec::read_style(&text_meta),
+        |t| t.style.clone(),
+    );
     // A single-line text's paths are open centre lines: Fill off, so no closing line is ever
     // filled (`specs/0076-single-line-fonts` criterion 17).
-    if crate::text_codec::read_font(&text_meta)
-        .is_some_and(|font| font.kind == crate::text_model::FontKind::SingleLine)
+    if shown
+        .as_ref()
+        .is_some_and(|text| text.font.kind == crate::text_model::FontKind::SingleLine)
     {
         style.fill.enabled = false;
     }

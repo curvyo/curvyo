@@ -33,6 +33,16 @@ pub struct CloneColours {
     pub stroke: Option<crate::path_model::Color>,
 }
 
+impl CloneColours {
+    /// `style` with these colours: the fill colour, and the stroke colour when given.
+    fn apply(&self, style: &mut Style) {
+        style.fill.color = self.fill;
+        if let Some(stroke) = self.stroke {
+            style.stroke.color = stroke;
+        }
+    }
+}
+
 impl Document {
     /// Sets the placement state of every clone of `clones`: `own` true holds it back when its
     /// original is transformed, false lets it follow again (`0057` criterion 2). Nothing moves:
@@ -77,6 +87,23 @@ impl Document {
     /// [`CloneError::NoSuchObject`] for an id that does not exist; [`CloneError::NotAClone`] for
     /// one that is not a resolvable clone. Checked before the first write.
     pub fn set_own_style(&self, clones: &[NodeId], own: bool) -> Result<usize, CloneError> {
+        self.set_own_style_and_texts(clones, &[], own)
+    }
+
+    /// [`Document::set_own_style`] for the linked clones of `clones` and, in the **same commit**,
+    /// the text clones of `texts` (`specs/0080-text-on-path` criterion 40, lead decision 2): `own`
+    /// true gives each a copy of the style it shows, false removes it; a text clone's opacity
+    /// stays its own register. Returns how many changed.
+    ///
+    /// # Errors
+    /// As [`Document::set_own_style`]; [`CloneError::NotAClone`] for an id of `texts` that is not
+    /// a text clone with a live source. Checked before the first write.
+    pub fn set_own_style_and_texts(
+        &self,
+        clones: &[NodeId],
+        texts: &[NodeId],
+        own: bool,
+    ) -> Result<usize, CloneError> {
         let tree = self.loro().get_tree(OBJECTS_TREE);
         let read = self.read_objects();
         let metas = live_clone_metas(&tree, &read, clones)?;
@@ -91,6 +118,10 @@ impl Document {
             });
             planned.push((meta, copy));
         }
+        let text_plan = self
+            .plan_text_clone_style(texts, own)
+            .map_err(|_| CloneError::NotAClone)?;
+        crate::text_clone_commands::write_text_clone_style(&text_plan, own);
         for (meta, copy) in &planned {
             if let Some((style, opacity)) = copy {
                 write_own_style(meta, style, *opacity);
@@ -99,14 +130,14 @@ impl Document {
                 write_flag(meta, KEY_OWN_STYLE, false);
             }
         }
-        if !planned.is_empty() {
+        if !planned.is_empty() || !text_plan.is_empty() {
             self.commit_with_label(if own {
                 OWN_STYLE_COMMIT_LABEL
             } else {
                 ORIGINAL_STYLE_COMMIT_LABEL
             });
         }
-        Ok(planned.len())
+        Ok(planned.len() + text_plan.len())
     }
 }
 
@@ -114,23 +145,40 @@ impl Document {
     /// Spread colours (`0057` criterion 42): every clone of `colours` gets its own style if it has
     /// none (a copy of the style it shows, as [`Document::set_own_style`]) and the given fill and
     /// stroke colours, alpha and opacity kept, in **one commit** labelled
-    /// [`SPREAD_COLOURS_COMMIT_LABEL`]. Returns how many clones changed; with none, nothing is
-    /// committed.
+    /// [`SPREAD_COLOURS_COMMIT_LABEL`]. A text clone among them is treated the same way
+    /// (`specs/0080-text-on-path` criterion 40). Returns how many clones changed; with none,
+    /// nothing is committed.
     ///
     /// # Errors
     /// As [`Document::set_own_style`]; checked before the first write.
     pub fn recolour_clones(&self, colours: &[CloneColours]) -> Result<usize, CloneError> {
         let tree = self.loro().get_tree(OBJECTS_TREE);
         let read = self.read_objects();
-        let ids: Vec<NodeId> = colours.iter().map(|c| c.clone).collect();
+        // Text clones take part too (`specs/0080-text-on-path`, lead decision 3).
+        let (texts, linked): (Vec<CloneColours>, Vec<CloneColours>) =
+            colours.iter().copied().partition(|c| {
+                matches!(
+                    read.get(c.clone),
+                    Some(crate::primitive_model::ObjectSnapshot::Text(_))
+                )
+            });
+        let text_ids: Vec<NodeId> = texts.iter().map(|c| c.clone).collect();
+        let text_plan = self
+            .plan_text_unlinks(&text_ids)
+            .map_err(|_| CloneError::NotAClone)?;
+        let ids: Vec<NodeId> = linked.iter().map(|c| c.clone).collect();
         let metas = live_clone_metas(&tree, &read, &ids)?;
         let mut changed = 0;
-        for ((meta, clone), wanted) in metas.iter().zip(colours) {
-            let mut style = clone.resolved.style.clone();
-            style.fill.color = wanted.fill;
-            if let Some(stroke) = wanted.stroke {
-                style.stroke.color = stroke;
+        for ((meta, shown), wanted) in text_plan.iter().zip(&texts) {
+            let mut style = shown.style.clone();
+            wanted.apply(&mut style);
+            if crate::text_clone_commands::write_text_clone_colours(meta, shown, &style) {
+                changed += 1;
             }
+        }
+        for ((meta, clone), wanted) in metas.iter().zip(&linked) {
+            let mut style = clone.resolved.style.clone();
+            wanted.apply(&mut style);
             if clone.chain.own_style {
                 if crate::style_codec::write_changes(meta, &clone.resolved.style, &style) {
                     changed += 1;

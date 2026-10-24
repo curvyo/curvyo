@@ -147,6 +147,27 @@ fn c07_a_locked_carrier_is_not_marked() {
     assert!(on_path(&d, t).curve.is_some());
 }
 
+/// Criterion 4: a text or a group is no carrier (the rule of Put text on paths); nothing is
+/// written.
+#[test]
+fn c04_a_text_or_a_group_is_refused_as_carrier() {
+    let d = Document::new(1);
+    let t = text(&d, "Hi");
+    let other = text(&d, "Other");
+    let first = line(&d, 1, (0.0, 0.0), (100.0, 0.0));
+    let second = line(&d, 2, (0.0, 10.0), (100.0, 10.0));
+    let group = d.group_objects(&[first, second]).unwrap();
+    let at = OnPathValues::at(Length::from_mm(0.0));
+    for carrier in [other, group, t] {
+        assert_eq!(
+            d.put_text_on_path(t, on(carrier), &at, true),
+            Err(curvyo_document_core::TextEditError::NoSuchText)
+        );
+    }
+    assert!(read_text(&d, t).on_path.is_none());
+    assert!(!is_guide(&d, other));
+}
+
 /// Criteria 17, 18, 23: the values with their labels; Release deletes every key, writes the
 /// straight placement, and leaves the carrier a guide (4a).
 #[test]
@@ -590,7 +611,7 @@ fn golden_document() -> (Document, Vec<NodeId>) {
 /// the clone guide, and a text whose carrier names nothing reads straight (criterion 35).
 #[test]
 fn c34_golden_file_of_format_22() {
-    assert_eq!(CURRENT_FORMAT_VERSION, 22);
+    const _: () = assert!(CURRENT_FORMAT_VERSION >= 22);
     let (document, texts) = golden_document();
     if std::env::var_os("CURVYO_WRITE_FIXTURES").is_some() {
         std::fs::write(fixture_path(GOLDEN), pack(&document, "0.1.0").unwrap()).unwrap();

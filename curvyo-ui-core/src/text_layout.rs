@@ -323,6 +323,7 @@ mod tests {
             style: Style::default(),
             outline: None,
             on_path: None,
+            source: None,
         }
     }
 

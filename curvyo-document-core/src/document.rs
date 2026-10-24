@@ -240,7 +240,14 @@ pub struct DocumentVersion(pub(crate) loro::Frontiers);
 /// text on path as a straight text and a guide clone as artwork (a cut) without a word, so it must
 /// refuse every file of this build as too new. Migration from version 21 is none: absent keys are
 /// a straight text. The number is provisional by the rule above. Golden: `text_on_path_v22.curvyo`.
-pub const CURRENT_FORMAT_VERSION: u32 = 22;
+///
+/// Bumped to 23 in `text-on-several-paths` (ADR 0022 §4): a text may carry `text_source` (a text
+/// clone, `crate::text_clone_codec`) and then no string, font, size or layout of its own, and with
+/// `own_style` its own style keys. A build that stops at version 22 refuses such a node at open
+/// (no string) or would drop it, so it must refuse every file of this build as too new.
+/// Migration from version 22 is none: no text has a source. The number is provisional by the rule
+/// above. Golden: `text_clones_v23.curvyo`.
+pub const CURRENT_FORMAT_VERSION: u32 = 23;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";
@@ -290,6 +297,9 @@ pub struct Document {
     /// How many texts kept their removed carrier's outline since the host last asked
     /// (`crate::text_carrier`); view state, not stored.
     pub(crate) kept_carriers: std::cell::Cell<usize>,
+    /// How many text clones became texts because their source was removed (`0080` criterion
+    /// 41), since the session last read it.
+    pub(crate) text_clones_unlinked: std::cell::Cell<usize>,
     /// What the held-back rule of the last transform did (`crate::clone_hold`); view state.
     pub(crate) clone_hold: std::cell::Cell<crate::clone_hold::CloneHold>,
     /// The next counter of the anchor ids the clone repair takes (`crate::clone_repair`).
@@ -350,6 +360,7 @@ impl Document {
             initial_layer: std::cell::Cell::default(),
             clone_repair: std::cell::Cell::default(),
             kept_carriers: std::cell::Cell::default(),
+            text_clones_unlinked: std::cell::Cell::default(),
             clone_hold: std::cell::Cell::default(),
             repair_ids: std::cell::Cell::default(),
             clone_refusal: std::cell::Cell::default(),
@@ -407,6 +418,7 @@ impl Document {
             initial_layer: std::cell::Cell::default(),
             clone_repair: std::cell::Cell::default(),
             kept_carriers: std::cell::Cell::default(),
+            text_clones_unlinked: std::cell::Cell::default(),
             clone_hold: std::cell::Cell::default(),
             repair_ids: std::cell::Cell::default(),
             clone_refusal: std::cell::Cell::default(),

@@ -547,7 +547,7 @@ fn c34_round_trip_keeps_values_guide_and_curve() {
 /// Criterion 34: format 22 and the golden file with the cases the criterion lists.
 #[test]
 fn c34_golden_file_opens_with_texts_on_every_carrier_kind() {
-    assert_eq!(CURRENT_FORMAT_VERSION, 22);
+    const _: () = assert!(CURRENT_FORMAT_VERSION >= 22);
     let d = unpack(3, &fixture("text_on_path_v22.curvyo")).expect("golden opens");
     let texts: Vec<TextSnapshot> = d
         .read_objects()

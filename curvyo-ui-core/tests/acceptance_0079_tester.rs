@@ -52,6 +52,7 @@ fn snapshot(string: &str, size: f64, layout: TextLayoutValues, placement: Affine
         style: Style::default(),
         outline: None,
         on_path: None,
+        source: None,
     }
 }
 
