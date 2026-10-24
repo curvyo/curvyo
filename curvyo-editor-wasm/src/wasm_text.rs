@@ -47,6 +47,10 @@ pub struct TextBarStateView {
     /// "count"}}`.
     #[wasm_bindgen(getter_with_clone)]
     pub style_json: String,
+    /// The pressed alignment (`specs/0079-text-layout-controls` criterion 1): `"left"`,
+    /// `"centre"`, `"right"`, `"justify"`, or empty when the subject texts differ.
+    #[wasm_bindgen(getter_with_clone)]
+    pub align: String,
 }
 
 /// A Style button as JSON.
@@ -259,6 +263,7 @@ impl WasmSession {
                 "italic": style_button_json(&bar.style.italic),
             })
             .to_string(),
+            align: crate::wasm_text_layout::align_code(self.session.text_alignment()).to_owned(),
         }
     }
 

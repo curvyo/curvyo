@@ -1,5 +1,6 @@
 //! The document commands of text objects (`specs/0074-text-objects`): create, edit the string,
-//! change the font, change the size. Each is one commit.
+//! change the font, change the size, change the layout values
+//! (`specs/0079-text-layout-controls`). Each is one commit.
 
 use loro::{LoroMap, TreeID};
 
@@ -10,7 +11,7 @@ use crate::path_model::NodeId;
 use crate::style_model::Style;
 use crate::text_codec::{self, SHAPE_TEXT};
 use crate::text_model::{
-    FontKind, FontRef, MAX_TEXT_CHARS, MAX_TEXT_SIZE, MIN_TEXT_SIZE, TextSnapshot,
+    FontKind, FontRef, MAX_TEXT_CHARS, MAX_TEXT_SIZE, MIN_TEXT_SIZE, TextLayoutValues, TextSnapshot,
 };
 use crate::units::Length;
 
@@ -36,6 +37,35 @@ pub enum TextEditError {
     /// A font hash is not 64 hex digits.
     #[error("a font reference needs a 64-digit hex hash")]
     InvalidFont,
+}
+
+/// The step a layout change is (`specs/0079-text-layout-controls/adrs.md` decision 3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TextLayoutLabel {
+    /// "Change text alignment".
+    Alignment,
+    /// "Change letter spacing".
+    LetterSpacing,
+    /// "Change word spacing".
+    WordSpacing,
+    /// "Change line spacing".
+    LineSpacing,
+    /// "Change character rotation".
+    CharacterRotation,
+}
+
+impl TextLayoutLabel {
+    /// The commit label.
+    #[must_use]
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Alignment => "change_text_alignment",
+            Self::LetterSpacing => "change_letter_spacing",
+            Self::WordSpacing => "change_word_spacing",
+            Self::LineSpacing => "change_line_spacing",
+            Self::CharacterRotation => "change_character_rotation",
+        }
+    }
 }
 
 fn check_string(string: &str) -> Result<(), TextEditError> {
@@ -71,9 +101,10 @@ fn apply_single_line_stroke(meta: &LoroMap) {
 }
 
 impl Document {
-    /// Creates a text object in the drawing parent with the creation style, in **one commit**
-    /// labelled `add_text` (criteria 2, 7, 14). A single-line face switches a stroke that is off
-    /// on (`0076` criterion 9).
+    /// Creates a text object in the drawing parent with the creation style and the layout values
+    /// `layout` (defaults are not stored, `0079` decision 1), in **one commit** labelled
+    /// `add_text` (criteria 2, 7, 14). A single-line face switches a stroke that is off on (`0076`
+    /// criterion 9).
     ///
     /// # Errors
     /// [`TextEditError::Empty`], [`TextEditError::TooLong`], [`TextEditError::SizeOutOfRange`],
@@ -84,6 +115,7 @@ impl Document {
         font: &FontRef,
         size: Length,
         placement: Affine,
+        layout: &TextLayoutValues,
     ) -> Result<NodeId, TextEditError> {
         if string.is_empty() {
             return Err(TextEditError::Empty);
@@ -101,6 +133,7 @@ impl Document {
             string: string.to_owned(),
             font: font.clone(),
             size,
+            layout: layout.held(),
             placement,
             style: Style::default(),
             outline: None,
@@ -218,6 +251,43 @@ impl Document {
             }
         }
         self.commit_with_label("change_text_size");
+        Ok(())
+    }
+
+    /// Sets the layout values and placement of each text to the ones paired with it (`0079`
+    /// criteria 4, 12 to 14; `adrs.md` decision 3), in **one commit** labelled by `label`. Only
+    /// the keys that differ are written, a default deletes its key, and the placement is written
+    /// only when it differs (the anchor shift of an alignment change). Nothing is committed when
+    /// nothing changed.
+    ///
+    /// # Errors
+    /// [`TextEditError::NoSuchText`] when an id is not a live text, or
+    /// [`TextEditError::InvalidPlacement`]; nothing is written.
+    pub fn set_text_layout(
+        &self,
+        texts: &[(NodeId, TextLayoutValues, Affine)],
+        label: TextLayoutLabel,
+    ) -> Result<(), TextEditError> {
+        for (_, _, placement) in texts {
+            if !placement.is_within_limit()
+                || placement.determinant().abs() <= crate::affine::SINGULAR_DETERMINANT
+            {
+                return Err(TextEditError::InvalidPlacement);
+            }
+        }
+        let ids: Vec<NodeId> = texts.iter().map(|(id, _, _)| *id).collect();
+        let metas = self.text_metas(&ids)?;
+        let mut wrote = false;
+        for (meta, (_, layout, placement)) in metas.iter().zip(texts) {
+            wrote |= text_codec::write_layout(meta, layout);
+            if text_codec::read_placement(meta) != Some(*placement) {
+                text_codec::write_placement(meta, *placement);
+                wrote = true;
+            }
+        }
+        if wrote {
+            self.commit_with_label(label.label());
+        }
         Ok(())
     }
 

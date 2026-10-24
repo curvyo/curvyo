@@ -183,10 +183,11 @@ pub use style_model::{
 pub use styles::{StyleEdit, StyleEditError};
 pub use template::{LOAD_TEMPLATE_COMMIT_LABEL, TemplateNode};
 pub use text_model::{
-    FontKind, FontRef, MAX_STORED_TEXT_CHARS, MAX_TEXT_CHARS, MAX_TEXT_SIZE, MIN_TEXT_SIZE,
-    SINGLE_LINE_STROKE_WIDTH, TEXT_NAME_CHARS, TextOutline, TextSnapshot, UNCREATED_TEXT_ID,
-    clamp_text_size, is_face_hash, single_line_style,
+    FontKind, FontRef, LETTER_SPACING_FACTORS, LINE_SPACING_FACTORS, MAX_STORED_TEXT_CHARS,
+    MAX_TEXT_CHARS, MAX_TEXT_SIZE, MIN_TEXT_SIZE, SINGLE_LINE_STROKE_WIDTH, TEXT_NAME_CHARS,
+    TextAlign, TextLayoutValues, TextOutline, TextSnapshot, UNCREATED_TEXT_ID,
+    WORD_SPACING_FACTORS, clamp_text_size, is_face_hash, single_line_style,
 };
 pub use text_paths::TextConversion;
-pub use texts::TextEditError;
+pub use texts::{TextEditError, TextLayoutLabel};
 pub use units::{Angle, DocumentSize, Length, Point, Timestamp, Tolerance, Vec2, ViewTransform};

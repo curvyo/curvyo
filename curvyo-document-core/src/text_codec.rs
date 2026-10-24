@@ -12,6 +12,15 @@
 //!                    ONE LWW register holding a map *value*, written whole by a maker's pick
 //!   text_size      : 20.0                  mm, the capital H, 0.1 ..= 2000
 //!   text_placement : [a, b, c, d, e, f]    text space to document, one list value
+//!   text_align        : "centre" | "right" | "justify"   absent: left
+//!   text_letter_space : f64, factor of text_size          absent: 0
+//!   text_word_space   : f64, factor of text_size          absent: 0
+//!   text_line_space   : f64, factor of text_size, >= 0    absent: Auto
+//!   text_rotation     : f64, degrees in (-180, 180]       absent: 0
+//!                    the five layout keys are optional (format 19,
+//!                    `specs/0079-text-layout-controls/adrs.md` decision 1): a value at its
+//!                    default is deleted, never written; an unknown align reads as left, a
+//!                    non-finite number as the default, a factor out of range is clamped
 //!   + the style keys of a path (`style_codec`), `name`, `visible`, `locked`, `opacity`
 //! ```
 //!
@@ -25,9 +34,10 @@ use crate::affine::Affine;
 use crate::path_codec::as_f64;
 use crate::path_model::NodeId;
 use crate::text_model::{
-    FontKind, FontRef, MAX_STORED_TEXT_CHARS, MAX_TEXT_SIZE, MIN_TEXT_SIZE, TextSnapshot,
+    FontKind, FontRef, MAX_STORED_TEXT_CHARS, MAX_TEXT_SIZE, MIN_TEXT_SIZE, TextAlign,
+    TextLayoutValues, TextSnapshot,
 };
-use crate::units::Length;
+use crate::units::{Angle, Length};
 
 /// The `shape` tag of a text node.
 pub(crate) const SHAPE_TEXT: &str = "text";
@@ -41,6 +51,17 @@ const KEY_FACE_HASH: &str = "face_hash";
 const KEY_FACE_INDEX: &str = "face_index";
 const KEY_KIND: &str = "kind";
 const KIND_SINGLE_LINE: &str = "single_line";
+const KEY_ALIGN: &str = "text_align";
+const KEY_LETTER_SPACE: &str = "text_letter_space";
+const KEY_WORD_SPACE: &str = "text_word_space";
+const KEY_LINE_SPACE: &str = "text_line_space";
+const KEY_ROTATION: &str = "text_rotation";
+/// Two factors or rotations (radians) closer than this are the same stored value.
+const SAME_VALUE: f64 = 1e-12;
+
+fn differs(a: f64, b: f64) -> bool {
+    (a - b).abs() > SAME_VALUE
+}
 
 /// Whether `meta` is a text node's.
 pub(crate) fn is_text_meta(meta: &LoroMap) -> bool {
@@ -61,6 +82,86 @@ pub(crate) fn write_text(meta: &LoroMap, text: &TextSnapshot) {
     write_font(meta, &text.font);
     write_size(meta, text.size);
     write_placement(meta, text.placement);
+    write_layout(meta, &text.layout);
+}
+
+fn align_code(align: TextAlign) -> Option<&'static str> {
+    match align {
+        TextAlign::Left => None,
+        TextAlign::Centre => Some("centre"),
+        TextAlign::Right => Some("right"),
+        TextAlign::Justify => Some("justify"),
+    }
+}
+
+/// Writes the layout keys that differ from the stored ones: a value at its default deletes its
+/// key (`0079` decision 1). Returns whether anything was written. The caller commits.
+pub(crate) fn write_layout(meta: &LoroMap, layout: &TextLayoutValues) -> bool {
+    let stored = read_layout(meta);
+    let layout = layout.held();
+    let mut wrote = false;
+    let mut put = |key: &str, value: Option<LoroValue>| {
+        let present = meta.get(key).is_some();
+        // invariant: inserting or deleting a plain value under a known key on an attached map
+        // cannot fail.
+        #[allow(clippy::unwrap_used)]
+        match value {
+            Some(value) => meta.insert(key, value).unwrap(),
+            None if present => meta.delete(key).unwrap(),
+            None => return,
+        }
+        wrote = true;
+    };
+    if stored.align != layout.align {
+        put(KEY_ALIGN, align_code(layout.align).map(LoroValue::from));
+    }
+    let factor = |value: f64| (value.abs() > SAME_VALUE).then_some(LoroValue::Double(value));
+    if differs(stored.letter_spacing, layout.letter_spacing) {
+        put(KEY_LETTER_SPACE, factor(layout.letter_spacing));
+    }
+    if differs(stored.word_spacing, layout.word_spacing) {
+        put(KEY_WORD_SPACE, factor(layout.word_spacing));
+    }
+    let line_changed = match (stored.line_spacing, layout.line_spacing) {
+        (Some(a), Some(b)) => differs(a, b),
+        (a, b) => a.is_some() != b.is_some(),
+    };
+    if line_changed {
+        put(KEY_LINE_SPACE, layout.line_spacing.map(LoroValue::Double));
+    }
+    // Degrees on disk, radians in the model: equal within float noise is unchanged.
+    if differs(stored.rotation.as_radians(), layout.rotation.as_radians()) {
+        put(
+            KEY_ROTATION,
+            factor(layout.rotation.as_radians().to_degrees()),
+        );
+    }
+    wrote
+}
+
+/// The layout values as stored, every absent or damaged key at its default.
+pub(crate) fn read_layout(meta: &LoroMap) -> TextLayoutValues {
+    let number = |key: &str| match meta.get(key) {
+        Some(ValueOrContainer::Value(value)) => as_f64(&value).filter(|v| v.is_finite()),
+        _ => None,
+    };
+    let align = match meta.get(KEY_ALIGN) {
+        Some(ValueOrContainer::Value(LoroValue::String(code))) => match code.as_str() {
+            "centre" => TextAlign::Centre,
+            "right" => TextAlign::Right,
+            "justify" => TextAlign::Justify,
+            _ => TextAlign::Left,
+        },
+        _ => TextAlign::Left,
+    };
+    TextLayoutValues {
+        align,
+        letter_spacing: number(KEY_LETTER_SPACE).unwrap_or(0.0),
+        word_spacing: number(KEY_WORD_SPACE).unwrap_or(0.0),
+        line_spacing: number(KEY_LINE_SPACE),
+        rotation: Angle::from_radians(number(KEY_ROTATION).unwrap_or(0.0).to_radians()),
+    }
+    .held()
 }
 
 /// The text's string container, if it has one.
@@ -189,6 +290,7 @@ pub(crate) fn read_text_snapshot(id: NodeId, meta: &LoroMap) -> Option<TextSnaps
         string: string_container(meta)?.to_string(),
         font: read_font(meta)?,
         size: read_size(meta)?,
+        layout: read_layout(meta),
         placement: read_placement(meta)?,
         style: crate::style_codec::read_style(meta),
         outline: None,
@@ -243,6 +345,7 @@ mod tests {
                 kind: FontKind::SingleLine,
             },
             size: Length::from_mm(12.5),
+            layout: TextLayoutValues::DEFAULT,
             placement: Affine::new(0.0, 1.0, -1.0, 0.0, 3.0, 4.0),
             style: Style::default(),
             outline: None,
@@ -323,5 +426,70 @@ mod tests {
         let string = string_container(&meta).unwrap();
         string.insert(0, &long).unwrap();
         assert!(!validate_text_node(&meta), "too long");
+    }
+
+    fn layout_keys(meta: &LoroMap) -> Vec<String> {
+        meta.keys()
+            .map(|key| key.to_string())
+            .filter(|key| {
+                [
+                    KEY_ALIGN,
+                    KEY_LETTER_SPACE,
+                    KEY_WORD_SPACE,
+                    KEY_LINE_SPACE,
+                    KEY_ROTATION,
+                ]
+                .contains(&key.as_str())
+            })
+            .collect()
+    }
+
+    /// `specs/0079-text-layout-controls` decision 1: the five keys round-trip, a default deletes
+    /// its key, so a text back at its defaults is stored as before format 19.
+    #[test]
+    fn the_layout_keys_round_trip_and_defaults_are_not_stored() {
+        let (_doc, meta) = written();
+        assert!(
+            layout_keys(&meta).is_empty(),
+            "a default text writes no key"
+        );
+        let values = TextLayoutValues {
+            align: TextAlign::Justify,
+            letter_spacing: 0.15,
+            word_spacing: -0.2,
+            line_spacing: Some(1.5),
+            rotation: Angle::from_radians(12.5_f64.to_radians()),
+        };
+        assert!(write_layout(&meta, &values));
+        assert_eq!(layout_keys(&meta).len(), 5);
+        let read = read_layout(&meta);
+        assert_eq!(read.align, values.align);
+        assert!((read.rotation.as_radians() - values.rotation.as_radians()).abs() < 1e-12);
+        assert!(!write_layout(&meta, &read), "unchanged writes nothing");
+        assert!(write_layout(&meta, &TextLayoutValues::DEFAULT));
+        assert_eq!(layout_keys(&meta), Vec::<String>::new());
+        assert_eq!(read_layout(&meta), TextLayoutValues::DEFAULT);
+    }
+
+    /// Decision 1, read rules: an unknown align is left, a non-finite number its default, a factor
+    /// out of range is clamped, a rotation wraps into (-180, 180]; the text still validates.
+    #[test]
+    fn damaged_layout_keys_read_leniently() {
+        let (_doc, meta) = written();
+        meta.insert(KEY_ALIGN, LoroValue::from("diagonal")).unwrap();
+        meta.insert(KEY_LETTER_SPACE, LoroValue::Double(f64::NAN))
+            .unwrap();
+        meta.insert(KEY_WORD_SPACE, LoroValue::Double(99.0))
+            .unwrap();
+        meta.insert(KEY_LINE_SPACE, LoroValue::Double(-3.0))
+            .unwrap();
+        meta.insert(KEY_ROTATION, LoroValue::Double(270.0)).unwrap();
+        let read = read_layout(&meta);
+        assert_eq!(read.align, TextAlign::Left);
+        assert!(read.letter_spacing.abs() < 1e-12);
+        assert!((read.word_spacing - 5.0).abs() < 1e-12);
+        assert_eq!(read.line_spacing, Some(0.0));
+        assert!((read.rotation.as_radians().to_degrees() + 90.0).abs() < 1e-9);
+        assert!(validate_text_node(&meta));
     }
 }

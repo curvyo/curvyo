@@ -5,7 +5,7 @@
 mod common;
 
 use common::{SANS, SERIF, face, font_bytes, fonts_dir, store_with};
-use curvyo_text_core::{FaceStore, Mm, TextError, layout};
+use curvyo_text_core::{FaceStore, LayoutOptions, Mm, TextError, layout};
 use kurbo::{CubicBez, ParamCurve, PathEl, Point, QuadBez, Shape};
 use skrifa::{
     FontRef, MetadataProvider,
@@ -21,7 +21,7 @@ const TOLERANCE_MM: f64 = 0.01;
 fn ac04_line_height_from_the_face_metrics() {
     let (store, key) = store_with(SERIF);
     let face = face(&store, &key);
-    let laid = layout(face, "Ab\nCd\nEf", Mm(10.0)).unwrap();
+    let laid = layout(face, "Ab\nCd\nEf", Mm(10.0), &LayoutOptions::default()).unwrap();
     let bytes = font_bytes(SERIF);
     let stated = FontRef::new(&bytes)
         .unwrap()
@@ -47,13 +47,22 @@ fn ac05_kerning_and_ligature() {
     let (store, key) = store_with(SERIF);
     let face = face(&store, &key);
     let size = Mm(20.0);
-    let width = |text| layout(face, text, size).unwrap().lines[0].width.0;
+    let width = |text| {
+        layout(face, text, size, &LayoutOptions::default())
+            .unwrap()
+            .lines[0]
+            .width
+            .0
+    };
     let kerned = width("AV");
     let unkerned = width("A") + width("V");
     // Source Serif 4 kerns A-V by -119 units of its 1000-unit em.
-    let kern = 119.0 / 1000.0 * layout(face, "A", size).unwrap().mm_per_em;
+    let kern = 119.0 / 1000.0
+        * layout(face, "A", size, &LayoutOptions::default())
+            .unwrap()
+            .mm_per_em;
     assert!((unkerned - kerned - kern).abs() < TOLERANCE_MM);
-    let fi = layout(face, "fi", size).unwrap();
+    let fi = layout(face, "fi", size, &LayoutOptions::default()).unwrap();
     assert_eq!(fi.lines[0].glyphs.len(), 1, "fi draws one ligature glyph");
     assert_ne!(fi.lines[0].glyphs[0].glyph, 0);
 }
@@ -63,7 +72,7 @@ fn ac05_kerning_and_ligature() {
 fn ac06_missing_character_draws_notdef() {
     let (store, key) = store_with(SERIF);
     let face = face(&store, &key);
-    let laid = layout(face, "a\u{E000}b", Mm(10.0)).unwrap();
+    let laid = layout(face, "a\u{E000}b", Mm(10.0), &LayoutOptions::default()).unwrap();
     let glyphs: Vec<u32> = laid.lines[0].glyphs.iter().map(|g| g.glyph).collect();
     assert_eq!(glyphs.len(), 3);
     assert_eq!(glyphs[1], 0);
@@ -80,7 +89,7 @@ fn ac06_missing_character_draws_notdef() {
 fn ac10_ac25_line_box_and_caret_boundaries() {
     let (store, key) = store_with(SERIF);
     let face = face(&store, &key);
-    let laid = layout(face, "fit\nH", Mm(10.0)).unwrap();
+    let laid = layout(face, "fit\nH", Mm(10.0), &LayoutOptions::default()).unwrap();
     let line_box = laid.line_box();
     assert!((line_box.y0 + laid.ascender.0).abs() < 1e-9);
     assert!((line_box.y1 - (laid.line_height.0 + laid.descender.0)).abs() < 1e-9);
@@ -115,7 +124,7 @@ fn ac12_size_is_the_cap_height_in_every_included_face() {
             let mut store = FaceStore::new();
             let key = store.add(std::fs::read(&path).unwrap(), 0).unwrap();
             let face = store.get(&key).unwrap();
-            let laid = layout(face, "H", Mm(20.0)).unwrap();
+            let laid = layout(face, "H", Mm(20.0), &LayoutOptions::default()).unwrap();
             let paths = laid.glyph_paths(face);
             let top = -paths[0].bounding_box().y0;
             assert!(
@@ -153,7 +162,7 @@ fn ac23_outlines_reproduce_the_font_points() {
     for (path, expect_quads) in [(SERIF, true), (SANS, false)] {
         let (store, key) = store_with(path);
         let face = face(&store, &key);
-        let laid = layout(face, "O", Mm(20.0)).unwrap();
+        let laid = layout(face, "O", Mm(20.0), &LayoutOptions::default()).unwrap();
         let converted = &laid.glyph_paths(face)[0];
         let bytes = font_bytes(path);
         let font = FontRef::new(&bytes).unwrap();

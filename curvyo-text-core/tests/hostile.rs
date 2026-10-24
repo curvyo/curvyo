@@ -7,7 +7,7 @@ mod common;
 
 use common::{SANS, SERIF, font_bytes};
 use curvyo_text_core::limits::{MAX_FACE_BYTES, MAX_SHAPE_CHARS};
-use curvyo_text_core::{FaceStore, Mm, TextError, layout};
+use curvyo_text_core::{FaceStore, LayoutOptions, Mm, TextError, layout};
 use proptest::prelude::*;
 
 /// Adds the bytes and, if they parse, lays out and outlines a text that touches many glyphs.
@@ -15,7 +15,12 @@ fn exercise(bytes: Vec<u8>) {
     let mut store = FaceStore::new();
     if let Ok(key) = store.add(bytes, 0) {
         let face = store.get(&key).unwrap();
-        if let Ok(laid) = layout(face, "AVfi Hxg\u{E000}\nÅß0", Mm(5.0)) {
+        if let Ok(laid) = layout(
+            face,
+            "AVfi Hxg\u{E000}\nÅß0",
+            Mm(5.0),
+            &LayoutOptions::default(),
+        ) {
             let _ = laid.glyph_paths(face);
             let _ = laid.line_box();
         }
@@ -41,9 +46,22 @@ fn ac32_named_limits() {
     );
     let key = store.add(font_bytes(SERIF), 0).unwrap();
     let face = store.get(&key).unwrap();
-    assert!(layout(face, &"a".repeat(MAX_SHAPE_CHARS), Mm(5.0)).is_ok());
+    assert!(
+        layout(
+            face,
+            &"a".repeat(MAX_SHAPE_CHARS),
+            Mm(5.0),
+            &LayoutOptions::default()
+        )
+        .is_ok()
+    );
     assert_eq!(
-        layout(face, &"a".repeat(MAX_SHAPE_CHARS + 1), Mm(5.0)),
+        layout(
+            face,
+            &"a".repeat(MAX_SHAPE_CHARS + 1),
+            Mm(5.0),
+            &LayoutOptions::default()
+        ),
         Err(TextError::TextTooLong)
     );
 }
@@ -158,7 +176,7 @@ fn ac32_soak_mutations() {
         let mut store = FaceStore::new();
         if let Ok(key) = store.add(bytes, 0) {
             let face = store.get(&key).unwrap();
-            if let Ok(laid) = layout(face, &text, Mm(5.0)) {
+            if let Ok(laid) = layout(face, &text, Mm(5.0), &LayoutOptions::default()) {
                 let _ = laid.glyph_paths(face);
             }
         }

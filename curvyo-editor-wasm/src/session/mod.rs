@@ -104,6 +104,9 @@ mod style_view;
 mod text;
 mod text_bar;
 mod text_fonts;
+mod text_layout;
+#[cfg(test)]
+mod text_layout_tests;
 mod text_path;
 #[cfg(test)]
 mod text_sample_tests;
@@ -159,6 +162,7 @@ pub use split::{BreakApartOutcome, SplitOutcome};
 #[cfg(target_arch = "wasm32")]
 pub use style_view::StylePanelView;
 pub use text_bar::{TextBarView, TextSizeOutcome};
+pub use text_layout::LayoutOutcome;
 pub use text_path::ObjectToPathOutcome;
 pub use text_style::StyleOutcome;
 pub use weld::WeldOutcome;

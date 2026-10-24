@@ -1,5 +1,5 @@
-//! The read model of a text object (ADR 0020 §1): its string, font reference, size and placement,
-//! and the transform rule that puts a uniform scale into the size.
+//! The read model of a text object (ADR 0020 §1): its string, font reference, size, layout values
+//! and placement, and the transform rule that puts a uniform scale into the size.
 
 use serde::Serialize;
 
@@ -88,6 +88,98 @@ pub fn single_line_style(style: &Style) -> Option<Style> {
     Some(style)
 }
 
+/// How the lines of a text sit on its anchor (`specs/0079-text-layout-controls` criterion 1);
+/// stored as `text_align`, absent for Left.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TextAlign {
+    /// Each line starts at the anchor.
+    #[default]
+    Left,
+    /// Each line is centred on the anchor.
+    Centre,
+    /// Each line ends at the anchor.
+    Right,
+    /// Every line but the last is spread to the widest line.
+    Justify,
+}
+
+/// The factors of Size a letter spacing may hold (`0079` criterion 7, typed range).
+pub const LETTER_SPACING_FACTORS: std::ops::RangeInclusive<f64> = -0.5..=2.0;
+/// The factors of Size a word spacing may hold.
+pub const WORD_SPACING_FACTORS: std::ops::RangeInclusive<f64> = -1.0..=5.0;
+/// The factors of Size a set line spacing may hold.
+pub const LINE_SPACING_FACTORS: std::ops::RangeInclusive<f64> = 0.0..=10.0;
+
+/// The layout values of a text (`0079` slice 1, `adrs.md` decision 1): lengths as factors of the
+/// text's Size (ratios, so a uniform resize keeps the look), the rotation as an angle. Each is
+/// stored only when it is not its default.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+pub struct TextLayoutValues {
+    /// The alignment.
+    pub align: TextAlign,
+    /// Extra width after each cluster but a line's last, times Size.
+    pub letter_spacing: f64,
+    /// Extra width of each space character, times Size.
+    pub word_spacing: f64,
+    /// The baseline distance times Size; `None` is Auto, the face's natural line spacing.
+    pub line_spacing: Option<f64>,
+    /// The turn of every glyph about its own centre, in (-π, π], clockwise on screen.
+    pub rotation: Angle,
+}
+
+impl TextLayoutValues {
+    /// Every value at its default: the layout of a text before this spec.
+    pub const DEFAULT: Self = Self {
+        align: TextAlign::Left,
+        letter_spacing: 0.0,
+        word_spacing: 0.0,
+        line_spacing: None,
+        rotation: Angle::from_radians(0.0),
+    };
+
+    /// Whether every value is its default (then nothing is stored).
+    #[must_use]
+    pub fn is_default(&self) -> bool {
+        *self == Self::DEFAULT
+    }
+
+    /// These values held to their ranges: a factor outside its typed range is clamped, a
+    /// non-finite one is its default, the rotation is wrapped to (-π, π] (merge residue is read,
+    /// never refused, `adrs.md` decision 1).
+    #[must_use]
+    pub fn held(self) -> Self {
+        let factor = |value: f64, range: &std::ops::RangeInclusive<f64>, default: f64| {
+            if value.is_finite() {
+                value.clamp(*range.start(), *range.end())
+            } else {
+                default
+            }
+        };
+        let rotation = self.rotation.as_radians();
+        Self {
+            align: self.align,
+            letter_spacing: factor(self.letter_spacing, &LETTER_SPACING_FACTORS, 0.0),
+            word_spacing: factor(self.word_spacing, &WORD_SPACING_FACTORS, 0.0),
+            line_spacing: self
+                .line_spacing
+                .filter(|value| value.is_finite())
+                .map(|value| factor(value, &LINE_SPACING_FACTORS, 0.0)),
+            rotation: if rotation.is_finite() {
+                Angle::from_radians(rotation).normalized()
+            } else {
+                Angle::from_radians(0.0)
+            },
+        }
+    }
+}
+
+impl Default for TextLayoutValues {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
+
 /// One text object as read from the document.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct TextSnapshot {
@@ -99,6 +191,9 @@ pub struct TextSnapshot {
     pub font: FontRef,
     /// The height of the capital H (spec "Terms", Size).
     pub size: Length,
+    /// Alignment, spacing and character rotation (`specs/0079-text-layout-controls`).
+    #[serde(skip_serializing_if = "TextLayoutValues::is_default")]
+    pub layout: TextLayoutValues,
     /// The map from text space (mm, origin at the left end of the first baseline, y down) to
     /// the document. Its translation is the anchor.
     pub placement: Affine,
@@ -245,6 +340,7 @@ mod tests {
                 kind: FontKind::Outline,
             },
             size: Length::from_mm(size),
+            layout: TextLayoutValues::DEFAULT,
             placement,
             style: Style::default(),
             outline: None,
@@ -294,6 +390,25 @@ mod tests {
         let clamped = start.mapped_by(huge);
         assert_eq!(clamped.size, MAX_TEXT_SIZE);
         draws_alike(&start, &clamped, huge);
+    }
+
+    /// `specs/0079-text-layout-controls` criterion 34: a uniform resize changes the size only,
+    /// so every relative value keeps its factor and its mm readout grows with the size.
+    #[test]
+    fn a_uniform_resize_keeps_the_layout_factors() {
+        let mut start = text(10.0, Affine::IDENTITY);
+        start.layout = TextLayoutValues {
+            align: TextAlign::Right,
+            letter_spacing: 0.2,
+            word_spacing: 0.1,
+            line_spacing: Some(1.5),
+            rotation: Angle::from_radians(0.5),
+        };
+        let scaled = start.mapped_by(Affine::scale(2.0, 2.0));
+        assert!((scaled.size.as_mm() - 20.0).abs() < 1e-9);
+        assert_eq!(scaled.layout, start.layout);
+        let stretched = start.mapped_by(Affine::scale(2.0, 1.0));
+        assert_eq!(stretched.layout, start.layout);
     }
 
     /// Criterion 27: the first 24 characters, line breaks as spaces, an ellipsis after.

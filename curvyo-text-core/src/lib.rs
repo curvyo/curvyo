@@ -8,12 +8,14 @@
 //! error, never a panic (criterion 32, limits in [`limits`]).
 #![forbid(unsafe_code)]
 
+mod align;
 mod error;
 mod face;
 mod face_store;
 mod face_style;
 mod font_class;
 mod font_names;
+mod glyph_map;
 mod layout;
 pub mod limits;
 mod outline;
@@ -23,13 +25,14 @@ mod shape;
 mod svg_font;
 mod units;
 
+pub use align::Align;
 pub use error::TextError;
 pub use face::{Face, FaceKind, FaceMetrics};
 pub use face_store::{FaceHash, FaceKey, FaceStore};
 pub use face_style::{FaceStyle, NORMAL_WIDTH, Slant, WeightBand};
 pub use font_class::{DeclaredClass, OS2_CLASS_BYTES, declared_class, os2_class_bytes};
 pub use font_names::{ListableFace, family_name, listable_faces, style_name, svg_listable_faces};
-pub use layout::{LineLayout, PlacedGlyph, TextLayout, layout};
+pub use layout::{LayoutOptions, LineLayout, PlacedGlyph, TextLayout, layout};
 pub use outline::GlyphOutline;
 pub use preview::{preview_path, preview_path_within};
 pub use units::Mm;

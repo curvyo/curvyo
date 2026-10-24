@@ -9,7 +9,8 @@ use std::path::PathBuf;
 
 use curvyo_document_core::{
     Affine, CURRENT_FORMAT_VERSION, Color, Document, FontKind, FontRef, Length, LineCap, LineJoin,
-    ObjectSnapshot, SINGLE_LINE_STROKE_WIDTH, StyleEdit, TextSnapshot, pack, unpack,
+    ObjectSnapshot, SINGLE_LINE_STROKE_WIDTH, StyleEdit, TextLayoutValues, TextSnapshot, pack,
+    unpack,
 };
 
 /// The version this slice takes; a rebase onto another bump renumbers it and the fixture.
@@ -66,7 +67,13 @@ fn golden_document() -> Document {
     ];
     for (string, font, size, placement) in texts {
         let id = d
-            .create_text(string, &font, Length::from_mm(size + 1.0), placement)
+            .create_text(
+                string,
+                &font,
+                Length::from_mm(size + 1.0),
+                placement,
+                &TextLayoutValues::DEFAULT,
+            )
             .unwrap();
         d.set_text_size(&[id], Length::from_mm(size)).unwrap();
     }
@@ -132,7 +139,13 @@ fn ac09_ac10_the_stroke_of_a_single_line_pick() {
     let d = Document::new(1);
     let sans = font("Source Sans 3", 'c', FontKind::Outline);
     let id = d
-        .create_text("Hi", &sans, Length::from_mm(10.0), Affine::IDENTITY)
+        .create_text(
+            "Hi",
+            &sans,
+            Length::from_mm(10.0),
+            Affine::IDENTITY,
+            &TextLayoutValues::DEFAULT,
+        )
         .unwrap();
     d.edit_style(&[id], &StyleEdit::StrokeEnabled(false))
         .unwrap();
@@ -170,6 +183,7 @@ fn ac09_ac10_the_stroke_of_a_single_line_pick() {
             &font("EMS Readability", 'e', FontKind::SingleLine),
             Length::from_mm(10.0),
             Affine::IDENTITY,
+            &TextLayoutValues::DEFAULT,
         )
         .unwrap();
     let new_style = d.text(created).unwrap().style;

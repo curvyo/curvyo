@@ -5,7 +5,8 @@
 use std::ops::Range;
 
 use curvyo_document_core::{
-    Affine, Document, FontRef, Length, MAX_TEXT_CHARS, NodeId, Style, TextEditError, TextSnapshot,
+    Affine, Document, FontRef, Length, MAX_TEXT_CHARS, NodeId, Style, TextEditError,
+    TextLayoutValues, TextSnapshot,
 };
 use curvyo_text_core::TextLayout;
 
@@ -126,6 +127,9 @@ pub struct TextEdit {
     pub font: FontRef,
     /// The text's size.
     pub size: Length,
+    /// The text's alignment, spacing and character rotation (`specs/0079-text-layout-controls`):
+    /// a new text starts at the defaults with the next text's alignment (criterion 33).
+    pub layout: TextLayoutValues,
     /// The text's placement.
     pub placement: Affine,
     /// The text's style.
@@ -173,6 +177,7 @@ impl TextEdit {
             typing: false,
             font,
             size,
+            layout: TextLayoutValues::DEFAULT,
             placement,
             style,
         }
@@ -196,6 +201,7 @@ impl TextEdit {
             typing: false,
             font: text.font.clone(),
             size: text.size,
+            layout: text.layout,
             placement: text.placement,
             style: text.style.clone(),
         }
@@ -255,6 +261,7 @@ impl TextEdit {
             string: self.shown().0,
             font: self.font.clone(),
             size: self.size,
+            layout: self.layout,
             placement: self.placement,
             style: self.style.clone(),
             outline: None,
@@ -412,7 +419,7 @@ impl TextEdit {
         match self.target {
             EditTarget::New if string.is_empty() => Ok(Finished::Nothing),
             EditTarget::New => document
-                .create_text(string, &self.font, self.size, self.placement)
+                .create_text(string, &self.font, self.size, self.placement, &self.layout)
                 .map(Finished::Created),
             EditTarget::Existing(_) if *string == self.original => Ok(Finished::Nothing),
             EditTarget::Existing(id) => {

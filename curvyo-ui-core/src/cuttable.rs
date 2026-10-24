@@ -12,7 +12,7 @@ use curvyo_document_core::{Point, Vec2};
 use curvyo_geometry_core::{
     BooleanOp, Outline, OutlineTriple, boolean, outline_has_area, outline_nesting,
 };
-use curvyo_text_core::{FaceHash, FaceStore, Mm, TextError, layout};
+use curvyo_text_core::{FaceHash, FaceStore, LayoutOptions, Mm, TextError, layout};
 
 use crate::boolean::BOOLEAN_TOLERANCE;
 use crate::font_library::CheckResult;
@@ -31,7 +31,12 @@ pub const CUTTABLE_CHECK_VERSION: u32 = 2;
 fn glyph_contours(
     face: &curvyo_text_core::Face,
 ) -> Result<Vec<Vec<Vec<OutlineTriple>>>, TextError> {
-    let laid = layout(face, CUTTABLE_WORD, Mm(CUTTABLE_SIZE_MM))?;
+    let laid = layout(
+        face,
+        CUTTABLE_WORD,
+        Mm(CUTTABLE_SIZE_MM),
+        &LayoutOptions::default(),
+    )?;
     let map = |p: kurbo::Point| Point::new(p.x, p.y);
     let mut next_id = 0;
     Ok(laid

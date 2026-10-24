@@ -21,6 +21,12 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     ("edit_text", "Edit text"),
     ("change_font", "Change font"),
     ("change_text_size", "Change text size"),
+    // `specs/0079-text-layout-controls` criteria 4 and 12.
+    ("change_text_alignment", "Change text alignment"),
+    ("change_letter_spacing", "Change letter spacing"),
+    ("change_word_spacing", "Change word spacing"),
+    ("change_line_spacing", "Change line spacing"),
+    ("change_character_rotation", "Change character rotation"),
     ("translate_objects", "Move"),
     ("duplicate_objects", "Duplicate"),
     // `specs/0042-history-branches` criteria 10 and 22; the row adds the version's id.

@@ -6,7 +6,8 @@
 use std::borrow::Cow;
 
 use curvyo_document_core::{
-    Affine, FontRef, Length, NodeId, ObjectSnapshot, Point, TextSnapshot, Vec2, ViewTransform,
+    Affine, FontRef, Length, NodeId, ObjectSnapshot, Point, TextAlign, TextLayoutValues,
+    TextSnapshot, Vec2, ViewTransform,
 };
 use curvyo_render_core::{DrawList, TextEditOverlay, build_text_edit_overlay};
 use curvyo_text_core::{Mm, TextLayout};
@@ -38,6 +39,12 @@ pub(super) struct TextState {
     /// The Size field's live value while an arrow key is held (UX notes §3), drawn, not
     /// written.
     pub(super) size_preview: Option<Length>,
+    /// The alignment of the next new text (`specs/0079-text-layout-controls` criterion 33).
+    pub(super) next_align: TextAlign,
+    /// A layout field's live value during a drag or a held arrow key: the field and its value in
+    /// mm or degrees (`None`: Line spacing Auto), drawn on the subject texts, not written; and the
+    /// subject it was started on, without which it counts as dropped (UX notes §5).
+    pub(super) layout_preview: Option<(curvyo_ui_core::LayoutField, Option<f64>, Vec<NodeId>)>,
     /// The notice of a typed or pasted text cut at the limit, until the host takes it.
     pub(super) limited: bool,
     /// The caret's blink phase is off (the host blinks it, UX notes §2).
@@ -78,20 +85,34 @@ impl Session {
             .unwrap_or(Length::from_mm(FIRST_TEXT_SIZE_MM))
     }
 
-    /// The engine's layout of `string` in `font` at `size` (the substitute for a missing face);
-    /// `None` while the face loads.
-    pub(super) fn layout_of(
-        &self,
-        font: &FontRef,
-        size: Length,
-        string: &str,
-    ) -> Option<TextLayout> {
+    /// The face `font` is drawn in: its own, or the substitute for a missing one; `None` while
+    /// it loads.
+    pub(super) fn face_of(&self, font: &FontRef) -> Option<&curvyo_text_core::Face> {
         let key = match self.fonts.resolve(font) {
             FaceMatch::Face(key) => key,
             FaceMatch::Missing => self.fonts.fallback(font.kind)?.0,
             FaceMatch::NeedsLoad(_) => return None,
         };
-        curvyo_text_core::layout(self.fonts.face(&key)?, string, Mm(size.as_mm())).ok()
+        self.fonts.face(&key)
+    }
+
+    /// The engine's layout of `string` in `font` at `size` with the layout values `layout` (the
+    /// substitute for a missing face); `None` while the face loads.
+    pub(super) fn layout_of(
+        &self,
+        font: &FontRef,
+        size: Length,
+        layout: &TextLayoutValues,
+        string: &str,
+    ) -> Option<TextLayout> {
+        let options = curvyo_ui_core::layout_options(size, layout);
+        curvyo_text_core::layout(self.face_of(font)?, string, Mm(size.as_mm()), &options).ok()
+    }
+
+    /// The layout values of the edited text as drawn now: its own, with a layout field's live
+    /// value applied.
+    pub(super) fn edit_layout(&self, edit: &TextEdit) -> TextLayoutValues {
+        self.previewed_layout(edit.size, &edit.layout)
     }
 
     /// The topmost pickable text whose line box holds `point` (criterion 25).
@@ -114,7 +135,7 @@ impl Session {
             return text.string.len();
         };
         let local = inverse.apply_point(point);
-        self.layout_of(&text.font, text.size, &text.string)
+        self.layout_of(&text.font, text.size, &text.layout, &text.string)
             .map_or(text.string.len(), |layout| {
                 layout.nearest_boundary(kurbo_point(local))
             })
@@ -139,12 +160,14 @@ impl Session {
             return;
         };
         self.selection.clear();
-        self.text.edit = Some(TextEdit::new_text(
+        let mut edit = TextEdit::new_text(
             font,
             self.next_text_size(),
             Affine::translation(Vec2::new(point.x, point.y)),
             curvyo_document_core::Style::default(),
-        ));
+        );
+        edit.layout.align = self.text.next_align;
+        self.text.edit = Some(edit);
     }
 
     /// Ends edit mode and writes its one step (criteria 7, 8). The written text is selected.
@@ -167,7 +190,13 @@ impl Session {
                 let kept = (!edit.string().is_empty())
                     .then(|| {
                         self.document
-                            .create_text(edit.string(), &edit.font, edit.size, edit.placement)
+                            .create_text(
+                                edit.string(),
+                                &edit.font,
+                                edit.size,
+                                edit.placement,
+                                &edit.layout,
+                            )
                             .ok()
                     })
                     .flatten();
@@ -252,8 +281,13 @@ impl Session {
             return None;
         }
         let local = edit.placement.inverse()?.apply_point(point);
-        self.layout_of(&edit.font, edit.size, edit.string())
-            .map(|layout| layout.nearest_boundary(kurbo_point(local)))
+        self.layout_of(
+            &edit.font,
+            edit.size,
+            &self.edit_layout(edit),
+            edit.string(),
+        )
+        .map(|layout| layout.nearest_boundary(kurbo_point(local)))
     }
 
     /// The pointer moved with the Text tool: a held press in the edited text extends the
@@ -265,8 +299,13 @@ impl Session {
         {
             let local = edit.placement.inverse().map(|i| i.apply_point(point));
             let caret = local.and_then(|local| {
-                self.layout_of(&edit.font, edit.size, edit.string())
-                    .map(|l| l.nearest_boundary(kurbo_point(local)))
+                self.layout_of(
+                    &edit.font,
+                    edit.size,
+                    &self.edit_layout(edit),
+                    edit.string(),
+                )
+                .map(|l| l.nearest_boundary(kurbo_point(local)))
             });
             if let Some(caret) = caret {
                 self.text_input(TextInput::Select { anchor, caret });
@@ -333,11 +372,14 @@ impl Session {
 
     /// One message of the input sink (criteria 3, 9, 31). Nothing is written to the document.
     pub fn text_input(&mut self, input: TextInput) -> InputOutcome {
-        let layout = self
-            .text
-            .edit
-            .as_ref()
-            .and_then(|edit| self.layout_of(&edit.font, edit.size, edit.string()));
+        let layout = self.text.edit.as_ref().and_then(|edit| {
+            self.layout_of(
+                &edit.font,
+                edit.size,
+                &self.edit_layout(edit),
+                edit.string(),
+            )
+        });
         let Some(edit) = self.text.edit.as_mut() else {
             return InputOutcome::default();
         };
@@ -385,6 +427,7 @@ impl Session {
         if let Some(size) = self.text.size_preview {
             snapshot.size = size;
         }
+        snapshot.layout = self.edit_layout(edit);
         snapshot.outline = self.fonts.lay_out(&snapshot).map(std::sync::Arc::new);
         Some(snapshot)
     }
@@ -397,19 +440,23 @@ impl Session {
     ) -> Cow<'a, [ObjectSnapshot]> {
         let edited = self.laid_out_edit();
         let preview = self.text.size_preview;
-        if edited.is_none() && preview.is_none() {
+        let previewing = preview.is_some() || self.live_layout_preview().is_some();
+        if edited.is_none() && !previewing {
             return objects;
         }
         let mut objects = objects.into_owned();
-        if let Some(size) = preview {
+        if previewing {
             for object in &mut objects {
                 if let ObjectSnapshot::Text(text) = object
                     && self.selection.ids().contains(&text.id)
                 {
-                    let mut resized = (**text).clone();
-                    resized.size = size;
-                    resized.outline = self.fonts.lay_out(&resized).map(std::sync::Arc::new);
-                    **text = resized;
+                    let mut shown = (**text).clone();
+                    if let Some(size) = preview {
+                        shown.size = size;
+                    }
+                    shown.layout = self.previewed_layout(shown.size, &shown.layout);
+                    shown.outline = self.fonts.lay_out(&shown).map(std::sync::Arc::new);
+                    **text = shown;
                 }
             }
         }
@@ -429,7 +476,8 @@ impl Session {
             return DrawList::default();
         };
         let (shown, preedit, caret) = edit.shown();
-        let Some(layout) = self.layout_of(&edit.font, edit.size, &shown) else {
+        let Some(layout) = self.layout_of(&edit.font, edit.size, &self.edit_layout(edit), &shown)
+        else {
             return DrawList::default();
         };
         let selection = if preedit.is_some() {
@@ -458,7 +506,7 @@ impl Session {
     pub fn text_caret_screen_point(&self) -> Option<(f64, f64)> {
         let edit = self.text.edit.as_ref()?;
         let (shown, preedit, caret) = edit.shown();
-        let layout = self.layout_of(&edit.font, edit.size, &shown)?;
+        let layout = self.layout_of(&edit.font, edit.size, &self.edit_layout(edit), &shown)?;
         let geometry = edit_geometry(
             &layout,
             edit.placement,
