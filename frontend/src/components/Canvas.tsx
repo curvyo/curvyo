@@ -14,6 +14,7 @@ import { OffsetEntryChip } from "@/components/OffsetEntryChip";
 import { PenEntryChip } from "@/components/PenEntryChip";
 import { PlacementChip } from "@/components/PlacementChip";
 import { SelectionAnnouncer } from "@/components/SelectionAnnouncer";
+import { TextPathEntryChip } from "@/components/TextPathEntryChip";
 import { TransformEntryChip } from "@/components/TransformEntryChip";
 import type { EditorSession } from "@/hooks/useEditorSession";
 import { ColourPickChip } from "@/components/ColourPickChip";
@@ -136,6 +137,11 @@ export function Canvas({ editor }: CanvasProps) {
             if (editor.tool !== "node" || editor.cursorHint === "eyedropper") {
               event.preventDefault();
             }
+            // A right click ends pick mode of text on path without a change (`0080` UX notes §2).
+            if (editor.cursorHint === "pick-carrier") {
+              event.preventDefault();
+              editor.cancelTextPathPick();
+            }
           }}
           style={{ background: "var(--pasteboard-bg)" }}
         />
@@ -153,6 +159,20 @@ export function Canvas({ editor }: CanvasProps) {
           onCancel={editor.cancelTransformEntry}
           onLinked={editor.transformEntryLinked}
           onMirrorLine={editor.transformEntryMirrorLine}
+        />
+      )}
+      {editor.textPathEntry && (
+        // Keyed by the values it opened with: a reopen starts with fresh text, a zoom or pan
+        // (same values, new position) keeps what was typed.
+        <TextPathEntryChip
+          key={`${editor.textPathEntry.position}|${editor.textPathEntry.distance}`}
+          entry={editor.textPathEntry}
+          containerRef={editor.containerRef}
+          onCommit={editor.commitTextPathEntry}
+          onCancel={editor.cancelTextPathEntry}
+          onSide={editor.textPathEntrySide}
+          onLine={editor.textPathEntryLine}
+          onMirror={editor.textPathEntryMirror}
         />
       )}
       {editor.moveEntry && (
@@ -206,6 +226,8 @@ export function Canvas({ editor }: CanvasProps) {
         feedback={{ readout: editor.text.kernReadout, announcement: editor.text.kernReadout?.text ?? "" }}
         containerRef={editor.containerRef}
       />
+      {/* "Put on path" after a text is put on a carrier (`specs/0080-text-on-path` UX notes §2). */}
+      <SelectionAnnouncer text={editor.text.pathAnnouncement.text} seq={editor.text.pathAnnouncement.seq} />
       <SelectionAnnouncer
         text={editor.selectionAnnouncement}
         seq={editor.selectionAnnouncementSeq}

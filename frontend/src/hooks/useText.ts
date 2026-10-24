@@ -27,6 +27,8 @@ import {
 import type { NudgeReadout } from "@/hooks/useNudgeFeedback";
 import { NUDGE_READOUT_MS } from "@/lib/nudgeText";
 import { type AlignCode, kernKey, parseAlign } from "@/lib/textLayoutText";
+import { parseLayerNotice } from "@/lib/layerRows";
+import { EMPTY_TEXT_PATH, type TextPathBar, parseTextPath } from "@/lib/textPathText";
 import {
   type OrientationCode,
   type WritingModeCode,
@@ -66,6 +68,8 @@ export interface TextBarState {
    * (criterion 20). */
   writingMode: WritingModeCode | null;
   orientation: OrientationCode | null;
+  /** The On path button and groups (`specs/0080-text-on-path`). */
+  path: TextPathBar;
 }
 
 const EMPTY_BAR: TextBarState = {
@@ -83,6 +87,7 @@ const EMPTY_BAR: TextBarState = {
   align: "left",
   writingMode: "horizontal",
   orientation: "auto",
+  path: EMPTY_TEXT_PATH,
 };
 
 type ShowNotice = (
@@ -224,6 +229,13 @@ export interface TextApi {
   /** A press in the Writing mode or Glyph orientation group (criterion 20). */
   setWritingMode: (mode: WritingModeCode) => void;
   setOrientation: (orientation: OrientationCode) => void;
+  /** The last "Put on path" for the polite region (`specs/0080-text-on-path` UX notes §2). */
+  pathAnnouncement: { text: string; seq: number };
+  /** The On path button and groups' presses. */
+  path: {
+    pressOnPath: () => void;
+    release: () => void;
+  };
   /** A typed or stepped size; returns the notice to show under the field, if any. */
   setSize: (mm: number) => string | null;
   previewSize: (mm: number | null) => void;
@@ -255,6 +267,8 @@ export function useText(
 ): TextApi {
   const [editing, setEditing] = useState(false);
   const [bar, setBar] = useState<TextBarState>(EMPTY_BAR);
+  /** The last "Put on path" for the polite region, with a sequence so a repeat is spoken. */
+  const [pathAnnouncement, setPathAnnouncement] = useState<{ text: string; seq: number }>({ text: "", seq: 0 });
   const [fonts, setFonts] = useState<FontsTabData>(EMPTY_FONTS);
   const [missingMarks, setMissingMarks] = useState<{ x: number; y: number }[]>([]);
   const [sinkPoint, setSinkPoint] = useState<{ x: number; y: number } | null>(null);
@@ -385,8 +399,14 @@ export function useText(
       align: parseAlign(raw.align),
       writingMode: parseWritingMode(raw.writing_mode),
       orientation: parseOrientation(raw.orientation),
+      path: parseTextPath(session.text_path_view_json()),
     });
     raw.free();
+    // "Put on path", spoken once by the polite region (`0080` UX notes §2).
+    const said = session.take_text_path_announcement();
+    if (said) {
+      setPathAnnouncement({ text: said, seq: Date.now() });
+    }
     setFonts(tab);
     const subject = JSON.parse(session.glyph_subject()) as {
       family: string;
@@ -784,6 +804,31 @@ export function useText(
     [getSession, syncFromSession],
   );
 
+  // The On path button and groups (`specs/0080-text-on-path`): each press, then a re-read.
+  const pathCommand = useCallback(
+    (run: (session: NonNullable<ReturnType<typeof getSession>>) => void) => {
+      const session = getSession();
+      if (!session) {
+        return;
+      }
+      run(session);
+      syncFromSession();
+    },
+    [getSession, syncFromSession],
+  );
+
+  const pressOnPath = useCallback(() => {
+    pathCommand((session) => {
+      // A locked text is refused with the Pen's lock notice (criterion 7).
+      if (session.text_path_press() === "locked") {
+        const notice = parseLayerNotice(session.take_layer_notice());
+        if (notice) {
+          showNotice(notice.text, undefined, "canvas", notice.kind);
+        }
+      }
+    });
+  }, [pathCommand, showNotice]);
+
   const setOrientation = useCallback(
     (orientation: OrientationCode) => {
       getSession()?.set_text_glyph_orientation(orientation);
@@ -874,6 +919,11 @@ export function useText(
     setAlign,
     setWritingMode,
     setOrientation,
+    pathAnnouncement,
+    path: {
+      pressOnPath,
+      release: () => pathCommand((session) => session.release_text_path()),
+    },
     setSize,
     previewSize,
     objectToPath,
