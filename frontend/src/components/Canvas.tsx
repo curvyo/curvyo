@@ -7,6 +7,7 @@ import { CloneTags } from "@/components/CloneTags";
 import { FontMissingTags } from "@/components/FontMissingTags";
 import { TextSink } from "@/components/TextSink";
 import { MoveBadges } from "@/components/MoveBadges";
+import { PickSetBadge } from "@/components/PickSetBadge";
 import { NudgeReadout } from "@/components/NudgeReadout";
 import { NodeContextMenu } from "@/components/NodeToolbar";
 import { MoveEntryChip } from "@/components/MoveEntryChip";
@@ -240,6 +241,7 @@ export function Canvas({ editor }: CanvasProps) {
       />
       <PenHintChip cue={penCue} containerRef={editor.containerRef} />
       <MoveBadges badges={editor.moveBadges} containerRef={editor.containerRef} />
+      <PickSetBadge at={editor.text.pickBadge} />
       <CloneTags tags={editor.clones.tags} />
       <FontMissingTags marks={editor.text.missingMarks} hidden={editor.isPanning} />
       <TextSink text={editor.text} mounted={editor.tool === "text"} />
