@@ -5,10 +5,10 @@ import { test } from "node:test";
 import {
   addNotice,
   chipTooltip,
-  deleteTagPrompt,
+  armedTagLabel,
   emptyTagText,
   tagNameError,
-  removePrompt,
+  armedRemoveLabel,
   STORAGE_FULL_NOTICE,
 } from "../src/lib/fontLibraryText.ts";
 
@@ -42,11 +42,8 @@ test("criteria 7, 8, 25, 30: names, prompts and the storage refusal", () => {
   assert.equal(tagNameError("reserved"), "All and Favourites are not tags.");
   assert.equal(tagNameError("empty"), "Enter a name.");
   assert.equal(tagNameError("long"), "Use at most 24 characters.");
-  assert.equal(deleteTagPrompt("Wedding", 12), "Delete tag Wedding? Its 12 fonts stay in Curvyo.");
-  assert.equal(deleteTagPrompt("Wedding", 1), "Delete tag Wedding? Its 1 font stays in Curvyo.");
-  assert.equal(deleteTagPrompt("Wedding", 0), "Delete tag Wedding?");
-  assert.equal(removePrompt("Lobster", 2), "Remove Lobster from Curvyo fonts? 2 texts here use it.");
-  assert.equal(removePrompt("Lobster", 0), "Remove Lobster from Curvyo fonts?");
+  assert.equal(armedTagLabel("Wedding", 12), "Press again to delete tag Wedding. Its 12 fonts stay in Curvyo.");
+  assert.equal(armedRemoveLabel("Lobster", 2), "Press again to remove Lobster from Curvyo fonts. 2 texts here use it.");
   assert.equal(STORAGE_FULL_NOTICE, "The browser has no room for this font. Nothing was added.");
 });
 

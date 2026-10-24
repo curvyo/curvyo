@@ -90,19 +90,30 @@ export function tagNameError(error: string, taken?: string): string {
   }
 }
 
-/** The inline confirmation of Delete tag (criterion 8). */
-export function deleteTagPrompt(name: string, members: number): string {
-  const tag = shortName(name);
-  return members === 0 ? `Delete tag ${tag}?` : `Delete tag ${tag}? Its ${fonts(members)} ${members === 1 ? "stays" : "stay"} in Curvyo.`;
+/** The armed tag trash's name and tooltip (`0081` criterion 11). */
+export function armedTagLabel(name: string, members: number): string {
+  const first = `Press again to delete tag ${shortName(name)}.`;
+  return members === 0 ? first : `${first} Its ${fonts(members)} ${members === 1 ? "stays" : "stay"} in Curvyo.`;
 }
 
-/** The inline confirmation of Remove (criterion 25). */
-export function removePrompt(family: string, texts: number): string {
-  const first = `Remove ${shortName(family)} from Curvyo fonts?`;
+/** The armed font trash's name and tooltip (`0081` criterion 3, the count of `0075` criterion
+ * 25). */
+export function armedRemoveLabel(family: string, texts: number): string {
+  const first = `Press again to remove ${shortName(family)} from Curvyo fonts.`;
   if (texts === 0) {
     return first;
   }
   return texts === 1 ? `${first} 1 text here uses it.` : `${first} ${texts} texts here use it.`;
+}
+
+/** The status text after a font was removed (`0081` UX notes §6). */
+export function removedText(family: string): string {
+  return `${shortName(family)} removed from Curvyo fonts.`;
+}
+
+/** The status text after a tag was deleted (`0081` UX notes §6). */
+export function tagDeletedText(name: string): string {
+  return `Tag ${shortName(name)} deleted.`;
 }
 
 /** The notice when a collection file was kept (criterion 25). */

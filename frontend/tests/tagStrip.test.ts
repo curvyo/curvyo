@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { deleteTagPrompt, tagNameError } from "../src/lib/fontLibraryText.ts";
+import { armedTagLabel, tagNameError } from "../src/lib/fontLibraryText.ts";
 import { stripCells, stripKeyAction } from "../src/lib/tagStrip.ts";
 
 test("F2 renames an own tag from the strip, a clash is refused with the inline message", () => {
@@ -18,7 +18,7 @@ test("Delete asks before deleting an own tag from the strip", () => {
   assert.equal(stripKeyAction("Delete", true), "delete");
   assert.equal(stripKeyAction("Delete", false), null);
   assert.equal(stripKeyAction("ArrowRight", true), null);
-  assert.equal(deleteTagPrompt("Wedding", 1), "Delete tag Wedding? Its 1 font stays in Curvyo.");
+  assert.equal(armedTagLabel("Wedding", 1), "Press again to delete tag Wedding. Its 1 font stays in Curvyo.");
 });
 
 test("a deleted tag leaves the strip; only All, Favourites and existing tags are cells", () => {

@@ -16,7 +16,7 @@ import {
 } from "@/lib/fontLibraryText";
 import { type FontFamily, type FontsTabData, fontBlocks } from "@/lib/textText";
 import { forgetFileBytes, hostListing } from "@/hooks/useText";
-import type { RowTag } from "@/lib/fontRows";
+import { type RowTag, familyKey } from "@/lib/fontRows";
 import { loadPage, os2Of, page, representative, resultKey } from "@/hooks/fontLibraryPage";
 import { useCuttableChecks } from "@/hooks/useCuttableChecks";
 import { invoke, isTauri } from "@/platform/host";
@@ -31,10 +31,12 @@ export interface FontTagView {
   members: Set<string>;
 }
 
-/** A notice of the tab: under the strip (library file) or under the Add font button. */
+/** A notice of the tab: under the strip (library file), under the Add font button or under the
+ * family row `row` (its Remove trash, `specs/0081-inline-delete-confirm` criterion 8). */
 export interface FontNotice {
   id: number;
-  anchor: "strip" | "add";
+  anchor: "strip" | "add" | "row";
+  row?: string;
   kind: "success" | "refusal";
   text: string;
   ms: number;
@@ -81,10 +83,13 @@ export function useFontLibrary(
   const noticeCounter = useRef(0);
   const bump = useCallback(() => setRevision((r) => r + 1), []);
 
-  const show = useCallback((anchor: FontNotice["anchor"], kind: FontNotice["kind"], text: string, ms?: number) => {
-    noticeCounter.current += 1;
-    setNotice({ id: noticeCounter.current, anchor, kind, text, ms: ms ?? (kind === "success" ? 3000 : 8000) });
-  }, []);
+  const show = useCallback(
+    (anchor: FontNotice["anchor"], kind: FontNotice["kind"], text: string, ms?: number, row?: string) => {
+      noticeCounter.current += 1;
+      setNotice({ id: noticeCounter.current, anchor, row, kind, text, ms: ms ?? (kind === "success" ? 3000 : 8000) });
+    },
+    [],
+  );
 
   const showOnce = useCallback(
     (text: string) => {
@@ -274,7 +279,7 @@ export function useFontLibrary(
       forgetFileBytes(faces.map((face) => face.id));
       await listHostFonts();
       if (report.kept.length > 0) {
-        show("add", "refusal", keptNotice(family.family));
+        show("row", "refusal", keptNotice(family.family), undefined, familyKey(family));
       }
     },
     [listHostFonts, show],

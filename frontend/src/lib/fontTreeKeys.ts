@@ -1,9 +1,10 @@
 // The keys of the Fonts tab's tree (`specs/0074-text-objects` UX notes §4,
 // `specs/0075-font-library` UX notes §6 and tags amendment §8): moving over rows, expanding and
-// collapsing, picking, Ctrl+D for the star, F2 and Shift+F2 for tags, Delete for Remove, Escape
-// to the canvas, and typing into the search.
-import { type Row, familyKey } from "@/lib/fontRows";
-import type { FontFace as ListedFace, FontFamily } from "@/lib/textText";
+// collapsing, picking, Ctrl+D for the star, F2 and Shift+F2 for tags, Delete to arm and Delete or
+// Enter to press the armed Remove trash (`specs/0081-inline-delete-confirm` criterion 7), Escape to
+// the canvas, and typing into the search.
+import { type Row, familyKey } from "./fontRows.ts";
+import type { FontFace as ListedFace, FontFamily } from "./textText.ts";
 
 /** What a key in the tree can do. */
 export interface FontTreeKeyContext {
@@ -18,7 +19,10 @@ export interface FontTreeKeyContext {
   pickFamily: (family: FontFamily, byKeyboard: boolean) => void;
   pickFace: (face: ListedFace) => void;
   star: (family: FontFamily) => void;
-  askRemove: (family: FontFamily) => void;
+  /** A press on the family's Remove trash (arms it, or removes when armed). */
+  pressRemove: (family: FontFamily) => void;
+  /** Whether the family's Remove trash is armed. */
+  isArmed: (family: FontFamily) => boolean;
   /** F2: the add field of the family's tag line. */
   openAddTag: (family: FontFamily) => void;
   /** Shift+F2: the last chip's x on the family's tag line. */
@@ -72,7 +76,7 @@ export function onFontTreeKey(event: React.KeyboardEvent<HTMLElement>, ctx: Font
       return;
     case "ArrowLeft":
       event.preventDefault();
-      if (row?.kind === "face" || row?.kind === "remove") {
+      if (row?.kind === "face") {
         ctx.focusRow(familyKey(row.family));
       } else if (row?.kind === "family") {
         ctx.toggle(row.family, false);
@@ -81,7 +85,9 @@ export function onFontTreeKey(event: React.KeyboardEvent<HTMLElement>, ctx: Font
     case "Enter":
     case " ":
       event.preventDefault();
-      if (row?.kind === "family") {
+      if (event.key === "Enter" && row && (row.kind === "family" || row.kind === "face") && ctx.isArmed(row.family)) {
+        ctx.pressRemove(row.family);
+      } else if (row?.kind === "family") {
         ctx.pickFamily(row.family, true);
       } else if (row?.kind === "face") {
         ctx.pickFace(row.face);
@@ -100,9 +106,9 @@ export function onFontTreeKey(event: React.KeyboardEvent<HTMLElement>, ctx: Font
       }
       return;
     case "Delete":
-      if (row?.kind === "family" && row.family.block === "curvyo") {
+      if ((row?.kind === "family" || row?.kind === "face") && row.family.block === "curvyo") {
         event.preventDefault();
-        ctx.askRemove(row.family);
+        ctx.pressRemove(row.family);
       }
       return;
     case "Escape":

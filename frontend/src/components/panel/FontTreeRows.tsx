@@ -1,8 +1,8 @@
 // The rows of the Fonts tab's tree (`specs/0074-text-objects` UX notes §4,
 // `specs/0075-font-library` UX tags amendment §2): block headers, the Missing row, a family row of
-// two lines (its name in its own face with chevron, current mark, star and face count; under it
-// the tag line), a face row.
-import { ChevronDown, ChevronRight, Star, TriangleAlert } from "lucide-react";
+// two lines (its name in its own face with chevron, current mark, Curvyo trash, star and face
+// count; under it the tag line), a face row.
+import { ChevronDown, ChevronRight, Star, Trash2, TriangleAlert } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { Tooltip } from "@/components/ui/tooltip";
@@ -33,6 +33,7 @@ function LineName({ preview, em }: { preview: LinePreview; em: number }) {
     </svg>
   );
 }
+import { ARM_TRASH, ARM_ZONE } from "@/hooks/useDeleteArm";
 import { tagsLine } from "@/lib/fontLibraryText";
 import { type FontFace as ListedFace, type FontFamily, familyName } from "@/lib/textText";
 
@@ -47,11 +48,58 @@ interface FamilyRowProps {
   tagNames: string[];
   /** The tag line under the name. */
   tagLine: ReactNode;
+  /** The arm zone of a Curvyo family (its row and its face rows), else `undefined`. */
+  zone?: string;
+  /** The Remove trash of a Curvyo family (`specs/0081-inline-delete-confirm` criterion 1). */
+  trash?: TrashProps;
+  /** A notice anchored under the row, right-aligned to the trash (`0081` UX notes §7). */
+  notice?: ReactNode;
   style: React.CSSProperties;
   onFocus: () => void;
   onPick: (byKeyboard: boolean) => void;
   onToggle: () => void;
   onStar: () => void;
+}
+
+/** The look of an armed row or cell and of its trash (`0081` UX notes §2 to §4). */
+export const ARM_TRANSITION = "transition-colors duration-[120ms] ease-out motion-reduce:transition-none";
+export const ARMED_TRASH = "bg-[var(--destructive)] text-white";
+
+interface TrashProps {
+  target: string;
+  armed: boolean;
+  /** Its accessible name and tooltip. */
+  label: string;
+  tip: string;
+  onPress: () => void;
+}
+
+/** The family row's Remove trash: 24 x 28, not a Tab stop, the focus stays on a press. */
+function RowTrash({ target, armed, label, tip, onPress }: TrashProps) {
+  return (
+    <Tooltip side="left" content={tip}>
+      <button
+        type="button"
+        tabIndex={-1}
+        aria-label={label}
+        {...{ [ARM_TRASH]: target }}
+        onMouseDown={(event) => event.preventDefault()}
+        onClick={(event) => {
+          event.stopPropagation();
+          onPress();
+        }}
+        className={`flex h-7 w-6 shrink-0 items-center justify-center rounded-[5px] ${armed ? "" : "hover:bg-[var(--editor-accent-hover)]"}`}
+      >
+        <span
+          className={`flex size-[22px] items-center justify-center rounded-[5px] ${ARM_TRANSITION} ${
+            armed ? ARMED_TRASH : "text-[var(--panel-muted-fg)]"
+          }`}
+        >
+          <Trash2 size={16} strokeWidth={1.5} aria-hidden />
+        </span>
+      </button>
+    </Tooltip>
+  );
 }
 
 export function FamilyRow({
@@ -63,6 +111,9 @@ export function FamilyRow({
   favourite,
   tagNames,
   tagLine,
+  zone,
+  trash,
+  notice,
   style,
   onFocus,
   onPick,
@@ -88,12 +139,15 @@ export function FamilyRow({
       aria-expanded={open}
       aria-label={name}
       data-row-key={rowKey}
+      {...(zone ? { [ARM_ZONE]: zone } : {})}
       tabIndex={focused ? 0 : -1}
       onFocus={onFocus}
       onClick={(event) => onPick(event.detail === 0)}
       title={tip}
       style={style}
-      className="flex cursor-default flex-col rounded-[5px] text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)]"
+      className={`flex cursor-default flex-col rounded-[5px] text-[var(--toolbar-icon)] outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)] ${ARM_TRANSITION} ${
+        trash?.armed ? "bg-[var(--destructive-soft)]" : "hover:bg-[var(--editor-accent-hover)]"
+      }`}
     >
       <div className="flex h-7 shrink-0 items-center gap-1">
         <span
@@ -120,6 +174,12 @@ export function FamilyRow({
           </span>
         )}
         {holdsCurrent && !open ? <span aria-hidden className="size-1.5 rotate-45 bg-[var(--editor-accent)]" /> : null}
+        {trash ? (
+          <span className="relative flex shrink-0">
+            <RowTrash {...trash} />
+            {notice}
+          </span>
+        ) : null}
         <Tooltip side="left" content="Favourite">
           <button
             type="button"
@@ -150,6 +210,8 @@ export function FamilyRow({
 
 interface FaceRowProps {
   rowKey: string;
+  /** The arm zone of its Curvyo family, else `undefined`. */
+  zone?: string;
   face: ListedFace;
   current: boolean;
   focused: boolean;
@@ -158,7 +220,7 @@ interface FaceRowProps {
   onPick: (byKeyboard: boolean) => void;
 }
 
-export function FaceRow({ rowKey, face, current, focused, style, onFocus, onPick }: FaceRowProps) {
+export function FaceRow({ rowKey, zone, face, current, focused, style, onFocus, onPick }: FaceRowProps) {
   const cssFamily = cssFamilyOf(face.id);
   const lines = face.singleLine ? linePreviewOf(face.id)?.style : undefined;
   return (
@@ -167,6 +229,7 @@ export function FaceRow({ rowKey, face, current, focused, style, onFocus, onPick
       aria-level={2}
       aria-selected={current}
       data-row-key={rowKey}
+      {...(zone ? { [ARM_ZONE]: zone } : {})}
       tabIndex={focused ? 0 : -1}
       onFocus={onFocus}
       onClick={(event) => onPick(event.detail === 0)}

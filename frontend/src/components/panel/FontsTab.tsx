@@ -5,7 +5,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { FontTagStrip } from "@/components/panel/FontTagStrip";
-import { RemoveRow } from "@/components/panel/FontRemoveRow";
 import { FontTagLine } from "@/components/panel/FontTagLine";
 import {
   FAMILY_PX,
@@ -19,10 +18,11 @@ import {
   tagLineRoom,
 } from "@/lib/fontRows";
 import { useFontLibrary } from "@/hooks/useFontLibrary";
+import { useDeleteArm } from "@/hooks/useDeleteArm";
 import { useFontTagLine } from "@/hooks/useFontTagLine";
 import { useFontDrop } from "@/hooks/useFontDrop";
 import { isTauri } from "@/platform/host";
-import { checkingText, emptyTagText, removePrompt } from "@/lib/fontLibraryText";
+import { armedRemoveLabel, checkingText, emptyTagText, removedText } from "@/lib/fontLibraryText";
 import { useFontTreeScroll } from "@/hooks/useFontTreeScroll";
 import { useFontPreviewState } from "@/hooks/useFontPreviewState";
 import { type PreviewListing, previewState, publishListing, setPreviewOpen } from "@/lib/fontPreviewStore";
@@ -67,10 +67,11 @@ export function FontsTab({ data, onPick, onPickFamily, onReturnFocus, onShown, t
   /** Families that left the chosen cell by the maker's own press: they stay until the cell or
    * the search changes (UX notes §3). */
   const [kept, setKept] = useState<Set<string>>(() => new Set());
-  const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement | null>(null);
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const lib = useFontLibrary(data, onShown);
+  /** The one armed trash of the tab: a Curvyo family's Remove or an own tag's Delete (`0081`). */
+  const arm = useDeleteArm();
 
   useEffect(() => {
     void onShown();
@@ -114,12 +115,11 @@ export function FontsTab({ data, onPick, onPickFamily, onReturnFocus, onShown, t
         blocks,
         isOpen: (key) => expanded.has(key) || (key === currentFamily && !collapsedCurrent && !search),
         tags: (family) => lib.tagsOf(family),
-        confirmRemove,
         treeWidth,
       }),
     // `lib.tags` changes with every library change, so the tag lines are read again.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [blocks, data, expanded, currentFamily, collapsedCurrent, search, lib.tags, confirmRemove, treeWidth],
+    [blocks, data, expanded, currentFamily, collapsedCurrent, search, lib.tags, treeWidth],
   );
 
   const tops = useMemo(() => rowTops(rows), [rows]);
@@ -187,10 +187,28 @@ export function FontsTab({ data, onPick, onPickFamily, onReturnFocus, onShown, t
     lib.toggleFavourite(family.family);
   };
 
-  const askRemove = (family: FontFamily) => {
+  // The list changing under an armed trash disarms it (`0081` criterion 5).
+  const { disarm } = arm;
+  useEffect(disarm, [disarm, search, chosen, expanded, collapsedCurrent]);
+
+  /** A press on a Curvyo family's trash: arms it, or removes the family when armed. */
+  const pressRemove = (family: FontFamily, byKeyboard: boolean) => {
     const key = familyKey(family);
-    toggle(family, true);
-    setConfirmRemove(key);
+    const label = armedRemoveLabel(family.family, textsUsingFamily(family.family));
+    arm.press(`font:${key}`, label, () => {
+      const at = focusable.findIndex((r) => r.key === key);
+      const after = focusable.slice(at + 1).find((r) => r.kind === "family");
+      const before = focusable.slice(0, at).reverse().find((r) => r.kind === "family");
+      // By mouse the focus stays, unless it was inside the removed row (never to `body`).
+      const inRow = document.activeElement?.closest(`[data-arm-zone="${CSS.escape(`font:${key}`)}"]`);
+      void lib.removeFamily(family).then(() => {
+        const target = after ?? before;
+        if (target && (byKeyboard || inRow)) {
+          focusRow(target.key);
+        }
+      });
+      return removedText(family.family);
+    });
   };
 
   const addFonts = async (dropped: { paths?: string[]; files?: File[] } | undefined, byKeyboard: boolean) => {
@@ -231,7 +249,8 @@ export function FontsTab({ data, onPick, onPickFamily, onReturnFocus, onShown, t
       pickFamily,
       pickFace: (face) => onPick(face, true),
       star,
-      askRemove,
+      pressRemove: (family) => pressRemove(family, true),
+      isArmed: (family) => arm.armed === `font:${familyKey(family)}`,
       openAddTag: (family) => openAddTag(family, true),
       focusTagLine,
       returnFocus: onReturnFocus,
@@ -240,6 +259,20 @@ export function FontsTab({ data, onPick, onPickFamily, onReturnFocus, onShown, t
         searchRef.current?.focus();
       },
     });
+
+  /** The trash of a Curvyo family row, idle or armed (`0081` criteria 1 and 3). */
+  const trashOf = (family: FontFamily) => {
+    const target = `font:${familyKey(family)}`;
+    const armed = arm.armed === target;
+    const label = armed ? armedRemoveLabel(family.family, textsUsingFamily(family.family)) : null;
+    return {
+      target,
+      armed,
+      label: label ?? `Remove ${family.family} from Curvyo fonts`,
+      tip: label ?? "Remove from Curvyo fonts",
+      onPress: () => pressRemove(family, false),
+    };
+  };
 
   const searching = search.trim().length > 0;
   const filtered = searching || chosen !== "all";
@@ -409,6 +442,9 @@ export function FontsTab({ data, onPick, onPickFamily, onReturnFocus, onShown, t
                       onLeave={() => focusRow(row.key)}
                     />
                   }
+                  zone={row.family.block === "curvyo" ? `font:${row.key}` : undefined}
+                  trash={row.family.block === "curvyo" ? trashOf(row.family) : undefined}
+                  notice={<TabNotice notice={lib.notice} anchor="row" row={row.key} rowHeight={row.height} />}
                   style={style}
                   onFocus={() => setFocusKey(row.key)}
                   onPick={(byKeyboard) => pickFamily(row.family, byKeyboard)}
@@ -417,42 +453,11 @@ export function FontsTab({ data, onPick, onPickFamily, onReturnFocus, onShown, t
                 />
               );
             }
-            if (row.kind === "remove") {
-              const key = familyKey(row.family);
-              return (
-                <RemoveRow
-                  key={row.key}
-                  rowKey={row.key}
-                  focused={focused}
-                  confirming={confirmRemove === key}
-                  prompt={removePrompt(row.family.family, textsUsingFamily(row.family.family))}
-                  style={style}
-                  onFocusRow={() => setFocusKey(row.key)}
-                  onAsk={() => setConfirmRemove(key)}
-                  onCancel={() => {
-                    setConfirmRemove(null);
-                    focusRow(row.key);
-                  }}
-                  onRemove={() => {
-                    setConfirmRemove(null);
-                    const at = focusable.findIndex((r) => r.key === key);
-                    const after = focusable.slice(at + 1).find((r) => r.kind === "family");
-                    const before = focusable.slice(0, at).reverse().find((r) => r.kind === "family");
-                    void lib.removeFamily(row.family).then(() => {
-                      const target = after ?? before;
-                      if (target) {
-                        focusRow(target.key);
-                      }
-                    });
-                  }}
-                  onReturnFocus={onReturnFocus}
-                />
-              );
-            }
             return (
               <FaceRow
                 key={row.key}
                 rowKey={row.key}
+                zone={row.family.block === "curvyo" ? `font:${familyKey(row.family)}` : undefined}
                 face={row.face}
                 current={row.face.index === currentFace}
                 focused={focused}
@@ -474,6 +479,9 @@ export function FontsTab({ data, onPick, onPickFamily, onReturnFocus, onShown, t
       {...drop.handlers}
       className={`relative flex min-h-0 flex-1 flex-col ${drop.over ? DROP_OUTLINE : ""}`}
     >
+      <p role="status" aria-live="polite" className="sr-only">
+        {arm.status}
+      </p>
       <div className="relative">
         <FontTagStrip
           tags={lib.tags}
@@ -482,6 +490,7 @@ export function FontsTab({ data, onPick, onPickFamily, onReturnFocus, onShown, t
           onChoose={(id) => lib.choose(id)}
           onRename={lib.renameTag}
           onDelete={lib.deleteTag}
+          arm={arm}
           onReturnFocus={onReturnFocus}
         />
         <TabNotice notice={lib.notice} anchor="strip" />
