@@ -15,8 +15,13 @@ pub struct TextBarView {
     pub shown: bool,
     /// The face name, "Source Sans 3 Regular"; empty when several faces differ.
     pub font: String,
-    /// The face is missing on this computer (criterion 29).
+    /// A subject face is missing on this computer (criterion 29; with several faces, any of
+    /// them, `specs/0084-text-bar-second-row` UX notes §0.4).
     pub missing: bool,
+    /// How many different faces the subject texts use (1 for the next text's face).
+    pub faces: u32,
+    /// How many of them are missing: "1 of 3 fonts missing on this computer."
+    pub missing_faces: u32,
     /// The size in mm; `None` when several sizes differ ("Mixed").
     pub size_mm: Option<f64>,
     /// The node the font preview's sample follows: the one edited or selected text (its full id),
@@ -213,6 +218,7 @@ impl Session {
             None => (self.next_text_font(), Some(self.next_text_size())),
         };
         let size = self.text.size_preview.or(size);
+        let (faces, missing_faces) = self.bar_face_counts(&texts, font.as_ref());
         let (sample_node, sample) = match texts.as_slice() {
             [one] => (
                 one.id.full_id(),
@@ -226,12 +232,37 @@ impl Session {
                 .as_ref()
                 .map(|f| format!("{} {}", f.family, f.style))
                 .unwrap_or_default(),
-            missing: font.as_ref().is_some_and(|f| self.fonts.is_missing(f)),
+            missing: missing_faces > 0,
+            faces,
+            missing_faces,
             size_mm: size.map(Length::as_mm),
             sample_node,
             sample,
             style: self.style_buttons(),
         }
+    }
+
+    /// The number of different faces of `texts` (by family and style) and of missing ones among
+    /// them; without texts, the next text's `font`.
+    fn bar_face_counts(&self, texts: &[TextSnapshot], font: Option<&FontRef>) -> (u32, u32) {
+        let mut seen: Vec<&FontRef> = Vec::new();
+        for face in texts
+            .iter()
+            .map(|t| &t.font)
+            .chain(font.filter(|_| texts.is_empty()))
+        {
+            if !seen
+                .iter()
+                .any(|s| s.family == face.family && s.style == face.style)
+            {
+                seen.push(face);
+            }
+        }
+        let missing = seen.iter().filter(|f| self.fonts.is_missing(f)).count();
+        (
+            u32::try_from(seen.len()).unwrap_or(u32::MAX),
+            u32::try_from(missing).unwrap_or(u32::MAX),
+        )
     }
 
     /// A pick in the Fonts tab (criteria 13, 18): the listed face `index` becomes the face of

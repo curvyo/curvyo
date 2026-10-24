@@ -7,6 +7,7 @@ import { Tooltip } from "radix-ui";
 import { useEffect, useRef, useState } from "react";
 
 import { WeightGlyph } from "@/components/StyleGlyphs";
+import { shiftStyle, useNoticeShift } from "@/hooks/useNoticeShift";
 import {
   type StyleButtonState,
   type StyleState,
@@ -80,6 +81,8 @@ export function StyleGroup({ style, editing, onPressWeight, onPressItalic, onRet
   const [focused, setFocused] = useState<number | null>(null);
   const [notice, setNotice] = useState<{ text: string; at: WeightCode | "italic" } | null>(null);
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
+  const noticeRef = useRef<HTMLDivElement>(null);
+  const shift = useNoticeShift(noticeRef, notice);
   const tabStop = focused ?? weightTabStop(style);
 
   useEffect(() => {
@@ -114,7 +117,9 @@ export function StyleGroup({ style, editing, onPressWeight, onPressItalic, onRet
   const noticeUnder = (at: WeightCode | "italic") =>
     notice?.at === at ? (
       <div
+        ref={noticeRef}
         role="status"
+        style={shiftStyle(shift)}
         className="absolute top-full left-0 z-30 mt-1 w-max max-w-[480px] rounded-lg bg-[var(--toolbar-bg)] p-2 text-xs text-[var(--toolbar-icon)] shadow-[var(--panel-elevation-shadow)]"
       >
         {notice.text}

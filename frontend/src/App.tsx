@@ -14,6 +14,7 @@ import { SelectToolbar } from "@/components/SelectToolbar";
 import { ShapeToolbar } from "@/components/ShapeToolbar";
 import { TextBar } from "@/components/TextBar";
 import { focusCurrentFont } from "@/lib/textText";
+import { readRow2Open, writeRow2Open } from "@/lib/textBarRows";
 import { setPreviewOpen } from "@/lib/fontPreviewStore";
 import { StatusBar } from "@/components/StatusBar";
 import { ToolRail } from "@/components/ToolRail";
@@ -62,6 +63,16 @@ function Editor() {
     panelOpen.setOpen(true);
     documentPanel.shortcut("fonts");
     focusCurrentFont();
+  };
+  // Row 2 of the Text controls, one per-user preference for the Text bar and the Select bar, read
+  // once at startup (`specs/0084-text-bar-second-row` criterion 14).
+  const [row2Open, setRow2Open] = useState(readRow2Open);
+  const textRow2 = {
+    open: row2Open,
+    onToggle: () => {
+      writeRow2Open(!row2Open);
+      setRow2Open(!row2Open);
+    },
   };
   const preview = useFontPreview({ node: editor.text.bar.sampleNode, sample: editor.text.bar.sample });
   const { getSession } = editor;
@@ -166,6 +177,7 @@ function Editor() {
          * rail, so showing/hiding it never resizes the canvas
          * (`docs/design-system.md`, "no layout shift on tool switch"). */}
         <div
+          data-bar-area
           inert={historyPreview.kind === "document"}
           className={`pointer-events-none absolute top-3 right-3 left-[calc(var(--rail-right)+12px)] z-20 flex ${
             historyPreview.kind === "document" ? "opacity-40" : ""
@@ -196,6 +208,7 @@ function Editor() {
               objectToPathNotice={editor.text.objectToPathNotice}
               textBar={editor.text.bar}
               glyphs={glyphs}
+              textRow2={textRow2}
               onShowFonts={showFonts}
               onSetTextSize={editor.text.setSize}
               onPreviewTextSize={editor.text.previewSize}
@@ -249,6 +262,7 @@ function Editor() {
               onSetWritingMode={editor.text.setWritingMode}
               onSetOrientation={editor.text.setOrientation}
               glyphs={glyphs}
+              row2={textRow2}
               onReturnFocus={() => {
                 if (editor.text.editing) {
                   editor.text.sinkRef.current?.focus({ preventScroll: true });

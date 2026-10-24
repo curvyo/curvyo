@@ -39,6 +39,10 @@ export interface TextBarState {
   /** "Source Sans 3 Regular", or "" for "Mixed". */
   font: string;
   missing: boolean;
+  /** How many different faces the subject texts use, and how many of them are missing (UX notes
+   * §0.4 of `specs/0084-text-bar-second-row`). */
+  faces: number;
+  missingFaces: number;
   /** The face a missing one is drawn in: Source Sans 3, or EMS Readability for a single-line
    * text (`specs/0076-single-line-fonts` criterion 22). */
   substitute: string;
@@ -66,6 +70,8 @@ const EMPTY_BAR: TextBarState = {
   shown: false,
   font: "",
   missing: false,
+  faces: 1,
+  missingFaces: 0,
   substitute: "Source Sans 3",
   sizeMm: null,
   desktop: isTauri,
@@ -361,6 +367,8 @@ export function useText(
       shown: raw.shown,
       font: raw.font,
       missing: raw.missing,
+      faces: raw.faces,
+      missingFaces: raw.missing_faces,
       substitute: tab.current?.substitute ?? EMPTY_BAR.substitute,
       sizeMm: Number.isFinite(raw.size_mm) ? raw.size_mm : null,
       desktop: isTauri,

@@ -1,7 +1,8 @@
 import { Tooltip } from "radix-ui";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 
 import type { FlipApi } from "@/hooks/useFlip";
+import { useNoticeShift } from "@/hooks/useNoticeShift";
 import { FLIP_DISABLED_LINE, FLIP_TEXT, type FlipAxis } from "@/lib/flipText";
 
 const BUTTON_CLASS =
@@ -58,22 +59,7 @@ function FlipButton({ axis, enabled, flip, onReturnFocus }: FlipButtonProps) {
   // Left-aligned to the button, shifted to stay right of the tool rail and inside the window
   // (`review-ux.md` finding 2).
   const noticeRef = useRef<HTMLDivElement>(null);
-  const [shift, setShift] = useState(0);
-  useLayoutEffect(() => {
-    const element = noticeRef.current;
-    if (!notice || !element) {
-      setShift(0);
-      return;
-    }
-    const rail = parseFloat(getComputedStyle(element).getPropertyValue("--rail-right")) || 0;
-    const box = element.getBoundingClientRect();
-    const left = box.left - shift;
-    const right = box.right - shift;
-    const room = document.documentElement.clientWidth - 8;
-    setShift(Math.max(rail + 12 - left, Math.min(0, room - right)));
-    // `shift` is read to undo the last one; the measure runs once per notice.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [notice]);
+  const shift = useNoticeShift(noticeRef, notice);
   return (
     <div className="relative">
       <Tooltip.Root>

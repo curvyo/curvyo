@@ -339,3 +339,50 @@ fn ac26_typed_size_resizes_a_text() {
     assert_eq!(text.size.as_mm(), 10.0);
     assert!((text.placement.a - 2.0).abs() < 0.01 && (text.placement.d - 2.0).abs() < 0.01);
 }
+
+/// `specs/0084-text-bar-second-row` UX notes §0.4: with three selected texts in three faces, one
+/// of them missing, the bar is Mixed and missing and counts "1 of 3".
+#[test]
+fn ux0084_mixed_fonts_count_the_missing_ones() {
+    let mut session = with_text("A");
+    click(&mut session, Point::new(10.0, 60.0));
+    type_text(&mut session, "B");
+    assert_eq!(session.escape(), EscapeStep::ClearedState);
+    click(&mut session, Point::new(10.0, 100.0));
+    type_text(&mut session, "C");
+    assert_eq!(session.escape(), EscapeStep::ClearedState);
+    load_wanted(&mut session);
+    let ids: Vec<_> = texts(&session).iter().map(|t| t.id).collect();
+    assert_eq!(ids.len(), 3);
+    let lost = FontRef {
+        family: "Lost Serif".to_owned(),
+        style: "Bold".to_owned(),
+        face_hash: "c".repeat(64),
+        face_index: 0,
+        kind: curvyo_document_core::FontKind::Outline,
+    };
+    session.document.set_text_fonts(&[(ids[2], lost)]).unwrap();
+    session.set_tool(Tool::Select);
+    session.selection.select_single(ids[1]);
+    let serif = session
+        .fonts
+        .faces()
+        .iter()
+        .position(|f| f.family == "Source Serif 4" && f.style == "Bold")
+        .unwrap();
+    session.pick_font(serif);
+    load_wanted(&mut session);
+    for id in &ids {
+        if !session.selection.ids().contains(id) {
+            session.selection.toggle(*id);
+        }
+    }
+    let bar = session.text_bar();
+    assert_eq!(bar.font, "");
+    assert!(bar.missing);
+    assert_eq!((bar.missing_faces, bar.faces), (1, 3));
+    session.selection.select_single(ids[0]);
+    let bar = session.text_bar();
+    assert!(!bar.missing);
+    assert_eq!((bar.missing_faces, bar.faces), (0, 1));
+}

@@ -1,12 +1,21 @@
 import { CircleAlert, Link, Unlink } from "lucide-react";
 import { AlignmentGroup } from "@/components/AlignmentGroup";
-import { OrientationGroup, WritingModeGroup } from "@/components/WritingGroups";
 import type { OrientationCode, WritingModeCode } from "@/lib/textWritingText";
 import { StyleGroup } from "@/components/StyleGroup";
+import { BAR_ROW_CLASS } from "@/lib/barLayout";
 import type { WeightCode } from "@/lib/styleText";
 import type { AlignCode } from "@/lib/textLayoutText";
-import { GlyphsButton, type GlyphsButtonState, TextControls } from "@/components/TextBar";
+import {
+  BarGroup,
+  ExpandButton,
+  type GlyphsButtonState,
+  type Row2State,
+  TextControls,
+  TextRow2,
+  TextRow2Groups,
+} from "@/components/TextBar";
 import type { TextBarState } from "@/hooks/useText";
+import { shiftStyle, useNoticeShift } from "@/hooks/useNoticeShift";
 import { Toggle, Tooltip } from "radix-ui";
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 
@@ -54,8 +63,10 @@ export interface SelectToolbarProps {
   /** The Text group (`specs/0074-text-objects` criterion 11): shown while the selection holds a
    * text, acting on the texts only. */
   textBar?: TextBarState;
-  /** The Glyphs button after the Alignment group (`specs/0082-glyph-table`, UX notes P1). */
+  /** The Glyphs button, on row 2 (`specs/0082-glyph-table`; `specs/0084-text-bar-second-row`). */
   glyphs?: GlyphsButtonState;
+  /** Row 2 of the Text controls, open or closed (`0084` criterion 14). */
+  textRow2?: Row2State;
   onShowFonts?: () => void;
   onSetTextSize?: (mm: number) => string | null;
   onPreviewTextSize?: (mm: number | null) => void;
@@ -102,14 +113,15 @@ function formatMm(value: number): string {
   return String(Math.round(value * 100) / 100);
 }
 
-/** The divider before a kind group. It stays in the layout but is invisible
- * when its group starts a wrapped row (`data-row-start` on the group), so the
- * hiding cannot change the wrapping. */
+/** The divider before a kind group, drawn 13px left of its group (which is `relative`), in the
+ * 25px gap, so it takes no width: hidden when its group starts a wrapped row
+ * (`data-row-start` on the group), every line starts at the pill's padding, and the hiding cannot
+ * change the wrapping (`specs/0084-text-bar-second-row` UX notes §2). */
 export function Divider() {
   return (
     <span
       aria-hidden
-      className="mt-2 h-5 w-px shrink-0 group-data-[row-start]/row:invisible"
+      className="pointer-events-none absolute top-2 -left-[13px] h-5 w-px group-data-[row-start]/row:invisible"
       style={DIVIDER_STYLE}
     />
   );
@@ -200,6 +212,8 @@ function RadiusField({ bar, onSetRadius, onReturnFocus }: RadiusFieldProps) {
   };
 
   const corners = bar.radiusCorners;
+  const messageRef = useRef<HTMLDivElement>(null);
+  const messageShift = useNoticeShift(messageRef, invalid);
   const tooltip = bar.radiusLimited
     ? `Stored ${formatMm(bar.radiusStored)} mm, limited to ${formatMm(bar.radius)} mm by the size; enlarging brings it back.`
     : corners
@@ -290,6 +304,7 @@ function RadiusField({ bar, onSetRadius, onReturnFocus }: RadiusFieldProps) {
       </Tooltip.Root>
       </Tooltip.Provider>
       <div
+        ref={messageRef}
         id={messageId}
         role="status"
         aria-live="polite"
@@ -300,7 +315,7 @@ function RadiusField({ bar, onSetRadius, onReturnFocus }: RadiusFieldProps) {
         }
         style={
           invalid
-            ? { background: "var(--toolbar-bg)", boxShadow: "var(--panel-elevation-shadow)" }
+            ? { background: "var(--toolbar-bg)", boxShadow: "var(--panel-elevation-shadow)", ...shiftStyle(messageShift) }
             : undefined
         }
       >
@@ -469,19 +484,7 @@ function LinkedCloneButton({
   // Right-aligned to the button, but never left of the tool rail (`--rail-right` + 12) or off
   // the canvas: the shift that keeps it there (`0049` UX re-check).
   const noticeRef = useRef<HTMLDivElement>(null);
-  const [shift, setShift] = useState(0);
-  useLayoutEffect(() => {
-    const element = noticeRef.current;
-    if (!notice || !element) {
-      setShift(0);
-      return;
-    }
-    const rail = parseFloat(getComputedStyle(element).getPropertyValue("--rail-right")) || 0;
-    const left = element.getBoundingClientRect().left - shift;
-    setShift(Math.max(0, rail + 12 - left));
-    // `shift` is read to undo the last one; the measure runs once per notice.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [notice]);
+  const shift = useNoticeShift(noticeRef, notice);
   return (
     <div className="relative">
     <Tooltip.Provider delayDuration={400}>
@@ -526,7 +529,7 @@ function LinkedCloneButton({
               background: "var(--toolbar-bg)",
               color: "var(--toolbar-icon)",
               boxShadow: "var(--panel-elevation-shadow)",
-              transform: shift > 0 ? `translateX(${shift}px)` : undefined,
+              ...shiftStyle(shift),
             }
           : { display: "none" }
       }
@@ -569,6 +572,7 @@ export function SelectToolbar({
   objectToPathNotice = null,
   textBar,
   glyphs,
+  textRow2,
   onShowFonts,
   onSetTextSize,
   onPreviewTextSize,
@@ -589,6 +593,8 @@ export function SelectToolbar({
 }: SelectToolbarProps) {
   const barRef = useRef<HTMLDivElement>(null);
   useRowStarts(barRef);
+  const objectToPathRef = useRef<HTMLDivElement>(null);
+  const objectToPathShift = useNoticeShift(objectToPathRef, objectToPathNotice);
   const groups: React.ReactNode[] = [];
   if (bar.radiusShown) {
     groups.push(
@@ -641,7 +647,12 @@ export function SelectToolbar({
   if (arcBar.state.curveShown && !arcBar.state.ellipseShown) {
     groups.push(<CurveGroup key="curve" arc={arcBar} onReturnFocus={onReturnFocus} />);
   }
-  if (textBar?.shown && onShowFonts && onSetTextSize && onPreviewTextSize) {
+  // The Text controls' row 1 in place, in the Text bar's order (`specs/0084-text-bar-second-row`
+  // criteria 6 and 8): Font and Size, Alignment, Style, the expand button. Row 2 is the bottom
+  // line of the pill, under every other row.
+  const textShown = Boolean(textBar?.shown && onShowFonts && onSetTextSize && onPreviewTextSize);
+  const row2Id = useId();
+  if (textBar && textShown && onShowFonts && onSetTextSize && onPreviewTextSize) {
     groups.push(
       <div key="text" role="group" aria-label="Text" className={GROUP_CLASS}>
         <TextControls
@@ -653,9 +664,14 @@ export function SelectToolbar({
         />
       </div>,
     );
+    if (onSetTextAlign) {
+      groups.push(
+        <div key="text-align" className={GROUP_CLASS}>
+          <AlignmentGroup align={textBar.align} onPress={onSetTextAlign} onReturnFocus={onReturnFocus} />
+        </div>,
+      );
+    }
     if (onPressTextWeight && onPressTextItalic) {
-      // The Style group of its own after the Text group (`specs/0078-font-style-buttons`, UX
-      // notes §1), acting on the selected texts only.
       groups.push(
         <div key="text-style" className={GROUP_CLASS}>
           <StyleGroup
@@ -668,37 +684,10 @@ export function SelectToolbar({
         </div>,
       );
     }
-    if (onSetTextAlign) {
-      // The Alignment group of its own after Style, before Object to path
-      // (`specs/0079-text-layout-controls` UX notes §2).
+    if (textRow2) {
       groups.push(
-        <div key="text-align" className={GROUP_CLASS}>
-          <AlignmentGroup align={textBar.align} onPress={onSetTextAlign} onReturnFocus={onReturnFocus} />
-        </div>,
-      );
-    }
-    if (onSetTextWritingMode && onSetTextOrientation) {
-      // Writing mode and Glyph orientation after Alignment (`0079` criterion 20, UX notes §10.2).
-      groups.push(
-        <div key="text-writing" className={GROUP_CLASS}>
-          <WritingModeGroup mode={textBar.writingMode} onPress={onSetTextWritingMode} onReturnFocus={onReturnFocus} />
-        </div>,
-        <div key="text-orientation" className={GROUP_CLASS}>
-          <OrientationGroup
-            mode={textBar.writingMode}
-            orientation={textBar.orientation}
-            onPress={onSetTextOrientation}
-            onReturnFocus={onReturnFocus}
-          />
-        </div>,
-      );
-    }
-    if (glyphs?.shown) {
-      // The Glyphs button in a group of its own after the Alignment group (`specs/0082-glyph-table`
-      // criterion 2).
-      groups.push(
-        <div key="text-glyphs" className={GROUP_CLASS}>
-          <GlyphsButton glyphs={glyphs} />
+        <div key="text-expand" className={GROUP_CLASS}>
+          <ExpandButton row2={textRow2} controls={row2Id} bar={textBar} onReturnFocus={onReturnFocus} />
         </div>,
       );
     }
@@ -716,11 +705,12 @@ export function SelectToolbar({
         </button>
         {/* Takes no focus; the refusal look of the design system ("Action notice"). */}
         <div
+          ref={objectToPathRef}
           role="alert"
           className="absolute top-full right-0 mt-1 w-max max-w-[320px] break-words rounded-md px-2 py-1 text-xs ring-1 ring-[var(--field-invalid)]"
           style={
             objectToPathNotice
-              ? { background: "var(--popover)", color: "var(--field-invalid)" }
+              ? { background: "var(--popover)", color: "var(--field-invalid)", ...shiftStyle(objectToPathShift) }
               : { display: "none" }
           }
         >
@@ -743,17 +733,16 @@ export function SelectToolbar({
   }
   return (
     <div
-      ref={barRef}
       data-context-bar=""
-      // Every row is 36 px (28 px controls), so the switches, always on the
-      // first row, sit at the same y whether the bar has one row or two. Groups are
-      // top-aligned so a tall settings group does not move the others.
-      className="pointer-events-auto flex min-w-0 flex-wrap items-start gap-x-3 gap-y-0 rounded-lg px-2 text-sm"
+      className="pointer-events-auto flex min-w-0 flex-col rounded-lg px-2 text-sm"
       style={{
         background: "var(--toolbar-bg)",
         boxShadow: "var(--panel-elevation-shadow)",
       }}
     >
+    {/* Every row is 36 px (28 px controls), so the switches, always on the first row, sit at the
+     * same y whether the bar has one row or two. */}
+    <div ref={barRef} className={BAR_ROW_CLASS}>
       {/* The two switches wrap inside their group in a bar too narrow for both (the 356px row
        * of a window of 800px with the second rail column); the first row keeps its y. */}
       {/* With only linked clones selected the switches would do nothing: they leave the bar
@@ -778,7 +767,7 @@ export function SelectToolbar({
       )}
       {/* The Flip group: second, after the switches, in every selection state, so the first
        * row does not move with the selection (`specs/0056-mirror-and-negative-scale/` D7). */}
-      <div className="group/row flex min-h-9 items-start gap-3">
+      <div className="group/row relative flex min-h-9 items-start">
         {bar.scaleSwitchesShown && <Divider />}
         {/* The Guide button directly after the Flip group, in every selection state, 4 px from
          * it like the two flip buttons from each other, so the row stays as narrow as it can
@@ -791,11 +780,22 @@ export function SelectToolbar({
         </div>
       </div>
       {groups.map((group, index) => (
-        <div key={index} className="group/row flex min-h-9 items-start gap-3">
-          <Divider />
+        <BarGroup key={index} className="flex min-h-9 items-start">
           {group}
-        </div>
+        </BarGroup>
       ))}
+    </div>
+    {textBar && textShown && textRow2?.open && onSetTextWritingMode && onSetTextOrientation ? (
+      <TextRow2 id={row2Id} role="group">
+        <TextRow2Groups
+          bar={textBar}
+          glyphs={glyphs}
+          onSetWritingMode={onSetTextWritingMode}
+          onSetOrientation={onSetTextOrientation}
+          onReturnFocus={onReturnFocus}
+        />
+      </TextRow2>
+    ) : null}
     </div>
   );
 }
