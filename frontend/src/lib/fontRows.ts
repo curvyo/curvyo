@@ -10,10 +10,6 @@ export const FAMILY_PX = 52;
 export const NAME_LINE_PX = 28;
 export const TAG_LINE_PX = 24;
 export const FACE_PX = 28;
-/** The Remove row's height: the 28 px button and 8 px below. */
-export const REMOVE_ROW_PX = 36;
-/** The Remove confirm's height: prompt lines and the buttons. */
-export const REMOVE_CONFIRM_PX = 104;
 
 /** The tag line starts under the name (after the chevron) and ends 8 px from the edge. */
 const TAG_LINE_INDENT = 28;
@@ -35,8 +31,7 @@ export type Row =
   | { key: string; kind: "header"; block: FontBlockRows; height: number }
   | { key: string; kind: "missing"; name: string; height: number }
   | { key: string; kind: "family"; family: FontFamily; tags: RowTag[]; open: boolean; height: number }
-  | { key: string; kind: "face"; face: ListedFace; family: FontFamily; height: number }
-  | { key: string; kind: "remove"; family: FontFamily; height: number };
+  | { key: string; kind: "face"; face: ListedFace; family: FontFamily; height: number };
 
 /** A family's row key: its block and name. */
 export function familyKey(family: FontFamily): string {
@@ -115,15 +110,13 @@ interface RowInputs {
   /** Whether the family of this key is expanded. */
   isOpen: (key: string) => boolean;
   tags: (family: string) => RowTag[];
-  /** The family key whose Remove confirm is open. */
-  confirmRemove: string | null;
   /** The tree's inner width, measured (px). */
   treeWidth: number;
 }
 
 /** The rows: the Missing block, then each block's header and families; an expanded family shows
- * all its tag lines and adds its faces and, in the Curvyo block, its Remove row. */
-export function buildRows({ data, blocks, isOpen, tags, confirmRemove, treeWidth }: RowInputs): Row[] {
+ * all its tag lines and adds its faces. */
+export function buildRows({ data, blocks, isOpen, tags, treeWidth }: RowInputs): Row[] {
   const out: Row[] = [];
   if (data.current?.missing) {
     out.push({
@@ -147,10 +140,6 @@ export function buildRows({ data, blocks, isOpen, tags, confirmRemove, treeWidth
       }
       for (const face of family.faces) {
         out.push({ key: `face:${face.index}`, kind: "face", face, family, height: FACE_PX });
-      }
-      if (family.block === "curvyo") {
-        const height = confirmRemove === key ? REMOVE_CONFIRM_PX : REMOVE_ROW_PX;
-        out.push({ key: `remove:${key}`, kind: "remove", family, height });
       }
     }
   }

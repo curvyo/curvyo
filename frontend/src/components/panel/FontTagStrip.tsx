@@ -1,15 +1,17 @@
 // The Fonts tab's tag strip (`specs/0075-font-library` criteria 1, 5 to 8 and 18; UX tags
 // amendment §6 and the strip editing of 2026-10-20): one radio group "Font tag" in the preset
 // strip's look, single choice, at most four rows, the Cuttable cell's progress bar; an own tag's
-// cell carries Rename and Delete, edited in place and confirmed inline.
+// cell carries Rename, edited in place, and Delete, an inline delete confirm
+// (`specs/0081-inline-delete-confirm` Part B).
 import { CircleAlert, Pencil, Trash2 } from "lucide-react";
 import { RadioGroup } from "radix-ui";
 import { useEffect, useRef, useState } from "react";
 
-import { InlineConfirm } from "@/components/panel/FormatList";
+import { ARMED_TRASH, ARM_TRANSITION } from "@/components/panel/FontTreeRows";
 import { Tooltip } from "@/components/ui/tooltip";
+import { ARM_TRASH, ARM_ZONE, type DeleteArm } from "@/hooks/useDeleteArm";
 import type { FontTagView } from "@/hooks/useFontLibrary";
-import { checkingDescription, deleteTagPrompt, tagNameError } from "@/lib/fontLibraryText";
+import { armedTagLabel, checkingDescription, tagDeletedText, tagNameError } from "@/lib/fontLibraryText";
 import { stripCells, stripKeyAction } from "@/lib/tagStrip";
 
 const BORDER = "color-mix(in srgb, var(--toolbar-icon) 60%, transparent)";
@@ -97,6 +99,8 @@ interface FontTagStripProps {
   onChoose: (id: string, keyboard: boolean) => void;
   onRename: (id: string, name: string) => { error?: string; taken?: string };
   onDelete: (id: string) => void;
+  /** The tab's one armed trash. */
+  arm: Pick<DeleteArm, "armed" | "press">;
   onReturnFocus: () => void;
 }
 
@@ -107,11 +111,11 @@ export function FontTagStrip({
   onChoose,
   onRename,
   onDelete,
+  arm,
   onReturnFocus,
 }: FontTagStripProps) {
   const stripRef = useRef<HTMLDivElement | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
-  const [confirming, setConfirming] = useState<string | null>(null);
   const cells = stripCells(tags);
 
   /** Puts the focus back on the cell `id` after an edit (the strip's one Tab stop). */
@@ -119,6 +123,18 @@ export function FontTagStrip({
     window.requestAnimationFrame(() =>
       stripRef.current?.querySelector<HTMLElement>(`[data-tag="${CSS.escape(id)}"]`)?.focus(),
     );
+
+  /** A press on an own tag's trash: arms it, or deletes the tag when armed (`0081` criterion 12). */
+  const pressDelete = (cell: { id: string; name: string; members: number }, byKeyboard: boolean) =>
+    arm.press(`tag:${cell.id}`, armedTagLabel(cell.name, cell.members), () => {
+      const inCell = document.activeElement?.closest(`[${ARM_ZONE}="${CSS.escape(`tag:${cell.id}`)}"]`);
+      // A deleted chosen tag gives way to All; a keyboard delete puts the focus on All.
+      onDelete(cell.id);
+      if (byKeyboard || inCell) {
+        focusCell("all");
+      }
+      return tagDeletedText(cell.name);
+    });
 
   // The chosen cell is always scrolled into the strip's view (the 4-row cap).
   useEffect(() => {
@@ -160,40 +176,26 @@ export function FontTagStrip({
               />
             );
           }
-          if (confirming === cell.id) {
-            return (
-              <div key={cell.id} className="basis-full bg-[var(--panel-bg)]">
-                <InlineConfirm
-                  prompt={deleteTagPrompt(cell.name, cell.members)}
-                  onCancel={() => {
-                    setConfirming(null);
-                    focusCell(cell.id);
-                  }}
-                  onDelete={() => {
-                    setConfirming(null);
-                    // A deleted chosen tag gives way to All; the focus goes to All either way.
-                    onDelete(cell.id);
-                    focusCell("all");
-                  }}
-                  onReturnFocus={onReturnFocus}
-                />
-              </div>
-            );
-          }
           const checking = cell.id === "cuttable" && progress;
           const tip = checking ? checkingDescription(progress.done, progress.total) : null;
           const pressed = cell.id === chosen;
+          const armed = arm.armed === `tag:${cell.id}`;
+          const armedLabel = armed ? armedTagLabel(cell.name, cell.members) : null;
           const item = (
             <RadioGroup.Item
               value={cell.id}
               data-tag={cell.id}
               aria-description={tip ?? undefined}
               onKeyDown={(event) => {
-                const action = stripKeyAction(event.key, cell.own);
+                const action = stripKeyAction(event.key, cell.own) ?? (armed && event.key === "Enter" ? "delete" : null);
                 if (action) {
                   event.preventDefault();
                   event.stopPropagation();
-                  (action === "rename" ? setEditing : setConfirming)(cell.id);
+                  if (action === "rename") {
+                    setEditing(cell.id);
+                  } else {
+                    pressDelete(cell, true);
+                  }
                 }
               }}
               onClick={(event) => {
@@ -210,8 +212,13 @@ export function FontTagStrip({
           return (
             <div
               key={cell.id}
-              className={`${CELL} hover:[background-image:linear-gradient(var(--editor-accent-hover),var(--editor-accent-hover))] ${
-                pressed ? "![background-image:none] !bg-[var(--toolbar-icon-active-bg)] !text-[var(--toolbar-icon-active-fg)]" : ""
+              {...(cell.own ? { [ARM_ZONE]: `tag:${cell.id}` } : {})}
+              className={`${CELL} ${ARM_TRANSITION} ${
+                armed
+                  ? "!bg-[var(--destructive-soft)] !text-[var(--toolbar-icon)]"
+                  : pressed
+                    ? "!bg-[var(--toolbar-icon-active-bg)] !text-[var(--toolbar-icon-active-fg)]"
+                    : "hover:[background-image:linear-gradient(var(--editor-accent-hover),var(--editor-accent-hover))]"
               }`}
             >
               {tip ? (
@@ -234,13 +241,15 @@ export function FontTagStrip({
                       <Pencil size={12} aria-hidden />
                     </button>
                   </Tooltip>
-                  <Tooltip side="bottom" content="Delete">
+                  <Tooltip side="bottom" content={armedLabel ?? "Delete"}>
                     <button
                       type="button"
                       tabIndex={-1}
-                      aria-label={`Delete tag ${cell.name}`}
-                      onClick={() => setConfirming(cell.id)}
-                      className={CELL_ICON}
+                      aria-label={armedLabel ?? `Delete tag ${cell.name}`}
+                      {...{ [ARM_TRASH]: `tag:${cell.id}` }}
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => pressDelete(cell, false)}
+                      className={`${CELL_ICON} ${ARM_TRANSITION} ${armed ? `${ARMED_TRASH} !bg-[var(--destructive)]` : ""}`}
                     >
                       <Trash2 size={12} aria-hidden />
                     </button>

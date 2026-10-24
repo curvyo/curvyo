@@ -147,6 +147,9 @@
        numeric-entry field whose content was refused; 4.8:1 on
        --toolbar-bg, always paired with a message and aria-invalid. */
     --field-invalid: #B3261E;
+    /* The ground of an armed Inline delete confirm row or strip cell (`docs/design-system.md`,
+     * `specs/0081-inline-delete-confirm`); the filled --destructive trash carries the state. */
+    --destructive-soft: #F7D3CF;
     /* The violet of the marks of a selected linked clone and of what it follows
      * (`docs/design-system.md`, "Linked clone marks"; `specs/0049-linked-clone` criterion 60). */
     --clone-link: #7B3FD6;
