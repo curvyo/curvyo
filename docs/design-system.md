@@ -188,6 +188,7 @@ values, not an implementation site, for those four rows.
 | `--marquee-legend-fg` | `--toolbar-icon` (`#3A3A3F`) | Legend text color, same pairing as the toolbar's own icon-on-chrome contrast |
 | `--field-invalid` | `#B3261E` | Border of a text field whose content was refused (`object-transform-refinements` numeric entry chip). 4.8:1 on `--toolbar-bg`. Always paired with a message line and `aria-invalid`, never the only cue. Not `--marquee-contain` (`#E5484D`): that is a drag-mode color and is only 2.9:1 on the chrome tone |
 | `--destructive` | `--field-invalid` (`#B3261E`), an alias | `0020`, `0045` (2026-10-10): border and label of the action button of an inline confirm (Wipe, Delete), 4.8:1 on `--toolbar-bg`, 6.5:1 on white; fills with it (white label) on press and focus. An alias so the destructive and the error meaning can be split later without a rename. The word on the button names the action; the colour is never the only cue |
+| `--destructive-soft` | `#F7D3CF` | `0081` (2026-10-23): ground of an armed Inline delete confirm row or strip cell. `--toolbar-icon` 8.2:1, `--panel-muted-fg` 4.95:1, `--destructive` 4.7:1, `--editor-accent` 3.3:1 on it; 1.01:1 to `--panel-bg` on purpose, the filled trash carries the state. A dark theme swaps the value |
 | `--lane-line` | `--toolbar-icon` at 60 % = `#7B7B7F` on `--panel-bg` | `0042` (2026-10-10): the lines of branch lanes and the dotted segment of undone steps in the History list. 3.1:1. The main lane uses `--toolbar-icon` at 100 %, 2 px. Since `0050` also the calm glyph of an unhidden eye and an unlocked lock in the Layers list (3.1:1; "40 % opacity" would be about 2:1 on a working control) |
 | `--preview-ghost` | the previewed version's own fill and stroke at 40 % | `0042`: the lighter copy drawn under the `--preview-new` outline of an object preview. A constant, not a colour: it keeps the version's own colours so the maker sees what he would get |
 | `--axis-guide` | `--accent` at 50% opacity (blended on `--canvas-bg` about 1.7:1; deliberately faint) | `edit-interaction-polish` (2026-10-06): the origin axis line the locked move runs along (see "Move axis guide"). Informational only: the lock is also readable from the motion, the lock badge and the readout, so it is exempt from the 3:1 non-text rule on purpose. Not a new colour: `--accent` with the opacity step between the hover (20%) and selected (100%) states |
@@ -506,6 +507,23 @@ values, not an implementation site, for those four rows.
   group. Delete layer never asks: the layer goes at once, empty or not, and
   Ctrl+Z takes it back (`0050` criterion 36). A reversible action (anything
   Ctrl+Z takes back) never asks.
+- **Inline delete confirm** (2026-10-23, `0081`): how removing a listed item
+  asks without a popup and without text. A `Trash2` icon button in the item's
+  own row, always visible, not a Tab stop; the first press **arms** it: the row
+  (or strip cell) takes `--destructive-soft` and the trash turns into a filled
+  `--destructive` square with a white glyph, no width or height changes. The
+  second press on the same trash removes; a press within 400 ms of arming is
+  ignored. It disarms, without notice, after 4 s, on Escape, on any other
+  pointer press, when the focus leaves the row and when the list changes
+  (search, strip cell, expand or collapse, tab, panel collapsed). One trash is
+  armed in the app at a time; arming another disarms the first. Keys: `Delete`
+  on the focused row arms, `Delete` or `Enter` on the armed row removes; the
+  focus stays put. The armed trash's name and tooltip say what the next press
+  does, a polite status region repeats it. No countdown, no transition over
+  120 ms, none under `prefers-reduced-motion`. Used by: Remove from Curvyo
+  fonts (family row), Delete tag (tag strip). Not for reversible actions (they
+  never ask) and not where the consequence needs a sentence (that is the Inline
+  confirm).
 - **List row** (2026-10-10, `0020`, `0045`): one row component for the History
   list and the formats list. Fixed height per row type (History 44 px, 32 px for
   the Now row, 24 px for a branch header; formats and Layers 28 px) so a list can be
@@ -1347,7 +1365,7 @@ Decisions: `specs/0075-font-library/specification.md`, "UX notes" and "UX amendm
 | Item | Value |
 |---|---|
 | Layout (replaces) | Header row (24px + 8), tag strip (2 to 4 rows of 28px), 8px, search row (search field, full width less Add font, 4, Add font 28 x 28), 8px, the list (the one scroll area, minimum 120px, 8px gutter). At 800 x 600 the list is about 396px with a 2-row strip, 7 family rows |
-| Tag strip (replaces Group strip) | The `0045` preset strip look, one `role="radiogroup"` "Font tag", single choice: All, Favourites, Cuttable, Script, Sans, Serif, Initials, own tags A to Z; at most 4 rows, then it scrolls by rows; arrows move and choose; a mouse press returns the focus to the canvas. An own tag's cell ends with Rename (`Pencil` 12px) and Delete (`Trash2` 12px), 20 x 20 icon buttons, not Tab stops; built-in cells, All and Favourites have none. Rename turns the cell into a 24px text field (Enter or blur saves, Escape cancels, validation chip under it); Delete replaces the cell by the Inline confirm across the strip; after it the focus is on All |
+| Tag strip (replaces Group strip) | The `0045` preset strip look, one `role="radiogroup"` "Font tag", single choice: All, Favourites, Cuttable, Script, Sans, Serif, Initials, own tags A to Z; at most 4 rows, then it scrolls by rows; arrows move and choose; a mouse press returns the focus to the canvas. An own tag's cell ends with Rename (`Pencil` 12px) and Delete (`Trash2` 12px), 20 x 20 icon buttons, not Tab stops; built-in cells, All and Favourites have none. Rename turns the cell into a 24px text field (Enter or blur saves, Escape cancels, validation chip under it); Delete is an Inline delete confirm on the cell; after a keyboard delete the focus is on All |
 | Tag strip (amends, `0076`) | Built-in order All, Favourites, Cuttable, Single line, Script, Sans, Serif, Initials, then own tags A to Z; at 244px the built-ins take 3 rows |
 | Family row (replaces) | 52px, fixed: name line 28 (chevron 24, 4, name, current mark, star 24 x 28, face count, 8) and tag line 24 (from 28px in: chips, "+N", Add tag 20 x 20 at the right, 8px gutter). Expanded: the tag line wraps, 24px per line |
 | Favourite star | 24 x 28 button on the name line, `Star` 16px; filled `--toolbar-icon` or outline `--panel-muted-fg`; always visible; `aria-pressed`; toggles only the star, never picks, never moves the row; Ctrl+D in the list |
@@ -1356,7 +1374,7 @@ Decisions: `specs/0075-font-library/specification.md`, "UX notes" and "UX amendm
 | Single-line name (`0076`) | The name in the face's own centre lines: inline `<svg>`, `fill="none"`, `stroke="currentColor"`, 1 CSS px, round caps and joins, `vector-effect: non-scaling-stroke`, `aria-hidden`; 1 em = 16px (family) or 14px (face row), baseline on the text baseline; too wide: fewer characters plus "…" in the same strokes; loading, tooltip, states and keys as outline rows |
 | Tag overflow | "+N" chip, 20px, 12px tabular muted, no x; a button that expands the family; the row tooltip lists all tags |
 | Add tag | 20 x 20 outline button `Plus` 14px at the end of the tag line, always shown; it turns the line into a 20px field with inline completion (Up/Down through the matches, Right/End takes the completion), Enter adds or creates, Escape closes; the row height never changes |
-| Remove row | Curvyo-block families only: 28px outline button "Remove from Curvyo fonts", `--destructive` label, Inline confirm in place; Delete on the family row opens it |
+| Remove trash (`0081`) | Curvyo-block family rows only, on the name line before the star: 24 x 28 button, `Trash2` 16px `--panel-muted-fg`; Inline delete confirm; Delete on the family row (or one of its face rows) arms it; other blocks reserve no slot |
 | Add font | 28 x 28 icon button `FilePlus`, "Add font…", busy state over 150 ms; result in the Action notice under it (names in the text, no tooltip); drop of files on the tab body: 2px dashed `--accent` inset outline, no text |
 | Cuttable progress | 2px determinate bar inside the bottom of the Cuttable cell; "checking 340/2000" in the This computer header (also above the empty Cuttable list); no width change while counting |
 | Cuttable progress (amends, `0076`) | Counts outline faces only; single-line faces are never checked |
@@ -1452,10 +1470,11 @@ Decisions: `specs/0077-font-preview/ux-notes.md` §1 to §6 and `adrs.md` decisi
 | Bold, Regular / Italic of a text | `Ctrl+B` / `Ctrl+I` (`Cmd`), edit mode only | `0078`; Ctrl+B presses Bold, or Regular on a Bold text; taken by the edit sink before the browser; outside edit mode nothing (Ctrl+I stays free for `0058`) |
 | Show the Fonts tab | `Shift+Ctrl+T` (`Cmd`), desktop only | `0074`; Inkscape's Text and Font key; Chrome reserves it, so the browser build has the Font button only. Focus on the current face row |
 | Favourite a font | `Ctrl+D` (`Cmd+D`) in the Fonts list | `0075`; on any row of the family; the browser's bookmark key is prevented while the list has focus |
-| Remove a Curvyo font | `Delete` on its family row, then the Inline confirm | `0075`; Curvyo fonts block only; not undoable (a file, not the document) |
+| Remove a Curvyo font | `Delete` on its family row, then `Delete` or `Enter` | `0081`; Curvyo fonts block only; not undoable (a file, not the document) |
 | Add a tag to a font | `F2` in the Fonts list | `0075`; on any row of the family; inline completion, Enter adds |
 | Remove a font's tag | `Shift+F2` in the Fonts list, arrows to the chip, `Delete` | `0075`; or the chip's x; not a document change, so there is no undo: add it back |
-| Rename, delete an own tag | `F2`, `Delete` on its cell in the tag strip | `0075`; or its pencil and bin; built-in tags, All and Favourites ignore both |
+| Rename an own tag | `F2` on its cell in the tag strip | `0075`; or its pencil |
+| Delete an own tag | `Delete` on its cell in the tag strip, then `Delete` or `Enter` | `0081`; built-in tags, All and Favourites ignore it |
 | Choose a font tag | Tab to the tag strip, arrows, Home, End | `0075`; single choice; writes no history step |
 | Change text size by key | Up/Down in the Size field (1 mm, Shift 10, Ctrl 0.1) | `0074`; live, one commit on key-up |
 
