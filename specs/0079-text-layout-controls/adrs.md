@@ -200,6 +200,67 @@ first.
     become column-aware (criterion 24). No ADR: the node keeps its shape and no value is
     per-character.
 
+### Slice 3 spike result and build notes (2026-10-24, implementer)
+
+Spike run on `story/text-vertical` itself (no separate branch; the throwaway test was deleted),
+against harfrust `=0.14.0`, read-fonts 0.45.1, skrifa `=0.48.0`. **No blocker; no ADR.** One new
+dependency of text-core after the tester pass: `unicode-segmentation` (below).
+
+- **Fixtures.** None of the included faces has vertical metrics: Source Sans 3, Source Serif 4
+  and Great Vibes have no `vhea`, `vmtx`, `VORG` and no `vert`/`vrt2`. CJK test face:
+  `curvyo-text-core/tests/fixtures/vertical/NotoSansJP-Subset.otf`, a 3.5 KB fontTools subset of
+  Noto Sans JP Regular (SIL OFL 1.1, `OFL.txt` and `README.txt` beside it): `vhea` (500/-500/0),
+  `vmtx`, `VORG`, `vert`, `vrt2`; Latin A B H I x y and 日本語、。「」ー（）.
+- **`Direction::TopToBottom` works.** Noto: y advance −1000 (`vmtx`), offsets (−500, −880)
+  (half the advance width, `VORG` 880), and `vert` substitutes 、。「ー（ for their vertical
+  forms with no feature passed. Source Sans 3 (no `vmtx`): y advance −1326 = hhea ascender −
+  descender, x offset −h_advance/2, which is criterion 23's fallback, computed by read-fonts as
+  HarfBuzz does. So the engine passes no metrics of its own for OpenType faces.
+- **`vrt2` is not applied**, and criterion 23 no longer names it (tester and implementer agree):
+  `vrt2` substitutes pre-rotated forms of proportional glyphs, which would lay Latin on its side
+  in Upright mode; HarfBuzz enables only `vert` for the same reason. Sideways runs are turned
+  by the layout instead. Upright CJK gets its vertical forms from `vert`.
+- **UAX #50 source: a generated table in text-core**, not `unicode-vo`: that crate is 0.1.0 of
+  2019 (Unicode 12, unmaintained). `tools/unicode-data/vertical_orientation.py` reads
+  `VerticalOrientation.txt` of Unicode 17.0.0, checks its SHA-256 (`dcef09c3...cd3cd`) and writes
+  `curvyo-text-core/src/vertical_orientation_data.rs`: the U and Tu ranges merged, 99 pairs of
+  `u32` (792 bytes). R and Tr are sideways, as criterion 23 says (Tr glyphs such as 「 and ー are
+  therefore turned in Auto, not taken from `vert`; Upright gives the `vert` forms).
+- **Runs split per grapheme cluster** (tester finding, criterion 23 with `0074` decision 3): in
+  Auto a combining mark, variation selector or joiner takes its base's orientation, so base and
+  mark stay in one run and one caret cluster. The cluster split comes from
+  `unicode-segmentation` 1.13 (MIT OR Apache-2.0, no dependencies, builds for wasm32, already in
+  `Cargo.lock` through `tao`).
+- **Single-line (SVG) fonts** have no vertical metrics: Upright advances by the em and centres the
+  glyph on the column (criterion 25).
+- **Wasm size** (release editor wasm after `wasm-bindgen`, no `wasm-opt`): main at `90de814`
+  (0082 merged) 12,612,654 bytes; this slice 12,635,923 bytes: **+23,269 bytes (22.7 KiB;
+  +5.4 KiB gzip -9)**. Of the about 179 KiB left in the 2 MiB budget, about 156 KiB remain.
+
+Build decisions (feature-local):
+
+- **Line space and a frame.** `layout` keeps laying lines out along x with baselines on y ("line
+  space") and `TextLayout::frame()` maps it to text space: identity for horizontal, a quarter
+  turn clockwise for columns (columns of Vertical, left to right take negative baselines, so the
+  same turn puts them to the right). Alignment, justify, letter and word spacing, caret
+  boundaries, `line_of`, Up/Down and the line box are unchanged code; `line_box()` and
+  `nearest_boundary()` speak text space, `caret_point()` and `boundary_on_line()` line space.
+  A sideways glyph turns with the frame; an upright glyph (`PlacedGlyph::upright`) only has its
+  origin mapped. `PlacedGlyph::centre_y` is the turning point of criterion 11 (the column's centre
+  line for upright glyphs). Auto line spacing in columns: `vhea`, else natural.
+- **Placement on a change** (criterion 20): `ui-core::kept_placement` keeps the first line's
+  extent start (on its baseline, through the frame) where it was, for writing mode and
+  orientation alike.
+- **Keys** (criterion 24): `ui-core::text_edit` maps the arrows in columns (Up/Down along,
+  Left/Right across in reading order) before the existing moves.
+- **Greyed orientation** (criterion 21): the frontend greys the group when the pressed writing
+  mode is Horizontal (with mixed modes it acts); a greyed press does nothing. The session accepts
+  the press on a horizontal text (it is stored and kept), so the rule lives in one place.
+- **Order in the bars:** Writing mode and orientation follow Alignment (the Taper field of slice 2
+  is not built) and come before the Glyphs button of `0082`.
+- **JSON mirror:** `writing_mode` and `orientation` are left out of `document.json` at their
+  defaults, so a text of format 19 mirrors byte for byte as before.
+
 ## Slice 4 (kerning): needs a new ADR, `needs-customer`
 
 14. **ADR 0021 "Per-character values on a text" (`needs-customer`, document model).** Criteria 30
