@@ -153,3 +153,94 @@ values). Built for `adrs.md` decisions 11 to 13 and the slice 3 spike note there
   lead.
 - 2026-10-24: the Select bar with one vertical text was not measured at 800 x 600; the Text bar
   was (design-system row).
+
+# Plan for the text layout controls, slice 4 (kerning)
+
+Implementer, 2026-10-24, on `story/text-kerning` (Part E, criteria 26 to 31, and Part G for its
+values). Built for `adrs.md` decision 14 and
+[ADR 0021](../../docs/adr/0021-per-character-values-on-a-text.md); UX per `ux-notes.md` §10.3.
+Format 21 (20 after slice 3).
+
+## Affected crates/modules
+
+- `curvyo-document-core`: new `text_chars.rs` (`CharValues`, `TextChars`, the Loro marks
+  `kern_x`/`kern_y`, the style config); the three plain-string readers carry marks: `objects.rs`
+  `copy_map`, `history/node_value.rs` `Node::Text { string, chars }`, `history/merge.rs` (write
+  and three-way restore per character); `TextSnapshot::chars`; `Document::edit_text` (replaces
+  `edit_text_string`), `create_text_with_chars`, `set_text_chars` ("Change kerning", "Clear
+  kerning"); the config on `Document::new`, `from_loro_snapshot` and the history wipe; format 21,
+  golden `text_layout_v21.curvyo`.
+- `curvyo-text-core`: new `char_offsets.rs` (`CharOffset`, the byte lookup);
+  `LayoutOptions::char_offsets` applied in `layout.rs` `place` (along before the cluster, across
+  on its glyphs).
+- `curvyo-ui-core`: `layout_options` maps the factors; `text_edit.rs` keeps one `CharValues` per
+  character with the string (typed characters none, deleted ones gone, undo inside the session),
+  `kern` for Alt+arrows, the character subject at the caret or range; `text_layout_fields.rs`
+  two more fields (`HorizontalKerning`, `VerticalKerning`), subjects per character; history
+  names.
+- `curvyo-editor-wasm`: kerning subjects, preview, commit and reset in `session/text_layout.rs`
+  (new `session/text_kerning.rs` for the character subjects and writes), `text_kern` binding.
+- `frontend`: two more fields in `TextLayoutBlock` (a third group), names, Alt+arrows in the edit
+  sink, the readout "Kern +0.3, 0.0 mm".
+
+## Tasks
+
+- [x] 1. document-core, test first: style config on both constructors (and after a wipe), marks
+  survive `apply_string_diff` before and after them, `copy_map` copies them, undo restores a
+  kern per character, two peers' kerns on different characters both survive (AC 29 to 31, 37)
+- [x] 2. document-core: `TextChars` read rules (non-finite 0, clamp), `TextSnapshot::chars`,
+  `edit_text`, `set_text_chars` labels, one commit; format 21, golden file with one text with
+  `kern_x`, one with `kern_y`, one with both on several characters, one without; a format-20 file
+  opens with no mark (AC 26, 28, 37)
+- [x] 3. text-core: `char_offsets` along (pen and the rest of the line move, caret in the middle
+  of the gap, justify keeps the width) and across (only that cluster), horizontal and vertical;
+  a value on a later character of a cluster ignored (AC 26, 27, 38)
+- [x] 4. ui-core: `layout_options` factor x Size; session values per character through insert,
+  delete, undo; Alt steps 0.1 mm, Shift 1 mm, clamped to the range; field subjects (caret, range,
+  end of line, whole texts), Mixed; Object to path equals drawing (AC 26 to 30, 35)
+- [x] 5. Session and bindings: the two fields in the block, preview, release one step "Change
+  kerning", reset outside edit mode "Clear kerning", in edit mode the session and the node; Alt+
+  arrows in the edit session (AC 26 to 29)
+- [x] 6. Frontend: the third group in the block, Alt+arrows in the sink, the readout; node tests
+  (AC 26, 29)
+- [x] 7. Full gate, frontend tsc, npm test, oxlint; headless Chromium screenshots
+- [x] 8. Customer feedback on PR #189 (2026-10-24): text-core cumulative `across` (a running rise
+  per line) and `CharOffset.rotation_rad` / `PlacedGlyph.rotation_rad` added to the text's turn
+  (AC 27, 27b); document-core mark key `rot` in degrees, wrapped, own labels, golden v21 with a
+  rotated text (AC 27b, 37); ui-core field Per-character rotation, `chars_label`; session
+  "All characters" and per-key resets (AC 27b, 27c, 28); frontend third group with the buttons
+  (AC 26, 27c)
+
+## Validation
+
+- `curvyo-document-core/src/text_chars.rs` unit tests and `tests/text_kerning_format.rs`
+  (golden, peers, undo, copy); `curvyo-text-core/tests/kerning.rs`; ui-core unit tests of the
+  session values and the fields; session tests `text_kerning_tests.rs`; node tests.
+
+## Dated notes
+
+- 2026-10-24: the lead's brief put the two kerning fields into the Text bar's row 2 (0084); the
+  spec (criterion 26), UX notes §10.3 and 0084 ("Per-character kerning adds no bar control") put
+  them in the text layout block of the Fonts tab. Built per the spec.
+- 2026-10-24: tester-owned files adapted mechanically only: `LayoutOptions` is no longer `Copy`
+  (it holds `char_offsets`), so `..o` became `..o.clone()` and full literals got
+  `..LayoutOptions::default()`; `layout_options` takes the characters' values; `TextSnapshot`
+  and `LayoutSubject` literals got the new field; the block's field count 4 became 6 (criterion
+  26) and the label test compares the first four; slice 3's `CURRENT_FORMAT_VERSION == 20`
+  became `>= 20` (format 21 here). No other assertion changed.
+- 2026-10-24: Alt+arrows act the same in columns: Left/Right change the horizontal (along) kern,
+  Up/Down the vertical (across) one, not mapped to the column's direction. Left to the lead.
+- 2026-10-24: a kerning field's change in edit mode is not a step of the session's own undo;
+  a later Ctrl+Z inside the session that goes back past it restores the characters' values of
+  that earlier state too (the session's states hold the values with the string).
+- 2026-10-24: measured at build (headless Chromium): the block is 196px with six fields (UX notes
+  §4 said 208px); no sideways scroll at 800 x 600.
+- 2026-10-24 (customer feedback on PR #189): tests that asserted "Vertical kerning moves the
+  character alone" (implementer's `tests/kerning.rs`, tester's
+  `acceptance_0079_slice4_tester.rs` in text-core) were rewritten to the new rule: the following
+  characters of the line move too, the earlier ones and the next line stay. The tester's field
+  order test now expects Per-character rotation after the kerning fields, the field counts 6
+  became 7. The degree fields' notices read "°" and drop "to fit its size" (a rotation is never
+  limited by Size), which keeps every notice within 70 characters with the longer label.
+- 2026-10-24: text on a path (`0080`) is stacked on this branch and not in it; it needs the
+  cumulative `across` along the carrier's normal and `PlacedGlyph.rotation_rad` after its rebase.
