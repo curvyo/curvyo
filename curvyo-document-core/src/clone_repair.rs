@@ -34,11 +34,14 @@ enum Fix {
 }
 
 impl Document {
-    /// Repairs, without committing, every live clone outside `removed` (nodes and everything
+    /// Writes the kept outline on every text whose carrier is removed, then repairs, without
+    /// committing, every live clone outside `removed` (nodes and everything
     /// under them) whose original is in it. Call it before the nodes are deleted, in the commit
     /// that deletes them: it reads the state before the command. Records the counts for
     /// [`Document::take_clone_repair`].
     pub(crate) fn repair_clones_of_removed(&self, tree: &LoroTree, removed: &[TreeID]) {
+        // The texts on a removed carrier keep its outline (`specs/0080-text-on-path` criterion 25).
+        self.keep_carriers_of_removed(tree, removed);
         let links = self.clone_links();
         if links.is_empty() {
             return;

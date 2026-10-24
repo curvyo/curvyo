@@ -78,6 +78,8 @@ pub struct ObjectRead {
     /// The clones whose chain does not end in a live path or compound path, or whose outline is
     /// not finite, in stacking order.
     pub orphans: Vec<NodeId>,
+    /// The texts on each live carrier, in stacking order (`specs/0080-text-on-path`).
+    pub texts_on: HashMap<NodeId, Vec<NodeId>>,
 }
 
 impl ObjectRead {
@@ -87,6 +89,7 @@ impl ObjectRead {
     pub fn from_objects(objects: std::sync::Arc<[ObjectSnapshot]>) -> Self {
         let mut clones_of: HashMap<NodeId, Vec<NodeId>> = HashMap::new();
         let mut index = HashMap::with_capacity(objects.len());
+        let mut texts_on: HashMap<NodeId, Vec<NodeId>> = HashMap::new();
         for (i, object) in objects.iter().enumerate() {
             index.insert(object.id(), i);
             if let ObjectSnapshot::Clone(clone) = object {
@@ -95,12 +98,23 @@ impl ObjectRead {
                     .or_default()
                     .push(clone.id());
             }
+            if let ObjectSnapshot::Text(text) = object
+                && let Some(on_path) = &text.on_path
+                && !on_path.kept
+                && on_path.curve.is_some()
+            {
+                texts_on
+                    .entry(on_path.carrier.node)
+                    .or_default()
+                    .push(text.id);
+            }
         }
         Self {
             objects,
             index,
             clones_of,
             orphans: Vec::new(),
+            texts_on,
         }
     }
 
@@ -121,6 +135,8 @@ pub(crate) struct Resolution {
     pub(crate) clones_of: HashMap<NodeId, Vec<NodeId>>,
     /// The orphans, in stacking order.
     pub(crate) orphans: Vec<NodeId>,
+    /// The texts on each live carrier (`crate::text_carrier`).
+    pub(crate) texts_on: HashMap<NodeId, Vec<NodeId>>,
 }
 
 impl Resolution {
@@ -137,6 +153,7 @@ impl Resolution {
             index,
             clones_of: self.clones_of,
             orphans: self.orphans,
+            texts_on: self.texts_on,
         }
     }
 }
@@ -299,6 +316,7 @@ fn assemble(leaves: Vec<RawLeaf>, states: &[State], index: &HashMap<NodeId, usiz
         leaves: Vec::with_capacity(leaves.len()),
         clones_of: HashMap::new(),
         orphans: Vec::new(),
+        texts_on: HashMap::new(),
     };
     for (i, leaf) in leaves.into_iter().enumerate() {
         let object = match leaf {
@@ -322,6 +340,8 @@ fn assemble(leaves: Vec<RawLeaf>, states: &[State], index: &HashMap<NodeId, usiz
         };
         result.leaves.push(object);
     }
+    // Texts on path read their carriers' outlines in the same pass (ADR 0022 §3).
+    result.texts_on = crate::text_carrier::resolve_carriers(&mut result.leaves);
     result
 }
 

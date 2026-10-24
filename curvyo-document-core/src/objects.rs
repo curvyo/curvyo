@@ -261,6 +261,25 @@ impl Document {
         sources: &[CopySource],
         offset: Vec2,
     ) -> Result<Vec<NodeId>, ObjectEditError> {
+        self.duplicate_objects_shifting(sources, offset, &std::collections::HashMap::new())
+    }
+
+    /// [`Document::duplicate_objects`], where a copied text on path whose carrier is not copied
+    /// moves along its carrier by its entry in `text_shifts`, else by
+    /// [`crate::DUPLICATE_TEXT_SHIFT`] (`specs/0080-text-on-path` criterion 31); a copied text
+    /// whose carrier is copied too goes on the carrier's copy.
+    ///
+    /// # Errors
+    /// As [`Document::duplicate_objects`].
+    ///
+    /// # Panics
+    /// As [`Document::duplicate_objects`].
+    pub fn duplicate_objects_shifting(
+        &self,
+        sources: &[CopySource],
+        offset: Vec2,
+        text_shifts: &std::collections::HashMap<NodeId, crate::units::Length>,
+    ) -> Result<Vec<NodeId>, ObjectEditError> {
         let mut seen = HashSet::with_capacity(sources.len());
         let sources: Vec<&CopySource> = sources.iter().filter(|s| seen.insert(s.id)).collect();
         let tree = self.loro().get_tree(OBJECTS_TREE);
@@ -344,6 +363,7 @@ impl Document {
                 .unwrap();
         }
         crate::clone_copy::relink_copied_clones(&tree, &copying.made, offset);
+        crate::text_carrier::relink_copied_texts(&tree, &copying.made, text_shifts);
         self.commit_with_label("duplicate_objects");
         Ok(created
             .into_iter()
