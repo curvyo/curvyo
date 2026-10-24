@@ -1,15 +1,17 @@
-//! The font preview's faces and tiles for the frontend (`specs/0077-font-preview` criteria 11,
-//! 13, 15, 17 and 18, `adrs.md` decisions 2 and 3): bytes cross once per face, then each tile is
-//! one call with the sample, answered as JSON.
+//! The font preview's faces, tiles and glyph table for the frontend (`specs/0077-font-preview`
+//! criteria 11, 13, 15, 17 and 18, `adrs.md` decisions 2 and 3; `specs/0082-glyph-table`
+//! `adrs.md` decisions 2, 3 and 6): bytes cross once per face, then each tile, table or row batch
+//! of cells is one call, answered as JSON.
 
-use curvyo_text_core::{FaceKind, preview_path_within};
-use curvyo_ui_core::PreviewFaces;
+use curvyo_text_core::{FaceKind, UnicodeNames, block_of, glyph_cell, preview_path_within};
+use curvyo_ui_core::{MAX_GLYPH_QUERY_CHARS, NO_BLOCK, PreviewFaces, glyph_table};
 use serde_json::json;
 
-/// The faces the preview holds, within their byte budget.
+/// The faces the preview holds, within their byte budget, and the Unicode names once loaded.
 #[derive(Debug, Default)]
 pub struct PreviewFacesGlue {
     faces: PreviewFaces,
+    names: Option<UnicodeNames>,
 }
 
 impl PreviewFacesGlue {
@@ -60,6 +62,93 @@ impl PreviewFacesGlue {
     }
 }
 
+impl PreviewFacesGlue {
+    /// Takes the shipped Unicode names file (fetched on the first Glyphs open); `false` for
+    /// bytes that are not one.
+    pub fn set_unicode_names(&mut self, bytes: &[u8]) -> bool {
+        self.names = UnicodeNames::parse(bytes).ok();
+        self.names.is_some()
+    }
+
+    /// Whether the Unicode names are loaded.
+    #[must_use]
+    pub const fn has_unicode_names(&self) -> bool {
+        self.names.is_some()
+    }
+
+    /// The glyph table of the face `id` for `query` (at most 64 characters used) as JSON
+    /// `{"total", "shown", "single_line", "groups": [{"name", "cells": [code points]}]}`; empty
+    /// when the face is not held.
+    #[must_use]
+    pub fn glyph_table(&mut self, id: &str, query: &str) -> String {
+        let Some(face) = self.faces.get(id) else {
+            return String::new();
+        };
+        let list = face.listed_chars();
+        let query: String = query.chars().take(MAX_GLYPH_QUERY_CHARS).collect();
+        let table = glyph_table(&list, &query, self.names.as_ref());
+        let groups: Vec<serde_json::Value> = table
+            .groups
+            .iter()
+            .map(|group| {
+                let cells: Vec<u32> = group.cells.iter().map(|&i| u32::from(list[i].c)).collect();
+                json!({ "name": group.name, "cells": cells })
+            })
+            .collect();
+        json!({
+            "total": list.len(),
+            "shown": table.shown,
+            "single_line": face.kind() == FaceKind::SingleLine,
+            "groups": groups,
+        })
+        .to_string()
+    }
+
+    /// The cells of `code_points` in the face `id` as JSON `[{"d", "adv", "empty"}]` in cap-height
+    /// units (`null` for a code point the face does not draw); empty when the face is not held.
+    #[must_use]
+    pub fn glyph_cells(&mut self, id: &str, code_points: &[u32]) -> String {
+        let Some(face) = self.faces.get(id) else {
+            return String::new();
+        };
+        let cells: Vec<serde_json::Value> = code_points
+            .iter()
+            .map(|&code| {
+                char::from_u32(code)
+                    .and_then(|c| glyph_cell(&face, c))
+                    .map_or(
+                        serde_json::Value::Null,
+                        |cell| json!({ "d": cell.d, "adv": cell.advance, "empty": cell.empty }),
+                    )
+            })
+            .collect();
+        serde_json::Value::Array(cells).to_string()
+    }
+
+    /// The detail bar's text for `code_point` in the face `id`, as JSON `{"name", "glyph_name",
+    /// "block", "abbreviation"}` (`null` where there is none; `name` and `abbreviation` are
+    /// `null` until the names are loaded).
+    #[must_use]
+    pub fn glyph_detail(&mut self, id: &str, code_point: u32) -> String {
+        let Some(c) = char::from_u32(code_point) else {
+            return String::new();
+        };
+        let glyph_name = self.faces.get(id).and_then(|face| {
+            let list = face.listed_chars();
+            list.binary_search_by_key(&c, |l| l.c)
+                .ok()
+                .and_then(|at| list[at].name.as_deref().map(str::to_owned))
+        });
+        json!({
+            "name": self.names.as_ref().and_then(|names| names.name_of(c)),
+            "glyph_name": glyph_name,
+            "block": block_of(c).unwrap_or(NO_BLOCK),
+            "abbreviation": self.names.as_ref().and_then(|names| names.abbreviation_of(c)),
+        })
+        .to_string()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -86,6 +175,49 @@ mod tests {
         let script = tile(&mut glue, "script#0", "Anna");
         assert_eq!(script["single_line"], json!(true));
         assert_eq!(script["missing"], json!([]));
+    }
+
+    fn names() -> Vec<u8> {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        std::fs::read(dir.join("../frontend/public/unicode/names-17.0.0.bin")).unwrap()
+    }
+
+    #[test]
+    fn the_glyph_table_groups_searches_and_draws_cells() {
+        let mut glue = PreviewFacesGlue::default();
+        assert!(glue.add("sans#0", &font("source-sans-3/SourceSans3-Regular.otf"), 0));
+        let table: serde_json::Value =
+            serde_json::from_str(&glue.glyph_table("sans#0", "")).unwrap();
+        assert_eq!(table["groups"][0]["name"], "Basic Latin");
+        assert_eq!(table["total"], table["shown"]);
+        // A word finds nothing by name until the names arrive.
+        let heart: serde_json::Value =
+            serde_json::from_str(&glue.glyph_table("sans#0", "diaeresis")).unwrap();
+        assert_eq!(heart["shown"], 0);
+        assert!(!glue.has_unicode_names());
+        assert!(glue.set_unicode_names(&names()));
+        let found: serde_json::Value =
+            serde_json::from_str(&glue.glyph_table("sans#0", "a diaeresis")).unwrap();
+        assert!(
+            found["groups"][0]["cells"]
+                .as_array()
+                .unwrap()
+                .contains(&json!(0xE4))
+        );
+        let cells: serde_json::Value =
+            serde_json::from_str(&glue.glyph_cells("sans#0", &[0x48, 0x20, 0x6F22])).unwrap();
+        assert_ne!(cells[0]["d"], "");
+        assert_eq!(cells[1]["empty"], true);
+        assert_eq!(cells[2], serde_json::Value::Null);
+        let detail: serde_json::Value =
+            serde_json::from_str(&glue.glyph_detail("sans#0", 0xE4)).unwrap();
+        assert_eq!(detail["name"], "LATIN SMALL LETTER A WITH DIAERESIS");
+        assert_eq!(detail["glyph_name"], "adieresis");
+        assert_eq!(detail["block"], "Latin-1 Supplement");
+        let space: serde_json::Value =
+            serde_json::from_str(&glue.glyph_detail("sans#0", 0x20)).unwrap();
+        assert_eq!(space["abbreviation"], "SP");
+        assert!(!glue.set_unicode_names(b"nope"));
     }
 
     #[test]

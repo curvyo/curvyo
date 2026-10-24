@@ -170,6 +170,32 @@ impl WasmPreviewFaces {
     pub fn preview_tile(&mut self, id: &str, text: &str, width_caps: f64) -> String {
         self.glue.tile_within(id, text, width_caps)
     }
+
+    /// Takes the Unicode names file (`specs/0082-glyph-table` criterion 17).
+    pub fn set_unicode_names(&mut self, bytes: &[u8]) -> bool {
+        self.glue.set_unicode_names(bytes)
+    }
+
+    /// Whether the Unicode names are loaded.
+    #[must_use]
+    pub fn has_unicode_names(&self) -> bool {
+        self.glue.has_unicode_names()
+    }
+
+    /// The glyph table of the face `id` for `query`, as JSON (see `PreviewFacesGlue::glyph_table`).
+    pub fn glyph_table(&mut self, id: &str, query: &str) -> String {
+        self.glue.glyph_table(id, query)
+    }
+
+    /// One batch of glyph table cells, as JSON (see `PreviewFacesGlue::glyph_cells`).
+    pub fn glyph_cells(&mut self, id: &str, code_points: &[u32]) -> String {
+        self.glue.glyph_cells(id, code_points)
+    }
+
+    /// The detail bar's names of one character, as JSON (see `PreviewFacesGlue::glyph_detail`).
+    pub fn glyph_detail(&mut self, id: &str, code_point: u32) -> String {
+        self.glue.glyph_detail(id, code_point)
+    }
 }
 
 /// The faces of a font file the browser's Add font accepts, as JSON.

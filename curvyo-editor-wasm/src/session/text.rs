@@ -155,7 +155,7 @@ impl Session {
     }
 
     /// Starts edit mode on a new text whose first baseline starts at `point` (criterion 2).
-    fn start_new_text(&mut self, point: Point) {
+    pub(super) fn start_new_text(&mut self, point: Point) {
         let Some(font) = self.next_text_font() else {
             return;
         };

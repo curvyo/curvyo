@@ -46,6 +46,7 @@ mod font_match;
 mod format_form;
 mod format_list_view;
 mod fracture;
+mod glyph_table;
 mod group_box;
 mod group_entry;
 mod group_transform;
@@ -195,6 +196,7 @@ pub use format_form::{
 };
 pub use format_list_view::{FormatGroupView, FormatListView, FormatRowView, format_list_view};
 pub use fracture::{FRACTURE_COMMIT_LABEL, plan_fracture};
+pub use glyph_table::{GlyphGroup, GlyphTable, MAX_GLYPH_QUERY_CHARS, NO_BLOCK, glyph_table};
 pub use group_box::{
     GroupBoxShape, GroupSelection, group_handles, hit_group_handle, is_drawn_group_handle,
 };

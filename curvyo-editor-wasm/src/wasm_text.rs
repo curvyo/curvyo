@@ -146,6 +146,20 @@ impl WasmSession {
             .limited
     }
 
+    /// A character from the glyph table (`specs/0082-glyph-table` criteria 12 to 14): at the
+    /// caret, or in the one selected text at its end, or as a new text centred on the visible
+    /// drawing. JSON `{"editing", "limited"}`.
+    pub fn insert_from_glyph_table(&mut self, ch: &str) -> String {
+        let outcome = self.session.insert_from_glyph_table(ch);
+        serde_json::json!({ "editing": outcome.editing, "limited": outcome.limited }).to_string()
+    }
+
+    /// The face the glyph table shows, as JSON `{family, style, missing, index}` or `null`.
+    #[must_use]
+    pub fn glyph_subject(&self) -> String {
+        self.session.glyph_subject_json()
+    }
+
     /// Backspace (`backward`) or Delete.
     pub fn text_delete(&mut self, backward: bool) {
         self.session.text_input(if backward {
