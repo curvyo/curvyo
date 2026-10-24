@@ -10,8 +10,9 @@ use curvyo_document_core::{
 };
 use curvyo_text_core::{Face, FaceStore};
 use curvyo_ui_core::{
-    PathPlacement, default_position, lay_out, line_box_contains, measure_of, projected_values,
-    release_placement, shift_along, slid_values, stored_vertical_layout, text_layout,
+    PathPlacement, default_position, edit_geometry_on_path, lay_out, line_box_contains, measure_of,
+    nearest_boundary_on_path, projected_values, release_placement, shift_along, slid_values,
+    stored_vertical_layout, text_layout,
 };
 
 fn sans() -> std::sync::Arc<Face> {
@@ -95,7 +96,7 @@ fn put(
     let face = sans();
     let laid = text_layout(&text, &face).unwrap();
     let measure = measure_of(text.on_path.as_ref().unwrap().curve.as_ref().unwrap());
-    let position = default_position(&laid, &measure, &values);
+    let position = default_position(&laid, &measure);
     d.set_text_path(
         &[(id, OnPathValues { position, ..values })],
         curvyo_document_core::OnPathLabel::Move,
@@ -129,15 +130,15 @@ fn near(a: f64, b: f64) -> bool {
     (a - b).abs() < 0.01
 }
 
-/// Criterion 9: on a straight carrier from (0, 0), Above with Baseline at Position 0 draws the
-/// straight text with its anchor at (0, 0).
+/// Criterion 9: on a straight carrier from (0, 0), Above with Baseline at the default Position
+/// (half the text's width, customer 2026-10-24) draws the straight text with its anchor at (0, 0).
 #[test]
 fn c09_a_straight_carrier_draws_the_straight_text() {
     let d = Document::new(1);
     let t = create(&d, "Curvyo", &TextLayoutValues::DEFAULT);
     let straight = lay_out(&read(&d, t), &sans(), false).unwrap();
     let c = line(&d, 100.0);
-    let on = put(&d, t, c, OnPathValues::at(Length::from_mm(0.0)), false);
+    let on = put(&d, t, c, OnPathValues::at(Length::from_mm(0.0)), true);
     let laid = lay_out(&on, &sans(), false).unwrap();
     let a: Vec<Point> = straight.glyphs.all_anchors().map(|a| a.point).collect();
     let b: Vec<Point> = laid.glyphs.all_anchors().map(|a| a.point).collect();
@@ -172,15 +173,8 @@ fn c10_the_four_cases_on_a_circle() {
         let mut text = put(&d, t, c, values(side, line_on), true);
         if !top_half {
             // The H's middle at the 90° point: a quarter of the length from 3 o'clock.
-            let laid = text_layout(&text, &face).unwrap();
             let measure = measure_of(text.on_path.as_ref().unwrap().curve.as_ref().unwrap());
-            let middle = f64::midpoint(laid.lines[0].extent.start.0, laid.lines[0].extent.end.0);
-            let sigma = if values(side, line_on).reads_with_carrier() {
-                1.0
-            } else {
-                -1.0
-            };
-            let position = measure.length().as_mm() / 4.0 - sigma * middle;
+            let position = measure.length().as_mm() / 4.0;
             let on_path = text.on_path.as_mut().unwrap();
             on_path.values.position = Length::from_mm(position);
         }
@@ -252,7 +246,7 @@ fn c19_mirror_letters() {
     let d = Document::new(1);
     let t = create(&d, "L", &TextLayoutValues::DEFAULT);
     let c = line(&d, 100.0);
-    let plain = put(&d, t, c, OnPathValues::at(Length::from_mm(0.0)), false);
+    let plain = put(&d, t, c, OnPathValues::at(Length::from_mm(0.0)), true);
     let mut mirrored = plain.clone();
     mirrored.on_path.as_mut().unwrap().values.mirror_letters = true;
     let laid = text_layout(&plain, &sans()).unwrap();
@@ -270,7 +264,7 @@ fn c26_overflow_continues_straight() {
     let d = Document::new(1);
     let t = create(&d, "HHHHHHHH", &TextLayoutValues::DEFAULT);
     let c = line(&d, 10.0);
-    let text = put(&d, t, c, OnPathValues::at(Length::from_mm(0.0)), false);
+    let text = put(&d, t, c, OnPathValues::at(Length::from_mm(0.0)), true);
     let outline = lay_out(&text, &sans(), false).unwrap();
     assert_eq!(outline.glyph_outlines.len(), 8);
     let (lo, hi) = bounds(&text);
@@ -294,7 +288,8 @@ fn c28_hit_on_the_letter_boxes() {
     );
 }
 
-/// Criterion 47: kerns along the tangent and the normal.
+/// Criterion 47: kerns along the tangent and the normal; the vertical kern moves the following
+/// letters too (customer 2026-10-24).
 #[test]
 fn c47_kerning_along_the_carrier() {
     let face = sans();
@@ -314,23 +309,105 @@ fn c47_kerning_along_the_carrier() {
         CharValues {
             kern_x: 0.0,
             kern_y: 0.2,
+            rotation: 0.0,
         },
     )]);
     let middle = base(&up, 1);
     assert!(near(middle.x, 100.0) && near(middle.y, 48.0), "{middle:?}");
     assert!(base(&up, 0).vector_to(before[0]).length() < 0.01);
-    assert!(base(&up, 2).vector_to(before[2]).length() < 0.01);
+    let measure = measure_of(text.on_path.as_ref().unwrap().curve.as_ref().unwrap());
+    let centre = Point::new(100.0, 100.0);
+    let radius = |p: Point| p.vector_to(centre).length();
+    let last = base(&up, 2);
+    assert!(near(radius(last), radius(before[2]) + 2.0), "{last:?}");
+    assert!(near(
+        measure.nearest(last).as_mm(),
+        measure.nearest(before[2]).as_mm()
+    ));
     let mut along = text.clone();
     along.chars = TextChars::new([(
         2,
         CharValues {
             kern_x: 0.3,
             kern_y: 0.0,
+            rotation: 0.0,
         },
     )]);
-    let measure = measure_of(text.on_path.as_ref().unwrap().curve.as_ref().unwrap());
-    let moved = measure.nearest(base(&along, 2)).as_mm() - measure.nearest(before[2]).as_mm();
-    assert!(near(moved, 3.0), "{moved}");
+    // The text's middle stays: the last H lies 3 mm further from the first one.
+    let moved =
+        |g: usize| measure.nearest(base(&along, g)).as_mm() - measure.nearest(before[g]).as_mm();
+    assert!(near(moved(2) - moved(0), 3.0), "{} {}", moved(0), moved(2));
+}
+
+/// The extent of each drawn glyph of `text` on its path.
+fn glyph_boxes(text: &TextSnapshot) -> Vec<(Point, Point)> {
+    let outline = lay_out(text, &sans(), false).unwrap();
+    let mut subpaths = vec![outline.glyphs.anchors.clone()];
+    subpaths.extend(
+        outline
+            .glyphs
+            .extra_subpaths
+            .iter()
+            .map(|s| s.anchors.clone()),
+    );
+    subpaths.retain(|s| !s.is_empty());
+    let mut boxes = Vec::new();
+    let mut at = 0;
+    for &n in &outline.glyph_outlines {
+        let points = subpaths[at..at + n].iter().flatten().map(|a| a.point);
+        boxes.push(points.fold(
+            (
+                Point::new(f64::MAX, f64::MAX),
+                Point::new(f64::MIN, f64::MIN),
+            ),
+            |(lo, hi), p| {
+                (
+                    Point::new(lo.x.min(p.x), lo.y.min(p.y)),
+                    Point::new(hi.x.max(p.x), hi.y.max(p.y)),
+                )
+            },
+        ));
+        at += n;
+    }
+    boxes
+}
+
+/// Criterion 47 (customer 2026-10-24): a character's own rotation adds to its rigid turn on the
+/// path about its centre, on top of Character rotation; its neighbours stay.
+#[test]
+fn c47_own_rotation_on_the_path() {
+    let d = Document::new(1);
+    let t = create(&d, "HIH", &TextLayoutValues::DEFAULT);
+    let c = circle(&d);
+    let text = put(&d, t, c, OnPathValues::at(Length::from_mm(0.0)), true);
+    let turned = |text_deg: f64, own_deg: f64| {
+        let mut t = text.clone();
+        t.layout.rotation = Angle::from_radians(text_deg.to_radians());
+        t.chars = TextChars::new([(
+            1,
+            CharValues {
+                rotation: own_deg,
+                ..CharValues::DEFAULT
+            },
+        )]);
+        glyph_boxes(&t)
+    };
+    let plain = glyph_boxes(&text);
+    let own = turned(0.0, 90.0);
+    let same = |a: (Point, Point), b: (Point, Point)| {
+        a.0.vector_to(b.0).length() < 0.01 && a.1.vector_to(b.1).length() < 0.01
+    };
+    assert!(same(own[0], plain[0]) && same(own[2], plain[2]));
+    // The narrow I at the top of the circle lies on its side, about the same centre.
+    let (lo, hi) = own[1];
+    assert!(hi.x - lo.x > hi.y - lo.y, "{lo:?} {hi:?}");
+    let mid =
+        |b: (Point, Point)| Point::new(f64::midpoint(b.0.x, b.1.x), f64::midpoint(b.0.y, b.1.y));
+    assert!(mid(own[1]).vector_to(mid(plain[1])).length() < 0.3);
+    assert!(
+        same(turned(45.0, 45.0)[1], own[1]),
+        "Character rotation adds"
+    );
 }
 
 /// Criterion 48: a vertical text is set horizontally on a path; Release keeps its first
@@ -456,4 +533,160 @@ fn c31_the_copy_shift_is_the_drag_projected_on_the_carrier() {
     let v = projected_values(m, start, press, to);
     assert!(near(v.position.as_mm(), 22.0), "{:?}", v.position);
     assert_eq!((v.side, v.line), (start.side, start.line));
+}
+
+/// The outline points of each drawn glyph of `text`.
+fn glyph_points(text: &TextSnapshot) -> Vec<Vec<Point>> {
+    let outline = lay_out(text, &sans(), false).unwrap();
+    let mut subpaths = vec![outline.glyphs.anchors.clone()];
+    subpaths.extend(
+        outline
+            .glyphs
+            .extra_subpaths
+            .iter()
+            .map(|s| s.anchors.clone()),
+    );
+    subpaths.retain(|s| !s.is_empty());
+    let mut glyphs = Vec::new();
+    let mut at = 0;
+    for &n in &outline.glyph_outlines {
+        glyphs.push(
+            subpaths[at..at + n]
+                .iter()
+                .flatten()
+                .map(|a| a.point)
+                .collect(),
+        );
+        at += n;
+    }
+    glyphs
+}
+
+/// "HHHH" centred at the top of the circle, each H after the first raised 3 mm more than the one
+/// before (cumulative vertical kern), the third also turned 30° on its own.
+fn staircase(d: &Document) -> TextSnapshot {
+    let t = create(d, "HHHH", &TextLayoutValues::DEFAULT);
+    let c = circle(d);
+    let mut text = put(d, t, c, OnPathValues::at(Length::from_mm(0.0)), true);
+    let raised = |rotation: f64| CharValues {
+        kern_x: 0.0,
+        kern_y: 0.3,
+        rotation,
+    };
+    text.chars = TextChars::new([(1, raised(0.0)), (2, raised(30.0)), (3, raised(0.0))]);
+    text.outline = lay_out(&text, &sans(), false).map(std::sync::Arc::new);
+    text
+}
+
+/// Inside the quad `q` (any winding), with `margin` mm.
+fn in_quad(q: &[Point; 4], p: Point, margin: f64) -> bool {
+    let sides: Vec<f64> = (0..4)
+        .map(|i| {
+            let (a, b) = (q[i], q[(i + 1) % 4]);
+            let edge = a.vector_to(b);
+            (edge.x * (p.y - a.y) - edge.y * (p.x - a.x)) / edge.length()
+        })
+        .collect();
+    sides.iter().all(|s| *s >= -margin) || sides.iter().all(|s| *s <= margin)
+}
+
+/// Criteria 28, 47: the hit boxes of a raised and turned letter cover the letter as drawn, and a
+/// click inside a raised letter puts the caret at its boundaries.
+#[test]
+fn c47_hit_boxes_follow_the_raised_and_turned_letters() {
+    let d = Document::new(1);
+    let text = staircase(&d);
+    let boxes = text.outline.as_ref().unwrap().letter_boxes.clone();
+    for (index, points) in glyph_points(&text).iter().enumerate() {
+        for p in points {
+            assert!(in_quad(&boxes[index], *p, 0.01), "letter {index}: {p:?}");
+        }
+    }
+    let laid = text_layout(&text, &sans()).unwrap();
+    let placement = placement(&text);
+    let last = laid.lines[0].glyphs[3];
+    let inside = placement
+        .point(0, last.centre_x.0, last.centre_y.0 - 4.0)
+        .unwrap();
+    assert!(line_box_contains(&text, inside, 0.0), "{inside:?}");
+    let left = placement
+        .point(0, last.centre_x.0 - 1.5, last.centre_y.0 - 4.0)
+        .unwrap();
+    let right = placement
+        .point(0, last.centre_x.0 + 1.5, last.centre_y.0 - 4.0)
+        .unwrap();
+    assert_eq!(nearest_boundary_on_path(&laid, &placement, left), 3);
+    assert_eq!(nearest_boundary_on_path(&laid, &placement, right), 4);
+}
+
+/// Criteria 27, 47: the caret before a raised letter stands across that letter as drawn.
+#[test]
+fn c47_the_caret_sits_on_the_raised_letter() {
+    let d = Document::new(1);
+    let text = staircase(&d);
+    let laid = text_layout(&text, &sans()).unwrap();
+    let geometry = edit_geometry_on_path(&laid, &placement(&text), 3, &(3..3), None);
+    let [top, bottom] = geometry.caret.unwrap();
+    let centre = Point::new(100.0, 100.0);
+    let radius = |p: Point| p.vector_to(centre).length();
+    let letter = &glyph_points(&text)[3];
+    let (low, high) = letter.iter().fold((f64::MAX, f64::MIN), |(lo, hi), p| {
+        (lo.min(radius(*p)), hi.max(radius(*p)))
+    });
+    assert!(
+        radius(top) > high && radius(bottom) < low,
+        "{top:?} {bottom:?}"
+    );
+}
+
+/// The middle x of the axis-parallel box of `text`'s letter boxes.
+fn box_middle_x(text: &TextSnapshot) -> f64 {
+    let outline = lay_out(text, &sans(), false).unwrap();
+    f64::midpoint(outline.line_box[0].x, outline.line_box[2].x)
+}
+
+/// Customer 2026-10-24: Position is the arc length of the text's middle, whatever the
+/// alignment; Mirror and Mirror letters keep the text where it is.
+#[test]
+fn customer_position_is_the_text_middle_and_mirroring_keeps_it() {
+    for align in [
+        curvyo_document_core::TextAlign::Left,
+        curvyo_document_core::TextAlign::Centre,
+        curvyo_document_core::TextAlign::Right,
+    ] {
+        let d = Document::new(1);
+        let layout = TextLayoutValues {
+            align,
+            ..TextLayoutValues::DEFAULT
+        };
+        let t = create(&d, "Hello", &layout);
+        let c = line(&d, 100.0);
+        let text = put(&d, t, c, OnPathValues::at(Length::from_mm(50.0)), false);
+        assert!(near(box_middle_x(&text), 50.0), "{align:?}");
+        let mut letters = text.clone();
+        letters.on_path.as_mut().unwrap().values.mirror_letters = true;
+        assert!(near(box_middle_x(&letters), 50.0), "{align:?} letters");
+        let mut across = text.clone();
+        let values = &mut across.on_path.as_mut().unwrap().values;
+        *values = values.mirrored();
+        assert!(near(box_middle_x(&across), 50.0), "{align:?} across");
+        let mut against = text.clone();
+        against.on_path.as_mut().unwrap().values.line = LineOnPath::TopEdge;
+        assert!(near(box_middle_x(&against), 50.0), "{align:?} against");
+    }
+}
+
+/// Customer 2026-10-24 with criterion 5: on an open carrier the default puts the text's start at
+/// the carrier's start, so its middle lies half its width along.
+#[test]
+fn customer_the_open_default_starts_the_text_at_the_start() {
+    let d = Document::new(1);
+    let t = create(&d, "Hello", &TextLayoutValues::DEFAULT);
+    let c = line(&d, 100.0);
+    let text = put(&d, t, c, OnPathValues::at(Length::from_mm(0.0)), true);
+    let outline = lay_out(&text, &sans(), false).unwrap();
+    assert!(near(outline.line_box[0].x, 0.0), "{:?}", outline.line_box);
+    let width = outline.line_box[2].x - outline.line_box[0].x;
+    let position = text.on_path.unwrap().values.position.as_mm();
+    assert!(near(position, width / 2.0), "{position} {width}");
 }

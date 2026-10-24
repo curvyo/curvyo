@@ -851,8 +851,9 @@ fn c35_position_past_the_length_reads_modulo_on_a_closed_carrier() {
     }
 }
 
-/// Criterion 47: Vertical kerning moves that letter alone along the normal (+2 mm on the middle
-/// H at the top: up by 2 mm); Horizontal kerning on the last H moves it 3 mm further along the
+/// Criterion 47 (customer 2026-10-24): Vertical kerning moves that letter and the following ones,
+/// each along its own normal (+2 mm on the middle H at the top: it goes up by 2 mm, the last H 2 mm
+/// radially out, the first stays); Horizontal kerning on the last H moves it 3 mm further along the
 /// circle.
 #[test]
 fn c47_kerns_along_tangent_and_normal() {
@@ -882,7 +883,19 @@ fn c47_kerns_along_tangent_and_normal() {
         },
     )]));
     assert_same(&up[0], &base[0], "first H as without the kern");
-    assert_same(&up[2], &base[2], "last H as without the kern");
+    let centroid = |ps: &[Point]| {
+        let n = ps.len() as f64;
+        let (sx, sy) = ps.iter().fold((0.0, 0.0), |a, p| (a.0 + p.x, a.1 + p.y));
+        pt(sx / n, sy / n)
+    };
+    let c = centroid(&base[2]);
+    let r = ((c.x - 100.0).powi(2) + (c.y - 100.0).powi(2)).sqrt();
+    let (ux, uy) = ((c.x - 100.0) / r, (c.y - 100.0) / r);
+    let outward: Vec<Point> = base[2]
+        .iter()
+        .map(|p| pt(p.x + 2.0 * ux, p.y + 2.0 * uy))
+        .collect();
+    assert_same(&up[2], &outward, "last H 2 mm out along its own normal");
     let lifted: Vec<Point> = base[1].iter().map(|p| pt(p.x, p.y - 2.0)).collect();
     assert_same(
         &up[1],
