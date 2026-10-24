@@ -113,8 +113,16 @@ pub(crate) fn distance_to_object(
     match object {
         // Every outline of a compound path counts: the stroke of any of them
         // picks the object (criterion 33).
+        // A text on path wins a tie with the outline under its letters, its own carrier's line
+        // included (`specs/0080-text-on-path` UX notes §0.8).
         ObjectSnapshot::Text(text) => {
-            crate::text_box::line_box_contains(text, point, tolerance.as_mm()).then_some(0.0)
+            let inside = crate::text_box::line_box_contains(text, point, tolerance.as_mm());
+            let ahead = if crate::text_box::on_path_boxes(text).is_some() {
+                -tolerance.as_mm()
+            } else {
+                0.0
+            };
+            inside.then_some(ahead)
         }
         ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_)
             if let Some(path) = object.drawn_path() =>
@@ -150,6 +158,23 @@ pub(crate) fn distance_to_object(
 /// path), a primitive's rotation-aware outline.
 fn outlines_of(object: &ObjectSnapshot) -> Vec<(Vec<OutlineTriple>, bool)> {
     match object {
+        // Marquee and lasso take a text on path when all its letter boxes are inside
+        // (`specs/0080-text-on-path` criterion 28).
+        ObjectSnapshot::Text(text) if crate::text_box::on_path_boxes(text).is_some() => {
+            crate::text_box::on_path_boxes(text)
+                .unwrap_or_default()
+                .iter()
+                .map(|corners| {
+                    (
+                        corners
+                            .iter()
+                            .map(|corner| (*corner, Vec2::ZERO, Vec2::ZERO))
+                            .collect(),
+                        true,
+                    )
+                })
+                .collect()
+        }
         // Marquee and lasso take a text by its line box (criterion 25).
         ObjectSnapshot::Text(text) => vec![(
             crate::text_box::line_box_corners(text)

@@ -167,8 +167,9 @@ pub struct LayerRow {
     /// How many siblings it has, itself included (`aria-setsize`).
     pub siblings: usize,
     /// For a linked clone, the muted second line of its tooltip: "Linked clone", or from depth 2
-    /// "Linked clone, chain of 3. Root: Path 3f9a1c" (`0049` UX notes "The Layers list"); empty
-    /// for every other row.
+    /// "Linked clone, chain of 3. Root: Path 3f9a1c" (`0049` UX notes "The Layers list"); for a
+    /// text on path "On path: Circle 3f9a1c" or "On a deleted path" (`0080` criteria 25, 33);
+    /// empty for every other row.
     pub chain_line: String,
     /// For a linked clone with overrides, the next muted line: "Own placement, own style", only
     /// the parts that apply (`specs/0057-clone-overrides` criterion 28); empty otherwise.
@@ -368,6 +369,20 @@ impl<'a> Tree<'a> {
 
     /// The chain line of a clone row's tooltip, empty for other rows.
     fn chain_line(&self, at: usize) -> String {
+        // A text on path names its carrier (`specs/0080-text-on-path` criteria 25, 33).
+        if let NodeKind::Leaf(ObjectSnapshot::Text(text)) = &self.nodes[at].kind
+            && let Some(on_path) = &text.on_path
+            && on_path.curve.is_some()
+        {
+            if on_path.kept {
+                return "On a deleted path".to_owned();
+            }
+            let carrier = self.index.get(&on_path.carrier.node).map_or_else(
+                || format!("Object {}", on_path.carrier.node.short_id()),
+                |&carrier| self.names[carrier].0.clone(),
+            );
+            return format!("On path: {carrier}");
+        }
         let NodeKind::Leaf(ObjectSnapshot::Clone(clone)) = &self.nodes[at].kind else {
             return String::new();
         };

@@ -171,6 +171,9 @@ pub struct TextEdit {
     pub placement: Affine,
     /// The text's style.
     pub style: Style,
+    /// The carrier the text is on, with its resolved outline (`specs/0080-text-on-path`
+    /// criterion 27): typing lays the letters out along it.
+    pub on_path: Option<curvyo_document_core::TextOnPath>,
 }
 
 /// Normalises typed or pasted text: CR LF and CR to LF, a tab to [`TAB_SPACES`] spaces, other
@@ -218,6 +221,7 @@ impl TextEdit {
             layout: TextLayoutValues::DEFAULT,
             placement,
             style,
+            on_path: None,
         }
     }
 
@@ -243,6 +247,7 @@ impl TextEdit {
             layout: text.layout,
             placement: text.placement,
             style: text.style.clone(),
+            on_path: text.on_path.clone(),
         }
     }
 
@@ -357,6 +362,7 @@ impl TextEdit {
             placement: self.placement,
             style: self.style.clone(),
             outline: None,
+            on_path: self.on_path.clone(),
         }
     }
 
