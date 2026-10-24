@@ -17,10 +17,13 @@
 //!   text_word_space   : f64, factor of text_size          absent: 0
 //!   text_line_space   : f64, factor of text_size, >= 0    absent: Auto
 //!   text_rotation     : f64, degrees in (-180, 180]       absent: 0
-//!                    the five layout keys are optional (format 19,
-//!                    `specs/0079-text-layout-controls/adrs.md` decision 1): a value at its
-//!                    default is deleted, never written; an unknown align reads as left, a
-//!                    non-finite number as the default, a factor out of range is clamped
+//!   text_writing_mode      : "vertical_rl" | "vertical_lr"   absent: horizontal
+//!   text_glyph_orientation : "upright" | "sideways"          absent: auto
+//!                    the layout keys are optional (format 19, the last two format 20,
+//!                    `specs/0079-text-layout-controls/adrs.md` decisions 1 and 13): a value at
+//!                    its default is deleted, never written; an unknown code reads as the
+//!                    default, a non-finite number as the default, a factor out of range is
+//!                    clamped
 //!   + the style keys of a path (`style_codec`), `name`, `visible`, `locked`, `opacity`
 //! ```
 //!
@@ -35,7 +38,7 @@ use crate::path_codec::as_f64;
 use crate::path_model::NodeId;
 use crate::text_model::{
     FontKind, FontRef, MAX_STORED_TEXT_CHARS, MAX_TEXT_SIZE, MIN_TEXT_SIZE, TextAlign,
-    TextLayoutValues, TextSnapshot,
+    TextGlyphOrientation, TextLayoutValues, TextSnapshot, TextWritingMode,
 };
 use crate::units::{Angle, Length};
 
@@ -56,6 +59,8 @@ const KEY_LETTER_SPACE: &str = "text_letter_space";
 const KEY_WORD_SPACE: &str = "text_word_space";
 const KEY_LINE_SPACE: &str = "text_line_space";
 const KEY_ROTATION: &str = "text_rotation";
+const KEY_WRITING_MODE: &str = "text_writing_mode";
+const KEY_ORIENTATION: &str = "text_glyph_orientation";
 /// Two factors or rotations (radians) closer than this are the same stored value.
 const SAME_VALUE: f64 = 1e-12;
 
@@ -94,6 +99,22 @@ fn align_code(align: TextAlign) -> Option<&'static str> {
     }
 }
 
+const fn writing_mode_code(mode: TextWritingMode) -> Option<&'static str> {
+    match mode {
+        TextWritingMode::Horizontal => None,
+        TextWritingMode::VerticalRl => Some("vertical_rl"),
+        TextWritingMode::VerticalLr => Some("vertical_lr"),
+    }
+}
+
+const fn orientation_code(orientation: TextGlyphOrientation) -> Option<&'static str> {
+    match orientation {
+        TextGlyphOrientation::Auto => None,
+        TextGlyphOrientation::Upright => Some("upright"),
+        TextGlyphOrientation::Sideways => Some("sideways"),
+    }
+}
+
 /// Writes the layout keys that differ from the stored ones: a value at its default deletes its
 /// key (`0079` decision 1). Returns whether anything was written. The caller commits.
 pub(crate) fn write_layout(meta: &LoroMap, layout: &TextLayoutValues) -> bool {
@@ -129,6 +150,18 @@ pub(crate) fn write_layout(meta: &LoroMap, layout: &TextLayoutValues) -> bool {
     if line_changed {
         put(KEY_LINE_SPACE, layout.line_spacing.map(LoroValue::Double));
     }
+    if stored.writing_mode != layout.writing_mode {
+        put(
+            KEY_WRITING_MODE,
+            writing_mode_code(layout.writing_mode).map(LoroValue::from),
+        );
+    }
+    if stored.orientation != layout.orientation {
+        put(
+            KEY_ORIENTATION,
+            orientation_code(layout.orientation).map(LoroValue::from),
+        );
+    }
     // Degrees on disk, radians in the model: equal within float noise is unchanged.
     if differs(stored.rotation.as_radians(), layout.rotation.as_radians()) {
         put(
@@ -145,14 +178,25 @@ pub(crate) fn read_layout(meta: &LoroMap) -> TextLayoutValues {
         Some(ValueOrContainer::Value(value)) => as_f64(&value).filter(|v| v.is_finite()),
         _ => None,
     };
-    let align = match meta.get(KEY_ALIGN) {
-        Some(ValueOrContainer::Value(LoroValue::String(code))) => match code.as_str() {
-            "centre" => TextAlign::Centre,
-            "right" => TextAlign::Right,
-            "justify" => TextAlign::Justify,
-            _ => TextAlign::Left,
-        },
+    let code = |key: &str| match meta.get(key) {
+        Some(ValueOrContainer::Value(LoroValue::String(code))) => Some(code.to_string()),
+        _ => None,
+    };
+    let align = match code(KEY_ALIGN).as_deref() {
+        Some("centre") => TextAlign::Centre,
+        Some("right") => TextAlign::Right,
+        Some("justify") => TextAlign::Justify,
         _ => TextAlign::Left,
+    };
+    let writing_mode = match code(KEY_WRITING_MODE).as_deref() {
+        Some("vertical_rl") => TextWritingMode::VerticalRl,
+        Some("vertical_lr") => TextWritingMode::VerticalLr,
+        _ => TextWritingMode::Horizontal,
+    };
+    let orientation = match code(KEY_ORIENTATION).as_deref() {
+        Some("upright") => TextGlyphOrientation::Upright,
+        Some("sideways") => TextGlyphOrientation::Sideways,
+        _ => TextGlyphOrientation::Auto,
     };
     TextLayoutValues {
         align,
@@ -160,6 +204,8 @@ pub(crate) fn read_layout(meta: &LoroMap) -> TextLayoutValues {
         word_spacing: number(KEY_WORD_SPACE).unwrap_or(0.0),
         line_spacing: number(KEY_LINE_SPACE),
         rotation: Angle::from_radians(number(KEY_ROTATION).unwrap_or(0.0).to_radians()),
+        writing_mode,
+        orientation,
     }
     .held()
 }
@@ -438,6 +484,8 @@ mod tests {
                     KEY_WORD_SPACE,
                     KEY_LINE_SPACE,
                     KEY_ROTATION,
+                    KEY_WRITING_MODE,
+                    KEY_ORIENTATION,
                 ]
                 .contains(&key.as_str())
             })
@@ -459,9 +507,16 @@ mod tests {
             word_spacing: -0.2,
             line_spacing: Some(1.5),
             rotation: Angle::from_radians(12.5_f64.to_radians()),
+            writing_mode: TextWritingMode::VerticalRl,
+            orientation: TextGlyphOrientation::Upright,
         };
         assert!(write_layout(&meta, &values));
-        assert_eq!(layout_keys(&meta).len(), 5);
+        assert_eq!(layout_keys(&meta).len(), 7);
+        assert_eq!(read_layout(&meta).writing_mode, TextWritingMode::VerticalRl);
+        assert_eq!(
+            read_layout(&meta).orientation,
+            TextGlyphOrientation::Upright
+        );
         let read = read_layout(&meta);
         assert_eq!(read.align, values.align);
         assert!((read.rotation.as_radians() - values.rotation.as_radians()).abs() < 1e-12);
@@ -484,8 +539,14 @@ mod tests {
         meta.insert(KEY_LINE_SPACE, LoroValue::Double(-3.0))
             .unwrap();
         meta.insert(KEY_ROTATION, LoroValue::Double(270.0)).unwrap();
+        meta.insert(KEY_WRITING_MODE, LoroValue::from("diagonal"))
+            .unwrap();
+        meta.insert(KEY_ORIENTATION, LoroValue::Double(1.0))
+            .unwrap();
         let read = read_layout(&meta);
         assert_eq!(read.align, TextAlign::Left);
+        assert_eq!(read.writing_mode, TextWritingMode::Horizontal);
+        assert_eq!(read.orientation, TextGlyphOrientation::Auto);
         assert!(read.letter_spacing.abs() < 1e-12);
         assert!((read.word_spacing - 5.0).abs() < 1e-12);
         assert_eq!(read.line_spacing, Some(0.0));

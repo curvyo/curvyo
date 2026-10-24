@@ -260,6 +260,7 @@ fn ac05_ac12_budget_with_every_value_set() {
         word_spacing: Mm(1.0),
         line_spacing: Some(Mm(14.0)),
         rotation_rad: 0.3,
+        ..LayoutOptions::default()
     };
     let started = std::time::Instant::now();
     let laid = layout(face, &text, Mm(10.0), &options).unwrap();

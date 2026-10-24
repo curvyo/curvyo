@@ -423,6 +423,7 @@ fn ac05_ac12_500_characters_budget() {
             word_spacing: Mm(1.0),
             line_spacing: Some(Mm(14.0)),
             rotation_rad: 0.3,
+            ..LayoutOptions::default()
         };
         let _ = lay(face, &text, 10.0, &o).glyph_paths(face);
         let start = Instant::now();
@@ -446,6 +447,7 @@ fn edge_degenerate_strings() {
             word_spacing: Mm(-10.0),
             line_spacing: Some(Mm(0.0)),
             rotation_rad: -3.0,
+            ..LayoutOptions::default()
         };
         for text in ["", " ", "   ", "\n\n", " \n ", "A", "A\n"] {
             for align in [Align::Left, Align::Centre, Align::Right, Align::Justify] {
@@ -506,6 +508,7 @@ fn edge_huge_values_stay_finite() {
             word_spacing: Mm(10_000.0),
             line_spacing: Some(Mm(20_000.0)),
             rotation_rad: 1.0,
+            ..LayoutOptions::default()
         };
         let l = lay(face, &text, 2000.0, &o);
         assert!(l.line_box().is_finite());

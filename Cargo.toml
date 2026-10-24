@@ -50,6 +50,10 @@ roxmltree = { version = "=0.20.0", default-features = false, features = ["std"] 
 # The desktop font list (ADR 0020 §3): pure Rust, its own fontconfig reader, no C library.
 # Pinned exactly as the spike measured it; MIT. Without `memmap` (no `unsafe` mmap in the tree).
 fontdb = { version = "=0.24.0", default-features = false, features = ["std", "fs", "fontconfig"] }
+# Grapheme clusters for the vertical run split (`specs/0079-text-layout-controls`, criterion 23):
+# a mark never lands in another run than its base. MIT OR Apache-2.0, no dependencies, builds for
+# wasm32; already in `Cargo.lock` through `tao` (desktop shell).
+unicode-segmentation = { version = "1.13", default-features = false }
 # Property tests (dev-dependency of the geometry, ui and text crates).
 proptest = "1"
 

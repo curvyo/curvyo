@@ -7,9 +7,12 @@
 
 use curvyo_document_core::{
     Affine, AnchorId, AnchorKind, FontKind, Length, NewAnchor, PathSnapshot, Point,
-    SubpathSnapshot, TextAlign, TextLayoutValues, TextOutline, TextSnapshot, Vec2,
+    SubpathSnapshot, TextAlign, TextGlyphOrientation, TextLayoutValues, TextOutline, TextSnapshot,
+    TextWritingMode, Vec2,
 };
-use curvyo_text_core::{Align, Face, LayoutOptions, Mm, TextLayout, layout};
+use curvyo_text_core::{
+    Align, Face, GlyphOrientation, LayoutOptions, Mm, TextLayout, WritingMode, layout,
+};
 use kurbo::{BezPath, PathEl, Shape};
 
 /// Two points closer than this (mm) are one: a contour whose last point returns to its start
@@ -32,6 +35,16 @@ pub fn layout_options(size: Length, values: &TextLayoutValues) -> LayoutOptions 
         word_spacing: Mm(values.word_spacing * size),
         line_spacing: values.line_spacing.map(|factor| Mm(factor * size)),
         rotation_rad: values.rotation.as_radians(),
+        writing_mode: match values.writing_mode {
+            TextWritingMode::Horizontal => WritingMode::Horizontal,
+            TextWritingMode::VerticalRl => WritingMode::VerticalRl,
+            TextWritingMode::VerticalLr => WritingMode::VerticalLr,
+        },
+        orientation: match values.orientation {
+            TextGlyphOrientation::Auto => GlyphOrientation::Auto,
+            TextGlyphOrientation::Upright => GlyphOrientation::Upright,
+            TextGlyphOrientation::Sideways => GlyphOrientation::Sideways,
+        },
     }
 }
 
@@ -75,8 +88,35 @@ pub fn realigned_placement(text: &TextSnapshot, face: &Face, align: TextAlign) -
         return text.placement;
     };
     let dx = old.extent.start.0 - new.extent.start.0;
+    // Along the line: down the column for vertical text.
+    let along = after.frame() * kurbo::Point::new(dx, 0.0);
     text.placement
-        .compose(Affine::translation(Vec2::new(dx, 0.0)))
+        .compose(Affine::translation(Vec2::new(along.x, along.y)))
+}
+
+/// The placement that keeps `text` where it is on the canvas when its layout values become
+/// `values` (writing mode or glyph orientation, `0079` criterion 20): the first column's start
+/// stays where the first line's start was, in text space. The text's own placement when it
+/// cannot be laid out.
+#[must_use]
+pub fn kept_placement(text: &TextSnapshot, face: &Face, values: &TextLayoutValues) -> Affine {
+    let mut moved = text.clone();
+    moved.layout = *values;
+    let start = |laid: &TextLayout| {
+        laid.lines
+            .first()
+            .map(|line| laid.frame() * kurbo::Point::new(line.extent.start.0, line.baseline.0))
+    };
+    let (Some(before), Some(after)) = (
+        text_layout(text, face).as_ref().and_then(start),
+        text_layout(&moved, face).as_ref().and_then(start),
+    ) else {
+        return text.placement;
+    };
+    text.placement.compose(Affine::translation(Vec2::new(
+        before.x - after.x,
+        before.y - after.y,
+    )))
 }
 
 /// `text` laid out in `face` and mapped to the document by its placement. `substitute` says the
@@ -207,6 +247,7 @@ pub(crate) fn contours_of(
 mod tests {
     use curvyo_document_core::{
         Angle, FontKind, FontRef, Length, Style, TextAlign, TextLayoutValues, TextSnapshot,
+        TextWritingMode,
     };
     use curvyo_text_core::FaceStore;
 
@@ -285,6 +326,36 @@ mod tests {
             assert!(anchor.point.x >= min_x - 1e-9 && anchor.point.x <= max_x + 1e-9);
         }
     }
+    /// `specs/0079-text-layout-controls` criteria 20 and 24: in a column the caret lies across it
+    /// at the boundary's height, and a writing-mode change keeps the first line's start.
+    #[test]
+    fn a_column_has_a_crosswise_caret_and_keeps_its_start() {
+        let face = &sans();
+        let flat = text("AB", TextLayoutValues::DEFAULT);
+        let values = TextLayoutValues {
+            writing_mode: TextWritingMode::VerticalRl,
+            ..TextLayoutValues::DEFAULT
+        };
+        let mut column = flat.clone();
+        column.layout = values;
+        column.placement = kept_placement(&flat, face, &values);
+        let laid = text_layout(&column, face).unwrap();
+        let geometry = crate::edit_geometry(&laid, column.placement, 1, &(1..1), None);
+        let [a, b] = geometry.caret.unwrap();
+        let down = laid.lines[0].boundaries[1].1.0;
+        assert!(
+            (a.y - b.y).abs() < 1e-9
+                && (a.y - column.placement.apply_point(Point::new(0.0, down)).y).abs() < 1e-9
+        );
+        assert!((a.x - b.x).abs() > 1.0, "across the column");
+        let start = |t: &TextSnapshot| {
+            let laid = text_layout(t, face).unwrap();
+            let p = laid.frame() * kurbo::Point::new(laid.lines[0].extent.start.0, 0.0);
+            t.placement.apply_point(Point::new(p.x, p.y))
+        };
+        assert!(start(&flat).vector_to(start(&column)).length() < 0.01);
+    }
+
     /// The engine lays out every string a file may hold (`MAX_SHAPE_CHARS` is text-core's own
     /// copy of the document's bound, architect review m2, must-fix 1).
     #[test]

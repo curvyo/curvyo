@@ -125,6 +125,7 @@ fn ac37_defaults_are_never_stored() {
         word_spacing: -0.5,
         line_spacing: Some(0.0),
         rotation: deg(-12.5),
+        ..TextLayoutValues::DEFAULT
     };
     let p = d.text(id).unwrap().placement;
     d.set_text_layout(&[(id, all, p)], TextLayoutLabel::LetterSpacing)
@@ -273,6 +274,7 @@ fn ac34_resize_keeps_the_factors() {
         line_spacing: Some(1.5),
         rotation: deg(33.0),
         align: TextAlign::Centre,
+        ..TextLayoutValues::DEFAULT
     };
     let id = new_text(&d, &v);
     d.set_text_size(&[id], Length::from_mm(20.0)).unwrap();

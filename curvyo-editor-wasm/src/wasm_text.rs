@@ -51,6 +51,13 @@ pub struct TextBarStateView {
     /// `"centre"`, `"right"`, `"justify"`, or empty when the subject texts differ.
     #[wasm_bindgen(getter_with_clone)]
     pub align: String,
+    /// The pressed writing mode (criterion 20): `"horizontal"`, `"vertical-rl"`,
+    /// `"vertical-lr"`, or empty when the subject texts differ.
+    #[wasm_bindgen(getter_with_clone)]
+    pub writing_mode: String,
+    /// The pressed glyph orientation: `"auto"`, `"upright"`, `"sideways"`, or empty.
+    #[wasm_bindgen(getter_with_clone)]
+    pub orientation: String,
 }
 
 /// A Style button as JSON.
@@ -278,6 +285,14 @@ impl WasmSession {
             })
             .to_string(),
             align: crate::wasm_text_layout::align_code(self.session.text_alignment()).to_owned(),
+            writing_mode: crate::wasm_text_layout::writing_mode_code(
+                self.session.text_writing_mode(),
+            )
+            .to_owned(),
+            orientation: crate::wasm_text_layout::orientation_code(
+                self.session.text_glyph_orientation(),
+            )
+            .to_owned(),
         }
     }
 

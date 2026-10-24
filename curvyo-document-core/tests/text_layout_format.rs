@@ -61,6 +61,7 @@ fn values() -> [TextLayoutValues; 7] {
             word_spacing: 0.3,
             line_spacing: Some(0.0),
             rotation: Angle::from_radians(90.0_f64.to_radians()),
+            ..TextLayoutValues::DEFAULT
         },
         d,
     ]

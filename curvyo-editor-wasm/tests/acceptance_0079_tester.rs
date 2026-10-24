@@ -198,6 +198,7 @@ fn mm_options(t: &TextSnapshot) -> curvyo_text_core::LayoutOptions {
         word_spacing: Mm(t.layout.word_spacing * size),
         line_spacing: t.layout.line_spacing.map(|f| Mm(f * size)),
         rotation_rad: t.layout.rotation.as_radians(),
+        ..curvyo_text_core::LayoutOptions::default()
     }
 }
 
@@ -741,6 +742,7 @@ fn ac36_missing_face_keeps_the_values() {
         word_spacing: 0.3,
         line_spacing: Some(1.7),
         rotation: curvyo_document_core::Angle::from_radians(0.25),
+        ..TextLayoutValues::DEFAULT
     };
     let missing = FontRef {
         family: "Nowhere Sans".to_owned(),
