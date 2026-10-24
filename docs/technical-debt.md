@@ -1585,6 +1585,13 @@ text engine) to this slice the editor wasm grew by 1,828,399 bytes (1,786 KiB), 
 inside the 2 MiB (2,048 KiB) budget with about 262 KiB left. The next feature on the text engine
 measures again; the levers stay `wasm-opt` and loading the engine on first use.
 
+**Glyph table (`0082`, 2026-10-24).** Listing a face's characters, the Unicode 17.0.0 block table,
+the names decoder, the cell drawing and the search add **+84,556 bytes (82.6 KiB; +29,706 bytes
+gzip -9)** to the release editor wasm after `wasm-bindgen`, no `wasm-opt` (12,479,487 to 12,564,043
+bytes, measured against `main` at `5535342`). The character names stay outside the wasm
+(`frontend/public/unicode/names-17.0.0.bin`, 370,854 bytes, fetched on the first Glyphs open). About
+179 KiB of the 2 MiB budget are left.
+
 ## The clone frame budget is not asserted on CI (`0049` criterion 44, 2026-10-24)
 
 The absolute frame budget of 150 ms after the original of 10,000 clones moved (`0049` criterion 44,
