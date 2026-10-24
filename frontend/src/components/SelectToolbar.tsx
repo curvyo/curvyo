@@ -3,7 +3,7 @@ import { AlignmentGroup } from "@/components/AlignmentGroup";
 import { StyleGroup } from "@/components/StyleGroup";
 import type { WeightCode } from "@/lib/styleText";
 import type { AlignCode } from "@/lib/textLayoutText";
-import { TextControls } from "@/components/TextBar";
+import { GlyphsButton, type GlyphsButtonState, TextControls } from "@/components/TextBar";
 import type { TextBarState } from "@/hooks/useText";
 import { Toggle, Tooltip } from "radix-ui";
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
@@ -52,6 +52,8 @@ export interface SelectToolbarProps {
   /** The Text group (`specs/0074-text-objects` criterion 11): shown while the selection holds a
    * text, acting on the texts only. */
   textBar?: TextBarState;
+  /** The Glyphs button after the Alignment group (`specs/0082-glyph-table`, UX notes P1). */
+  glyphs?: GlyphsButtonState;
   onShowFonts?: () => void;
   onSetTextSize?: (mm: number) => string | null;
   onPreviewTextSize?: (mm: number | null) => void;
@@ -561,6 +563,7 @@ export function SelectToolbar({
   onConvertToPaths,
   objectToPathNotice = null,
   textBar,
+  glyphs,
   onShowFonts,
   onSetTextSize,
   onPreviewTextSize,
@@ -664,6 +667,15 @@ export function SelectToolbar({
       groups.push(
         <div key="text-align" className={GROUP_CLASS}>
           <AlignmentGroup align={textBar.align} onPress={onSetTextAlign} onReturnFocus={onReturnFocus} />
+        </div>,
+      );
+    }
+    if (glyphs?.shown) {
+      // The Glyphs button in a group of its own after the Alignment group (`specs/0082-glyph-table`
+      // criterion 2).
+      groups.push(
+        <div key="text-glyphs" className={GROUP_CLASS}>
+          <GlyphsButton glyphs={glyphs} />
         </div>,
       );
     }

@@ -151,8 +151,23 @@ async function readFile(id: string): Promise<Uint8Array> {
   return new Uint8Array(buffer);
 }
 
+/** The face the glyph table shows (`specs/0082-glyph-table` "Terms", Frage 39 A). */
+export interface GlyphSubject {
+  /** "Great Vibes Regular". */
+  name: string;
+  family: string;
+  missing: boolean;
+  /** The listed face, `null` when missing. */
+  face: FontFace | null;
+}
+
 export interface TextApi {
   editing: boolean;
+  /** The glyph table's subject face; `null` before any font is listed. */
+  glyphSubject: GlyphSubject | null;
+  /** A cell's character inserted (`0082` criteria 12 to 14); unless `keepFocus`, the focus goes
+   * to the edit sink. */
+  insertGlyph: (character: string, keepFocus: boolean) => void;
   bar: TextBarState;
   fonts: FontsTabData;
   /** The "Font missing" tags, canvas CSS px (criterion 29). */
@@ -220,6 +235,7 @@ export function useText(
   const [sinkValue, setSinkValue] = useState<TextApi["sinkValue"]>(null);
   const [listsRevision, setListsRevision] = useState(0);
   const [objectToPathNotice, setObjectToPathNotice] = useState<string | null>(null);
+  const [glyphSubject, setGlyphSubject] = useState<GlyphSubject | null>(null);
   const sinkRef = useRef<HTMLTextAreaElement | null>(null);
   const lastKeyRef = useRef(0);
   const composingRef = useRef(false);
@@ -340,6 +356,30 @@ export function useText(
     });
     raw.free();
     setFonts(tab);
+    const subject = JSON.parse(session.glyph_subject()) as {
+      family: string;
+      style: string;
+      missing: boolean;
+      index: number | null;
+    } | null;
+    setGlyphSubject((before) => {
+      const next: GlyphSubject | null = subject
+        ? {
+            name: `${subject.family} ${subject.style}`,
+            family: subject.family,
+            missing: subject.missing,
+            face: subject.index === null ? null : (tab.faces[subject.index] ?? null),
+          }
+        : null;
+      const same =
+        before !== null &&
+        next !== null &&
+        before.name === next.name &&
+        before.missing === next.missing &&
+        before.face?.id === next.face?.id &&
+        before.face?.faceIndex === next.face?.faceIndex;
+      return same ? before : next;
+    });
     const marks = session.missing_font_marks();
     const points: { x: number; y: number }[] = [];
     for (let i = 0; i + 1 < marks.length; i += 2) {
@@ -726,10 +766,27 @@ export function useText(
     return () => window.clearTimeout(timer);
   }, [objectToPathNotice]);
 
+  const insertGlyph = useCallback(
+    (character: string, keepFocus: boolean) => {
+      const session = getSession();
+      if (!session) {
+        return;
+      }
+      const outcome = JSON.parse(session.insert_from_glyph_table(character)) as { editing: boolean; limited: boolean };
+      afterInput(session, outcome.limited);
+      if (!keepFocus && outcome.editing) {
+        focusSinkIfEditing();
+      }
+    },
+    [getSession, afterInput, focusSinkIfEditing],
+  );
+
   const refusalFace = useCallback(() => getSession()?.text_refusal_face() ?? "", [getSession]);
 
   return {
     editing,
+    glyphSubject,
+    insertGlyph,
     bar,
     fonts,
     missingMarks,

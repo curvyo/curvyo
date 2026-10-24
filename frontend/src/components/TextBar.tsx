@@ -1,9 +1,9 @@
 // The Text bar (`specs/0074-text-objects` criterion 11; UX notes §3): the Font button and the
-// Size field, then the Style group (`specs/0078-font-style-buttons`) and the Alignment group
-// (`specs/0079-text-layout-controls`). In the Text tool it is the
-// overlay row's bar; in the Select tool the same controls are the Select bar's Text and Style
-// groups.
-import { CaseSensitive, TriangleAlert } from "lucide-react";
+// Size field, then the Style group (`specs/0078-font-style-buttons`), the Alignment group
+// (`specs/0079-text-layout-controls`) and the Glyphs button (`specs/0082-glyph-table`
+// criterion 2). In the Text tool it is the overlay row's bar; in the Select tool the same
+// controls are the Select bar's Text and Style groups.
+import { CaseSensitive, Omega, TriangleAlert } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { AlignmentGroup } from "@/components/AlignmentGroup";
@@ -157,18 +157,50 @@ export function TextControls({ bar, onShowFonts, onSetSize, onPreviewSize, onRet
   );
 }
 
+/** The Glyphs button's state and press (`specs/0082-glyph-table` criterion 2). */
+export interface GlyphsButtonState {
+  /** In the tree: a text in edit mode or exactly one text selected. */
+  shown: boolean;
+  /** The pane is open in Glyphs mode. */
+  pressed: boolean;
+  onPress: (byKeyboard: boolean) => void;
+}
+
+/** The Glyphs icon button (UX notes §1): opens the preview pane in Glyphs mode, closes it when
+ * pressed again. */
+export function GlyphsButton({ glyphs }: { glyphs: GlyphsButtonState }) {
+  return (
+    <Tooltip side="bottom" content="Glyphs">
+      <button
+        type="button"
+        aria-label="Glyphs"
+        aria-pressed={glyphs.pressed}
+        onClick={(event) => glyphs.onPress(event.detail === 0)}
+        className={`flex size-7 items-center justify-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)] ${
+          glyphs.pressed
+            ? "bg-[var(--toolbar-icon-active-bg)] text-[var(--toolbar-icon-active-fg)]"
+            : "text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]"
+        }`}
+      >
+        <Omega size={16} strokeWidth={1.5} aria-hidden />
+      </button>
+    </Tooltip>
+  );
+}
+
 interface TextBarProps extends TextControlsProps {
   /** Edit mode: Bold and Italic name their keys. */
   editing: boolean;
   onPressWeight: (code: WeightCode) => string | null;
   onPressItalic: () => string | null;
   onSetAlign: (align: AlignCode) => void;
+  glyphs: GlyphsButtonState;
 }
 
 /** The Text tool's bar in the overlay row: one pill with the Font button and the Size field,
  * then the Style group (`specs/0078-font-style-buttons`, UX notes §1); it wraps by whole groups
  * and draws no divider at the start of a row. */
-export function TextBar({ editing, onPressWeight, onPressItalic, onSetAlign, ...props }: TextBarProps) {
+export function TextBar({ editing, onPressWeight, onPressItalic, onSetAlign, glyphs, ...props }: TextBarProps) {
   const barRef = useRef<HTMLDivElement>(null);
   useRowStarts(barRef);
   return (
@@ -196,6 +228,12 @@ export function TextBar({ editing, onPressWeight, onPressItalic, onSetAlign, ...
         <Divider />
         <AlignmentGroup align={props.bar.align} onPress={onSetAlign} onReturnFocus={props.onReturnFocus} />
       </div>
+      {glyphs.shown ? (
+        <div className="group/row flex h-9 items-center gap-3">
+          <Divider />
+          <GlyphsButton glyphs={glyphs} />
+        </div>
+      ) : null}
     </div>
   );
 }
