@@ -231,6 +231,8 @@ export interface TextApi {
   setOrientation: (orientation: OrientationCode) => void;
   /** The last "Put on path" for the polite region (`specs/0080-text-on-path` UX notes §2). */
   pathAnnouncement: { text: string; seq: number };
+  /** Where the "1" badge of the pick set sits, canvas px (`0080` UX notes §9); `null` without. */
+  pickBadge: { x: number; y: number } | null;
   /** The On path button and groups' presses. */
   path: {
     pressOnPath: () => void;
@@ -272,6 +274,7 @@ export function useText(
   const [fonts, setFonts] = useState<FontsTabData>(EMPTY_FONTS);
   const [missingMarks, setMissingMarks] = useState<{ x: number; y: number }[]>([]);
   const [sinkPoint, setSinkPoint] = useState<{ x: number; y: number } | null>(null);
+  const [pickBadge, setPickBadge] = useState<{ x: number; y: number } | null>(null);
   const [sinkValue, setSinkValue] = useState<TextApi["sinkValue"]>(null);
   const [listsRevision, setListsRevision] = useState(0);
   const [objectToPathNotice, setObjectToPathNotice] = useState<string | null>(null);
@@ -462,6 +465,16 @@ export function useText(
     if (session.take_text_write_failed()) {
       showNotice(TEXT_WRITE_FAILED_NOTICE, 8000, "canvas", "alert");
     }
+    // "Put text on 3 paths." in the canvas notice slot (`0080` criterion 37).
+    const pathNotice = session.take_text_path_notice();
+    if (pathNotice) {
+      showNotice(pathNotice, undefined, "canvas", "status");
+    }
+    const badge = session.text_path_pick_badge();
+    setPickBadge((previous) => {
+      const next = badge.length === 2 ? { x: badge[0], y: badge[1] } : null;
+      return previous?.x === next?.x && previous?.y === next?.y ? previous : next;
+    });
   }, [
     syncRevision,
     listsRevision,
@@ -920,6 +933,7 @@ export function useText(
     setWritingMode,
     setOrientation,
     pathAnnouncement,
+    pickBadge,
     path: {
       pressOnPath,
       release: () => pathCommand((session) => session.release_text_path()),

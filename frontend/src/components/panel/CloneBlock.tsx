@@ -11,6 +11,7 @@ import {
   SPREAD_COLOURS_DISABLED_TITLE,
   SPREAD_COLOURS_TITLE,
   STYLE_SEGMENTS,
+  unlinkTitle,
 } from "@/lib/cloneText";
 
 const OUTLINE_BUTTON =
@@ -216,23 +217,25 @@ export function CloneBlock({ clones, onReturnFocus, onPressedAt }: CloneBlockPro
         )}
         <BlockButton
           label={many ? "Unlink clones" : "Unlink clone"}
-          title="Turns the clone into an ordinary path. Shape and style stay."
+          title={unlinkTitle(panel)}
           onPress={(keyboard) => clones.apply("unlink", "panel", keyboard)}
           onReturnFocus={onReturnFocus}
           onPressedAt={onPressedAt}
         />
       </div>
       <div className="mt-2 flex flex-col gap-2">
-        <OverrideRow
-          label="Placement"
-          segments={PLACEMENT_SEGMENTS}
-          state={panel.placement}
-          onSet={(own, keyboard) =>
-            clones.apply((own ? "own-placement" : "follow-placement") as CloneCommand, "panel", keyboard)
-          }
-          onReturnFocus={onReturnFocus}
-          onPressedAt={onPressedAt}
-        />
+        {panel.placementRow && (
+          <OverrideRow
+            label="Placement"
+            segments={PLACEMENT_SEGMENTS}
+            state={panel.placement}
+            onSet={(own, keyboard) =>
+              clones.apply((own ? "own-placement" : "follow-placement") as CloneCommand, "panel", keyboard)
+            }
+            onReturnFocus={onReturnFocus}
+            onPressedAt={onPressedAt}
+          />
+        )}
         <OverrideRow
           label="Style"
           segments={STYLE_SEGMENTS}

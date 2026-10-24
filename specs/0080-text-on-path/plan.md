@@ -163,26 +163,57 @@ Implementer, 2026-10-24, on `story/text-on-several-paths` (stacked on `story/tex
 ## Tasks (slice 2)
 
 Milestone 5, core (test first)
-- [ ] 14. document-core: `text_source` codec and validation; read pass fills a clone from its
+- [x] 14. document-core: `text_source` codec and validation; read pass fills a clone from its
   source (string, kerns, font, size, layout, style unless own style), own placement and on-path
   values; orphan when the source is missing or a clone; `clones_of`; single reads (AC 37, 38, 39)
-- [ ] 15. document-core: Put text on paths (first carrier on the text, a clone per further
+- [x] 15. document-core: Put text on paths (first carrier on the text, a clone per further
   carrier, every carrier a guide, one commit); content commands write to the source; transforms
   write the size to the source; Unlink clone; the Style row (own style); removal of a source
   unlinks its clones in the same commit with the count; Object to path of a clone; Duplicate;
   Undo; two-peer merge; format 23 and golden file (AC 37 to 42)
-- [ ] 16. ui-core: clone block (no Placement row), names "Clone of Text", Select original and
+- [x] 16. ui-core: clone block (no Placement row), names "Clone of Text", Select original and
   Select clones, marks of a selected text clone, style scope skips a clone without own style;
   timing of 20 clones of 100 characters (AC 40, 44)
 
 Milestone 6, session and frontend
-- [ ] 17. Session: pick set with Shift+click (toggle), Enter and the second press put on the set,
+- [x] 17. Session: pick set with Shift+click (toggle), Enter and the second press put on the set,
   the "1" badge and selected look of the picked carriers, the Select route with several carriers,
   notice "Put text on 3 paths."; edit mode on a clone shows the edit on every member; Unlink clone
   and Style row on text clones; notice "3 text clones became texts." (AC 37 to 41)
-- [ ] 18. Frontend: clone block without Placement row for text clones, Unlink tooltip; node
+- [x] 18. Frontend: clone block without Placement row for text clones, Unlink tooltip; node
   tests (AC 40)
 
 Milestone 7, gate
-- [ ] 19. Full gate, frontend tsc, npm test, oxlint; Chromium screenshots: one text on three
+- [x] 19. Full gate, frontend tsc, npm test, oxlint; Chromium screenshots: one text on three
   circles, the source text edited, one clone's handle moved, one clone in its own colour.
+
+## Dated notes (slice 2)
+
+- 2026-10-24, storage: a text clone stores no string, font, size, layout or kerns (ADR 0022 §4:
+  it reads them from its source); its opacity register stays its own (the Style row copies and
+  removes fill and stroke only).
+- 2026-10-24, an emptied string removed the source and every clone; replaced on 2026-10-25 by lead
+  decision 1 (criterion 41a): only the edited text goes.
+- 2026-10-24, a plain click in pick mode with a pick set puts the text on the set plus the clicked
+  carrier; Spread colours was for linked clones only; since 2026-10-25 (lead decision 3) it takes
+  text clones too.
+- 2026-10-24, format 23: the slice-1 tests pinned `CURRENT_FORMAT_VERSION == 22` (`text_on_path.rs`
+  and the tester's `acceptance_0080_tester.rs`); both now assert `>= 22`, the renumbering rule above
+  `CURRENT_FORMAT_VERSION`.
+- 2026-10-24, budget 44 (release, navi): a typed character read and laid out on 21 texts of 100
+  characters 3.5 ms (budget 50 ms); a radius drag frame of one of 20 circles 0.18 ms (33 ms).
+- Open point for the lead (slice 1, also without clones): with the Select tool, a double-click on a
+  text on path to edit, Escape twice, V and a pointer move slide the text along its carrier
+  (browser check; a stale slide drag survives edit mode).
+
+## Lead decisions 2026-10-25 (folded into the slice-2 commits)
+
+- [x] 20. Emptied string (criterion 41a): `edit_text` with "" removes the edited text only; a
+  removed source's clones become texts by the removal rule with the string they showed; a Save
+  in edit mode with an empty string writes nothing; the finish notice "2 text clones became
+  texts."; tests in `text_clones.rs` and `text_clones_tests.rs`.
+- [x] 21. Linked and text clones together (criterion 41b): `Document::unlink_clones_and_texts`
+  and `Document::set_own_style_and_texts` write both kinds in one commit; session tests.
+- [x] 22. Spread colours on text clones (criterion 40): `spread_colours` and `recolour_clones`
+  take text clones; `spread_colours_ready` counts both kinds; session test.
+

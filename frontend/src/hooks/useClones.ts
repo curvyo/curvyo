@@ -174,6 +174,8 @@ export function useClones(
       followed: raw.followed,
       placement: raw.placement as ClonePanelState["placement"],
       style: raw.style as ClonePanelState["style"],
+      placementRow: raw.placement_row,
+      texts: raw.texts,
       spreadReady: raw.spread_ready,
       strokeSummary: raw.stroke_summary,
       strokeHex: raw.stroke_hex,

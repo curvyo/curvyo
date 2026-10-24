@@ -34,6 +34,10 @@ export interface ClonePanelState {
   placement: OverrideState;
   /** The Style row: "original" is Original's. */
   style: OverrideState;
+  /** Whether the Placement row is shown: not for text clones (`0080` criterion 40). */
+  placementRow: boolean;
+  /** Whether every selected clone is a text clone (Unlink makes texts, `0080` criterion 41). */
+  texts: boolean;
   /** Spread colours is enabled (two or more clones). */
   spreadReady: boolean;
   /** The greyed headers' summaries (the first clone's effective style). */
@@ -53,6 +57,8 @@ export const NO_CLONE_PANEL: ClonePanelState = {
   followed: 0,
   placement: "original",
   style: "original",
+  placementRow: true,
+  texts: false,
   spreadReady: false,
   strokeSummary: "",
   strokeHex: "",
@@ -115,3 +121,11 @@ export function cloneBlockLines(panel: ClonePanelState): { title: string; chain:
   return { title, chain };
 }
 
+
+/** The tooltip of Unlink clone: a linked clone becomes a path, a text clone a text (`0080`
+ * criterion 41). */
+export function unlinkTitle(panel: ClonePanelState): string {
+  return panel.texts
+    ? "Turns the clone into an ordinary text. Text, place and style stay."
+    : "Turns the clone into an ordinary path. Shape and style stay.";
+}
