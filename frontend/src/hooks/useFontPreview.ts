@@ -7,7 +7,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useFontPreviewState } from "@/hooks/useFontPreviewState";
 import { type PreviewState, setPreviewOpen } from "@/lib/fontPreviewStore";
 import { type SampleSource, followedSample, openingSample } from "@/lib/fontPreviewSample";
-import { type PreviewPrefs, readPreviewPrefs, writePreviewPrefs } from "@/lib/fontPreviewState";
+import {
+  type PreviewMode,
+  type PreviewPrefs,
+  readPreviewPrefs,
+  withRecent,
+  writePreviewPrefs,
+} from "@/lib/fontPreviewState";
 import { prerenderTiles } from "@/lib/previewFaces";
 
 export interface FontPreviewApi {
@@ -25,6 +31,15 @@ export interface FontPreviewApi {
   /** Keeps a dragged split, or forgets it (undefined) for the default. */
   setSplit: (split: number | undefined) => void;
   close: () => void;
+  /** Fonts or Glyphs, kept (`specs/0082-glyph-table` criterion 3). */
+  mode: PreviewMode;
+  setMode: (mode: PreviewMode) => void;
+  /** The glyph search field's text, kept (`0082` criterion 16). */
+  glyphSearch: string;
+  setGlyphSearch: (text: string) => void;
+  /** The characters last inserted from the glyph table, most recent first (`0082` criterion 18). */
+  recent: string[];
+  addRecent: (character: string) => void;
 }
 
 export function useFontPreview(source: SampleSource): FontPreviewApi {
@@ -104,5 +119,14 @@ export function useFontPreview(source: SampleSource): FontPreviewApi {
       [],
     ),
     close: useCallback(() => setPreviewOpen(false), []),
+    mode: prefs.mode ?? "fonts",
+    setMode: useCallback((mode: PreviewMode) => keep(() => ({ mode })), [keep]),
+    glyphSearch: prefs.glyphSearch ?? "",
+    setGlyphSearch: useCallback((glyphSearch: string) => keep(() => ({ glyphSearch })), [keep]),
+    recent: prefs.recent ?? [],
+    addRecent: useCallback(
+      (character: string) => keep((before) => ({ recent: withRecent(before.recent ?? [], character) })),
+      [keep],
+    ),
   };
 }

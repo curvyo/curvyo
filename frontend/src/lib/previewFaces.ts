@@ -25,7 +25,7 @@ let faces: WasmPreviewFaces | null = null;
 const unreadable = new Set<string>();
 
 /** The engine's id of a listed face: its file and its index in the file. */
-function faceId(face: ListedFace): string {
+export function faceId(face: ListedFace): string {
   return `${face.id}#${face.faceIndex}`;
 }
 
@@ -38,8 +38,19 @@ function isPreviewFaceLoaded(face: ListedFace): boolean {
  * at once share one read. */
 const loading = new Map<string, Promise<boolean>>();
 
+/** The engine's store of preview faces, made on first use (after `wasmReady`). */
+export function previewEngine(): WasmPreviewFaces {
+  faces ??= new WasmPreviewFaces();
+  return faces;
+}
+
+/** Whether the face's bytes held no usable face. */
+export function isUnreadableFace(face: ListedFace): boolean {
+  return unreadable.has(faceId(face));
+}
+
 /** Hands the face's bytes to the engine once; resolves to whether its tiles can be drawn. */
-function readPreviewFace(face: ListedFace): Promise<boolean> {
+export function readPreviewFace(face: ListedFace): Promise<boolean> {
   const id = faceId(face);
   if (isPreviewFaceLoaded(face)) {
     return Promise.resolve(true);
@@ -53,8 +64,7 @@ function readPreviewFace(face: ListedFace): Promise<boolean> {
   }
   const read = Promise.all([wasmReady(), readFaceBytes(face)])
     .then(([, buffer]) => {
-      faces ??= new WasmPreviewFaces();
-      const added = faces.add_preview_face(id, new Uint8Array(buffer), face.faceIndex);
+      const added = previewEngine().add_preview_face(id, new Uint8Array(buffer), face.faceIndex);
       if (!added) {
         unreadable.add(id);
       }

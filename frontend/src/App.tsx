@@ -14,6 +14,7 @@ import { SelectToolbar } from "@/components/SelectToolbar";
 import { ShapeToolbar } from "@/components/ShapeToolbar";
 import { TextBar } from "@/components/TextBar";
 import { focusCurrentFont } from "@/lib/textText";
+import { setPreviewOpen } from "@/lib/fontPreviewStore";
 import { StatusBar } from "@/components/StatusBar";
 import { ToolRail } from "@/components/ToolRail";
 import { HistoryPreviewFrame, HistoryPreviewLine } from "@/components/HistoryPreview";
@@ -75,6 +76,24 @@ function Editor() {
       editor.containerRef.current?.focus();
     }
   };
+  // The Glyphs button (`specs/0082-glyph-table` criterion 2): the pane in Glyphs mode, closed by
+  // a second press; a mouse press hands the keyboard back, a key goes to the search field.
+  const glyphsPressed = preview.store.open && preview.mode === "glyphs";
+  const glyphs = {
+    shown: editor.text.bar.sampleNode !== "",
+    pressed: glyphsPressed,
+    onPress: (byKeyboard: boolean) => {
+      if (glyphsPressed) {
+        preview.close();
+      } else {
+        preview.setMode("glyphs");
+        setPreviewOpen(true, byKeyboard);
+      }
+      if (!byKeyboard) {
+        returnToText();
+      }
+    },
+  };
   const project = useProject({
     editor,
     panelOpen,
@@ -110,6 +129,8 @@ function Editor() {
               onPick={editor.text.pickFamily}
               tileFace={editor.text.tileFace}
               onReturnFocus={returnToText}
+              glyphSubject={editor.text.glyphSubject}
+              onInsertGlyph={editor.text.insertGlyph}
             />
           )}
           drawing={
@@ -174,6 +195,7 @@ function Editor() {
               onConvertToPaths={editor.text.objectToPath}
               objectToPathNotice={editor.text.objectToPathNotice}
               textBar={editor.text.bar}
+              glyphs={glyphs}
               onShowFonts={showFonts}
               onSetTextSize={editor.text.setSize}
               onPreviewTextSize={editor.text.previewSize}
@@ -222,6 +244,7 @@ function Editor() {
               onPressWeight={editor.text.pressWeight}
               onPressItalic={editor.text.pressItalic}
               onSetAlign={editor.text.setAlign}
+              glyphs={glyphs}
               onReturnFocus={() => {
                 if (editor.text.editing) {
                   editor.text.sinkRef.current?.focus({ preventScroll: true });

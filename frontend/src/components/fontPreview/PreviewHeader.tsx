@@ -1,17 +1,24 @@
-// The font preview's header (`specs/0077-font-preview` criteria 4, 5, 7, 12 and 26, UX notes §2):
-// the sample field with Clear, the Size slider and its readout, the subject line, Full view and
-// Close; one row from 560px of pane width, two rows below.
-import { Maximize2, Minimize2, X } from "lucide-react";
+// The font preview's header (`specs/0077-font-preview` criteria 4, 5, 7, 12 and 26, UX notes §2;
+// `specs/0082-glyph-table` criteria 1, 4 and 16, UX notes §2): the mode switch, the sample field
+// (the search field in Glyphs mode) with Clear, the Size slider and its readout, the subject
+// line, Full view and Close; one row from 560px of pane width, two rows below.
+import { Maximize2, Minimize2, Search, X } from "lucide-react";
 
+import { ModeSwitch } from "@/components/fontPreview/ModeSwitch";
 import { SizeSlider } from "@/components/fontPreview/SizeSlider";
 import { Tooltip } from "@/components/ui/tooltip";
-import { MAX_SAMPLE_CHARS } from "@/lib/fontPreviewState";
+import { MAX_GLYPH_SEARCH_CHARS, MAX_SAMPLE_CHARS, type PreviewMode } from "@/lib/fontPreviewState";
 
 interface PreviewHeaderProps {
   rows: 1 | 2;
+  mode: PreviewMode;
+  onMode: (mode: PreviewMode) => void;
+  /** The sample, or in Glyphs mode the search text. */
   sample: string;
   onSample: (sample: string) => void;
   sampleRef: React.RefObject<HTMLInputElement | null>;
+  /** Down or Enter in the search field: the focus goes to the first cell (UX notes P5). */
+  onFieldDown: () => void;
   size: number;
   onSize: (size: number) => void;
   subject: string;
@@ -27,24 +34,39 @@ const ICON_BUTTON =
   "flex size-7 shrink-0 items-center justify-center rounded-[5px] text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]";
 
 export function PreviewHeader(props: PreviewHeaderProps) {
-  const { rows, sample, onSample, sampleRef, size, onSize, subject, canSplit, full, onFull, onClose, onReturnFocus } =
+  const { rows, mode, onMode, sample, onSample, sampleRef, size, onSize, subject, canSplit, full, onFull, onClose, onReturnFocus } =
     props;
+  const search = mode === "glyphs";
   const field = (
     <div className={`relative h-7 min-w-0 flex-1 ${rows === 1 ? "max-w-[480px] min-w-[200px]" : ""}`}>
+      {search ? (
+        <Search
+          size={16}
+          strokeWidth={1.5}
+          aria-hidden
+          className="pointer-events-none absolute top-1.5 left-2 text-[var(--panel-muted-fg)]"
+        />
+      ) : null}
       <input
         ref={sampleRef}
         type="text"
         value={sample}
-        maxLength={MAX_SAMPLE_CHARS}
-        aria-label="Sample text"
+        maxLength={search ? MAX_GLYPH_SEARCH_CHARS : MAX_SAMPLE_CHARS}
+        aria-label={search ? "Search characters" : "Sample text"}
         spellCheck={false}
         onChange={(event) => onSample(event.target.value)}
-        className="h-7 w-full rounded-[5px] bg-white pr-7 pl-2 text-sm text-[var(--toolbar-icon)] outline-none ring-1 ring-border focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+        onKeyDown={(event) => {
+          if (search && (event.key === "ArrowDown" || event.key === "Enter")) {
+            event.preventDefault();
+            props.onFieldDown();
+          }
+        }}
+        className={`h-7 w-full rounded-[5px] bg-white pr-7 ${search ? "pl-7" : "pl-2"} text-sm text-[var(--toolbar-icon)] outline-none ring-1 ring-border focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]`}
       />
       {sample ? (
         <button
           type="button"
-          aria-label="Clear sample"
+          aria-label={search ? "Clear search" : "Clear sample"}
           onClick={() => {
             onSample("");
             sampleRef.current?.focus();
@@ -87,6 +109,8 @@ export function PreviewHeader(props: PreviewHeaderProps) {
     <div className="shrink-0 border-b border-[color-mix(in_srgb,var(--toolbar-icon)_25%,transparent)] bg-[var(--panel-bg)] p-2">
       {rows === 1 ? (
         <div className="flex h-7 items-center">
+          <ModeSwitch mode={mode} onMode={onMode} onReturnFocus={onReturnFocus} />
+          <div className="w-3 shrink-0" />
           {field}
           <div className="w-4 shrink-0" />
           {sizeGroup}
@@ -101,7 +125,8 @@ export function PreviewHeader(props: PreviewHeaderProps) {
           className="grid gap-x-1 gap-y-2"
           style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gridTemplateAreas: '"field buttons" "second second"' }}
         >
-          <div className="flex h-7 min-w-0" style={{ gridArea: "field" }}>
+          <div className="flex h-7 min-w-0 gap-2" style={{ gridArea: "field" }}>
+            <ModeSwitch mode={mode} onMode={onMode} onReturnFocus={onReturnFocus} />
             {field}
           </div>
           <div className="flex h-7 min-w-0 items-center gap-3" style={{ gridArea: "second" }}>
