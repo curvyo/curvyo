@@ -1,6 +1,6 @@
 //! The caret, the selected range and the click of a text in edit mode along its carrier
 //! (`specs/0080-text-on-path` criterion 27, UX notes §4): each piece is turned with the letter it
-//! stands at, through the frame of `text_on_path`.
+//! stands at, raised and turned as it is drawn (criterion 47), through `text_on_path`'s letters.
 
 use std::ops::Range;
 
@@ -8,7 +8,7 @@ use curvyo_document_core::{Point, Vec2};
 use curvyo_text_core::{LineLayout, TextLayout};
 
 use crate::text_caret::TextEditGeometry;
-use crate::text_on_path::PathPlacement;
+use crate::text_on_path::{Letter, PathPlacement, letter};
 
 /// The x of caret position `byte` on `line`.
 fn x_at(line: &LineLayout, byte: usize) -> f64 {
@@ -19,16 +19,11 @@ fn x_at(line: &LineLayout, byte: usize) -> f64 {
         .map_or(0.0, |(_, x)| x.0)
 }
 
-/// The clusters of `line`: (start byte, end byte, x0, x1, centre).
-fn clusters(line: &LineLayout) -> impl Iterator<Item = (usize, usize, f64, f64, f64)> + '_ {
+/// The clusters of `line`: (start byte, end byte, x0, x1).
+fn clusters(line: &LineLayout) -> impl Iterator<Item = (usize, usize, f64, f64)> + '_ {
     line.boundaries.windows(2).map(|pair| {
         let ((start, x0), (end, x1)) = (pair[0], pair[1]);
-        let centre = line
-            .glyphs
-            .iter()
-            .find(|g| g.cluster == start)
-            .map_or(f64::midpoint(x0.0, x1.0), |g| g.centre_x.0);
-        (start, end, x0.0, x1.0, centre)
+        (start, end, x0.0, x1.0)
     })
 }
 
@@ -52,12 +47,12 @@ pub fn edit_geometry_on_path(
     };
     let mut corners = Vec::new();
     for (index, line) in layout.lines.iter().enumerate() {
-        let baseline = line.baseline.0;
-        for (start, end, x0, x1, centre) in clusters(line) {
-            let Some(frame) = placement.frame(index, centre) else {
+        for (start, end, x0, x1) in clusters(line) {
+            let Some(letter) = letter(layout, placement, index, line, start, (x0, x1)) else {
                 continue;
             };
-            let map = |x: f64, y: f64| frame.apply_point(Point::new(x, y));
+            let baseline = letter.baseline;
+            let map = |x: f64, y: f64| letter.map.apply_point(Point::new(x, y));
             let quad = [
                 map(x0, baseline - ascender),
                 map(x1, baseline - ascender),
@@ -95,16 +90,24 @@ fn caret_on_path(
     let index = layout.line_of(caret);
     let line = layout.lines.get(index)?;
     let x = x_at(line, caret);
-    // The caret turns with the letter after it, or with the last one at the line's end.
-    let centre = clusters(line)
+    // The caret stands with the letter after it, or with the last one at the line's end.
+    let letter = match clusters(line)
         .find(|c| c.0 >= caret)
         .or_else(|| clusters(line).last())
-        .map_or(x, |c| c.4);
-    let frame = placement.frame(index, centre)?;
-    let baseline = line.baseline.0;
+    {
+        Some((start, _, x0, x1)) => letter(layout, placement, index, line, start, (x0, x1))?,
+        None => Letter {
+            map: placement.frame(index, x)?,
+            baseline: line.baseline.0,
+        },
+    };
     Some([
-        frame.apply_point(Point::new(x, baseline - ascender)),
-        frame.apply_point(Point::new(x, baseline + descender)),
+        letter
+            .map
+            .apply_point(Point::new(x, letter.baseline - ascender)),
+        letter
+            .map
+            .apply_point(Point::new(x, letter.baseline + descender)),
     ])
 }
 
@@ -135,14 +138,14 @@ pub fn nearest_boundary_on_path(
     let (ascender, descender) = (layout.ascender.0, layout.descender.0);
     let mut best = (f64::INFINITY, 0_usize);
     for (index, line) in layout.lines.iter().enumerate() {
-        let (top, bottom) = (line.baseline.0 - ascender, line.baseline.0 + descender);
-        for (start, end, x0, x1, centre) in clusters(line) {
-            let Some(inverse) = placement
-                .frame(index, centre)
-                .and_then(curvyo_document_core::Affine::inverse)
-            else {
+        for (start, end, x0, x1) in clusters(line) {
+            let Some(letter) = letter(layout, placement, index, line, start, (x0, x1)) else {
                 continue;
             };
+            let Some(inverse) = letter.map.inverse() else {
+                continue;
+            };
+            let (top, bottom) = (letter.baseline - ascender, letter.baseline + descender);
             let q = inverse.apply_point(point);
             let outside = Vec2::new(
                 (x0 - q.x).max(q.x - x1).max(0.0),

@@ -18,7 +18,7 @@ use curvyo_document_core::{
     TextOutline, TextSnapshot, Vec2,
 };
 use curvyo_geometry_core::PathMeasure;
-use curvyo_text_core::{Face, TextLayout};
+use curvyo_text_core::{Face, LineLayout, TextLayout};
 
 /// Letters whose frame lands beyond this (mm) are left out (criterion 45).
 const LIMIT_MM: f64 = 1e7;
@@ -230,40 +230,76 @@ pub fn lay_out_on_path(
 }
 
 /// The map of a glyph's em outline into line space: scaled, at its origin, turned by the text's
-/// character rotation about its cluster's centre (`0079` criterion 11). A text on path is laid
-/// out horizontally, so line space is text space.
+/// character rotation plus the character's own rotation about its cluster's centre (`0079`
+/// criteria 11, 27b; `0080` criterion 47). A text on path is laid out horizontally, so line space
+/// is text space.
 fn glyph_in_line(glyph: &curvyo_text_core::PlacedGlyph, laid: &TextLayout) -> kurbo::Affine {
     let placed =
         kurbo::Affine::translate(glyph.origin.to_vec2()) * kurbo::Affine::scale(laid.mm_per_em);
-    if laid.rotation_rad == 0.0 {
+    let turn = laid.rotation_rad + glyph.rotation_rad;
+    if turn == 0.0 {
         return placed;
     }
-    kurbo::Affine::rotate_about(
-        laid.rotation_rad,
-        kurbo::Point::new(glyph.centre_x.0, glyph.centre_y.0),
-    ) * placed
+    kurbo::Affine::rotate_about(turn, kurbo::Point::new(glyph.centre_x.0, glyph.centre_y.0))
+        * placed
+}
+
+/// A cluster as it is drawn on the carrier: the map of its line-space points to the document
+/// (its turn about its centre, then the frame of its centre) and its baseline with the vertical
+/// kerns (criterion 47). Hit boxes, caret and selection go through it so they cover the letter.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct Letter {
+    /// Line space to the document.
+    pub map: Affine,
+    /// The line-space y of the cluster's baseline, raised by the kerns up to it.
+    pub baseline: f64,
+}
+
+/// The cluster of line `index` (`line`) that starts at `byte` as drawn; `x0..x1` its caret
+/// boundaries, for a cluster without a glyph. `None` off the carrier (criterion 45).
+pub(crate) fn letter(
+    laid: &TextLayout,
+    placement: &PathPlacement,
+    index: usize,
+    line: &LineLayout,
+    byte: usize,
+    (x0, x1): (f64, f64),
+) -> Option<Letter> {
+    let Some(glyph) = line.glyphs.iter().find(|g| g.cluster == byte) else {
+        return placement
+            .frame(index, f64::midpoint(x0, x1))
+            .map(|map| Letter {
+                map,
+                baseline: line.baseline.0,
+            });
+    };
+    let frame = placement.frame(index, glyph.centre_x.0)?;
+    let turn = Affine::rotation_about(
+        Point::new(glyph.centre_x.0, glyph.centre_y.0),
+        Angle::from_radians(laid.rotation_rad + glyph.rotation_rad),
+    );
+    Some(Letter {
+        map: frame.compose(turn),
+        // A horizontal glyph turns about half the size above its (raised) baseline.
+        baseline: glyph.centre_y.0 + laid.size.0 / 2.0,
+    })
 }
 
 /// One box per cluster of every line: from its caret boundary to the next, ascender to
-/// descender, through the frame of its centre.
+/// descender of its raised baseline, turned and placed as the letter is drawn.
 fn letter_boxes(laid: &TextLayout, placement: &PathPlacement) -> Vec<[Point; 4]> {
     let mut boxes = Vec::new();
     for (index, line) in laid.lines.iter().enumerate() {
-        let top = line.baseline.0 - laid.ascender.0;
-        let bottom = line.baseline.0 + laid.descender.0;
         for pair in line.boundaries.windows(2) {
             let ((byte, x0), (_, x1)) = (pair[0], pair[1]);
-            let centre = line
-                .glyphs
-                .iter()
-                .find(|g| g.cluster == byte)
-                .map_or(f64::midpoint(x0.0, x1.0), |g| g.centre_x.0);
-            let Some(frame) = placement.frame(index, centre) else {
+            let Some(letter) = letter(laid, placement, index, line, byte, (x0.0, x1.0)) else {
                 continue;
             };
+            let top = letter.baseline - laid.ascender.0;
+            let bottom = letter.baseline + laid.descender.0;
             boxes.push(
                 [(x0.0, top), (x1.0, top), (x1.0, bottom), (x0.0, bottom)]
-                    .map(|(x, y)| frame.apply_point(Point::new(x, y))),
+                    .map(|(x, y)| letter.map.apply_point(Point::new(x, y))),
             );
         }
     }
