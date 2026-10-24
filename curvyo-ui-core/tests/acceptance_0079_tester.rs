@@ -75,6 +75,7 @@ fn ac34_relative_values_times_size() {
         word_spacing: -0.1,
         line_spacing: Some(1.5),
         rotation: deg(30.0),
+        ..TextLayoutValues::DEFAULT
     };
     for (size, line) in [(10.0, 15.0), (20.0, 30.0)] {
         let o = layout_options(Length::from_mm(size), &v);
@@ -497,6 +498,7 @@ fn ac35_drawn_outline_is_the_engine_layout() {
             word_spacing: 0.3,
             line_spacing: Some(1.2),
             rotation: deg(20.0),
+            ..TextLayoutValues::DEFAULT
         };
         let placement = Affine::translation(Vec2::new(30.0, 40.0));
         let t = snapshot("Ab c\nde", 10.0, values, placement);
@@ -511,6 +513,7 @@ fn ac35_drawn_outline_is_the_engine_layout() {
                 word_spacing: Mm(3.0),
                 line_spacing: Some(Mm(12.0)),
                 rotation_rad: 20f64.to_radians(),
+                ..curvyo_text_core::LayoutOptions::default()
             },
         )
         .unwrap();

@@ -217,7 +217,15 @@ pub struct DocumentVersion(pub(crate) loro::Frontiers);
 /// left, a non-finite number as its default, a factor out of range is clamped and a rotation is
 /// wrapped; nothing of it is refused (`crate::text_codec`). The number is provisional by the rule
 /// above (`0080` text on path takes the next one). Golden: `text_layout_v19.curvyo`.
-pub const CURRENT_FORMAT_VERSION: u32 = 19;
+///
+/// Bumped to 20 in `text-vertical` (`specs/0079-text-layout-controls/adrs.md` decision 13): a
+/// text may carry the optional keys `text_writing_mode` (`"vertical_rl"`, `"vertical_lr"`) and
+/// `text_glyph_orientation` (`"upright"`, `"sideways"`). A build that stops at version 19 ignores them
+/// and would draw a vertical text as one horizontal line without a word, so it must refuse every
+/// file of this build as too new. Migration from version 19 is none: absent keys are horizontal
+/// and auto, a value at its default is never written, an unknown code reads as the default. The
+/// number is provisional by the rule above. Golden: `text_layout_v20.curvyo`.
+pub const CURRENT_FORMAT_VERSION: u32 = 20;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";

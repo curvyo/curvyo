@@ -45,6 +45,9 @@ pub struct FaceMetrics {
     /// The height of the capital H: its measured outline top, else OS/2 `sCapHeight`, else 0.7
     /// (spec "Terms", Size).
     pub cap_height: f64,
+    /// The distance between two columns from `vhea` (ascender minus descender plus line gap),
+    /// when the face has vertical metrics (`specs/0079-text-layout-controls` criterion 22).
+    pub vertical_line_height: Option<f64>,
 }
 
 impl FaceMetrics {
@@ -52,6 +55,16 @@ impl FaceMetrics {
     #[must_use]
     pub fn line_height(&self) -> f64 {
         self.ascender - self.descender + self.line_gap
+    }
+
+    /// The Auto line spacing: between columns of vertical text the face's `vhea` line, else the
+    /// natural line height (`0079` criterion 22); between horizontal lines the natural one.
+    #[must_use]
+    pub fn auto_line_height(&self, vertical: bool) -> f64 {
+        match self.vertical_line_height {
+            Some(height) if vertical => height,
+            _ => self.line_height(),
+        }
     }
 }
 
@@ -87,6 +100,7 @@ const DEFAULT_METRICS: FaceMetrics = FaceMetrics {
     descender: -0.2,
     line_gap: 0.0,
     cap_height: FALLBACK_CAP_HEIGHT,
+    vertical_line_height: None,
 };
 
 impl Face {
@@ -186,6 +200,13 @@ impl Face {
                 metrics.line_gap = line_gap;
             }
         }
+        metrics.vertical_line_height = stated
+            .vhea_line
+            .map(|line| {
+                (line.ascender.to_f64() - line.descender.to_f64() + line.line_gap.to_f64().max(0.0))
+                    / upem
+            })
+            .filter(|height| height.is_finite() && *height > 0.0);
         let measured = shaper
             .charmap()
             .map_unicode('H')

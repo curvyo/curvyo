@@ -27,6 +27,8 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     ("change_word_spacing", "Change word spacing"),
     ("change_line_spacing", "Change line spacing"),
     ("change_character_rotation", "Change character rotation"),
+    ("change_writing_mode", "Change writing mode"),
+    ("change_glyph_orientation", "Change glyph orientation"),
     ("translate_objects", "Move"),
     ("duplicate_objects", "Duplicate"),
     // `specs/0042-history-branches` criteria 10 and 22; the row adds the version's id.

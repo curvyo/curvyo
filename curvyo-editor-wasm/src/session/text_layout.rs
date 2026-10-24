@@ -3,7 +3,9 @@
 //! their live preview, commit, reset and typed values. The rules live in `curvyo_ui_core`
 //! (`realigned_placement`, `text_layout_fields`).
 
-use curvyo_document_core::{Affine, Length, NodeId, TextAlign, TextLayoutLabel, TextLayoutValues};
+use curvyo_document_core::{
+    Affine, Length, NodeId, TextAlign, TextLayoutLabel, TextLayoutValues, TextWritingMode,
+};
 use curvyo_ui_core::{
     Grid, LayoutChange, LayoutField, LayoutFieldView, LayoutSubject, field_view, parse_field_text,
     realigned_placement, set_field, stepped, value_at,
@@ -124,7 +126,10 @@ impl Session {
                 values: self.previewed_layout(text.size, &text.layout),
                 natural_line_mm: self.face_of(&text.font).map_or(text.size.as_mm(), |face| {
                     let metrics = face.metrics();
-                    metrics.line_height() * text.size.as_mm() / metrics.cap_height
+                    metrics
+                        .auto_line_height(text.layout.writing_mode != TextWritingMode::Horizontal)
+                        * text.size.as_mm()
+                        / metrics.cap_height
                 }),
             })
             .collect()
@@ -247,7 +252,7 @@ impl Session {
     /// Writes new layout values and placements of subject texts: in edit mode to the session
     /// (and to the edited text's node, if it exists, as its own step), else to the selected texts
     /// in one step.
-    fn write_layout(
+    pub(super) fn write_layout(
         &mut self,
         writes: &[(NodeId, TextLayoutValues, Affine)],
         label: TextLayoutLabel,

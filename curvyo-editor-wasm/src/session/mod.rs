@@ -116,6 +116,9 @@ mod text_style;
 mod text_style_tests;
 #[cfg(test)]
 mod text_tests;
+mod text_writing;
+#[cfg(test)]
+mod text_writing_tests;
 mod tolerances;
 mod transform_entry;
 mod weld;
