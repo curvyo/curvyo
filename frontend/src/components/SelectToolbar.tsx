@@ -1,5 +1,7 @@
 import { CircleAlert, Link, Unlink } from "lucide-react";
 import { AlignmentGroup } from "@/components/AlignmentGroup";
+import { OrientationGroup, WritingModeGroup } from "@/components/WritingGroups";
+import type { OrientationCode, WritingModeCode } from "@/lib/textWritingText";
 import { StyleGroup } from "@/components/StyleGroup";
 import type { WeightCode } from "@/lib/styleText";
 import type { AlignCode } from "@/lib/textLayoutText";
@@ -62,6 +64,9 @@ export interface SelectToolbarProps {
   onPressTextItalic?: () => string | null;
   /** The Alignment group's press (`specs/0079-text-layout-controls` criterion 1). */
   onSetTextAlign?: (align: AlignCode) => void;
+  /** The Writing mode and Glyph orientation presses (`0079` criterion 20). */
+  onSetTextWritingMode?: (mode: WritingModeCode) => void;
+  onSetTextOrientation?: (orientation: OrientationCode) => void;
   /** The Linked clone button is shown (`specs/0049-linked-clone` criterion 4). */
   linkedCloneShown: boolean;
   onLinkedClone: () => void;
@@ -570,6 +575,8 @@ export function SelectToolbar({
   onPressTextWeight,
   onPressTextItalic,
   onSetTextAlign,
+  onSetTextWritingMode,
+  onSetTextOrientation,
   linkedCloneShown,
   onLinkedClone,
   linkedCloneNotice,
@@ -667,6 +674,22 @@ export function SelectToolbar({
       groups.push(
         <div key="text-align" className={GROUP_CLASS}>
           <AlignmentGroup align={textBar.align} onPress={onSetTextAlign} onReturnFocus={onReturnFocus} />
+        </div>,
+      );
+    }
+    if (onSetTextWritingMode && onSetTextOrientation) {
+      // Writing mode and Glyph orientation after Alignment (`0079` criterion 20, UX notes §10.2).
+      groups.push(
+        <div key="text-writing" className={GROUP_CLASS}>
+          <WritingModeGroup mode={textBar.writingMode} onPress={onSetTextWritingMode} onReturnFocus={onReturnFocus} />
+        </div>,
+        <div key="text-orientation" className={GROUP_CLASS}>
+          <OrientationGroup
+            mode={textBar.writingMode}
+            orientation={textBar.orientation}
+            onPress={onSetTextOrientation}
+            onReturnFocus={onReturnFocus}
+          />
         </div>,
       );
     }
