@@ -87,18 +87,24 @@ export function expandLabel(open: boolean): string {
 export interface Row2Values {
   writingMode: WritingModeCode | null;
   orientation: OrientationCode | null;
+  /** How many subject texts are on a path (`specs/0080-text-on-path`, UX notes §5). */
+  path?: { onPath: number };
 }
 
 /** The row 2 controls whose value differs from the default, in row order. Mixed counts as
  * changed; the glyph orientation counts only while some subject text is vertical, since it acts on
  * nothing else (UX notes §3). */
-export function changedRow2Controls({ writingMode, orientation }: Row2Values): string[] {
+export function changedRow2Controls({ writingMode, orientation, path }: Row2Values): string[] {
   const changed: string[] = [];
   if (writingMode !== "horizontal") {
     changed.push("Writing mode");
     if (orientation !== "auto") {
       changed.push("Glyph orientation");
     }
+  }
+  // A subject text on a path: "Changed: On path" (UX notes §5 of `0080`).
+  if ((path?.onPath ?? 0) > 0) {
+    changed.push("On path");
   }
   return changed;
 }

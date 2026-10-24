@@ -12,6 +12,12 @@ import type { OrientationCode, WritingModeCode } from "@/lib/textWritingText";
 import { Divider, useRowStarts } from "@/components/SelectToolbar";
 import { BAR_ROW_CLASS } from "@/lib/barLayout";
 import { StyleGroup } from "@/components/StyleGroup";
+import {
+  OnPathButton,
+  ReleaseButton,
+  type TextPathActions,
+} from "@/components/TextPathGroups";
+import { ON_PATH_WRITING_LINE, writingGreyedOnPath } from "@/lib/textPathText";
 import { Tooltip } from "@/components/ui/tooltip";
 import { shiftStyle, useNoticeShift } from "@/hooks/useNoticeShift";
 import type { TextBarState } from "@/hooks/useText";
@@ -223,7 +229,7 @@ export function ExpandButton({
 }) {
   const descriptionId = useId();
   const label = expandLabel(row2.open);
-  const changed = row2.open ? null : changedText(changedRow2Controls(bar));
+  const changed = row2.open ? null : changedText(changedRow2Controls({ ...bar, path: bar.path }));
   return (
     <>
       <Tooltip
@@ -317,10 +323,12 @@ interface TextBarProps extends TextControlsProps {
   onSetOrientation: (orientation: OrientationCode) => void;
   glyphs: GlyphsButtonState;
   row2: Row2State;
+  /** The On path button and groups (`specs/0080-text-on-path`). */
+  path: TextPathActions;
 }
 
 /** The Text tool's bar in the overlay row: one pill, row 1 (Font and Size, Alignment, Style,
- * expand) and, while open, row 2 (Writing mode, Glyph orientation, Glyphs) under it
+ * On path, expand) and, while open, row 2 (Writing mode, Glyph orientation, Glyphs) under it
  * (`0084` criteria 6, 7). Each row wraps by whole groups; a wrapped line starts at the pill's
  * padding. */
 export function TextBar({
@@ -332,6 +340,7 @@ export function TextBar({
   onSetOrientation,
   glyphs,
   row2,
+  path,
   ...props
 }: TextBarProps) {
   const rowRef = useRef<HTMLDivElement>(null);
@@ -359,6 +368,9 @@ export function TextBar({
           />
         </BarGroup>
         <BarGroup>
+          <OnPathButton path={path} onReturnFocus={props.onReturnFocus} />
+        </BarGroup>
+        <BarGroup>
           <ExpandButton row2={row2} controls={row2Id} bar={props.bar} onReturnFocus={props.onReturnFocus} />
         </BarGroup>
       </div>
@@ -367,6 +379,7 @@ export function TextBar({
           <TextRow2Groups
             bar={props.bar}
             glyphs={glyphs}
+            path={path}
             onSetWritingMode={onSetWritingMode}
             onSetOrientation={onSetOrientation}
             onReturnFocus={props.onReturnFocus}
@@ -377,30 +390,40 @@ export function TextBar({
   );
 }
 
-/** Row 2's groups in their order (`0084` criterion 7): Writing mode, Glyph orientation, Glyphs
- * (UX notes §0.1, Proposal); Taper and the On path options follow once they are built. */
+/** Row 2's groups in their order (`0084` criterion 7; `0080` UX notes §0.1, §5): Writing mode,
+ * Glyph orientation, Glyphs, (Taper, not built), then Release from path while a subject text is on
+ * a path (its other values are in the position handle's entry box, customer 2026-10-24). */
 export function TextRow2Groups({
   bar,
   glyphs,
+  path,
   onSetWritingMode,
   onSetOrientation,
   onReturnFocus,
 }: {
   bar: TextBarState;
   glyphs?: GlyphsButtonState;
+  path?: TextPathActions;
   onSetWritingMode: (mode: WritingModeCode) => void;
   onSetOrientation: (orientation: OrientationCode) => void;
   onReturnFocus: () => void;
 }) {
+  const greyedLine = writingGreyedOnPath(bar.path) ? ON_PATH_WRITING_LINE : undefined;
   return (
     <>
       <BarGroup divider={false}>
-        <WritingModeGroup mode={bar.writingMode} onPress={onSetWritingMode} onReturnFocus={onReturnFocus} />
+        <WritingModeGroup
+          mode={bar.writingMode}
+          greyedLine={greyedLine}
+          onPress={onSetWritingMode}
+          onReturnFocus={onReturnFocus}
+        />
       </BarGroup>
       <BarGroup>
         <OrientationGroup
           mode={bar.writingMode}
           orientation={bar.orientation}
+          greyedLine={greyedLine}
           onPress={onSetOrientation}
           onReturnFocus={onReturnFocus}
         />
@@ -408,6 +431,11 @@ export function TextRow2Groups({
       {glyphs?.shown ? (
         <BarGroup>
           <GlyphsButton glyphs={glyphs} />
+        </BarGroup>
+      ) : null}
+      {path && path.bar.onPath > 0 ? (
+        <BarGroup>
+          <ReleaseButton path={path} onReturnFocus={onReturnFocus} />
         </BarGroup>
       ) : null}
     </>

@@ -28,7 +28,7 @@ const BUTTON_CLASS =
   "flex size-7 items-center justify-center rounded-md text-[var(--toolbar-icon)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)]";
 
 /** A 16px glyph on a 24 grid, 1.5 stroke, round caps (the Lucide look). */
-function Glyph({ d }: { d: string }) {
+export function Glyph({ d }: { d: string }) {
   return (
     <svg
       aria-hidden
@@ -67,6 +67,8 @@ const ORIENTATION_GLYPHS: Record<OrientationCode, string> = {
 
 interface ChoiceGroupProps<T extends string> {
   label: string;
+  /** The tooltip's second line on a greyed button; "Only for vertical text" without one. */
+  greyedLine?: string;
   codes: readonly T[];
   names: Record<T, string>;
   glyphs: Record<T, string>;
@@ -76,12 +78,13 @@ interface ChoiceGroupProps<T extends string> {
   onReturnFocus: () => void;
 }
 
-function ChoiceGroup<T extends string>(props: ChoiceGroupProps<T>): ReactNode {
+/** A radio group of 28 x 28 glyph buttons with the Alignment group's look and keys. */
+export function ChoiceGroup<T extends string>(props: ChoiceGroupProps<T>): ReactNode {
   const { codes, pressed, greyed, onPress, onReturnFocus } = props;
   const [focused, setFocused] = useState<number | null>(null);
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
   const tabStop = focused ?? (pressed ? codes.indexOf(pressed) : 0);
-  const line = writingTooltipLine(pressed, greyed);
+  const line = greyed && props.greyedLine ? props.greyedLine : writingTooltipLine(pressed, greyed);
   return (
     <div
       role="radiogroup"
@@ -161,9 +164,11 @@ function ChoiceGroup<T extends string>(props: ChoiceGroupProps<T>): ReactNode {
   );
 }
 
-/** The Writing mode group. */
+/** The Writing mode group; greyed with `greyedLine` while a vertical text is on a path
+ * (`specs/0080-text-on-path` criterion 48). */
 export function WritingModeGroup(props: {
   mode: WritingModeCode | null;
+  greyedLine?: string;
   onPress: (mode: WritingModeCode) => void;
   onReturnFocus: () => void;
 }) {
@@ -174,7 +179,8 @@ export function WritingModeGroup(props: {
       names={WRITING_MODE_NAMES}
       glyphs={WRITING_GLYPHS}
       pressed={props.mode}
-      greyed={false}
+      greyed={props.greyedLine !== undefined}
+      greyedLine={props.greyedLine}
       onPress={props.onPress}
       onReturnFocus={props.onReturnFocus}
     />
@@ -185,6 +191,7 @@ export function WritingModeGroup(props: {
 export function OrientationGroup(props: {
   mode: WritingModeCode | null;
   orientation: OrientationCode | null;
+  greyedLine?: string;
   onPress: (orientation: OrientationCode) => void;
   onReturnFocus: () => void;
 }) {
@@ -195,7 +202,8 @@ export function OrientationGroup(props: {
       names={ORIENTATION_NAMES}
       glyphs={ORIENTATION_GLYPHS}
       pressed={props.orientation}
-      greyed={orientationGreyed(props.mode)}
+      greyed={props.greyedLine !== undefined || orientationGreyed(props.mode)}
+      greyedLine={props.greyedLine}
       onPress={props.onPress}
       onReturnFocus={props.onReturnFocus}
     />

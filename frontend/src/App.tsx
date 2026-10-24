@@ -105,6 +105,12 @@ function Editor() {
       }
     },
   };
+  // The On path button and groups (`specs/0080-text-on-path`), the same in both bars.
+  const textPath = {
+    bar: editor.text.bar.path,
+    onPress: editor.text.path.pressOnPath,
+    onRelease: editor.text.path.release,
+  };
   const project = useProject({
     editor,
     panelOpen,
@@ -216,6 +222,7 @@ function Editor() {
               onPressTextItalic={editor.text.pressItalic}
               onSetTextAlign={editor.text.setAlign}
               onSetTextWritingMode={editor.text.setWritingMode}
+              textPath={textPath}
               onSetTextOrientation={editor.text.setOrientation}
               linkedCloneShown={editor.clones.shown}
               onLinkedClone={() => editor.clones.apply("linked-clone")}
@@ -260,6 +267,7 @@ function Editor() {
               onPressItalic={editor.text.pressItalic}
               onSetAlign={editor.text.setAlign}
               onSetWritingMode={editor.text.setWritingMode}
+              path={textPath}
               onSetOrientation={editor.text.setOrientation}
               glyphs={glyphs}
               row2={textRow2}

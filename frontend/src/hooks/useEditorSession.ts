@@ -27,6 +27,7 @@ import type { BreakApartResult, CombineResult, CutResult, SplitResult } from "@/
 import type { StackCommand, StackResult } from "@/lib/stackText";
 import type { WeldResult } from "@/lib/weldText";
 import type { ClosePathResult } from "@/lib/penText";
+import { type LineCode, type SideCode, type TextPathEntry, parseTextPathEntry } from "@/lib/textPathText";
 
 /** The canvas's backing-buffer size for a CSS size at the window's current
  * `devicePixelRatio` (`backingBufferFor`). */
@@ -616,6 +617,8 @@ export interface EditorSession {
    * or `"resize:<degrees>"` (`object-transform`'s transform-handle
    * cursors); `Canvas` turns it into a CSS cursor via `lib/cursors`. */
   cursorHint: string;
+  /** Ends pick mode of text on path without a change (a right click). */
+  cancelTextPathPick: () => void;
   /** Which hint the handle under the pointer earns (`""`, `"resize-edge"`,
    * `"resize-corner"`, `"resize-corner-uniform"`, `"rotate-corner"`,
    * `"rotate-side"`, `"skew"` (top and bottom handle), `"skew-y"` (left and
@@ -630,6 +633,17 @@ export interface EditorSession {
   transformEntry: TransformEntryState | null;
   /** The open typed move, if any. */
   moveEntry: MoveEntryState | null;
+  /** The open entry box of a text on path's position handle, if any (`specs/0080-text-on-path`,
+   * customer 2026-10-24). */
+  textPathEntry: TextPathEntry | null;
+  /** Enter in that box: `"committed"`, `"unchanged"` or `"invalid:<field>"`. */
+  commitTextPathEntry: (position: string, distance: string) => string;
+  /** Escape in that box, or leaving it: closed with no change. */
+  cancelTextPathEntry: () => void;
+  /** The box's Side, Line on path and Mirror buttons: previewed until Enter. */
+  textPathEntrySide: (side: SideCode) => void;
+  textPathEntryLine: (line: LineCode) => void;
+  textPathEntryMirror: () => void;
   /** The plus and lock badges by the pointer. */
   moveBadges: MoveBadgeState;
   /** Enter in the move chip: `"committed"`, `"unchanged"` or
@@ -936,6 +950,7 @@ export function useEditorSession(
   const limitNoticeTimer = useRef<number | undefined>(undefined);
   const [transformEntry, setTransformEntry] = useState<TransformEntryState | null>(null);
   const [moveEntry, setMoveEntry] = useState<MoveEntryState | null>(null);
+  const [textPathEntry, setTextPathEntry] = useState<TextPathEntry | null>(null);
   const [moveBadges, setMoveBadges] = useState<MoveBadgeState>(NO_BADGES);
   const entryOpenRef = useRef(false);
   /** The last pointer position over the canvas (CSS px) — lets a
@@ -981,7 +996,9 @@ export function useEditorSession(
   const syncEntry = useCallback((session: WasmSession) => {
     const next = readTransformEntry(session.transform_entry());
     const nextMove = readMoveEntry(session.move_entry());
-    entryOpenRef.current = next !== null || nextMove !== null;
+    const nextPath = parseTextPathEntry(session.text_path_entry_json());
+    entryOpenRef.current = next !== null || nextMove !== null || nextPath !== null;
+    setTextPathEntry((previous) => (sameEntry(previous, nextPath) ? previous : nextPath));
     setTransformEntry((previous) => (sameEntry(previous, next) ? previous : next));
     setMoveEntry((previous) => (sameEntry(previous, nextMove) ? previous : nextMove));
     if (nextMove === null) {
@@ -1062,6 +1079,14 @@ export function useEditorSession(
   }, [syncEntry, syncBadges]);
 
   const getSession = useCallback(() => sessionRef.current, []);
+  // A right click in pick mode of text on path ends it (`specs/0080-text-on-path` UX notes §2).
+  const cancelTextPathPick = useCallback(() => {
+    const session = sessionRef.current;
+    if (session?.cancel_text_path_pick()) {
+      setCursorHint(session.cursor_hint());
+      syncFromSession();
+    }
+  }, [syncFromSession]);
   const history = useHistory(getSession, syncFromSession, containerRef, onNudgeHistory);
   const { refresh: refreshHistory, handleKeyOutcome } = history;
   useEffect(() => {
@@ -1854,6 +1879,16 @@ export function useEditorSession(
         return;
       }
 
+      // A right press in pick mode of text on path ends it and puts nothing
+      // (`specs/0080-text-on-path` UX notes §2).
+      if (event.button === 2 && session.text_path_picking()) {
+        event.preventDefault();
+        session.cancel_text_path_pick();
+        setCursorHint(session.cursor_hint());
+        syncFromSession();
+        return;
+      }
+
       // A secondary press with the Pen finishes the path in progress as Enter does and places
       // nothing (`0072` criterion 19a, customer 2026-10-19).
       if (event.button === 2 && session.pen_secondary_press()) {
@@ -2470,6 +2505,48 @@ export function useEditorSession(
     syncFromSession();
   }, [syncFromSession]);
 
+  const commitTextPathEntry = useCallback(
+    (position: string, distance: string): string => {
+      const session = sessionRef.current;
+      if (!session) {
+        return "unchanged";
+      }
+      const outcome = session.commit_text_path_entry(position, distance);
+      syncFromSession();
+      return outcome;
+    },
+    [syncFromSession],
+  );
+
+  /** Runs `change` on the open entry box of a text on path, then re-reads the session. */
+  const textPathEntryCommand = useCallback(
+    (change: (session: WasmSession) => void) => {
+      const session = sessionRef.current;
+      if (!session) {
+        return;
+      }
+      change(session);
+      syncFromSession();
+    },
+    [syncFromSession],
+  );
+  const cancelTextPathEntry = useCallback(
+    () => textPathEntryCommand((session) => session.cancel_text_path_entry()),
+    [textPathEntryCommand],
+  );
+  const textPathEntrySide = useCallback(
+    (side: SideCode) => textPathEntryCommand((session) => session.text_path_entry_side(side)),
+    [textPathEntryCommand],
+  );
+  const textPathEntryLine = useCallback(
+    (line: LineCode) => textPathEntryCommand((session) => session.text_path_entry_line(line)),
+    [textPathEntryCommand],
+  );
+  const textPathEntryMirror = useCallback(
+    () => textPathEntryCommand((session) => session.text_path_entry_mirror()),
+    [textPathEntryCommand],
+  );
+
   const transformEntryLinked = useCallback(
     (field: number, text: string): string | undefined =>
       sessionRef.current?.transform_entry_linked(field, text) ?? undefined,
@@ -2486,12 +2563,19 @@ export function useEditorSession(
     polyStarRatio,
     liveReadout,
     cursorHint,
+    cancelTextPathPick,
     editHint,
     dismissEditHint,
     handleHint,
     cornerHintLines,
     transformEntry,
     moveEntry,
+    textPathEntry,
+    commitTextPathEntry,
+    cancelTextPathEntry,
+    textPathEntrySide,
+    textPathEntryLine,
+    textPathEntryMirror,
     moveBadges,
     commitMoveEntry,
     setMoveChipAbsolute,

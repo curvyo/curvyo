@@ -2,6 +2,7 @@ import { CircleAlert, Link, Unlink } from "lucide-react";
 import { AlignmentGroup } from "@/components/AlignmentGroup";
 import type { OrientationCode, WritingModeCode } from "@/lib/textWritingText";
 import { StyleGroup } from "@/components/StyleGroup";
+import { OnPathButton, type TextPathActions } from "@/components/TextPathGroups";
 import { BAR_ROW_CLASS } from "@/lib/barLayout";
 import type { WeightCode } from "@/lib/styleText";
 import type { AlignCode } from "@/lib/textLayoutText";
@@ -78,6 +79,8 @@ export interface SelectToolbarProps {
   /** The Writing mode and Glyph orientation presses (`0079` criterion 20). */
   onSetTextWritingMode?: (mode: WritingModeCode) => void;
   onSetTextOrientation?: (orientation: OrientationCode) => void;
+  /** The On path button and groups (`specs/0080-text-on-path`). */
+  textPath?: TextPathActions;
   /** The Linked clone button is shown (`specs/0049-linked-clone` criterion 4). */
   linkedCloneShown: boolean;
   onLinkedClone: () => void;
@@ -581,6 +584,7 @@ export function SelectToolbar({
   onSetTextAlign,
   onSetTextWritingMode,
   onSetTextOrientation,
+  textPath,
   linkedCloneShown,
   onLinkedClone,
   linkedCloneNotice,
@@ -681,6 +685,13 @@ export function SelectToolbar({
             onPressItalic={onPressTextItalic}
             onReturnFocus={onReturnFocus}
           />
+        </div>,
+      );
+    }
+    if (textPath) {
+      groups.push(
+        <div key="text-on-path" className={GROUP_CLASS}>
+          <OnPathButton path={textPath} onReturnFocus={onReturnFocus} />
         </div>,
       );
     }
@@ -790,6 +801,7 @@ export function SelectToolbar({
         <TextRow2Groups
           bar={textBar}
           glyphs={glyphs}
+          path={textPath}
           onSetWritingMode={onSetTextWritingMode}
           onSetOrientation={onSetTextOrientation}
           onReturnFocus={onReturnFocus}
