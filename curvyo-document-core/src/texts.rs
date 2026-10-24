@@ -52,6 +52,10 @@ pub enum TextLayoutLabel {
     LineSpacing,
     /// "Change character rotation".
     CharacterRotation,
+    /// "Change writing mode".
+    WritingMode,
+    /// "Change glyph orientation".
+    GlyphOrientation,
 }
 
 impl TextLayoutLabel {
@@ -64,6 +68,8 @@ impl TextLayoutLabel {
             Self::WordSpacing => "change_word_spacing",
             Self::LineSpacing => "change_line_spacing",
             Self::CharacterRotation => "change_character_rotation",
+            Self::WritingMode => "change_writing_mode",
+            Self::GlyphOrientation => "change_glyph_orientation",
         }
     }
 }

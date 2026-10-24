@@ -25,6 +25,12 @@ import {
   styleNotice,
 } from "@/lib/styleText";
 import { type AlignCode, parseAlign } from "@/lib/textLayoutText";
+import {
+  type OrientationCode,
+  type WritingModeCode,
+  parseOrientation,
+  parseWritingMode,
+} from "@/lib/textWritingText";
 import { invoke, isTauri } from "@/platform/host";
 
 /** What the Text bar (Text tool) or the Select bar's Text group shows (criterion 11). */
@@ -50,6 +56,10 @@ export interface TextBarState {
   /** The pressed alignment, `null` when the subject texts differ
    * (`specs/0079-text-layout-controls` criterion 1). */
   align: AlignCode | null;
+  /** The pressed writing mode and glyph orientation, `null` when the subject texts differ
+   * (criterion 20). */
+  writingMode: WritingModeCode | null;
+  orientation: OrientationCode | null;
 }
 
 const EMPTY_BAR: TextBarState = {
@@ -63,6 +73,8 @@ const EMPTY_BAR: TextBarState = {
   sample: "",
   style: EMPTY_STYLE,
   align: "left",
+  writingMode: "horizontal",
+  orientation: "auto",
 };
 
 type ShowNotice = (
@@ -198,6 +210,9 @@ export interface TextApi {
   pressItalic: () => string | null;
   /** A press in the Alignment group (`specs/0079-text-layout-controls` criterion 1). */
   setAlign: (align: AlignCode) => void;
+  /** A press in the Writing mode or Glyph orientation group (criterion 20). */
+  setWritingMode: (mode: WritingModeCode) => void;
+  setOrientation: (orientation: OrientationCode) => void;
   /** A typed or stepped size; returns the notice to show under the field, if any. */
   setSize: (mm: number) => string | null;
   previewSize: (mm: number | null) => void;
@@ -353,6 +368,8 @@ export function useText(
       sample: raw.sample,
       style: parseStyle(raw.style_json),
       align: parseAlign(raw.align),
+      writingMode: parseWritingMode(raw.writing_mode),
+      orientation: parseOrientation(raw.orientation),
     });
     raw.free();
     setFonts(tab);
@@ -729,6 +746,22 @@ export function useText(
     [getSession, syncFromSession],
   );
 
+  const setWritingMode = useCallback(
+    (mode: WritingModeCode) => {
+      getSession()?.set_text_writing_mode(mode);
+      syncFromSession();
+    },
+    [getSession, syncFromSession],
+  );
+
+  const setOrientation = useCallback(
+    (orientation: OrientationCode) => {
+      getSession()?.set_text_glyph_orientation(orientation);
+      syncFromSession();
+    },
+    [getSession, syncFromSession],
+  );
+
   const setSize = useCallback(
     (mm: number): string | null => {
       const outcome = getSession()?.set_text_size(mm) ?? "invalid";
@@ -808,6 +841,8 @@ export function useText(
     pressWeight,
     pressItalic,
     setAlign,
+    setWritingMode,
+    setOrientation,
     setSize,
     previewSize,
     objectToPath,

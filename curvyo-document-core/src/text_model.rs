@@ -104,6 +104,50 @@ pub enum TextAlign {
     Justify,
 }
 
+/// Which way the lines of a text run (`specs/0079-text-layout-controls` criterion 20); stored as
+/// `text_writing_mode`, absent for Horizontal.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TextWritingMode {
+    /// Lines left to right, the next one below.
+    #[default]
+    Horizontal,
+    /// Columns top to bottom, the next one to the left.
+    VerticalRl,
+    /// Columns top to bottom, the next one to the right.
+    VerticalLr,
+}
+
+impl TextWritingMode {
+    /// Whether this is the default, horizontal lines.
+    #[must_use]
+    pub fn is_horizontal(&self) -> bool {
+        *self == Self::Horizontal
+    }
+}
+
+/// How the glyphs of vertical text stand (criterion 20); stored as `text_glyph_orientation`,
+/// absent for Auto. Kept, and without effect, while the text is horizontal (criterion 21).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TextGlyphOrientation {
+    /// By the characters' Unicode vertical orientation.
+    #[default]
+    Auto,
+    /// Every glyph upright.
+    Upright,
+    /// The column set as horizontal text turned a quarter clockwise.
+    Sideways,
+}
+
+impl TextGlyphOrientation {
+    /// Whether this is the default, Auto.
+    #[must_use]
+    pub fn is_auto(&self) -> bool {
+        *self == Self::Auto
+    }
+}
+
 /// The factors of Size a letter spacing may hold (`0079` criterion 7, typed range).
 pub const LETTER_SPACING_FACTORS: std::ops::RangeInclusive<f64> = -0.5..=2.0;
 /// The factors of Size a word spacing may hold.
@@ -126,6 +170,13 @@ pub struct TextLayoutValues {
     pub line_spacing: Option<f64>,
     /// The turn of every glyph about its own centre, in (-π, π], clockwise on screen.
     pub rotation: Angle,
+    /// Horizontal lines or vertical columns (slice 3); left out of the JSON mirror when
+    /// horizontal, so a text of format 19 mirrors as before.
+    #[serde(skip_serializing_if = "TextWritingMode::is_horizontal")]
+    pub writing_mode: TextWritingMode,
+    /// How the glyphs of a column stand (slice 3); left out of the JSON mirror when Auto.
+    #[serde(skip_serializing_if = "TextGlyphOrientation::is_auto")]
+    pub orientation: TextGlyphOrientation,
 }
 
 impl TextLayoutValues {
@@ -136,6 +187,8 @@ impl TextLayoutValues {
         word_spacing: 0.0,
         line_spacing: None,
         rotation: Angle::from_radians(0.0),
+        writing_mode: TextWritingMode::Horizontal,
+        orientation: TextGlyphOrientation::Auto,
     };
 
     /// Whether every value is its default (then nothing is stored).
@@ -170,6 +223,8 @@ impl TextLayoutValues {
             } else {
                 Angle::from_radians(0.0)
             },
+            writing_mode: self.writing_mode,
+            orientation: self.orientation,
         }
     }
 }
@@ -191,7 +246,8 @@ pub struct TextSnapshot {
     pub font: FontRef,
     /// The height of the capital H (spec "Terms", Size).
     pub size: Length,
-    /// Alignment, spacing and character rotation (`specs/0079-text-layout-controls`).
+    /// Alignment, spacing, character rotation, writing mode and glyph orientation
+    /// (`specs/0079-text-layout-controls`).
     #[serde(skip_serializing_if = "TextLayoutValues::is_default")]
     pub layout: TextLayoutValues,
     /// The map from text space (mm, origin at the left end of the first baseline, y down) to
@@ -403,6 +459,8 @@ mod tests {
             word_spacing: 0.1,
             line_spacing: Some(1.5),
             rotation: Angle::from_radians(0.5),
+            writing_mode: TextWritingMode::VerticalLr,
+            orientation: TextGlyphOrientation::Sideways,
         };
         let scaled = start.mapped_by(Affine::scale(2.0, 2.0));
         assert!((scaled.size.as_mm() - 20.0).abs() < 1e-9);

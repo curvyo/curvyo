@@ -8,7 +8,7 @@ use curvyo_document_core::{
     Affine, Document, FontRef, Length, MAX_TEXT_CHARS, NodeId, Style, TextEditError,
     TextLayoutValues, TextSnapshot,
 };
-use curvyo_text_core::TextLayout;
+use curvyo_text_core::{TextLayout, WritingMode};
 
 /// A tab in typed or pasted text becomes this many spaces (criterion 3; `adrs.md` decision 4).
 const TAB_SPACES: usize = 4;
@@ -41,6 +41,21 @@ pub enum CaretMove {
     WordLeft,
     /// The end of the word after (Ctrl+Right).
     WordRight,
+}
+
+/// The move an arrow key means in `mode` (`specs/0079-text-layout-controls` criterion 24): in a
+/// column Up and Down move along it, Left and Right to the column before or after in reading
+/// order (right to left: Left is the next column).
+const fn along_the_lines(mode: WritingMode, key: CaretMove) -> CaretMove {
+    match (mode, key) {
+        (WritingMode::VerticalRl | WritingMode::VerticalLr, CaretMove::Up) => CaretMove::Left,
+        (WritingMode::VerticalRl | WritingMode::VerticalLr, CaretMove::Down) => CaretMove::Right,
+        (WritingMode::VerticalRl, CaretMove::Left)
+        | (WritingMode::VerticalLr, CaretMove::Right) => CaretMove::Down,
+        (WritingMode::VerticalRl, CaretMove::Right)
+        | (WritingMode::VerticalLr, CaretMove::Left) => CaretMove::Up,
+        _ => key,
+    }
 }
 
 /// One message of the input sink.
@@ -360,6 +375,7 @@ impl TextEdit {
     }
 
     fn move_caret(&mut self, to: CaretMove, extend: bool, layout: Option<&TextLayout>) {
+        let to = layout.map_or(to, |l| along_the_lines(l.writing_mode, to));
         let string = &self.state.string;
         let caret = self.state.caret;
         let selection = self.selection();

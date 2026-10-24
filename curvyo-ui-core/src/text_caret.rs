@@ -1,6 +1,7 @@
 //! Where the caret, the selected range and the IME composition of a text in edit mode are drawn
 //! (`specs/0074-text-objects` criterion 3; UX notes §2, "Look in edit mode"), in document mm,
-//! turned and skewed with the text's placement.
+//! turned and skewed with the text's placement; across the column in vertical text
+//! (`specs/0079-text-layout-controls` criterion 24).
 
 use std::ops::Range;
 
@@ -43,15 +44,21 @@ pub fn edit_geometry(
     selection: &Range<usize>,
     preedit: Option<&Range<usize>>,
 ) -> TextEditGeometry {
-    let map = |x: f64, y: f64| placement.apply_point(Point::new(x, y));
+    // Caret and ranges are found in line space; the frame turns them into a column's.
+    let frame = layout.frame();
+    let map = |x: f64, y: f64| {
+        let p = frame * kurbo::Point::new(x, y);
+        placement.apply_point(Point::new(p.x, p.y))
+    };
+    let corner = |x: f64, y: f64| placement.apply_point(Point::new(x, y));
     let (ascender, descender) = (layout.ascender.0, layout.descender.0);
     let line_box = layout.line_box();
     let mut geometry = TextEditGeometry {
         line_box: [
-            map(line_box.x0, line_box.y0),
-            map(line_box.x1, line_box.y0),
-            map(line_box.x1, line_box.y1),
-            map(line_box.x0, line_box.y1),
+            corner(line_box.x0, line_box.y0),
+            corner(line_box.x1, line_box.y0),
+            corner(line_box.x1, line_box.y1),
+            corner(line_box.x0, line_box.y1),
         ],
         caret: None,
         selection: Vec::new(),

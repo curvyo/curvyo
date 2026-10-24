@@ -195,6 +195,14 @@ budget for the text engine 1.3 MiB uncompressed). Details in `specs/0074-text-ob
   SL-WASM: the wasm budget for the text engine is raised from 1.4 MiB to **2 MiB** uncompressed
   (`docs/technical-debt.md`).
 
+- 2026-10-24, text layout controls slice 3 (`specs/0079-text-layout-controls/adrs.md` decisions
+  11 to 13 and the spike note): §1 two more optional registers, `text_writing_mode` and
+  `text_glyph_orientation`; `format_version` 20. §2 `layout` lays every line out in line space
+  and maps it by the writing mode's frame (a quarter turn for columns); upright runs are shaped
+  top to bottom by `harfrust` (`vmtx`/`VORG`, `vert`), sideways runs left to right and turned;
+  Auto reads a generated UAX #50 table (`tools/unicode-data/vertical_orientation.py`, Unicode
+  17.0, 99 ranges). No new dependency.
+
 - 2026-10-24, text layout controls slice 1 (`specs/0079-text-layout-controls/adrs.md` decisions 1
   to 6): §1 the text node gains five optional registers, `text_align`, `text_letter_space`,
   `text_word_space`, `text_line_space` (factors of `text_size`) and `text_rotation` (degrees);

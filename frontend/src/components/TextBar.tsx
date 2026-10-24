@@ -7,6 +7,8 @@ import { CaseSensitive, Omega, TriangleAlert } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { AlignmentGroup } from "@/components/AlignmentGroup";
+import { OrientationGroup, WritingModeGroup } from "@/components/WritingGroups";
+import type { OrientationCode, WritingModeCode } from "@/lib/textWritingText";
 import { Divider, useRowStarts } from "@/components/SelectToolbar";
 import { StyleGroup } from "@/components/StyleGroup";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -194,13 +196,24 @@ interface TextBarProps extends TextControlsProps {
   onPressWeight: (code: WeightCode) => string | null;
   onPressItalic: () => string | null;
   onSetAlign: (align: AlignCode) => void;
+  onSetWritingMode: (mode: WritingModeCode) => void;
+  onSetOrientation: (orientation: OrientationCode) => void;
   glyphs: GlyphsButtonState;
 }
 
 /** The Text tool's bar in the overlay row: one pill with the Font button and the Size field,
  * then the Style group (`specs/0078-font-style-buttons`, UX notes §1); it wraps by whole groups
  * and draws no divider at the start of a row. */
-export function TextBar({ editing, onPressWeight, onPressItalic, onSetAlign, glyphs, ...props }: TextBarProps) {
+export function TextBar({
+  editing,
+  onPressWeight,
+  onPressItalic,
+  onSetAlign,
+  onSetWritingMode,
+  onSetOrientation,
+  glyphs,
+  ...props
+}: TextBarProps) {
   const barRef = useRef<HTMLDivElement>(null);
   useRowStarts(barRef);
   return (
@@ -227,6 +240,17 @@ export function TextBar({ editing, onPressWeight, onPressItalic, onSetAlign, gly
       <div className="group/row flex h-9 items-center gap-3">
         <Divider />
         <AlignmentGroup align={props.bar.align} onPress={onSetAlign} onReturnFocus={props.onReturnFocus} />
+      </div>
+      <div className="group/row flex h-9 items-center gap-3">
+        <Divider />
+        <WritingModeGroup mode={props.bar.writingMode} onPress={onSetWritingMode} onReturnFocus={props.onReturnFocus} />
+        <Divider />
+        <OrientationGroup
+          mode={props.bar.writingMode}
+          orientation={props.bar.orientation}
+          onPress={onSetOrientation}
+          onReturnFocus={props.onReturnFocus}
+        />
       </div>
       {glyphs.shown ? (
         <div className="group/row flex h-9 items-center gap-3">

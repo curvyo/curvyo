@@ -41,6 +41,10 @@ pub(super) struct TextState {
     pub(super) size_preview: Option<Length>,
     /// The alignment of the next new text (`specs/0079-text-layout-controls` criterion 33).
     pub(super) next_align: TextAlign,
+    /// The writing mode and glyph orientation of the next new text (criterion 33).
+    pub(super) next_writing_mode: curvyo_document_core::TextWritingMode,
+    /// See `next_writing_mode`.
+    pub(super) next_orientation: curvyo_document_core::TextGlyphOrientation,
     /// A layout field's live value during a drag or a held arrow key: the field and its value in
     /// mm or degrees (`None`: Line spacing Auto), drawn on the subject texts, not written; and the
     /// subject it was started on, without which it counts as dropped (UX notes §5).
@@ -167,6 +171,8 @@ impl Session {
             curvyo_document_core::Style::default(),
         );
         edit.layout.align = self.text.next_align;
+        edit.layout.writing_mode = self.text.next_writing_mode;
+        edit.layout.orientation = self.text.next_orientation;
         self.text.edit = Some(edit);
     }
 

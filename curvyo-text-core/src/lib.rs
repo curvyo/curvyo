@@ -28,6 +28,8 @@ mod svg_font;
 mod unicode_blocks;
 mod unicode_names;
 mod units;
+mod vertical_orientation;
+mod writing_mode;
 
 pub use align::Align;
 pub use error::TextError;
@@ -44,3 +46,4 @@ pub use preview::{preview_path, preview_path_within};
 pub use unicode_blocks::{BLOCKS, UNICODE_VERSION, block_of};
 pub use unicode_names::UnicodeNames;
 pub use units::Mm;
+pub use writing_mode::{GlyphOrientation, WritingMode};

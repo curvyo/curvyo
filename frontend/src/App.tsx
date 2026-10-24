@@ -202,6 +202,8 @@ function Editor() {
               onPressTextWeight={editor.text.pressWeight}
               onPressTextItalic={editor.text.pressItalic}
               onSetTextAlign={editor.text.setAlign}
+              onSetTextWritingMode={editor.text.setWritingMode}
+              onSetTextOrientation={editor.text.setOrientation}
               linkedCloneShown={editor.clones.shown}
               onLinkedClone={() => editor.clones.apply("linked-clone")}
               linkedCloneNotice={editor.clones.barNotice}
@@ -244,6 +246,8 @@ function Editor() {
               onPressWeight={editor.text.pressWeight}
               onPressItalic={editor.text.pressItalic}
               onSetAlign={editor.text.setAlign}
+              onSetWritingMode={editor.text.setWritingMode}
+              onSetOrientation={editor.text.setOrientation}
               glyphs={glyphs}
               onReturnFocus={() => {
                 if (editor.text.editing) {

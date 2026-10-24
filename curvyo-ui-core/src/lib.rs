@@ -345,7 +345,7 @@ pub use text_convert::{
     TextRefusal, area_refusal, build_text_conversions, text_path, texts_as_paths, texts_refusal,
 };
 pub use text_edit::{CaretMove, EditTarget, Finished, InputOutcome, TextEdit, TextInput};
-pub use text_layout::{lay_out, layout_options, realigned_placement, text_layout};
+pub use text_layout::{kept_placement, lay_out, layout_options, realigned_placement, text_layout};
 pub use text_layout_fields::{
     LayoutChange, LayoutField, LayoutFieldView, LayoutSubject, field_view, parse_field_text,
     set_field, stepped, value_at,

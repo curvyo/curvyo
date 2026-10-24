@@ -96,3 +96,60 @@ Milestone 3, gate
   the list's top. Left as is (UX notes §5 asks for the same screen position).
 - 2026-10-24: `R-EDIT-048`, which the spec links, does not exist in `docs/requirements.md`;
   R-FONT-011 is added. Left to the product owner.
+
+# Plan for the text layout controls, slice 3
+
+Implementer, 2026-10-24, on `story/text-vertical` (Part D, criteria 20 to 25, and Part G for its
+values). Built for `adrs.md` decisions 11 to 13 and the slice 3 spike note there; UX per
+`ux-notes.md` §10.2. Format 20 (main at 19 after slice 1 and `0082`).
+
+## Affected crates/modules
+
+- `curvyo-text-core`: new `writing_mode.rs` (`WritingMode`, `GlyphOrientation`, the frame),
+  `vertical_orientation.rs` with the generated `vertical_orientation_data.rs`
+  (`tools/unicode-data/vertical_orientation.py`); `shape.rs` upright (top to bottom) and sideways
+  runs; `layout.rs` line space, column baselines, Auto from `vhea`; `glyph_map.rs` frame and upright
+  glyphs; `FaceMetrics::vertical_line_height`.
+- `curvyo-document-core`: `TextWritingMode`, `TextGlyphOrientation`, two optional keys, labels
+  "Change writing mode" and "Change glyph orientation", format 20, golden `text_layout_v20.curvyo`.
+- `curvyo-ui-core`: `layout_options` maps the two values; `kept_placement`; caret geometry
+  through the frame; arrow keys in columns; history names.
+- `curvyo-editor-wasm`: session `text_writing.rs` (pressed state, press, next text), bindings.
+- `frontend`: `WritingGroups.tsx` (two groups, custom glyphs, greyed orientation),
+  `lib/textWritingText.ts` with node tests, Text bar and Select bar wiring.
+
+## Tasks
+
+- [x] 1. Spike: harfrust top-to-bottom shaping, `vmtx`/`VORG`/`vert`, the fallback without
+  `vmtx`, the UAX #50 source, the wasm size; dated note in `adrs.md` (AC 22, 23, 25, 38)
+- [x] 2. text-core, test first (`tests/vertical.rs`): Auto = Sideways for Latin and = Upright for
+  CJK; Sideways = the line turned clockwise; Upright advances by `vmtx` with `vert` forms, else by
+  ascender − descender; columns RL and LR one Line spacing apart, Auto from `vhea`; alignment,
+  letter spacing and the line box along the column; rotation of an upright glyph about its middle;
+  a text-space point finds its caret position; single-line fonts (AC 22, 23, 25, 38)
+- [x] 3. document-core: two keys, defaults deleted, lenient read, labels, format 20, golden with
+  one text per value, one with both, one with none; a format 19 file opens horizontal (AC 20, 37)
+- [x] 4. ui-core and session: layout options, kept placement, crosswise caret, arrow keys; press
+  on selected texts in one step and Undo, orientation kept on horizontal text, next text's values
+  (AC 20, 21, 24, 33, 35)
+- [x] 5. Frontend: both groups in the Text bar and the Select bar, greyed orientation, node tests
+  (AC 20, 21, 32)
+- [x] 6. Full gate, frontend tsc, npm test, oxlint; headless Chromium screenshots
+
+## Validation
+
+- `curvyo-text-core/tests/vertical.rs` with the Noto Sans JP subset, Source Sans 3 and EMS
+  Readability; codec unit tests and `curvyo-document-core/tests/text_vertical_format.rs`;
+  `ui-core` unit test of the crosswise caret and the kept start; session tests
+  `text_writing_tests.rs`; `frontend/tests/textWritingText.test.ts`.
+
+## Dated notes
+
+- 2026-10-24: the tester-owned 0079 acceptance files of slice 1 got
+  `..LayoutOptions::default()` / `..TextLayoutValues::DEFAULT` where they build the structs in
+  full (two new fields); no assertion changed.
+- 2026-10-24: `curvyo-ui-core/src/text_edit.rs` was 621 lines before this slice (over the ~500
+  guide); the 18-line key map is added there because the moves it maps live there. Left to the
+  lead.
+- 2026-10-24: the Select bar with one vertical text was not measured at 800 x 600; the Text bar
+  was (design-system row).

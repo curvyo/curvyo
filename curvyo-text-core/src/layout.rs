@@ -1,21 +1,25 @@
 //! Line layout of a string in one face at one size with the text's layout values: glyph
 //! positions, line metrics, the line box and the caret boundaries (`specs/0074-text-objects`
-//! criteria 3, 4, 10, 25; `specs/0079-text-layout-controls` criteria 2, 3, 8 to 11, 15).
+//! criteria 3, 4, 10, 25; `specs/0079-text-layout-controls` criteria 2, 3, 8 to 11, 15, 22 to 25).
 //!
 //! Text space is millimetres, origin at the anchor on the first baseline, y down (ADR 0020 §1,
-//! `text_placement` maps it to the document).
+//! `text_placement` maps it to the document). Lines are laid out in line space: x along the line,
+//! y across it; for horizontal text it is text space, for vertical text
+//! [`WritingMode::frame`] turns it a quarter clockwise, so a line becomes a column whose centre
+//! line is its baseline.
 
 use std::ops::Range;
 
-use kurbo::{BezPath, Point, Rect};
+use kurbo::{Affine, BezPath, Point, Rect};
 
 use crate::align::{Align, Extra, LineMeasure, justify, shift};
 use crate::error::TextError;
 use crate::face::Face;
 use crate::glyph_map::glyph_to_text;
 use crate::limits::MAX_SHAPE_CHARS;
-use crate::shape::{ShapedGlyph, shape_line};
+use crate::shape::{ShapedGlyph, shape_line, shape_vertical_line};
 use crate::units::Mm;
+use crate::writing_mode::{GlyphOrientation, WritingMode};
 
 /// The characters word spacing widens (`0079` criterion 9).
 const SPACES: [char; 3] = [' ', '\u{a0}', '\u{3000}'];
@@ -34,19 +38,29 @@ pub struct LayoutOptions {
     pub line_spacing: Option<Mm>,
     /// The turn of every glyph about its cluster's centre, clockwise on screen.
     pub rotation_rad: f64,
+    /// Horizontal lines or vertical columns.
+    pub writing_mode: WritingMode,
+    /// How the glyphs of a column stand; horizontal text ignores it.
+    pub orientation: GlyphOrientation,
 }
 
-/// One glyph placed in text space.
+/// One glyph placed in line space.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct PlacedGlyph {
     /// The glyph id in the face.
     pub glyph: u32,
-    /// Where the glyph's origin sits, in text space (mm).
+    /// Where the glyph's origin sits, in line space (mm).
     pub origin: Point,
     /// The byte offset in the whole string of the first character this glyph draws.
     pub cluster: usize,
     /// The x of the middle of its cluster's advance: the glyph turns about it (criterion 11).
     pub centre_x: Mm,
+    /// The line-space y of the point the glyph turns about: half the size above its baseline,
+    /// or for an upright glyph of a column the column's centre line.
+    pub centre_y: Mm,
+    /// The glyph stands upright in a column: it is drawn unturned at its mapped origin
+    /// (`0079` criterion 23); every other glyph turns with the line.
+    pub upright: bool,
 }
 
 /// One line of the layout.
@@ -81,9 +95,11 @@ pub struct TextLayout {
     pub size: Mm,
     /// The glyphs' turn (criterion 11), radians, clockwise on screen.
     pub rotation_rad: f64,
-    /// The line's top above the baseline (positive).
+    /// Horizontal lines or vertical columns; [`Self::frame`] maps line space to text space.
+    pub writing_mode: WritingMode,
+    /// The line's top above the baseline (positive); a column's half width.
     pub ascender: Mm,
-    /// The line's bottom below the baseline (positive).
+    /// The line's bottom below the baseline (positive); a column's half width.
     pub descender: Mm,
     /// The distance between baselines as used.
     pub line_height: Mm,
@@ -95,7 +111,7 @@ pub struct TextLayout {
 
 /// Lays out `text` in `face` so that the capital H is `size` high (spec "Terms", Size), with the
 /// layout values of `options`. Lines break at `\n` only; each next baseline is one line spacing
-/// lower (criterion 4).
+/// lower (criterion 4), or each next column one line spacing further left or right.
 ///
 /// # Errors
 /// [`TextError::TextTooLong`] for more than [`MAX_SHAPE_CHARS`] characters.
@@ -110,24 +126,36 @@ pub fn layout(
     }
     let metrics = face.metrics();
     let mm_per_em = size.get() / metrics.cap_height;
-    let natural = metrics.line_height() * mm_per_em;
+    let mode = options.writing_mode;
+    let vertical = mode.is_vertical();
+    let natural = metrics.auto_line_height(vertical) * mm_per_em;
     let line_height = options.line_spacing.map_or(natural, Mm::get);
     let ligatures = options.letter_spacing.0 == 0.0;
+    // A sideways run's baseline lies so that its line (ascender to descender) is centred on the
+    // column (criterion 23).
+    let drop = f64::midpoint(metrics.ascender, metrics.descender);
     let mut shaped = Vec::new();
     let mut start = 0;
     for line in text.split('\n') {
-        shaped.push(ShapedLine::new(face, line, start, ligatures));
+        let glyphs = if vertical {
+            shape_vertical_line(face, line, ligatures, options.orientation, drop)
+        } else {
+            shape_line(face, line, ligatures)
+        };
+        shaped.push(ShapedLine::new(glyphs, line, start));
         start += line.len() + 1;
     }
     let spacing = Spacing {
         mm_per_em,
         letter: options.letter_spacing.0,
         word: options.word_spacing.0,
+        pivot: if vertical { drop * mm_per_em } else { 0.0 } - size.get() / 2.0,
     };
+    let baseline = |index: usize| mode.baseline(f64_from(index), line_height);
     let mut lines: Vec<LineLayout> = shaped
         .iter()
         .enumerate()
-        .map(|(index, line)| line.place(line_height * f64_from(index), spacing, Extra::default()))
+        .map(|(index, line)| line.place(baseline(index), spacing, Extra::default()))
         .collect();
     if options.align == Align::Justify {
         let measures: Vec<LineMeasure> = shaped
@@ -137,7 +165,7 @@ pub fn layout(
             .collect();
         for (index, extra) in justify(&measures).into_iter().enumerate() {
             if extra != Extra::default() {
-                lines[index] = shaped[index].place(line_height * f64_from(index), spacing, extra);
+                lines[index] = shaped[index].place(baseline(index), spacing, extra);
             }
         }
     }
@@ -145,12 +173,19 @@ pub fn layout(
         let dx = shift(options.align, line.extent.start, line.extent.end);
         line.shift(dx);
     }
+    let (ascender, descender) = if vertical {
+        let half = (metrics.ascender - metrics.descender) / 2.0;
+        (half, half)
+    } else {
+        (metrics.ascender, -metrics.descender)
+    };
     Ok(TextLayout {
         mm_per_em,
         size,
         rotation_rad: options.rotation_rad,
-        ascender: Mm(metrics.ascender * mm_per_em),
-        descender: Mm(-metrics.descender * mm_per_em),
+        writing_mode: mode,
+        ascender: Mm(ascender * mm_per_em),
+        descender: Mm(descender * mm_per_em),
         line_height: Mm(line_height),
         natural_line_height: Mm(natural),
         lines,
@@ -167,6 +202,8 @@ struct Spacing {
     mm_per_em: f64,
     letter: f64,
     word: f64,
+    /// The turning point's y from the baseline of a glyph that turns with the line.
+    pivot: f64,
 }
 
 /// One cluster of a shaped line: its glyphs, its byte in the line and its advance in em.
@@ -187,8 +224,7 @@ struct ShapedLine {
 }
 
 impl ShapedLine {
-    fn new(face: &Face, line: &str, start: usize, ligatures: bool) -> Self {
-        let glyphs = shape_line(face, line, ligatures);
+    fn new(glyphs: Vec<ShapedGlyph>, line: &str, start: usize) -> Self {
         let mut clusters: Vec<Cluster> = Vec::new();
         for (index, glyph) in glyphs.iter().enumerate() {
             let byte = glyph.cluster.min(line.len());
@@ -256,6 +292,12 @@ impl ShapedLine {
                     ),
                     cluster: start + cluster.byte,
                     centre_x,
+                    centre_y: Mm(if shaped.upright {
+                        baseline
+                    } else {
+                        baseline + spacing.pivot
+                    }),
+                    upright: shaped.upright,
                 });
                 pen += shaped.advance * spacing.mm_per_em;
             }
@@ -303,9 +345,15 @@ impl LineLayout {
 }
 
 impl TextLayout {
+    /// The map from line space to text space.
+    #[must_use]
+    pub const fn frame(&self) -> Affine {
+        self.writing_mode.frame()
+    }
+
     /// The box of the lines in text space: from the first line's ascender to the last line's
     /// descender, from the leftmost line start to the rightmost line end (criterion 25; with
-    /// Centre and Right lines start at negative x).
+    /// Centre and Right lines start at negative x), turned with the frame for columns.
     #[must_use]
     pub fn line_box(&self) -> Rect {
         let (left, right) =
@@ -322,8 +370,19 @@ impl TextLayout {
         } else {
             (0.0, 0.0)
         };
-        let last = self.lines.last().map_or(0.0, |line| line.baseline.0);
-        Rect::new(left, -self.ascender.0, right, last + self.descender.0)
+        let (top, bottom) = self
+            .lines
+            .iter()
+            .fold((0.0_f64, 0.0_f64), |(top, bottom), line| {
+                (top.min(line.baseline.0), bottom.max(line.baseline.0))
+            });
+        let lines = Rect::new(
+            left,
+            top - self.ascender.0,
+            right,
+            bottom + self.descender.0,
+        );
+        self.frame().transform_rect_bbox(lines)
     }
 
     /// The line that holds caret position `byte` (the last line for a position past the end).
@@ -335,8 +394,8 @@ impl TextLayout {
             .unwrap_or(self.lines.len().saturating_sub(1))
     }
 
-    /// The caret's x and baseline for caret position `byte`, which is snapped to the nearest
-    /// boundary at or before it.
+    /// The caret's x and baseline in line space for caret position `byte`, which is snapped to
+    /// the nearest boundary at or before it.
     #[must_use]
     pub fn caret_point(&self, byte: usize) -> Point {
         let Some(line) = self.lines.get(self.line_of(byte)) else {
@@ -352,9 +411,10 @@ impl TextLayout {
     }
 
     /// The caret position nearest to `point` (text space): the line by y, then the nearest
-    /// boundary by x (criterion 10).
+    /// boundary by x, both in line space (criterion 10).
     #[must_use]
     pub fn nearest_boundary(&self, point: Point) -> usize {
+        let point = self.frame().inverse() * point;
         let middle = (self.descender.0 - self.ascender.0) / 2.0;
         let index = self
             .lines
@@ -369,7 +429,7 @@ impl TextLayout {
         self.boundary_on_line(index, point.x)
     }
 
-    /// The boundary of line `index` nearest to `x`.
+    /// The boundary of line `index` nearest to line-space `x`.
     #[must_use]
     pub fn boundary_on_line(&self, index: usize, x: f64) -> usize {
         self.lines.get(index).map_or(0, |line| {
@@ -407,23 +467,14 @@ impl TextLayout {
     pub fn glyph_paths(&self, face: &Face) -> Vec<BezPath> {
         self.lines
             .iter()
-            .flat_map(|line| {
-                line.glyphs
-                    .iter()
-                    .map(move |placed| (line.baseline, placed))
-            })
-            .filter_map(|(baseline, placed)| {
+            .flat_map(|line| line.glyphs.iter())
+            .filter_map(|placed| {
                 let outline = face.outline(placed.glyph);
                 if outline.path.elements().is_empty() {
                     return None;
                 }
-                let to_text = glyph_to_text(
-                    placed,
-                    baseline.0,
-                    self.mm_per_em,
-                    self.size.0,
-                    self.rotation_rad,
-                );
+                let to_text =
+                    glyph_to_text(placed, self.frame(), self.mm_per_em, self.rotation_rad);
                 Some(to_text * &outline.path)
             })
             .collect()
