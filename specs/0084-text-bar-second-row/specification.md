@@ -77,14 +77,15 @@ groups as today. **Subject texts**: the texts the controls act on today.
 ### B. Which control is on which row
 
 6. Given the Text bar, then row 1 holds, in this order: Font button, Size field
-   (one group), Alignment group, Style group, Glyphs button (while shown, as
-   today), On path button (once `0080` is built), then the expand button of
-   part C. **(Proposal: the split and the order; Alignment moves before Style
-   so that Font, Size and Alignment fit one 324px line at 800 x 600)**
+   (one group, 4px apart), Alignment group, Style group, On path button (once
+   `0080` is built), then the expand button of part C. **(Proposal: the split
+   and the order; Alignment moves before Style so that Font, Size and Alignment
+   fit one 324px line at 800 x 600; Glyphs moves to row 2 and Font and Size are
+   4px apart, UX notes §0.1 and §0.2, lead decision 2026-10-24)**
 7. Given the Text bar, then row 2 holds, in this order: Writing mode group,
    Glyph orientation group (`0079` slice 3), Taper field (once `0079` slice 2 is
    built; this amends the placement "after the Alignment group" of `0079`
-   criterion 16). When `0080` is built, its options of a text on a path (Side,
+   criterion 16), Glyphs button (while shown, as today). When `0080` is built, its options of a text on a path (Side,
    Line, Release from path) go to row 2 after Taper unless its UX notes give a
    reason otherwise. **(Proposal)**
 8. Given the Select bar with a text in the selection, then its Text controls
@@ -111,9 +112,10 @@ groups as today. **Subject texts**: the texts the controls act on today.
     open; Enter and Space toggle it; focus stays on it after the toggle; it has
     no keyboard shortcut.
 12. Given row 2 closed, then its controls are not in the DOM and not in the Tab
-    order. Given row 2 open, then Tab from the expand button goes to the first
-    control of row 2, and Shift+Tab from the first control of row 2 goes back to
-    the expand button. Row 2 has `role="toolbar"` (Text bar) or `role="group"`
+    order. Given row 2 open in the Text bar, then Tab from the expand button goes
+    to the first control of row 2, and Shift+Tab from the first control of row 2
+    goes back to the expand button; in the Select bar Tab follows what is seen
+    (expand, Object to path, Linked clone, row 2; UX notes §0.5). Row 2 has `role="toolbar"` (Text bar) or `role="group"`
     (Select bar) with the accessible name "More text options".
 13. Given a subject text whose row 2 values differ from the defaults (writing
     mode not Horizontal, or Taper not 0 %), while row 2 is closed, then the
