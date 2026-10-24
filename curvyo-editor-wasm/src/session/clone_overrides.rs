@@ -27,6 +27,17 @@ impl Session {
         ids.to_vec()
     }
 
+    /// The selected linked clones of a selection of clones that holds text clones too.
+    fn linked_block_clones(&self) -> Vec<NodeId> {
+        let read = self.object_read();
+        self.selection
+            .ids()
+            .iter()
+            .copied()
+            .filter(|id| matches!(read.get(*id), Some(ObjectSnapshot::Clone(_))))
+            .collect()
+    }
+
     /// The Placement row (criterion 2): `own` true is "Own placement", false "Follows original",
     /// for every selected clone in one commit. Pressing the state they already have does nothing
     /// and posts nothing.
@@ -59,7 +70,16 @@ impl Session {
             }
             this.flush_style_preview();
             let clones = this.block_clones();
-            match this.document.set_own_style(&clones, own) {
+            // Text clones have the Style row too (`specs/0080-text-on-path` criterion 40).
+            let texts = this.selected_text_clones();
+            // One step for both kinds (lead decision 2).
+            let changed = if texts.is_empty() {
+                this.document.set_own_style(&clones, own)
+            } else {
+                this.document
+                    .set_own_style_and_texts(&this.linked_block_clones(), &texts, own)
+            };
+            match changed {
                 Ok(n) if n > 0 => CloneResult::done(
                     if own {
                         "Own style, copied from the original."
@@ -73,10 +93,11 @@ impl Session {
         })
     }
 
-    /// Whether Spread colours is enabled: two or more clones selected (criterion 42).
+    /// Whether Spread colours is enabled: two or more clones selected (criterion 42), linked or
+    /// text clones (`specs/0080-text-on-path`, lead decision 3).
     #[must_use]
     pub fn spread_colours_ready(&self) -> bool {
-        self.block_clones().len() >= 2
+        self.selected_clones_of_both_kinds().len() >= 2
     }
 
     /// Spread colours (criterion 42): evenly spaced hues over the selected clones, back to front,
@@ -86,7 +107,7 @@ impl Session {
             if this.tool != Tool::Select && this.tool != Tool::Node {
                 return CloneResult::ignored();
             }
-            let clones = this.block_clones();
+            let clones = this.selected_clones_of_both_kinds();
             let colours = curvyo_ui_core::spread_colours(&this.object_read(), &clones);
             if colours.is_empty() {
                 return CloneResult::ignored();

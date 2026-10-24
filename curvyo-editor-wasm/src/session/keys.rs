@@ -307,6 +307,10 @@ impl Session {
         if self.document_preview_active() {
             return KeyOutcome::Paused;
         }
+        // Enter in pick mode puts the text on the pick set (`0080` criterion 2).
+        if input.key == "Enter" && !input.dom_blocked && self.confirm_text_path_pick() {
+            return KeyOutcome::Consumed;
+        }
         match decide(&input, self.key_state()) {
             KeyAction::Ignore => KeyOutcome::Ignored,
             KeyAction::SetTool(tool) => {

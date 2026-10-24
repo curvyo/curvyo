@@ -1,6 +1,7 @@
 //! The outlines of the carriers of texts on path (`specs/0080-text-on-path` UX notes §2, §4): the
 //! carrier line of a selected text (1 px solid `--member-box` over the guide dashes) and the
-//! hover outline of a carrier in pick mode (2 px `--hover-box` on its casing).
+//! hover outline of a carrier in pick mode (2 px `--hover-box` on its casing) and a carrier in
+//! the pick set (2 px `--accent` on its casing).
 
 use curvyo_document_core::{AnchorId, CarrierCurve, NewAnchor, ViewTransform};
 
@@ -48,6 +49,21 @@ pub fn build_carrier_lines(curves: &[&CarrierCurve], view: ViewTransform) -> Dra
 /// The hover outline of the carrier under the pointer in pick mode, on its white casing.
 #[must_use]
 pub fn build_carrier_hover(curve: &CarrierCurve, view: ViewTransform) -> DrawList {
+    outline_on_casing(curve, view, theme::HOVER_BOX)
+}
+
+/// A carrier in the pick set (slice 2, UX notes §9): 2 px `--accent`, the selected look, on its
+/// white casing.
+#[must_use]
+pub fn build_carrier_picked(curve: &CarrierCurve, view: ViewTransform) -> DrawList {
+    outline_on_casing(curve, view, theme::ACCENT)
+}
+
+fn outline_on_casing(
+    curve: &CarrierCurve,
+    view: ViewTransform,
+    color: crate::RgbaColor,
+) -> DrawList {
     let tolerance = theme::DISPLAY_TOLERANCE_PX / view.scale();
     let width = CARRIER_HOVER_PX / view.scale();
     let anchors = anchors(curve);
@@ -62,7 +78,7 @@ pub fn build_carrier_hover(curve: &CarrierCurve, view: ViewTransform) -> DrawLis
         &anchors,
         curve.closed,
         width,
-        theme::HOVER_BOX,
+        color,
         tolerance,
     ));
     list

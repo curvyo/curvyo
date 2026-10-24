@@ -69,7 +69,8 @@ impl Session {
     /// hover outline and preview of pick mode, the dragged text's preview.
     pub(super) fn text_path_draw_list(&self, view: ViewTransform) -> DrawList {
         let mut list = DrawList::default();
-        if let Some(pick) = self.text_path.pick {
+        if let Some(pick_text) = self.text_path.pick.as_ref().map(|pick| pick.text) {
+            list.extend(self.pick_set_list(view));
             if let Some(carrier) = self.text_path.hover
                 && let Some(curve) = self
                     .document_read()
@@ -79,7 +80,7 @@ impl Session {
                     .and_then(|o| curvyo_document_core::carrier_curve(o, carrier.outline))
             {
                 list.extend(curvyo_render_core::build_carrier_hover(&curve, view));
-                if let Some(mut text) = self.read_text(pick.text) {
+                if let Some(mut text) = self.read_text(pick_text) {
                     let values = self.put_values(&text, &curve);
                     text.on_path = Some(curvyo_document_core::TextOnPath {
                         carrier,

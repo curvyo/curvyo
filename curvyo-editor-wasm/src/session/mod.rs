@@ -104,6 +104,9 @@ mod style;
 mod style_view;
 mod text;
 mod text_bar;
+mod text_clones;
+#[cfg(test)]
+mod text_clones_tests;
 mod text_fonts;
 mod text_kerning;
 #[cfg(test)]
@@ -118,6 +121,7 @@ mod text_on_path_entry;
 mod text_on_path_handle_entry;
 mod text_on_path_options;
 mod text_on_path_pick;
+mod text_on_path_set;
 #[cfg(test)]
 mod text_on_path_tests;
 mod text_path;
