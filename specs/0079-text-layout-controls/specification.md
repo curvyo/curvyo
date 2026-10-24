@@ -147,7 +147,7 @@ None for the customer. Not put to the customer (Proposal, vetoable at the demo):
 
 ## UX notes
 
-(filled in by ux-engineer before Ready: icons of the Alignment, Writing mode and Glyph orientation groups, the signed fill bar of the value fields, the text layout block at the top of the Fonts tab (height per slice, rows of the font list left at 800 x 600, how it appears and goes, the design-system record of the exception), the fit of the Text bar.)
+See [`ux-notes.md`](ux-notes.md) (2026-10-24): slice 1 in full, slices 2 to 4 sketched; its §0 lists the proposed changes to the criteria.
 
 ## What the architect must decide (`adrs.md`)
 
