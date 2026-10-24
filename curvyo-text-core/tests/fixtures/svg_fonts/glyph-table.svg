@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!-- A single-line face for the glyph table (specs/0082-glyph-table criterion 7): one-scalar glyphs
+     (with and without glyph-name, one in the Private Use Area), a glyph with a multi-character
+     unicode, a glyph without unicode, a missing-glyph and an empty space glyph. -->
+<svg xmlns="http://www.w3.org/2000/svg">
+<defs>
+<font id="GlyphTable" horiz-adv-x="500">
+<font-face font-family="Glyph Table" units-per-em="1000" ascent="800" descent="200" cap-height="700"/>
+<missing-glyph horiz-adv-x="500" d="M 50 0 L 450 0 L 450 700 L 50 700 Z"/>
+<glyph unicode=" " glyph-name="space" horiz-adv-x="300"/>
+<glyph unicode="H" glyph-name="H" d="M 50 0 V 700 M 450 0 V 700 M 50 350 H 450"/>
+<glyph unicode="L" d="M 50 700 V 0 H 400"/>
+<glyph unicode="&#xE001;" glyph-name="swash.one" d="M 50 0 C 150 700 350 700 450 0"/>
+<glyph unicode="ff" glyph-name="f_f" d="M 50 0 V 700 M 250 0 V 700"/>
+<glyph glyph-name="alt.H" d="M 50 0 V 700 M 450 0 V 700"/>
+</font>
+</defs>
+</svg>
