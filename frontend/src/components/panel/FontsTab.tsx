@@ -5,6 +5,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { FontTagStrip } from "@/components/panel/FontTagStrip";
+import { TextLayoutBlock } from "@/components/panel/TextLayoutBlock";
+import type { TextLayoutApi } from "@/hooks/useTextLayout";
 import { FontTagLine } from "@/components/panel/FontTagLine";
 import {
   FAMILY_PX,
@@ -52,6 +54,8 @@ interface FontsTabProps {
   onShown: () => Promise<void>;
   /** The texts of the project using a Curvyo family (`0075` criterion 25). */
   textsUsingFamily: (family: string) => number;
+  /** The text layout block over the strip (`specs/0079-text-layout-controls` criterion 6). */
+  layout: TextLayoutApi;
 }
 
 /** The drop outline (UX notes §4): an overlay, so the strip, the search field and the pinned
@@ -59,7 +63,15 @@ interface FontsTabProps {
 const DROP_OUTLINE =
   "after:pointer-events-none after:absolute after:inset-0 after:z-20 after:rounded-[5px] after:border-2 after:border-dashed after:border-[var(--editor-accent)] after:content-['']";
 
-export function FontsTab({ data, onPick, onPickFamily, onReturnFocus, onShown, textsUsingFamily }: FontsTabProps) {
+export function FontsTab({
+  data,
+  onPick,
+  onPickFamily,
+  onReturnFocus,
+  onShown,
+  textsUsingFamily,
+  layout,
+}: FontsTabProps) {
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [collapsedCurrent, setCollapsedCurrent] = useState(false);
@@ -482,6 +494,9 @@ export function FontsTab({ data, onPick, onPickFamily, onReturnFocus, onShown, t
       <p role="status" aria-live="polite" className="sr-only">
         {arm.status}
       </p>
+      {layout.fields ? (
+        <TextLayoutBlock layout={layout} fields={layout.fields} onReturnFocus={onReturnFocus} />
+      ) : null}
       <div className="relative">
         <FontTagStrip
           tags={lib.tags}

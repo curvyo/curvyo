@@ -14,6 +14,15 @@ export const VALUE_FIELD_NAMES = {
   backgroundOpacity: "Background opacity",
 } as const;
 
+/** The four value fields of the text layout block (`specs/0079-text-layout-controls`
+ * criterion 7); their labels are the full names. */
+export const TEXT_LAYOUT_FIELD_NAMES = {
+  letterSpacing: "Letter spacing",
+  wordSpacing: "Word spacing",
+  lineSpacing: "Line spacing",
+  characterRotation: "Character rotation",
+} as const;
+
 /** The two ratio sliders (`RatioSlider`): the selected stars' and the tool setting for new ones. */
 export const RATIO_SLIDER_NAMES = {
   selectedStars: "Star inner ratio",
@@ -52,6 +61,7 @@ export function allSliderNames(): string[] {
   const kinds = Object.keys(COLOUR_SLIDER_KINDS) as Array<keyof typeof COLOUR_SLIDER_KINDS>;
   return [
     ...Object.values(VALUE_FIELD_NAMES),
+    ...Object.values(TEXT_LAYOUT_FIELD_NAMES),
     ...Object.values(RATIO_SLIDER_NAMES),
     ...paints.flatMap((paint) => kinds.map((kind) => colourSliderName(paint, kind))),
   ];

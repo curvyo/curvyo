@@ -1,15 +1,18 @@
 // The Text bar (`specs/0074-text-objects` criterion 11; UX notes §3): the Font button and the
-// Size field, then the Style group (`specs/0078-font-style-buttons`). In the Text tool it is the
+// Size field, then the Style group (`specs/0078-font-style-buttons`) and the Alignment group
+// (`specs/0079-text-layout-controls`). In the Text tool it is the
 // overlay row's bar; in the Select tool the same controls are the Select bar's Text and Style
 // groups.
 import { CaseSensitive, TriangleAlert } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+import { AlignmentGroup } from "@/components/AlignmentGroup";
 import { Divider, useRowStarts } from "@/components/SelectToolbar";
 import { StyleGroup } from "@/components/StyleGroup";
 import { Tooltip } from "@/components/ui/tooltip";
 import type { TextBarState } from "@/hooks/useText";
 import type { WeightCode } from "@/lib/styleText";
+import type { AlignCode } from "@/lib/textLayoutText";
 import { parseSize, sizeStep, sizeText } from "@/lib/textText";
 
 /** How long the clamp notice stays under the field (Action notice, status). */
@@ -159,12 +162,13 @@ interface TextBarProps extends TextControlsProps {
   editing: boolean;
   onPressWeight: (code: WeightCode) => string | null;
   onPressItalic: () => string | null;
+  onSetAlign: (align: AlignCode) => void;
 }
 
 /** The Text tool's bar in the overlay row: one pill with the Font button and the Size field,
  * then the Style group (`specs/0078-font-style-buttons`, UX notes §1); it wraps by whole groups
  * and draws no divider at the start of a row. */
-export function TextBar({ editing, onPressWeight, onPressItalic, ...props }: TextBarProps) {
+export function TextBar({ editing, onPressWeight, onPressItalic, onSetAlign, ...props }: TextBarProps) {
   const barRef = useRef<HTMLDivElement>(null);
   useRowStarts(barRef);
   return (
@@ -187,6 +191,10 @@ export function TextBar({ editing, onPressWeight, onPressItalic, ...props }: Tex
           onPressItalic={onPressItalic}
           onReturnFocus={props.onReturnFocus}
         />
+      </div>
+      <div className="group/row flex h-9 items-center gap-3">
+        <Divider />
+        <AlignmentGroup align={props.bar.align} onPress={onSetAlign} onReturnFocus={props.onReturnFocus} />
       </div>
     </div>
   );

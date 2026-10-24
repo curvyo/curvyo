@@ -24,6 +24,7 @@ import {
   parseStyle,
   styleNotice,
 } from "@/lib/styleText";
+import { type AlignCode, parseAlign } from "@/lib/textLayoutText";
 import { invoke, isTauri } from "@/platform/host";
 
 /** What the Text bar (Text tool) or the Select bar's Text group shows (criterion 11). */
@@ -46,6 +47,9 @@ export interface TextBarState {
   sample: string;
   /** The Style group's six buttons (`specs/0078-font-style-buttons`). */
   style: StyleState;
+  /** The pressed alignment, `null` when the subject texts differ
+   * (`specs/0079-text-layout-controls` criterion 1). */
+  align: AlignCode | null;
 }
 
 const EMPTY_BAR: TextBarState = {
@@ -58,6 +62,7 @@ const EMPTY_BAR: TextBarState = {
   sampleNode: "",
   sample: "",
   style: EMPTY_STYLE,
+  align: "left",
 };
 
 type ShowNotice = (
@@ -176,6 +181,8 @@ export interface TextApi {
   /** A weight or Italic press; returns the notice to show under the button, if any. */
   pressWeight: (code: WeightCode) => string | null;
   pressItalic: () => string | null;
+  /** A press in the Alignment group (`specs/0079-text-layout-controls` criterion 1). */
+  setAlign: (align: AlignCode) => void;
   /** A typed or stepped size; returns the notice to show under the field, if any. */
   setSize: (mm: number) => string | null;
   previewSize: (mm: number | null) => void;
@@ -329,6 +336,7 @@ export function useText(
       sampleNode: raw.sample_node,
       sample: raw.sample,
       style: parseStyle(raw.style_json),
+      align: parseAlign(raw.align),
     });
     raw.free();
     setFonts(tab);
@@ -673,6 +681,14 @@ export function useText(
     return styleNotice("italic", outcome);
   }, [getSession, syncFromSession]);
 
+  const setAlign = useCallback(
+    (align: AlignCode) => {
+      getSession()?.set_text_alignment(align);
+      syncFromSession();
+    },
+    [getSession, syncFromSession],
+  );
+
   const setSize = useCallback(
     (mm: number): string | null => {
       const outcome = getSession()?.set_text_size(mm) ?? "invalid";
@@ -734,6 +750,7 @@ export function useText(
     tileFace,
     pressWeight,
     pressItalic,
+    setAlign,
     setSize,
     previewSize,
     objectToPath,
