@@ -47,6 +47,7 @@ fn snapshot(string: &str, size: f64, layout: TextLayoutValues, placement: Affine
         },
         size: Length::from_mm(size),
         layout,
+        chars: curvyo_document_core::TextChars::default(),
         placement,
         style: Style::default(),
         outline: None,
@@ -58,6 +59,7 @@ fn subject(size: f64, values: TextLayoutValues) -> LayoutSubject {
         size_mm: size,
         values,
         natural_line_mm: size * 1.4,
+        kern: curvyo_document_core::CharValues::DEFAULT,
     }
 }
 
@@ -78,14 +80,22 @@ fn ac34_relative_values_times_size() {
         ..TextLayoutValues::DEFAULT
     };
     for (size, line) in [(10.0, 15.0), (20.0, 30.0)] {
-        let o = layout_options(Length::from_mm(size), &v);
+        let o = layout_options(
+            Length::from_mm(size),
+            &v,
+            &curvyo_document_core::TextChars::default(),
+        );
         assert!((o.letter_spacing.0 - 0.2 * size).abs() < 1e-9);
         assert!((o.word_spacing.0 + 0.1 * size).abs() < 1e-9);
         assert!((o.line_spacing.unwrap().0 - line).abs() < 1e-9);
         assert!((o.rotation_rad - 30f64.to_radians()).abs() < 1e-12);
         assert_eq!(o.align, curvyo_text_core::Align::Right);
     }
-    let auto = layout_options(Length::from_mm(10.0), &D);
+    let auto = layout_options(
+        Length::from_mm(10.0),
+        &D,
+        &curvyo_document_core::TextChars::default(),
+    );
     assert_eq!(auto, curvyo_text_core::LayoutOptions::default());
     // Criterion 10 end to end: two lines at 1.5 x Size are 15 then 30 mm apart.
     sans(|face| {

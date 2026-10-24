@@ -228,6 +228,7 @@ fn mm_options(t: &TextSnapshot) -> LayoutOptions {
             TextGlyphOrientation::Upright => GlyphOrientation::Upright,
             TextGlyphOrientation::Sideways => GlyphOrientation::Sideways,
         },
+        ..LayoutOptions::default()
     }
 }
 

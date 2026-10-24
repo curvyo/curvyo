@@ -1,6 +1,6 @@
 // The text layout block's state and commands (`specs/0079-text-layout-controls` criteria 6, 7,
-// 12 to 14): the four fields as the session shows them, their drag preview, arrow steps, reset
-// and typed values. Every rule is the session's; this forwards each control's command.
+// 12 to 14, 27c): the seven fields as the session shows them, their drag preview, arrow steps,
+// reset, "All characters" and typed values. Every rule is the session's; this forwards each control's command.
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { GridName } from "@/hooks/useStylePanel";
@@ -19,14 +19,18 @@ import {
 const NOTICE_MS = 3000;
 
 export interface TextLayoutApi {
-  /** The four fields, or `null` when the block is not shown. */
+  /** The seven fields, or `null` when the block is not shown. */
   fields: LayoutFieldState[] | null;
+  /** Edit mode is on: the kerning fields act on the characters at the caret. */
+  editing: boolean;
   /** The notice under a field after a typed value was held to a limit. */
   notice: { field: LayoutFieldCode; text: string } | null;
   preview: (field: LayoutFieldCode, p: number, grid: GridName) => void;
   step: (field: LayoutFieldCode, steps: number, grid: GridName) => void;
   settle: () => void;
   reset: (field: LayoutFieldCode) => void;
+  /** "All characters": the field's value on every character of the text (criterion 27c). */
+  applyToAll: (field: LayoutFieldCode) => void;
   /** A typed value: the shared entry field's answer. */
   submit: (field: LayoutFieldCode, text: string) => string;
 }
@@ -39,8 +43,14 @@ export function useTextLayout(
   const [local, setLocal] = useState(0);
   const [notice, setNotice] = useState<TextLayoutApi["notice"]>(null);
   const refresh = useCallback(() => setLocal((n) => n + 1), []);
-  const fields = useMemo(
-    () => parseLayoutBlock(getSession()?.text_layout_block_json() ?? "null"),
+  const [fields, editing] = useMemo(
+    () => {
+      const session = getSession();
+      return [
+        parseLayoutBlock(session?.text_layout_block_json() ?? "null"),
+        session?.text_editing() ?? false,
+      ] as const;
+    },
     // `syncRevision` and `local` say the session changed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [getSession, syncRevision, local],
@@ -84,12 +94,16 @@ export function useTextLayout(
 
   return {
     fields,
+    editing,
     notice,
     preview: (field, p, grid) => queue((s) => s.preview_text_layout(field, p, grid)),
     step: (field, steps, grid) => queue((s) => s.step_text_layout(field, steps, grid)),
     settle,
     reset: (field) => {
       act(field, (s) => s.reset_text_layout(field));
+    },
+    applyToAll: (field) => {
+      act(field, (s) => s.apply_text_layout_to_all(field));
     },
     submit: (field, text) => act(field, (s) => s.set_text_layout_text(field, text)),
   };

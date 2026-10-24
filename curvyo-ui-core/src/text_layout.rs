@@ -7,11 +7,11 @@
 
 use curvyo_document_core::{
     Affine, AnchorId, AnchorKind, FontKind, Length, NewAnchor, PathSnapshot, Point,
-    SubpathSnapshot, TextAlign, TextGlyphOrientation, TextLayoutValues, TextOutline, TextSnapshot,
-    TextWritingMode, Vec2,
+    SubpathSnapshot, TextAlign, TextChars, TextGlyphOrientation, TextLayoutValues, TextOutline,
+    TextSnapshot, TextWritingMode, Vec2,
 };
 use curvyo_text_core::{
-    Align, Face, GlyphOrientation, LayoutOptions, Mm, TextLayout, WritingMode, layout,
+    Align, CharOffset, Face, GlyphOrientation, LayoutOptions, Mm, TextLayout, WritingMode, layout,
 };
 use kurbo::{BezPath, PathEl, Shape};
 
@@ -19,12 +19,23 @@ use kurbo::{BezPath, PathEl, Shape};
 /// closes there.
 const SAME_POINT_MM: f64 = 1e-9;
 
-/// The engine's options for a text of `size` with the layout values `values`: every relative
-/// value times the size, in mm (`0079` decision 4).
+/// The engine's options for a text of `size` with the layout values `values` and the
+/// per-character values `chars`: every relative value times the size, in mm (`0079` decision 4,
+/// ADR 0021 §6).
 #[must_use]
-pub fn layout_options(size: Length, values: &TextLayoutValues) -> LayoutOptions {
+pub fn layout_options(size: Length, values: &TextLayoutValues, chars: &TextChars) -> LayoutOptions {
     let size = size.as_mm();
     LayoutOptions {
+        char_offsets: chars
+            .entries()
+            .iter()
+            .map(|(index, values)| CharOffset {
+                index: *index,
+                along: Mm(values.kern_x * size),
+                across: Mm(values.kern_y * size),
+                rotation_rad: values.rotation.to_radians(),
+            })
+            .collect(),
         align: match values.align {
             TextAlign::Left => Align::Left,
             TextAlign::Centre => Align::Centre,
@@ -56,7 +67,7 @@ pub fn text_layout(text: &TextSnapshot, face: &Face) -> Option<TextLayout> {
         face,
         &text.string,
         Mm(text.size.as_mm()),
-        &layout_options(text.size, &text.layout),
+        &layout_options(text.size, &text.layout, &text.chars),
     )
     .ok()
 }
@@ -135,9 +146,16 @@ pub fn lay_out(text: &TextSnapshot, face: &Face, substitute: bool) -> Option<Tex
         glyph_outlines.push(contours.len());
         outlines.extend(contours);
     }
-    let mut line_box = laid.line_box();
-    if laid.rotation_rad != 0.0 {
-        // Turned glyphs may stand out of the lines' box: the box covers them (`0079` criterion 15).
+    // The box of the letters as drawn, raised by their vertical kerns (`0079` criterion 26).
+    let mut line_box = crate::text_caret::letters_box(&laid);
+    let turned = laid.rotation_rad != 0.0
+        || laid
+            .lines
+            .iter()
+            .flat_map(|line| &line.glyphs)
+            .any(|glyph| glyph.rotation_rad != 0.0);
+    if turned {
+        // Turned glyphs may stand out of their boxes: the box covers them (`0079` criterion 15).
         line_box = paths
             .iter()
             .map(Shape::bounding_box)
@@ -274,6 +292,7 @@ mod tests {
             },
             size: Length::from_mm(10.0),
             layout,
+            chars: curvyo_document_core::TextChars::default(),
             placement: Affine::translation(Vec2::new(30.0, 40.0)),
             style: Style::default(),
             outline: None,

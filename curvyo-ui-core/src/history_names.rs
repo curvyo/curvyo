@@ -29,6 +29,10 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     ("change_character_rotation", "Change character rotation"),
     ("change_writing_mode", "Change writing mode"),
     ("change_glyph_orientation", "Change glyph orientation"),
+    ("change_kerning", "Change kerning"),
+    ("clear_kerning", "Clear kerning"),
+    ("change_char_rotation", "Change per-character rotation"),
+    ("clear_char_rotation", "Clear per-character rotation"),
     ("translate_objects", "Move"),
     ("duplicate_objects", "Duplicate"),
     // `specs/0042-history-branches` criteria 10 and 22; the row adds the version's id.

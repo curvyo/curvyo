@@ -81,7 +81,7 @@ fn ac33_the_next_text_takes_the_alignment() {
 fn ac06_ac12_drag_preview_commit_and_cancel() {
     let mut session = with_text("HH");
     let block = session.text_layout_block().unwrap();
-    assert_eq!(block.len(), 4);
+    assert_eq!(block.len(), 7);
     assert_eq!(block[0].text, "0");
     let steps = labels(&session).len();
     let drawn = |session: &Session| {

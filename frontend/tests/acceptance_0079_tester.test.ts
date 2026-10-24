@@ -64,7 +64,7 @@ test("criterion 1: one Tab stop on the pressed button, Align left when none; arr
 
 test("criterion 7: the four field labels in the block's order", () => {
   assert.deepEqual(
-    LAYOUT_FIELDS.map((f) => LAYOUT_FIELD_LABELS[f]),
+    LAYOUT_FIELDS.slice(0, 4).map((f) => LAYOUT_FIELD_LABELS[f]),
     ["Letter spacing", "Word spacing", "Line spacing", "Character rotation"],
   );
 });
@@ -113,6 +113,9 @@ test("criterion 6: the block JSON is four fields or no block; garbage is no bloc
   assert.equal(parseLayoutBlock("[]"), null);
   assert.equal(parseLayoutBlock("{"), null);
   assert.equal(parseLayoutBlock(JSON.stringify([state({}), state({})])), null);
-  assert.equal(parseLayoutBlock(JSON.stringify(LAYOUT_FIELDS.map(() => state({}))))?.length, 4);
+  assert.equal(
+    parseLayoutBlock(JSON.stringify(LAYOUT_FIELDS.map(() => state({}))))?.length,
+    LAYOUT_FIELDS.length,
+  );
   assert.deepEqual(parseLayoutOutcome("not json"), { kind: "unchanged" });
 });

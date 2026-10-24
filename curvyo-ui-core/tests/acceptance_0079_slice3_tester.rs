@@ -97,7 +97,7 @@ fn ac24_text_edit_keys_in_a_column() {
         )
         .unwrap();
     let snap = d.text(id).unwrap();
-    let opts = layout_options(snap.size, &snap.layout);
+    let opts = layout_options(snap.size, &snap.layout, &snap.chars);
     assert_eq!(opts.writing_mode, WritingMode::VerticalRl);
     assert_eq!(opts.orientation, GlyphOrientation::Sideways);
     let l = layout(face, &snap.string, Mm(10.0), &opts).unwrap();

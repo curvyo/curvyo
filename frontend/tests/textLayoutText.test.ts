@@ -7,15 +7,21 @@ import { test } from "node:test";
 import {
   ALIGN_CODES,
   ALIGN_NAMES,
+  APPLY_TO_ALL_NAME,
+  LAYOUT_FIELDS,
   LAYOUT_FIELD_LABELS,
   type LayoutFieldState,
   alignFocusMove,
   alignTabStop,
   alignTooltipLine,
+  appliesToAll,
   entryAnswer,
+  kernKey,
   layoutDefaultText,
+  layoutResetLabel,
   layoutNotice,
   layoutTipValue,
+  layoutUnit,
   layoutValueText,
   parseAlign,
   parseLayoutBlock,
@@ -65,6 +71,9 @@ test("criterion 7: the field names, the defaults and the readouts", () => {
     "Word spacing",
     "Line spacing",
     "Character rotation",
+    "Horizontal kerning",
+    "Vertical kerning",
+    "Per-character rotation",
   ]);
   assert.equal(layoutDefaultText("line-spacing"), "Auto");
   assert.equal(layoutDefaultText("character-rotation"), "0°");
@@ -105,9 +114,44 @@ test("criterion 7 and UX notes §0.4: the notices fit 70 characters", () => {
   assert.equal(entryAnswer({ kind: "max", mm: 40 }), "committed");
 });
 
-test("criterion 6: the block is there only with four fields", () => {
+test("criteria 6, 26 and 27b: the block is there only with seven fields", () => {
   assert.equal(parseLayoutBlock("null"), null);
   assert.equal(parseLayoutBlock("not json"), null);
-  const four = JSON.stringify([field({}), field({}), field({}), field({})]);
-  assert.equal(parseLayoutBlock(four)?.length, 4);
+  const six = JSON.stringify(Array.from({ length: 6 }, () => field({})));
+  assert.equal(parseLayoutBlock(six), null);
+  const seven = JSON.stringify(Array.from({ length: 7 }, () => field({})));
+  assert.equal(parseLayoutBlock(seven)?.length, 7);
+});
+
+test("criteria 27b and 27c: Per-character rotation in degrees with its own reset; All characters on the three", () => {
+  assert.equal(LAYOUT_FIELD_LABELS["char-rotation"], "Per-character rotation");
+  assert.equal(layoutUnit("char-rotation"), "°");
+  assert.equal(layoutTipValue("char-rotation", field({ text: "30" })), "30°");
+  assert.equal(layoutResetLabel("char-rotation", false), "Clear per-character rotation");
+  assert.equal(layoutResetLabel("char-rotation", true), undefined);
+  assert.equal(
+    layoutNotice("char-rotation", { kind: "max", mm: 180 }),
+    "Per-character rotation set to 180°, the largest for this size.",
+  );
+  assert.deepEqual(
+    LAYOUT_FIELDS.filter(appliesToAll),
+    ["horizontal-kerning", "vertical-kerning", "char-rotation"],
+  );
+  assert.equal(APPLY_TO_ALL_NAME, "Apply to all characters");
+});
+
+test("criterion 29: Alt+arrows kern, Shift for 1 mm; other keys do not", () => {
+  assert.deepEqual(kernKey("ArrowLeft", true, false, false), [-1, 0, false]);
+  assert.deepEqual(kernKey("ArrowUp", true, true, false), [0, 1, true]);
+  assert.deepEqual(kernKey("ArrowDown", true, false, false), [0, -1, false]);
+  assert.equal(kernKey("ArrowLeft", false, false, false), null);
+  assert.equal(kernKey("ArrowLeft", true, false, true), null);
+  assert.equal(kernKey("Home", true, false, false), null);
+});
+
+test("criterion 28: outside edit mode a kerning reset is named Clear kerning", () => {
+  assert.equal(layoutResetLabel("horizontal-kerning", false), "Clear kerning");
+  assert.equal(layoutResetLabel("vertical-kerning", false), "Clear kerning");
+  assert.equal(layoutResetLabel("horizontal-kerning", true), undefined);
+  assert.equal(layoutResetLabel("letter-spacing", false), undefined);
 });

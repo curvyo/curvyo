@@ -188,6 +188,14 @@ impl WasmSession {
         }
     }
 
+    /// Alt+arrows in edit mode (`specs/0079-text-layout-controls` criterion 29): `right` −1 or 1
+    /// (Left, Right), `up` 1 or −1 (Up, Down), `coarse` with Shift; the session maps them to the
+    /// kerns by the writing mode. Returns the readout ("Kern +0.3, 0.0 mm"), empty when nothing
+    /// changed.
+    pub fn text_kern(&mut self, right: i32, up: i32, coarse: bool) -> String {
+        self.session.text_kern(right, up, coarse)
+    }
+
     /// Ctrl+A in edit mode.
     pub fn text_select_all(&mut self) {
         self.session.text_input(TextInput::SelectAll);

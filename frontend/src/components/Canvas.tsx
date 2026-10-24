@@ -202,6 +202,10 @@ export function Canvas({ editor }: CanvasProps) {
       />
       <KeyHintChip hint={editor.keyHint} containerRef={editor.containerRef} />
       <NudgeReadout feedback={editor.nudgeFeedback} containerRef={editor.containerRef} />
+      <NudgeReadout
+        feedback={{ readout: editor.text.kernReadout, announcement: editor.text.kernReadout?.text ?? "" }}
+        containerRef={editor.containerRef}
+      />
       <SelectionAnnouncer
         text={editor.selectionAnnouncement}
         seq={editor.selectionAnnouncementSeq}

@@ -105,6 +105,9 @@ mod style_view;
 mod text;
 mod text_bar;
 mod text_fonts;
+mod text_kerning;
+#[cfg(test)]
+mod text_kerning_tests;
 mod text_layout;
 #[cfg(test)]
 mod text_layout_tests;
