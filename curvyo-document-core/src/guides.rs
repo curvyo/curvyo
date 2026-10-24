@@ -41,10 +41,15 @@ impl GuideMarking {
     }
 }
 
-/// Whether the leaf `id` can carry the flag: a path or a shape, not a linked clone (a clone reads
-/// its root's flag, ADR 0019 §2).
+/// Whether the leaf `id` can carry the flag: a path or a shape; a linked clone only when it
+/// carries its own flag already (ADR 0022 §2: putting a text on a clone marks the clone alone),
+/// so Guide off turns that clone back into artwork while Guide on still skips clones (they read
+/// their root's flag, ADR 0019 §2).
 fn is_markable(tree: &LoroTree, id: TreeID) -> bool {
-    !is_group_node(tree, id) && tree.get_meta(id).is_ok_and(|meta| !is_clone_meta(&meta))
+    !is_group_node(tree, id)
+        && tree
+            .get_meta(id)
+            .is_ok_and(|meta| !is_clone_meta(&meta) || read_registers(&meta).guide)
 }
 
 impl Document {
@@ -124,14 +129,17 @@ impl Document {
 }
 
 /// Whether the leaf `object` is a guide, given which nodes carry their own flag (`own`): a path's
-/// or shape's own register, a linked clone's root's (ADR 0019 §2, criterion 34). The one place
-/// of the clone rule, for the current read and for a version's.
+/// or shape's own register; a linked clone's own or its root's (ADR 0019 §2 as extended by ADR
+/// 0022 §2, criterion 34). The one place of the clone rule, for the current read and for a
+/// version's.
 pub(crate) fn effective_guide(
     object: &crate::primitive_model::ObjectSnapshot,
     own: impl Fn(NodeId) -> bool,
 ) -> bool {
     match object {
-        crate::primitive_model::ObjectSnapshot::Clone(clone) => own(clone.chain.root),
+        crate::primitive_model::ObjectSnapshot::Clone(clone) => {
+            own(clone.id()) || own(clone.chain.root)
+        }
         crate::primitive_model::ObjectSnapshot::Path(_)
         | crate::primitive_model::ObjectSnapshot::Primitive(_)
         | crate::primitive_model::ObjectSnapshot::Text(_) => own(object.id()),

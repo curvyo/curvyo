@@ -521,8 +521,10 @@ pub(crate) fn object_in(tree: &loro::LoroTree, id: NodeId) -> Option<ObjectSnaps
         return crate::object_read::read_one_clone(tree, id).map(ObjectSnapshot::Clone);
     }
     if crate::text_codec::is_text_meta(&meta) {
-        return crate::text_codec::read_text_snapshot(id, &meta)
-            .map(|text| ObjectSnapshot::Text(Box::new(text)));
+        return crate::text_codec::read_text_snapshot(id, &meta).map(|mut text| {
+            crate::text_carrier::resolve_one(tree, &mut text);
+            ObjectSnapshot::Text(Box::new(text))
+        });
     }
     match shape_codec::read_shape_tag(&meta) {
         Some(shape) => Some(ObjectSnapshot::Primitive(

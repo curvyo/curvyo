@@ -232,7 +232,7 @@ fn c31_two_peers_kern_different_characters_and_both_survive() {
 /// mark.
 #[test]
 fn c37_format_21_golden_file_and_older_files() {
-    assert_eq!(CURRENT_FORMAT_VERSION, 21);
+    const _: () = assert!(CURRENT_FORMAT_VERSION >= 21);
     let golden = unpack(3, &fixture("text_layout_v21.curvyo")).unwrap();
     let kerned: Vec<_> = golden
         .object_ids()

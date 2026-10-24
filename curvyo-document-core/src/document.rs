@@ -232,7 +232,15 @@ pub struct DocumentVersion(pub(crate) loro::Frontiers);
 /// word, so it must refuse every file of this build as too new. Migration from version 20 is none:
 /// a string without marks reads as before. The number is provisional by the rule above. Golden:
 /// `text_layout_v21.curvyo`.
-pub const CURRENT_FORMAT_VERSION: u32 = 21;
+///
+/// Bumped to 22 in `text-on-path` (ADR 0022 §1 and §2): a text may carry the optional keys
+/// `text_carrier`, `text_path_position`, `text_path_side`, `text_path_line`, `text_path_distance`,
+/// `text_path_mirror` and `text_carrier_kept` (`crate::text_path_codec`), and a linked clone may
+/// carry its own `guide` flag. A build that stops at version 21 ignores them and would draw every
+/// text on path as a straight text and a guide clone as artwork (a cut) without a word, so it must
+/// refuse every file of this build as too new. Migration from version 21 is none: absent keys are
+/// a straight text. The number is provisional by the rule above. Golden: `text_on_path_v22.curvyo`.
+pub const CURRENT_FORMAT_VERSION: u32 = 22;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";
@@ -279,6 +287,9 @@ pub struct Document {
     /// What the clone repair of the last removing command did (`crate::clone_repair`); view
     /// state for its notice, never stored.
     pub(crate) clone_repair: std::cell::Cell<crate::clone_repair::CloneRepair>,
+    /// How many texts kept their removed carrier's outline since the host last asked
+    /// (`crate::text_carrier`); view state, not stored.
+    pub(crate) kept_carriers: std::cell::Cell<usize>,
     /// What the held-back rule of the last transform did (`crate::clone_hold`); view state.
     pub(crate) clone_hold: std::cell::Cell<crate::clone_hold::CloneHold>,
     /// The next counter of the anchor ids the clone repair takes (`crate::clone_repair`).
@@ -338,6 +349,7 @@ impl Document {
             draw_parent: std::cell::Cell::default(),
             initial_layer: std::cell::Cell::default(),
             clone_repair: std::cell::Cell::default(),
+            kept_carriers: std::cell::Cell::default(),
             clone_hold: std::cell::Cell::default(),
             repair_ids: std::cell::Cell::default(),
             clone_refusal: std::cell::Cell::default(),
@@ -394,6 +406,7 @@ impl Document {
             draw_parent: std::cell::Cell::default(),
             initial_layer: std::cell::Cell::default(),
             clone_repair: std::cell::Cell::default(),
+            kept_carriers: std::cell::Cell::default(),
             clone_hold: std::cell::Cell::default(),
             repair_ids: std::cell::Cell::default(),
             clone_refusal: std::cell::Cell::default(),

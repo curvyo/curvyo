@@ -188,6 +188,7 @@ impl Document {
             placement,
             style: Style::default(),
             outline: None,
+            on_path: None,
         });
         if font.kind == FontKind::SingleLine
             && let Ok(meta) = self.text_meta(id)
@@ -220,7 +221,9 @@ impl Document {
     #[must_use]
     pub fn text(&self, id: NodeId) -> Option<TextSnapshot> {
         let meta = self.text_meta(id).ok()?;
-        text_codec::read_text_snapshot(id, &meta)
+        let mut text = text_codec::read_text_snapshot(id, &meta)?;
+        crate::text_carrier::resolve_one(&self.loro().get_tree(OBJECTS_TREE), &mut text);
+        Some(text)
     }
 
     /// Replaces the string of text `id` by `string` as the difference of the two (common start
@@ -379,7 +382,7 @@ impl Document {
         ids.iter().map(|id| self.text_meta(*id)).collect()
     }
 
-    fn text_meta(&self, id: NodeId) -> Result<LoroMap, TextEditError> {
+    pub(crate) fn text_meta(&self, id: NodeId) -> Result<LoroMap, TextEditError> {
         let tree = self.loro().get_tree(OBJECTS_TREE);
         let tree_id = TreeID::new(id.peer, id.counter);
         if !leaf_exists(&tree, tree_id) {

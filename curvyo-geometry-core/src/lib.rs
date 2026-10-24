@@ -34,6 +34,7 @@ mod offset_polyline;
 mod offset_rebuild;
 mod outline_nesting;
 mod outline_touch;
+mod path_measure;
 mod region_contact;
 mod segment;
 mod stack_regions;
@@ -53,6 +54,7 @@ pub use offset::{
 pub use offset_pieces::miter_within_limit;
 pub use outline_nesting::{Nesting, outline_area_mm2, outline_has_area, outline_nesting};
 pub use outline_touch::{TOUCH_DISTANCE_MM, touching_outlines};
+pub use path_measure::{PathMeasure, PathSample};
 pub use segment::{
     BentHandles, Subdivision, bend_segment_handles, nearest_point_on_segment, segment_bounds,
     subdivide_at_parameter,

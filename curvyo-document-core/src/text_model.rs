@@ -263,6 +263,11 @@ pub struct TextSnapshot {
     /// layout in the file), and mapped with the text by [`TextSnapshot::mapped_by`].
     #[serde(skip)]
     pub outline: Option<std::sync::Arc<TextOutline>>,
+    /// The carrier this text is put on and its values there (`specs/0080-text-on-path`, ADR
+    /// 0022 §1); `None` for a straight text. While it is set, `placement` holds the straight
+    /// placement from before and is not what draws the text.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub on_path: Option<crate::text_path_model::TextOnPath>,
 }
 
 /// A text as laid out, in document mm.
@@ -276,6 +281,10 @@ pub struct TextOutline {
     /// How many outlines of `glyphs` each drawn glyph has, in drawing order: Object to path
     /// writes one compound path per glyph (criterion 22).
     pub glyph_outlines: Vec<usize>,
+    /// Each letter's advance by ascender to descender, turned with the letter, for a text on
+    /// path (`specs/0080-text-on-path` criterion 28): it is hit on these; empty for a straight
+    /// text.
+    pub letter_boxes: Vec<[Point; 4]>,
     /// Whether the glyphs are those of the included sans face standing in for a missing face
     /// (ADR 0020 §1, matching step c): drawn and hit, never cut or converted (criterion 29).
     pub substitute: bool,
@@ -289,6 +298,11 @@ impl TextOutline {
             glyphs: self.glyphs.mapped(map),
             line_box: self.line_box.map(|corner| map.apply_point(corner)),
             glyph_outlines: self.glyph_outlines.clone(),
+            letter_boxes: self
+                .letter_boxes
+                .iter()
+                .map(|corners| corners.map(|corner| map.apply_point(corner)))
+                .collect(),
             substitute: self.substitute,
         }
     }
@@ -404,6 +418,7 @@ mod tests {
             placement,
             style: Style::default(),
             outline: None,
+            on_path: None,
         }
     }
 

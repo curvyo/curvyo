@@ -90,6 +90,9 @@ pub(crate) fn write_text(meta: &LoroMap, text: &TextSnapshot) {
     write_size(meta, text.size);
     write_placement(meta, text.placement);
     write_layout(meta, &text.layout);
+    if let Some(on_path) = &text.on_path {
+        crate::text_path_codec::write_on_path(meta, on_path);
+    }
 }
 
 fn align_code(align: TextAlign) -> Option<&'static str> {
@@ -344,6 +347,7 @@ pub(crate) fn read_text_snapshot(id: NodeId, meta: &LoroMap) -> Option<TextSnaps
         placement: read_placement(meta)?,
         style: crate::style_codec::read_style(meta),
         outline: None,
+        on_path: crate::text_path_codec::read_on_path(meta),
     })
 }
 
@@ -400,6 +404,7 @@ mod tests {
             placement: Affine::new(0.0, 1.0, -1.0, 0.0, 3.0, 4.0),
             style: Style::default(),
             outline: None,
+            on_path: None,
         }
     }
 
