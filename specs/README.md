@@ -1,7 +1,7 @@
 # Feature specs
 
 The list of all features comes first, then the convention for writing them.
-State of this list: 2026-10-23, synced with the merged pull requests up to #178
+State of this list: 2026-10-24, synced with the merged pull requests up to #180
 (the last story merged is #178, font style buttons). The customer
 renumbered every folder on 2026-10-09, see "Numbering" below.
 
@@ -98,6 +98,7 @@ Their order, dependencies and conflicts are in "Proposed build order" below.
 |---|---|---|---|---|---|---|
 | [0032](0032-pen-tablet-input/) | `pen-tablet-input` | A minimal Pencil (freehand) tool, and pen pressure from a drawing tablet, read through browser Pointer Events in the webview, that sets the width of Pencil strokes; the result is an ordinary outline; a mouse or a pen without pressure draws a plain path. Promoted by the customer on 2026-10-10 (was a Could draft). Device and OS questions are confirmed at the demo. | Ready, on hold (PR #116 closed unmerged) | Should | R-INP-001 | - |
 | [0055](0055-compound-path-node-editing/) | `compound-path-node-editing` | The Node tool edits every compound path: nodes selected across outlines and objects, move, kind conversion, segment bending, insert and delete (an outline left with one node is removed, a compound path left with one outline becomes an ordinary path); Join of open outline ends within one object or across objects (the other object's outlines move in, with a notice); Split at a node opens or splits an outline in the same object; Close path closes selected open outlines; the Pen continues and connects open outline ends. No format change. Customer decision 7 of 2026-10-12 on `0054`, split out by the lead the same day. | Ready (2026-10-12: `adrs.md` and UX notes done; the product owner's rules are vetoable; builds right after 0054) | Should | R-EDIT-023, R-EDIT-001 | - |
+| [0081](0081-inline-delete-confirm/) | `inline-delete-confirm` | A trash can on every Curvyo font row and on own tag cells that arms on the first press (soft red row, filled trash) and removes on a second press after 400 ms; disarms after 4 s, on Escape, a press elsewhere or a list change; Delete arms and Delete or Enter removes. Replaces the Remove row and the Inline confirm of `0075` for these two uses; frontend only, no format change. Customer request of 2026-10-23. First in the customer's build order of 2026-10-23. | Ready (2026-10-23; `adrs.md` and UX notes done) | Should | R-FONT-006, R-FONT-002 | - |
 
 ### Specified but not built
 
@@ -131,6 +132,10 @@ own entry when the customer schedules it.
 | [0070](0070-measure-and-dimension/) | `measure-and-dimension` | A Measure tool and dimensions (linear, aligned, angle, radius, diameter) as thin solid green guide objects (guides stay dashed; decided 2026-10-17) that are not output and convert back to paths; the base of driving dimensions in `0066`. Customer request of 2026-10-17. | Draft (sketch, 2026-10-17) | Should | R-EDIT-045 | - |
 | [0071](0071-pattern-fill/) | `pattern-fill` | Fill a closed shape with generated vector patterns (hatch, grid, dots, honeycomb, motif) as real geometry; Hatch, Grid and Dots are core, further generators extensions (decided 2026-10-17). Customer request of 2026-10-17. | Draft (sketch, 2026-10-17) | Could | R-EDIT-046 | - |
 | [0073](0073-parameter-handle-clone/) | `parameter-handle-clone` | Ctrl on a parameter handle (Curve, inner radius, Start, End, corner radius, sides) or an "As copy" check in its entry box makes an ordinary copy at the same place with the new value instead of changing the shape. Customer request of 2026-10-19. | Draft (sketch, 2026-10-19) | Should | R-EDIT-004 | - |
+| [0079](0079-text-layout-controls/) | `text-layout-controls` | Four slices for texts: (1) alignment left, centre, right, justify, letter, word and line spacing in mm that follows the size, character rotation about each letter's middle; (2) a taper of live letters for lettering on a ring; (3) vertical writing modes and glyph orientation; (4) per-character horizontal and vertical kerning. Sliders in the properties panel, buttons in the Text bar. Customer request of 2026-10-23. | Draft (customer questions decided 2026-10-23; `adrs.md` and UX notes next) | Should | R-EDIT-048, R-FONT-011 (to be added) | - |
+| [0080](0080-text-on-path/) | `text-on-path` | An On path button for texts: put a text on any path, compound outline, rectangle, ellipse or arc, polygon or star (primitives stay primitives, the carrier becomes a guide); Side, Line (baseline or top of the H), a position handle on the carrier, rotation on a circle, Mirror, Release from path; the text stays editable text until Object to path and keeps the outline of a deleted carrier. Slice 2: one text on several shapes as linked text clones. `format_version` bump. Customer request of 2026-10-23. | Draft (customer questions decided 2026-10-23; `adrs.md` and UX notes next) | Should | R-EDIT-048, R-EDIT-004, R-FONT-009 | - |
+| [0082](0082-glyph-table/) | `glyph-table` | A glyph table in the preview pane of `0077`: every character the text's font really has, a click inserts it at the caret; ornaments and special characters of script fonts without the OS character map. Customer accepted 2026-10-23 (`0077` Frage 25 B). | Draft (2026-10-23; Frage 39 and 40 open with defaults) | Should | R-FONT-007, R-FONT-002 | - |
+| [0083](0083-font-info-and-zip/) | `font-info-and-zip` | A font info view (licence, file, format, version, designer, embedding permission) and Add font of a .zip archive, keeping the licence and readme that came with it. Customer request of 2026-10-23 (`0077` Frage 25 C). | Draft (2026-10-23; Frage 41 open with a default) | Should | R-FONT-008, R-FONT-006 | - |
 ### MVP slices not yet specified (no folder, number reserved)
 
 | No. | Slug | What it delivers | Status | Priority | Requirements | MVP slice |
@@ -146,9 +151,28 @@ deferred past the laser MVP on 2026-10-02 (multi-OS parity and sync, fonts,
 asset management, collaboration, the asset connector, plugins, other machine
 families). They are tracked in `docs/requirements.md` ("MVP (confirmed)" and
 "Explicitly deferred past MVP") and get a number here once the customer
-prioritises them. The next free number is 0079 (0078 is `font-style-buttons`; 0077 is `font-preview`, stage 3 of `0062`; 0076 is `single-line-fonts`; 0075 is `font-library`; 0074 is `text-objects`; 0073 is `parameter-handle-clone`; 0072 is `pen-angle-snap-and-typed-values`; 0066 to 0071 are the drafts of 2026-10-17: `constraint-sketcher`, `clipping`, `laserable-lettering`, `tiling`, `measure-and-dimension`, `pattern-fill`; 0059 to 0065 are the drafts of 2026-10-17: `multiple-pages`, `snapping`, `align-and-distribute`, `fonts`, `manufacturing-workbenches`, `machine-connector`, `extensions-sdk`; guides are not a spec of their own, they are folded into the rework of `0046` and snapped to by `0060`; 0058 is `bitmap-import`; 0057 is `clone-overrides`; 0056 is `mirror-and-negative-scale`; 0055 is `compound-path-node-editing`; 0054 is `combine-open-paths`; 0047 is `transform-polish`; 0048 is `split-compound-path`; 0049 is `linked-clone`; 0050 is `layers-and-objects-panel`; 0051 is `sidebar-and-no-menu`; 0052 is `click-to-create-shapes`; 0053 is `node-marquee-selection`).
+prioritises them. The next free number is 0084 (0083 is `font-info-and-zip`; 0082 is `glyph-table`; 0081 is `inline-delete-confirm`; 0080 is `text-on-path`; 0079 is `text-layout-controls`; 0078 is `font-style-buttons`; 0077 is `font-preview`, stage 3 of `0062`; 0076 is `single-line-fonts`; 0075 is `font-library`; 0074 is `text-objects`; 0073 is `parameter-handle-clone`; 0072 is `pen-angle-snap-and-typed-values`; 0066 to 0071 are the drafts of 2026-10-17: `constraint-sketcher`, `clipping`, `laserable-lettering`, `tiling`, `measure-and-dimension`, `pattern-fill`; 0059 to 0065 are the drafts of 2026-10-17: `multiple-pages`, `snapping`, `align-and-distribute`, `fonts`, `manufacturing-workbenches`, `machine-connector`, `extensions-sdk`; guides are not a spec of their own, they are folded into the rework of `0046` and snapped to by `0060`; 0058 is `bitmap-import`; 0057 is `clone-overrides`; 0056 is `mirror-and-negative-scale`; 0055 is `compound-path-node-editing`; 0054 is `combine-open-paths`; 0047 is `transform-polish`; 0048 is `split-compound-path`; 0049 is `linked-clone`; 0050 is `layers-and-objects-panel`; 0051 is `sidebar-and-no-menu`; 0052 is `click-to-create-shapes`; 0053 is `node-marquee-selection`).
 
-## Proposed build order (product owner, updated 2026-10-12; built slices removed 2026-10-20)
+## Proposed build order (product owner, updated 2026-10-12; built slices removed 2026-10-20; text and font order of 2026-10-23)
+
+**Customer build order of 2026-10-23 (text and fonts; this order wins over the waves below for these specs):**
+
+1. 0081 `inline-delete-confirm`
+2. 0079 slice 1 (alignment, spacing, rotation)
+3. 0082 `glyph-table`
+4. 0079 slice 3 (vertical writing modes, glyph orientation)
+5. 0079 slice 4 (per-character kerning)
+6. 0080 slice 1 (`text-on-path`, one text on one carrier)
+7. 0080 slice 2 (`text-on-several-paths`, linked text clones)
+8. 0079 slice 2 (taper)
+9. 0083 `font-info-and-zip`
+
+Because 0079 slices 3 and 4 come before 0080, the text-on-path spec carries criteria for vertical text and per-character kerning on a path (its criteria 47 and 48, Proposal).
+
+**Backlog notes (customer, 2026-10-23), no folder yet:**
+
+- OTF/TTF stick fonts (single-line fonts in OpenType or TrueType files, beside the SVG fonts of `0076`): parked for refinement.
+- Stroke to path (turn a stroke into a filled outline): later, independent of fonts.
 
 For the specs that are not built yet. The lead decides; this is my reading of dependencies and of which slices can run side by side (at most two implementers, `CLAUDE.md` §4). Almost every slice touches `curvyo-editor-wasm` and `frontend`, so "same crate" cannot be the test; the table names the files and modules that actually collide. Everything in "Needs first" that is already merged is left out.
 

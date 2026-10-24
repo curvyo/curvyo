@@ -1,6 +1,6 @@
 # Single-line fonts: engrave and plot lettering as one line per stroke
 
-Status: Done (PR #171, merged 2026-10-23; Ready 2026-10-20; customer questions 17 to 21 decided 2026-10-20, Frage 23 SL-BACK open with default A, see "Open questions")
+Status: Done (PR #171, merged 2026-10-23; Ready 2026-10-20; customer questions 17 to 21 decided 2026-10-20, Frage 23 SL-BACK decided A 2026-10-23)
 Priority: Should (R-FONT-002 names "single-line" first among the manufacturing groups; R-MFG-CUT-001 and engraving need it; not in the laser MVP)
 Origin: Customer. A story of the fonts epic `0062` (named out of scope in `0074` and `0075` as "a later story"; ADR 0002 §7 and ADR 0020 "Consequences" keep the model open for it). Items marked **(Proposal)** are the product owner's and are vetoable at the demo.
 Depends on: `0074-text-objects` (text node, Text tool, Fonts tab, Object to path, missing-font rule), `0075-font-library` (tags, Add font, Remove, the Curvyo folder in the browser), `0054-combine-open-paths` (open outlines in a compound path, stroke and fill of open outlines), `0068` Weld v2 (PR #169, merged 2026-10-23, open operands closed by a straight line, its criterion 13).
@@ -119,9 +119,13 @@ In [`ux-notes.md`](ux-notes.md) (ux-engineer, 2026-10-20): the Single line cell 
 - Frage 20 SL-WASM: raise the text-engine wasm budget. Even 2 MiB is acceptable for now; record it in `docs/technical-debt.md`. The new budget is 2 MiB.
 - Frage 21 SL-KIND: **A**. The project file stores `text_font.kind = "single_line"` (format version bump); a missing single-line font keeps drawing as a line (fallback EMS Readability, marked missing).
 
-## Open questions (customer; each has a default)
+## Decided by the customer 2026-10-23
 
-Frage 17 to 21 are decided (above). Open: **Frage 23 (SL-BACK)**, the stroke after switching back to an outline font (`ux-notes.md` §3). Default A, built: the stroke stays as it is (criterion 10 as written).
+- Frage 23 SL-BACK: **A**. After switching a text back from a single-line font to an outline font, the stroke stays as it is (criterion 10 as written; `ux-notes.md` §3). This is what was built in PR #171; nothing changes.
+
+## Open questions
+
+None. Frage 17 to 21 and 23 are decided (above).
 
 Not put to the customer (safe default, vetoable at the demo): criterion 9 (stroke switched on at 0.25 mm in the fill colour), criterion 19 (area commands refused on a single-line text), criterion 22 (EMS Readability as the fallback).
 
