@@ -1,6 +1,8 @@
 //! Shared helpers of the text-core tests: the included fonts as fixtures.
 #![allow(clippy::unwrap_used, dead_code)]
 
+pub mod sfnt;
+
 use std::path::PathBuf;
 
 use curvyo_text_core::{Face, FaceKey, FaceStore};

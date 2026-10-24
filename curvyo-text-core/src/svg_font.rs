@@ -36,6 +36,8 @@ pub(crate) struct SvgFont {
     pub(crate) cap_height: Option<f64>,
     /// Advance (font units) and outline (em, y down) per glyph.
     pub(crate) glyphs: Vec<(f64, Arc<GlyphOutline>)>,
+    /// The first `glyph-name` of each glyph, by glyph id.
+    names: Vec<Option<Box<str>>>,
     by_char: BTreeMap<char, u32>,
     kerning: BTreeMap<(u32, u32), f64>,
 }
@@ -44,6 +46,18 @@ impl SvgFont {
     /// The glyph of `c`, or 0 (`<missing-glyph>`).
     pub(crate) fn glyph_of(&self, c: char) -> u32 {
         self.by_char.get(&c).copied().unwrap_or(0)
+    }
+
+    /// The characters with a glyph of their own (a `unicode` of one scalar), in code point order.
+    pub(crate) fn chars(&self) -> impl Iterator<Item = char> + '_ {
+        self.by_char.keys().copied()
+    }
+
+    /// The first `glyph-name` of glyph `glyph`.
+    pub(crate) fn glyph_name(&self, glyph: u32) -> Option<&str> {
+        self.names
+            .get(usize::try_from(glyph).ok()?)
+            .and_then(Option::as_deref)
     }
 
     /// The kerning between `first` and `second` in font units (subtracted from the advance).
@@ -312,6 +326,7 @@ fn read_font(font: Node<'_, '_>) -> Option<SvgFont> {
         Some(node) => outline_of(node)?,
         None => (default_advance, Arc::new(GlyphOutline::default())),
     }];
+    let mut names = vec![None];
     let mut by_char = BTreeMap::new();
     let mut by_name: BTreeMap<&str, Vec<u32>> = BTreeMap::new();
     for node in font.children().filter(|n| n.tag_name().name() == "glyph") {
@@ -324,6 +339,10 @@ fn read_font(font: Node<'_, '_>) -> Option<SvgFont> {
         if let (Some(c), None) = (chars.next(), chars.next()) {
             by_char.entry(c).or_insert(id);
         }
+        let first = node
+            .attribute("glyph-name")
+            .and_then(|n| n.split(',').map(str::trim).find(|n| !n.is_empty()));
+        names.push(first.map(Box::from));
         if let Some(name) = node.attribute("glyph-name") {
             for name in name.split(',').map(str::trim).filter(|n| !n.is_empty()) {
                 by_name.entry(name).or_default().push(id);
@@ -337,6 +356,7 @@ fn read_font(font: Node<'_, '_>) -> Option<SvgFont> {
         descent: face_number("descent").ok()?.map(f64::abs),
         cap_height: face_number("cap-height").ok()?,
         glyphs,
+        names,
         by_char,
         kerning,
     })

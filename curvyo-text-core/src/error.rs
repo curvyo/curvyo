@@ -18,4 +18,7 @@ pub enum TextError {
     /// The string has more than [`MAX_SHAPE_CHARS`] characters.
     #[error("a text holds at most {MAX_SHAPE_CHARS} characters")]
     TextTooLong,
+    /// The bytes are not a readable Unicode names file (`specs/0082-glyph-table`).
+    #[error("the Unicode names file is damaged")]
+    UnreadableNames,
 }
