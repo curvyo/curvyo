@@ -13,6 +13,7 @@ use std::ops::Range;
 use kurbo::{Affine, BezPath, Point, Rect};
 
 use crate::align::{Align, Extra, LineMeasure, justify, shift};
+use crate::char_offsets::{ByteOffsets, CharOffset, Offset};
 use crate::error::TextError;
 use crate::face::Face;
 use crate::glyph_map::glyph_to_text;
@@ -26,7 +27,7 @@ const SPACES: [char; 3] = [' ', '\u{a0}', '\u{3000}'];
 
 /// The layout values of a text, in millimetres and radians (`0079` criterion 7). The default is
 /// the layout of `0074`: left-aligned, no added spacing, the face's line spacing, upright glyphs.
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct LayoutOptions {
     /// How the lines sit on the anchor's x.
     pub align: Align,
@@ -42,6 +43,9 @@ pub struct LayoutOptions {
     pub writing_mode: WritingMode,
     /// How the glyphs of a column stand; horizontal text ignores it.
     pub orientation: GlyphOrientation,
+    /// Offsets of single characters (kerning, ADR 0021 §6), applied to the cluster a character
+    /// starts; any order.
+    pub char_offsets: Vec<CharOffset>,
 }
 
 /// One glyph placed in line space.
@@ -58,9 +62,14 @@ pub struct PlacedGlyph {
     /// The line-space y of the point the glyph turns about: half the size above its baseline,
     /// or for an upright glyph of a column the column's centre line.
     pub centre_y: Mm,
+    /// The line-space y of its cluster's baseline, moved across by the offsets up to it: the
+    /// letter's caret and box stand on it (ADR 0021 §6).
+    pub baseline: Mm,
     /// The glyph stands upright in a column: it is drawn unturned at its mapped origin
     /// (`0079` criterion 23); every other glyph turns with the line.
     pub upright: bool,
+    /// Its character's own turn (ADR 0021), added to the text's [`TextLayout::rotation_rad`].
+    pub rotation_rad: f64,
 }
 
 /// One line of the layout.
@@ -145,11 +154,13 @@ pub fn layout(
         shaped.push(ShapedLine::new(glyphs, line, start));
         start += line.len() + 1;
     }
+    let offsets = ByteOffsets::new(text, &options.char_offsets);
     let spacing = Spacing {
         mm_per_em,
         letter: options.letter_spacing.0,
         word: options.word_spacing.0,
         pivot: if vertical { drop * mm_per_em } else { 0.0 } - size.get() / 2.0,
+        offsets: &offsets,
     };
     let baseline = |index: usize| mode.baseline(f64_from(index), line_height);
     let mut lines: Vec<LineLayout> = shaped
@@ -198,12 +209,14 @@ fn f64_from(index: usize) -> f64 {
 
 /// The added spacing of a placement, mm.
 #[derive(Debug, Clone, Copy)]
-struct Spacing {
+struct Spacing<'a> {
     mm_per_em: f64,
     letter: f64,
     word: f64,
     /// The turning point's y from the baseline of a glyph that turns with the line.
     pivot: f64,
+    /// The per-character offsets.
+    offsets: &'a ByteOffsets,
 }
 
 /// One cluster of a shaped line: its glyphs, its byte in the line and its advance in em.
@@ -271,15 +284,31 @@ impl ShapedLine {
         let inside = self.extent_end();
         let start = self.range.start;
         let mut x = 0.0;
+        let mut extent_start = 0.0;
         let mut extent_end = 0.0;
         let mut glyphs = Vec::with_capacity(self.glyphs.len());
         let mut boundaries = vec![(start, Mm(0.0))];
+        // The sum of the across offsets so far: each moves the rest of the line (SVG `dy`).
+        let mut rise = 0.0;
         for (index, cluster) in self.clusters.iter().enumerate() {
+            let Offset {
+                along,
+                across,
+                rotation_rad,
+            } = spacing.offsets.at(start + cluster.byte);
             if index > 0 {
-                let gap = spacing.letter + if index < inside { extra.per_gap } else { 0.0 };
+                let gap = spacing.letter + along + if index < inside { extra.per_gap } else { 0.0 };
                 boundaries.push((start + cluster.byte, Mm(x + gap / 2.0)));
                 x += gap;
+            } else {
+                // A kern on the first cluster moves the line from the anchor; the caret before
+                // it sits in the middle of the gap.
+                boundaries[0].1 = Mm(along / 2.0);
+                x += along;
+                extent_start = x;
             }
+            rise += across;
+            let baseline = baseline - rise;
             let advance = cluster.advance * spacing.mm_per_em;
             let centre_x = Mm(x + advance / 2.0);
             let mut pen = x;
@@ -297,7 +326,9 @@ impl ShapedLine {
                     } else {
                         baseline + spacing.pivot
                     }),
+                    baseline: Mm(baseline),
                     upright: shaped.upright,
+                    rotation_rad,
                 });
                 pen += shaped.advance * spacing.mm_per_em;
             }
@@ -318,28 +349,9 @@ impl ShapedLine {
             baseline: Mm(baseline),
             start: Mm(0.0),
             width: Mm(x),
-            extent: Mm(0.0)..Mm(extent_end),
+            extent: Mm(extent_start)..Mm(extent_end.max(extent_start)),
             glyphs,
             boundaries,
-        }
-    }
-}
-
-impl LineLayout {
-    /// Moves the line by `dx` along its baseline: glyphs, extent and caret boundaries alike, so
-    /// caret and drawing never disagree.
-    fn shift(&mut self, dx: f64) {
-        if dx == 0.0 {
-            return;
-        }
-        self.start.0 += dx;
-        self.extent = Mm(self.extent.start.0 + dx)..Mm(self.extent.end.0 + dx);
-        for glyph in &mut self.glyphs {
-            glyph.origin.x += dx;
-            glyph.centre_x.0 += dx;
-        }
-        for (_, x) in &mut self.boundaries {
-            x.0 += dx;
         }
     }
 }
@@ -473,8 +485,8 @@ impl TextLayout {
                 if outline.path.elements().is_empty() {
                     return None;
                 }
-                let to_text =
-                    glyph_to_text(placed, self.frame(), self.mm_per_em, self.rotation_rad);
+                let turn = self.rotation_rad + placed.rotation_rad;
+                let to_text = glyph_to_text(placed, self.frame(), self.mm_per_em, turn);
                 Some(to_text * &outline.path)
             })
             .collect()

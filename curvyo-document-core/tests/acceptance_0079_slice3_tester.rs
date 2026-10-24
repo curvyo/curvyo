@@ -166,7 +166,7 @@ fn ac37_keys_words_and_defaults() {
 /// slice-1 values; the file is format 20.
 #[test]
 fn ac37_round_trip_every_combination() {
-    assert_eq!(CURRENT_FORMAT_VERSION, 20);
+    const _: () = assert!(CURRENT_FORMAT_VERSION >= 20);
     let d = Document::new(1);
     let mut want = Vec::new();
     for mode in [

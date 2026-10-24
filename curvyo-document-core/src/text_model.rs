@@ -250,6 +250,9 @@ pub struct TextSnapshot {
     /// (`specs/0079-text-layout-controls`).
     #[serde(skip_serializing_if = "TextLayoutValues::is_default")]
     pub layout: TextLayoutValues,
+    /// The values of single characters, kerning (ADR 0021); empty for almost every text.
+    #[serde(skip_serializing_if = "crate::text_chars::TextChars::is_empty")]
+    pub chars: crate::text_chars::TextChars,
     /// The map from text space (mm, origin at the left end of the first baseline, y down) to
     /// the document. Its translation is the anchor.
     pub placement: Affine,
@@ -397,6 +400,7 @@ mod tests {
             },
             size: Length::from_mm(size),
             layout: TextLayoutValues::DEFAULT,
+            chars: crate::text_chars::TextChars::default(),
             placement,
             style: Style::default(),
             outline: None,

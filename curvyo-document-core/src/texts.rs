@@ -1,5 +1,5 @@
 //! The document commands of text objects (`specs/0074-text-objects`): create, edit the string,
-//! change the font, change the size, change the layout values
+//! change the font, change the size, change the layout values and the per-character values
 //! (`specs/0079-text-layout-controls`). Each is one commit.
 
 use loro::{LoroMap, TreeID};
@@ -9,6 +9,7 @@ use crate::document::{Document, OBJECTS_TREE};
 use crate::path_codec::leaf_exists;
 use crate::path_model::NodeId;
 use crate::style_model::Style;
+use crate::text_chars::{self, TextChars};
 use crate::text_codec::{self, SHAPE_TEXT};
 use crate::text_model::{
     FontKind, FontRef, MAX_TEXT_CHARS, MAX_TEXT_SIZE, MIN_TEXT_SIZE, TextLayoutValues, TextSnapshot,
@@ -74,6 +75,32 @@ impl TextLayoutLabel {
     }
 }
 
+/// The step a change of per-character values is (`0079` criteria 27 to 29, 27b).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TextCharsLabel {
+    /// "Change kerning".
+    Kerning,
+    /// "Clear kerning" (the reset outside edit mode, criterion 28).
+    ClearKerning,
+    /// "Change per-character rotation" (criterion 27b).
+    CharRotation,
+    /// "Clear per-character rotation" (its reset outside edit mode, criterion 28).
+    ClearCharRotation,
+}
+
+impl TextCharsLabel {
+    /// The commit label.
+    #[must_use]
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Kerning => "change_kerning",
+            Self::ClearKerning => "clear_kerning",
+            Self::CharRotation => "change_char_rotation",
+            Self::ClearCharRotation => "clear_char_rotation",
+        }
+    }
+}
+
 fn check_string(string: &str) -> Result<(), TextEditError> {
     if string.chars().count() > MAX_TEXT_CHARS {
         return Err(TextEditError::TooLong);
@@ -123,6 +150,23 @@ impl Document {
         placement: Affine,
         layout: &TextLayoutValues,
     ) -> Result<NodeId, TextEditError> {
+        self.create_text_with_chars(string, font, size, placement, layout, &TextChars::default())
+    }
+
+    /// [`Document::create_text`] with the per-character values `chars` (ADR 0021), in the same
+    /// one commit: a new text kerned in edit mode before it existed.
+    ///
+    /// # Errors
+    /// As [`Document::create_text`].
+    pub fn create_text_with_chars(
+        &self,
+        string: &str,
+        font: &FontRef,
+        size: Length,
+        placement: Affine,
+        layout: &TextLayoutValues,
+        chars: &TextChars,
+    ) -> Result<NodeId, TextEditError> {
         if string.is_empty() {
             return Err(TextEditError::Empty);
         }
@@ -140,6 +184,7 @@ impl Document {
             font: font.clone(),
             size,
             layout: layout.held(),
+            chars: chars.clone(),
             placement,
             style: Style::default(),
             outline: None,
@@ -180,21 +225,24 @@ impl Document {
 
     /// Replaces the string of text `id` by `string` as the difference of the two (common start
     /// and end kept, the middle deleted and inserted), so a peer's concurrent edit elsewhere in the
-    /// string merges per character (ADR 0009 §3). One commit labelled `edit_text`; nothing when
-    /// the string is unchanged (criterion 7). An empty `string` removes the text in that same
-    /// commit, so Undo brings it back with its string (criterion 8). A string longer than
-    /// [`MAX_TEXT_CHARS`] is refused unless it is no longer than the stored one (a merge may have
-    /// made it longer; deleting from it is allowed).
+    /// string merges per character (ADR 0009 §3), then writes the per-character values `chars`
+    /// (of `string`) where they differ from the stored ones (ADR 0021 §2: a typed character never
+    /// inherits a kern). One commit labelled `edit_text`; nothing when neither changed (criterion
+    /// 7). An empty `string` removes the text in that same commit, so Undo brings it back with its
+    /// string (criterion 8). A string longer than [`MAX_TEXT_CHARS`] is refused unless it is no
+    /// longer than the stored one (a merge may have made it longer; deleting from it is allowed).
     ///
     /// # Errors
     /// [`TextEditError::NoSuchText`] or [`TextEditError::TooLong`].
-    pub fn edit_text_string(&self, id: NodeId, string: &str) -> Result<(), TextEditError> {
+    pub fn edit_text(
+        &self,
+        id: NodeId,
+        string: &str,
+        chars: &TextChars,
+    ) -> Result<(), TextEditError> {
         let meta = self.text_meta(id)?;
         let container = text_codec::string_container(&meta).ok_or(TextEditError::NoSuchText)?;
         let old = container.to_string();
-        if old == string {
-            return Ok(());
-        }
         if string.chars().count() > old.chars().count() {
             check_string(string)?;
         }
@@ -209,10 +257,40 @@ impl Document {
             self.commit_with_label("edit_text");
             return Ok(());
         }
-        if !text_codec::apply_string_diff(&container, string) {
+        let edited = old != string;
+        if edited && !text_codec::apply_string_diff(&container, string) {
             return Err(TextEditError::NoSuchText);
         }
-        self.commit_with_label("edit_text");
+        if text_chars::write_chars(&container, chars) || edited {
+            self.commit_with_label("edit_text");
+        }
+        Ok(())
+    }
+
+    /// Sets the per-character values of each text to the ones paired with it (`0079` criteria 27,
+    /// 28; ADR 0021 §6), in **one commit** labelled by `label`; only the values that differ are
+    /// written. Nothing is committed when nothing changed.
+    ///
+    /// # Errors
+    /// [`TextEditError::NoSuchText`] when an id is not a live text; nothing is written.
+    pub fn set_text_chars(
+        &self,
+        texts: &[(NodeId, TextChars)],
+        label: TextCharsLabel,
+    ) -> Result<(), TextEditError> {
+        let ids: Vec<NodeId> = texts.iter().map(|(id, _)| *id).collect();
+        let metas = self.text_metas(&ids)?;
+        let containers: Vec<_> = metas
+            .iter()
+            .map(|meta| text_codec::string_container(meta).ok_or(TextEditError::NoSuchText))
+            .collect::<Result<_, _>>()?;
+        let mut wrote = false;
+        for (container, (_, chars)) in containers.iter().zip(texts) {
+            wrote |= text_chars::write_chars(container, chars);
+        }
+        if wrote {
+            self.commit_with_label(label.label());
+        }
         Ok(())
     }
 

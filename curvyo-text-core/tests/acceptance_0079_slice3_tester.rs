@@ -301,7 +301,7 @@ fn ac22_rotation_of_an_upright_glyph() {
                 7.0,
                 &LayoutOptions {
                     rotation_rad: rad,
-                    ..o
+                    ..o.clone()
                 },
             );
             let (a, b) = (boxes(face, &up), boxes(face, &turned));
@@ -600,6 +600,7 @@ fn edge_degenerate_vertical_strings() {
                         rotation_rad: -3.0,
                         writing_mode: mode,
                         orientation,
+                        ..LayoutOptions::default()
                     };
                     for text in ["", " ", "\n\n", " \n ", "日", "日\n", "A 日 B\n日日"] {
                         let l = lay(face, text, 10.0, &o);

@@ -7,6 +7,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use loro::{Container, LoroMap, LoroMovableList, LoroResult, LoroText, ValueOrContainer};
 
 use super::node_value::{Node, read_list};
+use crate::text_chars::{TextChars, carried, read_chars, write_chars};
 
 /// What a restore did.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -29,10 +30,17 @@ fn write_entry(map: &LoroMap, key: &str, node: &Node) -> LoroResult<()> {
             let child = map.insert_container(key, LoroMovableList::new())?;
             fill_list(&child, items)
         }
-        Node::Text(string) => map
-            .insert_container(key, LoroText::new())?
-            .insert(0, string),
+        Node::Text { string, chars } => {
+            fill_text(&map.insert_container(key, LoroText::new())?, string, chars)
+        }
     }
+}
+
+/// Fills a fresh text container with `string` and its per-character values (ADR 0021 §5).
+fn fill_text(text: &LoroText, string: &str, chars: &TextChars) -> LoroResult<()> {
+    text.insert(0, string)?;
+    write_chars(text, chars);
+    Ok(())
 }
 
 fn fill_map(map: &LoroMap, entries: &BTreeMap<String, Node>) -> LoroResult<()> {
@@ -59,9 +67,11 @@ fn insert_item(list: &LoroMovableList, index: usize, item: &Node) -> LoroResult<
             let child = list.insert_container(index, LoroMovableList::new())?;
             fill_list(&child, items)
         }
-        Node::Text(string) => list
-            .insert_container(index, LoroText::new())?
-            .insert(0, string),
+        Node::Text { string, chars } => fill_text(
+            &list.insert_container(index, LoroText::new())?,
+            string,
+            chars,
+        ),
     }
 }
 
@@ -93,20 +103,21 @@ pub(crate) fn restore_map(
                 Some(ValueOrContainer::Container(Container::MovableList(child))),
             ) => restore_list(child, from_items, to_items, tally),
             (
-                Some(Node::Text(from_string)),
-                Some(Node::Text(to_string)),
+                Some(Node::Text {
+                    string: from_string,
+                    chars: from_chars,
+                }),
+                Some(Node::Text {
+                    string: to_string,
+                    chars: to_chars,
+                }),
                 Some(ValueOrContainer::Container(Container::Text(child))),
-            ) => {
-                // As a register: back to the old string only where nobody typed since, written
-                // as the difference so the container (and a peer's merge) stays.
-                if child.to_string() == *from_string
-                    && crate::text_codec::apply_string_diff(child, to_string)
-                {
-                    tally.written += 1;
-                } else {
-                    tally.kept += 1;
-                }
-            }
+            ) => restore_text(
+                child,
+                (from_string, from_chars),
+                (to_string, to_chars),
+                tally,
+            ),
             _ => {
                 let now = current.as_ref().map(Node::read);
                 if now.as_ref() == from_node && write_back(live, key, to_node) {
@@ -116,6 +127,59 @@ pub(crate) fn restore_map(
                 }
             }
         }
+    }
+}
+
+/// Brings the live text `child` from `from` to `to`: the string as a register, back only where
+/// nobody typed since, written as the difference so the container (and a peer's merge) stays;
+/// then, where the live string is the restored one, each character's value goes back only where
+/// it still holds the value the step wrote (ADR 0021 §5).
+fn restore_text(
+    child: &LoroText,
+    (from_string, from_chars): (&String, &TextChars),
+    (to_string, to_chars): (&String, &TextChars),
+    tally: &mut Tally,
+) {
+    if from_string != to_string {
+        if child.to_string() == *from_string
+            && crate::text_codec::apply_string_diff(child, to_string)
+        {
+            tally.written += 1;
+        } else {
+            tally.kept += 1;
+            return;
+        }
+    }
+    let from_chars = carried(from_chars, from_string, to_string);
+    if from_chars == *to_chars || child.to_string() != *to_string {
+        return;
+    }
+    let live = read_chars(child);
+    let len = to_string.chars().count();
+    let (live, from, to) = (
+        live.to_dense(len),
+        from_chars.to_dense(len),
+        to_chars.to_dense(len),
+    );
+    let mut target = live.clone();
+    let (mut written, mut kept) = (false, false);
+    for index in 0..len {
+        if from[index] == to[index] {
+            continue;
+        }
+        if live[index] == from[index] {
+            target[index] = to[index];
+            written = true;
+        } else {
+            kept = true;
+        }
+    }
+    if written {
+        write_chars(child, &TextChars::from_dense(&target));
+        tally.written += 1;
+    }
+    if kept {
+        tally.kept += 1;
     }
 }
 
