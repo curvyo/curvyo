@@ -77,6 +77,24 @@ they build or test; only docs-only agents run in parallel. Only one agent drives
 **Stacked PRs:** a PR is always opened against `main`. A branch stacked on an unmerged one waits
 until its base is merged, is rebased onto `main`, then gets its PR.
 
+## 4a. Tokens: model, machine, gate
+
+- **Model per task** (role default in `.claude/agents/`, the lead overrides per dispatch):
+  Haiku for mechanical work (clean rebases, dependency/advisory bumps, status rows, lint fixes
+  in tests, watching CI); Sonnet for tester, UX notes, spec drafts, browser checks, frontend
+  wiring after finished UX notes; Opus for lead, architect and core logic (document model,
+  format, geometry, text engine, sync), and for the tester on format or document-model changes.
+  **Escalate** to Fable only after two failed attempts on the same problem, with the failure
+  handed over; never as a default.
+- **Tester on its own VM** (`navi-curvyo`, plain clone `~/curvyo`): the lead sends the branch
+  name; the tester pulls it, commits acceptance tests to the branch, pushes, and reports
+  PASS/FAIL. The lead's checkout stays free; never two agents building in one checkout.
+- **Gate once:** during work only the affected crates; the full gate (§7) once before the push.
+- **Verify by risk:** full tester pass for format, document model and public APIs; for
+  `chore/` and `fix/` the gate plus one focused test.
+- **Short briefs and reports:** give agents the paths and criteria they need, not the history;
+  reports stay under ~30 lines.
+
 ## 5. Engineering rules
 
 - No trait without a second implementation (or a used test double), no generic without two
