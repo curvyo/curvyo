@@ -94,9 +94,10 @@ keeps the history linear and every commit separate (the repo has
 
 ## 4. Stacked branches
 
-Allowed so work can continue while a PR waits for review. **Maximum depth 2**: one unmerged
-branch under the one being built (customer, 2026-10-25). Any number of parallel branches from
-`main` stays allowed.
+**Not by default.** One story at a time; the next starts after the merge. Only when the customer
+says so (he is away at night or on a weekend) may one branch build on an unmerged one, and never
+more than **2 deep** (customer, 2026-10-25). `chore/` and `fix/` branches from `main` stay allowed
+at any time.
 
 ```text
 git switch -c story/<upper> story/<lower>
@@ -116,6 +117,6 @@ git switch -c story/<upper> story/<lower>
 
 - **The customer tests** the open PR against `main`; an upper branch is tried after its lower PR
   is merged and it has its own PR.
-- **While the customer is away** nothing merges that needs acceptance; `chore/` and `fix/` PRs
-  still merge on green CI. The depth limit of 2 holds; further story work starts in parallel
-  from `main` or waits.
+- **While the customer is away** (and only if he said to work ahead) nothing merges that needs
+  acceptance; `chore/` and `fix/` PRs still merge on green CI. The depth limit of 2 holds;
+  further story work waits.
