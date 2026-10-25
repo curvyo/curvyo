@@ -1601,5 +1601,9 @@ measured 152 to 206 ms of CPU time for it, depending on the runner. Customer dec
 variable is not set and prints it on CI; the hardware-independent ratio (clones at most 1.2 times
 ordinary copies plus 5 ms) stays asserted everywhere in release.
 
+The same rule applies to the marquee frame of `0053` criterion 25 (16.7 ms;
+`curvyo-editor-wasm/tests/node_marquee_interactivity.rs`, 2026-10-25): CI runners measured 18.2
+and 19.4 ms of CPU time on PR #193, a developer machine 9.8 to 9.9 ms on the same commit.
+
 **Resolution:** open. A dedicated benchmark runner with stable hardware would let CI assert the
-absolute budget again.
+absolute budgets again.
