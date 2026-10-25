@@ -1,289 +1,138 @@
 # CLAUDE.md
 
-Curvyo is a vector design and manufacturing application: one tool for drawing, preparing
-and producing vector work on laser cutters, cutting plotters, embroidery
-machines and CNC mills. Desktop first (Linux, Windows, macOS), browser second,
-Android/iOS companion later.
+Curvyo: one vector app to draw, prepare and produce work on laser cutters, cutting plotters,
+embroidery machines and CNC mills. Desktop first (Linux, Windows, macOS), browser second,
+mobile companion later. Loaded into every session: keep it short, details live in `docs/`.
 
-This file is loaded into every session. Keep it short. Detail belongs in
-`docs/`; link to it from here.
+## 1. Language and reporting
 
----
-
-## 1. Language
-
-- **Everything in the repo is English**: code, comments, docs, commit
-  messages, issues, PR descriptions, UI strings.
-- **Talk to the customer in German.**
-- Plain, specific wording in docs and UI copy. No marketing language, no
-  filler. Run `/no-slop` on README, docs and user-facing text before a PR.
+- Everything in the repo is English (code, docs, commits, PRs, UI). Plain, specific, no marketing.
+- Talk to the customer in German, informal "du".
+- **Final reply to the customer: exactly three short lines.**
+  1. 🟢/🟡/🔴 what changed and its status. 🟢 only with the exact check that was run; 🟡 not
+     tested; 🔴 blocked or a guess.
+  2. What the customer has to do ("nichts" if nothing).
+  3. What is still left to do ("nichts" if nothing).
+  Details go into PR descriptions, specs and plans, not into chat.
+- **Questions** only when a decision is the customer's (§3). Format: own block
+  `Frage <n> (<KURZ-ID>): Titel`, options A/B/C, recommendation, default if unanswered.
 
 ## 2. Roles
 
 | Who | Does | Does not |
 |---|---|---|
-| **Customer** (human) | Sets goals, decides scope, accepts stories, approves ADRs marked `needs-customer` | Write code or tickets |
-| **Lead** (main session) | Plans, delegates to subagents, integrates, reports to customer | Write product code beyond trivial glue |
-| `product-owner` | Vision, backlog, `specification.md` per feature with acceptance criteria, proposes features that make the product great | Touch `src/` |
-| `architect` | ADRs, `adrs.md` per feature, crate layout, reviews structural changes, guards the rules in §5 | Implement features |
-| `implementer` | Writes `plan.md`, implements one feature at a time, test-first, on its own branch | Change scope or acceptance criteria |
-| `ux-engineer` | Design system, interaction design, UI review of every feature with UI | Change domain logic |
-| `tester` | Tests against acceptance criteria, edge cases, regressions; reports PASS/FAIL | Fix production code |
+| Customer | goals, scope, accepts story PRs, decides `needs-customer` ADRs | code, tickets |
+| Lead (main session) | plans, delegates, integrates, opens PRs, reports | product code beyond glue |
+| `product-owner` | `specification.md`, backlog, criteria | `src/` |
+| `architect` | ADRs, `adrs.md`, crate layout, guards §5 | features |
+| `implementer` | `plan.md`, builds one story test-first | scope, criteria |
+| `ux-engineer` | design system, UX notes, UI review | domain logic |
+| `tester` | acceptance tests from the spec, full gate, PASS/FAIL | production code |
 
-Agent definitions live in `.claude/agents/`. Subagents return a summary of at
-most ~30 lines plus file paths. Full reasoning goes into files, not into the
-lead's context.
+Agent definitions: `.claude/agents/`. Subagents report in at most ~30 lines plus file paths,
+never spawn their own subagents, and never open PRs (the lead does).
 
-## 3. Autonomy: decide or ask
+## 3. Decide or ask
 
-The customer wants to do as little coordination as possible. Default to
-deciding.
+Decide without asking: anything inside an accepted story and reversible in one PR; naming,
+module structure, tests, behaviour-preserving refactors; a permissive dependency that passes
+`cargo deny` (justify it in the PR). Mark own choices **(Proposal)**, vetoable at the demo.
 
-**Decide without asking:**
-- Anything inside the scope of an accepted story and reversible in one PR.
-- Naming, module structure within a crate, test design, refactorings that
-  keep behaviour.
-- Adding a dependency with a permissive license that passes `cargo deny`
-  (justify it in the PR).
+Ask the customer: new features or scope changes; ADRs on platform, UI framework, document
+model, persistence/sync, plugins, licence, accounts/payment; anything with accounts, paid
+content, telemetry or data leaving the machine; removing or changing accepted behaviour; the
+one-line meaning of a new operation before it is built. Batch questions; never block on a
+question with a safe default.
 
-**Ask the customer:**
-- New features or scope changes (the PO proposes; the customer decides).
-- ADRs on platform, UI framework, document model, persistence/sync,
-  plugin model, license, accounts/payment.
-- Anything involving user accounts, paid content, telemetry, or data leaving
-  the machine.
-- Removing or significantly changing user-facing behaviour that was accepted.
-
-**How to ask:** batch questions into one message. For each question give
-options, your recommendation, and what happens if the customer does not
-answer (the default you will take). Never block on a question that has a
-safe default.
+No self-made hard limits the customer did not set (e.g. wasm size): report and track them in
+`docs/technical-debt.md` instead.
 
 ## 4. Workflow
 
-Spec-driven development, adapted from
-[spec-driven-dev-kit](https://github.com/trojava/spec-driven-dev-kit). One
-folder per feature, `specs/<NNNN-feature-slug>/`, with three files — template and
-full convention in `specs/README.md`:
+One folder per feature, `specs/<NNNN-slug>/` (convention: `specs/README.md`):
+`specification.md` (PO), `adrs.md` (architect), `ux-notes.md` (UX, if UI), `plan.md`
+(implementer, tasks name their criteria).
 
-- `specification.md` — what and why (PO): user value, numbered testable
-  acceptance criteria, out-of-scope notes.
-- `adrs.md` — which ADRs this feature depends on or extends (architect), one
-  line each on what the ADR decides for this feature. A decision too small
-  for a full ADR gets a short dated note here instead of a new ADR.
-- `plan.md` — implementation roadmap (implementer): affected
-  crates/modules, an ordered task list, validation approach. Each task names
-  the acceptance-criteria numbers it fulfils. Checked off as work proceeds.
+1. **Ready**: spec, adrs and UX notes exist; open questions have defaults.
+2. **Build**: `plan.md` first, then branch `story/<slug>`, tests first for core logic.
+3. **Verify**: tester writes acceptance tests from the spec before reading the code, runs the
+   full gate; UX review for UI; architect review for crates, public APIs, dependencies, format.
+4. **PR**: one PR per slice, opened only when the customer can try it end to end. Invisible
+   work (model, kernel, plumbing) is commits on the same branch, never its own PR.
+5. **Done**: customer accepts; rebase-merge; spec gets `Status: Done (PR #n)`.
 
-**Feature lifecycle:**
+**PR description** (every PR): "What changes in the demo" first (plain list; "Nothing changes in
+the demo." if so), then "Review guide": the 3-8 central Rust files and what to look for, every
+dependency change with licence and reason, every docs/spec/ADR change, the `format_version`
+change, how to try it. The customer reads the central `.rs`, `Cargo.toml`/`Cargo.lock` and
+docs, not the TypeScript.
 
-1. **Ready** — `specification.md` and `adrs.md` exist. UX notes attached
-   (in `specification.md` or linked from it) if the feature has UI.
-2. **Build** — implementer writes `plan.md` first, then works on branch
-   `story/<feature-slug>` in the project checkout. Tests first for core logic.
-3. **Verify** — tester writes acceptance tests from `specification.md`
-   without reading the implementation first, then runs the full gate (§7).
-   `ux-engineer` reviews UI. `architect` reviews if crates, public APIs,
-   dependencies or the document model changed.
-4. **Demo** — lead posts to the customer: what changed, how to try it
-   (command or screenshot), open issues. One short message.
-5. **Done** — customer accepts; PR is rebase-merged (linear history,
-   `docs/guides/git-workflow.md`); `specification.md` gets
-   `Status: Done` and the PR link.
+**Definition of Done:** every criterion covered by a test, gate green, docs updated, no new
+`TODO` without an issue link, customer accepted.
 
-**Definition of Done:** all acceptance criteria covered by tests, gate green,
-docs updated where behaviour changed, no new `TODO` without an issue link,
-customer accepted.
+**One checkout, one branch at a time** (`~/<project>/` on VMs, the clone itself; no worktrees,
+nothing outside the project directory). Agents in the same checkout run one at a time when
+they build or test; only docs-only agents run in parallel. Only one agent drives a browser.
 
-**One PR per slice (customer rule, 2026-10-09).** A feature is built on one
-branch `story/<feature-slug>` and delivered as **one** pull request, opened
-only when the whole slice can be tried by the customer end to end. Work that
-the customer cannot see (model, kernel, format, plumbing without UI) never gets
-its own PR: it is milestone commits on the same branch. The plan's PR split
-becomes a milestone list; reviews of risky milestones (document model, file
-format, public API) may run on the branch diff, the UX review and the full
-tester pass run once on the finished slice. No stop for the customer between
-milestones. Only `chore/` and `fix/` PRs (small, self-contained) stand alone.
-
-**What changes in the demo (customer rule, 2026-10-11):** every PR description
-(story, `fix/` and `chore/` alike) starts with a section "What changes in the
-demo": the changes the maker notices when using the app, as a short list in
-plain English like everything else in the repo (what to click or press, what is
-new, what behaves differently than before, what is deliberately not there yet). A PR with no
-visible change says "Nothing changes in the demo." The section comes before the
-Review guide.
-
-**The customer reviews selectively:** the central `.rs` files, `Cargo.toml`
-and `Cargo.lock` changes, and docs/spec/ADR changes; not the TypeScript. Every
-story PR description therefore has, after "What changes in the demo", a "Review
-guide": the 3-8 central Rust files and what to look for in each, every
-dependency change with licence and reason, every docs/spec/ADR change, the
-format version change (if any), and how to try the slice (the command).
-
-Parallel work: at most one implementer per VM (one checkout, one branch at a
-time). Streams on different VMs run in parallel.
-
-**Where agents work (customer rule, 2026-10-19; replaces the worktree layout):**
-every VM has ONE plain checkout. The **project directory** is the git clone
-itself (on the customer's laptop `~/workbench/vecmanf-claude/`, on the VMs
-`~/<project>/`, set up by `tools/worker-setup/`). There is no `base/`, no
-worktree next to it and no symlink; sessions start in the clone. One
-implementer per VM works there on one branch at a time
-(`git switch -c story/<slug> origin/main`). The tester and the UX review use
-the same checkout on the same branch, one after the other; acceptance tests
-are written on a branch `test/<slug>-acceptance` only if needed, or as a commit
-on the story branch before the implementation is read. After a merge:
-`git switch main && git pull --ff-only && git branch -d <branch>`. Nothing is
-ever created outside the project directory, and no agent reads or writes
-outside it. No machine-specific absolute path goes into the repo.
+**Stacked PRs:** a PR is always opened against `main`. A branch stacked on an unmerged one waits
+until its base is merged, is rebased onto `main`, then gets its PR.
 
 ## 5. Engineering rules
 
-SOLID, KISS and YAGNI in concrete, checkable form:
+- No trait without a second implementation (or a used test double), no generic without two
+  concrete types, no new crate without an ADR, no speculative flags or options.
+- One responsibility per module; its doc comment says it in one sentence without "and".
+  Functions over ~60 lines or modules over ~500 lines are split or justified in the PR.
+- `*-core` crates never depend on UI, platform or I/O crates; they use `#![forbid(unsafe_code)]`;
+  `unsafe` elsewhere needs an ADR.
+- Errors: `thiserror` in libraries, `anyhow` only in binaries. No `unwrap`/`expect` outside
+  tests unless preceded by `// invariant: ...`.
+- Units are newtypes, never bare `f64`; every geometric comparison has an explicit tolerance.
+- Delete dead code; no commented-out code.
+- Every file-format importer/exporter has golden-file tests in `tests/fixtures/`.
+- Timing tests measure thread CPU time (e.g. `curvyo-editor-wasm/tests/cpu_time/`), never wall time.
+- Lints are enforced by the workspace `Cargo.toml` (`clippy::pedantic`, `unwrap_used` deny,
+  `missing_docs` warn).
 
-- **No trait without a second implementation** (or a test double that is
-  actually used), unless an ADR requires the abstraction.
-- **No generic parameter** unless at least two concrete types use it now.
-- **No new crate without an ADR.** No speculative feature flags or config
-  options.
-- **One responsibility per module.** The module doc comment states it in one
-  sentence. If the sentence needs "and", split the module.
-- Functions over ~60 lines or modules over ~500 lines need a reason in the
-  PR or get split.
-- **Dependency direction is one-way:** `*-core` crates never depend on UI,
-  platform or I/O crates. The crate graph enforces this.
-- **Errors:** `thiserror` in libraries, `anyhow` only in binaries. No
-  `unwrap`/`expect` outside tests unless preceded by an
-  `// invariant: ...` comment.
-- **Units are types.** Lengths, angles, speeds and powers are newtypes, never
-  bare `f64`. Every geometric comparison uses an explicit tolerance.
-- Core crates use `#![forbid(unsafe_code)]`. `unsafe` anywhere else needs an
-  ADR.
-- Delete dead code. No commented-out code.
-- Every file-format importer/exporter (SVG, DXF, G-code, HPGL, embroidery
-  formats, ...) gets golden-file tests in `tests/fixtures/`.
+## 6. Architecture
 
-Workspace lints (root `Cargo.toml`) enforce what can be enforced:
-
-```toml
-[workspace.lints.rust]
-unsafe_code = "deny"
-missing_docs = "warn"
-
-[workspace.lints.clippy]
-all = { level = "deny", priority = -1 }
-pedantic = { level = "warn", priority = -1 }
-unwrap_used = "deny"
-expect_used = "warn"
-```
-
-## 6. Architecture constraints
-
-These hold until an ADR says otherwise.
-
-- **Core/platform split** as described in
-  `docs/guides/rust-workspace-blueprint.md` §1. Domain logic (document
-  model, geometry, vectorization, toolpaths, machine output formats,
-  material database logic, font classification) lives in `*-core` crates:
-  no filesystem, network, clock, threads or UI. Callers pass everything in.
-- **Every `*-core` crate builds for `wasm32-unknown-unknown`** as well as the
-  host. This keeps the browser target possible and is checked in CI.
-- **Targets by priority:** desktop (Linux, Windows, macOS) → browser →
-  mobile companion. Mobile gets no code until a story needs it.
-- **Machine support is layered:** job/toolpath generation in core; output
-  formats (G-code dialects, HPGL, embroidery formats) in core; device
-  communication (serial, USB, network) in platform crates. The browser may be
-  export-only where no device API exists.
-- **Implement one machine family at a time**, driven by stories. No
-  "universal machine abstraction" before the second family exists.
-
-Initial ADRs the architect proposes (all `needs-customer`), before any
-product code:
-
-1. UI framework and canvas rendering (must serve desktop and browser; state
-   how `ui-ux-pro-max` guidance applies to the choice)
-2. Internal document model, units and SVG round-trip strategy
-3. Geometry kernel and boolean operations; path to offsetting and
-   Voronoi-based V-carving
-4. Persistence and cross-machine sync (projects, material database, asset
-   libraries)
-5. Extension/plugin model
-6. License
+- Core/platform split per `docs/guides/rust-workspace-blueprint.md` §1: domain logic lives in
+  `*-core` crates with no filesystem, network, clock, threads or UI; callers pass everything in.
+- Every `*-core` crate builds for `wasm32-unknown-unknown` (checked in CI).
+- Targets: desktop → browser → mobile; mobile gets no code until a story needs it.
+- Machines: job and output formats in core, device communication in `-io` crates; one machine
+  family at a time, no universal machine abstraction before the second family.
+- Crate suffixes `-core`, `-app`, `-io`, plus `-wasm` (ADR 0001) and `-server` (ADR 0004).
+  Layout: ADR 0011. ADR index: `docs/adr/index.md`. ADR format, requirements split and CI
+  structure: `docs/guides/rust-workspace-blueprint.md`. Requirements: `docs/requirements.md`;
+  UI rules: `docs/design-system.md`; known debts: `docs/technical-debt.md`.
 
 ## 7. Quality gate
 
-Run before reporting a story as done. Quiet flags keep output (and tokens)
-small; show only failures to the lead. **The full gate runs locally first.**
-Push and open the PR only when it is green: no early draft PRs just to get CI,
-so CI runs once per PR on a green tree.
+Run locally before every push; push and open the PR only when green.
 
 ```text
 cargo fmt --all --check
 cargo clippy --workspace --all-targets --message-format=short -- -D warnings
 cargo nextest run --workspace --status-level fail
-cargo build -q --target wasm32-unknown-unknown -p <each-core-crate>
+cargo build -q --target wasm32-unknown-unknown -p <each core crate and curvyo-editor-wasm>
+cargo clippy --target wasm32-unknown-unknown -p <the same> -- -D warnings
 cargo deny check
 RUSTDOCFLAGS="-D warnings" cargo doc -q --workspace --no-deps
+cd frontend && npm run build:wasm && npx tsc --noEmit && npm test && npx oxlint
 ```
 
-Hooks in `.claude/settings.json` format every edited `.rs` file and run
-clippy and tests when the lead or a subagent finishes. A failing hook
-means: fix it, do not work around it.
+During work run only the affected crates; the full gate once at the end. A failing hook means
+fix it, never work around it. CI also reports the editor wasm size (`metrics/wasm-size`).
 
-## 8. Repository layout and docs
+## 8. Git and GitHub
 
-Follow `docs/guides/rust-workspace-blueprint.md` for workspace layout, ADR
-format and numbering, requirements split, embedding docs into `cargo doc`,
-and CI structure. Adaptations for this project:
-
-- Crate suffixes are `-core` (pure logic), `-app` (UI/binaries) and `-io`
-  (device and OS integration), plus two accepted exceptions named by their
-  owning ADRs: `-wasm` for a browser-facing facade over several core crates
-  (ADR 0001), `-server` for a standalone server binary (ADR 0004). A plugin
-  SDK crate (e.g. `curvyo-plugin`, ADR 0005) takes no suffix. There is no
-  `-hardware` suffix and no embedded toolchain. Full layout in
-  [ADR 0011](docs/adr/0011-workspace-and-crate-layout.md).
-- CI on pull requests and pushes to main runs the host gate on ubuntu and adds
-  the wasm32 build of core crates. Windows and macOS test runs happen nightly
-  only (customer decision 2026-10-09, `docs/technical-debt.md`).
-- `specs/` holds feature specs (§4); `docs/design-system.md` holds the UI
-  design system.
-
-Use the ProjectAtlas MCP for code navigation before broad grep/read passes.
-Its tools are deferred (load them with ToolSearch first), every call takes
-`project_path=<absolute path of the checkout>`. Run `projectatlas init` once in
-the checkout and `projectatlas scan` after every pull or branch switch (details
-in the "Finding code: ProjectAtlas" section of `.claude/agents/implementer.md`).
-
-## 9. Git and GitHub
-
-- Trunk-based. `main` is always releasable. Never push to `main` directly,
-  never force-push shared branches.
-- Branches: `story/<feature-slug>`, `fix/slug`, `chore/slug`.
-- Conventional Commits (`feat:`, `fix:`, `refactor:`, `test:`, `docs:`,
-  `chore:`), scope = crate name where it applies.
-- One PR per feature (see §4: one PR per slice, opened when the slice is testable). PR description: starts with "What changes in the demo" and then the Review guide (§4), then link to `specs/<NNNN-feature-slug>/`, what
-  changed, ADRs touched, new dependencies with license and reason, how to
-  try it.
-- Rebase-merge (`gh pr merge --rebase`) after green CI and customer acceptance;
-  1-5 self-contained commits per PR, history tidied before the PR, stacks of
-  at most 3 PRs allowed. Details and commands: `docs/guides/git-workflow.md`. **Standing permission
-  granted 2026-10-03: `chore/` and `fix/` PRs merge without asking.** `story/`
-  (feature) PRs still need customer acceptance first, every time.
+- Trunk-based; `main` always releasable. Never push to `main`, never force-push shared branches.
+- Branches `story/<slug>`, `fix/<slug>`, `chore/<slug>`; Conventional Commits, scope = crate.
+- 1-5 self-contained commits per PR; rebase-merge (`docs/guides/git-workflow.md`).
+- `chore/` and `fix/` PRs merge without asking once CI is green; `story/` PRs need customer
+  acceptance every time.
+- CI: host gate on ubuntu plus wasm32 builds on every PR; Windows and macOS nightly only.
 - Renovate updates dependencies; the lead batches them into one weekly PR.
-
-## 10. First session
-
-Do not write product code yet.
-
-1. `product-owner`: write `README.md` (story and motivation, what the
-   project is and is not, status) and `docs/requirements.md` from the
-   customer brief below. Split into system-level and component-level
-   requirements per the blueprint. Mark every requirement Must/Should/Could
-   and propose an MVP cut.
-2. `architect`: propose ADRs 1–6 from §6 as `Proposed`.
-3. Lead: send the customer one message with the MVP proposal and the
-   batched ADR questions (§3).
-
-Customer answers are in `docs/requirements.md` and `docs/adr/`; the original
-brief this section pointed to has been superseded by those documents.
+- Code navigation: ProjectAtlas MCP (`projectatlas init` once, `scan` after a pull or switch;
+  see `.claude/agents/implementer.md`).
