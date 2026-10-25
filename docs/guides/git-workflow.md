@@ -92,66 +92,30 @@ keeps the history linear and every commit separate (the repo has
    `chore/` and `fix/` PRs merge on green CI without asking (standing
    permission of 2026-10-03). `gh pr merge` stays in the `ask` list.
 
-## 4. Stacked PRs
+## 4. Stacked branches
 
-Allowed so work can continue while the customer is away. **Maximum depth 3**
-(one PR on main, two on top). Any number of parallel PRs from `main` stays
-allowed (one implementer per VM, `CLAUDE.md` §4).
+Allowed so work can continue while a PR waits for review. **Maximum depth 2**: one unmerged
+branch under the one being built (customer, 2026-10-25). Any number of parallel branches from
+`main` stays allowed.
 
-**Build**
 ```text
 git switch -c story/<upper> story/<lower>
-gh pr create --base story/<lower> --head story/<upper> ...
 ```
-The upper PR's base is the lower story branch, so its diff shows only its own
-commits. Stack only when the upper slice needs the lower one's code; independent
-work goes parallel from `main`.
-
-**Stack table.** Every PR in a stack starts its description (before "What
-changes in the demo") with:
-`Stack: #A -> #B -> #C. Merge in this order. This is #B.`
-Update all descriptions when the stack changes.
-
-**Descriptions.** "What changes in the demo" and the Review guide cover only
-the diff against the PR's base. The upper PR says "Builds on #A". Dependency
-and ADR changes appear in the PR that makes them.
 
 **Rules**
-- Merge strictly bottom-up. Never merge an upper PR first.
-- CI runs on every PR against its own base. The wasm32 build and the gate run
-  per PR, locally before each push as usual. The upper PR is not green-for-merge
-  until it has been rebased onto `main` after the lower one merged.
-- The agent that built the stack maintains it (rebases, retargets, table). If
-  a lower PR changes after review, fix it there, then rebase each upper
-  branch: `git rebase --onto story/<lower> <old-lower-tip> story/<upper>`
-  and push with `--force-with-lease`. Note `<old-lower-tip>` before the fix.
-- One slice is still one PR (`CLAUDE.md` §4): a stack is several slices, never
-  one slice cut into invisible pieces.
-- `format_version` numbers (`specs/README.md`) are taken at merge, in merge
-  order. A stacked PR with a format change uses the next number after the
-  PRs below it and says so in the table; renumber if the order changes.
-
-**After the lowest PR is merged** (rebase-merge gives new SHAs, so the upper
-branch still contains the old commits)
-```text
-git fetch origin
-OLD=$(git rev-parse origin/story/<lower>)   # record this before the merge
-# ... lower PR merged and branch deleted ...
-git rebase --onto origin/main $OLD story/<upper>
-git push --force-with-lease origin story/<upper>
-gh pr edit <upper-pr> --base main
-```
-Then rerun the gate, update the stack table, and repeat for the next PR.
-If `OLD` was lost, use `git log --oneline origin/main..story/<upper>` and pick
-the first commit that belongs to the upper PR.
+- A PR is always opened against `main`. The upper branch gets its PR only after the lower PR is
+  merged and the upper branch is rebased onto `main` (`git rebase --onto origin/main <old lower
+  tip>`). Lesson of #176: a PR whose base is another story branch merges into that branch, not
+  into `main`, once the lower PR is gone.
+- Stack only when the upper slice needs the lower one's code; independent work goes parallel
+  from `main`.
+- The agent that built the stack keeps it current: after every change to the lower branch,
+  rebase the upper one and run the gate there.
 
 ## 5. Testing and absence
 
-- **Customer tests a stack** by checking out the top PR branch (`gh pr
-  checkout <n>`) to try everything at once, or by accepting and merging
-  bottom-up one PR at a time. The lead's demo message says which.
-- **While the customer is away** stacks may grow to depth 3 and wait for
-  acceptance. Nothing merges that needs acceptance. `chore/` and `fix/` PRs
-  still merge on green CI; if a stack sits on top of main and main moves,
-  the maintaining agent rebases it.
-- At depth 3, new story work starts in parallel from `main` or waits.
+- **The customer tests** the open PR against `main`; an upper branch is tried after its lower PR
+  is merged and it has its own PR.
+- **While the customer is away** nothing merges that needs acceptance; `chore/` and `fix/` PRs
+  still merge on green CI. The depth limit of 2 holds; further story work starts in parallel
+  from `main` or waits.
