@@ -1,6 +1,6 @@
 // The entry box of the position handle of a text on path (`specs/0080-text-on-path` criteria 17,
-// 18; customer 2026-10-24): opened by a double-click on the handle, the "Transform entry chip"
-// surface with Position and Distance, then Side, Line on path and Mirror. Tab cycles fields and
+// 18; customer 2026-10-24): opened by a double-click on the handle beside the text, never over it,
+// the "Transform entry chip" surface with Position and Distance, then Side, Line on path and Mirror. Tab cycles fields and
 // buttons, the buttons preview, Enter writes one step, Escape (or leaving the box) closes it with
 // no change. Values and steps are the session's.
 import { CircleAlert } from "lucide-react";
@@ -9,7 +9,7 @@ import { type ReactNode, useEffect, useId, useLayoutEffect, useRef, useState } f
 import { MirrorGlyph } from "@/components/TextPathGroups";
 import { Glyph } from "@/components/WritingGroups";
 import { Tooltip } from "@/components/ui/tooltip";
-import { placeMoveChip } from "@/lib/readoutPlacement";
+import { placeTextPathEntryChip } from "@/lib/readoutPlacement";
 import {
   LINE_CODES,
   LINE_NAMES,
@@ -173,8 +173,8 @@ export function TextPathEntryChip({
     setSizes((previous) => (JSON.stringify(previous) === JSON.stringify(next) ? previous : next));
   }, [entry, invalid, containerRef]);
 
-  const placed = placeMoveChip(entry.handle, sizes.chip, sizes.canvas);
-  const placement = { ...placed, left: Math.max(placed.left, TOOL_RAIL_CLEAR_PX) };
+  // Outside the text's box, on the side of the carrier away from the text.
+  const placement = placeTextPathEntryChip(entry.handle, entry.box, sizes.chip, sizes.canvas, TOOL_RAIL_CLEAR_PX);
   const returnFocusToCanvas = () => containerRef.current?.focus();
 
   const submit = () => {

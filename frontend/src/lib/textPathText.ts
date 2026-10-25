@@ -53,6 +53,8 @@ export function parseTextPath(json: string | undefined): TextPathBar {
  * the handle is (canvas px) and what the box shows. */
 export interface TextPathEntry {
   handle: { x: number; y: number };
+  /** The text's box as drawn with the pending values, canvas px: the entry box stays outside it. */
+  box: { left: number; top: number; right: number; bottom: number };
   side: SideCode;
   line: LineCode;
   /** mm, or degrees on an ellipse carrier. */
@@ -76,7 +78,14 @@ export function parseTextPathEntry(json: string | undefined): TextPathEntry | nu
     if (x === null || y === null || position === null || distance === null || !side || !line) {
       return null;
     }
-    return { handle: { x, y }, side, line, position, degrees: raw.degrees === true, distance };
+    // Without a readable box the handle alone stands for it.
+    const edges = raw.box as Record<string, unknown> | undefined;
+    const [left, top, right, bottom] = [edges?.left, edges?.top, edges?.right, edges?.bottom].map(finite);
+    const box =
+      typeof left === "number" && typeof top === "number" && typeof right === "number" && typeof bottom === "number"
+        ? { left, top, right, bottom }
+        : { left: x, top: y, right: x, bottom: y };
+    return { handle: { x, y }, box, side, line, position, degrees: raw.degrees === true, distance };
   } catch {
     return null;
   }

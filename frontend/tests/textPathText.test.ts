@@ -34,6 +34,18 @@ test("customer 2026-10-24: the entry box reads its handle and values, closed as 
     }),
   );
   assert.deepEqual(entry?.handle, { x: 120, y: 80 });
+  assert.deepEqual(entry?.box, { left: 120, top: 80, right: 120, bottom: 80 }, "no box: the handle");
+  const boxed = parseTextPathEntry(
+    JSON.stringify({
+      handle: { x: 120, y: 80 },
+      box: { left: 60, top: 30, right: 180, bottom: 82 },
+      side: "above",
+      line: "baseline",
+      position: 10,
+      distance: 0,
+    }),
+  );
+  assert.deepEqual(boxed?.box, { left: 60, top: 30, right: 180, bottom: 82 });
   assert.equal(entry?.side, "below");
   assert.equal(entry?.line, "top");
   assert.equal(entry ? positionUnit(entry) : "", "°");

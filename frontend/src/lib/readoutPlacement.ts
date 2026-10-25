@@ -355,3 +355,43 @@ export function placePenEntryChip(
   const top = at.top >= last.y ? last.y - clear - chip.height : last.y + clear;
   return { left: at.left, top: Math.max(0, Math.min(top, canvas.height - chip.height)) };
 }
+
+/**
+ * Where to put the entry box of a text-on-path position handle (`specs/0080-text-on-path`
+ * criterion 17): on the side of the carrier away from the text, 16px outside the text's box
+ * `box` (canvas px), centred on the handle along that side. The side is the one from the box's
+ * centre through the handle (below a text standing on the top of a ring, right of a text on its
+ * right side). Without room there (the canvas edge, or `leftInset` px on the left for the tool
+ * rail) it flips to the far side of the text's box, so it still never covers the text; a canvas
+ * too small for either is clamped.
+ */
+export function placeTextPathEntryChip(
+  handle: { x: number; y: number },
+  box: Rect,
+  chip: Size,
+  canvas: Size,
+  leftInset: number,
+): Placement {
+  const awayX = handle.x - (box.left + box.right) / 2;
+  const awayY = handle.y - (box.top + box.bottom) / 2;
+  const clamp = (left: number, top: number) => {
+    const placed = clampInside(left, top, chip, canvas);
+    return { ...placed, left: Math.max(placed.left, Math.min(leftInset, canvas.width - chip.width)) };
+  };
+  if (Math.abs(awayY) >= Math.abs(awayX)) {
+    const left = handle.x - chip.width / 2;
+    const below = Math.max(handle.y, box.bottom) + MOVE_CHIP_OFFSET_PX;
+    const above = Math.min(handle.y, box.top) - MOVE_CHIP_OFFSET_PX - chip.height;
+    const fitsBelow = below + chip.height <= canvas.height;
+    const fitsAbove = above >= 0;
+    const top = awayY >= 0 ? (fitsBelow || !fitsAbove ? below : above) : fitsAbove || !fitsBelow ? above : below;
+    return clamp(left, top);
+  }
+  const top = handle.y - chip.height / 2;
+  const right = Math.max(handle.x, box.right) + MOVE_CHIP_OFFSET_PX;
+  const leftSide = Math.min(handle.x, box.left) - MOVE_CHIP_OFFSET_PX - chip.width;
+  const fitsRight = right + chip.width <= canvas.width;
+  const fitsLeft = leftSide >= leftInset;
+  const left = awayX >= 0 ? (fitsRight || !fitsLeft ? right : leftSide) : fitsLeft || !fitsRight ? leftSide : right;
+  return clamp(left, top);
+}
