@@ -32,9 +32,16 @@ const fn line_code(line: LineOnPath) -> &'static str {
     }
 }
 
-fn entry_json(entry: &TextPathEntryView, (x, y): (f64, f64)) -> String {
+fn entry_json(entry: &TextPathEntryView, (x, y): (f64, f64), corners: &[(f64, f64)]) -> String {
+    let (mut left, mut top) = (f64::INFINITY, f64::INFINITY);
+    let (mut right, mut bottom) = (f64::NEG_INFINITY, f64::NEG_INFINITY);
+    for &(cx, cy) in corners {
+        (left, top) = (left.min(cx), top.min(cy));
+        (right, bottom) = (right.max(cx), bottom.max(cy));
+    }
     serde_json::json!({
         "handle": { "x": x, "y": y },
+        "box": { "left": left, "top": top, "right": right, "bottom": bottom },
         "side": side_code(entry.side),
         "line": line_code(entry.line),
         "position": entry.position,
@@ -77,15 +84,21 @@ impl WasmSession {
     }
 
     /// The open entry box of the position handle as JSON, or an empty string: `{"handle": {x,
-    /// y} (canvas px), "side": "above" | "below", "line": "baseline" | "top", "position",
+    /// y} (canvas px), "box": {left, top, right, bottom} (the text's box, canvas px), "side":
+    /// "above" | "below", "line": "baseline" | "top", "position",
     /// "degrees", "distance"}`.
     #[must_use]
     pub fn text_path_entry_json(&self) -> String {
         self.session
             .text_path_entry()
             .map_or_else(String::new, |entry| {
-                let at = self.session.view().document_to_screen(entry.handle);
-                entry_json(&entry, at)
+                let view = self.session.view();
+                let corners: Vec<(f64, f64)> = entry
+                    .text_box
+                    .iter()
+                    .map(|p| view.document_to_screen(*p))
+                    .collect();
+                entry_json(&entry, view.document_to_screen(entry.handle), &corners)
             })
     }
 

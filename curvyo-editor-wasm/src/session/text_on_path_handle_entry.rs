@@ -34,6 +34,9 @@ pub struct TextPathEntryView {
     pub degrees: bool,
     /// The Distance at the open, mm.
     pub distance_mm: f64,
+    /// The corners of the text's box as drawn with the pending values, document mm: the box is
+    /// placed outside it, away from the text.
+    pub text_box: [Point; 4],
 }
 
 impl Session {
@@ -73,7 +76,9 @@ impl Session {
         let position = ellipse.map_or(entry.start.position.as_mm(), |e| {
             curvyo_ui_core::ellipse_degrees(&e, handle)
         });
+        let shown = self.text_path_live().unwrap_or(text);
         Some(TextPathEntryView {
+            text_box: curvyo_ui_core::line_box_corners(&shown),
             handle,
             side: entry.values.side,
             line: entry.values.line,

@@ -169,6 +169,27 @@ fn handle(session: &Session) -> Point {
     session.text_path_handles().unwrap().handles[0].position
 }
 
+/// Criterion 17: the entry box carries the text's box as drawn with the pending values, so the
+/// frontend places the box away from the text; a Side change moves the text's box across.
+#[test]
+fn c17_the_entry_box_knows_the_text_box_of_the_preview() {
+    let (mut session, t, c) = badge();
+    session.selection.set(&[t, c]);
+    session.text_path_press();
+    session.selection.select_single(t);
+    let at = handle(&session);
+    session.double_click(at, false, false);
+    let offset = |session: &Session| {
+        let entry = session.text_path_entry().unwrap();
+        let mid = entry.text_box.iter().fold(0.0, |sum, p| sum + p.y) / 4.0;
+        mid - entry.handle.y
+    };
+    let above = offset(&session);
+    session.text_path_entry_side(PathSide::Below);
+    let below = offset(&session);
+    assert!(above * below < 0.0, "{above} {below}");
+}
+
 /// Criteria 17, 18 (customer 2026-10-24): a double-click on the position handle opens the entry
 /// box with Position, Distance, Side, Line and Mirror; its buttons preview, Escape writes
 /// nothing, Enter writes one step.
