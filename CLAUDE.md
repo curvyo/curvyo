@@ -90,6 +90,8 @@ until its base is merged, is rebased onto `main`, then gets its PR.
   name; the tester pulls it, commits acceptance tests to the branch, pushes, and reports
   PASS/FAIL. The lead's checkout stays free; never two agents building in one checkout.
 - **Gate once:** during work only the affected crates; the full gate (§7) once before the push.
+- **Stack at most 2:** at most one unmerged branch under the one being built (customer,
+  2026-10-25); a third waits until the first is merged.
 - **Verify by risk:** full tester pass for format, document model and public APIs; for
   `chore/` and `fix/` the gate plus one focused test.
 - **Short briefs and reports:** give agents the paths and criteria they need, not the history;
