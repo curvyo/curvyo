@@ -40,25 +40,28 @@
 <line class="grid" x1="56" y1="40.0" x2="624" y2="40.0"/>
 <text class="muted" x="48" y="44.0" text-anchor="end">16</text>
 <text class="muted" x="56.0" y="270" text-anchor="middle">10-20</text>
-<text class="muted" x="169.6" y="270" text-anchor="middle">10-24</text>
-<text class="muted" x="283.2" y="270" text-anchor="middle">10-24</text>
-<text class="muted" x="396.8" y="270" text-anchor="middle">10-24</text>
-<text class="muted" x="510.4" y="270" text-anchor="middle">10-24</text>
+<text class="muted" x="150.7" y="270" text-anchor="middle">10-24</text>
+<text class="muted" x="245.3" y="270" text-anchor="middle">10-24</text>
+<text class="muted" x="340.0" y="270" text-anchor="middle">10-24</text>
+<text class="muted" x="434.7" y="270" text-anchor="middle">10-24</text>
+<text class="muted" x="529.3" y="270" text-anchor="middle">10-25</text>
 <text class="muted" x="624.0" y="270" text-anchor="middle">10-25</text>
-<polyline class="raw line" points="56.0,120.9 169.6,91.9 283.2,90.7 396.8,89.4 510.4,90.4 624.0,89.0"/>
+<polyline class="raw line" points="56.0,120.9 150.7,91.9 245.3,90.7 340.0,89.4 434.7,90.4 529.3,89.0 624.0,89.0"/>
 <circle class="raw" cx="56.0" cy="120.9" r="4"><title>2026-10-20 4ece1b1 (main): raw 10,373,991 bytes</title></circle>
-<circle class="raw" cx="169.6" cy="91.9" r="4"><title>2026-10-24 3ff03cf (main): raw 12,670,295 bytes</title></circle>
-<circle class="raw hollow" cx="283.2" cy="90.7" r="4"><title>2026-10-24 5cb7a0a (story/text-kerning): raw 12,763,446 bytes</title></circle>
-<circle class="raw hollow" cx="396.8" cy="89.4" r="4"><title>2026-10-24 3082c82 (story/text-on-path): raw 12,866,733 bytes</title></circle>
-<circle class="raw" cx="510.4" cy="90.4" r="4"><title>2026-10-24 29a258c (main): raw 12,788,467 bytes</title></circle>
-<circle class="raw" cx="624.0" cy="89.0" r="4"><title>2026-10-25 63aa7d1 (main): raw 12,897,126 bytes</title></circle>
+<circle class="raw" cx="150.7" cy="91.9" r="4"><title>2026-10-24 3ff03cf (main): raw 12,670,295 bytes</title></circle>
+<circle class="raw hollow" cx="245.3" cy="90.7" r="4"><title>2026-10-24 5cb7a0a (story/text-kerning): raw 12,763,446 bytes</title></circle>
+<circle class="raw hollow" cx="340.0" cy="89.4" r="4"><title>2026-10-24 3082c82 (story/text-on-path): raw 12,866,733 bytes</title></circle>
+<circle class="raw" cx="434.7" cy="90.4" r="4"><title>2026-10-24 29a258c (main): raw 12,788,467 bytes</title></circle>
+<circle class="raw" cx="529.3" cy="89.0" r="4"><title>2026-10-25 63aa7d1 (main): raw 12,897,126 bytes</title></circle>
+<circle class="raw" cx="624.0" cy="89.0" r="4"><title>2026-10-25 d3204ba (main): raw 12,898,630 bytes</title></circle>
 <text class="ink" x="634.0" y="93.0">raw 12.30</text>
-<polyline class="gz line" points="56.0,209.0 169.6,198.9 283.2,198.6 396.8,198.1 510.4,198.5 624.0,198.0"/>
+<polyline class="gz line" points="56.0,209.0 150.7,198.9 245.3,198.6 340.0,198.1 434.7,198.5 529.3,198.0 624.0,198.0"/>
 <circle class="gz" cx="56.0" cy="209.0" r="4"><title>2026-10-20 4ece1b1 (main): gzip -9 3,405,489 bytes</title></circle>
-<circle class="gz" cx="169.6" cy="198.9" r="4"><title>2026-10-24 3ff03cf (main): gzip -9 4,202,645 bytes</title></circle>
-<circle class="gz hollow" cx="283.2" cy="198.6" r="4"><title>2026-10-24 5cb7a0a (story/text-kerning): gzip -9 4,227,451 bytes</title></circle>
-<circle class="gz hollow" cx="396.8" cy="198.1" r="4"><title>2026-10-24 3082c82 (story/text-on-path): gzip -9 4,268,422 bytes</title></circle>
-<circle class="gz" cx="510.4" cy="198.5" r="4"><title>2026-10-24 29a258c (main): gzip -9 4,232,978 bytes</title></circle>
-<circle class="gz" cx="624.0" cy="198.0" r="4"><title>2026-10-25 63aa7d1 (main): gzip -9 4,275,845 bytes</title></circle>
+<circle class="gz" cx="150.7" cy="198.9" r="4"><title>2026-10-24 3ff03cf (main): gzip -9 4,202,645 bytes</title></circle>
+<circle class="gz hollow" cx="245.3" cy="198.6" r="4"><title>2026-10-24 5cb7a0a (story/text-kerning): gzip -9 4,227,451 bytes</title></circle>
+<circle class="gz hollow" cx="340.0" cy="198.1" r="4"><title>2026-10-24 3082c82 (story/text-on-path): gzip -9 4,268,422 bytes</title></circle>
+<circle class="gz" cx="434.7" cy="198.5" r="4"><title>2026-10-24 29a258c (main): gzip -9 4,232,978 bytes</title></circle>
+<circle class="gz" cx="529.3" cy="198.0" r="4"><title>2026-10-25 63aa7d1 (main): gzip -9 4,275,845 bytes</title></circle>
+<circle class="gz" cx="624.0" cy="198.0" r="4"><title>2026-10-25 d3204ba (main): gzip -9 4,275,705 bytes</title></circle>
 <text class="ink" x="634.0" y="202.0">gzip -9 4.08</text>
 </svg>
