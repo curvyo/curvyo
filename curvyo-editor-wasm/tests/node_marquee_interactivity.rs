@@ -7,7 +7,7 @@
 //! - from the release, or Ctrl+A, to the finished draw list of the new selection at most 100 ms.
 //!
 //! Budgets are asserted in release builds only; a debug build runs a tenth of the size and
-//! prints the numbers.
+//! prints the numbers. The marquee frame budget is printed only on CI (see `check_off_ci`).
 //! Run: `cargo test --release -p curvyo-editor-wasm --test node_marquee_interactivity -- --nocapture`.
 
 #![allow(
@@ -82,6 +82,17 @@ fn check(name: &str, measured: Duration, budget: Duration) {
     }
 }
 
+/// The absolute frame budget is asserted on a developer machine only; on CI (`CI` set) it is
+/// printed: runners measured 18 to 19 ms of CPU time where a developer machine measures 10 ms
+/// (customer decision 2026-10-24 B for frame budgets, `docs/technical-debt.md`).
+fn check_off_ci(name: &str, measured: Duration, budget: Duration) {
+    if std::env::var_os("CI").is_some() {
+        println!("{name}: {measured:?} (budget {budget:?}, printed only on CI)");
+    } else {
+        check(name, measured, budget);
+    }
+}
+
 #[test]
 fn anchors_in_box_and_apply_stay_within_their_budgets() {
     let document = document();
@@ -149,7 +160,7 @@ fn the_marquee_frame_and_the_release_stay_within_their_budgets() {
         "plain Node frame {plain_frame:?}, marquee frame {marquee:?} (CPU time), ratio {:.2}",
         marquee.as_secs_f64() / plain_frame.as_secs_f64()
     );
-    check("marquee frame", marquee, Duration::from_micros(16_700));
+    check_off_ci("marquee frame", marquee, Duration::from_micros(16_700));
 
     let start = Instant::now();
     session.pointer_up(half_corner(), false, false);
