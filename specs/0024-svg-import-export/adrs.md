@@ -133,6 +133,14 @@ first importer (and, later, the first exporter). **One new ADR
   containers saves about 10 %). As the risk below foresaw, the two large budgets are restated
   from the measurement to 3.0 s and 3.5 s (`curvyo-ui-core/tests/svg_import_budget.rs`) until
   the PO confirms; the 100 ms budget holds.
+- **2026-10-26 (implementer, after the tester): budget 71 in thread CPU time.** The budget test
+  moved to `curvyo-editor-wasm/tests/svg_import_budget.rs` and times `Session::open_file` by
+  thread CPU time (`tests/cpu_time/`). Open of 20,000 paths: 2.32 s, 5,000 groups of 4: 2.27 s,
+  122 KB: 20 ms (one test per process). Profile of Open: read and map 0.11 s, session setup and
+  id minting under 1 ms, the Loro write 1.85 s with a warm heap; the remaining 0.4 s of a cold
+  run is kernel time for about 300,000 page faults while the heap first grows to 1.2 GB, not work
+  in our code, so nothing outside Loro can be trimmed. The restated 3.0 s and 3.5 s stay until
+  the customer confirms them.
 
 ## Risks for the plan (not decided here)
 

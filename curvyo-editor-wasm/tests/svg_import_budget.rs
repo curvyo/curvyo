@@ -1,16 +1,19 @@
-//! The budgets of the SVG import (`specs/0024-svg-import-export` criterion 71), from bytes to a
-//! finished document. The first two are restated from the measurement (`adrs.md`, risk "Budget 71
-//! is unproven", dated note 2026-10-26): Loro alone takes about 2.0 s for the two million anchor
-//! registers, so 2.0 s and 2.5 s become 3.0 s and 3.5 s until the PO decides. Native release
-//! builds only:
-//! `cargo test --release -p curvyo-ui-core --test svg_import_budget -- --ignored`.
-#![allow(clippy::unwrap_used)]
+//! The budgets of the SVG import (`specs/0024-svg-import-export` criterion 71): Open of the bytes
+//! to a finished session document, timed by the thread's CPU time (`CLAUDE.md` §5). The first two
+//! are restated from the measurement to 3.0 s and 3.5 s, to be confirmed by the customer
+//! (`adrs.md`, dated notes of 2026-10-26): the Loro write of the 400,000 anchors takes about
+//! 1.85 s on its own, and the first use of the 1.2 GB of heap it needs adds about 0.4 s of
+//! kernel page faults. Native release builds only:
+//! `cargo test --release -p curvyo-editor-wasm --test svg_import_budget -- --ignored --nocapture`.
+#![allow(clippy::unwrap_used, missing_docs)]
+
+mod cpu_time;
 
 use std::fmt::Write;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
-use curvyo_document_core::{AnchorId, Document, DrawingNode};
-use curvyo_ui_core::{SvgPlacement, svg_import};
+use cpu_time::cpu_time_of;
+use curvyo_editor_wasm::Session;
 
 /// `paths` paths of 20 nodes each (cubic segments), in groups of `per_group` when given.
 fn generated(paths: usize, per_group: Option<usize>) -> String {
@@ -51,28 +54,18 @@ fn generated(paths: usize, per_group: Option<usize>) -> String {
     text
 }
 
-/// Bytes to a finished document; returns the time.
-fn import(bytes: &[u8]) -> Duration {
-    let start = Instant::now();
-    let drawing = curvyo_svg_core::read_svg(bytes).unwrap();
-    let read = start.elapsed();
-    let import = svg_import(&drawing, SvgPlacement::File);
-    let mapped = start.elapsed();
-    let ids: Vec<AnchorId> = (0..DrawingNode::anchor_count(&import.nodes) as u64)
-        .map(|n| AnchorId::new(7, n))
-        .collect();
-    let document = Document::from_drawing(7, &import.page, &import.nodes, &ids).unwrap();
-    let elapsed = start.elapsed();
-    println!("read {read:?}, mapped {mapped:?}, written {elapsed:?}");
-    assert_ne!(document.children(None), []);
-    elapsed
+/// The CPU time of Open from bytes to a finished document.
+fn open(bytes: &[u8]) -> Duration {
+    let (mut session, took) = cpu_time_of(|| Session::open_file(7, bytes, "big.svg").unwrap());
+    assert_eq!(session.take_open_notice(), "", "something was imported");
+    took
 }
 
 #[test]
 #[ignore = "release-build budget, run by hand or in the performance job"]
 fn ac71_twenty_thousand_paths_in_three_seconds() {
     let text = generated(20_000, None);
-    let elapsed = import(text.as_bytes());
+    let elapsed = open(text.as_bytes());
     println!("20,000 paths, {} MB: {elapsed:?}", text.len() / 1_000_000);
     assert!(elapsed < Duration::from_millis(3000), "{elapsed:?}");
 }
@@ -81,7 +74,7 @@ fn ac71_twenty_thousand_paths_in_three_seconds() {
 #[ignore = "release-build budget, run by hand or in the performance job"]
 fn ac71_five_thousand_groups_of_four_in_three_and_a_half_seconds() {
     let text = generated(20_000, Some(4));
-    let elapsed = import(text.as_bytes());
+    let elapsed = open(text.as_bytes());
     println!("5,000 groups of 4: {elapsed:?}");
     assert!(elapsed < Duration::from_millis(3500), "{elapsed:?}");
 }
@@ -90,7 +83,7 @@ fn ac71_five_thousand_groups_of_four_in_three_and_a_half_seconds() {
 #[ignore = "release-build budget, run by hand or in the performance job"]
 fn ac71_a_hundred_kilobyte_file_in_a_tenth_of_a_second() {
     let text = generated(160, Some(8));
-    let elapsed = import(text.as_bytes());
+    let elapsed = open(text.as_bytes());
     println!("{} KB: {elapsed:?}", text.len() / 1000);
     assert!(elapsed < Duration::from_millis(100), "{elapsed:?}");
 }
