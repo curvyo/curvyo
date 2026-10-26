@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="10mm" height="10mm" viewBox="0 0 10 10">
+  <path d="M0 0 L1e308 1e308"/>
+  <path d="M NaN 0 L 1 1"/>
+  <rect width="1e400" height="1"/>
+  <circle r="-5"/>
+  <path transform="scale(1e300)" d="M0 0 H10 V10 Z"/>
+  <path d="M1 1 H9 V9 Z"/>
+</svg>

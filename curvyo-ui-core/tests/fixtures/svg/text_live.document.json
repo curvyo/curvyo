@@ -1,0 +1,31 @@
+{
+  "background": {
+    "color": [
+      232,
+      232,
+      235
+    ],
+    "opacity": 1.0,
+    "paint": "none"
+  },
+  "display_unit": "mm",
+  "leaves": 0,
+  "nodes": [
+    {
+      "Group": {
+        "children": [],
+        "layer": true,
+        "registers": {
+          "locked": false,
+          "name": "Layer 1",
+          "opacity": 1.0,
+          "visible": true
+        }
+      }
+    }
+  ],
+  "page": [
+    210.0,
+    297.0
+  ]
+}

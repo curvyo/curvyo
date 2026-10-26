@@ -38,6 +38,7 @@ mod document;
 mod document_background;
 mod document_presets;
 mod document_size;
+mod drawing_insert;
 mod ellipse_arc;
 mod error;
 mod format_edit;
@@ -126,6 +127,10 @@ pub use document_presets::{
 };
 pub use document_size::{
     DocumentSizeError, MAX_DOCUMENT_MM, MIN_DOCUMENT_MM, validated_document_side,
+};
+pub use drawing_insert::{
+    DrawingAnchor, DrawingNode, DrawingOutline, DrawingPage, DrawingRegisters,
+    IMPORT_SVG_COMMIT_LABEL,
 };
 pub use ellipse_arc::{
     ArcKind, EllipseArc, EllipseAxes, Linear, WHOLE_ARC_TOLERANCE_DEG, arc_after_linear_map,

@@ -1,0 +1,92 @@
+{
+  "background": {
+    "color": [
+      232,
+      232,
+      235
+    ],
+    "opacity": 1.0,
+    "paint": "none"
+  },
+  "display_unit": null,
+  "leaves": 1,
+  "nodes": [
+    {
+      "Group": {
+        "children": [
+          {
+            "Primitive": {
+              "registers": {
+                "locked": false,
+                "name": null,
+                "opacity": 1.0,
+                "visible": true
+              },
+              "rotation": 0.0,
+              "shape": {
+                "Rect": {
+                  "bounds": {
+                    "height": 25.4,
+                    "origin": {
+                      "x": 25.400000000000002,
+                      "y": 25.400000000000002
+                    },
+                    "width": 25.4
+                  },
+                  "corner_radii": {
+                    "bl": 0.0,
+                    "br": 0.0,
+                    "tl": 0.0,
+                    "tr": 0.0
+                  }
+                }
+              },
+              "style": {
+                "fill": {
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "enabled": false,
+                  "opacity": 1.0
+                },
+                "stroke": {
+                  "cap": "butt",
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "dash": [],
+                  "enabled": true,
+                  "join": "miter",
+                  "markers": {
+                    "end": "none",
+                    "mid": "none",
+                    "mid_count": 1,
+                    "mid_place": "spaced",
+                    "start": "none"
+                  },
+                  "opacity": 1.0,
+                  "width": 0.2822222222222222
+                }
+              }
+            }
+          }
+        ],
+        "layer": true,
+        "registers": {
+          "locked": false,
+          "name": "Layer 1",
+          "opacity": 1.0,
+          "visible": true
+        }
+      }
+    }
+  ],
+  "page": [
+    210.00000000028888,
+    296.9999999931111
+  ]
+}

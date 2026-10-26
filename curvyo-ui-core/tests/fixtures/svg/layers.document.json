@@ -1,0 +1,348 @@
+{
+  "background": {
+    "color": [
+      232,
+      232,
+      235
+    ],
+    "opacity": 1.0,
+    "paint": "none"
+  },
+  "display_unit": "mm",
+  "leaves": 4,
+  "nodes": [
+    {
+      "Group": {
+        "children": [
+          {
+            "Primitive": {
+              "registers": {
+                "locked": false,
+                "name": null,
+                "opacity": 1.0,
+                "visible": true
+              },
+              "rotation": 0.0,
+              "shape": {
+                "Rect": {
+                  "bounds": {
+                    "height": 30.0,
+                    "origin": {
+                      "x": 20.0,
+                      "y": 20.0
+                    },
+                    "width": 50.0
+                  },
+                  "corner_radii": {
+                    "bl": 0.0,
+                    "br": 0.0,
+                    "tl": 0.0,
+                    "tr": 0.0
+                  }
+                }
+              },
+              "style": {
+                "fill": {
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "enabled": false,
+                  "opacity": 1.0
+                },
+                "stroke": {
+                  "cap": "butt",
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 255
+                  },
+                  "dash": [],
+                  "enabled": true,
+                  "join": "miter",
+                  "markers": {
+                    "end": "none",
+                    "mid": "none",
+                    "mid_count": 1,
+                    "mid_place": "spaced",
+                    "start": "none"
+                  },
+                  "opacity": 1.0,
+                  "width": 0.1
+                }
+              }
+            }
+          },
+          {
+            "Group": {
+              "children": [
+                {
+                  "Primitive": {
+                    "registers": {
+                      "locked": false,
+                      "name": null,
+                      "opacity": 1.0,
+                      "visible": true
+                    },
+                    "rotation": 0.0,
+                    "shape": {
+                      "Ellipse": {
+                        "arc": null,
+                        "curve": 1.0,
+                        "frame": {
+                          "center": {
+                            "x": 35.0,
+                            "y": 35.0
+                          },
+                          "rx": 5.0,
+                          "ry": 5.0
+                        }
+                      }
+                    },
+                    "style": {
+                      "fill": {
+                        "color": {
+                          "b": 0,
+                          "g": 0,
+                          "r": 0
+                        },
+                        "enabled": false,
+                        "opacity": 1.0
+                      },
+                      "stroke": {
+                        "cap": "butt",
+                        "color": {
+                          "b": 0,
+                          "g": 0,
+                          "r": 255
+                        },
+                        "dash": [],
+                        "enabled": true,
+                        "join": "miter",
+                        "markers": {
+                          "end": "none",
+                          "mid": "none",
+                          "mid_count": 1,
+                          "mid_place": "spaced",
+                          "start": "none"
+                        },
+                        "opacity": 1.0,
+                        "width": 0.1
+                      }
+                    }
+                  }
+                }
+              ],
+              "layer": false,
+              "registers": {
+                "locked": false,
+                "name": "Holes",
+                "opacity": 1.0,
+                "visible": true
+              }
+            }
+          }
+        ],
+        "layer": true,
+        "registers": {
+          "locked": false,
+          "name": "Cut",
+          "opacity": 1.0,
+          "visible": true
+        }
+      }
+    },
+    {
+      "Group": {
+        "children": [
+          {
+            "Path": {
+              "outlines": [
+                {
+                  "anchors": [
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 42.5,
+                        "y": 56.0
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 72.5,
+                        "y": 56.0
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 57.5,
+                        "y": 76.0
+                      }
+                    }
+                  ],
+                  "closed": true
+                }
+              ],
+              "registers": {
+                "locked": false,
+                "name": null,
+                "opacity": 1.0,
+                "visible": true
+              },
+              "style": {
+                "fill": {
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "enabled": false,
+                  "opacity": 1.0
+                },
+                "stroke": {
+                  "cap": "butt",
+                  "color": {
+                    "b": 255,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "dash": [],
+                  "enabled": true,
+                  "join": "miter",
+                  "markers": {
+                    "end": "none",
+                    "mid": "none",
+                    "mid_count": 1,
+                    "mid_place": "spaced",
+                    "start": "none"
+                  },
+                  "opacity": 1.0,
+                  "width": 0.2
+                }
+              }
+            }
+          }
+        ],
+        "layer": true,
+        "registers": {
+          "locked": true,
+          "name": "Engrave",
+          "opacity": 0.5,
+          "visible": true
+        }
+      }
+    },
+    {
+      "Group": {
+        "children": [
+          {
+            "Primitive": {
+              "registers": {
+                "locked": false,
+                "name": null,
+                "opacity": 1.0,
+                "visible": true
+              },
+              "rotation": 0.0,
+              "shape": {
+                "Ellipse": {
+                  "arc": null,
+                  "curve": 1.0,
+                  "frame": {
+                    "center": {
+                      "x": 105.0,
+                      "y": 148.5
+                    },
+                    "rx": 80.0,
+                    "ry": 40.0
+                  }
+                }
+              },
+              "style": {
+                "fill": {
+                  "color": {
+                    "b": 204,
+                    "g": 204,
+                    "r": 204
+                  },
+                  "enabled": true,
+                  "opacity": 1.0
+                },
+                "stroke": {
+                  "cap": "butt",
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "dash": [],
+                  "enabled": false,
+                  "join": "miter",
+                  "markers": {
+                    "end": "none",
+                    "mid": "none",
+                    "mid_count": 1,
+                    "mid_place": "spaced",
+                    "start": "none"
+                  },
+                  "opacity": 1.0,
+                  "width": 0.25
+                }
+              }
+            }
+          }
+        ],
+        "layer": true,
+        "registers": {
+          "locked": false,
+          "name": "Reference",
+          "opacity": 1.0,
+          "visible": false
+        }
+      }
+    },
+    {
+      "Group": {
+        "children": [],
+        "layer": true,
+        "registers": {
+          "locked": false,
+          "name": "Empty",
+          "opacity": 1.0,
+          "visible": true
+        }
+      }
+    }
+  ],
+  "page": [
+    210.0,
+    297.0
+  ]
+}

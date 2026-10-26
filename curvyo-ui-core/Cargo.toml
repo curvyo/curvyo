@@ -13,6 +13,8 @@ workspace = true
 curvyo-document-core = { path = "../curvyo-document-core", version = "0.1.0" }
 curvyo-geometry-core = { path = "../curvyo-geometry-core", version = "0.1.0" }
 curvyo-text-core = { path = "../curvyo-text-core", version = "0.1.0" }
+# The SVG reader whose drawing `svg_import` maps to the document (ADR 0018 §2).
+curvyo-svg-core = { path = "../curvyo-svg-core", version = "0.1.0" }
 kurbo.workspace = true
 serde.workspace = true
 thiserror.workspace = true

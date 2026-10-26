@@ -218,6 +218,30 @@ pub struct LeafStyle {
     pub join: Option<Join>,
 }
 
+impl SvgDrawing {
+    /// The bounding box in millimetres of the whole drawing: the true outlines (clones through
+    /// their chain), the stroke excluded, hidden objects included; `None` when it has no leaf.
+    #[must_use]
+    pub fn bounds(&self) -> Option<Rect> {
+        crate::read::bounds_of(&self.nodes)
+    }
+
+    /// How many leaves the drawing has.
+    #[must_use]
+    pub fn leaf_count(&self) -> usize {
+        fn count(nodes: &[SvgNode]) -> usize {
+            nodes
+                .iter()
+                .map(|n| match n {
+                    SvgNode::Group { children, .. } => count(children),
+                    SvgNode::Leaf { .. } => 1,
+                })
+                .sum()
+        }
+        count(&self.nodes)
+    }
+}
+
 impl SvgNode {
     /// The registers of this node.
     #[must_use]
@@ -253,7 +277,8 @@ impl LeafKind {
 }
 
 /// A rectangle with elliptical corners of radii `rx`, `ry` as a path: clockwise on the screen
-/// from the start of the top edge, each corner one quarter of an ellipse in two cubics.
+/// from the start of the top right corner, each corner a quarter of an ellipse in two cubics;
+/// the closing segment is the top edge, so no node repeats.
 #[must_use]
 pub fn rounded_rect(rect: Rect, rx: f64, ry: f64) -> BezPath {
     if rx <= 0.0 || ry <= 0.0 {
@@ -270,9 +295,12 @@ pub fn rounded_rect(rect: Rect, rx: f64, ry: f64) -> BezPath {
         Point::new(center.x + rx * cos, center.y + ry * sin)
     };
     let mut path = BezPath::new();
-    path.move_to(Point::new(rect.x0 + rx, rect.y0));
-    for (center, turn) in corners {
-        path.line_to(at(center, turn));
+    for (index, (center, turn)) in corners.into_iter().enumerate() {
+        if index == 0 {
+            path.move_to(Point::new(rect.x1 - rx, rect.y0));
+        } else {
+            path.line_to(at(center, turn));
+        }
         let arc = kurbo::Arc::new(
             center,
             (rx, ry),

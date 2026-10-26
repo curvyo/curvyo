@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="10mm" height="10mm" viewBox="0 0 10 10">
+  <image xlink:href="http://example.com/x.png" width="5" height="5"/>
+  <use xlink:href="http://example.com/a.svg#x"/>
+  <use xlink:href="file:///etc/passwd#x"/>
+  <path fill="url(http://example.com/g.svg#g)" d="M1 1 H9 V9 Z"/>
+</svg>

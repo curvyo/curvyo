@@ -1,0 +1,71 @@
+{
+  "background": null,
+  "display_unit": null,
+  "leaves": 1,
+  "nodes": [
+    {
+      "Primitive": {
+        "registers": {
+          "locked": false,
+          "name": null,
+          "opacity": 1.0,
+          "visible": true
+        },
+        "rotation": 0.0,
+        "shape": {
+          "Rect": {
+            "bounds": {
+              "height": 25.4,
+              "origin": {
+                "x": 25.400000000000002,
+                "y": 0.0
+              },
+              "width": 25.4
+            },
+            "corner_radii": {
+              "bl": 0.0,
+              "br": 0.0,
+              "tl": 0.0,
+              "tr": 0.0
+            }
+          }
+        },
+        "style": {
+          "fill": {
+            "color": {
+              "b": 204,
+              "g": 102,
+              "r": 51
+            },
+            "enabled": true,
+            "opacity": 1.0
+          },
+          "stroke": {
+            "cap": "butt",
+            "color": {
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "dash": [],
+            "enabled": false,
+            "join": "miter",
+            "markers": {
+              "end": "none",
+              "mid": "none",
+              "mid_count": 1,
+              "mid_place": "spaced",
+              "start": "none"
+            },
+            "opacity": 1.0,
+            "width": 0.25
+          }
+        }
+      }
+    }
+  ],
+  "page": [
+    50.8,
+    25.4
+  ]
+}
