@@ -115,11 +115,6 @@ pub enum SelectDoubleClickOutcome {
     /// handoff and nothing changes; the caller shows the edit hint chip
     /// (criterion 32, which replaces criterion 23 of slice 4).
     EditHint,
-    /// A compound path was hit: its nodes cannot be edited yet, so there is no
-    /// handoff to the Node tool and nothing changes (`specs/0016-boolean-
-    /// operations` criterion 38). The caller may show the sentence "Nodes of
-    /// compound paths cannot be edited yet."
-    CompoundPath,
     /// A linked clone was hit: it has no nodes, the tool stays and a hint names the way out
     /// (`specs/0049-linked-clone` criterion 26).
     Clone,

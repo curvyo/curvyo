@@ -71,13 +71,7 @@ impl Session {
         let mut list = build_artwork_with_guides(&artwork_objects, &guides, view);
         // The blue half of a segment bend, over the artwork and under the nodes and handles.
         list.extend(self.bend_preview_list(view, &objects));
-        // A compound path shows no node, handle or segment (`0016-boolean-operations` criterion 38).
-        let editable: Vec<_> = paths
-            .iter()
-            .filter(|path| !path.is_compound())
-            .cloned()
-            .collect();
-        list.extend(build_decorations(&editable, view, &self.decoration_input()));
+        list.extend(build_decorations(&paths, view, &self.decoration_input()));
         // The origin axes of an axis-locked move: above the artwork, below the
         // blue outline, the boxes and the handles (criterion 27).
         if let Some(axes) = self.move_axes_in(&objects) {

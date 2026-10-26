@@ -845,8 +845,11 @@ fn circle_anchors(cx: f64, cy: f64, r: f64) -> Vec<NewAnchor> {
     ]
 }
 
+/// `0031` criterion 6's compound-path exclusion is withdrawn by
+/// `specs/0055-compound-path-node-editing` criterion 3: a segment of a compound path bends as on
+/// an ordinary path, in one `bend_segment` commit.
 #[test]
-fn c6_a_compound_path_cannot_be_bent() {
+fn c6_a_compound_path_can_be_bent() {
     let d = Document::new(1);
     d.create_path(&circle_anchors(100.0, 100.0, 60.0), true);
     d.create_path(&circle_anchors(100.0, 100.0, 30.0), true);
@@ -869,12 +872,8 @@ fn c6_a_compound_path_cannot_be_bent() {
         100.0 - r * 0.5f64.sqrt() * 1.0,
     );
     drag(&mut s, on, pt(on.x + 15.0, on.y - 15.0), false);
-    assert_eq!(bend_labels(&s), 0);
-    assert_eq!(
-        json(&s),
-        before,
-        "a compound path is left alone in the Node tool"
-    );
+    assert_eq!(bend_labels(&s), 1);
+    assert_ne!(json(&s), before, "the outer outline was bent");
 }
 
 // ---------------------------------------------------------------------------------------------

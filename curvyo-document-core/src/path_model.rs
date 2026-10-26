@@ -334,6 +334,20 @@ impl PathSnapshot {
             .chain(self.extra_subpaths.iter().flat_map(|s| s.anchors.iter()))
     }
 
+    /// The anchor `id`, in whichever outline holds it.
+    #[must_use]
+    pub fn anchor(&self, id: AnchorId) -> Option<&AnchorSnapshot> {
+        self.all_anchors().find(|anchor| anchor.id == id)
+    }
+
+    /// The outline that holds the anchor `id` (`specs/0055-compound-path-node-editing`: a node of
+    /// a compound path is named without an outline index, so the outline is found by its node).
+    #[must_use]
+    pub fn outline_of(&self, id: AnchorId) -> Option<SubpathRef<'_>> {
+        self.subpaths()
+            .find(|outline| outline.anchors.iter().any(|anchor| anchor.id == id))
+    }
+
     /// Every anchor of every outline, mutably, in the same order.
     pub fn all_anchors_mut(&mut self) -> impl Iterator<Item = &mut AnchorSnapshot> {
         self.anchors.iter_mut().chain(
@@ -382,9 +396,9 @@ pub enum PathEditError {
     /// or less would make the file refuse to open.
     #[error("a stroke width must be a finite number greater than zero")]
     InvalidStrokeWidth,
-    /// `Document::extend_path`, `connect_paths` or `close_paths` refused: the path to grow is
-    /// closed, compound, the same object as the one to absorb, or the absorbed one is closed or
-    /// compound (`specs/0034-pen-path-extension`).
+    /// `Document::extend_path`, `connect_paths` or `close_paths` refused: the outline to grow or
+    /// to absorb is closed or does not end at the named node, or the path to grow is the one to
+    /// absorb (`specs/0034-pen-path-extension`, `specs/0055-compound-path-node-editing`).
     #[error("this path cannot be extended or connected")]
     NotExtendable,
     /// `Document::close_paths` refused: the closed result would have fewer than three anchors.

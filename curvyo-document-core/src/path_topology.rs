@@ -1,9 +1,10 @@
 //! Join and Split — the two path-restructuring commands
 //! (`specs/0006-path-merge-split-and-node-types/adrs.md`, "Join and
 //! Split are anchor-list surgery on the existing schema: no new
-//! register, no curve evaluation"). Split out of [`crate::paths`]
-//! (architect review: that module had grown past `CLAUDE.md` §5's
-//! ~500-line guidance with no reason given) — this module owns exactly
+//! register, no curve evaluation"), on any outline of a path
+//! (`specs/0055-compound-path-node-editing` criteria 5 and 6). Split out of
+//! [`crate::paths`] (architect review: that module had grown past `CLAUDE.md`
+//! §5's ~500-line guidance with no reason given) — this module owns exactly
 //! the two topology-changing operations and the helpers only they need;
 //! [`crate::paths`] keeps the per-anchor/per-path field edits plus the
 //! `path_parts`/`create_path_uncommitted`/`tree_id_of` helpers both
@@ -17,6 +18,7 @@ use crate::path_codec::{
 };
 use crate::path_model::{AnchorId, AnchorKind, NewAnchor, NodeId, PathEditError, PathSnapshot};
 use crate::path_reverse::reversed_anchors;
+use crate::subpath_codec::{append_outlines, insert_outline, remove_outlines};
 use crate::units::Vec2;
 
 /// One of [`Document::split_at_anchor`]'s two resulting coincident
@@ -25,53 +27,104 @@ use crate::units::Vec2;
 /// (`clippy::type_complexity`).
 type SplitEndpoint = (NodeId, AnchorId);
 
-/// What `Document::resolve_join` found: the one-path case (acceptance
-/// criterion 10) or the two-object case (criterion 9), each carrying
-/// everything `join_endpoints` needs to act and nothing `check_join`
-/// needs to re-derive.
+/// One node of a path found in its outline: the path's snapshot, the outline's number in storage
+/// order (`0` for the first) and the node's index in it.
+struct OutlineNode {
+    path: NodeId,
+    snapshot: PathSnapshot,
+    outline: usize,
+    index: usize,
+}
+
+impl OutlineNode {
+    /// Finds `anchor` in whichever outline of `path` holds it.
+    fn find(document: &Document, path: NodeId, anchor: AnchorId) -> Result<Self, PathEditError> {
+        let snapshot = document.path(path).ok_or(PathEditError::NoSuchPath)?;
+        let (outline, index) = snapshot
+            .subpaths()
+            .enumerate()
+            .find_map(|(outline, subpath)| {
+                subpath
+                    .anchors
+                    .iter()
+                    .position(|a| a.id == anchor)
+                    .map(|index| (outline, index))
+            })
+            .ok_or(PathEditError::NoSuchAnchor)?;
+        Ok(Self {
+            path,
+            snapshot,
+            outline,
+            index,
+        })
+    }
+
+    /// The outline's anchors, as read.
+    fn anchors(&self) -> &[NewAnchor] {
+        self.outline_ref().anchors
+    }
+
+    fn closed(&self) -> bool {
+        self.outline_ref().closed
+    }
+
+    fn outline_ref(&self) -> crate::path_model::SubpathRef<'_> {
+        // invariant: `outline` was found among these same subpaths in `find`.
+        #[allow(clippy::unwrap_used)]
+        self.snapshot.subpaths().nth(self.outline).unwrap()
+    }
+
+    /// Whether the node is the first or last of an open outline.
+    fn is_open_end(&self) -> bool {
+        !self.closed() && (self.index == 0 || self.index == self.anchors().len() - 1)
+    }
+
+    fn is_last(&self) -> bool {
+        self.index == self.anchors().len() - 1
+    }
+
+    fn anchor(&self) -> &NewAnchor {
+        &self.anchors()[self.index]
+    }
+}
+
+/// What `Document::resolve_join` found: the ends of one outline (acceptance
+/// criterion 10, `0055` criterion 5 a), or the ends of two outlines, of one
+/// object or of two (criterion 9, `0055` criterion 5 b and c), each carrying
+/// everything `join_endpoints` needs to act and nothing `check_join` needs to
+/// re-derive.
 enum JoinPlan {
-    SamePath {
-        path: NodeId,
-        snapshot: PathSnapshot,
-    },
-    TwoObjects {
-        a_path: NodeId,
-        a_snapshot: PathSnapshot,
-        a_index: usize,
-        b_path: NodeId,
-        b_snapshot: PathSnapshot,
-        b_index: usize,
-    },
+    SameOutline(OutlineNode),
+    TwoOutlines { a: OutlineNode, b: OutlineNode },
 }
 
 impl Document {
     /// Merges two selected endpoint nodes into one
     /// (`specs/0006-path-merge-split-and-node-types/adrs.md`, "Join is
-    /// `Document::join_endpoints`"; acceptance criteria 8, 9, 10, 11).
-    /// Works identically whether `a_path`/`b_path` name the same path
-    /// (criterion 10: the one path's own two endpoints close it into a
-    /// loop) or two different path objects (criterion 9: the second
-    /// object is deleted and its content folds into the first) — the
-    /// document model makes no distinction between the two; only the
-    /// maker's selection mechanism decides which call a given gesture
-    /// becomes (the cross-object case needs `canvas-navigation-and-
-    /// selection`'s `ObjectSelection` to select two path objects first,
-    /// which is not wired up to this command yet; the same-path case
-    /// needs only `path-node-editing`'s existing Node tool).
+    /// `Document::join_endpoints`"; acceptance criteria 8, 9, 10, 11), on
+    /// any open outline of a path (`specs/0055-compound-path-node-editing`
+    /// criterion 5):
+    ///
+    /// - **the two ends of one outline** close it (criterion 10);
+    /// - **ends of two outlines of one object** become one outline of that
+    ///   object, in the place of `a`'s outline;
+    /// - **ends in two objects:** `a`'s object survives with its id, style and
+    ///   place, the joined outline stands where `a`'s outline stood, the other
+    ///   object's remaining outlines are appended in their order, and the other
+    ///   object is removed.
     ///
     /// `a_anchor`/`b_anchor` are in **selection order** (`a` = first-
-    /// selected, `b` = second-selected) — load-bearing only for the
-    /// cross-object case: `a`'s path survives with its own node order
-    /// never reversed; `b`'s path is appended/prepended, reversed only
-    /// when needed to meet at the junction (criterion 9's four bullet
-    /// points). The one-path case's result does not depend on which
-    /// endpoint is named `a` or which `b`.
+    /// selected, `b` = second-selected): `a`'s outline keeps its own node
+    /// order; `b`'s is appended or prepended, reversed only when needed to
+    /// meet at the junction (criterion 9's four bullet points). The
+    /// one-outline case's result does not depend on which endpoint is named
+    /// `a` or which `b`.
     ///
     /// Refuses (writes nothing) unless both anchors resolve, both are
-    /// the first-or-last anchor of an *open* path, they are not the same
-    /// anchor, and — for two ends of the same path — that path has more
-    /// than two anchors (joining a 2-anchor open path would produce a
-    /// 1-anchor closed path `curvyo-render-core::stroke` cannot draw).
+    /// the first-or-last anchor of an *open* outline, they are not the same
+    /// anchor, and — for two ends of the same outline — that outline has more
+    /// than two anchors (joining a 2-anchor open outline would produce a
+    /// 1-anchor closed one `curvyo-render-core::stroke` cannot draw).
     ///
     /// # Errors
     /// [`PathEditError::NoSuchPath`] / [`PathEditError::NoSuchAnchor`] if
@@ -86,15 +139,8 @@ impl Document {
         b_anchor: AnchorId,
     ) -> Result<(NodeId, AnchorId), PathEditError> {
         match self.resolve_join(a_path, a_anchor, b_path, b_anchor)? {
-            JoinPlan::SamePath { path, snapshot } => self.join_same_path(path, &snapshot),
-            JoinPlan::TwoObjects {
-                a_path,
-                a_snapshot,
-                a_index,
-                b_path,
-                b_snapshot,
-                b_index,
-            } => self.join_two_objects(a_path, &a_snapshot, a_index, b_path, &b_snapshot, b_index),
+            JoinPlan::SameOutline(node) => self.join_one_outline(&node),
+            JoinPlan::TwoOutlines { a, b } => self.join_two_outlines(&a, &b),
         }
     }
 
@@ -129,71 +175,41 @@ impl Document {
         b_path: NodeId,
         b_anchor: AnchorId,
     ) -> Result<JoinPlan, PathEditError> {
-        let a_snapshot = self.path(a_path).ok_or(PathEditError::NoSuchPath)?;
-        if a_snapshot.is_compound() {
-            // A compound path has no editable nodes yet (specs/0016-boolean-
-            // operations criterion 38a).
+        let a = OutlineNode::find(self, a_path, a_anchor)?;
+        if !a.is_open_end() {
             return Err(PathEditError::NotJoinable);
         }
-        let a_index = index_of(&a_snapshot, a_anchor)?;
-        if a_snapshot.closed || !is_endpoint(&a_snapshot, a_index) {
+        let b = OutlineNode::find(self, b_path, b_anchor)?;
+        if !b.is_open_end() || (a_path == b_path && a_anchor == b_anchor) {
             return Err(PathEditError::NotJoinable);
         }
-
-        if a_path == b_path {
-            if a_anchor == b_anchor {
+        // A linked clone has no nodes to join (`specs/0049-linked-clone` criterion 26).
+        self.path_parts(a_path)?;
+        self.path_parts(b_path)?;
+        if a_path == b_path && a.outline == b.outline {
+            if a.anchors().len() <= 2 {
                 return Err(PathEditError::NotJoinable);
             }
-            let b_index = index_of(&a_snapshot, b_anchor)?;
-            if !is_endpoint(&a_snapshot, b_index) {
-                return Err(PathEditError::NotJoinable);
-            }
-            if a_snapshot.anchors.len() <= 2 {
-                return Err(PathEditError::NotJoinable);
-            }
-            return Ok(JoinPlan::SamePath {
-                path: a_path,
-                snapshot: a_snapshot,
-            });
+            return Ok(JoinPlan::SameOutline(a));
         }
-
-        let b_snapshot = self.path(b_path).ok_or(PathEditError::NoSuchPath)?;
-        if b_snapshot.is_compound() {
-            return Err(PathEditError::NotJoinable);
-        }
-        let b_index = index_of(&b_snapshot, b_anchor)?;
-        if b_snapshot.closed || !is_endpoint(&b_snapshot, b_index) {
-            return Err(PathEditError::NotJoinable);
-        }
-
-        Ok(JoinPlan::TwoObjects {
-            a_path,
-            a_snapshot,
-            a_index,
-            b_path,
-            b_snapshot,
-            b_index,
-        })
+        Ok(JoinPlan::TwoOutlines { a, b })
     }
 
-    /// The one-path half of [`Document::join_endpoints`] (acceptance
+    /// The one-outline half of [`Document::join_endpoints`] (acceptance
     /// criterion 10): `anchors[0]` survives (keeps its id) at list
     /// position 0, `anchors[len - 1]` is removed, `closed` becomes
-    /// `true`. Same midpoint/handle/Corner-kind rule as the two-object
+    /// `true`. Same midpoint/handle/Corner-kind rule as the two-outline
     /// case — `anchors[0]`'s own interior-facing handle (`handle_out`,
-    /// since it is the path's first anchor) is already correct and left
+    /// since it is the outline's first anchor) is already correct and left
     /// untouched; only `point`, `handle_in` (transplanted from the
     /// removed anchor's own interior-facing `handle_in`) and `kind` are
     /// written.
-    fn join_same_path(
-        &self,
-        path: NodeId,
-        snapshot: &PathSnapshot,
-    ) -> Result<(NodeId, AnchorId), PathEditError> {
-        let (meta, anchors) = self.path_parts(path)?;
-        let len = snapshot.anchors.len();
-        let first = &snapshot.anchors[0];
-        let last = &snapshot.anchors[len - 1];
+    fn join_one_outline(&self, node: &OutlineNode) -> Result<(NodeId, AnchorId), PathEditError> {
+        let (outline, anchors) = self.outline_parts(node.path, node.anchor().id)?;
+        let outline_anchors = node.anchors();
+        let len = outline_anchors.len();
+        let first = &outline_anchors[0];
+        let last = &outline_anchors[len - 1];
         let merged = merged_junction(first, false, last, true);
         let map = anchor_map_at(&anchors, 0);
         write_point(&map, KEY_POINT, merged.point);
@@ -203,94 +219,109 @@ impl Document {
         // snapshot, so `len - 1` is this list's own last valid index.
         #[allow(clippy::unwrap_used)]
         anchors.delete(len - 1, 1).unwrap();
-        write_closed(&meta, true);
+        write_closed(&outline, true);
         self.commit_with_label("join_endpoints");
-        Ok((path, first.id))
+        Ok((node.path, first.id))
     }
 
-    /// The two-object half of [`Document::join_endpoints`] (acceptance
-    /// criterion 9). `a_path` survives with its own `NodeId` and every
-    /// non-anchor register; `b_path`'s tree node is deleted outright.
-    /// `b`'s remaining anchors (every one except the join anchor itself)
-    /// are copied — keeping their own `AnchorId`s, per `specs/0006-path-
-    /// merge-split-and-node-types/adrs.md`'s "moved anchors keep their
-    /// `AnchorId`s (globally unique), so selection survives" — into
-    /// `a_path`'s own movable list, reversed (and each one's handles
-    /// swapped) exactly when `a` and `b` are the *same* kind of end
-    /// (both first, or both last), so the two selected nodes land
-    /// adjacent at the junction regardless of which combination of ends
-    /// was selected.
-    fn join_two_objects(
+    /// The two-outline half of [`Document::join_endpoints`] (acceptance
+    /// criterion 9, `0055` criterion 5 b and c). `a`'s outline takes `b`'s
+    /// remaining anchors (every one except the join anchor itself), keeping
+    /// their own `AnchorId`s — per `specs/0006-path-merge-split-and-node-
+    /// types/adrs.md`'s "moved anchors keep their `AnchorId`s (globally
+    /// unique), so selection survives" — reversed (and each one's handles
+    /// swapped) exactly when `a` and `b` are the *same* kind of end (both
+    /// first, or both last), so the two selected nodes land adjacent at the
+    /// junction regardless of which combination of ends was selected. Then
+    /// `b`'s outline is removed: from the same object by the outline removal
+    /// rule, or with its whole object, whose other outlines are appended to
+    /// `a`'s object first.
+    fn join_two_outlines(
         &self,
-        a_path: NodeId,
-        a_snapshot: &PathSnapshot,
-        a_index: usize,
-        b_path: NodeId,
-        b_snapshot: &PathSnapshot,
-        b_index: usize,
+        a: &OutlineNode,
+        b: &OutlineNode,
     ) -> Result<(NodeId, AnchorId), PathEditError> {
-        let a_anchor = &a_snapshot.anchors[a_index];
-        let b_anchor = &b_snapshot.anchors[b_index];
-        let a_is_last = a_index == a_snapshot.anchors.len() - 1;
-        let b_is_last = b_index == b_snapshot.anchors.len() - 1;
+        let a_anchor = a.anchor();
+        let a_is_last = a.is_last();
+        let b_is_last = b.is_last();
         // Each side's own interior-facing handle is read *before* any
         // reversal — a structural fact of being a first- or last-anchor,
         // unaffected by how the list is later reordered.
-        let merged = merged_junction(a_anchor, a_is_last, b_anchor, b_is_last);
+        let merged = merged_junction(a_anchor, a_is_last, b.anchor(), b_is_last);
 
-        let mut rest: Vec<NewAnchor> = b_snapshot
-            .anchors
+        let mut rest: Vec<NewAnchor> = b
+            .anchors()
             .iter()
             .enumerate()
-            .filter(|&(index, _)| index != b_index)
+            .filter(|&(index, _)| index != b.index)
             .map(|(_, anchor)| *anchor)
             .collect();
         if a_is_last == b_is_last {
             rest = reversed_anchors(&rest);
         }
 
-        let (_, a_anchors) = self.path_parts(a_path)?;
-        let a_map = anchor_map_at(&a_anchors, a_index);
+        let (a_meta, _) = self.path_parts(a.path)?;
+        let (_, a_anchors) = self.outline_parts(a.path, a_anchor.id)?;
+        let a_map = anchor_map_at(&a_anchors, a.index);
         write_point(&a_map, KEY_POINT, merged.point);
         write_kind(&a_map, merged.kind);
         write_vec2(&a_map, KEY_HANDLE_IN, merged.handle_in);
         write_vec2(&a_map, KEY_HANDLE_OUT, merged.handle_out);
-        if a_is_last {
-            for (offset, anchor) in rest.iter().enumerate() {
-                insert_anchor_at(&a_anchors, a_index + 1 + offset, anchor);
-            }
-        } else {
-            for (offset, anchor) in rest.iter().enumerate() {
-                insert_anchor_at(&a_anchors, offset, anchor);
-            }
+        let at = if a_is_last { a.index + 1 } else { 0 };
+        for (offset, anchor) in rest.iter().enumerate() {
+            insert_anchor_at(&a_anchors, at + offset, anchor);
         }
 
-        let tree = self.loro().get_tree(OBJECTS_TREE);
-        let b_tree_id = crate::paths::tree_id_of(b_path);
-        // The joined path is a guide only when both were (`specs/0046-document-shapes`
-        // criterion 34); `a` keeps its node, so only a guide `a` joined to an ordinary `b` changes.
-        let a_tree_id = crate::paths::tree_id_of(a_path);
-        if !crate::guides::all_guides(&tree, &[a_tree_id, b_tree_id])
-            && let Ok(a_meta) = tree.get_meta(a_tree_id)
-            && crate::node_registers::read_registers(&a_meta).guide
-        {
-            crate::guides::write_guide(&a_meta, false);
+        if a.path == b.path {
+            remove_outlines(&a_meta, &[b.outline]);
+            // A text on `b`'s outline now sits on the joined one; one on a later outline stays.
+            let (joined, gone) = (to_u32(a.outline), to_u32(b.outline));
+            crate::text_carrier::renumber_carried_outlines(
+                &self.loro().get_tree(OBJECTS_TREE),
+                a.path,
+                &|old| {
+                    let old = if old == gone { joined } else { old };
+                    if old > gone { old - 1 } else { old }
+                },
+            );
+        } else {
+            let others: Vec<(Vec<NewAnchor>, bool)> = b
+                .snapshot
+                .subpaths()
+                .enumerate()
+                .filter(|&(outline, _)| outline != b.outline)
+                .map(|(_, subpath)| (subpath.anchors.to_vec(), subpath.closed))
+                .collect();
+            append_outlines(&a_meta, &others);
+            let tree = self.loro().get_tree(OBJECTS_TREE);
+            let b_tree_id = crate::paths::tree_id_of(b.path);
+            // The joined path is a guide only when both were (`specs/0046-document-shapes`
+            // criterion 34); `a` keeps its node, so only a guide `a` joined to an ordinary `b`
+            // changes.
+            let a_tree_id = crate::paths::tree_id_of(a.path);
+            if !crate::guides::all_guides(&tree, &[a_tree_id, b_tree_id])
+                && crate::node_registers::read_registers(&a_meta).guide
+            {
+                crate::guides::write_guide(&a_meta, false);
+            }
+            self.repair_clones_of_removed(&tree, &[b_tree_id]);
+            let parents = crate::group_tree::parents_of(&tree, &[b_tree_id]);
+            // invariant: `resolve_join` resolved this same node moments ago.
+            #[allow(clippy::unwrap_used)]
+            tree.delete(b_tree_id).unwrap();
+            crate::groups::remove_emptied_groups(&tree, &parents);
         }
-        self.repair_clones_of_removed(&tree, &[b_tree_id]);
-        let parents = crate::group_tree::parents_of(&tree, &[b_tree_id]);
-        // invariant: `self.path(b_path)` resolved this same node moments
-        // ago in `join_endpoints`.
-        #[allow(clippy::unwrap_used)]
-        tree.delete(b_tree_id).unwrap();
-        crate::groups::remove_emptied_groups(&tree, &parents);
 
         self.commit_with_label("join_endpoints");
-        Ok((a_path, a_anchor.id))
+        Ok((a.path, a_anchor.id))
     }
 
     /// Breaks a path apart at one selected node (`specs/0006-path-merge-
     /// split-and-node-types/adrs.md`, "Split is `Document::
-    /// split_at_anchor`, Join's inverse"; acceptance criteria 12-15).
+    /// split_at_anchor`, Join's inverse"; acceptance criteria 12-15). On a
+    /// compound path (`specs/0055-compound-path-node-editing` criterion 6)
+    /// the object stays one object: an open outline splits into two outlines
+    /// in its place, first part first, and a closed outline opens in place.
     ///
     /// `new_id` is a fresh [`AnchorId`] the caller mints
     /// (`curvyo-ui-core`'s `AnchorIdMinter`) for the second of the two
@@ -298,8 +329,8 @@ impl Document {
     /// (`CLAUDE.md` §6).
     ///
     /// Refuses (writes nothing) unless `anchor` resolves and is either an
-    /// interior node of an open path or any node of a closed path — the
-    /// first or last anchor of an open path has nothing on one side to
+    /// interior node of an open outline or any node of a closed one — the
+    /// first or last anchor of an open outline has nothing on one side to
     /// split off (acceptance criterion 12).
     ///
     /// # Errors
@@ -313,11 +344,13 @@ impl Document {
         anchor: AnchorId,
         new_id: AnchorId,
     ) -> Result<(SplitEndpoint, SplitEndpoint), PathEditError> {
-        let (snapshot, index) = self.resolve_split(path, anchor)?;
-        if snapshot.closed {
-            self.split_closed_path(path, &snapshot, index, new_id)
+        let node = self.resolve_split(path, anchor)?;
+        if node.closed() {
+            self.split_closed_outline(&node, new_id)
+        } else if node.snapshot.is_compound() {
+            self.split_open_outline(&node, new_id)
         } else {
-            self.split_open_path(path, &snapshot, index, new_id)
+            self.split_open_path(&node, new_id)
         }
     }
 
@@ -337,20 +370,53 @@ impl Document {
     /// without writing anything — shared by `split_at_anchor` itself and
     /// [`Document::check_split`], so the refusal rule exists in exactly
     /// one place.
-    fn resolve_split(
+    fn resolve_split(&self, path: NodeId, anchor: AnchorId) -> Result<OutlineNode, PathEditError> {
+        let node = OutlineNode::find(self, path, anchor)?;
+        if node.is_open_end() {
+            return Err(PathEditError::NotSplittable);
+        }
+        // A linked clone has no nodes to split (`specs/0049-linked-clone` criterion 26).
+        self.path_parts(path)?;
+        Ok(node)
+    }
+
+    /// The two copies of the split node: the first part's last node keeps
+    /// the incoming handle (its outgoing one retracted), the second part's
+    /// first node, with `new_id`, keeps the outgoing handle (its incoming one
+    /// retracted). Both become `Corner`.
+    fn split_copy(node: &OutlineNode, new_id: AnchorId) -> NewAnchor {
+        let split_anchor = node.anchor();
+        NewAnchor {
+            id: new_id,
+            point: split_anchor.point,
+            handle_in: Vec2::ZERO,
+            handle_out: split_anchor.handle_out,
+            kind: AnchorKind::Corner,
+        }
+    }
+
+    /// Cuts an open outline after the split node: retracts that node's
+    /// outgoing handle, makes it a corner and deletes the anchors after it.
+    /// Returns the second part's anchors, the copy first.
+    fn cut_open_outline(
         &self,
-        path: NodeId,
-        anchor: AnchorId,
-    ) -> Result<(PathSnapshot, usize), PathEditError> {
-        let snapshot = self.path(path).ok_or(PathEditError::NoSuchPath)?;
-        if snapshot.is_compound() {
-            return Err(PathEditError::NotSplittable);
+        node: &OutlineNode,
+        new_id: AnchorId,
+    ) -> Result<Vec<NewAnchor>, PathEditError> {
+        let (_, anchors) = self.outline_parts(node.path, node.anchor().id)?;
+        let index = node.index;
+        let original_map = anchor_map_at(&anchors, index);
+        write_vec2(&original_map, KEY_HANDLE_OUT, Vec2::ZERO);
+        write_kind(&original_map, AnchorKind::Corner);
+        let len = anchors.len();
+        if index + 1 < len {
+            // invariant: `len` was just read from this same list.
+            #[allow(clippy::unwrap_used)]
+            anchors.delete(index + 1, len - index - 1).unwrap();
         }
-        let index = index_of(&snapshot, anchor)?;
-        if !snapshot.closed && is_endpoint(&snapshot, index) {
-            return Err(PathEditError::NotSplittable);
-        }
-        Ok((snapshot, index))
+        Ok(std::iter::once(Self::split_copy(node, new_id))
+            .chain(node.anchors()[index + 1..].iter().copied())
+            .collect())
     }
 
     /// The open-path half of [`Document::split_at_anchor`] (acceptance
@@ -369,39 +435,17 @@ impl Document {
     /// siblings.
     fn split_open_path(
         &self,
-        path: NodeId,
-        snapshot: &PathSnapshot,
-        index: usize,
+        node: &OutlineNode,
         new_id: AnchorId,
     ) -> Result<(SplitEndpoint, SplitEndpoint), PathEditError> {
-        let split_anchor = &snapshot.anchors[index];
-        let (_, anchors) = self.path_parts(path)?;
-
-        let original_map = anchor_map_at(&anchors, index);
-        write_vec2(&original_map, KEY_HANDLE_OUT, Vec2::ZERO);
-        write_kind(&original_map, AnchorKind::Corner);
-        let len = anchors.len();
-        if index + 1 < len {
-            // invariant: `len` was just read from this same list.
-            #[allow(clippy::unwrap_used)]
-            anchors.delete(index + 1, len - index - 1).unwrap();
-        }
-
-        let new_path_anchors: Vec<NewAnchor> = std::iter::once(NewAnchor {
-            id: new_id,
-            point: split_anchor.point,
-            handle_in: Vec2::ZERO,
-            handle_out: split_anchor.handle_out,
-            kind: AnchorKind::Corner,
-        })
-        .chain(snapshot.anchors[index + 1..].iter().copied())
-        .collect();
+        let path = node.path;
+        let new_path_anchors = self.cut_open_outline(node, new_id)?;
         let new_path = self.create_path_uncommitted(
             self.creation_parent(&self.loro().get_tree(OBJECTS_TREE)),
             &new_path_anchors,
             false,
-            &snapshot.style,
-            snapshot.rotation,
+            &node.snapshot.style,
+            node.snapshot.rotation,
         );
 
         // `mov_after` (and every other positional tree op) needs the
@@ -411,7 +455,7 @@ impl Document {
         // assuming an earlier call already did.
         let tree = self.loro().get_tree(OBJECTS_TREE);
         tree.enable_fractional_index(0);
-        // invariant: `path` was just resolved via `self.path_parts` above
+        // invariant: `path` was just resolved via `self.outline_parts` above
         // (still the original, surviving object), and `new_path` was
         // just created by `create_path_uncommitted` immediately above —
         // both tree ids are live root siblings at this point.
@@ -431,10 +475,39 @@ impl Document {
         }
 
         self.commit_with_label("split_at_anchor");
-        Ok(((path, split_anchor.id), (new_path, new_id)))
+        Ok(((path, node.anchor().id), (new_path, new_id)))
     }
 
-    /// The closed-path half of [`Document::split_at_anchor`] (acceptance
+    /// The open-outline half of [`Document::split_at_anchor`] on a compound
+    /// path (`0055` criterion 6): as [`Document::split_open_path`], but the
+    /// second part becomes a new outline of the same object, right after the
+    /// split one.
+    fn split_open_outline(
+        &self,
+        node: &OutlineNode,
+        new_id: AnchorId,
+    ) -> Result<(SplitEndpoint, SplitEndpoint), PathEditError> {
+        let (meta, _) = self.path_parts(node.path)?;
+        let second = self.cut_open_outline(node, new_id)?;
+        insert_outline(&meta, node.outline + 1, &second, false);
+        // A text on a later outline stays on it.
+        let inserted = to_u32(node.outline + 1);
+        crate::text_carrier::renumber_carried_outlines(
+            &self.loro().get_tree(OBJECTS_TREE),
+            node.path,
+            &|old| {
+                if old >= inserted {
+                    old.saturating_add(1)
+                } else {
+                    old
+                }
+            },
+        );
+        self.commit_with_label("split_at_anchor");
+        Ok(((node.path, node.anchor().id), (node.path, new_id)))
+    }
+
+    /// The closed-outline half of [`Document::split_at_anchor`] (acceptance
     /// criterion 14). Same object, same `NodeId`, `closed` becomes
     /// `false`, one more anchor than before. The list is rotated with
     /// movable-list `mov` operations (one anchor moved from front to
@@ -444,18 +517,14 @@ impl Document {
     /// order: a fresh copy (outgoing handle, first node), the anchors
     /// after the split point around the loop, the split anchor itself
     /// (incoming handle kept, outgoing retracted, last node).
-    fn split_closed_path(
+    fn split_closed_outline(
         &self,
-        path: NodeId,
-        snapshot: &PathSnapshot,
-        index: usize,
+        node: &OutlineNode,
         new_id: AnchorId,
     ) -> Result<(SplitEndpoint, SplitEndpoint), PathEditError> {
-        let (meta, anchors) = self.path_parts(path)?;
+        let (outline, anchors) = self.outline_parts(node.path, node.anchor().id)?;
         let len = anchors.len();
-        let split_anchor = &snapshot.anchors[index];
-
-        for _ in 0..=index {
+        for _ in 0..=node.index {
             // invariant: `len` (`anchors.len()`) is unchanged by `mov`;
             // `0` and `len - 1` are valid positions of this non-empty
             // list (it holds at least the anchor just resolved above).
@@ -466,36 +535,17 @@ impl Document {
         let last_map = anchor_map_at(&anchors, len - 1);
         write_vec2(&last_map, KEY_HANDLE_OUT, Vec2::ZERO);
         write_kind(&last_map, AnchorKind::Corner);
+        insert_anchor_at(&anchors, 0, &Self::split_copy(node, new_id));
 
-        let new_anchor = NewAnchor {
-            id: new_id,
-            point: split_anchor.point,
-            handle_in: Vec2::ZERO,
-            handle_out: split_anchor.handle_out,
-            kind: AnchorKind::Corner,
-        };
-        insert_anchor_at(&anchors, 0, &new_anchor);
-
-        write_closed(&meta, false);
+        write_closed(&outline, false);
         self.commit_with_label("split_at_anchor");
-        Ok(((path, new_id), (path, split_anchor.id)))
+        Ok(((node.path, new_id), (node.path, node.anchor().id)))
     }
 }
 
-/// `id`'s index within `snapshot`'s own anchor list.
-fn index_of(snapshot: &PathSnapshot, id: AnchorId) -> Result<usize, PathEditError> {
-    snapshot
-        .anchors
-        .iter()
-        .position(|anchor| anchor.id == id)
-        .ok_or(PathEditError::NoSuchAnchor)
-}
-
-/// Whether `index` is the first or last anchor of a path with this many
-/// anchors — Join's and Split's shared "is this an endpoint" test
-/// (acceptance criteria 8, 12).
-fn is_endpoint(snapshot: &PathSnapshot, index: usize) -> bool {
-    index == 0 || index == snapshot.anchors.len() - 1
+/// An outline number as the `u32` of a text's carrier link (a path has far fewer outlines).
+fn to_u32(outline: usize) -> u32 {
+    u32::try_from(outline).unwrap_or(u32::MAX)
 }
 
 #[cfg(test)]

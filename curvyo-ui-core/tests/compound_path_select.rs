@@ -472,9 +472,10 @@ fn a_ctrl_move_copies_every_outline_with_fresh_ids() {
     }
 }
 
-/// Criterion 38: a double-click on a compound path stays in the Select tool.
+/// Criterion 38, withdrawn by `0055` criterion 1: a double-click on a compound path hands it off to
+/// the Node tool.
 #[test]
-fn a_double_click_on_a_compound_path_does_not_hand_off_to_the_node_tool() {
+fn a_double_click_on_a_compound_path_hands_off_to_the_node_tool() {
     let mut rig = Rig::ring();
     // The stroke of the hole, away from every handle of the box.
     let at = pt(10.0, 15.0);
@@ -503,7 +504,11 @@ fn a_double_click_on_a_compound_path_does_not_hand_off_to_the_node_tool() {
         tolerances(),
         (false, false),
     );
-    assert_eq!(outcome, SelectDoubleClickOutcome::CompoundPath);
+    // `specs/0055-compound-path-node-editing` criterion 1: handed off like any path.
+    assert!(matches!(
+        outcome,
+        SelectDoubleClickOutcome::Hit(ObjectSnapshot::Path(ref path)) if path.is_compound()
+    ));
 }
 
 // ------------------------------------------------------------ document fit

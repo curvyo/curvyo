@@ -432,12 +432,11 @@ fn hit_outcome_in(object: &ObjectSnapshot, units: &Units) -> SelectDoubleClickOu
     }
 }
 
-/// A path is handed off to the Node tool; a primitive only earns the edit
-/// hint (criteria 31, 32); a compound path has no editable nodes yet, so it
-/// stays in the Select tool (`specs/0016-boolean-operations` criterion 38).
+/// A path, compound or not, is handed off to the Node tool
+/// (`specs/0055-compound-path-node-editing` criterion 1); a primitive only earns the edit hint
+/// (criteria 31, 32).
 fn hit_outcome(object: &ObjectSnapshot) -> SelectDoubleClickOutcome {
     match object {
-        ObjectSnapshot::Path(path) if path.is_compound() => SelectDoubleClickOutcome::CompoundPath,
         ObjectSnapshot::Path(_) => SelectDoubleClickOutcome::Hit(object.clone()),
         ObjectSnapshot::Primitive(_) => SelectDoubleClickOutcome::EditHint,
         ObjectSnapshot::Text(text) => SelectDoubleClickOutcome::Text(text.id),

@@ -468,7 +468,9 @@ fn join_and_split_have_their_names() {
     session.set_tool(Tool::Node);
     click(&mut session, pt(20.0, 0.0), false);
     click(&mut session, pt(100.0, 50.0), true);
-    one_step(&mut session, "Join nodes", Session::join_selected);
+    one_step(&mut session, "Join nodes", |s| {
+        s.join_selected();
+    });
 
     let document = Document::new(1);
     let _ = document.create_path(

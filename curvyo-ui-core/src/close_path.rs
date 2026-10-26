@@ -1,55 +1,87 @@
-//! The Close path command (`specs/0034-pen-path-extension` criteria 18 to 21): which open paths it
-//! closes, and the one [`PathGrowth`] per path that [`curvyo_document_core::Document::close_paths`]
-//! writes in a single commit. The Node bar's buttons use [`closable_counts`] for their enablement
-//! and tooltips and [`plan_close_paths`] for the press, so a button and the command cannot
-//! disagree.
+//! The Close path command (`specs/0034-pen-path-extension` criteria 18 to 21, on compound paths
+//! `specs/0055-compound-path-node-editing` criterion 7): which open outlines it closes, and the
+//! one [`PathGrowth`] per outline that [`curvyo_document_core::Document::close_paths`] writes in a
+//! single commit. The Node bar's buttons use [`closable_counts`] for their enablement and tooltips
+//! and [`plan_close_paths`] for the press, so a button and the command cannot disagree.
 
 use curvyo_document_core::{
     AnchorSnapshot, COINCIDENT_MM, HandleSlot, NodeId, PathEnd, PathGrowth, PathSnapshot,
-    merged_junction,
+    SubpathRef, merged_junction,
 };
 
 use crate::closing_join::{JoinType, resolve_closing_node};
 use crate::object_selection::ObjectSelection;
 use crate::selection::NodeSelection;
 
-/// The paths the Close path buttons act on, in the order of `paths`: those holding a selected node
-/// or the selected segment, and the selected objects. Which nodes are selected within them does not
-/// matter (`0034` criterion 18). The Node tool draws and hit-tests every path, so there is no
-/// "editing set" to take; `paths` are the ones it can edit (compound paths are left out by the
-/// caller).
+/// One open outline the Close path buttons act on: of an ordinary path (its only outline) or of a
+/// compound path.
+#[derive(Debug, Clone, Copy)]
+pub struct CloseTarget<'a> {
+    /// The path the outline belongs to.
+    pub path: &'a PathSnapshot,
+    /// The open outline.
+    pub outline: SubpathRef<'a>,
+}
+
+impl CloseTarget<'_> {
+    /// Whether the outline is one of several of a compound path: the notes and the notice count
+    /// it apart from paths (criterion 7).
+    fn of_compound(&self) -> bool {
+        self.path.is_compound()
+    }
+}
+
+/// The open outlines the Close path buttons act on, in the order of `paths`, outline by outline.
+/// The paths are those holding a selected node or the selected segment, and the selected objects
+/// (`0034` criterion 18). Of an ordinary path its outline counts whichever node is selected; of a
+/// compound path the open outlines that hold a selected node (or the selected segment), or all its
+/// open outlines when none of its nodes is selected (`0055` criterion 7, decision 4). `paths` are
+/// the ones the Node tool can edit.
 #[must_use]
 pub fn close_path_set<'a>(
     paths: &'a [PathSnapshot],
     nodes: &NodeSelection,
     objects: &ObjectSelection,
-) -> Vec<&'a PathSnapshot> {
-    let mut wanted: Vec<NodeId> = nodes.node_pairs().iter().map(|&(path, _)| path).collect();
-    if let Some((path, _, _)) = nodes.segment_with_path() {
-        wanted.push(path);
+) -> Vec<CloseTarget<'a>> {
+    let mut selected: Vec<(NodeId, curvyo_document_core::AnchorId)> = nodes.node_pairs().to_vec();
+    if let Some((path, start, _)) = nodes.segment_with_path() {
+        selected.push((path, start));
     }
-    wanted.extend(objects.ids().iter().copied());
-    paths
-        .iter()
-        .filter(|path| wanted.contains(&path.id))
-        .collect()
+    let mut targets = Vec::new();
+    for path in paths {
+        let own: Vec<_> = selected
+            .iter()
+            .filter(|&&(of, _)| of == path.id)
+            .map(|&(_, anchor)| anchor)
+            .collect();
+        if own.is_empty() && !objects.ids().contains(&path.id) {
+            continue;
+        }
+        let rule_applies = path.is_compound() && !own.is_empty();
+        for outline in path.subpaths() {
+            if outline.closed || outline.anchors.is_empty() {
+                continue;
+            }
+            if rule_applies && !outline.anchors.iter().any(|a| own.contains(&a.id)) {
+                continue;
+            }
+            targets.push(CloseTarget { path, outline });
+        }
+    }
+    targets
 }
 
-/// What the command does to a set of paths.
+/// What the command does to a set of outlines.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ClosePlan {
-    /// One growth per path that gets closed, for `Document::close_paths`.
+    /// One growth per outline that gets closed, for `Document::close_paths`.
     pub growths: Vec<PathGrowth>,
-    /// How many paths are closed.
-    pub closed: usize,
-    /// How many open ordinary paths are skipped for having fewer than three nodes, or three nodes
-    /// whose first and last coincide (see [`ClosableCounts::same_ends`]).
-    pub skipped: usize,
-    /// How many of the skipped paths are of the second kind.
-    pub same_ends: usize,
+    /// What is closed and skipped, as the notice counts it.
+    pub counts: ClosableCounts,
 }
 
-/// What the buttons and the notice say about a set of paths (`0034` criteria 19 to 21).
+/// What the buttons and the notice say about a set of outlines (`0034` criteria 19 to 21,
+/// `0055` criterion 7): ordinary paths and outlines of compound paths are counted apart.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct ClosableCounts {
     /// Open ordinary paths that would be closed.
@@ -60,85 +92,97 @@ pub struct ClosableCounts {
     /// How many of the skipped paths have three nodes with coinciding ends: the notice says so in
     /// its own words, "fewer than 3 nodes" would be wrong for them.
     pub same_ends: usize,
+    /// Open outlines of compound paths that would be closed.
+    pub closable_outlines: usize,
+    /// Open outlines of compound paths skipped, by the same rule as `skipped`.
+    pub skipped_outlines: usize,
+    /// How many of the skipped outlines have three nodes with coinciding ends.
+    pub same_ends_outlines: usize,
 }
 
-/// Whether a path is an open ordinary path (a candidate): not closed, not compound.
-fn is_open_ordinary(path: &PathSnapshot) -> bool {
-    !path.closed && !path.is_compound() && !path.anchors.is_empty()
-}
-
-/// Whether the ends of `path` coincide and are merged into one node before closing (`0006`
+/// Whether the ends of `anchors` coincide and are merged into one node before closing (`0006`
 /// criterion 10), which leaves one node fewer.
-fn merges_ends(path: &PathSnapshot) -> bool {
-    path.anchors.len() >= 3
-        && path.anchors[0]
+fn merges_ends(anchors: &[AnchorSnapshot]) -> bool {
+    anchors.len() >= 3
+        && anchors[0]
             .point
-            .vector_to(path.anchors[path.anchors.len() - 1].point)
+            .vector_to(anchors[anchors.len() - 1].point)
             .length()
             < COINCIDENT_MM
 }
 
-/// How many nodes `path` has once closed: the merge of coincident ends counts.
-fn nodes_when_closed(path: &PathSnapshot) -> usize {
-    path.anchors.len() - usize::from(merges_ends(path))
+/// How many nodes an outline has once closed: the merge of coincident ends counts.
+fn nodes_when_closed(anchors: &[AnchorSnapshot]) -> usize {
+    anchors.len() - usize::from(merges_ends(anchors))
 }
 
-/// The counts among `paths`: open ordinary paths that would be closed, and those skipped. Closed
-/// paths, compound paths and anything else are not counted (criterion 21).
+/// The counts among `targets`: open outlines that would be closed, and those skipped, paths and
+/// outlines of compound paths apart. Closed outlines are never targets (criterion 21).
 #[must_use]
-pub fn closable_counts(paths: &[&PathSnapshot]) -> ClosableCounts {
+pub fn closable_counts(targets: &[CloseTarget<'_>]) -> ClosableCounts {
     let mut counts = ClosableCounts::default();
-    for path in paths.iter().filter(|path| is_open_ordinary(path)) {
-        if nodes_when_closed(path) >= 3 {
-            counts.closable += 1;
+    for target in targets {
+        let anchors = target.outline.anchors;
+        let (closable, skipped, same_ends) = if target.of_compound() {
+            (
+                &mut counts.closable_outlines,
+                &mut counts.skipped_outlines,
+                &mut counts.same_ends_outlines,
+            )
         } else {
-            counts.skipped += 1;
-            counts.same_ends += usize::from(path.anchors.len() >= 3);
+            (
+                &mut counts.closable,
+                &mut counts.skipped,
+                &mut counts.same_ends,
+            )
+        };
+        if nodes_when_closed(anchors) >= 3 {
+            *closable += 1;
+        } else {
+            *skipped += 1;
+            *same_ends += usize::from(anchors.len() >= 3);
         }
     }
     counts
 }
 
-/// Closes every open ordinary path of `paths` with three or more nodes: one segment from its last
+/// Closes every open outline of `targets` with three or more nodes: one segment from its last
 /// node to its first, the first node being the closing node with `join` applied by
-/// [`resolve_closing_node`]. A path whose first and last node coincide has them merged first.
+/// [`resolve_closing_node`]. An outline whose first and last node coincide has them merged first.
 #[must_use]
-pub fn plan_close_paths(paths: &[&PathSnapshot], join: JoinType) -> ClosePlan {
-    let counts = closable_counts(paths);
-    let mut growths = Vec::with_capacity(counts.closable);
-    for path in paths.iter().filter(|path| is_open_ordinary(path)) {
-        if nodes_when_closed(path) < 3 {
+pub fn plan_close_paths(targets: &[CloseTarget<'_>], join: JoinType) -> ClosePlan {
+    let counts = closable_counts(targets);
+    let mut growths = Vec::with_capacity(counts.closable + counts.closable_outlines);
+    for target in targets {
+        let anchors = target.outline.anchors;
+        if nodes_when_closed(anchors) < 3 {
             continue;
         }
-        let len = path.anchors.len();
-        let first = &path.anchors[0];
-        let (closing, drop, before): (AnchorSnapshot, Vec<_>, _) = if merges_ends(path) {
-            let last = &path.anchors[len - 1];
+        let len = anchors.len();
+        let first = &anchors[0];
+        let last = &anchors[len - 1];
+        let (closing, drop, before): (AnchorSnapshot, Vec<_>, _) = if merges_ends(anchors) {
             (
                 merged_junction(first, false, last, true),
                 vec![last.id],
-                path.anchors[len - 2].point,
+                anchors[len - 2].point,
             )
         } else {
-            (*first, Vec::new(), path.anchors[len - 1].point)
+            (*first, Vec::new(), last.point)
         };
-        let after = path.anchors[1].point;
+        let after = anchors[1].point;
         let resolved = resolve_closing_node(&closing, before, after, HandleSlot::In, join);
         growths.push(PathGrowth {
-            path: path.id,
+            path: target.path.id,
             end: PathEnd::Last,
+            at: last.id,
             added: Vec::new(),
             absorb: None,
             replace: vec![resolved],
             drop,
         });
     }
-    ClosePlan {
-        growths,
-        closed: counts.closable,
-        skipped: counts.skipped,
-        same_ends: counts.same_ends,
-    }
+    ClosePlan { growths, counts }
 }
 
 #[cfg(test)]
@@ -146,6 +190,18 @@ mod tests {
     use curvyo_document_core::{AnchorId, AnchorKind, Document, NewAnchor, Point};
 
     use super::*;
+
+    /// Every open outline of `paths`, as the buttons see them when the paths are selected.
+    fn targets<'a>(paths: &[&'a PathSnapshot]) -> Vec<CloseTarget<'a>> {
+        paths
+            .iter()
+            .flat_map(|&path| {
+                path.subpaths()
+                    .filter(|outline| !outline.closed)
+                    .map(move |outline| CloseTarget { path, outline })
+            })
+            .collect()
+    }
 
     fn open(document: &Document, base: u64, points: &[(f64, f64)], closed: bool) -> PathSnapshot {
         let anchors: Vec<NewAnchor> = points
@@ -177,17 +233,16 @@ mod tests {
             &[(0.0, 0.0), (10.0, 0.0), (10.0, 10.0)],
             true,
         );
-        let plan = plan_close_paths(&[&a, &b, &c], JoinType::Sharp);
-        assert_eq!(plan.closed, 1);
-        assert_eq!(plan.skipped, 1);
+        let plan = plan_close_paths(&targets(&[&a, &b, &c]), JoinType::Sharp);
+        assert_eq!(plan.counts.closable, 1);
+        assert_eq!(plan.counts.skipped, 1);
         assert_eq!(plan.growths.len(), 1);
         assert_eq!(plan.growths[0].path, a.id);
         assert_eq!(
-            closable_counts(&[&b, &c]),
+            closable_counts(&targets(&[&b, &c])),
             ClosableCounts {
-                closable: 0,
                 skipped: 1,
-                same_ends: 0
+                ..ClosableCounts::default()
             }
         );
     }
@@ -203,9 +258,9 @@ mod tests {
             &[(0.0, 0.0), (20.0, 0.0), (20.0, 20.0), (0.0, 20.0)],
             false,
         );
-        let plan = plan_close_paths(&[&a], JoinType::Smooth);
+        let plan = plan_close_paths(&targets(&[&a]), JoinType::Smooth);
         assert_eq!(plan.growths[0].replace[0].kind, AnchorKind::Asymmetric);
-        let sharp = plan_close_paths(&[&a], JoinType::Sharp);
+        let sharp = plan_close_paths(&targets(&[&a]), JoinType::Sharp);
         assert_eq!(sharp.growths[0].replace[0].kind, AnchorKind::Corner);
     }
 
@@ -219,8 +274,8 @@ mod tests {
             &[(0.0, 0.0), (20.0, 0.0), (20.0, 20.0), (0.0, 0.0)],
             false,
         );
-        let plan = plan_close_paths(&[&a], JoinType::Sharp);
-        assert_eq!(plan.closed, 1);
+        let plan = plan_close_paths(&targets(&[&a]), JoinType::Sharp);
+        assert_eq!(plan.counts.closable, 1);
         assert_eq!(plan.growths[0].drop, vec![a.anchors[3].id]);
         // Three distinct nodes remain: a triangle.
         document.close_paths(&plan.growths).unwrap();
@@ -229,7 +284,7 @@ mod tests {
         assert_eq!(closed.anchors.len(), 3);
         // Fewer than three distinct nodes after the merge: skipped.
         let b = open(&document, 10, &[(0.0, 0.0), (20.0, 0.0), (0.0, 0.0)], false);
-        let counts = closable_counts(&[&b]);
+        let counts = closable_counts(&targets(&[&b]));
         assert_eq!(
             (counts.closable, counts.skipped, counts.same_ends),
             (0, 1, 1),

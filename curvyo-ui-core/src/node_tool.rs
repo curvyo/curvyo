@@ -79,12 +79,8 @@ pub struct NodeToolbarState {
     pub can_make_line: bool,
     /// Make curve: a segment is selected and it is already a line.
     pub can_make_curve: bool,
-    /// The Node tool is active and the only selected object is a compound path: it shows its
-    /// outline but no node, and the host says why (`0016-boolean-operations` criterion 38).
-    /// Set by the session, which sees the object selection; the node tool does not.
-    pub compound_only: bool,
-    /// The selection holds linked clones (and compound paths) only: the bar holds the sentence that
-    /// a clone has no nodes (`specs/0049-linked-clone` criterion 26).
+    /// The selection holds linked clones only: the bar holds the sentence that a clone has no
+    /// nodes (`specs/0049-linked-clone` criterion 26).
     pub clone_only: bool,
     /// Join: the current selection is exactly two endpoint nodes of
     /// open paths (same path or two different objects), not the two
@@ -122,6 +118,20 @@ pub enum JoinBlock {
     /// Two end nodes, but the document refuses them for another reason (the two ends of a
     /// two-node path). No reason line.
     Other,
+}
+
+/// What [`NodeTool::split_selected`] did (`specs/0055-compound-path-node-editing` criterion 6):
+/// on a compound path the result stays one object, so the host says what happened.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NodeSplitOutcome {
+    /// Nothing was split.
+    None,
+    /// An ordinary path was split or opened (`0006` criteria 13 and 14).
+    Path,
+    /// An open outline of a compound path became two outlines of it.
+    OutlineInTwo,
+    /// A closed outline of a compound path was opened.
+    OutlineOpened,
 }
 
 /// The node tool's state: its persistent [`NodeSelection`] plus whatever
@@ -393,7 +403,7 @@ impl NodeTool {
                 paths
                     .iter()
                     .find(|p| p.id == path)
-                    .and_then(|snapshot| snapshot.anchors.iter().find(|a| a.id == anchor_id))
+                    .and_then(|snapshot| snapshot.anchor(anchor_id))
                     .map(|a| (path, anchor_id, a.point))
             })
             .collect();
@@ -420,7 +430,7 @@ impl NodeTool {
         let found = paths
             .iter()
             .find(|p| p.id == path)
-            .and_then(|snapshot| snapshot.anchors.iter().find(|a| a.id == anchor));
+            .and_then(|snapshot| snapshot.anchor(anchor));
         let start_handle_in = found.map_or(Vec2::ZERO, |a| a.handle_in);
         let start_handle_out = found.map_or(Vec2::ZERO, |a| a.handle_out);
         let start_value = match slot {
@@ -678,8 +688,8 @@ impl NodeTool {
             .zip(self.selection.segment())
             .and_then(|(path, (start, end))| {
                 let snapshot = document.path(path)?;
-                let start_anchor = snapshot.anchors.iter().find(|a| a.id == start)?;
-                let end_anchor = snapshot.anchors.iter().find(|a| a.id == end)?;
+                let start_anchor = snapshot.anchor(start)?;
+                let end_anchor = snapshot.anchor(end)?;
                 Some(start_anchor.handle_out == Vec2::ZERO && end_anchor.handle_in == Vec2::ZERO)
             });
         let join_block = self.join_check(document, paths).err();
@@ -691,7 +701,6 @@ impl NodeTool {
             can_convert_to_asymmetric: has_nodes,
             can_make_line: segment_is_line == Some(false),
             can_make_curve: segment_is_line == Some(true),
-            compound_only: false,
             clone_only: false,
             can_join: join_block.is_none(),
             can_split: self.can_split(document),
@@ -736,14 +745,22 @@ impl NodeTool {
     /// condition, which `Document::join_endpoints` independently refuses
     /// on too. On success, selects only the merged node (criterion 11),
     /// so the maker can immediately continue working at the junction.
-    pub fn join_selected(&mut self, document: &Document) {
-        let Some((a, b)) = self.selection.join_pairs() else {
-            return;
+    ///
+    /// Returns how many outlines moved into the surviving object besides the joined one (ends in
+    /// two objects, `specs/0055-compound-path-node-editing` criterion 5 c: the notice counts
+    /// them), or `None` when nothing was joined.
+    pub fn join_selected(&mut self, document: &Document) -> Option<usize> {
+        let (a, b) = self.selection.join_pairs()?;
+        let moved_outlines = if a.0 == b.0 {
+            0
+        } else {
+            document
+                .path(b.0)
+                .map_or(0, |other| other.subpaths().count() - 1)
         };
-        let Ok((path, anchor)) = document.join_endpoints(a.0, a.1, b.0, b.1) else {
-            return;
-        };
+        let (path, anchor) = document.join_endpoints(a.0, a.1, b.0, b.1).ok()?;
         self.selection.select_single_node(path, anchor);
+        Some(moved_outlines)
     }
 
     /// Acceptance criteria 12-15: Split. A no-op (no commit, and
@@ -757,18 +774,34 @@ impl NodeTool {
     /// one), which is the one `minter` just minted an id for. A press at the
     /// shared position then hits it ([`hit_test`]'s tie rule) and a drag
     /// moves that node only.
-    pub fn split_selected(&mut self, minter: &mut AnchorIdMinter, document: &Document) {
+    ///
+    /// Returns what the split did, for the notice of a compound path
+    /// (`specs/0055-compound-path-node-editing` criterion 6).
+    pub fn split_selected(
+        &mut self,
+        minter: &mut AnchorIdMinter,
+        document: &Document,
+    ) -> NodeSplitOutcome {
         let [(path, anchor)] = self.selection.node_pairs() else {
-            return;
+            return NodeSplitOutcome::None;
         };
         let (path, anchor) = (*path, *anchor);
+        let Some(before) = document.path(path) else {
+            return NodeSplitOutcome::None;
+        };
+        let outline_closed = before.outline_of(anchor).is_some_and(|o| o.closed);
         let new_id = minter.mint();
         let Ok((first, second)) = document.split_at_anchor(path, anchor, new_id) else {
-            return;
+            return NodeSplitOutcome::None;
         };
         let second_node = if second.1 == new_id { second } else { first };
         self.selection
             .select_single_node(second_node.0, second_node.1);
+        match (before.is_compound(), outline_closed) {
+            (false, _) => NodeSplitOutcome::Path,
+            (true, false) => NodeSplitOutcome::OutlineInTwo,
+            (true, true) => NodeSplitOutcome::OutlineOpened,
+        }
     }
 
     /// Whether [`NodeTool::split_selected`] would do anything right now
@@ -821,8 +854,8 @@ impl NodeTool {
             return None;
         };
         let snapshot = paths.iter().find(|p| p.id == path)?;
-        let start_anchor = snapshot.anchors.iter().find(|a| a.id == start)?;
-        let end_anchor = snapshot.anchors.iter().find(|a| a.id == end)?;
+        let start_anchor = snapshot.anchor(start)?;
+        let end_anchor = snapshot.anchor(end)?;
 
         let (t, _, _) = nearest_point_on_segment(
             start_anchor.point,
@@ -882,8 +915,8 @@ impl NodeTool {
     ) -> Option<NodeId> {
         let (path, start, end) = self.selection_segment()?;
         let snapshot = paths.iter().find(|p| p.id == path)?;
-        let start_anchor = snapshot.anchors.iter().find(|a| a.id == start)?;
-        let end_anchor = snapshot.anchors.iter().find(|a| a.id == end)?;
+        let start_anchor = snapshot.anchor(start)?;
+        let end_anchor = snapshot.anchor(end)?;
 
         let subdivision = subdivide_at_parameter(
             start_anchor.point,

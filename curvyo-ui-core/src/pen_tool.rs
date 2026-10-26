@@ -42,8 +42,24 @@ pub struct Continuation {
     pub path: NodeId,
     /// The end the maker pressed: new nodes attach there.
     pub end: PathEnd,
-    /// The path's anchors as they were at the press, in stored order.
+    /// The anchors of the continued outline (the path's only one, or one outline of a compound
+    /// path, `specs/0055-compound-path-node-editing` criterion 8) as they were at the press, in
+    /// stored order.
     pub original: Vec<AnchorSnapshot>,
+}
+
+impl Continuation {
+    /// The id of the end node the maker pressed: it names the continued outline in a
+    /// [`curvyo_document_core::PathGrowth`].
+    #[must_use]
+    pub fn end_node(&self) -> curvyo_document_core::AnchorId {
+        // invariant: `original` is an outline of two or more nodes: `EndNodeIndex` skips shorter
+        // outlines, so no continuation starts from one.
+        match self.end {
+            PathEnd::First => self.original[0].id,
+            PathEnd::Last => self.original[self.original.len() - 1].id,
+        }
+    }
 }
 
 /// What a press does, decided at the press and run at the release (a drag is ignored for every
@@ -101,8 +117,14 @@ pub enum PointerUpOutcome {
     /// Acceptance criterion 5: the press landed on the closing node, so the path closed and
     /// committed as this [`NodeId`] (a new path object, or the continued one).
     Closed(NodeId),
-    /// The press landed on another path's end: the two became one path, this [`NodeId`].
-    Joined(NodeId),
+    /// The press landed on another path's end: the two became one path.
+    Joined {
+        /// The path the two became.
+        path: NodeId,
+        /// How many outlines of the removed object moved into `path` besides the joined one
+        /// (`specs/0055-compound-path-node-editing` criterion 9: the notice counts them).
+        moved_outlines: usize,
+    },
 }
 
 /// The closing segment as it will be committed, in stored orientation: from the last stored node
@@ -360,6 +382,7 @@ impl PenTool {
                 let growth = PathGrowth {
                     path: continuation.path,
                     end: continuation.end,
+                    at: continuation.end_node(),
                     added,
                     absorb: None,
                     replace: Vec::new(),
@@ -994,7 +1017,13 @@ mod tests {
                 Point::new(press.0, press.1),
                 false,
             );
-            assert_eq!(outcome, PointerUpOutcome::Joined(p));
+            assert_eq!(
+                outcome,
+                PointerUpOutcome::Joined {
+                    path: p,
+                    moved_outlines: 0
+                }
+            );
             assert_eq!(pts(&document, p), expected);
             assert!(document.path(q).is_none());
             assert_eq!(document.path(p).unwrap().style, red);
@@ -1030,7 +1059,13 @@ mod tests {
             Point::new(30.0, 0.0),
             false,
         );
-        assert_eq!(outcome, PointerUpOutcome::Joined(q));
+        assert_eq!(
+            outcome,
+            PointerUpOutcome::Joined {
+                path: q,
+                moved_outlines: 0
+            }
+        );
         assert_eq!(document.object_ids().len(), 1);
         // Q starts at its first node, so the new nodes precede it in drawing order.
         assert_eq!(
@@ -1062,7 +1097,13 @@ mod tests {
             Point::new(10.0004, 0.0),
             false,
         );
-        assert_eq!(outcome, PointerUpOutcome::Joined(p));
+        assert_eq!(
+            outcome,
+            PointerUpOutcome::Joined {
+                path: p,
+                moved_outlines: 0
+            }
+        );
         let points = pts(&document, p);
         assert_eq!(points.len(), 3, "the two ends became one node: {points:?}");
         assert!((points[1].0 - 10.0002).abs() < 1e-9);
