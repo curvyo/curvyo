@@ -133,3 +133,5 @@ bar, both applied to the spec).
   the crate `tauri-plugin-opener` uses for `open_path`; with `shellexecute-on-windows`. Brings
   `is-wsl` and `is-docker` (MIT). Replaces the `tauri-plugin-opener` of adrs.md decision 7
   (see above).
+
+- 2026-10-26, lead (customer review): `open` with default features only, so `dunce` is not pulled (it came only through `shellexecute-on-windows`); on Windows `open` uses `cmd /c start`. `is-wsl` (with `is-docker`, about 90 lines together) stays for now; the customer suggests an upstream PR to `open` that inlines the WSL check instead of the dependency.

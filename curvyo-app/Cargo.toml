@@ -36,9 +36,9 @@ tauri = { version = "2", default-features = false, features = [
 tauri-plugin-dialog = "2"
 # Opens a font folder's PDF in the system viewer (`specs/0083-font-info-and-zip` adrs.md decision 7,
 # plan note 2026-10-26): MIT, the crate `tauri-plugin-opener` itself calls for `open_path`, without
-# the plugin's D-Bus stack (`zbus`, flagged unmaintained by `cargo deny`). ShellExecute on Windows,
-# so no `cmd /c start` quoting.
-open = { version = "5", features = ["shellexecute-on-windows"] }
+# the plugin's D-Bus stack (`zbus`, flagged unmaintained by `cargo deny`). Default features only:
+# `shellexecute-on-windows` would pull `dunce` (customer, 2026-10-26); Windows uses `cmd /c start`.
+open = "5"
 # A fresh Loro peer id per open session (specs/0001-project-file-foundation/
 # adrs.md, amended 2026-10-03) is minted by the frontend itself now
 # (`frontend/src/lib/editorSession.ts`'s `mintPeerId`, the browser's own
