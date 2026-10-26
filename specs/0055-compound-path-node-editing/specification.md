@@ -109,6 +109,13 @@ Criterion 11: the overlay of 4004 nodes is drawn within 500 ms (the implementer 
 
 Updated by `ux-engineer` in the slice's PR, when the behaviour lands: "Compound path in the UI" (Node tool edits every outline; pill and hint chip removed), "Close path group" (outline counts, hover preview), "Pen hint chip" (the outlines line), "Path tooltips and notices" or a Node bar row (Join and Split notices for compound paths), and "Node marquee" (`0053`) for the compound path counts.
 
+## Amendment 2026-10-26 (customer): the editing set follows the selection
+
+With one or more paths selected, the Node tool draws and hit-tests only the selected paths' nodes,
+handles and segments; with nothing selected (or no path in the selection) every path as before.
+A click on another path selects it, a click on empty canvas clears the selection. The rule is in
+`0053`, "Amendment 2026-10-26".
+
 ## Links
 
 Requirements: R-EDIT-023, R-EDIT-001 (`docs/requirements.md`)
