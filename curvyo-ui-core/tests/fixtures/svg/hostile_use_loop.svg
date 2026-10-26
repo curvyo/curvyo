@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="10mm" height="10mm" viewBox="0 0 10 10">
+  <g id="a"><use href="#b"/><path d="M1 1 H2 V2 Z"/></g>
+  <g id="b"><use href="#a"/></g>
+  <use href="#self" id="self"/>
+</svg>

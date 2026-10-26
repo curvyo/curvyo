@@ -205,6 +205,13 @@ fn rebuild(
 /// bottom edge of the drawing (stroke excluded, hidden objects included), rounded up to whole
 /// millimetres, at least 1 mm; `None` for an empty drawing.
 fn content_page(nodes: &[SvgNode]) -> Option<(f64, f64)> {
+    let b = bounds_of(nodes)?;
+    Some((b.x1.max(0.0).ceil().max(1.0), b.y1.max(0.0).ceil().max(1.0)))
+}
+
+/// The bounding box in millimetres of every leaf of `nodes` (clones through their chain), the
+/// stroke excluded and hidden leaves included; `None` without a leaf.
+pub(crate) fn bounds_of(nodes: &[SvgNode]) -> Option<Rect> {
     let mut outlines: Vec<Outline> = Vec::new();
     collect_outlines(nodes, &mut outlines);
     let mut bounds: Option<Rect> = None;
@@ -230,8 +237,7 @@ fn content_page(nodes: &[SvgNode]) -> Option<(f64, f64)> {
             bounds = Some(bounds.map_or(b, |all| all.union(b)));
         }
     }
-    let b = bounds?;
-    Some((b.x1.max(0.0).ceil().max(1.0), b.y1.max(0.0).ceil().max(1.0)))
+    bounds
 }
 
 /// A leaf's own outline, or a clone's original and matrix.

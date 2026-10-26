@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="10mm" height="10mm" viewBox="0 0 10 10">
+  <defs>
+    <path id="u0" d="M0 0 H1 V1 Z"/>
+    <g id="u1"><use href="#u0"/><use href="#u0"/></g>
+    <g id="u2"><use href="#u1"/><use href="#u1"/></g>
+    <g id="u3"><use href="#u2"/><use href="#u2"/></g>
+    <g id="u4"><use href="#u3"/><use href="#u3"/></g>
+    <g id="u5"><use href="#u4"/><use href="#u4"/></g>
+    <g id="u6"><use href="#u5"/><use href="#u5"/></g>
+    <g id="u7"><use href="#u6"/><use href="#u6"/></g>
+    <g id="u8"><use href="#u7"/><use href="#u7"/></g>
+    <g id="u9"><use href="#u8"/><use href="#u8"/></g>
+    <g id="u10"><use href="#u9"/><use href="#u9"/></g>
+    <g id="u11"><use href="#u10"/><use href="#u10"/></g>
+    <g id="u12"><use href="#u11"/><use href="#u11"/></g>
+    <g id="u13"><use href="#u12"/><use href="#u12"/></g>
+    <g id="u14"><use href="#u13"/><use href="#u13"/></g>
+    <g id="u15"><use href="#u14"/><use href="#u14"/></g>
+    <g id="u16"><use href="#u15"/><use href="#u15"/></g>
+    <g id="u17"><use href="#u16"/><use href="#u16"/></g>
+    <g id="u18"><use href="#u17"/><use href="#u17"/></g>
+    <g id="u19"><use href="#u18"/><use href="#u18"/></g>
+    <g id="u20"><use href="#u19"/><use href="#u19"/></g>
+  </defs>
+  <use href="#u20"/>
+</svg>

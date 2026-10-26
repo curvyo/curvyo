@@ -113,6 +113,9 @@ mod style_edit;
 mod style_entry;
 mod style_panel;
 mod style_scope;
+mod svg_import;
+mod svg_import_shapes;
+mod svg_import_style;
 mod text_box;
 mod text_caret;
 mod text_convert;
@@ -348,6 +351,7 @@ pub use style_scope::{
     StyleScope, StyleTool, is_single_line_text, object_kind_name, owns_style, skipped_clones,
     skipped_single_line_texts, style_scope, style_scope_in,
 };
+pub use svg_import::{SvgImport, SvgPlacement, svg_import};
 pub use text_box::{line_box_contains, line_box_corners, on_path_boxes};
 pub use text_caret::{TextEditGeometry, edit_geometry, nearest_boundary};
 pub use text_convert::{

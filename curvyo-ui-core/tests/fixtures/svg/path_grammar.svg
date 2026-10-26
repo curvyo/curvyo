@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="200mm" height="100mm" viewBox="0 0 200 100">
+  <!-- Hand-written: every command of criterion 21, absolute and relative, compact numbers. -->
+  <path fill="none" stroke="black" d="M10,10 L20,10 H30 V20 C30,25 35,30 40,30 S50,35 50,40 Q55,45 60,40 T70,40 A5,5 0 0,1 80,40 Z"/>
+  <path fill="none" stroke="black" d="m10 50l10 0h10v10c0 5 5 10 10 10s10 5 10 10q5 5 10 0t10 0a5 5 0 0 1 10 0z"/>
+  <path fill="none" stroke="black" d="M100-5l1.5.5.5.5h1e1v.5e1a1 1 0 00 5 5 1 1 0 11 5 5"/>
+  <path fill="none" stroke="black" d="M100,50 L110,50 L120 Z"/>
+  <path fill="none" stroke="black" d="M130,50 L140,60 # L150,70"/>
+  <path fill="none" stroke="black" d="M150,50 Z L160,60"/>
+  <path fill="none" stroke="black" d="M170,50"/>
+</svg>

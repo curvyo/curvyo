@@ -1,0 +1,992 @@
+{
+  "background": {
+    "color": [
+      232,
+      232,
+      235
+    ],
+    "opacity": 1.0,
+    "paint": "none"
+  },
+  "display_unit": "mm",
+  "leaves": 4,
+  "nodes": [
+    {
+      "Group": {
+        "children": [
+          {
+            "Group": {
+              "children": [
+                {
+                  "Path": {
+                    "outlines": [
+                      {
+                        "anchors": [
+                          {
+                            "handle_in": {
+                              "x": 0.0,
+                              "y": 0.0
+                            },
+                            "handle_out": {
+                              "x": 0.0,
+                              "y": 0.0
+                            },
+                            "kind": "corner",
+                            "point": {
+                              "x": 22.0,
+                              "y": 35.0
+                            }
+                          },
+                          {
+                            "handle_in": {
+                              "x": 0.0,
+                              "y": 0.0
+                            },
+                            "handle_out": {
+                              "x": 3.0,
+                              "y": 0.0
+                            },
+                            "kind": "corner",
+                            "point": {
+                              "x": 29.0,
+                              "y": 35.0
+                            }
+                          },
+                          {
+                            "handle_in": {
+                              "x": 0.0,
+                              "y": -2.6000000000000014
+                            },
+                            "handle_out": {
+                              "x": 0.0,
+                              "y": 1.5999999999999943
+                            },
+                            "kind": "asymmetric",
+                            "point": {
+                              "x": 34.0,
+                              "y": 39.2
+                            }
+                          },
+                          {
+                            "handle_in": {
+                              "x": 1.4000000000000021,
+                              "y": -0.5
+                            },
+                            "handle_out": {
+                              "x": 2.0000000000000036,
+                              "y": 0.3999999999999986
+                            },
+                            "kind": "corner",
+                            "point": {
+                              "x": 31.7,
+                              "y": 42.4
+                            }
+                          },
+                          {
+                            "handle_in": {
+                              "x": 0.0,
+                              "y": -2.1999999999999957
+                            },
+                            "handle_out": {
+                              "x": 0.0,
+                              "y": 3.0
+                            },
+                            "kind": "asymmetric",
+                            "point": {
+                              "x": 35.0,
+                              "y": 46.4
+                            }
+                          },
+                          {
+                            "handle_in": {
+                              "x": 3.3999999999999986,
+                              "y": 0.0
+                            },
+                            "handle_out": {
+                              "x": 0.0,
+                              "y": 0.0
+                            },
+                            "kind": "corner",
+                            "point": {
+                              "x": 29.5,
+                              "y": 53.0
+                            }
+                          },
+                          {
+                            "handle_in": {
+                              "x": 0.0,
+                              "y": 0.0
+                            },
+                            "handle_out": {
+                              "x": 0.0,
+                              "y": 0.0
+                            },
+                            "kind": "corner",
+                            "point": {
+                              "x": 22.0,
+                              "y": 53.0
+                            }
+                          }
+                        ],
+                        "closed": true
+                      },
+                      {
+                        "anchors": [
+                          {
+                            "handle_in": {
+                              "x": 0.0,
+                              "y": 0.0
+                            },
+                            "handle_out": {
+                              "x": 0.0,
+                              "y": 0.0
+                            },
+                            "kind": "corner",
+                            "point": {
+                              "x": 24.2,
+                              "y": 37.0
+                            }
+                          },
+                          {
+                            "handle_in": {
+                              "x": 0.0,
+                              "y": 0.0
+                            },
+                            "handle_out": {
+                              "x": 0.0,
+                              "y": 0.0
+                            },
+                            "kind": "corner",
+                            "point": {
+                              "x": 24.2,
+                              "y": 41.2
+                            }
+                          },
+                          {
+                            "handle_in": {
+                              "x": 0.0,
+                              "y": 0.0
+                            },
+                            "handle_out": {
+                              "x": 1.8000000000000007,
+                              "y": 0.0
+                            },
+                            "kind": "corner",
+                            "point": {
+                              "x": 28.8,
+                              "y": 41.2
+                            }
+                          },
+                          {
+                            "handle_in": {
+                              "x": 0.0,
+                              "y": 1.2999999999999972
+                            },
+                            "handle_out": {
+                              "x": 0.0,
+                              "y": -1.3000000000000043
+                            },
+                            "kind": "symmetric",
+                            "point": {
+                              "x": 31.8,
+                              "y": 39.1
+                            }
+                          },
+                          {
+                            "handle_in": {
+                              "x": 1.8000000000000007,
+                              "y": 0.0
+                            },
+                            "handle_out": {
+                              "x": 0.0,
+                              "y": 0.0
+                            },
+                            "kind": "corner",
+                            "point": {
+                              "x": 28.8,
+                              "y": 37.0
+                            }
+                          }
+                        ],
+                        "closed": true
+                      },
+                      {
+                        "anchors": [
+                          {
+                            "handle_in": {
+                              "x": 0.0,
+                              "y": 0.0
+                            },
+                            "handle_out": {
+                              "x": 0.0,
+                              "y": 0.0
+                            },
+                            "kind": "corner",
+                            "point": {
+                              "x": 24.2,
+                              "y": 43.2
+                            }
+                          },
+                          {
+                            "handle_in": {
+                              "x": 0.0,
+                              "y": 0.0
+                            },
+                            "handle_out": {
+                              "x": 0.0,
+                              "y": 0.0
+                            },
+                            "kind": "corner",
+                            "point": {
+                              "x": 24.2,
+                              "y": 51.0
+                            }
+                          },
+                          {
+                            "handle_in": {
+                              "x": 0.0,
+                              "y": 0.0
+                            },
+                            "handle_out": {
+                              "x": 2.1999999999999993,
+                              "y": 0.0
+                            },
+                            "kind": "corner",
+                            "point": {
+                              "x": 29.3,
+                              "y": 51.0
+                            }
+                          },
+                          {
+                            "handle_in": {
+                              "x": 0.0,
+                              "y": 2.5
+                            },
+                            "handle_out": {
+                              "x": 0.0,
+                              "y": -2.5
+                            },
+                            "kind": "symmetric",
+                            "point": {
+                              "x": 32.8,
+                              "y": 47.1
+                            }
+                          },
+                          {
+                            "handle_in": {
+                              "x": 2.1999999999999993,
+                              "y": 0.0
+                            },
+                            "handle_out": {
+                              "x": 0.0,
+                              "y": 0.0
+                            },
+                            "kind": "corner",
+                            "point": {
+                              "x": 29.3,
+                              "y": 43.2
+                            }
+                          }
+                        ],
+                        "closed": true
+                      }
+                    ],
+                    "registers": {
+                      "locked": false,
+                      "name": null,
+                      "opacity": 1.0,
+                      "visible": true
+                    },
+                    "style": {
+                      "fill": {
+                        "color": {
+                          "b": 0,
+                          "g": 0,
+                          "r": 0
+                        },
+                        "enabled": true,
+                        "opacity": 1.0
+                      },
+                      "stroke": {
+                        "cap": "butt",
+                        "color": {
+                          "b": 0,
+                          "g": 0,
+                          "r": 0
+                        },
+                        "dash": [],
+                        "enabled": false,
+                        "join": "miter",
+                        "markers": {
+                          "end": "none",
+                          "mid": "none",
+                          "mid_count": 1,
+                          "mid_place": "spaced",
+                          "start": "none"
+                        },
+                        "opacity": 1.0,
+                        "width": 0.264583
+                      }
+                    }
+                  }
+                },
+                {
+                  "Path": {
+                    "outlines": [
+                      {
+                        "anchors": [
+                          {
+                            "handle_in": {
+                              "x": 0.0,
+                              "y": 0.0
+                            },
+                            "handle_out": {
+                              "x": -3.5,
+                              "y": 0.0
+                            },
+                            "kind": "corner",
+                            "point": {
+                              "x": 43.0,
+                              "y": 40.0
+                            }
+                          },
+                          {
+                            "handle_in": {
+                              "x": 0.0,
+                              "y": -3.8999999999999986
+                            },
+                            "handle_out": {
+                              "x": 0.0,
+                              "y": 3.8999999999999986
+                            },
+                            "kind": "symmetric",
+                            "point": {
+                              "x": 37.0,
+                              "y": 46.5
+                            }
+                          },
+                          {
+                            "handle_in": {
+                              "x": -3.5,
+                              "y": 0.0
+                            },
+                            "handle_out": {
+                              "x": 3.5,
+                              "y": 0.0
+                            },
+                            "kind": "symmetric",
+                            "point": {
+                              "x": 43.0,
+                              "y": 53.0
+                            }
+                          },
+                          {
+                            "handle_in": {
+                              "x": 0.0,
+                              "y": 3.8999999999999986
+                            },
+                            "handle_out": {
+                              "x": 0.0,
+                              "y": -3.8999999999999986
+                            },
+                            "kind": "symmetric",
+                            "point": {
+                              "x": 49.0,
+                              "y": 46.5
+                            }
+                          },
+                          {
+                            "handle_in": {
+                              "x": 3.5,
+                              "y": 0.0
+                            },
+                            "handle_out": {
+                              "x": 0.0,
+                              "y": 0.0
+                            },
+                            "kind": "corner",
+                            "point": {
+                              "x": 43.0,
+                              "y": 40.0
+                            }
+                          }
+                        ],
+                        "closed": true
+                      },
+                      {
+                        "anchors": [
+                          {
+                            "handle_in": {
+                              "x": 0.0,
+                              "y": 0.0
+                            },
+                            "handle_out": {
+                              "x": 2.200000000000003,
+                              "y": 0.0
+                            },
+                            "kind": "corner",
+                            "point": {
+                              "x": 43.0,
+                              "y": 42.0
+                            }
+                          },
+                          {
+                            "handle_in": {
+                              "x": 0.0,
+                              "y": -2.700000000000003
+                            },
+                            "handle_out": {
+                              "x": 0.0,
+                              "y": 2.700000000000003
+                            },
+                            "kind": "symmetric",
+                            "point": {
+                              "x": 46.8,
+                              "y": 46.5
+                            }
+                          },
+                          {
+                            "handle_in": {
+                              "x": 2.1999999999999957,
+                              "y": 0.0
+                            },
+                            "handle_out": {
+                              "x": -2.200000000000003,
+                              "y": 0.0
+                            },
+                            "kind": "symmetric",
+                            "point": {
+                              "x": 43.0,
+                              "y": 51.0
+                            }
+                          },
+                          {
+                            "handle_in": {
+                              "x": 0.0,
+                              "y": 2.700000000000003
+                            },
+                            "handle_out": {
+                              "x": 0.0,
+                              "y": -2.700000000000003
+                            },
+                            "kind": "symmetric",
+                            "point": {
+                              "x": 39.2,
+                              "y": 46.5
+                            }
+                          },
+                          {
+                            "handle_in": {
+                              "x": -2.1999999999999957,
+                              "y": 0.0
+                            },
+                            "handle_out": {
+                              "x": 0.0,
+                              "y": 0.0
+                            },
+                            "kind": "corner",
+                            "point": {
+                              "x": 43.0,
+                              "y": 42.0
+                            }
+                          }
+                        ],
+                        "closed": true
+                      }
+                    ],
+                    "registers": {
+                      "locked": false,
+                      "name": null,
+                      "opacity": 1.0,
+                      "visible": true
+                    },
+                    "style": {
+                      "fill": {
+                        "color": {
+                          "b": 0,
+                          "g": 0,
+                          "r": 0
+                        },
+                        "enabled": true,
+                        "opacity": 1.0
+                      },
+                      "stroke": {
+                        "cap": "butt",
+                        "color": {
+                          "b": 0,
+                          "g": 0,
+                          "r": 0
+                        },
+                        "dash": [],
+                        "enabled": false,
+                        "join": "miter",
+                        "markers": {
+                          "end": "none",
+                          "mid": "none",
+                          "mid_count": 1,
+                          "mid_place": "spaced",
+                          "start": "none"
+                        },
+                        "opacity": 1.0,
+                        "width": 0.264583
+                      }
+                    }
+                  }
+                },
+                {
+                  "Path": {
+                    "outlines": [
+                      {
+                        "anchors": [
+                          {
+                            "handle_in": {
+                              "x": 0.0,
+                              "y": 0.0
+                            },
+                            "handle_out": {
+                              "x": 0.0,
+                              "y": 0.0
+                            },
+                            "kind": "corner",
+                            "point": {
+                              "x": 52.0,
+                              "y": 35.0
+                            }
+                          },
+                          {
+                            "handle_in": {
+                              "x": 0.0,
+                              "y": 0.0
+                            },
+                            "handle_out": {
+                              "x": 0.0,
+                              "y": 0.0
+                            },
+                            "kind": "corner",
+                            "point": {
+                              "x": 52.0,
+                              "y": 53.0
+                            }
+                          },
+                          {
+                            "handle_in": {
+                              "x": 0.0,
+                              "y": 0.0
+                            },
+                            "handle_out": {
+                              "x": 0.0,
+                              "y": 0.0
+                            },
+                            "kind": "corner",
+                            "point": {
+                              "x": 54.2,
+                              "y": 53.0
+                            }
+                          },
+                          {
+                            "handle_in": {
+                              "x": 0.0,
+                              "y": 0.0
+                            },
+                            "handle_out": {
+                              "x": 0.0,
+                              "y": -2.0
+                            },
+                            "kind": "corner",
+                            "point": {
+                              "x": 54.2,
+                              "y": 45.7
+                            }
+                          },
+                          {
+                            "handle_in": {
+                              "x": -1.8999999999999986,
+                              "y": 0.0
+                            },
+                            "handle_out": {
+                              "x": 1.7999999999999972,
+                              "y": 0.0
+                            },
+                            "kind": "asymmetric",
+                            "point": {
+                              "x": 57.5,
+                              "y": 42.2
+                            }
+                          },
+                          {
+                            "handle_in": {
+                              "x": 0.0,
+                              "y": -2.1000000000000014
+                            },
+                            "handle_out": {
+                              "x": 0.0,
+                              "y": 0.0
+                            },
+                            "kind": "corner",
+                            "point": {
+                              "x": 60.2,
+                              "y": 45.400000000000006
+                            }
+                          },
+                          {
+                            "handle_in": {
+                              "x": 0.0,
+                              "y": 0.0
+                            },
+                            "handle_out": {
+                              "x": 0.0,
+                              "y": 0.0
+                            },
+                            "kind": "corner",
+                            "point": {
+                              "x": 60.2,
+                              "y": 53.0
+                            }
+                          },
+                          {
+                            "handle_in": {
+                              "x": 0.0,
+                              "y": 0.0
+                            },
+                            "handle_out": {
+                              "x": 0.0,
+                              "y": 0.0
+                            },
+                            "kind": "corner",
+                            "point": {
+                              "x": 62.400000000000006,
+                              "y": 53.0
+                            }
+                          },
+                          {
+                            "handle_in": {
+                              "x": 0.0,
+                              "y": 0.0
+                            },
+                            "handle_out": {
+                              "x": 0.0,
+                              "y": -3.200000000000003
+                            },
+                            "kind": "corner",
+                            "point": {
+                              "x": 62.400000000000006,
+                              "y": 45.2
+                            }
+                          },
+                          {
+                            "handle_in": {
+                              "x": 2.799999999999997,
+                              "y": 0.0
+                            },
+                            "handle_out": {
+                              "x": -1.7000000000000028,
+                              "y": 0.0
+                            },
+                            "kind": "asymmetric",
+                            "point": {
+                              "x": 58.00000000000001,
+                              "y": 40.2
+                            }
+                          },
+                          {
+                            "handle_in": {
+                              "x": 0.7999999999999972,
+                              "y": -1.2999999999999972
+                            },
+                            "handle_out": {
+                              "x": 0.0,
+                              "y": 0.0
+                            },
+                            "kind": "corner",
+                            "point": {
+                              "x": 54.20000000000001,
+                              "y": 42.2
+                            }
+                          },
+                          {
+                            "handle_in": {
+                              "x": 0.0,
+                              "y": 0.0
+                            },
+                            "handle_out": {
+                              "x": 0.0,
+                              "y": 0.0
+                            },
+                            "kind": "corner",
+                            "point": {
+                              "x": 54.20000000000001,
+                              "y": 35.0
+                            }
+                          }
+                        ],
+                        "closed": true
+                      }
+                    ],
+                    "registers": {
+                      "locked": false,
+                      "name": null,
+                      "opacity": 1.0,
+                      "visible": true
+                    },
+                    "style": {
+                      "fill": {
+                        "color": {
+                          "b": 0,
+                          "g": 0,
+                          "r": 0
+                        },
+                        "enabled": true,
+                        "opacity": 1.0
+                      },
+                      "stroke": {
+                        "cap": "butt",
+                        "color": {
+                          "b": 0,
+                          "g": 0,
+                          "r": 0
+                        },
+                        "dash": [],
+                        "enabled": false,
+                        "join": "miter",
+                        "markers": {
+                          "end": "none",
+                          "mid": "none",
+                          "mid_count": 1,
+                          "mid_place": "spaced",
+                          "start": "none"
+                        },
+                        "opacity": 1.0,
+                        "width": 0.264583
+                      }
+                    }
+                  }
+                },
+                {
+                  "Path": {
+                    "outlines": [
+                      {
+                        "anchors": [
+                          {
+                            "handle_in": {
+                              "x": 0.0,
+                              "y": 0.0
+                            },
+                            "handle_out": {
+                              "x": -3.5,
+                              "y": 0.0
+                            },
+                            "kind": "corner",
+                            "point": {
+                              "x": 70.0,
+                              "y": 40.0
+                            }
+                          },
+                          {
+                            "handle_in": {
+                              "x": 0.0,
+                              "y": -3.8999999999999986
+                            },
+                            "handle_out": {
+                              "x": 0.0,
+                              "y": 3.8999999999999986
+                            },
+                            "kind": "symmetric",
+                            "point": {
+                              "x": 64.0,
+                              "y": 46.5
+                            }
+                          },
+                          {
+                            "handle_in": {
+                              "x": -3.5,
+                              "y": 0.0
+                            },
+                            "handle_out": {
+                              "x": 3.5,
+                              "y": 0.0
+                            },
+                            "kind": "symmetric",
+                            "point": {
+                              "x": 70.0,
+                              "y": 53.0
+                            }
+                          },
+                          {
+                            "handle_in": {
+                              "x": 0.0,
+                              "y": 3.8999999999999986
+                            },
+                            "handle_out": {
+                              "x": 0.0,
+                              "y": -3.8999999999999986
+                            },
+                            "kind": "symmetric",
+                            "point": {
+                              "x": 76.0,
+                              "y": 46.5
+                            }
+                          },
+                          {
+                            "handle_in": {
+                              "x": 3.5,
+                              "y": 0.0
+                            },
+                            "handle_out": {
+                              "x": 0.0,
+                              "y": 0.0
+                            },
+                            "kind": "corner",
+                            "point": {
+                              "x": 70.0,
+                              "y": 40.0
+                            }
+                          }
+                        ],
+                        "closed": true
+                      },
+                      {
+                        "anchors": [
+                          {
+                            "handle_in": {
+                              "x": 0.0,
+                              "y": 0.0
+                            },
+                            "handle_out": {
+                              "x": 2.200000000000003,
+                              "y": 0.0
+                            },
+                            "kind": "corner",
+                            "point": {
+                              "x": 70.0,
+                              "y": 42.0
+                            }
+                          },
+                          {
+                            "handle_in": {
+                              "x": 0.0,
+                              "y": -2.700000000000003
+                            },
+                            "handle_out": {
+                              "x": 0.0,
+                              "y": 2.700000000000003
+                            },
+                            "kind": "symmetric",
+                            "point": {
+                              "x": 73.8,
+                              "y": 46.5
+                            }
+                          },
+                          {
+                            "handle_in": {
+                              "x": 2.200000000000003,
+                              "y": 0.0
+                            },
+                            "handle_out": {
+                              "x": -2.200000000000003,
+                              "y": 0.0
+                            },
+                            "kind": "symmetric",
+                            "point": {
+                              "x": 70.0,
+                              "y": 51.0
+                            }
+                          },
+                          {
+                            "handle_in": {
+                              "x": 0.0,
+                              "y": 2.700000000000003
+                            },
+                            "handle_out": {
+                              "x": 0.0,
+                              "y": -2.700000000000003
+                            },
+                            "kind": "symmetric",
+                            "point": {
+                              "x": 66.2,
+                              "y": 46.5
+                            }
+                          },
+                          {
+                            "handle_in": {
+                              "x": -2.200000000000003,
+                              "y": 0.0
+                            },
+                            "handle_out": {
+                              "x": 0.0,
+                              "y": 0.0
+                            },
+                            "kind": "corner",
+                            "point": {
+                              "x": 70.0,
+                              "y": 42.0
+                            }
+                          }
+                        ],
+                        "closed": true
+                      }
+                    ],
+                    "registers": {
+                      "locked": false,
+                      "name": null,
+                      "opacity": 1.0,
+                      "visible": true
+                    },
+                    "style": {
+                      "fill": {
+                        "color": {
+                          "b": 0,
+                          "g": 0,
+                          "r": 0
+                        },
+                        "enabled": true,
+                        "opacity": 1.0
+                      },
+                      "stroke": {
+                        "cap": "butt",
+                        "color": {
+                          "b": 0,
+                          "g": 0,
+                          "r": 0
+                        },
+                        "dash": [],
+                        "enabled": false,
+                        "join": "miter",
+                        "markers": {
+                          "end": "none",
+                          "mid": "none",
+                          "mid_count": 1,
+                          "mid_place": "spaced",
+                          "start": "none"
+                        },
+                        "opacity": 1.0,
+                        "width": 0.264583
+                      }
+                    }
+                  }
+                }
+              ],
+              "layer": false,
+              "registers": {
+                "locked": false,
+                "name": null,
+                "opacity": 1.0,
+                "visible": true
+              }
+            }
+          }
+        ],
+        "layer": true,
+        "registers": {
+          "locked": false,
+          "name": "Layer 1",
+          "opacity": 1.0,
+          "visible": true
+        }
+      }
+    }
+  ],
+  "page": [
+    210.0,
+    297.0
+  ]
+}

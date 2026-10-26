@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="210mm"
+   height="297mm"
+   viewBox="0 0 210 297"
+   version="1.1"
+   id="svg1"
+   inkscape:version="1.3.2 (091e20e, 2023-11-25)"
+   sodipodi:docname="unsupported.svg"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:xlink="http://www.w3.org/1999/xlink"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:document-units="mm" />
+  <defs
+     id="defs1">
+    <linearGradient
+       id="linearGradient1"
+       inkscape:collect="always">
+      <stop
+         style="stop-color:#000000;stop-opacity:1;"
+         offset="0"
+         id="stop1" />
+      <stop
+         style="stop-color:#ffffff;stop-opacity:1;"
+         offset="1"
+         id="stop2" />
+    </linearGradient>
+    <radialGradient
+       inkscape:collect="always"
+       xlink:href="#linearGradient1"
+       id="radialGradient1"
+       cx="70"
+       cy="30"
+       r="10"
+       gradientUnits="userSpaceOnUse" />
+    <pattern
+       id="pattern1"
+       width="2"
+       height="2"
+       patternUnits="userSpaceOnUse">
+      <rect width="1" height="1" />
+    </pattern>
+    <clipPath
+       clipPathUnits="userSpaceOnUse"
+       id="clipPath1">
+      <circle cx="110" cy="30" r="5" id="circle1" />
+    </clipPath>
+    <mask
+       maskUnits="userSpaceOnUse"
+       id="mask1">
+      <rect x="120" y="20" width="5" height="20" style="fill:#ffffff" id="rect9" />
+    </mask>
+    <filter
+       inkscape:collect="always"
+       style="color-interpolation-filters:sRGB"
+       id="filter1">
+      <feGaussianBlur
+         inkscape:collect="always"
+         stdDeviation="1.5"
+         id="feGaussianBlur1" />
+    </filter>
+    <marker
+       style="overflow:visible"
+       id="Arrow1"
+       refX="0"
+       refY="0"
+       orient="auto-start-reverse"
+       inkscape:stockid="Arrow1"
+       markerWidth="1"
+       markerHeight="1"
+       viewBox="0 0 1 1"
+       inkscape:isstock="true"
+       inkscape:collect="always"
+       preserveAspectRatio="xMidYMid">
+      <path
+         style="fill:context-stroke;fill-rule:evenodd;stroke:none"
+         d="M 0,0 L -1,-0.5 V 0.5 Z"
+         id="path9" />
+    </marker>
+  </defs>
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1"
+     xmlns:inkstitch="http://inkstitch.org/namespace">
+    <rect x="10" y="20" width="20" height="20" style="fill:url(#linearGradient1)" id="rect1" />
+    <rect x="40" y="20" width="20" height="20" style="fill:url(#radialGradient1)" id="rect2" />
+    <rect x="70" y="20" width="20" height="20" style="fill:url(#pattern1)" id="rect3" />
+    <rect x="100" y="20" width="20" height="20" style="fill:#ff0000" clip-path="url(#clipPath1)" id="rect4" />
+    <rect x="130" y="20" width="20" height="20" style="fill:#00ff00" mask="url(#mask1)" id="rect5" />
+    <rect x="160" y="20" width="20" height="20" style="fill:#0000ff;filter:url(#filter1)" id="rect6" />
+    <path
+       style="fill:none;stroke:#000000;stroke-width:0.5;marker-end:url(#Arrow1)"
+       d="M 10,60 H 60"
+       id="path1"
+       inkstitch:running_stitch_length_mm="2" />
+    <image
+       width="10"
+       height="10"
+       preserveAspectRatio="none"
+       xlink:href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+       id="image1"
+       x="80"
+       y="55" />
+    <foreignObject x="100" y="55" width="20" height="10"><div xmlns="http://www.w3.org/1999/xhtml">html</div></foreignObject>
+  </g>
+</svg>

@@ -726,6 +726,7 @@ version = "0.1.0"
 dependencies = [
  "curvyo-document-core",
  "curvyo-geometry-core",
+ "curvyo-svg-core",
  "curvyo-text-core",
  "kurbo",
  "proptest",

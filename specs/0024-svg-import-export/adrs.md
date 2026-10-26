@@ -126,6 +126,14 @@ first importer (and, later, the first exporter). **One new ADR
   path; do not send 50 MiB as a JSON number array). The implementer states the mechanism in
   `plan.md`.
 
+- **2026-10-26 (implementer): budget 71 measured.** Native release build, one thread: 20,000
+  paths of 20 cubic nodes (17 MB) from bytes to a finished document in 2.3 s, 5,000 groups of 4
+  in 2.2 s, a 120 KB file in 20 ms. Reading and mapping take 0.13 s; Loro takes about 2.0 s for
+  the two million anchor registers alone (measured with the plain Loro API; writing detached
+  containers saves about 10 %). As the risk below foresaw, the two large budgets are restated
+  from the measurement to 3.0 s and 3.5 s (`curvyo-ui-core/tests/svg_import_budget.rs`) until
+  the PO confirms; the 100 ms budget holds.
+
 ## Risks for the plan (not decided here)
 
 - **Budget 71 is unproven.** A path anchor is a Loro map with five registers

@@ -47,19 +47,19 @@ limit is checked in the session before the parse (criterion 6c); the host reads 
 ## Tasks
 
 - [x] 1. Docs commit: spec Ready, UX amendments, ADR 0018, index, ADR 0011 note.
-- [ ] 2. Budget probe: an `#[ignore]` benchmark of `insert_drawing` over 20,000 paths with 400,000
+- [x] 2. Budget probe: an `#[ignore]` benchmark of `insert_drawing` over 20,000 paths with 400,000
   nodes in one commit (risk of `adrs.md`; AC 71). Restate the budget from the measurement if missed.
 - [x] 3. New crate `curvyo-svg-core`; move `xml_guard` and `path_data` from `text-core` (font tests
   and `0076` hostile fixtures as the net); the literal-entity DOCTYPE rule and the element cap
   (AC 6, 68, 69).
-- [ ] 4. Reader, tests first: page and units (AC 15 to 20), path grammar and arcs (AC 21 to 24, 30),
+- [x] 4. Reader, tests first: page and units (AC 15 to 20), path grammar and arcs (AC 21 to 24, 30),
   shapes (AC 26, 27, 28 data), transforms (AC 31 to 35), styles and CSS (AC 36 to 43), structure,
   layers, `use` (AC 44 to 49), ignored content (AC 13), limits (AC 69).
 - [x] 5. Hostile input: refusals per case (AC 6), entity rules (AC 68), truncation and byte-change
   sweep of every fixture and a proptest over random bytes (AC 70 a), nothing fetched (AC 67).
-- [ ] 6. `document-core`: `Drawing`, `insert_drawing` one commit, `from_drawing` with empty history
+- [x] 6. `document-core`: `Drawing`, `insert_drawing` one commit, `from_drawing` with empty history
   (AC 2, 3, 77).
-- [ ] 7. `ui-core::svg_import`: primitives and transforms (AC 26, 27, 33), node kinds (AC 25), star
+- [x] 7. `ui-core::svg_import`: primitives and transforms (AC 26, 27, 33), node kinds (AC 25), star
   match (AC 28), even-odd (AC 50, 51), placement (AC 3), styles (AC 34, 38 to 42); goldens in
   `tests/fixtures/svg/` with `README.md` (AC 74, 75), determinism (AC 72), the 0046 call (AC 73).
 - [ ] 8. Session and bindings: Open by content (AC 1, 2), Import SVG… (AC 3), the notice (AC 8),

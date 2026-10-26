@@ -1,0 +1,923 @@
+{
+  "background": {
+    "color": [
+      232,
+      232,
+      235
+    ],
+    "opacity": 1.0,
+    "paint": "none"
+  },
+  "display_unit": "mm",
+  "leaves": 7,
+  "nodes": [
+    {
+      "Group": {
+        "children": [
+          {
+            "Path": {
+              "outlines": [
+                {
+                  "anchors": [
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": -2.6521648983954407,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 30.0,
+                        "y": 20.0
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 1.8753637844803457,
+                        "y": -1.8753637844803457
+                      },
+                      "handle_out": {
+                        "x": -1.8753637844803457,
+                        "y": 1.8753637844803457
+                      },
+                      "kind": "symmetric",
+                      "point": {
+                        "x": 22.928932188134524,
+                        "y": 22.928932188134524
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": -2.6521648983954407
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 20.0,
+                        "y": 30.0
+                      }
+                    }
+                  ],
+                  "closed": false
+                }
+              ],
+              "registers": {
+                "locked": false,
+                "name": null,
+                "opacity": 1.0,
+                "visible": true
+              },
+              "style": {
+                "fill": {
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "enabled": false,
+                  "opacity": 1.0
+                },
+                "stroke": {
+                  "cap": "butt",
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "dash": [],
+                  "enabled": true,
+                  "join": "miter",
+                  "markers": {
+                    "end": "none",
+                    "mid": "none",
+                    "mid_count": 1,
+                    "mid_place": "spaced",
+                    "start": "none"
+                  },
+                  "opacity": 1.0,
+                  "width": 0.264583
+                }
+              }
+            }
+          },
+          {
+            "Path": {
+              "outlines": [
+                {
+                  "anchors": [
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 2.6521648983954407
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 60.0,
+                        "y": 20.0
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 1.8753637844803492,
+                        "y": -1.8753637844803457
+                      },
+                      "handle_out": {
+                        "x": -1.8753637844803492,
+                        "y": 1.8753637844803457
+                      },
+                      "kind": "symmetric",
+                      "point": {
+                        "x": 57.071067811865476,
+                        "y": 27.071067811865476
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 2.6521648983954407,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 50.0,
+                        "y": 30.0
+                      }
+                    }
+                  ],
+                  "closed": false
+                }
+              ],
+              "registers": {
+                "locked": false,
+                "name": null,
+                "opacity": 1.0,
+                "visible": true
+              },
+              "style": {
+                "fill": {
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "enabled": false,
+                  "opacity": 1.0
+                },
+                "stroke": {
+                  "cap": "butt",
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "dash": [],
+                  "enabled": true,
+                  "join": "miter",
+                  "markers": {
+                    "end": "none",
+                    "mid": "none",
+                    "mid_count": 1,
+                    "mid_place": "spaced",
+                    "start": "none"
+                  },
+                  "opacity": 1.0,
+                  "width": 0.264583
+                }
+              }
+            }
+          },
+          {
+            "Path": {
+              "outlines": [
+                {
+                  "anchors": [
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": -2.6521648983954407
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 90.0,
+                        "y": 20.0
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 1.8753637844803421,
+                        "y": 1.8753637844803457
+                      },
+                      "handle_out": {
+                        "x": -1.8753637844803421,
+                        "y": -1.8753637844803457
+                      },
+                      "kind": "symmetric",
+                      "point": {
+                        "x": 87.07106781186548,
+                        "y": 12.928932188134524
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 2.6521648983954407,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": -2.6521648983954407,
+                        "y": 0.0
+                      },
+                      "kind": "symmetric",
+                      "point": {
+                        "x": 80.0,
+                        "y": 10.0
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 1.8753637844803421,
+                        "y": -1.8753637844803457
+                      },
+                      "handle_out": {
+                        "x": -1.8753637844803421,
+                        "y": 1.8753637844803457
+                      },
+                      "kind": "symmetric",
+                      "point": {
+                        "x": 72.92893218813452,
+                        "y": 12.928932188134524
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": -2.6521648983954407
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 2.6521648983954407
+                      },
+                      "kind": "symmetric",
+                      "point": {
+                        "x": 70.0,
+                        "y": 20.0
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": -1.8753637844803421,
+                        "y": -1.8753637844803457
+                      },
+                      "handle_out": {
+                        "x": 1.8753637844803421,
+                        "y": 1.8753637844803457
+                      },
+                      "kind": "symmetric",
+                      "point": {
+                        "x": 72.92893218813452,
+                        "y": 27.071067811865476
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": -2.6521648983954407,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 80.0,
+                        "y": 30.0
+                      }
+                    }
+                  ],
+                  "closed": false
+                }
+              ],
+              "registers": {
+                "locked": false,
+                "name": null,
+                "opacity": 1.0,
+                "visible": true
+              },
+              "style": {
+                "fill": {
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "enabled": false,
+                  "opacity": 1.0
+                },
+                "stroke": {
+                  "cap": "butt",
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "dash": [],
+                  "enabled": true,
+                  "join": "miter",
+                  "markers": {
+                    "end": "none",
+                    "mid": "none",
+                    "mid_count": 1,
+                    "mid_place": "spaced",
+                    "start": "none"
+                  },
+                  "opacity": 1.0,
+                  "width": 0.264583
+                }
+              }
+            }
+          },
+          {
+            "Path": {
+              "outlines": [
+                {
+                  "anchors": [
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 2.6521648983954407,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 120.0,
+                        "y": 20.0
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": -1.8753637844803421,
+                        "y": -1.8753637844803457
+                      },
+                      "handle_out": {
+                        "x": 1.8753637844803563,
+                        "y": 1.8753637844803457
+                      },
+                      "kind": "symmetric",
+                      "point": {
+                        "x": 127.07106781186548,
+                        "y": 22.928932188134524
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": -2.6521648983954407
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 2.6521648983954407
+                      },
+                      "kind": "symmetric",
+                      "point": {
+                        "x": 130.0,
+                        "y": 30.0
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 1.8753637844803563,
+                        "y": -1.8753637844803492
+                      },
+                      "handle_out": {
+                        "x": -1.8753637844803421,
+                        "y": 1.8753637844803492
+                      },
+                      "kind": "symmetric",
+                      "point": {
+                        "x": 127.07106781186548,
+                        "y": 37.071067811865476
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 2.6521648983954407,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": -2.6521648983954407,
+                        "y": 0.0
+                      },
+                      "kind": "symmetric",
+                      "point": {
+                        "x": 120.0,
+                        "y": 40.0
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 1.8753637844803421,
+                        "y": 1.8753637844803492
+                      },
+                      "handle_out": {
+                        "x": -1.8753637844803421,
+                        "y": -1.8753637844803492
+                      },
+                      "kind": "symmetric",
+                      "point": {
+                        "x": 112.92893218813452,
+                        "y": 37.071067811865476
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 2.6521648983954407
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 110.0,
+                        "y": 30.0
+                      }
+                    }
+                  ],
+                  "closed": false
+                }
+              ],
+              "registers": {
+                "locked": false,
+                "name": null,
+                "opacity": 1.0,
+                "visible": true
+              },
+              "style": {
+                "fill": {
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "enabled": false,
+                  "opacity": 1.0
+                },
+                "stroke": {
+                  "cap": "butt",
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "dash": [],
+                  "enabled": true,
+                  "join": "miter",
+                  "markers": {
+                    "end": "none",
+                    "mid": "none",
+                    "mid_count": 1,
+                    "mid_place": "spaced",
+                    "start": "none"
+                  },
+                  "opacity": 1.0,
+                  "width": 0.264583
+                }
+              }
+            }
+          },
+          {
+            "Path": {
+              "outlines": [
+                {
+                  "anchors": [
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 1.822028659799841,
+                        "y": -1.4692036922186062
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 20.0,
+                        "y": 60.0
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": -3.6305254033510614,
+                        "y": -0.40491146337019757
+                      },
+                      "handle_out": {
+                        "x": 3.6305254033510614,
+                        "y": 0.40491146337019757
+                      },
+                      "kind": "symmetric",
+                      "point": {
+                        "x": 28.412837286022768,
+                        "y": 58.35788563627629
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": -3.9095410820703123,
+                        "y": -2.1084440317702544
+                      },
+                      "handle_out": {
+                        "x": 3.9095410820703194,
+                        "y": 2.1084440317702615
+                      },
+                      "kind": "symmetric",
+                      "point": {
+                        "x": 40.04653256587973,
+                        "y": 62.23578406289528
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": -2.5415309469252776,
+                        "y": -2.9237235611269767
+                      },
+                      "handle_out": {
+                        "x": 2.759949400479691,
+                        "y": 3.1749875402709336
+                      },
+                      "kind": "asymmetric",
+                      "point": {
+                        "x": 50.0,
+                        "y": 70.0
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 0.13057200427604698,
+                        "y": -2.6256199001016967
+                      },
+                      "handle_out": {
+                        "x": -0.13057200427604698,
+                        "y": 2.6256199001016967
+                      },
+                      "kind": "symmetric",
+                      "point": {
+                        "x": 54.07782569142945,
+                        "y": 78.99599505206076
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 2.9568494253673308,
+                        "y": -0.7843958401245885
+                      },
+                      "handle_out": {
+                        "x": -2.9568494253673308,
+                        "y": 0.7843958401245885
+                      },
+                      "kind": "symmetric",
+                      "point": {
+                        "x": 49.28963269781534,
+                        "y": 84.28449027292581
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 4.328299012308655,
+                        "y": 1.4427663374362112
+                      },
+                      "handle_out": {
+                        "x": -4.328299012308655,
+                        "y": -1.4427663374362112
+                      },
+                      "kind": "symmetric",
+                      "point": {
+                        "x": 37.99130576006773,
+                        "y": 83.2634424262786
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 3.5701407052503917,
+                        "y": 2.960059216997152
+                      },
+                      "handle_out": {
+                        "x": -3.5701407052503917,
+                        "y": -2.960059216997152
+                      },
+                      "kind": "symmetric",
+                      "point": {
+                        "x": 25.741843035936753,
+                        "y": 76.43522705229961
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 1.0554032415836403,
+                        "y": 3.020944982054928
+                      },
+                      "handle_out": {
+                        "x": -1.0554032415836403,
+                        "y": -3.020944982054928
+                      },
+                      "kind": "symmetric",
+                      "point": {
+                        "x": 18.568220120310624,
+                        "y": 67.15945986168782
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": -1.9786132895037483,
+                        "y": 1.5954666436097966
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 20.0,
+                        "y": 60.0
+                      }
+                    }
+                  ],
+                  "closed": true
+                }
+              ],
+              "registers": {
+                "locked": false,
+                "name": null,
+                "opacity": 1.0,
+                "visible": true
+              },
+              "style": {
+                "fill": {
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "enabled": false,
+                  "opacity": 1.0
+                },
+                "stroke": {
+                  "cap": "butt",
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "dash": [],
+                  "enabled": true,
+                  "join": "miter",
+                  "markers": {
+                    "end": "none",
+                    "mid": "none",
+                    "mid_count": 1,
+                    "mid_place": "spaced",
+                    "start": "none"
+                  },
+                  "opacity": 1.0,
+                  "width": 0.264583
+                }
+              }
+            }
+          },
+          {
+            "Path": {
+              "outlines": [
+                {
+                  "anchors": [
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": -2.6521648983954407
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 80.0,
+                        "y": 60.0
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": -1.8753637844803421,
+                        "y": 1.8753637844803492
+                      },
+                      "handle_out": {
+                        "x": 1.8753637844803421,
+                        "y": -1.8753637844803492
+                      },
+                      "kind": "symmetric",
+                      "point": {
+                        "x": 82.92893218813452,
+                        "y": 52.928932188134524
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": -2.6521648983954407,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 2.6521648983954407,
+                        "y": 0.0
+                      },
+                      "kind": "symmetric",
+                      "point": {
+                        "x": 90.0,
+                        "y": 50.0
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": -1.8753637844803421,
+                        "y": -1.8753637844803492
+                      },
+                      "handle_out": {
+                        "x": 1.8753637844803421,
+                        "y": 1.8753637844803492
+                      },
+                      "kind": "symmetric",
+                      "point": {
+                        "x": 97.07106781186548,
+                        "y": 52.928932188134524
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": -2.6521648983954407
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 100.0,
+                        "y": 60.0
+                      }
+                    }
+                  ],
+                  "closed": false
+                }
+              ],
+              "registers": {
+                "locked": false,
+                "name": null,
+                "opacity": 1.0,
+                "visible": true
+              },
+              "style": {
+                "fill": {
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "enabled": false,
+                  "opacity": 1.0
+                },
+                "stroke": {
+                  "cap": "butt",
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "dash": [],
+                  "enabled": true,
+                  "join": "miter",
+                  "markers": {
+                    "end": "none",
+                    "mid": "none",
+                    "mid_count": 1,
+                    "mid_place": "spaced",
+                    "start": "none"
+                  },
+                  "opacity": 1.0,
+                  "width": 0.264583
+                }
+              }
+            }
+          },
+          {
+            "Path": {
+              "outlines": [
+                {
+                  "anchors": [
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 120.0,
+                        "y": 60.0
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 130.0,
+                        "y": 60.0
+                      }
+                    }
+                  ],
+                  "closed": false
+                }
+              ],
+              "registers": {
+                "locked": false,
+                "name": null,
+                "opacity": 1.0,
+                "visible": true
+              },
+              "style": {
+                "fill": {
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "enabled": false,
+                  "opacity": 1.0
+                },
+                "stroke": {
+                  "cap": "butt",
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "dash": [],
+                  "enabled": true,
+                  "join": "miter",
+                  "markers": {
+                    "end": "none",
+                    "mid": "none",
+                    "mid_count": 1,
+                    "mid_place": "spaced",
+                    "start": "none"
+                  },
+                  "opacity": 1.0,
+                  "width": 0.264583
+                }
+              }
+            }
+          }
+        ],
+        "layer": true,
+        "registers": {
+          "locked": false,
+          "name": "Layer 1",
+          "opacity": 1.0,
+          "visible": true
+        }
+      }
+    }
+  ],
+  "page": [
+    210.0,
+    297.0
+  ]
+}

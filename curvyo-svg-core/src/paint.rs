@@ -46,6 +46,13 @@ pub(crate) type Ids<'a, 'input> = BTreeMap<&'a str, Node<'a, 'input>>;
 /// caller resolves).
 pub(crate) fn colour(text: &str) -> Option<Rgba> {
     let text = text.trim();
+    // The 148th CSS colour name, which `svgtypes` lacks.
+    if text.eq_ignore_ascii_case("rebeccapurple") {
+        return Some(Rgba {
+            rgb: [0x66, 0x33, 0x99],
+            alpha: 1.0,
+        });
+    }
     let c: svgtypes::Color = text.parse().ok()?;
     Some(Rgba {
         rgb: [c.red, c.green, c.blue],

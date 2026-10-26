@@ -115,6 +115,16 @@ impl Document {
         self.commit_state.continue_next.set(allowed);
     }
 
+    /// Runs `write` with every commit its inner methods would make deferred, and commits
+    /// nothing: the caller's next commit takes it all (a new document's setup change).
+    pub(crate) fn uncommitted<R>(&self, write: impl FnOnce(&Self) -> R) -> R {
+        self.commit_state
+            .batch_depth
+            .set(self.commit_state.batch_depth.get() + 1);
+        let _guard = BatchGuard(&self.commit_state);
+        write(self)
+    }
+
     /// Runs `write` and commits everything it wrote as one step labelled `label`. Commits the
     /// closure's inner methods would make are deferred to the end; a closure that writes nothing
     /// adds no step.

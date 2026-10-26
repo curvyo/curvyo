@@ -156,7 +156,14 @@ impl<'a, 'd, 'input> Reader<'a, 'd, 'input> {
         match name {
             "g" | "a" => self.group(node, &inner, ctx.at_root && name == "g"),
             "switch" => {
-                let first = node.children().find(Node::is_element)?;
+                // The first child that passes: no extension is supported, so a child that
+                // requires one (Illustrator's private data) does not.
+                let first = node.children().find(|child| {
+                    child.is_element()
+                        && child
+                            .attribute("requiredExtensions")
+                            .is_none_or(|ext| ext.trim().is_empty())
+                })?;
                 self.element(first, &inner)
             }
             "svg" => self.nested_svg(node, inner),

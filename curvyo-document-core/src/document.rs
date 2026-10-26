@@ -16,6 +16,15 @@ use crate::units::{DocumentSize, Length};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DocumentVersion(pub(crate) loro::Frontiers);
 
+impl DocumentVersion {
+    /// A version no document ever has (every document has its setup change): a project that
+    /// exists in no saved file, such as one opened from an SVG, is dirty against it.
+    #[must_use]
+    pub fn never() -> Self {
+        Self(loro::Frontiers::default())
+    }
+}
+
 /// The container `format_version` this build writes and the newest it
 /// accepts on read (ADR 0004 §9).
 ///
@@ -341,6 +350,16 @@ impl Document {
     /// reject.
     #[must_use]
     pub fn new(peer_id: u64) -> Self {
+        let document = Self::blank(peer_id, DocumentSize::default());
+        document.commit_new_document();
+        // A document without history has nothing to read.
+        document.commit_state.set_warm();
+        document
+    }
+
+    /// The setup of a new document of `size`, not committed yet: [`Document::new`] commits it at
+    /// once, [`Document::from_drawing`] after writing its content into the same change.
+    pub(crate) fn blank(peer_id: u64, size: DocumentSize) -> Self {
         let loro = LoroDoc::new();
         // invariant: setting the peer id on a freshly created doc with no
         // recorded operations yet cannot fail.
@@ -348,7 +367,6 @@ impl Document {
         loro.set_peer_id(peer_id).unwrap();
         crate::text_chars::configure(&loro);
         let root = loro.get_map(ROOT_MAP);
-        let size = DocumentSize::default();
         // invariant: inserting known-valid keys into a freshly created,
         // attached root map cannot fail.
         #[allow(clippy::unwrap_used)]
@@ -358,7 +376,7 @@ impl Document {
             root.insert(KEY_WIDTH_MM, size.width.as_mm()).unwrap();
             root.insert(KEY_HEIGHT_MM, size.height.as_mm()).unwrap();
         }
-        let document = Self {
+        Self {
             loro,
             commit_state: crate::history::CommitState::default(),
             container_index: std::cell::RefCell::default(),
@@ -373,11 +391,7 @@ impl Document {
             clone_refusal: std::cell::Cell::default(),
             object_index: std::cell::RefCell::default(),
             writable_cache: std::cell::RefCell::default(),
-        };
-        document.commit_new_document();
-        // A document without history has nothing to read.
-        document.commit_state.set_warm();
-        document
+        }
     }
 
     /// Rebuilds a document from a previously exported Loro snapshot — the
