@@ -111,6 +111,10 @@ with the fixtures of `tests/fixtures/fonts/`, time-boxed run in the PR (as ADR 0
   use on both targets, never compiled into the wasm. The browser lists Included only; its Curvyo block
   stays empty (not shown) until adding fonts in the browser (`0062` criterion 9) exists.
 - The spec's `directories` crate is not needed: Tauri's path resolver is already a dependency.
+- 2026-10-26 (`0083`): the listing also carries a display-only folder path for the Curvyo and
+  This computer blocks (`specs/0083-font-info-and-zip` criterion 2); the page never passes it
+  back, files are still addressed by host id. The Curvyo folder is read one subfolder level deep
+  (no dot-folders, no symlinked folders; criterion 10).
 
 | Option | Why it lost or won |
 |---|---|
