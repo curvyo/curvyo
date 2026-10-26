@@ -56,6 +56,9 @@ name = "curvyo-text-core"
 [[licenses.exceptions]]
 allow = ["AGPL-3.0-or-later"]
 name = "curvyo-svg-core"
+[[licenses.exceptions]]
+allow = ["AGPL-3.0-or-later"]
+name = "curvyo-image-core"
 
 [[licenses.exceptions]]
 allow = ["AGPL-3.0-or-later"]

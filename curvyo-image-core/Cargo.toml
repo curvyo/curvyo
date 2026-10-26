@@ -1,0 +1,18 @@
+[package]
+name = "curvyo-image-core"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "The Curvyo bitmap decoder boundary: PNG, JPEG and WebP by content, header checks before any pixel buffer, a deterministic working image (pure, wasm-compatible)."
+
+[lints]
+workspace = true
+
+[dependencies]
+image.workspace = true
+thiserror.workspace = true
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+# Mutation smoke over the fixtures (`specs/0058-bitmap-import` "Fixtures", the fuzz plan item).
+proptest.workspace = true

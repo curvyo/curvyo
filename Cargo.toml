@@ -5,6 +5,7 @@ members = [
     "curvyo-geometry-core",
     "curvyo-text-core",
     "curvyo-svg-core",
+    "curvyo-image-core",
     "curvyo-ui-core",
     "curvyo-render-core",
     "curvyo-editor-wasm",
@@ -62,6 +63,10 @@ fontdb = { version = "=0.24.0", default-features = false, features = ["std", "fs
 # a mark never lands in another run than its base. MIT OR Apache-2.0, no dependencies, builds for
 # wasm32; already in `Cargo.lock` through `tao` (desktop shell).
 unicode-segmentation = { version = "1.13", default-features = false }
+# Pinned exactly (ADR 0017 §4, spike 2026-10-26): the bitmap decoders of the image import, hostile
+# input in wasm, and a decoder upgrade can change a lossy decode. MIT OR Apache-2.0; brings `png`,
+# `zune-jpeg`, `image-webp`. No default features: no `rayon`, no BMP, GIF, TIFF or other formats.
+image = { version = "=0.25.10", default-features = false, features = ["png", "jpeg", "webp"] }
 # Property tests (dev-dependency of the geometry, ui and text crates).
 proptest = "1"
 
