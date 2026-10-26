@@ -12,8 +12,8 @@ session, the engine or the document.** The only state written is one `localStora
   widget code; nothing in this story crosses into wasm or redraws the canvas.
 - [ADR 0011](../../docs/adr/0011-workspace-and-crate-layout.md): no crate is touched.
 - [ADR 0020](../../docs/adr/0020-text-nodes-text-engine-and-font-sources.md): unchanged; the
-  writing mode, glyph orientation and Taper registers keep their meaning, only their bar place
-  moves.
+  writing mode and glyph orientation registers keep their meaning, only their bar place
+  moves (the Taper is a field of the Fonts tab's text layout block since 2026-10-25).
 - [`0051` adrs.md](../0051-sidebar-and-no-menu/adrs.md) decision 8: the pattern for per-user
   view state (webview `localStorage` in both builds, guarded, no host command).
 - [`0074` adrs.md](../0074-text-objects/adrs.md): the Font button's command (show the panel,

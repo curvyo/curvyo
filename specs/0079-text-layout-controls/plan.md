@@ -244,3 +244,60 @@ Format 21 (20 after slice 3).
   limited by Size), which keeps every notice within 70 characters with the longer label.
 - 2026-10-24: text on a path (`0080`) is stacked on this branch and not in it; it needs the
   cumulative `across` along the carrier's normal and `PlacedGlyph.rotation_rad` after its rebase.
+
+# Plan for the text layout controls, slice 2 (taper)
+
+Implementer, 2026-10-26, on `story/text-taper` (Part C, criteria 16 to 19, and Part G for the
+taper). Built for `adrs.md` decisions 7 to 10. Format 24 (main at 23). Customer corrections of
+2026-10-25: the Taper control is a value field of the text layout block in the Fonts tab (not the
+Text bar), and the block folds under a "Text layout" header, closed by default.
+
+## Affected crates/modules
+
+- `curvyo-text-core`: new `taper.rs` (the map of criterion 17 and the refit of criterion 18 with
+  `kurbo::fit_to_bezpath`); `LayoutOptions.taper`, `TextLayout.taper`; `glyph_map.rs` applies it
+  in the glyph frame before the turn; `TextLayout::glyph_in_line` for text on path.
+- `curvyo-document-core`: `TextLayoutValues.taper`, key `text_taper`, label "Change taper",
+  format 24, golden `text_layout_v24.curvyo`.
+- `curvyo-ui-core`: `layout_options` maps the taper; `LayoutField::Taper` (%, −50 to 50);
+  `text_on_path` draws the tapered glyph in its frame; the box covers tapered glyphs.
+- `curvyo-editor-wasm`: the eighth block field, its notice outcome.
+- `frontend`: Taper field after Character rotation; the block's "Text layout" header (fold,
+  stored per user, dot when folded with changed values); node tests.
+
+## Tasks
+
+- [x] 1. text-core, test first (`tests/taper.rs`): H at 20 mm, 20 %: stems 0.8 x / 1.2 x apart
+  at the baseline and at the top, top stays 20 mm; H and V lines stay lines; curves within
+  0.01 mm of the exact map; the 0.05 clamp; advances unchanged; taper before rotation; the
+  circle values outside and inside the ring (AC 17, 18, 19, 38)
+- [x] 2. document-core: key, default deleted, lenient read and clamp, label, format 24, golden
+  with the taper alone and with all values (AC 16, 37)
+- [x] 3. ui-core and session: the field (range, steps 1 / 10 / 0.1 %, Mixed, notice at the
+  limit), mapping, text on path in each glyph's frame, Object to path (AC 16, 19, 34, 35, 36)
+- [x] 4. Frontend: the Taper field, the folding block header, node tests (AC 16, 6)
+- [x] 5. Spec, UX notes and `0084` updated for the customer corrections; full gate; screenshot
+  of a tapered text on a circle
+
+## Validation
+
+- `curvyo-text-core/tests/taper.rs`; codec unit tests and
+  `curvyo-document-core/tests/text_taper_format.rs`; ui-core unit tests of the field and of text
+  on path; session test; `frontend/tests/textLayoutText.test.ts`.
+
+## Dated notes
+
+- 2026-10-26: the glyph frame of criterion 17 is the glyph's own em frame: its baseline is the
+  glyph origin's line (for a sideways glyph of a column that is its own baseline, not the
+  column's centre line); for an upright glyph of a column the middle is the column's centre line.
+  Kerned glyphs taper about their raised baseline.
+- 2026-10-26: refit accuracy 0.01 mm in text space divided by the placement's largest singular
+  value (`ui-core::text_layout::taper_accuracy`); text on a path uses 0.01 mm (its frames are
+  rigid). Measured on host (release): 532 tapered glyphs of Source Serif 4 laid out and refitted
+  in about 24 ms; the outline grows by under 2 % in elements.
+- 2026-10-26: the tester-owned files were adapted mechanically for the eighth field only: the
+  block's field count 7 became 8 (`curvyo-editor-wasm/tests/acceptance_0079_tester.rs`), and the
+  slice 4 order test now expects the Taper between Character rotation and the kerning fields
+  (`acceptance_0079_slice4_tester.rs`, customer decision 2026-10-25). No other assertion changed.
+- 2026-10-26: a typed taper beyond the range on several texts answers with the single-text notice
+  ("Taper set to 50 %, the largest taper."), because the range is the same for every text.

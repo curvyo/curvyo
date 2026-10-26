@@ -129,7 +129,7 @@ impl WasmSession {
         self.session.set_text_glyph_orientation(orientation);
     }
 
-    /// The text layout block, as JSON: `null` when it is not shown, else the seven fields in
+    /// The text layout block, as JSON: `null` when it is not shown, else the eight fields in
     /// order (`{"text", "value", "mixed", "auto", "barFrom", "barTo", "zero", "dragBase",
     /// "dragMin", "dragLimit", "trackMin", "trackMax", "resettable"}`).
     #[must_use]
@@ -144,7 +144,7 @@ impl WasmSession {
     }
 
     /// A tick of a drag or a click on the field `field` (`"letter-spacing"`, `"word-spacing"`,
-    /// `"line-spacing"`, `"character-rotation"`, `"horizontal-kerning"`, `"vertical-kerning"`,
+    /// `"line-spacing"`, `"character-rotation"`, `"taper"`, `"horizontal-kerning"`, `"vertical-kerning"`,
     /// `"char-rotation"`) at position `p`, grid `"normal"`, `"coarse"` or
     /// `"fine"`.
     pub fn preview_text_layout(&mut self, field: &str, p: f64, grid: &str) {

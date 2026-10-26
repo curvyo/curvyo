@@ -15,7 +15,7 @@ fn only_text(session: &Session) -> TextSnapshot {
 /// The block's kerning fields: horizontal, vertical.
 fn kern_fields(session: &Session) -> (String, String) {
     let block = session.text_layout_block().unwrap();
-    (block[4].text.clone(), block[5].text.clone())
+    (block[5].text.clone(), block[6].text.clone())
 }
 
 /// Edit mode on the only text with the caret before character `before` (a byte, ASCII here).
@@ -35,10 +35,10 @@ fn edit_at(session: &mut Session, before: usize) {
 fn ac26_ac28_the_fields_outside_edit_mode() {
     let mut session = with_text("AV\nTo");
     let block = session.text_layout_block().unwrap();
-    assert_eq!(block.len(), 7);
+    assert_eq!(block.len(), 8);
     assert_eq!(kern_fields(&session), ("0".to_owned(), "0".to_owned()));
     // Size 10 mm: the horizontal track is -2.5 to 2.5 mm, the vertical -5 to 5 mm.
-    assert!((block[4].track_max - 2.5).abs() < 1e-9 && (block[5].track_max - 5.0).abs() < 1e-9);
+    assert!((block[5].track_max - 2.5).abs() < 1e-9 && (block[6].track_max - 5.0).abs() < 1e-9);
     assert_eq!(
         session.set_text_layout_text(LayoutField::HorizontalKerning, "0.4"),
         LayoutOutcome::Set
@@ -55,7 +55,7 @@ fn ac26_ac28_the_fields_outside_edit_mode() {
         session.set_text_layout_text(LayoutField::VerticalKerning, "50"),
         LayoutOutcome::Clamped(true, 20.0)
     );
-    assert!(session.text_layout_block().unwrap()[4].resettable);
+    assert!(session.text_layout_block().unwrap()[5].resettable);
     let steps = labels(&session).len();
     assert_eq!(
         session.reset_text_layout(LayoutField::VerticalKerning),
@@ -102,7 +102,7 @@ fn ac27_the_fields_follow_the_caret() {
         anchor: 0,
         caret: 3,
     });
-    assert!(session.text_layout_block().unwrap()[4].mixed);
+    assert!(session.text_layout_block().unwrap()[5].mixed);
     session.text_input(TextInput::Select {
         anchor: 3,
         caret: 3,
@@ -199,7 +199,7 @@ fn ac35_object_to_path_keeps_the_kerns() {
 #[test]
 fn ac27b_per_character_rotation_and_its_own_reset() {
     let mut session = with_text("AVA");
-    assert_eq!(session.text_layout_block().unwrap().len(), 7);
+    assert_eq!(session.text_layout_block().unwrap().len(), 8);
     edit_at(&mut session, 1);
     assert_eq!(
         session.set_text_layout_text(LayoutField::CharRotation, "30"),
@@ -211,7 +211,7 @@ fn ac27b_per_character_rotation_and_its_own_reset() {
     let chars = only_text(&session).chars;
     assert_eq!(chars.entries().len(), 1);
     assert!((chars.get(1).rotation - 30.0).abs() < 1e-9 && chars.get(1).kern_x > 0.0);
-    assert_eq!(session.text_layout_block().unwrap()[6].text, "", "Mixed");
+    assert_eq!(session.text_layout_block().unwrap()[7].text, "", "Mixed");
     assert_eq!(
         session.reset_text_layout(LayoutField::HorizontalKerning),
         LayoutOutcome::Set

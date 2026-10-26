@@ -23,8 +23,9 @@ Today (branch `story/text-vertical`, `0079` slice 3) the Text bar holds, in
 this order: the Font button (168px, shows the face name), Size (120px), Style
 (196px), Alignment (124px), Writing mode and Glyph orientation (197px), Glyphs
 (28px). Measured: two rows at 1280 x 800, four rows (144px) at 800 x 600. Still
-to come: the Taper field (`0079` slice 2, criterion 16, "after the Alignment
-group") and the On path button (`0080` criterion 1). Per-character kerning
+to come: the On path button (`0080` criterion 1). The Taper (`0079` slice 2)
+is a field of the text layout block in the Fonts tab (customer decision
+2026-10-25), not a bar control. Per-character kerning
 (`0079` slice 4) adds no bar control: its fields sit in the text layout block
 of the Fonts tab (`0079` criteria 6 and 26) and its keys are Alt+arrows.
 
@@ -83,11 +84,10 @@ groups as today. **Subject texts**: the texts the controls act on today.
    fit one 324px line at 800 x 600; Glyphs moves to row 2 and Font and Size are
    4px apart, UX notes §0.1 and §0.2, lead decision 2026-10-24)**
 7. Given the Text bar, then row 2 holds, in this order: Writing mode group,
-   Glyph orientation group (`0079` slice 3), Taper field (once `0079` slice 2 is
-   built; this amends the placement "after the Alignment group" of `0079`
-   criterion 16), Glyphs button (while shown, as today). When `0080` is built, its options of a text on a path (Side,
-   Line, Release from path) go to row 2 after Taper unless its UX notes give a
-   reason otherwise. **(Proposal)**
+   Glyph orientation group (`0079` slice 3), Glyphs button (while shown, as
+   today). When `0080` is built, its options of a text on a path (Side, Line,
+   Release from path) go to row 2 after Glyphs unless its UX notes give a
+   reason otherwise. **(Proposal)** *(Customer decision 2026-10-25: the Taper is a field of the text layout block in the Fonts tab, `0079` criterion 16, not a row 2 control.)*
 8. Given the Select bar with a text in the selection, then its Text controls
    follow the same split: the row 1 controls stay where the Text group is today
    (after Guide, before Object to path) in the order of criterion 6, and the
@@ -118,10 +118,10 @@ groups as today. **Subject texts**: the texts the controls act on today.
     (expand, Object to path, Linked clone, row 2; UX notes §0.5). Row 2 has `role="toolbar"` (Text bar) or `role="group"`
     (Select bar) with the accessible name "More text options".
 13. Given a subject text whose row 2 values differ from the defaults (writing
-    mode not Horizontal, or Taper not 0 %), while row 2 is closed, then the
+    mode not Horizontal, or a subject text on a path), while row 2 is closed, then the
     expand button carries a 6px dot in the accent colour at its top right corner
     and its accessible description is "Changed: " plus the changed control names
-    ("Changed: Writing mode, Taper"); with row 2 open, or all values default, no
+    ("Changed: Writing mode, On path"); with row 2 open, or all values default, no
     dot. Mixed counts as changed. **(Proposal)**
 14. Given the maker opens or closes row 2 in the Text bar, then the Select bar
     Text controls show the same state, and vice versa (one preference). The
@@ -145,8 +145,9 @@ groups as today. **Subject texts**: the texts the controls act on today.
     notice), then it is drawn above row 2 and readable in full.
 18. Given the window at 800 x 600, the Properties panel open, the second rail
     column shown (overlay row 324px), a text in edit mode, all controls of
-    criteria 6 and 7 present (with Taper and On path, or stand-ins of their
-    widths: Taper 120px, On path 28px), then the Text bar is 2 lines (72px) with
+    criteria 6 and 7 present (with On path, or a stand-in of its width, 28px;
+    the build measured a 120px Taper stand-in too, which is no longer on the
+    bar since 2026-10-25), then the Text bar is 2 lines (72px) with
     row 2 closed and at most 4 lines (144px) with row 2 open; nothing scrolls
     sideways and nothing is clipped.
 19. Given the window at 1280 x 800, panel open, the same controls, then the
@@ -182,8 +183,9 @@ groups as today. **Subject texts**: the texts the controls act on today.
   Proposal).
 - `0079` slice 3 (criterion 20): Writing mode and Glyph orientation move from
   "after the Alignment group" to row 2.
-- `0079` slice 2 (criterion 16): Taper is placed in row 2, not after the
-  Alignment group (the customer had set "in the bar"; it stays in the bar).
+- `0079` slice 2 (criterion 16): Taper was placed in row 2; on 2026-10-25 the
+  customer moved it into the text layout block of the Fonts tab, so row 2 does
+  not hold it.
 - `0080` criterion 1: the On path button is on row 1; its options go to row 2
   (criterion 7).
 
@@ -198,7 +200,7 @@ groups as today. **Subject texts**: the texts the controls act on today.
 - A font family combo box or search in the bar; the font is picked in the
   Fonts tab only.
 - Changes to the Fonts tab, the text layout block or the kerning fields.
-- Auto-opening row 2 when a vertical or tapered text is selected (criterion 13
+- Auto-opening row 2 when a vertical text is selected (criterion 13
   shows a dot instead).
 - Any change to the document or the project format (no `format_version` bump).
 

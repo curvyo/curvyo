@@ -359,7 +359,7 @@ fn ac06_block_only_with_a_text_subject() {
     start_text(&mut s, pt(10.0, 20.0), "Edit");
     assert_eq!(
         s.text_layout_block().unwrap().len(),
-        7,
+        8,
         "edit mode: the block"
     );
     s.escape();
@@ -388,7 +388,7 @@ fn ac07_fields_defaults_limits_and_wrap() {
     add_text(&mut s, pt(10.0, 20.0), "Plate");
     s.set_text_size(20.0);
     let block = s.text_layout_block().unwrap();
-    assert_eq!(block.len(), 7);
+    assert_eq!(block.len(), 8);
     assert_eq!(block[0].text, "0");
     assert_eq!(block[1].text, "0");
     assert!(block[2].auto && !block[2].resettable);

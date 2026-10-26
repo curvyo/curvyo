@@ -1,12 +1,13 @@
 //! The value fields of the text layout block (`specs/0079-text-layout-controls` criteria 7, 10,
-//! 12, 13, 26 to 28, 27b; UX notes §0, §6 and §10.3): their scales relative to Size, what they show
+//! 12, 13, 16, 26 to 28, 27b; UX notes §0, §6 and §10.3): their scales relative to Size, what they show
 //! for one or several subjects, and the values a change sets.
 
 use std::ops::RangeInclusive;
 
 use curvyo_document_core::{
     Angle, CharValues, KERN_X_FACTORS, KERN_Y_FACTORS, LETTER_SPACING_FACTORS,
-    LINE_SPACING_FACTORS, TextCharsLabel, TextLayoutLabel, TextLayoutValues, WORD_SPACING_FACTORS,
+    LINE_SPACING_FACTORS, TAPER_FRACTIONS, TextCharsLabel, TextLayoutLabel, TextLayoutValues,
+    WORD_SPACING_FACTORS,
 };
 
 use crate::display_unit_text::parse_length;
@@ -32,6 +33,8 @@ pub enum LayoutField {
     LineSpacing,
     /// Character rotation, degrees.
     CharacterRotation,
+    /// Taper, percent (criterion 16; in the block since the customer's decision of 2026-10-25).
+    Taper,
     /// Horizontal kerning of single characters, mm (criterion 26).
     HorizontalKerning,
     /// Vertical kerning of single characters, mm (criterion 26).
@@ -100,18 +103,19 @@ pub struct LayoutChange {
 
 impl LayoutField {
     /// Every field, in the block's order.
-    pub const ALL: [Self; 7] = [
+    pub const ALL: [Self; 8] = [
         Self::LetterSpacing,
         Self::WordSpacing,
         Self::LineSpacing,
         Self::CharacterRotation,
+        Self::Taper,
         Self::HorizontalKerning,
         Self::VerticalKerning,
         Self::CharRotation,
     ];
 
     /// The field named by the host (`"letter-spacing"`, `"word-spacing"`, `"line-spacing"`,
-    /// `"character-rotation"`, `"horizontal-kerning"`, `"vertical-kerning"`,
+    /// `"character-rotation"`, `"taper"`, `"horizontal-kerning"`, `"vertical-kerning"`,
     /// `"char-rotation"`).
     #[must_use]
     pub fn from_name(name: &str) -> Option<Self> {
@@ -120,6 +124,7 @@ impl LayoutField {
             "word-spacing" => Some(Self::WordSpacing),
             "line-spacing" => Some(Self::LineSpacing),
             "character-rotation" => Some(Self::CharacterRotation),
+            "taper" => Some(Self::Taper),
             "horizontal-kerning" => Some(Self::HorizontalKerning),
             "vertical-kerning" => Some(Self::VerticalKerning),
             "char-rotation" => Some(Self::CharRotation),
@@ -139,6 +144,19 @@ impl LayoutField {
     /// Whether the field holds degrees.
     const fn is_rotation(self) -> bool {
         matches!(self, Self::CharacterRotation | Self::CharRotation)
+    }
+
+    /// The fixed ends of a field not relative to Size: the rotations in degrees, the taper in
+    /// percent; `None` for the lengths.
+    const fn fixed_range(self) -> Option<(f64, f64)> {
+        match self {
+            Self::CharacterRotation | Self::CharRotation => Some((-180.0, 180.0)),
+            Self::Taper => Some((
+                *TAPER_FRACTIONS.start() * 100.0,
+                *TAPER_FRACTIONS.end() * 100.0,
+            )),
+            _ => None,
+        }
     }
 
     /// The step a change (or, with `clear`, the reset outside edit mode) of a per-character field
@@ -168,11 +186,12 @@ impl LayoutField {
             Self::WordSpacing => Some(TextLayoutLabel::WordSpacing),
             Self::LineSpacing => Some(TextLayoutLabel::LineSpacing),
             Self::CharacterRotation => Some(TextLayoutLabel::CharacterRotation),
+            Self::Taper => Some(TextLayoutLabel::Taper),
             Self::HorizontalKerning | Self::VerticalKerning | Self::CharRotation => None,
         }
     }
 
-    /// The typed range as factors of Size (criterion 7); `None` for the rotations.
+    /// The typed range as factors of Size (criterion 7); `None` for the rotations and the taper.
     fn typed_factors(self) -> Option<RangeInclusive<f64>> {
         match self {
             Self::LetterSpacing => Some(LETTER_SPACING_FACTORS),
@@ -180,17 +199,20 @@ impl LayoutField {
             Self::LineSpacing => Some(LINE_SPACING_FACTORS),
             Self::HorizontalKerning => Some(KERN_X_FACTORS),
             Self::VerticalKerning => Some(KERN_Y_FACTORS),
-            Self::CharacterRotation | Self::CharRotation => None,
+            Self::CharacterRotation | Self::CharRotation | Self::Taper => None,
         }
     }
 
-    /// The track in mm at the smallest subject Size, or in degrees (UX notes §0.4).
+    /// The track in mm at the smallest subject Size, in degrees or in percent (UX notes §0.4).
     fn track(self, size_mm: f64) -> (f64, f64) {
+        if let Some(range) = self.fixed_range() {
+            return range;
+        }
         match self {
             Self::LetterSpacing => (-0.25 * size_mm, size_mm),
             Self::WordSpacing => (-0.5 * size_mm, 2.0 * size_mm),
             Self::LineSpacing => (0.0, 3.0 * size_mm),
-            Self::CharacterRotation | Self::CharRotation => (-180.0, 180.0),
+            Self::CharacterRotation | Self::CharRotation | Self::Taper => (-180.0, 180.0),
             Self::HorizontalKerning => (-0.25 * size_mm, 0.25 * size_mm),
             Self::VerticalKerning => (-0.5 * size_mm, 0.5 * size_mm),
         }
@@ -204,6 +226,7 @@ impl LayoutField {
             Self::WordSpacing => Some(values.word_spacing * subject.size_mm),
             Self::LineSpacing => values.line_spacing.map(|f| f * subject.size_mm),
             Self::CharacterRotation => Some(values.rotation.as_radians().to_degrees()),
+            Self::Taper => Some(values.taper * 100.0),
             Self::HorizontalKerning => Some(subject.kern.kern_x * subject.size_mm),
             Self::VerticalKerning => Some(subject.kern.kern_y * subject.size_mm),
             Self::CharRotation => Some(subject.kern.rotation),
@@ -215,11 +238,15 @@ impl LayoutField {
         self.value_of(subject).unwrap_or(subject.natural_line_mm)
     }
 
-    /// The value as the field shows it: mm with up to two decimals, degrees with one, trailing
-    /// zeros trimmed, U+2212 for minus.
+    /// The value as the field shows it: mm with up to two decimals, degrees and percent with
+    /// one, trailing zeros trimmed, U+2212 for minus.
     #[must_use]
     pub fn text(self, value: f64) -> String {
-        let scale = if self.is_rotation() { 10.0 } else { 100.0 };
+        let scale = if self.fixed_range().is_some() {
+            10.0
+        } else {
+            100.0
+        };
         let rounded = (value * scale).round() / scale + 0.0;
         format!("{rounded}").replace('-', "\u{2212}")
     }
@@ -295,14 +322,11 @@ fn one_two_five(at_least: f64) -> f64 {
 }
 
 /// The drag grid of `field` (UX notes §0.1): spacing on the smallest 1-2-5 step of at least one
-/// track span per field width, Shift ten times, Ctrl a tenth; rotation 1°, Shift 15°, Ctrl 0.1°.
+/// track span per field width, Shift ten times, Ctrl a tenth; rotation 1°, Shift 15°, Ctrl 0.1°;
+/// taper 1 %, Shift 10 %, Ctrl 0.1 % (criterion 16).
 fn drag_grid(field: LayoutField, subjects: &[LayoutSubject], grid: Grid) -> f64 {
-    if field.is_rotation() {
-        return match grid {
-            Grid::Normal => 1.0,
-            Grid::Coarse => 15.0,
-            Grid::Fine => 0.1,
-        };
+    if field.fixed_range().is_some() {
+        return fixed_steps(field, grid);
     }
     let (low, high) = field.track(smallest_size(subjects));
     let step = one_two_five((high - low) / FIELD_WIDTH_PX);
@@ -328,35 +352,48 @@ pub fn value_at(field: LayoutField, subjects: &[LayoutSubject], p: f64, grid: Gr
     snapped(value, drag_grid(field, subjects, grid))
 }
 
-/// The value `steps` arrow-key steps from `shown` (UX notes §0.1): spacing 0.1 mm, Shift 1 mm,
-/// Ctrl 0.01 mm; rotation 1°, Shift 15°, Ctrl 0.1°.
-#[must_use]
-pub fn stepped(field: LayoutField, shown: f64, steps: i32, grid: Grid) -> f64 {
-    let (normal, coarse, fine) = if field.is_rotation() {
-        (1.0, 15.0, 0.1)
-    } else {
-        (0.1, 1.0, 0.01)
-    };
-    let step = match grid {
-        Grid::Normal => normal,
+/// The step of a field with fixed ends: rotation 1°, Shift 15°, Ctrl 0.1°; taper 1 %, Shift
+/// 10 %, Ctrl 0.1 %.
+fn fixed_steps(field: LayoutField, grid: Grid) -> f64 {
+    let coarse = if field.is_rotation() { 15.0 } else { 10.0 };
+    match grid {
+        Grid::Normal => 1.0,
         Grid::Coarse => coarse,
-        Grid::Fine => fine,
-    };
-    let value = snapped(shown + f64::from(steps) * step, step);
-    if field.is_rotation() {
-        value.clamp(-180.0, 180.0)
-    } else {
-        value
+        Grid::Fine => 0.1,
     }
 }
 
-/// A typed value in mm (the units of `0052`: "2", "2 mm", "0.1 in") or degrees ("12", "12°");
-/// `None` when it is not a number.
+/// The value `steps` arrow-key steps from `shown` (UX notes §0.1): spacing 0.1 mm, Shift 1 mm,
+/// Ctrl 0.01 mm; rotation and taper as their drag grid, held to their ends.
+#[must_use]
+pub fn stepped(field: LayoutField, shown: f64, steps: i32, grid: Grid) -> f64 {
+    let step = if field.fixed_range().is_some() {
+        fixed_steps(field, grid)
+    } else {
+        match grid {
+            Grid::Normal => 0.1,
+            Grid::Coarse => 1.0,
+            Grid::Fine => 0.01,
+        }
+    };
+    let value = snapped(shown + f64::from(steps) * step, step);
+    match field.fixed_range() {
+        Some((low, high)) => value.clamp(low, high),
+        None => value,
+    }
+}
+
+/// A typed value in mm (the units of `0052`: "2", "2 mm", "0.1 in"), degrees ("12", "12°") or
+/// percent ("12", "12 %"); `None` when it is not a number.
 #[must_use]
 pub fn parse_field_text(field: LayoutField, text: &str) -> Option<f64> {
     match field {
         LayoutField::CharacterRotation | LayoutField::CharRotation => {
             parse_entry_number(text, true)
+        }
+        LayoutField::Taper => {
+            let trimmed = text.trim();
+            parse_entry_number(trimmed.strip_suffix('%').unwrap_or(trimmed), false)
         }
         _ => parse_length(text, curvyo_document_core::DisplayUnit::Mm)
             .map(curvyo_document_core::Length::as_mm),
@@ -387,6 +424,17 @@ pub fn set_field(
                 kerns.push(kern);
                 return values;
             }
+            if field == LayoutField::Taper {
+                let asked = value.unwrap_or(0.0) / 100.0;
+                let held = asked.clamp(*TAPER_FRACTIONS.start(), *TAPER_FRACTIONS.end());
+                if (held - asked).abs() > LIMITED {
+                    limited += 1;
+                    limit = Some((asked > held, held * 100.0));
+                }
+                values.taper = held;
+                kerns.push(kern);
+                return values;
+            }
             if field == LayoutField::CharRotation {
                 kern.rotation = value.unwrap_or(0.0);
                 kerns.push(kern.held());
@@ -408,7 +456,8 @@ pub fn set_field(
                 LayoutField::LineSpacing => values.line_spacing = factor,
                 LayoutField::HorizontalKerning => kern.kern_x = factor.unwrap_or(0.0),
                 LayoutField::VerticalKerning => kern.kern_y = factor.unwrap_or(0.0),
-                LayoutField::CharacterRotation | LayoutField::CharRotation => {}
+                LayoutField::CharacterRotation | LayoutField::CharRotation | LayoutField::Taper => {
+                }
             }
             kerns.push(kern);
             values
@@ -609,5 +658,38 @@ mod tests {
             LayoutField::from_name("char-rotation"),
             Some(LayoutField::CharRotation)
         );
+    }
+
+    /// Criterion 16: the taper reads in percent with one decimal, −50 % to 50 % with a zero
+    /// mark, steps 1 %, Shift 10 %, Ctrl 0.1 %; a typed value beyond the range is set to the
+    /// nearest end and reported; Mixed for differing texts.
+    #[test]
+    fn ac16_taper_field() {
+        let mut tapered = subject(10.0);
+        tapered.values.taper = 0.125;
+        let view = field_view(LayoutField::Taper, &[tapered]);
+        assert_eq!(view.text, "12.5");
+        assert!((view.track_min + 50.0).abs() < 1e-9 && (view.track_max - 50.0).abs() < 1e-9);
+        assert!((view.zero.unwrap() - 0.5).abs() < 1e-9 && view.resettable);
+        assert_eq!((view.drag_min, view.drag_limit), (0.0, 1.0));
+        assert!(!field_view(LayoutField::Taper, &[subject(10.0)]).resettable);
+        assert!(field_view(LayoutField::Taper, &[tapered, subject(20.0)]).mixed);
+        assert!((stepped(LayoutField::Taper, 12.5, 1, Grid::Normal) - 14.0).abs() < 1e-9);
+        assert!((stepped(LayoutField::Taper, 45.0, 1, Grid::Coarse) - 50.0).abs() < 1e-9);
+        assert!((stepped(LayoutField::Taper, 1.0, -1, Grid::Fine) - 0.9).abs() < 1e-9);
+        assert_eq!(parse_field_text(LayoutField::Taper, "20 %"), Some(20.0));
+        assert_eq!(
+            parse_field_text(LayoutField::Taper, "\u{2212}5"),
+            Some(-5.0)
+        );
+        let change = set_field(LayoutField::Taper, &[tapered, subject(20.0)], Some(80.0));
+        assert!(change.values.iter().all(|v| (v.taper - 0.5).abs() < 1e-12));
+        assert_eq!(change.limited, 2);
+        assert_eq!(change.limit, Some((true, 50.0)));
+        let set = set_field(LayoutField::Taper, &[tapered], Some(-20.0));
+        assert!((set.values[0].taper + 0.2).abs() < 1e-12 && set.limit.is_none());
+        assert_eq!(set.values[0].rotation, tapered.values.rotation);
+        assert_eq!(LayoutField::Taper.label(), Some(TextLayoutLabel::Taper));
+        assert_eq!(LayoutField::from_name("taper"), Some(LayoutField::Taper));
     }
 }

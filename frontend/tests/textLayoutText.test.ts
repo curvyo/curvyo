@@ -1,5 +1,5 @@
 // The words and keys of the text layout controls (`specs/0079-text-layout-controls` criteria 1,
-// 7, 10, 13; UX notes §0.3, §0.4, §1, §6).
+// 6, 7, 10, 13, 16; UX notes §0.3, §0.4, §1, §6, §10.1).
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
@@ -23,8 +23,13 @@ import {
   layoutTipValue,
   layoutUnit,
   layoutValueText,
+  TEXT_LAYOUT_OPEN_KEY,
+  changedLayoutFields,
+  foldChangedText,
   parseAlign,
   parseLayoutBlock,
+  readLayoutOpen,
+  writeLayoutOpen,
 } from "../src/lib/textLayoutText.ts";
 
 const field = (over: Partial<LayoutFieldState>): LayoutFieldState => ({
@@ -71,6 +76,7 @@ test("criterion 7: the field names, the defaults and the readouts", () => {
     "Word spacing",
     "Line spacing",
     "Character rotation",
+    "Taper",
     "Horizontal kerning",
     "Vertical kerning",
     "Per-character rotation",
@@ -114,13 +120,65 @@ test("criterion 7 and UX notes §0.4: the notices fit 70 characters", () => {
   assert.equal(entryAnswer({ kind: "max", mm: 40 }), "committed");
 });
 
-test("criteria 6, 26 and 27b: the block is there only with seven fields", () => {
+test("criteria 6, 16, 26 and 27b: the block is there only with eight fields", () => {
   assert.equal(parseLayoutBlock("null"), null);
   assert.equal(parseLayoutBlock("not json"), null);
-  const six = JSON.stringify(Array.from({ length: 6 }, () => field({})));
-  assert.equal(parseLayoutBlock(six), null);
   const seven = JSON.stringify(Array.from({ length: 7 }, () => field({})));
-  assert.equal(parseLayoutBlock(seven)?.length, 7);
+  assert.equal(parseLayoutBlock(seven), null);
+  const eight = JSON.stringify(Array.from({ length: 8 }, () => field({})));
+  assert.equal(parseLayoutBlock(eight)?.length, 8);
+});
+
+test("criterion 16: Taper after Character rotation, in percent, with its notices", () => {
+  assert.equal(LAYOUT_FIELDS[LAYOUT_FIELDS.indexOf("character-rotation") + 1], "taper");
+  assert.equal(LAYOUT_FIELD_LABELS.taper, "Taper");
+  assert.equal(layoutUnit("taper"), "%");
+  assert.equal(layoutDefaultText("taper"), "0 %");
+  assert.equal(layoutTipValue("taper", field({ text: "12.5" })), "12.5 %");
+  assert.equal(layoutValueText("taper", field({ text: "−20" })), "−20 percent");
+  assert.equal(layoutResetLabel("taper", false), undefined);
+  assert.equal(appliesToAll("taper"), false);
+  assert.equal(
+    layoutNotice("taper", { kind: "max", mm: 50 }),
+    "Taper set to 50 %, the largest taper.",
+  );
+  assert.equal(
+    layoutNotice("taper", { kind: "min", mm: -50 }),
+    "Taper set to −50 %, the smallest taper.",
+  );
+  assert.equal(layoutNotice("taper", { kind: "set" }), null);
+});
+
+test("customer 2026-10-25: the block folds, closed by default, remembered, dot when changed", () => {
+  const stored = new Map<string, string>();
+  const storage = {
+    getItem: (key: string) => stored.get(key) ?? null,
+    setItem: (key: string, value: string) => void stored.set(key, value),
+  };
+  assert.equal(readLayoutOpen(storage), false, "a new user starts closed");
+  writeLayoutOpen(true, storage);
+  assert.equal(stored.get(TEXT_LAYOUT_OPEN_KEY), "true");
+  assert.equal(readLayoutOpen(storage), true);
+  writeLayoutOpen(false, storage);
+  assert.equal(readLayoutOpen(storage), false);
+  const broken = {
+    getItem: () => {
+      throw new Error("blocked");
+    },
+    setItem: () => {
+      throw new Error("blocked");
+    },
+  };
+  assert.equal(readLayoutOpen(broken), false);
+  assert.doesNotThrow(() => writeLayoutOpen(true, broken));
+  assert.equal(readLayoutOpen(undefined), false);
+
+  const plain = Array.from({ length: 8 }, () => field({ resettable: false }));
+  assert.equal(foldChangedText(false, plain), null, "all at default: no dot");
+  const changed = plain.map((f, i) => (i === 0 || i === 4 ? { ...f, resettable: true } : f));
+  assert.deepEqual(changedLayoutFields(changed), ["Letter spacing", "Taper"]);
+  assert.equal(foldChangedText(false, changed), "Changed: Letter spacing, Taper");
+  assert.equal(foldChangedText(true, changed), null, "open: no dot");
 });
 
 test("criteria 27b and 27c: Per-character rotation in degrees with its own reset; All characters on the three", () => {

@@ -24,7 +24,8 @@ pub enum LayoutOutcome {
     Unchanged,
     /// Not a number.
     Invalid,
-    /// The one text was held to its limit: at the top (`true`) or the bottom, in mm.
+    /// The one text was held to its limit: at the top (`true`) or the bottom, in mm (degrees,
+    /// percent for the taper, which is held alike on every text).
     Clamped(bool, f64),
     /// Of `of` texts, `limited` were held to their own limit.
     Limited {
@@ -147,7 +148,7 @@ impl Session {
         }
     }
 
-    /// The text layout block's seven fields, in order, or `None` when it is not shown: no text
+    /// The text layout block's eight fields, in order, or `None` when it is not shown: no text
     /// is selected and none is in edit mode (criteria 6, 26).
     #[must_use]
     pub fn text_layout_block(&self) -> Option<Vec<LayoutFieldView>> {
@@ -272,7 +273,11 @@ impl Session {
             }
             this.write_layout(&writes, label);
             match (limit, texts.len()) {
+                // The taper's range is the same for every text: its limit is one value.
                 (Some((top, mm)), 1) => LayoutOutcome::Clamped(top, mm),
+                (Some((top, percent)), _) if field == LayoutField::Taper => {
+                    LayoutOutcome::Clamped(top, percent)
+                }
                 (Some(_), of) => LayoutOutcome::Limited { limited, of },
                 (None, _) => LayoutOutcome::Set,
             }
@@ -310,8 +315,9 @@ const fn field_index(field: LayoutField) -> usize {
         LayoutField::WordSpacing => 1,
         LayoutField::LineSpacing => 2,
         LayoutField::CharacterRotation => 3,
-        LayoutField::HorizontalKerning => 4,
-        LayoutField::VerticalKerning => 5,
-        LayoutField::CharRotation => 6,
+        LayoutField::Taper => 4,
+        LayoutField::HorizontalKerning => 5,
+        LayoutField::VerticalKerning => 6,
+        LayoutField::CharRotation => 7,
     }
 }

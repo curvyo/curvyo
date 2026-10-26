@@ -1,5 +1,5 @@
 // The text layout block's state and commands (`specs/0079-text-layout-controls` criteria 6, 7,
-// 12 to 14, 27c): the seven fields as the session shows them, their drag preview, arrow steps,
+// 12 to 14, 27c): the eight fields as the session shows them, their drag preview, arrow steps,
 // reset, "All characters" and typed values. Every rule is the session's; this forwards each control's command.
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -19,7 +19,7 @@ import {
 const NOTICE_MS = 3000;
 
 export interface TextLayoutApi {
-  /** The seven fields, or `null` when the block is not shown. */
+  /** The eight fields, or `null` when the block is not shown. */
   fields: LayoutFieldState[] | null;
   /** Edit mode is on: the kerning fields act on the characters at the caret. */
   editing: boolean;

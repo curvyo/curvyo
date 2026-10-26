@@ -21,6 +21,7 @@ export const TEXT_LAYOUT_FIELD_NAMES = {
   wordSpacing: "Word spacing",
   lineSpacing: "Line spacing",
   characterRotation: "Character rotation",
+  taper: "Taper",
   horizontalKerning: "Horizontal kerning",
   verticalKerning: "Vertical kerning",
   charRotation: "Per-character rotation",
