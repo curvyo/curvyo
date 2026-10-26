@@ -1,6 +1,6 @@
 # Font info and fonts from zip archives
 
-Status: Draft (2026-10-23; customer request, Frage 41 open with a default)
+Status: Ready (2026-10-26; Frage 41 unanswered, built with default A; UX notes applied, Info only from the mode switch as Proposal)
 Priority: Should (R-FONT-008 for the embedding permission; R-FONT-006 for Add font)
 Origin: Customer. (a) The font info view was `0077` Frage 25 C and its Out of scope ("licence, file, format, embedding permission (`fsType`, R-FONT-008), version"). (b) Request of 2026-10-23 (translated): Add font should take .zip archives, "then you don't have to unpack yourself; you often find the licence and credits there; we can simply keep those". Items marked **(Proposal)** are the product owner's; safe defaults the customer can veto at the demo.
 Depends on: `0074-text-objects` (blocks, the Curvyo folder, font matching), `0075-font-library` (Add font, drop, de-duplication, the notice, Remove from Curvyo fonts, the browser's IndexedDB store), `0076-single-line-fonts` (SVG fonts, the hostile-file limits pattern of its criterion 23), `0077-font-preview` (the pane), `0082-glyph-table` (the mode switch and the subject face; whichever of `0082` and this story is built first brings the switch).
@@ -66,7 +66,7 @@ As a maker who buys or downloads fonts for a sign shop, I want to add the .zip I
 11. Given de-duplication (`0075` criterion 21), then a font entry whose bytes equal a font file anywhere in the Curvyo folder (top level or a subfolder) is "already there" and not copied; when an archive adds no font, no font folder is created and its documents are not kept. Inside one archive, the same face offered twice (the same family and style, for example `Lobster.otf` and `Lobster.ttf`) is added once, the first in the order TTF, OTF, TTC, SVG; the others count as "already there". (Proposal)
 12. Given the archive is added, then it is added as a whole: the font folder appears complete or not at all (built under a temporary name starting with `.` in the Curvyo folder, then renamed); a cancelled, failed or interrupted add leaves no font folder and no partial file, and a leftover temporary folder is removed at the next start. The archive itself is not copied and stays where it was.
 13. Given the result, then one notice (`0075` criterion 22) reports archives with the fonts and files: "Lobster.zip: 2 fonts added, 3 documents kept." / "Lobster.zip: 2 fonts were already there." / "Lobster.zip holds no font. Nothing was added." / "Pack.zip could not be read. Nothing was added." / "Pack.zip is over the size limit. Nothing was added."; counts of several archives and loose files are combined ("5 fonts added. 4 documents kept."). Left-out entries are not reported, skipped hostile entries (criterion 16) are counted as "2 files were skipped as unsafe.". The new families appear and are scrolled into view as `0075` criterion 22 says, and the tag rule of `0075` criterion 23 applies to them. Adding an archive of 20 fonts and 10 MB is done within 2 s.
-14. Given **Remove from Curvyo fonts** (`0075` criterion 25) on a family whose files are in a font folder, then its files are deleted, and a font folder left with no font file is deleted together with its documents; the confirmation then says so: "Remove Lobster from Curvyo fonts? Its 3 documents go too." (with the `0075` sentence about texts when it applies). A font folder that still holds another family's font keeps its documents.
+14. Given **Remove from Curvyo fonts** (`0075` criterion 25) on a family whose files are in a font folder, then its files are deleted, and a font folder left with no font file is deleted together with its documents; the armed trash then says so (the inline confirm of `0081` criterion 3): its accessible name, tooltip and polite status read "Press again to remove Lobster from Curvyo fonts. Its 3 documents go too." plus, when texts use the family, " 2 texts here use it." ("1 document" in the singular). The documents sentence appears only when this removal takes the font folder's last font and that folder holds documents. A font folder that still holds another family's font keeps its documents.
 
 ### Part C: hostile archives
 
@@ -86,6 +86,7 @@ As a maker who buys or downloads fonts for a sign shop, I want to add the .zip I
 - Interpreting a licence: no "commercial use allowed" verdict, no licence detection from the documents' text, no warning for restrictive `fsType`; R-FONT-008 says the permission is shown and does not block use.
 - Mapping documents to families inside a multi-family pack (every document of a font folder is shown for every font in it); recreating the archive's inner folders.
 - Adding, editing or deleting single documents of a font folder in the app (the file manager can), documents for loose fonts in the Curvyo folder's top level (documents attach only to the fonts of their own subfolder), opening documents of other formats (`.html`, `.rtf`, images: left out).
+- An Info button in the Text bar or the Select bar: Info is reached from the pane's mode switch only (Proposal, UX notes section 1; the `0084` second row is full).
 - Info for a face that is not the subject face (see `0082` Frage 39), comparing the info of two fonts, languages or script coverage, the font's OpenType features, a "Show in folder" button.
 - Exporting a font folder back to a zip, sync of font folders beyond what the data directory sync of `0075` gives.
 
@@ -99,7 +100,7 @@ As a maker who buys or downloads fonts for a sign shop, I want to add the .zip I
 
 ## UX notes
 
-(filled in by ux-engineer before Ready: the Info cell in the mode switch, the field rows at 339px split width and in full view, Show all, the Documents list and the text shown in place, the notice wording for archives, the drop outline with archives, the Remove confirmation with documents)
+See [`ux-notes.md`](ux-notes.md) (ux-engineer, 2026-10-26).
 
 ## Questions for the customer
 
