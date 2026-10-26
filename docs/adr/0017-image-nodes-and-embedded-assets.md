@@ -1,6 +1,6 @@
 # ADR 0017: Image nodes, embedded assets and bitmap decoding
 
-**Status:** Accepted 2026-10-16 by the customer for the decision to use the `image` crate and the image node/asset design; the spike (wasm size, decode time in the webview, peak memory, geiger, hostile files, deny) still has to confirm the numbers before the build starts; if the spike fails, the ADR is reopened. `needs-customer` (document model: a new node kind; file format:
+**Status:** Accepted 2026-10-16 by the customer for the decision to use the `image` crate and the image node/asset design; the spike (wasm size, decode time in the webview, peak memory, geiger, hostile files, deny) still has to confirm the numbers before the build starts; if the spike fails, the ADR is reopened. **Spike done 2026-10-26: the numbers hold; three corrections in "Spike result" (no change to the customer's decisions).** `needs-customer` (document model: a new node kind; file format:
 `assets/` in the container; new crate and dependencies). Extends [ADR 0002](0002-document-model-units-and-svg-round-trip.md)
 §5 and §10 (images were named in the owned SVG subset, never modelled), [ADR 0004](0004-persistence-and-cross-machine-sync.md)
 §1 (`assets/` in the container) and §9 (format refusal), [ADR 0014](0014-history-undo-and-branches.md)
@@ -49,7 +49,7 @@ a `frame_outline()` (the mapped square) that no output code can reach by acciden
 ### 2. Bytes live in the container, the document holds the hash
 
 `Document` owns an `AssetStore` (`BTreeMap<AssetHash, Arc<[u8]>>`, sorted, so a save is
-deterministic). `pack(&Document)` keeps its signature and writes each asset as
+deterministic). `pack(&Document, app_version)` keeps its signature and writes each asset as
 `assets/<hash>.<ext>` after the three existing members, in hash order, **Stored** for PNG, JPEG
 and WebP (and **Deflated** for TIFF, if the spike includes it; TIFF is mostly uncompressed). `unpack` reads every `assets/*`
 member whose name is `<64 hex>.<ext>`, each read bounded by the file ceiling of `0058` (a bomb in
@@ -83,8 +83,8 @@ history preview.
 
 ### 3. Format
 
-`format_version` is the next free number at merge (14 if this merges before `0057`, else 15; the
-rule of the constant's doc comment). Older builds refuse the file by version ("saved by a newer
+`format_version` is the next free number at merge (25 on `main` on 2026-10-26; the rule of the
+constant's doc comment). Older builds refuse the file by version ("saved by a newer
 version"): they would show nothing where the picture is. No migration: a file without images is
 unchanged and not rewritten. `document.json` lists image nodes (hash, placement) and no bytes.
 Golden: `image_v<N>.curvyo` and its four damaged variants (`0058` criterion 44).
@@ -157,8 +157,9 @@ thread; accepted, recorded in `docs/technical-debt.md`.
 
 `render-core` stays pixel-free. `DrawList` gets `images: Vec<ImageQuad>`; a quad carries the asset
 hash, four view-space corners, the effective opacity, the screen pixels per image pixel (for the
-sampler choice of `0058` criterion 28) and `at_vertex`, the index in the triangle list where it
-is drawn, so images interleave with shapes in z-order. `editor-wasm` (ADR 0001 §4: GPU
+sampler choice of `0058` criterion 28) and the index of the image's own artwork layer (one
+depth value, as every object's fill and stroke since the layered `DrawList`; note of 2026-10-26 in
+`specs/0058-bitmap-import/adrs.md`), so images interleave with shapes in z-order. `editor-wasm` (ADR 0001 §4: GPU
 submission) owns textures. It uploads the CPU mip chain (wgpu does not generate mips) as
 **premultiplied** alpha, because filtering straight alpha leaves dark fringes at transparent
 edges; the trace hand-off stays straight. The device's `max_texture_dimension_2d` can be below the
@@ -187,6 +188,43 @@ A throwaway spike on `spike/image-decoder` answers, and this ADR records, with n
 build with the chosen features and the size added to the module; decode time of a 12 Mpx JPEG and
 a 16 Mpx PNG in the webview (not native); peak memory for a 50 Mpx JPEG; the `cargo geiger` count;
 what the pinned decoder does with CMYK, an animated WebP and a PNG bomb; whether `tiff` is free; that `orientation()` works for JPEG, WebP and PNG as read above; `cargo deny check`.
+
+## Spike result (2026-10-26)
+
+Throwaway build outside the repo (no branch), `image` =0.25.10 (2026-03-10), `default-features =
+false`, `png`, `jpeg`, `webp`; release profile of the workspace (LTO, one codegen unit, opt-level
+3); timings on the build host (8-core Xeon), wasm run in Node 26 (V8, the engine of Chromium and
+WebView2; WebKitGTK on Linux is timed in the PR).
+
+| Question | Result |
+|---|---|
+| wasm32 build, size | Builds. A cdylib that decodes, orients and converts adds **671 KB** (221 KB gzip) over an empty one; `editor-wasm` is 13.2 MB today, so about +5 %. `moxcms`/`pxfm` (new in 0.25.9, ICC) are in the tree but not linked. Separate `png` + `zune-jpeg` + `image-webp` would save 190 KB (50 KB gzip); not worth three APIs. |
+| Decode time, wasm (native) | 12 Mpx JPEG 180 ms (71), progressive 325 ms (167); 16 Mpx PNG 120 ms (91), with alpha 158 ms; 12 Mpx lossy WebP 389 ms (281); 50 Mpx JPEG 642 ms (271). Every budget of criterion 46 has room for scaling, mips and upload. |
+| Peak memory, 50 Mpx JPEG | 348 MiB native, 360 MiB wasm linear memory, when the full image is converted to RGBA (150 MB RGB + 200 MB RGBA). See correction 2. |
+| Limits | **Correction 1.** `Limits::max_alloc` is enforced only by `ImageReader::decode()`; the `into_decoder()` path (needed for `orientation()`) never checks it: a 900 Mpx PNG bomb decoded to 4.3 GB natively and **aborted the wasm module** (`unreachable`). `probe` therefore checks `ImageDecoder::total_bytes()` against our own cap before `from_decoder`, as well as the 50 Mpx header ceiling. |
+| Hostile files | A PNG declaring 60,000 x 60,000 px with 1 KB of data, truncated PNG and WebP, a JPEG header without data: errors in under 30 ms. A 7,000 x 7,000 zero PNG (47 KB file) decodes in 0.85 s wasm. **Correction 3:** a truncated JPEG decodes **without error** (`zune-jpeg` fills the rest grey; `image` gives no strict switch). Mutation smoke (30 s per format, about 4.7 M mutants): no panic; 2 JPEG mutants over 1 s (headers grown to large sizes, which correction 1 stops). |
+| CMYK, animation | A CMYK (Adobe) JPEG comes out as RGB, mean colour equal to ImageMagick's within 0.1: supported. An animated WebP gives its first frame. |
+| Orientation | `orientation()` returns 6 for a JPEG (APP1), a PNG (`eXIf`) and a WebP (VP8X `EXIF`); `apply_orientation` turns 600x400 into 400x600. |
+| Determinism | Sampled checksums of JPEG, PNG and WebP decodes are equal between native (SIMD) and wasm (scalar) on these files; the per-channel tolerance of §4 stays. |
+| `unsafe`, build scripts | `cargo geiger` is not installed; a token count of the sources: `png`, `image-webp`, `fdeflate` 0; `image` 11; `zune-jpeg` 85, all in x86/NEON SIMD modules (`forbid(unsafe_code)` when those features are off; not compiled for wasm32). Build scripts only in `crc32fast`, `num-traits` (autocfg); no C. |
+| `cargo deny` | Our `deny.toml` passes. New in the tree: `image`, `zune-jpeg` 0.5.15, `zune-core` 0.5.3, `image-webp` 0.2.4, `moxcms` 0.8.1, `pxfm` 0.1.30 (both BSD-3-Clause OR Apache-2.0), `byteorder-lite` (Unlicense OR MIT), `quick-error`, `bytemuck`; `png` 0.18.1, `fdeflate`, both `miniz_oxide` versions are already locked. |
+| TIFF | Not easy enough: adds `tiff` (MIT), `weezl`, `fax`, `half`, `zerocopy` with a `syn` proc-macro, and **+406 KB** wasm (+96 KB gzip), with many compression modes to harden. **Out** (IMG-FORMATS left it to us). |
+
+Corrections to the decision above:
+
+1. §4 "one `Limits` that every decoder honours before allocating" holds only for `decode()`.
+   `decode_working` uses `into_decoder`, so it refuses when `total_bytes()` exceeds the cap of
+   criterion 19 before any buffer exists; the header ceiling of `probe` stays the first line.
+2. `decode_working` never converts the full-size image to RGBA8: the box downscale reads the
+   decoder's own layout (L8, La8, Rgb8, Rgba8, and their 16-bit forms) and writes the RGBA8
+   working image. Peak for a 50 Mpx JPEG is then 150 MB + 64 MB. The cap is the decoder buffer
+   in its own layout (at most 8 bytes per pixel, so at most 400 MB at 50 Mpx for RGBA16) plus
+   the working image plus 64 MiB; `0058` criterion 19 is reworded to that.
+3. A truncated JPEG shows its decoded part (as browsers do) instead of failing; `0058`
+   criterion 20 drops "a truncated file" for JPEG (customer question in `0058/adrs.md`).
+
+Pin: `image = { version = "=0.25.10", default-features = false, features = ["png", "jpeg",
+"webp"] }`. The fixtures and scripts of the spike are not kept; the PR's fixtures replace them.
 
 ## Consequences
 

@@ -30,3 +30,11 @@ ux-engineer, 2026-10-26. Condenses and amends the "UX notes" section of `specifi
 
 ## Rows for `docs/design-system.md` (written by the PR)
 Import SVG… in the File tab (order, tooltip), the busy texts and 1 MiB threshold, the one notice, the refusal titles ("Can't open file", "Can't import SVG").
+
+## Import button in the tool rail (customer change 2026-10-27)
+Supersedes "Where import lives" for Import SVG… ("I don't like the position under File. I want an Import button as a tool, and it can do SVG and raster graphics.").
+- **One Import button, shared with `0058`** (`specs/0058-bitmap-import/specification.md`, "Import trigger"): own card in column A under Path tools, an action (opens the OS picker at once, no active-tool state, the tool does not change), Lucide `Import` 20 px, name "Import", tooltip "Import (Ctrl+I)". One picker: `.svg`, `.png`, `.jpg`/`.jpeg`, `.webp`; routing by content.
+- **"Import SVG…" and "Import image…" leave the File tab** (the rows and the row order above fall away). **Open…** stays and still opens `.svg` as a project (Ctrl+O, unsaved-changes block first).
+- **SVG placement unchanged:** one layer named after the file, on top and active, content centred on the view centre, nothing scaled, one step "Import SVG" (a batch with images: "Import"). **New: drop.** An `.svg` dropped on the canvas lands centred on the drop point; the "no drop" rule above is withdrawn for the canvas (the panel, rail and rulers still refuse).
+- **Ctrl+I (Cmd+I)** triggers it outside text edit mode only; in text edit mode it stays italic.
+- No hint label, no dialog of ours; cancelled picker returns focus to the rail button.
