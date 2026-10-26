@@ -6,7 +6,10 @@
 //! are (`docs/technical-debt.md`, "`Session` is one module past the size
 //! limit").
 
-use curvyo_document_core::{AnchorKind, ObjectSnapshot, PathSnapshot, Point};
+use std::borrow::Cow;
+use std::collections::HashSet;
+
+use curvyo_document_core::{AnchorKind, NodeId, ObjectSnapshot, PathSnapshot, Point};
 use curvyo_render_core::{DecorationInput, Hovered as RenderHovered};
 use curvyo_ui_core::{
     BendResolution, Hit, LiveNodeDrag, NodeSplitOutcome, NodeToolbarState, segment_is_bendable,
@@ -42,6 +45,36 @@ impl Session {
             self.apply_live_node_drag(&mut paths);
         }
         paths
+    }
+
+    /// The Node tool's editing set (customer 2026-10-26, amending `specs/0053-node-marquee-
+    /// selection` "editing set"): the selected paths when the selection holds one, else every
+    /// path [`Session::paths`] gives. The Node tool draws and hit-tests these only.
+    pub(super) fn node_paths(&self) -> Vec<PathSnapshot> {
+        let mut paths = self.paths();
+        if self.cuts_node_set(&paths) {
+            paths.retain(|path| self.selection.contains(path.id));
+        }
+        paths
+    }
+
+    /// `paths` cut to the editing set: those whose id is selected, or all when none is.
+    pub(super) fn in_node_set<'a>(&self, paths: &'a [PathSnapshot]) -> Cow<'a, [PathSnapshot]> {
+        if !self.cuts_node_set(paths) {
+            return Cow::Borrowed(paths);
+        }
+        Cow::Owned(
+            paths
+                .iter()
+                .filter(|path| self.selection.contains(path.id))
+                .cloned()
+                .collect(),
+        )
+    }
+
+    /// Whether the selection holds one of `paths`, which cuts the editing set to the selected.
+    fn cuts_node_set(&self, paths: &[PathSnapshot]) -> bool {
+        paths.iter().any(|path| self.selection.contains(path.id))
     }
 
     pub(super) fn apply_live_node_drag(&self, paths: &mut [curvyo_document_core::PathSnapshot]) {
@@ -150,7 +183,20 @@ impl Session {
     pub fn split_selected_outcome(&mut self) -> NodeSplitOutcome {
         self.recording(|this| {
             if this.tool == Tool::Node {
-                this.node.split_selected(&mut this.minter, &this.document)
+                let before: HashSet<NodeId> = this.document.object_ids().into_iter().collect();
+                let outcome = this.node.split_selected(&mut this.minter, &this.document);
+                // The new piece joins a selection, so the editing set keeps both halves
+                // (customer 2026-10-26).
+                if !this.selection.is_empty() {
+                    let pieces: Vec<NodeId> = this
+                        .document
+                        .object_ids()
+                        .into_iter()
+                        .filter(|id| !before.contains(id))
+                        .collect();
+                    this.selection.add_all(&pieces);
+                }
+                outcome
             } else {
                 NodeSplitOutcome::None
             }
@@ -162,7 +208,7 @@ impl Session {
     pub fn insert_at(&mut self, point: Point) {
         self.recording(|this| {
             if this.tool == Tool::Node {
-                let paths = this.paths();
+                let paths = this.node_paths();
                 let tolerances = this.hit_tolerances();
                 this.node
                     .insert_at(&mut this.minter, &this.document, &paths, point, tolerances);
@@ -176,7 +222,7 @@ impl Session {
     pub fn insert_selected(&mut self) {
         self.recording(|this| {
             if this.tool == Tool::Node {
-                let paths = this.paths();
+                let paths = this.node_paths();
                 this.node
                     .insert_on_selected_segment(&mut this.minter, &this.document, &paths);
             }
@@ -191,7 +237,7 @@ impl Session {
         if self.tool != Tool::Node {
             return NodeToolbarState::default();
         }
-        let paths = self.paths();
+        let paths = self.node_paths();
         let mut state = self.node.toolbar_state(&self.document, &paths);
         state.clone_only = self.node_selection_is_clones();
         state
@@ -307,5 +353,100 @@ impl Session {
             handle_nodes,
             ringed_nodes,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use curvyo_document_core::{NodeId, Point};
+
+    use super::super::{Session, Tool};
+
+    /// An open two-node path from `from` to `to`, drawn with the Pen.
+    fn line(session: &mut Session, from: Point, to: Point) -> NodeId {
+        session.set_tool(Tool::Pen);
+        for point in [from, to] {
+            session.pointer_down(point, false);
+            session.pointer_up(point, false, false);
+        }
+        session.finish_pen();
+        *session.document.object_ids().last().unwrap()
+    }
+
+    fn ids(session: &Session) -> Vec<NodeId> {
+        session.node_paths().iter().map(|path| path.id).collect()
+    }
+
+    /// Customer 2026-10-26: with nothing selected the Node tool shows and hits every path; with
+    /// paths selected only those.
+    #[test]
+    fn the_editing_set_is_the_selected_paths_or_every_path() {
+        let mut session = Session::new(1);
+        let a = line(&mut session, Point::new(0.0, 0.0), Point::new(10.0, 0.0));
+        let b = line(&mut session, Point::new(0.0, 20.0), Point::new(10.0, 20.0));
+        session.selection.clear();
+        session.set_tool(Tool::Node);
+        assert_eq!(ids(&session), [a, b]);
+        session.selection.set(&[a]);
+        assert_eq!(ids(&session), [a]);
+        // A press on b's node hits nothing and moves nothing.
+        session.pointer_down(Point::new(0.0, 20.0), false);
+        session.pointer_up(Point::new(5.0, 25.0), false, false);
+        assert_eq!(
+            session.document.path(b).unwrap().anchors[0].point,
+            Point::new(0.0, 20.0)
+        );
+        // The drawn nodes are a's only.
+        let all = session.live_node_drag_paths_in(&session.objects());
+        let drawn: Vec<NodeId> = session.in_node_set(&all).iter().map(|p| p.id).collect();
+        assert_eq!(drawn, [a]);
+    }
+
+    /// A click on another path's outline selects it, Shift adds it, a click on nothing clears
+    /// the selection (customer 2026-10-26, as Inkscape's node tool).
+    #[test]
+    fn a_click_picks_the_path_the_node_tool_edits() {
+        let mut session = Session::new(1);
+        let a = line(&mut session, Point::new(0.0, 0.0), Point::new(10.0, 0.0));
+        let b = line(&mut session, Point::new(0.0, 20.0), Point::new(10.0, 20.0));
+        session.selection.set(&[a]);
+        session.set_tool(Tool::Node);
+        let click = |session: &mut Session, at: Point, shift: bool| {
+            session.pointer_down(at, shift);
+            session.pointer_up(at, shift, false);
+        };
+        click(&mut session, Point::new(5.0, 20.0), false);
+        assert_eq!(session.selection.ids(), [b]);
+        assert_eq!(ids(&session), [b]);
+        click(&mut session, Point::new(5.0, 0.0), true);
+        assert_eq!(ids(&session), [a, b]);
+        click(&mut session, Point::new(50.0, 50.0), false);
+        assert!(session.selection.is_empty());
+        assert_eq!(ids(&session), [a, b]);
+    }
+
+    /// A split keeps both pieces in the editing set: the new one joins the selection.
+    #[test]
+    fn a_split_adds_the_new_piece_to_the_selection() {
+        let mut session = Session::new(1);
+        session.set_tool(Tool::Pen);
+        for point in [
+            Point::new(0.0, 0.0),
+            Point::new(10.0, 0.0),
+            Point::new(20.0, 0.0),
+        ] {
+            session.pointer_down(point, false);
+            session.pointer_up(point, false, false);
+        }
+        session.finish_pen();
+        let a = session.document.object_ids()[0];
+        session.selection.set(&[a]);
+        session.set_tool(Tool::Node);
+        session.pointer_down(Point::new(10.0, 0.0), false);
+        session.pointer_up(Point::new(10.0, 0.0), false, false);
+        session.split_selected();
+        assert_eq!(session.document.object_ids().len(), 2, "split");
+        assert_eq!(session.selection.ids().len(), 2);
+        assert_eq!(session.node_paths().len(), 2);
     }
 }

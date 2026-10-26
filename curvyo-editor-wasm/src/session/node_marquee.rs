@@ -5,7 +5,7 @@
 use curvyo_document_core::{PathSnapshot, Point};
 use curvyo_render_core::MarqueeOverlay;
 use curvyo_ui_core::{
-    Modifiers, NodePointerUpOutcome, NodeSelection, SelectionCombine, hit_test,
+    Modifiers, NodePointerUpOutcome, NodeSelection, SelectionCombine, hit_test, hit_test_object,
     node_marquee_legend_text, nodes_selected_announcement,
 };
 
@@ -28,13 +28,34 @@ impl Session {
     /// and inside list end there), then the tool ends it. A marquee that changed the selection
     /// sets the announcement (criterion 24).
     pub(super) fn node_pointer_up(&mut self, point: Point, modifiers: Modifiers) {
-        let paths = self.paths();
+        let paths = self.node_paths();
         let threshold = self.hit_tolerances().drag_threshold;
         self.node
             .pointer_moved(&paths, point, modifiers.shift, threshold);
+        if self.node.marquee().is_some_and(|marquee| !marquee.armed()) {
+            self.node_click_on_nothing(point, modifiers);
+        }
         let outcome = self.node.pointer_up(&self.document, point, modifiers);
         if outcome == NodePointerUpOutcome::NodesSelected {
             self.announce_node_selection();
+        }
+    }
+
+    /// A click that hit no node, handle or segment of the editing set (customer 2026-10-26, as
+    /// Inkscape's node tool): on a path of the context it selects that path, Shift adds it; on
+    /// anything else a plain click clears the selection, so every path shows its nodes again.
+    fn node_click_on_nothing(&mut self, point: Point, modifiers: Modifiers) {
+        if modifiers.ctrl {
+            return;
+        }
+        let paths = self.paths();
+        let hit = hit_test_object(&self.pickable_objects(), point, self.object_tolerance())
+            .filter(|id| paths.iter().any(|path| path.id == *id));
+        match (hit, modifiers.shift) {
+            (Some(id), true) => self.selection.add(id),
+            (Some(id), false) => self.selection.select_single(id),
+            (None, true) => {}
+            (None, false) => self.selection.clear(),
         }
     }
 
@@ -55,7 +76,7 @@ impl Session {
     /// Ctrl+A in the Node tool (criterion 22): every node of the editing set, in document
     /// order, replacing the selection. Consumed also when there is no node. View state only.
     pub(super) fn node_select_all(&mut self) -> KeyOutcome {
-        let paths = self.paths();
+        let paths = self.node_paths();
         self.node.select_all(&paths);
         self.announce_node_selection();
         KeyOutcome::SelectedAll

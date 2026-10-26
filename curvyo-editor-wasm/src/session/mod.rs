@@ -693,7 +693,7 @@ impl Session {
                     }
                 }
                 Tool::Node => {
-                    let paths = this.paths();
+                    let paths = this.node_paths();
                     let tolerances = this.hit_tolerances();
                     this.node_announcement = None;
                     this.node.pointer_down(&paths, point, tolerances, shift);
@@ -748,7 +748,7 @@ impl Session {
             Tool::Node => {
                 // A bend or a marquee in flight follows the pointer; no hover test runs during
                 // any drag (`0031` criterion 17, `0053` criterion 10).
-                let paths = self.paths();
+                let paths = self.node_paths();
                 let threshold = self.hit_tolerances().drag_threshold;
                 self.node.pointer_moved(&paths, point, shift, threshold);
                 self.node_hover_on_nothing = false;

@@ -315,6 +315,13 @@ AC11's "chooses ... from the node tool's actions" and AC14's "make line" /
   (no path is discarded — that's pen-tool-only, AC4); Escape with nothing
   selected is a no-op.
 
+## Amendment 2026-10-26 (customer): the editing set follows the selection
+
+With one or more paths selected, the Node tool draws and hit-tests only the selected paths' nodes,
+handles and segments; with nothing selected (or no path in the selection) every path as before.
+A click on another path selects it, a click on empty canvas clears the selection. The rule is in
+`0053`, "Amendment 2026-10-26".
+
 ## Links
 Requirements: R-EDIT-001 (`docs/requirements.md`)
 ADRs: ADR 0002 §5 (node identity, movable-list anchors), §6 (curve

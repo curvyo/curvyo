@@ -148,6 +148,19 @@ Status: **confirmed by the ux-engineer (2026-10-12)**, from the product owner's 
 1. **Criteria 23 and 26, the count's place:** reword "the Node bar shows at its start a status text in a fixed-width slot" to "the status bar shows, in its right segment before the document size", and drop the Node bar wrap clause of criterion 26 (keep "never clipped for up to 6 digits on each side"). Default: these notes. *Resolved 2026-10-12: criteria 23 and 26 reworded.*
 2. **Criterion 10:** "drawn with the hover ring" becomes "drawn with the pre-selection ring (design-system row 'Node marquee')". Default: these notes. *Resolved 2026-10-12: criterion 10 reworded.*
 
+## Amendment 2026-10-26 (customer): the editing set follows the selection
+
+The Node tool's editing set (`0053` "What exists today", "Which paths show nodes") is cut to the
+selection: with nothing selected, or with a selection that holds no path, it is every path of the
+context as before; with one or more paths (compound paths included) selected, it is those paths
+only. Only their nodes, handles and segments are drawn and hit-tested; hover, a press, the node
+marquee, Ctrl+A, Insert node and the Node bar's states read the same set. A click (no drag) that
+hits no node, handle or segment of the set picks the path to edit, as Inkscape's node tool does:
+on the outline or fill of a path of the context it selects that path (its nodes appear, the
+previous selection's go), Shift+click adds it; a plain click on anything else (empty canvas, an
+object that is not a path) clears the selection, so every path shows its nodes again. Ctrl+click
+and a node marquee leave the object selection alone.
+
 ## Links
 
 Requirements: R-EDIT-034 (new, `docs/requirements.md`), R-EDIT-001, R-EDIT-014
