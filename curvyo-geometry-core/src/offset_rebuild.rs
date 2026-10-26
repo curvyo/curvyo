@@ -12,7 +12,7 @@ use std::cell::OnceCell;
 use std::collections::HashMap;
 
 use curvyo_document_core::Point as DocPoint;
-use i_overlay::core::fill_rule::FillRule;
+pub(crate) use i_overlay::core::fill_rule::FillRule;
 use i_overlay::core::overlay::{IntOverlayOptions, Overlay, ShapeType};
 use i_overlay::core::overlay_rule::OverlayRule;
 use i_overlay::core::solver::Solver;
@@ -41,13 +41,14 @@ pub(crate) struct Rebuilt {
     pub fallback: usize,
 }
 
-/// Overlays `loops` with the Positive rule and maps every surviving ring back onto the loops'
+/// Overlays `loops` with `fill_rule` (`Positive` for an offset, `NonZero` for a stroke) and maps every surviving ring back onto the loops'
 /// pieces. `flatten_mm` is the flattening tolerance, `tolerance_mm` the largest distance a mapped
 /// outline may lie from its ring. `keep` decides which rings count (the caller drops slivers).
 pub(crate) fn rebuild(
     loops: &[Vec<PathSeg>],
     flatten_mm: f64,
     tolerance_mm: f64,
+    fill_rule: FillRule,
     keep: impl Fn(Paths64) -> Paths64,
 ) -> Rebuilt {
     let samples: Vec<Vec<Sample>> = loops
@@ -74,7 +75,7 @@ pub(crate) fn rebuild(
         }
     }
     let rings: Paths64 = overlay
-        .overlay(OverlayRule::Subject, FillRule::Positive)
+        .overlay(OverlayRule::Subject, fill_rule)
         .into_iter()
         .flatten()
         .collect();
@@ -386,7 +387,17 @@ impl Context<'_> {
         let (xa, xb) = (first.eval(sa), second.eval(sb));
         let point = xa.midpoint(xb);
         let reach = self.tolerance_mm;
-        if (xa - xb).hypot() > reach || (point - vertex).hypot() > reach {
+        // The ring's vertex is the crossing of two flattened chords, each within the tolerance of
+        // its curve: where the curves cross at a shallow angle it slides along them by up to
+        // `reach / sin(angle)`, so the vertex may lie that far (at most four times `reach`).
+        let (da, db) = (derivative(&first, sa), derivative(&second, sb));
+        let lengths = da.hypot() * db.hypot();
+        let sine = if lengths > 0.0 {
+            (da.cross(db).abs() / lengths).max(0.25)
+        } else {
+            1.0
+        };
+        if (xa - xb).hypot() > reach || (point - vertex).hypot() > reach / sine {
             return None;
         }
         Some((

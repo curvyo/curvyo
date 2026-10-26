@@ -14,7 +14,7 @@ use kurbo::{BezPath, CubicBez, Line, ParamCurve, PathEl, PathSeg, Point, Vec2};
 use crate::offset::OffsetJoin;
 
 /// Distances below this, in millimetres, are one point: segment lengths, gaps between pieces.
-const COINCIDENT_MM: f64 = 1e-9;
+pub(crate) const COINCIDENT_MM: f64 = 1e-9;
 
 /// The sine of the turn below which two tangents count as the same direction (no join).
 const TANGENT_SINE: f64 = 1e-9;
@@ -42,12 +42,25 @@ pub(crate) struct RawStyle {
     pub join: OffsetJoin,
     /// The accuracy handed to `kurbo`'s cubic offset, in millimetres.
     pub curve_tolerance_mm: f64,
+    /// A miter past the limit is clipped at 4 |d| (SVG 2 `miter-clip`, the offset's rule);
+    /// otherwise it is a bevel (a stroke's rule, as the canvas draws it).
+    pub clip_long_miters: bool,
 }
 
 /// The segments of the closed outline through `anchors` (point, handle in, handle out; handles relative),
 /// without segments of zero length. A cubic whose control points lie on one line is a line.
 pub(crate) fn segments_of(anchors: &[(Point, Vec2, Vec2)]) -> Vec<PathSeg> {
-    let count = anchors.len();
+    segments_between(anchors, true)
+}
+
+/// The segments of the outline through `anchors`, closed back to the first anchor when `closed`,
+/// as [`segments_of`] makes them.
+pub(crate) fn segments_between(anchors: &[(Point, Vec2, Vec2)], closed: bool) -> Vec<PathSeg> {
+    let count = if closed {
+        anchors.len()
+    } else {
+        anchors.len().saturating_sub(1)
+    };
     let mut segments = Vec::with_capacity(count);
     for index in 0..count {
         let (p0, _, out) = anchors[index];
@@ -102,7 +115,7 @@ fn first_direction(from: Point, towards: &[Point; 3]) -> Vec2 {
 }
 
 /// The unit normal to the right of the unit direction `u`.
-fn right_of(u: Vec2) -> Vec2 {
+pub(crate) fn right_of(u: Vec2) -> Vec2 {
     Vec2::new(u.y, -u.x)
 }
 
@@ -129,7 +142,7 @@ pub(crate) fn closed_loop(segments: &[PathSeg], d: f64, style: RawStyle) -> Vec<
 }
 
 /// The parallel curve of one segment at `d` to its right.
-fn offset_segment(segment: &PathSeg, d: f64, style: RawStyle) -> Vec<PathSeg> {
+pub(crate) fn offset_segment(segment: &PathSeg, d: f64, style: RawStyle) -> Vec<PathSeg> {
     match *segment {
         PathSeg::Line(line) => {
             let shift = right_of(start_tangent(segment)) * d;
@@ -173,7 +186,7 @@ fn offset_segment(segment: &PathSeg, d: f64, style: RawStyle) -> Vec<PathSeg> {
 
 /// The pieces between the offset of `before` and the offset `after_offset` of `after`, which meet
 /// at their shared anchor.
-fn corner(
+pub(crate) fn corner(
     pieces: &mut Vec<PathSeg>,
     before: &PathSeg,
     after: &PathSeg,
@@ -214,6 +227,8 @@ fn corner(
                 let tip = at + (n1 + n2) * (d / (1.0 + dot));
                 pieces.push(PathSeg::Line(Line::new(end, tip)));
                 pieces.push(PathSeg::Line(Line::new(tip, start)));
+            } else if !style.clip_long_miters {
+                pieces.push(PathSeg::Line(Line::new(end, start)));
             } else {
                 // SVG 2 `miter-clip`: both edges extended to 4 |d| from the corner, where
                 // `|d|² + s² = (4 |d|)²` gives `s = sqrt(15) |d|` along each edge.
@@ -230,7 +245,7 @@ fn corner(
 /// A circular arc around `center` from `from` to `to` (both at `radius` from it), as cubics of at
 /// most 90° (45° above 37 mm). The arc turns the short way; for a half turn it passes through
 /// `center + radius x ahead`.
-fn arc(pieces: &mut Vec<PathSeg>, center: Point, from: Point, to: Point, ahead: Vec2, radius: f64) {
+pub(crate) fn arc(pieces: &mut Vec<PathSeg>, center: Point, from: Point, to: Point, ahead: Vec2, radius: f64) {
     if radius <= COINCIDENT_MM {
         return;
     }
@@ -291,6 +306,7 @@ mod tests {
     const STYLE: RawStyle = RawStyle {
         join: OffsetJoin::Round,
         curve_tolerance_mm: 0.001,
+        clip_long_miters: true,
     };
 
     fn square() -> Vec<PathSeg> {
