@@ -1,0 +1,51 @@
+# Expected results of the image fixtures (`specs/0058-bitmap-import`, "Fixtures").
+# <file> | ok <format> <w>x<h> [dpi <x>x<y>] [orient <n>] [animated] [truncated] [px <x>,<y>=<r>,<g>,<b>,<a> ...] [tol <n>]
+# <file> | err <unsupported|damaged|too-many-pixels>
+# Sizes are the upright working size; dpi is the density of the file, "-" for none. JPEG and lossy
+# WebP compare their pixels within `tol` per channel (ADR 0017 §4).
+png_rgb_8.png | ok PNG 8x6 dpi - px 0,0=0,0,0,255 px 7,5=255,255,255,255
+png_rgba_8.png | ok PNG 3x1 px 0,0=255,0,0,0 px 1,0=0,255,0,128 px 2,0=0,0,255,255
+png_gray_16.png | ok PNG 4x4 px 0,0=0,0,0,255 px 1,0=68,68,68,255 px 0,1=17,17,17,255 px 3,3=255,255,255,255
+png_indexed_trns.png | ok PNG 2x1 px 0,0=0,0,255,0 px 1,0=255,255,0,255
+png_phys_300dpi.png | ok PNG 30x20 dpi 299.9994x299.9994 px 0,0=10,20,30,255
+png_phys_150x300dpi.png | ok PNG 30x20 dpi 150.0124x299.9994
+png_phys_unit_unknown.png | ok PNG 30x20 dpi -
+png_interlaced.png | ok PNG 8x6 px 0,0=0,0,0,255 px 7,5=255,255,255,255
+png_icc_ignored.png | ok PNG 8x6 px 0,0=0,0,0,255 px 7,5=255,255,255,255
+png_exif_orientation_6.png | ok PNG 20x40 orient 6 px 16,3=255,0,0,255 px 3,3=128,128,128,255
+png_renamed.jpg | ok PNG 8x6
+polyglot_png_zip.png | ok PNG 8x6 px 7,5=255,255,255,255
+# Hostile files the pinned decoders read harmlessly (no panic, no hang, bounded memory): an index
+# outside the palette reads black, as browsers show it; a chunk length past the end of the file is
+# read up to the end. Both import (permit over refuse); reported in the PR.
+png_bad_palette_index.png | ok PNG 2x1 px 0,0=0,0,255,255 px 1,0=0,0,0,255
+webp_chunk_overflow.webp | ok WebP 40x30 px 20,15=192,128,64,255 tol 8
+jpeg_baseline_jfif_300dpi.jpg | ok JPEG 60x40 dpi 300x300 px 30,20=51,102,153,255 tol 3
+jpeg_progressive.jpg | ok JPEG 60x40 px 30,0=255,0,0,255 px 30,39=0,0,255,255 tol 12
+jpeg_gray.jpg | ok JPEG 16x16 px 8,8=119,119,119,255 tol 2
+jpeg_cmyk_adobe.jpg | ok JPEG 16x16 px 8,8=0,255,0,255 tol 16
+jpeg_exif_dpi_only.jpg | ok JPEG 48x48 dpi -
+jpeg_exif_orientation_1.jpg | ok JPEG 40x20 orient 1 px 3,3=255,0,0,255 px 36,16=128,128,128,255 tol 24
+jpeg_exif_orientation_2.jpg | ok JPEG 40x20 orient 2 px 36,3=255,0,0,255 px 3,3=128,128,128,255 tol 24
+jpeg_exif_orientation_3.jpg | ok JPEG 40x20 orient 3 px 36,16=255,0,0,255 px 3,3=128,128,128,255 tol 24
+jpeg_exif_orientation_4.jpg | ok JPEG 40x20 orient 4 px 3,16=255,0,0,255 px 3,3=128,128,128,255 tol 24
+jpeg_exif_orientation_5.jpg | ok JPEG 20x40 orient 5 px 3,3=255,0,0,255 px 16,36=128,128,128,255 tol 24
+jpeg_exif_orientation_6.jpg | ok JPEG 20x40 orient 6 px 16,3=255,0,0,255 px 3,3=128,128,128,255 tol 24
+jpeg_exif_orientation_7.jpg | ok JPEG 20x40 orient 7 px 16,36=255,0,0,255 px 3,3=128,128,128,255 tol 24
+jpeg_exif_orientation_8.jpg | ok JPEG 20x40 orient 8 px 3,36=255,0,0,255 px 3,3=128,128,128,255 tol 24
+jpeg_truncated.jpg | ok JPEG 64x64 truncated
+webp_lossy.webp | ok WebP 40x30 dpi - px 20,15=192,128,64,255 tol 8
+webp_lossless_alpha.webp | ok WebP 3x1 px 1,0=0,255,0,128 px 2,0=0,0,255,255
+webp_animated.webp | ok WebP 20x10 animated px 5,5=255,0,0,255
+webp_exif_orientation_6.webp | ok WebP 20x40 orient 6 px 16,3=255,0,0,255 px 3,3=128,128,128,255
+empty.png | err unsupported
+text_renamed.png | err unsupported
+pdf_renamed.png | err unsupported
+svg_renamed.png | err unsupported
+png_truncated.png | err damaged
+png_bad_crc.png | err damaged
+png_bomb_60000x60000.png | err too-many-pixels
+png_zero_width.png | err damaged
+jpeg_endless_markers.jpg | err damaged
+jpeg_dimensions_65535x65535.jpg | err too-many-pixels
+webp_truncated.webp | err damaged
