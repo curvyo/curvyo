@@ -5,13 +5,20 @@
 //! `curvyo_ui_core` (`style_scope`, `style_panel_state`, `StyleEditor`); the DOM
 //! holds only the open text, the invalid state and "Escape restores".
 
-use curvyo_document_core::{LineCap, LineJoin, MarkerPlace, MarkerShape, NodeId, StyleEdit};
+use std::borrow::Cow;
+use std::sync::Arc;
+
+use curvyo_document_core::{
+    LineCap, LineJoin, MarkerPlace, MarkerShape, NodeId, ObjectSnapshot, StyleEdit,
+};
 use curvyo_ui_core::{
-    DashChoice, Grid, MarkerSlot, StyleEntryError, StyleField, StylePanelState, StyleScope,
-    StyleTool, ValueField, hsv_to_rgb, parse_dash_text, style_panel_state, style_scope_in,
+    DashChoice, Grid, MarkerSlot, ObjectSelection, StyleEntryError, StyleField, StylePanelState,
+    StyleScope, StyleTool, ValueField, hsv_to_rgb, parse_dash_text, style_panel_state,
+    style_scope_in,
 };
 
 use super::style_view::StylePanelView;
+use super::text::{NEW_TEXT_ID, edit_id};
 use super::{Session, Tool};
 
 impl Session {
@@ -32,13 +39,57 @@ impl Session {
     /// (criterion 37).
     #[must_use]
     pub fn style_scope(&self) -> StyleScope {
+        let (objects, selection) = self.style_subject();
         style_scope_in(
             self.style_tool(),
-            &self.objects(),
-            &self.selection,
+            &objects,
+            &selection,
             self.node.selection(),
             &self.units(),
         )
+    }
+
+    /// The objects and the selection the panel reads: the document's, and in edit mode on a new
+    /// text with characters that text as typed, which the document does not hold yet (customer
+    /// 2026-10-26: Fill and Stroke act on the text being edited).
+    fn style_subject(&self) -> (Arc<[ObjectSnapshot]>, Cow<'_, ObjectSelection>) {
+        let objects = self.objects();
+        let Some(edit) = self.text.edit.as_ref() else {
+            return (objects, Cow::Borrowed(&self.selection));
+        };
+        if edit_id(edit).is_some() || edit.string().is_empty() {
+            return (objects, Cow::Borrowed(&self.selection));
+        }
+        let mut with_new: Vec<ObjectSnapshot> = objects.to_vec();
+        with_new.push(ObjectSnapshot::Text(Box::new(edit.snapshot(NEW_TEXT_ID))));
+        let mut selection = ObjectSelection::default();
+        selection.set(&[NEW_TEXT_ID]);
+        (with_new.into(), Cow::Owned(selection))
+    }
+
+    /// Before a style edit in edit mode on a new text: the text is written as Save writes it,
+    /// so the edit has a node to go to; edit mode goes on.
+    fn write_new_text_for_style(&mut self) {
+        if self
+            .text
+            .edit
+            .as_ref()
+            .is_some_and(|edit| edit_id(edit).is_none())
+        {
+            self.checkpoint_text_edit_inner();
+        }
+    }
+
+    /// After a style write in edit mode: the edited text is drawn in the style its node now has.
+    fn follow_edited_style(&mut self) {
+        let Some(id) = self.text.edit.as_ref().and_then(edit_id) else {
+            return;
+        };
+        if let Some(text) = self.document.text(id)
+            && let Some(edit) = self.text.edit.as_mut()
+        {
+            edit.style = text.style;
+        }
     }
 
     /// What the Style panel shows, or `None` when there is nothing to edit. A
@@ -46,11 +97,11 @@ impl Session {
     /// drag; which rows are shown follows the committed document.
     #[must_use]
     pub fn style_panel_state(&self) -> Option<StylePanelState> {
-        let committed = self.objects();
+        let (committed, selection) = self.style_subject();
         let scope = style_scope_in(
             self.style_tool(),
             &committed,
-            &self.selection,
+            &selection,
             self.node.selection(),
             &self.units(),
         );
@@ -98,6 +149,7 @@ impl Session {
         self.recording(|this| {
             let _ = this.style.commit(&this.document);
             this.commit_background_preview();
+            this.follow_edited_style();
         });
     }
 
@@ -136,6 +188,7 @@ impl Session {
         let ids = if self.style.is_active() {
             Vec::new()
         } else {
+            self.recording(Self::write_new_text_for_style);
             self.edit_ids(&edit)
         };
         if self.style.is_active() || !ids.is_empty() {
@@ -153,6 +206,7 @@ impl Session {
             let edit = this.style.pending_edit().cloned();
             let wrote = this.style.commit(&this.document).is_ok() && pending;
             this.commit_background_preview();
+            this.follow_edited_style();
             this.note_skipped_clones(wrote);
             if let Some(edit) = edit {
                 this.note_skipped_single_line(&edit, wrote);
@@ -265,8 +319,10 @@ impl Session {
     pub(super) fn apply_style_edit(&mut self, edit: &StyleEdit) -> bool {
         self.recording(|this| -> bool {
             this.flush_style_preview();
+            this.write_new_text_for_style();
             let ids = this.edit_ids(edit);
             let wrote = !ids.is_empty() && this.document.edit_style(&ids, edit).is_ok();
+            this.follow_edited_style();
             this.note_skipped_clones(wrote);
             this.note_skipped_single_line(edit, wrote);
             wrote

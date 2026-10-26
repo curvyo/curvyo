@@ -242,27 +242,30 @@ impl Session {
 
     /// Writes the session as its step and edit mode goes on (a Save in edit mode, UX notes §2).
     pub fn checkpoint_text_edit(&mut self) {
-        self.recording(|this| {
-            let Some(caret) = this.text.edit.as_ref().map(TextEdit::caret) else {
-                return;
-            };
-            // An emptied text stays in edit mode, unwritten, until edit mode ends (lead decision
-            // 1 of `0080` slice 2): a Save never removes it.
-            if this
-                .text
-                .edit
-                .as_ref()
-                .is_some_and(|e| e.string().is_empty())
-            {
-                return;
-            }
-            this.finish_text_edit_inner();
-            if let Some(&id) = this.selection.ids().first()
-                && let Some(text) = this.document.text(id)
-            {
-                this.text.edit = Some(TextEdit::existing(&text, caret));
-            }
-        });
+        self.recording(Self::checkpoint_text_edit_inner);
+    }
+
+    /// [`Session::checkpoint_text_edit`] inside a command that records.
+    pub(super) fn checkpoint_text_edit_inner(&mut self) {
+        let Some(caret) = self.text.edit.as_ref().map(TextEdit::caret) else {
+            return;
+        };
+        // An emptied text stays in edit mode, unwritten, until edit mode ends (lead decision
+        // 1 of `0080` slice 2): a Save never removes it.
+        if self
+            .text
+            .edit
+            .as_ref()
+            .is_some_and(|e| e.string().is_empty())
+        {
+            return;
+        }
+        self.finish_text_edit_inner();
+        if let Some(&id) = self.selection.ids().first()
+            && let Some(text) = self.document.text(id)
+        {
+            self.text.edit = Some(TextEdit::existing(&text, caret));
+        }
     }
 
     /// A press with the Text tool: inside the edited text it places the caret; elsewhere it ends

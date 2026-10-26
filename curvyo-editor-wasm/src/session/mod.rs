@@ -110,6 +110,8 @@ mod text_bar;
 mod text_clones;
 #[cfg(test)]
 mod text_clones_tests;
+#[cfg(test)]
+mod text_edit_style_tests;
 mod text_fonts;
 mod text_kerning;
 #[cfg(test)]
