@@ -245,6 +245,8 @@ function Editor() {
                 selectionCount: editor.selectionCount,
               }}
               state={editor.nodeToolbarState}
+              tool={editor.tool}
+              selectionCount={editor.selectionCount}
               actions={{
                 insertSelected: editor.insertSelected,
                 deleteSelected: editor.deleteSelected,

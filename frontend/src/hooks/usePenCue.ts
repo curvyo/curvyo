@@ -79,7 +79,8 @@ export function usePenCue(editor: EditorSession): PenCue {
 
 const NO_CLOSE_STATE: ClosePathState = { closable: 0, skipped: 0, sameEnds: 0 };
 
-/** What the Node bar's Close path buttons would do now: how many open paths they close and skip. */
+/** What the Node bar's Close path buttons would do now: how many open paths and open outlines
+ * of compound paths they close and skip. */
 export function useClosePathState(editor: EditorSession): ClosePathState {
   const { getSession, syncRevision, tool } = editor;
   return useMemo(() => {
@@ -94,6 +95,9 @@ export function useClosePathState(editor: EditorSession): ClosePathState {
       closable: raw.closable,
       skipped: raw.skipped,
       sameEnds: raw.same_ends,
+      closableOutlines: raw.closable_outlines,
+      skippedOutlines: raw.skipped_outlines,
+      sameEndsOutlines: raw.same_ends_outlines,
     };
     raw.free();
     return state;
