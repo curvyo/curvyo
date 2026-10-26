@@ -5,13 +5,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { addBrowserFontFiles, type BrowserAddResult, pickBrowserFontFiles } from "@/lib/browserFonts";
+import { addBrowserFontArchives, isArchiveFile } from "@/lib/browserFontArchives";
+import { addNoticeWithArchives } from "@/lib/fontArchiveText";
 import {
   type AddResult,
   LIBRARY_NEWER,
   LIBRARY_READ_FAILED,
   LIBRARY_SAVE_FAILED,
   STORAGE_FULL_NOTICE,
-  addNotice,
   keptNotice,
 } from "@/lib/fontLibraryText";
 import { type FontFamily, type FontsTabData, fontBlocks } from "@/lib/textText";
@@ -234,9 +235,15 @@ export function useFontLibrary(
       const timer = window.setTimeout(() => setBusy(count), 150);
       let result: AddResult | BrowserAddResult | null = null;
       try {
-        result = files
-          ? await addBrowserFontFiles(files)
-          : await invoke<AddResult>("add_font_files", { paths });
+        if (files) {
+          // Loose fonts in one transaction, then each archive in one of its own (`0083`
+          // criterion 18).
+          const loose = await addBrowserFontFiles(files.filter((file) => !isArchiveFile(file)));
+          const zipped = await addBrowserFontArchives(files.filter(isArchiveFile));
+          result = { ...loose, archives: zipped.archives, full: loose.full || zipped.full };
+        } else {
+          result = await invoke<AddResult>("add_font_files", { paths });
+        }
       } catch {
         result = null;
       } finally {
@@ -246,7 +253,8 @@ export function useFontLibrary(
       if (!result) {
         return null;
       }
-      if ("full" in result && result.full) {
+      const nothingKept = result.added.length === 0 && (result.archives ?? []).every((a) => a.added === 0);
+      if ("full" in result && result.full && nothingKept) {
         show("add", "refusal", STORAGE_FULL_NOTICE);
         return null;
       }
@@ -263,7 +271,7 @@ export function useFontLibrary(
         }
         persist();
       }
-      const words = addNotice(result, own && result.added.length > 0 ? own.name : null);
+      const words = addNoticeWithArchives(result, own && result.added.length > 0 ? own.name : null);
       show("add", words.kind, words.text, /Not fonts:|Already there:/.test(words.text) ? 8000 : undefined);
       return newFamilies.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()))[0] ?? null;
     },

@@ -5,7 +5,7 @@
 use wasm_bindgen::prelude::*;
 
 use crate::wasm_api::WasmSession;
-use crate::{FontChecksGlue, FontLibraryGlue, PreviewFacesGlue};
+use crate::{FontArchiveGlue, FontChecksGlue, FontLibraryGlue, PreviewFacesGlue};
 
 /// The maker's font library (one per page, it outlives a project's session).
 #[wasm_bindgen]
@@ -192,6 +192,11 @@ impl WasmPreviewFaces {
         self.glue.glyph_cells(id, code_points)
     }
 
+    /// The info fields of the face `id`, as JSON (see `PreviewFacesGlue::font_info`).
+    pub fn font_info(&mut self, id: &str) -> String {
+        self.glue.font_info(id)
+    }
+
     /// The detail bar's names of one character, as JSON (see `PreviewFacesGlue::glyph_detail`).
     pub fn glyph_detail(&mut self, id: &str, code_point: u32) -> String {
         self.glue.glyph_detail(id, code_point)
@@ -219,5 +224,47 @@ impl WasmSession {
     #[must_use]
     pub fn texts_using_family(&self, family: &str) -> u32 {
         u32::try_from(self.session.texts_using_family(family)).unwrap_or(u32::MAX)
+    }
+}
+
+/// A file or folder name made safe for Windows, macOS and Linux (`specs/0083-font-info-and-zip`
+/// criterion 9): the browser names a font folder with it.
+#[wasm_bindgen]
+#[must_use]
+pub fn sanitised_name(name: &str) -> String {
+    curvyo_text_core::sanitised_name(name)
+}
+
+/// A zip archive of fonts the browser's Add font reads (`specs/0083-font-info-and-zip`).
+#[wasm_bindgen]
+#[derive(Debug)]
+pub struct WasmFontArchive {
+    glue: FontArchiveGlue,
+}
+
+#[wasm_bindgen]
+impl WasmFontArchive {
+    /// Opens the archive's bytes; the error is `"unreadable"` or `"over_limit"`.
+    ///
+    /// # Errors
+    /// The refusal's code when the archive is refused whole.
+    pub fn open(bytes: Vec<u8>) -> Result<WasmFontArchive, String> {
+        FontArchiveGlue::open(bytes)
+            .map(|glue| Self { glue })
+            .map_err(str::to_owned)
+    }
+
+    /// The entries as JSON (see `FontArchiveGlue::entries`).
+    #[must_use]
+    pub fn entries(&self) -> String {
+        self.glue.entries()
+    }
+
+    /// The bytes of font or document entry `index`; the error is `"unsafe"` or `"over_limit"`.
+    ///
+    /// # Errors
+    /// The skip's code.
+    pub fn read(&mut self, index: usize) -> Result<Vec<u8>, String> {
+        self.glue.read(index).map_err(str::to_owned)
     }
 }

@@ -12,6 +12,7 @@ import {
 } from "@tauri-apps/api/event";
 
 import {
+  browserDocumentBytes,
   browserFontBytes,
   listBrowserFonts,
   removeBrowserFontFiles,
@@ -151,6 +152,19 @@ const browserCommands: Record<string, (args?: Record<string, unknown>) => unknow
     throw new Error("the browser adds font files through browserFonts");
   },
   remove_font_files: (args) => removeBrowserFontFiles(args?.faces as { id: string; index: number }[]),
+  // A font folder's documents from IndexedDB (`specs/0083-font-info-and-zip` criterion 4): the
+  // first 1 MiB of a text, a PDF in a new tab from the stored bytes (no network request).
+  read_font_document: async (args) => {
+    const bytes = await browserDocumentBytes(String(args?.folder), String(args?.name));
+    const limit = 1024 * 1024;
+    return { text: new TextDecoder("utf-8").decode(bytes.slice(0, limit)), cut: bytes.byteLength > limit };
+  },
+  open_font_document: async (args) => {
+    const bytes = await browserDocumentBytes(String(args?.folder), String(args?.name));
+    const url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
+    window.open(url, "_blank", "noopener");
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  },
   // The font library file and the check cache sit beside the formats file (`0075` decisions 1, 5).
   read_font_library: () => readStored(FONT_LIBRARY_KEY),
   write_font_library: (args) => window.localStorage.setItem(FONT_LIBRARY_KEY, String(args?.text)),

@@ -34,6 +34,15 @@ function isPreviewFaceLoaded(face: ListedFace): boolean {
   return faces?.has_preview_face(faceId(face)) ?? false;
 }
 
+/** The file size of each face read, by engine id (the Info mode's File row,
+ * `specs/0083-font-info-and-zip` criterion 2). */
+const sizes = new Map<string, number>();
+
+/** The size of the listed face's file once its bytes were read; `null` before. */
+export function previewFaceSize(face: ListedFace): number | null {
+  return sizes.get(faceId(face)) ?? null;
+}
+
 /** Faces whose bytes are on the way, by engine id: a tile and the background preparation asking
  * at once share one read. */
 const loading = new Map<string, Promise<boolean>>();
@@ -64,6 +73,7 @@ export function readPreviewFace(face: ListedFace): Promise<boolean> {
   }
   const read = Promise.all([wasmReady(), readFaceBytes(face)])
     .then(([, buffer]) => {
+      sizes.set(id, buffer.byteLength);
       const added = previewEngine().add_preview_face(id, new Uint8Array(buffer), face.faceIndex);
       if (!added) {
         unreadable.add(id);

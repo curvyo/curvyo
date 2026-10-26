@@ -66,7 +66,7 @@ test("ac03/18: each bad new field falls back alone, the old fields stay", () => 
       sample: "Kept",
       size: 50,
       full: false,
-      mode: "info",
+      mode: "table",
       glyphSearch: "x".repeat(MAX_GLYPH_SEARCH_CHARS + 1),
       recent: "♥",
     }),

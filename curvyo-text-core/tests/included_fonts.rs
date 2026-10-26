@@ -54,6 +54,9 @@ struct IndexFace {
     style: String,
     file: String,
     licence: String,
+    /// The licence text's path under the fonts folder (`specs/0083-font-info-and-zip`
+    /// criterion 2: the info view shows it).
+    licence_file: String,
     /// `"single_line"` for a single-line face (`0076` decision 7); absent for an outline face.
     #[serde(default)]
     kind: Option<String>,
@@ -157,6 +160,7 @@ fn every_included_font_has_an_allowed_licence_record() {
                 style: face.style.clone(),
                 file: format!("{folder_name}/{}", face.file),
                 licence: record.licence.clone(),
+                licence_file: format!("{folder_name}/{}", record.licence_file),
                 kind: single_line.then(|| "single_line".to_owned()),
             });
         }

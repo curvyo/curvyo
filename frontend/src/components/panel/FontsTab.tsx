@@ -25,6 +25,8 @@ import { useFontTagLine } from "@/hooks/useFontTagLine";
 import { useFontDrop } from "@/hooks/useFontDrop";
 import { isTauri } from "@/platform/host";
 import { armedRemoveLabel, checkingText, emptyTagText, removedText } from "@/lib/fontLibraryText";
+import { documentsGoing } from "@/lib/fontInfoText";
+import { hostFolders, hostListing } from "@/hooks/useText";
 import { useFontTreeScroll } from "@/hooks/useFontTreeScroll";
 import { useFontPreviewState } from "@/hooks/useFontPreviewState";
 import { type PreviewListing, previewState, publishListing, setPreviewOpen } from "@/lib/fontPreviewStore";
@@ -203,10 +205,13 @@ export function FontsTab({
   const { disarm } = arm;
   useEffect(disarm, [disarm, search, chosen, expanded, collapsedCurrent]);
 
+  /** The documents a Remove of `family` takes with an emptied font folder (`0083` criterion 14). */
+  const documentsOf = (family: FontFamily) => documentsGoing(family.family, hostListing("curvyo"), hostFolders());
+
   /** A press on a Curvyo family's trash: arms it, or removes the family when armed. */
   const pressRemove = (family: FontFamily, byKeyboard: boolean) => {
     const key = familyKey(family);
-    const label = armedRemoveLabel(family.family, textsUsingFamily(family.family));
+    const label = armedRemoveLabel(family.family, textsUsingFamily(family.family), documentsOf(family));
     arm.press(`font:${key}`, label, () => {
       const at = focusable.findIndex((r) => r.key === key);
       const after = focusable.slice(at + 1).find((r) => r.kind === "family");
@@ -276,7 +281,9 @@ export function FontsTab({
   const trashOf = (family: FontFamily) => {
     const target = `font:${familyKey(family)}`;
     const armed = arm.armed === target;
-    const label = armed ? armedRemoveLabel(family.family, textsUsingFamily(family.family)) : null;
+    const label = armed
+      ? armedRemoveLabel(family.family, textsUsingFamily(family.family), documentsOf(family))
+      : null;
     return {
       target,
       armed,

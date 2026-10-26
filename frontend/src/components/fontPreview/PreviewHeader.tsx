@@ -1,7 +1,8 @@
 // The font preview's header (`specs/0077-font-preview` criteria 4, 5, 7, 12 and 26, UX notes §2;
 // `specs/0082-glyph-table` criteria 1, 4 and 16, UX notes §2): the mode switch, the sample field
 // (the search field in Glyphs mode) with Clear, the Size slider and its readout, the subject
-// line, Full view and Close; one row from 560px of pane width, two rows below.
+// line, Full view and Close; one row from 560px of pane width, two rows below. Info mode has no
+// field and no Size slider (`specs/0083-font-info-and-zip` UX notes §1).
 import { Maximize2, Minimize2, Search, X } from "lucide-react";
 
 import { ModeSwitch } from "@/components/fontPreview/ModeSwitch";
@@ -105,8 +106,33 @@ export function PreviewHeader(props: PreviewHeaderProps) {
       </Tooltip>
     </div>
   );
+  const frame = "shrink-0 border-b border-[color-mix(in_srgb,var(--toolbar-icon)_25%,transparent)] bg-[var(--panel-bg)] p-2";
+  if (mode === "info") {
+    const switcher = <ModeSwitch mode={mode} onMode={onMode} onReturnFocus={onReturnFocus} />;
+    return (
+      <div className={frame}>
+        {rows === 1 ? (
+          <div className="flex h-7 items-center">
+            {switcher}
+            <div className="w-3 shrink-0" />
+            {subjectLine}
+            <div className="w-2 shrink-0" />
+            {buttons}
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2">
+            <div className="flex h-7 items-center justify-between">
+              {switcher}
+              {buttons}
+            </div>
+            <div className="flex h-5 min-w-0 items-center">{subjectLine}</div>
+          </div>
+        )}
+      </div>
+    );
+  }
   return (
-    <div className="shrink-0 border-b border-[color-mix(in_srgb,var(--toolbar-icon)_25%,transparent)] bg-[var(--panel-bg)] p-2">
+    <div className={frame}>
       {rows === 1 ? (
         <div className="flex h-7 items-center">
           <ModeSwitch mode={mode} onMode={onMode} onReturnFocus={onReturnFocus} />

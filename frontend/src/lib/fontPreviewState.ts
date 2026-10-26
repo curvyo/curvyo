@@ -15,8 +15,9 @@ export const MAX_SAMPLE_CHARS = 200;
 export const SIZE_RANGE = { min: 16, max: 160, step: 1 } as const;
 export const DEFAULT_SIZE = 32;
 
-/** The pane's modes (`specs/0082-glyph-table` criterion 1). */
-export type PreviewMode = "fonts" | "glyphs";
+/** The pane's modes (`specs/0082-glyph-table` criterion 1; Info, `specs/0083-font-info-and-zip`
+ * criterion 1). */
+export type PreviewMode = "fonts" | "glyphs" | "info";
 /** The glyph search field's limit (`0082` criterion 16). */
 export const MAX_GLYPH_SEARCH_CHARS = 64;
 /** The Recent list's length (`0082` criterion 18). */
@@ -100,7 +101,7 @@ export function readPreviewPrefs(storage: PreviewStorage | undefined = defaultSt
     size: sizeInRange(value.size) ? value.size : DEFAULT_SIZE,
     full: typeof value.full === "boolean" ? value.full : false,
     ...(typeof split === "number" && split > 0 && split < 1 ? { split } : {}),
-    ...(mode === "fonts" || mode === "glyphs" ? { mode } : {}),
+    ...(mode === "fonts" || mode === "glyphs" || mode === "info" ? { mode } : {}),
     ...(typeof glyphSearch === "string" && [...glyphSearch].length <= MAX_GLYPH_SEARCH_CHARS ? { glyphSearch } : {}),
     ...(kept.length > 0 ? { recent: kept } : {}),
   };

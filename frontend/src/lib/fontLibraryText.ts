@@ -19,11 +19,23 @@ function fonts(count: number): string {
   return count === 1 ? "1 font" : `${count} fonts`;
 }
 
-/** What Add font did, by file name. */
+/** What adding one zip archive did (`specs/0083-font-info-and-zip` criterion 13). */
+export interface ArchiveResult {
+  name: string;
+  added: number;
+  present: number;
+  documents: number;
+  unsafeEntries: number;
+  /** Refused whole: not a zip, damaged, or over a limit. */
+  refused: "unreadable" | "over_limit" | null;
+}
+
+/** What Add font did, by file name, and per archive. */
 export interface AddResult {
   added: string[];
   present: string[];
   notFonts: string[];
+  archives?: ArchiveResult[];
 }
 
 /** The notice of an Add (criteria 22, 23): what happened, the names of the refused and present
@@ -97,13 +109,16 @@ export function armedTagLabel(name: string, members: number): string {
 }
 
 /** The armed font trash's name and tooltip (`0081` criterion 3, the count of `0075` criterion
- * 25). */
-export function armedRemoveLabel(family: string, texts: number): string {
-  const first = `Press again to remove ${shortName(family)} from Curvyo fonts.`;
-  if (texts === 0) {
-    return first;
+ * 25); `documents` go with the font folder this removal empties (`0083` criterion 14). */
+export function armedRemoveLabel(family: string, texts: number, documents = 0): string {
+  let label = `Press again to remove ${shortName(family)} from Curvyo fonts.`;
+  if (documents > 0) {
+    label += documents === 1 ? " Its 1 document goes too." : ` Its ${documents} documents go too.`;
   }
-  return texts === 1 ? `${first} 1 text here uses it.` : `${first} ${texts} texts here use it.`;
+  if (texts === 0) {
+    return label;
+  }
+  return texts === 1 ? `${label} 1 text here uses it.` : `${label} ${texts} texts here use it.`;
 }
 
 /** The status text after a font was removed (`0081` UX notes §6). */

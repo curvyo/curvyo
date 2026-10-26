@@ -3,7 +3,9 @@
 //! `adrs.md` decisions 2, 3 and 6): bytes cross once per face, then each tile, table or row batch
 //! of cells is one call, answered as JSON.
 
-use curvyo_text_core::{FaceKind, UnicodeNames, block_of, glyph_cell, preview_path_within};
+use curvyo_text_core::{
+    FaceKind, FontFormat, UnicodeNames, block_of, font_info, glyph_cell, preview_path_within,
+};
 use curvyo_ui_core::{MAX_GLYPH_QUERY_CHARS, NO_BLOCK, PreviewFaces, glyph_table};
 use serde_json::json;
 
@@ -63,6 +65,42 @@ impl PreviewFacesGlue {
 }
 
 impl PreviewFacesGlue {
+    /// The info fields of the face `id` (`specs/0083-font-info-and-zip` criterion 2) as JSON
+    /// `{"format": {"kind", "face", "faces"}, "full_name", "version", "designer", "vendor",
+    /// "copyright", "trademark", "licence", "licence_url", "fs_type", "glyphs", "characters"}`,
+    /// `null` where the font states nothing; empty when the face is not held.
+    #[must_use]
+    pub fn font_info(&mut self, id: &str) -> String {
+        let Some(face) = self.faces.get(id) else {
+            return String::new();
+        };
+        let info = font_info(&face);
+        let format = match info.format {
+            FontFormat::TrueType => json!({ "kind": "truetype" }),
+            FontFormat::OpenTypeCff => json!({ "kind": "cff" }),
+            FontFormat::OpenTypeCff2 => json!({ "kind": "cff2" }),
+            FontFormat::Collection { face, faces } => {
+                json!({ "kind": "collection", "face": face, "faces": faces })
+            }
+            FontFormat::SvgFont => json!({ "kind": "svg" }),
+        };
+        json!({
+            "format": format,
+            "full_name": info.full_name,
+            "version": info.version,
+            "designer": info.designer,
+            "vendor": info.vendor,
+            "copyright": info.copyright,
+            "trademark": info.trademark,
+            "licence": info.licence,
+            "licence_url": info.licence_url,
+            "fs_type": info.fs_type,
+            "glyphs": info.glyphs,
+            "characters": face.listed_chars().len(),
+        })
+        .to_string()
+    }
+
     /// Takes the shipped Unicode names file (fetched on the first Glyphs open); `false` for
     /// bytes that are not one.
     pub fn set_unicode_names(&mut self, bytes: &[u8]) -> bool {
@@ -160,6 +198,16 @@ mod tests {
 
     fn tile(glue: &mut PreviewFacesGlue, id: &str, text: &str) -> serde_json::Value {
         serde_json::from_str(&glue.tile(id, text)).unwrap()
+    }
+
+    #[test]
+    fn font_info_crosses_as_json() {
+        let mut glue = PreviewFacesGlue::default();
+        assert!(glue.add("sans#0", &font("source-sans-3/SourceSans3-Regular.otf"), 0));
+        let info: serde_json::Value = serde_json::from_str(&glue.font_info("sans#0")).unwrap();
+        assert_eq!(info["format"]["kind"], "cff");
+        assert!(info["characters"].as_u64().unwrap() > 500);
+        assert_eq!(glue.font_info("nothing"), "");
     }
 
     #[test]

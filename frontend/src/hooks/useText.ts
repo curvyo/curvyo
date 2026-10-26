@@ -125,8 +125,19 @@ interface Listed {
     stamp?: string;
     /** `"single_line"` for an SVG font face (`specs/0076-single-line-fonts`). */
     kind?: string;
+    /** The file's name and size, its folder path for display (desktop) and its font folder
+     * (`specs/0083-font-info-and-zip` criteria 2 and 10). */
+    file?: string;
+    size?: number;
+    path?: string;
+    folder?: string | null;
+    /** An included font's licence id and licence file (`font.toml`, ADR 0020 §4). */
+    licence?: string;
+    licence_file?: string;
   }[];
   skipped: string[];
+  /** The Curvyo folder's font folders and their documents (`0083` criterion 4). */
+  folders?: { name: string; documents: { name: string; size: number }[] }[];
 }
 
 /** The lists and bytes of this page, kept across sessions: a New or Open gets them again, and a
@@ -140,6 +151,11 @@ const includedIds = new Set<string>();
  * not keep (the font library reads them). */
 export function hostListing(block: "curvyo" | "included" | "system"): Listed["faces"] {
   return lists[block]?.faces ?? [];
+}
+
+/** The Curvyo block's font folders and their documents (`0083` criterion 4). */
+export function hostFolders(): NonNullable<Listed["folders"]> {
+  return lists.curvyo?.folders ?? [];
 }
 
 /** The bytes of a listed file, read once per page (the cuttable check reads them too). */
@@ -303,7 +319,10 @@ export function useText(
     let live = true;
     void fetch(`${fontsBase()}index.json`)
       .then((response) => response.json())
-      .then((index: { faces: { family: string; style: string; file: string; kind?: string }[] }) => {
+      .then(
+        (index: {
+          faces: { family: string; style: string; file: string; kind?: string; licence?: string; licence_file?: string }[];
+        }) => {
         for (const face of index.faces) {
           includedIds.add(face.file);
         }
@@ -314,13 +333,17 @@ export function useText(
             style: face.style,
             index: 0,
             kind: face.kind,
+            file: face.file.slice(face.file.lastIndexOf("/") + 1),
+            licence: face.licence,
+            licence_file: face.licence_file,
           })),
           skipped: [],
         };
         if (live) {
           setListsRevision((r) => r + 1);
         }
-      })
+      },
+      )
       .catch(() => {});
     return () => {
       live = false;

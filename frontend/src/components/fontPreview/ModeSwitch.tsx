@@ -1,5 +1,5 @@
-// The preview pane's mode switch (`specs/0082-glyph-table` criterion 1, UX notes §1): a radio
-// strip Fonts | Glyphs with one Tab stop on the pressed cell; Left and Right move and choose
+// The preview pane's mode switch (`specs/0082-glyph-table` criterion 1, UX notes §1;
+// `specs/0083-font-info-and-zip` criterion 1): a radio strip Fonts | Glyphs | Info with one Tab stop on the pressed cell; Left and Right move and choose
 // (no wrap), Home and End; a mouse press hands the focus back, a key keeps it on the strip.
 import { useRef } from "react";
 
@@ -8,6 +8,7 @@ import type { PreviewMode } from "@/lib/fontPreviewState";
 const MODES: { mode: PreviewMode; label: string }[] = [
   { mode: "fonts", label: "Fonts" },
   { mode: "glyphs", label: "Glyphs" },
+  { mode: "info", label: "Info" },
 ];
 
 interface ModeSwitchProps {
