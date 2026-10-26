@@ -9,12 +9,15 @@
 #![forbid(unsafe_code)]
 
 mod align;
+mod archive_names;
 mod char_offsets;
 mod error;
 mod face;
 mod face_store;
 mod face_style;
+mod font_archive;
 mod font_class;
+mod font_info;
 mod font_names;
 mod glyph_cell;
 mod glyph_list;
@@ -34,12 +37,17 @@ mod vertical_orientation;
 mod writing_mode;
 
 pub use align::Align;
+pub use archive_names::{free_folder_name, free_name, is_document_name, sanitised_name};
 pub use char_offsets::CharOffset;
 pub use error::TextError;
 pub use face::{Face, FaceKind, FaceMetrics};
 pub use face_store::{FaceHash, FaceKey, FaceStore};
 pub use face_style::{FaceStyle, NORMAL_WIDTH, Slant, WeightBand};
+pub use font_archive::{
+    ArchiveEntry, ArchiveError, EntryClass, EntrySkip, FontArchive, FontFileKind, UnsafeReason,
+};
 pub use font_class::{DeclaredClass, OS2_CLASS_BYTES, declared_class, os2_class_bytes};
+pub use font_info::{FontFormat, FontInfo, font_info};
 pub use font_names::{ListableFace, family_name, listable_faces, style_name, svg_listable_faces};
 pub use glyph_cell::{GlyphCell, glyph_cell};
 pub use glyph_list::ListedChar;

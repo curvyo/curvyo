@@ -1,0 +1,25 @@
+# The cargo-fuzz target on the archive reader (`specs/0083-font-info-and-zip` criterion 16,
+# ADR 0020 §2). Not a workspace member: it needs a nightly compiler (or `RUSTC_BOOTSTRAP=1`) and
+# `libfuzzer-sys`, which the product never links. Run from this folder:
+#   RUSTC_BOOTSTRAP=1 cargo fuzz run font_archive corpus/font_archive ../tests/fixtures/fonts/zip -- -max_total_time=600
+[package]
+name = "curvyo-text-core-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+curvyo-text-core = { path = ".." }
+
+[[bin]]
+name = "font_archive"
+path = "fuzz_targets/font_archive.rs"
+test = false
+doc = false
+bench = false
+
+[workspace]

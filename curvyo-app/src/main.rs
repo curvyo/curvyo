@@ -15,6 +15,7 @@
 // to the stricter rule.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
+mod font_documents;
 mod font_library;
 mod fonts;
 mod formats;
@@ -115,6 +116,8 @@ fn main() {
             fonts::pick_font_files,
             fonts::add_font_files,
             fonts::remove_font_files,
+            font_documents::read_font_document,
+            font_documents::open_font_document,
             font_library::read_font_library,
             font_library::write_font_library,
             font_library::set_font_library_aside,
@@ -137,6 +140,11 @@ fn main() {
         })
         .setup(|app| {
             let handle = app.handle().clone();
+            // A font folder an interrupted archive add left is removed at start (`0083`
+            // criterion 12).
+            if let Ok(dir) = fonts::fonts_dir(&handle) {
+                curvyo_storage_io::remove_add_leftovers(&dir);
+            }
             // Linux and Windows have no menu bar: Tauri sets no default menu there, and none is
             // built. macOS cannot lose its bar, so it gets the small one of `menu` (criterion 39).
             #[cfg(target_os = "macos")]

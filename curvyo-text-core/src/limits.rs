@@ -37,3 +37,20 @@ pub const MAX_SVG_KERN_PAIRS: usize = 1 << 20;
 /// The largest absolute value of a number in an SVG font (font units). A real em is at most
 /// 16,384 units; a larger number is hostile and would make arcs split into billions of curves.
 pub const MAX_SVG_COORDINATE: f64 = 1.0e6;
+
+/// The largest zip archive Add font reads, in bytes (256 MiB, `specs/0083-font-info-and-zip`
+/// criterion 15).
+pub const MAX_ARCHIVE_BYTES: usize = 256 * 1024 * 1024;
+
+/// The most entries one archive may declare; checked before its table is read.
+pub const MAX_ARCHIVE_ENTRIES: usize = 10_000;
+
+/// The most bytes the kept entries (fonts and documents) of one archive may decompress to
+/// together (256 MiB), counted on the bytes actually read.
+pub const MAX_ARCHIVE_KEPT_BYTES: usize = 256 * 1024 * 1024;
+
+/// The most font entries one archive may hold.
+pub const MAX_ARCHIVE_FONTS: usize = 500;
+
+/// The largest document entry kept from an archive (16 MiB).
+pub const MAX_DOCUMENT_BYTES: usize = 16 * 1024 * 1024;
