@@ -247,7 +247,14 @@ pub struct DocumentVersion(pub(crate) loro::Frontiers);
 /// (no string) or would drop it, so it must refuse every file of this build as too new.
 /// Migration from version 22 is none: no text has a source. The number is provisional by the rule
 /// above. Golden: `text_clones_v23.curvyo`.
-pub const CURRENT_FORMAT_VERSION: u32 = 23;
+///
+/// Bumped to 24 in `text-taper` (`specs/0079-text-layout-controls/adrs.md` decision 7): a text may
+/// carry the optional key `text_taper` (a fraction, −0.5 to 0.5). A build that stops at version 23
+/// ignores it and would draw a tapered text untapered without a word, so it must refuse every file
+/// of this build as too new. Migration from version 23 is none: an absent key is no taper, a taper
+/// of 0 is never written, a non-finite one reads as 0 and one out of range is clamped. The number
+/// is provisional by the rule above. Golden: `text_layout_v24.curvyo`.
+pub const CURRENT_FORMAT_VERSION: u32 = 24;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";

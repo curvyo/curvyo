@@ -19,7 +19,9 @@
 //!   text_rotation     : f64, degrees in (-180, 180]       absent: 0
 //!   text_writing_mode      : "vertical_rl" | "vertical_lr"   absent: horizontal
 //!   text_glyph_orientation : "upright" | "sideways"          absent: auto
-//!                    the layout keys are optional (format 19, the last two format 20,
+//!   text_taper        : f64, fraction in -0.5 ..= 0.5      absent: 0
+//!                    the layout keys are optional (format 19, writing mode and orientation
+//!                    format 20, the taper format 24,
 //!                    `specs/0079-text-layout-controls/adrs.md` decisions 1 and 13): a value at
 //!                    its default is deleted, never written; an unknown code reads as the
 //!                    default, a non-finite number as the default, a factor out of range is
@@ -62,6 +64,7 @@ const KEY_LINE_SPACE: &str = "text_line_space";
 const KEY_ROTATION: &str = "text_rotation";
 const KEY_WRITING_MODE: &str = "text_writing_mode";
 const KEY_ORIENTATION: &str = "text_glyph_orientation";
+const KEY_TAPER: &str = "text_taper";
 /// Two factors or rotations (radians) closer than this are the same stored value.
 const SAME_VALUE: f64 = 1e-12;
 
@@ -167,6 +170,9 @@ pub(crate) fn write_layout(meta: &LoroMap, layout: &TextLayoutValues) -> bool {
             orientation_code(layout.orientation).map(LoroValue::from),
         );
     }
+    if differs(stored.taper, layout.taper) {
+        put(KEY_TAPER, factor(layout.taper));
+    }
     // Degrees on disk, radians in the model: equal within float noise is unchanged.
     if differs(stored.rotation.as_radians(), layout.rotation.as_radians()) {
         put(
@@ -211,6 +217,7 @@ pub(crate) fn read_layout(meta: &LoroMap) -> TextLayoutValues {
         rotation: Angle::from_radians(number(KEY_ROTATION).unwrap_or(0.0).to_radians()),
         writing_mode,
         orientation,
+        taper: number(KEY_TAPER).unwrap_or(0.0),
     }
     .held()
 }
@@ -501,6 +508,7 @@ mod tests {
                     KEY_ROTATION,
                     KEY_WRITING_MODE,
                     KEY_ORIENTATION,
+                    KEY_TAPER,
                 ]
                 .contains(&key.as_str())
             })
@@ -524,9 +532,11 @@ mod tests {
             rotation: Angle::from_radians(12.5_f64.to_radians()),
             writing_mode: TextWritingMode::VerticalRl,
             orientation: TextGlyphOrientation::Upright,
+            taper: -0.25,
         };
         assert!(write_layout(&meta, &values));
-        assert_eq!(layout_keys(&meta).len(), 7);
+        assert_eq!(layout_keys(&meta).len(), 8);
+        assert!((read_layout(&meta).taper + 0.25).abs() < 1e-12);
         assert_eq!(read_layout(&meta).writing_mode, TextWritingMode::VerticalRl);
         assert_eq!(
             read_layout(&meta).orientation,
@@ -558,7 +568,12 @@ mod tests {
             .unwrap();
         meta.insert(KEY_ORIENTATION, LoroValue::Double(1.0))
             .unwrap();
+        meta.insert(KEY_TAPER, LoroValue::Double(0.9)).unwrap();
         let read = read_layout(&meta);
+        assert!(
+            (read.taper - 0.5).abs() < 1e-12,
+            "a taper out of range is clamped"
+        );
         assert_eq!(read.align, TextAlign::Left);
         assert_eq!(read.writing_mode, TextWritingMode::Horizontal);
         assert_eq!(read.orientation, TextGlyphOrientation::Auto);
