@@ -1,6 +1,6 @@
 # Compound path node editing: the Node tool, Join, Split at a node, Close path and the Pen on every compound path
 
-Status: Ready (2026-10-12: criteria moved from `0054`; `adrs.md` by the architect and UX notes by the ux-engineer the same day; the product owner's rules stay vetoable)
+Status: In progress (`story/compound-path-node-editing-v2`, no PR yet). Ready since 2026-10-12 (criteria moved from `0054`; `adrs.md` by the architect and UX notes by the ux-engineer the same day; the product owner's rules stay vetoable)
 Priority: Should
 Origin: Customer decision 7 of 2026-10-12 on `0054` ("doch das soll gehen": compound paths must be node-editable with the Node tool, and the Pen continues open outline ends if sensible), with the customer principle "allow much so the operator does not have to puzzle out what they did wrong": a defined result plus a notice instead of a refusal. Split out of `0054` as its own slice (lead decision, 2026-10-12). The rules marked **PO** in "Decisions" are mine and the customer can change them.
 
