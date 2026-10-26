@@ -85,7 +85,7 @@ limit is checked in the session before the parse (criterion 6c); the host reads 
   6 (a) refuses it as written); `<switch>` takes its first child that needs no
   `requiredExtensions`, so older Illustrator files (whose first child is a `foreignObject` with
   `requiredExtensions`) import (criterion 44 says "the first child element").
-- **Budget 71** restated from the measurement (`adrs.md`, dated note 2026-10-26).
+- **Budget 71** restated from the measurement (`adrs.md`, dated notes 2026-10-26), timed in thread CPU time by `curvyo-editor-wasm/tests/svg_import_budget.rs`.
 - **Not built here:** the 60 s nightly fuzz target of criterion 70 (b) (the truncation and
   byte-change sweep and two proptests stand in); the WASM timings and the `editor-wasm` size delta
   for the PR description; Inkscape-saved fixtures (the files are hand-written in Inkscape's
