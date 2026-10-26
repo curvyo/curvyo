@@ -250,6 +250,16 @@ Width: 8 + 168 + 12 + 120 + 8 = 316px, one row in the 324px overlay row at 800 x
 
 Applied on 2026-10-20 to criteria 1, 7, 10, 11, 15, 19 and 29 (implementer, from the ux-engineer's list).
 
+## Amendment 2026-10-26 (customer): the Style tab in edit mode
+
+Criterion 14 is extended to edit mode. While a text is in edit mode, the Style tab's Fill and
+Stroke act on that text directly: each change is one history step, edit mode stays on, and after
+a click on a control the keyboard returns to the text, so typing goes on. A new text with at least
+one character is the Style tab's subject ("Text") before it is written; the first style change
+writes it as Save does ("Add text", then the style step). A new text with no character yet has no
+style subject and the Style tab stays dimmed. A drag on a colour, width or opacity control shows
+on the edited text live and writes one step at the release (`0007` criterion 36).
+
 ## Links
 
 Requirements: R-EDIT-048 (new: text objects and the Text tool), R-EDIT-004 (text half), R-FONT-001 (Curvyo font folder, Must), R-FONT-005 (first part)

@@ -65,7 +65,15 @@ export function PropertiesPanel({
   const { getSession } = editor;
   const formats = useFormats(getSession, doc);
   const { shortcut } = doc;
-  const returnFocus = () => editor.containerRef.current?.focus();
+  // In text edit mode the keyboard goes back to the text being edited, so typing goes on after a
+  // click on a control (customer 2026-10-26), as after the Text bar's controls.
+  const returnFocus = () => {
+    if (editor.text.editing) {
+      editor.text.sinkRef.current?.focus({ preventScroll: true });
+    } else {
+      editor.containerRef.current?.focus();
+    }
+  };
   const picking = panel.view.pickTarget !== "" || background.view.picking;
   const endPick = () => {
     panel.endPick();
