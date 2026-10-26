@@ -340,6 +340,7 @@ fn ac22_multi_object_conversion_cannot_keep_both_paths_selected_together() {
 
 fn as_path(document: &Document, id: NodeId) -> PathSnapshot {
     match document.object(id).expect("object exists") {
+        curvyo_document_core::ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         curvyo_document_core::ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         curvyo_document_core::ObjectSnapshot::Path(path) => path,
         curvyo_document_core::ObjectSnapshot::Primitive(_)

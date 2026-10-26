@@ -16,6 +16,8 @@ serde_json.workspace = true
 toml.workspace = true
 zip.workspace = true
 loro.workspace = true
+# The asset hash of embedded images (ADR 0017 §2): SHA-256, already in the lock file.
+sha2.workspace = true
 
 # `tests/acceptance_0016_pr2_tester.rs` times the rotate commit by the thread's CPU time, so a
 # busy test run does not distort the ratio it asserts.

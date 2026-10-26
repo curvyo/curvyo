@@ -32,6 +32,7 @@ pub fn build_history_preview(objects: &[ObjectSnapshot], view: ViewTransform) ->
                 ObjectSnapshot::Path(path) => ghost_style(&mut path.style),
                 ObjectSnapshot::Primitive(primitive) => ghost_style(&mut primitive.style),
                 ObjectSnapshot::Clone(clone) => ghost_style(&mut clone.resolved.style),
+                ObjectSnapshot::Image(image) => image.shown_opacity = ghost(image.shown_opacity),
                 ObjectSnapshot::Text(text) => {
                     ghost_style(&mut text.style);
                     if let Some(outline) = &mut text.outline {

@@ -39,7 +39,10 @@ impl TemplateNode {
                         .map(|sub| sub.anchors.len())
                         .sum::<usize>()
             }
-            ObjectSnapshot::Primitive(_) | ObjectSnapshot::Clone(_) | ObjectSnapshot::Text(_) => 0,
+            ObjectSnapshot::Primitive(_)
+            | ObjectSnapshot::Clone(_)
+            | ObjectSnapshot::Text(_)
+            | ObjectSnapshot::Image(_) => 0,
         }
     }
 }
@@ -64,8 +67,10 @@ impl Document {
                     NodeKind::Leaf(ObjectSnapshot::Clone(clone)) => {
                         ObjectSnapshot::Path(clone.resolved)
                     }
-                    NodeKind::Leaf(object) => object,
-                    NodeKind::Layer | NodeKind::Group => return None,
+                    NodeKind::Leaf(object) if !matches!(object, ObjectSnapshot::Image(_)) => object,
+                    // A picture is no outline to trace by hand and its bytes stay in the other
+                    // project (ADR 0019: a template is guides).
+                    NodeKind::Leaf(_) | NodeKind::Layer | NodeKind::Group => return None,
                 };
                 Some(TemplateNode {
                     object,
@@ -105,7 +110,9 @@ impl Document {
         let mut ids = anchor_ids.iter().copied();
         let mut created = Vec::with_capacity(nodes.len());
         for node in nodes {
-            let id = self.write_template_node(&node.object, &mut ids);
+            let Some(id) = self.write_template_node(&node.object, &mut ids) else {
+                continue;
+            };
             // invariant: the node was just created.
             #[allow(clippy::unwrap_used)]
             let meta = tree.get_meta(tree_id_of(id)).unwrap();
@@ -127,7 +134,7 @@ impl Document {
         &self,
         object: &ObjectSnapshot,
         ids: &mut impl Iterator<Item = AnchorId>,
-    ) -> NodeId {
+    ) -> Option<NodeId> {
         let path = match object {
             ObjectSnapshot::Primitive(primitive) => {
                 let id = self.create_primitive_uncommitted(primitive.shape, primitive.rotation);
@@ -137,9 +144,10 @@ impl Document {
                 let meta = tree.get_meta(tree_id_of(id)).unwrap();
                 let created = crate::style_codec::read_style(&meta);
                 crate::style_codec::write_changes(&meta, &created, &primitive.style);
-                return id;
+                return Some(id);
             }
-            ObjectSnapshot::Text(text) => return self.create_text_uncommitted(text),
+            ObjectSnapshot::Text(text) => return Some(self.create_text_uncommitted(text)),
+            ObjectSnapshot::Image(_) => return None,
             ObjectSnapshot::Path(path) => path,
             ObjectSnapshot::Clone(clone) => &clone.resolved,
         };
@@ -174,6 +182,6 @@ impl Document {
             let meta = tree.get_meta(tree_id_of(id)).unwrap();
             crate::subpath_codec::append_outlines(&meta, &rest);
         }
-        id
+        Some(id)
     }
 }

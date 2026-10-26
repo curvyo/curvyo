@@ -28,6 +28,33 @@ impl RefusalMarks {
 }
 
 impl Session {
+    /// Whether a selected object is an image (`specs/0058-bitmap-import` criteria 37 and 38).
+    pub(super) fn selection_holds_image(&self) -> bool {
+        let ids = self.selection.ids();
+        self.objects()
+            .iter()
+            .any(|object| matches!(object, ObjectSnapshot::Image(_)) && ids.contains(&object.id()))
+    }
+
+    /// Refuses an outline command for a selection that holds an image (`specs/0058-bitmap-import`
+    /// criterion 37): the images are outlined red and `true` says "refused, nothing changed".
+    pub fn refuse_images(&mut self) -> bool {
+        let objects = self.objects();
+        let images: Vec<NodeId> = objects
+            .iter()
+            .filter(|object| {
+                matches!(object, ObjectSnapshot::Image(_))
+                    && self.selection.ids().contains(&object.id())
+            })
+            .map(ObjectSnapshot::id)
+            .collect();
+        if images.is_empty() {
+            return false;
+        }
+        self.command_refusal = Some(RefusalMarks::new(images, &self.selection));
+        true
+    }
+
     /// Removes the red outline of a refusal of any rail command, Boolean or Path (the host's
     /// timer ran out, or the next action).
     pub fn clear_boolean_refusal(&mut self) {

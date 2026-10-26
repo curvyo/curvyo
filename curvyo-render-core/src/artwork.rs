@@ -99,6 +99,9 @@ pub fn build_artwork_with_guides(
                     draw_path(&mut list, &outline.glyphs, view, &mut budgets);
                 }
             }
+            // An image is a layer of its own that the host fills with its texture
+            // (`specs/0058-bitmap-import` criterion 27).
+            ObjectSnapshot::Image(image) => list.push_image(image),
         }
     }
     list
@@ -131,6 +134,8 @@ fn draw_guide(
             };
             draw_primitive(list, &marked, view, budgets);
         }
+        // An image is never a guide (ADR 0019); it draws as itself.
+        ObjectSnapshot::Image(image) => list.push_image(image),
         ObjectSnapshot::Text(_) => {
             if let Some(path) = object.drawn_path() {
                 let outlines: Vec<OutlineRef<'_>> = path

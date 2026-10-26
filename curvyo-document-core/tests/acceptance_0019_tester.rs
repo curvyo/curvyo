@@ -178,6 +178,7 @@ fn the_stroke_width_rule() {
     let mut ra = moved(&d.object(a).unwrap(), 2.0);
     let mut rb = moved(&d.object(b).unwrap(), 2.0);
     let set = |o: &mut ObjectSnapshot, w: f64| match o {
+        ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Primitive(p) => p.style.stroke.width = Length::from_mm(w),
         ObjectSnapshot::Clone(p) => p.resolved.style.stroke.width = Length::from_mm(w),
@@ -191,6 +192,7 @@ fn the_stroke_width_rule() {
         .unwrap();
     for o in all(&d) {
         let w = match &o {
+            ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
             ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
             ObjectSnapshot::Primitive(p) => p.style.stroke.width.as_mm(),
             ObjectSnapshot::Clone(p) => p.resolved.style.stroke.width.as_mm(),
@@ -205,6 +207,7 @@ fn the_stroke_width_rule() {
     let w: Vec<f64> = all(&d)
         .iter()
         .map(|o| match o {
+            ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
             ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
             ObjectSnapshot::Primitive(p) => p.style.stroke.width.as_mm(),
             ObjectSnapshot::Clone(p) => p.resolved.style.stroke.width.as_mm(),

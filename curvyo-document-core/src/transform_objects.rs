@@ -22,6 +22,11 @@ use crate::units::Point;
 
 /// One object of the call, resolved against the document before any write.
 enum Planned<'a> {
+    /// An image: its placement.
+    Image {
+        meta: loro::LoroMap,
+        placement: crate::affine::Affine,
+    },
     Primitive {
         meta: loro::LoroMap,
         current: Shape,
@@ -138,6 +143,13 @@ impl Document {
                     // A clone has no rotation and no stroke of its own.
                     continue;
                 }
+                Planned::Image { meta, placement } => {
+                    if crate::image_codec::read_placement(meta) != Some(*placement) {
+                        crate::image_codec::write_placement(meta, *placement);
+                    }
+                    // An image has no rotation and no stroke.
+                    continue;
+                }
                 Planned::Text { meta, result } => {
                     if let ObjectSnapshot::Text(text) = result {
                         crate::text_clone_commands::write_transformed(&tree, meta, text);
@@ -184,7 +196,8 @@ impl Document {
                         ObjectSnapshot::Path(path) => path.closed,
                         ObjectSnapshot::Primitive(_)
                         | ObjectSnapshot::Clone(_)
-                        | ObjectSnapshot::Text(_) => true,
+                        | ObjectSnapshot::Text(_)
+                        | ObjectSnapshot::Image(_) => true,
                     };
                     shape_codec::write_converted_path_fields(meta, anchors, closed);
                     (meta, result)
@@ -273,6 +286,18 @@ fn plan_one<'a>(
         .map_err(|_| ObjectEditError::NoSuchObject)?;
     if crate::clone_codec::is_clone_meta(&meta) {
         return plan_clone(tree, meta, result);
+    }
+    if crate::image_codec::is_image_meta(&meta) {
+        return match result {
+            ObjectSnapshot::Image(image) if image.placement.is_within_limit() => {
+                Ok(Planned::Image {
+                    meta,
+                    placement: image.placement,
+                })
+            }
+            ObjectSnapshot::Image(_) => Err(ObjectEditError::NonFiniteGeometry),
+            _ => Err(ObjectEditError::NoSuchObject),
+        };
     }
     if crate::text_codec::is_text_meta(&meta) {
         return match result {
@@ -366,7 +391,7 @@ fn plan_clone<'a>(
                 result,
             })
         }
-        ObjectSnapshot::Primitive(_) | ObjectSnapshot::Text(_) => {
+        ObjectSnapshot::Primitive(_) | ObjectSnapshot::Text(_) | ObjectSnapshot::Image(_) => {
             Err(ObjectEditError::NoSuchObject)
         }
     }
@@ -427,6 +452,7 @@ fn is_finite(object: &ObjectSnapshot) -> bool {
         }
         ObjectSnapshot::Clone(clone) => rotation && clone.chain.matrix.is_finite(),
         ObjectSnapshot::Text(text) => text.placement.is_finite() && text.size.as_mm().is_finite(),
+        ObjectSnapshot::Image(image) => image.placement.is_finite(),
         ObjectSnapshot::Path(path) => {
             rotation
                 && path.all_anchors().all(|a| {

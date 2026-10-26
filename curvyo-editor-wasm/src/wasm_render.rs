@@ -79,8 +79,9 @@ impl WasmSession {
             return Ok(());
         };
         gpu.resize(width, height, device_pixel_ratio);
-        let draw_list = self.session.frame_draw_list();
-        gpu.render(&draw_list, self.session.view())
+        let mut draw_list = self.session.frame_draw_list();
+        let pictures = self.session.frame_images(&mut draw_list);
+        gpu.render(&draw_list, self.session.view(), &pictures)
     }
 
     /// Builds this frame's draw list and submits it. A no-op (not an
@@ -93,7 +94,8 @@ impl WasmSession {
         let Some(gpu) = &mut self.gpu else {
             return Ok(());
         };
-        let draw_list = self.session.frame_draw_list();
-        gpu.render(&draw_list, self.session.view())
+        let mut draw_list = self.session.frame_draw_list();
+        let pictures = self.session.frame_images(&mut draw_list);
+        gpu.render(&draw_list, self.session.view(), &pictures)
     }
 }

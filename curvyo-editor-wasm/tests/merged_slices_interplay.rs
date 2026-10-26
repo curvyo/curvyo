@@ -267,6 +267,7 @@ fn a_compound_path_in_a_selection_transforms_as_one_path() {
     let moved: Vec<Vec<Point>> = objects(&session)
         .iter()
         .filter_map(|object| match object {
+            ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
             ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
             ObjectSnapshot::Path(path) => Some(
                 path.subpaths()

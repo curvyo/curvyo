@@ -149,6 +149,10 @@ fn looks_the_same(a: &ObjectSnapshot, b: &ObjectSnapshot) -> bool {
     if same_within_tolerance(a, b) {
         return true;
     }
+    // A mirrored picture is never the same picture, whatever its frame (criterion 32 of `0058`).
+    if matches!(a, ObjectSnapshot::Image(_)) || matches!(b, ObjectSnapshot::Image(_)) {
+        return false;
+    }
     if let (ObjectSnapshot::Primitive(pa), ObjectSnapshot::Primitive(pb)) = (a, b)
         && let (Shape::Ellipse { frame: fa, .. }, Shape::Ellipse { frame: fb, .. }) =
             (pa.shape, pb.shape)
@@ -178,6 +182,8 @@ fn outlines(object: &ObjectSnapshot) -> Vec<Outline> {
                 .collect();
             vec![outline_of(&anchors, outline.closed)]
         }
+        // Never reached: `looks_the_same` compares images by their placement only.
+        ObjectSnapshot::Image(_) => Vec::new(),
         ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_) | ObjectSnapshot::Text(_) => object
             .drawn_path()
             .into_iter()

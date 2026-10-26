@@ -152,7 +152,10 @@ fn shapes_of<'a>(
         .into_iter()
         .filter_map(|object| match object {
             ObjectSnapshot::Primitive(primitive) => Some(&primitive.shape),
-            ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_) | ObjectSnapshot::Text(_) => None,
+            ObjectSnapshot::Path(_)
+            | ObjectSnapshot::Clone(_)
+            | ObjectSnapshot::Text(_)
+            | ObjectSnapshot::Image(_) => None,
         })
 }
 

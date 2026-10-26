@@ -599,6 +599,8 @@ fn ac27_files_of_earlier_builds_open_unchanged() {
         if path.extension().is_none_or(|e| e != "curvyo")
             || name.contains("group")
             || name.starts_with("layers")
+            // `0058-bitmap-import` (format 25) is a later build: its golden holds a group.
+            || name.starts_with("image_")
         {
             continue;
         }
@@ -871,6 +873,7 @@ fn replicas_one_peer_groups_while_another_moves_a_member() {
     let _ = orig;
     // The member really moved by (7, 3) relative to where it was grouped.
     match moved {
+        curvyo_document_core::ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         curvyo_document_core::ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         curvyo_document_core::ObjectSnapshot::Clone(_) => panic!("no clone here"),
         curvyo_document_core::ObjectSnapshot::Primitive(p) => match p.shape {

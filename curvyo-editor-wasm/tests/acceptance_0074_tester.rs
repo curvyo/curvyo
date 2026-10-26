@@ -121,6 +121,7 @@ fn kinds(d: &Document) -> Vec<&'static str> {
     d.object_ids()
         .into_iter()
         .map(|id| match d.object(id).unwrap() {
+            ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
             ObjectSnapshot::Text(_) => "text",
             ObjectSnapshot::Path(_) => "path",
             ObjectSnapshot::Primitive(_) => "primitive",

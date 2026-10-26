@@ -61,6 +61,7 @@ fn objects_of(s: &Session) -> Vec<ObjectSnapshot> {
 
 fn path_points(o: &ObjectSnapshot) -> Vec<Point> {
     match o {
+        ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Path(p) => p.anchors.iter().map(|a| a.point).collect(),
         ObjectSnapshot::Primitive(_) | ObjectSnapshot::Clone(_) => panic!("path expected"),
@@ -597,6 +598,7 @@ fn ac42_skew_and_parameter_handle_drags_are_cancelled_too() {
         let p0 = {
             let o = &objects_of(&s)[0];
             match o {
+                ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
                 ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
                 ObjectSnapshot::Clone(_) => panic!("no clone here"),
                 ObjectSnapshot::Primitive(p) => {

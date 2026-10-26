@@ -237,7 +237,10 @@ impl Document {
                 let meta = tree
                     .get_meta(tree_id)
                     .map_err(|_| CloneError::NoSuchObject)?;
-                if crate::text_codec::is_text_meta(&meta) {
+                // An image is never an original (`specs/0058-bitmap-import` criterion 38).
+                if crate::text_codec::is_text_meta(&meta)
+                    || crate::image_codec::is_image_meta(&meta)
+                {
                     return Err(CloneError::NotClonable);
                 }
                 if is_clone_meta(&meta) {

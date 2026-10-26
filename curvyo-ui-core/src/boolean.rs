@@ -104,7 +104,10 @@ pub(crate) fn is_open(object: &ObjectSnapshot) -> bool {
         // An open Arc (`specs/0021-ellipse-arcs-and-shaping/` criterion 60).
         // A text arrives as its glyphs' path (`text_convert::texts_as_paths`), never here as a
         // text: only an unconverted one, which the command refused first.
-        ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_) | ObjectSnapshot::Text(_) => false,
+        ObjectSnapshot::Path(_)
+        | ObjectSnapshot::Clone(_)
+        | ObjectSnapshot::Text(_)
+        | ObjectSnapshot::Image(_) => false,
         ObjectSnapshot::Primitive(primitive) => {
             !outline_of_rotated(&primitive.shape, primitive.rotation).closed
         }
@@ -212,7 +215,10 @@ pub(crate) fn outlines_of(object: &ObjectSnapshot) -> Vec<(Vec<OutlineTriple>, b
         }
         // A text arrives as its glyphs' path (`text_convert::texts_as_paths`), never here as a
         // text: only an unconverted one, which the command refused first.
-        ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_) | ObjectSnapshot::Text(_) => Vec::new(),
+        ObjectSnapshot::Path(_)
+        | ObjectSnapshot::Clone(_)
+        | ObjectSnapshot::Text(_)
+        | ObjectSnapshot::Image(_) => Vec::new(),
         ObjectSnapshot::Primitive(primitive) => {
             let outline = outline_of_rotated(&primitive.shape, primitive.rotation);
             vec![(

@@ -75,7 +75,9 @@ fn paths_among(ids: &[NodeId], objects: &[ObjectSnapshot]) -> Vec<NodeId> {
         .filter(|object| match object {
             ObjectSnapshot::Path(_) => true,
             ObjectSnapshot::Clone(clone) => clone.chain.own_style,
-            ObjectSnapshot::Primitive(_) | ObjectSnapshot::Text(_) => false,
+            ObjectSnapshot::Primitive(_) | ObjectSnapshot::Text(_) | ObjectSnapshot::Image(_) => {
+                false
+            }
         })
         .map(ObjectSnapshot::id)
         .collect()
@@ -151,9 +153,11 @@ pub fn style_scope_in(
     // A linked clone without its own style shows its original's: an edit never goes to it, and
     // "Mixed" is read from the other objects (`specs/0049-linked-clone` criterion 24 as extended
     // by `specs/0057-clone-overrides` criterion 18).
+    // An image has no fill or stroke: a style edit never goes to it (`specs/0058-bitmap-import`
+    // criterion 35).
     let ids = held
         .iter()
-        .filter(|object| owns_style(object))
+        .filter(|object| owns_style(object) && !matches!(object, ObjectSnapshot::Image(_)))
         .map(|object| object.id())
         .collect();
     StyleScope { ids, subject }
@@ -229,6 +233,7 @@ fn kind_name(object: &ObjectSnapshot) -> (&'static str, &'static str) {
         ObjectSnapshot::Path(_) => ("Path", "paths"),
         ObjectSnapshot::Clone(_) => ("Clone", "clones"),
         ObjectSnapshot::Text(_) => ("Text", "texts"),
+        ObjectSnapshot::Image(_) => ("Image", "images"),
         ObjectSnapshot::Primitive(PrimitiveSnapshot { shape, .. }) => match shape {
             Shape::Rect { .. } => ("Rectangle", "rectangles"),
             Shape::Ellipse { .. } => ("Ellipse", "ellipses"),

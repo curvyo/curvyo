@@ -33,6 +33,8 @@ pub enum RowKind {
     Clone,
     /// A text object (`specs/0074-text-objects`).
     Text,
+    /// An image object (`specs/0058-bitmap-import`).
+    Image,
 }
 
 impl RowKind {
@@ -44,6 +46,7 @@ impl RowKind {
             NodeKind::Leaf(ObjectSnapshot::Path(_)) => Self::Path,
             NodeKind::Leaf(ObjectSnapshot::Clone(_)) => Self::Clone,
             NodeKind::Leaf(ObjectSnapshot::Text(_)) => Self::Text,
+            NodeKind::Leaf(ObjectSnapshot::Image(_)) => Self::Image,
             NodeKind::Leaf(ObjectSnapshot::Primitive(primitive)) => match primitive.shape {
                 Shape::Rect { .. } => Self::Rectangle,
                 Shape::Ellipse { .. } => Self::Ellipse,
@@ -67,6 +70,7 @@ impl RowKind {
             Self::Star => "Star",
             Self::Clone => "Clone",
             Self::Text => "Text",
+            Self::Image => "Image",
         }
     }
 
@@ -84,6 +88,7 @@ impl RowKind {
             Self::Star => "star",
             Self::Clone => "clone",
             Self::Text => "text",
+            Self::Image => "image",
         }
     }
 }

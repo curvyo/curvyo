@@ -61,6 +61,7 @@ fn col(r: u8, g: u8, b: u8) -> Color {
 }
 fn outline(o: &ObjectSnapshot) -> Vec<(f64, f64)> {
     match o {
+        ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Path(p) => p.anchors.iter().map(|a| (a.point.x, a.point.y)).collect(),
         ObjectSnapshot::Clone(c) => c
@@ -220,6 +221,7 @@ fn transform(d: &Document, ids: &[NodeId], g: Affine) {
     let results: Vec<ObjectSnapshot> = ids
         .iter()
         .map(|&id| match d.object(id).unwrap() {
+            ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
             ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
             ObjectSnapshot::Path(p) => ObjectSnapshot::Path(p.mapped(g)),
             ObjectSnapshot::Clone(c) => {

@@ -26,6 +26,10 @@ impl Session {
         if state.object_to_path && !self.selected_group_leaves().is_empty() {
             state.object_to_path = false;
         }
+        // Nor for a selection that holds an image (`specs/0058-bitmap-import` criterion 37).
+        if state.object_to_path && self.selection_holds_image() {
+            state.object_to_path = false;
+        }
         state
     }
 

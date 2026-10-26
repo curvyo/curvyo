@@ -156,6 +156,14 @@ pub fn file_chord(
         .find(|&command| command.key() == (typed, shift) && platform.page_handles(command))
 }
 
+/// Whether a key press is Ctrl+I (Cmd+I on macOS), the chord of the Import button of the tool
+/// rail (`specs/0058-bitmap-import` criterion 3): not a File tab command, but a page chord on
+/// every platform, matched by the typed character like them.
+#[must_use]
+pub fn is_import_chord(key: &str, shift: bool, primary: bool, alt: bool) -> bool {
+    primary && !alt && !shift && key.eq_ignore_ascii_case("i")
+}
+
 /// The key text of a command on `platform`: `"Ctrl+Shift+S"`, `"Cmd+N"`, or `None` where the build
 /// has no key for it.
 #[must_use]
@@ -301,6 +309,16 @@ mod tests {
         assert_eq!(command_tooltip(Quit, Windows), "Quit");
         assert_eq!(command_tooltip(Quit, MacOs), "Quit (Cmd+Q)");
         assert_eq!(command_tooltip(Save, Browser), "Save (Ctrl+S)");
+    }
+
+    #[test]
+    fn ctrl_i_is_the_import_chord_and_nothing_else_is() {
+        assert!(is_import_chord("i", false, true, false));
+        assert!(is_import_chord("I", false, true, false));
+        assert!(!is_import_chord("i", true, true, false));
+        assert!(!is_import_chord("i", false, true, true));
+        assert!(!is_import_chord("i", false, false, false));
+        assert!(!is_import_chord("o", false, true, false));
     }
 
     #[test]

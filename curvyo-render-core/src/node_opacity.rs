@@ -16,6 +16,12 @@ pub fn faded(object: &ObjectSnapshot, opacity: Opacity) -> ObjectSnapshot {
     if opacity == Opacity::OPAQUE {
         return shown;
     }
+    if let ObjectSnapshot::Image(image) = &mut shown {
+        // invariant: a product of numbers in 0..=1 lies in 0..=1.
+        image.shown_opacity =
+            Opacity::new(image.shown_opacity.get() * opacity.get()).unwrap_or(image.shown_opacity);
+        return shown;
+    }
     let style = shown.style_mut();
     // invariant: a product of numbers in 0..=1 lies in 0..=1, so `new` cannot refuse it.
     let times = |paint: Opacity| Opacity::new(paint.get() * opacity.get()).unwrap_or(paint);

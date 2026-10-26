@@ -57,6 +57,10 @@ mod history_list;
 mod history_preview;
 mod history_rows;
 mod history_version;
+mod image_cache;
+mod image_import;
+#[cfg(test)]
+mod image_import_tests;
 mod key_table;
 mod keys;
 mod layers;
@@ -174,6 +178,8 @@ pub use history::HistoryResult;
 pub use history_preview::{FAR_PREVIEW_ROWS, HistoryRowPress};
 pub use history_rows::{WipeOutcome, WipeState};
 pub use history_version::{CloneOutcome, GoToOutcome};
+pub use image_cache::FrameImages;
+pub use image_import::ImportOutcome;
 pub use keys::{EscapeStep, KeyHint, KeyInput, KeyOutcome};
 pub use layers_edit::{DropPlace, RowFlag};
 pub use layers_panel::{PanelReply, RowPress};
@@ -395,6 +401,10 @@ pub struct Session {
     /// The notice of an Open of an SVG that brought in nothing, until the host has taken it
     /// (`svg_import.rs`).
     open_notice: Option<String>,
+    /// The working images of the canvas (`image_cache.rs`).
+    images: image_cache::ImageCache,
+    /// The import being added by the Import button (`image_import.rs`).
+    import: Option<image_import::ImportBatch>,
     /// The notice of the last style or opacity edit that left clones with their original's style
     /// alone, until the host has taken it (`clone_overrides.rs`).
     skip_notice: Option<String>,
@@ -478,6 +488,8 @@ impl Session {
             offset: offset::OffsetTool::default(),
             orphan_notice: None,
             open_notice: None,
+            images: image_cache::ImageCache::default(),
+            import: None,
             skip_notice: None,
             deleted_objects: 0,
             dom_chips: Vec::new(),
@@ -547,6 +559,8 @@ impl Session {
             offset: offset::OffsetTool::default(),
             orphan_notice: None,
             open_notice: None,
+            images: image_cache::ImageCache::default(),
+            import: None,
             skip_notice: None,
             deleted_objects: 0,
             dom_chips: Vec::new(),

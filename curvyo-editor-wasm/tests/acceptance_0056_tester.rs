@@ -142,6 +142,7 @@ fn path_pts(o: &ObjectSnapshot) -> Vec<Point> {
 }
 fn outline_pts(o: &ObjectSnapshot) -> Vec<Point> {
     match o {
+        ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Primitive(p) => outline_of_rotated(&p.shape, p.rotation)
             .iter()
@@ -162,6 +163,7 @@ fn outline_pts(o: &ObjectSnapshot) -> Vec<Point> {
 }
 fn rotation_of(o: &ObjectSnapshot) -> f64 {
     match o {
+        ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Primitive(p) => p.rotation.as_radians(),
         ObjectSnapshot::Path(p) => p.rotation.as_radians(),
@@ -337,6 +339,7 @@ fn radius_t(r: CornerRadii) -> [f64; 4] {
 }
 fn id_of(o: &ObjectSnapshot) -> String {
     match o {
+        ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Primitive(p) => format!("{:?}", p.id),
         ObjectSnapshot::Path(p) => format!("{:?}", p.id),
@@ -716,6 +719,7 @@ fn tbb_centre_extreme(o: &ObjectSnapshot) -> Point {
 }
 fn tbb(o: &ObjectSnapshot) -> (Point, Point) {
     let anchors = match o {
+        ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Primitive(p) => outline_of_rotated(&p.shape, p.rotation),
         ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_) => panic!("primitives only"),
@@ -1584,6 +1588,7 @@ fn mixed_scene() -> Document {
 fn nums(o: &ObjectSnapshot) -> Vec<f64> {
     let mut v = vec![rotation_of(o)];
     match o {
+        ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Primitive(p) => {
             for q in outline_of_rotated(&p.shape, p.rotation) {
@@ -1649,6 +1654,7 @@ fn ac28_flip_properties_on_mixed_selection() {
     let mut ptsb = Vec::new();
     for o in &before {
         let (l, h) = match o {
+            ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
             ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
             ObjectSnapshot::Primitive(_) => tbb(o),
             ObjectSnapshot::Path(_) => path_tbb(o),
@@ -1836,6 +1842,7 @@ fn ac26_file_round_trip_no_negative_lengths() {
     let now = objects(&s);
     for o in &now {
         match o {
+            ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
             ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
             ObjectSnapshot::Primitive(p) => match p.shape {
                 Shape::Rect {

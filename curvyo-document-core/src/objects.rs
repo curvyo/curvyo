@@ -219,7 +219,9 @@ impl Document {
                     Some(ObjectSnapshot::Clone(clone))
                 }
                 ObjectSnapshot::Path(path) => Some(ObjectSnapshot::Path(path.mapped(g))),
-                ObjectSnapshot::Primitive(_) | ObjectSnapshot::Text(_) => None,
+                ObjectSnapshot::Primitive(_)
+                | ObjectSnapshot::Text(_)
+                | ObjectSnapshot::Image(_) => None,
             })
             .collect();
         self.clone_limits_hold(&links, &changed)
@@ -693,6 +695,7 @@ pub(crate) fn translate_meta(meta: &loro::LoroMap, offset: Vec2) {
         shape_codec::LeafKind::Path => translate_path_meta(meta, offset),
         shape_codec::LeafKind::Clone => {}
         shape_codec::LeafKind::Text => crate::text_codec::translate_text_meta(meta, offset),
+        shape_codec::LeafKind::Image => crate::image_codec::translate_image_meta(meta, offset),
     }
 }
 

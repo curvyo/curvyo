@@ -27,6 +27,8 @@ mod session;
 #[cfg(target_arch = "wasm32")]
 mod gpu;
 #[cfg(target_arch = "wasm32")]
+mod gpu_images;
+#[cfg(target_arch = "wasm32")]
 mod gpu_pipeline;
 #[cfg(target_arch = "wasm32")]
 mod wasm_api;
@@ -52,6 +54,8 @@ mod wasm_fracture;
 mod wasm_group;
 #[cfg(target_arch = "wasm32")]
 mod wasm_history;
+#[cfg(target_arch = "wasm32")]
+mod wasm_image_import;
 #[cfg(target_arch = "wasm32")]
 mod wasm_keys;
 #[cfg(target_arch = "wasm32")]
@@ -113,8 +117,8 @@ pub use session::{
     Session, SizeOutcome, SplitOutcome, StackOutcome, Tool, WipeOutcome, WipeState,
 };
 pub use session::{DragStop, OFFSET_COMMIT_LABEL, OffsetOutcome, OffsetView};
+pub use session::{FrameImages, ImportOutcome, StrokeToPathOutcome, WeldOutcome};
 pub use session::{LayoutOutcome, ObjectToPathOutcome, StyleOutcome, TextBarView, TextSizeOutcome};
-pub use session::{StrokeToPathOutcome, WeldOutcome};
 pub use session::{TextPathPress, TextPathView};
 
 #[cfg(target_arch = "wasm32")]

@@ -57,6 +57,10 @@ mod history_names;
 mod history_notice;
 mod hit_test;
 mod hit_test_object;
+mod image_frame;
+mod image_import;
+mod image_import_text;
+mod image_placement;
 mod layer_move;
 mod layer_rows;
 mod layer_text;
@@ -186,7 +190,9 @@ pub use face_style_pick::{
     family_tile, italic_target, press_italic, press_weight, style_buttons, weight_target,
 };
 pub use family_key::family_key;
-pub use file_chords::{FileCommand, Platform, chord_label, command_tooltip, file_chord};
+pub use file_chords::{
+    FileCommand, Platform, chord_label, command_tooltip, file_chord, is_import_chord,
+};
 pub use flatten_command::{FLATTEN_COMMIT_LABEL, plan_flatten};
 pub use flip::{FlipAxis, FlipOutcome, flip_selection};
 pub use font_library::{
@@ -231,6 +237,14 @@ pub use history_notice::{
 };
 pub use hit_test::{Hit, hit_test};
 pub use hit_test_object::{hit_test_object, hit_test_objects, hit_test_objects_along};
+pub use image_import::{PlannedImage, plan_image_import};
+pub use image_import_text::{
+    ANIMATED_NOTICE, BAD_ASSET_NOTICE, DAMAGED_IMAGE_NOTICE, IMAGE_COMMAND_REFUSAL,
+    OUT_OF_MEMORY_NOTICE, REDUCED_NOTICE, UNSUPPORTED_FILE_NOTICE, batch_failures_notice,
+    failure_notice, failure_reason, fit_notice, image_display_name, importing_notice,
+    project_full_reason, size_notice, skipped_notice, truncated_notice,
+};
+pub use image_placement::{ImagePlacement, ImageTarget, STAGGER_MM, natural_size_mm, place_image};
 pub use layer_move::{Reorder, move_refusal_text, reorder_plans, unchanged_text};
 pub use layer_rows::{
     Cause, Container, Expansion, Flags, LayerRow, LayerRows, RowFacts, RowKind, RowMark, percent,

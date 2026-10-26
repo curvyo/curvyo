@@ -43,6 +43,12 @@ pub struct StrokeToPathView {
 impl WasmSession {
     /// Stroke to path on the selected objects, in one commit (criteria 2, 19 to 22).
     pub fn apply_stroke_to_path(&mut self) -> StrokeToPathView {
+        if self.session.refuse_images() {
+            return StrokeToPathView {
+                kind: "images".to_owned(),
+                ..StrokeToPathView::default()
+            };
+        }
         let of = count(self.session.selected_object_count());
         let face = self.session.text_refusal_face();
         match self.session.apply_stroke_to_path() {

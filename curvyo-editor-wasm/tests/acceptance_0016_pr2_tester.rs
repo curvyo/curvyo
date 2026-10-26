@@ -119,6 +119,7 @@ fn paths(s: &Session) -> Vec<PathSnapshot> {
     d.object_ids()
         .into_iter()
         .filter_map(|id| match d.object(id).unwrap() {
+            ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
             ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
             ObjectSnapshot::Path(p) => Some(p),
             ObjectSnapshot::Primitive(_) | ObjectSnapshot::Clone(_) => None,

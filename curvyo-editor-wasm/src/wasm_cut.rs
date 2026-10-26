@@ -19,7 +19,7 @@ fn count(n: usize) -> u32 {
 /// `"too_many"` (the cut would make `pieces` pieces). Nothing was changed by anything but
 /// `"applied"`.
 #[wasm_bindgen]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct CutResultView {
     /// The outcome code.
     #[wasm_bindgen(getter_with_clone)]
@@ -76,6 +76,12 @@ impl WasmSession {
     /// `"no_crossing"`, `of` is the number of selected objects (the sentence says "path" or
     /// "paths"); a refusal leaves the selection as it was.
     pub fn apply_cut(&mut self) -> CutResultView {
+        if self.session.refuse_images() {
+            return CutResultView {
+                kind: "images".to_owned(),
+                ..CutResultView::default()
+            };
+        }
         let mut view: CutResultView = self.session.apply_cut().into();
         if view.kind == "no_crossing" {
             view.of = count(self.session.selected_object_count());

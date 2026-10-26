@@ -106,7 +106,7 @@ fn style_outcome_json(outcome: Option<StyleOutcome>) -> String {
 /// What Object to path did: `kind` is `"ignored"`, `"converted"`, `"missing_fonts"` (`count`
 /// texts; `face` names the face when there is one) or `"fonts_loading"`.
 #[wasm_bindgen]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct ObjectToPathView {
     /// The outcome code.
     #[wasm_bindgen(getter_with_clone)]
@@ -420,6 +420,12 @@ impl WasmSession {
 
     /// Object to path of the selection (criterion 22), with its refusal (criterion 29).
     pub fn object_to_path(&mut self) -> ObjectToPathView {
+        if self.session.refuse_images() {
+            return ObjectToPathView {
+                kind: "images".to_owned(),
+                ..ObjectToPathView::default()
+            };
+        }
         let view = |kind: &str, count: usize, face: String| ObjectToPathView {
             kind: kind.to_owned(),
             count: u32::try_from(count).unwrap_or(u32::MAX),

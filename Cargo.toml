@@ -90,6 +90,11 @@ debug = "line-tables-only"
 [profile.dev.package."*"]
 debug = false
 
+# The asset hash runs over up to 512 MiB in the image tests (`specs/0058-bitmap-import`
+# criterion 17); unoptimised SHA-256 takes seconds there.
+[profile.dev.package.sha2]
+opt-level = 3
+
 [profile.release]
 codegen-units = 1
 lto = true

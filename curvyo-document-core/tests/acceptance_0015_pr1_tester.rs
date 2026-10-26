@@ -66,6 +66,7 @@ struct Sig {
 
 fn sig_of(d: &Document, id: NodeId) -> Sig {
     match d.object(id).expect("object exists") {
+        ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Path(p) => Sig {
             id,

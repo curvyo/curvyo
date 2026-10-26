@@ -13,10 +13,12 @@ use curvyo_render_core::{DrawList, checker_grid};
 use wasm_bindgen::JsValue;
 use web_sys::HtmlCanvasElement;
 
+use crate::gpu_images::{GpuImages, ImageDraws};
 use crate::gpu_pipeline::{
     DEPTH_FORMAT, PipelineKind, ScreenTransform, TransformResources, create_depth_view,
     create_msaa_view, create_pipeline, create_transform_resources, gpu_vertices,
 };
+use crate::session::FrameImages;
 
 /// `--pasteboard-bg` (`docs/design-system.md`): cleared behind every frame's
 /// geometry. The document rectangle in `--canvas-bg` is the bottom artwork
@@ -105,6 +107,8 @@ pub struct Gpu {
     checker_pipeline: wgpu::RenderPipeline,
     /// Draws the overlay (editor decorations): no depth test, no writes.
     overlay_pipeline: wgpu::RenderPipeline,
+    /// The image objects' textures and pipeline (`specs/0058-bitmap-import`).
+    images: GpuImages,
     transform_buffer: wgpu::Buffer,
     transform_bind_group: wgpu::BindGroup,
     /// The offscreen multisampled color target every frame actually
@@ -287,6 +291,12 @@ impl Gpu {
         );
         let msaa_view = create_msaa_view(&device, &config, sample_count);
         let depth_view = create_depth_view(&device, &config, sample_count);
+        let images = GpuImages::new(
+            &device,
+            &transform_bind_group_layout,
+            config.format,
+            sample_count,
+        );
 
         Ok(Self {
             surface,
@@ -296,6 +306,7 @@ impl Gpu {
             artwork_pipeline,
             checker_pipeline,
             overlay_pipeline,
+            images,
             transform_buffer,
             transform_bind_group,
             msaa_view,
@@ -356,7 +367,12 @@ impl Gpu {
     /// not be acquired (e.g. the surface was lost) — reported to the
     /// host rather than panicking, since a dropped frame should not
     /// crash the editor.
-    pub fn render(&mut self, draw_list: &DrawList, view: ViewTransform) -> Result<(), JsValue> {
+    pub fn render(
+        &mut self,
+        draw_list: &DrawList,
+        view: ViewTransform,
+        pictures: &FrameImages,
+    ) -> Result<(), JsValue> {
         let css_width = f64::from(self.config.width) / self.device_pixel_ratio;
         let css_height = f64::from(self.config.height) / self.device_pixel_ratio;
         let grid = checker_grid(view, self.device_pixel_ratio);
@@ -367,7 +383,10 @@ impl Gpu {
         // The document point currently at screen pixel (0, 0) — every
         // vertex below is shifted by this same point in `f64`, before
         // its own `f32` cast (`to_gpu_vertex`'s own doc comment).
-        let vertices = gpu_vertices(draw_list, view.screen_to_document(0.0, 0.0));
+        let origin = view.screen_to_document(0.0, 0.0);
+        let vertices = gpu_vertices(draw_list, origin);
+        self.images.sync(&self.device, &self.queue, pictures);
+        let image_draws = self.images.prepare(&self.device, draw_list, view, origin);
 
         let frame = self.acquire_frame()?;
         let view_texture = frame
@@ -421,7 +440,12 @@ impl Gpu {
                     draw_list.overlay_start() as u32,
                     vertices.len() as u32,
                 );
-                self.record_draws(&mut pass, vertex_buffer, checker_end, overlay_start, end);
+                self.record_draws(
+                    &mut pass,
+                    vertex_buffer,
+                    (checker_end, overlay_start, end),
+                    &image_draws,
+                );
             }
         }
 
@@ -478,15 +502,15 @@ impl Gpu {
 
     /// Issues the frame's draw calls: the checkerboard prefix when there is
     /// one (one call, however large the document or the zoom), the rest of the
-    /// artwork with single coverage per layer, then the overlay over it in
-    /// list order.
+    /// artwork with single coverage per layer, split at each image layer where the
+    /// image's quad is drawn (`specs/0058-bitmap-import` criterion 27), then the
+    /// overlay over it in list order.
     fn record_draws(
         &self,
         pass: &mut wgpu::RenderPass<'_>,
         vertex_buffer: &wgpu::Buffer,
-        checker_end: u32,
-        overlay_start: u32,
-        end: u32,
+        (checker_end, overlay_start, end): (u32, u32, u32),
+        images: &ImageDraws,
     ) {
         pass.set_bind_group(0, &self.transform_bind_group, &[]);
         pass.set_vertex_buffer(0, vertex_buffer.slice(..));
@@ -494,9 +518,21 @@ impl Gpu {
             pass.set_pipeline(&self.checker_pipeline);
             pass.draw(0..checker_end, 0..1);
         }
-        if overlay_start > checker_end {
+        let mut start = checker_end;
+        for (index, split) in images.splits().enumerate() {
+            let split = split.clamp(start, overlay_start);
+            if split > start {
+                pass.set_pipeline(&self.artwork_pipeline);
+                pass.draw(start..split, 0..1);
+            }
+            self.images.draw(pass, images, index);
+            // The image quad bound its own vertices: the list's are bound again.
+            pass.set_vertex_buffer(0, vertex_buffer.slice(..));
+            start = split;
+        }
+        if overlay_start > start {
             pass.set_pipeline(&self.artwork_pipeline);
-            pass.draw(checker_end..overlay_start, 0..1);
+            pass.draw(start..overlay_start, 0..1);
         }
         if end > overlay_start {
             pass.set_pipeline(&self.overlay_pipeline);

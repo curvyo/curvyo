@@ -63,6 +63,11 @@ pub(crate) fn apply(
     if let ObjectSnapshot::Clone(clone) = object {
         return crate::clone_gesture::map_clone(clone, map_affine(clone.id(), map), converted);
     }
+    // An image takes every map whole into its frame and never converts (`specs/0058-bitmap-import`
+    // criterion 32: a stretch or skew distorts the picture).
+    if let ObjectSnapshot::Image(image) = object {
+        return ObjectSnapshot::Image(image.mapped_by(map_affine(image.id, map)));
+    }
     // A text takes every map whole: a uniform scale into its size, the rest into its placement
     // (`specs/0074-text-objects` criterion 26); it never converts.
     if let ObjectSnapshot::Text(text) = object {
@@ -86,7 +91,10 @@ pub(crate) fn apply(
                     ObjectSnapshot::Path(path.sheared_along(fixed, ku, kv, axes))
                 }
                 (ObjectSnapshot::Primitive(_), None)
-                | (ObjectSnapshot::Clone(_) | ObjectSnapshot::Text(_), _) => object.clone(),
+                | (
+                    ObjectSnapshot::Clone(_) | ObjectSnapshot::Text(_) | ObjectSnapshot::Image(_),
+                    _,
+                ) => object.clone(),
             }
         }
     }
@@ -137,7 +145,9 @@ fn scale_by_magnitudes(
         (ObjectSnapshot::Path(path), _) => {
             ObjectSnapshot::Path(path.scaled_along(pivot, sx, sy, axes))
         }
-        (ObjectSnapshot::Clone(_) | ObjectSnapshot::Text(_), _) => object.clone(),
+        (ObjectSnapshot::Clone(_) | ObjectSnapshot::Text(_) | ObjectSnapshot::Image(_), _) => {
+            object.clone()
+        }
         (ObjectSnapshot::Primitive(_), Some(path)) if is_stretch(sx, sy) => {
             ObjectSnapshot::Path(path.scaled_along(pivot, sx, sy, axes))
         }
@@ -921,6 +931,7 @@ mod tests {
         let pivot = Point::new(7.0, -2.0);
         let points = |object: &ObjectSnapshot| -> Vec<Point> {
             match object {
+                ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
                 ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
                 ObjectSnapshot::Primitive(p) => outline_of_rotated(&p.shape, p.rotation)
                     .iter()

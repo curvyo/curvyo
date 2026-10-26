@@ -246,6 +246,7 @@ fn tall() -> Document {
 
 fn origin_of(session: &Session) -> Point {
     match &objects(session)[0] {
+        ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Clone(_) => panic!("no clone here"),
         ObjectSnapshot::Primitive(p) => match p.shape {
@@ -592,6 +593,7 @@ fn a_selection_moves_by_one_offset_about_the_group_centre() {
     assert_eq!(change_count(&session), commits + 1, "one commit");
     let all = objects(&session);
     let first = match &all[0] {
+        ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Clone(_) => panic!("no clone here"),
         ObjectSnapshot::Primitive(p) => match p.shape {

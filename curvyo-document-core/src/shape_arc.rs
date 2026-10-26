@@ -32,7 +32,8 @@ impl Document {
                         crate::ObjectSnapshot::Primitive(p) => crate::outline_of(&p.shape).closed,
                         crate::ObjectSnapshot::Path(_)
                         | crate::ObjectSnapshot::Clone(_)
-                        | crate::ObjectSnapshot::Text(_) => true,
+                        | crate::ObjectSnapshot::Text(_)
+                        | crate::ObjectSnapshot::Image(_) => true,
                     };
                     (o.orientation(), closed)
                 })

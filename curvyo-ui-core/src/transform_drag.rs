@@ -517,6 +517,13 @@ fn resize_by_box(
                 });
                 (ObjectSnapshot::Clone(clone.mapped_by(g)), 1.0)
             }
+            // An image is stretched freely; its frame is mapped, never converted (`0058` 32, 33).
+            ObjectSnapshot::Image(image) => {
+                let g = crate::clone_gesture::affine_of(image.id, &|path: &PathSnapshot| {
+                    path.scaled(pivot, resized.sx, resized.sy)
+                });
+                (ObjectSnapshot::Image(image.mapped_by(g)), 1.0)
+            }
             ObjectSnapshot::Text(text) => {
                 let g = crate::clone_gesture::affine_of(text.id, &|path: &PathSnapshot| {
                     path.scaled(pivot, resized.sx, resized.sy)
@@ -588,6 +595,14 @@ pub(crate) fn skewed_unchecked(
             });
             return ObjectSnapshot::Clone(clone.mapped_by(g));
         }
+        // An image is skewed by its frame and never converts (`0058` criterion 32).
+        (ObjectSnapshot::Image(image), _) => {
+            let fixed = frame.fixed_point;
+            let g = crate::clone_gesture::affine_of(image.id, &|path: &PathSnapshot| {
+                path.sheared(fixed, ku, kv)
+            });
+            return ObjectSnapshot::Image(image.mapped_by(g));
+        }
         // A text is skewed by its placement and never converts (criterion 26).
         (ObjectSnapshot::Text(text), _) => {
             let fixed = frame.fixed_point;
@@ -613,7 +628,8 @@ pub(crate) fn scale_stroke(object: &mut ObjectSnapshot, factor: f64) {
         ObjectSnapshot::Text(t) => {
             t.style.stroke.width = scaled_and_floored(t.style.stroke.width, factor, floor);
         }
-        // A clone shows its root's stroke width, never scaled (`0049` criterion 9).
-        ObjectSnapshot::Clone(_) => {}
+        // A clone shows its root's stroke width, never scaled (`0049` criterion 9); an image has
+        // no stroke (`0058` criterion 32).
+        ObjectSnapshot::Clone(_) | ObjectSnapshot::Image(_) => {}
     }
 }

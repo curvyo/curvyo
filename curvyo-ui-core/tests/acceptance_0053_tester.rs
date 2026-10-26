@@ -31,6 +31,7 @@ fn make(d: &Document, peer: u64, pts: &[(f64, f64)], closed: bool) -> PathSnapsh
         .collect();
     let id = d.create_path(&anchors, closed);
     match d.object(id).unwrap() {
+        ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Path(p) => p,
         ObjectSnapshot::Primitive(_) | ObjectSnapshot::Clone(_) => unreachable!(),

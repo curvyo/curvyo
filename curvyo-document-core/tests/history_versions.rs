@@ -28,6 +28,7 @@ fn width(d: &Document, id: NodeId, mm: f64) -> StepRef {
 
 fn stroke(d: &Document, id: NodeId) -> f64 {
     match d.object(id).unwrap() {
+        curvyo_document_core::ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         curvyo_document_core::ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         curvyo_document_core::ObjectSnapshot::Primitive(p) => p.style.stroke.width.as_mm(),
         curvyo_document_core::ObjectSnapshot::Path(p) => p.style.stroke.width.as_mm(),

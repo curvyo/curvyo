@@ -96,7 +96,10 @@ fn contour_of(object: &ObjectSnapshot) -> Option<Contour> {
                 closed: path.closed,
             })
         }
-        ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_) | ObjectSnapshot::Text(_) => None,
+        ObjectSnapshot::Path(_)
+        | ObjectSnapshot::Clone(_)
+        | ObjectSnapshot::Text(_)
+        | ObjectSnapshot::Image(_) => None,
         ObjectSnapshot::Primitive(primitive) => {
             let placeholder = AnchorId::new(0, 0);
             let outline = outline_of_rotated(&primitive.shape, primitive.rotation);

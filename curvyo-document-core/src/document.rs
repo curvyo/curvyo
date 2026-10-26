@@ -263,7 +263,18 @@ impl DocumentVersion {
 /// of this build as too new. Migration from version 23 is none: an absent key is no taper, a taper
 /// of 0 is never written, a non-finite one reads as 0 and one out of range is clamped. The number
 /// is provisional by the rule above. Golden: `text_layout_v24.curvyo`.
-pub const CURRENT_FORMAT_VERSION: u32 = 24;
+///
+/// Bumped to 25 in `bitmap-import` (ADR 0017 §1 to §3, `specs/0058-bitmap-import`): a new leaf
+/// kind, `shape = "image"`, with the registers `image_asset` (the SHA-256 of the picture's bytes)
+/// and `image_placement` (six numbers), and the container members `assets/<hash>.<ext>` that hold
+/// the bytes. A build that stops at version 24 does not know the kind and would refuse the node
+/// as an unknown shape or draw nothing where the picture is, so it must refuse every file of this
+/// build as too new. Migration from version 24 is none: a file without images opens unchanged
+/// and is not rewritten. An image whose hash or placement cannot be read is refused as damaged
+/// (`crate::image_codec`); a missing, oversized or mismatching asset is not damage: the image
+/// keeps its frame and shows as unreadable. The number is provisional by the rule above. Golden:
+/// `image_v25.curvyo`.
+pub const CURRENT_FORMAT_VERSION: u32 = 25;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";
@@ -327,6 +338,8 @@ pub struct Document {
     pub(crate) object_index: std::cell::RefCell<crate::history::ObjectIndex>,
     /// The step an object undo of one object would really write, until the log changes.
     pub(crate) writable_cache: std::cell::RefCell<Option<crate::history::WritableUndo>>,
+    /// The picture bytes the image nodes name (ADR 0017 §2); not in the Loro log.
+    pub(crate) assets: std::cell::RefCell<crate::assets::AssetStore>,
 }
 
 impl Document {
@@ -391,6 +404,7 @@ impl Document {
             clone_refusal: std::cell::Cell::default(),
             object_index: std::cell::RefCell::default(),
             writable_cache: std::cell::RefCell::default(),
+            assets: std::cell::RefCell::default(),
         }
     }
 
@@ -445,6 +459,7 @@ impl Document {
             clone_refusal: std::cell::Cell::default(),
             object_index: std::cell::RefCell::default(),
             writable_cache: std::cell::RefCell::default(),
+            assets: std::cell::RefCell::default(),
         })
     }
 
@@ -702,6 +717,12 @@ enum ObjectJson {
         /// reconstruct geometry — see [`crate::path_model::PathSnapshot::rotation`].
         rotation: crate::units::Angle,
     },
+    /// An image: the asset's hash and its frame, never the bytes (ADR 0017 §3).
+    Image {
+        id: crate::path_model::NodeId,
+        asset: crate::assets::AssetHash,
+        placement: crate::affine::Affine,
+    },
     Rect {
         id: crate::path_model::NodeId,
         bounds: crate::primitive_model::RectBounds,
@@ -770,6 +791,11 @@ impl From<crate::primitive_model::ObjectSnapshot> for ObjectJson {
                 chars: text.chars,
                 placement: text.placement,
                 style: text.style,
+            },
+            ObjectSnapshot::Image(image) => Self::Image {
+                id: image.id,
+                asset: image.asset,
+                placement: image.placement,
             },
             ObjectSnapshot::Clone(clone) => Self::Clone {
                 id: clone.id(),

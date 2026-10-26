@@ -19,6 +19,7 @@
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
 mod affine;
+mod assets;
 mod clone_codec;
 mod clone_copy;
 mod clone_hold;
@@ -31,6 +32,7 @@ mod clone_transform;
 mod clone_write;
 mod clones;
 mod container;
+mod container_assets;
 mod corner_radii;
 mod corner_radii_codec;
 mod display_unit;
@@ -49,6 +51,9 @@ mod group_tree;
 mod groups;
 mod guides;
 mod history;
+mod image_codec;
+mod image_model;
+mod images;
 mod junction;
 mod layers;
 mod legacy_fill;
@@ -102,6 +107,9 @@ mod transform_objects;
 mod units;
 
 pub use affine::{Affine, MATRIX_ENTRY_LIMIT, SINGULAR_DETERMINANT};
+pub use assets::{
+    AssetError, AssetHash, MAX_ASSET_BYTES, MAX_PROJECT_ASSET_BYTES, asset_extension,
+};
 pub use clone_hold::CloneHold;
 pub use clone_model::{CloneChain, CloneSnapshot, MAX_CLONE_DEPTH};
 pub use clone_overrides::{
@@ -155,6 +163,11 @@ pub use history::{
     Role, RowRevert, RowVersion, SMALL_STEP_OPS, STACK_LIMIT, SkipReason, StackMachine, Status,
     StepKind, StepRef, SyncError, TouchedObject, WIPE_LABEL, is_document_level_label, shown_ids,
 };
+pub use image_model::{
+    IMPORT_COMMIT_LABEL, IMPORT_IMAGE_COMMIT_LABEL, IMPORT_IMAGES_COMMIT_LABEL, ImageSnapshot,
+    no_paint,
+};
+pub use images::{ImageInsertError, NewImage};
 pub use junction::{COINCIDENT_MM, interior_handle, merged_junction};
 pub use layers::{DELETE_LAYER_COMMIT_LABEL, INITIAL_LAYER_NAME, NEW_LAYER_COMMIT_LABEL};
 pub use node_edit::{

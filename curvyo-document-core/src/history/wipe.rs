@@ -81,6 +81,7 @@ impl Document {
             return Err(HistoryError::Wipe);
         }
         self.replace_loro(fresh);
+        self.prune_assets();
         let epoch = encode_frontiers(&self.loro().shallow_since_frontiers());
         self.loro()
             .get_map(ROOT_MAP)

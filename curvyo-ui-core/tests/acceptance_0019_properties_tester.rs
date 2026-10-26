@@ -125,6 +125,7 @@ fn gesture(d: &Document, press: Point, to: Point, mods: Modifiers) -> Vec<Object
 
 fn points(o: &ObjectSnapshot) -> Vec<(Point, Vec2, Vec2)> {
     match o {
+        ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Path(p) => p
             .anchors

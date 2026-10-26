@@ -113,6 +113,9 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     // `specs/0085-stroke-to-path` criterion 21.
     ("stroke_to_path", "Stroke to path"),
     ("import_svg", "Import SVG"),
+    ("import_image", "Import image"),
+    ("import_images", "Import images"),
+    ("import", "Import"),
     ("offset_path", "Offset"),
     ("group", "Group"),
     ("ungroup", "Ungroup"),

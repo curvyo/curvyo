@@ -31,6 +31,21 @@ pub fn build_live_edit_preview(objects: &[ObjectSnapshot], view: ViewTransform) 
                 ObjectSnapshot::Primitive(primitive) => {
                     shape_live_outline(&primitive.shape, primitive.rotation, view, casing)
                 }
+                ObjectSnapshot::Image(image) => stroke::path_stroke(
+                    &crate::image_layer::frame_anchors(image),
+                    true,
+                    if casing {
+                        width_mm * theme::CASING_WIDTH_FACTOR
+                    } else {
+                        width_mm
+                    },
+                    if casing {
+                        theme::SELECTION_CASING
+                    } else {
+                        theme::PREVIEW_NEW
+                    },
+                    tolerance_mm,
+                ),
                 _ => object.drawn_path().map_or_else(DrawList::default, |path| {
                     let mut outlines = DrawList::default();
                     for subpath in path.subpaths() {

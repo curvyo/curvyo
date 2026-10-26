@@ -3,7 +3,7 @@
 //! the session lets it act now. It is a method of its own, apart from `key_down`, so the editor's
 //! own key table still ignores Ctrl+S and the page keeps the key.
 
-use curvyo_ui_core::{FileCommand, Platform, file_chord};
+use curvyo_ui_core::{FileCommand, Platform, file_chord, is_import_chord};
 
 use super::Session;
 use super::keys::KeyInput;
@@ -23,5 +23,19 @@ impl Session {
             || self.operation_in_flight()
             || self.select.has_entry();
         (!gated).then_some(command)
+    }
+
+    /// Whether the key press `input` is Ctrl+I (Cmd+I) for the Import button and may act now
+    /// (`specs/0058-bitmap-import` criterion 3): gated as the file chords are, and never in the
+    /// on-canvas text editor, where the key stays with the text.
+    #[must_use]
+    pub fn import_chord(&self, input: &KeyInput<'_>) -> bool {
+        is_import_chord(input.key, input.shift, input.ctrl, input.alt)
+            && !(input.repeat
+                || input.dom_blocked
+                || self.button_down
+                || self.operation_in_flight()
+                || self.select.has_entry()
+                || self.text_editing())
     }
 }

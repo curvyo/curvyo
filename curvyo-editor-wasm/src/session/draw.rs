@@ -252,7 +252,8 @@ impl Session {
                 ),
                 ObjectSnapshot::Primitive(_)
                 | ObjectSnapshot::Clone(_)
-                | ObjectSnapshot::Text(_) => object.clone(),
+                | ObjectSnapshot::Text(_)
+                | ObjectSnapshot::Image(_) => object.clone(),
             })
             .collect()
     }

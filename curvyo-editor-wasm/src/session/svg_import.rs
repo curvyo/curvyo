@@ -34,7 +34,7 @@ impl Session {
             FileKind::Project => {
                 Self::open(peer, bytes).map_err(|error| super::map_open_error(&error).to_owned())
             }
-            FileKind::Other => Err(NEITHER_PROJECT_NOR_SVG.to_owned()),
+            FileKind::Image | FileKind::Other => Err(NEITHER_PROJECT_NOR_SVG.to_owned()),
         }
     }
 

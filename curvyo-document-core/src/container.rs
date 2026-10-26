@@ -74,6 +74,7 @@ pub fn pack(document: &Document, app_version: &str) -> Result<Vec<u8>, SaveError
     write_member(&mut writer, MANIFEST_MEMBER, &manifest_bytes, options)?;
     write_member(&mut writer, LORO_SNAPSHOT_MEMBER, &loro_bytes, options)?;
     write_member(&mut writer, DOCUMENT_JSON_MEMBER, &json_bytes, options)?;
+    crate::container_assets::write_assets(&mut writer, &document.assets.borrow())?;
     let cursor = writer.finish().map_err(|_| SaveError::Container)?;
     Ok(cursor.into_inner())
 }
@@ -137,7 +138,9 @@ pub fn unpack(peer_id: u64, bytes: &[u8]) -> Result<Document, OpenError> {
     }
 
     let loro_bytes = read_member(&mut archive, LORO_SNAPSHOT_MEMBER)?;
-    Document::from_loro_snapshot(peer_id, &loro_bytes)
+    let document = Document::from_loro_snapshot(peer_id, &loro_bytes)?;
+    *document.assets.borrow_mut() = crate::container_assets::read_assets(&mut archive);
+    Ok(document)
 }
 
 fn looks_like_zip(bytes: &[u8]) -> bool {

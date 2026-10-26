@@ -15,6 +15,8 @@ curvyo-geometry-core = { path = "../curvyo-geometry-core", version = "0.1.0" }
 curvyo-text-core = { path = "../curvyo-text-core", version = "0.1.0" }
 # The SVG reader whose drawing `svg_import` maps to the document (ADR 0018 §2).
 curvyo-svg-core = { path = "../curvyo-svg-core", version = "0.1.0" }
+# The bitmap decoder boundary of the image import (ADR 0017 §4).
+curvyo-image-core = { path = "../curvyo-image-core", version = "0.1.0" }
 kurbo.workspace = true
 serde.workspace = true
 thiserror.workspace = true

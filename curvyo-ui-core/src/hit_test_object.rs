@@ -64,6 +64,8 @@ fn certainly_farther_than(object: &ObjectSnapshot, point: Point, margin: f64) ->
         // A text is hit anywhere inside the box of its lines (`specs/0074-text-objects`
         // criterion 25).
         ObjectSnapshot::Text(text) => !crate::text_box::line_box_contains(text, point, margin),
+        // An image is hit anywhere inside its frame (`specs/0058-bitmap-import` criterion 31).
+        ObjectSnapshot::Image(image) => !crate::image_frame::frame_contains(image, point, margin),
         ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_)
             if let Some(path) = object.drawn_path() =>
         {
@@ -124,6 +126,9 @@ pub(crate) fn distance_to_object(
             };
             inside.then_some(ahead)
         }
+        ObjectSnapshot::Image(image) => {
+            crate::image_frame::frame_contains(image, point, tolerance.as_mm()).then_some(0.0)
+        }
         ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_)
             if let Some(path) = object.drawn_path() =>
         {
@@ -175,6 +180,7 @@ fn outlines_of(object: &ObjectSnapshot) -> Vec<(Vec<OutlineTriple>, bool)> {
                 })
                 .collect()
         }
+        ObjectSnapshot::Image(image) => crate::image_frame::frame_outline(image),
         // Marquee and lasso take a text by its line box (criterion 25).
         ObjectSnapshot::Text(text) => vec![(
             crate::text_box::line_box_corners(text)

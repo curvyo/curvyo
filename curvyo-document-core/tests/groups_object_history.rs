@@ -59,6 +59,7 @@ fn an_object_undo_of_a_move_inside_a_group_keeps_the_member_in_the_group() {
     assert!(!restored.whole_step);
     assert_eq!(d.parent_group(a), Some(group));
     let x = |id| match d.object(id).unwrap() {
+        curvyo_document_core::ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         curvyo_document_core::ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         curvyo_document_core::ObjectSnapshot::Clone(_) => panic!("no clone here"),
         curvyo_document_core::ObjectSnapshot::Primitive(p) => match p.shape {

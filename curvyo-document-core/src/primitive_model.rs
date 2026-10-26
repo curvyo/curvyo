@@ -310,6 +310,9 @@ pub enum ObjectSnapshot {
     /// commands that work on paths convert it first. Boxed, so a text is no larger than the
     /// other kinds in every object list.
     Text(Box<TextSnapshot>),
+    /// An image object (`specs/0058-bitmap-import`, ADR 0017 §1): one asset in a mapped unit
+    /// square. It has no outline, so every command that needs one matches on the kind.
+    Image(crate::image_model::ImageSnapshot),
 }
 
 impl ObjectSnapshot {
@@ -321,6 +324,7 @@ impl ObjectSnapshot {
             Self::Primitive(snapshot) => &snapshot.style,
             Self::Clone(snapshot) => &snapshot.resolved.style,
             Self::Text(snapshot) => &snapshot.style,
+            Self::Image(snapshot) => &snapshot.style,
         }
     }
 
@@ -332,6 +336,7 @@ impl ObjectSnapshot {
             Self::Primitive(snapshot) => &mut snapshot.style,
             Self::Clone(snapshot) => &mut snapshot.resolved.style,
             Self::Text(snapshot) => &mut snapshot.style,
+            Self::Image(snapshot) => &mut snapshot.style,
         }
     }
 
@@ -344,7 +349,7 @@ impl ObjectSnapshot {
             Self::Path(path) => Some(path),
             Self::Clone(clone) => Some(&clone.resolved),
             Self::Text(text) => text.outline.as_deref().map(|outline| &outline.glyphs),
-            Self::Primitive(_) => None,
+            Self::Primitive(_) | Self::Image(_) => None,
         }
     }
 
@@ -356,6 +361,7 @@ impl ObjectSnapshot {
             Self::Primitive(snapshot) => snapshot.id,
             Self::Clone(snapshot) => snapshot.id(),
             Self::Text(snapshot) => snapshot.id,
+            Self::Image(snapshot) => snapshot.id,
         }
     }
 
@@ -370,6 +376,9 @@ impl ObjectSnapshot {
             Self::Primitive(snapshot) => snapshot.rotation,
             Self::Clone(snapshot) => snapshot.resolved.rotation,
             Self::Text(snapshot) => snapshot.rotation(),
+            Self::Image(snapshot) => {
+                Angle::from_radians(snapshot.placement.b.atan2(snapshot.placement.a))
+            }
         }
     }
 
@@ -429,6 +438,9 @@ impl ObjectSnapshot {
             Self::Text(text) => Self::Text(Box::new(
                 text.mapped_by(Affine::rotation_about(pivot, angle)),
             )),
+            Self::Image(image) => {
+                Self::Image(image.mapped_by(Affine::rotation_about(pivot, angle)))
+            }
         }
     }
 
@@ -458,6 +470,7 @@ impl ObjectSnapshot {
             }
             Self::Clone(clone) => Self::Clone(clone.mapped_by(Affine::translation(offset))),
             Self::Text(text) => Self::Text(Box::new(text.mapped_by(Affine::translation(offset)))),
+            Self::Image(image) => Self::Image(image.mapped_by(Affine::translation(offset))),
         }
     }
 }
