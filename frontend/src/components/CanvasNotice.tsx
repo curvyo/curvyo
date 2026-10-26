@@ -33,7 +33,7 @@ export function CanvasNotice({
   const box = (
     <div
       key={shown?.id}
-      className="rounded-md p-2 text-xs"
+      className="rounded-md p-2 text-xs whitespace-pre-line"
       style={{
         background: "var(--toolbar-bg)",
         color: shown?.kind === "alert" ? "var(--field-invalid)" : "var(--toolbar-icon)",

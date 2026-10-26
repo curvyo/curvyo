@@ -14,13 +14,25 @@ import { isMac } from "@/lib/historyText";
 import { createBusyGate } from "@/lib/busyGate";
 import { templateOutcome } from "@/lib/guideText";
 import { invoke, isTauri, listen, PLATFORM } from "@/platform/host";
-import { svg_busy_notice } from "@/wasm-bindings/curvyo_editor_wasm.js";
+import { import_busy_notice, svg_busy_notice } from "@/wasm-bindings/curvyo_editor_wasm.js";
 
 /** The browser build on a Mac uses Cmd as well. */
 const MAC = isMac(navigator.platform);
 
 /** A command of the File tab: the names `curvyo-ui-core`'s chord table uses. */
-export type FileCommandName = "new" | "open" | "save" | "save-as" | "close" | "quit";
+export type FileCommandName = "new" | "open" | "save" | "save-as" | "close" | "quit" | "import";
+
+/** A file for the Import button: its name and bytes. */
+export interface ImportFile {
+  name: string;
+  bytes: Uint8Array;
+}
+
+/** Files dropped on the canvas and the drop point in canvas CSS pixels. */
+export interface DroppedFiles {
+  files: ImportFile[];
+  at: { x: number; y: number };
+}
 
 /** What a replacing action will do once the maker has answered the check. */
 type Action =
@@ -69,9 +81,10 @@ export interface ProjectApi {
   /** The Template button (`specs/0046-document-shapes` criterion 19): the file dialog, then the
    * file's outlines as guides. It never replaces the project and raises no check. */
   loadTemplate: () => void;
-  /** Import SVG… (`specs/0024-svg-import-export` criterion 3): the file dialog, then the file's
-   * content as a new layer in the middle of the view. It never replaces the project. */
-  importSvg: () => void;
+  /** The Import button and Ctrl+I (`specs/0058-bitmap-import` criteria 1 to 5): the file dialog
+   * (or the dropped files), then each file by its content as an image or an SVG layer, in one
+   * step, selected. It never replaces the project. */
+  importFiles: (dropped?: DroppedFiles) => void;
   /** Save in the check: the action goes on after a successful save. */
   saveFromCheck: () => void;
   /** Discard in the check: the action goes on and the changes are dropped. */
@@ -95,7 +108,6 @@ const DEFAULT_FILE_NAME = "Untitled.curvyo";
 
 /** The titles of the error dialog for Open… and Import SVG… (`0024` UX notes). */
 const OPEN_FILE_TITLE = "Can't open file";
-const IMPORT_SVG_TITLE = "Can't import SVG";
 
 /** From this size on, a notice says the file is being read (`0024` UX notes, "Large files"). */
 const BUSY_NOTICE_BYTES = 1024 * 1024;
@@ -319,41 +331,70 @@ export function useProject(deps: ProjectDeps): ProjectApi {
     }
   }, [busy]);
 
-  const importSvg = useCallback(async () => {
-    if (!busy.enter()) {
-      return;
-    }
-    const { editor, onOpenError } = depsRef.current;
-    const button = () => document.querySelector<HTMLElement>('[data-file-command="import-svg"]');
-    try {
-      const picked = await invoke<OpenPayload | null>("pick_project", { kind: "svg" });
-      if (!picked) {
-        // Cancelled: the focus returns to the button, nothing is shown.
-        button()?.focus();
+  const importFiles = useCallback(
+    async (dropped?: DroppedFiles) => {
+      if (!busy.enter()) {
         return;
       }
-      if (picked.kind === "io_error") {
-        onOpenError(picked.message, IMPORT_SVG_TITLE);
-        return;
+      const { editor } = depsRef.current;
+      const button = () => document.querySelector<HTMLElement>("[data-import-button]");
+      const root = document.documentElement;
+      try {
+        let files: ImportFile[];
+        if (dropped) {
+          files = dropped.files;
+        } else {
+          const picked = await invoke<OpenPayload[]>("pick_import_files");
+          if (!picked || picked.length === 0) {
+            // Cancelled: the focus returns to the button, nothing is shown.
+            button()?.focus();
+            return;
+          }
+          // A file the host could not read is read as no bytes: it is reported as refused.
+          files = picked.map((file) =>
+            file.kind === "bytes"
+              ? { name: baseName(file.path), bytes: new Uint8Array(file.bytes) }
+              : { name: "", bytes: new Uint8Array() },
+          );
+        }
+        root.setAttribute("aria-busy", "true");
+        root.style.cursor = "wait";
+        editor.importBegin(dropped ? dropped.at : null);
+        for (const [index, file] of files.entries()) {
+          const notice = import_busy_notice(file.bytes, file.name, index + 1, files.length);
+          if (notice) {
+            editor.showHistoryNotice(notice, 600_000);
+          }
+          // One painted frame before each read: the cursor and the notice show (UX notes,
+          // "Busy state").
+          await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+          editor.importAdd(file.bytes, file.name);
+        }
+        const outcome = editor.importFinish();
+        if (outcome.notice) {
+          editor.showHistoryNotice(
+            outcome.notice,
+            outcome.alert ? 5000 : undefined,
+            "canvas",
+            outcome.alert ? "alert" : "status",
+          );
+        } else {
+          editor.showHistoryNotice("", 1);
+        }
+        if (outcome.imported > 0) {
+          // The new objects are selected: arrows, S and Delete act on them at once.
+          editor.containerRef.current?.focus();
+        }
+      } catch (error) {
+        editor.showHistoryNotice(String(error), 5000, "canvas", "alert");
+      } finally {
+        root.removeAttribute("aria-busy");
+        root.style.cursor = "";
+        busy.leave();
       }
-      const name = baseName(picked.path);
-      const outcome = await whileBusy(editor, picked.bytes.length, svg_busy_notice(false, name), () =>
-        editor.importSvg(new Uint8Array(picked.bytes), name),
-      );
-      if (outcome.startsWith("imported:")) {
-        // The new layer's objects are selected: arrows, S and Delete act on them at once.
-        editor.containerRef.current?.focus();
-      } else if (outcome.startsWith("nothing:")) {
-        editor.showHistoryNotice(outcome.slice("nothing:".length));
-      } else {
-        onOpenError(outcome.slice("error:".length), IMPORT_SVG_TITLE);
-      }
-    } catch (error) {
-      onOpenError(String(error), IMPORT_SVG_TITLE);
-    } finally {
-      busy.leave();
-    }
-  }, [busy]);
+    },
+    [busy],
+  );
 
   const resetProject = useCallback(async () => {
     // The host hears "clean" only once the new session exists: if the attach fails, the project is
@@ -563,9 +604,12 @@ export function useProject(deps: ProjectDeps): ProjectApi {
         case "save-as":
           void save(true);
           break;
+        case "import":
+          void importFiles();
+          break;
       }
     },
-    [request, save, saveFromCheck],
+    [importFiles, request, save, saveFromCheck],
   );
 
   const press = useCallback(
@@ -599,6 +643,10 @@ export function useProject(deps: ProjectDeps): ProjectApi {
         PLATFORM,
       );
       if (name === "") {
+        return;
+      }
+      // In a text field Ctrl+I stays with the field (`specs/0058-bitmap-import` criterion 3).
+      if (name === "import" && isTextField(document.activeElement)) {
         return;
       }
       event.preventDefault();
@@ -663,7 +711,7 @@ export function useProject(deps: ProjectDeps): ProjectApi {
     check,
     press,
     loadTemplate: () => void loadTemplate(),
-    importSvg: () => void importSvg(),
+    importFiles: (dropped?: DroppedFiles) => void importFiles(dropped),
     saveFromCheck: () => void saveFromCheck(),
     discard,
     cancel,

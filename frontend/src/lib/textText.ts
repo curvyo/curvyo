@@ -31,6 +31,10 @@ export function shortFace(face: string): string {
  * named, several texts are counted; a face still loading says so. `null` for any other kind. */
 export function textRefusalText(result: { kind: string; count?: number; of?: number; face?: string }): string | null {
   const count = result.count || result.of || 0;
+  // A selection with an image (`specs/0058-bitmap-import` criterion 37): every outline command.
+  if (result.kind === "images") {
+    return `Images can't be used with this command. ${NOTHING_CHANGED}`;
+  }
   if (result.kind === "single_line_texts") {
     return singleLineRefusalText(count);
   }

@@ -40,13 +40,48 @@ function download(bytes: number[], fileName: string): SaveOutcome {
   return { kind: "saved", file_name: fileName, path: fileName };
 }
 
-/** What the browser's picker offers per dialog kind (`specs/0024-svg-import-export` criteria 1
- * and 3): Open… projects and SVG drawings, Import SVG… drawings, Template projects. */
+/** What the browser's picker offers per dialog kind (`specs/0024-svg-import-export` criterion 1):
+ * Open… projects and SVG drawings, Template projects. */
 const PICKER_ACCEPT: Record<string, string> = {
   open: ".curvyo,.svg,image/svg+xml",
-  svg: ".svg,image/svg+xml",
   project: ".curvyo",
 };
+
+/** What the Import button's picker offers (`specs/0058-bitmap-import` criterion 1). */
+const IMPORT_ACCEPT = ".svg,.png,.jpg,.jpeg,.webp,image/svg+xml,image/png,image/jpeg,image/webp";
+
+/** Browser Import: every picked file's name and bytes in the picker's order, none when the
+ * picker was cancelled; a file that cannot be read is its read error. */
+function pickImportFiles(): Promise<OpenPayload[]> {
+  return new Promise((resolve) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.multiple = true;
+    input.accept = IMPORT_ACCEPT;
+    input.onchange = () => {
+      const files = Array.from(input.files ?? []);
+      void Promise.all(
+        files.map((file) =>
+          file.arrayBuffer().then(
+            (buffer): OpenPayload => ({
+              kind: "bytes",
+              path: file.name,
+              bytes: Array.from(new Uint8Array(buffer)),
+            }),
+            (): OpenPayload => ({ kind: "io_error", message: "This file couldn't be read." }),
+          ),
+        ),
+      ).then(resolve);
+    };
+    input.addEventListener("cancel", () => resolve([]));
+    window.addEventListener(
+      "focus",
+      () => window.setTimeout(() => (input.files?.length ? undefined : resolve([])), 1500),
+      { once: true },
+    );
+    input.click();
+  });
+}
 
 /** Browser Open: the picked file's name and bytes, `null` when the picker was cancelled, or the
  * read error. The answer returns to the caller, as the desktop command's does. */
@@ -127,6 +162,7 @@ function downloadText(name: string, text: string) {
 const browserCommands: Record<string, (args?: Record<string, unknown>) => unknown> = {
   take_pending_open: () => null,
   pick_project: (args) => pickProject(String(args?.kind ?? "project")),
+  pick_import_files: () => pickImportFiles(),
   confirm_project_opened: () => undefined,
   reset_project: () => undefined,
   set_dirty: () => undefined,

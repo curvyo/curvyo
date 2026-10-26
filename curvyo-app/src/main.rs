@@ -100,6 +100,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             project::take_pending_open,
             project::pick_project,
+            project::pick_import_files,
             project::confirm_project_opened,
             project::reset_project,
             project::set_dirty,

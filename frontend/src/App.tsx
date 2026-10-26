@@ -174,8 +174,9 @@ function Editor() {
           commands={railCommands}
           grouping={editor.grouping.commands}
           paused={historyPreview.kind === "document"}
+          onImport={() => project.importFiles()}
         />
-        <Canvas editor={editor} />
+        <Canvas editor={editor} onDropFiles={project.importFiles} />
         <HistoryPreviewFrame />
         {/* Contextual tool bar: floats over the canvas, right of the tool
          * rail, so showing/hiding it never resizes the canvas
