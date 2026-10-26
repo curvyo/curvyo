@@ -1,6 +1,6 @@
 # Text on path: put a text on paths and shapes, keep it editable text
 
-Status: Ready for slice 1 (2026-10-24)
+Status: Done (2026-10-26, customer; slice 1 PR #190, slice 2 PR #193; ADR 0022 accepted; was Ready for slice 1 on 2026-10-24)
 Priority: Should
 Origin: Customer (request of 2026-10-23, translated: "Put text on path. Text always stays text until you do Object to path — no matter how distorted, rotated, put on paths, ... it must always stay editable text. 'Text on path' is a button in the tool bar for text; after it you select paths. You can select several; then the text is put on all paths as linked clones. You can change the position on the path individually (by handles in the drawing), either on top of the path or below it, either with the top edge or with the baseline. You must be able to mirror the text, or rotate it (if it is a circle). You should also be able to put texts on circles, rectangles, stars, polygons that are not paths."). Every criterion marked **(Proposal)** is the product owner's idea and is not accepted until the customer says so.
 Depends on: `0074` (text node, Text bar, Object to path), `0078` (Style group), `0049` and `0057` (linked clone, own style), `0003`, `0013`, `0021` (rectangle, ellipse with arcs, polygon and star with curve: primitives that stay primitives), `0016` and `0054` (compound paths, open outlines), `0046` (guides), `0056` (Flip), `0020` (one step per interaction). Companion: `0079-text-layout-controls` (alignment, letter and word spacing, rotation of letters, writing mode, the per-letter taper "Kegelverzerrung"), written in parallel; this spec uses its controls and does not repeat them.
@@ -167,4 +167,4 @@ See [ux-notes.md](ux-notes.md). Its §0 proposes ten changes to the criteria; al
 ## Links
 
 Requirements: R-EDIT-048 (text objects), R-EDIT-004 (Object to path), R-FONT-009 (laserable lettering); a new requirement for text on path is to be added to `docs/requirements.md` when the customer accepts the definition (Frage 33).
-Companion: `0079-text-layout-controls`. ADRs: 0002, 0015, 0016, 0019, 0020. PR: none yet.
+Companion: `0079-text-layout-controls`. ADRs: 0002, 0015, 0016, 0019, 0020. PR: #190 (slice 1), #193 (slice 2).

@@ -1,6 +1,6 @@
 # Text layout controls: alignment, spacing, character rotation, taper, vertical text and kerning
 
-Status: Slice 1 built (format 19); slice 3 built (format 20); slice 4 built (format 21); slice 2 built on `story/text-taper` (format 24)
+Status: Done (2026-10-26, customer; slices 1 to 4, PR #184, #187, #189, #197; format 19 to 24)
 Priority: Should
 Origin: Customer. Request of 2026-10-23 (translated), with a screenshot of Inkscape's Text toolbar: "Text alignment right, centred, left, justified goes into the tool bar; likewise horizontal text, vertical left-to-right and right-to-left, auto glyph orientation, upright glyph orientation and sideways glyph orientation. We need a letter 'cone' distortion (Kegelverzerrung, a taper/keystone of each glyph) to compensate a little for fonts laid in a circle. Spacing between letters, spacing between baselines, spacing between words, horizontal kerning, vertical kerning, character rotation go into the properties panel; we need nice sliders there." Placement of each control, units, ranges, defaults, the exact meaning of the taper and of kerning are the product owner's and marked **(Proposal)** where the customer did not state them.
 Depends on: `0074-text-objects` (text node, Text bar, Select bar Text group, line layout, Size = height of the capital H, Object to path), `0076-single-line-fonts`, `0078-font-style-buttons` (Style group; the greyed-button exception), `0047` (value fields and sliders), `0020` (one step per interaction), `0043`/`0051` (panel tabs).
@@ -178,4 +178,4 @@ See [`ux-notes.md`](ux-notes.md) (2026-10-24): slice 1 in full, slices 2 to 4 sk
 Requirements: R-EDIT-048, R-FONT-011 (new, to be added: text layout controls)
 Depends on: `specs/0074-text-objects/`, `specs/0076-single-line-fonts/`, `specs/0078-font-style-buttons/`; companion `specs/0080-text-on-path/`
 ADRs: 0020 (text engine), 0009 §3 (per-character merge), 0004 §9 (format version)
-PR: (one per slice)
+PR: #184 (slice 1), #187 (slice 3), #189 (slice 4), #197 (slice 2)

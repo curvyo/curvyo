@@ -1,6 +1,6 @@
 # Glyph table: every character of the text's font, a click inserts it
 
-Status: Ready (2026-10-24; customer accepted the feature; Frage 39 and 40 unanswered, built with defaults A; UX notes P1 to P7 applied as Proposal)
+Status: Done (PR #186, 2026-10-26; Frage 39 and 40 built with defaults A; was Ready 2026-10-24, customer accepted the feature)
 Priority: Should (R-FONT-007 neighbourhood; no own requirement yet, see Links)
 Origin: Customer. Accepted 2026-10-23: the glyph grid of `0077` Frage 25 B ("every character the font has, a click inserts it at the text cursor: ornaments, special characters in script fonts"), listed in `0077` Out of scope as "a glyph grid of one family with click-to-insert". Items marked **(Proposal)** are the product owner's; they are safe defaults the customer can veto at the demo.
 Depends on: `0074-text-objects` (text node, edit mode, caret, Text bar, next-text face), `0076-single-line-fonts` (SVG font glyphs, `<missing-glyph>`), `0077-font-preview` (the pane in the canvas area, split and full view, divider, Size slider, engine-drawn glyphs, `Face::missing_chars`).
@@ -118,4 +118,4 @@ Requirements: none of its own yet; R-FONT-007 (preview page it extends), R-FONT-
 Depends on: `specs/0074-text-objects/`, `specs/0076-single-line-fonts/`, `specs/0077-font-preview/`
 Related: `specs/0083-font-info-and-zip/` (its Info mode joins the same mode switch)
 ADRs: 0020 (text engine), 0001 (UI and canvas)
-PR: -
+PR: #186
