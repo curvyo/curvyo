@@ -1,20 +1,25 @@
-// The font preview pane (`specs/0077-font-preview`, UX notes §1; `specs/0082-glyph-table`): the
-// header and, in Fonts mode, the tile grid of the Fonts tab's listed families, in Glyphs mode the
-// glyph table of the subject face and its detail bar; Escape anywhere inside closes it, and so
+// The font preview pane (`specs/0077-font-preview`, UX notes §1; `specs/0082-glyph-table`;
+// `specs/0083-font-info-and-zip`): the header and, in Fonts mode, the tile grid of the Fonts tab's
+// listed families, in Glyphs mode the glyph table of the subject face and its detail bar, in Info
+// mode the subject face's facts and documents; Escape anywhere inside closes it, and so
 // does an Escape outside that nothing else handled; the focus goes back to the Preview button when
 // it came from inside and the Fonts tab is shown, else to the canvas.
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { GlyphDetailBar } from "@/components/fontPreview/GlyphDetailBar";
 import { GlyphGrid } from "@/components/fontPreview/GlyphGrid";
+import { InfoView } from "@/components/fontPreview/InfoView";
 import { PreviewGrid } from "@/components/fontPreview/PreviewGrid";
 import { PreviewHeader } from "@/components/fontPreview/PreviewHeader";
 import type { FontPreviewApi } from "@/hooks/useFontPreview";
+import { useFontInfo } from "@/hooks/useFontInfo";
 import { useGlyphTable } from "@/hooks/useGlyphTable";
 import type { GlyphSubject } from "@/hooks/useText";
 import { charOf, glyphSubjectLine, insertedText } from "@/lib/glyphTableText";
 import { focusStaysOnCell } from "@/lib/glyphTableLayout";
 import { escapeClosesPreview } from "@/lib/fontPreviewKeys";
+import { blockText, infoSubjectLine } from "@/lib/fontInfoText";
+import { isTauri } from "@/platform/host";
 import { type PaneLayout, headerRows } from "@/lib/fontPreviewLayout";
 import { PREVIEW_BUTTON_ID, sampleFocused } from "@/lib/fontPreviewStore";
 import { MAX_GLYPH_SEARCH_CHARS, MAX_SAMPLE_CHARS } from "@/lib/fontPreviewState";
@@ -141,16 +146,25 @@ export function FontPreview({
     },
     [onInsertGlyph, addRecent, layout.full],
   );
+  // Info mode (`specs/0083-font-info-and-zip`); the listing as revision: a Remove changes the
+  // documents.
+  const info = preview.mode === "info";
+  const infoState = useFontInfo(glyphSubject, store.open && info, store.listing);
   const searching = preview.glyphSearch.trim() !== "";
-  const subjectLine = glyphs
-    ? glyphSubjectLine(
-        glyphSubject?.name ?? "",
-        glyphState.table?.total ?? 0,
-        glyphState.table?.shown ?? 0,
-        searching,
-        glyphState.status === "missing",
-      )
-    : store.listing.subject;
+  let subjectLine = store.listing.subject;
+  if (glyphs) {
+    subjectLine = glyphSubjectLine(
+      glyphSubject?.name ?? "",
+      glyphState.table?.total ?? 0,
+      glyphState.table?.shown ?? 0,
+      searching,
+      glyphState.status === "missing",
+    );
+  } else if (info && glyphSubject) {
+    subjectLine = glyphSubject.face
+      ? infoSubjectLine(glyphSubject.name, blockText(glyphSubject.face.block, isTauri))
+      : `${glyphSubject.name} · missing`;
+  }
 
   return (
     <section
@@ -183,7 +197,9 @@ export function FontPreview({
         onClose={close}
         onReturnFocus={onReturnFocus}
       />
-      {glyphs ? (
+      {info ? (
+        <InfoView subject={glyphSubject} info={infoState} full={layout.full} />
+      ) : glyphs ? (
         <>
           <GlyphGrid
             state={glyphState}

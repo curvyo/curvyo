@@ -3,7 +3,9 @@
 // Each Add is one transaction, so a full storage keeps nothing of it. The faces of a file are
 // read by wasm when it is added and kept in a store of their own with the file's length and
 // SHA-256, so listing and the "already there" test read no font bytes; the bytes are read only
-// when a face is used.
+// when a face is used. Since `specs/0083-font-info-and-zip` a file may sit in a font folder: its
+// key is `<folder>/<file>` (top-level files keep their bare name), and the folder's documents are
+// kept in a store of their own under the same keys (`adrs.md` decision 4).
 import type { AddResult } from "@/lib/fontLibraryText";
 import { requestFontStorageKeep } from "@/lib/fontStorageKeep";
 import { font_file_faces } from "@/wasm-bindings/curvyo_editor_wasm.js";
@@ -13,9 +15,12 @@ const DB_NAME = "curvyo-fonts";
 const FILES = "files";
 /** The faces, length and SHA-256 of each file, by file name. */
 const FACES = "faces";
+/** The documents of font folders, by `<folder>/<file>` (`0083`). */
+const DOCUMENTS = "documents";
 /** Version 2 split the bytes from the faces (review of 2026-10-20); version 1 existed only on the
- * unmerged branch, so its store is dropped. */
-const DB_VERSION = 2;
+ * unmerged branch, so its store is dropped. Version 3 adds the documents store and nothing else
+ * (`0083` adrs.md decision 4). */
+const DB_VERSION = 3;
 /** The host id prefix of a face in this store. */
 export const BROWSER_FONT_PREFIX = "idb:";
 /** The largest font file read (64 MiB, ADR 0020 §2). */
@@ -32,16 +37,21 @@ interface StoredFace {
   kind?: string;
 }
 
-interface StoredFile {
+export interface StoredFile {
   name: string;
   bytes: ArrayBuffer;
 }
 
-interface StoredFaces {
+export interface StoredFaces {
   name: string;
   faces: StoredFace[];
   length: number;
   sha256: string;
+}
+
+export interface StoredDocument {
+  key: string;
+  bytes: ArrayBuffer;
 }
 
 /** A listed face, as the desktop's `font_folder_list` gives it. */
@@ -53,10 +63,25 @@ export interface BrowserListedFace {
   os2: string | null;
   stamp: string;
   kind?: string;
+  file: string;
+  size: number;
+  folder?: string;
+}
+
+/** A font folder and its documents, as the desktop lists them. */
+export interface ListedFontFolder {
+  name: string;
+  documents: { name: string; size: number }[];
+}
+
+/** The folder and file of a store key: `Lobster/OFL.txt` -> `["Lobster", "OFL.txt"]`. */
+export function splitKey(key: string): [string | null, string] {
+  const slash = key.indexOf("/");
+  return slash < 0 ? [null, key] : [key.slice(0, slash), key.slice(slash + 1)];
 }
 
 
-function request<T>(req: IDBRequest<T>): Promise<T> {
+export function request<T>(req: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -65,16 +90,21 @@ function request<T>(req: IDBRequest<T>): Promise<T> {
 
 let opened: Promise<IDBDatabase> | null = null;
 
-function database(): Promise<IDBDatabase> {
+export function database(): Promise<IDBDatabase> {
   opened ??= new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = () => {
+    req.onupgradeneeded = (event) => {
       const db = req.result;
-      for (const store of [FILES, FACES]) {
-        if (db.objectStoreNames.contains(store)) {
-          db.deleteObjectStore(store);
+      if (event.oldVersion < 2) {
+        for (const store of [FILES, FACES]) {
+          if (db.objectStoreNames.contains(store)) {
+            db.deleteObjectStore(store);
+          }
+          db.createObjectStore(store, { keyPath: "name" });
         }
-        db.createObjectStore(store, { keyPath: "name" });
+      }
+      if (!db.objectStoreNames.contains(DOCUMENTS)) {
+        db.createObjectStore(DOCUMENTS, { keyPath: "key" });
       }
     };
     req.onsuccess = () => resolve(req.result);
@@ -86,23 +116,59 @@ function database(): Promise<IDBDatabase> {
   return opened;
 }
 
+/** The store names, for the archive add's one transaction. */
+export const STORES = { files: FILES, faces: FACES, documents: DOCUMENTS } as const;
+
+/** Every stored document (licence and readme files are small). */
+async function allDocuments(): Promise<StoredDocument[]> {
+  const db = await database();
+  return request(db.transaction(DOCUMENTS).objectStore(DOCUMENTS).getAll() as IDBRequest<StoredDocument[]>);
+}
+
 /** The faces records of every stored file; no font bytes are read. */
-async function allFaces(): Promise<StoredFaces[]> {
+export async function allFaces(): Promise<StoredFaces[]> {
   const db = await database();
   return request(db.transaction(FACES).objectStore(FACES).getAll() as IDBRequest<StoredFaces[]>);
 }
 
 /** The SHA-256 of `bytes` as hex. */
-async function sha256(bytes: ArrayBuffer): Promise<string> {
+export async function sha256(bytes: ArrayBuffer): Promise<string> {
   const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
   return Array.from(digest, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-/** The Curvyo block of the browser: every face of every stored file. */
-export async function listBrowserFonts(): Promise<{ faces: BrowserListedFace[]; skipped: string[] }> {
+/** The font folders of the stored files and documents, documents A to Z ignoring case. */
+function foldersOf(files: StoredFaces[], documents: StoredDocument[]): ListedFontFolder[] {
+  const folders = new Map<string, { name: string; size: number }[]>();
+  for (const file of files) {
+    const [folder] = splitKey(file.name);
+    if (folder !== null && !folders.has(folder)) {
+      folders.set(folder, []);
+    }
+  }
+  for (const doc of documents) {
+    const [folder, name] = splitKey(doc.key);
+    if (folder !== null) {
+      folders.set(folder, [...(folders.get(folder) ?? []), { name, size: doc.bytes.byteLength }]);
+    }
+  }
+  return [...folders.entries()].map(([name, docs]) => ({
+    name,
+    documents: docs.sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase())),
+  }));
+}
+
+/** The Curvyo block of the browser: every face of every stored file, and the font folders. */
+export async function listBrowserFonts(): Promise<{
+  faces: BrowserListedFace[];
+  skipped: string[];
+  folders: ListedFontFolder[];
+}> {
   const files = await allFaces().catch(() => []);
-  const faces = files.flatMap((file) =>
-    file.faces.map((face) => ({
+  const documents = await allDocuments().catch(() => []);
+  const faces = files.flatMap((file) => {
+    const [folder, name] = splitKey(file.name);
+    return file.faces.map((face) => ({
       id: `${BROWSER_FONT_PREFIX}${file.name}`,
       family: face.family,
       style: face.style,
@@ -112,9 +178,24 @@ export async function listBrowserFonts(): Promise<{ faces: BrowserListedFace[]; 
       // Length and content: a file removed and added again under its name with other bytes of
       // the same length is checked again (review of 2026-10-20).
       stamp: `${file.length}-${file.sha256}`,
-    })),
+      file: name,
+      size: file.length,
+      ...(folder !== null ? { folder } : {}),
+    }));
+  });
+  return { faces, skipped: [], folders: foldersOf(files, documents) };
+}
+
+/** The bytes of document `name` of font folder `folder`. */
+export async function browserDocumentBytes(folder: string, name: string): Promise<ArrayBuffer> {
+  const db = await database();
+  const doc = await request(
+    db.transaction(DOCUMENTS).objectStore(DOCUMENTS).get(`${folder}/${name}`) as IDBRequest<StoredDocument | undefined>,
   );
-  return { faces, skipped: [] };
+  if (!doc) {
+    throw new Error("this document is no longer stored");
+  }
+  return doc.bytes;
 }
 
 /** The bytes of the stored file behind host id `id`. */
@@ -146,7 +227,7 @@ export function freeFontName(name: string, taken: string[]): string {
 }
 
 /** Whether a storage error means the quota is full (criterion 30). */
-function isQuota(error: unknown): boolean {
+export function isQuota(error: unknown): boolean {
   return error instanceof DOMException && (error.name === "QuotaExceededError" || error.code === 22);
 }
 
@@ -211,15 +292,17 @@ export async function addBrowserFontFiles(files: File[]): Promise<BrowserAddResu
 }
 
 /** Deletes the stored files of a family's faces (criterion 25): a file is deleted only when
- * every face of it is among `faces`, else it is kept. */
+ * every face of it is among `faces`, else it is kept. A font folder left without a file loses
+ * its documents in the same transaction (`0083` criterion 14). */
 export async function removeBrowserFontFiles(
   faces: { id: string; index: number }[],
-): Promise<{ removed: string[]; kept: string[] }> {
+): Promise<{ removed: string[]; kept: string[]; documents: number }> {
   const files = await allFaces();
+  const documents = await allDocuments();
   const removed: string[] = [];
   const kept: string[] = [];
   const db = await database();
-  const tx = db.transaction([FILES, FACES], "readwrite");
+  const tx = db.transaction([FILES, FACES, DOCUMENTS], "readwrite");
   for (const id of new Set(faces.map((face) => face.id))) {
     const name = id.slice(BROWSER_FONT_PREFIX.length);
     const file = files.find((f) => f.name === name);
@@ -235,21 +318,32 @@ export async function removeBrowserFontFiles(
       kept.push(name);
     }
   }
+  let gone = 0;
+  const touched = new Set(removed.map((name) => splitKey(name)[0]).filter((f): f is string => f !== null));
+  for (const folder of touched) {
+    const left = files.some((f) => splitKey(f.name)[0] === folder && !removed.includes(f.name));
+    if (!left) {
+      for (const doc of documents.filter((d) => splitKey(d.key)[0] === folder)) {
+        tx.objectStore(DOCUMENTS).delete(doc.key);
+        gone += 1;
+      }
+    }
+  }
   await new Promise<void>((resolve, reject) => {
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
-  return { removed, kept };
+  return { removed, kept, documents: gone };
 }
 
-/** The browser's file picker for Add font (criterion 28): several fonts; `null` when
- * cancelled. */
+/** The browser's file picker for Add font (criterion 28): several fonts and zip archives
+ * (`0083` criterion 7); `null` when cancelled. */
 export function pickBrowserFontFiles(): Promise<File[] | null> {
   return new Promise((resolve) => {
     const input = document.createElement("input");
     input.type = "file";
     input.multiple = true;
-    input.accept = [...FONT_EXTENSIONS, "image/svg+xml"].join(",");
+    input.accept = [...FONT_EXTENSIONS, "image/svg+xml", ".zip", "application/zip"].join(",");
     input.onchange = () => resolve(input.files && input.files.length > 0 ? Array.from(input.files) : null);
     input.addEventListener("cancel", () => resolve(null));
     input.click();

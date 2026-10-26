@@ -51,7 +51,7 @@ test("the mode, the search and the Recent list are kept with the preview state",
   // Each unreadable field falls back alone; the old fields stay.
   storage.values.set(
     FONT_PREVIEW_KEY,
-    JSON.stringify({ sample: "a", size: 32, full: false, mode: "info", glyphSearch: "x".repeat(65), recent: ["ab", "\u0007", "♥", "♥", 3] }),
+    JSON.stringify({ sample: "a", size: 32, full: false, mode: "table", glyphSearch: "x".repeat(65), recent: ["ab", "\u0007", "♥", "♥", 3] }),
   );
   assert.deepEqual(readPreviewPrefs(storage), { sample: "a", size: 32, full: false, recent: ["♥"] });
 });

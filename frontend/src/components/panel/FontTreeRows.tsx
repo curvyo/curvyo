@@ -11,7 +11,7 @@ import { cssFamilyOf, type LinePreview, linePreviewOf } from "@/lib/fontFaceLoad
 /** A name drawn in a single-line face's own centre lines (`specs/0076-single-line-fonts`
  * criterion 6, design system "Single-line name"): 1 em = `em` px, 1 CSS px round lines in the
  * row's text colour, clipped to the slot. */
-function LineName({ preview, em }: { preview: LinePreview; em: number }) {
+export function LineName({ preview, em }: { preview: LinePreview; em: number }) {
   const [x, y, width, height] = preview.box;
   return (
     <svg
