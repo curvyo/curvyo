@@ -1,0 +1,8 @@
+# Inkscape 1.4.4 --query-all (geometric: stroke:none on a scratch copy); one line per single-leaf element; id,x,y,w,h in Inkscape px
+polygon-01,11,45,97,95
+polygon-02,131,45,97,95
+polygon-03,290,45,120,100
+polygon-05,11,185,97,95
+polygon-06,131,185,97,95
+polygon-07,270,185,150,95
+test-frame,1,1,478,358

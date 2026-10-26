@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+     xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+     xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+     width="210mm" height="297mm" viewBox="0 0 210 297" id="svg1">
+  <sodipodi:namedview id="namedview1" pagecolor="#ffffff" bordercolor="#000000" borderopacity="0.25"
+     inkscape:showpageshadow="2" inkscape:pageopacity="0.0" inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1" inkscape:document-units="mm"/>
+  <g inkscape:groupmode="layer" id="layer1" inkscape:label="Cut">
+    <path id="p1" inkscape:label="p1" style="fill:#ff0000;stroke:none" d="M 10,10 H 30 V 30 H 10 Z"/>
+    <rect id="r1" inkscape:label="r1" style="fill:#00ff00;stroke:none" x="40" y="10" width="30" height="20"/>
+    <rect id="r2" inkscape:label="r2" style="fill:#0000ff;stroke:none" x="80" y="10" width="30" height="20" rx="4"/>
+    <rect id="r3" inkscape:label="r3" style="fill:#0000ff;stroke:none" x="120" y="10" width="30" height="20" rx="6" ry="3"/>
+    <rect id="r4" inkscape:label="r4" style="fill:#00ffff;stroke:none" x="160" y="10" width="30" height="20"/>
+    <circle id="c1" inkscape:label="c1" style="fill:#000000;stroke:none" cx="25" cy="60" r="10"/>
+    <ellipse id="e1" inkscape:label="e1" style="fill:#000000;stroke:none" cx="60" cy="60" rx="15" ry="8"/>
+    <path sodipodi:type="star" id="s1" inkscape:label="s1" style="fill:#ffcc00;stroke:none"
+       sodipodi:sides="5" sodipodi:cx="100" sodipodi:cy="60" sodipodi:r1="12" sodipodi:r2="5"
+       sodipodi:arg1="-1.5707963" sodipodi:arg2="-0.9424778" inkscape:flatsided="false"
+       inkscape:rounded="0" inkscape:randomized="0" d="M 0,0"/>
+    <path sodipodi:type="star" id="s2" inkscape:label="s2" style="fill:#ffcc00;stroke:none"
+       sodipodi:sides="6" sodipodi:cx="140" sodipodi:cy="60" sodipodi:r1="12" sodipodi:r2="10"
+       sodipodi:arg1="0" sodipodi:arg2="0.5235988" inkscape:flatsided="true"
+       inkscape:rounded="0" inkscape:randomized="0" d="M 0,0"/>
+    <circle id="d1" style="fill:#800080;stroke:none" cx="25" cy="100" r="12"/>
+    <circle id="d2" style="fill:#800080;stroke:none" cx="25" cy="100" r="6"/>
+    <rect id="x1" style="fill:#008080;stroke:none" x="50" y="90" width="20" height="20"/>
+    <rect id="x2" style="fill:#008080;stroke:none" x="60" y="100" width="20" height="20"/>
+    <path id="st1" inkscape:label="st1" style="fill:none;stroke:#000000;stroke-width:0.5;stroke-dasharray:2,1;stroke-linecap:round;stroke-linejoin:bevel" d="M 100,100 L 140,100 L 150,120"/>
+  </g>
+  <g inkscape:groupmode="layer" id="layer2" inkscape:label="Engrave" sodipodi:insensitive="true" style="opacity:0.5">
+    <text id="t1" xml:space="preserve" style="font-size:20px;font-family:'DejaVu Sans';fill:#000000;stroke:none" x="20" y="160">Boho</text>
+    <g id="g1" inkscape:label="g1">
+      <path id="p2" inkscape:label="p2" style="fill:#333333;stroke:none" d="M 120,150 C 130,140 150,140 160,150 L 140,170 Z"/>
+    </g>
+  </g>
+  <g inkscape:groupmode="layer" id="layer3" inkscape:label="Reference" style="display:none">
+    <rect id="r5" inkscape:label="r5" style="fill:#cccccc" x="10" y="200" width="50" height="50"/>
+  </g>
+  <g inkscape:groupmode="layer" id="layer4" inkscape:label="Empty"/>
+</svg>

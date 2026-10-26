@@ -1,0 +1,9 @@
+# Inkscape 1.4.4 --query-all (geometric: stroke:none on a scratch copy); one line per single-leaf element; id,x,y,w,h in Inkscape px
+ellipse-01,20,25,60,100
+ellipse-02,130,25,60,100
+ellipse-03,235,45,70,70
+ellipse-04,335,45,70,70
+ellipse-05,20,170,60,100
+ellipse-06,130,170,60,100
+ellipse-07,260,180,140,80
+test-frame,1,1,478,358
