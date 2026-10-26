@@ -8,6 +8,8 @@ use std::path::{Path, PathBuf};
 
 use curvyo_text_core::{FaceStyle, Slant};
 
+use crate::font_subfolders::{FontFolder, folder_files};
+
 /// Where a face was found.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FontSource {
@@ -37,6 +39,11 @@ pub struct FontFace {
     pub stamp: String,
     /// A single-line face (an SVG font, `specs/0076-single-line-fonts` criterion 1).
     pub single_line: bool,
+    /// The file's size in bytes (`specs/0083-font-info-and-zip` criterion 2).
+    pub size: u64,
+    /// The subfolder of the Curvyo folder the file is in; `None` at its top level or for a
+    /// system font (`0083` criterion 10).
+    pub folder: Option<String>,
 }
 
 /// The faces of the Curvyo font folder and the files in it that are not readable fonts.
@@ -47,6 +54,8 @@ pub struct FolderFonts {
     pub faces: Vec<FontFace>,
     /// The names of the font files that could not be read (criterion 19, "2 skipped").
     pub skipped: Vec<String>,
+    /// The subfolders read and their documents (`0083` criteria 4 and 10).
+    pub folders: Vec<FontFolder>,
 }
 
 pub(crate) const FONT_EXTENSIONS: [&str; 3] = ["ttf", "otf", "ttc"];
@@ -146,6 +155,10 @@ fn stamp_of(path: &Path) -> String {
     )
 }
 
+fn size_of(path: &Path) -> u64 {
+    std::fs::metadata(path).map_or(0, |meta| meta.len())
+}
+
 fn small_enough(path: &Path) -> bool {
     std::fs::metadata(path).is_ok_and(|meta| meta.len() <= MAX_FONT_FILE_BYTES)
 }
@@ -180,10 +193,12 @@ fn faces_of(db: &fontdb::Database, source: FontSource) -> Vec<FontFace> {
                 family,
                 style: style_name(face),
                 stamp: stamp_of(&path),
+                size: size_of(&path),
                 path,
                 index: face.index,
                 os2: tables.os2,
                 single_line: false,
+                folder: None,
             })
         })
         .collect();
@@ -203,39 +218,39 @@ fn sort_faces(faces: &mut [FontFace]) {
     });
 }
 
-/// Lists the font files directly in `dir` (not in sub-folders), creating the folder when it is
-/// missing (criterion 19). A file with a font extension (`.svg` included) that holds no readable
-/// face is counted as skipped; other files are ignored.
+/// Whether `path` has a font extension (`.ttf`, `.otf`, `.ttc`, `.svg`, any case).
+pub(crate) fn has_font_extension(path: &Path) -> bool {
+    is_svg(path)
+        || path
+            .extension()
+            .and_then(|e| e.to_str())
+            .is_some_and(|e| FONT_EXTENSIONS.contains(&e.to_ascii_lowercase().as_str()))
+}
+
+/// Lists the font files directly in `dir` and in its subfolders one level deep (not in
+/// dot-folders or symlinked folders), creating the folder when it is missing (criterion 19;
+/// `specs/0083-font-info-and-zip` criterion 10). A file with a font extension (`.svg` included)
+/// that holds no readable face is counted as skipped; other files are ignored.
 #[must_use]
 pub fn list_font_folder(dir: &Path) -> FolderFonts {
     let _ = std::fs::create_dir_all(dir);
     let mut db = fontdb::Database::new();
     let mut skipped = Vec::new();
-    let Ok(entries) = std::fs::read_dir(dir) else {
-        return FolderFonts::default();
-    };
-    let mut files: Vec<PathBuf> = entries
-        .filter_map(Result::ok)
-        .map(|entry| entry.path())
-        .filter(|path| path.is_file())
-        .filter(|path| {
-            is_svg(path)
-                || path
-                    .extension()
-                    .and_then(|e| e.to_str())
-                    .is_some_and(|e| FONT_EXTENSIONS.contains(&e.to_ascii_lowercase().as_str()))
-        })
-        .collect();
-    files.sort();
+    let listed = folder_files(dir);
     let name = |path: &Path| {
         path.file_name()
             .map(|name| name.to_string_lossy().into_owned())
             .unwrap_or_default()
     };
+    let mut folder_of: std::collections::HashMap<PathBuf, Option<String>> =
+        std::collections::HashMap::new();
     let mut svg_faces = Vec::new();
-    for path in files {
+    for (path, folder) in listed.files {
+        if !has_font_extension(&path) {
+            continue;
+        }
         if is_svg(&path) {
-            let faces = svg_faces_of(&path);
+            let faces = svg_faces_of(&path, folder.as_ref());
             if faces.is_empty() {
                 skipped.push(name(&path));
             }
@@ -246,15 +261,23 @@ pub fn list_font_folder(dir: &Path) -> FolderFonts {
         if !small_enough(&path) || db.load_font_file(&path).is_err() || db.len() == before {
             skipped.push(name(&path));
         }
+        folder_of.insert(path, folder);
     }
     let mut faces = faces_of(&db, FontSource::Curvyo);
+    for face in &mut faces {
+        face.folder = folder_of.get(&face.path).cloned().flatten();
+    }
     faces.extend(svg_faces);
     sort_faces(&mut faces);
-    FolderFonts { faces, skipped }
+    FolderFonts {
+        faces,
+        skipped,
+        folders: listed.folders,
+    }
 }
 
 /// The faces of the SVG font at `path` (empty when it is larger than 16 MiB or not a font).
-fn svg_faces_of(path: &Path) -> Vec<FontFace> {
+fn svg_faces_of(path: &Path, folder: Option<&String>) -> Vec<FontFace> {
     let small = std::fs::metadata(path)
         .is_ok_and(|meta| meta.len() <= crate::svg_fonts::MAX_SVG_FONT_BYTES as u64);
     let Some(bytes) = small.then(|| std::fs::read(path).ok()).flatten() else {
@@ -271,6 +294,8 @@ fn svg_faces_of(path: &Path) -> Vec<FontFace> {
             os2: None,
             stamp: stamp_of(path),
             single_line: true,
+            size: bytes.len() as u64,
+            folder: folder.cloned(),
         })
         .collect()
 }
@@ -304,8 +329,8 @@ mod tests {
     }
 
     /// Criteria 19 and 21: the folder is created, every font file directly in it is listed by
-    /// family and style, a damaged one is counted as skipped, sub-folders and other files are
-    /// not read.
+    /// family and style, a damaged one is counted as skipped, other files are not read; a
+    /// subfolder one level deep is read (`0083` criterion 10).
     #[test]
     fn ac19_ac21_folder_listing() {
         let dir = tempfile::tempdir().unwrap();
@@ -348,8 +373,15 @@ mod tests {
             .collect();
         assert_eq!(
             names,
-            [("Source Sans 3", "Italic"), ("Source Serif 4", "Bold")]
+            [
+                ("Great Vibes", "Regular"),
+                ("Source Sans 3", "Italic"),
+                ("Source Serif 4", "Bold")
+            ]
         );
+        assert_eq!(listed.faces[0].folder.as_deref(), Some("sub"));
+        assert_eq!(listed.faces[1].folder, None);
+        assert!(listed.faces[0].size > 0);
         assert_eq!(listed.skipped, ["broken.ttf"]);
         assert!(listed.faces.iter().all(|f| f.source == FontSource::Curvyo));
     }

@@ -17,6 +17,9 @@ kurbo.workspace = true
 roxmltree.workspace = true
 thiserror.workspace = true
 unicode-segmentation.workspace = true
+# Zip archives of fonts (`specs/0083-font-info-and-zip` adrs.md decision 1): the reader already
+# in the workspace for the `.curvyo` container, deflate only.
+zip.workspace = true
 
 [dev-dependencies]
 toml.workspace = true

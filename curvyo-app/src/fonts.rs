@@ -36,6 +36,27 @@ pub(crate) struct ListedFace {
     /// `"single_line"` for an SVG font (`0076` criterion 1), else absent.
     #[serde(skip_serializing_if = "Option::is_none")]
     kind: Option<&'static str>,
+    /// The file's name and size, and the folder it is in for display only (`0083` criterion 2,
+    /// ADR 0020 §3 note of 2026-10-26): the page never passes the path back.
+    file: String,
+    size: u64,
+    path: String,
+    /// The Curvyo folder's subfolder the file is in (`0083` criterion 10).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    folder: Option<String>,
+}
+
+/// A subfolder of the Curvyo folder and its documents (`0083` criterion 4).
+#[derive(Clone, serde::Serialize)]
+pub(crate) struct ListedFolder {
+    name: String,
+    documents: Vec<ListedDocument>,
+}
+
+#[derive(Clone, serde::Serialize)]
+pub(crate) struct ListedDocument {
+    name: String,
+    size: u64,
 }
 
 /// The Curvyo folder's faces and the names of its unreadable files.
@@ -43,6 +64,7 @@ pub(crate) struct ListedFace {
 pub(crate) struct FolderList {
     faces: Vec<ListedFace>,
     skipped: Vec<String>,
+    folders: Vec<ListedFolder>,
 }
 
 fn listed(files: &FontFiles, faces: Vec<FontFace>) -> Vec<ListedFace> {
@@ -56,6 +78,16 @@ fn listed(files: &FontFiles, faces: Vec<FontFace>) -> Vec<ListedFace> {
             let mut hasher = DefaultHasher::new();
             face.path.hash(&mut hasher);
             let id = format!("{:016x}", hasher.finish());
+            let file = face
+                .path
+                .file_name()
+                .map(|name| name.to_string_lossy().into_owned())
+                .unwrap_or_default();
+            let path = face
+                .path
+                .parent()
+                .map(|dir| dir.display().to_string())
+                .unwrap_or_default();
             known.insert(id.clone(), face.path);
             ListedFace {
                 id,
@@ -71,12 +103,16 @@ fn listed(files: &FontFiles, faces: Vec<FontFace>) -> Vec<ListedFace> {
                 }),
                 stamp: face.stamp,
                 kind: face.single_line.then_some("single_line"),
+                file,
+                size: face.size,
+                path,
+                folder: face.folder,
             }
         })
         .collect()
 }
 
-fn fonts_dir(app: &AppHandle) -> Result<PathBuf, String> {
+pub(crate) fn fonts_dir(app: &AppHandle) -> Result<PathBuf, String> {
     app.path()
         .app_data_dir()
         .map(|dir| dir.join(FONTS_FOLDER))
@@ -96,6 +132,21 @@ pub(crate) fn font_folder_list(
     Ok(FolderList {
         faces: listed(&files, folder.faces),
         skipped: folder.skipped,
+        folders: folder
+            .folders
+            .into_iter()
+            .map(|f| ListedFolder {
+                name: f.name,
+                documents: f
+                    .documents
+                    .into_iter()
+                    .map(|d| ListedDocument {
+                        name: d.name,
+                        size: d.size,
+                    })
+                    .collect(),
+            })
+            .collect(),
     })
 }
 
@@ -135,13 +186,42 @@ pub(crate) fn font_bytes(
     Ok(tauri::ipc::Response::new(bytes))
 }
 
-/// What Add font did, by file name (`0075` criterion 22).
+/// What Add font did, by file name (`0075` criterion 22), and per archive (`0083` criterion 13).
 #[derive(Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct AddedFonts {
     added: Vec<String>,
     present: Vec<String>,
     not_fonts: Vec<String>,
+    archives: Vec<AddedArchive>,
+}
+
+/// What adding one archive did; `refused` is `"unreadable"` or `"over_limit"`.
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct AddedArchive {
+    name: String,
+    added: usize,
+    present: usize,
+    documents: usize,
+    unsafe_entries: usize,
+    refused: Option<&'static str>,
+}
+
+impl From<curvyo_storage_io::AddedArchive> for AddedArchive {
+    fn from(report: curvyo_storage_io::AddedArchive) -> Self {
+        Self {
+            name: report.name,
+            added: report.added.len(),
+            present: report.present,
+            documents: report.documents,
+            unsafe_entries: report.unsafe_entries,
+            refused: report.refused.map(|refusal| match refusal {
+                curvyo_storage_io::ArchiveRefusal::Unreadable => "unreadable",
+                curvyo_storage_io::ArchiveRefusal::OverLimit => "over_limit",
+            }),
+        }
+    }
 }
 
 /// The files the maker chose in the Add font dialog or dropped on the window: the only paths
@@ -159,9 +239,10 @@ pub(crate) fn grant_font_paths(app: &AppHandle, paths: &[PathBuf]) {
         .extend(paths.iter().cloned());
 }
 
-/// The file types the dialog offers (`0075` criterion 20; SVG fonts, `0076` criterion 3).
+/// The file types the dialog offers (`0075` criterion 20; SVG fonts, `0076` criterion 3; zip
+/// archives, `0083` criterion 7).
 const FONT_FILTER_NAME: &str = "Fonts";
-const FONT_FILTER: [&str; 4] = ["ttf", "otf", "ttc", "svg"];
+const FONT_FILTER: [&str; 5] = ["ttf", "otf", "ttc", "svg", "zip"];
 
 /// The file dialog of Add font (`0075` criterion 20): several files, fonts only; `None` when
 /// cancelled. The chosen paths go to the page as a drop's do, so it can count them while
@@ -218,8 +299,15 @@ pub(crate) async fn add_font_files(
             granted.remove(path);
         }
     }
-    let report = tauri::async_runtime::spawn_blocking(move || {
-        curvyo_storage_io::add_font_files(&dir, &chosen)
+    let (archives, fonts): (Vec<PathBuf>, Vec<PathBuf>) = chosen
+        .into_iter()
+        .partition(|path| curvyo_storage_io::is_archive(path));
+    let (report, archives) = tauri::async_runtime::spawn_blocking(move || {
+        let archives: Vec<AddedArchive> = archives
+            .iter()
+            .map(|path| curvyo_storage_io::add_font_archive(&dir, path).into())
+            .collect();
+        (curvyo_storage_io::add_font_files(&dir, &fonts), archives)
     })
     .await
     .map_err(|error| error.to_string())?;
@@ -227,6 +315,7 @@ pub(crate) async fn add_font_files(
         added: report.added,
         present: report.present,
         not_fonts: report.not_fonts,
+        archives,
     })
 }
 
@@ -242,10 +331,13 @@ pub(crate) struct FaceToRemove {
 pub(crate) struct RemovedFonts {
     removed: Vec<String>,
     kept: Vec<String>,
+    /// Documents deleted with an emptied font folder (`0083` criterion 14).
+    documents: usize,
 }
 
 /// Remove from Curvyo fonts (`0075` criterion 25): deletes the files of these faces that lie
-/// directly in the Curvyo folder and hold no other face; any other file is kept and named.
+/// directly in the Curvyo folder or a subfolder of it and hold no other face; any other file is
+/// kept and named. An emptied font folder goes with its documents (`0083` criterion 14).
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)]
 pub(crate) fn remove_font_files(
@@ -267,5 +359,6 @@ pub(crate) fn remove_font_files(
     Ok(RemovedFonts {
         removed: report.removed,
         kept: report.kept,
+        documents: report.documents,
     })
 }

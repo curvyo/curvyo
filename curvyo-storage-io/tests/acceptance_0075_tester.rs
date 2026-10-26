@@ -89,6 +89,8 @@ fn ac27_file_manager_copy_and_delete_still_work() {
 
 /// Criterion 25 and the core rule "nothing outside the Curvyo folder": Remove refuses paths
 /// outside the folder, `..` escapes and a file in a sub-folder, and never deletes them.
+/// (`specs/0083-font-info-and-zip` criterion 14 widened Remove to subfolders one level deep; the
+/// sub-folder case is now two levels deep, which stays refused.)
 #[test]
 fn ac25_remove_never_leaves_the_folder() {
     let root = tempfile::tempdir().unwrap();
@@ -96,8 +98,8 @@ fn ac25_remove_never_leaves_the_folder() {
     std::fs::create_dir(&dir).unwrap();
     let outside = root.path().join("outside.ttf");
     std::fs::copy(included(SCRIPT), &outside).unwrap();
-    let sub = dir.join("sub");
-    std::fs::create_dir(&sub).unwrap();
+    let sub = dir.join("sub").join("deeper");
+    std::fs::create_dir_all(&sub).unwrap();
     let nested = sub.join("nested.ttf");
     std::fs::copy(included(SCRIPT), &nested).unwrap();
 

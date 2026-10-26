@@ -21,3 +21,5 @@ curvyo-text-core = { path = "../curvyo-text-core", version = "0.1.0" }
 # Only the test that opening an older project writes nothing to its file (`0040` criterion 4).
 curvyo-document-core = { path = "../curvyo-document-core", version = "0.1.0" }
 tempfile = "3"
+# Builds archives for the font archive tests (`specs/0083-font-info-and-zip`).
+zip.workspace = true

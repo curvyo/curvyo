@@ -1,12 +1,15 @@
 //! Copies font files into the Curvyo font folder and deletes a family's files from it
 //! (`specs/0075-font-library` criteria 21, 22, 25 and 32, `adrs.md` decision 6). A file is
 //! accepted exactly when the folder listing would list a face of it; nothing outside the folder
-//! is ever written or deleted.
+//! and its listed subfolders is ever written or deleted (`specs/0083-font-info-and-zip`
+//! criteria 11 and 14, `adrs.md` decision 8).
 
 use std::path::{Path, PathBuf};
 
 use crate::filesystem::write_atomic;
-use crate::fonts::{FONT_EXTENSIONS, MAX_FONT_FILE_BYTES, face_tables, is_svg};
+use crate::font_subfolders::{folder_files, is_listed_folder_name};
+use crate::fonts::{MAX_FONT_FILE_BYTES, face_tables, has_font_extension, is_svg};
+use curvyo_text_core::is_document_name;
 
 /// What an Add did, by the chosen files' names.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -25,8 +28,10 @@ pub struct RemovedFonts {
     /// Deleted from the folder.
     pub removed: Vec<String>,
     /// Kept: a collection that also holds faces of another family, or a file not directly in
-    /// the folder.
+    /// the folder or one of its listed subfolders.
     pub kept: Vec<String>,
+    /// The documents deleted with a font folder that lost its last font (`0083` criterion 14).
+    pub documents: usize,
 }
 
 fn name_of(path: &Path) -> String {
@@ -35,18 +40,10 @@ fn name_of(path: &Path) -> String {
         .unwrap_or_default()
 }
 
-fn has_font_extension(path: &Path) -> bool {
-    is_svg(path)
-        || path
-            .extension()
-            .and_then(|e| e.to_str())
-            .is_some_and(|e| FONT_EXTENSIONS.contains(&e.to_ascii_lowercase().as_str()))
-}
-
 /// Whether `bytes` hold a face the folder listing lists: `fontdb` reads it with a family name
 /// and it has outlines and no colour tables, or it is an SVG font with a drawn glyph
 /// (`specs/0076-single-line-fonts` criterion 3).
-fn is_listable(bytes: &[u8]) -> bool {
+pub(crate) fn is_listable(bytes: &[u8]) -> bool {
     if !crate::svg_fonts::svg_font_faces(bytes).is_empty() {
         return true;
     }
@@ -60,7 +57,7 @@ fn is_listable(bytes: &[u8]) -> bool {
 
 /// The bytes of the file at `path`, read through `take` so a file that grows past the 64 MiB
 /// limit after a size check is never read whole; `None` for a larger or unreadable file.
-fn read_limited(path: &Path) -> Option<Vec<u8>> {
+pub(crate) fn read_limited(path: &Path) -> Option<Vec<u8>> {
     use std::io::Read;
     let file = std::fs::File::open(path).ok()?;
     if !file.metadata().ok()?.is_file() {
@@ -74,22 +71,38 @@ fn read_limited(path: &Path) -> Option<Vec<u8>> {
 }
 
 /// The files directly in `dir`.
-fn folder_files(dir: &Path) -> Vec<PathBuf> {
-    std::fs::read_dir(dir)
-        .map(|entries| {
-            entries
-                .filter_map(Result::ok)
-                .map(|entry| entry.path())
-                .filter(|path| path.is_file())
-                .collect()
-        })
-        .unwrap_or_default()
+fn top_level_files(dir: &Path) -> Vec<PathBuf> {
+    folder_files(dir)
+        .files
+        .into_iter()
+        .filter(|(_, folder)| folder.is_none())
+        .map(|(path, _)| path)
+        .collect()
+}
+
+/// Whether a file of `existing` holds exactly `bytes`.
+pub(crate) fn same_bytes_in(existing: &[PathBuf], bytes: &[u8]) -> bool {
+    existing.iter().any(|other| {
+        std::fs::metadata(other).is_ok_and(|m| m.len() == bytes.len() as u64)
+            && std::fs::read(other).is_ok_and(|other| other == bytes)
+    })
+}
+
+/// Every font file of the Curvyo folder and its listed subfolders (de-duplication, `0083`
+/// criterion 11).
+pub(crate) fn every_font_file(dir: &Path) -> Vec<PathBuf> {
+    folder_files(dir)
+        .files
+        .into_iter()
+        .map(|(path, _)| path)
+        .filter(|path| has_font_extension(path))
+        .collect()
 }
 
 /// The first free name for `name` among `taken`, compared by Unicode lower case (the browser's
 /// `freeFontName` uses the same rule): `name`, else
 /// `<stem>-2.<ext>`, `-3`, ...
-fn free_name(name: &str, taken: &[String]) -> String {
+pub(crate) fn free_name(name: &str, taken: &[String]) -> String {
     let is_taken = |candidate: &str| {
         taken
             .iter()
@@ -128,16 +141,11 @@ pub fn add_font_files(dir: &Path, paths: &[PathBuf]) -> AddedFonts {
             report.not_fonts.push(name);
             continue;
         };
-        let existing = folder_files(dir);
-        let same = existing.iter().any(|other| {
-            std::fs::metadata(other).is_ok_and(|m| m.len() == bytes.len() as u64)
-                && std::fs::read(other).is_ok_and(|other| other == bytes)
-        });
-        if same {
+        if same_bytes_in(&every_font_file(dir), &bytes) {
             report.present.push(name);
             continue;
         }
-        let taken: Vec<String> = existing.iter().map(|p| name_of(p)).collect();
+        let taken: Vec<String> = top_level_files(dir).iter().map(|p| name_of(p)).collect();
         let target = free_name(&name, &taken);
         if write_atomic(&dir.join(&target), &bytes).is_ok() {
             report.added.push(target);
@@ -148,9 +156,76 @@ pub fn add_font_files(dir: &Path, paths: &[PathBuf]) -> AddedFonts {
     report
 }
 
+/// Where a file to remove lies in the Curvyo folder.
+enum Place {
+    /// Directly in it.
+    Top,
+    /// In this listed subfolder of it.
+    Subfolder(PathBuf),
+}
+
+/// Where `file` lies in the canonical Curvyo folder `folder`; `None` anywhere else.
+fn place_of(folder: &Path, file: &Path) -> Option<Place> {
+    let real = file.canonicalize().ok()?;
+    let parent = real.parent()?;
+    if parent == folder {
+        return Some(Place::Top);
+    }
+    let listed = parent
+        .file_name()
+        .is_some_and(|name| is_listed_folder_name(&name.to_string_lossy()));
+    (listed && parent.parent() == Some(folder)).then(|| Place::Subfolder(parent.to_path_buf()))
+}
+
+/// The face indices of the font file `file`.
+fn face_indices(file: &Path) -> Vec<u32> {
+    if is_svg(file) {
+        let bytes = std::fs::read(file).unwrap_or_default();
+        return crate::svg_fonts::svg_font_faces(&bytes)
+            .iter()
+            .map(|face| face.index)
+            .collect();
+    }
+    let mut db = fontdb::Database::new();
+    let _ = db.load_font_file(file);
+    db.faces().map(|face| face.index).collect()
+}
+
+/// After a removal from the font folder `subfolder`: when it holds no font the listing would
+/// list, its documents are deleted and the folder removed if that leaves it empty (never a
+/// maker's other files). Returns the documents deleted.
+fn clear_emptied_folder(subfolder: &Path) -> usize {
+    let files: Vec<PathBuf> = std::fs::read_dir(subfolder)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .map(|entry| entry.path())
+        .filter(|path| path.is_file())
+        .collect();
+    let has_font = files.iter().any(|path| {
+        has_font_extension(path) && read_limited(path).is_some_and(|bytes| is_listable(&bytes))
+    });
+    if has_font {
+        return 0;
+    }
+    let mut deleted = 0;
+    for path in &files {
+        let name = path
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        if is_document_name(&name) && std::fs::remove_file(path).is_ok() {
+            deleted += 1;
+        }
+    }
+    let _ = std::fs::remove_dir(subfolder);
+    deleted
+}
+
 /// Deletes the files of a family's faces `faces` (file and face index) from `dir`. A file is
-/// deleted only when it lies directly in `dir` and every face of it is among `faces`; otherwise
-/// it is kept and named in [`RemovedFonts::kept`].
+/// deleted only when it lies directly in `dir` or in a listed subfolder of it and every face of
+/// it is among `faces`; otherwise it is kept and named in [`RemovedFonts::kept`]. A subfolder
+/// left with no font loses its documents and, when then empty, itself (`0083` criterion 14).
 #[must_use]
 pub fn remove_font_files(dir: &Path, faces: &[(PathBuf, u32)]) -> RemovedFonts {
     let mut report = RemovedFonts::default();
@@ -160,34 +235,30 @@ pub fn remove_font_files(dir: &Path, faces: &[(PathBuf, u32)]) -> RemovedFonts {
     let mut files: Vec<&PathBuf> = faces.iter().map(|(path, _)| path).collect();
     files.sort();
     files.dedup();
+    let mut touched: Vec<PathBuf> = Vec::new();
     for file in files {
-        let inside = file
-            .canonicalize()
-            .ok()
-            .and_then(|real| real.parent().map(|parent| parent == folder))
-            .unwrap_or(false);
-        let mut db = fontdb::Database::new();
-        let mut indices: Vec<u32> = Vec::new();
-        if inside && is_svg(file) {
-            let bytes = std::fs::read(file).unwrap_or_default();
-            indices = crate::svg_fonts::svg_font_faces(&bytes)
-                .iter()
-                .map(|face| face.index)
-                .collect();
-        } else if inside {
-            let _ = db.load_font_file(file);
-            indices = db.faces().map(|face| face.index).collect();
-        }
+        let place = place_of(&folder, file);
+        let indices = if place.is_some() {
+            face_indices(file)
+        } else {
+            Vec::new()
+        };
         let all_faces = !indices.is_empty()
             && indices
                 .iter()
                 .all(|index| faces.iter().any(|(p, i)| p == file && i == index));
-        if inside && all_faces && std::fs::remove_file(file).is_ok() {
+        if all_faces && std::fs::remove_file(file).is_ok() {
             report.removed.push(name_of(file));
+            if let Some(Place::Subfolder(subfolder)) = place
+                && !touched.contains(&subfolder)
+            {
+                touched.push(subfolder);
+            }
         } else {
             report.kept.push(name_of(file));
         }
     }
+    report.documents = touched.iter().map(|sub| clear_emptied_folder(sub)).sum();
     report
 }
 
@@ -250,7 +321,10 @@ mod tests {
         assert_eq!(second.present, ["Font.ttf"]);
         assert_eq!(second.added, ["font-2.TTF"]);
         assert!(serif.is_file(), "the original stays");
-        let mut names: Vec<String> = folder_files(&folder).iter().map(|p| name_of(p)).collect();
+        let mut names: Vec<String> = top_level_files(&folder)
+            .iter()
+            .map(|p| name_of(p))
+            .collect();
         names.sort();
         assert_eq!(names, ["Font.ttf", "font-2.TTF"]);
     }
@@ -284,6 +358,52 @@ mod tests {
         let report = remove_font_files(&folder, &[(collection.clone(), 0)]);
         assert_eq!(report.kept, ["Two.ttc"]);
         assert!(collection.exists());
+    }
+
+    /// `0083` criterion 14: a family in a font folder is removed with the folder's documents
+    /// when it was the last font; a folder that keeps another font keeps its documents; a
+    /// maker's other file keeps the folder.
+    #[test]
+    fn ac14_remove_from_a_font_folder() {
+        let dir = tempfile::tempdir().unwrap();
+        let folder = dir.path().join("fonts");
+        let lobster = folder.join("Lobster");
+        std::fs::create_dir_all(&lobster).unwrap();
+        let vibes = lobster.join("Vibes.ttf");
+        let serif = lobster.join("Serif.ttf");
+        std::fs::copy(included("great-vibes/GreatVibes-Regular.ttf"), &vibes).unwrap();
+        std::fs::copy(included("source-serif-4/SourceSerif4-Bold.ttf"), &serif).unwrap();
+        std::fs::write(lobster.join("OFL.txt"), b"licence").unwrap();
+        std::fs::write(lobster.join("README.md"), b"readme").unwrap();
+        let first = remove_font_files(&folder, &[(vibes.clone(), 0)]);
+        assert_eq!((first.removed.len(), first.documents), (1, 0));
+        assert!(lobster.join("OFL.txt").exists());
+        let second = remove_font_files(&folder, &[(serif, 0)]);
+        assert_eq!((second.removed.len(), second.documents), (1, 2));
+        assert!(!lobster.exists());
+        let kept = folder.join("Kept");
+        std::fs::create_dir(&kept).unwrap();
+        std::fs::copy(
+            included("great-vibes/GreatVibes-Regular.ttf"),
+            kept.join("V.ttf"),
+        )
+        .unwrap();
+        std::fs::write(kept.join("OFL.txt"), b"licence").unwrap();
+        std::fs::write(kept.join("photo.png"), b"mine").unwrap();
+        let third = remove_font_files(&folder, &[(kept.join("V.ttf"), 0)]);
+        assert_eq!(third.documents, 1);
+        assert!(kept.join("photo.png").exists());
+        let deep = kept.join("deeper");
+        std::fs::create_dir(&deep).unwrap();
+        std::fs::copy(
+            included("great-vibes/GreatVibes-Regular.ttf"),
+            deep.join("D.ttf"),
+        )
+        .unwrap();
+        assert_eq!(
+            remove_font_files(&folder, &[(deep.join("D.ttf"), 0)]).kept,
+            ["D.ttf"]
+        );
     }
 
     /// A TrueType collection of two faces, both Great Vibes' bytes (the table offsets of the
