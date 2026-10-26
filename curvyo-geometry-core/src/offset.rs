@@ -26,7 +26,7 @@ use crate::flatten::flatten;
 use crate::offset_finish::{canonical, lines_of_mm};
 use crate::offset_pieces::{RawStyle, closed_loop, segments_of};
 use crate::offset_polyline::{polyline_offset, without_flattening_noise};
-use crate::offset_rebuild::rebuild;
+use crate::offset_rebuild::{FillRule, rebuild};
 use crate::outline_touch::point_segment_distance;
 
 /// How a corner is treated where the offset outline opens a gap.
@@ -95,6 +95,11 @@ pub struct OffsetOutlines {
 }
 
 impl OffsetOutlines {
+    /// Outlines already in canonical order, `fallback` of them polylines.
+    pub(crate) const fn from_parts(outlines: Vec<Vec<OffsetAnchor>>, fallback: usize) -> Self {
+        Self { outlines, fallback }
+    }
+
     /// The outlines in canonical order. Never empty.
     #[must_use]
     pub fn outlines(&self) -> &[Vec<OffsetAnchor>] {
@@ -147,6 +152,7 @@ pub fn offset(
     let style = RawStyle {
         join,
         curve_tolerance_mm: checked.flatten_mm / 2.0,
+        clip_long_miters: true,
     };
     let region = normalize(&grid_paths(operand, checked.flatten_mm));
     if region.is_empty() {
@@ -154,7 +160,7 @@ pub fn offset(
     }
     let loops = closed_loops(operand, &region, checked.d, style, checked.flatten_mm);
     let (outlines, fallback) = if let Some(loops) = loops {
-        let rebuilt = rebuild(&loops, checked.flatten_mm, tolerance.as_mm(), |rings| {
+        let rebuilt = rebuild(&loops, checked.flatten_mm, tolerance.as_mm(), FillRule::Positive, |rings| {
             let rings = without_flattening_noise(rings, checked.flatten_mm);
             without_inverted_rings(rings, operand, checked.d.abs(), checked.flatten_mm)
         });

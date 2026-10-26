@@ -38,6 +38,10 @@ mod path_measure;
 mod region_contact;
 mod segment;
 mod stack_regions;
+mod stroke_dash;
+mod stroke_loops;
+mod stroke_markers;
+mod stroke_outline;
 mod visible_region;
 mod weld;
 mod weld_lines;
@@ -60,5 +64,6 @@ pub use segment::{
     subdivide_at_parameter,
 };
 pub use stack_regions::StackError;
+pub use stroke_outline::{StrokeOutlineError, StrokeShape, stroke_outline};
 pub use visible_region::{Visible, visible_regions};
 pub use weld::{Welded, weld};
