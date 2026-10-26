@@ -197,15 +197,15 @@ pub fn lay_out_on_path(
     let mut next_id = 0_u64;
     for (index, line) in laid.lines.iter().enumerate() {
         for glyph in &line.glyphs {
-            let outline = face.outline(glyph.glyph);
-            if outline.path.elements().is_empty() {
-                continue;
-            }
             let Some(frame) = placement.frame(index, glyph.centre_x.0) else {
                 continue;
             };
-            let in_line = glyph_in_line(glyph, laid);
-            let path = in_line * &outline.path;
+            // Tapered and turned in the glyph's own frame before it is put on the carrier
+            // (`0079` criterion 19); the frame is rigid, so the accuracy holds on the page.
+            let Some(path) = laid.glyph_in_line(face, glyph, curvyo_text_core::TAPER_ACCURACY)
+            else {
+                continue;
+            };
             let map = |p: kurbo::Point| frame.apply_point(Point::new(p.x, p.y));
             let contours = crate::text_layout::contours_of(&path, &map, &mut next_id);
             glyph_outlines.push(contours.len());
@@ -227,21 +227,6 @@ pub fn lay_out_on_path(
         letter_boxes,
         substitute,
     }
-}
-
-/// The map of a glyph's em outline into line space: scaled, at its origin, turned by the text's
-/// character rotation plus the character's own rotation about its cluster's centre (`0079`
-/// criteria 11, 27b; `0080` criterion 47). A text on path is laid out horizontally, so line space
-/// is text space.
-fn glyph_in_line(glyph: &curvyo_text_core::PlacedGlyph, laid: &TextLayout) -> kurbo::Affine {
-    let placed =
-        kurbo::Affine::translate(glyph.origin.to_vec2()) * kurbo::Affine::scale(laid.mm_per_em);
-    let turn = laid.rotation_rad + glyph.rotation_rad;
-    if turn == 0.0 {
-        return placed;
-    }
-    kurbo::Affine::rotate_about(turn, kurbo::Point::new(glyph.centre_x.0, glyph.centre_y.0))
-        * placed
 }
 
 /// A cluster as it is drawn on the carrier: the map of its line-space points to the document
