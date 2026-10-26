@@ -69,6 +69,13 @@ bar, both applied to the spec).
 ### Milestone 4: docs (commit `docs`)
 - [x] 4.1 ADR 0020 §3 dated note, design-system rows, this plan's results
 
+### Milestone 5: tester findings (commit `fix(curvyo-text-core)`)
+- [x] 5.1 `archive_folder_name`: leading dots and spaces removed, `Fonts` when nothing is left,
+  so a folder from `.Lobster.zip` is listed and never matches `.curvyo-add-*` (AC 9, 10, 12)
+- [x] 5.2 Entries with the same full name are all kept (`OFL.txt`, `OFL-2.txt`) (AC 9, 16)
+- [x] 5.3 Browser: a storage error other than a full storage gives "Lobster.zip could not be
+  added." and keeps nothing (AC 13, 18)
+
 ## Validation
 
 - Golden fixtures per hostile case (criterion 16) with the expected class or error.
@@ -135,3 +142,14 @@ bar, both applied to the spec).
   (see above).
 
 - 2026-10-26, lead (customer review): `open` with default features only, so `dunce` is not pulled (it came only through `shellexecute-on-windows`); on Windows `open` uses `cmd /c start`. `is-wsl` (with `is-docker`, about 90 lines together) stays for now; the customer suggests an upstream PR to `open` that inlines the WSL check instead of the dependency.
+
+- 2026-10-26, tester findings: the `zip` crate keys its entry table by name, so a second entry
+  with the same full name replaced the first. `FontArchive::open` walks the central directory
+  itself and gives each repeated name a unique stand-in of the same length in the central
+  record before `zip` reads the table (the local header is not compared); the entry list shows
+  the original names, and the sanitised names are made unique as before (`OFL-2.txt`; two equal
+  fonts are "already there" by the `0075` rule). Two records pointing at the same data are now
+  both listed and so caught by the overlap check (unreadable).
+- 2026-10-26, follow-up candidate (no change): on Windows `open` without `shellexecute-on-windows`
+  runs `cmd /c start`; a document path with `%` or `^` may then be expanded or escaped by `cmd`
+  and not open.

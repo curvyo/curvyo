@@ -85,6 +85,16 @@ test("criterion 13: several archives and loose files are summed", () => {
   }
 });
 
+test("criterion 18: an archive the store could not write gets the failure notice", () => {
+  assert.equal(only(archive({ refused: "not_written" })), "Lobster.zip could not be added.");
+  const two = addNoticeWithArchives(
+    { added: [], present: [], notFonts: [], archives: [archive({ refused: "not_written" }), archive({ name: "B.zip", refused: "not_written" })] },
+    null,
+  );
+  assert.equal(two.text, "Lobster.zip and 1 more could not be added.");
+  assert.equal(two.kind, "refusal");
+});
+
 test("criterion 9: a taken folder name gets -2, by lower case (the Rust table)", () => {
   assert.equal(freeFolderName("Lobster", ["lobster"]), "Lobster-2");
   assert.equal(freeFolderName("Pack.v2", ["pack.V2"]), "Pack.v2-2");

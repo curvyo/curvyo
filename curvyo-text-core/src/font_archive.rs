@@ -6,6 +6,7 @@
 //! decompressed through a bounded reader. Font entries are only candidates: the caller checks
 //! their bytes as it checks a loose font file.
 
+use std::collections::{HashMap, HashSet};
 use std::io::{Cursor, Read};
 
 use zip::{CompressionMethod, ZipArchive};
@@ -156,13 +157,23 @@ fn end_record(bytes: &[u8]) -> Option<(u64, u64)> {
     Some((le_u64(bytes, record + 32)?, le_u64(bytes, record + 48)?))
 }
 
-/// The raw names whose central header sets the UTF-8 flag (general purpose bit 11). A walk that
-/// meets damaged headers stops; the names read so far are kept.
-fn utf8_flagged(bytes: &[u8], start: u64, count: u64) -> Vec<Vec<u8>> {
+/// One central directory record's name as the archive stores it.
+struct CentralName {
+    /// The raw name bytes.
+    raw: Vec<u8>,
+    /// Where the name starts in the archive bytes.
+    at: usize,
+    /// Whether the record sets the UTF-8 flag (general purpose bit 11).
+    utf8: bool,
+}
+
+/// The names of the central directory records in table order. A walk that meets damaged headers
+/// stops; the names read so far are kept.
+fn central_names(bytes: &[u8], start: u64, count: u64) -> Vec<CentralName> {
     const CENTRAL: u32 = 0x0201_4b50;
-    let mut flagged = Vec::new();
+    let mut names = Vec::new();
     let Ok(mut at) = usize::try_from(start) else {
-        return flagged;
+        return names;
     };
     for _ in 0..count {
         if le_u32(bytes, at) != Some(CENTRAL) {
@@ -180,21 +191,59 @@ fn utf8_flagged(bytes: &[u8], start: u64, count: u64) -> Vec<Vec<u8>> {
         let Some(raw) = bytes.get(name_at..name_at + usize::from(name)) else {
             break;
         };
-        if flags & 0x0800 != 0 && std::str::from_utf8(raw).is_err() {
-            flagged.push(raw.to_vec());
-        }
+        names.push(CentralName {
+            raw: raw.to_vec(),
+            at: name_at,
+            utf8: flags & 0x0800 != 0,
+        });
         at = name_at + usize::from(name) + usize::from(extra) + usize::from(comment);
     }
-    flagged
+    names
+}
+
+/// A name of `len` bytes not in `seen`, ending in `/` when `folder` (a folder stays a folder);
+/// `None` when the length leaves no free name.
+fn stand_in(len: usize, folder: bool, seen: &HashSet<Vec<u8>>) -> Option<Vec<u8>> {
+    let digits = len.checked_sub(usize::from(folder)).filter(|d| *d > 0)?;
+    (0_u64..)
+        .take(MAX_ARCHIVE_ENTRIES + 1)
+        .map(|n| {
+            let mut name = format!("{n:0digits$}").into_bytes();
+            name.truncate(digits);
+            if folder {
+                name.push(b'/');
+            }
+            name
+        })
+        .find(|name| name.len() == len && !seen.contains(name))
+}
+
+/// Gives every record whose raw name repeats an earlier one a unique stand-in name of the same
+/// length in `bytes`, so the `zip` reader, which keys its table by name, keeps every entry
+/// (criteria 9 and 16). Names are only renamed in the central directory; the entry list shows
+/// the original names from `names`.
+fn unique_names(bytes: &mut [u8], names: &[CentralName]) {
+    let mut seen: HashSet<Vec<u8>> = names.iter().map(|n| n.raw.clone()).collect();
+    let mut first: HashSet<&[u8]> = HashSet::new();
+    for name in names {
+        if first.insert(&name.raw) {
+            continue;
+        }
+        let folder = name.raw.last() == Some(&b'/');
+        if let Some(new) = stand_in(name.raw.len(), folder, &seen) {
+            bytes[name.at..name.at + new.len()].copy_from_slice(&new);
+            seen.insert(new);
+        }
+    }
 }
 
 /// The display name of an entry: UTF-8 when valid; `_` for each bad byte when the UTF-8 flag is
 /// set; else CP437 as `zip` decodes it.
-fn display_name(raw: &[u8], decoded: Option<String>, flagged: &[Vec<u8>]) -> String {
+fn display_name(raw: &[u8], decoded: Option<String>, utf8_flag: bool) -> String {
     if let Ok(text) = std::str::from_utf8(raw) {
         return text.to_owned();
     }
-    if flagged.iter().any(|f| f.as_slice() == raw) {
+    if utf8_flag {
         return String::from_utf8_lossy(raw).replace('\u{FFFD}', "_");
     }
     decoded.unwrap_or_else(|| String::from_utf8_lossy(raw).replace('\u{FFFD}', "_"))
@@ -246,8 +295,17 @@ impl FontArchive {
         if declared > MAX_ARCHIVE_ENTRIES as u64 {
             return Err(ArchiveError::OverLimit);
         }
-        let flagged = utf8_flagged(&bytes, start, declared);
+        let mut bytes = bytes;
+        let names = central_names(&bytes, start, declared);
+        unique_names(&mut bytes, &names);
         let mut zip = ZipArchive::new(Cursor::new(bytes)).map_err(|_| ArchiveError::Damaged)?;
+        // The walk read the table as `zip` did: the record names line up by index.
+        let names = if names.len() == zip.len() {
+            names
+        } else {
+            Vec::new()
+        };
+        let mut decoded: HashMap<Vec<u8>, String> = HashMap::new();
         if zip.len() > MAX_ARCHIVE_ENTRIES {
             return Err(ArchiveError::OverLimit);
         }
@@ -263,12 +321,18 @@ impl FontArchive {
                 .checked_add(file.compressed_size())
                 .ok_or(ArchiveError::Damaged)?;
             spans.push((file.header_start(), end));
-            let raw = file.name_raw().to_vec();
-            let name = display_name(
-                &raw,
-                file.name().ok().map(std::borrow::Cow::into_owned),
-                &flagged,
+            let (raw, utf8) = names.get(zip_index).map_or_else(
+                || (file.name_raw().to_vec(), false),
+                |n| (n.raw.clone(), n.utf8),
             );
+            let name = if let Some(first) = decoded.get(&raw) {
+                first.clone()
+            } else {
+                let zip_name = file.name().ok().map(std::borrow::Cow::into_owned);
+                let name = display_name(&raw, zip_name, utf8);
+                decoded.insert(raw, name.clone());
+                name
+            };
             if file.is_dir() || name.ends_with(['/', '\\']) {
                 continue;
             }

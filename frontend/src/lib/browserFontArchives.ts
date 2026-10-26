@@ -15,7 +15,7 @@ import {
   sha256,
   splitKey,
 } from "@/lib/browserFonts";
-import { WasmFontArchive, font_file_faces, sanitised_name } from "@/wasm-bindings/curvyo_editor_wasm.js";
+import { WasmFontArchive, archive_folder_name, font_file_faces } from "@/wasm-bindings/curvyo_editor_wasm.js";
 
 /** The largest archive read (256 MiB), checked before its bytes are read (criterion 15). */
 const MAX_ARCHIVE_BYTES = 256 * 1024 * 1024;
@@ -84,7 +84,7 @@ async function prepare(file: File, known: StoredFaces[], takenFolders: string[])
         return null;
       }
     };
-    const folder = freeFolderName(sanitised_name(stem(file.name)), takenFolders);
+    const folder = freeFolderName(archive_folder_name(stem(file.name)), takenFolders);
     const taken = new Set<string>();
     for (const entry of fonts) {
       const data = read(entry.index);
@@ -130,10 +130,11 @@ async function prepare(file: File, known: StoredFaces[], takenFolders: string[])
   return out;
 }
 
-/** Writes one prepared archive in one transaction; `false` when the storage is full. */
-async function write(prepared: Prepared): Promise<boolean> {
-  const db = await database();
+/** Writes one prepared archive in one transaction: `full` when the storage had no room,
+ * `failed` for any other storage error; either way the transaction keeps nothing. */
+async function write(prepared: Prepared): Promise<"written" | "full" | "failed"> {
   try {
+    const db = await database();
     await new Promise<void>((resolve, reject) => {
       const tx = db.transaction([STORES.files, STORES.faces, STORES.documents], "readwrite");
       prepared.files.forEach((f) => tx.objectStore(STORES.files).put(f));
@@ -143,12 +144,9 @@ async function write(prepared: Prepared): Promise<boolean> {
       tx.onerror = () => reject(tx.error);
       tx.onabort = () => reject(tx.error);
     });
-    return true;
+    return "written";
   } catch (error) {
-    if (!isQuota(error)) {
-      throw error;
-    }
-    return false;
+    return isQuota(error) ? "full" : "failed";
   }
 }
 
@@ -161,8 +159,10 @@ export async function addBrowserFontArchives(files: File[]): Promise<{ archives:
     const known = await allFaces();
     const takenFolders = known.map((f) => splitKey(f.name)[0] ?? f.name);
     const prepared = await prepare(file, known, takenFolders);
-    if (prepared.files.length > 0 && !(await write(prepared))) {
-      full = true;
+    const written = prepared.files.length > 0 ? await write(prepared) : "written";
+    if (written !== "written") {
+      full ||= written === "full";
+      prepared.result.refused = written === "failed" ? "not_written" : null;
       prepared.result.added = 0;
       prepared.result.documents = 0;
     }

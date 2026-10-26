@@ -53,6 +53,8 @@ export function addNoticeWithArchives(
       main = `${name} could not be read. Nothing was added.`;
     } else if (archive.refused === "over_limit") {
       main = `${name} is over the size limit. Nothing was added.`;
+    } else if (archive.refused === "not_written") {
+      main = `${name} could not be added.`;
     } else if (archive.added > 0) {
       main =
         archive.documents > 0
@@ -74,6 +76,7 @@ export function addNoticeWithArchives(
   const kept = archives.reduce((sum, a) => sum + a.documents, 0);
   const unreadable = archives.filter((a) => a.refused === "unreadable").map((a) => a.name);
   const over = archives.filter((a) => a.refused === "over_limit").map((a) => a.name);
+  const notWritten = archives.filter((a) => a.refused === "not_written").map((a) => a.name);
   const empty = archives.filter((a) => a.refused === null && a.added === 0 && a.present === 0).length;
   const parts: (string | null)[] = [
     added > 0 ? `${fonts(added)} added.` : null,
@@ -83,6 +86,7 @@ export function addNoticeWithArchives(
     result.notFonts.length > 1 ? `${result.notFonts.length} files are not fonts and were not added.` : null,
     refusedPart(unreadable, "could not be read.", "could not be read."),
     refusedPart(over, "is over the size limit.", "are over the size limit."),
+    refusedPart(notWritten, "could not be added.", "could not be added."),
     empty > 0 ? (empty === 1 ? "1 archive holds no font." : `${empty} archives hold no font.`) : null,
     unsafePart(unsafe),
   ];
