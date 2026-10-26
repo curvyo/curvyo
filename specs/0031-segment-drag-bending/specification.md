@@ -1,6 +1,6 @@
 # Segment drag bending: drag a line or curve segment of a path to bend it
 
-Status: Done (#79, milestone M2 of the path-tools PR). Amended by `0020-undo-redo`: the sentence "No undo yet." and the statements that no undo exists are removed; Ctrl+Z takes the step back.
+Status: Done (#79, milestone M2 of the path-tools PR). Amended by `0020-undo-redo`: the sentence "No undo yet." and the statements that no undo exists are removed; Ctrl+Z takes the step back. Amended by `0055-compound-path-node-editing` (2026-10-26, built on `story/compound-path-node-editing-v2`): segments of compound paths bend too (`0055` criterion 3).
 Priority: Should
 Origin: Customer (the request: click a segment in the Node tool and drag it to bend it, as in Inkscape). The shape rule, the 3 px dead zone, the hover look, Shift and the preview are my proposals, marked in "Decided by the product owner" and "Proposals".
 
