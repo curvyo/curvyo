@@ -637,6 +637,7 @@ dependencies = [
  "rustix",
  "serde",
  "serde_json",
+ "sha2",
  "thiserror 2.0.21",
  "toml 1.1.6+spec-1.1.0",
  "zip",
@@ -649,6 +650,7 @@ dependencies = [
  "bytemuck",
  "console_error_panic_hook",
  "curvyo-document-core",
+ "curvyo-image-core",
  "curvyo-render-core",
  "curvyo-text-core",
  "curvyo-ui-core",
@@ -741,6 +743,7 @@ version = "0.1.0"
 dependencies = [
  "curvyo-document-core",
  "curvyo-geometry-core",
+ "curvyo-image-core",
  "curvyo-svg-core",
  "curvyo-text-core",
  "kurbo",

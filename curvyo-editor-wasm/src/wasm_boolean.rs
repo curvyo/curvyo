@@ -124,6 +124,12 @@ impl WasmSession {
     pub fn apply_boolean(&mut self, op: &str) -> Result<BooleanResultView, JsValue> {
         let op = BooleanOp::from_code(op)
             .ok_or_else(|| JsValue::from_str(&format!("unknown boolean operation: {op}")))?;
+        if self.session.refuse_images() {
+            return Ok(BooleanResultView {
+                kind: "images".to_owned(),
+                ..BooleanResultView::default()
+            });
+        }
         Ok(self.session.apply_boolean(op).into())
     }
 

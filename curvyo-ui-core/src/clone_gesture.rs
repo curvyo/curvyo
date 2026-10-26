@@ -142,6 +142,7 @@ mod tests {
         let mut results: Vec<ObjectSnapshot> = [o, b]
             .iter()
             .map(|&id| match snapshot(&document, id) {
+                ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
                 ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
                 ObjectSnapshot::Path(path) => ObjectSnapshot::Path(path.mapped(g)),
                 ObjectSnapshot::Clone(clone) => map_clone(&clone, g, None),
@@ -191,6 +192,7 @@ mod tests {
         let mut results: Vec<ObjectSnapshot> = [o, c]
             .iter()
             .map(|&id| match snapshot(&document, id) {
+                ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
                 ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
                 ObjectSnapshot::Path(path) => ObjectSnapshot::Path(path.mapped(g)),
                 ObjectSnapshot::Clone(clone) => map_clone(&clone, g, None),

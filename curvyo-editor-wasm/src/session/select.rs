@@ -324,7 +324,9 @@ impl Session {
                 self.leave_group(false);
                 DoubleClickHint::None
             }
-            SelectDoubleClickOutcome::EntryOpened => DoubleClickHint::None,
+            SelectDoubleClickOutcome::EntryOpened | SelectDoubleClickOutcome::NoNodes => {
+                DoubleClickHint::None
+            }
         }
     }
 }

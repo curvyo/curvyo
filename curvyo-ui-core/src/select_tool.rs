@@ -118,6 +118,9 @@ pub enum SelectDoubleClickOutcome {
     /// A linked clone was hit: it has no nodes, the tool stays and a hint names the way out
     /// (`specs/0049-linked-clone` criterion 26).
     Clone,
+    /// An image was hit: it has no nodes and nothing opens (`specs/0058-bitmap-import`
+    /// criterion 36).
+    NoNodes,
     /// A text object was hit: the caller starts editing it in the Text tool
     /// (`specs/0074-text-objects` criterion 10).
     Text(curvyo_document_core::NodeId),
@@ -1274,6 +1277,7 @@ mod tests {
                 let after = document.object(id).expect("exists");
                 assert_ne!(after, before, "{direction:?}: the resize happened");
                 let width = |o: &ObjectSnapshot| match o {
+                    ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
                     ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
                     ObjectSnapshot::Primitive(p) => p.style.stroke.width,
                     ObjectSnapshot::Path(p) => p.style.stroke.width,

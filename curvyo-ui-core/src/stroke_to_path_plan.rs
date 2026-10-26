@@ -115,7 +115,7 @@ fn stroked_outlines(object: &ObjectSnapshot) -> (Vec<(Vec<OutlineTriple>, bool)>
                 (outlines, markers)
             })
         }
-        ObjectSnapshot::Text(_) => (Vec::new(), false),
+        ObjectSnapshot::Text(_) | ObjectSnapshot::Image(_) => (Vec::new(), false),
     }
 }
 

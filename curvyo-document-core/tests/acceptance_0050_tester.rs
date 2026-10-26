@@ -711,6 +711,8 @@ fn ac46_files_of_earlier_builds_open_without_layers_or_flags() {
             || name.starts_with("clone_overrides")
             // `0046-document-shapes` (format 15) is a later build: its template sources store names.
             || name.starts_with("template_")
+            // `0058-bitmap-import` (format 25) is a later build: its golden stores names and flags.
+            || name.starts_with("image_")
             || name.contains("damaged")
             || name.contains("truncated")
             || name.contains("too_deep")

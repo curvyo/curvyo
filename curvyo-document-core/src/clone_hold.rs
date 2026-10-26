@@ -112,7 +112,9 @@ impl Document {
         let drawn = |object: &ObjectSnapshot| match object {
             ObjectSnapshot::Path(path) => Some(path.clone()),
             ObjectSnapshot::Clone(clone) => Some(clone.resolved.clone()),
-            ObjectSnapshot::Primitive(_) | ObjectSnapshot::Text(_) => None,
+            ObjectSnapshot::Primitive(_) | ObjectSnapshot::Text(_) | ObjectSnapshot::Image(_) => {
+                None
+            }
         };
         let moved: Vec<(NodeId, Affine)> = results
             .iter()

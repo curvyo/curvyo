@@ -69,6 +69,7 @@ pub fn object_bounds(object: &ObjectSnapshot) -> (Point, Point) {
     match object {
         // The selection box of a text is its line box (`specs/0074-text-objects`, UX notes §5).
         ObjectSnapshot::Text(text) => crate::text_box::line_box_bounds(text),
+        ObjectSnapshot::Image(image) => crate::image_frame::frame_bounds(image),
         ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_)
             if let Some(path) = object.drawn_path() =>
         {
@@ -93,6 +94,7 @@ pub fn object_outline_bounds(object: &ObjectSnapshot) -> (Point, Point) {
         ObjectSnapshot::Text(text) if text.outline.is_none() => {
             crate::text_box::line_box_bounds(text)
         }
+        ObjectSnapshot::Image(image) => crate::image_frame::frame_bounds(image),
         ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_) | ObjectSnapshot::Text(_)
             if let Some(path) = object.drawn_path() =>
         {

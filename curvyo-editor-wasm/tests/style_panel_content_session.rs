@@ -42,6 +42,7 @@ fn stored_styles(session: &Session) -> Vec<Style> {
         .into_iter()
         .filter_map(|id| document.object(id))
         .map(|object| match object {
+            ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
             ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
             ObjectSnapshot::Path(p) => p.style,
             ObjectSnapshot::Primitive(p) => p.style,

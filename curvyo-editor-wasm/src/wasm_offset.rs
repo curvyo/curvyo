@@ -72,7 +72,7 @@ pub struct OffsetViewJs {
 /// (`count` leaves outlined), or a refusal: `"out_of_range"`, `"no_area"` (`count` of `of` to
 /// blame) or `"empty"` (at `distance_mm`).
 #[wasm_bindgen]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct OffsetOutcomeJs {
     /// The outcome code.
     #[wasm_bindgen(getter_with_clone)]
@@ -289,6 +289,12 @@ impl WasmSession {
     /// Enter in the Offset entry chip: writes the remembered values for the selection in one
     /// commit.
     pub fn apply_offset(&mut self) -> OffsetOutcomeJs {
+        if self.session.refuse_images() {
+            return OffsetOutcomeJs {
+                kind: "images".to_owned(),
+                ..OffsetOutcomeJs::default()
+            };
+        }
         self.session.apply_offset().into()
     }
 

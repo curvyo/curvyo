@@ -18,7 +18,7 @@ fn count(n: usize) -> u32 {
 /// compound paths are one piece each; `with_holes` says one of them has a hole) or `"out_of_range"` (`compounds` of the `of` selected objects
 /// reach beyond the kernel's range). Nothing was changed by anything but `"applied"`.
 #[wasm_bindgen]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct SplitResultView {
     /// The outcome code.
     #[wasm_bindgen(getter_with_clone)]
@@ -79,7 +79,7 @@ impl From<SplitOutcome> for SplitResultView {
 /// outlines of a single node were left out) or a refusal:
 /// `"no_compound"` or `"groups"`. Nothing was changed by anything but `"applied"`.
 #[wasm_bindgen]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct BreakApartResultView {
     /// The outcome code.
     #[wasm_bindgen(getter_with_clone)]
@@ -134,11 +134,23 @@ impl From<BreakApartOutcome> for BreakApartResultView {
 impl WasmSession {
     /// Splits the selected compound paths into their unconnected parts, in one commit.
     pub fn apply_split(&mut self) -> SplitResultView {
+        if self.session.refuse_images() {
+            return SplitResultView {
+                kind: "images".to_owned(),
+                ..SplitResultView::default()
+            };
+        }
         self.session.apply_split().into()
     }
 
     /// Breaks the selected compound paths apart into one path per outline, in one commit.
     pub fn apply_break_apart(&mut self) -> BreakApartResultView {
+        if self.session.refuse_images() {
+            return BreakApartResultView {
+                kind: "images".to_owned(),
+                ..BreakApartResultView::default()
+            };
+        }
         self.session.apply_break_apart().into()
     }
 }

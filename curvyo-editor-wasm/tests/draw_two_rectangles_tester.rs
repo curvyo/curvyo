@@ -35,6 +35,7 @@ fn rects(s: &Session) -> Vec<(NodeId, RectBounds)> {
     d.object_ids()
         .into_iter()
         .filter_map(|id| match d.object(id)? {
+            ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
             ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
             ObjectSnapshot::Clone(_) => panic!("no clone here"),
             ObjectSnapshot::Primitive(p) => match p.shape {

@@ -139,6 +139,8 @@ pub(crate) enum LeafKind {
     Clone,
     /// A text object (`shape = "text"`).
     Text,
+    /// An image object (`shape = "image"`, ADR 0017 §1).
+    Image,
 }
 
 /// The kind of the leaf `meta` holds.
@@ -147,6 +149,7 @@ pub(crate) fn leaf_kind(meta: &LoroMap) -> LeafKind {
         None => LeafKind::Path,
         Some(tag) if tag == crate::clone_codec::SHAPE_CLONE => LeafKind::Clone,
         Some(tag) if tag == crate::text_codec::SHAPE_TEXT => LeafKind::Text,
+        Some(tag) if tag == crate::image_codec::SHAPE_IMAGE => LeafKind::Image,
         Some(tag) => LeafKind::Primitive(tag),
     }
 }

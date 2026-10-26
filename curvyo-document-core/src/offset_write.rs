@@ -171,7 +171,9 @@ impl Document {
                     let mut path = match self.object(*target)? {
                         ObjectSnapshot::Path(path) => path,
                         ObjectSnapshot::Clone(clone) => clone.resolved,
-                        ObjectSnapshot::Primitive(_) | ObjectSnapshot::Text(_) => return None,
+                        ObjectSnapshot::Primitive(_)
+                        | ObjectSnapshot::Text(_)
+                        | ObjectSnapshot::Image(_) => return None,
                     };
                     path.id = *target;
                     let (first, rest) = outlines.split_first()?;

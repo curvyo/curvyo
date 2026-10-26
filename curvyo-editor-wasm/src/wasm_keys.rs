@@ -76,7 +76,7 @@ impl WasmSession {
     /// 33). `key` is `KeyboardEvent.key`, `primary` is Ctrl (Cmd on macOS), `blocked` is true
     /// during an IME composition or a long operation, `platform` is `"linux"`, `"windows"`,
     /// `"macos"` or `"browser"`. Returns the command to run (`"new"`, `"open"`, `"save"`,
-    /// `"save-as"`, `"close"`, `"quit"`) or an empty string when the press is no chord or may not
+    /// `"save-as"`, `"close"`, `"quit"`, or `"import"` for the Import button) or an empty string when the press is no chord or may not
     /// act now; the host prevents the page's default for a command only.
     #[allow(clippy::fn_params_excessive_bools, clippy::too_many_arguments)] // one scalar per DOM fact
     #[must_use]
@@ -93,19 +93,21 @@ impl WasmSession {
         let Some(platform) = Platform::from_name(platform) else {
             return String::new();
         };
+        let input = KeyInput {
+            key,
+            shift,
+            ctrl: primary,
+            alt,
+            repeat,
+            dom_blocked: blocked,
+            ..KeyInput::default()
+        };
+        // Ctrl+I of the Import button (`specs/0058-bitmap-import` criterion 3).
+        if self.session.import_chord(&input) {
+            return "import".to_owned();
+        }
         self.session
-            .file_chord(
-                &KeyInput {
-                    key,
-                    shift,
-                    ctrl: primary,
-                    alt,
-                    repeat,
-                    dom_blocked: blocked,
-                    ..KeyInput::default()
-                },
-                platform,
-            )
+            .file_chord(&input, platform)
             .map_or_else(String::new, |command| command.name().to_string())
     }
 

@@ -112,6 +112,10 @@ fn raw_from_meta(id: NodeId, meta: &LoroMap) -> RawLeaf {
                 RawLeaf::Text(Box::new(text))
             });
     }
+    if crate::image_codec::is_image_meta(meta) {
+        return crate::image_codec::read_image_snapshot(id, meta)
+            .map_or(RawLeaf::Unreadable(id), RawLeaf::Image);
+    }
     if let Some(tag) = read_shape_tag(meta) {
         return RawLeaf::Primitive(read_primitive_snapshot(id, meta, &tag));
     }

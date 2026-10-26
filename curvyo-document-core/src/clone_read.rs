@@ -27,6 +27,8 @@ pub(crate) enum RawLeaf {
     Text(Box<crate::text_model::TextSnapshot>),
     /// A text clone as stored, filled from its source text after the walk (ADR 0022 §4).
     TextClone(Box<crate::text_clone_codec::TextCloneParts>),
+    /// An image: never an original.
+    Image(crate::image_model::ImageSnapshot),
     /// A leaf whose registers cannot be read (merge residue of a text): left out.
     Unreadable(NodeId),
 }
@@ -46,6 +48,7 @@ impl RawLeaf {
             Self::Path(path) => path.id,
             Self::Primitive(primitive) => primitive.id,
             Self::Text(text) => text.id,
+            Self::Image(image) => image.id,
             Self::TextClone(parts) => parts.id,
             Self::Clone(id, ..) | Self::BrokenClone(id) | Self::Unreadable(id) => *id,
         }
@@ -200,6 +203,7 @@ pub(crate) fn resolve(leaves: Vec<RawLeaf>) -> Resolution {
             RawLeaf::Primitive(_)
             | RawLeaf::BrokenClone(_)
             | RawLeaf::Text(_)
+            | RawLeaf::Image(_)
             | RawLeaf::TextClone(_)
             | RawLeaf::Unreadable(_) => State::NotOrigin,
             RawLeaf::Clone(..) => State::Pending,
@@ -333,6 +337,7 @@ fn assemble(leaves: Vec<RawLeaf>, states: &[State], index: &HashMap<NodeId, usiz
             RawLeaf::Path(path) => Some(ObjectSnapshot::Path(path)),
             RawLeaf::Primitive(primitive) => Some(ObjectSnapshot::Primitive(primitive)),
             RawLeaf::Text(text) => Some(ObjectSnapshot::Text(text)),
+            RawLeaf::Image(image) => Some(ObjectSnapshot::Image(image)),
             RawLeaf::TextClone(parts) => {
                 text_clones.push((i, *parts));
                 None

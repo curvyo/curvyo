@@ -312,7 +312,9 @@ fn markers_panel(
             // (`specs/0057-clone-overrides` criterion 12).
             ObjectSnapshot::Clone(clone) => Some(&clone.resolved),
             // Stroke markers do not apply to a text (criterion 14).
-            ObjectSnapshot::Primitive(_) | ObjectSnapshot::Text(_) => None,
+            ObjectSnapshot::Primitive(_) | ObjectSnapshot::Text(_) | ObjectSnapshot::Image(_) => {
+                None
+            }
         })
         .collect();
     // A compound path draws no markers (`0016` criterion 38b, `0054` criterion 5): with one in

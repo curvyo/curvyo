@@ -136,7 +136,10 @@ fn contours_of(owner: usize, object: &ObjectSnapshot) -> Vec<Contour> {
         }
         // A text arrives as its glyphs' path (`text_convert::texts_as_paths`), never here as a
         // text: only an unconverted one, which the command refused first.
-        ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_) | ObjectSnapshot::Text(_) => Vec::new(),
+        ObjectSnapshot::Path(_)
+        | ObjectSnapshot::Clone(_)
+        | ObjectSnapshot::Text(_)
+        | ObjectSnapshot::Image(_) => Vec::new(),
         ObjectSnapshot::Primitive(primitive) => {
             let placeholder = AnchorId::new(0, 0);
             vec![Contour {

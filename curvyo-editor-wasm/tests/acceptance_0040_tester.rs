@@ -136,6 +136,7 @@ fn styles(s: &Session) -> Vec<Style> {
         .into_iter()
         .filter_map(|id| d.object(id))
         .map(|o| match o {
+            ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
             ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
             ObjectSnapshot::Path(p) => p.style,
             ObjectSnapshot::Primitive(p) => p.style,

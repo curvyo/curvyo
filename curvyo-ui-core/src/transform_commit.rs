@@ -170,7 +170,7 @@ pub(crate) fn commit_resize(
         },
         // A clone's result is its matrix, and a text's its size and placement, which the
         // multi-object commit writes.
-        ObjectSnapshot::Clone(_) | ObjectSnapshot::Text(_) => {
+        ObjectSnapshot::Clone(_) | ObjectSnapshot::Text(_) | ObjectSnapshot::Image(_) => {
             let _ = commit_group(
                 document,
                 std::slice::from_ref(result),
@@ -277,6 +277,7 @@ fn numbers_of(object: &ObjectSnapshot) -> (Vec<f64>, f64) {
         ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_) | ObjectSnapshot::Text(_) => {
             (Vec::new(), 0.0)
         }
+        ObjectSnapshot::Image(image) => (image.placement.to_array().to_vec(), 0.0),
         ObjectSnapshot::Primitive(p) => {
             let mut v = vec![p.style.stroke.width.as_mm()];
             v.extend(shape_numbers(&p.shape));

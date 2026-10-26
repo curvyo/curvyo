@@ -61,6 +61,7 @@ fn rect(document: &Document) -> NodeId {
 
 fn markers_of(document: &Document, id: NodeId) -> Markers {
     match document.object(id).unwrap() {
+        ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Path(p) => p.style.stroke.markers,
         ObjectSnapshot::Primitive(p) => p.style.stroke.markers,

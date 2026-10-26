@@ -100,11 +100,23 @@ impl From<StackOutcome> for StackResultView {
 impl WasmSession {
     /// Fracture on the selected objects, in one commit.
     pub fn apply_fracture(&mut self) -> StackResultView {
+        if self.session.refuse_images() {
+            return StackResultView {
+                kind: "images".to_owned(),
+                ..StackResultView::default()
+            };
+        }
         self.session.apply_fracture().into()
     }
 
     /// Flatten on the selected objects, in one commit.
     pub fn apply_flatten(&mut self) -> StackResultView {
+        if self.session.refuse_images() {
+            return StackResultView {
+                kind: "images".to_owned(),
+                ..StackResultView::default()
+            };
+        }
         self.session.apply_flatten().into()
     }
 }

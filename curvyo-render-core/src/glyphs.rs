@@ -54,6 +54,9 @@ pub struct DrawList {
     /// The number of leading vertices the host paints as a checkerboard; `0`
     /// when there is none. Always the end of artwork layer 0 when not 0.
     checker_end: usize,
+    /// The images of the artwork, each naming its own (empty) artwork layer
+    /// (`crate::image_layer`).
+    pub images: Vec<crate::image_layer::ImageQuad>,
 }
 
 impl DrawList {
@@ -121,6 +124,13 @@ impl DrawList {
         }
     }
 
+    /// Closes an artwork layer with no triangles and returns its index: the layer of an image.
+    pub(crate) fn push_empty_layer(&mut self) -> usize {
+        self.close_layer();
+        self.layers.push(self.triangles.len());
+        self.layers.len() - 1
+    }
+
     /// Closes the triangles pushed so far as the checkerboard prefix, which is
     /// also artwork layer 0. Only the document-area builder calls this, on an
     /// empty list.
@@ -181,6 +191,11 @@ impl DrawList {
         let keeps_layers = self.overlay_start() == base;
         self.triangles.extend(other.triangles);
         if keeps_layers {
+            let layer_base = self.layers.len();
+            self.images.extend(other.images.into_iter().map(|mut quad| {
+                quad.layer += layer_base;
+                quad
+            }));
             self.layers
                 .extend(other.layers.into_iter().map(|end| end + base));
         }

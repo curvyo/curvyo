@@ -128,6 +128,12 @@ impl WasmSession {
 
     /// Weld on the selected objects, in one commit.
     pub fn apply_weld(&mut self) -> WeldResultView {
+        if self.session.refuse_images() {
+            return WeldResultView {
+                kind: "images".to_owned(),
+                ..WeldResultView::default()
+            };
+        }
         self.session.apply_weld().into()
     }
 }

@@ -345,6 +345,7 @@ fn only_a_primitive_becomes_a_path_never_the_reverse() {
     let primitive_for_path = ObjectSnapshot::Primitive(PrimitiveSnapshot {
         id: p,
         ..match document.object(r).unwrap() {
+            ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
             ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
             ObjectSnapshot::Primitive(x) => x,
             ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_) => panic!(),

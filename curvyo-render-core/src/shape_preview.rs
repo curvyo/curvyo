@@ -21,7 +21,8 @@ fn screen_px_to_mm(view: ViewTransform, px: f64) -> f64 {
 /// [`crate::stroke::path_stroke`]'s `AnchorSnapshot` parameter type — an
 /// outline anchor has no real id (`curvyo_document_core::OutlineAnchor`
 /// is deliberately id-less), and nothing here ever reads it back.
-const UNUSED_ANCHOR_ID: curvyo_document_core::AnchorId = curvyo_document_core::AnchorId::new(0, 0);
+pub(crate) const UNUSED_ANCHOR_ID: curvyo_document_core::AnchorId =
+    curvyo_document_core::AnchorId::new(0, 0);
 
 pub(crate) fn outline_to_anchors(
     outline: &[curvyo_document_core::OutlineAnchor],

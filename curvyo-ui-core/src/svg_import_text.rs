@@ -17,6 +17,8 @@ pub enum FileKind {
     Svg,
     /// A Curvyo project container (a zip).
     Project,
+    /// A PNG, JPEG or WebP picture (`specs/0058-bitmap-import` criterion 2).
+    Image,
     /// Neither.
     Other,
 }
@@ -26,7 +28,9 @@ pub enum FileKind {
 #[must_use]
 pub fn file_kind(bytes: &[u8]) -> FileKind {
     use curvyo_svg_core::xml_guard::{is_gzip, is_utf16, looks_like_xml};
-    if looks_like_xml(bytes) || is_gzip(bytes) || is_utf16(bytes) {
+    if curvyo_image_core::ImageFormat::detect(bytes).is_some() {
+        FileKind::Image
+    } else if looks_like_xml(bytes) || is_gzip(bytes) || is_utf16(bytes) {
         FileKind::Svg
     } else if bytes.starts_with(b"PK") {
         FileKind::Project
@@ -131,6 +135,8 @@ mod tests {
         assert_eq!(file_kind(&[0x1F, 0x8B]), FileKind::Svg);
         assert_eq!(file_kind(b"PK\x03\x04"), FileKind::Project);
         assert_eq!(file_kind(b"hello"), FileKind::Other);
+        assert_eq!(file_kind(b"\x89PNG\r\n\x1a\n"), FileKind::Image);
+        assert_eq!(file_kind(b"RIFF\0\0\0\0WEBPVP8 "), FileKind::Image);
         assert_eq!(
             svg_refusal_text(SvgError::NotSvg(Some((3, 14)))),
             "This file is not an SVG drawing (line 3, column 14). Nothing was changed."

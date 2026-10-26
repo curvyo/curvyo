@@ -165,6 +165,7 @@ fn polyline(o: &ObjectSnapshot) -> Vec<Point> {
         out
     }
     match o {
+        ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Clone(_) => panic!("no clone here"),
         ObjectSnapshot::Primitive(p) => {
@@ -222,6 +223,7 @@ fn ref_point(b: (Point, Point), r: ReferencePoint) -> Point {
 
 fn rect_origin(o: &ObjectSnapshot) -> Point {
     match o {
+        ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Clone(_) => panic!("no clone here"),
         ObjectSnapshot::Primitive(p) => match p.shape {
@@ -234,6 +236,7 @@ fn rect_origin(o: &ObjectSnapshot) -> Point {
 
 fn rect_centre(o: &ObjectSnapshot) -> Point {
     match o {
+        ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Clone(_) => panic!("no clone here"),
         ObjectSnapshot::Primitive(p) => match p.shape {

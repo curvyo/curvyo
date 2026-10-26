@@ -131,6 +131,12 @@ impl WasmSession {
 
     /// Combines the selected objects into one compound path, in one commit.
     pub fn apply_combine(&mut self) -> CombineResultView {
+        if self.session.refuse_images() {
+            return CombineResultView {
+                kind: "images".to_owned(),
+                ..CombineResultView::default()
+            };
+        }
         self.session.apply_combine().into()
     }
 }

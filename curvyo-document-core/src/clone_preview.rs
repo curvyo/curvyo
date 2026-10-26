@@ -77,6 +77,7 @@ pub fn clone_previews(
                 ObjectSnapshot::Primitive(primitive) => RawLeaf::Primitive(primitive.clone()),
                 ObjectSnapshot::Clone(clone) => RawLeaf::of_clone(clone),
                 ObjectSnapshot::Text(text) => RawLeaf::Text(text.clone()),
+                ObjectSnapshot::Image(image) => RawLeaf::Image(image.clone()),
             }
         })
         .collect();

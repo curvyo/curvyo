@@ -253,6 +253,7 @@ fn a_corner_drag_is_free_and_ctrl_keeps_the_proportions() {
         // A very uneven drag.
         rig.drag(corner, pt(corner.x + 40.0, corner.y + 2.0), modifiers);
         let Shape::Rect { bounds, .. } = (match rig.document.object(rect).unwrap() {
+            ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
             ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
             ObjectSnapshot::Clone(_) => panic!("no clone here"),
             ObjectSnapshot::Primitive(p) => p.shape,

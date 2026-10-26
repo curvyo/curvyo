@@ -228,7 +228,10 @@ impl Document {
     pub fn primitive(&self, id: NodeId) -> Option<PrimitiveSnapshot> {
         match self.object(id)? {
             ObjectSnapshot::Primitive(snapshot) => Some(snapshot),
-            ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_) | ObjectSnapshot::Text(_) => None,
+            ObjectSnapshot::Path(_)
+            | ObjectSnapshot::Clone(_)
+            | ObjectSnapshot::Text(_)
+            | ObjectSnapshot::Image(_) => None,
         }
     }
 
@@ -525,6 +528,9 @@ pub(crate) fn object_in(tree: &loro::LoroTree, id: NodeId) -> Option<ObjectSnaps
             crate::text_carrier::resolve_one(tree, &mut text);
             ObjectSnapshot::Text(Box::new(text))
         });
+    }
+    if crate::image_codec::is_image_meta(&meta) {
+        return crate::image_codec::read_image_snapshot(id, &meta).map(ObjectSnapshot::Image);
     }
     match shape_codec::read_shape_tag(&meta) {
         Some(shape) => Some(ObjectSnapshot::Primitive(

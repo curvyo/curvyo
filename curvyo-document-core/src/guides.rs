@@ -142,7 +142,8 @@ pub(crate) fn effective_guide(
         }
         crate::primitive_model::ObjectSnapshot::Path(_)
         | crate::primitive_model::ObjectSnapshot::Primitive(_)
-        | crate::primitive_model::ObjectSnapshot::Text(_) => own(object.id()),
+        | crate::primitive_model::ObjectSnapshot::Text(_)
+        | crate::primitive_model::ObjectSnapshot::Image(_) => own(object.id()),
     }
 }
 

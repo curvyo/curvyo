@@ -90,7 +90,7 @@ pub fn line_box_contains(text: &TextSnapshot, point: Point, margin: f64) -> bool
 }
 
 /// Whether `point` lies inside the quad `corners` or within `margin` of it.
-fn quad_contains(corners: &[Point; 4], point: Point, margin: f64) -> bool {
+pub(crate) fn quad_contains(corners: &[Point; 4], point: Point, margin: f64) -> bool {
     let corners = *corners;
     let mut sign = 0.0_f64;
     let mut inside = true;

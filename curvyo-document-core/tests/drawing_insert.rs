@@ -182,8 +182,6 @@ fn ac2_ac77_a_document_from_a_drawing_has_no_step() {
     let bytes = curvyo_document_core::pack(&document, "test").unwrap();
     let reopened = curvyo_document_core::unpack(5, &bytes).unwrap();
     assert_eq!(reopened.read_objects().objects.len(), 3);
-    assert_eq!(
-        CURRENT_FORMAT_VERSION, 24,
-        "no format change (criterion 77)"
-    );
+    // No format change of its own (criterion 77); `0058` took 25 for the image kind.
+    assert!((24..=25).contains(&CURRENT_FORMAT_VERSION));
 }

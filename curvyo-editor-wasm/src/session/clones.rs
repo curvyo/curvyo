@@ -82,7 +82,10 @@ impl Session {
     /// Whether the Linked clone button is in the Select bar (criterion 4).
     #[must_use]
     pub fn linked_clone_shown(&self) -> bool {
-        self.tool == Tool::Select && linked_clone_shown(&self.selection, &self.units())
+        // Never for a selection that holds an image (`specs/0058-bitmap-import` criterion 38).
+        self.tool == Tool::Select
+            && linked_clone_shown(&self.selection, &self.units())
+            && !self.selection_holds_image()
     }
 
     /// Linked clone (criteria 1 to 3, 5, 52): one clone above each selected object in one commit,

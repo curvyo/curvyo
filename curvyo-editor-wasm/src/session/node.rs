@@ -38,7 +38,8 @@ impl Session {
                 ObjectSnapshot::Path(path) => Some(path.clone()),
                 ObjectSnapshot::Primitive(_)
                 | ObjectSnapshot::Clone(_)
-                | ObjectSnapshot::Text(_) => None,
+                | ObjectSnapshot::Text(_)
+                | ObjectSnapshot::Image(_) => None,
             })
             .collect();
         if self.tool == Tool::Node {
