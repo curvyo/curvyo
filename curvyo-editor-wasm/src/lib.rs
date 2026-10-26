@@ -87,6 +87,8 @@ mod wasm_shape_tools;
 #[cfg(target_arch = "wasm32")]
 mod wasm_split;
 #[cfg(target_arch = "wasm32")]
+mod wasm_stroke_to_path;
+#[cfg(target_arch = "wasm32")]
 mod wasm_text;
 #[cfg(target_arch = "wasm32")]
 mod wasm_text_layout;
@@ -100,7 +102,6 @@ pub use font_checks_glue::FontChecksGlue;
 pub use font_file_glue::{face_preview_path, font_file_faces};
 pub use font_library_glue::FontLibraryGlue;
 pub use font_preview_glue::PreviewFacesGlue;
-pub use session::WeldOutcome;
 pub use session::{
     APP_VERSION, BooleanOutcome, BreakApartOutcome, CloneOutcome, ClosePathOutcome, ClosePathState,
     CombineOutcome, CutOutcome, DocumentPresetsRecord, DocumentSide, DoubleClickHint, DropPlace,
@@ -111,6 +112,7 @@ pub use session::{
 };
 pub use session::{DragStop, OFFSET_COMMIT_LABEL, OffsetOutcome, OffsetView};
 pub use session::{LayoutOutcome, ObjectToPathOutcome, StyleOutcome, TextBarView, TextSizeOutcome};
+pub use session::{StrokeToPathOutcome, WeldOutcome};
 pub use session::{TextPathPress, TextPathView};
 
 #[cfg(target_arch = "wasm32")]

@@ -245,7 +245,14 @@ pub(crate) fn corner(
 /// A circular arc around `center` from `from` to `to` (both at `radius` from it), as cubics of at
 /// most 90° (45° above 37 mm). The arc turns the short way; for a half turn it passes through
 /// `center + radius x ahead`.
-pub(crate) fn arc(pieces: &mut Vec<PathSeg>, center: Point, from: Point, to: Point, ahead: Vec2, radius: f64) {
+pub(crate) fn arc(
+    pieces: &mut Vec<PathSeg>,
+    center: Point,
+    from: Point,
+    to: Point,
+    ahead: Vec2,
+    radius: f64,
+) {
     if radius <= COINCIDENT_MM {
         return;
     }

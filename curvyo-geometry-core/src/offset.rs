@@ -160,10 +160,16 @@ pub fn offset(
     }
     let loops = closed_loops(operand, &region, checked.d, style, checked.flatten_mm);
     let (outlines, fallback) = if let Some(loops) = loops {
-        let rebuilt = rebuild(&loops, checked.flatten_mm, tolerance.as_mm(), FillRule::Positive, |rings| {
-            let rings = without_flattening_noise(rings, checked.flatten_mm);
-            without_inverted_rings(rings, operand, checked.d.abs(), checked.flatten_mm)
-        });
+        let rebuilt = rebuild(
+            &loops,
+            checked.flatten_mm,
+            tolerance.as_mm(),
+            FillRule::Positive,
+            |rings| {
+                let rings = without_flattening_noise(rings, checked.flatten_mm);
+                without_inverted_rings(rings, operand, checked.d.abs(), checked.flatten_mm)
+            },
+        );
         (rebuilt.outlines, rebuilt.fallback)
     } else {
         let polylines = polyline_offset(operand, checked.units, join, checked.flatten_mm)?;

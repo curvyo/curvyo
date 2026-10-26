@@ -405,3 +405,42 @@ fn ac26_out_of_range_is_refused() {
         Err(StrokeOutlineError::OutOfRange)
     );
 }
+
+#[test]
+fn ac24_the_outline_offsets_like_any_closed_path() {
+    let outline = run(
+        &[line(&[(0.0, 0.0), (100.0, 0.0)])],
+        &shape(2.0, LineJoin::Miter, LineCap::Butt),
+    );
+    let anchors: Vec<Anchors> = outline
+        .outlines()
+        .iter()
+        .map(|o| {
+            o.iter()
+                .map(|a| (a.point, a.handle_in, a.handle_out))
+                .collect()
+        })
+        .collect();
+    let borrowed: Vec<Outline<'_>> = anchors.iter().map(|a| Outline::new(a, true)).collect();
+    let grown = curvyo_geometry_core::offset(
+        &borrowed,
+        Length::from_mm(1.0),
+        curvyo_geometry_core::OffsetJoin::Round,
+        KERNEL_TOLERANCE,
+    )
+    .unwrap();
+    let points: Vec<Point> = grown
+        .outlines()
+        .iter()
+        .flat_map(|o| sampled(o, 16))
+        .collect();
+    let (min_x, max_x) = points.iter().fold((f64::MAX, f64::MIN), |(lo, hi), p| {
+        (lo.min(p.x), hi.max(p.x))
+    });
+    let (min_y, max_y) = points.iter().fold((f64::MAX, f64::MIN), |(lo, hi), p| {
+        (lo.min(p.y), hi.max(p.y))
+    });
+    assert!((max_x - min_x - 102.0).abs() < 0.01 && (max_y - min_y - 4.0).abs() < 0.01);
+    let expected = 102.0 * 4.0 - 4.0 + std::f64::consts::PI;
+    assert!((area(&grown) - expected).abs() < 0.01, "{}", area(&grown));
+}

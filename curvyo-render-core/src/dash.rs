@@ -37,6 +37,12 @@ impl DashBudget {
     }
 }
 
+/// The coarsest tolerance the dash walk measures arc length at, millimetres: at the display
+/// tolerance the flattened length falls short of the exact one and the dash ends drift along a
+/// long curve; Stroke to path measures exactly and must agree within 0.05 mm
+/// (`specs/0085-stroke-to-path` `adrs.md` decision 4).
+const MAX_MEASURE_TOLERANCE_MM: f64 = 0.001;
+
 /// Every outline with its length, or `None` when a length is not a number or no
 /// outline has any length.
 #[allow(clippy::cast_possible_truncation)]
@@ -44,7 +50,10 @@ fn measure(outlines: &[Path], tolerance_mm: f64) -> Option<Vec<(PathMeasurements
     let measured: Vec<(PathMeasurements, f64)> = outlines
         .iter()
         .map(|path| {
-            let measurements = PathMeasurements::from_path(path, tolerance_mm as f32);
+            let measurements = PathMeasurements::from_path(
+                path,
+                tolerance_mm.min(MAX_MEASURE_TOLERANCE_MM) as f32,
+            );
             let length = f64::from(measurements.length());
             (measurements, length)
         })

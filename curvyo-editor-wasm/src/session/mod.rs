@@ -100,6 +100,9 @@ mod shapes;
 #[cfg(test)]
 mod single_line_tests;
 mod split;
+mod stroke_to_path;
+#[cfg(test)]
+mod stroke_to_path_tests;
 mod style;
 mod style_view;
 mod text;
@@ -180,6 +183,7 @@ pub use pen::PenJoinNotice;
 pub use project::APP_VERSION;
 pub use select::DoubleClickHint;
 pub use split::{BreakApartOutcome, SplitOutcome};
+pub use stroke_to_path::StrokeToPathOutcome;
 #[cfg(target_arch = "wasm32")]
 pub use style_view::StylePanelView;
 pub use text_bar::{TextBarView, TextSizeOutcome};
