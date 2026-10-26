@@ -665,6 +665,7 @@ dependencies = [
  "i_overlay",
  "kurbo",
  "proptest",
+ "rustix",
  "thiserror 2.0.21",
  "wasm-bindgen-test",
 ]

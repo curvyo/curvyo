@@ -1624,3 +1624,11 @@ and 19.4 ms of CPU time on PR #193, a developer machine 9.8 to 9.9 ms on the sam
 
 **Resolution:** open. A dedicated benchmark runner with stable hardware would let CI assert the
 absolute budgets again.
+
+## The canvas draws more than 2,000 dashes per object solid (`0085` criterion 11, 2026-10-26)
+
+The canvas draws more than 2,000 dashes per object solid (no draw-list cache); Stroke to path
+follows it (`DashPattern::MAX_DASHES_PER_OBJECT`, read by `curvyo-render-core` and
+`curvyo-geometry-core`), so a dense dash on a long path is outlined as a solid line.
+
+**Resolution:** open. Raising the cap needs the cache.
