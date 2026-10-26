@@ -11,7 +11,8 @@ use curvyo_document_core::{
     TextSnapshot, TextWritingMode, Vec2,
 };
 use curvyo_text_core::{
-    Align, CharOffset, Face, GlyphOrientation, LayoutOptions, Mm, TextLayout, WritingMode, layout,
+    Align, CharOffset, Face, GlyphOrientation, LayoutOptions, Mm, TAPER_ACCURACY, TextLayout,
+    WritingMode, layout,
 };
 use kurbo::{BezPath, PathEl, Shape};
 
@@ -56,6 +57,27 @@ pub fn layout_options(size: Length, values: &TextLayoutValues, chars: &TextChars
             TextGlyphOrientation::Upright => GlyphOrientation::Upright,
             TextGlyphOrientation::Sideways => GlyphOrientation::Sideways,
         },
+        taper: values.taper,
+    }
+}
+
+/// How close a tapered curve must stay to the exact map in text space so that it stays within
+/// [`TAPER_ACCURACY`] in the document under `placement`: the accuracy divided by the placement's
+/// largest scale (`0079` `adrs.md` decision 9).
+#[must_use]
+pub(crate) fn taper_accuracy(placement: Affine) -> Mm {
+    let [a, b, c, d, _, _] = placement.to_array();
+    let squares = a * a + b * b + c * c + d * d;
+    let det = a * d - b * c;
+    let largest = f64::midpoint(
+        squares,
+        (squares * squares - 4.0 * det * det).max(0.0).sqrt(),
+    )
+    .sqrt();
+    if largest.is_finite() && largest > 1.0 {
+        Mm(TAPER_ACCURACY.0 / largest)
+    } else {
+        TAPER_ACCURACY
     }
 }
 
@@ -156,7 +178,7 @@ pub fn lay_out(text: &TextSnapshot, face: &Face, substitute: bool) -> Option<Tex
     let mut outlines: Vec<SubpathSnapshot> = Vec::new();
     let mut glyph_outlines = Vec::new();
     let mut next_id = 0_u64;
-    let paths = laid.glyph_paths(face);
+    let paths = laid.glyph_paths_within(face, taper_accuracy(placement));
     for glyph in &paths {
         let contours = contours_of(glyph, &map, &mut next_id);
         glyph_outlines.push(contours.len());
@@ -165,13 +187,15 @@ pub fn lay_out(text: &TextSnapshot, face: &Face, substitute: bool) -> Option<Tex
     // The box of the letters as drawn, raised by their vertical kerns (`0079` criterion 26).
     let mut line_box = crate::text_caret::letters_box(&laid);
     let turned = laid.rotation_rad != 0.0
+        || laid.taper != 0.0
         || laid
             .lines
             .iter()
             .flat_map(|line| &line.glyphs)
             .any(|glyph| glyph.rotation_rad != 0.0);
     if turned {
-        // Turned glyphs may stand out of their boxes: the box covers them (`0079` criterion 15).
+        // Turned or tapered glyphs may stand out of their boxes: the box covers them (`0079`
+        // criteria 15, 17).
         line_box = paths
             .iter()
             .map(Shape::bounding_box)

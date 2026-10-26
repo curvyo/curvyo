@@ -22,6 +22,9 @@ use crate::shape::{ShapedGlyph, shape_line, shape_vertical_line};
 use crate::units::Mm;
 use crate::writing_mode::{GlyphOrientation, WritingMode};
 
+/// How close a tapered curve stays to the exact map in text space (criterion 18).
+pub const TAPER_ACCURACY: Mm = Mm(0.01);
+
 /// The characters word spacing widens (`0079` criterion 9).
 const SPACES: [char; 3] = [' ', '\u{a0}', '\u{3000}'];
 
@@ -46,6 +49,8 @@ pub struct LayoutOptions {
     /// Offsets of single characters (kerning, ADR 0021 §6), applied to the cluster a character
     /// starts; any order.
     pub char_offsets: Vec<CharOffset>,
+    /// The taper of every glyph in its own frame (criterion 17), a fraction: 0.2 is 20 %.
+    pub taper: f64,
 }
 
 /// One glyph placed in line space.
@@ -104,6 +109,8 @@ pub struct TextLayout {
     pub size: Mm,
     /// The glyphs' turn (criterion 11), radians, clockwise on screen.
     pub rotation_rad: f64,
+    /// The glyphs' taper (criterion 17), a fraction.
+    pub taper: f64,
     /// Horizontal lines or vertical columns; [`Self::frame`] maps line space to text space.
     pub writing_mode: WritingMode,
     /// The line's top above the baseline (positive); a column's half width.
@@ -194,6 +201,7 @@ pub fn layout(
         mm_per_em,
         size,
         rotation_rad: options.rotation_rad,
+        taper: options.taper,
         writing_mode: mode,
         ascender: Mm(ascender * mm_per_em),
         descender: Mm(descender * mm_per_em),
@@ -474,21 +482,55 @@ impl TextLayout {
     }
 
     /// Every glyph's outline in text space (mm), one path per drawn glyph, in drawing order;
-    /// glyphs without contours (spaces) give no path (criterion 22).
+    /// glyphs without contours (spaces) give no path (criterion 22). A tapered glyph's curves are
+    /// within [`TAPER_ACCURACY`] of the exact map (criterion 18).
     #[must_use]
     pub fn glyph_paths(&self, face: &Face) -> Vec<BezPath> {
+        self.glyph_paths_within(face, TAPER_ACCURACY)
+    }
+
+    /// [`Self::glyph_paths`] with tapered curves within `accuracy` (mm of text space): a caller
+    /// that scales text space up passes the accuracy divided by its largest scale.
+    #[must_use]
+    pub fn glyph_paths_within(&self, face: &Face, accuracy: Mm) -> Vec<BezPath> {
         self.lines
             .iter()
             .flat_map(|line| line.glyphs.iter())
-            .filter_map(|placed| {
-                let outline = face.outline(placed.glyph);
-                if outline.path.elements().is_empty() {
-                    return None;
-                }
-                let turn = self.rotation_rad + placed.rotation_rad;
-                let to_text = glyph_to_text(placed, self.frame(), self.mm_per_em, turn);
-                Some(to_text * &outline.path)
-            })
+            .filter_map(|placed| self.glyph_path(face, placed, self.frame(), accuracy))
             .collect()
+    }
+
+    /// One glyph's outline in line space: scaled, at its origin, tapered and turned as
+    /// [`Self::glyph_paths`] draws it, without the writing mode's frame (text on a path places
+    /// each glyph itself, `specs/0080-text-on-path`). `None` for a glyph without contours.
+    #[must_use]
+    pub fn glyph_in_line(
+        &self,
+        face: &Face,
+        placed: &PlacedGlyph,
+        accuracy: Mm,
+    ) -> Option<BezPath> {
+        self.glyph_path(face, placed, Affine::IDENTITY, accuracy)
+    }
+
+    fn glyph_path(
+        &self,
+        face: &Face,
+        placed: &PlacedGlyph,
+        frame: Affine,
+        accuracy: Mm,
+    ) -> Option<BezPath> {
+        let outline = face.outline(placed.glyph);
+        if outline.path.elements().is_empty() {
+            return None;
+        }
+        let turn = self.rotation_rad + placed.rotation_rad;
+        let map = glyph_to_text(
+            placed,
+            frame,
+            self.mm_per_em,
+            (turn, self.taper, self.size.0),
+        );
+        Some(map.path(&outline.path, accuracy.0))
     }
 }

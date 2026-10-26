@@ -26,6 +26,7 @@ mod path_data;
 mod preview;
 mod shape;
 mod svg_font;
+mod taper;
 mod unicode_blocks;
 mod unicode_names;
 mod units;
@@ -42,7 +43,7 @@ pub use font_class::{DeclaredClass, OS2_CLASS_BYTES, declared_class, os2_class_b
 pub use font_names::{ListableFace, family_name, listable_faces, style_name, svg_listable_faces};
 pub use glyph_cell::{GlyphCell, glyph_cell};
 pub use glyph_list::ListedChar;
-pub use layout::{LayoutOptions, LineLayout, PlacedGlyph, TextLayout, layout};
+pub use layout::{LayoutOptions, LineLayout, PlacedGlyph, TAPER_ACCURACY, TextLayout, layout};
 pub use outline::GlyphOutline;
 pub use preview::{preview_path, preview_path_within};
 pub use unicode_blocks::{BLOCKS, UNICODE_VERSION, block_of};
