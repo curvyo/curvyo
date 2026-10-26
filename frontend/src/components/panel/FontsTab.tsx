@@ -398,13 +398,13 @@ export function FontsTab({
           // (UX notes §4); the next header pushes it up.
           <div
             aria-hidden
-            className="sticky top-0 z-10 -mb-6 h-6"
+            className="sticky top-0 z-10 mr-4 -mb-6 h-6"
             style={{ transform: pinned.push < 0 ? `translateY(${pinned.push}px)` : undefined }}
           >
             {headerRow(pinned.row, { position: "absolute", top: 0, left: 0, right: 0, height: HEADER_PX })}
           </div>
         ) : null}
-        <div style={{ height: tops.total, position: "relative" }}>
+        <div style={{ height: tops.total, position: "relative", marginRight: 16 }}>
           {visible.map((i) => {
             const row = rows[i];
             const style = { position: "absolute" as const, top: tops.at[i], left: 0, right: 0, height: row.height };
