@@ -740,7 +740,6 @@ fn ac14_remove_refuses_dot_and_linked_folders() {
 /// still gives a font folder the listing reads; it never becomes a dot-folder that the listing
 /// skips or the start-up cleanup deletes.
 #[test]
-#[ignore = "0083 FAIL: `.Lobster.zip` gives the dot-folder `.Lobster` (never listed) and `.curvyo-add-7.zip` gives `.curvyo-add-7` (deleted at the next start)"]
 fn ac09_dot_archive_names_give_a_listed_folder() {
     let mut wrong = Vec::new();
     for (i, name) in [".Lobster.zip", ".curvyo-add-7.zip", "...zip", " .zip"]

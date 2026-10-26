@@ -141,6 +141,22 @@ pub fn sanitised_name(name: &str) -> String {
     out
 }
 
+/// The folder name used when an archive's base name leaves nothing (criterion 9).
+const FALLBACK_FOLDER: &str = "Fonts";
+
+/// The font folder name for an archive whose base name is `stem` (criterion 9): leading dots and
+/// spaces removed, so the folder is never hidden from the listing and never a `.curvyo-add-*`
+/// temporary folder; `Fonts` when nothing is left; then [`sanitised_name`].
+#[must_use]
+pub fn archive_folder_name(stem: &str) -> String {
+    let visible = stem.trim_start_matches(|c: char| c == '.' || c.is_whitespace());
+    sanitised_name(if visible.is_empty() {
+        FALLBACK_FOLDER
+    } else {
+        visible
+    })
+}
+
 /// `name` if no name of `taken` equals it by Unicode lower case, else the first free
 /// `numbered(n)` for n = 2, 3, ...
 fn first_free(name: &str, taken: &[String], numbered: impl Fn(u32) -> String) -> String {
@@ -240,6 +256,20 @@ mod tests {
         );
         let wide = format!("{}.ttf", "漢".repeat(119));
         assert!(sanitised_name(&wide).len() <= MAX_NAME_BYTES);
+    }
+
+    /// Criterion 9: a folder name from an archive name never starts with a dot, so the listing
+    /// reads it and it never matches the `.curvyo-add-*` temporary folders.
+    #[test]
+    fn archive_folder_names() {
+        assert_eq!(archive_folder_name("Lobster"), "Lobster");
+        assert_eq!(archive_folder_name(".Lobster"), "Lobster");
+        assert_eq!(archive_folder_name(".curvyo-add-7"), "curvyo-add-7");
+        assert_eq!(archive_folder_name(". .Pack"), "Pack");
+        assert_eq!(archive_folder_name(".."), "Fonts");
+        assert_eq!(archive_folder_name(" "), "Fonts");
+        assert_eq!(archive_folder_name(""), "Fonts");
+        assert_eq!(archive_folder_name("CON"), "_CON");
     }
 
     #[test]

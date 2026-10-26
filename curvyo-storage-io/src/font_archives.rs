@@ -9,8 +9,8 @@ use std::path::{Path, PathBuf};
 
 use curvyo_text_core::limits::MAX_ARCHIVE_BYTES;
 use curvyo_text_core::{
-    ArchiveError, EntryClass, EntrySkip, FontArchive, free_folder_name, listable_faces,
-    sanitised_name,
+    ArchiveError, EntryClass, EntrySkip, FontArchive, archive_folder_name, free_folder_name,
+    listable_faces,
 };
 
 use crate::font_files::{every_font_file, is_listable, same_bytes_in};
@@ -249,8 +249,9 @@ pub fn add_font_archive(dir: &Path, path: &Path) -> AddedArchive {
     }
     let stem = path
         .file_stem()
-        .map_or_else(|| "Fonts".to_owned(), |s| s.to_string_lossy().into_owned());
-    match write_folder(dir, &sanitised_name(&stem), &kept) {
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    match write_folder(dir, &archive_folder_name(&stem), &kept) {
         Ok(folder) => {
             report.folder = Some(folder);
             report.added = kept.fonts.iter().map(|(name, _)| name.clone()).collect();

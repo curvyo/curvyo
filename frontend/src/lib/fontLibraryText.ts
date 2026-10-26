@@ -26,8 +26,8 @@ export interface ArchiveResult {
   present: number;
   documents: number;
   unsafeEntries: number;
-  /** Refused whole: not a zip, damaged, or over a limit. */
-  refused: "unreadable" | "over_limit" | null;
+  /** Refused whole: not a zip, damaged, over a limit, or the store could not write it. */
+  refused: "unreadable" | "over_limit" | "not_written" | null;
 }
 
 /** What Add font did, by file name, and per archive. */

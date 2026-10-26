@@ -37,7 +37,9 @@ mod vertical_orientation;
 mod writing_mode;
 
 pub use align::Align;
-pub use archive_names::{free_folder_name, free_name, is_document_name, sanitised_name};
+pub use archive_names::{
+    archive_folder_name, free_folder_name, free_name, is_document_name, sanitised_name,
+};
 pub use char_offsets::CharOffset;
 pub use error::TextError;
 pub use face::{Face, FaceKind, FaceMetrics};

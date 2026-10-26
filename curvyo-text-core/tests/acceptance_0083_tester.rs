@@ -505,7 +505,6 @@ fn ac16_offset_into_central_directory_damaged() {
 /// Criterion 9 and 16: two distinct entries with the same full name (not overlapping) are both
 /// kept under unique names; this is not the overlap bomb.
 #[test]
-#[ignore = "0083 FAIL: two entries with the same full name list as one; the first is dropped silently, neither kept as OFL-2.txt nor counted"]
 fn ac16_duplicate_names_without_overlap() {
     let archive = open(&[
         RawEntry::stored("OFL.txt", b"first"),

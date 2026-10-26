@@ -227,12 +227,12 @@ impl WasmSession {
     }
 }
 
-/// A file or folder name made safe for Windows, macOS and Linux (`specs/0083-font-info-and-zip`
-/// criterion 9): the browser names a font folder with it.
+/// The font folder name for an archive whose base name is `stem`, safe for Windows, macOS and
+/// Linux and never starting with a dot (`specs/0083-font-info-and-zip` criterion 9).
 #[wasm_bindgen]
 #[must_use]
-pub fn sanitised_name(name: &str) -> String {
-    curvyo_text_core::sanitised_name(name)
+pub fn archive_folder_name(stem: &str) -> String {
+    curvyo_text_core::archive_folder_name(stem)
 }
 
 /// A zip archive of fonts the browser's Add font reads (`specs/0083-font-info-and-zip`).
