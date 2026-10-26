@@ -376,14 +376,15 @@ fn scan_elements(bytes: &[u8], max_elements: Option<usize>) -> Scan {
                 }
                 i += 1;
             }
+            // An empty element (`<rect/>`) is one level deeper than its parent too.
+            if open.len() + 1 > MAX_DEPTH {
+                return Scan {
+                    too_deep: true,
+                    cut: None,
+                };
+            }
             if !empty {
                 open.push(name);
-                if open.len() > MAX_DEPTH {
-                    return Scan {
-                        too_deep: true,
-                        cut: None,
-                    };
-                }
             }
             at = i + 1;
         }
@@ -458,6 +459,10 @@ mod tests {
     fn depth_is_counted_as_the_reader_recurses() {
         let deep = "<a>".repeat(MAX_DEPTH + 1);
         assert!(scan_elements(deep.as_bytes(), None).too_deep);
+        let leaf_too_deep = format!("{}<b/>", "<a>".repeat(MAX_DEPTH));
+        assert!(scan_elements(leaf_too_deep.as_bytes(), None).too_deep);
+        let leaf_at_limit = format!("{}<b/>", "<a>".repeat(MAX_DEPTH - 1));
+        assert!(!scan_elements(leaf_at_limit.as_bytes(), None).too_deep);
         let wide = "<a/><b x='<>'></b>".repeat(10_000);
         assert!(!scan_elements(format!("<svg>{wide}</svg>").as_bytes(), None).too_deep);
     }
