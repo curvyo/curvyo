@@ -1,28 +1,52 @@
-//! Parses SVG path data into a cubic path (`specs/0076-single-line-fonts` criterion 16).
+//! Parses SVG path data into a cubic path (`specs/0076-single-line-fonts` criterion 16,
+//! `specs/0024-svg-import-export` criteria 21 to 23; moved from `curvyo-text-core`, ADR 0018 §3).
 //!
-//! Every command of SVG 1.1 (absolute and relative M, L, H, V, C, S, Q, T, A, Z), implicit
+//! Every command of SVG 1.1 and 2 (absolute and relative M, L, H, V, C, S, Q, T, A, Z), implicit
 //! repetition and packed arc flags. Quadratics are elevated to cubics exactly, arcs become cubics
-//! within the caller's tolerance, and a sub-path is closed only by `Z`. A syntax error ends the
-//! path where it occurs (SVG's error rule); a number that is not finite or beyond
-//! [`MAX_SVG_COORDINATE`], or more than `max_points` points, refuse the whole path.
+//! as the caller's [`ArcSplit`] says, and a sub-path is closed only by `Z`. A syntax error ends
+//! the path where it occurs (SVG's error rule); a number that is not finite or beyond the
+//! caller's limit, or more than `max_points` points, refuse the whole path.
+
+use std::f64::consts::FRAC_PI_4;
 
 use kurbo::{Arc, BezPath, PathEl, Point, SvgArc, Vec2};
 
-use crate::limits::MAX_SVG_COORDINATE;
-
 /// Why a path was refused.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum PathDataError {
-    /// A number is not finite or larger than [`MAX_SVG_COORDINATE`].
+pub enum PathDataError {
+    /// A number is not finite or larger than the caller's limit.
     BadNumber,
     /// The path has more points than allowed.
     TooManyPoints,
+}
+
+/// How an arc becomes cubics.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ArcSplit {
+    /// As few cubics as keep within this distance of the arc (units of the data); an arc between
+    /// equal points is a zero-length line (SVG fonts).
+    Tolerance(f64),
+    /// One cubic per at most 45° of the arc, the last ending exactly on the stated end point; an
+    /// arc between equal points is dropped (the import, criterion 22).
+    EighthTurns,
+}
+
+/// The caller's limits.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PathLimits {
+    /// The largest absolute value of a number.
+    pub max_coordinate: f64,
+    /// The most points (one per line or move, three per cubic).
+    pub max_points: usize,
+    /// How arcs are split.
+    pub arcs: ArcSplit,
 }
 
 /// The reader's position in the data.
 struct Cursor<'a> {
     bytes: &'a [u8],
     at: usize,
+    max_coordinate: f64,
 }
 
 impl Cursor<'_> {
@@ -84,7 +108,7 @@ impl Cursor<'_> {
         let Ok(value) = text.parse::<f64>() else {
             return Ok(None);
         };
-        if !value.is_finite() || value.abs() > MAX_SVG_COORDINATE {
+        if !value.is_finite() || value.abs() > self.max_coordinate {
             return Err(PathDataError::BadNumber);
         }
         Ok(Some(value))
@@ -171,7 +195,11 @@ impl Builder {
         Ok(())
     }
 
-    fn arc_to(&mut self, arc: &SvgArc, tolerance: f64) -> Result<(), PathDataError> {
+    fn arc_to(&mut self, arc: &SvgArc, split: ArcSplit) -> Result<(), PathDataError> {
+        let tolerance = match split {
+            ArcSplit::Tolerance(tolerance) => tolerance,
+            ArcSplit::EighthTurns => return self.arc_in_eighths(arc),
+        };
         match Arc::from_svg_arc(arc) {
             None => self.line_to(arc.to),
             Some(arc_shape) => {
@@ -189,6 +217,25 @@ impl Builder {
         }
     }
 
+    /// [`ArcSplit::EighthTurns`]: the centre form of SVG's implementation notes (F.6), one cubic
+    /// per at most 45° with the arm length `4/3 tan(θ/4)`; equal end points draw nothing, a zero
+    /// radius is a line.
+    fn arc_in_eighths(&mut self, arc: &SvgArc) -> Result<(), PathDataError> {
+        if arc.from == arc.to {
+            self.ensure_moved()?;
+            self.last_cubic = None;
+            return Ok(());
+        }
+        let Some(shape) = Arc::from_svg_arc(arc) else {
+            return self.line_to(arc.to);
+        };
+        for (c1, c2, end) in eighth_turn_cubics(&shape, arc.to) {
+            self.cubic_to(c1, c2, end)?;
+        }
+        self.last_cubic = None;
+        Ok(())
+    }
+
     fn close(&mut self) {
         if !self.needs_move {
             self.path.close_path();
@@ -198,25 +245,55 @@ impl Builder {
     }
 }
 
-/// Parses `data` (font units, as written) into cubics. Arcs are split within `tolerance` (font
-/// units).
+/// The cubics of `arc`, one per at most 45° of its sweep, with the arm length `4/3 tan(θ/4)`; the
+/// last ends exactly on `end` (the arc's stated end point). Each is `(control 1, control 2, end)`.
+#[must_use]
+pub fn eighth_turn_cubics(arc: &Arc, end: Point) -> Vec<(Point, Point, Point)> {
+    let turns = (arc.sweep_angle.abs() / FRAC_PI_4 - 1e-9)
+        .ceil()
+        .clamp(1.0, 8.0);
+    // invariant: `turns` is a whole number from 1 to 8.
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    let pieces = turns as usize;
+    let step = arc.sweep_angle / turns;
+    let arm = 4.0 / 3.0 * (step / 4.0).tan();
+    let (sin_r, cos_r) = arc.x_rotation.sin_cos();
+    let at = |angle: f64| {
+        let (sin, cos) = angle.sin_cos();
+        let (u, v) = (arc.radii.x * cos, arc.radii.y * sin);
+        let (du, dv) = (-arc.radii.x * sin, arc.radii.y * cos);
+        (
+            arc.center + Vec2::new(u * cos_r - v * sin_r, u * sin_r + v * cos_r),
+            Vec2::new(du * cos_r - dv * sin_r, du * sin_r + dv * cos_r),
+        )
+    };
+    (0..pieces)
+        .map(|piece| {
+            #[allow(clippy::cast_precision_loss)] // at most eight
+            let start = arc.start_angle + step * piece as f64;
+            let (p0, d0) = at(start);
+            let (p1, d1) = at(start + step);
+            let last = if piece + 1 == pieces { end } else { p1 };
+            (p0 + d0 * arm, p1 - d1 * arm, last)
+        })
+        .collect()
+}
+
+/// Parses `data` (user units, as written) into cubics within `limits`.
 ///
 /// # Errors
-/// [`PathDataError`] for a number that is not finite or too large, or more than `max_points`
-/// points.
-pub(crate) fn parse_path_data(
-    data: &str,
-    tolerance: f64,
-    max_points: usize,
-) -> Result<BezPath, PathDataError> {
+/// [`PathDataError`] for a number that is not finite or too large, or more than
+/// `limits.max_points` points.
+pub fn parse_path_data(data: &str, limits: PathLimits) -> Result<BezPath, PathDataError> {
     let mut cursor = Cursor {
         bytes: data.as_bytes(),
         at: 0,
+        max_coordinate: limits.max_coordinate,
     };
     let mut b = Builder {
         path: BezPath::new(),
         points: 0,
-        max_points,
+        max_points: limits.max_points,
         current: Point::ZERO,
         start: Point::ZERO,
         last_cubic: None,
@@ -230,6 +307,10 @@ pub(crate) fn parse_path_data(
             break;
         };
         if next.is_ascii_alphabetic() {
+            // Path data begins with a move; anything else is an error and draws nothing.
+            if command.is_none() && !matches!(next, b'M' | b'm') {
+                break;
+            }
             cursor.at += 1;
             command = Some(next);
             if matches!(next, b'Z' | b'z') {
@@ -242,7 +323,7 @@ pub(crate) fn parse_path_data(
             break;
         }
         let Some(letter) = command else { break };
-        if !step(letter, &mut cursor, &mut b, tolerance)? {
+        if !step(letter, &mut cursor, &mut b, limits.arcs)? {
             break;
         }
         // An implicit repetition of M is a L (m: l).
@@ -279,7 +360,7 @@ fn step(
     letter: u8,
     cursor: &mut Cursor<'_>,
     b: &mut Builder,
-    tolerance: f64,
+    arcs: ArcSplit,
 ) -> Result<bool, PathDataError> {
     let relative = letter.is_ascii_lowercase();
     let origin = if relative {
@@ -361,7 +442,7 @@ fn step(
                 large_arc,
                 sweep,
             };
-            b.arc_to(&arc, tolerance)?;
+            b.arc_to(&arc, arcs)?;
         }
         _ => return Ok(false),
     }
@@ -374,8 +455,16 @@ mod tests {
     use super::*;
     use kurbo::{ParamCurve, ParamCurveNearest, PathSeg, Shape};
 
+    fn limits(arcs: ArcSplit, max_points: usize) -> PathLimits {
+        PathLimits {
+            max_coordinate: 1e6,
+            max_points,
+            arcs,
+        }
+    }
+
     fn parse(d: &str) -> BezPath {
-        parse_path_data(d, 1e-7, 65_535).unwrap()
+        parse_path_data(d, limits(ArcSplit::Tolerance(1e-7), 65_535)).unwrap()
     }
 
     fn closes(path: &BezPath) -> usize {
@@ -443,15 +532,15 @@ mod tests {
     #[test]
     fn ac23_hostile_numbers_and_points() {
         assert_eq!(
-            parse_path_data("M0 0 L1e999 0", 1e-7, 100),
+            parse_path_data("M0 0 L1e999 0", limits(ArcSplit::EighthTurns, 100)),
             Err(PathDataError::BadNumber)
         );
         assert_eq!(
-            parse_path_data("M0 0 L1e7 0", 1e-7, 100),
+            parse_path_data("M0 0 L1e7 0", limits(ArcSplit::EighthTurns, 100)),
             Err(PathDataError::BadNumber)
         );
         assert_eq!(
-            parse_path_data("M0 0 1 1 2 2 3 3", 1e-7, 3),
+            parse_path_data("M0 0 1 1 2 2 3 3", limits(ArcSplit::EighthTurns, 3)),
             Err(PathDataError::TooManyPoints)
         );
         let cut = parse("M0 0 L5 5 L # 7 7");

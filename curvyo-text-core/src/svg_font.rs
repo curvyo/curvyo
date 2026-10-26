@@ -2,23 +2,25 @@
 //! (`specs/0076-single-line-fonts` criteria 1, 14 to 16, 23; `adrs.md` decision 2).
 //!
 //! The `<font>` element of SVG 1.1 as Hershey Text v3 and the EMS `svg-fonts` files write it.
-//! Hostile input is refused before the XML reader sees it: the size, a DOCTYPE with an internal
-//! subset (so no entity is ever declared) and the element depth are checked on the bytes; the
-//! node count, glyph count, points and numbers while reading. Nothing is fetched or resolved.
+//! Hostile input is refused before the XML reader sees it by `curvyo-svg-core`'s guard (ADR 0018
+//! §3): the size, a DOCTYPE with an internal subset (so no entity is ever declared) and the
+//! element depth are checked on the bytes; the node count, glyph count, points and numbers while
+//! reading. Nothing is fetched or resolved.
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use curvyo_svg_core::path_data::{ArcSplit, PathLimits, parse_path_data};
+use curvyo_svg_core::xml_guard::{self, DoctypeRule, GuardLimits};
 use kurbo::{Affine, BezPath};
-use roxmltree::{Document, Node, ParsingOptions};
+use roxmltree::{Document, Node};
 
 use crate::face_style::{FaceStyle, NORMAL_WIDTH, Slant};
 use crate::limits::{
-    MAX_GLYPH_POINTS, MAX_SVG_COORDINATE, MAX_SVG_DEPTH, MAX_SVG_FONT_BYTES, MAX_SVG_FONT_POINTS,
-    MAX_SVG_GLYPHS, MAX_SVG_KERN_PAIRS, MAX_SVG_NODES,
+    MAX_GLYPH_POINTS, MAX_SVG_COORDINATE, MAX_SVG_FONT_BYTES, MAX_SVG_FONT_POINTS, MAX_SVG_GLYPHS,
+    MAX_SVG_KERN_PAIRS, MAX_SVG_NODES,
 };
 use crate::outline::GlyphOutline;
-use crate::path_data::parse_path_data;
 
 /// The em fraction within which arcs become cubics (0.0002 mm at the largest size).
 const ARC_TOLERANCE_EM: f64 = 1e-7;
@@ -69,115 +71,7 @@ impl SvgFont {
 /// Whether `bytes` look like an SVG font (the first non-blank character after an optional BOM is
 /// `<`): the store sends them here instead of to the OpenType reader.
 pub(crate) fn looks_like_xml(bytes: &[u8]) -> bool {
-    let body = bytes.strip_prefix(b"\xEF\xBB\xBF").unwrap_or(bytes);
-    body.iter()
-        .find(|b| !b.is_ascii_whitespace())
-        .is_some_and(|b| *b == b'<')
-}
-
-/// Whether a DOCTYPE in the prolog of `bytes` has an internal subset (a `[` before the
-/// DOCTYPE's own `>`, outside quotes): such a file is refused, so no entity declaration reaches
-/// the parser. The prolog is read as the XML reader reads it: the XML declaration, processing
-/// instructions, comments and whitespace before the root element are skipped, so a decoy
-/// `<!DOCTYPE` inside a comment or an instruction hides nothing.
-fn has_internal_subset(bytes: &[u8]) -> bool {
-    let skip_past = |from: usize, end: &[u8]| {
-        bytes
-            .get(from..)
-            .and_then(|rest| rest.windows(end.len()).position(|w| w == end))
-            .map(|at| from + at + end.len())
-    };
-    let mut at = usize::from(bytes.starts_with(b"\xEF\xBB\xBF")) * 3;
-    loop {
-        while bytes.get(at).is_some_and(u8::is_ascii_whitespace) {
-            at += 1;
-        }
-        let rest = bytes.get(at..).unwrap_or_default();
-        let next = if rest.starts_with(b"<?") {
-            skip_past(at + 2, b"?>")
-        } else if rest.starts_with(b"<!--") {
-            skip_past(at + 4, b"-->")
-        } else if rest.starts_with(b"<!DOCTYPE") {
-            let mut quote: Option<u8> = None;
-            let mut end = None;
-            for (i, &b) in rest.iter().enumerate().skip(9) {
-                match (quote, b) {
-                    (Some(q), _) if b == q => quote = None,
-                    (None, b'"' | b'\'') => quote = Some(b),
-                    (None, b'[') => return true,
-                    (None, b'>') => {
-                        end = Some(at + i + 1);
-                        break;
-                    }
-                    _ => {}
-                }
-            }
-            end
-        } else {
-            return false;
-        };
-        match next {
-            Some(next) => at = next,
-            None => return false,
-        }
-    }
-}
-
-/// The deepest element nesting of `bytes`, counted as the XML reader would recurse, stopping
-/// as soon as it passes [`MAX_SVG_DEPTH`]. Comments, CDATA, processing instructions,
-/// declarations and quoted attribute values are skipped.
-fn too_deep(bytes: &[u8]) -> bool {
-    let skip_to = |from: usize, end: &[u8]| {
-        bytes[from..]
-            .windows(end.len())
-            .position(|w| w == end)
-            .map_or(bytes.len(), |at| from + at + end.len())
-    };
-    let mut depth = 0_usize;
-    let mut at = 0;
-    while let Some(offset) = bytes[at..].iter().position(|b| *b == b'<') {
-        at += offset;
-        let rest = &bytes[at..];
-        if rest.starts_with(b"<!--") {
-            at = skip_to(at + 4, b"-->");
-        } else if rest.starts_with(b"<![CDATA[") {
-            at = skip_to(at + 9, b"]]>");
-        } else if rest.starts_with(b"<?") {
-            at = skip_to(at + 2, b"?>");
-        } else if rest.starts_with(b"<!") {
-            at = skip_to(at + 2, b">");
-        } else if rest.starts_with(b"</") {
-            depth = depth.saturating_sub(1);
-            at = skip_to(at + 2, b">");
-        } else {
-            let mut quote: Option<u8> = None;
-            let mut i = at + 1;
-            let mut empty = false;
-            while let Some(&b) = bytes.get(i) {
-                match (quote, b) {
-                    (Some(q), _) if b == q => quote = None,
-                    (None, b'"' | b'\'') => quote = Some(b),
-                    (None, b'>') => {
-                        empty = bytes.get(i.wrapping_sub(1)) == Some(&b'/');
-                        break;
-                    }
-                    _ => {}
-                }
-                i += 1;
-            }
-            if !empty {
-                depth += 1;
-                if depth > MAX_SVG_DEPTH {
-                    return true;
-                }
-            }
-            at = i + 1;
-        }
-        if at >= bytes.len() {
-            break;
-        }
-    }
-    false
+    xml_guard::looks_like_xml(bytes)
 }
 
 /// A finite number within [`MAX_SVG_COORDINATE`] from an attribute; `Err` for a stated value
@@ -219,17 +113,19 @@ fn style_of(face: Option<Node<'_, '_>>) -> String {
     .name()
 }
 
-/// Parses the bytes' XML after the byte checks; `None` for anything refused.
-fn parse_document(bytes: &[u8]) -> Option<Document<'_>> {
-    if bytes.len() > MAX_SVG_FONT_BYTES || has_internal_subset(bytes) || too_deep(bytes) {
-        return None;
-    }
-    let text = std::str::from_utf8(bytes).ok()?;
-    let options = ParsingOptions {
-        allow_dtd: true,
-        nodes_limit: MAX_SVG_NODES,
-    };
-    Document::parse_with_options(text, options).ok()
+/// The guard's limits for an SVG font: no internal subset, no element cap.
+const FONT_LIMITS: GuardLimits = GuardLimits {
+    max_bytes: MAX_SVG_FONT_BYTES,
+    max_nodes: MAX_SVG_NODES,
+    max_elements: None,
+    doctype: DoctypeRule::NoInternalSubset,
+};
+
+/// Runs `read` on the bytes' XML after the guard's checks; `None` for anything refused.
+fn with_document<T>(bytes: &[u8], read: impl FnOnce(&Document<'_>) -> Option<T>) -> Option<T> {
+    let checked = xml_guard::check(bytes, FONT_LIMITS).ok()?;
+    let doc = checked.parse().ok()?;
+    read(&doc)
 }
 
 /// The `<font>` elements of the document in order.
@@ -261,24 +157,27 @@ fn family_of(font: Node<'_, '_>) -> Option<String> {
 /// The faces of an SVG font file: `(index of the <font>, family, style)` for every `<font>` that
 /// holds a `<glyph>` with a `d` and parses in full. Empty for a file that is not one.
 pub(crate) fn svg_faces(bytes: &[u8]) -> Vec<(u32, String, String)> {
-    let Some(doc) = parse_document(bytes) else {
-        return Vec::new();
-    };
-    fonts(&doc)
-        .enumerate()
-        .filter_map(|(index, font)| {
-            let index = u32::try_from(index).ok()?;
-            read_font(font)?;
-            Some((index, family_of(font)?, style_of(font_face(font))))
-        })
-        .collect()
+    with_document(bytes, |doc| {
+        Some(
+            fonts(doc)
+                .enumerate()
+                .filter_map(|(index, font)| {
+                    let index = u32::try_from(index).ok()?;
+                    read_font(font)?;
+                    Some((index, family_of(font)?, style_of(font_face(font))))
+                })
+                .collect(),
+        )
+    })
+    .unwrap_or_default()
 }
 
 /// Parses `<font>` number `index` of `bytes`.
 pub(crate) fn parse_svg_font(bytes: &[u8], index: u32) -> Option<SvgFont> {
-    let doc = parse_document(bytes)?;
-    let font = fonts(&doc).nth(usize::try_from(index).ok()?)?;
-    read_font(font)
+    with_document(bytes, |doc| {
+        let font = fonts(doc).nth(usize::try_from(index).ok()?)?;
+        read_font(font)
+    })
 }
 
 fn read_font(font: Node<'_, '_>) -> Option<SvgFont> {
@@ -302,7 +201,12 @@ fn read_font(font: Node<'_, '_>) -> Option<SvgFont> {
         let path = match node.attribute("d") {
             Some(d) => {
                 let left = MAX_SVG_FONT_POINTS.saturating_sub(total_points);
-                let path = parse_path_data(d, tolerance, MAX_GLYPH_POINTS.min(left)).ok()?;
+                let limits = PathLimits {
+                    max_coordinate: MAX_SVG_COORDINATE,
+                    max_points: MAX_GLYPH_POINTS.min(left),
+                    arcs: ArcSplit::Tolerance(tolerance),
+                };
+                let path = parse_path_data(d, limits).ok()?;
                 total_points += path
                     .elements()
                     .iter()
@@ -412,34 +316,4 @@ fn read_kerning(
         }
     }
     Some(kerning)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn byte_checks() {
-        assert!(looks_like_xml(b"\xEF\xBB\xBF \n<svg/>"));
-        assert!(!looks_like_xml(b"\x00\x01\x00\x00"));
-        assert!(!has_internal_subset(
-            br#"<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://x/svg11.dtd" ><svg/>"#
-        ));
-        assert!(has_internal_subset(
-            br#"<!DOCTYPE svg [<!ENTITY a "b">]><svg/>"#
-        ));
-        assert!(has_internal_subset(
-            br#"<!DOCTYPE svg PUBLIC "a>b" [ ]><svg/>"#
-        ));
-        assert!(has_internal_subset(
-            br#"<?xml version="1.0"?><!-- <!DOCTYPE svg> --><!DOCTYPE svg [ ]><svg/>"#
-        ));
-        assert!(!has_internal_subset(
-            b"<svg><!-- <!DOCTYPE svg [ ]> --></svg>"
-        ));
-        let deep = "<a>".repeat(MAX_SVG_DEPTH + 1);
-        assert!(too_deep(deep.as_bytes()));
-        let wide = "<a/><b x='<>'></b>".repeat(10_000);
-        assert!(!too_deep(format!("<svg>{wide}</svg>").as_bytes()));
-    }
 }
