@@ -12,6 +12,7 @@ import { Tooltip } from "radix-ui";
 import { BooleanCommands } from "@/components/BooleanCommands";
 import { BooleanNotice } from "@/components/BooleanNotice";
 import { GroupCommands } from "@/components/GroupCommands";
+import { ImportCard } from "@/components/ImportCard";
 import { PathCommands } from "@/components/PathCommands";
 import {
   COLUMN_A_TOOLTIP_OFFSET_PX,
@@ -42,6 +43,8 @@ interface ToolRailProps {
   grouping: GroupingCommands;
   /** A document preview pauses editing: the rail is dimmed and inert (`0042` criterion 19). */
   paused?: boolean;
+  /** The Import button below the Path tools card (`specs/0058-bitmap-import` criterion 1). */
+  onImport: () => void;
 }
 
 /** The muted last tooltip line of the creation tools (`specs/0052-click-to-create-shapes/`
@@ -148,7 +151,8 @@ function OffsetGlyph() {
  * it, the Grouping card; column B holds the Path card and, 8px below it, the Boolean card. Select
  * is first, a deliberate, one-time exception to "new tools append in ship order" (acceptance
  * criterion 12), then Pen, Node, Rectangle, Ellipse, Polygon-star. The canvas is never resized or
- * repositioned to make room for it. Column A ends with the Path tools card (the Offset tool).
+ * repositioned to make room for it. Column A ends with the Path tools card (the Offset tool) and
+ * the Import card (`specs/0058-bitmap-import`).
  *
  * The root keeps 4px clear under the columns; it passes no pointer event through to itself, so
  * the canvas around the cards stays usable. Column B, the taller one, is 500px high with the
@@ -162,6 +166,7 @@ export function ToolRail({
   commands,
   grouping,
   paused = false,
+  onImport,
 }: ToolRailProps) {
   // The one state that changes a letter: the Select tool with a selection.
   const letterActsOnSelection = tool === "select" && selectionCount > 0;
@@ -270,6 +275,7 @@ export function ToolRail({
               onReturnFocus={onReturnFocus}
             />
           </div>
+          <ImportCard primary={MAC ? "Cmd" : "Ctrl"} onImport={onImport} />
         </div>
         {/* Column B: the Path card and, 8px below it, the Boolean card. */}
         <div className="flex w-12 flex-col gap-2">

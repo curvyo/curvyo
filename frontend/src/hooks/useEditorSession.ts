@@ -875,8 +875,13 @@ export interface EditorSession {
    * dirty project) and the notice to show (empty for none).
    * @throws the error dialog's sentence; the open project is untouched. */
   openFile: (bytes: Uint8Array, fileName: string) => Promise<{ svg: boolean; notice: string }>;
-  /** Import SVG… (criterion 3): `"imported:<n>"`, `"nothing:<notice>"` or `"error:<sentence>"`. */
-  importSvg: (bytes: Uint8Array, fileName: string) => string;
+  /** The Import button (`specs/0058-bitmap-import` criteria 1 to 5): starts an import at the
+   * drop point (canvas CSS pixels) or, with `null`, at the view centre. */
+  importBegin: (drop: { x: number; y: number } | null) => void;
+  /** Reads one file of the import (an image is decoded, an SVG parsed). */
+  importAdd: (bytes: Uint8Array, fileName: string) => void;
+  /** Commits the import as one step and selects what came in. */
+  importFinish: () => { imported: number; notice: string; alert: boolean };
   /** Save / Save as: packs the live session's document into `.curvyo` container bytes for the
    * host to write, recording the application version. Call `markSaved` once they are written.
    * @throws a plain `Error` if there is no live session yet, or the
@@ -1102,6 +1107,8 @@ export function useEditorSession(
     }
   }, [syncFromSession]);
   const history = useHistory(getSession, syncFromSession, containerRef, onNudgeHistory);
+  // `showNotice` is stable (a callback without dependencies), so the render loop may keep it.
+  const showNoticeRef = useRef(history.showNotice);
   const { refresh: refreshHistory, handleKeyOutcome } = history;
   useEffect(() => {
     refreshHistoryRef.current = refreshHistory;
@@ -1361,6 +1368,12 @@ export function useEditorSession(
     let frame = requestAnimationFrame(function renderLoop() {
       const session = sessionRef.current;
       session?.render();
+      // An image of an opened project whose picture cannot be read, once per open
+      // (`specs/0058-bitmap-import` criterion 30).
+      const badAsset = session?.take_bad_asset_notice();
+      if (badAsset) {
+        showNoticeRef.current(badAsset, 5000, "canvas", "alert");
+      }
       if (session) {
         const view = `${session.view_origin_x()},${session.view_origin_y()},${session.view_scale()}`;
         if (view !== tagView) {
@@ -1415,18 +1428,25 @@ export function useEditorSession(
     [attachSession],
   );
 
-  const importSvg = useCallback(
-    (bytes: Uint8Array, fileName: string): string => {
-      const session = sessionRef.current;
-      if (!session) {
-        return "error:";
-      }
-      const outcome = session.import_svg(bytes, fileName);
-      syncFromSession();
-      return outcome;
-    },
-    [syncFromSession],
-  );
+  const importBegin = useCallback((drop: { x: number; y: number } | null) => {
+    sessionRef.current?.import_begin(drop !== null, drop?.x ?? 0, drop?.y ?? 0);
+  }, []);
+
+  const importAdd = useCallback((bytes: Uint8Array, fileName: string) => {
+    sessionRef.current?.import_add(bytes, fileName);
+  }, []);
+
+  const importFinish = useCallback(() => {
+    const session = sessionRef.current;
+    if (!session) {
+      return { imported: 0, notice: "", alert: false };
+    }
+    const outcome = session.import_finish();
+    const result = { imported: outcome.imported, notice: outcome.notice, alert: outcome.alert };
+    outcome.free();
+    syncFromSession();
+    return result;
+  }, [syncFromSession]);
 
   const packProject = useCallback((): Uint8Array => {
     const session = sessionRef.current;
@@ -2733,7 +2753,9 @@ export function useEditorSession(
     newProject,
     openProject,
     openFile,
-    importSvg,
+    importBegin,
+    importAdd,
+    importFinish,
     packProject,
     markSaved,
   };

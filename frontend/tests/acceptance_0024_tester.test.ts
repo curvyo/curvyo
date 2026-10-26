@@ -179,24 +179,19 @@ test("criteria 1 to 3, 5, 6, 8, 67 in Chromium: Import SVG… and Open… of rea
     await waitFor("the app", async () => ((await s.evaluate(`!!document.querySelector('[role=tab][aria-label^="File"]')`)) ? true : null));
     await sleep(1500);
 
-    // Criterion 5: the button, its text, size, row order, tooltip name only.
+    // Criterion 5 as changed by the customer on 2026-10-27 (`specs/0058-bitmap-import`
+    // criterion 1): the File tab has no import row; the Import button of the tool rail imports.
     await s.tab("File");
-    const file = JSON.parse(
-      (await s.evaluate(`JSON.stringify((() => {
-        const b = document.querySelector('[data-file-command=import-svg]');
-        const all = [...document.querySelectorAll('[data-file-command]')].map((e) => e.getAttribute('data-file-command'));
-        return b ? { text: b.textContent, width: b.getBoundingClientRect().width, disabled: b.disabled, all } : null;
-      })())`)) as string,
-    ) as { text: string; width: number; disabled: boolean; all: string[] } | null;
-    assert.ok(file, "criterion 5: Import SVG… is in the File tab");
-    assert.equal(file.text, "Import SVG…");
-    assert.equal(Math.round(file.width), 118);
-    assert.equal(file.disabled, false);
-    assert.ok(file.all.indexOf("import-svg") > file.all.indexOf("close"), `below Close: ${file.all}`);
+    const commands = JSON.parse(
+      (await s.evaluate(`JSON.stringify([...document.querySelectorAll('[data-file-command]')].map((e) => e.getAttribute('data-file-command')))`)) as string,
+    ) as string[];
+    assert.ok(!commands.includes("import-svg"), `no Import SVG… in the File tab: ${commands}`);
+    const rail = (await s.evaluate(`!!document.querySelector('[data-import-button]')`)) as boolean;
+    assert.ok(rail, "the Import button is in the tool rail");
 
     // Criterion 3: a real Inkscape file, one new layer named after the file, one history step.
     const network = s.requests.length;
-    await s.choose("[data-file-command=import-svg]", path.join(REAL, "inkscape", "inkscape_mm_a4.svg"));
+    await s.choose("[data-import-button]", path.join(REAL, "inkscape", "inkscape_mm_a4.svg"));
     assert.equal(await s.dialogText(), "", "no dialog after an import");
     assert.ok(!/inkscape_mm_a4/.test(await s.statusText()), "criterion 8: no message after a successful import");
     await s.tab("Layers");
@@ -220,7 +215,7 @@ test("criteria 1 to 3, 5, 6, 8, 67 in Chromium: Import SVG… and Open… of rea
     // Criterion 6: a refusal shows the dialog with the spec's text and changes nothing.
     await s.tab("File");
     const rowsBefore = await s.layerRows().catch(() => []);
-    await s.choose("[data-file-command=import-svg]", bomb);
+    await s.choose("[data-import-button]", bomb);
     const dialog = await waitFor("the refusal", async () => {
       const t = await s.dialogText();
       return t ? t : null;
@@ -233,7 +228,7 @@ test("criteria 1 to 3, 5, 6, 8, 67 in Chromium: Import SVG… and Open… of rea
 
     // Criterion 8: nothing imported gives the one notice.
     await s.tab("File");
-    await s.choose("[data-file-command=import-svg]", textOnly);
+    await s.choose("[data-import-button]", textOnly);
     const notice = await waitFor("the notice", async () => {
       const t = await s.statusText();
       return /could be imported/.test(t) ? t : null;

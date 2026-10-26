@@ -1,7 +1,8 @@
 # SVG import: what is read and what is ignored
 
-Open… reads an `.svg` file as a new, untitled project; Import SVG… in the File tab adds one as a
-new layer in the middle of the view (`specs/0024-svg-import-export`). Both read the same subset.
+Open… reads an `.svg` file as a new, untitled project; the Import button of the tool rail (Ctrl+I)
+adds one as a new layer in the middle of the view, or at the point where it is dropped on the
+canvas (`specs/0024-svg-import-export`, `specs/0058-bitmap-import`). Both read the same subset.
 What is not in it is left out without a message; when nothing at all could be imported, one
 notice says so. Five kinds of file are refused: not an SVG, XML entities beyond plain text
 constants, larger than 50 MiB, not UTF-8, and compressed `.svgz`.
@@ -13,7 +14,7 @@ constants, larger than 50 MiB, not UTF-8, and compressed `.svgz`.
   without sizes the viewBox gives the page; with neither, the drawing's extent. Files from Adobe
   Illustrator use 1/72 inch per pixel, files from Inkscape 0.91 and earlier without a viewBox
   1/90 inch. Inkscape's document units (mm, cm, in) and page colour become the display unit and
-  the background. Import SVG… uses these rules only to scale the file to millimetres.
+  the background. Import uses these rules only to scale the file to millimetres.
 - **Shapes.** `path` (every command of SVG 1.1 and 2, arcs as cubic curves of at most 45°),
   `rect`, `circle`, `ellipse`, `line`, `polyline`, `polygon`. A rectangle, circle or ellipse stays
   a primitive when its transform is a move, rotation, uniform scale or mirror (or a stretch along

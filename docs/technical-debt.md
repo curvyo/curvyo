@@ -1564,6 +1564,15 @@ pre-checks, the decoder limits and a time-boxed fuzz run before the PR. The deco
 and a message protocol), or a streaming decoder with a deadline. Not needed before images are a
 daily workflow.
 
+Built 2026-10-26: a project's pictures are decoded on their first drawn frame, all in that frame
+(no "one per task" yet, so the frames of a project with three 12 Mpx images show together after
+about half a second instead of filling in one by one); a texture is released as soon as no drawn
+image names it (hidden, deleted or another project), not after 30 s off screen, so unhiding a
+large picture decodes it again. The desktop picker hands each file to the page as a JSON array of
+numbers (the existing `pick_project` path), several times the file's size in transit for a 100 MB
+photo. **Resolution:** decode one image per animation frame with the pending hatch of `0058`
+criterion 30; an eviction clock passed in by the host; a binary IPC channel for file bytes.
+
 ## A template's size limit covers the packed file only
 
 `specs/0046-document-shapes` criterion 22 refuses a template file over 64 MiB

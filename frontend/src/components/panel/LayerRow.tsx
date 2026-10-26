@@ -6,6 +6,7 @@ import {
   EyeOff,
   Group,
   Hexagon,
+  Image,
   Layers,
   Link2,
   ListChecks,
@@ -52,6 +53,8 @@ const KIND_GLYPHS: Record<string, Glyph> = {
   clone: Link2,
   // A text object (`specs/0074-text-objects` criterion 27).
   text: Type,
+  // An image object (`specs/0058-bitmap-import` criterion 14).
+  image: Image,
 };
 
 /** The four cells of a row, in order (criterion 38, customer feedback 2026-10-14). */

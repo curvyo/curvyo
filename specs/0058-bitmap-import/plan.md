@@ -29,41 +29,41 @@ of `0024` merged). Design: ADR 0017 (with the spike result) and `adrs.md`.
 ## Tasks
 
 Milestone 1, image-core:
-- [ ] 1. Crate, `deny.toml` exception, workspace pin `image` =0.25.10 (ADR 0017 §4).
-- [ ] 2. Fixtures and their script; golden expectations (AC 6, 7, 8, 9, 20; Fixtures list).
-- [ ] 3. `probe`: format by content, header size, density from `pHYs`/JFIF, 96 dpi rule, header
+- [x] 1. Crate, `deny.toml` exception, workspace pin `image` =0.25.10 (ADR 0017 §4).
+- [x] 2. Fixtures and their script; golden expectations (AC 6, 7, 8, 9, 20; Fixtures list).
+- [x] 3. `probe`: format by content, header size, density from `pHYs`/JFIF, 96 dpi rule, header
       and file ceilings (AC 2, 6, 9, 16, 17).
-- [ ] 4. `decode_working`: decoded-size cap before decode, own-layout integer box downscale,
+- [x] 4. `decode_working`: decoded-size cap before decode, own-layout integer box downscale,
       16-bit rounding, orientation after the downscale, animated first frame, truncated JPEG
       flag; hostile files fail fast (AC 7, 8, 18, 19, 20, 21, 42).
-- [ ] 5. `mip_level` (2x2 integer box) for the GPU upload (AC 28).
+- [x] 5. `mip_level` (2x2 integer box) for the GPU upload (AC 28).
 
 Milestone 2, document-core (format 25):
-- [ ] 6. `AssetHash`, `AssetStore` with dedup and the 512 MiB cap (AC 16, 17, 23).
-- [ ] 7. `ImageSnapshot`, `image_codec`, the fifth arm everywhere the compiler asks (AC 31, 32,
+- [x] 6. `AssetHash`, `AssetStore` with dedup and the 512 MiB cap (AC 16, 17, 23).
+- [x] 7. `ImageSnapshot`, `image_codec`, the fifth arm everywhere the compiler asks (AC 31, 32,
       36, 37, 38, 40, 41).
-- [ ] 8. `Document::add_images`: active layer / Initial Layer, on top, one commit "Import image" /
+- [x] 8. `Document::add_images`: active layer / Initial Layer, on top, one commit "Import image" /
       "Import images" (AC 2, 5, 13, 14, 15, 45).
-- [ ] 9. Container: `assets/` Stored, bounded read, missing asset is not an open failure; JSON;
+- [x] 9. Container: `assets/` Stored, bounded read, missing asset is not an open failure; JSON;
       format 25; golden and damaged variants (AC 23, 44).
-- [ ] 10. Wipe prunes the store (AC 25); duplicate shares the asset; `make_clone` refuses (AC 38).
+- [x] 10. Wipe prunes the store (AC 25); duplicate shares the asset; `make_clone` refuses (AC 38).
 
 Milestone 3, ui-core and render-core:
-- [ ] 11. Placement function: natural size, fit, view centre, clamp, drop point, stagger (AC 9 to
+- [x] 11. Placement function: natural size, fit, view centre, clamp, drop point, stagger (AC 9 to
       12, 4, 5).
-- [ ] 12. `FileKind::Image`; notice texts incl. truncated JPEG (AC 2, 10, 17, 18, 21, 24, 26).
-- [ ] 13. Image arm in hit test (whole quad), bounds, transforms, refusals of outline commands with
+- [x] 12. `FileKind::Image`; notice texts incl. truncated JPEG (AC 2, 10, 17, 18, 21, 24, 26).
+- [x] 13. Image arm in hit test (whole quad), bounds, transforms, refusals of outline commands with
       "Images can't be used with this command. Nothing was changed." (AC 31, 32, 37).
-- [ ] 14. `ImageQuad` and the image artwork layer; opacity and hidden (AC 27, 30).
+- [x] 14. `ImageQuad` and the image artwork layer; opacity and hidden (AC 27, 30).
 
 Milestone 4, editor-wasm and frontend:
-- [ ] 15. `Session::import_files` routing by content; one commit per batch; selection; notices
+- [x] 15. `Session::import_files` routing by content; one commit per batch; selection; notices
       (AC 1 to 5, 10, 18, 24, 26).
-- [ ] 16. Working-image cache, textured pipeline with premultiplied mips and the sampler rule;
+- [x] 16. Working-image cache, textured pipeline with premultiplied mips and the sampler rule;
       failed-asset frame with a cross and the open notice (AC 27, 28, 30).
-- [ ] 17. Rail Import card, Ctrl+I outside text edit, drop at the drop point, File tab rows gone
+- [x] 17. Rail Import card, Ctrl+I outside text edit, drop at the drop point, File tab rows gone
       (AC 1, 3, 4).
-- [ ] 18. User page `docs/importing-images.md` and the string test (AC 47); design-system rows.
+- [x] 18. User page `docs/importing-images.md` and the string test (AC 47); design-system rows.
 
 ## Validation
 
@@ -78,8 +78,17 @@ Milestone 4, editor-wasm and frontend:
 
 ## Deliberately not in this pass (reported to the lead)
 
-- AC 34 "Original size" and AC 35 Style tab Image block: still **(Proposal)**, not accepted.
-- AC 46 eviction of off-screen textures after 30 s (needs a clock from the host): textures are
-  dropped when the document no longer shows the image.
-- The fuzz run of 10 minutes per format: a proptest mutation smoke over the fixtures stands in
-  locally; the timed run is for the PR.
+- AC 34 "Original size" and AC 35 Style tab Image block: still **(Proposal)**, not built; the
+  Style tab leaves images out of its scope (no style key is ever written to an image).
+- AC 30 pending hatch and AC 46 "one image per task" and 30 s eviction: pictures decode on their
+  first drawn frame and a texture goes when no drawn image names it (`docs/technical-debt.md`).
+- The fuzz run of 10 minutes per format: a proptest mutation smoke over the fixtures (512 cases)
+  stands in locally; the timed run is for the PR.
+- AC 20: two hostile fixtures decode harmlessly instead of failing (an index outside the palette
+  reads black; a WebP chunk length past the file end is read to the end); recorded in
+  `expected.txt`.
+
+## Measured
+
+- Native release decode (`curvyo-image-core/tests/budgets.rs`): 12 Mpx JPEG 63 ms, 16 Mpx PNG
+  133 ms, 50 Mpx JPEG 571 ms (budgets 2 s, 2.5 s, 8 s).

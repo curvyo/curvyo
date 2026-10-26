@@ -23,9 +23,10 @@ pub(crate) const PROJECT_EXTENSION: &str = "curvyo";
 const PROJECT_FILTER_NAME: &str = "Curvyo project";
 /// The default filter of Open… (`specs/0024-svg-import-export` UX notes): projects and drawings.
 const OPEN_FILTER_NAME: &str = "Curvyo projects and SVG drawings";
-/// The filter of Import SVG….
-const SVG_FILTER_NAME: &str = "SVG drawings";
 const SVG_EXTENSION: &str = "svg";
+/// The filter of the Import button (`specs/0058-bitmap-import` criterion 1).
+const IMPORT_FILTER_NAME: &str = "Drawings and images";
+const IMPORT_EXTENSIONS: [&str; 5] = ["svg", "png", "jpg", "jpeg", "webp"];
 const DEFAULT_FILE_NAME: &str = "Untitled.curvyo";
 
 /// What the page is told when a file could not be read or written.
@@ -122,9 +123,9 @@ pub(crate) fn take_pending_open(state: tauri::State<AppState>) -> Option<OpenPay
 /// the open project changes here: [`confirm_project_opened`] does that once the page has parsed
 /// the bytes.
 ///
-/// `kind` chooses the filters (`specs/0024-svg-import-export` criteria 1 and 3): `"open"` lists
-/// projects and SVG drawings, then all files; `"svg"` SVG drawings only; anything else (the
-/// Template button) projects only. The page decides by the content what the file is.
+/// `kind` chooses the filters (`specs/0024-svg-import-export` criterion 1): `"open"` lists
+/// projects and SVG drawings, then all files; anything else (the Template button) projects only.
+/// The page decides by the content what the file is.
 #[tauri::command]
 #[allow(clippy::unused_async)] // async keeps the blocking dialog off the main thread
 pub(crate) async fn pick_project(app: AppHandle, kind: Option<String>) -> Option<OpenPayload> {
@@ -136,17 +137,33 @@ pub(crate) async fn pick_project(app: AppHandle, kind: Option<String>) -> Option
                 .add_filter(OPEN_FILTER_NAME, &[PROJECT_EXTENSION, SVG_EXTENSION])
                 .add_filter("All files", &["*"]),
         ),
-        Some("svg") => parented(
-            &app,
-            app.dialog()
-                .file()
-                .add_filter(SVG_FILTER_NAME, &[SVG_EXTENSION]),
-        ),
         _ => project_dialog(&app),
     };
     let picked = dialog.blocking_pick_file()?;
     let path = picked.into_path().ok()?;
     Some(read_project(&path).into())
+}
+
+/// The Import button's dialog (`specs/0058-bitmap-import` criteria 1 and 5): drawings and
+/// images, then all files, several at once; each chosen file read, in the order the dialog
+/// returns them. Empty when the maker cancelled. The page decides by the content what each is.
+#[tauri::command]
+#[allow(clippy::unused_async)] // async keeps the blocking dialog off the main thread
+pub(crate) async fn pick_import_files(app: AppHandle) -> Vec<OpenPayload> {
+    let dialog = parented(
+        &app,
+        app.dialog()
+            .file()
+            .add_filter(IMPORT_FILTER_NAME, &IMPORT_EXTENSIONS)
+            .add_filter("All files", &["*"]),
+    );
+    dialog
+        .blocking_pick_files()
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|picked| picked.into_path().ok())
+        .map(|path| read_project(&path).into())
+        .collect()
 }
 
 /// The frontend's confirmation that bytes this host handed it (via

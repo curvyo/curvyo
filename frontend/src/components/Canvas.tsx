@@ -20,7 +20,9 @@ import { TransformEntryChip } from "@/components/TransformEntryChip";
 import type { EditorSession } from "@/hooks/useEditorSession";
 import { ColourPickChip } from "@/components/ColourPickChip";
 import { PenHintChip } from "@/components/PenHintChip";
+import { useFileDrop } from "@/hooks/useFileDrop";
 import { usePenCue } from "@/hooks/usePenCue";
+import type { DroppedFiles } from "@/hooks/useProject";
 import { cursorForHint } from "@/lib/cursors";
 import { type Rect, placeReadout } from "@/lib/readoutPlacement";
 
@@ -40,6 +42,8 @@ const PANEL_TAB_CLEAR_PX = 14;
 
 interface CanvasProps {
   editor: EditorSession;
+  /** Files dropped on the canvas (`specs/0058-bitmap-import` criterion 4). */
+  onDropFiles?: (dropped: DroppedFiles) => void;
 }
 
 /**
@@ -54,11 +58,13 @@ interface CanvasProps {
  * (`specs/0001-project-file-foundation`'s "chrome never frames the canvas"
  * precedent, reaffirmed by `docs/design-system.md`).
  */
-export function Canvas({ editor }: CanvasProps) {
+export function Canvas({ editor, onDropFiles }: CanvasProps) {
   const penCue = usePenCue(editor);
+  const drop = useFileDrop(editor.canvasRef, onDropFiles);
   return (
     <div
       ref={editor.containerRef}
+      {...drop.handlers}
       tabIndex={0}
       onKeyDown={editor.onKeyDown}
       onKeyUp={editor.onKeyUp}
@@ -147,6 +153,15 @@ export function Canvas({ editor }: CanvasProps) {
           style={{ background: "var(--pasteboard-bg)" }}
         />
       </NodeContextMenu>
+      {/* The drop cue: a 2px dashed accent outline inside the viewport while files hover over the
+          canvas (`specs/0058-bitmap-import` UX notes, "Drag and drop"). No text, no animation. */}
+      {drop.over && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 z-10"
+          style={{ outline: "2px dashed var(--accent)", outlineOffset: "-2px" }}
+        />
+      )}
       {editor.transformEntry && (
         // Keyed by the handle so a different entry starts with fresh text,
         // while a zoom or pan (same handle, new position) keeps what was typed.
