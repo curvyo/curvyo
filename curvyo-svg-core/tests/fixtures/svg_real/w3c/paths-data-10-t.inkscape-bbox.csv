@@ -1,0 +1,8 @@
+# Inkscape 1.4.4 --query-all (geometric: stroke:none on a scratch copy); one line per single-leaf element; id,x,y,w,h in Inkscape px
+triangle-01,125,10,100,80
+triangle-02,125,115,100,80
+triangle-03,125,220,100,80
+triangle-04,250,10,100,80
+triangle-05,250,115,100,80
+triangle-06,250,220,100,80
+test-frame,1,1,478,358

@@ -1,0 +1,5 @@
+# Inkscape 1.4.4 --query-all (geometric: stroke:none on a scratch copy); one line per single-leaf element; id,x,y,w,h in Inkscape px
+circle1,1,1,78,78
+path1,2,2,57,76
+circle2,35,54,10,10
+circle3,35,16,10,10

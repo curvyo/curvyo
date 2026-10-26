@@ -1,0 +1,16 @@
+# Inkscape 1.4.4 --query-all (geometric: stroke:none on a scratch copy); one line per single-leaf element; id,x,y,w,h in Inkscape px
+rect1,0,0,0,0
+rect2,0,0,0,0
+rect3,100,100,150,5
+rect4,100,100,5,50
+rect5,70,60,225,7.5
+rect6,70,60,7.5,75
+rect7,30,170,152.5,5
+rect8,30,170,30,50
+rect9,100,200,150,80
+rect10,100,200,5,52.5
+rect11,445,0,5,150
+rect12,400,0,50,5
+rect13,300,220,154,125
+rect14,300,220,45,54
+test-frame,1,1,478,358
