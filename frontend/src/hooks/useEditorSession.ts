@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { type CanvasNotice, type HistoryNames, MAC, useHistory } from "@/hooks/useHistory";
 import { type ClonesApi, useClones } from "@/hooks/useClones";
+import { type StrokeToPathApi, useStrokeToPath } from "@/hooks/useStrokeToPath";
+import { isStrokeToPathChord } from "@/lib/strokeToPathText";
 import { type GroupingApi, useGrouping } from "@/hooks/useGrouping";
 import { type OffsetApi, readOffsetView, useOffset } from "@/hooks/useOffset";
 import { type TextApi, useText } from "@/hooks/useText";
@@ -125,6 +127,8 @@ export interface SelectBarState {
   ratio: number;
   objectToPathShown: boolean;
   scaleSwitchesShown: boolean;
+  /** Stroke to path is enabled (`specs/0085-stroke-to-path` criterion 1). */
+  strokeToPathEnabled: boolean;
 }
 
 const EMPTY_SELECT_BAR_STATE: SelectBarState = {
@@ -144,6 +148,7 @@ const EMPTY_SELECT_BAR_STATE: SelectBarState = {
   ratio: 0,
   objectToPathShown: false,
   scaleSwitchesShown: true,
+  strokeToPathEnabled: false,
 };
 
 function readSelectBar(raw: {
@@ -167,6 +172,7 @@ function readSelectBar(raw: {
   ratio: number;
   object_to_path_shown: boolean;
   scale_switches_shown: boolean;
+  stroke_to_path_enabled: boolean;
   free(): void;
 }): SelectBarState {
   const state: SelectBarState = {
@@ -188,6 +194,7 @@ function readSelectBar(raw: {
     ratio: raw.ratio,
     objectToPathShown: raw.object_to_path_shown,
     scaleSwitchesShown: raw.scale_switches_shown,
+    strokeToPathEnabled: raw.stroke_to_path_enabled,
   };
   raw.free();
   return state;
@@ -710,6 +717,8 @@ export interface EditorSession {
   text: TextApi;
   /** Linked clones: the button, the panel block, the canvas tags (`specs/0049-linked-clone`). */
   clones: ClonesApi;
+  /** Stroke to path: the Select bar button and Ctrl+Alt+C (`specs/0085-stroke-to-path`). */
+  strokeToPath: StrokeToPathApi;
   /** The flip buttons and the keys H and V (`specs/0056-mirror-and-negative-scale/`). */
   flip: FlipApi;
   /** The flip buttons act: something is selected in the Select tool. */
@@ -1117,6 +1126,8 @@ export function useEditorSession(
     refreshGroupingRef.current = refreshGrouping;
   }, [refreshGrouping]);
   const clones = useClones(getSession, syncFromSession, history.showNotice, containerRef);
+  const strokeToPath = useStrokeToPath(getSession, syncFromSession);
+  const strokeToPathReady = tool === "select" && selectBar.strokeToPathEnabled;
   const { refresh: refreshClones, handleKeyOutcome: handleCloneOutcome } = clones;
   const flip = useFlip(getSession, syncFromSession, history.showNotice);
   const { handleKeyOutcome: handleFlipOutcome } = flip;
@@ -2327,6 +2338,15 @@ export function useEditorSession(
       if (!session) {
         return;
       }
+      // Ctrl+Alt+C: Stroke to path with the button's rule; with a dimmed button it does nothing
+      // and shows no notice (`specs/0085-stroke-to-path` criterion 3, UX notes "Keyboard").
+      if (isStrokeToPathChord(event.nativeEvent) && !isSpaceHeld) {
+        event.preventDefault();
+        if (strokeToPathReady && !event.repeat) {
+          strokeToPath.apply();
+        }
+        return;
+      }
       const outcome = session.key_down(
         event.key,
         event.shiftKey,
@@ -2399,6 +2419,8 @@ export function useEditorSession(
       onNudge,
       onSelectAll,
       onEscape,
+      strokeToPath,
+      strokeToPathReady,
     ],
   );
 
@@ -2616,6 +2638,7 @@ export function useEditorSession(
     offset,
     text,
     clones,
+    strokeToPath,
     flip,
     flipEnabled,
     guideState,
