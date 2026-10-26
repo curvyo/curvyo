@@ -141,7 +141,7 @@ bar, both applied to the spec).
   `is-wsl` and `is-docker` (MIT). Replaces the `tauri-plugin-opener` of adrs.md decision 7
   (see above).
 
-- 2026-10-26, lead (customer review): `open` with default features only, so `dunce` is not pulled (it came only through `shellexecute-on-windows`); on Windows `open` uses `cmd /c start`. `is-wsl` (with `is-docker`, about 90 lines together) stays for now; the customer suggests an upstream PR to `open` that inlines the WSL check instead of the dependency.
+- 2026-10-26, lead (customer review): `open` with default features only, so `dunce` is not pulled (it came only through `shellexecute-on-windows`); on Windows `open` 5.4 uses PowerShell `Invoke-Item -LiteralPath`, then `explorer.exe`, never `cmd` (see the 2026-10-26 follow-up note). `is-wsl` (with `is-docker`, about 90 lines together) stays for now; the customer suggests an upstream PR to `open` that inlines the WSL check instead of the dependency.
 
 - 2026-10-26, tester findings: the `zip` crate keys its entry table by name, so a second entry
   with the same full name replaced the first. `FontArchive::open` walks the central directory
@@ -150,6 +150,7 @@ bar, both applied to the spec).
   the original names, and the sanitised names are made unique as before (`OFL-2.txt`; two equal
   fonts are "already there" by the `0075` rule). Two records pointing at the same data are now
   both listed and so caught by the overlap check (unreadable).
-- 2026-10-26, follow-up candidate (no change): on Windows `open` without `shellexecute-on-windows`
-  runs `cmd /c start`; a document path with `%` or `^` may then be expanded or escaped by `cmd`
-  and not open.
+- 2026-10-26, follow-up checked (no code change): `open` 5.4.5 `src/windows.rs` runs `cmd /c start` only with its
+  `insecure` feature. By default it tries `powershell.exe Invoke-Item -LiteralPath` (path passed in the
+  `OPEN_RS_TARGET` env var, so `%`, `^`, `&`, `!` are literal), then `explorer.exe <path>` via
+  `Command` (no shell). The earlier worry about `cmd` was wrong; no own opener is needed.
