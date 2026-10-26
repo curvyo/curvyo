@@ -3,8 +3,10 @@
 Architect review, 2026-10-14, of the Draft specification and its six questions; reworked 2026-10-16 for
 the customer's decisions (see the specification, "Decided (customer, 2026-10-16)"): first slice is the
 import, export is a later slice, no loss report, no passthrough bag, `<use>` becomes a linked clone where
-it can. The slice adds the first importer (and, later, the first exporter). **One new ADR (0018,
-proposed), one new crate (`curvyo-svg-core`), three new dependencies, no `format_version` bump**
+it can; reviewed again on 2026-10-26 against the code of that day (dated note below). The slice adds the
+first importer (and, later, the first exporter). **One new ADR
+([0018](../../docs/adr/0018-svg-import-crate-parser-and-limits.md), accepted 2026-10-26), one new crate
+(`curvyo-svg-core`), two new dependencies (`svgtypes`, `simplecss`), no `format_version` bump**
 (criterion 77 holds: no register, no node kind, no schema change; a linked clone uses the register of
 `0049`). The one `needs-customer` item of the draft, the passthrough bag, is decided (BAG A, below).
 
@@ -22,7 +24,7 @@ proposed), one new crate (`curvyo-svg-core`), three new dependencies, no `format
     Gradient amendment of 2026-10-08 is what criterion 38 implements.
   - §11 with [ADR 0004](../../docs/adr/0004-persistence-and-cross-machine-sync.md) §9: no
     `format_version` change (criterion 77). The importer writes through the existing document
-    API, so the project file is whatever the model writes (current format 13).
+    API, so the project file is whatever the model writes (current format 24, 2026-10-26).
 - [ADR 0001](../../docs/adr/0001-ui-framework-and-canvas-rendering.md) §5: the browser boundary
   carries strings and scalars. The importer is called from `curvyo-editor-wasm` with the file
   bytes; the 50 MiB limit is checked before the call. There is no report to return.
@@ -51,74 +53,23 @@ proposed), one new crate (`curvyo-svg-core`), three new dependencies, no `format
 - `0046` stage 2 calls the same importer (criterion 73): it depends on `curvyo-svg-core`, not
   on a second parser.
 
-## New ADR needed: 0018 "SVG import and export crate, parser and limits"
+## ADR 0018 "SVG import and export crate, parser and limits" (written 2026-10-26)
 
-Needed because `CLAUDE.md` §5 says no new crate without an ADR and ADR 0011 is accepted, so its
-row cannot be edited. It records the following, which are the architect's proposals here.
+[ADR 0018](../../docs/adr/0018-svg-import-crate-parser-and-limits.md) records the proposal of
+2026-10-16 as changed by the dated note of 2026-10-26 below. What it decides for this feature:
 
-1. **Crate `curvyo-svg-core`** (pure, `forbid(unsafe_code)`, builds for wasm32, no I/O; bytes in,
-   `SvgImport { page, display unit, background, tree }` out; the tree has a clone leaf that names
-   another leaf of the same tree and carries its matrix, which `document-core` resolves to ids when
-   it applies the drawing. The second slice adds `export(&ObjectRead snapshot, page) -> String`;
-   there is no report type anywhere). Depends on `curvyo-document-core`
-   and `curvyo-geometry-core`. *Why not a module in `curvyo-document-core` (ADR 0011's row):*
-   the re-winding needs `touching_outlines` and `outline_nesting`, which live in
-   `geometry-core`, and `geometry-core` depends on `document-core`, so the module cannot exist
-   there without moving the geometry down or duplicating it; and every crate (render, ui,
-   wasm) would compile an XML parser and CSS reader for no reason. *Why not in `ui-core`:* it
-   is not editor state, and `0046` and later machine specs need it without the editor.
-   Applying a finished import to the open document in one commit and one history step is a
-   `document-core` API (`insert_drawing`, a tree of the existing snapshot types), so the crate
-   needs no Loro knowledge.
-2. **Dependencies** (all permissive, in the `cargo deny` allow list; to be confirmed by the
-   ADR's spike on `spike/svg-parser`, checklist below): `roxmltree` (MIT or Apache-2.0, no
-   dependencies, `forbid(unsafe_code)`, takes `&str`, resolves namespaces by URI, gives line and
-   column for the refusal text of criterion 6), `svgtypes` (MIT or Apache-2.0: path data, transform, colour, length
-   and paint grammar; stops at the first path error, as criterion 23 needs), `simplecss`
-   (MIT or Apache-2.0: the `<style>` subset of criterion 36; selectors with combinators are
-   parsed, then skipped by us). *Rejected:* `usvg` (it normalises away what we read:
-   `sodipodi:*`, `inkscape:label`, `use` as clone; pulls font
-   and image crates; resolves text), `quick-xml` (streaming, no tree: we would rebuild a DOM,
-   find entity declarations ourselves and compute line numbers from byte offsets),
-   `xml-rs` (slow, no wasm story needed), and writing all grammars ourselves (about 800 lines
-   of already solved, fuzz-tested code; reconsider only if the checklist fails).
-   *Checklist before 0018 is Accepted:* licence in `cargo deny`; `forbid(unsafe_code)` or no
-   `unsafe` in the used code (`CLAUDE.md` §5); wasm32 build; one `kurbo` version in the lock
-   file (if `svgtypes` pins another, use its `PathParser` without arc simplification and convert
-   arcs with the workspace `kurbo`); `roxmltree` entity and depth limits behave as in point 3
-   (these were written from memory of the crates, not run).
-3. **Limits and DOCTYPE** (criteria 6, 67 to 69). Checks that run before parsing: size 50 MiB,
-   UTF-8, gzip magic, and a byte scan of the DOCTYPE that applies criterion 68 (literal
-   internal entities only; at most 64, 256 bytes each, 100,000 references). Only then
-   `roxmltree` with `allow_dtd` on and a `nodes_limit` of 500,000. Element depth 256 is
-   enforced by our own walk; every tree walk is iterative or bounded by that depth.
-4. **BAG A and no report: amendments to ADR 0002 §10, customer-decided 2026-10-16.**
-   (a) *No passthrough bag in this slice.* The bag is built only if Curvyo later adopts SVG as a
-   native file format (open, edit, save), because only then does foreign data have to survive a
-   save. When an SVG is imported to be used as a composition, the other information (for example
-   `inkstitch:` attributes) simply disappears. Recorded like the gradient amendment of 2026-10-08.
-   It also removes the risks of a bag: attributes written back verbatim are untrusted input in an
-   export (`onclick`, `href`, script), a bag needs a namespace allowlist, and merge semantics in
-   the CRDT (ADR 0009 §3). A later bag takes the next free `format_version` and its own ADR.
-   (b) *No loss report.* The "named, listed loss" of §10 is replaced by "unsupported content is
-   ignored silently" (customer: "a report of what could not be imported has no added value; we
-   will try to import as well as Inkscape over time and until then we simply try"). The importer
-   has no counters, no entry catalogue, no line numbers kept, nothing to hold in editor state. The
-   cost, accepted by the customer: a file that hits a limit (criterion 69) imports partially
-   without a message; a maker cannot see what was left out.
-5. **Floating point** (criteria 54, 57, 62, 63, 72; mostly the later export, and the clone
-   matrix text of criterion 59). All text is produced with Rust's own
-   `f64` formatting (`{:.6}` for lengths, `{}` shortest round trip for `curvyo:` data, opacities,
-   ratios and radians); both are exact and independent of locale. Rounding to 6 decimals is
-   idempotent, which is why export(import(export(d))) is byte-identical. The
-   code uses `+ - * /` and `sqrt` (exact in IEEE 754; Rust never fuses multiply-add) and
-   `sin`, `cos`, `atan2`, `tan` (library-defined; native and WASM may differ in the last bit).
-   Hence the contract of criterion 72: bytes identical for the same input on the same
-   target; across targets documents agree within 1e-9 mm and goldens compare with that
-   tolerance; exported goldens are compared byte for byte on the Linux gate and nightly on
-   Windows and macOS. If the nightly job ever shows a one-digit difference, the fix is the
-   `libm` crate for those four functions in this crate, not a looser test. Maps are
-   `BTreeMap` or `Vec` in order; nothing iterates a `HashMap`.
+1. `curvyo-svg-core` reads bytes into `SvgDrawing` (mm, `kurbo` paths, styles resolved per leaf,
+   clone leaves by tree index); it depends on no Curvyo crate.
+2. `ui-core` module `svg_import` maps `SvgDrawing` to the document (primitives, EVENODD A
+   re-winding with `geometry-core`, USE-CLONE B); `document-core` gets `insert_drawing`, one commit.
+3. The hostile-XML guard and `path_data` move from `text-core` to `svg-core`; the import uses the
+   DOCTYPE rule of criterion 68, fonts keep `0076` criterion 23.
+4. Dependencies: `roxmltree` =0.20.0 (present), `svgtypes` =0.16.1 (attribute grammars, not path
+   data), `simplecss` =0.2.2 (criterion 36).
+5. BAG A and no report: amendments to ADR 0002 §10 (customer, 2026-10-16).
+6. Limits of criteria 6, 67 to 69; determinism of criterion 72 (`f64` formatting, `libm` if
+   targets ever differ).
+7. `<text>` and `<image>` stay ignored (criteria 13, 49); the ADR says how a later story maps them.
 
 ## Feature-local decisions (dated notes)
 
@@ -153,6 +104,24 @@ row cannot be edited. It records the following, which are the architect's propos
 - **2026-10-14: the apply step is one commit.** `document-core` gets one insert API for a drawing
   (`ObjectRead`-shaped tree) so Import is one history step (criterion 3) and Open builds a new
   document in the same way. Not a trait, not generic.
+- **2026-10-26: review against the code of the day; ADR 0018 written and accepted.** Changes to the
+  proposal of 2026-10-16: (a) `svg-core` no longer depends on `document-core` and
+  `geometry-core`; the mapping to the document moves to `ui-core`, because `text-core` (which may
+  not depend on `document-core`, ADR 0011 note 2026-10-20) must share the importer's XML guard and
+  path parser, and `0046` stage 2 then reads outlines without building a document. (b) `0076`
+  already brought `roxmltree` =0.20.0, a prolog/DOCTYPE scan that skips decoys, a depth scan and a
+  complete path data parser on the workspace `kurbo`; these move to `svg-core` instead of being
+  written twice, so `svgtypes` is used for transform, colour, length, paint and number lists only.
+  (c) The entity rules differ on purpose: fonts refuse any internal subset (`0076` criterion 23),
+  the import accepts bounded literal entities (criterion 68); one guard, the rule as an argument.
+  (d) Checklist of 2026-10-16 run: `svgtypes` 0.16.1 (2026-01-09) and `simplecss` 0.2.2
+  (2025-01-06) are Apache-2.0 OR MIT, linebender-maintained, without `unsafe`; `svgtypes` uses
+  `kurbo` 0.13 (one version in the lock file) and `siphasher`, `simplecss` uses `log`, both already
+  locked; a scratch wasm32 build passes and adds about 89 KB (40 KB gzip). `roxmltree` reports the
+  error position without its `positions` feature, so criterion 6's line and column need no
+  feature change. (e) `0049` is merged, so criterion 47 (a) is not deferred. (f) Text now exists
+  (`0074`, `0079`, `0080`), but criteria 13 and 49 still ignore `<text>`; importing it as a text
+  node is a scope question for the PO (ADR 0018 point 8 says how it would map).
 - **2026-10-14: bytes cross the Tauri boundary as the project open already does** (reuse that
   path; do not send 50 MiB as a JSON number array). The implementer states the mechanism in
   `plan.md`.
@@ -169,8 +138,7 @@ row cannot be edited. It records the following, which are the architect's propos
   (500,000 elements, 5,000,000 path commands).
 - **`use` needs two passes.** A target may stand after its `use` and a clone's original must exist
   first; the importer builds the tree first, then `document-core` creates originals before clones
-  in one commit. If `0049` is not merged when this is built, criterion 47 (a) is deferred and a
-  `use` is a copy; the lead decides the order.
+  in one commit. (`0049` is merged; the deferral once noted here no longer applies, 2026-10-26.)
 - **Re-wound outlines change direction**, which matters for dash start and for cutting
   direction. Accepted (EVENODD A); the fixture `even_odd.svg` pins the stored directions.
 - **`svgtypes` and `simplecss` drift.** Both are pinned in `Cargo.toml` with `=` like

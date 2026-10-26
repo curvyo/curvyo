@@ -1,6 +1,6 @@
 # ADR 0011: Workspace and crate layout
 
-**Status:** Accepted (architect, 2026-10-02 — no customer sign-off required); crate and directory names amended by [ADR 0013](0013-rename-to-curvyo.md) (`vecmanf-*` is now `curvyo-*`); §7 CI note of 2026-10-10 (Windows and macOS host gate nightly only, customer decision 2026-10-09); §2/§3 note of 2026-10-20 (`curvyo-text-core`, ADR 0020)
+**Status:** Accepted (architect, 2026-10-02 — no customer sign-off required); crate and directory names amended by [ADR 0013](0013-rename-to-curvyo.md) (`vecmanf-*` is now `curvyo-*`); §7 CI note of 2026-10-10 (Windows and macOS host gate nightly only, customer decision 2026-10-09); §2/§3 note of 2026-10-20 (`curvyo-text-core`, ADR 0020); §2/§3 note of 2026-10-26 (`curvyo-svg-core`, ADR 0018)
 
 This ADR invents no architecture. ADRs 0001–0010 each authorized the crates
 their own decision needed, in the ADR that needed them; this one pulls those
@@ -173,6 +173,11 @@ for the cost of one `lib.rs`: doing it now is a speculative crate
    > depend on it (layout, Object to path, hit box, edit session). `render-core` may depend on it
    > if drawing the caret or selection needs the engine. `editor-wasm` may depend on it only to
    > own the session's `FaceStore` and hand face bytes in, with no layout logic of its own.
+
+   > **Note 2026-10-26 ([ADR 0018](0018-svg-import-crate-parser-and-limits.md), architect):** new crate
+   > `curvyo-svg-core`, a pure SVG reader. SVG import/export leaves `document-core`'s row. Edges:
+   > `curvyo-svg-core → (external only)`, never `document-core`; `text-core → svg-core` (shared
+   > hostile-XML guard and path data); `ui-core → svg-core` (mapping to the document).
 
    **No `*-core` crate depends on `*-io`, on `*-app`, on `vecmanf-editor-wasm`
    or on the frontend, ever.** This is the `CLAUDE.md` §6 rule, and the crate
