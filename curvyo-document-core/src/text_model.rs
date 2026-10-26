@@ -154,6 +154,14 @@ pub const LETTER_SPACING_FACTORS: std::ops::RangeInclusive<f64> = -0.5..=2.0;
 pub const WORD_SPACING_FACTORS: std::ops::RangeInclusive<f64> = -1.0..=5.0;
 /// The factors of Size a set line spacing may hold.
 pub const LINE_SPACING_FACTORS: std::ops::RangeInclusive<f64> = 0.0..=10.0;
+/// The tapers a text may hold, fractions (`0079` criterion 16: −50 % to 50 %).
+pub const TAPER_FRACTIONS: std::ops::RangeInclusive<f64> = -0.5..=0.5;
+
+// serde's `skip_serializing_if` hands the field by reference.
+#[allow(clippy::trivially_copy_pass_by_ref)]
+fn is_zero(value: &f64) -> bool {
+    *value == 0.0
+}
 
 /// The layout values of a text (`0079` slice 1, `adrs.md` decision 1): lengths as factors of the
 /// text's Size (ratios, so a uniform resize keeps the look), the rotation as an angle. Each is
@@ -177,6 +185,10 @@ pub struct TextLayoutValues {
     /// How the glyphs of a column stand (slice 3); left out of the JSON mirror when Auto.
     #[serde(skip_serializing_if = "TextGlyphOrientation::is_auto")]
     pub orientation: TextGlyphOrientation,
+    /// The taper of every glyph in its own frame (slice 2, criterion 17), a fraction in
+    /// [`TAPER_FRACTIONS`]; left out of the JSON mirror at 0.
+    #[serde(skip_serializing_if = "is_zero")]
+    pub taper: f64,
 }
 
 impl TextLayoutValues {
@@ -189,6 +201,7 @@ impl TextLayoutValues {
         rotation: Angle::from_radians(0.0),
         writing_mode: TextWritingMode::Horizontal,
         orientation: TextGlyphOrientation::Auto,
+        taper: 0.0,
     };
 
     /// Whether every value is its default (then nothing is stored).
@@ -225,6 +238,7 @@ impl TextLayoutValues {
             },
             writing_mode: self.writing_mode,
             orientation: self.orientation,
+            taper: factor(self.taper, &TAPER_FRACTIONS, 0.0),
         }
     }
 }
@@ -486,6 +500,7 @@ mod tests {
             rotation: Angle::from_radians(0.5),
             writing_mode: TextWritingMode::VerticalLr,
             orientation: TextGlyphOrientation::Sideways,
+            taper: 0.2,
         };
         let scaled = start.mapped_by(Affine::scale(2.0, 2.0));
         assert!((scaled.size.as_mm() - 20.0).abs() < 1e-9);

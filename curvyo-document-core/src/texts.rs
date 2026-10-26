@@ -57,6 +57,8 @@ pub enum TextLayoutLabel {
     WritingMode,
     /// "Change glyph orientation".
     GlyphOrientation,
+    /// "Change taper".
+    Taper,
 }
 
 impl TextLayoutLabel {
@@ -71,6 +73,7 @@ impl TextLayoutLabel {
             Self::CharacterRotation => "change_character_rotation",
             Self::WritingMode => "change_writing_mode",
             Self::GlyphOrientation => "change_glyph_orientation",
+            Self::Taper => "change_taper",
         }
     }
 }
