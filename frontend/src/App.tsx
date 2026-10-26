@@ -51,9 +51,7 @@ function Editor() {
   const closePathState = useClosePathState(editor);
   const documentPanel = useDocumentPanel(editor);
   const panelOpen = usePanelOpen(editor.getSession);
-  const [openErrorMessage, setOpenErrorMessage] = useState<string | null>(
-    null,
-  );
+  const [openError, setOpenError] = useState<{ message: string; title: string } | null>(null);
   const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(
     null,
   );
@@ -115,7 +113,7 @@ function Editor() {
     editor,
     panelOpen,
     panel: documentPanel,
-    onOpenError: setOpenErrorMessage,
+    onOpenError: (message: string, title = "Can't open project") => setOpenError({ message, title }),
     onSaveError: setSaveErrorMessage,
   });
 
@@ -332,9 +330,9 @@ function Editor() {
         nodeCountText={editor.tool === "node" ? nodeCountText(editor.nodeToolbarState) : null}
       />
       <ErrorDialog
-        title="Can't open project"
-        message={openErrorMessage}
-        onDismiss={() => setOpenErrorMessage(null)}
+        title={openError?.title ?? "Can't open project"}
+        message={openError?.message ?? null}
+        onDismiss={() => setOpenError(null)}
       />
       <ErrorDialog
         title="Can't save project"

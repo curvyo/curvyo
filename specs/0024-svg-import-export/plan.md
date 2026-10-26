@@ -62,10 +62,10 @@ limit is checked in the session before the parse (criterion 6c); the host reads 
 - [x] 7. `ui-core::svg_import`: primitives and transforms (AC 26, 27, 33), node kinds (AC 25), star
   match (AC 28), even-odd (AC 50, 51), placement (AC 3), styles (AC 34, 38 to 42); goldens in
   `tests/fixtures/svg/` with `README.md` (AC 74, 75), determinism (AC 72), the 0046 call (AC 73).
-- [ ] 8. Session and bindings: Open by content (AC 1, 2), Import SVG… (AC 3), the notice (AC 8),
+- [x] 8. Session and bindings: Open by content (AC 1, 2), Import SVG… (AC 3), the notice (AC 8),
   refusals (AC 6), busy (AC 7), history name.
-- [ ] 9. Host and frontend: dialogs and filters, File tab row (AC 5), save name after Open (AC 2).
-- [ ] 10. Docs (AC 76), full gate, browser check with a screenshot.
+- [x] 9. Host and frontend: dialogs and filters, File tab row (AC 5), save name after Open (AC 2).
+- [x] 10. Docs (AC 76), full gate, browser check with a screenshot.
 
 ## Validation
 
@@ -78,3 +78,18 @@ limit is checked in the session before the parse (criterion 6c); the host reads 
   noted as an open point.
 - `#[ignore]` budget tests (AC 71) run once in release; numbers in the report.
 - Browser check: Import SVG… of a sample file in the browser build, screenshot.
+
+## Notes for the lead (2026-10-26)
+
+- **Permit over refuse, two readings.** A root `<svg>` without `xmlns` is read as SVG (criterion
+  6 (a) refuses it as written); `<switch>` takes its first child that needs no
+  `requiredExtensions`, so older Illustrator files (whose first child is a `foreignObject` with
+  `requiredExtensions`) import (criterion 44 says "the first child element").
+- **Budget 71** restated from the measurement (`adrs.md`, dated note 2026-10-26).
+- **Not built here:** the 60 s nightly fuzz target of criterion 70 (b) (the truncation and
+  byte-change sweep and two proptests stand in); the WASM timings and the `editor-wasm` size delta
+  for the PR description; Inkscape-saved fixtures (the files are hand-written in Inkscape's
+  layout, `tests/fixtures/svg/README.md`).
+- **Existing tests touched:** the button lists of `frontend/tests/fileTab.test.ts` and
+  `acceptance_0051_tester.test.ts` gain "Import SVG…" (criterion 5), as the Template button's
+  commit did.

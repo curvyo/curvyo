@@ -105,6 +105,7 @@ mod stroke_to_path;
 mod stroke_to_path_tests;
 mod style;
 mod style_view;
+mod svg_import;
 mod text;
 mod text_bar;
 mod text_clones;
@@ -198,8 +199,9 @@ pub use text_path::ObjectToPathOutcome;
 pub use text_style::StyleOutcome;
 pub use weld::WeldOutcome;
 
-#[cfg(target_arch = "wasm32")]
 pub use open_error::map_open_error;
+#[cfg(target_arch = "wasm32")]
+pub use svg_import::SvgImportOutcome;
 
 // Re-exported only for `wasm_api`'s own `LiveReadout` wrapper (its only
 // consumer, and itself `wasm32`-only) — `#[cfg]`-gated the same way so
@@ -390,6 +392,9 @@ pub struct Session {
     /// The notice of the orphan repair after the Open, until the host has taken it
     /// (`clones.rs`).
     orphan_notice: Option<String>,
+    /// The notice of an Open of an SVG that brought in nothing, until the host has taken it
+    /// (`svg_import.rs`).
+    open_notice: Option<String>,
     /// The notice of the last style or opacity edit that left clones with their original's style
     /// alone, until the host has taken it (`clone_overrides.rs`).
     skip_notice: Option<String>,
@@ -472,6 +477,7 @@ impl Session {
             panel: layers_panel::PanelState::default(),
             offset: offset::OffsetTool::default(),
             orphan_notice: None,
+            open_notice: None,
             skip_notice: None,
             deleted_objects: 0,
             dom_chips: Vec::new(),
@@ -540,6 +546,7 @@ impl Session {
             panel: layers_panel::PanelState::default(),
             offset: offset::OffsetTool::default(),
             orphan_notice: None,
+            open_notice: None,
             skip_notice: None,
             deleted_objects: 0,
             dom_chips: Vec::new(),

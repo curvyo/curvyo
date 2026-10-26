@@ -40,13 +40,21 @@ function download(bytes: number[], fileName: string): SaveOutcome {
   return { kind: "saved", file_name: fileName, path: fileName };
 }
 
-/** Browser Open: the picked `.curvyo` file's name and bytes, `null` when the picker was
- * cancelled, or the read error. The answer returns to the caller, as the desktop command's does. */
-function pickProject(): Promise<OpenPayload | null> {
+/** What the browser's picker offers per dialog kind (`specs/0024-svg-import-export` criteria 1
+ * and 3): Open… projects and SVG drawings, Import SVG… drawings, Template projects. */
+const PICKER_ACCEPT: Record<string, string> = {
+  open: ".curvyo,.svg,image/svg+xml",
+  svg: ".svg,image/svg+xml",
+  project: ".curvyo",
+};
+
+/** Browser Open: the picked file's name and bytes, `null` when the picker was cancelled, or the
+ * read error. The answer returns to the caller, as the desktop command's does. */
+function pickProject(kind: string): Promise<OpenPayload | null> {
   return new Promise((resolve) => {
     const input = document.createElement("input");
     input.type = "file";
-    input.accept = ".curvyo";
+    input.accept = PICKER_ACCEPT[kind] ?? PICKER_ACCEPT.project;
     input.onchange = () => {
       const file = input.files?.[0];
       if (!file) {
@@ -118,7 +126,7 @@ function downloadText(name: string, text: string) {
 
 const browserCommands: Record<string, (args?: Record<string, unknown>) => unknown> = {
   take_pending_open: () => null,
-  pick_project: () => pickProject(),
+  pick_project: (args) => pickProject(String(args?.kind ?? "project")),
   confirm_project_opened: () => undefined,
   reset_project: () => undefined,
   set_dirty: () => undefined,

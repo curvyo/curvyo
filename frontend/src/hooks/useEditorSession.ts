@@ -20,7 +20,7 @@ import { canvasLeavesKey } from "@/lib/fontPreviewKeys";
 import { type ArcBarApi, useArcBar } from "@/hooks/useArcBar";
 import { type FlipApi, useFlip } from "@/hooks/useFlip";
 import { TOO_FAR_HINT } from "@/lib/nudgeText";
-import { createSession, openSession } from "@/lib/editorSession";
+import { createSession, openFileSession, openSession } from "@/lib/editorSession";
 import type { WasmSession } from "@/lib/editorSession";
 import { freeCanvasArea, type GuideState, readGuideState } from "@/lib/guideText";
 import type { EditHint } from "@/components/EditHintChip";
@@ -870,6 +870,13 @@ export interface EditorSession {
    * be opened (see `@/lib/editorSession`'s `openSession`) — the caller
    * shows it, this hook does not. */
   openProject: (bytes: Uint8Array) => Promise<void>;
+  /** Open… of any file (`specs/0024-svg-import-export` criterion 1): swaps in the session the
+   * bytes give, an SVG drawing or a project. Resolves with whether it was an SVG (an untitled,
+   * dirty project) and the notice to show (empty for none).
+   * @throws the error dialog's sentence; the open project is untouched. */
+  openFile: (bytes: Uint8Array, fileName: string) => Promise<{ svg: boolean; notice: string }>;
+  /** Import SVG… (criterion 3): `"imported:<n>"`, `"nothing:<notice>"` or `"error:<sentence>"`. */
+  importSvg: (bytes: Uint8Array, fileName: string) => string;
   /** Save / Save as: packs the live session's document into `.curvyo` container bytes for the
    * host to write, recording the application version. Call `markSaved` once they are written.
    * @throws a plain `Error` if there is no live session yet, or the
@@ -1396,6 +1403,29 @@ export function useEditorSession(
       await attachSession(session);
     },
     [attachSession],
+  );
+
+  const openFile = useCallback(
+    async (bytes: Uint8Array, fileName: string) => {
+      const session = await openFileSession(bytes, fileName);
+      const result = { svg: session.opened_svg(), notice: session.take_open_notice() };
+      await attachSession(session);
+      return result;
+    },
+    [attachSession],
+  );
+
+  const importSvg = useCallback(
+    (bytes: Uint8Array, fileName: string): string => {
+      const session = sessionRef.current;
+      if (!session) {
+        return "error:";
+      }
+      const outcome = session.import_svg(bytes, fileName);
+      syncFromSession();
+      return outcome;
+    },
+    [syncFromSession],
   );
 
   const packProject = useCallback((): Uint8Array => {
@@ -2702,6 +2732,8 @@ export function useEditorSession(
     onKeyUp,
     newProject,
     openProject,
+    openFile,
+    importSvg,
     packProject,
     markSaved,
   };

@@ -2,7 +2,6 @@
 //! fail. Split out of `session/mod.rs` (`docs/technical-debt.md`,
 //! "`Session` is one module past the size limit").
 
-#[cfg(any(test, target_arch = "wasm32"))]
 use curvyo_document_core::OpenError;
 
 /// Returns the one-sentence message the frontend's `ErrorDialog` shows
@@ -12,12 +11,8 @@ use curvyo_document_core::OpenError;
 /// `Document::open` it wraps) only ever runs inside this wasm session,
 /// never natively (`specs/0002-path-node-editing/adrs.md`'s PR review: "the
 /// host does byte I/O only"). Plain Rust, not `wasm_api`'s `wasm32`-only
-/// shell, so it stays exercised by ordinary `cargo test` — its only
-/// caller is `wasm_api::WasmSession::open`, which is itself `wasm32`-
-/// only, so this function is `cfg`-gated the same way plus `test`
-/// (otherwise a host `cargo build`/`clippy` sees it as genuinely unused
-/// dead code, since its one caller does not exist in that build).
-#[cfg(any(test, target_arch = "wasm32"))]
+/// shell, so it stays exercised by ordinary `cargo test`; Open… of any file
+/// (`specs/0024-svg-import-export` criterion 1) calls it on the host too.
 #[must_use]
 pub const fn map_open_error(error: &OpenError) -> &'static str {
     match error {

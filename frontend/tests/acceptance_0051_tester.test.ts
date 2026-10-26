@@ -386,14 +386,14 @@ const buttonLabels = (html: string) =>
 
 test("c15 desktop File tab: six buttons, then Quit, then the version", async () => {
   const html = await renderFile({ desktop: true, project: {} });
-  assert.deepEqual(buttonLabels(html), ["New", "Open…", "Save", "Save as…", "Close", "Template", "Quit"]);
+  assert.deepEqual(buttonLabels(html), ["New", "Open…", "Save", "Save as…", "Close", "Template", "Import SVG…", "Quit"]);
   assert.match(html, /Curvyo 9\.8\.7/);
   assert.ok(html.indexOf("Quit") < html.indexOf("Curvyo 9.8.7"));
 });
 
 test("c15 browser File tab: no Save as, no Quit, no divider", async () => {
   const html = await renderFile({ desktop: false, project: {} });
-  assert.deepEqual(buttonLabels(html), ["New", "Open…", "Save", "Close", "Template"]);
+  assert.deepEqual(buttonLabels(html), ["New", "Open…", "Save", "Close", "Template", "Import SVG…"]);
   assert.doesNotMatch(html, /Quit|Save as/);
   assert.match(html, /Curvyo 9\.8\.7/);
 });
@@ -406,7 +406,7 @@ test("c15 the buttons are never dimmed or hidden by the state of the project", a
     { dirty: true, info: { fileName: "a.curvyo", path: "/x/a.curvyo" } },
   ]) {
     const html = await renderFile({ desktop: true, project });
-    assert.deepEqual(buttonLabels(html), ["New", "Open…", "Save", "Save as…", "Close", "Template", "Quit"]);
+    assert.deepEqual(buttonLabels(html), ["New", "Open…", "Save", "Save as…", "Close", "Template", "Import SVG…", "Quit"]);
     assert.doesNotMatch(html, /\sdisabled=/);
     assert.doesNotMatch(html, /aria-disabled/);
   }

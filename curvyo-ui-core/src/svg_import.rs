@@ -60,6 +60,15 @@ pub fn svg_import(drawing: &SvgDrawing, placement: SvgPlacement) -> SvgImport {
     }
 }
 
+/// Reads the SVG `bytes` and maps them by `placement`.
+///
+/// # Errors
+/// The error dialog's sentence when the file gives no drawing (criterion 6).
+pub fn import_svg_bytes(bytes: &[u8], placement: SvgPlacement) -> Result<SvgImport, String> {
+    let drawing = curvyo_svg_core::read_svg(bytes).map_err(crate::svg_refusal_text)?;
+    Ok(svg_import(&drawing, placement))
+}
+
 /// The page settings of `drawing`: its page (a new document's size when it gives none), its
 /// display unit and its background.
 fn page_of(drawing: &SvgDrawing) -> DrawingPage {

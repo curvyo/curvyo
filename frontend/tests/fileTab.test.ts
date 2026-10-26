@@ -73,7 +73,7 @@ test("an untitled clean project: name, status, six buttons, Quit, version", asyn
   const html = await render();
   assert.match(html, />Untitled</);
   assert.match(html, />Not saved yet</);
-  assert.deepEqual(buttons(html), ["New", "Open…", "Save", "Save as…", "Close", "Template", "Quit"]);
+  assert.deepEqual(buttons(html), ["New", "Open…", "Save", "Save as…", "Close", "Template", "Import SVG…", "Quit"]);
   assert.match(html, />Curvyo 0.4.0</);
 });
 
@@ -87,7 +87,7 @@ test("a saved project shows its file name and whether it changed", async () => {
 
 test("the browser build has no Save as, Quit or divider", async () => {
   const html = await render({ desktop: false });
-  assert.deepEqual(buttons(html), ["New", "Open…", "Save", "Close", "Template"]);
+  assert.deepEqual(buttons(html), ["New", "Open…", "Save", "Close", "Template", "Import SVG…"]);
   assert.doesNotMatch(html, /Quit/);
   assert.doesNotMatch(html, /Save as/);
 });
@@ -114,7 +114,7 @@ test("the check replaces the six buttons in place with a sentence and three butt
     dirty: true,
     check: { id: 1, kind: "open", origin: "outside", previous: null },
   });
-  assert.deepEqual(buttons(html), ["Cancel", "Discard", "Save", "Quit"]);
+  assert.deepEqual(buttons(html), ["Cancel", "Discard", "Save", "Import SVG…", "Quit"]);
   assert.match(
     html,
     /role="group" aria-label="Poster\.curvyo has unsaved changes\. Save them before you open another project\? Discarded changes cannot be brought back\."/,
