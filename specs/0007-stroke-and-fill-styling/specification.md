@@ -1288,6 +1288,12 @@ the status to Ready: items 1 to 5 in criteria 5, 6, 8, 13, 14, 16, 17, 18 and
 questions (UX notes 9) have defaults, were told to the customer, and do not
 block.
 
+## Amendment 2026-10-26 (customer): the live preview covers texts
+
+Criterion 36's live preview applies to texts as to paths: while a colour, width or opacity control
+is dragged, a selected text, or a text in edit mode, is drawn in the previewed style; the release
+writes one step. Before, a text changed only at the release.
+
 ## Links
 Requirements: R-EDIT-005, R-EDIT-006 (`docs/requirements.md`)
 PR: #54 (style model), #55 (render and hit test), #58 (properties panel), #59 (gradient fills, removed again by `0017`, #78)

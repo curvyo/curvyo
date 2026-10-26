@@ -230,18 +230,23 @@ pub(crate) fn glyph_path(
         closed: true,
         anchors: Vec::new(),
     });
-    let mut style = text.style.clone();
-    if text.font.kind == FontKind::SingleLine {
-        style.fill.enabled = false;
-    }
     PathSnapshot {
         id: text.id,
         closed: first.closed,
-        style,
+        style: glyph_style(text),
         anchors: first.anchors,
         extra_subpaths: outlines.collect(),
         rotation,
     }
+}
+
+/// The style the glyphs of `text` are drawn in: its own, with the fill off for a single-line face.
+pub(crate) fn glyph_style(text: &TextSnapshot) -> curvyo_document_core::Style {
+    let mut style = text.style.clone();
+    if text.font.kind == FontKind::SingleLine {
+        style.fill.enabled = false;
+    }
+    style
 }
 
 /// The contours of one glyph path (cubics and lines only) as outlines of anchors in the
