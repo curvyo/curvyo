@@ -1,16 +1,19 @@
 //! Criterion 29 (b) and (c) of `specs/0085-stroke-to-path`: lettering stroked to paths through
 //! the session. (b) 500 characters of Hershey Sans 1-stroke at 10 mm, width 0.5 mm, Round cap
-//! and join, within 2 s; (c) "Annabelle" in Great Vibes at 20 mm with a 1 mm stroke within
-//! 500 ms. Each matches its golden summary in `tests/fixtures/stroke_to_path/` (objects, closed
+//! and join, within 2 s of CPU time; (c) "Annabelle" in Great Vibes at 20 mm with a 1 mm stroke within
+//! 500 ms of CPU time. Each matches its golden summary in `tests/fixtures/stroke_to_path/` (objects, closed
 //! outlines, nodes, a hash of the grid coordinates). Budgets are asserted in release builds (the
 //! `performance-budgets` job); a debug build prints the times. Regenerate the golden files with
 //! `CURVYO_UPDATE_GOLDEN=1`.
 
 #![allow(clippy::unwrap_used, clippy::cast_possible_truncation, missing_docs)]
 
-use std::path::{Path, PathBuf};
-use std::time::{Duration, Instant};
+mod cpu_time;
 
+use std::path::{Path, PathBuf};
+use std::time::Duration;
+
+use cpu_time::cpu_time_of;
 use curvyo_document_core::{Document, LineCap, LineJoin, ObjectSnapshot, Point, unpack};
 use curvyo_editor_wasm::{EscapeStep, Session, StrokeToPathOutcome, Tool};
 use curvyo_ui_core::{FontBlock, StyleField, TextInput};
@@ -67,10 +70,9 @@ fn lettering(family: &str, string: &str, size_mm: f64) -> Session {
     s
 }
 
+/// The command's thread CPU time (`tests/cpu_time/`), so a busy machine does not fail the budget.
 fn timed(s: &mut Session) -> Duration {
-    let started = Instant::now();
-    let outcome = s.apply_stroke_to_path();
-    let elapsed = started.elapsed();
+    let (outcome, elapsed) = cpu_time_of(|| s.apply_stroke_to_path());
     assert!(
         matches!(outcome, StrokeToPathOutcome::Applied { .. }),
         "{outcome:?}"

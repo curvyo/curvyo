@@ -8,7 +8,7 @@
 //! cargo test --target wasm32-unknown-unknown -p curvyo-geometry-core --test stroke_to_path_golden
 //! ```
 //!
-//! The budgets (50 ms per shape, 2 s for the long path) are asserted natively in a release build
+//! The budgets (50 ms per shape, 2 s for the long path, thread CPU time) are asserted natively in a release build
 //! (the `performance-budgets` CI job). Regenerate with `CURVYO_UPDATE_GOLDEN=1` (native) and
 //! review the diff.
 
@@ -203,19 +203,36 @@ fn node_lines(result: &OffsetOutlines) -> Vec<String> {
         .collect()
 }
 
-/// Runs `case` and checks `budget_ms` in a native release build.
+/// The CPU time the calling thread has used so far: wall time would count every moment another
+/// process holds the core, and a busy machine would fail the budget.
+#[cfg(unix)]
+fn thread_time() -> std::time::Duration {
+    let now = rustix::time::clock_gettime(rustix::time::ClockId::ThreadCPUTime);
+    std::time::Duration::new(
+        u64::try_from(now.tv_sec).unwrap(),
+        u32::try_from(now.tv_nsec).unwrap(),
+    )
+}
+
+/// Runs `case` and checks `budget_ms` of thread CPU time in a native release build (wall time off
+/// Unix; the budget job runs on Linux).
 fn timed(
     name: &str,
     budget_ms: u64,
     case: impl FnOnce() -> Result<OffsetOutlines, StrokeOutlineError>,
 ) -> Result<OffsetOutlines, StrokeOutlineError> {
-    #[cfg(not(target_arch = "wasm32"))]
+    #[cfg(unix)]
+    let started = thread_time();
+    #[cfg(all(not(unix), not(target_arch = "wasm32")))]
     let started = std::time::Instant::now();
     let result = case();
     #[cfg(not(target_arch = "wasm32"))]
     {
+        #[cfg(unix)]
+        let elapsed = thread_time().saturating_sub(started);
+        #[cfg(not(unix))]
         let elapsed = started.elapsed();
-        println!("{name}: {elapsed:?}");
+        println!("{name}: {elapsed:?} CPU");
         if !cfg!(debug_assertions) {
             assert!(
                 elapsed < std::time::Duration::from_millis(budget_ms),

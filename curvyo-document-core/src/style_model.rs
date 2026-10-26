@@ -81,6 +81,12 @@ impl From<Opacity> for f64 {
 pub struct DashPattern(Vec<f64>);
 
 impl DashPattern {
+    /// The most dashes one object's stroke may have. A pattern that would give
+    /// more (over all outlines of the object) is drawn solid on the canvas, and
+    /// Stroke to path outlines it solid too, so both agree
+    /// (`specs/0085-stroke-to-path`, criterion 11 note).
+    pub const MAX_DASHES_PER_OBJECT: usize = 2000;
+
     /// Solid: no dashes.
     #[must_use]
     pub const fn solid() -> Self {

@@ -13,11 +13,13 @@ use lyon::tessellation::{
     VertexBuffers,
 };
 
-/// The miter limit of every stroke: a miter join whose point would reach
-/// farther than this many stroke widths from the vertex draws as a bevel
-/// instead (acceptance criterion 11; SVG's and Inkscape's default). Fixed;
-/// there is no control for it.
-const MITER_LIMIT: f32 = 4.0;
+/// The miter limit of every stroke in lyon's terms: a miter join longer than
+/// SVG's `stroke-miterlimit` 4 (miter length / stroke width, SVG's and
+/// Inkscape's default, acceptance criterion 11) draws as a bevel instead.
+/// lyon bevels once the miter length exceeds twice its limit times the width
+/// (`miter_limit_is_exceeded` compares |normal| with 2 x limit), so SVG 4 is
+/// lyon 2. Fixed; there is no control for it.
+const MITER_LIMIT: f32 = 2.0;
 
 /// How a stroke is shaped and painted: width, colour, display tolerance, join
 /// and cap.

@@ -17,7 +17,7 @@ use crate::offset_finish::canonical;
 use crate::offset_pieces::{RawStyle, segments_between};
 use crate::offset_polyline::without_flattening_noise;
 use crate::offset_rebuild::{FillRule, rebuild};
-use crate::stroke_dash::{DashPiece, Measured, dash_pieces};
+use crate::stroke_dash::{DashPiece, Measured, dash_pieces, object_is_dashed};
 use crate::stroke_loops::{Cap, closed_loops, dot_loop, open_loop};
 use crate::stroke_markers::marker_loops;
 
@@ -86,9 +86,15 @@ pub fn stroke_outline(
         LineCap::Round => Cap::Round,
         LineCap::Square => Cap::Square,
     };
+    let prepared: Vec<Prepared> = outlines.iter().filter_map(Prepared::new).collect();
+    let measured: Vec<Measured<'_>> = prepared
+        .iter()
+        .map(|outline| Measured::new(&outline.segments))
+        .collect();
+    let dashed = object_is_dashed(&measured, &stroke.dash, width, cap);
     let mut loops: Vec<Vec<PathSeg>> = Vec::new();
-    for outline in outlines {
-        outline_loops(outline, stroke, style, cap, &mut loops);
+    for (outline, measured) in prepared.iter().zip(&measured) {
+        outline_loops(outline, measured, stroke, style, cap, dashed, &mut loops);
     }
     if loops.is_empty() {
         return Err(StrokeOutlineError::Empty);
@@ -113,38 +119,65 @@ pub fn stroke_outline(
     Ok(OffsetOutlines::from_parts(outlines, rebuilt.fallback))
 }
 
-/// The raw loops of one outline: the stroke (solid or dashed) and the markers.
+/// One outline ready to stroke: its anchors, segments and whether it is closed.
+struct Prepared {
+    anchors: Vec<(KPoint, KVec, KVec)>,
+    segments: Vec<PathSeg>,
+    closed: bool,
+}
+
+impl Prepared {
+    /// The anchors and segments of `outline`, or `None` when it has no segment.
+    fn new(outline: &Outline<'_>) -> Option<Self> {
+        let anchors: Vec<(KPoint, KVec, KVec)> = outline
+            .anchors
+            .iter()
+            .map(|(p, hin, hout)| {
+                (
+                    KPoint::new(p.x, p.y),
+                    KVec::new(hin.x, hin.y),
+                    KVec::new(hout.x, hout.y),
+                )
+            })
+            .collect();
+        if anchors.len() < 2 {
+            return None;
+        }
+        let segments = segments_between(&anchors, outline.closed);
+        (!segments.is_empty()).then_some(Self {
+            anchors,
+            segments,
+            closed: outline.closed,
+        })
+    }
+}
+
+/// The raw loops of one outline (`measured` its lengths): the stroke (solid, or dashed when
+/// `dashed`) and the markers.
 fn outline_loops(
-    outline: &Outline<'_>,
+    outline: &Prepared,
+    measured: &Measured<'_>,
     stroke: &StrokeShape,
     style: RawStyle,
     cap: Cap,
+    dashed: bool,
     loops: &mut Vec<Vec<PathSeg>>,
 ) {
-    let anchors: Vec<(KPoint, KVec, KVec)> = outline
-        .anchors
-        .iter()
-        .map(|(p, hin, hout)| {
-            (
-                KPoint::new(p.x, p.y),
-                KVec::new(hin.x, hin.y),
-                KVec::new(hout.x, hout.y),
-            )
-        })
-        .collect();
-    if anchors.len() < 2 {
-        return;
-    }
-    let segments = segments_between(&anchors, outline.closed);
-    if segments.is_empty() {
-        return;
-    }
+    let Prepared {
+        anchors,
+        segments,
+        closed,
+    } = outline;
     let width = stroke.width.as_mm();
     let half = width / 2.0;
-    let measured = Measured::new(&segments);
-    match dash_pieces(&measured, &stroke.dash, width, cap) {
-        None if outline.closed => loops.extend(closed_loops(&segments, half, style)),
-        None => loops.push(open_loop(&segments, half, style, cap)),
+    let pieces = if dashed {
+        dash_pieces(measured, &stroke.dash, width, cap)
+    } else {
+        None
+    };
+    match pieces {
+        None if *closed => loops.extend(closed_loops(segments, half, style)),
+        None => loops.push(open_loop(segments, half, style, cap)),
         Some(pieces) => {
             for piece in pieces {
                 match piece {
@@ -155,9 +188,9 @@ fn outline_loops(
         }
     }
     loops.extend(marker_loops(
-        &anchors,
-        outline.closed,
-        &segments,
+        anchors,
+        *closed,
+        segments,
         stroke.markers,
         width,
     ));

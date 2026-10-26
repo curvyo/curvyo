@@ -22,6 +22,12 @@ thiserror.workspace = true
 # (`CLAUDE.md`'s tester role, "Geometry ... property tests with proptest").
 proptest.workspace = true
 
+# `tests/stroke_to_path_golden.rs` times its budgets by the thread's CPU time, so a busy CI
+# runner does not fail them (`specs/0085-stroke-to-path` criterion 29). Already in the lock file
+# through `curvyo-editor-wasm`'s tests; MIT OR Apache-2.0 OR Apache-2.0 WITH LLVM-exception.
+[target.'cfg(unix)'.dev-dependencies]
+rustix = { version = "1.1", features = ["time"] }
+
 # The golden results are also compared in the wasm build, in Node, by `wasm-bindgen-test-runner`
 # (`tests/boolean_golden_wasm.rs`, criterion 43 of `specs/0016-boolean-operations`). Same
 # release train as the `wasm-bindgen` crate the facade uses; MIT OR Apache-2.0.

@@ -1103,7 +1103,6 @@ fn c11_more_shapes_paint_what_the_canvas_paints() {
 /// (lyon's `miter_limit_is_exceeded` compares |normal| with 2 x limit, an SVG limit of 8) mitres
 /// down to 14.4 degrees. At 20 and 28 degrees the outline loses the canvas's miter tip.
 #[test]
-#[ignore = "0085 FAIL: canvas mitres corners of 14.4 to 29 degrees (lyon limit 4 = SVG 8), outline bevels them (SVG 4); criterion 11 parity broken"]
 fn c11_miter_between_svg_limit_4_and_8_matches_the_canvas() {
     for deg in [20.0_f64, 28.0] {
         let a = deg.to_radians();
@@ -1124,7 +1123,6 @@ fn c11_miter_between_svg_limit_4_and_8_matches_the_canvas() {
 /// canvas rule that a stroke of more than 2,000 dashes is drawn solid: a 0.2 mm line 100 mm
 /// long with the dash `1 1` has 2,500 dashes.
 #[test]
-#[ignore = "0085 QUESTION: canvas draws >2,000 dashes solid, Stroke to path outlines them dashed; spec (criterion 11, Frage 45) says the outline is what the canvas paints"]
 fn c11_more_than_2000_dashes_match_the_canvas() {
     let (d, id) = stroked_path(
         &[(0.0, 0.0), (1000.0, 0.0)],

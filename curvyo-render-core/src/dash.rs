@@ -10,8 +10,8 @@ use lyon::path::Path;
 use crate::dash_walk::{Walk, dash_outline, walked};
 
 /// The most dashes one object may draw. A pattern that would produce more
-/// draws solid instead.
-pub(crate) const MAX_DASHES_PER_OBJECT: usize = 2000;
+/// draws solid instead; shared with Stroke to path in `curvyo-geometry-core`.
+pub(crate) const MAX_DASHES_PER_OBJECT: usize = DashPattern::MAX_DASHES_PER_OBJECT;
 
 /// The most dashes one frame may draw across all objects. Once spent, further
 /// dashed objects draw solid.

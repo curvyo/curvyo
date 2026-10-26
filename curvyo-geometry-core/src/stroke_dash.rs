@@ -12,10 +12,6 @@ use crate::stroke_loops::Cap;
 /// The accuracy of every arc length, millimetres.
 const ARCLEN_ACCURACY_MM: f64 = 1e-6;
 
-/// More dashes than this on one outline draw it solid, as the canvas does past its own limit; it
-/// keeps a crafted pattern from exhausting memory.
-const MAX_DASHES_PER_OUTLINE: f64 = 100_000.0;
-
 /// One "on" part of a dashed outline.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum DashPiece {
@@ -126,39 +122,91 @@ impl<'a> Measured<'a> {
     }
 }
 
+/// The walk of a dash pattern at one width: the even ratio list (an odd list walked twice), the
+/// period in millimetres and the "on" entries per period that draw something.
+struct Walk {
+    ratios: Vec<f64>,
+    period: f64,
+    per_period: usize,
+    dots: bool,
+}
+
+impl Walk {
+    /// `None` for the solid pattern or a period that is not a positive number.
+    fn new(pattern: &DashPattern, width: f64, cap: Cap) -> Option<Self> {
+        let stored = pattern.as_slice();
+        if stored.is_empty() {
+            return None;
+        }
+        let ratios: Vec<f64> = if stored.len() % 2 == 1 {
+            [stored, stored].concat()
+        } else {
+            stored.to_vec()
+        };
+        let period = ratios.iter().sum::<f64>() * width;
+        if !(period > 0.0 && period.is_finite()) {
+            return None;
+        }
+        let dots = cap != Cap::Butt;
+        let per_period = ratios
+            .chunks(2)
+            .filter(|pair| pair[0] > 0.0 || dots)
+            .count();
+        Some(Self {
+            ratios,
+            period,
+            per_period,
+            dots,
+        })
+    }
+
+    /// The dashes on an outline of `length`, counted as the canvas counts them
+    /// (`curvyo-render-core` `dash.rs`): whole periods rounded up.
+    #[allow(clippy::cast_precision_loss)] // a handful of entries
+    fn estimate(&self, length: f64) -> f64 {
+        if length > 0.0 {
+            (length / self.period).ceil() * self.per_period as f64
+        } else {
+            0.0
+        }
+    }
+}
+
+/// Whether an object whose outlines are `measured` is dashed with `pattern` at `width`: not the
+/// solid pattern, and at most [`DashPattern::MAX_DASHES_PER_OBJECT`] dashes over all outlines
+/// together. Past that the canvas draws the object solid, and so does Stroke to path
+/// (criterion 45: the outline is the area the canvas paints).
+pub(crate) fn object_is_dashed(
+    measured: &[Measured<'_>],
+    pattern: &DashPattern,
+    width: f64,
+    cap: Cap,
+) -> bool {
+    let Some(walk) = Walk::new(pattern, width, cap) else {
+        return false;
+    };
+    let total: f64 = measured.iter().map(|m| walk.estimate(m.total())).sum();
+    #[allow(clippy::cast_precision_loss)] // 2,000
+    let cap_count = DashPattern::MAX_DASHES_PER_OBJECT as f64;
+    !total.is_nan() && total <= cap_count
+}
+
 /// The dashes of the outline `segments` (at least one, positive length) for `pattern` at `width`
-/// millimetres, or `None` when it draws solid: a solid pattern, or more dashes than
-/// [`MAX_DASHES_PER_OUTLINE`].
+/// millimetres, or `None` when it draws solid: a solid pattern, or no length. The caller checks
+/// the object's dash count first ([`object_is_dashed`]).
 pub(crate) fn dash_pieces(
     measured: &Measured<'_>,
     pattern: &DashPattern,
     width: f64,
     cap: Cap,
 ) -> Option<Vec<DashPiece>> {
-    let stored = pattern.as_slice();
-    if stored.is_empty() {
-        return None;
-    }
-    let ratios: Vec<f64> = if stored.len() % 2 == 1 {
-        [stored, stored].concat()
-    } else {
-        stored.to_vec()
-    };
-    let period = ratios.iter().sum::<f64>() * width;
+    let walk = Walk::new(pattern, width, cap)?;
     let length = measured.total();
-    if !(period > 0.0 && period.is_finite() && length > 0.0) {
+    let estimate = walk.estimate(length);
+    if !(length > 0.0 && estimate.is_finite()) {
         return None;
     }
-    let dots = cap != Cap::Butt;
-    let per_period = ratios
-        .chunks(2)
-        .filter(|pair| pair[0] > 0.0 || dots)
-        .count();
-    #[allow(clippy::cast_precision_loss)] // a handful of entries
-    let estimate = (length / period).ceil() * per_period as f64;
-    if estimate.is_nan() || estimate > MAX_DASHES_PER_OUTLINE {
-        return None;
-    }
+    let Walk { ratios, dots, .. } = walk;
     let mut pieces = Vec::new();
     let mut distance = 0.0_f64;
     // invariant: the estimate bounds the walk; the step cap also stops it if rounding ever failed
