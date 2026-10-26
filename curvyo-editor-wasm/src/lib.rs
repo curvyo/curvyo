@@ -89,6 +89,8 @@ mod wasm_split;
 #[cfg(target_arch = "wasm32")]
 mod wasm_stroke_to_path;
 #[cfg(target_arch = "wasm32")]
+mod wasm_svg_import;
+#[cfg(target_arch = "wasm32")]
 mod wasm_text;
 #[cfg(target_arch = "wasm32")]
 mod wasm_text_layout;

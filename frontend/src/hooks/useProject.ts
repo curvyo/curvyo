@@ -14,6 +14,7 @@ import { isMac } from "@/lib/historyText";
 import { createBusyGate } from "@/lib/busyGate";
 import { templateOutcome } from "@/lib/guideText";
 import { invoke, isTauri, listen, PLATFORM } from "@/platform/host";
+import { svg_busy_notice } from "@/wasm-bindings/curvyo_editor_wasm.js";
 
 /** The browser build on a Mac uses Cmd as well. */
 const MAC = isMac(navigator.platform);
@@ -52,6 +53,9 @@ interface PendingCheck extends InlineCheck {
 export interface ProjectInfo {
   fileName: string | null;
   path: string | null;
+  /** The name Save offers for a project that has no file yet, such as one opened from an SVG
+   * ("poster.curvyo", `specs/0024-svg-import-export` criterion 2). */
+  suggestedName?: string | null;
 }
 
 export interface ProjectApi {
@@ -65,6 +69,9 @@ export interface ProjectApi {
   /** The Template button (`specs/0046-document-shapes` criterion 19): the file dialog, then the
    * file's outlines as guides. It never replaces the project and raises no check. */
   loadTemplate: () => void;
+  /** Import SVG… (`specs/0024-svg-import-export` criterion 3): the file dialog, then the file's
+   * content as a new layer in the middle of the view. It never replaces the project. */
+  importSvg: () => void;
   /** Save in the check: the action goes on after a successful save. */
   saveFromCheck: () => void;
   /** Discard in the check: the action goes on and the changes are dropped. */
@@ -77,13 +84,53 @@ interface ProjectDeps {
   editor: EditorSession;
   panelOpen: PanelOpenApi;
   panel: DocumentPanelApi;
-  /** The existing error dialogs; their text is the host's or the session's. */
-  onOpenError: (message: string) => void;
+  /** The existing error dialogs; their text is the host's or the session's. The title of the
+   * open dialog is "Can't open project" unless one is given. */
+  onOpenError: (message: string, title?: string) => void;
   onSaveError: (message: string) => void;
 }
 
 const SAVE_FAILED = "This project couldn't be saved.";
 const DEFAULT_FILE_NAME = "Untitled.curvyo";
+
+/** The titles of the error dialog for Open… and Import SVG… (`0024` UX notes). */
+const OPEN_FILE_TITLE = "Can't open file";
+const IMPORT_SVG_TITLE = "Can't import SVG";
+
+/** From this size on, a notice says the file is being read (`0024` UX notes, "Large files"). */
+const BUSY_NOTICE_BYTES = 1024 * 1024;
+
+/** The name Save offers for a project opened from `fileName`: the same name with `.curvyo`. */
+function savedNameOf(fileName: string): string {
+  const dot = fileName.lastIndexOf(".");
+  return `${dot > 0 ? fileName.slice(0, dot) : fileName}.curvyo`;
+}
+
+/** Runs `work` with the page busy (`0024` criterion 7): the cursor `wait`, `aria-busy` on the
+ * root so input and chords wait, one frame painted first, and from 1 MiB a notice. */
+async function whileBusy<T>(
+  editor: EditorSession,
+  bytes: number,
+  notice: string,
+  work: () => Promise<T> | T,
+): Promise<T> {
+  const root = document.documentElement;
+  if (bytes >= BUSY_NOTICE_BYTES) {
+    editor.showHistoryNotice(notice, 600_000);
+  }
+  root.setAttribute("aria-busy", "true");
+  root.style.cursor = "wait";
+  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  try {
+    return await work();
+  } finally {
+    root.removeAttribute("aria-busy");
+    root.style.cursor = "";
+    if (bytes >= BUSY_NOTICE_BYTES) {
+      editor.showHistoryNotice("", 1);
+    }
+  }
+}
 
 /** Whether keyboard focus is in a field whose edit commits when it loses focus. */
 function isTextField(element: Element | null): element is HTMLElement {
@@ -196,16 +243,30 @@ export function useProject(deps: ProjectDeps): ProjectApi {
   const openBytes = useCallback(
     async (path: string, bytes: number[]) => {
       const { editor, onOpenError } = depsRef.current;
+      const name = baseName(path);
+      let opened: { svg: boolean; notice: string };
       try {
-        await editor.openProject(new Uint8Array(bytes));
+        opened = await whileBusy(editor, bytes.length, svg_busy_notice(true, name), () =>
+          editor.openFile(new Uint8Array(bytes), name),
+        );
       } catch (error) {
-        onOpenError(String(error));
+        onOpenError(String(error), OPEN_FILE_TITLE);
+        return;
+      }
+      if (opened.svg) {
+        // An SVG is an untitled project that no saved file holds (`0024` criterion 2): the host
+        // forgets any path, and Save asks where, offering the SVG's name.
+        await invoke("reset_project").catch(() => undefined);
+        setInfo({ fileName: null, path: null, suggestedName: savedNameOf(name) });
+        if (opened.notice !== "") {
+          editor.showHistoryNotice(opened.notice);
+        }
         return;
       }
       await invoke("confirm_project_opened", { path }).catch(() => {
         /* The window title falls behind, but the document itself opened fine. */
       });
-      setInfo({ fileName: baseName(path), path });
+      setInfo({ fileName: name, path });
     },
     [setInfo],
   );
@@ -215,12 +276,12 @@ export function useProject(deps: ProjectDeps): ProjectApi {
       return;
     }
     try {
-      const picked = await invoke<OpenPayload | null>("pick_project");
+      const picked = await invoke<OpenPayload | null>("pick_project", { kind: "open" });
       if (!picked) {
         return;
       }
       if (picked.kind === "io_error") {
-        depsRef.current.onOpenError(picked.message);
+        depsRef.current.onOpenError(picked.message, OPEN_FILE_TITLE);
         return;
       }
       await openBytes(picked.path, picked.bytes);
@@ -237,7 +298,7 @@ export function useProject(deps: ProjectDeps): ProjectApi {
     }
     const { editor, onOpenError } = depsRef.current;
     try {
-      const picked = await invoke<OpenPayload | null>("pick_project");
+      const picked = await invoke<OpenPayload | null>("pick_project", { kind: "project" });
       if (!picked) {
         return;
       }
@@ -253,6 +314,42 @@ export function useProject(deps: ProjectDeps): ProjectApi {
       }
     } catch (error) {
       onOpenError(String(error));
+    } finally {
+      busy.leave();
+    }
+  }, [busy]);
+
+  const importSvg = useCallback(async () => {
+    if (!busy.enter()) {
+      return;
+    }
+    const { editor, onOpenError } = depsRef.current;
+    const button = () => document.querySelector<HTMLElement>('[data-file-command="import-svg"]');
+    try {
+      const picked = await invoke<OpenPayload | null>("pick_project", { kind: "svg" });
+      if (!picked) {
+        // Cancelled: the focus returns to the button, nothing is shown.
+        button()?.focus();
+        return;
+      }
+      if (picked.kind === "io_error") {
+        onOpenError(picked.message, IMPORT_SVG_TITLE);
+        return;
+      }
+      const name = baseName(picked.path);
+      const outcome = await whileBusy(editor, picked.bytes.length, svg_busy_notice(false, name), () =>
+        editor.importSvg(new Uint8Array(picked.bytes), name),
+      );
+      if (outcome.startsWith("imported:")) {
+        // The new layer's objects are selected: arrows, S and Delete act on them at once.
+        editor.containerRef.current?.focus();
+      } else if (outcome.startsWith("nothing:")) {
+        editor.showHistoryNotice(outcome.slice("nothing:".length));
+      } else {
+        onOpenError(outcome.slice("error:".length), IMPORT_SVG_TITLE);
+      }
+    } catch (error) {
+      onOpenError(String(error), IMPORT_SVG_TITLE);
     } finally {
       busy.leave();
     }
@@ -312,10 +409,12 @@ export function useProject(deps: ProjectDeps): ProjectApi {
           onSaveError(SAVE_FAILED);
           return "failed";
         }
+        const suggestedName = infoRef.current.suggestedName ?? null;
         const outcome = await invoke<SaveOutcome>("save_project_bytes", {
           bytes: Array.from(bytes),
           saveAs,
-          fileName: infoRef.current.fileName ?? DEFAULT_FILE_NAME,
+          fileName: infoRef.current.fileName ?? suggestedName ?? DEFAULT_FILE_NAME,
+          suggestedName,
         });
         if (outcome.kind === "cancelled") {
           return "cancelled";
@@ -564,6 +663,7 @@ export function useProject(deps: ProjectDeps): ProjectApi {
     check,
     press,
     loadTemplate: () => void loadTemplate(),
+    importSvg: () => void importSvg(),
     saveFromCheck: () => void saveFromCheck(),
     discard,
     cancel,

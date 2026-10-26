@@ -3,6 +3,9 @@ import { useEffect, useId, useRef, useState } from "react";
 import { Tooltip } from "@/components/ui/tooltip";
 import type { FileCommandName, InlineCheck, ProjectApi } from "@/hooks/useProject";
 import { TEMPLATE_NAME } from "@/lib/guideText";
+
+/** The name of the Import SVG… button and its tooltip (UX notes: the control's name only). */
+const IMPORT_SVG_NAME = "Import SVG";
 import { checkSentence, projectName, projectStatus } from "@/lib/projectText";
 
 /** Discard ignores presses for this long after the check appears (a double-click on the button
@@ -47,6 +50,11 @@ export function FileTab({ project, desktop, version, tooltipFor, onReturnFocus }
         ) : (
           <Buttons {...buttonProps} />
         )}
+      </div>
+      {/* Its own row below the block the check replaces, so it stays where it is
+          (`specs/0024-svg-import-export` criterion 5). */}
+      <div className="mt-2 flex gap-2">
+        <ImportSvgButton {...buttonProps} />
       </div>
       {desktop ? (
         <>
@@ -135,6 +143,23 @@ function TemplateButton({ project, onReturnFocus }: ButtonProps) {
         className={`${BUTTON} ${OUTLINE} w-[118px]`}
       >
         {TEMPLATE_NAME}
+      </button>
+    </Tooltip>
+  );
+}
+
+/** Import SVG… (`specs/0024-svg-import-export` criterion 5, UX notes): an outline text button
+ * like its neighbours, never dimmed; its tooltip is its name; it has no chord. */
+function ImportSvgButton({ project }: ButtonProps) {
+  return (
+    <Tooltip side="left" content={IMPORT_SVG_NAME}>
+      <button
+        type="button"
+        data-file-command="import-svg"
+        onClick={() => project.importSvg()}
+        className={`${BUTTON} ${OUTLINE} w-[118px]`}
+      >
+        {`${IMPORT_SVG_NAME}…`}
       </button>
     </Tooltip>
   );

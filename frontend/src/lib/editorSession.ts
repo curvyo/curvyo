@@ -77,6 +77,18 @@ export async function openSession(bytes: Uint8Array): Promise<WasmSession> {
   return session;
 }
 
+/** Open… of any file (`specs/0024-svg-import-export` criterion 1): the session reads `bytes` as an
+ * SVG drawing or a `.curvyo` project by their content. `fileName` names the file in the notice of
+ * an SVG that brought in nothing.
+ * @throws the error dialog's sentence when the file cannot be opened; nothing changed. */
+export async function openFileSession(bytes: Uint8Array, fileName: string): Promise<WasmSession> {
+  await loadOnce();
+  await formatsFileReady();
+  const session = WasmSession.open_file(mintPeerId(), bytes, fileName);
+  applyFormats(session);
+  return session;
+}
+
 /** The application version, the same in both builds (`specs/0051-sidebar-and-no-menu/`
  * criterion 42). Needs the wasm module loaded, which any session guarantees. */
 export function appVersion(): string {

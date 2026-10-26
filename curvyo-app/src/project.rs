@@ -21,6 +21,11 @@ const MAIN_WINDOW: &str = "main";
 /// dialogs and the file association in `tauri.conf.json`.
 pub(crate) const PROJECT_EXTENSION: &str = "curvyo";
 const PROJECT_FILTER_NAME: &str = "Curvyo project";
+/// The default filter of Open… (`specs/0024-svg-import-export` UX notes): projects and drawings.
+const OPEN_FILTER_NAME: &str = "Curvyo projects and SVG drawings";
+/// The filter of Import SVG….
+const SVG_FILTER_NAME: &str = "SVG drawings";
+const SVG_EXTENSION: &str = "svg";
 const DEFAULT_FILE_NAME: &str = "Untitled.curvyo";
 
 /// What the page is told when a file could not be read or written.
@@ -116,10 +121,30 @@ pub(crate) fn take_pending_open(state: tauri::State<AppState>) -> Option<OpenPay
 /// second unsaved-changes check (`specs/0051-sidebar-and-no-menu/` criterion 18). Nothing about
 /// the open project changes here: [`confirm_project_opened`] does that once the page has parsed
 /// the bytes.
+///
+/// `kind` chooses the filters (`specs/0024-svg-import-export` criteria 1 and 3): `"open"` lists
+/// projects and SVG drawings, then all files; `"svg"` SVG drawings only; anything else (the
+/// Template button) projects only. The page decides by the content what the file is.
 #[tauri::command]
 #[allow(clippy::unused_async)] // async keeps the blocking dialog off the main thread
-pub(crate) async fn pick_project(app: AppHandle) -> Option<OpenPayload> {
-    let picked = project_dialog(&app).blocking_pick_file()?;
+pub(crate) async fn pick_project(app: AppHandle, kind: Option<String>) -> Option<OpenPayload> {
+    let dialog = match kind.as_deref() {
+        Some("open") => parented(
+            &app,
+            app.dialog()
+                .file()
+                .add_filter(OPEN_FILTER_NAME, &[PROJECT_EXTENSION, SVG_EXTENSION])
+                .add_filter("All files", &["*"]),
+        ),
+        Some("svg") => parented(
+            &app,
+            app.dialog()
+                .file()
+                .add_filter(SVG_FILTER_NAME, &[SVG_EXTENSION]),
+        ),
+        _ => project_dialog(&app),
+    };
+    let picked = dialog.blocking_pick_file()?;
     let path = picked.into_path().ok()?;
     Some(read_project(&path).into())
 }
@@ -167,12 +192,16 @@ pub(crate) async fn save_project_bytes(
     app: AppHandle,
     bytes: Vec<u8>,
     save_as: bool,
+    suggested_name: Option<String>,
 ) -> SaveOutcome {
     let state = app.state::<AppState>();
     let (known_path, known_name) = {
         let project = state.lock_project();
         (project.path.clone(), project.file_name())
     };
+    // A project opened from an SVG has no file yet; the dialog offers the SVG's name with
+    // `.curvyo` (`specs/0024-svg-import-export` criterion 2).
+    let known_name = known_name.or(suggested_name);
     let path = if save_as { None } else { known_path };
     let Some(path) = path.or_else(|| pick_save_path(&app, known_name.as_deref())) else {
         return SaveOutcome::Cancelled;
@@ -275,10 +304,16 @@ pub(crate) fn open_handed_path(app: &AppHandle, path: &Path) {
 /// stays operable while a dialog without a parent is up, and a New or Discard pressed meanwhile
 /// would make the dialog's answer land on a different project.
 fn project_dialog(app: &AppHandle) -> FileDialogBuilder<Wry> {
-    let dialog = app
-        .dialog()
-        .file()
-        .add_filter(PROJECT_FILTER_NAME, &[PROJECT_EXTENSION]);
+    parented(
+        app,
+        app.dialog()
+            .file()
+            .add_filter(PROJECT_FILTER_NAME, &[PROJECT_EXTENSION]),
+    )
+}
+
+/// `dialog` modal to the main window, when it exists.
+fn parented(app: &AppHandle, dialog: FileDialogBuilder<Wry>) -> FileDialogBuilder<Wry> {
     match app.get_webview_window(MAIN_WINDOW) {
         Some(window) => dialog.set_parent(&window),
         None => dialog,
