@@ -4,6 +4,7 @@ members = [
     "curvyo-document-core",
     "curvyo-geometry-core",
     "curvyo-text-core",
+    "curvyo-svg-core",
     "curvyo-ui-core",
     "curvyo-render-core",
     "curvyo-editor-wasm",
@@ -47,6 +48,13 @@ sha2 = { version = "0.10", default-features = false }
 # hostile input in wasm. MIT OR Apache-2.0, no dependencies, no `unsafe`, no I/O; already in
 # `Cargo.lock` through `fontdb`. Without `positions`.
 roxmltree = { version = "=0.20.0", default-features = false, features = ["std"] }
+# Pinned exactly (ADR 0018 §4): the attribute grammars of the SVG import (transform, colour,
+# length, paint, number lists; not path data), hostile input in wasm. Apache-2.0 OR MIT,
+# linebender, `forbid(unsafe_code)`; its `kurbo` 0.13 and `siphasher` are already locked.
+svgtypes = { version = "=0.16.1", default-features = false, features = ["std"] }
+# Pinned exactly (ADR 0018 §4): the `<style>` subset of the SVG import (`specs/0024` criterion 36).
+# Apache-2.0 OR MIT, linebender, no `unsafe`; its `log` is already locked.
+simplecss = { version = "=0.2.2", default-features = false }
 # The desktop font list (ADR 0020 §3): pure Rust, its own fontconfig reader, no C library.
 # Pinned exactly as the spike measured it; MIT. Without `memmap` (no `unsafe` mmap in the tree).
 fontdb = { version = "=0.24.0", default-features = false, features = ["std", "fs", "fontconfig"] }

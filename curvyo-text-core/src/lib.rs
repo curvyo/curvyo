@@ -25,7 +25,6 @@ mod glyph_map;
 mod layout;
 pub mod limits;
 mod outline;
-mod path_data;
 mod preview;
 mod shape;
 mod svg_font;

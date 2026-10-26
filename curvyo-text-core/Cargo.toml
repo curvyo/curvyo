@@ -10,6 +10,8 @@ description = "The Curvyo text engine: turns a face's bytes, a string and a size
 workspace = true
 
 [dependencies]
+# The hostile-XML guard and the path data parser of SVG fonts (ADR 0018 §3).
+curvyo-svg-core = { path = "../curvyo-svg-core", version = "0.1.0" }
 harfrust.workspace = true
 skrifa.workspace = true
 sha2.workspace = true

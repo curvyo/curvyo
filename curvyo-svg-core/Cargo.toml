@@ -1,0 +1,20 @@
+[package]
+name = "curvyo-svg-core"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "The Curvyo SVG reader: hostile-input checks, path data and an SVG drawing read into millimetres, kurbo paths and resolved styles (pure, wasm-compatible)."
+
+[lints]
+workspace = true
+
+[dependencies]
+kurbo.workspace = true
+roxmltree.workspace = true
+svgtypes.workspace = true
+simplecss.workspace = true
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+# Hostile-input property test over arbitrary bytes (`specs/0024-svg-import-export` criterion 70).
+proptest.workspace = true

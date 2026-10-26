@@ -21,8 +21,8 @@ pub const MAX_SVG_FONT_BYTES: usize = 16 * 1024 * 1024;
 pub const MAX_SVG_NODES: u32 = 262_144;
 
 /// The deepest element nesting an SVG font file may have, checked on the bytes before parsing
-/// (the XML reader recurses per level).
-pub const MAX_SVG_DEPTH: usize = 256;
+/// (the XML reader recurses per level): the one constant of `curvyo-svg-core` (ADR 0018 §3).
+pub const MAX_SVG_DEPTH: usize = curvyo_svg_core::xml_guard::MAX_DEPTH;
 
 /// The most glyphs one SVG font may have.
 pub const MAX_SVG_GLYPHS: usize = 65_535;
