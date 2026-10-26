@@ -224,6 +224,12 @@ function Editor() {
               onSetTextWritingMode={editor.text.setWritingMode}
               textPath={textPath}
               onSetTextOrientation={editor.text.setOrientation}
+              strokeToPath={{
+                shown: editor.flipEnabled,
+                enabled: editor.selectBar.strokeToPathEnabled,
+                onPress: editor.strokeToPath.apply,
+                notice: editor.strokeToPath.notice,
+              }}
               linkedCloneShown={editor.clones.shown}
               onLinkedClone={() => editor.clones.apply("linked-clone")}
               linkedCloneNotice={editor.clones.barNotice}

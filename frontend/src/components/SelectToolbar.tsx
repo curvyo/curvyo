@@ -2,6 +2,8 @@ import { CircleAlert, Link, Unlink } from "lucide-react";
 import { AlignmentGroup } from "@/components/AlignmentGroup";
 import type { OrientationCode, WritingModeCode } from "@/lib/textWritingText";
 import { StyleGroup } from "@/components/StyleGroup";
+import { StrokeToPathButton } from "@/components/StrokeToPathButton";
+import type { StrokeToPathBarNotice } from "@/hooks/useStrokeToPath";
 import { OnPathButton, type TextPathActions } from "@/components/TextPathGroups";
 import { BAR_ROW_CLASS } from "@/lib/barLayout";
 import type { WeightCode } from "@/lib/styleText";
@@ -81,6 +83,14 @@ export interface SelectToolbarProps {
   onSetTextOrientation?: (orientation: OrientationCode) => void;
   /** The On path button and groups (`specs/0080-text-on-path`). */
   textPath?: TextPathActions;
+  /** The Stroke to path button (`specs/0085-stroke-to-path` criterion 1): shown whenever
+   * something is selected, enabled when a selected object draws a stroke. */
+  strokeToPath?: {
+    shown: boolean;
+    enabled: boolean;
+    onPress: () => void;
+    notice: StrokeToPathBarNotice | null;
+  };
   /** The Linked clone button is shown (`specs/0049-linked-clone` criterion 4). */
   linkedCloneShown: boolean;
   onLinkedClone: () => void;
@@ -585,6 +595,7 @@ export function SelectToolbar({
   onSetTextWritingMode,
   onSetTextOrientation,
   textPath,
+  strokeToPath,
   linkedCloneShown,
   onLinkedClone,
   linkedCloneNotice,
@@ -703,9 +714,14 @@ export function SelectToolbar({
       );
     }
   }
-  if (bar.objectToPathShown) {
+  // Object to path and Stroke to path are one group "Convert", 4 px apart, so they wrap together
+  // (`specs/0085-stroke-to-path` UX notes, "Button").
+  const strokeToPathShown = Boolean(strokeToPath?.shown);
+  if (bar.objectToPathShown || strokeToPathShown) {
     groups.push(
-      <div key="object-to-path" className="relative">
+      <div key="convert" role="group" aria-label="Convert" className="flex items-start gap-1">
+      {bar.objectToPathShown && (
+      <div className="relative">
         <button
           type="button"
           title="Convert the selected shapes and texts to paths"
@@ -727,6 +743,16 @@ export function SelectToolbar({
         >
           {objectToPathNotice}
         </div>
+      </div>
+      )}
+      {strokeToPath && strokeToPathShown && (
+        <StrokeToPathButton
+          enabled={strokeToPath.enabled}
+          onPress={strokeToPath.onPress}
+          onReturnFocus={onReturnFocus}
+          notice={strokeToPath.notice}
+        />
+      )}
       </div>,
     );
   }
