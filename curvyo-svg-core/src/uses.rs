@@ -32,7 +32,14 @@ impl Reader<'_, '_, '_> {
             .and_then(|t| ctx.units.parse(t, Axis::Y))
             .unwrap_or(0.0);
         let placed = ctx.matrix * Affine::translate((x, y));
-        if let Some((matrix, _)) = self.clone_of(node, target, placed, &ctx.style, &ctx.units) {
+        // Inside a copy every `use` is a copy too: a copy is an ordinary leaf with no link, so a
+        // chain past its clone depth continues as copies (criterion 47 (b) and (v)).
+        let clone = if ctx.copy_depth == 0 {
+            self.clone_of(node, target, placed, &ctx.style, &ctx.units)
+        } else {
+            None
+        };
+        if let Some((matrix, _)) = clone {
             let index = self.leaves;
             let style = ctx.style.leaf_style(1.0);
             let leaf = self.push_leaf(

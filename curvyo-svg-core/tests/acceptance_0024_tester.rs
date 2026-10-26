@@ -930,7 +930,6 @@ fn ac69_depth_256_boundary() {
 /// with 257 nested elements (the root counted as 1) must be refused; it is accepted, 258 is
 /// refused (off by one).
 #[test]
-#[ignore = "0024 FAIL: 257 nested elements are accepted; criterion 69 refuses nesting deeper than 256"]
 fn ac69_depth_257_is_refused() {
     let open = "<g>".repeat(255);
     let close = "</g>".repeat(255);
@@ -1110,7 +1109,6 @@ fn ac47_matrix_example_and_chain_depth() {
 /// and tenth `use` of a chain must be ordinary copies; the reader re-links them as clones of the
 /// eighth link's original instead (depth stays 8, but they are not copies).
 #[test]
-#[ignore = "0024 FAIL: uses deeper than chain depth 8 become clones re-linked to an earlier link instead of copies (criterion 47 (v))"]
 fn ac47v_a_chain_deeper_than_eight_continues_as_copies() {
     let mut body = String::from(r#"<path id="u0" d="M0 0 H1 V1 Z"/>"#);
     for i in 1..=10 {
