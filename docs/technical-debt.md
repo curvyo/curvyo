@@ -162,6 +162,21 @@ route to what OpenVoronoi does, and still not free: `centerline` depends on
 V-carve a desktop-only capability or force a reimplementation of that filter.
 That trade is what makes it an escalation rather than the first choice.
 
+## Dash and marker walk exist twice
+
+The canvas dashes strokes and places markers in `curvyo-render-core` (`dash_walk.rs`,
+`marker_place.rs`, on `lyon`'s flattened path at display tolerance); Stroke to path
+(`specs/0085-stroke-to-path/`, `adrs.md` decision 4) ports the same semantics onto exact arc
+length in `curvyo-geometry-core` (`stroke_dash.rs`, `stroke_markers.rs`), because a
+`render-core -> geometry-core` edge (ADR 0011 change) was not worth two small functions.
+A change to dashes or markers must be made in both places. The safeguard is the parity test in
+`curvyo-editor-wasm` (dash ends and marker positions within 0.05 mm, stroke edges within
+0.01 mm).
+
+**Trigger:** a third copy, or a dash or marker change that has to be made twice.
+**Resolution:** move the walk into one crate both depend on (an ADR 0011 edge), with the kernel's
+exact arc length as the reference.
+
 ## SVG round-trip is lossy
 
 We own a documented SVG subset; unmodelled attributes survive in a per-node
