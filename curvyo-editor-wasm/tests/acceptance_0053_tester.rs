@@ -254,14 +254,29 @@ fn ac4_compound_paths_hidden_and_locked_paths_contribute_no_nodes() {
     d.set_node_locked(&[locked], true).unwrap();
     let mut s = open(&d);
     marquee(&mut s, (0., 0.), (100., 100.), NONE);
+    // `0053` criterion 4 as amended by `specs/0055-compound-path-node-editing` (UX notes, "With the
+    // node marquee"): every node of every outline of a compound path counts; hidden and locked
+    // paths still contribute none.
     assert_eq!(
         count(&s),
-        2,
-        "only the visible, unlocked, non-compound path"
+        8,
+        "the visible, unlocked path and both outlines of the compound path"
     );
-    assert_eq!(s.node_toolbar_state().total_nodes, 2);
+    assert_eq!(s.node_toolbar_state().total_nodes, 8);
     let got = selected_ids(&mut s);
-    assert_eq!(got, ids(&[(1, 0), (1, 1)]));
+    assert_eq!(
+        got,
+        ids(&[
+            (1, 0),
+            (1, 1),
+            (4, 0),
+            (4, 1),
+            (4, 2),
+            (5, 0),
+            (5, 1),
+            (5, 2)
+        ])
+    );
     let _ = (visible, compound);
 }
 

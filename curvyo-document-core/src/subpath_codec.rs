@@ -58,13 +58,34 @@ fn subpath_anchors(map: &LoroMap) -> LoroMovableList {
     }
 }
 
+/// The map of every outline, the first outline's first, in storage order: the meta map itself for
+/// the first outline, the `extra_subpaths` element for each further one. Each holds the outline's
+/// `closed` and `anchors` under the same two keys, so a command that edits an outline reads and
+/// writes it the same way whichever outline it is.
+pub(crate) fn outline_maps(meta: &LoroMap) -> Vec<LoroMap> {
+    let mut maps = vec![meta.clone()];
+    if let Some(extra) = extra_list(meta) {
+        maps.extend((0..extra.len()).map(|i| subpath_map_at(&extra, i)));
+    }
+    maps
+}
+
 /// Every outline's anchor list, the first outline's first, in storage order.
 pub(crate) fn all_anchor_lists(meta: &LoroMap) -> Vec<LoroMovableList> {
-    let mut lists = vec![anchors_container(meta)];
-    if let Some(extra) = extra_list(meta) {
-        lists.extend((0..extra.len()).map(|i| subpath_anchors(&subpath_map_at(&extra, i))));
-    }
-    lists
+    outline_maps(meta).iter().map(anchors_container).collect()
+}
+
+/// One anchor's place: the outline that holds it (its number in storage order, `0` for the first),
+/// that outline's map and anchor list, and the anchor's index in that list.
+pub(crate) struct AnchorAt {
+    /// The outline's number in storage order, `0` for the first outline.
+    pub(crate) outline: usize,
+    /// The map that holds the outline's `closed` and `anchors`.
+    pub(crate) map: LoroMap,
+    /// The outline's anchor list.
+    pub(crate) list: LoroMovableList,
+    /// The anchor's index in `list`.
+    pub(crate) index: usize,
 }
 
 /// Where every anchor of a path is: the outline lists, and for each anchor id its outline and its
@@ -72,6 +93,7 @@ pub(crate) fn all_anchor_lists(meta: &LoroMap) -> Vec<LoroMovableList> {
 /// thousands of anchor ids stays linear (scanning for each id would be quadratic, and a boolean
 /// result has thousands of anchors). Lookup only: no iteration order is ever used.
 pub(crate) struct AnchorPositions {
+    maps: Vec<LoroMap>,
     lists: Vec<LoroMovableList>,
     positions: HashMap<AnchorId, (usize, usize)>,
 }
@@ -87,11 +109,33 @@ impl AnchorPositions {
         let &(outline, index) = self.positions.get(&id)?;
         Some((self.lists[outline].clone(), index))
     }
+
+    /// The outline that holds the anchor `id`, and its index there.
+    pub(crate) fn at(&self, id: AnchorId) -> Option<AnchorAt> {
+        let &(outline, index) = self.positions.get(&id)?;
+        Some(AnchorAt {
+            outline,
+            map: self.maps[outline].clone(),
+            list: self.lists[outline].clone(),
+            index,
+        })
+    }
+
+    /// How many outlines the path has.
+    pub(crate) fn outline_count(&self) -> usize {
+        self.lists.len()
+    }
+
+    /// The anchor list of outline number `outline`.
+    pub(crate) fn list(&self, outline: usize) -> &LoroMovableList {
+        &self.lists[outline]
+    }
 }
 
 /// Reads the id of every anchor of every outline of `meta` once.
 pub(crate) fn anchor_positions(meta: &LoroMap) -> AnchorPositions {
-    let lists = all_anchor_lists(meta);
+    let maps = outline_maps(meta);
+    let lists: Vec<LoroMovableList> = maps.iter().map(anchors_container).collect();
     let mut positions = HashMap::with_capacity(lists.iter().map(LoroMovableList::len).sum());
     for (outline, list) in lists.iter().enumerate() {
         for index in 0..list.len() {
@@ -100,7 +144,115 @@ pub(crate) fn anchor_positions(meta: &LoroMap) -> AnchorPositions {
             }
         }
     }
-    AnchorPositions { lists, positions }
+    AnchorPositions {
+        maps,
+        lists,
+        positions,
+    }
+}
+
+/// Removes the outlines numbered `doomed` (storage order, `0` for the first) from a path that keeps
+/// at least one (`specs/0055-compound-path-node-editing/adrs.md`, "outline removal and
+/// promotion"): a further outline is deleted from `extra_subpaths`; when the first outline goes, the
+/// first remaining further outline's `closed` and anchors (ids kept) are written into the first
+/// outline's keys and its element deleted. When no further outline is left the key is deleted, which
+/// is exactly an ordinary path. The one place Delete, Join and the Pen's connect remove an outline.
+///
+/// # Panics
+/// Does not panic in practice: every number names an outline of `meta` (the caller took it from
+/// [`anchor_positions`] of the same map), and at least one outline stays.
+pub(crate) fn remove_outlines(meta: &LoroMap, doomed: &[usize]) {
+    let mut doomed: Vec<usize> = doomed.to_vec();
+    doomed.sort_unstable();
+    doomed.dedup();
+    if doomed.is_empty() {
+        return;
+    }
+    // invariant: a path with an outline to remove besides the first has `extra_subpaths`, and the
+    // caller keeps at least one outline, so a removed first outline has a further one to promote.
+    #[allow(clippy::unwrap_used)]
+    let extra = extra_list(meta).unwrap();
+    for &outline in doomed.iter().rev().filter(|&&outline| outline > 0) {
+        // invariant: `outline - 1` is an index of this list, removed from the highest down.
+        #[allow(clippy::unwrap_used)]
+        extra.delete(outline - 1, 1).unwrap();
+    }
+    if doomed[0] == 0 {
+        let promoted = subpath_map_at(&extra, 0);
+        let anchors = subpath_anchors(&promoted);
+        let snapshots: Vec<NewAnchor> = (0..anchors.len())
+            .map(|k| read_anchor_snapshot(&anchor_map_at(&anchors, k)))
+            .collect();
+        let closed = read_closed(&promoted);
+        let first = crate::path_codec::insert_anchors_container(meta);
+        for anchor in &snapshots {
+            push_anchor(&first, anchor);
+        }
+        write_closed(meta, closed);
+        // invariant: index 0 was just read from this list.
+        #[allow(clippy::unwrap_used)]
+        extra.delete(0, 1).unwrap();
+    }
+    if extra.is_empty() {
+        // invariant: the key was just read from this attached map.
+        #[allow(clippy::unwrap_used)]
+        meta.delete(KEY_EXTRA_SUBPATHS).unwrap();
+    }
+}
+
+/// Inserts a new open or closed outline so that it becomes outline number `outline` (storage order,
+/// at least `1`: the first outline is never replaced this way), creating `extra_subpaths` when the
+/// path has none. Split at a node puts the second part of an outline right after it.
+///
+/// # Panics
+/// Does not panic in practice: `outline - 1` is at most the list's length (the caller passes the
+/// number of an existing outline plus one).
+pub(crate) fn insert_outline(meta: &LoroMap, outline: usize, anchors: &[NewAnchor], closed: bool) {
+    let list = extra_list_or_new(meta);
+    // invariant: see above; inserting a container into an attached list cannot fail otherwise.
+    #[allow(clippy::unwrap_used)]
+    let map = list.insert_container(outline - 1, LoroMap::new()).unwrap();
+    write_outline(&map, anchors, closed);
+}
+
+/// Appends outlines after every outline of a path, creating `extra_subpaths` when the path has
+/// none; writes nothing for an empty slice (a writer never writes an empty list). A new path gets
+/// its further outlines this way, and Join across objects moves the other object's outlines in.
+pub(crate) fn append_outlines(meta: &LoroMap, outlines: &[(Vec<NewAnchor>, bool)]) {
+    if outlines.is_empty() {
+        return;
+    }
+    let list = extra_list_or_new(meta);
+    for (anchors, closed) in outlines {
+        // invariant: pushing a container onto an attached list cannot fail.
+        #[allow(clippy::unwrap_used)]
+        let map = list.push_container(LoroMap::new()).unwrap();
+        write_outline(&map, anchors, *closed);
+    }
+}
+
+/// The `extra_subpaths` list, created empty when the path has none (the caller fills it at once,
+/// so no empty list is ever committed).
+fn extra_list_or_new(meta: &LoroMap) -> LoroMovableList {
+    extra_list(meta).unwrap_or_else(|| {
+        // invariant: inserting a container under a key just found absent cannot fail.
+        #[allow(clippy::unwrap_used)]
+        meta.insert_container(KEY_EXTRA_SUBPATHS, LoroMovableList::new())
+            .unwrap()
+    })
+}
+
+/// Writes `closed` and a fresh `anchors` list into a just created outline map.
+fn write_outline(map: &LoroMap, anchors: &[NewAnchor], closed: bool) {
+    write_closed(map, closed);
+    // invariant: inserting a container under a fresh key of an attached map cannot fail.
+    #[allow(clippy::unwrap_used)]
+    let list = map
+        .insert_container(KEY_ANCHORS, LoroMovableList::new())
+        .unwrap();
+    for anchor in anchors {
+        push_anchor(&list, anchor);
+    }
 }
 
 /// The number of anchors over all outlines.
@@ -111,32 +263,6 @@ pub(crate) fn total_anchor_count(meta: &LoroMap) -> usize {
         .sum()
 }
 
-/// Writes the further outlines of a freshly created path; writes nothing for
-/// an empty slice (a writer never writes an empty list).
-pub(crate) fn write_extra_subpaths(meta: &LoroMap, outlines: &[(Vec<NewAnchor>, bool)]) {
-    if outlines.is_empty() {
-        return;
-    }
-    // invariant: inserting a new container under a fresh key of an attached
-    // map, and pushing containers onto the lists just created, cannot fail.
-    #[allow(clippy::unwrap_used)]
-    {
-        let list = meta
-            .insert_container(KEY_EXTRA_SUBPATHS, LoroMovableList::new())
-            .unwrap();
-        for (anchors, closed) in outlines {
-            let map = list.push_container(LoroMap::new()).unwrap();
-            write_closed(&map, *closed);
-            let anchor_list = map
-                .insert_container(KEY_ANCHORS, LoroMovableList::new())
-                .unwrap();
-            for anchor in anchors {
-                push_anchor(&anchor_list, anchor);
-            }
-        }
-    }
-}
-
 /// Replaces the further outlines of a path (or of a primitive becoming one) by `outlines`; an
 /// empty slice leaves none.
 pub(crate) fn replace_extra_subpaths(meta: &LoroMap, outlines: &[(Vec<NewAnchor>, bool)]) {
@@ -145,7 +271,7 @@ pub(crate) fn replace_extra_subpaths(meta: &LoroMap, outlines: &[(Vec<NewAnchor>
         #[allow(clippy::unwrap_used)]
         meta.delete(KEY_EXTRA_SUBPATHS).unwrap();
     }
-    write_extra_subpaths(meta, outlines);
+    append_outlines(meta, outlines);
 }
 
 /// The further outlines as a read model; empty for an ordinary path.

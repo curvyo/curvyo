@@ -172,7 +172,7 @@ impl Document {
             // invariant: the node was just created.
             #[allow(clippy::unwrap_used)]
             let meta = tree.get_meta(tree_id_of(id)).unwrap();
-            crate::subpath_codec::write_extra_subpaths(&meta, &rest);
+            crate::subpath_codec::append_outlines(&meta, &rest);
         }
         id
     }

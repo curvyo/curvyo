@@ -447,48 +447,24 @@ fn ac35_scale_then_rotate_ring_centre_is_still_not_painted() {
 }
 
 // ---- 38 / 38a Node tool ------------------------------------------------------------
+// Criteria 38 and 38a are withdrawn by `specs/0055-compound-path-node-editing` (criterion 1): the
+// Node tool edits the nodes of a compound path like those of any path. The three tests below
+// check the amended behaviour.
 
 #[test]
-fn ac38_node_tool_shows_no_node_handle_or_segment_for_a_compound_path_alone() {
+fn ac38_node_tool_shows_the_nodes_of_a_compound_path_alone() {
     let (d, _) = ring_document(false);
     let mut s = open(&d);
     click(&mut s, pt(7.0, 20.0));
     s.set_tool(Tool::Node);
-    let list_node = s.draw_list();
-    let mut s_sel = open(&d);
-    click(&mut s_sel, pt(7.0, 20.0));
-    // Same artwork; the Node tool adds nothing about the nodes of this path.
-    let a = list_node.triangle_count();
-    let b = s_sel.draw_list().triangle_count();
-    // Node tool decorations for a path with nodes would add squares at 8 anchors.
-    println!("node tool triangles {a}, select tool triangles {b} (selection box adds some)");
-    let before = s.pack("0.1.0").unwrap();
-    for corner in [
-        pt(0.0, 0.0),
-        pt(40.0, 0.0),
-        pt(15.0, 15.0),
-        pt(25.0, 25.0),
-        pt(20.0, 0.0),
-    ] {
-        click(&mut s, corner);
-        let st = s.node_toolbar_state();
-        assert!(!st.can_delete && !st.can_insert && !st.can_join && !st.can_split);
-        assert!(!st.can_convert_to_corner && !st.can_make_line && !st.can_make_curve);
-    }
-    s.delete_selected();
-    s.join_selected();
-    s.split_selected();
-    assert_eq!(
-        unpack(5, &s.pack("0.1.0").unwrap())
-            .unwrap()
-            .export_json()
-            .unwrap(),
-        unpack(5, &before).unwrap().export_json().unwrap()
-    );
+    click(&mut s, pt(0.0, 0.0));
+    let st = s.node_toolbar_state();
+    assert!(st.can_delete && st.can_convert_to_corner, "{st:?}");
+    assert_eq!(st.total_nodes, 8);
 }
 
 #[test]
-fn ac38_double_click_with_the_select_tool_does_not_change_the_tool_and_changes_nothing() {
+fn ac38_double_click_with_the_select_tool_enters_the_node_tool_and_changes_nothing() {
     let (d, _) = ring_document(false);
     let mut s = open(&d);
     let at = pt(7.0, 20.0);
@@ -496,31 +472,16 @@ fn ac38_double_click_with_the_select_tool_does_not_change_the_tool_and_changes_n
     let before = s.pack("0.1.0").unwrap();
     s.pointer_hover(at, false, false);
     let _ = s.double_click(at, false, false);
-    assert_eq!(s.tool(), Tool::Select);
+    assert_eq!(s.tool(), Tool::Node);
     let after = s.pack("0.1.0").unwrap();
     assert_eq!(
         unpack(5, &after).unwrap().export_json().unwrap(),
         unpack(5, &before).unwrap().export_json().unwrap()
     );
-    // Also an unselected double-click (first press selects).
-    let mut s = open(&d);
-    s.pointer_hover(at, false, false);
-    s.pointer_down(at, false);
-    s.pointer_up(at, false, false);
-    let _ = s.double_click(at, false, false);
-    assert_eq!(s.tool(), Tool::Select);
-    // And a double click on the stroke of the hole.
-    let mut s = open(&d);
-    let on_hole = pt(15.0, 20.0);
-    s.pointer_hover(on_hole, false, false);
-    s.pointer_down(on_hole, false);
-    s.pointer_up(on_hole, false, false);
-    let _ = s.double_click(on_hole, false, false);
-    assert_eq!(s.tool(), Tool::Select);
 }
 
 #[test]
-fn ac38a_compound_plus_ordinary_path_in_the_node_tool_only_the_ordinary_one_has_nodes() {
+fn ac38a_compound_plus_ordinary_path_in_the_node_tool_both_have_nodes() {
     let d = Document::new(1);
     let seed = d.create_rect(RectBounds {
         origin: pt(900.0, 900.0),
@@ -546,7 +507,6 @@ fn ac38a_compound_plus_ordinary_path_in_the_node_tool_only_the_ordinary_one_has_
         ],
         false,
     );
-    let _ = (ring, ordinary);
     let mut s = open(&d);
     // Select both in the Select tool (click ring, shift-click the open path edge).
     click(&mut s, pt(20.0, 0.0));
@@ -555,8 +515,7 @@ fn ac38a_compound_plus_ordinary_path_in_the_node_tool_only_the_ordinary_one_has_
     s.pointer_up(pt(120.0, 100.0), true, false);
     assert_eq!(s.selected_object_count(), 2);
     s.set_tool(Tool::Node);
-    let before = s.pack("0.1.0").unwrap();
-    // Select all nodes (Ctrl+A) then Delete: only the ordinary path's nodes go.
+    // Select all nodes (Ctrl+A) then Delete: every node of both objects goes.
     fn key(k: &str, ctrl: bool) -> curvyo_editor_wasm::KeyInput<'_> {
         curvyo_editor_wasm::KeyInput {
             key: k,
@@ -570,20 +529,10 @@ fn ac38a_compound_plus_ordinary_path_in_the_node_tool_only_the_ordinary_one_has_
         }
     }
     let _ = s.key_down(key("a", true));
+    assert_eq!(s.node_toolbar_state().selected_nodes, 11);
     s.delete_selected();
     let ps = paths(&s);
-    let comp: Vec<_> = ps.iter().filter(|p| p.is_compound()).collect();
-    assert_eq!(
-        comp.len(),
-        1,
-        "the compound path was deleted through the Node tool"
-    );
-    assert_eq!(
-        comp[0].all_anchors().count(),
-        8,
-        "a node of the compound path was deleted"
-    );
-    let _ = before;
+    assert!(ps.iter().all(|p| p.id != ring && p.id != ordinary));
 }
 
 #[test]

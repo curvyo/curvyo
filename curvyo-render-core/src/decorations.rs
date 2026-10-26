@@ -138,7 +138,7 @@ pub fn build(paths: &[PathSnapshot], view: ViewTransform, input: &DecorationInpu
     let sets = NodeSets::of(input);
     for draw_selected in [false, true] {
         for path in drawn_paths {
-            for anchor in &path.anchors {
+            for anchor in path.all_anchors() {
                 let selected = sets.is_node_selected(path.id, anchor.id);
                 if selected == draw_selected {
                     let handles = sets.shows_handles(path.id, anchor.id);
@@ -303,8 +303,8 @@ fn hovered_segment_band(
         return None;
     }
     let snapshot = paths.iter().find(|p| p.id == path)?;
-    let start_anchor = snapshot.anchors.iter().find(|a| a.id == start)?;
-    let end_anchor = snapshot.anchors.iter().find(|a| a.id == end)?;
+    let start_anchor = snapshot.anchor(start)?;
+    let end_anchor = snapshot.anchor(end)?;
     Some(crate::stroke::segment_band(
         start_anchor.point,
         start_anchor.handle_out,
@@ -331,8 +331,8 @@ fn selected_segment_overlay(
 ) -> Option<DrawList> {
     let (path, start, end) = selected_segment?;
     let snapshot = paths.iter().find(|p| p.id == path)?;
-    let start_anchor = snapshot.anchors.iter().find(|a| a.id == start)?;
-    let end_anchor = snapshot.anchors.iter().find(|a| a.id == end)?;
+    let start_anchor = snapshot.anchor(start)?;
+    let end_anchor = snapshot.anchor(end)?;
     let min_width_mm = screen_px_to_mm(view, theme::MIN_DISPLAY_STROKE_WIDTH_PX);
     let overlay_width = snapshot.style.stroke.width.as_mm().max(min_width_mm)
         + screen_px_to_mm(view, theme::SEGMENT_OVERLAY_EXTRA_PX);

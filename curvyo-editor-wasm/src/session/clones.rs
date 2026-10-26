@@ -395,8 +395,8 @@ impl Session {
         text
     }
 
-    /// Whether the Node tool's selection is one clone, or clones and compound paths only: the
-    /// Node bar then holds the sentence that a clone has no nodes (criterion 26).
+    /// Whether the Node tool's selection is linked clones only: the Node bar then holds the
+    /// sentence that a clone has no nodes (criterion 26).
     #[must_use]
     pub fn node_selection_is_clones(&self) -> bool {
         let read = self.object_read();
@@ -406,13 +406,12 @@ impl Session {
             .iter()
             .filter_map(|id| read.get(*id))
             .collect();
-        held.iter()
-            .any(|object| matches!(object, ObjectSnapshot::Clone(_)))
-            && held.iter().all(|object| match object {
-                ObjectSnapshot::Clone(_) => true,
-                ObjectSnapshot::Path(path) => path.is_compound(),
-                ObjectSnapshot::Primitive(_) | ObjectSnapshot::Text(_) => false,
-            })
+        // A compound path has nodes since `specs/0055-compound-path-node-editing`, so the clone
+        // sentence stands only for a selection of clones alone.
+        !held.is_empty()
+            && held
+                .iter()
+                .all(|object| matches!(object, ObjectSnapshot::Clone(_)))
     }
 }
 

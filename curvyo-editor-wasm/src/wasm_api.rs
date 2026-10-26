@@ -267,7 +267,7 @@ impl WasmSession {
     /// (`specs/0004-canvas-navigation-and-selection/adrs.md`). Returns
     /// the code of the hint the host should show: `"edit_hint"` (a double-click on a
     /// primitive's outline, body or centre handle: nothing else changes),
-    /// `"compound_path"` (on a compound path: its nodes cannot be edited yet) or `""`.
+    /// `"offset_chip"`, `"clone"` (on a linked clone: it has no nodes) or `""`.
     pub fn double_click(&mut self, x: f64, y: f64, shift: bool, ctrl: bool) -> String {
         let point = self.session.screen_to_document(x, y);
         self.session

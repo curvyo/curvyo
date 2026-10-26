@@ -38,9 +38,10 @@
 #                        ADR 0011 §6 dependency ban list. Ubuntu only, per the
 #                        ADR.
 #   performance-budgets — the performance budgets in a release build, ubuntu only: the boolean
-#                        kernel and the commands of 0035, 0036, 0048, and the linked clones of
+#                        kernel and the commands of 0035, 0036, 0048, the linked clones of
 #                        0049 (read, frame, commands, hostile sizes, the no-cycle property test),
-#                        Fracture, Flatten and Weld (0037, 0068).
+#                        Fracture, Flatten and Weld (0037, 0068), and node editing of compound
+#                        paths (0055).
 #   boolean-wasm-golden — the kernel's golden results in the wasm build, run in Node, ubuntu only.
 #   deny              — `cargo deny check`, once, over the whole workspace
 #                        (ADR 0011 §7: not matrixed — it inspects the
@@ -386,6 +387,7 @@ jobs:
           cargo test --release -p curvyo-geometry-core --test curve_intersections -- --nocapture
           cargo test --release -p curvyo-editor-wasm --test cut_interactivity -- --nocapture
           cargo test --release -p curvyo-editor-wasm --test node_marquee_interactivity -- --nocapture
+          cargo test --release -p curvyo-editor-wasm --test compound_node_editing_budget -- --nocapture
           cargo test --release -p curvyo-editor-wasm --test placement_frame_budget -- --nocapture
           cargo test --release -p curvyo-editor-wasm --test font_preview_budget -- --nocapture
 

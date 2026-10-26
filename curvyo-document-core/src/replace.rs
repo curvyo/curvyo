@@ -14,7 +14,7 @@ use crate::path_codec::{self, anchor_map_at, insert_anchors_container, leaf_exis
 use crate::path_model::{AnchorId, NewAnchor, NodeId};
 use crate::paths::tree_id_of;
 use crate::style_model::Style;
-use crate::subpath_codec::{all_anchor_lists, write_extra_subpaths};
+use crate::subpath_codec::{all_anchor_lists, append_outlines};
 
 impl Document {
     /// Replaces `operands` by one new path made of `outlines`, in **one
@@ -355,7 +355,7 @@ pub(crate) fn write_path_node(
     for anchor in &first.0 {
         push_anchor(&anchor_list, anchor);
     }
-    write_extra_subpaths(&meta, rest);
+    append_outlines(&meta, rest);
 }
 
 /// An anchor id names a node across the whole document: none of `seen`, the ids a command is

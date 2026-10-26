@@ -8,7 +8,9 @@
 
 use curvyo_document_core::{AnchorKind, ObjectSnapshot, PathSnapshot, Point};
 use curvyo_render_core::{DecorationInput, Hovered as RenderHovered};
-use curvyo_ui_core::{BendResolution, Hit, LiveNodeDrag, NodeToolbarState, segment_is_bendable};
+use curvyo_ui_core::{
+    BendResolution, Hit, LiveNodeDrag, NodeSplitOutcome, NodeToolbarState, segment_is_bendable,
+};
 
 use super::{Session, Tool};
 
@@ -55,7 +57,7 @@ impl Session {
                 // path: the artwork stays as committed (black old, `0031` criterion 16).
                 for end in bend.ends {
                     if let Some(snapshot) = paths.iter_mut().find(|p| p.id == bend.path)
-                        && let Some(anchor) = snapshot.anchors.iter_mut().find(|a| a.id == end.id)
+                        && let Some(anchor) = snapshot.all_anchors_mut().find(|a| a.id == end.id)
                     {
                         anchor.handle_in = end.handle_in;
                         anchor.handle_out = end.handle_out;
@@ -65,7 +67,7 @@ impl Session {
             LiveNodeDrag::Nodes { positions } => {
                 for (path, id, point) in positions {
                     if let Some(snapshot) = paths.iter_mut().find(|p| p.id == path)
-                        && let Some(anchor) = snapshot.anchors.iter_mut().find(|a| a.id == id)
+                        && let Some(anchor) = snapshot.all_anchors_mut().find(|a| a.id == id)
                     {
                         anchor.point = point;
                     }
@@ -84,7 +86,7 @@ impl Session {
                 // assignment, no slot/mirror logic of its own to
                 // independently drift from the commit.
                 if let Some(snapshot) = paths.iter_mut().find(|p| p.id == path)
-                    && let Some(anchor) = snapshot.anchors.iter_mut().find(|a| a.id == anchor)
+                    && let Some(anchor) = snapshot.all_anchors_mut().find(|a| a.id == anchor)
                 {
                     anchor.handle_in = handle_in;
                     anchor.handle_out = handle_out;
@@ -123,24 +125,36 @@ impl Session {
 
     /// Acceptance criteria 8-11: Join (the contextual toolbar/context
     /// menu button). A no-op outside the node tool or when the current
-    /// selection does not qualify.
-    pub fn join_selected(&mut self) {
+    /// selection does not qualify. Returns how many outlines moved into the surviving object
+    /// besides the joined one, for the notice (`specs/0055-compound-path-node-editing` criterion
+    /// 5 c), or `None` when nothing was joined.
+    pub fn join_selected(&mut self) -> Option<usize> {
         self.recording(|this| {
             if this.tool == Tool::Node {
-                this.node.join_selected(&this.document);
+                this.node.join_selected(&this.document)
+            } else {
+                None
             }
-        });
+        })
     }
 
     /// Acceptance criteria 12-15: Split (the contextual toolbar/context
     /// menu button). A no-op outside the node tool or when the current
-    /// selection does not qualify.
+    /// selection does not qualify. [`Session::split_selected_outcome`] also says what was split.
     pub fn split_selected(&mut self) {
+        let _ = self.split_selected_outcome();
+    }
+
+    /// [`Session::split_selected`], returning what was split, for the notice of a compound path
+    /// (`0055` criterion 6).
+    pub fn split_selected_outcome(&mut self) -> NodeSplitOutcome {
         self.recording(|this| {
             if this.tool == Tool::Node {
-                this.node.split_selected(&mut this.minter, &this.document);
+                this.node.split_selected(&mut this.minter, &this.document)
+            } else {
+                NodeSplitOutcome::None
             }
-        });
+        })
     }
 
     /// Acceptance criterion 12: a double-click (already recognized by
@@ -179,8 +193,6 @@ impl Session {
         }
         let paths = self.paths();
         let mut state = self.node.toolbar_state(&self.document, &paths);
-        state.compound_only = matches!(self.selection.ids(), [only]
-            if self.document.path(*only).is_some_and(|path| path.is_compound()));
         state.clone_only = self.node_selection_is_clones();
         state
     }

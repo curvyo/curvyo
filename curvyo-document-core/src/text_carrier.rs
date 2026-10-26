@@ -215,6 +215,32 @@ pub(crate) fn relink_copied_texts(
     }
 }
 
+/// Writes, without committing, a new outline index on every text on an outline of `path`
+/// after a node edit removed, inserted or merged outlines of it
+/// (`specs/0055-compound-path-node-editing` criteria 4 to 6): `renumber` maps the old index
+/// to the new one, so the text stays on the outline it was put on. A text whose outline was
+/// removed gets the index of the outline that took its place (read as the last outline when
+/// none did, `specs/0080-text-on-path/adrs.md` decision 1).
+pub(crate) fn renumber_carried_outlines(
+    tree: &LoroTree,
+    path: NodeId,
+    renumber: &dyn Fn(u32) -> u32,
+) {
+    for leaf in crate::group_tree::leaves_under(tree, None) {
+        let Ok(meta) = tree.get_meta(leaf) else {
+            continue;
+        };
+        let Some(mut carrier) = crate::text_path_codec::read_carrier(&meta) else {
+            continue;
+        };
+        let outline = renumber(carrier.outline);
+        if carrier.node == path && outline != carrier.outline {
+            carrier.outline = outline;
+            crate::text_path_codec::write_carrier(&meta, carrier);
+        }
+    }
+}
+
 impl Document {
     /// Writes, without committing, the kept copy of its carrier's outline on every live text
     /// outside `removed` whose carrier is in it (`specs/0080-text-on-path` criterion 25, Frage 36

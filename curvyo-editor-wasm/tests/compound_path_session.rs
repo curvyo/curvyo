@@ -1,7 +1,7 @@
 //! A compound path in the editor session (`specs/0016-boolean-operations`
-//! criteria 38, 38a): the Node tool shows no node, handle or segment of it,
-//! cannot select, join, split or delete its nodes, and an ordinary path in the
-//! same document is node-editable as before.
+//! criteria 38, 38a, withdrawn by `specs/0055-compound-path-node-editing`
+//! criterion 1): the Node tool edits its nodes, a double-click enters the Node
+//! tool, and an ordinary path in the same document is node-editable as before.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
@@ -77,22 +77,25 @@ fn click(session: &mut Session, at: Point) {
     session.pointer_up(at, false, false);
 }
 
-/// The ring's corners are not nodes in the Node tool: a click selects nothing,
-/// and Join, Split, convert and delete change nothing.
+/// The ring's corners are nodes in the Node tool: a click selects one, and Split opens its outline
+/// in place, the ring staying one object (`0055` criteria 1 and 6).
 #[test]
-fn the_node_tool_cannot_touch_the_nodes_of_a_compound_path() {
+fn the_node_tool_edits_the_nodes_of_a_compound_path() {
     let mut session = session();
     session.set_tool(Tool::Node);
-    let before = json(&session);
-    for corner in [pt(0.0, 0.0), pt(40.0, 40.0), pt(10.0, 30.0), pt(30.0, 10.0)] {
-        click(&mut session, corner);
-        let state = session.node_toolbar_state();
-        assert!(!state.can_join && !state.can_split, "{corner:?}");
-        session.join_selected();
-        session.split_selected();
-        session.delete_selected();
-    }
-    assert_eq!(json(&session), before, "nothing changed");
+    click(&mut session, pt(0.0, 0.0));
+    let state = session.node_toolbar_state();
+    assert!(state.can_split && state.can_delete, "{state:?}");
+    session.split_selected();
+    let document = unpack(3, &session.pack("0.1.0").unwrap()).unwrap();
+    let ring = document
+        .object_ids()
+        .into_iter()
+        .filter_map(|id| document.path(id))
+        .find(curvyo_document_core::PathSnapshot::is_compound)
+        .expect("still a compound path");
+    assert!(!ring.closed, "the outer outline was opened");
+    assert!(ring.extra_subpaths[0].closed, "the hole is unchanged");
 }
 
 /// The ordinary path in the same document is node-editable as before.
@@ -108,14 +111,14 @@ fn an_ordinary_path_next_to_a_compound_one_is_still_node_editable() {
     assert_ne!(json(&session), before);
 }
 
-/// Criterion 38: the compound path stays in the Select tool on a double-click.
+/// `0055` criterion 1: a double-click on a compound path enters the Node tool.
 #[test]
-fn a_double_click_on_a_compound_path_does_not_enter_the_node_tool() {
+fn a_double_click_on_a_compound_path_enters_the_node_tool() {
     let mut session = session();
     session.set_tool(Tool::Select);
     let at = pt(10.0, 15.0);
     click(&mut session, at);
     let hint = session.double_click(at, false, false);
     assert!(!hint, "the edit hint is for primitives");
-    assert_eq!(session.tool(), Tool::Select, "the tool does not change");
+    assert_eq!(session.tool(), Tool::Node);
 }

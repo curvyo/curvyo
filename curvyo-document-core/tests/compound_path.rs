@@ -709,9 +709,10 @@ fn delete_and_style_edits_work_on_a_compound_path() {
     assert!(document.object(node).is_none());
 }
 
-/// Criterion 38a: Join and Split refuse a compound path, and check_* say so.
+/// Criterion 38a as amended by `specs/0055-compound-path-node-editing` (criteria 5 and 6): the
+/// ring's outlines are closed, so Join is refused; Split opens a closed outline.
 #[test]
-fn join_and_split_refuse_a_compound_path() {
+fn join_refuses_closed_outlines_and_split_opens_one() {
     let document = Document::new(1);
     let node = ring(&document);
     let other = document.create_path(
@@ -734,13 +735,15 @@ fn join_and_split_refuse_a_compound_path() {
         document.join_endpoints(node, first, other, id(900)),
         Err(PathEditError::NotJoinable)
     );
-    assert!(!document.check_split(node, first));
-    assert!(!document.check_split(node, extra));
-    assert_eq!(
-        document.split_at_anchor(node, first, id(950)),
-        Err(PathEditError::NotSplittable)
-    );
     assert_eq!(labels(&document).len(), changes, "nothing changed");
+    assert!(document.check_split(node, first));
+    assert!(document.check_split(node, extra));
+    document.split_at_anchor(node, extra, id(950)).unwrap();
+    let after = path_of(&document, node);
+    assert!(
+        after.closed && !after.extra_subpaths[0].closed,
+        "the hole is open"
+    );
     // A kind of sanity check that an ordinary closed path can still split.
     let plain = path_with_three(&document, 40);
     assert!(document.check_split(plain, id(41)));
