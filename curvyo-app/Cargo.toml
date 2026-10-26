@@ -37,7 +37,8 @@ tauri-plugin-dialog = "2"
 # Opens a font folder's PDF in the system viewer (`specs/0083-font-info-and-zip` adrs.md decision 7,
 # plan note 2026-10-26): MIT, the crate `tauri-plugin-opener` itself calls for `open_path`, without
 # the plugin's D-Bus stack (`zbus`, flagged unmaintained by `cargo deny`). Default features only:
-# `shellexecute-on-windows` would pull `dunce` (customer, 2026-10-26); Windows uses `cmd /c start`.
+# `shellexecute-on-windows` would pull `dunce` (customer, 2026-10-26). On Windows `open` 5.4 runs PowerShell `Invoke-Item
+# -LiteralPath` (path in an env var), then `explorer.exe`; `cmd` only with its `insecure` feature.
 open = "5"
 # A fresh Loro peer id per open session (specs/0001-project-file-foundation/
 # adrs.md, amended 2026-10-03) is minted by the frontend itself now
