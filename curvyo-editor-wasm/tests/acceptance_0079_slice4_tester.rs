@@ -252,7 +252,10 @@ fn c26_two_kerning_fields_after_rotation_with_ranges_and_tracks() {
         .iter()
         .position(|f| *f == LayoutField::CharacterRotation)
         .unwrap();
-    assert_eq!(&order[rot + 1..], &[HK, VK, LayoutField::CharRotation]);
+    assert_eq!(
+        &order[rot + 1..],
+        &[LayoutField::Taper, HK, VK, LayoutField::CharRotation]
+    );
     let mut s = fresh();
     add_text(&mut s, pt(10.0, 20.0), "Kern");
     for (f, track) in [(HK, 2.5), (VK, 5.0)] {

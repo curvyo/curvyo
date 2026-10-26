@@ -179,6 +179,21 @@ first.
     pointing at the centre, radius `R − y`), the exact value is `t = −h / (2(R − h/2))`, not the
     negative of the outside formula; it exists only for `R > h/2`. `0080` should use this form.
 
+### Slice 2 build notes (2026-10-26, implementer)
+
+- Built as decided in 7 to 10, format **24** (main was at 23). `curvyo-text-core/src/taper.rs`
+  holds the map and the refit; `glyph_map.rs` splits each glyph's map into em → glyph frame,
+  taper, glyph frame → text space (origin, writing frame, turn), so the taper is always in the
+  glyph's own frame and before the turn.
+- The 0.05 clamp is handled by splitting every line and curve where `s` reaches 0.05; a clamped
+  piece is mapped by one scale (affine), so `break_cusp` is never needed.
+- Text on path (`0080`) takes each glyph from `TextLayout::glyph_in_line` (tapered and turned in
+  line space) and puts it on its rigid carrier frame; the circle values of decision 10 are pinned
+  by `curvyo-ui-core/tests/text_taper.rs` (the H's stems pass through the circle's centre, both
+  sides of the ring).
+- Customer decision 2026-10-25: the control is a field of the text layout block (after Character
+  rotation), not of the Text bar; nothing of decision 7 to 10 changes.
+
 ## Slice 3 (vertical): what needs deciding before the build
 
 11. **No ADR expected, a spike first** (`spike/text-vertical`, never merged), result as a dated

@@ -81,7 +81,7 @@ fn ac33_the_next_text_takes_the_alignment() {
 fn ac06_ac12_drag_preview_commit_and_cancel() {
     let mut session = with_text("HH");
     let block = session.text_layout_block().unwrap();
-    assert_eq!(block.len(), 7);
+    assert_eq!(block.len(), 8);
     assert_eq!(block[0].text, "0");
     let steps = labels(&session).len();
     let drawn = |session: &Session| {
@@ -230,6 +230,7 @@ fn ac35_object_to_path_matches_the_drawing() {
     session.set_text_alignment(TextAlign::Centre);
     session.set_text_layout_text(LayoutField::LetterSpacing, "1");
     session.set_text_layout_text(LayoutField::CharacterRotation, "20");
+    session.set_text_layout_text(LayoutField::Taper, "20");
     let drawn = only_text(&session).outline.unwrap().glyphs.clone();
     session.set_tool(Tool::Select);
     let _ = session.object_to_path();
@@ -260,4 +261,33 @@ fn ac35_object_to_path_matches_the_drawing() {
     for (a, b) in points.iter().zip(&expected) {
         assert!((a.x - b.x).abs() < 0.01 && (a.y - b.y).abs() < 0.01);
     }
+}
+
+/// Criterion 16: the Taper field reads and writes percent in one step "Change taper"; a value
+/// beyond 50 % is set to 50 % and reported; the reset returns to 0 %; the drawing changes.
+#[test]
+fn ac16_taper_in_one_step() {
+    let mut session = with_text("Ring");
+    let before = only_text(&session).outline.unwrap().glyphs.clone();
+    assert_eq!(session.text_layout_block().unwrap()[4].text, "0");
+    assert_eq!(
+        session.set_text_layout_text(LayoutField::Taper, "20 %"),
+        LayoutOutcome::Set
+    );
+    assert_eq!(labels(&session).last().unwrap(), "change_taper");
+    assert!((only_text(&session).layout.taper - 0.2).abs() < 1e-12);
+    assert_ne!(only_text(&session).outline.unwrap().glyphs, before);
+    assert_eq!(
+        session.set_text_layout_text(LayoutField::Taper, "80"),
+        LayoutOutcome::Clamped(true, 50.0)
+    );
+    assert_eq!(session.text_layout_block().unwrap()[4].text, "50");
+    session.step_text_layout(LayoutField::Taper, -1, Grid::Coarse);
+    assert_eq!(session.commit_text_layout_preview(), LayoutOutcome::Set);
+    assert!((only_text(&session).layout.taper - 0.4).abs() < 1e-12);
+    assert_eq!(
+        session.reset_text_layout(LayoutField::Taper),
+        LayoutOutcome::Set
+    );
+    assert!(only_text(&session).layout.taper.abs() < 1e-12);
 }

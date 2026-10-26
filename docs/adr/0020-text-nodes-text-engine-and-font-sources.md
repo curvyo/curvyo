@@ -195,6 +195,12 @@ budget for the text engine 1.3 MiB uncompressed). Details in `specs/0074-text-ob
   SL-WASM: the wasm budget for the text engine is raised from 1.4 MiB to **2 MiB** uncompressed
   (`docs/technical-debt.md`).
 
+- 2026-10-26, text layout controls slice 2 (`specs/0079-text-layout-controls/adrs.md` decisions
+  7 to 10): §1 one more optional register, `text_taper` (a fraction, −0.5 to 0.5, absent 0);
+  `format_version` 24. §2 `LayoutOptions.taper` maps every glyph in its own frame before the turn;
+  horizontal and vertical lines stay lines, other segments are refitted with `kurbo`'s curve
+  fitter within 0.01 mm (no new dependency).
+
 - 2026-10-24, text layout controls slice 3 (`specs/0079-text-layout-controls/adrs.md` decisions
   11 to 13 and the spike note): §1 two more optional registers, `text_writing_mode` and
   `text_glyph_orientation`; `format_version` 20. §2 `layout` lays every line out in line space

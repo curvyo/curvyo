@@ -11,8 +11,9 @@ each side, 12px + 1px divider + 12px = 25px between groups, 4px inside a group.
    the second line at 800 x 600 needs 196 + 25 + 28 + 25 + 28 + 25 + 28 =
    355px in a 308px inner width, so the expand button wraps to a third line and
    criteria 18 and 20 fail. Row 1 becomes: Font, Size, Alignment, Style, On
-   path, expand. Row 2: Writing mode, Glyph orientation, Taper, **Glyphs**,
-   then the On path options of `0080`. Glyphs opens a pane and sets no value,
+   path, expand. Row 2: Writing mode, Glyph orientation, **Glyphs**, then the
+   On path options of `0080` (the Taper left row 2 for the Fonts tab's text
+   layout block, customer 2026-10-25). Glyphs opens a pane and sets no value,
    so it is rare in the sense of this story. If the customer keeps Glyphs on
    row 1, the bar is 3 lines closed at 800 x 600 once On path ships (2 until
    then).
@@ -84,11 +85,11 @@ each side, 12px + 1px divider + 12px = 25px between groups, 4px inside a group.
   apart from the chevron in both themes. Accent on `--toolbar-bg` is 3.3:1
   (non-text minimum 3:1). It appears and disappears at once: no pulse, no
   fade. It counts values only (writing mode, glyph orientation while vertical,
-  Taper, later the On path options). Glyphs being open does not count. With no
+  the On path options). Glyphs being open does not count. With no
   text (Text tool before the first text) it reflects the settings the next
   text gets.
 - **Tooltip:** "More text options" or "Fewer text options"; while the dot
-  shows, a second line "Changed: Writing mode, Taper", the same text as the
+  shows, a second line "Changed: Writing mode, On path", the same text as the
   accessible description (`aria-describedby`). It names a state, so it is a
   label, not a hint.
 
@@ -104,7 +105,7 @@ a growing row would move what overlaps the canvas while the pointer is on it.
 - **Text bar, row 2 closed:** Font, Size, Alignment (one stop, arrows inside),
   Style weight (one stop), Italic, On path, expand, then out of the bar.
 - **Row 2 open:** ... expand, Writing mode (one stop), Glyph orientation (one
-  stop; greyed buttons stay reachable as today), Taper, Glyphs, On path
+  stop; greyed buttons stay reachable as today), Glyphs, On path
   options, then out. Shift+Tab runs the same list backwards.
 - **Select bar:** its order with the row 1 text controls in place, then Object
   to path, Linked clone, then row 2 last, matching what is seen. Tab from the
@@ -118,6 +119,10 @@ a growing row would move what overlaps the canvas while the pointer is on it.
 - No shortcut (spec, out of scope). Shift+Ctrl+T stays on the Font button.
 
 ## 6. Fit tables
+
+*Dated note 2026-10-25: the Taper is no longer a bar control (customer, `0079`
+criterion 16); the tables below keep the build measurement with its stand-in.
+Without it, line 4 of the open Text bar at 800 x 600 is Glyphs alone (28px).*
 
 Inner width = overlay row less 16px. 800 x 600 with the panel open and the
 second rail column: 324px row, **308px** inner. 1280 x 800, panel open: about

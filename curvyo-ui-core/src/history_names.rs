@@ -29,6 +29,7 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     ("change_character_rotation", "Change character rotation"),
     ("change_writing_mode", "Change writing mode"),
     ("change_glyph_orientation", "Change glyph orientation"),
+    ("change_taper", "Change taper"),
     ("change_kerning", "Change kerning"),
     ("put_text_on_path", "Put text on path"),
     ("put_text_on_paths", "Put text on paths"),

@@ -1,6 +1,7 @@
 // The words and keys of the text layout controls (`specs/0079-text-layout-controls` criteria 1,
-// 7, 10, 13, 26, 27b, 27c, 29; UX notes §1, §6 and §10.3): the Alignment group, the seven fields
-// of the text layout block, the "All characters" buttons and the kerning keys. No React, so node tests can check them; every value comes from the session.
+// 6, 7, 10, 13, 16, 26, 27b, 27c, 29; UX notes §1, §6, §10.1 and §10.3): the Alignment group, the
+// eight fields of the text layout block, its fold, the "All characters" buttons and the kerning
+// keys. No React, so node tests can check them; every value comes from the session.
 
 import { TEXT_LAYOUT_FIELD_NAMES } from "./sliderNames.ts";
 
@@ -56,6 +57,7 @@ export const LAYOUT_FIELDS = [
   "word-spacing",
   "line-spacing",
   "character-rotation",
+  "taper",
   "horizontal-kerning",
   "vertical-kerning",
   "char-rotation",
@@ -68,6 +70,7 @@ export const LAYOUT_FIELD_LABELS: Record<LayoutFieldCode, string> = {
   "word-spacing": TEXT_LAYOUT_FIELD_NAMES.wordSpacing,
   "line-spacing": TEXT_LAYOUT_FIELD_NAMES.lineSpacing,
   "character-rotation": TEXT_LAYOUT_FIELD_NAMES.characterRotation,
+  taper: TEXT_LAYOUT_FIELD_NAMES.taper,
   "horizontal-kerning": TEXT_LAYOUT_FIELD_NAMES.horizontalKerning,
   "vertical-kerning": TEXT_LAYOUT_FIELD_NAMES.verticalKerning,
   "char-rotation": TEXT_LAYOUT_FIELD_NAMES.charRotation,
@@ -81,6 +84,11 @@ function perCharacter(code: LayoutFieldCode): boolean {
 /** The fields in degrees. */
 function inDegrees(code: LayoutFieldCode): boolean {
   return code === "character-rotation" || code === "char-rotation";
+}
+
+/** The field in percent (criterion 16). */
+function inPercent(code: LayoutFieldCode): boolean {
+  return code === "taper";
 }
 
 /** The fields with an "All characters" button beside them (criterion 27c). */
@@ -120,7 +128,7 @@ export interface LayoutFieldState {
   resettable: boolean;
 }
 
-/** The block's seven fields, or `null` when it is not shown (no text selected or edited). */
+/** The block's eight fields, or `null` when it is not shown (no text selected or edited). */
 export function parseLayoutBlock(json: string): LayoutFieldState[] | null {
   try {
     const parsed = JSON.parse(json) as LayoutFieldState[] | null;
@@ -130,20 +138,29 @@ export function parseLayoutBlock(json: string): LayoutFieldState[] | null {
   }
 }
 
-/** The field's unit as drawn: mm, or the degree sign. */
+/** The field's unit as drawn: mm, the degree sign, or "%". */
 export function layoutUnit(field: LayoutFieldCode): string {
+  if (inPercent(field)) {
+    return "%";
+  }
   return inDegrees(field) ? "°" : "mm";
 }
 
 /** The unit spelled out for `aria-valuetext`. */
 export function layoutUnitWords(field: LayoutFieldCode): string {
+  if (inPercent(field)) {
+    return "percent";
+  }
   return inDegrees(field) ? "degrees" : "millimetres";
 }
 
-/** The reset target as text ("0 mm", "Auto", "0°"). */
+/** The reset target as text ("0 mm", "Auto", "0°", "0 %"). */
 export function layoutDefaultText(field: LayoutFieldCode): string {
   if (field === "line-spacing") {
     return "Auto";
+  }
+  if (inPercent(field)) {
+    return "0 %";
   }
   return inDegrees(field) ? "0°" : "0 mm";
 }
@@ -158,10 +175,13 @@ export function layoutValueText(field: LayoutFieldCode, state: LayoutFieldState)
   return state.auto ? `${words}, automatic` : words;
 }
 
-/** The tooltip's value: "1.5 mm", "12.4 mm (Auto)", "−12°", "Mixed". */
+/** The tooltip's value: "1.5 mm", "12.4 mm (Auto)", "−12°", "20 %", "Mixed". */
 export function layoutTipValue(field: LayoutFieldCode, state: LayoutFieldState): string {
   if (state.mixed) {
     return "Mixed";
+  }
+  if (inPercent(field)) {
+    return `${state.text} %`;
   }
   if (inDegrees(field)) {
     return `${state.text}°`;
@@ -184,6 +204,19 @@ function mmText(mm: number): string {
 /** The notice under the field, or `null` (criterion 7, UX notes §0.4); at most 70 characters. */
 export function layoutNotice(field: LayoutFieldCode, outcome: LayoutOutcome): string | null {
   const name = LAYOUT_FIELD_LABELS[field];
+  if (inPercent(field)) {
+    // One range for every text (criterion 16): "Taper set to 50 %, the largest taper."
+    const percent = `${mmText(outcome.mm ?? 0)} %`;
+    if (outcome.kind === "max") {
+      return `${name} set to ${percent}, the largest taper.`;
+    }
+    if (outcome.kind === "min") {
+      return `${name} set to ${percent}, the smallest taper.`;
+    }
+    return outcome.kind === "limited"
+      ? `${name} limited on ${outcome.limited ?? 0} of ${outcome.of ?? 0} texts.`
+      : null;
+  }
   const value = `${mmText(outcome.mm ?? 0)}${inDegrees(field) ? "°" : " mm"}`;
   switch (outcome.kind) {
     case "max":
@@ -242,4 +275,58 @@ export function parseLayoutOutcome(json: string): LayoutOutcome {
   } catch {
     return { kind: "unchanged" };
   }
+}
+
+/** The storage key of the block's fold; the value is the JSON boolean `true` while it is open. */
+export const TEXT_LAYOUT_OPEN_KEY = "curvyo.text-layout-open";
+
+/** The part of `Storage` the fold uses, so a test can hand in a fake. */
+export interface FoldStorage {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+}
+
+/** The webview's `localStorage`, or `undefined` when even reaching it throws. */
+function defaultStorage(): FoldStorage | undefined {
+  try {
+    return window.localStorage;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Whether the block was open when the maker last folded it; a new user starts closed
+ * (customer decision 2026-10-25). Anything unreadable means closed. */
+export function readLayoutOpen(storage: FoldStorage | undefined = defaultStorage()): boolean {
+  try {
+    return storage?.getItem(TEXT_LAYOUT_OPEN_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+/** Remembers whether the block is open. A failing write is ignored. */
+export function writeLayoutOpen(open: boolean, storage: FoldStorage | undefined = defaultStorage()): void {
+  try {
+    storage?.setItem(TEXT_LAYOUT_OPEN_KEY, JSON.stringify(open));
+  } catch {
+    /* Not kept; the next start shows the block closed. */
+  }
+}
+
+/** The fields whose value differs from the default (or is Mixed), in block order: what the
+ * folded header's dot stands for ("Changed: Letter spacing, Taper"). */
+export function changedLayoutFields(fields: readonly LayoutFieldState[]): string[] {
+  return LAYOUT_FIELDS.filter((_, index) => fields[index]?.resettable).map(
+    (code) => LAYOUT_FIELD_LABELS[code],
+  );
+}
+
+/** The header's description while it is folded and a value is changed, else `null`. */
+export function foldChangedText(open: boolean, fields: readonly LayoutFieldState[]): string | null {
+  if (open) {
+    return null;
+  }
+  const changed = changedLayoutFields(fields);
+  return changed.length > 0 ? `Changed: ${changed.join(", ")}` : null;
 }

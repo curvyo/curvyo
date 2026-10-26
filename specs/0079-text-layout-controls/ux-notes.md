@@ -104,9 +104,33 @@ Top to bottom inside the Fonts tab:
   than the 8px inside it, separates the selected text's settings from the
   font library without a rule; it goes with the block.
 - No section title, no fold, no "Layout" caption: the four labels name
-  everything.
+  everything. *Superseded 2026-10-25 by the customer: the block folds under a
+  "Text layout" header (§3.1).*
 - **Tab order** in the tab: Letter spacing, Word spacing, Line spacing,
   Character rotation, then the tag strip, search field, list.
+
+### 3.1 The fold (criterion 6b, customer decision 2026-10-25)
+
+- First row of the block: a 28px disclosure button across the content width,
+  the look of "All formats" in the Document tab (`ChevronRight` 12px folded,
+  `ChevronDown` open, 4px, "Text layout" 14px `--toolbar-icon`, hover
+  `--editor-accent-hover`, focus-visible 2px `--editor-accent` ring),
+  `aria-expanded`, `aria-controls` the fields. Enter and Space toggle; a
+  mouse press returns focus to the canvas (or the edit sink), a key press
+  keeps it on the header.
+- **Folded by default**; the state is one per-user preference in the
+  webview's storage (`curvyo.text-layout-open`, JSON `true` while open),
+  every access guarded, unreadable means folded, as `curvyo.text-bar-row2`
+  of `0084`.
+- While folded and any field would show its reset slot (a value not at its
+  default, or Mixed), a 6px `--editor-accent` dot after the label, the dot
+  of the Text bar's expand button; the header's description (hidden text,
+  `aria-describedby`) reads "Changed: Letter spacing, Taper", the changed
+  fields in block order. Open, or every value at default: no dot.
+- Folded, the block is the header and the 12px below it: 40px. Open, the
+  header adds 28 + 8px above the fields.
+- The fields keep their Tab order after the header when open; folded, the
+  header is the block's only Tab stop.
 
 ## 4. Fit of the Fonts tab (criterion 6a)
 
@@ -208,13 +232,18 @@ texts Mixed; Line spacing Auto and set.
 
 ### 10.1 Slice 2: Taper (criterion 16)
 
-- "Bar number field" like the Select bar Curve field: 99px, "Taper" inside
-  left, "%" inside right, one decimal trimmed, Mixed placeholder; a group of
-  its own after Alignment with the usual divider. No glyph.
-- Text bar 810px: at 1280 x 800 (about 804px) it wraps to two rows unless the
-  measured overlay row is wider; the wrap is accepted (whole groups), the
-  controls are not narrowed. At 800 x 600 Taper shares the Alignment row
-  (124 + 25 + 99 = 248px): still 3 rows.
+*Revised 2026-10-25 (customer): the Taper is a field of the block, not of the
+Text bar.*
+
+- A "Value field" (244 x 28) like Character rotation, directly below it in
+  the Turn group (4px apart): label "Taper", unit "%", a signed bar from the
+  zero mark in the middle of the track (−50 % to 50 %), the value with one
+  decimal trimmed, reset slot to 0 %, Mixed placeholder. No "All characters"
+  button.
+- The Turn group grows by 32px (28 + 4); the open block with all slices'
+  fields is about 228px plus the header row (§3.1).
+- The Text bar is unchanged by this slice (`0084` row 2 holds Writing mode,
+  Glyph orientation, Glyphs and the on-path options).
 
 ### 10.2 Slice 3: Writing mode and Glyph orientation (criteria 20, 21)
 
