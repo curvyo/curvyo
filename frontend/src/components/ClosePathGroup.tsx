@@ -2,6 +2,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { useActionNotice } from "@/hooks/useActionNotice";
 import {
   CLOSE_BUTTONS,
+  closeDimmed,
   closeNoticeMs,
   closeNoticeText,
   closeTooltipNote,
@@ -24,8 +25,9 @@ interface ClosePathGroupProps {
  * The Close path group at the end of the Node bar (`docs/design-system.md`, row "Close path
  * group"; `specs/0034-pen-path-extension/` criteria 18 to 21): a label and two text buttons,
  * Sharp and Smooth. Commands, not toggles. Dimmed (`aria-disabled`, still focusable, inert, the
- * tooltip says why) when the editing set holds no open path with three or more nodes. The notice
- * of the last press sits 4 px below the pressed button, right-aligned to the group.
+ * tooltip says why) when the editing set holds no open path or open outline of a compound path
+ * with three or more nodes (`0055` criterion 7). The notice of the last press sits 4 px below the
+ * pressed button, right-aligned to the group.
  */
 export function ClosePathGroup({
   state,
@@ -34,7 +36,7 @@ export function ClosePathGroup({
   tool,
   selectionCount,
 }: ClosePathGroupProps) {
-  const dimmed = state.closable === 0;
+  const dimmed = closeDimmed(state);
   const { notice, show } = useActionNotice(tool, selectionCount, () => {});
   return (
     <>

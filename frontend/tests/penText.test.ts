@@ -85,7 +85,7 @@ test("the Close path notice (criterion 20)", () => {
 test("the Close path tooltip note by state", () => {
   assert.equal(
     closeTooltipNote({ closable: 0, skipped: 0 }),
-    "Select an open path with 3 or more nodes.",
+    "Select an open path or outline with 3 or more nodes.",
   );
   assert.equal(closeTooltipNote({ closable: 2, skipped: 0 }), "Closes 2 open paths.");
   assert.equal(

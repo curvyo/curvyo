@@ -26,6 +26,7 @@ import type { BooleanOp, BooleanResult } from "@/lib/booleanText";
 import type { BreakApartResult, CombineResult, CutResult, SplitResult } from "@/lib/pathText";
 import type { StackCommand, StackResult } from "@/lib/stackText";
 import type { WeldResult } from "@/lib/weldText";
+import { joinNoticeText } from "@/lib/nodeText";
 import type { ClosePathResult } from "@/lib/penText";
 import { type LineCode, type SideCode, type TextPathEntry, parseTextPathEntry } from "@/lib/textPathText";
 
@@ -67,9 +68,6 @@ export interface NodeToolbarState {
   canJoin: boolean;
   /** Split (acceptance criterion 12). */
   canSplit: boolean;
-  /** The only selected object is a compound path: the bar says its nodes
-   * cannot be edited yet (`0016-boolean-operations` criterion 38). */
-  compoundOnly: boolean;
   cloneOnly: boolean;
   /** Why Join is disabled (`0053` criterion 19): 0 enabled, 1 count, 2 not end nodes, 3 other. */
   joinBlock: number;
@@ -91,7 +89,6 @@ const EMPTY_TOOLBAR_STATE: NodeToolbarState = {
   canMakeCurve: false,
   canJoin: false,
   canSplit: false,
-  compoundOnly: false,
   cloneOnly: false,
   joinBlock: 0,
   joinNotEnd: 0,
@@ -261,7 +258,6 @@ function readToolbarState(raw: {
   can_make_curve: boolean;
   can_join: boolean;
   can_split: boolean;
-  compound_only: boolean;
   clone_only: boolean;
   join_block: number;
   join_not_end: number;
@@ -280,7 +276,6 @@ function readToolbarState(raw: {
     canMakeCurve: raw.can_make_curve,
     canJoin: raw.can_join,
     canSplit: raw.can_split,
-    compoundOnly: raw.compound_only,
     cloneOnly: raw.clone_only,
     joinBlock: raw.join_block,
     joinNotEnd: raw.join_not_end,
@@ -760,11 +755,14 @@ export interface EditorSession {
   makeCurve: () => void;
   /** Join: merges the two selected endpoint nodes into one (acceptance
    * criteria 8-11). No keyboard shortcut (specification.md's "Out of
-   * scope"). */
-  joinSelected: () => void;
+   * scope"). Returns how many outlines moved into the surviving object
+   * besides the joined one (`0055` criterion 5 c), for the notice. */
+  joinSelected: () => number;
   /** Split: breaks a path apart at the one selected node (acceptance
-   * criteria 12-15). No keyboard shortcut, same reasoning as Join. */
-  splitSelected: () => void;
+   * criteria 12-15). No keyboard shortcut, same reasoning as Join. Returns
+   * `""`, `"path"`, `"outline_in_two"` or `"outline_opened"` (`0055`
+   * criterion 6), for the notice. */
+  splitSelected: () => string;
   insertSelected: () => void;
   /** Acceptance criterion 6's "remove rounding" action. */
   removeCornerRounding: () => void;
@@ -1470,14 +1468,16 @@ export function useEditorSession(
     syncFromSession();
   }, [syncFromSession]);
 
-  const joinSelected = useCallback(() => {
-    sessionRef.current?.join_selected();
+  const joinSelected = useCallback((): number => {
+    const moved = sessionRef.current?.join_selected() ?? 0;
     syncFromSession();
+    return moved;
   }, [syncFromSession]);
 
-  const splitSelected = useCallback(() => {
-    sessionRef.current?.split_selected();
+  const splitSelected = useCallback((): string => {
+    const code = sessionRef.current?.split_selected() ?? "";
     syncFromSession();
+    return code;
   }, [syncFromSession]);
 
   const insertSelected = useCallback(() => {
@@ -1601,6 +1601,9 @@ export function useEditorSession(
         closed: raw.closed,
         skipped: raw.skipped,
         sameEnds: raw.same_ends,
+        closedOutlines: raw.closed_outlines,
+        skippedOutlines: raw.skipped_outlines,
+        sameEndsOutlines: raw.same_ends_outlines,
       };
       raw.free();
       return result;
@@ -2108,13 +2111,12 @@ export function useEditorSession(
         } else if (hintCode) {
           // A double-click on a primitive changes nothing; the hint says how
           // to edit it (criterion 32), on every such double-click. On a
-          // compound path it says why there are no nodes (`0016` criterion 38).
+          // linked clone it says it has no nodes (`0049` criterion 26).
           editHintCounter.current += 1;
           setEditHint({
             x: press.x,
             y: press.y,
             id: editHintCounter.current,
-            compound: hintCode === "compound_path",
             clone: hintCode === "clone",
           });
         }
@@ -2152,9 +2154,20 @@ export function useEditorSession(
           });
           return;
         }
+        const joinSeq = session.pen_join_notice_seq();
         session.pointer_up(x, y, shift, ctrl, alt);
         showOffsetOutcome();
         showTransformNotice(session);
+        // A Pen join that moved outlines into the survivor says so at the joined node, in the
+        // edit hint chip's surface (`0055` criterion 9): the Pen has no button for a notice.
+        const joinNotice =
+          session.pen_join_notice_seq() !== joinSeq
+            ? joinNoticeText(session.pen_join_moved_outlines())
+            : null;
+        if (joinNotice !== null) {
+          editHintCounter.current += 1;
+          setEditHint({ x, y, id: editHintCounter.current, lines: [joinNotice] });
+        }
       }
       setLiveReadout(null);
       setCursorHint(session.cursor_hint());

@@ -1,6 +1,8 @@
 /**
- * The words of the Node tool's count and Join reason (`specs/0053-node-marquee-selection/`
- * criteria 19 and 23). Rust sends codes and counts; the sentences are written here, once.
+ * The words of the Node tool's count, Join reason (`specs/0053-node-marquee-selection/`
+ * criteria 19 and 23) and the Join and Split notices on compound paths
+ * (`specs/0055-compound-path-node-editing/` criteria 5 and 6). Rust sends codes and counts; the
+ * sentences are written here, once.
  */
 
 /** What the node count and the Join reason read from `NodeToolbarState`. */
@@ -44,11 +46,11 @@ export function joinReasonText(state: NodeCountState): string | null {
     return null;
   }
   if (state.joinBlock === 1) {
-    return `Needs exactly two end nodes of open paths. ${nodes(state.selectedNodes)} selected.`;
+    return `Needs exactly two end nodes of open paths or outlines. ${nodes(state.selectedNodes)} selected.`;
   }
   if (state.joinBlock === 2) {
     const verb = state.joinNotEnd === 1 ? "is" : "are";
-    return `Needs end nodes of open paths. ${state.joinNotEnd} of ${state.selectedNodes} selected nodes ${verb} not an end node.`;
+    return `Needs end nodes of open paths or outlines. ${state.joinNotEnd} of ${state.selectedNodes} selected nodes ${verb} not an end node.`;
   }
   return null;
 }
@@ -64,4 +66,31 @@ export function joinReasonLines(state: NodeCountState): [string, string] | null 
   }
   const cut = text.indexOf(". ") + 1;
   return [text.slice(0, cut), text.slice(cut + 1)];
+}
+
+/**
+ * The Join notice (`0055` criterion 5 c): ends in two objects moved the other object's outlines
+ * besides the joined one into the survivor. `null` when none moved.
+ */
+export function joinNoticeText(movedOutlines: number): string | null {
+  if (movedOutlines <= 0) {
+    return null;
+  }
+  const outlines = movedOutlines === 1 ? "1 more outline" : `${movedOutlines} more outlines`;
+  return `Join: ${outlines} moved into this compound path.`;
+}
+
+/**
+ * The Split notice of a compound path (`0055` criterion 6), by the code `split_selected` returns:
+ * the result stays one object. `null` for an ordinary path or nothing split.
+ */
+export function splitNoticeText(code: string): string | null {
+  switch (code) {
+    case "outline_in_two":
+      return "Split: 1 outline became 2. They stay in this compound path.";
+    case "outline_opened":
+      return "Split: 1 closed outline was opened.";
+    default:
+      return null;
+  }
 }

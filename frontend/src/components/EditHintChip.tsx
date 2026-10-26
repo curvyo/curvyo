@@ -1,6 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
-import { COMPOUND_NODES_TEXT } from "@/lib/booleanText";
 import { CLONE_NODES_TEXT } from "@/lib/cloneText";
 import { placeReadout } from "@/lib/readoutPlacement";
 
@@ -31,9 +30,10 @@ export interface EditHint {
   y: number;
   /** Changes on every double-click, so the 3 s life restarts. */
   id: number;
-  /** The double-click was on a compound path: the chip gives the one line of
-   * `0016-boolean-operations` criterion 38 instead of the shape hint. */
-  compound?: boolean;
+  /** The chip gives these lines instead of the shape hint: the Join notice
+   * after a Pen join that moved outlines (`specs/0055-compound-path-node-
+   * editing/` criterion 9). */
+  lines?: string[];
   /** The double-click was on a linked clone: the chip says it has no nodes
    * (`specs/0049-linked-clone` criterion 26). */
   clone?: boolean;
@@ -117,8 +117,8 @@ export function EditHintChip({ hint, containerRef, polygon, onDismiss }: EditHin
     >
       {(hint.clone
         ? [CLONE_NODES_TEXT]
-        : hint.compound
-          ? [COMPOUND_NODES_TEXT]
+        : hint.lines
+          ? hint.lines
           : polygon
             ? POLYGON_LINES
             : LINES

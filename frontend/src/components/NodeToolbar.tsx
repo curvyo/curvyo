@@ -10,14 +10,15 @@ import {
   Minus as MakeLineIcon,
 } from "lucide-react";
 import { ContextMenu } from "radix-ui";
-import type { ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 
 import type { NodeToolbarState } from "@/hooks/useEditorSession";
 import { ClosePathGroup } from "@/components/ClosePathGroup";
 import { Tooltip } from "@/components/ui/tooltip";
-import { COMPOUND_NODES_TEXT } from "@/lib/booleanText";
+import { useActionNotice } from "@/hooks/useActionNotice";
 import { CLONE_NODES_TEXT } from "@/lib/cloneText";
-import { joinReasonLines } from "@/lib/nodeText";
+import { joinNoticeText, joinReasonLines, splitNoticeText } from "@/lib/nodeText";
+import { noticeMs } from "@/lib/pathText";
 
 export interface NodeActions {
   insertSelected: () => void;
@@ -25,10 +26,12 @@ export interface NodeActions {
   convertSelected: (kind: "corner" | "symmetric" | "asymmetric") => void;
   makeLine: () => void;
   makeCurve: () => void;
-  /** Join (acceptance criteria 8-11). No keyboard shortcut. */
-  joinSelected: () => void;
-  /** Split (acceptance criteria 12-15). No keyboard shortcut. */
-  splitSelected: () => void;
+  /** Join (acceptance criteria 8-11). No keyboard shortcut. Returns how many outlines moved
+   * into the surviving object besides the joined one (`0055` criterion 5 c). */
+  joinSelected: () => number;
+  /** Split (acceptance criteria 12-15). No keyboard shortcut. Returns the code of what was
+   * split (`0055` criterion 6). */
+  splitSelected: () => string;
 }
 
 /**
@@ -143,6 +146,10 @@ const OTHER_ACTIONS: ActionDescriptor[] = [
 interface NodeToolbarProps {
   state: NodeToolbarState;
   actions: NodeActions;
+  /** The active tool and the object selection size: a Join or Split notice ends when either
+   * changes (`useActionNotice`). */
+  tool: string;
+  selectionCount: number;
   /** The Close path group (`0034-pen-path-extension`); the bar has none without it. */
   closePath?: React.ComponentProps<typeof ClosePathGroup>;
 }
@@ -156,9 +163,40 @@ interface NodeToolbarProps {
  * individual buttons (`specs/0006-path-merge-split-and-node-types/
  * specification.md`'s UX notes).
  */
-export function NodeToolbar({ state, actions, closePath }: NodeToolbarProps) {
-  if (state.compoundOnly || state.cloneOnly) {
-    // Text only, no controls (`0016-boolean-operations` criterion 38).
+export function NodeToolbar({
+  state,
+  actions: plain,
+  closePath,
+  tool,
+  selectionCount,
+}: NodeToolbarProps) {
+  const { notice, show } = useActionNotice(tool, selectionCount, () => {});
+  // Join and Split say what they did to a compound path (`specs/0055-compound-path-node-
+  // editing/` UX notes): the result stays one object, which looks the same as before.
+  const actions = useMemo<NodeActions>(
+    () => ({
+      ...plain,
+      joinSelected: () => {
+        const moved = plain.joinSelected();
+        const text = joinNoticeText(moved);
+        if (text !== null) {
+          show("success", text, noticeMs(text));
+        }
+        return moved;
+      },
+      splitSelected: () => {
+        const code = plain.splitSelected();
+        const text = splitNoticeText(code);
+        if (text !== null) {
+          show("success", text, noticeMs(text));
+        }
+        return code;
+      },
+    }),
+    [plain, show],
+  );
+  if (state.cloneOnly) {
+    // Text only, no controls (`0049-linked-clone` criterion 26).
     return (
       <div
         role="status"
@@ -170,7 +208,7 @@ export function NodeToolbar({ state, actions, closePath }: NodeToolbarProps) {
           color: "var(--toolbar-icon)",
         }}
       >
-        {state.cloneOnly ? CLONE_NODES_TEXT : COMPOUND_NODES_TEXT}
+        {CLONE_NODES_TEXT}
       </div>
     );
   }
@@ -205,7 +243,7 @@ export function NodeToolbar({ state, actions, closePath }: NodeToolbarProps) {
 
       <div className="mx-1 h-5 w-px bg-border" aria-hidden />
 
-      <div className="flex items-center gap-1">
+      <div className="relative flex items-center gap-1">
         {OTHER_ACTIONS.map((action) =>
           action.key === "join" ? (
             <JoinButton key={action.key} state={state} action={action} actions={actions} />
@@ -222,6 +260,21 @@ export function NodeToolbar({ state, actions, closePath }: NodeToolbarProps) {
             </button>
           </Tooltip>
           ),
+        )}
+        {/* The live region is always in the tree, visually hidden, so its text change is
+            announced; the visible notice is a text-only copy, 4 px under the buttons,
+            right-aligned. */}
+        <p role="status" className="sr-only">
+          {notice?.text ?? ""}
+        </p>
+        {notice && (
+          <p
+            aria-hidden
+            className="pointer-events-none absolute top-full right-0 z-30 mt-1 max-w-[360px] rounded-md bg-[var(--toolbar-bg)] px-2 py-1 text-xs text-[var(--toolbar-icon)]"
+            style={{ boxShadow: "var(--panel-elevation-shadow)" }}
+          >
+            {notice.text}
+          </p>
         )}
       </div>
 

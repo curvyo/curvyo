@@ -90,12 +90,16 @@ export function chipIsImmediate(cue: PenCue): boolean {
 /** How long the pointer rests on a continue or join target before its chip appears, ms. */
 export const CHIP_REST_MS = 600;
 
-/** What a press of a Close path button did (`WasmSession.close_path`). */
+/** What a press of a Close path button did (`WasmSession.close_path`): ordinary paths and
+ * outlines of compound paths apart (`specs/0055-compound-path-node-editing/` criterion 7). */
 export interface ClosePathResult {
   closed: number;
   skipped: number;
   /** How many of the skipped paths have three nodes whose first and last coincide. */
   sameEnds?: number;
+  closedOutlines?: number;
+  skippedOutlines?: number;
+  sameEndsOutlines?: number;
 }
 
 /** What the Close path buttons would do (`WasmSession.close_path_state`). */
@@ -104,26 +108,34 @@ export interface ClosePathState {
   skipped: number;
   /** How many of the skipped paths have three nodes whose first and last coincide. */
   sameEnds?: number;
+  closableOutlines?: number;
+  skippedOutlines?: number;
+  sameEndsOutlines?: number;
 }
 
 function paths(count: number): string {
   return count === 1 ? "1 path" : `${count} paths`;
 }
 
-/** Why paths were skipped, in the notice: fewer than 3 nodes, or a start and end on one point. */
-function skippedSentences(skipped: number, sameEnds: number): string {
+function outlines(count: number): string {
+  return count === 1 ? "1 outline" : `${count} outlines`;
+}
+
+/** Why paths or outlines were skipped, in the notice: fewer than 3 nodes, or a start and end on
+ * one point. */
+function skippedSentences(skipped: number, sameEnds: number, noun: (n: number) => string): string {
   const few = skipped - sameEnds;
   const parts: string[] = [];
   if (few > 0) {
     parts.push(
-      `${paths(few)} ${few === 1 ? "has" : "have"} fewer than 3 nodes and ${
+      `${noun(few)} ${few === 1 ? "has" : "have"} fewer than 3 nodes and ${
         few === 1 ? "was" : "were"
       } not closed.`,
     );
   }
   if (sameEnds > 0) {
     parts.push(
-      `${paths(sameEnds)} ${sameEnds === 1 ? "starts" : "start"} and ${
+      `${noun(sameEnds)} ${sameEnds === 1 ? "starts" : "start"} and ${
         sameEnds === 1 ? "ends" : "end"
       } on the same point and ${sameEnds === 1 ? "was" : "were"} not closed.`,
     );
@@ -131,16 +143,31 @@ function skippedSentences(skipped: number, sameEnds: number): string {
   return parts.join(" ");
 }
 
-/** The notice after a press (criterion 20), or `null` if nothing was closed. */
+/** "1 path and 3 outlines", paths first; either part left out at zero. */
+function pathsAndOutlines(pathCount: number, outlineCount: number): string {
+  const parts: string[] = [];
+  if (pathCount > 0) {
+    parts.push(paths(pathCount));
+  }
+  if (outlineCount > 0) {
+    parts.push(outlines(outlineCount));
+  }
+  return parts.join(" and ");
+}
+
+/** The notice after a press (criterion 20, `0055` criterion 7), or `null` if nothing was
+ * closed. */
 export function closeNoticeText(result: ClosePathResult): string | null {
-  if (result.closed === 0) {
+  const closedOutlines = result.closedOutlines ?? 0;
+  if (result.closed === 0 && closedOutlines === 0) {
     return null;
   }
-  const closed = `Closed ${paths(result.closed)}.`;
-  if (result.skipped === 0) {
-    return `${closed}`;
-  }
-  return `${closed} ${skippedSentences(result.skipped, result.sameEnds ?? 0)}`;
+  const closed = `Closed ${pathsAndOutlines(result.closed, closedOutlines)}.`;
+  const reasons = [
+    skippedSentences(result.skipped, result.sameEnds ?? 0, paths),
+    skippedSentences(result.skippedOutlines ?? 0, result.sameEndsOutlines ?? 0, outlines),
+  ].filter((part) => part !== "");
+  return [closed, ...reasons].join(" ");
 }
 
 /** How long that notice stays: 3 s, or 5 s when the sentence is longer than 70 characters. */
@@ -148,27 +175,62 @@ export function closeNoticeMs(text: string): number {
   return text.length > 70 ? 5000 : 3000;
 }
 
-/** The third tooltip line of a Close path button, by state (design system, "Close path group"). */
-export function closeTooltipNote(state: ClosePathState): string {
-  if (state.closable === 0) {
-    return "Select an open path with 3 or more nodes.";
-  }
-  if (state.skipped === 0) {
-    return `Closes ${paths(state.closable).replace(" path", " open path")}.`;
-  }
-  const total = state.closable + state.skipped;
-  const sameEnds = state.sameEnds ?? 0;
-  const few = state.skipped - sameEnds;
+/** The reasons of a tooltip note: "1 has fewer than 3 nodes.", "1 starts and ends on one point.",
+ * each count followed by `noun` ("1 outline has ...") when given. */
+function skippedReasons(
+  skipped: number,
+  sameEnds: number,
+  noun: (n: number) => string = String,
+): string[] {
+  const few = skipped - sameEnds;
   const reasons: string[] = [];
   if (few > 0) {
-    reasons.push(`${few === 1 ? "1 has" : `${few} have`} fewer than 3 nodes.`);
+    reasons.push(`${noun(few)} ${few === 1 ? "has" : "have"} fewer than 3 nodes.`);
   }
   if (sameEnds > 0) {
     reasons.push(
-      `${sameEnds === 1 ? "1 starts and ends" : `${sameEnds} start and end`} on one point.`,
+      `${noun(sameEnds)} ${sameEnds === 1 ? "starts and ends" : "start and end"} on one point.`,
     );
   }
-  return `Closes ${state.closable} of ${total} open paths. ${reasons.join(" ")}`;
+  return reasons;
+}
+
+/** Whether the buttons are dimmed: no open path or open outline with 3 or more nodes
+ * (`0055` criterion 7). */
+export function closeDimmed(state: ClosePathState): boolean {
+  return state.closable === 0 && (state.closableOutlines ?? 0) === 0;
+}
+
+/** The third tooltip line of a Close path button, by state (design system, "Close path group";
+ * paths and outlines of compound paths counted apart, paths first, `0055` UX notes). */
+export function closeTooltipNote(state: ClosePathState): string {
+  if (closeDimmed(state)) {
+    return "Select an open path or outline with 3 or more nodes.";
+  }
+  const closableOutlines = state.closableOutlines ?? 0;
+  const skippedOutlines = state.skippedOutlines ?? 0;
+  if (closableOutlines === 0 && skippedOutlines === 0) {
+    if (state.skipped === 0) {
+      return `Closes ${paths(state.closable).replace(" path", " open path")}.`;
+    }
+    const total = state.closable + state.skipped;
+    const reasons = skippedReasons(state.skipped, state.sameEnds ?? 0);
+    return `Closes ${state.closable} of ${total} open paths. ${reasons.join(" ")}`;
+  }
+  if (state.closable === 0 && state.skipped === 0) {
+    if (skippedOutlines === 0) {
+      return `Closes ${outlines(closableOutlines)}.`;
+    }
+    const total = closableOutlines + skippedOutlines;
+    const reasons = skippedReasons(skippedOutlines, state.sameEndsOutlines ?? 0);
+    return `Closes ${closableOutlines} of ${total} open outlines. ${reasons.join(" ")}`;
+  }
+  const closes = `Closes ${pathsAndOutlines(state.closable, closableOutlines)}.`;
+  const reasons = [
+    ...skippedReasons(state.skipped, state.sameEnds ?? 0, paths),
+    ...skippedReasons(skippedOutlines, state.sameEndsOutlines ?? 0, outlines),
+  ];
+  return [closes, ...reasons].join(" ");
 }
 
 /** The two buttons: the visible word, the accessible name, the join code and the tooltip. */
