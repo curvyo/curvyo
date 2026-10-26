@@ -108,6 +108,7 @@ mod skew_entry;
 mod skew_math;
 mod split;
 mod stack_plan;
+mod stroke_to_path_plan;
 mod style_edit;
 mod style_entry;
 mod style_panel;
@@ -329,6 +330,10 @@ pub use skew_entry::SkewEntry;
 pub use skew_math::{SkewFrame, skew_angle, skew_factor, skew_frame};
 pub use split::{SPLIT_COMMIT_LABEL, SplitPlan, SplitRefusal, plan_split};
 pub use stack_plan::{MAX_STACK_PIECES, StackPlan, StackRefusal};
+pub use stroke_to_path_plan::{
+    StrokeToPathPlan, StrokeToPathRefusal, draws_stroke, plan_stroke_to_path,
+    stroke_to_path_available,
+};
 pub use style_edit::StyleEditor;
 pub use style_entry::{
     HexColour, MAX_STROKE_WIDTH_MM, MarkerSlot, StyleEntryError, StyleField, cap_from_name,

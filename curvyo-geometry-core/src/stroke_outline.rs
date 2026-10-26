@@ -69,8 +69,7 @@ pub fn stroke_outline(
     }
     let width = stroke.width.as_mm();
     let width_ok = width.is_finite() && width > 0.0 && width <= MAX_COORDINATE_MM;
-    if !width_ok || !outlines.iter().all(|outline| in_range(outline, width))
-    {
+    if !width_ok || !outlines.iter().all(|outline| in_range(outline, width)) {
         return Err(StrokeOutlineError::OutOfRange);
     }
     let style = RawStyle {

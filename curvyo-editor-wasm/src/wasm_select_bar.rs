@@ -61,6 +61,9 @@ pub struct SelectBarView {
     pub object_to_path_shown: bool,
     /// "Scale stroke width" and "Scale corner radius" are shown (not with only linked clones).
     pub scale_switches_shown: bool,
+    /// "Stroke to path" is enabled: some selected object draws a stroke
+    /// (`specs/0085-stroke-to-path` criterion 1). Shown whenever anything is selected.
+    pub stroke_to_path_enabled: bool,
 }
 
 impl From<SelectBarState> for SelectBarView {
@@ -103,6 +106,7 @@ impl From<SelectBarState> for SelectBarView {
             ratio,
             object_to_path_shown: state.object_to_path,
             scale_switches_shown: state.scale_switches_shown,
+            stroke_to_path_enabled: false,
         }
     }
 }
@@ -113,7 +117,9 @@ impl WasmSession {
     /// pointer release and tool or selection change, and after every bar edit.
     #[must_use]
     pub fn select_bar_state(&self) -> SelectBarView {
-        self.session.select_bar_state().into()
+        let mut view: SelectBarView = self.session.select_bar_state().into();
+        view.stroke_to_path_enabled = self.session.stroke_to_path_available();
+        view
     }
 
     /// The Select tool's "Scale corner radius" switch (criterion 23). Off in

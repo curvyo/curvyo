@@ -110,6 +110,8 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     ("flatten", "Flatten"),
     // `specs/0068-laserable-lettering` criterion 20.
     ("weld", "Weld"),
+    // `specs/0085-stroke-to-path` criterion 21.
+    ("stroke_to_path", "Stroke to path"),
     ("offset_path", "Offset"),
     ("group", "Group"),
     ("ungroup", "Ungroup"),

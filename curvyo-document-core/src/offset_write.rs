@@ -285,7 +285,7 @@ fn create_object(
 
 /// Writes a path's outlines: the first in the ordinary keys, the rest as extra subpaths. Every
 /// outline is closed.
-fn write_outlines(meta: &loro::LoroMap, outlines: &PieceOutlines) {
+pub(crate) fn write_outlines(meta: &loro::LoroMap, outlines: &PieceOutlines) {
     // invariant: the caller checked `outlines` to be non-empty.
     #[allow(clippy::unwrap_used)]
     let (first, rest) = outlines.split_first().unwrap();
@@ -320,7 +320,7 @@ fn write_primitive_fields(meta: &loro::LoroMap, shape: &Shape) {
 }
 
 /// Replaces an object's geometry in place, keeping every other key (name, style, links).
-fn change_geometry(meta: &loro::LoroMap, geometry: &OffsetGeometry) {
+pub(crate) fn change_geometry(meta: &loro::LoroMap, geometry: &OffsetGeometry) {
     match geometry {
         OffsetGeometry::Path(outlines) => {
             shape_codec::strip_primitive_keys(meta);

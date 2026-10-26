@@ -78,6 +78,7 @@ mod shape_codec;
 mod shape_radii;
 mod shapes;
 mod smooth_handles;
+mod stroke_to_path_write;
 mod style_codec;
 mod style_model;
 mod style_validation;
@@ -184,6 +185,10 @@ pub use ring_curve::{
 };
 pub use shapes::ShapeEditError;
 pub use smooth_handles::smooth_corner_handles;
+pub use stroke_to_path_write::{
+    STROKE_TO_PATH_COMMIT_LABEL, StrokeOutlineWrite, StrokeSubject, StrokeToPath,
+    stroke_outline_style,
+};
 pub use style_model::{
     DashPattern, Fill, LineCap, LineJoin, MarkerCount, MarkerPlace, MarkerShape, Markers, Opacity,
     Stroke, Style, StyleParamError,
