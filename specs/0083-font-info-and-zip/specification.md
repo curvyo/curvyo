@@ -1,6 +1,6 @@
 # Font info and fonts from zip archives
 
-Status: Ready (2026-10-26; Frage 41 unanswered, built with default A; UX notes applied, Info only from the mode switch as Proposal)
+Status: Done (PR #199, 2026-10-26; Frage 41 built as default A; UX notes applied, Info only from the mode switch as Proposal)
 Priority: Should (R-FONT-008 for the embedding permission; R-FONT-006 for Add font)
 Origin: Customer. (a) The font info view was `0077` Frage 25 C and its Out of scope ("licence, file, format, embedding permission (`fsType`, R-FONT-008), version"). (b) Request of 2026-10-23 (translated): Add font should take .zip archives, "then you don't have to unpack yourself; you often find the licence and credits there; we can simply keep those". Items marked **(Proposal)** are the product owner's; safe defaults the customer can veto at the demo.
 Depends on: `0074-text-objects` (blocks, the Curvyo folder, font matching), `0075-font-library` (Add font, drop, de-duplication, the notice, Remove from Curvyo fonts, the browser's IndexedDB store), `0076-single-line-fonts` (SVG fonts, the hostile-file limits pattern of its criterion 23), `0077-font-preview` (the pane), `0082-glyph-table` (the mode switch and the subject face; whichever of `0082` and this story is built first brings the switch).
@@ -117,4 +117,4 @@ Requirements: R-FONT-008 (embedding permission shown, does not block use), R-FON
 Depends on: `specs/0074-text-objects/`, `specs/0075-font-library/`, `specs/0076-single-line-fonts/`, `specs/0077-font-preview/`, `specs/0082-glyph-table/`
 Changes to accepted specs: `0074` (the Curvyo folder is read one level deep, criterion 10), `0075` Out of scope ("Fonts in sub-folders of the Curvyo folder" moves into this story) and criterion 25 (Remove also deletes an emptied font folder, criterion 14)
 ADRs: 0020 §2 and §4 (face limits, licence record), 0004 §7 (atomic writes), 0006 item 5 (font licences)
-PR: -
+PR: #199

@@ -1,6 +1,6 @@
 # Text bar second row and Font jump button
 
-Status: Ready (2026-10-24; adrs.md and UX notes done)
+Status: Done (PR #188, 2026-10-26; was Ready 2026-10-24, adrs.md and UX notes done)
 Priority: Should
 Origin: Customer (direction of 2026-10-24); the split of the controls, the icon, the order and the "changed" dot are marked **(Proposal)**
 
@@ -212,6 +212,6 @@ font with Mixed, Tab order in the Select bar) and §9 holds two demo questions.
 
 ## Links
 
-Requirements: R-EDIT-048, R-FONT-001, R-FONT-011  PR: none yet
+Requirements: R-EDIT-048, R-FONT-001, R-FONT-011  PR: #188
 Depends on: `0079` slice 3 (`story/text-vertical`) merged. Related:
 `0074`, `0078`, `0079`, `0080`, `0082`, `0051` (per-user panel state).

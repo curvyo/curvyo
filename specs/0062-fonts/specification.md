@@ -1,6 +1,6 @@
 # Fonts: a Fonts card, groups and favourites, an own font folder, and a preview page of the lettering in every font
 
-Status: Draft (epic with stages; stage 1 Done #165, stage 2 Done #168, stage 2b in progress (0076, PR #171), stage 3 Ready as 0077; preview placement decided 2026-10-17)
+Status: Done (epic, 2026-10-26, customer; stages 1, 2, 2b, 3 and style buttons merged; OTF/TTF stick fonts moved out to `0086-stick-fonts`, parked)
 Priority: Should (big; the customer called it "a great feature")
 Origin: Customer (request of 2026-10-17, translated): "A great feature. We need our own card in the properties and a tool to add. The font selection like the document sizes: groupable, e.g. initials, script, sans, serif, cuttable (fonts whose strokes end up connected so they laser well). Mark with * as favourites. We need our own folder under .config (directories crate) to add fonts just for Curvyo; they are shown first in the whole list. Harder: I would like a preview for fonts as seen in PewPew Studio: a page where exactly the lettering is shown with all fonts (e.g. of a group). We said no popups and honestly I do not want one. Maybe we need a new fixed panel, or a split page. It may make sense to build this together with the output, since the main canvas must be extended/switched there anyway."
 
@@ -22,6 +22,8 @@ There are no text objects: the node kinds are layer, group, path and primitive. 
 | 2 | Groups, favourites, the Curvyo font folder, "cuttable" tag, adding fonts. Specified as [`0075-font-library`](../0075-font-library/) | stage 1 | Done (#168) |
 | 2b | Single-line (stroke) fonts as live text: SVG fonts, the Single line tag, four shipped fonts. Specified as [`0076-single-line-fonts`](../0076-single-line-fonts/) | stage 2 | Done (#171) |
 | 3 | The preview page (criteria 14 to 17), split and full view | stage 2 (the split is built in `0077` and reused by `0063`, Frage 26 A, 2026-10-23) | Done (#175, `0077`) |
+
+**Moved out (customer, 2026-10-26):** OTF/TTF stick fonts (single-line fonts in OpenType or TrueType files with doubled-back closed outlines, de-doubled to a centre line) are no longer a stage of this epic. They are specified as [`0086-stick-fonts`](../0086-stick-fonts/) and parked until the customer wants to refine them.
 
 ## Acceptance criteria (as far as clear)
 
@@ -82,4 +84,4 @@ Requirements: R-FONT-001 to R-FONT-004 (existing); R-FONT-005 to R-FONT-008 (new
 Depends on: `specs/0074-text-objects/`, `specs/0043-properties-tabs/` and `specs/0051-sidebar-and-no-menu/` (tabs), `specs/0045-document-formats-library/` (the list pattern)
 Related: `specs/0063-manufacturing-workbenches/`, `specs/0065-extensions-sdk/` (font packs as extensions), `specs/0025-raster-trace/research.md` (text recognition), `specs/0022-color-management/`; ADR 0004 item 12, ADR 0006 item 5, ADR 0007
 ADRs: [ADR 0020](../../docs/adr/0020-text-nodes-text-engine-and-font-sources.md) (text node, text engine and font sources; accepted 2026-10-20); the pane host (split and full view) is part of `0063`'s workbench ADR
-PR: -
+PR: #165 (stage 1), #168 (stage 2), #171 (stage 2b), #175 (stage 3, `0077`), #178 (style buttons, `0078`)

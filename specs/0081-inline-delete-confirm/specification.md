@@ -1,6 +1,6 @@
 # Inline delete confirm: a trash can that asks by turning red
 
-Status: Ready (2026-10-23; adrs.md and UX notes done)
+Status: Done (PR #182; Ready 2026-10-23, adrs.md and UX notes done)
 Priority: Should
 Origin: Customer. Request of 2026-10-23 (translated): "Remove from Curvyo fonts should simply be a trash can in the font row. I want the delete dialog gone. Instead (and we do this for tag delete too): the row turns a pleasant red and you have to press the trash can again." Timeout, guard time, disarm rules and keyboard keys are the product owner's and marked **(Proposal)**; they are safe defaults, vetoable at the demo.
 Depends on: `0075-font-library` (Curvyo fonts block, family row, tag strip, Remove from Curvyo fonts criteria 25 and 26, tag delete criterion 8, UX amendment A7 and A8), `0045` and `0020` (the design-system row "Inline confirm", which stays for its other uses).
@@ -73,4 +73,4 @@ In [ux-notes.md](ux-notes.md): the trash's place on the family name line and whe
 Requirements: R-FONT-006 (own fonts), R-FONT-002 (tags)
 Depends on: `specs/0075-font-library/`
 ADRs: none expected (frontend only; no document, file-format or crate change); `adrs.md` confirms.
-PR: none yet.
+PR: #182.
