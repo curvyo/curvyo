@@ -19,12 +19,13 @@ names the cap: a new family of commands goes to the Select bar or the panel; a t
 customer decision. The "too short" rule (cards below Tools scroll) is for the browser build only and
 must not become the normal state of the Tauri window.
 
-**Proposal (default, Frage 61):** no new rail card.
+**Decided (customer, 2026-10-27, Frage 61):** no new rail card. The Trace button belongs in the top bar
+of the Select tool when raster images are selected (one or several); the toolbar is tidied later in polish.
 
 - **Key `I`** selects the Trace tool in every state (a tool letter like `B`, `N`, `P`); ignored in text
   fields and the text editor. Ctrl+I / Cmd+I stays Import. If no image is selected, `I` shows the empty
   bar (section 2).
-- **A text button "Trace"** in the Select bar, shown only when the selection is images only,
+- **A text button "Trace"** in the Select bar, shown only when the selection is images only (one or several),
   **appended last in a group of its own** (the "Linked clone" pattern: a new control is appended, no
   earlier one moves). 28 px outline button as "Linked clone". Press = choose the tool. Tab order: last
   in the bar. Measure at 800 x 600 with the panel open (bar about 324 px): it wraps whole.
@@ -34,22 +35,21 @@ must not become the normal state of the Tauri window.
 - Rejected: a second button in Path tools or beside Import (580 px, over the cap); a flyout (design
   system rejects them); column B (commands on the selection, full).
 
-The other options are in Frage 61. Spec criterion 1 (a rail button "Trace" in a card "Image tools")
-changes with the answer; the PO updates it. If the customer picks the third column or the shared card,
-the button is `ToolButton` in a `role="toolbar"` card, 40 x 40 px, glyph per proposal section 1, tooltip
-"Trace tool (I)" **without** the second line (section 9).
+The customer chose this option; spec criterion 1 is updated. A rail button is out of scope until the
+toolbar polish.
 
 ## 2. Bar states (replaces the Select bar in place, overlay row)
 
 | State | Bar |
 |---|---|
 | One image selected | Full bar (section 3), preview at once on a reduced copy, full size follows. |
+| Several images selected (only images) | Same bar, label "Tracing 1 of 3 images"; the preview shows the image clicked last; Create paths traces all with the same settings, one undo step. |
 | Nothing selected | One row: state label, text "Click an image to trace it." and text button "Import image..." (same action as the rail Import button; focus rules of the Import card). |
 | Something else selected | One row: "The selection is not an image. Click an image to trace it." Nothing refused. |
 
 The two sentences are the empty state and name what the tool waits for; they are not tips. Several
-images selected is slice 2 (Frage TRACE-UX-MULTI default a); slice 1 traces the one image last clicked
-and the bar says "1 of 3 images" only when 2 or more are selected. **(Proposal)**
+images selected is slice 1 (customer, Frage 61): the label says "Tracing 1 of 3 images" only when 2 or
+more are selected. **(Proposal)**
 
 ## 3. Bar contents, slice 1 (black and white)
 
@@ -102,23 +102,18 @@ Values are remembered as an app setting. A change of value is not a history step
   status reads "Tracing..." and the button shows `aria-busy`; the group is inserted when the trace
   finishes. A new press during that wait is ignored. **(Proposal)**
 - On commit: one step "Trace image" does everything of criterion 13: group "Trace of <name>" directly
-  above the image, one compound path (black, no stroke), image hidden, group selected, Select tool, focus
-  to the canvas. The Select bar shows. Ctrl+Z reverses all of it; the image shows again.
-- Notice (Action notice next to the rail, 3 s, `role="status"`): "Traced: 7 paths, 412 nodes. Source image
-  hidden." For a locked or hidden-never image: "Traced: ... Source image is locked and stays visible."
-  (A locked or hidden image cannot be selected, so the lock case arises only from a lock set between
-  preview and commit.)
+  above the image, one compound path (black, no stroke), the image stays visible, group selected, Select
+  tool, focus to the canvas. The Select bar shows. Ctrl+Z reverses all of it.
+- Notice (Action notice next to the rail, 3 s, `role="status"`): "Traced: 7 paths, 412 nodes." With
+  several images: "Traced 3 images: 21 paths, 1,204 nodes."
 - Zero paths: Create paths is `aria-disabled`, the status gives the reason (section 7). One path covering
   the whole image: allowed.
 
-## 6. Source image hidden afterwards (Frage 54, default B)
+## 6. Source image stays visible afterwards (Frage 54, decided A)
 
-Hidden (visible = false), not locked, not deleted; its row in Layers shows the closed eye; the eye shows
-it again. The paths sit on the pixels they came from (criterion 14), so with the image hidden the maker
-sees the trace alone. No switch in the bar (option C is a control for a choice nobody asked for).
-Visible effect to note for the review: the hidden image can no longer be clicked on the canvas; selecting
-it is by Layers. If the customer chooses A (stay visible), the notice drops its second sentence and
-nothing else changes.
+The image is untouched (visible, unlocked); the paths sit on top on the pixels they came from (criterion
+14). The maker hides or moves the image by the usual means (Layers eye, Select). No switch in the bar and
+no extra notice text.
 
 ## 7. States and wording (permit over refuse; no tips)
 
@@ -150,21 +145,16 @@ and cut faster" tooltip, "raise Smooth or Specks", the tooltip second line of th
 ## 9. Differences from `ux-proposal.md` and the spec
 
 1. No "Image tools" card; key `I` plus a Select bar button (Frage 61). Spec criterion 1 and
-   `ux-proposal.md` sections 1 and 11.1 are superseded if the default stands.
+   `ux-proposal.md` sections 1 and 11.1 are superseded (decided).
 2. No second tooltip line (spec criterion 1): operating tip.
 3. 0-path and whole-image texts lose their instruction (spec criterion 15).
 4. State label "Trace" at the start of the bar, because the rail shows no pressed button.
 5. Create paths waits for the full-size trace instead of using the reduced copy.
 6. Slice 2 inserts the Look row above the slice 1 rows (one-time shift).
 
-## 10. Question for the customer
+## 10. Decided by the customer (2026-10-27)
 
-**Frage 61 (TRACE-RAIL): Where does the Trace tool sit now that the tool rail is full?**
-The Import card (2026-10-27) leaves column A at 536 px; one more button ends at 580 px, over the 560 px
-of the 640 px window.
-- A: No rail button. Key `I` and a "Trace" button in the Select bar when images are selected; the bar
-  shows the active state. Fits, nothing moves, changeable later.
-- B: One shared card "Image" under Path tools holding Import and Trace (two buttons, 92 px, ends 580
-  px); the cards below Tools scroll in the minimum window.
-- C: A third rail column.
-Recommendation: A. Default if unanswered: A.
+**Frage 61 (TRACE-RAIL):** "Belongs in the top bar of the Select tool when a raster image is selected;
+several can be selected. The toolbar needs tidying later in polish; first we make chips." Option A
+stands, extended to several selected images (section 2). Colours are postponed (Frage 50 A), so the
+Mode pill, Colours field and Photo preset of the proposal are not drawn.

@@ -1,47 +1,48 @@
 # ADR 0023: Raster trace crate, pipeline and background job
 
-**Status:** Proposed (architect, 2026-10-27). Not `needs-customer` by itself: no document model,
-file format, plugin or platform change. It rests on the defaults of `specs/0025-raster-trace`
-Frage 49 (C, own pipeline with step 0), Frage 55 (A, no extension seam) and Frage 60 (B, VectorCraft
-as idea source only); a different customer answer to any of them reopens this ADR. Becomes Accepted
-when step 0 (§7) has numbers and they do not overturn §2. Fills the `curvyo-vectorize-core` slot of
-[ADR 0011](0011-workspace-and-crate-layout.md) §2/§3 (ADR 0003 §6). Asked by `specs/0025-raster-trace`.
+**Status:** Proposed (architect, 2026-10-27, revised the same day to the customer's Frage 49 = B).
+Not `needs-customer` by itself: no document model, file format, plugin or platform change. It rests
+on the customer answers of `specs/0025-raster-trace` (Frage 49 B "VTracer for now, if it works",
+Frage 50 A black and white only, Frage 55 A no extension seam, Frage 60 B VectorCraft as idea source
+only). Becomes Accepted when step 0 (§7) has numbers and they do not trigger the fallback (§8). Fills
+the `curvyo-vectorize-core` slot of [ADR 0011](0011-workspace-and-crate-layout.md) §2/§3 (ADR 0003 §6).
 
 ## Context
 
 The Trace tool turns the working image of an image node (ADR 0017 §4, §6: RGBA8, straight alpha, at
 most 16 Mpx, pixel map `placement · scale(1/w, 1/h)`) into closed paths. The customer wants fewer
-nodes, less wobble and no micro paths compared with Inkscape (potrace), a live preview while values
-change, and 2 to 4 s for a 2000 x 2000 px image. Hard to change later: where the tracer sits in the
-crate graph, the shape of its call (it is the seam a plugin tracer would later copy, ADR 0005 §4),
-and the rule that it is deterministic, because golden files and the preview-equals-result promise
-rest on it. The editor runs as wasm in the webview on desktop too (ADR 0001 §3), so the wasm time is
-the shipping time. No Web Worker exists in the frontend today.
+nodes, less wobble and no micro paths compared with Inkscape (potrace), a live preview, and 2 to 4 s
+for a 2000 x 2000 px image. He chose VTracer/visioncortex as a dependency "for now, if it works", with
+our pre- and post-processing. Hard to change later: where the tracer sits in the crate graph, the
+shape of its call (the seam a plugin tracer would later copy, ADR 0005 §4), and what "deterministic"
+promises, because golden files and the preview-equals-result promise rest on it. The editor runs as
+wasm in the webview on desktop too (ADR 0001 §3), so the wasm time is the shipping time.
 
 | Option | Why it lost or won |
 |---|---|
-| **C. Own pipeline in `curvyo-vectorize-core` (chosen)** | Sub-pixel contours and a tolerance-bounded fit are the two things that beat potrace; both are a few hundred lines on top of `kurbo`, which is already locked. Ours to tune, wasm-clean, no new dependency. Cost: the most work of the three. |
-| A. Port potrace | GPL-2.0-or-later is compatible (ADR 0006), but the module loses dual-licensing and the port keeps potrace's limits: binary input, pixel-border contours. It reproduces what the customer wants beaten. |
-| B. VTracer/visioncortex as a dependency | Fast to a demo, MIT OR Apache-2.0; but pixel-border regions need our refit anyway, its fitter and API are not ours, and an extra tree has to pass `cargo deny` and `unsafe` review. Kept as a benchmark (§7). |
-| D. Depend on VectorCraft's `trace` crate | Alpha, internal workspace crate bound to `vectorcraft-geom` and `image`, API changing weekly. Idea source and benchmark only. |
-| Crate: new name `curvyo-trace-core` | Would need a note superseding a row of ADR 0011 for no gain; the reserved name already covers later centerline and R-VEC-002 multi-pass. |
-| Crate: a module of `geometry-core` | Pixels, histograms and region labelling are not the geometric kernel; the kernel's one-sentence responsibility would need an "and". |
+| **B. `visioncortex` (the library under VTracer) as a dependency (chosen, customer)** | MIT OR Apache-2.0, pure Rust, no `unsafe` of its own, builds for wasm32, takes an in-memory bit mask, passes `cargo deny`. Its binary path is fast and good on the spike fixtures (§7). Cost: pixel-border outlines (no sub-pixel position), a `u16` label limit, one `acos` that breaks bit-equality between native and wasm (§4). |
+| B'. The `vtracer` crate itself | Fails `cargo deny` advisories (`clap` 2 pulls unmaintained `atty`, `ansi_term`; `image` 0.23 pulls unmaintained `adler`), plus `rayon` and `fastrand`, and its entry point takes a file or a `ColorImage`. Its binary mode is a 20-line loop over visioncortex; we write that loop ourselves. |
+| C. Own pipeline (sub-pixel contours, `kurbo` fit) | The previous decision of this ADR; better in theory, the most work. Now the fallback (§8). |
+| A. Port potrace | GPL-2.0-or-later; reproduces what the customer wants beaten. |
+| D. VectorCraft's `trace` crate | Alpha, internal workspace crate bound to `image`, API changing weekly. Benchmark only. |
+| Crate `curvyo-trace-core` or a module of `geometry-core` | A new name needs a note superseding ADR 0011 for no gain; pixels and labelling are not the geometric kernel. |
 
 ## Decision
 
 ### 1. Crate and edges
 
-`curvyo-vectorize-core`, `#![forbid(unsafe_code)]`, builds for `wasm32-unknown-unknown` (CI finds
-it by the `-core` suffix). Responsibility: it turns an RGBA8 raster and trace settings into closed
-outlines in document millimetres. Edges: `vectorize-core → document-core` (`Affine`, `Point`,
-`Length`) and `kurbo` (workspace, Apache-2.0 OR MIT); the `geometry-core` edge that ADR 0011 allows is
-not used until a stage needs it. It does **not** depend on `image-core`: it takes a borrowed raster,
-so no decoder is linked into it. `ui-core → vectorize-core` (the trace job wrapper and the insert
-command); `editor-wasm` reaches the tracer only through `ui-core`, so ADR 0011 §3 gains no edge.
-`deny.toml` gets the AGPL exception for the crate. Dev-dependencies (harness only, never linked into a
-build): `curvyo-image-core` (decode PNG fixtures), `curvyo-svg-core` (read baseline SVGs, §7).
+`curvyo-vectorize-core`, `#![forbid(unsafe_code)]`, builds for `wasm32-unknown-unknown`.
+Responsibility: it turns an RGBA8 raster and trace settings into closed outlines in document
+millimetres. Edges: `→ document-core` (`Affine`, `Point`, `Length`), `kurbo` (workspace) and
+**`visioncortex = "0.8"`** (default features; transitive: `flo_curves` 0.3 Apache-2.0, `roots`
+BSD-2-Clause, `itertools` 0.8, `smallvec`, `bit-vec` 0.6, `num-traits`; `flo_curves` and `bit-vec`
+have a few `unsafe` blocks, ordinary for crates.io leaves). It does **not** depend on `image-core` or
+`image`. `ui-core → vectorize-core`; `editor-wasm` reaches the tracer only through `ui-core`.
+`deny.toml` gets the AGPL exception for the crate. `cargo deny` stays green; it adds two duplicate
+*warnings* (`bit-vec` and `itertools` get a third version), no error. Dev-dependencies (harness only):
+`curvyo-image-core`, `curvyo-svg-core`.
 
-### 2. Public API: one pure function, a schema as data
+### 2. Public API: one pure function, a schema as data (unchanged)
 
 ```rust
 pub struct Raster<'a> { pub width: u32, pub height: u32, pub rgba: &'a [u8] } // straight alpha
@@ -51,111 +52,116 @@ pub fn auto_threshold(raster: Raster<'_>) -> u8;           // Otsu on the luma h
 pub const PARAMS: &[ParamSpec];                             // name, kind, unit, range, default, step, group, advanced
 ```
 
-`TraceResult` holds the outlines (each a closed `kurbo::BezPath` in document mm, holes wound against
-their parent), the per-colour grouping (slice 2), and `Counts { paths, nodes, specks_removed }`.
-`TraceError` is `Cancelled` or `Invalid(reason)` (`thiserror`). No trait, no registry, no generic
-(CLAUDE.md §5, Frage 55 A). `ParamSpec` is plain `const` data; `editor-wasm` hands it to the frontend
-as JSON and the bar is generated from it (criterion 6).
+`TraceResult`: closed `kurbo::BezPath` outlines in document mm (holes wound against their parent),
+`Counts { paths, nodes, specks_removed }`. `TraceError`: `Cancelled`, `Invalid(reason)`,
+`TooDetailed` (§3 step 3). No visioncortex type appears in the public API, so the fallback (§8)
+changes no caller. No trait, no registry, no generic.
 
-**`poll`** is the only way out of the call: it is called at fixed work boundaries (every 64 rows of a
-raster pass, every outline in the fit, every bisection step of the node limit), never on a clock, with
-`Progress { done, total }` in work units. `Break` makes `trace` return `Cancelled` at once. That keeps
-the core free of threads and time, gives the progress line its value, and bounds the cancel latency by
-work, not by wall time (criterion 17 is measured in thread CPU time on native).
+**`poll`** is called at fixed work boundaries (every 64 rows of our passes, before every region handed
+to visioncortex), never on a clock. `Break` returns `Cancelled`. One visioncortex call is not
+interruptible; the largest (a full-page region at 2000 x 2000 px) is under 0.1 s native.
 
 ### 3. Pipeline (slice 1, black and white)
 
-1. **Luma** in integers: alpha composited over white, `2126 R + 7152 G + 722 B` (Rec. 709 × 10 000,
-   criterion D8), one `u16`-scaled value per pixel. Threshold compares integers.
-2. **Mask and regions:** foreground 8-connected, background 4-connected (no topological ambiguity at
-   diagonal touches); one scanline union-find labelling. Specks: a region whose pixel count × `|det|`
-   of the pixel map's linear part is below `specks²` mm² is flipped (foreground speck to background,
-   hole speck filled). This is the true area for rotated or skewed images.
-3. **Contours:** marching squares on the cleaned mask decides topology (saddles by the connectivity
-   rule above); each crossing point sits at the linear interpolation of the **luma** between the two
-   pixel centres, clamped to the cell edge. Topology from the mask, position from the field.
-4. **Corners** by the turning of the sub-pixel polyline over a short window, compared as a cosine
-   threshold (no angle functions at run time), with a minimum run length.
-5. **Fit** in pixel space, per run between corners: a straight run within tolerance becomes a line,
-   the rest goes through `kurbo::fit_to_bezpath` over a `ParamCurveFit` of the run. Smooth 0 to 100
-   maps monotonically to a pixel tolerance (start: 0.05 px to 1.0 px, linear; tuned in step 0 and
-   documented in the crate). Fitting in pixels keeps the deviation targets in pixels and is exact for
-   any pixel map, because an affine maps a cubic to a cubic.
-6. **Assemble:** close every outline, map through `pixel_map` once at the end, order outlines by
-   their first scan position, count nodes.
+Ours before, visioncortex in the middle, ours after:
 
-Slice 2 (quantisation, merge into most common neighbour, stacked colours, denoise, upscale, node
-limit by bisection over step 5 only) gets a dated note in `specs/0025-raster-trace/adrs.md` before its
-build. No new dependency is expected; any one that appears needs that note and `cargo deny`.
+1. **Luma and mask** (ours): alpha composited over white, integer Rec. 709 luma, foreground =
+   luma below the Threshold. One bit per pixel.
+2. **Regions and specks** (ours): one scanline union-find labelling with `u32` labels, 4-connected
+   like visioncortex's `to_clusters(false)` so both agree on what a region is. A foreground region or
+   a hole whose pixel count × `|det|` of the pixel map is below Specks² mm² is flipped. VTracer has no
+   hole filter and counts specks in pixels; ours is in mm² (criterion: Specks).
+3. **Guard** (ours): visioncortex labels with `u16` and calls `panic!("overflow")` at 65 535 clusters.
+   We never call its `to_clusters` on the whole image; we hand it one cropped region at a time, where
+   it only labels that region's holes. A region with 65 000 holes or more after speck removal returns
+   `TooDetailed` (status: raise Specks) instead of a worker crash; recorded in `docs/technical-debt.md`.
+4. **Trace** (visioncortex): per region, `clusters::Cluster::image_to_compound_path(offset, &crop,
+   PathSimplifyMode::Spline, corner, segment_length, max_iterations, splice)`. It walks the pixel
+   border, smooths it and fits cubics (`flo_curves`). Output: `CompoundPathElement::Spline` per
+   outline, outer clockwise, holes counter-clockwise, in pixel-corner coordinates.
+5. **Assemble** (ours): each `Spline` (start point, then control-point triples) becomes a
+   `kurbo::BezPath` (`move_to`, `curve_to`, `close_path`) directly; no SVG string is produced or
+   parsed. A cubic whose control points lie on its chord within 0.01 px becomes a line. Map through
+   `pixel_map` once, order by first scan position, count nodes.
+
+**Settings mapping (Proposal, tuned in step 0):** Smooth 0 to 100 → `segment_length` 3.5 to 10 px,
+monotone; `corner_threshold` 60°, `splice_threshold` 45°, `max_iterations` 10 fixed in slice 1 (not
+shown). Colour mode, `color_clusters` and VTracer's hierarchical stacking are not used (Frage 50 A).
 
 ### 4. Determinism
 
-Same input and params give the same result on every run and OS; native and wasm agree within 1e-6 mm
-with equal counts (criterion 18). Rules: integer luma and labelling; `Vec` and `BTreeMap` only (no
-hash-map order); no `sin`, `cos`, `atan2`, `exp`, `powf` in our code (platform `libm` differs from
-wasm's); no clock, locale or threads; f64 basic operations and `sqrt` only (IEEE-exact). `kurbo`'s fit
-is the one place we do not control; a test runs the golden fixtures through the wasm build in
-`npm test` and compares with the native goldens. If it diverges, the fit is replaced by an own
-Schneider fit on basic operations, which is an amendment here, not a new crate.
+- **Same build, same input, same settings: bit-identical result on every run** (spike: two runs,
+  equal hash). The binary path of visioncortex has no hash map (only its colour path does), no
+  threads, no clock, no random numbers; ours keeps the rules (`Vec`/`BTreeMap`, integer luma).
+- **Native and wasm are not bit-identical.** visioncortex measures corner and splice angles with
+  `f64::acos`; native uses the platform `libm`, wasm Rust's `libm`. On the 2000 x 2000 px spike image
+  both gave 593 paths but 9 678 against 9 680 curves. Replacing that one `acos` with basic operations
+  made native and wasm bit-identical, so it is the only source.
+- **Consequence (Proposal):** the preview and Create paths run in the same wasm worker, so the user
+  always gets what he previewed. Golden files are native and exact; the wasm comparison in
+  `npm test` checks the same fixtures for equal path count, node count within 1 % and bounding boxes
+  within 0.01 mm. We send visioncortex an upstream PR replacing `acos` by a basic-operations version;
+  when it is released, the wasm check returns to 1e-6 mm with equal counts.
+- Rejected: a patched copy under `[patch.crates-io]` (a fork to maintain for a ±0.02 % node
+  difference); our own `acos` around it (not possible, it is internal).
 
-### 5. Where the job, the debounce and the reduced copy live
+### 5. Where the job, the debounce and the reduced copy live (unchanged)
 
-- **Both builds run the trace in one dedicated Web Worker** that instantiates the same
-  `curvyo-editor-wasm` module (the compiled `WebAssembly.Module` is posted from the main thread, so no
-  second download or compile), and calls one export `trace_job(params_json) -> result`. The worker
-  holds its copy of the RGBA bytes (transferred once per image, not per job) and the reduced copy.
-- **Cancel = terminate.** A worker inside a synchronous wasm call cannot receive messages, and a
-  shared flag needs `SharedArrayBuffer`, which needs cross-origin isolation headers we do not serve.
-  A stale job is stopped with `worker.terminate()` and a fresh worker is started from the cached
-  module. In the worker `poll` posts progress and always continues; `Break` is used by native tests
-  and any later native caller.
-- **Debounce 150 ms, "Tracing..." after 400 ms, Stop after 1.5 s** are TypeScript timers in the
-  frontend. The core has no time.
-- **Reduced copy** (longest side 1000 px, area-averaged) is a function of `curvyo-image-core`, which
-  already owns the box downscale; the pixel map of the copy is `pixel_map(w', h')` (ADR 0017 §1).
-- **Create paths** inserts the worker's last full-size result through an `editor-wasm` call into a
-  `ui-core` command: one history step (criterion 13). The main thread never traces; determinism makes
-  the inserted result the one previewed.
-
-| Rejected | Why |
-|---|---|
-| Native thread in `curvyo-app` via a Tauri command | Faster (wasm is about 1.5 to 3x slower), but a second code path and a different number in the browser. Revisit only if the wasm time misses 4 s (§Consequences). |
-| A second, small `-wasm` crate for the worker | Smaller instance, but a new crate and build output for a size problem not yet measured. |
-| `SharedArrayBuffer` cancel flag | Needs COOP/COEP on the Tauri protocol and on the browser deploy (GitHub Pages cannot set them). |
+Both builds trace in one dedicated Web Worker that instantiates the same `curvyo-editor-wasm` module
+(posted `WebAssembly.Module`) and calls `trace_job`. Cancel = `worker.terminate()` and a fresh worker
+from the cached module (a synchronous wasm call cannot receive a message; a `SharedArrayBuffer` flag
+needs COOP/COEP we do not serve). Debounce 150 ms, "Tracing..." after 400 ms and Stop after 1.5 s are
+TypeScript timers. The reduced copy (longest side 1000 px, area-averaged) is a function of
+`curvyo-image-core`. Create paths inserts the worker's full-size results (one per selected image,
+Frage 61) through `editor-wasm` into one `ui-core` command, one history step; the source images stay
+(Frage 54 A). Rejected as before: a native Tauri thread (second code path, different numbers in the
+browser), a second small `-wasm` crate, a `SharedArrayBuffer` flag.
 
 ### 6. Format
 
-None. The result is a group and a compound path, existing kinds; the settings are an app setting.
-`format_version` is unchanged (criterion 33).
+None. Group and compound path are existing kinds; the settings are an app setting.
 
-### 7. Quality harness and step 0
+### 7. Spike result and step 0
 
-The harness is an `#[ignore]` integration test of `curvyo-vectorize-core` with a rasteriser of its own
-(nonzero scanline fill at 4x, test code) computing the metrics of `research.md` §5. Fixtures in
-`tests/fixtures/trace/`: synthetic ones (rectangle, disc, ring with dot) are generated by test code;
-real images are PNGs with an origin note, own or CC0.
+Spike of 2026-10-27 (throwaway workspace member, reverted; nothing committed):
 
-**External tracers never enter `Cargo.lock`.** Inkscape (potrace), VTracer (`vtracer` CLI) and
-VectorCraft (its own CLI) are run offline by a script in `tools/trace-baseline/` on the developer's
-machine, writing SVGs to an ignored `target/trace-baseline/`. The harness reads those SVGs and writes
-`tests/fixtures/trace/baseline.json` with numbers only. No GPL output and no output of another tracer
-is committed; running a GPL program is not linking to it. Step 0 is this harness plus those three
-baselines, built before the pipeline; its table is copied into this ADR. Reading VectorCraft's MIT OR
-Apache-2.0 sources as ideas is fine; copying a file needs Frage 60 = A, a dated amendment listing the
-files and the notices kept.
+| Check | Result |
+|---|---|
+| `cargo deny check` with `visioncortex` 0.8.10 | ok (licences, advisories, sources); 2 new duplicate warnings |
+| `cargo deny check` with `vtracer` 0.6.5 | **fails**: `atty`, `ansi_term`, `adler` unmaintained |
+| `wasm32-unknown-unknown` build | ok, no imports needed; spike module 66 KB release, before `wasm-opt` |
+| Input | in-memory `BinaryImage` built from our mask; no file I/O, no `image` decoding |
+| Run-to-run / native vs wasm | identical / differs by `acos` only (§4) |
+| 2000 x 2000 px, 400 shapes + 20 000 noise pixels, 12 859 regions | 0.11 s thread CPU native, 0.19 s in Node (wasm); budget 4 s |
+| Rectangle fixture (crit. 20) | 1 outline, 4 nodes, corners exact at (50, 25) … (50, 75) |
+| AA disc r = 100 px (crit. 21) | 7 nodes; deviation max 0.66 px, mean 0.20 px at segment 10; mean 0.34 px at segment 4 |
+| Ring with dot (crit. 22) | outer and hole wound opposite; the dot is its own region (step 2) |
+| Cancel / progress | none in the library; our `poll` between regions (§2) |
 
-The nightly workflow runs the harness and fails on a regression above 5 % (criterion 36); the PR gate
-runs only the fast fixture tests.
+Step 0 (first build task) is the harness of the previous version of this section, unchanged: an
+`#[ignore]` integration test with its own 4x scanline rasteriser computing the metrics of
+`research.md` §5; Inkscape and VectorCraft run offline by `tools/trace-baseline/` into an ignored
+`target/trace-baseline/`, only `tests/fixtures/trace/baseline.json` (numbers) is committed. Our
+visioncortex-based trace is now the candidate, not a baseline. Its table is copied here. The nightly
+job fails on a regression above 5 %.
+
+### 8. Fallback to C
+
+If, after tuning §3's mapping, step 0 shows a miss of the criterion 28 targets on the black and white
+set that our pre/post-processing cannot fix, or memory above criterion 26 that cannot be brought
+down, the PR says so per image and the lead asks the customer whether to build the own pipeline C
+(sub-pixel contours, `kurbo` fit, the earlier text of this ADR in git history). The public API (§2)
+does not change, so the fallback is a crate-internal swap plus dropping the dependency.
 
 ## Consequences
 
-- One new crate, no new external dependency, no new `unsafe`, no format change.
-- The wasm worker holds a second linear memory: the module's own memory plus the RGBA copy (64 MB at
-  16 Mpx) plus at most 10 bytes per pixel of intermediate data (luma 2, labels 4, union-find 4); the
-  bound of criterion 26 is checked by a counting allocator in a native test.
-- Terminate-to-cancel loses the worker's cached image; it is re-sent (one transfer) after a cancel.
-- The 4 s budget is gated on native (criterion 25), but desktop ships wasm. If the wasm time on the
-  2000 x 2000 px line-art fixture is above 4 s, the PR records it in `docs/technical-debt.md` and the
-  native-thread option above becomes a follow-up ADR.
-- A plugin tracer (ADR 0005) would need an image type in the WIT interface; not written now
-  (Frage 55 A). `trace`'s signature is the shape that type would carry.
+- One new crate, one new external dependency tree (7 small crates, permissive), no new `unsafe` in
+  our code, no format change.
+- Outlines follow the thresholded pixel border, smoothed; there is no sub-pixel position from the
+  anti-aliasing. The disc numbers above show this is within the criteria at the default.
+- Memory: our mask (1 bit) and labels (`u32` + union-find, 8 B/px) plus visioncortex's per-region
+  copies (a bit image, a `u16` label image and 8 B per hole pixel of the region being traced); worst
+  case about 18 B/px for a full-page region, measured by the counting allocator of criterion 26; above
+  16 B/px it goes to `docs/technical-debt.md` (the criterion says so; no self-made limit).
+- Native and wasm differ in the last few nodes until the upstream `acos` fix lands (§4).
+- A plugin tracer (ADR 0005) would need an image type in the WIT interface; not written now.
