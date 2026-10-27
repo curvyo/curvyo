@@ -13,6 +13,7 @@ import { Rulers } from "@/components/Rulers";
 import { SelectToolbar } from "@/components/SelectToolbar";
 import { ShapeToolbar } from "@/components/ShapeToolbar";
 import { TextBar } from "@/components/TextBar";
+import { TraceBar } from "@/components/TraceBar";
 import { focusCurrentFont } from "@/lib/textText";
 import { readRow2Open, writeRow2Open } from "@/lib/textBarRows";
 import { setPreviewOpen } from "@/lib/fontPreviewStore";
@@ -190,7 +191,7 @@ function Editor() {
             // The Select bar is left-aligned so its two switches never move
             // when the selection changes; the Node and Shape bars stay
             // centred (`docs/design-system.md`, "Select bar layout").
-            editor.tool === "select" ? "justify-start" : "justify-center"
+            editor.tool === "select" || editor.tool === "trace" ? "justify-start" : "justify-center"
           }`}
         >
           {editor.tool === "select" ? (
@@ -232,11 +233,20 @@ function Editor() {
               linkedCloneShown={editor.clones.shown}
               onLinkedClone={() => editor.clones.apply("linked-clone")}
               linkedCloneNotice={editor.clones.barNotice}
+              traceShown={editor.trace.available}
+              onTrace={() => editor.setTool("trace")}
               flipEnabled={editor.flipEnabled}
               flip={editor.flip}
               guideState={editor.guideState}
               onToggleGuide={editor.toggleGuide}
               arcBar={editor.arcBar}
+              onReturnFocus={() => editor.containerRef.current?.focus()}
+            />
+          ) : null}
+          {editor.tool === "trace" ? (
+            <TraceBar
+              trace={editor.trace}
+              onImport={() => project.importFiles()}
               onReturnFocus={() => editor.containerRef.current?.focus()}
             />
           ) : null}

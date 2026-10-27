@@ -1649,3 +1649,29 @@ follows it (`DashPattern::MAX_DASHES_PER_OBJECT`, read by `curvyo-render-core` a
 `curvyo-geometry-core`), so a dense dash on a long path is outlined as a solid line.
 
 **Resolution:** open. Raising the cap needs the cache.
+
+## The tracer refuses a region with 65,000 holes or more (`0025` criterion 16, 2026-10-27)
+
+`visioncortex` labels the clusters of one crop with `u16` and panics at 65,535. Our labelling is
+`u32` and hands it one boundary at a time, so the panic cannot occur; the one place left where the
+library's limit would show is a single region with that many holes, and criterion 16 turns it into
+the status "Too much detail: raise Specks." (`curvyo-vectorize-core`, `MAX_HOLES_PER_REGION`).
+
+**Resolution:** open; lifts with an upstream `u32` labelling or the own pipeline of ADR 0023 §8.
+
+## Native and wasm traces differ in the last few nodes (`0025` criterion 18, 2026-10-27)
+
+`visioncortex` measures corner and splice angles with `f64::acos`, which is the platform `libm` on
+native and Rust's `libm` on wasm. The golden files are native and exact; `npm test` compares the
+wasm build with equal path counts, nodes within 1 % and boxes within 0.01 mm. The preview and
+Create paths run in the same wasm worker, so what is previewed is what is created.
+
+**Resolution:** open; an upstream PR replacing the `acos` with basic operations, then the wasm
+check returns to 1e-6 mm (ADR 0023 §4).
+
+## The Trace preview is tessellated every frame (`0025` criterion 8, 2026-10-27)
+
+The preview outline is cached as anchors and culled to the visible canvas per outline, but its
+stroke is built again every frame. Criterion 56 (100,000 nodes under 16 ms) is slice 3.
+
+**Resolution:** open, slice 3.

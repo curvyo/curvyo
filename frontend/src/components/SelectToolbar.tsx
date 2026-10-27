@@ -3,6 +3,7 @@ import { AlignmentGroup } from "@/components/AlignmentGroup";
 import type { OrientationCode, WritingModeCode } from "@/lib/textWritingText";
 import { StyleGroup } from "@/components/StyleGroup";
 import { StrokeToPathButton } from "@/components/StrokeToPathButton";
+import { TraceButton } from "@/components/TraceBar";
 import type { StrokeToPathBarNotice } from "@/hooks/useStrokeToPath";
 import { OnPathButton, type TextPathActions } from "@/components/TextPathGroups";
 import { BAR_ROW_CLASS } from "@/lib/barLayout";
@@ -96,6 +97,9 @@ export interface SelectToolbarProps {
   onLinkedClone: () => void;
   /** The notice of the last Linked clone, 4 px under the button (UX notes). */
   linkedCloneNotice: CloneBarNotice | null;
+  /** The Trace button: shown with only images selected (`specs/0025-raster-trace` criterion 1). */
+  traceShown?: boolean;
+  onTrace?: () => void;
   /** The flip buttons act: something is selected (`specs/0056-mirror-and-negative-scale/`
    * criterion 1). */
   flipEnabled: boolean;
@@ -599,6 +603,8 @@ export function SelectToolbar({
   linkedCloneShown,
   onLinkedClone,
   linkedCloneNotice,
+  traceShown = false,
+  onTrace,
   flipEnabled,
   flip,
   guideState,
@@ -767,6 +773,10 @@ export function SelectToolbar({
         notice={linkedCloneNotice}
       />,
     );
+  }
+  if (traceShown && onTrace) {
+    // Last, in a group of its own, so no earlier control moves (`0025` UX notes section 1).
+    groups.push(<TraceButton key="trace" onTrace={onTrace} onReturnFocus={onReturnFocus} />);
   }
   return (
     <div

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { type CanvasNotice, type HistoryNames, MAC, useHistory } from "@/hooks/useHistory";
 import { type ClonesApi, useClones } from "@/hooks/useClones";
 import { type StrokeToPathApi, useStrokeToPath } from "@/hooks/useStrokeToPath";
+import { type TraceApi, useTrace } from "@/hooks/useTrace";
 import { isStrokeToPathChord } from "@/lib/strokeToPathText";
 import { type GroupingApi, useGrouping } from "@/hooks/useGrouping";
 import { type OffsetApi, readOffsetView, useOffset } from "@/hooks/useOffset";
@@ -49,7 +50,8 @@ export type Tool =
   | "ellipse"
   | "polygon-star"
   | "offset"
-  | "text";
+  | "text"
+  | "trace";
 
 /** The polygon/star tool-options bar's mode toggle (acceptance criteria
  * 11 vs. 12). */
@@ -719,6 +721,8 @@ export interface EditorSession {
   clones: ClonesApi;
   /** Stroke to path: the Select bar button and Ctrl+Alt+C (`specs/0085-stroke-to-path`). */
   strokeToPath: StrokeToPathApi;
+  /** The Trace tool (`specs/0025-raster-trace`). */
+  trace: TraceApi;
   /** The flip buttons and the keys H and V (`specs/0056-mirror-and-negative-scale/`). */
   flip: FlipApi;
   /** The flip buttons act: something is selected in the Select tool. */
@@ -1143,6 +1147,16 @@ export function useEditorSession(
   const clones = useClones(getSession, syncFromSession, history.showNotice, containerRef);
   const strokeToPath = useStrokeToPath(getSession, syncFromSession);
   const strokeToPathReady = tool === "select" && selectBar.strokeToPathEnabled;
+  const focusCanvas = useCallback(() => containerRef.current?.focus(), []);
+  const trace = useTrace(getSession, syncFromSession, syncRevision, tool, history.showNotice, focusCanvas);
+  // Enter and Escape of the Trace tool, and a double-click that creates, reach it through refs so
+  // the canvas handlers keep their dependencies (`specs/0025-raster-trace` criterion 12).
+  const traceKeyRef = useRef(trace.keyDown);
+  const traceCreateRef = useRef(trace.create);
+  useEffect(() => {
+    traceKeyRef.current = trace.keyDown;
+    traceCreateRef.current = trace.create;
+  }, [trace.keyDown, trace.create]);
   const { refresh: refreshClones, handleKeyOutcome: handleCloneOutcome } = clones;
   const flip = useFlip(getSession, syncFromSession, history.showNotice);
   const { handleKeyOutcome: handleFlipOutcome } = flip;
@@ -2189,6 +2203,8 @@ export function useEditorSession(
         const hintCode = session.double_click(press.x, press.y, press.shift, press.ctrl);
         if (hintCode === "offset_chip") {
           // The chip mounts with the next sync and takes the focus (`0038` criterion 53).
+        } else if (hintCode === "create_trace") {
+          traceCreateRef.current();
         } else if (hintCode) {
           // A double-click on a primitive changes nothing; the hint says how
           // to edit it (criterion 32), on every such double-click. On a
@@ -2415,6 +2431,10 @@ export function useEditorSession(
         if (strokeToPathReady && !event.repeat) {
           strokeToPath.apply();
         }
+        return;
+      }
+      if (traceKeyRef.current(event.nativeEvent)) {
+        event.preventDefault();
         return;
       }
       const outcome = session.key_down(
@@ -2709,6 +2729,7 @@ export function useEditorSession(
     text,
     clones,
     strokeToPath,
+    trace,
     flip,
     flipEnabled,
     guideState,
