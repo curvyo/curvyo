@@ -1,0 +1,29 @@
+[package]
+name = "curvyo-vectorize-core"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "The Curvyo raster tracer: an RGBA8 raster and trace settings in, closed outlines in document millimetres out (pure, wasm-compatible)."
+
+[lints]
+workspace = true
+
+[dependencies]
+curvyo-document-core = { path = "../curvyo-document-core", version = "0.1.0" }
+kurbo.workspace = true
+thiserror.workspace = true
+visioncortex.workspace = true
+
+[target.'cfg(unix)'.dev-dependencies]
+# The CPU-time budget of criterion 25 reads the thread's CPU clock (`CLAUDE.md` §5).
+rustix = { version = "1.1", features = ["time"] }
+
+[dev-dependencies]
+# The golden files of `tests/fixtures/trace/` (criterion 18).
+serde_json.workspace = true
+# The quality harness reads Inkscape's baseline SVGs (ADR 0023 §1, dev only).
+curvyo-svg-core = { path = "../curvyo-svg-core", version = "0.1.0" }
+# The counting global allocator of the memory test (criterion 26), dev only: MIT OR Apache-2.0,
+# no dependencies, keeps the `unsafe` of an allocator out of our code.
+cap = { version = "0.1.2", features = ["stats"] }
