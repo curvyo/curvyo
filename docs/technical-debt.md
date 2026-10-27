@@ -184,7 +184,11 @@ paths, the basic shapes (rectangles, ellipses and Inkscape stars stay primitives
 groups, Inkscape layers, transforms, the simple `<style>` rules, colours and opacities, dashes,
 caps and joins, even-odd fills (re-wound by depth), `<use>` as a linked clone or a copy, and the
 page from the file's sizes and viewBox. Its second slice imports live text as editable text
-objects and embedded PNG, JPEG and WebP pictures as image objects. Everything else (clip paths,
+objects and embedded PNG, JPEG and WebP pictures as image objects. Its third slice keeps
+Inkscape's arcs (as ellipse arcs), polygons and exact stars as primitives when they draw the same
+line within 0.001 mm, and imports spirals as a path and 3D boxes as a group of paths without
+their perspective; rectangles with `rx ≠ ry` and rounded, randomized or twisted stars stay paths.
+Everything else (clip paths,
 masks, filters, markers, gradients beyond their middle colour, linked images, text decorations,
 foreign data such as `inkstitch:`) is ignored silently: there is no loss report and no passthrough bag (customer decisions of 2026-10-16,
 ADR 0018 §5). There is no SVG export yet (the later slice of `0024`), so nothing round-trips.

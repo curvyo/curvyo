@@ -18,8 +18,8 @@ constants, larger than 50 MiB, not UTF-8, and compressed `.svgz`.
 - **Shapes.** `path` (every command of SVG 1.1 and 2, arcs as cubic curves of at most 45°),
   `rect`, `circle`, `ellipse`, `line`, `polyline`, `polygon`. A rectangle, circle or ellipse stays
   a primitive when its transform is a move, rotation, uniform scale or mirror (or a stretch along
-  its axes); otherwise it becomes its exact outline. An Inkscape star or polygon stays one while
-  its drawn path still matches its star data. Inkscape's node types are kept.
+  its axes); otherwise it becomes its exact outline. Inkscape's own shapes are described under
+  "Inkscape shapes". Inkscape's node types are kept.
 - **Structure.** `g` and `a` as groups (32 levels), `switch` as its first child that SVG draws
   (no required extension, only SVG 1.1 features, English or no `systemLanguage`, not a
   `foreignObject`), nested `svg` as a group, Inkscape layers with their names, hidden and locked state and
@@ -85,6 +85,30 @@ once. An embedded picture may be up to the 50 MiB file limit (the 16 MiB attribu
 apply to it); the limits of picture import (`docs/importing-images.md`) apply to its contents.
 A linked image (a file path or address), another picture type, or a damaged or cut-off picture is
 left out.
+
+## Inkscape shapes
+
+Inkscape saves every shape tool object as a path that also carries the tool's numbers. The import
+makes the Curvyo primitive from those numbers only when its outline and the drawn path lie within
+0.001 mm of each other (checked at 16 points per segment, both ways); otherwise, and when a number
+is missing, unreadable or out of range, the object is an ordinary path from its drawn data, without
+a message. A node moved by hand or by another program therefore gives a path.
+
+- **Arcs** (the ellipse tool with angles) become an ellipse with an arc: Inkscape's slice is a
+  pie, arc an arc, chord a chord; a file without `arc-type` (Inkscape 0.92) is an arc when it is
+  open, else a pie. An arc without angles, or one that sweeps the whole turn, is a whole ellipse.
+  A move, rotation, uniform scale or mirror keeps the arc, a stretch along its axes too; a rotated
+  or skewed stretch gives a path. An arc is named "Arc".
+- **Polygons and stars** (the star tool) become a polygon or a star when they are not rounded,
+  not randomized and, for a star, not twisted (the inner points halfway between the outer ones).
+  A stretch gives a path.
+- **Stay paths:** rectangles whose corner radii differ in x and y (Curvyo's corners are circular),
+  rounded or randomized stars and polygons, twisted stars.
+- **Spirals** are one open path named "Spiral".
+- **3D boxes** are a group named "3D box" of their faces, each a path with its own style named
+  "Face 1" to "Face 6"; the perspective is not kept.
+
+A name given in Inkscape (`inkscape:label`) always wins.
 
 ## Ignored
 
