@@ -1,76 +1,88 @@
-//! The "new" half of blue-new, black-old
-//! (`specs/0009-unified-object-editing/specification.md`, criteria 10 to 15): the
-//! geometry a release would commit, drawn as a hollow `--preview-new` outline
-//! of constant screen width over the unchanged committed objects. The
-//! committed objects are not touched here; "black old" is the absence of a
-//! second render path, because the document's own strokes are drawn exactly
-//! as they are.
+//! The hollow outlines of the edit previews (`specs/0009-unified-object-editing/specification.md`,
+//! criteria 10 to 15, and its note of 2026-10-27): the blue outline of geometry a release would
+//! commit, and the ghost a Select-tool drag leaves at the origin while the moved objects are drawn
+//! as themselves at the pointer. Both have a constant screen width; the artwork is not touched
+//! here.
 
-use curvyo_document_core::{ObjectSnapshot, ViewTransform};
+use std::borrow::Cow;
 
+use curvyo_document_core::{
+    AnchorSnapshot, ObjectSnapshot, ViewTransform, drawing_outline_of_rotated,
+};
+
+use crate::color::RgbaColor;
 use crate::glyphs::DrawList;
-use crate::shape_preview::shape_live_outline;
+use crate::shape_preview::outline_to_anchors;
 use crate::stroke;
 use crate::theme;
 
 /// The hollow `--preview-new` outline of every object in `objects` (the
-/// resolved geometry of a Select-tool drag or bar edit): a primitive through
+/// resolved geometry of a bar slider edit or a create preview): a primitive through
 /// its rotated outline, a path through its anchors. 1.5 px wide on screen
 /// whatever the object's own stroke width; no fill preview.
 #[must_use]
 pub fn build_live_edit_preview(objects: &[ObjectSnapshot], view: ViewTransform) -> DrawList {
+    hollow_outlines(objects, view, theme::PREVIEW_NEW)
+}
+
+/// The ghost a Select-tool drag leaves behind (customer 2026-10-27, `docs/design-system.md` row
+/// "Drag ghost"): the outline of every object in `objects` (the committed objects the drag moves)
+/// in the look of [`build_live_edit_preview`], its line in `--drag-ghost`, while the
+/// objects themselves are drawn at the pointer.
+#[must_use]
+pub fn build_drag_ghost(objects: &[ObjectSnapshot], view: ViewTransform) -> DrawList {
+    hollow_outlines(objects, view, theme::DRAG_GHOST)
+}
+
+/// Every outline of `objects` as a 1.5 px line in `line` over its white casing.
+fn hollow_outlines(objects: &[ObjectSnapshot], view: ViewTransform, line: RgbaColor) -> DrawList {
     let width_mm = theme::LIVE_PREVIEW_STROKE_PX / view.scale();
     let tolerance_mm = theme::DISPLAY_TOLERANCE_PX / view.scale();
+    let outlines: Vec<Vec<(Cow<'_, [AnchorSnapshot]>, bool)>> =
+        objects.iter().map(outlines_of).collect();
     let mut list = DrawList::default();
     // Every casing first, then every line: the casing of one object never
     // covers the line of another (`0007` criterion 40; the outline is always
     // above all artwork because it belongs to the overlay).
     for casing in [true, false] {
-        for object in objects {
-            list.extend(match object {
-                ObjectSnapshot::Primitive(primitive) => {
-                    shape_live_outline(&primitive.shape, primitive.rotation, view, casing)
-                }
-                ObjectSnapshot::Image(image) => stroke::path_stroke(
-                    &crate::image_layer::frame_anchors(image),
-                    true,
-                    if casing {
-                        width_mm * theme::CASING_WIDTH_FACTOR
-                    } else {
-                        width_mm
-                    },
-                    if casing {
-                        theme::SELECTION_CASING
-                    } else {
-                        theme::PREVIEW_NEW
-                    },
-                    tolerance_mm,
-                ),
-                _ => object.drawn_path().map_or_else(DrawList::default, |path| {
-                    let mut outlines = DrawList::default();
-                    for subpath in path.subpaths() {
-                        outlines.extend(stroke::path_stroke(
-                            subpath.anchors,
-                            subpath.closed,
-                            if casing {
-                                width_mm * theme::CASING_WIDTH_FACTOR
-                            } else {
-                                width_mm
-                            },
-                            if casing {
-                                theme::SELECTION_CASING
-                            } else {
-                                theme::PREVIEW_NEW
-                            },
-                            tolerance_mm,
-                        ));
-                    }
-                    outlines
-                }),
-            });
+        let (width, colour) = if casing {
+            (
+                width_mm * theme::CASING_WIDTH_FACTOR,
+                theme::SELECTION_CASING,
+            )
+        } else {
+            (width_mm, line)
+        };
+        for (anchors, closed) in outlines.iter().flatten() {
+            list.extend(stroke::path_stroke(
+                anchors,
+                *closed,
+                width,
+                colour,
+                tolerance_mm,
+            ));
         }
     }
     list
+}
+
+/// The outlines of one object as anchors: a primitive's rotated outline, an image's frame, a
+/// path's (or a text's glyph) subpaths.
+fn outlines_of(object: &ObjectSnapshot) -> Vec<(Cow<'_, [AnchorSnapshot]>, bool)> {
+    match object {
+        ObjectSnapshot::Primitive(primitive) => {
+            let outline = drawing_outline_of_rotated(&primitive.shape, primitive.rotation);
+            vec![(Cow::Owned(outline_to_anchors(&outline)), outline.closed)]
+        }
+        ObjectSnapshot::Image(image) => {
+            vec![(Cow::Owned(crate::image_layer::frame_anchors(image)), true)]
+        }
+        _ => object.drawn_path().map_or_else(Vec::new, |path| {
+            path.subpaths()
+                .map(|subpath| (Cow::Borrowed(subpath.anchors), subpath.closed))
+                .collect()
+        }),
+    }
 }
 
 #[cfg(test)]
@@ -116,6 +128,30 @@ mod tests {
                 .all(|v| (v.position.x - 5.0).abs() > 2.5 || (v.position.y - 5.0).abs() > 2.5),
             "no fill preview"
         );
+    }
+
+    /// Customer 2026-10-27: the ghost has the outline's geometry, its line in the ghost colour.
+    #[test]
+    fn the_drag_ghost_is_the_same_outline_in_the_ghost_colour() {
+        let document = Document::new(1);
+        let id = document.create_rect(RectBounds {
+            origin: Point::new(0.0, 0.0),
+            width: Length::from_mm(10.0),
+            height: Length::from_mm(10.0),
+        });
+        let object = document.object(id).expect("exists");
+        let blue = build_live_edit_preview(std::slice::from_ref(&object), view(1.0));
+        let ghost = build_drag_ghost(std::slice::from_ref(&object), view(1.0));
+        assert_eq!(ghost.triangle_count(), blue.triangle_count());
+        for (g, b) in ghost.triangles.iter().zip(&blue.triangles) {
+            assert_eq!(g.position, b.position);
+            let expected = if b.color == theme::PREVIEW_NEW {
+                theme::DRAG_GHOST
+            } else {
+                b.color
+            };
+            assert_eq!(g.color, expected);
+        }
     }
 
     #[test]

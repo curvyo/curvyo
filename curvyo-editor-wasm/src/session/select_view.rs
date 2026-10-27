@@ -47,17 +47,16 @@ impl Session {
         )
     }
 
-    /// The document's objects with `live` substituted: the one place live
-    /// geometry enters, and only for the decorations (the boxes, handles,
-    /// pivot marker and readout follow the new geometry). The objects
-    /// themselves are always drawn as committed, so the old geometry stays on
-    /// screen under the blue outline; a copy substitutes nothing. Without a
-    /// substitution the committed objects are borrowed, not copied.
+    /// The document's objects with `live` substituted, for the decorations (the
+    /// boxes, handles, pivot marker and readout follow the new geometry); the
+    /// artwork takes the same objects through [`super::drag_swap`]. A copy
+    /// substitutes nothing here. Without a substitution the committed objects
+    /// are borrowed, not copied.
     pub(super) fn live_objects_in<'a>(
         objects: &'a [ObjectSnapshot],
         live: Option<&LiveEdit>,
     ) -> Cow<'a, [ObjectSnapshot]> {
-        // In a copy the blue outline travels alone: the boxes, handles and the
+        // In a copy the copies travel alone: the boxes, handles and the
         // pivot stay on the originals (`edit-interaction-polish` criterion 33).
         let Some(live) = live.filter(|live| !live.copy) else {
             return Cow::Borrowed(objects);

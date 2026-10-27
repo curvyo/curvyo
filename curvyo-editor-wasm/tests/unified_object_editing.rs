@@ -16,7 +16,7 @@ use curvyo_document_core::{
     unpack,
 };
 use curvyo_editor_wasm::{Session, Tool};
-use curvyo_render_core::{RgbaColor, build_live_edit_preview};
+use curvyo_render_core::{build_artwork, build_drag_ghost, build_live_edit_preview};
 use curvyo_ui_core::{BarValue, EntryOutcome, InvalidReason};
 
 fn pt(x: f64, y: f64) -> Point {
@@ -254,13 +254,14 @@ fn a_star_inner_radius_drag_shows_a_ratio_readout() {
 // Criteria 10 to 14: blue new, black old
 // ---------------------------------------------------------------------
 
-/// Criterion 10: during a radius drag the committed rectangle stays drawn
-/// unchanged in black and the geometry the release commits is drawn over it,
-/// in blue; after the release there is only the new black one.
+/// Criterion 10 as changed by the customer on 2026-10-27: during a radius drag
+/// the rectangle is drawn as the release will commit it, and the outline of
+/// the committed one stays behind as the ghost; after the release there is
+/// only the new one.
 #[test]
-fn a_drag_draws_the_old_object_in_black_and_the_new_geometry_in_blue() {
+fn a_drag_draws_the_new_object_and_leaves_the_ghost_of_the_old_one() {
     let mut session = selected_rect(0.0);
-    let before_drag = session.draw_list();
+    let old = first_object(&session);
     let knob = ne_radius_handle(&session, RECT, 0.0);
     session.pointer_hover(knob, false, false);
     session.pointer_down(knob, false);
@@ -269,7 +270,8 @@ fn a_drag_draws_the_old_object_in_black_and_the_new_geometry_in_blue() {
     let during = session.draw_list();
     session.pointer_up(to, false, false);
     let committed = first_object(&session);
-    let expected_blue = build_live_edit_preview(std::slice::from_ref(&committed), session.view());
+    let expected = build_artwork(std::slice::from_ref(&committed), session.view());
+    let ghost = build_drag_ghost(std::slice::from_ref(&old), session.view());
     let has = |frame: &curvyo_render_core::DrawList, v: &curvyo_render_core::Vertex| {
         frame.triangles.iter().any(|w| {
             w.color == v.color
@@ -277,26 +279,23 @@ fn a_drag_draws_the_old_object_in_black_and_the_new_geometry_in_blue() {
                 && (w.position.y - v.position.y).abs() < 1e-6
         })
     };
-    assert!(expected_blue.triangle_count() > 0);
+    assert!(expected.triangle_count() > 0);
     assert!(
-        expected_blue.triangles.iter().all(|v| has(&during, v)),
-        "the blue outline is exactly what the release commits"
+        expected.triangles.iter().all(|v| has(&during, v)),
+        "the object drawn during the drag is exactly what the release commits"
     );
-    let black = RgbaColor::BLACK;
     assert!(
-        before_drag
-            .triangles
-            .iter()
-            .filter(|v| v.color == black)
-            .all(|v| has(&during, v)),
-        "the old stroke is unchanged during the drag"
+        ghost.triangles.iter().all(|v| has(&during, v)),
+        "the ghost of the old object stays"
     );
-    // After the release the object is drawn in black at the new geometry
-    // and the blue overlay is gone.
     let after = session.draw_list();
     assert!(
-        !expected_blue.triangles.iter().all(|v| has(&after, v)),
-        "no blue outline remains after the release"
+        expected.triangles.iter().all(|v| has(&after, v)),
+        "the new object after the release"
+    );
+    assert!(
+        !ghost.triangles.iter().all(|v| has(&after, v)),
+        "no ghost remains after the release"
     );
 }
 

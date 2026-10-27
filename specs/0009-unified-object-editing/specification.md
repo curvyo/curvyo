@@ -233,6 +233,23 @@ the parameter-handle threshold).
 
 ### Blue new, black old, in every edit
 
+**Changed (customer, 2026-10-27): the object follows, its ghost stays.** The roles of
+criteria 10 to 15 are swapped for every Select-tool drag (move, Ctrl copy, resize, rotate,
+skew, corner and inner radius, the bar sliders) and for a text on path dragged along its
+carrier (`0080`). The affected objects are drawn as themselves (fill, stroke, picture, glyphs)
+with the geometry the release would commit, in their place in the stacking order; the committed
+geometry stays behind as the **drag ghost**, a 1.5 px hollow outline of constant screen width in
+`--drag-ghost` (`--accent` at 60 %) over its white casing, drawn where the blue outline was
+(above the artwork and the move axes, below the boxes and handles). In a Ctrl copy the originals
+stay drawn as themselves and the copies are drawn at the pointer directly above them; there is
+no ghost. Linked clones and texts on a moved carrier follow as themselves too. Escape and a
+drag back to the start leave the frame as before the drag. Where the criteria below say "blue
+outline" for these drags, read "the object drawn at the pointer"; where they say "old geometry
+unchanged in its own rendering", read "the ghost". The Node tool, the segment bend and the
+Boolean and Offset previews keep blue new, black old. Cost: the frame draws the moved objects
+instead of the committed ones and the ghost instead of the blue outline, the same work as before
+(the renderer re-tessellates every frame, `docs/technical-debt.md`, "renderer not cached").
+
 10. Given a Select-tool drag that changes geometry (move, resize, rotate, skew,
     corner radius, inner radius), then for the whole drag every affected
     object is drawn twice: its committed geometry unchanged in its own
