@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="210mm"
+   height="297mm"
+   viewBox="0 0 210 297"
+   version="1.1"
+   id="svg1"
+   sodipodi:docname="seed_flowroot.svg"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs1" />
+  <sodipodi:namedview
+     id="nv"
+     inkscape:document-units="mm"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1" />
+  <g
+     id="layer1"
+     inkscape:groupmode="layer"
+     inkscape:label="Layer 1">
+    <flowRoot
+       id="flow1"
+       inkscape:label="flow1"
+       xml:space="preserve"
+       style="font-size:5.64444px;line-height:1.25;font-family:'Source Sans 3';text-align:start;fill:#000000"><flowRegion
+         id="fr1"><rect
+           id="frect1"
+           x="20"
+           y="30"
+           width="60"
+           height="80" /></flowRegion><flowPara
+         id="fp1">The quick brown fox jumps over the lazy dog and keeps on running far away.</flowPara><flowPara
+         id="fp2">Second paragraph.</flowPara></flowRoot>
+    <flowRoot
+       id="flow2"
+       inkscape:label="flow2"
+       xml:space="preserve"
+       style="font-size:5.64444px;line-height:1.25;font-family:'Source Sans 3';text-align:center;text-anchor:middle;fill:#000000"><flowRegion
+         id="fr2"><rect
+           id="frect2"
+           x="110"
+           y="30"
+           width="60"
+           height="80" /></flowRegion><flowPara
+         id="fp3">Centred flowed text that needs to wrap more than once in its box.</flowPara></flowRoot>
+  </g>
+</svg>

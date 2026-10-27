@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200mm" height="200mm" viewBox="0 0 200 200">
+  <text x="10 16 22 28 34" y="20" style="font-size:8px">Chart</text>
+  <text x="10" y="35" rotate="0 30 -30 0 15" style="font-size:8px;font-family:serif">Turns</text>
+  <text x="10" y="50" dominant-baseline="middle" style="font-size:8px">middle</text>
+  <text x="60" y="50" dominant-baseline="central" style="font-size:8px">central</text>
+  <text x="110" y="50" dominant-baseline="hanging" style="font-size:8px">hanging</text>
+  <text x="10" y="65" style="font-size:8px">E = mc<tspan baseline-shift="super" style="font-size:5px">2</tspan></text>
+  <text x="10" y="80" style="font-size:x-large;text-transform:uppercase;font-family:cursive">shouting</text>
+  <text x="10" y="95" style="font-size:8px">Big <tspan style="font-size:1.5em">em</tspan> words</text>
+  <text x="10" y="110" style="font-size:8px;font-family:monospace">   collapsed    spaces   </text>
+  <text x="10" y="120" xml:space="preserve" style="font-size:8px">   kept    spaces</text>
+  <text x="10" y="135" style="font-size:8px;white-space:pre">first
+second</text>
+  <switch>
+    <foreignObject requiredExtensions="http://ns.adobe.com/AdobeIllustrator/10.0/" width="1" height="1"/>
+    <g><rect x="150" y="150" width="20" height="10"/><text x="150" y="175" style="font-size:8px">Behind the switch</text></g>
+  </switch>
+  <switch>
+    <foreignObject width="1" height="1"><p xmlns="http://www.w3.org/1999/xhtml">HTML</p></foreignObject>
+    <g><rect x="150" y="180" width="20" height="10"/></g>
+  </switch>
+</svg>

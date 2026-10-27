@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+     xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+     xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+     width="210mm" height="297mm" viewBox="0 0 210 297">
+  <sodipodi:namedview id="nv" inkscape:document-units="mm"/>
+  <defs id="defs1">
+    <rect id="frame1" x="10" y="250" width="60" height="40"/>
+  </defs>
+  <g id="layer1" inkscape:groupmode="layer" inkscape:label="Text">
+    <text id="t_one" inkscape:label="t_one" xml:space="preserve" x="10" y="20" style="font-size:10.5833px;line-height:1.25;font-family:'Source Sans 3';fill:#000000">Curvyo AVATAR</text>
+    <text id="t_multi" inkscape:label="t_multi" xml:space="preserve" x="150" y="20" style="font-size:7.05556px;line-height:1.25;font-family:'Source Sans 3';text-anchor:middle;text-align:center;fill:#000000"><tspan sodipodi:role="line" x="150" y="20">First line</tspan><tspan sodipodi:role="line" x="150" y="28.8194">Second, longer line</tspan><tspan sodipodi:role="line" x="150" y="37.6389">Third</tspan></text>
+    <text id="t_right" inkscape:label="t_right" xml:space="preserve" x="200" y="50" style="font-size:7.05556px;font-family:'Source Sans 3';text-anchor:end;text-align:end">Right aligned</text>
+    <text id="t_bold" inkscape:label="t_bold" xml:space="preserve" x="10" y="40" style="font-size:7.05556px;font-family:'Source Sans 3';font-weight:bold">Bold face</text>
+    <text id="t_italic" inkscape:label="t_italic" xml:space="preserve" x="10" y="50" style="font-size:7.05556px;font-family:'Source Sans 3';font-style:italic">Italic face</text>
+    <text id="t_light" inkscape:label="t_light" xml:space="preserve" x="10" y="60" style="font-size:7.05556px;font-family:'Source Sans 3';font-weight:300">Light face</text>
+    <text id="t_bolditalic" inkscape:label="t_bolditalic" xml:space="preserve" x="10" y="70" style="font-size:7.05556px;font-family:'Source Sans 3';font-weight:bold;font-style:italic">Bold Italic face</text>
+    <text id="t_semibold" inkscape:label="t_semibold" xml:space="preserve" x="10" y="80" style="font-size:7.05556px;font-family:'Source Sans 3';font-weight:600">Semibold asks</text>
+    <text id="t_serif" inkscape:label="t_serif" xml:space="preserve" x="10" y="90" style="font-size:7.05556px;font-family:'Source Serif 4'">Serif Type</text>
+    <text id="t_spacing" inkscape:label="t_spacing" xml:space="preserve" x="10" y="100" style="font-size:7.05556px;font-family:'Source Sans 3';letter-spacing:0.5px;word-spacing:2px">Spaced out words</text>
+    <text id="t_kerns" inkscape:label="t_kerns" xml:space="preserve" x="10" y="110" style="font-size:7.05556px;font-family:'Source Sans 3'"><tspan sodipodi:role="line" x="10" y="110" dx="0 0.6 -0.4 0 1.2" dy="0 0 -1 1 0" rotate="0 0 0 0 0 0 0 25 0">KERNED pair</tspan></text>
+    <text id="t_mixed" inkscape:label="t_mixed" xml:space="preserve" x="10" y="122" style="font-size:7.05556px;font-family:'Source Sans 3';fill:#000000">Hello <tspan style="font-weight:bold">world</tspan> <tspan style="fill:#ff0000;font-size:4.9389px">red</tspan></text>
+    <text id="t_super" inkscape:label="t_super" xml:space="preserve" x="60" y="122" style="font-size:7.05556px;font-family:'Source Sans 3'">x<tspan style="baseline-shift:super">2</tspan></text>
+    <text id="t_vertical" inkscape:label="t_vertical" xml:space="preserve" x="190" y="70" style="font-size:7.05556px;font-family:'Source Sans 3';writing-mode:vertical-rl;text-orientation:upright">VERT</text>
+    <text id="t_rot30" inkscape:label="t_rot30" xml:space="preserve" x="0" y="0" transform="translate(110,70) rotate(30)" style="font-size:7.05556px;font-family:'Source Sans 3'">Rotated</text>
+    <text id="t_stretch" inkscape:label="t_stretch" xml:space="preserve" x="0" y="0" transform="matrix(1.5,0,0,1,100,130)" style="font-size:7.05556px;font-family:'Source Sans 3'">Stretched</text>
+    <text id="t_mirror" inkscape:label="t_mirror" xml:space="preserve" x="0" y="0" transform="matrix(-1,0,0,1,190,140)" style="font-size:7.05556px;font-family:'Source Sans 3'">Mirrored</text>
+    <text id="t_missing" inkscape:label="t_missing" xml:space="preserve" x="10" y="140" style="font-size:7.05556px;font-family:'Nonexistent Sans'">Missing font</text>
+    <text id="t_inline" inkscape:label="t_inline" xml:space="preserve" x="80" y="250" style="font-size:5.64444px;line-height:1.25;font-family:'Source Sans 3';inline-size:40;white-space:pre">An inline-size text that wraps onto several lines in Inkscape</text>
+    <text id="t_shape" inkscape:label="t_shape" xml:space="preserve" style="font-size:5.64444px;line-height:1.25;font-family:'Source Sans 3';shape-inside:url(#frame1);white-space:pre">A shape-inside frame text that also wraps across lines inside the rectangle</text>
+  </g>
+  <g id="layer2" inkscape:groupmode="layer" inkscape:label="Paths">
+    <path id="carrier_open" d="M 10,170 C 40,150 70,190 100,170" style="fill:none;stroke:#0000ff;stroke-width:0.3"/>
+    <text id="tp_open" inkscape:label="tp_open" xml:space="preserve" style="font-size:5.64444px;font-family:'Source Sans 3'"><textPath xlink:href="#carrier_open">Along an open path</textPath></text>
+    <circle id="carrier_circle" cx="150" cy="200" r="40" style="fill:none;stroke:#000000;stroke-width:0.3"/>
+    <text id="tp_circle" inkscape:label="tp_circle" xml:space="preserve" style="font-size:7.05556px;font-family:'Source Sans 3';text-anchor:middle"><textPath xlink:href="#carrier_circle" startOffset="75%">CURVYO</textPath></text>
+    <rect id="carrier_rect" x="20" y="200" width="60" height="30" style="fill:none;stroke:none"/>
+    <text id="tp_rect" inkscape:label="tp_rect" xml:space="preserve" style="font-size:5.64444px;font-family:'Source Sans 3'"><textPath xlink:href="#carrier_rect" startOffset="5">On a rectangle</textPath></text>
+    <path id="carrier_side" d="M 110,260 L 200,260" style="fill:none;stroke:none"/>
+    <text id="tp_side" inkscape:label="tp_side" xml:space="preserve" style="font-size:5.64444px;font-family:'Source Sans 3'"><textPath xlink:href="#carrier_side" side="right" startOffset="10">Right side</textPath></text>
+    <path id="carrier_moved" d="M 110,280 L 200,280" style="fill:none;stroke:#00aa00;stroke-width:0.3"/>
+    <text id="tp_moved" inkscape:label="tp_moved" xml:space="preserve" transform="translate(0,-8)" style="font-size:5.64444px;font-family:'Source Sans 3'"><textPath xlink:href="#carrier_moved">Own transform</textPath></text>
+  </g>
+</svg>

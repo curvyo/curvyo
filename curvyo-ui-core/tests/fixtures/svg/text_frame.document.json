@@ -1,0 +1,165 @@
+{
+  "assets": [],
+  "background": {
+    "color": [
+      232,
+      232,
+      235
+    ],
+    "opacity": 1.0,
+    "paint": "none"
+  },
+  "display_unit": "mm",
+  "leaves": 2,
+  "nodes": [
+    {
+      "Group": {
+        "children": [
+          {
+            "Text": {
+              "registers": {
+                "locked": false,
+                "name": "t_inline",
+                "opacity": 1.0,
+                "visible": true
+              },
+              "text": {
+                "font": {
+                  "face_hash": "08df266400933d3178d081a45f94a08814c3e55b4b7dd2e0ff69cb1329f13ab6",
+                  "face_index": 0,
+                  "family": "Source Sans 3",
+                  "style": "Regular"
+                },
+                "layout": {
+                  "align": "left",
+                  "letter_spacing": 0.0,
+                  "line_spacing": 1.9054878048780486,
+                  "rotation": 0.0,
+                  "word_spacing": 0.0
+                },
+                "placement": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  1.0,
+                  80.0,
+                  250.0
+                ],
+                "size": 3.7027526400000004,
+                "string": "An inline-size \ntext that wraps \nonto several \nlines in Inkscape",
+                "style": {
+                  "fill": {
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "enabled": true,
+                    "opacity": 1.0
+                  },
+                  "stroke": {
+                    "cap": "butt",
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "dash": [],
+                    "enabled": false,
+                    "join": "miter",
+                    "markers": {
+                      "end": "none",
+                      "mid": "none",
+                      "mid_count": 1,
+                      "mid_place": "spaced",
+                      "start": "none"
+                    },
+                    "opacity": 1.0,
+                    "width": 0.25
+                  }
+                }
+              }
+            }
+          },
+          {
+            "Text": {
+              "registers": {
+                "locked": false,
+                "name": "t_shape",
+                "opacity": 1.0,
+                "visible": true
+              },
+              "text": {
+                "font": {
+                  "face_hash": "08df266400933d3178d081a45f94a08814c3e55b4b7dd2e0ff69cb1329f13ab6",
+                  "face_index": 0,
+                  "family": "Source Sans 3",
+                  "style": "Regular"
+                },
+                "layout": {
+                  "align": "left",
+                  "letter_spacing": 0.0,
+                  "line_spacing": 1.9054878048780486,
+                  "rotation": 0.0,
+                  "word_spacing": 0.0
+                },
+                "placement": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  1.0,
+                  10.0,
+                  254.9623
+                ],
+                "size": 3.7027526400000004,
+                "string": "A shape-inside frame text \nthat also wraps across \nlines inside the rectangle",
+                "style": {
+                  "fill": {
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "enabled": true,
+                    "opacity": 1.0
+                  },
+                  "stroke": {
+                    "cap": "butt",
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "dash": [],
+                    "enabled": false,
+                    "join": "miter",
+                    "markers": {
+                      "end": "none",
+                      "mid": "none",
+                      "mid_count": 1,
+                      "mid_place": "spaced",
+                      "start": "none"
+                    },
+                    "opacity": 1.0,
+                    "width": 0.25
+                  }
+                }
+              }
+            }
+          }
+        ],
+        "layer": true,
+        "registers": {
+          "locked": false,
+          "name": "Text",
+          "opacity": 1.0,
+          "visible": true
+        }
+      }
+    }
+  ],
+  "page": [
+    210.0,
+    297.0
+  ]
+}

@@ -1,0 +1,182 @@
+{
+  "assets": [
+    "74d0cf0d4fd801c988315ad32f834f271393f40ffa6e339edb6ab9796dba70e6",
+    "c310b9a1c208a699e465f279020ed9e8b162c48450cd8f36d8e6b0992ecf336c"
+  ],
+  "background": {
+    "color": [
+      232,
+      232,
+      235
+    ],
+    "opacity": 1.0,
+    "paint": "none"
+  },
+  "display_unit": "mm",
+  "leaves": 7,
+  "nodes": [
+    {
+      "Group": {
+        "children": [
+          {
+            "Image": {
+              "asset": 0,
+              "placement": [
+                50.0,
+                0.0,
+                0.0,
+                25.0,
+                0.0,
+                12.5
+              ],
+              "registers": {
+                "locked": false,
+                "name": "img_png",
+                "opacity": 1.0,
+                "visible": true
+              }
+            }
+          },
+          {
+            "Image": {
+              "asset": 0,
+              "placement": [
+                50.0,
+                0.0,
+                0.0,
+                50.0,
+                60.0,
+                0.0
+              ],
+              "registers": {
+                "locked": false,
+                "name": "img_none",
+                "opacity": 1.0,
+                "visible": true
+              }
+            }
+          },
+          {
+            "Image": {
+              "asset": 0,
+              "placement": [
+                100.0,
+                0.0,
+                0.0,
+                50.0,
+                120.0,
+                0.0
+              ],
+              "registers": {
+                "locked": false,
+                "name": "img_slice",
+                "opacity": 1.0,
+                "visible": true
+              }
+            }
+          },
+          {
+            "Image": {
+              "asset": 1,
+              "placement": [
+                60.0,
+                0.0,
+                0.0,
+                40.0,
+                10.0,
+                80.0
+              ],
+              "registers": {
+                "locked": false,
+                "name": "img_jpeg",
+                "opacity": 1.0,
+                "visible": true
+              }
+            }
+          },
+          {
+            "Image": {
+              "asset": 1,
+              "placement": [
+                51.96152422706632,
+                29.999999999999996,
+                -19.999999999999996,
+                34.64101615137755,
+                114.01923571757338,
+                67.67949069699087
+              ],
+              "registers": {
+                "locked": false,
+                "name": "img_rot",
+                "opacity": 1.0,
+                "visible": true
+              }
+            }
+          },
+          {
+            "Image": {
+              "asset": 1,
+              "placement": [
+                60.0,
+                0.0,
+                14.558809370648094,
+                40.0,
+                64.59553513993035,
+                150.0
+              ],
+              "registers": {
+                "locked": false,
+                "name": "img_skew",
+                "opacity": 1.0,
+                "visible": true
+              }
+            }
+          },
+          {
+            "Group": {
+              "children": [
+                {
+                  "Image": {
+                    "asset": 0,
+                    "placement": [
+                      40.0,
+                      0.0,
+                      0.0,
+                      40.0,
+                      140.0,
+                      140.0
+                    ],
+                    "registers": {
+                      "locked": false,
+                      "name": "img_clip",
+                      "opacity": 1.0,
+                      "visible": true
+                    }
+                  }
+                }
+              ],
+              "layer": false,
+              "registers": {
+                "locked": false,
+                "name": null,
+                "opacity": 1.0,
+                "visible": true
+              }
+            }
+          }
+        ],
+        "layer": true,
+        "registers": {
+          "locked": false,
+          "name": "Images",
+          "opacity": 1.0,
+          "visible": true
+        }
+      }
+    }
+  ],
+  "page": [
+    210.0,
+    297.0
+  ]
+}

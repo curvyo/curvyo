@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="210mm"
+   height="297mm"
+   viewBox="0 0 210 297"
+   version="1.1"
+   id="svg11"
+   sodipodi:docname="seed_text.svg"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:xlink="http://www.w3.org/1999/xlink"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="nv"
+     inkscape:document-units="mm"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1" />
+  <defs
+     id="defs1">
+    <rect
+       id="frame1"
+       x="10"
+       y="250"
+       width="60"
+       height="40" />
+  </defs>
+  <g
+     id="layer1"
+     inkscape:groupmode="layer"
+     inkscape:label="Text">
+    <text
+       id="t_inline"
+       inkscape:label="t_inline"
+       xml:space="preserve"
+       x="80"
+       y="250"
+       style="font-size:5.64444px;line-height:1.25;font-family:'Source Sans 3';white-space:pre;inline-size:40"><tspan
+         x="80"
+         y="250"
+         id="tspan8">An inline-size </tspan><tspan
+         x="80"
+         y="257.05556"
+         id="tspan9">text that wraps </tspan><tspan
+         x="80"
+         y="264.1111"
+         id="tspan10">onto several </tspan><tspan
+         x="80"
+         y="271.16664"
+         id="tspan11">lines in Inkscape</tspan></text>
+    <text
+       id="t_shape"
+       inkscape:label="t_shape"
+       xml:space="preserve"
+       style="font-size:5.64444px;line-height:1.25;font-family:'Source Sans 3';white-space:pre;shape-inside:url(#frame1)"><tspan
+         x="10"
+         y="254.9623"
+         id="tspan12">A shape-inside frame text </tspan><tspan
+         x="10"
+         y="262.01784"
+         id="tspan13">that also wraps across </tspan><tspan
+         x="10"
+         y="269.07338"
+         id="tspan14">lines inside the rectangle</tspan></text>
+  </g>
+</svg>

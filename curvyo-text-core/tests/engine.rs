@@ -281,3 +281,13 @@ fn collection_of(fonts: &[Vec<u8>]) -> Vec<u8> {
     out.extend_from_slice(&tables);
     out
 }
+
+/// `specs/0024-svg-import-export` criterion 90: the OS/2 superscript and subscript y offsets in
+/// em (Source Sans 3: 350 and 75 of 1,000 units).
+#[test]
+fn os2_superscript_and_subscript_offsets() {
+    let (store, key) = store_with(SANS);
+    let metrics = face(&store, &key).metrics();
+    assert_eq!(metrics.superscript_offset, Some(0.35));
+    assert_eq!(metrics.subscript_offset, Some(0.075));
+}

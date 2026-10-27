@@ -1,0 +1,799 @@
+{
+  "assets": [],
+  "background": {
+    "color": [
+      232,
+      232,
+      235
+    ],
+    "opacity": 1.0,
+    "paint": "none"
+  },
+  "display_unit": "mm",
+  "leaves": 11,
+  "nodes": [
+    {
+      "Group": {
+        "children": [
+          {
+            "Path": {
+              "outlines": [
+                {
+                  "anchors": [
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 30.0,
+                        "y": -20.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 10.0,
+                        "y": 170.0
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": -30.0,
+                        "y": 20.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 100.0,
+                        "y": 170.0
+                      }
+                    }
+                  ],
+                  "closed": false
+                }
+              ],
+              "registers": {
+                "locked": false,
+                "name": null,
+                "opacity": 1.0,
+                "visible": true
+              },
+              "style": {
+                "fill": {
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "enabled": false,
+                  "opacity": 1.0
+                },
+                "stroke": {
+                  "cap": "butt",
+                  "color": {
+                    "b": 255,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "dash": [],
+                  "enabled": true,
+                  "join": "miter",
+                  "markers": {
+                    "end": "none",
+                    "mid": "none",
+                    "mid_count": 1,
+                    "mid_place": "spaced",
+                    "start": "none"
+                  },
+                  "opacity": 1.0,
+                  "width": 0.3
+                }
+              }
+            }
+          },
+          {
+            "TextOnPath": {
+              "carrier": 0,
+              "registers": {
+                "locked": false,
+                "name": "tp_open",
+                "opacity": 1.0,
+                "visible": true
+              },
+              "text": {
+                "font": {
+                  "face_hash": "08df266400933d3178d081a45f94a08814c3e55b4b7dd2e0ff69cb1329f13ab6",
+                  "face_index": 0,
+                  "family": "Source Sans 3",
+                  "style": "Regular"
+                },
+                "placement": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  1.0,
+                  0.0,
+                  0.0
+                ],
+                "size": 3.7027526400000004,
+                "string": "Along an open path",
+                "style": {
+                  "fill": {
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "enabled": true,
+                    "opacity": 1.0
+                  },
+                  "stroke": {
+                    "cap": "butt",
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "dash": [],
+                    "enabled": false,
+                    "join": "miter",
+                    "markers": {
+                      "end": "none",
+                      "mid": "none",
+                      "mid_count": 1,
+                      "mid_place": "spaced",
+                      "start": "none"
+                    },
+                    "opacity": 1.0,
+                    "width": 0.25
+                  }
+                }
+              },
+              "values": {
+                "distance": 0.0,
+                "line": "baseline",
+                "mirror_letters": false,
+                "position": 22.848693120000004,
+                "side": "above"
+              }
+            }
+          },
+          {
+            "Primitive": {
+              "registers": {
+                "locked": false,
+                "name": null,
+                "opacity": 1.0,
+                "visible": true
+              },
+              "rotation": 0.0,
+              "shape": {
+                "Ellipse": {
+                  "arc": null,
+                  "curve": 1.0,
+                  "frame": {
+                    "center": {
+                      "x": 150.0,
+                      "y": 200.0
+                    },
+                    "rx": 40.0,
+                    "ry": 40.0
+                  }
+                }
+              },
+              "style": {
+                "fill": {
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "enabled": false,
+                  "opacity": 1.0
+                },
+                "stroke": {
+                  "cap": "butt",
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "dash": [],
+                  "enabled": true,
+                  "join": "miter",
+                  "markers": {
+                    "end": "none",
+                    "mid": "none",
+                    "mid_count": 1,
+                    "mid_place": "spaced",
+                    "start": "none"
+                  },
+                  "opacity": 1.0,
+                  "width": 0.3
+                }
+              }
+            }
+          },
+          {
+            "TextOnPath": {
+              "carrier": 1,
+              "registers": {
+                "locked": false,
+                "name": "tp_circle",
+                "opacity": 1.0,
+                "visible": true
+              },
+              "text": {
+                "font": {
+                  "face_hash": "08df266400933d3178d081a45f94a08814c3e55b4b7dd2e0ff69cb1329f13ab6",
+                  "face_index": 0,
+                  "family": "Source Sans 3",
+                  "style": "Regular"
+                },
+                "placement": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  1.0,
+                  0.0,
+                  0.0
+                ],
+                "size": 4.62844736,
+                "string": "CURVYO",
+                "style": {
+                  "fill": {
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "enabled": true,
+                    "opacity": 1.0
+                  },
+                  "stroke": {
+                    "cap": "butt",
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "dash": [],
+                    "enabled": false,
+                    "join": "miter",
+                    "markers": {
+                      "end": "none",
+                      "mid": "none",
+                      "mid_count": 1,
+                      "mid_place": "spaced",
+                      "start": "none"
+                    },
+                    "opacity": 1.0,
+                    "width": 0.25
+                  }
+                }
+              },
+              "values": {
+                "distance": 0.0,
+                "line": "baseline",
+                "mirror_letters": false,
+                "position": 188.49555921769942,
+                "side": "above"
+              }
+            }
+          },
+          {
+            "Primitive": {
+              "registers": {
+                "guide": true,
+                "locked": false,
+                "name": null,
+                "opacity": 1.0,
+                "visible": true
+              },
+              "rotation": 0.0,
+              "shape": {
+                "Rect": {
+                  "bounds": {
+                    "height": 30.0,
+                    "origin": {
+                      "x": 20.0,
+                      "y": 200.0
+                    },
+                    "width": 60.0
+                  },
+                  "corner_radii": {
+                    "bl": 0.0,
+                    "br": 0.0,
+                    "tl": 0.0,
+                    "tr": 0.0
+                  }
+                }
+              },
+              "style": {
+                "fill": {
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "enabled": false,
+                  "opacity": 1.0
+                },
+                "stroke": {
+                  "cap": "butt",
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "dash": [],
+                  "enabled": false,
+                  "join": "miter",
+                  "markers": {
+                    "end": "none",
+                    "mid": "none",
+                    "mid_count": 1,
+                    "mid_place": "spaced",
+                    "start": "none"
+                  },
+                  "opacity": 1.0,
+                  "width": 0.25
+                }
+              }
+            }
+          },
+          {
+            "TextOnPath": {
+              "carrier": 2,
+              "registers": {
+                "locked": false,
+                "name": "tp_rect",
+                "opacity": 1.0,
+                "visible": true
+              },
+              "text": {
+                "font": {
+                  "face_hash": "08df266400933d3178d081a45f94a08814c3e55b4b7dd2e0ff69cb1329f13ab6",
+                  "face_index": 0,
+                  "family": "Source Sans 3",
+                  "style": "Regular"
+                },
+                "placement": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  1.0,
+                  0.0,
+                  0.0
+                ],
+                "size": 3.7027526400000004,
+                "string": "On a rectangle",
+                "style": {
+                  "fill": {
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "enabled": true,
+                    "opacity": 1.0
+                  },
+                  "stroke": {
+                    "cap": "butt",
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "dash": [],
+                    "enabled": false,
+                    "join": "miter",
+                    "markers": {
+                      "end": "none",
+                      "mid": "none",
+                      "mid_count": 1,
+                      "mid_place": "spaced",
+                      "start": "none"
+                    },
+                    "opacity": 1.0,
+                    "width": 0.25
+                  }
+                }
+              },
+              "values": {
+                "distance": 0.0,
+                "line": "baseline",
+                "mirror_letters": false,
+                "position": 21.98129774,
+                "side": "above"
+              }
+            }
+          },
+          {
+            "Path": {
+              "outlines": [
+                {
+                  "anchors": [
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 110.0,
+                        "y": 260.0
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 200.0,
+                        "y": 260.0
+                      }
+                    }
+                  ],
+                  "closed": false
+                }
+              ],
+              "registers": {
+                "guide": true,
+                "locked": false,
+                "name": null,
+                "opacity": 1.0,
+                "visible": true
+              },
+              "style": {
+                "fill": {
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "enabled": false,
+                  "opacity": 1.0
+                },
+                "stroke": {
+                  "cap": "butt",
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "dash": [],
+                  "enabled": false,
+                  "join": "miter",
+                  "markers": {
+                    "end": "none",
+                    "mid": "none",
+                    "mid_count": 1,
+                    "mid_place": "spaced",
+                    "start": "none"
+                  },
+                  "opacity": 1.0,
+                  "width": 0.25
+                }
+              }
+            }
+          },
+          {
+            "TextOnPath": {
+              "carrier": 3,
+              "registers": {
+                "locked": false,
+                "name": "tp_side",
+                "opacity": 1.0,
+                "visible": true
+              },
+              "text": {
+                "font": {
+                  "face_hash": "08df266400933d3178d081a45f94a08814c3e55b4b7dd2e0ff69cb1329f13ab6",
+                  "face_index": 0,
+                  "family": "Source Sans 3",
+                  "style": "Regular"
+                },
+                "placement": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  1.0,
+                  0.0,
+                  0.0
+                ],
+                "size": 3.7027526400000004,
+                "string": "Right side",
+                "style": {
+                  "fill": {
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "enabled": true,
+                    "opacity": 1.0
+                  },
+                  "stroke": {
+                    "cap": "butt",
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "dash": [],
+                    "enabled": false,
+                    "join": "miter",
+                    "markers": {
+                      "end": "none",
+                      "mid": "none",
+                      "mid_count": 1,
+                      "mid_place": "spaced",
+                      "start": "none"
+                    },
+                    "opacity": 1.0,
+                    "width": 0.25
+                  }
+                }
+              },
+              "values": {
+                "distance": 0.0,
+                "line": "baseline",
+                "mirror_letters": false,
+                "position": 68.38092026,
+                "side": "below"
+              }
+            }
+          },
+          {
+            "Path": {
+              "outlines": [
+                {
+                  "anchors": [
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 110.0,
+                        "y": 280.0
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 200.0,
+                        "y": 280.0
+                      }
+                    }
+                  ],
+                  "closed": false
+                }
+              ],
+              "registers": {
+                "locked": false,
+                "name": null,
+                "opacity": 1.0,
+                "visible": true
+              },
+              "style": {
+                "fill": {
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "enabled": false,
+                  "opacity": 1.0
+                },
+                "stroke": {
+                  "cap": "butt",
+                  "color": {
+                    "b": 0,
+                    "g": 170,
+                    "r": 0
+                  },
+                  "dash": [],
+                  "enabled": true,
+                  "join": "miter",
+                  "markers": {
+                    "end": "none",
+                    "mid": "none",
+                    "mid_count": 1,
+                    "mid_place": "spaced",
+                    "start": "none"
+                  },
+                  "opacity": 1.0,
+                  "width": 0.3
+                }
+              }
+            }
+          },
+          {
+            "Path": {
+              "outlines": [
+                {
+                  "anchors": [
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 110.0,
+                        "y": 272.0
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 200.0,
+                        "y": 272.0
+                      }
+                    }
+                  ],
+                  "closed": false
+                }
+              ],
+              "registers": {
+                "guide": true,
+                "locked": false,
+                "name": null,
+                "opacity": 1.0,
+                "visible": true
+              },
+              "style": {
+                "fill": {
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "enabled": false,
+                  "opacity": 1.0
+                },
+                "stroke": {
+                  "cap": "butt",
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "dash": [],
+                  "enabled": false,
+                  "join": "miter",
+                  "markers": {
+                    "end": "none",
+                    "mid": "none",
+                    "mid_count": 1,
+                    "mid_place": "spaced",
+                    "start": "none"
+                  },
+                  "opacity": 1.0,
+                  "width": 0.25
+                }
+              }
+            }
+          },
+          {
+            "TextOnPath": {
+              "carrier": 5,
+              "registers": {
+                "locked": false,
+                "name": "tp_moved",
+                "opacity": 1.0,
+                "visible": true
+              },
+              "text": {
+                "font": {
+                  "face_hash": "08df266400933d3178d081a45f94a08814c3e55b4b7dd2e0ff69cb1329f13ab6",
+                  "face_index": 0,
+                  "family": "Source Sans 3",
+                  "style": "Regular"
+                },
+                "placement": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -8.0
+                ],
+                "size": 3.7027526400000004,
+                "string": "Own transform",
+                "style": {
+                  "fill": {
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "enabled": true,
+                    "opacity": 1.0
+                  },
+                  "stroke": {
+                    "cap": "butt",
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "dash": [],
+                    "enabled": false,
+                    "join": "miter",
+                    "markers": {
+                      "end": "none",
+                      "mid": "none",
+                      "mid_count": 1,
+                      "mid_place": "spaced",
+                      "start": "none"
+                    },
+                    "opacity": 1.0,
+                    "width": 0.25
+                  }
+                }
+              },
+              "values": {
+                "distance": 0.0,
+                "line": "baseline",
+                "mirror_letters": false,
+                "position": 17.66991942,
+                "side": "above"
+              }
+            }
+          }
+        ],
+        "layer": true,
+        "registers": {
+          "locked": false,
+          "name": "Paths",
+          "opacity": 1.0,
+          "visible": true
+        }
+      }
+    }
+  ],
+  "page": [
+    210.0,
+    297.0
+  ]
+}

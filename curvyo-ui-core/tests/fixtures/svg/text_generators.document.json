@@ -1,0 +1,1177 @@
+{
+  "assets": [],
+  "background": null,
+  "display_unit": null,
+  "leaves": 17,
+  "nodes": [
+    {
+      "Text": {
+        "registers": {
+          "locked": false,
+          "name": null,
+          "opacity": 1.0,
+          "visible": true
+        },
+        "text": {
+          "chars": [
+            [
+              1,
+              {
+                "kern_x": 0.2728658536585365,
+                "kern_y": -0.0,
+                "rotation": 0.0
+              }
+            ],
+            [
+              2,
+              {
+                "kern_x": 0.3140243902439022,
+                "kern_y": -0.0,
+                "rotation": 0.0
+              }
+            ],
+            [
+              3,
+              {
+                "kern_x": 0.375,
+                "kern_y": -0.0,
+                "rotation": 0.0
+              }
+            ],
+            [
+              4,
+              {
+                "kern_x": 0.614329268292683,
+                "kern_y": -0.0,
+                "rotation": 0.0
+              }
+            ]
+          ],
+          "font": {
+            "face_hash": "08df266400933d3178d081a45f94a08814c3e55b4b7dd2e0ff69cb1329f13ab6",
+            "face_index": 0,
+            "family": "Source Sans 3",
+            "style": "Regular"
+          },
+          "placement": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            10.0,
+            20.0
+          ],
+          "size": 5.248,
+          "string": "Chart",
+          "style": {
+            "fill": {
+              "color": {
+                "b": 0,
+                "g": 0,
+                "r": 0
+              },
+              "enabled": true,
+              "opacity": 1.0
+            },
+            "stroke": {
+              "cap": "butt",
+              "color": {
+                "b": 0,
+                "g": 0,
+                "r": 0
+              },
+              "dash": [],
+              "enabled": false,
+              "join": "miter",
+              "markers": {
+                "end": "none",
+                "mid": "none",
+                "mid_count": 1,
+                "mid_place": "spaced",
+                "start": "none"
+              },
+              "opacity": 1.0,
+              "width": 0.25
+            }
+          }
+        }
+      }
+    },
+    {
+      "Text": {
+        "registers": {
+          "locked": false,
+          "name": null,
+          "opacity": 1.0,
+          "visible": true
+        },
+        "text": {
+          "chars": [
+            [
+              1,
+              {
+                "kern_x": 0.2245468734375582,
+                "kern_y": -0.28452461154061637,
+                "rotation": 30.0
+              }
+            ],
+            [
+              2,
+              {
+                "kern_x": -0.484003033287694,
+                "kern_y": 0.3753731343283581,
+                "rotation": -30.0
+              }
+            ],
+            [
+              3,
+              {
+                "kern_x": 0.29229198074565854,
+                "kern_y": -0.09084852278774175,
+                "rotation": 0.0
+              }
+            ],
+            [
+              4,
+              {
+                "kern_x": 0.11837355882697355,
+                "kern_y": -0.10086355370210319,
+                "rotation": 15.0
+              }
+            ]
+          ],
+          "font": {
+            "face_hash": "e5a4ee6a3d87bb9024796be390c6771e2a0eb1883dae25effaf57ca01668e24b",
+            "face_index": 0,
+            "family": "Source Serif 4",
+            "style": "Regular"
+          },
+          "placement": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            10.0,
+            35.0
+          ],
+          "size": 5.36,
+          "string": "Turns",
+          "style": {
+            "fill": {
+              "color": {
+                "b": 0,
+                "g": 0,
+                "r": 0
+              },
+              "enabled": true,
+              "opacity": 1.0
+            },
+            "stroke": {
+              "cap": "butt",
+              "color": {
+                "b": 0,
+                "g": 0,
+                "r": 0
+              },
+              "dash": [],
+              "enabled": false,
+              "join": "miter",
+              "markers": {
+                "end": "none",
+                "mid": "none",
+                "mid_count": 1,
+                "mid_place": "spaced",
+                "start": "none"
+              },
+              "opacity": 1.0,
+              "width": 0.25
+            }
+          }
+        }
+      }
+    },
+    {
+      "Text": {
+        "registers": {
+          "locked": false,
+          "name": null,
+          "opacity": 1.0,
+          "visible": true
+        },
+        "text": {
+          "chars": [
+            [
+              0,
+              {
+                "kern_x": 0.0,
+                "kern_y": -0.3704268292682932,
+                "rotation": 0.0
+              }
+            ]
+          ],
+          "font": {
+            "face_hash": "08df266400933d3178d081a45f94a08814c3e55b4b7dd2e0ff69cb1329f13ab6",
+            "face_index": 0,
+            "family": "Source Sans 3",
+            "style": "Regular"
+          },
+          "placement": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            10.0,
+            50.0
+          ],
+          "size": 5.248,
+          "string": "middle",
+          "style": {
+            "fill": {
+              "color": {
+                "b": 0,
+                "g": 0,
+                "r": 0
+              },
+              "enabled": true,
+              "opacity": 1.0
+            },
+            "stroke": {
+              "cap": "butt",
+              "color": {
+                "b": 0,
+                "g": 0,
+                "r": 0
+              },
+              "dash": [],
+              "enabled": false,
+              "join": "miter",
+              "markers": {
+                "end": "none",
+                "mid": "none",
+                "mid_count": 1,
+                "mid_place": "spaced",
+                "start": "none"
+              },
+              "opacity": 1.0,
+              "width": 0.25
+            }
+          }
+        }
+      }
+    },
+    {
+      "Text": {
+        "registers": {
+          "locked": false,
+          "name": null,
+          "opacity": 1.0,
+          "visible": true
+        },
+        "text": {
+          "chars": [
+            [
+              0,
+              {
+                "kern_x": 0.0,
+                "kern_y": -0.5137195121951216,
+                "rotation": 0.0
+              }
+            ]
+          ],
+          "font": {
+            "face_hash": "08df266400933d3178d081a45f94a08814c3e55b4b7dd2e0ff69cb1329f13ab6",
+            "face_index": 0,
+            "family": "Source Sans 3",
+            "style": "Regular"
+          },
+          "placement": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            60.0,
+            50.0
+          ],
+          "size": 5.248,
+          "string": "central",
+          "style": {
+            "fill": {
+              "color": {
+                "b": 0,
+                "g": 0,
+                "r": 0
+              },
+              "enabled": true,
+              "opacity": 1.0
+            },
+            "stroke": {
+              "cap": "butt",
+              "color": {
+                "b": 0,
+                "g": 0,
+                "r": 0
+              },
+              "dash": [],
+              "enabled": false,
+              "join": "miter",
+              "markers": {
+                "end": "none",
+                "mid": "none",
+                "mid_count": 1,
+                "mid_place": "spaced",
+                "start": "none"
+              },
+              "opacity": 1.0,
+              "width": 0.25
+            }
+          }
+        }
+      }
+    },
+    {
+      "Text": {
+        "registers": {
+          "locked": false,
+          "name": null,
+          "opacity": 1.0,
+          "visible": true
+        },
+        "text": {
+          "chars": [
+            [
+              0,
+              {
+                "kern_x": 0.0,
+                "kern_y": -1.219512195121951,
+                "rotation": 0.0
+              }
+            ]
+          ],
+          "font": {
+            "face_hash": "08df266400933d3178d081a45f94a08814c3e55b4b7dd2e0ff69cb1329f13ab6",
+            "face_index": 0,
+            "family": "Source Sans 3",
+            "style": "Regular"
+          },
+          "placement": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            110.0,
+            50.0
+          ],
+          "size": 5.248,
+          "string": "hanging",
+          "style": {
+            "fill": {
+              "color": {
+                "b": 0,
+                "g": 0,
+                "r": 0
+              },
+              "enabled": true,
+              "opacity": 1.0
+            },
+            "stroke": {
+              "cap": "butt",
+              "color": {
+                "b": 0,
+                "g": 0,
+                "r": 0
+              },
+              "dash": [],
+              "enabled": false,
+              "join": "miter",
+              "markers": {
+                "end": "none",
+                "mid": "none",
+                "mid_count": 1,
+                "mid_place": "spaced",
+                "start": "none"
+              },
+              "opacity": 1.0,
+              "width": 0.25
+            }
+          }
+        }
+      }
+    },
+    {
+      "Group": {
+        "children": [
+          {
+            "Text": {
+              "registers": {
+                "locked": false,
+                "name": null,
+                "opacity": 1.0,
+                "visible": true
+              },
+              "text": {
+                "font": {
+                  "face_hash": "08df266400933d3178d081a45f94a08814c3e55b4b7dd2e0ff69cb1329f13ab6",
+                  "face_index": 0,
+                  "family": "Source Sans 3",
+                  "style": "Regular"
+                },
+                "placement": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  1.0,
+                  10.0,
+                  65.0
+                ],
+                "size": 5.248,
+                "string": "E = mc",
+                "style": {
+                  "fill": {
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "enabled": true,
+                    "opacity": 1.0
+                  },
+                  "stroke": {
+                    "cap": "butt",
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "dash": [],
+                    "enabled": false,
+                    "join": "miter",
+                    "markers": {
+                      "end": "none",
+                      "mid": "none",
+                      "mid_count": 1,
+                      "mid_place": "spaced",
+                      "start": "none"
+                    },
+                    "opacity": 1.0,
+                    "width": 0.25
+                  }
+                }
+              }
+            }
+          },
+          {
+            "Text": {
+              "registers": {
+                "locked": false,
+                "name": null,
+                "opacity": 1.0,
+                "visible": true
+              },
+              "text": {
+                "chars": [
+                  [
+                    0,
+                    {
+                      "kern_x": 0.0,
+                      "kern_y": 0.5335365853658536,
+                      "rotation": 0.0
+                    }
+                  ]
+                ],
+                "font": {
+                  "face_hash": "08df266400933d3178d081a45f94a08814c3e55b4b7dd2e0ff69cb1329f13ab6",
+                  "face_index": 0,
+                  "family": "Source Sans 3",
+                  "style": "Regular"
+                },
+                "placement": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  1.0,
+                  31.672,
+                  65.0
+                ],
+                "size": 3.2800000000000002,
+                "string": "2",
+                "style": {
+                  "fill": {
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "enabled": true,
+                    "opacity": 1.0
+                  },
+                  "stroke": {
+                    "cap": "butt",
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "dash": [],
+                    "enabled": false,
+                    "join": "miter",
+                    "markers": {
+                      "end": "none",
+                      "mid": "none",
+                      "mid_count": 1,
+                      "mid_place": "spaced",
+                      "start": "none"
+                    },
+                    "opacity": 1.0,
+                    "width": 0.25
+                  }
+                }
+              }
+            }
+          }
+        ],
+        "layer": false,
+        "registers": {
+          "locked": false,
+          "name": "E = mc2",
+          "opacity": 1.0,
+          "visible": true
+        }
+      }
+    },
+    {
+      "Text": {
+        "registers": {
+          "locked": false,
+          "name": null,
+          "opacity": 1.0,
+          "visible": true
+        },
+        "text": {
+          "font": {
+            "face_hash": "8d509802186f1b51572531ecf313e8098f9a5bfdfaca93f0c9b34467f9982d15",
+            "face_index": 0,
+            "family": "Great Vibes",
+            "style": "Regular"
+          },
+          "placement": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            10.0,
+            80.0
+          ],
+          "size": 19.368000000000002,
+          "string": "SHOUTING",
+          "style": {
+            "fill": {
+              "color": {
+                "b": 0,
+                "g": 0,
+                "r": 0
+              },
+              "enabled": true,
+              "opacity": 1.0
+            },
+            "stroke": {
+              "cap": "butt",
+              "color": {
+                "b": 0,
+                "g": 0,
+                "r": 0
+              },
+              "dash": [],
+              "enabled": false,
+              "join": "miter",
+              "markers": {
+                "end": "none",
+                "mid": "none",
+                "mid_count": 1,
+                "mid_place": "spaced",
+                "start": "none"
+              },
+              "opacity": 1.0,
+              "width": 0.25
+            }
+          }
+        }
+      }
+    },
+    {
+      "Group": {
+        "children": [
+          {
+            "Text": {
+              "registers": {
+                "locked": false,
+                "name": null,
+                "opacity": 1.0,
+                "visible": true
+              },
+              "text": {
+                "font": {
+                  "face_hash": "08df266400933d3178d081a45f94a08814c3e55b4b7dd2e0ff69cb1329f13ab6",
+                  "face_index": 0,
+                  "family": "Source Sans 3",
+                  "style": "Regular"
+                },
+                "placement": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  1.0,
+                  10.0,
+                  95.0
+                ],
+                "size": 5.248,
+                "string": "Big ",
+                "style": {
+                  "fill": {
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "enabled": true,
+                    "opacity": 1.0
+                  },
+                  "stroke": {
+                    "cap": "butt",
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "dash": [],
+                    "enabled": false,
+                    "join": "miter",
+                    "markers": {
+                      "end": "none",
+                      "mid": "none",
+                      "mid_count": 1,
+                      "mid_place": "spaced",
+                      "start": "none"
+                    },
+                    "opacity": 1.0,
+                    "width": 0.25
+                  }
+                }
+              }
+            }
+          },
+          {
+            "Text": {
+              "registers": {
+                "locked": false,
+                "name": null,
+                "opacity": 1.0,
+                "visible": true
+              },
+              "text": {
+                "font": {
+                  "face_hash": "08df266400933d3178d081a45f94a08814c3e55b4b7dd2e0ff69cb1329f13ab6",
+                  "face_index": 0,
+                  "family": "Source Sans 3",
+                  "style": "Regular"
+                },
+                "placement": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  1.0,
+                  22.304000000000002,
+                  95.0
+                ],
+                "size": 7.872,
+                "string": "em",
+                "style": {
+                  "fill": {
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "enabled": true,
+                    "opacity": 1.0
+                  },
+                  "stroke": {
+                    "cap": "butt",
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "dash": [],
+                    "enabled": false,
+                    "join": "miter",
+                    "markers": {
+                      "end": "none",
+                      "mid": "none",
+                      "mid_count": 1,
+                      "mid_place": "spaced",
+                      "start": "none"
+                    },
+                    "opacity": 1.0,
+                    "width": 0.25
+                  }
+                }
+              }
+            }
+          },
+          {
+            "Text": {
+              "registers": {
+                "locked": false,
+                "name": null,
+                "opacity": 1.0,
+                "visible": true
+              },
+              "text": {
+                "font": {
+                  "face_hash": "08df266400933d3178d081a45f94a08814c3e55b4b7dd2e0ff69cb1329f13ab6",
+                  "face_index": 0,
+                  "family": "Source Sans 3",
+                  "style": "Regular"
+                },
+                "placement": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  1.0,
+                  38.204,
+                  95.0
+                ],
+                "size": 5.248,
+                "string": " words",
+                "style": {
+                  "fill": {
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "enabled": true,
+                    "opacity": 1.0
+                  },
+                  "stroke": {
+                    "cap": "butt",
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "dash": [],
+                    "enabled": false,
+                    "join": "miter",
+                    "markers": {
+                      "end": "none",
+                      "mid": "none",
+                      "mid_count": 1,
+                      "mid_place": "spaced",
+                      "start": "none"
+                    },
+                    "opacity": 1.0,
+                    "width": 0.25
+                  }
+                }
+              }
+            }
+          }
+        ],
+        "layer": false,
+        "registers": {
+          "locked": false,
+          "name": "Big em words",
+          "opacity": 1.0,
+          "visible": true
+        }
+      }
+    },
+    {
+      "Text": {
+        "registers": {
+          "locked": false,
+          "name": null,
+          "opacity": 1.0,
+          "visible": true
+        },
+        "text": {
+          "font": {
+            "face_hash": "08df266400933d3178d081a45f94a08814c3e55b4b7dd2e0ff69cb1329f13ab6",
+            "face_index": 0,
+            "family": "Source Sans 3",
+            "style": "Regular"
+          },
+          "placement": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            10.0,
+            110.0
+          ],
+          "size": 5.248,
+          "string": "collapsed spaces",
+          "style": {
+            "fill": {
+              "color": {
+                "b": 0,
+                "g": 0,
+                "r": 0
+              },
+              "enabled": true,
+              "opacity": 1.0
+            },
+            "stroke": {
+              "cap": "butt",
+              "color": {
+                "b": 0,
+                "g": 0,
+                "r": 0
+              },
+              "dash": [],
+              "enabled": false,
+              "join": "miter",
+              "markers": {
+                "end": "none",
+                "mid": "none",
+                "mid_count": 1,
+                "mid_place": "spaced",
+                "start": "none"
+              },
+              "opacity": 1.0,
+              "width": 0.25
+            }
+          }
+        }
+      }
+    },
+    {
+      "Text": {
+        "registers": {
+          "locked": false,
+          "name": null,
+          "opacity": 1.0,
+          "visible": true
+        },
+        "text": {
+          "font": {
+            "face_hash": "08df266400933d3178d081a45f94a08814c3e55b4b7dd2e0ff69cb1329f13ab6",
+            "face_index": 0,
+            "family": "Source Sans 3",
+            "style": "Regular"
+          },
+          "placement": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            10.0,
+            120.0
+          ],
+          "size": 5.248,
+          "string": "   kept    spaces",
+          "style": {
+            "fill": {
+              "color": {
+                "b": 0,
+                "g": 0,
+                "r": 0
+              },
+              "enabled": true,
+              "opacity": 1.0
+            },
+            "stroke": {
+              "cap": "butt",
+              "color": {
+                "b": 0,
+                "g": 0,
+                "r": 0
+              },
+              "dash": [],
+              "enabled": false,
+              "join": "miter",
+              "markers": {
+                "end": "none",
+                "mid": "none",
+                "mid_count": 1,
+                "mid_place": "spaced",
+                "start": "none"
+              },
+              "opacity": 1.0,
+              "width": 0.25
+            }
+          }
+        }
+      }
+    },
+    {
+      "Text": {
+        "registers": {
+          "locked": false,
+          "name": null,
+          "opacity": 1.0,
+          "visible": true
+        },
+        "text": {
+          "font": {
+            "face_hash": "08df266400933d3178d081a45f94a08814c3e55b4b7dd2e0ff69cb1329f13ab6",
+            "face_index": 0,
+            "family": "Source Sans 3",
+            "style": "Regular"
+          },
+          "placement": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            10.0,
+            135.0
+          ],
+          "size": 5.248,
+          "string": "first\nsecond",
+          "style": {
+            "fill": {
+              "color": {
+                "b": 0,
+                "g": 0,
+                "r": 0
+              },
+              "enabled": true,
+              "opacity": 1.0
+            },
+            "stroke": {
+              "cap": "butt",
+              "color": {
+                "b": 0,
+                "g": 0,
+                "r": 0
+              },
+              "dash": [],
+              "enabled": false,
+              "join": "miter",
+              "markers": {
+                "end": "none",
+                "mid": "none",
+                "mid_count": 1,
+                "mid_place": "spaced",
+                "start": "none"
+              },
+              "opacity": 1.0,
+              "width": 0.25
+            }
+          }
+        }
+      }
+    },
+    {
+      "Group": {
+        "children": [
+          {
+            "Primitive": {
+              "registers": {
+                "locked": false,
+                "name": null,
+                "opacity": 1.0,
+                "visible": true
+              },
+              "rotation": 0.0,
+              "shape": {
+                "Rect": {
+                  "bounds": {
+                    "height": 10.0,
+                    "origin": {
+                      "x": 150.0,
+                      "y": 150.0
+                    },
+                    "width": 20.0
+                  },
+                  "corner_radii": {
+                    "bl": 0.0,
+                    "br": 0.0,
+                    "tl": 0.0,
+                    "tr": 0.0
+                  }
+                }
+              },
+              "style": {
+                "fill": {
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "enabled": true,
+                  "opacity": 1.0
+                },
+                "stroke": {
+                  "cap": "butt",
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "dash": [],
+                  "enabled": false,
+                  "join": "miter",
+                  "markers": {
+                    "end": "none",
+                    "mid": "none",
+                    "mid_count": 1,
+                    "mid_place": "spaced",
+                    "start": "none"
+                  },
+                  "opacity": 1.0,
+                  "width": 0.25
+                }
+              }
+            }
+          },
+          {
+            "Text": {
+              "registers": {
+                "locked": false,
+                "name": null,
+                "opacity": 1.0,
+                "visible": true
+              },
+              "text": {
+                "font": {
+                  "face_hash": "08df266400933d3178d081a45f94a08814c3e55b4b7dd2e0ff69cb1329f13ab6",
+                  "face_index": 0,
+                  "family": "Source Sans 3",
+                  "style": "Regular"
+                },
+                "placement": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  1.0,
+                  150.0,
+                  175.0
+                ],
+                "size": 5.248,
+                "string": "Behind the switch",
+                "style": {
+                  "fill": {
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "enabled": true,
+                    "opacity": 1.0
+                  },
+                  "stroke": {
+                    "cap": "butt",
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "dash": [],
+                    "enabled": false,
+                    "join": "miter",
+                    "markers": {
+                      "end": "none",
+                      "mid": "none",
+                      "mid_count": 1,
+                      "mid_place": "spaced",
+                      "start": "none"
+                    },
+                    "opacity": 1.0,
+                    "width": 0.25
+                  }
+                }
+              }
+            }
+          }
+        ],
+        "layer": false,
+        "registers": {
+          "locked": false,
+          "name": null,
+          "opacity": 1.0,
+          "visible": true
+        }
+      }
+    },
+    {
+      "Group": {
+        "children": [
+          {
+            "Primitive": {
+              "registers": {
+                "locked": false,
+                "name": null,
+                "opacity": 1.0,
+                "visible": true
+              },
+              "rotation": 0.0,
+              "shape": {
+                "Rect": {
+                  "bounds": {
+                    "height": 10.0,
+                    "origin": {
+                      "x": 150.0,
+                      "y": 180.0
+                    },
+                    "width": 20.0
+                  },
+                  "corner_radii": {
+                    "bl": 0.0,
+                    "br": 0.0,
+                    "tl": 0.0,
+                    "tr": 0.0
+                  }
+                }
+              },
+              "style": {
+                "fill": {
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "enabled": true,
+                  "opacity": 1.0
+                },
+                "stroke": {
+                  "cap": "butt",
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "dash": [],
+                  "enabled": false,
+                  "join": "miter",
+                  "markers": {
+                    "end": "none",
+                    "mid": "none",
+                    "mid_count": 1,
+                    "mid_place": "spaced",
+                    "start": "none"
+                  },
+                  "opacity": 1.0,
+                  "width": 0.25
+                }
+              }
+            }
+          }
+        ],
+        "layer": false,
+        "registers": {
+          "locked": false,
+          "name": null,
+          "opacity": 1.0,
+          "visible": true
+        }
+      }
+    }
+  ],
+  "page": [
+    200.0,
+    200.0
+  ]
+}

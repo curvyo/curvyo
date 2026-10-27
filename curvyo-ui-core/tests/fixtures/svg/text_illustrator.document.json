@@ -1,0 +1,324 @@
+{
+  "assets": [],
+  "background": null,
+  "display_unit": null,
+  "leaves": 4,
+  "nodes": [
+    {
+      "Text": {
+        "registers": {
+          "locked": false,
+          "name": null,
+          "opacity": 1.0,
+          "visible": true
+        },
+        "text": {
+          "font": {
+            "face_hash": "7776ddb9f3eb58683e59f28d558d8896b768c2d0c80799fb3f1c56c54dfd98c9",
+            "face_index": 0,
+            "family": "Source Sans 3",
+            "style": "Bold"
+          },
+          "placement": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            25.576388888888886,
+            35.34833333333333
+          ],
+          "size": 5.520266666666666,
+          "string": "Headline",
+          "style": {
+            "fill": {
+              "color": {
+                "b": 0,
+                "g": 0,
+                "r": 0
+              },
+              "enabled": true,
+              "opacity": 1.0
+            },
+            "stroke": {
+              "cap": "butt",
+              "color": {
+                "b": 0,
+                "g": 0,
+                "r": 0
+              },
+              "dash": [],
+              "enabled": false,
+              "join": "miter",
+              "markers": {
+                "end": "none",
+                "mid": "none",
+                "mid_count": 1,
+                "mid_place": "spaced",
+                "start": "none"
+              },
+              "opacity": 1.0,
+              "width": 0.25
+            }
+          }
+        }
+      }
+    },
+    {
+      "Text": {
+        "registers": {
+          "locked": false,
+          "name": null,
+          "opacity": 1.0,
+          "visible": true
+        },
+        "text": {
+          "chars": [
+            [
+              24,
+              {
+                "kern_x": 0.0,
+                "kern_y": 0.19207317073170713,
+                "rotation": 0.0
+              }
+            ],
+            [
+              49,
+              {
+                "kern_x": 0.0,
+                "kern_y": 0.38414634146341425,
+                "rotation": 0.0
+              }
+            ],
+            [
+              50,
+              {
+                "kern_x": 0.2540650406504064,
+                "kern_y": -0.0,
+                "rotation": 0.0
+              }
+            ],
+            [
+              51,
+              {
+                "kern_x": 0.2540650406504064,
+                "kern_y": -0.0,
+                "rotation": 0.0
+              }
+            ],
+            [
+              52,
+              {
+                "kern_x": 0.25406504065040625,
+                "kern_y": -0.0,
+                "rotation": 0.0
+              }
+            ],
+            [
+              53,
+              {
+                "kern_x": 0.2540650406504066,
+                "kern_y": -0.0,
+                "rotation": 0.0
+              }
+            ],
+            [
+              54,
+              {
+                "kern_x": 0.2540650406504066,
+                "kern_y": -0.0,
+                "rotation": 0.0
+              }
+            ],
+            [
+              55,
+              {
+                "kern_x": 0.25406504065040597,
+                "kern_y": -0.0,
+                "rotation": 0.0
+              }
+            ]
+          ],
+          "font": {
+            "face_hash": "08df266400933d3178d081a45f94a08814c3e55b4b7dd2e0ff69cb1329f13ab6",
+            "face_index": 0,
+            "family": "Source Sans 3",
+            "style": "Regular"
+          },
+          "placement": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            25.576388888888886,
+            49.388888888888886
+          ],
+          "size": 2.7770666666666664,
+          "string": "First line of body copy\nsecond line of body copy\nTRACKED",
+          "style": {
+            "fill": {
+              "color": {
+                "b": 0,
+                "g": 0,
+                "r": 0
+              },
+              "enabled": true,
+              "opacity": 1.0
+            },
+            "stroke": {
+              "cap": "butt",
+              "color": {
+                "b": 0,
+                "g": 0,
+                "r": 0
+              },
+              "dash": [],
+              "enabled": false,
+              "join": "miter",
+              "markers": {
+                "end": "none",
+                "mid": "none",
+                "mid_count": 1,
+                "mid_place": "spaced",
+                "start": "none"
+              },
+              "opacity": 1.0,
+              "width": 0.25
+            }
+          }
+        }
+      }
+    },
+    {
+      "Text": {
+        "registers": {
+          "locked": false,
+          "name": null,
+          "opacity": 1.0,
+          "visible": true
+        },
+        "text": {
+          "chars": [
+            [
+              1,
+              {
+                "kern_x": 0.09756097560975607,
+                "kern_y": -0.0,
+                "rotation": 0.0
+              }
+            ]
+          ],
+          "font": {
+            "face_hash": "08df266400933d3178d081a45f94a08814c3e55b4b7dd2e0ff69cb1329f13ab6",
+            "face_index": 0,
+            "family": "Source Sans 3",
+            "style": "Regular"
+          },
+          "placement": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            25.576388888888886,
+            77.6111111111111
+          ],
+          "size": 5.554133333333333,
+          "string": "WAVE",
+          "style": {
+            "fill": {
+              "color": {
+                "b": 0,
+                "g": 0,
+                "r": 0
+              },
+              "enabled": true,
+              "opacity": 1.0
+            },
+            "stroke": {
+              "cap": "butt",
+              "color": {
+                "b": 0,
+                "g": 0,
+                "r": 0
+              },
+              "dash": [],
+              "enabled": false,
+              "join": "miter",
+              "markers": {
+                "end": "none",
+                "mid": "none",
+                "mid_count": 1,
+                "mid_place": "spaced",
+                "start": "none"
+              },
+              "opacity": 1.0,
+              "width": 0.25
+            }
+          }
+        }
+      }
+    },
+    {
+      "Text": {
+        "registers": {
+          "locked": false,
+          "name": null,
+          "opacity": 1.0,
+          "visible": true
+        },
+        "text": {
+          "font": {
+            "face_hash": "08df266400933d3178d081a45f94a08814c3e55b4b7dd2e0ff69cb1329f13ab6",
+            "face_index": 0,
+            "family": "Source Sans 3",
+            "style": "Regular"
+          },
+          "placement": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            105.83333333333333,
+            77.6111111111111
+          ],
+          "size": 5.554133333333333,
+          "string": "Red",
+          "style": {
+            "fill": {
+              "color": {
+                "b": 45,
+                "g": 39,
+                "r": 193
+              },
+              "enabled": true,
+              "opacity": 1.0
+            },
+            "stroke": {
+              "cap": "butt",
+              "color": {
+                "b": 0,
+                "g": 0,
+                "r": 0
+              },
+              "dash": [],
+              "enabled": false,
+              "join": "miter",
+              "markers": {
+                "end": "none",
+                "mid": "none",
+                "mid_count": 1,
+                "mid_place": "spaced",
+                "start": "none"
+              },
+              "opacity": 1.0,
+              "width": 0.25
+            }
+          }
+        }
+      }
+    }
+  ],
+  "page": [
+    210.00861111111107,
+    297.00361111111107
+  ]
+}

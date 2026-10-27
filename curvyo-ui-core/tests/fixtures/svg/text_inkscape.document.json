@@ -1,0 +1,1382 @@
+{
+  "assets": [],
+  "background": {
+    "color": [
+      232,
+      232,
+      235
+    ],
+    "opacity": 1.0,
+    "paint": "none"
+  },
+  "display_unit": "mm",
+  "leaves": 21,
+  "nodes": [
+    {
+      "Group": {
+        "children": [
+          {
+            "Text": {
+              "registers": {
+                "locked": false,
+                "name": "t_one",
+                "opacity": 1.0,
+                "visible": true
+              },
+              "text": {
+                "font": {
+                  "face_hash": "08df266400933d3178d081a45f94a08814c3e55b4b7dd2e0ff69cb1329f13ab6",
+                  "face_index": 0,
+                  "family": "Source Sans 3",
+                  "style": "Regular"
+                },
+                "layout": {
+                  "align": "left",
+                  "letter_spacing": 0.0,
+                  "line_spacing": 1.9054878048780488,
+                  "rotation": 0.0,
+                  "word_spacing": 0.0
+                },
+                "placement": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  1.0,
+                  10.0,
+                  20.0
+                ],
+                "size": 6.9426448,
+                "string": "Curvyo AVATAR",
+                "style": {
+                  "fill": {
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "enabled": true,
+                    "opacity": 1.0
+                  },
+                  "stroke": {
+                    "cap": "butt",
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "dash": [],
+                    "enabled": false,
+                    "join": "miter",
+                    "markers": {
+                      "end": "none",
+                      "mid": "none",
+                      "mid_count": 1,
+                      "mid_place": "spaced",
+                      "start": "none"
+                    },
+                    "opacity": 1.0,
+                    "width": 0.25
+                  }
+                }
+              }
+            }
+          },
+          {
+            "Text": {
+              "registers": {
+                "locked": false,
+                "name": "t_multi",
+                "opacity": 1.0,
+                "visible": true
+              },
+              "text": {
+                "font": {
+                  "face_hash": "08df266400933d3178d081a45f94a08814c3e55b4b7dd2e0ff69cb1329f13ab6",
+                  "face_index": 0,
+                  "family": "Source Sans 3",
+                  "style": "Regular"
+                },
+                "layout": {
+                  "align": "centre",
+                  "letter_spacing": 0.0,
+                  "line_spacing": 1.9054878048780488,
+                  "rotation": 0.0,
+                  "word_spacing": 0.0
+                },
+                "placement": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  1.0,
+                  150.0,
+                  20.0
+                ],
+                "size": 4.62844736,
+                "string": "First line\nSecond, longer line\nThird",
+                "style": {
+                  "fill": {
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "enabled": true,
+                    "opacity": 1.0
+                  },
+                  "stroke": {
+                    "cap": "butt",
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "dash": [],
+                    "enabled": false,
+                    "join": "miter",
+                    "markers": {
+                      "end": "none",
+                      "mid": "none",
+                      "mid_count": 1,
+                      "mid_place": "spaced",
+                      "start": "none"
+                    },
+                    "opacity": 1.0,
+                    "width": 0.25
+                  }
+                }
+              }
+            }
+          },
+          {
+            "Text": {
+              "registers": {
+                "locked": false,
+                "name": "t_right",
+                "opacity": 1.0,
+                "visible": true
+              },
+              "text": {
+                "font": {
+                  "face_hash": "08df266400933d3178d081a45f94a08814c3e55b4b7dd2e0ff69cb1329f13ab6",
+                  "face_index": 0,
+                  "family": "Source Sans 3",
+                  "style": "Regular"
+                },
+                "layout": {
+                  "align": "right",
+                  "letter_spacing": 0.0,
+                  "line_spacing": null,
+                  "rotation": 0.0,
+                  "word_spacing": 0.0
+                },
+                "placement": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  1.0,
+                  199.99999999999997,
+                  50.0
+                ],
+                "size": 4.62844736,
+                "string": "Right aligned",
+                "style": {
+                  "fill": {
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "enabled": true,
+                    "opacity": 1.0
+                  },
+                  "stroke": {
+                    "cap": "butt",
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "dash": [],
+                    "enabled": false,
+                    "join": "miter",
+                    "markers": {
+                      "end": "none",
+                      "mid": "none",
+                      "mid_count": 1,
+                      "mid_place": "spaced",
+                      "start": "none"
+                    },
+                    "opacity": 1.0,
+                    "width": 0.25
+                  }
+                }
+              }
+            }
+          },
+          {
+            "Text": {
+              "registers": {
+                "locked": false,
+                "name": "t_bold",
+                "opacity": 1.0,
+                "visible": true
+              },
+              "text": {
+                "font": {
+                  "face_hash": "7776ddb9f3eb58683e59f28d558d8896b768c2d0c80799fb3f1c56c54dfd98c9",
+                  "face_index": 0,
+                  "family": "Source Sans 3",
+                  "style": "Bold"
+                },
+                "placement": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  1.0,
+                  10.0,
+                  40.0
+                ],
+                "size": 4.60022512,
+                "string": "Bold face",
+                "style": {
+                  "fill": {
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "enabled": true,
+                    "opacity": 1.0
+                  },
+                  "stroke": {
+                    "cap": "butt",
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "dash": [],
+                    "enabled": false,
+                    "join": "miter",
+                    "markers": {
+                      "end": "none",
+                      "mid": "none",
+                      "mid_count": 1,
+                      "mid_place": "spaced",
+                      "start": "none"
+                    },
+                    "opacity": 1.0,
+                    "width": 0.25
+                  }
+                }
+              }
+            }
+          },
+          {
+            "Text": {
+              "registers": {
+                "locked": false,
+                "name": "t_italic",
+                "opacity": 1.0,
+                "visible": true
+              },
+              "text": {
+                "font": {
+                  "face_hash": "430b9f0eb1170be0981706d14b6cf87122efba9d86c373bbdf69daf276421462",
+                  "face_index": 0,
+                  "family": "Source Sans 3",
+                  "style": "Italic"
+                },
+                "placement": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  1.0,
+                  10.0,
+                  50.0
+                ],
+                "size": 4.62844736,
+                "string": "Italic face",
+                "style": {
+                  "fill": {
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "enabled": true,
+                    "opacity": 1.0
+                  },
+                  "stroke": {
+                    "cap": "butt",
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "dash": [],
+                    "enabled": false,
+                    "join": "miter",
+                    "markers": {
+                      "end": "none",
+                      "mid": "none",
+                      "mid_count": 1,
+                      "mid_place": "spaced",
+                      "start": "none"
+                    },
+                    "opacity": 1.0,
+                    "width": 0.25
+                  }
+                }
+              }
+            }
+          },
+          {
+            "Text": {
+              "registers": {
+                "locked": false,
+                "name": "t_light",
+                "opacity": 1.0,
+                "visible": true
+              },
+              "text": {
+                "font": {
+                  "face_hash": "bbfab2c58d46defe8a194634744660ee15d560dcf3d7a8c7bb509936acc618c7",
+                  "face_index": 0,
+                  "family": "Source Sans 3",
+                  "style": "Light"
+                },
+                "placement": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  1.0,
+                  10.0,
+                  60.0
+                ],
+                "size": 4.64961404,
+                "string": "Light face",
+                "style": {
+                  "fill": {
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "enabled": true,
+                    "opacity": 1.0
+                  },
+                  "stroke": {
+                    "cap": "butt",
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "dash": [],
+                    "enabled": false,
+                    "join": "miter",
+                    "markers": {
+                      "end": "none",
+                      "mid": "none",
+                      "mid_count": 1,
+                      "mid_place": "spaced",
+                      "start": "none"
+                    },
+                    "opacity": 1.0,
+                    "width": 0.25
+                  }
+                }
+              }
+            }
+          },
+          {
+            "Text": {
+              "registers": {
+                "locked": false,
+                "name": "t_bolditalic",
+                "opacity": 1.0,
+                "visible": true
+              },
+              "text": {
+                "font": {
+                  "face_hash": "05e97d9adc01059607e97b167a68afb25680db904db7aba831dc2510f14b6515",
+                  "face_index": 0,
+                  "family": "Source Sans 3",
+                  "style": "Bold Italic"
+                },
+                "placement": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  1.0,
+                  10.0,
+                  70.0
+                ],
+                "size": 4.60022512,
+                "string": "Bold Italic face",
+                "style": {
+                  "fill": {
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "enabled": true,
+                    "opacity": 1.0
+                  },
+                  "stroke": {
+                    "cap": "butt",
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "dash": [],
+                    "enabled": false,
+                    "join": "miter",
+                    "markers": {
+                      "end": "none",
+                      "mid": "none",
+                      "mid_count": 1,
+                      "mid_place": "spaced",
+                      "start": "none"
+                    },
+                    "opacity": 1.0,
+                    "width": 0.25
+                  }
+                }
+              }
+            }
+          },
+          {
+            "Text": {
+              "registers": {
+                "locked": false,
+                "name": "t_semibold",
+                "opacity": 1.0,
+                "visible": true
+              },
+              "text": {
+                "font": {
+                  "face_hash": "7776ddb9f3eb58683e59f28d558d8896b768c2d0c80799fb3f1c56c54dfd98c9",
+                  "face_index": 0,
+                  "family": "Source Sans 3",
+                  "style": "Bold"
+                },
+                "placement": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  1.0,
+                  10.0,
+                  80.0
+                ],
+                "size": 4.60022512,
+                "string": "Semibold asks",
+                "style": {
+                  "fill": {
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "enabled": true,
+                    "opacity": 1.0
+                  },
+                  "stroke": {
+                    "cap": "butt",
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "dash": [],
+                    "enabled": false,
+                    "join": "miter",
+                    "markers": {
+                      "end": "none",
+                      "mid": "none",
+                      "mid_count": 1,
+                      "mid_place": "spaced",
+                      "start": "none"
+                    },
+                    "opacity": 1.0,
+                    "width": 0.25
+                  }
+                }
+              }
+            }
+          },
+          {
+            "Text": {
+              "registers": {
+                "locked": false,
+                "name": "t_serif",
+                "opacity": 1.0,
+                "visible": true
+              },
+              "text": {
+                "font": {
+                  "face_hash": "e5a4ee6a3d87bb9024796be390c6771e2a0eb1883dae25effaf57ca01668e24b",
+                  "face_index": 0,
+                  "family": "Source Serif 4",
+                  "style": "Regular"
+                },
+                "placement": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  1.0,
+                  10.0,
+                  90.0
+                ],
+                "size": 4.7272252,
+                "string": "Serif Type",
+                "style": {
+                  "fill": {
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "enabled": true,
+                    "opacity": 1.0
+                  },
+                  "stroke": {
+                    "cap": "butt",
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "dash": [],
+                    "enabled": false,
+                    "join": "miter",
+                    "markers": {
+                      "end": "none",
+                      "mid": "none",
+                      "mid_count": 1,
+                      "mid_place": "spaced",
+                      "start": "none"
+                    },
+                    "opacity": 1.0,
+                    "width": 0.25
+                  }
+                }
+              }
+            }
+          },
+          {
+            "Text": {
+              "registers": {
+                "locked": false,
+                "name": "t_spacing",
+                "opacity": 1.0,
+                "visible": true
+              },
+              "text": {
+                "font": {
+                  "face_hash": "08df266400933d3178d081a45f94a08814c3e55b4b7dd2e0ff69cb1329f13ab6",
+                  "face_index": 0,
+                  "family": "Source Sans 3",
+                  "style": "Regular"
+                },
+                "layout": {
+                  "align": "left",
+                  "letter_spacing": 0.10802758703082668,
+                  "line_spacing": null,
+                  "rotation": 0.0,
+                  "word_spacing": 0.43211034812330673
+                },
+                "placement": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  1.0,
+                  10.0,
+                  100.0
+                ],
+                "size": 4.62844736,
+                "string": "Spaced out words",
+                "style": {
+                  "fill": {
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "enabled": true,
+                    "opacity": 1.0
+                  },
+                  "stroke": {
+                    "cap": "butt",
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "dash": [],
+                    "enabled": false,
+                    "join": "miter",
+                    "markers": {
+                      "end": "none",
+                      "mid": "none",
+                      "mid_count": 1,
+                      "mid_place": "spaced",
+                      "start": "none"
+                    },
+                    "opacity": 1.0,
+                    "width": 0.25
+                  }
+                }
+              }
+            }
+          },
+          {
+            "Text": {
+              "registers": {
+                "locked": false,
+                "name": "t_kerns",
+                "opacity": 1.0,
+                "visible": true
+              },
+              "text": {
+                "chars": [
+                  [
+                    1,
+                    {
+                      "kern_x": 0.1296331087580952,
+                      "kern_y": -0.0,
+                      "rotation": 0.0
+                    }
+                  ],
+                  [
+                    2,
+                    {
+                      "kern_x": -0.08642207178521315,
+                      "kern_y": 0.21605517406165337,
+                      "rotation": 0.0
+                    }
+                  ],
+                  [
+                    3,
+                    {
+                      "kern_x": 0.0,
+                      "kern_y": -0.21605517406165337,
+                      "rotation": 0.0
+                    }
+                  ],
+                  [
+                    4,
+                    {
+                      "kern_x": 0.25926620887398427,
+                      "kern_y": -0.0,
+                      "rotation": 0.0
+                    }
+                  ],
+                  [
+                    7,
+                    {
+                      "kern_x": 0.17267537537250646,
+                      "kern_y": -0.22111171593420434,
+                      "rotation": 25.0
+                    }
+                  ],
+                  [
+                    8,
+                    {
+                      "kern_x": -0.15133391195786994,
+                      "kern_y": 0.22111171593420434,
+                      "rotation": 0.0
+                    }
+                  ]
+                ],
+                "font": {
+                  "face_hash": "08df266400933d3178d081a45f94a08814c3e55b4b7dd2e0ff69cb1329f13ab6",
+                  "face_index": 0,
+                  "family": "Source Sans 3",
+                  "style": "Regular"
+                },
+                "placement": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  1.0,
+                  10.0,
+                  110.0
+                ],
+                "size": 4.62844736,
+                "string": "KERNED pair",
+                "style": {
+                  "fill": {
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "enabled": true,
+                    "opacity": 1.0
+                  },
+                  "stroke": {
+                    "cap": "butt",
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "dash": [],
+                    "enabled": false,
+                    "join": "miter",
+                    "markers": {
+                      "end": "none",
+                      "mid": "none",
+                      "mid_count": 1,
+                      "mid_place": "spaced",
+                      "start": "none"
+                    },
+                    "opacity": 1.0,
+                    "width": 0.25
+                  }
+                }
+              }
+            }
+          },
+          {
+            "Group": {
+              "children": [
+                {
+                  "Text": {
+                    "registers": {
+                      "locked": false,
+                      "name": null,
+                      "opacity": 1.0,
+                      "visible": true
+                    },
+                    "text": {
+                      "font": {
+                        "face_hash": "08df266400933d3178d081a45f94a08814c3e55b4b7dd2e0ff69cb1329f13ab6",
+                        "face_index": 0,
+                        "family": "Source Sans 3",
+                        "style": "Regular"
+                      },
+                      "placement": [
+                        1.0,
+                        0.0,
+                        0.0,
+                        1.0,
+                        10.0,
+                        122.0
+                      ],
+                      "size": 4.62844736,
+                      "string": "Hello ",
+                      "style": {
+                        "fill": {
+                          "color": {
+                            "b": 0,
+                            "g": 0,
+                            "r": 0
+                          },
+                          "enabled": true,
+                          "opacity": 1.0
+                        },
+                        "stroke": {
+                          "cap": "butt",
+                          "color": {
+                            "b": 0,
+                            "g": 0,
+                            "r": 0
+                          },
+                          "dash": [],
+                          "enabled": false,
+                          "join": "miter",
+                          "markers": {
+                            "end": "none",
+                            "mid": "none",
+                            "mid_count": 1,
+                            "mid_place": "spaced",
+                            "start": "none"
+                          },
+                          "opacity": 1.0,
+                          "width": 0.25
+                        }
+                      }
+                    }
+                  }
+                },
+                {
+                  "Text": {
+                    "registers": {
+                      "locked": false,
+                      "name": null,
+                      "opacity": 1.0,
+                      "visible": true
+                    },
+                    "text": {
+                      "font": {
+                        "face_hash": "7776ddb9f3eb58683e59f28d558d8896b768c2d0c80799fb3f1c56c54dfd98c9",
+                        "face_index": 0,
+                        "family": "Source Sans 3",
+                        "style": "Bold"
+                      },
+                      "placement": [
+                        1.0,
+                        0.0,
+                        0.0,
+                        1.0,
+                        26.933343999999998,
+                        122.0
+                      ],
+                      "size": 4.60022512,
+                      "string": "world",
+                      "style": {
+                        "fill": {
+                          "color": {
+                            "b": 0,
+                            "g": 0,
+                            "r": 0
+                          },
+                          "enabled": true,
+                          "opacity": 1.0
+                        },
+                        "stroke": {
+                          "cap": "butt",
+                          "color": {
+                            "b": 0,
+                            "g": 0,
+                            "r": 0
+                          },
+                          "dash": [],
+                          "enabled": false,
+                          "join": "miter",
+                          "markers": {
+                            "end": "none",
+                            "mid": "none",
+                            "mid_count": 1,
+                            "mid_place": "spaced",
+                            "start": "none"
+                          },
+                          "opacity": 1.0,
+                          "width": 0.25
+                        }
+                      }
+                    }
+                  }
+                },
+                {
+                  "Text": {
+                    "registers": {
+                      "locked": false,
+                      "name": null,
+                      "opacity": 1.0,
+                      "visible": true
+                    },
+                    "text": {
+                      "font": {
+                        "face_hash": "08df266400933d3178d081a45f94a08814c3e55b4b7dd2e0ff69cb1329f13ab6",
+                        "face_index": 0,
+                        "family": "Source Sans 3",
+                        "style": "Regular"
+                      },
+                      "placement": [
+                        1.0,
+                        0.0,
+                        0.0,
+                        1.0,
+                        45.136688799999995,
+                        122.0
+                      ],
+                      "size": 4.62844736,
+                      "string": " ",
+                      "style": {
+                        "fill": {
+                          "color": {
+                            "b": 0,
+                            "g": 0,
+                            "r": 0
+                          },
+                          "enabled": true,
+                          "opacity": 1.0
+                        },
+                        "stroke": {
+                          "cap": "butt",
+                          "color": {
+                            "b": 0,
+                            "g": 0,
+                            "r": 0
+                          },
+                          "dash": [],
+                          "enabled": false,
+                          "join": "miter",
+                          "markers": {
+                            "end": "none",
+                            "mid": "none",
+                            "mid_count": 1,
+                            "mid_place": "spaced",
+                            "start": "none"
+                          },
+                          "opacity": 1.0,
+                          "width": 0.25
+                        }
+                      }
+                    }
+                  }
+                },
+                {
+                  "Text": {
+                    "registers": {
+                      "locked": false,
+                      "name": null,
+                      "opacity": 1.0,
+                      "visible": true
+                    },
+                    "text": {
+                      "font": {
+                        "face_hash": "08df266400933d3178d081a45f94a08814c3e55b4b7dd2e0ff69cb1329f13ab6",
+                        "face_index": 0,
+                        "family": "Source Sans 3",
+                        "style": "Regular"
+                      },
+                      "placement": [
+                        1.0,
+                        0.0,
+                        0.0,
+                        1.0,
+                        46.5478008,
+                        122.0
+                      ],
+                      "size": 3.2399184000000005,
+                      "string": "red",
+                      "style": {
+                        "fill": {
+                          "color": {
+                            "b": 0,
+                            "g": 0,
+                            "r": 255
+                          },
+                          "enabled": true,
+                          "opacity": 1.0
+                        },
+                        "stroke": {
+                          "cap": "butt",
+                          "color": {
+                            "b": 0,
+                            "g": 0,
+                            "r": 0
+                          },
+                          "dash": [],
+                          "enabled": false,
+                          "join": "miter",
+                          "markers": {
+                            "end": "none",
+                            "mid": "none",
+                            "mid_count": 1,
+                            "mid_place": "spaced",
+                            "start": "none"
+                          },
+                          "opacity": 1.0,
+                          "width": 0.25
+                        }
+                      }
+                    }
+                  }
+                }
+              ],
+              "layer": false,
+              "registers": {
+                "locked": false,
+                "name": "t_mixed",
+                "opacity": 1.0,
+                "visible": true
+              }
+            }
+          },
+          {
+            "Text": {
+              "registers": {
+                "locked": false,
+                "name": "t_super",
+                "opacity": 1.0,
+                "visible": true
+              },
+              "text": {
+                "chars": [
+                  [
+                    1,
+                    {
+                      "kern_x": 0.0,
+                      "kern_y": 0.5335365853658547,
+                      "rotation": 0.0
+                    }
+                  ]
+                ],
+                "font": {
+                  "face_hash": "08df266400933d3178d081a45f94a08814c3e55b4b7dd2e0ff69cb1329f13ab6",
+                  "face_index": 0,
+                  "family": "Source Sans 3",
+                  "style": "Regular"
+                },
+                "placement": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  1.0,
+                  60.0,
+                  122.0
+                ],
+                "size": 4.62844736,
+                "string": "x2",
+                "style": {
+                  "fill": {
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "enabled": true,
+                    "opacity": 1.0
+                  },
+                  "stroke": {
+                    "cap": "butt",
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "dash": [],
+                    "enabled": false,
+                    "join": "miter",
+                    "markers": {
+                      "end": "none",
+                      "mid": "none",
+                      "mid_count": 1,
+                      "mid_place": "spaced",
+                      "start": "none"
+                    },
+                    "opacity": 1.0,
+                    "width": 0.25
+                  }
+                }
+              }
+            }
+          },
+          {
+            "Text": {
+              "registers": {
+                "locked": false,
+                "name": "t_vertical",
+                "opacity": 1.0,
+                "visible": true
+              },
+              "text": {
+                "font": {
+                  "face_hash": "08df266400933d3178d081a45f94a08814c3e55b4b7dd2e0ff69cb1329f13ab6",
+                  "face_index": 0,
+                  "family": "Source Sans 3",
+                  "style": "Regular"
+                },
+                "layout": {
+                  "align": "left",
+                  "letter_spacing": 0.0,
+                  "line_spacing": null,
+                  "orientation": "upright",
+                  "rotation": 0.0,
+                  "word_spacing": 0.0,
+                  "writing_mode": "vertical_rl"
+                },
+                "placement": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  1.0,
+                  190.0,
+                  70.69248778328809
+                ],
+                "size": 4.62844736,
+                "string": "VERT",
+                "style": {
+                  "fill": {
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "enabled": true,
+                    "opacity": 1.0
+                  },
+                  "stroke": {
+                    "cap": "butt",
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "dash": [],
+                    "enabled": false,
+                    "join": "miter",
+                    "markers": {
+                      "end": "none",
+                      "mid": "none",
+                      "mid_count": 1,
+                      "mid_place": "spaced",
+                      "start": "none"
+                    },
+                    "opacity": 1.0,
+                    "width": 0.25
+                  }
+                }
+              }
+            }
+          },
+          {
+            "Text": {
+              "registers": {
+                "locked": false,
+                "name": "t_rot30",
+                "opacity": 1.0,
+                "visible": true
+              },
+              "text": {
+                "font": {
+                  "face_hash": "08df266400933d3178d081a45f94a08814c3e55b4b7dd2e0ff69cb1329f13ab6",
+                  "face_index": 0,
+                  "family": "Source Sans 3",
+                  "style": "Regular"
+                },
+                "placement": [
+                  0.8660254037844387,
+                  0.49999999999999994,
+                  -0.49999999999999994,
+                  0.8660254037844387,
+                  109.99999605783754,
+                  69.99999799544916
+                ],
+                "size": 4.62844736,
+                "string": "Rotated",
+                "style": {
+                  "fill": {
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "enabled": true,
+                    "opacity": 1.0
+                  },
+                  "stroke": {
+                    "cap": "butt",
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "dash": [],
+                    "enabled": false,
+                    "join": "miter",
+                    "markers": {
+                      "end": "none",
+                      "mid": "none",
+                      "mid_count": 1,
+                      "mid_place": "spaced",
+                      "start": "none"
+                    },
+                    "opacity": 1.0,
+                    "width": 0.25
+                  }
+                }
+              }
+            }
+          },
+          {
+            "Text": {
+              "registers": {
+                "locked": false,
+                "name": "t_stretch",
+                "opacity": 1.0,
+                "visible": true
+              },
+              "text": {
+                "font": {
+                  "face_hash": "08df266400933d3178d081a45f94a08814c3e55b4b7dd2e0ff69cb1329f13ab6",
+                  "face_index": 0,
+                  "family": "Source Sans 3",
+                  "style": "Regular"
+                },
+                "placement": [
+                  1.224744886391589,
+                  0.0,
+                  0.0,
+                  0.8164965709277263,
+                  100.00000222224419,
+                  129.9999971734414
+                ],
+                "size": 5.668666622985807,
+                "string": "Stretched",
+                "style": {
+                  "fill": {
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "enabled": true,
+                    "opacity": 1.0
+                  },
+                  "stroke": {
+                    "cap": "butt",
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "dash": [],
+                    "enabled": false,
+                    "join": "miter",
+                    "markers": {
+                      "end": "none",
+                      "mid": "none",
+                      "mid_count": 1,
+                      "mid_place": "spaced",
+                      "start": "none"
+                    },
+                    "opacity": 1.0,
+                    "width": 1.2247400136083566
+                  }
+                }
+              }
+            }
+          },
+          {
+            "Text": {
+              "registers": {
+                "locked": false,
+                "name": "t_mirror",
+                "opacity": 1.0,
+                "visible": true
+              },
+              "text": {
+                "font": {
+                  "face_hash": "08df266400933d3178d081a45f94a08814c3e55b4b7dd2e0ff69cb1329f13ab6",
+                  "face_index": 0,
+                  "family": "Source Sans 3",
+                  "style": "Regular"
+                },
+                "placement": [
+                  -1.0,
+                  0.0,
+                  0.0,
+                  1.0,
+                  190.0,
+                  140.0
+                ],
+                "size": 4.62844736,
+                "string": "Mirrored",
+                "style": {
+                  "fill": {
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "enabled": true,
+                    "opacity": 1.0
+                  },
+                  "stroke": {
+                    "cap": "butt",
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "dash": [],
+                    "enabled": false,
+                    "join": "miter",
+                    "markers": {
+                      "end": "none",
+                      "mid": "none",
+                      "mid_count": 1,
+                      "mid_place": "spaced",
+                      "start": "none"
+                    },
+                    "opacity": 1.0,
+                    "width": 0.25
+                  }
+                }
+              }
+            }
+          },
+          {
+            "Text": {
+              "registers": {
+                "locked": false,
+                "name": "t_missing",
+                "opacity": 1.0,
+                "visible": true
+              },
+              "text": {
+                "font": {
+                  "face_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+                  "face_index": 0,
+                  "family": "Nonexistent Sans",
+                  "style": "Regular"
+                },
+                "placement": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  1.0,
+                  10.0,
+                  140.0
+                ],
+                "size": 4.62844736,
+                "string": "Missing font",
+                "style": {
+                  "fill": {
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "enabled": true,
+                    "opacity": 1.0
+                  },
+                  "stroke": {
+                    "cap": "butt",
+                    "color": {
+                      "b": 0,
+                      "g": 0,
+                      "r": 0
+                    },
+                    "dash": [],
+                    "enabled": false,
+                    "join": "miter",
+                    "markers": {
+                      "end": "none",
+                      "mid": "none",
+                      "mid_count": 1,
+                      "mid_place": "spaced",
+                      "start": "none"
+                    },
+                    "opacity": 1.0,
+                    "width": 0.25
+                  }
+                }
+              }
+            }
+          }
+        ],
+        "layer": true,
+        "registers": {
+          "locked": false,
+          "name": "Text",
+          "opacity": 1.0,
+          "visible": true
+        }
+      }
+    }
+  ],
+  "page": [
+    210.0,
+    297.0
+  ]
+}
