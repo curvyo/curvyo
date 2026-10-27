@@ -498,9 +498,14 @@ fn kinds(name: &str) -> Vec<&'static str> {
 fn ac125_inkscape_shapes_fixture() {
     assert_eq!(
         kinds("inkscape_shapes.svg"),
+        // The tester's real Inkscape 1.4.4 save (`inkscape_shapes_src/`): five arcs, the arc
+        // tool's whole ellipse (an `<ellipse>`) and a 359.99° arc, three arcs, the rx ≠ ry
+        // rectangle, four polygons, a star, the rounded, randomized and twisted stars, two
+        // stars, the spiral, then the skew, stretch and rotate groups and the 3D box.
         [
-            "arc", "arc", "arc", "arc", "arc", "ellipse", "arc", "arc", "path", "polygon",
-            "polygon", "polygon", "star", "path", "path", "path", "group", "path"
+            "arc", "arc", "arc", "arc", "arc", "ellipse", "ellipse", "arc", "arc", "arc", "arc",
+            "path", "polygon", "polygon", "polygon", "polygon", "star", "path", "path", "path",
+            "star", "star", "path", "group", "group", "group", "group"
         ]
     );
 }
