@@ -2,9 +2,9 @@
 // CURVYO_E2E_BROWSER=/path/to/chromium and the wasm bindings built, Chromium drives the File tab:
 // Import SVG… of a real Inkscape 1.4.4 file through the browser's own file chooser (criteria 3, 5:
 // one new layer named after the file, one history step, Ctrl+Z removes it), a refused file
-// (criterion 6: the dialog text, nothing changed), a file that brings in nothing (criterion 8: the
-// one notice), Open… of an SVG (criteria 1, 2: untitled and dirty), no network request and no file
-// markup in the page (criterion 67). Written from the spec before the implementation was read; the
+// (criterion 6: the notice text, nothing changed; slice 2 imports live text, so the "nothing
+// imported" case of criterion 8 is left to the slice-2 test), Open… of an SVG (criteria 1, 2:
+// untitled and dirty), no network request and no file markup in the page (criterion 67). Written from the spec before the implementation was read; the
 // selectors come from the rendered page. The browser profile lives under `target/`.
 
 import assert from "node:assert/strict";
@@ -159,16 +159,13 @@ const ENTITY_BOMB = `<?xml version="1.0"?>
 <!ENTITY b "&a;&a;&a;&a;&a;&a;&a;&a;&a;&a;">
 ]>
 <svg xmlns="http://www.w3.org/2000/svg"><desc>&b;</desc><rect width="1" height="1"/></svg>`;
-const TEXT_ONLY = `<svg xmlns="http://www.w3.org/2000/svg" width="10mm" height="10mm"><text x="1" y="5">Boho</text></svg>`;
 
-test("criteria 1 to 3, 5, 6, 8, 67 in Chromium: Import SVG… and Open… of real files", { skip: !BROWSER, timeout: 300_000 }, async () => {
+test("criteria 1 to 3, 5, 6, 67 in Chromium: Import SVG… and Open… of real files", { skip: !BROWSER, timeout: 300_000 }, async () => {
   let vite: ChildProcess | null = null;
   mkdirSync(SCRATCH, { recursive: true });
   const profile = mkdtempSync(path.join(SCRATCH, "profile-"));
   const bomb = path.join(SCRATCH, "bomb.svg");
-  const textOnly = path.join(SCRATCH, "text_only.svg");
   writeFileSync(bomb, ENTITY_BOMB);
-  writeFileSync(textOnly, TEXT_ONLY);
   let closeAll: () => Promise<void> = async () => undefined;
   try {
     vite = spawn("npx", ["vite", "--port", String(PORT), "--strictPort"], { cwd: FRONTEND, stdio: "ignore" });
@@ -212,28 +209,19 @@ test("criteria 1 to 3, 5, 6, 8, 67 in Chromium: Import SVG… and Open… of rea
     await s.tab("Layers");
     assert.ok(!(await s.layerRows()).some((r) => /inkscape_mm_a4/.test(r ?? "")), "Ctrl+Z removes the layer");
 
-    // Criterion 6: a refusal shows the dialog with the spec's text and changes nothing.
-    await s.tab("File");
+    // Criterion 6 on the Import button's route (`0058`, 2026-10-27): a refusal is the canvas
+    // notice with the file name and the spec's sentence, and changes nothing.
+    await s.tab("Layers");
     const rowsBefore = await s.layerRows().catch(() => []);
     await s.choose("[data-import-button]", bomb);
-    const dialog = await waitFor("the refusal", async () => {
-      const t = await s.dialogText();
-      return t ? t : null;
-    }, 10_000);
-    assert.match(dialog, /Can't import SVG/);
-    assert.match(dialog, /This file defines XML entities, which Curvyo does not read because they can be used to exhaust memory\. Nothing was changed\./);
-    await s.key("Escape", 27);
-    assert.equal(await s.dialogText(), "", "Escape closes");
-    assert.deepEqual(await s.layerRows().catch(() => []), rowsBefore);
-
-    // Criterion 8: nothing imported gives the one notice.
-    await s.tab("File");
-    await s.choose("[data-import-button]", textOnly);
-    const notice = await waitFor("the notice", async () => {
+    const refusal = await waitFor("the refusal", async () => {
       const t = await s.statusText();
-      return /could be imported/.test(t) ? t : null;
-    }, 5_000);
-    assert.match(notice, /Nothing in text_only\.svg could be imported\./);
+      return /XML entities/.test(t) ? t : null;
+    }, 10_000);
+    assert.match(refusal, /bomb\.svg/);
+    assert.match(refusal, /This file defines XML entities, which Curvyo does not read because they can be used to exhaust memory\. Nothing was changed\./);
+    assert.equal(await s.dialogText(), "", "no dialog");
+    assert.deepEqual(await s.layerRows().catch(() => []), rowsBefore);
 
     // Criteria 1 and 2: Open… of an SVG gives an untitled, dirty project.
     await s.tab("File");

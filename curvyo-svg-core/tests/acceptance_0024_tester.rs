@@ -67,6 +67,7 @@ fn leaves(nodes: &[SvgNode]) -> Vec<(&NodeState, &SvgLeaf)> {
         match node {
             SvgNode::Group { children, .. } => out.extend(leaves(children)),
             SvgNode::Leaf { state, leaf } => out.push((state, leaf)),
+            SvgNode::Text { .. } | SvgNode::Image { .. } => {}
         }
     }
     out
@@ -124,7 +125,7 @@ fn top_groups(d: &SvgDrawing) -> Vec<(&NodeState, bool, &[SvgNode])> {
                 layer,
                 children,
             } => Some((state, *layer, children.as_slice())),
-            SvgNode::Leaf { .. } => None,
+            SvgNode::Leaf { .. } | SvgNode::Text { .. } | SvgNode::Image { .. } => None,
         })
         .collect()
 }
@@ -1044,9 +1045,10 @@ fn ac42_ac44_ac46_states_and_structure() {
         <switch><rect systemLanguage="xx" width="2" height="2"/><rect width="3" height="3"/></switch>"#);
     let all = leaves(&d.nodes);
     assert_eq!(all.len(), 5, "switch gives its first child only");
+    // Slice 2, criterion 99: a child whose `systemLanguage` names no English tag is passed over.
     assert!(
-        close(bounds(&all, 4).width(), 2.0, 1e-12),
-        "the first child, untested"
+        close(bounds(&all, 4).width(), 3.0, 1e-12),
+        "the first child that passes the tests"
     );
     assert!(all[0].0.hidden || matches!(&d.nodes[0], SvgNode::Group { state, .. } if state.hidden));
     assert!(all[1].0.hidden);
@@ -1146,7 +1148,14 @@ fn ac13_ignored_content_leaves_the_rest_alone() {
     let busy = mm(
         r##"<title>t</title><metadata><x/></metadata><rect width="1" height="1" fill="#f00" data-x="1" aria-label="r" paint-order="stroke" vector-effect="non-scaling-stroke" xmlns:inkstitch="http://inkstitch.org/namespace" inkstitch:running_stitch_length_mm="2"/><text>x</text><image href="data:image/png;base64,AAAA" width="5" height="5"/><foreignObject><div xmlns="http://www.w3.org/1999/xhtml">x</div></foreignObject><script>alert(1)</script><animate attributeName="x"/><circle cx="5" cy="5" r="1"/><unknownElement/>"##,
     );
-    assert_eq!(plain.nodes, busy.nodes);
+    // Slice 2 (criteria 78, 100): the text and the image now come in; the rest is unchanged.
+    let drawn: Vec<_> = busy
+        .nodes
+        .iter()
+        .filter(|n| !matches!(n, SvgNode::Text { .. } | SvgNode::Image { .. }))
+        .cloned()
+        .collect();
+    assert_eq!(plain.nodes, drawn);
 }
 
 /// Criterion 70: the real files truncated and with single bytes changed refuse or read in under
