@@ -82,7 +82,13 @@ pub fn read_svg(bytes: &[u8]) -> Result<SvgDrawing, SvgError> {
         .iter()
         .filter_map(|(clone, target)| Some((*clone, *reader.leaf_of.get(target)?)))
         .collect();
-    let nodes = resolve_clones(nodes, reader.leaves, &originals);
+    // Text path carriers: (text number, path slot) to the carrier's leaf number in the walk.
+    let carriers: BTreeMap<(usize, usize), usize> = reader
+        .carriers
+        .iter()
+        .filter_map(|(text, slot, target)| Some(((*text, *slot), *reader.leaf_of.get(target)?)))
+        .collect();
+    let nodes = resolve_clones(nodes, reader.leaves, &originals, &carriers);
     let page = view
         .page
         .or_else(|| content_page(&nodes))
@@ -114,6 +120,7 @@ fn resolve_clones(
     nodes: Vec<SvgNode>,
     leaves: usize,
     originals: &BTreeMap<usize, usize>,
+    carriers: &BTreeMap<(usize, usize), usize>,
 ) -> Vec<SvgNode> {
     let mut clones = vec![false; leaves];
     let mut walk_index = 0;
@@ -142,8 +149,16 @@ fn resolve_clones(
             next += 1;
         }
     }
-    let mut walk_index = 0;
-    rebuild(nodes, &mut walk_index, &kept, &new_index, originals)
+    let mut rebuilt = Rebuild {
+        index: 0,
+        text: 0,
+        kept: &kept,
+        new_index: &new_index,
+        originals,
+        carriers,
+        carrier_leaves: carriers.values().copied().collect(),
+    };
+    rebuilt.nodes(nodes)
 }
 
 fn mark_clones(nodes: &[SvgNode], index: &mut usize, clones: &mut [bool]) {
@@ -154,51 +169,85 @@ fn mark_clones(nodes: &[SvgNode], index: &mut usize, clones: &mut [bool]) {
                 clones[*index] = matches!(leaf.kind, LeafKind::Clone { .. });
                 *index += 1;
             }
+            SvgNode::Text { .. } | SvgNode::Image { .. } => {}
         }
     }
 }
 
-fn rebuild(
-    nodes: Vec<SvgNode>,
-    index: &mut usize,
-    kept: &[bool],
-    new_index: &[Option<usize>],
-    originals: &BTreeMap<usize, usize>,
-) -> Vec<SvgNode> {
-    let mut out = Vec::with_capacity(nodes.len());
-    for node in nodes {
-        match node {
-            SvgNode::Group {
-                state,
-                layer,
-                children,
-            } => {
-                let children = rebuild(children, index, kept, new_index, originals);
-                if layer || !children.is_empty() {
-                    out.push(SvgNode::Group {
-                        state,
-                        layer,
-                        children,
-                    });
-                }
-            }
-            SvgNode::Leaf { state, mut leaf } => {
-                let old = *index;
-                *index += 1;
-                if !kept[old] {
-                    continue;
-                }
-                if let LeafKind::Clone { original, .. } = &mut leaf.kind {
-                    match originals.get(&old).and_then(|o| new_index[*o]) {
-                        Some(found) => *original = found,
-                        None => continue,
+/// The renumbering after the walk: clones to their originals' final numbers, texts to their
+/// carriers', carriers that SVG does not draw marked as guides (criterion 94).
+struct Rebuild<'a> {
+    /// The leaf number in the walk.
+    index: usize,
+    /// The text number in the walk.
+    text: usize,
+    kept: &'a [bool],
+    new_index: &'a [Option<usize>],
+    originals: &'a BTreeMap<usize, usize>,
+    carriers: &'a BTreeMap<(usize, usize), usize>,
+    carrier_leaves: std::collections::BTreeSet<usize>,
+}
+
+impl Rebuild<'_> {
+    fn nodes(&mut self, nodes: Vec<SvgNode>) -> Vec<SvgNode> {
+        let mut out = Vec::with_capacity(nodes.len());
+        for node in nodes {
+            match node {
+                SvgNode::Group {
+                    state,
+                    layer,
+                    children,
+                } => {
+                    let children = self.nodes(children);
+                    if layer || !children.is_empty() {
+                        out.push(SvgNode::Group {
+                            state,
+                            layer,
+                            children,
+                        });
                     }
                 }
-                out.push(SvgNode::Leaf { state, leaf });
+                SvgNode::Leaf {
+                    mut state,
+                    mut leaf,
+                } => {
+                    let old = self.index;
+                    self.index += 1;
+                    if !self.kept[old] {
+                        continue;
+                    }
+                    if let LeafKind::Clone { original, .. } = &mut leaf.kind {
+                        match self.originals.get(&old).and_then(|o| self.new_index[*o]) {
+                            Some(found) => *original = found,
+                            None => continue,
+                        }
+                    }
+                    if self.carrier_leaves.contains(&old) {
+                        let painted = |paint: Option<crate::drawing::Paint>| {
+                            paint.is_some_and(|p| p.opacity > 0.0)
+                        };
+                        let drawn = (painted(leaf.style.fill) || painted(leaf.style.stroke))
+                            && state.opacity > 0.0;
+                        state.guide |= !drawn || state.hidden;
+                    }
+                    out.push(SvgNode::Leaf { state, leaf });
+                }
+                SvgNode::Text { state, mut text } => {
+                    let number = self.text;
+                    self.text += 1;
+                    for (slot, path) in text.paths.iter_mut().enumerate() {
+                        let walked = path
+                            .carrier
+                            .or_else(|| self.carriers.get(&(number, slot)).copied());
+                        path.carrier = walked.and_then(|old| self.new_index[old]);
+                    }
+                    out.push(SvgNode::Text { state, text });
+                }
+                image @ SvgNode::Image { .. } => out.push(image),
             }
         }
+        out
     }
-    out
 }
 
 /// The page of a file with no size and no viewBox (criterion 17): from (0, 0) to the right and
@@ -251,6 +300,7 @@ fn collect_outlines(nodes: &[SvgNode], out: &mut Vec<Outline>) {
                 LeafKind::Clone { original, matrix } => (None, Some((original, matrix))),
                 ref kind => (kind.outline_mm(), None),
             }),
+            SvgNode::Text { .. } | SvgNode::Image { .. } => {}
         }
     }
 }

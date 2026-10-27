@@ -57,6 +57,14 @@ pub(crate) struct Reader<'a, 'd, 'input> {
     pub(crate) clone_depths: BTreeMap<u32, Option<usize>>,
     /// Layers made so far, for "Layer N".
     layers: usize,
+    /// The text characters left in the file (criterion 98).
+    pub(crate) text_chars: usize,
+    /// The texts made so far.
+    pub(crate) texts: usize,
+    /// Text paths whose carrier is a drawn element: (text number, path slot, element).
+    pub(crate) carriers: Vec<(usize, usize, u32)>,
+    /// Nodes to place before the next node read (a text's new guide carrier, criterion 94).
+    pub(crate) before: Vec<SvgNode>,
 }
 
 impl<'a, 'd, 'input> Reader<'a, 'd, 'input> {
@@ -80,6 +88,10 @@ impl<'a, 'd, 'input> Reader<'a, 'd, 'input> {
             pending: Vec::new(),
             clone_depths: BTreeMap::new(),
             layers: 0,
+            text_chars: crate::limits::MAX_TEXT_CHARS,
+            texts: 0,
+            carriers: Vec::new(),
+            before: Vec::new(),
         }
     }
 
@@ -105,6 +117,7 @@ impl<'a, 'd, 'input> Reader<'a, 'd, 'input> {
                 break;
             }
             if let Some(read) = self.element(child, ctx) {
+                out.append(&mut self.before);
                 out.push(read);
             }
         }
@@ -130,6 +143,9 @@ impl<'a, 'd, 'input> Reader<'a, 'd, 'input> {
                 | "line"
                 | "polyline"
                 | "polygon"
+                | "text"
+                | "flowRoot"
+                | "image"
         );
         if !known {
             return None;
@@ -156,20 +172,39 @@ impl<'a, 'd, 'input> Reader<'a, 'd, 'input> {
         match name {
             "g" | "a" => self.group(node, &inner, ctx.at_root && name == "g"),
             "switch" => {
-                // The first child that passes: no extension is supported, so a child that
-                // requires one (Illustrator's private data) does not.
-                let first = node.children().find(|child| {
-                    child.is_element()
-                        && child
-                            .attribute("requiredExtensions")
-                            .is_none_or(|ext| ext.trim().is_empty())
-                })?;
+                let first = node
+                    .children()
+                    .find(|child| child.is_element() && self.passes_switch(*child))?;
                 self.element(first, &inner)
             }
+            "text" => self.text(node, &inner),
+            "flowRoot" => self.flow_root(node, &inner),
+            "image" => crate::image::image(node, &inner),
             "svg" => self.nested_svg(node, inner),
             "use" => self.use_element(node, &inner),
             _ => self.leaf(node, &inner),
         }
+    }
+
+    /// Whether a child of `<switch>` is one SVG draws (criterion 99): no extension is supported
+    /// (Illustrator's private data), only SVG 1.1 features, English as the language; a bare
+    /// `foreignObject` draws nothing here, so it is passed over too.
+    fn passes_switch(&self, child: Node<'_, '_>) -> bool {
+        let extensions = child
+            .attribute("requiredExtensions")
+            .is_none_or(|ext| ext.trim().is_empty());
+        let features = child.attribute("requiredFeatures").is_none_or(|list| {
+            list.split_ascii_whitespace()
+                .all(|f| f.starts_with("http://www.w3.org/TR/SVG11/feature#"))
+        });
+        let language = child.attribute("systemLanguage").is_none_or(|list| {
+            list.split(',').any(|tag| {
+                let tag = tag.trim().to_ascii_lowercase();
+                tag == "en" || tag.starts_with("en-")
+            })
+        });
+        let foreign = self.is(child, "foreignObject");
+        extensions && features && language && !foreign
     }
 
     /// The registers of `node` under its computed style.
@@ -179,6 +214,7 @@ impl<'a, 'd, 'input> Reader<'a, 'd, 'input> {
             hidden: style.display_none || (leaf && style.hidden_visibility),
             locked: node.attribute((SODIPODI_NS, "insensitive")).map(str::trim) == Some("true"),
             opacity: style.opacity,
+            guide: false,
         }
     }
 

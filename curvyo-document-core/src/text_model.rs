@@ -327,6 +327,12 @@ impl TextOutline {
     }
 }
 
+/// The face hash an import writes for a font it did not find (`specs/0024-svg-import-export`
+/// criterion 82, `adrs.md` note 2026-10-27): 64 zeros, a stored hash to every reader and never
+/// the SHA-256 of a real file, so it matches no loaded face and the family and style decide.
+pub const MISSING_FACE_HASH: &str =
+    "0000000000000000000000000000000000000000000000000000000000000000";
+
 /// Whether `hash` is 64 lower-case hex digits, as a face hash is stored (ADR 0020 §1).
 #[must_use]
 pub fn is_face_hash(hash: &str) -> bool {

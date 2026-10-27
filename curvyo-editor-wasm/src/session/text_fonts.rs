@@ -49,6 +49,11 @@ impl TextFonts {
         self.generation
     }
 
+    /// The engine's loaded faces.
+    pub(crate) const fn store(&self) -> &FaceStore {
+        &self.store
+    }
+
     /// The listed faces.
     pub(crate) fn faces(&self) -> &[ListedFace] {
         &self.faces

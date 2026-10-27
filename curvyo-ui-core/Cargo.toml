@@ -29,3 +29,6 @@ toml.workspace = true
 # `curvyo-geometry-core` already uses.
 proptest.workspace = true
 serde_json.workspace = true
+# `tests/svg_text_budget.rs` encodes the 12-megapixel JPEG of `specs/0024-svg-import-export`
+# criterion 108 in memory; the workspace's own pinned `image`.
+image.workspace = true

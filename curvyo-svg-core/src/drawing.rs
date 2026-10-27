@@ -3,6 +3,8 @@
 
 use kurbo::{Affine, BezPath, Point, Rect, Shape};
 
+use crate::drawing_text::{SvgImage, SvgText};
+
 /// A colour without alpha, 8 bits per channel.
 pub type Rgb = [u8; 3];
 
@@ -53,6 +55,8 @@ pub struct NodeState {
     pub locked: bool,
     /// `opacity`, 0 to 1.
     pub opacity: f64,
+    /// A carrier a text sits on that SVG does not draw (criterion 94): it becomes a guide.
+    pub guide: bool,
 }
 
 impl Default for NodeState {
@@ -62,6 +66,7 @@ impl Default for NodeState {
             hidden: false,
             locked: false,
             opacity: 1.0,
+            guide: false,
         }
     }
 }
@@ -85,6 +90,20 @@ pub enum SvgNode {
         state: NodeState,
         /// Its geometry and style.
         leaf: SvgLeaf,
+    },
+    /// A live text (criterion 78); it takes no leaf number.
+    Text {
+        /// Its registers.
+        state: NodeState,
+        /// Its characters and styles.
+        text: Box<SvgText>,
+    },
+    /// An embedded picture (criterion 100); it takes no leaf number.
+    Image {
+        /// Its registers.
+        state: NodeState,
+        /// Its bytes and frame.
+        image: Box<SvgImage>,
     },
 }
 
@@ -226,7 +245,7 @@ impl SvgDrawing {
         crate::read::bounds_of(&self.nodes)
     }
 
-    /// How many leaves the drawing has.
+    /// How many objects the drawing has: leaves, texts and images.
     #[must_use]
     pub fn leaf_count(&self) -> usize {
         fn count(nodes: &[SvgNode]) -> usize {
@@ -234,7 +253,7 @@ impl SvgDrawing {
                 .iter()
                 .map(|n| match n {
                     SvgNode::Group { children, .. } => count(children),
-                    SvgNode::Leaf { .. } => 1,
+                    SvgNode::Leaf { .. } | SvgNode::Text { .. } | SvgNode::Image { .. } => 1,
                 })
                 .sum()
         }
@@ -247,7 +266,22 @@ impl SvgNode {
     #[must_use]
     pub const fn state(&self) -> &NodeState {
         match self {
-            Self::Group { state, .. } | Self::Leaf { state, .. } => state,
+            Self::Group { state, .. }
+            | Self::Leaf { state, .. }
+            | Self::Text { state, .. }
+            | Self::Image { state, .. } => state,
+        }
+    }
+}
+
+impl SvgNode {
+    /// The registers of this node, to change.
+    pub fn state_mut(&mut self) -> &mut NodeState {
+        match self {
+            Self::Group { state, .. }
+            | Self::Leaf { state, .. }
+            | Self::Text { state, .. }
+            | Self::Image { state, .. } => state,
         }
     }
 }

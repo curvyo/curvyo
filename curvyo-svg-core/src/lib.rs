@@ -11,7 +11,10 @@ pub mod path_data;
 pub mod xml_guard;
 
 mod css;
+mod data_uri;
 mod drawing;
+mod drawing_text;
+mod image;
 pub mod limits;
 mod page;
 mod paint;
@@ -19,11 +22,19 @@ mod read;
 mod reader;
 mod shapes;
 mod style;
+mod text;
+mod text_chars;
+mod text_style;
 mod units;
 mod uses;
 
+pub use data_uri::decode_data_uri;
 pub use drawing::{
     Cap, DisplayUnitName, Join, LeafKind, LeafStyle, NodeState, PageBackground, Paint, Rgb,
     StarData, SvgDrawing, SvgLeaf, SvgNode, rounded_rect,
+};
+pub use drawing_text::{
+    Baseline, BaselineShift, FlowAlign, FlowBox, FontFamily, ImageAspect, LineHeight, SvgChar,
+    SvgImage, SvgOrientation, SvgText, SvgTextPath, SvgWritingMode, TextAnchor, TextStyle,
 };
 pub use read::{SvgError, read_svg};

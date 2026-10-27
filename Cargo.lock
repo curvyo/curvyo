@@ -746,6 +746,7 @@ dependencies = [
  "curvyo-image-core",
  "curvyo-svg-core",
  "curvyo-text-core",
+ "image",
  "kurbo",
  "proptest",
  "serde",

@@ -9,6 +9,7 @@ use crate::css::Sheets;
 use crate::drawing::{Cap, Join, LeafStyle, Paint};
 use crate::limits::MAX_DASHES;
 use crate::paint::{BLACK, Ids, PaintValue, Rgba, colour, paint};
+use crate::text_style::{TEXT_PROPERTIES, TextProps};
 use crate::units::{Axis, Units};
 
 /// The namespace of `xlink:href`.
@@ -53,6 +54,8 @@ pub(crate) struct Computed {
     pub(crate) opacity: f64,
     /// Not inherited.
     pub(crate) display_none: bool,
+    /// The text properties.
+    pub(crate) text: TextProps,
 }
 
 impl Default for Computed {
@@ -71,6 +74,7 @@ impl Default for Computed {
             hidden_visibility: false,
             opacity: 1.0,
             display_none: false,
+            text: TextProps::default(),
         }
     }
 }
@@ -91,7 +95,10 @@ impl Cascade<'_, '_, '_> {
     ) -> Computed {
         let mut declarations: Vec<(String, &str)> = Vec::new();
         for attribute in node.attributes() {
-            if attribute.namespace().is_none() && PROPERTIES.contains(&attribute.name()) {
+            if attribute.namespace().is_none()
+                && (PROPERTIES.contains(&attribute.name())
+                    || TEXT_PROPERTIES.contains(&attribute.name()))
+            {
                 declarations.push((attribute.name().to_owned(), attribute.value()));
             }
         }
@@ -106,13 +113,26 @@ impl Cascade<'_, '_, '_> {
         let mut style = Computed {
             opacity: 1.0,
             display_none: false,
+            text: TextProps::inherited(&parent.text),
             ..parent.clone()
         };
+        // `font-size` before the lengths that are relative to it.
+        for (_, value) in declarations.iter().filter(|(name, _)| name == "font-size") {
+            let value = value.trim();
+            if value.eq_ignore_ascii_case("inherit") {
+                style.text.font_size = parent.text.font_size;
+            } else {
+                style.text.apply_font_size(value, &parent.text);
+            }
+        }
         // `color` first, so a `currentColor` of the same element sees it.
         for (name, value) in declarations.iter().filter(|(name, _)| name == "color") {
             self.apply(&mut style, parent, name, value.trim(), units);
         }
-        for (name, value) in declarations.iter().filter(|(name, _)| name != "color") {
+        for (name, value) in declarations
+            .iter()
+            .filter(|(name, _)| name != "color" && name != "font-size")
+        {
             self.apply(&mut style, parent, name, value.trim(), units);
         }
         style
@@ -184,6 +204,7 @@ impl Cascade<'_, '_, '_> {
                 }
             }
             "display" => style.display_none = value == "none",
+            text if TEXT_PROPERTIES.contains(&text) => style.text.apply(text, value, &parent.text),
             "visibility" => match value {
                 "hidden" | "collapse" => style.hidden_visibility = true,
                 "visible" => style.hidden_visibility = false,
@@ -210,7 +231,7 @@ fn inherit(style: &mut Computed, parent: &Computed, name: &str) {
         "stroke-dasharray" => style.dash.clone_from(&parent.dash),
         "display" => style.display_none = parent.display_none,
         "visibility" => style.hidden_visibility = parent.hidden_visibility,
-        _ => {}
+        text => style.text.inherit(text, &parent.text),
     }
 }
 

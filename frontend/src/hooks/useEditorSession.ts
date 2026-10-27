@@ -880,8 +880,9 @@ export interface EditorSession {
   importBegin: (drop: { x: number; y: number } | null) => void;
   /** Reads one file of the import (an image is decoded, an SVG parsed). */
   importAdd: (bytes: Uint8Array, fileName: string) => void;
-  /** Commits the import as one step and selects what came in. */
-  importFinish: () => { imported: number; notice: string; alert: boolean };
+  /** Commits the import as one step and selects what came in, once the faces of an SVG's texts
+   * are loaded. */
+  importFinish: () => Promise<{ imported: number; notice: string; alert: boolean }>;
   /** Save / Save as: packs the live session's document into `.curvyo` container bytes for the
    * host to write, recording the application version. Call `markSaved` once they are written.
    * @throws a plain `Error` if there is no live session yet, or the
@@ -1421,11 +1422,15 @@ export function useEditorSession(
   const openFile = useCallback(
     async (bytes: Uint8Array, fileName: string) => {
       const session = await openFileSession(bytes, fileName);
-      const result = { svg: session.opened_svg(), notice: session.take_open_notice() };
       await attachSession(session);
+      // An SVG with texts waits for their faces: the text hook loads what the session asks for
+      // on every sync (`specs/0024-svg-import-export` criterion 106).
+      await untilFacesLoaded((force) => session.continue_open_svg(force), syncFromSession);
+      const result = { svg: session.opened_svg(), notice: session.take_open_notice() };
+      syncFromSession();
       return result;
     },
-    [attachSession],
+    [attachSession, syncFromSession],
   );
 
   const importBegin = useCallback((drop: { x: number; y: number } | null) => {
@@ -1436,14 +1441,19 @@ export function useEditorSession(
     sessionRef.current?.import_add(bytes, fileName);
   }, []);
 
-  const importFinish = useCallback(() => {
+  const importFinish = useCallback(async () => {
     const session = sessionRef.current;
     if (!session) {
       return { imported: 0, notice: "", alert: false };
     }
-    const outcome = session.import_finish();
-    const result = { imported: outcome.imported, notice: outcome.notice, alert: outcome.alert };
-    outcome.free();
+    let result = { imported: 0, notice: "", alert: false };
+    await untilFacesLoaded((force) => {
+      const outcome = session.import_finish(force);
+      result = { imported: outcome.imported, notice: outcome.notice, alert: outcome.alert };
+      const waiting = outcome.waiting;
+      outcome.free();
+      return waiting;
+    }, syncFromSession);
     syncFromSession();
     return result;
   }, [syncFromSession]);
@@ -2759,4 +2769,17 @@ export function useEditorSession(
     packProject,
     markSaved,
   };
+}
+
+/** How long an SVG import waits for the faces of its texts before it takes what is loaded. */
+const FACE_WAIT_MS = 10_000;
+
+/** Calls `step` until it no longer waits, syncing between calls so the text hook reads and hands
+ * in the faces the session asked for; after `FACE_WAIT_MS` the step is forced. */
+async function untilFacesLoaded(step: (force: boolean) => boolean, sync: () => void): Promise<void> {
+  const started = performance.now();
+  while (step(performance.now() - started > FACE_WAIT_MS)) {
+    sync();
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
 }

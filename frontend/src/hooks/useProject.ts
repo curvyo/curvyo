@@ -370,7 +370,7 @@ export function useProject(deps: ProjectDeps): ProjectApi {
           await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
           editor.importAdd(file.bytes, file.name);
         }
-        const outcome = editor.importFinish();
+        const outcome = await editor.importFinish();
         if (outcome.notice) {
           editor.showHistoryNotice(
             outcome.notice,

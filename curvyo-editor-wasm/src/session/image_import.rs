@@ -10,10 +10,11 @@ use curvyo_document_core::{
     AssetError, DrawingNode, IMPORT_COMMIT_LABEL, IMPORT_IMAGE_COMMIT_LABEL,
     IMPORT_IMAGES_COMMIT_LABEL, IMPORT_SVG_COMMIT_LABEL, ImageInsertError, NodeId, Point,
 };
+use curvyo_ui_core::SvgDrawing;
 use curvyo_ui_core::{
     FileKind, ImageTarget, PlannedImage, SvgImport, SvgPlacement, UNSUPPORTED_FILE_NOTICE,
-    batch_failures_notice, failure_notice, file_kind, import_layer_name, import_svg_bytes,
-    plan_image_import, project_full_reason, skipped_notice,
+    batch_failures_notice, failure_notice, file_kind, import_layer_name, plan_image_import,
+    project_full_reason, read_svg_drawing, skipped_notice,
 };
 
 use super::layers::ActiveLayer;
@@ -27,7 +28,12 @@ enum Planned {
     Image(PlannedImage),
     Svg {
         layer_name: String,
-        import: SvgImport,
+        /// The drawing read, converted once the faces of its texts are loaded.
+        drawing: Box<SvgDrawing>,
+        /// The point its box is centred on.
+        centre: Point,
+        /// The content, once converted.
+        import: Option<SvgImport>,
     },
 }
 
@@ -51,6 +57,9 @@ pub struct ImportOutcome {
     pub notice: String,
     /// Whether the notice reports a failure (an alert, 5 s).
     pub alert: bool,
+    /// The faces of an SVG's texts are loading: nothing changed, call again
+    /// (`specs/0024-svg-import-export` criterion 106).
+    pub waiting: bool,
 }
 
 impl Session {
@@ -89,19 +98,11 @@ impl Session {
                 let (ImageTarget::ViewCentre(centre) | ImageTarget::Drop(centre)) = target;
                 #[allow(clippy::cast_precision_loss)]
                 let step = curvyo_ui_core::STAGGER_MM * index as f64;
-                import_svg_bytes(
-                    bytes,
-                    SvgPlacement::CentredOn(Point::new(centre.x + step, centre.y + step)),
-                )
-                .and_then(|import| {
-                    if import.leaves == 0 {
-                        Err(curvyo_ui_core::nothing_imported_notice(file_name))
-                    } else {
-                        Ok(Planned::Svg {
-                            layer_name: import_layer_name(file_name),
-                            import,
-                        })
-                    }
+                read_svg_drawing(bytes).map(|drawing| Planned::Svg {
+                    layer_name: import_layer_name(file_name),
+                    drawing: Box::new(drawing),
+                    centre: Point::new(centre.x + step, centre.y + step),
+                    import: None,
                 })
             }
             FileKind::Project | FileKind::Other => Err(UNSUPPORTED_FILE_NOTICE.to_owned()),
@@ -114,15 +115,32 @@ impl Session {
 
     /// Commits the import begun by [`Session::import_begin`] as one step ("Import image",
     /// "Import images", "Import SVG" or, mixed, "Import"), selects everything new with the Select
-    /// tool, and returns its notice. Nothing is written when nothing could be read.
-    pub fn import_finish(&mut self) -> ImportOutcome {
+    /// tool, and returns its notice. Nothing is written when nothing could be read. While the
+    /// faces of an SVG's texts load, it changes nothing and says it waits (unless `force`d, when
+    /// a text without any face is left out); the host calls again.
+    pub fn import_finish(&mut self, force: bool) -> ImportOutcome {
         let Some(mut batch) = self.import.take() else {
             return ImportOutcome {
                 imported: 0,
                 notice: String::new(),
                 alert: false,
+                waiting: false,
             };
         };
+        let ready = batch.planned.iter().all(|(_, planned)| match planned {
+            Planned::Svg { drawing, .. } => self.svg_faces_ready(drawing),
+            Planned::Image(_) => true,
+        });
+        if !ready && !force {
+            self.import = Some(batch);
+            return ImportOutcome {
+                imported: 0,
+                notice: String::new(),
+                alert: false,
+                waiting: true,
+            };
+        }
+        self.convert_planned(&mut batch);
         let images: Vec<_> = batch
             .planned
             .iter()
@@ -149,7 +167,34 @@ impl Session {
             imported: ids.len(),
             alert: !batch.failed.is_empty(),
             notice,
+            waiting: false,
         }
+    }
+
+    /// Converts every SVG of `batch` with the loaded faces; one that brings in nothing becomes a
+    /// failure with the notice of criterion 8.
+    fn convert_planned(&mut self, batch: &mut ImportBatch) {
+        let mut failed = Vec::new();
+        for (name, planned) in &mut batch.planned {
+            if let Planned::Svg {
+                drawing,
+                centre,
+                import,
+                ..
+            } = planned
+            {
+                let converted = self.convert_svg(drawing, SvgPlacement::CentredOn(*centre));
+                if converted.leaves == 0 {
+                    failed.push((name.clone(), curvyo_ui_core::nothing_imported_notice(name)));
+                }
+                *import = Some(converted);
+            }
+        }
+        batch.planned.retain(|(_, planned)| match planned {
+            Planned::Svg { import, .. } => import.as_ref().is_some_and(|i| i.leaves > 0),
+            Planned::Image(_) => true,
+        });
+        batch.failed.extend(failed);
     }
 
     /// Writes the planned files in one step and selects them; returns the new top-level ids.
@@ -170,10 +215,13 @@ impl Session {
         let anchor_ids: Vec<Vec<_>> = planned
             .iter()
             .map(|(_, p)| match p {
-                Planned::Svg { import, .. } => (0..DrawingNode::anchor_count(&import.nodes))
+                Planned::Svg {
+                    import: Some(import),
+                    ..
+                } => (0..DrawingNode::anchor_count(&import.nodes))
                     .map(|_| self.minter.mint())
                     .collect(),
-                Planned::Image(_) => Vec::new(),
+                _ => Vec::new(),
             })
             .collect();
         if self.tool != Tool::Select {
@@ -181,11 +229,16 @@ impl Session {
         }
         self.select.cancel_entry();
         for (_, p) in planned {
-            if let Planned::Image(image) = p {
-                self.images.insert(
+            match p {
+                Planned::Image(image) => self.images.insert(
                     curvyo_document_core::AssetHash::of(&image.image.bytes),
                     image.working.clone(),
-                );
+                ),
+                Planned::Svg {
+                    import: Some(import),
+                    ..
+                } => self.cache_pictures(import),
+                Planned::Svg { import: None, .. } => {}
             }
         }
         let (ids, layer) = self.recording(|this| {
@@ -197,14 +250,22 @@ impl Session {
                         Planned::Image(image) => {
                             ids.extend(document.write_images(std::slice::from_ref(&image.image)));
                         }
-                        Planned::Svg { layer_name, import } => {
-                            if let Ok((new_layer, children)) =
-                                document.insert_drawing(layer_name, &import.nodes, anchors)
-                            {
+                        Planned::Svg {
+                            layer_name,
+                            import: Some(import),
+                            ..
+                        } => {
+                            if let Ok((new_layer, children)) = document.insert_drawing(
+                                layer_name,
+                                &import.nodes,
+                                anchors,
+                                &import.assets,
+                            ) {
                                 ids.extend(children);
                                 layer = Some(new_layer);
                             }
                         }
+                        Planned::Svg { import: None, .. } => {}
                     }
                 }
                 (ids, layer)

@@ -117,10 +117,17 @@ mod style_edit;
 mod style_entry;
 mod style_panel;
 mod style_scope;
+mod svg_font_match;
 mod svg_import;
+mod svg_import_faces;
+mod svg_import_images;
 mod svg_import_shapes;
 mod svg_import_style;
 mod svg_import_text;
+mod svg_text;
+mod svg_text_align;
+mod svg_text_flow;
+mod svg_text_layout;
 mod text_box;
 mod text_caret;
 mod text_convert;
@@ -170,6 +177,7 @@ pub use combine::{
     plan_combine,
 };
 pub use conversion::{build_primitive_conversions, primitive_as_path};
+pub use curvyo_svg_core::SvgDrawing;
 pub use cut::{CUT_COMMIT_LABEL, CutPlan, CutRefusal, MAX_CUT_PIECES, plan_cut};
 pub use cuttable::{
     CUTTABLE_CHECK_VERSION, CUTTABLE_SIZE_MM, CUTTABLE_WORD, FontChecks, cuttable_pieces,
@@ -366,11 +374,16 @@ pub use style_scope::{
     StyleScope, StyleTool, is_single_line_text, object_kind_name, owns_style, skipped_clones,
     skipped_single_line_texts, style_scope, style_scope_in,
 };
-pub use svg_import::{SvgImport, SvgPlacement, import_svg_bytes, svg_import};
+pub use svg_font_match::{GENERIC_CURSIVE, GENERIC_SANS, GENERIC_SERIF, SvgFace, svg_face};
+pub use svg_import::{
+    SvgImport, SvgPlacement, import_svg_bytes, read_svg_drawing, svg_import, svg_page,
+};
+pub use svg_import_faces::{SvgFaceNeeds, substitute_face, svg_faces_needed};
 pub use svg_import_text::{
     FileKind, NEITHER_PROJECT_NOR_SVG, file_kind, import_layer_name, nothing_imported_notice,
     notice_file_name, svg_busy_notice, svg_refusal_text,
 };
+pub use svg_text_layout::ImportFaces;
 pub use text_box::{line_box_contains, line_box_corners, on_path_boxes};
 pub use text_caret::{TextEditGeometry, edit_geometry, nearest_boundary};
 pub use text_convert::{

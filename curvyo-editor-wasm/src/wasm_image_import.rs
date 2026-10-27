@@ -18,6 +18,8 @@ pub struct ImportOutcomeView {
     pub notice: String,
     /// Whether the notice reports a failure.
     pub alert: bool,
+    /// The faces of an SVG's texts are loading: nothing changed, call `import_finish` again.
+    pub waiting: bool,
 }
 
 impl From<ImportOutcome> for ImportOutcomeView {
@@ -26,6 +28,7 @@ impl From<ImportOutcome> for ImportOutcomeView {
             imported: u32::try_from(outcome.imported).unwrap_or(u32::MAX),
             notice: outcome.notice,
             alert: outcome.alert,
+            waiting: outcome.waiting,
         }
     }
 }
@@ -44,9 +47,11 @@ impl WasmSession {
         self.session.import_add(bytes, file_name);
     }
 
-    /// Commits the import as one step and selects what came in.
-    pub fn import_finish(&mut self) -> ImportOutcomeView {
-        self.session.import_finish().into()
+    /// Commits the import as one step and selects what came in; while the faces of an SVG's
+    /// texts load it says `waiting` and changes nothing (with `force`, it commits with the faces
+    /// that are loaded).
+    pub fn import_finish(&mut self, force: bool) -> ImportOutcomeView {
+        self.session.import_finish(force).into()
     }
 
     /// "An image in this project could not be read." once per open; empty otherwise.
