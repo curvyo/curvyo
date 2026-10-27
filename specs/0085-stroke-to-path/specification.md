@@ -1,6 +1,6 @@
 # Stroke to path: the area a stroke covers becomes a filled outline
 
-Status: Ready (2026-10-26; customer answers of 2026-10-26: Frage 45 A, Frage 46 A, Frage 47 A; `adrs.md` and UX notes the same day)
+Status: Done (#203; was Ready 2026-10-26; customer answers of 2026-10-26: Frage 45 A, Frage 46 A, Frage 47 A; `adrs.md` and UX notes the same day)
 Priority: Should
 Origin: Customer (backlog note of 2026-10-23 "Stroke to path (turn a stroke into a filled outline)"; chosen by the customer on 2026-10-26, "C vorher", built before `0055`). Items marked **(Proposal)** or **PO** are the product owner's and vetoable at the demo.
 Depends on: `0007-stroke-and-fill-styling` and `0017-style-panel-rework` (width, dash, join, cap, miter limit 4), `0018-stroke-markers`, `0016-boolean-operations` (kernel grid and tolerance, region, refusal sentences), `0054-combine-open-paths` (open outlines in compound paths, stroked open), `0038-path-offset` (exact parallel curves), `0074-text-objects` and `0076-single-line-fonts` (Object to path of texts), `0023-groups`, `0049-linked-clone`, `0046-document-shapes` (guides), `0020-undo-redo`.
@@ -138,4 +138,4 @@ UX notes: [`ux-notes.md`](ux-notes.md) (Select bar placement and wrap, dimmed st
 Requirements: R-EDIT-004 (Object to path family); related R-EDIT-005, R-EDIT-007, R-EDIT-023, R-FONT-009
 Depends on: `specs/0007-stroke-and-fill-styling/`, `specs/0018-stroke-markers/`, `specs/0016-boolean-operations/`, `specs/0054-combine-open-paths/`, `specs/0038-path-offset/`, `specs/0074-text-objects/`, `specs/0076-single-line-fonts/`, `specs/0049-linked-clone/`
 ADRs: ADR 0003 (kernel); none new expected
-PR: none yet
+PR: #203
