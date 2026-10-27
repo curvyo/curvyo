@@ -227,6 +227,11 @@ test("0058 in Chromium: Import button, Ctrl+I, bomb refusal, drop placement, und
     await waitFor("undo", async () => ((await s.layerRows()).some((r) => r?.includes("photo.png")) ? null : true));
     await s.key("z", 90, 2 | 8);
     await waitFor("redo", async () => ((await s.layerRows()).some((r) => r?.includes("photo.png")) ? true : null));
+    const redid = await waitFor("the redo notice", async () => {
+      const t = await s.statusText();
+      return t.includes("Redid") ? t : null;
+    });
+    assert.ok(redid.includes("Redid: Import image (1 image)."), redid);
 
     // Criterion 3: Ctrl+I opens the chooser on the canvas, not inside a text field.
     const canvas = JSON.parse(
@@ -243,8 +248,7 @@ test("0058 in Chromium: Import button, Ctrl+I, bomb refusal, drop placement, und
       const t = await s.statusText();
       return t.includes("png_bomb_60000x6") ? t : null;
     });
-    // The exact reason is checked in the skipped FAIL test below (wasm32 says "damaged").
-    assert.ok(/too large|damaged/.test(refusal), refusal);
+    assert.ok(refusal.includes("Image too large: 60,000 x 60,000 px. The limit is 50 megapixels."), refusal);
     assert.equal((await s.layerRows()).length, rowsNow, "nothing imported");
     await s.tab("Document");
     const field = (await s.evaluate(`(() => { const f = [...document.querySelectorAll('input')].find((i) => (!i.type || i.type === 'text' || i.type === 'number') && i.offsetParent); if (!f) return false; f.focus(); return document.activeElement === f; })()`)) as boolean;
@@ -312,7 +316,7 @@ test("0058 in Chromium: Import button, Ctrl+I, bomb refusal, drop placement, und
   }
 });
 
-test("in the browser (wasm32) a 60,000 x 60,000 px PNG bomb is refused with \"Image too large: 60,000 x 60,000 px. The limit is 50 megapixels.\" (criterion 17)", async () => {
+test("0058 in Chromium: a 60,000 x 60,000 px PNG bomb is refused with its numbers (criterion 17)", { skip: !BROWSER, timeout: 300_000 }, async () => {
   let vite: ChildProcess | null = null;
   mkdirSync(SCRATCH, { recursive: true });
   const profile = mkdtempSync(path.join(SCRATCH, "profile-"));
