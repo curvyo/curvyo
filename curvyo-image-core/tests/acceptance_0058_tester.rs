@@ -819,7 +819,7 @@ fn ac20_each_hostile_fixture_fails_within_2_s_of_cpu_and_300_mib() {
 }
 
 #[test]
-#[ignore = "0058 FAIL: an index outside the palette imports as black; criterion 20 says it fails by criterion 26"]
+#[ignore = "criterion 20 amended 2026-10-27 (customer default): an index outside the palette imports as black"]
 fn ac20_a_png_with_an_invalid_palette_index_is_not_imported() {
     assert_eq!(
         decode_working(&spec_fixture("png_bad_palette_index.png")).err(),
@@ -828,7 +828,6 @@ fn ac20_a_png_with_an_invalid_palette_index_is_not_imported() {
 }
 
 #[test]
-#[ignore = "0058 FAIL: a VP8 chunk claiming 0xFFFFFFF0 bytes imports; criterion 20 says a WebP with an overflowing chunk size fails by criterion 26"]
 fn ac20_a_webp_with_an_overflowing_chunk_size_is_not_imported() {
     assert_eq!(
         decode_working(&spec_fixture("webp_chunk_overflow.webp")).err(),
@@ -966,7 +965,6 @@ fn ac21_cuts_after_the_first_scan_are_truncated_and_a_complete_file_is_not() {
 }
 
 #[test]
-#[ignore = "0058 FAIL: format.rs is_truncated_jpeg searches raw bytes, so the thumbnail's SOS and EOI inside APP1 hide the cut; no notice"]
 fn ac21_an_exif_thumbnail_end_marker_does_not_hide_a_cut_main_image() {
     // Camera files carry a thumbnail JPEG (with its own SOS and EOI) inside APP1; the main
     // picture is cut. The thumbnail's end marker belongs to APP1, not to the file.
@@ -1022,7 +1020,6 @@ fn png_with_plte_len(plte_len: usize) -> Vec<u8> {
 }
 
 #[test]
-#[ignore = "0058 FAIL: png 0.18.1 palette.rs:74 panics on a PLTE whose length is not a multiple of 3 (fuzz decode_png); a panic aborts the wasm module"]
 fn ac19_ac20_a_plte_chunk_that_is_not_a_multiple_of_3_fails_without_panic() {
     // Found by the decode_png fuzz target (with CRC checks off); rebuilt here with valid CRCs.
     for len in [4, 5, 7, 8] {
@@ -1055,7 +1052,6 @@ fn decodes_within_address_limit(test: &str, name: &str) -> bool {
 }
 
 #[test]
-#[ignore = "0058 FAIL: image-webp allocates an EXIF chunk by its declared size (malloc 4,278,190,106 bytes, fuzz decode_webp); on wasm32 that aborts the module"]
 fn ac19_ac20_a_webp_exif_chunk_claiming_4_gib_fails_without_allocating_it() {
     assert!(
         decodes_within_address_limit(

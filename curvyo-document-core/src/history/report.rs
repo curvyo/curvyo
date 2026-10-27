@@ -63,6 +63,8 @@ pub enum ObjectShape {
     Clone,
     /// A text object (`specs/0074-text-objects`).
     Text,
+    /// An image (`specs/0058-bitmap-import`).
+    Image,
 }
 
 /// The outcome for one object.

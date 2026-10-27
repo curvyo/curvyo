@@ -1,6 +1,6 @@
 //! The file type by its first bytes, never by a name or MIME type (`specs/0058-bitmap-import`
-//! criterion 2), and the two container facts the decoder does not report: an animated WebP and
-//! a JPEG cut off before its end marker (criteria 6 and 21).
+//! criterion 2), and the container fact the decoder does not report: an animated WebP
+//! (criterion 6).
 
 /// A supported bitmap format.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -62,16 +62,6 @@ pub(crate) fn is_animated_webp(bytes: &[u8]) -> bool {
     bytes.len() > 20 && &bytes[12..16] == b"VP8X" && bytes[20] & 0x02 != 0
 }
 
-/// Whether `bytes` (a JPEG) end before their end-of-image marker: no `FF D9` follows the first
-/// start-of-scan marker. Inside the scan data a `FF` is always followed by `00` or a restart
-/// marker, so the pair cannot occur by chance.
-pub(crate) fn is_truncated_jpeg(bytes: &[u8]) -> bool {
-    let Some(scan) = bytes.windows(2).position(|pair| pair == [0xFF, 0xDA]) else {
-        return true;
-    };
-    !bytes[scan..].windows(2).any(|pair| pair == [0xFF, 0xD9])
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -100,12 +90,5 @@ mod tests {
         ] {
             assert_eq!(ImageFormat::detect(other), None);
         }
-    }
-
-    #[test]
-    fn a_jpeg_without_its_end_marker_is_truncated() {
-        assert!(is_truncated_jpeg(&[0xFF, 0xD8, 0xFF, 0xDA, 1, 2, 3]));
-        assert!(!is_truncated_jpeg(&[0xFF, 0xD8, 0xFF, 0xDA, 1, 0xFF, 0xD9]));
-        assert!(is_truncated_jpeg(&[0xFF, 0xD8]));
     }
 }

@@ -6,6 +6,7 @@ use std::io::Cursor;
 
 use image::{ImageDecoder, ImageReader, Limits};
 
+use crate::container::walk;
 use crate::density::{PixelDensity, read_density};
 use crate::error::ImageError;
 use crate::format::{ImageFormat, is_animated_webp};
@@ -58,23 +59,30 @@ impl ImageInfo {
 }
 
 /// Reads the header of `bytes`: the file ceiling first, then the format by content, then the
-/// declared size against the header ceiling, all before any pixel buffer exists.
+/// chunk structure and the declared size against the header ceiling, all before any pixel buffer
+/// exists and before the decoder reads a chunk.
 ///
 /// # Errors
 /// [`ImageError::FileTooLarge`] over 100 MiB; [`ImageError::Unsupported`] for anything but PNG,
 /// JPEG and WebP; [`ImageError::TooManyPixels`] over 50 megapixels; [`ImageError::Damaged`] for
-/// a header that cannot be read or a zero side.
+/// a header that cannot be read, a chunk that does not fit in the file or a zero side.
 pub fn probe(bytes: &[u8]) -> Result<ImageInfo, ImageError> {
-    open(bytes).map(|(info, _)| info)
+    open(bytes).map(|(info, _, _)| info)
 }
 
-/// [`probe`] and the decoder positioned after the header, for [`crate::decode_working`].
-pub(crate) fn open(bytes: &[u8]) -> Result<(ImageInfo, impl ImageDecoder + '_), ImageError> {
+/// [`probe`], the decoder positioned after the header and whether a JPEG ends before its end
+/// marker, for [`crate::decode_working`].
+pub(crate) fn open(bytes: &[u8]) -> Result<(ImageInfo, impl ImageDecoder + '_, bool), ImageError> {
     let size = u64::try_from(bytes.len()).unwrap_or(u64::MAX);
     if size > MAX_FILE_BYTES {
         return Err(ImageError::FileTooLarge { bytes: size });
     }
     let format = ImageFormat::detect(bytes).ok_or(ImageError::Unsupported)?;
+    let structure = walk(format, bytes)?;
+    // Before the decoder: on wasm32 it fails on a size it cannot address, before it reports it.
+    if let Some((width, height)) = structure.declared {
+        check_header_pixels(width, height)?;
+    }
     let mut reader = ImageReader::with_format(Cursor::new(bytes), format.decoder_format());
     // Our own checks replace the decoder's: its `max_alloc` is not enforced on this path (ADR
     // 0017 spike correction 1), and a refusal by it would hide the numbers of the notice.
@@ -84,9 +92,7 @@ pub(crate) fn open(bytes: &[u8]) -> Result<(ImageInfo, impl ImageDecoder + '_), 
     if width == 0 || height == 0 {
         return Err(ImageError::Damaged);
     }
-    if u64::from(width) * u64::from(height) > MAX_HEADER_PIXELS {
-        return Err(ImageError::TooManyPixels { width, height });
-    }
+    check_header_pixels(width, height)?;
     let orientation = decoder
         .orientation()
         .map_or(1, image::metadata::Orientation::to_exif);
@@ -102,5 +108,12 @@ pub(crate) fn open(bytes: &[u8]) -> Result<(ImageInfo, impl ImageDecoder + '_), 
         density: read_density(format, bytes),
         animated: format == ImageFormat::WebP && is_animated_webp(bytes),
     };
-    Ok((info, decoder))
+    Ok((info, decoder, structure.truncated))
+}
+
+fn check_header_pixels(width: u32, height: u32) -> Result<(), ImageError> {
+    if u64::from(width) * u64::from(height) > MAX_HEADER_PIXELS {
+        return Err(ImageError::TooManyPixels { width, height });
+    }
+    Ok(())
 }

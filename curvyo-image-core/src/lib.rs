@@ -9,6 +9,7 @@
 #![forbid(unsafe_code)]
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
+mod container;
 mod decode;
 mod density;
 mod downscale;
