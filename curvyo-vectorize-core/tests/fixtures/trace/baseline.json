@@ -73,6 +73,154 @@
       "wobble": 2.4292
     }
   },
+  "inkscape_best": {
+    "01-flat-logo": {
+      "area_error_pct": 0.9066,
+      "closed_pct": 100.0,
+      "max_deviation_px": 3.461,
+      "mean_deviation_px": 0.1729,
+      "micro_paths": 0.0,
+      "node_density": 4.449,
+      "wobble": 1.6525
+    },
+    "03-text-300dpi": {
+      "area_error_pct": 6.0333,
+      "closed_pct": 100.0,
+      "max_deviation_px": 8.9102,
+      "mean_deviation_px": 0.24,
+      "micro_paths": 1.0,
+      "node_density": 67.0606,
+      "wobble": 29.6855
+    },
+    "04-small-text": {
+      "area_error_pct": 21.334,
+      "closed_pct": 100.0,
+      "max_deviation_px": 1.2695,
+      "mean_deviation_px": 0.1923,
+      "micro_paths": 0.0,
+      "node_density": 56.7967,
+      "wobble": 21.4565
+    },
+    "05-line-art-scan": {
+      "area_error_pct": 12.5283,
+      "closed_pct": 100.0,
+      "max_deviation_px": 1.5242,
+      "mean_deviation_px": 0.2576,
+      "micro_paths": 0.0,
+      "node_density": 7.6682,
+      "wobble": 4.7388
+    },
+    "07-silhouette": {
+      "area_error_pct": 0.4939,
+      "closed_pct": 100.0,
+      "max_deviation_px": 1.776,
+      "mean_deviation_px": 0.2754,
+      "micro_paths": 0.0,
+      "node_density": 14.3092,
+      "wobble": 7.1546
+    },
+    "10-pixel-art": {
+      "area_error_pct": 1.0899,
+      "closed_pct": 100.0,
+      "max_deviation_px": 1.0815,
+      "mean_deviation_px": 0.0964,
+      "micro_paths": 0.0,
+      "node_density": 24.0148,
+      "wobble": 9.0812
+    },
+    "11-stencil-lines": {
+      "area_error_pct": 7.2874,
+      "closed_pct": 100.0,
+      "max_deviation_px": 2.4049,
+      "mean_deviation_px": 0.1592,
+      "micro_paths": 0.0,
+      "node_density": 53.3364,
+      "wobble": 22.6964
+    },
+    "12-technical-drawing": {
+      "area_error_pct": 12.7313,
+      "closed_pct": 100.0,
+      "max_deviation_px": 1.9818,
+      "mean_deviation_px": 0.2239,
+      "micro_paths": 0.0,
+      "node_density": 4.5898,
+      "wobble": 0.9367
+    }
+  },
+  "inkscape_default": {
+    "01-flat-logo": {
+      "area_error_pct": 0.8147,
+      "closed_pct": 100.0,
+      "max_deviation_px": 1.1355,
+      "mean_deviation_px": 0.1516,
+      "micro_paths": 0.0,
+      "node_density": 6.8371,
+      "wobble": 1.5194
+    },
+    "03-text-300dpi": {
+      "area_error_pct": 5.4778,
+      "closed_pct": 100.0,
+      "max_deviation_px": 1.188,
+      "mean_deviation_px": 0.2128,
+      "micro_paths": 3.0,
+      "node_density": 90.8825,
+      "wobble": 26.1685
+    },
+    "04-small-text": {
+      "area_error_pct": 19.1955,
+      "closed_pct": 100.0,
+      "max_deviation_px": 0.9215,
+      "mean_deviation_px": 0.1656,
+      "micro_paths": 0.0,
+      "node_density": 62.3756,
+      "wobble": 21.6153
+    },
+    "05-line-art-scan": {
+      "area_error_pct": 11.2833,
+      "closed_pct": 100.0,
+      "max_deviation_px": 1.0009,
+      "mean_deviation_px": 0.2342,
+      "micro_paths": 0.0,
+      "node_density": 11.6339,
+      "wobble": 4.8259
+    },
+    "07-silhouette": {
+      "area_error_pct": 0.4226,
+      "closed_pct": 100.0,
+      "max_deviation_px": 0.9007,
+      "mean_deviation_px": 0.2315,
+      "micro_paths": 0.0,
+      "node_density": 22.7751,
+      "wobble": 6.7985
+    },
+    "10-pixel-art": {
+      "area_error_pct": 0.0,
+      "closed_pct": 100.0,
+      "max_deviation_px": 0.0,
+      "mean_deviation_px": 0.0,
+      "micro_paths": 0.0,
+      "node_density": 32.5287,
+      "wobble": 8.1322
+    },
+    "11-stencil-lines": {
+      "area_error_pct": 5.6186,
+      "closed_pct": 100.0,
+      "max_deviation_px": 1.2183,
+      "mean_deviation_px": 0.1101,
+      "micro_paths": 0.0,
+      "node_density": 62.1019,
+      "wobble": 18.3445
+    },
+    "12-technical-drawing": {
+      "area_error_pct": 12.1694,
+      "closed_pct": 100.0,
+      "max_deviation_px": 1.0675,
+      "mean_deviation_px": 0.2122,
+      "micro_paths": 0.0,
+      "node_density": 7.9073,
+      "wobble": 1.1229
+    }
+  },
   "settings": {
     "smooth": 80,
     "specks_mm": 0.5,
