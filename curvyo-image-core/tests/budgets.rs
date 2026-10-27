@@ -4,7 +4,11 @@
 
 #![allow(clippy::unwrap_used, clippy::cast_possible_truncation, missing_docs)]
 
-use std::time::{Duration, Instant};
+mod common;
+
+use std::time::Duration;
+
+use common::thread_cpu;
 
 use image::ImageEncoder;
 
@@ -45,9 +49,9 @@ fn png(width: u32, height: u32) -> Vec<u8> {
 }
 
 fn timed(name: &str, bytes: &[u8], budget: Duration) {
-    let started = Instant::now();
+    let started = thread_cpu();
     let image = curvyo_image_core::decode_working(bytes).unwrap();
-    let took = started.elapsed();
+    let took = thread_cpu().saturating_sub(started);
     println!("{name}: {took:?} -> {}x{}", image.width, image.height);
     assert!(took < budget, "{name} took {took:?}, budget {budget:?}");
 }

@@ -103,11 +103,11 @@ pub fn failure_notice(file_name: &str, reason: &str) -> String {
     )
 }
 
-/// "Scaled to 20 % to fit the document. Original size restores it." (criterion 10).
+/// "Scaled to 20 % to fit the document." (criterion 10).
 #[must_use]
 pub fn fit_notice(factor: f64) -> String {
     format!(
-        "Scaled to {:.0} % to fit the document. Original size restores it.",
+        "Scaled to {:.0} % to fit the document.",
         (factor * 100.0).round()
     )
 }
@@ -198,10 +198,7 @@ mod tests {
 
     #[test]
     fn ac10_ac24_success_lines() {
-        assert_eq!(
-            fit_notice(0.198_425),
-            "Scaled to 20 % to fit the document. Original size restores it."
-        );
+        assert_eq!(fit_notice(0.198_425), "Scaled to 20 % to fit the document.");
         assert_eq!(size_notice(10 * 1_048_576 - 1), None);
         assert_eq!(
             size_notice(24 * 1_048_576).as_deref(),

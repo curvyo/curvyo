@@ -54,7 +54,7 @@ apart, Cut, Fracture, Flatten, Weld, Offset and Stroke to path refuse a selectio
 
 ## Notices
 
-- Scaled to 20 % to fit the document. Original size restores it.
+- Scaled to 20 % to fit the document.
 - Shown and traced at reduced resolution (16 MP). Original is kept.
 - This image adds 24.0 MB to the project file.
 - Animated image: only the first frame was used.

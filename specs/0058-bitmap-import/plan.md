@@ -65,6 +65,21 @@ Milestone 4, editor-wasm and frontend:
       (AC 1, 3, 4).
 - [x] 18. User page `docs/importing-images.md` and the string test (AC 47); design-system rows.
 
+## Tester findings (2026-10-27)
+
+- [x] 19. `curvyo-image-core/src/container.rs`: walk PNG chunks and RIFF chunks before the
+  decoder; a chunk past the file end, a `PLTE` not a multiple of 3 or over 768 bytes is damaged
+  (png 0.18.1 `palette.rs:74` panics, image-webp allocates a chunk by its declared length; both
+  abort a wasm module, so the walk is the only defence; nothing filed upstream) (AC 19, 20).
+- [x] 20. The declared size from `IHDR`, `VP8X` or the first SOF is checked against the header
+  ceiling before the decoder: on wasm32 png fails on an unaddressable buffer first and the bomb
+  read "damaged" (AC 17).
+- [x] 21. JPEG marker walk by segment length, so a thumbnail inside `APP1` does not hide a cut
+  main image (AC 21).
+- [x] 22. Fit notice without "Original size restores it." (AC 34 not built); undo/redo summary
+  says "1 image" (`ObjectShape::Image`) (AC 10, 45).
+- [x] 23. Time bounds of `fixtures_golden.rs` and `budgets.rs` on thread CPU time.
+
 ## Validation
 
 - Golden decoder tests over every fixture (size, sample pixels, notice or failure); hostile files
@@ -84,9 +99,8 @@ Milestone 4, editor-wasm and frontend:
   first drawn frame and a texture goes when no drawn image names it (`docs/technical-debt.md`).
 - The fuzz run of 10 minutes per format: a proptest mutation smoke over the fixtures (512 cases)
   stands in locally; the timed run is for the PR.
-- AC 20: two hostile fixtures decode harmlessly instead of failing (an index outside the palette
-  reads black; a WebP chunk length past the file end is read to the end); recorded in
-  `expected.txt`.
+- AC 20: an index outside the palette reads black and imports (criterion 20 amended
+  2026-10-27); recorded in `expected.txt`.
 
 ## Measured
 

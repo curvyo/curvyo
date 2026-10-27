@@ -312,7 +312,7 @@ test("0058 in Chromium: Import button, Ctrl+I, bomb refusal, drop placement, und
   }
 });
 
-test.skip("0058 FAIL: in the browser (wasm32) a 60,000 x 60,000 px PNG bomb is refused as damaged, not with \"Image too large: 60,000 x 60,000 px. The limit is 50 megapixels.\" (criterion 17; native gives the right text)", async () => {
+test("in the browser (wasm32) a 60,000 x 60,000 px PNG bomb is refused with \"Image too large: 60,000 x 60,000 px. The limit is 50 megapixels.\" (criterion 17)", async () => {
   let vite: ChildProcess | null = null;
   mkdirSync(SCRATCH, { recursive: true });
   const profile = mkdtempSync(path.join(SCRATCH, "profile-"));

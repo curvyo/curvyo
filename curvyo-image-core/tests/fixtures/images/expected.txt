@@ -15,11 +15,10 @@ png_icc_ignored.png | ok PNG 8x6 px 0,0=0,0,0,255 px 7,5=255,255,255,255
 png_exif_orientation_6.png | ok PNG 20x40 orient 6 px 16,3=255,0,0,255 px 3,3=128,128,128,255
 png_renamed.jpg | ok PNG 8x6
 polyglot_png_zip.png | ok PNG 8x6 px 7,5=255,255,255,255
-# Hostile files the pinned decoders read harmlessly (no panic, no hang, bounded memory): an index
-# outside the palette reads black, as browsers show it; a chunk length past the end of the file is
-# read up to the end. Both import (permit over refuse); reported in the PR.
+# An index outside the palette reads black, as browsers show it, and imports (criterion 20 as
+# amended 2026-10-27). A chunk length past the end of the file is refused (criterion 20).
 png_bad_palette_index.png | ok PNG 2x1 px 0,0=0,0,255,255 px 1,0=0,0,0,255
-webp_chunk_overflow.webp | ok WebP 40x30 px 20,15=192,128,64,255 tol 8
+webp_chunk_overflow.webp | err damaged
 jpeg_baseline_jfif_300dpi.jpg | ok JPEG 60x40 dpi 300x300 px 30,20=51,102,153,255 tol 3
 jpeg_progressive.jpg | ok JPEG 60x40 px 30,0=255,0,0,255 px 30,39=0,0,255,255 tol 12
 jpeg_gray.jpg | ok JPEG 16x16 px 8,8=119,119,119,255 tol 2

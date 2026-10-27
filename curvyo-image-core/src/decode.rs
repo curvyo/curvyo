@@ -6,7 +6,7 @@ use image::{DynamicImage, ImageDecoder, RgbaImage, metadata::Orientation};
 
 use crate::downscale::{Layout, to_working};
 use crate::error::ImageError;
-use crate::format::{ImageFormat, is_truncated_jpeg};
+use crate::format::ImageFormat;
 use crate::limits::{MAX_DECODER_BYTES, working_size};
 use crate::probe::open;
 use crate::working::WorkingImage;
@@ -20,7 +20,7 @@ use crate::working::WorkingImage;
 /// than [`MAX_DECODER_BYTES`]; [`ImageError::OutOfMemory`] when a buffer cannot be allocated;
 /// [`ImageError::Damaged`] for a decoder error.
 pub fn decode_working(bytes: &[u8]) -> Result<WorkingImage, ImageError> {
-    let (info, decoder) = open(bytes)?;
+    let (info, decoder, truncated) = open(bytes)?;
     let (width, height) = (info.stored_width, info.stored_height);
     // Checked before any buffer exists (ADR 0017 spike correction 1).
     if decoder.total_bytes() > MAX_DECODER_BYTES {
@@ -50,7 +50,7 @@ pub fn decode_working(bytes: &[u8]) -> Result<WorkingImage, ImageError> {
         height,
         pixels,
         original_size: info.upright_size(),
-        truncated: info.format == ImageFormat::Jpeg && is_truncated_jpeg(bytes),
+        truncated: info.format == ImageFormat::Jpeg && truncated,
         animated: info.animated,
     })
 }

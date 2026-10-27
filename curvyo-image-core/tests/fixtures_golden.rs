@@ -10,8 +10,12 @@
     missing_docs
 )]
 
+mod common;
+
 use std::path::PathBuf;
-use std::time::{Duration, Instant};
+use std::time::Duration;
+
+use common::thread_cpu;
 
 use curvyo_image_core::{ImageError, decode_working, probe};
 
@@ -48,9 +52,9 @@ fn parse_numbers<const N: usize>(text: &str, separator: char) -> [f64; N] {
 fn check(name: &str, expected: &str) -> Result<(), String> {
     let bytes = std::fs::read(fixture_dir().join(name)).unwrap();
     let mut words = expected.split_whitespace();
-    let started = Instant::now();
+    let started = thread_cpu();
     let decoded = decode_working(&bytes);
-    let elapsed = started.elapsed();
+    let elapsed = thread_cpu().saturating_sub(started);
     if elapsed > Duration::from_secs(2) {
         return Err(format!("{name}: took {elapsed:?}"));
     }

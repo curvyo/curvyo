@@ -228,11 +228,8 @@ fn ac2_ac26_a_text_file_named_png_is_refused_with_the_unsupported_reason() {
 
 #[test]
 fn ac10_the_fit_notice_rounds_the_percent_and_keeps_its_length() {
-    assert_eq!(
-        fit_notice(0.19843),
-        "Scaled to 20 % to fit the document. Original size restores it."
-    );
-    assert_eq!(fit_notice(0.19843).chars().count(), 62);
+    assert_eq!(fit_notice(0.19843), "Scaled to 20 % to fit the document.");
+    assert_eq!(fit_notice(0.19843).chars().count(), 35);
     assert!(
         fit_notice(0.104).starts_with("Scaled to 10 % "),
         "{}",

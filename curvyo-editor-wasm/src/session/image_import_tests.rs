@@ -89,9 +89,9 @@ fn ac5_a_mixed_batch_is_one_step_named_import_with_the_failures_counted() {
 fn ac45_undo_removes_the_import_and_redo_needs_no_decode_from_disk() {
     let mut session = Session::new(1);
     import(&mut session, &[(PNG, "a.png")]);
-    session.undo();
+    assert_eq!(session.undo().notice, "Undid: Import image (1 image).");
     assert_eq!(images(&session).len(), 0);
-    session.redo();
+    assert_eq!(session.redo().notice, "Redid: Import image (1 image).");
     assert_eq!(images(&session).len(), 1);
     assert!(session.document.asset(&AssetHash::of(PNG)).is_some());
 }

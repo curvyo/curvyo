@@ -430,6 +430,7 @@ pub(crate) fn kind_of(doc: &LoroDoc, id: TreeID) -> ObjectShape {
     match crate::shape_codec::read_shape_tag(&meta).as_deref() {
         Some(crate::clone_codec::SHAPE_CLONE) => ObjectShape::Clone,
         Some(crate::text_codec::SHAPE_TEXT) => ObjectShape::Text,
+        Some(crate::image_codec::SHAPE_IMAGE) => ObjectShape::Image,
         Some(crate::shape_codec::SHAPE_RECT) => ObjectShape::Rectangle,
         Some(crate::shape_codec::SHAPE_ELLIPSE) => ObjectShape::Ellipse,
         Some(crate::shape_codec::SHAPE_POLYGON) => ObjectShape::Polygon,
