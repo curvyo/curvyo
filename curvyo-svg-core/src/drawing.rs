@@ -208,8 +208,8 @@ pub struct StarData {
     pub center: Point,
     /// The outer radius `sodipodi:r1`.
     pub r1: f64,
-    /// The inner radius `sodipodi:r2`.
-    pub r2: f64,
+    /// The inner radius `sodipodi:r2`, when the file gives one (a polygon ignores it).
+    pub r2: Option<f64>,
     /// The angle of the first outer vertex `sodipodi:arg1`, radians.
     pub arg1: f64,
     /// The angle of the first inner vertex `sodipodi:arg2`, radians, when the file gives one.

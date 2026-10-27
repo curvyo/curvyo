@@ -90,9 +90,10 @@ left out.
 
 Inkscape saves every shape tool object as a path that also carries the tool's numbers. The import
 makes the Curvyo primitive from those numbers only when its outline and the drawn path lie within
-0.001 mm of each other (checked at 16 points per segment, both ways); otherwise, and when a number
-is missing, unreadable or out of range, the object is an ordinary path from its drawn data, without
-a message. A node moved by hand or by another program therefore gives a path.
+0.001 mm of each other (the same subpaths, each open or closed alike, and every point of one
+within 0.001 mm of the other, both ways; ellipses and arcs are measured against the true curve);
+otherwise, and when a number is missing, unreadable or out of range, the object is an ordinary
+path from its drawn data, without a message. A node moved by hand or by another program therefore gives a path.
 
 - **Arcs** (the ellipse tool with angles) become an ellipse with an arc: Inkscape's slice is a
   pie, arc an arc, chord a chord; a file without `arc-type` (Inkscape 0.92) is an arc when it is

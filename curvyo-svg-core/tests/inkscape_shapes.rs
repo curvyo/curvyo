@@ -90,17 +90,21 @@ fn ac111_ac124_unreadable_arc_numbers_give_a_path() {
 fn ac117_star_exposes_arg2() {
     let d = mm(
         r#"<path sodipodi:type="star" sodipodi:sides="5" sodipodi:cx="0" sodipodi:cy="0" sodipodi:r1="10" sodipodi:r2="4" sodipodi:arg1="-1.5707963" sodipodi:arg2="-0.9424778" inkscape:flatsided="false" d="M 0,-10 L 5,5 Z"/>
-        <path sodipodi:type="star" sodipodi:sides="6" sodipodi:cx="0" sodipodi:cy="0" sodipodi:r1="10" sodipodi:r2="8.66" sodipodi:arg1="0" inkscape:flatsided="true" d="M 10,0 L 5,8 Z"/>"#,
+        <path sodipodi:type="star" sodipodi:sides="6" sodipodi:cx="0" sodipodi:cy="0" sodipodi:r1="10" sodipodi:arg1="0" inkscape:flatsided="true" d="M 10,0 L 5,8 Z"/>"#,
     );
     let all = leaves(&d.nodes);
     let LeafKind::Star { star, .. } = &all[0].1.kind else {
         panic!()
     };
-    assert_eq!((star.r2, star.arg2), (4.0, Some(-0.942_477_8)));
+    assert_eq!((star.r2, star.arg2), (Some(4.0), Some(-0.942_477_8)));
     let LeafKind::Star { star, .. } = &all[1].1.kind else {
         panic!()
     };
-    assert_eq!((star.flat, star.arg2), (true, None));
+    assert_eq!(
+        (star.flat, star.r2, star.arg2),
+        (true, None, None),
+        "r2 is optional"
+    );
 }
 
 #[test]

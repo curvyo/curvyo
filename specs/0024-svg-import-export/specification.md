@@ -388,6 +388,12 @@ Customer, 2026-10-27: import Inkscape's own objects as Curvyo primitives whereve
 - **S3-4 A spiral is one path, not a group of one** (criterion 119).
 - **S3-5 A box loses its perspective** (criterion 120): six named paths.
 
+### Decided by the lead for slice 3 (2026-10-27, Proposal, vetoable at the demo)
+
+- **S3-6 Ellipses and arcs are compared with the true curve** (criterion 111): the 0.001 mm rule measures an ellipse or arc primitive against the true ellipse, not against the four-cubic (or 22.5° piece) drawing the canvas uses. The primitive is exact; its drawing in cubics is a rendering detail.
+- **S3-7 A pie whose `d` retraces an edge matches** (criterion 111): when `d` draws the same line as the pie but runs along one of its radii twice, it is the pie: the geometry is the same and the primitive is the cleaner object.
+- **S3-8 What "within 0.001 mm" checks** (criterion 111, after the tester's finding that 16 samples per segment let gaps through): both outlines have the same number of subpaths, each open or closed alike (a subpath whose ends are within 0.002 mm counts as closed, because its missing closing line is then within 0.001 mm of its ends), and every point of each lies within 0.001 mm of the other. The distance is bounded exactly rather than sampled: both outlines are flattened within 1e-5 mm and the remaining margin is applied to the polylines, so a gap anywhere is found.
+
 ### Out of scope (slice 3)
 
 - A spiral primitive or Spiral tool, a 3D box primitive, elliptical rectangle corners, a Curve value fitted to a rounded star, guessing any primitive from a plain path (criterion 29).

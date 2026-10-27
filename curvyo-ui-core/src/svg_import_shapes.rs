@@ -210,7 +210,7 @@ fn star_geometry(star: &StarData, drawn: &BezPath, m: Affine) -> Option<LeafGeom
         Shape::Star {
             frame,
             point_count: count,
-            inner_ratio: InnerRatio::new(star.r2 / star.r1).ok()?,
+            inner_ratio: InnerRatio::new(star.r2? / star.r1).ok()?,
             curve: Curve::POLYGON_DEFAULT,
         }
     };

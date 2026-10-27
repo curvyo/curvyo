@@ -548,13 +548,14 @@ fn ac126_same_bytes_give_the_same_document() {
     assert_eq!(a.leaves, 1000);
 }
 
+/// Criterion 126 in this thread's CPU time (CLAUDE.md §5, as `curvyo-image-core/tests/common`).
 #[test]
 #[ignore = "budget: run with --release -- --ignored"]
 fn ac126_budget_1000_shapes_under_half_a_second() {
     let text = mixed();
-    let start = std::time::Instant::now();
+    let start = thread_cpu();
     let import = import_svg_bytes(text.as_bytes(), SvgPlacement::File).unwrap();
-    let took = start.elapsed();
+    let took = thread_cpu().saturating_sub(start);
     let primitives = import
         .nodes
         .iter()
@@ -562,4 +563,18 @@ fn ac126_budget_1000_shapes_under_half_a_second() {
         .count();
     assert_eq!(primitives, 1000);
     assert!(took.as_secs_f64() < 0.5, "{took:?}");
+}
+
+/// The calling thread's CPU time (Linux `schedstat`; wall time since the first call elsewhere).
+fn thread_cpu() -> std::time::Duration {
+    std::fs::read_to_string("/proc/thread-self/schedstat")
+        .ok()
+        .and_then(|s| s.split_whitespace().next()?.parse::<u64>().ok())
+        .map_or_else(
+            || {
+                static START: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
+                START.get_or_init(std::time::Instant::now).elapsed()
+            },
+            std::time::Duration::from_nanos,
+        )
 }

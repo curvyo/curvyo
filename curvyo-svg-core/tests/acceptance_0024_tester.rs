@@ -278,7 +278,9 @@ fn ac26_to_ac28_ac33_inkscape_primitives() {
         panic!("Inkscape star")
     };
     assert_eq!(star.sides, 5);
-    assert!(!star.flat && close(star.r1, 12.0, 1e-9) && close(star.r2, 5.0, 1e-9));
+    assert!(
+        !star.flat && close(star.r1, 12.0, 1e-9) && star.r2.is_some_and(|r2| close(r2, 5.0, 1e-9))
+    );
     let LeafKind::Star { star, .. } = by_name(&all, "s2").1.kind else {
         panic!("Inkscape polygon")
     };
