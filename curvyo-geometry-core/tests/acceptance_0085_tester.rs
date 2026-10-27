@@ -4,11 +4,12 @@
 //!
 //! The reference is built here, not with the code under test: the stroke area of a polyline is
 //! the union of one rectangle per segment, one join piece per corner (miter quad within the
-//! limit 4, else a bevel triangle; a round join is a disk) and the caps, and of the dash pieces
+//! limit 4, else a bevel triangle; a round join is the disk sector between the outer corners; a
+//! round cap is a half disk beyond the end) and the caps, and of the dash pieces
 //! and markers (`0018` criterion 4: arrow 4 w long and 3 w wide centred on its anchor, dot 3 w
 //! across). Curves are flattened densely; a flattening vertex on a smooth curve gets a bevel
 //! wedge. Both regions are sampled on a grid; a sample may differ only within `NEAR_EDGE_MM` of
-//! the reference edge, and the result's winding must be 0 or 1 everywhere (the union, no
+//! the reference edge (measured as the distance to the nearest point on the other side of it), and the result's winding must be 0 or 1 everywhere (the union, no
 //! overlapping pieces, criterion 9).
 
 #![allow(
@@ -53,12 +54,20 @@ enum Piece {
     Poly(Vec<P>),
     /// A disk.
     Disk(P, f64),
+    /// The sector of the disk at `.0` with radius `.1` whose directions lie within the angle `.3`
+    /// of the unit direction `.2` (a half disk for `PI / 2`).
+    Sector(P, f64, P, f64),
 }
 
 impl Piece {
     fn contains(&self, p: P) -> bool {
         match self {
             Self::Disk(c, r) => (p.0 - c.0).hypot(p.1 - c.1) <= *r,
+            Self::Sector(c, r, mid, half) => {
+                let q = sub(p, *c);
+                let d = len(q);
+                d <= *r && (d == 0.0 || (q.0 * mid.0 + q.1 * mid.1) >= d * half.cos())
+            }
             Self::Poly(points) => {
                 let n = points.len();
                 let mut inside = false;
@@ -78,7 +87,7 @@ impl Piece {
 
     fn bounds(&self) -> (P, P) {
         match self {
-            Self::Disk(c, r) => ((c.0 - r, c.1 - r), (c.0 + r, c.1 + r)),
+            Self::Disk(c, r) | Self::Sector(c, r, _, _) => ((c.0 - r, c.1 - r), (c.0 + r, c.1 + r)),
             Self::Poly(points) => points.iter().fold(
                 ((f64::MAX, f64::MAX), (f64::MIN, f64::MIN)),
                 |(lo, hi), q| {
@@ -90,6 +99,119 @@ impl Piece {
             ),
         }
     }
+
+    /// The straight edges of the piece's boundary.
+    fn edges(&self) -> Vec<(P, P)> {
+        match self {
+            Self::Disk(..) => Vec::new(),
+            Self::Poly(points) => (0..points.len())
+                .map(|i| (points[i], points[(i + 1) % points.len()]))
+                .collect(),
+            Self::Sector(c, r, mid, half) => {
+                let (e1, e2) = (rotate(*mid, *half), rotate(*mid, -*half));
+                vec![(*c, add(*c, mul(e1, *r))), (*c, add(*c, mul(e2, *r)))]
+            }
+        }
+    }
+
+    /// The circle and the angular range of the piece's curved boundary, if any.
+    fn arc(&self) -> Option<(P, f64, P, f64)> {
+        match self {
+            Self::Disk(c, r) => Some((*c, *r, (1.0, 0.0), PI)),
+            Self::Sector(c, r, mid, half) => Some((*c, *r, *mid, *half)),
+            Self::Poly(_) => None,
+        }
+    }
+
+    /// The exact distance from an outside point `p` to the piece (0 inside).
+    fn distance(&self, p: P) -> f64 {
+        if self.contains(p) {
+            return 0.0;
+        }
+        let mut d = self
+            .edges()
+            .iter()
+            .map(|&(a, b)| segment_distance(p, a, b))
+            .fold(f64::INFINITY, f64::min);
+        if let Some((c, r, mid, half)) = self.arc() {
+            let q = sub(p, c);
+            if angle_between(q, mid) <= half {
+                d = d.min((len(q) - r).abs());
+            }
+        }
+        d
+    }
+
+    /// Points on the piece's boundary within `reach` of `p`, every `BOUNDARY_STEP_MM` at most,
+    /// each with the unit normal of the boundary there.
+    fn boundary_near(&self, p: P, reach: f64) -> Vec<(P, P)> {
+        let mut out = Vec::new();
+        for (a, b) in self.edges() {
+            let l = len(sub(b, a));
+            if l < 1e-12 {
+                continue;
+            }
+            let d = mul(sub(b, a), 1.0 / l);
+            let n = left(d);
+            // The part of the edge within `reach`: |a + t d - p| <= reach.
+            let ap = sub(p, a);
+            let t0 = ap.0 * d.0 + ap.1 * d.1;
+            let off = cross(d, ap);
+            if off.abs() > reach {
+                continue;
+            }
+            let half_chord = (reach * reach - off * off).sqrt();
+            let (from, to) = ((t0 - half_chord).max(0.0), (t0 + half_chord).min(l));
+            let k = ((to - from) / BOUNDARY_STEP_MM).ceil().max(0.0) as usize;
+            for i in 0..=k {
+                let t = from + (to - from) * i as f64 / k.max(1) as f64;
+                out.push((add(a, mul(d, t)), n));
+            }
+        }
+        if let Some((c, r, mid, half)) = self.arc() {
+            let q = sub(p, c);
+            if (len(q) - r).abs() <= reach {
+                let at = q.1.atan2(q.0);
+                let span = if len(q) < 1e-12 {
+                    PI
+                } else {
+                    (4.0 * reach / r).min(PI)
+                };
+                let k = (2.0 * span * r / BOUNDARY_STEP_MM).ceil() as usize;
+                for i in 0..=k {
+                    let a = at - span + 2.0 * span * i as f64 / k as f64;
+                    let e = (a.cos(), a.sin());
+                    let point = add(c, mul(e, r));
+                    if angle_between(e, mid) <= half && len(sub(point, p)) <= reach {
+                        out.push((point, e));
+                    }
+                }
+            }
+        }
+        out
+    }
+}
+
+/// The spacing of the boundary points the near-edge check tries.
+const BOUNDARY_STEP_MM: f64 = 0.0005;
+
+fn rotate(v: P, a: f64) -> P {
+    (v.0 * a.cos() - v.1 * a.sin(), v.0 * a.sin() + v.1 * a.cos())
+}
+
+fn angle_between(a: P, b: P) -> f64 {
+    cross(a, b).atan2(a.0 * b.0 + a.1 * b.1).abs()
+}
+
+fn segment_distance(p: P, a: P, b: P) -> f64 {
+    let ab = sub(b, a);
+    let l2 = ab.0 * ab.0 + ab.1 * ab.1;
+    let t = if l2 < 1e-24 {
+        0.0
+    } else {
+        (((p.0 - a.0) * ab.0 + (p.1 - a.1) * ab.1) / l2).clamp(0.0, 1.0)
+    };
+    len(sub(p, add(a, mul(ab, t))))
 }
 
 fn sub(a: P, b: P) -> P {
@@ -134,16 +256,26 @@ fn join_piece(v: P, d1: P, d2: P, h: f64, join: LineJoin, out: &mut Vec<Piece>) 
     if turn.abs() < 1e-12 && dot > 0.0 {
         return;
     }
-    if join == LineJoin::Round {
-        out.push(Piece::Disk(v, h));
-        return;
-    }
     // The outer side is opposite the turn.
     let s = if turn > 0.0 { -1.0 } else { 1.0 };
     let p1 = add(v, mul(left(d1), s * h));
     let p2 = add(v, mul(left(d2), s * h));
     // Interior angle theta between the segments; miter length / width = 1 / sin(theta / 2).
     let phi = turn.atan2(dot).abs();
+    if join == LineJoin::Round {
+        // SVG and canvas: the arc between the two outer corners, centred on the node (spec 0085
+        // criterion 5, "the outer corners are quarter arcs ... the hole stays sharp"). It is the
+        // sector between the two outer normals, not the full disk: on the inner side a full disk
+        // would reach past a segment shorter than w / 2. A U-turn's sector faces forward.
+        let normals = add(left(d1), left(d2));
+        let mid = if len(normals) > 1e-9 {
+            mul(unit(normals), s)
+        } else {
+            d1
+        };
+        out.push(Piece::Sector(v, h, mid, phi / 2.0));
+        return;
+    }
     let half_theta = (PI - phi) / 2.0;
     let within = half_theta.sin() > 0.0 && 1.0 / half_theta.sin() <= 4.0;
     if join == LineJoin::Miter && within {
@@ -158,7 +290,10 @@ fn join_piece(v: P, d1: P, d2: P, h: f64, join: LineJoin, out: &mut Vec<Piece>) 
 fn cap_piece(end: P, outward: P, h: f64, cap: LineCap, out: &mut Vec<Piece>) {
     match cap {
         LineCap::Butt => {}
-        LineCap::Round => out.push(Piece::Disk(end, h)),
+        // A half disk beyond the end (spec 0085 criterion 4, "two half circles"; adrs.md
+        // decision 2, "Round one half circle"), not a full disk, which would reach behind the end
+        // past a last segment shorter than w / 2. A lone point gets two halves: a dot.
+        LineCap::Round => out.push(Piece::Sector(end, h, outward, PI / 2.0)),
         LineCap::Square => {
             let n = left(outward);
             let far = add(end, mul(outward, h));
@@ -464,6 +599,48 @@ impl<'a> Index<'a> {
             .iter()
             .any(|&k| self.pieces[k].contains(p))
     }
+
+    /// The pieces whose bounds may come within `reach` of `p` (with repeats).
+    fn near(&self, p: P, reach: f64) -> Vec<&'a Piece> {
+        let cell = |v: f64, lo: f64, n: usize| (((v - lo) / CELL_MM).max(0.0) as usize).min(n - 1);
+        let (c0, c1) = (
+            cell(p.0 - reach, self.lo.0, self.cols),
+            cell(p.0 + reach, self.lo.0, self.cols),
+        );
+        let (r0, r1) = (
+            cell(p.1 - reach, self.lo.1, self.rows),
+            cell(p.1 + reach, self.lo.1, self.rows),
+        );
+        let mut out = Vec::new();
+        for r in r0..=r1 {
+            for c in c0..=c1 {
+                out.extend(
+                    self.cells[r * self.cols + c]
+                        .iter()
+                        .map(|&k| &self.pieces[k]),
+                );
+            }
+        }
+        out
+    }
+
+    /// Whether the edge of the reference region lies within `reach` of `p`, that is whether a
+    /// point of the other side (inside versus outside the union of the pieces) is that close.
+    /// Outside, this is the exact distance to the nearest piece. Inside, the nearest outside
+    /// point lies on some piece's boundary, so the boundaries within reach are walked every
+    /// `BOUNDARY_STEP_MM` and the points just off them tested. Unlike probes on a circle, this
+    /// also finds the thin outside wedge where two piece edges cross at a shallow angle.
+    fn edge_within(&self, p: P, reach: f64) -> bool {
+        let near = self.near(p, reach);
+        if !self.contains(p) {
+            return near.iter().any(|piece| piece.distance(p) <= reach);
+        }
+        near.iter().any(|piece| {
+            piece.boundary_near(p, reach).iter().any(|&(q, n)| {
+                !self.contains(add(q, mul(n, 1e-7))) || !self.contains(sub(q, mul(n, 1e-7)))
+            })
+        })
+    }
 }
 
 struct Comparison {
@@ -510,14 +687,11 @@ fn compare(result: &OffsetOutlines, pieces: &[Piece], step: f64) -> Comparison {
             }
             let theirs = inside((x, y));
             reference_count += usize::from(theirs);
-            if ours != theirs {
-                let near_edge = (0..16).any(|i| {
-                    let a = TAU * f64::from(i) / 16.0;
-                    inside((x + NEAR_EDGE_MM * a.cos(), y + NEAR_EDGE_MM * a.sin())) != theirs
-                });
-                if !near_edge && far_mismatches.len() < 10 {
-                    far_mismatches.push((x, y));
-                }
+            if ours != theirs
+                && far_mismatches.len() < 10
+                && !index.edge_within((x, y), NEAR_EDGE_MM)
+            {
+                far_mismatches.push((x, y));
             }
         }
     }
@@ -1417,4 +1591,52 @@ fn prop_regression_open_sharp_corner_wide_stroke() {
         (4.301965899134147, 28.643826533957476),
     ];
     assert_polyline_matches(&raw, false, 3.1853415778829293, 0, 0);
+}
+
+/// Regression for the property test above: an open polyline whose last segment (1.54 mm) is
+/// shorter than half the width (3.80 mm, Round join, Butt cap). A Round join is the arc between
+/// the outer corners (criterion 5), so nothing of it lies beyond the Butt end on the inner side;
+/// the reference's former full disk at the node did reach there.
+#[test]
+#[allow(clippy::unreadable_literal)] // proptest's shrunk values, verbatim
+fn prop_regression_round_join_short_last_segment() {
+    let raw = [
+        (0.0, 0.0),
+        (1.930258079191085, 37.38665807630355),
+        (3.3980652686146215, 37.83826460948236),
+    ];
+    assert_polyline_matches(&raw, false, 3.8034945146579986, 79, 81);
+}
+
+/// Regression for the property test above: an open polyline (width 3.88 mm, Round join, Round
+/// cap) where the start cap's arc and the edge of the fourth segment's band cross at about
+/// 9 degrees. A sample 0.004 mm inside the cap lies in the thin outside wedge of the result;
+/// it is within `NEAR_EDGE_MM` of the reference edge, which 16 probes on a 0.03 mm circle missed.
+#[test]
+#[allow(clippy::unreadable_literal)] // proptest's shrunk values, verbatim
+fn prop_regression_shallow_crossing_of_cap_and_band() {
+    let raw = [
+        (30.23173860023782, 8.151102023448852),
+        (15.217811215609494, 21.375391850378353),
+        (28.492104713561098, 39.59698359301516),
+        (39.26697280623219, 2.3138519534760364),
+        (21.225126782614023, 27.056706714512664),
+    ];
+    assert_polyline_matches(&raw, false, 3.8837375357414965, 100, 95);
+}
+
+/// Regression for the property test above: a closed self-crossing outline (width 2.91 mm, Round
+/// join) where a join arc and a band edge cross so shallowly that the hole between them is not
+/// mapped and stays the grid polyline; it must stay a hole and within the tolerance.
+#[test]
+#[allow(clippy::unreadable_literal)] // proptest's shrunk values, verbatim
+fn prop_regression_closed_round_join_hole_falls_back() {
+    let raw = [
+        (0.22449338484045006, 30.4310071051755),
+        (32.19273486433957, 18.66927114067511),
+        (31.378978531548565, 27.288148049090772),
+        (36.66933054960745, 18.26918837816915),
+        (29.59282831589451, 13.33470575447622),
+    ];
+    assert_polyline_matches(&raw, true, 2.905740668033855, 100, 0);
 }
