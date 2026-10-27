@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="210mm" height="297mm" viewBox="0 0 210 297" version="1.1" id="svg1" inkscape:version="1.4.4 (dcaf3e7d9e, 2026-05-05)"
+  xmlns="http://www.w3.org/2000/svg"
+  xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+  xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape">
+<sodipodi:namedview id="namedview1" inkscape:document-units="mm"/>
+<defs id="defs1">
+  <inkscape:perspective sodipodi:type="inkscape:persp3d" inkscape:vp_x="0 : 148.5 : 1" inkscape:vp_y="0 : 1000 : 0" inkscape:vp_z="210 : 148.5 : 1" inkscape:persp3d-origin="105 : 99 : 1" id="persp1"/>
+</defs>
+<g inkscape:groupmode="layer" id="layer1" inkscape:label="Shapes">
+  <!-- Row 1: arc kinds and angles -->
+  <path id="a_slice" style="fill:#ffcc00;stroke:#000000;stroke-width:0.26" sodipodi:type="arc" sodipodi:cx="25" sodipodi:cy="25" sodipodi:rx="15" sodipodi:ry="15" sodipodi:start="0" sodipodi:end="1.5707963" sodipodi:arc-type="slice"/>
+  <path id="a_arc" style="fill:none;stroke:#000000;stroke-width:0.26" sodipodi:type="arc" sodipodi:cx="65" sodipodi:cy="25" sodipodi:rx="15" sodipodi:ry="15" sodipodi:start="0" sodipodi:end="1.5707963" sodipodi:arc-type="arc" sodipodi:open="true"/>
+  <path id="a_chord" style="fill:#99ccff;stroke:#000000;stroke-width:0.26" sodipodi:type="arc" sodipodi:cx="105" sodipodi:cy="25" sodipodi:rx="15" sodipodi:ry="15" sodipodi:start="0" sodipodi:end="1.5707963" sodipodi:arc-type="chord"/>
+  <path id="a_big" style="fill:#ffcc00;stroke:#000000;stroke-width:0.26" sodipodi:type="arc" sodipodi:cx="145" sodipodi:cy="25" sodipodi:rx="15" sodipodi:ry="15" sodipodi:start="0.5" sodipodi:end="4.5" sodipodi:arc-type="slice"/>
+  <path id="a_neg" style="fill:#99ccff;stroke:#000000;stroke-width:0.26" sodipodi:type="arc" sodipodi:cx="185" sodipodi:cy="25" sodipodi:rx="15" sodipodi:ry="15" sodipodi:start="-1" sodipodi:end="1" sodipodi:arc-type="chord"/>
+  <!-- Row 2: whole ellipse from the arc tool, elliptical arcs, rotated and mirrored -->
+  <path id="a_whole" style="fill:#ccffcc;stroke:#000000;stroke-width:0.26" sodipodi:type="arc" sodipodi:cx="25" sodipodi:cy="65" sodipodi:rx="15" sodipodi:ry="8"/>
+  <path id="a_full" style="fill:#ccffcc;stroke:#000000;stroke-width:0.26" sodipodi:type="arc" sodipodi:cx="65" sodipodi:cy="65" sodipodi:rx="15" sodipodi:ry="15" sodipodi:start="0" sodipodi:end="6.2831" sodipodi:arc-type="arc"/>
+  <path id="a_ell" style="fill:none;stroke:#000000;stroke-width:0.26" sodipodi:type="arc" sodipodi:cx="105" sodipodi:cy="65" sodipodi:rx="15" sodipodi:ry="8" sodipodi:start="0.3" sodipodi:end="2.5" sodipodi:arc-type="arc"/>
+  <path id="a_rot30" style="fill:#ffcc00;stroke:#000000;stroke-width:0.26" sodipodi:type="arc" sodipodi:cx="145" sodipodi:cy="65" sodipodi:rx="15" sodipodi:ry="15" sodipodi:start="0" sodipodi:end="1.5707963" sodipodi:arc-type="slice"/>
+  <path id="a_mirror" style="fill:#ffcc00;stroke:#000000;stroke-width:0.26" sodipodi:type="arc" sodipodi:cx="185" sodipodi:cy="65" sodipodi:rx="15" sodipodi:ry="8" sodipodi:start="0.2" sodipodi:end="2" sodipodi:arc-type="chord"/>
+  <path id="a_label" inkscape:label="My pie" style="fill:#ffcc00;stroke:#000000;stroke-width:0.26" sodipodi:type="arc" sodipodi:cx="25" sodipodi:cy="275" sodipodi:rx="10" sodipodi:ry="10" sodipodi:start="1" sodipodi:end="3" sodipodi:arc-type="slice"/>
+  <!-- Row 3: rectangle with elliptical corners, polygons -->
+  <rect id="r_ell" style="fill:#ffccff;stroke:#000000;stroke-width:0.26" x="5" y="92" width="40" height="26" rx="10" ry="5"/>
+  <path id="p3" style="fill:#ffccff;stroke:#000000;stroke-width:0.26" sodipodi:type="star" sodipodi:sides="3" sodipodi:cx="65" sodipodi:cy="105" sodipodi:r1="13" sodipodi:arg1="-1.5707963" inkscape:flatsided="true" inkscape:rounded="0" inkscape:randomized="0"/>
+  <path id="p5" style="fill:#ffccff;stroke:#000000;stroke-width:0.26" sodipodi:type="star" sodipodi:sides="5" sodipodi:cx="105" sodipodi:cy="105" sodipodi:r1="13" sodipodi:r2="10.5" sodipodi:arg1="0.4" sodipodi:arg2="1.0283185" inkscape:flatsided="true" inkscape:rounded="0" inkscape:randomized="0"/>
+  <path id="p6" style="fill:#ffccff;stroke:#000000;stroke-width:0.26" sodipodi:type="star" sodipodi:sides="6" sodipodi:cx="145" sodipodi:cy="105" sodipodi:r1="13" sodipodi:arg1="0" inkscape:flatsided="true"/>
+  <path id="p6_rot" style="fill:#ffccff;stroke:#000000;stroke-width:0.26" sodipodi:type="star" sodipodi:sides="6" sodipodi:cx="185" sodipodi:cy="105" sodipodi:r1="13" sodipodi:r2="11" sodipodi:arg1="0" sodipodi:arg2="0.5235988" inkscape:flatsided="true" inkscape:rounded="0" inkscape:randomized="0"/>
+  <!-- Row 4: stars -->
+  <path id="s5" style="fill:#ff9999;stroke:#000000;stroke-width:0.26" sodipodi:type="star" sodipodi:sides="5" sodipodi:cx="25" sodipodi:cy="145" sodipodi:r1="14" sodipodi:r2="5.6" sodipodi:arg1="-1.5707963" sodipodi:arg2="-0.9424778" inkscape:flatsided="false" inkscape:rounded="0" inkscape:randomized="0"/>
+  <path id="s_round" style="fill:#ff9999;stroke:#000000;stroke-width:0.26" sodipodi:type="star" sodipodi:sides="5" sodipodi:cx="65" sodipodi:cy="145" sodipodi:r1="14" sodipodi:r2="5.6" sodipodi:arg1="-1.5707963" sodipodi:arg2="-0.9424778" inkscape:flatsided="false" inkscape:rounded="0.3" inkscape:randomized="0"/>
+  <path id="s_rand" style="fill:#ff9999;stroke:#000000;stroke-width:0.26" sodipodi:type="star" sodipodi:sides="5" sodipodi:cx="105" sodipodi:cy="145" sodipodi:r1="14" sodipodi:r2="5.6" sodipodi:arg1="-1.5707963" sodipodi:arg2="-0.9424778" inkscape:flatsided="false" inkscape:rounded="0" inkscape:randomized="0.2"/>
+  <path id="s_twist" style="fill:#ff9999;stroke:#000000;stroke-width:0.26" sodipodi:type="star" sodipodi:sides="5" sodipodi:cx="145" sodipodi:cy="145" sodipodi:r1="14" sodipodi:r2="5.6" sodipodi:arg1="-1.5707963" sodipodi:arg2="-0.6" inkscape:flatsided="false" inkscape:rounded="0" inkscape:randomized="0"/>
+  <path id="s_rot" style="fill:#ff9999;stroke:#000000;stroke-width:0.26" sodipodi:type="star" sodipodi:sides="7" sodipodi:cx="185" sodipodi:cy="145" sodipodi:r1="14" sodipodi:r2="7" sodipodi:arg1="0" sodipodi:arg2="0.44879895" inkscape:flatsided="false" inkscape:rounded="0" inkscape:randomized="0"/>
+  <path id="s_flip" style="fill:#ff9999;stroke:#000000;stroke-width:0.26" sodipodi:type="star" sodipodi:sides="5" sodipodi:cx="25" sodipodi:cy="240" sodipodi:r1="14" sodipodi:r2="6" sodipodi:arg1="0.3" sodipodi:arg2="0.92831853" inkscape:flatsided="false" inkscape:rounded="0" inkscape:randomized="0"/>
+  <!-- Row 5: spirals and shapes under stretches and inherited transforms -->
+  <path id="sp1" style="fill:none;stroke:#000000;stroke-width:0.26" sodipodi:type="spiral" sodipodi:cx="25" sodipodi:cy="190" sodipodi:expansion="1" sodipodi:revolution="3" sodipodi:radius="15" sodipodi:argument="0" sodipodi:t0="0"/>
+  <g id="g_skew" transform="translate(-40,0) skewX(20)">
+    <path id="sp_skew" style="fill:none;stroke:#000000;stroke-width:0.26" sodipodi:type="spiral" sodipodi:cx="65" sodipodi:cy="190" sodipodi:expansion="1.5" sodipodi:revolution="2.5" sodipodi:radius="15" sodipodi:argument="0.7" sodipodi:t0="0.1"/>
+    <path id="a_skew" style="fill:#ffcc00;stroke:#000000;stroke-width:0.26" sodipodi:type="arc" sodipodi:cx="185" sodipodi:cy="230" sodipodi:rx="12" sodipodi:ry="12" sodipodi:start="0" sodipodi:end="2" sodipodi:arc-type="slice"/>
+  </g>
+  <g id="g_stretch" transform="matrix(2,0,0,1,-120,0)">
+    <path id="a_stretch" style="fill:#ffcc00;stroke:#000000;stroke-width:0.26" sodipodi:type="arc" sodipodi:cx="110" sodipodi:cy="190" sodipodi:rx="8" sodipodi:ry="12" sodipodi:start="0.5" sodipodi:end="3" sodipodi:arc-type="chord"/>
+    <path id="p_stretch" style="fill:#ffccff;stroke:#000000;stroke-width:0.26" sodipodi:type="star" sodipodi:sides="5" sodipodi:cx="130" sodipodi:cy="190" sodipodi:r1="8" sodipodi:r2="6" sodipodi:arg1="0" sodipodi:arg2="0.62831853" inkscape:flatsided="true" inkscape:rounded="0" inkscape:randomized="0"/>
+  </g>
+  <g id="g_rot" transform="rotate(30,185,190)">
+    <path id="s_in_rot" style="fill:#ff9999;stroke:#000000;stroke-width:0.26" sodipodi:type="star" sodipodi:sides="4" sodipodi:cx="185" sodipodi:cy="190" sodipodi:r1="14" sodipodi:r2="5" sodipodi:arg1="0" sodipodi:arg2="0.78539816" inkscape:flatsided="false" inkscape:rounded="0" inkscape:randomized="0"/>
+  </g>
+  <!-- Row 6: 3D box -->
+  <g id="box1" sodipodi:type="inkscape:box3d" style="fill:#e9e9ff;stroke:#000000;stroke-width:0.26" inkscape:perspectiveID="#persp1" inkscape:corner0="0.5 : 0.45 : 0 : 1" inkscape:corner7="0.3 : 0.3 : 0.2 : 1">
+    <path sodipodi:type="inkscape:box3dside" id="f1" style="fill:#353564" inkscape:box3dsidetype="6"/>
+    <path sodipodi:type="inkscape:box3dside" id="f2" style="fill:#afafde" inkscape:box3dsidetype="13"/>
+    <path sodipodi:type="inkscape:box3dside" id="f3" style="fill:#4d4d9f" inkscape:box3dsidetype="11"/>
+    <path sodipodi:type="inkscape:box3dside" id="f4" style="fill:#e9e9ff" inkscape:box3dsidetype="5" inkscape:label="Lid"/>
+    <path sodipodi:type="inkscape:box3dside" id="f5" style="fill:#d7d7ff" inkscape:box3dsidetype="14"/>
+    <path sodipodi:type="inkscape:box3dside" id="f6" style="fill:#8686bf" inkscape:box3dsidetype="3"/>
+  </g>
+</g>
+</svg>
