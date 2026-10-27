@@ -322,6 +322,110 @@ fn ac117_star_and_twisted_star() {
     assert!(matches!(twisted, DrawingNode::Path { .. }));
 }
 
+/// `x` with `digits` significant digits, as Inkscape writes a number (`numericprecision`).
+fn written(x: f64, digits: i32) -> String {
+    if x == 0.0 {
+        return "0".to_owned();
+    }
+    #[allow(clippy::cast_possible_truncation)]
+    let magnitude = x.abs().log10().floor() as i32;
+    let decimals = usize::try_from((digits - 1 - magnitude).max(0)).unwrap();
+    let text = format!("{x:.decimals$}");
+    if text.contains('.') {
+        text.trim_end_matches('0').trim_end_matches('.').to_owned()
+    } else {
+        text
+    }
+}
+
+/// The star of Inkscape's star tool with its defaults (5 corners, spoke ratio 0.5, not rounded
+/// or randomized): every number written with `digits` significant digits, `d` with absolute
+/// `M`/`L` and `Z`, `shift` mm added to the first point's x, `twist` rad added to `arg2`.
+fn tool_star(
+    center: (f64, f64),
+    r1: f64,
+    arg1: f64,
+    digits: i32,
+    shift: f64,
+    twist: f64,
+    transform: &str,
+) -> String {
+    let (cx, cy) = center;
+    let (r2, arg2) = (r1 * 0.5, arg1 + PI / 5.0 + twist);
+    let w = |x: f64| written(x, digits);
+    let mut path = String::new();
+    for k in 0..5 {
+        let turn = TAU * f64::from(k) / 5.0;
+        let (sin, cos) = (arg1 + turn).sin_cos();
+        let x = cx + r1 * cos + if k == 0 { shift } else { 0.0 };
+        let command = if k == 0 { "M" } else { "L" };
+        write!(path, "{command} {},{} ", w(x), w(cy + r1 * sin)).unwrap();
+        let (sin, cos) = (arg2 + turn).sin_cos();
+        write!(path, "L {},{} ", w(cx + r2 * cos), w(cy + r2 * sin)).unwrap();
+    }
+    path.push('z');
+    format!(
+        r#"<path sodipodi:type="star" sodipodi:sides="5" sodipodi:cx="{}" sodipodi:cy="{}" sodipodi:r1="{}" sodipodi:r2="{}" sodipodi:arg1="{}" sodipodi:arg2="{}" inkscape:flatsided="false" inkscape:rounded="0" inkscape:randomized="0" d="{path}" {transform}/>"#,
+        w(cx),
+        w(cy),
+        w(r1),
+        w(r2),
+        w(arg1),
+        w(arg2),
+    )
+}
+
+/// Criteria 111 and 117 with the dated note of 2026-10-27: a plain star of the star tool is a
+/// star primitive at any size, rotation and written precision (six or eight significant
+/// digits); a moved node or a twist beyond the rounding of the written numbers still makes it a
+/// path.
+#[test]
+fn ac111_ac117_the_default_tool_star_at_any_size_and_precision() {
+    let shapes = [
+        ((40.123_4, 37.891_2), 1.733_3),
+        ((103.471, 128.602), 35.217_9),
+        ((150.4, 210.77), 92.345_6),
+        ((512.345, 488.765), 455.432_1),
+    ];
+    for digits in [6, 8] {
+        for (center, r1) in shapes {
+            for arg1 in [-FRAC_PI_2, 0.927_295_2, 2.981_234, -2.498_09] {
+                let rotate = format!(
+                    r#"transform="rotate({},{},{})""#,
+                    written(23.456_7, digits),
+                    written(center.0, digits),
+                    written(center.1, digits)
+                );
+                for transform in ["", rotate.as_str()] {
+                    let body = tool_star(center, r1, arg1, digits, 0.0, 0.0, transform);
+                    let node = one(&body);
+                    let DrawingNode::Primitive {
+                        shape:
+                            Shape::Star {
+                                inner_ratio,
+                                point_count,
+                                ..
+                            },
+                        ..
+                    } = &node
+                    else {
+                        panic!("not a star: {body}")
+                    };
+                    assert_eq!(point_count.get(), 5);
+                    assert!(near(inner_ratio.get(), 0.5, 1e-5), "{body}");
+                }
+            }
+        }
+    }
+    let moved = tool_star((103.471, 128.602), 35.217_9, 0.3, 6, 0.01, 0.0, "");
+    assert!(matches!(one(&moved), DrawingNode::Path { .. }), "{moved}");
+    let twisted = tool_star((103.471, 128.602), 35.217_9, 0.3, 6, 0.0, 1e-3, "");
+    assert!(
+        matches!(one(&twisted), DrawingNode::Path { .. }),
+        "{twisted}"
+    );
+}
+
 #[test]
 fn ac118_rounded_and_randomized_stars_are_paths() {
     for extra in [r#"inkscape:rounded="0.3""#, r#"inkscape:randomized="0.2""#] {
