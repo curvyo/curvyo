@@ -65,6 +65,11 @@ impl ImageCache {
 pub type FrameImages = Vec<(AssetHash, Arc<WorkingImage>)>;
 
 impl Session {
+    /// The working image of `hash`, decoded when it is not cached (the Trace tool's pixels).
+    pub(super) fn working_image(&mut self, hash: &AssetHash) -> Option<Arc<WorkingImage>> {
+        self.images.working(&self.document, hash)
+    }
+
     /// The working image of every image `list` draws, decoded where needed; an unreadable one is
     /// drawn as its frame with a cross over the artwork instead (criterion 30). Pictures no image
     /// of the frame draws are released: a hidden or deleted image decodes again when it is drawn.

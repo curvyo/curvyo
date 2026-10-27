@@ -35,6 +35,7 @@ fn tool_from_str(name: &str) -> Result<Tool, JsValue> {
         "polygon-star" => Ok(Tool::PolygonStar),
         "offset" => Ok(Tool::Offset),
         "text" => Ok(Tool::Text),
+        "trace" => Ok(Tool::Trace),
         other => Err(JsValue::from_str(&format!("unknown tool: {other}"))),
     }
 }
@@ -194,6 +195,7 @@ impl WasmSession {
             Tool::PolygonStar => "polygon-star".to_string(),
             Tool::Offset => "offset".to_string(),
             Tool::Text => "text".to_string(),
+            Tool::Trace => "trace".to_string(),
         }
     }
 

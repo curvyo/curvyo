@@ -17,6 +17,7 @@ mod error;
 mod format;
 mod limits;
 mod probe;
+mod reduced;
 mod working;
 
 pub use decode::decode_working;
@@ -28,4 +29,5 @@ pub use limits::{
     MAX_HEADER_PIXELS, MAX_WORKING_PIXELS, MAX_WORKING_SIDE, MIN_DPI, working_size,
 };
 pub use probe::{ImageInfo, probe};
+pub use reduced::TRACE_PREVIEW_SIDE;
 pub use working::{MipLevel, WorkingImage};

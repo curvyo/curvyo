@@ -31,7 +31,8 @@ impl Session {
             | Tool::Ellipse
             | Tool::PolygonStar
             | Tool::Offset
-            | Tool::Text => StyleTool::Other,
+            | Tool::Text
+            | Tool::Trace => StyleTool::Other,
         }
     }
 

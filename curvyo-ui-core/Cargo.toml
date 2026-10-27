@@ -17,6 +17,8 @@ curvyo-text-core = { path = "../curvyo-text-core", version = "0.1.0" }
 curvyo-svg-core = { path = "../curvyo-svg-core", version = "0.1.0" }
 # The bitmap decoder boundary of the image import (ADR 0017 §4).
 curvyo-image-core = { path = "../curvyo-image-core", version = "0.1.0" }
+# The raster tracer of the Trace tool (ADR 0023 §1; ADR 0011 §3: ui-core → vectorize-core).
+curvyo-vectorize-core = { path = "../curvyo-vectorize-core", version = "0.1.0" }
 kurbo.workspace = true
 serde.workspace = true
 thiserror.workspace = true

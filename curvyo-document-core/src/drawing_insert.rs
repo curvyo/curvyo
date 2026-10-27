@@ -177,15 +177,15 @@ impl DrawingNode {
 
 /// The writer of one drawing: the anchor ids in order, the created leaves by number and the
 /// clones to link once every leaf exists.
-struct Writer<'a, I: Iterator<Item = AnchorId>> {
-    document: &'a Document,
-    tree: LoroTree,
-    ids: I,
-    leaves: Vec<TreeID>,
-    clones: Vec<(TreeID, usize, Affine)>,
+pub(crate) struct Writer<'a, I: Iterator<Item = AnchorId>> {
+    pub(crate) document: &'a Document,
+    pub(crate) tree: LoroTree,
+    pub(crate) ids: I,
+    pub(crate) leaves: Vec<TreeID>,
+    pub(crate) clones: Vec<(TreeID, usize, Affine)>,
     /// Texts on path to link once every leaf exists.
-    links: Vec<(TreeID, usize, OnPathValues)>,
-    assets: &'a [Arc<[u8]>],
+    pub(crate) links: Vec<(TreeID, usize, OnPathValues)>,
+    pub(crate) assets: &'a [Arc<[u8]>],
 }
 
 impl<I: Iterator<Item = AnchorId>> Writer<'_, I> {
@@ -197,7 +197,7 @@ impl<I: Iterator<Item = AnchorId>> Writer<'_, I> {
             .collect()
     }
 
-    fn write_one(&mut self, parent: TreeParentId, node: &DrawingNode) -> TreeID {
+    pub(crate) fn write_one(&mut self, parent: TreeParentId, node: &DrawingNode) -> TreeID {
         let (created, registers) = match node {
             DrawingNode::Group {
                 registers,
@@ -365,7 +365,7 @@ impl<I: Iterator<Item = AnchorId>> Writer<'_, I> {
     }
 
     /// Writes every clone's link now that all leaves exist.
-    fn link_clones(&self) {
+    pub(crate) fn link_clones(&self) {
         for &(clone, original, matrix) in &self.clones {
             let origin = node_id(self.leaves[original]);
             write_clone(&self.meta(clone), CloneLink { origin, matrix });

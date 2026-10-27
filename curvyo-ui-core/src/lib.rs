@@ -140,6 +140,8 @@ mod text_layout_fields;
 mod text_on_path;
 mod text_path_caret;
 mod text_path_edit;
+mod trace_plan;
+mod trace_transfer;
 mod transform_commit;
 mod transform_drag;
 mod transform_entry;
@@ -180,6 +182,10 @@ pub use combine::{
 };
 pub use conversion::{build_primitive_conversions, primitive_as_path};
 pub use curvyo_svg_core::SvgDrawing;
+/// The Trace tool's settings schema (criterion 6), passed through for the host.
+pub use curvyo_vectorize_core::{
+    PARAMS as TRACE_PARAMS, ParamKind as TraceParamKind, ParamUnit as TraceParamUnit,
+};
 pub use cut::{CUT_COMMIT_LABEL, CutPlan, CutRefusal, MAX_CUT_PIECES, plan_cut};
 pub use cuttable::{
     CUTTABLE_CHECK_VERSION, CUTTABLE_SIZE_MM, CUTTABLE_WORD, FontChecks, cuttable_pieces,
@@ -403,6 +409,10 @@ pub use text_path_edit::{
     default_position, dragged_values, ellipse_degrees, ellipse_point, handle_points,
     nearest_outline, nudged_values, position_at_degrees, projected_values, release_placement,
     rotated_position, shift_along, slid_values, snap_stops, stored_vertical_layout,
+};
+pub use trace_plan::{TracePlan, TraceTarget, plan_trace, trace_group_name, trace_style};
+pub use trace_transfer::{
+    TRACE_WIRE_HEADER, TraceStatus, TraceWire, read_trace_wire, trace_auto_threshold, trace_job,
 };
 pub use transform_drag::{
     CornerLinking, CornerRadiusScaling, ParamDragInfo, ScaleModes, StrokeScaling,

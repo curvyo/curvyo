@@ -418,7 +418,7 @@ fn set_kinds(outlines: &mut [DrawingOutline], node_types: Option<&str>) {
 }
 
 /// Collinear and equal handles are Symmetric, collinear and unequal Asymmetric, else Corner.
-fn kind_from_handles(handle_in: Vec2, handle_out: Vec2) -> AnchorKind {
+pub(crate) fn kind_from_handles(handle_in: Vec2, handle_out: Vec2) -> AnchorKind {
     let (a, b) = (handle_in.length(), handle_out.length());
     if a == 0.0 || b == 0.0 {
         return AnchorKind::Corner;

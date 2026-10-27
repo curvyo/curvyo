@@ -29,11 +29,14 @@ pub enum DoubleClickHint {
     OffsetChip,
     /// The sentence that a linked clone has no nodes (`0049-linked-clone` criterion 26).
     Clone,
+    /// A double-click on a traced image in the Trace tool: the host creates the paths
+    /// (`specs/0025-raster-trace` criterion 12).
+    CreateTrace,
 }
 
 impl DoubleClickHint {
-    /// The code the host keys its text or action on: `""`, `"edit_hint"`, `"offset_chip"` or
-    /// `"clone"`.
+    /// The code the host keys its text or action on: `""`, `"edit_hint"`, `"offset_chip"`,
+    /// `"clone"` or `"create_trace"`.
     #[must_use]
     pub const fn code(self) -> &'static str {
         match self {
@@ -41,6 +44,7 @@ impl DoubleClickHint {
             Self::EditHint => "edit_hint",
             Self::OffsetChip => "offset_chip",
             Self::Clone => "clone",
+            Self::CreateTrace => "create_trace",
         }
     }
 }
