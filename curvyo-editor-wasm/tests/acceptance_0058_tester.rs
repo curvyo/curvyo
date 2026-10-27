@@ -57,7 +57,7 @@ fn import(
     for (bytes, name) in files {
         session.import_add(bytes, name);
     }
-    session.import_finish()
+    session.import_finish(false)
 }
 
 fn fresh() -> Session {

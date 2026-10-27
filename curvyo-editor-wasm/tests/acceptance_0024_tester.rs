@@ -372,7 +372,8 @@ fn ac6_refusals_change_nothing() {
 fn ac8_nothing_imported_notice_and_long_name() {
     let mut s = Session::new(5);
     let steps = s.history_len();
-    let only_text = br#"<svg xmlns="http://www.w3.org/2000/svg" width="10mm" height="10mm"><text x="1" y="5">Boho</text></svg>"#;
+    // Slice 2 (criterion 78) imports live text, so the file that brings in nothing holds a title.
+    let only_text = br#"<svg xmlns="http://www.w3.org/2000/svg" width="10mm" height="10mm"><title>Boho</title></svg>"#;
     let outcome = s
         .import_svg(only_text, "a-very-long-poster-file-name.svg")
         .unwrap();

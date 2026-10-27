@@ -64,8 +64,9 @@ fn measure(text: &str) -> (Duration, Duration, Duration) {
     let ids: Vec<AnchorId> = (0..DrawingNode::anchor_count(&import.nodes) as u64)
         .map(|n| AnchorId::new(7, n))
         .collect();
-    let (_, write) =
-        cpu_time_of(|| Document::from_drawing(7, &import.page, &import.nodes, &ids).unwrap());
+    let (_, write) = cpu_time_of(|| {
+        Document::from_drawing(7, &import.page, &import.nodes, &ids, &import.assets).unwrap()
+    });
     println!(
         "{:.1} MB, {} objects: open {open:?} = read+map {read_map:?} + write {write:?}",
         text.len() as f64 / 1e6,
