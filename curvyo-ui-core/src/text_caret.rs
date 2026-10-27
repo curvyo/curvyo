@@ -77,21 +77,27 @@ impl Letter {
 /// The letters of `line` in reading order.
 fn letters(layout: &TextLayout, line: &LineLayout) -> Vec<Letter> {
     let frame = layout.frame();
+    // The first glyph of each cluster, found once (a search per letter is quadratic in a long
+    // line).
+    let mut first_glyph = std::collections::HashMap::with_capacity(line.glyphs.len());
+    for glyph in &line.glyphs {
+        first_glyph.entry(glyph.cluster).or_insert(glyph);
+    }
     line.boundaries
         .windows(2)
         .map(|pair| {
             let ((start, x0), (end, x1)) = (pair[0], pair[1]);
-            let (map, baseline) = line.glyphs.iter().find(|g| g.cluster == start).map_or(
-                (frame, line.baseline.0),
-                |glyph| {
-                    let turn = layout.rotation_rad + glyph.rotation_rad;
-                    let centre = kurbo::Point::new(glyph.centre_x.0, glyph.centre_y.0);
-                    (
-                        frame * kurbo::Affine::rotate_about(turn, centre),
-                        glyph.baseline.0,
-                    )
-                },
-            );
+            let (map, baseline) =
+                first_glyph
+                    .get(&start)
+                    .map_or((frame, line.baseline.0), |glyph| {
+                        let turn = layout.rotation_rad + glyph.rotation_rad;
+                        let centre = kurbo::Point::new(glyph.centre_x.0, glyph.centre_y.0);
+                        (
+                            frame * kurbo::Affine::rotate_about(turn, centre),
+                            glyph.baseline.0,
+                        )
+                    });
             Letter {
                 bytes: (start, end),
                 x: (x0.0, x1.0),

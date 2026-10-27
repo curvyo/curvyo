@@ -1,16 +1,26 @@
 //! An SVG drawing as document content (`specs/0024-svg-import-export`, ADR 0018 §2): the reader's
-//! tree as groups, layers, paths, primitives and linked clones, for Open (at the file's own
-//! coordinates, layers kept) or for Import SVG… (moved as one onto a point, layers as groups).
+//! tree as groups, layers, paths, primitives, linked clones, texts and images, for Open (at the
+//! file's own coordinates, layers kept) or for Import SVG… (moved as one onto a point, layers as
+//! groups). Texts need faces (`adrs.md` note 2026-10-27, point 3): phase one,
+//! [`svg_faces_needed`], names the listed faces to load; phase two, [`svg_import`], converts
+//! with them loaded.
+
+use std::sync::Arc;
 
 use curvyo_document_core::{
-    Affine, BackgroundPaint, Color, DisplayUnit, DocumentBackground, DocumentSize, DrawingNode,
-    DrawingPage, DrawingRegisters, MAX_GROUP_DEPTH, Opacity, Point, clean_name,
-    validated_document_side,
+    Affine, AssetHash, BackgroundPaint, Color, DisplayUnit, DocumentBackground, DocumentSize,
+    DrawingNode, DrawingPage, DrawingRegisters, MAX_GROUP_DEPTH, Opacity, Point, TEXT_NAME_CHARS,
+    clean_name, validated_document_side,
 };
+use curvyo_image_core::WorkingImage;
 use curvyo_svg_core::{DisplayUnitName, LeafKind, NodeState, PageBackground, SvgDrawing, SvgNode};
 
+use crate::svg_font_match::FaceMemo;
+use crate::svg_import_images::{ImportAssets, frame_bounds};
 use crate::svg_import_shapes::{LeafGeometry, leaf_geometry};
 use crate::svg_import_style::{model_style, rewind_even_odd};
+use crate::svg_text::{TextPiece, convert_text};
+use crate::svg_text_layout::ImportFaces;
 
 /// Where the drawing goes.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -23,7 +33,7 @@ pub enum SvgPlacement {
 }
 
 /// An SVG drawing ready to write.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct SvgImport {
     /// The page, display unit and background for Open (criteria 15 to 20).
     pub page: DrawingPage,
@@ -31,15 +41,42 @@ pub struct SvgImport {
     pub nodes: Vec<DrawingNode>,
     /// How many objects came in; 0 means nothing could be imported (criterion 8).
     pub leaves: usize,
+    /// The bytes the images name, by asset number (criterion 104).
+    pub assets: Vec<Arc<[u8]>>,
+    /// The decoded pictures of those assets, for the canvas.
+    pub working: Vec<(AssetHash, Arc<WorkingImage>)>,
 }
 
-/// The document content of `drawing` placed by `placement`.
+/// The texts and images of a drawing converted in the file's millimetres, in tree order.
+enum Converted {
+    /// The pieces and the whole text's string, lines joined by spaces (for a group's name).
+    Text(Vec<TextPiece>, String),
+    Image(Option<(usize, kurbo::Affine)>),
+}
+
+/// Phase two: the document content of `drawing` placed by `placement`, its texts in `fonts`, its
+/// images within `asset_room` bytes of the project's limit.
 #[must_use]
-pub fn svg_import(drawing: &SvgDrawing, placement: SvgPlacement) -> SvgImport {
+pub fn svg_import(
+    drawing: &SvgDrawing,
+    placement: SvgPlacement,
+    fonts: &ImportFaces<'_>,
+    asset_room: u64,
+) -> SvgImport {
+    let mut assets = ImportAssets::new(asset_room);
+    let mut converted = Vec::new();
+    let mut bounds = drawing.bounds();
+    convert_all(
+        &drawing.nodes,
+        (fonts, &FaceMemo::new(fonts.faces)),
+        &mut assets,
+        &mut converted,
+        &mut bounds,
+    );
     let (matrix, max_groups) = match placement {
         SvgPlacement::File => (kurbo::Affine::IDENTITY, MAX_GROUP_DEPTH),
         SvgPlacement::CentredOn(target) => {
-            let shift = drawing.bounds().map_or(kurbo::Vec2::ZERO, |b| {
+            let shift = bounds.map_or(kurbo::Vec2::ZERO, |b| {
                 kurbo::Point::new(target.x, target.y) - b.center()
             });
             // The import's own layer is one group above everything.
@@ -52,26 +89,95 @@ pub fn svg_import(drawing: &SvgDrawing, placement: SvgPlacement) -> SvgImport {
         max_groups,
     };
     let mut nodes = Vec::new();
-    mapper.map(&drawing.nodes, 0, &mut nodes);
+    let mut next = converted.into_iter();
+    mapper.map(&drawing.nodes, 0, &mut next, &mut nodes);
     SvgImport {
-        page: page_of(drawing),
-        leaves: drawing.leaf_count(),
+        page: svg_page(drawing),
+        leaves: count_objects(&nodes),
         nodes,
+        assets: assets.bytes,
+        working: assets.working,
     }
 }
 
-/// Reads the SVG `bytes` and maps them by `placement`.
+/// Converts every text and image below `nodes`, widening `bounds` by their boxes (criterion 106).
+fn convert_all(
+    nodes: &[SvgNode],
+    fonts: (&ImportFaces<'_>, &FaceMemo<'_>),
+    assets: &mut ImportAssets,
+    out: &mut Vec<Converted>,
+    bounds: &mut Option<kurbo::Rect>,
+) {
+    let widen = |bounds: &mut Option<kurbo::Rect>, b: kurbo::Rect| {
+        *bounds = Some(bounds.map_or(b, |all| all.union(b)));
+    };
+    for node in nodes {
+        match node {
+            SvgNode::Group { children, .. } => convert_all(children, fonts, assets, out, bounds),
+            SvgNode::Text { text, .. } => {
+                let pieces = convert_text(text, fonts.0, fonts.1);
+                for b in pieces.iter().filter_map(|p| p.bounds) {
+                    widen(bounds, b);
+                }
+                let whole = text
+                    .chars
+                    .iter()
+                    .map(|c| if c.ch == '\n' { ' ' } else { c.ch })
+                    .collect();
+                out.push(Converted::Text(pieces, whole));
+            }
+            SvgNode::Image { image, .. } => {
+                let added = assets.add(image);
+                if let Some((_, map)) = added {
+                    widen(bounds, frame_bounds(map));
+                }
+                out.push(Converted::Image(added));
+            }
+            SvgNode::Leaf { .. } => {}
+        }
+    }
+}
+
+/// How many objects `nodes` hold (leaves, texts and images; a split text counts once per
+/// piece).
+fn count_objects(nodes: &[DrawingNode]) -> usize {
+    nodes
+        .iter()
+        .map(|node| match node {
+            DrawingNode::Group { children, .. } => count_objects(children),
+            _ => 1,
+        })
+        .sum()
+}
+
+/// Reads the SVG `bytes` and maps them by `placement` without faces: texts are left out (a
+/// drawing without text needs none), images come in.
 ///
 /// # Errors
 /// The error dialog's sentence when the file gives no drawing (criterion 6).
 pub fn import_svg_bytes(bytes: &[u8], placement: SvgPlacement) -> Result<SvgImport, String> {
-    let drawing = curvyo_svg_core::read_svg(bytes).map_err(crate::svg_refusal_text)?;
-    Ok(svg_import(&drawing, placement))
+    let drawing = read_svg_drawing(bytes)?;
+    let store = curvyo_text_core::FaceStore::new();
+    let fonts = ImportFaces {
+        faces: &[],
+        store: &store,
+        substitute: None,
+    };
+    Ok(svg_import(&drawing, placement, &fonts, u64::MAX))
+}
+
+/// Reads the SVG `bytes`.
+///
+/// # Errors
+/// The error dialog's sentence when the file gives no drawing (criterion 6).
+pub fn read_svg_drawing(bytes: &[u8]) -> Result<SvgDrawing, String> {
+    curvyo_svg_core::read_svg(bytes).map_err(crate::svg_refusal_text)
 }
 
 /// The page settings of `drawing`: its page (a new document's size when it gives none), its
 /// display unit and its background.
-fn page_of(drawing: &SvgDrawing) -> DrawingPage {
+#[must_use]
+pub fn svg_page(drawing: &SvgDrawing) -> DrawingPage {
     let size = drawing
         .page
         .and_then(|(w, h)| {
@@ -115,6 +221,7 @@ fn registers(state: &NodeState) -> DrawingRegisters {
         visible: !state.hidden,
         locked: state.locked,
         opacity: Opacity::new(state.opacity).unwrap_or(Opacity::OPAQUE),
+        guide: state.guide,
     }
 }
 
@@ -130,7 +237,13 @@ struct Mapper {
 impl Mapper {
     /// Maps `nodes` at group depth `depth` into `out`. Every leaf of the reader gives exactly one
     /// leaf, in order, so clone numbers stay valid.
-    fn map(&self, nodes: &[SvgNode], depth: usize, out: &mut Vec<DrawingNode>) {
+    fn map(
+        &self,
+        nodes: &[SvgNode],
+        depth: usize,
+        next: &mut impl Iterator<Item = Converted>,
+        out: &mut Vec<DrawingNode>,
+    ) {
         for (index, node) in nodes.iter().enumerate() {
             match node {
                 SvgNode::Group {
@@ -139,11 +252,11 @@ impl Mapper {
                     children,
                 } => {
                     if depth >= self.max_groups {
-                        self.map(children, depth, out);
+                        self.map(children, depth, next, out);
                         continue;
                     }
                     let mut inner = Vec::new();
-                    self.map(children, depth + 1, &mut inner);
+                    self.map(children, depth + 1, next, &mut inner);
                     let layer = *layer && self.keep_layers && depth == 0;
                     if inner.is_empty() && !layer {
                         continue;
@@ -189,6 +302,89 @@ impl Mapper {
                         (_, None) => continue,
                     });
                 }
+                SvgNode::Text { state, .. } => {
+                    if let Some(Converted::Text(pieces, whole)) = next.next() {
+                        self.text(state, pieces, &whole, depth, out);
+                    }
+                }
+                SvgNode::Image { state, .. } => {
+                    if let Some(Converted::Image(Some((asset, map)))) = next.next() {
+                        let mut registers = registers(state);
+                        if registers.name.is_none() {
+                            registers.name = Some("Image".to_owned());
+                        }
+                        out.push(DrawingNode::Image {
+                            registers,
+                            asset,
+                            placement: self.placed(map),
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    /// A map of the file's millimetres after the placement.
+    fn placed(&self, map: kurbo::Affine) -> Affine {
+        Affine::from_array((self.matrix * map).as_coeffs())
+    }
+
+    /// The pieces of one text: one text object, or a group of them named by the whole text's
+    /// first characters (criterion 92); the text's registers go on the object or the group.
+    fn text(
+        &self,
+        state: &NodeState,
+        pieces: Vec<TextPiece>,
+        whole: &str,
+        depth: usize,
+        out: &mut Vec<DrawingNode>,
+    ) {
+        let mut nodes: Vec<DrawingNode> = pieces
+            .into_iter()
+            .map(|piece| {
+                let mut text = piece.text;
+                text.placement = Affine::from_array(
+                    (self.matrix * kurbo::Affine::new(text.placement.to_array())).as_coeffs(),
+                );
+                match piece.on_path {
+                    Some((carrier, values)) => DrawingNode::TextOnPath {
+                        registers: DrawingRegisters::default(),
+                        text,
+                        carrier,
+                        values,
+                    },
+                    None => DrawingNode::Text {
+                        registers: DrawingRegisters::default(),
+                        text,
+                    },
+                }
+            })
+            .collect();
+        let registers = registers(state);
+        match nodes.len() {
+            0 => {}
+            1 => {
+                if let Some(
+                    DrawingNode::Text { registers: r, .. }
+                    | DrawingNode::TextOnPath { registers: r, .. },
+                ) = nodes.first_mut()
+                {
+                    *r = registers;
+                }
+                out.append(&mut nodes);
+            }
+            _ if depth >= self.max_groups => out.append(&mut nodes),
+            _ => {
+                let mut registers = registers;
+                if registers.name.is_none() {
+                    let first: String = whole.chars().take(TEXT_NAME_CHARS).collect();
+                    registers.name = clean_name(&first);
+                }
+                out.push(DrawingNode::Group {
+                    registers,
+                    layer: false,
+                    children: nodes,
+                });
             }
         }
     }
@@ -216,7 +412,18 @@ mod tests {
             r#"<svg xmlns="http://www.w3.org/2000/svg" width="400mm" height="400mm" viewBox="0 0 400 400">
             <rect x="200" y="200" width="40" height="20"/><circle cx="300" cy="210" r="10"/></svg>"#,
         );
-        let import = svg_import(&drawing, SvgPlacement::CentredOn(Point::new(50.0, 40.0)));
+        let store = curvyo_text_core::FaceStore::new();
+        let fonts = ImportFaces {
+            faces: &[],
+            store: &store,
+            substitute: None,
+        };
+        let import = svg_import(
+            &drawing,
+            SvgPlacement::CentredOn(Point::new(50.0, 40.0)),
+            &fonts,
+            u64::MAX,
+        );
         let DrawingNode::Primitive {
             shape: Shape::Rect { bounds, .. },
             ..

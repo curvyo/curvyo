@@ -34,3 +34,6 @@ pub const MAX_COORDINATE_MM: f64 = 1e7;
 
 /// The page side limits (`0015`): a page from the file is clamped to them.
 pub const PAGE_MM: (f64, f64) = (1.0, 100_000.0);
+
+/// The most text characters a file holds; the rest of the texts is skipped (criterion 98).
+pub const MAX_TEXT_CHARS: usize = 1_000_000;

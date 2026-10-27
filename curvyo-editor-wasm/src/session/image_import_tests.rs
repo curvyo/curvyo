@@ -16,7 +16,7 @@ fn import(session: &mut Session, files: &[(&[u8], &str)]) -> super::ImportOutcom
     for (bytes, name) in files {
         session.import_add(bytes, name);
     }
-    session.import_finish()
+    session.import_finish(false)
 }
 
 fn images(session: &Session) -> Vec<curvyo_document_core::ImageSnapshot> {

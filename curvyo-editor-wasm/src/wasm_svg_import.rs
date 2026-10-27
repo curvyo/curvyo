@@ -26,6 +26,18 @@ impl WasmSession {
         self.session.opened_svg()
     }
 
+    /// Whether an opened SVG still waits for the faces of its texts (criterion 106).
+    #[must_use]
+    pub fn open_svg_waiting(&self) -> bool {
+        self.session.open_svg_waiting()
+    }
+
+    /// Converts an opened SVG once the faces of its texts are loaded (with `force`, with the
+    /// faces that are loaded); returns whether it still waits.
+    pub fn continue_open_svg(&mut self, force: bool) -> bool {
+        self.session.continue_open_svg(force)
+    }
+
     /// The notice of an Open of an SVG that brought in nothing (criterion 8), once.
     pub fn take_open_notice(&mut self) -> String {
         self.session.take_open_notice()
@@ -33,11 +45,13 @@ impl WasmSession {
 
     /// Import SVG… (criterion 3): `"imported:<n>"` with the objects that came in, selected;
     /// `"nothing:<notice>"` when nothing could be imported; `"error:<sentence>"` when the file
-    /// gives no drawing. Only `"imported"` changed anything.
+    /// gives no drawing; `"waiting"` while the faces of its texts load (call again). Only
+    /// `"imported"` changed anything.
     pub fn import_svg(&mut self, bytes: &[u8], file_name: &str) -> String {
         match self.session.import_svg(bytes, file_name) {
             Ok(SvgImportOutcome::Imported(count)) => format!("imported:{count}"),
             Ok(SvgImportOutcome::Nothing(notice)) => format!("nothing:{notice}"),
+            Ok(SvgImportOutcome::Waiting) => "waiting".to_owned(),
             Err(message) => format!("error:{message}"),
         }
     }

@@ -405,6 +405,8 @@ pub struct Session {
     images: image_cache::ImageCache,
     /// The import being added by the Import button (`image_import.rs`).
     import: Option<image_import::ImportBatch>,
+    /// An opened SVG whose texts wait for their faces (`svg_import.rs`).
+    pending_open: Option<svg_import::PendingOpen>,
     /// The notice of the last style or opacity edit that left clones with their original's style
     /// alone, until the host has taken it (`clone_overrides.rs`).
     skip_notice: Option<String>,
@@ -490,6 +492,7 @@ impl Session {
             open_notice: None,
             images: image_cache::ImageCache::default(),
             import: None,
+            pending_open: None,
             skip_notice: None,
             deleted_objects: 0,
             dom_chips: Vec::new(),
@@ -561,6 +564,7 @@ impl Session {
             open_notice: None,
             images: image_cache::ImageCache::default(),
             import: None,
+            pending_open: None,
             skip_notice: None,
             deleted_objects: 0,
             dom_chips: Vec::new(),

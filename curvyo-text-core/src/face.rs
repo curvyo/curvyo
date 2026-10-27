@@ -5,6 +5,7 @@ use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex, OnceLock, PoisonError};
 
 use harfrust::font::Kind;
+use skrifa::raw::TableProvider;
 use skrifa::{FontRef, MetadataProvider};
 
 use crate::error::TextError;
@@ -48,6 +49,12 @@ pub struct FaceMetrics {
     /// The distance between two columns from `vhea` (ascender minus descender plus line gap),
     /// when the face has vertical metrics (`specs/0079-text-layout-controls` criterion 22).
     pub vertical_line_height: Option<f64>,
+    /// How far a superscript's baseline rises, from OS/2 `ySuperscriptYOffset`, when it states
+    /// one above 0 (up to 2 em).
+    pub superscript_offset: Option<f64>,
+    /// How far a subscript's baseline falls (positive down), from OS/2 `ySubscriptYOffset`,
+    /// when it states one above 0 (up to 2 em).
+    pub subscript_offset: Option<f64>,
 }
 
 impl FaceMetrics {
@@ -101,6 +108,8 @@ const DEFAULT_METRICS: FaceMetrics = FaceMetrics {
     line_gap: 0.0,
     cap_height: FALLBACK_CAP_HEIGHT,
     vertical_line_height: None,
+    superscript_offset: None,
+    subscript_offset: None,
 };
 
 impl Face {
@@ -207,6 +216,13 @@ impl Face {
                     / upem
             })
             .filter(|height| height.is_finite() && *height > 0.0);
+        if let Source::OpenType { bytes, .. } = &self.source
+            && let Ok(os2) = FontRef::from_index(bytes, self.index).and_then(|f| f.os2())
+        {
+            let em = |units: i16| Some(f64::from(units) / upem).filter(|v| *v > 0.0 && *v <= 2.0);
+            metrics.superscript_offset = em(os2.y_superscript_y_offset());
+            metrics.subscript_offset = em(os2.y_subscript_y_offset());
+        }
         let measured = shaper
             .charmap()
             .map_unicode('H')

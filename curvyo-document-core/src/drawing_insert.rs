@@ -4,24 +4,25 @@
 //! holds it, so the new document has no step to undo. Existing node kinds and registers only; no
 //! format change.
 
-use std::collections::HashSet;
+use std::sync::Arc;
 
 use loro::{LoroTree, TreeID, TreeParentId};
 use serde::Serialize;
 
 use crate::affine::Affine;
 use crate::clone_codec::{CloneLink, write_clone};
-use crate::clone_model::MAX_CLONE_DEPTH;
 use crate::display_unit::DisplayUnit;
 use crate::document::{Document, OBJECTS_TREE};
 use crate::document_background::DocumentBackground;
-use crate::group_tree::{KEY_GROUP, MAX_GROUP_DEPTH, node_id};
+use crate::drawing_content::DrawingText;
+use crate::group_tree::{KEY_GROUP, node_id};
 use crate::node_registers::{KEY_LAYER, KEY_LOCKED, KEY_NAME, KEY_VISIBLE};
 use crate::objects::ObjectEditError;
 use crate::path_model::{AnchorId, AnchorKind, NewAnchor, NodeId};
 use crate::paths::tree_id_of;
 use crate::primitive_model::Shape;
 use crate::style_model::{Opacity, Style};
+use crate::text_path_model::OnPathValues;
 use crate::units::{Angle, DocumentSize, Point, Vec2};
 
 /// The label of Import SVG's commit; its history name is "Import SVG".
@@ -38,6 +39,9 @@ pub struct DrawingRegisters {
     pub locked: bool,
     /// The node's opacity.
     pub opacity: Opacity,
+    /// Whether the node is a guide (`0046`): an import's carrier that SVG does not draw.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub guide: bool,
 }
 
 impl Default for DrawingRegisters {
@@ -47,6 +51,7 @@ impl Default for DrawingRegisters {
             visible: true,
             locked: false,
             opacity: Opacity::OPAQUE,
+            guide: false,
         }
     }
 }
@@ -115,6 +120,33 @@ pub enum DrawingNode {
         /// The clone matrix.
         matrix: Affine,
     },
+    /// A straight text (`0074`); it takes no leaf number.
+    Text {
+        /// Its registers.
+        registers: DrawingRegisters,
+        /// Its values.
+        text: DrawingText,
+    },
+    /// A text on the path or primitive leaf number `carrier` (`0080`); it takes no leaf number.
+    TextOnPath {
+        /// Its registers.
+        registers: DrawingRegisters,
+        /// Its values; `placement` is the straight placement kept for Release.
+        text: DrawingText,
+        /// The carrier's leaf number.
+        carrier: usize,
+        /// Its values on the carrier.
+        values: OnPathValues,
+    },
+    /// An image (`0058`) of the asset number `asset`; it takes no leaf number.
+    Image {
+        /// Its registers.
+        registers: DrawingRegisters,
+        /// The index of its bytes in the drawing's assets.
+        asset: usize,
+        /// The unit square to document millimetres.
+        placement: Affine,
+    },
 }
 
 /// The page settings of a drawing that becomes a new document.
@@ -137,86 +169,9 @@ impl DrawingNode {
             .map(|node| match node {
                 Self::Group { children, .. } => Self::anchor_count(children),
                 Self::Path { outlines, .. } => outlines.iter().map(|o| o.anchors.len()).sum(),
-                Self::Primitive { .. } | Self::Clone { .. } => 0,
+                _ => 0,
             })
             .sum()
-    }
-}
-
-/// What the leaves of a drawing are, in document order: `Some(original)` for a clone.
-fn leaf_kinds(nodes: &[DrawingNode], out: &mut Vec<(bool, Option<usize>)>) {
-    for node in nodes {
-        match node {
-            DrawingNode::Group { children, .. } => leaf_kinds(children, out),
-            DrawingNode::Path { .. } => out.push((true, None)),
-            DrawingNode::Primitive { .. } => out.push((false, None)),
-            DrawingNode::Clone { original, .. } => out.push((false, Some(*original))),
-        }
-    }
-}
-
-/// The deepest chain of groups in `nodes`.
-fn group_depth(nodes: &[DrawingNode]) -> usize {
-    nodes
-        .iter()
-        .map(|node| match node {
-            DrawingNode::Group { children, .. } => 1 + group_depth(children),
-            _ => 0,
-        })
-        .max()
-        .unwrap_or(0)
-}
-
-/// Every check of a drawing before the first write: anchor ids, outlines, clone references and
-/// chains, group depth (`extra_groups` above the drawing's own).
-fn validate(
-    tree: &LoroTree,
-    nodes: &[DrawingNode],
-    anchor_ids: &[AnchorId],
-    extra_groups: usize,
-) -> Result<(), ObjectEditError> {
-    let needed = DrawingNode::anchor_count(nodes);
-    let seen: HashSet<AnchorId> = anchor_ids.iter().copied().collect();
-    if anchor_ids.len() != needed || seen.len() != needed {
-        return Err(ObjectEditError::AnchorIds);
-    }
-    crate::replace::check_new_anchor_ids(tree, &[], &seen)?;
-    if group_depth(nodes) + extra_groups > MAX_GROUP_DEPTH {
-        return Err(ObjectEditError::TooDeep);
-    }
-    let mut empty = false;
-    check_outlines(nodes, &mut empty);
-    if empty {
-        return Err(ObjectEditError::NoOutlines);
-    }
-    let mut leaves = Vec::new();
-    leaf_kinds(nodes, &mut leaves);
-    for start in 0..leaves.len() {
-        let mut at = start;
-        let mut depth = 0;
-        while let Some(original) = leaves[at].1 {
-            depth += 1;
-            if depth > MAX_CLONE_DEPTH || original >= leaves.len() {
-                return Err(ObjectEditError::NoSuchObject);
-            }
-            at = original;
-        }
-        if depth > 0 && !leaves[at].0 {
-            return Err(ObjectEditError::NoSuchObject);
-        }
-    }
-    Ok(())
-}
-
-fn check_outlines(nodes: &[DrawingNode], empty: &mut bool) {
-    for node in nodes {
-        match node {
-            DrawingNode::Group { children, .. } => check_outlines(children, empty),
-            DrawingNode::Path { outlines, .. } => {
-                *empty |= outlines.is_empty() || outlines.iter().any(|o| o.anchors.is_empty());
-            }
-            _ => {}
-        }
     }
 }
 
@@ -228,6 +183,9 @@ struct Writer<'a, I: Iterator<Item = AnchorId>> {
     ids: I,
     leaves: Vec<TreeID>,
     clones: Vec<(TreeID, usize, Affine)>,
+    /// Texts on path to link once every leaf exists.
+    links: Vec<(TreeID, usize, OnPathValues)>,
+    assets: &'a [Arc<[u8]>],
 }
 
 impl<I: Iterator<Item = AnchorId>> Writer<'_, I> {
@@ -263,39 +221,7 @@ impl<I: Iterator<Item = AnchorId>> Writer<'_, I> {
                 registers,
                 outlines,
                 style,
-            } => {
-                let mut renumbered = outlines.iter().map(|outline| {
-                    let anchors = outline
-                        .anchors
-                        .iter()
-                        .map(|a| NewAnchor {
-                            // invariant: `validate` checked one id per anchor.
-                            #[allow(clippy::unwrap_used)]
-                            id: self.ids.next().unwrap(),
-                            point: a.point,
-                            handle_in: a.handle_in,
-                            handle_out: a.handle_out,
-                            kind: a.kind,
-                        })
-                        .collect::<Vec<_>>();
-                    (anchors, outline.closed)
-                });
-                // invariant: `validate` checked at least one outline.
-                #[allow(clippy::unwrap_used)]
-                let (first, closed) = renumbered.next().unwrap();
-                let rest: Vec<_> = renumbered.collect();
-                let id = self.document.create_path_uncommitted(
-                    parent,
-                    &first,
-                    closed,
-                    style,
-                    Angle::from_radians(0.0),
-                );
-                let leaf = tree_id_of(id);
-                crate::subpath_codec::append_outlines(&self.meta(leaf), &rest);
-                self.leaves.push(leaf);
-                (leaf, registers)
-            }
+            } => (self.write_path(parent, outlines, style), registers),
             DrawingNode::Primitive {
                 registers,
                 shape,
@@ -327,9 +253,82 @@ impl<I: Iterator<Item = AnchorId>> Writer<'_, I> {
                 self.clones.push((leaf, *original, *matrix));
                 (leaf, registers)
             }
+            DrawingNode::Text { registers, text } => {
+                (self.document.write_drawing_text(parent, text), registers)
+            }
+            DrawingNode::TextOnPath {
+                registers,
+                text,
+                carrier,
+                values,
+            } => (self.text_on_path(parent, text, *carrier, values), registers),
+            DrawingNode::Image {
+                registers,
+                asset,
+                placement,
+            } => (self.image(parent, *asset, *placement), registers),
         };
         self.write_registers(created, registers);
         created
+    }
+
+    /// Writes a path of `outlines` (at least one) with `style`.
+    fn write_path(
+        &mut self,
+        parent: TreeParentId,
+        outlines: &[DrawingOutline],
+        style: &Style,
+    ) -> TreeID {
+        let mut renumbered = outlines.iter().map(|outline| {
+            let anchors = outline
+                .anchors
+                .iter()
+                .map(|a| NewAnchor {
+                    // invariant: `validate` checked one id per anchor.
+                    #[allow(clippy::unwrap_used)]
+                    id: self.ids.next().unwrap(),
+                    point: a.point,
+                    handle_in: a.handle_in,
+                    handle_out: a.handle_out,
+                    kind: a.kind,
+                })
+                .collect::<Vec<_>>();
+            (anchors, outline.closed)
+        });
+        // invariant: `validate` checked at least one outline.
+        #[allow(clippy::unwrap_used)]
+        let (first, closed) = renumbered.next().unwrap();
+        let rest: Vec<_> = renumbered.collect();
+        let id = self.document.create_path_uncommitted(
+            parent,
+            &first,
+            closed,
+            style,
+            Angle::from_radians(0.0),
+        );
+        let leaf = tree_id_of(id);
+        crate::subpath_codec::append_outlines(&self.meta(leaf), &rest);
+        self.leaves.push(leaf);
+        leaf
+    }
+
+    /// Writes a text on path; it is linked to its carrier once every leaf exists.
+    fn text_on_path(
+        &mut self,
+        parent: TreeParentId,
+        text: &DrawingText,
+        carrier: usize,
+        values: &OnPathValues,
+    ) -> TreeID {
+        let created = self.document.write_drawing_text(parent, text);
+        self.links.push((created, carrier, *values));
+        created
+    }
+
+    /// Writes an image of the asset number `asset`.
+    fn image(&self, parent: TreeParentId, asset: usize, placement: Affine) -> TreeID {
+        self.document
+            .write_drawing_image(&self.tree, parent, &self.assets[asset], placement)
     }
 
     fn create(&self, parent: TreeParentId) -> TreeID {
@@ -359,6 +358,9 @@ impl<I: Iterator<Item = AnchorId>> Writer<'_, I> {
                 meta.insert(KEY_LOCKED, true).unwrap();
             }
         }
+        if registers.guide {
+            crate::guides::write_guide(&meta, true);
+        }
         crate::clone_write::write_opacity_register(&meta, registers.opacity.get());
     }
 
@@ -368,6 +370,9 @@ impl<I: Iterator<Item = AnchorId>> Writer<'_, I> {
             let origin = node_id(self.leaves[original]);
             write_clone(&self.meta(clone), CloneLink { origin, matrix });
         }
+        for (text, carrier, values) in &self.links {
+            crate::drawing_content::link_text(&self.tree, *text, self.leaves[*carrier], values);
+        }
     }
 }
 
@@ -375,23 +380,27 @@ impl Document {
     /// Adds `nodes` as the children of **one new layer** named `layer_name` on top of the top
     /// level, in one commit labelled [`IMPORT_SVG_COMMIT_LABEL`] (`0024` criterion 3). Layers of
     /// the drawing must already be groups (layers do not nest). `anchor_ids` are the paths'
-    /// anchor ids, [`DrawingNode::anchor_count`] in document order. Returns the layer and its
-    /// top-level children.
+    /// anchor ids, [`DrawingNode::anchor_count`] in document order; `assets` the bytes the
+    /// images name, written to the asset store in the same commit (criterion 104). Returns the
+    /// layer and its top-level children.
     ///
     /// # Errors
     /// [`ObjectEditError::AnchorIds`] when the ids are not as many as needed, repeat or are in
     /// use; [`ObjectEditError::NoOutlines`] for a path without an outline or an outline without
     /// an anchor; [`ObjectEditError::NoSuchObject`] for a clone whose chain does not end on a
-    /// path within [`MAX_CLONE_DEPTH`]; [`ObjectEditError::TooDeep`] for groups nested deeper
-    /// than [`MAX_GROUP_DEPTH`] under the layer. Nothing is written.
+    /// path within [`MAX_CLONE_DEPTH`](crate::MAX_CLONE_DEPTH); [`ObjectEditError::TooDeep`] for groups nested deeper
+    /// than [`MAX_GROUP_DEPTH`](crate::MAX_GROUP_DEPTH) under the layer; [`ObjectEditError::InvalidText`] for a text
+    /// that cannot be written; [`ObjectEditError::ProjectFull`] when the assets would pass the
+    /// project's limit. Nothing is written.
     pub fn insert_drawing(
         &self,
         layer_name: &str,
         nodes: &[DrawingNode],
         anchor_ids: &[AnchorId],
+        assets: &[Arc<[u8]>],
     ) -> Result<(NodeId, Vec<NodeId>), ObjectEditError> {
         let tree = self.loro().get_tree(OBJECTS_TREE);
-        validate(&tree, nodes, anchor_ids, 1)?;
+        crate::drawing_check::validate(self, &tree, nodes, anchor_ids, 1, assets)?;
         Ok(self.batch(IMPORT_SVG_COMMIT_LABEL, |document| {
             let layer = crate::layers::create_layer_node(&tree, layer_name);
             let mut writer = Writer {
@@ -400,6 +409,8 @@ impl Document {
                 ids: anchor_ids.iter().copied(),
                 leaves: Vec::new(),
                 clones: Vec::new(),
+                links: Vec::new(),
+                assets,
             };
             let children = writer.write(TreeParentId::Node(layer), nodes);
             writer.link_clones();
@@ -418,10 +429,11 @@ impl Document {
         page: &DrawingPage,
         nodes: &[DrawingNode],
         anchor_ids: &[AnchorId],
+        assets: &[Arc<[u8]>],
     ) -> Result<Self, ObjectEditError> {
         let document = Self::blank(peer, page.size);
         let tree = document.loro().get_tree(OBJECTS_TREE);
-        validate(&tree, nodes, anchor_ids, 0)?;
+        crate::drawing_check::validate(&document, &tree, nodes, anchor_ids, 0, assets)?;
         document.uncommitted(|document| {
             if let Some(unit) = page.display_unit {
                 let _ = document.set_display_unit(unit);
@@ -436,6 +448,8 @@ impl Document {
                 ids: anchor_ids.iter().copied(),
                 leaves: Vec::new(),
                 clones: Vec::new(),
+                links: Vec::new(),
+                assets,
             };
             writer.write(TreeParentId::Root, nodes);
             writer.link_clones();

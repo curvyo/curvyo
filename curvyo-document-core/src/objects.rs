@@ -30,6 +30,14 @@ use crate::units::Vec2;
 /// (ADR 0009 §2), not a defect in this crate.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 pub enum ObjectEditError {
+    /// A drawing's text cannot be written: empty, too long, a size out of range, no stored face
+    /// hash or an unusable placement (`specs/0024-svg-import-export` criterion 78).
+    #[error("a text of the drawing cannot be written")]
+    InvalidText,
+    /// A drawing's images would take the project over its picture limit
+    /// (`specs/0058-bitmap-import` criterion 16).
+    #[error("the project would hold more pictures than allowed")]
+    ProjectFull,
     /// No object with this [`NodeId`] exists (deleted locally or by a
     /// collaborator since the caller last read a snapshot).
     #[error("no such object")]

@@ -40,6 +40,8 @@ mod document;
 mod document_background;
 mod document_presets;
 mod document_size;
+mod drawing_check;
+mod drawing_content;
 mod drawing_insert;
 mod ellipse_arc;
 mod error;
@@ -136,6 +138,7 @@ pub use document_presets::{
 pub use document_size::{
     DocumentSizeError, MAX_DOCUMENT_MM, MIN_DOCUMENT_MM, validated_document_side,
 };
+pub use drawing_content::DrawingText;
 pub use drawing_insert::{
     DrawingAnchor, DrawingNode, DrawingOutline, DrawingPage, DrawingRegisters,
     IMPORT_SVG_COMMIT_LABEL,
@@ -219,10 +222,10 @@ pub use text_clone_codec::TextSource;
 pub use text_clone_commands::PUT_ON_PATHS_LABEL;
 pub use text_model::{
     FontKind, FontRef, LETTER_SPACING_FACTORS, LINE_SPACING_FACTORS, MAX_STORED_TEXT_CHARS,
-    MAX_TEXT_CHARS, MAX_TEXT_SIZE, MIN_TEXT_SIZE, SINGLE_LINE_STROKE_WIDTH, TAPER_FRACTIONS,
-    TEXT_NAME_CHARS, TextAlign, TextGlyphOrientation, TextLayoutValues, TextOutline, TextSnapshot,
-    TextWritingMode, UNCREATED_TEXT_ID, WORD_SPACING_FACTORS, clamp_text_size, is_face_hash,
-    single_line_style,
+    MAX_TEXT_CHARS, MAX_TEXT_SIZE, MIN_TEXT_SIZE, MISSING_FACE_HASH, SINGLE_LINE_STROKE_WIDTH,
+    TAPER_FRACTIONS, TEXT_NAME_CHARS, TextAlign, TextGlyphOrientation, TextLayoutValues,
+    TextOutline, TextSnapshot, TextWritingMode, UNCREATED_TEXT_ID, WORD_SPACING_FACTORS,
+    clamp_text_size, is_face_hash, single_line_style,
 };
 pub use text_path_model::{
     CarrierCurve, CarrierRef, EllipseCarrier, LineOnPath, OnPathLabel, OnPathValues,

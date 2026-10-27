@@ -126,7 +126,7 @@ impl Reader<'_, '_, '_> {
     /// The map, computed style and units of the parent of `node` at its own place in the file,
     /// or `None` when it is not drawn there (inside `defs`, a `symbol` and the like, or under an
     /// element the import does not read).
-    fn natural_context(&self, node: Node<'_, '_>) -> Option<(Affine, Computed, Units)> {
+    pub(crate) fn natural_context(&self, node: Node<'_, '_>) -> Option<(Affine, Computed, Units)> {
         let chain: Vec<Node> = node.ancestors().skip(1).filter(Node::is_element).collect();
         let (root, containers) = chain.split_last()?;
         let view = crate::page::root_view(self.doc, *root);
@@ -154,6 +154,11 @@ impl Reader<'_, '_, '_> {
             }
         }
         Some((matrix, style, units))
+    }
+
+    /// The map of the parent of `node` at its own place, when it is drawn there.
+    pub(crate) fn natural_parent_matrix(&self, node: Node<'_, '_>) -> Option<Affine> {
+        self.natural_context(node).map(|(matrix, _, _)| matrix)
     }
 
     /// The target copied to the place of the `use` (criterion 47 (b)), with the `use`'s name,
@@ -197,9 +202,7 @@ impl Reader<'_, '_, '_> {
         };
         let use_state = Reader::state(node, &ctx.style, true);
         copied.map(|mut copy| {
-            let state = match &mut copy {
-                SvgNode::Group { state, .. } | SvgNode::Leaf { state, .. } => state,
-            };
+            let state = copy.state_mut();
             if use_state.name.is_some() {
                 state.name = use_state.name;
             }
