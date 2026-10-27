@@ -1359,3 +1359,62 @@ proptest! {
             "area {} vs {}", cmp.result_area, cmp.reference_area);
     }
 }
+
+/// The checks of the property test above on one fixed case.
+fn assert_polyline_matches(raw: &[P], is_closed: bool, w: f64, j: u8, c: u8) {
+    let pts: Vec<P> = raw
+        .iter()
+        .map(|&(x, y)| ((x * 1000.0).round() / 1000.0, (y * 1000.0).round() / 1000.0))
+        .collect();
+    let n = pts.len();
+    let segs = if is_closed { n } else { n - 1 };
+    let (join, cap) = (join_of(j), cap_of(c));
+    let r = stroke(&[(polygon(&pts), is_closed)], &shape(w, join, cap));
+    let refp = stroke_pieces(&sharp(&pts), is_closed, w, join, cap);
+    let cmp = compare(&r, &refp, 0.04);
+    assert!(cmp.far_mismatches.is_empty(), "{:?}", cmp.far_mismatches);
+    assert!(cmp.bad_winding.is_empty(), "{:?}", cmp.bad_winding);
+    let longest = (0..segs)
+        .map(|i| len(sub(pts[(i + 1) % n], pts[i])))
+        .fold(0.0, f64::max);
+    assert!(cmp.result_area >= longest * w - 0.01);
+    let perimeter: f64 = (0..segs)
+        .map(|i| len(sub(pts[(i + 1) % n], pts[i])))
+        .sum::<f64>()
+        * 2.0;
+    assert!(
+        (cmp.result_area - cmp.reference_area).abs() <= 0.02 * perimeter + 0.1,
+        "area {} vs {}",
+        cmp.result_area,
+        cmp.reference_area
+    );
+}
+
+/// Regression for the property test above: a closed outline whose second node is a spike back
+/// onto itself (width 0.3 mm, Bevel, Butt). The hole beside the spike must stay a hole.
+#[test]
+#[allow(clippy::unreadable_literal)] // proptest's shrunk values, verbatim
+fn prop_regression_closed_spike_keeps_its_hole() {
+    let raw = [
+        (7.986516249877105, 1.4092908286041914),
+        (8.382531447775364, 26.244138530103065),
+        (8.324391631514969, 0.0),
+        (32.675174612763385, 9.2024134626996),
+        (3.8383474554605423, 30.534818860624096),
+    ];
+    assert_polyline_matches(&raw, true, 0.3, 29, 0);
+}
+
+/// Regression for the property test above: an open polyline with a sharp first corner and a wide
+/// stroke (width 3.19 mm, Miter, Butt).
+#[test]
+#[allow(clippy::unreadable_literal)] // proptest's shrunk values, verbatim
+fn prop_regression_open_sharp_corner_wide_stroke() {
+    let raw = [
+        (18.118813344013738, 0.0),
+        (0.9867409610957119, 2.0304993460894485),
+        (2.2974577580140623, 11.553249208345882),
+        (4.301965899134147, 28.643826533957476),
+    ];
+    assert_polyline_matches(&raw, false, 3.1853415778829293, 0, 0);
+}
