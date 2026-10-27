@@ -1302,7 +1302,8 @@ fn thread_time() -> std::time::Duration {
 
 /// Rotating (and resizing) a compound path writes every anchor; the cost per
 /// anchor must not grow with the number of outlines. Measured on 100 and 400
-/// outlines of 4 anchors by thread CPU time (debug build, so only the ratio is asserted).
+/// outlines of 4 anchors by thread CPU time, the cheapest of five runs each (debug build, so
+/// only the ratio is asserted).
 #[test]
 fn rotate_commit_cost_grows_roughly_linearly_with_the_number_of_outlines() {
     let time = |n: usize| {
@@ -1319,8 +1320,14 @@ fn rotate_commit_cost_grows_roughly_linearly_with_the_number_of_outlines() {
         d.rotate_object(&rot).unwrap();
         thread_time().saturating_sub(start).as_secs_f64()
     };
-    let small = time(100).max(1e-4);
-    let large = time(400);
+    // The cheapest of five runs each, taken alternately: a single 8 ms sample was too noisy
+    // (first-touch allocation, a busy machine) and failed the ratio now and then.
+    let (mut small, mut large) = (f64::MAX, f64::MAX);
+    for _ in 0..5 {
+        small = small.min(time(100));
+        large = large.min(time(400));
+    }
+    let small = small.max(1e-4);
     println!("rotate commit: 100 outlines {small:.3}s, 400 outlines {large:.3}s");
     // Linear would be 4x; allow 8x. Quadratic is 16x.
     assert!(
