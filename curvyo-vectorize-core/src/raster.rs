@@ -39,7 +39,7 @@ fn over_white(c: u8, a: u8) -> u32 {
 /// The luma of one straight-alpha pixel over white: `0.2126 R + 0.7152 G + 0.0722 B` of the
 /// stored sRGB values, in integers, rounded (`0058` D10, no colour management).
 #[must_use]
-pub fn luma(r: u8, g: u8, b: u8, a: u8) -> u8 {
+pub(crate) fn luma(r: u8, g: u8, b: u8, a: u8) -> u8 {
     let weighted = 2126 * over_white(r, a) + 7152 * over_white(g, a) + 722 * over_white(b, a);
     // invariant: the weights sum to 10 000, so the quotient is at most 255.
     u8::try_from((weighted + 5000) / 10_000).unwrap_or(u8::MAX)

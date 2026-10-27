@@ -15,9 +15,13 @@ pub const TRACE_IMAGE_COMMIT_LABEL: &str = "trace_image";
 
 impl Document {
     /// Writes each `(object, node)` of `items` as a new node directly above `object`, in its
-    /// parent (a layer, a group or the root), in **one commit** labelled `label`. `anchor_ids`
+    /// parent (a layer, a group or the root), in **one commit** labelled [`TRACE_IMAGE_COMMIT_LABEL`]. `anchor_ids`
     /// are the paths' anchor ids, [`DrawingNode::anchor_count`] in item order. Clones and texts
     /// on path link within one item only. Returns the new nodes in item order.
+    ///
+    /// Two items on the same object end up on its stack in reverse order: the later item is
+    /// placed right above the object, below the earlier one. Image assets are not supported:
+    /// an [`DrawingNode::Image`] item is not allowed.
     ///
     /// Everything is checked before the first write.
     ///
@@ -31,7 +35,6 @@ impl Document {
     /// just created.
     pub fn insert_drawing_above(
         &self,
-        label: &str,
         items: &[(NodeId, DrawingNode)],
         anchor_ids: &[AnchorId],
     ) -> Result<Vec<NodeId>, ObjectEditError> {
@@ -49,7 +52,7 @@ impl Document {
         }
         let nodes: Vec<DrawingNode> = items.iter().map(|(_, node)| node.clone()).collect();
         crate::drawing_check::validate(self, &tree, &nodes, anchor_ids, depth, &[])?;
-        Ok(self.batch(label, |document| {
+        Ok(self.batch(TRACE_IMAGE_COMMIT_LABEL, |document| {
             tree.enable_fractional_index(0);
             let mut ids = anchor_ids.iter().copied();
             let mut created = Vec::with_capacity(items.len());
@@ -129,7 +132,6 @@ mod tests {
         let ids: Vec<AnchorId> = (0..6).map(|i| AnchorId::new(9, i)).collect();
         let created = doc
             .insert_drawing_above(
-                TRACE_IMAGE_COMMIT_LABEL,
                 &[(a, square("Trace of a")), (b, square("Trace of b"))],
                 &ids,
             )
@@ -149,11 +151,7 @@ mod tests {
         let doc = Document::new(1);
         let steps = doc.own_step_count();
         let ids: Vec<AnchorId> = (0..3).map(|i| AnchorId::new(9, i)).collect();
-        let result = doc.insert_drawing_above(
-            TRACE_IMAGE_COMMIT_LABEL,
-            &[(NodeId::from_parts(77, 77), square("x"))],
-            &ids,
-        );
+        let result = doc.insert_drawing_above(&[(NodeId::from_parts(77, 77), square("x"))], &ids);
         assert_eq!(result, Err(ObjectEditError::NoSuchObject));
         assert_eq!(doc.own_step_count(), steps);
     }
