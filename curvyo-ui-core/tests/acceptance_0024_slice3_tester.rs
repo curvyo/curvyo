@@ -980,7 +980,6 @@ fn c111_same_end_points_other_arc_is_a_path() {
 /// but the drawn `d` wins: a gap of 0.086° (0.0225 mm on a 15 mm circle) leaves points of the
 /// whole circle more than 0.001 mm from `d`, so it is the open path.
 #[test]
-#[ignore = "0024s3 FAIL: d with a 0.0225 mm gap gives the whole circle; points of the circle lie 0.011 mm from d (only 16 samples per primitive segment are checked)"]
 fn c111_c113_gap_wider_than_the_tolerance_stays_a_path() {
     let end = TAU - 0.0015;
     let (ex, ey) = (65.0 + 15.0 * end.cos(), 65.0 + 15.0 * end.sin());
@@ -996,7 +995,6 @@ fn c111_c113_gap_wider_than_the_tolerance_stays_a_path() {
 /// samples of that side) is not the closed hexagon: the points of the hexagon in the gap are
 /// 0.26 mm from `d`. It must be the path of `d`.
 #[test]
-#[ignore = "0024s3 FAIL: a hexagon whose d misses 0.52 mm of a side imports as the closed polygon (gap between the 16 samples of the primitive's side)"]
 fn c111_gap_in_a_side_is_not_the_closed_polygon() {
     let (a, b) = (p(151.5, 93.741_67), p(158.0, 105.0));
     let at = |t: f64| p(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t);
@@ -1279,7 +1277,6 @@ fn without_r2(e: String) -> String {
 /// optional: a polygon ignores it"). Inkscape 1.4.4 never writes one: it adds `r2="0"` and
 /// `arg2="0"` to a polygon that lacks them (see `inkscape_shapes_src`).
 #[test]
-#[ignore = "0024s3 FAIL: a polygon without sodipodi:r2 is a path (plan.md keeps r2 required); spec 116 and adrs.md say r2 is ignored"]
 fn c116_polygon_without_r2_is_a_polygon() {
     let polygon = real("p5", without_r2);
     assert_eq!(kind(&polygon), "polygon");

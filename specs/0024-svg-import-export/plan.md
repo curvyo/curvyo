@@ -232,11 +232,15 @@ Implementer, 2026-10-27, branch `story/svg-inkscape-shapes`, stacked on `story/s
 - **A whole ellipse is checked against the true ellipse**, not its four-cubic drawing: that
   drawing (existing `0021` behaviour) is 2.7e-4 of the radius off the ellipse, so for radii above
   about 4 mm the literal "as the document would draw it" would refuse every whole ellipse of
-  criterion 113. Arcs are checked against their 22.5° drawing outline (far under 0.001 mm).
+  criterion 113. Arcs are checked against the true arc too (lead decision S3-6, 2026-10-27).
+- **The 0.001 mm check is bounded, not sampled** (tester finding, S3-8): same subpath count and
+  open/closed state, then both outlines flattened within 1e-5 mm and checked both ways; a piece
+  of one polyline is near a line of the other when both its ends are (the distance to a line is
+  convex), else it is split at the shared corner. 1,000 real shapes: about 75 ms thread CPU.
 - **`d` is checked with its arcs split within 1e-5 mm**: the 45° cubics of criterion 22 are up
   to 4.2e-6 of the radius off, too much for 0.001 mm above 240 mm radius.
-- `sodipodi:r2` stays required for a polygon (a missing one gives a path, criterion 111); Inkscape
-  always writes it, and the tester's slice-1 test reads it as a number.
+- `sodipodi:r2` is optional in `StarData` (criterion 116: a polygon ignores it; a star without
+  it is a path, criterion 117).
 - The fixtures are hand-written (no Inkscape here); the tester replaces `inkscape_shapes.svg` with a
   real Inkscape 1.4.4 save and regenerates its golden.
 - Budget of AC 126 (release, this VM): 1,000 mixed shapes in about 10 ms.

@@ -341,7 +341,7 @@ fn star_data(node: Node<'_, '_>) -> Option<StarData> {
         sides,
         center: Point::new(number(SODIPODI_NS, "cx")?, number(SODIPODI_NS, "cy")?),
         r1: number(SODIPODI_NS, "r1")?,
-        r2: number(SODIPODI_NS, "r2")?,
+        r2: tool_number(node, SODIPODI_NS, "r2").ok()?,
         arg1: number(SODIPODI_NS, "arg1")?,
         arg2: tool_number(node, SODIPODI_NS, "arg2").ok()?,
         flat: node.attribute((INKSCAPE_NS, "flatsided")).map(str::trim) == Some("true"),
