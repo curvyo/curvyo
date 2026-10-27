@@ -62,6 +62,10 @@ name = "curvyo-image-core"
 
 [[licenses.exceptions]]
 allow = ["AGPL-3.0-or-later"]
+name = "curvyo-vectorize-core"
+
+[[licenses.exceptions]]
+allow = ["AGPL-3.0-or-later"]
 name = "curvyo-ui-core"
 
 [[licenses.exceptions]]

@@ -1,0 +1,81 @@
+{
+  "candidate": {
+    "01-flat-logo": {
+      "area_error_pct": 1.1197,
+      "closed_pct": 100.0,
+      "max_deviation_px": 1.5031,
+      "mean_deviation_px": 0.2031,
+      "micro_paths": 0.0,
+      "node_density": 11.5006,
+      "wobble": 2.654
+    },
+    "03-text-300dpi": {
+      "area_error_pct": 6.153,
+      "closed_pct": 100.0,
+      "max_deviation_px": 9.4609,
+      "mean_deviation_px": 0.2137,
+      "micro_paths": 0.0,
+      "node_density": 124.3899,
+      "wobble": 52.1521
+    },
+    "04-small-text": {
+      "area_error_pct": 12.0927,
+      "closed_pct": 100.0,
+      "max_deviation_px": 1.3339,
+      "mean_deviation_px": 0.0915,
+      "micro_paths": 0.0,
+      "node_density": 53.4688,
+      "wobble": 16.322
+    },
+    "05-line-art-scan": {
+      "area_error_pct": 31.8569,
+      "closed_pct": 100.0,
+      "max_deviation_px": 3.215,
+      "mean_deviation_px": 0.7041,
+      "micro_paths": 0.0,
+      "node_density": 10.2776,
+      "wobble": 3.8001
+    },
+    "07-silhouette": {
+      "area_error_pct": 0.475,
+      "closed_pct": 100.0,
+      "max_deviation_px": 1.701,
+      "mean_deviation_px": 0.2635,
+      "micro_paths": 0.0,
+      "node_density": 23.515,
+      "wobble": 4.3671
+    },
+    "10-pixel-art": {
+      "area_error_pct": 0.0,
+      "closed_pct": 100.0,
+      "max_deviation_px": 0.0,
+      "mean_deviation_px": 0.0,
+      "micro_paths": 0.0,
+      "node_density": 16.002,
+      "wobble": 4.8578
+    },
+    "11-stencil-lines": {
+      "area_error_pct": 7.6895,
+      "closed_pct": 100.0,
+      "max_deviation_px": 1.118,
+      "mean_deviation_px": 0.148,
+      "micro_paths": 0.0,
+      "node_density": 46.5769,
+      "wobble": 9.3937
+    },
+    "12-technical-drawing": {
+      "area_error_pct": 11.1064,
+      "closed_pct": 100.0,
+      "max_deviation_px": 2.0016,
+      "mean_deviation_px": 0.1539,
+      "micro_paths": 0.0,
+      "node_density": 12.7531,
+      "wobble": 2.4292
+    }
+  },
+  "settings": {
+    "smooth": 80,
+    "specks_mm": 0.5,
+    "threshold": "automatic"
+  }
+}
