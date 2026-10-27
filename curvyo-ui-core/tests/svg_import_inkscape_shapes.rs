@@ -322,6 +322,91 @@ fn ac117_star_and_twisted_star() {
     assert!(matches!(twisted, DrawingNode::Path { .. }));
 }
 
+/// The star primitive of `node`: points, outer radius, inner ratio and first-tip angle.
+fn star_of(node: &DrawingNode) -> (u32, f64, f64, f64) {
+    let DrawingNode::Primitive {
+        shape:
+            Shape::Star {
+                frame,
+                point_count,
+                inner_ratio,
+                ..
+            },
+        ..
+    } = node
+    else {
+        panic!("not a star: {node:?}")
+    };
+    (
+        point_count.get(),
+        frame.radius.as_mm(),
+        inner_ratio.get(),
+        frame.angle.as_radians(),
+    )
+}
+
+/// Criterion 117 with the dated note of 2026-10-27: Inkscape lets `r2` exceed `r1`, and then the
+/// vertices at `r2`/`arg2` are the tips; such a star is the star primitive with the roles
+/// swapped, at any size, number of points and under a uniform scale.
+#[test]
+fn ac117_a_star_whose_r2_is_the_larger_radius() {
+    for (sides, r1, r2) in [
+        (5, 4.0, 10.0),
+        (12, 14.290_906, 27.971_268),
+        (40, 30.5, 61.25),
+    ] {
+        let step = PI / f64::from(sides);
+        for (transform, scale) in [
+            ("", 1.0),
+            (r#"transform="matrix(1.5,0,0,1.5,-20,-30)""#, 1.5),
+        ] {
+            let body = star(sides, r1, r2, 0.88, 0.88 + step, false, transform);
+            let (points, radius, ratio, angle) = star_of(&one(&body));
+            assert_eq!(points, sides);
+            assert!(near(radius, r2 * scale, 1e-6), "{body}");
+            assert!(near(ratio, r1 / r2, 1e-6), "{body}");
+            assert!(near(angle, 0.88 + step, 1e-6), "{body}");
+        }
+    }
+    let twisted = star(12, 14.0, 28.0, 0.88, 0.88 + 0.2, false, "");
+    assert!(matches!(one(&twisted), DrawingNode::Path { .. }));
+}
+
+/// Criterion 117 with the dated note of 2026-10-27: `r2` equal to `r1` draws a regular polygon
+/// of 2N corners, and comes in as that polygon.
+#[test]
+fn ac117_a_star_with_equal_radii_is_a_polygon_of_twice_the_points() {
+    let node = one(&star(6, 10.0, 10.0, 0.0, PI / 6.0, false, ""));
+    let DrawingNode::Primitive {
+        shape: Shape::Polygon {
+            frame, point_count, ..
+        },
+        ..
+    } = &node
+    else {
+        panic!("{node:?}")
+    };
+    assert_eq!(point_count.get(), 12);
+    assert!(near(frame.radius.as_mm(), 10.0, 1e-9));
+}
+
+/// The customer's two stars of Inkscape 1.4.4 (`inkscape_stars_customer.svg`): `path1` with
+/// `r1 > r2`, and `path17` with `r1 < r2` under a uniform scale, both stars.
+#[test]
+fn ac117_the_customers_stars_fixture() {
+    assert_eq!(kinds("inkscape_stars_customer.svg"), ["star", "star"]);
+    let nodes = import_svg_bytes(&fixture("inkscape_stars_customer.svg"), SvgPlacement::File)
+        .unwrap()
+        .nodes;
+    let DrawingNode::Group { children, .. } = &nodes[0] else {
+        panic!()
+    };
+    let (points, radius, ratio, _) = star_of(&children[1]);
+    assert_eq!(points, 12);
+    assert!(near(radius, 27.971_268 * 1.571_123_7, 1e-5));
+    assert!(near(ratio, 14.290_906 / 27.971_268, 1e-6));
+}
+
 /// `x` with `digits` significant digits, as Inkscape writes a number (`numericprecision`).
 fn written(x: f64, digits: i32) -> String {
     if x == 0.0 {

@@ -186,6 +186,8 @@ fn ellipse_geometry(center: kurbo::Point, rx: f64, ry: f64, m: Affine) -> LeafGe
 
 /// An Inkscape star or polygon as the primitive, when the matrix keeps it and its outline is
 /// the drawn path within 0.001 mm (criteria 111, 116 to 118 and 33); `None` makes it a path.
+/// Inkscape lets `r2` exceed `r1`; the tips are then at `r2`/`arg2`, and `r2 = r1` draws a
+/// polygon of 2N corners, equal within the rounding of the written radii (criterion 117's note of 2026-10-27).
 fn star_geometry(star: &StarData, drawn: &BezPath, m: Affine) -> Option<LeafGeometry> {
     let Fit::Similar(scale, _) = fit(m) else {
         return None;
@@ -193,39 +195,54 @@ fn star_geometry(star: &StarData, drawn: &BezPath, m: Affine) -> Option<LeafGeom
     if star.r1 <= 0.0 {
         return None;
     }
-    let count = PointCount::new(star.sides).ok()?;
     let digits = written_digits(star);
-    let vertex = star.center + kurbo::Vec2::from_angle(star.arg1) * star.r1;
+    let valley = if star.flat {
+        None
+    } else {
+        Some((star.r2?, star.arg2?))
+    };
+    let (tip_r, tip_arg) = match valley {
+        Some((r2, arg2)) if r2 > star.r1 => (r2, arg2),
+        _ => (star.r1, star.arg1),
+    };
+    let vertex = star.center + kurbo::Vec2::from_angle(tip_arg) * tip_r;
     let (c, v) = (m * star.center, m * vertex);
     let frame = StarFrame {
         center: Point::new(c.x, c.y),
-        radius: Length::from_mm(star.r1 * scale),
+        radius: Length::from_mm(tip_r * scale),
         angle: Angle::from_radians((v.y - c.y).atan2(v.x - c.x)),
     };
-    let shape = if star.flat {
-        Shape::Polygon {
+    let shape = match valley {
+        None => Shape::Polygon {
             frame,
-            point_count: count,
+            point_count: PointCount::new(star.sides).ok()?,
             curve: Curve::POLYGON_DEFAULT,
-        }
-    } else {
-        let half_step = std::f64::consts::PI / f64::from(star.sides);
-        let twist = (star.arg2? - star.arg1 - half_step + std::f64::consts::PI)
-            .rem_euclid(std::f64::consts::TAU)
-            - std::f64::consts::PI;
-        let written = rounding(star.arg1, digits) + rounding(star.arg2?, digits);
-        if twist.abs() > TWIST_TOLERANCE_RAD.max(written) {
-            return None;
-        }
-        Shape::Star {
-            frame,
-            point_count: count,
-            inner_ratio: InnerRatio::new(star.r2? / star.r1).ok()?,
-            curve: Curve::POLYGON_DEFAULT,
+        },
+        Some((r2, arg2)) => {
+            let step = std::f64::consts::TAU / f64::from(star.sides);
+            let off = (arg2 - star.arg1 - step / 2.0).rem_euclid(step);
+            let written = rounding(star.arg1, digits) + rounding(arg2, digits);
+            if off.min(step - off) > TWIST_TOLERANCE_RAD.max(written) {
+                return None;
+            }
+            if (r2 - star.r1).abs() <= rounding(star.r1, digits) + rounding(r2, digits) {
+                Shape::Polygon {
+                    frame,
+                    point_count: PointCount::new(star.sides.checked_mul(2)?).ok()?,
+                    curve: Curve::POLYGON_DEFAULT,
+                }
+            } else {
+                Shape::Star {
+                    frame,
+                    point_count: PointCount::new(star.sides).ok()?,
+                    inner_ratio: InnerRatio::new(r2.min(star.r1) / tip_r).ok()?,
+                    curve: Curve::POLYGON_DEFAULT,
+                }
+            }
         }
     };
     let rotation = Angle::from_radians(0.0);
-    let limit = MATCH_MM + rounding_reach(star, digits) * scale;
+    let limit = MATCH_MM + rounding_reach(star, tip_r, tip_arg, digits) * scale;
     draws_within(&shape, rotation, drawn, limit).then_some(LeafGeometry::Primitive(shape, rotation))
 }
 
@@ -269,12 +286,12 @@ fn rounding(x: f64, digits: i32) -> f64 {
 
 /// How far, in the star's own units, rounding the written numbers can move the star's outline
 /// against its drawn `d`: a point of `d` (both coordinates), the centre (both coordinates), and
-/// an outer vertex by the radius and the angle (an inner vertex moves less).
-fn rounding_reach(star: &StarData, digits: i32) -> f64 {
+/// a tip at `tip_r`/`tip_arg` by the radius and the angle (an inner vertex moves less).
+fn rounding_reach(star: &StarData, tip_r: f64, tip_arg: f64, digits: i32) -> f64 {
     let centre = star.center.x.abs().max(star.center.y.abs());
-    let drawn = std::f64::consts::SQRT_2 * rounding(centre + star.r1, digits);
+    let drawn = std::f64::consts::SQRT_2 * rounding(centre + tip_r, digits);
     let centre = std::f64::consts::SQRT_2 * rounding(centre, digits);
-    let vertex = rounding(star.r1, digits) + star.r1 * rounding(star.arg1, digits);
+    let vertex = rounding(tip_r, digits) + tip_r * rounding(tip_arg, digits);
     drawn + centre + vertex
 }
 

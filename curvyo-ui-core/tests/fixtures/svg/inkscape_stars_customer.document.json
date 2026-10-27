@@ -1,0 +1,147 @@
+{
+  "assets": [],
+  "background": {
+    "color": [
+      232,
+      232,
+      235
+    ],
+    "opacity": 1.0,
+    "paint": "none"
+  },
+  "display_unit": "mm",
+  "leaves": 2,
+  "nodes": [
+    {
+      "Group": {
+        "children": [
+          {
+            "Primitive": {
+              "registers": {
+                "locked": false,
+                "name": null,
+                "opacity": 1.0,
+                "visible": true
+              },
+              "rotation": 0.0,
+              "shape": {
+                "Star": {
+                  "curve": 0.0,
+                  "frame": {
+                    "angle": 0.8760580500000003,
+                    "center": {
+                      "x": 62.443912,
+                      "y": 71.904387
+                    },
+                    "radius": 31.801573
+                  },
+                  "inner_ratio": 0.5109137840445818,
+                  "point_count": 15
+                }
+              },
+              "style": {
+                "fill": {
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "enabled": true,
+                  "opacity": 1.0
+                },
+                "stroke": {
+                  "cap": "round",
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "dash": [],
+                  "enabled": false,
+                  "join": "bevel",
+                  "markers": {
+                    "end": "none",
+                    "mid": "none",
+                    "mid_count": 1,
+                    "mid_place": "spaced",
+                    "start": "none"
+                  },
+                  "opacity": 1.0,
+                  "width": 1.0
+                }
+              }
+            }
+          },
+          {
+            "Primitive": {
+              "registers": {
+                "locked": false,
+                "name": null,
+                "opacity": 1.0,
+                "visible": true
+              },
+              "rotation": 0.0,
+              "shape": {
+                "Star": {
+                  "curve": 0.0,
+                  "frame": {
+                    "angle": 1.1421493000000003,
+                    "center": {
+                      "x": 136.838151781011,
+                      "y": 75.34291427842697
+                    },
+                    "radius": 43.9463220738516
+                  },
+                  "inner_ratio": 0.5109137705162312,
+                  "point_count": 12
+                }
+              },
+              "style": {
+                "fill": {
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "enabled": true,
+                  "opacity": 1.0
+                },
+                "stroke": {
+                  "cap": "round",
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "dash": [],
+                  "enabled": false,
+                  "join": "bevel",
+                  "markers": {
+                    "end": "none",
+                    "mid": "none",
+                    "mid_count": 1,
+                    "mid_place": "spaced",
+                    "start": "none"
+                  },
+                  "opacity": 1.0,
+                  "width": 1.5711237
+                }
+              }
+            }
+          }
+        ],
+        "layer": true,
+        "registers": {
+          "locked": false,
+          "name": "Layer 1",
+          "opacity": 1.0,
+          "visible": true
+        }
+      }
+    }
+  ],
+  "page": [
+    210.0,
+    297.0
+  ]
+}
