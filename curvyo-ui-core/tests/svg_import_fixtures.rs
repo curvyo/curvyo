@@ -99,8 +99,9 @@ fn ac26_to_ac28_ac33_primitives_stay_where_exact() {
         kinds,
         [
             "rect", "rect", "path", "rect", "ellipse", "ellipse", "star", "polygon", "path",
-            "path", "path", "path", "path"
-        ]
+            "ellipse", "ellipse", "path", "path"
+        ],
+        "slice 3 (criterion 112): the arc and the pie are ellipse arcs, the spiral a path"
     );
     let DrawingNode::Path { outlines, .. } = all[2] else {
         panic!()

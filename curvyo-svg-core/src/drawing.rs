@@ -57,6 +57,20 @@ pub struct NodeState {
     pub opacity: f64,
     /// A carrier a text sits on that SVG does not draw (criterion 94): it becomes a guide.
     pub guide: bool,
+    /// The Inkscape object it is, from `sodipodi:type`, when the importer names it after one
+    /// (criteria 119 to 121).
+    pub inkscape: Option<InkscapeObject>,
+}
+
+/// An Inkscape object that has no primitive and is imported as paths (slice 3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InkscapeObject {
+    /// `sodipodi:type="spiral"`: a path.
+    Spiral,
+    /// `sodipodi:type="inkscape:box3d"`: a group of faces.
+    Box3d,
+    /// `sodipodi:type="inkscape:box3dside"`: one face of a 3D box.
+    Box3dSide,
 }
 
 impl Default for NodeState {
@@ -67,6 +81,7 @@ impl Default for NodeState {
             locked: false,
             opacity: 1.0,
             guide: false,
+            inkscape: None,
         }
     }
 }
@@ -160,6 +175,20 @@ pub enum LeafKind {
         /// User units to millimetres.
         matrix: Affine,
     },
+    /// An Inkscape arc (`sodipodi:type="arc"`), with its drawn path.
+    Arc {
+        /// The arc numbers in user units.
+        arc: ArcData,
+        /// The drawn `d` in millimetres, arcs in eighth turns as for a path (criterion 22).
+        path: BezPath,
+        /// The same `d` with its arcs within 1e-5 mm, for the 0.001 mm check of criterion 111;
+        /// `None` when it cannot be read within the point budget.
+        fine: Option<BezPath>,
+        /// `sodipodi:nodetypes`, when present.
+        node_types: Option<String>,
+        /// User units to millimetres.
+        matrix: Affine,
+    },
     /// A `<use>` that is a linked clone of the leaf with this index (document order of all
     /// leaves, clones included), with the clone's matrix in millimetres.
     Clone {
@@ -183,8 +212,29 @@ pub struct StarData {
     pub r2: f64,
     /// The angle of the first outer vertex `sodipodi:arg1`, radians.
     pub arg1: f64,
+    /// The angle of the first inner vertex `sodipodi:arg2`, radians, when the file gives one.
+    pub arg2: Option<f64>,
     /// `inkscape:flatsided`: a polygon.
     pub flat: bool,
+}
+
+/// The numbers of Inkscape's arc tool, in user units; each is finite.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ArcData {
+    /// `sodipodi:cx`, `sodipodi:cy`.
+    pub center: Point,
+    /// `sodipodi:rx`.
+    pub rx: f64,
+    /// `sodipodi:ry`.
+    pub ry: f64,
+    /// `sodipodi:start`, radians, when present.
+    pub start: Option<f64>,
+    /// `sodipodi:end`, radians, when present.
+    pub end: Option<f64>,
+    /// `sodipodi:arc-type` as written (trimmed), when present.
+    pub arc_type: Option<String>,
+    /// `sodipodi:open="true"`.
+    pub open: bool,
 }
 
 /// One paint: a colour and its opacity (the property's opacity times the colour's alpha).
@@ -292,7 +342,9 @@ impl LeafKind {
     #[must_use]
     pub fn outline_mm(&self) -> Option<BezPath> {
         match self {
-            Self::Path { path, .. } | Self::Star { path, .. } => Some(path.clone()),
+            Self::Path { path, .. } | Self::Star { path, .. } | Self::Arc { path, .. } => {
+                Some(path.clone())
+            }
             Self::Rect {
                 rect,
                 rx,

@@ -13,7 +13,9 @@ use curvyo_document_core::{
     clean_name, validated_document_side,
 };
 use curvyo_image_core::WorkingImage;
-use curvyo_svg_core::{DisplayUnitName, LeafKind, NodeState, PageBackground, SvgDrawing, SvgNode};
+use curvyo_svg_core::{
+    DisplayUnitName, InkscapeObject, LeafKind, NodeState, PageBackground, SvgDrawing, SvgNode,
+};
 
 use crate::svg_font_match::FaceMemo;
 use crate::svg_import_images::{ImportAssets, frame_bounds};
@@ -225,6 +227,33 @@ fn registers(state: &NodeState) -> DrawingRegisters {
     }
 }
 
+/// The name of a leaf without a label after the Inkscape object it is (criterion 121): "Arc"
+/// for an arc kept as an ellipse arc, "Spiral", "Face N" for the `face`-th face of a 3D box;
+/// `None` takes the default name.
+fn inkscape_name(
+    state: &NodeState,
+    kind: &LeafKind,
+    geometry: Option<&LeafGeometry>,
+    face: usize,
+) -> Option<String> {
+    let arc = matches!(
+        (kind, geometry),
+        (
+            LeafKind::Arc { .. },
+            Some(LeafGeometry::Primitive(
+                curvyo_document_core::Shape::Ellipse { arc: Some(_), .. },
+                _
+            ))
+        )
+    );
+    match state.inkscape {
+        _ if arc => Some("Arc".to_owned()),
+        Some(InkscapeObject::Spiral) => Some("Spiral".to_owned()),
+        Some(InkscapeObject::Box3dSide) => Some(format!("Face {face}")),
+        _ => None,
+    }
+}
+
 /// The tree mapping of one import.
 struct Mapper {
     /// The placement translation (Import) or the identity (Open).
@@ -244,6 +273,7 @@ impl Mapper {
         next: &mut impl Iterator<Item = Converted>,
         out: &mut Vec<DrawingNode>,
     ) {
+        let mut faces = 0;
         for (index, node) in nodes.iter().enumerate() {
             match node {
                 SvgNode::Group {
@@ -265,6 +295,9 @@ impl Mapper {
                     if layer && registers.name.is_none() {
                         registers.name = Some(format!("Layer {}", index + 1));
                     }
+                    if state.inkscape == Some(InkscapeObject::Box3d) && registers.name.is_none() {
+                        registers.name = Some("3D box".to_owned());
+                    }
                     out.push(DrawingNode::Group {
                         registers,
                         layer,
@@ -272,9 +305,16 @@ impl Mapper {
                     });
                 }
                 SvgNode::Leaf { state, leaf } => {
-                    let registers = registers(state);
+                    let mut registers = registers(state);
+                    if state.inkscape == Some(InkscapeObject::Box3dSide) {
+                        faces += 1;
+                    }
+                    let geometry = leaf_geometry(&leaf.kind, self.matrix);
+                    if registers.name.is_none() {
+                        registers.name = inkscape_name(state, &leaf.kind, geometry.as_ref(), faces);
+                    }
                     let style = model_style(&leaf.style);
-                    out.push(match (&leaf.kind, leaf_geometry(&leaf.kind, self.matrix)) {
+                    out.push(match (&leaf.kind, geometry) {
                         (LeafKind::Clone { original, matrix }, _) => DrawingNode::Clone {
                             registers,
                             original: *original,

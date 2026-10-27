@@ -1,0 +1,1764 @@
+{
+  "assets": [],
+  "background": {
+    "color": [
+      232,
+      232,
+      235
+    ],
+    "opacity": 1.0,
+    "paint": "none"
+  },
+  "display_unit": "mm",
+  "leaves": 18,
+  "nodes": [
+    {
+      "Group": {
+        "children": [
+          {
+            "Path": {
+              "outlines": [
+                {
+                  "anchors": [
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 3.978247347593161
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 45.0,
+                        "y": 30.0
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 2.8130456767205203,
+                        "y": -2.8130456767205203
+                      },
+                      "handle_out": {
+                        "x": -2.8130456767205203,
+                        "y": 2.8130456767205203
+                      },
+                      "kind": "symmetric",
+                      "point": {
+                        "x": 40.60660171779821,
+                        "y": 40.60660171779821
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 3.978247347593161,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 30.0,
+                        "y": 45.0
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 30.002,
+                        "y": 30.0
+                      }
+                    }
+                  ],
+                  "closed": true
+                }
+              ],
+              "registers": {
+                "locked": false,
+                "name": null,
+                "opacity": 1.0,
+                "visible": true
+              },
+              "style": {
+                "fill": {
+                  "color": {
+                    "b": 0,
+                    "g": 204,
+                    "r": 255
+                  },
+                  "enabled": true,
+                  "opacity": 1.0
+                },
+                "stroke": {
+                  "cap": "butt",
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "dash": [],
+                  "enabled": true,
+                  "join": "miter",
+                  "markers": {
+                    "end": "none",
+                    "mid": "none",
+                    "mid_count": 1,
+                    "mid_place": "spaced",
+                    "start": "none"
+                  },
+                  "opacity": 1.0,
+                  "width": 0.264583
+                }
+              }
+            }
+          },
+          {
+            "Primitive": {
+              "registers": {
+                "locked": false,
+                "name": "Arc",
+                "opacity": 1.0,
+                "visible": true
+              },
+              "rotation": 0.0,
+              "shape": {
+                "Ellipse": {
+                  "arc": {
+                    "end": 1.570796,
+                    "kind": "Pie",
+                    "start": 0.0
+                  },
+                  "curve": 1.0,
+                  "frame": {
+                    "center": {
+                      "x": 70.0,
+                      "y": 30.0
+                    },
+                    "rx": 15.0,
+                    "ry": 15.0
+                  }
+                }
+              },
+              "style": {
+                "fill": {
+                  "color": {
+                    "b": 0,
+                    "g": 204,
+                    "r": 255
+                  },
+                  "enabled": true,
+                  "opacity": 1.0
+                },
+                "stroke": {
+                  "cap": "butt",
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "dash": [],
+                  "enabled": true,
+                  "join": "miter",
+                  "markers": {
+                    "end": "none",
+                    "mid": "none",
+                    "mid_count": 1,
+                    "mid_place": "spaced",
+                    "start": "none"
+                  },
+                  "opacity": 1.0,
+                  "width": 0.264583
+                }
+              }
+            }
+          },
+          {
+            "Path": {
+              "outlines": [
+                {
+                  "anchors": [
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 110.002,
+                        "y": 18.0
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 112.938926,
+                        "y": 25.954915
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 121.412678,
+                        "y": 26.291795999999998
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 114.755282,
+                        "y": 31.545084999999997
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 117.053422,
+                        "y": 39.708203999999995
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 109.999999,
+                        "y": 34.99999999999999
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 102.94657600000001,
+                        "y": 39.708203999999995
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 105.24471600000001,
+                        "y": 31.545084999999993
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 98.58732,
+                        "y": 26.291795999999994
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 107.06107200000001,
+                        "y": 25.954914999999993
+                      }
+                    }
+                  ],
+                  "closed": true
+                }
+              ],
+              "registers": {
+                "locked": false,
+                "name": null,
+                "opacity": 1.0,
+                "visible": true
+              },
+              "style": {
+                "fill": {
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "enabled": false,
+                  "opacity": 1.0
+                },
+                "stroke": {
+                  "cap": "butt",
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "dash": [],
+                  "enabled": true,
+                  "join": "miter",
+                  "markers": {
+                    "end": "none",
+                    "mid": "none",
+                    "mid_count": 1,
+                    "mid_place": "spaced",
+                    "start": "none"
+                  },
+                  "opacity": 1.0,
+                  "width": 0.264583
+                }
+              }
+            }
+          },
+          {
+            "Primitive": {
+              "registers": {
+                "locked": false,
+                "name": null,
+                "opacity": 1.0,
+                "visible": true
+              },
+              "rotation": 0.0,
+              "shape": {
+                "Star": {
+                  "curve": 0.0,
+                  "frame": {
+                    "angle": -1.5707959999999996,
+                    "center": {
+                      "x": 150.0,
+                      "y": 30.0
+                    },
+                    "radius": 12.0
+                  },
+                  "inner_ratio": 0.4166666666666667,
+                  "point_count": 5
+                }
+              },
+              "style": {
+                "fill": {
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "enabled": false,
+                  "opacity": 1.0
+                },
+                "stroke": {
+                  "cap": "butt",
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "dash": [],
+                  "enabled": true,
+                  "join": "miter",
+                  "markers": {
+                    "end": "none",
+                    "mid": "none",
+                    "mid_count": 1,
+                    "mid_place": "spaced",
+                    "start": "none"
+                  },
+                  "opacity": 1.0,
+                  "width": 0.264583
+                }
+              }
+            }
+          },
+          {
+            "Path": {
+              "outlines": [
+                {
+                  "anchors": [
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 30.0,
+                        "y": 58.0
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 33.916635,
+                        "y": 66.89195
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 41.412679,
+                        "y": 66.29179599999999
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 34.166238,
+                        "y": 72.764501
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 37.053423,
+                        "y": 79.708204
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 28.658242,
+                        "y": 74.816605
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 22.946577,
+                        "y": 79.708204
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 25.00451,
+                        "y": 70.21232499999999
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 18.587322,
+                        "y": 66.29179599999999
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 28.254376,
+                        "y": 65.314619
+                      }
+                    }
+                  ],
+                  "closed": true
+                }
+              ],
+              "registers": {
+                "locked": false,
+                "name": null,
+                "opacity": 1.0,
+                "visible": true
+              },
+              "style": {
+                "fill": {
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "enabled": false,
+                  "opacity": 1.0
+                },
+                "stroke": {
+                  "cap": "butt",
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "dash": [],
+                  "enabled": true,
+                  "join": "miter",
+                  "markers": {
+                    "end": "none",
+                    "mid": "none",
+                    "mid_count": 1,
+                    "mid_place": "spaced",
+                    "start": "none"
+                  },
+                  "opacity": 1.0,
+                  "width": 0.264583
+                }
+              }
+            }
+          },
+          {
+            "Primitive": {
+              "registers": {
+                "locked": false,
+                "name": "Arc",
+                "opacity": 1.0,
+                "visible": true
+              },
+              "rotation": 0.0,
+              "shape": {
+                "Ellipse": {
+                  "arc": {
+                    "end": 1.570796,
+                    "kind": "Arc",
+                    "start": 0.0
+                  },
+                  "curve": 1.0,
+                  "frame": {
+                    "center": {
+                      "x": 70.0,
+                      "y": 70.0
+                    },
+                    "rx": 15.0,
+                    "ry": 15.0
+                  }
+                }
+              },
+              "style": {
+                "fill": {
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "enabled": false,
+                  "opacity": 1.0
+                },
+                "stroke": {
+                  "cap": "butt",
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "dash": [],
+                  "enabled": true,
+                  "join": "miter",
+                  "markers": {
+                    "end": "none",
+                    "mid": "none",
+                    "mid_count": 1,
+                    "mid_place": "spaced",
+                    "start": "none"
+                  },
+                  "opacity": 1.0,
+                  "width": 0.264583
+                }
+              }
+            }
+          },
+          {
+            "Primitive": {
+              "registers": {
+                "locked": false,
+                "name": "Arc",
+                "opacity": 1.0,
+                "visible": true
+              },
+              "rotation": 0.0,
+              "shape": {
+                "Ellipse": {
+                  "arc": {
+                    "end": 1.570796,
+                    "kind": "Pie",
+                    "start": 0.0
+                  },
+                  "curve": 1.0,
+                  "frame": {
+                    "center": {
+                      "x": 110.0,
+                      "y": 70.0
+                    },
+                    "rx": 15.0,
+                    "ry": 15.0
+                  }
+                }
+              },
+              "style": {
+                "fill": {
+                  "color": {
+                    "b": 0,
+                    "g": 204,
+                    "r": 255
+                  },
+                  "enabled": true,
+                  "opacity": 1.0
+                },
+                "stroke": {
+                  "cap": "butt",
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "dash": [],
+                  "enabled": true,
+                  "join": "miter",
+                  "markers": {
+                    "end": "none",
+                    "mid": "none",
+                    "mid_count": 1,
+                    "mid_place": "spaced",
+                    "start": "none"
+                  },
+                  "opacity": 1.0,
+                  "width": 0.264583
+                }
+              }
+            }
+          },
+          {
+            "Primitive": {
+              "registers": {
+                "locked": false,
+                "name": "Arc",
+                "opacity": 1.0,
+                "visible": true
+              },
+              "rotation": 0.0,
+              "shape": {
+                "Ellipse": {
+                  "arc": {
+                    "end": 4.712389,
+                    "kind": "Arc",
+                    "start": 0.0
+                  },
+                  "curve": 1.0,
+                  "frame": {
+                    "center": {
+                      "x": 150.0,
+                      "y": 70.0
+                    },
+                    "rx": 15.0,
+                    "ry": 10.0
+                  }
+                }
+              },
+              "style": {
+                "fill": {
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "enabled": false,
+                  "opacity": 1.0
+                },
+                "stroke": {
+                  "cap": "butt",
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "dash": [],
+                  "enabled": true,
+                  "join": "miter",
+                  "markers": {
+                    "end": "none",
+                    "mid": "none",
+                    "mid_count": 1,
+                    "mid_place": "spaced",
+                    "start": "none"
+                  },
+                  "opacity": 1.0,
+                  "width": 0.264583
+                }
+              }
+            }
+          },
+          {
+            "Path": {
+              "outlines": [
+                {
+                  "anchors": [
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 20.0,
+                        "y": 110.0
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 30.0,
+                        "y": 110.0
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 30.0,
+                        "y": 120.0
+                      }
+                    }
+                  ],
+                  "closed": true
+                }
+              ],
+              "registers": {
+                "locked": false,
+                "name": null,
+                "opacity": 1.0,
+                "visible": true
+              },
+              "style": {
+                "fill": {
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "enabled": false,
+                  "opacity": 1.0
+                },
+                "stroke": {
+                  "cap": "butt",
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "dash": [],
+                  "enabled": true,
+                  "join": "miter",
+                  "markers": {
+                    "end": "none",
+                    "mid": "none",
+                    "mid_count": 1,
+                    "mid_place": "spaced",
+                    "start": "none"
+                  },
+                  "opacity": 1.0,
+                  "width": 0.264583
+                }
+              }
+            }
+          },
+          {
+            "Path": {
+              "outlines": [
+                {
+                  "anchors": [
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 35.0,
+                        "y": 110.0
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 45.0,
+                        "y": 110.0
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 45.0,
+                        "y": 120.0
+                      }
+                    }
+                  ],
+                  "closed": true
+                }
+              ],
+              "registers": {
+                "locked": false,
+                "name": null,
+                "opacity": 1.0,
+                "visible": true
+              },
+              "style": {
+                "fill": {
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "enabled": false,
+                  "opacity": 1.0
+                },
+                "stroke": {
+                  "cap": "butt",
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "dash": [],
+                  "enabled": true,
+                  "join": "miter",
+                  "markers": {
+                    "end": "none",
+                    "mid": "none",
+                    "mid_count": 1,
+                    "mid_place": "spaced",
+                    "start": "none"
+                  },
+                  "opacity": 1.0,
+                  "width": 0.264583
+                }
+              }
+            }
+          },
+          {
+            "Path": {
+              "outlines": [
+                {
+                  "anchors": [
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 50.0,
+                        "y": 110.0
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 60.0,
+                        "y": 110.0
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 60.0,
+                        "y": 120.0
+                      }
+                    }
+                  ],
+                  "closed": true
+                }
+              ],
+              "registers": {
+                "locked": false,
+                "name": null,
+                "opacity": 1.0,
+                "visible": true
+              },
+              "style": {
+                "fill": {
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "enabled": false,
+                  "opacity": 1.0
+                },
+                "stroke": {
+                  "cap": "butt",
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "dash": [],
+                  "enabled": true,
+                  "join": "miter",
+                  "markers": {
+                    "end": "none",
+                    "mid": "none",
+                    "mid_count": 1,
+                    "mid_place": "spaced",
+                    "start": "none"
+                  },
+                  "opacity": 1.0,
+                  "width": 0.264583
+                }
+              }
+            }
+          },
+          {
+            "Path": {
+              "outlines": [
+                {
+                  "anchors": [
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 65.0,
+                        "y": 110.0
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 75.0,
+                        "y": 110.0
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 75.0,
+                        "y": 120.0
+                      }
+                    }
+                  ],
+                  "closed": true
+                }
+              ],
+              "registers": {
+                "locked": false,
+                "name": null,
+                "opacity": 1.0,
+                "visible": true
+              },
+              "style": {
+                "fill": {
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "enabled": false,
+                  "opacity": 1.0
+                },
+                "stroke": {
+                  "cap": "butt",
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "dash": [],
+                  "enabled": true,
+                  "join": "miter",
+                  "markers": {
+                    "end": "none",
+                    "mid": "none",
+                    "mid_count": 1,
+                    "mid_place": "spaced",
+                    "start": "none"
+                  },
+                  "opacity": 1.0,
+                  "width": 0.264583
+                }
+              }
+            }
+          },
+          {
+            "Path": {
+              "outlines": [
+                {
+                  "anchors": [
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 80.0,
+                        "y": 110.0
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 90.0,
+                        "y": 110.0
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 90.0,
+                        "y": 120.0
+                      }
+                    }
+                  ],
+                  "closed": true
+                }
+              ],
+              "registers": {
+                "locked": false,
+                "name": null,
+                "opacity": 1.0,
+                "visible": true
+              },
+              "style": {
+                "fill": {
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "enabled": false,
+                  "opacity": 1.0
+                },
+                "stroke": {
+                  "cap": "butt",
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "dash": [],
+                  "enabled": true,
+                  "join": "miter",
+                  "markers": {
+                    "end": "none",
+                    "mid": "none",
+                    "mid_count": 1,
+                    "mid_place": "spaced",
+                    "start": "none"
+                  },
+                  "opacity": 1.0,
+                  "width": 0.264583
+                }
+              }
+            }
+          },
+          {
+            "Path": {
+              "outlines": [
+                {
+                  "anchors": [
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 95.0,
+                        "y": 110.0
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 105.0,
+                        "y": 110.0
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 105.0,
+                        "y": 120.0
+                      }
+                    }
+                  ],
+                  "closed": true
+                }
+              ],
+              "registers": {
+                "locked": false,
+                "name": null,
+                "opacity": 1.0,
+                "visible": true
+              },
+              "style": {
+                "fill": {
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "enabled": false,
+                  "opacity": 1.0
+                },
+                "stroke": {
+                  "cap": "butt",
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "dash": [],
+                  "enabled": true,
+                  "join": "miter",
+                  "markers": {
+                    "end": "none",
+                    "mid": "none",
+                    "mid_count": 1,
+                    "mid_place": "spaced",
+                    "start": "none"
+                  },
+                  "opacity": 1.0,
+                  "width": 0.264583
+                }
+              }
+            }
+          },
+          {
+            "Path": {
+              "outlines": [
+                {
+                  "anchors": [
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 20.0,
+                        "y": 130.0
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 30.0,
+                        "y": 130.0
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 30.0,
+                        "y": 140.0
+                      }
+                    }
+                  ],
+                  "closed": true
+                }
+              ],
+              "registers": {
+                "locked": false,
+                "name": null,
+                "opacity": 1.0,
+                "visible": true
+              },
+              "style": {
+                "fill": {
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "enabled": false,
+                  "opacity": 1.0
+                },
+                "stroke": {
+                  "cap": "butt",
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "dash": [],
+                  "enabled": true,
+                  "join": "miter",
+                  "markers": {
+                    "end": "none",
+                    "mid": "none",
+                    "mid_count": 1,
+                    "mid_place": "spaced",
+                    "start": "none"
+                  },
+                  "opacity": 1.0,
+                  "width": 0.264583
+                }
+              }
+            }
+          },
+          {
+            "Path": {
+              "outlines": [
+                {
+                  "anchors": [
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 35.0,
+                        "y": 130.0
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 45.0,
+                        "y": 130.0
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 45.0,
+                        "y": 140.0
+                      }
+                    }
+                  ],
+                  "closed": true
+                }
+              ],
+              "registers": {
+                "locked": false,
+                "name": null,
+                "opacity": 1.0,
+                "visible": true
+              },
+              "style": {
+                "fill": {
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "enabled": false,
+                  "opacity": 1.0
+                },
+                "stroke": {
+                  "cap": "butt",
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "dash": [],
+                  "enabled": true,
+                  "join": "miter",
+                  "markers": {
+                    "end": "none",
+                    "mid": "none",
+                    "mid_count": 1,
+                    "mid_place": "spaced",
+                    "start": "none"
+                  },
+                  "opacity": 1.0,
+                  "width": 0.264583
+                }
+              }
+            }
+          },
+          {
+            "Path": {
+              "outlines": [
+                {
+                  "anchors": [
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 50.0,
+                        "y": 130.0
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 60.0,
+                        "y": 130.0
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 60.0,
+                        "y": 140.0
+                      }
+                    }
+                  ],
+                  "closed": true
+                }
+              ],
+              "registers": {
+                "locked": false,
+                "name": null,
+                "opacity": 1.0,
+                "visible": true
+              },
+              "style": {
+                "fill": {
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "enabled": false,
+                  "opacity": 1.0
+                },
+                "stroke": {
+                  "cap": "butt",
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "dash": [],
+                  "enabled": true,
+                  "join": "miter",
+                  "markers": {
+                    "end": "none",
+                    "mid": "none",
+                    "mid_count": 1,
+                    "mid_place": "spaced",
+                    "start": "none"
+                  },
+                  "opacity": 1.0,
+                  "width": 0.264583
+                }
+              }
+            }
+          },
+          {
+            "Path": {
+              "outlines": [
+                {
+                  "anchors": [
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 65.0,
+                        "y": 130.0
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 75.0,
+                        "y": 130.0
+                      }
+                    },
+                    {
+                      "handle_in": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "handle_out": {
+                        "x": 0.0,
+                        "y": 0.0
+                      },
+                      "kind": "corner",
+                      "point": {
+                        "x": 75.0,
+                        "y": 140.0
+                      }
+                    }
+                  ],
+                  "closed": true
+                }
+              ],
+              "registers": {
+                "locked": false,
+                "name": null,
+                "opacity": 1.0,
+                "visible": true
+              },
+              "style": {
+                "fill": {
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "enabled": false,
+                  "opacity": 1.0
+                },
+                "stroke": {
+                  "cap": "butt",
+                  "color": {
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
+                  },
+                  "dash": [],
+                  "enabled": true,
+                  "join": "miter",
+                  "markers": {
+                    "end": "none",
+                    "mid": "none",
+                    "mid_count": 1,
+                    "mid_place": "spaced",
+                    "start": "none"
+                  },
+                  "opacity": 1.0,
+                  "width": 0.264583
+                }
+              }
+            }
+          }
+        ],
+        "layer": true,
+        "registers": {
+          "locked": false,
+          "name": "Layer 1",
+          "opacity": 1.0,
+          "visible": true
+        }
+      }
+    }
+  ],
+  "page": [
+    210.0,
+    297.0
+  ]
+}

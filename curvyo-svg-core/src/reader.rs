@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 use kurbo::Affine;
 use roxmltree::{Document, Node, NodeId};
 
-use crate::drawing::{LeafKind, NodeState, SvgLeaf, SvgNode};
+use crate::drawing::{InkscapeObject, LeafKind, NodeState, SvgLeaf, SvgNode};
 use crate::page::{INKSCAPE_NS, SODIPODI_NS};
 use crate::paint::Ids;
 use crate::shapes::{ShapeError, attr, leaf_kind};
@@ -215,6 +215,12 @@ impl<'a, 'd, 'input> Reader<'a, 'd, 'input> {
             locked: node.attribute((SODIPODI_NS, "insensitive")).map(str::trim) == Some("true"),
             opacity: style.opacity,
             guide: false,
+            inkscape: match node.attribute((SODIPODI_NS, "type")).map(str::trim) {
+                Some("spiral") => Some(InkscapeObject::Spiral),
+                Some("inkscape:box3d") => Some(InkscapeObject::Box3d),
+                Some("inkscape:box3dside") => Some(InkscapeObject::Box3dSide),
+                _ => None,
+            },
         }
     }
 

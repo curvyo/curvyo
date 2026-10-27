@@ -30,8 +30,8 @@ mod uses;
 
 pub use data_uri::decode_data_uri;
 pub use drawing::{
-    Cap, DisplayUnitName, Join, LeafKind, LeafStyle, NodeState, PageBackground, Paint, Rgb,
-    StarData, SvgDrawing, SvgLeaf, SvgNode, rounded_rect,
+    ArcData, Cap, DisplayUnitName, InkscapeObject, Join, LeafKind, LeafStyle, NodeState,
+    PageBackground, Paint, Rgb, StarData, SvgDrawing, SvgLeaf, SvgNode, rounded_rect,
 };
 pub use drawing_text::{
     Baseline, BaselineShift, FlowAlign, FlowBox, FontFamily, ImageAspect, LineHeight, SvgChar,

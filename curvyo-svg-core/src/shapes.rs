@@ -1,11 +1,11 @@
 //! The geometry of one drawn element (`specs/0024-svg-import-export` criteria 21 to 30): path
-//! data, the basic shapes and Inkscape's star data, with every coordinate checked against the
+//! data, the basic shapes and Inkscape's star and arc data, with every coordinate checked against the
 //! limits after the transforms.
 
 use kurbo::{Affine, BezPath, PathEl, Point, Rect};
 use roxmltree::Node;
 
-use crate::drawing::{LeafKind, StarData};
+use crate::drawing::{ArcData, LeafKind, StarData};
 use crate::limits::{MAX_ATTRIBUTE_BYTES, MAX_COORDINATE_MM};
 use crate::page::{INKSCAPE_NS, SODIPODI_NS};
 use crate::path_data::{ArcSplit, PathDataError, PathLimits, parse_path_data};
@@ -128,7 +128,17 @@ pub(crate) fn leaf_kind(
         }
         _ => return Err(ShapeError::Skip),
     };
-    let path = mapped(&path, matrix, points)?;
+    let drawn = mapped(&path, matrix, points)?;
+    if let Some(arc) = arc_data(node) {
+        return Ok(LeafKind::Arc {
+            arc,
+            path: drawn,
+            fine: fine_path(node, matrix, *points),
+            node_types: node_types(),
+            matrix,
+        });
+    }
+    let path = drawn;
     if let Some(star) = star_data(node) {
         return Ok(LeafKind::Star {
             star,
@@ -156,6 +166,60 @@ fn path_data(node: Node<'_, '_>, points: usize) -> Result<BezPath, ShapeError> {
         Err(PathDataError::TooManyPoints) => Err(ShapeError::Budget),
         Err(PathDataError::BadNumber) => Err(ShapeError::Skip),
     }
+}
+
+/// The `d` of an arc element with its arcs split within 1e-5 mm, in millimetres, for the check
+/// of criterion 111; not charged to the budget (it holds a bounded multiple of the charged
+/// points), but never more than `points` points.
+fn fine_path(node: Node<'_, '_>, matrix: Affine, points: usize) -> Option<BezPath> {
+    let [a, b, c, d, _, _] = matrix.as_coeffs();
+    // The Frobenius norm is at least the largest stretch of the matrix.
+    let stretch = a.hypot(b).hypot(c.hypot(d));
+    let limits = PathLimits {
+        max_coordinate: f64::MAX,
+        max_points: points,
+        arcs: ArcSplit::Tolerance(FINE_ARC_MM / stretch),
+    };
+    let path = parse_path_data(attr(node, "d")?, limits).ok()?;
+    Some(matrix * path)
+}
+
+/// How far the check path of an arc may be from the true arc, millimetres.
+const FINE_ARC_MM: f64 = 1e-5;
+
+/// A number of `node` in namespace `ns`: `Ok(None)` when absent, `Err` when present but not a
+/// finite number.
+fn tool_number(node: Node<'_, '_>, ns: &str, name: &str) -> Result<Option<f64>, ()> {
+    match node.attribute((ns, name)) {
+        None => Ok(None),
+        Some(text) => text
+            .trim()
+            .parse::<f64>()
+            .ok()
+            .filter(|n| n.is_finite())
+            .map(Some)
+            .ok_or(()),
+    }
+}
+
+/// Inkscape's arc data of `node` (criterion 112), when every number it gives is readable and
+/// the centre and radii are there; the caller decides whether it becomes an arc.
+fn arc_data(node: Node<'_, '_>) -> Option<ArcData> {
+    if node.attribute((SODIPODI_NS, "type")).map(str::trim) != Some("arc") {
+        return None;
+    }
+    let number = |name: &str| tool_number(node, SODIPODI_NS, name).ok();
+    Some(ArcData {
+        center: kurbo::Point::new(number("cx")??, number("cy")??),
+        rx: number("rx")??,
+        ry: number("ry")??,
+        start: number("start")?,
+        end: number("end")?,
+        arc_type: node
+            .attribute((SODIPODI_NS, "arc-type"))
+            .map(|t| t.trim().chars().take(16).collect()),
+        open: node.attribute((SODIPODI_NS, "open")).map(str::trim) == Some("true"),
+    })
 }
 
 /// A `<rect>`: a missing radius takes the other's value, both are clamped to half the sides; no
@@ -279,6 +343,7 @@ fn star_data(node: Node<'_, '_>) -> Option<StarData> {
         r1: number(SODIPODI_NS, "r1")?,
         r2: number(SODIPODI_NS, "r2")?,
         arg1: number(SODIPODI_NS, "arg1")?,
+        arg2: tool_number(node, SODIPODI_NS, "arg2").ok()?,
         flat: node.attribute((INKSCAPE_NS, "flatsided")).map(str::trim) == Some("true"),
     })
 }
