@@ -819,12 +819,11 @@ fn ac20_each_hostile_fixture_fails_within_2_s_of_cpu_and_300_mib() {
 }
 
 #[test]
-#[ignore = "criterion 20 amended 2026-10-27 (customer default): an index outside the palette imports as black"]
-fn ac20_a_png_with_an_invalid_palette_index_is_not_imported() {
-    assert_eq!(
-        decode_working(&spec_fixture("png_bad_palette_index.png")).err(),
-        Some(ImageError::Damaged)
-    );
+fn ac20_a_png_with_an_invalid_palette_index_imports_with_the_index_black() {
+    // Criterion 20 as amended 2026-10-27: an invalid palette index may import, reading black.
+    let working = decode_working(&spec_fixture("png_bad_palette_index.png")).unwrap();
+    assert_eq!(working.pixel(0, 0), Some([0, 0, 255, 255]));
+    assert_eq!(working.pixel(1, 0), Some([0, 0, 0, 255]));
 }
 
 #[test]
