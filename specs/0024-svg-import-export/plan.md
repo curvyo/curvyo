@@ -189,3 +189,40 @@ push, no PR in this run.
   criterion.
 - **Budgets (AC 108, release, this VM):** 1,000 texts 94 ms; 12 Mpx JPEG (1.3 MB) 70 ms; 100 KB
   file with 20 texts 23 ms. Hostile texts (AC 98): 4 s release, 48 s debug.
+
+# Slice 3: Inkscape shapes as primitives (criteria 111 to 127)
+
+Implementer, 2026-10-27, branch `story/svg-inkscape-shapes`, stacked on `story/svg-text-images`
+(PR #210). Built under the `adrs.md` dated note 2026-10-27 (slice 3). No push, no PR in this run.
+
+## Affected crates/modules
+
+- **`curvyo-svg-core`** (reader only): `shapes.rs` reads `sodipodi:type="arc"` into
+  `LeafKind::Arc` (numbers, `arc-type`, `open`, drawn `d`, `d` with fine arcs for the check) and
+  `arg2` into `StarData`; `reader.rs` sets `NodeState::inkscape` for a spiral, a 3D box group and
+  its `box3dside` faces. Missing or unreadable numbers give a plain path (AC 111, 124).
+- **`curvyo-ui-core`:** `svg_import_match.rs` (new: the 0.001 mm outline check, AC 111);
+  `svg_import_arcs.rs` (new: arc to `0021` ellipse arc, kinds, whole ellipse, transforms, AC 112
+  to 114); `svg_import_shapes.rs` (star and polygon through the new check, twisted stars, AC 116
+  to 118); `svg_import.rs` (names "Arc", "Spiral", "3D box", "Face N", AC 119 to 121).
+- **Docs:** `docs/svg-import.md` section "Inkscape shapes", `docs/technical-debt.md`, fixtures
+  README (AC 127).
+
+## Tasks
+
+- [ ] 1. Docs commit: slice 3 Ready, adrs note, this plan.
+- [ ] 2. svg-core: arc data, `arg2`, Inkscape object marks; tests first (AC 112, 113, 116, 117,
+  119, 120, 124).
+- [ ] 3. ui-core: outline check (AC 111, 123), arcs and transforms (AC 112 to 114), stars and
+  polygons (AC 116 to 118), `rx ≠ ry` rectangles unchanged (AC 115), spiral and box names and
+  transforms (AC 119 to 122), hostile numbers (AC 124); tests first.
+- [ ] 4. Fixtures `inkscape_shapes.svg` and `inkscape_shapes_edited.svg` with goldens (AC 125),
+  the 1,000-shape `#[ignore]` budget and determinism (AC 126), docs (AC 127); full gate.
+
+## Validation
+
+- Unit tests per criterion in svg-core and ui-core; the check compared on the examples of
+  criteria 112, 113, 116, 117 and 123 (0.002 mm moved: path; 0.0005 mm: arc).
+- Golden files: no Inkscape on this machine, so `inkscape_shapes.svg` is **hand-written** in
+  Inkscape 1.4.4's layout; the tester on navi replaces it with a real Inkscape save (AC 125).
+- `#[ignore]` budget of AC 126 runs once in release.
