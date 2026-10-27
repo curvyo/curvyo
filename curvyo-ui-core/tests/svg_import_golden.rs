@@ -1,7 +1,9 @@
 //! Golden files of the SVG import (`specs/0024-svg-import-export` criteria 72, 74 and 75): each
 //! fixture `tests/fixtures/svg/<name>.svg` opened as a project gives the document in
 //! `<name>.document.json` (page, display unit, background, the tree with leaves numbered in
-//! document order; clones by their original's number and matrix), compared within 1e-9 mm.
+//! document order; clones by their original's number and matrix; texts with their values, images
+//! with their asset number and frame; the assets by hash), compared within 1e-9 mm. Texts use
+//! the included faces (slice 2, criterion 107).
 //!
 //! `CURVYO_UPDATE_GOLDENS=1 cargo test -p curvyo-ui-core --test svg_import_golden` rewrites the
 //! goldens; a change to one is a change of the spec's behaviour and is explained in the PR.
@@ -9,21 +11,25 @@
 
 use std::path::{Path, PathBuf};
 
-use curvyo_ui_core::{SvgPlacement, svg_import};
+mod svg_fonts;
+
+use curvyo_ui_core::SvgPlacement;
 use serde_json::{Value, json};
 
 fn fixtures() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/svg")
 }
 
-/// The fixtures that import (not the hostile ones), sorted.
+/// The fixtures that import (not the hostile ones, not Inkscape's `name.paths.svg` conversions
+/// of criterion 86), sorted.
 fn names() -> Vec<String> {
     let mut names: Vec<String> = std::fs::read_dir(fixtures())
         .unwrap()
         .filter_map(|entry| {
             let name = entry.ok()?.file_name().into_string().ok()?;
             let stem = name.strip_suffix(".svg")?;
-            (!stem.starts_with("hostile_")).then(|| stem.to_owned())
+            let conversion = stem.strip_suffix(".paths").is_some();
+            (!stem.starts_with("hostile_") && !conversion).then(|| stem.to_owned())
         })
         .collect();
     names.sort();
@@ -32,8 +38,10 @@ fn names() -> Vec<String> {
 
 /// The imported document of a fixture as JSON.
 fn document_json(bytes: &[u8]) -> Value {
-    let drawing = curvyo_svg_core::read_svg(bytes).expect("a fixture opens");
-    let import = svg_import(&drawing, SvgPlacement::File);
+    thread_local! {
+        static FONTS: svg_fonts::Fonts = svg_fonts::Fonts::included();
+    }
+    let import = FONTS.with(|fonts| fonts.import(bytes, SvgPlacement::File));
     let background = import.page.background.map(|b| {
         json!({
             "paint": b.paint.name(),
@@ -47,6 +55,11 @@ fn document_json(bytes: &[u8]) -> Value {
         "background": background,
         "leaves": import.leaves,
         "nodes": serde_json::to_value(&import.nodes).unwrap(),
+        "assets": import
+            .assets
+            .iter()
+            .map(|bytes| curvyo_document_core::AssetHash::of(bytes).as_str().to_owned())
+            .collect::<Vec<_>>(),
     })
 }
 

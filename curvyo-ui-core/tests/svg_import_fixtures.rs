@@ -7,7 +7,17 @@ use std::time::{Duration, Instant};
 
 use curvyo_document_core::{DrawingNode, Point, Shape};
 use curvyo_geometry_core::{Outline, OutlineTriple, contains_point_in_outlines};
-use curvyo_ui_core::{SvgImport, SvgPlacement, svg_import};
+use curvyo_ui_core::{SvgImport, SvgPlacement};
+
+mod svg_fonts;
+
+/// The import of `drawing` with the included faces (slice 2).
+fn svg_import(drawing: &curvyo_svg_core::SvgDrawing, placement: SvgPlacement) -> SvgImport {
+    thread_local! {
+        static FONTS: svg_fonts::Fonts = svg_fonts::Fonts::included();
+    }
+    FONTS.with(|fonts| fonts.import_drawing(drawing, placement))
+}
 
 fn fixtures() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/svg")
@@ -53,7 +63,8 @@ fn filled(leaf: &DrawingNode, x: f64, y: f64) -> bool {
 
 #[test]
 fn ac8_text_and_empty_files_bring_in_nothing() {
-    assert_eq!(open("text_live.svg").leaves, 0);
+    // Slice 2 (criterion 78): live text comes in as one text object.
+    assert_eq!(open("text_live.svg").leaves, 1);
     assert_eq!(open("empty.svg").leaves, 0);
     assert_eq!(open("text_converted_to_paths.svg").leaves, 4);
 }
@@ -258,7 +269,12 @@ fn ac50_ac51_even_odd_files_fill_the_same() {
 #[test]
 fn ac13_unsupported_content_is_left_out() {
     let import = open("unsupported.svg");
-    assert_eq!(import.leaves, 7);
+    // Slice 2 (criterion 100): the embedded 1 x 1 PNG comes in as an image, last in the list.
+    assert_eq!(import.leaves, 8);
+    assert!(matches!(
+        leaves(&import.nodes).last(),
+        Some(DrawingNode::Image { .. })
+    ));
     let all = leaves(&import.nodes);
     let DrawingNode::Primitive { style, .. } = all[0] else {
         panic!()
@@ -312,6 +328,7 @@ fn ac73_a_template_loader_reads_closed_outlines_from_the_reader() {
                         .filter(|e| matches!(e, kurbo::PathEl::ClosePath))
                         .count();
                 }
+                curvyo_svg_core::SvgNode::Text { .. } | curvyo_svg_core::SvgNode::Image { .. } => {}
             }
         }
         assert!(closed > 0, "{name}");

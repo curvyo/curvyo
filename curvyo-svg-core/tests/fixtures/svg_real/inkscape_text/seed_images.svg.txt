@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+     xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+     xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+     width="210mm" height="297mm" viewBox="0 0 210 297">
+  <sodipodi:namedview id="nv" inkscape:document-units="mm"/>
+  <defs id="defs1"><clipPath id="clip1"><rect x="150" y="150" width="20" height="20"/></clipPath></defs>
+  <g id="layer1" inkscape:groupmode="layer" inkscape:label="Images">
+    <image id="img_png" inkscape:label="img_png" x="0" y="0" width="50" height="50" xlink:href="data:image/png;base64,@PNG@"/>
+    <image id="img_none" inkscape:label="img_none" x="60" y="0" width="50" height="50" preserveAspectRatio="none" xlink:href="data:image/png;base64,@PNG@"/>
+    <image id="img_slice" inkscape:label="img_slice" x="120" y="0" width="50" height="50" preserveAspectRatio="xMinYMin slice" xlink:href="data:image/png;base64,@PNG@"/>
+    <image id="img_jpeg" inkscape:label="img_jpeg" x="10" y="80" width="60" height="40" xlink:href="data:image/jpeg;base64,@JPEG@"/>
+    <image id="img_rot" inkscape:label="img_rot" x="100" y="80" width="60" height="40" preserveAspectRatio="none" xlink:href="data:image/jpeg;base64,@JPEG@"/>
+    <image id="img_skew" inkscape:label="img_skew" x="10" y="150" width="60" height="40" transform="skewX(20)" preserveAspectRatio="none" xlink:href="data:image/jpeg;base64,@JPEG@"/>
+    <image id="img_link" inkscape:label="img_link" x="10" y="220" width="60" height="40" xlink:href="linked.png"/>
+    <g id="g_clip" clip-path="url(#clip1)"><image id="img_clip" inkscape:label="img_clip" x="140" y="140" width="40" height="40" preserveAspectRatio="none" xlink:href="data:image/png;base64,@PNG@"/></g>
+  </g>
+</svg>

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generator: Adobe Illustrator 27.0.0, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 viewBox="0 0 595.3 841.9" style="enable-background:new 0 0 595.3 841.9;" xml:space="preserve">
+<style type="text/css">
+	.st0{font-family:'SourceSans3-Bold';}
+	.st1{font-size:24px;}
+	.st2{font-family:'SourceSans3-Regular';}
+	.st3{font-size:12px;}
+	.st4{letter-spacing:2;}
+	.st5{fill:#C1272D;}
+</style>
+<text transform="matrix(1 0 0 1 72.5 100.2)" class="st0 st1">Headline</text>
+<text transform="matrix(1 0 0 1 72.5 140)"><tspan x="0" y="0" class="st2 st3">First line of body copy</tspan><tspan x="0" y="14.4" class="st2 st3">second line of body copy</tspan><tspan x="0" y="28.8" class="st2 st3 st4">TRACKED</tspan></text>
+<text transform="matrix(1 0 0 1 72.5 220)" class="st2 st1">W<tspan x="20.4" y="0" class="st2 st1">AVE</tspan></text>
+<text transform="matrix(1 0 0 1 300 220)" class="st2 st1 st5">Red</text>
+</svg>

@@ -1,4 +1,7 @@
 {
+  "assets": [
+    "6b7fa434f92a8b80aab02d9bf1a12e49ffcae424e4013a1c4f68b67e3d2bbcd0"
+  ],
   "background": {
     "color": [
       232,
@@ -9,7 +12,7 @@
     "paint": "none"
   },
   "display_unit": "mm",
-  "leaves": 7,
+  "leaves": 8,
   "nodes": [
     {
       "Group": {
@@ -449,6 +452,25 @@
                   "opacity": 1.0,
                   "width": 0.5
                 }
+              }
+            }
+          },
+          {
+            "Image": {
+              "asset": 0,
+              "placement": [
+                10.0,
+                0.0,
+                0.0,
+                10.0,
+                80.0,
+                55.0
+              ],
+              "registers": {
+                "locked": false,
+                "name": "Image",
+                "opacity": 1.0,
+                "visible": true
               }
             }
           }

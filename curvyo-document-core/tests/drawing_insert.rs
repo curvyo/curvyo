@@ -86,7 +86,7 @@ fn ac3_one_layer_in_one_commit_and_one_undo_removes_it() {
     assert_eq!(anchor_ids.len(), 5);
     let steps = document.own_step_count();
     let (layer, top) = document
-        .insert_drawing("poster", &nodes, &anchor_ids)
+        .insert_drawing("poster", &nodes, &anchor_ids, &[])
         .unwrap();
     assert_eq!(document.own_step_count(), steps + 1);
     assert!(document.is_layer(layer));
@@ -123,7 +123,7 @@ fn bad_drawings_write_nothing() {
     let nodes = drawing();
     let too_few = ids(4);
     assert_eq!(
-        document.insert_drawing("x", &nodes, &too_few),
+        document.insert_drawing("x", &nodes, &too_few, &[]),
         Err(ObjectEditError::AnchorIds)
     );
     let clone_of_primitive = vec![
@@ -135,7 +135,7 @@ fn bad_drawings_write_nothing() {
         },
     ];
     assert_eq!(
-        document.insert_drawing("x", &clone_of_primitive, &[]),
+        document.insert_drawing("x", &clone_of_primitive, &[], &[]),
         Err(ObjectEditError::NoSuchObject)
     );
     let mut deep = square(DrawingRegisters::default());
@@ -147,7 +147,7 @@ fn bad_drawings_write_nothing() {
         };
     }
     assert_eq!(
-        document.insert_drawing("x", &[deep], &ids(5)),
+        document.insert_drawing("x", &[deep], &ids(5), &[]),
         Err(ObjectEditError::TooDeep)
     );
     assert_eq!(document.own_step_count(), 0);
@@ -172,7 +172,7 @@ fn ac2_ac77_a_document_from_a_drawing_has_no_step() {
             children: vec![],
         },
     );
-    let document = Document::from_drawing(4, &page, &nodes, &ids(5)).unwrap();
+    let document = Document::from_drawing(4, &page, &nodes, &ids(5), &[]).unwrap();
     assert_eq!(document.own_step_count(), 0);
     assert_eq!(document.size(), page.size);
     assert_eq!(document.display_unit(), DisplayUnit::In);
@@ -184,4 +184,132 @@ fn ac2_ac77_a_document_from_a_drawing_has_no_step() {
     assert_eq!(reopened.read_objects().objects.len(), 3);
     // No format change of its own (criterion 77); `0058` took 25 for the image kind.
     assert!((24..=25).contains(&CURRENT_FORMAT_VERSION));
+}
+
+fn drawing_text(string: &str, hash: &str) -> curvyo_document_core::DrawingText {
+    curvyo_document_core::DrawingText {
+        string: string.to_owned(),
+        font: curvyo_document_core::FontRef {
+            family: "Lobster".into(),
+            style: "Bold".into(),
+            face_hash: hash.to_owned(),
+            face_index: 0,
+            kind: curvyo_document_core::FontKind::Outline,
+        },
+        size: Length::from_mm(5.0),
+        layout: curvyo_document_core::TextLayoutValues::DEFAULT,
+        chars: curvyo_document_core::TextChars::new([(
+            1,
+            curvyo_document_core::CharValues {
+                kern_x: 0.25,
+                kern_y: 0.0,
+                rotation: 90.0,
+            },
+        )]),
+        placement: Affine::translation(Vec2::new(10.0, 20.0)),
+        style: Style::default(),
+    }
+}
+
+/// Slice 2, criteria 78, 82, 93, 94, 104: a text with kerns and a missing face, a text on a
+/// carrier that becomes a guide, and two images of the same bytes come in with the drawing in its
+/// one commit; one undo removes them all, the bytes are one asset.
+#[test]
+fn ac78_ac94_ac104_texts_and_images_in_the_one_commit() {
+    use curvyo_document_core::{MISSING_FACE_HASH, OnPathValues};
+    use std::sync::Arc;
+    let document = Document::new(1);
+    let png: Arc<[u8]> = Arc::from(&b"\x89PNG\r\n\x1a\nbytes"[..]);
+    let nodes = vec![
+        DrawingNode::Text {
+            registers: DrawingRegisters::default(),
+            text: drawing_text("AB", MISSING_FACE_HASH),
+        },
+        square(DrawingRegisters {
+            guide: true,
+            ..DrawingRegisters::default()
+        }),
+        DrawingNode::TextOnPath {
+            registers: DrawingRegisters::default(),
+            text: drawing_text("On path", MISSING_FACE_HASH),
+            carrier: 0,
+            values: OnPathValues::at(Length::from_mm(12.0)),
+        },
+        DrawingNode::Image {
+            registers: DrawingRegisters {
+                name: Some("Image".into()),
+                ..DrawingRegisters::default()
+            },
+            asset: 0,
+            placement: Affine::new(50.0, 0.0, 0.0, 25.0, 0.0, 12.5),
+        },
+        DrawingNode::Image {
+            registers: DrawingRegisters::default(),
+            asset: 1,
+            placement: Affine::new(5.0, 0.0, 0.0, 5.0, 0.0, 0.0),
+        },
+    ];
+    let anchors = ids(DrawingNode::anchor_count(&nodes));
+    let steps = document.own_step_count();
+    let (layer, top) = document
+        .insert_drawing("poster", &nodes, &anchors, &[png.clone(), png.clone()])
+        .unwrap();
+    assert_eq!(document.own_step_count(), steps + 1);
+    assert_eq!(top.len(), 5);
+    let text = document.text(top[0]).unwrap();
+    assert_eq!(text.string, "AB");
+    assert_eq!(text.font.face_hash, MISSING_FACE_HASH);
+    assert_eq!(text.chars.get(1).kern_x, 0.25);
+    assert!(document.node_registers(top[1]).unwrap().guide);
+    let on_path = document.text(top[2]).unwrap().on_path.unwrap();
+    assert_eq!(on_path.carrier.node, top[1]);
+    assert_eq!(on_path.values.position.as_mm(), 12.0);
+    let read = document.read_objects();
+    let images: Vec<_> = read
+        .objects
+        .iter()
+        .filter_map(|o| match o {
+            ObjectSnapshot::Image(image) => Some(image),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(images.len(), 2);
+    assert_eq!(images[0].asset, images[1].asset);
+    assert_eq!(document.asset_bytes(), png.len() as u64);
+    assert_eq!(
+        document.node_registers(top[3]).unwrap().name.as_deref(),
+        Some("Image")
+    );
+    let step = document.own_steps().last().unwrap().clone();
+    document.undo_step(step.step).unwrap();
+    assert!(!document.contains_node(layer));
+    let mut bad = drawing_text("x", "nothash");
+    assert_eq!(
+        document.insert_drawing(
+            "x",
+            &[DrawingNode::Text {
+                registers: DrawingRegisters::default(),
+                text: bad.clone(),
+            }],
+            &[],
+            &[]
+        ),
+        Err(ObjectEditError::InvalidText)
+    );
+    bad.font.face_hash = MISSING_FACE_HASH.into();
+    assert_eq!(
+        document.insert_drawing(
+            "x",
+            &[DrawingNode::TextOnPath {
+                registers: DrawingRegisters::default(),
+                text: bad,
+                carrier: 0,
+                values: OnPathValues::at(Length::from_mm(0.0)),
+            }],
+            &[],
+            &[]
+        ),
+        Err(ObjectEditError::NoSuchObject),
+        "a carrier must be a drawn leaf"
+    );
 }

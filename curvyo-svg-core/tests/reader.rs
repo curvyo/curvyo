@@ -31,6 +31,7 @@ fn leaves(nodes: &[SvgNode]) -> Vec<(&curvyo_svg_core::NodeState, &SvgLeaf)> {
         match node {
             SvgNode::Group { children, .. } => out.extend(leaves(children)),
             SvgNode::Leaf { state, leaf } => out.push((state, leaf)),
+            SvgNode::Text { .. } | SvgNode::Image { .. } => {}
         }
     }
     out
@@ -534,7 +535,9 @@ fn ac13_ac49_unsupported_content_leaves_no_trace() {
         <path clip-path="url(#c)" filter="url(#f)" d="M0 0 H1"/>"#,
     );
     assert_eq!(leaves(&d.nodes).len(), 1);
-    assert_eq!(mm(r#"<text>only text</text>"#).nodes, []);
+    // Slice 2 (criterion 78): a text is read as a text node, no leaf.
+    let only_text = mm(r#"<text>only text</text>"#).nodes;
+    assert!(matches!(only_text.as_slice(), [SvgNode::Text { .. }]));
 }
 
 #[test]

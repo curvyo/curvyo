@@ -1,0 +1,5 @@
+target/
+artifacts/
+Cargo.lock
+# Inputs libFuzzer adds (named by their SHA-1); the named seeds are kept.
+corpus/read_svg/[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]*

@@ -16,6 +16,7 @@ fn leaf_count(nodes: &[SvgNode]) -> usize {
         .map(|n| match n {
             SvgNode::Group { children, .. } => leaf_count(children),
             SvgNode::Leaf { .. } => 1,
+            SvgNode::Text { .. } | SvgNode::Image { .. } => 0,
         })
         .sum()
 }
@@ -136,8 +137,26 @@ mod property {
 
     const SEED: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" width="20mm" height="20mm" viewBox="0 0 20 20"><style>.a{fill:red}</style><g transform="rotate(30)"><path class="a" d="M0 0 C 1 2 3 4 5 6 A 3 3 0 1 1 9 9 Z" stroke-dasharray="1 2"/><rect id="r" rx="2" width="5" height="5"/><use href="#r" x="4"/></g></svg>"##;
 
+    /// Slice 2 (criterion 109): texts, a text path, a flowed text, a switch and an image.
+    const TEXT_SEED: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" viewBox="0 0 20 20"><path id="p" d="M0 10 H20"/><text xml:space="preserve" x="1 2 3" y="5" dx="1" rotate="5 10" style="font:bold;font-size:2px;letter-spacing:0.1em"><tspan sodipodi:role="line" x="1" y="5">Ab<tspan style="font-weight:bold">c</tspan></tspan><textPath xlink:href="#p" startOffset="50%">on</textPath></text><flowRoot><flowRegion><rect width="10" height="10"/></flowRegion><flowPara>f</flowPara></flowRoot><switch><foreignObject/><g><text>s</text></g></switch><image href="data:image/png;base64,iVBORw0KGgo=" width="2" height="2"/></svg>"##;
+
     proptest! {
         #![proptest_config(ProptestConfig::with_cases(512))]
+
+        /// The text and image seed with bytes changed or cut never panics.
+        #[test]
+        fn mutated_text_files_never_panic(
+            changes in proptest::collection::vec((any::<prop::sample::Index>(), any::<u8>()), 0..8),
+            cut in any::<prop::sample::Index>(),
+        ) {
+            let mut bytes = TEXT_SEED.as_bytes().to_vec();
+            for (at, value) in changes {
+                let i = at.index(bytes.len());
+                bytes[i] = value;
+            }
+            let end = cut.index(bytes.len() + 1);
+            let _ = curvyo_svg_core::read_svg(&bytes[..end]);
+        }
 
         /// Criterion 70: arbitrary bytes give a refusal or a drawing, never a panic.
         #[test]

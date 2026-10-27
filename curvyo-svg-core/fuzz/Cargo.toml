@@ -1,0 +1,28 @@
+# cargo-fuzz target on the SVG reader (`specs/0024-svg-import-export` criteria 70 and 109: arbitrary
+# bytes neither panic nor hang; the text and image fixtures are the seeds).
+# Not a workspace member: it needs a nightly compiler (or `RUSTC_BOOTSTRAP=1`) and
+# `libfuzzer-sys`, which the product never links. Run from this folder, e.g.:
+#   cargo +nightly fuzz run read_svg corpus/read_svg -- -max_total_time=600 -rss_limit_mb=2048 -timeout=5
+# `corpus/read_svg/` holds the slice-2 text and image fixtures as seeds; `seed.sh` refreshes them
+# and copies the workspace `Cargo.lock`. New inputs libFuzzer finds are git-ignored.
+[package]
+name = "curvyo-svg-core-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+curvyo-svg-core = { path = ".." }
+
+[[bin]]
+name = "read_svg"
+path = "fuzz_targets/read_svg.rs"
+test = false
+doc = false
+bench = false
+
+[workspace]

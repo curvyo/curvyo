@@ -1,0 +1,53 @@
+{
+  "assets": [
+    "9986d67c3034ae056e83f4b803291e4a5dde9aaa823ffc439290f5e59e1f9349",
+    "4e790bf8809be795618fb73490c32f1181af25b30d5c0a0eb706f0299b9d7811"
+  ],
+  "background": null,
+  "display_unit": null,
+  "leaves": 2,
+  "nodes": [
+    {
+      "Image": {
+        "asset": 0,
+        "placement": [
+          30.0,
+          0.0,
+          0.0,
+          10.0,
+          10.0,
+          20.0
+        ],
+        "registers": {
+          "locked": false,
+          "name": "Image",
+          "opacity": 1.0,
+          "visible": true
+        }
+      }
+    },
+    {
+      "Image": {
+        "asset": 1,
+        "placement": [
+          30.0,
+          0.0,
+          0.0,
+          10.0,
+          10.0,
+          60.0
+        ],
+        "registers": {
+          "locked": false,
+          "name": "Image",
+          "opacity": 1.0,
+          "visible": true
+        }
+      }
+    }
+  ],
+  "page": [
+    200.0,
+    200.0
+  ]
+}

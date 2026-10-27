@@ -104,3 +104,27 @@ ae18e5cc74e5d150adef97a08fb8d094f027e5ea788ceab7a95e5db54ebb9830  wikimedia/Bioh
 ff14f6628c6a3de12a6ee6ccbe2c26e04b3eeeba76eb4ffeb28d85e0c555c9b8  wikimedia/Star_of_David.svg
 e6e74a305acde52cdcb070d8fdf7a46847bea34060c484ea58481cc8b98fdb98  wikimedia/Yin_yang.svg
 ```
+
+## inkscape_text/ (made here with Inkscape 1.4.4 (dcaf3e7d9e, 2026-05-05), project licence; slice 2)
+
+Tester fixtures of slice 2 (criteria 78 to 106), used by
+`curvyo-editor-wasm/tests/acceptance_0024_slice2_tester.rs` and
+`frontend/tests/acceptance_0024_slice2_tester.test.ts`. `make_slice2.sh` (run with `TMPDIR` set to
+a scratch directory under `target/`) writes all of them from the hand-written seeds; Inkscape lays
+out with only the faces of `frontend/public/fonts` through an isolated fontconfig, so both programs
+use the same font files.
+
+| File | How it was made |
+|---|---|
+| `text_ink.svg` | `seed_text.svg.txt` (A4 mm page; one 30 pt line; three centred lines at `line-height:1.25`; right-aligned; Bold, Italic, Light, Bold Italic, a 600 request, Source Serif 4; letter and word spacing; `dx`/`dy`/`rotate` kerns; "Hello world red" with a bold and a smaller red `tspan`; `x²` with `baseline-shift:super`; vertical upright; rotated 30°, stretched 150 %, mirrored; "Nonexistent Sans"; an `inline-size` text and a `shape-inside` text; texts on an open stroked path, a stroked circle at `startOffset` 75 % centred, an unpainted rectangle, an unpainted path with `side="right"`, and a path with a text that has its own `transform`). Every text is moved by `transform-translate:0,0`, so Inkscape re-lays it out and writes its own `x`/`y` (it also writes `tb-rl`, the SVG 1.1 lines of `inline-size`/`shape-inside`, and folds the transforms). Saved as Inkscape SVG. |
+| `text_ink.paths.svg` | `text_ink.svg` after `object-to-path` on every text: Inkscape's own outlines, the oracle of criterion 86 (each text becomes a path or group labelled as the text, `aria-label` holding its string). |
+| `flowroot_ink.svg` | `seed_flowroot.svg.txt` (two SVG 1.2 `flowRoot`s in a 60 × 80 mm region, left and centred, as Inkscape 0.92 wrote them) saved by Inkscape 1.4.4, which keeps the `flowRoot`. |
+| `flowroot_ink.paths.svg` | `flowroot_ink.svg` after `object-to-path`: Inkscape's line breaks (criterion 96). |
+| `images_ink.svg` | `seed_images.svg.txt` with the pictures of `make_pictures.py` (a 200 × 100 RGBA PNG with an alpha ramp, a 120 × 80 baseline JPEG) embedded as base64: default meet, `none`, `xMinYMin slice`, a JPEG, one rotated 30° by Inkscape, one with `skewX(20)`, a linked `linked.png` (does not exist; Inkscape's relative path is rewritten to the bare name by the script), and one in a clipped group. |
+
+**Comparison method.** Both files of a pair are opened in Curvyo; every glyph node of the imported
+text, laid out in its face (`curvyo_ui_core::lay_out`), must have an Inkscape node within 0.05 mm
+and the other way round. Measured agreement where the spec and Inkscape agree: 0.0000 to 0.0050 mm
+(0.037 mm on the circle). Where the spec and Inkscape disagree the test follows the spec and says
+so (`flowRoot` first baseline: the spec's ascender rule sits 0.68 mm below Inkscape's half-leading;
+the comparison aligns the first baselines and checks the breaks).
