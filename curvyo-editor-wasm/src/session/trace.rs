@@ -4,9 +4,7 @@
 
 use std::sync::Arc;
 
-use curvyo_document_core::{
-    ImageSnapshot, NodeId, ObjectSnapshot, Opacity, Point, TRACE_IMAGE_COMMIT_LABEL, ViewTransform,
-};
+use curvyo_document_core::{ImageSnapshot, NodeId, ObjectSnapshot, Opacity, Point, ViewTransform};
 use curvyo_render_core::{DrawList, PreviewAnchor};
 use curvyo_ui_core::{
     TraceStatus, TraceTarget, TraceWire, hit_test_objects, plan_trace, read_trace_wire,
@@ -237,11 +235,10 @@ impl Session {
             if plan.items.is_empty() {
                 return TraceCreateOutcome::Ignored;
             }
-            let Ok(groups) = this.document.insert_drawing_above(
-                TRACE_IMAGE_COMMIT_LABEL,
-                &plan.items,
-                &plan.anchor_ids,
-            ) else {
+            let Ok(groups) = this
+                .document
+                .insert_drawing_above(&plan.items, &plan.anchor_ids)
+            else {
                 // invariant: the images were just read and the ids are fresh.
                 debug_assert!(false, "a planned trace could not be written");
                 return TraceCreateOutcome::Ignored;

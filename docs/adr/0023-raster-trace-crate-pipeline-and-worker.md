@@ -4,7 +4,7 @@
 Not `needs-customer` by itself: no document model, file format, plugin or platform change. It rests
 on the customer answers of `specs/0025-raster-trace` (Frage 49 B "VTracer for now, if it works",
 Frage 50 A black and white only, Frage 55 A no extension seam, Frage 60 B VectorCraft as idea source
-only). Becomes Accepted when step 0 (§7) has numbers and they do not trigger the fallback (§8). Fills
+only). Becomes Accepted when the Inkscape baseline is in, step 0 (§7) does not trigger the fallback (§8) and the customer decides. Fills
 the `curvyo-vectorize-core` slot of [ADR 0011](0011-workspace-and-crate-layout.md) §2/§3 (ADR 0003 §6).
 
 ## Context
@@ -34,12 +34,12 @@ wasm in the webview on desktop too (ADR 0001 §3), so the wasm time is the shipp
 `curvyo-vectorize-core`, `#![forbid(unsafe_code)]`, builds for `wasm32-unknown-unknown`.
 Responsibility: it turns an RGBA8 raster and trace settings into closed outlines in document
 millimetres. Edges: `→ document-core` (`Affine`, `Point`, `Length`), `kurbo` (workspace) and
-**`visioncortex = "0.8"`** (default features; transitive: `flo_curves` 0.3 Apache-2.0, `roots`
-BSD-2-Clause, `itertools` 0.8, `smallvec`, `bit-vec` 0.6, `num-traits`; `flo_curves` and `bit-vec`
-have a few `unsafe` blocks, ordinary for crates.io leaves). It does **not** depend on `image-core` or
+**`visioncortex = "0.8"`** with `default-features = false` (transitive, per `Cargo.lock`: `bit-vec`
+0.6, `flo_curves` and `num-traits`; `flo_curves` and `bit-vec` have a few `unsafe` blocks, ordinary
+for crates.io leaves). It does **not** depend on `image-core` or
 `image`. `ui-core → vectorize-core`; `editor-wasm` reaches the tracer only through `ui-core`.
-`deny.toml` gets the AGPL exception for the crate. `cargo deny` stays green; it adds two duplicate
-*warnings* (`bit-vec` and `itertools` get a third version), no error. Dev-dependencies (harness only):
+`deny.toml` gets the AGPL exception for the crate. `cargo deny` stays green; it may add duplicate
+*warnings* (`bit-vec`), no error. Dev-dependencies (harness only):
 `curvyo-image-core`, `curvyo-svg-core`.
 
 ### 2. Public API: one pure function, a schema as data (unchanged)
@@ -66,7 +66,7 @@ interruptible; the largest (a full-page region at 2000 x 2000 px) is under 0.1 s
 Ours before, visioncortex in the middle, ours after:
 
 1. **Luma and mask** (ours): alpha composited over white, integer Rec. 709 luma, foreground =
-   luma below the Threshold. One bit per pixel.
+   luma below the Threshold. A `Vec<bool>`, one byte per pixel.
 2. **Regions and specks** (ours): one scanline union-find labelling with `u32` labels, 4-connected
    like visioncortex's `to_clusters(false)` so both agree on what a region is. A foreground region or
    a hole whose pixel count × `|det|` of the pixel map is below Specks² mm² is flipped. VTracer has no
@@ -142,8 +142,33 @@ Step 0 (first build task) is the harness of the previous version of this section
 `#[ignore]` integration test with its own 4x scanline rasteriser computing the metrics of
 `research.md` §5; Inkscape and VectorCraft run offline by `tools/trace-baseline/` into an ignored
 `target/trace-baseline/`, only `tests/fixtures/trace/baseline.json` (numbers) is committed. Our
-visioncortex-based trace is now the candidate, not a baseline. Its table is copied here. The nightly
-job fails on a regression above 5 %.
+visioncortex-based trace is now the candidate, not a baseline. The nightly job fails on a
+regression above 5 %.
+
+**Step 0 result (2026-10-27, build host, release), copied from `specs/0025-raster-trace/plan.md`:**
+
+Inkscape is not installed on the build host, so the baseline columns of `baseline.json` are empty
+and the relative targets of criterion 28 (node density at most 60 %, wobble at most 50 % of
+Inkscape's) are not evaluated yet; `tools/trace-baseline/README.md` says how to add them. Our run
+at the defaults (Smooth 80, Specks 0.5 mm, automatic Threshold) on the synthetic set:
+
+| Image | Nodes /100 mm | Micro | Max dev px | Mean dev px | Area err % | Wobble /100 mm | Closed % |
+|---|---|---|---|---|---|---|---|
+| 01 flat logo | 11.50 | 0 | 1.50 | 0.20 | 1.12 | 2.65 | 100 |
+| 03 text 300 dpi | 124.39 | 0 | 9.46 | 0.21 | 6.15 | 52.15 | 100 |
+| 04 small text | 53.47 | 0 | 1.33 | 0.09 | 12.09 | 16.32 | 100 |
+| 05 line art scan | 10.28 | 0 | 3.22 | 0.70 | 31.86 | 3.80 | 100 |
+| 07 silhouette | 23.52 | 0 | 1.70 | 0.26 | 0.48 | 4.37 | 100 |
+| 10 pixel art | 16.00 | 0 | 0.00 | 0.00 | 0.00 | 4.86 | 100 |
+| 11 stencil lines | 46.58 | 0 | 1.12 | 0.15 | 7.69 | 9.39 | 100 |
+| 12 technical drawing | 12.75 | 0 | 2.00 | 0.15 | 11.11 | 2.43 | 100 |
+
+Misses of the absolute targets: max deviation above 0.75 px on 7 of 8 images (pixel border
+smoothing; on the text the 0.5 mm Specks fill small letter holes, and visioncortex closes 1 px
+notches), mean above 0.3 px on the line-art scan (paper noise), area error above the target on the
+thin-line images (the metric divides the border error by a thin foreground). Micro paths 0 and
+100 % closed everywhere. Whether this triggers the fallback of ADR 0023 §8 needs the Inkscape
+numbers on the same set (the targets are relative to them where they are relative).
 
 ### 8. Fallback to C
 
@@ -155,11 +180,11 @@ does not change, so the fallback is a crate-internal swap plus dropping the depe
 
 ## Consequences
 
-- One new crate, one new external dependency tree (7 small crates, permissive), no new `unsafe` in
+- One new crate, one new external dependency tree (`visioncortex` and 3 small permissive crates), no new `unsafe` in
   our code, no format change.
 - Outlines follow the thresholded pixel border, smoothed; there is no sub-pixel position from the
   anti-aliasing. The disc numbers above show this is within the criteria at the default.
-- Memory: our mask (1 bit) and labels (`u32` + union-find, 8 B/px) plus visioncortex's per-region
+- Memory: our mask (`Vec<bool>`, 1 B/px) and labels (`u32` + union-find, 8 B/px) plus visioncortex's per-region
   copies (a bit image, a `u16` label image and 8 B per hole pixel of the region being traced); worst
   case about 18 B/px for a full-page region, measured by the counting allocator of criterion 26; above
   16 B/px it goes to `docs/technical-debt.md` (the criterion says so; no self-made limit).

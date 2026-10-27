@@ -22,5 +22,5 @@ pub use params::{
     ParamSpec, ParamUnit, TraceParams,
 };
 pub use progress::{Phase, Progress};
-pub use raster::{Raster, auto_threshold, luma};
+pub use raster::{Raster, auto_threshold};
 pub use trace::{Counts, MAX_HOLES_PER_REGION, TraceError, TraceResult, trace};

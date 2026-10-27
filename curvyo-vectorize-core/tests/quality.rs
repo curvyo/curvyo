@@ -53,6 +53,14 @@ fn mm_per_px(image: &QualityImage) -> f64 {
     25.4 / image.dpi
 }
 
+/// The luma of one straight-alpha pixel over white (Rec. 709, integers, rounded), as the tracer
+/// computes it; the harness measures against its own copy.
+fn luma(r: u8, g: u8, b: u8, a: u8) -> u8 {
+    let over = |c: u8| (u32::from(c) * u32::from(a) + 255 * (255 - u32::from(a)) + 127) / 255;
+    let weighted = 2126 * over(r) + 7152 * over(g) + 722 * over(b);
+    u8::try_from((weighted + 5000) / 10_000).unwrap_or(u8::MAX)
+}
+
 /// The thresholded mask of `image`.
 fn mask_of(image: &QualityImage, threshold: u8) -> Vec<bool> {
     image
@@ -61,7 +69,7 @@ fn mask_of(image: &QualityImage, threshold: u8) -> Vec<bool> {
         .as_chunks::<4>()
         .0
         .iter()
-        .map(|&[r, g, b, a]| curvyo_vectorize_core::luma(r, g, b, a) < threshold)
+        .map(|&[r, g, b, a]| luma(r, g, b, a) < threshold)
         .collect()
 }
 
