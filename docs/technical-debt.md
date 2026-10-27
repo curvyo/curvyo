@@ -183,9 +183,10 @@ The import of `0024` (first slice) reads a documented subset ([`svg-import.md`](
 paths, the basic shapes (rectangles, ellipses and Inkscape stars stay primitives where exact),
 groups, Inkscape layers, transforms, the simple `<style>` rules, colours and opacities, dashes,
 caps and joins, even-odd fills (re-wound by depth), `<use>` as a linked clone or a copy, and the
-page from the file's sizes and viewBox. Everything else (text, images, clip paths, masks, filters,
-markers, gradients beyond their middle colour, foreign data such as `inkstitch:`) is ignored
-silently: there is no loss report and no passthrough bag (customer decisions of 2026-10-16,
+page from the file's sizes and viewBox. Its second slice imports live text as editable text
+objects and embedded PNG, JPEG and WebP pictures as image objects. Everything else (clip paths,
+masks, filters, markers, gradients beyond their middle colour, linked images, text decorations,
+foreign data such as `inkstitch:`) is ignored silently: there is no loss report and no passthrough bag (customer decisions of 2026-10-16,
 ADR 0018 §5). There is no SVG export yet (the later slice of `0024`), so nothing round-trips.
 
 **Resolution:** driven by real files. Each failing customer file becomes a golden-file fixture
