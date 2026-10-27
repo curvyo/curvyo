@@ -1,0 +1,49 @@
+# cargo-fuzz targets on the bitmap decoder boundary and the project asset reader
+# (`specs/0058-bitmap-import` criterion 19, ADR 0017 §4: a time-boxed run of 10 minutes per format).
+# Not a workspace member: it needs a nightly compiler (or `RUSTC_BOOTSTRAP=1`) and
+# `libfuzzer-sys`, which the product never links. Run from this folder, e.g.:
+#   cargo +nightly fuzz run decode_png corpus/decode_png seeds/png -- -max_total_time=600 -rss_limit_mb=2048
+# `seed.sh` fills `seeds/` from the fixtures and copies the workspace `Cargo.lock` (pinned `loro`).
+[package]
+name = "curvyo-image-core-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+curvyo-image-core = { path = ".." }
+curvyo-document-core = { path = "../../curvyo-document-core" }
+
+[[bin]]
+name = "decode_png"
+path = "fuzz_targets/decode_png.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "decode_jpeg"
+path = "fuzz_targets/decode_jpeg.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "decode_webp"
+path = "fuzz_targets/decode_webp.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "project_assets"
+path = "fuzz_targets/project_assets.rs"
+test = false
+doc = false
+bench = false
+
+[workspace]
