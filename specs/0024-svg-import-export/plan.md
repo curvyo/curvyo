@@ -93,3 +93,99 @@ limit is checked in the session before the parse (criterion 6c); the host reads 
 - **Existing tests touched:** the button lists of `frontend/tests/fileTab.test.ts` and
   `acceptance_0051_tester.test.ts` gain "Import SVG…" (criterion 5), as the Template button's
   commit did.
+
+# Slice 2: text and images (criteria 78 to 110)
+
+Implementer, 2026-10-27, branch `story/svg-text-images`, stacked on `story/bitmap-import` (not
+merged). Built under the `adrs.md` dated note 2026-10-27 and Frage 48 default A (unanswered). No
+push, no PR in this run.
+
+## Affected crates/modules
+
+- **`curvyo-svg-core`** (font-free, ADR 0018): `switch` tests (`systemLanguage`,
+  `requiredFeatures`, bare `foreignObject`, AC 99); `text_style.rs` (inherited text properties in
+  the cascade: font list, size, weight with bolder/lighter, style, stretch, spacing, anchor,
+  writing mode, orientation, line height, white space, baselines, text-transform); `text.rs` and
+  `text_chars.rs` (a `<text>` into an `SvgText`: characters after white-space processing, one
+  style run per character, position lists, line starts, `textPath` pieces, flowed text boxes);
+  `data_uri.rs` (base64 and percent decoding straight from the attribute, AC 100, 105);
+  `image.rs` (`<image>` viewport, aspect rule and matrix, AC 101). New `SvgNode::Text` and
+  `SvgNode::Image`; `NodeState::guide` for carriers (AC 94); carrier links resolved after the walk
+  like clones.
+- **`curvyo-document-core`:** `DrawingNode::{Text, TextOnPath, Image}`, `DrawingRegisters::guide`,
+  `insert_drawing`/`from_drawing` take the asset bytes and write them in the same commit (AC 104);
+  `MISSING_FACE_HASH` in `text_model.rs` (adrs note 2).
+- **`curvyo-ui-core`:** `svg_font_match.rs` (AC 80 to 82 over `ListedFace`, full and PostScript
+  names derived from family and style); `svg_import.rs` two-phase (`svg_faces_needed`, then
+  `svg_import` with the face store); `svg_text.rs`, `svg_text_runs.rs`, `svg_text_kerns.rs`
+  (Size by cap H, positions to kerns, rotation correction, splits of AC 92, alignment, writing
+  modes, line height, text on path, flowed text); `svg_import_images.rs` (decode, frame, budget).
+- **`curvyo-editor-wasm`:** Open, Import SVG and the Import button wait for the faces: the drawing
+  is kept, the faces asked for, and the host calls again once they are loaded.
+- **`frontend`:** the open and import calls repeat while the session answers "waiting for fonts".
+- **Docs:** `docs/svg-import.md` (Text, Images), `docs/user/` importing images line,
+  `docs/technical-debt.md`, fixtures README.
+
+## Tasks
+
+- [x] 1. Docs commit: criterion 99 reworded, format line, slice 2 Ready.
+- [x] 2. svg-core: switch (AC 99), text properties and `<text>` reading (AC 78, 79, 85 to 91, 93,
+  95 to 98 data), images and data URIs (AC 100 to 103, 105), carrier roles (AC 94); tests first.
+- [x] 3. document-core: drawing variants, guide register, assets in the one commit,
+  `MISSING_FACE_HASH` (AC 82, 104, 109).
+- [x] 4. ui-core: font matching (AC 80 to 82), Size and transform (AC 83, 84), positions to kerns
+  and rotation (AC 86, 87), spacing (AC 88), alignment (AC 89), baselines (AC 90), writing modes
+  (AC 91), lines (AC 85), splits (AC 92), text on path (AC 93 to 95), flowed text (AC 96),
+  left-out features (AC 97), images (AC 100 to 104), bounds with texts and images (AC 106).
+- [x] 5. Session and frontend: two-phase Open, Import SVG and Import button (AC 106).
+- [x] 6. Fixtures and goldens (AC 107), hostile text fixtures (AC 98), budgets (AC 108),
+  determinism and fuzz seeds (AC 109), docs (AC 110); full gate; browser check.
+- [x] 7. Tester findings (2026-10-27), test-first on the tester's cases: an uneven line gap kerned
+  on the moving line (AC 85: kerns are stored at the string index, line breaks included); a
+  turned character shaped alone, so it has no kerning pair, as Inkscape draws it (AC 87);
+  `textLength` built (AC 88); super and sub from OS/2 `ySuperscriptYOffset`/`ySubscriptYOffset`
+  (AC 90, `FaceMetrics` gains the two offsets); upright vertical text placed as Inkscape 1.4
+  draws it (AC 91); `side="right"` Position counted from the carrier's end (AC 93, spec
+  reworded); face matching memoised per style, a piece without kerns keeps its first layout,
+  the letters' box linear (AC 98: 100,000 texts 3.2 s, was 5.2 s); the Inkscape fixtures and
+  their `name.paths.svg` cut from the tester's real Inkscape 1.4.4 files (AC 107); the SVG
+  fuzz target `curvyo-svg-core/fuzz` with the text and image fixtures as seeds (AC 70, 109).
+
+## Validation
+
+- Unit tests per criterion in svg-core and ui-core with the included faces loaded from
+  `frontend/public/fonts` (no system font); glyph origins compared with positions computed from the
+  face's advances within 0.01 mm.
+- Golden files for the new fixtures, hand-written in Inkscape and Illustrator layout (no Inkscape
+  on this machine): the `name.paths.svg` comparison of AC 86 needs Inkscape and is left to the
+  tester (open point).
+- `#[ignore]` budgets of AC 108 run once in release.
+
+## Proposals and open points (slice 2)
+
+- **(Proposal) `MISSING_FACE_HASH`** = 64 zeros marks an imported missing-font reference (adrs
+  note 2). It is a valid hash to every reader, never a real SHA-256, matches no loaded face, so the
+  family-and-style rule and then "Font missing" apply.
+- **Full and PostScript names** are derived from the listing (`family style`, `FamilyNoSpaces-
+  StyleNoSpaces`): `ListedFace` carries no name table, and adding one is a host change.
+- **Criterion 83's example** corrected to 6.943 mm (the measured H of 656 units; lead,
+  2026-10-27).
+- **Not built:** the desktop wait for
+  the system font list (criterion 106: the import waits for the faces it finds listed, and after
+  10 s takes what is loaded); per-glyph rotation correction in vertical text; x-height for
+  `middle` is measured from the face's `x` (no OS/2 read). Super/sub take OS/2's offsets (not its
+  sizes: a smaller size would split the text, and Inkscape keeps the size too).
+- **Spec conflict (tester's `c88_text_length`):** a `textLength` of 60 mm on four 5 px letters
+  needs 5 × Size per gap, beyond Letter spacing (2) plus a kern (1), so criterion 92 (b) splits
+  the text into four; the test reads only the first piece. Left ignored for the lead.
+- **Splits beyond the spec:** a centred or right-aligned text that starts or ends inside a line
+  (a bold word in a centred paragraph) keeps Centre for its whole lines and sets the partial line
+  as left-aligned pieces; a run longer than the engine's 100,000-character shaping limit is shaped
+  in parts of 10,000.
+- **Tests of slice 1 changed by slice 2** (criteria 13, 44, 49 give way to 78, 99, 100): the
+  tester's `ac13_ignored_content_leaves_the_rest_alone` and `ac42_ac44_ac46_states_and_structure`
+  (svg-core), `ac8_nothing_imported_notice_and_long_name` (editor-wasm), and the implementer's
+  `ac8`/`ac13` fixture tests now expect the text and image to come in; each change names the new
+  criterion.
+- **Budgets (AC 108, release, this VM):** 1,000 texts 94 ms; 12 Mpx JPEG (1.3 MB) 70 ms; 100 KB
+  file with 20 texts 23 ms. Hostile texts (AC 98): 4 s release, 48 s debug.

@@ -8,7 +8,8 @@ content, never by its name: a PNG called `photo.jpg` imports as a PNG. An SVG be
 selected. One import is one step in the History ("Import image", "Import images", or "Import"
 for drawings and pictures together); Ctrl+Z removes it. Ctrl+I does nothing while you type in a
 text field or edit a text on the canvas. Open… still opens an SVG as a project; it does not open
-pictures. (`specs/0058-bitmap-import`)
+pictures. Pictures embedded in an SVG come in with the drawing as image objects, at the size the
+SVG gives them (`docs/svg-import.md`, "Images"). (`specs/0058-bitmap-import`)
 
 ## Formats
 

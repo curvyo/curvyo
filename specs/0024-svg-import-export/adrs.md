@@ -24,7 +24,7 @@ first importer (and, later, the first exporter). **One new ADR
     Gradient amendment of 2026-10-08 is what criterion 38 implements.
   - §11 with [ADR 0004](../../docs/adr/0004-persistence-and-cross-machine-sync.md) §9: no
     `format_version` change (criterion 77). The importer writes through the existing document
-    API, so the project file is whatever the model writes (current format 24, 2026-10-26).
+    API, so the project file is whatever the model writes (format 25 since `0058`, 2026-10-27).
 - [ADR 0001](../../docs/adr/0001-ui-framework-and-canvas-rendering.md) §5: the browser boundary
   carries strings and scalars. The importer is called from `curvyo-editor-wasm` with the file
   bytes; the 50 MiB limit is checked before the call. There is no report to return.
@@ -141,6 +141,44 @@ first importer (and, later, the first exporter). **One new ADR
   run is kernel time for about 300,000 page faults while the heap first grows to 1.2 GB, not work
   in our code, so nothing outside Loro can be trimmed. The restated 3.0 s and 3.5 s stay until
   the customer confirms them.
+- **2026-10-27: slice 2, text and images (criteria 78 to 110, Frage 48 default A).** Checked
+  against the code of the day.
+  1. **Where it runs.** `curvyo-svg-core` stays font-free (ADR 0018): it reads `<text>` into a
+     font-free run list (characters after criterion 79, resolved style per character including
+     `font-family` list, weight and italic state, `x`/`y`/`dx`/`dy`/`rotate` lists, line breaks,
+     anchor, writing mode, the `textPath` target's element id) and decodes `data:` hrefs to
+     bytes. Font matching (criteria 80 to 82), shaping, Size (83), kerns (86 to 90) and the
+     split into texts (92, Frage 48 A) run in `curvyo-ui-core::svg_import` over the session's
+     face listing (`font_match.rs`, `ListedFace`) and `curvyo-text-core` (`FaceStyle` rules of
+     `0078`). No new crate, no new dependency edge: ui-core already depends on both.
+  2. **Missing font: no `format_version` bump.** Today's `text_font` requires a 64-hex
+     `face_hash` (`text_codec::read_font` returns `None` otherwise, `check_font` refuses), so an
+     absent hash would drop the font in a format-25 reader and need format 26. Instead the import
+     writes the reserved hash `MISSING_FACE_HASH` = 64 zeros (a named constant in
+     `text_model.rs`, never a real SHA-256): it matches no loaded face, so `match_face` falls
+     through to family-and-style (case b) and then `Missing`, which is exactly criteria 82 and 30.
+     Rejected: `Option` hash plus format 26 (every older build refuses projects with any import
+     text, for no behaviour gain). Criterion 109 holds; the dependency line above stays "no change".
+  3. **Face metrics: the import waits, no fallback ratio.** Kerns (86, 87) and the split (92) need
+     the real advances, not only the H ratio, and a later re-size would break determinism (109)
+     and make a second history step. Conversion is two-phase and pure: phase 1 matches every run
+     and returns the `NeedsLoad` faces; the host loads them (desktop and browser alike, the
+     existing load path) and calls phase 2, which converts with all faces loaded; `Missing` uses
+     the included substitute, which is always loaded. The busy notice of slice 1 covers the wait.
+  4. **Images in the one commit.** `DrawingNode` gets `Text`, `TextOnPath` and `Image` variants;
+     `insert_drawing` takes the asset bytes beside the nodes and writes them through the
+     `0058` asset store (content-addressed, the code behind `Document::add_images`) inside its
+     single `batch`, so criterion 104's one step "Import SVG" holds. Identification and decoding
+     stay in `curvyo-image-core` (by content, criterion 100); svg-core only base64/percent-decodes.
+  5. **Kerns and rotation** are ADR 0021 per-character marks written in the same commit; values
+     outside `0079`'s range start a new text (92 b), never clamp. **textPath** is an ADR 0022
+     carrier: the carrier's node is created first in the commit (as originals before clones), the
+     text references it; a `textPath` to an element not drawn as a carrier is skipped.
+  6. **Criterion 99 is a partial gap, not today's Illustrator bug.** `reader.rs` (`"switch"`)
+     already skips a child with a non-empty `requiredExtensions`, and Illustrator's
+     `&ns_ai;` resolves by criterion 68, so the Illustrator layout imports today. Missing: the
+     `systemLanguage` and `requiredFeatures` tests and skipping a bare `<foreignObject>` (taken
+     today, yields nothing, so the switch is lost). The fixture of 107 must pin both layouts.
 
 ## Risks for the plan (not decided here)
 
