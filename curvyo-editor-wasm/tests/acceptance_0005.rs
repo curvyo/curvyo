@@ -2405,33 +2405,35 @@ fn live_rotation_preview_draws_the_rotated_shape_before_release() {
     s.pointer_hover(to, false, false);
     // Doc not yet changed:
     assert!(close(prim(&s).rotation.as_radians(), 0.0));
-    // Blue new, black old (`unified-object-editing` criterion 10): the
-    // committed rectangle stays drawn unchanged in its own black stroke, and
-    // the rotated outline is drawn over it. Rotated 90 degrees about (50, 10)
-    // the corners move from (0, 0) to (60, -40) and from (100, 20) to (40, 60).
+    // The object follows, its ghost stays (`unified-object-editing` note of
+    // 2026-10-27, which replaced blue new, black old): the rotated rectangle
+    // is drawn in its own black stroke, and the ghost outline stays at the
+    // committed one. Rotated 90 degrees about (50, 10) the corners move from
+    // (0, 0) to (60, -40) and from (100, 20) to (40, 60).
     let list = s.draw_list();
     let near = |v: &curvyo_render_core::Vertex, x: f64, y: f64| {
         (v.position.x - x).abs() < 1.0 && (v.position.y - y).abs() < 1.0
     };
     let black = curvyo_render_core::RgbaColor::BLACK;
+    let ghost = curvyo_render_core::RgbaColor::opaque(0x2F, 0x6F, 0xEE).with_alpha(153);
     assert!(
         list.triangles
             .iter()
-            .any(|v| near(v, 0.0, 0.0) && v.color == black),
-        "the old geometry stays drawn in black"
+            .any(|v| near(v, 60.0, -40.0) && v.color == black),
+        "the rotated object is drawn in black at its new corner"
     );
     assert!(
         list.triangles
             .iter()
-            .filter(|v| near(v, 0.0, 0.0) || near(v, 100.0, 20.0))
-            .all(|v| v.color == black),
-        "nothing but the old stroke at the old corners: box, handles and outline follow the new geometry"
+            .any(|v| near(v, 0.0, 0.0) && v.color == ghost),
+        "the ghost stays at the old corner"
     );
     assert!(
-        list.triangles
+        !list
+            .triangles
             .iter()
-            .any(|v| near(v, 60.0, -40.0) && v.color != black),
-        "the rotated outline is drawn at its new corner"
+            .any(|v| (near(v, 0.0, 0.0) || near(v, 100.0, 20.0)) && v.color == black),
+        "the old stroke is not drawn at the old corners"
     );
     s.pointer_up(to, false, false);
 }

@@ -367,6 +367,11 @@ pub const CLONE_LINK: RgbaColor = RgbaColor::opaque(0x7B, 0x3F, 0xD6);
 /// committed object in its own style.
 pub const PREVIEW_NEW: RgbaColor = ACCENT;
 
+/// `--drag-ghost` (`docs/design-system.md`, row "Drag ghost", customer 2026-10-27): the line of
+/// the outline a Select-tool drag leaves at the origin while the moved objects follow the pointer
+/// as themselves. [`ACCENT`] at 60 %, so it reads as the selection's trace, not as new geometry.
+pub const DRAG_GHOST: RgbaColor = ACCENT.with_alpha(153); // 60% of 255, rounded
+
 /// `--preview-ghost` (`specs/0042-history-branches` criterion 17): a previewed version's own fill
 /// and stroke are drawn at this share of their opacity under its `--preview-new` outline.
 pub const PREVIEW_GHOST_OPACITY: f64 = 0.4;

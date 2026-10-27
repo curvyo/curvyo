@@ -529,7 +529,10 @@ on the centre handle) and has left the 3 px dead zone.
     the drag back into a move in the frame of the key event (the box and handles
     follow the blue outline again), pressing it turns it into a copy in that
     frame, also while the pointer holds still; the Ctrl state at the release
-    decides. A **plus badge** marks a copy: 16 px, solid `--accent`, a white plus,
+    decides. (Changed, customer 2026-10-27, `0009` note: the copies are drawn as
+    themselves at the offset, directly above the originals, not as a blue
+    outline; a move draws the objects at the pointer and their ghost at the origin.)
+    A **plus badge** marks a copy: 16 px, solid `--accent`, a white plus,
     its centre 16 px left of and 16 px below the pointer hotspot (clear of the
     arrow, move and crosshair cursors and opposite the readout chip). It is a
     DOM element that follows the key event, not a CSS cursor, and it is gone in

@@ -40,6 +40,7 @@ mod corner_readout;
 mod cut;
 mod document;
 mod document_presets;
+mod drag_swap;
 mod draw;
 mod file_chord;
 mod flip;

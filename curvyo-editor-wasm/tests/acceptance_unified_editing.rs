@@ -2090,7 +2090,19 @@ fn blue_cover_misses(dl: &DrawList, samples: &[Point], k: f64) -> usize {
     misses(&tris, samples, 0.9, k)
 }
 
-/// The committed rendering of the old object: dark, non-accent triangles.
+/// The ghost a drag leaves at the origin (customer 2026-10-27): `--accent` at 60 %.
+fn is_ghost(v: &Vertex) -> bool {
+    v.color.r == 47 && v.color.g == 111 && v.color.b == 238 && v.color.a == 153
+}
+
+/// Samples of the old geometry not covered by the ghost outline.
+fn ghost_cover_misses(dl: &DrawList, samples: &[Point], k: f64) -> usize {
+    let tris = tris_where(dl, is_ghost);
+    misses(&tris, samples, 0.9, k)
+}
+
+/// The rendering of an object in its own style: dark, non-accent triangles. During a drag
+/// that is the moved object at the pointer (customer 2026-10-27).
 fn black_cover_misses(dl: &DrawList, samples: &[Point], k: f64) -> usize {
     let tris = tris_where(dl, |v| {
         !is_blue(v)
@@ -2159,8 +2171,8 @@ fn run_drag(sc: &mut Scene, h: H, to_offset_px: (f64, f64), shift: bool, ctrl: b
     sc.s.pointer_up(to, shift, ctrl);
     let after_doc = doc_of(&sc.s).export_loro_snapshot().unwrap();
     // `edit-interaction-polish` criterion 33: a move released with Ctrl down
-    // is a copy. The original stays, and the blue outline is the copy, which
-    // sits directly above it.
+    // is a copy. The original stays drawn as itself, and the copy is drawn at
+    // the pointer, directly above it (customer 2026-10-27).
     let is_copy = ctrl && matches!(h, H::Move | H::Centre);
     let made_a_copy = is_copy && doc_of(&sc.s).object_ids().len() > 1;
     let new_samples = samples_of(&sc.s, usize::from(made_a_copy));
@@ -2177,8 +2189,14 @@ fn run_drag(sc: &mut Scene, h: H, to_offset_px: (f64, f64), shift: bool, ctrl: b
     let changed = after_doc != before_doc && !degenerate;
     Outcome {
         changed,
-        blue_misses: blue_cover_misses(&dl, &new_samples, k),
-        black_misses: black_cover_misses(&dl, &old_samples, k),
+        // Customer 2026-10-27: the object itself follows the pointer, its outline stays
+        // behind as the ghost; a copy leaves the original drawn as itself.
+        blue_misses: black_cover_misses(&dl, &new_samples, k),
+        black_misses: if made_a_copy {
+            black_cover_misses(&dl, &old_samples, k)
+        } else {
+            ghost_cover_misses(&dl, &old_samples, k)
+        },
         n_samples: new_samples.len(),
         leaked: during_doc != before_doc,
         commits: change_count(&sc.s) - c0,
@@ -2202,11 +2220,11 @@ fn sweep(label: &str, mk: &dyn Fn() -> Scene, handles: &[H], trials: usize, seed
             assert_eq!(o.commits, 1, "{ctx}: one interaction, one commit");
             assert_eq!(
                 o.black_misses, 0,
-                "{ctx}: the old geometry stays drawn (black)"
+                "{ctx}: the old geometry stays drawn (ghost)"
             );
             assert_eq!(
                 o.blue_misses, 0,
-                "{ctx}: blue preview != committed outline ({} samples)",
+                "{ctx}: drawn preview != committed outline ({} samples)",
                 o.n_samples
             );
         }
@@ -2322,9 +2340,10 @@ fn ac13_preview_equals_release_for_polygon_and_star() {
 }
 
 #[test]
-fn ac10_old_geometry_stays_drawn_in_its_own_style_while_the_blue_one_follows() {
-    // Rounded rectangle, move far away: the old outline is still covered by
-    // dark triangles and the new one by blue ones, in the same frame.
+fn ac10_the_object_follows_in_its_own_style_while_its_ghost_stays() {
+    // Rounded rectangle, move far away: the new outline is covered by dark
+    // triangles and the old one by the ghost, in the same frame (customer
+    // 2026-10-27; before that, black old and blue new).
     let mut sc = rect_scene(100, 140.0, 100.0, 30.0, 0.0);
     let old = samples_of(&sc.s, 0);
     let from = handle_point(&sc, H::Move);
@@ -2337,19 +2356,24 @@ fn ac10_old_geometry_stays_drawn_in_its_own_style_while_the_blue_one_follows() {
         .iter()
         .map(|p| pt(p.x + 120.0 / sc.k, p.y + 90.0 / sc.k))
         .collect();
-    assert_eq!(black_cover_misses(&dl, &old, sc.k), 0, "old stays (black)");
-    assert_eq!(blue_cover_misses(&dl, &new, sc.k), 0, "new is blue");
+    assert_eq!(ghost_cover_misses(&dl, &old, sc.k), 0, "old stays (ghost)");
+    assert_eq!(
+        black_cover_misses(&dl, &new, sc.k),
+        0,
+        "new is drawn as itself"
+    );
     sc.s.pointer_up(to, false, false);
-    // released: the blue outline is gone, the object renders normally
+    // released: the ghost is gone, the object renders normally
     sc.s.pointer_hover(pt(900.0, 900.0), false, false);
     let after = sc.s.draw_list();
     assert_eq!(black_cover_misses(&after, &new, sc.k), 0);
 }
 
 #[test]
-fn ac10_blue_is_a_hollow_outline_of_constant_screen_width() {
-    // The blue outline of a rotated rectangle at two zoom levels: the
-    // strip around a straight edge is about 1.5 px wide, whatever the zoom.
+fn ac10_the_ghost_is_a_hollow_outline_of_constant_screen_width() {
+    // The ghost a move leaves at the origin (customer 2026-10-27; before that the blue outline
+    // at the new place), at two zoom levels: the strip around a straight edge is about 1.5 px
+    // wide, whatever the zoom.
     for pct in [100, 400] {
         let mut sc = rect_scene(pct, 160.0, 100.0, 0.0, 0.0);
         let from = handle_point(&sc, H::Move);
@@ -2358,16 +2382,16 @@ fn ac10_blue_is_a_hollow_outline_of_constant_screen_width() {
         let to = pt(from.x + 200.0 / sc.k, from.y);
         sc.s.pointer_hover(to, false, false);
         let dl = sc.s.draw_list();
-        // new top edge sits at y = centre - 50 px, shifted right by 200 px
+        // the old top edge sits at y = centre - 50 px
         let y_mm = sc.fr.c.y - 50.0 / sc.k;
-        let x_mm = sc.fr.c.x + (200.0 + 45.0) / sc.k;
-        // Find the extent of blue triangles across the top edge at x_mm: where the
+        let x_mm = sc.fr.c.x + 45.0 / sc.k;
+        // Find the extent of ghost triangles across the top edge at x_mm: where the
         // vertical line through x_mm crosses their sides (a straight edge is one
         // long quad whose vertices are at its ends, since a handle-less segment is
         // drawn as a line, so the vertices cannot be sampled near x_mm).
         let mut lo = f64::INFINITY;
         let mut hi = f64::NEG_INFINITY;
-        for t in tris_where(&dl, is_blue) {
+        for t in tris_where(&dl, is_ghost) {
             for i in 0..3 {
                 let (a, b) = (t[i], t[(i + 1) % 3]);
                 if (a.x - x_mm) * (b.x - x_mm) <= 0.0 && (a.x - b.x).abs() > 1e-12 {
@@ -2379,17 +2403,14 @@ fn ac10_blue_is_a_hollow_outline_of_constant_screen_width() {
                 }
             }
         }
-        // the 1px selection box coincides with the new geometry too (boxes
-        // follow), so the union of box and blue outline is at least 1.5 px
-        // and at most 2 px wide
         let width_px = (hi - lo) * sc.k;
-        assert!((1.4..=2.1).contains(&width_px), "{pct}%: {width_px} px");
-        // hollow: no blue triangle covers the interior centre of the new box
-        let centre = pt(sc.fr.c.x + (200.0 + 30.0) / sc.k, sc.fr.c.y + 20.0 / sc.k);
-        let covered = tris_where(&dl, is_blue)
+        assert!((1.4..=1.6).contains(&width_px), "{pct}%: {width_px} px");
+        // hollow: no ghost triangle covers the interior centre of the old box
+        let centre = pt(sc.fr.c.x + 30.0 / sc.k, sc.fr.c.y + 20.0 / sc.k);
+        let covered = tris_where(&dl, is_ghost)
             .iter()
             .any(|t| dist_pt_tri(centre, t) == 0.0);
-        assert!(!covered, "{pct}%: no fill preview");
+        assert!(!covered, "{pct}%: no fill in the ghost");
     }
 }
 
@@ -2485,7 +2506,7 @@ fn ac12_press_under_the_dead_zone_writes_nothing_at_every_zoom() {
 }
 
 #[test]
-fn ac11_a_multi_object_move_shows_both_renderings_for_every_object() {
+fn ac11_a_multi_object_move_shows_the_object_and_its_ghost_for_every_object() {
     let mut s = open_in_session(&bar_doc());
     select_set(&mut s, &[0, 1, 2, 4]);
     let k = k_of(&s);
@@ -2498,11 +2519,15 @@ fn ac11_a_multi_object_move_shows_both_renderings_for_every_object() {
     let dl = s.draw_list();
     for (n, old) in olds.iter().enumerate() {
         let new: Vec<Point> = old.iter().map(|p| pt(p.x + off.0, p.y + off.1)).collect();
-        assert_eq!(black_cover_misses(&dl, old, k), 0, "object {n}: old stays");
         assert_eq!(
-            blue_cover_misses(&dl, &new, k),
+            ghost_cover_misses(&dl, old, k),
             0,
-            "object {n}: new is blue"
+            "object {n}: ghost stays"
+        );
+        assert_eq!(
+            black_cover_misses(&dl, &new, k),
+            0,
+            "object {n}: the object follows"
         );
     }
     s.pointer_up(pt(from.x + off.0, from.y + off.1), false, false);
@@ -2533,7 +2558,7 @@ fn ac14_pressing_or_releasing_shift_or_ctrl_while_the_pointer_holds_still_update
         sc.s.pointer_up(to, shift, ctrl);
         let committed = samples_of(&sc.s, 0);
         assert_eq!(
-            blue_cover_misses(&dl_mod, &committed, sc.k),
+            black_cover_misses(&dl_mod, &committed, sc.k),
             0,
             "{handle:?} shift={shift} ctrl={ctrl}: preview follows the modifier"
         );
@@ -2549,7 +2574,7 @@ fn ac14_pressing_or_releasing_shift_or_ctrl_while_the_pointer_holds_still_update
         sc2.s.pointer_up(to, false, false);
         let plain = samples_of(&sc2.s, 0);
         assert_eq!(
-            blue_cover_misses(&dl_back, &plain, sc2.k),
+            black_cover_misses(&dl_back, &plain, sc2.k),
             0,
             "{handle:?}: releasing {shift} {ctrl} restores the plain preview"
         );
@@ -2664,7 +2689,7 @@ fn ac23_the_switch_is_read_at_the_press_not_at_the_release() {
             "switch {first} at press: {r} vs {want}"
         );
         assert_eq!(
-            blue_cover_misses(&during, &samples_of(&sc.s, 0), sc.k),
+            black_cover_misses(&during, &samples_of(&sc.s, 0), sc.k),
             0,
             "preview agrees"
         );
@@ -3717,7 +3742,7 @@ fn ac13_preview_equals_release_at_other_zoom_levels() {
 }
 
 #[test]
-fn ac11_a_multi_object_move_shows_the_path_in_blue_over_its_black_old_one() {
+fn ac11_a_multi_object_move_draws_the_path_at_the_pointer_and_its_ghost_behind() {
     let mut s = open_in_session(&bar_doc());
     select_set(&mut s, &[0, 6]);
     let k = k_of(&s);
@@ -3739,8 +3764,8 @@ fn ac11_a_multi_object_move_shows_the_path_in_blue_over_its_black_old_one() {
     s.pointer_hover(pt(from.x + off.0, from.y + off.1), false, false);
     let dl = s.draw_list();
     let new: Vec<Point> = old.iter().map(|p| pt(p.x + off.0, p.y + off.1)).collect();
-    assert_eq!(black_cover_misses(&dl, &old, k), 0, "the path stays drawn");
-    assert_eq!(blue_cover_misses(&dl, &new, k), 0, "its blue copy follows");
+    assert_eq!(ghost_cover_misses(&dl, &old, k), 0, "its ghost stays");
+    assert_eq!(black_cover_misses(&dl, &new, k), 0, "the path follows");
     s.pointer_up(pt(from.x + off.0, from.y + off.1), false, false);
 }
 

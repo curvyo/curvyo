@@ -27,7 +27,7 @@ use curvyo_document_core::{
     ObjectSnapshot, Point, PointCount, RectBounds, Shape, StarFrame, Vec2, pack, unpack,
 };
 use curvyo_editor_wasm::{EscapeStep, KeyInput, KeyOutcome, Session, Tool};
-use curvyo_render_core::{DrawList, RgbaColor, Vertex, build_live_edit_preview};
+use curvyo_render_core::{DrawList, RgbaColor, Vertex, build_artwork, build_drag_ghost};
 use curvyo_ui_core::{Axis, EntryOutcome, InvalidReason, MoveEntryMode, ReferencePoint};
 
 // ---------------------------------------------------------------------
@@ -970,7 +970,8 @@ fn c26_escape_cancels_the_drag_with_ctrl_held_and_the_badge_stays() {
 }
 
 // ---------------------------------------------------------------------
-// Criterion 26, 33: draw list: blue copy, black originals, box stays
+// Criterion 26, 33: draw list: the copy at the pointer, the originals, box stays
+// (customer 2026-10-27: the copy is drawn as itself, not as a blue outline)
 // ---------------------------------------------------------------------
 
 fn start_drag(s: &mut Session, ctrl: bool) -> (Point, DrawList) {
@@ -982,21 +983,21 @@ fn start_drag(s: &mut Session, ctrl: bool) -> (Point, DrawList) {
 }
 
 #[test]
-fn c33_copy_preview_blue_outline_travels_alone_box_and_handles_stay() {
+fn c33_copy_preview_travels_alone_box_and_handles_stay() {
     let mut s = abc_with_a_selected();
     let a = all(&s)[0].clone();
     let (o, rest) = start_drag(&mut s, true);
     let to = plus(o, 30.0, 12.0);
     s.pointer_hover(to, false, true);
     let during = s.draw_list();
-    let blue = build_live_edit_preview(
+    let blue = build_artwork(
         std::slice::from_ref(&a.translated(Vec2::new(30.0, 12.0))),
         s.view(),
     );
     assert!(blue.triangle_count() > 0);
     assert!(
         contains_all(&during, &blue),
-        "the blue copy is exactly the result"
+        "the copy drawn at the pointer is exactly the result"
     );
     // Everything drawn at rest stays where it was, except the four corner
     // radius knobs (parameter handles), which every drag hides, move or
@@ -1025,7 +1026,14 @@ fn c33_copy_preview_blue_outline_travels_alone_box_and_handles_stay() {
     );
     assert!(
         contains_all(&moving, &blue),
-        "the blue outline is the same result"
+        "the object drawn at the pointer is the same result"
+    );
+    assert!(
+        contains_all(
+            &moving,
+            &build_drag_ghost(std::slice::from_ref(&a), s.view())
+        ),
+        "in a move the ghost stays at the original"
     );
     // press Ctrl again with the pointer at rest: copy in that frame
     s.modifiers_changed(false, true, false);
@@ -1136,11 +1144,8 @@ fn c27_origin_axes_colours_geometry_and_draw_order() {
     assert!(((vxmin + vxmax) / 2.0 - centre.x).abs() * scale <= 1.01);
     assert!((0.9..=1.1).contains(&((vxmax - vxmin) * scale)));
     assert!(vymin <= 0.0 && vymax >= 800.0 / scale - 1.0);
-    // draw order: artwork, axes, blue outline, box and handles
-    let blue = build_live_edit_preview(
-        std::slice::from_ref(&a.translated(Vec2::new(30.0, 0.0))),
-        s.view(),
-    );
+    // draw order: artwork, axes, the ghost (the blue outline until 2026-10-27), box and handles
+    let blue = build_drag_ghost(std::slice::from_ref(&a), s.view());
     let first_axis = active.iter().chain(&idle).map(|(i, _)| *i).min().unwrap();
     let last_axis = active.iter().chain(&idle).map(|(i, _)| *i).max().unwrap();
     let blue_first = locked
@@ -1149,8 +1154,8 @@ fn c27_origin_axes_colours_geometry_and_draw_order() {
         .position(|v| {
             has(&blue, v) && v.color == blue.triangles[0].color && v.color != RgbaColor::BLACK
         })
-        .expect("blue outline present");
-    assert!(last_axis < blue_first, "axes under the blue outline");
+        .expect("ghost present");
+    assert!(last_axis < blue_first, "axes under the ghost");
     let black_rest: Vec<_> = with_color(&rest, RgbaColor::BLACK);
     let black_last = with_color(&locked, RgbaColor::BLACK)
         .iter()
@@ -1165,7 +1170,7 @@ fn c27_origin_axes_colours_geometry_and_draw_order() {
     let after_blue = locked.triangles.len();
     assert!(
         after_blue > blue_first + blue.triangles.len(),
-        "box and handles drawn after the blue outline"
+        "box and handles drawn after the ghost"
     );
     // Shift released: axes gone in that frame
     s.modifiers_changed(false, false, false);

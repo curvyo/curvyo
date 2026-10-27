@@ -3265,14 +3265,13 @@ fn ac40_skew_readout_has_axis_sign_and_one_decimal() {
 
 #[test]
 fn ac40_preview_and_commit_are_the_same_function() {
-    // Blue new, black old (`unified-object-editing` criteria 10 and 13): the
-    // frame during the drag holds the committed path unchanged in black and,
-    // over it, the blue outline of exactly the geometry the release commits.
-    // The expected blue layer is built from the committed object after the
-    // release, with the renderer's own function, and must appear unchanged in
-    // the mid-drag frame; the black stroke from before the drag must too.
+    // The object follows, its ghost stays (`unified-object-editing` criterion 13 and the note of
+    // 2026-10-27, which replaced blue new, black old): the frame during the drag holds the path
+    // drawn exactly as the release commits it and the ghost outline of the path before the drag.
+    // Both expected layers are built with the renderer's own functions and must appear unchanged
+    // in the mid-drag frame.
     let (mut s, b) = selected_triangle();
-    let before_drag = s.draw_list();
+    let old = curvyo_document_core::ObjectSnapshot::Path(path_of(&s));
     let from = skew_handle_pos(&s, &b, (0.0, -1.0));
     s.pointer_hover(from, false, false);
     s.pointer_down(from, false);
@@ -3281,34 +3280,30 @@ fn ac40_preview_and_commit_are_the_same_function() {
     let preview = s.draw_list();
     s.pointer_up(to, false, false);
     let committed = curvyo_document_core::ObjectSnapshot::Path(path_of(&s));
-    let expected_blue = curvyo_render_core::build_live_edit_preview(&[committed], s.view());
-    assert_ne!(expected_blue.triangle_count(), 0);
+    let expected = curvyo_render_core::build_artwork(&[committed], s.view());
+    let ghost = curvyo_render_core::build_drag_ghost(&[old], s.view());
+    assert_ne!(expected.triangle_count(), 0);
     let in_frame = |frame: &curvyo_render_core::DrawList, v: &curvyo_render_core::Vertex| {
         frame
             .triangles
             .iter()
             .any(|w| w.color == v.color && pnear(w.position, v.position, 1e-6))
     };
-    let missing_blue = expected_blue
+    let missing = expected
         .triangles
         .iter()
         .filter(|v| !in_frame(&preview, v))
         .count();
     assert_eq!(
-        missing_blue, 0,
-        "the blue outline during the drag is the committed geometry"
+        missing, 0,
+        "the object drawn during the drag is the committed geometry"
     );
-    let black = curvyo_render_core::RgbaColor::BLACK;
-    let old_stroke_gone = before_drag
+    let ghost_missing = ghost
         .triangles
         .iter()
-        .filter(|v| v.color == black)
         .filter(|v| !in_frame(&preview, v))
         .count();
-    assert_eq!(
-        old_stroke_gone, 0,
-        "the old stroke is unchanged during the drag"
-    );
+    assert_eq!(ghost_missing, 0, "the ghost stays at the old geometry");
 }
 
 #[test]

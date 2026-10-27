@@ -561,22 +561,21 @@ fn black_vertices(s: &Session) -> Vec<(u64, u64)> {
 }
 
 #[test]
-fn the_black_original_stays_while_the_drag_previews_and_escape_restores_the_picture() {
+fn the_drag_draws_the_previewed_object_and_escape_restores_the_picture() {
+    // Customer 2026-10-27: the object is drawn as the release would leave it (its ghost stays
+    // behind); until then the original stayed drawn in black under a blue outline.
     let mut f = fx([5.0, 0.0, 12.0, 3.0]);
     let before = black_vertices(&f.s);
     assert!(!before.is_empty());
     let from = f.press(0, false);
     f.s.pointer_hover(along(from, 0, 8.0), false, false);
-    assert_eq!(
-        black_vertices(&f.s),
-        before,
-        "the original is drawn unchanged under the preview"
-    );
+    let during = black_vertices(&f.s);
+    assert_ne!(during, before, "the black outline is the previewed one");
     let _ = f.s.escape();
     assert_eq!(black_vertices(&f.s), before);
-    // After a real release the black outline is the new one.
+    // A real release commits what the drag drew.
     f.drag(0, false, false, 8.0);
-    assert_ne!(black_vertices(&f.s), before);
+    assert_eq!(black_vertices(&f.s), during);
 }
 
 // ---------------------------------- hints -----------------------------------

@@ -47,6 +47,8 @@ impl Session {
         // Outside an entered group the artwork recedes; the decorations only see the inside.
         let render = self.render_objects();
         let live = self.select_live_edit_in(&objects);
+        // A Select drag draws what it moves as itself at the pointer (customer 2026-10-27).
+        let swap = self.drag_swap_in(&objects, live.as_ref());
         let paths = self.live_node_drag_paths_in(&objects);
         // The artwork: every object in tree order, paths and primitives
         // interleaved, each with its fill then its stroke
@@ -54,11 +56,14 @@ impl Session {
         // tool's live drag reshapes the paths it moves.
         // A segment bend leaves the artwork as committed ("black old"): its blue outline is
         // drawn over it below, and only the decorations read the live paths.
-        let artwork_objects = if self.tool == Tool::Node && self.live_bend().is_none() {
+        let mut artwork_objects = if self.tool == Tool::Node && self.live_bend().is_none() {
             Cow::Owned(Self::with_paths(&render, &paths))
         } else {
             Cow::Borrowed(&render[..])
         };
+        if !swap.is_empty() {
+            swap.apply_to(artwork_objects.to_mut());
+        }
         // A text in edit mode is drawn as typed (`specs/0074-text-objects` criterion 3).
         let mut artwork_objects = self.with_text_edit(artwork_objects);
         // A panel drag draws the objects in the style being previewed
@@ -87,24 +92,18 @@ impl Session {
         if let Some(axes) = self.move_axes_in(&objects) {
             list.extend(curvyo_render_core::build_move_axes(view, &axes));
         }
-        // The blue half of blue-new, black-old: the geometry a release would
-        // commit, over the committed objects drawn above and under the boxes
-        // and handles below (`specs/0009-unified-object-editing` criterion 10),
-        // with the linked clones behind it and the link marks (`0049`).
-        let (clone_previews, previewing) = self.clone_layers(
-            view,
-            &objects,
-            &paths,
-            live.as_ref().map(|l| &l.objects[..]),
-        );
+        // The ghost a Select drag leaves at the origin, where the blue outline of
+        // `specs/0009-unified-object-editing` criterion 10 was until 2026-10-27: over the
+        // artwork, under the boxes and handles.
+        list.extend(swap.ghost(&objects, view));
+        // A Node drag: the linked clones behind it in blue, and whether the link marks stay
+        // away (`0049`).
+        let (clone_previews, previewing) =
+            self.clone_layers(view, &objects, &paths, live.is_some());
         list.extend(clone_previews);
-        // The texts on a dragged carrier follow it in the same frame (`0080` criterion 24).
-        list.extend(self.text_path_follower_list(
-            view,
-            &objects,
-            &paths,
-            live.as_ref().map(|l| &l.objects[..]),
-        ));
+        // The texts on a carrier the Node tool drags follow it in the same frame (`0080`
+        // criterion 24).
+        list.extend(self.text_path_follower_list(view, &objects, &paths, live.is_some()));
         // Carrier lines, pick mode's hover and preview, a text dragged along its carrier.
         list.extend(self.text_path_draw_list(view));
         // The Offset tool: the blue hollow result, the box and its four handles

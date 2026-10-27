@@ -16,18 +16,18 @@ use super::{Session, Tool};
 const PREVIEW_CAP: usize = 500;
 
 impl Session {
-    /// The blue preview of the texts on the carriers a drag reshapes (criterion 24): the Select
-    /// tool's live objects, or the Node tool's dragged paths that differ from the read.
+    /// The blue preview of the texts on the carriers a Node-tool drag reshapes (criterion 24): the
+    /// dragged paths that differ from the read. A Select drag draws its followers as themselves
+    /// ([`super::drag_swap`]).
     pub(super) fn text_path_follower_list(
         &self,
         view: ViewTransform,
         objects: &[ObjectSnapshot],
         paths: &[curvyo_document_core::PathSnapshot],
-        live: Option<&[ObjectSnapshot]>,
+        select_drag: bool,
     ) -> DrawList {
-        let changed: Vec<ObjectSnapshot> = match live {
-            Some(live) => live.to_vec(),
-            None if self.tool == Tool::Node => paths
+        let changed: Vec<ObjectSnapshot> = if !select_drag && self.tool == Tool::Node {
+            paths
                 .iter()
                 .filter(|path| {
                     objects.iter().any(
@@ -35,8 +35,9 @@ impl Session {
                     )
                 })
                 .map(|path| ObjectSnapshot::Path(path.clone()))
-                .collect(),
-            None => Vec::new(),
+                .collect()
+        } else {
+            Vec::new()
         };
         let followers = self.text_path_followers(objects, &changed);
         if followers.is_empty() {
@@ -47,7 +48,7 @@ impl Session {
 
     /// The texts whose carriers `changed` replaces (a drag of the carrier, criterion 24), laid out
     /// on the changed carriers.
-    fn text_path_followers(
+    pub(super) fn text_path_followers(
         &self,
         objects: &[ObjectSnapshot],
         changed: &[ObjectSnapshot],
@@ -66,7 +67,8 @@ impl Session {
     }
 
     /// The canvas layer of text on path: the carrier lines of the selected texts on path, the
-    /// hover outline and preview of pick mode, the dragged text's preview.
+    /// hover outline and preview of pick mode. A dragged text is drawn as itself
+    /// ([`super::drag_swap`]).
     pub(super) fn text_path_draw_list(&self, view: ViewTransform) -> DrawList {
         let mut list = DrawList::default();
         if let Some(pick_text) = self.text_path.pick.as_ref().map(|pick| pick.text) {
@@ -115,12 +117,6 @@ impl Session {
             .collect();
         let curves: Vec<&CarrierCurve> = selected.iter().map(AsRef::as_ref).collect();
         list.extend(curvyo_render_core::build_carrier_lines(&curves, view));
-        if let Some(live) = self.text_path_live() {
-            list.extend(curvyo_render_core::build_live_edit_preview(
-                &[ObjectSnapshot::Text(Box::new(live))],
-                view,
-            ));
-        }
         list
     }
 

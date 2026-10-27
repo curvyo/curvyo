@@ -79,33 +79,30 @@ impl Session {
         )
     }
 
-    /// The preview layers of a frame: the blue outline of what a Select drag would commit and the
-    /// clones behind what a drag edits, previewed like it (criterion 11), over the artwork and
-    /// under the boxes and handles, and whether a live edit is in the frame (the marks then stay
-    /// away). The marks are [`Session::clone_mark_layer`].
+    /// The preview layer of a Node-tool drag: the clones behind the paths it edits, as the blue
+    /// outline (criterion 11), over the artwork and under the boxes and handles, and whether a
+    /// live edit is in the frame (the marks then stay away). A Select drag (`select_drag`) draws
+    /// its clones as themselves ([`super::drag_swap`]). The marks are
+    /// [`Session::clone_mark_layer`].
     pub(super) fn clone_layers(
         &self,
         view: curvyo_document_core::ViewTransform,
         objects: &[ObjectSnapshot],
         paths: &[PathSnapshot],
-        live: Option<&[ObjectSnapshot]>,
+        select_drag: bool,
     ) -> (curvyo_render_core::DrawList, bool) {
         let mut list = curvyo_render_core::DrawList::default();
-        if let Some(live) = live {
-            list.extend(curvyo_render_core::build_live_edit_preview(live, view));
-        }
-        let changed = match live {
-            Some(live) => live.to_vec(),
-            None if self.tool == Tool::Node => Self::changed_paths(objects, paths),
-            None => Vec::new(),
+        let changed = if !select_drag && self.tool == Tool::Node {
+            Self::changed_paths(objects, paths)
+        } else {
+            Vec::new()
         };
         if !changed.is_empty() {
-            // A Select drag maps its objects as a whole: clones with own placement stay
-            // (`specs/0057-clone-overrides` criterion 9); a Node drag edits the shape.
-            let behind = Self::clone_previews_in(objects, &changed, live.is_some());
+            // A Node drag edits the shape: every clone behind it follows.
+            let behind = Self::clone_previews_in(objects, &changed, false);
             list.extend(curvyo_render_core::build_live_edit_preview(&behind, view));
         }
-        (list, !changed.is_empty())
+        (list, select_drag || !changed.is_empty())
     }
 
     /// The violet traces of a selected clone and of what it follows (criteria 57 and 60), drawn

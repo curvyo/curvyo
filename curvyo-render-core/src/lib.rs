@@ -60,7 +60,7 @@ pub use glyphs::{DrawList, Vertex};
 pub use group_box::{GroupBoxKind, GroupDecorationInput};
 pub use history_preview::build_history_preview;
 pub use image_layer::{ImageQuad, build_unreadable_frame};
-pub use live_preview::build_live_edit_preview;
+pub use live_preview::{build_drag_ghost, build_live_edit_preview};
 pub use marquee_overlay::{MarqueeOverlay, build_marquee_overlay};
 pub use move_axes::{LockedAxis, MoveAxes, build_move_axes};
 pub use node_opacity::{drawn_leaves, drawn_leaves_with, faded};
