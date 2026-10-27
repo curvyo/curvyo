@@ -180,6 +180,18 @@ first importer (and, later, the first exporter). **One new ADR
      `systemLanguage` and `requiredFeatures` tests and skipping a bare `<foreignObject>` (taken
      today, yields nothing, so the switch is lost). The fixture of 107 must pin both layouts.
 
+- **2026-10-27 (slice 3, Inkscape shapes, criteria 111 to 127).** No new crate, no new
+  dependency, no document-model or format change (criterion 126). `curvyo-svg-core` stays a
+  reader and only exposes the tool numbers: a `LeafKind::Arc` (centre, radii, optional start and
+  end, `arc-type`, `open`, the drawn `d` and the same `d` with arcs split within 1e-5 mm for the
+  check), `StarData` gains `arg2` (and `r2` becomes optional: a polygon ignores it), and
+  `NodeState::inkscape` names a spiral, a 3D box and a box face. Every decision (which primitive,
+  the transform rule of criterion 114, names) is made in `curvyo-ui-core::svg_import`. The
+  0.001 mm check of criterion 111 is a private function of `curvyo-ui-core`
+  (`svg_import_match.rs`, both outlines sampled at 16 points per segment, nearest point on the
+  other within a bounding-box pre-filter); no core crate gains a public function. Arcs are mapped
+  with `0021`'s existing `ellipse_after_linear_map` and `arc_after_linear_map`.
+
 ## Risks for the plan (not decided here)
 
 - **Budget 71 is unproven.** A path anchor is a Loro map with five registers
