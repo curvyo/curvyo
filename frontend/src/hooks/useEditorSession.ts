@@ -6,7 +6,7 @@ import { type StrokeToPathApi, useStrokeToPath } from "@/hooks/useStrokeToPath";
 import { isStrokeToPathChord } from "@/lib/strokeToPathText";
 import { type GroupingApi, useGrouping } from "@/hooks/useGrouping";
 import { type OffsetApi, readOffsetView, useOffset } from "@/hooks/useOffset";
-import { type TextApi, useText } from "@/hooks/useText";
+import { type TextApi, fontListingReady, sendFontLists, useText } from "@/hooks/useText";
 import { type PenEntryApi, usePenEntry } from "@/hooks/usePenEntry";
 import { type PlacementApi, usePlacement } from "@/hooks/usePlacement";
 import { offsetKeyOutcome, offsetReadout } from "@/lib/offsetText";
@@ -1413,7 +1413,10 @@ export function useEditorSession(
 
   const openProject = useCallback(
     async (bytes: Uint8Array) => {
+      // The texts' faces are matched against the full listing, never a partial one at start.
+      await fontListingReady();
       const session = await openSession(bytes);
+      sendFontLists(session);
       await attachSession(session);
     },
     [attachSession],
@@ -1421,7 +1424,11 @@ export function useEditorSession(
 
   const openFile = useCallback(
     async (bytes: Uint8Array, fileName: string) => {
+      // Phase 1 matches the texts' faces against the full listing: a face in the Curvyo folder or
+      // among the system fonts is found on the first Open after start too.
+      await fontListingReady();
       const session = await openFileSession(bytes, fileName);
+      sendFontLists(session);
       await attachSession(session);
       // An SVG with texts waits for their faces: the text hook loads what the session asks for
       // on every sync (`specs/0024-svg-import-export` criterion 106).
@@ -1442,10 +1449,13 @@ export function useEditorSession(
   }, []);
 
   const importFinish = useCallback(async () => {
+    // As for Open: the faces are matched once every font block is listed.
+    await fontListingReady();
     const session = sessionRef.current;
     if (!session) {
       return { imported: 0, notice: "", alert: false };
     }
+    sendFontLists(session);
     let result = { imported: 0, notice: "", alert: false };
     await untilFacesLoaded((force) => {
       const outcome = session.import_finish(force);

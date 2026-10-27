@@ -35,6 +35,7 @@ import {
   parseOrientation,
   parseWritingMode,
 } from "@/lib/textWritingText";
+import { createFontListing } from "@/lib/fontListing";
 import { invoke, isTauri } from "@/platform/host";
 
 /** What the Text bar (Text tool) or the Select bar's Text group shows (criterion 11). */
@@ -146,6 +147,72 @@ const lists: Partial<Record<"curvyo" | "included" | "system", Listed>> = {};
 const bytes = new Map<string, Uint8Array>();
 const loading = new Set<string>();
 const includedIds = new Set<string>();
+
+/** The included fonts' index, as a list (both targets). */
+async function listIncluded(): Promise<Listed> {
+  const response = await fetch(`${fontsBase()}index.json`);
+  const index = (await response.json()) as {
+    faces: { family: string; style: string; file: string; kind?: string; licence?: string; licence_file?: string }[];
+  };
+  for (const face of index.faces) {
+    includedIds.add(face.file);
+  }
+  return {
+    faces: index.faces.map((face) => ({
+      id: face.file,
+      family: face.family,
+      style: face.style,
+      index: 0,
+      kind: face.kind,
+      file: face.file.slice(face.file.lastIndexOf("/") + 1),
+      licence: face.licence,
+      licence_file: face.licence_file,
+    })),
+    skipped: [],
+  };
+}
+
+/** The mounted text hooks, told when a block is listed. */
+const listeners = new Set<() => void>();
+
+/** Lists each block once: the included index at start, the system fonts (desktop) when the Fonts
+ * tab or the Text tool asks, and every block before an SVG import or an Open matches faces. */
+const ensureListing = createFontListing<Listed>(
+  {
+    included: listIncluded,
+    curvyo: () => invoke<Listed>("font_folder_list"),
+    ...(isTauri
+      ? {
+          system: () =>
+            invoke<Listed["faces"]>("system_font_list").then((faces) => ({ faces, skipped: [] })),
+        }
+      : {}),
+  },
+  lists,
+  () => {
+    for (const listed of listeners) {
+      listed();
+    }
+  },
+);
+
+/** Sends every list read so far to `session`. */
+export function sendFontLists(session: WasmSession): void {
+  for (const block of ["curvyo", "included", "system"] as const) {
+    const listed = lists[block];
+    if (listed) {
+      session.set_font_list(block, JSON.stringify(listed));
+    }
+  }
+}
+
+/** Resolves once every font block is listed (or could not be): an SVG import or an Open waits for
+ * it, then hands the lists to its session with [`sendFontLists`], so phase 1 matches the faces
+ * against the full listing and never takes a listed face for missing
+ * (`specs/0024-svg-import-export` criterion 106). */
+export function fontListingReady(): Promise<void> {
+  return ensureListing();
+}
 
 /** The host's listing of a block as it arrived, with the class bytes and stamps the session does
  * not keep (the font library reads them). */
@@ -301,52 +368,15 @@ export function useText(
   const lastKeyRef = useRef(0);
   const composingRef = useRef(false);
   const sessionSeenRef = useRef<WasmSession | null>(null);
-  const systemAskedRef = useRef(false);
   const lastToolRef = useRef<string | null>(null);
 
-  /** Sends every list read so far to `session`. */
-  const sendLists = useCallback((session: WasmSession) => {
-    for (const block of ["curvyo", "included", "system"] as const) {
-      const listed = lists[block];
-      if (listed) {
-        session.set_font_list(block, JSON.stringify(listed));
-      }
-    }
-  }, []);
-
-  // The included fonts are listed at once (both targets); the Curvyo folder on the desktop too.
+  // The included fonts are listed at once (both targets); a list that arrives syncs again.
   useEffect(() => {
-    let live = true;
-    void fetch(`${fontsBase()}index.json`)
-      .then((response) => response.json())
-      .then(
-        (index: {
-          faces: { family: string; style: string; file: string; kind?: string; licence?: string; licence_file?: string }[];
-        }) => {
-        for (const face of index.faces) {
-          includedIds.add(face.file);
-        }
-        lists.included = {
-          faces: index.faces.map((face) => ({
-            id: face.file,
-            family: face.family,
-            style: face.style,
-            index: 0,
-            kind: face.kind,
-            file: face.file.slice(face.file.lastIndexOf("/") + 1),
-            licence: face.licence,
-            licence_file: face.licence_file,
-          })),
-          skipped: [],
-        };
-        if (live) {
-          setListsRevision((r) => r + 1);
-        }
-      },
-      )
-      .catch(() => {});
+    const listed = () => setListsRevision((r) => r + 1);
+    listeners.add(listed);
+    void ensureListing(["included"]);
     return () => {
-      live = false;
+      listeners.delete(listed);
     };
   }, []);
 
@@ -358,18 +388,7 @@ export function useText(
         setListsRevision((r) => r + 1);
       })
       .catch(() => {});
-    if (!isTauri) {
-      return folder;
-    }
-    if (!systemAskedRef.current) {
-      systemAskedRef.current = true;
-      void invoke<Listed["faces"]>("system_font_list")
-        .then((faces) => {
-          lists.system = { faces, skipped: [] };
-          setListsRevision((r) => r + 1);
-        })
-        .catch(() => {});
-    }
+    void ensureListing(["system"]);
     return folder;
   }, []);
 
@@ -382,7 +401,7 @@ export function useText(
     }
     if (sessionSeenRef.current !== session) {
       sessionSeenRef.current = session;
-      sendLists(session);
+      sendFontLists(session);
     }
     for (const id of session.wanted_font_files()) {
       const cached = bytes.get(id);
@@ -502,7 +521,6 @@ export function useText(
     syncRevision,
     listsRevision,
     getSession,
-    sendLists,
     syncFromSession,
     listHostFonts,
     containerRef,
@@ -513,10 +531,10 @@ export function useText(
   useEffect(() => {
     const session = getSession();
     if (session && listsRevision > 0) {
-      sendLists(session);
+      sendFontLists(session);
       syncFromSession();
     }
-  }, [listsRevision, getSession, sendLists, syncFromSession]);
+  }, [listsRevision, getSession, syncFromSession]);
 
   // The caret blinks while edit mode is on (UX notes §2): steady while typing and 500 ms after,
   // steady with reduced motion, hidden without window focus.
