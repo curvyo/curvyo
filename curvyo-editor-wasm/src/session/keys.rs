@@ -228,7 +228,7 @@ impl Session {
             Tool::Ellipse => self.ellipse.drag_in_flight(),
             Tool::PolygonStar => self.poly_star.drag_in_flight(),
             Tool::Offset => self.offset_drag_in_flight() || self.select.drag_in_flight(),
-            Tool::Pen | Tool::Text => false,
+            Tool::Pen | Tool::Text | Tool::Trace => false,
         };
         // A drag of a panel value field is a drag too (`specs/0020-undo-redo` criterion 6a).
         // A click-to-create placement is an operation in flight (`0052` criterion 8).
@@ -421,7 +421,7 @@ impl Session {
                 }
                 self.cancel_offset_drag() || marquee
             }
-            Tool::Pen | Tool::Text => false,
+            Tool::Pen | Tool::Text | Tool::Trace => false,
         }
     }
 
@@ -491,7 +491,12 @@ impl Session {
             return EscapeStep::ClearedState;
         }
         let cleared = match self.tool {
-            Tool::Pen | Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar | Tool::Text => false,
+            Tool::Pen
+            | Tool::Rectangle
+            | Tool::Ellipse
+            | Tool::PolygonStar
+            | Tool::Text
+            | Tool::Trace => false,
             Tool::Node => self.node.clear_selection(),
             Tool::Select | Tool::Offset => {
                 let had = !self.selection.is_empty();
@@ -559,7 +564,8 @@ impl Session {
                 | Tool::Ellipse
                 | Tool::PolygonStar
                 | Tool::Offset
-                | Tool::Text => {}
+                | Tool::Text
+                | Tool::Trace => {}
             }
         });
     }

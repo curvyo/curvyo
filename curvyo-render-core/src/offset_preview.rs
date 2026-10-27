@@ -31,6 +31,17 @@ pub type PreviewAnchor = (Point, Vec2, Vec2);
 /// Every casing comes first, then every line, so no casing covers a line.
 #[must_use]
 pub fn build_offset_preview(outlines: &[Vec<PreviewAnchor>], view: ViewTransform) -> DrawList {
+    build_preview_outline(outlines, view, 1.0)
+}
+
+/// [`build_offset_preview`] at `strength` (0 to 1) of its colours' alpha: the Trace tool's
+/// preview, at half strength when it is out of date (`specs/0025-raster-trace` criteria 8, 53).
+#[must_use]
+pub fn build_preview_outline(
+    outlines: &[Vec<PreviewAnchor>],
+    view: ViewTransform,
+    strength: f64,
+) -> DrawList {
     let width_mm = theme::LIVE_PREVIEW_STROKE_PX / view.scale();
     let tolerance_mm = theme::DISPLAY_TOLERANCE_PX / view.scale();
     let paths: Vec<Vec<NewAnchor>> = outlines
@@ -58,6 +69,7 @@ pub fn build_offset_preview(outlines: &[Vec<PreviewAnchor>], view: ViewTransform
         } else {
             (width_mm, theme::PREVIEW_NEW)
         };
+        let color = at_strength(color, strength);
         for anchors in &paths {
             list.extend(stroke::path_stroke(
                 anchors,
@@ -69,6 +81,14 @@ pub fn build_offset_preview(outlines: &[Vec<PreviewAnchor>], view: ViewTransform
         }
     }
     list
+}
+
+/// `color` with its alpha scaled by `strength`.
+fn at_strength(color: RgbaColor, strength: f64) -> RgbaColor {
+    // invariant: the product of an alpha byte and a strength in 0..=1 is a byte.
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    let alpha = (f64::from(color.a) * strength.clamp(0.0, 1.0)).round() as u8;
+    color.with_alpha(alpha)
 }
 
 /// What the handles show.

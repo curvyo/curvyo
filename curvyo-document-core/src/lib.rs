@@ -40,6 +40,7 @@ mod document;
 mod document_background;
 mod document_presets;
 mod document_size;
+mod drawing_above;
 mod drawing_check;
 mod drawing_content;
 mod drawing_insert;
@@ -138,6 +139,7 @@ pub use document_presets::{
 pub use document_size::{
     DocumentSizeError, MAX_DOCUMENT_MM, MIN_DOCUMENT_MM, validated_document_side,
 };
+pub use drawing_above::TRACE_IMAGE_COMMIT_LABEL;
 pub use drawing_content::DrawingText;
 pub use drawing_insert::{
     DrawingAnchor, DrawingNode, DrawingOutline, DrawingPage, DrawingRegisters,

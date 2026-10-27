@@ -71,6 +71,10 @@ impl Session {
         if self.style.is_active() {
             self.style.apply_to(artwork_objects.to_mut());
         }
+        // The Trace tool dims the images it traces (`specs/0025-raster-trace` criterion 2).
+        if self.tool == Tool::Trace {
+            self.trace_dim(artwork_objects.to_mut());
+        }
         // Guides in the marking style (`specs/0046-document-shapes` criterion 5).
         let guides = Arc::clone(&self.document_read().guides);
         let mut list = build_artwork_with_guides(&artwork_objects, &guides, view);
@@ -109,6 +113,8 @@ impl Session {
         // The Offset tool: the blue hollow result, the box and its four handles
         // (`specs/0038-path-offset` criteria 9, 14, 18).
         list.extend(self.offset_draw_list(view));
+        // The Trace tool's hollow preview outline (`specs/0025-raster-trace` criterion 8).
+        list.extend(self.trace_draw_list(view));
         // The pale red box of a move drag or the open typed move (`0047` criteria 33, 36): above
         // the blue preview, whose white casing would otherwise cover it where the two coincide
         // (an unrotated object), and below the selection box and the handles.

@@ -66,7 +66,7 @@ pub use move_axes::{LockedAxis, MoveAxes, build_move_axes};
 pub use node_opacity::{drawn_leaves, drawn_leaves_with, faded};
 pub use offset_preview::{
     OffsetCenterState, OffsetHandleState, PreviewAnchor, build_offset_center_handle,
-    build_offset_grown_box, build_offset_handles, build_offset_preview,
+    build_offset_grown_box, build_offset_handles, build_offset_preview, build_preview_outline,
 };
 pub use pen_cue::{ClosingCue, PenCue, build_pen_cue};
 pub use pen_preview::build_pen_preview;

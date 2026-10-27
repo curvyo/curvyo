@@ -101,6 +101,8 @@ mod wasm_text_layout;
 #[cfg(target_arch = "wasm32")]
 mod wasm_text_path;
 #[cfg(target_arch = "wasm32")]
+mod wasm_trace;
+#[cfg(target_arch = "wasm32")]
 mod wasm_weld;
 
 pub use font_archive_glue::FontArchiveGlue;
@@ -120,6 +122,7 @@ pub use session::{DragStop, OFFSET_COMMIT_LABEL, OffsetOutcome, OffsetView};
 pub use session::{FrameImages, ImportOutcome, StrokeToPathOutcome, WeldOutcome};
 pub use session::{LayoutOutcome, ObjectToPathOutcome, StyleOutcome, TextBarView, TextSizeOutcome};
 pub use session::{TextPathPress, TextPathView};
+pub use session::{TraceCreateOutcome, TraceSelection, TraceSource, TraceView};
 
 #[cfg(target_arch = "wasm32")]
 pub use wasm_api::{WasmSession, init_panic_hook};

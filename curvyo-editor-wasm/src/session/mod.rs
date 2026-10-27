@@ -147,6 +147,9 @@ mod text_writing;
 #[cfg(test)]
 mod text_writing_tests;
 mod tolerances;
+mod trace;
+#[cfg(test)]
+mod trace_tests;
 mod transform_entry;
 mod weld;
 #[cfg(test)]
@@ -204,6 +207,7 @@ pub use text_on_path_options::TextPathView;
 pub use text_on_path_pick::TextPathPress;
 pub use text_path::ObjectToPathOutcome;
 pub use text_style::StyleOutcome;
+pub use trace::{TraceCreateOutcome, TraceSelection, TraceSource, TraceView};
 pub use weld::WeldOutcome;
 
 pub use open_error::map_open_error;
@@ -269,6 +273,9 @@ pub enum Tool {
     Offset,
     /// The Text tool (`specs/0074-text-objects` criteria 1 to 10): click and type.
     Text,
+    /// The Trace tool (`specs/0025-raster-trace` criteria 1 to 3): key `I` or the Select bar's
+    /// Trace button; a press selects, the preview and Create paths act on the selected images.
+    Trace,
 }
 
 /// One open document's whole editing session.
@@ -426,6 +433,8 @@ pub struct Session {
     text: text::TextState,
     /// Pick mode and the drags of a text on path (`text_on_path.rs`).
     text_path: text_on_path::TextPathState,
+    /// The Trace tool's preview and results (`trace.rs`).
+    trace: trace::TraceState,
 }
 
 impl Session {
@@ -502,6 +511,7 @@ impl Session {
             fonts: text_fonts::TextFonts::default(),
             text: text::TextState::default(),
             text_path: text_on_path::TextPathState::default(),
+            trace: trace::TraceState::default(),
         }
     }
 
@@ -574,6 +584,7 @@ impl Session {
             fonts: text_fonts::TextFonts::default(),
             text: text::TextState::default(),
             text_path: text_on_path::TextPathState::default(),
+            trace: trace::TraceState::default(),
         };
         // A file another tool wrote can hold clones whose original is gone (`0049` criterion 35).
         session.remove_orphans_after_open();
@@ -651,6 +662,7 @@ impl Session {
                 this.command_refusal = None;
                 this.node_announcement = None;
                 this.leave_offset_tool();
+                this.leave_trace_tool();
             }
             this.tool = tool;
         });
@@ -732,6 +744,7 @@ impl Session {
                     this.offset_pointer_down(point, shift);
                 }
                 Tool::Text => this.text_pointer_down(point, shift),
+                Tool::Trace => this.trace_pointer_down(point, shift),
             }
         });
     }
@@ -794,7 +807,7 @@ impl Session {
                 self.offset_hover(point);
             }
             Tool::Text => self.text_pointer_move(point),
-            Tool::Pen => {}
+            Tool::Pen | Tool::Trace => {}
         }
     }
 
@@ -845,6 +858,7 @@ impl Session {
                     this.offset_pointer_up(point, shift, constrain);
                 }
                 Tool::Text => this.text_pointer_up(),
+                Tool::Trace => {}
             }
         });
     }
@@ -884,6 +898,7 @@ impl Session {
                 Tool::Select => return this.select_double_click(point, shift, ctrl),
                 Tool::Offset => return this.offset_double_click(point, shift, ctrl),
                 Tool::Text => this.text_double_click(point),
+                Tool::Trace => return this.trace_double_click(point),
                 Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar => {}
             }
             DoubleClickHint::None
