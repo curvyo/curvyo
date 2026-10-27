@@ -19,7 +19,7 @@ use i_overlay::core::solver::Solver;
 use kurbo::{ParamCurve, ParamCurveDeriv, PathSeg, Point, Vec2};
 
 use crate::boolean_cleanup::cleanup;
-use crate::boolean_grid::{Path64, Paths64, Point64, snap, to_millimetres};
+use crate::boolean_grid::{Path64, Paths64, Point64, double_area, snap, to_millimetres};
 use crate::offset_finish::{finish, lines_of_mm, set_end, set_start};
 
 /// At most this many flattening steps per cubic piece.
@@ -91,7 +91,7 @@ pub(crate) fn rebuild(
         match context.ring(&ring).map(|pieces| finish(&pieces)) {
             Some(pieces) if pieces.len() >= 2 => rebuilt.outlines.push(pieces),
             _ => {
-                let polyline = cleanup(&vec![ring]);
+                let polyline = fallback_polyline(ring);
                 rebuilt.fallback += polyline.len();
                 rebuilt
                     .outlines
@@ -100,6 +100,20 @@ pub(crate) fn rebuild(
         }
     }
     rebuilt
+}
+
+/// The cleaned-up polyline of `ring`, wound as the ring is. `cleanup` unions its input, which
+/// turns a lone hole (wound negatively) into an outer outline, so a hole is cleaned up reversed
+/// and turned back.
+fn fallback_polyline(ring: Path64) -> Paths64 {
+    if double_area(&ring) >= 0 {
+        return cleanup(&vec![ring]);
+    }
+    let reversed: Path64 = ring.into_iter().rev().collect();
+    cleanup(&vec![reversed])
+        .into_iter()
+        .map(|path| path.into_iter().rev().collect())
+        .collect()
 }
 
 /// The flattened, snapped vertices of one loop, each tagged with its piece and parameter, without
@@ -301,9 +315,12 @@ impl Context<'_> {
             ends.push(self.crossing(labels[last], labels[next_first], vertex)?);
         }
         let mut pieces = Vec::new();
-        for (k, &(first, _)) in runs.iter().enumerate() {
+        for (k, &(first, last)) in runs.iter().enumerate() {
             let (_, start_point, start) = ends[(k + runs.len() - 1) % runs.len()];
             let (end, end_point, _) = ends[k];
+            if first == last && is_backwards(start, end) {
+                continue;
+            }
             let mut span = self.span(labels[first].0, start, end);
             if span.is_empty() {
                 continue;
@@ -455,6 +472,13 @@ impl Context<'_> {
         push_part(&mut out, &pieces[end.piece], 0.0, end.t);
         out
     }
+}
+
+/// Whether `end` lies before `start` on the same piece. For a run of one ring edge, which stays
+/// on one chord, that is not a trip around the loop: the overlay kept the crossing of the same two
+/// pieces as two ring vertices, rounding put the second one back, and the run is a point.
+fn is_backwards(start: Place, end: Place) -> bool {
+    end.piece == start.piece && end.t < start.t
 }
 
 /// Pushes the part of `piece` from `t0` to `t1` unless it is a point.
