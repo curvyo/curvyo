@@ -10,7 +10,7 @@ use curvyo_document_core::{
 use curvyo_svg_core::{LeafKind, StarData, rounded_rect};
 
 use crate::svg_import_arcs::arc_primitive;
-use crate::svg_import_match::draws;
+use crate::svg_import_match::{MATCH_MM, draws, draws_within};
 use kurbo::{Affine, BezPath, PathEl};
 
 /// The relative tolerance of "collinear" and "equal length" for node kinds (criterion 25).
@@ -19,8 +19,16 @@ const KIND_TOLERANCE: f64 = 1e-6;
 /// How far a matrix may be from orthogonal or uniform and still keep a primitive.
 const MATRIX_TOLERANCE: f64 = 1e-9;
 
-/// How far `arg2` may be from `arg1 + π/N` for a star that is not twisted (criterion 117).
+/// How far `arg2` may be from `arg1 + π/N` for a star that is not twisted (criterion 117), unless
+/// the rounding of the written angles is larger.
 const TWIST_TOLERANCE_RAD: f64 = 1e-6;
+
+/// The fewest significant digits a star's numbers are taken to be written with (Inkscape's
+/// `numericprecision` set down to 6; criterion 111's note of 2026-10-27).
+const FEWEST_DIGITS: i32 = 6;
+
+/// The most significant digits an `f64` holds.
+const MOST_DIGITS: i32 = 17;
 
 /// The geometry of a leaf in document millimetres.
 #[derive(Debug, Clone, PartialEq)]
@@ -186,6 +194,7 @@ fn star_geometry(star: &StarData, drawn: &BezPath, m: Affine) -> Option<LeafGeom
         return None;
     }
     let count = PointCount::new(star.sides).ok()?;
+    let digits = written_digits(star);
     let vertex = star.center + kurbo::Vec2::from_angle(star.arg1) * star.r1;
     let (c, v) = (m * star.center, m * vertex);
     let frame = StarFrame {
@@ -204,7 +213,8 @@ fn star_geometry(star: &StarData, drawn: &BezPath, m: Affine) -> Option<LeafGeom
         let twist = (star.arg2? - star.arg1 - half_step + std::f64::consts::PI)
             .rem_euclid(std::f64::consts::TAU)
             - std::f64::consts::PI;
-        if twist.abs() > TWIST_TOLERANCE_RAD {
+        let written = rounding(star.arg1, digits) + rounding(star.arg2?, digits);
+        if twist.abs() > TWIST_TOLERANCE_RAD.max(written) {
             return None;
         }
         Shape::Star {
@@ -215,7 +225,57 @@ fn star_geometry(star: &StarData, drawn: &BezPath, m: Affine) -> Option<LeafGeom
         }
     };
     let rotation = Angle::from_radians(0.0);
-    draws(&shape, rotation, drawn).then_some(LeafGeometry::Primitive(shape, rotation))
+    let limit = MATCH_MM + rounding_reach(star, digits) * scale;
+    draws_within(&shape, rotation, drawn, limit).then_some(LeafGeometry::Primitive(shape, rotation))
+}
+
+/// How many significant digits the star's numbers were written with: the most any of them
+/// shows (`arg2`, `arg1 + π/N`, shows them all), from [`FEWEST_DIGITS`] to [`MOST_DIGITS`].
+fn written_digits(star: &StarData) -> i32 {
+    [
+        star.center.x,
+        star.center.y,
+        star.r1,
+        star.r2.unwrap_or(0.0),
+        star.arg1,
+        star.arg2.unwrap_or(0.0),
+    ]
+    .into_iter()
+    .map(significant_digits)
+    .max()
+    .unwrap_or(0)
+    .clamp(FEWEST_DIGITS, MOST_DIGITS)
+}
+
+/// The significant digits of the shortest decimal form of `x` (as the file wrote it, without
+/// trailing zeros).
+fn significant_digits(x: f64) -> i32 {
+    let text = format!("{:e}", x.abs());
+    let mantissa = text.split('e').next().unwrap_or_default();
+    let count = mantissa.chars().filter(char::is_ascii_digit).count();
+    i32::try_from(count).unwrap_or(MOST_DIGITS)
+}
+
+/// Half a unit in the last place of `x` written with `digits` significant digits.
+fn rounding(x: f64, digits: i32) -> f64 {
+    if x == 0.0 || !x.is_finite() {
+        return 0.0;
+    }
+    // invariant: the decimal exponent of a finite, non-zero f64 lies within ±400.
+    #[allow(clippy::cast_possible_truncation)]
+    let exponent = x.abs().log10().floor() as i32;
+    0.5 * 10f64.powi(exponent - digits + 1)
+}
+
+/// How far, in the star's own units, rounding the written numbers can move the star's outline
+/// against its drawn `d`: a point of `d` (both coordinates), the centre (both coordinates), and
+/// an outer vertex by the radius and the angle (an inner vertex moves less).
+fn rounding_reach(star: &StarData, digits: i32) -> f64 {
+    let centre = star.center.x.abs().max(star.center.y.abs());
+    let drawn = std::f64::consts::SQRT_2 * rounding(centre + star.r1, digits);
+    let centre = std::f64::consts::SQRT_2 * rounding(centre, digits);
+    let vertex = rounding(star.r1, digits) + star.r1 * rounding(star.arg1, digits);
+    drawn + centre + vertex
 }
 
 /// The outline of a primitive in its local units mapped by `m` (an affine map takes cubics to

@@ -19,20 +19,31 @@ const FLAT_MM: f64 = 1e-5;
 /// A piece shorter than this is judged by its ends, millimetres.
 const SHORTEST_PIECE_MM: f64 = 1e-7;
 
-/// How far a point of one polyline may be from the other: the polylines' own error and the
-/// error of judging the shortest piece by its ends are taken off, so a match bounds the true
-/// distance by [`MATCH_MM`].
-const POLYLINE_MM: f64 = MATCH_MM - 2.0 * FLAT_MM - ELLIPSE_ACCURACY_MM - SHORTEST_PIECE_MM;
-
 /// Whether `shape` turned by `rotation` draws `drawn` within [`MATCH_MM`]. An ellipse or an arc
 /// is compared as the true curve (`specs/0024-svg-import-export`, lead 2026-10-27: the
 /// primitive is exact, its drawing in cubics is a rendering detail); the rest as its outline.
 pub(crate) fn draws(shape: &Shape, rotation: Angle, drawn: &BezPath) -> bool {
-    let (ours, theirs) = (subpaths(&reference(shape, rotation)), subpaths(drawn));
+    draws_within(shape, rotation, drawn, MATCH_MM)
+}
+
+/// Whether `shape` turned by `rotation` draws `drawn` within `limit_mm` (at least
+/// [`MATCH_MM`]; more only for the rounding of the written numbers, criterion 111's note of
+/// 2026-10-27).
+pub(crate) fn draws_within(shape: &Shape, rotation: Angle, drawn: &BezPath, limit_mm: f64) -> bool {
+    let limit = limit_mm.max(MATCH_MM);
+    // The polylines' own error and the error of judging the shortest piece by its ends are
+    // taken off, so a match bounds the true distance by `limit`.
+    let reach = limit - 2.0 * FLAT_MM - ELLIPSE_ACCURACY_MM - SHORTEST_PIECE_MM;
+    let (ours, theirs) = (
+        subpaths(&reference(shape, rotation), limit),
+        subpaths(drawn, limit),
+    );
     !ours.is_empty()
         && ours.len() == theirs.len()
         && ours.iter().zip(&theirs).all(|(a, b)| {
-            a.closed == b.closed && covers(&a.lines, &b.lines) && covers(&b.lines, &a.lines)
+            a.closed == b.closed
+                && covers(&a.lines, &b.lines, reach)
+                && covers(&b.lines, &a.lines, reach)
         })
 }
 
@@ -67,7 +78,7 @@ fn reference(shape: &Shape, rotation: Angle) -> BezPath {
 }
 
 /// One subpath flattened to lines, and whether it is closed: by `Z`, or by ending within twice
-/// [`MATCH_MM`] of where it starts (the missing closing line is then within [`MATCH_MM`] of its
+/// the limit of where it starts (the missing closing line is then within the limit of its
 /// ends, as Inkscape's arc of 2π − 0.0001 rad).
 struct Polyline {
     lines: Vec<Line>,
@@ -75,7 +86,7 @@ struct Polyline {
 }
 
 /// The subpaths of `path` that draw something, flattened within [`FLAT_MM`].
-fn subpaths(path: &BezPath) -> Vec<Polyline> {
+fn subpaths(path: &BezPath, limit: f64) -> Vec<Polyline> {
     let mut out: Vec<Polyline> = Vec::new();
     let mut current = Polyline {
         lines: Vec::new(),
@@ -91,7 +102,7 @@ fn subpaths(path: &BezPath) -> Vec<Polyline> {
             },
         );
         if !done.lines.is_empty() {
-            done.closed |= at.distance(start) <= 2.0 * MATCH_MM;
+            done.closed |= at.distance(start) <= 2.0 * limit;
             out.push(done);
         }
     };
@@ -119,13 +130,14 @@ fn subpaths(path: &BezPath) -> Vec<Polyline> {
     out
 }
 
-/// Every point of `of` lies within [`POLYLINE_MM`] of `near`: the distance to one line is
+/// Every point of `of` lies within `reach` of `near`: the distance to one line is
 /// convex along a line, so a piece of `of` whose ends are both near one line of `near` is near
 /// all along; any other piece is split (at the shared corner of the two lines its ends are
 /// near, else halved) until it is, or a point is too far.
-fn covers(of: &[Line], near: &[Line]) -> bool {
+fn covers(of: &[Line], near: &[Line], reach: f64) -> bool {
     let near = Near {
         lines: near,
+        reach,
         grid: std::cell::OnceCell::new(),
         hint: std::cell::Cell::new(0),
     };
@@ -139,6 +151,8 @@ const HINT_REACH: usize = 2;
 /// outlines run alongside), else through a grid of square cells.
 struct Near<'a> {
     lines: &'a [Line],
+    /// How far a point may be from a line and count as near it.
+    reach: f64,
     grid: std::cell::OnceCell<Grid>,
     hint: std::cell::Cell<usize>,
 }
@@ -155,7 +169,7 @@ struct Found {
 
 impl Near<'_> {
     fn is_near(&self, i: usize, p: Point) -> bool {
-        self.lines[i].nearest(p, 0.0).distance_sq <= POLYLINE_MM * POLYLINE_MM
+        self.lines[i].nearest(p, 0.0).distance_sq <= self.reach * self.reach
     }
 
     fn look(&self, piece: Line, found: &mut Found, candidates: impl Iterator<Item = usize>) {
@@ -182,7 +196,7 @@ impl Near<'_> {
         self.look(piece, &mut found, window);
         if found.both.is_none() && (found.start.is_none() || found.end.is_none()) {
             let grid = self.grid.get_or_init(|| Grid::new(self.lines));
-            self.look(piece, &mut found, grid.around(piece));
+            self.look(piece, &mut found, grid.around(piece, self.reach));
         }
         if let Some(i) = found.both.or(found.end) {
             self.hint.set(i);
@@ -190,7 +204,7 @@ impl Near<'_> {
         found
     }
 
-    /// Every point of `piece` is within [`POLYLINE_MM`] of a line.
+    /// Every point of `piece` is within `reach` of a line.
     fn covers(&self, piece: Line) -> bool {
         let found = self.find(piece);
         if found.both.is_some() {
@@ -248,9 +262,9 @@ impl Grid {
         ((p.x / cell).floor() as i64, (p.y / cell).floor() as i64)
     }
 
-    /// The lines that may come within [`POLYLINE_MM`] of the segment `piece`.
-    fn around(&self, piece: Line) -> impl Iterator<Item = usize> + '_ {
-        let room = POLYLINE_MM + self.cell;
+    /// The lines that may come within `reach` of the segment `piece`.
+    fn around(&self, piece: Line, reach: f64) -> impl Iterator<Item = usize> + '_ {
+        let room = reach + self.cell;
         let lo = Self::key(
             Point::new(
                 piece.p0.x.min(piece.p1.x) - room,
