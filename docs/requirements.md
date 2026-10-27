@@ -91,7 +91,7 @@ to it instead of restating it.
 | R-VEC-001 | Trace a raster image to vector paths with adjustable threshold/color-count settings, comparable to Inkscape's "Trace Bitmap". Needs an image in the document first: R-EDIT-037 (customer, 2026-10-14). | Must | Customer |
 | R-VEC-002 | Combine multiple trace passes (e.g. different thresholds or color layers) into one result, so fine detail and large flat areas can each use their own best setting instead of one compromise setting for the whole image. | Should | Customer |
 | R-VEC-003 | Path simplification that reduces node count while holding a stated maximum deviation from the original trace, and visibly outperforms Inkscape's simplify on a corner-heavy test image (fewer nodes at the same deviation tolerance). | Should | Customer |
-| R-VEC-004 | Live preview of trace settings on the actual source image before committing, so a maker doesn't trace-undo-retrace repeatedly. | Could | Proposal |
+| R-VEC-004 | Live preview of trace settings on the actual source image before committing, so a maker doesn't trace-undo-retrace repeatedly. Accepted with the Trace tool mockup (customer, 2026-10-14); specified in `0025`. | Should | Customer |
 
 ## 4. Manufacturing — general
 
