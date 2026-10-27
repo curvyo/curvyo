@@ -210,13 +210,13 @@ Implementer, 2026-10-27, branch `story/svg-inkscape-shapes`, stacked on `story/s
 
 ## Tasks
 
-- [ ] 1. Docs commit: slice 3 Ready, adrs note, this plan.
-- [ ] 2. svg-core: arc data, `arg2`, Inkscape object marks; tests first (AC 112, 113, 116, 117,
+- [x] 1. Docs commit: slice 3 Ready, adrs note, this plan.
+- [x] 2. svg-core: arc data, `arg2`, Inkscape object marks; tests first (AC 112, 113, 116, 117,
   119, 120, 124).
-- [ ] 3. ui-core: outline check (AC 111, 123), arcs and transforms (AC 112 to 114), stars and
+- [x] 3. ui-core: outline check (AC 111, 123), arcs and transforms (AC 112 to 114), stars and
   polygons (AC 116 to 118), `rx ≠ ry` rectangles unchanged (AC 115), spiral and box names and
   transforms (AC 119 to 122), hostile numbers (AC 124); tests first.
-- [ ] 4. Fixtures `inkscape_shapes.svg` and `inkscape_shapes_edited.svg` with goldens (AC 125),
+- [x] 4. Fixtures `inkscape_shapes.svg` and `inkscape_shapes_edited.svg` with goldens (AC 125),
   the 1,000-shape `#[ignore]` budget and determinism (AC 126), docs (AC 127); full gate.
 
 ## Validation
@@ -226,3 +226,17 @@ Implementer, 2026-10-27, branch `story/svg-inkscape-shapes`, stacked on `story/s
 - Golden files: no Inkscape on this machine, so `inkscape_shapes.svg` is **hand-written** in
   Inkscape 1.4.4's layout; the tester on navi replaces it with a real Inkscape save (AC 125).
 - `#[ignore]` budget of AC 126 runs once in release.
+
+## Notes for the lead (slice 3)
+
+- **A whole ellipse is checked against the true ellipse**, not its four-cubic drawing: that
+  drawing (existing `0021` behaviour) is 2.7e-4 of the radius off the ellipse, so for radii above
+  about 4 mm the literal "as the document would draw it" would refuse every whole ellipse of
+  criterion 113. Arcs are checked against their 22.5° drawing outline (far under 0.001 mm).
+- **`d` is checked with its arcs split within 1e-5 mm**: the 45° cubics of criterion 22 are up
+  to 4.2e-6 of the radius off, too much for 0.001 mm above 240 mm radius.
+- `sodipodi:r2` stays required for a polygon (a missing one gives a path, criterion 111); Inkscape
+  always writes it, and the tester's slice-1 test reads it as a number.
+- The fixtures are hand-written (no Inkscape here); the tester replaces `inkscape_shapes.svg` with a
+  real Inkscape 1.4.4 save and regenerates its golden.
+- Budget of AC 126 (release, this VM): 1,000 mixed shapes in about 10 ms.
