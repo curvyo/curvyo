@@ -779,7 +779,7 @@
               ],
               "registers": {
                 "locked": false,
-                "name": null,
+                "name": "Spiral",
                 "opacity": 1.0,
                 "visible": true
               },
@@ -817,124 +817,31 @@
             }
           },
           {
-            "Path": {
-              "outlines": [
-                {
-                  "anchors": [
-                    {
-                      "handle_in": {
-                        "x": 0.0,
-                        "y": 0.0
-                      },
-                      "handle_out": {
-                        "x": 0.0,
-                        "y": 2.6521648983954265
-                      },
-                      "kind": "corner",
-                      "point": {
-                        "x": 105.0,
-                        "y": 160.0
-                      }
-                    },
-                    {
-                      "handle_in": {
-                        "x": 2.8130456767205203,
-                        "y": -1.8753637844803563
-                      },
-                      "handle_out": {
-                        "x": -2.8130456767205203,
-                        "y": 1.8753637844803563
-                      },
-                      "kind": "symmetric",
-                      "point": {
-                        "x": 100.60660171779821,
-                        "y": 167.07106781186548
-                      }
-                    },
-                    {
-                      "handle_in": {
-                        "x": 3.978247347593154,
-                        "y": 0.0
-                      },
-                      "handle_out": {
-                        "x": -3.978247347593154,
-                        "y": 0.0
-                      },
-                      "kind": "symmetric",
-                      "point": {
-                        "x": 90.0,
-                        "y": 170.0
-                      }
-                    },
-                    {
-                      "handle_in": {
-                        "x": 2.8130456767205203,
-                        "y": 1.8753637844803563
-                      },
-                      "handle_out": {
-                        "x": -2.8130456767205203,
-                        "y": -1.8753637844803563
-                      },
-                      "kind": "symmetric",
-                      "point": {
-                        "x": 79.39339828220179,
-                        "y": 167.07106781186548
-                      }
-                    },
-                    {
-                      "handle_in": {
-                        "x": 0.0,
-                        "y": 2.6521648983954265
-                      },
-                      "handle_out": {
-                        "x": 0.0,
-                        "y": -2.6521648983954265
-                      },
-                      "kind": "symmetric",
-                      "point": {
-                        "x": 75.0,
-                        "y": 160.0
-                      }
-                    },
-                    {
-                      "handle_in": {
-                        "x": -2.8130456767205203,
-                        "y": 1.8753637844803563
-                      },
-                      "handle_out": {
-                        "x": 2.8130456767205203,
-                        "y": -1.8753637844803563
-                      },
-                      "kind": "symmetric",
-                      "point": {
-                        "x": 79.39339828220179,
-                        "y": 152.92893218813452
-                      }
-                    },
-                    {
-                      "handle_in": {
-                        "x": -3.978247347593154,
-                        "y": 0.0
-                      },
-                      "handle_out": {
-                        "x": 0.0,
-                        "y": 0.0
-                      },
-                      "kind": "corner",
-                      "point": {
-                        "x": 90.0,
-                        "y": 150.0
-                      }
-                    }
-                  ],
-                  "closed": false
-                }
-              ],
+            "Primitive": {
               "registers": {
                 "locked": false,
-                "name": null,
+                "name": "Arc",
                 "opacity": 1.0,
                 "visible": true
+              },
+              "rotation": 0.0,
+              "shape": {
+                "Ellipse": {
+                  "arc": {
+                    "end": 4.712389,
+                    "kind": "Arc",
+                    "start": 0.0
+                  },
+                  "curve": 1.0,
+                  "frame": {
+                    "center": {
+                      "x": 90.0,
+                      "y": 160.0
+                    },
+                    "rx": 15.0,
+                    "ry": 10.0
+                  }
+                }
               },
               "style": {
                 "fill": {
@@ -970,79 +877,31 @@
             }
           },
           {
-            "Path": {
-              "outlines": [
-                {
-                  "anchors": [
-                    {
-                      "handle_in": {
-                        "x": 0.0,
-                        "y": 0.0
-                      },
-                      "handle_out": {
-                        "x": 0.0,
-                        "y": 3.978247347593168
-                      },
-                      "kind": "corner",
-                      "point": {
-                        "x": 155.0,
-                        "y": 160.0
-                      }
-                    },
-                    {
-                      "handle_in": {
-                        "x": 2.8130456767205203,
-                        "y": -2.8130456767205203
-                      },
-                      "handle_out": {
-                        "x": -2.8130456767205203,
-                        "y": 2.8130456767205203
-                      },
-                      "kind": "symmetric",
-                      "point": {
-                        "x": 150.6066017177982,
-                        "y": 170.6066017177982
-                      }
-                    },
-                    {
-                      "handle_in": {
-                        "x": 3.978247347593168,
-                        "y": 0.0
-                      },
-                      "handle_out": {
-                        "x": 0.0,
-                        "y": 0.0
-                      },
-                      "kind": "corner",
-                      "point": {
-                        "x": 140.0,
-                        "y": 175.0
-                      }
-                    },
-                    {
-                      "handle_in": {
-                        "x": 0.0,
-                        "y": 0.0
-                      },
-                      "handle_out": {
-                        "x": 0.0,
-                        "y": 0.0
-                      },
-                      "kind": "corner",
-                      "point": {
-                        "x": 140.0,
-                        "y": 160.0
-                      }
-                    }
-                  ],
-                  "closed": true
-                }
-              ],
+            "Primitive": {
               "registers": {
                 "locked": false,
-                "name": null,
+                "name": "Arc",
                 "opacity": 1.0,
                 "visible": true
+              },
+              "rotation": 0.0,
+              "shape": {
+                "Ellipse": {
+                  "arc": {
+                    "end": 1.5707963,
+                    "kind": "Pie",
+                    "start": 0.0
+                  },
+                  "curve": 1.0,
+                  "frame": {
+                    "center": {
+                      "x": 140.0,
+                      "y": 160.0
+                    },
+                    "rx": 15.0,
+                    "ry": 15.0
+                  }
+                }
               },
               "style": {
                 "fill": {

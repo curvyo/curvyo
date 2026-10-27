@@ -1,5 +1,5 @@
 //! The geometry of one imported leaf (`specs/0024-svg-import-export` criteria 24 to 29 and 33):
-//! path data into outlines with node kinds, and a rectangle, ellipse or Inkscape star kept as a
+//! path data into outlines with node kinds, and a rectangle, ellipse, Inkscape star or arc kept as a
 //! primitive where its transform allows (the rules of `0056` criteria 18 to 22), else its exact
 //! outline as a path.
 
@@ -8,6 +8,9 @@ use curvyo_document_core::{
     Length, Point, PointCount, RectBounds, Shape, StarFrame, Vec2, outline_of,
 };
 use curvyo_svg_core::{LeafKind, StarData, rounded_rect};
+
+use crate::svg_import_arcs::arc_primitive;
+use crate::svg_import_match::draws;
 use kurbo::{Affine, BezPath, PathEl};
 
 /// The relative tolerance of "collinear" and "equal length" for node kinds (criterion 25).
@@ -16,8 +19,8 @@ const KIND_TOLERANCE: f64 = 1e-6;
 /// How far a matrix may be from orthogonal or uniform and still keep a primitive.
 const MATRIX_TOLERANCE: f64 = 1e-9;
 
-/// How far the drawn path of an Inkscape star may be from the star's outline (criterion 28).
-const STAR_MATCH_MM: f64 = 1e-3;
+/// How far `arg2` may be from `arg1 + π/N` for a star that is not twisted (criterion 117).
+const TWIST_TOLERANCE_RAD: f64 = 1e-6;
 
 /// The geometry of a leaf in document millimetres.
 #[derive(Debug, Clone, PartialEq)]
@@ -57,12 +60,27 @@ pub(crate) fn leaf_geometry(kind: &LeafKind, placement: Affine) -> Option<LeafGe
             star_geometry(star, &drawn, placement * *matrix)
                 .unwrap_or_else(|| LeafGeometry::Path(outlines(&drawn, node_types.as_deref())))
         }
+        LeafKind::Arc {
+            arc,
+            path,
+            fine,
+            node_types,
+            matrix,
+        } => arc_primitive(arc, placement * *matrix)
+            .filter(|(shape, rotation)| {
+                fine.as_ref()
+                    .is_some_and(|fine| draws(shape, *rotation, &(placement * fine.clone())))
+            })
+            .map_or_else(
+                || LeafGeometry::Path(outlines(&(placement * path.clone()), node_types.as_deref())),
+                |(shape, rotation)| LeafGeometry::Primitive(shape, rotation),
+            ),
         LeafKind::Clone { .. } => return None,
     })
 }
 
 /// How a matrix acts on a primitive.
-enum Fit {
+pub(crate) enum Fit {
     /// A rotation, uniform scale, mirror and translation: the scale and the rotation angle.
     Similar(f64, f64),
     /// Axes kept parallel to the page: the scale along the primitive's x and y, and whether the
@@ -73,7 +91,7 @@ enum Fit {
 }
 
 #[allow(clippy::many_single_char_names)] // the SVG names of the matrix entries
-fn fit(m: Affine) -> Fit {
+pub(crate) fn fit(m: Affine) -> Fit {
     let [a, b, c, d, _, _] = m.as_coeffs();
     let (sx, sy) = (a.hypot(b), c.hypot(d));
     let scale = sx.max(sy);
@@ -158,12 +176,15 @@ fn ellipse_geometry(center: kurbo::Point, rx: f64, ry: f64, m: Affine) -> LeafGe
     }
 }
 
-/// An Inkscape star or polygon as the primitive, when the drawn path still is its outline and
-/// the matrix keeps it (criteria 28 and 33); `None` makes it a path.
+/// An Inkscape star or polygon as the primitive, when the matrix keeps it and its outline is
+/// the drawn path within 0.001 mm (criteria 111, 116 to 118 and 33); `None` makes it a path.
 fn star_geometry(star: &StarData, drawn: &BezPath, m: Affine) -> Option<LeafGeometry> {
     let Fit::Similar(scale, _) = fit(m) else {
         return None;
     };
+    if star.r1 <= 0.0 {
+        return None;
+    }
     let count = PointCount::new(star.sides).ok()?;
     let vertex = star.center + kurbo::Vec2::from_angle(star.arg1) * star.r1;
     let (c, v) = (m * star.center, m * vertex);
@@ -179,6 +200,13 @@ fn star_geometry(star: &StarData, drawn: &BezPath, m: Affine) -> Option<LeafGeom
             curve: Curve::POLYGON_DEFAULT,
         }
     } else {
+        let half_step = std::f64::consts::PI / f64::from(star.sides);
+        let twist = (star.arg2? - star.arg1 - half_step + std::f64::consts::PI)
+            .rem_euclid(std::f64::consts::TAU)
+            - std::f64::consts::PI;
+        if twist.abs() > TWIST_TOLERANCE_RAD {
+            return None;
+        }
         Shape::Star {
             frame,
             point_count: count,
@@ -186,30 +214,8 @@ fn star_geometry(star: &StarData, drawn: &BezPath, m: Affine) -> Option<LeafGeom
             curve: Curve::POLYGON_DEFAULT,
         }
     };
-    let curved = drawn
-        .elements()
-        .iter()
-        .any(|e| matches!(e, PathEl::CurveTo(..) | PathEl::QuadTo(..)));
-    let mut points: Vec<kurbo::Point> = drawn
-        .elements()
-        .iter()
-        .filter_map(|e| match e {
-            PathEl::MoveTo(p) | PathEl::LineTo(p) => Some(*p),
-            _ => None,
-        })
-        .collect();
-    if points.len() > 1 && points.first() == points.last() {
-        points.pop();
-    }
-    let expected = outline_of(&shape);
-    let near = |p: &kurbo::Point| {
-        expected
-            .anchors
-            .iter()
-            .any(|a| (a.point.x - p.x).hypot(a.point.y - p.y) <= STAR_MATCH_MM)
-    };
-    let matches = !curved && expected.anchors.len() == points.len() && points.iter().all(near);
-    matches.then_some(LeafGeometry::Primitive(shape, Angle::from_radians(0.0)))
+    let rotation = Angle::from_radians(0.0);
+    draws(&shape, rotation, drawn).then_some(LeafGeometry::Primitive(shape, rotation))
 }
 
 /// The outline of a primitive in its local units mapped by `m` (an affine map takes cubics to
