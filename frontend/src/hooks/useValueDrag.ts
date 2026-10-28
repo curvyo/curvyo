@@ -61,6 +61,8 @@ interface ValueDragOptions {
   onDoubleClick: () => void;
   /** After a drag: the keyboard goes back to the canvas. */
   onDragEnd: () => void;
+  /** Escape during the press: a caller that applies ticks itself drops them. */
+  onEscape?: () => void;
 }
 
 /**
@@ -81,6 +83,7 @@ export function useValueDrag({
   onClickAt,
   onDoubleClick,
   onDragEnd,
+  onEscape,
 }: ValueDragOptions) {
   const drag = useRef<Drag | null>(null);
   const [modifier, setModifier] = useState<GridName>("normal");
@@ -159,7 +162,10 @@ export function useValueDrag({
     },
     onPointerCancel: finish,
     // The preview is dropped by `usePreviewGesture`'s own Escape; the press ends here.
-    onEscape: finish,
+    onEscape: () => {
+      finish();
+      onEscape?.();
+    },
     onDoubleClick,
   });
 

@@ -1,9 +1,9 @@
 // `specs/0025-raster-trace` slice 1 in the real app (Chromium via DevTools; set
 // CURVYO_E2E_BROWSER=/path/to/chromium; the wasm bindings must be built): the Select bar's Trace
 // button for an image (criterion 1), the Trace bar with its status from the worker (criteria 2,
-// 4, 11, 17, 58), Create paths as one step with its notice and the group above the image
+// 4, 11, 17, 58), Create paths (Enter) as one step with its notice and the group above the image
 // (criteria 12, 13, 30), Ctrl+Z (criterion 13), the key I and Escape (criterion 1), and the empty
-// bar (criterion 3). Harness as in `acceptance_0058_tester.test.ts`.
+// bar (criterion 3); slice 3: the View pill and the backslash keys (criterion 51). Harness as in `acceptance_0058_tester.test.ts`.
 
 import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
@@ -154,6 +154,27 @@ async function session(profile: string) {
 }
 
 
+/** The trace worker's answers held back `window.__delay` ms, and a worker that dies at start while
+ * `window.__failWorker` is set (as the slice 3 tester does): the slot's states on demand. */
+const SLOW_WORKER = `(() => {
+  const Real = window.Worker;
+  window.__failWorker = false;
+  window.__delay = 0;
+  const set = Object.getOwnPropertyDescriptor(Real.prototype, 'onmessage').set;
+  window.Worker = class extends Real {
+    set onmessage(fn) {
+      set.call(this, fn === null ? null : (event) => {
+        if (window.__delay > 0 && event.data && event.data.kind === 'trace') setTimeout(() => fn(event), window.__delay);
+        else fn(event);
+      });
+    }
+    constructor(url, options) {
+      if (window.__failWorker) super(URL.createObjectURL(new Blob(['throw new Error("boom")'], { type: 'text/javascript' })), options);
+      else super(url, options);
+    }
+  };
+})();`;
+
 /** A `width` x `height` grey PNG whose pixels `dark` decides (black or white), 96 dpi. */
 function png(width: number, height: number, dark: (x: number, y: number) => boolean): Buffer {
   const chunk = (kind: string, data: Buffer) => {
@@ -204,27 +225,42 @@ test("0025 in Chromium: Trace button, preview status, Create paths, undo, key I"
     assert.equal(lastButton, "Trace");
     await s.evaluate(`[...document.querySelectorAll('[data-context-bar] button')].find((b) => b.textContent === 'Trace').click()`);
 
-    // Criteria 2, 4, 11: the Trace bar with its groups and the status from the worker.
+    // Criteria 2, 4, 11, 71: the Trace bar with its groups; the counts from the worker are the
+    // last row of the Advanced block, never in the state row.
+    await waitFor("the Trace bar", async () => ((await s.evaluate(`!!document.querySelector('[role=toolbar][aria-label=Trace] [aria-label="More trace options"]')`)) ? true : null));
+    await sleep(1500);
+    assert.equal(
+      await s.evaluate(`document.querySelector('[role=toolbar][aria-label=Trace] [data-trace-counts]') === null && !/path/.test(document.querySelector('[role=toolbar][aria-label=Trace] [role=status]')?.textContent ?? '')`),
+      true,
+      "no counts with Advanced closed",
+    );
+    await s.evaluate(`document.querySelector('[role=toolbar][aria-label=Trace] [aria-label="More trace options"]').click()`);
     const status = await waitFor(
-      "the trace status",
+      "the trace counts",
       async () => {
-        const t = (await s.evaluate(`document.querySelector('[role=toolbar][aria-label=Trace] [role=status]')?.textContent ?? ''`)) as string;
+        const t = (await s.evaluate(`document.querySelector('[role=toolbar][aria-label=Trace] [data-trace-counts]')?.textContent ?? ''`)) as string;
         return /^1 path, 4 nodes, \d+\.\d s$/.test(t) ? t : null;
       },
       30_000,
     );
     assert.match(status, /^1 path, 4 nodes/);
-    const fields = JSON.parse((await s.evaluate(`JSON.stringify([...document.querySelectorAll('[role=toolbar][aria-label=Trace] input')].map((i) => [i.getAttribute('aria-label'), i.value]))`)) as string) as [string, string][];
-    assert.deepEqual(fields.map((f) => f[0]), ["Threshold", "Smooth", "Ignore below (mm)"]);
+    await s.evaluate(`document.querySelector('[role=toolbar][aria-label=Trace] [aria-label="Fewer trace options"]').click()`);
+    const fields = JSON.parse((await s.evaluate(`JSON.stringify([...document.querySelectorAll('[role=toolbar][aria-label=Trace] [role=spinbutton]')].map((i) => [i.getAttribute('aria-label'), i.getAttribute('aria-valuenow'), i.getAttribute('aria-valuemax'), i.getAttribute('aria-valuetext')]))`)) as string) as [string, string, string, string][];
+    assert.deepEqual(fields.map((f) => f[0]), ["Threshold", "Smooth", "Ignore below"]);
     const thresholdValue = Number(fields[0][1]);
-    assert.ok(thresholdValue > 0 && thresholdValue < 256, `the automatic Threshold: ${fields[0][1]}`);
+    assert.equal(fields[0][2], "100", "the Threshold is shown in percent");
+    assert.ok(thresholdValue > 0 && thresholdValue < 100, `the automatic Threshold: ${fields[0][1]} %`);
+    assert.match(fields[0][3], /^\d+ percent$/);
     assert.equal(fields[1][1], "80");
+    assert.equal(fields[2][3], "0.50 millimetres");
     const pressedRail = (await s.evaluate(`document.querySelectorAll('[aria-pressed=true][data-tool]').length`)) as number;
     assert.equal(pressedRail, 0, "no rail button is pressed");
 
     // Criteria 12, 13: Create paths is one step; the notice; the group above the image.
     const rowsBefore = (await s.layerRows()).length;
-    await s.evaluate(`[...document.querySelectorAll('[role=toolbar][aria-label=Trace] button')].find((b) => b.textContent === 'Create paths').click()`);
+    assert.equal(await s.evaluate(`[...document.querySelectorAll('[role=toolbar][aria-label=Trace] button')].some((b) => b.textContent === 'Create paths')`), false, "the bar has no Create paths button");
+    await s.evaluate(`document.activeElement?.blur?.(); [...document.querySelectorAll('canvas')].map((c) => c.closest('[tabindex]')).find(Boolean)?.focus()`);
+    await s.key("Enter", 13);
     const notice = await waitFor("the notice", async () => {
       const t = await s.statusText();
       return t.includes("Traced:") ? t : null;
@@ -271,6 +307,7 @@ test("0025 in Chromium at 800x600: no Trace bar control passes the bar's right e
     const s = await session(profile);
     closeAll = s.close;
     await s.send("Emulation.setDeviceMetricsOverride", { width: 800, height: 600, deviceScaleFactor: 1, mobile: false });
+    await s.send("Page.addScriptToEvaluateOnNewDocument", { source: SLOW_WORKER });
     await s.send("Page.navigate", { url: `${ORIGIN}/` });
     await waitFor("the app", async () => ((await s.evaluate(`!!document.querySelector('[data-import-button]')`)) ? true : null));
     await sleep(1500);
@@ -278,12 +315,13 @@ test("0025 in Chromium at 800x600: no Trace bar control passes the bar's right e
     await s.choose("[data-import-button]", logo);
     await waitFor("the image row", async () => ((await s.layerRows()).some((r) => r?.includes("logo.png")) ? true : null));
     await s.evaluate(`[...document.querySelectorAll('[data-context-bar] button')].find((b) => b.textContent === 'Trace').click()`);
-    await waitFor("the trace status", async () => ((await s.evaluate(`/path/.test(document.querySelector('[role=toolbar][aria-label=Trace] [role=status]')?.textContent ?? '')`)) ? true : null), 30_000);
-    await s.evaluate(`[...document.querySelectorAll('[role=toolbar][aria-label=Trace] button')].find((b) => b.textContent === 'Advanced').click()`);
+    await waitFor("the Trace bar", async () => ((await s.evaluate(`!!document.querySelector('[role=toolbar][aria-label=Trace] [aria-label="More trace options"]')`)) ? true : null));
+    await s.evaluate(`[...document.querySelectorAll('[role=toolbar][aria-label=Trace] button')].find((b) => b.getAttribute('aria-label') === 'More trace options').click()`);
+    await waitFor("the trace counts", async () => ((await s.evaluate(`/path/.test(document.querySelector('[role=toolbar][aria-label=Trace] [data-trace-counts]')?.textContent ?? '')`)) ? true : null), 30_000);
     await sleep(500);
     const overflow = async () =>
       (await s.evaluate(`(() => { const bar = document.querySelector('[role=toolbar][aria-label=Trace]'); const edge = bar.getBoundingClientRect().right;
-        return JSON.stringify([...bar.querySelectorAll('button, input, [role=radiogroup], label')].filter((e) => e.getBoundingClientRect().width > 0 && e.getBoundingClientRect().right > edge + 0.5)
+        return JSON.stringify([...bar.querySelectorAll('button, input, [role=radiogroup], [role=spinbutton], label')].filter((e) => e.getBoundingClientRect().width > 0 && e.getBoundingClientRect().right > edge + 0.5)
           .map((e) => (e.getAttribute('aria-label') || e.textContent || e.tagName) + ' ' + Math.round(e.getBoundingClientRect().right - edge))); })()`)) as string;
     for (const open of [true, false]) {
       const panelOpen = (await s.evaluate(`!!document.querySelector('[aria-label="Hide panel"]')`)) as boolean;
@@ -295,6 +333,165 @@ test("0025 in Chromium at 800x600: no Trace bar control passes the bar's right e
       const shot = (await s.send("Page.captureScreenshot", { format: "png" })) as { result?: { data?: string } };
       writeFileSync(path.join(SCRATCH, `pr-panel-${open ? "open" : "closed"}-800x600.png`), Buffer.from(shot.result?.data ?? "", "base64"));
     }
+    // UX notes 20.5: Advanced row 1 starts with Invert and Ignore background, the counts row is
+    // the block's last; panel open, the bar keeps inside 800 px.
+    await s.clickSel('[aria-label="Show panel"]');
+    await sleep(600);
+    const advanced = JSON.parse((await s.evaluate(`JSON.stringify((() => { const block = document.querySelector('[role=toolbar][aria-label=Trace] [role=group][aria-label=Advanced]');
+      const y = (e) => Math.round(e.getBoundingClientRect().top);
+      const controls = [...block.querySelectorAll('button[aria-pressed], [role=radiogroup], [role=spinbutton]')];
+      const counts = block.querySelector('[data-trace-counts]');
+      return { names: controls.map((e) => e.getAttribute('aria-label')), firstRow: controls.filter((e) => y(e) === y(controls[0])).map((e) => e.getAttribute('aria-label')),
+        countsLast: block.lastElementChild === counts, countsBelow: y(counts) > Math.max(...controls.map(y)) }; })())`)) as string) as { names: string[]; firstRow: string[]; countsLast: boolean; countsBelow: boolean };
+    assert.deepEqual(advanced.names, ["Invert", "Ignore background", "Denoise", "Upscale", "Corners"]);
+    assert.deepEqual(advanced.firstRow.slice(0, 3), ["Invert", "Ignore background", "Denoise"]);
+    assert.ok(advanced.countsLast && advanced.countsBelow, "the counts row is the last row");
+    // The shorter Specks readout lets the expander share the Ignore below row (UX notes 20.5).
+    const sameRow = (await s.evaluate(`(() => { const bar = document.querySelector('[role=toolbar][aria-label=Trace]');
+      const top = (e) => Math.round(e.getBoundingClientRect().top);
+      const ex = bar.querySelector('[aria-label="Fewer trace options"]'); const sp = bar.querySelector('[aria-label="Ignore below"]');
+      return !!ex && !!sp && top(ex) < top(sp) + 20 && top(ex) > top(sp) - 20; })()`)) as boolean;
+    assert.ok(sameRow, "the Advanced expander is on the Ignore below row");
+    const advancedShot = (await s.send("Page.captureScreenshot", { format: "png" })) as { result?: { data?: string } };
+    writeFileSync(path.join(SCRATCH, "r2-advanced.png"), Buffer.from(advancedShot.result?.data ?? "", "base64"));
+    // Criterion 70 (round 3): About Trace is the strip's last tab while the tool is active; the
+    // "i" button selects it, is pressed while it shows and restores the tab and body state on a
+    // second press; the page has no X.
+    const heading = async () => (await s.evaluate(`document.querySelector('aside[aria-label=Properties] h2')?.textContent ?? ''`)) as string;
+    const pressed = async () => (await s.evaluate(`document.querySelector('[role=toolbar][aria-label=Trace] button[aria-label="About Trace"]').getAttribute('aria-pressed')`)) as string;
+    const stripTabs = async () => JSON.parse((await s.evaluate(`JSON.stringify([...document.querySelectorAll('[role=tablist][aria-label=Panel] [role=tab]')].map((t) => t.getAttribute('aria-label')))`)) as string) as string[];
+    assert.equal((await stripTabs()).at(-1), "About Trace", `About Trace is the last tab: ${await stripTabs()}`);
+    const tabBefore = await heading();
+    await s.clickSel('[role=toolbar][aria-label=Trace] button[aria-label="About Trace"]');
+    await sleep(400);
+    const page = JSON.parse((await s.evaluate(`JSON.stringify((() => { const r = document.querySelector('aside[aria-label=Properties] [aria-label="About Trace"]');
+      return { text: r ? r.innerText : '', close: !!document.querySelector('aside[aria-label=Properties] button[aria-label=Close]'),
+        selected: document.querySelector('[role=tablist][aria-label=Panel] [role=tab][aria-label="About Trace"]').getAttribute('aria-selected') }; })())`)) as string) as { text: string; close: boolean; selected: string };
+    assert.equal(await heading(), "About Trace");
+    assert.equal(await pressed(), "true");
+    assert.equal(page.selected, "true", "the i button selects the tab");
+    assert.equal(page.close, false, "the page has no X");
+    assert.match(page.text, /^Trace turns the selected image into paths\./);
+    assert.match(page.text, /Ignore background\s+drops shapes that touch the image border\./);
+    const infoShot = (await s.send("Page.captureScreenshot", { format: "png" })) as { result?: { data?: string } };
+    writeFileSync(path.join(SCRATCH, "r3-about.png"), Buffer.from(infoShot.result?.data ?? "", "base64"));
+    await s.clickSel('[role=toolbar][aria-label=Trace] button[aria-label="About Trace"]');
+    await sleep(400);
+    assert.equal(await heading(), tabBefore, "a second press restores the tab");
+    assert.equal(await pressed(), "false");
+    // Chosen in the strip, the button follows the tab.
+    await s.clickSel('[role=tablist][aria-label=Panel] [role=tab][aria-label="About Trace"]');
+    await sleep(400);
+    assert.equal(await heading(), "About Trace");
+    assert.equal(await pressed(), "true", "the button is pressed while the tab chosen in the strip shows");
+    await s.clickSel(`[role=tablist][aria-label=Panel] [role=tab][aria-label="${tabBefore}"]`);
+    await sleep(400);
+    assert.equal(await pressed(), "false");
+    // With the body hidden the button shows it, and a second press hides it again.
+    await s.clickSel('[aria-label="Hide panel"]');
+    await sleep(600);
+    await s.clickSel('[role=toolbar][aria-label=Trace] button[aria-label="About Trace"]');
+    await sleep(600);
+    assert.equal(await s.evaluate(`!!document.querySelector('aside[aria-label=Properties]:not([hidden]) [aria-label="About Trace"]')`), true, "the hidden body opens for the page");
+    await s.clickSel('[role=toolbar][aria-label=Trace] button[aria-label="About Trace"]');
+    await sleep(600);
+    assert.equal(await s.evaluate(`document.querySelector('aside[aria-label=Properties]').hidden`), true, "the second press hides the body again");
+    await s.clickSel('[aria-label="Show panel"]');
+    await sleep(600);
+    // Round 3 (criteria 4, 10, 53, 54, 71; UX notes 21.2): the slot after Specks, the expander at
+    // the far right of the last line in every state; 800 x 600, panel open, Advanced closed.
+    await s.clickSel('[role=toolbar][aria-label=Trace] button[aria-label="Fewer trace options"]');
+    await sleep(400);
+    const layout = async () =>
+      JSON.parse((await s.evaluate(`JSON.stringify((() => { const bar = document.querySelector('[role=toolbar][aria-label=Trace]');
+        const row = bar.querySelector('[data-trace-state]').parentElement;
+        const items = [...row.children].filter((e) => !e.matches('[data-trace-state], .basis-full') && e.getBoundingClientRect().width > 0);
+        // A line is 36 px; a 28 px control with its 4 px margin starts 4 px lower in the same line.
+        const tops = items.map((e) => Math.round(e.getBoundingClientRect().top)).sort((x, y) => x - y).filter((t, i, all) => i === 0 || t - all[i - 1] > 10);
+        const ex = bar.querySelector('button[aria-expanded][aria-controls]').getBoundingClientRect();
+        const slot = bar.querySelector('[data-trace-slot]');
+        return { rows: tops.length, expanderLast: Math.round(ex.top) >= Math.max(...tops) - 4 && Math.abs(ex.right - row.getBoundingClientRect().right) < 1.5,
+          lastItem: items.at(-1).contains(bar.querySelector('button[aria-expanded][aria-controls]')), slot: slot ? slot.getAttribute('data-trace-slot') : null,
+          specksBeforeSlot: !slot || items.indexOf(slot) === items.findIndex((e) => e.querySelector('[aria-label="Ignore below"]')) + 1 }; })())`)) as string) as
+        { rows: number; expanderLast: boolean; lastItem: boolean; slot: string | null; specksBeforeSlot: boolean };
+    const shoot = async (name: string) => {
+      const shot = (await s.send("Page.captureScreenshot", { format: "png" })) as { result?: { data?: string } };
+      writeFileSync(path.join(SCRATCH, name), Buffer.from(shot.result?.data ?? "", "base64"));
+    };
+    const rest = await layout();
+    console.log("at rest, panel open:", JSON.stringify(rest));
+    assert.deepEqual([rest.rows, rest.expanderLast, rest.lastItem, rest.slot], [4, true, true, null], "4 rows at rest, the expander last at the far right");
+    await s.evaluate(`window.__delay = 6000`);
+    await s.evaluate(`document.querySelector('[role=toolbar][aria-label=Trace] [role=spinbutton][aria-label=Smooth]').focus()`);
+    await s.send("Input.dispatchKeyEvent", { type: "rawKeyDown", key: "ArrowUp", code: "ArrowUp", windowsVirtualKeyCode: 38 });
+    await s.send("Input.dispatchKeyEvent", { type: "keyUp", key: "ArrowUp", code: "ArrowUp", windowsVirtualKeyCode: 38 });
+    await waitFor("the progress pill", async () => ((await s.evaluate(`!!document.querySelector('[role=toolbar][aria-label=Trace] [role=progressbar]')`)) ? true : null), 10_000);
+    const running = await layout();
+    console.log("tracing, panel open:", JSON.stringify(running));
+    assert.deepEqual([running.rows, running.expanderLast, running.lastItem, running.slot, running.specksBeforeSlot], [5, true, true, "running", true], "the slot wraps with the expander to a fifth row");
+    assert.equal(await overflow(), "[]", "nothing passes the bar's edge while tracing");
+    await shoot("r3-tracing.png");
+    await s.clickSel('[role=toolbar][aria-label=Trace] button[aria-label="Stop (Esc)"]');
+    await sleep(600);
+    const stopped = await layout();
+    assert.deepEqual([stopped.expanderLast, stopped.lastItem, stopped.slot, stopped.specksBeforeSlot], [true, true, "stopped", true], JSON.stringify(stopped));
+    assert.equal(await overflow(), "[]", "nothing passes the bar's edge when stopped");
+    await shoot("r3-stopped.png");
+    await s.evaluate(`window.__delay = 0; window.__failWorker = true`);
+    await s.evaluate(`[...document.querySelectorAll('[role=toolbar][aria-label=Trace] button')].find((b) => b.textContent === 'Retry').click()`);
+    await waitFor("Failed", async () => ((await s.evaluate(`!!document.querySelector('[role=toolbar][aria-label=Trace] [data-trace-slot=failed]')`)) ? true : null), 20_000);
+    await sleep(300);
+    const failed = await layout();
+    assert.deepEqual([failed.expanderLast, failed.lastItem, failed.slot, failed.specksBeforeSlot], [true, true, "failed", true], JSON.stringify(failed));
+    assert.equal(await overflow(), "[]", "nothing passes the bar's edge when failed");
+    await shoot("r3-failed.png");
+    await s.evaluate(`window.__failWorker = false`);
+    await s.evaluate(`[...document.querySelectorAll('[role=toolbar][aria-label=Trace] button')].find((b) => b.textContent === 'Retry').click()`);
+    await waitFor("the slot empties", async () => ((await s.evaluate(`!document.querySelector('[role=toolbar][aria-label=Trace] [data-trace-slot]')`)) ? true : null), 20_000);
+    // Panel closed: 2 rows at rest and while tracing (no growth).
+    await s.clickSel('[aria-label="Hide panel"]');
+    await sleep(600);
+    const closedRest = await layout();
+    await s.evaluate(`window.__delay = 6000`);
+    await s.evaluate(`document.querySelector('[role=toolbar][aria-label=Trace] [role=spinbutton][aria-label=Smooth]').focus()`);
+    await s.send("Input.dispatchKeyEvent", { type: "rawKeyDown", key: "ArrowDown", code: "ArrowDown", windowsVirtualKeyCode: 40 });
+    await s.send("Input.dispatchKeyEvent", { type: "keyUp", key: "ArrowDown", code: "ArrowDown", windowsVirtualKeyCode: 40 });
+    await waitFor("the progress pill", async () => ((await s.evaluate(`!!document.querySelector('[role=toolbar][aria-label=Trace] [role=progressbar]')`)) ? true : null), 10_000);
+    const closedRunning = await layout();
+    console.log("panel closed, rest and tracing:", JSON.stringify([closedRest, closedRunning]));
+    assert.deepEqual([closedRest.rows, closedRunning.rows, closedRunning.expanderLast, closedRunning.lastItem], [2, 2, true, true], "2 rows, no growth while tracing");
+    await shoot("r3-tracing-panel-closed.png");
+    await s.evaluate(`window.__delay = 0`);
+    await s.clickSel('[role=toolbar][aria-label=Trace] button[aria-label="Stop (Esc)"]');
+    await sleep(400);
+    await s.clickSel('[aria-label="Show panel"]');
+    await sleep(600);
+    // Slice 3 (criterion 51): the View pill in row 1; held backslash presses Image, release
+    // restores, Shift+backslash cycles.
+    const checked = async () =>
+      (await s.evaluate(`document.querySelector('[role=radiogroup][aria-label=View] [aria-checked=true]')?.getAttribute('aria-label') ?? ''`)) as string;
+    const key = (type: string, k: string, shift = false) =>
+      s.evaluate(`window.dispatchEvent(new KeyboardEvent('${type}', { key: ${JSON.stringify(k)}, shiftKey: ${shift} })) && true`);
+    assert.equal(await checked(), "Overlay");
+    await key("keydown", "\\");
+    await sleep(200);
+    assert.equal(await checked(), "Image", "the peek presses Image");
+    await key("keyup", "\\");
+    await sleep(200);
+    assert.equal(await checked(), "Overlay");
+    await key("keydown", "|", true);
+    await sleep(200);
+    assert.equal(await checked(), "Trace", "Shift+backslash cycles");
+    // Leaving the tool with the tab active returns to the stored tab; the tab leaves the strip.
+    await s.clickSel('[role=tablist][aria-label=Panel] [role=tab][aria-label="About Trace"]');
+    await sleep(400);
+    await s.evaluate(`[...document.querySelectorAll('canvas')].map((c) => c.closest('[tabindex]')).find(Boolean)?.focus()`);
+    await s.send("Input.dispatchKeyEvent", { type: "rawKeyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
+    await s.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
+    await waitFor("Escape leaves", async () => ((await s.evaluate(`!!document.querySelector('[role=toolbar][aria-label=Trace]')`)) ? null : true));
+    await sleep(400);
+    assert.equal(await heading(), tabBefore, "leaving the tool returns to the stored tab");
+    assert.ok(!(await stripTabs()).includes("About Trace"), "the tab leaves the strip with the tool");
   } finally {
     await closeAll();
     vite?.kill();

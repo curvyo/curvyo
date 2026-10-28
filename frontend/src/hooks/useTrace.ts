@@ -2,17 +2,22 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { WasmSession } from "@/lib/editorSession";
 import {
-  FULL_SIZE_PREVIEW_MAX_PX,
-  PREVIEW_OUT_OF_DATE,
+  NO_STATUS,
+  TRACE_VIEWS,
+  type TraceViewMode,
+  failureReason,
+  failureText,
+  isCycleKey,
+  isPeekKey,
+  previewIsReduced,
   TRACE_PARAMS_FALLBACK,
   TRACE_PRESETS_FALLBACK,
-  TRACING,
-  LOADING_IMAGE,
   type TraceChoice,
   type TraceParam,
+  type TraceSlot,
+  type TraceStatusText,
   type TracePreset,
   type TraceValues,
-  creatingLabel,
   editChoice,
   imagesLabel,
   pickPreset,
@@ -31,17 +36,16 @@ import { trace_params, trace_presets } from "@/wasm-bindings/curvyo_editor_wasm.
 
 /** Debounce of a value change (criterion 10). */
 const DEBOUNCE_MS = 150;
-/** "Tracing..." and the progress line after this long (criterion 10). */
+/** The progress pill with its x and the old outline at 50 % after this long (UX notes 21.2). */
 const BUSY_MS = 400;
-/** The Stop button after this long (criterion 10). */
-const STOP_MS = 1500;
 /** The longest side of the reduced copy; a picture this small is traced once. */
 const REDUCED_SIDE = 1000;
 
 type ShowNotice = (text: string, ms?: number, source?: "canvas" | "panel", kind?: "status" | "alert") => void;
 
 /** The Trace tool in the frontend (`specs/0025-raster-trace` criteria 1 to 5, 9 to 13, 15, 16,
- * 46): the bar's state, the worker jobs with their timers, Stop, Create paths and its notice.
+ * 46, 51 to 54): the bar's state, the worker jobs with their timers, the progress slot, the
+ * view and the peek, Create paths and its notice.
  * Every document decision is the session's; the trace runs in the worker. */
 export interface TraceApi {
   /** The Trace tool is the active tool. */
@@ -62,14 +66,19 @@ export interface TraceApi {
   presetLabel: string;
   /** The Advanced block is open (criterion 41). */
   advancedOpen: boolean;
-  /** The shown image has more than 4 Mpx: Full-size preview cannot be honoured. */
-  overFullSizeLimit: boolean;
-  /** The status line, its muted second line, and whether Create paths may run. */
-  status: { line: string; muted: string; canCreate: boolean };
-  /** A job runs past 400 ms: "Tracing..." and the progress line. */
-  busy: boolean;
-  /** A job runs past 1.5 s: the Stop button. */
-  stopShown: boolean;
+  /** The state row's line and muted line, the counts of the Advanced block, and whether Enter
+   * may create (criteria 11, 71). */
+  status: TraceStatusText;
+  /** The counts belong to an older result: a trace runs or was stopped (UX notes 20.4). */
+  countsStale: boolean;
+  /** What the progress slot of row 1 shows (criteria 10, 53, 54; UX notes 21.2). */
+  slot: TraceSlot;
+  /** The view on the canvas as the View pill shows it (criterion 51). */
+  viewMode: TraceViewMode;
+  /** A segment of the View pill. */
+  setViewMode: (mode: TraceViewMode) => void;
+  /** Trace again after a stop, or Retry after a failure. */
+  retrace: () => void;
   /** Create paths waits for full-size traces. */
   creating: boolean;
   /** Working-image pixels per millimetre of the shown image, for the Specks readout. */
@@ -158,11 +167,15 @@ export function useTrace(
     setChoice((c) => ({ ...c, values: update(c.values) }));
   }, []);
   const [advancedOpen, setAdvancedOpenState] = useState(() => readAdvancedOpen());
-  const [overFullSizeLimit, setOverFullSizeLimit] = useState(false);
-  const [status, setStatus] = useState({ line: "", muted: "", canCreate: false });
+  const [status, setStatus] = useState<TraceStatusText>(NO_STATUS);
   const [busy, setBusy] = useState(false);
-  const [stopShown, setStopShown] = useState(false);
+  /** The running job's whole percent, `null` before the first report or without one. */
+  const [percent, setPercent] = useState<number | null>(null);
   const [creating, setCreating] = useState(false);
+  const [stopped, setStopped] = useState(false);
+  const [failure, setFailure] = useState<string | null>(null);
+  /** The picture is not read yet (UX notes 21.2: the pill with "..."). */
+  const [loading, setLoading] = useState(false);
   /** The image the job is on (0-based): the first until Create paths moves on (criterion 46). */
   const [progress, setProgress] = useState(0);
   const [pxPerMm, setPxPerMm] = useState(0);
@@ -194,14 +207,27 @@ export function useTrace(
     }
     timers.current = [];
     setBusy(false);
-    setStopShown(false);
+    setPercent(null);
   }, []);
 
-  const startTimers = useCallback(() => {
-    clearTimers();
-    timers.current.push(window.setTimeout(() => setBusy(true), BUSY_MS));
-    timers.current.push(window.setTimeout(() => setStopShown(true), STOP_MS));
-  }, [clearTimers]);
+  /** The timers of a job; `known` (over 4 Mpx at full size) shows the progress pill at once
+   * (criterion 52). After 400 ms the pill shows and the old outline is drawn at 50 % (criterion 10). */
+  const startTimers = useCallback(
+    (known = false) => {
+      clearTimers();
+      const busyNow = () => {
+        setBusy(true);
+        getSession()?.set_trace_preview_stale(true);
+        onChange();
+      };
+      if (known) {
+        busyNow();
+        return;
+      }
+      timers.current.push(window.setTimeout(busyNow, BUSY_MS));
+    },
+    [clearTimers, getSession, onChange],
+  );
 
   /** Ends whatever runs: the debounce, the jobs and their timers. */
   const cancelAll = useCallback(() => {
@@ -215,6 +241,21 @@ export function useTrace(
   }, [clearTimers]);
 
   const key = (threshold: number, v: TraceValues) => settingsJson(v, threshold);
+
+  /** A failed job (criterion 54): "Failed" with a plain reason in the slot; values and document
+   * stay. */
+  const fail = useCallback(
+    (error: unknown, pixels: number) => {
+      clearTimers();
+      setCreating(false);
+      setFailure(failureText(failureReason(String(error), pixels)));
+      setLoading(false);
+      setStatus(NO_STATUS);
+      getSession()?.set_trace_preview_stale(true);
+      onChange();
+    },
+    [clearTimers, getSession, onChange],
+  );
 
   /** The Threshold of `id`, its automatic value on first use. */
   const thresholdOf = useCallback(
@@ -244,15 +285,25 @@ export function useTrace(
       }
       const mine = ++generation.current;
       const stale = () => mine !== generation.current;
+      setStopped(false);
+      setFailure(null);
+      setLoading(false);
       startTimers();
+      const onProgress = (p: number) => {
+        if (!stale()) {
+          setPercent(p);
+        }
+      };
+      let pixels = 0;
       try {
         const threshold = await thresholdOf(session, id);
         if (stale()) {
           return;
         }
         if (threshold === null) {
-          setStatus({ line: LOADING_IMAGE, muted: "", canCreate: false });
+          setStatus(NO_STATUS);
           clearTimers();
+          setLoading(true);
           return;
         }
         setValues((v) => (v.threshold === threshold ? v : { ...v, threshold }));
@@ -260,30 +311,40 @@ export function useTrace(
         const settings = settingsJson(v, threshold);
         const full = pixelsOf(session, id, false);
         if (!full) {
-          setStatus({ line: LOADING_IMAGE, muted: "", canCreate: false });
+          setStatus(NO_STATUS);
           clearTimers();
+          setLoading(true);
           return;
         }
         setPxPerMm(1 / Math.sqrt(Math.abs(full.map[0] * full.map[3] - full.map[1] * full.map[2])));
-        const over = full.width * full.height > FULL_SIZE_PREVIEW_MAX_PX;
-        setOverFullSizeLimit(over);
-        // Full-size preview skips the reduced copy, up to 4 Mpx (criterion 41, UX notes section 12).
-        const small = (full.width <= REDUCED_SIDE && full.height <= REDUCED_SIDE) || (v.fullSizePreview && !over);
+        pixels = full.width * full.height;
+        // Over 4 Mpx the preview is the reduced copy only; Create paths traces at full size
+        // (criterion 52).
+        const reducedOnly = previewIsReduced(full.width, full.height);
+        if (reducedOnly) {
+          startTimers(true);
+        }
+        const small = full.width <= REDUCED_SIDE && full.height <= REDUCED_SIDE;
         if (!small) {
           const reduced = pixelsOf(session, id, true);
           if (reduced) {
-            const out = await runner().trace(reduced, settings);
+            const reducedPixels = reduced.width * reduced.height;
+            const out = await runner().trace(reduced, settings, onProgress);
             if (stale()) {
               return;
             }
             session.set_trace_preview(id, out.wire);
+            if (reducedOnly) {
+              setStatus(statusText(readSummary(out.wire), out.seconds, reducedPixels, true));
+            }
           }
-          if (!fullAfter) {
+          if (!fullAfter || reducedOnly) {
             clearTimers();
+            onChange();
             return;
           }
         }
-        const out = await runner().trace(full, settings);
+        const out = await runner().trace(full, settings, onProgress);
         if (stale()) {
           return;
         }
@@ -292,14 +353,14 @@ export function useTrace(
         results.current.set(id, key(threshold, v));
         setStatus(statusText(readSummary(out.wire), out.seconds, full.width * full.height));
         clearTimers();
+        onChange();
       } catch (error) {
         if (!(error instanceof TraceCancelled) && !stale()) {
-          setStatus({ line: `Trace failed: ${String(error)}. Your drawing is unchanged.`, muted: "", canCreate: false });
-          clearTimers();
+          fail(error, pixels);
         }
       }
     },
-    [getSession, startTimers, clearTimers, thresholdOf, runner, setValues],
+    [getSession, startTimers, clearTimers, thresholdOf, runner, setValues, onChange, fail],
   );
 
   const schedule = useCallback(
@@ -336,9 +397,12 @@ export function useTrace(
     cancelAll();
     results.current.clear();
     session?.clear_trace_results();
-    setStatus({ line: "", muted: "", canCreate: false });
+    setStatus(NO_STATUS);
     setCreating(false);
     setProgress(0);
+    setStopped(false);
+    setFailure(null);
+    setLoading(false);
     if (active && next.shown) {
       const known = thresholds.current.get(next.shown);
       setValues((v) => ({ ...v, threshold: known ?? null }));
@@ -356,6 +420,9 @@ export function useTrace(
       results.current.clear();
       session?.clear_trace_results();
       session?.set_trace_preview_stale(false);
+      setStopped(false);
+      setFailure(null);
+      setLoading(false);
       schedule(DEBOUNCE_MS);
     },
     [getSession, schedule],
@@ -392,15 +459,40 @@ export function useTrace(
     }
   }, [schedule]);
 
+  /** Stop or the first Escape (criteria 10, 53): the old outline at 50 %, "Stopped" with Retry in
+   * the slot, Enter traces again. */
   const stop = useCallback(() => {
     cancelAll();
     setCreating(false);
+    setLoading(false);
+    setStopped(true);
     getSession()?.set_trace_preview_stale(true);
-    setStatus((s) => ({ ...s, muted: PREVIEW_OUT_OF_DATE }));
+    setStatus((s) => ({ ...s, line: "", muted: "", canCreate: false }));
     onChange();
   }, [cancelAll, getSession, onChange]);
 
+  /** Trace again or Retry: the preview at once, with the values as they are. */
+  const retrace = useCallback(() => {
+    dragging.current = false;
+    setStopped(false);
+    setFailure(null);
+    schedule(0);
+  }, [schedule]);
+
+  const setViewMode = useCallback(
+    (mode: TraceViewMode) => {
+      getSession()?.set_trace_view_mode(mode);
+      onChange();
+    },
+    [getSession, onChange],
+  );
+
   const create = useCallback(() => {
+    if (stopped || failure !== null) {
+      // Stopped or failed: Enter, Ctrl+Enter and a double-click trace again (UX notes 19).
+      retrace();
+      return;
+    }
     const session = getSession();
     const current = viewRef.current;
     if (!session || creating || current.images.length === 0) {
@@ -416,6 +508,7 @@ export function useTrace(
     setProgress(0);
     const mine = ++generation.current;
     startTimers();
+    let pixels = 0;
     void (async () => {
       try {
         let paths = 0;
@@ -425,15 +518,25 @@ export function useTrace(
             continue;
           }
           setProgress(index);
-          setStatus({ line: creatingLabel(index, current.images.length), muted: "", canCreate: false });
           const full = pixelsOf(session, id, false);
           if (!full) {
-            setStatus({ line: LOADING_IMAGE, muted: "", canCreate: false });
+            setStatus(NO_STATUS);
             setCreating(false);
             clearTimers();
+            setLoading(true);
             return;
           }
-          const out = await runner().trace(full, wanted);
+          pixels = full.width * full.height;
+          // Over 4 Mpx the wait is known: the progress pill at once (criterion 52).
+          if (previewIsReduced(full.width, full.height)) {
+            startTimers(true);
+          }
+          setStatus((s) => ({ ...s, line: "", canCreate: false }));
+          const out = await runner().trace(full, wanted, (p) => {
+            if (mine === generation.current) {
+              setPercent(p);
+            }
+          });
           if (mine !== generation.current) {
             return;
           }
@@ -454,20 +557,75 @@ export function useTrace(
       } catch (error) {
         clearTimers();
         setCreating(false);
-        if (!(error instanceof TraceCancelled)) {
-          setStatus({ line: `Trace failed: ${String(error)}. Your drawing is unchanged.`, muted: "", canCreate: false });
+        if (!(error instanceof TraceCancelled) && mine === generation.current) {
+          fail(error, pixels);
         }
       }
     })();
-  }, [getSession, creating, status.canCreate, startTimers, clearTimers, runner, showNotice, onChange, returnFocus]);
+  }, [getSession, creating, stopped, failure, retrace, status.canCreate, startTimers, clearTimers, runner, showNotice, onChange, returnFocus, fail]);
 
   // Leaving the tool ends every job.
   useEffect(() => {
     if (!active) {
       cancelAll();
       setCreating(false);
+      setStopped(false);
+      setFailure(null);
+      setLoading(false);
     }
   }, [active, cancelAll]);
+
+
+  // `\` held peeks at the image, Shift+`\` cycles the views (criterion 51), with focus on the
+  // canvas or a bar button, never in a text field; release, window blur and leaving the tool
+  // end the peek (UX notes section 13).
+  useEffect(() => {
+    if (!active) {
+      return undefined;
+    }
+    let peeking = false;
+    const end = () => {
+      if (peeking) {
+        peeking = false;
+        getSession()?.set_trace_peek(false);
+        onChange();
+      }
+    };
+    const typing = (target: EventTarget | null) =>
+      target instanceof HTMLElement &&
+      target.closest('input, textarea, select, [role="spinbutton"], [contenteditable]:not([contenteditable="false"])') !== null;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (typing(event.target)) {
+        return;
+      }
+      if (isCycleKey(event)) {
+        event.preventDefault();
+        getSession()?.cycle_trace_view_mode();
+        onChange();
+      } else if (isPeekKey(event)) {
+        event.preventDefault();
+        peeking = true;
+        getSession()?.set_trace_peek(true);
+        onChange();
+      } else if (event.key === "\\" || event.key === "|") {
+        event.preventDefault();
+      }
+    };
+    const onKeyUp = (event: KeyboardEvent) => {
+      if (event.key === "\\" || event.key === "|" || event.code === "Backslash") {
+        end();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    window.addEventListener("blur", end);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("blur", end);
+      end();
+    };
+  }, [active, getSession, onChange]);
 
   const keyDown = useCallback(
     (event: KeyboardEvent): boolean => {
@@ -488,7 +646,19 @@ export function useTrace(
     [active, create, creating, stop],
   );
 
-  const busyLine = busy && !status.line.startsWith("Tracing") ? { ...status, line: TRACING } : status;
+  // The view the session draws, read on every render (each sync renders); entering the tool
+  // starts on Overlay.
+  const sessionMode = active ? (getSession()?.trace_view_mode() as TraceViewMode | undefined) : undefined;
+  const viewMode: TraceViewMode = sessionMode && TRACE_VIEWS.some((v) => v.mode === sessionMode) ? sessionMode : "overlay";
+
+  const slot: TraceSlot =
+    failure !== null
+      ? { kind: "failed", text: failure }
+      : stopped
+        ? { kind: "stopped" }
+        : busy || loading
+          ? { kind: "running", percent: loading ? null : percent }
+          : { kind: "none" };
   return {
     active,
     available,
@@ -500,10 +670,12 @@ export function useTrace(
     choice,
     presetLabel: presetLabel(choice, presets),
     advancedOpen,
-    overFullSizeLimit,
-    status: busyLine,
-    busy,
-    stopShown,
+    status,
+    countsStale: busy || stopped || creating,
+    slot,
+    viewMode,
+    setViewMode,
+    retrace,
     creating,
     pxPerMm,
     setValue,

@@ -23,6 +23,8 @@ export type TraceRequest =
 export type TraceResponse =
   | { id: number; kind: "threshold"; threshold: number; ms: number }
   | { id: number; kind: "trace"; wire: Float64Array; ms: number }
+  /** A running trace reached a higher whole percent (criterion 10). */
+  | { id: number; kind: "progress"; percent: number }
   | { id: number; kind: "error"; message: string };
 
 /** The pixels of one job. */
@@ -55,7 +57,11 @@ export interface TraceWorkerLike {
   terminate(): void;
 }
 
-type Pending = { resolve: (response: TraceResponse) => void; reject: (error: Error) => void };
+type Pending = {
+  resolve: (response: TraceResponse) => void;
+  reject: (error: Error) => void;
+  onProgress?: (percent: number) => void;
+};
 
 /** Runs trace jobs in a worker; `cancel` ends every running job by terminating it. */
 export class TraceRunner {
@@ -87,7 +93,9 @@ export class TraceRunner {
     worker.onmessage = (event) => {
       const response = event.data;
       const pending = this.pending.get(response.id);
-      if (pending) {
+      if (pending && response.kind === "progress") {
+        pending.onProgress?.(response.percent);
+      } else if (pending) {
         this.pending.delete(response.id);
         pending.resolve(response);
       }
@@ -108,11 +116,15 @@ export class TraceRunner {
     return worker;
   }
 
-  private async send(make: (id: number) => TraceRequest, transfer: Transferable[]): Promise<TraceResponse> {
+  private async send(
+    make: (id: number) => TraceRequest,
+    transfer: Transferable[],
+    onProgress?: (percent: number) => void,
+  ): Promise<TraceResponse> {
     const worker = await this.ready();
     const id = this.nextId++;
     return new Promise<TraceResponse>((resolve, reject) => {
-      this.pending.set(id, { resolve, reject });
+      this.pending.set(id, { resolve, reject, onProgress });
       worker.postMessage(make(id), transfer);
     });
   }
@@ -130,8 +142,8 @@ export class TraceRunner {
   }
 
   /** One trace of `pixels` with `settings` (the JSON of `settingsJson`); the pixels are handed
-   * over to the worker. */
-  async trace(pixels: TracePixels, settings: string): Promise<TraceOutput> {
+   * over to the worker; `onProgress` hears each higher whole percent. */
+  async trace(pixels: TracePixels, settings: string, onProgress?: (percent: number) => void): Promise<TraceOutput> {
     const response = await this.send(
       (id) => ({
         type: "trace",
@@ -143,6 +155,7 @@ export class TraceRunner {
         settings,
       }),
       [pixels.rgba.buffer],
+      onProgress,
     );
     if (response.kind !== "trace") {
       throw new Error(response.kind === "error" ? response.message : "unexpected reply");

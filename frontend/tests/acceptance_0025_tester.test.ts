@@ -219,6 +219,9 @@ async function launch() {
   const vite = spawn("npx", ["vite", "--port", String(PORT), "--strictPort"], { cwd: FRONTEND, stdio: "ignore" });
   await waitFor("vite", async () => ((await fetch(ORIGIN)).ok ? true : null));
   const s = await session(profile);
+  // UX notes 20.4 (2026-10-29): the counts are the Advanced block's last row; the block starts
+  // open unless a test closed it (it is remembered).
+  await s.send("Page.addScriptToEvaluateOnNewDocument", { source: "if (localStorage.getItem('curvyo.trace-advanced-open') === null) localStorage.setItem('curvyo.trace-advanced-open', '1');" });
   await s.send("Page.navigate", { url: `${ORIGIN}/` });
   await waitFor("the app", async () => ((await s.evaluate(`!!document.querySelector('[data-import-button]')`)) ? true : null));
   await sleep(1500);
@@ -309,15 +312,27 @@ const press = async (s: S, k: string, vk: number, modifiers = 0) => {
   await s.send("Input.dispatchKeyEvent", { type: "keyUp", key: k, code: k, windowsVirtualKeyCode: vk, modifiers });
   await sleep(250);
 };
-const field = (name: string) => `input[aria-label^="${name}"]`;
-const fieldValue = async (s: S, name: string) => (await s.evaluate(`document.querySelector('${field(name)}')?.value ?? null`)) as string | null;
+// The bar's fields are the app's value fields (Frage 78, UX notes 20.1): a spinbutton whose
+// `aria-valuetext` carries the shown value; F2 opens the number entry. The Threshold is in percent.
+const field = (name: string) => `[role=toolbar][aria-label=Trace] [role=spinbutton][aria-label="${name}"]`;
+const fieldValue = async (s: S, name: string) =>
+  (await s.evaluate(`(() => { const f = document.querySelector('${field(name)}'); return f ? (f.getAttribute('aria-valuetext') ?? '').split(' ')[0] : null; })()`)) as string | null;
 const typeInto = async (s: S, name: string, text: string) => {
-  await s.evaluate(`(() => { const f = document.querySelector('${field(name)}'); f.focus(); f.select(); })()`);
+  await s.evaluate(`document.querySelector('${field(name)}').focus()`);
+  await press(s, "F2", 113);
+  await s.evaluate(`document.activeElement?.select?.()`);
   await s.send("Input.insertText", { text });
   await press(s, "Enter", 13);
 };
+// The state row's line (UX notes 20.4), else the counts line of the Advanced block, else an empty
+// bar's words.
 const barStatus = async (s: S) =>
-  (await s.evaluate(`[...document.querySelectorAll('[role=status]')].map((e) => e.textContent.trim()).filter((t) => /path|Tracing|Click an image|not an image/.test(t)).join(' | ')`)) as string;
+  (await s.evaluate(`(() => { const bar = document.querySelector('[role=toolbar][aria-label=Trace]');
+    const line = bar?.querySelector('[data-trace-line]')?.textContent.trim() ?? '';
+    if (line) return line;
+    const counts = bar?.querySelector('[data-trace-counts] > span')?.textContent.trim() ?? '';
+    if (counts) return counts;
+    return [...document.querySelectorAll('[role=status]')].map((e) => e.textContent.trim()).filter((t) => /Click an image|not an image/.test(t)).join(' | '); })()`)) as string;
 const traceReady = async (s: S) =>
   waitFor("a settled trace", async () => {
     const t = await barStatus(s);
@@ -402,12 +417,12 @@ test("0025 in Chromium: Trace button, key I, bar, preview, fields, leaving (crit
     assert.equal(pressed, "", "no rail button is pressed in the Trace tool");
     const bar = (await s.evaluate(`document.querySelector('[role=toolbar][aria-label=Trace]')?.innerText ?? ''`)) as string;
     assert.match(bar, /^Trace\b/, `the first element is the state label: ${JSON.stringify(bar.slice(0, 40))}`);
-    const labels = await s.evaluate(`JSON.stringify([...document.querySelectorAll('input')].filter((i) => i.offsetParent).map((i) => i.getAttribute('aria-label')))`);
+    const labels = await s.evaluate(`JSON.stringify([...document.querySelectorAll('[role=spinbutton]')].filter((i) => i.offsetParent).map((i) => i.getAttribute('aria-label')))`);
     console.log("bar fields:", labels, "| bar text:", JSON.stringify(bar));
-    assert.equal(await fieldValue(s, "Threshold"), "128", "criterion 9: automatic value of a 0/255 picture");
+    assert.equal(await fieldValue(s, "Threshold"), "50", "criterion 9: automatic value of a 0/255 picture (luma 128) shown as 50 %");
     assert.equal(await fieldValue(s, "Smooth"), "80");
     assert.equal(await fieldValue(s, "Ignore below"), "0.50");
-    assert.match(bar, /0\.50 mm\s+~\s*\d+ px/, "the muted pixel readout");
+    assert.match(bar, /~\s*\d+ px/, "the muted pixel readout");
     assert.deepEqual(await s.layerRows(), rowsBefore, "criterion 7: no node, no layer row");
     assert.equal(await historyText(s), historyBefore, "criterion 7: no history step");
     const during = await pixels(s);
@@ -420,19 +435,20 @@ test("0025 in Chromium: Trace button, key I, bar, preview, fields, leaving (crit
     // Criterion 5: the fields.
     await s.evaluate(`document.querySelector('${field("Threshold")}').focus()`);
     await press(s, "ArrowUp", 38);
-    assert.equal(await fieldValue(s, "Threshold"), "129");
+    assert.equal(await fieldValue(s, "Threshold"), "51");
     await press(s, "ArrowUp", 38, 8);
-    assert.equal(await fieldValue(s, "Threshold"), "139");
+    assert.equal(await fieldValue(s, "Threshold"), "61");
     await press(s, "ArrowDown", 40, 8);
-    assert.equal(await fieldValue(s, "Threshold"), "129");
+    assert.equal(await fieldValue(s, "Threshold"), "51");
     await press(s, "Home", 36);
     assert.equal(await fieldValue(s, "Threshold"), "0");
     await press(s, "End", 35);
-    assert.equal(await fieldValue(s, "Threshold"), "255");
+    assert.equal(await fieldValue(s, "Threshold"), "100");
     await typeInto(s, "Threshold", "999");
-    assert.equal(await fieldValue(s, "Threshold"), "255", "clamped silently");
+    assert.equal(await fieldValue(s, "Threshold"), "100", "clamped silently");
     const focusAfter = (await s.evaluate(`document.activeElement?.tagName`)) as string;
     assert.notEqual(focusAfter, "INPUT", "Enter returns focus to the canvas");
+    assert.equal(await s.evaluate(`document.activeElement?.getAttribute('role')`), null, "Enter leaves the field for the canvas");
     await typeInto(s, "Smooth", "150");
     assert.equal(await fieldValue(s, "Smooth"), "100");
     await s.evaluate(`document.querySelector('${field("Ignore below")}').focus()`);
@@ -448,15 +464,20 @@ test("0025 in Chromium: Trace button, key I, bar, preview, fields, leaving (crit
     assert.equal(await fieldValue(s, "Ignore below"), "0.00");
     assert.equal(await historyText(s), historyBefore, "changing values is not a history step");
 
-    // Criterion 15: 0 paths names the direction and disables Create paths.
+    // Criterion 15: 0 paths names the direction; Enter creates nothing (no button to disable).
     await typeInto(s, "Threshold", "0");
     const none = await waitFor("0 paths", async () => {
       const t = await barStatus(s);
       return /^0 paths/.test(t) ? t : null;
     });
     assert.equal(none, "0 paths at this Threshold: too low.");
-    assert.equal(await s.evaluate(`[...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Create paths').getAttribute('aria-disabled')`), "true");
-    await typeInto(s, "Threshold", "128");
+    assert.equal(await s.evaluate(`[...document.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Create paths')`), false, "there is no Create paths button");
+    const rowsNone = await rowInfo(s);
+    await focusCanvas(s);
+    await press(s, "Enter", 13);
+    await sleep(500);
+    assert.deepEqual(await rowInfo(s), rowsNone, "Enter creates nothing for 0 paths");
+    await typeInto(s, "Threshold", "50");
     await traceReady(s);
 
     // Criterion 5: remembered as an app setting.
@@ -504,7 +525,7 @@ test("0025 in Chromium: Trace button, key I, bar, preview, fields, leaving (crit
   }
 });
 
-test("0025 in Chromium: Create paths in one undo step by button, Enter, double-click (criteria 12, 13, 30, 31)", { skip: !BROWSER, timeout: 400_000 }, async () => {
+test("0025 in Chromium: Create paths in one undo step by Enter, double-click (criteria 12, 13, 30, 31)", { skip: !BROWSER, timeout: 400_000 }, async () => {
   const { s, close } = await launch();
   try {
     await s.tab("Layers");
@@ -551,19 +572,21 @@ test("0025 in Chromium: Create paths in one undo step by button, Enter, double-c
       await waitFor("undo again", async () => ((await groupIndex()) < 0 ? true : null));
     };
 
-    // (a) the button
+    // (a) no button; the bar's hidden description says what Enter does (UX notes 19)
     await focusCanvas(s);
     await s.key("i", 73);
     await traceReady(s);
-    await buttonByText(s, "Create paths");
-    const cp = JSON.parse((await s.evaluate(`JSON.stringify((() => { const b = document.querySelector('[data-t25]'); const r = b.getBoundingClientRect(); return [b.title, r.width, r.height]; })())`)) as string) as [string, number, number];
-    assert.equal(cp[0], "Create paths (Enter)");
-    assert.equal(Math.round(cp[1]), 112, "112 px wide");
-    await clickText(s, "Create paths");
-    await check("button");
+    assert.equal(await buttonByText(s, "Create paths"), false, "there is no Create paths button");
+    assert.equal(
+      await s.evaluate(`document.getElementById(document.querySelector('[role=toolbar][aria-label=Trace]').getAttribute('aria-describedby')).textContent`),
+      "Enter creates the paths",
+    );
+    await focusCanvas(s);
+    await press(s, "Enter", 13);
+    await check("first Enter");
     const created = await pixels(s);
     assert.ok(created.black > 200, `the paths are filled black over the visible image: ${created.black}`);
-    await undoRedo("button");
+    await undoRedo("first Enter");
 
     // (b) Enter with focus on the canvas
     await focusCanvas(s);
@@ -718,7 +741,6 @@ test("0025 in Chromium: empty and whole-page results (criterion 15)", { skip: !B
     await s.key("i", 73);
     const white = await traceReady(s);
     assert.equal(white, "0 paths at this Threshold: too low.");
-    assert.equal(await s.evaluate(`[...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Create paths').getAttribute('aria-disabled')`), "true");
     await press(s, "Enter", 13);
     await sleep(500);
     assert.ok(!(await rowInfo(s)).some(([n]) => /Trace of/.test(n ?? "")), "Enter creates nothing for 0 paths");
@@ -729,7 +751,8 @@ test("0025 in Chromium: empty and whole-page results (criterion 15)", { skip: !B
     await s.key("i", 73);
     const black = await traceReady(s);
     assert.equal(black, "1 path covering the whole image.");
-    await clickText(s, "Create paths");
+    await focusCanvas(s);
+    await press(s, "Enter", 13);
     await waitFor("the group", async () => ((await rowInfo(s)).some(([n]) => /Trace of black/.test(n ?? "")) ? true : null));
   } finally {
     await close();

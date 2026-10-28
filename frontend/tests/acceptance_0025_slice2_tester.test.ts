@@ -218,6 +218,9 @@ async function launch() {
   const vite = spawn("npx", ["vite", "--port", String(PORT), "--strictPort"], { cwd: FRONTEND, stdio: "ignore" });
   await waitFor("vite", async () => ((await fetch(ORIGIN)).ok ? true : null));
   const s = await session(profile);
+  // UX notes 20.4 (2026-10-29): the counts are the Advanced block's last row; the block starts
+  // open unless a test closed it (it is remembered).
+  await s.send("Page.addScriptToEvaluateOnNewDocument", { source: "if (localStorage.getItem('curvyo.trace-advanced-open') === null) localStorage.setItem('curvyo.trace-advanced-open', '1');" });
   await s.send("Page.navigate", { url: `${ORIGIN}/` });
   await waitFor("the app", async () => ((await s.evaluate(`!!document.querySelector('[data-import-button]')`)) ? true : null));
   await sleep(1500);
@@ -308,15 +311,27 @@ const press = async (s: S, k: string, vk: number, modifiers = 0) => {
   await s.send("Input.dispatchKeyEvent", { type: "keyUp", key: k, code: k, windowsVirtualKeyCode: vk, modifiers });
   await sleep(250);
 };
-const field = (name: string) => `input[aria-label^="${name}"]`;
-const fieldValue = async (s: S, name: string) => (await s.evaluate(`document.querySelector('${field(name)}')?.value ?? null`)) as string | null;
+// The bar's fields are the app's value fields (Frage 78, UX notes 20.1): a spinbutton whose
+// `aria-valuetext` carries the shown value; F2 opens the number entry. The Threshold is in percent.
+const field = (name: string) => `[role=toolbar][aria-label=Trace] [role=spinbutton][aria-label="${name}"]`;
+const fieldValue = async (s: S, name: string) =>
+  (await s.evaluate(`(() => { const f = document.querySelector('${field(name)}'); return f ? (f.getAttribute('aria-valuetext') ?? '').split(' ')[0] : null; })()`)) as string | null;
 const typeInto = async (s: S, name: string, text: string) => {
-  await s.evaluate(`(() => { const f = document.querySelector('${field(name)}'); f.focus(); f.select(); })()`);
+  await s.evaluate(`document.querySelector('${field(name)}').focus()`);
+  await press(s, "F2", 113);
+  await s.evaluate(`document.activeElement?.select?.()`);
   await s.send("Input.insertText", { text });
   await press(s, "Enter", 13);
 };
+// The state row's line (UX notes 20.4), else the counts line of the Advanced block, else an empty
+// bar's words.
 const barStatus = async (s: S) =>
-  (await s.evaluate(`[...document.querySelectorAll('[role=status]')].map((e) => e.textContent.trim()).filter((t) => /path|Tracing|Click an image|not an image/.test(t)).join(' | ')`)) as string;
+  (await s.evaluate(`(() => { const bar = document.querySelector('[role=toolbar][aria-label=Trace]');
+    const line = bar?.querySelector('[data-trace-line]')?.textContent.trim() ?? '';
+    if (line) return line;
+    const counts = bar?.querySelector('[data-trace-counts] > span')?.textContent.trim() ?? '';
+    if (counts) return counts;
+    return [...document.querySelectorAll('[role=status]')].map((e) => e.textContent.trim()).filter((t) => /Click an image|not an image/.test(t)).join(' | '); })()`)) as string;
 const traceReady = async (s: S) =>
   waitFor("a settled trace", async () => {
     const t = await barStatus(s);
@@ -393,9 +408,19 @@ const pick = async (s: S, name: string) => {
   await s.clickSel("[data-t25]");
   await sleep(500);
 };
+/** Presses the bar's expander (an icon button, found by its aria-label). */
+const clickExpander = async (s: S) => {
+  await s.evaluate(`(() => { document.querySelectorAll('[data-t25]').forEach((e) => e.removeAttribute('data-t25')); document.querySelector('[role=toolbar][aria-label=Trace] button[aria-expanded][aria-controls]').setAttribute('data-t25', '1'); })()`);
+  await s.clickSel("[data-t25]");
+};
+/** Creates the paths: Enter on the canvas (UX notes 19, no button). */
+const createPaths = async (s: S) => {
+  await focusCanvas(s);
+  await s.key("Enter", 13);
+};
 const advanced = async (s: S) => {
-  if ((await s.evaluate(`document.querySelector('[role=toolbar][aria-label=Trace]')?.querySelector('input[aria-label=Corners]') === null`)) as boolean) {
-    await clickText(s, "Advanced");
+  if ((await s.evaluate(`document.querySelector('[role=toolbar][aria-label=Trace]')?.querySelector('[role=spinbutton][aria-label=Corners]') === null`)) as boolean) {
+    await clickExpander(s);
     await sleep(400);
   }
 };
@@ -407,11 +432,11 @@ const clickRadio = async (s: S, group: string, label: string) => {
   await sleep(500);
 };
 const toggle = async (s: S, label: string) => {
-  await s.evaluate(`(() => { document.querySelectorAll('[data-t25]').forEach((e) => e.removeAttribute('data-t25')); document.querySelector('[role=switch][aria-label="${label}"]').setAttribute('data-t25', '1'); })()`);
+  await s.evaluate(`(() => { document.querySelectorAll('[data-t25]').forEach((e) => e.removeAttribute('data-t25')); document.querySelector('[role=toolbar][aria-label=Trace] button[aria-label="${label}"]').setAttribute('data-t25', '1'); })()`);
   await s.clickSel("[data-t25]");
   await sleep(500);
 };
-const switchState = async (s: S, label: string) => (await s.evaluate(`document.querySelector('[role=switch][aria-label="${label}"]')?.getAttribute('aria-checked')`)) as string;
+const switchState = async (s: S, label: string) => (await s.evaluate(`document.querySelector('[role=toolbar][aria-label=Trace] button[aria-label="${label}"]')?.getAttribute('aria-pressed')`)) as string;
 const reload = async (s: S) => {
   const reloading = s.send("Page.reload");
   await sleep(1000);
@@ -433,10 +458,12 @@ test("0025s2 in Chromium: the Preset menu, its values, Custom, the remembered ch
     // Criteria 37 and 59: a row above Threshold; 132 px; the first use is Logo / Line art.
     assert.equal(await presetButton(s), "Logo / Line art", "the first-ever use starts on Logo / Line art");
     const geo = JSON.parse(
-      (await s.evaluate(`JSON.stringify((() => { const b = document.querySelector('button[aria-label=Preset]').getBoundingClientRect(); const t = document.querySelector('input[aria-label=Threshold]').getBoundingClientRect(); return { w: Math.round(b.width), presetY: b.y, thresholdY: t.y }; })())`)) as string,
-    ) as { w: number; presetY: number; thresholdY: number };
+      (await s.evaluate(`JSON.stringify((() => { const b = document.querySelector('button[aria-label=Preset]').getBoundingClientRect(); const t = document.querySelector('[role=spinbutton][aria-label=Threshold]').getBoundingClientRect(); return { w: Math.round(b.width), presetY: b.y, thresholdY: t.y, presetX: b.x, thresholdX: t.x }; })())`)) as string,
+    ) as { w: number; presetY: number; thresholdY: number; presetX: number; thresholdX: number };
     assert.equal(geo.w, 132);
-    assert.ok(geo.presetY < geo.thresholdY, `the Preset row is above Threshold: ${JSON.stringify(geo)}`);
+    // The Preset row comes first: Threshold is below it, or, where the bar is wide enough, after it
+    // in row 1 (UX notes 20.5: "row 1 + Threshold" with the panel closed).
+    assert.ok(geo.presetY < geo.thresholdY || (geo.presetY === geo.thresholdY && geo.presetX < geo.thresholdX), `the Preset row comes before Threshold: ${JSON.stringify(geo)}`);
     assert.equal(await s.evaluate(`document.querySelector('button[aria-label=Preset]').getAttribute('aria-haspopup')`), "menu");
     // Criterion 59: four presets in order with the customer's second lines; criterion 40: no advice.
     await openMenu(s);
@@ -533,7 +560,7 @@ test("0025s2 in Chromium: the Preset menu, its values, Custom, the remembered ch
     assert.equal(await presetButton(s), "Silhouette for cutting/carving", "a picked preset survives a reload");
 
     // The notice does not name the preset.
-    await clickText(s, "Create paths");
+    await createPaths(s);
     const notice = await waitFor("the notice", async () => {
       const t = await s.statusText();
       return /Traced: /.test(t) ? t : null;
@@ -568,7 +595,7 @@ test("0025s2 in Chromium: one preset for all selected images, in one step (crite
     await pick(s, "Silhouette");
     const status = await settle(s);
     const one = nodesOf(status);
-    await clickText(s, "Create paths");
+    await createPaths(s);
     const notice = await waitFor("the notice", async () => {
       const t = await s.statusText();
       return /Traced 3 images/.test(t) ? t : null;
@@ -580,7 +607,7 @@ test("0025s2 in Chromium: one preset for all selected images, in one step (crite
   }
 });
 
-test("0025s2 in Chromium: the Advanced block (criteria 41, 43, 44)", { skip: !BROWSER, timeout: 400_000 }, async () => {
+test("0025s2 in Chromium: the Advanced block (criteria 41, 44)", { skip: !BROWSER, timeout: 400_000 }, async () => {
   const { s, close } = await launch();
   try {
     await s.tab("Layers");
@@ -590,30 +617,42 @@ test("0025s2 in Chromium: the Advanced block (criteria 41, 43, 44)", { skip: !BR
     await settle(s);
     const geometry = async () =>
       JSON.parse(
-        (await s.evaluate(`JSON.stringify((() => { const y = (q) => document.querySelector(q).getBoundingClientRect().y; const a = [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Advanced'); return { preset: y('button[aria-label=Preset]'), threshold: y('input[aria-label=Threshold]'), smooth: y('input[aria-label=Smooth]'), create: [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Create paths').getBoundingClientRect().y, advanced: a.getBoundingClientRect().y, disabled: a.disabled || a.getAttribute('aria-disabled'), expanded: a.getAttribute('aria-expanded') }; })())`)) as string,
+        (await s.evaluate(`JSON.stringify((() => { const y = (q) => document.querySelector(q).getBoundingClientRect().y; const a = document.querySelector('[role=toolbar][aria-label=Trace] button[aria-expanded][aria-controls]'); return { preset: y('button[aria-label=Preset]'), threshold: y('[role=spinbutton][aria-label=Threshold]'), smooth: y('[role=spinbutton][aria-label=Smooth]'), status: y('[role=toolbar][aria-label=Trace] [role=status]'), advanced: a.getBoundingClientRect().y, disabled: a.disabled || a.getAttribute('aria-disabled'), expanded: a.getAttribute('aria-expanded') }; })())`)) as string,
       ) as Record<string, number | string | boolean | null>;
+    // The block starts open in this file (the counts live there); close it first.
+    if ((await geometry()).expanded === "true") {
+      await clickExpander(s);
+      await sleep(400);
+    }
     const closed = await geometry();
     assert.equal(closed.expanded, "false");
     assert.ok(!closed.disabled, "Advanced is never disabled or dimmed");
-    assert.equal(await s.evaluate(`!!document.querySelector('input[aria-label=Corners]')`), false, "the block is closed");
-    await clickText(s, "Advanced");
+    assert.equal(await s.evaluate(`!!document.querySelector('[role=spinbutton][aria-label=Corners]')`), false, "the block is closed");
+    await clickExpander(s);
     await sleep(400);
     const open = await geometry();
     assert.equal(open.expanded, "true");
-    for (const k of ["preset", "threshold", "smooth", "create", "advanced"]) {
+    for (const k of ["preset", "threshold", "smooth", "status", "advanced"]) {
       assert.equal(open[k], closed[k], `${k} row does not move when the block opens`);
     }
     // Contents.
     const text = await bar(s);
-    for (const label of ["Denoise", "Upscale", "Corners", "Node limit", "Invert", "Ignore background", "Full-size preview"]) {
+    for (const label of ["Denoise", "Upscale", "Corners"]) {
       assert.ok(text.includes(label), `${label} in the block: ${JSON.stringify(text)}`);
     }
+    // Frage 74 A (2026-10-29): Node limit and Full-size preview are gone.
+    for (const label of ["Node limit", "Full-size preview"]) {
+      assert.ok(!text.includes(label), `${label} is not in the block`);
+      assert.equal(await s.evaluate(`!!document.querySelector('[role=toolbar][aria-label=Trace] [aria-label="${label}"]')`), false, `no ${label} control`);
+    }
+    for (const label of ["Invert", "Ignore background"]) {
+      assert.equal(await switchState(s, label), "false", `${label} is an icon toggle (aria-pressed), off by default`);
+      assert.ok(!text.includes(label), `${label} is not drawn as a label`);
+    }
     assert.deepEqual([await radio(s, "Denoise", "Off"), await radio(s, "Denoise", "Low"), await radio(s, "Denoise", "High")], ["true", "false", "false"]);
-    assert.equal(await switchState(s, "Full-size preview"), "false", "off by default");
-    assert.equal(await fieldValue(s, "Node limit"), "", "empty = none");
     // Two columns: the controls sit at two or more distinct x positions.
     const xs = JSON.parse(
-      (await s.evaluate(`JSON.stringify([...new Set([...document.querySelectorAll('[role=radiogroup][aria-label=Denoise],[role=radiogroup][aria-label=Upscale],input[aria-label=Corners],input[aria-label="Node limit"],[role=switch]')].map((e) => Math.round(e.getBoundingClientRect().x / 20)))])`)) as string,
+      (await s.evaluate(`JSON.stringify([...new Set([...document.querySelectorAll('[role=radiogroup][aria-label=Denoise],[role=radiogroup][aria-label=Upscale],[role=spinbutton][aria-label=Corners],[role=toolbar][aria-label=Trace] button[aria-pressed]')].map((e) => Math.round(e.getBoundingClientRect().x / 20)))])`)) as string,
     ) as number[];
     assert.ok(xs.length >= 2, `two columns: ${xs}`);
     // Corners clamps.
@@ -637,52 +676,16 @@ test("0025s2 in Chromium: the Advanced block (criteria 41, 43, 44)", { skip: !BR
     await focusCanvas(s);
     await s.key("i", 73);
     await settle(s);
-    assert.equal(await s.evaluate(`!!document.querySelector('input[aria-label=Corners]')`), true, "open stays open");
+    assert.equal(await s.evaluate(`!!document.querySelector('[role=spinbutton][aria-label=Corners]')`), true, "open stays open");
     await reload(s);
     await importImage(s, "ring2.png", ring);
     await focusCanvas(s);
     await s.key("i", 73);
     await settle(s);
-    assert.equal(await s.evaluate(`!!document.querySelector('input[aria-label=Corners]')`), true, "open survives a reload");
-    await clickText(s, "Advanced");
+    assert.equal(await s.evaluate(`!!document.querySelector('[role=spinbutton][aria-label=Corners]')`), true, "open survives a reload");
+    await clickExpander(s);
     await sleep(300);
-    assert.equal(await s.evaluate(`!!document.querySelector('input[aria-label=Corners]')`), false);
-  } finally {
-    await close();
-  }
-});
-
-test("0025s2 in Chromium: Node limit statuses (criterion 43)", { skip: !BROWSER, timeout: 400_000 }, async () => {
-  const { s, close } = await launch();
-  try {
-    await s.tab("Layers");
-    await importImage(s, "blobs.png", blobs, 300, 300);
-    await focusCanvas(s);
-    await s.key("i", 73);
-    const free = nodesOf(await settle(s));
-    await advanced(s);
-    await typeInto(s, "Node limit", String(free + 5));
-    const same = await settle(s);
-    assert.equal(nodesOf(same), free, "a result at or under N is untouched");
-    assert.ok(!/Node limit/.test(await bar(s)) || /Node limit$/m.test(await bar(s)), "no limit message when under");
-    const limit = Math.floor(free * 0.8);
-    await typeInto(s, "Node limit", String(limit));
-    const reached = await waitFor("the limit status", async () => {
-      const t = await bar(s);
-      return /Node limit (reached|could not)/.test(t) ? t : null;
-    });
-    const line = /Node limit (reached|could not be met)[^\n]*/.exec(reached)![0];
-    console.log("node limit line:", line, "| free:", free, "limit:", limit);
-    assert.match(line, /^Node limit reached: [\d,]+ nodes, tolerance raised\.$|^Node limit could not be met: [\d,]+ nodes\.$/);
-    await typeInto(s, "Node limit", "1");
-    const unmet = await waitFor("the unmet status", async () => {
-      const t = await bar(s);
-      return /Node limit could not be met/.test(t) ? t : null;
-    });
-    assert.match(unmet, /Node limit could not be met: [\d,]+ nodes\./);
-    await typeInto(s, "Node limit", "");
-    await sleep(800);
-    assert.ok(!/Node limit (reached|could not)/.test(await bar(s)), "empty = none");
+    assert.equal(await s.evaluate(`!!document.querySelector('[role=spinbutton][aria-label=Corners]')`), false);
   } finally {
     await close();
   }

@@ -33,6 +33,7 @@ scope.onmessage = (event) => {
       request.height,
       new Float64Array(request.map),
       request.settings,
+      { report: (percent: number) => scope.postMessage({ id: request.id, kind: "progress", percent }) },
     );
     scope.postMessage({ id: request.id, kind: "trace", wire, ms: performance.now() - started }, [wire.buffer]);
   } catch (error) {

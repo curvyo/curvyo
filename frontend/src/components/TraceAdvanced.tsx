@@ -1,21 +1,16 @@
-import { Switch } from "radix-ui";
-import { useId, useRef, useState } from "react";
+import { Contrast, ImageMinus, type LucideIcon } from "lucide-react";
+import { useRef } from "react";
 import type { KeyboardEvent } from "react";
 
+import { ICON_BUTTON_CLASS } from "@/components/TextBar";
 import { TraceField } from "@/components/TraceField";
-import {
-  OVER_4_MPX,
-  type TraceParam,
-  type TraceValues,
-  nodeLimitShown,
-  parseNodeLimit,
-} from "@/lib/traceText";
+import { Tooltip } from "@/components/ui/tooltip";
+import type { TraceParam, TraceStatusText, TraceValues } from "@/lib/traceText";
 
-/** The value each switch of the schema sets (Invert, Ignore background, Full-size preview). */
-const SWITCH_VALUES: Partial<Record<TraceParam["name"], "invert" | "ignoreBackground" | "fullSizePreview">> = {
-  invert: "invert",
-  ignore_background: "ignoreBackground",
-  full_size_preview: "fullSizePreview",
+/** The value and icon each toggle of the schema sets (Invert, Ignore background). */
+const TOGGLES: Partial<Record<TraceParam["name"], { key: "invert" | "ignoreBackground"; icon: LucideIcon }>> = {
+  invert: { key: "invert", icon: Contrast },
+  ignore_background: { key: "ignoreBackground", icon: ImageMinus },
 };
 
 const LABEL_CLASS = "text-xs text-[var(--toolbar-icon)]";
@@ -50,7 +45,7 @@ function ChoicePill({ param, value, onValue, onReturnFocus }: ChoicePillProps) {
   return (
     <div className={CELL_CLASS}>
       <span className={`${LABEL_CLASS} w-16 shrink-0`}>{param.label}</span>
-      <div role="radiogroup" aria-label={param.label} className="flex h-7 overflow-hidden rounded-md border border-[var(--toolbar-icon)]/40" onKeyDown={keyDown}>
+      <div role="radiogroup" aria-label={param.label} className="flex h-7 overflow-hidden rounded-md outline outline-1 -outline-offset-1 outline-[var(--toolbar-icon)]/40" onKeyDown={keyDown}>
         {param.choices.map((choice, index) => {
           const on = index === value;
           return (
@@ -64,7 +59,7 @@ function ChoicePill({ param, value, onValue, onReturnFocus }: ChoicePillProps) {
               aria-checked={on}
               tabIndex={on ? 0 : -1}
               onClick={() => onValue(index)}
-              className={`px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)] ${
+              className={`min-w-7 px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)] ${
                 on ? "bg-[var(--toolbar-icon-active-bg)] text-[var(--toolbar-icon-active-fg)]" : "text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]"
               }`}
             >
@@ -77,105 +72,87 @@ function ChoicePill({ param, value, onValue, onReturnFocus }: ChoicePillProps) {
   );
 }
 
-interface TraceSwitchProps {
+interface TraceToggleProps {
   label: string;
-  checked: boolean;
-  disabled?: boolean;
-  /** A muted state text beside the label ("Over 4 Mpx"). */
-  state?: string;
-  onChange: (checked: boolean) => void;
+  icon: LucideIcon;
+  pressed: boolean;
+  onChange: (pressed: boolean) => void;
+  onReturnFocus: () => void;
 }
 
-/** A switch row (UX notes section 12): label left, switch right, the whole row is the target. */
-function TraceSwitch({ label, checked, disabled = false, state, onChange }: TraceSwitchProps) {
-  const id = useId();
+/** An icon toggle (UX notes 19): the look and wiring of the Glyphs button, no label drawn, the
+ * full label in the tooltip and as the name; Escape returns the focus to the canvas. */
+function TraceToggle({ label, icon: Icon, pressed, onChange, onReturnFocus }: TraceToggleProps) {
+  const on = pressed;
   return (
-    <label
-      htmlFor={id}
-      className={`${CELL_CLASS} cursor-pointer justify-between gap-2 rounded-md px-1 text-sm text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)] has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[var(--editor-accent)]`}
-    >
-      <span className="flex flex-col whitespace-nowrap leading-tight">
-        {label}
-        {state ? <span className={`${LABEL_CLASS} opacity-70`}>{state}</span> : null}
-      </span>
-      <Switch.Root
-        id={id}
+    <Tooltip side="bottom" content={label}>
+      <button
+        type="button"
         aria-label={label}
-        aria-disabled={disabled}
-        checked={checked && !disabled}
-        onCheckedChange={(next) => {
-          if (!disabled) {
-            onChange(next);
-          }
-        }}
-        className={`inline-flex h-[18px] w-8 shrink-0 cursor-pointer items-center rounded-full border-[1.5px] border-[var(--toolbar-icon)] bg-transparent outline-none data-[state=checked]:border-[var(--toolbar-icon-active-bg)] data-[state=checked]:bg-[var(--toolbar-icon-active-bg)] ${disabled ? "opacity-40" : ""}`}
-      >
-        <Switch.Thumb className="block size-3 rounded-full bg-[var(--toolbar-icon)] data-[state=checked]:translate-x-[15px] data-[state=checked]:bg-[var(--toolbar-icon-active-fg)] data-[state=unchecked]:translate-x-[2px]" />
-      </Switch.Root>
-    </label>
-  );
-}
-
-/** The Node limit field (criterion 43): a number, empty for none, thousands separator on blur. */
-function NodeLimitField({ value, onValue, onReturnFocus }: { value: number | null; onValue: (value: number | null) => void; onReturnFocus: () => void }) {
-  const [draft, setDraft] = useState<string | null>(null);
-  const commit = () => {
-    if (draft !== null) {
-      onValue(parseNodeLimit(draft));
-      setDraft(null);
-    }
-  };
-  return (
-    <label className={`${CELL_CLASS} gap-2`}>
-      <span className={`${LABEL_CLASS} w-16 shrink-0`}>Node limit</span>
-      <input
-        inputMode="numeric"
-        aria-label="Node limit"
-        value={draft ?? nodeLimitShown(value)}
-        onChange={(event) => setDraft(event.target.value)}
-        onBlur={commit}
+        aria-pressed={on}
+        onClick={() => onChange(!pressed)}
         onKeyDown={(event) => {
-          if (event.key === "Enter") {
-            event.preventDefault();
-            commit();
-            onReturnFocus();
-          } else if (event.key === "Escape") {
+          if (event.key === "Escape") {
             event.preventDefault();
             event.stopPropagation();
-            setDraft(null);
             onReturnFocus();
           }
         }}
-        className="h-7 w-[88px] rounded-md px-2 text-right text-sm tabular-nums text-[var(--toolbar-icon)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
-        style={{ background: "color-mix(in srgb, var(--toolbar-icon) 8%, transparent)" }}
-      />
-    </label>
+        className={`${ICON_BUTTON_CLASS} ${
+          on ? "bg-[var(--toolbar-icon-active-bg)] text-[var(--toolbar-icon-active-fg)]" : "text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]"
+        }`}
+      >
+        <Icon size={16} strokeWidth={1.5} aria-hidden />
+      </button>
+    </Tooltip>
   );
 }
 
 interface TraceAdvancedProps {
   params: readonly TraceParam[];
   values: TraceValues;
-  /** The shown image has more than 4 Mpx: Full-size preview is disabled. */
-  overFullSizeLimit: boolean;
+  /** The counts line of the last result and its muted line (criterion 11). */
+  status: TraceStatusText;
+  /** The counts belong to an older result (a running or stopped trace): drawn at 50 %. */
+  countsStale: boolean;
   setValue: <K extends keyof TraceValues>(name: K, value: TraceValues[K], dragging?: boolean) => void;
   onEndDrag: () => void;
   onCreate: () => void;
   onReturnFocus: () => void;
+  /** The id `aria-controls` of the expander names. */
+  id: string;
 }
 
 /**
- * The Advanced block (`specs/0025-raster-trace` criteria 41, 43, 44; UX notes section 12): below
- * the result row inside the bar, after a divider, two columns of 168 px: Denoise and Upscale,
- * Corners and Node limit, Invert and Ignore background, Full-size preview.
+ * The Advanced block (`specs/0025-raster-trace` criteria 11, 41, 44, 71; UX notes 20.4, 20.5):
+ * below the main rows inside the bar, after a divider: row 1 the two icon toggles (Invert,
+ * Ignore background) and Denoise, then Upscale and Corners, the counts line always last in a
+ * row of its own.
  */
-export function TraceAdvanced({ params, values, overFullSizeLimit, setValue, onEndDrag, onCreate, onReturnFocus }: TraceAdvancedProps) {
+export function TraceAdvanced({ params, values, status, countsStale, setValue, onEndDrag, onCreate, onReturnFocus, id }: TraceAdvancedProps) {
   const param = (name: TraceParam["name"]) => params.find((p) => p.name === name);
   const denoise = param("denoise");
   const upscale = param("upscale");
   const corners = param("corners");
   return (
-    <div role="group" aria-label="Advanced" className="mt-1 flex flex-wrap gap-x-2 border-t border-[var(--toolbar-icon)]/25 py-1">
+    <div id={id} role="group" aria-label="Advanced" className="mt-1 flex flex-wrap gap-x-2 border-t border-[var(--toolbar-icon)]/25 py-1">
+      <div className="flex h-9 items-center gap-1">
+        {params
+          .filter((p) => p.advanced && p.kind === "toggle")
+          .map((p) => {
+            const toggle = TOGGLES[p.name];
+            return toggle ? (
+              <TraceToggle
+                key={p.name}
+                label={p.label}
+                icon={toggle.icon}
+                pressed={values[toggle.key]}
+                onChange={(v) => setValue(toggle.key, v)}
+                onReturnFocus={onReturnFocus}
+              />
+            ) : null;
+          })}
+      </div>
       {denoise ? <ChoicePill param={denoise} value={values.denoise} onValue={(v) => setValue("denoise", v)} onReturnFocus={onReturnFocus} /> : null}
       {upscale ? <ChoicePill param={upscale} value={values.upscale} onValue={(v) => setValue("upscale", v)} onReturnFocus={onReturnFocus} /> : null}
       {corners ? (
@@ -190,26 +167,13 @@ export function TraceAdvanced({ params, values, overFullSizeLimit, setValue, onE
           />
         </div>
       ) : null}
-      {param("node_limit") ? <NodeLimitField value={values.nodeLimit} onValue={(v) => setValue("nodeLimit", v)} onReturnFocus={onReturnFocus} /> : null}
-      {params
-        .filter((p) => p.advanced && p.kind === "toggle")
-        .map((p) => {
-          const key = SWITCH_VALUES[p.name];
-          if (!key) {
-            return null;
-          }
-          const fullSize = key === "fullSizePreview";
-          return (
-            <TraceSwitch
-              key={p.name}
-              label={p.label}
-              checked={values[key]}
-              disabled={fullSize && overFullSizeLimit}
-              state={fullSize && overFullSizeLimit ? OVER_4_MPX : undefined}
-              onChange={(v) => setValue(key, v)}
-            />
-          );
-        })}
+      {status.counts ? (
+        // Not a live region: the counts are not announced (UX notes 20.4).
+        <div data-trace-counts="" className={`flex min-h-9 basis-full flex-col justify-center py-1 tabular-nums ${countsStale ? "opacity-50" : ""}`}>
+          <span className="text-[var(--toolbar-icon)]">{status.counts}</span>
+          {status.countsMuted ? <span className={`${LABEL_CLASS} opacity-70`}>{status.countsMuted}</span> : null}
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -10,17 +10,20 @@ import { HistoryTab } from "@/components/panel/HistoryTab";
 import { LayersTab } from "@/components/panel/LayersTab";
 import { PanelStrip } from "@/components/panel/PanelStrip";
 import { StyleSection } from "@/components/panel/StyleSection";
+import { TraceInfoPage } from "@/components/panel/TraceInfoPage";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Tooltip } from "@/components/ui/tooltip";
 import type { DocumentPanelApi } from "@/hooks/useDocumentPanel";
 import type { EditorSession } from "@/hooks/useEditorSession";
 import type { PanelOpenApi } from "@/hooks/usePanelOpen";
 import type { ProjectApi } from "@/hooks/useProject";
+import { TRACE_INFO_TAB, type TraceInfoApi } from "@/hooks/useTraceInfo";
 import { useBackgroundPanel } from "@/hooks/useBackgroundPanel";
 import { useFormats } from "@/hooks/useFormats";
 import { useHistoryScope } from "@/hooks/useHistoryScope";
 import { useStylePanel } from "@/hooks/useStylePanel";
 import { appVersion, fileCommandTooltip } from "@/lib/editorSession";
+import { TRACE_INFO_TITLE } from "@/lib/traceText";
 import { isTauri, PLATFORM } from "@/platform/host";
 
 interface PropertiesPanelProps {
@@ -30,6 +33,8 @@ interface PropertiesPanelProps {
   panelOpen: PanelOpenApi;
   /** The open project: the File tab shows it and the strip carries its dirty dot. */
   project: ProjectApi;
+  /** The Trace tool's About Trace tab, last in the strip while the tool is active. */
+  traceInfo: TraceInfoApi;
 }
 
 /**
@@ -52,6 +57,7 @@ export function PropertiesPanel({
   document: doc,
   panelOpen,
   project,
+  traceInfo,
 }: PropertiesPanelProps) {
   const { open, setOpen } = panelOpen;
   const panelId = useId();
@@ -123,11 +129,13 @@ export function PropertiesPanel({
         return;
       }
       if (key === "t") {
+        traceInfo.dismiss();
         shortcut("fonts");
         setOpen(true);
         focusCurrentFont();
         return;
       }
+      traceInfo.dismiss();
       focusAfterShortcut.current = true;
       shortcut(
         key === "f" ? "style" : key === "h" ? "history" : key === "l" ? "layers" : "document",
@@ -136,7 +144,7 @@ export function PropertiesPanel({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [getSession, shortcut, setOpen]);
+  }, [getSession, shortcut, setOpen, traceInfo]);
 
   useEffect(() => {
     if (open && focusAfterShortcut.current) {
@@ -184,14 +192,25 @@ export function PropertiesPanel({
           ? fontsSubject(editor.text.fonts)
           : "";
   const activeLabel = doc.view.tabs.find((tab) => tab.name === doc.view.activeTab)?.label ?? "";
+  // The About Trace tab is the frontend's, appended last so no other tab moves (UX notes 21.1).
+  const tabs = traceInfo.available
+    ? [...doc.view.tabs, { name: TRACE_INFO_TAB, label: TRACE_INFO_TITLE, tooltip: TRACE_INFO_TITLE, enabled: true }]
+    : doc.view.tabs;
+  const aboutActive = traceInfo.available && traceInfo.active;
+  const activeTab = aboutActive ? TRACE_INFO_TAB : doc.view.activeTab;
   /** A press on a tab (or Enter, Space on a focused one) shows the body with that tab. */
   const activate = (name: string) => {
+    if (name === TRACE_INFO_TAB) {
+      traceInfo.choose();
+      return;
+    }
+    traceInfo.dismiss();
     setOpen(true);
     doc.pressTab(name);
   };
   return (
     <Tabs
-      value={doc.view.activeTab}
+      value={activeTab}
       onValueChange={activate}
       orientation="vertical"
       // Hidden, the arrows only move the focus; Enter or Space opens the focused tab.
@@ -199,8 +218,8 @@ export function PropertiesPanel({
       className="flex h-full shrink-0"
     >
       <PanelStrip
-        tabs={doc.view.tabs}
-        active={doc.view.activeTab}
+        tabs={tabs}
+        active={activeTab}
         open={open}
         bodyId={panelId}
         fileDirty={project.dirty}
@@ -273,15 +292,28 @@ export function PropertiesPanel({
         className="properties-panel flex h-full w-[280px] flex-col overflow-hidden bg-[var(--panel-bg)] outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)]"
       >
         <div className="box-content flex h-6 shrink-0 items-center justify-between gap-2 px-3 pt-3 pb-2">
+          {aboutActive ? (
+            <h2 className="shrink-0 text-sm font-normal text-[var(--toolbar-icon)]">{TRACE_INFO_TITLE}</h2>
+          ) : (
+          <>
           <h2 className="shrink-0 text-sm font-normal text-[var(--toolbar-icon)]">{activeLabel}</h2>
           {doc.view.content === "history" && objectSubject ? (
             <ObjectSubject kind={objectSubject.kind} id={objectSubject.id} fullId={objectSubject.fullId} />
           ) : (
             <PanelSubject text={subject} />
           )}
+          </>
+          )}
         </div>
-        {/* Keyed on the tab: the scroll position starts at the top on every
-            tab change (criterion 19). */}
+        {aboutActive ? (
+          <div className="flex min-h-0 flex-1 flex-col px-3 pb-3">
+            <TabsContent value={TRACE_INFO_TAB} tabIndex={-1} className="flex min-h-0 flex-1 flex-col outline-none">
+              <TraceInfoPage onReturnFocus={returnFocus} />
+            </TabsContent>
+          </div>
+        ) : (
+        /* Keyed on the tab: the scroll position starts at the top on every
+            tab change (criterion 19). */
         <div
           key={doc.view.activeTab}
           className={
@@ -358,6 +390,7 @@ export function PropertiesPanel({
             ) : null}
           </TabsContent>
         </div>
+        )}
       </aside>
     </Tabs>
   );

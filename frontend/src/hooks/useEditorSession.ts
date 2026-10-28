@@ -4,6 +4,7 @@ import { type CanvasNotice, type HistoryNames, MAC, useHistory } from "@/hooks/u
 import { type ClonesApi, useClones } from "@/hooks/useClones";
 import { type StrokeToPathApi, useStrokeToPath } from "@/hooks/useStrokeToPath";
 import { type TraceApi, useTrace } from "@/hooks/useTrace";
+import { ViewRest } from "@/lib/viewRest";
 import { isStrokeToPathChord } from "@/lib/strokeToPathText";
 import { type GroupingApi, useGrouping } from "@/hooks/useGrouping";
 import { type OffsetApi, readOffsetView, useOffset } from "@/hooks/useOffset";
@@ -1380,8 +1381,17 @@ export function useEditorSession(
     // The view the clone tags were last placed for: they follow every pan and zoom, whatever
     // moved the view (`0049` UX review must-fix 7).
     let tagView = "";
+    // The Trace tool draws its kept meshes while the view moves and tessellates them again for
+    // the new zoom once it rests (`specs/0025-raster-trace` criterion 56).
+    const viewRest = new ViewRest();
     let frame = requestAnimationFrame(function renderLoop() {
       const session = sessionRef.current;
+      if (session) {
+        const moving = viewRest.update(`${session.view_origin_x()},${session.view_origin_y()},${session.view_scale()}`, performance.now());
+        if (moving !== null) {
+          session.set_trace_view_moving(moving);
+        }
+      }
       session?.render();
       // An image of an opened project whose picture cannot be read, once per open
       // (`specs/0058-bitmap-import` criterion 30).

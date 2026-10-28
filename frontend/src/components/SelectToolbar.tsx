@@ -11,7 +11,7 @@ import type { WeightCode } from "@/lib/styleText";
 import type { AlignCode } from "@/lib/textLayoutText";
 import {
   BarGroup,
-  ExpandButton,
+  TextExpandButton,
   type GlyphsButtonState,
   type Row2State,
   TextControls,
@@ -715,7 +715,7 @@ export function SelectToolbar({
     if (textRow2) {
       groups.push(
         <div key="text-expand" className={GROUP_CLASS}>
-          <ExpandButton row2={textRow2} controls={row2Id} bar={textBar} onReturnFocus={onReturnFocus} />
+          <TextExpandButton row2={textRow2} controls={row2Id} bar={textBar} onReturnFocus={onReturnFocus} />
         </div>,
       );
     }

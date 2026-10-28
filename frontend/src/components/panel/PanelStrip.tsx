@@ -4,6 +4,7 @@ import {
   File,
   FolderOpen,
   History,
+  Info,
   Layers,
   PanelRightClose,
   PanelRightOpen,
@@ -31,6 +32,7 @@ const GLYPHS: Record<string, Glyph> = {
   layers: Layers,
   history: History,
   fonts: CaseSensitive,
+  "trace-info": Info,
 };
 
 /** The tooltips come from the session with the Ctrl key; macOS says Cmd (criterion 4). */
