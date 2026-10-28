@@ -71,9 +71,9 @@ impl Session {
         if self.style.is_active() {
             self.style.apply_to(artwork_objects.to_mut());
         }
-        // The Trace tool dims the images it traces (`specs/0025-raster-trace` criterion 2).
+        // The Trace tool washes the images it traces (`specs/0025-raster-trace` criteria 2, 68).
         if self.tool == Tool::Trace {
-            self.trace_dim(artwork_objects.to_mut());
+            self.trace_wash(artwork_objects.to_mut());
         }
         // Guides in the marking style (`specs/0046-document-shapes` criterion 5).
         let guides = Arc::clone(&self.document_read().guides);

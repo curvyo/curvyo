@@ -23,6 +23,7 @@ mod font_file_glue;
 mod font_library_glue;
 mod font_preview_glue;
 mod session;
+mod trace_glue;
 
 #[cfg(target_arch = "wasm32")]
 mod gpu;
@@ -123,6 +124,7 @@ pub use session::{FrameImages, ImportOutcome, StrokeToPathOutcome, WeldOutcome};
 pub use session::{LayoutOutcome, ObjectToPathOutcome, StyleOutcome, TextBarView, TextSizeOutcome};
 pub use session::{TextPathPress, TextPathView};
 pub use session::{TraceCreateOutcome, TraceSelection, TraceSource, TraceView};
+pub use trace_glue::{trace_params_json, trace_presets_json, trace_settings};
 
 #[cfg(target_arch = "wasm32")]
 pub use wasm_api::{WasmSession, init_panic_hook};

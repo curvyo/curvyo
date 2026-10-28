@@ -5,7 +5,7 @@
 use std::ops::ControlFlow;
 
 use curvyo_document_core::{Affine, Length};
-use curvyo_vectorize_core::{Raster, TraceError, TraceParams, trace};
+use curvyo_vectorize_core::{NodeLimitOutcome, Raster, TraceError, TraceParams, trace};
 use kurbo::{BezPath, PathEl, Point};
 
 /// How a trace job ended.
@@ -54,22 +54,23 @@ pub struct TraceWire {
     pub foreground_pixels: u64,
     /// One outline covers the whole picture.
     pub covers_whole_image: bool,
+    /// What the Node limit did (criterion 43).
+    pub node_limit: NodeLimitOutcome,
     /// The outlines in document millimetres.
     pub outlines: Vec<BezPath>,
 }
 
 /// The numbers before the outlines: status, paths, nodes, specks, foreground pixels, whole
-/// picture, outline count.
-pub const TRACE_WIRE_HEADER: usize = 7;
+/// picture, Node limit outcome (0 untouched, 1 reached, 2 not met), outline count.
+pub const TRACE_WIRE_HEADER: usize = 8;
 
 const MOVE: f64 = 0.0;
 const LINE: f64 = 1.0;
 const CURVE: f64 = 3.0;
 const CLOSE: f64 = 4.0;
 
-/// One trace for the worker: `rgba` (`width` x `height`, straight alpha) mapped by `pixel_map`
-/// (`[a, b, c, d, e, f]`) with the bar's values; the result as numbers. Never panics on bad
-/// input: it says `Invalid`.
+/// One trace with slice 1's three bar values and every other setting at its first-use value;
+/// see [`trace_job_with`].
 #[must_use]
 pub fn trace_job(
     rgba: &[u8],
@@ -84,14 +85,29 @@ pub fn trace_job(
         threshold,
         smooth,
         specks: Length::from_mm(specks_mm),
+        ..TraceParams::with_threshold(threshold)
     };
+    trace_job_with(rgba, width, height, pixel_map, &params)
+}
+
+/// One trace for the worker: `rgba` (`width` x `height`, straight alpha) mapped by `pixel_map`
+/// (`[a, b, c, d, e, f]`) with `params`; the result as numbers. Never panics on bad input: it
+/// says `Invalid`.
+#[must_use]
+pub fn trace_job_with(
+    rgba: &[u8],
+    width: u32,
+    height: u32,
+    pixel_map: [f64; 6],
+    params: &TraceParams,
+) -> Vec<f64> {
     let raster = Raster {
         width,
         height,
         rgba,
     };
     let mut go = |_| ControlFlow::Continue(());
-    match trace(raster, Affine::from_array(pixel_map), &params, &mut go) {
+    match trace(raster, Affine::from_array(pixel_map), params, &mut go) {
         Ok(result) => {
             #[allow(clippy::cast_precision_loss)] // counts far below 2^52
             let mut wire = vec![
@@ -101,6 +117,7 @@ pub fn trace_job(
                 result.counts.specks_removed as f64,
                 result.foreground_pixels as f64,
                 f64::from(u8::from(result.covers_whole_image)),
+                node_limit_code(result.node_limit),
                 result.outlines.len() as f64,
             ];
             for outline in &result.outlines {
@@ -121,6 +138,14 @@ pub fn trace_auto_threshold(rgba: &[u8], width: u32, height: u32) -> u8 {
         height,
         rgba,
     })
+}
+
+fn node_limit_code(outcome: NodeLimitOutcome) -> f64 {
+    match outcome {
+        NodeLimitOutcome::Untouched => 0.0,
+        NodeLimitOutcome::Reached => 1.0,
+        NodeLimitOutcome::NotMet => 2.0,
+    }
 }
 
 fn status_only(status: TraceStatus) -> Vec<f64> {
@@ -184,7 +209,13 @@ pub fn read_trace_wire(wire: &[f64]) -> Option<TraceWire> {
         value.is_finite().then_some(value)
     };
     let point = |next: &mut dyn FnMut() -> Option<f64>| Some(Point::new(next()?, next()?));
-    let outline_count = count(header[6])?;
+    let node_limit = match count(header[6])? {
+        0 => NodeLimitOutcome::Untouched,
+        1 => NodeLimitOutcome::Reached,
+        2 => NodeLimitOutcome::NotMet,
+        _ => return None,
+    };
+    let outline_count = count(header[7])?;
     let mut outlines = Vec::with_capacity(outline_count.min(wire.len()));
     for _ in 0..outline_count {
         let elements = count(next()?)?;
@@ -216,6 +247,7 @@ pub fn read_trace_wire(wire: &[f64]) -> Option<TraceWire> {
         specks_removed: count(header[3])?,
         foreground_pixels: u64::try_from(count(header[4])?).ok()?,
         covers_whole_image: header[5] != 0.0,
+        node_limit,
         outlines,
     })
 }
@@ -254,6 +286,7 @@ mod tests {
         assert_eq!((read.paths, read.nodes, read.specks_removed), (1, 4, 0));
         assert_eq!(read.foreground_pixels, 64);
         assert!(!read.covers_whole_image);
+        assert_eq!(read.node_limit, NodeLimitOutcome::Untouched);
         let b = kurbo::Shape::bounding_box(&read.outlines[0]);
         assert_eq!((b.x0, b.y0, b.x1, b.y1), (3.0, 4.0, 7.0, 8.0));
     }
@@ -288,5 +321,28 @@ mod tests {
         good[TRACE_WIRE_HEADER + 1] = MOVE;
         good[TRACE_WIRE_HEADER + 2] = f64::NAN;
         assert_eq!(read_trace_wire(&good), None);
+    }
+
+    /// Criterion 43: the Node limit's outcome crosses the wire with the full settings.
+    #[test]
+    fn the_node_limit_outcome_crosses_the_wire() {
+        let disc: Vec<u8> = (0..64 * 64)
+            .flat_map(|i| {
+                let (x, y) = (f64::from(i % 64) - 31.5, f64::from(i / 64) - 31.5);
+                let v = if x * x + y * y < 600.0 { 0 } else { 255 };
+                [v, v, v, 255]
+            })
+            .collect();
+        let map = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0];
+        let params = |limit| TraceParams {
+            node_limit: Some(limit),
+            specks: Length::from_mm(0.0),
+            ..TraceParams::with_threshold(128)
+        };
+        let free = read_trace_wire(&trace_job_with(&disc, 64, 64, map, &params(1000))).unwrap();
+        assert_eq!(free.node_limit, NodeLimitOutcome::Untouched);
+        let tight = read_trace_wire(&trace_job_with(&disc, 64, 64, map, &params(1))).unwrap();
+        assert_eq!(tight.node_limit, NodeLimitOutcome::NotMet);
+        assert!(tight.nodes > 1);
     }
 }
