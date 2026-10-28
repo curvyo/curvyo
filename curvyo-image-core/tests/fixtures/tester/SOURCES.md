@@ -5,3 +5,12 @@ a tool). No photograph or third-party picture is included; the pixels are flat c
 
 `fuzz_webp_exif_claims_4gib.webp` (108 bytes) is a reproducer saved by the `decode_webp` cargo-fuzz
 target in `../../fuzz/` (mutated from `../images/webp_*.webp`); its EXIF chunk claims 0xFF00001A bytes.
+
+## Not committed: the large photo of the Trace timing tests
+
+`target/photo/iceberg.jpg` (6.2 MB, 3747 x 3178 px) is downloaded by hand and never committed. It is
+"Iceberg in North Star Bay, Greenland.jpg" by Jeremy Harbeck, NASA, public domain (a work of
+NASA), from Wikimedia Commons:
+`https://commons.wikimedia.org/wiki/File:Iceberg_in_North_Star_Bay,_Greenland.jpg`. Used by
+`curvyo-editor-wasm/tests/acceptance_0025_slice3_photo_timing.rs` (ignored tests) and the
+"re photo" case of `frontend/tests/acceptance_0025_slice3_tester.test.ts`, which skip without it.
