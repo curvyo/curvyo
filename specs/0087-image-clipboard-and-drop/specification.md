@@ -1,0 +1,132 @@
+# Image clipboard, drag and drop, and a preview in the import dialog
+
+Status: Ready (2026-10-28; customer answered Frage 65, 67, 68, 69 on 2026-10-28; no open question for the customer; the architect's `adrs.md` still decides the desktop clipboard route, the desktop drop route and the preview mechanism, including the browser deviation)
+Priority: Should
+Origin: Customer. Request of 2026-10-28 on PR #213 (`0025` slice 1): "for the feature to be really usable we need some side features: an image in the clipboard must be pastable with Ctrl+V, and Ctrl+C must copy it out to paste elsewhere. Drag and drop would be good too. The import dialog lacks an image preview in the file browser." Everything marked **Proposal** is the product owner's and vetoable at the demo.
+Depends on: `0058-bitmap-import` (done, #207: image object, the import commit, placement, limits, notices, file drop on the canvas), `0020-undo-redo`, `0050-layers-and-objects-panel`.
+
+## User value
+
+As a maker who traces and engraves pictures, I want to paste a screenshot or a copied picture straight onto the canvas with Ctrl+V, copy an image out with Ctrl+C, drop a picture on the canvas from the file manager or a browser, and see what a file looks like before I import it, so that getting a picture into the drawing and out again takes one gesture instead of save-file-then-browse-for-it.
+
+**Field reference.**
+
+- *Inkscape.* Ctrl+V pastes a clipboard bitmap as an embedded image (at the pointer, Ctrl+Alt+V in place); Ctrl+C on an object puts SVG (and a PNG of it) on the clipboard; drop of files and of images from a browser works on desktop; the GTK file dialog shows a preview pane for images in the Import dialog.
+- *LightBurn.* Ctrl+V pastes a clipboard image as a bitmap object; drop of files works; Import has no preview.
+- *Illustrator, Affinity.* Paste of a screenshot places the image centred in the view; the Open and Place dialogs of the OS show previews.
+- *What is better here.* One rule for every way in (picker, drop, paste): the same decoder, limits, size and DPI rules and notices as `0058`; nothing is fetched from the network; the maker never sees a dialog for any of them.
+
+## Terms
+
+- **Image object, working image, notices, limits:** as `0058` (criteria 6 to 26). The clipboard, a drop and the picker are three doors into the same import commit.
+- **OS clipboard:** the system clipboard, not an in-app buffer.
+- **Image data:** the bytes of a PNG, JPEG or WebP (identified by content, `0058` criterion 2), whether they come as a file, as clipboard data or as a dropped item.
+
+## What exists today (facts from the code, 2026-10-28; the architect confirms)
+
+- **No clipboard for objects exists.** In `frontend/src` the clipboard is touched only by the text editor's hidden textarea (`hooks/useText.ts`: copy, cut and paste of plain text while a text is in edit mode, `docs/design-system.md` row "Type in a text"). `curvyo-editor-wasm/src` has no copy, paste or clipboard function. Ctrl+X is reserved for a later clipboard Cut (`docs/design-system.md`, Path toolbox row). Duplicate exists only as a Layers toolbar button; no Ctrl+D on objects. `0058` criterion 23 already says copy-paste inside the project adds no second asset, as a rule for when a clipboard exists; ADR 0017 §Clipboard says the plan must check how it is held.
+- **Dropping files on the canvas exists** (`0058` criterion 4, `frontend/src/hooks/useFileDrop.ts`, #207): HTML5 file drag events, dashed outline while hovering, centre at the drop point, anywhere else `dropEffect none`.
+- **The desktop host** (`curvyo-app`, Tauri 2) handles `WindowEvent::DragDrop` only to grant font paths (`src/main.rs`); `tauri.conf.json` does not set `dragDropEnabled`. The Import dialog is `tauri-plugin-dialog` (`blocking_pick_files` with the filters "Drawings and images" and "All files", `src/project.rs`, `pick_import_files`). No clipboard plugin is in `curvyo-app/Cargo.toml`.
+
+## Slices
+
+One story in three slices, one PR each, in this order:
+
+1. **Slice 1: Ctrl+V and Ctrl+C for images** (criteria 1 to 18), browser and desktop.
+2. **Slice 2: drop of image data** (criteria 19 to 25): dropped image data that has no file, and a check that file drops work in the desktop app on Linux, Windows and macOS.
+3. **Slice 3: a preview in the import dialog** (criteria 26 to 29), after the architect's `adrs.md` has chosen the mechanism (Frage 69 B).
+
+## Acceptance criteria
+
+### Slice 1, Part A: paste (Ctrl+V, Cmd+V on macOS)
+
+1. Given the canvas has focus (or nothing editable has), the OS clipboard holds a PNG, JPEG or WebP, and no drag is running, when the maker presses Ctrl+V, then the image is imported by the rules of `0058`: identified by its content (not by a MIME label), one commit with the History name **"Paste image"**, size from the data's DPI else 96 dpi (`0058` criterion 9), scaled down to fit the document with the notice of `0058` criterion 10, the limits and notices of `0058` criteria 16 to 24, the working image of criterion 18, the asset embedded once (criterion 23), added on top of the active layer, not locked (criteria 13 and 14). Afterwards the new image is selected, the Select tool is active and focus is on the canvas, as after Import. No dialog and no panel appears. Test: a paste event carrying a 3000 x 2000 px PNG with `pHYs` 300 dpi gives a 254.0 x 169.33 mm image; a 4000 x 3000 px JPEG without density in an A4 portrait document gives the "Scaled to 20 % to fit the document." notice; Ctrl+Z removes it in one step.
+2. Given the placement (customer, Frage 67 B), then the image centre is **under the pointer** when the pointer is over the canvas, with the clamp of `0058` criterion 12. The pointer position is the last one reported over the canvas while the pointer has not left it. **Fallback (Proposal):** when the pointer is outside the canvas (over a panel, bar or rail, or outside the window), or has not been over the canvas since the app started (a paste by keyboard without a known pointer position), the image centre is the **view centre**. The name register is "Pasted image" (the clipboard has no file name); a second paste is "Pasted image" again (no counter). Test: a paste with the pointer last reported at a known screen point puts the image centre on the matching document point within 1e-6 mm; a paste with the pointer over the right panel, and a paste before any pointer move, put the centre on the view centre.
+3. Given Ctrl+V while a text is in edit mode, or a text field, chip or other editable element has focus, then it does what that element does (a text paste into the text editor, `0074`) and no image is imported. During a drag it is ignored, like every chord.
+4. Given the clipboard holds an image and text at once (a copy from a web page or a spreadsheet), then the **image wins** and the text is ignored (**Proposal**: the canvas has no text paste).
+5. Given the clipboard holds no image (empty, text only, a file list of other types, an SVG file), then nothing is imported and the notice reads "Nothing to paste: the clipboard has no image." (45 characters, `role="status"`, as other notices). Ctrl+V never edits the document in that case and adds no history step. (A clipboard that holds an SVG file is not routed to `0024` in this story; see Out of scope.)
+6. Given the clipboard holds a file copied in the file manager (an image file), then it is imported like image data where the webview delivers the file in the paste event (name from the file, cleaned by `0058` criterion 22); where it does not, criterion 5 applies. This is reported in the PR per platform (Linux, Windows, macOS, browser); it is not a gate.
+7. Given clipboard data that is not a valid image (a PNG header with garbage, a truncated WebP, an unsupported format such as BMP or GIF), then the notices of `0058` criteria 20, 21 and 26 apply and the document is unchanged. Test: the damaged and hostile fixtures of `0058`, pasted, give the same notice and no history step.
+8. Given the paste of an image over the limits of `0058` criterion 17, then the same refusal notices appear and nothing is decoded before the header is checked.
+9. Given a paste while the Trace tool is active (`0025`), then the image is imported and selected, and the tool stays Trace with the new image traced (**Proposal**; the same rule applies to Import). Given any other tool, the Select tool is chosen as `0058` criterion 2 says.
+10. Given the browser build, then the paste is read from the page's `paste` event (`clipboardData` items and files), which needs no permission prompt; given the desktop build, then the same event is used where the webview delivers the image in it, else a hidden text field that has focus catches the paste (architect's decision: no Tauri clipboard plugin, no new dependency). In both builds the maker sees no permission prompt or dialog. Test (browser build, automated): a synthetic `ClipboardEvent` with a PNG file; (desktop, manual check in the PR): a screenshot taken with the OS tool pastes.
+
+### Slice 1, Part B: copy (Ctrl+C, Cmd+C on macOS)
+
+11. Given exactly one image is selected, the canvas has focus and no text is in edit mode, when the maker presses Ctrl+C, then the OS clipboard receives that image as **PNG** and the notice reads "Image copied." (`role="status"`). Pasting it into another program (a browser's text area, Inkscape, GIMP, LibreOffice, a chat) shows the picture. Test (browser build): `navigator.clipboard.write` receives one `ClipboardItem` of type `image/png` whose bytes decode to the image; (desktop): manual check in the PR.
+12. Given the content of the copy, then it is the image's **stored pixels**: the working image as the file showed them (upright after the EXIF rotation of `0058` criterion 8), with its alpha, in sRGB, **without** the object's rotation, flip, skew, opacity or stretch and without any metadata (no EXIF, no ICC, no DPI chunk is promised) (customer, Frage 65 A: stored pixels as PNG). The PNG is written at the working image's size (at most 16 Mpx, 8192 px on the long side); the original bytes are not re-used because a clipboard only carries PNG reliably, and a JPEG or WebP asset is converted. Test: an image of 40 x 20 px with a red marker in the top-left corner (after rotating the object by 90 degrees) copies a PNG with the marker still top-left.
+13. Given several objects are selected, then the **topmost image** of the selection is copied and the notice reads "Copied 1 of 3 images." if more than one image is selected (36 characters); a selection with other objects and exactly one image copies that image with no extra text (**Proposal**). Given a selection with no image (paths, texts, groups, nothing), then Ctrl+C does nothing, shows no notice, and does not stop the browser's own copy of a text selection in a panel field. (There is no object clipboard; see "What exists today".)
+14. Given a copy that takes time (a 16 Mpx image), then the PNG is made without blocking the canvas input for more than 50 ms on the main thread (thread CPU time in the editor harness, `CLAUDE.md` §5) and the notice "Copying..." shows after 400 ms (**Proposal**). The time for a 2000 x 2000 px photo-like image and for a 16 Mpx image is **reported** in the PR, not gated.
+15. Given a copy that fails (the OS clipboard refuses, a secure-context or permission problem in the browser), then the notice reads "Could not copy the image: <short reason>." (at most 70 characters), the document and the clipboard are unchanged. Firefox before the version that supports `ClipboardItem`, and any browser without the API, get "Copying images needs a newer browser." (**Proposal**).
+16. Given the interplay with the text editor, then Ctrl+C in a text edit keeps copying plain text and Ctrl+C in a panel field copies that field's text; Ctrl+C on the canvas never changes them.
+17. Given the interplay with the future object clipboard (Ctrl+C/V/X for paths and groups, not built), then this story does not create one; when it is specified it writes its own format next to the PNG for a single image and must decide what Ctrl+V does with both. Test: none; the rule is recorded in `adrs.md`.
+18. Given the work is done, then `docs/design-system.md` lists Ctrl+V and Ctrl+C in the shortcut table (outside text edit; "Cmd" on macOS) and the notices of this part; the user documentation page "Importing images" (`0058` criterion 47) gains the paste and copy rules; every notice quoted here is the same string in code and in the page (a test compares them).
+
+### Slice 2: dropping image data
+
+19. Given a drop of image files from the file manager on the canvas, then it works as `0058` criterion 4 says in **both builds** (centre at the drop point, one commit named "Import image" or "Import images" for several). Test: the existing test of `useFileDrop`; the PR reports a manual drop on Linux (X11 and Wayland), Windows and macOS for the desktop build. Decision (architect): the desktop app sets `dragDropEnabled: false` so the page receives HTML5 drops on every platform; the desktop font drop, which used the host's `DragDrop` paths, moves to file bytes read in the page. This is part of this slice, not a new story.
+20. Given a drag from a browser or another program that carries image bytes without a file name (a dragged picture in a drop's `DataTransfer` as a file item of type `image/png`, `image/jpeg` or `image/webp`), then it is imported at the drop point with the name "Dropped image" (or the file name if the browser gives one), by the same rules as criterion 1 (History name "Import image").
+21. Given a drop that carries **only a link** (`text/uri-list` or `text/html` with an `<img src>`, no bytes), then **nothing is fetched** (no request leaves the machine, R-SYS-007) and the notice reads "That drop is a link, not an image. Nothing was downloaded." (customer, Frage 68 A; no tip sentence, `role="alert"`, the refusal look). Test: a drop with only a `text/uri-list` makes no network request (the test's fetch stub is never called) and shows the notice.
+22. Given a drop of several files that mix images and other types, then the images import, the others give one merged notice as `0058` criterion 5 says; a dropped `.curvyo` file opens nothing.
+23. Given a drop on the panel, rail, rulers or any non-canvas area, then the drop effect is `none` and nothing happens (`0058` criterion 4); while an image hovers over the canvas the dashed 2 px outline shows (no text).
+24. Given a drop during the Trace tool, then the same rule as criterion 9 applies.
+25. Given the work is done, then the user page of `0058` lists the drop rules (files, image data, links) and the desktop and browser differences found.
+
+### Slice 3: a preview in the import dialog (Frage 69 B; the mechanism is the architect's)
+
+Customer reference (2026-10-28): GIMP and Inkscape on Linux use the GTK file chooser with a preview pane, an "Enable preview" checkbox, the image and its pixel size. Frage 69 B: an own preview, "if that is possible in the browser, else a deviation for native".
+
+26. Given the maker presses Import (the rail button or Ctrl+I) on the **desktop build** on Linux, Windows and macOS, then the import dialog shows, for the image file currently selected in it, a **preview of the image together with its pixel size** (for example "3000 x 2000 px"): the image fits a preview area of at least 128 x 128 px with its aspect kept, and the size line is read from the file header without decoding the pixels. Moving the selection to another file updates it; a non-image file, a folder and an unreadable file show no image and no size. The preview needs no setting that the maker must switch on. Mechanism (architect's decision): on **Linux** an own preview pane (image plus pixel size) in the import dialog; on **Windows and macOS** the OS dialog's own preview is kept (Windows: the preview pane, toggled once with Alt+P), recorded as a **deviation** from "nothing to switch on" on those two OSes. Test: manual check per OS in the PR with a 3000 x 2000 px PNG and a JPEG; where an own preview exists, the unit test of its thumbnail function (a 3000 x 2000 px PNG gives a thumbnail whose longest side is 256 px, aspect kept, within 1 px) and of the size line ("3000 x 2000 px").
+27. Given the **browser build**, then the browser's own file picker is used **without a preview** (architect's decision: a web page cannot add one to it without an own dialog); this is recorded as a **deviation** in `adrs.md` and stated in the user documentation.
+28. Given any preview, native or own, then it reads only the file the maker selects in the dialog, shows no image for a file over the ceilings of `0058` criterion 17 (the name and "Too large" instead, never decoded), decodes through the same bounded decoder as the import, never writes, never leaves the machine, and shows an unreadable file as its name only.
+29. Given the dialog is cancelled, then nothing changes (`0058` criterion 1) and focus returns to the Import button.
+
+## Out of scope
+
+- **Object clipboard** for paths, texts and groups (Ctrl+C/V/X of drawing objects, Paste in place, Paste style): a separate story; this one copies and pastes images only.
+- **Ctrl+X** on an image (cut), **Duplicate** (Ctrl+D) and copying an image's transform to the clipboard.
+- **Pasting or dropping SVG** from the clipboard or as dropped text (SVG files by file drop and picker are `0024` and keep working); pasting SVG source text; pasting a vector from other programs.
+- **Fetching an image from a URL** (dropped or pasted link), link previews, drag out of Curvyo to other programs (dragging an image from the canvas to a file manager).
+- **Copy of the image with its transform, opacity or a crop**, copy as SVG, JPEG or WebP, and copying a rendered area of the drawing (that is an export).
+- **Several images on the clipboard** (the OS clipboard holds one picture).
+- **Colour management** of clipboard images (sRGB only, `0058` criterion 7).
+- **A general file manager** (folder tree, sorting, search, rename, delete) beyond what the preview needs; the mechanism of the preview is the architect's decision.
+- **Mobile** clipboard and drop.
+
+## Decided by the product owner (Proposal, vetoable at the demo)
+
+- **D1. Image only, no object clipboard.** The customer asked for images; an object clipboard is a document-model story with format questions (ADR on persistence).
+- **D2. Paste goes under the pointer, else to the view centre** (customer, Frage 67 B; the fallback is a Proposal), with the History name "Paste image".
+- **D3. Copy writes the stored pixels as PNG** (customer, Frage 65 A), because it is exact, small and predictable; a PNG is the one format all programs read from a clipboard.
+- **D4. Nothing is ever fetched from the network.** A dropped link is refused with a notice (customer, Frage 68 A); R-SYS-007.
+- **D5. The import dialog shows the selected image and its pixel size** (customer, Frage 69 B); in the browser if possible, else a recorded deviation.
+
+## Open questions
+
+None for the customer. Open items for the architect only: the desktop clipboard route (criterion 10), the desktop drop route (criterion 19), the preview mechanism per OS and whether it is possible in the browser (criteria 26 and 27).
+
+## Decided by the customer (2026-10-28)
+
+- **Frage 65 (CLIP-COPY-CONTENT): A.** Ctrl+C puts the image's stored pixels on the clipboard as PNG (criterion 12).
+- **Frage 67 (CLIP-PASTE-PLACE): B.** A pasted image goes under the pointer. The fallback for a pointer outside the canvas or an unknown pointer position is the view centre (criterion 2; the fallback is the product owner's Proposal).
+- **Frage 68 (DROP-URL): A.** A dropped link is never fetched; the notice reads "That drop is a link, not an image. Nothing was downloaded." with no tip sentence (criterion 21).
+- **Frage 69 (PICKER-PREVIEW): B.** An own preview of the selected image with its pixel size in the import dialog, "if that is possible in the browser, else a deviation for native". He showed GIMP and Inkscape on Linux with the GTK file chooser preview pane ("Enable preview" checkbox, image plus pixel size) as the model (criteria 26 to 28).
+
+## UX notes
+
+[`ux-notes.md`](ux-notes.md) (ux-engineer, 2026-10-28) covers the notices' placement, the drop outline for image data and the preview. Where it differs from this spec, this spec wins (it applies the customer's answers of 2026-10-28).
+
+## Notes for the architect
+
+- **Desktop clipboard.** Whether the webview's `paste` event carries an image (WebKitGTK, WebView2, WKWebView differ) and whether `navigator.clipboard.write` with `image/png` works in the Tauri webview (secure-context rules for the `tauri://` or `http://tauri.localhost` origin). If not, a clipboard plugin (`tauri-plugin-clipboard-manager` reads and writes images as RGBA; check licence with `cargo deny`, capability scoping, a new dependency and ADR). A PNG encoder is available in `image` (already pinned for `0058`); the copy runs off the main thread (worker or a host command).
+- **Desktop drop.** `dragDropEnabled` (default true) makes the host receive the OS drop (paths) and, on Windows, stops HTML5 drops in the page; `main.rs` uses the event for fonts only. Decide the route: page events everywhere, or host event paths to the importer.
+- **Import dialog preview (Frage 69 B).** `tauri-plugin-dialog` uses `rfd`, which on Linux uses the xdg desktop portal or GTK3 and exposes no preview widget; Windows' common dialog and macOS's NSOpenPanel have their own preview/thumbnail views that the user switches on. The customer wants the selected image and its pixel size shown without switching anything on, on all three desktop OSes. Decide the mechanism per OS (GTK preview widget, own dialog or sheet, other), record it, and say whether the same is possible in the browser; if not, record the browser deviation (criterion 27).
+- **Paste placement (Frage 67 B).** The page needs the last pointer position over the canvas for a keyboard paste; say where it is tracked and how it maps to document millimetres (criterion 2).
+- **One import door.** Picker, drop and paste hand bytes to the same import command; only the History name and the default object name differ.
+- **Asset sharing.** A copied PNG pasted back is a re-encode of a JPEG or WebP asset and adds a second asset (the bytes differ); acceptable, noted in the user page.
+
+## Links
+
+Requirements: R-EDIT-037 (bitmap import), R-SYS-007 (nothing leaves the machine), R-SYS-002 (offline).
+Related specs: `0058-bitmap-import` (criteria 1 to 26, 47), `0025-raster-trace` (images are traced; slices 2 and 3), `0020-undo-redo`, `0050-layers-and-objects-panel`, `0074-text-objects` (text clipboard).
+PR: none yet.
