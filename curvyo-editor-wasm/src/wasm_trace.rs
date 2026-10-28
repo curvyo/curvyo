@@ -4,7 +4,6 @@
 //! as the JSON of their node id; the sentences are the host's (ADR 0001 §5).
 
 use curvyo_document_core::NodeId;
-use curvyo_ui_core::{TRACE_PARAMS, TraceParamKind, TraceParamUnit};
 use wasm_bindgen::prelude::*;
 
 use crate::session::{TraceCreateOutcome, TraceSelection};
@@ -23,21 +22,29 @@ fn id_of(text: &str) -> Option<NodeId> {
 }
 
 /// One trace for the worker (criterion 17): `rgba` (`width` x `height`, straight alpha) mapped
-/// by `map` (`[a, b, c, d, e, f]`) with the bar's values; the result as the flat numbers of
-/// `curvyo_ui_core::trace_job`. Never throws: bad input reads as the status "invalid".
+/// by `map` (`[a, b, c, d, e, f]`) with `settings` (JSON: `threshold`, `smooth`, `specks` in mm,
+/// `corners`, `upscale` and `denoise` as choice indices, `node_limit` or null, `invert`,
+/// `ignore_background`); the result as the flat numbers of `curvyo_ui_core::trace_job_with`.
+/// Never throws: bad input reads as the status "invalid".
 #[wasm_bindgen]
 #[must_use]
-pub fn trace_job(
-    rgba: &[u8],
-    width: u32,
-    height: u32,
-    map: &[f64],
-    threshold: u8,
-    smooth: u8,
-    specks_mm: f64,
-) -> Vec<f64> {
+pub fn trace_job(rgba: &[u8], width: u32, height: u32, map: &[f64], settings: &str) -> Vec<f64> {
     let map: [f64; 6] = map.try_into().unwrap_or([f64::NAN; 6]);
-    curvyo_ui_core::trace_job(rgba, width, height, map, threshold, smooth, specks_mm)
+    curvyo_ui_core::trace_job_with(
+        rgba,
+        width,
+        height,
+        map,
+        &crate::trace_glue::trace_settings(settings),
+    )
+}
+
+/// The presets as JSON (criteria 59 and 60), in menu order: a list of `{key, label, detail,
+/// values: {smooth, specks, corners, upscale, denoise}}`.
+#[wasm_bindgen]
+#[must_use]
+pub fn trace_presets() -> String {
+    crate::trace_glue::trace_presets_json()
 }
 
 /// The automatic Threshold of a picture (criterion 9), for the worker.
@@ -47,31 +54,13 @@ pub fn trace_auto_threshold(rgba: &[u8], width: u32, height: u32) -> u8 {
     curvyo_ui_core::trace_auto_threshold(rgba, width, height)
 }
 
-/// The settings schema as JSON (criterion 6): a list of `{name, label, kind, unit, min, max,
-/// default, step, big_step, fine_step, group, advanced}` the bar's fields are made from.
+/// The settings schema as JSON (criteria 6 and 45): a list of `{name, label, kind, unit, min,
+/// max, default, step, big_step, fine_step, group, advanced, choices}` the bar's fields and the
+/// Advanced block are made from, the bar's first, then the Advanced block's in its order.
 #[wasm_bindgen]
 #[must_use]
 pub fn trace_params() -> String {
-    let list: Vec<serde_json::Value> = TRACE_PARAMS
-        .iter()
-        .map(|p| {
-            serde_json::json!({
-                "name": p.name,
-                "label": p.label,
-                "kind": match p.kind { TraceParamKind::Integer => "integer", TraceParamKind::Length => "length" },
-                "unit": match p.unit { TraceParamUnit::None => "", TraceParamUnit::Millimetre => "mm" },
-                "min": p.min,
-                "max": p.max,
-                "default": p.default,
-                "step": p.step,
-                "big_step": p.big_step,
-                "fine_step": p.fine_step,
-                "group": p.group,
-                "advanced": p.advanced,
-            })
-        })
-        .collect();
-    serde_json::Value::Array(list).to_string()
+    crate::trace_glue::trace_params_json()
 }
 
 /// What the Trace bar reads.

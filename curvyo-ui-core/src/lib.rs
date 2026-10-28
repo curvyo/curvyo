@@ -184,7 +184,9 @@ pub use conversion::{build_primitive_conversions, primitive_as_path};
 pub use curvyo_svg_core::SvgDrawing;
 /// The Trace tool's settings schema (criterion 6), passed through for the host.
 pub use curvyo_vectorize_core::{
-    PARAMS as TRACE_PARAMS, ParamKind as TraceParamKind, ParamUnit as TraceParamUnit,
+    ADVANCED_PARAMS as TRACE_ADVANCED_PARAMS, Denoise as TraceDenoise,
+    NodeLimitOutcome as TraceNodeLimit, PARAMS as TRACE_PARAMS, PRESETS as TRACE_PRESETS,
+    ParamKind as TraceParamKind, ParamUnit as TraceParamUnit, TraceParams, Upscale as TraceUpscale,
 };
 pub use cut::{CUT_COMMIT_LABEL, CutPlan, CutRefusal, MAX_CUT_PIECES, plan_cut};
 pub use cuttable::{
@@ -413,6 +415,7 @@ pub use text_path_edit::{
 pub use trace_plan::{TracePlan, TraceTarget, plan_trace, trace_group_name, trace_style};
 pub use trace_transfer::{
     TRACE_WIRE_HEADER, TraceStatus, TraceWire, read_trace_wire, trace_auto_threshold, trace_job,
+    trace_job_with,
 };
 pub use transform_drag::{
     CornerLinking, CornerRadiusScaling, ParamDragInfo, ScaleModes, StrokeScaling,

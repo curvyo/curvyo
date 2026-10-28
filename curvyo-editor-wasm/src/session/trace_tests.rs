@@ -235,3 +235,58 @@ fn create_paths_is_one_step_over_several_images() {
     session.undo();
     assert_eq!(session.document.object_ids(), images);
 }
+
+/// Criterion 68 (b): the traced image is washed by white at 65 % directly above it, over its
+/// frame; nothing is washed outside the tool's selection.
+#[test]
+fn the_traced_image_gets_a_white_wash() {
+    let mut session = Session::new(1);
+    let images = import_images(&mut session, 2);
+    session.set_tool(Tool::Trace);
+    session.selection.set(&images[..1]);
+    let mut objects = session.objects().to_vec();
+    session.trace_wash(&mut objects);
+    assert_eq!(objects.len(), 3);
+    let ObjectSnapshot::Image(image) = &objects[0] else {
+        panic!("the image first");
+    };
+    let ObjectSnapshot::Path(wash) = &objects[1] else {
+        panic!("the wash directly above the image");
+    };
+    assert!(wash.closed && !wash.style.stroke.enabled);
+    let fill = &wash.style.fill;
+    assert!(fill.enabled && (fill.color.r, fill.color.g, fill.color.b) == (255, 255, 255));
+    assert!((fill.opacity.get() - 0.65).abs() < 1e-12);
+    let corners: Vec<Point> = wash.anchors.iter().map(|a| a.point).collect();
+    assert_eq!(corners, image.corners());
+    assert!(
+        matches!(objects[2], ObjectSnapshot::Image(_)),
+        "the other image is not washed"
+    );
+}
+
+/// Criteria 30 and 68 (a): the counts of each written group, for its Layers row's tooltip.
+#[test]
+fn each_trace_group_keeps_its_counts_for_the_layers_tooltip() {
+    let mut session = Session::new(1);
+    let images = import_images(&mut session, 2);
+    session.set_tool(Tool::Trace);
+    give_results(&mut session, &images);
+    session.create_traced_paths();
+    let order = session.document.object_ids();
+    for &image in &images {
+        let at = order.iter().position(|&id| id == image).unwrap();
+        let group = session.document.parent_group(order[at + 1]).unwrap();
+        assert_eq!(session.traced_counts(group), Some((1, 4)));
+        assert_eq!(session.traced_counts(image), None);
+    }
+    let json: serde_json::Value = serde_json::from_str(&session.layers_view_json(0, 20)).unwrap();
+    let traced: Vec<&serde_json::Value> = json["rows"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|row| !row["traced"].is_null())
+        .collect();
+    assert_eq!(traced.len(), 2);
+    assert_eq!(traced[0]["traced"], serde_json::json!([1, 4]));
+}

@@ -435,6 +435,8 @@ pub struct Session {
     text_path: text_on_path::TextPathState,
     /// The Trace tool's preview and results (`trace.rs`).
     trace: trace::TraceState,
+    /// The groups Create paths wrote and their counts (`trace.rs`).
+    traced_groups: trace::TracedGroups,
 }
 
 impl Session {
@@ -512,6 +514,7 @@ impl Session {
             text: text::TextState::default(),
             text_path: text_on_path::TextPathState::default(),
             trace: trace::TraceState::default(),
+            traced_groups: Vec::new(),
         }
     }
 
@@ -585,6 +588,7 @@ impl Session {
             text: text::TextState::default(),
             text_path: text_on_path::TextPathState::default(),
             trace: trace::TraceState::default(),
+            traced_groups: Vec::new(),
         };
         // A file another tool wrote can hold clones whose original is gone (`0049` criterion 35).
         session.remove_orphans_after_open();

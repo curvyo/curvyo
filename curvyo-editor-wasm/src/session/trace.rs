@@ -4,7 +4,10 @@
 
 use std::sync::Arc;
 
-use curvyo_document_core::{ImageSnapshot, NodeId, ObjectSnapshot, Opacity, Point, ViewTransform};
+use curvyo_document_core::{
+    AnchorId, AnchorKind, AnchorSnapshot, Angle, Color, DrawingNode, Fill, ImageSnapshot, NodeId,
+    ObjectSnapshot, Opacity, PathSnapshot, Point, Stroke, Style, Vec2, ViewTransform,
+};
 use curvyo_render_core::{DrawList, PreviewAnchor};
 use curvyo_ui_core::{
     TraceStatus, TraceTarget, TraceWire, hit_test_objects, plan_trace, read_trace_wire,
@@ -13,8 +16,9 @@ use curvyo_ui_core::{
 use super::select::DoubleClickHint;
 use super::{Session, Tool};
 
-/// The strength of a traced image under the preview (criterion 2: dimmed to 35 %).
-const TRACE_DIM: f64 = 0.35;
+/// The wash over a traced image under the preview (criteria 2 and 68 b, UX notes section 4): the
+/// image dimmed to 35 % by white at 65 % on the light theme (the only theme so far).
+const TRACE_WASH: f64 = 0.65;
 
 /// The preview outline of one image, cached for every frame (criterion 8).
 #[derive(Debug, Clone, PartialEq)]
@@ -36,6 +40,11 @@ pub(super) struct TraceState {
     /// The full-size results Create paths writes, per image.
     results: Vec<(NodeId, TraceWire)>,
 }
+
+/// The counts of each group Create paths wrote in this session, for its Layers row's tooltip
+/// (criteria 30 and 68 a): group, outlines, anchors. Not in the document; kept when the tool is
+/// left.
+pub(super) type TracedGroups = Vec<(NodeId, usize, usize)>;
 
 /// What the selection is to the Trace tool.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -248,6 +257,11 @@ impl Session {
                 .flat_map(|&group| this.document.leaves_of(group))
                 .collect();
             let images = plan.items.len();
+            for (&group, (_, node)) in groups.iter().zip(&plan.items) {
+                let (paths, nodes) = drawn_counts(node);
+                this.traced_groups.retain(|(id, _, _)| *id != group);
+                this.traced_groups.push((group, paths, nodes));
+            }
             this.set_tool(Tool::Select);
             this.selection.set(&leaves);
             this.hovered_object = None;
@@ -297,16 +311,29 @@ impl Session {
         }
     }
 
-    /// The traced images drawn at 35 % (criterion 2).
-    pub(super) fn trace_dim(&self, objects: &mut [ObjectSnapshot]) {
+    /// The outlines and anchors Create paths wrote into `group` in this session, if it did.
+    #[must_use]
+    pub fn traced_counts(&self, group: NodeId) -> Option<(usize, usize)> {
+        self.traced_groups
+            .iter()
+            .find(|(id, _, _)| *id == group)
+            .map(|&(_, paths, nodes)| (paths, nodes))
+    }
+
+    /// The traced images washed to 35 % (criteria 2 and 68 b): a white quad at 65 % directly
+    /// above each, under everything stacked above the image and under the preview outline.
+    pub(super) fn trace_wash(&self, objects: &mut Vec<ObjectSnapshot>) {
         let view = self.trace_view();
-        for object in objects {
-            if let ObjectSnapshot::Image(image) = object
+        let mut at = 0;
+        while at < objects.len() {
+            if let ObjectSnapshot::Image(image) = &objects[at]
                 && view.images.contains(&image.id)
             {
-                let dimmed = image.shown_opacity.get() * TRACE_DIM;
-                image.shown_opacity = Opacity::new(dimmed).unwrap_or(image.shown_opacity);
+                let wash = ObjectSnapshot::Path(wash_over(image));
+                objects.insert(at + 1, wash);
+                at += 1;
             }
+            at += 1;
         }
     }
 
@@ -343,6 +370,63 @@ impl Session {
             .collect();
         let strength = if preview.stale { 0.5 } else { 1.0 };
         curvyo_render_core::build_preview_outline(&shown, view, strength)
+    }
+}
+
+/// The outlines and anchors of a planned trace group's compound path.
+fn drawn_counts(node: &DrawingNode) -> (usize, usize) {
+    let DrawingNode::Group { children, .. } = node else {
+        return (0, 0);
+    };
+    children
+        .iter()
+        .filter_map(|child| match child {
+            DrawingNode::Path { outlines, .. } => Some(outlines),
+            _ => None,
+        })
+        .flatten()
+        .fold((0, 0), |(paths, nodes), outline| {
+            (paths + 1, nodes + outline.anchors.len())
+        })
+}
+
+/// A white quad over `image`'s frame at [`TRACE_WASH`] of the image's own strength; it carries
+/// the image's id and is never a document node.
+fn wash_over(image: &ImageSnapshot) -> PathSnapshot {
+    let anchors = image
+        .corners()
+        .into_iter()
+        .zip(0_u64..)
+        .map(|(point, n)| AnchorSnapshot {
+            id: AnchorId::new(0, n),
+            point,
+            handle_in: Vec2::ZERO,
+            handle_out: Vec2::ZERO,
+            kind: AnchorKind::Corner,
+        })
+        .collect();
+    let strength = image.shown_opacity.get() * TRACE_WASH;
+    PathSnapshot {
+        id: image.id,
+        closed: true,
+        style: Style {
+            stroke: Stroke {
+                enabled: false,
+                ..Stroke::default()
+            },
+            fill: Fill {
+                enabled: true,
+                color: Color {
+                    r: 255,
+                    g: 255,
+                    b: 255,
+                },
+                opacity: Opacity::new(strength).unwrap_or(Opacity::OPAQUE),
+            },
+        },
+        anchors,
+        extra_subpaths: Vec::new(),
+        rotation: Angle::from_radians(0.0),
     }
 }
 

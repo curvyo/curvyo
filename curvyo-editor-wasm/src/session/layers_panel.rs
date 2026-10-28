@@ -226,7 +226,14 @@ impl Session {
             .window(first, count)
             .iter()
             .enumerate()
-            .map(|(offset, row)| row_json(row, first + offset))
+            .map(|(offset, row)| {
+                let mut json = row_json(row, first + offset);
+                // The trace group's tooltip repeats the success notice (`0025` criteria 30, 68).
+                json["traced"] = self
+                    .traced_counts(row.id)
+                    .map_or(Value::Null, |(paths, nodes)| json!([paths, nodes]));
+                json
+            })
             .collect();
         json!({
             "count": rows.len(),
