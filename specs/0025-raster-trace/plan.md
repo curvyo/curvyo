@@ -218,3 +218,93 @@ equals `candidate` (goldens unchanged). Final values are criterion 60's.
 
 Run: `cargo test --release -p curvyo-vectorize-core --test quality -- --ignored --nocapture` and
 `cargo test --release -p curvyo-vectorize-core --lib -- --ignored`.
+
+# Plan for Raster trace, slice 3 (comparing, large images, failure)
+
+Implementer, 2026-10-28, on `story/raster-trace-view` (from `main` `84942751`). Design: ADR 0023 §5
+(worker, cancel by terminate), `ux-notes.md` sections 13 to 15. Slice 3 = criteria 51 to 58
+(53 and 58 mostly built in slice 1, verified here); colours stay Later.
+
+## Affected crates/modules
+
+- **`curvyo-editor-wasm`:** `session/trace.rs` grows the view of the Trace tool (Overlay, Trace,
+  Image), the held peek and the Shift+`\` cycle; `draw.rs` draws per view (Trace view: the
+  shown image replaced by the black fill of its preview, cached at `set_trace_preview`; Image view:
+  neither wash nor outline); the wasm surface (`wasm_trace.rs`). Budget tests: the redraw of a
+  100,000-node preview on pan and zoom (criterion 56), the main-thread handlers of a trace on a
+  16 Mpx image (criterion 58), both thread CPU time.
+- **`frontend`:** `traceText` (view names, "Stopped", "Trace again", the reduced-copy line, the
+  slow-to-edit status, the failure reason and card text); `useTrace` (preview over 4 Mpx is the
+  reduced copy only, Create paths over 4 Mpx with Stop at once and "Tracing at full size...", the
+  stale state while running and after Stop, Trace again, the failure card and Retry, the view and
+  the peek); `TraceBar` (View pill in row 1, Stop or Trace again slot, failure card under the bar);
+  the `\` keys in `useEditorSession`.
+- **docs:** user page "Tracing an image" (View, peek, large images, failure), `docs/design-system.md`
+  rows (View pill, `\` shortcut, failure card, Trace again).
+
+## Tasks
+
+Milestone 6, session (tests first):
+- [x] 28. View of the Trace tool, peek and cycle in the session; draw per view; dropped on leaving
+      (AC 51).
+- [x] 29. One group, one step for a result over 20,000 nodes (AC 55 second half).
+- [x] 30. Budget tests: 100,000-node preview pan and zoom under 16 ms in Overlay and Trace (AC 56); main-thread trace
+      handlers on a 16 Mpx image under 50 ms (AC 58).
+
+Milestone 7, frontend and docs:
+- [x] 31. `traceText`: views, stale and stopped words, reduced-copy line, slow-to-edit status,
+      failure text; tests (AC 52, 53, 54, 55).
+- [x] 32. `useTrace`: over 4 Mpx, running and stopped stale state, Trace again, failure and Retry,
+      view and peek (AC 51 to 54, 58).
+- [x] 33. `TraceBar`: View pill, Stop or Trace again, failure card, Tab order, `\` keys (AC 51, 54, 57).
+- [x] 34. Docs: user page and design-system rows; notice strings test (AC 35 for the new strings).
+- [x] 35. Kept meshes (lead, 2026-10-28): the outline and the Trace view's fill tessellated once
+      per result and zoom (`trace_mesh.rs`), drawn as they are while the view moves, again for the
+      new zoom 150 ms after it rests (`frontend/src/lib/viewRest.ts`) (AC 56).
+- [x] 36. Quality baseline (lead, 2026-10-28): criterion 65 is about the trace; since #215 the
+      preset runs measure against the mask after the preset's Specks, so `candidate` is measured
+      the same way and re-stored. Only 03 text 300 dpi moved (max deviation 9.46 to 7.02 px, area
+      error 6.15 to 6.10 %); the trace and the goldens are byte-identical (AC 28, 65).
+
+## Validation
+
+- Session tests in `curvyo-editor-wasm` for the views, the peek, the large result in one step.
+- Release budget tests (thread CPU time) for criteria 56 and 58; numbers in the PR description.
+  Measured (build host, 107,202-node trace whole in view): Overlay frames at rest, pan and zoom
+  5.2 ms; Trace view 0.9 to 1.2 ms; the one frame that tessellates after a rest about 50 ms
+  (Overlay) and 105 ms (Trace), reported.
+- `npm test`: the new strings and rules in `traceText`; the Chromium layout test at 800 x 600,
+  panel open and closed, with the View pill in row 1.
+
+# Plan for Raster trace, round 3 (customer feedback 2026-10-29, `ux-notes.md` section 21)
+
+Implementer, 2026-10-29, on `story/raster-trace-view`. Criteria 4, 10, 11, 12, 52, 53, 54, 57, 70, 71.
+
+## Affected crates/modules
+
+- **`curvyo-ui-core`:** `trace_transfer` reports a monotonic percentage of a job
+  (`trace_job_reporting`, built on the tracer's existing `Progress`; Labelling 0 to 30 %, the outlines
+  30 to 100 %, one call per whole percent).
+- **`curvyo-editor-wasm`:** `trace_job` takes an optional progress sink (an object with `report`).
+- **`frontend`:** the worker posts progress messages; `TraceRunner` hands them to the job;
+  `useTrace` drops the 1.5 s timer and the failure card text in favour of one slot state
+  (running with percent, stopped, failed with reason); `TraceBar` draws the slot after Specks and
+  the expander at the far right, the notice row with result messages only; `useTraceInfo` and
+  `PropertiesPanel`/`PanelStrip` make About Trace a tab last in the strip while the tool is active
+  (a frontend tab on top of the session's active tab, so no core change; **Proposal**).
+
+## Tasks
+
+- [x] 37. `trace_job_reporting` in ui-core, test first: percent rises, never falls, ends at 100 (AC 10).
+- [x] 38. Wasm `trace_job` with the optional sink; worker and runner progress messages (AC 10).
+- [x] 39. `useTrace`/`TraceBar`: slot (running pill with percent and x at 400 ms, at once over 4 Mpx;
+      Stopped + Retry; Failed + Retry with tooltip and hidden alert), failure card, 2 px line,
+      `aria-busy`, "Tracing..." removed; notice row; Threshold-Smooth 4 px; expander last
+      (AC 4, 10, 11, 12, 52, 53, 54, 57, 71).
+- [x] 40. About Trace tab and the kept "i" button (AC 70).
+- [x] 41. Unit and Chromium tests updated; 800 x 600 layout and hit targets; screenshots (AC 4, 57, 70, 71).
+
+## Validation
+
+ui-core unit test for the percent; `npm test` for traceText and the hooks; the 0025 Chromium tests
+(slot states, tab, Tab order, 800 x 600 rows); full gate once.
