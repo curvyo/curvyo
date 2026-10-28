@@ -148,6 +148,8 @@ mod text_writing;
 mod text_writing_tests;
 mod tolerances;
 mod trace;
+mod trace_draw;
+mod trace_mesh;
 #[cfg(test)]
 mod trace_tests;
 mod transform_entry;
@@ -208,6 +210,7 @@ pub use text_on_path_pick::TextPathPress;
 pub use text_path::ObjectToPathOutcome;
 pub use text_style::StyleOutcome;
 pub use trace::{TraceCreateOutcome, TraceSelection, TraceSource, TraceView};
+pub use trace_draw::TraceViewMode;
 pub use weld::WeldOutcome;
 
 pub use open_error::map_open_error;

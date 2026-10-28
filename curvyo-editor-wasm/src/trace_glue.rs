@@ -9,7 +9,7 @@ use curvyo_ui_core::{
 };
 
 /// `settings` (the host's JSON: `threshold`, `smooth`, `specks` in mm, `corners`, `upscale` and
-/// `denoise` as choice indices, `node_limit` or null, `invert`, `ignore_background`) as trace
+/// `denoise` as choice indices, `invert`, `ignore_background`) as trace
 /// values (criteria 41, 60); a missing or unreadable field takes its first-use value.
 pub fn trace_settings(settings: &str) -> TraceParams {
     let json: serde_json::Value = serde_json::from_str(settings).unwrap_or_default();
@@ -29,10 +29,6 @@ pub fn trace_settings(settings: &str) -> TraceParams {
         corners: byte("corners").unwrap_or(first.corners),
         upscale: byte("upscale").map_or(first.upscale, TraceUpscale::from_index),
         denoise: byte("denoise").map_or(first.denoise, TraceDenoise::from_index),
-        node_limit: json
-            .get("node_limit")
-            .and_then(serde_json::Value::as_u64)
-            .and_then(|v| u32::try_from(v).ok()),
         invert: flag("invert").unwrap_or(first.invert),
         ignore_background: flag("ignore_background").unwrap_or(first.ignore_background),
         ..first
@@ -100,7 +96,7 @@ mod tests {
     fn the_settings_json_reads_every_value_and_falls_back_to_the_first_use() {
         let p = trace_settings(
             r#"{"threshold":90,"smooth":100,"specks":2,"corners":30,"upscale":0,"denoise":1,
-                "node_limit":500,"invert":true,"ignore_background":true}"#,
+                "invert":true,"ignore_background":true}"#,
         );
         assert_eq!((p.threshold, p.smooth, p.corners), (90, 100, 30));
         assert!((p.specks.as_mm() - 2.0).abs() < 1e-12);
@@ -108,7 +104,6 @@ mod tests {
             (p.upscale, p.denoise),
             (TraceUpscale::Auto, TraceDenoise::Low)
         );
-        assert_eq!(p.node_limit, Some(500));
         assert!(p.invert && p.ignore_background);
         assert_eq!(trace_settings("nonsense"), TraceParams::with_threshold(128));
         let partial = trace_settings(r#"{"threshold":40}"#);
@@ -133,17 +128,15 @@ mod tests {
                 "threshold",
                 "smooth",
                 "specks",
-                "denoise",
-                "upscale",
-                "corners",
-                "node_limit",
                 "invert",
                 "ignore_background",
-                "full_size_preview"
+                "denoise",
+                "upscale",
+                "corners"
             ]
         );
         assert_eq!(
-            params[3]["choices"],
+            params[5]["choices"],
             serde_json::json!(["Off", "Low", "High"])
         );
     }

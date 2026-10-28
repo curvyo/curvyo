@@ -184,9 +184,9 @@ pub use conversion::{build_primitive_conversions, primitive_as_path};
 pub use curvyo_svg_core::SvgDrawing;
 /// The Trace tool's settings schema (criterion 6), passed through for the host.
 pub use curvyo_vectorize_core::{
-    ADVANCED_PARAMS as TRACE_ADVANCED_PARAMS, Denoise as TraceDenoise,
-    NodeLimitOutcome as TraceNodeLimit, PARAMS as TRACE_PARAMS, PRESETS as TRACE_PRESETS,
-    ParamKind as TraceParamKind, ParamUnit as TraceParamUnit, TraceParams, Upscale as TraceUpscale,
+    ADVANCED_PARAMS as TRACE_ADVANCED_PARAMS, Denoise as TraceDenoise, PARAMS as TRACE_PARAMS,
+    PRESETS as TRACE_PRESETS, ParamKind as TraceParamKind, ParamUnit as TraceParamUnit,
+    TraceParams, Upscale as TraceUpscale,
 };
 pub use cut::{CUT_COMMIT_LABEL, CutPlan, CutRefusal, MAX_CUT_PIECES, plan_cut};
 pub use cuttable::{

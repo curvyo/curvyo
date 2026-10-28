@@ -10,9 +10,9 @@
       "wobble": 2.654
     },
     "03-text-300dpi": {
-      "area_error_pct": 6.153,
+      "area_error_pct": 6.0991,
       "closed_pct": 100.0,
-      "max_deviation_px": 9.4609,
+      "max_deviation_px": 7.0178,
       "mean_deviation_px": 0.2137,
       "micro_paths": 0.0,
       "node_density": 124.3899,

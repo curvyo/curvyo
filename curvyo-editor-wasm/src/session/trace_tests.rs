@@ -1,11 +1,12 @@
-//! The Trace tool's session side (`specs/0025-raster-trace` criteria 1 to 3, 7, 12, 13 and 46).
+//! The Trace tool's session side (`specs/0025-raster-trace` criteria 1 to 3, 7, 12, 13, 46, 51
+//! and 55).
 
 use curvyo_document_core::{NodeId, ObjectSnapshot, Point};
 use curvyo_ui_core::trace_job;
 
 use super::{
     DoubleClickHint, EscapeStep, KeyInput, KeyOutcome, Session, Tool, TraceCreateOutcome,
-    TraceSelection,
+    TraceSelection, TraceViewMode,
 };
 
 const PNG: &[u8] =
@@ -170,12 +171,12 @@ fn the_preview_is_no_document_node() {
     let source = session.trace_source(images[0], true).unwrap();
     assert!(session.set_trace_preview(images[0], &wire(source.map)));
     assert!(!session.set_trace_preview(images[0], &[1.0, 2.0]));
-    assert!(session.trace_draw_list(session.view()).triangle_count() > 0);
+    assert!(outline_triangles(&session) > 0);
     assert_eq!(session.document.own_steps().len(), steps);
     assert_eq!(session.objects().len(), 1);
     session.set_tool(Tool::Select);
     session.set_tool(Tool::Trace);
-    assert_eq!(session.trace_draw_list(session.view()).triangle_count(), 0);
+    assert_eq!(outline_triangles(&session), 0);
 }
 
 /// Criteria 13 and 46: one step "Trace image", a group above each image, the images stay, the
@@ -289,4 +290,149 @@ fn each_trace_group_keeps_its_counts_for_the_layers_tooltip() {
         .collect();
     assert_eq!(traced.len(), 2);
     assert_eq!(traced[0]["traced"], serde_json::json!([1, 4]));
+}
+
+/// Criterion 51: Overlay first; Shift+`\` cycles Overlay, Trace, Image; the held peek shows Image
+/// without changing the choice; leaving the tool drops both.
+#[test]
+fn the_view_starts_on_overlay_cycles_and_peeks() {
+    let mut session = Session::new(1);
+    import_images(&mut session, 1);
+    session.set_tool(Tool::Trace);
+    assert_eq!(session.trace_view_mode(), TraceViewMode::Overlay);
+    session.cycle_trace_view_mode();
+    assert_eq!(session.trace_view_mode(), TraceViewMode::Trace);
+    session.set_trace_peek(true);
+    assert_eq!(session.shown_trace_view_mode(), TraceViewMode::Image);
+    assert_eq!(session.trace_view_mode(), TraceViewMode::Trace);
+    session.set_trace_peek(false);
+    assert_eq!(session.shown_trace_view_mode(), TraceViewMode::Trace);
+    session.cycle_trace_view_mode();
+    session.cycle_trace_view_mode();
+    assert_eq!(session.trace_view_mode(), TraceViewMode::Overlay);
+    session.set_trace_view_mode(TraceViewMode::Image);
+    session.set_trace_peek(true);
+    session.set_tool(Tool::Select);
+    session.set_tool(Tool::Trace);
+    assert_eq!(session.shown_trace_view_mode(), TraceViewMode::Overlay);
+    session.set_tool(Tool::Select);
+    session.set_trace_peek(true);
+    session.set_tool(Tool::Trace);
+    assert_eq!(
+        session.shown_trace_view_mode(),
+        TraceViewMode::Overlay,
+        "no peek outside the tool"
+    );
+}
+
+/// Criterion 51: Overlay washes the image under the outline; Trace shows the result filled
+/// black in place of the image (a mesh kept across frames), at half strength when stale, without
+/// the outline; Image shows the original alone. None of it touches the document.
+#[test]
+fn each_view_draws_what_it_names() {
+    let mut session = Session::new(1);
+    let images = import_images(&mut session, 1);
+    session.set_tool(Tool::Trace);
+    let source = session.trace_source(images[0], false).unwrap();
+    assert!(session.set_trace_preview(images[0], &wire(source.map)));
+    let objects = session.objects().to_vec();
+    let artwork = |session: &Session| {
+        let mut drawn = objects.clone();
+        session.trace_artwork(&mut drawn);
+        drawn
+    };
+    let outline = outline_triangles;
+
+    let overlay = artwork(&session);
+    assert_eq!(overlay.len(), 2, "the image and its wash");
+    assert!(outline(&session) > 0);
+
+    session.set_trace_view_mode(TraceViewMode::Trace);
+    let mut traced = objects.clone();
+    assert_eq!(
+        session.trace_artwork(&mut traced),
+        Some(0),
+        "the result goes where the image was"
+    );
+    assert!(traced.is_empty(), "the image and its wash are taken out");
+    let fill = session.trace_fill_mesh(session.view());
+    assert!(fill.triangle_count() > 0);
+    assert!(
+        fill.triangles
+            .iter()
+            .all(|v| (v.color.r, v.color.g, v.color.b, v.color.a) == (0, 0, 0, 255)),
+        "black, opaque"
+    );
+    assert_eq!(outline(&session), 0, "no outline in the Trace view");
+    session.set_trace_preview_stale(true);
+    let stale = session.trace_fill_mesh(session.view());
+    assert!(
+        stale.triangles.iter().all(|v| v.color.a == 128),
+        "half strength"
+    );
+
+    session.set_trace_view_mode(TraceViewMode::Image);
+    assert_eq!(artwork(&session), objects);
+    assert_eq!(outline(&session), 0);
+    session.set_trace_view_mode(TraceViewMode::Overlay);
+    session.set_trace_peek(true);
+    assert_eq!(artwork(&session), objects, "the peek is the Image view");
+    assert_eq!(
+        &session.objects()[..],
+        &objects[..],
+        "the document is untouched"
+    );
+}
+
+/// The triangles of the Trace tool's hollow outline in a frame.
+fn outline_triangles(session: &Session) -> usize {
+    let mut list = curvyo_render_core::DrawList::default();
+    session.trace_draw_into(session.view(), &mut list);
+    list.triangle_count()
+}
+
+/// Squares of 4 nodes, `count` of them, as the worker's numbers.
+fn many_squares(count: usize) -> Vec<f64> {
+    let mut wire = vec![0.0; curvyo_ui_core::TRACE_WIRE_HEADER];
+    #[allow(clippy::cast_precision_loss)]
+    {
+        wire[1] = count as f64;
+        wire[2] = (count * 4) as f64;
+        wire[curvyo_ui_core::TRACE_WIRE_HEADER - 1] = count as f64;
+    }
+    for i in 0..count {
+        #[allow(clippy::cast_precision_loss)]
+        let (x, y) = ((i % 200) as f64 * 0.5, (i / 200) as f64 * 0.5);
+        wire.extend([6.0, 0.0, x, y]);
+        wire.extend([1.0, x + 0.25, y, 1.0, x + 0.25, y + 0.25, 1.0, x, y + 0.25]);
+        wire.extend([1.0, x, y, 4.0]);
+    }
+    wire
+}
+
+/// Criterion 55: a result over 20,000 nodes is one group with one compound path, written in
+/// one step, one row in Layers.
+#[test]
+fn a_result_over_20000_nodes_is_one_group_in_one_step() {
+    let mut session = Session::new(1);
+    let images = import_images(&mut session, 1);
+    session.set_tool(Tool::Trace);
+    assert!(session.set_trace_result(images[0], &many_squares(5_001)));
+    let steps = session.history_len();
+    let outcome = session.create_traced_paths();
+    assert_eq!(
+        outcome,
+        TraceCreateOutcome::Created {
+            images: 1,
+            paths: 5_001,
+            nodes: 20_004
+        }
+    );
+    assert_eq!(session.history_len(), steps + 1);
+    let order = session.document.object_ids();
+    assert_eq!(order.len(), 2, "the image and one compound path");
+    let group = session.document.parent_group(order[1]).unwrap();
+    assert_eq!(session.traced_counts(group), Some((5_001, 20_004)));
+    session.undo();
+    assert_eq!(session.document.object_ids(), images);
 }

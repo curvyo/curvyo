@@ -30,9 +30,9 @@ mod test_common;
 
 pub use params::{
     ADVANCED_PARAMS, DEFAULT_CORNERS, DEFAULT_SMOOTH, DEFAULT_SPECKS_MM, DEFAULT_THRESHOLD,
-    Denoise, MAX_NODE_LIMIT, MAX_SPECKS_MM, PARAMS, PRESETS, ParamKind, ParamSpec, ParamUnit,
-    Preset, TraceParams, UPSCALE_AUTO_BELOW_PX, Upscale,
+    Denoise, MAX_SPECKS_MM, PARAMS, PRESETS, ParamKind, ParamSpec, ParamUnit, Preset, TraceParams,
+    UPSCALE_AUTO_BELOW_PX, Upscale,
 };
 pub use progress::{Phase, Progress};
 pub use raster::{Raster, auto_threshold};
-pub use trace::{Counts, MAX_HOLES_PER_REGION, NodeLimitOutcome, TraceError, TraceResult, trace};
+pub use trace::{Counts, MAX_HOLES_PER_REGION, TraceError, TraceResult, trace};

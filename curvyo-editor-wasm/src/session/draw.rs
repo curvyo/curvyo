@@ -18,6 +18,24 @@ use super::reference_view::{reference_box_list, reference_marks_list};
 use super::{Session, Tool};
 
 impl Session {
+    /// The artwork of `objects`; with `fill_at`, the Trace view's kept mesh of the result where
+    /// the image was (`specs/0025-raster-trace` criterion 56).
+    fn artwork_list(
+        &self,
+        objects: &[ObjectSnapshot],
+        fill_at: Option<usize>,
+        guides: &std::collections::HashSet<curvyo_document_core::NodeId>,
+        view: ViewTransform,
+    ) -> DrawList {
+        let Some(at) = fill_at else {
+            return build_artwork_with_guides(objects, guides, view);
+        };
+        let mut list = build_artwork_with_guides(&objects[..at], guides, view);
+        list.extend(self.trace_fill_mesh(view));
+        list.extend(build_artwork_with_guides(&objects[at..], guides, view));
+        list
+    }
+
     /// Builds this frame's draw list from the document's current state,
     /// the active view transform, and the node tool's selection/hover —
     /// plus the pen tool's in-progress preview
@@ -71,13 +89,14 @@ impl Session {
         if self.style.is_active() {
             self.style.apply_to(artwork_objects.to_mut());
         }
-        // The Trace tool washes the images it traces (`specs/0025-raster-trace` criteria 2, 68).
-        if self.tool == Tool::Trace {
-            self.trace_wash(artwork_objects.to_mut());
-        }
+        // The Trace tool washes the images it traces or shows its result filled, by its view
+        // (`specs/0025-raster-trace` criteria 2, 51, 68).
+        let fill_at = (self.tool == Tool::Trace)
+            .then(|| self.trace_artwork(artwork_objects.to_mut()))
+            .flatten();
         // Guides in the marking style (`specs/0046-document-shapes` criterion 5).
         let guides = Arc::clone(&self.document_read().guides);
-        let mut list = build_artwork_with_guides(&artwork_objects, &guides, view);
+        let mut list = self.artwork_list(&artwork_objects, fill_at, &guides, view);
         // The blue half of a segment bend, over the artwork and under the nodes and handles.
         list.extend(self.bend_preview_list(view, &objects));
         // The Node tool draws the nodes and handles of its editing set only (customer 2026-10-26).
@@ -114,7 +133,7 @@ impl Session {
         // (`specs/0038-path-offset` criteria 9, 14, 18).
         list.extend(self.offset_draw_list(view));
         // The Trace tool's hollow preview outline (`specs/0025-raster-trace` criterion 8).
-        list.extend(self.trace_draw_list(view));
+        self.trace_draw_into(view, &mut list);
         // The pale red box of a move drag or the open typed move (`0047` criteria 33, 36): above
         // the blue preview, whose white casing would otherwise cover it where the two coincide
         // (an unrotated object), and below the selection box and the handles.

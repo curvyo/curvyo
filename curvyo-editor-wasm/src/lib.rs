@@ -123,7 +123,7 @@ pub use session::{DragStop, OFFSET_COMMIT_LABEL, OffsetOutcome, OffsetView};
 pub use session::{FrameImages, ImportOutcome, StrokeToPathOutcome, WeldOutcome};
 pub use session::{LayoutOutcome, ObjectToPathOutcome, StyleOutcome, TextBarView, TextSizeOutcome};
 pub use session::{TextPathPress, TextPathView};
-pub use session::{TraceCreateOutcome, TraceSelection, TraceSource, TraceView};
+pub use session::{TraceCreateOutcome, TraceSelection, TraceSource, TraceView, TraceViewMode};
 pub use trace_glue::{trace_params_json, trace_presets_json, trace_settings};
 
 #[cfg(target_arch = "wasm32")]

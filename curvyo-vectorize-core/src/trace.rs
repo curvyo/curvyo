@@ -1,6 +1,6 @@
 //! The one trace (ADR 0023 §2, §3): Denoise, Upscale, mask, background and specks, regions and
-//! holes, one outline per boundary, the Node limit, mapped to document millimetres, with the
-//! counts the status line shows.
+//! holes, one outline per boundary, mapped to document millimetres, with the counts the status
+//! line shows.
 
 use std::ops::ControlFlow;
 
@@ -10,9 +10,7 @@ use visioncortex::BinaryImage;
 
 use crate::filter::{median, upscale_2x};
 use crate::outline::{Crop, node_count, trace_crop};
-use crate::params::{
-    CurveSettings, SEGMENT_CEILING_PX, TraceParams, corner_cos, curve_settings, reduce_tolerance_mm,
-};
+use crate::params::{CurveSettings, TraceParams, corner_cos, curve_settings, reduce_tolerance_mm};
 use crate::progress::{Phase, Poller, Progress};
 use crate::raster::Raster;
 use crate::reduce::reduce;
@@ -33,18 +31,6 @@ pub struct Counts {
     pub specks_removed: usize,
 }
 
-/// What the Node limit did to a result (criterion 43).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum NodeLimitOutcome {
-    /// No limit, or the result was at or under it: untouched.
-    #[default]
-    Untouched,
-    /// The tolerance was raised until the result fitted.
-    Reached,
-    /// The tolerance reached its ceiling and the result still has more nodes.
-    NotMet,
-}
-
 /// What a trace made (criterion "Trace result" in Terms).
 #[derive(Debug, Clone, PartialEq)]
 pub struct TraceResult {
@@ -57,8 +43,6 @@ pub struct TraceResult {
     pub foreground_pixels: u64,
     /// Every pixel of the picture is foreground after specks: one outline covers it all.
     pub covers_whole_image: bool,
-    /// What the Node limit did.
-    pub node_limit: NodeLimitOutcome,
 }
 
 /// Why a trace made nothing.
@@ -74,14 +58,6 @@ pub enum TraceError {
     #[error("too much detail")]
     TooDetailed,
 }
-
-/// Re-runs of the outlines the Node limit makes at most per stage (`adrs.md` 2026-10-28 point 3).
-const NODE_LIMIT_RUNS: usize = 6;
-
-/// The ceiling of the node reduction tolerance, in pixels of the traced picture, the Node limit
-/// raises it to once the segment length is at [`SEGMENT_CEILING_PX`] and still too many nodes
-/// remain (criterion 43, "raises the fit tolerance").
-const REDUCE_CEILING_PX: f64 = 2.0;
 
 /// Traces `raster` with `params`: the pixels below the Threshold (after Denoise and Upscale; the
 /// others with Invert) become closed outlines, mapped to document millimetres by `pixel_map`
@@ -170,13 +146,7 @@ fn trace_reducing(
         corner_cos: corner_cos(params.corners),
     });
     let mut outlines = Outlines::new(&labels, map, min_area_mm2, reduction, &mut poller)?;
-    let (mut traced, mut dropped) = outlines.at(settings)?;
-    let mut node_limit = NodeLimitOutcome::Untouched;
-    if let Some(limit) = params.node_limit()
-        && nodes(&traced) > limit
-    {
-        (traced, dropped, node_limit) = outlines.within(limit, settings)?;
-    }
+    let (traced, dropped) = outlines.at(settings)?;
     specks_removed += dropped;
     let outlines: Vec<BezPath> = traced
         .into_iter()
@@ -196,16 +166,7 @@ fn trace_reducing(
         counts,
         foreground_pixels,
         covers_whole_image,
-        node_limit,
     })
-}
-
-/// The anchors of traced regions.
-fn nodes(traced: &[Traced]) -> usize {
-    traced
-        .iter()
-        .map(|(outer, holes)| node_count(outer) + holes.iter().map(node_count).sum::<usize>())
-        .sum()
 }
 
 /// The node reduction after visioncortex (`adrs.md` 2026-10-28, second note, point 1).
@@ -224,7 +185,7 @@ impl Reduction {
     }
 }
 
-/// The outlines of one labelled mask, traced again at another curve setting on request.
+/// The outlines of one labelled mask with its hole ownership.
 struct Outlines<'a, 'p, 'q> {
     labels: &'a Labels,
     map: Affine,
@@ -270,16 +231,7 @@ impl<'a, 'p, 'q> Outlines<'a, 'p, 'q> {
     /// The outlines at `settings` and how many were dropped as below the Specks size after
     /// smoothing.
     fn at(&mut self, settings: CurveSettings) -> Result<(Vec<Traced>, u64), TraceError> {
-        self.reduced_at(settings, self.reduction.and_then(Reduction::active))
-    }
-
-    /// The outlines at `settings` reduced by `reduction`, and how many were dropped as below the
-    /// Specks size after smoothing.
-    fn reduced_at(
-        &mut self,
-        settings: CurveSettings,
-        reduction: Option<Reduction>,
-    ) -> Result<(Vec<Traced>, u64), TraceError> {
+        let reduction = self.reduction.and_then(Reduction::active);
         let mut traced = trace_regions(
             self.labels,
             &self.holes,
@@ -295,81 +247,6 @@ impl<'a, 'p, 'q> Outlines<'a, 'p, 'q> {
             0
         };
         Ok((traced, dropped))
-    }
-
-    /// The outlines with at most `limit` nodes (criterion 43): the segment length raised from
-    /// `settings` by bisection up to [`SEGMENT_CEILING_PX`], at most [`NODE_LIMIT_RUNS`] runs;
-    /// when the ceiling still has too many nodes, the reduction tolerance at that ceiling raised
-    /// the same way up to [`REDUCE_CEILING_PX`].
-    fn within(
-        &mut self,
-        limit: usize,
-        settings: CurveSettings,
-    ) -> Result<(Vec<Traced>, u64, NodeLimitOutcome), TraceError> {
-        let mut high = CurveSettings {
-            segment_length: SEGMENT_CEILING_PX.max(settings.segment_length),
-            ..settings
-        };
-        let (mut best, mut dropped) = self.at(high)?;
-        if nodes(&best) > limit {
-            return self.within_tolerance(limit, high, best, dropped);
-        }
-        let mut low = settings.segment_length;
-        for _ in 1..NODE_LIMIT_RUNS {
-            let middle = CurveSettings {
-                segment_length: f64::midpoint(low, high.segment_length),
-                ..settings
-            };
-            let (traced, small) = self.at(middle)?;
-            if nodes(&traced) <= limit {
-                (best, dropped, high) = (traced, small, middle);
-            } else {
-                low = middle.segment_length;
-            }
-        }
-        Ok((best, dropped, NodeLimitOutcome::Reached))
-    }
-
-    /// The outlines at `settings` with at most `limit` nodes by raising the reduction tolerance
-    /// by bisection up to [`REDUCE_CEILING_PX`], at most [`NODE_LIMIT_RUNS`] runs; `over` is the
-    /// result at the settings' own tolerance, returned when even the ceiling has more nodes.
-    fn within_tolerance(
-        &mut self,
-        limit: usize,
-        settings: CurveSettings,
-        over: Vec<Traced>,
-        over_dropped: u64,
-    ) -> Result<(Vec<Traced>, u64, NodeLimitOutcome), TraceError> {
-        let Some(base) = self.reduction else {
-            return Ok((over, over_dropped, NodeLimitOutcome::NotMet));
-        };
-        let mut high = Reduction {
-            tolerance_px: REDUCE_CEILING_PX.max(base.tolerance_px),
-            ..base
-        };
-        let (mut best, mut dropped) = self.reduced_at(settings, Some(high))?;
-        if nodes(&best) > limit {
-            let (best, dropped) = if nodes(&best) < nodes(&over) {
-                (best, dropped)
-            } else {
-                (over, over_dropped)
-            };
-            return Ok((best, dropped, NodeLimitOutcome::NotMet));
-        }
-        let mut low = base.tolerance_px;
-        for _ in 1..NODE_LIMIT_RUNS {
-            let middle = Reduction {
-                tolerance_px: f64::midpoint(low, high.tolerance_px),
-                ..base
-            };
-            let (traced, small) = self.reduced_at(settings, Some(middle))?;
-            if nodes(&traced) <= limit {
-                (best, dropped, high) = (traced, small, middle);
-            } else {
-                low = middle.tolerance_px;
-            }
-        }
-        Ok((best, dropped, NodeLimitOutcome::Reached))
     }
 }
 

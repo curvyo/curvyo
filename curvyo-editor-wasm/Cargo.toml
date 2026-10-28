@@ -30,6 +30,10 @@ loro.workspace = true
 
 zip.workspace = true
 
+# `tests/trace_view_budget.rs` encodes its 16 Mpx picture as a PNG for the import
+# (`specs/0025-raster-trace` criterion 58); the workspace's own decoder crate, no new package.
+image.workspace = true
+
 # `tests/cpu_time/` times budget tests by the thread's CPU time, so a busy CI runner does not
 # fail them (the marquee frame of `specs/0053-node-marquee-selection/` crit. 25, the template
 # load of `specs/0046-document-shapes`).
