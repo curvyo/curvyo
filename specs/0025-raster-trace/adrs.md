@@ -248,3 +248,15 @@ None. Frage 49 B is built as asked; the fallback C is put to the customer only i
 ### Note of 2026-10-28 (lead, Proposal): Node limit second stage
 
 Raising the segment length to its 20 px ceiling does not always reach a Node limit the maker can expect (blobs fixture: 68 nodes, ceiling 55, limit 54). When the ceiling still has too many nodes, the tracer runs a second bisection of at most 6 runs on the node-reduction tolerance of `reduce.rs`, up to 2 px; only then the status says the limit could not be met. Both stages use the existing poll points; worst case 12 runs instead of 6.
+
+### Note of 2026-10-29 (implementer): Node limit and Full-size preview removed (Frage 74 A)
+
+The customer removed both. `TraceParams::node_limit`, `NodeLimitOutcome`, `MAX_NODE_LIMIT`, the two
+bisection stages of the note of 2026-10-28 above (`Outlines::within`, `within_tolerance`,
+`SEGMENT_CEILING_PX`, `REDUCE_CEILING_PX`) and the `node_limit` and `full_size_preview` schema
+entries are deleted; `trace(...)` runs the outlines once. The worker's wire loses its Node limit
+slot: the header is 7 numbers (status, paths, nodes, specks, foreground pixels, whole picture,
+outline count). The Advanced schema order is now Invert, Ignore background, Denoise, Upscale,
+Corners (UX notes 20.5). The Threshold stays a luma 0 to 255 in `PARAMS` and `TraceParams`; the
+bar shows and edits it in percent (Frage 75), the conversion lives in the frontend
+(`traceText.ts`, `percentToLuma`, `lumaToPercent`).

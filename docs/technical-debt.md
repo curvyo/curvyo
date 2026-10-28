@@ -1669,12 +1669,13 @@ Create paths run in the same wasm worker, so what is previewed is what is create
 **Resolution:** open; an upstream PR replacing the `acos` with basic operations, then the wasm
 check returns to 1e-6 mm (ADR 0023 §4).
 
-## The Trace preview is tessellated every frame (`0025` criterion 8, 2026-10-27)
+## The first reduced copy of a large image is made on the main thread (`0025` criterion 58, 2026-10-28)
 
-The preview outline is cached as anchors and culled to the visible canvas per outline, but its
-stroke is built again every frame. Criterion 56 (100,000 nodes under 16 ms) is slice 3.
+The reduced copy (longest side 1,000 px) of a 16 Mpx image takes about 42 ms of CPU native
+(release), on the main thread, the first time the image is previewed; it is then kept. In wasm it
+may pass the 50 ms of criterion 58. Making it in the worker needs a second trace entry point.
 
-**Resolution:** open, slice 3.
+**Resolution:** open.
 
 ## The trace wash has no dark-theme value (`0025` criterion 68 b, 2026-10-28)
 
@@ -1693,3 +1694,8 @@ reopened project shows the row without that line.
 
 **Resolution:** accepted unless the customer wants the line after reopening; then it would be
 derived from the group's compound path instead.
+
+## Public seven-argument `trace_job`
+
+`curvyo_ui_core::trace_job` (seven positional arguments) is used only by tests. Move it into a
+shared test helper later and keep `trace_job_with` as the one public entry point.
