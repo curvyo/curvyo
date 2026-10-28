@@ -1675,3 +1675,21 @@ The preview outline is cached as anchors and culled to the visible canvas per ou
 stroke is built again every frame. Criterion 56 (100,000 nodes under 16 ms) is slice 3.
 
 **Resolution:** open, slice 3.
+
+## The trace wash has no dark-theme value (`0025` criterion 68 b, 2026-10-28)
+
+The traced image is washed by white at 65 % (a path drawn directly above the image in the Trace
+tool). Criterion 68 b also names the canvas colour at 65 % for a dark theme, but there is no dark
+theme yet (`docs/design-system.md`), so the colour is fixed in `curvyo-editor-wasm`
+(`session/trace.rs`, `TRACE_WASH`).
+
+**Resolution:** open; the dark theme swaps the wash colour when it is built.
+
+## The Layers tooltip of a trace group lasts for the session (`0025` criterion 30, 2026-10-28)
+
+The counts behind "Traced: 7 paths, 412 nodes." in a trace group's Layers row come from the
+session that ran Create paths; they are not in the project (criterion 33: no format change), so a
+reopened project shows the row without that line.
+
+**Resolution:** accepted unless the customer wants the line after reopening; then it would be
+derived from the group's compound path instead.

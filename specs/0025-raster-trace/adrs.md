@@ -145,3 +145,106 @@ None. Frage 49 B is built as asked; the fallback C is put to the customer only i
        outline or hole counts as a miss below **0.95 × 4 mm² = 3.8 mm²**; the same factor applies to
        Photo's (0.1 mm)² and to the per-preset micro-path count of crit. 61.
      - **Ignore background** = foreground regions touching the image border (point 3).
+- 2026-10-28 (second note, after step 0 of slice 2 was blocked on criteria 62 to 64): **node
+  reduction for Silhouette, the area reference for Engraving, three open points**. Within ADR
+  0023: visioncortex stays, same one function, no new dependency, no trait, no format change.
+  Throwaway spike on the branch (reverted, nothing committed), numbers from `preset_relations` in
+  release.
+  1. **Own node reduction after visioncortex** (R-VEC-003, customer-accepted Should). visioncortex
+     places one cubic per 45° of turn and per inflection whatever the segment length, so fewer
+     nodes need a step after it, not other parameters. New private module
+     `curvyo-vectorize-core/src/reduce.rs`, `pub(crate) fn reduce(path: &BezPath, tolerance_px: f64,
+     corner_cos: f64) -> BezPath`, called in `trace_regions` right after each `trace_crop` (so the
+     existing poll before each region covers it, the Node limit bisection counts reduced nodes and
+     `drop_small_outlines` still removes an outline the reduction shrank below Specks).
+     - **Algorithm:** the outline's segments (lines and cubics) in pixel coordinates; a joint whose
+       turn is below the Corners angle (the same `200° − 2 × Corners` visioncortex gets) may be
+       merged, a sharper one never. Greedy from a corner (or the first anchor of a corner-free
+       outline): extend a run while one cubic fits it; the fit keeps the run's end points and end
+       tangent directions (so joints with the neighbours stay smooth) and solves the two handle
+       lengths by least squares on 8 samples per original segment, chord-length parameters, at most
+       4 reparameterisation passes; accepted when the sampled distance both ways (originals to the
+       candidate, candidate to the originals) is within the tolerance; a run has at most 48
+       segments. Lines take part (their direction is the tangent).
+     - **Tolerance comes from Smooth, no new control (Proposal):** Smooth up to 80 → none; Smooth
+       81 to 100 → `(Smooth − 80) × 0.01 mm`, so **0.2 mm at Smooth 100**; in pixels
+       `tolerance_mm / sqrt(|det|)` of the map (Upscale's 0.5 included). Logo / Line art (Smooth 80)
+       and every golden stay bit-identical (crit. 65); crit. 23 stays monotone. Rejected: a hidden
+       preset field (Custom would carry a value nobody can see or edit); a new Advanced "Simplify"
+       control (UI scope the customer has not asked for; if he wants it with R-VEC-003's Inkscape
+       comparison, the Smooth mapping becomes its default).
+     - **Determinism (ADR 0023 §4):** only `+ − × ÷` and `sqrt`; no `f64::hypot` (libm) and so no
+       kurbo `hypot()`, `nearest`, `arclen` or `ParamCurveFit` (`solve_cubic` uses `cbrt`/`acos`);
+       lengths are `(x*x + y*y).sqrt()`; the turn test is `dot ≥ corner_cos × |u| × |v|`, with
+       `corner_cos` from the integer Corners through a fixed polynomial in basic operations, never
+       `f64::cos`. Run-to-run and native/wasm identical apart from visioncortex's own `acos`.
+     - **Cost:** 2000 x 2000 px line art 0.09 → 0.16 s thread CPU native, the 1000 x 1000 px
+       reduced copy 0.02 → 0.09 s; longest poll gap unchanged (0.012 s).
+     - **Lives in `vectorize-core`, not `geometry-core`:** it is the only caller. It moves to the
+       kernel when a second caller arrives (the curve refit after booleans of `0016`, or a Simplify
+       path tool for the rest of R-VEC-003); the move is one module and no public API.
+     - **Measured** (Silhouette Smooth 100, Specks 2.0, Corners 70, Upscale Off, Denoise Low, with
+       the reduction): Silhouette / Logo nodes per 100 mm 01 0.40, 03 0.29, 04 0.83, 05 0.60,
+       07 0.37, 10 0.96, 11 0.59, 12 0.27; **geometric mean 0.49**; outlines never more than Logo's,
+       no outline under 3.8 mm², 100 % closed, ordering of crit. 64 holds on every image. 04 (72 dpi
+       text, 0.2 mm < 1 px) and 10 (pixel art: every node is a grid corner, Logo is already exact)
+       cannot reach 0.6 without dropping corners; hence the mean in the wording below.
+  2. **Engraving: the area error is measured against the drawn shape, not the 1x staircase.** The
+     set is synthetic: `render` draws each image with 4 x 4 samples per pixel. The harness keeps
+     those samples (before the noise of 05 and 07) as the image's `truth_4x` and adds the metric
+     `area_error_true_pct`: XOR of the outlines' 4x raster with `truth_4x`, % of the true
+     foreground. The 1x staircase is itself far from the drawing on thin lines (Logo against the
+     truth: 25.3 % on 04, 33.5 % on 12), so it punished the outline that is closer to the drawing.
+     `area_error_pct` (1x) stays as it is, so the slice-1 numbers, `candidate` and crit. 65 do not
+     change; the new metric is stored beside it (`null` for the photograph, which has no truth).
+     Max deviation stays against the pixel border (Engraving passes it). Rejected: coverage from
+     the grey levels (05 and 07 would carry their noise into the reference); the 2x staircase the
+     tracer saw (circular: it rewards whatever Upscale does).
+     - **Engraving gets no reduction** (Smooth 80): it promises accuracy, not few nodes. Its node
+       cap becomes a mean plus a ceiling, as for Silhouette. Measured (Engraving Smooth 80, Specks
+       0.1, Corners 70, Upscale Auto, Denoise Off): mean max deviation 1.14 against 2.54 px
+       (55 % lower), no larger than Logo's on every image; area error against the truth E / L:
+       01 0.67/0.88, 03 6.07/5.87, 04 18.99/25.33, 05 12.27/30.89, 07 0.29/0.39, 10 0/0,
+       11 14.45/15.46, 12 9.60/33.46 (mean 7.8 against 14.0 %); density ratio E / L 2.34, 1.72,
+       1.41, 3.83, 2.33, 1.00, 2.38, 2.73, **geometric mean 2.06**; letter holes 14 of 14 (Logo 11).
+  3. **Wording for the product owner (criteria 60, 62 to 64):**
+     - **60:** Silhouette Smooth 100, Specks 2.0 mm, Corners 70, Upscale Off, Denoise Low;
+       Engraving Smooth 80, Specks 0.1 mm, Corners 70, Upscale Auto, Denoise Off; Photo Denoise
+       Off, Upscale Off (implementer's step 0: 4.6 x Logo's outlines); add to the Smooth row: "above
+       80, Smooth also merges nodes while the outline stays within (Smooth − 80) × 0.01 mm of the
+       trace (0.2 mm at 100)".
+     - **62:** "Engraving (finer than Logo / Line art, per image of the set): the maximum deviation
+       is no larger (plus 0.001 px); the area error against the drawn shape (the 4 x 4 samples per
+       pixel the synthetic image was drawn from) is no larger plus 0.5 percentage points, and its
+       mean over the set is at least 25 % lower; the mean over the set of the maximum deviation is
+       at least 25 % lower; nodes per 100 mm are at most 4 times Logo's on every image and at most
+       2.5 times as the geometric mean over the set; closedness 100 %. Test: the letter holes
+       (unchanged)." Expected: 0.20 points over on 03 (within 0.5), area mean 44 % lower, deviation
+       55 % lower, density 3.83 x worst, 2.06 x mean.
+     - **63, Silhouette:** "nodes per 100 mm, over the images with at least 10 per 100 mm at
+       Logo / Line art: at most 0.6 times Logo's as the geometric mean, and never more than Logo's;
+       outlines no more than Logo's; no outline or hole under 3.8 mm²; Denoise Low; closedness
+       100 %; every outline lies within the Smooth tolerance (0.2 mm) of the trace before the
+       reduction (both ways, sampled every 0.1 px, plus 0.001 mm); the maximum deviation from the
+       thresholded reference is reported, without a bound (Specks 2 mm fills letter holes, 59 px on
+       03, which is the purpose)." Expected 0.49 mean, 0.96 worst. `SILHOUETTE_MAX_DEVIATION_PX`
+       goes; the reduction bound is a unit test on `reduce` plus the harness check. Photo
+       unchanged.
+     - **64:** unchanged (holds with the numbers above).
+  4. **Open point 1, `ADVANCED_PARAMS`:** accepted as built. `PARAMS` stays the three bar controls
+     (crit. 6 test unchanged), `ADVANCED_PARAMS` the six Advanced entries in the menu order; the
+     list is the grouping, so no `advanced` flag on `ParamSpec`. Point 3 of the first note is
+     amended accordingly.
+  5. **Open point 3, Invert:** foreground with Invert is luma **at or above** the Threshold, the
+     exact complement of the normal mask (every pixel is in exactly one of the two). Crit. 44 and
+     the doc comment say "at or above".
+  6. **Open point 5, Custom:** stored state wins over the ux-notes' computed label. The app setting
+     is `{ preset: key, edited: bool, values }` (amends point 2 of the first note): a pick sets
+     `preset` and `edited = false`, any edit sets `edited = true`; the button shows "Custom" when
+     `edited`, and the menu focuses `preset`, which is the "preset the values came from" of the
+     ux-notes. Editing back to a preset's values stays Custom; picking the preset again clears it.
+     No value comparison anywhere. The ux-engineer updates the "Custom" paragraph of `ux-notes.md`.
+
+### Note of 2026-10-28 (lead, Proposal): Node limit second stage
+
+Raising the segment length to its 20 px ceiling does not always reach a Node limit the maker can expect (blobs fixture: 68 nodes, ceiling 55, limit 54). When the ceiling still has too many nodes, the tracer runs a second bisection of at most 6 runs on the node-reduction tolerance of `reduce.rs`, up to 2 px; only then the status says the limit could not be met. Both stages use the existing poll points; worst case 12 runs instead of 6.
