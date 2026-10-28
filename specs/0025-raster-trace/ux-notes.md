@@ -1,6 +1,6 @@
 # 0025 Raster trace: UX notes
 
-Author: ux-engineer. Date: 2026-10-27. Status: for Ready. Builds on `ux-proposal.md` and
+Author: ux-engineer. Date: 2026-10-27, slices 2 and 3 added 2026-10-28 (sections 11 to 17). Status: for Ready. Builds on `ux-proposal.md` and
 `ux-mockup.html` (accepted by the customer 2026-10-14) and `docs/design-system.md`. Where this file
 differs from the proposal, the difference is listed in section 9. Own choices are marked **(Proposal)**.
 
@@ -68,9 +68,9 @@ Arithmetic (label + Threshold 224, Smooth 168 and Specks 212 do not pair within 
 collapsed (about 628 px) Threshold, Smooth and Specks share row 1 and the result row is row 2 (84 px).
 The first row never moves; the result row is last. **(Proposal)** Measure at build.
 
-Slice 2 inserts Mode, Preset and View as a row **above** these (mockup order, "Look" first); the fields
-move down once, in that PR, and the PR description says so. Advanced joins row 3 then, below row 4
-(proposal 3.3). **(Proposal)**
+Slice 2 puts the Preset button in row 1 beside the state label and Advanced beside Specks; the exact
+rows are in section 11 (superseding the "row above" sketch of slice 1). The fields move once, in that
+PR, and the PR description says so. **(Proposal)**
 
 Fields: Up/Down 1, Shift 10, Specks 0.1 / 1 / Ctrl 0.01 mm, Home/End, type and Enter (criterion 5);
 Enter in a field returns focus to the canvas. Hit target 28 px, focus ring 2 px `--editor-accent`.
@@ -150,7 +150,7 @@ and cut faster" tooltip, "raise Smooth or Specks", the tooltip second line of th
 3. 0-path and whole-image texts lose their instruction (spec criterion 15).
 4. State label "Trace" at the start of the bar, because the rail shows no pressed button.
 5. Create paths waits for the full-size trace instead of using the reduced copy.
-6. Slice 2 inserts the Look row above the slice 1 rows (one-time shift).
+6. Slice 2 puts Preset beside the state label in row 1 and Advanced beside Specks (one-time shift, section 11).
 
 ## 10. Decided by the customer (2026-10-27)
 
@@ -158,3 +158,150 @@ and cut faster" tooltip, "raise Smooth or Specks", the tooltip second line of th
 several can be selected. The toolbar needs tidying later in polish; first we make chips." Option A
 stands, extended to several selected images (section 2). Colours are postponed (Frage 50 A), so the
 Mode pill, Colours field and Photo preset of the proposal are not drawn.
+
+## 11. Slice 2: Preset button, presets, bar rows (criteria 37, 40, 59 to 66)
+
+**Rows** (inner width 344 px at 356; label 48, Preset 132, View 78, Threshold and Smooth 168, Specks 212,
+Advanced 96, gap 8). Groups wrap whole; the first row never moves, the result row is last. Measure at build.
+
+| Panel open (4 rows, 156 px) | Contents |
+|---|---|
+| 1 | State label "Trace", **Preset** button (132 px; View joins here in slice 3: 48+132+78+16 = 274) |
+| 2 | Threshold and Smooth side by side (168 + 8 + 168 = 344: no slack, so they wrap to two rows if the build measures wider) |
+| 3 | Specks and **Advanced** (212 + 8 + 96 = 316) |
+| 4 | Status, Stop or Trace again, Create paths |
+
+Panel closed (about 628 px, inner 616): 3 rows; row 1 label, Preset, View, Threshold (450); row 2 Smooth,
+Specks, Advanced (492); the result row 3. **(Proposal)**
+
+**Preset button.** Text button, 28 px, outline as "Linked clone", shows the preset name or "Custom",
+`aria-haspopup="menu"`, `aria-expanded`, the chevron of the accepted mockup (it names a menu; it is not a
+rare-function dropdown). Name "Preset" is the accessible name, not drawn.
+
+**Menu.** Opens below the button, 4 px gap, left edges aligned, 232 px wide, flips above when it would leave
+the viewport; `--toolbar-bg`, `--panel-elevation-shadow`, 8 px radius. `role="menu"` with five
+`menuitemradio` rows in the order of criterion 59 (Logo / Line art, Photo, Silhouette for cutting/carving,
+Engraving), each a name (semibold) and its second line (muted, `aria-describedby`): "Sharp corners, clean
+curves.", "Many shapes. Photos trace roughly.", "Closed, simple, few nodes.", "Keeps fine lines." (the
+customer's texts, Frage 64 A); they describe the result, not operating tips. "Silhouette for cutting/carving"
+is the longest name; the build checks that it fits the 232 px menu on one line. Enter or Down on the button opens and puts focus on the
+checked item, in Custom on the preset the values came from (marked as current by `--editor-accent-hover`,
+not checked); Up and Down move without wrap, Home and End, Enter or click picks and closes, Escape closes
+the menu only and focus returns to the button; a click outside closes it. The pick is not a history step
+and sets the values of criterion 60 only (never Threshold, Node limit or the switches); focus returns to
+the button, not the canvas, so the maker can keep adjusting.
+
+**Custom.** The label is computed, not stored as a flag: it shows the preset name while Smooth, Specks,
+Corners, Upscale and Denoise equal that preset's values, else "Custom". Threshold, Node limit, Invert,
+Ignore background and Full-size preview are not preset values and never cause "Custom". Putting the values
+back by hand turns the name back. Picking the current base preset restores it (criterion 40). **(Proposal)**
+
+**Status and notice.** A pick prints nothing: no notice, the status line does not name the preset
+(criterion 66); the preview and counts update after the 150 ms debounce. With several images the pick
+applies to all (label "Tracing 1 of 3 images" unchanged).
+
+## 12. Advanced block (criteria 41, 43, 44)
+
+- **Button** "Advanced", text, 28 px, same row as Specks, `aria-expanded`, never hidden or dimmed. Pressed =
+  open. Open and closed is remembered as an app setting. This is the customer's "second row for rare
+  functions": no dropdown, no icon.
+- **Block** below the result row inside the same pill, separated by a 25 % divider; the bar only grows
+  downward, nothing above moves. Two columns of 168 px, rows of 36 px, in this order: Denoise (3-segment
+  pill Off, Low, High) and Upscale (Auto, Off); Corners (value field, 0 to 100) and Node limit (number field,
+  empty = none, thousands separator on blur); Invert and Ignore background (a 28 px high `role="switch"`
+  control, label left, switch right, the whole row is the target); Full-size preview. 4 rows, 144 px; the bar
+  ends about 340 px below its top at 800 x 600, inside the 560 px minimum. Labels are drawn in full (the
+  mockup's "No backgr." and "Limit" are cut or unclear). **(Proposal)**
+- **Honest controls.** A control the tracer cannot honour is not drawn (criterion 41); no placeholder.
+- **Full-size preview over 4 Mpx** (criterion 52) cannot be honoured: the switch is `aria-disabled`, off, with
+  the muted state text "Over 4 Mpx" beside the label. **(Proposal)**
+- **Node limit** outcomes use the status text of criterion 43, no extra control; the field keeps what the
+  maker typed. Invert and Ignore background have no status text.
+- Escape in an Advanced field returns focus to the canvas; Tab leaves the block to Create paths.
+
+## 13. Slice 3: View pill and peek (criterion 51)
+
+- **Pill** right of Preset in row 1, `role="radiogroup"` "View", three 25 x 28 px icon segments (16 px
+  glyphs, the Select bar's pill look, selected = `--active-bg`): **Overlay**, **Trace**, **Image**. Tooltips
+  name the segment (Overlay, Trace, Image); the Image tooltip adds the key as a key name ("Image (\)"), the
+  pattern of "Create paths (Enter)". Arrows move and select, no Tab stop per segment.
+- **Overlay** is section 4. **Trace** draws the result with its fills (black, as Create paths makes it), the
+  image hidden, no dim, no outline; on a dark document ground the shapes get the 1 px `--selection-casing`
+  edge so black stays visible. **Image** shows the original at full strength, no outline. Zoom and pan work
+  everywhere; none of this touches the document.
+- **Peek.** Holding `\` shows Image while held and returns on release; the Image segment shows pressed
+  while held (the pill always tells the truth). Key repeat is ignored; release, window blur and tool exit
+  restore the chosen view. Shift+`\` cycles Overlay, Trace, Image. Both ignored in text fields.
+- The chosen view is not remembered: entering the tool always starts on Overlay, so an Image view cannot
+  look like "the preview is gone". **(Proposal)**
+- In Trace view a stale preview is drawn at 50 % with the words of section 14; while a job runs after
+  400 ms the same.
+
+## 14. Stale preview, Stop, large images, failure (criteria 52 to 55)
+
+- **Running** (after 400 ms, section 4): outline at 50 %, status "Tracing...", muted second line "Preview
+  is out of date" (the mockup's computing state), progress line, **Stop** after 1.5 s.
+- **Stopped** (Stop or first Escape): status "Stopped", the same muted line, outline at 50 %; Stop is
+  replaced in the same slot by **Trace again**. Create paths is `aria-disabled` (its reason is the status).
+  Changing a value, Enter, or Trace again traces; Enter while stale is "Trace again", never Create.
+  **(Proposal)** The slot order is status, Stop or Trace again, Create paths; Tab follows it.
+- **Over 4 Mpx:** the preview is the reduced copy; the muted second line reads "Preview from a reduced
+  copy", with "; 38 specks ignored" appended when both apply (about 280 px, fits). Counts are those of the
+  reduced copy; the success notice carries the full-size counts. Create paths shows the progress line and Stop
+  at once (no 1.5 s delay: the wait is known), status "Tracing at full size...". Escape stops; the document
+  is untouched until the trace finishes. **(Proposal)**
+- **Over 100,000 nodes:** status "412,000 nodes. Slow to edit." (comma separators), Create paths works;
+  no confirmation.
+- **Failure card.** Under the bar, 8 px gap below its bottom edge (below the Advanced block when open),
+  same left edge and width, the refusal look of the Action notice: `--popover` ground, 1 px
+  `--field-invalid` ring, 12 px alert glyph, text "Trace failed: <reason>. Your drawing is unchanged.",
+  `role="alert"`, plus a **Retry** text button (28 px). Red is never the only cue (glyph, words, ring).
+  Reasons are plain ("out of memory at 36 Mpx", "internal error"); no stack, no code. It does not take
+  focus; Retry is the last Tab stop; Enter on the canvas also retries. It stays until the next successful
+  trace, a changed value, another image or leaving the tool; values stay. Create paths is `aria-disabled`.
+  A worker that died is replaced on Retry. **(Proposal)**
+- **Pan and zoom** with a big preview: cached outline, culled (criterion 56); no state text.
+
+## 15. Keyboard and accessibility, slices 2 and 3 (criterion 57)
+
+Tab: Trace (Select bar), Preset, View (one stop, arrows inside), Threshold, Smooth, Specks, Advanced, the
+Advanced controls when open, Stop or Trace again (when shown), Create paths, Retry (when shown). Shift+Tab
+reverses. The menu follows the menu pattern of section 11. `\` and Shift+`\` work with focus on the
+canvas or a bar button. Every state change not visible on the canvas is text in the status row or the
+alert card, announced once. Hit targets 28 px, focus ring 2 px `--editor-accent`. Contrast of muted text
+and the 50 % outline checked in both themes. Nothing animates, so reduced motion needs no case.
+
+## 16. Slice-1 leftovers (criterion 68)
+
+(a) The Layers row of the trace group carries the tooltip text of the success notice ("Traced: 7 paths,
+412 nodes."). (b) The wash of section 4 is checked in both themes by a test (white wash on light; canvas
+colour at 65 % on dark). No design change.
+
+## 17. Mockup comparison (criterion 67)
+
+Mockup `ux-mockup.html` sections 1 and 2, planned differences. The implemented tool is compared at 800 x 600,
+panel open and closed, in the review; this list is the starting point and the PR adds what the build shows.
+"Fixed" = the build follows the mockup or a later rule; "Show at demo" = a deliberate difference the
+customer may veto. Colours, Mode, Photo: excluded (Later).
+
+| # | Mockup | Build | Status |
+|---|---|---|---|
+| 1 | Rail card "Image tools", tooltip "Turn an image into paths. Enter creates them, Esc cancels." | Key `I` and a Select bar button; no tooltip text | Fixed (Frage 61; no tips, 2026-10-16) |
+| 2 | Presets Logo / Line art, Photo, Silhouette, Engraving | The same four; Silhouette is named "Silhouette for cutting/carving"; menu mechanics as mockup | Fixed (criterion 59, Frage 64 A) |
+| 3 | Preset button on row 1 with the Mode pill | Preset beside the state label "Trace"; no Mode | Fixed |
+| 4 | No state label | Label "Trace" starts row 1 (no rail button pressed) | Show at demo |
+| 5 | Specks hint "~ 6 px" | "0.50 mm  ~ 2 px" live from the image | Fixed |
+| 6 | "9 180 nodes" | "9,180 nodes" | Fixed |
+| 7 | "0 paths. Try a lighter Threshold." | "0 paths at this Threshold: too low." (or too high); no instruction | Show at demo (criterion 67: spec wording wins unless the customer picks the mockup's) |
+| 8 | Advanced labels "No backgr.", "Limit 20000 nodes" | "Ignore background", "Node limit", empty = none | Fixed |
+| 9 | Advanced has no Full-size preview | Switch added (criterion 41); disabled over 4 Mpx | Fixed |
+| 10 | Computing: "Tracing..." and "Preview is out of date" with Stop | Same; after Stop the slot becomes "Trace again" | Show at demo (new button) |
+| 11 | Failure: red text with Create paths beside | Card with glyph, ring, Retry, under the bar; Create paths disabled | Fixed (red not the only cue) |
+| 12 | After Create: image hidden, notice "Source image hidden." | Image stays visible (Frage 54 A); notice without that sentence | Fixed |
+| 13 | Menu second lines (Logo / Line art "Sharp corners, clean curves.") | Kept, with the customer's texts (criterion 59) | Fixed |
+| 14 | Bar "four rows" | 4 rows panel open if Threshold and Smooth pair, else 5; 3 closed | Fixed after measuring |
+| 15 | View pill | Slice 3; chosen view not remembered | Show at demo |
+
+## 18. Open for the lead
+
+Answered: the Preset menu's second lines are the customer's own texts (Frage 64 A, 2026-10-28); they stay.
