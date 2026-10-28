@@ -2,22 +2,32 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { WasmSession } from "@/lib/editorSession";
 import {
+  FULL_SIZE_PREVIEW_MAX_PX,
   PREVIEW_OUT_OF_DATE,
   TRACE_PARAMS_FALLBACK,
+  TRACE_PRESETS_FALLBACK,
   TRACING,
   LOADING_IMAGE,
+  type TraceChoice,
   type TraceParam,
+  type TracePreset,
   type TraceValues,
   creatingLabel,
+  editChoice,
   imagesLabel,
+  pickPreset,
+  presetLabel,
+  readAdvancedOpen,
+  readChoice,
   readSummary,
-  readValues,
+  settingsJson,
   statusText,
   tracedNotice,
-  writeValues,
+  writeAdvancedOpen,
+  writeChoice,
 } from "@/lib/traceText";
 import { TraceCancelled, type TracePixels, type TraceRunner, createTraceRunner } from "@/lib/traceJobs";
-import { trace_params } from "@/wasm-bindings/curvyo_editor_wasm.js";
+import { trace_params, trace_presets } from "@/wasm-bindings/curvyo_editor_wasm.js";
 
 /** Debounce of a value change (criterion 10). */
 const DEBOUNCE_MS = 150;
@@ -43,7 +53,17 @@ export interface TraceApi {
   /** "Tracing 1 of 3 images", or empty for one image. */
   imagesLabel: string;
   params: readonly TraceParam[];
+  /** The presets in menu order (criterion 59). */
+  presets: readonly TracePreset[];
   values: TraceValues;
+  /** The remembered choice: the preset the values came from and whether they were edited. */
+  choice: TraceChoice;
+  /** The Preset button's text: the preset's name or "Custom" (criterion 40). */
+  presetLabel: string;
+  /** The Advanced block is open (criterion 41). */
+  advancedOpen: boolean;
+  /** The shown image has more than 4 Mpx: Full-size preview cannot be honoured. */
+  overFullSizeLimit: boolean;
   /** The status line, its muted second line, and whether Create paths may run. */
   status: { line: string; muted: string; canCreate: boolean };
   /** A job runs past 400 ms: "Tracing..." and the progress line. */
@@ -55,7 +75,11 @@ export interface TraceApi {
   /** Working-image pixels per millimetre of the shown image, for the Specks readout. */
   pxPerMm: number;
   /** A value from a field; `dragging` traces the reduced copy only (criterion 10). */
-  setValue: (name: TraceParam["name"], value: number, dragging: boolean) => void;
+  setValue: <K extends keyof TraceValues>(name: K, value: TraceValues[K], dragging?: boolean) => void;
+  /** A pick in the Preset menu (criteria 40, 60, 66): every preset value at once. */
+  pick: (preset: TracePreset) => void;
+  /** Opens or closes the Advanced block (remembered). */
+  setAdvancedOpen: (open: boolean) => void;
   /** The end of a drag: the full-size trace follows. */
   endDrag: () => void;
   /** Stop (criterion 10): ends the job; the preview is out of date. */
@@ -73,6 +97,16 @@ function loadParams(): readonly TraceParam[] {
     return parsed.length > 0 ? parsed : TRACE_PARAMS_FALLBACK;
   } catch {
     return TRACE_PARAMS_FALLBACK;
+  }
+}
+
+/** The presets from the wasm module, or the copy in `traceText` before it loads. */
+function loadPresets(): readonly TracePreset[] {
+  try {
+    const parsed = JSON.parse(trace_presets()) as TracePreset[];
+    return parsed.length > 0 ? parsed : TRACE_PRESETS_FALLBACK;
+  } catch {
+    return TRACE_PRESETS_FALLBACK;
   }
 }
 
@@ -115,9 +149,16 @@ export function useTrace(
 ): TraceApi {
   const active = tool === "trace";
   const params = useMemo(() => loadParams(), []);
+  const presets = useMemo(() => loadPresets(), []);
   const [view, setView] = useState<ViewState>(NO_VIEW);
   const [available, setAvailable] = useState(false);
-  const [values, setValues] = useState<TraceValues>(() => readValues(params));
+  const [choice, setChoice] = useState<TraceChoice>(() => readChoice(params, presets));
+  const values = choice.values;
+  const setValues = useCallback((update: (v: TraceValues) => TraceValues) => {
+    setChoice((c) => ({ ...c, values: update(c.values) }));
+  }, []);
+  const [advancedOpen, setAdvancedOpenState] = useState(() => readAdvancedOpen());
+  const [overFullSizeLimit, setOverFullSizeLimit] = useState(false);
   const [status, setStatus] = useState({ line: "", muted: "", canCreate: false });
   const [busy, setBusy] = useState(false);
   const [stopShown, setStopShown] = useState(false);
@@ -134,10 +175,10 @@ export function useTrace(
   const thresholds = useRef(new Map<string, number>());
   /** The values each kept full-size result was traced with. */
   const results = useRef(new Map<string, string>());
-  const valuesRef = useRef(values);
+  const choiceRef = useRef(choice);
   useEffect(() => {
-    valuesRef.current = values;
-  }, [values]);
+    choiceRef.current = choice;
+  }, [choice]);
   /** The view as last read; the sync effect below keeps it and the state together. */
   const viewRef = useRef(view);
 
@@ -173,7 +214,7 @@ export function useTrace(
     clearTimers();
   }, [clearTimers]);
 
-  const key = (threshold: number, v: TraceValues) => `${threshold}|${v.smooth}|${v.specks}`;
+  const key = (threshold: number, v: TraceValues) => settingsJson(v, threshold);
 
   /** The Threshold of `id`, its automatic value on first use. */
   const thresholdOf = useCallback(
@@ -215,7 +256,8 @@ export function useTrace(
           return;
         }
         setValues((v) => (v.threshold === threshold ? v : { ...v, threshold }));
-        const v = { ...valuesRef.current, threshold };
+        const v = { ...choiceRef.current.values, threshold };
+        const settings = settingsJson(v, threshold);
         const full = pixelsOf(session, id, false);
         if (!full) {
           setStatus({ line: LOADING_IMAGE, muted: "", canCreate: false });
@@ -223,11 +265,14 @@ export function useTrace(
           return;
         }
         setPxPerMm(1 / Math.sqrt(Math.abs(full.map[0] * full.map[3] - full.map[1] * full.map[2])));
-        const small = full.width <= REDUCED_SIDE && full.height <= REDUCED_SIDE;
+        const over = full.width * full.height > FULL_SIZE_PREVIEW_MAX_PX;
+        setOverFullSizeLimit(over);
+        // Full-size preview skips the reduced copy, up to 4 Mpx (criterion 41, UX notes section 12).
+        const small = (full.width <= REDUCED_SIDE && full.height <= REDUCED_SIDE) || (v.fullSizePreview && !over);
         if (!small) {
           const reduced = pixelsOf(session, id, true);
           if (reduced) {
-            const out = await runner().trace(reduced, threshold, v.smooth, v.specks);
+            const out = await runner().trace(reduced, settings);
             if (stale()) {
               return;
             }
@@ -238,7 +283,7 @@ export function useTrace(
             return;
           }
         }
-        const out = await runner().trace(full, threshold, v.smooth, v.specks);
+        const out = await runner().trace(full, settings);
         if (stale()) {
           return;
         }
@@ -254,7 +299,7 @@ export function useTrace(
         }
       }
     },
-    [getSession, startTimers, clearTimers, thresholdOf, runner],
+    [getSession, startTimers, clearTimers, thresholdOf, runner, setValues],
   );
 
   const schedule = useCallback(
@@ -299,19 +344,15 @@ export function useTrace(
       setValues((v) => ({ ...v, threshold: known ?? null }));
       void runPreview(true);
     }
-  }, [syncRevision, active, getSession, cancelAll, runPreview]);
+  }, [syncRevision, active, getSession, cancelAll, runPreview, setValues]);
 
-  const setValue = useCallback(
-    (name: TraceParam["name"], value: number, isDragging: boolean) => {
-      dragging.current = isDragging;
+  /** Takes a new choice: remembered, the kept results dropped, a preview after the debounce. */
+  const apply = useCallback(
+    (next: TraceChoice) => {
       const session = getSession();
-      const next = { ...valuesRef.current, [name]: value };
-      if (name === "threshold" && viewRef.current.shown) {
-        thresholds.current.set(viewRef.current.shown, value);
-      }
-      valuesRef.current = next;
-      setValues(next);
-      writeValues(next);
+      choiceRef.current = next;
+      setChoice(next);
+      writeChoice(next);
       results.current.clear();
       session?.clear_trace_results();
       session?.set_trace_preview_stale(false);
@@ -319,6 +360,30 @@ export function useTrace(
     },
     [getSession, schedule],
   );
+
+  const setValue = useCallback(
+    <K extends keyof TraceValues>(name: K, value: TraceValues[K], isDragging = false) => {
+      dragging.current = isDragging;
+      if (name === "threshold" && viewRef.current.shown && typeof value === "number") {
+        thresholds.current.set(viewRef.current.shown, value);
+      }
+      apply(editChoice(choiceRef.current, name, value));
+    },
+    [apply],
+  );
+
+  const pick = useCallback(
+    (preset: TracePreset) => {
+      dragging.current = false;
+      apply(pickPreset(choiceRef.current, preset));
+    },
+    [apply],
+  );
+
+  const setAdvancedOpen = useCallback((open: boolean) => {
+    setAdvancedOpenState(open);
+    writeAdvancedOpen(open);
+  }, []);
 
   const endDrag = useCallback(() => {
     if (dragging.current) {
@@ -341,11 +406,11 @@ export function useTrace(
     if (!session || creating || current.images.length === 0) {
       return;
     }
-    const threshold = valuesRef.current.threshold;
+    const threshold = choiceRef.current.values.threshold;
     if (threshold === null || (!status.canCreate && results.current.size > 0)) {
       return;
     }
-    const v = { ...valuesRef.current, threshold };
+    const v = { ...choiceRef.current.values, threshold };
     const wanted = key(threshold, v);
     setCreating(true);
     setProgress(0);
@@ -368,7 +433,7 @@ export function useTrace(
             clearTimers();
             return;
           }
-          const out = await runner().trace(full, threshold, v.smooth, v.specks);
+          const out = await runner().trace(full, wanted);
           if (mine !== generation.current) {
             return;
           }
@@ -430,13 +495,20 @@ export function useTrace(
     selection: view.selection,
     imagesLabel: imagesLabel(progress, view.images.length),
     params,
+    presets,
     values,
+    choice,
+    presetLabel: presetLabel(choice, presets),
+    advancedOpen,
+    overFullSizeLimit,
     status: busyLine,
     busy,
     stopShown,
     creating,
     pxPerMm,
     setValue,
+    pick,
+    setAdvancedOpen,
     endDrag,
     stop,
     create,

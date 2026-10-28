@@ -23,6 +23,7 @@ import { useEffect, useRef } from "react";
 
 import { Tooltip } from "@/components/ui/tooltip";
 import { type LayerRowData, indentPx } from "@/lib/layerRows";
+import { tracedNotice } from "@/lib/traceText";
 
 type Glyph = ComponentType<{ size: number; strokeWidth: number; "aria-hidden": boolean }>;
 
@@ -211,6 +212,9 @@ export function LayerRow({
   const tooltip = (
     <span className="flex flex-col">
       <span>{row.name}</span>
+      {row.traced ? (
+        <span className="text-[var(--panel-muted-fg)]">{tracedNotice(1, row.traced[0], row.traced[1])}</span>
+      ) : null}
       {row.chainLine ? (
         <span className="text-[var(--panel-muted-fg)]">{row.chainLine}</span>
       ) : null}

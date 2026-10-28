@@ -40,18 +40,84 @@ export const STOP = "Stop";
 /** A region with 65 000 holes or more (criterion 16). */
 export const TOO_DETAILED = "Too much detail: raise Specks.";
 
-/** The values of the bar. `threshold` is `null` until the image's automatic value is known. */
+/** The Preset button's text after an edit (criterion 40). */
+export const CUSTOM = "Custom";
+
+/** The Advanced button (criterion 41). */
+export const ADVANCED = "Advanced";
+
+/** The Full-size preview switch's state text over 4 Mpx (UX notes section 12). */
+export const OVER_4_MPX = "Over 4 Mpx";
+
+/** Full-size preview is honoured up to this many pixels (UX notes section 12). */
+export const FULL_SIZE_PREVIEW_MAX_PX = 4_000_000;
+
+/** The values of a trace. `threshold` is `null` until the image's automatic value is known;
+ * `upscale` and `denoise` are choice indices (Auto | Off, Off | Low | High); `nodeLimit` is `null`
+ * for none. */
 export interface TraceValues {
   threshold: number | null;
   smooth: number;
   specks: number;
+  corners: number;
+  upscale: number;
+  denoise: number;
+  nodeLimit: number | null;
+  invert: boolean;
+  ignoreBackground: boolean;
+  fullSizePreview: boolean;
 }
 
-/** One field of the settings schema (`trace_params()` of the wasm module, criterion 6). */
-export interface TraceParam {
-  name: "threshold" | "smooth" | "specks";
+/** The values a preset sets (criterion 60). */
+export type PresetValues = Pick<TraceValues, "smooth" | "specks" | "corners" | "upscale" | "denoise">;
+
+/** The names of the preset values: an edit of one of them makes the choice "Custom". */
+export const PRESET_FIELDS: readonly (keyof PresetValues)[] = ["smooth", "specks", "corners", "upscale", "denoise"];
+
+/** One preset (`trace_presets()` of the wasm module, criteria 59 and 60). */
+export interface TracePreset {
+  key: string;
   label: string;
-  kind: "integer" | "length";
+  detail: string;
+  values: PresetValues;
+}
+
+/** The presets as the crate states them (the wasm module's `trace_presets()` is the source; this
+ * copy is what the bar uses before the module is loaded and what the tests compare). */
+export const TRACE_PRESETS_FALLBACK: readonly TracePreset[] = [
+  { key: "logo", label: "Logo / Line art", detail: "Sharp corners, clean curves.", values: { smooth: 80, specks: 0.5, corners: 70, upscale: 1, denoise: 0 } },
+  { key: "photo", label: "Photo", detail: "Many shapes. Photos trace roughly.", values: { smooth: 50, specks: 0.1, corners: 30, upscale: 1, denoise: 0 } },
+  { key: "silhouette", label: "Silhouette for cutting/carving", detail: "Closed, simple, few nodes.", values: { smooth: 100, specks: 2, corners: 70, upscale: 1, denoise: 1 } },
+  { key: "engraving", label: "Engraving", detail: "Keeps fine lines.", values: { smooth: 80, specks: 0.1, corners: 70, upscale: 0, denoise: 0 } },
+];
+
+/** The remembered choice (criteria 40 and 66, `adrs.md` 2026-10-28 second note point 6): the
+ * preset the values came from, whether they were edited since, and the values. No value
+ * comparison: a pick clears `edited`, any edit of a preset value sets it. */
+export interface TraceChoice {
+  preset: string;
+  edited: boolean;
+  values: TraceValues;
+}
+
+/** The name of a setting in the schema. */
+export type TraceParamName =
+  | "threshold"
+  | "smooth"
+  | "specks"
+  | "denoise"
+  | "upscale"
+  | "corners"
+  | "node_limit"
+  | "invert"
+  | "ignore_background"
+  | "full_size_preview";
+
+/** One field of the settings schema (`trace_params()` of the wasm module, criteria 6 and 45). */
+export interface TraceParam {
+  name: TraceParamName;
+  label: string;
+  kind: "integer" | "length" | "choice" | "toggle";
   unit: string;
   min: number;
   max: number;
@@ -61,14 +127,23 @@ export interface TraceParam {
   fine_step: number;
   group: string;
   advanced: boolean;
+  /** A choice's labels in index order; empty otherwise. */
+  choices: readonly string[];
 }
 
 /** The schema of slice 1 as the crate states it (the wasm module's `trace_params()` is the source;
  * this copy is what the bar uses before the module is loaded and what the tests compare). */
 export const TRACE_PARAMS_FALLBACK: readonly TraceParam[] = [
-  { name: "threshold", label: "Threshold", kind: "integer", unit: "", min: 0, max: 255, default: 128, step: 1, big_step: 10, fine_step: 1, group: "threshold", advanced: false },
-  { name: "smooth", label: "Smooth", kind: "integer", unit: "", min: 0, max: 100, default: 80, step: 1, big_step: 10, fine_step: 1, group: "smooth", advanced: false },
-  { name: "specks", label: "Ignore below", kind: "length", unit: "mm", min: 0, max: 10, default: 0.5, step: 0.1, big_step: 1, fine_step: 0.01, group: "specks", advanced: false },
+  { name: "threshold", label: "Threshold", kind: "integer", unit: "", min: 0, max: 255, default: 128, step: 1, big_step: 10, fine_step: 1, group: "threshold", advanced: false, choices: [] },
+  { name: "smooth", label: "Smooth", kind: "integer", unit: "", min: 0, max: 100, default: 80, step: 1, big_step: 10, fine_step: 1, group: "smooth", advanced: false, choices: [] },
+  { name: "specks", label: "Ignore below", kind: "length", unit: "mm", min: 0, max: 10, default: 0.5, step: 0.1, big_step: 1, fine_step: 0.01, group: "specks", advanced: false, choices: [] },
+  { name: "denoise", label: "Denoise", kind: "choice", unit: "", min: 0, max: 2, default: 0, step: 1, big_step: 1, fine_step: 1, group: "advanced", advanced: true, choices: ["Off", "Low", "High"] },
+  { name: "upscale", label: "Upscale", kind: "choice", unit: "", min: 0, max: 1, default: 1, step: 1, big_step: 1, fine_step: 1, group: "advanced", advanced: true, choices: ["Auto", "Off"] },
+  { name: "corners", label: "Corners", kind: "integer", unit: "", min: 0, max: 100, default: 70, step: 1, big_step: 10, fine_step: 1, group: "advanced", advanced: true, choices: [] },
+  { name: "node_limit", label: "Node limit", kind: "integer", unit: "", min: 0, max: 10_000_000, default: 0, step: 100, big_step: 1000, fine_step: 1, group: "advanced", advanced: true, choices: [] },
+  { name: "invert", label: "Invert", kind: "toggle", unit: "", min: 0, max: 1, default: 0, step: 1, big_step: 1, fine_step: 1, group: "advanced", advanced: true, choices: [] },
+  { name: "ignore_background", label: "Ignore background", kind: "toggle", unit: "", min: 0, max: 1, default: 0, step: 1, big_step: 1, fine_step: 1, group: "advanced", advanced: true, choices: [] },
+  { name: "full_size_preview", label: "Full-size preview", kind: "toggle", unit: "", min: 0, max: 1, default: 0, step: 1, big_step: 1, fine_step: 1, group: "advanced", advanced: true, choices: [] },
 ];
 
 /** `value` clamped to the field's range and rounded to its finest step (criterion 5). */
@@ -115,11 +190,11 @@ export function valueText(param: TraceParam, value: number): string {
 /** The muted pixel readout of Specks ("0.50 mm  ~ 2 px", criterion 4): the size on the canvas. */
 export function specksHint(mm: number, pxPerMm: number): string {
   const px = Math.round(mm * pxPerMm);
-  return `${mm.toFixed(2)} mm  ~ ${px} px`;
+  return `${mm.toFixed(2)} mm  ${px < 1 ? "< 1 px" : `~ ${px} px`}`;
 }
 
 /** Thousands with a comma ("1,204"). */
-function grouped(n: number): string {
+export function grouped(n: number): string {
   return Math.round(n).toLocaleString("en-US");
 }
 
@@ -135,9 +210,12 @@ export interface TraceSummary {
   specks: number;
   foregroundPixels: number;
   coversWholeImage: boolean;
+  /** What the Node limit did (criterion 43). */
+  nodeLimit: "untouched" | "reached" | "not_met";
 }
 
-/** Reads the head of the worker's numbers (`curvyo_ui_core::trace_job`'s layout). */
+/** Reads the head of the worker's numbers (`curvyo_ui_core::trace_job_with`'s layout: status,
+ * paths, nodes, specks, foreground pixels, whole picture, Node limit, outline count). */
 export function readSummary(wire: ArrayLike<number>): TraceSummary {
   const status = wire[0] === 1 ? "too_detailed" : wire[0] === 0 ? "traced" : "invalid";
   return {
@@ -147,7 +225,15 @@ export function readSummary(wire: ArrayLike<number>): TraceSummary {
     specks: wire[3] ?? 0,
     foregroundPixels: wire[4] ?? 0,
     coversWholeImage: wire[5] === 1,
+    nodeLimit: wire[6] === 1 ? "reached" : wire[6] === 2 ? "not_met" : "untouched",
   };
+}
+
+/** The status line when the Node limit acted (criterion 43). */
+export function nodeLimitText(outcome: "reached" | "not_met", nodes: number): string {
+  return outcome === "reached"
+    ? `Node limit reached: ${grouped(nodes)} nodes, tolerance raised.`
+    : `Node limit could not be met: ${grouped(nodes)} nodes.`;
 }
 
 /** The status line of a settled trace (criteria 11, 15, 16) and its muted second line. */
@@ -168,6 +254,9 @@ export function statusText(
     // is too high, otherwise too low (UX notes section 7).
     const direction = summary.foregroundPixels * 2 > pixels ? "too high" : "too low";
     return { line: `0 paths at this Threshold: ${direction}.`, muted, canCreate: false };
+  }
+  if (summary.nodeLimit !== "untouched") {
+    return { line: nodeLimitText(summary.nodeLimit, summary.nodes), muted, canCreate: true };
   }
   if (summary.paths === 1 && summary.coversWholeImage) {
     return { line: "1 path covering the whole image.", muted, canCreate: true };
@@ -210,35 +299,154 @@ function defaultStorage(): ValueStorage | undefined {
   }
 }
 
-/** The remembered Smooth and Specks; the defaults for a new user or anything unreadable. The
- * Threshold always starts at the image's automatic value (criterion 9). */
-export function readValues(
-  params: readonly TraceParam[] = TRACE_PARAMS_FALLBACK,
-  storage: ValueStorage | undefined = defaultStorage(),
-): TraceValues {
-  const byName = (name: TraceParam["name"]) => params.find((p) => p.name === name) ?? TRACE_PARAMS_FALLBACK.find((p) => p.name === name)!;
-  const fallback = { threshold: null, smooth: byName("smooth").default, specks: byName("specks").default };
-  try {
-    const raw: unknown = JSON.parse(storage?.getItem(TRACE_VALUES_KEY) ?? "null");
-    if (raw && typeof raw === "object") {
-      const { smooth, specks } = raw as { smooth?: unknown; specks?: unknown };
-      return {
-        threshold: null,
-        smooth: typeof smooth === "number" ? clampValue(byName("smooth"), smooth) : fallback.smooth,
-        specks: typeof specks === "number" ? clampValue(byName("specks"), specks) : fallback.specks,
-      };
-    }
-  } catch {
-    /* A broken value reads as the defaults. */
-  }
-  return fallback;
+/** The storage key of the remembered Advanced block state (criterion 41). */
+export const TRACE_ADVANCED_KEY = "curvyo.trace-advanced-open";
+
+/** The values of `preset` over `base` (criterion 60): never the Threshold, the Node limit or the
+ * switches. */
+export function withPreset(base: TraceValues, preset: TracePreset): TraceValues {
+  return { ...base, ...preset.values };
 }
 
-/** Remembers Smooth and Specks. A failing write is ignored. */
-export function writeValues(values: TraceValues, storage: ValueStorage | undefined = defaultStorage()): void {
-  try {
-    storage?.setItem(TRACE_VALUES_KEY, JSON.stringify({ smooth: values.smooth, specks: values.specks }));
-  } catch {
-    /* Not kept; the next start uses the defaults. */
+/** The first use (criterion 59): the first preset, the Threshold not known yet, no Node limit,
+ * the switches off. */
+export function firstChoice(presets: readonly TracePreset[] = TRACE_PRESETS_FALLBACK): TraceChoice {
+  const first = presets[0] ?? TRACE_PRESETS_FALLBACK[0];
+  const base: TraceValues = {
+    threshold: null,
+    ...first.values,
+    nodeLimit: null,
+    invert: false,
+    ignoreBackground: false,
+    fullSizePreview: false,
+  };
+  return { preset: first.key, edited: false, values: base };
+}
+
+/** A pick of `preset` (criterion 40): its values, not edited. */
+export function pickPreset(choice: TraceChoice, preset: TracePreset): TraceChoice {
+  return { preset: preset.key, edited: false, values: withPreset(choice.values, preset) };
+}
+
+/** An edit of one value: a preset value makes the choice "Custom" (criterion 40), the others
+ * (Threshold, Node limit, the switches) do not. */
+export function editChoice<K extends keyof TraceValues>(choice: TraceChoice, name: K, value: TraceValues[K]): TraceChoice {
+  const edited = choice.edited || (PRESET_FIELDS as readonly string[]).includes(name);
+  return { ...choice, edited, values: { ...choice.values, [name]: value } };
+}
+
+/** The Preset button's text: the preset's name, or "Custom" after an edit (criterion 40). */
+export function presetLabel(choice: TraceChoice, presets: readonly TracePreset[] = TRACE_PRESETS_FALLBACK): string {
+  if (choice.edited) {
+    return CUSTOM;
   }
+  return presets.find((p) => p.key === choice.preset)?.label ?? CUSTOM;
+}
+
+/** The settings JSON `trace_job` of the wasm module reads, with `threshold`. */
+export function settingsJson(values: TraceValues, threshold: number): string {
+  return JSON.stringify({
+    threshold,
+    smooth: values.smooth,
+    specks: values.specks,
+    corners: values.corners,
+    upscale: values.upscale,
+    denoise: values.denoise,
+    node_limit: values.nodeLimit,
+    invert: values.invert,
+    ignore_background: values.ignoreBackground,
+  });
+}
+
+/** The remembered choice (criterion 66): the preset, whether it was edited, and the preset
+ * values; the first use for a new user or anything unreadable. The Threshold always starts at the
+ * image's automatic value (criterion 9); the Node limit and the switches start off (Proposal). A
+ * slice-1 setting (`{ smooth, specks }`) reads as an edited Logo / Line art. */
+export function readChoice(
+  params: readonly TraceParam[] = TRACE_PARAMS_FALLBACK,
+  presets: readonly TracePreset[] = TRACE_PRESETS_FALLBACK,
+  storage: ValueStorage | undefined = defaultStorage(),
+): TraceChoice {
+  const first = firstChoice(presets);
+  const byName = (name: TraceParamName) => params.find((p) => p.name === name) ?? TRACE_PARAMS_FALLBACK.find((p) => p.name === name)!;
+  const number = (raw: Record<string, unknown>, field: keyof PresetValues, name: TraceParamName) =>
+    typeof raw[field] === "number" ? clampValue(byName(name), raw[field]) : first.values[field];
+  try {
+    const raw: unknown = JSON.parse(storage?.getItem(TRACE_VALUES_KEY) ?? "null");
+    if (!raw || typeof raw !== "object") {
+      return first;
+    }
+    const stored = raw as { preset?: unknown; edited?: unknown; values?: unknown };
+    const slice1 = stored.values === undefined;
+    const values = (slice1 ? raw : stored.values) as Record<string, unknown>;
+    if (!values || typeof values !== "object") {
+      return first;
+    }
+    const preset = typeof stored.preset === "string" && presets.some((p) => p.key === stored.preset) ? stored.preset : first.preset;
+    return {
+      preset,
+      edited: slice1 || stored.edited === true,
+      values: {
+        ...first.values,
+        smooth: number(values, "smooth", "smooth"),
+        specks: number(values, "specks", "specks"),
+        corners: number(values, "corners", "corners"),
+        upscale: number(values, "upscale", "upscale"),
+        denoise: number(values, "denoise", "denoise"),
+      },
+    };
+  } catch {
+    /* A broken value reads as the first use. */
+  }
+  return first;
+}
+
+/** Remembers the choice: the preset, `edited` and the preset values. A failing write is
+ * ignored. */
+export function writeChoice(choice: TraceChoice, storage: ValueStorage | undefined = defaultStorage()): void {
+  const values: Record<string, number> = {};
+  for (const field of PRESET_FIELDS) {
+    values[field] = choice.values[field];
+  }
+  try {
+    storage?.setItem(TRACE_VALUES_KEY, JSON.stringify({ preset: choice.preset, edited: choice.edited, values }));
+  } catch {
+    /* Not kept; the next start uses the first use. */
+  }
+}
+
+/** Whether the Advanced block was left open (criterion 41). */
+export function readAdvancedOpen(storage: ValueStorage | undefined = defaultStorage()): boolean {
+  try {
+    return storage?.getItem(TRACE_ADVANCED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+/** Remembers whether the Advanced block is open. */
+export function writeAdvancedOpen(open: boolean, storage: ValueStorage | undefined = defaultStorage()): void {
+  try {
+    storage?.setItem(TRACE_ADVANCED_KEY, open ? "1" : "0");
+  } catch {
+    /* Not kept. */
+  }
+}
+
+/** The Node limit as typed (criterion 43): empty or 0 is none, else a whole number in range. */
+export function parseNodeLimit(text: string): number | null {
+  const digits = text.replace(/[,\s]/g, "");
+  if (digits === "") {
+    return null;
+  }
+  const value = Number.parseInt(digits, 10);
+  if (!Number.isFinite(value) || value <= 0) {
+    return null;
+  }
+  return Math.min(10_000_000, value);
+}
+
+/** The Node limit as shown after leaving the field: thousands with a comma, empty for none. */
+export function nodeLimitShown(limit: number | null): string {
+  return limit === null ? "" : grouped(limit);
 }

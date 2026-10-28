@@ -55,6 +55,9 @@ export interface LayerRowData {
   stateLine: string;
   /** A clone row's chain line for its tooltip (`0049`); empty otherwise. */
   chainLine?: string;
+  /** A trace group's outlines and nodes as Create paths wrote them (`0025` criteria 30, 68):
+   * its tooltip repeats the success notice; null otherwise. */
+  traced?: [number, number] | null;
   /** "Own placement, own style" for a clone with overrides (`0057` criterion 28). */
   overridesLine?: string;
   /** "Hidden" or "Locked" when a press selects nothing. */
