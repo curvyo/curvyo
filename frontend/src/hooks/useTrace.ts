@@ -122,6 +122,8 @@ export function useTrace(
   const [busy, setBusy] = useState(false);
   const [stopShown, setStopShown] = useState(false);
   const [creating, setCreating] = useState(false);
+  /** The image the job is on (0-based): the first until Create paths moves on (criterion 46). */
+  const [progress, setProgress] = useState(0);
   const [pxPerMm, setPxPerMm] = useState(0);
   const runnerRef = useRef<TraceRunner | null>(null);
   const generation = useRef(0);
@@ -291,6 +293,7 @@ export function useTrace(
     session?.clear_trace_results();
     setStatus({ line: "", muted: "", canCreate: false });
     setCreating(false);
+    setProgress(0);
     if (active && next.shown) {
       const known = thresholds.current.get(next.shown);
       setValues((v) => ({ ...v, threshold: known ?? null }));
@@ -345,6 +348,7 @@ export function useTrace(
     const v = { ...valuesRef.current, threshold };
     const wanted = key(threshold, v);
     setCreating(true);
+    setProgress(0);
     const mine = ++generation.current;
     startTimers();
     void (async () => {
@@ -355,6 +359,7 @@ export function useTrace(
           if (results.current.get(id) === wanted) {
             continue;
           }
+          setProgress(index);
           setStatus({ line: creatingLabel(index, current.images.length), muted: "", canCreate: false });
           const full = pixelsOf(session, id, false);
           if (!full) {
@@ -418,13 +423,12 @@ export function useTrace(
     [active, create, creating, stop],
   );
 
-  const shownIndex = Math.max(0, view.images.indexOf(view.shown));
   const busyLine = busy && !status.line.startsWith("Tracing") ? { ...status, line: TRACING } : status;
   return {
     active,
     available,
     selection: view.selection,
-    imagesLabel: imagesLabel(shownIndex, view.images.length),
+    imagesLabel: imagesLabel(progress, view.images.length),
     params,
     values,
     status: busyLine,

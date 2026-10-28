@@ -111,7 +111,8 @@ function FlagButton({
 }) {
   const ref = useRef<HTMLButtonElement>(null);
   useEffect(() => {
-    if (focused) {
+    // Only while the focus is already in the list (see the row's own effect).
+    if (focused && ref.current?.closest("[role=row]")?.parentElement?.contains(document.activeElement)) {
       ref.current?.focus();
     }
   }, [focused]);
@@ -184,6 +185,11 @@ export function LayerRow({
   const actionRef = useRef<HTMLButtonElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
+    // Roving focus moves only while the focus is already in the list: a row that mounts (the new
+    // group after Create paths) must not take it from the canvas.
+    if (!rowRef.current?.parentElement?.contains(document.activeElement)) {
+      return;
+    }
     if (tabbable && cell === "name" && !renaming) {
       rowRef.current?.focus();
     }
