@@ -176,9 +176,10 @@ export function statusText(
   return { line, muted, canCreate: true };
 }
 
-/** "Tracing 1 of 3 images" with two or more images, else nothing (criterion 46). */
-export function imagesLabel(shownIndex: number, count: number): string {
-  return count >= 2 ? `Tracing ${shownIndex + 1} of ${count} images` : "";
+/** "Tracing 1 of 3 images" with two or more images, else nothing (criterion 46). `done` counts the
+ * job's progress (0-based image it is on), not the position of the previewed image. */
+export function imagesLabel(done: number, count: number): string {
+  return count >= 2 ? `Tracing ${done + 1} of ${count} images` : "";
 }
 
 /** "Tracing 2 of 3..." while Create paths traces several images (criterion 46). */

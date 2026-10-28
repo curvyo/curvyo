@@ -515,6 +515,12 @@ test("0025 in Chromium: Create paths in one undo step by button, Enter, double-c
     const history0 = countOf(await historyText(s), "Trace image");
     const groupIndex = async () => (await rowInfo(s)).findIndex(([n]) => /Trace of/.test(n ?? ""));
     const check = async (how: string) => {
+      // ux-notes section 5: the focus is back on the canvas, where Delete and the tool letters work.
+      assert.equal(
+        await s.evaluate(`document.activeElement?.tagName + ' ' + document.activeElement?.getAttribute('tabindex') + ' ' + !!document.activeElement?.querySelector?.('canvas')`),
+        'DIV 0 true',
+        `${how}: the focus is on the canvas after Create paths`,
+      );
       const rows = await rowInfo(s);
       const g = rows.findIndex(([n]) => /Trace of/.test(n ?? ""));
       const img = rows.findIndex(([n]) => n?.includes("ring.png") && !/Trace of/.test(n));
@@ -677,8 +683,8 @@ test("0025 in Chromium: several images, empty states, zero and whole results (cr
     await s.clickSel("[data-t25]");
     await traceReady(s);
     const bar = (await s.evaluate(`document.body.innerText`)) as string;
-    // Spec 46 writes "Tracing 1 of 3 images"; the build counts the previewed image (3 of 3 when c is clicked last).
-    assert.match(bar, /Tracing [123] of 3 images/);
+    // Criterion 46: the label counts the job (the first image until Create paths moves on).
+    assert.match(bar, /Tracing 1 of 3 images/);
     await press(s, "Enter", 13);
     const notice = await waitFor("the notice", async () => {
       const t = await s.statusText();
