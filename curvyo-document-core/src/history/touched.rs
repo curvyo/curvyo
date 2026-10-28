@@ -5,7 +5,7 @@
 //! the container-creating operations of the log, so it also resolves the nested containers of
 //! deleted objects, which `get_path_to_container` cannot.
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeSet, HashMap, HashSet};
 
 use loro::{
     ContainerID, ContainerType, JsonChange, JsonListOp, JsonMapOp, JsonMovableListOp,
@@ -46,6 +46,13 @@ impl Touched {
             changed: keep(&self.changed),
             root: false,
         }
+    }
+
+    /// Whether the step only created objects: nothing it touched existed before it. Revivals (an
+    /// object undo bringing a node back) are recorded in `moved`, never in `created`, so a step
+    /// that revived a node is not `only_created`.
+    pub(crate) fn only_created(&self) -> bool {
+        self.deleted.is_empty() && self.moved.is_empty() && self.changed.is_empty() && !self.root
     }
 
     /// Every touched object, created ones first.
@@ -155,8 +162,9 @@ impl ContainerIndex {
         let mut changed_ids = BTreeSet::new();
         let mut root = false;
         let mut order: Vec<TreeID> = Vec::new();
-        let note = |id: TreeID, order: &mut Vec<TreeID>| {
-            if !order.contains(&id) {
+        let mut noted: HashSet<TreeID> = HashSet::new();
+        let mut note = |id: TreeID, order: &mut Vec<TreeID>| {
+            if noted.insert(id) {
                 order.push(id);
             }
         };
