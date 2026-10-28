@@ -167,7 +167,7 @@ mod tests {
 
     #[test]
     fn a_single_pixel_is_its_square() {
-        let path = trace_crop(&crop(&["#"]), true, curve_settings(80)).unwrap();
+        let path = trace_crop(&crop(&["#"]), true, curve_settings(80, 70)).unwrap();
         let bounds = kurbo::Shape::bounding_box(&path);
         assert!(
             (bounds.x0 - 10.0).abs() < 0.5 && (bounds.y0 - 20.0).abs() < 0.5,
@@ -178,7 +178,7 @@ mod tests {
 
     #[test]
     fn a_thin_line_traces() {
-        let path = trace_crop(&crop(&["##########"]), true, curve_settings(80)).unwrap();
+        let path = trace_crop(&crop(&["##########"]), true, curve_settings(80, 70)).unwrap();
         let area = kurbo::Shape::area(&path).abs();
         assert!(area > 5.0 && area < 15.0, "{area}");
     }
@@ -186,7 +186,7 @@ mod tests {
     #[test]
     fn a_square_stays_four_lines() {
         let rows = vec!["##########"; 10];
-        let path = trace_crop(&crop(&rows), true, curve_settings(80)).unwrap();
+        let path = trace_crop(&crop(&rows), true, curve_settings(80, 70)).unwrap();
         assert_eq!(node_count(&path), 4, "{path:?}");
         let area = kurbo::Shape::area(&path).abs();
         assert!((area - 100.0).abs() < 1e-9, "{area}");
