@@ -32,9 +32,7 @@ scope.onmessage = (event) => {
       request.width,
       request.height,
       new Float64Array(request.map),
-      request.threshold,
-      request.smooth,
-      request.specks,
+      request.settings,
     );
     scope.postMessage({ id: request.id, kind: "trace", wire, ms: performance.now() - started }, [wire.buffer]);
   } catch (error) {

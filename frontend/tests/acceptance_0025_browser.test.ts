@@ -257,3 +257,47 @@ test("0025 in Chromium: Trace button, preview status, Create paths, undo, key I"
     rmSync(profile, { recursive: true, force: true });
   }
 });
+
+test("0025 in Chromium at 800x600: no Trace bar control passes the bar's right edge, panel open and closed", { skip: !BROWSER, timeout: 300_000 }, async () => {
+  let vite: ChildProcess | null = null;
+  mkdirSync(SCRATCH, { recursive: true });
+  const profile = mkdtempSync(path.join(SCRATCH, "profile-"));
+  const logo = path.join(SCRATCH, "logo.png");
+  writeFileSync(logo, png(200, 100, (x, y) => x >= 50 && x < 150 && y >= 25 && y < 75));
+  let closeAll: () => Promise<void> = async () => undefined;
+  try {
+    vite = spawn("npx", ["vite", "--port", String(PORT), "--strictPort"], { cwd: FRONTEND, stdio: "ignore" });
+    await waitFor("vite", async () => ((await fetch(ORIGIN)).ok ? true : null));
+    const s = await session(profile);
+    closeAll = s.close;
+    await s.send("Emulation.setDeviceMetricsOverride", { width: 800, height: 600, deviceScaleFactor: 1, mobile: false });
+    await s.send("Page.navigate", { url: `${ORIGIN}/` });
+    await waitFor("the app", async () => ((await s.evaluate(`!!document.querySelector('[data-import-button]')`)) ? true : null));
+    await sleep(1500);
+    await s.tab("Layers");
+    await s.choose("[data-import-button]", logo);
+    await waitFor("the image row", async () => ((await s.layerRows()).some((r) => r?.includes("logo.png")) ? true : null));
+    await s.evaluate(`[...document.querySelectorAll('[data-context-bar] button')].find((b) => b.textContent === 'Trace').click()`);
+    await waitFor("the trace status", async () => ((await s.evaluate(`/path/.test(document.querySelector('[role=toolbar][aria-label=Trace] [role=status]')?.textContent ?? '')`)) ? true : null), 30_000);
+    await s.evaluate(`[...document.querySelectorAll('[role=toolbar][aria-label=Trace] button')].find((b) => b.textContent === 'Advanced').click()`);
+    await sleep(500);
+    const overflow = async () =>
+      (await s.evaluate(`(() => { const bar = document.querySelector('[role=toolbar][aria-label=Trace]'); const edge = bar.getBoundingClientRect().right;
+        return JSON.stringify([...bar.querySelectorAll('button, input, [role=radiogroup], label')].filter((e) => e.getBoundingClientRect().width > 0 && e.getBoundingClientRect().right > edge + 0.5)
+          .map((e) => (e.getAttribute('aria-label') || e.textContent || e.tagName) + ' ' + Math.round(e.getBoundingClientRect().right - edge))); })()`)) as string;
+    for (const open of [true, false]) {
+      const panelOpen = (await s.evaluate(`!!document.querySelector('[aria-label="Hide panel"]')`)) as boolean;
+      if (panelOpen !== open) {
+        await s.clickSel(`[aria-label="${panelOpen ? "Hide panel" : "Show panel"}"]`);
+        await sleep(600);
+      }
+      assert.equal(await overflow(), "[]", `controls past the bar's right edge, panel ${open ? "open" : "closed"}`);
+      const shot = (await s.send("Page.captureScreenshot", { format: "png" })) as { result?: { data?: string } };
+      writeFileSync(path.join(SCRATCH, `pr-panel-${open ? "open" : "closed"}-800x600.png`), Buffer.from(shot.result?.data ?? "", "base64"));
+    }
+  } finally {
+    await closeAll();
+    vite?.kill();
+    rmSync(profile, { recursive: true, force: true });
+  }
+});

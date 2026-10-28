@@ -15,9 +15,8 @@ export type TraceRequest =
       width: number;
       height: number;
       map: number[];
-      threshold: number;
-      smooth: number;
-      specks: number;
+      /** The settings JSON of `settingsJson` in `traceText`. */
+      settings: string;
     };
 
 /** A message from the worker. */
@@ -130,8 +129,9 @@ export class TraceRunner {
     return response.threshold;
   }
 
-  /** One trace of `pixels` with the bar's values; the pixels are handed over to the worker. */
-  async trace(pixels: TracePixels, threshold: number, smooth: number, specks: number): Promise<TraceOutput> {
+  /** One trace of `pixels` with `settings` (the JSON of `settingsJson`); the pixels are handed
+   * over to the worker. */
+  async trace(pixels: TracePixels, settings: string): Promise<TraceOutput> {
     const response = await this.send(
       (id) => ({
         type: "trace",
@@ -140,9 +140,7 @@ export class TraceRunner {
         width: pixels.width,
         height: pixels.height,
         map: pixels.map,
-        threshold,
-        smooth,
-        specks,
+        settings,
       }),
       [pixels.rgba.buffer],
     );

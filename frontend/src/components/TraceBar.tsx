@@ -1,12 +1,15 @@
 import { Tooltip } from "radix-ui";
-import { useRef, useState } from "react";
-import type { KeyboardEvent, PointerEvent } from "react";
+import { useRef } from "react";
 
 import { useRowStarts } from "@/components/SelectToolbar";
 import { BarGroup } from "@/components/TextBar";
+import { TraceAdvanced } from "@/components/TraceAdvanced";
+import { TraceField } from "@/components/TraceField";
+import { TracePresetMenu } from "@/components/TracePresetMenu";
 import type { TraceApi } from "@/hooks/useTrace";
 import { BAR_ROW_CLASS } from "@/lib/barLayout";
 import {
+  ADVANCED,
   CREATE_PATHS,
   CREATE_PATHS_TOOLTIP,
   STOP,
@@ -17,10 +20,7 @@ import {
   TRACE_STATE_LABEL,
   TRACE_TOOLTIP,
   type TraceParam,
-  parseTyped,
   specksHint,
-  stepValue,
-  valueText,
 } from "@/lib/traceText";
 
 const BUTTON_CLASS =
@@ -63,97 +63,6 @@ export function TraceButton({ onTrace, onReturnFocus }: { onTrace: () => void; o
   );
 }
 
-interface TraceFieldProps {
-  param: TraceParam;
-  value: number | null;
-  onValue: (value: number, dragging: boolean) => void;
-  onEndDrag: () => void;
-  onCreate: () => void;
-  onReturnFocus: () => void;
-}
-
-/** One value field of the bar (criterion 5): the label inside, the `--value-fill` bar, a drag
- * across it sets the value (the reduced copy is traced while it moves), the keys step it, a typed
- * value commits on Enter and the focus returns to the canvas; Ctrl+Enter creates the paths. */
-function TraceField({ param, value, onValue, onEndDrag, onCreate, onReturnFocus }: TraceFieldProps) {
-  const [draft, setDraft] = useState<string | null>(null);
-  const trackRef = useRef<HTMLDivElement>(null);
-  const shown = value ?? param.default;
-  const share = value === null ? 0 : (shown - param.min) / (param.max - param.min);
-  const fromPointer = (event: PointerEvent<HTMLDivElement>) => {
-    const box = trackRef.current?.getBoundingClientRect();
-    if (!box || box.width <= 0) {
-      return shown;
-    }
-    const p = Math.min(1, Math.max(0, (event.clientX - box.left) / box.width));
-    return param.min + p * (param.max - param.min);
-  };
-  const keyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      if (event.ctrlKey || event.metaKey) {
-        onCreate();
-        return;
-      }
-      const typed = draft === null ? null : parseTyped(param, draft);
-      if (typed !== null) {
-        onValue(typed, false);
-      }
-      setDraft(null);
-      onReturnFocus();
-      return;
-    }
-    const stepped = stepValue(param, shown, event);
-    if (stepped !== null) {
-      event.preventDefault();
-      setDraft(null);
-      onValue(stepped, false);
-    }
-  };
-  const label = param.unit ? `${param.label} (${param.unit})` : param.label;
-  return (
-    <div
-      ref={trackRef}
-      className="relative my-1 flex h-7 w-[168px] items-center overflow-hidden rounded-md text-sm"
-      style={{ background: "color-mix(in srgb, var(--toolbar-icon) 8%, transparent)" }}
-      onPointerDown={(event) => {
-        if (event.target instanceof HTMLInputElement) {
-          return;
-        }
-        event.currentTarget.setPointerCapture(event.pointerId);
-        onValue(Number.parseFloat(valueText(param, fromPointer(event))), true);
-      }}
-      onPointerMove={(event) => {
-        if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-          onValue(Number.parseFloat(valueText(param, fromPointer(event))), true);
-        }
-      }}
-      onPointerUp={(event) => {
-        if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-          event.currentTarget.releasePointerCapture(event.pointerId);
-          onEndDrag();
-        }
-      }}
-    >
-      <span
-        aria-hidden
-        className="pointer-events-none absolute inset-y-0 left-0"
-        style={{ width: `${share * 100}%`, background: "var(--value-fill)" }}
-      />
-      <span className="relative whitespace-nowrap pl-2 text-[var(--toolbar-icon)]">{param.label}</span>
-      <input
-        aria-label={label}
-        inputMode="decimal"
-        value={draft ?? (value === null ? "" : valueText(param, shown))}
-        onChange={(event) => setDraft(event.target.value)}
-        onBlur={() => setDraft(null)}
-        onKeyDown={keyDown}
-        className="relative ml-auto w-12 bg-transparent pr-2 text-right tabular-nums text-[var(--toolbar-icon)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
-      />
-    </div>
-  );
-}
-
 /** A field with its muted readout beside it (the Specks pixel hint, criterion 4). */
 function WithHint({ hint, children }: { hint?: string; children: React.ReactNode }) {
   return (
@@ -171,10 +80,11 @@ interface TraceBarProps {
 }
 
 /**
- * The Trace bar in the overlay row (`specs/0025-raster-trace` criteria 1 to 5, 10 to 12, 15, 46;
- * UX notes sections 2 and 3): the state label, Threshold, Smooth, Specks, then the result row
- * with the status and Create paths; wraps by whole groups, the first row never moving. With
- * nothing or something else selected it is one row of words.
+ * The Trace bar in the overlay row (`specs/0025-raster-trace` criteria 1 to 5, 10 to 12, 15, 37,
+ * 40, 41, 46; UX notes sections 2, 3, 11 and 12): the state label and the Preset button,
+ * Threshold, Smooth, Specks with the Advanced button, then the result row with the status and
+ * Create paths, and the Advanced block below it when open; wraps by whole groups, the first row
+ * never moving. With nothing or something else selected it is one row of words.
  */
 export function TraceBar({ trace, onImport, onReturnFocus }: TraceBarProps) {
   const rowRef = useRef<HTMLDivElement>(null);
@@ -202,7 +112,7 @@ export function TraceBar({ trace, onImport, onReturnFocus }: TraceBarProps) {
       </div>
     );
   }
-  const field = (name: TraceParam["name"]) => (
+  const field = (name: "threshold" | "smooth" | "specks") => (
     <TraceField
       param={param(name)}
       value={trace.values[name]}
@@ -225,13 +135,31 @@ export function TraceBar({ trace, onImport, onReturnFocus }: TraceBarProps) {
       <div ref={rowRef} className={BAR_ROW_CLASS}>
         <BarGroup divider={false}>
           {label}
-          {field("threshold")}
+          <TracePresetMenu
+            presets={trace.presets}
+            current={trace.choice.preset}
+            edited={trace.choice.edited}
+            label={trace.presetLabel}
+            onPick={trace.pick}
+          />
         </BarGroup>
+        <BarGroup>{field("threshold")}</BarGroup>
         <BarGroup>{field("smooth")}</BarGroup>
-        <BarGroup>
+        <BarGroup className="flex h-9 items-center gap-2">
           <WithHint hint={trace.pxPerMm > 0 ? specksHint(trace.values.specks, trace.pxPerMm) : undefined}>
             {field("specks")}
           </WithHint>
+        </BarGroup>
+        <BarGroup>
+          <button
+            type="button"
+            aria-expanded={trace.advancedOpen}
+            aria-pressed={trace.advancedOpen}
+            onClick={() => trace.setAdvancedOpen(!trace.advancedOpen)}
+            className={`${BUTTON_CLASS} w-[96px] ${trace.advancedOpen ? "bg-[var(--editor-accent-hover)]" : ""}`}
+          >
+            {ADVANCED}
+          </button>
         </BarGroup>
         <BarGroup className="flex min-h-9 items-center gap-3">
           <div className="flex flex-col py-1 tabular-nums">
@@ -263,6 +191,17 @@ export function TraceBar({ trace, onImport, onReturnFocus }: TraceBarProps) {
           </button>
         </BarGroup>
       </div>
+      {trace.advancedOpen ? (
+        <TraceAdvanced
+          params={trace.params}
+          values={trace.values}
+          overFullSizeLimit={trace.overFullSizeLimit}
+          setValue={trace.setValue}
+          onEndDrag={trace.endDrag}
+          onCreate={trace.create}
+          onReturnFocus={onReturnFocus}
+        />
+      ) : null}
       {trace.busy || trace.creating ? (
         <div role="progressbar" aria-label={trace.status.line} className="h-0.5 w-full overflow-hidden">
           <div className="h-full w-full" style={{ background: "var(--editor-accent)" }} />
