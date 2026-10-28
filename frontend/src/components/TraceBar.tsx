@@ -1,17 +1,34 @@
+import { CircleAlert, Image, Info, Layers, Spline, X } from "lucide-react";
 import { Tooltip } from "radix-ui";
-import { useRef } from "react";
+import { useId, useRef } from "react";
+import type { KeyboardEvent } from "react";
 
 import { useRowStarts } from "@/components/SelectToolbar";
-import { BarGroup } from "@/components/TextBar";
+import { ExpandButton, ICON_BUTTON_CLASS } from "@/components/TextBar";
 import { TraceAdvanced } from "@/components/TraceAdvanced";
 import { TraceField } from "@/components/TraceField";
 import { TracePresetMenu } from "@/components/TracePresetMenu";
+import { Tooltip as AppTooltip } from "@/components/ui/tooltip";
 import type { TraceApi } from "@/hooks/useTrace";
-import { BAR_ROW_CLASS } from "@/lib/barLayout";
+import type { TraceInfoApi } from "@/hooks/useTraceInfo";
 import {
-  ADVANCED,
-  CREATE_PATHS,
-  CREATE_PATHS_TOOLTIP,
+  FAILED,
+  PREVIEW_OUT_OF_DATE,
+  RETRY,
+  STOPPED,
+  TRACING,
+  type TraceSlot,
+  percentText,
+  TRACE_BAR_DESCRIPTION,
+  TRACE_EXPAND_LABELS,
+  TRACE_INFO_PAGE_ID,
+  TRACE_INFO_TITLE,
+  changedAdvancedText,
+  lumaToPercent,
+  percentToLuma,
+  thresholdPercentParam,
+  TRACE_VIEWS,
+  type TraceViewMode,
   STOP,
   TRACE_BUTTON,
   TRACE_EMPTY,
@@ -27,6 +44,9 @@ const BUTTON_CLASS =
   "my-1 h-7 whitespace-nowrap rounded-md px-2 text-sm text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]";
 
 const LABEL_CLASS = "text-xs text-[var(--toolbar-icon)]";
+
+/** The bar's one flow (UX notes 21.2): wraps by whole items, 8 px between them, top-aligned. */
+const TRACE_ROW_CLASS = "flex min-w-0 flex-wrap items-start gap-x-2 gap-y-0";
 
 /** The Select bar's Trace button (criterion 1): last, in a group of its own; a press chooses the
  * Trace tool. */
@@ -63,6 +83,124 @@ export function TraceButton({ onTrace, onReturnFocus }: { onTrace: () => void; o
   );
 }
 
+const VIEW_ICONS: Record<TraceViewMode, typeof Image> = { overlay: Layers, trace: Spline, image: Image };
+
+/** The View pill (criterion 51, UX notes section 13): three icon segments, one Tab stop, the
+ * arrows move and select; the pressed segment is the view on the canvas, Image while `\` is
+ * held. */
+function ViewPill({ mode, onMode }: { mode: TraceViewMode; onMode: (mode: TraceViewMode) => void }) {
+  const buttons = useRef<(HTMLButtonElement | null)[]>([]);
+  const at = Math.max(0, TRACE_VIEWS.findIndex((v) => v.mode === mode));
+  const keyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    const step = event.key === "ArrowRight" || event.key === "ArrowDown" ? 1 : event.key === "ArrowLeft" || event.key === "ArrowUp" ? -1 : 0;
+    if (step !== 0) {
+      event.preventDefault();
+      const next = (at + step + TRACE_VIEWS.length) % TRACE_VIEWS.length;
+      onMode(TRACE_VIEWS[next].mode);
+      buttons.current[next]?.focus();
+    }
+  };
+  return (
+    <Tooltip.Provider delayDuration={400}>
+      <div role="radiogroup" aria-label="View" className="my-1 flex h-7 overflow-hidden rounded-md outline outline-1 -outline-offset-1 outline-[var(--toolbar-icon)]/40" onKeyDown={keyDown}>
+        {TRACE_VIEWS.map((view, index) => {
+          const Icon = VIEW_ICONS[view.mode];
+          const on = index === at;
+          return (
+            <Tooltip.Root key={view.mode}>
+              <Tooltip.Trigger asChild>
+                <button
+                  ref={(element) => {
+                    buttons.current[index] = element;
+                  }}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  aria-label={view.label}
+                  tabIndex={on ? 0 : -1}
+                  onClick={() => onMode(view.mode)}
+                  className={`flex h-full w-7 items-center justify-center outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)] ${
+                    on ? "bg-[var(--toolbar-icon-active-bg)] text-[var(--toolbar-icon-active-fg)]" : "text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]"
+                  }`}
+                >
+                  <Icon size={16} aria-hidden />
+                </button>
+              </Tooltip.Trigger>
+              <Tooltip.Portal>
+                <Tooltip.Content
+                  side="bottom"
+                  sideOffset={6}
+                  className="z-50 rounded-md px-2 py-1 text-xs"
+                  style={{ background: "var(--toolbar-bg)", color: "var(--toolbar-icon)", boxShadow: "var(--panel-elevation-shadow)" }}
+                >
+                  {view.tooltip}
+                </Tooltip.Content>
+              </Tooltip.Portal>
+            </Tooltip.Root>
+          );
+        })}
+      </div>
+    </Tooltip.Provider>
+  );
+}
+
+/** The 1 px border of the bar's pills at 40 % (the View pill's look). */
+const PILL_BORDER = "outline outline-1 -outline-offset-1 outline-[var(--toolbar-icon)]/40";
+
+/** The progress slot of row 1 (criteria 10, 53, 54; UX notes 21.2): the running pill with its
+ * percentage and x, "Stopped" with Retry, or "Failed" with Retry and the reason as tooltip and
+ * hidden alert; nothing, and no width, at rest. */
+function ProgressSlot({ slot, onStop, onRetry }: { slot: TraceSlot; onStop: () => void; onRetry: () => void }) {
+  if (slot.kind === "none") {
+    return null;
+  }
+  if (slot.kind === "running") {
+    const fill = slot.percent ?? 0;
+    return (
+      <div data-trace-slot="running" className={`relative my-1 flex h-7 w-[75px] shrink-0 items-center overflow-hidden rounded-md ${PILL_BORDER}`}>
+        <div
+          role="progressbar"
+          aria-label={TRACING}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={slot.percent ?? undefined}
+          className="flex h-full min-w-0 flex-1 items-center"
+        >
+          <span aria-hidden className="absolute inset-y-0 left-0" style={{ width: `${fill}%`, background: "color-mix(in srgb, var(--editor-accent) 25%, transparent)" }} />
+          <span className="relative pl-2 text-xs tabular-nums text-[var(--toolbar-icon)]">{percentText(slot.percent)}</span>
+        </div>
+        <AppTooltip side="bottom" content={STOP}>
+          <button type="button" aria-label={STOP} onClick={onStop} className={`${ICON_BUTTON_CLASS} relative text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]`}>
+            <X size={16} strokeWidth={1.5} aria-hidden />
+          </button>
+        </AppTooltip>
+      </div>
+    );
+  }
+  const failed = slot.kind === "failed";
+  return (
+    <div data-trace-slot={slot.kind} className="flex shrink-0 items-center gap-1">
+      <AppTooltip side="bottom" content={failed ? slot.text : PREVIEW_OUT_OF_DATE}>
+        <span
+          className={`my-1 flex h-7 items-center gap-1 rounded-md px-2 text-xs ${failed ? "text-[var(--toolbar-icon)]" : `${PILL_BORDER} text-[var(--toolbar-icon)] opacity-70`}`}
+          style={failed ? { boxShadow: "inset 0 0 0 1px var(--field-invalid)" } : undefined}
+        >
+          {failed ? <CircleAlert size={12} aria-hidden className="shrink-0" style={{ color: "var(--field-invalid)" }} /> : null}
+          {failed ? FAILED : STOPPED}
+        </span>
+      </AppTooltip>
+      {failed ? (
+        <span role="alert" className="sr-only">
+          {slot.text}
+        </span>
+      ) : null}
+      <button type="button" className={BUTTON_CLASS} onClick={onRetry}>
+        {RETRY}
+      </button>
+    </div>
+  );
+}
+
 /** A field with its muted readout beside it (the Specks pixel hint, criterion 4). */
 function WithHint({ hint, children }: { hint?: string; children: React.ReactNode }) {
   return (
@@ -73,27 +211,57 @@ function WithHint({ hint, children }: { hint?: string; children: React.ReactNode
   );
 }
 
+/** The "i" button (criterion 70, UX notes 21.1): shows the About Trace tab, or returns to the tab
+ * and panel state before it; pressed while that tab is shown. A mouse press hands the keyboard
+ * back to the canvas, a key keeps it. */
+function InfoButton({ info, onReturnFocus }: { info: TraceInfoApi; onReturnFocus: () => void }) {
+  return (
+    <AppTooltip side="bottom" content={TRACE_INFO_TITLE}>
+      <button
+        type="button"
+        aria-label={TRACE_INFO_TITLE}
+        aria-pressed={info.shown}
+        aria-controls={info.shown ? TRACE_INFO_PAGE_ID : undefined}
+        onClick={(event) => {
+          info.toggle();
+          if (event.detail > 0) {
+            onReturnFocus();
+          }
+        }}
+        className={`${ICON_BUTTON_CLASS} ${
+          info.shown ? "bg-[var(--toolbar-icon-active-bg)] text-[var(--toolbar-icon-active-fg)]" : "text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]"
+        }`}
+      >
+        <Info size={16} strokeWidth={1.5} aria-hidden />
+      </button>
+    </AppTooltip>
+  );
+}
+
 interface TraceBarProps {
   trace: TraceApi;
+  info: TraceInfoApi;
   onImport: () => void;
   onReturnFocus: () => void;
 }
 
 /**
  * The Trace bar in the overlay row (`specs/0025-raster-trace` criteria 1 to 5, 10 to 12, 15, 37,
- * 40, 41, 46; UX notes sections 2, 3, 11 and 12): the state label and the Preset button,
- * Threshold, Smooth, Specks with the Advanced button, then the result row with the status and
- * Create paths, and the Advanced block below it when open; wraps by whole groups, the first row
- * never moving. With nothing or something else selected it is one row of words.
+ * 40, 41, 46, 51 to 54, 57, 71; UX notes section 21.2): one flow of the state label with the "i"
+ * button, Preset, View, Threshold, Smooth, Specks, the progress slot and the expander at the far
+ * right, wrapping by whole items; under it the notice row and, when open, the Advanced block.
+ * With nothing or something else selected it is one row of words.
  */
-export function TraceBar({ trace, onImport, onReturnFocus }: TraceBarProps) {
+export function TraceBar({ trace, info, onImport, onReturnFocus }: TraceBarProps) {
   const rowRef = useRef<HTMLDivElement>(null);
   useRowStarts(rowRef);
+  const advancedId = useId();
+  const descriptionId = useId();
   const param = (name: TraceParam["name"]) => trace.params.find((p) => p.name === name)!;
   const pill = "pointer-events-auto flex min-w-0 flex-col rounded-lg px-2 text-sm";
   const pillStyle = { background: "var(--toolbar-bg)", boxShadow: "var(--panel-elevation-shadow)" };
   const label = (
-    <span className={`${LABEL_CLASS} py-2 pr-2`} aria-hidden={false}>
+    <span className={`${LABEL_CLASS} py-2`}>
       {TRACE_STATE_LABEL}
     </span>
   );
@@ -112,7 +280,7 @@ export function TraceBar({ trace, onImport, onReturnFocus }: TraceBarProps) {
       </div>
     );
   }
-  const field = (name: "threshold" | "smooth" | "specks") => (
+  const field = (name: "smooth" | "specks") => (
     <TraceField
       param={param(name)}
       value={trace.values[name]}
@@ -122,19 +290,39 @@ export function TraceBar({ trace, onImport, onReturnFocus }: TraceBarProps) {
       onReturnFocus={onReturnFocus}
     />
   );
-  const canCreate = trace.status.canCreate || trace.status.line === "";
+  // The Threshold is shown and typed in percent; the tracer keeps the exact luma until an edit
+  // (criterion 9, Terms).
+  const threshold = trace.values.threshold;
+  const thresholdField = (
+    <TraceField
+      param={thresholdPercentParam(param("threshold"))}
+      value={threshold === null ? null : lumaToPercent(threshold)}
+      onValue={(percent, dragging) => trace.setValue("threshold", percentToLuma(percent), dragging)}
+      onEndDrag={trace.endDrag}
+      onCreate={trace.create}
+      onReturnFocus={onReturnFocus}
+    />
+  );
+  const noticeShown = trace.status.line !== "" || trace.status.muted !== "" || trace.imagesLabel !== "";
   return (
+    <div className="pointer-events-none flex min-w-0 flex-col gap-2">
     <div
       data-context-bar=""
       className={pill}
       style={pillStyle}
       role="toolbar"
       aria-label="Trace"
-      aria-busy={trace.busy || trace.creating}
+      aria-describedby={descriptionId}
     >
-      <div ref={rowRef} className={BAR_ROW_CLASS}>
-        <BarGroup divider={false}>
+      <span id={descriptionId} hidden>
+        {TRACE_BAR_DESCRIPTION}
+      </span>
+      <div ref={rowRef} className={TRACE_ROW_CLASS}>
+        <span className="flex h-9 items-center gap-1.5">
           {label}
+          <InfoButton info={info} onReturnFocus={onReturnFocus} />
+        </span>
+        <div className="flex h-9 items-center">
           <TracePresetMenu
             presets={trace.presets}
             current={trace.choice.preset}
@@ -142,71 +330,63 @@ export function TraceBar({ trace, onImport, onReturnFocus }: TraceBarProps) {
             label={trace.presetLabel}
             onPick={trace.pick}
           />
-        </BarGroup>
-        <BarGroup>{field("threshold")}</BarGroup>
-        <BarGroup>{field("smooth")}</BarGroup>
-        <BarGroup className="flex h-9 items-center gap-2">
+        </div>
+        <ViewPill mode={trace.viewMode} onMode={trace.setViewMode} />
+        <div className="flex h-9 items-center">{thresholdField}</div>
+        {/* 4 px after Threshold, not 8 (UX notes 21.2), unless it starts a line. */}
+        <div className="-ml-1 flex h-9 items-center data-[row-start]:ml-0">{field("smooth")}</div>
+        <div className="flex h-9 items-center gap-2">
           <WithHint hint={trace.pxPerMm > 0 ? specksHint(trace.values.specks, trace.pxPerMm) : undefined}>
             {field("specks")}
           </WithHint>
-        </BarGroup>
-        <BarGroup>
-          <button
-            type="button"
-            aria-expanded={trace.advancedOpen}
-            aria-pressed={trace.advancedOpen}
-            onClick={() => trace.setAdvancedOpen(!trace.advancedOpen)}
-            className={`${BUTTON_CLASS} w-[96px] ${trace.advancedOpen ? "bg-[var(--editor-accent-hover)]" : ""}`}
-          >
-            {ADVANCED}
-          </button>
-        </BarGroup>
-        <BarGroup className="flex min-h-9 items-center gap-3">
-          <div className="flex flex-col py-1 tabular-nums">
-            {trace.imagesLabel ? <span className={LABEL_CLASS}>{trace.imagesLabel}</span> : null}
-            <span role="status" aria-live="polite" className="text-[var(--toolbar-icon)]">
-              {trace.status.line}
-            </span>
-            {trace.status.muted ? <span className={`${LABEL_CLASS} opacity-70`}>{trace.status.muted}</span> : null}
-          </div>
-          {trace.stopShown ? (
-            <button type="button" className={BUTTON_CLASS} onClick={trace.stop}>
-              {STOP}
-            </button>
-          ) : null}
-          <button
-            type="button"
-            title={CREATE_PATHS_TOOLTIP}
-            aria-disabled={!canCreate}
-            aria-busy={trace.creating}
-            onClick={() => {
-              if (canCreate) {
-                trace.create();
-              }
-            }}
-            className={`my-1 h-7 w-[112px] whitespace-nowrap rounded-md px-2 text-sm text-white outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 ${canCreate ? "" : "opacity-40"}`}
-            style={{ background: "var(--editor-accent)" }}
-          >
-            {CREATE_PATHS}
-          </button>
-        </BarGroup>
-      </div>
-      {trace.advancedOpen ? (
-        <TraceAdvanced
-          params={trace.params}
-          values={trace.values}
-          overFullSizeLimit={trace.overFullSizeLimit}
-          setValue={trace.setValue}
-          onEndDrag={trace.endDrag}
-          onCreate={trace.create}
-          onReturnFocus={onReturnFocus}
-        />
-      ) : null}
-      {trace.busy || trace.creating ? (
-        <div role="progressbar" aria-label={trace.status.line} className="h-0.5 w-full overflow-hidden">
-          <div className="h-full w-full" style={{ background: "var(--editor-accent)" }} />
         </div>
-      ) : null}
+        <ProgressSlot slot={trace.slot} onStop={trace.stop} onRetry={trace.retrace} />
+        <div className="ml-auto flex h-9 items-center">
+          <ExpandButton
+            open={trace.advancedOpen}
+            onToggle={() => trace.setAdvancedOpen(!trace.advancedOpen)}
+            controls={advancedId}
+            labels={TRACE_EXPAND_LABELS}
+            changed={trace.advancedOpen ? null : changedAdvancedText(trace.values, trace.params)}
+            onReturnFocus={onReturnFocus}
+          />
+        </div>
+        {trace.advancedOpen ? (
+          // After the expander in the DOM, so Tab reaches the Advanced controls after it
+          // (criterion 57, UX notes 21.2); drawn below the notice row, full width.
+          <div className="order-last basis-full">
+            <TraceAdvanced
+              id={advancedId}
+              params={trace.params}
+              values={trace.values}
+              status={trace.status}
+              countsStale={trace.countsStale}
+              setValue={trace.setValue}
+              onEndDrag={trace.endDrag}
+              onCreate={trace.create}
+              onReturnFocus={onReturnFocus}
+            />
+          </div>
+        ) : null}
+        {/* The notice row (UX notes 21.3): result messages only, always mounted with its live
+            region, no height while empty; drawn under the main rows and above the Advanced block. */}
+        <div data-trace-state="" className={`order-[9998] basis-full ${noticeShown ? "flex min-h-9 items-center gap-3" : ""}`}>
+          <div role="status" aria-live="polite" className={noticeShown ? "flex flex-col py-1 tabular-nums" : ""}>
+            {trace.imagesLabel ? <span className={`block ${LABEL_CLASS}`}>{trace.imagesLabel}</span> : null}
+            {trace.status.line ? (
+              <span data-trace-line="" className="block text-[var(--toolbar-icon)]">
+                {trace.status.line}
+              </span>
+            ) : null}
+            {trace.status.muted ? (
+              <span data-trace-muted="" className={`block ${LABEL_CLASS} opacity-70`}>
+                {trace.status.muted}
+              </span>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    </div>
     </div>
   );
 }

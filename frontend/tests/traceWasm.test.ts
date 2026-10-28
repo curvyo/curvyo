@@ -44,8 +44,8 @@ function readPicture(file: string): { width: number; height: number; rgba: Uint8
 /** The tight box of the outlines in the worker's numbers (cubic extrema included). */
 function boxes(wire: Float64Array): number[][] {
   const out: number[][] = [];
-  let at = 8;
-  const outlines = wire[7];
+  let at = 7;
+  const outlines = wire[6];
   for (let o = 0; o < outlines; o++) {
     const elements = wire[at++];
     let box = [Infinity, Infinity, -Infinity, -Infinity];
@@ -79,7 +79,7 @@ function boxes(wire: Float64Array): number[][] {
 test("criterion 18: the wasm trace matches the native goldens", { skip: !existsSync(WASM) }, async () => {
   const bindings = (await import(path.join(BINDINGS, "curvyo_editor_wasm.js"))) as {
     initSync: (options: { module: BufferSource }) => unknown;
-    trace_job: (rgba: Uint8Array, w: number, h: number, map: Float64Array, settings: string) => Float64Array;
+    trace_job: (rgba: Uint8Array, w: number, h: number, map: Float64Array, settings: string, progress: { report: (percent: number) => void }) => Float64Array;
   };
   bindings.initSync({ module: readFileSync(WASM) });
   const goldens = JSON.parse(readFileSync(path.join(FIXTURES, "goldens.json"), "utf8")) as Record<string, Golden>;
@@ -91,6 +91,7 @@ test("criterion 18: the wasm trace matches the native goldens", { skip: !existsS
       picture.height,
       new Float64Array(golden.map),
       JSON.stringify({ threshold: golden.threshold, smooth: golden.smooth, specks: golden.specks_mm }),
+      { report() {} },
     );
     assert.equal(wire[0], 0, `${name}: traced`);
     assert.equal(wire[1], golden.paths, `${name}: paths`);
@@ -103,6 +104,24 @@ test("criterion 18: the wasm trace matches the native goldens", { skip: !existsS
       });
     });
   }
+});
+
+test("criterion 10: the wasm trace reports a rising percentage that ends at 100", { skip: !existsSync(WASM) }, async () => {
+  const bindings = (await import(path.join(BINDINGS, "curvyo_editor_wasm.js"))) as {
+    initSync: (options: { module: BufferSource }) => unknown;
+    trace_job: (rgba: Uint8Array, w: number, h: number, map: Float64Array, settings: string, progress?: { report: (percent: number) => void }) => Float64Array;
+  };
+  bindings.initSync({ module: readFileSync(WASM) });
+  const [name, golden] = Object.entries(JSON.parse(readFileSync(path.join(FIXTURES, "goldens.json"), "utf8")) as Record<string, Golden>)[0];
+  const picture = readPicture(golden.file);
+  const seen: number[] = [];
+  const wire = bindings.trace_job(picture.rgba, picture.width, picture.height, new Float64Array(golden.map), JSON.stringify({ threshold: golden.threshold, smooth: golden.smooth, specks: golden.specks_mm }), {
+    report: (percent) => seen.push(percent),
+  });
+  assert.equal(wire[0], 0, `${name}: traced`);
+  assert.ok(seen.length > 1, `reports: ${seen}`);
+  assert.ok(seen.every((p, i) => i === 0 || p > seen[i - 1]), `rising: ${seen}`);
+  assert.equal(seen.at(-1), 100);
 });
 
 test("criteria 6, 45, 59, 60: the schema and the presets equal the copies in traceText", { skip: !existsSync(WASM) }, async () => {

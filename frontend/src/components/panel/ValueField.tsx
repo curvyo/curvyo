@@ -62,6 +62,14 @@ interface ValueFieldProps {
   resetLabel?: string;
   /** 224 px wide instead of 244 px, to leave room for a 28 px button beside it in the panel. */
   narrow?: boolean;
+  /** A width in px other than the panel's 244 or 224 (the Trace bar's 168). */
+  width?: number;
+  /** No reserved reset slot at the right end (a bar field without reset, the Trace bar). */
+  noResetSlot?: boolean;
+  /** The gesture help line of the tooltip when it is not the panel's. */
+  help?: string;
+  /** Escape during a press or drag: the caller drops what the drag changed. */
+  onCancel?: () => void;
   /** The reset target as text ("0.25 mm", "100 %"). */
   defaultText: string;
   /** A further muted line of the field's one tooltip, or nothing. */
@@ -121,6 +129,10 @@ export function ValueField({
   defaultText,
   resetLabel,
   narrow = false,
+  width,
+  noResetSlot = false,
+  help = HELP,
+  onCancel,
   messages,
   note,
   onPreview,
@@ -146,7 +158,10 @@ export function ValueField({
     },
     onDoubleClick: () => setTyping({}),
     onDragEnd: onReturnFocus,
+    onEscape: onCancel,
   });
+  const fieldWidth = width ?? (narrow ? 224 : 244);
+  const slot = noResetSlot ? 0 : 30;
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     const grid = gridOf(event);
@@ -179,7 +194,7 @@ export function ValueField({
 
   const unitText = mixed ? "" : unit;
   return (
-    <div className={`relative h-7 ${narrow ? "w-[224px]" : "w-[244px]"}`}>
+    <div className="relative h-7" style={{ width: fieldWidth }}>
       {typing ? (
         <>
           <EntryField
@@ -187,9 +202,9 @@ export function ValueField({
             shown={mixed ? "" : text}
             mixed={mixed}
             suffix={unit}
-            suffixRight={30}
-            gutter={30 + (unit.length > 1 ? 24 : 12) + 4}
-            width={narrow ? 224 : 244}
+            suffixRight={noResetSlot ? 8 : slot}
+            gutter={(noResetSlot ? 8 : slot) + (unit.length > 1 ? 24 : 12) + 4}
+            width={fieldWidth}
             autoFocus
             initialText={typing.initial}
             onSubmit={onSubmit}
@@ -209,7 +224,7 @@ export function ValueField({
           side="left"
           name={name}
           valueText={tipValue ?? (mixed ? "Mixed" : `${text}${unit ? ` ${unit}` : ""}`)}
-          help={HELP}
+          help={help}
           note={note}
         >
           <div
@@ -226,7 +241,7 @@ export function ValueField({
             aria-keyshortcuts="Control+Backspace Enter F2"
             onKeyDown={onKeyDown}
             {...handlers}
-            className={`relative h-7 ${narrow ? "w-[224px]" : "w-[244px]"} cursor-ew-resize overflow-hidden rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] bg-white outline-none hover:border-[var(--toolbar-icon)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)]`}
+            className={`relative h-7 w-full cursor-ew-resize overflow-hidden rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] bg-white outline-none hover:border-[var(--toolbar-icon)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)]`}
             style={{ touchAction: "pan-y" }}
           >
             {!mixed && bar > barFrom && (
@@ -264,7 +279,7 @@ export function ValueField({
             )}
             <span
               aria-hidden
-              className="absolute top-1/2 right-8 -translate-y-1/2 text-sm tabular-nums"
+              className={`absolute top-1/2 ${noResetSlot ? "right-2" : "right-8"} -translate-y-1/2 text-sm tabular-nums`}
             >
               {mixed ? (
                 <span className="text-[var(--field-placeholder)]">Mixed</span>

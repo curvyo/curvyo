@@ -1,9 +1,11 @@
-import { useRef, useState } from "react";
-import type { KeyboardEvent, PointerEvent } from "react";
+import { useRef } from "react";
 
-import { type TraceParam, parseTyped, stepValue, valueText } from "@/lib/traceText";
+import { ValueField } from "@/components/panel/ValueField";
+import { HELP_RATIO } from "@/lib/sliderNames";
+import { type TraceParam, parseTyped, stepOnGrid, valueAt, valueText } from "@/lib/traceText";
 
 export interface TraceFieldProps {
+  /** The field as the bar shows it (the Threshold in percent). */
   param: TraceParam;
   value: number | null;
   onValue: (value: number, dragging: boolean) => void;
@@ -12,92 +14,100 @@ export interface TraceFieldProps {
   onReturnFocus: () => void;
 }
 
-/** One value field of the bar (criterion 5): the label inside, the `--value-fill` bar, a drag
- * across it sets the value (the reduced copy is traced while it moves), the keys step it, a typed
- * value commits on Enter and the focus returns to the canvas; Ctrl+Enter creates the paths. */
+/** The width of a Trace bar field, px (UX notes 20.1). */
+const TRACE_FIELD_WIDTH = 168;
+
+const UNIT_WORDS: Readonly<Record<string, string>> = { "%": "percent", mm: "millimetres" };
+
+/**
+ * One value field of the Trace bar (`specs/0025-raster-trace` criteria 5 and 71, UX notes 20.1):
+ * an adapter from the schema's `TraceParam` to the app's shared `ValueField`, 168 px, no reset
+ * slot. A click or a drag moves the value (the reduced copy is traced while it moves), a
+ * double-click, Enter or F2 opens the number entry, the arrows step it; Ctrl+Enter creates the
+ * paths, also in the entry; Escape in a drag puts the value back.
+ */
 export function TraceField({ param, value, onValue, onEndDrag, onCreate, onReturnFocus }: TraceFieldProps) {
-  const [draft, setDraft] = useState<string | null>(null);
-  const trackRef = useRef<HTMLDivElement>(null);
   const shown = value ?? param.default;
-  const share = value === null ? 0 : (shown - param.min) / (param.max - param.min);
-  const fromPointer = (event: PointerEvent<HTMLDivElement>) => {
-    const box = trackRef.current?.getBoundingClientRect();
-    if (!box || box.width <= 0) {
-      return shown;
-    }
-    const p = Math.min(1, Math.max(0, (event.clientX - box.left) / box.width));
-    return param.min + p * (param.max - param.min);
-  };
-  const keyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      event.stopPropagation();
-      setDraft(null);
-      onReturnFocus();
-      return;
-    }
-    if (event.key === "Enter") {
-      event.preventDefault();
-      if (event.ctrlKey || event.metaKey) {
-        onCreate();
-        return;
+  const pressing = useRef<{ start: number | null; last: number } | null>(null);
+  const span = param.max - param.min;
+  const text = value === null ? "" : valueText(param, shown);
+  const unitWords = UNIT_WORDS[param.unit] ?? "";
+  const set = (next: number, dragging: boolean) => {
+    if (next !== (pressing.current?.last ?? value)) {
+      if (pressing.current) {
+        pressing.current.last = next;
       }
-      const typed = draft === null ? null : parseTyped(param, draft);
-      if (typed !== null) {
-        onValue(typed, false);
-      }
-      setDraft(null);
-      onReturnFocus();
-      return;
-    }
-    const stepped = stepValue(param, shown, event);
-    if (stepped !== null) {
-      event.preventDefault();
-      setDraft(null);
-      onValue(stepped, false);
+      onValue(next, dragging);
     }
   };
-  const label = param.unit ? `${param.label} (${param.unit})` : param.label;
+  const release = () => {
+    if (pressing.current) {
+      pressing.current = null;
+      onEndDrag();
+    }
+  };
   return (
     <div
-      ref={trackRef}
-      className="relative my-1 flex h-7 w-[168px] items-center overflow-hidden rounded-md text-sm"
-      style={{ background: "color-mix(in srgb, var(--toolbar-icon) 8%, transparent)" }}
-      onPointerDown={(event) => {
-        if (event.target instanceof HTMLInputElement) {
-          return;
-        }
-        event.currentTarget.setPointerCapture(event.pointerId);
-        onValue(Number.parseFloat(valueText(param, fromPointer(event))), true);
-      }}
-      onPointerMove={(event) => {
-        if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-          onValue(Number.parseFloat(valueText(param, fromPointer(event))), true);
+      className="my-1"
+      onPointerDownCapture={(event) => {
+        if (event.button === 0) {
+          pressing.current = { start: value, last: shown };
         }
       }}
-      onPointerUp={(event) => {
-        if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-          event.currentTarget.releasePointerCapture(event.pointerId);
-          onEndDrag();
+      onKeyDownCapture={(event) => {
+        if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+          event.preventDefault();
+          event.stopPropagation();
+          onCreate();
         }
       }}
     >
-      <span
-        aria-hidden
-        className="pointer-events-none absolute inset-y-0 left-0"
-        style={{ width: `${share * 100}%`, background: "var(--value-fill)" }}
-      />
-      <span className="relative whitespace-nowrap pl-2 text-[var(--toolbar-icon)]">{param.label}</span>
-      <input
-        aria-label={label}
-        inputMode="decimal"
-        value={draft ?? (value === null ? "" : valueText(param, shown))}
-        onChange={(event) => setDraft(event.target.value)}
-        onBlur={() => setDraft(null)}
-        onKeyDown={keyDown}
-        className="relative ml-auto w-12 bg-transparent pr-2 text-right tabular-nums text-[var(--toolbar-icon)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+      <ValueField
+        label={param.label}
+        name={param.label}
+        text={text}
+        bar={value === null || span <= 0 ? 0 : (shown - param.min) / span}
+        mixed={false}
+        resettable={false}
+        noResetSlot
+        width={TRACE_FIELD_WIDTH}
+        help={HELP_RATIO}
+        unit={param.unit}
+        valueNow={shown}
+        valueMin={param.min}
+        valueMax={param.max}
+        unitWords={unitWords}
+        valueText={text === "" ? "" : `${text}${unitWords ? ` ${unitWords}` : ""}`}
+        tipValue={text === "" ? "" : `${text}${param.unit ? ` ${param.unit}` : ""}`}
+        defaultText={valueText(param, param.default)}
+        messages={{}}
+        onPreview={(p, grid) => {
+          // A press or a drag traces the reduced copy; Home and End are a plain step.
+          set(valueAt(param, p, grid), pressing.current !== null);
+        }}
+        onSettle={release}
+        onStep={(steps, grid) => set(stepOnGrid(param, shown, steps, grid), false)}
+        onReset={() => undefined}
+        onSubmit={(typed) => {
+          const next = parseTyped(param, typed);
+          if (next === null || next === value) {
+            return "unchanged";
+          }
+          onValue(next, false);
+          return "committed";
+        }}
+        onCancel={() => {
+          const start = pressing.current?.start ?? null;
+          pressing.current = null;
+          if (start !== null) {
+            onValue(start, false);
+          }
+        }}
+        onReturnFocus={() => {
+          release();
+          onReturnFocus();
+        }}
       />
     </div>
   );
 }
-

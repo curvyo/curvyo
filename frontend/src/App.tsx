@@ -14,6 +14,7 @@ import { SelectToolbar } from "@/components/SelectToolbar";
 import { ShapeToolbar } from "@/components/ShapeToolbar";
 import { TextBar } from "@/components/TextBar";
 import { TraceBar } from "@/components/TraceBar";
+import { useTraceInfo } from "@/hooks/useTraceInfo";
 import { focusCurrentFont } from "@/lib/textText";
 import { readRow2Open, writeRow2Open } from "@/lib/textBarRows";
 import { setPreviewOpen } from "@/lib/fontPreviewStore";
@@ -52,6 +53,7 @@ function Editor() {
   const closePathState = useClosePathState(editor);
   const documentPanel = useDocumentPanel(editor);
   const panelOpen = usePanelOpen(editor.getSession);
+  const traceInfo = useTraceInfo(panelOpen, editor.tool === "trace");
   const [openError, setOpenError] = useState<{ message: string; title: string } | null>(null);
   const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(
     null,
@@ -246,6 +248,7 @@ function Editor() {
           {editor.tool === "trace" ? (
             <TraceBar
               trace={editor.trace}
+              info={traceInfo}
               onImport={() => project.importFiles()}
               onReturnFocus={() => editor.containerRef.current?.focus()}
             />
@@ -332,6 +335,7 @@ function Editor() {
           document={documentPanel}
           panelOpen={panelOpen}
           project={project}
+          traceInfo={traceInfo}
         />
       </div>
       <StatusBar

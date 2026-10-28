@@ -27,7 +27,7 @@ import { changedRow2Controls, changedText, expandLabel, fontButtonName, fontTool
 import { parseSize, sizeStep, sizeText } from "@/lib/textText";
 
 /** A 28 x 28 icon button of the bar (the Glyphs button's look, `0082` UX notes §1). */
-const ICON_BUTTON_CLASS =
+export const ICON_BUTTON_CLASS =
   "flex size-7 shrink-0 items-center justify-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)]";
 
 /** How long the clamp notice stays under the field (Action notice, status). */
@@ -213,23 +213,30 @@ export interface Row2State {
   onToggle: (byKeyboard: boolean) => void;
 }
 
-/** The expand button at the end of row 1 (`0084` criteria 10, 11, 13): a double chevron, no
- * popup; while row 2 is closed and holds a changed value, a 6px accent dot at its top right. */
+/** The expand button at the end of a bar's row 1 (`0084` criteria 10, 11, 13; shared with the
+ * Trace bar): a double chevron, no popup; while closed and holding a changed value, a 6px accent
+ * dot at its top right and the "Changed: ..." line in its tooltip. */
 export function ExpandButton({
-  row2,
+  open,
+  onToggle,
   controls,
-  bar,
+  labels,
+  changed,
   onReturnFocus,
 }: {
-  row2: Row2State;
-  /** The id of row 2's container. */
+  open: boolean;
+  /** A press; `byKeyboard` keeps the focus on the button (criteria 11, 15). */
+  onToggle: (byKeyboard: boolean) => void;
+  /** The id of the expanded container. */
   controls: string;
-  bar: TextBarState;
+  /** The accessible name and tooltip for the closed and the open state. */
+  labels: { closed: string; open: string };
+  /** The "Changed: ..." line, or `null` (always `null` while open). */
+  changed: string | null;
   onReturnFocus: () => void;
 }) {
   const descriptionId = useId();
-  const label = expandLabel(row2.open);
-  const changed = row2.open ? null : changedText(changedRow2Controls({ ...bar, path: bar.path }));
+  const label = open ? labels.open : labels.closed;
   return (
     <>
       <Tooltip
@@ -244,20 +251,20 @@ export function ExpandButton({
         <button
           type="button"
           aria-label={label}
-          aria-expanded={row2.open}
+          aria-expanded={open}
           aria-controls={controls}
           aria-describedby={changed ? descriptionId : undefined}
           data-text-row2-toggle
           onClick={(event) => {
             const byKeyboard = event.detail === 0;
-            row2.onToggle(byKeyboard);
+            onToggle(byKeyboard);
             if (!byKeyboard) {
               onReturnFocus();
             }
           }}
           className={`${ICON_BUTTON_CLASS} relative text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]`}
         >
-          {row2.open ? (
+          {open ? (
             <ChevronsUp size={16} strokeWidth={1.5} aria-hidden />
           ) : (
             <ChevronsDown size={16} strokeWidth={1.5} aria-hidden />
@@ -310,6 +317,31 @@ export function BarGroup({ divider = true, className = "flex h-9 items-center", 
       {divider ? <Divider /> : null}
       {children}
     </div>
+  );
+}
+
+/** The Text and Select bars' expand button: the row 2 state and the changed values in. */
+export function TextExpandButton({
+  row2,
+  controls,
+  bar,
+  onReturnFocus,
+}: {
+  row2: Row2State;
+  controls: string;
+  bar: TextBarState;
+  onReturnFocus: () => void;
+}) {
+  const changed = row2.open ? null : changedText(changedRow2Controls({ ...bar, path: bar.path }));
+  return (
+    <ExpandButton
+      open={row2.open}
+      onToggle={row2.onToggle}
+      controls={controls}
+      labels={{ closed: expandLabel(false), open: expandLabel(true) }}
+      changed={changed}
+      onReturnFocus={onReturnFocus}
+    />
   );
 }
 
@@ -371,7 +403,7 @@ export function TextBar({
           <OnPathButton path={path} onReturnFocus={props.onReturnFocus} />
         </BarGroup>
         <BarGroup>
-          <ExpandButton row2={row2} controls={row2Id} bar={props.bar} onReturnFocus={props.onReturnFocus} />
+          <TextExpandButton row2={row2} controls={row2Id} bar={props.bar} onReturnFocus={props.onReturnFocus} />
         </BarGroup>
       </div>
       {row2.open ? (
