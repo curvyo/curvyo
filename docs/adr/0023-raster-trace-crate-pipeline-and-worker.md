@@ -1,6 +1,8 @@
 # ADR 0023: Raster trace crate, pipeline and background job
 
-**Status:** Proposed (architect, 2026-10-27, revised the same day to the customer's Frage 49 = B).
+**Status:** Accepted (customer, 2026-10-28, Frage 62 option A: keep visioncortex, loosen the absolute
+quality targets; the fallback of §8 is not triggered). Proposed by the architect 2026-10-27, revised
+the same day to the customer's Frage 49 = B.
 Not `needs-customer` by itself: no document model, file format, plugin or platform change. It rests
 on the customer answers of `specs/0025-raster-trace` (Frage 49 B "VTracer for now, if it works",
 Frage 50 A black and white only, Frage 55 A no extension seam, Frage 60 B VectorCraft as idea source
