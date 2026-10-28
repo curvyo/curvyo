@@ -191,10 +191,12 @@ the menu only and focus returns to the button; a click outside closes it. The pi
 and sets the values of criterion 60 only (never Threshold, Node limit or the switches); focus returns to
 the button, not the canvas, so the maker can keep adjusting.
 
-**Custom.** The label is computed, not stored as a flag: it shows the preset name while Smooth, Specks,
-Corners, Upscale and Denoise equal that preset's values, else "Custom". Threshold, Node limit, Invert,
-Ignore background and Full-size preview are not preset values and never cause "Custom". Putting the values
-back by hand turns the name back. Picking the current base preset restores it (criterion 40). **(Proposal)**
+**Custom.** The label comes from the stored state `{ preset, edited, values }` (architect, 2026-10-28;
+no value comparison anywhere). A pick sets `preset` and `edited = false`; any edit of Smooth, Specks,
+Corners, Upscale or Denoise sets `edited = true`, and the button then shows "Custom". The menu marks and
+focuses `preset`, the preset the values came from. Threshold, Node limit, Invert, Ignore background and
+Full-size preview are not preset values and never cause "Custom". Putting the values back by hand stays
+"Custom"; picking the preset again clears it (criterion 40).
 
 **Status and notice.** A pick prints nothing: no notice, the status line does not name the preset
 (criterion 66); the preview and counts update after the 150 ms debounce. With several images the pick
@@ -301,6 +303,18 @@ customer may veto. Colours, Mode, Photo: excluded (Later).
 | 13 | Menu second lines (Logo / Line art "Sharp corners, clean curves.") | Kept, with the customer's texts (criterion 59) | Fixed |
 | 14 | Bar "four rows" | 4 rows panel open if Threshold and Smooth pair, else 5; 3 closed | Fixed after measuring |
 | 15 | View pill | Slice 3; chosen view not remembered | Show at demo |
+| 16 | Advanced button with a chevron | Text button, pressed fill, no icon (section 12; no dropdown icons, customer rule) | Fixed |
+| 17 | Specks value "0.50mm" with the unit in the field, label "Specks" | Label "Ignore below", value without unit, muted "0.10 mm  ~ 0 px" beside it; "~ 0 px" at small values | Show at demo |
+| 18 | Threshold and Smooth as label plus white value box on a fill | One fill field, label inside, value right (section 3) | Fixed |
+| 19 | Panel open: bar four rows | Measured 5 rows at 800 x 600 (bar 324 px wide, Threshold and Smooth do not pair); panel closed 3 rows as planned | Fixed (row 14 resolved: five) |
+| 20 | Menu: current item shown by fill only | Fill plus check mark (not colour alone) | Fixed |
+| 21 | Zero paths: one-line status | At panel open "0 paths at this Threshold: too low." wraps to two lines and the bar grows 12 px | Show at demo |
+| 22 | Advanced fits its pill at 800 x 600 | Panel open: the button ends 50 px right of the pill, over the right panel | To fix (review finding B1) |
+| 23 | Advanced block: Denoise Off / Low / High, two columns inside the pill | "High" clipped (pill container 104 px, segments need 121 px), panel open also Upscale, Node limit, Ignore background overflow the pill | To fix (review findings B2, B3) |
+
+Reviewed at 800 x 600, panel open and closed: bar rows, Preset menu (keyboard, Custom), Advanced block, zero-path
+status, Create paths, Layers tooltip, Tab order. Not exercised: computing and Stop, failure card, several
+images, nothing selected, dark theme, Full-size preview over 4 Mpx.
 
 ## 18. Open for the lead
 
