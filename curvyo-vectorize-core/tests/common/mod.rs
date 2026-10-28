@@ -49,7 +49,25 @@ impl Picture {
 
 /// Black shapes on white: each pixel's grey is the share of `samples` x `samples` points inside.
 pub fn render(width: u32, height: u32, samples: u32, inside: impl Fn(f64, f64) -> bool) -> Picture {
+    render_with_truth(width, height, samples, inside).0
+}
+
+/// [`render`] and the drawn shape at 4 x 4 samples per pixel, row by row of the 4x grid (the
+/// samples themselves for 4, each pixel's centre four times over for 1; empty otherwise).
+pub fn render_with_truth(
+    width: u32,
+    height: u32,
+    samples: u32,
+    inside: impl Fn(f64, f64) -> bool,
+) -> (Picture, Vec<bool>) {
     let mut levels = Vec::with_capacity((width * height) as usize);
+    let keep = matches!(samples, 1 | 4);
+    let w4 = width as usize * 4;
+    let mut truth = if keep {
+        vec![false; w4 * height as usize * 4]
+    } else {
+        Vec::new()
+    };
     let n = f64::from(samples);
     for y in 0..height {
         for x in 0..width {
@@ -60,6 +78,15 @@ pub fn render(width: u32, height: u32, samples: u32, inside: impl Fn(f64, f64) -
                     let py = f64::from(y) + (f64::from(sy) + 0.5) / n;
                     if inside(px, py) {
                         hits += 1;
+                        if keep {
+                            let r = 4 / samples;
+                            for dy in 0..r {
+                                for dx in 0..r {
+                                    let row = (y * 4 + sy * r + dy) as usize;
+                                    truth[row * w4 + (x * 4 + sx * r + dx) as usize] = true;
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -67,7 +94,7 @@ pub fn render(width: u32, height: u32, samples: u32, inside: impl Fn(f64, f64) -
             levels.push((255.0 * (1.0 - cover)).round() as u8);
         }
     }
-    Picture::grey(width, height, &levels)
+    (Picture::grey(width, height, &levels), truth)
 }
 
 pub fn fixture_dir() -> PathBuf {
@@ -130,6 +157,7 @@ pub fn params(threshold: u8, smooth: u8, specks_mm: f64) -> TraceParams {
         threshold,
         smooth,
         specks: Length::from_mm(specks_mm),
+        ..TraceParams::with_threshold(threshold)
     }
 }
 

@@ -87,6 +87,7 @@ fn params(threshold: u8, smooth: u8, specks_mm: f64) -> TraceParams {
         threshold,
         smooth,
         specks: Length::from_mm(specks_mm),
+        ..TraceParams::with_threshold(threshold)
     }
 }
 
@@ -917,6 +918,7 @@ fn degenerate_inputs_do_not_panic() {
             threshold: 128,
             smooth: 80,
             specks: Length::from_mm(f64::NAN),
+            ..TraceParams::with_threshold(128)
         },
         &mut |_| ControlFlow::Continue(()),
     );

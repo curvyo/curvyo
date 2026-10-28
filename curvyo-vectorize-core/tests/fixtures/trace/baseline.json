@@ -73,6 +73,376 @@
       "wobble": 2.4292
     }
   },
+  "candidate_profiles": {
+    "engraving": {
+      "01-flat-logo": {
+        "area_error_pct": 0.9338,
+        "area_error_true_pct": 0.666,
+        "closed_pct": 100.0,
+        "max_deviation_px": 1.2179,
+        "mean_deviation_px": 0.1722,
+        "micro_paths": 0.0,
+        "node_density": 26.8682,
+        "wobble": 20.8417
+      },
+      "03-text-300dpi": {
+        "area_error_pct": 6.4395,
+        "area_error_true_pct": 6.071,
+        "closed_pct": 100.0,
+        "max_deviation_px": 1.7622,
+        "mean_deviation_px": 0.2573,
+        "micro_paths": 0.0,
+        "node_density": 214.1178,
+        "wobble": 97.0714
+      },
+      "04-small-text": {
+        "area_error_pct": 23.8798,
+        "area_error_true_pct": 18.9873,
+        "closed_pct": 100.0,
+        "max_deviation_px": 1.118,
+        "mean_deviation_px": 0.2024,
+        "micro_paths": 0.0,
+        "node_density": 75.6416,
+        "wobble": 27.9292
+      },
+      "05-line-art-scan": {
+        "area_error_pct": 14.0097,
+        "area_error_true_pct": 12.2746,
+        "closed_pct": 100.0,
+        "max_deviation_px": 1.8291,
+        "mean_deviation_px": 0.2906,
+        "micro_paths": 0.0,
+        "node_density": 39.4086,
+        "wobble": 26.815
+      },
+      "07-silhouette": {
+        "area_error_pct": 0.4025,
+        "area_error_true_pct": 0.2946,
+        "closed_pct": 100.0,
+        "max_deviation_px": 1.1293,
+        "mean_deviation_px": 0.2224,
+        "micro_paths": 0.0,
+        "node_density": 54.8113,
+        "wobble": 25.0661
+      },
+      "10-pixel-art": {
+        "area_error_pct": 0.0,
+        "area_error_true_pct": 0.0,
+        "closed_pct": 100.0,
+        "max_deviation_px": 0.0,
+        "mean_deviation_px": 0.0,
+        "micro_paths": 0.0,
+        "node_density": 16.002,
+        "wobble": 4.8578
+      },
+      "11-stencil-lines": {
+        "area_error_pct": 8.0837,
+        "area_error_true_pct": 14.4527,
+        "closed_pct": 100.0,
+        "max_deviation_px": 0.975,
+        "mean_deviation_px": 0.1628,
+        "micro_paths": 0.0,
+        "node_density": 110.9116,
+        "wobble": 48.5028
+      },
+      "12-technical-drawing": {
+        "area_error_pct": 27.3488,
+        "area_error_true_pct": 9.6024,
+        "closed_pct": 100.0,
+        "max_deviation_px": 1.1033,
+        "mean_deviation_px": 0.4365,
+        "micro_paths": 0.0,
+        "node_density": 34.8627,
+        "wobble": 12.0714
+      },
+      "13-photograph": {
+        "area_error_pct": 3.0433,
+        "area_error_true_pct": null,
+        "closed_pct": 100.0,
+        "max_deviation_px": 24.5204,
+        "mean_deviation_px": 0.1204,
+        "micro_paths": 0.0,
+        "node_density": 125.6875,
+        "wobble": 26.4236
+      }
+    },
+    "logo": {
+      "01-flat-logo": {
+        "area_error_pct": 1.1197,
+        "area_error_true_pct": 0.8814,
+        "closed_pct": 100.0,
+        "max_deviation_px": 1.5031,
+        "mean_deviation_px": 0.2031,
+        "micro_paths": 0.0,
+        "node_density": 11.5006,
+        "wobble": 2.654
+      },
+      "03-text-300dpi": {
+        "area_error_pct": 6.0991,
+        "area_error_true_pct": 5.8747,
+        "closed_pct": 100.0,
+        "max_deviation_px": 7.0178,
+        "mean_deviation_px": 0.2137,
+        "micro_paths": 0.0,
+        "node_density": 124.3899,
+        "wobble": 52.1521
+      },
+      "04-small-text": {
+        "area_error_pct": 12.0927,
+        "area_error_true_pct": 25.3304,
+        "closed_pct": 100.0,
+        "max_deviation_px": 1.3339,
+        "mean_deviation_px": 0.0915,
+        "micro_paths": 0.0,
+        "node_density": 53.4688,
+        "wobble": 16.322
+      },
+      "05-line-art-scan": {
+        "area_error_pct": 31.8569,
+        "area_error_true_pct": 30.8854,
+        "closed_pct": 100.0,
+        "max_deviation_px": 3.215,
+        "mean_deviation_px": 0.7041,
+        "micro_paths": 0.0,
+        "node_density": 10.2776,
+        "wobble": 3.8001
+      },
+      "07-silhouette": {
+        "area_error_pct": 0.475,
+        "area_error_true_pct": 0.3914,
+        "closed_pct": 100.0,
+        "max_deviation_px": 1.701,
+        "mean_deviation_px": 0.2635,
+        "micro_paths": 0.0,
+        "node_density": 23.515,
+        "wobble": 4.3671
+      },
+      "10-pixel-art": {
+        "area_error_pct": 0.0,
+        "area_error_true_pct": 0.0,
+        "closed_pct": 100.0,
+        "max_deviation_px": 0.0,
+        "mean_deviation_px": 0.0,
+        "micro_paths": 0.0,
+        "node_density": 16.002,
+        "wobble": 4.8578
+      },
+      "11-stencil-lines": {
+        "area_error_pct": 7.6895,
+        "area_error_true_pct": 15.4627,
+        "closed_pct": 100.0,
+        "max_deviation_px": 1.118,
+        "mean_deviation_px": 0.148,
+        "micro_paths": 0.0,
+        "node_density": 46.5769,
+        "wobble": 9.3937
+      },
+      "12-technical-drawing": {
+        "area_error_pct": 11.1064,
+        "area_error_true_pct": 33.4612,
+        "closed_pct": 100.0,
+        "max_deviation_px": 2.0016,
+        "mean_deviation_px": 0.1539,
+        "micro_paths": 0.0,
+        "node_density": 12.7531,
+        "wobble": 2.4292
+      },
+      "13-photograph": {
+        "area_error_pct": 2.1905,
+        "area_error_true_pct": null,
+        "closed_pct": 100.0,
+        "max_deviation_px": 9.6298,
+        "mean_deviation_px": 0.1087,
+        "micro_paths": 0.0,
+        "node_density": 62.4211,
+        "wobble": 14.433
+      }
+    },
+    "photo": {
+      "01-flat-logo": {
+        "area_error_pct": 6.4607,
+        "area_error_true_pct": 6.2677,
+        "closed_pct": 100.0,
+        "max_deviation_px": 5.5078,
+        "mean_deviation_px": 1.3974,
+        "micro_paths": 0.0,
+        "node_density": 18.6508,
+        "wobble": 8.3172
+      },
+      "03-text-300dpi": {
+        "area_error_pct": 16.6537,
+        "area_error_true_pct": 16.4584,
+        "closed_pct": 100.0,
+        "max_deviation_px": 9.4739,
+        "mean_deviation_px": 0.6016,
+        "micro_paths": 0.0,
+        "node_density": 135.0711,
+        "wobble": 50.0845
+      },
+      "04-small-text": {
+        "area_error_pct": 21.805,
+        "area_error_true_pct": 33.3565,
+        "closed_pct": 100.0,
+        "max_deviation_px": 1.3554,
+        "mean_deviation_px": 0.1963,
+        "micro_paths": 0.0,
+        "node_density": 56.1728,
+        "wobble": 16.8519
+      },
+      "05-line-art-scan": {
+        "area_error_pct": 31.8474,
+        "area_error_true_pct": 31.1531,
+        "closed_pct": 100.0,
+        "max_deviation_px": 3.3524,
+        "mean_deviation_px": 0.7032,
+        "micro_paths": 0.0,
+        "node_density": 10.7919,
+        "wobble": 4.8348
+      },
+      "07-silhouette": {
+        "area_error_pct": 0.491,
+        "area_error_true_pct": 0.4112,
+        "closed_pct": 100.0,
+        "max_deviation_px": 1.701,
+        "mean_deviation_px": 0.2733,
+        "micro_paths": 0.0,
+        "node_density": 24.5025,
+        "wobble": 6.0417
+      },
+      "10-pixel-art": {
+        "area_error_pct": 17.6566,
+        "area_error_true_pct": 17.6566,
+        "closed_pct": 100.0,
+        "max_deviation_px": 12.8083,
+        "mean_deviation_px": 1.4966,
+        "micro_paths": 0.0,
+        "node_density": 33.6509,
+        "wobble": 14.9145
+      },
+      "11-stencil-lines": {
+        "area_error_pct": 59.5682,
+        "area_error_true_pct": 63.041,
+        "closed_pct": 100.0,
+        "max_deviation_px": 4.6445,
+        "mean_deviation_px": 0.9736,
+        "micro_paths": 0.0,
+        "node_density": 78.6006,
+        "wobble": 40.3684
+      },
+      "12-technical-drawing": {
+        "area_error_pct": 512.0399,
+        "area_error_true_pct": 614.7786,
+        "closed_pct": 100.0,
+        "max_deviation_px": 85.5219,
+        "mean_deviation_px": 12.0919,
+        "micro_paths": 0.0,
+        "node_density": 15.0937,
+        "wobble": 3.3491
+      },
+      "13-photograph": {
+        "area_error_pct": 2.9902,
+        "area_error_true_pct": null,
+        "closed_pct": 100.0,
+        "max_deviation_px": 2.8437,
+        "mean_deviation_px": 0.127,
+        "micro_paths": 0.0,
+        "node_density": 136.2159,
+        "wobble": 12.2294
+      }
+    },
+    "silhouette": {
+      "01-flat-logo": {
+        "area_error_pct": 1.4334,
+        "area_error_true_pct": 1.2306,
+        "closed_pct": 100.0,
+        "max_deviation_px": 1.8376,
+        "mean_deviation_px": 0.2702,
+        "micro_paths": 0.0,
+        "node_density": 4.0641,
+        "wobble": 3.1751
+      },
+      "03-text-300dpi": {
+        "area_error_pct": 17.5967,
+        "area_error_true_pct": 26.8132,
+        "closed_pct": 100.0,
+        "max_deviation_px": 7.0178,
+        "mean_deviation_px": 0.7321,
+        "micro_paths": 0.0,
+        "node_density": 35.7164,
+        "wobble": 31.5144
+      },
+      "04-small-text": {
+        "area_error_pct": 40.5888,
+        "area_error_true_pct": 56.35,
+        "closed_pct": 100.0,
+        "max_deviation_px": 9.9425,
+        "mean_deviation_px": 0.3199,
+        "micro_paths": 0.0,
+        "node_density": 44.4152,
+        "wobble": 30.4327
+      },
+      "05-line-art-scan": {
+        "area_error_pct": 36.9207,
+        "area_error_true_pct": 36.4448,
+        "closed_pct": 100.0,
+        "max_deviation_px": 3.4374,
+        "mean_deviation_px": 0.8179,
+        "micro_paths": 0.0,
+        "node_density": 5.8897,
+        "wobble": 4.1574
+      },
+      "07-silhouette": {
+        "area_error_pct": 0.6872,
+        "area_error_true_pct": 0.7104,
+        "closed_pct": 100.0,
+        "max_deviation_px": 2.6248,
+        "mean_deviation_px": 0.3924,
+        "micro_paths": 0.0,
+        "node_density": 8.662,
+        "wobble": 4.1578
+      },
+      "10-pixel-art": {
+        "area_error_pct": 4.1306,
+        "area_error_true_pct": 4.1306,
+        "closed_pct": 100.0,
+        "max_deviation_px": 2.015,
+        "mean_deviation_px": 0.2955,
+        "micro_paths": 0.0,
+        "node_density": 14.9741,
+        "wobble": 9.1618
+      },
+      "11-stencil-lines": {
+        "area_error_pct": 47.5665,
+        "area_error_true_pct": 48.4145,
+        "closed_pct": 100.0,
+        "max_deviation_px": 3.9115,
+        "mean_deviation_px": 0.8361,
+        "micro_paths": 0.0,
+        "node_density": 27.4431,
+        "wobble": 29.2612
+      },
+      "12-technical-drawing": {
+        "area_error_pct": 21.4577,
+        "area_error_true_pct": 33.3654,
+        "closed_pct": 100.0,
+        "max_deviation_px": 3.0,
+        "mean_deviation_px": 0.3577,
+        "micro_paths": 0.0,
+        "node_density": 3.3284,
+        "wobble": 1.6877
+      },
+      "13-photograph": {
+        "area_error_pct": 3.2104,
+        "area_error_true_pct": null,
+        "closed_pct": 100.0,
+        "max_deviation_px": 9.9612,
+        "mean_deviation_px": 0.4588,
+        "micro_paths": 0.0,
+        "node_density": 37.6841,
+        "wobble": 25.9938
+      }
+    }
+  },
   "inkscape_best": {
     "01-flat-logo": {
       "area_error_pct": 0.9066,

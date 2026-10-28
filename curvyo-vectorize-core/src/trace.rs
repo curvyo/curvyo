@@ -1,5 +1,6 @@
-//! The one trace (ADR 0023 §2, §3): mask, specks, regions and holes, one outline per boundary,
-//! mapped to document millimetres, with the counts the status line shows.
+//! The one trace (ADR 0023 §2, §3): Denoise, Upscale, mask, background and specks, regions and
+//! holes, one outline per boundary, the Node limit, mapped to document millimetres, with the
+//! counts the status line shows.
 
 use std::ops::ControlFlow;
 
@@ -7,11 +8,15 @@ use curvyo_document_core::Affine;
 use kurbo::{BezPath, Shape};
 use visioncortex::BinaryImage;
 
+use crate::filter::{median, upscale_2x};
 use crate::outline::{Crop, node_count, trace_crop};
-use crate::params::{TraceParams, curve_settings};
+use crate::params::{
+    CurveSettings, SEGMENT_CEILING_PX, TraceParams, corner_cos, curve_settings, reduce_tolerance_mm,
+};
 use crate::progress::{Phase, Poller, Progress};
-use crate::raster::{Raster, foreground_mask};
-use crate::regions::{Labels, label};
+use crate::raster::Raster;
+use crate::reduce::reduce;
+use crate::regions::{Labels, Region, label};
 
 /// A single region with this many holes or more is not traced (criterion 16, `adrs.md`
 /// decision 3).
@@ -28,6 +33,18 @@ pub struct Counts {
     pub specks_removed: usize,
 }
 
+/// What the Node limit did to a result (criterion 43).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum NodeLimitOutcome {
+    /// No limit, or the result was at or under it: untouched.
+    #[default]
+    Untouched,
+    /// The tolerance was raised until the result fitted.
+    Reached,
+    /// The tolerance reached its ceiling and the result still has more nodes.
+    NotMet,
+}
+
 /// What a trace made (criterion "Trace result" in Terms).
 #[derive(Debug, Clone, PartialEq)]
 pub struct TraceResult {
@@ -36,10 +53,12 @@ pub struct TraceResult {
     pub outlines: Vec<BezPath>,
     /// The counts.
     pub counts: Counts,
-    /// Pixels below the Threshold, before specks were removed.
+    /// Foreground pixels of the picture (after Denoise, before Upscale and specks).
     pub foreground_pixels: u64,
     /// Every pixel of the picture is foreground after specks: one outline covers it all.
     pub covers_whole_image: bool,
+    /// What the Node limit did.
+    pub node_limit: NodeLimitOutcome,
 }
 
 /// Why a trace made nothing.
@@ -56,10 +75,18 @@ pub enum TraceError {
     TooDetailed,
 }
 
-/// Traces `raster` with `params`: the pixels below the Threshold become closed outlines, mapped
-/// to document millimetres by `pixel_map` (pixel corners, ADR 0017 §6). `poll` is called every
-/// 64 rows of the passes over the mask and before each region; `Break` returns
-/// [`TraceError::Cancelled`].
+/// Re-runs of the outlines the Node limit makes at most per stage (`adrs.md` 2026-10-28 point 3).
+const NODE_LIMIT_RUNS: usize = 6;
+
+/// The ceiling of the node reduction tolerance, in pixels of the traced picture, the Node limit
+/// raises it to once the segment length is at [`SEGMENT_CEILING_PX`] and still too many nodes
+/// remain (criterion 43, "raises the fit tolerance").
+const REDUCE_CEILING_PX: f64 = 2.0;
+
+/// Traces `raster` with `params`: the pixels below the Threshold (after Denoise and Upscale; the
+/// others with Invert) become closed outlines, mapped to document millimetres by `pixel_map`
+/// (pixel corners, ADR 0017 §6). `poll` is called every 64 rows of the passes over the picture
+/// and before each region; `Break` returns [`TraceError::Cancelled`].
 ///
 /// # Errors
 /// [`TraceError::Cancelled`] when `poll` breaks; [`TraceError::Invalid`] when the bytes do not
@@ -71,6 +98,18 @@ pub fn trace(
     params: &TraceParams,
     poll: &mut dyn FnMut(Progress) -> ControlFlow<()>,
 ) -> Result<TraceResult, TraceError> {
+    trace_reducing(raster, pixel_map, params, true, poll)
+}
+
+/// [`trace`], with the node reduction only when `reduce_nodes` (off only in the test that
+/// measures the reduction against the trace before it).
+fn trace_reducing(
+    raster: Raster<'_>,
+    pixel_map: Affine,
+    params: &TraceParams,
+    reduce_nodes: bool,
+    poll: &mut dyn FnMut(Progress) -> ControlFlow<()>,
+) -> Result<TraceResult, TraceError> {
     if raster.checked_pixels().is_none() {
         return Err(TraceError::Invalid("the pixel bytes do not match the size"));
     }
@@ -78,43 +117,72 @@ pub fn trace(
         return Err(TraceError::Invalid("the pixel map is not invertible"));
     }
     let mut poller = Poller::new(poll);
-    let (width, height) = (raster.width as usize, raster.height as usize);
-    let mut mask = foreground_mask(raster, params.threshold);
-    let foreground_pixels = mask.iter().filter(|&&f| f).count() as u64;
+    let (mut width, mut height) = (raster.width as usize, raster.height as usize);
+    let mut luma: Vec<u8> = raster.lumas().collect();
+    luma = median(&luma, width, height, params.denoise.radius(), &mut poller)?;
+    let is_foreground = |value: u8| (value < params.threshold) != params.invert;
+    let foreground_pixels = luma.iter().filter(|&&v| is_foreground(v)).count() as u64;
+    let mut map = pixel_map;
+    if params.upscale.applies(raster.width, raster.height) {
+        luma = upscale_2x(&luma, width, height, &mut poller)?;
+        (width, height) = (width * 2, height * 2);
+        map = Affine::scale(0.5, 0.5).compose(pixel_map);
+    }
+    let mut mask: Vec<bool> = luma.iter().map(|&v| is_foreground(v)).collect();
+    drop(luma);
     let specks = params.specks_mm();
     let min_area_mm2 = specks * specks;
-    let pixel_area_mm2 = pixel_map.determinant().abs();
+    let pixel_area_mm2 = map.determinant().abs();
     let is_speck = |pixels: u64| {
-        #[allow(clippy::cast_precision_loss)] // at most 16 Mpx, exact in f64
+        #[allow(clippy::cast_precision_loss)] // at most 64 Mpx, exact in f64
         let area = pixels as f64 * pixel_area_mm2;
         area < min_area_mm2
     };
     let mut specks_removed = 0;
-    if min_area_mm2 > 0.0 {
-        // Foreground specks become background, then the holes that are specks are filled.
+    if min_area_mm2 > 0.0 || params.ignore_background {
+        // The background regions are dropped, foreground specks become background, then the
+        // holes that are specks are filled.
         let labels = label(&mask, width, height, &mut poller)?;
-        specks_removed += labels.flip(&mut mask, |r| r.foreground && is_speck(r.pixels), false);
-        drop(labels);
-        let labels = label(&mask, width, height, &mut poller)?;
+        let background = |r: &Region| params.ignore_background && r.touches_border;
+        labels.flip(&mut mask, |r| r.foreground && background(r), false);
         specks_removed += labels.flip(
             &mut mask,
-            |r| !r.foreground && !r.touches_border && is_speck(r.pixels),
-            true,
+            |r| r.foreground && !background(r) && is_speck(r.pixels),
+            false,
         );
+        drop(labels);
+        if min_area_mm2 > 0.0 {
+            let labels = label(&mask, width, height, &mut poller)?;
+            specks_removed += labels.flip(
+                &mut mask,
+                |r| !r.foreground && !r.touches_border && is_speck(r.pixels),
+                true,
+            );
+        }
     }
     let labels = label(&mask, width, height, &mut poller)?;
     drop(mask);
     let covers_whole_image = labels.regions.len() == 1 && labels.regions[0].foreground;
-    let mut traced = trace_regions(&labels, params, &mut poller)?;
-    // Smoothing can shrink a region just above the Specks size below it (criterion 19).
-    if min_area_mm2 > 0.0 {
-        specks_removed += drop_small_outlines(&mut traced, pixel_map, min_area_mm2);
+    let settings = curve_settings(params.smooth_clamped(), params.corners);
+    let tolerance_mm = reduce_tolerance_mm(params.smooth_clamped());
+    let reduction = reduce_nodes.then(|| Reduction {
+        tolerance_px: tolerance_mm / map.determinant().abs().sqrt(),
+        corner_cos: corner_cos(params.corners),
+    });
+    let mut outlines = Outlines::new(&labels, map, min_area_mm2, reduction, &mut poller)?;
+    let (mut traced, mut dropped) = outlines.at(settings)?;
+    let mut node_limit = NodeLimitOutcome::Untouched;
+    if let Some(limit) = params.node_limit()
+        && nodes(&traced) > limit
+    {
+        (traced, dropped, node_limit) = outlines.within(limit, settings)?;
     }
+    specks_removed += dropped;
     let outlines: Vec<BezPath> = traced
         .into_iter()
         .flat_map(|(outer, holes)| std::iter::once(outer).chain(holes))
         .map(|mut path| {
-            path.apply_affine(to_kurbo(pixel_map));
+            path.apply_affine(to_kurbo(map));
             path
         })
         .collect();
@@ -128,30 +196,196 @@ pub fn trace(
         counts,
         foreground_pixels,
         covers_whole_image,
+        node_limit,
     })
+}
+
+/// The anchors of traced regions.
+fn nodes(traced: &[Traced]) -> usize {
+    traced
+        .iter()
+        .map(|(outer, holes)| node_count(outer) + holes.iter().map(node_count).sum::<usize>())
+        .sum()
+}
+
+/// The node reduction after visioncortex (`adrs.md` 2026-10-28, second note, point 1).
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct Reduction {
+    /// The tolerance in pixels of the traced picture.
+    tolerance_px: f64,
+    /// The cosine of the corner angle: sharper joints are never merged.
+    corner_cos: f64,
+}
+
+impl Reduction {
+    /// This reduction, or none when its tolerance is 0 (Smooth 80 and below).
+    fn active(self) -> Option<Self> {
+        (self.tolerance_px > 0.0).then_some(self)
+    }
+}
+
+/// The outlines of one labelled mask, traced again at another curve setting on request.
+struct Outlines<'a, 'p, 'q> {
+    labels: &'a Labels,
+    map: Affine,
+    min_area_mm2: f64,
+    /// The node reduction of the settings; its tolerance may be 0, `None` only when the trace
+    /// skips the reduction.
+    reduction: Option<Reduction>,
+    holes: Vec<Vec<u32>>,
+    owners: Vec<Option<u32>>,
+    poller: &'q mut Poller<'p>,
+}
+
+impl<'a, 'p, 'q> Outlines<'a, 'p, 'q> {
+    fn new(
+        labels: &'a Labels,
+        map: Affine,
+        min_area_mm2: f64,
+        reduction: Option<Reduction>,
+        poller: &'q mut Poller<'p>,
+    ) -> Result<Self, TraceError> {
+        let owners = labels.hole_owners();
+        let mut holes: Vec<Vec<u32>> = vec![Vec::new(); labels.regions.len()];
+        for (hole, owner) in owners.iter().enumerate() {
+            if let Some(owner) = owner {
+                // invariant: region indices fit `u32` (the labelling numbers them so).
+                holes[*owner as usize].push(u32::try_from(hole).unwrap_or(u32::MAX));
+            }
+        }
+        if holes.iter().any(|h| h.len() >= MAX_HOLES_PER_REGION) {
+            return Err(TraceError::TooDetailed);
+        }
+        Ok(Self {
+            labels,
+            map,
+            min_area_mm2,
+            reduction,
+            holes,
+            owners,
+            poller,
+        })
+    }
+
+    /// The outlines at `settings` and how many were dropped as below the Specks size after
+    /// smoothing.
+    fn at(&mut self, settings: CurveSettings) -> Result<(Vec<Traced>, u64), TraceError> {
+        self.reduced_at(settings, self.reduction.and_then(Reduction::active))
+    }
+
+    /// The outlines at `settings` reduced by `reduction`, and how many were dropped as below the
+    /// Specks size after smoothing.
+    fn reduced_at(
+        &mut self,
+        settings: CurveSettings,
+        reduction: Option<Reduction>,
+    ) -> Result<(Vec<Traced>, u64), TraceError> {
+        let mut traced = trace_regions(
+            self.labels,
+            &self.holes,
+            &self.owners,
+            settings,
+            reduction,
+            self.poller,
+        )?;
+        // Smoothing can shrink a region just above the Specks size below it (criterion 19).
+        let dropped = if self.min_area_mm2 > 0.0 {
+            drop_small_outlines(&mut traced, self.map, self.min_area_mm2)
+        } else {
+            0
+        };
+        Ok((traced, dropped))
+    }
+
+    /// The outlines with at most `limit` nodes (criterion 43): the segment length raised from
+    /// `settings` by bisection up to [`SEGMENT_CEILING_PX`], at most [`NODE_LIMIT_RUNS`] runs;
+    /// when the ceiling still has too many nodes, the reduction tolerance at that ceiling raised
+    /// the same way up to [`REDUCE_CEILING_PX`].
+    fn within(
+        &mut self,
+        limit: usize,
+        settings: CurveSettings,
+    ) -> Result<(Vec<Traced>, u64, NodeLimitOutcome), TraceError> {
+        let mut high = CurveSettings {
+            segment_length: SEGMENT_CEILING_PX.max(settings.segment_length),
+            ..settings
+        };
+        let (mut best, mut dropped) = self.at(high)?;
+        if nodes(&best) > limit {
+            return self.within_tolerance(limit, high, best, dropped);
+        }
+        let mut low = settings.segment_length;
+        for _ in 1..NODE_LIMIT_RUNS {
+            let middle = CurveSettings {
+                segment_length: f64::midpoint(low, high.segment_length),
+                ..settings
+            };
+            let (traced, small) = self.at(middle)?;
+            if nodes(&traced) <= limit {
+                (best, dropped, high) = (traced, small, middle);
+            } else {
+                low = middle.segment_length;
+            }
+        }
+        Ok((best, dropped, NodeLimitOutcome::Reached))
+    }
+
+    /// The outlines at `settings` with at most `limit` nodes by raising the reduction tolerance
+    /// by bisection up to [`REDUCE_CEILING_PX`], at most [`NODE_LIMIT_RUNS`] runs; `over` is the
+    /// result at the settings' own tolerance, returned when even the ceiling has more nodes.
+    fn within_tolerance(
+        &mut self,
+        limit: usize,
+        settings: CurveSettings,
+        over: Vec<Traced>,
+        over_dropped: u64,
+    ) -> Result<(Vec<Traced>, u64, NodeLimitOutcome), TraceError> {
+        let Some(base) = self.reduction else {
+            return Ok((over, over_dropped, NodeLimitOutcome::NotMet));
+        };
+        let mut high = Reduction {
+            tolerance_px: REDUCE_CEILING_PX.max(base.tolerance_px),
+            ..base
+        };
+        let (mut best, mut dropped) = self.reduced_at(settings, Some(high))?;
+        if nodes(&best) > limit {
+            let (best, dropped) = if nodes(&best) < nodes(&over) {
+                (best, dropped)
+            } else {
+                (over, over_dropped)
+            };
+            return Ok((best, dropped, NodeLimitOutcome::NotMet));
+        }
+        let mut low = base.tolerance_px;
+        for _ in 1..NODE_LIMIT_RUNS {
+            let middle = Reduction {
+                tolerance_px: f64::midpoint(low, high.tolerance_px),
+                ..base
+            };
+            let (traced, small) = self.reduced_at(settings, Some(middle))?;
+            if nodes(&traced) <= limit {
+                (best, dropped, high) = (traced, small, middle);
+            } else {
+                low = middle.tolerance_px;
+            }
+        }
+        Ok((best, dropped, NodeLimitOutcome::Reached))
+    }
 }
 
 /// One region's outer outline and its holes, in pixel coordinates.
 type Traced = (BezPath, Vec<BezPath>);
 
-/// The outlines of every foreground region in label order.
+/// The outlines of every foreground region in label order, each reduced by `reduction`; `holes`
+/// lists each region's holes, `owners` each hole's region.
 fn trace_regions(
     labels: &Labels,
-    params: &TraceParams,
+    holes: &[Vec<u32>],
+    owners: &[Option<u32>],
+    settings: CurveSettings,
+    reduction: Option<Reduction>,
     poller: &mut Poller<'_>,
 ) -> Result<Vec<Traced>, TraceError> {
-    let owners = labels.hole_owners();
-    let mut holes: Vec<Vec<u32>> = vec![Vec::new(); labels.regions.len()];
-    for (hole, owner) in owners.iter().enumerate() {
-        if let Some(owner) = owner {
-            // invariant: region indices fit `u32` (the labelling numbers them so).
-            holes[*owner as usize].push(u32::try_from(hole).unwrap_or(u32::MAX));
-        }
-    }
-    if holes.iter().any(|h| h.len() >= MAX_HOLES_PER_REGION) {
-        return Err(TraceError::TooDetailed);
-    }
-    let settings = curve_settings(params.smooth_clamped());
     let total = labels.regions.iter().filter(|r| r.foreground).count();
     let mut traced = Vec::with_capacity(total);
     for (index, region) in labels.regions.iter().enumerate() {
@@ -161,14 +395,19 @@ fn trace_regions(
         poller.check(Phase::Tracing, traced.len(), total)?;
         let id = u32::try_from(index).unwrap_or(u32::MAX);
         let own = &holes[index];
-        let outer_crop = outer_crop(labels, id, own, &owners);
-        let Some(outer) = trace_crop(&outer_crop, true, settings) else {
+        let outer_crop = outer_crop(labels, id, own, owners);
+        let reduced = |path: BezPath| match reduction {
+            Some(r) => reduce(&path, r.tolerance_px, r.corner_cos),
+            None => path,
+        };
+        let Some(outer) = trace_crop(&outer_crop, true, settings).map(reduced) else {
             continue;
         };
         drop(outer_crop);
         let inner = own
             .iter()
             .filter_map(|&hole| trace_crop(&hole_crop(labels, hole), false, settings))
+            .map(reduced)
             .collect();
         traced.push((outer, inner));
     }
@@ -201,22 +440,59 @@ fn hole_crop(labels: &Labels, id: u32) -> Crop {
     })
 }
 
-/// The pixels in the box `(left, top, right, bottom)` whose label `inside` accepts.
+/// The pixels in the box `(left, top, right, bottom)` whose label `inside` accepts, with every
+/// pocket they enclose filled: visioncortex walks one boundary and gets stuck where two pixels of
+/// the shape touch only diagonally across an empty pocket owned by another region (a noisy
+/// photograph has them), so the crop holds the shape as visioncortex's own clusters do.
 fn crop(
     labels: &Labels,
     (left, top, right, bottom): (usize, usize, usize, usize),
     inside: impl Fn(u32) -> bool,
 ) -> Crop {
-    let mut image = BinaryImage::new_w_h(right - left, bottom - top);
+    let (width, height) = (right - left, bottom - top);
+    let mut shape = Vec::with_capacity(width * height);
     for y in top..bottom {
         let row = &labels.ids[y * labels.width + left..y * labels.width + right];
-        for (x, &label) in row.iter().enumerate() {
-            if inside(label) {
-                image.set_pixel(x, y - top, true);
+        shape.extend(row.iter().map(|&label| inside(label)));
+    }
+    fill_pockets(&mut shape, width, height);
+    let mut image = BinaryImage::new_w_h(width, height);
+    for (i, _) in shape.iter().enumerate().filter(|(_, set)| **set) {
+        image.set_pixel(i % width, i / width, true);
+    }
+    Crop { left, top, image }
+}
+
+/// Sets every empty pixel of `shape` (`width` x `height`) that is not 4-connected to the edge.
+fn fill_pockets(shape: &mut [bool], width: usize, height: usize) {
+    let mut outside = vec![false; shape.len()];
+    let mut stack: Vec<usize> = (0..shape.len())
+        .filter(|&i| {
+            let (x, y) = (i % width, i / width);
+            !shape[i] && (x == 0 || y == 0 || x + 1 == width || y + 1 == height)
+        })
+        .collect();
+    for &i in &stack {
+        outside[i] = true;
+    }
+    while let Some(i) = stack.pop() {
+        let (x, y) = (i % width, i / width);
+        let neighbours = [
+            (x > 0).then(|| i - 1),
+            (x + 1 < width).then(|| i + 1),
+            (y > 0).then(|| i - width),
+            (y + 1 < height).then(|| i + width),
+        ];
+        for j in neighbours.into_iter().flatten() {
+            if !shape[j] && !outside[j] {
+                outside[j] = true;
+                stack.push(j);
             }
         }
     }
-    Crop { left, top, image }
+    for (pixel, out) in shape.iter_mut().zip(outside) {
+        *pixel |= !out;
+    }
 }
 
 /// Drops the outer outlines (with their holes) and the holes whose area in mm² is below
@@ -241,4 +517,73 @@ fn drop_small_outlines(traced: &mut Vec<Traced>, pixel_map: Affine, min_area_mm2
 /// The document map as a `kurbo` map (both in SVG order).
 fn to_kurbo(map: Affine) -> kurbo::Affine {
     kurbo::Affine::new(map.to_array())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pockets_are_filled_and_the_outside_stays() {
+        let rows = ["#####.", "#...#.", "#.#.#.", "#...#.", "##.###"];
+        let mut shape: Vec<bool> = rows
+            .iter()
+            .flat_map(|r| r.chars().map(|c| c == '#'))
+            .collect();
+        fill_pockets(&mut shape, 6, 5);
+        let text: Vec<String> = shape
+            .chunks(6)
+            .map(|row| row.iter().map(|&s| if s { '#' } else { '.' }).collect())
+            .collect();
+        // The ring's inside reaches the edge through the gap in the bottom row: not a pocket.
+        assert_eq!(text, ["#####.", "#...#.", "#.#.#.", "#...#.", "##.###"]);
+        let closed = ["#####", "#...#", "#.#.#", "#...#", "#####"];
+        let mut shape: Vec<bool> = closed
+            .iter()
+            .flat_map(|r| r.chars().map(|c| c == '#'))
+            .collect();
+        fill_pockets(&mut shape, 5, 5);
+        assert!(shape.iter().all(|&s| s));
+    }
+
+    /// Criterion 63: every Silhouette outline lies within the Smooth tolerance (0.2 mm) of the
+    /// trace before the node reduction, both ways, sampled every 0.1 px, plus 0.001 mm; and the
+    /// reduction lowers the node count. Release, with the quality harness:
+    /// `cargo test --release -p curvyo-vectorize-core --lib -- --ignored`.
+    #[test]
+    #[ignore = "quality harness: run in release with --ignored"]
+    fn silhouette_stays_within_the_smooth_tolerance_on_the_set() {
+        use crate::params::PRESETS;
+        use crate::test_common::quality::{directed_distance, quality_set};
+        let silhouette = PRESETS.iter().find(|p| p.key == "silhouette").unwrap();
+        let tolerance_mm = reduce_tolerance_mm(silhouette.smooth) + 0.001;
+        for image in quality_set() {
+            let raster = image.picture.raster();
+            let params = silhouette.apply(TraceParams::with_threshold(
+                crate::raster::auto_threshold(raster),
+            ));
+            let mm_per_px = 25.4 / image.dpi;
+            let map = Affine::scale(mm_per_px, mm_per_px);
+            let mut go = |_| ControlFlow::Continue(());
+            let after = trace_reducing(raster, map, &params, true, &mut go).unwrap();
+            let before = trace_reducing(raster, map, &params, false, &mut go).unwrap();
+            let in_px = |paths: &[BezPath]| -> Vec<BezPath> {
+                paths
+                    .iter()
+                    .map(|p| kurbo::Affine::scale(1.0 / mm_per_px) * p.clone())
+                    .collect()
+            };
+            let (a, b) = (in_px(&after.outlines), in_px(&before.outlines));
+            let (w, h) = (raster.width as usize, raster.height as usize);
+            let worst = directed_distance(&a, &b, w, h).max(directed_distance(&b, &a, w, h));
+            assert!(
+                worst * mm_per_px <= tolerance_mm,
+                "{}: {:.4} mm",
+                image.name,
+                worst * mm_per_px
+            );
+            assert!(after.counts.nodes <= before.counts.nodes, "{}", image.name);
+            assert_eq!(after.counts.paths, before.counts.paths, "{}", image.name);
+        }
+    }
 }

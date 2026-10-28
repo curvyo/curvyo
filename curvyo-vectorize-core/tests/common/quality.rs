@@ -5,7 +5,7 @@
 
 use kurbo::{BezPath, ParamCurve, ParamCurveArclen, PathEl, PathSeg, Point};
 
-use super::{Picture, render};
+use super::{Picture, render_with_truth};
 
 /// What kind of picture an image of the set is (the area error target depends on it).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -24,6 +24,9 @@ pub struct QualityImage {
     /// Its resolution: the pixel size in mm is `25.4 / dpi`.
     pub dpi: f64,
     pub kind: Kind,
+    /// The drawn shape at 4 x 4 samples per pixel, before any noise (`adrs.md` 2026-10-28,
+    /// second note, point 2); `None` for the photograph.
+    pub truth_4x: Option<Vec<bool>>,
 }
 
 /// A fixed pseudo-random sequence (64-bit LCG), the same on every machine.
@@ -175,11 +178,28 @@ fn with_noise(picture: Picture, amplitude: f64, seed: u64) -> Picture {
     Picture::grey(picture.width, picture.height, &levels)
 }
 
+/// Image 4 of the set, small low-resolution text (120 x 60 px), drawn `scale` times larger (the
+/// 4x reference of criterion 42).
+pub fn small_text(scale: u32) -> Picture {
+    small_text_with_truth(scale).0
+}
+
+/// [`small_text`] and its drawn shape at 4 x 4 samples per pixel.
+fn small_text_with_truth(scale: u32) -> (Picture, Vec<bool>) {
+    let s = f64::from(scale);
+    let strokes = text_strokes("TRACE", 4.0, 6.0, 1.6);
+    let strokes2 = text_strokes("CURVY", 4.0, 30.0, 1.6);
+    render_with_truth(120 * scale, 60 * scale, 4, move |x, y| {
+        let p = (x / s, y / s);
+        near_strokes(p, &strokes, 0.9) || near_strokes(p, &strokes2, 0.9)
+    })
+}
+
 /// The black and white set: images 1, 3, 4, 5, 7, 10, 11 and 12 of `research.md` section 5.
 pub fn quality_set() -> Vec<QualityImage> {
     let logo = {
         let star = star(420.0, 190.0, 140.0, 60.0, 5);
-        render(600, 400, 4, move |x, y| {
+        render_with_truth(600, 400, 4, move |x, y| {
             let d = ((x - 150.0).powi(2) + (y - 190.0).powi(2)).sqrt();
             (50.0..=110.0).contains(&d)
                 || in_polygon((x, y), &star)
@@ -190,15 +210,9 @@ pub fn quality_set() -> Vec<QualityImage> {
         let mut strokes = text_strokes("CURVYO TRACE", 30.0, 30.0, 10.0);
         strokes.extend(text_strokes("TRACE 2026 CURVY", 30.0, 160.0, 5.0));
         strokes.extend(text_strokes("CURVE TO TRACE", 30.0, 230.0, 3.0));
-        render(900, 300, 4, move |x, y| near_strokes((x, y), &strokes, 4.0))
+        render_with_truth(900, 300, 4, move |x, y| near_strokes((x, y), &strokes, 4.0))
     };
-    let small = {
-        let strokes = text_strokes("TRACE", 4.0, 6.0, 1.6);
-        let strokes2 = text_strokes("CURVY", 4.0, 30.0, 1.6);
-        render(120, 60, 4, move |x, y| {
-            near_strokes((x, y), &strokes, 0.9) || near_strokes((x, y), &strokes2, 0.9)
-        })
-    };
+    let small = small_text_with_truth(1);
     let line_art = {
         let skew = 1.5_f64.to_radians();
         let mut strokes = Vec::new();
@@ -218,14 +232,14 @@ pub fn quality_set() -> Vec<QualityImage> {
                 .collect();
             strokes.extend(wave.windows(2).map(|w| (w[0], w[1])));
         }
-        let drawn = render(600, 600, 4, move |x, y| {
+        let drawn = render_with_truth(600, 600, 4, move |x, y| {
             let (sx, sy) = (
                 x * skew.cos() + y * skew.sin(),
                 -x * skew.sin() + y * skew.cos(),
             );
             near_strokes((sx, sy), &strokes, 2.5)
         });
-        with_noise(drawn, 14.0, 5)
+        (with_noise(drawn.0, 14.0, 5), drawn.1)
     };
     let silhouette = {
         let blobs = [
@@ -245,7 +259,7 @@ pub fn quality_set() -> Vec<QualityImage> {
                 )
             })
             .collect();
-        let drawn = render(600, 600, 4, move |x, y| {
+        let drawn = render_with_truth(600, 600, 4, move |x, y| {
             let inside = blobs
                 .iter()
                 .any(|&(cx, cy, r)| (x - cx).powi(2) + (y - cy).powi(2) <= r * r);
@@ -254,12 +268,12 @@ pub fn quality_set() -> Vec<QualityImage> {
                     .iter()
                     .any(|&(cx, cy, r)| (x - cx).powi(2) + (y - cy).powi(2) <= r * r)
         });
-        with_noise(drawn, 18.0, 11)
+        (with_noise(drawn.0, 18.0, 11), drawn.1)
     };
     let pixel_art = {
         let mut noise = Noise::new(3);
         let cells: Vec<bool> = (0..16 * 8).map(|_| noise.next() > 0.1).collect();
-        render(256, 256, 1, move |x, y| {
+        render_with_truth(256, 256, 1, move |x, y| {
             let (cx, cy) = ((x / 16.0) as usize, (y / 16.0) as usize);
             // Mirrored like an icon.
             let col = if cx < 8 { cx } else { 15 - cx };
@@ -276,7 +290,7 @@ pub fn quality_set() -> Vec<QualityImage> {
                 (580.0, 60.0 + f64::from(i) * 50.0),
             ));
         }
-        render(600, 600, 4, move |x, y| {
+        render_with_truth(600, 600, 4, move |x, y| {
             near_strokes((x, y), &strokes, 1.75)
         })
     };
@@ -292,7 +306,7 @@ pub fn quality_set() -> Vec<QualityImage> {
             (575.0, 200.0, 40.0),
             (240.0, 430.0, 80.0),
         ];
-        render(800, 600, 4, move |x, y| {
+        render_with_truth(800, 600, 4, move |x, y| {
             let on_rect = rects.iter().any(|&(x0, y0, x1, y1)| {
                 let near_x = (x0 - 1.5..=x1 + 1.5).contains(&x);
                 let near_y = (y0 - 1.5..=y1 + 1.5).contains(&y);
@@ -311,53 +325,118 @@ pub fn quality_set() -> Vec<QualityImage> {
     vec![
         QualityImage {
             name: "01-flat-logo",
-            picture: logo,
+            picture: logo.0,
+            truth_4x: Some(logo.1),
             dpi: 96.0,
             kind: Kind::LogoOrText,
         },
         QualityImage {
             name: "03-text-300dpi",
-            picture: text,
+            picture: text.0,
+            truth_4x: Some(text.1),
             dpi: 300.0,
             kind: Kind::LogoOrText,
         },
         QualityImage {
             name: "04-small-text",
-            picture: small,
+            picture: small.0,
+            truth_4x: Some(small.1),
             dpi: 72.0,
             kind: Kind::LogoOrText,
         },
         QualityImage {
             name: "05-line-art-scan",
-            picture: line_art,
+            picture: line_art.0,
+            truth_4x: Some(line_art.1),
             dpi: 150.0,
             kind: Kind::Other,
         },
         QualityImage {
             name: "07-silhouette",
-            picture: silhouette,
+            picture: silhouette.0,
+            truth_4x: Some(silhouette.1),
             dpi: 150.0,
             kind: Kind::Other,
         },
         QualityImage {
             name: "10-pixel-art",
-            picture: pixel_art,
+            picture: pixel_art.0,
+            truth_4x: Some(pixel_art.1),
             dpi: 96.0,
             kind: Kind::Other,
         },
         QualityImage {
             name: "11-stencil-lines",
-            picture: stencil,
+            picture: stencil.0,
+            truth_4x: Some(stencil.1),
             dpi: 300.0,
             kind: Kind::Other,
         },
         QualityImage {
             name: "12-technical-drawing",
-            picture: technical,
+            picture: technical.0,
+            truth_4x: Some(technical.1),
             dpi: 150.0,
             kind: Kind::Other,
         },
     ]
+}
+
+/// The photograph fixture of criterion 61: a synthetic street-scene-like photo (400 x 300 px at
+/// 96 dpi): a sky gradient, soft-edged buildings and trees, a figure, fine sensor noise of 12
+/// grey levels and grain. Generated here from fixed shapes and a fixed noise sequence, so it has
+/// no origin to credit and no copyright.
+pub fn photograph() -> Picture {
+    let (width, height) = (400_u32, 300_u32);
+    let mut noise = Noise::new(2026);
+    let soft = |d: f64| (0.5 - d / 3.0).clamp(0.0, 1.0);
+    let blobs = [
+        (90.0, 120.0, 45.0),
+        (130.0, 150.0, 38.0),
+        (320.0, 130.0, 55.0),
+        (290.0, 170.0, 35.0),
+    ];
+    let mut levels = Vec::with_capacity((width * height) as usize);
+    for y in 0..height {
+        for x in 0..width {
+            let (fx, fy) = (f64::from(x) + 0.5, f64::from(y) + 0.5);
+            // Sky to ground: light at the top, mid grey at the bottom, with clouds.
+            let mut v = 225.0 - 90.0 * fy / f64::from(height)
+                + 18.0 * (fx / 23.0).sin() * (fy / 31.0).cos();
+            // Buildings: dark blocks with lit windows.
+            for &(x0, x1, top, grey) in &[
+                (150.0, 210.0, 90.0, 70.0),
+                (215.0, 260.0, 60.0, 95.0),
+                (20.0, 60.0, 140.0, 85.0),
+            ] {
+                let inside = soft(x0 - fx).min(soft(fx - x1)).min(soft(top - fy));
+                let window = (fx - x0) % 12.0 < 5.0 && (fy - top) % 14.0 < 6.0;
+                let tone = if window { grey + 90.0 } else { grey };
+                v = v * (1.0 - inside) + tone * inside;
+            }
+            // Trees: dark round crowns with leafy texture.
+            for &(cx, cy, r) in &blobs {
+                let d = ((fx - cx).powi(2) + (fy - cy).powi(2)).sqrt();
+                let inside = soft(d - r);
+                let leaves = 60.0 + 35.0 * ((fx * 0.9).sin() * (fy * 1.1).cos());
+                v = v * (1.0 - inside) + leaves * inside;
+            }
+            // A figure: head and body.
+            let head = ((fx - 280.0).powi(2) + (fy - 205.0).powi(2)).sqrt();
+            let body = soft((fx - 280.0).abs() - 12.0)
+                .min(soft(215.0 - fy))
+                .min(soft(fy - 275.0));
+            let person = soft(head - 9.0).max(body);
+            v = v * (1.0 - person) + 40.0 * person;
+            // Sensor noise and grain.
+            v += 12.0 * noise.next();
+            if noise.next() > 0.98 {
+                v -= 60.0 * noise.next().abs();
+            }
+            levels.push(v.round().clamp(0.0, 255.0) as u8);
+        }
+    }
+    Picture::grey(width, height, &levels)
 }
 
 /// The metrics of one trace against its thresholded picture (`research.md` section 5).
@@ -365,7 +444,7 @@ pub fn quality_set() -> Vec<QualityImage> {
 pub struct Metrics {
     /// Nodes per 100 mm of outline.
     pub node_density: f64,
-    /// Outlines below 0.25 mm².
+    /// Outlines below 0.25 mm² (a preset's run: below 0.95 x its Specks², criterion 61).
     pub micro_paths: f64,
     /// Hausdorff distance in pixels between the outlines and the pixel border, both ways.
     pub max_deviation_px: f64,
@@ -574,6 +653,18 @@ pub fn measure(
     height: usize,
     mm_per_px: f64,
 ) -> Metrics {
+    measure_micro(outlines, mask, width, height, mm_per_px, 0.25)
+}
+
+/// [`measure`] with micro paths counted below `micro_mm2`.
+pub fn measure_micro(
+    outlines: &[BezPath],
+    mask: &[bool],
+    width: usize,
+    height: usize,
+    mm_per_px: f64,
+    micro_mm2: f64,
+) -> Metrics {
     let length_px: f64 = outlines
         .iter()
         .flat_map(BezPath::segments)
@@ -583,7 +674,7 @@ pub fn measure(
     let nodes: usize = outlines.iter().map(|p| p.segments().count()).sum();
     let micro = outlines
         .iter()
-        .filter(|p| kurbo::Shape::area(*p).abs() * mm_per_px * mm_per_px < 0.25)
+        .filter(|p| kurbo::Shape::area(*p).abs() * mm_per_px * mm_per_px < micro_mm2)
         .count();
     // Deviation: samples every 0.1 px along the outlines to the pixel border, and the border's
     // edge midpoints to the outlines.
@@ -662,6 +753,48 @@ pub fn measure(
             closed as f64 / outlines.len() as f64 * 100.0
         },
     }
+}
+
+/// The area error against the drawn shape (`adrs.md` 2026-10-28, second note, point 2): XOR of
+/// `outlines` rasterised at 4x with `truth_4x`, as % of the true foreground.
+pub fn area_error_true_pct(
+    outlines: &[BezPath],
+    truth_4x: &[bool],
+    width: usize,
+    height: usize,
+) -> f64 {
+    let raster = rasterise_4x(outlines, width, height);
+    let fg = truth_4x.iter().filter(|&&t| t).count();
+    let xor = raster.iter().zip(truth_4x).filter(|(a, b)| a != b).count();
+    if fg == 0 {
+        0.0
+    } else {
+        xor as f64 / fg as f64 * 100.0
+    }
+}
+
+/// The largest distance from samples every 0.1 px along `a` to the flattened `b`, in pixels
+/// (the directed half of a Hausdorff distance).
+pub fn directed_distance(a: &[BezPath], b: &[BezPath], width: usize, height: usize) -> f64 {
+    let lines = polylines(b, 0.001);
+    let segments: Vec<(Point, Point)> = lines
+        .iter()
+        .flat_map(|l| l.windows(2).map(|w| (w[0], w[1])))
+        .collect();
+    if segments.is_empty() {
+        return f64::INFINITY;
+    }
+    let grid = Grid::new(&segments, width, height, 4.0);
+    let mut max = 0.0_f64;
+    for path in a {
+        for seg in path.segments() {
+            let steps = (seg.arclen(1e-3) / 0.1).ceil().max(1.0) as usize;
+            for i in 0..=steps {
+                max = max.max(grid.distance(seg.eval(i as f64 / steps as f64)));
+            }
+        }
+    }
+    max
 }
 
 /// The segments of a path, for callers outside this module.

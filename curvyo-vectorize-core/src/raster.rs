@@ -1,6 +1,6 @@
 //! The picture as the tracer reads it (`specs/0025-raster-trace` Terms, criteria 9 and 24): luma
-//! of the straight-alpha RGBA8 pixels composited over white, the foreground mask and Otsu's
-//! automatic Threshold.
+//! of the straight-alpha RGBA8 pixels composited over white, and Otsu's automatic
+//! Threshold.
 
 /// A straight-alpha RGBA8 picture, row-major, top row first (ADR 0017 §6).
 #[derive(Debug, Clone, Copy)]
@@ -107,11 +107,6 @@ fn otsu(histogram: &[u64; 256]) -> u8 {
     }
 }
 
-/// The foreground mask: `true` where the luma is below `threshold`.
-pub(crate) fn foreground_mask(raster: Raster<'_>, threshold: u8) -> Vec<bool> {
-    raster.lumas().map(|value| value < threshold).collect()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -164,16 +159,5 @@ mod tests {
             rgba: &rgba,
         };
         assert_eq!(auto_threshold(broken), 128);
-    }
-
-    #[test]
-    fn the_mask_is_the_pixels_below_the_threshold() {
-        let rgba = grey(&[0, 99, 100, 255]);
-        let raster = Raster {
-            width: 4,
-            height: 1,
-            rgba: &rgba,
-        };
-        assert_eq!(foreground_mask(raster, 100), [true, true, false, false]);
     }
 }
