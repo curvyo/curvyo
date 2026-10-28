@@ -21,8 +21,9 @@ use crate::document::OBJECTS_TREE;
 pub(super) struct Snapshot {
     pub(super) nodes: BTreeMap<TreeID, NodeAt>,
     pub(super) root: BTreeMap<String, Node>,
-    /// The children, in z-order at that version, of every parent a created or deleted object
-    /// had (`None` is the document root): where a returning object finds its neighbours.
+    /// The children, in z-order at that version, of every parent a created, deleted or moved
+    /// object had (`None` is the document root): where a returning object finds its neighbours.
+    /// Empty for the before version of a step that only created objects: nothing returns from it.
     pub(super) siblings: BTreeMap<Option<TreeID>, Vec<TreeID>>,
 }
 

@@ -448,12 +448,32 @@ fn result_of(tally: Tally) -> ObjectResult {
 }
 
 /// Reads the touched objects before and after the step, through one guarded checkout pair.
+///
+/// A step that only created objects is read at its end alone: the objects did not exist before
+/// it, and nothing the plan does for a created object reads that version. Checking out past such
+/// a step is what is expensive about it: Loro rebuilds each list container the step created by
+/// replaying the log from the start, so one big trace group cost time quadratic in its outlines
+/// (`specs/0025-raster-trace` criterion 55).
 fn read_versions(
     doc: &LoroDoc,
     log: &LogStep,
     touched: &Touched,
 ) -> Result<(Snapshot, Snapshot), HistoryError> {
-    read_versions_between(doc, &log.before, &log.after(), touched)
+    if !touched.only_created() {
+        return read_versions_between(doc, &log.before, &log.after(), touched);
+    }
+    let absent = || NodeAt {
+        meta: BTreeMap::new(),
+        index: None,
+        parent: None,
+    };
+    let before = Snapshot {
+        nodes: touched.created.iter().map(|&id| (id, absent())).collect(),
+        root: BTreeMap::new(),
+        siblings: BTreeMap::new(),
+    };
+    let guard = Detached::at(doc, &log.after())?;
+    Ok((before, read_snapshot(&guard, touched)))
 }
 
 /// The touched objects at the versions `before` and `after`, read under one checkout guard.
@@ -463,39 +483,40 @@ pub(super) fn read_versions_between(
     after: &loro::Frontiers,
     touched: &Touched,
 ) -> Result<(Snapshot, Snapshot), HistoryError> {
-    let ids: Vec<TreeID> = touched.nodes().collect();
-    let read = |guard: &Detached<'_>| {
-        let nodes: BTreeMap<TreeID, NodeAt> = ids.iter().map(|&id| (id, guard.node(id))).collect();
-        // The children of the parents of created, deleted and moved objects, in z-order: where a
-        // returning object finds its neighbours. Each node is read once, for both.
-        let mut siblings = BTreeMap::new();
-        for id in touched
-            .created
-            .iter()
-            .chain(&touched.deleted)
-            .chain(&touched.moved)
-        {
-            let parent = nodes.get(id).and_then(|node| node.parent);
-            siblings
-                .entry(parent)
-                .or_insert_with(|| guard.children(parent));
-        }
-        let root = if touched.root {
-            guard.root()
-        } else {
-            BTreeMap::new()
-        };
-        Snapshot {
-            nodes,
-            root,
-            siblings,
-        }
-    };
     let guard = Detached::at(doc, before)?;
-    let before = read(&guard);
+    let before = read_snapshot(&guard, touched);
     guard.goto(after)?;
-    let after = read(&guard);
+    let after = read_snapshot(&guard, touched);
     Ok((before, after))
+}
+
+/// The touched objects at the version `guard` holds.
+fn read_snapshot(guard: &Detached<'_>, touched: &Touched) -> Snapshot {
+    let nodes: BTreeMap<TreeID, NodeAt> = touched.nodes().map(|id| (id, guard.node(id))).collect();
+    // The children of the parents of created, deleted and moved objects, in z-order: where a
+    // returning object finds its neighbours. Each node is read once, for both.
+    let mut siblings = BTreeMap::new();
+    for id in touched
+        .created
+        .iter()
+        .chain(&touched.deleted)
+        .chain(&touched.moved)
+    {
+        let parent = nodes.get(id).and_then(|node| node.parent);
+        siblings
+            .entry(parent)
+            .or_insert_with(|| guard.children(parent));
+    }
+    let root = if touched.root {
+        guard.root()
+    } else {
+        BTreeMap::new()
+    };
+    Snapshot {
+        nodes,
+        root,
+        siblings,
+    }
 }
 
 /// Undo rule (a) of `0049` criterion 36: the restore would write back a `clone_link` whose origin
