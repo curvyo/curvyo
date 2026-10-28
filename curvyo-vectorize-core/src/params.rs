@@ -116,10 +116,37 @@ pub const PARAMS: &[ParamSpec] = &[
     },
 ];
 
-/// The controls of the Advanced block in its order (criteria 41 and 45): the same schema as
-/// [`PARAMS`], kept apart so the bar's main rows stay the three of slice 1. The last one,
-/// Full-size preview, is the host's choice of preview copy, not a value of [`TraceParams`].
+/// The controls of the Advanced block in its order, the two toggles first (criteria 41 and 45): the same schema as
+/// [`PARAMS`], kept apart so the bar's main rows stay the three of slice 1.
 pub const ADVANCED_PARAMS: &[ParamSpec] = &[
+    ParamSpec {
+        name: "invert",
+        label: "Invert",
+        kind: ParamKind::Toggle,
+        unit: ParamUnit::None,
+        min: 0.0,
+        max: 1.0,
+        default: 0.0,
+        step: 1.0,
+        big_step: 1.0,
+        fine_step: 1.0,
+        group: "advanced",
+        advanced: true,
+    },
+    ParamSpec {
+        name: "ignore_background",
+        label: "Ignore background",
+        kind: ParamKind::Toggle,
+        unit: ParamUnit::None,
+        min: 0.0,
+        max: 1.0,
+        default: 0.0,
+        step: 1.0,
+        big_step: 1.0,
+        fine_step: 1.0,
+        group: "advanced",
+        advanced: true,
+    },
     ParamSpec {
         name: "denoise",
         label: "Denoise",
@@ -162,71 +189,10 @@ pub const ADVANCED_PARAMS: &[ParamSpec] = &[
         group: "advanced",
         advanced: true,
     },
-    ParamSpec {
-        name: "node_limit",
-        label: "Node limit",
-        kind: ParamKind::Integer,
-        unit: ParamUnit::None,
-        min: 0.0,
-        max: MAX_NODE_LIMIT as f64,
-        default: 0.0,
-        step: 100.0,
-        big_step: 1000.0,
-        fine_step: 1.0,
-        group: "advanced",
-        advanced: true,
-    },
-    ParamSpec {
-        name: "invert",
-        label: "Invert",
-        kind: ParamKind::Toggle,
-        unit: ParamUnit::None,
-        min: 0.0,
-        max: 1.0,
-        default: 0.0,
-        step: 1.0,
-        big_step: 1.0,
-        fine_step: 1.0,
-        group: "advanced",
-        advanced: true,
-    },
-    ParamSpec {
-        name: "ignore_background",
-        label: "Ignore background",
-        kind: ParamKind::Toggle,
-        unit: ParamUnit::None,
-        min: 0.0,
-        max: 1.0,
-        default: 0.0,
-        step: 1.0,
-        big_step: 1.0,
-        fine_step: 1.0,
-        group: "advanced",
-        advanced: true,
-    },
-    // A host-side switch, not a trace setting: it chooses the full-size copy for the preview
-    // and has no field in [`TraceParams`] (criterion 41, UX notes section 12).
-    ParamSpec {
-        name: "full_size_preview",
-        label: "Full-size preview",
-        kind: ParamKind::Toggle,
-        unit: ParamUnit::None,
-        min: 0.0,
-        max: 1.0,
-        default: 0.0,
-        step: 1.0,
-        big_step: 1.0,
-        fine_step: 1.0,
-        group: "advanced",
-        advanced: true,
-    },
 ];
 
 /// The default Corners: a bend sharper than 60° stays a corner, slice 1's fixed angle.
 pub const DEFAULT_CORNERS: u8 = 70;
-
-/// The largest Node limit; 0 means none.
-pub const MAX_NODE_LIMIT: u32 = 10_000_000;
 
 /// The median filter before the Threshold (criterion 41, `adrs.md` note 2026-10-28 point 4).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -332,8 +298,7 @@ pub struct Preset {
 }
 
 impl Preset {
-    /// `params` with this preset's values; Threshold, Node limit, Invert and Ignore background
-    /// stay.
+    /// `params` with this preset's values; Threshold, Invert and Ignore background stay.
     #[must_use]
     pub fn apply(&self, params: TraceParams) -> TraceParams {
         TraceParams {
@@ -407,8 +372,6 @@ pub struct TraceParams {
     pub upscale: Upscale,
     /// The median filter before the Threshold.
     pub denoise: Denoise,
-    /// The most nodes the result may have; `None` (or 0) for no limit.
-    pub node_limit: Option<u32>,
     /// Trace the light parts: the mask is flipped.
     pub invert: bool,
     /// Drop the foreground regions that touch the picture's border.
@@ -416,8 +379,8 @@ pub struct TraceParams {
 }
 
 impl TraceParams {
-    /// The values of a first use with `threshold`: the first preset's (Logo / Line art), no
-    /// Node limit, Invert and Ignore background off.
+    /// The values of a first use with `threshold`: the first preset's (Logo / Line art), Invert
+    /// and Ignore background off.
     #[must_use]
     pub const fn with_threshold(threshold: u8) -> Self {
         Self {
@@ -427,7 +390,6 @@ impl TraceParams {
             corners: DEFAULT_CORNERS,
             upscale: Upscale::Off,
             denoise: Denoise::Off,
-            node_limit: None,
             invert: false,
             ignore_background: false,
         }
@@ -449,14 +411,6 @@ impl TraceParams {
             0.0
         }
     }
-
-    /// The Node limit, `None` for none or 0.
-    #[must_use]
-    pub fn node_limit(self) -> Option<usize> {
-        self.node_limit
-            .filter(|&n| n > 0)
-            .map(|n| usize::try_from(n.min(MAX_NODE_LIMIT)).unwrap_or(usize::MAX))
-    }
 }
 
 /// The settings of visioncortex's spline mode one trace runs with (ADR 0023 §3).
@@ -477,9 +431,6 @@ const SEGMENT_MIN_PX: f64 = 3.5;
 
 /// The longest smoothing segment in pixels (Smooth 100).
 const SEGMENT_MAX_PX: f64 = 10.0;
-
-/// The ceiling of the segment length the Node limit raises it to (`adrs.md` 2026-10-28 point 3).
-pub(crate) const SEGMENT_CEILING_PX: f64 = 20.0;
 
 /// The splice angle, degrees (fixed).
 const SPLICE_DEGREES: f64 = 45.0;
@@ -573,33 +524,47 @@ mod tests {
         assert_eq!(
             names,
             [
-                "denoise",
-                "upscale",
-                "corners",
-                "node_limit",
                 "invert",
                 "ignore_background",
-                "full_size_preview"
+                "denoise",
+                "upscale",
+                "corners"
             ]
         );
-        let advanced = ADVANCED_PARAMS;
+        let advanced = &ADVANCED_PARAMS[2..];
+        assert_eq!(ADVANCED_PARAMS[0].kind, ParamKind::Toggle);
+        assert_eq!(ADVANCED_PARAMS[1].label, "Ignore background");
         assert_eq!(advanced[0].kind, ParamKind::Choice(&["Off", "Low", "High"]));
         assert_eq!(advanced[1].kind, ParamKind::Choice(&["Auto", "Off"]));
         assert_eq!((advanced[2].min, advanced[2].max), (0.0, 100.0));
-        assert_eq!(advanced[3].default, 0.0);
-        assert_eq!(advanced[4].kind, ParamKind::Toggle);
-        assert_eq!(advanced[5].label, "Ignore background");
-        assert_eq!(advanced[6].kind, ParamKind::Toggle);
-        assert_eq!(
-            (advanced[6].label, advanced[6].default),
-            ("Full-size preview", 0.0)
-        );
-        // The schema's defaults are the first use: Logo / Line art, Node limit none, switches off.
+        // The schema's defaults are the first use: Logo / Line art, switches off.
         let first = TraceParams::with_threshold(DEFAULT_THRESHOLD);
         assert_eq!(advanced[0].default, f64::from(first.denoise.index()));
         assert_eq!(advanced[1].default, f64::from(first.upscale.index()));
         assert_eq!(advanced[2].default, f64::from(first.corners));
-        assert_eq!(first.node_limit(), None);
+    }
+
+    /// Criterion 43 (removed, Frage 74 A): neither the schema nor the values know a Node limit
+    /// or a Full-size preview.
+    #[test]
+    fn there_is_no_node_limit_and_no_full_size_preview() {
+        for p in PARAMS.iter().chain(ADVANCED_PARAMS) {
+            let name = p.name.to_lowercase();
+            let label = p.label.to_lowercase();
+            assert!(
+                !name.contains("node") && !label.contains("node"),
+                "{}",
+                p.name
+            );
+            assert!(
+                !name.contains("full") && !label.contains("full"),
+                "{}",
+                p.name
+            );
+        }
+        let fields = format!("{:?}", TraceParams::with_threshold(DEFAULT_THRESHOLD));
+        assert!(!fields.contains("node_limit"), "{fields}");
+        assert!(!fields.contains("full_size"), "{fields}");
     }
 
     /// Criteria 45, 59 and 60: the preset table in menu order with the customer's texts, its
@@ -641,9 +606,8 @@ mod tests {
         }
         let first = TraceParams::with_threshold(140);
         assert_eq!(PRESETS[0].apply(first), first);
-        // A pick never sets the Threshold, the Node limit or the switches.
+        // A pick never sets the Threshold or the switches.
         let mine = TraceParams {
-            node_limit: Some(500),
             invert: true,
             ignore_background: true,
             ..first
@@ -651,7 +615,6 @@ mod tests {
         for preset in PRESETS {
             let picked = preset.apply(mine);
             assert_eq!(picked.threshold, 140);
-            assert_eq!(picked.node_limit, Some(500));
             assert!(picked.invert && picked.ignore_background);
         }
         // The values of criterion 60 (step 0 of slice 2, `adrs.md` 2026-10-28 second note).

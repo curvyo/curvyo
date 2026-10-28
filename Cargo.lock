@@ -666,6 +666,7 @@ dependencies = [
  "curvyo-render-core",
  "curvyo-text-core",
  "curvyo-ui-core",
+ "image",
  "kurbo",
  "loro",
  "rustix",

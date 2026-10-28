@@ -26,8 +26,8 @@ use std::ops::ControlFlow;
 
 use curvyo_document_core::{Affine, Length};
 use curvyo_vectorize_core::{
-    ADVANCED_PARAMS, DEFAULT_THRESHOLD, Denoise, NodeLimitOutcome, PARAMS, PRESETS, ParamKind,
-    Raster, TraceParams, TraceResult, Upscale, auto_threshold, trace,
+    ADVANCED_PARAMS, DEFAULT_THRESHOLD, Denoise, PARAMS, PRESETS, ParamKind, Raster, TraceParams,
+    TraceResult, Upscale, auto_threshold, trace,
 };
 use kurbo::{BezPath, PathEl, Point, Shape};
 
@@ -187,7 +187,6 @@ fn c60_the_values_of_the_table() {
 fn c60_a_pick_sets_those_values_and_nothing_else() {
     let start = TraceParams {
         threshold: 77,
-        node_limit: Some(1234),
         invert: true,
         ignore_background: true,
         ..base(77)
@@ -195,7 +194,6 @@ fn c60_a_pick_sets_those_values_and_nothing_else() {
     for p in PRESETS {
         let got = p.apply(start);
         assert_eq!(got.threshold, 77, "{}: Threshold is never set", p.key);
-        assert_eq!(got.node_limit, Some(1234));
         assert!(got.invert && got.ignore_background);
         assert_eq!(
             (got.smooth, got.corners, got.upscale, got.denoise),
@@ -231,7 +229,6 @@ fn c45_the_schema_describes_the_advanced_controls_and_the_table_fits_it() {
         "denoise",
         "upscale",
         "corners",
-        "node_limit",
         "invert",
         "ignore_background",
     ] {
@@ -252,7 +249,6 @@ fn c45_the_schema_describes_the_advanced_controls_and_the_table_fits_it() {
     assert!(matches!(by("upscale").kind, ParamKind::Choice(l) if l == ["Auto", "Off"]));
     assert!(matches!(by("invert").kind, ParamKind::Toggle));
     assert!(matches!(by("ignore_background").kind, ParamKind::Toggle));
-    assert_eq!(by("node_limit").default, 0.0, "empty = none");
     for p in PRESETS {
         let (s, k, c) = (by("smooth"), by("specks"), by("corners"));
         assert!((s.min..=s.max).contains(&f64::from(p.smooth)), "{}", p.key);
@@ -262,14 +258,13 @@ fn c45_the_schema_describes_the_advanced_controls_and_the_table_fits_it() {
 }
 
 #[test]
-fn c45_c41_full_size_preview_is_in_the_schema() {
-    // Criterion 41 lists "Full-size preview" among the Advanced contents (off by default) and
-    // criterion 45 says the Advanced controls are described by the schema.
+fn c41_c43_neither_full_size_preview_nor_node_limit_is_in_the_schema() {
+    // Frage 74 A (2026-10-29): both were removed from the UI, the schema and the product.
     let names: Vec<&str> = ADVANCED_PARAMS.iter().map(|p| p.name).collect();
     assert!(
-        names
+        !names
             .iter()
-            .any(|n| n.contains("full") || n.contains("preview")),
+            .any(|n| n.contains("full") || n.contains("preview") || n.contains("node")),
         "the schema has {names:?}"
     );
 }
@@ -415,109 +410,6 @@ fn c41_upscale_auto_applies_only_below_one_megapixel() {
     assert!(!Upscale::Auto.applies(1000, 1000));
     assert!(!Upscale::Auto.applies(2000, 2000));
     assert!(!Upscale::Off.applies(10, 10));
-}
-
-// ------------------------------------------------------- criterion 43: Node limit
-
-#[test]
-fn c43_node_limit_bisects_untouched_when_met_and_says_so_when_not() {
-    let pic = line_art(500);
-    let t = auto(&pic);
-    let free = run(&pic, px_map(), &base(t));
-    assert_eq!(free.node_limit, NodeLimitOutcome::Untouched);
-    let n = free.counts.nodes;
-    assert!(n > 400, "fixture has many nodes: {n}");
-    // at or over the count: untouched, byte-identical
-    for limit in [n as u32, n as u32 + 1, 10_000_000] {
-        let r = run(
-            &pic,
-            px_map(),
-            &TraceParams {
-                node_limit: Some(limit),
-                ..base(t)
-            },
-        );
-        assert_eq!(r.node_limit, NodeLimitOutcome::Untouched, "limit {limit}");
-        assert_eq!(r.outlines, free.outlines);
-    }
-    // None and Some(0) are both "no limit"
-    let zero = run(
-        &pic,
-        px_map(),
-        &TraceParams {
-            node_limit: Some(0),
-            ..base(t)
-        },
-    );
-    assert_eq!(zero.outlines, free.outlines);
-    // a limit a little under the count is reached
-    let mut reached = 0;
-    for frac in [0.95, 0.8, 0.6, 0.4] {
-        let limit = (n as f64 * frac) as u32;
-        let r = run(
-            &pic,
-            px_map(),
-            &TraceParams {
-                node_limit: Some(limit),
-                ..base(t)
-            },
-        );
-        println!(
-            "c43 limit {limit}: {} nodes, {:?}",
-            r.counts.nodes, r.node_limit
-        );
-        match r.node_limit {
-            NodeLimitOutcome::Reached => {
-                reached += 1;
-                assert!(r.counts.nodes <= limit as usize);
-            }
-            NodeLimitOutcome::NotMet => assert!(r.counts.nodes > limit as usize),
-            NodeLimitOutcome::Untouched => panic!("limit {limit} under {n} must act"),
-        }
-        assert!(
-            r.outlines
-                .iter()
-                .all(|o| matches!(o.elements().last(), Some(PathEl::ClosePath)))
-        );
-    }
-    assert!(
-        reached >= 1,
-        "at least one modest limit is reachable by raising the tolerance"
-    );
-    // an impossible limit says NotMet and still returns a result
-    let r = run(
-        &pic,
-        px_map(),
-        &TraceParams {
-            node_limit: Some(1),
-            ..base(t)
-        },
-    );
-    assert_eq!(r.node_limit, NodeLimitOutcome::NotMet);
-    assert!(r.counts.nodes > 1);
-}
-
-#[test]
-fn c43_a_smaller_limit_never_gives_more_nodes() {
-    let pic = blobs();
-    let t = auto(&pic);
-    let mut last = usize::MAX;
-    for limit in [100_000_u32, 400, 300, 200, 150, 100] {
-        let r = run(
-            &pic,
-            px_map(),
-            &TraceParams {
-                node_limit: Some(limit),
-                ..base(t)
-            },
-        );
-        assert!(
-            r.counts.nodes <= last,
-            "limit {limit}: {} after {last}",
-            r.counts.nodes
-        );
-        last = r.counts.nodes;
-    }
 }
 
 // ------------------------------------------------------- criterion 44: Invert, Ignore background
@@ -915,7 +807,6 @@ fn advanced_options_survive_a_stop_and_degenerate_input() {
     let p = TraceParams {
         denoise: Denoise::High,
         upscale: Upscale::Auto,
-        node_limit: Some(50),
         invert: true,
         ignore_background: true,
         ..base(128)

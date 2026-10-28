@@ -59,6 +59,14 @@ pub fn build_preview_outline(
                 .collect()
         })
         .collect();
+    let refs: Vec<stroke::OutlineRef<'_>> = paths
+        .iter()
+        .map(|anchors| stroke::OutlineRef {
+            anchors,
+            closed: true,
+        })
+        .collect();
+    let all = stroke::build_outlines(&refs, false);
     let mut list = DrawList::default();
     for casing in [true, false] {
         let (width, color) = if casing {
@@ -70,14 +78,10 @@ pub fn build_preview_outline(
             (width_mm, theme::PREVIEW_NEW)
         };
         let color = at_strength(color, strength);
-        for anchors in &paths {
-            list.extend(stroke::path_stroke(
-                anchors,
-                true,
-                width,
-                color,
-                tolerance_mm,
-            ));
+        // One path of every outline, tessellated once: a trace preview has tens of thousands of
+        // outlines, and a tessellator per outline cost most of a frame (`0025` criterion 56).
+        if let Some(path) = &all {
+            list.extend(stroke::path_stroke_of(path, width, color, tolerance_mm));
         }
     }
     list

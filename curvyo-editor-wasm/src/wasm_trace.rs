@@ -6,7 +6,7 @@
 use curvyo_document_core::NodeId;
 use wasm_bindgen::prelude::*;
 
-use crate::session::{TraceCreateOutcome, TraceSelection};
+use crate::session::{TraceCreateOutcome, TraceSelection, TraceViewMode};
 use crate::wasm_api::WasmSession;
 
 fn count(n: usize) -> u32 {
@@ -21,14 +21,31 @@ fn id_of(text: &str) -> Option<NodeId> {
     serde_json::from_str(text).ok()
 }
 
+#[wasm_bindgen]
+extern "C" {
+    /// Where the worker hears how far a job is (criterion 10): an object with `report(percent)`.
+    pub type TraceProgressSink;
+
+    #[wasm_bindgen(method)]
+    fn report(this: &TraceProgressSink, percent: u8);
+}
+
 /// One trace for the worker (criterion 17): `rgba` (`width` x `height`, straight alpha) mapped
 /// by `map` (`[a, b, c, d, e, f]`) with `settings` (JSON: `threshold`, `smooth`, `specks` in mm,
-/// `corners`, `upscale` and `denoise` as choice indices, `node_limit` or null, `invert`,
-/// `ignore_background`); the result as the flat numbers of `curvyo_ui_core::trace_job_with`.
-/// Never throws: bad input reads as the status "invalid".
+/// `corners`, `upscale` and `denoise` as choice indices, `invert`, `ignore_background`); the
+/// result as the flat numbers of `curvyo_ui_core::trace_job_with`. `progress` hears each higher
+/// whole percent (criterion 10). Never throws: bad input reads as the status
+/// "invalid".
 #[wasm_bindgen]
 #[must_use]
-pub fn trace_job(rgba: &[u8], width: u32, height: u32, map: &[f64], settings: &str) -> Vec<f64> {
+pub fn trace_job(
+    rgba: &[u8],
+    width: u32,
+    height: u32,
+    map: &[f64],
+    settings: &str,
+    progress: &TraceProgressSink,
+) -> Vec<f64> {
     let map: [f64; 6] = map.try_into().unwrap_or([f64::NAN; 6]);
     curvyo_ui_core::trace_job_with(
         rgba,
@@ -36,6 +53,9 @@ pub fn trace_job(rgba: &[u8], width: u32, height: u32, map: &[f64], settings: &s
         height,
         map,
         &crate::trace_glue::trace_settings(settings),
+        &mut |percent| {
+            progress.report(percent);
+        },
     )
 }
 
@@ -166,6 +186,45 @@ impl WasmSession {
     /// Forgets the full-size results (a value changed).
     pub fn clear_trace_results(&mut self) {
         self.session.clear_trace_results();
+    }
+
+    /// The view on the canvas, as the View pill shows it (criterion 51): `"overlay"`,
+    /// `"trace"` or `"image"`; Image while `\` is held.
+    #[must_use]
+    pub fn trace_view_mode(&self) -> String {
+        match self.session.shown_trace_view_mode() {
+            TraceViewMode::Overlay => "overlay",
+            TraceViewMode::Trace => "trace",
+            TraceViewMode::Image => "image",
+        }
+        .to_string()
+    }
+
+    /// Chooses the view `mode` (`"overlay"`, `"trace"` or `"image"`; anything else is ignored).
+    pub fn set_trace_view_mode(&mut self, mode: &str) {
+        let mode = match mode {
+            "overlay" => TraceViewMode::Overlay,
+            "trace" => TraceViewMode::Trace,
+            "image" => TraceViewMode::Image,
+            _ => return,
+        };
+        self.session.set_trace_view_mode(mode);
+    }
+
+    /// Shift+`\`: the next view.
+    pub fn cycle_trace_view_mode(&mut self) {
+        self.session.cycle_trace_view_mode();
+    }
+
+    /// `\` held (`true`) or released.
+    pub fn set_trace_peek(&mut self, held: bool) {
+        self.session.set_trace_peek(held);
+    }
+
+    /// The view is moving (`true`) or has rested for 150 ms (`false`): while it moves, the Trace
+    /// tool's kept meshes are drawn at any zoom (criterion 56).
+    pub fn set_trace_view_moving(&mut self, moving: bool) {
+        self.session.set_trace_view_moving(moving);
     }
 
     /// Create paths over every selected image, one step (criteria 12, 13, 46).

@@ -1,34 +1,38 @@
-//! The Trace tool's session side (`specs/0025-raster-trace` criteria 1 to 3, 7, 8, 12 to 14 and
-//! 46): the images it traces, their pixels for the worker, the preview it draws and Create paths
-//! in one step. The trace itself runs in the host's worker (ADR 0023 §5).
+//! The Trace tool's session side (`specs/0025-raster-trace` criteria 1 to 3, 7, 12 to 14 and
+//! 46): the images it traces, their pixels for the worker, the results it keeps and Create paths
+//! in one step. What it draws is `trace_draw.rs`; the trace itself runs in the host's worker
+//! (ADR 0023 §5).
 
 use std::sync::Arc;
 
-use curvyo_document_core::{
-    AnchorId, AnchorKind, AnchorSnapshot, Angle, Color, DrawingNode, Fill, ImageSnapshot, NodeId,
-    ObjectSnapshot, Opacity, PathSnapshot, Point, Stroke, Style, Vec2, ViewTransform,
-};
-use curvyo_render_core::{DrawList, PreviewAnchor};
+use curvyo_document_core::{AssetHash, DrawingNode, ImageSnapshot, NodeId, ObjectSnapshot, Point};
+use curvyo_image_core::WorkingImage;
+use curvyo_render_core::PreviewAnchor;
 use curvyo_ui_core::{
     TraceStatus, TraceTarget, TraceWire, hit_test_objects, plan_trace, read_trace_wire,
 };
 
 use super::select::DoubleClickHint;
+use super::trace_draw::{TraceViewMode, filled_result, preview_anchors};
+use super::trace_mesh::MeshCache;
 use super::{Session, Tool};
 
-/// The wash over a traced image under the preview (criteria 2 and 68 b, UX notes section 4): the
-/// image dimmed to 35 % by white at 65 % on the light theme (the only theme so far).
-const TRACE_WASH: f64 = 0.65;
-
-/// The preview outline of one image, cached for every frame (criterion 8).
+/// The preview of one image (criterion 8): its outlines and what is tessellated from them.
 #[derive(Debug, Clone, PartialEq)]
-struct TracePreview {
-    image: NodeId,
-    outlines: Vec<Vec<PreviewAnchor>>,
+pub(super) struct TracePreview {
+    pub(super) image: NodeId,
+    pub(super) outlines: Vec<Vec<PreviewAnchor>>,
     /// Each outline's box in document millimetres, for the cull.
-    boxes: Vec<(Point, Point)>,
+    pub(super) boxes: Vec<(Point, Point)>,
     /// A stopped job left it out of date: drawn at half strength.
-    stale: bool,
+    pub(super) stale: bool,
+    /// The result as Create paths would write it, black and filled, for the Trace view
+    /// (criterion 51); built once per result.
+    pub(super) fill: curvyo_document_core::PathSnapshot,
+    /// The tessellated hollow outline, kept across frames (criterion 56).
+    pub(super) outline_mesh: MeshCache,
+    /// The tessellated filled result of the Trace view, kept across frames (criterion 56).
+    pub(super) fill_mesh: MeshCache,
 }
 
 /// What the Trace tool keeps between events; nothing of it is in the document.
@@ -36,9 +40,20 @@ struct TracePreview {
 pub(super) struct TraceState {
     /// The image clicked last: the one the preview shows.
     last_clicked: Option<NodeId>,
-    preview: Option<TracePreview>,
+    pub(super) preview: Option<TracePreview>,
     /// The full-size results Create paths writes, per image.
     results: Vec<(NodeId, TraceWire)>,
+    /// The chosen view; Overlay on every entry into the tool (UX notes section 13).
+    pub(super) view_mode: TraceViewMode,
+    /// `\` is held: the Image view shows until it is released (criterion 51).
+    pub(super) peek: bool,
+    /// The view is moving (a pan or zoom has not rested yet): the kept meshes are drawn as they
+    /// are, whatever the zoom (criterion 56).
+    pub(super) moving: bool,
+    /// The reduced copy of the last picture asked for: every preview of a large image traces it
+    /// (criteria 10 and 52), and making it costs the main thread tens of milliseconds
+    /// (criterion 58).
+    reduced: Option<(AssetHash, Arc<WorkingImage>)>,
 }
 
 /// The counts of each group Create paths wrote in this session, for its Layers row's tooltip
@@ -146,7 +161,15 @@ impl Session {
         let snapshot = images.into_iter().find(|candidate| candidate.id == image)?;
         let working = self.working_image(&snapshot.asset)?;
         let picture = if reduced {
-            Arc::new(working.reduced_copy(curvyo_image_core::TRACE_PREVIEW_SIDE))
+            match &self.trace.reduced {
+                Some((asset, copy)) if *asset == snapshot.asset => Arc::clone(copy),
+                _ => {
+                    let copy =
+                        Arc::new(working.reduced_copy(curvyo_image_core::TRACE_PREVIEW_SIDE));
+                    self.trace.reduced = Some((snapshot.asset.clone(), Arc::clone(&copy)));
+                    copy
+                }
+            }
         } else {
             working
         };
@@ -171,11 +194,15 @@ impl Session {
             boxes.push((Point::new(b.x0, b.y0), Point::new(b.x1, b.y1)));
             outlines.push(preview_anchors(path));
         }
+        let fill = filled_result(image, &outlines);
         self.trace.preview = Some(TracePreview {
             image,
             outlines,
             boxes,
             stale: false,
+            fill,
+            outline_mesh: MeshCache::default(),
+            fill_mesh: MeshCache::default(),
         });
         true
     }
@@ -319,58 +346,6 @@ impl Session {
             .find(|(id, _, _)| *id == group)
             .map(|&(_, paths, nodes)| (paths, nodes))
     }
-
-    /// The traced images washed to 35 % (criteria 2 and 68 b): a white quad at 65 % directly
-    /// above each, under everything stacked above the image and under the preview outline.
-    pub(super) fn trace_wash(&self, objects: &mut Vec<ObjectSnapshot>) {
-        let view = self.trace_view();
-        let mut at = 0;
-        while at < objects.len() {
-            if let ObjectSnapshot::Image(image) = &objects[at]
-                && view.images.contains(&image.id)
-            {
-                let wash = ObjectSnapshot::Path(wash_over(image));
-                objects.insert(at + 1, wash);
-                at += 1;
-            }
-            at += 1;
-        }
-    }
-
-    /// The preview outline of the shown image, culled to the visible part of the canvas
-    /// (criterion 8).
-    pub(super) fn trace_draw_list(&self, view: ViewTransform) -> DrawList {
-        if self.tool != Tool::Trace {
-            return DrawList::default();
-        }
-        let Some(preview) = &self.trace.preview else {
-            return DrawList::default();
-        };
-        if self.trace_view().shown != Some(preview.image) {
-            return DrawList::default();
-        }
-        let (width, height) = self.viewport.canvas_size();
-        let (a, b) = (
-            self.screen_to_document(0.0, 0.0),
-            self.screen_to_document(width, height),
-        );
-        let (min, max) = (
-            Point::new(a.x.min(b.x), a.y.min(b.y)),
-            Point::new(a.x.max(b.x), a.y.max(b.y)),
-        );
-        let culled = width <= 0.0 || height <= 0.0;
-        let shown: Vec<Vec<PreviewAnchor>> = preview
-            .outlines
-            .iter()
-            .zip(&preview.boxes)
-            .filter(|(_, (lo, hi))| {
-                culled || (lo.x <= max.x && hi.x >= min.x && lo.y <= max.y && hi.y >= min.y)
-            })
-            .map(|(outline, _)| outline.clone())
-            .collect();
-        let strength = if preview.stale { 0.5 } else { 1.0 };
-        curvyo_render_core::build_preview_outline(&shown, view, strength)
-    }
 }
 
 /// The outlines and anchors of a planned trace group's compound path.
@@ -388,76 +363,4 @@ fn drawn_counts(node: &DrawingNode) -> (usize, usize) {
         .fold((0, 0), |(paths, nodes), outline| {
             (paths + 1, nodes + outline.anchors.len())
         })
-}
-
-/// A white quad over `image`'s frame at [`TRACE_WASH`] of the image's own strength; it carries
-/// the image's id and is never a document node.
-fn wash_over(image: &ImageSnapshot) -> PathSnapshot {
-    let anchors = image
-        .corners()
-        .into_iter()
-        .zip(0_u64..)
-        .map(|(point, n)| AnchorSnapshot {
-            id: AnchorId::new(0, n),
-            point,
-            handle_in: Vec2::ZERO,
-            handle_out: Vec2::ZERO,
-            kind: AnchorKind::Corner,
-        })
-        .collect();
-    let strength = image.shown_opacity.get() * TRACE_WASH;
-    PathSnapshot {
-        id: image.id,
-        closed: true,
-        style: Style {
-            stroke: Stroke {
-                enabled: false,
-                ..Stroke::default()
-            },
-            fill: Fill {
-                enabled: true,
-                color: Color {
-                    r: 255,
-                    g: 255,
-                    b: 255,
-                },
-                opacity: Opacity::new(strength).unwrap_or(Opacity::OPAQUE),
-            },
-        },
-        anchors,
-        extra_subpaths: Vec::new(),
-        rotation: Angle::from_radians(0.0),
-    }
-}
-
-/// The anchors of one closed outline for the preview: each node with its two handles.
-fn preview_anchors(path: &kurbo::BezPath) -> Vec<PreviewAnchor> {
-    use curvyo_document_core::Vec2;
-    use kurbo::PathEl;
-    let point = |p: kurbo::Point| Point::new(p.x, p.y);
-    let mut anchors: Vec<PreviewAnchor> = Vec::new();
-    for element in path.elements() {
-        match *element {
-            PathEl::MoveTo(p) | PathEl::LineTo(p) => {
-                anchors.push((point(p), Vec2::ZERO, Vec2::ZERO));
-            }
-            PathEl::CurveTo(c1, c2, p) => {
-                if let Some(last) = anchors.last_mut() {
-                    last.2 = Vec2::new(c1.x - last.0.x, c1.y - last.0.y);
-                }
-                anchors.push((point(p), Vec2::new(c2.x - p.x, c2.y - p.y), Vec2::ZERO));
-            }
-            PathEl::QuadTo(_, p) => anchors.push((point(p), Vec2::ZERO, Vec2::ZERO)),
-            PathEl::ClosePath => {}
-        }
-    }
-    // The last segment ends on the first anchor: one anchor, both handles.
-    if anchors.len() > 2 {
-        let (first, last) = (anchors[0], anchors[anchors.len() - 1]);
-        if (first.0.x - last.0.x).abs() < 1e-9 && (first.0.y - last.0.y).abs() < 1e-9 {
-            anchors[0].1 = last.1;
-            anchors.pop();
-        }
-    }
-    anchors
 }

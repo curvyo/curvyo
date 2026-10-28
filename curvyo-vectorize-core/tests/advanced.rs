@@ -1,5 +1,5 @@
 //! The Advanced settings of the tracer (`specs/0025-raster-trace` criteria 41 to 44): Denoise,
-//! Upscale, Node limit, Invert and Ignore background on small synthetic pictures.
+//! Upscale, Invert and Ignore background on small synthetic pictures.
 
 #![allow(
     clippy::unwrap_used,
@@ -20,7 +20,7 @@ mod common;
 use common::quality::{Noise, measure, small_text};
 use common::{Picture, area, at_96_dpi, params, render, run};
 use curvyo_document_core::Affine;
-use curvyo_vectorize_core::{Denoise, NodeLimitOutcome, TraceParams, Upscale, auto_threshold};
+use curvyo_vectorize_core::{Denoise, TraceParams, Upscale, auto_threshold};
 use kurbo::Shape;
 
 /// A black rectangle at x 30 to 70, y 20 to 40 on a white 100 x 60 px picture.
@@ -95,98 +95,6 @@ fn ignore_background_drops_the_regions_at_the_border() {
     );
     // Background regions are not counted as specks.
     assert_eq!(result.counts.specks_removed, plain.counts.specks_removed);
-}
-
-/// Many small rings: a result with many nodes for the Node limit.
-fn rings() -> Picture {
-    let centres: Vec<(f64, f64)> = (0..24)
-        .map(|i| {
-            (
-                30.0 + f64::from(i % 6) * 60.0,
-                30.0 + f64::from(i / 6) * 60.0,
-            )
-        })
-        .collect();
-    render(380, 260, 4, move |x, y| {
-        centres.iter().any(|&(cx, cy)| {
-            let d = ((x - cx).powi(2) + (y - cy).powi(2)).sqrt();
-            (14.0..22.0).contains(&d) || (x - cx).abs() < 3.0 && (y - cy).abs() < 24.0
-        })
-    })
-}
-
-/// Criterion 43: over the limit the tolerance is raised until the result fits; at or under it
-/// the result is untouched; a limit the ceiling cannot meet says so.
-#[test]
-fn the_node_limit_raises_the_tolerance() {
-    let picture = rings();
-    let free = run(&picture, at_96_dpi(), &params(128, 0, 0.5));
-    assert_eq!(free.node_limit, NodeLimitOutcome::Untouched);
-    let at_limit = TraceParams {
-        node_limit: Some(u32::try_from(free.counts.nodes).unwrap()),
-        ..params(128, 0, 0.5)
-    };
-    let same = run(&picture, at_96_dpi(), &at_limit);
-    assert_eq!(same, free, "a result at the limit is untouched");
-    // The ceiling's count: what a limit nobody can meet gets.
-    let impossible = TraceParams {
-        node_limit: Some(1),
-        ..params(128, 0, 0.5)
-    };
-    let ceiling = run(&picture, at_96_dpi(), &impossible);
-    assert_eq!(ceiling.node_limit, NodeLimitOutcome::NotMet);
-    assert!(ceiling.counts.nodes < free.counts.nodes);
-    let limit = usize::midpoint(ceiling.counts.nodes, free.counts.nodes);
-    let limited = TraceParams {
-        node_limit: Some(u32::try_from(limit).unwrap()),
-        ..params(128, 0, 0.5)
-    };
-    let result = run(&picture, at_96_dpi(), &limited);
-    assert_eq!(result.node_limit, NodeLimitOutcome::Reached);
-    assert!(
-        result.counts.nodes <= limit && result.counts.nodes < free.counts.nodes,
-        "{} of {limit}, free {}",
-        result.counts.nodes,
-        free.counts.nodes
-    );
-    assert_eq!(result.counts.paths, free.counts.paths);
-    // 0 is no limit.
-    let none = TraceParams {
-        node_limit: Some(0),
-        ..params(128, 0, 0.5)
-    };
-    assert_eq!(run(&picture, at_96_dpi(), &none), free);
-}
-
-/// Criterion 43: a limit the segment length alone cannot reach (the hard-edged blobs of the
-/// tester: 68 nodes free, 55 at the segment ceiling) is met by raising the reduction tolerance.
-#[test]
-fn the_node_limit_meets_a_limit_below_the_segment_ceiling() {
-    // One sample at the pixel centre; the tester's fixture samples the pixel corner.
-    let picture = render(300, 300, 1, |x, y| {
-        let (x, y) = (x - 0.5, y - 0.5);
-        (x * 0.05).sin() + (y * 0.04).cos() + ((x + y) * 0.03).sin() > 0.4
-    });
-    let threshold = auto_threshold(picture.raster());
-    let free = run(&picture, at_96_dpi(), &params(threshold, 80, 0.5));
-    let limit = free.counts.nodes * 8 / 10;
-    let limited = TraceParams {
-        node_limit: Some(u32::try_from(limit).unwrap()),
-        ..params(threshold, 80, 0.5)
-    };
-    let result = run(&picture, at_96_dpi(), &limited);
-    assert_eq!(
-        result.node_limit,
-        NodeLimitOutcome::Reached,
-        "free {}",
-        free.counts.nodes
-    );
-    assert!(
-        result.counts.nodes <= limit,
-        "{} of {limit}",
-        result.counts.nodes
-    );
-    assert_eq!(result.counts.paths, free.counts.paths);
 }
 
 /// The distance from `p` to the rectangle's border.

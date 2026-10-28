@@ -78,7 +78,9 @@ fn mask_of(image: &QualityImage, threshold: u8) -> Vec<bool> {
         .collect()
 }
 
-/// Our metrics on `image` at the defaults: outlines traced in mm, measured in pixels.
+/// Our metrics on `image` at the defaults: outlines traced in mm, measured in pixels against the
+/// thresholded mask after the default Specks, as the preset runs measure (criterion 65 compares
+/// the two; the trace is the same).
 fn candidate(image: &QualityImage) -> Metrics {
     let p = defaults(image);
     let scale = mm_per_px(image);
@@ -88,13 +90,10 @@ fn candidate(image: &QualityImage) -> Metrics {
         .iter()
         .map(|o| kurbo::Affine::scale(1.0 / scale) * o.clone())
         .collect();
-    measure(
-        &in_px,
-        &mask_of(image, p.threshold),
-        image.picture.width as usize,
-        image.picture.height as usize,
-        scale,
-    )
+    let (width, height) = (image.picture.width as usize, image.picture.height as usize);
+    let speck_px = DEFAULT_SPECKS_MM * DEFAULT_SPECKS_MM / (scale * scale);
+    let reference = without_specks(&mask_of(image, p.threshold), width, height, speck_px);
+    measure(&in_px, &reference, width, height, scale)
 }
 
 /// The photograph of criterion 61 as an image of the harness.
