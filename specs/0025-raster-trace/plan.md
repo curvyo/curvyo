@@ -63,14 +63,14 @@ Milestone 3, frontend and docs:
 - Session tests in `curvyo-editor-wasm` for the tool, the preview and the one-step Create paths.
 - `#[ignore]` tests: quality harness (AC 27, 28), 2000 x 2000 px CPU time (AC 25), 16 Mpx memory
   with a counting allocator (AC 26); numbers in the PR description.
-- Inkscape is not installed on the build host: the baseline columns stay empty until it is run
-  offline (`tools/trace-baseline/README.md`).
+- The Inkscape columns of `baseline.json` are filled by the tester's baseline run
+  (`tools/trace-baseline/README.md`); they are information only (customer decision, Frage 62 A).
 
 ## Step 0 and budgets (2026-10-27, build host, release)
 
-Inkscape is not installed on the build host, so the baseline columns of `baseline.json` are empty
-and the relative targets of criterion 28 (node density at most 60 %, wobble at most 50 % of
-Inkscape's) are not evaluated yet; `tools/trace-baseline/README.md` says how to add them. Our run
+Decision A (Frage 62, 2026-10-28): visioncortex stays; the Inkscape columns of `baseline.json` are
+now filled by the tester's baseline run and only printed as a gap. Criterion 28 is a regression
+guard against the stored `candidate` numbers (+5 %, +0.001 absolute). Our run
 at the defaults (Smooth 80, Specks 0.5 mm, automatic Threshold) on the synthetic set:
 
 | Image | Nodes /100 mm | Micro | Max dev px | Mean dev px | Area err % | Wobble /100 mm | Closed % |
@@ -88,8 +88,7 @@ Misses of the absolute targets: max deviation above 0.75 px on 7 of 8 images (pi
 smoothing; on the text the 0.5 mm Specks fill small letter holes, and visioncortex closes 1 px
 notches), mean above 0.3 px on the line-art scan (paper noise), area error above the target on the
 thin-line images (the metric divides the border error by a thin foreground). Micro paths 0 and
-100 % closed everywhere. Whether this triggers the fallback of ADR 0023 §8 needs the Inkscape
-numbers on the same set (the targets are relative to them where they are relative).
+100 % closed everywhere. The fallback of ADR 0023 §8 is not triggered (decision A).
 
 Default Smooth (criterion 4): criterion 21 holds from Smooth 30 up (disc: mean 0.33 px at 20,
 0.27 at 30, 0.25 at 80, max 0.66 px from 30 up, 7 nodes everywhere). 80 is kept: on the set it

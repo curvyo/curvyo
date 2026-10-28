@@ -6,9 +6,10 @@
 //! ```
 //!
 //! `quality_table` traces the synthetic black and white set at the default settings, prints the
-//! metrics of `research.md` section 5 per image, reports every miss of the criterion 28 targets,
-//! and fails when a metric is more than 5 % worse than the committed run in
-//! `tests/fixtures/trace/baseline.json` (the nightly job, criterion 36).
+//! metrics of `research.md` section 5 per image, prints the gap to Inkscape's default run, and
+//! fails when a metric is more than 5 % (plus 0.001) worse than the committed `candidate` run in
+//! `tests/fixtures/trace/baseline.json`, or a micro path or open outline appears (criterion 28,
+//! the nightly job, criterion 36).
 //! `CURVYO_UPDATE_BASELINE=1` rewrites our run in that file. With `TRACE_BASELINE_DIR` set it
 //! also measures Inkscape's results found there as `<image>.inkscape-default.svg` and
 //! `<image>.inkscape-best.svg` (`tools/trace-baseline/README.md`) and stores their numbers.
@@ -31,7 +32,7 @@ mod common;
 use std::collections::BTreeMap;
 use std::ops::ControlFlow;
 
-use common::quality::{Kind, Metrics, QualityImage, measure, quality_set};
+use common::quality::{Metrics, QualityImage, measure, quality_set};
 use common::{params, run};
 use curvyo_document_core::{Affine, Length};
 use curvyo_vectorize_core::{
@@ -138,57 +139,42 @@ fn metrics_json(m: &Metrics) -> Value {
     Value::Object(map)
 }
 
-/// The criterion 28 misses of `ours` (with Inkscape's default run when known).
-fn misses(image: &QualityImage, ours: &Metrics, inkscape: Option<&Value>) -> Vec<String> {
+/// The criterion 28 misses of `ours`: worse than the committed `candidate` numbers by more than
+/// 5 % plus 0.001 absolute, any micro path, or an outline that is not closed.
+fn misses(ours: &Metrics, committed: Option<&Value>) -> Vec<String> {
     let mut out = Vec::new();
-    let max_dev = 0.75;
-    let area_limit = if image.kind == Kind::LogoOrText {
-        1.0
-    } else {
-        3.0
-    };
     if ours.micro_paths > 0.0 {
         out.push(format!("micro_paths {} > 0", ours.micro_paths));
-    }
-    if ours.max_deviation_px > max_dev {
-        out.push(format!(
-            "max_deviation_px {:.3} > {max_dev}",
-            ours.max_deviation_px
-        ));
-    }
-    if ours.mean_deviation_px > 0.3 {
-        out.push(format!(
-            "mean_deviation_px {:.3} > 0.3",
-            ours.mean_deviation_px
-        ));
-    }
-    if ours.area_error_pct >= area_limit {
-        out.push(format!(
-            "area_error_pct {:.3} >= {area_limit}",
-            ours.area_error_pct
-        ));
     }
     if ours.closed_pct < 100.0 {
         out.push(format!("closed_pct {:.1} < 100", ours.closed_pct));
     }
-    if let Some(ink) = inkscape {
-        let of = |key: &str| ink[key].as_f64().unwrap_or(f64::NAN);
-        if ours.node_density > 0.6 * of("node_density") {
-            out.push(format!(
-                "node_density {:.2} > 60 % of Inkscape's {:.2}",
-                ours.node_density,
-                of("node_density")
-            ));
+    let Some(committed) = committed else {
+        return out;
+    };
+    for (name, value) in Metrics::NAMES.iter().zip(ours.values()) {
+        if matches!(*name, "closed_pct" | "micro_paths") {
+            continue;
         }
-        if ours.wobble > 0.5 * of("wobble") {
-            out.push(format!(
-                "wobble {:.2} > 50 % of Inkscape's {:.2}",
-                ours.wobble,
-                of("wobble")
-            ));
+        let old = committed[*name].as_f64().unwrap_or(f64::NAN);
+        if value > old * 1.05 + 1e-3 {
+            out.push(format!("{name}: {old} -> {value:.4}"));
         }
     }
     out
+}
+
+/// Prints the gap to Inkscape's default run per metric; a gap is information, not a miss.
+fn print_inkscape_gap(name: &str, ours: &Metrics, inkscape: &Value) {
+    let gaps: Vec<String> = Metrics::NAMES
+        .iter()
+        .zip(ours.values())
+        .filter_map(|(metric, value)| {
+            let ink = inkscape[*metric].as_f64()?;
+            Some(format!("{metric} {value:.2} vs {ink:.2}"))
+        })
+        .collect();
+    println!("  Inkscape gap {name}: {}", gaps.join(", "));
 }
 
 /// Criteria 27, 28, 29 and 36: the table, the misses and the regression check.
@@ -236,22 +222,12 @@ fn quality_table() {
         let inkscape = baseline
             .get("inkscape_default")
             .and_then(|i| i.get(image.name));
-        for miss in misses(image, &ours, inkscape) {
-            println!("  MISS {}: {miss}", image.name);
+        if let Some(ink) = inkscape {
+            print_inkscape_gap(image.name, &ours, ink);
         }
-        if let Some(committed) = baseline.get("candidate").and_then(|c| c.get(image.name)) {
-            for (name, value) in Metrics::NAMES.iter().zip(ours.values()) {
-                let old = committed[*name].as_f64().unwrap_or(f64::NAN);
-                // Higher is worse for every metric but closedness.
-                let worse = if *name == "closed_pct" {
-                    value < old * 0.95
-                } else {
-                    value > old * 1.05 + 1e-3
-                };
-                if worse {
-                    regressions.push(format!("{} {name}: {old} -> {value:.4}", image.name));
-                }
-            }
+        let committed = baseline.get("candidate").and_then(|c| c.get(image.name));
+        for miss in misses(&ours, committed) {
+            regressions.push(format!("{}: {miss}", image.name));
         }
         ours_all.insert(image.name.to_string(), metrics_json(&ours));
     }
@@ -274,7 +250,7 @@ fn quality_table() {
     }
     assert!(
         regressions.is_empty(),
-        "regressions over 5 %:\n{}",
+        "worse than the committed candidate (+5 %, +0.001):\n{}",
         regressions.join("\n")
     );
 }
