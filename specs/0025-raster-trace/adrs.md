@@ -82,3 +82,66 @@ None. Group and compound path are existing kinds (criterion 33).
 ## Questions for the customer
 
 None. Frage 49 B is built as asked; the fallback C is put to the customer only if step 0 fails.
+
+## Dated notes
+
+- 2026-10-28 (revised the same day to the four presets of criteria 40 and 59 to 69): **slices 2
+  and 3: presets, Denoise, the harness per preset**. Within ADR 0023: same crate, same one function,
+  no new dependency, no trait, no format change; the settings stay an app setting.
+  1. **Presets are data, not code.** `pub const PRESETS: &[Preset]` in
+     `curvyo-vectorize-core/src/params.rs`, next to `PARAMS`, in menu order: Logo / Line art, Photo,
+     Silhouette for cutting/carving, Engraving. `Preset { key, label, detail, smooth, specks_mm,
+     corners, upscale, denoise }`; `key` is a stable string (`"logo"`, `"photo"`, `"silhouette"`,
+     `"engraving"`) because the app setting stores it. A preset never holds Threshold. `ui-core`
+     re-exports it as `TRACE_PRESETS`, `editor-wasm` hands it to the page as JSON beside
+     `TRACE_PARAMS`, so the menu, the values and the user page table come from one table (crit. 45
+     and 60 compare it with the schema and the menu). Logo / Line art holds exactly today's
+     `DEFAULT_*` values (Upscale **Off**, point 6), and the first-use defaults read from it.
+  2. **"Custom" is stored state, not a value match.** No two presets are equal now, but crit. 66
+     stores "preset name or Custom with its values" anyway, and matching would need a float tolerance
+     on Specks. The app setting holds `{ preset: key | null, values }`; any edit sets `preset` to
+     `null` ("Custom"), a pick sets both. An unknown key (a preset removed later) reads as Logo / Line
+     art. No matching function in core.
+  3. **`PARAMS` grows the Advanced entries** (`advanced: true`): Corners, Upscale, Denoise, Node limit,
+     Invert, Ignore background; `ParamKind` gains `Choice(&'static [&'static str])` and `Toggle`.
+     `TraceParams` gains the same fields. Full-size preview is a page setting, not a tracer value.
+     Every Advanced control of crit. 41 can be honoured:
+     - **Corners** 0 to 100 → visioncortex `corner_threshold` = 200° − 2 × Corners, clamped to 10° to
+       180° (monotone; **Corners 70 = 60°, today's fixed value**). Splice and iterations stay fixed.
+     - **Denoise** (point 4).
+     - **Upscale** 2x: integer bilinear on the luma, before the mask; the pixel map gets `scale(0.5)`,
+       so Specks (mm² through `|det|`) and the output in mm are unchanged. Auto = working images under
+       1 Mpx. Mask and labels take 4x memory for those images only (crit. 26 counts it).
+     - **Node limit**: re-run with `segment_length` raised past Smooth 100's 10 px by bisection up to a
+       ceiling of 20 px, at most 6 runs, `poll` between runs; the status names the outcome (crit. 43).
+     - **Invert** flips the mask. **Ignore background** drops every foreground region that touches the
+       image border (decided: in black and white this is "the lightest region of the border" of crit.
+       41 and 44 once Invert has made the light background foreground; without Invert the light
+       background is never traced).
+  4. **Denoise (Photo and Silhouette use Low)** is our own step 1b of ADR 0023 §3, after the luma and
+     before Upscale and the Threshold: a **median** of the integer luma, 3 x 3 px for Low, 5 x 5 px for
+     High, with a sliding histogram per row, `poll` every 64 rows, one extra byte per pixel. Integer
+     only, so run-to-run and native/wasm stay identical up to the existing `acos` (ADR 0023 §4). Pixels,
+     not mm: it removes sensor and JPEG noise, which lives at pixel scale; sizes in mm stay with Specks.
+     Rejected: bilateral (floating point, two more parameters, slower; for black and white the median
+     keeps edges as well), `imageproc` (pulls `image` and `rayon` into a core crate that must not
+     depend on `image`, ADR 0023 §1). Removing features narrower than a cutter is not a denoise; it
+     waits for the tool diameter of `0026` (spec Later).
+  5. **The harness runs every preset.** `quality_table` traces each image once per entry of `PRESETS`
+     (4 x 8 traces plus the photograph fixture of crit. 61, seconds in release) and writes
+     `candidate_profiles.<key>.<image>` into `tests/fixtures/trace/baseline.json`; `candidate` stays and
+     must equal `candidate_profiles.logo` within 1e-9 (crit. 65). Micro paths count below each preset's
+     own Specks² (crit. 61); the +5 % regression guard applies per preset. A second `#[ignore]` test,
+     `preset_relations`, asserts crit. 62 to 64 on the same numbers (one helper computes the run once);
+     Photo is checked on the photograph only and stays out of the ordering of crit. 64. The
+     photograph is generated or public domain with its origin in the fixture note. The nightly job's
+     command is unchanged; the tester runs it in release before the PR, as in slice 1.
+  6. **Findings resolved (decided; the spec text follows).**
+     - **Logo / Line art has Upscale Off.** Every image of the quality set is under 1 Mpx (600 x 400
+       down to 120 x 60), so Auto would change all of them and break crit. 65. Photo and Engraving keep
+       Auto, Silhouette keeps Off.
+     - **Crit. 63's 4 mm² test has a tolerance:** Specks removes regions below 4 mm² by pixel area
+       before smoothing, and a smoothed outline just above the limit can measure slightly less. An
+       outline or hole counts as a miss below **0.95 × 4 mm² = 3.8 mm²**; the same factor applies to
+       Photo's (0.1 mm)² and to the per-preset micro-path count of crit. 61.
+     - **Ignore background** = foreground regions touching the image border (point 3).
