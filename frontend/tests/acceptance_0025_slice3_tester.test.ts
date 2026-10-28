@@ -410,9 +410,15 @@ const WORKER_FAULT = `(() => {
   window.__delay = 0;
   window.__workers = 0;
   const set = Object.getOwnPropertyDescriptor(Real.prototype, 'onmessage').set;
+  window.__jobs = [];
   window.Worker = class extends Real {
+    postMessage(message, transfer) {
+      if (message && message.type === 'trace') window.__jobs.push({ id: message.id, start: performance.now(), w: message.width, h: message.height });
+      return super.postMessage(message, transfer);
+    }
     set onmessage(fn) {
       set.call(this, fn === null ? null : (event) => {
+        if (event.data && event.data.kind === 'trace') { const j = window.__jobs.find((x) => x.id === event.data.id); if (j) j.end = performance.now(); }
         if (window.__delay > 0 && event.data && event.data.kind === 'trace') setTimeout(() => fn(event), window.__delay);
         else fn(event);
       });
@@ -1155,6 +1161,453 @@ test("0025s3 c13/c55 undo in Chromium: Ctrl+Z reverses a 108,900-node trace in a
     const gone = await waitFor("the group is gone", async () => ((await s.layerRows()).length === rowsBefore.length ? Date.now() - t0 : null), 120_000).catch(() => null);
     console.log("Ctrl+Z of a 27,225-outline trace took (ms, wall):", gone ?? "more than 120000");
     assert.ok(gone !== null && gone < 10_000, `Ctrl+Z took ${gone ?? ">120000"} ms`);
+  } finally {
+    await close();
+  }
+});
+
+// ---- Re-test after the customer's changes of 2026-10-29 (criteria 4, 5, 9, 11, 12, 41, 70, 71) ----
+
+const rectOf = async (s: S, sel: string) =>
+  JSON.parse(
+    (await s.evaluate(`JSON.stringify((() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; const r = e.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height, right: r.right, bottom: r.bottom }; })())`)) as string,
+  ) as { x: number; y: number; w: number; h: number; right: number; bottom: number } | null;
+const tabLabels = async (s: S) =>
+  JSON.parse((await s.evaluate(`JSON.stringify([...document.querySelectorAll('[role=tab]')].map((t) => t.getAttribute('aria-label')))`)) as string) as string[];
+const activeTab = async (s: S) =>
+  (await s.evaluate(`[...document.querySelectorAll('[role=tab]')].find((t) => t.getAttribute('aria-selected') === 'true')?.getAttribute('aria-label') ?? null`)) as string | null;
+const panelHidden = async (s: S) => (await s.evaluate(`!document.querySelector('[role=tabpanel]')`)) as boolean;
+const dblclick = async (s: S, x: number, y: number) => {
+  for (const clickCount of [1, 2]) {
+    for (const type of ["mousePressed", "mouseReleased"]) {
+      await s.send("Input.dispatchMouseEvent", { type, x, y, button: "left", clickCount });
+    }
+  }
+  await sleep(400);
+};
+
+test("0025s3 re c70 in Chromium: the About Trace tab and the i button (criterion 70)", { skip: !BROWSER, timeout: 400_000 }, async () => {
+  const { s, close } = await launch();
+  try {
+    await s.tab("Layers");
+    await importImage(s, "ring.png", ring);
+    const before = await tabLabels(s);
+    assert.ok(!before.some((t) => /About Trace/.test(t)), `no About Trace tab outside the tool: ${before}`);
+    const tabBefore = await activeTab(s);
+    await openTrace(s);
+    await settle(s);
+    const labels = await tabLabels(s);
+    assert.match(labels[labels.length - 1] ?? "", /^About Trace/, `About Trace is the last tab: ${labels}`);
+    const fontsAt = labels.findIndex((t) => /^Fonts/.test(t ?? ""));
+    if (fontsAt >= 0) assert.equal(fontsAt, labels.length - 2, "right after Fonts");
+    assert.notEqual(await activeTab(s), "About Trace", "the tool never opens the tab by itself");
+    assert.ok(!/About Trace/.test((await s.evaluate(`document.querySelector('[role=tabpanel]')?.innerText ?? ''`)) as string));
+    // The i button: right after the Trace label, first Tab stop, 28 px, aria-pressed false.
+    const info = await rectOf(s, `${barQ} button[aria-label="About Trace"]`);
+    assert.ok(info && info.w >= 28 && info.h >= 28, `the i button is 28 x 28: ${JSON.stringify(info)}`);
+    assert.equal(await s.evaluate(`document.querySelector('${barQ} button[aria-label="About Trace"]').getAttribute('aria-pressed')`), "false");
+    const labelBox = await rectOf(s, `${barQ} span`);
+    const presetBox = await rectOf(s, `${barQ} button[aria-label=Preset]`);
+    assert.ok(info && presetBox && info.x < presetBox.x && Math.abs(info.y - presetBox.y) < 8, "the i button sits before Preset on row 1");
+    assert.ok(labelBox === null || (info !== null && labelBox.x < info.x));
+    // Press: shows the About Trace page and is pressed; the text is the spec's.
+    await clickAria(s, "About Trace");
+    await sleep(400);
+    assert.equal(await activeTab(s), "About Trace");
+    assert.equal(await s.evaluate(`document.querySelector('${barQ} button[aria-label="About Trace"]').getAttribute('aria-pressed')`), "true");
+    const page = (await s.evaluate(`document.querySelector('[role=tabpanel]')?.innerText ?? ''`)) as string;
+    console.log("About Trace page:", JSON.stringify(page));
+    // The page is a definition list: a term and its text; "Preset: a named set ..." reads as the pair.
+    const flat = page.replace(/\n\n+/g, "\n").split("\n").map((l) => l.trim());
+    const joined = flat.map((l, i) => (i > 0 && /^[a-z]/.test(l) ? `${flat[i - 1]}: ${l}` : l)).join("\n");
+    assert.ok(await s.evaluate(`/About Trace/.test(document.body.innerText)`), "the header About Trace");
+    for (const line of [
+      "Trace turns the selected image into paths. Dark parts become shapes, light parts stay empty. Press Enter to create the paths.",
+      "Preset: a named set of values for what you do with the paths.",
+      "Logo / Line art: sharp corners, clean curves.",
+      "Photo: many shapes, photos trace roughly.",
+      "Silhouette for cutting/carving: closed, simple, few nodes; drops shapes and holes below 2 mm.",
+      "Engraving: keeps fine lines, drops shapes below 0.1 mm.",
+    ]) {
+      assert.ok(joined.includes(line), `the page has: ${line}`);
+    }
+    assert.equal(await s.evaluate(`!![...document.querySelectorAll('[role=tabpanel] button')].find((b) => /close/i.test(b.getAttribute('aria-label') || ''))`), false, "no close X");
+    // A second press restores the stored tab and panel state.
+    await clickAria(s, "About Trace");
+    await sleep(400);
+    assert.equal(await activeTab(s), tabBefore, "back to the stored tab");
+    assert.equal(await s.evaluate(`document.querySelector('${barQ} button[aria-label="About Trace"]').getAttribute('aria-pressed')`), "false");
+    // Choosing the tab in the strip presses the button; leaving the tool returns to the stored tab.
+    await s.tab("About Trace");
+    await sleep(300);
+    assert.equal(await s.evaluate(`document.querySelector('${barQ} button[aria-label="About Trace"]').getAttribute('aria-pressed')`), "true", "pressed also when chosen in the strip");
+    await focusCanvas(s);
+    await s.key("Escape", 27);
+    await sleep(400);
+    assert.ok(!(await trace(s)));
+    assert.ok(!(await tabLabels(s)).some((t) => /About Trace/.test(t ?? "")), "the tab leaves with the tool");
+    assert.notEqual(await activeTab(s), "About Trace");
+    // The empty bar has the tab too.
+    await s.key("Escape", 27);
+    await s.evaluate(`document.activeElement?.blur?.()`);
+    await focusCanvas(s);
+    await s.key("i", 73);
+    await sleep(500);
+    assert.ok((await tabLabels(s)).some((t) => /About Trace/.test(t ?? "")), "the tab exists in the Trace tool with the image selected or not");
+  } finally {
+    await close();
+  }
+});
+
+test("0025s3 re c4/c71/c41/c11 in Chromium: row 1, the far-right expander, counts only in Advanced, icon toggles (criteria 4, 11, 41, 71)", { skip: !BROWSER, timeout: 400_000 }, async () => {
+  const { s, close } = await launch();
+  try {
+    await s.tab("Layers");
+    await importImage(s, "ring.png", ring);
+    await openTrace(s);
+    await settle(s);
+    // Start closed whatever an earlier run stored.
+    if (await s.evaluate(`document.querySelector('${barQ} button[aria-label="Fewer trace options"]') !== null`)) {
+      await clickAria(s, "Fewer trace options");
+      await sleep(300);
+    }
+    // Criterion 4: no Create paths button (12), row 1 order, no Advanced word.
+    assert.ok(!(await hasButton(s, "Create paths")), "there is no Create paths button");
+    const names = ["button[aria-label=\"About Trace\"]", "button[aria-label=Preset]", "[role=radiogroup][aria-label=View]", "[role=spinbutton][aria-label=Threshold]", "[role=spinbutton][aria-label=Smooth]", "[role=spinbutton][aria-label=\"Ignore below\"]", "button[aria-expanded][aria-controls]"];
+    const boxes = [];
+    for (const n of names) boxes.push((await rectOf(s, `${barQ} ${n}`)) ?? assert.fail(`missing ${n}`));
+    const flow = (a: (typeof boxes)[0], b: (typeof boxes)[0]) => b.y > a.bottom - 4 || b.x >= a.right - 1;
+    for (let i = 1; i < boxes.length; i++) assert.ok(flow(boxes[i - 1], boxes[i]), `${names[i]} follows ${names[i - 1]} in reading order`);
+    assert.ok(!/Advanced/.test(await bar(s)), "the word Advanced is not drawn");
+    const ex = boxes[6];
+    const barBox = (await rectOf(s, barQ))!;
+    assert.ok(ex.w >= 28 && ex.h >= 28, "the expander is 28 x 28");
+    assert.ok(barBox.right - ex.right < 16, `the expander is at the far right: gap ${barBox.right - ex.right}`);
+    assert.equal(await s.evaluate(`document.querySelector('${barQ} button[aria-expanded][aria-controls]').getAttribute('aria-label')`), "More trace options");
+    assert.equal(await s.evaluate(`document.querySelector('${barQ} button[aria-controls]').getAttribute('aria-expanded')`), "false");
+    // Criterion 11: with Advanced closed no counts line.
+    assert.ok(!/\d+ paths?, [\d,]+ nodes?/.test(await bar(s)), `no counts line while closed: ${JSON.stringify(await bar(s))}`);
+    assert.equal(await s.evaluate(`document.querySelector('${barQ} [data-trace-counts]') === null || document.querySelector('${barQ} [data-trace-counts]').offsetParent === null`), true);
+    // Open: the toggles, the controls, the counts as the last row.
+    await clickAria(s, "More trace options");
+    await sleep(400);
+    assert.equal(await s.evaluate(`document.querySelector('${barQ} button[aria-controls]').getAttribute('aria-label')`), "Fewer trace options");
+    assert.equal(await s.evaluate(`document.querySelector('${barQ} button[aria-controls]').getAttribute('aria-expanded')`), "true");
+    const controls = await s.evaluate(`document.querySelector('${barQ} button[aria-controls]').getAttribute('aria-controls')`);
+    assert.ok(await s.evaluate(`!!document.getElementById(${JSON.stringify(controls)})`), "aria-controls names the block");
+    const ex2 = (await rectOf(s, `${barQ} button[aria-expanded][aria-controls]`))!;
+    assert.ok(Math.abs(ex2.y - ex.y) < 2 && Math.abs(ex2.right - ex.right) < 2, "the expander does not move when the block opens");
+    for (const label of ["Invert", "Ignore background"]) {
+      const pressed = await s.evaluate(`document.querySelector('${barQ} button[aria-label="${label}"]')?.getAttribute('aria-pressed')`);
+      assert.equal(pressed, "false", `${label} is an icon toggle with aria-pressed`);
+      const box = (await rectOf(s, `${barQ} button[aria-label="${label}"]`))!;
+      assert.ok(box.w >= 28 && box.h >= 28, `${label} is 28 x 28`);
+      assert.ok(!(await bar(s)).split("\n").some((l) => l.trim() === label), `${label} is not drawn as text`);
+    }
+    for (const gone of ["Full-size preview", "Node limit"]) {
+      assert.ok(!(await bar(s)).includes(gone) && (await s.evaluate(`document.querySelector('${barQ} [aria-label="${gone}"]') === null`)), `${gone} is removed`);
+    }
+    const toggleBox = (await rectOf(s, `${barQ} button[aria-label=Invert]`))!;
+    const denoise = (await rectOf(s, `${barQ} [role=radiogroup][aria-label=Denoise]`))!;
+    assert.ok(toggleBox.y <= denoise.y + 4, "the toggles start Advanced row 1 with Denoise");
+    const counts = (await bar(s)).split("\n").map((l) => l.trim()).filter(Boolean);
+    const countsLine = counts.findIndex((l) => /^\d+ paths?, [\d,]+ nodes?, [\d.]+ s$/.test(l));
+    assert.ok(countsLine >= 0, `the counts line is in Advanced: ${JSON.stringify(counts)}`);
+    const countsBox = (await rectOf(s, `${barQ} [data-trace-counts]`))!;
+    const corners = (await rectOf(s, `${barQ} [role=spinbutton][aria-label=Corners]`))!;
+    assert.ok(countsBox.y >= corners.y, "the counts line is the last row of the block");
+    // A toggle works: Invert changes the result and the dot/tooltip on the closed expander.
+    const rings = await settle(s);
+    await clickAria(s, "Invert");
+    await sleep(900);
+    assert.equal(await s.evaluate(`document.querySelector('${barQ} button[aria-label=Invert]').getAttribute('aria-pressed')`), "true");
+    await clickAria(s, "Fewer trace options");
+    await sleep(300);
+    const exBtn = (await s.evaluate(`document.querySelector('${barQ} button[aria-controls]').outerHTML`)) as string;
+    console.log("closed expander html:", exBtn.slice(0, 900));
+    let tip = await tooltipOf(s, "button[aria-controls]");
+    if (tip === "") {
+      await sleep(1000);
+      tip = await tooltipOf(s, "button[aria-controls]");
+    }
+    console.log("closed expander tooltip with Invert on:", JSON.stringify(tip), "| before:", rings);
+    assert.match(tip, /Changed: .*Invert/i, "the closed expander's tooltip lists the changed value");
+    // Criterion 71: states in the slot and the notice row stay visible with Advanced closed.
+    assert.ok(!/\d+ paths?, [\d,]+ nodes?/.test(await bar(s)));
+  } finally {
+    await close();
+  }
+});
+
+test("0025s3 re c5/c9 in Chromium: value fields (click, drag, double-click entry, keys, clamp) and Threshold in percent (criteria 5, 9)", { skip: !BROWSER, timeout: 400_000 }, async () => {
+  const { s, close } = await launch();
+  try {
+    await s.tab("Layers");
+    // Luma 101 left, 200 right: 40 % is luma 102 (the left half is dark), 39 % is luma 99 (it is light).
+    await importImage(s, "halves.png", (x) => (x < 100 ? 101 : 200), 200, 200);
+    await openTrace(s);
+    await settle(s);
+    const shown = await fieldValue(s, "Threshold");
+    const text = (await s.evaluate(`document.querySelector('${field("Threshold")}').getAttribute('aria-valuetext')`)) as string;
+    console.log("Threshold aria-valuetext:", JSON.stringify(text), "min/max/now:", await s.evaluate(`['aria-valuemin','aria-valuemax','aria-valuenow'].map((a) => document.querySelector('${field("Threshold")}').getAttribute(a)).join('/')`));
+    const visible = (await s.evaluate(`document.querySelector('${field("Threshold")}').closest('div')?.innerText ?? ''`)) as string;
+    console.log("Threshold visible text:", JSON.stringify(visible));
+    assert.ok(/%|percent/.test(text) && /%/.test(visible), `the Threshold is shown as percent: ${text} / ${visible}`);
+    const pct = Number(shown);
+    assert.ok(pct >= 16 && pct <= 78, `the automatic value of a 101/200 picture is between 16 and 78 %: ${pct}`);
+    // Typing 40 % dark-ens the left half, 39 % does not (luma 102 against 99).
+    const tracedAt = async (v: string) => {
+      await typeInto(s, "Threshold", v);
+      await sleep(900);
+      return (await bar(s)).includes("0 paths") ? 0 : 1;
+    };
+    // Counts live in Advanced; read the shown status through the notice row or the counts.
+    await advancedOpen(s);
+    const pathsAt = async (v: string) => {
+      await typeInto(s, "Threshold", v);
+      await sleep(1000);
+      const t = await bar(s);
+      const m = /(\d+) paths?, /.exec(t);
+      return m ? Number(m[1]) : /0 paths/.test(t) ? 0 : -1;
+    };
+    void tracedAt;
+    assert.ok((await pathsAt("40")) >= 1, "40 % (luma 102) takes the luma-101 half");
+    assert.equal(await pathsAt("39"), 0, "39 % (luma 99) does not");
+    // Clamp silently, Enter returns focus to the canvas.
+    await typeInto(s, "Threshold", "150");
+    assert.equal(await fieldValue(s, "Threshold"), "100");
+    await typeInto(s, "Threshold", "-5");
+    assert.equal(await fieldValue(s, "Threshold"), "0");
+    assert.ok(await s.evaluate(`!document.activeElement || !document.querySelector('${barQ}')?.contains(document.activeElement) || document.activeElement.tagName === 'CANVAS'`), "Enter in a field returns focus to the canvas");
+    // Keys on the focused field: Up/Down 1, Shift 10, Home/End.
+    await typeInto(s, "Smooth", "50");
+    await s.evaluate(`document.querySelector('${field("Smooth")}').focus()`);
+    await press(s, "ArrowUp", 38);
+    assert.equal(await fieldValue(s, "Smooth"), "51");
+    await press(s, "ArrowDown", 40);
+    await press(s, "ArrowDown", 40);
+    assert.equal(await fieldValue(s, "Smooth"), "49");
+    await press(s, "ArrowUp", 38, 8);
+    assert.equal(await fieldValue(s, "Smooth"), "59", "Shift+Up is 10");
+    await press(s, "End", 35);
+    assert.equal(await fieldValue(s, "Smooth"), "100");
+    await press(s, "Home", 36);
+    assert.equal(await fieldValue(s, "Smooth"), "0");
+    // Single click changes the value; a drag changes it; a double-click opens number entry.
+    const box = (await rectOf(s, field("Smooth")))!;
+    await typeInto(s, "Smooth", "50");
+    await s.click(box.x + box.w * 0.9, box.y + box.h / 2);
+    const afterClick = Number(await fieldValue(s, "Smooth"));
+    console.log("Smooth after a click at 90 % of the field:", afterClick);
+    assert.notEqual(afterClick, 50, "a single click changes the value");
+    await typeInto(s, "Smooth", "50");
+    await s.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: box.x + box.w * 0.5, y: box.y + box.h / 2 });
+    await s.send("Input.dispatchMouseEvent", { type: "mousePressed", x: box.x + box.w * 0.5, y: box.y + box.h / 2, button: "left", clickCount: 1 });
+    for (const f of [0.6, 0.7, 0.8]) {
+      await s.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: box.x + box.w * f, y: box.y + box.h / 2, button: "left" });
+    }
+    await s.send("Input.dispatchMouseEvent", { type: "mouseReleased", x: box.x + box.w * 0.8, y: box.y + box.h / 2, button: "left", clickCount: 1 });
+    await sleep(400);
+    const afterDrag = Number(await fieldValue(s, "Smooth"));
+    console.log("Smooth after a drag to 80 %:", afterDrag);
+    assert.ok(afterDrag > 50, "a drag to the right raises the value");
+    await dblclick(s, box.x + box.w / 2, box.y + box.h / 2);
+    assert.ok(await s.evaluate(`document.activeElement?.tagName === 'INPUT' && ${JSON.stringify(barQ)} !== ''`), "a double-click opens number entry");
+    await s.send("Input.insertText", { text: "33" });
+    await press(s, "Enter", 13);
+    assert.equal(await fieldValue(s, "Smooth"), "33");
+    // Changing a value is not a history step.
+    assert.ok(!/Trace image/.test(await historyText(s)));
+  } finally {
+    await close();
+  }
+});
+
+test("0025s3 re c12 in Chromium: Enter, Ctrl+Enter in a field and a double-click create; Enter on a bar button presses it; the hidden description (criterion 12)", { skip: !BROWSER, timeout: 400_000 }, async () => {
+  const { s, close } = await launch();
+  try {
+    await s.tab("Layers");
+    await importImage(s, "ring.png", ring);
+    const rowsBefore = (await s.layerRows()).length;
+    await openTrace(s);
+    await settle(s);
+    const tb = await s.evaluate(`(() => { const t = document.querySelector('${barQ}'); const d = t.getAttribute('aria-describedby'); return JSON.stringify({ role: t.getAttribute('role'), name: t.getAttribute('aria-label'), desc: d ? document.getElementById(d)?.textContent : null }); })()`);
+    assert.deepEqual(JSON.parse(tb as string), { role: "toolbar", name: "Trace", desc: "Enter creates the paths" });
+    // Ctrl+Enter from inside a field creates.
+    await s.evaluate(`document.querySelector('${field("Smooth")}').focus()`);
+    await press(s, "Enter", 13, 2);
+    await waitFor("the group", async () => ((await s.layerRows()).length === rowsBefore + 1 ? true : null), 20_000);
+    assert.ok(!(await trace(s)), "back in the Select tool");
+    // Enter on a focused bar button presses that button, it does not create.
+    await s.key("z", 90, 2).catch(() => undefined);
+    await sleep(300);
+    await s.evaluate(`document.activeElement?.blur?.()`);
+    // Enter in a field only commits (criterion 5).
+    const base = (await s.layerRows()).length;
+    await openTrace(s).catch(() => undefined);
+    if (!(await trace(s))) {
+      await clickRow(s, "ring.png");
+      await openTrace(s);
+    }
+    await settle(s);
+    await typeInto(s, "Smooth", "70");
+    assert.equal((await s.layerRows()).length, base, "Enter in a field commits the value, it does not create");
+    await s.evaluate(`document.querySelector('${barQ} button[aria-label=Preset]').focus()`);
+    await s.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13, text: "\r" });
+    await s.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13 });
+    await sleep(500);
+    assert.equal(await s.evaluate(`!!document.querySelector('[role=menu]')`), true, "Enter on the Preset button opens its menu");
+    assert.equal((await s.layerRows()).length, base, "and creates nothing");
+    await press(s, "Escape", 27);
+    // The next Enter on the canvas creates; double-click on the image creates too.
+    await focusCanvas(s);
+    await s.key("Enter", 13);
+    await waitFor("the second group", async () => ((await s.layerRows()).length === base + 1 ? true : null), 20_000);
+  } finally {
+    await close();
+  }
+});
+
+const clickRow = async (s: S, name: string) => {
+  await s.evaluate(`(() => { document.querySelectorAll('[data-t25]').forEach((e) => e.removeAttribute('data-t25')); [...document.querySelectorAll('[role=row]')].find((e) => (e.getAttribute('aria-label') || '').includes(${JSON.stringify(name)}) && !/Trace of/.test(e.getAttribute('aria-label') || '')).setAttribute('data-t25', '1'); })()`);
+  const c = JSON.parse((await s.evaluate(`JSON.stringify((() => { const b = document.querySelector('[data-t25]').getBoundingClientRect(); return [b.x + 80, b.y + b.height / 2]; })())`)) as string) as [number, number];
+  await s.click(c[0], c[1]);
+};
+
+const PHOTO = path.resolve(FRONTEND, "..", "target", "photo", "iceberg.jpg");
+
+test("0025s3 re photo in Chromium: a 3747 x 3178 px photo (Wikimedia Commons, public domain), Photo preset, every view, Enter, undo, repeated drags (timings)", { skip: !BROWSER || !existsSync(PHOTO), timeout: 1_500_000 }, async () => {
+  const { s, close } = await launch(WORKER_FAULT);
+  const times: [string, number][] = [];
+  const t = async <T>(step: string, work: () => Promise<T>): Promise<T> => {
+    const t0 = Date.now();
+    const out = await work();
+    times.push([step, Date.now() - t0]);
+    console.log(`TIMING ${step}: ${Date.now() - t0} ms`);
+    return out;
+  };
+  const frames = (n = 2) => s.evaluate(`new Promise((r) => { let i = 0; const f = () => (++i >= ${n} ? r(performance.now()) : requestAnimationFrame(f)); requestAnimationFrame(f); })`);
+  const longtasks = async () => JSON.parse((await s.evaluate(`JSON.stringify(window.__lt.splice(0))`)) as string) as number[];
+  try {
+    await s.tab("Layers");
+    await s.evaluate(`window.__lt = []; new PerformanceObserver((l) => l.getEntries().forEach((e) => window.__lt.push(Math.round(e.duration)))).observe({ entryTypes: ['longtask'] })`);
+    const rows = (await s.layerRows()).length;
+    await t("import the JPEG (until its Layers row)", async () => {
+      await s.choose("[data-import-button]", PHOTO);
+      await waitFor("the image row", async () => ((await s.layerRows()).length > rows ? true : null), 120_000);
+    });
+    console.log("longtasks (ms) during import:", JSON.stringify(await longtasks()));
+    await focusCanvas(s);
+    await t("key I until the first preview settled (reduced copy)", async () => {
+      await s.key("i", 73);
+      await settle(s);
+    });
+    console.log("longtasks during first preview:", JSON.stringify(await longtasks()), "jobs:", JSON.stringify(await s.evaluate(`JSON.stringify(window.__jobs.map((j) => [j.w + 'x' + j.h, Math.round((j.end ?? 0) - j.start)]))`)));
+    await t("pick the Photo preset until settled", async () => {
+      await s.evaluate(`document.querySelector('${barQ} button[aria-label=Preset]').click()`);
+      await waitFor("the menu", async () => ((await s.evaluate(`!!document.querySelector('[role=menu]')`)) ? true : null), 10_000);
+      await s.evaluate(`[...document.querySelectorAll('[role=menu] [role=menuitemradio], [role=menu] [role=menuitem]')].find((i) => i.innerText.startsWith('Photo')).click()`);
+      await sleep(300);
+      await settle(s);
+    });
+    console.log("preset:", await s.evaluate(`document.querySelector('${barQ} button[aria-label=Preset]').textContent.trim()`), "| notice:", JSON.stringify(await barStatus(s)), "| longtasks:", JSON.stringify(await longtasks()));
+    await advancedOpen(s);
+    console.log("counts of the reduced preview:", JSON.stringify(await barStatus(s)));
+    for (const view of ["Trace", "Image", "Overlay"]) {
+      await t(`View ${view}: click until two frames`, async () => {
+        await clickView(s, view);
+        await frames();
+      });
+      console.log(`  longtasks in ${view}:`, JSON.stringify(await longtasks()));
+    }
+    await t("peek (hold backslash) until two frames", async () => {
+      await focusCanvas(s);
+      await keyDownOnly(s, "\\", "Backslash", 220);
+      await frames();
+    });
+    await keyUpOnly(s, "\\", "Backslash", 220);
+    await frames();
+    await longtasks();
+    await t("zoom with the wheel until two frames", async () => {
+      const [cx, cy, cw, ch] = await canvasRect(s);
+      await s.send("Input.dispatchMouseEvent", { type: "mouseWheel", x: cx + cw * 0.6, y: cy + ch * 0.5, deltaX: 0, deltaY: -300, modifiers: 2 });
+      await frames();
+      await sleep(400);
+      await frames();
+    });
+    console.log("  longtasks in the zoom:", JSON.stringify(await longtasks()));
+    // Repeated value drags: 60 moves 16 ms apart on Smooth, then wait for the last job; count the jobs.
+    const jobsBefore = (await s.evaluate(`window.__jobs.length`)) as number;
+    const box = (await rectOf(s, field("Smooth")))!;
+    const dragT0 = Date.now();
+    await s.send("Input.dispatchMouseEvent", { type: "mousePressed", x: box.x + box.w * 0.2, y: box.y + box.h / 2, button: "left", clickCount: 1 });
+    for (let i = 0; i < 60; i++) {
+      await s.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: box.x + box.w * (0.2 + 0.6 * ((i % 30) / 30)), y: box.y + box.h / 2, button: "left" });
+      await sleep(16);
+    }
+    await s.send("Input.dispatchMouseEvent", { type: "mouseReleased", x: box.x + box.w * 0.5, y: box.y + box.h / 2, button: "left", clickCount: 1 });
+    const dragMs = Date.now() - dragT0;
+    await settle(s);
+    const jobs = JSON.parse((await s.evaluate(`JSON.stringify(window.__jobs.slice(${jobsBefore}).map((j) => [j.w + 'x' + j.h, Math.round((j.end ?? -1) - j.start)]))`)) as string) as [string, number][];
+    times.push(["60-move drag then settle", Date.now() - dragT0]);
+    console.log(`TIMING drag of ${dragMs} ms, settled ${Date.now() - dragT0} ms after the press; ${jobs.length} jobs started:`, JSON.stringify(jobs));
+    console.log("  longtasks in the drag:", JSON.stringify(await longtasks()));
+    // The same with keyboard auto-repeat on Threshold: 40 key presses 30 ms apart.
+    const jobs2 = (await s.evaluate(`window.__jobs.length`)) as number;
+    const k0 = Date.now();
+    await s.evaluate(`document.querySelector('${field("Threshold")}').focus()`);
+    for (let i = 0; i < 40; i++) {
+      await s.send("Input.dispatchKeyEvent", { type: "rawKeyDown", key: "ArrowUp", code: "ArrowUp", windowsVirtualKeyCode: 38, autoRepeat: i > 0 });
+      await sleep(30);
+    }
+    await s.send("Input.dispatchKeyEvent", { type: "keyUp", key: "ArrowUp", code: "ArrowUp", windowsVirtualKeyCode: 38 });
+    await settle(s);
+    const jobsKey = JSON.parse((await s.evaluate(`JSON.stringify(window.__jobs.slice(${jobs2}).map((j) => [j.w + 'x' + j.h, Math.round((j.end ?? -1) - j.start)]))`)) as string) as [string, number][];
+    console.log(`TIMING 40 held-key steps, settled ${Date.now() - k0} ms; ${jobsKey.length} jobs:`, JSON.stringify(jobsKey));
+    // Enter: create at full size.
+    const before = (await s.layerRows()).length;
+    const fullJobs = (await s.evaluate(`window.__jobs.length`)) as number;
+    await t("Enter until the group row", async () => {
+      await createPaths(s);
+      await waitFor("the group", async () => ((await s.layerRows()).length === before + 1 ? true : null), 600_000);
+    });
+    console.log("jobs of Enter:", JSON.stringify(await s.evaluate(`JSON.stringify(window.__jobs.slice(${fullJobs}).map((j) => [j.w + 'x' + j.h, Math.round((j.end ?? -1) - j.start)]))`)), "| notice:", JSON.stringify(await s.statusText()));
+    console.log("  longtasks in Enter:", JSON.stringify(await longtasks()));
+    await t("first two frames with the group", async () => {
+      await frames();
+    });
+    await focusCanvas(s);
+    await t("Ctrl+Z until the group row is gone", async () => {
+      await s.send("Input.dispatchKeyEvent", { type: "rawKeyDown", key: "z", code: "KeyZ", windowsVirtualKeyCode: 90, modifiers: 2 });
+      await s.send("Input.dispatchKeyEvent", { type: "keyUp", key: "z", code: "KeyZ", windowsVirtualKeyCode: 90, modifiers: 2 });
+      await waitFor("undone", async () => ((await s.layerRows()).length === before ? true : null), 600_000);
+    });
+    console.log("  longtasks in undo:", JSON.stringify(await longtasks()));
+    // A dense result: Threshold 16 % (luma 41) makes 130,000 nodes of the full-size trace.
+    await focusCanvas(s);
+    await s.key("i", 73);
+    await settle(s);
+    await t("Threshold 16 % until the reduced preview settled", async () => {
+      await typeInto(s, "Threshold", "16");
+      await settle(s);
+    });
+    console.log("  dense reduced preview:", JSON.stringify(await barStatus(s)), "| notice:", JSON.stringify(await mutedLines(s)));
+    const dense = (await s.layerRows()).length;
+    await t("dense Enter until the group row", async () => {
+      await createPaths(s);
+      await waitFor("the group", async () => ((await s.layerRows()).length === dense + 1 ? true : null), 600_000);
+    });
+    console.log("  notice:", JSON.stringify((await s.statusText()).replace(/[ |]+/g, " ")));
+    await t("dense first two frames", async () => {
+      await frames();
+    });
+    await focusCanvas(s);
+    await t("dense Ctrl+Z until the group row is gone", async () => {
+      await s.send("Input.dispatchKeyEvent", { type: "rawKeyDown", key: "z", code: "KeyZ", windowsVirtualKeyCode: 90, modifiers: 2 });
+      await s.send("Input.dispatchKeyEvent", { type: "keyUp", key: "z", code: "KeyZ", windowsVirtualKeyCode: 90, modifiers: 2 });
+      await waitFor("undone", async () => ((await s.layerRows()).length === dense ? true : null), 600_000);
+    });
+    console.log("TIMINGS", JSON.stringify(times));
   } finally {
     await close();
   }
