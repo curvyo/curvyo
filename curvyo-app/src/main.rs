@@ -19,10 +19,22 @@ mod font_documents;
 mod font_library;
 mod fonts;
 mod formats;
+#[cfg(target_os = "linux")]
+mod import_dialog;
+#[cfg(target_os = "linux")]
+mod import_preview;
 #[cfg(any(target_os = "macos", test))]
 mod menu;
+#[cfg(target_os = "linux")]
+mod preview_fonts;
+#[cfg(target_os = "linux")]
+mod preview_slot;
 mod project;
+#[cfg(target_os = "linux")]
+mod raster;
 mod state;
+#[cfg(target_os = "linux")]
+mod svg_preview;
 
 use std::path::PathBuf;
 

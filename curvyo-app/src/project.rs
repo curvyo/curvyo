@@ -150,20 +150,41 @@ pub(crate) async fn pick_project(app: AppHandle, kind: Option<String>) -> Option
 #[tauri::command]
 #[allow(clippy::unused_async)] // async keeps the blocking dialog off the main thread
 pub(crate) async fn pick_import_files(app: AppHandle) -> Vec<OpenPayload> {
-    let dialog = parented(
-        &app,
+    pick_import_paths(&app)
+        .into_iter()
+        .map(|path| read_project(&path).into())
+        .collect()
+}
+
+/// Linux: our GTK3 dialog with the preview pane of the selected image (`specs/0087-image-clipboard-and-drop`
+/// criterion 26, `adrs.md` decision 6).
+#[cfg(target_os = "linux")]
+fn pick_import_paths(app: &AppHandle) -> Vec<PathBuf> {
+    crate::import_dialog::pick_files(
+        app,
+        &[
+            (IMPORT_FILTER_NAME, &IMPORT_EXTENSIONS),
+            ("All files", &["*"]),
+        ],
+    )
+}
+
+/// Windows and macOS: the OS dialog with its own preview (the recorded deviation of
+/// `specs/0087-image-clipboard-and-drop` `adrs.md` decision 6).
+#[cfg(not(target_os = "linux"))]
+fn pick_import_paths(app: &AppHandle) -> Vec<PathBuf> {
+    parented(
+        app,
         app.dialog()
             .file()
             .add_filter(IMPORT_FILTER_NAME, &IMPORT_EXTENSIONS)
             .add_filter("All files", &["*"]),
-    );
-    dialog
-        .blocking_pick_files()
-        .unwrap_or_default()
-        .into_iter()
-        .filter_map(|picked| picked.into_path().ok())
-        .map(|path| read_project(&path).into())
-        .collect()
+    )
+    .blocking_pick_files()
+    .unwrap_or_default()
+    .into_iter()
+    .filter_map(|picked| picked.into_path().ok())
+    .collect()
 }
 
 /// The frontend's confirmation that bytes this host handed it (via
