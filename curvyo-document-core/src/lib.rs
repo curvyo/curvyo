@@ -170,7 +170,7 @@ pub use history::{
 };
 pub use image_model::{
     IMPORT_COMMIT_LABEL, IMPORT_IMAGE_COMMIT_LABEL, IMPORT_IMAGES_COMMIT_LABEL, ImageSnapshot,
-    no_paint,
+    PASTE_IMAGE_COMMIT_LABEL, no_paint,
 };
 pub use images::{ImageInsertError, NewImage};
 pub use junction::{COINCIDENT_MM, interior_handle, merged_junction};

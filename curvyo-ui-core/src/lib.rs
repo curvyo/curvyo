@@ -57,6 +57,7 @@ mod history_names;
 mod history_notice;
 mod hit_test;
 mod hit_test_object;
+mod image_clipboard_text;
 mod image_frame;
 mod image_import;
 mod image_import_text;
@@ -86,6 +87,7 @@ mod panel_tabs;
 mod param_edit;
 mod param_entry;
 mod param_handles;
+mod paste_rank;
 mod pen_constraint;
 mod pen_entry;
 mod pen_entry_text;
@@ -256,6 +258,10 @@ pub use history_notice::{
 };
 pub use hit_test::{Hit, hit_test};
 pub use hit_test_object::{hit_test_object, hit_test_objects, hit_test_objects_along};
+pub use image_clipboard_text::{
+    COPY_NEEDS_NEWER_BROWSER_NOTICE, COPYING_NOTICE, IMAGE_COPIED_NOTICE, LINK_DROP_NOTICE,
+    NOTHING_TO_PASTE_NOTICE, PASTING_NOTICE, copied_notice, copy_failed_notice,
+};
 pub use image_import::{PlannedImage, plan_image_import};
 pub use image_import_text::{
     ANIMATED_NOTICE, BAD_ASSET_NOTICE, DAMAGED_IMAGE_NOTICE, IMAGE_COMMAND_REFUSAL,
@@ -321,6 +327,7 @@ pub use param_handles::{
     PARAM_MIN_SIDE_PX, ParamHandle, centre_drawn, corner_local_position, handle_tiers, knob_rho,
     param_handles, radius_gain, radius_travel,
 };
+pub use paste_rank::{PasteRank, paste_rank};
 pub use pen_constraint::constrain_segment;
 pub use pen_entry::{LengthNotPositive, PenEntry, PenEntryField, PenEntryNotice, PenEntryPlaced};
 pub use pen_entry_text::{

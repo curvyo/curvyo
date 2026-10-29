@@ -118,6 +118,8 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     ("import_image", "Import image"),
     ("import_images", "Import images"),
     ("import", "Import"),
+    // `specs/0087-image-clipboard-and-drop` criterion 1.
+    ("paste_image", "Paste image"),
     ("offset_path", "Offset"),
     ("group", "Group"),
     ("ungroup", "Ungroup"),

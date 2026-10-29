@@ -59,6 +59,9 @@ mod history_preview;
 mod history_rows;
 mod history_version;
 mod image_cache;
+mod image_clipboard;
+#[cfg(test)]
+mod image_clipboard_tests;
 mod image_import;
 #[cfg(test)]
 mod image_import_tests;
@@ -185,7 +188,8 @@ pub use history_preview::{FAR_PREVIEW_ROWS, HistoryRowPress};
 pub use history_rows::{WipeOutcome, WipeState};
 pub use history_version::{CloneOutcome, GoToOutcome};
 pub use image_cache::FrameImages;
-pub use image_import::ImportOutcome;
+pub use image_clipboard::ImageCopy;
+pub use image_import::{ImportOrigin, ImportOutcome};
 pub use keys::{EscapeStep, KeyHint, KeyInput, KeyOutcome};
 pub use layers_edit::{DropPlace, RowFlag};
 pub use layers_panel::{PanelReply, RowPress};

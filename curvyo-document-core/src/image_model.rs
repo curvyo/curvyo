@@ -12,6 +12,10 @@ use crate::units::Point;
 /// The label of the import commit of one image; its history name is "Import image".
 pub const IMPORT_IMAGE_COMMIT_LABEL: &str = "import_image";
 
+/// The label of the import commit of one image pasted from the clipboard; its history name is
+/// "Paste image" (`specs/0087-image-clipboard-and-drop` criterion 1).
+pub const PASTE_IMAGE_COMMIT_LABEL: &str = "paste_image";
+
 /// The label of the import commit of several images; its history name is "Import images".
 pub const IMPORT_IMAGES_COMMIT_LABEL: &str = "import_images";
 
