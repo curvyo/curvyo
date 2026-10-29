@@ -62,18 +62,19 @@ Order by Frage 80 (recommended A, D, C, E, M, F); C and D are independent; M nee
 5. Given the corner fixtures (squares rotated 0, 15, 30, 45 degrees; a triangle; a five-point star with 36 degree tips), then every annotated sharp corner is a node of the result within **0.5 px [T]** of the true corner; 0025 criterion 20 still holds.
 6. Given an annotated straight edge longer than 20 px at any angle of criterion 2, then it is at most **2 [T]** line segments, deviates at most **0.35 px [T]** from the true line, and has 0 curvature sign flips (no staircase wobble).
 7. Given round transitions (a rounded rectangle with 10 px radius) and the sketch fixture with a bowed edge (2 px sagitta over 200 px), then neither is straightened or cornered: deviation from the true arc and bow at most **0.5 px [T]**, no structural corner on them.
-8. Given the parameter schema (0025 criterion 6), then input smoothing, deviation tolerance (source px) and corner protection are separate parameters; changing only the tolerance leaves every protected corner's position unchanged within 1e-6 px. There is no node-budget control (customer, 0025 Frage 74 A); an internal budget, if any, is not shown.
+8. Given the parameter schema (0025 criterion 6), then input smoothing, deviation tolerance (source px) and corner protection are separate parameters; changing only the tolerance leaves every protected corner's position unchanged within 1e-6 px. The Node limit and the Full-size preview are removed (customer, 0025 Frage 74 A, merged); there is no node-budget control and no internal budget.
 9. Given the set at Logo / Line art, then the geometric mean of nodes per 100 mm is at most **85 % [T]** of the baseline while each image's max deviation is no more than its baseline plus 0.05 px; no image is worse than its baseline by more than 5 % on any metric (guard of 0025 criterion 28).
 10. Given any fixture, then components, holes and connections equal the baseline's or the truth's (none lost), there are 0 self-intersections, and an outline whose simplification would self-intersect or touch a neighbour falls back to its previous valid contour (test: the 1 px parallels fixture).
-11. Given the same shape at different start positions (translated by whole pixels, the image rotated by 90 degrees), then the results agree after mapping within 1e-6 mm with equal node counts (closed outlines do not depend on their start point).
-12. Given any result, then its max deviation from the contour before simplification, measured densely both ways in source pixels, is at most the tolerance plus 0.01 px; the same image placed 10 mm and 100 mm wide (or stretched 2:1) gives the same outlines in pixel space.
+11. Given the same shape at different start positions (translated by whole pixels, the image rotated by 90 degrees), then the results agree after mapping within 1e-6 mm with equal node counts; closed outlines are compared cyclically, their start point is free.
+12. Given any result, then its max deviation from the contour before simplification, measured densely both ways in pixels of the traced raster (source pixels), is at most the tolerance plus 0.01 px; the same image placed 10 mm and 100 mm wide (or stretched 2:1) gives the same outlines in pixel space. Under a stretched placement the mm bound (tolerance times the largest stretch factor) is reported, not enforced.
 13. Given remembered settings from 0025, then they migrate as Frage 85 decides; the 0025 ordering (criteria 23, 62 to 64) and the 4 s budget (criterion 25) still hold. The PR reports the greedy reduction against an optimised split (kurbo) per image.
+13a. Given D ships its own contour, corner and fit (Frage 93), then native and wasm traces are bit-identical again: 0025 criterion 18 returns to exact equality and the technical-debt entry "Native and wasm traces differ in the last few nodes" is closed in that PR.
 
 ### Slice C: selection methods
 
-14. Given the bar, then a **Method** control (Brightness | Remove background | Pick colours) takes the place of Threshold, and its parameters follow it; Brightness gives results identical (1e-9) to slice D's.
+14. Given the bar, then a **Method** control (Brightness | Remove background | Pick colours) takes the place of Threshold, and its parameters follow it; Brightness gives results identical (1e-9) to slice D's on opaque images; images with partial transparency change by design (criterion 15).
 15. Given alpha, then a pixel with alpha 0 is never content in any method, also with Invert and also when its RGB is black; a partly transparent pixel's alpha counts once (fixture: a 50 % alpha black edge gives membership 0.5, not composited and weighted again); the background is not assumed white (Frage 87 covers the change of 0025 criteria 24 and 44).
-16. Given Remove background on a logo on a uniform #3366CC background with a pale #FFF2A8 element, then Auto suggests the background from the border pixels within Oklab distance **0.02 [T]**, the background pipette replaces it with a click, Tolerance 0 to 100 widens it, and the result holds the logo including the pale element with area error at most **2 % [T]** against the truth.
+16. Given Remove background on a logo on a uniform #3366CC background with a pale #FFF2A8 element, then Auto suggests the background from the border pixels within a distance of **0.02 [T]** in the colour space chosen by trial C1 (Oklab is the candidate), the background pipette replaces it with a click, Tolerance 0 to 100 widens it, and the result holds the logo including the pale element with area error at most **2 % [T]** against the truth.
 17. Given Pick colours, then a click with the pipette on the image picks a swatch (sampled from the working image), Shift+click adds one (up to 8, **Proposal**), and each swatch can be removed; on white, a pale #FFF2A8 shape and a light grey #D9D9D9 shape are each traced alone with the boundary within **0.75 px [T]** of the truth; #D9D9D9 and #DCD6CF (near-greys, hue alone fails) are separated.
 18. Given anti-aliased edges, then a picked colour includes the blend pixels toward the background so the outline lies within **0.5 px [T]** of the true edge (not shrunk inward by one pixel).
 19. Given two picked colours that touch, then the result is one compound path with no outline along their shared border (masks are united before tracing, not paths per colour).
@@ -81,7 +82,7 @@ Order by Frage 80 (recommended A, D, C, E, M, F); C and D are independent; M nee
 
 ### Slice E: integration
 
-21. Given the View control, then it gets a **Mask** view showing exactly the mask handed to the tracer (test: pixel-equal), beside Overlay, Trace and Image; the peek key works in all.
+21. Given the View control, then it gets a **Mask** view showing exactly the mask handed to the tracer (test: pixel-equal), beside Overlay, Trace and Image; the peek key works in all. The mask is the one after Specks and border shapes are applied, at the traced resolution.
 22. Given the bar, then its order follows the document: (1) preset/automatic and View, (2) Method with its parameters, (3) geometry (Smooth; Corners in Advanced), (4) Ignore below, slot, expander; nothing moves when a method changes except the method's own parameters; there is no visible finish button unless Frage 84 says otherwise.
 23. Given the same settings, then the preview equals the created result (same worker, same build); one history step; several selected images use the same method and swatches; a late worker answer for stale settings is dropped.
 24. Given the documentation, then the About Trace text (0025 criterion 70), the user page and `docs/design-system.md` describe the methods, the Mask view and the new geometry; every string matches code (0025 criterion 35).
@@ -89,9 +90,9 @@ Order by Frage 80 (recommended A, D, C, E, M, F); C and D are independent; M nee
 ### Slice M: multicolour (adjacent)
 
 25. Given an output control **Single colour | Multicolour**, then it is only changed by the maker (never by the analysis of F).
-26. Given Multicolour, then the palette comes from an automatic count (2 to 16, default 6 **Proposal**) plus fixed colours by pipette, which are kept; colours closer than **0.03 [T]** in Oklab merge; a pale accent covering 0.2 % of the image is kept; on the 3-colour logo fixture with anti-aliasing and JPEG quality 75 the result has exactly 3 colours plus background (no seam colours).
+26. Given Multicolour, then the palette comes from an automatic count (2 to 16, default 6 **Proposal**) plus fixed colours by pipette, which are kept; colours closer than **0.03 [T]** in the colour space chosen by trial C1 merge; a pale accent covering 0.2 % of the image is kept; on the 3-colour logo fixture with anti-aliasing and JPEG quality 75 the result has exactly 3 colours plus background (no seam colours).
 27. Given the segmentation, then every pixel belongs to exactly one region or the background; regions below Ignore below join the neighbour with the longest shared border (ties by palette order), and the count of joined regions is shown.
-28. Given two neighbouring regions, then their shared boundary is the same fitted curve in both paths (nodes equal within 1e-6 mm, reversed), and at a triple junction all three share one node, also after simplification; rasterised at 4x, uncovered and doubly covered area are each at most 0.01 % of the image.
+28. Given two neighbouring regions, then their shared boundary is the same fitted curve in both paths (the same segments reversed, so nodes are equal within 1e-6 mm), and at a triple junction all three share one node, also after simplification; rasterised at 4x, uncovered and doubly covered area are each at most 0.01 % of the image.
 29. Given the result, then it is one group "Trace of <name>" with one compound path per colour, filled with that colour, stroke off, largest area at the bottom, ties by colour value (stable). Recolouring a swatch changes fills without a refit (outlines equal within 1e-9). Excluding a colour makes it background; "Merge into" reassigns it to another colour (**Proposal**). The palette is usable without colour perception (hex value and name per swatch, keyboard reachable).
 30. Given 8 colours on a 2000 x 2000 px image, then the trace takes under 4.0 s thread CPU native (customer limit 2026-10-14); the wasm time is reported.
 
@@ -115,7 +116,7 @@ Order by Frage 80 (recommended A, D, C, E, M, F); C and D are independent; M nee
 | Profiles by image type and automatic settings | Four job presets (0025 Frage 64 A) | Frage 86 |
 | Better geometry for Logo / Line art | 0025 criterion 65: Logo equals the stored candidate | Frage 87 |
 | Transparent never content, background not white | 0025 criteria 24 and 44: transparent counts as white | Frage 87 |
-| Node budget | Node limit removed (0025 Frage 74 A) | Kept removed; internal only (criterion 8) |
+| Node budget | Node limit removed (0025 Frage 74 A, merged) | Stays removed, no internal budget (criterion 8) |
 | Multicolour in scope | Colours postponed (0025 Frage 50 A) | The document lifts it; order in Frage 81 |
 | "Remove background" method | "Ignore background" toggle drops border shapes | Frage 88 |
 
@@ -188,6 +189,12 @@ A: The toggle becomes "Drop border shapes"; "Remove background" is the method.
 B: The toggle is dropped; the method replaces it.
 C: Keep both names.
 Recommendation: A. Default: A.
+
+Frage 93 (TRQ-TRACER): Should visioncortex stay in the shipping path?
+A: If slice D's own contour, corner and fit beat visioncortex on the frozen targets, ship ours; visioncortex stays only as the harness baseline.
+B: Two paths: visioncortex keeps shipping, ours only where it is better.
+C: Keep visioncortex and tune around it only.
+Recommendation: A (one path, native equals wasm, no u16 limit, M needs the edge table anyway). Default: A, decided at D's demo with the per-image table.
 
 ## UX notes
 
