@@ -7,7 +7,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::hash::{DefaultHasher, Hash, Hasher};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use curvyo_storage_io::FontFace;
@@ -224,14 +224,14 @@ impl From<curvyo_storage_io::AddedArchive> for AddedArchive {
     }
 }
 
-/// The files the maker chose in the Add font dialog or dropped on the window: the only paths
-/// [`add_font_files`] accepts, each once (tester re-review 2026-10-20: the page may not name an
+/// The files the maker chose in the Add font dialog: the only paths [`add_font_files`] accepts,
+/// each once; a drop comes as bytes ([`crate::dropped_fonts`]) (tester re-review 2026-10-20: the page may not name an
 /// arbitrary file for the host to read).
 #[derive(Default)]
 pub(crate) struct GrantedFontPaths(Mutex<HashSet<PathBuf>>);
 
-/// Grants `paths` to Add font (the dialog's result, a drop on the window).
-pub(crate) fn grant_font_paths(app: &AppHandle, paths: &[PathBuf]) {
+/// Grants `paths` to Add font (the dialog's result).
+fn grant_font_paths(app: &AppHandle, paths: &[PathBuf]) {
     app.state::<GrantedFontPaths>()
         .0
         .lock()
@@ -275,7 +275,7 @@ pub(crate) async fn pick_font_files(app: AppHandle) -> Result<Option<Vec<String>
     ))
 }
 
-/// Add font (`0075` criteria 21 to 24): the chosen or dropped files are checked, then copied
+/// Add font (`0075` criteria 21 to 24): the chosen files are checked, then copied
 /// atomically into the Curvyo folder; the page lists the folder again afterwards. Only paths the
 /// host granted ([`GrantedFontPaths`]) are accepted, each once; any other path refuses the call.
 /// Runs off the main thread.
@@ -293,30 +293,34 @@ pub(crate) async fn add_font_files(
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         if !chosen.iter().all(|path| granted.contains(path)) {
-            return Err("only files chosen in Add font or dropped on the window are added".into());
+            return Err("only files chosen in Add font are added".into());
         }
         for path in &chosen {
             granted.remove(path);
         }
     }
+    tauri::async_runtime::spawn_blocking(move || add_paths(&dir, chosen))
+        .await
+        .map_err(|error| error.to_string())
+}
+
+/// Checks the font files and archives at `chosen` and copies them into the Curvyo folder `dir`:
+/// the one rule of Add font, for the dialog's files and for dropped bytes staged as files.
+pub(crate) fn add_paths(dir: &Path, chosen: Vec<PathBuf>) -> AddedFonts {
     let (archives, fonts): (Vec<PathBuf>, Vec<PathBuf>) = chosen
         .into_iter()
         .partition(|path| curvyo_storage_io::is_archive(path));
-    let (report, archives) = tauri::async_runtime::spawn_blocking(move || {
-        let archives: Vec<AddedArchive> = archives
-            .iter()
-            .map(|path| curvyo_storage_io::add_font_archive(&dir, path).into())
-            .collect();
-        (curvyo_storage_io::add_font_files(&dir, &fonts), archives)
-    })
-    .await
-    .map_err(|error| error.to_string())?;
-    Ok(AddedFonts {
+    let archives: Vec<AddedArchive> = archives
+        .iter()
+        .map(|path| curvyo_storage_io::add_font_archive(dir, path).into())
+        .collect();
+    let report = curvyo_storage_io::add_font_files(dir, &fonts);
+    AddedFonts {
         added: report.added,
         present: report.present,
         not_fonts: report.not_fonts,
         archives,
-    })
+    }
 }
 
 /// One face of the family to remove.
