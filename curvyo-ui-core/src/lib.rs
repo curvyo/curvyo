@@ -129,6 +129,7 @@ mod svg_import_text;
 mod svg_text;
 mod svg_text_align;
 mod svg_text_flow;
+mod svg_text_glyphs;
 mod svg_text_layout;
 mod text_box;
 mod text_caret;
@@ -393,6 +394,7 @@ pub use svg_import_text::{
     FileKind, NEITHER_PROJECT_NOR_SVG, file_kind, import_layer_name, nothing_imported_notice,
     notice_file_name, svg_busy_notice, svg_refusal_text,
 };
+pub use svg_text_glyphs::{SvgTextGlyphs, svg_text_glyphs};
 pub use svg_text_layout::ImportFaces;
 pub use text_box::{line_box_contains, line_box_corners, on_path_boxes};
 pub use text_caret::{TextEditGeometry, edit_geometry, nearest_boundary};
