@@ -2,28 +2,39 @@ import { useEffect, useRef, useState } from "react";
 import type { DragEvent, RefObject } from "react";
 
 import type { DroppedFiles, ImportFile } from "@/hooks/useProject";
+import { dragKind, dropContent } from "@/lib/dropData";
+import { isTauri } from "@/platform/host";
+import { resolveLocalFiles } from "@/platform/localFiles";
 
-/** Whether a drag carries files from the file manager. */
+/** Whether a drag carries files or a link (on the desktop also plain text, which may name local
+ * files): what the canvas takes and the page refuses elsewhere. */
 function carriesFiles(event: { dataTransfer: DataTransfer | null }): boolean {
-  return event.dataTransfer?.types.includes("Files") ?? false;
+  return dragKind(Array.from(event.dataTransfer?.types ?? []), isTauri) !== null;
 }
 
 /**
- * Files dropped on the canvas (`specs/0058-bitmap-import` criterion 4, UX notes "Drag and drop"):
- * while a drag with files is over the canvas the dashed outline shows; a drop hands the files and
- * the drop point (canvas CSS pixels) to `onDrop`. Anywhere else in the page a file drag shows the
- * "none" effect and a drop is cancelled, so a file never navigates the webview.
+ * Files dropped on the canvas (`specs/0058-bitmap-import` criterion 4, UX notes "Drag and drop";
+ * `specs/0087-image-clipboard-and-drop` criteria 19 to 23): while a drag with files, image data or
+ * a link is over the canvas the dashed outline shows; a drop hands the files (image data from a
+ * browser comes as a file item) and the drop point (canvas CSS pixels) to `onDrop`, and a drop of
+ * only a link to `onLink`, which fetches nothing. On the desktop, a drop whose text names local
+ * files (a file manager's `text/uri-list` or paths) hands those files, read by the host, to `onDrop`
+ * (criterion 21, lead decision 2026-10-29). Anywhere else in the page such a drag shows the
+ * "none" effect and a drop is cancelled, so it never navigates the webview; a drop target that
+ * took the drag itself (the Fonts tab) keeps it.
  */
 export function useFileDrop(
   canvasRef: RefObject<HTMLCanvasElement | null>,
   onDrop: ((dropped: DroppedFiles) => void) | undefined,
+  onLink?: () => void,
 ) {
   const [over, setOver] = useState(false);
   const depth = useRef(0);
 
   useEffect(() => {
     const refuse = (event: globalThis.DragEvent) => {
-      if (!carriesFiles(event)) {
+      // Plain text is left alone: it never navigates the webview, and a field may take it.
+      if (dragKind(Array.from(event.dataTransfer?.types ?? [])) === null || event.defaultPrevented) {
         return;
       }
       event.preventDefault();
@@ -74,7 +85,22 @@ export function useFileDrop(
       setOver(false);
       const box = canvasRef.current?.getBoundingClientRect();
       const at = { x: event.clientX - (box?.left ?? 0), y: event.clientY - (box?.top ?? 0) };
-      const files = Array.from(event.dataTransfer.files);
+      const content = dropContent(event.dataTransfer);
+      if (content?.kind !== "files") {
+        // A uri list or text may name local files; the host reads the dropped drag's list itself
+        // (WebKitGTK hides it from the page).
+        const types = Array.from(event.dataTransfer.types);
+        const named = types.includes("text/uri-list") || types.includes("text/plain");
+        void (named ? resolveLocalFiles("drop") : Promise.resolve([])).then((local) => {
+          if (local.length > 0) {
+            onDrop({ files: local, at });
+          } else if (content?.kind === "link") {
+            onLink?.();
+          }
+        });
+        return;
+      }
+      const files = content.files;
       void Promise.all(
         files.map(
           (file): Promise<ImportFile> =>

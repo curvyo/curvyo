@@ -135,12 +135,15 @@ export function useHistory(
     [],
   );
 
-  // A notice ends after its time, or when the next one replaces it.
+  // A notice ends after its time, or when the next one replaces it. The timer clears only its own
+  // notice: one that fires after a newer notice was set, before this effect is cleaned up, must
+  // not take the newer one away.
   useEffect(() => {
     if (!notice) {
       return undefined;
     }
-    const timer = window.setTimeout(() => setNotice(null), notice.ms);
+    const id = notice.id;
+    const timer = window.setTimeout(() => setNotice((current) => (current?.id === id ? null : current)), notice.ms);
     return () => window.clearTimeout(timer);
   }, [notice]);
 

@@ -21,6 +21,7 @@ import type { EditorSession } from "@/hooks/useEditorSession";
 import { ColourPickChip } from "@/components/ColourPickChip";
 import { PenHintChip } from "@/components/PenHintChip";
 import { useFileDrop } from "@/hooks/useFileDrop";
+import { clipboard_notice } from "@/wasm-bindings/curvyo_editor_wasm.js";
 import { usePenCue } from "@/hooks/usePenCue";
 import type { DroppedFiles } from "@/hooks/useProject";
 import { cursorForHint } from "@/lib/cursors";
@@ -60,7 +61,9 @@ interface CanvasProps {
  */
 export function Canvas({ editor, onDropFiles }: CanvasProps) {
   const penCue = usePenCue(editor);
-  const drop = useFileDrop(editor.canvasRef, onDropFiles);
+  const drop = useFileDrop(editor.canvasRef, onDropFiles, () =>
+    editor.showHistoryNotice(clipboard_notice("link", 0, ""), 5000, "canvas", "alert"),
+  );
   return (
     <div
       ref={editor.containerRef}

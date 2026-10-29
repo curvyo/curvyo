@@ -58,6 +58,10 @@ export type Tool =
  * 11 vs. 12). */
 export type PolyStarMode = "polygon" | "star";
 
+/** How bytes came into an import: they pick the History name and the name of a file that has
+ * none (`specs/0087-image-clipboard-and-drop` `adrs.md` decision 3). */
+export type ImportOrigin = "picker" | "drop" | "paste" | "paste-files";
+
 /** A plain-JS copy of the Rust `NodeToolbarState` — read out of the
  * wasm-bindgen struct instance once, immediately, so the instance itself
  * can be `free()`d rather than held onto (see `readToolbarState` below). */
@@ -880,11 +884,19 @@ export interface EditorSession {
    * dirty project) and the notice to show (empty for none).
    * @throws the error dialog's sentence; the open project is untouched. */
   openFile: (bytes: Uint8Array, fileName: string) => Promise<{ svg: boolean; notice: string }>;
-  /** The Import button (`specs/0058-bitmap-import` criteria 1 to 5): starts an import at the
-   * drop point (canvas CSS pixels) or, with `null`, at the view centre. */
-  importBegin: (drop: { x: number; y: number } | null) => void;
+  /** The Import button (`specs/0058-bitmap-import` criteria 1 to 5) and Ctrl+V
+   * (`specs/0087-image-clipboard-and-drop`): starts an import from `origin` centred on `at`
+   * (canvas CSS pixels: the drop point, the pointer of a paste) or, with `null`, on the view
+   * centre. */
+  importBegin: (origin: ImportOrigin, at: { x: number; y: number } | null) => void;
+  /** The pointer's last position over the canvas (canvas CSS pixels), `null` once it left the
+   * canvas or before it was ever over it (`specs/0087-image-clipboard-and-drop` criterion 2). */
+  lastCanvasPointer: () => { x: number; y: number } | null;
   /** Reads one file of the import (an image is decoded, an SVG parsed). */
   importAdd: (bytes: Uint8Array, fileName: string) => void;
+  /** Refuses a file of the import the host did not read because it is `bytes` long, over the
+   * import's file limit. */
+  importAddTooLarge: (fileName: string, bytes: number) => void;
   /** Commits the import as one step and selects what came in, once the faces of an SVG's texts
    * are loaded. */
   importFinish: () => Promise<{ imported: number; notice: string; alert: boolean }>;
@@ -1464,12 +1476,18 @@ export function useEditorSession(
     [attachSession, syncFromSession],
   );
 
-  const importBegin = useCallback((drop: { x: number; y: number } | null) => {
-    sessionRef.current?.import_begin(drop !== null, drop?.x ?? 0, drop?.y ?? 0);
+  const importBegin = useCallback((origin: ImportOrigin, at: { x: number; y: number } | null) => {
+    sessionRef.current?.import_begin(origin, at !== null, at?.x ?? 0, at?.y ?? 0);
   }, []);
+
+  const lastCanvasPointer = useCallback(() => lastPointerRef.current, []);
 
   const importAdd = useCallback((bytes: Uint8Array, fileName: string) => {
     sessionRef.current?.import_add(bytes, fileName);
+  }, []);
+
+  const importAddTooLarge = useCallback((fileName: string, bytes: number) => {
+    sessionRef.current?.import_add_too_large(fileName, bytes);
   }, []);
 
   const importFinish = useCallback(async () => {
@@ -2805,7 +2823,9 @@ export function useEditorSession(
     openProject,
     openFile,
     importBegin,
+    lastCanvasPointer,
     importAdd,
+    importAddTooLarge,
     importFinish,
     packProject,
     markSaved,

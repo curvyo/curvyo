@@ -1,9 +1,10 @@
 // The Trace tool's worker (`specs/0025-raster-trace` criteria 17 and 58, ADR 0023 §5): it
 // instantiates the same `curvyo-editor-wasm` module the page runs, from the compiled module the
-// page posts, and traces off the main thread. A stale or stopped job is ended by the page
+// page posts, and traces off the main thread; it also makes the PNG of a copied image
+// (`specs/0087-image-clipboard-and-drop` criterion 14). A stale or stopped job is ended by the page
 // terminating this worker; a synchronous wasm call cannot be interrupted otherwise.
 
-import { initSync, trace_auto_threshold, trace_job } from "@/wasm-bindings/curvyo_editor_wasm.js";
+import { encode_png, initSync, trace_auto_threshold, trace_job } from "@/wasm-bindings/curvyo_editor_wasm.js";
 
 import type { TraceRequest, TraceResponse } from "@/lib/traceJobs";
 
@@ -25,6 +26,11 @@ scope.onmessage = (event) => {
     if (request.type === "threshold") {
       const threshold = trace_auto_threshold(request.rgba, request.width, request.height);
       scope.postMessage({ id: request.id, kind: "threshold", threshold, ms: performance.now() - started });
+      return;
+    }
+    if (request.type === "png") {
+      const png = encode_png(request.rgba, request.width, request.height);
+      scope.postMessage({ id: request.id, kind: "png", png, ms: performance.now() - started }, [png.buffer]);
       return;
     }
     const wire = trace_job(
