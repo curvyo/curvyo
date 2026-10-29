@@ -2,7 +2,8 @@
 
 The **Import** button of the tool rail (the card under the Offset tool) and **Ctrl+I** (Cmd+I on
 macOS) open one file dialog for drawings and pictures: SVG, PNG, JPEG and WebP, up to 20 files at
-once. Files dropped on the canvas are imported where they are dropped. Each file is read by its
+once. Files dropped on the canvas are imported where they are dropped; Ctrl+V pastes a picture
+from the clipboard ("Paste and copy" below). Each file is read by its
 content, never by its name: a PNG called `photo.jpg` imports as a PNG. An SVG becomes a new layer
 (see `docs/svg-import.md`); a picture becomes an **image object** on top of the active layer,
 selected. One import is one step in the History ("Import image", "Import images", or "Import"
@@ -73,6 +74,58 @@ with the Opacity field of the Layers tab; hide or lock it there. Zoomed in to 8 
 image pixel and more, the pixels show as squares. Boolean operations, Combine, Split, Break
 apart, Cut, Fracture, Flatten, Weld, Offset and Stroke to path refuse a selection with an image.
 
+## Paste and copy
+
+- **Paste.** **Ctrl+V** (Cmd+V on macOS) on the canvas pastes the picture on the clipboard, such
+  as a screenshot or an image copied in a browser or another program. It is imported by the rules
+  of this page (formats by content, size and fit, limits and notices) as one step "Paste image" in
+  the History; Ctrl+Z removes it. Its centre lands under the pointer while the pointer is over the
+  canvas, as for a drop (not moved into the document); else on the centre of the view, moved the
+  least needed to lie inside the document. It is
+  named "Pasted image". When the clipboard holds a picture and text, the picture is pasted. Text,
+  an SVG and other files are not pasted.
+- **Files copied in the file manager.** In the desktop app on Linux, picture and SVG files copied
+  in the file manager are pasted with Ctrl+V even when the window receives only their names (a
+  list of `file://` addresses or paths, as GNOME's Files and WebKitGTK do): the app reads the list
+  from the clipboard and the files from the disk and imports them by the rules of this page, under the pointer or in the view
+  centre, each named by its file, in one step ("Paste image" for one picture). Only ordinary
+  files on this computer are read (a link to a file is followed; folders, devices and network
+  addresses are not), and a file over 100 MB is refused before it is read. On Windows and macOS
+  the window receives the copied files themselves. The browser cannot read files by their names:
+  there a copied file is pasted only where the browser hands over the file itself. While you type in a
+  text field or edit a text on the canvas, Ctrl+V pastes text there as before. With the Trace tool
+  active the pasted picture is traced and the tool stays.
+- **Copy.** **Ctrl+C** (Cmd+C on macOS) with an image selected puts its picture on the clipboard as
+  PNG, to paste into other programs. It is the picture as stored, upright and with its
+  transparency, without the object's rotation, flip, size or opacity, and without the file's
+  metadata; a picture of more than 16 megapixels is copied at its reduced working resolution. With
+  several images selected the topmost is copied. A JPEG or WebP picture copied and pasted back
+  comes in as a new PNG, so the project stores it a second time. With no image selected, Ctrl+C
+  does nothing; there is no copy and paste of paths and texts yet.
+- Nothing is downloaded: a pasted link to a web address is not fetched.
+
+## Drop
+
+- **Files.** Picture and SVG files dropped from the file manager on the canvas are imported with
+  their centre at the drop point, in one step ("Import image", "Import images" or "Import"). Of a
+  drop that mixes pictures and other files, the pictures come in and one notice names the rest. A
+  dropped `.curvyo` project opens nothing.
+- **Image data.** A picture dragged from a browser or another program comes in the same way; it
+  takes the file name the program gives, else "Dropped image".
+- **File names.** In the desktop app on Linux, files dragged from a file manager that hands over
+  only their names (`file://` addresses or paths) are read from the disk and imported like dropped files, by
+  the same rules as files copied in the file manager (see Paste and copy).
+- **Links.** A drop that carries only a link to a web address (or a picture of a web page that
+  the browser hands over as its address) is not downloaded; the notice says so. The browser
+  cannot read files by their names, so there a dropped file name is a link too.
+- **Elsewhere.** On the panel, the rails, the rulers and the bars nothing is dropped. While a
+  drag is over the canvas a dashed outline shows. With the Trace tool active a dropped picture
+  is traced and the tool stays.
+- **Desktop and browser.** Both use the same drop. In the desktop app the window hands every
+  drop to the page, so dropping fonts on the Fonts tab works as in the browser: their bytes are
+  checked and added like files chosen in Add font. Which programs hand over image data or only a
+  link differs between browsers and systems.
+
 ## Notices
 
 - Scaled to 20 % to fit the document.
@@ -90,6 +143,14 @@ apart, Cut, Fracture, Flatten, Weld, Offset and Stroke to path refuse a selectio
 - Not enough memory to open this image.
 - An image in this project could not be read.
 - Images can't be used with this command. Nothing was changed.
+- Nothing to paste: the clipboard has no image.
+- Pasting image...
+- Image copied.
+- Copied 1 of 3 images.
+- Copying...
+- Could not copy the image: <short reason>.
+- Copying images needs a newer browser.
+- That drop is a link, not an image. Nothing was downloaded.
 
 A file of 50 megapixels can keep the window busy for some seconds while it is read; there is no
 cancel.

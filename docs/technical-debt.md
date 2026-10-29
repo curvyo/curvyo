@@ -1724,3 +1724,13 @@ caller, so it stays in the app crate for now.
 
 **Resolution:** open; when a second caller needs CPU rasterization (an export thumbnail, a raster
 check in tests), move it into a `*-core` crate (needs an ADR).
+
+## File bytes cross the host boundary as JSON number arrays (`0087` criterion 6, 2026-10-29)
+
+`read_local_files` (pasted and dropped local files), `pick_import_files` and the other commands that
+hand file bytes to the page return `Vec<u8>`, which Tauri serializes as a JSON array of numbers:
+about four times the file's size in text, parsed on the page's main thread. A file near the
+100 MB import limit costs several hundred MB of IPC text and noticeable time.
+
+**Resolution:** open; move file bytes to a raw IPC response (`tauri::ipc::Response`) or a channel
+when the import of large files is worked on.
