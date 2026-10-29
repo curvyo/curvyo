@@ -140,7 +140,7 @@ cargo build -q --target wasm32-unknown-unknown -p <each core crate and curvyo-ed
 cargo clippy --target wasm32-unknown-unknown -p <the same> -- -D warnings
 cargo deny check
 RUSTDOCFLAGS="-D warnings" cargo doc -q --workspace --no-deps
-cd frontend && npm run build:wasm && npx tsc --noEmit && npm test && npx oxlint
+cd frontend && npm run build:wasm && npx tsc -b --noEmit && npm test && npx oxlint
 ```
 
 During work run only the affected crates; the full gate once at the end. A failing hook means
