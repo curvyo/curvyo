@@ -11,6 +11,26 @@ text field or edit a text on the canvas. Open… still opens an SVG as a project
 pictures. Pictures embedded in an SVG come in with the drawing as image objects, at the size the
 SVG gives them (`docs/svg-import.md`, "Images"). (`specs/0058-bitmap-import`)
 
+## The preview in the dialog
+
+On **Linux** the Import dialog shows the highlighted picture on its right with its pixel size
+under it ("3000 × 2000 px"), read from the file's header. "Enable preview" at the bottom left is on
+by default; switched off, the pane is hidden. A file over the size limits (see "Size and place")
+shows its name and "Too large" and is never decoded; a damaged or unreadable file or any other
+file shows its name only; a folder shows nothing. An **SVG** shows its page as Import SVG would place
+it, on white, with the page size in millimetres under it ("210 × 297 mm", the page-size rules of
+`docs/svg-import.md`): fills and solid strokes, hairlines at least 1 px wide, and texts in the
+fonts Import SVG would give them (Curvyo fonts, then the included fonts, then the fonts of this
+computer; a missing font in the included sans, as on import), straight or on their path; embedded
+pictures, dashes and texts inside masks or clips are left out of the preview. The fonts are listed
+once per open dialog, and only the faces a file needs are read. An SVG over 50 MiB shows "Too large"; one Import SVG
+refuses (compressed, entities, not SVG) or one that draws nothing shows its name only. The preview
+reads only the highlighted file, with the same decoder or SVG reader and limits as the import, and
+never writes. On **Windows** the dialog's own
+preview pane is used (switched on once with Alt+P, then Windows remembers it); on **macOS** the
+dialog's own Quick Look preview in column and gallery view. In the **browser** the browser's own
+file picker is used, which has no preview. (`specs/0087-image-clipboard-and-drop` criteria 26 to 28)
+
 ## Formats
 
 PNG (all bit depths, palettes, transparency, interlaced), JPEG (baseline, progressive, grey,

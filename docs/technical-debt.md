@@ -1699,3 +1699,28 @@ derived from the group's compound path instead.
 
 `curvyo_ui_core::trace_job` (seven positional arguments) is used only by tests. Move it into a
 shared test helper later and keep `trace_job_with` as the one public entry point.
+
+## The Linux Import dialog is bound to GTK3 (`0087` criterion 26, 2026-10-28)
+
+The preview pane of the Import dialog (`curvyo-app/src/import_dialog.rs`) is a GTK3
+`FileChooserDialog` preview widget. GTK4 removed preview widgets, so when Tauri moves to GTK4 and
+WebKitGTK 6 the dialog has to be rebuilt (an own pane in a GTK4 window, or an in-app file browser).
+
+**Resolution:** open; rewritten with the Tauri GTK4 move.
+
+## A Flatpak build would lose the Import preview (`0087` criterion 26, 2026-10-28)
+
+Inside a Flatpak sandbox the file dialog has to go through the xdg desktop portal
+(`org.freedesktop.portal.FileChooser`), which has no preview option. A Flatpak build would show the
+portal's dialog without our pane.
+
+**Resolution:** open; decided when a Flatpak build is planned.
+
+## The SVG preview's rasterizer lives in `curvyo-app` (`0087` criterion 26, 2026-10-29)
+
+The Import dialog's SVG preview draws with a small anti-aliased fill of its own
+(`curvyo-app/src/raster.rs`, with a work budget against hostile files). It is pure and has one
+caller, so it stays in the app crate for now.
+
+**Resolution:** open; when a second caller needs CPU rasterization (an export thumbnail, a raster
+check in tests), move it into a `*-core` crate (needs an ADR).
