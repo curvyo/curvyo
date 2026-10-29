@@ -51,10 +51,12 @@ serde.workspace = true
 serde_json.workspace = true
 curvyo-storage-io = { path = "../curvyo-storage-io", version = "0.1.0" }
 
-[target.'cfg(target_os = "linux")'.dependencies]
-# The import dialog's preview decodes through the import's own bounded decoder and ceilings
-# (`specs/0087-image-clipboard-and-drop` adrs.md decision 6), never through gdk-pixbuf.
+# The import's file limit, checked before a pasted or dropped local file is read
+# (`specs/0087-image-clipboard-and-drop` criterion 6); on Linux the import dialog's preview also
+# decodes through its bounded decoder and ceilings (adrs.md decision 6), never through gdk-pixbuf.
 curvyo-image-core = { path = "../curvyo-image-core", version = "0.1.0" }
+
+[target.'cfg(target_os = "linux")'.dependencies]
 # An SVG's preview reads the file through the importer of Import SVG and its hostile-input limits
 # (`specs/0024-svg-import-export`, no second SVG parser) and draws it with `kurbo`'s stroker and our
 # own small fill (`src/raster.rs`); no new crate, no gdk-pixbuf or librsvg decoding.

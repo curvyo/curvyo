@@ -15,6 +15,8 @@
 // to the stricter rule.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
+mod dropped_fonts;
+mod file_uris;
 mod font_documents;
 mod font_library;
 mod fonts;
@@ -23,8 +25,11 @@ mod formats;
 mod import_dialog;
 #[cfg(target_os = "linux")]
 mod import_preview;
+mod local_files;
 #[cfg(any(target_os = "macos", test))]
 mod menu;
+#[cfg(target_os = "linux")]
+mod native_file_lists;
 #[cfg(target_os = "linux")]
 mod preview_fonts;
 #[cfg(target_os = "linux")]
@@ -128,6 +133,8 @@ fn main() {
             fonts::font_bytes,
             fonts::pick_font_files,
             fonts::add_font_files,
+            dropped_fonts::add_dropped_fonts,
+            local_files::read_local_files,
             fonts::remove_font_files,
             font_documents::read_font_document,
             font_documents::open_font_document,
@@ -140,11 +147,6 @@ fn main() {
         // The window's close button and Alt+F4: a project with unsaved changes holds the close and
         // the page asks; a clean one closes at once, with no round trip to the page.
         .on_window_event(|window, event| {
-            // Files dropped on the window may be added as fonts; no other path is
-            // (`specs/0075-font-library`, tester re-review 2026-10-20).
-            if let tauri::WindowEvent::DragDrop(tauri::DragDropEvent::Drop { paths, .. }) = event {
-                fonts::grant_font_paths(window.app_handle(), paths);
-            }
             if let tauri::WindowEvent::CloseRequested { api, .. } = event
                 && project::hold_close_for_check(window.app_handle())
             {
@@ -153,6 +155,9 @@ fn main() {
         })
         .setup(|app| {
             let handle = app.handle().clone();
+            // WebKitGTK hides a dragged file list from the page; the host keeps it for a drop.
+            #[cfg(target_os = "linux")]
+            native_file_lists::watch_drags(&handle);
             // A font folder an interrupted archive add left is removed at start (`0083`
             // criterion 12).
             if let Ok(dir) = fonts::fonts_dir(&handle) {
@@ -258,5 +263,16 @@ mod capability_tests {
         for needed in ["core:event:allow-listen", "core:event:allow-unlisten"] {
             assert!(permissions.contains(&needed.to_string()), "{needed}");
         }
+    }
+
+    /// `specs/0087-image-clipboard-and-drop` criterion 19: the window leaves every drop to the
+    /// page, so HTML5 drops with files and image data reach it on Linux, Windows and macOS.
+    #[test]
+    fn the_main_window_hands_drops_to_the_page() {
+        let config: serde_json::Value =
+            serde_json::from_str(include_str!("../tauri.conf.json")).unwrap();
+        let window = &config["app"]["windows"][0];
+        assert_eq!(window["label"], "main");
+        assert_eq!(window["dragDropEnabled"], false);
     }
 }
