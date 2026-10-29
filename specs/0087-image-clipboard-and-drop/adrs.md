@@ -17,7 +17,9 @@ Frage 69, which the customer has answered; decision 6 is how that answer is buil
 - [ADR 0023](../../docs/adr/0023-raster-trace-crate-pipeline-and-worker.md) §5: the one Web Worker that
   instantiates `curvyo-editor-wasm`; the copy's PNG encode runs there (decision 2).
 - [ADR 0011](../../docs/adr/0011-workspace-and-crate-layout.md): `curvyo-app → curvyo-image-core` is an
-  app-to-core edge, allowed; no new crate.
+  app-to-core edge, allowed; no new crate. The SVG preview adds the Linux-only app-to-core edges
+  `curvyo-app → curvyo-svg-core`, `curvyo-ui-core`, `curvyo-text-core` and `curvyo-document-core`
+  (reading, font matching and text layout as Import SVG does them), allowed likewise.
 - `specs/0058-bitmap-import/adrs.md` (2026-10-26 notes): `editor-wasm`'s one `import_file(bytes, name)`
   door, `FileKind::Image` by magic bytes, `probe` before decode, placement in `ui-core`.
 
