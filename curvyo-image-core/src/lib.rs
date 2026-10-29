@@ -1,5 +1,6 @@
 //! The bitmap decoder boundary of the image import (`specs/0058-bitmap-import`, ADR 0017 §4):
-//! hostile bytes in, a checked header or a deterministic working image out.
+//! hostile bytes in, a checked header or a deterministic working image out; and the PNG of a
+//! working image for the clipboard (`specs/0087-image-clipboard-and-drop`).
 //!
 //! Pure and wasm-compatible (`CLAUDE.md` §6): no filesystem, clock or threads; callers pass the
 //! bytes in. A panic aborts a wasm module, so every size is checked before a buffer exists:
@@ -13,6 +14,7 @@ mod container;
 mod decode;
 mod density;
 mod downscale;
+mod encode;
 mod error;
 mod format;
 mod limits;
@@ -23,6 +25,7 @@ mod working;
 
 pub use decode::decode_working;
 pub use density::PixelDensity;
+pub use encode::encode_png;
 pub use error::ImageError;
 pub use format::ImageFormat;
 pub use limits::{
