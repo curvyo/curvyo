@@ -67,7 +67,7 @@ export interface FontLibraryApi {
   notice: FontNotice | null;
   /** Adding takes over 150 ms: how many files are being added (UX notes §4). */
   busy: number | null;
-  /** Add font: the dialog (no argument), dropped paths (desktop) or files (browser). Resolves to
+  /** Add font: the dialog (no argument; paths on the desktop) or dropped files. Resolves to
    * the first new family's name, or `null`. */
   addFonts: (dropped?: { paths?: string[]; files?: File[] }) => Promise<string | null>;
   removeFamily: (family: FontFamily) => Promise<void>;
@@ -235,7 +235,14 @@ export function useFontLibrary(
       const timer = window.setTimeout(() => setBusy(count), 150);
       let result: AddResult | BrowserAddResult | null = null;
       try {
-        if (files) {
+        if (files && isTauri) {
+          // A drop on the desktop: the bytes go to the host, which checks and copies them as Add
+          // font does (`specs/0087-image-clipboard-and-drop` criterion 19).
+          const dropped = await Promise.all(
+            files.map(async (file) => ({ name: file.name, bytes: Array.from(new Uint8Array(await file.arrayBuffer())) })),
+          );
+          result = await invoke<AddResult>("add_dropped_fonts", { files: dropped });
+        } else if (files) {
           // Loose fonts in one transaction, then each archive in one of its own (`0083`
           // criterion 18).
           const loose = await addBrowserFontFiles(files.filter((file) => !isArchiveFile(file)));

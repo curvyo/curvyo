@@ -195,6 +195,11 @@ const browserCommands: Record<string, (args?: Record<string, unknown>) => unknow
   add_font_files: () => {
     throw new Error("the browser adds font files through browserFonts");
   },
+  // The browser cannot read a local path (`specs/0087-image-clipboard-and-drop` criterion 6).
+  read_local_files: () => [],
+  add_dropped_fonts: () => {
+    throw new Error("the browser adds dropped font files through browserFonts");
+  },
   remove_font_files: (args) => removeBrowserFontFiles(args?.faces as { id: string; index: number }[]),
   // A font folder's documents from IndexedDB (`specs/0083-font-info-and-zip` criterion 4): the
   // first 1 MiB of a text, a PDF in a new tab from the stored bytes (no network request).

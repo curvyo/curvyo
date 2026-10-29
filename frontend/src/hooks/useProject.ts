@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { DocumentPanelApi } from "@/hooks/useDocumentPanel";
-import type { EditorSession } from "@/hooks/useEditorSession";
+import type { EditorSession, ImportOrigin } from "@/hooks/useEditorSession";
 import type { PanelOpenApi } from "@/hooks/usePanelOpen";
 import type { OpenBytesPayload, OpenErrorPayload, OpenPayload, SaveOutcome } from "@/lib/projectState";
 import {
@@ -14,7 +14,7 @@ import { isMac } from "@/lib/historyText";
 import { createBusyGate } from "@/lib/busyGate";
 import { templateOutcome } from "@/lib/guideText";
 import { invoke, isTauri, listen, PLATFORM } from "@/platform/host";
-import { import_busy_notice, svg_busy_notice } from "@/wasm-bindings/curvyo_editor_wasm.js";
+import { clipboard_notice, import_busy_notice, svg_busy_notice } from "@/wasm-bindings/curvyo_editor_wasm.js";
 
 /** The browser build on a Mac uses Cmd as well. */
 const MAC = isMac(navigator.platform);
@@ -26,6 +26,9 @@ export type FileCommandName = "new" | "open" | "save" | "save-as" | "close" | "q
 export interface ImportFile {
   name: string;
   bytes: Uint8Array;
+  /** A local file the host did not read because it is this many bytes long, over the import's
+   * file limit (`specs/0087-image-clipboard-and-drop` criterion 6). */
+  tooLarge?: number;
 }
 
 /** Files dropped on the canvas and the drop point in canvas CSS pixels. */
@@ -85,6 +88,14 @@ export interface ProjectApi {
    * (or the dropped files), then each file by its content as an image or an SVG layer, in one
    * step, selected. It never replaces the project. */
   importFiles: (dropped?: DroppedFiles) => void;
+  /** Ctrl+V of an image (`specs/0087-image-clipboard-and-drop` criteria 1, 2, 5, 7, 8): the
+   * clipboard's file through the same import, centred on `at` (the pointer over the canvas) or,
+   * with `null`, on the view centre; one step "Paste image". */
+  pasteImage: (file: ImportFile, at: { x: number; y: number } | null) => void;
+  /** Ctrl+V of files the clipboard named as local paths, read by the desktop host
+   * (`specs/0087-image-clipboard-and-drop` criterion 6, lead decision 2026-10-29): the same
+   * import, placed as a paste, one step. */
+  pasteFiles: (files: ImportFile[], at: { x: number; y: number } | null) => void;
   /** Save in the check: the action goes on after a successful save. */
   saveFromCheck: () => void;
   /** Discard in the check: the action goes on and the changes are dropped. */
@@ -332,7 +343,7 @@ export function useProject(deps: ProjectDeps): ProjectApi {
   }, [busy]);
 
   const importFiles = useCallback(
-    async (dropped?: DroppedFiles) => {
+    async (dropped?: DroppedFiles | { files: ImportFile[]; at: { x: number; y: number } | null }, origin?: ImportOrigin) => {
       if (!busy.enter()) {
         return;
       }
@@ -359,16 +370,23 @@ export function useProject(deps: ProjectDeps): ProjectApi {
         }
         root.setAttribute("aria-busy", "true");
         root.style.cursor = "wait";
-        editor.importBegin(dropped ? dropped.at : null);
+        const from: ImportOrigin = origin ?? (dropped ? "drop" : "picker");
+        editor.importBegin(from, dropped ? dropped.at : null);
         for (const [index, file] of files.entries()) {
-          const notice = import_busy_notice(file.bytes, file.name, index + 1, files.length);
+          const busyNotice = import_busy_notice(file.bytes, file.name, index + 1, files.length);
+          // A paste has no file name to show (UX notes §2).
+          const notice = busyNotice && from === "paste" ? clipboard_notice("pasting", 0, "") : busyNotice;
           if (notice) {
             editor.showHistoryNotice(notice, 600_000);
           }
           // One painted frame before each read: the cursor and the notice show (UX notes,
           // "Busy state").
           await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-          editor.importAdd(file.bytes, file.name);
+          if (file.tooLarge !== undefined) {
+            editor.importAddTooLarge(file.name, file.tooLarge);
+          } else {
+            editor.importAdd(file.bytes, file.name);
+          }
         }
         const outcome = await editor.importFinish();
         if (outcome.notice) {
@@ -712,6 +730,10 @@ export function useProject(deps: ProjectDeps): ProjectApi {
     press,
     loadTemplate: () => void loadTemplate(),
     importFiles: (dropped?: DroppedFiles) => void importFiles(dropped),
+    pasteImage: (file: ImportFile, at: { x: number; y: number } | null) =>
+      void importFiles({ files: [file], at }, "paste"),
+    pasteFiles: (files: ImportFile[], at: { x: number; y: number } | null) =>
+      void importFiles({ files, at }, "paste-files"),
     saveFromCheck: () => void saveFromCheck(),
     discard,
     cancel,

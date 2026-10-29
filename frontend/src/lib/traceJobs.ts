@@ -17,7 +17,9 @@ export type TraceRequest =
       map: number[];
       /** The settings JSON of `settingsJson` in `traceText`. */
       settings: string;
-    };
+    }
+  /** The PNG of a copied image (`specs/0087-image-clipboard-and-drop` criterion 14). */
+  | { type: "png"; id: number; rgba: Uint8Array; width: number; height: number };
 
 /** A message from the worker. */
 export type TraceResponse =
@@ -25,6 +27,7 @@ export type TraceResponse =
   | { id: number; kind: "trace"; wire: Float64Array; ms: number }
   /** A running trace reached a higher whole percent (criterion 10). */
   | { id: number; kind: "progress"; percent: number }
+  | { id: number; kind: "png"; png: Uint8Array; ms: number }
   | { id: number; kind: "error"; message: string };
 
 /** The pixels of one job. */
@@ -161,6 +164,19 @@ export class TraceRunner {
       throw new Error(response.kind === "error" ? response.message : "unexpected reply");
     }
     return { wire: response.wire, seconds: response.ms / 1000 };
+  }
+
+  /** The PNG of `rgba` (`width` x `height`, straight alpha), made in the worker; the pixels are
+   * handed over (`specs/0087-image-clipboard-and-drop` criterion 14). */
+  async png(rgba: Uint8Array, width: number, height: number): Promise<Uint8Array> {
+    const response = await this.send(
+      (id) => ({ type: "png", id, rgba, width, height }),
+      [rgba.buffer],
+    );
+    if (response.kind !== "png") {
+      throw new Error(response.kind === "error" ? response.message : "unexpected reply");
+    }
+    return response.png;
   }
 
   /** Ends every running job: the worker is terminated and their promises reject with

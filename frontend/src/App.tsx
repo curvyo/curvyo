@@ -28,6 +28,7 @@ import { useClosePathState } from "@/hooks/usePenCue";
 import { useDocumentPanel } from "@/hooks/useDocumentPanel";
 import { usePanelOpen } from "@/hooks/usePanelOpen";
 import { useProject } from "@/hooks/useProject";
+import { useImageClipboard } from "@/hooks/useImageClipboard";
 import { RULER_THICKNESS_PX } from "@/lib/rulerDraw";
 import { nodeCountText } from "@/lib/nodeText";
 import { isTauri, unsupportedReason } from "@/platform/host";
@@ -119,6 +120,8 @@ function Editor() {
     onOpenError: (message: string, title = "Can't open project") => setOpenError({ message, title }),
     onSaveError: setSaveErrorMessage,
   });
+  // Ctrl+V and Ctrl+C for images (`specs/0087-image-clipboard-and-drop`).
+  useImageClipboard(editor, project.pasteImage, project.pasteFiles);
 
   return (
     // The one tooltip provider of the app: every `Tooltip` and `SliderTip` below needs it, and a
