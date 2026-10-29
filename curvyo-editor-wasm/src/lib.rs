@@ -17,6 +17,7 @@
 #![forbid(unsafe_code)]
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
+mod clipboard_glue;
 mod font_archive_glue;
 mod font_checks_glue;
 mod font_file_glue;
@@ -55,6 +56,8 @@ mod wasm_fracture;
 mod wasm_group;
 #[cfg(target_arch = "wasm32")]
 mod wasm_history;
+#[cfg(target_arch = "wasm32")]
+mod wasm_image_clipboard;
 #[cfg(target_arch = "wasm32")]
 mod wasm_image_import;
 #[cfg(target_arch = "wasm32")]
@@ -106,6 +109,7 @@ mod wasm_trace;
 #[cfg(target_arch = "wasm32")]
 mod wasm_weld;
 
+pub use clipboard_glue::{clipboard_notice, encode_rgba_png, paste_rank_code};
 pub use font_archive_glue::FontArchiveGlue;
 pub use font_checks_glue::FontChecksGlue;
 pub use font_file_glue::{face_preview_path, font_file_faces};
@@ -120,7 +124,9 @@ pub use session::{
     Session, SizeOutcome, SplitOutcome, StackOutcome, Tool, WipeOutcome, WipeState,
 };
 pub use session::{DragStop, OFFSET_COMMIT_LABEL, OffsetOutcome, OffsetView};
-pub use session::{FrameImages, ImportOutcome, StrokeToPathOutcome, WeldOutcome};
+pub use session::{
+    FrameImages, ImageCopy, ImportOrigin, ImportOutcome, StrokeToPathOutcome, WeldOutcome,
+};
 pub use session::{LayoutOutcome, ObjectToPathOutcome, StyleOutcome, TextBarView, TextSizeOutcome};
 pub use session::{TextPathPress, TextPathView};
 pub use session::{TraceCreateOutcome, TraceSelection, TraceSource, TraceView, TraceViewMode};

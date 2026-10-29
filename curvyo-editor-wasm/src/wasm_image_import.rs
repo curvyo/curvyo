@@ -4,7 +4,7 @@
 
 use wasm_bindgen::prelude::*;
 
-use crate::session::ImportOutcome;
+use crate::session::{ImportOrigin, ImportOutcome};
 use crate::wasm_api::WasmSession;
 
 /// What an import did.
@@ -35,16 +35,33 @@ impl From<ImportOutcome> for ImportOutcomeView {
 
 #[wasm_bindgen]
 impl WasmSession {
-    /// Starts an import: at the drop point (`x`, `y` in canvas CSS pixels) when `dropped`, else
-    /// at the view centre.
-    pub fn import_begin(&mut self, dropped: bool, x: f64, y: f64) {
-        self.session.import_begin(dropped.then_some((x, y)));
+    /// Starts an import from `origin` (`"picker"`, `"drop"`, `"paste"` or `"paste-files"`, local
+    /// files a paste named; anything else reads as the picker): centred on (`x`, `y`) in canvas CSS pixels when `placed` (the drop point, the
+    /// pointer of a paste), else on the view centre (`specs/0087-image-clipboard-and-drop`
+    /// criterion 2).
+    pub fn import_begin(&mut self, origin: &str, placed: bool, x: f64, y: f64) {
+        let origin = match origin {
+            "drop" => ImportOrigin::Drop,
+            "paste" => ImportOrigin::Paste,
+            "paste-files" => ImportOrigin::PastedFiles,
+            _ => ImportOrigin::Picker,
+        };
+        self.session
+            .import_begin_from(origin, placed.then_some((x, y)));
     }
 
     /// Reads one file of the import (decoded or parsed at once; files past the 20th are
     /// skipped).
     pub fn import_add(&mut self, bytes: &[u8], file_name: &str) {
         self.session.import_add(bytes, file_name);
+    }
+
+    /// Refuses a file of the import that the host did not read because it is `bytes` long, over
+    /// the import's file limit (a local file a paste or drop named).
+    pub fn import_add_too_large(&mut self, file_name: &str, bytes: f64) {
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        let bytes = bytes.max(0.0) as u64;
+        self.session.import_add_too_large(file_name, bytes);
     }
 
     /// Commits the import as one step and selects what came in; while the faces of an SVG's

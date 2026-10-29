@@ -8,7 +8,8 @@ use std::sync::Arc;
 
 use curvyo_document_core::{
     AssetError, DrawingNode, IMPORT_COMMIT_LABEL, IMPORT_IMAGE_COMMIT_LABEL,
-    IMPORT_IMAGES_COMMIT_LABEL, IMPORT_SVG_COMMIT_LABEL, ImageInsertError, NodeId, Point,
+    IMPORT_IMAGES_COMMIT_LABEL, IMPORT_SVG_COMMIT_LABEL, ImageInsertError, NodeId,
+    PASTE_IMAGE_COMMIT_LABEL, Point,
 };
 use curvyo_ui_core::SvgDrawing;
 use curvyo_ui_core::{
@@ -37,9 +38,48 @@ enum Planned {
     },
 }
 
+/// The way bytes came into an import (`specs/0087-image-clipboard-and-drop` `adrs.md` decision
+/// 3): it picks only the History name and the name of a file that has none; decoder, limits,
+/// notices and the one step are the same for all.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum ImportOrigin {
+    /// The Import button or Ctrl+I.
+    #[default]
+    Picker,
+    /// Files dropped on the canvas.
+    Drop,
+    /// Ctrl+V: one image from the clipboard; a drawing is not pasted (criterion 5).
+    Paste,
+    /// Ctrl+V of files the clipboard named as local paths, read by the host (criterion 6, lead
+    /// decision 2026-10-29): placed as a paste, an SVG comes in as Import SVG brings it.
+    PastedFiles,
+}
+
+impl ImportOrigin {
+    /// The name of a file the origin gives without one: "Pasted image" for a paste (criterion 2),
+    /// "Dropped image" for dropped image data (criterion 20).
+    fn file_name(self, given: &str) -> &str {
+        if !given.trim().is_empty() {
+            return given;
+        }
+        match self {
+            Self::Paste | Self::PastedFiles => PASTED_IMAGE_NAME,
+            Self::Drop => DROPPED_IMAGE_NAME,
+            Self::Picker => given,
+        }
+    }
+}
+
+/// The name of a pasted image whose clipboard data has no file name (criterion 2).
+pub const PASTED_IMAGE_NAME: &str = "Pasted image";
+
+/// The name of dropped image data that has no file name (criterion 20).
+pub const DROPPED_IMAGE_NAME: &str = "Dropped image";
+
 /// The files of an import being added.
 #[derive(Default)]
 pub(super) struct ImportBatch {
+    origin: ImportOrigin,
     target: Option<ImageTarget>,
     planned: Vec<(String, Planned)>,
     /// The file name and reason of each file that cannot be imported, in order.
@@ -66,14 +106,45 @@ impl Session {
     /// Starts an import aimed at `drop` (a point on the canvas, in screen pixels), or at the view
     /// centre without one (criteria 4 and 12). Discards an unfinished one.
     pub fn import_begin(&mut self, drop: Option<(f64, f64)>) {
-        let target = match drop {
+        let origin = if drop.is_some() {
+            ImportOrigin::Drop
+        } else {
+            ImportOrigin::Picker
+        };
+        self.import_begin_from(origin, drop);
+    }
+
+    /// Starts an import from `origin` centred on `at` (a point on the canvas in screen pixels, with
+    /// the clamp of a drop) or, without one, on the view centre. A paste takes the pointer's last
+    /// point over the canvas (`specs/0087-image-clipboard-and-drop` criterion 2). Discards an
+    /// unfinished one.
+    pub fn import_begin_from(&mut self, origin: ImportOrigin, at: Option<(f64, f64)>) {
+        let target = match at {
             Some((x, y)) => ImageTarget::Drop(self.screen_to_document(x, y)),
             None => ImageTarget::ViewCentre(self.import_view_centre()),
         };
         self.import = Some(ImportBatch {
+            origin,
             target: Some(target),
             ..ImportBatch::default()
         });
+    }
+
+    /// Remembers a file of the import that the host did not read because it is `bytes` long, over
+    /// the import's file limit: it is refused with the limit's notice (criterion 16). Files past
+    /// the 20th are skipped.
+    pub fn import_add_too_large(&mut self, file_name: &str, bytes: u64) {
+        let Some(batch) = self.import.as_mut() else {
+            return;
+        };
+        let file_name = batch.origin.file_name(file_name).to_owned();
+        batch.chosen += 1;
+        if batch.planned.len() + batch.failed.len() >= MAX_IMPORT_FILES {
+            return;
+        }
+        let reason =
+            curvyo_ui_core::failure_reason(curvyo_image_core::ImageError::FileTooLarge { bytes });
+        batch.failed.push((file_name, reason));
     }
 
     /// Reads one file of the import begun by [`Session::import_begin`]: an image is decoded, an
@@ -83,6 +154,7 @@ impl Session {
         let Some(batch) = self.import.as_mut() else {
             return;
         };
+        let file_name = batch.origin.file_name(file_name);
         batch.chosen += 1;
         if batch.planned.len() + batch.failed.len() >= MAX_IMPORT_FILES {
             return;
@@ -91,7 +163,11 @@ impl Session {
             .target
             .unwrap_or(ImageTarget::ViewCentre(Point::new(0.0, 0.0)));
         let index = batch.planned.len();
-        let planned = match file_kind(bytes) {
+        let kind = match (batch.origin, file_kind(bytes)) {
+            (ImportOrigin::Paste, FileKind::Svg) => FileKind::Other,
+            (_, kind) => kind,
+        };
+        let planned = match kind {
             FileKind::Image => plan_image_import(Arc::from(bytes), file_name, page, target, index)
                 .map(Planned::Image),
             FileKind::Svg => {
@@ -161,7 +237,7 @@ impl Session {
                 Planned::Svg { .. } => true,
             });
         }
-        let ids = self.commit_import(&batch.planned);
+        let ids = self.commit_import(&batch.planned, batch.origin);
         let notice = batch_notice(&batch, ids.len());
         ImportOutcome {
             imported: ids.len(),
@@ -198,7 +274,11 @@ impl Session {
     }
 
     /// Writes the planned files in one step and selects them; returns the new top-level ids.
-    fn commit_import(&mut self, planned: &[(String, Planned)]) -> Vec<NodeId> {
+    fn commit_import(
+        &mut self,
+        planned: &[(String, Planned)],
+        origin: ImportOrigin,
+    ) -> Vec<NodeId> {
         if planned.is_empty() {
             return Vec::new();
         }
@@ -207,6 +287,9 @@ impl Session {
             .filter(|(_, p)| matches!(p, Planned::Image(_)))
             .count();
         let label = match (image_count, planned.len() - image_count) {
+            (1, 0) if matches!(origin, ImportOrigin::Paste | ImportOrigin::PastedFiles) => {
+                PASTE_IMAGE_COMMIT_LABEL
+            }
             (1, 0) => IMPORT_IMAGE_COMMIT_LABEL,
             (_, 0) => IMPORT_IMAGES_COMMIT_LABEL,
             (0, 1) => IMPORT_SVG_COMMIT_LABEL,
@@ -224,7 +307,10 @@ impl Session {
                 _ => Vec::new(),
             })
             .collect();
-        if self.tool != Tool::Select {
+        // The Trace tool stays for images only: it traces what came in
+        // (`specs/0087-image-clipboard-and-drop` criterion 9).
+        let keep_trace = self.tool == Tool::Trace && image_count == planned.len();
+        if self.tool != Tool::Select && !keep_trace {
             self.set_tool(Tool::Select);
         }
         self.select.cancel_entry();
