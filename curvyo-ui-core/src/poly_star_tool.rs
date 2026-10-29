@@ -5,7 +5,7 @@
 //! and ratio persist across shapes and never change a selected shape; that is
 //! the Select bar's job.
 
-use curvyo_document_core::{Angle, Document, InnerRatio, Point, PointCount, Shape, StarFrame};
+use curvyo_document_core::{Angle, Document, InnerRatio, Point, PointCount, Shape, StarFrame, Vec2};
 
 use crate::angle_snap::snap_angle;
 use crate::modifiers::Modifiers;
@@ -156,9 +156,9 @@ impl PolygonStarTool {
     /// The pointer moved with the drag in flight; writes nothing. Ctrl
     /// snaps the created angle (`specs/0010-edit-interaction-polish/` criterion
     /// 4); Shift has no effect on a polygon or star.
-    pub fn pointer_move(&mut self, point: Point, modifiers: Modifiers) {
+    pub fn pointer_move(&mut self, point: Point, modifiers: Modifiers, snap_offset: Vec2) {
         if let Some(drag) = &mut self.drag {
-            drag.current = point;
+            drag.current = point.translated(snap_offset);
             drag.modifiers = modifiers;
         }
     }
@@ -192,11 +192,13 @@ impl PolygonStarTool {
         document: &Document,
         point: Point,
         modifiers: Modifiers,
+        snap_offset: Vec2,
     ) -> CreateOutcome {
         let Some(drag) = self.drag.take() else {
             return CreateOutcome::NoOp;
         };
-        self.shape_for(drag.center, point, modifiers)
+        let snapped_point = point.translated(snap_offset);
+        self.shape_for(drag.center, snapped_point, modifiers)
             .map_or(CreateOutcome::NoOp, |preview| {
                 CreateOutcome::Created(
                     document.create_primitive(preview.shape, Angle::from_radians(0.0)),
@@ -209,6 +211,12 @@ impl PolygonStarTool {
     #[must_use]
     pub const fn drag_in_flight(&self) -> bool {
         self.drag.is_some()
+    }
+
+    /// The start point (center) of the drag in flight, if any.
+    #[must_use]
+    pub fn drag_start(&self) -> Option<Point> {
+        self.drag.map(|drag| drag.center)
     }
 
     /// Discards any in-progress drag, writing nothing. Returns whether there

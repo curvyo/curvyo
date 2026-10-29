@@ -9,8 +9,8 @@
 //! `Session`'s privacy boundary and its methods join the same type's
 //! `impl Session`.
 
-use curvyo_document_core::{InnerRatio, Point, PointCount, Shape};
-use curvyo_ui_core::{CreateOutcome, CreatePreview, Modifiers, PolyStarMode, format_degrees};
+use curvyo_document_core::{InnerRatio, Point, PointCount, Shape, Vec2};
+use curvyo_ui_core::{CreateOutcome, CreatePreview, Modifiers, PolyStarMode, SnapProbe, format_degrees};
 
 use super::{Session, Tool};
 
@@ -37,15 +37,44 @@ impl Session {
             Tool::PolygonStar => self.poly_star.pointer_down(point),
             Tool::Select | Tool::Pen | Tool::Node | Tool::Offset | Tool::Text | Tool::Trace => {}
         }
+        // If a create-drag began, start snapping.
+        match self.tool {
+            Tool::Rectangle if self.rectangle.drag_in_flight() => self.begin_snapping_drag_for_shape(),
+            Tool::Ellipse if self.ellipse.drag_in_flight() => self.begin_snapping_drag_for_shape(),
+            Tool::PolygonStar if self.poly_star.drag_in_flight() => self.begin_snapping_drag_for_shape(),
+            _ => {}
+        }
+    }
+
+    /// Computes the snap offset for the current shape creation drag, if any.
+    fn snap_offset_for_shape(&mut self, pointer: Point) -> Vec2 {
+        if self.snapping_suspended() {
+            return Vec2::ZERO;
+        }
+        let Some(start) = (match self.tool {
+            Tool::Rectangle => self.rectangle.drag_start(),
+            Tool::Ellipse => self.ellipse.drag_start(),
+            Tool::PolygonStar => self.poly_star.drag_start(),
+            _ => None,
+        }) else {
+            return Vec2::ZERO;
+        };
+        // Build the box from start and current pointer (sorted).
+        let min = Point::new(start.x.min(pointer.x), start.y.min(pointer.y));
+        let max = Point::new(start.x.max(pointer.x), start.y.max(pointer.y));
+        let probe = SnapProbe::box_edges(min, max);
+        let result = self.resolve_snapping(&probe);
+        result.offset
     }
 
     /// Feeds whatever create-drag is in flight for the live preview; writes
     /// nothing to the document.
     pub(super) fn shape_pointer_move(&mut self, point: Point, modifiers: Modifiers) {
+        let snap_offset = self.snap_offset_for_shape(point);
         match self.tool {
-            Tool::Rectangle => self.rectangle.pointer_move(point, modifiers),
-            Tool::Ellipse => self.ellipse.pointer_move(point, modifiers),
-            Tool::PolygonStar => self.poly_star.pointer_move(point, modifiers),
+            Tool::Rectangle => self.rectangle.pointer_move(point, modifiers, snap_offset),
+            Tool::Ellipse => self.ellipse.pointer_move(point, modifiers, snap_offset),
+            Tool::PolygonStar => self.poly_star.pointer_move(point, modifiers, snap_offset),
             Tool::Select | Tool::Pen | Tool::Node | Tool::Offset | Tool::Text | Tool::Trace => {}
         }
     }
@@ -61,14 +90,16 @@ impl Session {
         if self.release_starts_placement(point, modifiers) {
             return;
         }
+        let snap_offset = self.snap_offset_for_shape(point);
         let outcome = match self.tool {
-            Tool::Rectangle => self.rectangle.pointer_up(&self.document, point, modifiers),
-            Tool::Ellipse => self.ellipse.pointer_up(&self.document, point, modifiers),
-            Tool::PolygonStar => self.poly_star.pointer_up(&self.document, point, modifiers),
+            Tool::Rectangle => self.rectangle.pointer_up(&self.document, point, modifiers, snap_offset),
+            Tool::Ellipse => self.ellipse.pointer_up(&self.document, point, modifiers, snap_offset),
+            Tool::PolygonStar => self.poly_star.pointer_up(&self.document, point, modifiers, snap_offset),
             Tool::Select | Tool::Pen | Tool::Node | Tool::Offset | Tool::Text | Tool::Trace => {
                 CreateOutcome::NoOp
             }
         };
+        self.end_snapping_drag();
         if let CreateOutcome::Created(id) = outcome {
             self.selection.select_single(id);
             self.set_tool(Tool::Select);
@@ -78,14 +109,18 @@ impl Session {
     /// Cancels whichever creation tool's in-progress drag, writing nothing.
     /// Returns whether there was one.
     pub(super) fn shape_escape(&mut self) -> bool {
-        match self.tool {
+        let had_drag = match self.tool {
             Tool::Rectangle => self.rectangle.escape(),
             Tool::Ellipse => self.ellipse.escape(),
             Tool::PolygonStar => self.poly_star.escape(),
             Tool::Select | Tool::Pen | Tool::Node | Tool::Offset | Tool::Text | Tool::Trace => {
                 false
             }
+        };
+        if had_drag {
+            self.end_snapping_drag();
         }
+        had_drag
     }
 
     /// The polygon/star bar's mode for the next shape.

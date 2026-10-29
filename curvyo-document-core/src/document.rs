@@ -274,7 +274,18 @@ impl DocumentVersion {
 /// (`crate::image_codec`); a missing, oversized or mismatching asset is not damage: the image
 /// keeps its frame and shows as unreadable. The number is provisional by the rule above. Golden:
 /// `image_v25.curvyo`.
-pub const CURRENT_FORMAT_VERSION: u32 = 25;
+///
+/// Bumped to 26 in `snapping` (`specs/0060-snapping/adrs.md` decision 2): the document root may
+/// carry seven registers for snapping (`snapping_enabled`, `snapping_objects`,
+/// `snapping_guides`, `snapping_nodes`, `snapping_page`, `snapping_capture_px`,
+/// `snapping_release_px`; `crate::snapping`). A build that stops at version 25 would open the
+/// file, ignore the settings, and work against the file's stated intent without a word — every
+/// drag would be unsnapped although the document says otherwise. Migration from version 25 is
+/// none: an absent register is its default, so a file without snapping settings opens
+/// unchanged and is not rewritten. A malformed register is refused as damaged
+/// (`crate::snapping`); a release zone below the capture zone is valid and reads as the
+/// capture size. The number is provisional by the rule above. Golden: `snapping_v26.curvyo`.
+pub const CURRENT_FORMAT_VERSION: u32 = 26;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";
@@ -420,8 +431,8 @@ impl Document {
     ///
     /// # Errors
     /// Returns [`OpenError::Damaged`] if the bytes are not a valid Loro
-    /// snapshot this build can import, if a background register is present
-    /// but malformed, or if they import cleanly but the
+    /// snapshot this build can import, if a background or snapping register is
+    /// present but malformed, or if they import cleanly but the
     /// `paths` tree inside them does not match the shape
     /// [`crate::path_codec`]'s writers always produce — a damaged-but-
     /// still-unzippable file (project-file-foundation's acceptance
@@ -441,6 +452,7 @@ impl Document {
         loro.import(bytes).map_err(|_| OpenError::Damaged)?;
         if !crate::path_codec::validate_path_tree(&loro, OBJECTS_TREE)
             || !crate::document_background::validate(&loro)
+            || !crate::snapping::validate(&loro)
         {
             return Err(OpenError::Damaged);
         }
@@ -547,6 +559,7 @@ impl Document {
             size: self.size(),
             display_unit: self.display_unit(),
             background: self.background().into(),
+            snapping: self.snapping().into(),
             objects,
         };
         serde_json::to_vec_pretty(&view).map_err(|_| SaveError::Encode)
@@ -612,6 +625,7 @@ struct DocumentJsonView {
     size: DocumentSize,
     display_unit: DisplayUnit,
     background: crate::document_background::BackgroundJson,
+    snapping: crate::snapping::SnappingJson,
     objects: Vec<NodeJson>,
 }
 

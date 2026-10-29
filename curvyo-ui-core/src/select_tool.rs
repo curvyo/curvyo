@@ -13,7 +13,7 @@
 //! [`curvyo_document_core::Document`] commit on release, a press-and-
 //! release inside the 3 px dead zone writes nothing.
 
-use curvyo_document_core::{Document, ObjectSnapshot, Point, Tolerance};
+use curvyo_document_core::{Document, ObjectSnapshot, Point, Tolerance, Vec2};
 
 use crate::anchor_id_minter::AnchorIdMinter;
 use crate::conversion::converted_for_object;
@@ -416,6 +416,7 @@ impl SelectTool {
         point: Point,
         modifiers: Modifiers,
         minter: &mut AnchorIdMinter,
+        snap_offset: Vec2,
     ) -> ZeroRecovery {
         let (shift, ctrl) = (modifiers.shift, modifiers.ctrl);
         match std::mem::take(&mut self.drag) {
@@ -428,6 +429,7 @@ impl SelectTool {
                     selection,
                     (point, modifiers),
                     (minter, &self.units),
+                    snap_offset,
                 );
             }
             SelectDrag::Transforming(drag) => {
@@ -663,6 +665,8 @@ mod tests {
             Point::new(500.0, 500.0),
             NONE,
             &mut AnchorIdMinter::new(99),
+            Vec2::ZERO,
+            Vec2::ZERO,
         );
         assert!(selection.is_empty());
     }
@@ -739,6 +743,7 @@ mod tests {
             Point::new(55.0, 0.0),
             Modifiers::new(true, false),
             &mut AnchorIdMinter::new(99),
+            Vec2::ZERO,
         );
         assert_eq!(selection.ids(), &[a, b]);
     }
@@ -780,6 +785,7 @@ mod tests {
             Point::new(8.0, 3.0),
             Modifiers::new(false, false),
             &mut AnchorIdMinter::new(99),
+            Vec2::ZERO,
         );
 
         let shape_a = document.primitive(a).expect("exists").shape;
@@ -851,6 +857,7 @@ mod tests {
             Point::new(5.0, 9.0),
             Modifiers::new(false, false),
             &mut AnchorIdMinter::new(99),
+            Vec2::ZERO,
         );
         let Shape::Rect { bounds, .. } = document.primitive(id).expect("exists").shape else {
             panic!("expected rect");
@@ -885,6 +892,7 @@ mod tests {
             Point::new(0.0, 5.0),
             Modifiers::new(false, false),
             &mut AnchorIdMinter::new(99),
+            Vec2::ZERO,
         );
         let Shape::Rect { bounds, .. } = document.primitive(id).expect("exists").shape else {
             panic!("expected rect");
@@ -937,6 +945,7 @@ mod tests {
             Point::new(5.0, 9.0),
             Modifiers::new(false, false),
             &mut AnchorIdMinter::new(99),
+            Vec2::ZERO,
         );
 
         assert_eq!(
@@ -1093,6 +1102,7 @@ mod tests {
             Point::new(15.0, 13.0),
             Modifiers::new(false, false),
             &mut AnchorIdMinter::new(99),
+            Vec2::ZERO,
         );
         let Shape::Rect { bounds, .. } = document.primitive(id).expect("exists").shape else {
             panic!("expected rect");
@@ -1127,6 +1137,7 @@ mod tests {
             Point::new(20.0, 11.0),
             Modifiers::new(false, true),
             &mut AnchorIdMinter::new(99),
+            Vec2::ZERO,
         );
         let Shape::Rect { bounds, .. } = document.primitive(id).expect("exists").shape else {
             panic!("expected rect");
@@ -1163,6 +1174,7 @@ mod tests {
             Point::new(14.0, 5.0),
             Modifiers::new(true, false),
             &mut AnchorIdMinter::new(99),
+            Vec2::ZERO,
         );
         let Shape::Rect { bounds, .. } = document.primitive(id).expect("exists").shape else {
             panic!("expected rect");
@@ -1197,6 +1209,7 @@ mod tests {
             Point::new(15.0, 15.0),
             Modifiers::new(false, true),
             &mut AnchorIdMinter::new(99),
+            Vec2::ZERO,
         );
         let snapshot = document.primitive(id).expect("exists");
         // 1.5x proportional resize -> stroke width also 1.5x (0.25 -> 0.375).
@@ -1235,6 +1248,7 @@ mod tests {
             to,
             Modifiers::new(false, false),
             &mut AnchorIdMinter::new(99),
+            Vec2::ZERO,
         );
     }
 
@@ -1383,6 +1397,7 @@ mod tests {
             to,
             Modifiers::new(false, false),
             &mut AnchorIdMinter::new(99),
+            Vec2::ZERO,
         );
         assert!((document.primitive(id).unwrap().style.stroke.width.as_mm() - 0.25).abs() < 1e-12);
 
@@ -1408,6 +1423,7 @@ mod tests {
             Point::new(40.0, 40.0),
             Modifiers::new(false, true),
             &mut AnchorIdMinter::new(99),
+            Vec2::ZERO,
         );
         assert!((document.primitive(id).unwrap().style.stroke.width.as_mm() - 0.5).abs() < 1e-9);
     }
@@ -1518,6 +1534,7 @@ mod tests {
             Point::new(20.0, 20.0),
             Modifiers::new(false, true),
             &mut AnchorIdMinter::new(99),
+            Vec2::ZERO,
         );
         let Shape::Rect { corner_radii, .. } = document.primitive(id).unwrap().shape else {
             panic!("rect");
@@ -1557,6 +1574,7 @@ mod tests {
             Point::new(20.0, 20.0),
             Modifiers::new(false, true),
             &mut AnchorIdMinter::new(99),
+            Vec2::ZERO,
         );
         let Shape::Rect { corner_radii, .. } = document.primitive(id).expect("exists").shape else {
             panic!("expected rect");
@@ -1676,6 +1694,7 @@ mod tests {
             drag_to,
             Modifiers::new(false, true),
             &mut AnchorIdMinter::new(99),
+            Vec2::ZERO,
         );
         let Shape::Star {
             frame: new_frame,
@@ -1725,6 +1744,7 @@ mod tests {
             Point::new(20.0, 10.0),
             Modifiers::new(false, false),
             &mut AnchorIdMinter::new(99),
+            Vec2::ZERO,
         );
         let snapshot = document.path(id).expect("exists");
         // Anchored at (0,0); X doubled, Y unchanged.
@@ -1761,6 +1781,7 @@ mod tests {
             Point::new(-100.0, 5.0),
             Modifiers::new(false, false),
             &mut AnchorIdMinter::new(99),
+            Vec2::ZERO,
         );
         let Shape::Rect { bounds, .. } = document.primitive(id).expect("exists").shape else {
             panic!("expected rect");
@@ -1806,6 +1827,7 @@ mod tests {
             current,
             Modifiers::new(false, false),
             &mut AnchorIdMinter::new(99),
+            Vec2::ZERO,
         );
         let snapshot = document.primitive(id).expect("exists");
         assert!(
@@ -1861,6 +1883,7 @@ mod tests {
             ten_degrees_from_start,
             Modifiers::new(false, true),
             &mut AnchorIdMinter::new(99),
+            Vec2::ZERO,
         );
         let snapshot = document.primitive(id).expect("exists");
         let degrees = snapshot.rotation.as_radians().to_degrees();
@@ -1919,6 +1942,7 @@ mod tests {
             drag_to,
             Modifiers::new(false, false),
             &mut AnchorIdMinter::new(99),
+            Vec2::ZERO,
         );
         let p = document.primitive(id).expect("exists");
         let Shape::Rect { bounds, .. } = p.shape else {
@@ -1983,6 +2007,7 @@ mod tests {
                 at,
                 Modifiers::new(true, true),
                 &mut AnchorIdMinter::new(99),
+            Vec2::ZERO,
             );
             assert_eq!(document.object(id), before, "{wanted:?}");
         }
@@ -2014,6 +2039,7 @@ mod tests {
             Point::new(50.0, -6.0),
             Modifiers::new(false, true),
             &mut AnchorIdMinter::new(99),
+            Vec2::ZERO,
         );
         let Shape::Rect { bounds, .. } = document.primitive(id).expect("exists").shape else {
             panic!("expected rect");
@@ -2056,6 +2082,7 @@ mod tests {
             Point::new(40.0, 5.0),
             Modifiers::new(false, false),
             &mut AnchorIdMinter::new(99),
+            Vec2::ZERO,
         );
         let snapshot = document.primitive(id).expect("exists");
         assert!(
@@ -2091,6 +2118,7 @@ mod tests {
             Point::new(0.0, 5.0),
             Modifiers::new(false, false),
             &mut AnchorIdMinter::new(99),
+            Vec2::ZERO,
         );
         let snapshot = document.primitive(id).expect("exists");
         assert!(
@@ -2134,6 +2162,7 @@ mod tests {
             se.translated(Vec2::new(4.0, 2.0)),
             Modifiers::new(false, false),
             &mut AnchorIdMinter::new(99),
+            Vec2::ZERO,
         );
         let Shape::Ellipse { frame, .. } = document.primitive(id).expect("exists").shape else {
             panic!("still an ellipse");
@@ -2183,6 +2212,7 @@ mod tests {
             current,
             Modifiers::new(true, false),
             &mut AnchorIdMinter::new(99),
+            Vec2::ZERO,
         );
         let snapshot = document.primitive(id).expect("exists");
         assert!((snapshot.rotation.as_radians() - std::f64::consts::FRAC_PI_2).abs() < 1e-9);
@@ -2246,6 +2276,7 @@ mod tests {
                 to,
                 Modifiers::new(false, false),
                 &mut AnchorIdMinter::new(99),
+            Vec2::ZERO,
             );
         }
         let path = document.path(path_id).expect("still a path");
@@ -2370,6 +2401,7 @@ mod tests {
                     centre.translated(Vec2::new(7.0, 3.0)),
                     Modifiers::new(false, false),
                     &mut AnchorIdMinter::new(99),
+            Vec2::ZERO,
                 );
                 let moved = document.primitive(id).expect("exists");
                 assert!((moved.rotation.as_radians() - turn).abs() < 1e-9);
@@ -2424,6 +2456,7 @@ mod tests {
                     Point::new(900.0, 900.0),
                     NONE,
                     &mut AnchorIdMinter::new(99),
+            Vec2::ZERO,
                 );
                 assert!(selection.is_empty());
             }
@@ -2514,6 +2547,7 @@ mod tests {
             Point::new(15.0, -15.0),
             Modifiers::new(false, false),
             &mut AnchorIdMinter::new(99),
+            Vec2::ZERO,
         );
         let Shape::Polygon { frame, .. } = document.primitive(id).expect("exists").shape else {
             panic!("polygon");
@@ -2570,6 +2604,7 @@ mod tests {
                     bad,
                     Modifiers::new(true, true),
                     &mut AnchorIdMinter::new(99),
+            Vec2::ZERO,
                 );
                 assert_eq!(document.object(id), before, "{wanted:?} to {bad:?}");
             }
@@ -2608,6 +2643,7 @@ mod tests {
             to,
             Modifiers::new(true, false),
             &mut AnchorIdMinter::new(99),
+            Vec2::ZERO,
         );
         assert_eq!(document.object(id), Some(preview));
     }
@@ -2653,6 +2689,7 @@ mod tests {
             body_point.translated(Vec2::new(2.0, 3.0)),
             Modifiers::new(false, false),
             &mut AnchorIdMinter::new(99),
+            Vec2::ZERO,
         );
         let snapshot = document.primitive(id).expect("exists");
         assert!(

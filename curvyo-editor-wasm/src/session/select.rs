@@ -12,7 +12,7 @@
 use curvyo_document_core::Point;
 use curvyo_ui_core::{
     CornerLinking, CornerRadiusScaling, EditHandle, Modifiers, ParamHandle,
-    SelectDoubleClickOutcome, StrokeScaling, TransformHandleTolerances,
+    SelectDoubleClickOutcome, SnapProbe, StrokeScaling, TransformHandleTolerances,
 };
 
 use super::{Session, Tool};
@@ -179,6 +179,10 @@ impl Session {
         // A resize that may turn shapes into paths carries the session's own
         // anchor ids from the first preview (`0019` decision 8).
         self.select.mint_conversion_ids(&mut self.minter);
+        // If a move drag began, start snapping.
+        if self.select.move_drag_start_bounds().is_some() {
+            self.begin_snapping_drag_for_selection();
+        }
     }
 
     /// Acceptance criteria 3, 15-18, 20, 41: commits whatever move/resize/
@@ -193,6 +197,7 @@ impl Session {
             .live_resize_factors(point, shift, ctrl)
             .and_then(|(sx, sy)| curvyo_ui_core::mirror_line(sx, sy));
         let dragged = self.select.dragging_handle();
+        let snap_offset = self.snap_offset_for_move().unwrap_or(curvyo_document_core::Vec2::ZERO);
         let recovery = self.select.pointer_up(
             &self.document,
             &objects,
@@ -200,7 +205,9 @@ impl Session {
             point,
             Modifiers::new(shift, ctrl).with_alt(self.held.alt),
             &mut self.minter,
+            snap_offset,
         );
+        self.end_snapping_drag();
         // A release that set an axis to 0.01 mm says so (`0056` criterion 15).
         self.transform_notice = curvyo_ui_core::zero_recovery_notice(recovery);
         if self.has_unrecorded_steps() {
@@ -331,6 +338,27 @@ impl Session {
             SelectDoubleClickOutcome::EntryOpened | SelectDoubleClickOutcome::NoNodes => {
                 DoubleClickHint::None
             }
+        }
+    }
+
+    /// The snap offset for the current move drag, if any.
+    pub(super) fn snap_offset_for_move(&mut self) -> Option<curvyo_document_core::Vec2> {
+        if self.snapping_suspended() {
+            return None;
+        }
+        let Some(pointer) = self.pointer_position else {
+            return None;
+        };
+        let modifiers = Modifiers::new(self.held.shift, self.held.ctrl);
+        let Some((min, max)) = self.select.live_move_box(pointer, modifiers, curvyo_document_core::Vec2::ZERO) else {
+            return None;
+        };
+        let probe = SnapProbe::box_edges(min, max);
+        let result = self.resolve_snapping(&probe);
+        if result.is_empty() {
+            None
+        } else {
+            Some(result.offset)
         }
     }
 }

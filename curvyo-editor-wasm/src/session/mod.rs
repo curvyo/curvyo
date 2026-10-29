@@ -104,6 +104,7 @@ mod select_cursor;
 mod select_gesture;
 mod select_readout;
 mod select_view;
+mod snapping;
 mod shapes;
 #[cfg(test)]
 mod single_line_tests;
@@ -410,6 +411,8 @@ pub struct Session {
     /// The Offset tool: its bar's values (session memory), drag and preview
     /// (`specs/0038-path-offset`).
     offset: offset::OffsetTool,
+    /// Snapping state: the stored settings and the drag in flight (`specs/0060-snapping`).
+    snapping: snapping::SnappingState,
     /// The notice of the orphan repair after the Open, until the host has taken it
     /// (`clones.rs`).
     orphan_notice: Option<String>,
@@ -451,6 +454,7 @@ impl Session {
     #[must_use]
     pub fn new(peer: u64) -> Self {
         let document = Document::new(peer);
+        let snapping_value = document.snapping();
         Self {
             saved: document.version(),
             packed: None,
@@ -507,6 +511,7 @@ impl Session {
             layers: layers::LayerState::default(),
             panel: layers_panel::PanelState::default(),
             offset: offset::OffsetTool::default(),
+            snapping: snapping::SnappingState::new(snapping_value),
             orphan_notice: None,
             open_notice: None,
             images: image_cache::ImageCache::default(),
@@ -532,6 +537,7 @@ impl Session {
     /// See [`curvyo_document_core::unpack`].
     pub fn open(peer: u64, bytes: &[u8]) -> Result<Self, OpenError> {
         let document = curvyo_document_core::unpack(peer, bytes)?;
+        let snapping_value = document.snapping();
         let mut session = Self {
             saved: document.version(),
             packed: None,
@@ -581,6 +587,7 @@ impl Session {
             layers: layers::LayerState::default(),
             panel: layers_panel::PanelState::default(),
             offset: offset::OffsetTool::default(),
+            snapping: snapping::SnappingState::new(snapping_value),
             orphan_notice: None,
             open_notice: None,
             images: image_cache::ImageCache::default(),
@@ -828,6 +835,18 @@ impl Session {
     pub fn pointer_leave(&mut self) {
         self.pointer_position = None;
         self.hovered = None;
+    }
+
+    /// The document's snapping settings.
+    #[must_use]
+    pub fn snapping(&self) -> curvyo_document_core::DocumentSnapping {
+        self.snapping.stored()
+    }
+
+    /// Updates the document's snapping settings and the session's cached copy.
+    pub fn set_snapping(&mut self, snapping: curvyo_document_core::DocumentSnapping) {
+        self.document.set_snapping(snapping);
+        self.snapping.update_stored(snapping);
     }
 
     /// The pointer released at `point`, ending whatever gesture

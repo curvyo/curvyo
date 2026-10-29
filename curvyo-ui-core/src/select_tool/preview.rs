@@ -54,7 +54,7 @@ impl SelectTool {
         ctrl: bool,
     ) -> Option<LiveEdit> {
         let mut copy = false;
-        let resolved: Vec<ObjectSnapshot> = if let Some(live) = self.live_move(pointer, shift, ctrl)
+        let resolved: Vec<ObjectSnapshot> = if let Some(live) = self.live_move(pointer, shift, ctrl, curvyo_document_core::Vec2::ZERO)
         {
             copy = live.copy;
             let selected: HashSet<NodeId> = selection.ids().iter().copied().collect();

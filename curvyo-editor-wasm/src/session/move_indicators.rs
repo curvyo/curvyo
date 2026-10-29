@@ -65,9 +65,10 @@ impl Session {
         let Some(pointer) = self.pointer_position else {
             return none;
         };
+        let snap_offset = self.snapping.last_result().map_or(curvyo_document_core::Vec2::ZERO, |r| r.offset);
         let lock = self
             .select
-            .live_move(pointer, self.held.shift, self.held.ctrl)
+            .live_move(pointer, self.held.shift, self.held.ctrl, snap_offset)
             .and_then(|live| live.axis);
         // With Ctrl held a press either begins a move (copy: plus), or arms
         // a marquee or, with Alt, a lasso (remove: minus), never both, as
@@ -109,9 +110,10 @@ impl Session {
             return None;
         }
         let pointer = self.pointer_position?;
+        let snap_offset = self.snapping.last_result().map_or(curvyo_document_core::Vec2::ZERO, |r| r.offset);
         let live = self
             .select
-            .live_move(pointer, self.held.shift, self.held.ctrl)?;
+            .live_move(pointer, self.held.shift, self.held.ctrl, snap_offset)?;
         let locked = match live.axis? {
             Axis::X => LockedAxis::Horizontal,
             Axis::Y => LockedAxis::Vertical,
@@ -183,9 +185,10 @@ impl Session {
     /// would commit, after any axis lock, with " Copy" in copy mode.
     pub(super) fn move_readout(&self) -> Option<LiveReadout> {
         let anchor = self.pointer_position?;
+        let snap_offset = self.snapping.last_result().map_or(curvyo_document_core::Vec2::ZERO, |r| r.offset);
         let live = self
             .select
-            .live_move(anchor, self.held.shift, self.held.ctrl)?;
+            .live_move(anchor, self.held.shift, self.held.ctrl, snap_offset)?;
         Some(LiveReadout {
             text: move_readout_text(live.offset, live.copy),
             anchor,
