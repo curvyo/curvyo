@@ -9,6 +9,7 @@ import { FileTab } from "@/components/panel/FileTab";
 import { HistoryTab } from "@/components/panel/HistoryTab";
 import { LayersTab } from "@/components/panel/LayersTab";
 import { PanelStrip } from "@/components/panel/PanelStrip";
+import { SnappingToolbar } from "@/components/panel/SnappingToolbar";
 import { StyleSection } from "@/components/panel/StyleSection";
 import { TraceInfoPage } from "@/components/panel/TraceInfoPage";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
@@ -21,6 +22,7 @@ import { TRACE_INFO_TAB, type TraceInfoApi } from "@/hooks/useTraceInfo";
 import { useBackgroundPanel } from "@/hooks/useBackgroundPanel";
 import { useFormats } from "@/hooks/useFormats";
 import { useHistoryScope } from "@/hooks/useHistoryScope";
+import { useSnapping } from "@/hooks/useSnapping";
 import { useStylePanel } from "@/hooks/useStylePanel";
 import { appVersion, fileCommandTooltip } from "@/lib/editorSession";
 import { TRACE_INFO_TITLE } from "@/lib/traceText";
@@ -70,6 +72,7 @@ export function PropertiesPanel({
   const textLayout = useTextLayout(editor.getSession, editor.sync, editor.syncRevision);
   const { getSession } = editor;
   const formats = useFormats(getSession, doc);
+  const snapping = useSnapping({ getSession, syncRevision: editor.syncRevision });
   const { shortcut } = doc;
   // In text edit mode the keyboard goes back to the text being edited, so typing goes on after a
   // click on a control (customer 2026-10-26), as after the Text bar's controls.
@@ -291,6 +294,7 @@ export function PropertiesPanel({
         }}
         className="properties-panel flex h-full w-[280px] flex-col overflow-hidden bg-[var(--panel-bg)] outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)]"
       >
+        {!aboutActive && <SnappingToolbar snapping={snapping} />}
         <div className="box-content flex h-6 shrink-0 items-center justify-between gap-2 px-3 pt-3 pb-2">
           {aboutActive ? (
             <h2 className="shrink-0 text-sm font-normal text-[var(--toolbar-icon)]">{TRACE_INFO_TITLE}</h2>

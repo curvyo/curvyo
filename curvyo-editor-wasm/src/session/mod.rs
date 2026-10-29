@@ -179,6 +179,7 @@ pub use combine::CombineOutcome;
 pub use cut::CutOutcome;
 pub use document::{DocumentSide, FitOutcome, SizeOutcome};
 pub use document_presets::DocumentPresetsRecord;
+pub use snapping::{SnappingSettingsRecord, SnappingToolbarRecord};
 pub use formats::{FormTexts, FormatEdit};
 pub use fracture::StackOutcome;
 pub use grouping::{GroupingKind, GroupingResult};
@@ -844,9 +845,13 @@ impl Session {
     }
 
     /// Updates the document's snapping settings and the session's cached copy.
-    pub fn set_snapping(&mut self, snapping: curvyo_document_core::DocumentSnapping) {
-        self.document.set_snapping(snapping);
-        self.snapping.update_stored(snapping);
+    /// Returns whether anything changed.
+    pub fn set_snapping(&mut self, snapping: curvyo_document_core::DocumentSnapping) -> bool {
+        let changed = self.document.set_snapping(snapping);
+        if changed {
+            self.snapping.update_stored(snapping);
+        }
+        changed
     }
 
     /// The pointer released at `point`, ending whatever gesture

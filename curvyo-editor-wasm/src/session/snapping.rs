@@ -161,6 +161,104 @@ impl SnappingState {
     }
 }
 
+/// Snapping settings as a flat record the host reads.
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen::prelude::wasm_bindgen)]
+#[derive(Debug, Clone, PartialEq)]
+pub struct SnappingSettingsRecord {
+    /// Whether snapping is enabled.
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen(getter_with_clone))]
+    pub enabled: bool,
+    /// Whether objects snap to other objects.
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen(getter_with_clone))]
+    pub objects: bool,
+    /// Whether objects snap to guides.
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen(getter_with_clone))]
+    pub guides: bool,
+    /// Whether objects snap to nodes (anchors).
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen(getter_with_clone))]
+    pub nodes: bool,
+    /// Whether objects snap to page fractions.
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen(getter_with_clone))]
+    pub page: bool,
+    /// The capture distance in screen pixels.
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen(getter_with_clone))]
+    pub capture_px: f64,
+    /// The release distance in screen pixels.
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen(getter_with_clone))]
+    pub release_px: f64,
+}
+
+impl SnappingSettingsRecord {
+    /// The record of `snapping`.
+    #[must_use]
+    pub fn new(snapping: curvyo_document_core::DocumentSnapping) -> Self {
+        Self {
+            enabled: snapping.enabled,
+            objects: snapping.objects,
+            guides: snapping.guides,
+            nodes: snapping.nodes,
+            page: snapping.page,
+            capture_px: snapping.capture_px,
+            release_px: snapping.release_px,
+        }
+    }
+}
+
+/// Snapping toolbar state for the panel header.
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen::prelude::wasm_bindgen)]
+#[derive(Debug, Clone, PartialEq)]
+pub struct SnappingToolbarRecord {
+    /// Whether snapping is enabled.
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen(getter_with_clone))]
+    pub enabled: bool,
+    /// Whether snapping is suspended due to Ctrl+Alt.
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen(getter_with_clone))]
+    pub suspended: bool,
+    /// Whether a snapping drag is in flight.
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen(getter_with_clone))]
+    pub has_drag: bool,
+    /// Whether objects snap to other objects.
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen(getter_with_clone))]
+    pub objects: bool,
+    /// Whether objects snap to guides.
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen(getter_with_clone))]
+    pub guides: bool,
+    /// Whether objects snap to nodes (anchors).
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen(getter_with_clone))]
+    pub nodes: bool,
+    /// Whether objects snap to page fractions.
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen(getter_with_clone))]
+    pub page: bool,
+    /// The capture distance in screen pixels.
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen(getter_with_clone))]
+    pub capture_px: f64,
+    /// The release distance in screen pixels.
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen(getter_with_clone))]
+    pub release_px: f64,
+}
+
+impl SnappingToolbarRecord {
+    /// The record for the current session.
+    #[must_use]
+    pub fn new(
+        stored: curvyo_document_core::DocumentSnapping,
+        suspended: bool,
+        has_drag: bool,
+    ) -> Self {
+        Self {
+            enabled: stored.enabled,
+            suspended,
+            has_drag,
+            objects: stored.objects,
+            guides: stored.guides,
+            nodes: stored.nodes,
+            page: stored.page,
+            capture_px: stored.capture_px,
+            release_px: stored.release_px,
+        }
+    }
+}
+
 impl super::Session {
     /// Starts a snapping drag for the current selection, gathering targets from the current
     /// document read. Called when a move or resize drag begins.
@@ -226,5 +324,51 @@ impl super::Session {
     /// The last snap result, for drawing the marker.
     pub(super) fn snap_result(&self) -> Option<&curvyo_ui_core::SnapResult> {
         self.snapping.last_result()
+    }
+
+    /// The snapping settings as a record.
+    #[must_use]
+    pub fn snapping_settings(&self) -> SnappingSettingsRecord {
+        SnappingSettingsRecord::new(self.snapping.stored())
+    }
+
+    /// The snapping toolbar state for the panel header.
+    #[must_use]
+    pub fn snapping_toolbar(&self) -> SnappingToolbarRecord {
+        let stored = self.snapping.stored();
+        let suspended = self.snapping_suspended();
+        let has_drag = self.snapping.drag_in_flight();
+        SnappingToolbarRecord::new(stored, suspended, has_drag)
+    }
+
+    /// Toggles snapping enabled state. Returns the new state.
+    pub fn toggle_snapping(&mut self) -> bool {
+        let mut settings = self.snapping.stored();
+        settings.enabled = !settings.enabled;
+        self.set_snapping(settings);
+        settings.enabled
+    }
+
+    /// Sets snapping target kinds. Returns whether anything changed.
+    pub fn set_snapping_targets(
+        &mut self,
+        objects: bool,
+        guides: bool,
+        nodes: bool,
+        page: bool,
+    ) -> bool {
+        let mut settings = self.snapping.stored();
+        if settings.objects == objects
+            && settings.guides == guides
+            && settings.nodes == nodes
+            && settings.page == page
+        {
+            return false;
+        }
+        settings.objects = objects;
+        settings.guides = guides;
+        settings.nodes = nodes;
+        settings.page = page;
+        self.set_snapping(settings)
     }
 }
