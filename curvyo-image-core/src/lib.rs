@@ -18,6 +18,7 @@ mod format;
 mod limits;
 mod probe;
 mod reduced;
+mod thumbnail;
 mod working;
 
 pub use decode::decode_working;
@@ -30,4 +31,5 @@ pub use limits::{
 };
 pub use probe::{ImageInfo, probe};
 pub use reduced::TRACE_PREVIEW_SIDE;
+pub use thumbnail::thumbnail;
 pub use working::{MipLevel, WorkingImage};
