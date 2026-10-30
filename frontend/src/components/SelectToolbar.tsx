@@ -24,6 +24,7 @@ import { Toggle, Tooltip } from "radix-ui";
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 
 import { ArcFieldGroup, CurveGroup, EllipseKindGroup } from "@/components/ArcCurveGroups";
+import { AlignDistributeGroups } from "@/components/AlignGroup";
 import { FlipGroup } from "@/components/FlipGroup";
 import { GuideButton } from "@/components/GuideButton";
 import { RatioSlider } from "@/components/RatioSlider";
@@ -34,6 +35,7 @@ import type { CloneBarNotice } from "@/hooks/useClones";
 import type { ArcBarApi } from "@/hooks/useArcBar";
 import type { FlipApi } from "@/hooks/useFlip";
 import type { GuideState } from "@/lib/guideText";
+import type { AlignApi } from "@/hooks/useAlign";
 import { LINKED_CLONE_TOOLTIP } from "@/lib/cloneText";
 
 export interface SelectToolbarProps {
@@ -107,6 +109,10 @@ export interface SelectToolbarProps {
   /** The Guide button (`specs/0046-document-shapes` criteria 9 and 10). */
   guideState: GuideState;
   onToggleGuide: () => void;
+  /** The Align and Distribute groups (`specs/0061-align-and-distribute/`
+   * criterion 1): shown while something is selected, the distribute group
+   * from two. */
+  align?: AlignApi;
   /** The ellipse group and the Curve field (`specs/0021-ellipse-arcs-and-shaping/`). */
   arcBar: ArcBarApi;
   /** Returns the keyboard focus to the canvas (after Enter or Escape in a
@@ -607,6 +613,7 @@ export function SelectToolbar({
   onTrace,
   flipEnabled,
   flip,
+  align,
   guideState,
   onToggleGuide,
   arcBar,
@@ -831,6 +838,7 @@ export function SelectToolbar({
           {group}
         </BarGroup>
       ))}
+      {align ? <AlignDistributeGroups align={align} onReturnFocus={onReturnFocus} /> : null}
     </div>
     {textBar && textShown && textRow2?.open && onSetTextWritingMode && onSetTextOrientation ? (
       <TextRow2 id={row2Id} role="group">
