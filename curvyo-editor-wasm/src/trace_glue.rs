@@ -4,13 +4,71 @@
 
 use curvyo_document_core::Length;
 use curvyo_ui_core::{
-    TRACE_ADVANCED_PARAMS, TRACE_PARAMS, TRACE_PRESETS, TraceDenoise, TraceParamKind,
-    TraceParamUnit, TraceParams, TracePixelLength, TraceUpscale,
+    TRACE_ADVANCED_PARAMS, TRACE_DEFAULT_BACKGROUND_TOLERANCE, TRACE_DEFAULT_PICK_TOLERANCE,
+    TRACE_METHOD_PARAMS, TRACE_PARAMS, TRACE_PRESETS, TraceDenoise, TraceMethod, TraceParamKind,
+    TraceParamUnit, TraceParams, TracePixelLength, TraceRgb, TraceSwatches, TraceUpscale,
 };
 
-/// `settings` (the host's JSON: `threshold`, `smooth`, `tolerance` in source px, `specks` in mm, `corners`, `upscale` and
-/// `denoise` as choice indices, `invert`, `ignore_background`) as trace
-/// values (criteria 41, 60); a missing or unreadable field takes its first-use value.
+/// `#RRGGBB` (or `RRGGBB`) as a colour; `None` for anything else.
+#[must_use]
+pub fn parse_hex(text: &str) -> Option<TraceRgb> {
+    let digits = text.strip_prefix('#').unwrap_or(text);
+    if digits.len() != 6 || !digits.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return None;
+    }
+    let channel = |i: usize| u8::from_str_radix(&digits[i..i + 2], 16).ok();
+    Some(TraceRgb::new(channel(0)?, channel(2)?, channel(4)?))
+}
+
+/// A colour as `#RRGGBB`.
+#[must_use]
+pub fn hex(colour: TraceRgb) -> String {
+    format!("#{:02X}{:02X}{:02X}", colour.r, colour.g, colour.b)
+}
+
+/// The method of `json` (`method` 0 Brightness, 1 Remove background, 2 Pick colours; `background`
+/// `#RRGGBB` or null for a transparent one, the colour of both colour methods; `swatches` a list of `#RRGGBB`; `colour_tolerance`
+/// 0 to 100, the method's default when missing), Brightness for anything unreadable.
+fn method(json: &serde_json::Value) -> TraceMethod {
+    let tolerance = |default: u8| {
+        json.get("colour_tolerance")
+            .and_then(serde_json::Value::as_u64)
+            .and_then(|v| u8::try_from(v.min(100)).ok())
+            .unwrap_or(default)
+    };
+    let background = json
+        .get("background")
+        .and_then(serde_json::Value::as_str)
+        .and_then(parse_hex);
+    match json.get("method").and_then(serde_json::Value::as_u64) {
+        Some(1) => TraceMethod::RemoveBackground {
+            background,
+            tolerance: tolerance(TRACE_DEFAULT_BACKGROUND_TOLERANCE),
+        },
+        Some(2) => {
+            let colours: Vec<TraceRgb> = json
+                .get("swatches")
+                .and_then(serde_json::Value::as_array)
+                .map(|list| {
+                    list.iter()
+                        .filter_map(|v| v.as_str().and_then(parse_hex))
+                        .collect()
+                })
+                .unwrap_or_default();
+            TraceMethod::PickColours {
+                swatches: TraceSwatches::from_slice(&colours),
+                background,
+                tolerance: tolerance(TRACE_DEFAULT_PICK_TOLERANCE),
+            }
+        }
+        _ => TraceMethod::Brightness,
+    }
+}
+
+/// `settings` (the host's JSON: `threshold`, `smooth`, `tolerance` in source px, `specks` in mm,
+/// `corners`, `upscale` and `denoise` as choice indices, `invert`, `ignore_background`, and the
+/// method's `method`, `background`, `swatches`, `colour_tolerance`) as trace values (criteria
+/// 41, 60; `specs/0089` criterion 14); a missing or unreadable field takes its first-use value.
 pub fn trace_settings(settings: &str) -> TraceParams {
     let json: serde_json::Value = serde_json::from_str(settings).unwrap_or_default();
     let byte = |name: &str| {
@@ -21,6 +79,7 @@ pub fn trace_settings(settings: &str) -> TraceParams {
     let flag = |name: &str| json.get(name).and_then(serde_json::Value::as_bool);
     let first = TraceParams::with_threshold(byte("threshold").unwrap_or(128));
     TraceParams {
+        selection: method(&json),
         smooth: byte("smooth").unwrap_or(first.smooth),
         tolerance: json
             .get("tolerance")
@@ -66,12 +125,14 @@ pub fn trace_presets_json() -> String {
 
 /// The settings schema as JSON (criteria 6 and 45): a list of `{name, label, kind, unit, min,
 /// max, default, step, big_step, fine_step, group, advanced, choices}` the bar's fields and the
-/// Advanced block are made from, the bar's first, then the Advanced block's in its order.
+/// Advanced block are made from, the bar's first, then the Advanced block's in its order, then
+/// the method's (`specs/0089` criterion 14).
 #[must_use]
 pub fn trace_params_json() -> String {
     let list: Vec<serde_json::Value> = TRACE_PARAMS
         .iter()
         .chain(TRACE_ADVANCED_PARAMS)
+        .chain(TRACE_METHOD_PARAMS)
         .map(|p| {
             serde_json::json!({
                 "name": p.name,
@@ -116,6 +177,48 @@ mod tests {
         assert_eq!(partial, TraceParams::with_threshold(40));
     }
 
+    /// `specs/0089` criterion 14: the method and its fields cross; a missing tolerance is the
+    /// method's default; unreadable colours are dropped.
+    #[test]
+    fn the_method_crosses_as_json() {
+        let p = trace_settings(r##"{"method":1,"background":"#3366cc","colour_tolerance":30}"##);
+        assert_eq!(
+            p.selection,
+            TraceMethod::RemoveBackground {
+                background: Some(TraceRgb::new(0x33, 0x66, 0xCC)),
+                tolerance: 30
+            }
+        );
+        let p = trace_settings(r#"{"method":1,"background":null}"#);
+        assert_eq!(
+            p.selection,
+            TraceMethod::RemoveBackground {
+                background: None,
+                tolerance: TRACE_DEFAULT_BACKGROUND_TOLERANCE
+            }
+        );
+        let p = trace_settings(
+            r##"{"method":2,"background":"#FFFFFF","swatches":["#FFF2A8","nonsense","D9D9D9"]}"##,
+        );
+        assert_eq!(
+            p.selection,
+            TraceMethod::PickColours {
+                swatches: TraceSwatches::from_slice(&[
+                    TraceRgb::new(0xFF, 0xF2, 0xA8),
+                    TraceRgb::new(0xD9, 0xD9, 0xD9)
+                ]),
+                background: Some(TraceRgb::new(0xFF, 0xFF, 0xFF)),
+                tolerance: TRACE_DEFAULT_PICK_TOLERANCE
+            }
+        );
+        assert_eq!(
+            trace_settings(r#"{"method":7}"#).selection,
+            TraceMethod::Brightness
+        );
+        assert_eq!(hex(TraceRgb::new(1, 0xAB, 255)), "#01ABFF");
+        assert_eq!(parse_hex("#12345"), None);
+    }
+
     #[test]
     fn the_presets_and_the_schema_cross_as_json() {
         let presets: serde_json::Value = serde_json::from_str(&trace_presets_json()).unwrap();
@@ -140,9 +243,12 @@ mod tests {
                 "ignore_background",
                 "denoise",
                 "upscale",
-                "corners"
+                "corners",
+                "method",
+                "colour_tolerance"
             ]
         );
+        assert_eq!(params[5]["label"], "Drop border shapes");
         assert_eq!(
             params[6]["choices"],
             serde_json::json!(["Off", "Low", "High"])

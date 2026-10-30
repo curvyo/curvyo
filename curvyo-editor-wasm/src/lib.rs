@@ -131,8 +131,10 @@ pub use session::{
 };
 pub use session::{LayoutOutcome, ObjectToPathOutcome, StyleOutcome, TextBarView, TextSizeOutcome};
 pub use session::{TextPathPress, TextPathView};
-pub use session::{TraceCreateOutcome, TraceSelection, TraceSource, TraceView, TraceViewMode};
-pub use trace_glue::{trace_params_json, trace_presets_json, trace_settings};
+pub use session::{
+    TraceCreateOutcome, TracePickMode, TraceSelection, TraceSource, TraceView, TraceViewMode,
+};
+pub use trace_glue::{hex as trace_hex, trace_params_json, trace_presets_json, trace_settings};
 
 #[cfg(target_arch = "wasm32")]
 pub use wasm_api::{WasmSession, init_panic_hook};
