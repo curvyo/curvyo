@@ -5,7 +5,9 @@
 use std::ops::ControlFlow;
 
 use curvyo_document_core::{Affine, Length};
-use curvyo_vectorize_core::{Phase, Progress, Raster, TraceError, TraceParams, trace};
+use curvyo_vectorize_core::{
+    Phase, Progress, Raster, Rgb8 as TraceRgb, TraceError, TraceParams, trace,
+};
 use kurbo::{BezPath, PathEl, Point};
 
 /// How a trace job ended.
@@ -169,6 +171,37 @@ pub fn trace_auto_threshold(rgba: &[u8], width: u32, height: u32) -> u8 {
         height,
         rgba,
     })
+}
+
+/// The background colour Remove background's Auto suggests for `rgba` (`width` x `height`),
+/// for the worker (`specs/0089` criterion 16); `None` for a transparent background.
+#[must_use]
+pub fn trace_suggest_background(rgba: &[u8], width: u32, height: u32) -> Option<TraceRgb> {
+    curvyo_vectorize_core::suggest_background(Raster {
+        width,
+        height,
+        rgba,
+    })
+}
+
+/// The colour the Trace pipette takes at pixel (`x`, `y`) of `rgba` (`specs/0089` criterion 17).
+#[must_use]
+pub fn trace_sample_colour(
+    rgba: &[u8],
+    width: u32,
+    height: u32,
+    x: u32,
+    y: u32,
+) -> Option<TraceRgb> {
+    curvyo_vectorize_core::sample_colour(
+        Raster {
+            width,
+            height,
+            rgba,
+        },
+        x,
+        y,
+    )
 }
 
 fn status_only(status: TraceStatus) -> Vec<f64> {

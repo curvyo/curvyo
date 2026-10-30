@@ -50,6 +50,8 @@ pub(super) struct TraceState {
     /// The view is moving (a pan or zoom has not rested yet): the kept meshes are drawn as they
     /// are, whatever the zoom (criterion 56).
     pub(super) moving: bool,
+    /// The pipette (`trace_pick.rs`).
+    pub(super) pick: super::trace_pick::TracePick,
     /// The reduced copy of the last picture asked for: every preview of a large image traces it
     /// (criteria 10 and 52), and making it costs the main thread tens of milliseconds
     /// (criterion 58).
@@ -114,7 +116,7 @@ pub enum TraceCreateOutcome {
 
 impl Session {
     /// The selected images when only images are selected.
-    fn trace_images(&self) -> (TraceSelection, Vec<ImageSnapshot>) {
+    pub(super) fn trace_images(&self) -> (TraceSelection, Vec<ImageSnapshot>) {
         let ids = self.selection.ids();
         if ids.is_empty() {
             return (TraceSelection::Empty, Vec::new());

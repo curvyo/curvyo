@@ -6,7 +6,7 @@
 use curvyo_document_core::NodeId;
 use wasm_bindgen::prelude::*;
 
-use crate::session::{TraceCreateOutcome, TraceSelection, TraceViewMode};
+use crate::session::{TraceCreateOutcome, TracePickMode, TraceSelection, TraceViewMode};
 use crate::wasm_api::WasmSession;
 
 fn count(n: usize) -> u32 {
@@ -31,8 +31,9 @@ extern "C" {
 }
 
 /// One trace for the worker (criterion 17): `rgba` (`width` x `height`, straight alpha) mapped
-/// by `map` (`[a, b, c, d, e, f]`) with `settings` (JSON: `threshold`, `smooth`, `specks` in mm,
-/// `corners`, `upscale` and `denoise` as choice indices, `invert`, `ignore_background`); the
+/// by `map` (`[a, b, c, d, e, f]`) with `settings` (JSON: `threshold`, `smooth`, `tolerance`,
+/// `specks` in mm, `corners`, `upscale` and `denoise` as choice indices, `invert`,
+/// `ignore_background`, `method`, `background`, `swatches`, `colour_tolerance`); the
 /// result as the flat numbers of `curvyo_ui_core::trace_job_with`. `progress` hears each higher
 /// whole percent (criterion 10). Never throws: bad input reads as the status
 /// "invalid".
@@ -72,6 +73,16 @@ pub fn trace_presets() -> String {
 #[must_use]
 pub fn trace_auto_threshold(rgba: &[u8], width: u32, height: u32) -> u8 {
     curvyo_ui_core::trace_auto_threshold(rgba, width, height)
+}
+
+/// The background colour Remove background's Auto suggests for a picture (`specs/0089`
+/// criterion 16), for the worker: `#RRGGBB`, or empty for a transparent background.
+#[wasm_bindgen]
+#[must_use]
+pub fn trace_suggest_background(rgba: &[u8], width: u32, height: u32) -> String {
+    curvyo_ui_core::trace_suggest_background(rgba, width, height)
+        .map(crate::trace_glue::hex)
+        .unwrap_or_default()
 }
 
 /// The settings schema as JSON (criteria 6 and 45): a list of `{name, label, kind, unit, min,
@@ -225,6 +236,50 @@ impl WasmSession {
     /// tool's kept meshes are drawn at any zoom (criterion 56).
     pub fn set_trace_view_moving(&mut self, moving: bool) {
         self.session.set_trace_view_moving(moving);
+    }
+
+    /// Arms the Trace pipette (`specs/0089` criteria 16, 17): `"background"` (one pick) or
+    /// `"colours"` (stays armed); anything else disarms it.
+    pub fn set_trace_pick(&mut self, mode: &str) {
+        self.session.set_trace_pick(match mode {
+            "background" => Some(TracePickMode::Background),
+            "colours" => Some(TracePickMode::Colours),
+            _ => None,
+        });
+    }
+
+    /// What the Trace pipette is armed for: `"background"`, `"colours"` or empty.
+    #[must_use]
+    pub fn trace_pick_mode(&self) -> String {
+        match self.session.trace_pick_mode() {
+            Some(TracePickMode::Background) => "background",
+            Some(TracePickMode::Colours) => "colours",
+            None => "",
+        }
+        .to_string()
+    }
+
+    /// The colour a click would take while the Trace pipette is armed, as `#RRGGBB`; empty where
+    /// there is none; `undefined` while it is disarmed.
+    #[must_use]
+    pub fn trace_pick_hover(&self) -> Option<String> {
+        self.session
+            .trace_pick_hover()
+            .map(|colour| colour.map(crate::trace_glue::hex).unwrap_or_default())
+    }
+
+    /// The pick the host has not taken yet as `[#RRGGBB, "add"]` (Shift) or `[#RRGGBB, ""]`;
+    /// empty when there is none.
+    pub fn take_trace_pick(&mut self) -> Vec<String> {
+        self.session
+            .take_trace_pick()
+            .map(|(colour, add)| {
+                vec![
+                    crate::trace_glue::hex(colour),
+                    if add { "add" } else { "" }.to_string(),
+                ]
+            })
+            .unwrap_or_default()
     }
 
     /// Create paths over every selected image, one step (criteria 12, 13, 46).

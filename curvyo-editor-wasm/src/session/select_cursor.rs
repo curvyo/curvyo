@@ -43,7 +43,7 @@ impl Session {
     /// changes.
     #[must_use]
     pub fn cursor_hint(&self) -> String {
-        if self.colour_pick_target().is_some() {
+        if self.colour_pick_target().is_some() || self.trace_pick_mode().is_some() {
             return "eyedropper".to_string();
         }
         // Pick mode and the position handle of a text on path (`0080` UX notes §2, §3.1).

@@ -436,3 +436,58 @@ fn a_result_over_20000_nodes_is_one_group_in_one_step() {
     session.undo();
     assert_eq!(session.document.object_ids(), images);
 }
+
+/// `specs/0089` criteria 16 and 17, Frage 89 A: the armed pipette takes the working image's
+/// colour under a press for the host and nothing else; Shift adds; Pick colours stays armed,
+/// Remove background disarms after one pick; outside the image nothing is taken; leaving the
+/// tool disarms it.
+#[test]
+fn the_trace_pipette_takes_the_colour_under_a_press() {
+    use super::TracePickMode;
+    let mut session = Session::new(1);
+    let images = import_images(&mut session, 1);
+    session.set_tool(Tool::Trace);
+    let source = session.trace_source(images[0], false).unwrap();
+    let corners = session
+        .objects()
+        .iter()
+        .find_map(|o| match o {
+            ObjectSnapshot::Image(image) => Some(image.corners()),
+            _ => None,
+        })
+        .unwrap();
+    let middle = Point::new(
+        f64::midpoint(corners[0].x, corners[2].x),
+        f64::midpoint(corners[0].y, corners[2].y),
+    );
+    let expected =
+        curvyo_ui_core::trace_sample_colour(&source.rgba, source.width, source.height, 1, 0);
+    assert!(session.trace_pick_hover().is_none(), "disarmed");
+    session.set_trace_pick(Some(TracePickMode::Colours));
+    assert_eq!(session.cursor_hint(), "eyedropper");
+    session.pointer_hover(middle, false, false);
+    assert_eq!(session.trace_pick_hover(), Some(expected));
+    session.pointer_down(middle, true);
+    session.pointer_up(middle, true, false);
+    assert_eq!(session.take_trace_pick(), expected.map(|c| (c, true)));
+    assert_eq!(session.take_trace_pick(), None, "taken once");
+    assert_eq!(
+        session.selection.ids(),
+        &images[..],
+        "the press selects nothing"
+    );
+    assert_eq!(session.trace_pick_mode(), Some(TracePickMode::Colours));
+    let outside = Point::new(corners[2].x + 50.0, corners[2].y + 50.0);
+    session.pointer_down(outside, false);
+    session.pointer_up(outside, false, false);
+    assert_eq!(session.take_trace_pick(), None);
+    assert_eq!(session.selection.ids(), &images[..]);
+    session.set_trace_pick(Some(TracePickMode::Background));
+    session.pointer_down(middle, false);
+    session.pointer_up(middle, false, false);
+    assert_eq!(session.take_trace_pick(), expected.map(|c| (c, false)));
+    assert_eq!(session.trace_pick_mode(), None, "one background pick");
+    session.set_trace_pick(Some(TracePickMode::Colours));
+    session.set_tool(Tool::Select);
+    assert_eq!(session.trace_pick_mode(), None);
+}

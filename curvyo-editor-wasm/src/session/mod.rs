@@ -155,6 +155,7 @@ mod tolerances;
 mod trace;
 mod trace_draw;
 mod trace_mesh;
+mod trace_pick;
 #[cfg(test)]
 mod trace_tests;
 mod transform_entry;
@@ -217,6 +218,7 @@ pub use text_path::ObjectToPathOutcome;
 pub use text_style::StyleOutcome;
 pub use trace::{TraceCreateOutcome, TraceSelection, TraceSource, TraceView};
 pub use trace_draw::TraceViewMode;
+pub use trace_pick::TracePickMode;
 pub use weld::WeldOutcome;
 
 pub use open_error::map_open_error;
@@ -721,7 +723,7 @@ impl Session {
             // against, if the mouse was released outside the slider itself.
             this.flush_select_bar_preview();
             this.flush_style_preview();
-            if this.colour_pick_press(point) {
+            if this.colour_pick_press(point) || this.trace_pick_press(point, shift) {
                 return;
             }
             // During a placement a press places or is ignored; it starts no drag (`0052`
@@ -801,7 +803,7 @@ impl Session {
         self.hovered_object = None;
         self.held.shift = shift;
         self.held.ctrl = constrain;
-        if self.colour_pick_move(point) {
+        if self.colour_pick_move(point) || self.trace_pick_move(point) {
             return;
         }
         if self.text_path_pointer_move(point) {
@@ -855,7 +857,7 @@ impl Session {
     pub fn pointer_up(&mut self, point: Point, shift: bool, constrain: bool) {
         self.recording(|this| {
             this.button_down = false;
-            if this.colour_pick_release() {
+            if this.colour_pick_release() || this.trace_pick_release() {
                 return;
             }
             if this.text_path_pointer_up() {
