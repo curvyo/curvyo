@@ -1,4 +1,5 @@
-/** Shows the Trace view on the canvas: the View pill's mode and the peek and cycle keys. */
+/** Shows the Trace view on the canvas: the View pill's mode and the peek and cycle keys; a new
+ * view is reported to `onViewMode` (the Mask view fetches its mask). */
 import { useCallback, useEffect } from "react";
 
 import type { WasmSession } from "@/lib/editorSession";
@@ -8,13 +9,15 @@ export function useTraceViewMode(
   active: boolean,
   getSession: () => WasmSession | null,
   onChange: () => void,
+  onViewMode: (mode: string) => void,
 ): { viewMode: TraceViewMode; setViewMode: (mode: TraceViewMode) => void } {
   const setViewMode = useCallback(
     (mode: TraceViewMode) => {
       getSession()?.set_trace_view_mode(mode);
       onChange();
+      onViewMode(mode);
     },
-    [getSession, onChange],
+    [getSession, onChange, onViewMode],
   );
 
   // `\` held peeks at the image, Shift+`\` cycles the views (criterion 51), with focus on the
@@ -41,8 +44,10 @@ export function useTraceViewMode(
       }
       if (isCycleKey(event)) {
         event.preventDefault();
-        getSession()?.cycle_trace_view_mode();
+        const session = getSession();
+        session?.cycle_trace_view_mode();
         onChange();
+        onViewMode(session?.trace_view_mode() ?? "");
       } else if (isPeekKey(event)) {
         event.preventDefault();
         peeking = true;
@@ -66,7 +71,7 @@ export function useTraceViewMode(
       window.removeEventListener("blur", end);
       end();
     };
-  }, [active, getSession, onChange]);
+  }, [active, getSession, onChange, onViewMode]);
 
   // The view the session draws, read on every render (each sync renders); entering the tool
   // starts on Overlay.

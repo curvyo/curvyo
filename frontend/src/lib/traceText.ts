@@ -79,12 +79,14 @@ export const REDUCED_PREVIEW_OVER_PX = 4_000_000;
 /** Over this many nodes the status warns that the result is slow to edit (criterion 55). */
 export const SLOW_TO_EDIT_NODES = 100_000;
 
-/** A view of the Trace tool (criterion 51). */
-export type TraceViewMode = "overlay" | "trace" | "image";
+/** A view of the Trace tool (criterion 51; `specs/0089` criterion 21 adds Mask). */
+export type TraceViewMode = "overlay" | "mask" | "trace" | "image";
 
-/** The View pill's segments in order, with their tooltips (UX notes section 13). */
+/** The View pill's segments in order, with their tooltips (UX notes section 13, `specs/0089` UX
+ * notes §4: Mask after Overlay). */
 export const TRACE_VIEWS: readonly { mode: TraceViewMode; label: string; tooltip: string }[] = [
   { mode: "overlay", label: "Overlay", tooltip: "Overlay" },
+  { mode: "mask", label: "Mask", tooltip: "Mask" },
   { mode: "trace", label: "Trace", tooltip: "Trace" },
   { mode: "image", label: "Image", tooltip: "Image (\\)" },
 ];
@@ -113,7 +115,7 @@ export const DEFAULT_PICK_TOLERANCE = 19;
 /** The pipette's name and tooltip (UX notes §6, the Style eyedropper's words). */
 export const PICK_COLOUR = "Pick colour from the image";
 export const PICK_BACKGROUND = "Pick background colour from the image";
-export const PICK_TOOLTIP = "Pick a colour from the image (Esc cancels)";
+export const PICK_TOOLTIP = "Pick a colour from the image";
 
 /** The Auto toggle of Remove background and the hex of a transparent background (UX notes §5). */
 export const AUTO = "Auto";
@@ -205,7 +207,7 @@ export const TRACE_INFO_PAGE_ID = "trace-info-page";
 
 /** The info page's intro (criterion 70, exact text). */
 export const TRACE_INFO_INTRO =
-  "Trace turns the selected image into paths. Dark parts become shapes, light parts stay empty. Press Enter to create the paths.";
+  "Trace turns the selected image into paths. The method decides which parts become shapes. Press Enter or the Trace button to create the paths.";
 
 /** The info page's entries in bar order, each "Term: text" (criterion 70, exact text). */
 export const TRACE_INFO_ENTRIES: readonly string[] = [
@@ -214,11 +216,14 @@ export const TRACE_INFO_ENTRIES: readonly string[] = [
   "Photo: many shapes, photos trace roughly.",
   "Silhouette for cutting/carving: closed, simple, few nodes; drops shapes and holes below 2 mm.",
   "Engraving: keeps fine lines, drops shapes below 0.1 mm.",
-  "View: the image with the outline, the result alone, or the image alone. Hold \\ to peek at the image.",
+  "View: the image with the outline, the mask, the result alone, or the image alone. Hold \\ to peek at the image; Shift+\\ steps through the views.",
+  "Mask: what the tracer turns into shapes, black on white, after Ignore below and Drop border shapes.",
   "Method: how pixels become shapes.",
   "Brightness: pixels darker than the Threshold.",
-  "Remove background: everything unlike the background colour; Auto takes it from the image border, the pipette from a click.",
-  "Pick colours: pixels like the colours picked with the pipette; Shift+click adds a colour.",
+  "Remove background: everything unlike the background colour.",
+  "Background: the colour Remove background leaves out; Auto takes it from the image border.",
+  "Pick colours: pixels like the colours picked with the pipette; Shift+click adds a colour, up to 8.",
+  "Pipette: takes a colour from the image under a click; Esc ends it.",
   "Colour tolerance: how far a colour may be from the background or a picked colour and still count as it.",
   "Threshold: pixels darker than this brightness (0 to 100 %) become shapes.",
   "Smooth: calms the pixel steps of the outline before the fit; higher is calmer.",
@@ -607,7 +612,10 @@ export function settingsJson(values: TraceValues, threshold: number, suggested?:
 /** The remembered choice (criterion 66): the preset, whether it was edited, and the preset
  * values; the first use for a new user or anything unreadable. The Threshold always starts at the
  * image's automatic value (criterion 9); the switches start off (Proposal). A
- * slice-1 setting (`{ smooth, specks }`) reads as an edited Logo / Line art. */
+ * slice-1 setting (`{ smooth, specks }`) reads as an edited Logo / Line art; Smooth keeps its
+ * number and meaning (calmness, `specs/0089` Frage 85 B); a missing preset value is its preset's;
+ * a missing method is Brightness; keys of older builds (Node limit, Full-size preview) are
+ * ignored. */
 export function readChoice(
   params: readonly TraceParam[] = TRACE_PARAMS_FALLBACK,
   presets: readonly TracePreset[] = TRACE_PRESETS_FALLBACK,
@@ -615,8 +623,6 @@ export function readChoice(
 ): TraceChoice {
   const first = firstChoice(presets);
   const byName = (name: TraceParamName) => params.find((p) => p.name === name) ?? TRACE_PARAMS_FALLBACK.find((p) => p.name === name)!;
-  const number = (raw: Record<string, unknown>, field: keyof PresetValues, name: TraceParamName) =>
-    typeof raw[field] === "number" ? clampValue(byName(name), raw[field]) : first.values[field];
   try {
     const raw: unknown = JSON.parse(storage?.getItem(TRACE_VALUES_KEY) ?? "null");
     if (!raw || typeof raw !== "object") {
@@ -641,6 +647,11 @@ export function readChoice(
       return first;
     }
     const preset = typeof stored.preset === "string" && presets.some((p) => p.key === stored.preset) ? stored.preset : first.preset;
+    // A value the stored choice does not hold reads as its preset's (`specs/0089` Frage 85 B: a
+    // 0025 choice has no Tolerance and starts at its preset's, Silhouette 1.5 px, not Logo's).
+    const presetValues = presets.find((p) => p.key === preset)?.values ?? first.values;
+    const number = (raw: Record<string, unknown>, field: keyof PresetValues, name: TraceParamName) =>
+      typeof raw[field] === "number" ? clampValue(byName(name), raw[field]) : presetValues[field];
     return {
       preset,
       edited: slice1 || stored.edited === true,

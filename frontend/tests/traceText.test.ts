@@ -8,6 +8,7 @@ import path from "node:path";
 import { test } from "node:test";
 
 import {
+  BRIGHTNESS,
   NO_STATUS,
   withSwatchNote,
   TRACE_BAR_DESCRIPTION,
@@ -141,7 +142,7 @@ test("criterion 70: the info page's exact text", () => {
   assert.equal(TRACE_INFO_TITLE, "About Trace");
   assert.equal(
     TRACE_INFO_INTRO,
-    "Trace turns the selected image into paths. Dark parts become shapes, light parts stay empty. Press Enter to create the paths.",
+    "Trace turns the selected image into paths. The method decides which parts become shapes. Press Enter or the Trace button to create the paths.",
   );
   assert.deepEqual(TRACE_INFO_ENTRIES, [
     "Preset: a named set of values for what you do with the paths.",
@@ -149,11 +150,14 @@ test("criterion 70: the info page's exact text", () => {
     "Photo: many shapes, photos trace roughly.",
     "Silhouette for cutting/carving: closed, simple, few nodes; drops shapes and holes below 2 mm.",
     "Engraving: keeps fine lines, drops shapes below 0.1 mm.",
-    "View: the image with the outline, the result alone, or the image alone. Hold \\ to peek at the image.",
+    "View: the image with the outline, the mask, the result alone, or the image alone. Hold \\ to peek at the image; Shift+\\ steps through the views.",
+    "Mask: what the tracer turns into shapes, black on white, after Ignore below and Drop border shapes.",
     "Method: how pixels become shapes.",
     "Brightness: pixels darker than the Threshold.",
-    "Remove background: everything unlike the background colour; Auto takes it from the image border, the pipette from a click.",
-    "Pick colours: pixels like the colours picked with the pipette; Shift+click adds a colour.",
+    "Remove background: everything unlike the background colour.",
+    "Background: the colour Remove background leaves out; Auto takes it from the image border.",
+    "Pick colours: pixels like the colours picked with the pipette; Shift+click adds a colour, up to 8.",
+    "Pipette: takes a colour from the image under a click; Esc ends it.",
     "Colour tolerance: how far a colour may be from the background or a picked colour and still count as it.",
     "Threshold: pixels darker than this brightness (0 to 100 %) become shapes.",
     "Smooth: calms the pixel steps of the outline before the fit; higher is calmer.",
@@ -247,6 +251,36 @@ test("criteria 5 and 66: the choice is an app setting; Threshold starts automati
   assert.equal(readAdvancedOpen(storage), false);
   writeAdvancedOpen(true, storage);
   assert.equal(readAdvancedOpen(storage), true);
+});
+
+test("0089 criterion 13, Frage 85 B: remembered settings of older builds keep their meaning", () => {
+  const storage = memoryStorage();
+  const stored = (value: unknown) => {
+    storage.store.set("curvyo.trace-values", JSON.stringify(value));
+    return readChoice(TRACE_PARAMS_FALLBACK, TRACE_PRESETS_FALLBACK, storage);
+  };
+  // A 0025 choice (before slices D and C): no Tolerance, no method, a Node limit and a full-size
+  // flag of slice 2; Smooth keeps its number (calmness), the Tolerance is the preset's.
+  for (const preset of TRACE_PRESETS_FALLBACK) {
+    const read = stored({ preset: preset.key, edited: false, values: { ...preset.values, tolerance: undefined, nodeLimit: 5000, fullSize: true } });
+    assert.deepEqual([read.preset, read.edited], [preset.key, false], preset.key);
+    assert.equal(read.values.tolerance, preset.values.tolerance, `${preset.key} starts at its own Tolerance`);
+    assert.equal(read.values.smooth, preset.values.smooth);
+    assert.equal(read.values.method, BRIGHTNESS, "no method reads as Brightness");
+    assert.ok(!("nodeLimit" in read.values) && !("fullSize" in read.values));
+  }
+  // An edited 0025 Silhouette: its edited values stay, the missing Tolerance is Silhouette's.
+  const custom = stored({ preset: "silhouette", edited: true, values: { smooth: 60, specks: 3, corners: 50, upscale: 0, denoise: 2 } });
+  assert.deepEqual(
+    [custom.preset, custom.edited, custom.values.smooth, custom.values.tolerance, custom.values.specks, custom.values.corners, custom.values.upscale, custom.values.denoise],
+    ["silhouette", true, 60, 1.5, 3, 50, 0, 2],
+  );
+  // A stored "Ignore background" (never written by any build) does not switch Drop border shapes
+  // on: the toggles start off; an unknown preset key reads as the first preset.
+  const old = stored({ preset: "lineart", edited: false, values: { smooth: 70 }, ignoreBackground: true, ignore_background: true });
+  assert.deepEqual([old.preset, old.values.ignoreBackground, old.values.invert, old.values.smooth, old.values.tolerance], ["logo", false, false, 70, 0.5]);
+  // The settings the worker reads keep the old key: Drop border shapes is `ignore_background`.
+  assert.equal(JSON.parse(settingsJson({ ...firstChoice().values, ignoreBackground: true }, 128)).ignore_background, true);
 });
 
 test("criteria 40, 59, 60: presets, Custom as stored state", () => {
@@ -368,11 +402,12 @@ test("criterion 35: the notices are the same strings in the user page", () => {
   }
 });
 
-test("criterion 51: the View pill's segments and the backslash keys", () => {
+test("criterion 51 and 0089 criterion 21: the View pill's segments and the backslash keys", () => {
   assert.deepEqual(
     TRACE_VIEWS.map((v) => [v.mode, v.label, v.tooltip]),
     [
       ["overlay", "Overlay", "Overlay"],
+      ["mask", "Mask", "Mask"],
       ["trace", "Trace", "Trace"],
       ["image", "Image", "Image (\\)"],
     ],

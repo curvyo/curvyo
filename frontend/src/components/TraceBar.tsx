@@ -1,4 +1,4 @@
-import { CircleAlert, Image, Info, Layers, Spline, X } from "lucide-react";
+import { Binary, CircleAlert, Image, Info, Layers, Spline, X } from "lucide-react";
 import { Tooltip } from "radix-ui";
 import { useId, useRef } from "react";
 import type { KeyboardEvent } from "react";
@@ -89,11 +89,11 @@ export function TraceButton({ onTrace, onReturnFocus }: { onTrace: () => void; o
   );
 }
 
-const VIEW_ICONS: Record<TraceViewMode, typeof Image> = { overlay: Layers, trace: Spline, image: Image };
+const VIEW_ICONS: Record<TraceViewMode, typeof Image> = { overlay: Layers, mask: Binary, trace: Spline, image: Image };
 
-/** The View pill (criterion 51, UX notes section 13): three icon segments, one Tab stop, the
- * arrows move and select; the pressed segment is the view on the canvas, Image while `\` is
- * held. */
+/** The View pill (criterion 51, UX notes section 13; `specs/0089` criterion 21): four icon
+ * segments, Overlay, Mask, Trace, Image, one Tab stop, the arrows move and select; the pressed
+ * segment is the view on the canvas, Image while `\` is held. */
 function ViewPill({ mode, onMode }: { mode: TraceViewMode; onMode: (mode: TraceViewMode) => void }) {
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
   const at = Math.max(0, TRACE_VIEWS.findIndex((v) => v.mode === mode));
