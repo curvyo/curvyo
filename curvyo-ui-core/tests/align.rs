@@ -137,6 +137,31 @@ fn c7_a_distribute_with_fewer_than_three_objects_is_all_zero() {
     }
 }
 
+/// The customer's amendment of 2026-10-30: a typed gap spaces the second of
+/// two objects from the first; without one, two change nothing.
+#[test]
+fn a_typed_gap_distributes_two_objects_from_the_first() {
+    let boxes = [rect(0.0, 0.0, 10.0, 10.0), rect(30.0, 0.0, 40.0, 10.0)];
+    let moves = distribute_translations(
+        &boxes,
+        AlignAxis::Horizontal,
+        DistributeMode::Gaps,
+        Some(5.0),
+    );
+    assert_eq!(dx(moves[0]), 0.0);
+    assert_eq!(dx(moves[1]), 15.0 - 30.0);
+    // Centres and the end-relative gaps still need three.
+    let moves = distribute_translations(
+        &boxes,
+        AlignAxis::Horizontal,
+        DistributeMode::Centres,
+        Some(5.0),
+    );
+    assert!(moves.iter().all(|m| *m == Vec2::ZERO));
+    let moves = distribute_translations(&boxes, AlignAxis::Horizontal, DistributeMode::Gaps, None);
+    assert!(moves.iter().all(|m| *m == Vec2::ZERO));
+}
+
 /// Criterion 8: a typed gap replaces the ends; the first stays.
 #[test]
 fn c8_a_typed_gap_spaces_from_the_first_object() {

@@ -184,10 +184,12 @@ pub fn align_translations(
 /// `axis` by `mode` (criterion 6). The boxes are ordered by their position on
 /// the axis; with [`DistributeMode::Gaps`] and no `gap_mm` the first and last
 /// stay and the others get equal gaps between them; with a typed `gap_mm` the
-/// first stays and the others are spaced from it (criterion 8). With
-/// [`DistributeMode::Centres`] the first and last stay and the centres are
-/// evenly spaced between them. Fewer than three boxes change nothing
-/// (criterion 7): every translation is zero.
+/// first stays and the others are spaced from it (criterion 8) — from two
+/// boxes, since the typed gap does not need the ends to define the spacing
+/// (the customer's amendment of 2026-10-30). With [`DistributeMode::Centres`]
+/// the first and last stay and the centres are evenly spaced between them.
+/// Below that (fewer than three boxes, or two without a typed gap) nothing
+/// changes (criterion 7): every translation is zero.
 #[must_use]
 pub fn distribute_translations(
     boxes: &[AlignBox],
@@ -196,7 +198,12 @@ pub fn distribute_translations(
     gap_mm: Option<f64>,
 ) -> Vec<Vec2> {
     let zero = Vec2::ZERO;
-    if boxes.len() < 3 {
+    let floor_of = if gap_mm.is_some() && mode == DistributeMode::Gaps {
+        2
+    } else {
+        3
+    };
+    if boxes.len() < floor_of {
         return vec![zero; boxes.len()];
     }
     // Order by position on the axis, stable, so ties keep the input (paint)
@@ -210,14 +217,14 @@ pub fn distribute_translations(
     });
     let first = boxes[order[0]];
     let last = boxes[order[order.len() - 1]];
-    let mut targets = vec![0.0; boxes.len()];
+    let mut placements = vec![0.0; boxes.len()];
     match mode {
         DistributeMode::Centres => {
             let start = first.centre(axis);
             let step = (last.centre(axis) - start)
                 / f64::from(u32::try_from(boxes.len() - 1).unwrap_or(1));
             for (rank, &index) in order.iter().enumerate() {
-                targets[index] = start + step * f64::from(u32::try_from(rank).unwrap_or(0))
+                placements[index] = start + step * f64::from(u32::try_from(rank).unwrap_or(0))
                     - boxes[index].centre(axis);
             }
         }
@@ -233,14 +240,14 @@ pub fn distribute_translations(
             });
             let mut cursor = first.start(axis);
             for &index in &order {
-                targets[index] = cursor - boxes[index].start(axis);
+                placements[index] = cursor - boxes[index].start(axis);
                 cursor += boxes[index].extent(axis) + gap;
             }
         }
     }
-    targets
+    placements
         .into_iter()
-        .map(|delta| translation(axis, delta))
+        .map(|placement| translation(axis, placement))
         .collect()
 }
 

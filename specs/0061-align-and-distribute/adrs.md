@@ -43,3 +43,10 @@ choices marked **Proposal** are reversible in this story.
   millimetres; `None` is the empty field ("keep the ends").
 - Ties in distribute order (equal start coordinate) keep the document's paint
   order (stable sort) — deterministic, no selection-order dependence.
+- **Amended 2026-10-30** (customer, "distribute funktioniert noch gar
+  nicht"): a typed gap distributes from two units — the ends do not define
+  the spacing a typed gap needs (the spec's amendment of criterion 7).
+  Without a typed gap, three or more. The Gap field takes the "Bar number
+  field" look: label outside, value right-aligned with the `mm` suffix inside
+  the right edge, so value and unit never overlap, Escape restores the value
+  the field had.

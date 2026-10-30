@@ -1,4 +1,5 @@
 import { Tooltip } from "radix-ui";
+import { useId, useRef } from "react";
 
 import type { AlignApi } from "@/hooks/useAlign";
 import {
@@ -192,51 +193,69 @@ function DistributeButton({ code, align, onReturnFocus }: DistributeButtonProps)
 
 /** The Gap field next to the distribute buttons: a typed gap in millimetres
  * replaces the ends; empty keeps them (`specs/0061-align-and-distribute/`
- * criterion 8, UX notes). Enter distributes, Escape restores the shown
- * value and writes nothing — the bar fields' rule. */
+ * criterion 8, UX notes). The "Bar number field" look: the label outside,
+ * the value right-aligned with room for the `mm` suffix inside the right
+ * edge, so value and unit never overlap. Enter distributes, Escape restores
+ * the value the field had and writes nothing. */
 function GapField({ align }: { align: AlignApi }) {
+  const id = useId();
+  const previous = useRef("");
   return (
-    <div className="relative">
-      <input
-        type="text"
-        aria-label="Gap, millimetres"
-        aria-invalid={align.gapError !== null}
-        value={align.gap}
-        placeholder="Gap"
-        onChange={(event) => align.setGap(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === "Enter") {
-            align.distribute("h-gaps");
-          } else if (event.key === "Escape") {
-            align.setGap("");
-          } else {
-            return;
-          }
-          event.preventDefault();
-        }}
-        className="h-7 w-[84px] rounded-[5px] bg-white px-2 text-right text-sm tabular-nums text-[var(--toolbar-icon)] outline-none aria-[invalid]:ring-2 aria-[invalid]:ring-[var(--field-invalid)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
-        style={{ color: "var(--toolbar-icon)" }}
-      />
-      <span
-        aria-hidden
-        className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs"
-        style={{ color: "var(--panel-muted-fg)" }}
-      >
-        {align.gap === "" ? "mm" : ""}
-      </span>
-      {align.gapError !== null ? (
-        <div
-          role="status"
-          className="absolute top-full left-0 z-50 mt-1 w-max rounded-md px-2 py-1 text-xs"
-          style={{
-            background: "var(--toolbar-bg)",
-            color: "var(--toolbar-icon)",
-            boxShadow: "var(--panel-elevation-shadow)",
+    <div className="relative flex items-center gap-1.5 text-[var(--toolbar-icon)]">
+      <label htmlFor={`${id}-field`}>Gap</label>
+      <div className="relative w-[84px]">
+        <input
+          id={`${id}-field`}
+          type="text"
+          inputMode="decimal"
+          autoComplete="off"
+          spellCheck={false}
+          aria-label="Gap, millimetres"
+          aria-invalid={align.gapError !== null}
+          value={align.gap}
+          onFocus={(event) => {
+            previous.current = align.gap;
+            event.currentTarget.select();
           }}
+          onChange={(event) => align.setGap(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              align.distribute("h-gaps");
+            } else if (event.key === "Escape") {
+              event.preventDefault();
+              align.setGap(previous.current);
+              event.currentTarget.blur();
+            }
+          }}
+          className={`h-7 w-full rounded-[5px] border bg-white pr-8 text-right text-sm tabular-nums outline-none ${
+            align.gapError !== null
+              ? "border-[var(--field-invalid)] shadow-[inset_0_0_0_2px_var(--field-invalid)]"
+              : "border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] focus:border-[var(--editor-accent)] focus:shadow-[inset_0_0_0_1px_var(--editor-accent)]"
+          }`}
+          style={{ color: "var(--toolbar-icon)" }}
+        />
+        <span
+          aria-hidden
+          className="pointer-events-none absolute top-1/2 right-1.5 -translate-y-1/2 text-xs"
+          style={{ opacity: 0.7 }}
         >
-          {align.gapError}
-        </div>
-      ) : null}
+          mm
+        </span>
+        {align.gapError !== null ? (
+          <div
+            role="status"
+            className="absolute top-full left-0 z-50 mt-1 w-max rounded-md px-2 py-1 text-xs"
+            style={{
+              background: "var(--toolbar-bg)",
+              color: "var(--toolbar-icon)",
+              boxShadow: "var(--panel-elevation-shadow)",
+            }}
+          >
+            {align.gapError}
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }

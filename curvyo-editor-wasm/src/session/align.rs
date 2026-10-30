@@ -350,14 +350,34 @@ mod tests {
     fn a_distribute_with_fewer_than_three_objects_writes_nothing() {
         let mut session = Session::new(1);
         two_rects(&mut session);
+        // Without a typed gap the ends define the spacing: two change nothing.
+        assert_eq!(
+            session.distribute_selection(
+                curvyo_ui_core::AlignAxis::Horizontal,
+                curvyo_ui_core::DistributeMode::Gaps,
+                None,
+            ),
+            AlignOutcome::Unchanged
+        );
+    }
+
+    #[test]
+    fn a_typed_gap_distributes_two_objects_from_the_first() {
+        let mut session = Session::new(1);
+        two_rects(&mut session);
         assert_eq!(
             session.distribute_selection(
                 curvyo_ui_core::AlignAxis::Horizontal,
                 curvyo_ui_core::DistributeMode::Gaps,
                 Some(5.0),
             ),
-            AlignOutcome::Unchanged
+            AlignOutcome::Aligned
         );
+        // The second rectangle's left edge: 0 + 30 (the first's extent) + 5.
+        assert_eq!(left_x(&session, 1), 35.0);
+        // One undo puts the second rectangle back.
+        assert!(session.undo().changed);
+        assert_eq!(left_x(&session, 1), 50.0);
     }
     #[test]
     fn a_clone_moves_through_its_own_matrix_and_the_original_stays() {

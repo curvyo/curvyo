@@ -63,18 +63,22 @@ labels, no dialog (criterion 1).
 ## Gap field (criterion 8)
 
 - One number field **right of the four Distribute buttons**, 84 px wide, the
-  "Bar number field" look (28 px high, white ground, 14 px tabular, right
-  aligned, fixed `mm` suffix inside the right edge), visible label "Gap"
-  inside the left edge. Accessible name "Gap, millimetres".
+  "Bar number field" look: the visible label "Gap" **outside, left of the
+  field** (the Radius field's structure), 28 px high, white ground, 14 px
+  tabular, right-aligned, the fixed `mm` suffix inside the right edge with
+  32 px of right padding on the value, so value and unit never overlap — the
+  unit is always visible. Accessible name "Gap, millimetres".
 - Empty (default) means "keep the ends": equal gaps between the outermost
-  objects. A typed value is the gap in millimetres and the outermost **left**
+  objects. A typed value is the gap in millimetres; the outermost **left**
   object stays while everything to its right is spaced from it (the same for
-  a vertical distribute, top stays).
-- Enter commits the distribute with the typed gap; the value stays for the
-  next press (session state, never saved). Escape restores the shown value
-  and writes nothing, as in every bar field. Text that is not a number is
-  refused with "Enter a number" and a negative value with "Must be 0 or
-  more." (**Proposal**; the field keeps the typed text and marks itself
+  a vertical distribute, top stays). **Amended 2026-10-30:** with a typed gap
+  two objects are enough — the second is spaced from the first (criterion 8
+  needs no ends); without one, three or more (criterion 7).
+- Enter distributes the horizontal gaps with the typed gap; the value stays
+  for the next press (session state, never saved). Escape restores the value
+  the field had and writes nothing, as in every bar field. Text that is not a
+  number is refused with "Enter a number" and a negative value with "Must be
+  0 or more." (**Proposal**; the field keeps the typed text and marks itself
   invalid, nothing is distributed.)
 - A distribute press ignores the field's value only when it is empty; there
   is no separate apply button.
