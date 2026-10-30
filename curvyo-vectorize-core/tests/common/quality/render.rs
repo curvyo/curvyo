@@ -29,6 +29,9 @@ pub struct Layer {
     /// A seam colour drawn under the ink over the ink's 3 x 3 dilation (grey seams of cheap
     /// resampling); not part of the truth.
     pub seam: Option<[u8; 4]>,
+    /// Whether the layer is content the trace must find (part of the truth); a layer the
+    /// selection must leave out (an unpicked colour, slice C) is not.
+    pub content: bool,
 }
 
 impl Layer {
@@ -37,6 +40,15 @@ impl Layer {
             shape,
             rgba,
             seam: None,
+            content: true,
+        }
+    }
+
+    /// A layer drawn but not content.
+    pub fn other(shape: Shape, rgba: [u8; 4]) -> Self {
+        Self {
+            content: false,
+            ..Self::ink(shape, rgba)
         }
     }
 }
@@ -70,7 +82,7 @@ impl Scene {
     /// The truth boundary at `scale` in pixels, or `None` when a layer is implicit.
     pub fn truth_paths(&self, scale: f64) -> Option<Vec<BezPath>> {
         let mut out = Vec::new();
-        for layer in &self.layers {
+        for layer in self.layers.iter().filter(|l| l.content) {
             match &layer.shape {
                 Shape::Paths(paths) => {
                     out.extend(paths.iter().map(|p| Affine::scale(scale) * p.clone()));
@@ -98,8 +110,10 @@ impl Scene {
                 composite(&mut rgba, &grown, seam);
             }
             composite(&mut rgba, &cover, layer.rgba);
-            for (t, s) in truth.iter_mut().zip(&samples) {
-                *t |= *s;
+            if layer.content {
+                for (t, s) in truth.iter_mut().zip(&samples) {
+                    *t |= *s;
+                }
             }
         }
         let bytes = rgba.iter().flat_map(|p| unpremultiply(*p)).collect();

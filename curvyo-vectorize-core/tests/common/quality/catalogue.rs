@@ -1,10 +1,14 @@
 //! The catalogue of the synthetic reference set (`specs/0089-trace-quality-and-colour` criteria
 //! 1, 2): per fixture its group, intended use, covered cases, what must be preserved, resolution.
 
+use super::super::Picture;
 use super::reference::{Feature, Group, Reference, Use};
 use super::scenes::{
     clipart_badge, geo_corners, geo_round, line_angles, line_hatching, line_strokes_open,
     line_webs, logo_jpeg, logo_pale, logo_shapes, logo_transparent,
+};
+use super::scenes_colour::{
+    logo_blue, logo_fringe, logo_pale_picked, logo_picked, logo_transparent_colour,
 };
 use super::scenes_more::{
     ai_hatching, ai_portrait, ai_symbol, diagram, photo_combined, photo_lighting, photo_shadow,
@@ -12,6 +16,10 @@ use super::scenes_more::{
     sketch_strokes,
 };
 use super::text::text_umlauts;
+use curvyo_vectorize_core::{
+    DEFAULT_BACKGROUND_TOLERANCE, DEFAULT_PICK_TOLERANCE, Rgb8, Selection, Swatches,
+    suggest_background,
+};
 
 /// The synthetic reference set, in report order.
 pub fn reference_set() -> Vec<Reference> {
@@ -264,6 +272,116 @@ pub fn reference_set() -> Vec<Reference> {
             preserve: "no truth: the large dark shapes (buildings, trees, figure)",
             dpi: 96.0,
             build: photo_street,
+        },
+    ]
+}
+
+/// How a fixture of the selection methods is selected (`specs/0089` slice C), at the method's
+/// default colour tolerance.
+#[derive(Debug, Clone, Copy)]
+pub enum Method {
+    /// Remove background with Auto: the suggested background colour (none on a transparent
+    /// border).
+    RemoveBackground,
+    /// Pick colours with these colours picked.
+    Pick(&'static [[u8; 3]]),
+}
+
+impl Method {
+    /// The selection of `picture` as the bar would hand it to the tracer.
+    pub fn selection(self, picture: &Picture) -> Selection {
+        match self {
+            Self::RemoveBackground => Selection::RemoveBackground {
+                background: suggest_background(picture.raster()),
+                tolerance: DEFAULT_BACKGROUND_TOLERANCE,
+            },
+            Self::Pick(colours) => {
+                let colours: Vec<Rgb8> = colours
+                    .iter()
+                    .map(|&[r, g, b]| Rgb8::new(r, g, b))
+                    .collect();
+                Selection::PickColours {
+                    swatches: Swatches::from_slice(&colours),
+                    background: suggest_background(picture.raster()),
+                    tolerance: DEFAULT_PICK_TOLERANCE,
+                }
+            }
+        }
+    }
+}
+
+/// A fixture of the selection methods with its method.
+pub struct Selected {
+    pub reference: Reference,
+    pub method: Method,
+}
+
+/// The fixtures of the selection methods (`specs/0089` slice C, criteria 15 to 19), measured in
+/// the reference table with their method.
+pub fn selection_set() -> Vec<Selected> {
+    vec![
+        Selected {
+            reference: Reference {
+                name: "logo-blue",
+                group: Group::Logos,
+                intended_use: Use::AreaEngraving,
+                covers: &[Feature::PaleColours],
+                preserve: "white ring, dark bar and the pale #FFF2A8 panel on #3366CC paper",
+                dpi: 96.0,
+                build: logo_blue,
+            },
+            method: Method::RemoveBackground,
+        },
+        Selected {
+            reference: Reference {
+                name: "logo-transparent-colour",
+                group: Group::Logos,
+                intended_use: Use::CutContour,
+                covers: &[Feature::Transparency],
+                preserve: "blue ring, pale star and black bar; the transparent background is \
+                           never content",
+                dpi: 96.0,
+                build: logo_transparent_colour,
+            },
+            method: Method::RemoveBackground,
+        },
+        Selected {
+            reference: Reference {
+                name: "logo-pale-picked",
+                group: Group::Logos,
+                intended_use: Use::AreaEngraving,
+                covers: &[Feature::PaleColours],
+                preserve: "the #FFF2A8 rectangle and the #D9D9D9 disc picked; the #DCD6CF star \
+                           stays out",
+                dpi: 96.0,
+                build: logo_pale_picked,
+            },
+            method: Method::Pick(&[[0xFF, 0xF2, 0xA8], [0xD9, 0xD9, 0xD9]]),
+        },
+        Selected {
+            reference: Reference {
+                name: "logo-fringe",
+                group: Group::Logos,
+                intended_use: Use::CutContour,
+                covers: &[Feature::GreySeams],
+                preserve: "the red star picked; its grey fringe is not content",
+                dpi: 96.0,
+                build: logo_fringe,
+            },
+            method: Method::Pick(&[[0xCC, 0x22, 0x22]]),
+        },
+        Selected {
+            reference: Reference {
+                name: "logo-picked",
+                group: Group::Logos,
+                intended_use: Use::AreaEngraving,
+                covers: &[Feature::SharpCorners],
+                preserve: "the touching yellow and red panels as one shape; the blue disc stays \
+                           out",
+                dpi: 96.0,
+                build: logo_picked,
+            },
+            method: Method::Pick(&[[0xF2, 0xC4, 0x00], [0xD0, 0x20, 0x20]]),
         },
     ]
 }

@@ -114,7 +114,8 @@ pub struct Preset {
 }
 
 impl Preset {
-    /// `params` with this preset's values; Threshold, Invert and Ignore background stay.
+    /// `params` with this preset's values; the method, Threshold, Invert and Drop border shapes
+    /// stay.
     #[must_use]
     pub fn apply(&self, params: TraceParams) -> TraceParams {
         TraceParams {
@@ -196,10 +197,14 @@ impl PixelLength {
     }
 }
 
-/// The values one trace takes (black and white).
+pub use crate::method::{MAX_SWATCHES, Rgb8, Selection, Swatches};
+
+/// The values one trace takes (one colour of output).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TraceParams {
-    /// Pixels whose luma is below this are foreground (above or equal with `invert`).
+    /// How pixels become content.
+    pub selection: Selection,
+    /// With Brightness: pixels whose luma is below this are content (the others with `invert`).
     pub threshold: u8,
     /// 0 to 100: how strongly the pixel border is calmed before the fit.
     pub smooth: u8,
@@ -213,18 +218,19 @@ pub struct TraceParams {
     pub upscale: Upscale,
     /// The median filter before the Threshold.
     pub denoise: Denoise,
-    /// Trace the light parts: the mask is flipped.
+    /// Trace what the method leaves out: its score is flipped, never the alpha.
     pub invert: bool,
     /// Drop the foreground regions that touch the picture's border.
     pub ignore_background: bool,
 }
 
 impl TraceParams {
-    /// The values of a first use with `threshold`: the first preset's (Logo / Line art), Invert
-    /// and Ignore background off.
+    /// The values of a first use with `threshold`: Brightness, the first preset's (Logo / Line
+    /// art), Invert and Drop border shapes off.
     #[must_use]
     pub const fn with_threshold(threshold: u8) -> Self {
         Self {
+            selection: Selection::Brightness,
             threshold,
             smooth: DEFAULT_SMOOTH,
             tolerance: PixelLength::from_px(DEFAULT_TOLERANCE_PX),

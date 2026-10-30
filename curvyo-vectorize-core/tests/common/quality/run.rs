@@ -2,7 +2,7 @@
 //! criterion 3: everything but peak memory or the wasm time, which need their own process).
 
 use curvyo_document_core::Affine;
-use curvyo_vectorize_core::{Preset, TraceParams, auto_threshold};
+use curvyo_vectorize_core::{Preset, Selection, TraceParams, auto_threshold, selected};
 use kurbo::{BezPath, Point};
 
 use super::super::Picture;
@@ -29,24 +29,28 @@ pub struct Case {
     pub picture: Picture,
     pub mm_per_px: f64,
     pub truth: Option<Truth>,
+    /// The selection method (Brightness for all but the slice C fixtures).
+    pub selection: Selection,
 }
 
-/// The luma of one straight-alpha pixel over white, as today's tracer computes it.
-fn luma(r: u8, g: u8, b: u8, a: u8) -> u8 {
-    let over = |c: u8| (u32::from(c) * u32::from(a) + 255 * (255 - u32::from(a)) + 127) / 255;
-    let weighted = 2126 * over(r) + 7152 * over(g) + 722 * over(b);
-    u8::try_from((weighted + 5000) / 10_000).unwrap_or(u8::MAX)
-}
-
+/// The settings of `picture` with `preset`: Brightness at the automatic Threshold.
 pub fn params_for(preset: &Preset, picture: &Picture) -> TraceParams {
     preset.apply(TraceParams::with_threshold(auto_threshold(
         picture.raster(),
     )))
 }
 
+/// The settings of `case` with `preset`: its method, the automatic Threshold.
+pub fn case_params(preset: &Preset, case: &Case) -> TraceParams {
+    TraceParams {
+        selection: case.selection,
+        ..params_for(preset, &case.picture)
+    }
+}
+
 /// Traces `case` with `preset` and measures everything of criterion 3 but memory and wasm.
 pub fn measure(case: &Case, preset: &Preset) -> Row {
-    let p = params_for(preset, &case.picture);
+    let p = case_params(preset, case);
     let mm = case.mm_per_px;
     let t0 = super::super::thread_cpu_seconds();
     let result = super::super::run(&case.picture, Affine::scale(mm, mm), &p);
@@ -57,14 +61,7 @@ pub fn measure(case: &Case, preset: &Preset) -> Row {
         .map(|o| kurbo::Affine::scale(1.0 / mm) * o.clone())
         .collect();
     let (w, h) = (case.picture.width as usize, case.picture.height as usize);
-    let mask: Vec<bool> = case
-        .picture
-        .rgba
-        .as_chunks::<4>()
-        .0
-        .iter()
-        .map(|&[r, g, b, a]| luma(r, g, b, a) < p.threshold)
-        .collect();
+    let mask = selected(case.picture.raster(), &p);
     let speck_px = preset.specks_mm * preset.specks_mm / (mm * mm);
     let reference = without_specks(&mask, w, h, speck_px);
     let micro = 0.95 * preset.specks_mm * preset.specks_mm;

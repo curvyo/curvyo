@@ -19,12 +19,13 @@ pub mod reference;
 pub mod render;
 pub mod report;
 pub mod run;
-mod scenes;
+pub mod scenes;
+pub mod scenes_colour;
 mod scenes_more;
 pub mod shape;
 mod text;
 pub mod topology;
 
-pub use catalogue::reference_set;
+pub use catalogue::{Method, Selected, reference_set, selection_set};
 pub use fixtures::*;
 pub use metrics::*;
