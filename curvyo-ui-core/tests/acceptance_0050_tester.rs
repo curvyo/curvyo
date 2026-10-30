@@ -48,7 +48,9 @@ fn the_strip_has_layers_fourth_and_never_dimmed() {
             let names: Vec<_> = entries.iter().map(|e| e.name).collect();
             assert_eq!(
                 names,
-                ["file", "document", "style", "layers", "history", "fonts"]
+                [
+                    "file", "document", "style", "layers", "history", "fonts", "snapping"
+                ]
             );
             let l = &entries[3];
             assert_eq!((l.label, l.tooltip), ("Layers", "Layers (Shift+Ctrl+L)"));

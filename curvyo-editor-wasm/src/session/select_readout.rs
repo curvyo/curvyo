@@ -19,8 +19,14 @@ impl Session {
             return None;
         }
         let cursor = self.pointer_position?;
-        self.select
-            .live_transform(cursor, self.held.shift, self.held.ctrl)
+        self.select.live_transform(
+            cursor.translated(
+                self.snap_result()
+                    .map_or(curvyo_document_core::Vec2::ZERO, |r| r.offset),
+            ),
+            self.held.shift,
+            self.held.ctrl,
+        )
     }
 
     /// The on-canvas numeric readout for an in-flight Select-tool resize,
@@ -66,7 +72,14 @@ impl Session {
                 // the line that names the mirror (`0056` criterion 10).
                 let (sx, sy) = self
                     .select
-                    .live_resize_factors(anchor, self.held.shift, self.held.ctrl)
+                    .live_resize_factors(
+                        anchor.translated(
+                            self.snap_result()
+                                .map_or(curvyo_document_core::Vec2::ZERO, |r| r.offset),
+                        ),
+                        self.held.shift,
+                        self.held.ctrl,
+                    )
                     .unwrap_or((1.0, 1.0));
                 let size = match &self.select_live_transform()? {
                     ObjectSnapshot::Primitive(p)

@@ -35,7 +35,11 @@ impl Session {
         if self.node.marquee().is_some_and(|marquee| !marquee.armed()) {
             self.node_click_on_nothing(point, modifiers);
         }
-        let outcome = self.node.pointer_up(&self.document, point, modifiers);
+        let correction = self.resolve_node_snapping(point);
+        let outcome = self
+            .node
+            .pointer_up(&self.document, point.translated(correction), modifiers);
+        self.end_snapping_drag();
         if outcome == NodePointerUpOutcome::NodesSelected {
             self.announce_node_selection();
         }

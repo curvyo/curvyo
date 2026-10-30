@@ -319,7 +319,14 @@ impl Session {
                 let group = SelectTool::group_of(&live_objects, &self.selection)?;
                 let (sx, sy) = self
                     .select
-                    .live_resize_factors(anchor, shift, ctrl)
+                    .live_resize_factors(
+                        anchor.translated(
+                            self.snap_result()
+                                .map_or(curvyo_document_core::Vec2::ZERO, |r| r.offset),
+                        ),
+                        shift,
+                        ctrl,
+                    )
                     .unwrap_or((1.0, 1.0));
                 super::select_readout::with_mirror_line(
                     format!(

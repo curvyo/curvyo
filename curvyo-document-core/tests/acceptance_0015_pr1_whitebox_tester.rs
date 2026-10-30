@@ -307,6 +307,13 @@ fn older_files_export_exactly_what_the_previous_build_exported() {
                 serde_json::json!([{ "id": "first", "name": "Page 1", "origin": { "x": 0.0, "y": 0.0 }, "size": old["size"] }])
             )
         );
+        // 0060 adds document-owned snapping; old files read exact defaults.
+        assert_eq!(
+            now.as_object_mut().unwrap().remove("snapping"),
+            Some(
+                serde_json::json!({ "enabled": false, "objects": true, "guides": true, "nodes": true, "page": true, "capture_px": 8.0, "release_px": 14.0 })
+            )
+        );
         let mut old = old.clone();
         old.as_object_mut().unwrap().remove("format_version");
         assert_eq!(now, old, "{name}: export differs from the previous build");

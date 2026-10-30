@@ -405,6 +405,7 @@ impl Session {
     /// release. Returns whether there was one. The Pen has no separate drag:
     /// its step 2 and 3 are one, see [`Session::escape`].
     pub(super) fn cancel_drag_in_flight(&mut self) -> bool {
+        self.end_snapping_drag();
         if self.page_drag.take().is_some() {
             return true;
         }

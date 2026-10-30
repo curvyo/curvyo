@@ -110,7 +110,15 @@ impl MoveDrag {
     /// larger `|D|`, chosen again on every call (no latch, no hysteresis;
     /// an exact tie keeps `last_axis`, x if there was none); without it the
     /// offset is `D` itself, with nothing accumulated.
-    pub(super) fn resolve(&self, current: Point, modifiers: Modifiers) -> MoveResolution {
+    ///
+    /// If `snap_offset` is not zero, it is added after the axis lock, so the
+    /// snapped position is the axis-locked displacement plus the snap offset.
+    pub(super) fn resolve(
+        &self,
+        current: Point,
+        modifiers: Modifiers,
+        snap_offset: Vec2,
+    ) -> MoveResolution {
         let displacement = self.origin.down_at.vector_to(current);
         let (offset, axis) = if modifiers.shift {
             let (locked, axis) = lock_axis(displacement, self.last_axis);
@@ -118,9 +126,14 @@ impl MoveDrag {
         } else {
             (displacement, None)
         };
+        let correction = match axis {
+            Some(Axis::X) => Vec2::new(snap_offset.x, 0.0),
+            Some(Axis::Y) => Vec2::new(0.0, snap_offset.y),
+            None => snap_offset,
+        };
         MoveResolution {
-            offset,
-            copy: modifiers.ctrl,
+            offset: offset + correction,
+            copy: modifiers.ctrl && !modifiers.alt,
             axis,
         }
     }
@@ -145,7 +158,10 @@ impl SelectTool {
                     if let Some(id) = drag.joins.take() {
                         selection.add_all(self.units.leaves_with(&id));
                     }
-                    drag.last_axis = drag.resolve(point, modifiers).axis.or(drag.last_axis);
+                    drag.last_axis = drag
+                        .resolve(point, modifiers, curvyo_document_core::Vec2::ZERO)
+                        .axis
+                        .or(drag.last_axis);
                 }
             }
             SelectDrag::Transforming(drag) => {
@@ -166,11 +182,25 @@ impl SelectTool {
     /// inside the dead zone. Read live by the preview, the readout and the
     /// origin axes, so a Shift or Ctrl change with the pointer at rest reaches
     /// them (criterion 26).
+    ///
+    /// `snap_offset` is the displacement from snapping, added after axis lock.
     #[must_use]
     pub fn live_move(&self, pointer: Point, shift: bool, ctrl: bool) -> Option<MoveResolution> {
+        self.live_move_snapped(pointer, shift, ctrl, Vec2::ZERO)
+    }
+
+    /// The live move including the constrained snapping correction.
+    #[must_use]
+    pub fn live_move_snapped(
+        &self,
+        pointer: Point,
+        shift: bool,
+        ctrl: bool,
+        snap_offset: Vec2,
+    ) -> Option<MoveResolution> {
         match &self.drag {
             SelectDrag::Moving(drag) if drag.origin.is_active_at(pointer) => {
-                Some(drag.resolve(pointer, Modifiers::new(shift, ctrl)))
+                Some(drag.resolve(pointer, Modifiers::new(shift, ctrl), snap_offset))
             }
             SelectDrag::Moving(_)
             | SelectDrag::Transforming(_)
@@ -186,15 +216,28 @@ impl SelectTool {
     /// of the selected objects before the drag, moved by the live offset (the copy travels with
     /// the same offset). `None` when no move runs, inside the dead zone, or while the offset is
     /// zero (a drag back to its start). The bounds were read at the press; a frame costs a sum.
+    ///
+    /// `snap_offset` is added to the raw offset.
     #[must_use]
     pub fn live_move_box(&self, pointer: Point, modifiers: Modifiers) -> Option<(Point, Point)> {
+        self.live_move_box_snapped(pointer, modifiers, Vec2::ZERO)
+    }
+
+    /// The live bounds including the constrained snapping correction.
+    #[must_use]
+    pub fn live_move_box_snapped(
+        &self,
+        pointer: Point,
+        modifiers: Modifiers,
+        snap_offset: Vec2,
+    ) -> Option<(Point, Point)> {
         let SelectDrag::Moving(drag) = &self.drag else {
             return None;
         };
         if !drag.origin.is_active_at(pointer) {
             return None;
         }
-        let offset = drag.resolve(pointer, modifiers).offset;
+        let offset = drag.resolve(pointer, modifiers, snap_offset).offset;
         if offset.length() <= MOVE_EQUAL_EPSILON_MM {
             return None;
         }
@@ -209,6 +252,15 @@ impl SelectTool {
         matches!(self.drag, SelectDrag::Moving(_))
     }
 
+    /// The start bounds of the move drag in flight, if any.
+    #[must_use]
+    pub fn move_drag_start_bounds(&self) -> Option<(Point, Point)> {
+        let SelectDrag::Moving(drag) = &self.drag else {
+            return None;
+        };
+        drag.start_bounds
+    }
+
     /// The release of a move at `point` with the modifiers of the release
     /// event. A release that never left the dead zone is a click: it toggles
     /// the object a Shift press landed on and writes nothing else. Otherwise
@@ -216,6 +268,8 @@ impl SelectTool {
     /// copy of every selected object that becomes the selection; a zero offset
     /// (a drag back to the start, a locked axis ending at 0) writes nothing,
     /// with and without Ctrl (criteria 29, 31, 33, 35, 36).
+    ///
+    /// `snap_offset` is added to the raw offset.
     pub(super) fn finish_move(
         drag: &MoveDrag,
         document: &Document,
@@ -223,6 +277,7 @@ impl SelectTool {
         selection: &mut ObjectSelection,
         (point, modifiers): (Point, Modifiers),
         (minter, units): (&mut AnchorIdMinter, &Units),
+        snap_offset: Vec2,
     ) {
         if !drag.origin.is_active_at(point) {
             if let Some(id) = drag.pending_toggle {
@@ -235,7 +290,7 @@ impl SelectTool {
         if let Some(id) = drag.joins {
             selection.add_all(units.leaves_with(&id));
         }
-        let MoveResolution { offset, copy, .. } = drag.resolve(point, modifiers);
+        let MoveResolution { offset, copy, .. } = drag.resolve(point, modifiers, snap_offset);
         if offset.length() <= MOVE_EQUAL_EPSILON_MM {
             return;
         }

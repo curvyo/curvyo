@@ -132,9 +132,15 @@ impl Session {
             (entry.bounds(), marks)
         } else {
             let pointer = self.pointer_position?;
-            let bounds = self
-                .select
-                .live_move_box(pointer, Modifiers::new(self.held.shift, self.held.ctrl))?;
+            let snap_offset = self
+                .snapping
+                .last_result()
+                .map_or(curvyo_document_core::Vec2::ZERO, |r| r.offset);
+            let bounds = self.select.live_move_box_snapped(
+                pointer,
+                Modifiers::new(self.held.shift, self.held.ctrl),
+                snap_offset,
+            )?;
             (bounds, Vec::new())
         };
         Some(ReferenceBoxInput {

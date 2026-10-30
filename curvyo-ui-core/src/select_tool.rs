@@ -13,7 +13,7 @@
 //! [`curvyo_document_core::Document`] commit on release, a press-and-
 //! release inside the 3 px dead zone writes nothing.
 
-use curvyo_document_core::{Document, ObjectSnapshot, Point, Tolerance};
+use curvyo_document_core::{Document, ObjectSnapshot, Point, Tolerance, Vec2};
 
 use crate::anchor_id_minter::AnchorIdMinter;
 use crate::conversion::converted_for_object;
@@ -40,6 +40,7 @@ mod handles;
 mod move_drag;
 mod press;
 mod preview;
+mod snapping;
 
 use cycle::ClickCycle;
 use entry::OpenEntry;
@@ -417,6 +418,29 @@ impl SelectTool {
         modifiers: Modifiers,
         minter: &mut AnchorIdMinter,
     ) -> ZeroRecovery {
+        self.pointer_up_snapped(
+            document,
+            objects,
+            selection,
+            point,
+            modifiers,
+            minter,
+            Vec2::ZERO,
+        )
+    }
+
+    /// Releases with the same snapping correction used by the preview.
+    #[allow(clippy::too_many_arguments)] // Compatible release API plus optional geometric correction.
+    pub fn pointer_up_snapped(
+        &mut self,
+        document: &Document,
+        objects: &[ObjectSnapshot],
+        selection: &mut ObjectSelection,
+        point: Point,
+        modifiers: Modifiers,
+        minter: &mut AnchorIdMinter,
+        snap_offset: Vec2,
+    ) -> ZeroRecovery {
         let (shift, ctrl) = (modifiers.shift, modifiers.ctrl);
         match std::mem::take(&mut self.drag) {
             SelectDrag::None => {}
@@ -428,12 +452,18 @@ impl SelectTool {
                     selection,
                     (point, modifiers),
                     (minter, &self.units),
+                    snap_offset,
                 );
             }
             SelectDrag::Transforming(drag) => {
                 if !drag.origin.is_active_at(point) {
                     return ZeroRecovery::default();
                 }
+                let point = if matches!(drag.handle, EditHandle::Resize(_)) {
+                    point.translated(snap_offset)
+                } else {
+                    point
+                };
                 let result = drag.resolve(point, shift, ctrl);
                 if !same_within_tolerance(&result, &drag.start) {
                     drag.commit(document, &result);
@@ -444,6 +474,11 @@ impl SelectTool {
                 if !drag.origin.is_active_at(point) {
                     return ZeroRecovery::default();
                 }
+                let point = if matches!(drag.handle, EditHandle::Resize(_)) {
+                    point.translated(snap_offset)
+                } else {
+                    point
+                };
                 let results = drag.resolve(point, shift, ctrl);
                 let unchanged = results
                     .iter()

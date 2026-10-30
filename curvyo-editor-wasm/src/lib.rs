@@ -123,7 +123,8 @@ pub use session::{
     EscapeStep, FAR_PREVIEW_ROWS, FitOutcome, FormTexts, FormatEdit, GoToOutcome, GroupingKind,
     GroupingResult, HistoryResult, HistoryRowPress, KeyHint, KeyInput, KeyOutcome, MoveIndicators,
     ObjectWipeOutcome, PanelReply, PanelTabsRecord, PanelView, PenJoinNotice, RowFlag, RowPress,
-    Session, SizeOutcome, SplitOutcome, StackOutcome, Tool, WipeOutcome, WipeState,
+    Session, SizeOutcome, SnappingSettingsRecord, SnappingToolbarRecord, SplitOutcome,
+    StackOutcome, Tool, WipeOutcome, WipeState,
 };
 pub use session::{DragStop, OFFSET_COMMIT_LABEL, OffsetOutcome, OffsetView};
 pub use session::{

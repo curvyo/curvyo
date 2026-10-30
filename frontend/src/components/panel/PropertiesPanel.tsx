@@ -9,6 +9,7 @@ import { FileTab } from "@/components/panel/FileTab";
 import { HistoryTab } from "@/components/panel/HistoryTab";
 import { LayersTab } from "@/components/panel/LayersTab";
 import { PanelStrip } from "@/components/panel/PanelStrip";
+import { SnappingSection } from "@/components/panel/SnappingSection";
 import { StyleSection } from "@/components/panel/StyleSection";
 import { TraceInfoPage } from "@/components/panel/TraceInfoPage";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
@@ -21,6 +22,7 @@ import { TRACE_INFO_TAB, type TraceInfoApi } from "@/hooks/useTraceInfo";
 import { useBackgroundPanel } from "@/hooks/useBackgroundPanel";
 import { useFormats } from "@/hooks/useFormats";
 import { useHistoryScope } from "@/hooks/useHistoryScope";
+import { useSnapping } from "@/hooks/useSnapping";
 import { useStylePanel } from "@/hooks/useStylePanel";
 import { appVersion, fileCommandTooltip } from "@/lib/editorSession";
 import { TRACE_INFO_TITLE } from "@/lib/traceText";
@@ -70,6 +72,7 @@ export function PropertiesPanel({
   const textLayout = useTextLayout(editor.getSession, editor.sync, editor.syncRevision);
   const { getSession } = editor;
   const formats = useFormats(getSession, doc);
+  const snapping = useSnapping({ getSession, syncRevision: editor.syncRevision, sync:editor.sync });
   const { shortcut } = doc;
   // In text edit mode the keyboard goes back to the text being edited, so typing goes on after a
   // click on a control (customer 2026-10-26), as after the Text bar's controls.
@@ -235,6 +238,8 @@ export function PropertiesPanel({
             returnFocus();
           }
         }}
+        snappingEnabled={snapping.view.enabled}
+        onToggleSnapping={snapping.toggle}
         onActivate={activate}
         onReturnFocus={returnFocus}
       />
@@ -345,6 +350,8 @@ export function PropertiesPanel({
                 tooltipFor={(command) => fileCommandTooltip(command, PLATFORM)}
                 onReturnFocus={returnFocus}
               />
+            ) : doc.view.content === "snapping" ? (
+              <SnappingSection snapping={snapping} onReturnFocus={returnFocus}/>
             ) : doc.view.content === "document" ? (
               <DocumentSection
                 document={doc}

@@ -53,33 +53,63 @@ impl SelectTool {
         shift: bool,
         ctrl: bool,
     ) -> Option<LiveEdit> {
+        self.live_edit_snapped(objects, selection, pointer, shift, ctrl, Vec2::ZERO)
+    }
+
+    /// The live geometry with a snapping correction applied to the moving features.
+    #[must_use]
+    pub fn live_edit_snapped(
+        &self,
+        objects: &[ObjectSnapshot],
+        selection: &ObjectSelection,
+        pointer: Point,
+        shift: bool,
+        ctrl: bool,
+        snap_offset: Vec2,
+    ) -> Option<LiveEdit> {
         let mut copy = false;
-        let resolved: Vec<ObjectSnapshot> = if let Some(live) = self.live_move(pointer, shift, ctrl)
-        {
-            copy = live.copy;
-            let selected: HashSet<NodeId> = selection.ids().iter().copied().collect();
-            objects
-                .iter()
-                .filter(|object| selected.contains(&object.id()))
-                .map(|object| object.translated(live.offset))
-                .collect()
-        } else if let Some(live) = self.live_transform(pointer, shift, ctrl) {
-            vec![live]
-        } else if let SelectDrag::GroupTransforming(drag) = &self.drag
-            && drag.origin.is_active_at(pointer)
-        {
-            drag.resolve(pointer, shift, ctrl)
-        } else {
-            // No drag in flight: a slider edit of the bar, previewed the same
-            // way (criterion 10), on the objects it was started against.
-            let pending = self.bar_preview.as_ref()?;
-            pending
-                .ids
-                .iter()
-                .filter_map(|id| objects.iter().find(|object| object.id() == *id))
-                .map(|object| apply_param(object, pending.value))
-                .collect()
-        };
+        let resolved: Vec<ObjectSnapshot> =
+            if let Some(live) = self.live_move_snapped(pointer, shift, ctrl, snap_offset) {
+                copy = live.copy;
+                let selected: HashSet<NodeId> = selection.ids().iter().copied().collect();
+                objects
+                    .iter()
+                    .filter(|object| selected.contains(&object.id()))
+                    .map(|object| object.translated(live.offset))
+                    .collect()
+            } else if let Some(live) = self.live_transform(
+                if self.resize_snap_point(pointer, shift, ctrl).is_some() {
+                    pointer.translated(snap_offset)
+                } else {
+                    pointer
+                },
+                shift,
+                ctrl,
+            ) {
+                vec![live]
+            } else if let SelectDrag::GroupTransforming(drag) = &self.drag
+                && drag.origin.is_active_at(pointer)
+            {
+                drag.resolve(
+                    if matches!(drag.handle, EditHandle::Resize(_)) {
+                        pointer.translated(snap_offset)
+                    } else {
+                        pointer
+                    },
+                    shift,
+                    ctrl,
+                )
+            } else {
+                // No drag in flight: a slider edit of the bar, previewed the same
+                // way (criterion 10), on the objects it was started against.
+                let pending = self.bar_preview.as_ref()?;
+                pending
+                    .ids
+                    .iter()
+                    .filter_map(|id| objects.iter().find(|object| object.id() == *id))
+                    .map(|object| apply_param(object, pending.value))
+                    .collect()
+            };
         let committed: HashMap<NodeId, &ObjectSnapshot> =
             objects.iter().map(|object| (object.id(), object)).collect();
         let changed = resolved.iter().any(|new| {

@@ -484,6 +484,58 @@ impl NodeTool {
     /// calls (`resolve_node_positions`/`resolve_handle_value`, both
     /// private: this crate's own internal resolution, not part of its
     /// public surface), so the preview and the eventual commit can never
+    /// Raw moved anchor or handle positions for geometric snapping.
+    #[must_use]
+    pub fn snapping_points(
+        &self,
+        paths: &[PathSnapshot],
+        cursor: Point,
+    ) -> Vec<(NodeId, curvyo_document_core::AnchorId, Point)> {
+        match &self.drag {
+            Drag::Nodes { down_at, starts } => {
+                Self::resolve_node_positions(*down_at, starts, cursor)
+            }
+            Drag::Handle {
+                path,
+                anchor,
+                down_at,
+                start_value,
+                ..
+            } => paths
+                .iter()
+                .find(|p| p.id == *path)
+                .and_then(|p| p.anchor(*anchor))
+                .map(|a| {
+                    vec![(
+                        *path,
+                        *anchor,
+                        a.point.translated(Self::resolve_handle_value(
+                            *down_at,
+                            *start_value,
+                            cursor,
+                        )),
+                    )]
+                })
+                .unwrap_or_default(),
+            _ => Vec::new(),
+        }
+    }
+
+    /// Whether an anchor or handle gesture has left its exact press position.
+    #[must_use]
+    pub fn snapping_moved(&self, cursor: Point) -> bool {
+        match &self.drag {
+            Drag::Nodes { down_at, .. } | Drag::Handle { down_at, .. } => *down_at != cursor,
+            _ => false,
+        }
+    }
+
+    /// Whether the active gesture moves a handle rather than anchors.
+    #[must_use]
+    pub const fn snapping_handles_only(&self) -> bool {
+        matches!(self.drag, Drag::Handle { .. })
+    }
+
     /// disagree. `None` when no drag is in flight.
     #[must_use]
     pub fn live_drag(&self, cursor: Point, shift: bool) -> Option<LiveNodeDrag> {

@@ -61,6 +61,20 @@ fn guide_of(d: &Document, id: NodeId) -> bool {
     d.read_nodes().iter().find(|n| n.id == id).unwrap().guide
 }
 
+// Inspect exact object keys: document snapping adds a distinct `guides` setting.
+fn has_guide_key(d: &Document) -> bool {
+    fn contains(value: &serde_json::Value) -> bool {
+        match value {
+            serde_json::Value::Object(map) => {
+                map.contains_key("guide") || map.values().any(contains)
+            }
+            serde_json::Value::Array(items) => items.iter().any(contains),
+            _ => false,
+        }
+    }
+    contains(&serde_json::from_str::<serde_json::Value>(&json(d)).unwrap())
+}
+
 fn json(d: &Document) -> String {
     String::from_utf8(d.export_json().unwrap()).unwrap()
 }
@@ -134,14 +148,14 @@ fn c1_no_guides_means_no_guide_key_and_open_writes_nothing() {
     let d = Document::new(1);
     let _ = all_kinds(&d);
     assert!(
-        !json(&d).contains("guide"),
+        !has_guide_key(&d),
         "no guide key in a document without guides"
     );
     let bytes = pack(&d, "t").unwrap();
     let again = unpack(2, &bytes).unwrap();
     let steps_before = again.own_steps().len();
     assert_eq!(steps_before, 0, "opening writes no step");
-    assert!(!json(&again).contains("guide"));
+    assert!(!has_guide_key(&again));
     assert!(again.read_nodes().iter().all(|n| !n.guide));
     assert!(!pack(&again, "t").unwrap().is_empty());
 }
@@ -160,10 +174,10 @@ fn c2_every_kind_can_carry_the_flag_and_unmarking_removes_the_key() {
             "geometry and style untouched"
         );
     }
-    assert!(json(&d).contains("guide"));
+    assert!(has_guide_key(&d));
     d.set_guide(&ids, false).unwrap();
     assert!(ids.iter().all(|&id| !guide_of(&d, id)));
-    assert!(!json(&d).contains("guide"), "the key is gone, not false");
+    assert!(!has_guide_key(&d), "the key is gone, not false");
 }
 
 #[test]
@@ -570,7 +584,7 @@ fn c1_older_fixture_opens_and_resaves_without_guide_key() {
     ] {
         let d = unpack(2, &std::fs::read(dir.join(name)).unwrap()).unwrap();
         assert!(d.read_nodes().iter().all(|n| !n.guide), "{name}");
-        assert!(!json(&d).contains("\"guide\""), "{name}");
+        assert!(!has_guide_key(&d), "{name}");
         assert_eq!(d.own_steps().len(), 0, "{name}: opening writes nothing");
     }
 }

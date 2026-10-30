@@ -21,6 +21,8 @@ pub enum PanelContent {
     History,
     /// The Fonts tab (`specs/0074-text-objects` criteria 15 to 19).
     Fonts,
+    /// Document snapping controls.
+    Snapping,
     /// Nothing: no heading, no text, no control (`specs/0017-style-panel-
     /// rework` criterion 1). The Document tab with an unfinished Pen path, so
     /// a resize would not move the path being drawn, or the Style tab with
@@ -50,6 +52,7 @@ pub fn panel_body(
         PanelTab::History => PanelContent::History,
         PanelTab::File => PanelContent::File,
         PanelTab::Fonts => PanelContent::Fonts,
+        PanelTab::Snapping => PanelContent::Snapping,
     }
 }
 
