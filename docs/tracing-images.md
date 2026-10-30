@@ -6,7 +6,8 @@ there only while nothing but images is selected), or press **I**. Ctrl+I stays I
 above the canvas becomes the Trace bar; the right panel gets one more tab, **About Trace**, which
 opens only when you ask for it (see "About Trace" below).
 (`specs/0025-raster-trace`, slices 1 to 3: black and white, presets and Advanced settings, the
-View pill, large images.)
+View pill, large images; `specs/0089-trace-quality-and-colour` slices D and C: the geometry, and
+the methods Brightness, Remove background and Pick colours.)
 
 ## The preview
 
@@ -17,18 +18,19 @@ Escape, **S** or another tool. Pan and zoom redraw it without tracing again.
 
 The trace runs in the background, so the editor stays responsive. While a value is dragged, a
 reduced copy of the picture (longest side 1000 pixels) is traced; on release the full picture
-follows. At the far right of the bar, after the expander, sits the **Create paths** button; it does
-what Enter does. After 400 ms of a trace it becomes a small progress pill with the percentage (for
-example "42 %") and an x, "Stop (Esc)", and the old outline is drawn at half strength; a quick
-trace shows nothing. The x (or a first Escape) stops the trace: the pill says "Stopped" (its
-tooltip: "Preview is out of date"), the old outline stays at half strength, and a **Retry** button
-beside it traces again, as do Enter, a double-click on the image or changing a value.
+follows. At the far right of the bar, after the expander, sits the blue **Trace** button; it does
+what Enter does and creates the paths. When a trace has run for 400 ms the same blue button shows
+its percentage (for example "42 %") and an x, "Stop (Esc)", and the old outline is drawn at half
+strength; once shown, the percentage stays at least 300 ms, so a quick trace never flashes it. The
+x (or a first Escape) stops the trace: the button says "Stopped" (its tooltip: "Preview is out of
+date"), the old outline stays at half strength, and its **Retry** traces again, as do Enter, a
+double-click on the image or changing a value.
 
 For an image over 4 megapixels the preview is always the reduced copy, and a muted line says
 "Preview from a reduced copy"; the counts are those of the copy. Create paths then traces the
-full picture with the progress pill at once; the drawing is not changed until it finishes.
+full picture with the progress in the button at once; the drawing is not changed until it finishes.
 
-If a trace fails, the pill turns red and says "Failed", with a **Retry** button (Enter on the
+If a trace fails, the button says "Failed" with a red ring, with a **Retry** button (Enter on the
 canvas retries too); its tooltip, also read out by a screen reader, gives the reason, for example
 "Trace failed: out of memory at 16 Mpx. Your drawing is unchanged." The values stay; "Failed"
 goes with the next successful trace, a changed value, another image or leaving the tool.
@@ -49,7 +51,7 @@ it." A click on an image selects it and starts its preview.
 
 The **Preset** button at the start of the bar picks a set of values for what you do with the
 paths afterwards. A pick sets Smooth, Tolerance, Ignore below, Corners, Upscale and Denoise, never
-the Threshold or the toggles. After any change of those six values the button reads
+the method, the Threshold or the toggles. After any change of those six values the button reads
 "Custom"; picking a preset again restores its values. The menu opens with Enter or Down on the
 button; Up and Down move, Enter picks, Escape closes.
 
@@ -63,11 +65,44 @@ button; Up and Down move, Enter picks, Escape closes.
 The choice (the preset, or Custom with its values) is remembered for the next image and applies to
 every selected image.
 
+## Method
+
+The **Method** button after View chooses how pixels become shapes; only the method's own fields
+change with it (it is remembered, like each method's Colour tolerance):
+
+- **Brightness** ("Dark and light pixels by a cut-off."): pixels darker than the Threshold.
+- **Remove background** ("Everything unlike the background."): every pixel farther than the
+  **Colour tolerance** from the background colour. Beside the field: a chip with the colour, its
+  hex ("none" for a transparent background), **Auto** (pressed: the colour is the most frequent
+  colour of the image border) and the pipette; a click with the pipette on the image takes the
+  colour there and releases Auto.
+- **Pick colours** ("Pixels like the colours you picked."): pixels made of the picked colours,
+  including the soft edge toward the background, so pale colours and near-greys can be traced on
+  their own. The pipette is armed on choosing the method; a click on the image picks its colour (it
+  replaces the picked ones), **Shift+click** adds one (up to 8); the pipette stays armed until Esc
+  or a press on its button. A click on a swatch selects it and shows its Remove button; Delete
+  removes the focused swatch. Picked colours that touch become one shape. The picked colours
+  belong to this use of the tool and are not remembered. With none the status says "0 paths: no
+  colour picked."
+
+**Colour tolerance** (0 to 100; 40 for Remove background, 15 for Pick colours at first use): how far
+a colour may be from the background or a picked colour and still count as it; it grows with the
+square of the value (100 is half the colour cube's edge), so the low end separates pale colours.
+Colours are compared as their stored values (no colour management).
+
+The pipette samples the image itself (what the tracer reads, not the screen), the middle value of
+the 3 x 3 pixels under the pointer; the chip beside the pointer shows the colour or "No colour
+here". Esc first stops a running trace, then disarms the pipette, then leaves the tool.
+
+Transparent pixels are never shapes, with Invert neither, whatever colour they store. A partly
+transparent pixel counts by its opacity once: a black pixel at 50 % opacity is just a shape; the
+image is never laid over white first.
+
 ## Settings
 
-- **Threshold** (0 to 100 %, brightness): pixels darker than this become shapes. It starts at the
-  image's automatic value (Otsu's method on the brightness of the picture), shown as a whole
-  percent; transparent pixels count as white. Brightness is `0.2126 R + 0.7152 G + 0.0722 B` of
+- **Threshold** (0 to 100 %, brightness; Brightness only): pixels darker than this become shapes.
+  It starts at the image's automatic value (Otsu's method on the brightness of the picture), shown
+  as a whole percent; pixels under 50 % opacity count as the light class. Brightness is `0.2126 R + 0.7152 G + 0.0722 B` of
   the stored colours (0 to 255). The tracer works with that brightness value: a percent becomes
   `round(p x 255 / 100)`, so 50 % is 128; the automatic value is used exactly until you change
   the field.
@@ -95,12 +130,13 @@ value.
 
 ## Advanced
 
-The double-arrow button at the far right, before Create paths ("More trace options"), opens a block under the values
+The double-arrow button at the far right, before the Trace button ("More trace options"), opens a block under the values
 (open or closed is remembered). Its first row starts with two icon buttons (pressed means on, the
 tooltip names each):
 
-- **Invert**: traces the light parts: pixels at or above the Threshold become shapes.
-- **Ignore background**: drops the shapes that touch the border of the picture.
+- **Invert**: traces what the method leaves out (with Brightness the light parts: pixels at or
+  above the Threshold); transparent pixels stay empty.
+- **Drop border shapes**: drops the shapes that touch the border of the picture.
 
 Then:
 
@@ -112,8 +148,8 @@ Then:
   sharper than 60 degrees). Corners are found on the pixel outline before it is calmed and placed
   where the two straight sides meet.
 
-The last row of the block gives the counts of the result (see Status). Invert and Ignore
-background start off with each start of the app.
+The last row of the block gives the counts of the result (see Status). Invert and Drop border
+shapes start off with each start of the app.
 
 ## Status
 
@@ -123,7 +159,9 @@ specks were dropped, are the last row of the Advanced block; with the block clos
 shown. While a trace runs or after a stop they stay, at half strength. Results you should read
 show in a muted row under the values whether the Advanced block is open or not:
 
-- "0 paths at this Threshold: too low." (or "too high."): Create paths is not available.
+- "0 paths at this Threshold: too low." (or "too high."): the Trace button creates nothing. With
+  Remove background "0 paths at this Colour tolerance: too high.", with Pick colours "0 paths at
+  this Colour tolerance: too low." or "0 paths: no colour picked."
 - "1 path covering the whole image.": the whole picture is darker than the Threshold; Create
   paths works.
 - "Too much detail: raise Specks.": one shape has 65,000 holes or more; raise Ignore below.
@@ -147,6 +185,11 @@ Trace turns the selected image into paths. Dark parts become shapes, light parts
 - Silhouette for cutting/carving: closed, simple, few nodes; drops shapes and holes below 2 mm.
 - Engraving: keeps fine lines, drops shapes below 0.1 mm.
 - View: the image with the outline, the result alone, or the image alone. Hold \ to peek at the image.
+- Method: how pixels become shapes.
+- Brightness: pixels darker than the Threshold.
+- Remove background: everything unlike the background colour; Auto takes it from the image border, the pipette from a click.
+- Pick colours: pixels like the colours picked with the pipette; Shift+click adds a colour.
+- Colour tolerance: how far a colour may be from the background or a picked colour and still count as it.
 - Threshold: pixels darker than this brightness (0 to 100 %) become shapes.
 - Smooth: calms the pixel steps of the outline before the fit; higher is calmer.
 - Tolerance: how far in pixels the paths may stray from the calmed outline; higher gives fewer nodes.
@@ -154,12 +197,12 @@ Trace turns the selected image into paths. Dark parts become shapes, light parts
 - Denoise: smooths out noise in the picture before tracing.
 - Upscale: doubles small images before tracing; Auto does it below 1 Mpx.
 - Corners: higher turns more bends into sharp corners.
-- Invert: traces the light parts instead of the dark ones.
-- Ignore background: drops shapes that touch the image border.
+- Invert: traces what the method leaves out; transparent pixels never become shapes.
+- Drop border shapes: drops shapes that touch the image border.
 
 ## Create paths
 
-The **Create paths** button at the far right of the bar, Enter on the canvas, Ctrl+Enter in a field,
+The blue **Trace** button at the far right of the bar, Enter on the canvas, Ctrl+Enter in a field,
 or a double-click on the image adds one group "Trace of <image name>" directly above each image, with one compound
 path inside, filled black, without stroke, holes as holes. The image stays visible and unchanged
 under it; hide or move it as usual. The new groups are selected and the Select tool is active. The

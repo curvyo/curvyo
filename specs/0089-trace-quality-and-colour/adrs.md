@@ -294,6 +294,33 @@ chosen to match visioncortex, now removed) are amended: foreground is 8-connecte
 Specks reference before comparing. The guard is redefined in spec criterion 9a; axis-aligned
 half-pixel features are reported only until slice G.
 
+### Dated implementation note, slice C (2026-10-30, implementer; for the architect's review)
+
+- **Trial C1 result: sRGB.** The two-colour mixing model in the stored sRGB bytes (Euclidean,
+  bytes / 255) passes criteria 16 to 18 and 20 with the widest margins; point distances (sRGB,
+  linear, Oklab) fail the near-grey pair (#DCD6CF blends within the gate of #D9D9D9's blends);
+  mixing in linear RGB and Oklab pass with margins 4.8 and 4.3 against 10.2 at 6 to 14 times
+  the cost (renderers blend in sRGB, so blends lie on the sRGB segment). `colour.rs` is
+  therefore not built (no table, no cube root); `select.rs` alone does the selection. Measured
+  table: `plan.md` "Slice C results".
+- **`TraceParams` stays `Copy`:** `Selection::PickColours` holds `Swatches`, a fixed array of
+  8 with a length, instead of a `Vec`; `threshold` and `invert` stay fields of `TraceParams`
+  (the Threshold is read by Brightness only; Invert flips the score of every method, which the
+  UX notes ask for in Remove background). Every existing caller and test kept compiling.
+- **Automatic Threshold:** §3 says Otsu over the pixels with α ≥ 128 only. Measured on the
+  customer's transparent line drawings this fails: with only ink opaque, Otsu splits the ink
+  itself (`customer-turtle-shell`: Threshold 51, 2 % of the ink content, 15 → 559 nodes per
+  100 mm). Built instead: a pixel with α < 128 counts in the top level (the class no Threshold
+  makes content, whatever its stored colour), the others by the luma of their stored RGB;
+  nothing is composited. Opaque pictures are unchanged.
+- **Public additions:** `selected(raster, params) -> Vec<bool>` (the mask before Denoise and
+  Upscale; read by the harness, the seed of slice E's `mask`), `suggest_background`,
+  `sample_colour`, `Rgb8`, `Swatches`, `Selection`, `METHOD_PARAMS`, the two default colour
+  tolerances. Colour tolerance t maps to the gate `0.5 · (t/100)²` in the sRGB unit cube.
+- Pick colours mixes toward the picture's suggested background (the border colour), computed
+  inside the trace from the same raster; a transparent border mixes nothing (the alpha carries
+  the edges).
+
 ## Feature-local decisions
 
 1. No new ADR: the swap of the boundary fit is ADR 0023 §8's own path with the §2 shape kept, and
@@ -323,3 +350,5 @@ B: Keep visioncortex shipping; ours only where it is better (two paths).
 C: Keep visioncortex; tune around it only.
 Recommendation: A (one path, native = wasm, no `u16` limit, M needs the edge table anyway).
 Default: A, shown at D's demo with the per-image table.
+
+> **Architect note, slice C (2026-10-30).** §3 "Otsu over α ≥ 128 only" is replaced: a pixel with α < 128 counts in the top luma level (the class no Threshold makes content, also under Invert, since Invert never touches α); the others count by the luma of their stored RGB; nothing is composited. Reason: this matches the cut `α·s ≥ ½` exactly, and opaque-only Otsu split the ink of transparent line drawings (`customer-turtle-shell` 15 → 559 nodes/100 mm). Opaque images are unchanged. C1 result accepted: two-colour mixing in sRGB bytes, `colour.rs` not built; Oklab comes back only if trial M1 needs it for the palette. `TraceParams` stays `Copy` (`Swatches` = fixed array of 8); `threshold`/`invert` stay top-level because Invert acts on every method.

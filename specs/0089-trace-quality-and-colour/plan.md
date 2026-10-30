@@ -1,4 +1,4 @@
-# Plan for Trace quality and colour, slices A and D
+# Plan for Trace quality and colour, slices A, D and C
 
 Implementer, 2026-10-29, on `story/trace-geometry` (cut from `main` `faeb6f07`). Built on the
 defaults of Frage 80 to 93 (order A, D, C, E, M, F; reference images synthetic plus CC0, the
@@ -223,6 +223,119 @@ Engraving 52.3 → 28.1. Largest misses: pencil sketches (`loewe`, `pferd`: 2.7x
 wobble), wobble on phone photos, topology extras at 0.25x. 0025 tester tests red: c06, c23
 (superseded), c63 "the set has detailed images" (Logo now below 10 nodes/100 mm on every image
 of its set; line-art Silhouette 9.4 vs Logo 7.5 per 100 mm).
+
+## Slice C: selection methods
+
+Implementer, 2026-10-30, on `story/trace-selection` (cut from `main` after #223). Design:
+`adrs.md` §2 (`Selection`), §3 (alpha semantics, trial C1), §8 (determinism); UX: `ux-notes.md`
+§5, §6, §8 (Method, colour group, pipette, Drop border shapes). Customer answers in force:
+Frage 87 A (transparent never content), 88 A (Drop border shapes), 89 A (pipette armed in Pick
+colours, Shift+click adds, Esc ends; one pick in Remove background), and the finish button
+feedback of 2026-10-30 (always blue, "Trace", progress inside, no flicker).
+
+### Affected crates/modules
+
+- `curvyo-vectorize-core`: `params.rs` (`Rgb8`, `Swatches`, `Selection`, the colour tolerance
+  in `TraceParams`; `TraceParams` stays `Copy`, swatches are a fixed array of 8); new
+  `select.rs` (score and alpha fields per method, the membership cut `α·s ≥ ½`,
+  `suggest_background`, `sample_colour`); `raster.rs` (luma of the stored RGB, no compositing;
+  Otsu over pixels with α ≥ 128 only); `trace.rs` (`mask` reads the fields of `select.rs`);
+  `schema.rs` (the Method choice and Colour tolerance; the toggle's label "Drop border shapes").
+- `curvyo-ui-core`: re-exports; `curvyo-editor-wasm`: settings JSON (`method`, `background`,
+  `swatches`, `colour_tolerance`), `trace_suggest_background`, the session's Trace pipette
+  (armed state, hover sample, picks for the host, the eyedropper cursor).
+- `frontend`: Method menu, colour group (background chip/hex/Auto/pipette; swatches/pipette),
+  Colour tolerance field, the chip of the Style eyedropper reused, Esc order, "Drop border
+  shapes", the finish button (always blue, "Trace", progress inside after 400 ms, kept at least
+  300 ms).
+- Harness: `Layer::content` (layers that are not content are not truth), `Built::selection`,
+  the slice C fixtures, trial C1 (`tests/selection.rs`).
+
+### Tasks
+
+- [x] C1. Trial C1 in test code: masks of sRGB, linear-RGB and Oklab distance and of the
+      two-colour mixing model (sRGB, linear, Oklab) traced through Brightness and measured;
+      choose the simplest that passes (AC 16, 17, 18, 20).
+- [x] C2. Alpha semantics: luma of the stored RGB, membership `α/255 · s`, mask at ½, Invert on
+      `s` only, Otsu over opaque pixels (AC 15; 0025 criteria 24 and 44 as changed by Frage 87 A).
+- [x] C3. `Selection` and `select.rs`: Brightness (bit-identical on opaque images), Remove
+      background (distance to the background colour), Pick colours (mixing model, union as the
+      per-pixel maximum, up to 8 swatches), `suggest_background`, `sample_colour` (AC 14, 16 to
+      19).
+- [x] C4. Slice C fixtures with truth (pale colours on white, transparency, grey fringes,
+      coloured paper `logo-blue`, picked-colour logo) in the reference set; acceptance tests per
+      criterion; selection CPU at 2000 x 2000 px (AC 16 to 20).
+- [x] C5. Settings JSON, `trace_suggest_background`, the session's Trace pipette (AC 17, 20).
+- [x] C6. Bar: Method menu, Colour tolerance, colour group, pipette with chip, Esc order, Drop
+      border shapes; method and colour tolerance remembered, swatches per session (AC 14, 17,
+      20; Frage 88 A, 89 A).
+- [x] C7. Finish button (customer 2026-10-30): always blue, "Trace", progress inside after
+      400 ms and kept at least 300 ms; Stopped/Failed keep Retry; spec 0089 22a, 0025 and
+      `ux-notes.md` reworded.
+- [x] C8. Frozen colour distances in the spec's table; results below; full gate; reference and
+      quality tables in release; Chromium bar tests incl. 800 x 600.
+
+### Validation
+
+`cargo nextest run -p curvyo-vectorize-core` (selection unit tests, `tests/selection.rs` with
+one test per criterion 14 to 20); `reference_table` and `quality_table` in release (the guard
+of 9a on every old fixture; the slice C fixtures measured with their method); the bar in
+Chromium (`CURVYO_E2E_BROWSER=/usr/bin/chromium`), 800 x 600 included.
+
+### Slice C results (2026-10-30)
+
+**Trial C1** (`tests/trial_c1.rs`, 1x, each candidate's mask traced through Brightness; "in" is
+the largest gate distance of a picked colour's blends with the background from 25 % coverage
+(Point from 50 %), "out" the smallest of a colour that must stay out (its blends from 50 %);
+margin = out / in; deviation in px against the truth at the gate √(in · out)):
+
+| Candidate | Pale + near-grey (17): margin, dev | Black AA edge (18): dev | Grey fringe: dev | Touching picks (19): paths | ms per 4 Mpx |
+|---|---|---|---|---|---|
+| sRGB distance | 0.2 (fails), 215 | 200 (fails) | 1.01 | 1 | 37 |
+| linear distance | 0.2 (fails), 215 | 0.96 | 1.18 | 1 | 436 |
+| Oklab distance | 0.2 (fails), 215 | 200 (fails) | 1.18 | 2 (fails) | 1106 |
+| **sRGB mixing** | **10.2, 0.39** | **0.34** | 1.19 | **1** | **96** |
+| linear mixing | 4.8, 0.41 | 1.75 | 0.19 | 1 | 617 |
+| Oklab mixing | 4.3, 0.39 | 0.36 | 0.69 | 1 | 1354 |
+
+Winner: the mixing model in stored sRGB (simplest that passes 16 to 18 and 20; renderers blend
+sRGB bytes, so blends lie on the segment). Remove background uses the sRGB distance to the
+background. **Frozen colour distances** (sRGB unit cube, bytes / 255): background suggestion
+**0.02** (criterion 16; measured 0.000 on `logo-blue`), palette merge **0.03** (criterion 26;
+#D9D9D9 to #DCD6CF is 0.043, so they stay apart). Colour tolerance t → gate `0.5 · (t/100)²`;
+defaults Pick colours 15 (gate 0.011, between 0.002 in-class and 0.0195 out-of-class),
+Remove background 40 (gate 0.08).
+
+**Criteria** (`tests/selection.rs`, `select.rs` unit tests, `trace_glue` and session tests,
+Chromium `acceptance_0089_c_browser.test.ts`):
+
+| Criterion | Target | Measured | Met |
+|---|---|---|---|
+| 14 Brightness on opaque pictures | identical to D | goldens exact; reference table: every changed row is a picture with partial alpha (16 real images, `logo-transparent`) | yes |
+| 15 alpha once, transparent never content | membership α·s ≥ ½ | 50 % black → content, 49.8 % not; Invert never takes α = 0; `logo-transparent-colour` 0.31 px, 0.36 % | yes |
+| 16 Remove background on #3366CC | suggestion ≤ 0.02, area ≤ 2 % | 0.000; area 0.53 % (Brightness today 308 %), 0.57 px | yes |
+| 17 pale and near-grey picked alone | ≤ 0.75 px, separated | #FFF2A8 0.00, #D9D9D9 0.41, #DCD6CF 0.34 px, one shape each | yes |
+| 18 anti-aliased edge kept | ≤ 0.5 px | 0.34 px away from corners, area 0.28 % | yes |
+| 19 touching picks one shape | 1 path, no inner border | 1 path, 0 samples on the border, 0.00 px | yes |
+| 20 selection CPU at 2000 x 2000 px | ≤ 0.5 s native | worst case (a colour per pixel): Remove background 0.012 s, Pick 1/3/8 colours 0.030/0.062/0.256 s; wasm not measured | yes (native) |
+
+**Reference table** (release, all presets, 1x/0.5x/0.25x, without the peak child): 284 guard
+misses against 256 on main; every new one is on a picture with partial alpha (changed by design,
+criterion 15), and Photo's wobble (geo) improves 11.08 → 9.43 (still above 8.00). The slice C
+fixtures at Logo / Line art, 1x: `logo-blue` 0.53 % area, `logo-transparent-colour` 0.36 %,
+`logo-pale-picked` 0.17 %, `logo-picked` 0.00 %, `logo-fringe` 2.05 % (the star tips lose
+their red-to-grey blends: corner 1.5 px; the mixing model only knows blends toward the
+background; a higher Colour tolerance takes them). `quality_table`: the same 14 wobble and
+Silhouette misses as on main.
+
+**Finish button** (customer 2026-10-30): blue 75 x 28 px "Trace"; a job at 0 ms delay never
+showed its progress; at 480 ms it showed for 315 ms (held), percent and x inside the blue
+button; Stopped keeps Retry. Bar at 800 x 600 (Advanced closed): panel open Brightness 252 px,
+Remove background 288 px, Pick colours 288 px; closed 108, 108, 144 px; nothing past the edge.
+
+Open: the Mask view (criterion 21) is slice E; Pick colours mixes only toward the border
+colour (fringes of a second colour need a higher tolerance); the wasm time of the selection is
+not measured separately.
 
 ## Baseline results
 

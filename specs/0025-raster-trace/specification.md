@@ -239,6 +239,8 @@ Source: the customer's quality verdict on #213 (area laser cutting very good; pl
 
 Amendment the same day (0089 Frage 84 TRQ-FINISH, supersedes "The Create paths button is removed" below for the visible control): the progress pill with abort x is the trace button. It sits at the far right, right of the Advanced expander; idle it creates the paths (Enter still works), running it shows percent and x, Stopped and Failed show Retry; the "Trace" label at the start of row 1 is removed. Details: `specs/0089-trace-quality-and-colour/specification.md` criterion 22a.
 
+Amendment (customer 2026-10-30, feedback on #223): the finish button is always blue and keeps its shape; its label is "Trace", not "Create paths"; while a job runs the percentage and x show inside the same blue button, only after 400 ms of work and then for at least 300 ms, so a short job flashes nothing (criteria 10 and 53 as amended); Stopped and Failed keep Retry; Enter still creates. Criteria 24 and 44 (transparent counts as white; Invert as the exact complement) are changed by `specs/0089` criterion 15 (Frage 87 A): a transparent pixel is never content, also with Invert, and alpha is counted once, never composited over white. The toggle "Ignore background" is named "Drop border shapes" (Frage 88 A).
+
 Feedback on #216; applied in criteria 4, 12, 15, 16, 41, 53, 54, 57 and in `ux-notes.md` section 19.
 
 - **Advanced is the double-chevron expander** as in the Text bar; the word "Advanced" is not drawn.

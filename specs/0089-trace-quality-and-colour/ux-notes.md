@@ -29,6 +29,17 @@ below still says otherwise, this block wins and the implementer follows it):**
   below the flow and appears while Multicolour is on.
 - Frage 87 A, 89 A, 90 A, 86 A, 88 A: as designed. Frage 80/81/82/93 do not touch the UX.
 - Row counts in §2 are arithmetic before these answers where marked "old"; the PR re-measures them.
+- **Customer 2026-10-30 (feedback on #223), overrides §2 item 12, §9 and every "pill" wording of the finish action:**
+  the finish button is **always blue** (`--editor-accent` fill, white 14 px text) and keeps its shape (75 x 28 px
+  at rest and while running); its label is **"Trace"** (not "Create paths"); while a job runs its percentage and the
+  x (Stop (Esc)) show inside the same blue button; the progress shows only after the job has run **400 ms** and then
+  stays at least **300 ms**, so a short job never flashes percent and x; Stopped and Failed keep Retry inside the
+  blue shape (wider by their content); Enter still creates.
+- Slice C as built (2026-10-30, measured at 800 x 600, Advanced closed, no picks): the Method button is **176 px**
+  (160 cut "Remove background"); Colour tolerance is the shared 168 px field in the Threshold's slot; bar heights
+  with the panel open (inner 308): Brightness 252 px, Remove background 288 px, Pick colours 288 px; panel
+  closed (inner 588): 108, 108, 144 px. Pick colours' detail row is reduced to one action: a click on a swatch
+  selects it and shows its **Remove** (x) button after the strip; Delete removes the focused swatch.
 
 ## 1. Conflicts between the document and the customer's decisions
 
@@ -178,7 +189,9 @@ label "Threshold" (0 to 100 %, §20.2 incl. the automatic start) for Brightness,
 numbers) for Remove background and Pick colours; behaviour exactly as the app's value field: click sets, drag, double-click, Enter or F2 opens the entry, arrows 1, Shift 10, Home/End, Ctrl+Enter creates, no reset slot,
 the existing slider tooltip. `aria-valuetext` carries "percent". Each method remembers its
 own value (app setting). The tolerance is one value for all swatches (per-swatch tolerance is not offered).
-**(Proposal)**
+**(Proposal)** Pick colours starts at **19** (2026-10-30): with the noise filter (3 x 3 median and, in flat areas, 5 x 5
+mean) it selects 99.2 % of a picked shape with +-6 noise (the former 15 only 12 %). Above 19 a picked pale grey
+pulls in anti-aliased rims; lower the tolerance for near-grey artwork. Remove background starts at 40.
 
 **Brightness.** No colour group. Invert and the border-shape toggle sit in Advanced as today.
 
@@ -195,8 +208,8 @@ own value (app setting). The tolerance is one value for all swatches (per-swatch
 `[swatch x n, 28 px each, 4 apart, up to 8] [pipette 28]`. Empty: no swatches, the pipette is armed on
 entering the method and the status says "No colour picked." Swatches and strip behave exactly as the palette
 (§7: selection, hex and name, roving focus), with one action in the detail row: **Remove**. The ninth pick
-replaces nothing and says "8 colours picked" in the status (permit over refuse: the pipette stays armed, the
-click does nothing else). **(Proposal)**
+replaces nothing; "8 colours picked" shows in the status from the eighth swatch on (permit over refuse: the
+pipette stays armed, the click does nothing else). **(Proposal)**
 
 ## 6. Eyedropper on the canvas
 
