@@ -104,6 +104,9 @@ export function PlacementChip({ placement, chip, containerRef }: PlacementChipPr
   const count = chip.fields.length;
   const sizeField = chip.fields.some((field) => field.size);
   const onKeyDown = (index: number) => (event: React.KeyboardEvent<HTMLInputElement>) => {
+    // Alt belongs to canvas snapping even while this following chip owns focus.
+    // Let the window update its modifier tracker and suppress native menu focus.
+    if (event.key === "Alt") return;
     // This handler stops the event, so the window never sees it: a Shift or Ctrl tap, and the
     // chord check of the key after it, are reported here (criterion 32).
     placement.keyDown(event);

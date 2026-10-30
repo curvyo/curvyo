@@ -175,8 +175,8 @@ impl Session {
         // criteria 2, 5), with Ctrl as the press event reported it.
         let point = if action == PressAction::Place {
             self.begin_snapping_drag_for_shape();
-            let raw = self.pen_constrained(point, self.held.ctrl && !self.held.alt);
-            let direction = (self.held.ctrl && !self.held.alt)
+            let raw = self.pen_constrained(point, self.held.ctrl);
+            let direction = (self.held.ctrl)
                 .then(|| self.pen_last_node().map(|last| last.vector_to(raw)))
                 .flatten();
             let result =
@@ -208,13 +208,16 @@ impl Session {
 
     pub(super) fn pen_snap_hover(&mut self, point: Point) {
         if self.button_down {
+            // The node is pinned; modifier refresh must not re-place it or change its
+            // press offset. There is no moving node candidate during handle drawing.
+            self.resolve_snapping(&curvyo_ui_core::SnapProbe::default());
             return;
         }
         if !self.snapping.drag_in_flight() {
             self.begin_snapping_drag_for_shape();
         }
-        let raw = self.pen_constrained(point, self.held.ctrl && !self.held.alt);
-        let direction = (self.held.ctrl && !self.held.alt)
+        let raw = self.pen_constrained(point, self.held.ctrl);
+        let direction = (self.held.ctrl)
             .then(|| self.pen_last_node().map(|last| last.vector_to(raw)))
             .flatten();
         self.resolve_snapping_direction(&curvyo_ui_core::SnapProbe::point(raw), direction);
@@ -348,14 +351,11 @@ impl Session {
             Some(PenTarget::Join(end)) => Some(end.anchor.point),
             Some(PenTarget::Close { .. }) => None,
             _ => self.pointer_position.map(|pointer| {
-                self.pen_constrained(
-                    pointer,
-                    self.held.ctrl && !self.held.alt && !self.button_down,
-                )
-                .translated(
-                    self.snap_result()
-                        .map_or(curvyo_document_core::Vec2::ZERO, |r| r.offset),
-                )
+                self.pen_constrained(pointer, self.held.ctrl && !self.button_down)
+                    .translated(
+                        self.snap_result()
+                            .map_or(curvyo_document_core::Vec2::ZERO, |r| r.offset),
+                    )
             }),
         }
     }

@@ -270,7 +270,15 @@ impl super::Session {
         if !stored.x && !stored.y {
             return false;
         }
-        if self.tool == super::Tool::Select && self.select.move_in_flight() {
+        if (self.tool == super::Tool::Select && self.select.move_in_flight())
+            || matches!(
+                self.tool,
+                super::Tool::Pen
+                    | super::Tool::Rectangle
+                    | super::Tool::Ellipse
+                    | super::Tool::PolygonStar
+            )
+        {
             stored.enabled != self.held.alt
         } else {
             stored.enabled && !(self.held.ctrl && self.held.alt)
@@ -386,3 +394,6 @@ mod tests;
 
 #[cfg(test)]
 mod feedback_tests;
+
+#[cfg(test)]
+mod creation_alt_tests;

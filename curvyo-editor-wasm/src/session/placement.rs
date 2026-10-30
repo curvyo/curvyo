@@ -86,8 +86,14 @@ impl Session {
         if press.vector_to(point).length() >= self.click_threshold().as_mm() {
             return false;
         }
+        let anchor = match self.tool {
+            Tool::Rectangle => self.rectangle.drag_start(),
+            Tool::Ellipse => self.ellipse.drag_start(),
+            Tool::PolygonStar => self.poly_star.drag_start(),
+            _ => None,
+        }
+        .unwrap_or(press);
         self.shape_escape();
-        let anchor = self.snap_creation_point(press);
         self.start_placement(anchor, modifiers, press);
         true
     }

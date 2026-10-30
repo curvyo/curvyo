@@ -311,3 +311,88 @@ UX also identified Ctrl+Alt move feedback claiming Copy despite no copied object
 Public acceptance reproduced the plus-badge failure before the fix and now checks
 both badge and live readout, Ctrl-only restoration and initial Ctrl+Alt lasso's
 remove badge. The original commit/history assertions remain intact.
+
+## Independent creation-Alt extension plan — pre-code snapshot
+
+Prepared 2026-10-30 from the customer's latest clarification and amended AC9,
+16–18, before reading this extension's production changes. This supersedes the
+previous plan's creation-hover stored-only and creation Ctrl+Alt-suppression
+oracles. Select initial-press/lasso, Select resize, Node and other unrelated
+modifier contracts remain unchanged. No new document field, format or dependency
+is requested. Prior gate results do not verify this extension.
+
+### Tool/phase/state matrix
+
+Exercise Pen, Rectangle, Ellipse, Polygon and Star separately with stored-enabled
+false and true. In every eligible phase assert effective-enabled = stored XOR
+held-Alt, both with Ctrl absent and present; do not apply the old Ctrl+Alt bypass
+in these creation contexts. Preserve each tool's existing Ctrl/Shift constraints
+by comparing to an exact-coordinate unsnapped reference with identical modifiers.
+
+| Phase | Independent oracle |
+| --- | --- |
+| Idle hover, no button | Hover once at raw near target, then Alt down/up without pointer motion. Prospective point and marker alternate between raw and target as dictated by XOR, including default stored-off. No drag/history/artwork/settings change. |
+| First press, no earlier hover | Set modifiers before first press; resolve the actual press coordinate under XOR. Both Alt and Ctrl+Alt must work without a cached hover. Pen first node and shape placement anchor reflect the permitted axes and targets. |
+| Simple click and button-up placement-follow | First click pins its resolved start. Follow to a second raw point, then Alt down/up without motion. Only following candidate changes; placement preview and final second-click/Enter result match the effective state. |
+| Button-down creation drag | Press fixes the resolved start. Move to candidate, toggle Alt with stationary pointer, then release under either held state. Preview and release agree; pinned start never moves when snapping toggles. |
+| Pen after placed anchor | First/earlier nodes stay fixed; rubber-band endpoint updates on key-only changes. Next click commits the currently resolved endpoint, without accidental handles, duplicate anchors or extra history. Existing close/join/continue and angular constraints retain precedence. |
+| Frozen typed-size placement | Freeze valid typed dimensions/coordinates after initial anchor. Repeated Alt/Ctrl+Alt transitions and subsequent hover cannot move the pinned anchor or typed geometry. Confirm yields the same exact geometry as the unsnapped frozen reference. |
+
+Concrete page-only oracle: raw first point `(53,75)` resolves to `(52.5,74.25)`
+when effectively on; raw second point `(104,149)` resolves to `(105,148.5)`.
+Test both inversion directions and release restoration without feeding snapped
+output back as raw input. Hover at A then press B also recomputes B. For shape
+kinds whose placement reference is centre/radius rather than opposite corners,
+compare the complete resulting geometry with the same tool fed exact reference
+coordinates, not an invented shared rectangle convention.
+
+### Fixed state, masks and lifecycle
+
+- During a drag or placement, record the pinned start before each key-only
+  transition and assert it remains identical afterward. For Pen record prior
+  anchors and handles. Do not merely assert a marker changes while committed
+  geometry accidentally jumps.
+- Repeat representative phases with X-only, Y-only and both axes off, and with
+  the nearby target kind disabled. Alt cannot re-enable disabled axes/kinds.
+  An unreachable node remains unreachable; current tool constraints still bound
+  movement. Both axes off yields no correction or snap marker under either Alt
+  state. Maintain full two-dimensional point eligibility and finite-guide rules.
+- Read stored settings, history and serialized document before/after hover and
+  modifier transitions. Panel enabled/rail blue state remains stored state,
+  never temporary effective state. No copy badge/readout, extra object or history
+  entry is introduced by Ctrl+Alt creation. Final accepted creation is one step;
+  undo/redo restores exact geometry, cancellation creates none.
+- Losing capture, Escape, leave, tool/document change and modifier release clear
+  incompatible held state. Starting the next gesture must not retain inversion.
+  Releasing Alt with a stationary pointer restores stored behavior immediately;
+  entering/releasing beyond capture may not resurrect a stale held target.
+- Keep the previous Select move inversion/no-copy regression and initial Alt
+  lasso preservation. Explicitly preserve non-creation resize/Node suppression
+  and tool behavior; do not widen the customer's scope by changing those tools.
+
+### Verification and evidence ownership
+
+At executable handoff, inspect and narrowly amend existing creation suppression
+and stored-only hover tests to the new explicit AC9 contract. Retain assertions
+for geometry, constraints, history, cancellation and persisted state; document
+why each changed oracle is now wrong under the customer's clarification.
+Add public Session tests for same-pointer hover/drag/follow refresh and fixed
+starts, and real browser key sequences for visible marker/panel behavior and
+creation result. Benchmark/index assertions remain applicable; key-only refresh
+must reuse the current context rather than introduce a document read per event.
+Run focused tests before the full gate, coordinate the sole build/browser slot,
+and report actual coverage separately from any unexercised matrix combination.
+
+### Creation-extension implementation handoff observations
+
+Lead's actual browser found C3 before handoff: the focused Width placement field
+stopped Alt key propagation, so button-up following width stayed52.2 despite
+Alt. The corrected PlacementChip modifier propagation is exercised by the
+reusable browser script; public Session tests alone cannot prove DOM routing.
+This is explicitly browser-derived supplementary coverage after the plan.
+
+During independent lifecycle testing, Escape returned the idle drawing tool to
+Select as designed. The test now asserts that transition and explicitly re-enters
+the original tool/mode before subsequent creation-Alt assertions. A separate
+fresh hover→disable→Alt test verifies context rebuilding without Escape; it
+passed without a production change. No Escape behavior was weakened.

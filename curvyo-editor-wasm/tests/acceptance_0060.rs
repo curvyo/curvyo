@@ -86,7 +86,8 @@ fn ac7_creation_tools_use_exact_page_targets_and_suppression_preserves_raw_tool_
             let mut raw = Session::new(613);
             raw.set_tool(tool);
             raw.set_poly_star_mode(mode);
-            raw.modifiers_changed(shift, true, true);
+            // Stored off without Alt is the unsnapped reference under identical Ctrl/Shift constraints.
+            raw.modifiers_changed(shift, true, false);
             drag(
                 &mut raw,
                 Point::new(53.0, 75.0),
@@ -524,6 +525,10 @@ fn ac17_idle_hover_markers_have_no_drag_history_and_clear_on_lifecycle_events() 
         s.pointer_hover(Point::new(53.0, 75.0), false, false);
         s.escape();
         assert_eq!(reference_vertices(&s), empty);
+        // Escape returns idle drawing tools to Select; explicitly re-enter creation.
+        assert_eq!(s.tool(), Tool::Select);
+        s.set_tool(tool);
+        s.set_poly_star_mode(mode);
         s.pointer_hover(Point::new(53.0, 75.0), false, false);
         s.set_snapping(DocumentSnapping {
             x: false,
@@ -539,12 +544,13 @@ fn ac17_idle_hover_markers_have_no_drag_history_and_clear_on_lifecycle_events() 
         });
         assert_eq!(reference_vertices(&s), empty);
         s.modifiers_changed(false, false, true);
-        s.pointer_hover(Point::new(53.0, 75.0), false, false);
-        assert_eq!(
+        assert_ne!(
             reference_vertices(&s),
             empty,
-            "Alt does not invert idle hover"
+            "Alt now inverts creation hover without pointer motion {tool:?}/{mode:?}"
         );
+        s.modifiers_changed(false, false, false);
+        assert_eq!(reference_vertices(&s), empty);
         s.modifiers_changed(false, false, false);
         s.set_snapping(config());
         s.pointer_hover(Point::new(53.0, 75.0), false, false);
@@ -720,4 +726,241 @@ fn ac16_aspect_resize_cannot_change_the_disabled_coordinate() {
     let snapped = resize(true, true, true);
     close(snapped, (Point::new(10.0, 10.0), Point::new(100.0, 100.0)));
     assert!((raw.1.x - snapped.1.x).abs() > 0.1);
+}
+
+fn creation_cases() -> [(Tool, PolyStarMode); 5] {
+    [
+        (Tool::Rectangle, PolyStarMode::Polygon),
+        (Tool::Ellipse, PolyStarMode::Polygon),
+        (Tool::PolygonStar, PolyStarMode::Polygon),
+        (Tool::PolygonStar, PolyStarMode::Star),
+        (Tool::Pen, PolyStarMode::Polygon),
+    ]
+}
+fn creation_session(tool: Tool, mode: PolyStarMode, enabled: bool) -> Session {
+    let mut s = Session::new(660);
+    s.set_tool(tool);
+    s.set_poly_star_mode(mode);
+    s.set_snapping(DocumentSnapping {
+        enabled,
+        ..config()
+    });
+    s
+}
+
+#[test]
+fn ac9_all_creation_hover_key_only_inversion_preserves_document_axes_and_kinds() {
+    for (tool, mode) in creation_cases() {
+        for enabled in [false, true] {
+            let mut s = creation_session(tool, mode, enabled);
+            let empty = reference_vertices(&s);
+            s.pointer_hover(Point::new(53.0, 75.0), false, false);
+            let before = opened(&s);
+            let steps = s.undo_len();
+            for (ctrl, alt) in [(false, true), (true, true), (true, false), (false, false)] {
+                s.modifiers_changed(false, ctrl, alt);
+                assert_eq!(
+                    reference_vertices(&s) != empty,
+                    enabled != alt,
+                    "{tool:?}/{mode:?} {enabled}/{ctrl}/{alt}"
+                );
+                assert!(!s.snapping_toolbar().has_drag);
+                assert_eq!(s.undo_len(), steps);
+                assert_eq!(s.snapping(), before.snapping());
+                assert_eq!(
+                    opened(&s).read_objects().objects,
+                    before.read_objects().objects
+                );
+            }
+            for disabled_axes in [false, true] {
+                s.set_snapping(DocumentSnapping {
+                    enabled,
+                    x: !disabled_axes,
+                    y: !disabled_axes,
+                    page: disabled_axes,
+                    ..config()
+                });
+                s.modifiers_changed(false, true, true);
+                assert_eq!(
+                    reference_vertices(&s),
+                    empty,
+                    "disabled target/axes remain disabled"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn ac18_alt_before_first_press_without_hover_and_after_press_keep_exact_pinned_start() {
+    for (tool, mode) in creation_cases() {
+        for enabled in [false, true] {
+            for ctrl in [false, true] {
+                for alt_before_press in [false, true] {
+                    let mut s = creation_session(tool, mode, enabled);
+                    let steps = s.undo_len();
+                    let raw = Point::new(53.0, 75.0);
+                    let pinned = if enabled == alt_before_press {
+                        raw
+                    } else {
+                        Point::new(52.5, 74.25)
+                    };
+                    s.modifiers_changed(false, ctrl, alt_before_press);
+                    s.pointer_down(raw, false);
+                    s.modifiers_changed(false, ctrl, !alt_before_press);
+                    s.pointer_up(raw, false, ctrl);
+                    assert_eq!(s.undo_len(), steps);
+                    assert_eq!(s.snapping().enabled, enabled);
+                    if tool == Tool::Pen {
+                        s.modifiers_changed(false, false, false);
+                        drag(
+                            &mut s,
+                            Point::new(160.0, 180.0),
+                            Point::new(160.0, 180.0),
+                            false,
+                            false,
+                        );
+                        s.key_down(KeyInput {
+                            key: "Enter",
+                            ..KeyInput::default()
+                        });
+                        let d = opened(&s);
+                        let path = d.path(d.object_ids()[0]).unwrap();
+                        assert_eq!(path.anchors[0].point, pinned);
+                        assert_eq!(path.anchors[0].handle_out, Vec2::ZERO);
+                    } else {
+                        assert_eq!(s.placement().unwrap().a(), pinned);
+                        s.cancel_placement();
+                        assert_eq!(s.undo_len(), steps);
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn ac9_ac18_creation_drag_follow_and_pen_endpoint_invert_without_moving_pinned_start() {
+    for (tool, mode) in creation_cases() {
+        for enabled in [false, true] {
+            for follow in [false, true] {
+                if tool == Tool::Pen && !follow {
+                    continue;
+                }
+                let mut s = creation_session(tool, mode, enabled);
+                let steps = s.undo_len();
+                let raw_start = Point::new(53.0, 75.0);
+                let pinned = if enabled {
+                    Point::new(52.5, 74.25)
+                } else {
+                    raw_start
+                };
+                s.pointer_down(raw_start, false);
+                if follow {
+                    s.pointer_up(raw_start, false, false);
+                }
+                let raw_end = Point::new(104.0, 149.0);
+                s.pointer_hover(raw_end, false, false);
+                let baseline = reference_vertices(&s);
+                s.modifiers_changed(false, false, true);
+                let inverted = reference_vertices(&s);
+                assert_ne!(baseline, inverted);
+                if tool != Tool::Pen && follow {
+                    assert_eq!(s.placement().unwrap().a(), pinned);
+                }
+                s.modifiers_changed(false, false, false);
+                assert_eq!(reference_vertices(&s), baseline);
+                s.modifiers_changed(false, false, true);
+                assert_eq!(reference_vertices(&s), inverted);
+                assert_eq!(s.undo_len(), steps);
+                assert_eq!(opened(&s).object_ids().len(), 0);
+                if follow {
+                    s.pointer_down(raw_end, false);
+                }
+                s.pointer_up(raw_end, false, false);
+                if tool == Tool::Pen {
+                    s.key_down(KeyInput {
+                        key: "Enter",
+                        ..KeyInput::default()
+                    });
+                }
+                let expected_end = if enabled {
+                    raw_end
+                } else {
+                    Point::new(105.0, 148.5)
+                };
+                let mut exact = creation_session(tool, mode, false);
+                exact.pointer_down(pinned, false);
+                if follow {
+                    exact.pointer_up(pinned, false, false);
+                }
+                exact.pointer_hover(expected_end, false, false);
+                if follow {
+                    exact.pointer_down(expected_end, false);
+                }
+                exact.pointer_up(expected_end, false, false);
+                if tool == Tool::Pen {
+                    exact.key_down(KeyInput {
+                        key: "Enter",
+                        ..KeyInput::default()
+                    });
+                }
+                close(only_bounds(&s), only_bounds(&exact));
+                assert_eq!(s.undo_len(), steps + 1);
+                assert_eq!(s.snapping().enabled, enabled);
+                s.undo();
+                assert_eq!(opened(&s).object_ids().len(), 0);
+                s.redo();
+                close(only_bounds(&s), only_bounds(&exact));
+            }
+        }
+    }
+}
+
+#[test]
+fn ac18_all_frozen_typed_shapes_ignore_alt_and_ctrl_alt_geometry_changes() {
+    for (tool, mode) in creation_cases()
+        .into_iter()
+        .filter(|(tool, _)| *tool != Tool::Pen)
+    {
+        for enabled in [false, true] {
+            let mut s = creation_session(tool, mode, enabled);
+            let raw = Point::new(53.0, 75.0);
+            drag(&mut s, raw, raw, false, false);
+            s.placement_edit(0, "20");
+            s.placement_edit(1, "10");
+            let pinned = s.placement().unwrap().a();
+            let frozen = s.placement().unwrap().pointer();
+            let steps = s.undo_len();
+            for (ctrl, alt) in [(false, true), (true, true), (true, false), (false, false)] {
+                s.modifiers_changed(false, ctrl, alt);
+                assert_eq!(s.placement().unwrap().a(), pinned);
+                assert_eq!(s.placement().unwrap().pointer(), frozen);
+                assert_eq!(s.undo_len(), steps);
+            }
+            assert!(s.place_placement());
+            let mut exact = creation_session(tool, mode, false);
+            drag(&mut exact, pinned, pinned, false, false);
+            exact.placement_edit(0, "20");
+            exact.placement_edit(1, "10");
+            assert!(exact.place_placement());
+            close(only_bounds(&s), only_bounds(&exact));
+            assert_eq!(s.undo_len(), steps + 1);
+        }
+    }
+}
+
+#[test]
+fn ac9_alt_rebuilds_idle_candidate_after_settings_cleared_the_hover_context() {
+    let mut s = creation_session(Tool::Rectangle, PolyStarMode::Polygon, true);
+    s.pointer_hover(Point::new(53.0, 75.0), false, false);
+    let snapped = reference_vertices(&s);
+    assert_ne!(snapped.len(), 0);
+    s.set_snapping(DocumentSnapping {
+        enabled: false,
+        ..s.snapping()
+    });
+    assert_eq!(reference_vertices(&s).len(), 0);
+    s.modifiers_changed(false, false, true);
+    assert_eq!(reference_vertices(&s), snapped);
 }

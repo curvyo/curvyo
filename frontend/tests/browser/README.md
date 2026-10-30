@@ -40,3 +40,11 @@ inversion after a Select move has begun including Ctrl+Alt without copying.
 Run with the same optional runtime variables as above. Its exported project
 checks use Python's standard-library zipfile module; screenshots under
 `target/browser-check` include `axes-*-hover.png` and `alt-*-held.png`.
+
+`snapping-creation-alt.cjs` checks temporary inversion in creation contexts,
+including key-only hover, Alt held before press, button-down drag, button-up
+following placement and Alt while the Width field owns focus. Focused Ctrl+Alt
+also preserves the Ctrl aspect toggle, restores exact fields on Alt release and
+returns to the unconstrained preview on the next Ctrl tap. It verifies
+stored-state/geometry invariants and native lone-Alt menu suppression. Creation
+screenshots are written to `target/browser-check/creation-*-alt-held.png`.

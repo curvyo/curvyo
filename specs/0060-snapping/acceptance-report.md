@@ -1,5 +1,85 @@
 # Snapping acceptance report
 
+## Latest creation-Alt clarification — current verification
+
+Status: independent focused **36/36 PASS** (document4,engine14,session18);
+full gate **PASS**, final extended browser **PASS**. This section supersedes earlier scope results below.
+Pre-code plan covers all creation phases; no persistence/format/dependency change.
+
+Five new independent public tests exercise:
+
+- All5 tools (Rectangle,Ellipse,Polygon,Star,Pen), both stored states, key-only
+  hover XOR including Ctrl+Alt, stored/history/artwork invariants and masks/kinds.
+- First press without prior hover, Alt held before press or changed afterward:
+  pinned shape start/first Pen node stays exact, no accidental first-node handle.
+- Button-down drag and button-up following plus subsequent Pen endpoint:
+  key-only marker restoration, fixed initial coordinate, final geometry versus
+  exact-coordinate unsnapped reference, one-step creation and exact undo/redo.
+- All4 typed/frozen shape placements: pinned anchor and frozen pointer unchanged
+  through Alt/Ctrl+Alt transitions, exact geometry at confirm.
+- Fresh hover→disable→Alt context rebuilding at unchanged pointer.
+
+The existing31 tests remain. Two old oracles changed solely because the customer
+superseded them: the stored-on Ctrl+Alt creation-off case now compares against a
+stored-off Ctrl reference **without Alt**, since Ctrl+Alt now inverts off→on;
+idle stored-off hover now expects Alt to capture immediately. All existing
+constraint/geometry/history assertions remain. Lifecycle setup now explicitly
+asserts Escape returns idle drawing to Select and re-enters the original tool
+before testing creation-only behavior. The standalone context test confirmed no
+production defect and no Escape behavior change.
+
+### Current AC mapping delta
+
+The preceding18AC mapping remains applicable except the previously stated
+move-only Alt scope: AC9 now applies XOR in every drawing creation phase,
+including Ctrl; AC17 includes key-only hover refresh; AC18 includes key-only
+pressed/following candidate updates without moving pinned/frozen geometry.
+The five tests above cover those changed behaviors. Existing Select move,
+initial-Alt lasso, resize/Node, mask/guide/node constraints, storage and CPU
+regressions remain in the full gate. Neither saved fields nor format27 changed.
+
+Actual DOM routing has separate evidence: lead browser initially reproduced C3
+(focused placement Width stayed52.2 on Alt). PlacementChip swallowed the modifier
+keydown. After its bounded fix, lead's `snapping-creation-alt.cjs` passed focused
+Width key-only refresh, no-button hover, Alt-before-press, pressed-drag and
+follow/click placement in both stored states, saved exact Rectangle geometry,
+fixed start/stored enabled and no JS errors. Tester reran this reusable
+script after final WASM generation: PASS. Public Rust tests do not substitute for
+focused-input DOM event evidence.
+
+Commands: focused `cargo test -q -p curvyo-editor-wasm -p curvyo-document-core
+-p curvyo-ui-core --test acceptance_0060` passed4+18+14. Full gate follows the
+exact command family below, all9 WASM packages, with known nextest environment
+unset/escalation; logs `/tmp/snapping-creation-gate-*.log`. Only test/docs edits
+by tester. Remaining limits: browser saved-geometry matrix uses Rectangle;
+other shape/Pen committed geometry is verified through public Session APIs.
+Not every modifier×axis×phase permutation is exhausted independently; production
+truth-table and existing constraint tests supplement representative matrices.
+
+### Final creation browser result
+
+Tester executed `frontend/tests/browser/snapping-creation-alt.cjs` against final
+regenerated WASM with the README runtime variables: PASS, no JS page errors.
+Added focused Width Ctrl+Alt coverage verifies Ctrl tap keeps equal W/H, Alt
+changes the live candidate without losing that square constraint, Alt release
+restores the exact field pair, and a second Ctrl tap restores the unconstrained
+preview. Existing final export geometry/pinned-start/stored-enabled assertions
+then pass unchanged. Native lone-Alt menu prevention also passes. Creation
+screenshots were refreshed; architecture/UX approvals are recorded separately.
+No production change resulted from this additional event-routing check.
+
+### Latest complete gate results
+
+- `cargo fmt --all --check`; workspace all-target clippy `-D warnings`: PASS.
+- `env -u WEBKIT_DISABLE_DMABUF_RENDERER cargo nextest run --workspace --status-level fail --no-fail-fast`: **9529 passed,0 failed,117 existing skips**,430.355s,496 binaries. Includes36 independent acceptance tests and unchanged performance/regression suites.
+- All9 core/editor WASM builds and WASM clippy `-D warnings`: PASS.
+- `cargo deny check`; warning-denied workspace rustdoc: PASS.
+- Final `npm run build:wasm`; `npx tsc -b --noEmit`: PASS.
+- `npm test`:633 passed,0 failed,56 existing skips; `npx oxlint`: exit0 with existing warnings.
+- Logs `/tmp/snapping-creation-gate-results.txt` and per-check logs. First clippy caught one test-only inverted-condition style lint; equivalent branch ordering corrected before broad tests. Final broad invocation is entirely green.
+
+## Historical PR #225 feedback before creation-Alt clarification
+
 ## PR #225 customer feedback — current verification
 
 Status: **full gate PASS**, independent acceptance **31/31 passed**
