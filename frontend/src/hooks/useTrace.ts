@@ -30,6 +30,7 @@ import {
 import { TraceCancelled, type TraceRunner, createTraceRunner } from "@/lib/traceJobs";
 import { NO_VIEW, loadParams, loadPresets, pixelsOf, readView, type ViewState } from "@/lib/traceSource";
 import type { ShowNotice, TraceApi } from "./traceApi";
+import { useTraceMask } from "./useTraceMask";
 import { useTraceMethod } from "./useTraceMethod";
 import { useTraceProgress } from "./useTraceProgress";
 import { useTraceViewMode } from "./useTraceViewMode";
@@ -94,6 +95,7 @@ export function useTrace(
     return runnerRef.current;
   }, []);
   useEffect(() => () => runnerRef.current?.dispose(), []);
+  const { maskStep, last: maskSource } = useTraceMask(getSession, onChange, runner);
 
 
   /** Ends whatever runs: the debounce, the jobs and their timers. */
@@ -204,6 +206,10 @@ export function useTrace(
         if (!small) {
           const reduced = pixelsOf(session, id, true);
           if (reduced) {
+            await maskStep(id, true, settings, stale);
+            if (stale()) {
+              return;
+            }
             const reducedPixels = reduced.width * reduced.height;
             const out = await runner().trace(reduced, settings, onProgress);
             if (stale()) {
@@ -219,6 +225,10 @@ export function useTrace(
             onChange();
             return;
           }
+        }
+        await maskStep(id, false, settings, stale);
+        if (stale()) {
+          return;
         }
         const out = await runner().trace(full, settings, onProgress);
         if (stale()) {
@@ -236,7 +246,7 @@ export function useTrace(
         }
       }
     },
-    [getSession, startTimers, clearTimers, thresholdOf, runner, setValues, onChange, fail, setPercent],
+    [getSession, startTimers, clearTimers, thresholdOf, runner, setValues, onChange, fail, setPercent, maskStep],
   );
 
   const schedule = useCallback(
@@ -453,7 +463,22 @@ export function useTrace(
 
 
 
-  const { viewMode, setViewMode } = useTraceViewMode(active, getSession, onChange);
+  /** A change to the Mask view asks for the mask of the pixels the last preview step traced
+   * (`specs/0089` criterion 21); a running preview is not interrupted. */
+  const onViewMode = useCallback(
+    (mode: string) => {
+      const id = viewRef.current.shown;
+      const threshold = choiceRef.current.values.threshold;
+      const source = maskSource.current;
+      if (mode !== "mask" || !id || threshold === null || source?.id !== id) {
+        return;
+      }
+      const mine = generation.current;
+      maskStep(id, source.reduced, key(threshold, choiceRef.current.values, id), () => mine !== generation.current).catch(() => undefined);
+    },
+    [maskStep, maskSource],
+  );
+  const { viewMode, setViewMode } = useTraceViewMode(active, getSession, onChange, onViewMode);
   const { setPicking, setMethod, setColourTolerance, setBackgroundAuto, removeSwatch } = useTraceMethod({
     active,
     syncRevision,

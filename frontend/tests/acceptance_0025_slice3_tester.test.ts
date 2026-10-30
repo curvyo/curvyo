@@ -483,9 +483,16 @@ const slotInfo = async (s: S) =>
       const ex = document.querySelector('${barQ} button[aria-expanded][aria-controls]').getBoundingClientRect();
       const pb = e.querySelector('[role=progressbar]');
       return { kind: e.getAttribute('data-trace-slot'), text: e.innerText.trim(), width: Math.round(r.width), height: Math.round(r.height), afterSpecks: r.top > sp.bottom - 2 || r.left >= sp.right,
-        beforeExpander: r.top < ex.top - 2 || r.right <= ex.left, progress: pb ? { name: pb.getAttribute('aria-label'), now: pb.getAttribute('aria-valuenow') } : null,
+        afterExpander: r.top > ex.bottom - 2 || r.left >= ex.right, progress: pb ? { name: pb.getAttribute('aria-label'), now: pb.getAttribute('aria-valuenow') } : null,
         buttons: [...e.querySelectorAll('button')].map((b) => [(b.getAttribute('aria-label') || b.textContent).trim(), Math.round(b.getBoundingClientRect().width), Math.round(b.getBoundingClientRect().height)]) }; })())`)) as string,
-  ) as { kind: string; text: string; width: number; height: number; afterSpecks: boolean; beforeExpander: boolean; progress: { name: string; now: string | null } | null; buttons: [string, number, number][] } | null;
+  ) as { kind: string; text: string; width: number; height: number; afterSpecks: boolean; afterExpander: boolean; progress: { name: string; now: string | null } | null; buttons: [string, number, number][] } | null;
+/** The finish button at rest (0089 criterion 22a, customer 2026-10-30): always blue, "Trace", 75 x 28 px. */
+const atRest = async (s: S, when: string) => {
+  const slot = await slotInfo(s);
+  assert.equal(slot?.kind, "none", `the finish button is idle ${when}`);
+  assert.equal(slot?.text, "Trace", `it reads Trace ${when}`);
+  assert.ok(Math.abs((slot?.width ?? 0) - 75) <= 2 && slot?.height === 28, `75 x 28 px ${when}: ${slot?.width} x ${slot?.height}`);
+};
 const mutedLines = async (s: S) => (await bar(s)).split("\n").map((l) => l.trim()).filter(Boolean);
 
 /** Many small shapes, so a trace takes a while. */
@@ -529,7 +536,8 @@ test("0025s3 c51 in Chromium: the View pill, what each view draws, the peek, Shi
     await sleep(300);
     // The pill: radiogroup "View", three icon segments with tooltips, Overlay by default, in row 1.
     const names = (await s.evaluate(`[...document.querySelectorAll('[role=radiogroup][aria-label=View] [role=radio]')].map((r) => r.getAttribute('aria-label')).join(',')`)) as string;
-    assert.equal(names, "Overlay,Trace,Image");
+    // Mask is the second segment since `specs/0089` criterion 21 (UX notes §4).
+    assert.equal(names, "Overlay,Mask,Trace,Image");
     assert.equal(await viewChecked(s), "Overlay");
     const geo = JSON.parse(
       (await s.evaluate(`JSON.stringify((() => { const g = document.querySelector('[role=radiogroup][aria-label=View]').getBoundingClientRect(); const p = document.querySelector('button[aria-label=Preset]').getBoundingClientRect(); return { sameRow: Math.abs(g.y + g.height / 2 - (p.y + p.height / 2)) < 6, rightOfPreset: g.x >= p.right, segs: [...document.querySelectorAll('[role=radiogroup][aria-label=View] [role=radio]')].map((r) => { const b = r.getBoundingClientRect(); return [Math.round(b.width), Math.round(b.height)]; }) }; })())`)) as string,
@@ -620,19 +628,22 @@ test("0025s3 c51 in Chromium: the View pill, what each view draws, the peek, Shi
     await keyUpOnly(s, "\\", "Backslash", 220);
     await sleep(300);
 
-    // Shift+backslash cycles Overlay -> Trace -> Image -> Overlay.
+    // Shift+backslash cycles Overlay -> Mask -> Trace -> Image -> Overlay (Mask since `specs/0089`
+    // criterion 21).
     await focusCanvas(s);
     const seen: string[] = [];
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 4; i++) {
       await keyDownOnly(s, "|", "Backslash", 220, 8);
       await keyUpOnly(s, "|", "Backslash", 220, 8);
       await sleep(300);
       seen.push(await viewChecked(s));
     }
-    assert.deepEqual(seen, ["Trace", "Image", "Overlay"]);
+    assert.deepEqual(seen, ["Mask", "Trace", "Image", "Overlay"]);
 
     // Arrow keys in the pill move and select; one Tab stop; the view is not remembered.
     await s.evaluate(`document.querySelector('[role=radiogroup][aria-label=View] [role=radio][aria-checked=true]').focus()`);
+    await press(s, "ArrowRight", 39);
+    assert.equal(await viewChecked(s), "Mask");
     await press(s, "ArrowRight", 39);
     assert.equal(await viewChecked(s), "Trace");
     await press(s, "ArrowRight", 39);
@@ -641,7 +652,7 @@ test("0025s3 c51 in Chromium: the View pill, what each view draws, the peek, Shi
     await press(s, "ArrowLeft", 37);
     assert.equal(await viewChecked(s), "Image");
     const tabindexes = (await s.evaluate(`[...document.querySelectorAll('[role=radiogroup][aria-label=View] [role=radio]')].map((r) => r.tabIndex).join(',')`)) as string;
-    assert.equal(tabindexes, "-1,-1,0", "one Tab stop for the pill");
+    assert.equal(tabindexes, "-1,-1,-1,0", "one Tab stop for the pill");
     await focusCanvas(s);
     await s.key("Escape", 27);
     await sleep(300);
@@ -681,8 +692,9 @@ test("0025s3 c53/c58 in Chromium: Stop, Retry, Enter while stale, Escape, the wo
     await importImage(s, "blobs.png", blobs, 300, 300);
     const rowsBefore = await s.layerRows();
     await openTrace(s);
+    await advancedOpen(s); // the counts, which `settle` reads, live in the Advanced block (0089 UX notes 20.4)
     await settle(s);
-    assert.equal(await slotInfo(s), null, "the slot is empty at rest");
+    await atRest(s, "at rest");
     await s.evaluate(`window.__delay = 6000`);
     // A change of value starts a job the slow worker answers after 6 s.
     await typeInto(s, "Smooth", "41");
@@ -698,14 +710,14 @@ test("0025s3 c53/c58 in Chromium: Stop, Retry, Enter while stale, Escape, the wo
     assert.equal(running?.progress?.name, "Tracing", "role=progressbar named Tracing");
     assert.match(running?.text ?? "", /^(\d{1,3} %|\.\.\.)$/, "the percentage or ...");
     assert.ok(Math.abs((running?.width ?? 0) - 75) <= 2 && running?.height === 28, `about 75 x 28 px: ${running?.width} x ${running?.height}`);
-    assert.ok(running?.afterSpecks && running?.beforeExpander, "the slot is after Specks and before the expander");
+    assert.ok(running?.afterSpecks && running?.afterExpander, "the finish button is after Specks and after the expander (0089 criterion 22a)");
     assert.deepEqual(running?.buttons.map(([n, w, h]) => [n, w >= 28 && h >= 28]), [[STOP_X, true]], "the x is a 28 px target");
     assert.ok(!/Tracing\.\.\./.test(await bar(s)), "no Tracing... text");
     assert.equal(await busyAttr(s), null, "no aria-busy");
-    // The slot's tab order: after Ignore below, right before the expander.
+    // The finish button's tab order: right after the expander (0089 criterion 22a).
     const order = await barButtons(s);
     const expanderAt = order.findIndex((n) => n === EXPAND_CLOSED || n === EXPAND_OPEN);
-    assert.ok(order.indexOf(STOP_X) >= 0 && order.indexOf(STOP_X) === expanderAt - 1, `the x comes right before the expander: ${order}`);
+    assert.ok(order.indexOf(STOP_X) >= 0 && order.indexOf(STOP_X) === expanderAt + 1, `the x comes right after the expander (the finish button is last): ${order}`);
     await stopAndAgain(s, "preview");
     assert.equal(await fieldValue(s, "Smooth"), "41", "values stay");
     // Enter while stale traces again, never Create.
@@ -729,7 +741,7 @@ test("0025s3 c53/c58 in Chromium: Stop, Retry, Enter while stale, Escape, the wo
     console.log("settled after Retry:", again);
     assert.ok(!(await hasButton(s, "Retry")) && !(await hasButton(s, STOP_X)));
     assert.ok(!/out of date|Stopped/.test(await bar(s)), "the stale state is gone");
-    assert.equal(await slotInfo(s), null, "the slot empties");
+    await atRest(s, "after Retry");
     assert.ok(((await s.evaluate(`window.__workers`)) as number) > workersBefore, "Stop terminated the worker: Retry used a new one (criterion 58)");
     // A changed value while stale traces again too.
     await s.evaluate(`window.__delay = 6000`);
@@ -764,6 +776,7 @@ test("0025s3 c54 in Chromium: Failed in the slot, Retry, values and document sta
     const historyBefore = await historyText(s);
     await s.evaluate(`window.__failWorker = true`);
     await openTrace(s);
+    await advancedOpen(s); // the counts, which `traceReady` reads after Retry, live in Advanced
     const card = await waitFor("the failure alert", async () =>
       ((await s.evaluate(`(${CARD})?.textContent ?? null`)) as string | null), 30_000);
     console.log("failure alert:", JSON.stringify(card));
@@ -784,7 +797,7 @@ test("0025s3 c54 in Chromium: Failed in the slot, Retry, values and document sta
     assert.ok(String(info.border + String(info.shadow)).includes(String(info.invalid)), `a ring in --field-invalid: ${info.border} / ${info.shadow} vs ${info.invalid}`);
     const failed = await slotInfo(s);
     assert.equal(failed?.kind, "failed");
-    assert.ok(failed?.afterSpecks && failed?.beforeExpander, "Failed sits in the slot");
+    assert.ok(failed?.afterSpecks && failed?.afterExpander, "Failed sits in the finish button, after the expander");
     assert.deepEqual(failed?.buttons.map(([n, w, h]) => [n, w >= 28 && h >= 28]), [["Retry", true]], "one Retry, a 28 px target");
     assert.match(await tooltipOf(s, "[data-trace-slot=failed] span"), /^Trace failed: .+\. Your drawing is unchanged\.$/, "the reason is the tooltip");
     // The bar's values stay; the document is exactly as before.
@@ -795,7 +808,7 @@ test("0025s3 c54 in Chromium: Failed in the slot, Retry, values and document sta
     await s.evaluate(`(() => { const f = document.querySelector('${field("Smooth")}'); f.focus(); })()`);
     await press(s, "Enter", 13, 2);
     await sleep(500);
-    assert.deepEqual(await s.layerRows(), rowsBefore, "Create paths on a failed trace writes nothing");
+    assert.deepEqual(await s.layerRows(), rowsBefore, "Ctrl+Enter (create) on a failed trace writes nothing");
     // Retry with the worker still dying: the card stays (or returns).
     const before = (await s.evaluate(`window.__workers`)) as number;
     await clickText(s, "Retry");
@@ -808,7 +821,7 @@ test("0025s3 c54 in Chromium: Failed in the slot, Retry, values and document sta
     const ok = await traceReady(s);
     console.log("after Retry:", ok);
     assert.equal(await s.evaluate(`!!(${CARD})`), false, "the alert is gone after a successful trace");
-    assert.equal(await slotInfo(s), null, "the slot empties after a successful trace");
+    await atRest(s, "after a successful trace");
     // Enter on the canvas also retries; a changed value clears the card.
     await s.evaluate(`window.__failWorker = true`);
     await typeInto(s, "Smooth", "77");
@@ -979,20 +992,22 @@ test("0025s3 several images in Chromium: label, views, the peek and one step (cr
   }
 });
 
-test("0025s3 c55 in Chromium: over 100,000 nodes the status warns, Create paths works, one group, one step (criterion 55)", { skip: !BROWSER, timeout: 900_000 }, async () => {
+test("0025s3 c55 in Chromium: over 100,000 nodes the status warns, Enter creates, one group, one step (criterion 55)", { skip: !BROWSER, timeout: 900_000 }, async () => {
   const { s, close } = await launch();
   try {
     await s.tab("Layers");
-    // Under the limit (90,000 nodes): no warning.
-    await importImage(s, "discs-under.png", discs, 1200, 1200);
+    // Under the limit: no warning. Since 0089 slice D a disc of radius 3 px is fitted with 8 nodes
+    // (it was 4), so 800 x 800 px (100 x 100 discs) gives 80,000 nodes and 1000 x 1000 gives 125,000.
+    await importImage(s, "discs-under.png", discs, 800, 800);
     await openTrace(s);
+    await advancedOpen(s); // the counts, which `settle` reads, live in the Advanced block
     const under = await settle(s);
-    assert.equal(nodesOf(under), 90_000);
-    assert.ok(!/Slow to edit/.test(await bar(s)), `no warning at 90,000 nodes: ${under}`);
+    assert.equal(nodesOf(under), 80_000);
+    assert.ok(!/Slow to edit/.test(await bar(s)), `no warning at 80,000 nodes: ${under}`);
     await focusCanvas(s);
     await s.key("Escape", 27);
     await sleep(300);
-    await importImage(s, "discs.png", discs, 1320, 1320);
+    await importImage(s, "discs.png", discs, 1000, 1000);
     const rowsBefore = await s.layerRows();
     await openTrace(s);
     const status = await waitFor("the settled trace", async () => {
@@ -1199,8 +1214,8 @@ test("0025s3 re c70 in Chromium: the About Trace tab and the i button (criterion
     await settle(s);
     const labels = await tabLabels(s);
     assert.match(labels[labels.length - 1] ?? "", /^About Trace/, `About Trace is the last tab: ${labels}`);
-    const fontsAt = labels.findIndex((t) => /^Fonts/.test(t ?? ""));
-    if (fontsAt >= 0) assert.equal(fontsAt, labels.length - 2, "right after Fonts");
+    // 0060 snapping (main, 2026-10-30) added a Snapping tab after Fonts; criterion 70 only asks
+    // that About Trace is the last tab, which the assertion above checks.
     assert.notEqual(await activeTab(s), "About Trace", "the tool never opens the tab by itself");
     assert.ok(!/About Trace/.test((await s.evaluate(`document.querySelector('[role=tabpanel]')?.innerText ?? ''`)) as string));
     // The i button: right after the Trace label, first Tab stop, 28 px, aria-pressed false.
@@ -1223,7 +1238,8 @@ test("0025s3 re c70 in Chromium: the About Trace tab and the i button (criterion
     const joined = flat.map((l, i) => (i > 0 && /^[a-z]/.test(l) ? `${flat[i - 1]}: ${l}` : l)).join("\n");
     assert.ok(await s.evaluate(`/About Trace/.test(document.body.innerText)`), "the header About Trace");
     for (const line of [
-      "Trace turns the selected image into paths. Dark parts become shapes, light parts stay empty. Press Enter to create the paths.",
+      // The intro was reworded by the lead on 2026-10-30 (`specs/0089` criterion 24, 0025 criterion 70).
+      "Trace turns the selected image into paths. The method decides which parts become shapes. Press Enter or the Trace button to create the paths.",
       "Preset: a named set of values for what you do with the paths.",
       "Logo / Line art: sharp corners, clean curves.",
       "Photo: many shapes, photos trace roughly.",
@@ -1266,24 +1282,29 @@ test("0025s3 re c4/c71/c41/c11 in Chromium: row 1, the far-right expander, count
     await s.tab("Layers");
     await importImage(s, "ring.png", ring);
     await openTrace(s);
+    await advancedOpen(s); // the counts, which `settle` reads, live in the Advanced block
     await settle(s);
     // Start closed whatever an earlier run stored.
     if (await s.evaluate(`document.querySelector('${barQ} button[aria-label="Fewer trace options"]') !== null`)) {
       await clickAria(s, "Fewer trace options");
       await sleep(300);
     }
-    // Criterion 4: no Create paths button (12), row 1 order, no Advanced word.
+    // Criterion 4 as 0089 criteria 22 and 22a reshape it: the finish button is the blue "Trace" (no
+    // "Create paths" button, no state label), and the flow is i, Preset, View, Method, Threshold,
+    // Smooth, Tolerance, Ignore below, the expander, the finish button; no Advanced word.
     assert.ok(!(await hasButton(s, "Create paths")), "there is no Create paths button");
-    const names = ["button[aria-label=\"About Trace\"]", "button[aria-label=Preset]", "[role=radiogroup][aria-label=View]", "[role=spinbutton][aria-label=Threshold]", "[role=spinbutton][aria-label=Smooth]", "[role=spinbutton][aria-label=\"Ignore below\"]", "button[aria-expanded][aria-controls]"];
+    await atRest(s, "with Advanced closed");
+    const names = ["button[aria-label=\"About Trace\"]", "button[aria-label=Preset]", "[role=radiogroup][aria-label=View]", "button[aria-label=Method]", "[role=spinbutton][aria-label=Threshold]", "[role=spinbutton][aria-label=Smooth]", "[role=spinbutton][aria-label=Tolerance]", "[role=spinbutton][aria-label=\"Ignore below\"]", "button[aria-expanded][aria-controls]", "[data-trace-slot]"];
     const boxes = [];
     for (const n of names) boxes.push((await rectOf(s, `${barQ} ${n}`)) ?? assert.fail(`missing ${n}`));
     const flow = (a: (typeof boxes)[0], b: (typeof boxes)[0]) => b.y > a.bottom - 4 || b.x >= a.right - 1;
     for (let i = 1; i < boxes.length; i++) assert.ok(flow(boxes[i - 1], boxes[i]), `${names[i]} follows ${names[i - 1]} in reading order`);
     assert.ok(!/Advanced/.test(await bar(s)), "the word Advanced is not drawn");
-    const ex = boxes[6];
+    const ex = boxes[8];
+    const finish = boxes[9];
     const barBox = (await rectOf(s, barQ))!;
     assert.ok(ex.w >= 28 && ex.h >= 28, "the expander is 28 x 28");
-    assert.ok(barBox.right - ex.right < 16, `the expander is at the far right: gap ${barBox.right - ex.right}`);
+    assert.ok(barBox.right - finish.right < 16, `the Trace button is at the far right: gap ${barBox.right - finish.right}`);
     assert.equal(await s.evaluate(`document.querySelector('${barQ} button[aria-expanded][aria-controls]').getAttribute('aria-label')`), "More trace options");
     assert.equal(await s.evaluate(`document.querySelector('${barQ} button[aria-controls]').getAttribute('aria-expanded')`), "false");
     // Criterion 11: with Advanced closed no counts line.

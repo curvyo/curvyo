@@ -416,7 +416,11 @@ test("0025 in Chromium: Trace button, key I, bar, preview, fields, leaving (crit
     const pressed = (await s.evaluate(`[...document.querySelectorAll('button[aria-pressed=true]')].map((b) => b.getAttribute('aria-label')).join('|')`)) as string;
     assert.equal(pressed, "", "no rail button is pressed in the Trace tool");
     const bar = (await s.evaluate(`document.querySelector('[role=toolbar][aria-label=Trace]')?.innerText ?? ''`)) as string;
-    assert.match(bar, /^Trace\b/, `the first element is the state label: ${JSON.stringify(bar.slice(0, 40))}`);
+    // 0089 criterion 22a (Frage 84): no state label; the first control is the About Trace "i" and
+    // the only "Trace" text is the finish button at the end of the flow.
+    assert.doesNotMatch(bar, /^Trace\b/, `no state label at the start: ${JSON.stringify(bar.slice(0, 40))}`);
+    assert.equal((await s.evaluate(`document.querySelector('[role=toolbar][aria-label=Trace]').querySelector('button, [role=spinbutton]').getAttribute('aria-label')`)) as string, "About Trace", "the first control is the About Trace button");
+    assert.equal((await s.evaluate(`document.querySelector('[role=toolbar][aria-label=Trace] [data-trace-slot]').textContent.trim()`)) as string, "Trace", "the finish button reads Trace");
     const labels = await s.evaluate(`JSON.stringify([...document.querySelectorAll('[role=spinbutton]')].filter((i) => i.offsetParent).map((i) => i.getAttribute('aria-label')))`);
     console.log("bar fields:", labels, "| bar text:", JSON.stringify(bar));
     assert.equal(await fieldValue(s, "Threshold"), "50", "criterion 9: automatic value of a 0/255 picture (luma 128) shown as 50 %");

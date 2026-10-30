@@ -18,6 +18,8 @@ export type TraceRequest =
       /** The settings JSON of `settingsJson` in `traceText`. */
       settings: string;
     }
+  /** The mask the same trace would walk, for the Mask view (`specs/0089` criterion 21). */
+  | { type: "mask"; id: number; rgba: Uint8Array; width: number; height: number; map: number[]; settings: string }
   /** The PNG of a copied image (`specs/0087-image-clipboard-and-drop` criterion 14). */
   | { type: "png"; id: number; rgba: Uint8Array; width: number; height: number };
 
@@ -29,6 +31,8 @@ export type TraceResponse =
   /** A running trace reached a higher whole percent (criterion 10). */
   | { id: number; kind: "progress"; percent: number }
   | { id: number; kind: "png"; png: Uint8Array; ms: number }
+  /** A mask: 255 for content, 0 for the rest, row by row; `width` 0 when the picture cannot be traced. */
+  | { id: number; kind: "mask"; width: number; height: number; bits: Uint8Array; ms: number }
   | { id: number; kind: "error"; message: string };
 
 /** The pixels of one job. */
@@ -43,6 +47,13 @@ export interface TracePixels {
 export interface TraceOutput {
   wire: Float64Array;
   seconds: number;
+}
+
+/** The mask of the Mask view: `width` x `height` mask pixels, 255 for content. */
+export interface TraceMask {
+  width: number;
+  height: number;
+  bits: Uint8Array;
 }
 
 /** Thrown into a job's promise when it was cancelled. */
@@ -171,6 +182,19 @@ export class TraceRunner {
       throw new Error(response.kind === "error" ? response.message : "unexpected reply");
     }
     return { wire: response.wire, seconds: response.ms / 1000 };
+  }
+
+  /** The mask a trace of `pixels` with `settings` would walk (`specs/0089` criterion 21), or
+   * `null` when the picture cannot be traced; the pixels are handed over. */
+  async mask(pixels: TracePixels, settings: string): Promise<TraceMask | null> {
+    const response = await this.send(
+      (id) => ({ type: "mask", id, rgba: pixels.rgba, width: pixels.width, height: pixels.height, map: pixels.map, settings }),
+      [pixels.rgba.buffer],
+    );
+    if (response.kind !== "mask") {
+      throw new Error(response.kind === "error" ? response.message : "unexpected reply");
+    }
+    return response.width > 0 ? { width: response.width, height: response.height, bits: response.bits } : null;
   }
 
   /** The PNG of `rgba` (`width` x `height`, straight alpha), made in the worker; the pixels are

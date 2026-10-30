@@ -484,7 +484,8 @@ test("0025 in Chromium at 800x600: no Trace bar control passes the bar's right e
     assert.equal(await checked(), "Overlay");
     await key("keydown", "|", true);
     await sleep(200);
-    assert.equal(await checked(), "Trace", "Shift+backslash cycles");
+    // Mask follows Overlay since `specs/0089` criterion 21.
+    assert.equal(await checked(), "Mask", "Shift+backslash cycles");
     // Leaving the tool with the tab active returns to the stored tab; the tab leaves the strip.
     await s.clickSel('[role=tablist][aria-label=Panel] [role=tab][aria-label="About Trace"]');
     await sleep(400);
