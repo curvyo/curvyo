@@ -104,11 +104,13 @@ fn doc_of(s: &Session) -> Document {
 }
 
 fn assert_consistent(v: &PanelView, ctx: &str) {
-    assert_eq!(v.tabs.len(), 6, "{ctx}");
+    assert_eq!(v.tabs.len(), 7, "{ctx}");
     assert_eq!(v.tabs.iter().filter(|t| t.selected).count(), 1, "{ctx}");
     assert_eq!(
         v.tabs.iter().map(|t| t.name).collect::<Vec<_>>(),
-        ["file", "document", "style", "layers", "history", "fonts"],
+        [
+            "file", "document", "style", "layers", "history", "fonts", "snapping"
+        ],
         "{ctx}"
     );
     let style = tab(v, "style");
@@ -407,7 +409,7 @@ fn c10_an_unfinished_pen_path_empties_the_body_and_keeps_the_strip() {
     assert!(s.pen_in_progress().is_some(), "an unfinished path");
     let v = s.panel_view();
     assert_eq!(v.content, PanelContent::Empty);
-    assert_eq!(v.tabs.len(), 6, "the strip stays");
+    assert_eq!(v.tabs.len(), 7, "the strip stays");
     assert_eq!(active(&v), "document");
     // A press on a tab sets the active tab.
     assert!(

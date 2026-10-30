@@ -297,10 +297,12 @@ fn a_press_inside_the_turned_box_moves_the_shape_and_one_outside_does_not() {
 #[test]
 fn the_skew_handles_exist_at_any_angle() {
     for deg in [0.0, 30.0, 78.7, -90.0, 180.0] {
-        for (mut session, _) in [
+        for (mut session, _) in vec![
             hexagon(pt(0.0, 0.0), 10.0, deg),
             star(pt(0.0, 0.0), 10.0, deg),
-        ] {
+        ]
+        .into_boxed_slice()
+        {
             for side_rotate in [false, true] {
                 let handles = SelectTool::transform_handles(
                     &session.objects(),

@@ -1,4 +1,4 @@
-# Optional page browser acceptance checks
+# Optional browser acceptance checks
 
 Run from the repository root against a running development server. These scripts
 use Playwright with Chromium; they do not add a production or CI dependency.
@@ -13,6 +13,7 @@ node target/browser-check/node_modules/playwright/cli.js install chromium
 export NODE_PATH="$PWD/target/browser-check/node_modules"
 node frontend/tests/browser/pages.cjs
 node frontend/tests/browser/many-pages.cjs
+node frontend/tests/browser/snapping.cjs
 ```
 
 On the minimal validation host Chromium libraries additionally require
@@ -27,3 +28,8 @@ conversion, cancelled grip drag and deletion protection. `many-pages.cjs` checks
 200 rows and frames, first/last activation and a drawing interaction without JS
 errors. Its wall-clock duration is an observation; the CPU performance budget is
 asserted separately by Rust's `pages::two_hundred_pages_cpu_budget`.
+
+`snapping.cjs` checks dedicated rail navigation, child-icon Shift activation,
+keyboard repeat and Shift+Space, collapsed-panel behavior, all target controls,
+zone normalization and validation, native field and document undo, and sticky
+settings during drawing. Its screenshot is `target/browser-check/snapping-verified.png`.

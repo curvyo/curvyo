@@ -112,6 +112,7 @@ mod shape_placement;
 mod shape_tool_common;
 mod skew_entry;
 mod skew_math;
+mod snapping;
 mod split;
 mod stack_plan;
 mod stroke_to_path_plan;
@@ -372,6 +373,11 @@ pub use shape_placement::{
 pub use shape_tool_common::{CreateOutcome, CreatePreview};
 pub use skew_entry::SkewEntry;
 pub use skew_math::{SkewFrame, skew_angle, skew_factor, skew_frame};
+pub use snapping::{
+    AxisProbe, HeldSnap, MarkerLine, PAGE_FRACTIONS, SnapCurve, SnapExclusions, SnapMarker,
+    SnapProbe, SnapResult, SnapSettings, SnapState, SnapTarget, SnapTargets, TargetAxis,
+    TargetKind, resolve, resolve_along, resolve_probe_along,
+};
 pub use split::{SPLIT_COMMIT_LABEL, SplitPlan, SplitRefusal, plan_split};
 pub use stack_plan::{MAX_STACK_PIECES, StackPlan, StackRefusal};
 pub use stroke_to_path_plan::{

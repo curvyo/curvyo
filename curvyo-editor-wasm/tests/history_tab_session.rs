@@ -76,10 +76,15 @@ fn the_history_tab_exists_and_the_shortcut_selects_it() {
     assert_eq!(active.name, "history");
     let history = view.tabs.iter().find(|t| t.name == "history").unwrap();
     assert_eq!(history.tooltip, "History (Shift+Ctrl+H)");
-    // The Fonts tab of `specs/0074-text-objects` is appended after History.
+    // Fonts follows History; document Snapping is appended after Fonts.
     assert_eq!(
-        view.tabs.iter().rev().nth(1).map(|t| t.name),
-        Some("history")
+        view.tabs
+            .iter()
+            .rev()
+            .take(3)
+            .map(|t| t.name)
+            .collect::<Vec<_>>(),
+        vec!["snapping", "fonts", "history"]
     );
 }
 

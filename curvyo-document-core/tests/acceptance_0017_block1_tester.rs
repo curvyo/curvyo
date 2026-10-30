@@ -553,10 +553,28 @@ fn every_older_fixture_still_opens_with_the_styles_it_stored() {
         "curve_five_damaged_v16.curvyo",
         "arc_unknown_kind_damaged_v16.curvyo",
     ];
+    let snapping_damaged = [
+        // Intentionally malformed 0060 snapping registers.
+        "snapping_enabled_type_v27.curvyo",
+        "snapping_capture_type_v27.curvyo",
+        "snapping_capture_negative_v27.curvyo",
+        "snapping_objects_container_v27.curvyo",
+        "snapping_release_nan_v27.curvyo",
+    ];
     let mut opened = 0;
     for entry in std::fs::read_dir(dir).unwrap() {
         let path = entry.unwrap().path();
         let name = path.file_name().unwrap().to_string_lossy().to_string();
+        if snapping_damaged.contains(&name.as_str()) {
+            assert!(
+                matches!(
+                    unpack(5, &std::fs::read(&path).unwrap()),
+                    Err(OpenError::Damaged)
+                ),
+                "{name}"
+            );
+            continue;
+        }
         if bad.contains(&name.as_str()) || !name.ends_with(".curvyo") {
             continue;
         }

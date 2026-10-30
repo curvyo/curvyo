@@ -10,6 +10,7 @@ use wasm_bindgen::prelude::*;
 
 use crate::session::{
     DocumentPresetsRecord, DocumentSide, FitOutcome, PanelTabsRecord, SizeOutcome,
+    SnappingSettingsRecord, SnappingToolbarRecord,
 };
 use crate::wasm_api::WasmSession;
 
@@ -160,5 +161,91 @@ impl WasmSession {
     #[must_use]
     pub fn size_text(&self) -> String {
         self.session.size_text()
+    }
+
+    /// Whether snapping is enabled.
+    #[must_use]
+    pub fn snapping_enabled(&self) -> bool {
+        self.session.snapping().enabled
+    }
+
+    /// Whether objects snap to other objects.
+    #[must_use]
+    pub fn snapping_objects(&self) -> bool {
+        self.session.snapping().objects
+    }
+
+    /// Whether objects snap to guides.
+    #[must_use]
+    pub fn snapping_guides(&self) -> bool {
+        self.session.snapping().guides
+    }
+
+    /// Whether objects snap to nodes (anchors).
+    #[must_use]
+    pub fn snapping_nodes(&self) -> bool {
+        self.session.snapping().nodes
+    }
+
+    /// Whether objects snap to page fractions.
+    #[must_use]
+    pub fn snapping_page(&self) -> bool {
+        self.session.snapping().page
+    }
+
+    /// The capture distance in screen pixels.
+    #[must_use]
+    pub fn snapping_capture_px(&self) -> f64 {
+        self.session.snapping().capture_px
+    }
+
+    /// The release distance in screen pixels.
+    #[must_use]
+    pub fn snapping_release_px(&self) -> f64 {
+        self.session.snapping().release_px
+    }
+
+    /// Sets snapping settings. Returns whether anything changed.
+    // The WASM ABI exposes independent switches and numeric fields as primitives;
+    // Session immediately groups them into the typed document settings record.
+    #[allow(clippy::too_many_arguments, clippy::fn_params_excessive_bools)]
+    pub fn set_snapping(
+        &mut self,
+        enabled: bool,
+        objects: bool,
+        guides: bool,
+        nodes: bool,
+        page: bool,
+        capture_px: f64,
+        release_px: f64,
+    ) -> bool {
+        use curvyo_document_core::DocumentSnapping;
+        let snapping = DocumentSnapping {
+            enabled,
+            objects,
+            guides,
+            nodes,
+            page,
+            capture_px,
+            release_px,
+        };
+        self.session.set_snapping(snapping)
+    }
+
+    /// The snapping settings as a record.
+    #[must_use]
+    pub fn snapping_settings(&self) -> SnappingSettingsRecord {
+        self.session.snapping_settings()
+    }
+
+    /// The snapping toolbar state for the panel header.
+    #[must_use]
+    pub fn snapping_toolbar(&self) -> SnappingToolbarRecord {
+        self.session.snapping_toolbar()
+    }
+
+    /// Toggles snapping enabled state. Returns the new state.
+    pub fn toggle_snapping(&mut self) -> bool {
+        self.session.toggle_snapping()
     }
 }

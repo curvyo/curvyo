@@ -244,7 +244,9 @@ fn c45_tabs_found_by_name_order_file_document_style_history() {
             let names: Vec<_> = entries.iter().map(|e| e.name).collect();
             assert_eq!(
                 names,
-                ["file", "document", "style", "layers", "history", "fonts"]
+                [
+                    "file", "document", "style", "layers", "history", "fonts", "snapping"
+                ]
             );
             // exactly one selected; it is the active tab
             let sel: Vec<_> = entries

@@ -1,6 +1,6 @@
 # Multiple pages: several pages in one project, side by side on the canvas
 
-Status: In progress (implementation requested 2026-10-29; spatial page model decided by the customer 2026-10-17; defaults below apply)
+Status: Done (PR #224; customer accepted and merged 2026-10-30)
 Priority: Should
 Origin: Customer (request of 2026-10-17, translated): "In the page setup on the right side you can add a page like in Inkscape. It can have a different format, but it starts with the same as the last one. In the view it simply appears next to it with a bit of distance, similar to Inkscape. Especially interesting to put several coasters into one file for lasering, or, for a person who particularly likes an animal, a set of key rings, coasters and breakfast boards in one file. Very practical since fonts and graphics can be reused via linked clone, so you work very consistently."
 

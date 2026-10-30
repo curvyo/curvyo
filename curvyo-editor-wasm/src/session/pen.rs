@@ -30,6 +30,7 @@ pub(super) struct PenCueState {
     /// (`specs/0072-pen-angle-snap-and-typed-values/` criterion 3).
     node: Option<Point>,
     join_notice: Option<PenJoinNotice>,
+    snap_press_offset: Option<curvyo_document_core::Vec2>,
 }
 
 /// The notice after a Pen join that moved outlines of the removed object into the survivor
@@ -59,6 +60,7 @@ impl Session {
     /// Acceptance criterion 3 / the dedicated "finish path" action
     /// (Enter, or a double-click the host has already recognized).
     pub fn finish_pen(&mut self) {
+        self.end_snapping_drag();
         // A finish closes an open entry chip without adding (`0072` criterion 22).
         self.cancel_pen_entry();
         self.recording(|this| {
@@ -86,6 +88,8 @@ impl Session {
             });
         }
         self.pen_cue.release();
+        self.pen_cue.snap_press_offset = None;
+        self.end_snapping_drag();
     }
 
     /// The notice of the latest Pen join that moved outlines into the survivor, if any.
@@ -170,7 +174,15 @@ impl Session {
         // The target test ran on the raw pointer; only a placed node is snapped (`0072`
         // criteria 2, 5), with Ctrl as the press event reported it.
         let point = if action == PressAction::Place {
-            let node = self.pen_constrained(point, self.held.ctrl);
+            self.begin_snapping_drag_for_shape();
+            let raw = self.pen_constrained(point, self.held.ctrl && !self.held.alt);
+            let direction = (self.held.ctrl && !self.held.alt)
+                .then(|| self.pen_last_node().map(|last| last.vector_to(raw)))
+                .flatten();
+            let result =
+                self.resolve_snapping_direction(&curvyo_ui_core::SnapProbe::point(raw), direction);
+            let node = raw.translated(result.offset);
+            self.pen_cue.snap_press_offset = Some(point.vector_to(node));
             self.pen_cue.node = Some(node);
             node
         } else {
@@ -194,9 +206,28 @@ impl Session {
         }
     }
 
+    pub(super) fn pen_snap_hover(&mut self, point: Point) {
+        if self.button_down || self.pen_last_node().is_none() {
+            return;
+        }
+        if !self.snapping.drag_in_flight() {
+            self.begin_snapping_drag_for_shape();
+        }
+        let raw = self.pen_constrained(point, self.held.ctrl && !self.held.alt);
+        let direction = (self.held.ctrl && !self.held.alt)
+            .then(|| self.pen_last_node().map(|last| last.vector_to(raw)))
+            .flatten();
+        self.resolve_snapping_direction(&curvyo_ui_core::SnapProbe::point(raw), direction);
+    }
+
     /// The pointer of a node drag as the handle end: snapped about the new node N while Ctrl is
     /// held, read live (`0072` criterion 3). The node itself never moves.
     pub(super) fn pen_handle_point(&self, pointer: Point, ctrl: bool) -> Point {
+        let pointer = pointer.translated(
+            self.pen_cue
+                .snap_press_offset
+                .unwrap_or(curvyo_document_core::Vec2::ZERO),
+        );
         match self.pen_cue.node {
             Some(node) if ctrl => constrain_segment(node, pointer),
             _ => pointer,
@@ -316,9 +347,16 @@ impl Session {
         match self.pen_target() {
             Some(PenTarget::Join(end)) => Some(end.anchor.point),
             Some(PenTarget::Close { .. }) => None,
-            _ => self
-                .pointer_position
-                .map(|pointer| self.pen_constrained(pointer, self.held.ctrl && !self.button_down)),
+            _ => self.pointer_position.map(|pointer| {
+                self.pen_constrained(
+                    pointer,
+                    self.held.ctrl && !self.held.alt && !self.button_down,
+                )
+                .translated(
+                    self.snap_result()
+                        .map_or(curvyo_document_core::Vec2::ZERO, |r| r.offset),
+                )
+            }),
         }
     }
 

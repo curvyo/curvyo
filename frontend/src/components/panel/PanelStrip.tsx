@@ -6,6 +6,8 @@ import {
   History,
   Info,
   Layers,
+  Magnet,
+  Check,
   PanelRightClose,
   PanelRightOpen,
 } from "lucide-react";
@@ -32,6 +34,7 @@ const GLYPHS: Record<string, Glyph> = {
   layers: Layers,
   history: History,
   fonts: CaseSensitive,
+  snapping: Magnet,
   "trace-info": Info,
 };
 
@@ -57,6 +60,8 @@ interface PanelStripProps {
   desktop?: boolean;
   /** The project has unsaved changes: the File tab carries a dot, also while the body is hidden. */
   fileDirty: boolean;
+  snappingEnabled: boolean;
+  onToggleSnapping: () => boolean;
   /** The collapse control was pressed. */
   onToggle: (event: React.MouseEvent<HTMLButtonElement>) => void;
   /** A tab was pressed or chosen from the keyboard: the body is shown with it. */
@@ -90,6 +95,8 @@ export function PanelStrip({
   open,
   bodyId,
   fileDirty,
+  snappingEnabled,
+  onToggleSnapping,
   desktop = false,
   onToggle,
   onActivate,
@@ -158,16 +165,34 @@ export function PanelStrip({
               aria-selected={open && tab.name === active}
               disabled={!tab.enabled}
               aria-disabled={tab.enabled ? undefined : true}
+              aria-description={tab.name === "snapping" ? (snappingEnabled ? "On" : "Off") : undefined}
+              onMouseDown={(event) => {
+                if (tab.name === "snapping" && event.shiftKey) event.preventDefault();
+              }}
+              onKeyDown={(event) => {
+                if (tab.name === "snapping" && event.shiftKey && (event.key === "Enter" || event.key === " ")) {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  if (!event.repeat) onToggleSnapping();
+                }
+              }}
               onClick={(event) => {
+                if (tab.name === "snapping" && event.shiftKey) {
+                  event.preventDefault();
+                  onToggleSnapping();
+                  if (event.detail > 0) onReturnFocus();
+                  return;
+                }
                 onActivate(tab.name);
                 // `detail` is 0 for keyboard activation, 1 or more for a click.
                 if (event.detail > 0) {
                   onReturnFocus();
                 }
               }}
-              className={TAB_CLASS}
+              className={`${TAB_CLASS} ${tab.name === "snapping" && snappingEnabled ? "bg-[var(--editor-accent-hover)] !text-[var(--editor-accent)] aria-selected:!text-[var(--toolbar-icon-active-fg)]" : ""}`}
             >
               {Glyph && <Glyph size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />}
+              {tab.name === "snapping" && snappingEnabled && <Check size={8} aria-hidden className="absolute right-px top-px bg-[var(--panel-bg)] group-aria-selected:bg-[var(--toolbar-icon-active-bg)]"/>}
               {dot ? (
                 // A shape badge in the glyph's colour, inside the 28 px box so the strip's scroll
                 // area never clips it; the casing has the ground's colour (the pressed ground
@@ -181,7 +206,7 @@ export function PanelStrip({
             </TabsTrigger>
           );
           return (
-            <Tooltip key={tab.name} side="left" content={tooltipText(tab.tooltip, desktop)}>
+            <Tooltip key={tab.name} side="left" content={tab.name === "snapping" ? `Snapping — ${snappingEnabled ? "on" : "off"}. Shift-click or Shift+Enter/Space to toggle.` : tooltipText(tab.tooltip, desktop)}>
               {tab.enabled ? trigger : <span className="inline-flex">{trigger}</span>}
             </Tooltip>
           );

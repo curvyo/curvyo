@@ -714,12 +714,16 @@ fn c2_tab_order_is_file_document_style_history_and_labels_and_tooltips() {
     let view = s.panel_view();
     assert_eq!(
         names(&s),
-        ["file", "document", "style", "layers", "history", "fonts"]
+        [
+            "file", "document", "style", "layers", "history", "fonts", "snapping"
+        ]
     );
     let labels: Vec<_> = view.tabs.iter().map(|t| t.label).collect();
     assert_eq!(
         labels,
-        ["File", "Document", "Style", "Layers", "History", "Fonts"]
+        [
+            "File", "Document", "Style", "Layers", "History", "Fonts", "Snapping"
+        ]
     );
     let tip = |n: &str| view.tabs.iter().find(|t| t.name == n).unwrap().tooltip;
     assert_eq!(tip("file"), "File", "the File tab names no key");

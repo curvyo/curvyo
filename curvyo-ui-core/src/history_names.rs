@@ -108,6 +108,7 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     ("boolean_exclusion", "Exclusion"),
     ("boolean_reverse_difference", "Reverse difference"),
     ("set_document_background", "Change background"),
+    ("set_document_snapping", "Change snapping"),
     ("combine_paths", "Combine"),
     ("split", "Split"),
     ("break_apart", "Break apart"),

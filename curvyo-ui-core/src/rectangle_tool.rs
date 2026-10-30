@@ -6,7 +6,7 @@
 //! [`curvyo_document_core::Document`] commit on release, a zero-movement
 //! press writes nothing and leaves the selection alone.
 
-use curvyo_document_core::{Angle, CornerRadii, Document, Length, Point, RectBounds, Shape};
+use curvyo_document_core::{Angle, CornerRadii, Document, Length, Point, RectBounds, Shape, Vec2};
 
 use crate::modifiers::Modifiers;
 use crate::shape_tool_common::{CreateDragBox, CreateOutcome, CreatePreview, create_drag_box};
@@ -47,8 +47,13 @@ impl RectangleTool {
     /// flight: updates [`RectangleTool::live_shape`], writes nothing. Ctrl
     /// makes a square, Shift draws around the press point. A no-op when idle.
     pub fn pointer_move(&mut self, point: Point, modifiers: Modifiers) {
+        self.pointer_move_snapped(point, modifiers, Vec2::ZERO);
+    }
+
+    /// Updates the drag with a constrained snapping correction.
+    pub fn pointer_move_snapped(&mut self, point: Point, modifiers: Modifiers, snap_offset: Vec2) {
         if let Some(drag) = &mut self.drag {
-            drag.current = point;
+            drag.current = point.translated(snap_offset);
             drag.modifiers = modifiers;
         }
     }
@@ -87,14 +92,29 @@ impl RectangleTool {
         point: Point,
         modifiers: Modifiers,
     ) -> CreateOutcome {
+        self.pointer_up_snapped(document, point, modifiers, Vec2::ZERO)
+    }
+
+    /// Commits the drag with the same correction as its preview.
+    pub fn pointer_up_snapped(
+        &mut self,
+        document: &Document,
+        point: Point,
+        modifiers: Modifiers,
+        snap_offset: Vec2,
+    ) -> CreateOutcome {
         let Some(drag) = self.drag.take() else {
             return CreateOutcome::NoOp;
         };
-        Self::shape_for(drag.down_at, point, modifiers).map_or(CreateOutcome::NoOp, |preview| {
-            CreateOutcome::Created(
-                document.create_primitive(preview.shape, Angle::from_radians(0.0)),
-            )
-        })
+        let snapped_point = point.translated(snap_offset);
+        Self::shape_for(drag.down_at, snapped_point, modifiers).map_or(
+            CreateOutcome::NoOp,
+            |preview| {
+                CreateOutcome::Created(
+                    document.create_primitive(preview.shape, Angle::from_radians(0.0)),
+                )
+            },
+        )
     }
 
     /// Whether a create-drag is in flight (the button is down), also while it
@@ -102,6 +122,12 @@ impl RectangleTool {
     #[must_use]
     pub const fn drag_in_flight(&self) -> bool {
         self.drag.is_some()
+    }
+
+    /// The start point of the drag in flight, if any.
+    #[must_use]
+    pub fn drag_start(&self) -> Option<Point> {
+        self.drag.map(|drag| drag.down_at)
     }
 
     /// Discards any in-progress drag, writing nothing. Returns whether there

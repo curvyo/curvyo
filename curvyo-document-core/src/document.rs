@@ -278,7 +278,11 @@ impl DocumentVersion {
 /// Bumped to 26 in `multiple-pages` (ADR 0024): ordered spatial page frames
 /// use independent root registers. Older readers must not hide extra frames.
 /// Golden: `pages_v26.curvyo`; no old-file migration is required for this SID build.
-pub const CURRENT_FORMAT_VERSION: u32 = 26;
+///
+/// Bumped to 27 in `snapping`: document-owned snapping registers preserve
+/// enabled state, target kinds and capture/release zones.
+/// Golden: `snapping_v27.curvyo`; no old-file migration is required for this SID build.
+pub const CURRENT_FORMAT_VERSION: u32 = 27;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";
@@ -425,8 +429,8 @@ impl Document {
     ///
     /// # Errors
     /// Returns [`OpenError::Damaged`] if the bytes are not a valid Loro
-    /// snapshot this build can import, if a background register is present
-    /// but malformed, or if they import cleanly but the
+    /// snapshot this build can import, if a background or snapping register is
+    /// present but malformed, or if they import cleanly but the
     /// `paths` tree inside them does not match the shape
     /// [`crate::path_codec`]'s writers always produce — a damaged-but-
     /// still-unzippable file (project-file-foundation's acceptance
@@ -446,6 +450,7 @@ impl Document {
         loro.import(bytes).map_err(|_| OpenError::Damaged)?;
         if !crate::path_codec::validate_path_tree(&loro, OBJECTS_TREE)
             || !crate::document_background::validate(&loro)
+            || !crate::snapping::validate(&loro)
         {
             return Err(OpenError::Damaged);
         }
@@ -558,6 +563,7 @@ impl Document {
             pages: self.pages(),
             display_unit: self.display_unit(),
             background: self.background().into(),
+            snapping: self.snapping().into(),
             objects,
         };
         serde_json::to_vec_pretty(&view).map_err(|_| SaveError::Encode)
@@ -624,6 +630,7 @@ struct DocumentJsonView {
     pages: Vec<crate::Page>,
     display_unit: DisplayUnit,
     background: crate::document_background::BackgroundJson,
+    snapping: crate::snapping::SnappingJson,
     objects: Vec<NodeJson>,
 }
 

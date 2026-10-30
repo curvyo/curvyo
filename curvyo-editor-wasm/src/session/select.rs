@@ -12,7 +12,7 @@
 use curvyo_document_core::Point;
 use curvyo_ui_core::{
     CornerLinking, CornerRadiusScaling, EditHandle, Modifiers, ParamHandle,
-    SelectDoubleClickOutcome, StrokeScaling, TransformHandleTolerances,
+    SelectDoubleClickOutcome, SnapProbe, StrokeScaling, TransformHandleTolerances,
 };
 
 use super::{Session, Tool};
@@ -179,12 +179,19 @@ impl Session {
         // A resize that may turn shapes into paths carries the session's own
         // anchor ids from the first preview (`0019` decision 8).
         self.select.mint_conversion_ids(&mut self.minter);
+        // If a move drag began, start snapping.
+        if self.select.drag_in_flight() {
+            self.begin_snapping_drag_for_selection();
+        }
     }
 
     /// Acceptance criteria 3, 15-18, 20, 41: commits whatever move/resize/
     /// rotate/skew drag [`Session::select_pointer_down`] began. `shift`/
     /// `ctrl` are the modifiers' state at release.
     pub(super) fn select_pointer_up(&mut self, point: Point, shift: bool, ctrl: bool) {
+        self.pointer_position = Some(point);
+        self.held.shift = shift;
+        self.held.ctrl = ctrl;
         self.sync_select_units();
         let objects = self.objects();
         // A resize released through zero is announced with its mirror (`0056` UX notes).
@@ -193,14 +200,19 @@ impl Session {
             .live_resize_factors(point, shift, ctrl)
             .and_then(|(sx, sy)| curvyo_ui_core::mirror_line(sx, sy));
         let dragged = self.select.dragging_handle();
-        let recovery = self.select.pointer_up(
+        let snap_offset = self
+            .snap_offset_for_move()
+            .unwrap_or(curvyo_document_core::Vec2::ZERO);
+        let recovery = self.select.pointer_up_snapped(
             &self.document,
             &objects,
             &mut self.selection,
             point,
             Modifiers::new(shift, ctrl).with_alt(self.held.alt),
             &mut self.minter,
+            snap_offset,
         );
+        self.end_snapping_drag();
         // A release that set an axis to 0.01 mm says so (`0056` criterion 15).
         self.transform_notice = curvyo_ui_core::zero_recovery_notice(recovery);
         if self.has_unrecorded_steps() {
@@ -248,6 +260,7 @@ impl Session {
         self.sync_select_units();
         self.select
             .pointer_moved(point, modifiers, &mut self.selection);
+        self.snap_offset_for_move();
         let objects = self.objects();
         // Nothing lights up while a drag runs; hover returns after release.
         // Otherwise hover lights the object a press at this point would
@@ -331,6 +344,39 @@ impl Session {
             SelectDoubleClickOutcome::EntryOpened | SelectDoubleClickOutcome::NoNodes => {
                 DoubleClickHint::None
             }
+        }
+    }
+
+    /// The snap offset for the current move drag, if any.
+    pub(super) fn snap_offset_for_move(&mut self) -> Option<curvyo_document_core::Vec2> {
+        let pointer = self.pointer_position?;
+        let modifiers = Modifiers::new(self.held.shift, self.held.ctrl);
+        let Some((min, max)) =
+            self.select
+                .live_move_box_snapped(pointer, modifiers, curvyo_document_core::Vec2::ZERO)
+        else {
+            let (point, direction) =
+                self.select
+                    .resize_snap_point(pointer, self.held.shift, self.held.ctrl)?;
+            return Some(
+                self.resolve_snapping_direction(&SnapProbe::point(point), direction)
+                    .offset,
+            );
+        };
+        let probe = SnapProbe::box_edges(min, max);
+        let direction = self
+            .select
+            .live_move(pointer, self.held.shift, self.held.ctrl)
+            .and_then(|live| live.axis)
+            .map(|axis| match axis {
+                curvyo_ui_core::Axis::X => curvyo_document_core::Vec2::new(1.0, 0.0),
+                curvyo_ui_core::Axis::Y => curvyo_document_core::Vec2::new(0.0, 1.0),
+            });
+        let result = self.resolve_snapping_direction(&probe, direction);
+        if result.is_empty() {
+            None
+        } else {
+            Some(result.offset)
         }
     }
 }

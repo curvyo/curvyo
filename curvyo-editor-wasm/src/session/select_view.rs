@@ -38,12 +38,13 @@ impl Session {
             return None;
         }
         let cursor = self.pointer_position?;
-        self.select.live_edit(
+        self.select.live_edit_snapped(
             objects,
             &self.selection,
             cursor,
             self.held.shift,
-            self.held.ctrl,
+            self.held.ctrl && !self.held.alt,
+            self.snap_result().map_or(Vec2::ZERO, |r| r.offset),
         )
     }
 

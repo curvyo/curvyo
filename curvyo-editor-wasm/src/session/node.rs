@@ -82,7 +82,10 @@ impl Session {
         let Some(cursor) = self.pointer_position else {
             return;
         };
-        let Some(live) = self.node.live_drag(cursor, self.held.shift) else {
+        let Some(live) = self
+            .node
+            .live_drag(self.snapped_node_pointer(cursor), self.held.shift)
+        else {
             return;
         };
         match live {
@@ -250,7 +253,10 @@ impl Session {
             return None;
         }
         let cursor = self.pointer_position?;
-        match self.node.live_drag(cursor, self.held.shift)? {
+        match self
+            .node
+            .live_drag(self.snapped_node_pointer(cursor), self.held.shift)?
+        {
             LiveNodeDrag::Bend(bend) => Some(bend),
             LiveNodeDrag::Nodes { .. } | LiveNodeDrag::Handle { .. } => None,
         }

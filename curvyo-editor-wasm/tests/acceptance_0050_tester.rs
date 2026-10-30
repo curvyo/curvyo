@@ -257,7 +257,9 @@ fn ac1_the_strip_is_file_document_style_layers_history_and_layers_is_never_dimme
     let names: Vec<_> = v.tabs.iter().map(|t| t.name).collect();
     assert_eq!(
         names,
-        ["file", "document", "style", "layers", "history", "fonts"]
+        [
+            "file", "document", "style", "layers", "history", "fonts", "snapping"
+        ]
     );
     let layers = v.tabs.iter().find(|t| t.name == "layers").unwrap();
     assert_eq!(layers.label, "Layers");

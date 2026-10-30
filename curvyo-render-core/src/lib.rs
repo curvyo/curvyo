@@ -174,3 +174,6 @@ mod tests {
         assert_eq!(list.triangles.len(), 0);
     }
 }
+
+mod snap_marker;
+pub use snap_marker::{SnapMarkerSegment, build_snap_marker};

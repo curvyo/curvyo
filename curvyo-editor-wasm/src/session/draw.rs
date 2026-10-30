@@ -56,6 +56,7 @@ impl Session {
     /// reshapes the stroke and every decoration exactly as if it had
     /// already committed.
     #[must_use]
+    #[allow(clippy::too_many_lines)] // Explicit layer ordering keeps overlays auditable.
     pub fn draw_list(&self) -> DrawList {
         let view = self.view();
         // The document is read once per frame and every step below works on
@@ -139,6 +140,7 @@ impl Session {
         // (an unrotated object), and below the selection box and the handles.
         let reference = self.reference_decoration();
         list.extend(reference_box_list(view, reference.as_ref()));
+        list.extend(self.snap_marker_list());
         let live_objects = Self::live_objects_in(&objects, live.as_ref());
         list.extend(build_select_draw_list(
             view,

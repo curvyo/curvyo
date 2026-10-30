@@ -109,6 +109,8 @@ mod select_view;
 mod shapes;
 #[cfg(test)]
 mod single_line_tests;
+mod snapping;
+mod snapping_node;
 mod split;
 mod stroke_to_path;
 #[cfg(test)]
@@ -203,6 +205,7 @@ pub use panel_tabs::{PanelTabsRecord, PanelView};
 pub use pen::PenJoinNotice;
 pub use project::APP_VERSION;
 pub use select::DoubleClickHint;
+pub use snapping::{SnappingSettingsRecord, SnappingToolbarRecord};
 pub use split::{BreakApartOutcome, SplitOutcome};
 pub use stroke_to_path::StrokeToPathOutcome;
 #[cfg(target_arch = "wasm32")]
@@ -414,6 +417,8 @@ pub struct Session {
     /// The Offset tool: its bar's values (session memory), drag and preview
     /// (`specs/0038-path-offset`).
     offset: offset::OffsetTool,
+    /// Snapping state: the stored settings and the drag in flight (`specs/0060-snapping`).
+    snapping: snapping::SnappingState,
     /// The notice of the orphan repair after the Open, until the host has taken it
     /// (`clones.rs`).
     orphan_notice: Option<String>,
@@ -455,6 +460,7 @@ impl Session {
     #[must_use]
     pub fn new(peer: u64) -> Self {
         let document = Document::new(peer);
+        let snapping_value = document.snapping();
         Self {
             saved: document.version(),
             packed: None,
@@ -513,6 +519,7 @@ impl Session {
             layers: layers::LayerState::default(),
             panel: layers_panel::PanelState::default(),
             offset: offset::OffsetTool::default(),
+            snapping: snapping::SnappingState::new(snapping_value),
             orphan_notice: None,
             open_notice: None,
             images: image_cache::ImageCache::default(),
@@ -538,6 +545,7 @@ impl Session {
     /// See [`curvyo_document_core::unpack`].
     pub fn open(peer: u64, bytes: &[u8]) -> Result<Self, OpenError> {
         let document = curvyo_document_core::unpack(peer, bytes)?;
+        let snapping_value = document.snapping();
         let mut session = Self {
             saved: document.version(),
             packed: None,
@@ -589,6 +597,7 @@ impl Session {
             layers: layers::LayerState::default(),
             panel: layers_panel::PanelState::default(),
             offset: offset::OffsetTool::default(),
+            snapping: snapping::SnappingState::new(snapping_value),
             orphan_notice: None,
             open_notice: None,
             images: image_cache::ImageCache::default(),
@@ -636,6 +645,7 @@ impl Session {
     /// no acceptance criterion exercises switching tools mid-drag, so
     /// the same conservative stance applies.
     pub fn set_tool(&mut self, tool: Tool) {
+        self.end_snapping_drag();
         self.recording(|this| {
             // Flushes any pending ratio-slider preview against the
             // selection it was actually previewed against, before anything
@@ -759,6 +769,7 @@ impl Session {
                     let tolerances = this.hit_tolerances();
                     this.node_announcement = None;
                     this.node.pointer_down(&paths, point, tolerances, shift);
+                    this.begin_node_snapping(point);
                 }
                 Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar => {
                     this.note_shape_press(point);
@@ -817,6 +828,7 @@ impl Session {
                 let paths = self.node_paths();
                 let threshold = self.hit_tolerances().drag_threshold;
                 self.node.pointer_moved(&paths, point, shift, threshold);
+                self.resolve_node_snapping(point);
                 self.node_hover_on_nothing = false;
                 if !self.node.drag_in_flight() {
                     self.node_hover_on_nothing = self.node_hit_is_nothing(&paths, point);
@@ -834,7 +846,8 @@ impl Session {
                 self.offset_hover(point);
             }
             Tool::Text => self.text_pointer_move(point),
-            Tool::Pen | Tool::Trace => {}
+            Tool::Pen => self.pen_snap_hover(point),
+            Tool::Trace => {}
         }
     }
 
@@ -844,6 +857,25 @@ impl Session {
     pub fn pointer_leave(&mut self) {
         self.pointer_position = None;
         self.hovered = None;
+    }
+
+    /// The document's snapping settings.
+    #[must_use]
+    pub fn snapping(&self) -> curvyo_document_core::DocumentSnapping {
+        self.document.snapping()
+    }
+
+    /// Updates the document's snapping settings and the session's cached copy.
+    /// Returns whether anything changed.
+    pub fn set_snapping(&mut self, snapping: curvyo_document_core::DocumentSnapping) -> bool {
+        if self.operation_in_flight() || self.button_down {
+            return false;
+        }
+        let changed = self.recording(|this| this.document.set_snapping(snapping));
+        if changed {
+            self.snapping.update_stored(self.document.snapping());
+        }
+        changed
     }
 
     /// The pointer released at `point`, ending whatever gesture
@@ -867,6 +899,9 @@ impl Session {
                 this.cancel_gesture();
                 return;
             };
+            this.pointer_position = Some(point);
+            this.held.shift = shift;
+            this.held.ctrl = constrain;
             if this.page_drag_end(point) {
                 return;
             }
