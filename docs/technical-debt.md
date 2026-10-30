@@ -1657,7 +1657,8 @@ follows it (`DashPattern::MAX_DASHES_PER_OBJECT`, read by `curvyo-render-core` a
 library's limit would show is a single region with that many holes, and criterion 16 turns it into
 the status "Too much detail: raise Specks." (`curvyo-vectorize-core`, `MAX_HOLES_PER_REGION`).
 
-**Resolution:** open; lifts with an upstream `u32` labelling or the own pipeline of ADR 0023 §8.
+**Resolution:** open; the reason went with visioncortex (`specs/0089` slice D walks every
+boundary itself on `u32` labels), so the limit can be lifted when criterion 16 is revisited.
 
 ## Native and wasm traces differ in the last few nodes (`0025` criterion 18, 2026-10-27)
 
@@ -1666,8 +1667,9 @@ native and Rust's `libm` on wasm. The golden files are native and exact; `npm te
 wasm build with equal path counts, nodes within 1 % and boxes within 0.01 mm. The preview and
 Create paths run in the same wasm worker, so what is previewed is what is created.
 
-**Resolution:** open; an upstream PR replacing the `acos` with basic operations, then the wasm
-check returns to 1e-6 mm (ADR 0023 §4).
+**Resolution:** resolved 2026-10-29 (`specs/0089` slice D): visioncortex left the tracer; our own
+contour, corners and fit use basic operations and `sqrt` only, and `npm test` compares the wasm
+trace with the goldens exactly (equal counts, points within 1e-6 mm).
 
 ## The first reduced copy of a large image is made on the main thread (`0025` criterion 58, 2026-10-28)
 
@@ -1734,3 +1736,15 @@ about four times the file's size in text, parsed on the page's main thread. A fi
 
 **Resolution:** open; move file bytes to a raw IPC response (`tauri::ipc::Response`) or a channel
 when the import of large files is worked on.
+
+## Trace peak memory reaches 20 to 80 B/px on small pictures and with Upscale (`0089` slice A, 2026-10-29)
+
+ADR 0023 §8 and `specs/0089` adrs.md §8 expect about 11 B/px steady state and 16 B/px at most.
+The slice A reference run (`reference_table`, counting allocator, peak above the input per source
+pixel) measures 5 to 8 B/px at Logo / Line art on 1x pictures, but 20 to 80 B/px on the smallest
+0.25x pictures (fixed per-trace overhead over few pixels) and 20 to 29 B/px with Upscale
+(Engraving), because the 2x copy counts four times per source pixel. The 16 Mpx memory test still
+passes; no self-made limit is set.
+
+**Resolution:** open; revisit with the stage cache of `specs/0089` adrs.md §6 (slice E), which
+changes what is held between traces.

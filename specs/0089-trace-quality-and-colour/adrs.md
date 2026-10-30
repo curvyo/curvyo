@@ -285,6 +285,15 @@ same stages, scored with the truth-free subset of the harness metrics. Applying 
   0025 timing path), peak memory via `cap`. `baseline.json` gains the slice A columns per preset; the
   +5 % regression guard covers them.
 
+### Dated amendment note (2026-10-29, Proposal of the lead; customer confirms at D's demo, Frage 96)
+
+§5 "Saddles ... foreground stays 4-connected, matching `regions.rs`" and ADR 0023 §3 (4-connected,
+chosen to match visioncortex, now removed) are amended: foreground is 8-connected, background stays
+4-connected (Specks, regions and the contour walk agree). Reason: thin diagonal lines stay one shape
+(Logo about 13.2 nodes per 100 mm instead of 19.4). The baseline is re-measured with an 8-connected
+Specks reference before comparing. The guard is redefined in spec criterion 9a; axis-aligned
+half-pixel features are reported only until slice G.
+
 ## Feature-local decisions
 
 1. No new ADR: the swap of the boundary fit is ADR 0023 §8's own path with the §2 shape kept, and

@@ -17,7 +17,8 @@ Escape, **S** or another tool. Pan and zoom redraw it without tracing again.
 
 The trace runs in the background, so the editor stays responsive. While a value is dragged, a
 reduced copy of the picture (longest side 1000 pixels) is traced; on release the full picture
-follows. After 400 ms a small progress pill appears after Ignore below, with the percentage (for
+follows. At the far right of the bar, after the expander, sits the **Create paths** button; it does
+what Enter does. After 400 ms of a trace it becomes a small progress pill with the percentage (for
 example "42 %") and an x, "Stop (Esc)", and the old outline is drawn at half strength; a quick
 trace shows nothing. The x (or a first Escape) stops the trace: the pill says "Stopped" (its
 tooltip: "Preview is out of date"), the old outline stays at half strength, and a **Retry** button
@@ -47,17 +48,17 @@ it." A click on an image selects it and starts its preview.
 ## Presets
 
 The **Preset** button at the start of the bar picks a set of values for what you do with the
-paths afterwards. A pick sets Smooth, Ignore below, Corners, Upscale and Denoise, never the
-Threshold or the toggles. After any change of those five values the button reads
+paths afterwards. A pick sets Smooth, Tolerance, Ignore below, Corners, Upscale and Denoise, never
+the Threshold or the toggles. After any change of those six values the button reads
 "Custom"; picking a preset again restores its values. The menu opens with Enter or Down on the
 button; Up and Down move, Enter picks, Escape closes.
 
-| Preset | For | Smooth | Ignore below | Corners | Upscale | Denoise |
-|---|---|---|---|---|---|---|
-| **Logo / Line art** ("Sharp corners, clean curves.") | logos, line art, area laser cutting, plotting, embroidery; the first use | 80 | 0.5 mm | 70 | Off | Off |
-| **Photo** ("Many shapes. Photos trace roughly.") | photographs, black and white | 50 | 0.1 mm | 30 | Off | Off |
-| **Silhouette for cutting/carving** ("Closed, simple, few nodes.") | cutting plotters, milling, carving: few nodes, nothing smaller than 2 mm | 100 | 2.0 mm | 70 | Off | Low |
-| **Engraving** ("Keeps fine lines.") | engraving fine detail and thin lines | 80 | 0.1 mm | 70 | Auto | Off |
+| Preset | For | Smooth | Tolerance | Ignore below | Corners | Upscale | Denoise |
+|---|---|---|---|---|---|---|---|
+| **Logo / Line art** ("Sharp corners, clean curves.") | logos, line art, area laser cutting, plotting, embroidery; the first use | 80 | 0.5 px | 0.5 mm | 70 | Off | Off |
+| **Photo** ("Many shapes. Photos trace roughly.") | photographs, black and white | 50 | 0.5 px | 0.1 mm | 30 | Off | Off |
+| **Silhouette for cutting/carving** ("Closed, simple, few nodes.") | cutting plotters, milling, carving: few nodes, nothing smaller than 2 mm | 100 | 1.5 px | 2.0 mm | 70 | Off | Low |
+| **Engraving** ("Keeps fine lines.") | engraving fine detail and thin lines | 80 | 0.35 px | 0.1 mm | 70 | Auto | Off |
 
 The choice (the preset, or Custom with its values) is remembered for the next image and applies to
 every selected image.
@@ -70,26 +71,31 @@ every selected image.
   the stored colours (0 to 255). The tracer works with that brightness value: a percent becomes
   `round(p x 255 / 100)`, so 50 % is 128; the automatic value is used exactly until you change
   the field.
-- **Smooth** (0 to 100, default 80): higher gives fewer nodes and smoother curves. Sharp corners
-  of the picture stay sharp. Above 80, Smooth also merges nodes while the outline stays within
-  (Smooth - 80) x 0.01 mm of the trace, so 0.2 mm at 100; up to 80 nothing is merged.
+- **Smooth** (0 to 100, default 80): calms the pixel steps of the outline before the fit (0.03
+  pixels of smoothing per step, 2.4 at 80). Sharp corners of the picture are found before and stay
+  where they are.
+- **Tolerance** (0.1 to 3 px, default 0.5 px): the largest distance, in pixels of the image, of
+  the paths from the calmed outline. Higher gives fewer nodes. Corners do not move when it
+  changes; long straight edges become single lines.
 - **Ignore below** (specks, 0 to 10 mm, default 0.5 mm): shapes and holes smaller than a square of
   this side are dropped (a speck becomes background, a small hole is filled). The size is measured
   on the placed image in millimetres; the muted readout gives it in image pixels ("0.50 mm  ~ 2
-  px").
+  px"). Dark pixels that touch only at a corner count as one shape, so a thin diagonal line stays
+  one path.
 
 The fields work like every value field of the app: a click sets the value at the pointer, a drag
 changes it (the reduced copy is traced while you drag), a double-click, Enter or F2 opens number
-entry. Up and Down change a value by one step (Threshold 1 %, Specks 0.1 mm), Shift by ten
-(Threshold 10 %, Specks 1 mm), Ctrl by the finest step (Specks 0.01 mm), Home and End go to the
-limits. A typed value is set with Enter and kept within the range; Enter then returns to the
-canvas. Smooth and Specks are remembered between
+entry. Up and Down change a value by one step (Threshold 1 %, Tolerance 0.05 px, Specks 0.1 mm),
+Shift by a big step (Threshold 10 %, Tolerance 0.5 px, Specks 1 mm), Ctrl by the finest step
+(Tolerance 0.01 px, Specks 0.01 mm), Home and End go to the limits. A typed value is set with
+Enter and kept within the range; Enter then returns to the canvas. Smooth, Tolerance and Specks
+are remembered between
 uses as a setting of the app, not of the project; the Threshold starts at each image's automatic
 value.
 
 ## Advanced
 
-The double-arrow button after Ignore below ("More trace options") opens a block under the values
+The double-arrow button at the far right, before Create paths ("More trace options"), opens a block under the values
 (open or closed is remembered). Its first row starts with two icon buttons (pressed means on, the
 tooltip names each):
 
@@ -102,7 +108,9 @@ Then:
   3 x 3 pixels, High 5 x 5. It removes scan noise and JPEG ringing.
 - **Upscale** (Auto, Off): traces a copy at twice the size; Auto does so for images under 1
   megapixel. Small or low-resolution pictures keep their shape better.
-- **Corners** (0 to 100, default 70): higher makes a bend a sharp corner more readily.
+- **Corners** (0 to 100, default 70): higher makes a bend a sharp corner more readily (70: bends
+  sharper than 60 degrees). Corners are found on the pixel outline before it is calmed and placed
+  where the two straight sides meet.
 
 The last row of the block gives the counts of the result (see Status). Invert and Ignore
 background start off with each start of the app.
@@ -126,8 +134,8 @@ show in a muted row under the values whether the Advanced block is open or not:
 
 While the Trace tool is active the Properties panel has one more tab, last in its strip:
 **About Trace** (the "i" glyph). It shows a short description of the tool; it is the only
-description of this kind in the app and never opens by itself. The "i" button after the word
-"Trace" at the start of the bar opens the same tab and is pressed while it shows; pressing it
+description of this kind in the app and never opens by itself. The "i" button at the start of the
+bar opens the same tab and is pressed while it shows; pressing it
 again, or leaving the tool, returns the panel to the tab it showed before (hidden again if it was
 hidden). Any other tab leaves it too. The text:
 
@@ -140,7 +148,8 @@ Trace turns the selected image into paths. Dark parts become shapes, light parts
 - Engraving: keeps fine lines, drops shapes below 0.1 mm.
 - View: the image with the outline, the result alone, or the image alone. Hold \ to peek at the image.
 - Threshold: pixels darker than this brightness (0 to 100 %) become shapes.
-- Smooth: higher gives fewer nodes and a looser fit, up to 0.2 mm.
+- Smooth: calms the pixel steps of the outline before the fit; higher is calmer.
+- Tolerance: how far in pixels the paths may stray from the calmed outline; higher gives fewer nodes.
 - Ignore below: drops shapes and holes smaller than this size in mm.
 - Denoise: smooths out noise in the picture before tracing.
 - Upscale: doubles small images before tracing; Auto does it below 1 Mpx.
@@ -150,8 +159,8 @@ Trace turns the selected image into paths. Dark parts become shapes, light parts
 
 ## Create paths
 
-Creating the paths needs no button: Enter on the canvas, Ctrl+Enter in a field, or a double-click on
-the image adds one group "Trace of <image name>" directly above each image, with one compound
+The **Create paths** button at the far right of the bar, Enter on the canvas, Ctrl+Enter in a field,
+or a double-click on the image adds one group "Trace of <image name>" directly above each image, with one compound
 path inside, filled black, without stroke, holes as holes. The image stays visible and unchanged
 under it; hide or move it as usual. The new groups are selected and the Select tool is active. The
 notice says "Traced: 7 paths, 412 nodes." or, for several images, "Traced 3 images: 21 paths,
