@@ -47,7 +47,8 @@ function parseHex(hex: string): { rgb: number; opacity: number } {
  * background` criterion 35) the chip reads swatch, the muted word "Background",
  * then the stored colour; for an object's paint it is the colour, then the muted
  * "stroke" or "fill". A pick that ended picking is said once in the polite status
- * region (criterion 39).
+ * region (criterion 39). The Trace tool's pipette shows the image's colour as `#RRGGBB`, or
+ * "No colour here" outside the image (`specs/0089` UX notes §6).
  */
 export function ColourPickChip({
   active,
@@ -121,6 +122,12 @@ export function ColourPickChip({
         setHover(null);
         return;
       }
+      // The Trace pipette (`specs/0089` UX notes §6) reads the working image, as `#RRGGBB`.
+      const traced = session.trace_pick_hover();
+      if (traced !== undefined) {
+        setHover({ ...last, hex: traced ? `${traced}FF` : "", paint: "image" });
+        return;
+      }
       const [hex = "", paint = ""] = session.colour_pick_hover();
       setHover({ ...last, hex, paint });
     };
@@ -175,11 +182,13 @@ export function ColourPickChip({
   const placement = placeReadout(hover, sizes.chip, sizes.canvas, OFFSET_PX);
   const colour = hover.hex ? parseHex(hover.hex) : null;
   const background = hover.paint === "background";
+  const image = hover.paint === "image";
   return (
     <>
       {status}
     <div
       ref={chipRef}
+      data-colour-chip=""
       aria-hidden
       className="pointer-events-none absolute z-40 flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-xs whitespace-nowrap tabular-nums"
       style={{
@@ -195,12 +204,12 @@ export function ColourPickChip({
           <Swatch rgb={colour.rgb} opacity={colour.opacity} mixed={false} size={16} />
           <span className="flex gap-1">
             {background && <span className="text-[var(--panel-muted-fg)]">Background</span>}
-            <span>{hover.hex}</span>
-            {!background && <span className="text-[var(--panel-muted-fg)]">{hover.paint}</span>}
+            <span>{image ? hover.hex.slice(0, 7) : hover.hex}</span>
+            {!background && !image && <span className="text-[var(--panel-muted-fg)]">{hover.paint}</span>}
           </span>
         </>
       ) : (
-        <span>No paint here</span>
+        <span>{image ? "No colour here" : "No paint here"}</span>
       )}
     </div>
     </>

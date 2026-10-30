@@ -643,7 +643,8 @@ test("0025s2 in Chromium: the Advanced block (criteria 41, 44)", { skip: !BROWSE
       assert.ok(!text.includes(label), `${label} is not in the block`);
       assert.equal(await s.evaluate(`!!document.querySelector('[role=toolbar][aria-label=Trace] [aria-label="${label}"]')`), false, `no ${label} control`);
     }
-    for (const label of ["Invert", "Ignore background"]) {
+    // "Ignore background" is named "Drop border shapes" since `specs/0089` Frage 88 A (customer).
+    for (const label of ["Invert", "Drop border shapes"]) {
       assert.equal(await switchState(s, label), "false", `${label} is an icon toggle (aria-pressed), off by default`);
       assert.ok(!text.includes(label), `${label} is not drawn as a label`);
     }
@@ -662,11 +663,11 @@ test("0025s2 in Chromium: the Advanced block (criteria 41, 44)", { skip: !BROWSE
     assert.match(status0, /^2 paths/);
     await toggle(s, "Invert");
     assert.match(await settle(s), /^3 paths/, "inverted: the page with the ring as a hole, and the inner disc");
-    await toggle(s, "Ignore background");
+    await toggle(s, "Drop border shapes");
     assert.match(await settle(s), /^1 path\b/, "the page touches the border and goes");
     await toggle(s, "Invert");
     assert.match(await settle(s), /^2 paths/, "not inverted, background ignored: the ring touches no border");
-    await toggle(s, "Ignore background");
+    await toggle(s, "Drop border shapes");
     // The open block is remembered.
     await focusCanvas(s);
     await s.key("Escape", 27);

@@ -7,12 +7,17 @@ import { useRowStarts } from "@/components/SelectToolbar";
 import { ExpandButton, ICON_BUTTON_CLASS } from "@/components/TextBar";
 import { TraceAdvanced } from "@/components/TraceAdvanced";
 import { TraceField } from "@/components/TraceField";
+import { PickColoursGroup, RemoveBackgroundGroup } from "@/components/TraceColourGroup";
 import { TracePresetMenu } from "@/components/TracePresetMenu";
 import { Tooltip as AppTooltip } from "@/components/ui/tooltip";
 import type { TraceApi } from "@/hooks/useTrace";
 import type { TraceInfoApi } from "@/hooks/useTraceInfo";
 import {
-  CREATE_PATHS,
+  TRACE_FINISH,
+  TRACE_METHODS,
+  PICK_COLOURS,
+  REMOVE_BACKGROUND,
+  colourTolerance,
   FAILED,
   PREVIEW_OUT_OF_DATE,
   RETRY,
@@ -145,12 +150,15 @@ function ViewPill({ mode, onMode }: { mode: TraceViewMode; onMode: (mode: TraceV
   );
 }
 
-/** The 1 px border of the bar's pills at 40 % (the View pill's look). */
-const PILL_BORDER = "outline outline-1 -outline-offset-1 outline-[var(--toolbar-icon)]/40";
+/** The finish button's blue ground and shape (customer 2026-10-30): the same in every state,
+ * 75 px at rest and while running; Stopped and Failed widen it for their Retry. */
+const FINISH_CLASS =
+  "relative my-1 flex h-7 min-w-[75px] shrink-0 items-center overflow-hidden rounded-md bg-[var(--editor-accent)] text-sm text-white";
 
-/** The pill at the far right of the bar (criteria 10, 53, 54; `specs/0089` Frage 84): at rest
- * the finish button (the same as Enter), the running pill with its percentage and x, "Stopped"
- * with Retry, or "Failed" with Retry and the reason as tooltip and hidden alert. */
+/** The finish button at the far right of the bar (criteria 10, 53, 54; `specs/0089` Frage 84,
+ * customer 2026-10-30): always blue, "Trace" at rest (the same as Enter); while a job runs (shown
+ * after 400 ms, held at least 300 ms) its percentage and an x inside the same button; "Stopped"
+ * or "Failed" with Retry, the reason as tooltip and hidden alert. */
 function ProgressSlot({
   slot,
   onStop,
@@ -164,15 +172,20 @@ function ProgressSlot({
 }) {
   if (slot.kind === "none") {
     return (
-      <button type="button" data-trace-slot="none" className={`${BUTTON_CLASS} ${PILL_BORDER} shrink-0`} onClick={onCreate}>
-        {CREATE_PATHS}
+      <button
+        type="button"
+        data-trace-slot="none"
+        className={`${FINISH_CLASS} justify-center px-3 outline-none hover:brightness-110 focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)]`}
+        onClick={onCreate}
+      >
+        {TRACE_FINISH}
       </button>
     );
   }
   if (slot.kind === "running") {
     const fill = slot.percent ?? 0;
     return (
-      <div data-trace-slot="running" className={`relative my-1 flex h-7 w-[75px] shrink-0 items-center overflow-hidden rounded-md ${PILL_BORDER}`}>
+      <div data-trace-slot="running" className={`${FINISH_CLASS} w-[75px]`}>
         <div
           role="progressbar"
           aria-label={TRACING}
@@ -181,11 +194,11 @@ function ProgressSlot({
           aria-valuenow={slot.percent ?? undefined}
           className="flex h-full min-w-0 flex-1 items-center"
         >
-          <span aria-hidden className="absolute inset-y-0 left-0" style={{ width: `${fill}%`, background: "color-mix(in srgb, var(--editor-accent) 25%, transparent)" }} />
-          <span className="relative pl-2 text-xs tabular-nums text-[var(--toolbar-icon)]">{percentText(slot.percent)}</span>
+          <span aria-hidden className="absolute inset-y-0 left-0" style={{ width: `${fill}%`, background: "color-mix(in srgb, white 25%, transparent)" }} />
+          <span className="relative pl-2 text-xs tabular-nums">{percentText(slot.percent)}</span>
         </div>
         <AppTooltip side="bottom" content={STOP}>
-          <button type="button" aria-label={STOP} onClick={onStop} className={`${ICON_BUTTON_CLASS} relative text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]`}>
+          <button type="button" aria-label={STOP} onClick={onStop} className={`${ICON_BUTTON_CLASS} relative text-white hover:bg-white/20`}>
             <X size={16} strokeWidth={1.5} aria-hidden />
           </button>
         </AppTooltip>
@@ -194,13 +207,13 @@ function ProgressSlot({
   }
   const failed = slot.kind === "failed";
   return (
-    <div data-trace-slot={slot.kind} className="flex shrink-0 items-center gap-1">
+    <div data-trace-slot={slot.kind} className={`${FINISH_CLASS} gap-1 pl-2`}>
       <AppTooltip side="bottom" content={failed ? slot.text : PREVIEW_OUT_OF_DATE}>
         <span
-          className={`my-1 flex h-7 items-center gap-1 rounded-md px-2 text-xs ${failed ? "text-[var(--toolbar-icon)]" : `${PILL_BORDER} text-[var(--toolbar-icon)] opacity-70`}`}
+          className={`flex h-7 items-center gap-1 rounded-md text-xs ${failed ? "" : "opacity-90"}`}
           style={failed ? { boxShadow: "inset 0 0 0 1px var(--field-invalid)" } : undefined}
         >
-          {failed ? <CircleAlert size={12} aria-hidden className="shrink-0" style={{ color: "var(--field-invalid)" }} /> : null}
+          {failed ? <CircleAlert size={12} aria-hidden className="shrink-0" /> : null}
           {failed ? FAILED : STOPPED}
         </span>
       </AppTooltip>
@@ -209,7 +222,7 @@ function ProgressSlot({
           {slot.text}
         </span>
       ) : null}
-      <button type="button" className={BUTTON_CLASS} onClick={onRetry}>
+      <button type="button" className="h-7 rounded-md px-2 text-sm text-white outline-none hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-white" onClick={onRetry}>
         {RETRY}
       </button>
     </div>
@@ -262,9 +275,10 @@ interface TraceBarProps {
 
 /**
  * The Trace bar in the overlay row (`specs/0025-raster-trace` criteria 1 to 5, 10 to 12, 15, 37,
- * 40, 41, 46, 51 to 54, 57, 71; UX notes section 21.2; `specs/0089` Frage 84, 85 B): one flow of
- * the "i" button, Preset, View, Threshold, Smooth, Tolerance, Specks, and at the far right the
- * expander and the pill (the finish button at rest), wrapping by whole items; under it the notice row and, when open, the Advanced block.
+ * 40, 41, 46, 51 to 54, 57, 71; UX notes section 21.2; `specs/0089` criterion 14, Frage 84, 85 B):
+ * one flow of the "i" button, Preset, View, Method, Threshold or Colour tolerance, the method's
+ * colour group, Smooth, Tolerance, Specks, and at the far right the expander and the finish
+ * button, wrapping by whole items; under it the notice row and, when open, the Advanced block.
  * With nothing or something else selected it is one row of words.
  */
 export function TraceBar({ trace, info, onImport, onReturnFocus }: TraceBarProps) {
@@ -318,6 +332,41 @@ export function TraceBar({ trace, info, onImport, onReturnFocus }: TraceBarProps
       onReturnFocus={onReturnFocus}
     />
   );
+  // The method's field takes the Threshold's slot (`specs/0089` criterion 14, UX notes §5).
+  const method = trace.values.method;
+  const methodField =
+    method === REMOVE_BACKGROUND || method === PICK_COLOURS ? (
+      <TraceField
+        param={param("colour_tolerance")}
+        value={colourTolerance(trace.values)}
+        onValue={(value, dragging) => trace.setColourTolerance(value, dragging)}
+        onEndDrag={trace.endDrag}
+        onCreate={trace.create}
+        onReturnFocus={onReturnFocus}
+      />
+    ) : (
+      thresholdField
+    );
+  const colourGroup =
+    method === REMOVE_BACKGROUND ? (
+      <RemoveBackgroundGroup
+        background={trace.values.backgroundAuto ? trace.suggestedBackground : trace.values.background}
+        auto={trace.values.backgroundAuto}
+        armed={trace.pickMode === "background"}
+        onAuto={trace.setBackgroundAuto}
+        onPipette={() => trace.setPicking(trace.pickMode === "")}
+        onReturnFocus={onReturnFocus}
+      />
+    ) : method === PICK_COLOURS ? (
+      <PickColoursGroup
+        swatches={trace.values.swatches}
+        armed={trace.pickMode === "colours"}
+        onPipette={() => trace.setPicking(trace.pickMode === "")}
+        onRemove={trace.removeSwatch}
+        onReturnFocus={onReturnFocus}
+      />
+    ) : null;
+  const methodLabel = TRACE_METHODS[method]?.label ?? TRACE_METHODS[0].label;
   const noticeShown = trace.status.line !== "" || trace.status.muted !== "" || trace.imagesLabel !== "";
   return (
     <div className="pointer-events-none flex min-w-0 flex-col gap-2">
@@ -347,9 +396,20 @@ export function TraceBar({ trace, info, onImport, onReturnFocus }: TraceBarProps
           />
         </div>
         <ViewPill mode={trace.viewMode} onMode={trace.setViewMode} />
-        <div className="flex h-9 items-center">{thresholdField}</div>
-        {/* 4 px after Threshold, not 8 (UX notes 21.2), unless it starts a line. */}
-        <div className="-ml-1 flex h-9 items-center data-[row-start]:ml-0">{field("smooth")}</div>
+        <div className="flex h-9 items-center">
+          <TracePresetMenu
+            name="Method"
+            widthClass="w-[176px]"
+            presets={TRACE_METHODS}
+            current={TRACE_METHODS[method]?.key ?? TRACE_METHODS[0].key}
+            edited={false}
+            label={methodLabel}
+            onPick={(choice) => trace.setMethod(TRACE_METHODS.indexOf(choice))}
+          />
+        </div>
+        <div className="flex h-9 items-center">{methodField}</div>
+        {colourGroup}
+        <div className="flex h-9 items-center">{field("smooth")}</div>
         <div className="flex h-9 items-center">{field("tolerance")}</div>
         <div className="flex h-9 items-center gap-2">
           <WithHint hint={trace.pxPerMm > 0 ? specksHint(trace.values.specks, trace.pxPerMm) : undefined}>

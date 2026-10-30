@@ -8,6 +8,8 @@ import path from "node:path";
 import { test } from "node:test";
 
 import {
+  NO_STATUS,
+  withSwatchNote,
   TRACE_BAR_DESCRIPTION,
   TRACE_EXPAND_LABELS,
   changedAdvancedText,
@@ -58,6 +60,17 @@ import {
   isPeekKey,
   isCycleKey,
   previewIsReduced,
+  MAX_SWATCHES,
+  PICK_COLOURS,
+  PROGRESS_AFTER_MS,
+  PROGRESS_HOLD_MS,
+  REMOVE_BACKGROUND,
+  TRACE_FINISH,
+  TRACE_METHODS,
+  colourTolerance,
+  pickSwatch,
+  progressHoldLeft,
+  zeroPathsLine,
 } from "../src/lib/traceText.ts";
 
 const [threshold, smooth, tolerance, specks] = TRACE_PARAMS_FALLBACK;
@@ -137,6 +150,11 @@ test("criterion 70: the info page's exact text", () => {
     "Silhouette for cutting/carving: closed, simple, few nodes; drops shapes and holes below 2 mm.",
     "Engraving: keeps fine lines, drops shapes below 0.1 mm.",
     "View: the image with the outline, the result alone, or the image alone. Hold \\ to peek at the image.",
+    "Method: how pixels become shapes.",
+    "Brightness: pixels darker than the Threshold.",
+    "Remove background: everything unlike the background colour; Auto takes it from the image border, the pipette from a click.",
+    "Pick colours: pixels like the colours picked with the pipette; Shift+click adds a colour.",
+    "Colour tolerance: how far a colour may be from the background or a picked colour and still count as it.",
     "Threshold: pixels darker than this brightness (0 to 100 %) become shapes.",
     "Smooth: calms the pixel steps of the outline before the fit; higher is calmer.",
     "Tolerance: how far in pixels the paths may stray from the calmed outline; higher gives fewer nodes.",
@@ -144,8 +162,8 @@ test("criterion 70: the info page's exact text", () => {
     "Denoise: smooths out noise in the picture before tracing.",
     "Upscale: doubles small images before tracing; Auto does it below 1 Mpx.",
     "Corners: higher turns more bends into sharp corners.",
-    "Invert: traces the light parts instead of the dark ones.",
-    "Ignore background: drops shapes that touch the image border.",
+    "Invert: traces what the method leaves out; transparent pixels never become shapes.",
+    "Drop border shapes: drops shapes that touch the image border.",
   ]);
   assert.deepEqual(infoEntryParts(TRACE_INFO_ENTRIES[1]), { term: "Logo / Line art", text: "sharp corners, clean curves." });
 });
@@ -158,7 +176,23 @@ test("criteria 41, 43 (removed): no Node limit and no Full-size preview in the s
     TRACE_PARAMS_FALLBACK.filter((p) => p.advanced).map((p) => p.name),
     ["invert", "ignore_background", "denoise", "upscale", "corners"],
   );
-  assert.deepEqual(Object.keys(firstChoice().values).sort(), ["corners", "denoise", "ignoreBackground", "invert", "smooth", "specks", "threshold", "tolerance", "upscale"]);
+  assert.deepEqual(Object.keys(firstChoice().values).sort(), [
+    "background",
+    "backgroundAuto",
+    "backgroundTolerance",
+    "corners",
+    "denoise",
+    "ignoreBackground",
+    "invert",
+    "method",
+    "pickTolerance",
+    "smooth",
+    "specks",
+    "swatches",
+    "threshold",
+    "tolerance",
+    "upscale",
+  ]);
   assert.ok(!("node_limit" in JSON.parse(settingsJson(firstChoice().values, 128))));
 });
 
@@ -182,9 +216,18 @@ test("criteria 5 and 66: the choice is an app setting; Threshold starts automati
     denoise: 0,
     invert: false,
     ignoreBackground: false,
+    method: 0,
+    backgroundTolerance: 40,
+    pickTolerance: 19,
+    backgroundAuto: true,
+    background: null,
+    swatches: [],
   });
   const edited = editChoice(pickPreset(first, TRACE_PRESETS_FALLBACK[2]), "smooth", 90);
-  writeChoice({ ...edited, values: { ...edited.values, threshold: 77, invert: true } }, storage);
+  writeChoice(
+    { ...edited, values: { ...edited.values, threshold: 77, invert: true, method: 2, pickTolerance: 22, swatches: ["#FFF2A8"] } },
+    storage,
+  );
   const read = readChoice(TRACE_PARAMS_FALLBACK, TRACE_PRESETS_FALLBACK, storage);
   assert.equal(read.preset, "silhouette");
   assert.equal(read.edited, true);
@@ -193,6 +236,9 @@ test("criteria 5 and 66: the choice is an app setting; Threshold starts automati
   assert.equal(read.values.tolerance, 1.5, "the tolerance is a preset value");
   assert.equal(read.values.threshold, null, "the Threshold is never remembered");
   assert.equal(read.values.invert, false, "the switches start off");
+  // `specs/0089` criterion 20: the method and its tolerance are remembered, the picked colours not.
+  assert.deepEqual([read.values.method, read.values.pickTolerance, read.values.backgroundTolerance], [2, 22, 40]);
+  assert.deepEqual(read.values.swatches, []);
   storage.store.set("curvyo.trace-values", JSON.stringify({ smooth: 40, specks: 1.25 }));
   const slice1 = readChoice(TRACE_PARAMS_FALLBACK, TRACE_PRESETS_FALLBACK, storage);
   assert.deepEqual([slice1.preset, slice1.edited, slice1.values.smooth, slice1.values.specks], ["logo", true, 40, 1.25]);
@@ -235,6 +281,10 @@ test("criteria 40, 59, 60: presets, Custom as stored state", () => {
     denoise: 0,
     invert: true,
     ignore_background: false,
+    method: 0,
+    colour_tolerance: 19,
+    background: null,
+    swatches: [],
   });
 });
 
@@ -373,8 +423,60 @@ test("criterion 10: the progress pill's words", () => {
 });
 
 test("UX notes 19: the closed expander names the Advanced values that are not defaults", () => {
-  const base = { threshold: 128, smooth: 80, tolerance: 0.5, specks: 0.5, corners: 70, upscale: 1, denoise: 0, invert: false, ignoreBackground: false };
+  const base = { ...firstChoice().values, threshold: 128 };
   assert.equal(changedAdvancedText(base), null);
   assert.equal(changedAdvancedText({ ...base, invert: true }), "Changed: Invert");
-  assert.equal(changedAdvancedText({ ...base, denoise: 2, corners: 30, ignoreBackground: true }), "Changed: Ignore background, Denoise, Corners");
+  assert.equal(changedAdvancedText({ ...base, denoise: 2, corners: 30, ignoreBackground: true }), "Changed: Drop border shapes, Denoise, Corners");
+});
+
+test("specs/0089 criterion 14: the methods, their fields in the settings JSON", () => {
+  assert.deepEqual(
+    TRACE_METHODS.map((m) => [m.label, m.detail]),
+    [
+      ["Brightness", "Dark and light pixels by a cut-off."],
+      ["Remove background", "Everything unlike the background."],
+      ["Pick colours", "Pixels like the colours you picked."],
+    ],
+  );
+  const base = firstChoice().values;
+  const removing = { ...base, method: REMOVE_BACKGROUND, background: "#3366CC", backgroundTolerance: 30 };
+  assert.equal(colourTolerance(removing), 30);
+  const json = JSON.parse(settingsJson(removing, 120));
+  assert.deepEqual([json.method, json.colour_tolerance, json.background], [1, 30, "#3366CC"]);
+  // A transparent background crosses as null.
+  assert.equal(JSON.parse(settingsJson({ ...removing, background: "" }, 120)).background, null);
+  const picking = { ...base, method: PICK_COLOURS, swatches: ["#FFF2A8", "#D9D9D9"] };
+  assert.deepEqual(JSON.parse(settingsJson(picking, 120)).swatches, ["#FFF2A8", "#D9D9D9"]);
+  // Pick colours takes the image's suggested background, the same for preview and full size.
+  assert.equal(JSON.parse(settingsJson(picking, 120, "#FFFFFF")).background, "#FFFFFF");
+  assert.equal(JSON.parse(settingsJson(picking, 120, "")).background, null);
+  assert.equal(JSON.parse(settingsJson({ ...picking, method: 1, background: "#112233" }, 120, "#FFFFFF")).background, "#112233");
+  assert.equal(colourTolerance(picking), 19);
+  const full = { method: PICK_COLOURS, swatches: ["#000001", "#000002", "#000003", "#000004", "#000005", "#000006", "#000007", "#000008"] };
+  assert.equal(withSwatchNote(NO_STATUS, full).muted, "8 colours picked");
+  assert.equal(withSwatchNote(NO_STATUS, { ...full, swatches: full.swatches.slice(1) }).muted, "");
+  assert.deepEqual(pickSwatch(full.swatches, "#000009", true), full.swatches);
+});
+
+test("specs/0089 criterion 17, Frage 89 A: a click replaces the picked colours, Shift adds up to 8", () => {
+  assert.deepEqual(pickSwatch(["#111111"], "#222222", false), ["#222222"]);
+  assert.deepEqual(pickSwatch(["#111111"], "#222222", true), ["#111111", "#222222"]);
+  assert.deepEqual(pickSwatch(["#111111"], "#111111", true), ["#111111"], "no twin");
+  const full = Array.from({ length: MAX_SWATCHES }, (_, i) => `#00000${i}`);
+  assert.deepEqual(pickSwatch(full, "#FFFFFF", true), full, "a ninth is not added");
+  assert.equal(zeroPathsLine({ method: PICK_COLOURS, swatches: [] }), "0 paths: no colour picked.");
+  assert.equal(zeroPathsLine({ method: PICK_COLOURS, swatches: ["#FFFFFF"] }), "0 paths at this Colour tolerance: too low.");
+  assert.equal(zeroPathsLine({ method: REMOVE_BACKGROUND, swatches: [] }), "0 paths at this Colour tolerance: too high.");
+  assert.equal(zeroPathsLine({ method: 0, swatches: [] }), null);
+  assert.equal(statusText(readSummary([0, 0, 0, 0, 0, 0, 0]), 0.1, 100, false, "0 paths: no colour picked.").line, "0 paths: no colour picked.");
+});
+
+test("customer 2026-10-30: the finish button reads Trace; its progress shows after 400 ms and holds 300 ms", () => {
+  assert.equal(TRACE_FINISH, "Trace");
+  assert.equal(PROGRESS_AFTER_MS, 400);
+  assert.equal(PROGRESS_HOLD_MS, 300);
+  assert.equal(progressHoldLeft(null, 1000), 0, "never shown: nothing to hold");
+  assert.equal(progressHoldLeft(1000, 1050), 250, "shown 50 ms ago: 250 ms more");
+  assert.equal(progressHoldLeft(1000, 1300), 0);
+  assert.equal(progressHoldLeft(1000, 2000), 0);
 });

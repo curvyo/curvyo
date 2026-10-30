@@ -23,7 +23,8 @@ export type TraceRequest =
 
 /** A message from the worker. */
 export type TraceResponse =
-  | { id: number; kind: "threshold"; threshold: number; ms: number }
+  /** The automatic Threshold and the suggested background `#RRGGBB` (empty: transparent). */
+  | { id: number; kind: "threshold"; threshold: number; background: string; ms: number }
   | { id: number; kind: "trace"; wire: Float64Array; ms: number }
   /** A running trace reached a higher whole percent (criterion 10). */
   | { id: number; kind: "progress"; percent: number }
@@ -134,6 +135,12 @@ export class TraceRunner {
 
   /** The automatic Threshold of `pixels` (criterion 9). */
   async threshold(pixels: TracePixels): Promise<number> {
+    return (await this.defaults(pixels)).threshold;
+  }
+
+  /** What a new image starts with: the automatic Threshold (criterion 9) and the background
+   * colour Remove background's Auto suggests (`specs/0089` criterion 16; empty: transparent). */
+  async defaults(pixels: TracePixels): Promise<{ threshold: number; background: string }> {
     const response = await this.send(
       (id) => ({ type: "threshold", id, rgba: pixels.rgba, width: pixels.width, height: pixels.height }),
       [],
@@ -141,7 +148,7 @@ export class TraceRunner {
     if (response.kind !== "threshold") {
       throw new Error(response.kind === "error" ? response.message : "unexpected reply");
     }
-    return response.threshold;
+    return { threshold: response.threshold, background: response.background ?? "" };
   }
 
   /** One trace of `pixels` with `settings` (the JSON of `settingsJson`); the pixels are handed
