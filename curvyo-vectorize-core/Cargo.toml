@@ -13,7 +13,6 @@ workspace = true
 curvyo-document-core = { path = "../curvyo-document-core", version = "0.1.0" }
 kurbo.workspace = true
 thiserror.workspace = true
-visioncortex.workspace = true
 
 [target.'cfg(unix)'.dev-dependencies]
 # The CPU-time budget of criterion 25 reads the thread's CPU clock (`CLAUDE.md` §5).
@@ -22,6 +21,8 @@ rustix = { version = "1.1", features = ["time"] }
 [dev-dependencies]
 # The golden files of `tests/fixtures/trace/` (criterion 18).
 serde_json.workspace = true
+# The reference set's CC0 and local images are PNG and JPEG (`specs/0089` adrs.md §11, dev only).
+curvyo-image-core = { path = "../curvyo-image-core", version = "0.1.0" }
 # The quality harness reads Inkscape's baseline SVGs (ADR 0023 §1, dev only).
 curvyo-svg-core = { path = "../curvyo-svg-core", version = "0.1.0" }
 # The counting global allocator of the memory test (criterion 26), dev only: MIT OR Apache-2.0,
