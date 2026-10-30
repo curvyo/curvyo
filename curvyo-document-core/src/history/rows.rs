@@ -131,7 +131,17 @@ pub struct RowRevert {
 /// changed, and a row lists none.
 #[must_use]
 pub fn is_document_level_label(label: &str) -> bool {
-    matches!(label, "resize_document" | "fit_document_to_content")
+    matches!(
+        label,
+        "resize_document"
+            | "fit_document_to_content"
+            | "add_page"
+            | "delete_page"
+            | "rename_page"
+            | "resize_page"
+            | "move_page"
+            | "reorder_pages"
+    )
 }
 
 /// Who took the step back as a whole with an object undo, if anybody did. A Replace step is taken

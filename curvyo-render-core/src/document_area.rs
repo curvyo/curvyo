@@ -132,13 +132,60 @@ pub fn build_document_area(
     view: ViewTransform,
     device_pixel_ratio: f64,
 ) -> DrawList {
+    build_area_at(
+        size,
+        background,
+        Point::new(0.0, 0.0),
+        view,
+        device_pixel_ratio,
+    )
+}
+
+/// Builds every background before artwork, with one shared checkerboard prefix.
+#[must_use]
+pub fn build_page_areas(
+    pages: &[curvyo_document_core::Page],
+    background: DocumentBackground,
+    view: ViewTransform,
+    device_pixel_ratio: f64,
+) -> DrawList {
+    let areas: Vec<_> = pages
+        .iter()
+        .map(|p| build_area_at(p.size, background, p.origin, view, device_pixel_ratio))
+        .collect();
+    let mut list = DrawList::default();
+    for area in &areas {
+        list.triangles
+            .extend_from_slice(&area.triangles[..area.checker_end()]);
+    }
+    if !list.triangles.is_empty() {
+        list.close_checker_prefix();
+    }
+    for area in areas {
+        list.triangles
+            .extend_from_slice(&area.triangles[area.checker_end()..]);
+        list.close_layer();
+    }
+    list
+}
+
+fn build_area_at(
+    size: DocumentSize,
+    background: DocumentBackground,
+    origin: Point,
+    view: ViewTransform,
+    device_pixel_ratio: f64,
+) -> DrawList {
     let snap = |css_px: f64| (css_px * device_pixel_ratio).round() / device_pixel_ratio;
     let corner = |x_mm: f64, y_mm: f64| {
         let (x, y) = view.document_to_screen(Point::new(x_mm, y_mm));
         view.screen_to_document(snap(x), snap(y))
     };
-    let top_left = corner(0.0, 0.0);
-    let bottom_right = corner(size.width.as_mm(), size.height.as_mm());
+    let top_left = corner(origin.x, origin.y);
+    let bottom_right = corner(
+        origin.x + size.width.as_mm(),
+        origin.y + size.height.as_mm(),
+    );
     let top_right = Point::new(bottom_right.x, top_left.y);
     let bottom_left = Point::new(top_left.x, bottom_right.y);
     let corners = [

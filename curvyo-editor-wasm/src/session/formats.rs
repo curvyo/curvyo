@@ -124,7 +124,7 @@ impl Session {
     pub fn format_list(&self) -> FormatListView {
         format_list_view(
             self.formats.list(),
-            self.document.size(),
+            self.active_page().size,
             self.display_unit(),
             self.formats_broken.is_none(),
         )
@@ -140,7 +140,7 @@ impl Session {
         }
         add_prefill(
             &self.formats,
-            self.document.size(),
+            self.active_page().size,
             self.display_unit(),
             last_group,
         )

@@ -234,6 +234,7 @@ impl Session {
         // A click-to-create placement is an operation in flight (`0052` criterion 8).
         // So is an open Pen entry chip (`0072` criterion 23).
         in_tool
+            || self.page_drag.is_some()
             || self.placement().is_some()
             || self.pen_entry().is_some()
             || self.is_panning()
@@ -404,6 +405,9 @@ impl Session {
     /// release. Returns whether there was one. The Pen has no separate drag:
     /// its step 2 and 3 are one, see [`Session::escape`].
     pub(super) fn cancel_drag_in_flight(&mut self) -> bool {
+        if self.page_drag.take().is_some() {
+            return true;
+        }
         match self.tool {
             Tool::Select => {
                 let was = self.select.drag_in_flight();
@@ -440,6 +444,9 @@ impl Session {
     /// With the pointer button still down steps 3 and 4 are skipped: only the
     /// drag is cancelled (criterion 49).
     pub fn escape(&mut self) -> EscapeStep {
+        if self.page_drag.take().is_some() {
+            return EscapeStep::ClearedState;
+        }
         // Picking a colour ends first (`0017` criterion 60).
         if self.colour_pick_target().is_some() {
             self.end_colour_pick();
@@ -538,6 +545,7 @@ impl Session {
     /// pointer is lost: a drag, or, in the Pen, the unfinished path (the Pen
     /// has no way to cancel only a handle drag).
     pub(super) fn cancel_gesture(&mut self) {
+        self.page_drag = None;
         if !self.cancel_drag_in_flight() && self.tool == Tool::Pen {
             self.pen.escape();
         }

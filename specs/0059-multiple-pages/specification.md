@@ -1,10 +1,10 @@
 # Multiple pages: several pages in one project, side by side on the canvas
 
-Status: Draft (a sketch for the customer; not Ready: it needs the architect's ADR and UX notes; page model decided by the customer 2026-10-17)
+Status: In progress (implementation requested 2026-10-29; spatial page model decided by the customer 2026-10-17; defaults below apply)
 Priority: Should
 Origin: Customer (request of 2026-10-17, translated): "In the page setup on the right side you can add a page like in Inkscape. It can have a different format, but it starts with the same as the last one. In the view it simply appears next to it with a bit of distance, similar to Inkscape. Especially interesting to put several coasters into one file for lasering, or, for a person who particularly likes an animal, a set of key rings, coasters and breakfast boards in one file. Very practical since fonts and graphics can be reused via linked clone, so you work very consistently."
 
-This reverses the drop of 2026-10-05 ("not important enough for the MVP"; `0015`, `0046` out of scope, ADR 0012 rejected). Everything below about how pages behave is the product owner's proposal and is marked in the questions.
+This reverses the drop of 2026-10-05 ("not important enough for the MVP"; `0015`, `0046` out of scope, ADR 0012 rejected). Behaviour marked Proposal remains vetoable at the demo. ADR 0019 already settled that pages remain rectangular; templates are ordinary guide objects.
 
 ## User value
 
@@ -22,9 +22,9 @@ As a maker who fills a sheet of material with identical or different parts, I wa
 
 ## Acceptance criteria (as far as clear)
 
-1. Given a document without stored pages (every file before this slice), then it has exactly one page at 0, 0 with the stored document size; it opens and draws as before and nothing is written by opening it.
+1. Given a new document, then it has exactly one page at 0, 0 with the default document size. Saving and reopening a current-format document preserves its pages. Compatibility with older files is not required (customer, 2026-10-29: unreleased SID development).
 2. Given the Document tab, then it lists the pages (name, size) as rows under the existing size fields, and an **Add page** icon button (tooltip, accessible name). The row of the active page is marked. Selecting a row makes that page active and scrolls the view to it only if the page is not visible. No popup; nothing appears except the row and the page on the canvas.
-3. Given Add page, then the new page has the size, and the shape (`0046`), of the last page in the list, is placed to the right of the last page with a gap (Question 2), is named "Page N", becomes active, and is one history step "Add page".
+3. Given Add page, then the new rectangular page has the size of the last page in the list (ADR 0019; guide objects are not copied), is placed to the right of the last page with a gap (Question 2), is named "Page N", becomes active, and is one history step "Add page".
 4. Given the Width and Height fields of the Document tab, then they change the active page only; the other pages and their position do not move. Typed sizes follow `0015` and the formats of `0030` and `0045` apply to the active page.
 5. Given a page, then it has a name (editable in its row), a **Delete page** icon button on its row, and a drag handle to reorder the list. Order is the order of the list only: reordering does not move pages on the canvas (Proposal).
 6. Given Delete page, then the page frame goes and the objects that lay on it stay where they are on the pasteboard (permit over refuse; undo restores the frame). The last page cannot be deleted; the button is not shown on a single page.
@@ -36,6 +36,14 @@ As a maker who fills a sheet of material with identical or different parts, I wa
 12. Given Select all (Ctrl+A, `0044`), then it selects the objects of the active page's context only when the pointer was last used on that page (Proposal; otherwise all pages).
 13. Given undo, then page changes (add, delete, resize, rename, reorder, move) are steps in the document history (`0020`, `0042`) with operation names; the active page is not.
 14. Given a project with 200 pages, then adding, switching and drawing do not stall (budget set by the implementer's plan).
+
+## Implementation interpretation (2026-10-29)
+
+- The customer requested this story; unanswered PAGE-LAYERS and PAGE-GAP use their stated defaults.
+- Customer, 2026-10-29: old files do not matter during unreleased SID development. No backward compatibility or old-file migration requirement.
+- [UX notes](ux-notes.md) define reversible interaction details and exact wrapping.
+- [Architecture notes](adrs.md) preserve the accepted single-page resize behaviour. In a multi-page document, resize keeps frame origins fixed and recentres only wholly contained, non-shared objects by half the size delta; partial/shared objects stay (Proposal).
+- Shapes in the original draft are superseded by customer-accepted ADR 0019: every page is rectangular; guides stay ordinary objects.
 
 ## Out of scope
 
@@ -72,5 +80,5 @@ Frage 2 (PAGE-GAP): Where does a new page go, and how far away?
 Requirements: R-EDIT-038 (new)
 Depends on: `specs/0015-document-size-and-rulers/`, `specs/0050-layers-and-objects-panel/`
 Related: `specs/0043-properties-tabs/`, `specs/0045-document-formats-library/`, `specs/0046-document-shapes/` (shape per page, guides), `specs/0049-linked-clone/`, `specs/0057-clone-overrides/`, `specs/0042-history-branches/`, `specs/0024-svg-import-export/`, `specs/0063-manufacturing-workbenches/`; ADR 0012 (rejected, content reused), ADR 0009, ADR 0002
-ADRs: a short ADR on the page list, when scheduled (the page model is decided)
+ADRs: [ADR 0024](../../docs/adr/0024-spatial-pages.md); see [adrs.md](adrs.md)
 PR: -

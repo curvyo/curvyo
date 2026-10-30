@@ -3,6 +3,9 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, missing_docs)]
 
+#[path = "support/pre_pages_ids.rs"]
+mod pre_pages_ids;
+
 use std::io::{Cursor, Read, Write};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -169,7 +172,14 @@ fn ac44_the_golden_project_opens_with_every_image_as_saved() {
     assert_eq!(manifest_version(&stored), IMAGE_FORMAT_VERSION);
     let opened = unpack(2, &stored).unwrap();
     let expected = golden_document();
-    assert_eq!(images(&opened), images(&expected));
+    let expected_images: Vec<_> = images(&expected)
+        .into_iter()
+        .map(|mut image| {
+            image.id = pre_pages_ids::node(image.id);
+            image
+        })
+        .collect();
+    assert_eq!(images(&opened), expected_images);
     let reads = opened.read_nodes();
     assert_eq!(
         reads

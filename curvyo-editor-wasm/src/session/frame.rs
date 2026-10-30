@@ -3,7 +3,7 @@
 //! (`specs/0015-document-size-and-rulers/` criterion 28,
 //! `specs/0040-document-background` criterion 13).
 
-use curvyo_render_core::{DrawList, build_document_area};
+use curvyo_render_core::{DrawList, build_page_areas};
 
 use super::Session;
 
@@ -17,8 +17,8 @@ impl Session {
         // A document preview draws the version, its page included, plain, with nothing over it
         // (`specs/0042-history-branches` criterion 19).
         if let Some(version) = self.document_preview() {
-            let mut list = build_document_area(
-                version.size,
+            let mut list = build_page_areas(
+                &version.pages,
                 version.background,
                 self.view(),
                 self.device_pixel_ratio,
@@ -30,8 +30,8 @@ impl Session {
             ));
             return list;
         }
-        let mut list = build_document_area(
-            self.document.size(),
+        let mut list = build_page_areas(
+            &self.shown_pages(),
             self.shown_background(),
             self.view(),
             self.device_pixel_ratio,

@@ -4,6 +4,9 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::float_cmp)]
 
+#[path = "support/pre_pages_ids.rs"]
+mod pre_pages_ids;
+
 use std::io::{Cursor, Read, Write};
 use std::path::PathBuf;
 
@@ -267,6 +270,7 @@ fn ac14_ac32_ac50_the_goldens_read_back() {
         assert_eq!(manifest_version(&bytes), ARC_FORMAT_VERSION);
         let d = unpack(2, &bytes).unwrap();
         let (_, id) = arc_document(kind);
+        let id = pre_pages_ids::node(id);
         let Some(Shape::Ellipse { arc: Some(arc), .. }) = d.primitive(id).map(|p| p.shape) else {
             panic!("{name}: an ellipse with an arc");
         };
@@ -281,7 +285,9 @@ fn ac14_ac32_ac50_the_goldens_read_back() {
     .unwrap();
     let (_, ids) = curve_ellipse_document();
     for (id, k) in ids.iter().zip(CURVES.iter().flat_map(|k| [k, k])) {
-        let Some(Shape::Ellipse { curve, arc, .. }) = d.primitive(*id).map(|p| p.shape) else {
+        let Some(Shape::Ellipse { curve, arc, .. }) =
+            d.primitive(pre_pages_ids::node(*id)).map(|p| p.shape)
+        else {
             panic!("an ellipse");
         };
         assert!(arc.is_none());
@@ -293,6 +299,7 @@ fn ac14_ac32_ac50_the_goldens_read_back() {
     )
     .unwrap();
     for (id, k) in curve_polygon_star_document().1 {
+        let id = pre_pages_ids::node(id);
         match d.primitive(id).map(|p| p.shape) {
             Some(Shape::Polygon { curve, .. } | Shape::Star { curve, .. }) => {
                 assert_eq!(curve.get(), k, "stored raw, also below the limit");

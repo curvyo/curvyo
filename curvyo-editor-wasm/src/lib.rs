@@ -75,6 +75,8 @@ mod wasm_node_tool;
 #[cfg(target_arch = "wasm32")]
 mod wasm_offset;
 #[cfg(target_arch = "wasm32")]
+mod wasm_pages;
+#[cfg(target_arch = "wasm32")]
 mod wasm_pen;
 #[cfg(target_arch = "wasm32")]
 mod wasm_pen_entry;

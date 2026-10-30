@@ -293,7 +293,7 @@ mod tests {
         assert_eq!(document.own_step_count(), 0);
         let change = document.loro().get_change(loro::ID::new(5, 0)).unwrap();
         assert_eq!(change.message.as_deref(), Some("new_document;s=0;t=0"));
-        assert_eq!(change.len, 3);
+        assert_eq!(change.len, 7); // version, size and four initial page registers.
     }
 
     #[test]
@@ -304,7 +304,7 @@ mod tests {
         let steps = document.own_steps();
         assert_eq!(steps.len(), 1);
         assert_eq!(steps[0].label, "create_rect");
-        assert_eq!(steps[0].step, StepRef::new(5, 3));
+        assert_eq!(steps[0].step, StepRef::new(5, 7));
         let change = document.loro().get_change(steps[0].step.id()).unwrap();
         assert_eq!(
             change.message.as_deref(),

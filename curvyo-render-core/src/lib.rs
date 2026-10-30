@@ -54,7 +54,7 @@ pub use color::RgbaColor;
 pub use context_dim::{CONTEXT_DIM, dim_outside};
 pub use decorations::{DecorationInput, Hovered};
 pub use document_area::{
-    CheckerGrid, background_at, build_document_area, checker_grid, checker_tone,
+    CheckerGrid, background_at, build_document_area, build_page_areas, checker_grid, checker_tone,
 };
 pub use glyphs::{DrawList, Vertex};
 pub use group_box::{GroupBoxKind, GroupDecorationInput};

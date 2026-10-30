@@ -8,6 +8,12 @@ pub const UNKNOWN_OPERATION_NAME: &str = "Edit";
 
 /// Every commit label and the name the maker reads for it.
 pub const OPERATION_NAMES: &[(&str, &str)] = &[
+    ("add_page", "Add page"),
+    ("delete_page", "Delete page"),
+    ("rename_page", "Rename page"),
+    ("resize_page", "Resize page"),
+    ("move_page", "Move page"),
+    ("reorder_pages", "Reorder pages"),
     ("create_path", "Draw path"),
     ("extend_path", "Extend path"),
     ("connect_paths", "Connect paths"),

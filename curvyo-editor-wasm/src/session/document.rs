@@ -83,7 +83,7 @@ impl Session {
     /// mm and 4 in cm and in, no trailing zeros (criterion 35). Display only.
     #[must_use]
     pub fn side_text(&self, side: DocumentSide) -> String {
-        let current = self.document.size();
+        let current = self.active_page().size;
         let length = match side {
             DocumentSide::Width => current.width,
             DocumentSide::Height => current.height,
@@ -107,7 +107,7 @@ impl Session {
         let Some(typed) = parse_document_side(text, self.display_unit()) else {
             return SizeOutcome::Invalid;
         };
-        let before = self.document.size();
+        let before = self.active_page().size;
         let wanted = match side {
             DocumentSide::Width => DocumentSize::new(typed, before.height),
             DocumentSide::Height => DocumentSize::new(before.width, typed),
@@ -125,12 +125,15 @@ impl Session {
             if this.pen_path_unfinished() {
                 return SizeOutcome::Unchanged;
             }
-            let before = this.document.size();
+            let before = this.active_page().size;
+            if this.document.pages().len() > 1 {
+                return this.resize_active_page(wanted);
+            }
             match this.document.resize(wanted) {
                 Ok(true) => {
                     this.follow_document_shift(Document::resize_shift(
                         before,
-                        this.document.size(),
+                        this.active_page().size,
                     ));
                     SizeOutcome::Committed
                 }
@@ -145,6 +148,11 @@ impl Session {
         self.recording(|this| -> FitOutcome {
             if this.pen_path_unfinished() {
                 return FitOutcome::Blocked;
+            }
+            if this.document.pages().len() > 1
+                || this.active_page().origin != curvyo_document_core::Point::new(0.0, 0.0)
+            {
+                return this.fit_active_page();
             }
             let Some(bounds) = content_bounds(&this.document) else {
                 return FitOutcome::Empty;
@@ -186,7 +194,7 @@ impl Session {
     /// (criteria 12 and 21).
     #[must_use]
     pub fn size_text(&self) -> String {
-        format_size(self.document.size(), self.display_unit())
+        format_size(self.active_page().size, self.display_unit())
     }
 }
 

@@ -137,7 +137,14 @@ impl Session {
         }
         let source =
             curvyo_document_core::unpack(SOURCE_PEER, bytes).map_err(TemplateError::from)?;
-        let nodes = source.template_nodes();
+        let mut nodes = source.template_nodes();
+        let page_origin = self.active_page().origin;
+        for node in &mut nodes {
+            node.object = node.object.translated(curvyo_document_core::Vec2::new(
+                page_origin.x,
+                page_origin.y,
+            ));
+        }
         drop(source);
         if nodes.is_empty() {
             return Ok(0);
@@ -164,9 +171,16 @@ impl Session {
     /// guide when part of them is outside the canvas area the bars leave free, right of
     /// `free_left` and below `free_top` (CSS pixels from the canvas's top-left corner).
     pub fn show_page_and_guides(&mut self, free_left: f64, free_top: f64) {
-        let size = self.document.size();
-        let mut min = Point::new(0.0, 0.0);
-        let mut max = Point::new(size.width.as_mm(), size.height.as_mm());
+        let pages = self.document.pages();
+        let mut min = Point::new(f64::INFINITY, f64::INFINITY);
+        let mut max = Point::new(f64::NEG_INFINITY, f64::NEG_INFINITY);
+        for page in pages {
+            min = Point::new(min.x.min(page.origin.x), min.y.min(page.origin.y));
+            max = Point::new(
+                max.x.max(page.origin.x + page.size.width.as_mm()),
+                max.y.max(page.origin.y + page.size.height.as_mm()),
+            );
+        }
         let read = self.document_read();
         for object in read.leaves.iter().filter(|o| read.guides.contains(&o.id())) {
             let (low, high) = curvyo_ui_core::object_outline_bounds(object);

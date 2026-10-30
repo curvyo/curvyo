@@ -19,7 +19,11 @@ impl Session {
         minus_px: f64,
     ) -> RulerLayout {
         ruler_layout(
-            self.view(),
+            curvyo_document_core::ViewTransform::new(self.view().scale(), {
+                let origin = self.view().screen_to_document(0.0, 0.0);
+                let page = self.active_page();
+                curvyo_document_core::Point::new(origin.x - page.origin.x, origin.y - page.origin.y)
+            }),
             axis,
             length_px,
             self.display_unit(),

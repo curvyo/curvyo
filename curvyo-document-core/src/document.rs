@@ -274,7 +274,11 @@ impl DocumentVersion {
 /// (`crate::image_codec`); a missing, oversized or mismatching asset is not damage: the image
 /// keeps its frame and shows as unreadable. The number is provisional by the rule above. Golden:
 /// `image_v25.curvyo`.
-pub const CURRENT_FORMAT_VERSION: u32 = 25;
+///
+/// Bumped to 26 in `multiple-pages` (ADR 0024): ordered spatial page frames
+/// use independent root registers. Older readers must not hide extra frames.
+/// Golden: `pages_v26.curvyo`; no old-file migration is required for this SID build.
+pub const CURRENT_FORMAT_VERSION: u32 = 26;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";
@@ -389,6 +393,7 @@ impl Document {
             root.insert(KEY_WIDTH_MM, size.width.as_mm()).unwrap();
             root.insert(KEY_HEIGHT_MM, size.height.as_mm()).unwrap();
         }
+        crate::pages::initialize(&root);
         Self {
             loro,
             commit_state: crate::history::CommitState::default(),
@@ -474,7 +479,12 @@ impl Document {
     /// and stays as it is until the maker resizes.
     #[must_use]
     pub fn size(&self) -> DocumentSize {
-        Self::size_of_root(&self.loro.get_map(ROOT_MAP))
+        let pages = self.pages();
+        pages
+            .iter()
+            .find(|p| p.id == crate::FIRST_PAGE_ID)
+            .or_else(|| pages.first())
+            .map_or_else(DocumentSize::default, |p| p.size)
     }
 
     /// The size a root map holds, read as [`Document::size`] reads it; also for a checked-out
@@ -545,6 +555,7 @@ impl Document {
         let view = DocumentJsonView {
             format_version: CURRENT_FORMAT_VERSION,
             size: self.size(),
+            pages: self.pages(),
             display_unit: self.display_unit(),
             background: self.background().into(),
             objects,
@@ -610,6 +621,7 @@ impl Document {
 struct DocumentJsonView {
     format_version: u32,
     size: DocumentSize,
+    pages: Vec<crate::Page>,
     display_unit: DisplayUnit,
     background: crate::document_background::BackgroundJson,
     objects: Vec<NodeJson>,

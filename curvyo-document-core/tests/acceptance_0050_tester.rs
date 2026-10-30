@@ -154,7 +154,8 @@ fn registers_default_to_visible_unlocked_opaque_and_unnamed() {
 fn a_document_without_flags_exports_no_flag_keys_at_all() {
     let d = Document::new(1);
     rect(&d, 0.0);
-    let text = String::from_utf8(d.export_json().unwrap()).unwrap();
+    let json: serde_json::Value = serde_json::from_slice(&d.export_json().unwrap()).unwrap();
+    let text = json["objects"].to_string();
     for key in ["\"visible\"", "\"locked\"", "\"layer\"", "\"name\""] {
         assert!(!text.contains(key), "{key} in {text}");
     }

@@ -150,7 +150,7 @@ impl Session {
     /// Reads one file of the import begun by [`Session::import_begin`]: an image is decoded, an
     /// SVG parsed, anything else remembered as refused. Files past the 20th are skipped.
     pub fn import_add(&mut self, bytes: &[u8], file_name: &str) {
-        let page = self.document.size();
+        let page = self.active_page().size;
         let Some(batch) = self.import.as_mut() else {
             return;
         };
@@ -373,8 +373,11 @@ impl Session {
         if width > 0.0 && height > 0.0 {
             return self.viewport_centre();
         }
-        let size = self.document.size();
-        Point::new(size.width.as_mm() / 2.0, size.height.as_mm() / 2.0)
+        let page = self.active_page();
+        Point::new(
+            page.origin.x + page.size.width.as_mm() / 2.0,
+            page.origin.y + page.size.height.as_mm() / 2.0,
+        )
     }
 }
 

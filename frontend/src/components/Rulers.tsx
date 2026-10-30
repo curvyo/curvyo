@@ -51,6 +51,8 @@ interface Painted {
   scale: number;
   originX: number;
   originY: number;
+  pageX: number;
+  pageY: number;
   unit: string;
   dpr: number;
   width: number;
@@ -65,6 +67,8 @@ function samePainted(a: Painted | null, b: Painted): boolean {
     a.scale === b.scale &&
     a.originX === b.originX &&
     a.originY === b.originY &&
+    a.pageX === b.pageX &&
+    a.pageY === b.pageY &&
     a.unit === b.unit &&
     a.dpr === b.dpr &&
     a.width === b.width &&
@@ -204,6 +208,8 @@ export function Rulers({ editor, unit }: RulersProps) {
         scale: session.view_scale(),
         originX: session.view_origin_x(),
         originY: session.view_origin_y(),
+        pageX: session.active_page_x(),
+        pageY: session.active_page_y(),
         unit: unitRef.current,
         dpr: window.devicePixelRatio || 1,
         width: horizontal.clientWidth,

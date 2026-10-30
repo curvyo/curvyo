@@ -5,7 +5,9 @@
 //! object together, so no state exists in which only one of the two has
 //! happened. Nothing here scales, crops, restyles or rotates an object.
 
-use crate::document::{Document, KEY_HEIGHT_MM, KEY_WIDTH_MM, OBJECTS_TREE, ROOT_MAP};
+use crate::document::{Document, OBJECTS_TREE, ROOT_MAP};
+#[cfg(test)]
+use crate::document::{KEY_HEIGHT_MM, KEY_WIDTH_MM};
 use crate::objects::translate_meta;
 use crate::paths::tree_id_of;
 use crate::units::{DocumentSize, Length, Point, Vec2};
@@ -168,8 +170,17 @@ impl Document {
         // invariant: the root map is attached and the values are plain f64.
         #[allow(clippy::unwrap_used)]
         {
-            root.insert(KEY_WIDTH_MM, size.width.as_mm()).unwrap();
-            root.insert(KEY_HEIGHT_MM, size.height.as_mm()).unwrap();
+            let pages = self.pages();
+            let id = pages
+                .iter()
+                .find(|p| p.id == crate::FIRST_PAGE_ID)
+                .unwrap_or(&pages[0])
+                .id
+                .as_str();
+            root.insert(&crate::pages::key(id, "width"), size.width.as_mm())
+                .unwrap();
+            root.insert(&crate::pages::key(id, "height"), size.height.as_mm())
+                .unwrap();
         }
         if !shift_zero {
             self.translate_all_objects(shift);

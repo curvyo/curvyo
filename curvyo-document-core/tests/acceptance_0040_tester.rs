@@ -331,6 +331,12 @@ fn ac4_every_object_of_an_older_file_is_where_it_was() {
             serde_json::json!([232, 232, 235, 1.0]),
             "{name}"
         );
+        assert_eq!(
+            now.as_object_mut().unwrap().remove("pages"),
+            Some(
+                serde_json::json!([{ "id": "first", "name": "Page 1", "origin": { "x": 0.0, "y": 0.0 }, "size": old["size"] }])
+            )
+        );
         let mut old = old.clone();
         old.as_object_mut().unwrap().remove("format_version");
         assert_eq!(&now, &old, "{name}: objects moved");

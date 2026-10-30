@@ -5,6 +5,9 @@
 
 #![allow(clippy::unwrap_used)]
 
+#[path = "support/pre_pages_ids.rs"]
+mod pre_pages_ids;
+
 use std::collections::HashMap;
 use std::path::PathBuf;
 
@@ -634,7 +637,8 @@ fn c34_golden_file_of_format_22() {
         .collect();
     assert_eq!(read.len(), original.len());
     for (a, b) in read.iter().zip(&original) {
-        assert_eq!(a.carrier, b.carrier);
+        assert_eq!(a.carrier.node, pre_pages_ids::node(b.carrier.node));
+        assert_eq!(a.carrier.outline, b.carrier.outline);
         assert_eq!(a.values, b.values);
         assert_eq!(a.kept, b.kept);
         assert_eq!(a.curve, b.curve);

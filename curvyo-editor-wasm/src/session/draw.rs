@@ -83,7 +83,7 @@ impl Session {
             swap.apply_to(artwork_objects.to_mut());
         }
         // A text in edit mode is drawn as typed (`specs/0074-text-objects` criterion 3).
-        let mut artwork_objects = self.with_text_edit(artwork_objects);
+        let mut artwork_objects = self.page_drag_artwork(self.with_text_edit(artwork_objects));
         // A panel drag draws the objects in the style being previewed
         // (criterion 36); nothing is written until the release.
         if self.style.is_active() {

@@ -40,6 +40,8 @@ mod document;
 mod document_background;
 mod document_presets;
 mod document_size;
+mod pages;
+pub use pages::{FIRST_PAGE_ID, Page, PageError};
 mod drawing_above;
 mod drawing_check;
 mod drawing_content;
