@@ -9,6 +9,14 @@ Most entries are costs an accepted ADR chose to pay; some are shortcuts a featur
 (each names its slice). An entry is removed when its resolution lands, or stays with the note that
 it is accepted for good.
 
+## The trace worker has no stage cache
+
+`specs/0089-trace-quality-and-colour` slice E (accepted by the lead 2026-10-30): `adrs.md` §6's
+stage cache (S0 to S4) and the worker that keeps running with one queued job are not built. A
+settings change still terminates the worker, so every preview recomputes the selection, regions
+and outlines from the pixels, and the Mask view computes the selection once more per step.
+Resolved by a later slice that builds `Tracer` with the cache and the generation queue together.
+
 ## Boolean results are polylines, not curves
 
 Boolean operations flatten curves and return polygons
