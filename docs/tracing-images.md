@@ -6,8 +6,8 @@ there only while nothing but images is selected), or press **I**. Ctrl+I stays I
 above the canvas becomes the Trace bar; the right panel gets one more tab, **About Trace**, which
 opens only when you ask for it (see "About Trace" below).
 (`specs/0025-raster-trace`, slices 1 to 3: black and white, presets and Advanced settings, the
-View pill, large images; `specs/0089-trace-quality-and-colour` slices D and C: the geometry, and
-the methods Brightness, Remove background and Pick colours.)
+View pill, large images; `specs/0089-trace-quality-and-colour` slices D, C and E: the geometry,
+the methods Brightness, Remove background and Pick colours, and the Mask view.)
 
 ## The preview
 
@@ -38,10 +38,15 @@ goes with the next successful trace, a changed value, another image or leaving t
 ## View
 
 The **View** pill beside the Preset button switches what the canvas shows: **Overlay** (the
-washed-out image under the outline, where the tool starts every time), **Trace** (the result
-filled black as Create paths would make it, the image hidden) and **Image** (the original at full
-strength, no outline). Hold **\\** to see the image while it is held; **Shift+\\** steps through the
-three views. Neither changes the drawing; zoom and pan work in every view.
+washed-out image under the outline, where the tool starts every time), **Mask** (exactly the
+pixels the tracer turns into shapes: content black, everything else white, after Ignore below and
+Drop border shapes and at the resolution traced, so twice the image's pixels with Upscale; zoomed
+in, each pixel stays a sharp square), **Trace** (the result filled black as Create paths would make
+it, the image hidden) and **Image** (the original at full strength, no outline). Transparent pixels
+are white in the Mask, since they never become shapes; over 4 megapixels it is the reduced copy's
+mask, and after a stop it is drawn at half strength like the outline. Hold **\\** to see the image
+while it is held; **Shift+\\** steps through the four views. Neither changes the drawing; zoom
+and pan work in every view, and the pipette works in the Mask view too.
 
 With nothing selected the bar says "Click an image to trace it." and offers "Import image...".
 With something else selected it says "The selection is not an image. Click an image to trace
@@ -63,7 +68,9 @@ button; Up and Down move, Enter picks, Escape closes.
 | **Engraving** ("Keeps fine lines.") | engraving fine detail and thin lines | 80 | 0.35 px | 0.1 mm | 70 | Auto | Off |
 
 The choice (the preset, or Custom with its values) is remembered for the next image and applies to
-every selected image.
+every selected image. A choice remembered by an earlier version keeps its meaning: Smooth keeps
+its number, a preset value it did not hold yet (Tolerance) takes that preset's value, and the
+method starts as Brightness.
 
 ## Method
 
@@ -85,7 +92,7 @@ change with it (it is remembered, like each method's Colour tolerance):
   belong to this use of the tool and are not remembered. With none the status says "0 paths: no
   colour picked."
 
-**Colour tolerance** (0 to 100; 40 for Remove background, 15 for Pick colours at first use): how far
+**Colour tolerance** (0 to 100; 40 for Remove background, 19 for Pick colours at first use): how far
 a colour may be from the background or a picked colour and still count as it; it grows with the
 square of the value (100 is half the colour cube's edge), so the low end separates pale colours.
 Colours are compared as their stored values (no colour management).
@@ -177,18 +184,21 @@ bar opens the same tab and is pressed while it shows; pressing it
 again, or leaving the tool, returns the panel to the tab it showed before (hidden again if it was
 hidden). Any other tab leaves it too. The text:
 
-Trace turns the selected image into paths. Dark parts become shapes, light parts stay empty. Press Enter to create the paths.
+Trace turns the selected image into paths. The method decides which parts become shapes. Press Enter or the Trace button to create the paths.
 
 - Preset: a named set of values for what you do with the paths.
 - Logo / Line art: sharp corners, clean curves.
 - Photo: many shapes, photos trace roughly.
 - Silhouette for cutting/carving: closed, simple, few nodes; drops shapes and holes below 2 mm.
 - Engraving: keeps fine lines, drops shapes below 0.1 mm.
-- View: the image with the outline, the result alone, or the image alone. Hold \ to peek at the image.
+- View: the image with the outline, the mask, the result alone, or the image alone. Hold \ to peek at the image; Shift+\ steps through the views.
+- Mask: what the tracer turns into shapes, black on white, after Ignore below and Drop border shapes.
 - Method: how pixels become shapes.
 - Brightness: pixels darker than the Threshold.
-- Remove background: everything unlike the background colour; Auto takes it from the image border, the pipette from a click.
-- Pick colours: pixels like the colours picked with the pipette; Shift+click adds a colour.
+- Remove background: everything unlike the background colour.
+- Background: the colour Remove background leaves out; Auto takes it from the image border.
+- Pick colours: pixels like the colours picked with the pipette; Shift+click adds a colour, up to 8.
+- Pipette: takes a colour from the image under a click; Esc ends it.
 - Colour tolerance: how far a colour may be from the background or a picked colour and still count as it.
 - Threshold: pixels darker than this brightness (0 to 100 %) become shapes.
 - Smooth: calms the pixel steps of the outline before the fit; higher is calmer.

@@ -210,11 +210,14 @@ answer carries the settings generation, and an answer for an older generation is
   shape: tolerance 0.25 px at 0 to about 1.5 px at 100, smoothing 0 up to Smooth 30, then rising).
   **Corners** (Advanced) maps only to `corner_cos` (today's polynomial). Changing Smooth never moves a
   protected corner (corners are found before smoothing and pinned, criterion 8).
-- **Migration: none in storage.** A stored Smooth keeps its number and is read through the new
+- **Migration: none of the stored numbers.** A stored Smooth keeps its number and is read through the new
   mapping; the four presets keep their keys and numbers; `readChoice` is unchanged. Acceptance is
   measured (criteria 9, 13), not a value rewrite. Missing `method` in a stored setting reads as
   Brightness; method and tolerance are added fields of the app setting; swatches are not stored
   (session of the tool, criterion 20).
+  *Note 2026-10-30: the spec and the code do migrate stored settings (a stored setting is read into the
+  new fields, the added `method` and `tolerance` get their defaults); this ADR meant that no stored
+  number is rewritten. The spec and the code are authoritative.*
 - **Node limit:** still in `params.rs`, `trace.rs` and `TraceAdvanced.tsx` on main, while the spec
   says it was removed (0025 Frage 74 A). If Frage 74 A stands, D deletes it (both bisection stages,
   `NodeLimitOutcome`, the field) because it is tied to visioncortex's segment length.
@@ -320,6 +323,22 @@ half-pixel features are reported only until slice G.
 - Pick colours mixes toward the picture's suggested background (the border colour), computed
   inside the trace from the same raster; a transparent border mixes nothing (the alpha carries
   the edges).
+
+### Dated implementation note, slice E (2026-10-30, implementer; for the architect's review)
+
+- **`mask()` as in §2**, made by the same private function the trace walks (`masked` in
+  `trace.rs`), so the Mask view cannot drift from the tracer; `Mask { width, height, bits,
+  pixel_map }` with bits 0 or 255. The worker runs it as its own job (`trace_mask_job`) only
+  while the Mask view shows, before each preview step on the same pixels and settings; the
+  selection and the regions are therefore computed twice in that view.
+- **§6 stage cache and the non-terminating worker are not built.** No slice E criterion needs
+  them: criterion 23's "a late worker answer for stale settings is dropped" holds through the
+  page's generation check and `terminate()` on a settings change, as before. A synchronous wasm
+  call cannot be interrupted, so without the cache a queued job would wait for a stale one to
+  finish; the two belong together and are left for a later slice (Proposal; the lead decides).
+- The mask is drawn as a picture of the editor's image pipeline under a fresh name per mask
+  (no document asset); `FrameImages` carries a "pixelated" flag so a mask pixel is drawn
+  nearest-neighbour from one screen pixel per mask pixel (pictures keep the 8 px rule).
 
 ## Feature-local decisions
 

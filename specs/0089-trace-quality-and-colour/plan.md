@@ -1,4 +1,4 @@
-# Plan for Trace quality and colour, slices A, D and C
+# Plan for Trace quality and colour, slices A, D, C and E
 
 Implementer, 2026-10-29, on `story/trace-geometry` (cut from `main` `faeb6f07`). Built on the
 defaults of Frage 80 to 93 (order A, D, C, E, M, F; reference images synthetic plus CC0, the
@@ -336,6 +336,82 @@ Remove background 288 px, Pick colours 288 px; closed 108, 108, 144 px; nothing 
 Open: the Mask view (criterion 21) is slice E; Pick colours mixes only toward the border
 colour (fringes of a second colour need a higher tolerance); the wasm time of the selection is
 not measured separately.
+
+## Slice E: integration
+
+Implementer, 2026-10-30, on `story/trace-integration` (cut from `main` after #226). Design:
+`adrs.md` §2 (`mask`, `Mask`), §6 (late answers), §7 (migration); UX: `ux-notes.md` §2 (bar
+order), §4 (View with Mask), §12 (About Trace entries). Customer decisions kept: the blue
+"Trace" finish button at the far right, no hint texts outside About Trace, the 800 x 600 layout;
+Single colour / Multicolour (Frage 92 B) is slice M and not built here.
+
+### Affected crates/modules
+
+- `curvyo-vectorize-core`: `trace.rs` (`Mask`, `mask()`: the cleaned mask of the same code path
+  the trace walks, at the traced resolution, with its pixel map).
+- `curvyo-ui-core`: `trace_transfer.rs` (`trace_mask_job` for the worker).
+- `curvyo-editor-wasm`: `trace_draw.rs` (`TraceViewMode::Mask`, cycle Overlay, Mask, Trace,
+  Image; the mask drawn as a picture in place of the shown image), `trace.rs` (the kept mask),
+  `image_cache.rs` and `gpu_images.rs` (the mask's working image; nearest-neighbour as soon as a
+  mask pixel is larger than a screen pixel), `wasm_trace.rs` (`trace_mask_job`,
+  `set_trace_mask`, the `"mask"` view).
+- `frontend`: `traceText.ts` (the Mask segment, the About Trace entries, the migration of
+  remembered settings), `TraceBar.tsx` (the `Binary` segment), `traceJobs.ts` and
+  `traceWorker.ts` (the mask job), `useTraceMask.ts` (new: the mask jobs of the Mask view),
+  `useTrace.ts`, `useTraceViewMode.ts`.
+- Docs: `docs/tracing-images.md`, `docs/design-system.md`.
+
+### Tasks
+
+- [x] E1. `mask()` in core, test first: pixel-equal with the traced outlines (every mask pixel's
+      centre lies inside the outlines exactly when it is content), after Specks and Drop border
+      shapes, 2x after Upscale, transparent pixels never content (AC 21).
+- [x] E2. Session: the Mask view (fourth view, Shift+\ cycles four, peek shows Image), the mask
+      drawn black on white in place of the shown image, half strength when stale, its pixels equal
+      to the mask handed in; wasm surface and the worker job (AC 21).
+- [x] E3. Frontend: the Mask segment (`Binary`) after Overlay, the mask job whenever the Mask view
+      shows (a new view, each preview step in it), dropped when its generation is old (AC 21, 23).
+- [x] E4. Migration (Frage 85 B): a remembered 0025 choice without Tolerance takes its preset's
+      Tolerance (not Logo's); slice-1 values, unknown keys (Node limit, a stored Ignore background)
+      and a missing method read without a change of meaning; node tests per case (AC 13, 22).
+- [x] E5. About Trace entries (View with Mask, Mask, Background and Auto, pipette), the user page
+      and the design system; every string compared with the code by the existing test (AC 24).
+- [x] E6. Chromium: the View pill's four segments in order, Shift+\ through four, the Mask view
+      black where the content is and white elsewhere, the bar order (1) Preset and View, (2)
+      Method and its fields, (3) Smooth and Tolerance, (4) Ignore below, expander, finish button,
+      nothing before the method's field moving between methods; 800 x 600 (AC 21, 22, 22a).
+- [x] E7. Full gate; `reference_table` and `quality_table` in release.
+
+### Validation
+
+`cargo nextest run -p curvyo-vectorize-core -p curvyo-editor-wasm` (the mask tests, the session
+view tests); `npm test` (migration, strings); Chromium `acceptance_0089_e_browser.test.ts` with
+`CURVYO_E2E_BROWSER=/usr/bin/chromium`; the full `CLAUDE.md` §7 gate once.
+
+### Slice E results (2026-10-30)
+
+| Criterion | Test | Result |
+|---|---|---|
+| 21 Mask view, pixel-equal | `tests/mask.rs` (every mask pixel's centre is inside the traced outlines exactly when it is content, with Specks, Drop border shapes and Upscale), `trace_mask_tests.rs` (the drawn picture equals the bits handed in, black on white, at the image's frame, pixelated, half strength when stale), Chromium `acceptance_0089_e_browser.test.ts` (both blocks black, background white, no outline; Pick colours of the red leaves the black block white; the peek shows the image) | met |
+| 21 four views | Shift+\\ Overlay, Mask, Trace, Image (session and Chromium); the 0025 tester cases now expect Mask after Overlay (comment cites criterion 21) | met |
+| 22, 22a bar order | Chromium: i, Preset, View, Method, its field, Smooth, Tolerance, Ignore below, expander, Trace button in reading order for every method at 1280 x 800 and 800 x 600 with the panel open and closed; the first five never move between methods; the Trace button at the far right | met |
+| 23 late answers | the page's generation check drops a mask or trace of older settings (as before); `adrs.md` slice E note: the §6 stage cache is not built | met (as before) |
+| 13, Frage 85 B migration | `traceText.test.ts`: a 0025 choice without Tolerance takes its preset's (Silhouette 1.5 px, Engraving 0.35 px; before: Logo's 0.5 for all), Smooth keeps its number, Node limit and Full-size keys are ignored, a stored Ignore background switches nothing on, missing method is Brightness | met |
+| 24 docs | About Trace entries (View with Mask, Mask, Background, Pipette, Pick colours up to 8), `docs/tracing-images.md`, `docs/design-system.md`; the page test compares every string | met |
+
+Gate (2026-10-30): the full `CLAUDE.md` §7 gate green (9,460 tests); `reference_table` and
+`quality_table` in release report exactly the misses of the base `80439436` (the trace path is
+unchanged; the goldens stay exact).
+
+Bar heights at 800 x 600, Advanced closed (measured): panel open Brightness 252, Remove
+background 288, Pick colours 288 px; closed 108, 108, 144 px: unchanged by the four-segment
+View pill (it still fits beside Preset). 1280 x 800: open 72, 108, 108; closed 72, 72, 108 px.
+
+The About Trace intro reads "The method decides which parts become shapes" (lead 2026-10-30;
+0025 criterion 70 and 0089 criterion 24 updated). Open: the §6 stage cache (worker keeps its
+state, queues one job) is not built (no criterion needs it; `docs/technical-debt.md`). The Mask view computes the selection
+again in the worker (one extra job per preview step while it shows). No casing around the mask
+on a dark document ground (no dark theme yet).
 
 ## Baseline results
 
