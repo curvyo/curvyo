@@ -131,6 +131,7 @@ pub(crate) fn read_shape_tag_checked(meta: &LoroMap) -> ShapeTag {
 /// (`specs/0049-linked-clone/review-architect-m1.md`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum LeafKind {
+    Sketch,
     /// No `shape` tag: a path or compound path.
     Path,
     /// A primitive with this `shape` tag.
@@ -147,6 +148,7 @@ pub(crate) enum LeafKind {
 pub(crate) fn leaf_kind(meta: &LoroMap) -> LeafKind {
     match read_shape_tag(meta) {
         None => LeafKind::Path,
+        Some(tag) if tag == "sketch" => LeafKind::Sketch,
         Some(tag) if tag == crate::clone_codec::SHAPE_CLONE => LeafKind::Clone,
         Some(tag) if tag == crate::text_codec::SHAPE_TEXT => LeafKind::Text,
         Some(tag) if tag == crate::image_codec::SHAPE_IMAGE => LeafKind::Image,

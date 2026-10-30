@@ -49,7 +49,8 @@ fn the_strip_has_layers_fourth_and_never_dimmed() {
             assert_eq!(
                 names,
                 [
-                    "file", "document", "style", "layers", "history", "fonts", "snapping"
+                    "file", "document", "style", "layers", "history", "fonts", "snapping",
+                    "sketches"
                 ]
             );
             let l = &entries[3];

@@ -245,7 +245,8 @@ fn c45_tabs_found_by_name_order_file_document_style_history() {
             assert_eq!(
                 names,
                 [
-                    "file", "document", "style", "layers", "history", "fonts", "snapping"
+                    "file", "document", "style", "layers", "history", "fonts", "snapping",
+                    "sketches"
                 ]
             );
             // exactly one selected; it is the active tab

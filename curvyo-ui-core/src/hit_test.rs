@@ -196,7 +196,7 @@ fn hit_test_node(
 /// anchors or a primitive's outline.
 pub(crate) fn segment_pairs(len: usize, closed: bool) -> impl Iterator<Item = (usize, usize)> {
     let adjacent = (0..len.saturating_sub(1)).map(|i| (i, i + 1));
-    let wraparound = (closed && len >= 2).then_some((len - 1, 0));
+    let wraparound = (closed && len >= 2).then(|| (len - 1, 0));
     adjacent.chain(wraparound)
 }
 
@@ -269,6 +269,11 @@ fn hit_test_segment(paths: &[PathSnapshot], point: Point, tolerance: Tolerance) 
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn empty_outline_has_no_segments() {
+        assert_eq!(super::segment_pairs(0, false).count(), 0);
+        assert_eq!(super::segment_pairs(0, true).count(), 0);
+    }
     use curvyo_document_core::{AnchorId, AnchorKind, Document, NewAnchor};
 
     use super::*;

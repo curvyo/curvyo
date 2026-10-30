@@ -1009,6 +1009,7 @@ fn keys_cannot_delete_or_act_while_a_gesture_runs_with_focus_in_a_field() {
 fn origin_of(s: &Session, index: usize) -> (f64, f64) {
     let d = doc_of(s);
     match d.object(d.object_ids()[index]).unwrap() {
+        curvyo_document_core::ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         curvyo_document_core::ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         curvyo_document_core::ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         curvyo_document_core::ObjectSnapshot::Clone(_) => panic!("no clone here"),

@@ -1,3 +1,5 @@
+import type { SketchApi } from "@/hooks/useSketch";
+import { SketchAnnotations } from "@/components/sketch/SketchAnnotations";
 import { useLayoutEffect, useRef, useState } from "react";
 
 import { PageFrames } from "@/components/PageFrames";
@@ -43,6 +45,7 @@ const TOOL_RAIL_CLEAR_PX = 120;
 const PANEL_TAB_CLEAR_PX = 14;
 
 interface CanvasProps {
+  sketch: SketchApi;
   editor: EditorSession;
   /** Files dropped on the canvas (`specs/0058-bitmap-import` criterion 4). */
   onDropFiles?: (dropped: DroppedFiles) => void;
@@ -60,7 +63,7 @@ interface CanvasProps {
  * (`specs/0001-project-file-foundation`'s "chrome never frames the canvas"
  * precedent, reaffirmed by `docs/design-system.md`).
  */
-export function Canvas({ editor, onDropFiles }: CanvasProps) {
+export function Canvas({ editor, sketch, onDropFiles }: CanvasProps) {
   const penCue = usePenCue(editor);
   const drop = useFileDrop(editor.canvasRef, onDropFiles, () =>
     editor.showHistoryNotice(clipboard_notice("link", 0, ""), 5000, "canvas", "alert"),
@@ -79,7 +82,7 @@ export function Canvas({ editor, onDropFiles }: CanvasProps) {
       style={
         editor.isPanning || editor.isSpaceHeld
           ? undefined
-          : { cursor: cursorForHint(editor.cursorHint) }
+          : { cursor: sketch.view.workbench === "sketch" && !["select", "constraints"].includes(sketch.view.tool) ? "crosshair" : cursorForHint(editor.cursorHint) }
       }
       className={`relative flex-1 outline-none ${
         // Pan cursor convention (`docs/design-system.md`): grabbing for
@@ -117,7 +120,7 @@ export function Canvas({ editor, onDropFiles }: CanvasProps) {
           React would remount it, dropping the WasmSession's attached
           wgpu surface. */}
       <NodeContextMenu
-        disabled={editor.tool !== "node" || editor.cursorHint === "eyedropper"}
+        disabled={sketch.view.workbench === "sketch" || editor.tool !== "node" || editor.cursorHint === "eyedropper"}
         state={editor.nodeToolbarState}
         actions={{
           insertSelected: editor.insertSelected,
@@ -159,6 +162,7 @@ export function Canvas({ editor, onDropFiles }: CanvasProps) {
 
       </NodeContextMenu>
       <PageFrames getSession={editor.getSession} />
+      <SketchAnnotations sketch={sketch} />
       {/* The drop cue: a 2px dashed accent outline inside the viewport while files hover over the
           canvas (`specs/0058-bitmap-import` UX notes, "Drag and drop"). No text, no animation. */}
       {drop.over && (
@@ -265,7 +269,7 @@ export function Canvas({ editor, onDropFiles }: CanvasProps) {
       <PickSetBadge at={editor.text.pickBadge} />
       <CloneTags tags={editor.clones.tags} />
       <FontMissingTags marks={editor.text.missingMarks} hidden={editor.isPanning} />
-      <TextSink text={editor.text} mounted={editor.tool === "text"} />
+      <TextSink text={editor.text} mounted={sketch.view.workbench === "vector" && editor.tool === "text"} />
       <ColourPickChip
         active={editor.cursorHint === "eyedropper"}
         getSession={editor.getSession}

@@ -135,7 +135,17 @@ impl Session {
     /// object lights) and the object a press would select follow the key by
     /// themselves, whatever the host re-sends.
     pub fn modifiers_changed(&mut self, shift: bool, ctrl: bool, alt: bool) {
-        self.held = Modifiers::new(shift, ctrl).with_alt(alt);
+        let next = Modifiers::new(shift, ctrl).with_alt(alt);
+        if self.workbench() == super::Workbench::Sketch && self.held == next {
+            return;
+        }
+        self.held = next;
+        if self.workbench() == super::Workbench::Sketch {
+            if let Some(point) = self.pointer_position {
+                self.sketch_pointer_hover(point);
+            }
+            return;
+        }
         // An unfrozen placement follows the keys with the pointer still (`0052` criterion 3).
         if self.placement().is_some() {
             self.placement_modifiers(Modifiers::new(shift, ctrl));

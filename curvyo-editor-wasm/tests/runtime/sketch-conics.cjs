@@ -1,0 +1,12 @@
+const fs=require('node:fs'),path=require('node:path');
+const root=path.resolve(process.argv[2]||'target/0066-runtime');
+const {WasmSession}=require(path.resolve(process.argv[3]||`${root}/bindings/curvyo_editor_wasm.js`));
+const s=WasmSession.open(922n,fs.readFileSync(`${root}/conics.curvyo`));
+s.set_workbench('sketch');
+if(!s.enter_sketch(JSON.parse(s.sketch_view_json()).sketches[0].id))throw Error('enter');
+if(!s.sketch_select_entity('ellipse',false)||!s.sketch_select_entity('tangent',true))throw Error('select ellipse/line');
+s.sketch_apply_action('tangent','',false);
+if(!s.sketch_select_entity('circle',false))throw Error('select circle');
+s.sketch_apply_action('radius','5 mm',false);
+fs.writeFileSync(`${root}/conics-wasm.curvyo`,s.pack());
+console.log('Executed production WASM rotated ellipse tangent + circle radius edits; native verifier supplies independent numerical oracle');s.free();

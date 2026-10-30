@@ -22,6 +22,8 @@ pub enum PanelTab {
     Fonts,
     /// Document snapping settings, retained across selection changes.
     Snapping,
+    /// Parametric sketch editing and diagnostics.
+    Sketches,
 }
 
 impl PanelTab {
@@ -36,6 +38,7 @@ impl PanelTab {
             Self::History => "history",
             Self::Fonts => "fonts",
             Self::Snapping => "snapping",
+            Self::Sketches => "sketches",
         }
     }
 
@@ -54,6 +57,7 @@ impl PanelTab {
             Self::History => "History",
             Self::Fonts => "Fonts",
             Self::Snapping => "Snapping",
+            Self::Sketches => "Sketches",
         }
     }
 
@@ -69,6 +73,7 @@ impl PanelTab {
             // part in brackets there (UX notes §4).
             (Self::Fonts, _) => "Fonts (Shift+Ctrl+T)",
             (Self::Snapping, _) => "Snapping",
+            (Self::Sketches, _) => "Sketches",
         }
     }
 }
@@ -98,7 +103,7 @@ impl StyleBlocker {
 
 /// The strip's tabs, in order (`0051` criterion 2). A tab whose feature has not shipped is not
 /// built; the order never changes.
-const TABS: [PanelTab; 7] = [
+const TABS: [PanelTab; 8] = [
     PanelTab::File,
     PanelTab::Document,
     PanelTab::Style,
@@ -106,6 +111,7 @@ const TABS: [PanelTab; 7] = [
     PanelTab::History,
     PanelTab::Fonts,
     PanelTab::Snapping,
+    PanelTab::Sketches,
 ];
 
 /// The active tab and the one fact the automatic switches need: whether the
@@ -359,7 +365,7 @@ mod tests {
 
     /// `0051` criterion 2 and `0043` criterion 4: names, order, tooltips, the dimmed tab.
     #[test]
-    fn the_strip_has_seven_tabs_with_tooltips_and_a_dimmed_style() {
+    fn the_strip_has_eight_tabs_with_tooltips_and_a_dimmed_style() {
         let empty = tab_entries(Document, false);
         let names: Vec<_> = empty.iter().map(|e| (e.name, e.label)).collect();
         assert_eq!(
@@ -371,7 +377,8 @@ mod tests {
                 ("layers", "Layers"),
                 ("history", "History"),
                 ("fonts", "Fonts"),
-                ("snapping", "Snapping")
+                ("snapping", "Snapping"),
+                ("sketches", "Sketches")
             ]
         );
         assert_eq!(entry(&empty, "file").tooltip, "File");

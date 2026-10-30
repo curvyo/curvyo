@@ -438,7 +438,9 @@ fn hit_outcome_in(object: &ObjectSnapshot, units: &Units) -> SelectDoubleClickOu
 fn hit_outcome(object: &ObjectSnapshot) -> SelectDoubleClickOutcome {
     match object {
         ObjectSnapshot::Path(_) => SelectDoubleClickOutcome::Hit(object.clone()),
-        ObjectSnapshot::Primitive(_) => SelectDoubleClickOutcome::EditHint,
+        ObjectSnapshot::Sketch(_) | ObjectSnapshot::Primitive(_) => {
+            SelectDoubleClickOutcome::EditHint
+        }
         ObjectSnapshot::Text(text) => SelectDoubleClickOutcome::Text(text.id),
         ObjectSnapshot::Clone(_) => SelectDoubleClickOutcome::Clone,
         // An image has no nodes; nothing opens (`specs/0058-bitmap-import` criterion 36).

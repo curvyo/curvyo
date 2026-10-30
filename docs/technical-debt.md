@@ -994,6 +994,25 @@ selection, node editing and tool state have no accessible representation
 strategy (DOM overlays for handles and text, keyboard-only node editing)
 before the first canvas story, and UI review checks it.
 
+## Sketch solver transitively uses unmaintained paste
+
+[ADR 0025](adr/0025-sketch-core-and-solver.md) pins ACS 0.1.19 after native/WASM
+geometry, hard-constraint and pointer-performance validation for story 0066.
+Its dependency chain is `acs-solver 0.1.19 -> nalgebra 0.33.3 -> simba 0.9.1 ->
+paste 1.0.15`. [RustSec RUSTSEC-2024-0436](https://rustsec.org/advisories/RUSTSEC-2024-0436.html)
+classifies paste as informationally unmaintained and lists no patched version.
+The pinned nalgebra requires Simba 0.9, which unconditionally requires paste 1.0;
+newer Simba 0.10 cannot replace it within those version constraints. Disabling
+features does not remove this dependency.
+
+**Resolution:** acknowledge only this advisory ID in `deny.toml`, consistent with
+the existing informational-transitive policy below. Licence, source, wildcard
+and other advisory checks remain active. Revisit on ACS/nalgebra upgrades and
+remove the exception when their compatible dependency tree replaces paste.
+Changing the numerical backend requires repeating the independent constraints,
+native/WASM parity and performance evidence; a local fork is not introduced for
+this maintenance advisory. Any future vulnerability advisory is checked normally.
+
 ## Four transitive dependencies are unmaintained, with no safe upgrade
 
 `cargo deny`'s first real run (`project-file-foundation`, the first slice to

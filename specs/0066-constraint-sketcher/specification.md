@@ -1,77 +1,134 @@
-# Constraint sketcher: construct geometry from constraints and dimensions, and keep it parametric
+# Constraint sketcher: construct geometry from constraints, dimensions and formulas
 
-Status: Draft (a sketch for the customer; not Ready: it needs a solver decision, a model decision for parametric objects, core feature decided 2026-10-17)
-Priority: Should (large; the customer: "also a lot of work")
-Origin: Customer (request of 2026-10-17, translated): "I would like to be able to construct. Similar to SolveSpace or a sketch in FreeCAD you should be able to create geometry with constraints to specify origin, radii, sizes etc. Super practical for CNC milling and laser cutting. But also a lot of work :)"
+Status: Ready for story review (2026-10-30: accepted scope/UI implemented; independent acceptance, UX/architecture reviews and full CLAUDE §7 gate passed; customer acceptance and original-sketch scaling decision pending)
+Priority: Should
+Origin: Customer (2026-10-17; expanded and accepted 2026-10-30).
+
+The customer wants editable constrained construction for laser cutting and CNC,
+comparable to a SolveSpace sketch or FreeCAD Sketcher. The accepted feature
+includes the complete criteria below, including named parameters and formulas;
+it is not the original lines/circles-only alternative. The accepted shell uses a
+Vector/Sketch workbench selector above Properties, sketch-specific left tools,
+one existing floating tool-options bar and a Sketches Properties tab. The
+customer's final UI correction removes the demo's bottom state bar: all sketch
+states and diagnosis belong in Sketches.
 
 ## User value
 
-As a maker who cuts and mills parts that must fit (a bracket, a box joint, a gear plate), I want to say what is true of the part ("this line is 40 mm", "these two circles have the same radius", "this arc touches that line") and let the program find the shape, so that I change one number later and the whole part follows, instead of nudging nodes until it looks right.
+As a maker cutting and milling parts that must fit, I want to specify dimensions
+and geometric relationships once and edit them later, so that changing a plate
+width or hole-spacing formula updates the constrained part and its linked clones
+without manually repositioning nodes.
 
-**What other tools do.**
-- **SolveSpace**: a 2D/3D constraint sketch, a small own solver, shows the remaining degrees of freedom (DOF) as a number, constraints are points, lines and dimensions you add to selected entities. Over-constraint is reported with a list of the conflicting constraints.
-- **FreeCAD Sketcher**: a Sketch is a separate object inside a Part workbench; geometry is drawn, then constrained (coincident, horizontal, vertical, parallel, perpendicular, tangent, equal, symmetric, distance, radius, angle); the solver (planegcs) colours the geometry (white free, green fully constrained, red conflict); a sketch is an input for Pad or Pocket.
-- **Fusion and Onshape**: the same model; Fusion paints under-constrained geometry blue and fully constrained black; dimensions can be driven by named parameters and formulas.
-- **Inkscape, Illustrator, LightBurn**: none. This is the gap the customer sees.
+## Accepted operations
 
-## Model (Proposal)
+- **New sketch:** create an editable set of construction entities, constraints,
+  dimensions and parameters in the document.
+- **Edit sketch:** enter its Sketch workbench to change its entities and rules.
+- **Vector / Sketch:** switch editing context without converting or discarding
+  the sketch; switching context alone does not change the document.
+- **Apply constraint:** add the selected geometric relationship between valid
+  selected sketch entities.
+- **Driving dimension:** set a length, distance, radius, diameter or angle that
+  the solved geometry must satisfy.
+- **Reference dimension:** display a measured value without driving geometry.
+- **Parameter / formula:** name a typed value or expression that drives dependent
+  parameters and dimensions.
+- **Polyline:** create a connected open or closed chain of straight segments.
+- **Circle / ellipse variant:** construct the same analytic entity using the
+  explicit point-picking method selected in the tool-options bar.
+- **Straight slot:** create a centreline-and-width shape with tangent straight
+  sides and semicircular caps that remain constrainable.
+- **Fillet:** replace a corner with a radius-controlled tangent rounding while
+  preserving constraint intent, or refuse the edit without changing the sketch.
+- **Inspect:** locate a constraint's entities or inspect the selected geometry's
+  freedom, fixing relationships and diagnosis.
+- **Remove constraint:** delete the selected relationship and solve the remaining
+  sketch; the edit is undoable.
+- **Convert to paths:** replace the parametric sketch with ordinary solved paths
+  in one undoable edit.
 
-- A **sketch** is an object in the document with its own points, lines, arcs, circles, a list of constraints and a list of named dimensions. It lives in one layer like a path.
-- The **solved result** is shown as ordinary geometry. **Convert to paths** ends the parametric part and leaves normal paths (undo restores the sketch); until then the sketch is selectable, movable and styleable as one object, like a compound path.
-- A sketch can be the original of a **linked clone** (`0049`, `0057`): the clone follows the solved shape live, and a changed dimension changes every clone.
-- **Driving dimensions** are the dimensions of `0070` that are allowed to change the sketch (a number you type moves the geometry); **reference dimensions** only show a value.
-- The solver is a function from (entities, constraints) to solved coordinates, with no clock, file or thread, so it belongs in a `*-core` crate and builds for `wasm32` (`CLAUDE.md` §6).
+## Acceptance criteria
 
-## Solver approach (options; the architect's notes)
+1. Given a new or existing sketch, then the maker enters **Sketch** using the workbench selector above the right Properties panel and draws points, lines, polylines, arcs, circles, ellipses, rectangles and straight slots. Every resulting entity is constrainable. Selecting **Vector** returns to ordinary document editing with the sketch still editable as one object; re-entering restores its entities and relationships.
+2. Given a valid entity selection, then coincident, horizontal, vertical, parallel, perpendicular, tangent, equal, fixed, symmetric and midpoint are discoverable named constraint actions in the **Sketches** Properties tab, with active-tool shortcuts allowed in the existing tool-options bar. Invalid actions remain focusable and dimmed with a reason. Applying a valid action adds that relationship and updates the solved result.
+3. Given dimensions, then distance, length, radius, diameter and angle support unit-aware values (mm by default), direct double-click editing and an equivalent keyboard-accessible editor in Sketches. Driving dimensions and reference measurements are distinguished. Named parameters and formulas are included: names, expressions, units and resolved values are inspectable, and dependencies propagate into driving dimensions and solved geometry. For example, length parameters `width = 80 mm`, `edge_margin = 10 mm` and `hole_spacing = width - 2 * edge_margin` resolve to 60 mm; changing width to 100 mm resolves to 80 mm. Unknown names, cycles, incompatible units and invalid expressions identify the entry to fix and preserve the last valid values and geometry.
+4. Given the sketch origin, then it is fixed by default and may be explicitly moved or released.
+5. Given the sketch, then the **Sketches** Properties tab shows its inspectable DOF count and text diagnosis. Under-constrained, fully constrained, redundant, conflicting and solver-failure states are distinct. Geometry uses matching visual cues, with colour never the only signal; a valid zero DOF means fully constrained. If no valid count exists, show unavailable rather than a misleading zero. No bottom demo-state bar or separate diagnostic strip is added to the product.
+6. Given a drag of free sketch geometry, then the remaining geometry follows its hard constraints at pointer speed (under 16 ms of thread CPU per frame for the 100-entity workload, to be verified by the feasibility spike). A request beyond feasible movement stops at the constraint limit; it does not break constraints. Numerical failure retains the last valid solution and is diagnosed as failure rather than falsely as over-constraint.
+7. Given conflicting or redundant constraints, then Sketches identifies the affected constraints, links them to highlighted geometry and allows an explicit edit or removal. Redundancy alone does not imply contradiction. Solver failure does not prove a conflict. A contradictory change retains the last valid shape while the affected relationships remain inspectable; repairs are undoable. No globally minimal conflict-set guarantee is implied without solver evidence.
+8. Given Convert to paths, then the result is ordinary paths, with analytic curves approximated as Béziers within 0.01 mm and closed where sketch loops close. Constraint symbols, dimension annotations and parameter controls are not output geometry. Conversion is one history step and undo restores the editable sketch.
+9. Given a dimension or parameter changes in a sketch with linked clones, then the clones follow the newly solved shape using the existing clone placement/style rules. A clone does not become an independently editable constraint system.
+10. Given saving and reopening, then geometry, constraints, dimensions, named parameters, formulas and the information needed to restore the last valid editable result survive. The architect decides the authoritative model, format version and reader behaviour in the model ADR before implementation. Curvyo is unreleased SID: no migration or retrofit into existing old readers is required, and no unsupported older-reader fallback is promised.
+11. Given a completed geometry creation, constraint edit/removal, dimension edit, parameter/formula edit, fillet or drag, then it creates one named history step. Undo/redo restores geometry and associated relationships and values. Preview, diagnosis and workbench navigation add no document history step.
+12. Given identical sketch data and starting configuration, then native and WASM solve results agree within 1e-6 mm; the same condition applies to repeated runs on supported platforms. The feasibility evaluation verifies this independently of upstream claims.
+13. Given Polyline, then successive clicks create connected straight segments with shared coincident endpoints. Enter finishes an open chain; clicking the start completes a closed chain; Escape cancels the unfinished segment without discarding already completed segments. Open and closed chains remain constrainable.
+14. Given Circle or Ellipse, then construction variants are explicitly named in the existing floating tool-options bar. Circle supports centre/radius and three-point construction; Ellipse supports centre/axes and axis-endpoints/third-point construction. Previews identify the centre, axes or construction picks. Degenerate input refuses completion without discarding earlier picks needed to correct it. The result remains analytic, constrainable geometry; choosing a construction method alone does not silently create persistent external-reference constraints.
+15. Given Slot, then the maker picks its two centreline ends and width to create a straight slot with connected tangent line/arc boundaries. Width and centre spacing are editable, constrainable values. Curved slots are outside this feature.
+16. Given a valid corner, then Fillet previews a radius-controlled rounding while preserving applicable constraints and dimensions through explicit entity-reference remapping. If the rounding cannot preserve existing relationships, it identifies affected constraints in Sketches and leaves the sketch unchanged; it never silently drops constraints. Cancellation restores the original corner; commit and undo preserve the associated topology and relationships as one edit.
+17. Given constraint inspection, then selecting a constraint locates its entities and selecting geometry allows inspection of remaining freedom or the relationships fixing it. Sketches contains the corresponding status, DOF and diagnostic controls; the canvas highlights the geometry and annotations. Conflict, redundancy and numerical failure remain distinguishable without colour. Exact per-entity classification and conflict diagnostics must be verified in solver evaluation.
+18. Given the Sketch workbench, then the existing canvas, rulers, Properties tab strip and floating tool cards remain the application shell. The selector above Properties identifies **Vector / Sketch**; **Sketches** identifies the active sketch and holds constraints, dimensions, parameters and all state/diagnosis. The left floating tools change with workbench; construction variants and active-tool settings use the existing single floating top bar. There is no additional app header, breadcrumb/Finish bar, second constraint toolbar or bottom state bar. Ordinary Bézier Pen, Star and Polygon are not copied into Sketch by default. Active editing scope and the route back to Vector are explicit. Future work contexts do not authorize implementing manufacturing, simulations or an extension framework here.
 
-| Option | For | Against |
-|---|---|---|
-| A. Own Newton / Levenberg-Marquardt solver on a sparse Jacobian, with a DOF count from the rank | Full control, wasm-clean, about 2 to 3 kLOC for the usual 2D constraint set, no foreign licence | We own the hard cases: redundant and conflicting constraints, drag stability, convergence near singular states |
-| B. An existing Rust crate | Less code | The architect found no mature, maintained, permissively licensed 2D sketch solver crate in Rust (to be confirmed by a short spike before any ADR); a general optimisation crate does not give DOF or conflict diagnosis |
-| C. Bind planegcs (FreeCAD, LGPL-2.1+) or SolveSpace's solver (GPL-3.0) | Proven | C++ in a wasm and desktop build; licences conflict with the dependency rules of ADR 0006 or need review; no `forbid(unsafe_code)` path |
-Recommendation: A, behind a small input/output contract, with a spike on `spike/sketch-solver` that proves 12 constraint kinds and a 30-entity sketch before the ADR is written.
+## Model and solver readiness
 
-## Acceptance criteria (as far as clear)
+A sketch is an editable document object with stable references between entities,
+constraints, dimensions and parameters; its solved outline feeds ordinary vector
+selection, styling, transforms and output. The exact authoritative representation,
+placement rules, derived geometry and reference repair belong to the model ADR;
+this accepted product contract does not substitute for that architectural decision.
 
-1. Given the Sketch tool, then the maker draws points, lines, arcs, circles and rectangles into one sketch; every entity is constrainable. Options of the tool are in the top bar; nothing is added to the right panel for it.
-2. Given constraints, then at least these exist as symbol buttons in the top bar: coincident, horizontal, vertical, parallel, perpendicular, tangent, equal, fixed, symmetric, midpoint. Pressing one with a valid selection applies it; with an invalid selection the button is dimmed with a tooltip that says why (it stays focusable).
-3. Given dimensions, then distance, length, radius, diameter and angle can be added by selecting entities and typing a value with a unit (`R-EDIT-017`; mm is the default); the value can be edited later by double-click on the dimension.
-4. Given the origin, then the sketch has an origin point that is fixed by default and may be moved or released.
-5. Given the sketch, then the **DOF count** is shown in the top bar as a number; geometry is coloured free (neutral), fully constrained (a second colour) and conflicting (red); colour is never the only signal (the count and a tooltip carry the same).
-6. Given a drag of a free point or entity, then the rest follows the constraints at pointer speed (under 16 ms per frame for 100 entities, the budget is confirmed by the spike); a drag that would break a constraint stops at the limit and nothing is refused.
-7. Given a conflict or a redundant constraint, then the offending constraints are highlighted together and the maker can delete any one of them; the sketch keeps the last valid solution meanwhile.
-8. Given Convert to paths, then the result is ordinary paths and arcs-as-Bézier at the kernel tolerance (0.01 mm), closed where the sketch loops close; one history step.
-9. Given a dimension changed in a sketch that has linked clones, then the clones follow.
-10. Given the file, then a sketch is a new node kind with its constraints stored as data; a `format_version` bump and a reader rule (older readers keep the solved geometry as a path) are decided by the ADR.
-11. Given undo, then every constraint, dimension edit and drag is one history step with an operation name.
-12. Given determinism, then the same sketch solves to the same coordinates on every platform to 1e-6 mm.
+The solver/evaluator must run without UI, filesystem, network or clock access in
+core and build for native and `wasm32-unknown-unknown`. Parameter evaluation and
+geometric solving are distinct responsibilities; a converged numerical result
+still requires validation before committing document geometry.
+
+**Current evaluation:** the reproducible ACS0.1.19 spike established a viable
+adapter, including auxiliary-contact ellipse tangency, native/WASM agreement and
+the measured 100-entity workloads. ADR0025 records its provisional selection;
+`solver-spike.md` includes difficult-case latency rather than claiming universal
+16 ms performance. The production core passes 32 tests, including eleven
+independent acceptance cases, and native/WASM compile and lint checks. See
+`acceptance-core-report.md` and `review-core-architecture.md`. Actual production
+WASM execution, interactive CPU measurements and full document/UI acceptance
+remain required. ADR0026 governs document integration; the source-scaling
+decision remains pending. These milestones do not reduce the accepted scope.
 
 ## Out of scope
 
-- 3D sketches, assemblies, parametric 3D parts and any CAD kernel.
-- Formulas and named parameter tables (a later entry; a driving dimension holds a number for now).
-- Automatic constraint inference while drawing (Proposal for a later entry; the first version has the maker apply constraints).
-- Splines with constraints on control points other than coincident and fixed.
-- DXF/SVG import that infers constraints.
+- 3D sketches, assemblies, parametric 3D parts and a general CAD kernel.
+- Automatic constraint inference while drawing; snapping assists placement but
+  does not silently add constraints.
+- Curved slots, patterns, ordinary Star/Polygon tools and imported DXF/SVG
+  constraint recovery.
+- Spline constraints beyond coincident/fixed control-point relationships.
+- The general Measure tool and every guide workflow of `0070`; 0066 includes
+  the driving/reference dimension foundation required by the sketch.
+- Manufacturing, simulation and extension-workbench implementations.
+- Migration of previously saved unreleased files or retrofitting old readers.
 
-## Decided (customer, 2026-10-17)
+## Customer decisions
 
-- **SKETCH-HOME: core** (customer: "by feeling"). The sketch node, the solver, the Sketch tool and its Properties block are built in, not an extension. It is not the first extension of `0065`.
+- **SKETCH-HOME:** built into core, not an extension (2026-10-17).
+- **SKETCH-SCOPE:** the complete revised criteria 1–18, including Polyline,
+  circles/ellipses, straight slots, constraint-preserving fillets and inspectable
+  states; the original reduced first slice is superseded (2026-10-30).
+- **SKETCH-PARAMETERS:** named parameters and formulas are included, following
+  clarification of “parametric” and the customer's agreement (2026-10-30).
+- **SKETCH-UI:** existing shell, Vector/Sketch selector above Properties,
+  workbench-specific left tools, one active-tool options bar and Sketches tab;
+  all state/diagnosis stays in that tab, with the demo bottom bar removed.
+- **SKETCH-START:** implementation is authorized; the pending ACS evidence and
+  architect-owned ADRs are prerequisites for committing the production model,
+  not a request to reconfirm the accepted feature.
 
-## Open questions (customer; each has a default)
-
-Frage 1 (SKETCH-SOLVER): Own solver or a binding?
-- A (default): own Newton/LM solver after a spike. B: bind planegcs (LGPL) and check the licence. C: wait for a crate.
-- Default if unanswered: A, the spike only; no ADR before the customer reads it.
-
-Frage 2 (SKETCH-START): What is the smallest first slice?
-- A (default): lines, circles, arcs; coincident, horizontal, vertical, equal, tangent; length, radius, angle; DOF count; Convert to paths. B: add symmetric, midpoint, patterns. C: all of criteria 1 to 12 at once.
-- Default if unanswered: A.
+No product-scope question remains open. Solver selection and model decisions
+remain with their documented evaluation/ADR process; there is no default
+presumption in favour of an own Newton/LM solver.
 
 ## Links
 
-Requirements: R-EDIT-042 (new)
-Depends on: `0049-linked-clone`, `0070-measure-and-dimension` (the dimensions), `0016-boolean-operations` (kernel tolerance); needs ADRs: document model (parametric node, `needs-customer`), geometry/solver
-Related: `0057-clone-overrides`, `0060-snapping` (snap to sketch points), `0063-manufacturing-workbenches` (CNC use)
-ADRs: a new ADR for the sketch node and solver, `needs-customer`
+Requirements: R-EDIT-042
+Depends on: `0049-linked-clone`, `0016-boolean-operations` (kernel tolerance)
+Related: `0070-measure-and-dimension` (shared dimension foundation), `0057-clone-overrides`, `0060-snapping` (sketch targets), `0063-manufacturing-workbenches`
+ADRs: `docs/adr/0025-sketch-core-and-solver.md`, `docs/adr/0026-parametric-sketch-nodes-and-workbench.md`; source scaling uses the `needs-customer` process
 PR: -

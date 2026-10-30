@@ -59,6 +59,7 @@ fn shapes<'a>(objects: &'a [ObjectSnapshot], ids: &'a [NodeId]) -> Vec<&'a Shape
             ObjectSnapshot::Primitive(PrimitiveSnapshot { shape, .. }) => Some(shape),
             ObjectSnapshot::Path(_)
             | ObjectSnapshot::Clone(_)
+            | ObjectSnapshot::Sketch(_)
             | ObjectSnapshot::Text(_)
             | ObjectSnapshot::Image(_) => None,
         })

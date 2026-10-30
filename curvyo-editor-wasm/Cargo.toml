@@ -13,6 +13,7 @@ crate-type = ["cdylib", "rlib"]
 workspace = true
 
 [dependencies]
+curvyo-sketch-core = { path = "../curvyo-sketch-core", version = "0.1.0" }
 curvyo-document-core = { path = "../curvyo-document-core", version = "0.1.0" }
 curvyo-ui-core = { path = "../curvyo-ui-core", version = "0.1.0" }
 # The working images of the canvas, decoded from the assets (ADR 0017 §5).
@@ -22,6 +23,7 @@ curvyo-text-core = { path = "../curvyo-text-core", version = "0.1.0" }
 kurbo.workspace = true
 # The History tab's rows cross the wasm boundary as one JSON text (ADR 0001 §5: strings and scalars).
 serde_json.workspace = true
+serde.workspace = true
 
 [dev-dependencies]
 # `tests/acceptance_0005.rs` counts Loro changes / reads op keys to verify

@@ -246,6 +246,8 @@ impl Document {
                 if is_clone_meta(&meta) {
                     let clone = read_one_clone(&tree, id).ok_or(CloneError::NotClonable)?;
                     Ok(Source::Clone(clone.chain.depth))
+                } else if read_shape_tag(&meta).as_deref() == Some("sketch") {
+                    Ok(Source::Path)
                 } else if read_shape_tag(&meta).is_some() {
                     Ok(Source::Primitive)
                 } else {

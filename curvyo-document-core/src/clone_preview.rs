@@ -74,6 +74,7 @@ pub fn clone_previews(
                 .unwrap_or(&objects[j]);
             match object {
                 ObjectSnapshot::Path(path) => RawLeaf::Path(path.clone()),
+                ObjectSnapshot::Sketch(sketch) => RawLeaf::Sketch(sketch.clone()),
                 ObjectSnapshot::Primitive(primitive) => RawLeaf::Primitive(primitive.clone()),
                 ObjectSnapshot::Clone(clone) => RawLeaf::of_clone(clone),
                 ObjectSnapshot::Text(text) => RawLeaf::Text(text.clone()),

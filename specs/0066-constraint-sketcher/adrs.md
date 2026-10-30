@@ -1,0 +1,46 @@
+# Architecture for constraint sketcher
+
+2026-10-30. Customer authorized implementation after the view review; the bottom
+status/demo bar is removed. Status and diagnosis belong in Sketches Properties.
+Earlier pending-scope statements in planning files need reconciliation by their
+owners with the accepted plan; they do not revoke the latest authorization.
+
+- [ADR 0025](../../docs/adr/0025-sketch-core-and-solver.md): proposed pure sketch
+  core, concrete solver boundary and feasibility gate. ACS 0.1.19 is the
+  provisionally reviewed production adapter after the recorded feasibility
+  checkpoint and production validation; full story acceptance remains separate.
+  Its informational transitive `paste` advisory has a reviewed, narrowly scoped
+  exception disposition documented in ADR 0025; the lead owns the gate rerun.
+- [ADR 0026](../../docs/adr/0026-parametric-sketch-nodes-and-workbench.md): proposed,
+  implementation record for the authorized model/persistence; needs-customer
+  specifically for original-sketch scaling. Stable local graph IDs, individual
+  atomic records, last-valid checkpoint, topology repair, placement, clone
+  outlines, format and concrete session-only workbench state.
+- ADRs 0002/0009/0014: units, per-register collaboration and history restoration.
+- ADRs 0015/0016: clone source resolution, atomic links, overrides and repair.
+- ADR 0004: current-version validation and refusal of newer files; no automatic
+  older-reader path fallback. SID old-file migration is explicitly unnecessary.
+- ADR 0003: path approximation tolerance is distinct from solver residual and
+  cross-platform comparison tolerances.
+
+## Reviewable implementation choices (Proposal)
+
+No new customer question is implied by the already accepted feature/model plan.
+External original scaling semantics remain the specific pending customer
+decision; rigid placement and graph/persistence integration are authorized.
+Other reviewable details in ADR0026: constraints/parameters merge per atomic record;
+invalid merged graphs show last-valid geometry; slots use constrained primitives;
+fillets preserve references or leave the sketch unchanged. These choices do not
+introduce extra features or a general view framework.
+
+The initial core milestone and document integration have scoped source approval;
+this does not establish full feature acceptance. Remaining numerical failures
+require correction or explicit product discussion, never weakened criteria. Tests must
+cover native/WASM agreement, all accepted entity/constraint combinations,
+conflicts, singularities, repeated drags and the 100-entity CPU budget. See ADR0025
+for attributed feasibility measurements and core-api.md for implementer-reported
+checks; no full-feature PASS or final performance acceptance is claimed here.
+
+Format fact: current story writes 28 after main's format 27; old-file migration
+is not required. Scaled linked clones retain existing transform semantics and
+do not imply approval of original-sketch scaling.

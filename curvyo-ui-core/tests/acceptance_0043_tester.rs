@@ -37,14 +37,16 @@ fn c1_the_tabs_in_order_with_names_and_tooltips() {
             assert_eq!(
                 names,
                 [
-                    "file", "document", "style", "layers", "history", "fonts", "snapping"
+                    "file", "document", "style", "layers", "history", "fonts", "snapping",
+                    "sketches"
                 ]
             );
             let labels: Vec<&str> = entries.iter().map(|e| e.label).collect();
             assert_eq!(
                 labels,
                 [
-                    "File", "Document", "Style", "Layers", "History", "Fonts", "Snapping"
+                    "File", "Document", "Style", "Layers", "History", "Fonts", "Snapping",
+                    "Sketches"
                 ]
             );
             assert_eq!(entry(&entries, "history").tooltip, "History (Shift+Ctrl+H)");

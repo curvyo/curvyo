@@ -6,6 +6,7 @@ import type { WasmSession } from "@/lib/editorSession";
 /** What the Properties panel's body shows (`curvyo-ui-core::panel_content`). */
 export type PanelContent =
   | "snapping"
+  | "sketches"
   | "file" | "document" | "style" | "layers" | "history" | "fonts" | "empty";
 
 /** One tab of the panel's strip (`curvyo-ui-core::panel_tabs`). */

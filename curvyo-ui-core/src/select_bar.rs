@@ -40,7 +40,7 @@ pub enum ObjectKind {
 impl ObjectKind {
     fn matches(self, object: &ObjectSnapshot) -> bool {
         if self == Self::Text {
-            return matches!(object, ObjectSnapshot::Text(_));
+            return matches!(object, ObjectSnapshot::Sketch(_) | ObjectSnapshot::Text(_));
         }
         let ObjectSnapshot::Primitive(PrimitiveSnapshot { shape, .. }) = object else {
             return false;
@@ -154,6 +154,7 @@ fn shapes_of<'a>(
             ObjectSnapshot::Primitive(primitive) => Some(&primitive.shape),
             ObjectSnapshot::Path(_)
             | ObjectSnapshot::Clone(_)
+            | ObjectSnapshot::Sketch(_)
             | ObjectSnapshot::Text(_)
             | ObjectSnapshot::Image(_) => None,
         })

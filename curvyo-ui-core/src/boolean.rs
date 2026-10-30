@@ -106,6 +106,7 @@ pub(crate) fn is_open(object: &ObjectSnapshot) -> bool {
         // text: only an unconverted one, which the command refused first.
         ObjectSnapshot::Path(_)
         | ObjectSnapshot::Clone(_)
+        | ObjectSnapshot::Sketch(_)
         | ObjectSnapshot::Text(_)
         | ObjectSnapshot::Image(_) => false,
         ObjectSnapshot::Primitive(primitive) => {
@@ -217,6 +218,7 @@ pub(crate) fn outlines_of(object: &ObjectSnapshot) -> Vec<(Vec<OutlineTriple>, b
         // text: only an unconverted one, which the command refused first.
         ObjectSnapshot::Path(_)
         | ObjectSnapshot::Clone(_)
+        | ObjectSnapshot::Sketch(_)
         | ObjectSnapshot::Text(_)
         | ObjectSnapshot::Image(_) => Vec::new(),
         ObjectSnapshot::Primitive(primitive) => {

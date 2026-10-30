@@ -270,6 +270,9 @@ impl Document {
                     Some(ObjectSnapshot::Clone(clone))
                 }
                 ObjectSnapshot::Path(path) => Some(ObjectSnapshot::Path(path.mapped(g))),
+                ObjectSnapshot::Sketch(sketch) => {
+                    Some(ObjectSnapshot::Sketch(Box::new(sketch.mapped_by(g))))
+                }
                 ObjectSnapshot::Primitive(_)
                 | ObjectSnapshot::Text(_)
                 | ObjectSnapshot::Image(_) => None,
@@ -469,6 +472,26 @@ impl Document {
             if !crate::clone_write::write_matrix(&meta, clone.chain.origin, clone.chain.matrix) {
                 return Err(ObjectEditError::NoSuchObject);
             }
+            self.write_hold(&tree, hold);
+            self.commit_with_label("rotate_object");
+            return Ok(());
+        }
+        if shape_codec::read_shape_tag(&meta).as_deref() == Some("sketch") {
+            let ObjectSnapshot::Sketch(sketch) = rotated else {
+                return Err(ObjectEditError::NoSuchObject);
+            };
+            let current = self
+                .sketch(sketch.id)
+                .ok_or(ObjectEditError::NoSuchObject)?;
+            if current.graph != sketch.graph || !crate::sketch_codec::rigid(sketch.placement) {
+                return Err(ObjectEditError::InvalidConversion);
+            }
+            crate::sketch_codec::write(
+                &meta,
+                crate::sketch_codec::KEYS[4],
+                &sketch.placement.to_array(),
+            )
+            .map_err(|_| ObjectEditError::NonFiniteGeometry)?;
             self.write_hold(&tree, hold);
             self.commit_with_label("rotate_object");
             return Ok(());
@@ -744,6 +767,9 @@ pub(crate) fn translate_meta(meta: &loro::LoroMap, offset: Vec2) {
     match shape_codec::leaf_kind(meta) {
         shape_codec::LeafKind::Primitive(tag) => translate_primitive_meta(meta, &tag, offset),
         shape_codec::LeafKind::Path => translate_path_meta(meta, offset),
+        shape_codec::LeafKind::Sketch => {
+            crate::sketch_codec::map_placement(meta, crate::Affine::translation(offset));
+        }
         shape_codec::LeafKind::Clone => {}
         shape_codec::LeafKind::Text => crate::text_codec::translate_text_meta(meta, offset),
         shape_codec::LeafKind::Image => crate::image_codec::translate_image_meta(meta, offset),

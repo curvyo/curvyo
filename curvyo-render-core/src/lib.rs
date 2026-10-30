@@ -177,3 +177,6 @@ mod tests {
 
 mod snap_marker;
 pub use snap_marker::{SnapMarkerSegment, build_snap_marker};
+
+mod sketch_overlay;
+pub use sketch_overlay::{SketchPointGlyph, build_sketch_overlay};

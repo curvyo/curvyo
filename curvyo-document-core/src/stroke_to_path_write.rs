@@ -188,7 +188,12 @@ fn validate(tree: &LoroTree, write: &StrokeToPath) -> Result<(), ObjectEditError
     {
         return Err(ObjectEditError::NoOutlines);
     }
-    let live = |id: NodeId| leaf_exists(tree, tree_id_of(id));
+    let live = |id: NodeId| {
+        leaf_exists(tree, tree_id_of(id))
+            && tree.get_meta(tree_id_of(id)).is_ok_and(|meta| {
+                crate::shape_codec::read_shape_tag(&meta).as_deref() != Some("sketch")
+            })
+    };
     let glyph_counts: HashMap<NodeId, usize> = write
         .texts
         .iter()

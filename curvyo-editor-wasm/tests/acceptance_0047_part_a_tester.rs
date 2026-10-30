@@ -94,6 +94,7 @@ fn objects(s: &Session) -> Vec<ObjectSnapshot> {
 
 fn oid(o: &ObjectSnapshot) -> NodeId {
     match o {
+        ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Clone(_) => panic!("no clone here"),
@@ -181,6 +182,7 @@ fn is_path(o: &ObjectSnapshot) -> bool {
 
 fn style_debug(o: &ObjectSnapshot) -> String {
     match o {
+        ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Primitive(p) => format!("{:?}", p.style),
@@ -192,6 +194,7 @@ fn style_debug(o: &ObjectSnapshot) -> String {
 /// Anchors (point, handle_in, handle_out, kind) of every outline of a path.
 fn anchors_of(o: &ObjectSnapshot) -> Vec<NewAnchor> {
     match o {
+        ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Path(p) => p.subpaths().flat_map(|sp| sp.anchors.to_vec()).collect(),
@@ -204,6 +207,7 @@ fn anchors_of(o: &ObjectSnapshot) -> Vec<NewAnchor> {
 fn rotate_about_centre(d: &Document, id: NodeId, radians: f64) {
     let o = d.object(id).unwrap();
     let c = match &o {
+        ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Clone(_) => panic!("no clone here"),
@@ -387,6 +391,7 @@ fn bezier_samples(a: &[NewAnchor], closed: bool, per: usize) -> Vec<Point> {
 /// Dense polyline of the drawn outline of an object (primitives through their path form).
 fn polyline(o: &ObjectSnapshot) -> Vec<Point> {
     match o {
+        ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Clone(_) => panic!("no clone here"),
@@ -1072,6 +1077,7 @@ fn ac03_node_counts_style_slot_identity() {
 
 fn otp_markers(o: &ObjectSnapshot) -> curvyo_document_core::Markers {
     match o {
+        ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Path(p) => p.style.stroke.markers,
@@ -2447,6 +2453,7 @@ fn hostile_typed_skew_input_writes_nothing() {
 
 fn stroke_mm(o: &ObjectSnapshot) -> f64 {
     match o {
+        ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Primitive(p) => p.style.stroke.width.as_mm(),

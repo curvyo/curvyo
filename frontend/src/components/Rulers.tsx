@@ -1,3 +1,4 @@
+import { createRulerRaster } from "@/lib/rulerRaster";
 import { useEffect, useRef } from "react";
 
 import type { EditorSession } from "@/hooks/useEditorSession";
@@ -5,7 +6,6 @@ import {
   type RulerColours,
   type RulerData,
   LABEL_SIZE,
-  drawRuler,
   labelFont,
 } from "@/lib/rulerDraw";
 
@@ -57,6 +57,8 @@ interface Painted {
   dpr: number;
   width: number;
   height: number;
+  horizontalThickness: number;
+  verticalThickness: number;
   pointerX: number | null;
   pointerY: number | null;
 }
@@ -73,6 +75,8 @@ function samePainted(a: Painted | null, b: Painted): boolean {
     a.dpr === b.dpr &&
     a.width === b.width &&
     a.height === b.height &&
+    a.horizontalThickness === b.horizontalThickness &&
+    a.verticalThickness === b.verticalThickness &&
     a.pointerX === b.pointerX &&
     a.pointerY === b.pointerY
   );
@@ -115,6 +119,14 @@ export function Rulers({ editor, unit }: RulersProps) {
     const { digit, minus } = measureGlyphs();
     const pointer: { x: number | null; y: number | null } = { x: null, y: null };
     let painted: Painted | null = null;
+    const horizontalRaster = createRulerRaster(horizontal, colours);
+    const verticalRaster = createRulerRaster(vertical, colours);
+    let sizes = { width: 0, height: 0, horizontalThickness: 0, verticalThickness: 0 };
+    const readSizes = () => {
+      sizes = { width: horizontal.clientWidth, height: vertical.clientHeight,
+        horizontalThickness: horizontal.clientHeight, verticalThickness: vertical.clientWidth };
+    };
+    readSizes();
 
     const onPointerMove = (event: PointerEvent) => {
       const bounds = canvas.getBoundingClientRect();
@@ -154,43 +166,27 @@ export function Rulers({ editor, unit }: RulersProps) {
       element.addEventListener("wheel", forwardWheel, { passive: false });
     }
 
-    const paint = (strip: HTMLCanvasElement, isHorizontal: boolean) => {
+    const paint = (isHorizontal: boolean, rebuild: boolean) => {
       const session = getSession();
-      const ctx = strip.getContext("2d");
-      if (!session || !ctx) {
-        return;
-      }
-      const dpr = window.devicePixelRatio || 1;
-      const cssWidth = strip.clientWidth;
-      const cssHeight = strip.clientHeight;
-      const width = Math.round(cssWidth * dpr);
-      const height = Math.round(cssHeight * dpr);
-      if (strip.width !== width || strip.height !== height) {
-        strip.width = width;
-        strip.height = height;
-      }
-      const length = isHorizontal ? cssWidth : cssHeight;
-      const view = session.ruler_view(isHorizontal, length, digit, minus);
-      const data: RulerData = {
-        majors: view.majors,
-        minors: view.minors,
-        origin: view.origin,
-        labelTicks: view.label_ticks,
-        labelTexts: view.label_texts,
+      if (!session) return;
+      const geometry = {
+        horizontal: isHorizontal,
+        length: isHorizontal ? sizes.width : sizes.height,
+        thickness: isHorizontal ? sizes.horizontalThickness : sizes.verticalThickness,
+        devicePixelRatio: window.devicePixelRatio || 1,
+        pointer: isHorizontal ? pointer.x : pointer.y,
       };
-      view.free();
-      drawRuler(
-        ctx,
-        data,
-        {
-          horizontal: isHorizontal,
-          length,
-          thickness: isHorizontal ? cssHeight : cssWidth,
-          devicePixelRatio: dpr,
-          pointer: isHorizontal ? pointer.x : pointer.y,
-        },
-        colours,
-      );
+      const raster = isHorizontal ? horizontalRaster : verticalRaster;
+      if (rebuild) {
+        const view = session.ruler_view(isHorizontal, geometry.length, digit, minus);
+        const data: RulerData = {
+          majors: view.majors, minors: view.minors, origin: view.origin,
+          labelTicks: view.label_ticks, labelTexts: view.label_texts,
+        };
+        raster.rebuild(data, geometry);
+        view.free();
+      }
+      raster.paint(geometry);
     };
 
     // Repaints when anything the strips are drawn from changed. Runs every
@@ -212,27 +208,32 @@ export function Rulers({ editor, unit }: RulersProps) {
         pageY: session.active_page_y(),
         unit: unitRef.current,
         dpr: window.devicePixelRatio || 1,
-        width: horizontal.clientWidth,
-        height: vertical.clientHeight,
+        ...sizes,
         pointerX: pointer.x,
         pointerY: pointer.y,
       };
       if (samePainted(painted, now)) {
         return;
       }
+      const rebuild = painted === null || !samePainted(
+        { ...painted, pointerX: now.pointerX, pointerY: now.pointerY }, now);
       painted = now;
-      paint(horizontal, true);
-      paint(vertical, false);
+      paint(true, rebuild);
+      paint(false, rebuild);
     };
     let frame = requestAnimationFrame(function loop() {
       frame = requestAnimationFrame(loop);
       repaintIfChanged();
     });
-    const removeResizeListener = addViewResizedListener(repaintIfChanged);
+    const resized = () => { readSizes(); repaintIfChanged(); };
+    const observer = new ResizeObserver(resized);
+    observer.observe(horizontal); observer.observe(vertical);
+    const removeResizeListener = addViewResizedListener(resized);
 
     return () => {
       cancelAnimationFrame(frame);
       removeResizeListener();
+      observer.disconnect();
       canvas.removeEventListener("pointermove", onPointerMove);
       canvas.removeEventListener("pointerleave", onPointerLeave);
       for (const element of strips) {

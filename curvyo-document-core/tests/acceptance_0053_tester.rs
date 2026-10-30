@@ -24,6 +24,7 @@ fn a(peer: u64, n: u64, x: f64, y: f64) -> NewAnchor {
 
 fn path_of(d: &Document, id: NodeId) -> PathSnapshot {
     match d.object(id).expect("object") {
+        ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Path(p) => p,

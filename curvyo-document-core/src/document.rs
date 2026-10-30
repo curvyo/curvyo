@@ -282,7 +282,11 @@ impl DocumentVersion {
 /// Bumped to 27 in `snapping`: document-owned target, axis and zone registers preserve
 /// enabled state, target kinds and capture/release zones.
 /// Golden: `snapping_v27.curvyo`; no old-file migration is required for this SID build.
-pub const CURRENT_FORMAT_VERSION: u32 = 27;
+///
+/// Bumped to 28 in `constraint-sketcher`: parametric objects keep atomic intent records
+/// and independently validated solution checkpoints (ADR 0026).
+/// Goldens: `sketch_*_v28.curvyo`; older readers refuse this format.
+pub const CURRENT_FORMAT_VERSION: u32 = 28;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";
@@ -314,6 +318,10 @@ pub(crate) const OBJECTS_TREE: &str = "paths";
 /// this type's public API (ADR 0004 §3): callers only ever see
 /// [`DocumentSize`] and this crate's own error types.
 pub struct Document {
+    /// Ephemeral validated sketch read results; placement and style reuse the solve.
+    pub(crate) sketch_cache: std::cell::RefCell<
+        std::collections::HashMap<crate::NodeId, (DocumentVersion, crate::SketchSnapshot)>,
+    >,
     pub(crate) loro: LoroDoc,
     /// The commit path's session state (`crate::history`).
     pub(crate) commit_state: crate::history::CommitState,
@@ -413,6 +421,7 @@ impl Document {
             clone_refusal: std::cell::Cell::default(),
             object_index: std::cell::RefCell::default(),
             writable_cache: std::cell::RefCell::default(),
+            sketch_cache: std::cell::RefCell::default(),
             assets: std::cell::RefCell::default(),
         }
     }
@@ -469,6 +478,7 @@ impl Document {
             clone_refusal: std::cell::Cell::default(),
             object_index: std::cell::RefCell::default(),
             writable_cache: std::cell::RefCell::default(),
+            sketch_cache: std::cell::RefCell::default(),
             assets: std::cell::RefCell::default(),
         })
     }
@@ -680,6 +690,12 @@ impl From<crate::node_registers::NodeRegisters> for RegistersJson {
 #[derive(Serialize)]
 #[serde(tag = "shape", rename_all = "lowercase")]
 enum ObjectJson {
+    Sketch {
+        id: crate::NodeId,
+        graph: curvyo_sketch_core::Sketch,
+        placement: crate::Affine,
+        style: crate::Style,
+    },
     /// A group (`specs/0023-groups`): no geometry and no style, only its children in z-order.
     Group {
         id: crate::path_model::NodeId,
@@ -793,6 +809,12 @@ impl From<crate::primitive_model::ObjectSnapshot> for ObjectJson {
     fn from(snapshot: crate::primitive_model::ObjectSnapshot) -> Self {
         use crate::primitive_model::{ObjectSnapshot, Shape};
         match snapshot {
+            ObjectSnapshot::Sketch(sketch) => Self::Sketch {
+                id: sketch.id,
+                graph: sketch.graph,
+                placement: sketch.placement,
+                style: sketch.style,
+            },
             ObjectSnapshot::Path(path) => Self::Path {
                 id: path.id,
                 closed: path.closed,

@@ -43,6 +43,7 @@ fn path_curve(path: &PathSnapshot, outline: u32) -> Option<CarrierCurve> {
 pub fn carrier_curve(object: &ObjectSnapshot, outline: u32) -> Option<CarrierCurve> {
     match object {
         ObjectSnapshot::Path(path) => path_curve(path, outline),
+        ObjectSnapshot::Sketch(sketch) => path_curve(&sketch.resolved, outline),
         ObjectSnapshot::Clone(clone) => path_curve(&clone.resolved, outline),
         ObjectSnapshot::Primitive(primitive) => {
             let drawn = drawing_outline_of_rotated(&primitive.shape, primitive.rotation);

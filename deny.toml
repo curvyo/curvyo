@@ -64,6 +64,11 @@ name = "curvyo-image-core"
 allow = ["AGPL-3.0-or-later"]
 name = "curvyo-vectorize-core"
 
+# The first-party sketch solver adapter follows ADR 0006, like the other core crates.
+[[licenses.exceptions]]
+allow = ["AGPL-3.0-or-later"]
+name = "curvyo-sketch-core"
+
 [[licenses.exceptions]]
 allow = ["AGPL-3.0-or-later"]
 name = "curvyo-ui-core"
@@ -78,15 +83,16 @@ name = "curvyo-editor-wasm"
 
 [advisories]
 # "Unmaintained" advisories with no safe upgrade available, from
-# dependencies we don't control (`loro`'s and Tauri's own trees). Not
+# dependencies we don't control (`loro`, Tauri and ACS/nalgebra trees). Not
 # security vulnerabilities. Recorded in `docs/technical-debt.md`
-# ("Four transitive dependencies are unmaintained, with no safe upgrade");
-# revisit at each `loro`/`tauri` upgrade.
+# (the four original transitives and the separate Sketch solver paste entry);
+# revisit at each relevant upstream dependency upgrade.
 ignore = [
     "RUSTSEC-2026-0248", # im, via loro-internal
     "RUSTSEC-2026-0251", # sized-chunks, via loro-internal -> im
     "RUSTSEC-2026-0247", # bitmaps, via loro-internal -> im
     "RUSTSEC-2024-0370", # proc-macro-error, via Tauri's Linux gtk-rs stack
+    "RUSTSEC-2024-0436", # paste, via ACS -> nalgebra 0.33 -> simba 0.9; ADR 0025
 ]
 
 [bans]

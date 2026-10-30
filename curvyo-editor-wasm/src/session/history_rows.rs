@@ -19,6 +19,7 @@ fn kind_word(kind: StepKind) -> &'static str {
 
 fn shape_word(shape: ObjectShape) -> &'static str {
     match shape {
+        ObjectShape::Sketch => "sketch",
         ObjectShape::Path => "path",
         ObjectShape::Rectangle => "rectangle",
         ObjectShape::Ellipse => "ellipse",
@@ -88,6 +89,7 @@ fn row_words(row: &HistoryRow, summary: Option<String>) -> (String, bool, &'stat
 /// The kind of an object as a title, for "Wipe history of Rectangle, 3f9a1c".
 fn shape_name(shape: ObjectShape) -> &'static str {
     match shape {
+        ObjectShape::Sketch => "Sketch",
         ObjectShape::Path => "Path",
         ObjectShape::Rectangle => "Rectangle",
         ObjectShape::Ellipse => "Ellipse",

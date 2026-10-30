@@ -70,12 +70,12 @@ pub fn object_bounds(object: &ObjectSnapshot) -> (Point, Point) {
         // The selection box of a text is its line box (`specs/0074-text-objects`, UX notes §5).
         ObjectSnapshot::Text(text) => crate::text_box::line_box_bounds(text),
         ObjectSnapshot::Image(image) => crate::image_frame::frame_bounds(image),
-        ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_)
+        ObjectSnapshot::Sketch(_) | ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_)
             if let Some(path) = object.drawn_path() =>
         {
             path_bounds(path)
         }
-        ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_) => {
+        ObjectSnapshot::Sketch(_) | ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_) => {
             (Point::new(0.0, 0.0), Point::new(0.0, 0.0))
         }
         ObjectSnapshot::Primitive(primitive) => shape_frame_bounds(&primitive.shape),
@@ -95,16 +95,20 @@ pub fn object_outline_bounds(object: &ObjectSnapshot) -> (Point, Point) {
             crate::text_box::line_box_bounds(text)
         }
         ObjectSnapshot::Image(image) => crate::image_frame::frame_bounds(image),
-        ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_) | ObjectSnapshot::Text(_)
+        ObjectSnapshot::Sketch(_)
+        | ObjectSnapshot::Path(_)
+        | ObjectSnapshot::Clone(_)
+        | ObjectSnapshot::Text(_)
             if let Some(path) = object.drawn_path() =>
         {
             path_bounds(path)
         }
         // The exact box of an arc's drawn part, not of its cubics
         // (`specs/0021-ellipse-arcs-and-shaping/` criteria 9 and 54).
-        ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_) | ObjectSnapshot::Text(_) => {
-            (Point::new(0.0, 0.0), Point::new(0.0, 0.0))
-        }
+        ObjectSnapshot::Sketch(_)
+        | ObjectSnapshot::Path(_)
+        | ObjectSnapshot::Clone(_)
+        | ObjectSnapshot::Text(_) => (Point::new(0.0, 0.0), Point::new(0.0, 0.0)),
         ObjectSnapshot::Primitive(curvyo_document_core::PrimitiveSnapshot {
             shape:
                 curvyo_document_core::Shape::Ellipse {

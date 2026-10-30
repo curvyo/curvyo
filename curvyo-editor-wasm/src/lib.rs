@@ -139,3 +139,8 @@ pub use trace_glue::{hex as trace_hex, trace_params_json, trace_presets_json, tr
 
 #[cfg(target_arch = "wasm32")]
 pub use wasm_api::{WasmSession, init_panic_hook};
+
+pub use session::{SketchTool, Workbench};
+
+#[cfg(target_arch = "wasm32")]
+mod wasm_sketch;

@@ -223,10 +223,13 @@ impl Document {
                 );
             }
             let leaf = if container.is_none() {
-                raw_leaf(&tree, id).map(|raw| {
-                    raws.push(raw);
-                    raws.len() - 1
-                })
+                self.sketch(node)
+                    .map(|sketch| RawLeaf::Sketch(Box::new(sketch)))
+                    .or_else(|| raw_leaf(&tree, id))
+                    .map(|raw| {
+                        raws.push(raw);
+                        raws.len() - 1
+                    })
             } else {
                 None
             };

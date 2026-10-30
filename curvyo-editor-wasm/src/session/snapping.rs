@@ -120,6 +120,14 @@ impl SnappingState {
         }
     }
 
+    pub(super) fn extend_targets(&mut self, extra: Vec<curvyo_ui_core::SnapTarget>) {
+        if let Some(drag) = &mut self.drag {
+            let mut entries = drag.targets.entries().to_vec();
+            entries.extend(extra);
+            drag.targets = SnapTargets::new(entries);
+        }
+    }
+
     /// Ends the drag (release, Escape, tool change).
     pub fn end_drag(&mut self) {
         self.drag = None;
@@ -270,7 +278,14 @@ impl super::Session {
         if !stored.x && !stored.y {
             return false;
         }
-        if (self.tool == super::Tool::Select && self.select.move_in_flight())
+        if (self.workbench() == super::Workbench::Sketch
+            && (self.sketch_tool() != super::SketchTool::Select
+                || self
+                    .sketch
+                    .drag
+                    .as_ref()
+                    .is_some_and(|drag| drag.handle.is_none())))
+            || (self.tool == super::Tool::Select && self.select.move_in_flight())
             || matches!(
                 self.tool,
                 super::Tool::Pen

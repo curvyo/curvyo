@@ -1,5 +1,6 @@
 import {
   CaseSensitive,
+  Shapes,
   Droplet,
   File,
   FolderOpen,
@@ -35,6 +36,7 @@ const GLYPHS: Record<string, Glyph> = {
   history: History,
   fonts: CaseSensitive,
   snapping: Magnet,
+  sketches: Shapes,
   "trace-info": Info,
 };
 

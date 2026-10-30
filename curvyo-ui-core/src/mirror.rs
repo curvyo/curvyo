@@ -100,6 +100,7 @@ pub(crate) fn mirrored(object: &ObjectSnapshot, mirror: Mirror) -> ObjectSnapsho
         return object.clone();
     }
     match object {
+        ObjectSnapshot::Sketch(_) => object.clone(),
         ObjectSnapshot::Path(path) => ObjectSnapshot::Path(mirrored_path(path, mirror)),
         ObjectSnapshot::Primitive(primitive) => {
             ObjectSnapshot::Primitive(mirrored_primitive(primitive, mirror))
@@ -408,6 +409,7 @@ mod tests {
         match object {
             ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
             ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
+            ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
             ObjectSnapshot::Primitive(p) => outline_of_rotated(&p.shape, p.rotation)
                 .iter()
                 .map(|a| a.point)

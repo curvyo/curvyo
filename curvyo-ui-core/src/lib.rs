@@ -464,3 +464,9 @@ pub use weld_plan::{
 
 mod pages;
 pub use pages::PageViewState;
+
+mod sketch;
+pub use sketch::{SketchHit, sketch_handle_hit, sketch_hit, sketch_snap_points};
+
+mod sketch_actions;
+pub use sketch_actions::{SKETCH_ACTIONS, sketch_relation};

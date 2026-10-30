@@ -138,6 +138,7 @@ fn contours_of(owner: usize, object: &ObjectSnapshot) -> Vec<Contour> {
         // text: only an unconverted one, which the command refused first.
         ObjectSnapshot::Path(_)
         | ObjectSnapshot::Clone(_)
+        | ObjectSnapshot::Sketch(_)
         | ObjectSnapshot::Text(_)
         | ObjectSnapshot::Image(_) => Vec::new(),
         ObjectSnapshot::Primitive(primitive) => {
