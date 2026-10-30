@@ -246,13 +246,13 @@ test("0025 in Chromium: Trace button, preview status, Create paths, undo, key I"
     assert.match(status, /^1 path, 4 nodes/);
     await s.evaluate(`document.querySelector('[role=toolbar][aria-label=Trace] [aria-label="Fewer trace options"]').click()`);
     const fields = JSON.parse((await s.evaluate(`JSON.stringify([...document.querySelectorAll('[role=toolbar][aria-label=Trace] [role=spinbutton]')].map((i) => [i.getAttribute('aria-label'), i.getAttribute('aria-valuenow'), i.getAttribute('aria-valuemax'), i.getAttribute('aria-valuetext')]))`)) as string) as [string, string, string, string][];
-    assert.deepEqual(fields.map((f) => f[0]), ["Threshold", "Smooth", "Ignore below"]);
+    assert.deepEqual(fields.map((f) => f[0]), ["Threshold", "Smooth", "Tolerance", "Ignore below"]);
     const thresholdValue = Number(fields[0][1]);
     assert.equal(fields[0][2], "100", "the Threshold is shown in percent");
     assert.ok(thresholdValue > 0 && thresholdValue < 100, `the automatic Threshold: ${fields[0][1]} %`);
     assert.match(fields[0][3], /^\d+ percent$/);
     assert.equal(fields[1][1], "80");
-    assert.equal(fields[2][3], "0.50 millimetres");
+    assert.equal(fields[3][3], "0.50 millimetres");
     const pressedRail = (await s.evaluate(`document.querySelectorAll('[aria-pressed=true][data-tool]').length`)) as number;
     assert.equal(pressedRail, 0, "no rail button is pressed");
 
@@ -333,7 +333,7 @@ test("0025 in Chromium at 800x600: no Trace bar control passes the bar's right e
       const shot = (await s.send("Page.captureScreenshot", { format: "png" })) as { result?: { data?: string } };
       writeFileSync(path.join(SCRATCH, `pr-panel-${open ? "open" : "closed"}-800x600.png`), Buffer.from(shot.result?.data ?? "", "base64"));
     }
-    // UX notes 20.5: Advanced row 1 starts with Invert and Ignore background, the counts row is
+    // UX notes 20.5: Advanced row 1 starts with Invert and Drop border shapes (0089 Frage 88 A), the counts row is
     // the block's last; panel open, the bar keeps inside 800 px.
     await s.clickSel('[aria-label="Show panel"]');
     await sleep(600);
@@ -343,15 +343,16 @@ test("0025 in Chromium at 800x600: no Trace bar control passes the bar's right e
       const counts = block.querySelector('[data-trace-counts]');
       return { names: controls.map((e) => e.getAttribute('aria-label')), firstRow: controls.filter((e) => y(e) === y(controls[0])).map((e) => e.getAttribute('aria-label')),
         countsLast: block.lastElementChild === counts, countsBelow: y(counts) > Math.max(...controls.map(y)) }; })())`)) as string) as { names: string[]; firstRow: string[]; countsLast: boolean; countsBelow: boolean };
-    assert.deepEqual(advanced.names, ["Invert", "Ignore background", "Denoise", "Upscale", "Corners"]);
-    assert.deepEqual(advanced.firstRow.slice(0, 3), ["Invert", "Ignore background", "Denoise"]);
+    assert.deepEqual(advanced.names, ["Invert", "Drop border shapes", "Denoise", "Upscale", "Corners"]);
+    assert.deepEqual(advanced.firstRow.slice(0, 3), ["Invert", "Drop border shapes", "Denoise"]);
     assert.ok(advanced.countsLast && advanced.countsBelow, "the counts row is the last row");
-    // The shorter Specks readout lets the expander share the Ignore below row (UX notes 20.5).
+    // 0089 Frage 84: the expander and the finish button share the last line, the button at the
+    // far right (at 308 px they wrap below Ignore below, `specs/0089` ux-notes §2).
     const sameRow = (await s.evaluate(`(() => { const bar = document.querySelector('[role=toolbar][aria-label=Trace]');
       const top = (e) => Math.round(e.getBoundingClientRect().top);
-      const ex = bar.querySelector('[aria-label="Fewer trace options"]'); const sp = bar.querySelector('[aria-label="Ignore below"]');
-      return !!ex && !!sp && top(ex) < top(sp) + 20 && top(ex) > top(sp) - 20; })()`)) as boolean;
-    assert.ok(sameRow, "the Advanced expander is on the Ignore below row");
+      const ex = bar.querySelector('[aria-label="Fewer trace options"]'); const slot = bar.querySelector('[data-trace-slot]');
+      return !!ex && !!slot && Math.abs(top(ex) - top(slot)) < 20 && slot.getBoundingClientRect().left >= ex.getBoundingClientRect().right; })()`)) as boolean;
+    assert.ok(sameRow, "the expander and the finish button share a line, the button last");
     const advancedShot = (await s.send("Page.captureScreenshot", { format: "png" })) as { result?: { data?: string } };
     writeFileSync(path.join(SCRATCH, "r2-advanced.png"), Buffer.from(advancedShot.result?.data ?? "", "base64"));
     // Criterion 70 (round 3): About Trace is the strip's last tab while the tool is active; the
@@ -372,7 +373,7 @@ test("0025 in Chromium at 800x600: no Trace bar control passes the bar's right e
     assert.equal(page.selected, "true", "the i button selects the tab");
     assert.equal(page.close, false, "the page has no X");
     assert.match(page.text, /^Trace turns the selected image into paths\./);
-    assert.match(page.text, /Ignore background\s+drops shapes that touch the image border\./);
+    assert.match(page.text, /Drop border shapes\s+drops shapes that touch the image border\./);
     const infoShot = (await s.send("Page.captureScreenshot", { format: "png" })) as { result?: { data?: string } };
     writeFileSync(path.join(SCRATCH, "r3-about.png"), Buffer.from(infoShot.result?.data ?? "", "base64"));
     await s.clickSel('[role=toolbar][aria-label=Trace] button[aria-label="About Trace"]');
@@ -420,7 +421,9 @@ test("0025 in Chromium at 800x600: no Trace bar control passes the bar's right e
     };
     const rest = await layout();
     console.log("at rest, panel open:", JSON.stringify(rest));
-    assert.deepEqual([rest.rows, rest.expanderLast, rest.lastItem, rest.slot], [4, true, true, null], "4 rows at rest, the expander last at the far right");
+    // 0089 Frage 84 and the customer's 2026-10-30 feedback: the blue finish button is always
+    // there, after the expander in the last item; the bar does not grow while a job runs.
+    assert.deepEqual([rest.lastItem, rest.slot], [true, "none"], "the expander and the finish button last");
     await s.evaluate(`window.__delay = 6000`);
     await s.evaluate(`document.querySelector('[role=toolbar][aria-label=Trace] [role=spinbutton][aria-label=Smooth]').focus()`);
     await s.send("Input.dispatchKeyEvent", { type: "rawKeyDown", key: "ArrowUp", code: "ArrowUp", windowsVirtualKeyCode: 38 });
@@ -428,13 +431,13 @@ test("0025 in Chromium at 800x600: no Trace bar control passes the bar's right e
     await waitFor("the progress pill", async () => ((await s.evaluate(`!!document.querySelector('[role=toolbar][aria-label=Trace] [role=progressbar]')`)) ? true : null), 10_000);
     const running = await layout();
     console.log("tracing, panel open:", JSON.stringify(running));
-    assert.deepEqual([running.rows, running.expanderLast, running.lastItem, running.slot, running.specksBeforeSlot], [5, true, true, "running", true], "the slot wraps with the expander to a fifth row");
+    assert.deepEqual([running.rows, running.lastItem, running.slot], [rest.rows, true, "running"], "the progress shows in the same button, no new row");
     assert.equal(await overflow(), "[]", "nothing passes the bar's edge while tracing");
     await shoot("r3-tracing.png");
     await s.clickSel('[role=toolbar][aria-label=Trace] button[aria-label="Stop (Esc)"]');
     await sleep(600);
     const stopped = await layout();
-    assert.deepEqual([stopped.expanderLast, stopped.lastItem, stopped.slot, stopped.specksBeforeSlot], [true, true, "stopped", true], JSON.stringify(stopped));
+    assert.deepEqual([stopped.lastItem, stopped.slot], [true, "stopped"], JSON.stringify(stopped));
     assert.equal(await overflow(), "[]", "nothing passes the bar's edge when stopped");
     await shoot("r3-stopped.png");
     await s.evaluate(`window.__delay = 0; window.__failWorker = true`);
@@ -442,12 +445,12 @@ test("0025 in Chromium at 800x600: no Trace bar control passes the bar's right e
     await waitFor("Failed", async () => ((await s.evaluate(`!!document.querySelector('[role=toolbar][aria-label=Trace] [data-trace-slot=failed]')`)) ? true : null), 20_000);
     await sleep(300);
     const failed = await layout();
-    assert.deepEqual([failed.expanderLast, failed.lastItem, failed.slot, failed.specksBeforeSlot], [true, true, "failed", true], JSON.stringify(failed));
+    assert.deepEqual([failed.lastItem, failed.slot], [true, "failed"], JSON.stringify(failed));
     assert.equal(await overflow(), "[]", "nothing passes the bar's edge when failed");
     await shoot("r3-failed.png");
     await s.evaluate(`window.__failWorker = false`);
     await s.evaluate(`[...document.querySelectorAll('[role=toolbar][aria-label=Trace] button')].find((b) => b.textContent === 'Retry').click()`);
-    await waitFor("the slot empties", async () => ((await s.evaluate(`!document.querySelector('[role=toolbar][aria-label=Trace] [data-trace-slot]')`)) ? true : null), 20_000);
+    await waitFor("the button at rest", async () => ((await s.evaluate(`!!document.querySelector('[role=toolbar][aria-label=Trace] [data-trace-slot=none]')`)) ? true : null), 20_000);
     // Panel closed: 2 rows at rest and while tracing (no growth).
     await s.clickSel('[aria-label="Hide panel"]');
     await sleep(600);
@@ -459,7 +462,7 @@ test("0025 in Chromium at 800x600: no Trace bar control passes the bar's right e
     await waitFor("the progress pill", async () => ((await s.evaluate(`!!document.querySelector('[role=toolbar][aria-label=Trace] [role=progressbar]')`)) ? true : null), 10_000);
     const closedRunning = await layout();
     console.log("panel closed, rest and tracing:", JSON.stringify([closedRest, closedRunning]));
-    assert.deepEqual([closedRest.rows, closedRunning.rows, closedRunning.expanderLast, closedRunning.lastItem], [2, 2, true, true], "2 rows, no growth while tracing");
+    assert.deepEqual([closedRunning.rows, closedRunning.lastItem], [closedRest.rows, true], "no growth while tracing");
     await shoot("r3-tracing-panel-closed.png");
     await s.evaluate(`window.__delay = 0`);
     await s.clickSel('[role=toolbar][aria-label=Trace] button[aria-label="Stop (Esc)"]');

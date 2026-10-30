@@ -1083,7 +1083,8 @@ test("0025s3 c57 in Chromium: Tab order, arrows, focus rings, hit targets, roles
       if (name.includes("Corners")) break;
     }
     console.log("Tab stops from the expander (open) to Corners:", JSON.stringify(inside));
-    const advancedOrder = ["Invert", "Ignore background", "Denoise", "Upscale", "Corners"];
+    // "Drop border shapes" since `specs/0089` Frage 88 A (customer).
+    const advancedOrder = ["Invert", "Drop border shapes", "Denoise", "Upscale", "Corners"];
     let from = -1;
     for (const w of advancedOrder) {
       const idx = inside.findIndex((g, i) => i > from && g.includes(w));
@@ -1297,7 +1298,8 @@ test("0025s3 re c4/c71/c41/c11 in Chromium: row 1, the far-right expander, count
     assert.ok(await s.evaluate(`!!document.getElementById(${JSON.stringify(controls)})`), "aria-controls names the block");
     const ex2 = (await rectOf(s, `${barQ} button[aria-expanded][aria-controls]`))!;
     assert.ok(Math.abs(ex2.y - ex.y) < 2 && Math.abs(ex2.right - ex.right) < 2, "the expander does not move when the block opens");
-    for (const label of ["Invert", "Ignore background"]) {
+    // "Ignore background" is named "Drop border shapes" since `specs/0089` Frage 88 A (customer).
+    for (const label of ["Invert", "Drop border shapes"]) {
       const pressed = await s.evaluate(`document.querySelector('${barQ} button[aria-label="${label}"]')?.getAttribute('aria-pressed')`);
       assert.equal(pressed, "false", `${label} is an icon toggle with aria-pressed`);
       const box = (await rectOf(s, `${barQ} button[aria-label="${label}"]`))!;

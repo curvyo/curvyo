@@ -54,9 +54,21 @@ export function percentText(percent: number | null): string {
 /** The muted line of a preview over 4 Mpx (criterion 52). */
 export const REDUCED_COPY = "Preview from a reduced copy";
 
-/** The pill at rest: the finish button, the same as Enter (`specs/0089` Frage 84; **Proposal**
- * wording). */
-export const CREATE_PATHS = "Create paths";
+/** The finish button's label: always blue, the same as Enter (`specs/0089` Frage 84; customer
+ * 2026-10-30: "Trace", not "Create paths"). */
+export const TRACE_FINISH = "Trace";
+
+/** A job's progress shows in the finish button only after it has run this long (UX notes 21.2). */
+export const PROGRESS_AFTER_MS = 400;
+
+/** Once shown, the progress stays at least this long, so a job that ends just after
+ * `PROGRESS_AFTER_MS` does not flash percent and x (customer 2026-10-30). */
+export const PROGRESS_HOLD_MS = 300;
+
+/** How much longer a progress shown at `shownAt` must stay at `now` (0: it may go). */
+export function progressHoldLeft(shownAt: number | null, now: number): number {
+  return shownAt === null ? 0 : Math.max(0, shownAt + PROGRESS_HOLD_MS - now);
+}
 
 /** The slot's button after Stop or a failure (criteria 53, 54). */
 export const RETRY = "Retry";
@@ -76,6 +88,67 @@ export const TRACE_VIEWS: readonly { mode: TraceViewMode; label: string; tooltip
   { mode: "trace", label: "Trace", tooltip: "Trace" },
   { mode: "image", label: "Image", tooltip: "Image (\\)" },
 ];
+
+/** The selection methods in menu order with their second lines (`specs/0089` criterion 14, UX
+ * notes §5); the index is the settings JSON's `method`. */
+export const TRACE_METHODS: readonly { key: string; label: string; detail: string }[] = [
+  { key: "brightness", label: "Brightness", detail: "Dark and light pixels by a cut-off." },
+  { key: "remove-background", label: "Remove background", detail: "Everything unlike the background." },
+  { key: "pick-colours", label: "Pick colours", detail: "Pixels like the colours you picked." },
+];
+
+/** The method's index: Brightness, Remove background, Pick colours. */
+export const BRIGHTNESS = 0;
+export const REMOVE_BACKGROUND = 1;
+export const PICK_COLOURS = 2;
+
+/** The most colours Pick colours takes (`specs/0089` criterion 17, **Proposal**). */
+export const MAX_SWATCHES = 8;
+
+/** The Colour tolerance a first use of each colour method starts at (the crate's
+ * `DEFAULT_BACKGROUND_TOLERANCE` and `DEFAULT_PICK_TOLERANCE`). */
+export const DEFAULT_BACKGROUND_TOLERANCE = 40;
+export const DEFAULT_PICK_TOLERANCE = 19;
+
+/** The pipette's name and tooltip (UX notes §6, the Style eyedropper's words). */
+export const PICK_COLOUR = "Pick colour from the image";
+export const PICK_BACKGROUND = "Pick background colour from the image";
+export const PICK_TOOLTIP = "Pick a colour from the image (Esc cancels)";
+
+/** The Auto toggle of Remove background and the hex of a transparent background (UX notes §5). */
+export const AUTO = "Auto";
+export const NO_BACKGROUND = "none";
+
+/** The status with Pick colours and no colour (UX notes §5, §10). */
+export const NO_COLOUR_PICKED = "No colour picked.";
+
+/** The status of a ninth pick (UX notes §5). */
+export const SWATCHES_FULL = `${MAX_SWATCHES} colours picked`;
+
+/** The name of a swatch's Remove button. */
+export function removeSwatchLabel(hex: string): string {
+  return `Remove ${hex}`;
+}
+
+/** The swatches after a pick of `hex` (Frage 89 A): a click replaces them with this one, Shift
+ * adds it (a colour already picked or a ninth is not added). */
+export function pickSwatch(swatches: readonly string[], hex: string, add: boolean): string[] {
+  if (!add) {
+    return [hex];
+  }
+  if (swatches.includes(hex) || swatches.length >= MAX_SWATCHES) {
+    return [...swatches];
+  }
+  return [...swatches, hex];
+}
+
+/** `status` with "8 colours picked" in its muted line while Pick colours holds the most swatches
+ * (UX notes 5). */
+export function withSwatchNote(status: TraceStatusText, values: Pick<TraceValues, "method" | "swatches">): TraceStatusText {
+  return values.method === PICK_COLOURS && values.swatches.length >= MAX_SWATCHES && status.muted === ""
+    ? { ...status, muted: SWATCHES_FULL }
+    : status;
+}
 
 /** The parts of a key event the backslash keys read. */
 export interface PeekKey {
@@ -142,6 +215,11 @@ export const TRACE_INFO_ENTRIES: readonly string[] = [
   "Silhouette for cutting/carving: closed, simple, few nodes; drops shapes and holes below 2 mm.",
   "Engraving: keeps fine lines, drops shapes below 0.1 mm.",
   "View: the image with the outline, the result alone, or the image alone. Hold \\ to peek at the image.",
+  "Method: how pixels become shapes.",
+  "Brightness: pixels darker than the Threshold.",
+  "Remove background: everything unlike the background colour; Auto takes it from the image border, the pipette from a click.",
+  "Pick colours: pixels like the colours picked with the pipette; Shift+click adds a colour.",
+  "Colour tolerance: how far a colour may be from the background or a picked colour and still count as it.",
   "Threshold: pixels darker than this brightness (0 to 100 %) become shapes.",
   "Smooth: calms the pixel steps of the outline before the fit; higher is calmer.",
   "Tolerance: how far in pixels the paths may stray from the calmed outline; higher gives fewer nodes.",
@@ -149,8 +227,8 @@ export const TRACE_INFO_ENTRIES: readonly string[] = [
   "Denoise: smooths out noise in the picture before tracing.",
   "Upscale: doubles small images before tracing; Auto does it below 1 Mpx.",
   "Corners: higher turns more bends into sharp corners.",
-  "Invert: traces the light parts instead of the dark ones.",
-  "Ignore background: drops shapes that touch the image border.",
+  "Invert: traces what the method leaves out; transparent pixels never become shapes.",
+  "Drop border shapes: drops shapes that touch the image border.",
 ];
 
 /** An info entry split into its term and its text at the first ": ". */
@@ -192,6 +270,18 @@ export interface TraceValues {
   denoise: number;
   invert: boolean;
   ignoreBackground: boolean;
+  /** The selection method: `BRIGHTNESS`, `REMOVE_BACKGROUND` or `PICK_COLOURS`. */
+  method: number;
+  /** The Colour tolerance of Remove background and of Pick colours, 0 to 100, each its own. */
+  backgroundTolerance: number;
+  pickTolerance: number;
+  /** Remove background takes the background from the image border. */
+  backgroundAuto: boolean;
+  /** The background colour `#RRGGBB`, empty for a transparent one, `null` while Auto has not
+   * read the image yet. */
+  background: string | null;
+  /** The picked colours `#RRGGBB` (the tool's session, not remembered). */
+  swatches: readonly string[];
 }
 
 /** The values a preset sets (criterion 60). */
@@ -236,7 +326,9 @@ export type TraceParamName =
   | "ignore_background"
   | "denoise"
   | "upscale"
-  | "corners";
+  | "corners"
+  | "method"
+  | "colour_tolerance";
 
 /** One field of the settings schema (`trace_params()` of the wasm module, criteria 6 and 45). */
 export interface TraceParam {
@@ -264,10 +356,12 @@ export const TRACE_PARAMS_FALLBACK: readonly TraceParam[] = [
   { name: "tolerance", label: "Tolerance", kind: "length", unit: "px", min: 0.1, max: 3, default: 0.5, step: 0.05, big_step: 0.5, fine_step: 0.01, group: "tolerance", advanced: false, choices: [] },
   { name: "specks", label: "Ignore below", kind: "length", unit: "mm", min: 0, max: 10, default: 0.5, step: 0.1, big_step: 1, fine_step: 0.01, group: "specks", advanced: false, choices: [] },
   { name: "invert", label: "Invert", kind: "toggle", unit: "", min: 0, max: 1, default: 0, step: 1, big_step: 1, fine_step: 1, group: "advanced", advanced: true, choices: [] },
-  { name: "ignore_background", label: "Ignore background", kind: "toggle", unit: "", min: 0, max: 1, default: 0, step: 1, big_step: 1, fine_step: 1, group: "advanced", advanced: true, choices: [] },
+  { name: "ignore_background", label: "Drop border shapes", kind: "toggle", unit: "", min: 0, max: 1, default: 0, step: 1, big_step: 1, fine_step: 1, group: "advanced", advanced: true, choices: [] },
   { name: "denoise", label: "Denoise", kind: "choice", unit: "", min: 0, max: 2, default: 0, step: 1, big_step: 1, fine_step: 1, group: "advanced", advanced: true, choices: ["Off", "Low", "High"] },
   { name: "upscale", label: "Upscale", kind: "choice", unit: "", min: 0, max: 1, default: 1, step: 1, big_step: 1, fine_step: 1, group: "advanced", advanced: true, choices: ["Auto", "Off"] },
   { name: "corners", label: "Corners", kind: "integer", unit: "", min: 0, max: 100, default: 70, step: 1, big_step: 10, fine_step: 1, group: "advanced", advanced: true, choices: [] },
+  { name: "method", label: "Method", kind: "choice", unit: "", min: 0, max: 2, default: 0, step: 1, big_step: 1, fine_step: 1, group: "method", advanced: false, choices: ["Brightness", "Remove background", "Pick colours"] },
+  { name: "colour_tolerance", label: "Colour tolerance", kind: "integer", unit: "", min: 0, max: 100, default: 19, step: 1, big_step: 10, fine_step: 1, group: "method", advanced: false, choices: [] },
 ];
 
 /** `value` clamped to the field's range and rounded to its finest step (criterion 5). */
@@ -363,8 +457,24 @@ export interface TraceStatusText {
 /** No state, no counts. */
 export const NO_STATUS: TraceStatusText = { line: "", muted: "", counts: "", countsMuted: "", canCreate: false };
 
-/** The state and the counts of a settled trace (criteria 11, 15, 16, 52, 55). */
-export function statusText(summary: TraceSummary, seconds: number, pixels: number, reduced = false): TraceStatusText {
+/** The line of a trace without paths in a colour method (UX notes §10), or `null` for
+ * Brightness, whose line follows the Threshold's direction. */
+export function zeroPathsLine(values: Pick<TraceValues, "method" | "swatches">): string | null {
+  if (values.method === PICK_COLOURS) {
+    return values.swatches.length === 0 ? "0 paths: no colour picked." : "0 paths at this Colour tolerance: too low.";
+  }
+  return values.method === REMOVE_BACKGROUND ? "0 paths at this Colour tolerance: too high." : null;
+}
+
+/** The state and the counts of a settled trace (criteria 11, 15, 16, 52, 55); `zeroLine`
+ * replaces the Threshold's line of a trace without paths (a colour method). */
+export function statusText(
+  summary: TraceSummary,
+  seconds: number,
+  pixels: number,
+  reduced = false,
+  zeroLine: string | null = null,
+): TraceStatusText {
   if (summary.status === "too_detailed") {
     return { ...NO_STATUS, line: TOO_DETAILED };
   }
@@ -380,7 +490,7 @@ export function statusText(summary: TraceSummary, seconds: number, pixels: numbe
     // The direction from the histogram: more than half the picture below the Threshold means it
     // is too high, otherwise too low (UX notes section 7).
     const direction = summary.foregroundPixels * 2 > pixels ? "too high" : "too low";
-    return { ...settled, line: `0 paths at this Threshold: ${direction}.`, canCreate: false };
+    return { ...settled, line: zeroLine ?? `0 paths at this Threshold: ${direction}.`, canCreate: false };
   }
   if (summary.nodes > SLOW_TO_EDIT_NODES) {
     return { ...settled, line: `${grouped(summary.nodes)} nodes. Slow to edit.` };
@@ -437,6 +547,12 @@ export function firstChoice(presets: readonly TracePreset[] = TRACE_PRESETS_FALL
     ...first.values,
     invert: false,
     ignoreBackground: false,
+    method: BRIGHTNESS,
+    backgroundTolerance: DEFAULT_BACKGROUND_TOLERANCE,
+    pickTolerance: DEFAULT_PICK_TOLERANCE,
+    backgroundAuto: true,
+    background: null,
+    swatches: [],
   };
   return { preset: first.key, edited: false, values: base };
 }
@@ -461,9 +577,21 @@ export function presetLabel(choice: TraceChoice, presets: readonly TracePreset[]
   return presets.find((p) => p.key === choice.preset)?.label ?? CUSTOM;
 }
 
-/** The settings JSON `trace_job` of the wasm module reads, with `threshold`. */
-export function settingsJson(values: TraceValues, threshold: number): string {
+/** The Colour tolerance of the current method. */
+export function colourTolerance(values: TraceValues): number {
+  return values.method === REMOVE_BACKGROUND ? values.backgroundTolerance : values.pickTolerance;
+}
+
+/** The settings JSON `trace_job` of the wasm module reads, with `threshold`. Pick colours takes
+ * the image's `suggested` background (resolved once on the full image, so the reduced preview and
+ * the full-size trace agree; empty: transparent). */
+export function settingsJson(values: TraceValues, threshold: number, suggested?: string): string {
+  const background = values.method === PICK_COLOURS && suggested !== undefined ? suggested : values.background;
   return JSON.stringify({
+    method: values.method,
+    colour_tolerance: colourTolerance(values),
+    background: background === "" ? null : background,
+    swatches: values.swatches,
     threshold,
     smooth: values.smooth,
     tolerance: values.tolerance,
@@ -494,7 +622,19 @@ export function readChoice(
     if (!raw || typeof raw !== "object") {
       return first;
     }
-    const stored = raw as { preset?: unknown; edited?: unknown; values?: unknown };
+    const stored = raw as {
+      preset?: unknown;
+      edited?: unknown;
+      values?: unknown;
+      method?: unknown;
+      backgroundTolerance?: unknown;
+      pickTolerance?: unknown;
+    };
+    // The method and its tolerances are app settings too (`specs/0089` criterion 20); a missing
+    // method reads as Brightness.
+    const method = (m: unknown) => (m === REMOVE_BACKGROUND || m === PICK_COLOURS ? m : BRIGHTNESS);
+    const tolerance = (t: unknown, fallback: number) =>
+      typeof t === "number" && Number.isFinite(t) ? Math.min(100, Math.max(0, Math.round(t))) : fallback;
     const slice1 = stored.values === undefined;
     const values = (slice1 ? raw : stored.values) as Record<string, unknown>;
     if (!values || typeof values !== "object") {
@@ -512,6 +652,9 @@ export function readChoice(
         corners: number(values, "corners", "corners"),
         upscale: number(values, "upscale", "upscale"),
         denoise: number(values, "denoise", "denoise"),
+        method: method(stored.method),
+        backgroundTolerance: tolerance(stored.backgroundTolerance, first.values.backgroundTolerance),
+        pickTolerance: tolerance(stored.pickTolerance, first.values.pickTolerance),
       },
     };
   } catch {
@@ -528,7 +671,17 @@ export function writeChoice(choice: TraceChoice, storage: ValueStorage | undefin
     values[field] = choice.values[field];
   }
   try {
-    storage?.setItem(TRACE_VALUES_KEY, JSON.stringify({ preset: choice.preset, edited: choice.edited, values }));
+    storage?.setItem(
+      TRACE_VALUES_KEY,
+      JSON.stringify({
+        preset: choice.preset,
+        edited: choice.edited,
+        values,
+        method: choice.values.method,
+        backgroundTolerance: choice.values.backgroundTolerance,
+        pickTolerance: choice.values.pickTolerance,
+      }),
+    );
   } catch {
     /* Not kept; the next start uses the first use. */
   }
@@ -561,7 +714,7 @@ export function changedAdvancedText(values: TraceValues, params: readonly TraceP
     changed.push("Invert");
   }
   if (values.ignoreBackground) {
-    changed.push("Ignore background");
+    changed.push("Drop border shapes");
   }
   if (values.denoise !== dflt("denoise")) {
     changed.push("Denoise");

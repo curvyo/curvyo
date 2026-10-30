@@ -7,7 +7,7 @@ import { TraceField } from "@/components/TraceField";
 import { Tooltip } from "@/components/ui/tooltip";
 import type { TraceParam, TraceStatusText, TraceValues } from "@/lib/traceText";
 
-/** The value and icon each toggle of the schema sets (Invert, Ignore background). */
+/** The value and icon each toggle of the schema sets (Invert, Drop border shapes). */
 const TOGGLES: Partial<Record<TraceParam["name"], { key: "invert" | "ignoreBackground"; icon: LucideIcon }>> = {
   invert: { key: "invert", icon: Contrast },
   ignore_background: { key: "ignoreBackground", icon: ImageMinus },
@@ -126,7 +126,7 @@ interface TraceAdvancedProps {
 /**
  * The Advanced block (`specs/0025-raster-trace` criteria 11, 41, 44, 71; UX notes 20.4, 20.5):
  * below the main rows inside the bar, after a divider: row 1 the two icon toggles (Invert,
- * Ignore background) and Denoise, then Upscale and Corners, the counts line always last in a
+ * Drop border shapes) and Denoise, then Upscale and Corners, the counts line always last in a
  * row of its own.
  */
 export function TraceAdvanced({ params, values, status, countsStale, setValue, onEndDrag, onCreate, onReturnFocus, id }: TraceAdvancedProps) {

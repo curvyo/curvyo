@@ -3,17 +3,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { WasmSession } from "@/lib/editorSession";
 import {
   NO_STATUS,
-  TRACE_VIEWS,
-  type TraceViewMode,
+  PICK_COLOURS,
+  zeroPathsLine,
   failureReason,
   failureText,
-  isCycleKey,
-  isPeekKey,
   previewIsReduced,
-  TRACE_PARAMS_FALLBACK,
-  TRACE_PRESETS_FALLBACK,
   type TraceChoice,
-  type TraceParam,
   type TraceSlot,
   type TraceStatusText,
   type TracePreset,
@@ -28,125 +23,24 @@ import {
   settingsJson,
   statusText,
   tracedNotice,
+  withSwatchNote,
   writeAdvancedOpen,
   writeChoice,
 } from "@/lib/traceText";
-import { TraceCancelled, type TracePixels, type TraceRunner, createTraceRunner } from "@/lib/traceJobs";
-import { trace_params, trace_presets } from "@/wasm-bindings/curvyo_editor_wasm.js";
+import { TraceCancelled, type TraceRunner, createTraceRunner } from "@/lib/traceJobs";
+import { NO_VIEW, loadParams, loadPresets, pixelsOf, readView, type ViewState } from "@/lib/traceSource";
+import type { ShowNotice, TraceApi } from "./traceApi";
+import { useTraceMethod } from "./useTraceMethod";
+import { useTraceProgress } from "./useTraceProgress";
+import { useTraceViewMode } from "./useTraceViewMode";
+
+export type { TraceApi } from "./traceApi";
 
 /** Debounce of a value change (criterion 10). */
 const DEBOUNCE_MS = 150;
-/** The progress pill with its x and the old outline at 50 % after this long (UX notes 21.2). */
-const BUSY_MS = 400;
 /** The longest side of the reduced copy; a picture this small is traced once. */
 const REDUCED_SIDE = 1000;
 
-type ShowNotice = (text: string, ms?: number, source?: "canvas" | "panel", kind?: "status" | "alert") => void;
-
-/** The Trace tool in the frontend (`specs/0025-raster-trace` criteria 1 to 5, 9 to 13, 15, 16,
- * 46, 51 to 54): the bar's state, the worker jobs with their timers, the progress slot, the
- * view and the peek, Create paths and its notice.
- * Every document decision is the session's; the trace runs in the worker. */
-export interface TraceApi {
-  /** The Trace tool is the active tool. */
-  active: boolean;
-  /** The Select bar shows the Trace button (only images selected). */
-  available: boolean;
-  /** What is selected, to the tool. */
-  selection: "empty" | "other" | "images";
-  /** "Tracing 1 of 3 images", or empty for one image. */
-  imagesLabel: string;
-  params: readonly TraceParam[];
-  /** The presets in menu order (criterion 59). */
-  presets: readonly TracePreset[];
-  values: TraceValues;
-  /** The remembered choice: the preset the values came from and whether they were edited. */
-  choice: TraceChoice;
-  /** The Preset button's text: the preset's name or "Custom" (criterion 40). */
-  presetLabel: string;
-  /** The Advanced block is open (criterion 41). */
-  advancedOpen: boolean;
-  /** The state row's line and muted line, the counts of the Advanced block, and whether Enter
-   * may create (criteria 11, 71). */
-  status: TraceStatusText;
-  /** The counts belong to an older result: a trace runs or was stopped (UX notes 20.4). */
-  countsStale: boolean;
-  /** What the progress slot of row 1 shows (criteria 10, 53, 54; UX notes 21.2). */
-  slot: TraceSlot;
-  /** The view on the canvas as the View pill shows it (criterion 51). */
-  viewMode: TraceViewMode;
-  /** A segment of the View pill. */
-  setViewMode: (mode: TraceViewMode) => void;
-  /** Trace again after a stop, or Retry after a failure. */
-  retrace: () => void;
-  /** Create paths waits for full-size traces. */
-  creating: boolean;
-  /** Working-image pixels per millimetre of the shown image, for the Specks readout. */
-  pxPerMm: number;
-  /** A value from a field; `dragging` traces the reduced copy only (criterion 10). */
-  setValue: <K extends keyof TraceValues>(name: K, value: TraceValues[K], dragging?: boolean) => void;
-  /** A pick in the Preset menu (criteria 40, 60, 66): every preset value at once. */
-  pick: (preset: TracePreset) => void;
-  /** Opens or closes the Advanced block (remembered). */
-  setAdvancedOpen: (open: boolean) => void;
-  /** The end of a drag: the full-size trace follows. */
-  endDrag: () => void;
-  /** Stop (criterion 10): ends the job; the preview is out of date. */
-  stop: () => void;
-  /** Create paths (criteria 12, 13, 46). */
-  create: () => void;
-  /** Enter and Escape on the canvas in the tool: `true` when the key was taken. */
-  keyDown: (event: KeyboardEvent) => boolean;
-}
-
-/** The settings schema from the wasm module, or the copy in `traceText` before it loads. */
-function loadParams(): readonly TraceParam[] {
-  try {
-    const parsed = JSON.parse(trace_params()) as TraceParam[];
-    return parsed.length > 0 ? parsed : TRACE_PARAMS_FALLBACK;
-  } catch {
-    return TRACE_PARAMS_FALLBACK;
-  }
-}
-
-/** The presets from the wasm module, or the copy in `traceText` before it loads. */
-function loadPresets(): readonly TracePreset[] {
-  try {
-    const parsed = JSON.parse(trace_presets()) as TracePreset[];
-    return parsed.length > 0 ? parsed : TRACE_PRESETS_FALLBACK;
-  } catch {
-    return TRACE_PRESETS_FALLBACK;
-  }
-}
-
-/** The pixels of `id` for the worker, or `null` while the picture is not readable. */
-function pixelsOf(session: WasmSession, id: string, reduced: boolean): TracePixels | null {
-  const raw = session.trace_source(id, reduced);
-  if (!raw) {
-    return null;
-  }
-  const pixels = { width: raw.width, height: raw.height, rgba: raw.rgba, map: Array.from(raw.map) };
-  raw.free();
-  return pixels;
-}
-
-interface ViewState {
-  selection: "empty" | "other" | "images";
-  images: string[];
-  shown: string;
-}
-
-const NO_VIEW: ViewState = { selection: "empty", images: [], shown: "" };
-
-function readView(session: WasmSession | null): ViewState {
-  const raw = session?.trace_view();
-  if (!raw) {
-    return NO_VIEW;
-  }
-  const view = { selection: raw.selection as ViewState["selection"], images: raw.images, shown: raw.shown };
-  raw.free();
-  return view;
-}
 
 export function useTrace(
   getSession: () => WasmSession | null,
@@ -168,9 +62,6 @@ export function useTrace(
   }, []);
   const [advancedOpen, setAdvancedOpenState] = useState(() => readAdvancedOpen());
   const [status, setStatus] = useState<TraceStatusText>(NO_STATUS);
-  const [busy, setBusy] = useState(false);
-  /** The running job's whole percent, `null` before the first report or without one. */
-  const [percent, setPercent] = useState<number | null>(null);
   const [creating, setCreating] = useState(false);
   const [stopped, setStopped] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
@@ -181,11 +72,12 @@ export function useTrace(
   const [pxPerMm, setPxPerMm] = useState(0);
   const runnerRef = useRef<TraceRunner | null>(null);
   const generation = useRef(0);
-  const timers = useRef<number[]>([]);
   const debounce = useRef<number | null>(null);
   const dragging = useRef(false);
   /** Each image's Threshold: its automatic value until the maker sets one (criterion 9). */
   const thresholds = useRef(new Map<string, number>());
+  /** Each image's suggested background (`specs/0089` criterion 16; empty: transparent). */
+  const backgrounds = useRef(new Map<string, string>());
   /** The values each kept full-size result was traced with. */
   const results = useRef(new Map<string, string>());
   const choiceRef = useRef(choice);
@@ -195,39 +87,14 @@ export function useTrace(
   /** The view as last read; the sync effect below keeps it and the state together. */
   const viewRef = useRef(view);
 
+  const { busy, percent, setPercent, startTimers, clearTimers } = useTraceProgress(getSession, onChange);
+
   const runner = useCallback((): TraceRunner => {
     runnerRef.current ??= createTraceRunner();
     return runnerRef.current;
   }, []);
   useEffect(() => () => runnerRef.current?.dispose(), []);
 
-  const clearTimers = useCallback(() => {
-    for (const timer of timers.current) {
-      window.clearTimeout(timer);
-    }
-    timers.current = [];
-    setBusy(false);
-    setPercent(null);
-  }, []);
-
-  /** The timers of a job; `known` (over 4 Mpx at full size) shows the progress pill at once
-   * (criterion 52). After 400 ms the pill shows and the old outline is drawn at 50 % (criterion 10). */
-  const startTimers = useCallback(
-    (known = false) => {
-      clearTimers();
-      const busyNow = () => {
-        setBusy(true);
-        getSession()?.set_trace_preview_stale(true);
-        onChange();
-      };
-      if (known) {
-        busyNow();
-        return;
-      }
-      timers.current.push(window.setTimeout(busyNow, BUSY_MS));
-    },
-    [clearTimers, getSession, onChange],
-  );
 
   /** Ends whatever runs: the debounce, the jobs and their timers. */
   const cancelAll = useCallback(() => {
@@ -240,7 +107,8 @@ export function useTrace(
     clearTimers();
   }, [clearTimers]);
 
-  const key = (threshold: number, v: TraceValues) => settingsJson(v, threshold);
+  const key = (threshold: number, v: TraceValues, id: string) =>
+    settingsJson(v, threshold, backgrounds.current.get(id) ?? "");
 
   /** A failed job (criterion 54): "Failed" with a plain reason in the slot; values and document
    * stay. */
@@ -257,20 +125,24 @@ export function useTrace(
     [clearTimers, getSession, onChange],
   );
 
-  /** The Threshold of `id`, its automatic value on first use. */
+  /** The Threshold of `id`, its automatic value on first use, and its suggested background. */
   const thresholdOf = useCallback(
     async (session: WasmSession, id: string): Promise<number | null> => {
       const known = thresholds.current.get(id);
-      if (known !== undefined) {
+      if (known !== undefined && backgrounds.current.has(id)) {
         return known;
       }
       const pixels = pixelsOf(session, id, false);
       if (!pixels) {
         return null;
       }
-      const threshold = await runner().threshold(pixels);
-      thresholds.current.set(id, threshold);
-      return threshold;
+      const defaults = await runner().defaults(pixels);
+      backgrounds.current.set(id, defaults.background);
+      if (known !== undefined) {
+        return known;
+      }
+      thresholds.current.set(id, defaults.threshold);
+      return defaults.threshold;
     },
     [runner],
   );
@@ -302,17 +174,21 @@ export function useTrace(
         }
         if (threshold === null) {
           setStatus(NO_STATUS);
-          clearTimers();
           setLoading(true);
           return;
         }
-        setValues((v) => (v.threshold === threshold ? v : { ...v, threshold }));
-        const v = { ...choiceRef.current.values, threshold };
-        const settings = settingsJson(v, threshold);
+        const suggested = backgrounds.current.get(id) ?? "";
+        const resolve = (v: TraceValues): TraceValues =>
+          v.threshold === threshold && (!v.backgroundAuto || v.background === suggested)
+            ? v
+            : { ...v, threshold, background: v.backgroundAuto ? suggested : v.background };
+        setValues(resolve);
+        const v = resolve(choiceRef.current.values);
+        choiceRef.current = { ...choiceRef.current, values: v };
+        const settings = key(threshold, v, id);
         const full = pixelsOf(session, id, false);
         if (!full) {
           setStatus(NO_STATUS);
-          clearTimers();
           setLoading(true);
           return;
         }
@@ -335,7 +211,7 @@ export function useTrace(
             }
             session.set_trace_preview(id, out.wire);
             if (reducedOnly) {
-              setStatus(statusText(readSummary(out.wire), out.seconds, reducedPixels, true));
+              setStatus(statusText(readSummary(out.wire), out.seconds, reducedPixels, true, zeroPathsLine(v)));
             }
           }
           if (!fullAfter || reducedOnly) {
@@ -350,8 +226,8 @@ export function useTrace(
         }
         session.set_trace_preview(id, out.wire);
         session.set_trace_result(id, out.wire);
-        results.current.set(id, key(threshold, v));
-        setStatus(statusText(readSummary(out.wire), out.seconds, full.width * full.height));
+        results.current.set(id, settings);
+        setStatus(statusText(readSummary(out.wire), out.seconds, full.width * full.height, false, zeroPathsLine(v)));
         clearTimers();
         onChange();
       } catch (error) {
@@ -360,7 +236,7 @@ export function useTrace(
         }
       }
     },
-    [getSession, startTimers, clearTimers, thresholdOf, runner, setValues, onChange, fail],
+    [getSession, startTimers, clearTimers, thresholdOf, runner, setValues, onChange, fail, setPercent],
   );
 
   const schedule = useCallback(
@@ -405,7 +281,12 @@ export function useTrace(
     setLoading(false);
     if (active && next.shown) {
       const known = thresholds.current.get(next.shown);
-      setValues((v) => ({ ...v, threshold: known ?? null }));
+      const background = backgrounds.current.get(next.shown);
+      setValues((v) => ({
+        ...v,
+        threshold: known ?? null,
+        background: v.backgroundAuto ? (background ?? null) : v.background,
+      }));
       void runPreview(true);
     }
   }, [syncRevision, active, getSession, cancelAll, runPreview, setValues]);
@@ -479,13 +360,6 @@ export function useTrace(
     schedule(0);
   }, [schedule]);
 
-  const setViewMode = useCallback(
-    (mode: TraceViewMode) => {
-      getSession()?.set_trace_view_mode(mode);
-      onChange();
-    },
-    [getSession, onChange],
-  );
 
   const create = useCallback(() => {
     if (stopped || failure !== null) {
@@ -503,7 +377,6 @@ export function useTrace(
       return;
     }
     const v = { ...choiceRef.current.values, threshold };
-    const wanted = key(threshold, v);
     setCreating(true);
     setProgress(0);
     const mine = ++generation.current;
@@ -514,6 +387,10 @@ export function useTrace(
         let paths = 0;
         let nodes = 0;
         for (const [index, id] of current.images.entries()) {
+          if (v.method === PICK_COLOURS && !backgrounds.current.has(id)) {
+            await thresholdOf(session, id);
+          }
+          const wanted = key(threshold, v, id);
           if (results.current.get(id) === wanted) {
             continue;
           }
@@ -522,7 +399,6 @@ export function useTrace(
           if (!full) {
             setStatus(NO_STATUS);
             setCreating(false);
-            clearTimers();
             setLoading(true);
             return;
           }
@@ -562,7 +438,7 @@ export function useTrace(
         }
       }
     })();
-  }, [getSession, creating, stopped, failure, retrace, status.canCreate, startTimers, clearTimers, runner, showNotice, onChange, returnFocus, fail]);
+  }, [getSession, creating, stopped, failure, retrace, status.canCreate, startTimers, clearTimers, runner, thresholdOf, showNotice, onChange, returnFocus, fail, setPercent]);
 
   // Leaving the tool ends every job.
   useEffect(() => {
@@ -576,56 +452,19 @@ export function useTrace(
   }, [active, cancelAll]);
 
 
-  // `\` held peeks at the image, Shift+`\` cycles the views (criterion 51), with focus on the
-  // canvas or a bar button, never in a text field; release, window blur and leaving the tool
-  // end the peek (UX notes section 13).
-  useEffect(() => {
-    if (!active) {
-      return undefined;
-    }
-    let peeking = false;
-    const end = () => {
-      if (peeking) {
-        peeking = false;
-        getSession()?.set_trace_peek(false);
-        onChange();
-      }
-    };
-    const typing = (target: EventTarget | null) =>
-      target instanceof HTMLElement &&
-      target.closest('input, textarea, select, [role="spinbutton"], [contenteditable]:not([contenteditable="false"])') !== null;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (typing(event.target)) {
-        return;
-      }
-      if (isCycleKey(event)) {
-        event.preventDefault();
-        getSession()?.cycle_trace_view_mode();
-        onChange();
-      } else if (isPeekKey(event)) {
-        event.preventDefault();
-        peeking = true;
-        getSession()?.set_trace_peek(true);
-        onChange();
-      } else if (event.key === "\\" || event.key === "|") {
-        event.preventDefault();
-      }
-    };
-    const onKeyUp = (event: KeyboardEvent) => {
-      if (event.key === "\\" || event.key === "|" || event.code === "Backslash") {
-        end();
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    window.addEventListener("keyup", onKeyUp);
-    window.addEventListener("blur", end);
-    return () => {
-      window.removeEventListener("keydown", onKeyDown);
-      window.removeEventListener("keyup", onKeyUp);
-      window.removeEventListener("blur", end);
-      end();
-    };
-  }, [active, getSession, onChange]);
+
+  const { viewMode, setViewMode } = useTraceViewMode(active, getSession, onChange);
+  const { setPicking, setMethod, setColourTolerance, setBackgroundAuto, removeSwatch } = useTraceMethod({
+    active,
+    syncRevision,
+    getSession,
+    onChange,
+    apply,
+    choiceRef,
+    dragging,
+    viewRef,
+    backgrounds,
+  });
 
   const keyDown = useCallback(
     (event: KeyboardEvent): boolean => {
@@ -641,24 +480,35 @@ export function useTrace(
         stop();
         return true;
       }
+      // Esc order (UX notes §6): a running trace stops first, then the armed pipette disarms,
+      // then the tool is left.
+      const session = getSession();
+      if (event.key === "Escape" && session && session.trace_pick_mode() !== "") {
+        session.set_trace_pick("");
+        onChange();
+        return true;
+      }
       return false;
     },
-    [active, create, creating, stop],
+    [active, create, creating, stop, getSession, onChange],
   );
 
-  // The view the session draws, read on every render (each sync renders); entering the tool
-  // starts on Overlay.
-  const sessionMode = active ? (getSession()?.trace_view_mode() as TraceViewMode | undefined) : undefined;
-  const viewMode: TraceViewMode = sessionMode && TRACE_VIEWS.some((v) => v.mode === sessionMode) ? sessionMode : "overlay";
 
+
+  // The progress shows only after 400 ms and then holds (customer 2026-10-30); loading counts as
+  // a job that has not reported yet.
   const slot: TraceSlot =
     failure !== null
       ? { kind: "failed", text: failure }
       : stopped
         ? { kind: "stopped" }
-        : busy || loading
+        : busy
           ? { kind: "running", percent: loading ? null : percent }
           : { kind: "none" };
+  const session = active ? getSession() : null;
+  const pickMode = session?.trace_pick_mode() ?? "";
+  const shownId = view.shown;
+  const suggestedBackground = shownId ? (backgrounds.current.get(shownId) ?? null) : null;
   return {
     active,
     available,
@@ -670,7 +520,7 @@ export function useTrace(
     choice,
     presetLabel: presetLabel(choice, presets),
     advancedOpen,
-    status,
+    status: withSwatchNote(status, values),
     countsStale: busy || stopped || creating,
     slot,
     viewMode,
@@ -685,5 +535,12 @@ export function useTrace(
     stop,
     create,
     keyDown,
+    setMethod,
+    setColourTolerance,
+    setBackgroundAuto,
+    removeSwatch,
+    pickMode,
+    setPicking,
+    suggestedBackground,
   };
 }
