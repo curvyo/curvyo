@@ -1,7 +1,8 @@
 //! The textured pipeline of the image objects (ADR 0017 §5, `specs/0058-bitmap-import` criteria
 //! 27 to 30): one texture per asset with its premultiplied mip chain, a quad per image drawn at
 //! the depth of its own artwork layer, sampled trilinear when shrunk, bilinear when enlarged and
-//! nearest from 8 screen pixels per image pixel. Compiles for `wasm32` only, like `gpu.rs`.
+//! nearest from 8 screen pixels per image pixel (the Trace tool's mask from one). Compiles for
+//! `wasm32` only, like `gpu.rs`.
 
 use std::collections::HashMap;
 
@@ -83,6 +84,8 @@ struct ImageVertex {
 struct Texture {
     width: u32,
     height: u32,
+    /// Nearest as soon as a pixel is larger than a screen pixel (the Trace tool's mask).
+    pixelated: bool,
     smooth: wgpu::BindGroup,
     sharp: wgpu::BindGroup,
 }
@@ -176,12 +179,12 @@ impl GpuImages {
         images: &FrameImages,
     ) {
         self.textures
-            .retain(|hash, _| images.iter().any(|(drawn, _)| drawn == hash));
-        for (hash, working) in images {
+            .retain(|hash, _| images.iter().any(|(drawn, ..)| drawn == hash));
+        for (hash, working, pixelated) in images {
             if self.textures.contains_key(hash) {
                 continue;
             }
-            let texture = self.upload(device, queue, working);
+            let texture = self.upload(device, queue, working, *pixelated);
             self.textures.insert(hash.clone(), texture);
         }
     }
@@ -191,6 +194,7 @@ impl GpuImages {
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         working: &curvyo_image_core::WorkingImage,
+        pixelated: bool,
     ) -> Texture {
         // The device may hold less than the working limit (WebGL2 guarantees 2048): the top
         // levels are skipped (ADR 0017 §5).
@@ -258,6 +262,7 @@ impl GpuImages {
         Texture {
             width: working.width,
             height: working.height,
+            pixelated,
             smooth: bind(&self.smooth),
             sharp: bind(&self.sharp),
         }
@@ -349,12 +354,18 @@ impl GpuImages {
     }
 }
 
-/// Whether every image pixel of `quad` covers at least [`NEAREST_FROM_PX`] screen pixels.
+/// Whether every image pixel of `quad` covers at least [`NEAREST_FROM_PX`] screen pixels (one
+/// for a pixelated picture).
 fn sharp(quad: &ImageQuad, texture: &Texture, view: ViewTransform) -> bool {
     let c = quad.corners;
     let across = c[0].vector_to(c[1]).length() * view.scale() / f64::from(texture.width.max(1));
     let down = c[0].vector_to(c[3]).length() * view.scale() / f64::from(texture.height.max(1));
-    across.min(down) >= NEAREST_FROM_PX
+    across.min(down)
+        >= if texture.pixelated {
+            1.0
+        } else {
+            NEAREST_FROM_PX
+        }
 }
 
 fn create_image_pipeline(

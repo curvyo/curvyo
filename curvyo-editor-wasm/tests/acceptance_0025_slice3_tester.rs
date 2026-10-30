@@ -61,7 +61,7 @@ fn preview(session: &mut Session, image: NodeId) {
 }
 
 #[test]
-fn c51_views_overlay_trace_image_draw_what_the_spec_says() {
+fn c51_the_four_views_overlay_mask_trace_image_draw_what_the_spec_says() {
     let (mut session, image) = traced(60, 60);
     preview(&mut session, image);
     assert_eq!(session.trace_view_mode(), TraceViewMode::Overlay, "default");
@@ -114,7 +114,9 @@ fn c51_peek_shows_the_original_while_held_and_returns() {
 fn c51_the_cycle_goes_overlay_trace_image_and_the_peek_ends_with_the_tool() {
     let (mut session, image) = traced(60, 60);
     preview(&mut session, image);
+    // Mask is the second view since `specs/0089` criterion 21 (UX notes §4).
     for want in [
+        TraceViewMode::Mask,
         TraceViewMode::Trace,
         TraceViewMode::Image,
         TraceViewMode::Overlay,

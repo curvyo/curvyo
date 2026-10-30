@@ -52,6 +52,8 @@ pub(super) struct TraceState {
     pub(super) moving: bool,
     /// The pipette (`trace_pick.rs`).
     pub(super) pick: super::trace_pick::TracePick,
+    /// The mask of the Mask view (`trace_mask.rs`).
+    pub(super) mask: super::trace_mask::TraceMaskState,
     /// The reduced copy of the last picture asked for: every preview of a large image traces it
     /// (criteria 10 and 52), and making it costs the main thread tens of milliseconds
     /// (criterion 58).
@@ -209,11 +211,12 @@ impl Session {
         true
     }
 
-    /// Marks the preview out of date (a stopped job) or current again.
+    /// Marks the preview and the mask out of date (a stopped job) or current again.
     pub fn set_trace_preview_stale(&mut self, stale: bool) {
         if let Some(preview) = &mut self.trace.preview {
             preview.stale = stale;
         }
+        self.set_trace_mask_stale(stale);
     }
 
     /// Keeps the worker's full-size result `wire` for `image` for Create paths; `false` when the

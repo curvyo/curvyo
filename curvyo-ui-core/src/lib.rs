@@ -191,10 +191,10 @@ pub use curvyo_vectorize_core::{
     ADVANCED_PARAMS as TRACE_ADVANCED_PARAMS,
     DEFAULT_BACKGROUND_TOLERANCE as TRACE_DEFAULT_BACKGROUND_TOLERANCE,
     DEFAULT_PICK_TOLERANCE as TRACE_DEFAULT_PICK_TOLERANCE, Denoise as TraceDenoise,
-    METHOD_PARAMS as TRACE_METHOD_PARAMS, PARAMS as TRACE_PARAMS, PRESETS as TRACE_PRESETS,
-    ParamKind as TraceParamKind, ParamUnit as TraceParamUnit, PixelLength as TracePixelLength,
-    Rgb8 as TraceRgb, Selection as TraceMethod, Swatches as TraceSwatches, TraceParams,
-    Upscale as TraceUpscale,
+    METHOD_PARAMS as TRACE_METHOD_PARAMS, Mask as TraceMask, PARAMS as TRACE_PARAMS,
+    PRESETS as TRACE_PRESETS, ParamKind as TraceParamKind, ParamUnit as TraceParamUnit,
+    PixelLength as TracePixelLength, Rgb8 as TraceRgb, Selection as TraceMethod,
+    Swatches as TraceSwatches, TraceParams, Upscale as TraceUpscale,
 };
 pub use cut::{CUT_COMMIT_LABEL, CutPlan, CutRefusal, MAX_CUT_PIECES, plan_cut};
 pub use cuttable::{
@@ -434,7 +434,7 @@ pub use text_path_edit::{
 pub use trace_plan::{TracePlan, TraceTarget, plan_trace, trace_group_name, trace_style};
 pub use trace_transfer::{
     TRACE_WIRE_HEADER, TraceStatus, TraceWire, read_trace_wire, trace_auto_threshold, trace_job,
-    trace_job_with, trace_sample_colour, trace_suggest_background,
+    trace_job_with, trace_mask_job, trace_sample_colour, trace_suggest_background,
 };
 pub use transform_drag::{
     CornerLinking, CornerRadiusScaling, ParamDragInfo, ScaleModes, StrokeScaling,

@@ -1,6 +1,6 @@
 //! What the Trace tool draws in each of its views (`specs/0025-raster-trace` criteria 2, 8, 51,
-//! 56 and 68): the wash, the hollow outline of Overlay, the filled result of Trace, nothing of
-//! its own in Image, from meshes kept across frames.
+//! 56 and 68; `specs/0089` criterion 21): the wash, the hollow outline of Overlay, the mask of
+//! Mask, the filled result of Trace, nothing of its own in Image, from meshes kept across frames.
 
 use std::collections::HashSet;
 
@@ -24,6 +24,9 @@ pub enum TraceViewMode {
     /// The image dimmed under the hollow preview outline.
     #[default]
     Overlay,
+    /// The mask handed to the tracer, black content on white, in place of the image
+    /// (`specs/0089` criterion 21).
+    Mask,
     /// The result filled as Create paths would make it, the image hidden.
     Trace,
     /// The original at full strength, no outline.
@@ -31,11 +34,13 @@ pub enum TraceViewMode {
 }
 
 impl TraceViewMode {
-    /// The next view of Shift+`\`: Overlay, Trace, Image, Overlay.
+    /// The next view of Shift+`\`: Overlay, Mask, Trace, Image, Overlay (`specs/0089` UX notes
+    /// §4).
     #[must_use]
     pub const fn next(self) -> Self {
         match self {
-            Self::Overlay => Self::Trace,
+            Self::Overlay => Self::Mask,
+            Self::Mask => Self::Trace,
             Self::Trace => Self::Image,
             Self::Image => Self::Overlay,
         }
@@ -83,7 +88,7 @@ impl Session {
     }
 
     /// The artwork of the Trace tool in the shown view (criterion 51): Overlay washes the traced
-    /// images; Trace takes the shown image out and returns where the filled result goes
+    /// images; Mask puts the mask in place of the shown image (`trace_mask.rs`); Trace takes the shown image out and returns where the filled result goes
     /// ([`Session::trace_fill_mesh`]), washing the other selected images; Image leaves the
     /// artwork as it is.
     pub(super) fn trace_artwork(&self, objects: &mut Vec<ObjectSnapshot>) -> Option<usize> {
@@ -93,6 +98,11 @@ impl Session {
                 None
             }
             TraceViewMode::Image => None,
+            TraceViewMode::Mask => {
+                self.trace_wash(objects);
+                self.trace_mask_in(objects);
+                None
+            }
             TraceViewMode::Trace => {
                 self.trace_wash(objects);
                 let shown = self.trace_view().shown?;
