@@ -60,7 +60,7 @@ import {
   previewIsReduced,
 } from "../src/lib/traceText.ts";
 
-const [threshold, smooth, specks] = TRACE_PARAMS_FALLBACK;
+const [threshold, smooth, tolerance, specks] = TRACE_PARAMS_FALLBACK;
 const keyOf = (key: string, mods: Partial<{ shiftKey: boolean; ctrlKey: boolean }> = {}) => ({
   key,
   shiftKey: false,
@@ -89,11 +89,16 @@ test("criteria 5 and 6: steps, limits and clamping from the schema", () => {
   assert.equal(parseTyped(specks, "0,25 mm"), 0.25);
   assert.equal(parseTyped(smooth, "x"), null);
   assert.equal(clampValue(smooth, 33.4), 33);
+  // `specs/0089` Frage 85 B: Tolerance in source pixels after Smooth.
+  assert.equal(stepOnGrid(tolerance, 0.5, 1, "normal"), 0.55);
+  assert.equal(parseTyped(tolerance, "0,8 px"), 0.8);
+  assert.equal(parseTyped(tolerance, "9"), 3);
   assert.deepEqual(
-    TRACE_PARAMS_FALLBACK.slice(0, 3).map((p) => [p.name, p.min, p.max, p.default]),
+    TRACE_PARAMS_FALLBACK.slice(0, 4).map((p) => [p.name, p.min, p.max, p.default]),
     [
       ["threshold", 0, 255, 128],
       ["smooth", 0, 100, 80],
+      ["tolerance", 0.1, 3, 0.5],
       ["specks", 0, 10, 0.5],
     ],
   );
@@ -133,7 +138,8 @@ test("criterion 70: the info page's exact text", () => {
     "Engraving: keeps fine lines, drops shapes below 0.1 mm.",
     "View: the image with the outline, the result alone, or the image alone. Hold \\ to peek at the image.",
     "Threshold: pixels darker than this brightness (0 to 100 %) become shapes.",
-    "Smooth: higher gives fewer nodes and a looser fit, up to 0.2 mm.",
+    "Smooth: calms the pixel steps of the outline before the fit; higher is calmer.",
+    "Tolerance: how far in pixels the paths may stray from the calmed outline; higher gives fewer nodes.",
     "Ignore below: drops shapes and holes smaller than this size in mm.",
     "Denoise: smooths out noise in the picture before tracing.",
     "Upscale: doubles small images before tracing; Auto does it below 1 Mpx.",
@@ -152,7 +158,7 @@ test("criteria 41, 43 (removed): no Node limit and no Full-size preview in the s
     TRACE_PARAMS_FALLBACK.filter((p) => p.advanced).map((p) => p.name),
     ["invert", "ignore_background", "denoise", "upscale", "corners"],
   );
-  assert.deepEqual(Object.keys(firstChoice().values).sort(), ["corners", "denoise", "ignoreBackground", "invert", "smooth", "specks", "threshold", "upscale"]);
+  assert.deepEqual(Object.keys(firstChoice().values).sort(), ["corners", "denoise", "ignoreBackground", "invert", "smooth", "specks", "threshold", "tolerance", "upscale"]);
   assert.ok(!("node_limit" in JSON.parse(settingsJson(firstChoice().values, 128))));
 });
 
@@ -169,6 +175,7 @@ test("criteria 5 and 66: the choice is an app setting; Threshold starts automati
   assert.deepEqual(first.values, {
     threshold: null,
     smooth: 80,
+    tolerance: 0.5,
     specks: 0.5,
     corners: 70,
     upscale: 1,
@@ -183,6 +190,7 @@ test("criteria 5 and 66: the choice is an app setting; Threshold starts automati
   assert.equal(read.edited, true);
   assert.equal(read.values.smooth, 90);
   assert.equal(read.values.specks, 2);
+  assert.equal(read.values.tolerance, 1.5, "the tolerance is a preset value");
   assert.equal(read.values.threshold, null, "the Threshold is never remembered");
   assert.equal(read.values.invert, false, "the switches start off");
   storage.store.set("curvyo.trace-values", JSON.stringify({ smooth: 40, specks: 1.25 }));
@@ -220,6 +228,7 @@ test("criteria 40, 59, 60: presets, Custom as stored state", () => {
   assert.deepEqual(JSON.parse(settingsJson(photo.values, 140)), {
     threshold: 140,
     smooth: 50,
+    tolerance: 0.5,
     specks: 0.1,
     corners: 30,
     upscale: 1,
@@ -364,7 +373,7 @@ test("criterion 10: the progress pill's words", () => {
 });
 
 test("UX notes 19: the closed expander names the Advanced values that are not defaults", () => {
-  const base = { threshold: 128, smooth: 80, specks: 0.5, corners: 70, upscale: 1, denoise: 0, invert: false, ignoreBackground: false };
+  const base = { threshold: 128, smooth: 80, tolerance: 0.5, specks: 0.5, corners: 70, upscale: 1, denoise: 0, invert: false, ignoreBackground: false };
   assert.equal(changedAdvancedText(base), null);
   assert.equal(changedAdvancedText({ ...base, invert: true }), "Changed: Invert");
   assert.equal(changedAdvancedText({ ...base, denoise: 2, corners: 30, ignoreBackground: true }), "Changed: Ignore background, Denoise, Corners");

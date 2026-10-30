@@ -36,7 +36,8 @@ export const STOPPED = "Stopped";
 /** The pill of a failed trace (criterion 54). */
 export const FAILED = "Failed";
 
-/** What the progress slot of row 1 shows (criteria 10, 53, 54; UX notes 21.2). */
+/** What the pill at the end of the bar shows (criteria 10, 53, 54; `specs/0089` Frage 84): at
+ * rest the finish button. */
 export type TraceSlot =
   | { kind: "none" }
   /** A job past 400 ms; `percent` is `null` before its first report or while the picture loads. */
@@ -52,6 +53,10 @@ export function percentText(percent: number | null): string {
 
 /** The muted line of a preview over 4 Mpx (criterion 52). */
 export const REDUCED_COPY = "Preview from a reduced copy";
+
+/** The pill at rest: the finish button, the same as Enter (`specs/0089` Frage 84; **Proposal**
+ * wording). */
+export const CREATE_PATHS = "Create paths";
 
 /** The slot's button after Stop or a failure (criteria 53, 54). */
 export const RETRY = "Retry";
@@ -138,7 +143,8 @@ export const TRACE_INFO_ENTRIES: readonly string[] = [
   "Engraving: keeps fine lines, drops shapes below 0.1 mm.",
   "View: the image with the outline, the result alone, or the image alone. Hold \\ to peek at the image.",
   "Threshold: pixels darker than this brightness (0 to 100 %) become shapes.",
-  "Smooth: higher gives fewer nodes and a looser fit, up to 0.2 mm.",
+  "Smooth: calms the pixel steps of the outline before the fit; higher is calmer.",
+  "Tolerance: how far in pixels the paths may stray from the calmed outline; higher gives fewer nodes.",
   "Ignore below: drops shapes and holes smaller than this size in mm.",
   "Denoise: smooths out noise in the picture before tracing.",
   "Upscale: doubles small images before tracing; Auto does it below 1 Mpx.",
@@ -178,6 +184,8 @@ export function thresholdPercentParam(param: TraceParam): TraceParam {
 export interface TraceValues {
   threshold: number | null;
   smooth: number;
+  /** The deviation tolerance in source pixels (`specs/0089` Frage 85 B). */
+  tolerance: number;
   specks: number;
   corners: number;
   upscale: number;
@@ -187,10 +195,10 @@ export interface TraceValues {
 }
 
 /** The values a preset sets (criterion 60). */
-export type PresetValues = Pick<TraceValues, "smooth" | "specks" | "corners" | "upscale" | "denoise">;
+export type PresetValues = Pick<TraceValues, "smooth" | "tolerance" | "specks" | "corners" | "upscale" | "denoise">;
 
 /** The names of the preset values: an edit of one of them makes the choice "Custom". */
-export const PRESET_FIELDS: readonly (keyof PresetValues)[] = ["smooth", "specks", "corners", "upscale", "denoise"];
+export const PRESET_FIELDS: readonly (keyof PresetValues)[] = ["smooth", "tolerance", "specks", "corners", "upscale", "denoise"];
 
 /** One preset (`trace_presets()` of the wasm module, criteria 59 and 60). */
 export interface TracePreset {
@@ -203,10 +211,10 @@ export interface TracePreset {
 /** The presets as the crate states them (the wasm module's `trace_presets()` is the source; this
  * copy is what the bar uses before the module is loaded and what the tests compare). */
 export const TRACE_PRESETS_FALLBACK: readonly TracePreset[] = [
-  { key: "logo", label: "Logo / Line art", detail: "Sharp corners, clean curves.", values: { smooth: 80, specks: 0.5, corners: 70, upscale: 1, denoise: 0 } },
-  { key: "photo", label: "Photo", detail: "Many shapes. Photos trace roughly.", values: { smooth: 50, specks: 0.1, corners: 30, upscale: 1, denoise: 0 } },
-  { key: "silhouette", label: "Silhouette for cutting/carving", detail: "Closed, simple, few nodes.", values: { smooth: 100, specks: 2, corners: 70, upscale: 1, denoise: 1 } },
-  { key: "engraving", label: "Engraving", detail: "Keeps fine lines.", values: { smooth: 80, specks: 0.1, corners: 70, upscale: 0, denoise: 0 } },
+  { key: "logo", label: "Logo / Line art", detail: "Sharp corners, clean curves.", values: { smooth: 80, tolerance: 0.5, specks: 0.5, corners: 70, upscale: 1, denoise: 0 } },
+  { key: "photo", label: "Photo", detail: "Many shapes. Photos trace roughly.", values: { smooth: 50, tolerance: 0.5, specks: 0.1, corners: 30, upscale: 1, denoise: 0 } },
+  { key: "silhouette", label: "Silhouette for cutting/carving", detail: "Closed, simple, few nodes.", values: { smooth: 100, tolerance: 1.5, specks: 2, corners: 70, upscale: 1, denoise: 1 } },
+  { key: "engraving", label: "Engraving", detail: "Keeps fine lines.", values: { smooth: 80, tolerance: 0.35, specks: 0.1, corners: 70, upscale: 0, denoise: 0 } },
 ];
 
 /** The remembered choice (criteria 40 and 66, `adrs.md` 2026-10-28 second note point 6): the
@@ -222,6 +230,7 @@ export interface TraceChoice {
 export type TraceParamName =
   | "threshold"
   | "smooth"
+  | "tolerance"
   | "specks"
   | "invert"
   | "ignore_background"
@@ -252,6 +261,7 @@ export interface TraceParam {
 export const TRACE_PARAMS_FALLBACK: readonly TraceParam[] = [
   { name: "threshold", label: "Threshold", kind: "integer", unit: "", min: 0, max: 255, default: 128, step: 1, big_step: 10, fine_step: 1, group: "threshold", advanced: false, choices: [] },
   { name: "smooth", label: "Smooth", kind: "integer", unit: "", min: 0, max: 100, default: 80, step: 1, big_step: 10, fine_step: 1, group: "smooth", advanced: false, choices: [] },
+  { name: "tolerance", label: "Tolerance", kind: "length", unit: "px", min: 0.1, max: 3, default: 0.5, step: 0.05, big_step: 0.5, fine_step: 0.01, group: "tolerance", advanced: false, choices: [] },
   { name: "specks", label: "Ignore below", kind: "length", unit: "mm", min: 0, max: 10, default: 0.5, step: 0.1, big_step: 1, fine_step: 0.01, group: "specks", advanced: false, choices: [] },
   { name: "invert", label: "Invert", kind: "toggle", unit: "", min: 0, max: 1, default: 0, step: 1, big_step: 1, fine_step: 1, group: "advanced", advanced: true, choices: [] },
   { name: "ignore_background", label: "Ignore background", kind: "toggle", unit: "", min: 0, max: 1, default: 0, step: 1, big_step: 1, fine_step: 1, group: "advanced", advanced: true, choices: [] },
@@ -456,6 +466,7 @@ export function settingsJson(values: TraceValues, threshold: number): string {
   return JSON.stringify({
     threshold,
     smooth: values.smooth,
+    tolerance: values.tolerance,
     specks: values.specks,
     corners: values.corners,
     upscale: values.upscale,
@@ -496,6 +507,7 @@ export function readChoice(
       values: {
         ...first.values,
         smooth: number(values, "smooth", "smooth"),
+        tolerance: number(values, "tolerance", "tolerance"),
         specks: number(values, "specks", "specks"),
         corners: number(values, "corners", "corners"),
         upscale: number(values, "upscale", "upscale"),

@@ -1,7 +1,8 @@
-// `specs/0025-raster-trace` criterion 18: the wasm build (the one the worker runs in both builds)
-// traces the golden fixtures of `curvyo-vectorize-core` like the native build: equal path count,
-// node count within 1 % and bounding boxes within 0.01 mm (until visioncortex's `acos` is exact,
-// `adrs.md` decision 6). Needs the wasm bindings (`npm run build:wasm`).
+// `specs/0025-raster-trace` criterion 18 and `specs/0089` criterion 13a: the wasm build (the one
+// the worker runs in both builds) traces the golden fixtures of `curvyo-vectorize-core` exactly like
+// the native build: equal path and node counts, the golden points within 1e-6 mm (the tracer uses
+// basic operations and `sqrt` only), the boxes within the sampling sag of this test. Needs the wasm
+// bindings (`npm run build:wasm`).
 
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
@@ -22,6 +23,29 @@ interface Golden {
   paths: number;
   nodes: number;
   boxes: number[][];
+  points: number[][][];
+}
+
+/** The anchors of each outline in the worker's numbers (move, line and cubic end points). */
+function anchors(wire: Float64Array): number[][][] {
+  const out: number[][][] = [];
+  let at = 7;
+  for (let o = 0; o < wire[6]; o++) {
+    const elements = wire[at++];
+    const points: number[][] = [];
+    for (let e = 0; e < elements; e++) {
+      const tag = wire[at++];
+      if (tag === 0 || tag === 1) {
+        points.push([wire[at], wire[at + 1]]);
+        at += 2;
+      } else if (tag === 3) {
+        points.push([wire[at + 4], wire[at + 5]]);
+        at += 6;
+      }
+    }
+    out.push(points);
+  }
+  return out;
 }
 
 /** The RGBA of a fixture: binary PGM (grey) or PAM (RGBA). */
@@ -95,7 +119,13 @@ test("criterion 18: the wasm trace matches the native goldens", { skip: !existsS
     );
     assert.equal(wire[0], 0, `${name}: traced`);
     assert.equal(wire[1], golden.paths, `${name}: paths`);
-    assert.ok(Math.abs(wire[2] - golden.nodes) <= Math.max(0.01 * golden.nodes, 0), `${name}: nodes ${wire[2]} vs ${golden.nodes}`);
+    assert.equal(wire[2], golden.nodes, `${name}: nodes`);
+    const points = anchors(wire);
+    golden.points.forEach((outline, i) => {
+      outline.forEach((p, k) => {
+        assert.ok(Math.abs(points[i][k][0] - p[0]) <= 1e-6 && Math.abs(points[i][k][1] - p[1]) <= 1e-6, `${name} point ${i}.${k}: ${points[i][k]} vs ${p}`);
+      });
+    });
     const actual = boxes(wire);
     golden.boxes.forEach((expected, i) => {
       expected.forEach((v, k) => {

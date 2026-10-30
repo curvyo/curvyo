@@ -17,7 +17,7 @@ export interface TraceFieldProps {
 /** The width of a Trace bar field, px (UX notes 20.1). */
 const TRACE_FIELD_WIDTH = 168;
 
-const UNIT_WORDS: Readonly<Record<string, string>> = { "%": "percent", mm: "millimetres" };
+const UNIT_WORDS: Readonly<Record<string, string>> = { "%": "percent", mm: "millimetres", px: "pixels" };
 
 /**
  * One value field of the Trace bar (`specs/0025-raster-trace` criteria 5 and 71, UX notes 20.1):

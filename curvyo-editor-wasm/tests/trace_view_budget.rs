@@ -43,14 +43,15 @@ fn squares(count: usize) -> Vec<f64> {
     wire
 }
 
-/// A session with one imported `side` x `side` px picture of black discs of radius 7 px on a
-/// 24 px grid, selected in the Trace tool.
+/// A session with one imported `side` x `side` px picture of black discs of radius 4.9 px on an
+/// 18 px grid (over 100,000 nodes with the tracer of `specs/0089` slice D), selected in the Trace
+/// tool.
 fn traced_image(side: u32) -> (Session, NodeId) {
     let mut rgba = Vec::with_capacity((side * side * 4) as usize);
     for y in 0..side {
         for x in 0..side {
-            let (dx, dy) = (f64::from(x % 24) - 11.5, f64::from(y % 24) - 11.5);
-            let v = if dx * dx + dy * dy < 49.0 { 0 } else { 255 };
+            let (dx, dy) = (f64::from(x % 18) - 8.5, f64::from(y % 18) - 8.5);
+            let v = if dx * dx + dy * dy < 24.0 { 0 } else { 255 };
             rgba.extend([v, v, v, 255]);
         }
     }
