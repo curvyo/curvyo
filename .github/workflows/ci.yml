@@ -203,6 +203,55 @@ jobs:
           path: frontend/dist
           retention-days: 7
 
+  # Browser tests (nightly only, customer 2026-10-30, Frage 100 B): the
+  # frontend tests that drive a real Chromium skip themselves unless
+  # CURVYO_E2E_BROWSER is set. They run one file at a time, because files
+  # run in parallel fight over the browser and hang.
+  frontend-e2e:
+    name: frontend e2e (nightly)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install the pinned Rust toolchain
+        run: rustup show
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: npm ci
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install wasm-bindgen CLI matching Cargo.lock
+        run: |
+          set -euo pipefail
+          version=$(grep -A1 '^name = "wasm-bindgen"$' Cargo.lock | grep '^version' | head -1 | sed -E 's/version = "(.*)"/\1/')
+          cargo install wasm-bindgen-cli --version "$version" --locked
+
+      - name: Build the wasm-bindgen JS bindings
+        working-directory: frontend
+        run: npm run build:wasm
+
+      - name: Browser tests, one file at a time
+        working-directory: frontend
+        env:
+          CURVYO_E2E_BROWSER: /usr/bin/google-chrome
+        run: |
+          set -euo pipefail
+          for f in tests/*.test.ts; do
+            echo "::group::$f"
+            timeout 1200 node --test --test-concurrency=1 "$f"
+            echo "::endgroup::"
+          done
+
   # The full host gate (fmt, clippy, nextest) over the whole workspace.
   # Ubuntu only on pull_request/push; the nightly run (schedule,
   # workflow_dispatch) adds windows and macos because curvyo-app (Tauri)
