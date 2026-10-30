@@ -1,0 +1,11 @@
+{
+  "id": "customer-lion-logo",
+  "file": "tests/assets/trace-references/181389.png",
+  "group": "logos",
+  "use": "area engraving",
+  "preserve": "every mane strand as its own shape with sharp tips, the face cut-outs (eyes, nose, mouth) as holes",
+  "dpi": 150,
+  "origin": "openclipart.org (added by the customer 2026-10-29)",
+  "harness": "decoded in place; reduced by area averaging to at most 2000 px on the longest side",
+  "licence": "CC0 1.0"
+}

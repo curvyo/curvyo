@@ -1,0 +1,11 @@
+{
+  "id": "customer-eagle-mountains",
+  "file": "tests/assets/trace-references/354704.png",
+  "group": "graphics",
+  "use": "cut contour",
+  "preserve": "the bird with its wing tips sharp, the mountain peaks sharp, the snow caps and trees as holes or separate shapes, the clouds",
+  "dpi": 150,
+  "origin": "openclipart.org (added by the customer 2026-10-29)",
+  "harness": "decoded in place; reduced by area averaging to at most 2000 px on the longest side",
+  "licence": "CC0 1.0"
+}

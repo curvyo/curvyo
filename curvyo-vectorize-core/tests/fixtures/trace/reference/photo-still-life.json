@@ -1,0 +1,15 @@
+{
+  "id": "photo-still-life",
+  "file": "photo-still-life.jpg",
+  "group": "paper-photo",
+  "use": "area engraving",
+  "preserve": "the sphere, cube and pyramid outlines; low contrast, glare not content",
+  "dpi": 150,
+  "origin": "https://commons.wikimedia.org/wiki/File:Photo_of_still_life_sketch_or_drawing.jpg",
+  "author": "Teo Jin Cheng took this photo of the drawing. This drawing was created by Teo Jin Cheng and Art Pazionate(Singapore)",
+  "licence": "CC0 1.0",
+  "licence_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "retrieved": "2026-10-29",
+  "modified": "Wikimedia Commons thumbnail (3366 x 3060 original), resized to 640 x 582 px and metadata stripped with ImageMagick, re-encoded as JPEG quality 92",
+  "title": "Photo of still life sketch or drawing.jpg"
+}

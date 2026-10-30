@@ -1,0 +1,11 @@
+{
+  "id": "customer-ladybug-colour",
+  "file": "tests/assets/trace-references/61741.png",
+  "group": "graphics",
+  "use": "area engraving",
+  "preserve": "the body outline, the antennae, the stars; the red and the highlights follow the Threshold (visual check)",
+  "dpi": 150,
+  "origin": "openclipart.org (added by the customer 2026-10-29)",
+  "harness": "decoded in place; reduced by area averaging to at most 2000 px on the longest side",
+  "licence": "CC0 1.0"
+}

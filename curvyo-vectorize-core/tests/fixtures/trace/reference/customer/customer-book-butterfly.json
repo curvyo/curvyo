@@ -1,0 +1,11 @@
+{
+  "id": "customer-book-butterfly",
+  "file": "tests/assets/trace-references/book_butterfly.png",
+  "group": "line-drawings",
+  "use": "line plot",
+  "preserve": "the open book, the flowers and the butterflies as separate small shapes",
+  "dpi": 150,
+  "origin": "the customer's own work (added by the customer 2026-10-29)",
+  "harness": "decoded in place; reduced by area averaging to at most 2000 px on the longest side",
+  "licence": "CC0 1.0"
+}

@@ -7,9 +7,11 @@
 //!
 //! `quality_table` traces the synthetic black and white set at the default settings, prints the
 //! metrics of `research.md` section 5 per image, prints the gap to Inkscape's default run, and
-//! fails when a metric is more than 5 % (plus 0.001) worse than the committed `candidate` run in
-//! `tests/fixtures/trace/baseline.json`, or a micro path or open outline appears (criterion 28,
-//! the nightly job, criterion 36).
+//! fails on a miss of the guard of `specs/0089` criterion 9a against the committed `candidate`
+//! run in `tests/fixtures/trace/baseline.json` (nodes and wobble per image within +25 % or the
+//! absolute floor, the true-shape area error within +5 % plus 0.5 points; the deviations from
+//! the pixel border are reported on this synthetic set), or when a micro path or open outline
+//! appears (criterion 28 as amended, the nightly job, criterion 36).
 //! `CURVYO_UPDATE_BASELINE=1` rewrites our run in that file. With `TRACE_BASELINE_DIR` set it
 //! also measures Inkscape's results found there as `<image>.inkscape-default.svg` and
 //! `<image>.inkscape-best.svg` (`tools/trace-baseline/README.md`) and stores their numbers.
@@ -174,8 +176,8 @@ fn set_with_photograph() -> Vec<QualityImage> {
     set
 }
 
-/// The 4-connected regions of `mask` equal to `value`: each region's pixels and whether it
-/// touches the border.
+/// The regions of `mask` equal to `value` (foreground 8-connected, background 4-connected, as
+/// the tracer labels them): each region's pixels and whether it touches the border.
 fn regions(mask: &[bool], width: usize, height: usize, value: bool) -> Vec<(Vec<usize>, bool)> {
     let mut seen = vec![false; mask.len()];
     let mut found = Vec::new();
@@ -208,6 +210,14 @@ fn regions(mask: &[bool], width: usize, height: usize, value: bool) -> Vec<(Vec<
             }
             if y + 1 < height {
                 visit(i + width);
+            }
+            if value {
+                for (dx, dy) in [(-1_i64, -1_i64), (1, -1), (-1, 1), (1, 1)] {
+                    let (nx, ny) = (x as i64 + dx, y as i64 + dy);
+                    if nx >= 0 && ny >= 0 && (nx as usize) < width && (ny as usize) < height {
+                        visit(ny as usize * width + nx as usize);
+                    }
+                }
             }
         }
         found.push((pixels, border));
@@ -287,8 +297,13 @@ fn metrics_json(m: &Metrics) -> Value {
     Value::Object(map)
 }
 
-/// The criterion 28 misses of `ours`: worse than the committed `candidate` numbers by more than
-/// 5 % plus 0.001 absolute, any micro path, or an outline that is not closed.
+/// The misses of `ours` against the committed `candidate` numbers, with the guard of
+/// `specs/0089` criterion 9a (which replaces criterion 28's +5 % on every metric for the
+/// geometry metrics): any micro path or an outline that is not closed; nodes and wobble per
+/// 100 mm above the larger of +25 % and +3 nodes or +2 flips; the deviations from the pixel
+/// border (max, mean, area error against the thresholded mask) are reported only on this
+/// synthetic set (9a guards them on real images and guards the true-shape error instead, see
+/// `quality_table`).
 fn misses(ours: &Metrics, committed: Option<&Value>) -> Vec<String> {
     let mut out = Vec::new();
     if ours.micro_paths > 0.0 {
@@ -300,16 +315,28 @@ fn misses(ours: &Metrics, committed: Option<&Value>) -> Vec<String> {
     let Some(committed) = committed else {
         return out;
     };
-    for (name, value) in Metrics::NAMES.iter().zip(ours.values()) {
-        if matches!(*name, "closed_pct" | "micro_paths") {
-            continue;
-        }
-        let old = committed[*name].as_f64().unwrap_or(f64::NAN);
-        if value > old * 1.05 + 1e-3 {
-            out.push(format!("{name}: {old} -> {value:.4}"));
+    for (name, floor) in [("node_density", 3.0), ("wobble", 2.0)] {
+        let old = committed[name].as_f64().unwrap_or(f64::NAN);
+        let value = match name {
+            "node_density" => ours.node_density,
+            _ => ours.wobble,
+        };
+        let limit = (old * 1.25).max(old + floor);
+        if value > limit + 1e-9 {
+            out.push(format!("{name}: {old} -> {value:.4} (limit {limit:.4})"));
         }
     }
     out
+}
+
+/// The true-shape miss of a preset run (`specs/0089` criterion 9a: at most the baseline plus
+/// 5 % plus half a percentage point).
+fn true_shape_miss(ours: Option<f64>, committed: Option<&Value>) -> Option<String> {
+    let value = ours?;
+    let old = committed?.get("area_error_true_pct")?.as_f64()?;
+    let limit = old * 1.05 + 0.5;
+    (value > limit + 1e-9)
+        .then(|| format!("area_error_true_pct: {old} -> {value:.4} (limit {limit:.4})"))
 }
 
 /// Prints the gap to Inkscape's default run per metric; a gap is information, not a miss.
@@ -411,6 +438,9 @@ fn quality_table() {
             for miss in misses(&run.metrics, committed) {
                 regressions.push(format!("{} {}: {miss}", preset.key, image.name));
             }
+            if let Some(miss) = true_shape_miss(run.area_error_true_pct, committed) {
+                regressions.push(format!("{} {}: {miss}", preset.key, image.name));
+            }
             let mut values = metrics_json(&run.metrics);
             values["area_error_true_pct"] =
                 json!(run.area_error_true_pct.map(|v| (v * 1e4).round() / 1e4));
@@ -418,25 +448,8 @@ fn quality_table() {
         }
         profiles.insert(preset.key.to_string(), Value::Object(stored));
     }
-    // Criterion 65: Logo / Line art equals the stored candidate of criterion 28.
-    for image in &set {
-        let logo = metrics_json(&runs["logo"][image.name].metrics);
-        let Some(committed) = baseline.get("candidate").and_then(|c| c.get(image.name)) else {
-            continue;
-        };
-        for name in Metrics::NAMES {
-            let (a, b) = (
-                logo[name].as_f64().unwrap(),
-                committed[name].as_f64().unwrap_or(f64::NAN),
-            );
-            if name != "micro_paths" && (a - b).abs() > 1e-9 {
-                regressions.push(format!(
-                    "logo {}: {name} {a} differs from candidate {b}",
-                    image.name
-                ));
-            }
-        }
-    }
+    // Criterion 65 (Logo / Line art equals the stored candidate) is lifted by `specs/0089`
+    // (Frage 87 A: Logo may change); the candidate stays the measured reference of the guard.
     if std::env::var_os("CURVYO_UPDATE_BASELINE").is_some() || baseline_dir.is_some() {
         baseline["candidate_profiles"] = Value::Object(profiles);
         baseline["candidate"] = serde_json::to_value(&ours_all).unwrap();
@@ -454,7 +467,7 @@ fn quality_table() {
     }
     assert!(
         regressions.is_empty(),
-        "worse than the committed candidate (+5 %, +0.001):\n{}",
+        "misses of the guard of `specs/0089` criterion 9a against the committed candidate:\n{}",
         regressions.join("\n")
     );
 }

@@ -1,0 +1,15 @@
+{
+  "id": "clipart-clock",
+  "file": "clipart-clock.png",
+  "group": "graphics",
+  "use": "cut contour",
+  "preserve": "the round frame with its hole, the 12 hour ticks and numbers as separate shapes",
+  "dpi": 96,
+  "origin": "https://commons.wikimedia.org/wiki/File:Clock_clipart_nohands.png",
+  "author": "Mtanti",
+  "licence": "CC0 1.0",
+  "licence_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "retrieved": "2026-10-29",
+  "modified": "Wikimedia Commons thumbnail (548 x 548 original), resized to 548 x 548 px and metadata stripped with ImageMagick",
+  "title": "Clock clipart nohands.png"
+}

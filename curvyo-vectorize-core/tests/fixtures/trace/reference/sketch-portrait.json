@@ -1,0 +1,15 @@
+{
+  "id": "sketch-portrait",
+  "file": "sketch-portrait.jpg",
+  "group": "sketches",
+  "use": "area engraving",
+  "preserve": "face lines, braid texture, signature; paper grain not content",
+  "dpi": 150,
+  "origin": "https://commons.wikimedia.org/wiki/File:Pencil_sketch_1st_May.jpg",
+  "author": "PVRMurty1944",
+  "licence": "CC0 1.0",
+  "licence_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "retrieved": "2026-10-29",
+  "modified": "Wikimedia Commons thumbnail (720 x 548 original), resized to 640 x 487 px and metadata stripped with ImageMagick, re-encoded as JPEG quality 92",
+  "title": "Pencil sketch 1st May.jpg"
+}

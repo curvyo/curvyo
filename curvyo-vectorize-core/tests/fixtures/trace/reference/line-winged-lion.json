@@ -1,0 +1,15 @@
+{
+  "id": "line-winged-lion",
+  "file": "line-winged-lion.jpg",
+  "group": "line-drawings",
+  "use": "area engraving",
+  "preserve": "wing feathers separate, mane strands, eye",
+  "dpi": 150,
+  "origin": "https://commons.wikimedia.org/wiki/File:A_line_drawing_of_a_lion_with_wings_(public_domain).jpg",
+  "author": "Jerimee",
+  "licence": "CC0 1.0",
+  "licence_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "retrieved": "2026-10-29",
+  "modified": "Wikimedia Commons thumbnail (1080 x 1080 original), resized to 640 x 640 px and metadata stripped with ImageMagick, re-encoded as JPEG quality 92",
+  "title": "A line drawing of a lion with wings (public domain).jpg"
+}

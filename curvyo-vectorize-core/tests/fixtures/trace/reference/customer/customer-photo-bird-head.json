@@ -1,0 +1,11 @@
+{
+  "id": "customer-photo-bird-head",
+  "file": "tests/assets/trace-references/20261029_171129.jpg",
+  "group": "paper-photo",
+  "use": "line plot",
+  "preserve": "the hatching of the bird head on the sheet; the desk, the sheet edge and the shadow are not content (visual check)",
+  "dpi": 150,
+  "origin": "phone photo made by the customer on 2026-10-29 (added by the customer 2026-10-29)",
+  "harness": "decoded in place; reduced by area averaging to at most 2000 px on the longest side",
+  "licence": "CC0 1.0"
+}

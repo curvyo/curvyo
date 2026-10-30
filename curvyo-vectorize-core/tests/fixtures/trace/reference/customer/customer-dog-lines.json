@@ -1,0 +1,11 @@
+{
+  "id": "customer-dog-lines",
+  "file": "tests/assets/trace-references/dog_lines.png",
+  "group": "sketches",
+  "use": "line plot",
+  "preserve": "the dog's outline, the eyes and the nose; the thin lines unbroken where they are unbroken (visual check)",
+  "dpi": 150,
+  "origin": "the customer's own work (added by the customer 2026-10-29)",
+  "harness": "decoded in place; reduced by area averaging to at most 2000 px on the longest side",
+  "licence": "CC0 1.0"
+}

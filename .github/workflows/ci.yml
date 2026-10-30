@@ -393,9 +393,10 @@ jobs:
           cargo test --release -p curvyo-editor-wasm --test placement_frame_budget -- --nocapture
           cargo test --release -p curvyo-editor-wasm --test font_preview_budget -- --nocapture
 
-  # The tracer's quality harness, its 2000 x 2000 px budget and its 16 Mpx memory test
-  # (specs/0025-raster-trace criteria 25 to 28, 36): nightly only, never the PR gate. A metric
-  # more than 5 % worse than tests/fixtures/trace/baseline.json fails the run.
+  # The tracer's quality harness, its 2000 x 2000 px budget, its 16 Mpx memory test
+  # (specs/0025-raster-trace criteria 25 to 28, 36) and the reference set (specs/0089 slice A):
+  # nightly only, never the PR gate. A metric more than 5 % worse than
+  # tests/fixtures/trace/baseline.json fails the run.
   trace-quality:
     name: trace quality harness (nightly)
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
@@ -413,6 +414,13 @@ jobs:
         run: |
           cargo test --release -p curvyo-vectorize-core --test quality -- --ignored --nocapture --test-threads=1
           cargo test --release -p curvyo-vectorize-core --test memory -- --ignored --nocapture
+
+      # specs/0089-trace-quality-and-colour slice A: the reference set at three resolutions with all
+      # four presets (about 1 minute on the build host), guarded at +5 % like the harness above.
+      - name: Run the reference set in release
+        timeout-minutes: 15
+        run: |
+          cargo test --release -p curvyo-vectorize-core --test reference -- --ignored --nocapture --test-threads=1 reference_table
 
   # Criterion 43 of specs/0016-boolean-operations: the golden results of the boolean kernel are
   # compared in the build that ships to the browser, run in Node by wasm-bindgen-test-runner

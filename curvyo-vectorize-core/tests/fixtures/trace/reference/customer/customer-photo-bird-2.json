@@ -1,0 +1,11 @@
+{
+  "id": "customer-photo-bird-2",
+  "file": "tests/assets/trace-references/20261029_171145.jpg",
+  "group": "paper-photo",
+  "use": "line plot",
+  "preserve": "as customer-photo-bird-1, another angle (visual check)",
+  "dpi": 150,
+  "origin": "phone photo made by the customer on 2026-10-29 (added by the customer 2026-10-29)",
+  "harness": "decoded in place; reduced by area averaging to at most 2000 px on the longest side",
+  "licence": "CC0 1.0"
+}

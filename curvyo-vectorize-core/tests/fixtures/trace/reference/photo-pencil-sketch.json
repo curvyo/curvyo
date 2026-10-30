@@ -1,0 +1,15 @@
+{
+  "id": "photo-pencil-sketch",
+  "file": "photo-pencil-sketch.jpg",
+  "group": "paper-photo",
+  "use": "line plot",
+  "preserve": "the drawn lines; the table, the shadow and the paper edge are not content",
+  "dpi": 150,
+  "origin": "https://commons.wikimedia.org/wiki/File:Pencil_Sketch.jpg",
+  "author": "THE GOKUL",
+  "licence": "CC0 1.0",
+  "licence_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "retrieved": "2026-10-29",
+  "modified": "Wikimedia Commons thumbnail (4160 x 3120 original), resized to 640 x 480 px and metadata stripped with ImageMagick, re-encoded as JPEG quality 92",
+  "title": "Pencil Sketch.jpg"
+}
