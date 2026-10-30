@@ -1,3 +1,4 @@
+import { PagesBlock } from "@/components/panel/PagesBlock";
 import { CircleAlert } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
@@ -145,6 +146,7 @@ export function DocumentSection({
           </div>
         </Tooltip>
       </StyleRow>
+      <PagesBlock document={doc} onReturnFocus={onReturnFocus} />
       <StyleRow label="Unit">
         <ToggleGroup
           label="Display unit"

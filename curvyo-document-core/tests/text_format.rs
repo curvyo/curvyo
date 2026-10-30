@@ -4,6 +4,9 @@
 
 #![allow(clippy::unwrap_used)]
 
+#[path = "support/pre_pages_ids.rs"]
+mod pre_pages_ids;
+
 use std::io::{Cursor, Read, Write};
 use std::path::PathBuf;
 
@@ -143,7 +146,14 @@ fn ac28_golden_file_and_round_trip() {
     let stored = std::fs::read(fixture_path(GOLDEN)).unwrap();
     assert_eq!(manifest_version(&stored), TEXT_FORMAT_VERSION);
     let opened = unpack(2, &stored).unwrap();
-    assert_eq!(texts(&opened), texts(&document));
+    let expected_texts: Vec<_> = texts(&document)
+        .into_iter()
+        .map(|mut text| {
+            text.id = pre_pages_ids::node(text.id);
+            text
+        })
+        .collect();
+    assert_eq!(texts(&opened), expected_texts);
     assert_eq!(texts(&opened).len(), 5);
     let again = unpack(3, &pack(&opened, "t").unwrap()).unwrap();
     assert_eq!(again.export_json().unwrap(), opened.export_json().unwrap());

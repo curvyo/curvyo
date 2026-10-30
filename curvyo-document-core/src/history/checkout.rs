@@ -11,7 +11,7 @@ use loro::{FractionalIndex, Frontiers, LoroDoc, TreeID, TreeParentId};
 
 use super::error::HistoryError;
 use super::node_value::{Node, read_map};
-use crate::document::{Document, OBJECTS_TREE, ROOT_MAP};
+use crate::document::{OBJECTS_TREE, ROOT_MAP};
 use crate::document_background::{DocumentBackground, background_of_root};
 use crate::path_model::NodeId;
 use crate::primitive_model::ObjectSnapshot;
@@ -113,10 +113,23 @@ impl<'a> Detached<'a> {
         object_in(&self.doc.get_tree(OBJECTS_TREE), id)
     }
 
+    /// The spatial frames at this version.
+    pub(crate) fn pages(&self) -> Vec<crate::Page> {
+        crate::pages::pages_of_root(&self.doc.get_map(ROOT_MAP))
+    }
+
     /// The page at this version: its size and background.
     pub(crate) fn page(&self) -> (DocumentSize, DocumentBackground) {
         let root = self.doc.get_map(ROOT_MAP);
-        (Document::size_of_root(&root), background_of_root(&root))
+        {
+            let pages = self.pages();
+            let size = pages
+                .iter()
+                .find(|p| p.id == crate::FIRST_PAGE_ID)
+                .or_else(|| pages.first())
+                .map_or_else(DocumentSize::default, |p| p.size);
+            (size, background_of_root(&root))
+        }
     }
 
     /// The children of `parent` (`None` is the document root) in z-order at this version.

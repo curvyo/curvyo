@@ -4,6 +4,9 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::float_cmp)]
 
+#[path = "support/pre_pages_ids.rs"]
+mod pre_pages_ids;
+
 use std::io::{Cursor, Read, Write};
 use std::path::PathBuf;
 
@@ -267,8 +270,13 @@ fn ac37_the_golden_reads_back_and_opening_it_writes_nothing() {
     assert_eq!(manifest_version(&bytes), OVERRIDES_FORMAT_VERSION);
     let d = unpack(2, &bytes).unwrap();
     assert_eq!(d.read_objects().orphans, Vec::<NodeId>::new());
-    // The ids of the golden are those `golden()` mints: the build is deterministic.
-    let g = golden();
+    // Initial page registers add four operations before newly allocated node IDs.
+    let mut g = golden();
+    g.placed = pre_pages_ids::node(g.placed);
+    g.styled = pre_pages_ids::node(g.styled);
+    g.both = pre_pages_ids::node(g.both);
+    g.middle = pre_pages_ids::node(g.middle);
+    g.behind = pre_pages_ids::node(g.behind);
     let (placed, styled, both) = (
         clone_of(&d, g.placed),
         clone_of(&d, g.styled),

@@ -61,6 +61,13 @@ impl Session {
         if self.tool != Tool::Select {
             return "default".to_string();
         }
+        if self.page_drag.is_some()
+            || self
+                .pointer_position
+                .is_some_and(|p| self.page_edge_at(p).is_some())
+        {
+            return "move".to_owned();
+        }
         if let Some(hint) = self.gesture_cursor() {
             return hint.to_string();
         }

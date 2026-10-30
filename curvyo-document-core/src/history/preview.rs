@@ -22,6 +22,8 @@ pub struct HistoricalDocument {
     pub objects: Vec<ObjectSnapshot>,
     /// The page size at that version.
     pub size: DocumentSize,
+    /// Spatial frames at this version.
+    pub pages: Vec<crate::Page>,
     /// The background at that version.
     pub background: DocumentBackground,
     /// The objects among `objects` that were guides at that version, drawn in the marking style
@@ -70,11 +72,13 @@ impl Document {
         };
         let (size, background) = guard.page();
         let guides = guard.guides(&objects);
+        let pages = guard.pages();
         drop(guard);
         Ok(HistoricalDocument {
             step,
             objects,
             size,
+            pages,
             background,
             guides,
         })

@@ -5,6 +5,9 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::float_cmp)]
 
+#[path = "support/pre_pages_ids.rs"]
+mod pre_pages_ids;
+
 use std::io::{Cursor, Read, Write};
 use std::path::PathBuf;
 
@@ -257,7 +260,10 @@ fn the_golden_reads_back_and_opening_it_writes_nothing() {
     assert!(!reads[4].visible);
     assert!(reads[6].locked);
     assert_eq!(reads[6].registers.name.as_deref(), Some(MARKUP_NAME));
-    assert_eq!(json(&document), json(&golden_document()));
+    assert_eq!(
+        json(&document),
+        pre_pages_ids::value(&json(&golden_document()))
+    );
     let stored = LoroDoc::new();
     stored.import(&member(&bytes, "document.loro")).unwrap();
     assert_eq!(loro_of(&document).oplog_vv(), stored.oplog_vv());

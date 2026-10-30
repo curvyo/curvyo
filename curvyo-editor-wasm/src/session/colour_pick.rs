@@ -117,8 +117,24 @@ impl Session {
             point,
             self.object_tolerance(),
             self.document.size(),
-            self.document.background(),
+            DocumentBackground {
+                paint: BackgroundPaint::None,
+                ..self.document.background()
+            },
         )
+        .or_else(|| {
+            let bg = self.document.background();
+            (bg.paint == BackgroundPaint::Solid
+                && self.document.pages().iter().any(|p| {
+                    p.size
+                        .contains(Point::new(point.x - p.origin.x, point.y - p.origin.y))
+                }))
+            .then_some(PickedColour {
+                color: bg.color,
+                opacity: bg.opacity,
+                paint: PaintTarget::Background,
+            })
+        })
     }
 
     /// The pointer moved while picking: remembers what a click would take.

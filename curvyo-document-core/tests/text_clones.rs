@@ -5,6 +5,9 @@
 
 #![allow(clippy::unwrap_used)]
 
+#[path = "support/pre_pages_ids.rs"]
+mod pre_pages_ids;
+
 use std::path::PathBuf;
 
 use curvyo_document_core::{
@@ -534,7 +537,10 @@ fn golden_file_of_format_23() {
     }
     let stored = std::fs::read(fixture_path(GOLDEN)).unwrap();
     let opened = unpack(3, &stored).unwrap();
-    assert_eq!(opened.read_objects().objects, d.read_objects().objects);
+    assert_eq!(
+        serde_json::to_value(opened.read_objects().objects).unwrap(),
+        pre_pages_ids::value(&d.read_objects().objects)
+    );
     let again = unpack(4, &pack(&opened, "0.1.0").unwrap()).unwrap();
-    assert_eq!(again.read_objects().objects, d.read_objects().objects);
+    assert_eq!(again.read_objects().objects, opened.read_objects().objects);
 }

@@ -451,3 +451,6 @@ pub use viewport::{DOCUMENT_INSET_PX, PX_PER_MM_AT_100, Viewport, Zoom};
 pub use weld_plan::{
     WELD_COMMIT_LABEL, WeldAvailability, WeldPlan, WeldRefusal, plan_weld, weld_availability,
 };
+
+mod pages;
+pub use pages::PageViewState;

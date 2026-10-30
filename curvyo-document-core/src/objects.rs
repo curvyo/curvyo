@@ -152,6 +152,25 @@ impl Document {
     /// # Errors
     /// [`ObjectEditError::NoSuchObject`] if any named id no longer exists.
     pub fn translate_objects(&self, ids: &[NodeId], offset: Vec2) -> Result<(), ObjectEditError> {
+        self.translate_objects_holding(ids, offset, false)
+    }
+
+    /// Page movement keeps every unselected clone at its global position, without
+    /// changing the clone's ordinary own-placement preference.
+    pub(crate) fn translate_page_objects(
+        &self,
+        ids: &[NodeId],
+        offset: Vec2,
+    ) -> Result<(), ObjectEditError> {
+        self.translate_objects_holding(ids, offset, true)
+    }
+
+    fn translate_objects_holding(
+        &self,
+        ids: &[NodeId],
+        offset: Vec2,
+        hold_all: bool,
+    ) -> Result<(), ObjectEditError> {
         let ids = dedup_ids(ids);
         let tree = self.loro().get_tree(OBJECTS_TREE);
         let metas: Vec<_> = ids
@@ -165,8 +184,12 @@ impl Document {
                     .map_err(|_| ObjectEditError::NoSuchObject)
             })
             .collect::<Result<_, _>>()?;
-        let (clones, hold) =
-            self.moved_clone_matrices(&ids, crate::affine::Affine::translation(offset))?;
+        let transform = crate::affine::Affine::translation(offset);
+        let (clones, hold) = if hold_all {
+            self.moved_clone_matrices_holding(&ids, transform, true)?
+        } else {
+            self.moved_clone_matrices(&ids, transform)?
+        };
         for (meta, id) in metas.iter().zip(&ids) {
             match clones.get(id) {
                 Some(&(origin, matrix)) => {
@@ -197,6 +220,22 @@ impl Document {
         ),
         ObjectEditError,
     > {
+        self.moved_clone_matrices_holding(ids, g, false)
+    }
+
+    #[allow(clippy::type_complexity)]
+    fn moved_clone_matrices_holding(
+        &self,
+        ids: &[NodeId],
+        g: crate::affine::Affine,
+        hold_all: bool,
+    ) -> Result<
+        (
+            std::collections::HashMap<NodeId, (NodeId, crate::affine::Affine)>,
+            crate::clone_hold::HoldPlan,
+        ),
+        ObjectEditError,
+    > {
         let links = self.clone_links();
         if links.is_empty() {
             return Ok((
@@ -204,7 +243,11 @@ impl Document {
                 crate::clone_hold::HoldPlan::default(),
             ));
         }
-        let own_placement = self.own_placement_clones();
+        let own_placement = if hold_all {
+            links.keys().copied().collect()
+        } else {
+            self.own_placement_clones()
+        };
         let decided = crate::clone_transform::clone_matrices_after(&links, &own_placement, ids, g);
         let hold = self
             .plan_hold(&links, &decided)

@@ -4,6 +4,9 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
+#[path = "support/pre_pages_ids.rs"]
+mod pre_pages_ids;
+
 use std::io::{Cursor, Read, Write};
 use std::path::PathBuf;
 
@@ -178,7 +181,12 @@ fn c30_the_golden_reads_back_and_opening_it_writes_nothing() {
     let bytes = std::fs::read(fixture_path(GOLDEN)).unwrap();
     assert_eq!(manifest_version(&bytes), GUIDE_FORMAT_VERSION);
     let d = unpack(2, &bytes).unwrap();
-    let g = golden();
+    let mut g = golden();
+    g.path = pre_pages_ids::node(g.path);
+    g.clone = pre_pages_ids::node(g.clone);
+    g.circle = pre_pages_ids::node(g.circle);
+    g.ring = pre_pages_ids::node(g.ring);
+    g.ordinary = pre_pages_ids::node(g.ordinary);
     // A clone sits directly after its origin.
     assert_eq!(guides_of(&d), vec![g.path, g.clone, g.circle, g.ring]);
     assert!(!d.node_registers(g.clone).unwrap().guide, "the clone reads");

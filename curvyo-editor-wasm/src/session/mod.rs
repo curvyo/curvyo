@@ -88,6 +88,8 @@ mod offset;
 mod offset_chip;
 mod offset_view;
 mod open_error;
+mod page_drag;
+mod pages;
 mod panel_tabs;
 mod pen;
 mod pen_entry;
@@ -314,6 +316,8 @@ pub struct Session {
     /// The Background block's drag in flight: drawn in place of the stored background,
     /// committed once on release, never in the document (`background.rs`).
     background_preview: Option<curvyo_document_core::DocumentBackground>,
+    page_view: curvyo_ui_core::PageViewState,
+    page_drag: Option<page_drag::PageDrag>,
     /// The document formats: the built-in list with the maker's file over it
     /// (`formats.rs`).
     formats: curvyo_document_core::FormatLibrary,
@@ -479,6 +483,8 @@ impl Session {
             panel_tabs: std::cell::Cell::new(curvyo_ui_core::PanelTabs::new(false)),
             colour_pick: colour_pick::ColourPick::default(),
             background_preview: None,
+            page_view: curvyo_ui_core::PageViewState::default(),
+            page_drag: None,
             viewport: Viewport::new(),
             canvas_css_width: 0.0,
             covered_right: 0.0,
@@ -553,6 +559,8 @@ impl Session {
             panel_tabs: std::cell::Cell::new(curvyo_ui_core::PanelTabs::new(false)),
             colour_pick: colour_pick::ColourPick::default(),
             background_preview: None,
+            page_view: curvyo_ui_core::PageViewState::default(),
+            page_drag: None,
             viewport: Viewport::new(),
             canvas_css_width: 0.0,
             covered_right: 0.0,
@@ -704,6 +712,8 @@ impl Session {
             if this.history_preview_takes_press() {
                 return;
             }
+            this.page_view.press(&this.document.pages(), point);
+
             // Same flush as `set_tool`'s own doc comment explains: a canvas
             // click can change the selection (e.g. selecting a different
             // star) before a pending ratio-slider preview ever gets a
@@ -725,6 +735,9 @@ impl Session {
             // Pick mode and the drags of a selected text on path take the press (`0080`).
             if this.text_path_pointer_down(point, shift) {
                 this.button_down = true;
+                return;
+            }
+            if this.page_drag_start(point) {
                 return;
             }
             if this.refuse_drawing_into_layer() {
@@ -781,6 +794,9 @@ impl Session {
             return;
         };
         self.pointer_position = Some(point);
+        if self.page_drag_move(point) {
+            return;
+        }
         self.hovered = None;
         self.hovered_object = None;
         self.held.shift = shift;
@@ -851,6 +867,10 @@ impl Session {
                 this.cancel_gesture();
                 return;
             };
+            if this.page_drag_end(point) {
+                return;
+            }
+            this.page_view.press(&this.document.pages(), point);
             match this.tool {
                 Tool::Select => {
                     this.select_pointer_up(point, shift, constrain);

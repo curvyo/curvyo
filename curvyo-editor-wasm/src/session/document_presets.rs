@@ -18,7 +18,7 @@ impl Session {
     pub fn document_presets_view(&self) -> PresetsView {
         presets_view(
             self.formats.list(),
-            self.document.size(),
+            self.active_page().size,
             self.display_unit(),
         )
     }
@@ -26,7 +26,7 @@ impl Session {
     /// A press on the preset `id` (criteria 11 to 13): the preset's size in the
     /// orientation of the rule, as the typed resize applies it.
     pub fn apply_document_preset(&mut self, id: &str) -> SizeOutcome {
-        match preset_pick_size(self.formats.list(), self.document.size(), id) {
+        match preset_pick_size(self.formats.list(), self.active_page().size, id) {
             Some(size) => self.resize_document_to(size),
             None => SizeOutcome::Invalid,
         }
@@ -35,7 +35,7 @@ impl Session {
     /// A press on an orientation item (criterion 14): width and height swap; the
     /// pressed item and a square document write nothing.
     pub fn set_document_orientation(&mut self, wanted: Orientation) -> SizeOutcome {
-        match orientation_swap(self.document.size(), wanted) {
+        match orientation_swap(self.active_page().size, wanted) {
             Some(size) => self.resize_document_to(size),
             None => SizeOutcome::Unchanged,
         }

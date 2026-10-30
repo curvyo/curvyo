@@ -218,7 +218,7 @@ impl Document {
 
 /// The checks of the numbers of `results`, before anything else: the stroke widths
 /// (when they are written) and the finiteness of every coordinate and angle.
-fn check_numbers(
+pub(crate) fn check_numbers(
     results: &[ObjectSnapshot],
     write_stroke_width: bool,
 ) -> Result<(), ObjectEditError> {

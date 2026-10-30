@@ -2213,8 +2213,8 @@ fn c109_deterministic_and_format_unchanged() {
     assert_eq!(frames(&ia), frames(&ib));
     assert_eq!(
         curvyo_document_core::CURRENT_FORMAT_VERSION,
-        25,
-        "no format change"
+        26,
+        "SVG import adds no format change beyond spatial pages"
     );
 }
 

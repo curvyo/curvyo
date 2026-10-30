@@ -23,6 +23,7 @@ impl Session {
         let ids: Vec<_> = self
             .pickable_objects()
             .iter()
+            .filter(|object| self.page_selection_includes(object))
             .map(curvyo_document_core::ObjectSnapshot::id)
             .collect();
         let ids = self.units().widen(&ids);

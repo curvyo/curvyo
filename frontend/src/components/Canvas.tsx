@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState } from "react";
 
+import { PageFrames } from "@/components/PageFrames";
 import { EditHintChip } from "@/components/EditHintChip";
 import { HandleHintChip } from "@/components/HandleHintChip";
 import { KeyHintChip } from "@/components/KeyHintChip";
@@ -155,7 +156,9 @@ export function Canvas({ editor, onDropFiles }: CanvasProps) {
           }}
           style={{ background: "var(--pasteboard-bg)" }}
         />
+
       </NodeContextMenu>
+      <PageFrames getSession={editor.getSession} />
       {/* The drop cue: a 2px dashed accent outline inside the viewport while files hover over the
           canvas (`specs/0058-bitmap-import` UX notes, "Drag and drop"). No text, no animation. */}
       {drop.over && (

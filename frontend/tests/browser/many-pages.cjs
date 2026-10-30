@@ -1,0 +1,31 @@
+const {chromium}=require('playwright');
+const assert=require('node:assert/strict');
+(async()=>{
+ const browser=await chromium.launch({headless:true,args:['--no-sandbox','--enable-unsafe-webgpu','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+ const page=await browser.newPage({viewport:{width:1440,height:1000}});
+ const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.goto(process.env.CURVYO_BROWSER_URL || 'http://127.0.0.1:5173/',{waitUntil:'networkidle'});
+ const grid=page.getByRole('grid',{name:'Pages',exact:true});await grid.waitFor();
+ const add=page.getByRole('button',{name:'Add page',exact:true});
+ const started=Date.now();for(let i=1;i<200;i++)await add.click();
+ assert.equal(await grid.getByRole('row').count(),200);
+ assert.equal(await page.locator('[data-page-frames] > div').count(),200);
+ const first=grid.getByRole('button',{name:'Page 1',exact:true});await first.click();
+ const frame=await page.locator('[data-page-frames] > div').filter({hasText:/^Page 1$/}).boundingBox();
+ const canvas=await page.locator('canvas').first().boundingBox();
+ assert(frame.x+frame.width>canvas.x&&frame.x<canvas.x+canvas.width&&frame.y+frame.height>canvas.y&&frame.y<canvas.y+canvas.height);
+ await grid.getByRole('button',{name:'Page 200',exact:true}).click();
+ assert.equal(await grid.locator('[aria-current="true"]').getAttribute('aria-rowindex'),'200');
+
+ const activeFrame=await page.locator('[data-page-frames] > div').filter({hasText:/^Page 200$/}).boundingBox();
+ console.log(`PASS 200 page rows/frames and first/last reveal after ${Date.now()-started}ms`);
+ await page.getByRole('button',{name:/^Rectangle tool/}).click();
+ const drawX=Math.max(canvas.x+180,Math.min(canvas.x+canvas.width-140,activeFrame.x+activeFrame.width/2));
+ const drawY=Math.max(canvas.y+100,Math.min(canvas.y+canvas.height-100,activeFrame.y+activeFrame.height/2));
+ await page.mouse.move(drawX,drawY);await page.mouse.down();await page.mouse.move(drawX+60,drawY+45,{steps:5});await page.mouse.up();
+ await page.waitForTimeout(250);
+ assert.deepEqual(errors,[]);
+ console.log(`PASS 200-page browser: 199 Add clicks, 200 rendered frames/rows, first/last activation; ${Date.now()-started}ms wall time for full automated interaction sequence (observation, not CPU budget)`);
+ await page.screenshot({path:'target/browser-check/many-pages.png'});
+ await browser.close();
+})().catch(e=>{console.error(e);process.exit(1);});

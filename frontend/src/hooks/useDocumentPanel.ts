@@ -1,9 +1,11 @@
 import { useCallback, useMemo, useState } from "react";
 
+import { readPages, type PageRow } from "@/lib/pages";
 import type { WasmSession } from "@/lib/editorSession";
 
 /** What the Properties panel's body shows (`curvyo-ui-core::panel_content`). */
-export type PanelContent = "file" | "document" | "style" | "layers" | "history" | "fonts" | "empty";
+export type PanelContent =
+  "file" | "document" | "style" | "layers" | "history" | "fonts" | "empty";
 
 /** One tab of the panel's strip (`curvyo-ui-core::panel_tabs`). */
 export interface PanelTabView {
@@ -53,6 +55,7 @@ export interface PresetsView {
  * content, the size fields, the unit and the status bar's size text. Every
  * text is formatted in Rust. */
 export interface DocumentView {
+  pages: PageRow[];
   content: PanelContent;
   /** The active tab's name. */
   activeTab: string;
@@ -71,6 +74,7 @@ export interface DocumentView {
 /** Before a session exists: nothing is shown, no text is formatted here (the
  * formats live in Rust). */
 const INITIAL: DocumentView = {
+  pages: [],
   content: "document",
   activeTab: "document",
   tabs: [],
@@ -108,7 +112,9 @@ function readPresets(session: WasmSession): PresetsView {
   return view;
 }
 
-function readPanel(session: WasmSession): Pick<DocumentView, "content" | "activeTab" | "tabs"> {
+function readPanel(
+  session: WasmSession,
+): Pick<DocumentView, "content" | "activeTab" | "tabs"> {
   const raw = session.panel_view();
   const enabled = raw.tab_enabled;
   const labels = raw.tab_labels;
@@ -134,6 +140,7 @@ function readView(session: WasmSession | null): DocumentView {
   return {
     ...readPanel(session),
     unit: session.display_unit() as UnitSymbol,
+    pages: readPages(session.pages_json()),
     widthText: session.document_side_text("width"),
     heightText: session.document_side_text("height"),
     sideMessage: session.document_side_message(),
@@ -144,6 +151,21 @@ function readView(session: WasmSession | null): DocumentView {
 }
 
 export interface DocumentPanelApi {
+  pageAction: (
+    action:
+      | "add"
+      | "activate"
+      | "delete"
+      | "rename"
+      | "reorder"
+      | "frameOnly"
+      | "move"
+      | "x"
+      | "y",
+    id?: string,
+    value?: string | number | boolean,
+    y?: number,
+  ) => void;
   view: DocumentView;
   /** The status bar's cursor readout for a document point in millimetres. */
   cursorText: (xMm: number, yMm: number) => string;
@@ -162,7 +184,9 @@ export interface DocumentPanelApi {
    * (the dimmed Style tab). */
   pressTab: (name: string) => boolean;
   /** Shift+Ctrl+F or Shift+Ctrl+D: the tab the shortcut names. */
-  shortcut: (tab: "style" | "document" | "history" | "layers" | "fonts") => void;
+  shortcut: (
+    tab: "style" | "document" | "history" | "layers" | "fonts",
+  ) => void;
 }
 
 interface EditorHandle {
@@ -184,7 +208,10 @@ export function useDocumentPanel(editor: EditorHandle): DocumentPanelApi {
   const [local, setLocal] = useState(0);
   const refresh = useCallback(() => setLocal((n) => n + 1), []);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const view = useMemo(() => readView(getSession()), [getSession, syncRevision, local]);
+  const view = useMemo(
+    () => readView(getSession()),
+    [getSession, syncRevision, local],
+  );
 
   const setSide = useCallback(
     (side: "width" | "height", text: string): string => {
@@ -281,5 +308,56 @@ export function useDocumentPanel(editor: EditorHandle): DocumentPanelApi {
     [getSession],
   );
 
-  return { view, cursorText, setSide, setUnit, pickPreset, setOrientation, fit, refresh, pressTab, shortcut };
+  const pageAction: DocumentPanelApi["pageAction"] = (
+    action,
+    id = "",
+    value = "",
+    y = 0,
+  ) => {
+    const session = getSession();
+    if (!session) return;
+    switch (action) {
+      case "add":
+        session.add_page();
+        break;
+      case "activate":
+        session.activate_page(id);
+        break;
+      case "delete":
+        session.delete_page(id);
+        break;
+      case "rename":
+        session.rename_page(id, String(value));
+        break;
+      case "reorder":
+        session.reorder_page(id, Number(value));
+        break;
+      case "frameOnly":
+        session.set_page_frame_only(id, Boolean(value));
+        break;
+      case "x":
+      case "y":
+        session.set_page_position(id, action, String(value));
+        break;
+      case "move":
+        session.move_page_to(id, Number(value), y);
+        break;
+    }
+    refresh();
+    refreshCursor();
+  };
+
+  return {
+    pageAction,
+    view,
+    cursorText,
+    setSide,
+    setUnit,
+    pickPreset,
+    setOrientation,
+    fit,
+    refresh,
+    pressTab,
+    shortcut,
+  };
 }
