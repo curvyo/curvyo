@@ -7,7 +7,8 @@
 use curvyo_document_core::{NodeId, Point};
 use curvyo_ui_core::{
     AlignAxis, AlignBox, AlignCommand, AlignInput, AlignOutcome, DistributeMode, Modifiers,
-    PressTarget, classify_press, distribute_selection,
+    PressTarget, SelectedUnit, classify_press, distribute_page, distribute_selection,
+    page_object_ids,
 };
 
 use super::{Session, Tool};
@@ -35,18 +36,36 @@ const fn distribute_label(axis: AlignAxis) -> &'static str {
 }
 
 impl Session {
-    /// Whether the Align group is in the Select bar (criterion 1): the Select
-    /// tool with something selected.
+    /// Whether the Align group is in the Select bar (criterion 1, extended
+    /// 2026-10-30): the Select tool, and something selected or objects on
+    /// the active page to align onto it.
     #[must_use]
     pub fn align_group_shown(&self) -> bool {
-        self.tool == Tool::Select && !self.selection.ids().is_empty()
+        self.tool == Tool::Select
+            && (!self.selection.ids().is_empty() || !self.page_units().is_empty())
     }
 
-    /// Whether the Distribute group is in the Select bar (criterion 1): the
-    /// Select tool with two or more selected objects. A group counts once.
+    /// Whether the Distribute group is in the Select bar (criterion 1,
+    /// extended 2026-10-30): two or more selected objects, or, with nothing
+    /// selected, two or more objects on the active page.
     #[must_use]
     pub fn distribute_group_shown(&self) -> bool {
-        self.tool == Tool::Select && self.units().selected(self.selection.ids()).len() >= 2
+        if self.tool != Tool::Select {
+            return false;
+        }
+        if !self.selection.ids().is_empty() {
+            return self.units().selected(self.selection.ids()).len() >= 2;
+        }
+        self.page_units().len() >= 2
+    }
+
+    /// The units of the active page's pickable objects, the set a page-wise
+    /// align or distribute acts on when nothing is selected. Groups come in
+    /// whole; hidden and locked objects are not pickable and never move.
+    pub(super) fn page_units(&self) -> Vec<SelectedUnit> {
+        let pickable = self.pickable_objects();
+        let ids = page_object_ids(&pickable, &self.active_page_box());
+        self.units().selected(&ids)
     }
 
     /// The active page's rectangle, the reference of a one-object align
@@ -61,9 +80,11 @@ impl Session {
     }
 
     /// An align press: every selected unit's edge or centre onto the
-    /// reference, one step named after the command (criterion 12). An open
-    /// chip closes first, as with a flip. Nothing happens outside the Select
-    /// tool or while a drag runs.
+    /// reference, one step named after the command (criterion 12). With
+    /// nothing selected the active page's objects are aligned onto the page
+    /// (the customer's extension of 2026-10-30). An open chip closes first,
+    /// as with a flip. Nothing happens outside the Select tool or while a
+    /// drag runs.
     pub fn align_selection(&mut self, command: AlignCommand) -> AlignOutcome {
         if self.tool != Tool::Select || self.select.drag_in_flight() {
             return AlignOutcome::NothingSelected;
@@ -72,6 +93,7 @@ impl Session {
         self.sync_select_units();
         let label = align_label(command);
         let (key, page) = (self.key_object, self.active_page_box());
+        let page_units = self.selection.ids().is_empty().then(|| self.page_units());
         self.recording(|this| {
             let objects = this.objects();
             let units = this.units();
@@ -81,13 +103,18 @@ impl Session {
                 units: &units,
                 selection: &this.selection,
             };
-            curvyo_ui_core::align_selection(&input, key, page, command, label)
+            match &page_units {
+                Some(units) => curvyo_ui_core::align_page(&input, units, page, command, label),
+                None => curvyo_ui_core::align_selection(&input, key, page, command, label),
+            }
         })
     }
 
     /// A distribute press (criteria 6 to 8): one step named "Distribute
     /// horizontally" or "Distribute vertically". `gap_mm` is the typed gap of
-    /// criterion 8; `None` keeps the ends.
+    /// criterion 8; `None` keeps the ends. With nothing selected the active
+    /// page's objects are distributed evenly across the page (the customer's
+    /// extension of 2026-10-30).
     pub fn distribute_selection(
         &mut self,
         axis: AlignAxis,
@@ -100,6 +127,8 @@ impl Session {
         self.select.cancel_entry();
         self.sync_select_units();
         let label = distribute_label(axis);
+        let page = self.active_page_box();
+        let page_units = self.selection.ids().is_empty().then(|| self.page_units());
         self.recording(|this| {
             let objects = this.objects();
             let units = this.units();
@@ -109,7 +138,10 @@ impl Session {
                 units: &units,
                 selection: &this.selection,
             };
-            distribute_selection(&input, axis, mode, gap_mm, label)
+            match &page_units {
+                Some(units) => distribute_page(&input, units, page, axis, mode, gap_mm, label),
+                None => distribute_selection(&input, axis, mode, gap_mm, label),
+            }
         })
     }
 
@@ -414,5 +446,52 @@ mod tests {
         assert_eq!(left_x(&session, 0), 0.0);
         assert_eq!(left_x(&session, 1), 15.0);
         assert_eq!(left_x(&session, 2), 15.0);
+    }
+
+    #[test]
+    fn with_nothing_selected_align_acts_on_the_active_page_s_objects() {
+        let mut session = Session::new(1);
+        draw_rect(&mut session, (40.0, 30.0), (50.0, 44.0));
+        draw_rect(&mut session, (90.0, 20.0), (110.0, 50.0));
+        // Nothing is selected: the group still shows and aligns the page.
+        session.set_tool(Tool::Select);
+        session.escape();
+        assert!(session.selection.ids().is_empty(), "nothing is selected");
+        assert!(session.align_group_shown());
+        assert!(session.key_object().is_none());
+        assert_eq!(
+            session.align_selection(AlignCommand::Left),
+            AlignOutcome::Aligned
+        );
+        assert_eq!(left_x(&session, 0), 0.0);
+        assert_eq!(left_x(&session, 1), 0.0);
+        // One undo takes the whole page align back.
+        assert!(session.undo().changed);
+        assert_eq!(left_x(&session, 0), 40.0);
+    }
+
+    #[test]
+    fn with_nothing_selected_distribute_spreads_the_page_s_objects() {
+        let mut session = Session::new(1);
+        draw_rect(&mut session, (20.0, 0.0), (30.0, 10.0));
+        draw_rect(&mut session, (45.0, 0.0), (55.0, 10.0));
+        draw_rect(&mut session, (70.0, 0.0), (80.0, 10.0));
+        session.set_tool(Tool::Select);
+        session.escape();
+        assert!(session.selection.ids().is_empty(), "nothing is selected");
+        assert!(session.distribute_group_shown());
+        assert_eq!(
+            session.distribute_selection(
+                curvyo_ui_core::AlignAxis::Horizontal,
+                curvyo_ui_core::DistributeMode::Gaps,
+                None,
+            ),
+            AlignOutcome::Aligned
+        );
+        // Equal gaps across the page: the outer boxes at the page edges,
+        // the middle one evenly between.
+        assert_eq!(left_x(&session, 0), 0.0);
+        assert_eq!(left_x(&session, 1), 100.0);
+        assert_eq!(left_x(&session, 2), 200.0);
     }
 }

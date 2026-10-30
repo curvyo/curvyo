@@ -14,10 +14,12 @@ New interaction details are **(Proposal)**: reversible, vetoable at the demo.
   (`--toolbar-icon`), hover `--editor-accent-hover`, focus-visible 2 px
   `--editor-accent` ring with 1 px `--toolbar-bg` offset — the Flip buttons'
   look, plain command buttons (no `aria-pressed`). Groups wrap whole.
-- **Hidden, not disabled** (the design system's default — no new exception):
-  both groups are in the tree only while something is selected with the
-  Select tool. Distribute is in the tree from two selected objects
-  (criterion 1: with one object there is nothing to distribute).
+- **Extended 2026-10-30 (customer):** the groups are in the bar **in every
+  selection state of the Select tool**, nothing selected included — with
+  nothing selected they act on the **active page's objects** (align onto the
+  page, distribute evenly across it), so the bar does not come and go with
+  the selection. Hidden only when the page holds nothing to act on (align:
+  no object on the page; distribute: fewer than two).
 - Tooltips (Radix, 400 ms, `side="bottom"`, max 260 px): line 1 semibold the
   name, line 2 `--panel-muted-fg` the rule. No shortcut is shown (criterion
   13: none are assumed).
@@ -59,6 +61,22 @@ The reference the buttons act on is named in every align tooltip's rule only
 implicitly ("the reference"); the maker sees it: with a key object it is that
 object, with one selected object the page, else the selection's box. No text
 labels, no dialog (criterion 1).
+
+**Extended 2026-10-30 (customer):** with nothing selected the active page is
+both the set to act on and the reference, so the rule line says so instead of
+naming a selection — one line each, same structure:
+
+| Button | Rule line with nothing selected |
+|---|---|
+| 1–6 | "Nothing selected: every object of the page onto its left edge." (and the other five edges and centres) |
+| 7, 9 | "Nothing selected: the page's objects evenly across the page, equal gaps." |
+| 8, 10 | "Nothing selected: the page's objects evenly across the page, equal centres." (9, 10: "down the page") |
+
+Distributing on the page spreads over the **page's whole extent**: the first
+box starts on the page's start edge, the last ends on its end edge (equal
+gaps), or the outermost centres sit on those edges (equal centres) — the way
+Illustrator's distribute-to-artboard works. A typed gap spaces from the page's
+start edge and may reach past the end edge; the field is the same field.
 
 ## Gap field (criterion 8)
 

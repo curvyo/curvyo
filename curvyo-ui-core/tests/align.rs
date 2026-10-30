@@ -11,7 +11,8 @@
 
 use curvyo_document_core::{Point, Vec2};
 use curvyo_ui_core::{
-    AlignAxis, AlignBox, AlignCommand, DistributeMode, align_translations, distribute_translations,
+    AlignAxis, AlignBox, AlignCommand, DistributeMode, align_translations,
+    distribute_on_frame_translations, distribute_translations,
 };
 
 /// A box from its two extreme corners, in y-down document millimetres.
@@ -237,4 +238,72 @@ fn ties_keep_the_input_order() {
     // even centre; its twin keeps the first rank and stays.
     assert_eq!(dx(moves[1]), 20.0);
     assert_eq!(dx(moves[2]), 0.0);
+}
+/// The customer's extension of 2026-10-30: with nothing selected, align acts
+/// on the active page's objects with the page as the reference, whatever the
+/// count.
+#[test]
+fn the_page_align_puts_every_page_object_on_the_page_edge() {
+    // Two objects, both right of the A4 page's left edge.
+    let page = rect(0.0, 0.0, 210.0, 297.0);
+    let objects = [rect(40.0, 30.0, 50.0, 44.0), rect(90.0, 20.0, 110.0, 50.0)];
+    let moves = align_translations(&objects, &page, AlignCommand::Left);
+    assert_eq!(dx(moves[0]), -40.0);
+    assert_eq!(dx(moves[1]), -90.0);
+}
+
+/// Distribute evenly on the page: equal gaps spread from the page's start
+/// edge to its end edge; equal centres spread the centres from edge to edge.
+#[test]
+fn the_page_distribute_spreads_across_the_page() {
+    let page = rect(0.0, 0.0, 100.0, 100.0);
+    // Three boxes of 10 on a 100 mm page: 70 mm free, 35 per gap.
+    let boxes = [
+        rect(20.0, 0.0, 30.0, 10.0),
+        rect(45.0, 0.0, 55.0, 10.0),
+        rect(70.0, 0.0, 80.0, 10.0),
+    ];
+    let moves = distribute_on_frame_translations(
+        &boxes,
+        &page,
+        AlignAxis::Horizontal,
+        DistributeMode::Gaps,
+        None,
+    );
+    assert_eq!(dx(moves[0]), -20.0);
+    assert_eq!(dx(moves[1]), 0.0);
+    assert_eq!(dx(moves[2]), 20.0);
+    // Centres: 0, 50, 100 across the page (the outer centres sit ON the page
+    // edges, as Illustrator's distribute-to-artboard does).
+    let moves = distribute_on_frame_translations(
+        &boxes,
+        &page,
+        AlignAxis::Horizontal,
+        DistributeMode::Centres,
+        None,
+    );
+    assert_eq!(dx(moves[0]), -25.0);
+    assert_eq!(dx(moves[1]), 0.0);
+    assert_eq!(dx(moves[2]), 25.0);
+    // A typed gap spaces from the page's start edge and may reach past it.
+    // A typed gap spaces from the page's start edge and may reach past it.
+    let moves = distribute_on_frame_translations(
+        &boxes,
+        &page,
+        AlignAxis::Horizontal,
+        DistributeMode::Gaps,
+        Some(5.0),
+    );
+    assert_eq!(dx(moves[0]), -20.0);
+    assert_eq!(dx(moves[1]), -30.0);
+    assert_eq!(dx(moves[2]), -40.0);
+    // One object on the page is no distribute.
+    let moves = distribute_on_frame_translations(
+        &boxes[..1],
+        &page,
+        AlignAxis::Horizontal,
+        DistributeMode::Gaps,
+        None,
+    );
+    assert!(moves.iter().all(|m| *m == Vec2::ZERO));
 }

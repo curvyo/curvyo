@@ -2,6 +2,10 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+  ALIGN_PAGE_RULES,
+  DISTRIBUTE_PAGE_RULES,
+  alignRule,
+  distributeRule,
   ALIGN_ORDER,
   ALIGN_TEXT,
   DISTRIBUTE_ORDER,
@@ -43,4 +47,26 @@ test("criterion 8: the Gap field reads empty, a value, and refuses the rest", ()
   assert.deepEqual(parseGap("abc"), { ok: false, message: GAP_INVALID_NUMBER });
   assert.equal(GAP_NEGATIVE, "Must be 0 or more.");
   assert.equal(GAP_INVALID_NUMBER, "Enter a number");
+});
+
+// The customer's extension of 2026-10-30: with nothing selected the two
+// groups act on the active page, and their tooltips say so.
+test("the page rules: what the buttons do when nothing is selected", () => {
+  assert.equal(
+    alignRule("left", true),
+    "Nothing selected: every object of the page onto its left edge.",
+  );
+  assert.equal(alignRule("left", false), ALIGN_TEXT.left.rule);
+  assert.equal(
+    distributeRule("h-gaps", true),
+    "Nothing selected: the page's objects evenly across the page, equal gaps.",
+  );
+  assert.equal(distributeRule("v-centres", false), DISTRIBUTE_TEXT["v-centres"].rule);
+  // Every command has both lines, none of them empty.
+  for (const command of ALIGN_ORDER) {
+    assert.ok(ALIGN_PAGE_RULES[command].length > 0, command);
+  }
+  for (const code of DISTRIBUTE_ORDER) {
+    assert.ok(DISTRIBUTE_PAGE_RULES[code].length > 0, code);
+  }
 });

@@ -251,6 +251,63 @@ pub fn distribute_translations(
         .collect()
 }
 
+/// One translation per input box, in the input's order: the distribute of
+/// `axis` across the `frame` (the active page) instead of between the
+/// outermost boxes. Equal gaps: the first box's start lands on the frame's
+/// start edge, the last box's end on the frame's end edge, the gaps between
+/// are equal; a typed `gap_mm` spaces from the frame's start edge instead and
+/// may reach past it. Equal centres: the centres are evenly spaced from the
+/// frame's start edge to its end edge. Every translation is zero below two
+/// boxes.
+#[must_use]
+pub fn distribute_on_frame_translations(
+    boxes: &[AlignBox],
+    frame: &AlignBox,
+    axis: AlignAxis,
+    mode: DistributeMode,
+    gap_mm: Option<f64>,
+) -> Vec<Vec2> {
+    if boxes.len() < 2 {
+        return vec![Vec2::ZERO; boxes.len()];
+    }
+    // Order by position on the axis, stable, so ties keep the input (paint)
+    // order and the result never depends on the selection order.
+    let mut order: Vec<usize> = (0..boxes.len()).collect();
+    order.sort_by(|&a, &b| {
+        boxes[a]
+            .start(axis)
+            .total_cmp(&boxes[b].start(axis))
+            .then(a.cmp(&b))
+    });
+    let mut placements = vec![0.0; boxes.len()];
+    match mode {
+        DistributeMode::Centres => {
+            let start = frame.start(axis);
+            let step = frame.extent(axis) / f64::from(u32::try_from(boxes.len() - 1).unwrap_or(1));
+            for (rank, &index) in order.iter().enumerate() {
+                placements[index] = start + step * f64::from(u32::try_from(rank).unwrap_or(0))
+                    - boxes[index].centre(axis);
+            }
+        }
+        DistributeMode::Gaps => {
+            let gap = gap_mm.unwrap_or_else(|| {
+                let extents: f64 = boxes.iter().map(|b| b.extent(axis)).sum();
+                (frame.extent(axis) - extents)
+                    / f64::from(u32::try_from(boxes.len() - 1).unwrap_or(1))
+            });
+            let mut cursor = frame.start(axis);
+            for &index in &order {
+                placements[index] = cursor - boxes[index].start(axis);
+                cursor += boxes[index].extent(axis) + gap;
+            }
+        }
+    }
+    placements
+        .into_iter()
+        .map(|placement| translation(axis, placement))
+        .collect()
+}
+
 /// The translation `delta` on `axis`, zero when it does not exceed the move
 /// tolerance (criterion 3: an object that already lies on the reference does
 /// not move).
@@ -264,23 +321,23 @@ fn translation(axis: AlignAxis, delta: f64) -> Vec2 {
     }
 }
 
-/// What [`align_selection`] or [`distribute_selection`] did.
+/// What the align and distribute commands did.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AlignOutcome {
     /// One commit was written.
     Aligned,
     /// Every translation is zero: nothing was written (criteria 3 and 7).
     Unchanged,
-    /// Nothing is selected, or no selected object exists: nothing was written.
+    /// Nothing to act on: nothing was written.
     NothingSelected,
 }
 
-/// The one read the commands work from: the document to write, the objects
-/// and grouping of the current context, and the selection.
+/// The one read the commands work from: the document to write and the
+/// objects of the current context (the leaves the selection names).
 pub struct AlignInput<'a> {
     /// The document the commit is written to.
     pub document: &'a Document,
-    /// The objects of the context (the leaves the selection names).
+    /// The objects of the context.
     pub objects: &'a [ObjectSnapshot],
     /// The grouping of the context's leaves.
     pub units: &'a Units,
@@ -310,6 +367,27 @@ pub fn unit_boxes(objects: &[ObjectSnapshot], units: &[SelectedUnit]) -> Vec<Ali
                 .collect();
             AlignBox::union(&boxes)
         })
+        .collect()
+}
+
+/// The leaves of the context whose true box overlaps `page` (the active
+/// page's rectangle, edges included): the objects a page-wise align or
+/// distribute acts on when nothing is selected (the customer's extension of
+/// 2026-10-30). Hidden and locked objects are not in `objects` (the pickable
+/// read), so they never move and never count.
+#[must_use]
+pub fn page_object_ids(objects: &[ObjectSnapshot], page: &AlignBox) -> Vec<NodeId> {
+    objects
+        .iter()
+        .filter(|object| {
+            let (min, max) = object_outline_bounds(object);
+            let box_ = AlignBox::new(min, max);
+            box_.start(AlignAxis::Horizontal) <= page.end(AlignAxis::Horizontal)
+                && box_.end(AlignAxis::Horizontal) >= page.start(AlignAxis::Horizontal)
+                && box_.start(AlignAxis::Vertical) <= page.end(AlignAxis::Vertical)
+                && box_.end(AlignAxis::Vertical) >= page.start(AlignAxis::Vertical)
+        })
+        .map(ObjectSnapshot::id)
         .collect()
 }
 
@@ -357,12 +435,31 @@ fn translated_results(
         .collect()
 }
 
-/// Aligns the selected units of `input`'s selection by `command` and writes
-/// the result as one commit named `label` (criteria 2, 3, 12). The reference
-/// is `key`'s box when the key unit is still selected, else the selection's
-/// union box; with exactly one selected unit it is the active `page`
-/// (criterion 4). A linked clone moves through its own placement matrix
-/// (criterion 11).
+/// Writes `plan` for `units` as one commit named `label`, through the same
+/// writer as a group move. `Unchanged` when every translation is zero.
+fn commit_plan(
+    document: &Document,
+    objects: &[ObjectSnapshot],
+    units: &[SelectedUnit],
+    plan: &[Vec2],
+    label: &'static str,
+) -> AlignOutcome {
+    let results = translated_results(objects, units, plan);
+    if results.is_empty() {
+        return AlignOutcome::Unchanged;
+    }
+    if commit_group(document, &results, StrokeScaling::Keep, label, None) {
+        AlignOutcome::Aligned
+    } else {
+        AlignOutcome::NothingSelected
+    }
+}
+
+/// Aligns the selected units of `input`'s selection by `command` and writes the result as one
+/// commit named `label` (criteria 2, 3, 12). The reference is `key`'s box when the key
+/// unit is still selected, else the selection's union box; with exactly one selected
+/// unit it is the active `page` (criterion 4). A linked clone moves through its own
+/// placement matrix (criterion 11).
 #[must_use]
 pub fn align_selection(
     input: &AlignInput,
@@ -389,20 +486,32 @@ pub fn align_selection(
         std::cmp::Ordering::Less => return AlignOutcome::NothingSelected,
     };
     let plan = align_translations(&boxes, &reference, command);
-    let results = translated_results(input.objects, &selected, &plan);
-    if results.is_empty() {
-        return AlignOutcome::Unchanged;
-    }
-    if commit_group(input.document, &results, StrokeScaling::Keep, label, None) {
-        AlignOutcome::Aligned
-    } else {
-        AlignOutcome::NothingSelected
-    }
+    commit_plan(input.document, input.objects, &selected, &plan, label)
 }
 
-/// Distributes the selected units of `input`'s selection on `axis` by `mode`
-/// and the typed `gap_mm`, as one commit named `label` (criteria 6 to 8, 12).
-/// Fewer than three units change nothing (criterion 7).
+/// Aligns every unit of `units` onto the active `page` — the page is the
+/// reference whatever the count (the customer's extension of 2026-10-30:
+/// with nothing selected, align acts on the active page's objects).
+#[must_use]
+pub fn align_page(
+    input: &AlignInput,
+    units: &[SelectedUnit],
+    page: AlignBox,
+    command: AlignCommand,
+    label: &'static str,
+) -> AlignOutcome {
+    let boxes = unit_boxes(input.objects, units);
+    if boxes.is_empty() {
+        return AlignOutcome::NothingSelected;
+    }
+    let plan = align_translations(&boxes, &page, command);
+    commit_plan(input.document, input.objects, units, &plan, label)
+}
+
+/// Distributes the selected units of `input`'s selection on `axis` by `mode` and the
+/// typed `gap_mm`, as one commit named `label` (criteria 6 to 8, 12). Fewer than three
+/// units change nothing (criterion 7), two with a typed gap are enough (the
+/// amendment of 2026-10-30).
 #[must_use]
 pub fn distribute_selection(
     input: &AlignInput,
@@ -417,13 +526,28 @@ pub fn distribute_selection(
         return AlignOutcome::NothingSelected;
     }
     let plan = distribute_translations(&boxes, axis, mode, gap_mm);
-    let results = translated_results(input.objects, &selected, &plan);
-    if results.is_empty() {
-        return AlignOutcome::Unchanged;
+    commit_plan(input.document, input.objects, &selected, &plan, label)
+}
+
+/// Distributes every unit of `units` evenly across the active `page` (the
+/// customer's extension of 2026-10-30: distribute evenly on page,
+/// horizontally and vertically): equal gaps spread the boxes from the page's
+/// start edge to its end edge, equal centres spread the centres from edge to
+/// edge; a typed `gap_mm` spaces from the page's start edge instead.
+#[must_use]
+pub fn distribute_page(
+    input: &AlignInput,
+    units: &[SelectedUnit],
+    page: AlignBox,
+    axis: AlignAxis,
+    mode: DistributeMode,
+    gap_mm: Option<f64>,
+    label: &'static str,
+) -> AlignOutcome {
+    let boxes = unit_boxes(input.objects, units);
+    if boxes.is_empty() {
+        return AlignOutcome::NothingSelected;
     }
-    if commit_group(input.document, &results, StrokeScaling::Keep, label, None) {
-        AlignOutcome::Aligned
-    } else {
-        AlignOutcome::NothingSelected
-    }
+    let plan = distribute_on_frame_translations(&boxes, &page, axis, mode, gap_mm);
+    commit_plan(input.document, input.objects, units, &plan, label)
 }

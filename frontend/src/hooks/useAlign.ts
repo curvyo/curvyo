@@ -9,6 +9,9 @@ export interface AlignApi {
   shown: boolean;
   /** The Distribute group is in the bar: two or more selected objects. */
   distributeShown: boolean;
+  /** Nothing is selected: both groups act on the **active page's objects**
+   * (the customer's extension of 2026-10-30) — the tooltips say so. */
+  onPage: boolean;
   /** An align press: every selected unit onto the reference. */
   align: (command: AlignCommand) => void;
   /** A distribute press, with the Gap field's value (empty keeps the ends). */
@@ -32,6 +35,7 @@ export function useAlign(
   onChange: () => void,
   shown: boolean,
   distributeShown: boolean,
+  onPage: boolean,
 ): AlignApi {
   const [gap, setGapText] = useState("");
   const [gapError, setGapError] = useState<string | null>(null);
@@ -70,5 +74,5 @@ export function useAlign(
     [getSession, onChange],
   );
 
-  return { shown, distributeShown, align, distribute, gap, setGap, gapError };
+  return { shown, distributeShown, onPage, align, distribute, gap, setGap, gapError };
 }

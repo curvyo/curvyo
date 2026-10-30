@@ -39,6 +39,26 @@
   tooltips, gap field, App wiring — criteria 1, 5, 6, 8, 13.
 - [ ] 5. Full gate once before the push.
 
+## Page mode (customer, 2026-10-30, after the first demo)
+
+Two more behaviours on the same buttons, no new UI:
+
+- With **nothing selected**, the Align group aligns the **active page's**
+  objects onto the page and the Distribute group spreads them evenly across
+  it, horizontally and vertically, in both modes (criteria 1, 4 and 6 applied
+  with the page as the set *and* the frame). `page_object_ids` picks the set
+  (every pickable object whose true box overlaps the page, edges included; a
+  group comes whole; hidden and locked objects never move) and
+  `distribute_on_frame_translations` plans against the page's extent: equal
+  gaps run from the page's start edge to its end edge, equal centres space
+  the centres from edge to edge, a typed gap spaces from the start edge and
+  may reach past the end.
+- Both groups are in the bar in every selection state of the Select tool,
+  hidden only when there is nothing to act on; the tooltip's rule line names
+  the page (`ALIGN_PAGE_RULES`, `DISTRIBUTE_PAGE_RULES`).
+- One history step, same labels, the empty selection stays: nothing new in
+  `history_names` and nothing in the format.
+
 ## Validation
 Core tests precede the implementation. Focused: `cargo nextest -p
 curvyo-ui-core -p curvyo-editor-wasm`, `npm test` and `npx tsc -b --noEmit`

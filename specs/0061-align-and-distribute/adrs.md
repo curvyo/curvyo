@@ -41,6 +41,17 @@ choices marked **Proposal** are reversible in this story.
   `align_shown()`, `distribute_shown()`, `align(code)`, `distribute(code,
   Option<f64>)` (ADR 0001 §5). The typed gap reaches the command as
   millimetres; `None` is the empty field ("keep the ends").
+- **Extended 2026-10-30** (customer: "wenn nichts markiert ist, ist align auf
+  page bezug … distribute evenly on page"): with an empty selection the
+  commands act on the **active page's pickable objects** (`page_object_ids`:
+  every context object whose true box overlaps the page, edges included) —
+  align with the page as the reference for all of them, distribute across the
+  page's extent (`distribute_on_frame_translations`: equal gaps from the
+  page's start edge to its end edge, or the centres from edge to edge; a
+  typed gap spaces from the page's start edge). Groups come in whole (a
+  group partly on the page moves whole); hidden and locked objects are not
+  pickable and never move. Same commit labels, one history step, the
+  selection stays empty.
 - Ties in distribute order (equal start coordinate) keep the document's paint
   order (stable sort) — deterministic, no selection-order dependence.
 - **Amended 2026-10-30** (customer, "distribute funktioniert noch gar

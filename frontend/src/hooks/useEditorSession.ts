@@ -1178,7 +1178,9 @@ export function useEditorSession(
   }, [trace.keyDown, trace.create]);
   const { refresh: refreshClones, handleKeyOutcome: handleCloneOutcome } = clones;
   const flip = useFlip(getSession, syncFromSession, history.showNotice);
-  const align = useAlign(getSession, syncFromSession, alignShown, distributeShown);
+  // With nothing selected both groups act on the active page's objects
+  // (the customer's extension of 2026-10-30).
+  const align = useAlign(getSession, syncFromSession, alignShown, distributeShown, selectionCount === 0);
   const { handleKeyOutcome: handleFlipOutcome } = flip;
   // A release or an Enter that set a size to 0.01 mm says so in the canvas notice slot
   // (`0056` criterion 15).

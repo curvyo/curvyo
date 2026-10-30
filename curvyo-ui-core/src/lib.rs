@@ -159,8 +159,9 @@ mod viewport;
 mod weld_plan;
 
 pub use align::{
-    AlignAxis, AlignBox, AlignCommand, AlignInput, AlignOutcome, DistributeMode, align_selection,
-    align_translations, distribute_selection, distribute_translations,
+    AlignAxis, AlignBox, AlignCommand, AlignInput, AlignOutcome, DistributeMode, align_page,
+    align_selection, align_translations, distribute_on_frame_translations, distribute_page,
+    distribute_selection, distribute_translations, page_object_ids,
 };
 pub use anchor_id_minter::AnchorIdMinter;
 pub use angle_snap::{MAX_SKEW_SNAP_DEG, snap_angle, snap_skew_angle};

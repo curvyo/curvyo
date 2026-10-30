@@ -25,6 +25,18 @@ export const ALIGN_TEXT: Record<AlignCommand, { name: string; rule: string }> = 
   bottom: { name: "Align bottom edges", rule: "Bottom edges land on the reference's bottom edge." },
 };
 
+/** The align rules with the **active page** as the reference: what the
+ * buttons do when nothing is selected (the customer's extension of
+ * 2026-10-30). */
+export const ALIGN_PAGE_RULES: Record<AlignCommand, string> = {
+  left: "Nothing selected: every object of the page onto its left edge.",
+  "centre-h": "Nothing selected: every object of the page on its horizontal centre.",
+  right: "Nothing selected: every object of the page onto its right edge.",
+  top: "Nothing selected: every object of the page onto its top edge.",
+  "centre-v": "Nothing selected: every object of the page on its vertical centre.",
+  bottom: "Nothing selected: every object of the page onto its bottom edge.",
+};
+
 /** The accessible name and the tooltip's rule line of every distribute button. */
 export const DISTRIBUTE_TEXT: Record<DistributeCode, { name: string; rule: string }> = {
   "h-gaps": {
@@ -44,6 +56,25 @@ export const DISTRIBUTE_TEXT: Record<DistributeCode, { name: string; rule: strin
     rule: "Equal distances between the centres, top to bottom. The outermost stay.",
   },
 };
+
+/** The distribute rules spread over the **active page**: what the buttons do
+ * when nothing is selected (the customer's extension of 2026-10-30). */
+export const DISTRIBUTE_PAGE_RULES: Record<DistributeCode, string> = {
+  "h-gaps": "Nothing selected: the page's objects evenly across the page, equal gaps.",
+  "h-centres": "Nothing selected: the page's objects evenly across the page, equal centres.",
+  "v-gaps": "Nothing selected: the page's objects evenly down the page, equal gaps.",
+  "v-centres": "Nothing selected: the page's objects evenly down the page, equal centres.",
+};
+
+/** The tooltip's rule line of an align button, for the current mode. */
+export function alignRule(command: AlignCommand, onPage: boolean): string {
+  return onPage ? ALIGN_PAGE_RULES[command] : ALIGN_TEXT[command].rule;
+}
+
+/** The tooltip's rule line of a distribute button, for the current mode. */
+export function distributeRule(code: DistributeCode, onPage: boolean): string {
+  return onPage ? DISTRIBUTE_PAGE_RULES[code] : DISTRIBUTE_TEXT[code].rule;
+}
 
 /** The bar order of the six align buttons. */
 export const ALIGN_ORDER: AlignCommand[] = [

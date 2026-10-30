@@ -5,8 +5,10 @@ import type { AlignApi } from "@/hooks/useAlign";
 import {
   ALIGN_ORDER,
   ALIGN_TEXT,
+  alignRule,
   DISTRIBUTE_ORDER,
   DISTRIBUTE_TEXT,
+  distributeRule,
   type AlignCommand,
   type DistributeCode,
 } from "@/lib/alignText";
@@ -111,6 +113,7 @@ interface AlignButtonProps {
 
 function AlignButton({ command, align, onReturnFocus }: AlignButtonProps) {
   const text = ALIGN_TEXT[command];
+  const rule = alignRule(command, align.onPage);
   return (
     <Tooltip.Root>
       <Tooltip.Trigger asChild>
@@ -140,7 +143,7 @@ function AlignButton({ command, align, onReturnFocus }: AlignButtonProps) {
           }}
         >
           <div className="font-semibold">{text.name}</div>
-          <div style={{ color: "var(--panel-muted-fg)" }}>{text.rule}</div>
+          <div style={{ color: "var(--panel-muted-fg)" }}>{rule}</div>
         </Tooltip.Content>
       </Tooltip.Portal>
     </Tooltip.Root>
@@ -155,6 +158,7 @@ interface DistributeButtonProps {
 
 function DistributeButton({ code, align, onReturnFocus }: DistributeButtonProps) {
   const text = DISTRIBUTE_TEXT[code];
+  const rule = distributeRule(code, align.onPage);
   return (
     <Tooltip.Root>
       <Tooltip.Trigger asChild>
@@ -184,7 +188,7 @@ function DistributeButton({ code, align, onReturnFocus }: DistributeButtonProps)
           }}
         >
           <div className="font-semibold">{text.name}</div>
-          <div style={{ color: "var(--panel-muted-fg)" }}>{text.rule}</div>
+          <div style={{ color: "var(--panel-muted-fg)" }}>{rule}</div>
         </Tooltip.Content>
       </Tooltip.Portal>
     </Tooltip.Root>
