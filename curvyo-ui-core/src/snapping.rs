@@ -146,6 +146,10 @@ pub struct SnapSettings {
     pub nodes: bool,
     /// Snap to the six page fractions on each axis.
     pub page: bool,
+    /// Allow correction of the horizontal coordinate.
+    pub x: bool,
+    /// Allow correction of the vertical coordinate.
+    pub y: bool,
     /// How close a feature must come before it captures, in document millimetres.
     pub capture: f64,
     /// How far it must move away before it lets go, in document millimetres. Never smaller
@@ -170,6 +174,8 @@ impl SnapSettings {
             guides: value.guides,
             nodes: value.nodes,
             page: value.page,
+            x: value.x,
+            y: value.y,
             capture,
             release: zone(value.release_px).max(capture),
         }

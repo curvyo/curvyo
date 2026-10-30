@@ -279,7 +279,7 @@ impl DocumentVersion {
 /// use independent root registers. Older readers must not hide extra frames.
 /// Golden: `pages_v26.curvyo`; no old-file migration is required for this SID build.
 ///
-/// Bumped to 27 in `snapping`: document-owned snapping registers preserve
+/// Bumped to 27 in `snapping`: document-owned target, axis and zone registers preserve
 /// enabled state, target kinds and capture/release zones.
 /// Golden: `snapping_v27.curvyo`; no old-file migration is required for this SID build.
 pub const CURRENT_FORMAT_VERSION: u32 = 27;

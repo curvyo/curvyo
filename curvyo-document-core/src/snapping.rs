@@ -1,5 +1,5 @@
 //! The document's snapping settings: whether snapping is on, which target kinds
-//! contribute, and the two zone sizes, stored as seven registers in the
+//! contribute, and the two zone sizes, stored as nine registers in the
 //! document root (`specs/0060-snapping`, `adrs.md` decisions 1 and 2).
 //!
 //! Snapping is a property of the document, not of the user or the session: the
@@ -24,6 +24,8 @@ const KEY_GUIDES: &str = "snapping_guides";
 const KEY_NODES: &str = "snapping_nodes";
 /// The root register for the page fractions. Absent means on.
 const KEY_PAGE: &str = "snapping_page";
+const KEY_X: &str = "snapping_x";
+const KEY_Y: &str = "snapping_y";
 /// The root register for the capture zone in screen pixels. Absent means
 /// [`DocumentSnapping::DEFAULT_CAPTURE_PX`].
 const KEY_CAPTURE_PX: &str = "snapping_capture_px";
@@ -51,6 +53,10 @@ pub struct DocumentSnapping {
     pub nodes: bool,
     /// Snap to the six page fractions on each axis.
     pub page: bool,
+    /// Allow correction of the horizontal coordinate.
+    pub x: bool,
+    /// Allow correction of the vertical coordinate.
+    pub y: bool,
     /// How close a point must come, in screen pixels, before it captures.
     pub capture_px: f64,
     /// How far it must move away, in screen pixels, before it lets go. Never
@@ -72,6 +78,8 @@ impl DocumentSnapping {
         guides: true,
         nodes: true,
         page: true,
+        x: true,
+        y: true,
         capture_px: Self::DEFAULT_CAPTURE_PX,
         release_px: Self::DEFAULT_RELEASE_PX,
     };
@@ -110,6 +118,8 @@ pub(crate) struct SnappingJson {
     guides: bool,
     nodes: bool,
     page: bool,
+    x: bool,
+    y: bool,
     capture_px: f64,
     release_px: f64,
 }
@@ -122,6 +132,8 @@ impl From<DocumentSnapping> for SnappingJson {
             guides: snapping.guides,
             nodes: snapping.nodes,
             page: snapping.page,
+            x: snapping.x,
+            y: snapping.y,
             capture_px: snapping.capture_px,
             release_px: snapping.release_px,
         }
@@ -174,6 +186,8 @@ pub(crate) fn snapping_of_root(root: &LoroMap) -> DocumentSnapping {
         guides: boolean(KEY_GUIDES, true),
         nodes: boolean(KEY_NODES, true),
         page: boolean(KEY_PAGE, true),
+        x: boolean(KEY_X, true),
+        y: boolean(KEY_Y, true),
         capture_px: zone(KEY_CAPTURE_PX, DocumentSnapping::DEFAULT_CAPTURE_PX),
         release_px: zone(KEY_RELEASE_PX, DocumentSnapping::DEFAULT_RELEASE_PX),
     }
@@ -194,6 +208,8 @@ pub(crate) fn validate(loro: &LoroDoc) -> bool {
         && ok(KEY_GUIDES, |value| bool_of(value).is_some())
         && ok(KEY_NODES, |value| bool_of(value).is_some())
         && ok(KEY_PAGE, |value| bool_of(value).is_some())
+        && ok(KEY_X, |value| bool_of(value).is_some())
+        && ok(KEY_Y, |value| bool_of(value).is_some())
         && ok(KEY_CAPTURE_PX, |value| zone_of(value).is_some())
         && ok(KEY_RELEASE_PX, |value| zone_of(value).is_some())
 }
@@ -243,6 +259,12 @@ impl Document {
         }
         if value.page != current.page {
             set(KEY_PAGE, LoroValue::Bool(value.page));
+        }
+        if value.x != current.x {
+            set(KEY_X, LoroValue::Bool(value.x));
+        }
+        if value.y != current.y {
+            set(KEY_Y, LoroValue::Bool(value.y));
         }
         if value.capture_px != current.capture_px {
             set(KEY_CAPTURE_PX, LoroValue::Double(value.capture_px));

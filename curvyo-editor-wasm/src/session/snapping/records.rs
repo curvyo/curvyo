@@ -14,6 +14,10 @@ pub struct SnappingSettingsRecord {
     pub nodes: bool,
     /// Whether objects snap to page fractions.
     pub page: bool,
+    /// Whether the horizontal coordinate may snap.
+    pub x: bool,
+    /// Whether the vertical coordinate may snap.
+    pub y: bool,
     /// The capture distance in screen pixels.
     pub capture_px: f64,
     /// The release distance in screen pixels.
@@ -30,6 +34,8 @@ impl SnappingSettingsRecord {
             guides: snapping.guides,
             nodes: snapping.nodes,
             page: snapping.page,
+            x: snapping.x,
+            y: snapping.y,
             capture_px: snapping.capture_px,
             release_px: snapping.release_px,
         }
@@ -55,6 +61,10 @@ pub struct SnappingToolbarRecord {
     pub nodes: bool,
     /// Whether objects snap to page fractions.
     pub page: bool,
+    /// Whether the horizontal coordinate may snap.
+    pub x: bool,
+    /// Whether the vertical coordinate may snap.
+    pub y: bool,
     /// The capture distance in screen pixels.
     pub capture_px: f64,
     /// The release distance in screen pixels.
@@ -77,6 +87,8 @@ impl SnappingToolbarRecord {
             guides: stored.guides,
             nodes: stored.nodes,
             page: stored.page,
+            x: stored.x,
+            y: stored.y,
             capture_px: stored.capture_px,
             release_px: stored.release_px,
         }

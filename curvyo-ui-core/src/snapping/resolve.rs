@@ -19,6 +19,10 @@ pub fn resolve(
         state.clear();
         return SnapResult::default();
     }
+    if !settings.x || !settings.y {
+        let direction = Vec2::new(f64::from(settings.x), f64::from(settings.y));
+        return super::constrained::resolve_probe_along(settings, targets, probe, direction, state);
+    }
     let point = resolve_point(settings, targets, probe, state, false);
     let guide = resolve_point(settings, targets, probe, state, true);
     let held_line = [state.x, state.y].into_iter().flatten().any(|h| {

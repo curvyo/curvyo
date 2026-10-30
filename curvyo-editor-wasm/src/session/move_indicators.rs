@@ -71,7 +71,12 @@ impl Session {
             .map_or(curvyo_document_core::Vec2::ZERO, |r| r.offset);
         let lock = self
             .select
-            .live_move_snapped(pointer, self.held.shift, self.held.ctrl, snap_offset)
+            .live_move_snapped(
+                pointer,
+                self.held.shift,
+                self.held.ctrl && !self.held.alt,
+                snap_offset,
+            )
             .and_then(|live| live.axis);
         // With Ctrl held a press either begins a move (copy: plus), or arms
         // a marquee or, with Alt, a lasso (remove: minus), never both, as
@@ -80,7 +85,7 @@ impl Session {
             (false, false)
         } else if self.select.drag_in_flight() {
             (
-                self.select.move_in_flight(),
+                self.select.move_in_flight() && !self.held.alt,
                 self.select.gesture_kind().is_some(),
             )
         } else {
@@ -117,9 +122,12 @@ impl Session {
             .snapping
             .last_result()
             .map_or(curvyo_document_core::Vec2::ZERO, |r| r.offset);
-        let live =
-            self.select
-                .live_move_snapped(pointer, self.held.shift, self.held.ctrl, snap_offset)?;
+        let live = self.select.live_move_snapped(
+            pointer,
+            self.held.shift,
+            self.held.ctrl && !self.held.alt,
+            snap_offset,
+        )?;
         let locked = match live.axis? {
             Axis::X => LockedAxis::Horizontal,
             Axis::Y => LockedAxis::Vertical,
@@ -195,9 +203,12 @@ impl Session {
             .snapping
             .last_result()
             .map_or(curvyo_document_core::Vec2::ZERO, |r| r.offset);
-        let live =
-            self.select
-                .live_move_snapped(anchor, self.held.shift, self.held.ctrl, snap_offset)?;
+        let live = self.select.live_move_snapped(
+            anchor,
+            self.held.shift,
+            self.held.ctrl && !self.held.alt,
+            snap_offset,
+        )?;
         Some(LiveReadout {
             text: move_readout_text(live.offset, live.copy),
             anchor,

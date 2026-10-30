@@ -259,6 +259,7 @@ impl Session {
                 changed: false,
             };
         }
+        self.end_snapping_drag();
         // An undo or redo ends an object preview first (`0042` criterion 18).
         self.end_object_preview();
         if self.pen_path_open() {

@@ -22,10 +22,10 @@ within the story. No new crate, dependency, trait or generic is required.
 
 ## 1. Document settings and version
 
-Keep seven independent root registers: `snapping_enabled`, `snapping_objects`,
+Keep nine independent root registers: `snapping_enabled`, `snapping_objects`,
 `snapping_guides`, `snapping_nodes`, `snapping_page`, `snapping_capture_px`,
-`snapping_release_px`. Defaults: off, all target kinds on, capture 8 px, release
-14 px. Absent keys may resolve to defaults; old-format migration and historical
+`snapping_release_px`, `snapping_x`, `snapping_y`. Defaults: off, both coordinate
+axes and all target kinds on, capture 8 px, release 14 px. Absent keys may resolve to defaults; old-format migration and historical
 fixture compatibility are not obligations. Present malformed values are damage.
 
 Zones accept finite nonnegative values, including zero for exact capture; no
@@ -36,16 +36,18 @@ The settings writer commits only changed registers, as one labelled operation.
 UI settings must reflect the authoritative normalized document after writes,
 undo/redo and peer changes, not a separately authoritative session cache.
 
-Reserve the next free format version at merge: this branch currently uses 26,
-but pages also reserves 26, so snapping becomes **27 after pages merges**.
-Renumber its fixture, format comment and documentation together. The independent
+Pages has format 26; this open snapping story uses **27**. The additional axis
+registers remain part of version 27: the story is unmerged and the customer
+explicitly waived old-file compatibility for SID development. Regenerate current
+golden fixtures and update the format comment together; version 28 would suggest
+a separately released format boundary that does not exist. The independent
 Loro snapshot version does not change. Keep a current-format golden round trip
 and malformed-register tests; remove the assumption that zero is damage.
 
 ## 2. Targets and index
 
 Build an immutable target collection and its spatial index from the existing
-resolved document read at gesture start. No document traversal or full target
+resolved document read at gesture start or the first drawing hover. No document traversal or full target
 scan per frame. Refresh on an actual document geometry/settings change during
 a gesture; do not interpret a modal drag as proof that peer edits cannot occur.
 
@@ -145,3 +147,80 @@ an over-budget full scan behind the existing branch's amended wording.
 
 See `review.md` for the takeover findings. Its unchecked items are outstanding
 review work, not claims that any future revision still contains the defect.
+
+## 7. Customer follow-up: axes, Alt and drawing hover (2026-10-30)
+
+The customer requests independent horizontal/vertical snapping and snapping
+before the mouse button is pressed, including first clicks and click-based
+creation. **Proposal:** horizontal means X-coordinate correction; vertical
+means Y-coordinate correction. This is the working default pending the optional
+wording question. Two independent bool root registers default true; no bitfield,
+per-user override or separate per-tool persisted switches. Existing fieldwise
+history handles them. Malformed present values are damage.
+
+### Axis eligibility
+
+The axis mask constrains allowed displacement, not which coordinates are
+considered when finding points. With X enabled/Y disabled, a node must still be
+within the full two-dimensional capture/release radius and have the same Y
+within the kernel comparison tolerance. Otherwise it is unreachable and is
+rejected; do not turn its X into an infinite line. Both axes off yields no
+correction or marker. Keep atomic-node identity; never clip a two-axis correction
+after selecting an unreachable node.
+
+Intersect the document axis mask with each tool's permitted movement direction.
+For one free axis, curves use finite curve/axis intersections; diagonal aspect
+constraints incompatible with that axis permit no correction. Existing Shift
+axis locks still take precedence over attraction. Axis-line/guide composition
+must also obey this intersection. Clear incompatible held state when the mask
+or modifiers change. Capture and release continue to use raw geometry.
+
+### Alt inversion and existing actions
+
+The literal customer request is temporary inversion **while moving**. Apply
+`effective_enabled = stored_enabled XOR Alt` to an already-running Select move;
+read the current modifiers on motion, modifier change and release. This rule
+also applies when Ctrl is held: during a Select move Ctrl+Alt inverts rather
+than forcing off. Existing copy semantics are preserved by `ctrl && !alt`;
+Ctrl alone copies, Ctrl+Alt does not. Outside Select moves the existing
+Ctrl+Alt bypass remains unchanged. Neither inversion nor the effective
+state is written to the document or history. Marker visibility must use the same
+effective state, so Alt can show a marker while the stored switch is off.
+
+Alt at Select press already arms a lasso; keep that hit/pick behavior. Inversion
+starts only once the gesture is a move. Offset uses Alt for corner style; do not
+hijack it. Pen also has existing Ctrl/Alt handling. Extending inversion globally
+is unnecessary for the requested move behavior and risks unrelated changes, so
+this implementation keeps drawing hover on the stored switch. No question is
+needed to preserve these existing operations.
+
+### Hover lifetime and click creation
+
+Reuse the indexed snap context for an idle drawing hover instead of constructing
+a second snapping engine. Add a small ephemeral context distinction (hover vs
+gesture, or equivalent explicit intent) so the UI's drag flag does not claim a
+button-down drag during hover. Cache targets by document version and exclusions;
+settings/scale/mask resolve live. The first hover may build the index; subsequent
+hover frames only query it. A version change rebuilds once, never a full document
+read per pointer frame.
+
+Shape hover and Pen hover, including before the first node, resolve the raw
+pointer to a marker. On press recompute against that event's point/modifiers; do
+not trust a stale hover or feed snapped coordinates to Select/Node hit testing.
+Promote the existing drawing context to a gesture without an unnecessary rebuild
+when its exclusions and document version are unchanged.
+
+The current shape click starts the existing typed-size placement flow. Its
+release must use the snapped anchor and subsequent placement-follow/confirm must
+use the same resolver; an early `release_starts_placement` return must not bypass
+snapping. Preserve click thresholds based on raw pointer movement, so attraction
+alone cannot turn a click into a drag or invent Pen handles. Do not replace the
+accepted placement interaction with an unsolicited immediate-shape command.
+Clear hover markers on pointer leave, Escape, tool/document change and disabled
+effective snapping; retain raw pointer state for immediate modifier recompute.
+
+Tests must distinguish hover/no-button from drag; verify first click, simple
+click placement and Pen handle-free clicks, both Alt inversion directions with
+no persisted changes, all four axis combinations, nearby-but-unreachable and
+distant nodes, finite curves, constrained resize, marker state, merge/undo of
+axis settings and unchanged indexed frame budgets.

@@ -155,3 +155,159 @@ required browser/UX review finish. Later review adds white-box error paths witho
 weakening this independent oracle. Coordinate exclusive build/test and browser
 ownership with the lead; no production changes belong to the tester. Report each
 criterion's named evidence, exact commands, failures and unresolved coverage.
+
+## Independent PR #225 feedback plan — snapshot before production review
+
+Prepared 2026-10-30 from amended specification AC 1–18, ADR §7 and UX §10,
+without reading the feedback implementation or its diff. Docs-only handoff;
+none of the checks below is claimed executed. Earlier acceptance results cover
+the earlier scope only. AC9's Select-move rule is explicitly superseded; retain
+the prior Ctrl+Alt suppression oracle outside established Select moves.
+
+### Document settings and controls (AC 1, 2, 10, 14, 16)
+
+- Exercise all four axis combinations `(X,Y) = (on,on), (on,off), (off,on),
+  (off,off)` through document commands, session and actual panel controls.
+  Defaults are both true; editing one flag never enables global snapping or
+  changes the other axis/target-kind flags. Both-off is valid while global-on
+  remains stored/on in the rail. Controls remain usable while global-off.
+- Save/open preserves each combination. Current-format absent axis registers
+  read true without operations, dirty state or history. Present malformed
+  values (string, number, null or container instead of bool) fail with Damaged;
+  do not add old-format migration obligations. Verify the final allocated
+  format version against current documents rather than assuming a new bump.
+- Each changed flag is one ordinary settings history step; no-op is none.
+  Undo/redo restores flags and immediately invalidates incompatible held state.
+  Peers changing different axes merge independently in both directions; undo
+  one local edit preserves the peer axis. Same-field conflicts converge.
+- Browser: visible/accessibility labels Horizontal (X), Vertical (Y), pressed
+  states, keyboard activation, native field/global undo and unchanged rail
+  navigation. Labels are the documented safe default pending the customer's
+  optional wording answer. Coordinate semantics are explicit: X correction
+  ordinarily produces a vertical reference line, not a horizontal one.
+
+### Reachable geometry, not clipped output (AC 3–8, 12, 16)
+
+Use independently calculated raw point `(99,99)` and line targets x=100/y=100:
+expected results are `(100,100)`, `(100,99)`, `(99,100)`, `(99,99)` for the four
+masks above. Disabled coordinates remain raw to an explicit kernel tolerance;
+no held target or marker represents a disabled correction. Both-off produces
+no marker. Repeat capture, hold and release from raw coordinates at several
+screen scales, and change mask while held at the same pointer position.
+
+- Atomic node `(100,100)` is reachable with both axes. With X-only it is
+  unreachable from `(99,99)` even though its X is near. Node `(100,99)` is
+  reachable with X-only; node `(100,999)` is not. Mirror for Y-only. Verify full
+  spatial capture/release eligibility and absence of synthetic projections.
+- A finite diagonal guide from `(90,90)` to `(110,110)` intersects X-only motion
+  through raw `(99,100)` at `(100,100)`, leaving raw Y=100 unchanged. Repeat with
+  swapped axes, curved Bézier intersections and a shortened segment that cannot
+  intersect the allowed motion line. Never extrapolate endpoints or substitute
+  closest unconstrained projection. Mixed guide/box composition obeys the mask.
+- Shift-locked moves intersect axis mask with the free coordinate. When only
+  the locked axis is enabled, snapping cannot change the move. Compare actual
+  committed geometry to an equivalent unsnapped constrained gesture.
+- Aspect-constrained diagonal resize cannot snap if its required coupled
+  correction changes a disabled axis. Test ordinary and mirrored resize;
+  preserve opposite/centre anchor and aspect ratio. A permitted edge-only
+  resize may snap on its enabled axis. Preview and release agree, including
+  release at a new raw position and changed final modifiers.
+- Exercise actual creation geometry with axis masks for Rectangle, Ellipse,
+  Polygon and Star; default dimensions, centre/corner reference and existing
+  Shift constraints remain as before. Node anchor/handle interactions retain
+  existing eligible-target rules; disabled axes cannot be restored by nodes.
+
+### Temporary Alt inversion during an established move (AC 9, 12, 16)
+
+First select and begin a genuine object move without Alt, away from parameter
+handles. For each stored-enabled value, place raw moving geometry just inside
+capture and record its unsnapped position. Press/release Alt **without another
+pointer event**: stored-off must snap only while held, stored-on must stop
+snapping while held, then restore from the unchanged raw input. Check live
+preview and marker as well as final geometry; a release with changed modifiers
+uses that event's effective state. Repeat beyond capture but inside a previously
+held release zone to expose stale held-state reuse when re-enabling.
+
+- Modifier changes never write settings/history, alter the rail badge/panel,
+  create geometry or change selection. One completed move remains one history
+  step; Escape restores geometry with no step. Save/read during preview never
+  persists effective-enabled, held target or marker state.
+- Ctrl+Alt during an already-running move uses the same XOR truth table and
+  creates no copy. Ctrl without Alt retains existing copy behavior. Check
+  Shift+Alt and Shift+Ctrl+Alt with both axis masks: only free/enabled movement
+  may snap. Alt never enables a disabled target kind or disabled axis.
+- Both axes off remains unsnapped under Alt inversion. End/cancel the move,
+  clear modifiers/focus and start a new gesture: no inversion is latched.
+- Alt at initial Select press still starts the existing lasso/selection action,
+  rather than moving the hit object; overlapping Alt-click behavior remains.
+  Resize, Node, Pen, Offset and idle creation hover do not receive move-only
+  inversion. Existing Ctrl+Alt bypass and tool-specific modifiers remain in
+  those contexts. These are preservation tests, not new interaction scope.
+
+### Idle hover, first press and placement (AC 7, 8, 11, 17, 18)
+
+For each of Rectangle, Ellipse, Polygon, Star and Pen, start with no gesture or
+button held. Send hover near an eligible target and assert a marker, corrected
+prospective point and no object/history/register change. An idle hover must not
+claim an active drag. Stored-off plus Alt alone remains off; move inversion is
+not global. Off-target hover releases using raw capture/release geometry.
+
+- First press after hover agrees with the current resolved point. Also press
+  with **no prior hover**, and hover at A then press at distinct raw B: resolve
+  the press event, never consume stale A. Repeat after settings/mask or target
+  changes. Start a creation drag at the corrected press and assert final shape
+  against independently calculated or equivalent exact-coordinate geometry.
+- Pen: prospective first node and later rubber-band endpoint snap without a
+  button down; ordinary click places the displayed point without spurious
+  handles. Test click-only raw motion below threshold with attraction larger
+  than the click threshold: snapping must not invent a handle/drag. Existing
+  continue/join/close and angle constraints retain precedence; live preview
+  endpoint is not its own target.
+- Shape simple click enters the existing typed-size placement flow (0052), not
+  an immediate unsolicited object. Verify snapped initial anchor, unchanged
+  default/typed dimensions and placement reference. Follow with pointer-based
+  placement preview, click confirm and keyboard confirm in separate cases;
+  all resolve the actual prospective coordinate and use current masks/state.
+  Typed exact coordinates remain exact. Preview adds no history; final accepted
+  creation is one normal step, undo/redo exact, cancellation none.
+- Lifecycle, separately for hover and active placement: leaving canvas, Escape,
+  tool change, document replacement/open, disabling global snapping, both axes
+  off, capture/focus loss and target removal clear incompatible markers promptly.
+  Pointer-up clears the old drag marker; a later real hover may create a new
+  marker. Moving into settings creates no artwork. Re-entry starts from current
+  raw input and current targets, without a stale capture or extra history step.
+
+### Cache and performance proof (AC 11, 17, 18)
+
+Use 10,000 visible objects with a nearby target late in document order. Measure
+1000 no-button hover frames versus equivalent raw hover with thread CPU, after
+separately reporting initial index construction. Keep the incremental <=2ms
+budget; assert nonempty correct results so an empty/stale cache cannot pass.
+Consecutive unchanged hover events must reuse the indexed session read, and
+hover-to-press promotion must not rebuild solely because a button went down.
+Document/target changes rebuild once when necessary; settings, mask, scale and
+modifier changes re-resolve correctly without per-pointer full document reads.
+Prefer an existing observable cache/read seam; if absent, identify exactly what
+is structurally reviewed versus measured rather than claiming instrumented proof.
+
+### Execution handoff and reporting
+
+After explicit exclusive-slot handoff, add executable acceptance independently
+from this snapshot, retain the original 22 tests except narrowly justified AC9
+amendments, and send real defects to implementer/lead before changing any oracle.
+No production edits by tester. Final report maps all 18 criteria to actual test,
+browser, review and performance evidence, distinguishes historical evidence and
+new verification, records exact commands/counts and states remaining gaps.
+
+### Post-plan review-derived regression additions
+
+After executable handoff, the architect supplied a scale-invariance defect in
+constraint compatibility: proportional direction vectors must not allow drift
+on a disabled axis merely because their unnormalized components are small.
+Independent public engine coverage now tests both masks at scales 1e-8/1/1e8.
+This is white-box-derived supplementary coverage, not part of the pre-code oracle.
+
+UX also identified Ctrl+Alt move feedback claiming Copy despite no copied object.
+Public acceptance reproduced the plus-badge failure before the fix and now checks
+both badge and live readout, Ctrl-only restoration and initial Ctrl+Alt lasso's
+remove badge. The original commit/history assertions remain intact.

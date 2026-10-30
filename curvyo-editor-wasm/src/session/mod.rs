@@ -724,6 +724,8 @@ impl Session {
             if this.history_preview_takes_press() {
                 return;
             }
+            this.pointer_position = Some(point);
+            this.held.shift = shift;
             this.page_view.press(&this.document.pages(), point);
 
             // Same flush as `set_tool`'s own doc comment explains: a canvas
@@ -753,6 +755,7 @@ impl Session {
                 return;
             }
             if this.refuse_drawing_into_layer() {
+                this.end_snapping_drag();
                 return;
             }
             this.button_down = true;
@@ -857,6 +860,9 @@ impl Session {
     /// position so the pen tool's rubber-band preview disappears rather
     /// than sticking at the last position inside the canvas.
     pub fn pointer_leave(&mut self) {
+        if !self.button_down {
+            self.end_snapping_drag();
+        }
         self.pointer_position = None;
         self.hovered = None;
     }
@@ -876,6 +882,7 @@ impl Session {
         let changed = self.recording(|this| this.document.set_snapping(snapping));
         if changed {
             self.snapping.update_stored(self.document.snapping());
+            self.end_snapping_drag();
         }
         changed
     }
@@ -907,6 +914,8 @@ impl Session {
             if this.page_drag_end(point) {
                 return;
             }
+            this.pointer_position = Some(point);
+            this.held.shift = shift;
             this.page_view.press(&this.document.pages(), point);
             match this.tool {
                 Tool::Select => {

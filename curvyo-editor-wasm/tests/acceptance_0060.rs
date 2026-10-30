@@ -413,3 +413,311 @@ fn ac13_dragged_clone_snaps_to_stationary_source_and_sibling_without_losing_over
         );
     }
 }
+
+fn reference_vertices(s: &Session) -> Vec<Point> {
+    s.draw_list()
+        .triangles
+        .into_iter()
+        .filter(|v| v.color == curvyo_render_core::RgbaColor::opaque(229, 72, 77))
+        .map(|v| v.position)
+        .collect()
+}
+
+#[test]
+fn ac9_alt_recomputes_at_same_pointer_without_writes_and_ctrl_alt_never_copies() {
+    for enabled in [false, true] {
+        for ctrl in [false, true] {
+            let d = Document::new(640);
+            let moving = d.create_rect(RectBounds::from_corners(
+                Point::new(10.0, 10.0),
+                Point::new(30.0, 30.0),
+            ));
+            d.edit_style(&[moving], &StyleEdit::FillEnabled(true))
+                .unwrap();
+            let _ = d.create_rect(RectBounds::from_corners(
+                Point::new(100.0, 10.0),
+                Point::new(120.0, 30.0),
+            ));
+            d.set_snapping(DocumentSnapping {
+                enabled,
+                page: false,
+                nodes: false,
+                guides: false,
+                ..DocumentSnapping::DEFAULT
+            });
+            let mut s = Session::open(641, &pack(&d, "acceptance").unwrap()).unwrap();
+            s.set_tool(Tool::Select);
+            drag(
+                &mut s,
+                Point::new(20.0, 20.0),
+                Point::new(20.0, 20.0),
+                false,
+                false,
+            );
+            let before = opened(&s);
+            let steps = s.undo_len();
+            s.pointer_down(Point::new(20.0, 20.0), false);
+            s.pointer_hover(Point::new(89.0, 20.0), false, false);
+            let baseline = reference_vertices(&s);
+            s.modifiers_changed(false, ctrl, true);
+            let inverted = reference_vertices(&s);
+            assert!(!s.move_indicators().copy_badge);
+            assert!(!s.live_readout().unwrap().text.contains("Copy"));
+            assert_ne!(baseline, inverted, "stored {enabled},ctrl {ctrl}");
+            s.modifiers_changed(false, true, false);
+            assert!(s.move_indicators().copy_badge);
+            assert!(s.live_readout().unwrap().text.contains("Copy"));
+            s.modifiers_changed(false, false, false);
+            assert_eq!(reference_vertices(&s), baseline);
+            assert_eq!(s.undo_len(), steps);
+            assert_eq!(
+                opened(&s).read_objects().objects,
+                before.read_objects().objects
+            );
+            assert_eq!(s.snapping(), before.snapping());
+            s.modifiers_changed(false, ctrl, true);
+            assert_eq!(reference_vertices(&s), inverted);
+            s.pointer_up(Point::new(89.0, 20.0), false, ctrl);
+            let after = opened(&s);
+            assert_eq!(after.object_ids().len(), 2);
+            let left = if enabled { 79.0 } else { 80.0 };
+            close(
+                object_outline_bounds(&after.object(moving).unwrap()),
+                (Point::new(left, 10.0), Point::new(left + 20.0, 30.0)),
+            );
+            assert_eq!(s.undo_len(), steps + 1);
+            s.undo();
+            assert_eq!(
+                opened(&s).read_objects().objects,
+                before.read_objects().objects
+            );
+        }
+    }
+}
+
+#[test]
+fn ac17_idle_hover_markers_have_no_drag_history_and_clear_on_lifecycle_events() {
+    for (tool, mode) in [
+        (Tool::Rectangle, PolyStarMode::Polygon),
+        (Tool::Ellipse, PolyStarMode::Polygon),
+        (Tool::PolygonStar, PolyStarMode::Polygon),
+        (Tool::PolygonStar, PolyStarMode::Star),
+        (Tool::Pen, PolyStarMode::Polygon),
+    ] {
+        let mut s = Session::new(642);
+        s.set_tool(tool);
+        s.set_poly_star_mode(mode);
+        s.set_snapping(config());
+        let before = opened(&s);
+        let steps = s.undo_len();
+        let empty = reference_vertices(&s);
+        s.pointer_hover(Point::new(53.0, 75.0), false, false);
+        assert!(!s.snapping_toolbar().has_drag);
+        assert_ne!(reference_vertices(&s), empty, "{tool:?}");
+        assert_eq!(s.undo_len(), steps);
+        assert_eq!(
+            opened(&s).read_objects().objects,
+            before.read_objects().objects
+        );
+        s.pointer_leave();
+        assert_eq!(reference_vertices(&s), empty);
+        s.pointer_hover(Point::new(53.0, 75.0), false, false);
+        s.escape();
+        assert_eq!(reference_vertices(&s), empty);
+        s.pointer_hover(Point::new(53.0, 75.0), false, false);
+        s.set_snapping(DocumentSnapping {
+            x: false,
+            y: false,
+            ..s.snapping()
+        });
+        assert_eq!(reference_vertices(&s), empty);
+        s.set_snapping(config());
+        s.pointer_hover(Point::new(53.0, 75.0), false, false);
+        s.set_snapping(DocumentSnapping {
+            enabled: false,
+            ..s.snapping()
+        });
+        assert_eq!(reference_vertices(&s), empty);
+        s.modifiers_changed(false, false, true);
+        s.pointer_hover(Point::new(53.0, 75.0), false, false);
+        assert_eq!(
+            reference_vertices(&s),
+            empty,
+            "Alt does not invert idle hover"
+        );
+        s.modifiers_changed(false, false, false);
+        s.set_snapping(config());
+        s.pointer_hover(Point::new(53.0, 75.0), false, false);
+        s.set_tool(Tool::Select);
+        assert_eq!(reference_vertices(&s), empty);
+        let reopened = Session::open(643, &s.pack("acceptance").unwrap()).unwrap();
+        assert_eq!(reference_vertices(&reopened).len(), 0);
+    }
+}
+
+#[test]
+fn ac16_ac18_all_shape_click_placements_obey_axes_and_preserve_typed_geometry() {
+    for (tool, mode) in [
+        (Tool::Rectangle, PolyStarMode::Polygon),
+        (Tool::Ellipse, PolyStarMode::Polygon),
+        (Tool::PolygonStar, PolyStarMode::Polygon),
+        (Tool::PolygonStar, PolyStarMode::Star),
+    ] {
+        for (x, y) in [(true, true), (true, false), (false, true), (false, false)] {
+            for hover in [false, true] {
+                let mut s = Session::new(644);
+                s.set_tool(tool);
+                s.set_poly_star_mode(mode);
+                s.set_snapping(DocumentSnapping { x, y, ..config() });
+                let mut exact = Session::new(645);
+                exact.set_tool(tool);
+                exact.set_poly_star_mode(mode);
+                let raw = Point::new(53.0, 75.0);
+                let snapped = Point::new(if x { 52.5 } else { 53.0 }, if y { 74.25 } else { 75.0 });
+                if hover {
+                    s.pointer_hover(Point::new(104.0, 149.0), false, false);
+                }
+                let steps = s.undo_len();
+                drag(&mut s, raw, raw, false, false);
+                drag(&mut exact, snapped, snapped, false, false);
+                assert_eq!(s.placement().unwrap().a(), snapped);
+                assert_eq!(s.undo_len(), steps);
+                assert_eq!(opened(&s).object_ids().len(), 0);
+                s.placement_edit(0, "20");
+                exact.placement_edit(0, "20");
+                s.placement_edit(1, "10");
+                exact.placement_edit(1, "10");
+                // Typed size freezes the original placement anchor under later hover.
+                s.pointer_hover(Point::new(104.0, 149.0), false, false);
+                assert!(s.place_placement());
+                assert!(exact.place_placement());
+                close(only_bounds(&s), only_bounds(&exact));
+                assert_eq!(s.undo_len(), steps + 1);
+                s.undo();
+                assert_eq!(opened(&s).object_ids().len(), 0);
+                s.redo();
+                close(only_bounds(&s), only_bounds(&exact));
+            }
+        }
+    }
+}
+
+#[test]
+fn ac18_following_click_placement_and_pen_first_click_resolve_current_raw_coordinates() {
+    for (x, y) in [(true, true), (true, false), (false, true), (false, false)] {
+        for tool in [Tool::Rectangle, Tool::Ellipse, Tool::PolygonStar, Tool::Pen] {
+            let mut s = Session::new(646);
+            s.set_tool(tool);
+            s.set_snapping(DocumentSnapping { x, y, ..config() });
+            let start = Point::new(53.0, 75.0);
+            let end = Point::new(104.0, 149.0);
+            let a = Point::new(if x { 52.5 } else { 53.0 }, if y { 74.25 } else { 75.0 });
+            let b = Point::new(if x { 105.0 } else { 104.0 }, if y { 148.5 } else { 149.0 });
+            let steps = s.undo_len();
+            // No preceding hover before first press; second press has a real hover.
+            drag(&mut s, start, start, false, false);
+            s.pointer_hover(end, false, false);
+            if tool != Tool::Pen {
+                assert_eq!(s.placement().unwrap().following().unwrap().0, b);
+            }
+            drag(&mut s, end, end, false, false);
+            if tool == Tool::Pen {
+                s.key_down(KeyInput {
+                    key: "Enter",
+                    ..KeyInput::default()
+                });
+            }
+            let actual = opened(&s);
+            assert_eq!(actual.object_ids().len(), 1);
+            assert_eq!(s.undo_len(), steps + 1);
+            if tool == Tool::Pen {
+                let path = actual.path(actual.object_ids()[0]).unwrap();
+                assert_eq!(path.anchors[0].point, a);
+                assert_eq!(path.anchors[1].point, b);
+                for node in path.anchors {
+                    assert_eq!(node.handle_in, Vec2::ZERO);
+                    assert_eq!(node.handle_out, Vec2::ZERO);
+                }
+            } else {
+                let mut exact = Session::new(647);
+                exact.set_tool(tool);
+                drag(&mut exact, a, a, false, false);
+                exact.pointer_hover(b, false, false);
+                drag(&mut exact, b, b, false, false);
+                close(only_bounds(&s), only_bounds(&exact));
+            }
+        }
+    }
+}
+
+#[test]
+fn ac9_alt_at_initial_press_preserves_lasso_and_remove_badge() {
+    let d = Document::new(648);
+    let id = d.create_rect(RectBounds::from_corners(
+        Point::new(10.0, 10.0),
+        Point::new(30.0, 30.0),
+    ));
+    d.edit_style(&[id], &StyleEdit::FillEnabled(true)).unwrap();
+    for ctrl in [false, true] {
+        let mut s = Session::open(649, &pack(&d, "acceptance").unwrap()).unwrap();
+        s.set_tool(Tool::Select);
+        let before = opened(&s);
+        let steps = s.undo_len();
+        s.modifiers_changed(false, ctrl, true);
+        s.pointer_down(Point::new(20.0, 20.0), false);
+        s.pointer_hover(Point::new(90.0, 20.0), false, ctrl);
+        assert!(!s.move_indicators().copy_badge);
+        assert_eq!(s.move_indicators().remove_badge, ctrl);
+        s.pointer_up(Point::new(90.0, 20.0), false, ctrl);
+        assert_eq!(
+            opened(&s).read_objects().objects,
+            before.read_objects().objects
+        );
+        assert_eq!(s.undo_len(), steps);
+    }
+}
+
+#[test]
+fn ac16_aspect_resize_cannot_change_the_disabled_coordinate() {
+    let d = Document::new(650);
+    let id = d.create_rect(RectBounds::from_corners(
+        Point::new(10.0, 10.0),
+        Point::new(30.0, 30.0),
+    ));
+    d.edit_style(&[id], &StyleEdit::FillEnabled(true)).unwrap();
+    let _ = d.create_rect(RectBounds::from_corners(
+        Point::new(100.0, 100.0),
+        Point::new(120.0, 120.0),
+    ));
+    let resize = |enabled, x, y| {
+        let mut s = Session::open(651, &pack(&d, "acceptance").unwrap()).unwrap();
+        s.set_tool(Tool::Select);
+        s.set_snapping(DocumentSnapping {
+            enabled,
+            x,
+            y,
+            page: false,
+            nodes: false,
+            guides: false,
+            ..DocumentSnapping::DEFAULT
+        });
+        drag(
+            &mut s,
+            Point::new(20.0, 20.0),
+            Point::new(20.0, 20.0),
+            false,
+            false,
+        );
+        s.pointer_down(Point::new(30.0, 30.0), false);
+        s.pointer_hover(Point::new(99.0, 98.0), false, true);
+        s.pointer_up(Point::new(99.0, 98.0), false, true);
+        object_outline_bounds(&opened(&s).object(id).unwrap())
+    };
+    let raw = resize(false, true, true);
+    for (x, y) in [(true, false), (false, true), (false, false)] {
+        close(resize(true, x, y), raw);
+    }
+    let snapped = resize(true, true, true);
+    close(snapped, (Point::new(10.0, 10.0), Point::new(100.0, 100.0)));
+    assert!((raw.1.x - snapped.1.x).abs() > 0.1);
+}

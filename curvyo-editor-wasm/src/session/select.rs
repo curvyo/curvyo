@@ -140,10 +140,17 @@ impl Session {
         if self.placement().is_some() {
             self.placement_modifiers(Modifiers::new(shift, ctrl));
         }
-        if self.tool == Tool::Select
-            && let Some(point) = self.pointer_position
-        {
-            self.select_hover(point, self.held);
+        if let Some(point) = self.pointer_position {
+            match self.tool {
+                Tool::Select => self.select_hover(point, self.held),
+                Tool::Pen => self.pen_snap_hover(point),
+                Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar
+                    if self.placement().is_none() =>
+                {
+                    self.shape_pointer_move(point, self.held);
+                }
+                _ => {}
+            }
         }
     }
 

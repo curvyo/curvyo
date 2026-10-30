@@ -58,6 +58,7 @@ impl Session {
         let Some(row) = self.history_row_at(object, index) else {
             return HistoryRowPress::NotARow;
         };
+        self.end_snapping_drag();
         let steps_then = self.document.history_len();
         let shown = if object {
             let Some(subject) = self.history_object() else {

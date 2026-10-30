@@ -124,12 +124,6 @@ impl SnappingState {
     pub fn end_drag(&mut self) {
         self.drag = None;
     }
-
-    /// Whether Ctrl+Alt is held: snapping is off while the combination is
-    /// held, whatever the stored switch says.
-    pub fn suspended(ctrl: bool, alt: bool) -> bool {
-        ctrl && alt
-    }
 }
 
 mod records;
@@ -139,7 +133,6 @@ impl super::Session {
     /// Starts a snapping drag for the current selection, gathering targets from the current
     /// document read. Called when a move or resize drag begins.
     pub(super) fn begin_snapping_drag_for_selection(&mut self) {
-        use curvyo_ui_core::SnapExclusions;
         let read = self.object_cache.read(&self.document, true, &self.fonts);
         let pages = self.document.pages();
         let mm_per_px = 1.0 / self.viewport.view().scale();
@@ -164,7 +157,24 @@ impl super::Session {
     /// Starts a snapping drag for shape creation, gathering targets from the current
     /// document read. No boxes or nodes are excluded.
     pub(super) fn begin_snapping_drag_for_shape(&mut self) {
-        use curvyo_ui_core::SnapExclusions;
+        let blocked_layer = self.context_group().is_none()
+            && self
+                .active_layer()
+                .and_then(|id| self.document.node_registers(id))
+                .is_some_and(|layer| !layer.visible || layer.locked);
+        if self.document_preview_active() || blocked_layer {
+            self.end_snapping_drag();
+            return;
+        }
+        if self.snapping.drag.as_ref().is_some_and(|context| {
+            context.boxes.is_none()
+                && context.nodes.is_none()
+                && context.anchors.is_empty()
+                && !context.nodes_only
+        }) && self.snapping.version.as_ref() == Some(&self.document.version())
+        {
+            return;
+        }
         let read = self.object_cache.read(&self.document, true, &self.fonts);
         let pages = self.document.pages();
         let mm_per_px = 1.0 / self.viewport.view().scale();
@@ -220,6 +230,7 @@ impl super::Session {
             self.snapping.version = Some(version);
         }
         let mm_per_px = 1.0 / self.view().scale();
+        let effective_enabled = self.snapping_effective_enabled();
         if let Some(drag) = &mut self.snapping.drag {
             drag.settings = SnapSettings::from_document(self.document.snapping(), mm_per_px);
             if drag.nodes_only {
@@ -227,9 +238,7 @@ impl super::Session {
                 drag.settings.guides = false;
                 drag.settings.page = false;
             }
-            if self.held.ctrl && self.held.alt {
-                drag.settings.enabled = false;
-            }
+            drag.settings.enabled = effective_enabled;
         }
         if let Some(drag) = &mut self.snapping.drag {
             let result = if let Some(direction) = direction {
@@ -255,9 +264,28 @@ impl super::Session {
         self.snapping.end_drag();
     }
 
-    /// Whether snapping is suspended due to Ctrl+Alt.
+    /// Current modifier override, without changing the document switch.
+    pub(super) fn snapping_effective_enabled(&self) -> bool {
+        let stored = self.document.snapping();
+        if !stored.x && !stored.y {
+            return false;
+        }
+        if self.tool == super::Tool::Select && self.select.move_in_flight() {
+            stored.enabled != self.held.alt
+        } else {
+            stored.enabled && !(self.held.ctrl && self.held.alt)
+        }
+    }
+
+    /// A drawing press or idle hover shares one cached indexed context.
+    pub(super) fn snap_creation_point(&mut self, point: Point) -> Point {
+        self.begin_snapping_drag_for_shape();
+        point.translated(self.resolve_snapping(&SnapProbe::point(point)).offset)
+    }
+
+    /// Whether snapping is temporarily suppressed by the current modifiers.
     pub(super) fn snapping_suspended(&self) -> bool {
-        SnappingState::suspended(self.held.ctrl, self.held.alt)
+        self.document.snapping().enabled && !self.snapping_effective_enabled()
     }
 
     /// The last snap result, for drawing the marker.
@@ -317,7 +345,7 @@ impl super::Session {
         use curvyo_document_core::Vec2;
         use curvyo_render_core::SnapMarkerSegment;
         use curvyo_ui_core::MarkerLine;
-        if !self.document.snapping().enabled || self.snapping_suspended() {
+        if !self.snapping_effective_enabled() {
             return curvyo_render_core::DrawList::default();
         }
         let Some(result) = self.snap_result() else {
@@ -355,3 +383,6 @@ impl super::Session {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod feedback_tests;

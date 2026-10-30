@@ -1,6 +1,7 @@
 # 0060 Snapping: UX notes
 
-Status: UX implementation review APPROVE, 2026-10-30; full quality gate and customer acceptance remain separate.
+Status: UX APPROVE including PR #225 feedback (2026-10-30); customer acceptance remains separate.
+The final feedback verdict and corrected Copy indicator evidence are recorded in §10.6.
 Owner: ux-engineer. Authority: customer requests of 2026-10-17, 2026-10-29
 (document-owned settings and six page fractions), and the latest request relayed by the
 lead on 2026-10-30: a dedicated Snapping entry in the Properties rail, ordinary click opens
@@ -12,8 +13,10 @@ placement in criteria 2 and 10 and question SNAP-HOME; the product owner updates
 References: `docs/design-system.md`, especially Properties panel: tabs, Switch, Reference
 mark and keyboard conventions. **(Proposal)** marks reversible implementation choices.
 Defaults stay off, all four kinds on, capture 8 px, release 14 px; release is never smaller
-than capture. Ctrl+Alt temporarily suspends snapping. These notes do not change that
-modifier or introduce a new global shortcut. Settings remain document-owned and undoable;
+than capture. The latest PR #225 feedback adds independent X/Y controls, temporary Alt
+inversion during an established move, and drawing hover/first-click snapping (§10).
+Ctrl+Alt suspension outside that move scope remains unchanged pending a customer decision;
+no all-tool Alt reassignment is implied. Settings remain document-owned and undoable;
 active pane, collapse state, held targets and markers remain view/interaction state.
 
 ## 1. Snapping rail entry and settings panel
@@ -63,8 +66,9 @@ this reviewer. The marker and snapping engine contracts below otherwise remain i
 - Keep the panel sticky through selection changes, deselection, group entry and tool changes,
   like History/Layers/Fonts. Only deliberate navigation changes it. Hide/show retains it;
   New/Open keep the existing panel reset policy, and load the new document's snapping state.
-  Canvas-drag gating remains as for other settings: no mid-drag panel mutation; Ctrl+Alt is
-  the existing temporary suspension route.
+  Canvas-drag gating remains as for other settings: no mid-drag panel mutation. The
+  latest move-only Alt inversion is specified in §10; outside it the existing Ctrl+Alt
+  suspension route remains.
 
 ### 1.3 Independent enabled, selected and focused states
 
@@ -84,8 +88,9 @@ clearance to keep the magnet legible. It distinguishes state without relying on 
 its casing follows the current ground as the File dirty badge does. The existing two-tone
 inset focus ring stays visible independently of all four combinations. Hover must not erase
 enabled or selected state. With the body collapsed, no tab is selected but the enabled
-indication stays visible. Temporary Ctrl+Alt suspension does not change the persisted enabled
-indication; the marker disappears and the tooltip may say `Snapping on, suspended`.
+indication stays visible. Temporary suspension or move-only Alt inversion never changes
+the persisted enabled indication. Do not recolour the rail or toggle the panel switch to
+represent effective transient snapping; the canvas marker follows the effective result.
 
 Keep the tab's accessible name `Snapping`, its `role="tab"`, `aria-selected` and panel
 relationship. An accessible description names `On` or `Off` separately; do not give a tab a
@@ -106,8 +111,9 @@ No additional popup, banner, explanatory paragraph or second toolbar.
 |---|---|
 | 1 | Label `Snapping`, an explicit labelled on/off switch using the established Switch component; `role="switch"`, `aria-checked`, accessible name `Snapping`. This is the touch and unmodified-keyboard alternative to Shift-click. |
 | 2 | `Snap targets`: Objects, Guides, Nodes, Page as four independent pressed-state toggles, in the established two-column layout. They stay editable with global snapping off and do not switch it on implicitly. |
-| 3 | `Capture`: existing panel number-entry pattern, displayed in screen `px`, accepts finite nonnegative values. |
-| 4 | `Release`: same; below Capture normalizes to Capture and shows the stored result after commit. Raising Capture beyond Release raises Release in the same document transaction. |
+| 3 | `Snap axes`: independent `Horizontal (X)` and `Vertical (Y)` pressed-state controls, both on by default; coordinate-component semantics and history in §10. |
+| 4 | `Capture`: existing panel number-entry pattern, displayed in screen `px`, accepts finite nonnegative values. |
+| 5 | `Release`: same; below Capture normalizes to Capture and shows the stored result after commit. Raising Capture beyond Release raises Release in the same document transaction. |
 
 Tab order is controls in visual order (the header is not focusable). On keyboard tab opening,
 focus stays in the strip; Tab enters the first switch. All controls use existing token colours,
@@ -182,7 +188,9 @@ the line does not extend across the whole canvas: the maker must see *which* edg
   fractions. Ties are exact equality, not "within a pixel"; a near tie is a near win.
 - **Axis lock.** With Shift held for a horizontal or vertical move, only the free axis snaps;
   the locked axis shows no line. Ctrl alone still copies (its meaning in the Select tool) and
-  Ctrl+Alt together turn snapping off, so a Ctrl copy does not lose snapping.
+  the established move reads Alt as the temporary inversion described in §10. Outside
+  that scope Ctrl+Alt retains its existing suspension meaning until the customer chooses
+  otherwise. Enabled document axes further constrain the free-axis set.
 - **What moves.** A multi-selection or a group snaps by the box of the whole selection, not by
   each member: its four edges, two centre lines and nine reference points. A resize snaps the
   moving edges and the dragged reference point; the fixed edges do not pull.
@@ -192,9 +200,9 @@ the line does not extend across the whole canvas: the maker must see *which* edg
 - **Node tool.** Anchors snap to every enabled target. Handles snap to nodes only, so a handle
   can be made exactly as long as a neighbouring node offset; they never snap to boxes, guides
   or page lines. The edited path's own other anchors are targets, the dragged anchor is not.
-- **Creation drags.** Rectangle, Ellipse and Polygon/Star snap while the drag runs, including
-  the first press (a creation drag has no "raw start" to preserve: the pressed corner is the
-  raw point and snaps immediately). The existing size readout shows the snapped size.
+- **Creation.** Rectangle, Ellipse and Polygon/Star show snapping at the prospective
+  creation anchor before a press, on their first click, and during the creation drag or
+  placement preview (§10). The existing size readout shows the snapped size.
 - **Pen.** The first click and every placed node snap; the rubber-band preview follows the
   snapped point, so the segment the maker sees is the segment that is committed.
 - **Targets.** All effectively visible leaves except the dragged object(s): locked objects
@@ -204,8 +212,10 @@ the line does not extend across the whole canvas: the maker must see *which* edg
 - **Empty state.** Page lines exist in an empty document, so a newly drawn shape can be put on
   the page's 25 % line without another object. There is no 0 % line (customer's list); the
   left and top page edges are not snap targets of their own.
-- **No snap on hover, no snap on plain click.** Only a drag (or a placement) pulls. A nudge
-  with the arrow keys, a typed move and a typed size are exact input and never snap.
+- **Drawing hover and first click.** Creation and Pen use the prospective anchor and
+  show/commit the same eligible snapped point without requiring a held mouse button (§10).
+  Select hover and plain object-selection clicks do not snap or move objects. A nudge
+  with the arrow keys, a typed move and a typed size remain exact input and never snap.
 - **One history step.** A snapped drag commits exactly what an unsnapped drag commits, under
   the same label. The settings changes are their own steps (`set_document_snapping`). The snap
   state, the marker and the held target are never written to the document.
@@ -217,11 +227,13 @@ the line does not extend across the whole canvas: the maker must see *which* edg
 
 - No status-bar text, no toast and no live-region message for a snap: it would fire on every
   frame. The marker is the feedback.
-- The cursor does not change over a target and there is no hover highlight.
+- The cursor does not change over a target. Drawing hover uses the same snapping marker
+  as placement; ordinary Select hover gets no extra snapping highlight.
 - Invalid field text is refused with the validation chip and writes nothing; refused
   or interaction-gated commands retain their stored values.
 - Turning snapping off during a drag is not possible through panel controls (settings are inert during
-  a canvas drag); Ctrl+Alt is the way to suspend it, and it takes effect in the same frame.
+  a canvas drag); temporary move inversion follows §10 and changes feedback in the same
+  frame. Outside that scope the existing Ctrl+Alt suspension is retained.
 - Turning the document's switch off while a target is held releases it and removes the marker;
   the drag continues unsnapped.
 
@@ -324,3 +336,188 @@ off/on states, not every focus/hover/coarse-pointer combination; those states we
 in source. This approval covers the amended UI, not a fresh performance measurement,
 snapping-engine correctness proof or the tester's full quality gate. Customer acceptance
 remains outstanding.
+
+## 10. PR #225 customer feedback: axes, move inversion and drawing preview
+
+Authority: the lead relayed new customer feedback requesting two independent horizontal/
+vertical controls, Alt temporarily inverting snapping while moving, and snapping feedback
+while drawing before the first press, on the first click and along the Pen rubber band.
+This section supersedes earlier no-hover and move-modifier wording. It leaves the accepted
+Shift-click rail toggle, its keyboard equivalents, focus rules and undo ownership intact.
+The lead is asking the customer about directional meaning and broader modifier scope;
+the defaults below allow implementation without silently changing unrelated tool gestures.
+
+### 10.1 Independent coordinate axes
+
+**(Proposal; default pending the lead's directional question)** use `Horizontal (X)` and
+`Vertical (Y)` under `Snap axes`, two independent pressed-state controls in a two-column
+row after Snap targets and before Capture. Horizontal means correction of the x coordinate
+(left/right movement, generally to a vertical target line); Vertical means correction of y
+(up/down movement, generally to a horizontal target line). Do not label them only by target
+line orientation. Accessible names contain the visible axis labels.
+
+Both defaults are on, including legacy files without these flags. Values belong to the
+document and each edit is one undoable setting step. They remain editable when global
+snapping is off and do not enable it implicitly. Both off is valid: no correction or marker,
+while the global switch and blue rail indication continue to show the stored global setting.
+Turning an axis off clears any held component on that axis. A point target must not secretly
+restore a disabled coordinate: only eligible coordinate components may be corrected.
+For a one-axis point snap, the target must already lie on the reachable coordinate line
+within the architect's geometric tolerance; do not project an unreachable point into a
+false match. Curve targets must intersect the permitted motion line. The ADR owns exact
+geometry/tolerance; the marker must identify a target the moving point actually reaches.
+Shift's movement constraint is intersected with the enabled axes. Preserve exact typed input,
+current tool geometry constraints and the existing capture/release zones.
+
+### 10.2 Alt during a move, with existing gestures preserved
+
+**(Proposal; safe default limited to the customer's explicit moving scope)** once a Select
+object-move or copy-move has begun, holding Alt uses the opposite of the stored global
+snapping-enabled value. Off becomes temporarily on; on becomes temporarily off. Target kind
+and axis choices are unchanged, so Alt never enables a disabled target or coordinate. Ctrl-only
+copy and Shift axis lock retain their meanings, including the existing `ctrl && !alt` copy
+guard: Alt must not accidentally turn a move into a copy. Inside this established move, Alt inversion
+also applies with Ctrl held; do not additionally apply the old Ctrl+Alt suppression there.
+Outside this move scope the existing Ctrl+Alt rule remains until separately decided.
+
+No register, history entry, dirty state, panel switch, rail badge or panel visibility changes
+on Alt press/release. Re-evaluate from the raw pointer-derived position when the modifier
+changes, even without pointer movement. Losing effective snapping immediately clears the
+held target/marker; re-enabling it resolves eligible targets afresh. The movement remains
+one normal Move/Copy history operation on release. Release, Escape, abandoned capture and
+window focus loss clear transient state; do not leave inversion latched for the next gesture.
+
+Bounded source conflict review: `curvyo-ui-core/src/select_tool/press.rs` and `select_tool.rs`
+make Alt at pointer-down arm lasso before body/handle hits; Alt-click also cycles overlapped
+objects. `curvyo-editor-wasm/src/session/offset.rs` uses Alt during a corner drag to cycle
+corner style. Pen currently makes its Ctrl angle constraint conditional on Alt being up.
+Therefore preserve Alt-at-press selection/lasso and Offset behaviour. The safe move gesture
+is start moving, then hold Alt. Do not globally reinterpret Alt for every tool or remove
+established behaviour without the customer's broader-scope decision.
+
+### 10.3 Drawing hover, first click and Pen preview
+
+Rectangle, Ellipse, Polygon/Star and Pen resolve the prospective creation anchor while the
+pointer moves over the canvas, before any mouse button is held. With eligible snapping on,
+show the existing line/cross marker for the resolved anchor. The raw pointer remains the
+source for capture/release distances; hover must not synthesize document edits or an object.
+The first click uses that same eligible resolution, including a click with no preceding
+pointer move. A drag creation's initial anchor and the marker therefore agree.
+
+For simple click/default-sized shape placement, snap the existing placement anchor/origin,
+respecting enabled coordinate components; preserve the tool's default dimensions, angle and
+anchor convention. Do not resize the default shape to make its far edge match another target.
+For an existing click-move-click placement, keep its current constrained preview and apply
+snapping only to eligible free coordinates. A geometry constraint must never be broken to
+satisfy a disabled/ineligible axis. Typed dimensions and coordinates remain exact.
+
+For Pen, both the prospective first node and the endpoint of the rubber band resolve while
+no button is held. The click commits the previewed eligible endpoint. Existing path
+continue/join/close precedence and angular constraints still win; snap candidates must be
+compatible with them. The in-progress endpoint, handles and generated drawing preview are
+not their own targets. Previously eligible established anchors retain their existing rules;
+this feedback does not expand self-snapping targets.
+
+Marker lifecycle: appears only when an eligible prospective point is captured; updates on
+pointer movement or relevant modifier/setting changes; vanishes immediately when snapping
+is effectively off, both axes are off, the target releases, the pointer leaves the canvas,
+a tool changes, the operation is cancelled or capture/window focus is lost. Pointer-up ends
+an active drag's marker; a subsequent drawing hover/placement update can show the next
+prospective anchor. Do not leave the previous drag's marker stuck after release. Pen finish
+and Escape clear its held target before any new first-node preview. Moving into the panel
+clears drawing feedback; editing settings does not create artwork. No labels, animation or
+new cursor are added.
+
+Reuse the existing eligible-target index across consecutive hover/preview events when the
+document/visibility context has not changed. Invalidate/rebuild on actual target changes,
+page geometry, settings or editing-context changes, not on every pointer event or every
+preview endpoint. Use the same eligible target set when a hover becomes a press/drag so
+there is no feedback jump; exclude the live moving/drawing preview. The architect and
+implementer own cache identity and geometry policy; these UX notes require consistent
+feedback without a fresh document read per hover frame.
+
+### 10.4 Review evidence still needed for this feedback
+
+Recheck X-only, Y-only, both and neither; point targets and constrained drawing; defaults
+and saved/reopened flags; one-step setting undo. Demonstrate stored-off/Alt-on and
+stored-on/Alt-off during a move, restoration without pointer motion, Ctrl copy and Shift
+constraint, cancellation/focus loss, unchanged rail/panel state and preserved Alt lasso/
+click cycling and Offset corner style. Demonstrate hover capture before first press,
+first-click agreement, default-sized shape anchor, click-move-click preview, Pen first node
+and rubber band, preview self-exclusion and marker cleanup. The §9 approval is historical;
+these additions need their own implementation and validation evidence below.
+
+### 10.5 Partial source review of the feedback implementation
+
+Read-only review, 2026-10-30: current `SnappingSection` exposes independent `Horizontal (X)`
+and `Vertical (Y)` pressed-state buttons under `Snap axes`, before zone fields. Their visible
+labels supply accessible names, keyboard clicks retain focus, pointer clicks return to the
+canvas, and each uses the dedicated axis setter plus editor synchronization. The hook's
+initial defaults enable both. The WASM settings bridge preserves the current axis flags
+when other targets/zones change; the axis setter preserves the remaining document settings.
+No new generic key handler intercepts native field undo or the existing document undo path.
+
+The rail/panel switch continues to read the stored enabled value, independently of the
+effective move result. Current session code uses stored-enabled XOR held-Alt during an
+established Select move and returns no effective snapping when both axes are off. The
+marker renderer now consults effective snapping rather than the stored flag, allowing a
+marker when Alt temporarily enables a stored-off move. Outside moves, the existing Ctrl+Alt
+suppression remains. These are source observations, not a browser demonstration.
+
+Drawing/Pen hover routes resolve without a pressed button. The toolbar's `hasDrag` derives
+from an actual button/operation, so an idle cached hover context alone does not disable the
+settings controls. Pointer leave without a held button and setting changes clear the snap
+context; modifier changes refresh drawing/Pen at the retained pointer position. The drawing
+context reuses the current document version/exclusion context. No concrete new UI blocker
+was found in this bounded source review. Final review still needs saved screenshots and
+browser evidence for axes, both directions of temporary inversion and idle marker lifecycle;
+no visual PASS/APPROVE, build or test is claimed for this feedback yet.
+
+### 10.6 Saved-screenshot review and final feedback approval
+
+Initial finding: **CHANGES REQUESTED**, subsequently resolved below. Reviewed saved screenshots
+`axes-{both,x,y,none}-hover.png` and `alt-{true,false}-{false,true}-held.png` in
+`target/browser-check`. All four axis combinations read clearly: X permits a vertical
+target line with the cross at the permitted x coordinate; Y permits a horizontal target
+line; both show both lines; neither shows no marker while the global switch remains on.
+The markers are visible before pressing a mouse button. The independent axis controls fit
+the existing pane and use its established pressed-state appearance.
+
+The Alt screenshots show the intended stored-versus-effective distinction: stored-on
+retains the panel switch and rail state while its snap marker disappears; stored-off
+retains its off switch while temporary snapping shows a marker. However,
+`alt-false-true-held.png` also displays `Copy` and a plus badge. The lead confirmed this is
+a real feedback defect, not screenshot timing: move indicator rendering reads Ctrl without
+the existing `!alt` guard, while preview/commit correctly avoid copying. The readout and
+badge must use the same effective copy condition as the operation before final approval.
+The tester/implementer own the focused regression and correction; this reviewer ran none.
+
+The lead reports `frontend/tests/browser/snapping-feedback.cjs` passing exact saved rectangle
+coordinates and persisted axis flags in all four combinations, axis undo/redo, drawing
+hover before a press, second-click and Enter placement, both directions of moving Alt
+inversion including Ctrl without an extra committed copy or stored-setting mutation, and
+no JavaScript errors. The earlier rail/panel browser smoke also passed according to the
+lead. These runtime outcomes are attributed evidence, not independent reviewer reruns.
+
+The initial scratch placement screenshot showed an uncommitted live preview and intentional
+first-field focus. Synchronized browser interaction (two animation frames before the second
+canvas click) demonstrated successful placement, as did Enter. That scratch result is not
+a product defect and does not indicate incorrect snapping geometry. Final new-feedback UX
+approval remains pending corrected Copy feedback and updated screenshot evidence; no
+fresh live browser, build or tests were run by this reviewer.
+
+**Final verdict: APPROVE (2026-10-30).** Inspected the freshly regenerated
+`target/browser-check/alt-false-true-held.png` after the tester rebuilt WASM and reran the
+browser checks. The move readout now contains only the displacement, with no `Copy` text
+or plus badge. Temporary snap lines remain visible while the stored Snapping switch stays
+off, so the corrected feedback agrees with the actual move and document state. This
+resolves the only outstanding visual finding; the four axis/hover screenshots reviewed
+above remain consistent with the requested coordinate semantics.
+
+The lead reports the tester's refreshed browser checks passing with explicit assertions
+that neither Copy text nor the plus badge exists before capture, together with all axis,
+click/Enter placement and Alt saved-geometry checks. The lead also reports 31 public
+acceptance tests and the full gate passing, with 9,519/9,519 workspace tests green. These
+are attributed tester results, not tests rerun by the UX reviewer. This reviewer inspected
+the saved final screenshot only; no live browser, build, test or production edit was made.
+No concrete amended-UX blocker remains. Customer acceptance is still a separate step.
