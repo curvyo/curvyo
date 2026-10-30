@@ -12,6 +12,7 @@ import { Tooltip as AppTooltip } from "@/components/ui/tooltip";
 import type { TraceApi } from "@/hooks/useTrace";
 import type { TraceInfoApi } from "@/hooks/useTraceInfo";
 import {
+  CREATE_PATHS,
   FAILED,
   PREVIEW_OUT_OF_DATE,
   RETRY,
@@ -147,12 +148,26 @@ function ViewPill({ mode, onMode }: { mode: TraceViewMode; onMode: (mode: TraceV
 /** The 1 px border of the bar's pills at 40 % (the View pill's look). */
 const PILL_BORDER = "outline outline-1 -outline-offset-1 outline-[var(--toolbar-icon)]/40";
 
-/** The progress slot of row 1 (criteria 10, 53, 54; UX notes 21.2): the running pill with its
- * percentage and x, "Stopped" with Retry, or "Failed" with Retry and the reason as tooltip and
- * hidden alert; nothing, and no width, at rest. */
-function ProgressSlot({ slot, onStop, onRetry }: { slot: TraceSlot; onStop: () => void; onRetry: () => void }) {
+/** The pill at the far right of the bar (criteria 10, 53, 54; `specs/0089` Frage 84): at rest
+ * the finish button (the same as Enter), the running pill with its percentage and x, "Stopped"
+ * with Retry, or "Failed" with Retry and the reason as tooltip and hidden alert. */
+function ProgressSlot({
+  slot,
+  onStop,
+  onRetry,
+  onCreate,
+}: {
+  slot: TraceSlot;
+  onStop: () => void;
+  onRetry: () => void;
+  onCreate: () => void;
+}) {
   if (slot.kind === "none") {
-    return null;
+    return (
+      <button type="button" data-trace-slot="none" className={`${BUTTON_CLASS} ${PILL_BORDER} shrink-0`} onClick={onCreate}>
+        {CREATE_PATHS}
+      </button>
+    );
   }
   if (slot.kind === "running") {
     const fill = slot.percent ?? 0;
@@ -247,9 +262,9 @@ interface TraceBarProps {
 
 /**
  * The Trace bar in the overlay row (`specs/0025-raster-trace` criteria 1 to 5, 10 to 12, 15, 37,
- * 40, 41, 46, 51 to 54, 57, 71; UX notes section 21.2): one flow of the state label with the "i"
- * button, Preset, View, Threshold, Smooth, Specks, the progress slot and the expander at the far
- * right, wrapping by whole items; under it the notice row and, when open, the Advanced block.
+ * 40, 41, 46, 51 to 54, 57, 71; UX notes section 21.2; `specs/0089` Frage 84, 85 B): one flow of
+ * the "i" button, Preset, View, Threshold, Smooth, Tolerance, Specks, and at the far right the
+ * expander and the pill (the finish button at rest), wrapping by whole items; under it the notice row and, when open, the Advanced block.
  * With nothing or something else selected it is one row of words.
  */
 export function TraceBar({ trace, info, onImport, onReturnFocus }: TraceBarProps) {
@@ -280,7 +295,7 @@ export function TraceBar({ trace, info, onImport, onReturnFocus }: TraceBarProps
       </div>
     );
   }
-  const field = (name: "smooth" | "specks") => (
+  const field = (name: "smooth" | "tolerance" | "specks") => (
     <TraceField
       param={param(name)}
       value={trace.values[name]}
@@ -318,8 +333,8 @@ export function TraceBar({ trace, info, onImport, onReturnFocus }: TraceBarProps
         {TRACE_BAR_DESCRIPTION}
       </span>
       <div ref={rowRef} className={TRACE_ROW_CLASS}>
-        <span className="flex h-9 items-center gap-1.5">
-          {label}
+        {/* No "Trace" label at the start (Frage 84); the "i" stays. */}
+        <span className="flex h-9 items-center">
           <InfoButton info={info} onReturnFocus={onReturnFocus} />
         </span>
         <div className="flex h-9 items-center">
@@ -335,13 +350,13 @@ export function TraceBar({ trace, info, onImport, onReturnFocus }: TraceBarProps
         <div className="flex h-9 items-center">{thresholdField}</div>
         {/* 4 px after Threshold, not 8 (UX notes 21.2), unless it starts a line. */}
         <div className="-ml-1 flex h-9 items-center data-[row-start]:ml-0">{field("smooth")}</div>
+        <div className="flex h-9 items-center">{field("tolerance")}</div>
         <div className="flex h-9 items-center gap-2">
           <WithHint hint={trace.pxPerMm > 0 ? specksHint(trace.values.specks, trace.pxPerMm) : undefined}>
             {field("specks")}
           </WithHint>
         </div>
-        <ProgressSlot slot={trace.slot} onStop={trace.stop} onRetry={trace.retrace} />
-        <div className="ml-auto flex h-9 items-center">
+        <div className="ml-auto flex h-9 items-center gap-2">
           <ExpandButton
             open={trace.advancedOpen}
             onToggle={() => trace.setAdvancedOpen(!trace.advancedOpen)}
@@ -350,6 +365,7 @@ export function TraceBar({ trace, info, onImport, onReturnFocus }: TraceBarProps
             changed={trace.advancedOpen ? null : changedAdvancedText(trace.values, trace.params)}
             onReturnFocus={onReturnFocus}
           />
+          <ProgressSlot slot={trace.slot} onStop={trace.stop} onRetry={trace.retrace} onCreate={trace.create} />
         </div>
         {trace.advancedOpen ? (
           // After the expander in the DOM, so Tab reaches the Advanced controls after it

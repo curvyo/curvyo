@@ -5,10 +5,10 @@
 use curvyo_document_core::Length;
 use curvyo_ui_core::{
     TRACE_ADVANCED_PARAMS, TRACE_PARAMS, TRACE_PRESETS, TraceDenoise, TraceParamKind,
-    TraceParamUnit, TraceParams, TraceUpscale,
+    TraceParamUnit, TraceParams, TracePixelLength, TraceUpscale,
 };
 
-/// `settings` (the host's JSON: `threshold`, `smooth`, `specks` in mm, `corners`, `upscale` and
+/// `settings` (the host's JSON: `threshold`, `smooth`, `tolerance` in source px, `specks` in mm, `corners`, `upscale` and
 /// `denoise` as choice indices, `invert`, `ignore_background`) as trace
 /// values (criteria 41, 60); a missing or unreadable field takes its first-use value.
 pub fn trace_settings(settings: &str) -> TraceParams {
@@ -22,6 +22,10 @@ pub fn trace_settings(settings: &str) -> TraceParams {
     let first = TraceParams::with_threshold(byte("threshold").unwrap_or(128));
     TraceParams {
         smooth: byte("smooth").unwrap_or(first.smooth),
+        tolerance: json
+            .get("tolerance")
+            .and_then(serde_json::Value::as_f64)
+            .map_or(first.tolerance, TracePixelLength::from_px),
         specks: json
             .get("specks")
             .and_then(serde_json::Value::as_f64)
@@ -36,7 +40,7 @@ pub fn trace_settings(settings: &str) -> TraceParams {
 }
 
 /// The presets as JSON (criteria 59 and 60), in menu order: a list of `{key, label, detail,
-/// values: {smooth, specks, corners, upscale, denoise}}`.
+/// values: {smooth, tolerance, specks, corners, upscale, denoise}}`.
 #[must_use]
 pub fn trace_presets_json() -> String {
     let list: Vec<serde_json::Value> = TRACE_PRESETS
@@ -48,6 +52,7 @@ pub fn trace_presets_json() -> String {
                 "detail": p.detail,
                 "values": {
                     "smooth": p.smooth,
+                    "tolerance": p.tolerance_px,
                     "specks": p.specks_mm,
                     "corners": p.corners,
                     "upscale": p.upscale.index(),
@@ -72,7 +77,7 @@ pub fn trace_params_json() -> String {
                 "name": p.name,
                 "label": p.label,
                 "kind": match p.kind { TraceParamKind::Integer => "integer", TraceParamKind::Length => "length", TraceParamKind::Choice(_) => "choice", TraceParamKind::Toggle => "toggle" },
-                "unit": match p.unit { TraceParamUnit::None => "", TraceParamUnit::Millimetre => "mm" },
+                "unit": match p.unit { TraceParamUnit::None => "", TraceParamUnit::Millimetre => "mm", TraceParamUnit::Pixel => "px" },
                 "min": p.min,
                 "max": p.max,
                 "default": p.default,
@@ -95,11 +100,12 @@ mod tests {
     #[test]
     fn the_settings_json_reads_every_value_and_falls_back_to_the_first_use() {
         let p = trace_settings(
-            r#"{"threshold":90,"smooth":100,"specks":2,"corners":30,"upscale":0,"denoise":1,
+            r#"{"threshold":90,"smooth":100,"tolerance":1.25,"specks":2,"corners":30,"upscale":0,"denoise":1,
                 "invert":true,"ignore_background":true}"#,
         );
         assert_eq!((p.threshold, p.smooth, p.corners), (90, 100, 30));
         assert!((p.specks.as_mm() - 2.0).abs() < 1e-12);
+        assert!((p.tolerance.as_px() - 1.25).abs() < 1e-12);
         assert_eq!(
             (p.upscale, p.denoise),
             (TraceUpscale::Auto, TraceDenoise::Low)
@@ -115,6 +121,7 @@ mod tests {
         let presets: serde_json::Value = serde_json::from_str(&trace_presets_json()).unwrap();
         assert_eq!(presets.as_array().unwrap().len(), 4);
         assert_eq!(presets[2]["values"]["smooth"], 100);
+        assert_eq!(presets[2]["values"]["tolerance"], 1.5);
         let params: serde_json::Value = serde_json::from_str(&trace_params_json()).unwrap();
         let names: Vec<&str> = params
             .as_array()
@@ -127,6 +134,7 @@ mod tests {
             [
                 "threshold",
                 "smooth",
+                "tolerance",
                 "specks",
                 "invert",
                 "ignore_background",
@@ -136,7 +144,7 @@ mod tests {
             ]
         );
         assert_eq!(
-            params[5]["choices"],
+            params[6]["choices"],
             serde_json::json!(["Off", "Low", "High"])
         );
     }

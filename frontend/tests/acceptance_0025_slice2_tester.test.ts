@@ -514,9 +514,7 @@ test("0025s2 in Chromium: the Preset menu, its values, Custom, the remembered ch
       nodes[name] = nodesOf(await settle(s));
     }
     console.log("nodes per preset on the blobs fixture:", JSON.stringify(nodes));
-    // Criterion 64: Engraving >= Logo >= Silhouette; the preview updates on a pick.
-    assert.ok(nodes.Engraving >= nodes["Logo / Line art"], `Engraving ${nodes.Engraving} vs Logo ${nodes["Logo / Line art"]}`);
-    assert.ok(nodes["Logo / Line art"] >= nodes["Silhouette for cutting/carving"]);
+    // Criterion 64: the preview updates on a pick (the node order is the Rust test c64, 0089 criterion 9a).
 
     // Criterion 40: an edit turns the button into Custom; the pick restores.
     await typeInto(s, "Smooth", "33");
