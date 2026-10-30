@@ -228,8 +228,19 @@ impl WasmSession {
             page,
             capture_px,
             release_px,
+            ..self.session.snapping()
         };
         self.session.set_snapping(snapping)
+    }
+
+    /// Sets the independently permitted snapping coordinates.
+    pub fn set_snapping_axes(&mut self, x: bool, y: bool) -> bool {
+        let settings = curvyo_document_core::DocumentSnapping {
+            x,
+            y,
+            ..self.session.snapping()
+        };
+        self.session.set_snapping(settings)
     }
 
     /// The snapping settings as a record.

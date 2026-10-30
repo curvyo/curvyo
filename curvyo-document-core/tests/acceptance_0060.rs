@@ -8,6 +8,8 @@ fn ac1_ac14_defaults_roundtrip_and_reads_do_not_create_operations() {
     assert_eq!(d.snapping(), DocumentSnapping::DEFAULT);
     assert_eq!(d.version(), version);
     let stored = DocumentSnapping {
+        x: true,
+        y: true,
         enabled: true,
         objects: false,
         guides: true,
@@ -79,4 +81,30 @@ fn ac1_ac12_peer_settings_merge_independently_and_undo_preserves_peer_fields() {
     a.undo_step(step).unwrap();
     assert!(!a.snapping().enabled);
     assert!(!a.snapping().nodes);
+}
+
+#[test]
+fn ac16_axis_peers_merge_and_local_undo_retains_other_axis() {
+    let a = Document::new(630);
+    let b = unpack(631, &pack(&a, "acceptance").unwrap()).unwrap();
+    assert!(a.snapping().x && a.snapping().y);
+    a.set_snapping(DocumentSnapping {
+        x: false,
+        ..a.snapping()
+    });
+    let step = a.own_steps().last().unwrap().step;
+    b.set_snapping(DocumentSnapping {
+        y: false,
+        ..b.snapping()
+    });
+    let au = a.export_updates(&b.version()).unwrap();
+    let bu = b.export_updates(&a.version()).unwrap();
+    a.import_updates(&bu).unwrap();
+    b.import_updates(&au).unwrap();
+    assert_eq!(a.snapping(), b.snapping());
+    assert!(!a.snapping().x && !a.snapping().y && !a.snapping().enabled);
+    a.undo_step(step).unwrap();
+    assert!(a.snapping().x && !a.snapping().y);
+    let reopened = unpack(632, &pack(&a, "acceptance").unwrap()).unwrap();
+    assert_eq!(reopened.snapping(), a.snapping());
 }

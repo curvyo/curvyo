@@ -340,7 +340,7 @@ fn ac4_every_object_of_an_older_file_is_where_it_was() {
         assert_eq!(
             now.as_object_mut().unwrap().remove("snapping"),
             Some(
-                serde_json::json!({ "enabled": false, "objects": true, "guides": true, "nodes": true, "page": true, "capture_px": 8.0, "release_px": 14.0 })
+                serde_json::json!({ "enabled": false, "objects": true, "guides": true, "nodes": true, "page": true, "x": true, "y": true, "capture_px": 8.0, "release_px": 14.0 })
             )
         );
         let mut old = old.clone();

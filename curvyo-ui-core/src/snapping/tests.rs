@@ -4,6 +4,8 @@ use curvyo_document_core::{Document, Length, RectBounds};
 
 fn settings(capture: f64, release: f64) -> SnapSettings {
     SnapSettings {
+        x: true,
+        y: true,
         enabled: true,
         objects: true,
         guides: true,
@@ -269,6 +271,8 @@ fn a_disabled_kind_contributes_nothing() {
 #[test]
 fn page_fractions_are_exact_thirds_on_both_axes() {
     let settings = SnapSettings {
+        x: true,
+        y: true,
         enabled: true,
         objects: false,
         guides: false,
@@ -304,6 +308,8 @@ fn page_fractions_are_exact_thirds_on_both_axes() {
 #[test]
 fn page_fractions_follow_a_resize_with_nothing_stored() {
     let settings = SnapSettings {
+        x: true,
+        y: true,
         enabled: true,
         objects: false,
         guides: false,
@@ -383,6 +389,8 @@ fn gather_excludes_hidden_objects_and_keeps_locked_ones() {
     document.set_node_locked(&[locked], true).unwrap();
     let reads = document.read_nodes();
     let settings = SnapSettings {
+        x: true,
+        y: true,
         enabled: true,
         objects: true,
         guides: false,
@@ -428,6 +436,8 @@ fn gather_skips_the_dragged_object() {
     excluded.insert(dragged);
     let reads = document.read_nodes();
     let settings = SnapSettings {
+        x: true,
+        y: true,
         enabled: true,
         objects: true,
         guides: false,
@@ -471,6 +481,8 @@ fn a_guide_clone_and_its_anchors_are_targets() {
     document.set_guide(&[guide], true).unwrap();
     let reads = document.read_nodes();
     let settings = SnapSettings {
+        x: true,
+        y: true,
         enabled: true,
         objects: false,
         guides: true,
@@ -515,6 +527,8 @@ fn the_node_tool_can_add_its_own_path_anchors_but_not_the_dragged_one() {
         panic!("path")
     };
     let settings = SnapSettings {
+        x: true,
+        y: true,
         enabled: true,
         objects: false,
         guides: false,
@@ -555,6 +569,8 @@ fn gather_excludes_one_dragged_anchor_from_an_otherwise_included_path() {
     );
     let reads = document.read_nodes();
     let settings = SnapSettings {
+        x: true,
+        y: true,
         enabled: true,
         objects: false,
         guides: false,
@@ -587,6 +603,8 @@ fn a_box_move_snaps_by_its_edges_and_centre_lines() {
     ));
     let reads = document.read_nodes();
     let settings = SnapSettings {
+        x: true,
+        y: true,
         enabled: true,
         objects: true,
         guides: false,
@@ -849,4 +867,70 @@ fn composition_searches_beyond_the_nearest_finite_guide() {
         &mut SnapState::default(),
     );
     assert_eq!(r.offset, Vec2::new(1.0, 1.0));
+}
+
+#[test]
+fn axis_mask_requires_reachable_points_and_exact_curve_intersection() {
+    let mut config = settings(8.0, 14.0);
+    config.y = false;
+    let point = |p| SnapTargets::new(vec![SnapTarget::point(p, (p, p), TargetKind::Node)]);
+    let raw = SnapProbe::point(Point::new(99.0, 99.0));
+    assert!(
+        resolve(
+            &config,
+            &point(Point::new(100.0, 100.0)),
+            &raw,
+            &mut SnapState::default()
+        )
+        .is_empty()
+    );
+    let r = resolve(
+        &config,
+        &point(Point::new(100.0, 99.0)),
+        &raw,
+        &mut SnapState::default(),
+    );
+    assert_eq!(r.offset, Vec2::new(1.0, 0.0));
+    let mut guides = Vec::new();
+    push_guide(
+        &mut guides,
+        Point::new(90.0, 90.0),
+        Point::new(110.0, 110.0),
+    );
+    let r = resolve(
+        &config,
+        &SnapTargets::new(guides),
+        &SnapProbe::point(Point::new(98.0, 100.0)),
+        &mut SnapState::default(),
+    );
+    assert_eq!(r.offset, Vec2::new(2.0, 0.0));
+    config.x = false;
+    assert!(
+        resolve(
+            &config,
+            &point(Point::new(100.0, 99.0)),
+            &raw,
+            &mut SnapState::default()
+        )
+        .is_empty()
+    );
+}
+
+#[test]
+fn axis_constraints_are_independent_of_direction_vector_scale() {
+    let config = SnapSettings {
+        y: false,
+        ..settings(8.0, 14.0)
+    };
+    let targets = one_vertical(100.0, TargetKind::Box);
+    for scale in [1.0, 1e-8] {
+        let r = resolve_along(
+            &config,
+            &targets,
+            Point::new(99.0, 99.0),
+            Vec2::new(scale, 0.05 * scale),
+            &mut SnapState::default(),
+        );
+        assert!(r.is_empty());
+    }
 }

@@ -32,6 +32,17 @@ export function SnappingSection({ snapping, onReturnFocus }: {
         </Tooltip>)}
       </div>
     </fieldset>
+    <fieldset className="min-w-0">
+      <legend className="mb-2 text-sm">Snap axes</legend>
+      <div className="grid grid-cols-2 gap-1">
+        {([ ["x", "Horizontal (X)"], ["y", "Vertical (Y)"] ] as const).map(([key, label]) =>
+          <button key={key} type="button" aria-pressed={view[key]} className="h-7 rounded border border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] text-sm hover:bg-[var(--editor-accent-hover)] aria-pressed:bg-[var(--toolbar-icon-active-bg)] aria-pressed:text-[var(--toolbar-icon-active-fg)] focus-visible:outline-2 focus-visible:outline-[var(--editor-accent)]"
+            onClick={(event) => {
+              snapping.setAxes(key === "x" ? !view.x : view.x, key === "y" ? !view.y : view.y);
+              if (event.detail > 0) onReturnFocus();
+            }}>{label}</button>)}
+      </div>
+    </fieldset>
     {(["capturePx", "releasePx"] as const).map((key) => <label key={key} className="flex items-center justify-between text-sm">
       <span>{key === "capturePx" ? "Capture" : "Release"}</span>
       <EntryField label={`${key === "capturePx" ? "Capture" : "Release"}, pixels`} shown={String(view[key])} mixed={false} suffix="px" width={112} inputMode="decimal" commitOnBlur messages={MESSAGES} onReturnFocus={onReturnFocus}

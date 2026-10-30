@@ -1,5 +1,103 @@
 # Snapping acceptance report
 
+## PR #225 customer feedback — current verification
+
+Status: **full gate PASS**, independent acceptance **31/31 passed**
+(document4, engine14, session13), including all original22. Final feedback browser PASS
+on regenerated WASM; UX screenshot review pending. This section supersedes the historical result below.
+Independent feedback plan was written before implementation reads.
+
+| AC | Current executed evidence |
+| --- | --- |
+| 1 | Original defaults/persistence plus axis peer merge/local undo; root format suite tests all four axis roundtrips, exported JSON and fieldwise no-op commits. |
+| 2 | Prior rail browser remains applicable; lead feedback browser checks stored enabled state during temporary inversion. |
+| 3–4 | Existing raw screen-distance hysteresis tests retained; new mask/held-state tests ensure disabled components cannot persist. |
+| 5–6 | Existing target/atomic-point/finite-curve tests retained; independent one-axis nodes must be reachable in 2D, finite curves intersect the allowed line. |
+| 7 | Existing creation/Node/Pen/move tests plus actual Ctrl-aspect resize: disabled coordinate prevents coupled snap, both-enabled reaches exact target. Existing tool constraints remain under broad regression. |
+| 8 | Public rendered reference vertices establish idle marker appearance/cleanup; copy readout/badge regression and existing renderer screen-width tests. |
+| 9 | Independent same-pointer Alt on/off XOR under both stored states and Ctrl combinations; no settings/history writes, Ctrl+Alt no object copy or Copy feedback, Ctrl-only restores feedback; Alt-at-press lasso/remove badge preserved. |
+| 10 | Existing fields/target controls plus lead four-axis browser controls/undo and format normalization validation. |
+| 11 | Existing object/dense-guide/mixed-composition CPU tests retained; new production public Session idle-hover benchmark measures 10k objects without per-frame rebuild. Architecture reviews cache reuse separately. |
+| 12 | Original one-step commit/undo/cancel and clone tests retained; new typed placement/follow click/Pen one-step creation and exact undo/redo. |
+| 13 | Original independent clone drag to original/sibling, overrides/link retained, remains unchanged. |
+| 14 | Two new explicitly named malformed x/y fixtures assert Damaged in the old sweep; all seven damage fixtures and current-format absent defaults covered. |
+| 15 | Original actual inactive-page origin/resize and exact fraction tests retained. All-visible default unchanged; no hidden-page API. |
+| 16 | Independent all4 masks with nodes/lines, finite-curve intersections, normalized-direction scale invariance, actual aspect resize, axis peer merge/undo, save/open and root field tests. |
+| 17 | No-button hover for Rectangle/Ellipse/Polygon/Star/Pen: marker, no drag/history/artwork; leave/Escape/tool/open/disable/both-off cleanup; Alt does not invert idle hover. |
+| 18 | All4 shape typed placements ×4masks×hover/no-hover, press after stale different hover, exact geometry versus unsnapped reference; follow+click placement, first/subsequent Pen nodes without accidental handles; lead real-browser Enter/click confirmation. |
+
+### New defects and oracle review
+
+Public acceptance reproduced the UX copy-feedback defect before production fix:
+Ctrl+Alt during a Select move still showed a plus badge. Regression now asserts
+no Copy readout or badge, restoration with Ctrl-only, and unchanged initial
+Ctrl+Alt lasso remove badge. Implementer fixed only effective-copy use in
+move_indicators; tester made no production edits.
+
+Architect's earlier direction-scale finding is supplementary white-box-derived
+coverage: proportional direction vectors at 1e-8/1/1e8 cannot introduce movement
+on a disabled coordinate. It is identified as post-plan review evidence.
+
+Reviewed existing test changes: original acceptance initialization only gained
+x/y true; no original behavior assertion removed. Format suite additions test
+nine registers and seven malformed fixtures. Exact historical export expectations
+now separately include x/y true; damaged-fixture inventory explicitly asserts
+the two added files are Damaged. Shape test setup initially omitted a required
+second typed dimension; then used the wrong Enter dispatch (frontend calls
+place_placement, not generic key_down). Corrected test setup, preserved geometry
+oracle. Resize setup initially used Shift centre resize; corrected to existing
+Ctrl aspect constraint, then the strict geometry assertions passed.
+
+### Commands, limits and gate status
+
+Focused command: `cargo test -q -p curvyo-document-core -p curvyo-ui-core -p
+curvyo-editor-wasm --test acceptance_0060`:4+14+13 passed. Full gate uses the same
+nine-package command list recorded below, with `env -u
+WEBKIT_DISABLE_DMABUF_RENDERER` and escalated process/cache access for established
+nextest sandbox restrictions. Logs `/tmp/snapping-feedback-gate-*.log`.
+Initial clippy stopped on four test-style lints (empty assertions/redundant str
+conversion); equivalent assertions corrected before broad tests started.
+
+Scope limits: not every tool×modifier×handle combination is independently
+exhausted; existing regression suites supplement representative new public tests.
+No independent cache-read counter was added; hover CPU plus architecture cache
+review supply distinct evidence. Document replacement is tested by opening a
+fresh session from saved data, not an unavailable in-place replacement method.
+The fixed default labels and all-visible-page policy remain pending optional
+customer choices. No unrelated interaction scope is inferred.
+
+### Final browser evidence
+
+Tester reran `frontend/tests/browser/snapping-feedback.cjs` on final regenerated
+WASM using the optional runtime variables in the browser README: PASS, no JS
+page errors. Added explicit assertions for a present live move readout without
+Copy and zero copy badges during Alt holds. All four mask export/geometry tests,
+axis undo/redo, hover, second-canvas-click and Enter placement, both Alt inversion
+directions and Ctrl+Alt no-copy/stored-state checks passed. Screenshot
+`target/browser-check/alt-false-true-held.png` now reflects corrected feedback;
+axis and other Alt images were refreshed in the same run. The unchanged original
+`snapping.cjs` was run by the lead before this handoff, not repeated by tester.
+
+### Final feedback gate results
+
+- `cargo fmt --all --check` and workspace all-target clippy with `-D warnings`: PASS.
+- `env -u WEBKIT_DISABLE_DMABUF_RENDERER cargo nextest run --workspace --status-level fail --no-fail-fast`: **9519 passed, 0 failed, 117 existing skips**, 433.755s,496 binaries. All31 independent tests,19 format tests and3 performance tests included.
+- Nine-package `wasm32-unknown-unknown` build and clippy `-D warnings`: PASS.
+- `cargo deny check` and `RUSTDOCFLAGS="-D warnings" cargo doc -q --workspace --no-deps`: PASS.
+- Frontend `npm run build:wasm`, `npx tsc -b --noEmit`: PASS on final source.
+- Frontend `npm test`: **633 passed,0 failed,56 existing skips**; `npx oxlint`: exit0 with existing warnings.
+- Current gate logs: `/tmp/snapping-feedback-gate-results.txt` and individual check logs. This feedback gate has a single all-green broad nextest invocation; historical bounded reruns below do not describe this final revision.
+
+The three performance suites cover10k objects, dense curved guides and actual
+idle Session hover, with <=2ms thread-CPU assertions. The independent mixed
+10k guide+10k edge acceptance test also passed. Numeric idle-hover measurement
+0.0183ms/frame is implementer handoff evidence; the tester independently ran its
+budget assertion in the full gate, not a fresh printed timing sample. Cache
+read/rebuild structure remains architecture-reviewed rather than independently
+instrumented. No wall-clock responsiveness threshold substituted for CPU.
+
+## Historical acceptance before customer feedback
+
 2026-10-30. **PASS with bounded rerun evidence**, as detailed below; no unresolved test failure. Independent plan preceded
 production reads. Tester added 22 public-API acceptance tests: document 3,
 ui-core 12, editor session 7; all passed the focused run. No test is ignored.

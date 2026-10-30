@@ -558,6 +558,8 @@ fn every_older_fixture_still_opens_with_the_styles_it_stored() {
         "snapping_enabled_type_v27.curvyo",
         "snapping_capture_type_v27.curvyo",
         "snapping_capture_negative_v27.curvyo",
+        "snapping_x_type_v27.curvyo",
+        "snapping_y_type_v27.curvyo",
         "snapping_objects_container_v27.curvyo",
         "snapping_release_nan_v27.curvyo",
     ];

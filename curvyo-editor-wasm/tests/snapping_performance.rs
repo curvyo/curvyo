@@ -97,3 +97,41 @@ fn dense_curved_guides_stay_within_incremental_frame_budget() {
     eprintln!("10k dense curved guides: {per_frame:.4}ms/frame");
     assert!(per_frame <= 2.0, "{per_frame}ms/frame exceeds 2ms");
 }
+
+#[test]
+#[allow(clippy::unwrap_used)]
+fn drawing_hover_reuses_the_index_across_ten_thousand_objects() {
+    use curvyo_editor_wasm::{Session, Tool};
+    let d = Document::new(28);
+    d.batch("scene", |doc| {
+        for index in 0..10_000 {
+            let x = f64::from(index % 100) * 40.0;
+            let y = f64::from(index / 100) * 40.0;
+            let _ = doc.create_rect(RectBounds::from_corners(
+                Point::new(x, y),
+                Point::new(x + 20.0, y + 20.0),
+            ));
+        }
+    });
+    let mut s = Session::open(29, &curvyo_document_core::pack(&d, "perf").unwrap()).unwrap();
+    s.set_tool(Tool::Rectangle);
+    let measure = |session: &mut Session| {
+        // Build the context once before measuring incremental pointer frames.
+        session.pointer_hover(Point::new(0.0, 80.0), false, false);
+        cpu_time::cpu_time_of(|| {
+            for frame in 0..1000 {
+                session.pointer_hover(Point::new(f64::from(frame) * 3.7, 80.0), false, false);
+            }
+        })
+        .1
+    };
+    let baseline = measure(&mut s);
+    s.set_snapping(DocumentSnapping {
+        enabled: true,
+        ..DocumentSnapping::DEFAULT
+    });
+    let snapped = measure(&mut s);
+    let incremental = snapped.saturating_sub(baseline).as_secs_f64();
+    eprintln!("10k drawing hover incremental {incremental:.4}ms/frame");
+    assert!(incremental <= 2.0, "{incremental}ms/frame exceeds 2ms");
+}

@@ -11,6 +11,8 @@ export interface SnappingToolbarView {
   guides: boolean;
   nodes: boolean;
   page: boolean;
+  x: boolean;
+  y: boolean;
   capturePx: number;
   releasePx: number;
 }
@@ -23,6 +25,7 @@ export interface SnappingApi {
   /** Sets which target kinds contribute. */
   setTargets: (objects: boolean, guides: boolean, nodes: boolean, page: boolean) => boolean;
   /** Updates capture and release distances (screen pixels). */
+  setAxes: (x: boolean, y: boolean) => boolean;
   setZones: (capturePx: number, releasePx: number) => boolean;
 }
 
@@ -37,6 +40,8 @@ function readToolbar(session: WasmSession | null): SnappingToolbarView {
       guides: true,
       nodes: true,
       page: true,
+      x: true,
+      y: true,
       capturePx: 8,
       releasePx: 14,
     };
@@ -50,6 +55,8 @@ function readToolbar(session: WasmSession | null): SnappingToolbarView {
     guides: raw.guides,
     nodes: raw.nodes,
     page: raw.page,
+    x: raw.x,
+    y: raw.y,
     capturePx: raw.capture_px,
     releasePx: raw.release_px,
   };
@@ -107,6 +114,14 @@ export function useSnapping(editor: EditorHandle): SnappingApi {
     [getSession, sync],
   );
 
+  const setAxes = useCallback((x: boolean, y: boolean): boolean => {
+    const session = getSession();
+    if (!session) return false;
+    const changed = session.set_snapping_axes(x, y);
+    sync();
+    return changed;
+  }, [getSession, sync]);
+
   const setZones = useCallback(
     (capturePx: number, releasePx: number): boolean => {
       const session = getSession();
@@ -134,6 +149,7 @@ export function useSnapping(editor: EditorHandle): SnappingApi {
     view,
     toggle,
     setTargets,
+    setAxes,
     setZones,
   };
 }

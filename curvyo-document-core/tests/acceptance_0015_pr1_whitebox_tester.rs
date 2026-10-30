@@ -311,7 +311,7 @@ fn older_files_export_exactly_what_the_previous_build_exported() {
         assert_eq!(
             now.as_object_mut().unwrap().remove("snapping"),
             Some(
-                serde_json::json!({ "enabled": false, "objects": true, "guides": true, "nodes": true, "page": true, "capture_px": 8.0, "release_px": 14.0 })
+                serde_json::json!({ "enabled": false, "objects": true, "guides": true, "nodes": true, "page": true, "x": true, "y": true, "capture_px": 8.0, "release_px": 14.0 })
             )
         );
         let mut old = old.clone();

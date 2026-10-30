@@ -463,3 +463,101 @@ fn ac6_held_edge_uses_a_compatible_guide_when_nearest_finite_guide_cannot_inters
     assert_eq!(next.translated(r.offset), Point::new(100.0, 100.0));
     assert_eq!(r.marker.lines.len(), 2);
 }
+
+#[test]
+fn ac16_axis_masks_reject_unreachable_nodes_and_drop_incompatible_holds() {
+    let raw = Point::new(99.0, 99.0);
+    let lines = SnapTargets::new(vec![
+        line(100.0, TargetKind::Box),
+        SnapTarget::horizontal(100.0, (raw, Point::new(120.0, 100.0)), TargetKind::Page),
+    ]);
+    let mut state = SnapState::default();
+    for (x, y) in [(true, true), (true, false), (false, true), (false, false)] {
+        let settings = SnapSettings {
+            x,
+            y,
+            ..settings(1.0)
+        };
+        let r = resolve(&settings, &lines, &SnapProbe::point(raw), &mut state);
+        assert_eq!(r.offset, Vec2::new(f64::from(x), f64::from(y)));
+        assert_eq!(r.marker.lines.len(), usize::from(x) + usize::from(y));
+        for node in [
+            Point::new(100.0, 100.0),
+            Point::new(100.0, 99.0),
+            Point::new(99.0, 100.0),
+            Point::new(100.0, 999.0),
+        ] {
+            let targets = SnapTargets::new(vec![point(node.x, node.y, TargetKind::Node)]);
+            let r = resolve(
+                &settings,
+                &targets,
+                &SnapProbe::point(raw),
+                &mut SnapState::default(),
+            );
+            let reachable =
+                (x || node.x == raw.x) && (y || node.y == raw.y) && node.y < 200.0 && (x || y);
+            assert_eq!(!r.is_empty(), reachable, "mask {x}/{y} node {node:?}");
+            if reachable {
+                assert_eq!(raw.translated(r.offset), node);
+            }
+            if !x {
+                assert_eq!(r.offset.x, 0.0);
+            }
+            if !y {
+                assert_eq!(r.offset.y, 0.0);
+            }
+        }
+    }
+}
+
+#[test]
+fn ac16_finite_curve_intersection_obeys_axis_and_constraint_scale() {
+    use curvyo_ui_core::resolve_along;
+    for swap in [false, true] {
+        let raw = if swap {
+            Point::new(100.0, 98.0)
+        } else {
+            Point::new(98.0, 100.0)
+        };
+        let config = SnapSettings {
+            x: !swap,
+            y: swap,
+            ..settings(1.0)
+        };
+        for end in [95.0, 110.0] {
+            let curve = SnapCurve {
+                start: Point::new(90.0, 90.0),
+                end: Point::new(end, end),
+                handle_in: Vec2::ZERO,
+                handle_out: Vec2::ZERO,
+            };
+            let mut t = point(90.0, 90.0, TargetKind::Guide);
+            t.curve = Some(curve);
+            t.extent = (curve.start, curve.end);
+            let targets = SnapTargets::new(vec![t]);
+            let r = resolve(
+                &config,
+                &targets,
+                &SnapProbe::point(raw),
+                &mut SnapState::default(),
+            );
+            if end < 100.0 {
+                assert!(r.is_empty());
+            } else {
+                let p = raw.translated(r.offset);
+                assert!((p.x - 100.0).abs() < 1e-9 && (p.y - 100.0).abs() < 1e-9);
+            }
+            // Architecture white-box finding after independent plan: direction scale
+            // must never admit a nonzero correction on the disabled coordinate.
+            for scale in [1e-8, 1.0, 1e8] {
+                let direction = if swap {
+                    Vec2::new(0.05 * scale, scale)
+                } else {
+                    Vec2::new(scale, 0.05 * scale)
+                };
+                let r = resolve_along(&config, &targets, raw, direction, &mut SnapState::default());
+                assert!(r.is_empty(), "scale {scale}, axis {swap}");
+            }
+        }
+    }
+}

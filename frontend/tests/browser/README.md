@@ -33,3 +33,10 @@ asserted separately by Rust's `pages::two_hundred_pages_cpu_budget`.
 keyboard repeat and Shift+Space, collapsed-panel behavior, all target controls,
 zone normalization and validation, native field and document undo, and sticky
 settings during drawing. Its screenshot is `target/browser-check/snapping-verified.png`.
+
+`snapping-feedback.cjs` covers PR225 axes (all four masks, exported coordinates,
+settings persistence/undo), no-button hover and simple-click placement, and Alt
+inversion after a Select move has begun including Ctrl+Alt without copying.
+Run with the same optional runtime variables as above. Its exported project
+checks use Python's standard-library zipfile module; screenshots under
+`target/browser-check` include `axes-*-hover.png` and `alt-*-held.png`.

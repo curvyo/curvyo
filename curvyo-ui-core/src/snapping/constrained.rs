@@ -14,12 +14,11 @@ pub fn resolve_along(
     direction: Vec2,
     state: &mut SnapState,
 ) -> SnapResult {
-    if !settings.enabled || direction.length() <= EPS {
+    let Some(unit) = permitted_direction(settings, direction) else {
         state.clear();
         return SnapResult::default();
-    }
+    };
     state.curve = None;
-    let unit = direction.scaled(1.0 / direction.length());
     let held = state.x.or(state.y).and_then(|h| {
         targets.entries.get(h.target).and_then(|t| {
             if !t.kind.is_enabled(settings) {
@@ -112,6 +111,23 @@ pub fn resolve_along(
         },
     }
 }
+fn permitted_direction(settings: &SnapSettings, direction: Vec2) -> Option<Vec2> {
+    if !settings.enabled || direction.length() <= EPS {
+        return None;
+    }
+    let mut unit = direction.scaled(1.0 / direction.length());
+    if (!settings.x && unit.x.abs() > EPS) || (!settings.y && unit.y.abs() > EPS) {
+        return None;
+    }
+    if !settings.x {
+        unit.x = 0.0;
+    }
+    if !settings.y {
+        unit.y = 0.0;
+    }
+    Some(unit.scaled(1.0 / unit.length()))
+}
+
 fn correction(target: &SnapTarget, p: Point, d: Vec2) -> Option<Vec2> {
     if let Some(curve) = target.curve {
         return curve_intersections(curve, p, d)

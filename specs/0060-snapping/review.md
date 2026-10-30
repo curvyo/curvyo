@@ -182,3 +182,82 @@ with sparse/dense incremental thread CPU 0.0096/0.0055 ms per frame; wasm build
 reported ready. Earlier format 17/17, page 13/13 and browser reports remain
 separately attributed above. All fourteen takeover source findings are closed;
 independent final acceptance and full quality gate remain tester-owned.
+
+## New customer feedback: early axis review (2026-10-30)
+
+This review concerns the later Alt/axis/hover amendment. The preceding APPROVE
+applies to the earlier PR revision, not automatically to this new work.
+
+Nine-register defaults, strict boolean validation and fieldwise writes are
+present. One-axis resolution delegates to the finite constrained solver rather
+than treating points as independent infinite-axis targets; both axes off clears
+state. No build or tests were run during this source review.
+
+- [x] F1 — `constrained.rs::resolve_along` checks disabled-axis direction
+  components before normalization, although direction magnitude is arbitrary.
+  With Y disabled, `(1e-8, 5e-10)` passes the 1e-9 component guard and normalizes
+  to a direction with approximately 0.05 Y, permitting drift. Normalize before
+  testing compatibility, then ensure a tolerated forbidden component produces
+  exactly zero displacement. Test equivalent differently scaled directions.
+
+Alt effective-state and hover/placement integration remain under implementation;
+no acceptance claim is made for them here.
+
+### Feedback follow-up source check
+
+F1 is addressed: constraint direction is normalized before compatibility checks,
+and tolerated disabled components are forced to zero. Implementer reports core
+34/34, session 12/12 and document-zone 2/2; architect did not rerun tests.
+Hover contexts reuse targets when version/exclusions match, first Pen hover is
+enabled, and marker effective state matches Select-move Alt inversion.
+
+- [x] F2 — `placement_press` compares snapped point with the already snapped
+  initial anchor for the click threshold. Example: raw first click x47 snaps
+  to x52.5, then snapping is disabled and a second click at the same raw point
+  can exceed the 3px threshold and commit a tiny shape. Preserve a raw placement
+  anchor separately and decide click intent before applying snap correction.
+
+Frozen typed placement intentionally stops following the pointer under existing
+semantics; no new movement of that frozen geometry is requested by this review.
+New-feedback overall approval remains pending, distinct from prior PR approval.
+
+## Final review of the customer feedback amendment (2026-10-30)
+
+**APPROVE (structural source review).** F1 and F2 are addressed. Constraint
+directions are normalized before axis eligibility and forbidden components are
+zeroed. `PlacementState.raw_anchor` retains the raw first click (or keyboard
+anchor); confirmation tests raw distance before applying snapping, then clears
+the anchor on cancellation/commit. The reported failing-first regression uses
+raw (51, 74), which is within capture at the actual default zoom; the earlier
+x47 example illustrated the issue but was outside capture at that zoom.
+
+Axis registers remain independent authoritative document values with true
+defaults, validation and history. Format stays 27 for the unmerged SID story.
+Select move effective state is stored-enabled XOR Alt, including Ctrl+Alt;
+other contexts retain their previous modifier behavior. Marker visibility uses
+that same effective state. Modifier-only updates resolve from the stored raw
+pointer. Hover uses the existing versioned target context without button-down,
+while visible drag state stays separate; first Pen hover and shape placement
+use this context. Unsnapped tool previews retain raw-pointer semantics when
+no target captures. No new source blocker was found in this bounded review.
+
+Reported by implementer/lead, not rerun by architect: editor 464/464, ui-core
+871/871, document zones 2/2, format 19/19, CPU 3/3 (idle hover 0.0183 ms/frame),
+native and wasm clippy, frontend checks and rebuilt wasm. Independent 18-criterion
+acceptance, browser review and full gate remain separately owned. This approval
+applies to the later feedback amendment and is distinct from the historical
+approval above.
+
+### F3: visual copy indicators after Alt inversion
+
+- [x] F3 — Source-verified `move_indicators.rs`: all three live-move reads now
+  pass `ctrl && !alt`, and an active move's copy badge uses the same guard.
+  Ctrl+Alt therefore cannot advertise a copy while the committed operation is
+  a move. Initial Ctrl+Alt lasso/remove classification and the Offset tool's
+  separate copy indicator remain unchanged. Releasing Alt restores Ctrl-only
+  copy behavior through the existing modifier refresh.
+
+Lead reports 31 independent public acceptance tests passing, including a
+failing-first copy-badge/readout regression and Ctrl-only restoration; architect
+has not rerun them. **Feedback amendment structural APPROVE reaffirmed.**
+Final full gate is tester-owned; screenshot review awaits the rebuilt wasm.

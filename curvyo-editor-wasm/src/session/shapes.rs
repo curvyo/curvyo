@@ -33,8 +33,7 @@ impl Session {
     /// inside a selected box or where a handle would be. It never selects,
     /// toggles or moves anything and leaves the selection as it is (26).
     pub(super) fn shape_pointer_down(&mut self, point: Point) {
-        self.begin_snapping_drag_for_shape();
-        let point = point.translated(self.resolve_snapping(&SnapProbe::point(point)).offset);
+        let point = self.snap_creation_point(point);
         match self.tool {
             Tool::Rectangle => self.rectangle.pointer_down(point),
             Tool::Ellipse => self.ellipse.pointer_down(point),
@@ -51,8 +50,18 @@ impl Session {
             Tool::PolygonStar => self.poly_star.drag_start(),
             _ => None,
         }) else {
-            return Vec2::ZERO;
+            return pointer.vector_to(self.snap_creation_point(pointer));
         };
+        self.snap_shape_endpoint(start, pointer, modifiers)
+    }
+
+    pub(super) fn snap_shape_endpoint(
+        &mut self,
+        start: Point,
+        pointer: Point,
+        modifiers: Modifiers,
+    ) -> Vec2 {
+        self.begin_snapping_drag_for_shape();
         // Only the movable endpoint participates; the press point stays fixed.
         let raw = if modifiers.ctrl {
             if self.tool == Tool::PolygonStar {
@@ -70,7 +79,11 @@ impl Session {
         };
         let direction = modifiers.ctrl.then(|| start.vector_to(raw));
         let result = self.resolve_snapping_direction(&SnapProbe::point(raw), direction);
-        pointer.vector_to(raw.translated(result.offset))
+        if result.is_empty() {
+            Vec2::ZERO
+        } else {
+            pointer.vector_to(raw.translated(result.offset))
+        }
     }
 
     /// Feeds whatever create-drag is in flight for the live preview; writes

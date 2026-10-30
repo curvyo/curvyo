@@ -207,7 +207,7 @@ impl Session {
     }
 
     pub(super) fn pen_snap_hover(&mut self, point: Point) {
-        if self.button_down || self.pen_last_node().is_none() {
+        if self.button_down {
             return;
         }
         if !self.snapping.drag_in_flight() {

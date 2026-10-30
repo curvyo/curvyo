@@ -144,3 +144,62 @@ public APIs with wrappers where appropriate. No arbitrary candidate caps.
   command outcomes, corrected stale test names and remaining matrix limits in
   acceptance-report.md. No unresolved product/test blocker. Pending optional
   all-visible-page scope and PR224 coordination remain customer/release matters.
+
+## PR225 customer follow-up (AC9,16–18)
+
+- [x] H. Persist default-on independent X/Y registers in format27; current goldens,
+  damage validation, fieldwise history/merge and thin WASM/panel controls (AC1,10,14,16).
+- [x] I. Intersect axis eligibility with tool constraints; preserve atomic point
+  reachability, exact finite curves and raw hysteresis. Test all four masks (AC6,7,16).
+- [x] J. Apply stored-enabled XOR Alt only to running Select moves; immediately
+  recompute from raw modifier events, preserve press actions/copy and history (AC9).
+- [x] K. Reuse indexed context for drawing hover and press without prior hover;
+  preserve raw click thresholds and typed-size placement follow/confirm (AC17–18).
+  Clear ephemeral hover on leave/cancel/tool/document/history-context changes.
+- [x] L. Affected checks, index CPU and frontend/WASM validation, then independent
+  tester and browser handoff. No dependency or additional format bump planned.
+
+### Customer follow-up validation
+
+- New Alt/idle-hover session tests failed before wiring; now all 464 session
+  library tests pass. All 871 ui-core library tests pass, including new forbidden
+  axis point reachability, exact finite-curve intersection and direction-scale
+  invariance (the latter failed before normalizing the mask guard).
+- Default-on X/Y settings round trip in snapping_zones (2/2); lead extended
+  current format27 fixtures and snapping_format (19/19), including all masks and
+  malformed axis values. New bridge axis setter preserves other settings; existing
+  target/zone setter preserves axes. No format28 or migration introduced.
+- Hover context reuses the index by document version/exclusions. 10k objects:
+  move incremental0.0097ms/frame, densecurves0.0053ms/frame, idle drawing hover
+  incremental0.0183ms/frame; all three thread-CPU tests pass (1000frames each).
+- Placement tests cover no-prior-hover first click, all drawing tools, snapped
+  follow, frozen typed20×10 geometry, undo/axes, Escape/leave/disable. Architect
+  F2 regression raw51,74→snapped52.5,74.25→peer disables→same rawsecondclick failed
+  by committing a tiny shape before fix; raw_anchor threshold now retains the
+  placement with no object/history write. Initial suggested raw47 lay outside
+  capture at the test viewport zoom, so the regression uses raw51 within capture
+  and beyond the raw click threshold. No tolerance/assertion weakened.
+- Existing placement-chip test caught an unsnapped Ctrl pointer being replaced
+  by constrained geometry; no-snap now returns zero correction, preserving its
+  raw UI pointer while normal tool constraints still compute shape geometry.
+- Affected native all-target clippy and wasm32 clippy with -Dwarnings pass.
+  WASM release/bindings build passes; frontend tsc,104tests,oxlint(0errors,
+  existing warnings) and Vite production build pass. Final diff check passes.
+- Tester notified of two older exact JSON default oracles needing additive x/y
+  fields (acceptance0040 and0015) and two new malformed fixture classifications;
+  tester owns these updates plus independent feedback acceptance/full gate.
+  Independent browser verification and final gate remain L, not claimed here.
+
+### Final independent feedback verification
+
+- Independent plan preceded feedback implementation reads. Public acceptance31/31
+  (document4,ui14,session13), retaining original22; all18AC mapped in report.
+- Ctrl+Alt plus-badge regression independently red before fix, now public badge/
+  readout and final browser assertions green; initial lasso/remove badge retained.
+- Full gate:9519/9519 native tests,117 existing skips;19 format tests,3 CPU tests
+  included. fmt/nativeclippy/9crateWASMbuild+clippy/deny/rustdoc all green.
+- Frontend freshWASM+tsc pass; npm633pass56existing skips; oxlint exit0.
+- Tester final feedback browser PASS, no JS errors, exact4mask saved geometry,
+  no-button hover/placement, Alt on/off inclCtrl noCopy; screenshots refreshed.
+  UX final screenshot sign-off remains reviewer-owned. Exact commands/results,
+  test oracle review, red defect and scope limits: acceptance-report.md.

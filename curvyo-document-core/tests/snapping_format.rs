@@ -1,7 +1,7 @@
 //! The stored shape of the snapping settings (`specs/0060-snapping` criteria 1, 3 and 14,
-//! `adrs.md` decisions 1 and 2): seven root registers, defaults on absence, strict validation on
+//! `adrs.md` decisions 1 and 2): nine root registers, defaults on absence, strict validation on
 //! open, one labelled commit that writes only the registers that changed, the golden
-//! `snapping_v27.curvyo` and five damaged files. `CURVYO_WRITE_FIXTURES=1` rewrites the
+//! `snapping_v27.curvyo` and seven damaged files. `CURVYO_WRITE_FIXTURES=1` rewrites the
 //! fixtures.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::float_cmp)]
@@ -20,12 +20,14 @@ use loro::{LoroDoc, LoroValue};
 /// fixtures and their names (`specs/README.md`, "`format_version` plan").
 const THIS_SLICE_VERSION: u32 = 27;
 const GOLDEN: &str = "snapping_v27.curvyo";
-const DAMAGED: [&str; 5] = [
+const DAMAGED: [&str; 7] = [
     "snapping_enabled_type_v27.curvyo",
     "snapping_capture_type_v27.curvyo",
     "snapping_capture_negative_v27.curvyo",
     "snapping_release_nan_v27.curvyo",
     "snapping_objects_container_v27.curvyo",
+    "snapping_x_type_v27.curvyo",
+    "snapping_y_type_v27.curvyo",
 ];
 
 fn fixture_path(name: &str) -> PathBuf {
@@ -114,7 +116,7 @@ fn manifest_version(bytes: &[u8]) -> u32 {
     u32::try_from(manifest["format_version"].as_u64().unwrap()).unwrap()
 }
 
-fn damaged_files() -> [(&'static str, Vec<u8>); 5] {
+fn damaged_files() -> [(&'static str, Vec<u8>); 7] {
     let container = {
         let loro = loro_of(&Document::new(1));
         loro.set_peer_id(1).unwrap();
@@ -144,6 +146,14 @@ fn damaged_files() -> [(&'static str, Vec<u8>); 5] {
             file_with_root(&[("snapping_release_px", LoroValue::Double(f64::NAN))]),
         ),
         (DAMAGED[4], container),
+        (
+            DAMAGED[5],
+            file_with_root(&[("snapping_x", LoroValue::from("false"))]),
+        ),
+        (
+            DAMAGED[6],
+            file_with_root(&[("snapping_y", LoroValue::Double(0.0))]),
+        ),
     ]
 }
 
@@ -163,6 +173,8 @@ fn golden_document() -> Document {
         height: curvyo_document_core::Length::from_mm(30.0),
     });
     assert!(document.set_snapping(DocumentSnapping {
+        x: true,
+        y: true,
         enabled: true,
         objects: false,
         guides: true,
@@ -174,7 +186,7 @@ fn golden_document() -> Document {
     document
 }
 
-// ---- criteria 1 and 3: the value and its seven registers ----------------------
+// ---- criteria 1, 3 and 16: the value and its nine registers --------------------
 
 #[test]
 fn a_new_document_has_the_default_settings_and_stores_no_register() {
@@ -183,6 +195,7 @@ fn a_new_document_has_the_default_settings_and_stores_no_register() {
     assert_eq!(snapping, DocumentSnapping::DEFAULT);
     assert!(!snapping.enabled);
     assert!(snapping.objects && snapping.guides && snapping.nodes && snapping.page);
+    assert!(snapping.x && snapping.y);
     assert_eq!(snapping.capture_px, 8.0);
     assert_eq!(snapping.release_px, 14.0);
     for key in [
@@ -191,6 +204,8 @@ fn a_new_document_has_the_default_settings_and_stores_no_register() {
         "snapping_guides",
         "snapping_nodes",
         "snapping_page",
+        "snapping_x",
+        "snapping_y",
         "snapping_capture_px",
         "snapping_release_px",
     ] {
@@ -221,6 +236,56 @@ fn each_flag_writes_only_its_own_register() {
         Some(LoroValue::Bool(false))
     );
     assert_eq!(root_value(&document, "snapping_guides"), None);
+}
+
+#[test]
+fn each_axis_writes_only_its_own_register_and_repeating_it_is_a_noop() {
+    for (x, y, changed, unchanged) in [
+        (false, true, "snapping_x", "snapping_y"),
+        (true, false, "snapping_y", "snapping_x"),
+    ] {
+        let document = Document::new(1);
+        let settings = DocumentSnapping {
+            x,
+            y,
+            ..DocumentSnapping::DEFAULT
+        };
+        let before = labels(&document).len();
+        assert!(document.set_snapping(settings));
+        assert_eq!(root_value(&document, changed), Some(LoroValue::Bool(false)));
+        for key in [
+            unchanged,
+            "snapping_enabled",
+            "snapping_objects",
+            "snapping_page",
+        ] {
+            assert_eq!(root_value(&document, key), None, "{key}");
+        }
+        assert_eq!(labels(&document).len(), before + 1);
+        let ops = op_count(&document);
+        assert!(!document.set_snapping(settings));
+        assert_eq!(op_count(&document), ops);
+        assert_eq!(labels(&document).len(), before + 1);
+    }
+}
+
+#[test]
+fn all_axis_combinations_roundtrip_and_match_exported_json() {
+    for (x, y) in [(true, true), (true, false), (false, true), (false, false)] {
+        let document = Document::new(1);
+        let settings = DocumentSnapping {
+            x,
+            y,
+            ..DocumentSnapping::DEFAULT
+        };
+        let _ = document.set_snapping(settings);
+        let reopened = unpack(2, &pack(&document, "test").unwrap()).unwrap();
+        assert_eq!(reopened.snapping(), settings);
+        let json: serde_json::Value =
+            serde_json::from_slice(&document.export_json().unwrap()).unwrap();
+        assert_eq!(json["snapping"]["x"], x);
+        assert_eq!(json["snapping"]["y"], y);
+    }
 }
 
 #[test]
@@ -305,6 +370,8 @@ fn every_edit_is_one_commit_labelled_set_document_snapping() {
     let document = Document::new(1);
     let before = labels(&document).len();
     assert!(document.set_snapping(DocumentSnapping {
+        x: false,
+        y: false,
         enabled: true,
         objects: false,
         guides: false,
@@ -314,7 +381,7 @@ fn every_edit_is_one_commit_labelled_set_document_snapping() {
         release_px: 20.0,
     }));
     let after = labels(&document);
-    assert_eq!(after.len(), before + 1, "seven registers in one commit");
+    assert_eq!(after.len(), before + 1, "nine registers in one commit");
     assert_eq!(after.last().unwrap(), "set_document_snapping");
 }
 
@@ -337,6 +404,8 @@ fn a_stored_release_below_the_capture_reads_as_the_capture() {
 fn every_register_survives_save_and_open_exactly() {
     let document = Document::new(1);
     let value = DocumentSnapping {
+        x: true,
+        y: true,
         enabled: true,
         objects: false,
         guides: false,
@@ -366,6 +435,8 @@ fn document_json_carries_the_settings_and_the_current_version() {
     assert_eq!(json["snapping"]["guides"], true);
     assert_eq!(json["snapping"]["nodes"], true);
     assert_eq!(json["snapping"]["page"], true);
+    assert_eq!(json["snapping"]["x"], true);
+    assert_eq!(json["snapping"]["y"], true);
     assert_eq!(json["snapping"]["capture_px"], 6.0);
     assert_eq!(json["snapping"]["release_px"], 20.0);
     assert_eq!(json["format_version"], CURRENT_FORMAT_VERSION);
@@ -461,6 +532,8 @@ fn the_golden_reads_back_and_opening_it_writes_nothing() {
     assert_eq!(
         snapping,
         DocumentSnapping {
+            x: true,
+            y: true,
             enabled: true,
             objects: false,
             guides: true,

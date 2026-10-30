@@ -22,6 +22,8 @@ pub(super) struct PlacementState {
     placement: Option<ShapePlacement>,
     /// Where the creation tool's press in flight went down, to tell a click from a drag.
     press: Option<Point>,
+    /// Unsnapped first-click coordinate used only for the confirm threshold.
+    raw_anchor: Option<Point>,
     /// The frontend's report before each press: touch, not mouse or pen (`adrs.md` decision 1).
     touch: bool,
     announcement: Option<String>,
@@ -85,7 +87,8 @@ impl Session {
             return false;
         }
         self.shape_escape();
-        self.start_placement(press, modifiers);
+        let anchor = self.snap_creation_point(press);
+        self.start_placement(anchor, modifiers, press);
         true
     }
 
@@ -100,7 +103,8 @@ impl Session {
             let (width, height) = self.viewport.canvas_size();
             self.viewport.screen_to_document(width / 2.0, height / 2.0)
         });
-        self.start_placement(a, Modifiers::NONE);
+        let anchor = self.snap_creation_point(a);
+        self.start_placement(anchor, Modifiers::NONE, a);
         true
     }
 
@@ -133,7 +137,8 @@ impl Session {
         consumed.ctrl &= held.ctrl;
     }
 
-    fn start_placement(&mut self, a: Point, modifiers: Modifiers) {
+    fn start_placement(&mut self, a: Point, modifiers: Modifiers, raw_anchor: Point) {
+        self.placements.raw_anchor = Some(raw_anchor);
         let Some(kind) = placement_kind(self.tool) else {
             return;
         };
@@ -147,6 +152,7 @@ impl Session {
         let modifiers = self.placement_effective(modifiers);
         let mut placement = ShapePlacement::new(kind, a, modifiers);
         if let Some(pointer) = self.pointer_position {
+            let pointer = self.snap_creation_point(pointer);
             placement.follow(pointer, modifiers);
         }
         let noun = PlacementNoun::of(kind, self.poly_star.mode());
@@ -191,6 +197,7 @@ impl Session {
     pub(super) fn placement_follow(&mut self, point: Point, modifiers: Modifiers) {
         self.placement_note_release(modifiers);
         let modifiers = self.placement_effective(modifiers);
+        let point = self.snapped_placement_pointer(point, modifiers);
         if let Some(placement) = &mut self.placements.placement {
             placement.follow(point, modifiers);
         }
@@ -200,10 +207,28 @@ impl Session {
     /// The modifiers changed with the pointer still (criterion 3).
     pub(super) fn placement_modifiers(&mut self, modifiers: Modifiers) {
         let modifiers = self.placement_effective(modifiers);
+        let pointer = self
+            .pointer_position
+            .map(|point| self.snapped_placement_pointer(point, modifiers));
         if let Some(placement) = &mut self.placements.placement {
-            placement.set_modifiers(modifiers);
+            if let Some(pointer) = pointer {
+                placement.follow(pointer, modifiers);
+            } else {
+                placement.set_modifiers(modifiers);
+            }
         }
         self.refresh_placement();
+    }
+
+    fn snapped_placement_pointer(&mut self, point: Point, modifiers: Modifiers) -> Point {
+        let Some(placement) = self.placements.placement.as_ref() else {
+            return point;
+        };
+        if placement.is_frozen() {
+            return point;
+        }
+        let anchor = placement.a();
+        point.translated(self.snap_shape_endpoint(anchor, point, modifiers))
     }
 
     /// A primary press at `point` during a placement (criteria 4, 5, 22): a frozen placement
@@ -213,13 +238,21 @@ impl Session {
         self.placement_note_release(modifiers);
         let modifiers = self.placement_effective(modifiers);
         let threshold = self.click_threshold().as_mm();
+        if self
+            .placement()
+            .is_some_and(|placement| !placement.is_frozen())
+            && self
+                .placements
+                .raw_anchor
+                .is_some_and(|anchor| anchor.vector_to(point).length() < threshold)
+        {
+            return;
+        }
+        let point = self.snapped_placement_pointer(point, modifiers);
         let Some(placement) = &mut self.placements.placement else {
             return;
         };
         if !placement.is_frozen() {
-            if placement.a().vector_to(point).length() < threshold {
-                return;
-            }
             placement.follow(point, modifiers);
         }
         self.place_placement();
@@ -293,6 +326,7 @@ impl Session {
             return;
         };
         placement.edit(field, text, live);
+        self.end_snapping_drag();
         self.refresh_placement();
     }
 
@@ -323,6 +357,8 @@ impl Session {
                 }
             };
             this.placements.placement = None;
+            this.placements.raw_anchor = None;
+            this.end_snapping_drag();
             if this.refuse_drawing_into_layer() {
                 this.placements.announcement = Some(CANCELLED_SENTENCE.to_owned());
                 return false;
@@ -337,7 +373,9 @@ impl Session {
 
     /// Ends the placement without writing (criterion 7). Returns whether one was running.
     pub fn cancel_placement(&mut self) -> bool {
+        self.end_snapping_drag();
         self.placements.press = None;
+        self.placements.raw_anchor = None;
         self.placements.tap = None;
         if self.placements.placement.take().is_none() {
             return false;
