@@ -1,0 +1,15 @@
+{
+  "id": "ai-invisible-religion",
+  "file": "ai-invisible-religion.jpg",
+  "group": "ai-drawings",
+  "use": "area engraving",
+  "preserve": "black hood area, face details, thin concentric lines, triangle corners",
+  "dpi": 150,
+  "origin": "https://commons.wikimedia.org/wiki/File:Invisible_Religion_Drawing_AI.jpg",
+  "author": "Mojmir Churavy",
+  "licence": "CC0 1.0",
+  "licence_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "retrieved": "2026-10-29",
+  "modified": "Wikimedia Commons thumbnail (1024 x 1024 original), resized to 640 x 640 px and metadata stripped with ImageMagick, re-encoded as JPEG quality 92",
+  "title": "Invisible Religion Drawing AI.jpg"
+}

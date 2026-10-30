@@ -1,0 +1,15 @@
+{
+  "id": "line-durandal",
+  "file": "line-durandal.png",
+  "group": "line-drawings",
+  "use": "line plot",
+  "preserve": "long thin hull lines unbroken and smooth",
+  "dpi": 96,
+  "origin": "https://commons.wikimedia.org/wiki/File:Durandal_line_drawing.png",
+  "author": "Noelberrier",
+  "licence": "CC0 1.0",
+  "licence_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "retrieved": "2026-10-29",
+  "modified": "Wikimedia Commons thumbnail (1376 x 436 original), resized to 640 x 203 px and metadata stripped with ImageMagick",
+  "title": "Durandal line drawing.png"
+}

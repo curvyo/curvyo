@@ -1,0 +1,11 @@
+{
+  "id": "customer-penguin",
+  "file": "tests/assets/trace-references/135061.png",
+  "group": "graphics",
+  "use": "area engraving",
+  "preserve": "the penguin's outline, the eyes, the bow tie and the beak as shapes; the coloured parts follow the Threshold (visual check)",
+  "dpi": 150,
+  "origin": "openclipart.org (added by the customer 2026-10-29)",
+  "harness": "decoded in place; reduced by area averaging to at most 2000 px on the longest side",
+  "licence": "CC0 1.0"
+}

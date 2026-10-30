@@ -1,0 +1,11 @@
+{
+  "id": "customer-photo-lion-1",
+  "file": "tests/assets/trace-references/20261029_171150.jpg",
+  "group": "paper-photo",
+  "use": "area engraving",
+  "preserve": "the mane strands and the face holes of the printed lion; the desk is not content (visual check)",
+  "dpi": 150,
+  "origin": "phone photo made by the customer on 2026-10-29 (added by the customer 2026-10-29)",
+  "harness": "decoded in place; reduced by area averaging to at most 2000 px on the longest side",
+  "licence": "CC0 1.0"
+}

@@ -1,0 +1,11 @@
+{
+  "id": "customer-scan-bird-head",
+  "file": "tests/assets/trace-references/scan_20261029165803.jpg",
+  "group": "paper-scan",
+  "use": "line plot",
+  "preserve": "the scanned bird head: eye rings and hatching; paper texture is not content",
+  "dpi": 150,
+  "origin": "scan made by the customer on 2026-10-29 (added by the customer 2026-10-29)",
+  "harness": "decoded in place; reduced by area averaging to at most 2000 px on the longest side",
+  "licence": "CC0 1.0"
+}

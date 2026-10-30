@@ -1,0 +1,15 @@
+{
+  "id": "logo-ymc",
+  "file": "logo-ymc.png",
+  "group": "logos",
+  "use": "area engraving",
+  "preserve": "letters and frame with sharp corners",
+  "dpi": 96,
+  "origin": "https://commons.wikimedia.org/wiki/File:YMC_Logo_Black_%26_White_Square.png",
+  "author": "Youthmarketing",
+  "licence": "CC0 1.0",
+  "licence_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "retrieved": "2026-10-29",
+  "modified": "Wikimedia Commons thumbnail (224 x 224 original), resized to 224 x 224 px and metadata stripped with ImageMagick",
+  "title": "YMC Logo Black & White Square.png"
+}

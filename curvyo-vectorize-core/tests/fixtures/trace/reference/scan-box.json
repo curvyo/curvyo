@@ -1,0 +1,15 @@
+{
+  "id": "scan-box",
+  "file": "scan-box.jpg",
+  "group": "paper-scan",
+  "use": "line plot",
+  "preserve": "box edges straight, hatching strokes separate; grey wash and paper not content",
+  "dpi": 187,
+  "origin": "https://commons.wikimedia.org/wiki/File:Box_(drawing).jpg",
+  "author": "David Ring",
+  "licence": "CC0 1.0",
+  "licence_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "retrieved": "2026-10-29",
+  "modified": "Wikimedia Commons thumbnail (734 x 1026 original), resized to 458 x 640 px and metadata stripped with ImageMagick, re-encoded as JPEG quality 92",
+  "title": "Box (drawing).jpg"
+}

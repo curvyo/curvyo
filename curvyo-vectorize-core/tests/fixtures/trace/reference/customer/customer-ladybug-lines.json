@@ -1,0 +1,11 @@
+{
+  "id": "customer-ladybug-lines",
+  "file": "tests/assets/trace-references/ladybug.png",
+  "group": "line-drawings",
+  "use": "line plot",
+  "preserve": "the small ladybug's outline, the dots and the legs (visual check)",
+  "dpi": 150,
+  "origin": "the customer's own work (added by the customer 2026-10-29)",
+  "harness": "decoded in place; reduced by area averaging to at most 2000 px on the longest side",
+  "licence": "CC0 1.0"
+}

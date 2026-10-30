@@ -1,0 +1,11 @@
+{
+  "id": "customer-scan-lion",
+  "file": "tests/assets/trace-references/scan_20261029165757.jpg",
+  "group": "paper-scan",
+  "use": "area engraving",
+  "preserve": "the scanned lion print: mane strands with sharp tips and the face holes; paper texture is not content",
+  "dpi": 150,
+  "origin": "scan made by the customer on 2026-10-29 (added by the customer 2026-10-29)",
+  "harness": "decoded in place; reduced by area averaging to at most 2000 px on the longest side",
+  "licence": "CC0 1.0"
+}

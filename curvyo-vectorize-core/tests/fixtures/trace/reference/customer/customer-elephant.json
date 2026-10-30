@@ -1,0 +1,11 @@
+{
+  "id": "customer-elephant",
+  "file": "tests/assets/trace-references/elephant.jpg",
+  "group": "line-drawings",
+  "use": "line plot",
+  "preserve": "the outline, the ears, the trunk rings and the tusks; the yellow number badge follows the Threshold (visual check)",
+  "dpi": 150,
+  "origin": "openclipart.org (added by the customer 2026-10-29)",
+  "harness": "decoded in place; reduced by area averaging to at most 2000 px on the longest side",
+  "licence": "CC0 1.0"
+}

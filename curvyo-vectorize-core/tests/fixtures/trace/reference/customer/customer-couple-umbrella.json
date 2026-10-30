@@ -1,0 +1,11 @@
+{
+  "id": "customer-couple-umbrella",
+  "file": "tests/assets/trace-references/couple_umbrella.png",
+  "group": "graphics",
+  "use": "cut contour",
+  "preserve": "the silhouette of the couple and the umbrella with its ribs, the plants; the gap between the two figures stays where it is",
+  "dpi": 150,
+  "origin": "openclipart.org (added by the customer 2026-10-29)",
+  "harness": "decoded in place; reduced by area averaging to at most 2000 px on the longest side",
+  "licence": "CC0 1.0"
+}

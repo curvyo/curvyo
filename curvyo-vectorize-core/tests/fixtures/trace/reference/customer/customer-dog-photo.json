@@ -1,0 +1,11 @@
+{
+  "id": "customer-dog-photo",
+  "file": "tests/assets/trace-references/dog_picture.png",
+  "group": "photo",
+  "use": "area engraving",
+  "preserve": "a photograph: no shape is required; reported only (visual check)",
+  "dpi": 150,
+  "origin": "the customer's own work (added by the customer 2026-10-29)",
+  "harness": "decoded in place; reduced by area averaging to at most 2000 px on the longest side",
+  "licence": "CC0 1.0"
+}

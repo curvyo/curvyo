@@ -1,0 +1,15 @@
+{
+  "id": "diagram-kho-kho",
+  "file": "diagram-kho-kho.jpg",
+  "group": "diagram",
+  "use": "line plot",
+  "preserve": "white field lines, dashed boxes, arrows and the black posts",
+  "dpi": 96,
+  "origin": "https://commons.wikimedia.org/wiki/File:Kho_Kho_field_1.jpg",
+  "author": "Siddharth Patwardhan",
+  "licence": "CC0 1.0",
+  "licence_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "retrieved": "2026-10-29",
+  "modified": "Wikimedia Commons thumbnail (822 x 453 original), resized to 640 x 353 px and metadata stripped with ImageMagick, re-encoded as JPEG quality 92",
+  "title": "Kho Kho field 1.jpg"
+}

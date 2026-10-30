@@ -1,0 +1,15 @@
+{
+  "id": "clipart-goatee",
+  "file": "clipart-goatee.jpg",
+  "group": "graphics",
+  "use": "area engraving",
+  "preserve": "face contour, beard hatching lines separate, eyes",
+  "dpi": 96,
+  "origin": "https://commons.wikimedia.org/wiki/File:Goatee_line_drawing.jpg",
+  "author": "Johnny Automatic",
+  "licence": "CC0 1.0",
+  "licence_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "retrieved": "2026-10-29",
+  "modified": "Wikimedia Commons thumbnail (363 x 402 original), resized to 363 x 402 px and metadata stripped with ImageMagick, re-encoded as JPEG quality 92",
+  "title": "Goatee line drawing.jpg"
+}

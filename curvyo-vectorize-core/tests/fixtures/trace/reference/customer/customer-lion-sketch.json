@@ -1,0 +1,11 @@
+{
+  "id": "customer-lion-sketch",
+  "file": "tests/assets/trace-references/loewe.png",
+  "group": "sketches",
+  "use": "area engraving",
+  "preserve": "a pencil sketch: the face (eyes, nose, mouth) and the main mane strokes (visual check)",
+  "dpi": 150,
+  "origin": "openclipart.org (added by the customer 2026-10-29)",
+  "harness": "decoded in place; reduced by area averaging to at most 2000 px on the longest side",
+  "licence": "CC0 1.0"
+}

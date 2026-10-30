@@ -1,0 +1,11 @@
+{
+  "id": "customer-bird-walking",
+  "file": "tests/assets/trace-references/322003.png",
+  "group": "line-drawings",
+  "use": "line plot",
+  "preserve": "the outlines, the feather lines, the toes of both feet connected to the legs",
+  "dpi": 150,
+  "origin": "openclipart.org (added by the customer 2026-10-29)",
+  "harness": "decoded in place; reduced by area averaging to at most 2000 px on the longest side",
+  "licence": "CC0 1.0"
+}
