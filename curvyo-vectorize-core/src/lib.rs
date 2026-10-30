@@ -1,7 +1,8 @@
 //! The raster tracer of the Trace tool (`specs/0025-raster-trace`, ADR 0023): it turns an RGBA8
 //! raster and trace settings into closed outlines in document millimetres.
 //!
-//! Luma over white, Denoise, Upscale, Threshold, `u32` region labelling (foreground 8-connected,
+//! A score per pixel from the selection method (Brightness, Remove background, Pick colours)
+//! with the alpha counted once, Denoise, Upscale, the cut, `u32` region labelling (foreground 8-connected,
 //! background 4-connected), background
 //! and specks in mm², then per boundary our own crack-edge chain, structural corners found before
 //! any smoothing, smoothing with the corners pinned, lines and cubics fitted within a tolerance in
@@ -13,6 +14,7 @@
 #![forbid(unsafe_code)]
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
+mod background;
 mod boundary;
 mod clearance;
 mod contour;
@@ -21,13 +23,17 @@ mod corners;
 mod filter;
 mod fit;
 mod guard;
+mod guarded;
 mod line;
+mod method;
 mod outline;
 mod params;
+mod picker;
 mod progress;
 mod raster;
 mod regions;
 mod schema;
+mod select;
 mod smooth;
 mod trace;
 
@@ -40,14 +46,17 @@ extern crate self as curvyo_vectorize_core;
 #[allow(clippy::pedantic, clippy::all, missing_docs)]
 mod test_common;
 
+pub use background::{sample_colour, suggest_background};
 pub use params::{
-    Denoise, PRESETS, PixelLength, Preset, TraceParams, UPSCALE_AUTO_BELOW_PX, Upscale,
+    Denoise, MAX_SWATCHES, PRESETS, PixelLength, Preset, Rgb8, Selection, Swatches, TraceParams,
+    UPSCALE_AUTO_BELOW_PX, Upscale,
 };
 pub use progress::{Phase, Progress};
 pub use raster::{Raster, auto_threshold};
 pub use schema::{
     ADVANCED_PARAMS, DEFAULT_CORNERS, DEFAULT_SMOOTH, DEFAULT_SPECKS_MM, DEFAULT_THRESHOLD,
-    DEFAULT_TOLERANCE_PX, MAX_SPECKS_MM, MAX_TOLERANCE_PX, MIN_TOLERANCE_PX, PARAMS, ParamKind,
-    ParamSpec, ParamUnit,
+    DEFAULT_TOLERANCE_PX, MAX_SPECKS_MM, MAX_TOLERANCE_PX, METHOD_PARAMS, MIN_TOLERANCE_PX, PARAMS,
+    ParamKind, ParamSpec, ParamUnit,
 };
+pub use select::{DEFAULT_BACKGROUND_TOLERANCE, DEFAULT_PICK_TOLERANCE, selected};
 pub use trace::{Counts, Diagnostics, MAX_HOLES_PER_REGION, TraceError, TraceResult, trace};

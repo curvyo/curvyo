@@ -46,15 +46,15 @@ use common::quality::real::{
     sidecar_complete, sidecars,
 };
 use common::quality::reference::{Edge, Feature, Group, SCALES};
-use common::quality::reference_set;
 use common::quality::report::{
     NODE_TARGET, SUMMARY_HEADER, baseline_text, geo_mean_of, misses, row_json, summary_line,
     target_misses,
 };
-use common::quality::run::{Case, Truth, measure, params_for};
+use common::quality::run::{Case, Truth, case_params, measure, params_for};
 use common::quality::shape::{corner_errors, measure_edge, self_intersections};
+use common::quality::{reference_set, selection_set};
 use curvyo_document_core::Affine;
-use curvyo_vectorize_core::{PRESETS, Preset};
+use curvyo_vectorize_core::{PRESETS, Preset, Selection};
 use kurbo::{BezPath, Point};
 use serde_json::{Value, json};
 
@@ -64,10 +64,15 @@ static ALLOCATOR: Cap<System> = Cap::new(System, usize::MAX);
 /// Every case: the synthetic fixtures at their three resolutions, the real and the local images.
 fn cases() -> Vec<Case> {
     let mut out = Vec::new();
-    for reference in reference_set() {
+    let colour = selection_set()
+        .into_iter()
+        .map(|s| (s.reference, Some(s.method)));
+    for (reference, method) in reference_set().into_iter().map(|r| (r, None)).chain(colour) {
         for index in 0..SCALES.len() {
             let v = reference.variant(index);
+            let selection = method.map_or(Selection::Brightness, |m| m.selection(&v.picture));
             out.push(Case {
+                selection,
                 key: v.key,
                 group: Some(reference.group),
                 picture: v.picture,
@@ -87,6 +92,7 @@ fn cases() -> Vec<Case> {
         .chain(local_images())
     {
         out.push(Case {
+            selection: Selection::Brightness,
             key: image.id,
             group: image.group,
             mm_per_px: 25.4 / image.dpi,
@@ -132,10 +138,32 @@ fn write_pam(path: &Path, picture: &Picture) {
     std::fs::write(path, bytes).unwrap();
 }
 
-/// The settings JSON the wasm `trace_job` takes for `preset` on `picture`.
-fn wasm_settings(preset: &Preset, picture: &Picture) -> Value {
-    let p = params_for(preset, picture);
+/// The settings JSON the wasm `trace_job` takes for `preset` on `case`.
+fn wasm_settings(preset: &Preset, case: &Case) -> Value {
+    let p = case_params(preset, case);
+    let hex = |c: curvyo_vectorize_core::Rgb8| format!("#{:02X}{:02X}{:02X}", c.r, c.g, c.b);
+    let (method, background, swatches, tolerance) = match p.selection {
+        Selection::Brightness => (0, None, Vec::new(), 0),
+        Selection::RemoveBackground {
+            background,
+            tolerance,
+        } => (1, background.map(hex), Vec::new(), tolerance),
+        Selection::PickColours {
+            swatches,
+            background,
+            tolerance,
+        } => (
+            2,
+            background.map(hex),
+            swatches.as_slice().iter().map(|&c| hex(c)).collect(),
+            tolerance,
+        ),
+    };
     json!({
+        "method": method,
+        "background": background,
+        "swatches": swatches,
+        "colour_tolerance": tolerance,
         "threshold": p.threshold,
         "smooth": p.smooth,
         "tolerance": p.tolerance.as_px(),
@@ -221,7 +249,8 @@ fn peak_memory_child() {
 /// complete sidecar, its file and an entry in `SOURCES.md`.
 #[test]
 fn the_reference_set_is_complete() {
-    let set = reference_set();
+    let mut set = reference_set();
+    set.extend(selection_set().into_iter().map(|s| s.reference));
     for feature in Feature::ALL {
         assert!(
             set.iter().any(|r| r.covers.contains(&feature)),
@@ -353,7 +382,7 @@ fn reference_table() {
                 "key": run_key,
                 "file": file_name(&case.key),
                 "map": [case.mm_per_px, 0.0, 0.0, case.mm_per_px, 0.0, 0.0],
-                "settings": wasm_settings(preset, &case.picture),
+                "settings": wasm_settings(preset, &case),
             }));
             let value = row_json(&row, group);
             if let Some(old) = baseline

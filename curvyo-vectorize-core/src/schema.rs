@@ -2,7 +2,8 @@
 //! 45; `specs/0089` Frage 85 B): the fields the bar's controls are generated from, with their
 //! defaults and steps.
 
-use crate::params::{Denoise, Upscale};
+use crate::params::{Denoise, Selection, Upscale};
+use crate::select::DEFAULT_PICK_TOLERANCE;
 
 /// What kind of value a setting holds.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -142,6 +143,39 @@ pub const PARAMS: &[ParamSpec] = &[
     },
 ];
 
+/// The selection method and its colour tolerance (`specs/0089` criterion 14): the Method menu
+/// and the field that takes the Threshold's place in the colour methods.
+pub const METHOD_PARAMS: &[ParamSpec] = &[
+    ParamSpec {
+        name: "method",
+        label: "Method",
+        kind: ParamKind::Choice(Selection::LABELS),
+        unit: ParamUnit::None,
+        min: 0.0,
+        max: 2.0,
+        default: 0.0,
+        step: 1.0,
+        big_step: 1.0,
+        fine_step: 1.0,
+        group: "method",
+        advanced: false,
+    },
+    ParamSpec {
+        name: "colour_tolerance",
+        label: "Colour tolerance",
+        kind: ParamKind::Integer,
+        unit: ParamUnit::None,
+        min: 0.0,
+        max: 100.0,
+        default: DEFAULT_PICK_TOLERANCE as f64,
+        step: 1.0,
+        big_step: 10.0,
+        fine_step: 1.0,
+        group: "method",
+        advanced: false,
+    },
+];
+
 /// The controls of the Advanced block in its order, the two toggles first (criteria 41 and 45): the same schema as
 /// [`PARAMS`], kept apart so the bar's main rows stay the three of slice 1.
 pub const ADVANCED_PARAMS: &[ParamSpec] = &[
@@ -161,7 +195,7 @@ pub const ADVANCED_PARAMS: &[ParamSpec] = &[
     },
     ParamSpec {
         name: "ignore_background",
-        label: "Ignore background",
+        label: "Drop border shapes",
         kind: ParamKind::Toggle,
         unit: ParamUnit::None,
         min: 0.0,
@@ -231,6 +265,16 @@ mod tests {
     fn the_schema_matches_criteria_4_and_5() {
         let names: Vec<_> = PARAMS.iter().map(|p| p.name).collect();
         assert_eq!(names, ["threshold", "smooth", "tolerance", "specks"]);
+        let [method, colour] = METHOD_PARAMS else {
+            panic!("two method settings")
+        };
+        assert_eq!(method.name, "method");
+        assert_eq!(
+            method.kind,
+            ParamKind::Choice(&["Brightness", "Remove background", "Pick colours"])
+        );
+        assert_eq!(colour.label, "Colour tolerance");
+        assert_eq!((colour.min, colour.max, colour.default), (0.0, 100.0, 19.0));
         let tolerance = &PARAMS[2];
         assert_eq!(tolerance.unit, ParamUnit::Pixel);
         assert_eq!(
@@ -271,7 +315,8 @@ mod tests {
         );
         let advanced = &ADVANCED_PARAMS[2..];
         assert_eq!(ADVANCED_PARAMS[0].kind, ParamKind::Toggle);
-        assert_eq!(ADVANCED_PARAMS[1].label, "Ignore background");
+        // Frage 88 A: the toggle's label; its stored key stays.
+        assert_eq!(ADVANCED_PARAMS[1].label, "Drop border shapes");
         assert_eq!(advanced[0].kind, ParamKind::Choice(&["Off", "Low", "High"]));
         assert_eq!(advanced[1].kind, ParamKind::Choice(&["Auto", "Off"]));
         assert_eq!((advanced[2].min, advanced[2].max), (0.0, 100.0));
@@ -286,7 +331,7 @@ mod tests {
     /// or a Full-size preview.
     #[test]
     fn there_is_no_node_limit_and_no_full_size_preview() {
-        for p in PARAMS.iter().chain(ADVANCED_PARAMS) {
+        for p in PARAMS.iter().chain(ADVANCED_PARAMS).chain(METHOD_PARAMS) {
             let name = p.name.to_lowercase();
             let label = p.label.to_lowercase();
             assert!(

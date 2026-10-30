@@ -235,17 +235,25 @@ fn luma_of(px: [u8; 4]) -> u32 {
     255
 }
 
+/// Criterion 9's luma, with the alpha part as superseded by `specs/0089` criterion 15 (Frage
+/// 87 A): the alpha is counted once, never composited over white; a transparent pixel is never
+/// content, a 50 % alpha black one has membership 0.5 and is content.
 #[test]
-fn c09_luma_uses_rec709_over_white() {
+fn c09_luma_uses_rec709_and_alpha_counts_once() {
     assert_eq!(luma_of([255, 0, 0, 255]), 54);
     assert_eq!(luma_of([0, 255, 0, 255]), 182);
     assert_eq!(luma_of([0, 0, 255, 255]), 18);
-    assert_eq!(luma_of([0, 0, 0, 0]), 255, "transparent is white");
+    assert_eq!(luma_of([0, 0, 0, 0]), 255, "transparent is never content");
     assert_eq!(luma_of([0, 0, 0, 255]), 0);
-    let half = luma_of([0, 0, 0, 128]);
-    assert!(
-        (126..=129).contains(&half),
-        "half alpha black over white: {half}"
+    assert_eq!(
+        luma_of([0, 0, 0, 128]),
+        0,
+        "half alpha black: membership 0.5"
+    );
+    assert_eq!(
+        luma_of([0, 0, 0, 127]),
+        255,
+        "under half alpha: not content"
     );
 }
 
