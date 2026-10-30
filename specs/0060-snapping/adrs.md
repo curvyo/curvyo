@@ -111,10 +111,10 @@ resolves the actual release-event position and modifiers, not a stale hover.
 
 Implement Select move, Select resize, Node anchors, Node handles, Rectangle,
 Ellipse, Polygon/Star and Pen. Rotation retains its existing angle steps.
-Ctrl+Alt bypasses snapping from current event modifiers and clears held markers;
-releasing it resumes from raw geometry. Drop gesture state on release, Escape,
-tool change and document replacement. Turning document snapping off immediately
-removes both attraction and markers.
+Resolve effective snapping from current event modifiers under the scoped Alt
+rules in §§7–8. Disabled effective snapping clears held markers; resuming it
+uses raw geometry. Drop gesture state on release, Escape, tool change and
+document replacement. Attraction and markers share the same effective state.
 
 Only final geometry enters the existing operation commit; a snapped gesture
 adds no extra history step. Settings changes are their own document operation.
@@ -177,22 +177,24 @@ or modifiers change. Capture and release continue to use raw geometry.
 
 ### Alt inversion and existing actions
 
-The literal customer request is temporary inversion **while moving**. Apply
-`effective_enabled = stored_enabled XOR Alt` to an already-running Select move;
+The customer subsequently extended temporary inversion to **all creation
+contexts** as well as moving. Apply `effective_enabled = stored_enabled XOR Alt`
+to an already-running Select move and Pen/Rectangle/Ellipse/Polygon-Star creation;
 read the current modifiers on motion, modifier change and release. This rule
-also applies when Ctrl is held: during a Select move Ctrl+Alt inverts rather
+also applies when Ctrl is held: in these contexts Ctrl+Alt inverts rather
 than forcing off. Existing copy semantics are preserved by `ctrl && !alt`;
-Ctrl alone copies, Ctrl+Alt does not. Outside Select moves the existing
-Ctrl+Alt bypass remains unchanged. Neither inversion nor the effective
+Ctrl alone copies, Ctrl+Alt does not. Outside Select moves and these creation tools, the existing Ctrl+Alt bypass
+remains unchanged. Neither inversion nor the effective
 state is written to the document or history. Marker visibility must use the same
 effective state, so Alt can show a marker while the stored switch is off.
 
 Alt at Select press already arms a lasso; keep that hit/pick behavior. Inversion
 starts only once the gesture is a move. Offset uses Alt for corner style; do not
-hijack it. Pen also has existing Ctrl/Alt handling. Extending inversion globally
-is unnecessary for the requested move behavior and risks unrelated changes, so
-this implementation keeps drawing hover on the stored switch. No question is
-needed to preserve these existing operations.
+hijack it. Pen angle constraints continue to use Ctrl independently of Alt. Remove the old
+`ctrl && !alt` suppression from its angle calculation; Alt changes attraction
+only. This is an explicit customer extension, not a global reinterpretation of
+Alt for Offset, lasso or unrelated tools. No question is needed to preserve
+those existing operations.
 
 ### Hover lifetime and click creation
 
@@ -224,3 +226,36 @@ click placement and Pen handle-free clicks, both Alt inversion directions with
 no persisted changes, all four axis combinations, nearby-but-unreachable and
 distant nodes, finite curves, constrained resize, marker state, merge/undo of
 axis settings and unchanged indexed frame budgets.
+
+## 8. All-creation Alt extension: lifecycle constraints (2026-10-30)
+
+The explicit extension covers drawing hover before the first click, a pressed
+shape drag, unfrozen click-placement follow/confirmation and Pen first/subsequent
+placement. Stored state XOR held Alt is the single effective-state rule for
+these contexts, including Ctrl+Alt. Both disabled axes still prohibit correction.
+No additional register, format version or history operation is introduced.
+
+A modifier-only update resolves from the latest raw pointer. Reuse existing
+`modifiers_changed` dispatch: shape idle/pressed updates, placement follow and
+Pen hover all need immediate marker/preview updates without mouse motion.
+Release resolves current event state. Alt on/off must not rebuild an unchanged
+index; effective settings and held-state handling suffice.
+
+Do not change geometry that the current interaction has already pinned. A shape
+drag retains its press anchor; Pen retains its placed node and press offset
+while handles are being dragged; a typed-size frozen placement remains frozen.
+Pen's button-down early return must not leave a suppressed marker visible or
+reuse an incompatible hold after effective snapping changes. Clearing temporary
+snap state must not clear the press offset that makes the handle relative to
+the pinned snapped node. Do not reinterpret Alt as re-placing that node.
+
+Ctrl aspect/angle and Shift centre constraints remain active with Alt. In Pen
+press/hover/rubber-band calculations, the former `ctrl && !alt` condition
+belonged to the older suspension policy and must become Ctrl-only (retaining
+other existing conditions such as button-up). Existing Select copy remains
+`ctrl && !alt`; initial Alt lasso and Offset corner cycling stay unchanged.
+
+Independent verification should distinguish stored-off Alt-on and stored-on
+Alt-off for every creation tool, stationary-pointer key changes, press anchors,
+first/subsequent Pen clicks, active handles, follow/frozen placements, Ctrl
+constraints, release geometry, unchanged document switch/history and index reuse.

@@ -2363,13 +2363,15 @@ export function useEditorSession(
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       // A lone Alt press or release would focus the menu bar in some browsers
-      // and on Windows; with the pointer on the canvas and the Select tool
-      // active Alt belongs to the lasso and the Alt-click cycle
-      // (`specs/0014-advanced-selection/`).
+      // and on Windows. With the pointer on the canvas, Select uses Alt for
+      // its selection gestures; drawing tools use it to invert snapping.
+      // Only the Alt key itself is intercepted; text-entry chords stay native.
       if (
         event.key === "Alt" &&
         lastPointerRef.current !== null &&
-        sessionRef.current?.tool() === "select"
+        ["select", "pen", "rectangle", "ellipse", "polygon-star"].includes(
+          sessionRef.current?.tool() ?? "",
+        )
       ) {
         event.preventDefault();
       }

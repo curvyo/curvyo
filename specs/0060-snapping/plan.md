@@ -203,3 +203,58 @@ public APIs with wrappers where appropriate. No arbitrary candidate caps.
   no-button hover/placement, Alt on/off inclCtrl noCopy; screenshots refreshed.
   UX final screenshot sign-off remains reviewer-owned. Exact commands/results,
   test oracle review, red defect and scope limits: acceptance-report.md.
+
+## Alt during all drawing phases (customer clarification)
+
+- [x] M. Extend effective XOR to Pen/Rectangle/Ellipse/Polygon/Star, preserving
+  existing Select-press, resize, Node and Offset semantics (AC9,17,18).
+- [x] N. Test both stored states, Alt key-only toggles/held-before-press and Ctrl
+  combinations across hover, simple-click placement, button-down drawing and
+  subsequent Pen preview; fixed anchors/typed geometry remain fixed.
+- [x] O. Affected tests/clippy/WASM/frontend checks, then independent tester gate.
+  No persistence, format or dependency change.
+
+### All-creation Alt validation
+
+- Initial three actual-event matrix tests all failed: idle Alt-only refresh,
+  Alt held before first click without hover, and moving creation/placement
+  endpoints with fixed anchors. Central effective state now applies XOR in Pen,
+  Rectangle, Ellipse and Polygon/Star, including Ctrl+Alt.
+- Five focused tests pass over both stored states, polygon and star modes,
+  key-only toggles, first press/simple click, pressed creation and placement
+  follow, subsequent Pen preview, Ctrl constraints and frozen typed geometry.
+  Pen Ctrl geometry remains constrained independently of Alt; pressed Pen clears
+  only the moving candidate, leaving the pinned node/press offset untouched.
+- Click-release now transfers the original resolved drag_start into placement;
+  an Alt change between press/release cannot relocate that fixed anchor.
+- Affected editor library:469/469. Native all-target and wasm32 Clippy with
+  -Dwarnings pass. Final WASM release/bindings build:18.00s. Frontend tsc,104tests,
+  oxlint(0errors,existingwarnings) and Vite build pass; diffcheck passes.
+- Host intercepts lone Alt down/up for drawing tools with the pointer on canvas,
+  preventing native menu focus while leaving all text-entry chords untouched.
+  Architect source APPROVE closes C1/C2. Independent browser and full gate remain O.
+
+### Placement-chip Alt event routing
+
+Root's real browser follow-click case (stored off) stayed at width52.2 on Alt
+keydown: the focused PlacementChip input stopped the event before the window
+modifier tracker. A lone Alt key now returns before the chip's keyDown and
+stopPropagation; Shift/Ctrl tap handling and ordinary typing remain unchanged.
+TypeScript build,104frontendtests and oxlint(0errors,existingwarnings) pass.
+No Rust/WASM change. Root reruns the same browser case; engine/source approval
+alone does not verify host event propagation.
+
+### Final independent all-creation Alt verification
+
+- Independent pre-code extension plan;36 public acceptance tests pass (doc4,
+  ui14,editor18), retaining prior31 except two explicit customer-superseded
+  creation-Alt oracles. Escape→Select testprecondition corrected/rearmed; fresh
+  settings-clear→Alt context regression passes without production changes.
+- Fullgate9529/9529 pass,117existing skips;fmt/nativeclippy/9WASMbuild+clippy/
+  deny/rustdoc allPASS. Frontend freshWASM/tsc pass,npm633pass56skip,oxlint exit0.
+- Final realbrowser creationAlt PASS on regeneratedWASM, including focusedWidth
+  Ctrl+Alt preserving/restoring square constraint and exact final exported
+  geometry. Hover,Altbeforepress,buttondown/follow/press-to-placement bothstored
+  states,nativeAltguard,fixedanchors,storedsettings,JSerror0; screenshots refreshed.
+- Architecture/UX approved C1/C2/C3. Exactcommands,scope18ACdelta,testoracle
+  amendments and residual permutation limits are in acceptance-report.md.

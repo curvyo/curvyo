@@ -1,7 +1,7 @@
 # 0060 Snapping: UX notes
 
-Status: UX APPROVE including PR #225 feedback (2026-10-30); customer acceptance remains separate.
-The final feedback verdict and corrected Copy indicator evidence are recorded in §10.6.
+Status: UX APPROVE for the explicit creation-Alt extension; full gate and customer acceptance remain separate.
+The current extension's verdict is in §11.4; §9 and §10.6 retain earlier review history.
 Owner: ux-engineer. Authority: customer requests of 2026-10-17, 2026-10-29
 (document-owned settings and six page fractions), and the latest request relayed by the
 lead on 2026-10-30: a dedicated Snapping entry in the Properties rail, ordinary click opens
@@ -15,8 +15,9 @@ mark and keyboard conventions. **(Proposal)** marks reversible implementation ch
 Defaults stay off, all four kinds on, capture 8 px, release 14 px; release is never smaller
 than capture. The latest PR #225 feedback adds independent X/Y controls, temporary Alt
 inversion during an established move, and drawing hover/first-click snapping (§10).
-Ctrl+Alt suspension outside that move scope remains unchanged pending a customer decision;
-no all-tool Alt reassignment is implied. Settings remain document-owned and undoable;
+The customer has now explicitly extended Alt inversion to every Pen/Rectangle/Ellipse/
+Polygon-Star creation phase (§11), including Ctrl+Alt. Unrelated tools keep their existing
+modifier rules. Settings remain document-owned and undoable;
 active pane, collapse state, held targets and markers remain view/interaction state.
 
 ## 1. Snapping rail entry and settings panel
@@ -67,8 +68,8 @@ this reviewer. The marker and snapping engine contracts below otherwise remain i
   like History/Layers/Fonts. Only deliberate navigation changes it. Hide/show retains it;
   New/Open keep the existing panel reset policy, and load the new document's snapping state.
   Canvas-drag gating remains as for other settings: no mid-drag panel mutation. The
-  latest move-only Alt inversion is specified in §10; outside it the existing Ctrl+Alt
-  suspension route remains.
+  move and creation Alt inversion is specified in §10–11; outside those scopes the
+  existing Ctrl+Alt suspension route remains.
 
 ### 1.3 Independent enabled, selected and focused states
 
@@ -88,7 +89,7 @@ clearance to keep the magnet legible. It distinguishes state without relying on 
 its casing follows the current ground as the File dirty badge does. The existing two-tone
 inset focus ring stays visible independently of all four combinations. Hover must not erase
 enabled or selected state. With the body collapsed, no tab is selected but the enabled
-indication stays visible. Temporary suspension or move-only Alt inversion never changes
+indication stays visible. Temporary suspension or move/creation Alt inversion never changes
 the persisted enabled indication. Do not recolour the rail or toggle the panel switch to
 represent effective transient snapping; the canvas marker follows the effective result.
 
@@ -188,9 +189,9 @@ the line does not extend across the whole canvas: the maker must see *which* edg
   fractions. Ties are exact equality, not "within a pixel"; a near tie is a near win.
 - **Axis lock.** With Shift held for a horizontal or vertical move, only the free axis snaps;
   the locked axis shows no line. Ctrl alone still copies (its meaning in the Select tool) and
-  the established move reads Alt as the temporary inversion described in §10. Outside
-  that scope Ctrl+Alt retains its existing suspension meaning until the customer chooses
-  otherwise. Enabled document axes further constrain the free-axis set.
+  established moves and all supported creation phases read Alt as temporary inversion
+  (§10–11), including with Ctrl held. Other tool scopes retain existing modifier rules.
+  Enabled document axes further constrain the free-axis set.
 - **What moves.** A multi-selection or a group snaps by the box of the whole selection, not by
   each member: its four edges, two centre lines and nine reference points. A resize snaps the
   moving edges and the dragged reference point; the fixed edges do not pull.
@@ -233,7 +234,8 @@ the line does not extend across the whole canvas: the maker must see *which* edg
   or interaction-gated commands retain their stored values.
 - Turning snapping off during a drag is not possible through panel controls (settings are inert during
   a canvas drag); temporary move inversion follows §10 and changes feedback in the same
-  frame. Outside that scope the existing Ctrl+Alt suspension is retained.
+  frame. Creation now uses the same inversion (§11); unrelated tool scopes retain
+  their existing Ctrl+Alt suspension.
 - Turning the document's switch off while a target is held releases it and removes the marker;
   the drag continues unsnapped.
 
@@ -344,8 +346,8 @@ vertical controls, Alt temporarily inverting snapping while moving, and snapping
 while drawing before the first press, on the first click and along the Pen rubber band.
 This section supersedes earlier no-hover and move-modifier wording. It leaves the accepted
 Shift-click rail toggle, its keyboard equivalents, focus rules and undo ownership intact.
-The lead is asking the customer about directional meaning and broader modifier scope;
-the defaults below allow implementation without silently changing unrelated tool gestures.
+The coordinate-axis default below remains the working meaning. The customer has since
+explicitly resolved broader creation-modifier scope in §11; preserve unrelated tool gestures.
 
 ### 10.1 Independent coordinate axes
 
@@ -371,14 +373,15 @@ current tool geometry constraints and the existing capture/release zones.
 
 ### 10.2 Alt during a move, with existing gestures preserved
 
-**(Proposal; safe default limited to the customer's explicit moving scope)** once a Select
+For the established Select-move scope (creation is additionally covered by §11), once a Select
 object-move or copy-move has begun, holding Alt uses the opposite of the stored global
 snapping-enabled value. Off becomes temporarily on; on becomes temporarily off. Target kind
 and axis choices are unchanged, so Alt never enables a disabled target or coordinate. Ctrl-only
 copy and Shift axis lock retain their meanings, including the existing `ctrl && !alt` copy
 guard: Alt must not accidentally turn a move into a copy. Inside this established move, Alt inversion
 also applies with Ctrl held; do not additionally apply the old Ctrl+Alt suppression there.
-Outside this move scope the existing Ctrl+Alt rule remains until separately decided.
+Every supported creation phase also uses Alt inversion as explicitly required in §11.
+Other tool scopes retain their existing Ctrl+Alt rule.
 
 No register, history entry, dirty state, panel switch, rail badge or panel visibility changes
 on Alt press/release. Re-evaluate from the raw pointer-derived position when the modifier
@@ -390,10 +393,10 @@ window focus loss clear transient state; do not leave inversion latched for the 
 Bounded source conflict review: `curvyo-ui-core/src/select_tool/press.rs` and `select_tool.rs`
 make Alt at pointer-down arm lasso before body/handle hits; Alt-click also cycles overlapped
 objects. `curvyo-editor-wasm/src/session/offset.rs` uses Alt during a corner drag to cycle
-corner style. Pen currently makes its Ctrl angle constraint conditional on Alt being up.
-Therefore preserve Alt-at-press selection/lasso and Offset behaviour. The safe move gesture
-is start moving, then hold Alt. Do not globally reinterpret Alt for every tool or remove
-established behaviour without the customer's broader-scope decision.
+corner style. Preserve Alt-at-press selection/lasso and Offset behaviour. The safe Select
+move gesture is start moving, then hold Alt. The prior Pen Ctrl/Alt coupling is now subject
+to the explicit creation clarification in §11; Alt must invert snapping without changing
+the Ctrl geometry constraint. No reassignment for unrelated tools is authorized.
 
 ### 10.3 Drawing hover, first click and Pen preview
 
@@ -447,7 +450,7 @@ first-click agreement, default-sized shape anchor, click-move-click preview, Pen
 and rubber band, preview self-exclusion and marker cleanup. The §9 approval is historical;
 these additions need their own implementation and validation evidence below.
 
-### 10.5 Partial source review of the feedback implementation
+### 10.5 Historical partial source review before the creation-Alt extension
 
 Read-only review, 2026-10-30: current `SnappingSection` exposes independent `Horizontal (X)`
 and `Vertical (Y)` pressed-state buttons under `Snap axes`, before zone fields. Their visible
@@ -473,7 +476,7 @@ was found in this bounded source review. Final review still needs saved screensh
 browser evidence for axes, both directions of temporary inversion and idle marker lifecycle;
 no visual PASS/APPROVE, build or test is claimed for this feedback yet.
 
-### 10.6 Saved-screenshot review and final feedback approval
+### 10.6 Historical saved-screenshot review and feedback approval before §11
 
 Initial finding: **CHANGES REQUESTED**, subsequently resolved below. Reviewed saved screenshots
 `axes-{both,x,y,none}-hover.png` and `alt-{true,false}-{false,true}-held.png` in
@@ -521,3 +524,98 @@ acceptance tests and the full gate passing, with 9,519/9,519 workspace tests gre
 are attributed tester results, not tests rerun by the UX reviewer. This reviewer inspected
 the saved final screenshot only; no live browser, build, test or production edit was made.
 No concrete amended-UX blocker remains. Customer acceptance is still a separate step.
+
+## 11. Explicit customer clarification: Alt inversion throughout creation
+
+**Customer authority, relayed by the lead on 2026-10-30:** Alt temporarily inverts stored
+snapping during **all** creation phases of Pen, Rectangle, Ellipse and Polygon/Star, as well
+as the existing Select-move scope. This resolves the previous move-only default; it is not
+an optional proposal. Specification criteria 9, 17 and 18 carry the same clarification.
+The existing rail Shift-click/Shift+Enter/Shift+Space interactions, focus behaviour and
+settings history remain unchanged.
+
+### 11.1 Effective state and geometry
+
+In every supported creation phase, effective snapping is the stored enabled value XOR
+held Alt: stored-off becomes temporarily on; stored-on becomes temporarily off. Ctrl+Alt
+uses the same inversion; do not layer the old Ctrl+Alt force-off rule over it. This applies
+before the first press, during idle drawing hover, on the first press/click, while a simple
+click placement follows without a held button, during a button-down creation drag, and to
+the Pen's next-point/rubber-band preview and each placed point. No-button previews must not
+be mistaken for unsupported interactions merely because there is no drag flag.
+
+Axis and target-kind choices remain authoritative; Alt does not enable a disabled axis or
+kind. Both axes off still produces no correction/marker. The panel switch, rail blue state
+and badge continue to describe the stored document setting, not effective temporary state.
+Alt press/release creates no register write, dirty change or history step. Repeated Alt
+keydown must not toggle or latch anything; held-state inversion lasts only until release.
+
+Pressing or releasing Alt with an unmoved pointer updates the eligible preview and marker
+immediately from the raw pointer-derived point. Re-resolve the free endpoint; do not reuse a
+previously snapped endpoint as raw input. Clear held snaps when inversion disables snapping
+and resolve afresh when it enables it. Already fixed shape start anchors and already placed
+Pen anchors never move. Frozen typed size/placement remains exact and does not reflow on Alt;
+its fixed geometry must not acquire a misleading marker suggesting a different placement.
+Unfrozen simple-click placement follows the same effective state as hover and drag creation.
+
+Alt changes snapping only. Ctrl's current creation geometry constraint (shape proportions,
+polygon/star constraint or Pen angle constraint) and Shift's current creation meaning remain
+in force when combined with Alt. Candidate snaps must satisfy those constraints and the
+enabled axes; no incompatible target may bend the constrained geometry. Architecture owns
+the exact constrained resolver and Pen Ctrl-coupling correction. No extra product decision
+is needed to implement the customer's explicit creation request.
+
+### 11.2 Feedback, completion and cancellation
+
+Use the existing thin line/cross marker only, with the same appearance and eligible-target
+index reuse as §10.3. At the same pointer location, Alt can remove or reveal it before a
+button is pressed; the next click commits the point that the current preview indicates.
+No new status label, toast, cursor or temporary blue rail state is added.
+
+Pointer leave, cancellation, tool switch and focus/capture loss clear obsolete marker and
+held-target state according to the existing lifecycle. A later drawing hover resolves from
+the current held modifiers; no inversion remains latched. Ending a drawing gesture clears
+its transient state without modifying stored settings. Select Alt-at-press lasso/cycling
+and Offset corner-style Alt remain unchanged; this extension is limited to the named
+creation tools and the already accepted established Select move.
+
+### 11.3 Approval boundary and required evidence
+
+The earlier APPROVE verdicts covered the previous rail/axes/move implementation. They are
+historical and do not approve this extension. Before a fresh verdict, demonstrate both
+stored-enabled values with Alt held/released at a stationary pointer in every creation
+phase: hover/prepress, first click, simple-click follow, button-down drag, Pen first point
+and rubber band. Include Ctrl-constrained drawing with Alt, one-axis and both-off settings,
+fixed first/placed anchors, frozen typed geometry, unchanged document switch/rail state,
+cleanup and committed-coordinate agreement with the last preview. This amendment is
+UX documentation only; this reviewer ran no live browser, build or test for it.
+
+### 11.4 Final creation-Alt UX review
+
+**APPROVE**, based on current bounded source inspection, fresh saved screenshots and the
+lead's attributed browser evidence. Reviewed `creation-rectangle-{false,true}-alt-held.png`,
+`creation-follow-click-{false,true}-alt-held.png` and `creation-pen-false-alt-held.png` under
+`target/browser-check`. In the stored-off cases Alt reveals the snapping lines while the
+panel switch remains off; in stored-on cases it removes the lines while the switch remains
+on. The selected rail entry and enabled badge continue to represent document/pane state.
+The focused placement fields remain readable with a visible focus indicator; their live
+dimensions and the preview agree with the effective snapping state in these captures.
+Pen feedback is also visible before the first press without a held mouse button.
+
+The focused-chip event defect is resolved: `PlacementChip` now returns early for Alt so
+central modifier/menu handling receives it, while ordinary editing keys retain the chip's
+existing handling. `PenEntryChip` already forwards modifier keys. This bounded source check
+supports the focused-follow interaction without claiming a new native text-undo test.
+
+The lead reports the refreshed creation browser script passing all supported tool hovers,
+both stored-enabled values, Alt before the first click, button-down creation, no-button
+following placement, and press-to-placement fixed anchors. The reported checks include
+stationary Alt press/release changing and restoring live dimensions without pointer motion,
+central Alt/menu prevention, exact saved geometry, unchanged stored flags and no JavaScript
+errors. These checks were run by the lead, not independently repeated by this reviewer.
+
+No concrete blocker remains for the clarified creation-phase UX. The screenshots are
+representative states rather than every possible modifier/tool combination; geometry and
+independent public acceptance/full-gate checks remain the tester's responsibility and were
+still pending at this review. This reviewer ran no live browser, build or tests and made no
+production edits. This is a UX approval, not an overall test PASS or customer acceptance.

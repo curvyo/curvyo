@@ -261,3 +261,49 @@ Lead reports 31 independent public acceptance tests passing, including a
 failing-first copy-badge/readout regression and Ctrl-only restoration; architect
 has not rerun them. **Feedback amendment structural APPROVE reaffirmed.**
 Final full gate is tester-owned; screenshot review awaits the rebuilt wasm.
+
+## Explicit all-creation Alt extension: source APPROVE (2026-10-30)
+
+The earlier amendment approval remains historical for its narrower scope.
+The customer now requests Alt inversion for Pen/Rectangle/Ellipse/Polygon-Star
+as well as Select moves; implementation is under review.
+
+- [x] C1 — Pen press/hover/rubber-band angle calculations now preserve Ctrl
+  while Alt only inverts attraction; the old `ctrl && !alt` coupling is removed.
+- [x] C2 — Source routing covers key-only updates for idle/pressed shapes and unfrozen
+  placement follow, plus first/subsequent Pen hover. Pressed Pen nodes/press
+  offsets and frozen typed placement stay pinned; marker/held state must not
+  survive suppression incorrectly. Unchanged target indexes should be reused.
+
+No production edits, builds, tests or browser checks performed by architect.
+
+Final bounded source verification: `snapping_effective_enabled` applies XOR to
+Pen and all three shape tools as well as active Select moves.
+`modifiers_changed` refreshes the raw-pointer preview; pressed Pen clears its
+candidate with an empty probe without moving its node or changing its press
+offset. `release_starts_placement` retains the original snapped drag anchor
+before escape, while the click threshold still uses raw positions. Frozen
+placement follow remains inert. The creation context reuses its indexed targets
+when document version and exclusion identity are unchanged. No document-model,
+format or dependency change is needed. Offset/lasso remain outside this scope.
+
+Implementer reports 469/469 editor tests and native all-target Clippy passing,
+including failing-first creation Alt regressions, frozen/no-history, Pen
+constraint and pinned-press checks. These checks were not rerun by architect;
+independent acceptance and the full gate remain tester responsibilities.
+
+### C3: focused placement field intercepted Alt
+
+- [x] Source fix verified: `PlacementChip` returns for the Alt key before its
+  local `placement.keyDown` and unconditional `stopPropagation`. The existing
+  window listener therefore updates the modifier tracker, suppresses native
+  menu focus for drawing tools and applies held Alt to the session. During a
+  placement it forwards keydown exactly once. Shift/Ctrl retain their existing
+  local tap handling; form-control canvas shortcuts remain excluded.
+
+Lead reports the real browser exposed the defect with the Width field focused:
+Alt left Width at 52.2 despite the passing session tests. Implementer reports
+TypeScript, 104 frontend tests and lint passing after the fix. Architect's
+bounded source review finds this event flow coherent and reaffirms source
+approval; the lead's browser rerun is still pending at this record, so this is
+not a browser PASS. No builds, tests or browser checks were run by architect.
