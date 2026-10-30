@@ -181,12 +181,25 @@ impl Session {
                     .collect();
                 merged_corners(&corners).map(|shown| (id, shown))
             });
+        // The key object's mark (`specs/0061-align-and-distribute/` criterion
+        // 5): the box around all of its leaves — a group's own box — drawn
+        // thicker by the renderer.
+        let key = self.key_object.and_then(|unit| {
+            let leaves = self.units().leaves_of_unit(unit);
+            let corners: Vec<_> = objects
+                .iter()
+                .filter(|object| leaves.contains(&object.id()))
+                .map(|object| oriented_bounds(object).document_corners())
+                .collect();
+            merged_corners(&corners)
+        });
         SelectDecorationInput {
             selected,
             hovered,
             history_hovered,
             device_pixel_ratio: self.device_pixel_ratio,
             skew_guide: self.skew_guide_now(),
+            key,
         }
     }
 

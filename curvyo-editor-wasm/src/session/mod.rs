@@ -20,6 +20,7 @@
 //! methods join this type's `impl Session` the same way any other
 //! `impl` block in the same crate would.
 
+mod align;
 #[cfg(test)]
 mod arc_tests;
 mod background;
@@ -392,6 +393,11 @@ pub struct Session {
     /// The announcement of the last resize that mirrored ("Resized. Mirrored left to
     /// right."), until the host takes it (`specs/0056-mirror-and-negative-scale/`).
     transform_announcement: Option<String>,
+    /// The key object of the align and distribute commands (`specs/0061-align-and-
+    /// distribute/` criterion 5): the selected unit a Ctrl-click marked, as its unit
+    /// id. View state — never in the document, never undoable; forgotten when its unit
+    /// leaves the selection or on Escape.
+    key_object: Option<NodeId>,
     /// The Pen's end-node cache and the target of the press in flight (`0034`).
     pen_cue: pen::PenCueState,
     /// The maker's undo and redo stacks of this session (`history.rs`).
@@ -503,6 +509,7 @@ impl Session {
             command_refusal: None,
             transform_notice: None,
             transform_announcement: None,
+            key_object: None,
             pen_cue: pen::PenCueState::default(),
             history: history::HistoryState::new(),
             nudge_run: None,
@@ -579,6 +586,7 @@ impl Session {
             command_refusal: None,
             transform_notice: None,
             transform_announcement: None,
+            key_object: None,
             pen_cue: pen::PenCueState::default(),
             history: history::HistoryState::new(),
             nudge_run: None,

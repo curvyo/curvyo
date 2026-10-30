@@ -5,7 +5,8 @@
 //! `curvyo-ui-core`'s rules.
 
 use curvyo_ui_core::{
-    BarValue, EntryOutcome, FlipAxis, FlipOutcome, InvalidReason, SelectBarState, clamped_ratio,
+    AlignAxis, AlignCommand, AlignOutcome, BarValue, DistributeMode, EntryOutcome, FlipAxis,
+    FlipOutcome, InvalidReason, SelectBarState, clamped_ratio,
 };
 use wasm_bindgen::prelude::*;
 
@@ -166,6 +167,50 @@ impl WasmSession {
         flip_code(self.session.flip_selection(FlipAxis::Vertical))
     }
 
+    /// Whether the Align group is in the Select bar
+    /// (`specs/0061-align-and-distribute/` criterion 1): the Select tool with
+    /// something selected.
+    #[must_use]
+    pub fn align_shown(&self) -> bool {
+        self.session.align_group_shown()
+    }
+
+    /// Whether the Distribute group is in the Select bar: the Select tool
+    /// with two or more selected objects.
+    #[must_use]
+    pub fn distribute_shown(&self) -> bool {
+        self.session.distribute_group_shown()
+    }
+
+    /// An align press: `command` is one of `"left"`, `"centre-h"`, `"right"`,
+    /// `"top"`, `"centre-v"`, `"bottom"`. Returns `"aligned"`, `"unchanged"`
+    /// (criterion 3) or `"nothing"`.
+    pub fn align(&mut self, command: &str) -> String {
+        let command = match command {
+            "left" => AlignCommand::Left,
+            "centre-h" => AlignCommand::CentreH,
+            "right" => AlignCommand::Right,
+            "top" => AlignCommand::Top,
+            "centre-v" => AlignCommand::CentreV,
+            _ => AlignCommand::Bottom,
+        };
+        align_code(self.session.align_selection(command))
+    }
+
+    /// A distribute press: `code` is one of `"h-gaps"`, `"h-centres"`,
+    /// `"v-gaps"`, `"v-centres"`; `gap_mm` is the typed gap of criterion 8,
+    /// `None` keeps the ends. Returns `"aligned"`, `"unchanged"` (criterion 7)
+    /// or `"nothing"`.
+    pub fn distribute(&mut self, code: &str, gap_mm: Option<f64>) -> String {
+        let (axis, mode) = match code {
+            "h-gaps" => (AlignAxis::Horizontal, DistributeMode::Gaps),
+            "h-centres" => (AlignAxis::Horizontal, DistributeMode::Centres),
+            "v-gaps" => (AlignAxis::Vertical, DistributeMode::Gaps),
+            _ => (AlignAxis::Vertical, DistributeMode::Centres),
+        };
+        align_code(self.session.distribute_selection(axis, mode, gap_mm))
+    }
+
     /// The Guide button (`specs/0046-document-shapes` criteria 9, 10 and 34): `"disabled"` when
     /// nothing selected can be a guide, `"pressed"` when everything that can is one,
     /// `"pressed-inert"` when only linked clones of guides are selected, else `"off"`.
@@ -252,6 +297,16 @@ fn flip_code(outcome: FlipOutcome) -> String {
         FlipOutcome::Flipped => "flipped",
         FlipOutcome::LooksTheSame => "unchanged",
         FlipOutcome::NothingSelected => "nothing",
+    }
+    .to_string()
+}
+
+/// The wasm code of an align or distribute outcome.
+fn align_code(outcome: AlignOutcome) -> String {
+    match outcome {
+        AlignOutcome::Aligned => "aligned",
+        AlignOutcome::Unchanged => "unchanged",
+        AlignOutcome::NothingSelected => "nothing",
     }
     .to_string()
 }

@@ -124,6 +124,7 @@ fn ac65_ac67_the_session_draws_strokes_then_the_dashed_box_then_the_handles() {
                 history_hovered: Vec::new(),
                 device_pixel_ratio: dpr,
                 skew_guide: None,
+                key: None,
             },
         );
         assert!(
@@ -216,6 +217,7 @@ fn ac65_the_box_keeps_snapping_after_zoom_and_pan() {
                     history_hovered: Vec::new(),
                     device_pixel_ratio: dpr,
                     skew_guide: None,
+                    key: None,
                 },
             );
             assert!(
@@ -269,6 +271,7 @@ fn ac66_hovering_an_unselected_object_draws_a_solid_accent_hover_box() {
             history_hovered: Vec::new(),
             device_pixel_ratio: 2.0,
             skew_guide: None,
+            key: None,
         },
     );
     assert_eq!(
@@ -303,6 +306,7 @@ fn ac66_hovering_an_unselected_object_draws_a_solid_accent_hover_box() {
             history_hovered: Vec::new(),
             device_pixel_ratio: 2.0,
             skew_guide: None,
+            key: None,
         },
     );
     assert!(sel_only.triangle_count() > 8);
@@ -331,6 +335,7 @@ fn ac66_hovering_the_selected_object_adds_no_hover_box() {
             history_hovered: Vec::new(),
             device_pixel_ratio: 1.0,
             skew_guide: None,
+            key: None,
         },
     );
     assert!(
