@@ -1,6 +1,6 @@
 # 0089 Trace quality and colour: UX notes
 
-Status: Draft for Ready, revised 2026-10-29 against `specs/0025-raster-trace/ux-notes.md` §19 to §21 and the merged
+Status: Ready, revised 2026-10-29 against `specs/0025-raster-trace/ux-notes.md` §19 to §21 and the merged
 #216 bar (`TraceBar.tsx`, `TraceAdvanced.tsx`; where this file and §21 differ on the bar's rules, §21 wins). Owner:
 ux-engineer. Builds on 0025 (§2 to §17, the bar rules: pill, 36 px rows, 28 px controls, one flow wrapping by
 whole items, first line never reorders) and the customer's decisions of 2026-10-29: "i" button next to the "Trace"
@@ -13,6 +13,22 @@ document (`tracing-roadmap-de.md`). Built on the defaults of open Frage 80 to 88
 state; none tells the maker what to do. The "i" About Trace tab is the one granted exception (Frage 77 A) and only
 gains entries (§12). Pixel widths are arithmetic from the merged bar (inner **308** at 800 x 600 with the panel
 open, 616 closed; the PR measures and reports the differences).
+
+**Customer answers of 2026-10-29 that override the text below (all decided, no open questions; where a section
+below still says otherwise, this block wins and the implementer follows it):**
+- Frage 84: no "Trace" label at the start of line one (the "i" stays); the progress pill is the finish button (idle
+  it creates, same as Enter), at the far right, right of the expander (items 12 and 13 swap: expander, then pill;
+  it is always present, so §2's "no width when empty" is void; §9 and §11 Tab order follow).
+- Frage 85 B: Smooth and Tolerance (px, unit shown) are two bar fields; no readout beside Smooth (Frage 91 is
+  superseded). To avoid two fields named Tolerance, the method's 0 to 100 field is named **Colour tolerance**
+  **(Proposal)** in Remove background and Pick colours; Brightness keeps Threshold.
+- Frage 83 B: no "Suggested"/Apply state; a new image opens in Auto and the line says what was set; the button is
+  **Analyse again** (replaces Re-analyse).
+- Frage 92 B: Output (Single colour | Multicolour), the Colours field and the palette pipette live in Advanced,
+  not in the main bar (items 8 and 9 move; §2 row counts below are for the new flow). The palette (item 14) stays
+  below the flow and appears while Multicolour is on.
+- Frage 87 A, 89 A, 90 A, 86 A, 88 A: as designed. Frage 80/81/82/93 do not touch the UX.
+- Row counts in §2 are arithmetic before these answers where marked "old"; the PR re-measures them.
 
 ## 1. Conflicts between the document and the customer's decisions
 
@@ -66,24 +82,26 @@ Method (494). With the panel open (308) it does not: **View drops to line 2 and 
 panel open. Making the segments 22 px wide would fit 322 and still not 308, so it is not done (28 px hit targets
 are kept at 26 + the pill's own padding as in the merged bar).
 
-**Row counts** (36 px rows, Advanced closed, no notice, slot empty; the PR measures them):
+**Row counts** after Frage 84, 85 B and 92 B (36 px rows, Advanced closed, no notice; the label is gone, so line
+1 is "i" 28 + Preset 132 + View 104 + gaps = 280, which fits at 308; Method 160 is then its own line; the pill, 75,
+is always present and last; Smooth and Colour tolerance/Threshold are 168 each; the new Tolerance (px) field is
+168 **(Proposal)**; the PR measures them):
 
-| Method, Output | Panel open (308) | Panel closed (616) |
+| Method | Panel open (308) | Panel closed (616) |
 |---|---|---|
-| Brightness, Single colour | 7 (252 px): [label, Preset] [View, Method] [analysis] [Threshold] [Output] [Smooth] [Ignore below, expander 248] | 4 (144 px): [label, Preset, View, Method 494] [analysis] [Threshold, Output, Smooth 560] [Ignore below, slot, expander 356] |
-| Remove background, Single | 8: adds the Background group (172) as its own line | 4: [Threshold, Background, Output 564] [Smooth, Ignore, slot, expander 524] |
-| Pick colours, Single | 8: swatches + pipette (up to 288) own line | 4 to 5: [Threshold, Pick 464] [Output, Smooth, Ignore 604] [slot, expander] wraps when the slot shows |
-| any, Multicolour | + Colours (120 does not share a line with Output at 308: 336) = +1; + palette 1 to 2 rows + detail row 1 | + 0 to 1 (Brightness: [Threshold, Output, Colours 512] [Smooth, Ignore, slot, expander 532]); + palette 1 row + detail row |
+| Brightness | 8 (288 px): [i, Preset, View] [Method] [analysis] [Threshold] [Smooth] [Tolerance] [Ignore below, expander 248] [pill, right-aligned] | 4 (144 px): [i, Preset, View, Method 448] [analysis] [Threshold, Smooth, Tolerance 520] [Ignore below, expander, pill 331] |
+| Remove background | 9: adds the Background group (172) as its own line | 4: [i ... Method] [analysis] [Colour tolerance, Background, Smooth 524] [Tolerance, Ignore below, expander, pill 507] |
+| Pick colours | 9: swatches + pipette (up to 288) own line | 5: [i ... Method] [analysis] [Colour tolerance, Pick 464] [Smooth, Tolerance, Ignore below 564] [expander, pill] |
 
-While the slot shows, panel open: Ignore below (212) + running slot (75) = 295 fits, the expander wraps to the
-next line, **+36 px while running** (the Stopped and Failed slots, 64 and 100, push Ignore below's line to the
-same wrap). Closed: no growth (356). This is the 0025 §21.2 behaviour, accepted there.
+Multicolour adds no row to the flow (Output and Colours are in Advanced, one more control row there); the palette
+adds 1 to 2 strip rows and 1 detail row below the flow. Compared with the old table, Frage 92 B saves the Output
+row, Frage 85 B adds the Tolerance row, and the idle pill adds one wrapped row with the panel open (it is always
+there; closed it shares Ignore below's line).
 
-Worst case with the panel open (Pick colours, Multicolour, 16 colours, detail row, Advanced closed): 8 + 1 + 2 + 1
-= 12 rows, 432 px, plus a notice (36) and, with Advanced open, 152 px more: **it exceeds the 560 px minimum
-canvas height with Advanced open** and covers most of the canvas. This is the cost of the headline functions in
-the main bar; Frage 92 B (Output in Advanced) saves one row (none of the rest). The PR reports the measured
-heights; the architect may later propose a scrolling palette. **(Proposal; flagged, not solved here.)**
+Worst case with the panel open (Pick colours, Multicolour, 16 colours, detail row, Advanced closed): 9 + 2 + 1 =
+12 rows, 432 px, plus a notice (36); with Advanced open about 150 px more: **it exceeds the 560 px minimum canvas
+height** and covers most of the canvas. The PR reports the measured heights; the architect may later propose a
+scrolling palette. **(Proposal; flagged, not solved here.)**
 
 ## 3. Analysis line, Auto and Custom (item 5)
 
@@ -97,11 +115,10 @@ holds no controls, 0025 §21.3); the two stay separate, the analysis row above, 
 | State | Line | Button |
 |---|---|---|
 | Analysing (shown after 400 ms, like the trace) | "Analysing..." | none (the slot stays empty) |
-| **Suggested** (Frage 83 A only, the default) | "Suggested: Line drawing · paper background evened out" | **Apply** |
-| **Auto** (applied) | "Line drawing · paper background evened out" | **Re-analyse**, `aria-disabled`, dimmed: nothing was edited, the result would be the same (deterministic, spec criterion 34) |
-| **Custom** (the maker changed an analysed value) | "Custom · Line drawing" | **Re-analyse** |
-| **Low confidence** (spec criterion 32) | "Type unclear · Logo / Line art with automatic Threshold" | **Re-analyse**, disabled as in Auto |
-| Analysis failed | "Analysis failed · Logo / Line art settings used" | **Re-analyse** |
+| **Auto** (applied; a new image opens here, Frage 83 B; there is no Suggested state) | "Line drawing · paper background evened out" | **Analyse again**, `aria-disabled`, dimmed: nothing was edited, the result would be the same (deterministic, spec criterion 34) |
+| **Custom** (the maker changed an analysed value) | "Custom · Line drawing" | **Analyse again** |
+| **Low confidence** (spec criterion 32) | "Type unclear · Logo / Line art with automatic Threshold" | **Analyse again**, disabled as in Auto |
+| Analysis failed | "Analysis failed · Logo / Line art settings used" | **Analyse again** |
 
 The vocabulary of the line is fixed by the analysis: image type (Graphic, Logo, Line drawing, Sketch), a
 middle dot, then the findings that changed settings ("paper background evened out", "pale colours kept",
@@ -204,7 +221,8 @@ Reuses the Style eyedropper (design system, "Eyedropper button", colour chip, cu
 
 ## 7. Output switch and palette (items 8, 9, 14)
 
-**Output pill** (item 8): `role="radiogroup"` "Output", two text segments 104 px, **Single colour** and
+**Output pill** (item 8, **in the Advanced block** per Frage 92 B, first row after the Invert and Drop border
+shapes toggles; the Colours field and the pipette follow it there): `role="radiogroup"` "Output", two text segments 104 px, **Single colour** and
 **Multicolour**; arrows move and select, one Tab stop. Changed only by the maker (never by analysis).
 Remembered as an app setting. With **Multicolour** the **Colours** field (item 9, 120 px, the shared `ValueField`) follows as its own item:
 label inside, value right; range 2 to 16, whole numbers, the lowest stop reads "Auto" (position, not a value); the value is `Auto` with the resolved count muted ("Auto  6"), or a number 2 to
@@ -258,12 +276,11 @@ count and is `aria-disabled`.
 
 ## 8. Geometry controls and Advanced (items 10, 11, 16)
 
-**Smooth** (Frage 85 A): the same `ValueField`, 0 to 100 and default. It now drives the input smoothing and the
-deviation tolerance together, monotonically; it never moves a protected corner and never rounds one (spec
-criterion 8). Old stored values map by the architect's migration (a Logo / Line art trace looks the same or
-better). **Readout (Proposal, Frage 91):** a muted 56 px readout right of the field (the `WithHint` of Ignore below), "0.6 px", the deviation
-tolerance in source pixels that Smooth currently means (the number the harness measures); a value like Ignore
-below's pixel hint, not an explanation. Item 10 is 232 px with it, 168 without (the row table in §2 uses 168). If Frage 85 becomes B this slot holds the Tolerance field instead.
+**Smooth and Tolerance** (Frage 85 B, decided): two `ValueField`s in the bar. **Smooth** (0 to 100, calmness)
+drives input smoothing only; **Tolerance** is the deviation tolerance in source pixels with its unit ("px") shown,
+right of Smooth in the flow. Neither moves a protected corner or rounds one (spec criterion 8); changing Tolerance
+leaves protected corners where they are. Old stored Smooth values migrate by the architect's rule (a Logo / Line
+art trace looks the same or better). There is no readout beside Smooth (Frage 91 superseded).
 **Corners** stays in Advanced, renamed in its tooltip only ("Corner protection"; the visible label stays
 "Corners"): 0 to 100, higher marks more bends as corners, 0 none. There is no node budget and no node
 display outside Advanced.
@@ -333,22 +350,7 @@ text is a Proposal for the customer to read.
 
 ## 13. Questions for the customer
 
-Frage 89 (TRQ-PICK): The pipette after a pick
-A: In Pick colours and Multicolour it stays armed (Shift+click adds more), Esc ends it; in Remove background it ends after the pick.
-B: Always one pick, then it disarms; every further colour needs the button again.
-Recommendation: A. Default: A.
-
-Frage 90 (TRQ-MULTIPICK): Multicolour together with Pick colours
-A: The palette is exactly the picked colours; the Colours count is fixed and greyed out.
-B: Picked colours stay fixed and an automatic count adds more inside the tolerance of the picks.
-Recommendation: A (B adds colours the selection has just excluded). Default: A.
-
-Frage 91 (TRQ-SMOOTHREADOUT): Number beside Smooth
-A: Show the deviation tolerance as a small value, "0.6 px", beside the field (no sentence).
-B: Smooth alone, the number only in Advanced.
-Recommendation: A (the only number the quality is measured in). Default: B, because of the no-hints rule until you say yes.
-
-Frage 92 (TRQ-OUTPUTPOS): Where Single colour / Multicolour lives
-A: In the main bar after the colour fields (+36 px at panel open, 7 rows for Brightness; Multicolour is a headline function).
-B: In Advanced (one row less with the panel open, 6 instead of 7; most traces are single colour).
-Recommendation: A. Default: A.
+None open. Decided 2026-10-29 (see the spec): Frage 89 A (pipette stays armed in Pick colours and Multicolour,
+Shift+click adds, Esc ends; ends after one pick in Remove background), Frage 90 A (Multicolour with Pick colours:
+the palette is exactly the picks, Colours fixed and greyed out), Frage 91 superseded by Frage 85 B (Tolerance in px
+is its own bar field), Frage 92 B (Output in Advanced).
