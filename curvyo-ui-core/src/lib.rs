@@ -13,6 +13,7 @@
 #![forbid(unsafe_code)]
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
+mod align;
 mod anchor_id_minter;
 mod angle_snap;
 mod boolean;
@@ -157,6 +158,10 @@ mod value_scale;
 mod viewport;
 mod weld_plan;
 
+pub use align::{
+    AlignAxis, AlignBox, AlignCommand, AlignInput, AlignOutcome, DistributeMode, align_selection,
+    align_translations, distribute_selection, distribute_translations,
+};
 pub use anchor_id_minter::AnchorIdMinter;
 pub use angle_snap::{MAX_SKEW_SNAP_DEG, snap_angle, snap_skew_angle};
 pub use boolean::{
