@@ -61,8 +61,10 @@ impl ImageCache {
     }
 }
 
-/// The pictures one frame draws, by the image layers of its draw list.
-pub type FrameImages = Vec<(AssetHash, Arc<WorkingImage>)>;
+/// The pictures one frame draws, by the image layers of its draw list, and whether each shows
+/// its pixel grid as soon as a pixel is larger than a screen pixel (the Trace tool's mask,
+/// `specs/0089` UX notes §4).
+pub type FrameImages = Vec<(AssetHash, Arc<WorkingImage>, bool)>;
 
 impl Session {
     /// The working image of `hash`, decoded when it is not cached (the Trace tool's pixels).
@@ -77,8 +79,12 @@ impl Session {
         let quads = list.images.clone();
         let mut ready = Vec::new();
         for quad in &quads {
+            if let Some(mask) = self.trace_mask_picture(&quad.asset) {
+                ready.push((quad.asset.clone(), mask, true));
+                continue;
+            }
             match self.images.working(&self.document, &quad.asset) {
-                Some(working) => ready.push((quad.asset.clone(), working)),
+                Some(working) => ready.push((quad.asset.clone(), working, false)),
                 None => list.extend(curvyo_render_core::build_unreadable_frame(
                     quad.corners,
                     self.view(),

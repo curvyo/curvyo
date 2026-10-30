@@ -60,6 +60,46 @@ pub fn trace_job(
     )
 }
 
+/// The mask the trace of the same arguments walks (`specs/0089` criterion 21), for the worker's
+/// Mask view: `width` x `height` mask pixels (twice the picture's after Upscale), `bits` row by
+/// row, 255 for content and 0 for the rest; `undefined` when the picture cannot be traced.
+#[wasm_bindgen]
+#[must_use]
+pub fn trace_mask_job(
+    rgba: &[u8],
+    width: u32,
+    height: u32,
+    map: &[f64],
+    settings: &str,
+) -> Option<TraceMaskJs> {
+    let map: [f64; 6] = map.try_into().unwrap_or([f64::NAN; 6]);
+    curvyo_ui_core::trace_mask_job(
+        rgba,
+        width,
+        height,
+        map,
+        &crate::trace_glue::trace_settings(settings),
+    )
+    .map(|mask| TraceMaskJs {
+        width: mask.width,
+        height: mask.height,
+        bits: mask.bits,
+    })
+}
+
+/// A mask for the Mask view.
+#[wasm_bindgen]
+#[derive(Debug, Clone, Default)]
+pub struct TraceMaskJs {
+    /// Width in mask pixels.
+    pub width: u32,
+    /// Height in mask pixels.
+    pub height: u32,
+    /// Row by row, 255 for content, 0 for the rest.
+    #[wasm_bindgen(getter_with_clone)]
+    pub bits: Vec<u8>,
+}
+
 /// The presets as JSON (criteria 59 and 60), in menu order: a list of `{key, label, detail,
 /// values: {smooth, specks, corners, upscale, denoise}}`.
 #[wasm_bindgen]
@@ -194,27 +234,36 @@ impl WasmSession {
         id_of(id).is_some_and(|id| self.session.set_trace_result(id, wire))
     }
 
+    /// Keeps the worker's mask of image `id` (`width` x `height`, `bits` non-zero for content)
+    /// for the Mask view; `false` when the bits do not match the size.
+    pub fn set_trace_mask(&mut self, id: &str, width: u32, height: u32, bits: &[u8]) -> bool {
+        id_of(id).is_some_and(|id| self.session.set_trace_mask(id, width, height, bits))
+    }
+
     /// Forgets the full-size results (a value changed).
     pub fn clear_trace_results(&mut self) {
         self.session.clear_trace_results();
     }
 
-    /// The view on the canvas, as the View pill shows it (criterion 51): `"overlay"`,
+    /// The view on the canvas, as the View pill shows it (criterion 51): `"overlay"`, `"mask"`,
     /// `"trace"` or `"image"`; Image while `\` is held.
     #[must_use]
     pub fn trace_view_mode(&self) -> String {
         match self.session.shown_trace_view_mode() {
             TraceViewMode::Overlay => "overlay",
+            TraceViewMode::Mask => "mask",
             TraceViewMode::Trace => "trace",
             TraceViewMode::Image => "image",
         }
         .to_string()
     }
 
-    /// Chooses the view `mode` (`"overlay"`, `"trace"` or `"image"`; anything else is ignored).
+    /// Chooses the view `mode` (`"overlay"`, `"mask"`, `"trace"` or `"image"`; anything else is
+    /// ignored).
     pub fn set_trace_view_mode(&mut self, mode: &str) {
         let mode = match mode {
             "overlay" => TraceViewMode::Overlay,
+            "mask" => TraceViewMode::Mask,
             "trace" => TraceViewMode::Trace,
             "image" => TraceViewMode::Image,
             _ => return,

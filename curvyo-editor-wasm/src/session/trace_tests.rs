@@ -292,7 +292,7 @@ fn each_trace_group_keeps_its_counts_for_the_layers_tooltip() {
     assert_eq!(traced[0]["traced"], serde_json::json!([1, 4]));
 }
 
-/// Criterion 51: Overlay first; Shift+`\` cycles Overlay, Trace, Image; the held peek shows Image
+/// Criterion 51: Overlay first; Shift+`\` cycles Overlay, Mask, Trace, Image; the held peek shows Image
 /// without changing the choice; leaving the tool drops both.
 #[test]
 fn the_view_starts_on_overlay_cycles_and_peeks() {
@@ -300,6 +300,9 @@ fn the_view_starts_on_overlay_cycles_and_peeks() {
     import_images(&mut session, 1);
     session.set_tool(Tool::Trace);
     assert_eq!(session.trace_view_mode(), TraceViewMode::Overlay);
+    // `specs/0089` criterion 21: Mask is the second view.
+    session.cycle_trace_view_mode();
+    assert_eq!(session.trace_view_mode(), TraceViewMode::Mask);
     session.cycle_trace_view_mode();
     assert_eq!(session.trace_view_mode(), TraceViewMode::Trace);
     session.set_trace_peek(true);
