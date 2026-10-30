@@ -1,6 +1,6 @@
 # Align and distribute: a row of symbol buttons in the Select bar
 
-Status: Draft (a sketch for the customer; not Ready: needs UX notes and the customer's answers)
+Status: In progress (implementation requested 2026-10-30; the defaults below apply)
 Priority: Should
 Origin: Customer (request of 2026-10-17, translated): "We definitely need it too, similar to Inkscape but user-friendly. Inkscape's features are good but not easy to operate, and it takes long to understand them."
 
@@ -25,6 +25,12 @@ As a maker I want to line up several objects on an edge or centre and space them
 11. Given a linked clone (`0049`, `0057`), then it moves through its own placement matrix; an original is not moved by aligning its clone to it.
 12. Given any align or distribute, then it is one history step with the operation name ("Align left", "Distribute horizontally", `0020`), undone as one; the selection stays.
 13. Given the keyboard, then every button is reachable with Tab and activated by Space or Enter; shortcuts are a Proposal for the key table (R-SYS-009) and not assumed.
+
+## Implementation interpretation (2026-10-30)
+
+- The customer requested this story; unanswered ALIGN-KEY, ALIGN-GAP and ALIGN-GRID use their stated defaults A, A and A. Behaviour marked Proposal remains vetoable at the demo.
+- [UX notes](ux-notes.md) define reversible interaction details and exact control behaviour.
+- [Architecture notes](adrs.md) keep the operation in existing selection, transform and history boundaries. No format change is needed.
 
 ## Out of scope
 
