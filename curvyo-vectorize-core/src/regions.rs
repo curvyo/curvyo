@@ -1,10 +1,11 @@
 //! The regions of the foreground mask (ADR 0023 §3 steps 2 and 3): one scanline union-find
-//! labelling with `u32` labels, 4-connected for foreground and background alike.
+//! labelling with `u32` labels, 8-connected for foreground and 4-connected for background, so a
+//! diagonal stroke one pixel wide stays one region (`specs/0089` Frage 96 A).
 
 use crate::TraceError;
 use crate::progress::Poller;
 
-/// One 4-connected region of equal mask value.
+/// One region of equal mask value (foreground 8-connected, background 4-connected).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Region {
     /// Foreground (`true`) or background.
@@ -51,7 +52,8 @@ fn union(parent: &mut [u32], a: u32, b: u32) -> u32 {
     keep
 }
 
-/// Labels both values of `mask` (`width` x `height`) 4-connected, polling every 64 rows of each
+/// Labels both values of `mask` (`width` x `height`), foreground 8-connected and background
+/// 4-connected, polling every 64 rows of each
 /// of the two passes.
 pub(crate) fn label(
     mask: &[bool],
@@ -67,17 +69,30 @@ pub(crate) fn label(
         for x in 0..width {
             let i = row + x;
             let value = mask[i];
-            let up = (y > 0 && mask[i - width] == value).then(|| ids[i - width]);
-            let left = (x > 0 && mask[i - 1] == value).then(|| ids[i - 1]);
-            ids[i] = match (up, left) {
-                (Some(u), Some(l)) if u == l => u,
-                (Some(u), Some(l)) => union(&mut parent, u, l),
-                (Some(only), None) | (None, Some(only)) => only,
-                (None, None) => {
-                    let fresh = u32::try_from(parent.len()).map_err(|_| TraceError::TooDetailed)?;
-                    parent.push(fresh);
-                    fresh
+            // Up and left; for foreground also up-left and up-right (8-connected).
+            let mut joined: Option<u32> = None;
+            let neighbours = [
+                (y > 0).then(|| i - width),
+                (x > 0).then(|| i - 1),
+                (value && y > 0 && x > 0).then(|| i - width - 1),
+                (value && y > 0 && x + 1 < width).then(|| i - width + 1),
+            ];
+            for j in neighbours.into_iter().flatten() {
+                if mask[j] != value {
+                    continue;
                 }
+                joined = Some(match joined {
+                    None => ids[j],
+                    Some(id) if id == ids[j] => id,
+                    Some(id) => union(&mut parent, id, ids[j]),
+                });
+            }
+            ids[i] = if let Some(id) = joined {
+                id
+            } else {
+                let fresh = u32::try_from(parent.len()).map_err(|_| TraceError::TooDetailed)?;
+                parent.push(fresh);
+                fresh
             };
         }
     }
@@ -180,14 +195,19 @@ mod tests {
     }
 
     #[test]
-    fn regions_are_four_connected_and_numbered_in_scan_order() {
+    fn foreground_is_eight_connected_background_four_and_scan_ordered() {
         let l = labels(&["#..#", ".#..", "....", "##.."]);
         let fg: Vec<_> = l.regions.iter().filter(|r| r.foreground).collect();
-        // Diagonal neighbours are separate regions.
-        assert_eq!(fg.len(), 4);
+        // Diagonal foreground neighbours are one region (specs/0089 Frage 96 A).
+        assert_eq!(fg.len(), 3);
+        assert_eq!(fg[0].pixels, 2);
         assert_eq!(l.regions[0].first, 0);
         assert!(l.regions.windows(2).all(|w| w[0].first < w[1].first));
-        let bottom = fg[3];
+        // Diagonal background neighbours stay apart: the pixel inside the diagonal ring.
+        let ring = labels(&[".#.", "#.#", ".#."]);
+        assert_eq!(ring.regions.iter().filter(|r| r.foreground).count(), 1);
+        assert_eq!(ring.regions.iter().filter(|r| !r.foreground).count(), 5);
+        let bottom = fg[2];
         assert_eq!(
             (bottom.left, bottom.top, bottom.right, bottom.bottom),
             (0, 3, 2, 4)

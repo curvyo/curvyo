@@ -51,7 +51,7 @@ pub(crate) fn luma(r: u8, g: u8, b: u8, a: u8) -> u8 {
 #[must_use]
 pub fn auto_threshold(raster: Raster<'_>) -> u8 {
     if raster.checked_pixels().is_none() {
-        return crate::params::DEFAULT_THRESHOLD;
+        return crate::schema::DEFAULT_THRESHOLD;
     }
     let mut histogram = [0_u64; 256];
     for value in raster.lumas() {
@@ -103,7 +103,7 @@ fn otsu(histogram: &[u64; 256]) -> u8 {
         (Some(first), Some(last)) => {
             u8::try_from(usize::midpoint(first, last) + 1).unwrap_or(u8::MAX)
         }
-        _ => crate::params::DEFAULT_THRESHOLD,
+        _ => crate::schema::DEFAULT_THRESHOLD,
     }
 }
 

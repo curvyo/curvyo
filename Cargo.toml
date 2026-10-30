@@ -68,10 +68,6 @@ unicode-segmentation = { version = "1.13", default-features = false }
 # input in wasm, and a decoder upgrade can change a lossy decode. MIT OR Apache-2.0; brings `png`,
 # `zune-jpeg`, `image-webp`. No default features: no `rayon`, no BMP, GIF, TIFF or other formats.
 image = { version = "=0.25.10", default-features = false, features = ["png", "jpeg", "webp"] }
-# The tracer under the Trace tool (ADR 0023 §1, customer Frage 49 B): the binary path of the
-# library under VTracer. MIT OR Apache-2.0, pure Rust, builds for wasm32; `vtracer` itself fails
-# `cargo deny` (`specs/0025-raster-trace/adrs.md` decision 2).
-visioncortex = { version = "0.8", default-features = false }
 # Property tests (dev-dependency of the geometry, ui and text crates).
 proptest = "1"
 

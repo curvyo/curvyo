@@ -1,22 +1,34 @@
 //! The raster tracer of the Trace tool (`specs/0025-raster-trace`, ADR 0023): it turns an RGBA8
 //! raster and trace settings into closed outlines in document millimetres.
 //!
-//! Our pre-processing (luma over white, Denoise, Upscale, Threshold, 4-connected `u32` region
-//! labelling, background and specks in mm²) runs before `visioncortex` (the library under `VTracer`) smooths and fits each boundary;
-//! our post-processing turns its splines into `kurbo` paths, makes near-straight cubics lines, merges
-//! nodes above Smooth 80 within a tolerance and maps them through the pixel map. Pure and wasm-compatible (`CLAUDE.md` §6): no filesystem,
-//! network, clock or threads; the caller passes everything in and stops a trace through `poll`.
+//! Luma over white, Denoise, Upscale, Threshold, `u32` region labelling (foreground 8-connected,
+//! background 4-connected), background
+//! and specks in mm², then per boundary our own crack-edge chain, structural corners found before
+//! any smoothing, smoothing with the corners pinned, lines and cubics fitted within a tolerance in
+//! source pixels, a guard against crossing outlines, and the map to millimetres
+//! (`specs/0089-trace-quality-and-colour` slice D). Pure and wasm-compatible (`CLAUDE.md` §6): no
+//! filesystem, network, clock or threads; the caller passes everything in and stops a trace
+//! through `poll`. Basic operations and `sqrt` only, so native and wasm results are identical.
 
 #![forbid(unsafe_code)]
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
+mod boundary;
+mod clearance;
+mod contour;
+mod corner_place;
+mod corners;
 mod filter;
+mod fit;
+mod guard;
+mod line;
 mod outline;
 mod params;
 mod progress;
 mod raster;
-mod reduce;
 mod regions;
+mod schema;
+mod smooth;
 mod trace;
 
 // The integration tests' helpers (the quality set and its metrics) for the one unit test that
@@ -29,10 +41,13 @@ extern crate self as curvyo_vectorize_core;
 mod test_common;
 
 pub use params::{
-    ADVANCED_PARAMS, DEFAULT_CORNERS, DEFAULT_SMOOTH, DEFAULT_SPECKS_MM, DEFAULT_THRESHOLD,
-    Denoise, MAX_SPECKS_MM, PARAMS, PRESETS, ParamKind, ParamSpec, ParamUnit, Preset, TraceParams,
-    UPSCALE_AUTO_BELOW_PX, Upscale,
+    Denoise, PRESETS, PixelLength, Preset, TraceParams, UPSCALE_AUTO_BELOW_PX, Upscale,
 };
 pub use progress::{Phase, Progress};
 pub use raster::{Raster, auto_threshold};
-pub use trace::{Counts, MAX_HOLES_PER_REGION, TraceError, TraceResult, trace};
+pub use schema::{
+    ADVANCED_PARAMS, DEFAULT_CORNERS, DEFAULT_SMOOTH, DEFAULT_SPECKS_MM, DEFAULT_THRESHOLD,
+    DEFAULT_TOLERANCE_PX, MAX_SPECKS_MM, MAX_TOLERANCE_PX, MIN_TOLERANCE_PX, PARAMS, ParamKind,
+    ParamSpec, ParamUnit,
+};
+pub use trace::{Counts, Diagnostics, MAX_HOLES_PER_REGION, TraceError, TraceResult, trace};
