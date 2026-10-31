@@ -96,6 +96,9 @@ mod pen_entry;
 mod placement;
 mod placement_view;
 mod project;
+mod recognise;
+#[cfg(test)]
+mod recognise_tests;
 mod reference_view;
 mod refusal;
 mod ruler;
@@ -211,6 +214,7 @@ pub use offset_view::OffsetView;
 pub use panel_tabs::{PanelTabsRecord, PanelView};
 pub use pen::PenJoinNotice;
 pub use project::APP_VERSION;
+pub use recognise::{RecogniseOutcome, RecognisedLine};
 pub use select::DoubleClickHint;
 pub use snapping::{SnappingSettingsRecord, SnappingToolbarRecord};
 pub use split::{BreakApartOutcome, SplitOutcome};
@@ -461,6 +465,8 @@ pub struct Session {
     trace: trace::TraceState,
     /// The groups Create paths wrote and their counts (`trace.rs`).
     traced_groups: trace::TracedGroups,
+    /// The Recognise text run and its record of guessed letters (`recognise.rs`).
+    recognise: recognise::RecogniseState,
 }
 
 impl Session {
@@ -543,6 +549,7 @@ impl Session {
             text_path: text_on_path::TextPathState::default(),
             trace: trace::TraceState::default(),
             traced_groups: Vec::new(),
+            recognise: recognise::RecogniseState::default(),
         }
     }
 
@@ -621,6 +628,7 @@ impl Session {
             text_path: text_on_path::TextPathState::default(),
             trace: trace::TraceState::default(),
             traced_groups: Vec::new(),
+            recognise: recognise::RecogniseState::default(),
         };
         // A file another tool wrote can hold clones whose original is gone (`0049` criterion 35).
         session.remove_orphans_after_open();

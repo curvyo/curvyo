@@ -121,6 +121,8 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     ("stroke_to_path", "Stroke to path"),
     // `specs/0025-raster-trace` criterion 13.
     ("trace_image", "Trace image"),
+    // `specs/0088-trace-recognition` criterion 6.
+    ("recognise_text", "Recognise text"),
     ("import_svg", "Import SVG"),
     ("import_image", "Import image"),
     ("import_images", "Import images"),
