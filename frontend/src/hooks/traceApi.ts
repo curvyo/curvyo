@@ -1,3 +1,5 @@
+import type { TraceAnalysisState } from "@/lib/traceAnalysis";
+
 import type { HsvTriple } from "./useStylePanel";
 import type { TracePaletteApi } from "./useTracePalette";
 import type {
@@ -81,6 +83,10 @@ export interface TraceApi {
   /** The automatic background of the shown image (`#RRGGBB`, empty: transparent; `null` before
    * it is read). */
   suggestedBackground: string | null;
+  /** The shown image's analysis line state (`specs/0089` slice F, UX notes §3). */
+  analysis: TraceAnalysisState;
+  /** Analyse again: the analysed values back to the shown image's analysis. */
+  analyseAgain: () => void;
   /** The palette of a multicolour trace (`specs/0089` slice M). */
   palette: TracePaletteApi;
   /** The Recolour picker's conversions (Rust's rounding, as the Style section's). */

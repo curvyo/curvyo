@@ -357,9 +357,12 @@ const pixels = async (s: S) => {
   ) as number[];
   const shot = (await s.send("Page.captureScreenshot", { format: "png" })) as { result?: { data?: string } };
   const png = decodePng(Buffer.from(shot.result?.data ?? "", "base64"));
+  // The 36 px analysis row of 0089 slice F makes the bar taller, so its blue finish button (the same
+  // blue as the preview outline) now lies below canvas top + 80: sample below the bar's bottom edge.
+  const barBottom = (await s.evaluate(`document.querySelector('[role=toolbar][aria-label=Trace]')?.getBoundingClientRect().bottom ?? 0`)) as number;
   let black = 0;
   let near = 0;
-  for (let y = Math.floor(cy) + 80; y < cy + ch; y++) {
+  for (let y = Math.max(Math.floor(cy) + 80, Math.ceil(barBottom) + 4); y < cy + ch; y++) {
     for (let x = Math.floor(cx) + 400; x < cx + cw - 20; x++) {
       const i = (y * png.width + x) * 4;
       const [r, g, b] = [png.data[i], png.data[i + 1], png.data[i + 2]];
@@ -819,6 +822,10 @@ test("0025s3 c54 in Chromium: Failed in the slot, Retry, values and document sta
     // The bar's values stay; the document is exactly as before.
     assert.notEqual(await fieldValue(s, "Smooth"), null);
     assert.deepEqual(await s.layerRows(), rowsBefore);
+    // The reason tooltip just read stays open under the pointer. With the analysis row of 0089 slice F the
+    // slot is 36 px lower and the tooltip now lies over the History tab: move the pointer away first.
+    await s.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: 640, y: 700 });
+    await sleep(800);
     assert.equal(await historyText(s), historyBefore, "history is untouched");
     // Ctrl+Enter in a field only traces again while failed; it writes nothing.
     await s.evaluate(`(() => { const f = document.querySelector('${field("Smooth")}'); f.focus(); })()`);

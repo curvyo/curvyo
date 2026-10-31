@@ -697,8 +697,10 @@ test("0089C tester: at 800 x 600 nothing overlaps, clips or leaves the window; r
         return { overlaps, outside, clipped, texts, labels, height: Math.round(box.height), top: Math.round(box.top), bottom: Math.round(box.bottom), vh: innerHeight, vw: innerWidth,
           slotRightGap: Math.round(box.right - slot.right), insideBar: lastBottom <= box.bottom + 0.5 }; })())`)) as string) as {
         overlaps: string[]; outside: string[]; clipped: string[]; texts: string[]; labels: string[]; height: number; top: number; bottom: number; vh: number; vw: number; slotRightGap: number; insideBar: boolean };
-    // The as-built heights of ux-notes.md ("Slice C as built"), Advanced closed, no picks.
-    const asBuilt: Record<string, [number, number]> = { Brightness: [252, 108], "Remove background": [288, 108], "Pick colours": [288, 144] };
+    // The row counts of ux-notes.md §2 (36 px rows, Advanced closed, no picks), with the analysis row
+    // of slice F (item 5, a full-width 36 px row of its own): Brightness 8 / 4 rows, Remove background
+    // 9 / 4, Pick colours 9 / 5 (panel open / closed).
+    const asBuilt: Record<string, [number, number]> = { Brightness: [288, 144], "Remove background": [324, 144], "Pick colours": [324, 180] };
     await s.evaluate(`document.querySelector('${BAR} [aria-label="Fewer trace options"]')?.click()`);
     await sleep(400);
     const all: string[] = [];

@@ -159,6 +159,7 @@ test("criterion 70: the info page's exact text", () => {
     "Pick colours: pixels like the colours picked with the pipette; Shift+click adds a colour, up to 8.",
     "Pipette: takes a colour from the image under a click; Esc ends it.",
     "Colour tolerance: how far a colour may be from the background or a picked colour and still count as it.",
+    "Analysis: names the image type and what it set for a new image: the method, its background and Colour tolerance, and the Threshold; never the preset or other values. Custom after you change one of them; Analyse again sets them back.",
     "Threshold: pixels darker than this brightness (0 to 100 %) become shapes.",
     "Smooth: calms the pixel steps of the outline before the fit; higher is calmer.",
     "Tolerance: how far in pixels the paths may stray from the calmed outline; higher gives fewer nodes.",

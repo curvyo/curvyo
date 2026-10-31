@@ -1,6 +1,6 @@
 import { Binary, CircleAlert, Image, Info, Layers, Spline, X } from "lucide-react";
 import { Tooltip } from "radix-ui";
-import { useId, useRef } from "react";
+import { useId, useLayoutEffect, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
 
 import { useRowStarts } from "@/components/SelectToolbar";
@@ -13,6 +13,7 @@ import { TracePresetMenu } from "@/components/TracePresetMenu";
 import { Tooltip as AppTooltip } from "@/components/ui/tooltip";
 import type { TraceApi } from "@/hooks/useTrace";
 import type { TraceInfoApi } from "@/hooks/useTraceInfo";
+import { ANALYSE_AGAIN, type TraceAnalysisState, analysisLine, canAnalyseAgain } from "@/lib/traceAnalysis";
 import {
   TRACE_FINISH,
   TRACE_METHODS,
@@ -54,6 +55,68 @@ const LABEL_CLASS = "text-xs text-[var(--toolbar-icon)]";
 
 /** The bar's one flow (UX notes 21.2): wraps by whole items, 8 px between them, top-aligned. */
 const TRACE_ROW_CLASS = "flex min-w-0 flex-wrap items-start gap-x-2 gap-y-0";
+
+/** The analysis row (`specs/0089` slice F, UX notes §3): one 36 px line saying what the analysis
+ * found and set, announced once per change, and Analyse again (88 x 28 px), dimmed while it would
+ * change nothing. */
+function AnalysisRow({
+  state,
+  onAgain,
+  onReturnFocus,
+}: {
+  state: TraceAnalysisState;
+  onAgain: () => void;
+  onReturnFocus: () => void;
+}) {
+  const enabled = canAnalyseAgain(state);
+  const line = analysisLine(state);
+  // The ellipsis only when the line does not fit (UX notes §3: one line, never cut while it fits).
+  const lineRef = useRef<HTMLSpanElement>(null);
+  const [cut, setCut] = useState(false);
+  useLayoutEffect(() => {
+    const el = lineRef.current;
+    if (!el) {
+      return undefined;
+    }
+    const measure = () => setCut(el.scrollWidth > el.clientWidth + 1);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [line]);
+  return (
+    <div data-trace-analysis={state.kind} className="flex h-9 min-w-0 max-w-full basis-full items-center gap-2">
+      {/* One line; a long one ends in an ellipsis with the whole text as its tooltip (the live
+          region still reads it whole). */}
+      <span
+        ref={lineRef}
+        role="status"
+        aria-live="polite"
+        title={cut ? line : undefined}
+        className={`min-w-0 flex-1 overflow-hidden whitespace-nowrap text-xs text-[var(--toolbar-icon)] ${cut ? "text-ellipsis" : ""}`}
+      >
+        {line}
+      </span>
+      {state.kind === "analysing" || state.kind === "none" ? null : (
+        <button
+          type="button"
+          aria-disabled={!enabled}
+          className={`${BUTTON_CLASS.replace("px-2", "px-0")} w-[88px] shrink-0 ${enabled ? "" : "cursor-default opacity-40 hover:bg-transparent"}`}
+          onClick={(event) => {
+            if (enabled) {
+              onAgain();
+            }
+            if (event.detail > 0) {
+              onReturnFocus();
+            }
+          }}
+        >
+          {ANALYSE_AGAIN}
+        </button>
+      )}
+    </div>
+  );
+}
 
 /** The Select bar's Trace button (criterion 1): last, in a group of its own; a press chooses the
  * Trace tool. */
@@ -408,6 +471,7 @@ export function TraceBar({ trace, info, onImport, onReturnFocus }: TraceBarProps
             onPick={(choice) => trace.setMethod(TRACE_METHODS.indexOf(choice))}
           />
         </div>
+        <AnalysisRow state={trace.analysis} onAgain={trace.analyseAgain} onReturnFocus={onReturnFocus} />
         <div className="flex h-9 items-center">{methodField}</div>
         {colourGroup}
         <div className="flex h-9 items-center">{field("smooth")}</div>
