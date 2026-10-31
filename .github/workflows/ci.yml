@@ -203,6 +203,65 @@ jobs:
           path: frontend/dist
           retention-days: 7
 
+  # Browser tests (nightly only, customer 2026-10-30, Frage 100 B): the
+  # frontend tests that drive a real Chromium skip themselves unless
+  # CURVYO_E2E_BROWSER is set. They run one file at a time, because files
+  # run in parallel fight over the browser and hang.
+  frontend-e2e:
+    name: frontend e2e (nightly)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install the pinned Rust toolchain
+        run: rustup show
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: npm ci
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install wasm-bindgen CLI matching Cargo.lock
+        run: |
+          set -euo pipefail
+          version=$(grep -A1 '^name = "wasm-bindgen"$' Cargo.lock | grep '^version' | head -1 | sed -E 's/version = "(.*)"/\1/')
+          cargo install wasm-bindgen-cli --version "$version" --locked
+
+      - name: Build the wasm-bindgen JS bindings
+        working-directory: frontend
+        run: npm run build:wasm
+
+      # The files that drive a browser (the rest runs in the `frontend` job). Every file runs; a
+      # failing one does not stop the loop, the step fails at the end with the list.
+      - name: Browser tests, one file at a time
+        working-directory: frontend
+        env:
+          CURVYO_E2E_BROWSER: /usr/bin/google-chrome
+        run: |
+          failed=()
+          for f in $(grep -l CURVYO_E2E_BROWSER tests/*.test.ts); do
+            echo "::group::$f"
+            if ! timeout 1200 node --experimental-strip-types --test --test-concurrency=1 "$f"; then
+              failed+=("$f")
+              echo "::error file=frontend/$f::browser test file failed"
+            fi
+            echo "::endgroup::"
+          done
+          if [ ${#failed[@]} -gt 0 ]; then
+            echo "Failed browser test files (${#failed[@]}):"
+            printf '  %s\n' "${failed[@]}"
+            exit 1
+          fi
+
   # The full host gate (fmt, clippy, nextest) over the whole workspace.
   # Ubuntu only on pull_request/push; the nightly run (schedule,
   # workflow_dispatch) adds windows and macos because curvyo-app (Tauri)
@@ -217,6 +276,15 @@ jobs:
         os: ${{ fromJSON((github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && '["ubuntu-latest","windows-latest","macos-latest"]' || '["ubuntu-latest"]') }}
     steps:
       - uses: actions/checkout@v4
+
+      # The debug build of the whole workspace (about 500 test binaries) fills the runner's disk;
+      # rust-lld then dies with SIGBUS ("ld terminated with signal 7") while it writes a binary.
+      # The preinstalled toolchains this job never uses are removed first.
+      - name: Free disk space
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
 
       # curvyo-app (Tauri) links against the system GTK/WebKitGTK stack on
       # Linux at build time — `cargo clippy`/`cargo build` need it present
@@ -243,14 +311,23 @@ jobs:
           name: frontend-dist
           path: frontend/dist
 
+      # One `cargo fmt` per package: `--all` hands every source file of the
+      # workspace to a single rustfmt call, which exceeds the Windows command
+      # line limit ("The filename or extension is too long", os error 206).
       - name: cargo fmt --check
-        run: cargo fmt --all --check
+        shell: bash
+        run: |
+          status=0
+          for pkg in $(cargo metadata --no-deps --format-version 1 | python3 -c 'import json,sys; print(" ".join(p["name"] for p in json.load(sys.stdin)["packages"]))'); do
+            cargo fmt --check -p "$pkg" || status=1
+          done
+          exit $status
 
       - name: cargo clippy
         run: cargo clippy --workspace --all-targets --message-format=short -- -D warnings
 
       - name: cargo nextest
-        run: cargo nextest run --workspace --status-level fail
+        run: cargo nextest run --workspace --status-level fail --no-fail-fast
 
   # Discovers the crates core-wasm32 below runs against, instead of a
   # hand-maintained list that silently misses a new crate: every workspace
@@ -401,7 +478,7 @@ jobs:
     name: trace quality harness (nightly)
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
@@ -416,9 +493,9 @@ jobs:
           cargo test --release -p curvyo-vectorize-core --test memory -- --ignored --nocapture
 
       # specs/0089-trace-quality-and-colour slice A: the reference set at three resolutions with all
-      # four presets (about 1 minute on the build host), guarded at +5 % like the harness above.
+      # four presets (about 5 minutes on the build host), guarded at +5 % like the harness above.
       - name: Run the reference set in release
-        timeout-minutes: 15
+        timeout-minutes: 30
         run: |
           cargo test --release -p curvyo-vectorize-core --test reference -- --ignored --nocapture --test-threads=1 reference_table
 

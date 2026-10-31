@@ -1,0 +1,30 @@
+# Every checkout (Linux, macOS, Windows) has LF line endings: the tests compare file contents
+# (goldens, docs quoted by text tests, source read by guard tests) and rustfmt's newline_style is
+# Auto, so a CRLF checkout on Windows fails them.
+* text=auto eol=lf
+
+# Fixtures are read byte for byte (some real files keep their CRLF); git never converts them.
+**/tests/fixtures/** -text
+frontend/public/fonts/**/*.txt -text
+
+# Binary files.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.icns binary
+*.bmp binary
+*.tif binary
+*.tiff binary
+*.pgm binary
+*.pam binary
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary
+*.wasm binary
+*.zip binary
+*.pdf binary
+*.curvyo binary
