@@ -1,6 +1,7 @@
-//! What Create paths writes (`specs/0025-raster-trace` criteria 13, 14 and 46): per traced
-//! image one group "Trace of" and the image name holding one compound path, filled black, no stroke, ready
-//! for `Document::insert_drawing_above`.
+//! What Create paths writes (`specs/0025-raster-trace` criteria 13, 14 and 46; `specs/0089`
+//! criterion 29): per traced image one group "Trace of" and the image name holding one compound
+//! path, filled black, no stroke, or one filled compound path per colour of a multicolour trace,
+//! ready for `Document::insert_drawing_above`.
 
 use curvyo_document_core::{
     AnchorId, Color, DrawingAnchor, DrawingNode, DrawingOutline, DrawingRegisters, Fill, NodeId,
@@ -23,6 +24,18 @@ pub struct TraceTarget {
     pub name: Option<String>,
     /// The outlines in document millimetres.
     pub outlines: Vec<BezPath>,
+    /// A multicolour result's layers, largest area first: each fill and how many of `outlines`
+    /// (in order) are its; empty for one black path.
+    pub colours: Vec<TraceColour>,
+}
+
+/// One colour of a multicolour result as Create paths writes it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TraceColour {
+    /// The fill (the palette colour, or the maker's recolour of it).
+    pub fill: Color,
+    /// How many of the target's outlines are this colour's.
+    pub outlines: usize,
 }
 
 /// The write of one Create paths.
@@ -36,6 +49,8 @@ pub struct TracePlan {
     pub paths: usize,
     /// Anchors written.
     pub nodes: usize,
+    /// Colour paths written by multicolour results (0 for black ones).
+    pub colours: usize,
 }
 
 /// The group name of a trace of `image_name` (criterion 13): "Trace of" and the image name, cleaned and cut
@@ -62,6 +77,20 @@ pub fn trace_style() -> Style {
             opacity: Opacity::OPAQUE,
         },
     }
+}
+
+/// The style of one colour of a multicolour result (criterion 29): that fill, opaque, no stroke.
+#[must_use]
+pub fn trace_colour_style(fill: Color) -> Style {
+    let mut style = trace_style();
+    style.fill.color = fill;
+    style
+}
+
+/// The name of one colour's compound path: its hex value (`#RRGGBB`).
+#[must_use]
+pub fn trace_colour_name(fill: Color) -> String {
+    format!("#{:02X}{:02X}{:02X}", fill.r, fill.g, fill.b)
 }
 
 /// `path`'s closed outlines with the anchor a closing segment ends on merged into the first.
@@ -93,28 +122,55 @@ pub fn plan_trace(targets: &[TraceTarget], minter: &mut AnchorIdMinter) -> Trace
         anchor_ids: Vec::new(),
         paths: 0,
         nodes: 0,
+        colours: 0,
     };
     for target in targets {
-        let drawn: Vec<DrawingOutline> = target.outlines.iter().flat_map(trace_outlines).collect();
-        if drawn.is_empty() {
+        // One black path, or one path per colour (its outlines in order).
+        let layers: Vec<(Option<Color>, &[BezPath])> = if target.colours.is_empty() {
+            vec![(None, &target.outlines[..])]
+        } else {
+            let mut at = 0;
+            target
+                .colours
+                .iter()
+                .map(|c| {
+                    let to = (at + c.outlines).min(target.outlines.len());
+                    let part = &target.outlines[at..to];
+                    at = to;
+                    (Some(c.fill), part)
+                })
+                .collect()
+        };
+        let mut children = Vec::with_capacity(layers.len());
+        for (fill, outlines) in layers {
+            let drawn: Vec<DrawingOutline> = outlines.iter().flat_map(trace_outlines).collect();
+            if drawn.is_empty() {
+                continue;
+            }
+            let nodes: usize = drawn.iter().map(|o| o.anchors.len()).sum();
+            plan.anchor_ids.extend((0..nodes).map(|_| minter.mint()));
+            plan.paths += drawn.len();
+            plan.nodes += nodes;
+            plan.colours += usize::from(fill.is_some());
+            children.push(DrawingNode::Path {
+                registers: DrawingRegisters {
+                    name: fill.map(trace_colour_name),
+                    ..DrawingRegisters::default()
+                },
+                outlines: drawn,
+                style: fill.map_or_else(trace_style, trace_colour_style),
+            });
+        }
+        if children.is_empty() {
             continue;
         }
-        let nodes: usize = drawn.iter().map(|o| o.anchors.len()).sum();
-        plan.anchor_ids.extend((0..nodes).map(|_| minter.mint()));
-        plan.paths += drawn.len();
-        plan.nodes += nodes;
-        let path = DrawingNode::Path {
-            registers: DrawingRegisters::default(),
-            outlines: drawn,
-            style: trace_style(),
-        };
         let group = DrawingNode::Group {
             registers: DrawingRegisters {
                 name: Some(trace_group_name(target.name.as_deref())),
                 ..DrawingRegisters::default()
             },
             layer: false,
-            children: vec![path],
+            children,
         };
         plan.items.push((target.image, group));
     }
@@ -159,11 +215,13 @@ mod tests {
                 image: first,
                 name: Some("logo.png".into()),
                 outlines: vec![square(0.0), square(10.0)],
+                colours: Vec::new(),
             },
             TraceTarget {
                 image: second,
                 name: None,
                 outlines: vec![],
+                colours: Vec::new(),
             },
         ];
         let plan = plan_trace(&targets, &mut minter);
@@ -188,6 +246,72 @@ mod tests {
         assert!(outlines.iter().all(|o| o.closed && o.anchors.len() == 4));
         assert!(style.fill.enabled && !style.stroke.enabled);
         assert_eq!(style.fill.color, Color::BLACK);
+    }
+
+    /// `specs/0089` criterion 29: one group, one filled compound path per colour in the given
+    /// order (largest area first), named by its hex, stroke off.
+    #[test]
+    fn a_multicolour_result_is_one_path_per_colour() {
+        let mut minter = AnchorIdMinter::new(3);
+        let doc = curvyo_document_core::Document::new(1);
+        let image = doc.create_rect(curvyo_document_core::RectBounds {
+            origin: curvyo_document_core::Point::new(0.0, 0.0),
+            width: curvyo_document_core::Length::from_mm(1.0),
+            height: curvyo_document_core::Length::from_mm(1.0),
+        });
+        let red = Color {
+            r: 208,
+            g: 34,
+            b: 42,
+        };
+        let blue = Color {
+            r: 35,
+            g: 78,
+            b: 184,
+        };
+        let target = TraceTarget {
+            image,
+            name: Some("logo".into()),
+            outlines: vec![square(0.0), square(10.0), square(20.0)],
+            colours: vec![
+                TraceColour {
+                    fill: red,
+                    outlines: 2,
+                },
+                TraceColour {
+                    fill: blue,
+                    outlines: 1,
+                },
+            ],
+        };
+        let plan = plan_trace(&[target], &mut minter);
+        assert_eq!((plan.paths, plan.nodes, plan.colours), (3, 12, 2));
+        let DrawingNode::Group { children, .. } = &plan.items[0].1 else {
+            panic!("a group");
+        };
+        let fills: Vec<(Option<String>, Color, usize, bool)> = children
+            .iter()
+            .map(|c| match c {
+                DrawingNode::Path {
+                    registers,
+                    outlines,
+                    style,
+                } => (
+                    registers.name.clone(),
+                    style.fill.color,
+                    outlines.len(),
+                    style.stroke.enabled,
+                ),
+                _ => panic!("a path"),
+            })
+            .collect();
+        assert_eq!(
+            fills,
+            [
+                (Some("#D0222A".into()), red, 2, false),
+                (Some("#234EB8".into()), blue, 1, false)
+            ]
+        );
     }
 
     #[test]

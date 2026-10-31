@@ -5,8 +5,9 @@
 use curvyo_document_core::Length;
 use curvyo_ui_core::{
     TRACE_ADVANCED_PARAMS, TRACE_DEFAULT_BACKGROUND_TOLERANCE, TRACE_DEFAULT_PICK_TOLERANCE,
-    TRACE_METHOD_PARAMS, TRACE_PARAMS, TRACE_PRESETS, TraceDenoise, TraceMethod, TraceParamKind,
-    TraceParamUnit, TraceParams, TracePixelLength, TraceRgb, TraceSwatches, TraceUpscale,
+    TRACE_MAX_COLOURS, TRACE_METHOD_PARAMS, TRACE_MIN_COLOURS, TRACE_PARAMS, TRACE_PRESETS,
+    TraceColourParams, TraceDenoise, TraceMethod, TraceParamKind, TraceParamUnit, TraceParams,
+    TracePixelLength, TraceRgb, TraceSwatches, TraceUpscale,
 };
 
 /// `#RRGGBB` (or `RRGGBB`) as a colour; `None` for anything else.
@@ -96,6 +97,57 @@ pub fn trace_settings(settings: &str) -> TraceParams {
         ignore_background: flag("ignore_background").unwrap_or(first.ignore_background),
         ..first
     }
+}
+
+/// The colours of `list` (a JSON list of `#RRGGBB`), unreadable ones dropped.
+fn colours(list: Option<&serde_json::Value>) -> Vec<TraceRgb> {
+    list.and_then(serde_json::Value::as_array)
+        .map(|list| {
+            list.iter()
+                .filter_map(|v| v.as_str().and_then(parse_hex))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// The multicolour values of `settings` (`specs/0089` slice M: `output` 1 for Multicolour,
+/// `colours` a count 2 to 16 or null for Auto, `fixed` and `excluded` lists of `#RRGGBB`,
+/// `merged` a list of `[from, into]`), or `None` for Single colour (`output` missing or 0).
+#[must_use]
+pub fn trace_colour_settings(settings: &str) -> Option<TraceColourParams> {
+    let json: serde_json::Value = serde_json::from_str(settings).ok()?;
+    if json.get("output").and_then(serde_json::Value::as_u64) != Some(1) {
+        return None;
+    }
+    let count = json
+        .get("colours")
+        .and_then(serde_json::Value::as_u64)
+        .map(|n| {
+            // invariant: clamped to 2 to 16 first.
+            u8::try_from(n.clamp(TRACE_MIN_COLOURS as u64, TRACE_MAX_COLOURS as u64)).unwrap_or(2)
+        });
+    let merged = json
+        .get("merged")
+        .and_then(serde_json::Value::as_array)
+        .map(|list| {
+            list.iter()
+                .filter_map(|pair| {
+                    let pair = pair.as_array()?;
+                    Some((
+                        parse_hex(pair.first()?.as_str()?)?,
+                        parse_hex(pair.get(1)?.as_str()?)?,
+                    ))
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    Some(TraceColourParams {
+        trace: trace_settings(settings),
+        colours: count,
+        fixed: colours(json.get("fixed")),
+        excluded: colours(json.get("excluded")),
+        merged,
+    })
 }
 
 /// The presets as JSON (criteria 59 and 60), in menu order: a list of `{key, label, detail,
@@ -217,6 +269,34 @@ mod tests {
         );
         assert_eq!(hex(TraceRgb::new(1, 0xAB, 255)), "#01ABFF");
         assert_eq!(parse_hex("#12345"), None);
+    }
+
+    /// `specs/0089` slice M: Multicolour and its palette edits cross; Single colour is `None`.
+    #[test]
+    fn the_multicolour_settings_cross_as_json() {
+        assert_eq!(trace_colour_settings(r#"{"threshold":90}"#), None);
+        assert_eq!(trace_colour_settings(r#"{"output":0}"#), None);
+        let p = trace_colour_settings(
+            r##"{"output":1,"colours":40,"fixed":["#FF0000","x"],"excluded":["#00FF00"],
+                "merged":[["#0000FF","#FF0000"],["bad"]],"threshold":90}"##,
+        )
+        .unwrap();
+        assert_eq!(p.trace.threshold, 90);
+        assert_eq!(p.colours, Some(16));
+        assert_eq!(p.fixed, [TraceRgb::new(255, 0, 0)]);
+        assert_eq!(p.excluded, [TraceRgb::new(0, 255, 0)]);
+        assert_eq!(
+            p.merged,
+            [(TraceRgb::new(0, 0, 255), TraceRgb::new(255, 0, 0))]
+        );
+        let auto = trace_colour_settings(r#"{"output":1,"colours":null}"#).unwrap();
+        assert_eq!(auto.colours, None);
+        assert_eq!(
+            trace_colour_settings(r#"{"output":1,"colours":1}"#)
+                .unwrap()
+                .colours,
+            Some(2)
+        );
     }
 
     #[test]

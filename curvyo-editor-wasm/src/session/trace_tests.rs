@@ -199,7 +199,8 @@ fn create_paths_is_one_step_over_several_images() {
         TraceCreateOutcome::Created {
             images: 3,
             paths: 3,
-            nodes: 12
+            nodes: 12,
+            colours: 0
         }
     );
     let own = session.document.own_steps();
@@ -428,7 +429,8 @@ fn a_result_over_20000_nodes_is_one_group_in_one_step() {
         TraceCreateOutcome::Created {
             images: 1,
             paths: 5_001,
-            nodes: 20_004
+            nodes: 20_004,
+            colours: 0
         }
     );
     assert_eq!(session.history_len(), steps + 1);

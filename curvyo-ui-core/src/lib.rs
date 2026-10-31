@@ -188,10 +188,12 @@ pub use conversion::{build_primitive_conversions, primitive_as_path};
 pub use curvyo_svg_core::SvgDrawing;
 /// The Trace tool's settings schema (criterion 6), passed through for the host.
 pub use curvyo_vectorize_core::{
-    ADVANCED_PARAMS as TRACE_ADVANCED_PARAMS,
+    ADVANCED_PARAMS as TRACE_ADVANCED_PARAMS, ColourMask as TraceColourMask,
+    ColourParams as TraceColourParams,
     DEFAULT_BACKGROUND_TOLERANCE as TRACE_DEFAULT_BACKGROUND_TOLERANCE,
     DEFAULT_PICK_TOLERANCE as TRACE_DEFAULT_PICK_TOLERANCE, Denoise as TraceDenoise,
-    METHOD_PARAMS as TRACE_METHOD_PARAMS, Mask as TraceMask, PARAMS as TRACE_PARAMS,
+    MAX_COLOURS as TRACE_MAX_COLOURS, METHOD_PARAMS as TRACE_METHOD_PARAMS,
+    MIN_COLOURS as TRACE_MIN_COLOURS, Mask as TraceMask, PARAMS as TRACE_PARAMS,
     PRESETS as TRACE_PRESETS, ParamKind as TraceParamKind, ParamUnit as TraceParamUnit,
     PixelLength as TracePixelLength, Rgb8 as TraceRgb, Selection as TraceMethod,
     Swatches as TraceSwatches, TraceParams, Upscale as TraceUpscale,
@@ -431,10 +433,14 @@ pub use text_path_edit::{
     nearest_outline, nudged_values, position_at_degrees, projected_values, release_placement,
     rotated_position, shift_along, slid_values, snap_stops, stored_vertical_layout,
 };
-pub use trace_plan::{TracePlan, TraceTarget, plan_trace, trace_group_name, trace_style};
+pub use trace_plan::{
+    TraceColour, TracePlan, TraceTarget, plan_trace, trace_colour_name, trace_colour_style,
+    trace_group_name, trace_style,
+};
 pub use trace_transfer::{
-    TRACE_WIRE_HEADER, TraceStatus, TraceWire, read_trace_wire, trace_auto_threshold, trace_job,
-    trace_job_with, trace_mask_job, trace_sample_colour, trace_suggest_background,
+    TRACE_WIRE_HEADER, TraceLayerWire, TracePaletteWire, TraceStatus, TraceWire, read_trace_wire,
+    trace_auto_threshold, trace_colour_job_with, trace_colour_mask_job, trace_job, trace_job_with,
+    trace_mask_job, trace_sample_colour, trace_suggest_background,
 };
 pub use transform_drag::{
     CornerLinking, CornerRadiusScaling, ParamDragInfo, ScaleModes, StrokeScaling,

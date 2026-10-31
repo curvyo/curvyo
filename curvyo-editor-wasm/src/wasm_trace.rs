@@ -48,21 +48,28 @@ pub fn trace_job(
     progress: &TraceProgressSink,
 ) -> Vec<f64> {
     let map: [f64; 6] = map.try_into().unwrap_or([f64::NAN; 6]);
-    curvyo_ui_core::trace_job_with(
-        rgba,
-        width,
-        height,
-        map,
-        &crate::trace_glue::trace_settings(settings),
-        &mut |percent| {
-            progress.report(percent);
-        },
-    )
+    let mut report = |percent| progress.report(percent);
+    // Multicolour (`specs/0089` slice M): the outlines layer by layer, the palette after them.
+    match crate::trace_glue::trace_colour_settings(settings) {
+        Some(colour) => {
+            curvyo_ui_core::trace_colour_job_with(rgba, width, height, map, &colour, &mut report)
+        }
+        None => curvyo_ui_core::trace_job_with(
+            rgba,
+            width,
+            height,
+            map,
+            &crate::trace_glue::trace_settings(settings),
+            &mut report,
+        ),
+    }
 }
 
 /// The mask the trace of the same arguments walks (`specs/0089` criterion 21), for the worker's
 /// Mask view: `width` x `height` mask pixels (twice the picture's after Upscale), `bits` row by
-/// row, 255 for content and 0 for the rest; `undefined` when the picture cannot be traced.
+/// row, 255 for content and 0 for the rest; with Multicolour four bytes per pixel, the segmented
+/// palette in straight RGBA (the background transparent); `undefined` when the picture cannot
+/// be traced.
 #[wasm_bindgen]
 #[must_use]
 pub fn trace_mask_job(
@@ -73,6 +80,15 @@ pub fn trace_mask_job(
     settings: &str,
 ) -> Option<TraceMaskJs> {
     let map: [f64; 6] = map.try_into().unwrap_or([f64::NAN; 6]);
+    if let Some(colour) = crate::trace_glue::trace_colour_settings(settings) {
+        return curvyo_ui_core::trace_colour_mask_job(rgba, width, height, map, &colour).map(
+            |mask| TraceMaskJs {
+                width: mask.width,
+                height: mask.height,
+                bits: mask.rgba,
+            },
+        );
+    }
     curvyo_ui_core::trace_mask_job(
         rgba,
         width,
@@ -179,6 +195,8 @@ pub struct TraceCreateJs {
     pub paths: u32,
     /// Anchors written.
     pub nodes: u32,
+    /// Colour paths written by a multicolour trace (0 for black paths).
+    pub colours: u32,
 }
 
 #[wasm_bindgen]
@@ -243,6 +261,32 @@ impl WasmSession {
     /// Forgets the full-size results (a value changed).
     pub fn clear_trace_results(&mut self) {
         self.session.clear_trace_results();
+    }
+
+    /// The palette of the shown multicolour preview as JSON (`specs/0089` UX notes §7): `{colours:
+    /// [{hex, fixed, pixels}], layers: [hex], joined}`; empty for one colour or no preview.
+    #[must_use]
+    pub fn trace_palette(&self) -> String {
+        self.session.trace_palette_json()
+    }
+
+    /// The maker's palette view (`specs/0089` criterion 29): `recolours` a JSON list of `[from,
+    /// to]` `#RRGGBB` pairs (fills only, no trace), `isolated` a `#RRGGBB` or empty; the preview,
+    /// the Mask view and Create paths follow.
+    pub fn set_trace_palette_view(&mut self, recolours: &str, isolated: &str) {
+        let pairs: Vec<(curvyo_ui_core::TraceRgb, curvyo_ui_core::TraceRgb)> =
+            serde_json::from_str::<Vec<(String, String)>>(recolours)
+                .unwrap_or_default()
+                .iter()
+                .filter_map(|(from, to)| {
+                    Some((
+                        crate::trace_glue::parse_hex(from)?,
+                        crate::trace_glue::parse_hex(to)?,
+                    ))
+                })
+                .collect();
+        self.session
+            .set_trace_palette_view(pairs, crate::trace_glue::parse_hex(isolated));
     }
 
     /// The view on the canvas, as the View pill shows it (criterion 51): `"overlay"`, `"mask"`,
@@ -342,11 +386,13 @@ impl WasmSession {
                 images,
                 paths,
                 nodes,
+                colours,
             } => TraceCreateJs {
                 kind: "created".to_string(),
                 images: count(images),
                 paths: count(paths),
                 nodes: count(nodes),
+                colours: count(colours),
             },
         }
     }

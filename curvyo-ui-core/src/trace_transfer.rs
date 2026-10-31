@@ -6,7 +6,9 @@ use std::ops::ControlFlow;
 
 use curvyo_document_core::{Affine, Length};
 use curvyo_vectorize_core::{
+    ColourMask as TraceColourMask, ColourParams as TraceColourParams, ColourTrace,
     Mask as TraceMask, Phase, Progress, Raster, Rgb8 as TraceRgb, TraceError, TraceParams, trace,
+    trace_colours,
 };
 use kurbo::{BezPath, PathEl, Point};
 
@@ -56,8 +58,35 @@ pub struct TraceWire {
     pub foreground_pixels: u64,
     /// One outline covers the whole picture.
     pub covers_whole_image: bool,
-    /// The outlines in document millimetres.
+    /// The outlines in document millimetres (a multicolour result: layer by layer).
     pub outlines: Vec<BezPath>,
+    /// The palette of a multicolour result (`specs/0089` slice M); empty for one colour.
+    pub palette: Vec<TracePaletteWire>,
+    /// The layers of a multicolour result in order, largest area first; empty for one colour.
+    pub layers: Vec<TraceLayerWire>,
+    /// Colour regions below Ignore below joined to a neighbour (multicolour).
+    pub joined: usize,
+}
+
+/// One palette colour of a multicolour result, as the strip shows it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TracePaletteWire {
+    /// Its colour.
+    pub colour: TraceRgb,
+    /// The maker picked it.
+    pub fixed: bool,
+    /// Traced pixels it took before exclusions, merges and joins.
+    pub pixels: u64,
+}
+
+/// One layer of a multicolour result: its colour and how many of the outlines are its (they
+/// follow each other in layer order).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TraceLayerWire {
+    /// Its colour.
+    pub colour: TraceRgb,
+    /// Outlines of the layer.
+    pub outlines: usize,
 }
 
 /// The numbers before the outlines: status, paths, nodes, specks, foreground pixels, whole
@@ -163,6 +192,73 @@ pub fn trace_job_with(
     }
 }
 
+/// One multicolour trace for the worker (`specs/0089` slice M): as [`trace_job_with`], the
+/// outlines layer by layer, then the palette and the layers (each colour and its outline count)
+/// and the joined regions after them.
+#[must_use]
+pub fn trace_colour_job_with(
+    rgba: &[u8],
+    width: u32,
+    height: u32,
+    pixel_map: [f64; 6],
+    params: &TraceColourParams,
+    on_percent: &mut dyn FnMut(u8),
+) -> Vec<f64> {
+    let raster = Raster {
+        width,
+        height,
+        rgba,
+    };
+    let mut reported: Option<u8> = None;
+    let mut go = |progress: Progress| {
+        let percent = job_percent(progress);
+        if reported.is_none_or(|last| percent > last) {
+            reported = Some(percent);
+            on_percent(percent);
+        }
+        ControlFlow::Continue(())
+    };
+    match trace_colours(raster, Affine::from_array(pixel_map), params, &mut go) {
+        Ok(result) => colour_wire(&result),
+        Err(TraceError::TooDetailed) => status_only(TraceStatus::TooDetailed),
+        Err(TraceError::Invalid(_) | TraceError::Cancelled) => status_only(TraceStatus::Invalid),
+    }
+}
+
+/// The numbers of a multicolour result.
+fn colour_wire(result: &ColourTrace) -> Vec<f64> {
+    let outlines: usize = result.layers.iter().map(|l| l.outlines.len()).sum();
+    #[allow(clippy::cast_precision_loss)] // counts far below 2^52
+    let mut wire = vec![
+        TraceStatus::Traced.code(),
+        result.counts.paths as f64,
+        result.counts.nodes as f64,
+        result.counts.specks_removed as f64,
+        result.foreground_pixels as f64,
+        0.0,
+        outlines as f64,
+    ];
+    for outline in result.layers.iter().flat_map(|l| &l.outlines) {
+        write_outline(&mut wire, outline);
+    }
+    let rgb = |c: TraceRgb| [f64::from(c.r), f64::from(c.g), f64::from(c.b)];
+    #[allow(clippy::cast_precision_loss)] // counts far below 2^52
+    {
+        wire.push(result.palette.len() as f64);
+        for entry in &result.palette {
+            wire.extend(rgb(entry.colour));
+            wire.extend([f64::from(u8::from(entry.fixed)), entry.pixels as f64]);
+        }
+        wire.push(result.layers.len() as f64);
+        for layer in &result.layers {
+            wire.extend(rgb(layer.sample));
+            wire.push(layer.outlines.len() as f64);
+        }
+        wire.push(result.diagnostics.joined_regions as f64);
+    }
+    wire
+}
+
 /// The automatic Threshold of `rgba` (`width` x `height`), for the worker (criterion 9).
 #[must_use]
 pub fn trace_auto_threshold(rgba: &[u8], width: u32, height: u32) -> u8 {
@@ -223,6 +319,28 @@ pub fn trace_mask_job(
         ControlFlow::Continue(())
     })
     .ok()
+}
+
+/// The segmented palette the multicolour trace of the same arguments walks, for the worker's
+/// Mask view (`specs/0089` UX notes §4); `None` when the picture or the map cannot be traced.
+#[must_use]
+pub fn trace_colour_mask_job(
+    rgba: &[u8],
+    width: u32,
+    height: u32,
+    pixel_map: [f64; 6],
+    params: &TraceColourParams,
+) -> Option<TraceColourMask> {
+    let raster = Raster {
+        width,
+        height,
+        rgba,
+    };
+    curvyo_vectorize_core::colour_mask(raster, Affine::from_array(pixel_map), params, &mut |_| {
+        ControlFlow::Continue(())
+    })
+    .ok()
+    .map(|(mask, _)| mask)
 }
 
 fn status_only(status: TraceStatus) -> Vec<f64> {
@@ -308,9 +426,11 @@ pub fn read_trace_wire(wire: &[f64]) -> Option<TraceWire> {
         }
         outlines.push(path);
     }
-    if at != wire.len() {
-        return None;
-    }
+    let (palette, layers, joined) = if at == wire.len() {
+        (Vec::new(), Vec::new(), 0)
+    } else {
+        read_colour_tail(&wire[at..], outline_count)?
+    };
     Some(TraceWire {
         status,
         paths: count(header[1])?,
@@ -319,7 +439,56 @@ pub fn read_trace_wire(wire: &[f64]) -> Option<TraceWire> {
         foreground_pixels: u64::try_from(count(header[4])?).ok()?,
         covers_whole_image: header[5] != 0.0,
         outlines,
+        palette,
+        layers,
+        joined,
     })
+}
+
+/// The palette, layers and joined regions after a multicolour result's outlines; `None` unless
+/// they are well formed and the layers hold exactly the `outlines`.
+fn read_colour_tail(
+    tail: &[f64],
+    outlines: usize,
+) -> Option<(Vec<TracePaletteWire>, Vec<TraceLayerWire>, usize)> {
+    let mut at = 0;
+    let mut next = || -> Option<f64> {
+        let value = *tail.get(at)?;
+        at += 1;
+        value.is_finite().then_some(value)
+    };
+    let byte = |v: f64| u8::try_from(count(v)?).ok();
+    let colour = |next: &mut dyn FnMut() -> Option<f64>| -> Option<TraceRgb> {
+        Some(TraceRgb::new(
+            byte(next()?)?,
+            byte(next()?)?,
+            byte(next()?)?,
+        ))
+    };
+    let entries = count(next()?)?;
+    let mut palette = Vec::with_capacity(entries.min(tail.len()));
+    for _ in 0..entries {
+        let c = colour(&mut next)?;
+        let fixed = next()? != 0.0;
+        let pixels = u64::try_from(count(next()?)?).ok()?;
+        palette.push(TracePaletteWire {
+            colour: c,
+            fixed,
+            pixels,
+        });
+    }
+    let count_layers = count(next()?)?;
+    let mut layers = Vec::with_capacity(count_layers.min(tail.len()));
+    for _ in 0..count_layers {
+        let c = colour(&mut next)?;
+        layers.push(TraceLayerWire {
+            colour: c,
+            outlines: count(next()?)?,
+        });
+    }
+    let joined = count(next()?)?;
+    let held: usize = layers.iter().map(|l| l.outlines).sum();
+    (at == tail.len() && held == outlines).then_some((palette, layers, joined))
 }
 
 #[cfg(test)]
@@ -387,6 +556,55 @@ mod tests {
         assert!(!read.covers_whole_image);
         let b = kurbo::Shape::bounding_box(&read.outlines[0]);
         assert_eq!((b.x0, b.y0, b.x1, b.y1), (3.0, 4.0, 7.0, 8.0));
+    }
+
+    /// `specs/0089` slice M: the colour job's palette, layers and joined regions cross the
+    /// wire after the outlines; a tail that does not hold the outlines is refused.
+    #[test]
+    fn a_colour_job_round_trips_its_palette_and_layers() {
+        let picture: Vec<u8> = (0..40 * 20)
+            .flat_map(|i| {
+                let (x, y) = (i % 40, i / 40);
+                if !(4..36).contains(&x) || !(4..16).contains(&y) {
+                    [255, 255, 255, 255]
+                } else if x < 20 {
+                    [208, 34, 42, 255]
+                } else {
+                    [35, 78, 184, 255]
+                }
+            })
+            .collect();
+        let params = TraceColourParams::new(TraceParams {
+            selection: curvyo_vectorize_core::Selection::RemoveBackground {
+                background: Some(TraceRgb::new(255, 255, 255)),
+                tolerance: 40,
+            },
+            specks: Length::from_mm(0.0),
+            ..TraceParams::with_threshold(128)
+        });
+        let map = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0];
+        let wire = trace_colour_job_with(&picture, 40, 20, map, &params, &mut |_| {});
+        let read = read_trace_wire(&wire).unwrap();
+        assert_eq!(read.status, TraceStatus::Traced);
+        assert_eq!(read.palette.len(), 2);
+        assert_eq!(read.layers.len(), 2);
+        assert_eq!(
+            read.layers.iter().map(|l| l.outlines).sum::<usize>(),
+            read.outlines.len()
+        );
+        assert!(
+            read.layers
+                .iter()
+                .any(|l| l.colour == TraceRgb::new(208, 34, 42))
+        );
+        let mut bad = wire.clone();
+        // One more outline claimed by the last layer than there are.
+        let last = bad.len() - 2;
+        bad[last] += 1.0;
+        assert_eq!(read_trace_wire(&bad), None);
+        // A single-colour wire has no tail.
+        let single = trace_job(&picture, 40, 20, map, 200, 80, 0.0);
+        assert_eq!(read_trace_wire(&single).unwrap().layers, []);
     }
 
     #[test]

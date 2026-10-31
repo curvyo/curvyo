@@ -155,6 +155,9 @@ mod text_writing;
 mod text_writing_tests;
 mod tolerances;
 mod trace;
+mod trace_colours;
+#[cfg(test)]
+mod trace_colours_tests;
 mod trace_draw;
 mod trace_mask;
 #[cfg(test)]

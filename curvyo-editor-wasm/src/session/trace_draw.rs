@@ -11,6 +11,7 @@ use curvyo_document_core::{
 };
 use curvyo_render_core::{DrawList, PreviewAnchor};
 
+use super::trace_colours::{DIMMED, outline_layers};
 use super::trace_mesh::MeshFrame;
 use super::{Session, Tool};
 
@@ -155,15 +156,19 @@ impl Session {
             moving: self.trace.moving,
         };
         preview.fill_mesh.draw(frame, || {
-            let mut fill = preview.fill.clone();
-            if preview.stale {
-                fill.style.fill.opacity = Opacity::new(0.5).unwrap_or(Opacity::OPAQUE);
-            }
-            let list = curvyo_render_core::build_artwork_with_guides(
-                &[ObjectSnapshot::Path(fill)],
-                &HashSet::new(),
-                view,
-            );
+            let fills: Vec<ObjectSnapshot> = preview
+                .fills
+                .iter()
+                .map(|fill| {
+                    let mut fill = fill.clone();
+                    if preview.stale {
+                        let half = fill.style.fill.opacity.get() * 0.5;
+                        fill.style.fill.opacity = Opacity::new(half).unwrap_or(Opacity::OPAQUE);
+                    }
+                    ObjectSnapshot::Path(fill)
+                })
+                .collect();
+            let list = curvyo_render_core::build_artwork_with_guides(&fills, &HashSet::new(), view);
             (list, None)
         })
     }
@@ -213,22 +218,35 @@ impl Session {
                     Point::new(max.x + x, max.y + y),
                 )
             });
-            let shown: Vec<Vec<PreviewAnchor>> = preview
-                .outlines
-                .iter()
-                .zip(&preview.boxes)
-                .filter(|(_, (lo, hi))| {
-                    area.is_none_or(|(min, max)| {
-                        lo.x <= max.x && hi.x >= min.x && lo.y <= max.y && hi.y >= min.y
-                    })
-                })
-                .map(|(outline, _)| outline.clone())
-                .collect();
+            // The colours Isolate leaves out are drawn at 35 % (`specs/0089` UX notes §7).
+            let layer_of = outline_layers(&preview.layers, preview.outlines.len());
+            let palette_view = &self.trace.palette_view;
+            let (mut bright, mut dim): (Vec<Vec<PreviewAnchor>>, Vec<Vec<PreviewAnchor>>) =
+                (Vec::new(), Vec::new());
+            for ((outline, (lo, hi)), layer) in
+                preview.outlines.iter().zip(&preview.boxes).zip(layer_of)
+            {
+                let seen = area.is_none_or(|(min, max)| {
+                    lo.x <= max.x && hi.x >= min.x && lo.y <= max.y && hi.y >= min.y
+                });
+                if !seen {
+                    continue;
+                }
+                let dimmed = layer.is_some_and(|k| palette_view.dimmed(preview.layers[k].colour));
+                if dimmed {
+                    dim.push(outline.clone());
+                } else {
+                    bright.push(outline.clone());
+                }
+            }
             let strength = if preview.stale { 0.5 } else { 1.0 };
-            (
-                curvyo_render_core::build_preview_outline(&shown, view, strength),
-                area,
-            )
+            let mut list = curvyo_render_core::build_preview_outline(&bright, view, strength);
+            if !dim.is_empty() {
+                let other =
+                    curvyo_render_core::build_preview_outline(&dim, view, strength * DIMMED);
+                list.triangles.extend_from_slice(&other.triangles);
+            }
+            (list, area)
         };
         // The outline has no artwork layers and no images: its triangles are overlay as they are.
         preview.outline_mesh.with(frame, build, |mesh| {
@@ -278,8 +296,8 @@ fn wash_over(image: &ImageSnapshot) -> PathSnapshot {
 }
 
 /// The preview `outlines` of `image` as one black compound path without stroke, as Create paths
-/// writes it (criterion 13), for the Trace view; it carries the image's id and is never a
-/// document node.
+/// writes it (criterion 13), for the Trace view (`trace_colours.rs` sets a colour's fill); it
+/// carries the image's id and is never a document node.
 pub(super) fn filled_result(image: NodeId, outlines: &[Vec<PreviewAnchor>]) -> PathSnapshot {
     let mut n = 0_u64;
     let mut subpaths = outlines.iter().map(|outline| {
