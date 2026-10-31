@@ -313,6 +313,12 @@ test("0089 C in Chromium: Method, pipette, chip, Esc order, finish button", { sk
     assert.deepEqual([finish.text, finish.bg, finish.width, finish.height], ["Trace", "rgb(47, 111, 238)", 75, 28]);
     assert.equal(await s.evaluate(`[...document.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Create paths')`), false);
 
+    // Slice F: the analysis took Remove background for the pale image (Frage 83 B); back to
+    // Brightness for the checks of slice C.
+    await waitFor("the analysis", async () =>
+      (await s.evaluate(`document.querySelector('${BAR} button[aria-label=Method]').textContent`)) === "Remove background" ? true : null,
+    );
+    await pickMethod(s, "Brightness");
     // Criterion 14: Brightness shows the Threshold; the Method menu lists the three methods.
     await s.evaluate(`document.querySelector('${BAR} [aria-label="More trace options"]').click()`);
     await settled(s, /^\d+ paths?,/);

@@ -25,8 +25,9 @@ export type TraceRequest =
 
 /** A message from the worker. */
 export type TraceResponse =
-  /** The automatic Threshold and the suggested background `#RRGGBB` (empty: transparent). */
-  | { id: number; kind: "threshold"; threshold: number; background: string; ms: number }
+  /** The automatic Threshold, the suggested background `#RRGGBB` (empty: transparent) and the
+   * analysis JSON (`specs/0089` slice F; empty when it failed). */
+  | { id: number; kind: "threshold"; threshold: number; background: string; analysis: string; ms: number }
   | { id: number; kind: "trace"; wire: Float64Array; ms: number }
   /** A running trace reached a higher whole percent (criterion 10). */
   | { id: number; kind: "progress"; percent: number }
@@ -149,9 +150,10 @@ export class TraceRunner {
     return (await this.defaults(pixels)).threshold;
   }
 
-  /** What a new image starts with: the automatic Threshold (criterion 9) and the background
-   * colour Remove background's Auto suggests (`specs/0089` criterion 16; empty: transparent). */
-  async defaults(pixels: TracePixels): Promise<{ threshold: number; background: string }> {
+  /** What a new image starts with: the automatic Threshold (criterion 9), the background colour
+   * Remove background's Auto suggests (`specs/0089` criterion 16; empty: transparent) and the
+   * analysis JSON (`specs/0089` slice F; empty when it failed). */
+  async defaults(pixels: TracePixels): Promise<{ threshold: number; background: string; analysis: string }> {
     const response = await this.send(
       (id) => ({ type: "threshold", id, rgba: pixels.rgba, width: pixels.width, height: pixels.height }),
       [],
@@ -159,7 +161,7 @@ export class TraceRunner {
     if (response.kind !== "threshold") {
       throw new Error(response.kind === "error" ? response.message : "unexpected reply");
     }
-    return { threshold: response.threshold, background: response.background ?? "" };
+    return { threshold: response.threshold, background: response.background ?? "", analysis: response.analysis ?? "" };
   }
 
   /** One trace of `pixels` with `settings` (the JSON of `settingsJson`); the pixels are handed

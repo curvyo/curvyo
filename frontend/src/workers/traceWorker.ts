@@ -5,7 +5,7 @@
 // criterion 21). A stale or stopped job is ended by the page
 // terminating this worker; a synchronous wasm call cannot be interrupted otherwise.
 
-import { encode_png, initSync, trace_auto_threshold, trace_job, trace_mask_job, trace_suggest_background } from "@/wasm-bindings/curvyo_editor_wasm.js";
+import { encode_png, initSync, trace_analyse, trace_auto_threshold, trace_job, trace_mask_job, trace_suggest_background } from "@/wasm-bindings/curvyo_editor_wasm.js";
 
 import type { TraceRequest, TraceResponse } from "@/lib/traceJobs";
 
@@ -28,7 +28,9 @@ scope.onmessage = (event) => {
       const threshold = trace_auto_threshold(request.rgba, request.width, request.height);
       // Remove background's Auto (`specs/0089` criterion 16): read once per image with the Threshold.
       const background = trace_suggest_background(request.rgba, request.width, request.height);
-      scope.postMessage({ id: request.id, kind: "threshold", threshold, background, ms: performance.now() - started });
+      // The automatic analysis (`specs/0089` slice F): once per image with the Threshold.
+      const analysis = trace_analyse(request.rgba, request.width, request.height);
+      scope.postMessage({ id: request.id, kind: "threshold", threshold, background, analysis, ms: performance.now() - started });
       return;
     }
     if (request.type === "mask") {
