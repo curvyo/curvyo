@@ -402,7 +402,10 @@ test("0089 M in Chromium: Output, the palette and its actions, the segmented Mas
     await s.clickSel(`${BAR} [data-trace-palette-action="Exclude"]`);
     await waitFor("1 colour excluded", async () => ((await s.statusText()).includes("1 colour excluded") ? true : null), 20_000);
     assert.ok((await swatches(s)).some((n) => n.startsWith("#234EB8") && n.includes("excluded")));
-    // Sampled near the block's bottom edge: the grown bar's shadow falls on its top.
+    // Sampled near the block's bottom edge: the grown bar's shadow falls on its top; Advanced is
+    // closed first so the bar (one row taller with the analysis line) leaves the block visible.
+    await s.evaluate(`document.querySelector('${BAR} [aria-label="Fewer trace options"]').click()`);
+    await sleep(500);
     await waitFor("the excluded blue is white in the Mask", async () => (at(await shot(s), blue.cx, blue.y1 - 3).every((c) => c > 240) ? true : null), 20_000);
 
     // Criterion 29: Create paths writes one group with one filled path per traced colour, in one step.

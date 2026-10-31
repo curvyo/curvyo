@@ -171,10 +171,14 @@ export function useTrace(
           }
         }, ANALYSING_AFTER_MS);
       }
-      const defaults = await runner().defaults(pixels);
-      if (analysingTimer.current !== null) {
-        window.clearTimeout(analysingTimer.current);
-        analysingTimer.current = null;
+      let defaults: Awaited<ReturnType<TraceRunner["defaults"]>>;
+      try {
+        defaults = await runner().defaults(pixels);
+      } finally {
+        if (analysingTimer.current !== null) {
+          window.clearTimeout(analysingTimer.current);
+          analysingTimer.current = null;
+        }
       }
       backgrounds.current.set(id, defaults.background);
       if (fresh) {
