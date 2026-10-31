@@ -11,9 +11,10 @@
 )]
 
 mod catalogue;
-mod degrade;
+pub mod degrade;
 mod fixtures;
 mod metrics;
+pub mod multi;
 pub mod real;
 pub mod reference;
 pub mod render;

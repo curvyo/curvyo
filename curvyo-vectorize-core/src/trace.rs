@@ -53,8 +53,11 @@ pub struct TraceResult {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Diagnostics {
     /// Outlines kept at a coarser contour because their fit crossed itself or came too close to
-    /// another outline (criterion 10).
+    /// another outline (criterion 10); in a multicolour trace, edge spans kept coarser because
+    /// they crossed.
     pub fallbacks: usize,
+    /// Colour regions below Ignore below joined to a neighbour (multicolour, criterion 27).
+    pub joined_regions: usize,
 }
 
 /// Why a trace made nothing.
@@ -145,7 +148,7 @@ pub fn mask(
 }
 
 /// Refuses bytes that do not match the size and a map that is not finite or not invertible.
-fn check(raster: Raster<'_>, pixel_map: Affine) -> Result<(), TraceError> {
+pub(crate) fn check(raster: Raster<'_>, pixel_map: Affine) -> Result<(), TraceError> {
     if raster.checked_pixels().is_none() {
         return Err(TraceError::Invalid("the pixel bytes do not match the size"));
     }
@@ -156,15 +159,15 @@ fn check(raster: Raster<'_>, pixel_map: Affine) -> Result<(), TraceError> {
 }
 
 /// The cleaned mask of a trace and how it maps to millimetres.
-struct Masked {
-    labels: Labels,
+pub(crate) struct Masked {
+    pub(crate) labels: Labels,
     /// Traced pixels to millimetres.
-    map: Affine,
+    pub(crate) map: Affine,
     /// Traced pixels per source pixel (2 after Upscale).
-    unit: usize,
-    min_area_mm2: f64,
-    specks_removed: u64,
-    foreground_pixels: u64,
+    pub(crate) unit: usize,
+    pub(crate) min_area_mm2: f64,
+    pub(crate) specks_removed: u64,
+    pub(crate) foreground_pixels: u64,
 }
 
 /// [`trace`] with an explicit `geometry`; also returns the chains of the outlines in order
@@ -234,7 +237,10 @@ pub(crate) fn trace_with(
         counts,
         foreground_pixels: masked.foreground_pixels,
         covers_whole_image,
-        diagnostics: Diagnostics { fallbacks },
+        diagnostics: Diagnostics {
+            fallbacks,
+            joined_regions: 0,
+        },
     };
     Ok((result, flat.into_iter().cloned().collect()))
 }
@@ -294,7 +300,7 @@ fn room(
 
 /// The method's score and the alpha (`select.rs`), Denoise and Upscale on both, their cut,
 /// border shapes and specks: the labelled mask the outlines are walked on.
-fn masked(
+pub(crate) fn masked(
     raster: Raster<'_>,
     pixel_map: Affine,
     params: &TraceParams,
@@ -398,6 +404,6 @@ fn drop_small_outlines(traced: &mut Vec<Traced>, pixel_map: Affine, min_area_mm2
 }
 
 /// The document map as a `kurbo` map (both in SVG order).
-fn to_kurbo(map: Affine) -> kurbo::Affine {
+pub(crate) fn to_kurbo(map: Affine) -> kurbo::Affine {
     kurbo::Affine::new(map.to_array())
 }
