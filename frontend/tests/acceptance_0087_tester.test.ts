@@ -11,6 +11,8 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:f
 import path from "node:path";
 import { after, before, test } from "node:test";
 import { crc32, deflateSync, inflateSync } from "node:zlib";
+import { removeProfile } from "./browser/removeProfile.ts";
+import { startVite, stopVite } from "./browser/vite.ts";
 
 const BROWSER = process.env.CURVYO_E2E_BROWSER;
 const PORT = 5288;
@@ -77,10 +79,16 @@ async function session(profile: string) {
       choosers.push(msg.params.backendNodeId);
     }
   };
+  // A call the browser never answers (a clipboard read that waits for a permission or focus)
+  // fails after a minute and says which call it was, instead of hanging until the test timeout.
   const send = (method: string, params: object = {}) =>
-    new Promise<Reply>((resolve) => {
+    new Promise<Reply>((resolve, reject) => {
       id += 1;
-      pending.set(id, resolve);
+      const timer = setTimeout(() => reject(new Error(`no reply to ${method} in 60 s: ${JSON.stringify(params).slice(0, 200)}`)), 60_000);
+      pending.set(id, (v) => {
+        clearTimeout(timer);
+        resolve(v);
+      });
       ws.send(JSON.stringify({ id, method, params }));
     });
   const evaluate = async (expression: string): Promise<unknown> => {
@@ -294,11 +302,11 @@ let vite: ChildProcess | null = null;
 before(async () => {
   if (!BROWSER) return;
   mkdirSync(SCRATCH, { recursive: true });
-  vite = spawn("npx", ["vite", "--port", String(PORT), "--strictPort"], { cwd: FRONTEND, stdio: "ignore" });
+  vite = startVite(PORT, FRONTEND);
   await waitFor("vite", async () => ((await fetch(ORIGIN)).ok ? true : null));
 });
-after(() => {
-  vite?.kill();
+after(async () => {
+  await stopVite(vite, PORT);
 });
 
 /** Opens the app in a fresh browser profile, runs `body`, closes everything. */
@@ -312,7 +320,7 @@ async function withApp(body: (s: Session) => Promise<void>): Promise<void> {
     await body(s);
   } finally {
     await s.close();
-    rmSync(profile, { recursive: true, force: true });
+    removeProfile(profile);
   }
 }
 

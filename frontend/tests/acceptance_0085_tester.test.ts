@@ -19,6 +19,8 @@ import {
   isStrokeToPathChord,
   strokeToPathNotice,
 } from "../src/lib/strokeToPathText.ts";
+import { removeProfile } from "./browser/removeProfile.ts";
+import { startVite, stopVite } from "./browser/vite.ts";
 
 const result = (over: Partial<StrokeToPathResult>): StrokeToPathResult => ({
   kind: "applied",
@@ -148,17 +150,30 @@ async function browser(profile: string) {
   });
   let id = 0;
   const pending = new Map<number, (v: Reply) => void>();
+  const closers = new Set<() => void>();
+  ws.onclose = () => closers.forEach((fail) => fail());
   ws.onmessage = (event) => {
     const msg = JSON.parse(String(event.data)) as { id?: number };
     if (msg.id !== undefined) {
       pending.get(msg.id)?.(msg as never);
     }
   };
+  // A call the browser never answers (a crashed or closed page) fails with its name instead of
+  // leaving the test pending until its timeout.
   const send = (method: string, params: object = {}) =>
-    new Promise<Reply>((resolve) => {
+    new Promise<Reply>((resolve, reject) => {
       id += 1;
-      pending.set(id, resolve);
-      ws.send(JSON.stringify({ id, method, params }));
+      const mine = id;
+      const timer = setTimeout(() => reject(new Error(`no reply to ${method} in 180 s: ${JSON.stringify(params).slice(0, 200)}`)), 180_000);
+      pending.set(mine, (v) => {
+        clearTimeout(timer);
+        resolve(v);
+      });
+      closers.add(() => {
+        clearTimeout(timer);
+        reject(new Error(`the browser closed the connection during ${method}`));
+      });
+      ws.send(JSON.stringify({ id: mine, method, params }));
     });
   const evaluate = async (expression: string): Promise<unknown> => {
     const out = await send("Runtime.evaluate", { expression, awaitPromise: true, returnByValue: true });
@@ -240,7 +255,7 @@ test("criteria 1, 2, 3, 19, 21, 22 in Chromium: button, Ctrl+Alt+C, undo, dimmed
   mkdirSync(SCRATCH, { recursive: true });
   const profile = mkdtempSync(path.join(SCRATCH, "run-"));
   try {
-    vite = spawn("npx", ["vite", "--port", String(PORT), "--strictPort"], { cwd: FRONTEND, stdio: "ignore" });
+    vite = startVite(PORT, FRONTEND);
     await waitFor("vite", async () => ((await fetch(ORIGIN)).ok ? true : null));
     const b = await browser(profile);
     await b.send("Page.navigate", { url: `${ORIGIN}/` });
@@ -346,7 +361,7 @@ test("criteria 1, 2, 3, 19, 21, 22 in Chromium: button, Ctrl+Alt+C, undo, dimmed
     await b.close();
   } finally {
     chromes.forEach((c) => c.kill("SIGKILL"));
-    vite?.kill("SIGTERM");
-    rmSync(profile, { recursive: true, force: true });
+    await stopVite(vite, PORT);
+    removeProfile(profile);
   }
 });

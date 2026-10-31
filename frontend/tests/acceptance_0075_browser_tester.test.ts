@@ -13,6 +13,8 @@ import { mkdtempSync, readFileSync, rmSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
+import { removeProfile } from "./browser/removeProfile.ts";
+import { startVite, stopVite } from "./browser/vite.ts";
 
 const BROWSER = process.env.CURVYO_E2E_BROWSER;
 const PORT = 5199;
@@ -122,7 +124,7 @@ test("ac29 ac31: browser fonts and library survive a browser restart; a fresh pr
   let vite: ChildProcess | null = null;
   const profile = mkdtempSync(path.join(tmpdir(), "curvyo-0075-"));
   try {
-    vite = spawn("npx", ["vite", "--port", String(PORT), "--strictPort"], { cwd: FRONTEND, stdio: "ignore" });
+    vite = startVite(PORT, FRONTEND);
     await waitFor("vite", async () => ((await fetch(ORIGIN)).ok ? true : null));
 
     const first = (await inBrowser(
@@ -164,7 +166,7 @@ test("ac29 ac31: browser fonts and library survive a browser restart; a fresh pr
     assert.match(b.library, /great vibes/, "ac29: the library text survives");
     assert.deepEqual(b.system, [], "ac31: the browser lists no system fonts");
   } finally {
-    vite?.kill("SIGTERM");
-    rmSync(profile, { recursive: true, force: true });
+    await stopVite(vite, PORT);
+    removeProfile(profile);
   }
 });

@@ -11,6 +11,8 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import path from "node:path";
 import { test } from "node:test";
 import { crc32, deflateSync } from "node:zlib";
+import { removeProfile } from "./browser/removeProfile.ts";
+import { startVite, stopVite } from "./browser/vite.ts";
 
 const BROWSER = process.env.CURVYO_E2E_BROWSER;
 const PORT = 5203;
@@ -62,6 +64,8 @@ async function session(profile: string) {
   const requests: string[] = [];
   const choosers: number[] = [];
   const pending = new Map<number, (v: Reply) => void>();
+  const closers = new Set<() => void>();
+  ws.onclose = () => closers.forEach((fail) => fail());
   ws.onmessage = (event) => {
     const msg = JSON.parse(String(event.data)) as {
       id?: number;
@@ -78,11 +82,22 @@ async function session(profile: string) {
       choosers.push(msg.params.backendNodeId);
     }
   };
+  // A call the browser never answers (a crashed or closed page) fails with its name instead of
+  // leaving the test pending until its timeout.
   const send = (method: string, params: object = {}) =>
-    new Promise<Reply>((resolve) => {
+    new Promise<Reply>((resolve, reject) => {
       id += 1;
-      pending.set(id, resolve);
-      ws.send(JSON.stringify({ id, method, params }));
+      const mine = id;
+      const timer = setTimeout(() => reject(new Error(`no reply to ${method} in 180 s: ${JSON.stringify(params).slice(0, 200)}`)), 180_000);
+      pending.set(mine, (v) => {
+        clearTimeout(timer);
+        resolve(v);
+      });
+      closers.add(() => {
+        clearTimeout(timer);
+        reject(new Error(`the browser closed the connection during ${method}`));
+      });
+      ws.send(JSON.stringify({ id: mine, method, params }));
     });
   const evaluate = async (expression: string): Promise<unknown> => {
     const out = await send("Runtime.evaluate", { expression, awaitPromise: true, returnByValue: true });
@@ -286,7 +301,7 @@ test("0089 C in Chromium: Method, pipette, chip, Esc order, finish button", { sk
   writeFileSync(file, PALE);
   let closeAll: () => Promise<void> = async () => undefined;
   try {
-    vite = spawn("npx", ["vite", "--port", String(PORT), "--strictPort"], { cwd: FRONTEND, stdio: "ignore" });
+    vite = startVite(PORT, FRONTEND);
     await waitFor("vite", async () => ((await fetch(ORIGIN)).ok ? true : null));
     const s = await session(profile);
     closeAll = s.close;
@@ -406,8 +421,8 @@ test("0089 C in Chromium: Method, pipette, chip, Esc order, finish button", { sk
     assert.equal(await s.evaluate(`[...document.querySelectorAll('${BAR} [data-trace-slot=stopped] button')].map((b) => b.textContent).join()`), "Retry");
   } finally {
     await closeAll();
-    vite?.kill();
-    rmSync(profile, { recursive: true, force: true });
+    await stopVite(vite, PORT);
+    removeProfile(profile);
   }
 });
 
@@ -419,7 +434,7 @@ test("0089 C in Chromium at 800x600: every method's bar keeps inside its edge, p
   writeFileSync(file, PALE);
   let closeAll: () => Promise<void> = async () => undefined;
   try {
-    vite = spawn("npx", ["vite", "--port", String(PORT), "--strictPort"], { cwd: FRONTEND, stdio: "ignore" });
+    vite = startVite(PORT, FRONTEND);
     await waitFor("vite", async () => ((await fetch(ORIGIN)).ok ? true : null));
     const s = await session(profile);
     closeAll = s.close;
@@ -455,7 +470,7 @@ test("0089 C in Chromium at 800x600: every method's bar keeps inside its edge, p
     console.log(rows.join("\n"));
   } finally {
     await closeAll();
-    vite?.kill();
-    rmSync(profile, { recursive: true, force: true });
+    await stopVite(vite, PORT);
+    removeProfile(profile);
   }
 });
