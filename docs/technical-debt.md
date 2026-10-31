@@ -1774,3 +1774,25 @@ passes; no self-made limit is set.
 
 **Resolution:** open; revisit with the stage cache of `specs/0089` adrs.md §6 (slice E), which
 changes what is held between traces.
+
+## One Recognise text step can take up to 2 s on a script line (`0088`, 2026-10-31)
+
+The CPU targets of `adrs.md` decision 8 are met (tester and implementer, native release, thread
+CPU: tier-4 hit cold 253 ms of 300, 64 faces first run 1.07 s of 1.3, cached 243 ms of 300,
+descriptors 13 ms a face of 15, worst case 200 faces 3.06 s of 4). The run builds one cold face
+per step, then searches one line per face source per step. A single line of joined script (Great
+Vibes at 24 mm in the synthetic harness) still takes up to 2 s in one step, because each face is
+fitted again at its own size and the line is turned up to eight times; the bar cannot paint or
+stop during that step. Not measured in wasm yet.
+
+**Resolution:** open; split a line's search into one face per step when a customer run shows the
+wait.
+
+## System font faces read by Recognise text stay loaded for the session (`0088`, 2026-10-31)
+
+A run that reaches tier 5 hands the bytes of up to 64 system faces to the session's `FaceStore`,
+with their recognition references; nothing evicts them until the session ends (New, Open, close),
+so one such run can hold some tens of MB.
+
+**Resolution:** open; drop faces the document does not use after a run, or bound the store, when
+memory use shows it.

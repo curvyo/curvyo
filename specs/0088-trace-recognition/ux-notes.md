@@ -19,7 +19,8 @@ dialog and not a panel section. The rail is full (22 buttons, `0025` §1), so it
 
 - **Button:** the look of "Linked clone" (28 px, 1px `--toolbar-icon` at 60 % outline, `rounded-[5px]`, 14 px
   label, no glyph), **appended last in a group of its own**, after Linked clone, so no earlier control moves.
-  Hidden, not disabled: in the tree while the selection holds at least one filled path, compound path or group
+  Hidden, not disabled (Changed 2026-10-31, lead, permit over refuse: closed paths without fill count too, e.g. a text after
+  Object to path; a closed outline is read as filled): in the tree while the selection holds at least one closed path, compound path or group
   (a traced group counts); absent with another tool than Select, with nothing selected, or with images or texts
   only. Press = choose the tool; the mouse press returns focus to the canvas, Space/Enter keep it on the button.
   Tooltip (Radix, 400 ms, bottom, one line): "Recognise text". No chord (Proposal; the operation is rare and one
@@ -39,7 +40,7 @@ text", pill look and 36 px rows of the Trace bar. One flow of whole items, 8 px 
 |---|---|---|---|
 | 1 | State label "Recognise text" | about 100 | 12 px, `--toolbar-icon`, not a control; names the mode (no rail button is pressed, as in Trace) |
 | 2 | **Tolerance** | 168 | the shared `ValueField` (`0025` §20.1), unit `mm` shown, default 0.3, 0.05 to 2.00, step 0.05 (Proposal), two decimals, drag-to-scrub like Smooth; criterion 6 |
-| 3 | **Faces** readout | about 130 | Changed 2026-10-31 (Frage 102 B, 105 A; wording is a Proposal). 12 px muted text, a state, not a control, not a Tab stop. Before a run: "5 face sources". After a run, in the notice row's place of the Select bar it is gone (the bar closes), so the matched tier is named in the result notice (§4); after "nothing within tolerance" it reads "Searched: system fonts". Tooltip lists the order: "Document, favourites, installed, included, system fonts; stops at the first match." No selector; the order is fixed |
+| 3 | **Faces** readout | about 130 | Changed 2026-10-31 (Frage 102 B, 105 A; wording is a Proposal). 12 px muted text, a state, not a control, not a Tab stop. Before a run: "5 face sources". After a run, in the notice row's place of the Select bar it is gone (the bar closes), so the matched tier is named in the result notice (§4); after "nothing within tolerance" it reads "Searched: system fonts". Tooltip lists the order: "Document, favourites, installed, included, system fonts" (Changed 2026-10-31, lead: no hint text) No selector; the order is fixed |
 | 4 | **Finish button** "Recognise" | 75 x 28 | always blue like Trace's finish (`--editor-accent` fill, white 14 px text), same shape at rest and while running; Enter on the canvas does the same |
 
 At 800 x 600, panel open (inner 308): row 1 = label + Tolerance = 276; row 2 = Faces + button = 213, button
@@ -58,9 +59,9 @@ no handles because the operation has no position, only a tolerance (handles woul
 
 | Selection | Bar |
 |---|---|
-| Filled paths or groups with paths | normal; the label "Recognise text" |
+| Closed paths (filled or not) or groups with paths | normal; the label "Recognise text" |
 | Nothing selected | label and text "No paths selected.", button absent |
-| Only images, texts, clones, open paths | label and text "No filled paths selected.", button absent |
+| Only images, texts, clones, open paths | label and text "No closed paths selected.", button absent |
 
 Both texts state what is there, not what to do. Nothing is refused (permit over refuse): objects that cannot be
 read (images, open paths, outlines of more than 4,000 points) are skipped and counted in the result (§4).
@@ -158,7 +159,7 @@ failed or empty run adds no step. The tolerance value is a per-user preference s
 ## 8. Behaviour with large documents (checked at review)
 
 - 500 selected traced paths: the run is bounded by ADR 8; the bar shows progress after 400 ms and Stop works at
-  line granularity. The Select bar button stays in the tree (counting filled paths is cheap).
+  line granularity. The Select bar button stays in the tree (counting closed paths is cheap).
 - Outlines over 4,000 sample points, open paths, images and texts are skipped, not an error: counted in the
   result ("... were left as they are").
 - Selected objects spanning several layers or locked layers: locked objects are skipped and counted like the

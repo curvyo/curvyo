@@ -68,6 +68,8 @@ object (0074) in the library font (0075) whose glyphs match best, keeping positi
    used and the result names it, its tier and its largest deviation; the maker can pick another face from the 0062 list.
 4. Given a line where no face reaches 50 % sure letters within tolerance (REC-NEAREST A), then the line stays paths,
    nothing changes in the document, and the notice reads "No text within <tol> mm; nearest face <name>, <dev> mm."
+   <dev> is the largest per-letter deviation of that face, the one the tolerance judges (lead, 2026-10-31).
+   Closed paths are read whether filled or not (lead, 2026-10-31, permit over refuse).
 5. Nothing is sent over the network; recognition works with the network disabled.
 6. The tolerance is a setting in mm (default 0.3 mm), shown in the options bar; the original paths are restored by one undo step.
 7. Given a line where a letter is uncertain (outside tolerance or no clear margin) but at least 50 % of the line's
