@@ -232,6 +232,7 @@ impl Session {
             selected: false,
             conflicting: true,
             preview: true,
+            ..Default::default()
         })
     }
 }

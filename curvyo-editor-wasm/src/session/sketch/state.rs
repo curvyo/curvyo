@@ -88,6 +88,12 @@ pub(in crate::session) struct SketchState {
     pub spine_lock: Option<f64>,
     /// Alt was pressed after a variant pick: the label asks to finish or press Escape.
     pub variant_hint: bool,
+    /// The dimension or symbol under the pointer (AC31, AC32).
+    pub annotation_hover: Option<ConstraintId>,
+    /// A dimension text being dragged to a new place (AC31).
+    pub label_drag: Option<super::annotation_input::LabelDrag>,
+    /// The dimension whose value the on-canvas entry box edits (AC31, AC33).
+    pub canvas_edit: Option<ConstraintId>,
 }
 impl SketchState {
     pub fn cancel(&mut self) {
@@ -116,6 +122,8 @@ impl SketchState {
         self.lock = None;
         self.spine_lock = None;
         self.variant_hint = false;
+        self.label_drag = None;
+        self.canvas_edit = None;
     }
 }
 

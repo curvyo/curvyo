@@ -17,6 +17,9 @@ impl Session {
     /// The entry box for the pending construction or placed dimension, or `null`.
     /// Field values are the live proposal in millimetres or degrees, rounded for display.
     pub(super) fn sketch_entry(&self) -> Value {
+        if let Some(edit) = self.sketch_edit_entry() {
+            return edit;
+        }
         let dimension = self.sketch_dimension_stage();
         let kind = if dimension.is_some() {
             "dimension"

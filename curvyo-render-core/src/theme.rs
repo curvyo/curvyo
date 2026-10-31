@@ -487,3 +487,13 @@ pub const TEXT_SELECTION: RgbaColor = ACCENT.with_alpha(77); // 30% of 255, roun
 pub const TEXT_PREEDIT: RgbaColor = ACCENT;
 /// The composition's underline width, screen px.
 pub const TEXT_PREEDIT_PX: f64 = 1.0;
+
+/// `--dim-driving` (`docs/design-system.md`, "Sketch dimension annotation"): lines, extension
+/// lines and arrowheads of a driving sketch dimension.
+pub const DIM_DRIVING: RgbaColor = RgbaColor::opaque(0xBF, 0x29, 0x33);
+
+/// `--dim-reference`: a reference sketch dimension, an alias of `--panel-muted-fg`.
+pub const DIM_REFERENCE: RgbaColor = RgbaColor::opaque(0x5A, 0x5A, 0x5F);
+
+/// `--sketch-solved`: the stroke of sketch geometry the solver reports fully constrained.
+pub const SKETCH_SOLVED: RgbaColor = RgbaColor::opaque(0x12, 0x73, 0x3A);

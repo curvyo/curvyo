@@ -988,7 +988,8 @@ impl Session {
                 return DoubleClickHint::None;
             };
             if this.workbench() == Workbench::Sketch {
-                this.sketch_annotation_press(point, true);
+                // A dimension's text opens the entry box there (AC31, AC33).
+                this.sketch_edit_dimension_at(point);
                 return DoubleClickHint::None;
             }
             // On the position handle of a text on path: its entry box (`0080`, customer

@@ -57,6 +57,7 @@ impl Session {
                     selected: false,
                     conflicting: false,
                     preview: true,
+                    ..Default::default()
                 }
             })
             .collect()

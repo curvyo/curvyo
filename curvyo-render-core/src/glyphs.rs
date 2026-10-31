@@ -433,6 +433,14 @@ pub fn triangle(center: Point, size_mm: f64, color: RgbaColor) -> DrawList {
     list
 }
 
+/// One filled triangle with the corners `a`, `b` and `c`.
+#[must_use]
+pub(crate) fn filled_triangle(a: Point, b: Point, c: Point, color: RgbaColor) -> DrawList {
+    let mut list = DrawList::default();
+    list.push_triangle(a, b, c, color);
+    list
+}
+
 /// A thin rectangle running from `a` to `b`, `width_mm` wide — a handle
 /// line. Empty when `a` and `b` coincide (nothing to draw, not a
 /// division by zero).

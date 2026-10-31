@@ -51,6 +51,20 @@ impl WasmSession {
             Err(error("Unknown constraint tool"))
         }
     }
+    /// Presses a Constraints rail tool: applies, arms or does nothing (0066 AC24).
+    /// # Errors
+    /// Reports a refused constraint.
+    pub fn sketch_rail_press(&mut self, name: &str) -> Result<bool, JsValue> {
+        self.session.sketch_rail_press(name).map_err(error)
+    }
+    /// Opens the on-canvas entry box on a dimension, from its text (0066 AC31).
+    pub fn sketch_edit_dimension(&mut self, id: &str) -> bool {
+        self.session.sketch_edit_dimension(&id.into())
+    }
+    /// Closes the on-canvas dimension edit without a change.
+    pub fn sketch_close_dimension_edit(&mut self) {
+        self.session.sketch_close_dimension_edit();
+    }
     /// Chooses one concrete tool/variant.
     /// # Errors
     /// Refuses unknown tool names.

@@ -10,7 +10,7 @@ impl Session {
             self.sketch.tool,
             SketchTool::Select | SketchTool::Constraints
         ) {
-            if self.sketch_annotation_press(point, false) {
+            if self.sketch_annotation_press(point) {
                 return;
             }
             self.sketch_select_press(point);

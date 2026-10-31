@@ -81,6 +81,7 @@ impl Session {
             if !self.sketch.entities.insert(hit.entity.clone()) {
                 self.sketch.entities.remove(&hit.entity);
             }
+            self.sketch_apply_armed();
             return;
         }
         if self.held.shift {
@@ -116,6 +117,9 @@ impl Session {
     }
 
     pub(super) fn sketch_drag_hover(&mut self, point: Point) {
+        if self.sketch_label_drag_move(point) {
+            return;
+        }
         if self.sketch.lasso.is_some() {
             let scale = self.view().scale();
             if let Some(stroke) = &mut self.sketch.lasso
@@ -132,6 +136,7 @@ impl Session {
             return;
         }
         if self.sketch.drag.is_none() {
+            self.sketch_annotation_hover(point);
             if self.sketch.constraint_tool.as_deref() == Some("dimension") {
                 self.sketch.hover = self.sketch_local(point);
             }
@@ -215,6 +220,9 @@ impl Session {
     pub(super) fn sketch_drag_release(&mut self, point: Point) {
         self.sketch_drag_hover(point);
         self.end_snapping_drag();
+        if self.sketch_label_drag_release() {
+            return;
+        }
         if let Some(stroke) = self.sketch.lasso.take() {
             self.finish_sketch_lasso(&stroke, point);
             return;

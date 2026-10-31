@@ -1,10 +1,10 @@
 //! Constraint inspection links stable relationships to their current analytic geometry.
 use super::Session;
-use curvyo_document_core::{Point, SketchSnapshot};
-use curvyo_sketch_core::{ConstraintId, Entity, Position};
+use curvyo_document_core::SketchSnapshot;
+use curvyo_sketch_core::ConstraintId;
 use serde::Serialize;
 /// An annotation's screen placement is computed by Rust, never by the host.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Default, Serialize)]
 #[allow(clippy::struct_excessive_bools)] // Independent serialized presentation flags, not a domain state machine.
 pub struct SketchAnnotation {
     /// Stable relationship identity.
@@ -23,6 +23,16 @@ pub struct SketchAnnotation {
     pub preview: bool,
     /// Proven conflicting relationship, distinct from numerical failure.
     pub conflicting: bool,
+    /// Screen-reader name; empty for transient feedback, which reads its text.
+    pub name: String,
+    /// The pointer is over the dimension.
+    pub hovered: bool,
+    /// A reference dimension (parentheses and dashed lines).
+    pub reference: bool,
+    /// The value comes from a formula or named parameter: an "fx" prefix.
+    pub fx: bool,
+    /// The on-canvas entry box edits this dimension; its text is hidden.
+    pub editing: bool,
 }
 
 impl Session {
@@ -75,6 +85,7 @@ impl Session {
         true
     }
 
+    #[cfg(test)]
     pub(super) fn sketch_annotations(&self) -> Vec<SketchAnnotation> {
         let Some(snapshot) = self.sketch.active.and_then(|id| self.document.sketch(id)) else {
             return Vec::new();
@@ -86,109 +97,28 @@ impl Session {
         &self,
         snapshot: &SketchSnapshot,
     ) -> Vec<SketchAnnotation> {
-        let solution = self.sketch_preview().unwrap_or(&snapshot.solution);
-        let mut annotations: Vec<SketchAnnotation> = snapshot
-            .graph
-            .constraints
-            .iter()
-            .filter_map(|(id, constraint)| {
-                let mut positions = Vec::new();
-                for entity in constraint.relation.entity_ids() {
-                    match solution.entities.get(entity) {
-                        Some(Entity::Point { position, .. }) => positions.push(*position),
-                        Some(entity) => positions.extend(
-                            entity
-                                .point_ids()
-                                .into_iter()
-                                .filter_map(|id| solution.point(id).ok()),
-                        ),
-                        None => {}
-                    }
-                }
-                if positions.is_empty() {
-                    return None;
-                }
-                let sum = positions
-                    .iter()
-                    .fold((0.0, 0.0), |(x, y), p| (x + p.x.0, y + p.y.0));
-                #[allow(clippy::cast_precision_loss)]
-                // a collection's point count used only for a display centroid
-                let count = positions.len() as f64;
-                let center = snapshot
-                    .labels
-                    .get(id)
-                    .copied()
-                    .unwrap_or_else(|| Position::mm(sum.0 / count, sum.1 / count));
-                let document = snapshot
-                    .placement
-                    .apply_point(Point::new(center.x.0, center.y.0));
-                let screen = self.view().document_to_screen(document);
-                let value = curvyo_sketch_core::measure(solution, &constraint.relation).ok();
-                let text = value.map_or_else(
-                    || super::view::relation_name(&constraint.relation).to_owned(),
-                    |value| {
-                        let (number, unit) =
-                            if value.dimension() == curvyo_sketch_core::Dimension::Angle {
-                                (value.value().to_degrees(), "°")
-                            } else {
-                                (value.value(), " mm")
-                            };
-                        format!(
-                            "{number:.2}{unit}{}",
-                            if constraint.reference { " (ref)" } else { "" }
-                        )
-                    },
-                );
-                Some(SketchAnnotation {
-                    id: id.0.clone(),
-                    x: screen.0,
-                    y: screen.1
-                        - if snapshot.labels.contains_key(id) {
-                            0.0
-                        } else {
-                            18.0
-                        },
-                    text,
-                    dimension: value.is_some(),
-                    selected: self.sketch.constraints.contains(id),
-                    conflicting: snapshot.conflicting.contains(id),
-                    preview: false,
-                })
+        let mut annotations: Vec<SketchAnnotation> = self
+            .sketch_dimension_records(snapshot)
+            .into_iter()
+            .map(|record| SketchAnnotation {
+                editing: self.sketch.canvas_edit.as_ref() == Some(&record.id),
+                id: record.id.0,
+                x: record.screen.0,
+                y: record.screen.1,
+                text: record.text,
+                name: record.name,
+                dimension: true,
+                selected: record.selected,
+                hovered: record.hovered,
+                reference: record.reference,
+                fx: record.fx,
+                conflicting: record.conflicting,
+                preview: false,
             })
             .collect();
-        // Stable constraint order separates coincident labels without changing their
-        // geometry anchors. The matching hit-test uses these same screen positions.
-        for index in 0..annotations.len() {
-            if snapshot
-                .labels
-                .contains_key(&annotations[index].id.clone().into())
-            {
-                continue;
-            }
-            while annotations[..index].iter().any(|other| {
-                (other.x - annotations[index].x).abs() < 100.0
-                    && (other.y - annotations[index].y).abs() < 18.0
-            }) {
-                annotations[index].y -= 18.0;
-            }
-        }
         if let Some(preview) = self.sketch_dimension_annotation(snapshot) {
             annotations.push(preview);
         }
         annotations
-    }
-    pub(in crate::session) fn sketch_annotation_press(&mut self, point: Point, edit: bool) -> bool {
-        let screen = self.view().document_to_screen(point);
-        let nearest = self
-            .sketch_annotations()
-            .into_iter()
-            .filter(|annotation| !annotation.preview)
-            .map(|annotation| {
-                let distance = (annotation.x - screen.0).hypot(annotation.y - screen.1);
-                (annotation.id, distance)
-            })
-            .filter(|(_, distance)| *distance <= 14.0)
-            .min_by(|a, b| a.1.total_cmp(&b.1));
-        nearest.is_some_and(|(id, _)| self.sketch_inspect_constraint(&id.into(), edit))
     }
 }

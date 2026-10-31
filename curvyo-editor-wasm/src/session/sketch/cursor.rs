@@ -12,6 +12,13 @@ impl Session {
             SketchTool::Constraints => return "default",
             _ => return "crosshair",
         }
+        // A dimension text is dragged with the hand; symbols are not draggable (AC30, AC31).
+        if self.sketch.label_drag.is_some() {
+            return "grabbing";
+        }
+        if self.sketch_hovering_dimension() {
+            return "grab";
+        }
         if let Some(drag) = &self.sketch.drag {
             let movable =
                 drag.points.iter().any(|id| movable(&drag.base, id)) || drag.handle.is_some();

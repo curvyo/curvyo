@@ -178,5 +178,6 @@ fn preview(id: &str, x: f64, y: f64, text: &str) -> SketchAnnotation {
         selected: false,
         conflicting: false,
         preview: true,
+        ..Default::default()
     }
 }

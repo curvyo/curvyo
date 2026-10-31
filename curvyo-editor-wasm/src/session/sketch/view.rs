@@ -42,6 +42,24 @@ impl Session {
         annotations.extend(self.sketch_capture_annotation());
         annotations.extend(self.sketch_lock_annotations());
         view["annotations"] = json!(annotations);
+        view["rail"] = self.sketch_rail();
+        let (symbols, more) = snapshot.as_ref().map_or_else(
+            || (Vec::new(), Vec::new()),
+            |s| self.sketch_symbol_records(s),
+        );
+        view["symbols"] =
+            json!(symbols.iter().map(|r| json!({
+            "id": r.id.0, "glyph": r.glyph, "index": r.index, "name": r.name,
+            "x": r.screen.0, "y": r.screen.1, "selected": r.selected, "hovered": r.hovered,
+            "conflicting": r.conflicting, "dot": r.dot,
+        })).collect::<Vec<_>>());
+        view["symbols_more"] = json!(
+            more.iter()
+                .map(|m| json!({
+                    "count": m.count, "x": m.screen.0, "y": m.screen.1,
+                }))
+                .collect::<Vec<_>>()
+        );
         view["edit_constraint"] = json!(self.sketch.edit_constraint);
         view["affected_constraints"] = json!(self.sketch.affected);
         if let Some(snapshot) = snapshot {

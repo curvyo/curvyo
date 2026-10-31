@@ -1,5 +1,7 @@
 //! Sketch workbench interaction state is separate from ordinary vector tools.
 use super::Session;
+mod annotation_input;
+mod annotations;
 mod arc;
 mod axes;
 mod capture;
@@ -24,9 +26,11 @@ mod modes;
 mod numeric;
 mod numeric_chain;
 mod numeric_values;
+mod rail;
 mod relation_tools;
 mod selection;
 mod state;
+mod symbols;
 mod view;
 pub(super) use state::SketchState;
 pub use state::{SketchTool, Workbench};
@@ -41,6 +45,8 @@ mod repair_tests;
 #[cfg(test)]
 mod page_tests;
 
+#[cfg(test)]
+mod annotation_tests;
 #[cfg(test)]
 mod capture_tests;
 #[cfg(test)]

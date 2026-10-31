@@ -457,10 +457,13 @@ impl Session {
                 || self.sketch.lasso.is_some()
                 || !self.sketch.picks.is_empty()
                 || self.sketch.edit_constraint.is_some()
+                || self.sketch.label_drag.is_some()
+                || self.sketch.canvas_edit.is_some()
                 || self.button_down;
             self.sketch.cancel();
             if !pending {
                 self.sketch.tool = super::SketchTool::Select;
+                self.sketch.constraint_tool = None;
                 self.sketch.entities.clear();
                 self.sketch.constraints.clear();
             }
