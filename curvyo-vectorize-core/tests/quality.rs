@@ -16,6 +16,8 @@
 //! also measures Inkscape's results found there as `<image>.inkscape-default.svg` and
 //! `<image>.inkscape-best.svg` (`tools/trace-baseline/README.md`) and stores their numbers.
 
+// The harness measures thread CPU time and peak memory, which need Unix (every test in it is an `#[ignore]`d release run).
+#![cfg(unix)]
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -297,14 +299,8 @@ fn metrics_json(m: &Metrics) -> Value {
     Value::Object(map)
 }
 
-/// The misses of `ours` against the committed `candidate` numbers, with the guard of
-/// `specs/0089` criterion 9a (which replaces criterion 28's +5 % on every metric for the
-/// geometry metrics): any micro path or an outline that is not closed; nodes and wobble per
-/// 100 mm above the larger of +25 % and +3 nodes or +2 flips; the deviations from the pixel
-/// border (max, mean, area error against the thresholded mask) are reported only on this
-/// synthetic set (9a guards them on real images and guards the true-shape error instead, see
-/// `quality_table`).
-fn misses(ours: &Metrics, committed: Option<&Value>) -> Vec<String> {
+/// The hard misses of a run: micro paths and open outlines (criterion 28 as amended).
+fn hard_misses(ours: &Metrics) -> Vec<String> {
     let mut out = Vec::new();
     if ours.micro_paths > 0.0 {
         out.push(format!("micro_paths {} > 0", ours.micro_paths));
@@ -312,9 +308,17 @@ fn misses(ours: &Metrics, committed: Option<&Value>) -> Vec<String> {
     if ours.closed_pct < 100.0 {
         out.push(format!("closed_pct {:.1} < 100", ours.closed_pct));
     }
+    out
+}
+
+/// Nodes and wobble of a run beyond the guard of criterion 9a against the committed baseline
+/// (+25 % or the absolute floor): `(metric, value, text)`. These are the misses the customer
+/// accepted (`specs/0089` criterion 9a, Frage 98 A, 99 A) as far as `accepted.json` lists them.
+fn baseline_misses(ours: &Metrics, committed: Option<&Value>) -> Vec<(&'static str, f64, String)> {
     let Some(committed) = committed else {
-        return out;
+        return Vec::new();
     };
+    let mut out = Vec::new();
     for (name, floor) in [("node_density", 3.0), ("wobble", 2.0)] {
         let old = committed[name].as_f64().unwrap_or(f64::NAN);
         let value = match name {
@@ -323,10 +327,81 @@ fn misses(ours: &Metrics, committed: Option<&Value>) -> Vec<String> {
         };
         let limit = (old * 1.25).max(old + floor);
         if value > limit + 1e-9 {
-            out.push(format!("{name}: {old} -> {value:.4} (limit {limit:.4})"));
+            out.push((
+                name,
+                value,
+                format!("{name}: {old} -> {value:.4} (limit {limit:.4})"),
+            ));
         }
     }
     out
+}
+
+/// The accepted misses committed in `tests/fixtures/trace/accepted.json`, by `<run>/<image>`
+/// then metric. The nightly fails only on a regression against this state: a miss that is not
+/// listed, or a listed one that got more than 5 % worse. `CURVYO_UPDATE_ACCEPTED=1` rewrites it
+/// from the current misses (a deliberate act, reviewed in the PR).
+struct Accepted {
+    stored: Value,
+    recorded: BTreeMap<String, BTreeMap<String, f64>>,
+}
+
+impl Accepted {
+    fn load() -> Self {
+        let stored = std::fs::read_to_string(common::fixture_dir().join("accepted.json"))
+            .ok()
+            .and_then(|s| serde_json::from_str(&s).ok())
+            .unwrap_or_else(|| json!({}));
+        Self {
+            stored,
+            recorded: BTreeMap::new(),
+        }
+    }
+
+    /// Splits the misses of `ours` into regressions (returned) and accepted ones (printed).
+    fn check(&mut self, key: &str, ours: &Metrics, committed: Option<&Value>) -> Vec<String> {
+        let mut regressions = hard_misses(ours);
+        for (metric, value, text) in baseline_misses(ours, committed) {
+            self.recorded
+                .entry(key.to_string())
+                .or_default()
+                .insert(metric.to_string(), value);
+            match self.stored[key][metric].as_f64() {
+                Some(accepted) if value <= accepted * 1.05 + 1e-9 => {
+                    println!("  accepted miss {key}: {text} (accepted {accepted:.4})");
+                }
+                Some(accepted) => {
+                    regressions.push(format!("{text}; accepted {accepted:.4} + 5 % exceeded"));
+                }
+                None => regressions.push(format!("{text}; not an accepted miss")),
+            }
+        }
+        regressions
+    }
+
+    /// Writes the recorded misses as the new accepted state when asked to.
+    fn write_if_asked(&self) -> bool {
+        if std::env::var_os("CURVYO_UPDATE_ACCEPTED").is_none() {
+            return false;
+        }
+        let rounded: BTreeMap<_, BTreeMap<_, _>> = self
+            .recorded
+            .iter()
+            .map(|(k, m)| {
+                let m = m
+                    .iter()
+                    .map(|(n, v)| (n.clone(), (v * 1e4).round() / 1e4))
+                    .collect();
+                (k.clone(), m)
+            })
+            .collect();
+        std::fs::write(
+            common::fixture_dir().join("accepted.json"),
+            serde_json::to_string_pretty(&rounded).unwrap() + "\n",
+        )
+        .unwrap();
+        true
+    }
 }
 
 /// The true-shape miss of a preset run (`specs/0089` criterion 9a: at most the baseline plus
@@ -364,6 +439,7 @@ fn quality_table() {
     let baseline_dir = std::env::var_os("TRACE_BASELINE_DIR").map(std::path::PathBuf::from);
     let mut ours_all = BTreeMap::new();
     let mut regressions = Vec::new();
+    let mut accepted = Accepted::load();
     let mut sums = [0.0; 7];
     let set = quality_set();
     println!("image                 {}", Metrics::NAMES.join("  "));
@@ -401,7 +477,7 @@ fn quality_table() {
             print_inkscape_gap(image.name, &ours, ink);
         }
         let committed = baseline.get("candidate").and_then(|c| c.get(image.name));
-        for miss in misses(&ours, committed) {
+        for miss in accepted.check(&format!("candidate/{}", image.name), &ours, committed) {
             regressions.push(format!("{}: {miss}", image.name));
         }
         ours_all.insert(image.name.to_string(), metrics_json(&ours));
@@ -435,7 +511,8 @@ fn quality_table() {
                 .get("candidate_profiles")
                 .and_then(|c| c.get(preset.key))
                 .and_then(|c| c.get(image.name));
-            for miss in misses(&run.metrics, committed) {
+            let key = format!("{}/{}", preset.key, image.name);
+            for miss in accepted.check(&key, &run.metrics, committed) {
                 regressions.push(format!("{} {}: {miss}", preset.key, image.name));
             }
             if let Some(miss) = true_shape_miss(run.area_error_true_pct, committed) {
@@ -465,9 +542,12 @@ fn quality_table() {
         .unwrap();
         return;
     }
+    if accepted.write_if_asked() {
+        return;
+    }
     assert!(
         regressions.is_empty(),
-        "misses of the guard of `specs/0089` criterion 9a against the committed candidate:\n{}",
+        "regressions against the accepted misses of the guard of `specs/0089` criterion 9a:\n{}",
         regressions.join("\n")
     );
 }
@@ -668,11 +748,40 @@ fn preset_relations() {
             p.metrics.closed_pct, p.metrics.micro_paths
         ));
     }
+    let path = common::fixture_dir().join("accepted_relations.json");
+    let keys: Vec<String> = misses.iter().map(|m| relation_key(m)).collect();
+    if std::env::var_os("CURVYO_UPDATE_ACCEPTED").is_some() {
+        std::fs::write(&path, serde_json::to_string_pretty(&keys).unwrap() + "\n").unwrap();
+        return;
+    }
+    let accepted: Vec<String> = std::fs::read_to_string(&path)
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_default();
+    let (known, new): (Vec<_>, Vec<_>) = misses
+        .iter()
+        .zip(&keys)
+        .partition(|(_, key)| accepted.contains(key));
+    for (miss, _) in &known {
+        println!("accepted relation miss: {miss}");
+    }
     assert!(
-        misses.is_empty(),
-        "preset relations missed:\n{}",
-        misses.join("\n")
+        new.is_empty(),
+        "preset relations missed that are not accepted (`accepted_relations.json`):\n{}",
+        new.iter()
+            .map(|(m, _)| m.as_str())
+            .collect::<Vec<_>>()
+            .join("\n")
     );
+}
+
+/// A relation miss without its measured numbers, so that the accepted list names the relation
+/// on the image and not the value (the values are guarded per image by `quality_table`).
+fn relation_key(miss: &str) -> String {
+    miss.split_whitespace()
+        .filter(|token| token.parse::<f64>().is_err())
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 /// Step 0 for criterion 4: the lowest Smooth at which the disc of criterion 21 holds.

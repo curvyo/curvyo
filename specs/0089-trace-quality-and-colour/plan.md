@@ -496,3 +496,26 @@ Unchanged as guards: every other metric of every run no more than 5 % (plus 0.00
   mark in a child process per run. Neither is guarded (machine noise).
 - JPEG quality 50 is simulated by baseline-JPEG DCT quantisation with the standard tables and
   4:2:0 chroma (no encoder dependency); the entropy coding it leaves out is lossless.
+
+### Nightly guard against the accepted state (2026-10-30)
+
+The nightly `trace quality harness` failed on the misses the customer accepted (criterion 9a,
+Frage 98 A, 99 A): they are measured against the pre-0089 `candidate` in `baseline.json`, which
+stays the frozen reference. The nightly must fail on regressions only, so the accepted state is
+committed next to it and the harness compares against that:
+
+- `tests/fixtures/trace/accepted.json`: for every `<run>/<image>` (`candidate/...` and
+  `<preset>/<image>`) and metric (`node_density`, `wobble`) that is beyond the 9a limit of the
+  baseline, the accepted value. `quality_table` prints these as `accepted miss`; it fails on a
+  miss that is not listed, on a listed one that is more than 5 % worse than its accepted value,
+  and on any micro path or open outline (those have no accepted state).
+- `tests/fixtures/trace/accepted_relations.json`: the preset relations of criteria 62 to 64 that
+  miss, as text without the measured numbers. `preset_relations` fails on a relation miss that is
+  not listed; the numbers behind them are guarded per image by `quality_table`.
+- `tests/fixtures/trace/accepted_reference.json`: the same for `reference_table`, by
+  `<preset> <case>: <metric>` (the per-run guard, the frozen targets, the geometric means and
+  Silhouette against Logo), with the accepted value; fails on an unlisted miss or one over
+  accepted + 5 %. Keys of images that are not committed are harmless.
+- An improvement never fails. Accepting a new state is a deliberate act in a PR:
+  `CURVYO_UPDATE_ACCEPTED=1 cargo test --release -p curvyo-vectorize-core --test quality -- --ignored --test-threads=1 quality_table preset_relations`
+  rewrites both files from the current misses; the diff is the review.

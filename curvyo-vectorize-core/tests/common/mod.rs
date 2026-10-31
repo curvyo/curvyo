@@ -184,3 +184,14 @@ pub fn thread_cpu_seconds() -> f64 {
     let t = rustix::time::clock_gettime(rustix::time::ClockId::ThreadCPUTime);
     t.tv_sec as f64 + t.tv_nsec as f64 * 1e-9
 }
+
+/// Off Unix there is no thread CPU clock here: wall time since the first call, as in the other
+/// crates' timing tests (all of them `#[ignore]`d release runs).
+#[cfg(not(unix))]
+pub fn thread_cpu_seconds() -> f64 {
+    static START: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
+    START
+        .get_or_init(std::time::Instant::now)
+        .elapsed()
+        .as_secs_f64()
+}

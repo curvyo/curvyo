@@ -328,6 +328,7 @@ fn c19_touching_picks_are_one_shape() {
 
 /// A 2000 x 2000 px picture with a colour per pixel (no two neighbours alike): the worst case
 /// of the colour cache.
+#[cfg(unix)]
 fn noisy(side: u32) -> Picture {
     let mut seed = 0x1234_5678_u32;
     let mut rgba = Vec::with_capacity((side * side * 4) as usize);

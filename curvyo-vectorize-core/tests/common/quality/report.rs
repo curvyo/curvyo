@@ -30,20 +30,32 @@ fn value(row: &Value, name: &str) -> Option<f64> {
     row.get(name).and_then(Value::as_f64)
 }
 
+/// One miss of the guard: the metric (`name`), the measured `value` (none when missing) and the
+/// sentence for the report. The accepted state (`accepted_reference.json`) is keyed by `name`.
+pub struct Miss {
+    pub name: String,
+    pub value: Option<f64>,
+    pub text: String,
+}
+
 /// The guard's misses of one image (`ours` against `committed`, criterion 9 as frozen on
 /// 2026-10-29): nothing lost beyond the baseline, no self-intersection, the true-shape deviation within
 /// the baseline plus 5 % plus 0.05 px, the deviation from the pixel border on real images
 /// within the larger of the baseline plus 5 % and the tolerance plus 1.5 px, nodes and wobble
 /// per 100 mm within the larger of the baseline plus 25 % and the baseline plus 3 nodes or
 /// 2 flips.
-pub fn misses(ours: &Value, committed: &Value, tolerance_px: f64, real: bool) -> Vec<String> {
+pub fn misses(ours: &Value, committed: &Value, tolerance_px: f64, real: bool) -> Vec<Miss> {
     let mut out = Vec::new();
     let mut check = |name: &str, limit: f64| match value(ours, name) {
         Some(new) if new <= limit + 1e-9 => {}
-        new => out.push(format!(
-            "{name}: {:?} -> {new:?} (limit {limit:.4})",
-            value(committed, name)
-        )),
+        new => out.push(Miss {
+            name: name.to_string(),
+            value: new,
+            text: format!(
+                "{name}: {:?} -> {new:?} (limit {limit:.4})",
+                value(committed, name)
+            ),
+        }),
     };
     for name in TOPOLOGY {
         if let Some(old) = value(committed, name) {
@@ -81,7 +93,7 @@ pub fn geo_mean_of(rows: &[&Value], name: &str) -> f64 {
 /// The frozen targets of criteria 5 to 7 and 10 a run of Logo / Line art misses
 /// (`specs/0089`, frozen 2026-10-29), by fixture and resolution; axis-aligned features on
 /// half pixels are measured apart and reported only.
-pub fn target_misses(key: &str, row: &Value) -> Vec<String> {
+pub fn target_misses(key: &str, row: &Value) -> Vec<Miss> {
     let mut out = Vec::new();
     let Some((fixture, resolution)) = key.split_once('@') else {
         return out;
@@ -91,7 +103,11 @@ pub fn target_misses(key: &str, row: &Value) -> Vec<String> {
     }
     let mut over = |what: &str, name: &str, limit: f64| {
         if let Some(v) = value(row, name).filter(|v| *v > limit + 1e-9) {
-            out.push(format!("criterion {what}: {name} {v:.4} > {limit}"));
+            out.push(Miss {
+                name: format!("criterion {what}: {name}"),
+                value: Some(v),
+                text: format!("criterion {what}: {name} {v:.4} > {limit}"),
+            });
         }
     };
     if fixture == "geo-corners" {

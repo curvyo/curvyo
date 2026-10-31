@@ -20,6 +20,8 @@
 //! peak-memory child, and `CURVYO_TRACE_REPORT=<file>` writes the fresh numbers and the misses
 //! as JSON without touching `baseline.json`.
 
+// The harness measures peak memory and thread CPU time, which need Unix (every test in it is an `#[ignore]`d release run).
+#![cfg(unix)]
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -47,7 +49,7 @@ use common::quality::real::{
 };
 use common::quality::reference::{Edge, Feature, Group, SCALES};
 use common::quality::report::{
-    NODE_TARGET, SUMMARY_HEADER, baseline_text, geo_mean_of, misses, row_json, summary_line,
+    Miss, NODE_TARGET, SUMMARY_HEADER, baseline_text, geo_mean_of, misses, row_json, summary_line,
     target_misses,
 };
 use common::quality::run::{Case, Truth, case_params, measure, params_for};
@@ -344,6 +346,69 @@ fn the_metrics_measure_known_shapes() {
     assert_eq!(self_intersections(&[square], 60, 60), 0);
 }
 
+/// The accepted misses in `tests/fixtures/trace/accepted_reference.json`, by
+/// `<preset> <case>: <metric>` to the accepted value (`specs/0089` criterion 9a, customer
+/// acceptance 2026-10-30). The nightly fails only on a miss that is not listed or on a listed
+/// one more than 5 % worse. `CURVYO_UPDATE_ACCEPTED=1` rewrites the file from the current misses.
+struct Accepted {
+    stored: BTreeMap<String, f64>,
+    recorded: BTreeMap<String, f64>,
+}
+
+impl Accepted {
+    fn load() -> Self {
+        let stored = std::fs::read_to_string(common::fixture_dir().join("accepted_reference.json"))
+            .ok()
+            .and_then(|s| serde_json::from_str(&s).ok())
+            .unwrap_or_default();
+        Self {
+            stored,
+            recorded: BTreeMap::new(),
+        }
+    }
+
+    /// Adds the miss `text` of `key` to `regressions` unless it is accepted and not worse.
+    fn check(&mut self, regressions: &mut Vec<String>, key: &str, value: Option<f64>, text: &str) {
+        let Some(value) = value else {
+            regressions.push(text.to_string());
+            return;
+        };
+        self.recorded
+            .insert(key.to_string(), (value * 1e4).round() / 1e4);
+        match self.stored.get(key) {
+            Some(accepted) if value <= accepted * 1.05 + 1e-9 => {
+                println!("accepted miss {text} (accepted {accepted})");
+            }
+            Some(accepted) => {
+                regressions.push(format!("{text}; accepted {accepted} + 5 % exceeded"));
+            }
+            None => regressions.push(format!("{text}; not an accepted miss")),
+        }
+    }
+
+    /// The same for a miss of the per-run guard.
+    fn check_miss(&mut self, regressions: &mut Vec<String>, run: &str, miss: &Miss) {
+        self.check(
+            regressions,
+            &format!("{run}: {}", miss.name),
+            miss.value,
+            &format!("{run}: {}", miss.text),
+        );
+    }
+
+    fn write_if_asked(&self) -> bool {
+        if std::env::var_os("CURVYO_UPDATE_ACCEPTED").is_none() {
+            return false;
+        }
+        std::fs::write(
+            common::fixture_dir().join("accepted_reference.json"),
+            serde_json::to_string_pretty(&self.recorded).unwrap() + "\n",
+        )
+        .unwrap();
+        true
+    }
+}
+
 /// Criteria 3 and 4: the reference table, the summary and the +5 % guard.
 #[cfg(unix)]
 #[test]
@@ -362,6 +427,7 @@ fn reference_table() {
     let mut fresh: BTreeMap<&str, serde_json::Map<String, Value>> = BTreeMap::new();
     let mut groups: BTreeMap<(String, &str, String), Vec<Value>> = BTreeMap::new();
     let mut regressions = Vec::new();
+    let mut accepted = Accepted::load();
     for case in cases() {
         let file = dir.join(file_name(&case.key));
         write_pam(&file, &case.picture);
@@ -392,12 +458,20 @@ fn reference_table() {
             {
                 let real = !case.key.contains('@');
                 for miss in misses(&value, old, preset.tolerance_px, real) {
-                    regressions.push(format!("{} {}: {miss}", preset.key, case.key));
+                    accepted.check_miss(
+                        &mut regressions,
+                        &format!("{} {}", preset.key, case.key),
+                        &miss,
+                    );
                 }
             }
             if preset.key == "logo" {
                 for miss in target_misses(&case.key, &value) {
-                    regressions.push(format!("{} {}: {miss}", preset.key, case.key));
+                    accepted.check_miss(
+                        &mut regressions,
+                        &format!("{} {}", preset.key, case.key),
+                        &miss,
+                    );
                 }
             }
             let resolution = case.key.split('@').nth(1).unwrap_or("real").to_string();
@@ -447,15 +521,20 @@ fn reference_table() {
             preset.key
         );
         if preset.key == "logo" && n_new > NODE_TARGET * n_old {
-            regressions.push(format!(
-                "logo: nodes (geo) {n_new:.2} > {NODE_TARGET} x {n_old:.2}"
-            ));
+            accepted.check(
+                &mut regressions,
+                "logo: nodes (geo)",
+                Some(n_new),
+                &format!("logo: nodes (geo) {n_new:.2} > {NODE_TARGET} x {n_old:.2}"),
+            );
         }
         if w_new > w_old {
-            regressions.push(format!(
-                "{}: wobble (geo) {w_new:.2} > {w_old:.2}",
-                preset.key
-            ));
+            accepted.check(
+                &mut regressions,
+                &format!("{}: wobble (geo)", preset.key),
+                Some(w_new),
+                &format!("{}: wobble (geo) {w_new:.2} > {w_old:.2}", preset.key),
+            );
         }
     }
     // `CURVYO_TRACE_REPORT=<file>` writes the fresh numbers and the misses (a before/after
@@ -488,18 +567,31 @@ fn reference_table() {
                 ratios.push(ds / dl);
             }
             if ds > dl + 1e-9 {
-                regressions.push(format!(
-                    "silhouette {key}: nodes/100 mm {ds:.2} > Logo / Line art {dl:.2} (0025 criterion 63)"
-                ));
+                accepted.check(
+                    &mut regressions,
+                    &format!("silhouette {key}: nodes/100 mm above Logo / Line art"),
+                    Some(ds),
+                    &format!(
+                        "silhouette {key}: nodes/100 mm {ds:.2} > Logo / Line art {dl:.2} (0025 criterion 63)"
+                    ),
+                );
             }
         }
         let geo = (ratios.iter().map(|r| r.ln()).sum::<f64>() / ratios.len().max(1) as f64).exp();
         println!("silhouette / logo nodes per 100 mm (geo): {geo:.3}");
         if geo > 0.8 {
-            regressions.push(format!(
-                "silhouette: nodes/100 mm (geo) {geo:.3} x Logo / Line art > 0.8 (0025 criterion 63)"
-            ));
+            accepted.check(
+                &mut regressions,
+                "silhouette: nodes/100 mm (geo) to Logo / Line art",
+                Some(geo),
+                &format!(
+                    "silhouette: nodes/100 mm (geo) {geo:.3} x Logo / Line art > 0.8 (0025 criterion 63)"
+                ),
+            );
         }
+    }
+    if accepted.write_if_asked() {
+        return;
     }
     if std::env::var_os("CURVYO_UPDATE_BASELINE").is_some() {
         let reference = baseline

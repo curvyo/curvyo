@@ -1,0 +1,42 @@
+{
+  "candidate/10-pixel-art": {
+    "wobble": 8.1322
+  },
+  "engraving/10-pixel-art": {
+    "wobble": 8.1322
+  },
+  "logo/10-pixel-art": {
+    "wobble": 8.1322
+  },
+  "logo/13-photograph": {
+    "wobble": 22.1175
+  },
+  "photo/03-text-300dpi": {
+    "wobble": 65.2025
+  },
+  "photo/04-small-text": {
+    "wobble": 34.0499
+  },
+  "photo/10-pixel-art": {
+    "wobble": 26.3513
+  },
+  "photo/11-stencil-lines": {
+    "wobble": 68.1174
+  },
+  "photo/13-photograph": {
+    "wobble": 35.3467
+  },
+  "silhouette/03-text-300dpi": {
+    "node_density": 89.4173
+  },
+  "silhouette/04-small-text": {
+    "node_density": 67.8919
+  },
+  "silhouette/07-silhouette": {
+    "node_density": 11.763
+  },
+  "silhouette/13-photograph": {
+    "node_density": 58.7335,
+    "wobble": 34.7528
+  }
+}
