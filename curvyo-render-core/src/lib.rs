@@ -180,5 +180,6 @@ pub use snap_marker::{SnapMarkerSegment, build_snap_marker};
 
 mod sketch_overlay;
 pub use sketch_overlay::{
-    SketchPointGlyph, build_sketch_axes, build_sketch_overlay, build_sketch_preview,
+    SketchPointGlyph, build_sketch_axes, build_sketch_capture_marker, build_sketch_lock_guide,
+    build_sketch_overlay, build_sketch_preview,
 };

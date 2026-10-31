@@ -80,6 +80,39 @@ pub fn build_sketch_preview(
     list
 }
 
+/// Draws the endpoint capture ring: an 18px accent ring, 1.5px, on a 1px white casing.
+#[must_use]
+pub fn build_sketch_capture_marker(center: Point, view: ViewTransform) -> DrawList {
+    let px = 1.0 / view.scale();
+    let mut list = glyphs::ring(center, 20.0 * px, 3.5 * px, theme::SELECTION_CASING);
+    list.extend(glyphs::ring(center, 19.0 * px, 1.5 * px, theme::ACCENT));
+    list
+}
+
+/// Draws the Ctrl lock guide from `from` to `to`: 1px, dashed 2px on and 2px off.
+#[must_use]
+pub fn build_sketch_lock_guide(from: Point, to: Point, view: ViewTransform) -> DrawList {
+    let px = 1.0 / view.scale();
+    let mut list = DrawList::default();
+    let length = from.vector_to(to).length();
+    if !length.is_finite() || length <= 0.0 {
+        return list;
+    }
+    let step = from.vector_to(to).scaled(1.0 / length);
+    let mut at = 0.0;
+    while at < length {
+        let end = (at + 2.0 * px).min(length);
+        list.extend(glyphs::thick_line(
+            from.translated(step.scaled(at)),
+            from.translated(step.scaled(end)),
+            px,
+            theme::AXIS_GUIDE,
+        ));
+        at += 4.0 * px;
+    }
+    list
+}
+
 /// Draws the immutable local frame with distinct inferred-axis emphasis.
 #[must_use]
 pub fn build_sketch_axes(
@@ -117,4 +150,35 @@ pub fn build_sketch_axes(
         ));
     }
     list
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn extent(list: &DrawList) -> f64 {
+        list.triangles
+            .iter()
+            .map(|v| v.position.x.abs().max(v.position.y.abs()))
+            .fold(0.0, f64::max)
+    }
+
+    #[test]
+    fn the_capture_ring_keeps_its_screen_size_at_every_zoom() {
+        for scale in [0.25, 1.0, 8.0] {
+            let view = ViewTransform::new(scale, Point::new(0.0, 0.0));
+            let ring = build_sketch_capture_marker(Point::new(0.0, 0.0), view);
+            assert!((extent(&ring) * scale - 10.0).abs() < 0.5, "{scale}");
+        }
+    }
+
+    #[test]
+    fn the_lock_guide_is_dashed_two_on_two_off() {
+        let view = ViewTransform::new(1.0, Point::new(0.0, 0.0));
+        let guide = build_sketch_lock_guide(Point::new(0.0, 0.0), Point::new(40.0, 0.0), view);
+        let solid = build_sketch_lock_guide(Point::new(0.0, 0.0), Point::new(2.0, 0.0), view);
+        assert_eq!(guide.triangles.len(), 10 * solid.triangles.len());
+        let empty = build_sketch_lock_guide(Point::new(1.0, 1.0), Point::new(1.0, 1.0), view);
+        assert_eq!(empty.triangles.len(), 0);
+    }
 }
