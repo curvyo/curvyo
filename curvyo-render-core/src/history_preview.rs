@@ -30,6 +30,10 @@ pub fn build_history_preview(objects: &[ObjectSnapshot], view: ViewTransform) ->
         .map(|mut object| {
             match &mut object {
                 ObjectSnapshot::Path(path) => ghost_style(&mut path.style),
+                ObjectSnapshot::Sketch(sketch) => {
+                    ghost_style(&mut sketch.style);
+                    ghost_style(&mut sketch.resolved.style);
+                }
                 ObjectSnapshot::Primitive(primitive) => ghost_style(&mut primitive.style),
                 ObjectSnapshot::Clone(clone) => ghost_style(&mut clone.resolved.style),
                 ObjectSnapshot::Image(image) => image.shown_opacity = ghost(image.shown_opacity),

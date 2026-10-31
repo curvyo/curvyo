@@ -76,8 +76,22 @@ fn every_commit_label_in_the_source_has_an_operation_name() {
         rust_files(&root.join(krate).join("src"), &mut files);
     }
     assert!(files.len() > 50, "the sources were found");
+    // These external modules are test-only just like the inline cfg(test) sections below.
+    // Verify their declarations before excluding them; never hide production labels by prefix.
+    let document_src = root.join("curvyo-document-core/src");
+    let declarations = fs::read_to_string(document_src.join("lib.rs")).unwrap();
+    let test_modules = ["sketch_cache_tests", "sketch_fixtures", "sketch_tests"];
+    for module in test_modules {
+        assert!(declarations.contains(&format!("#[cfg(test)]\nmod {module};")));
+    }
     let mut labels = BTreeSet::new();
     for file in files {
+        if test_modules
+            .iter()
+            .any(|module| file == document_src.join(format!("{module}.rs")))
+        {
+            continue;
+        }
         let full = fs::read_to_string(&file).unwrap();
         let source = full.split("#[cfg(test)]").next().unwrap_or_default();
         for marker in [

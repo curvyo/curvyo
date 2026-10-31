@@ -507,6 +507,7 @@ fn the_same_events_give_the_same_bytes_and_the_preview_is_the_commit() {
 
 fn stroke_of(rig: &Rig, id: NodeId) -> f64 {
     match rig.document.object(id).unwrap() {
+        ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Primitive(p) => p.style.stroke.width.as_mm(),

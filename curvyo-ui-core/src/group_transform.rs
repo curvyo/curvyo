@@ -92,7 +92,10 @@ pub(crate) fn apply(
                 }
                 (ObjectSnapshot::Primitive(_), None)
                 | (
-                    ObjectSnapshot::Clone(_) | ObjectSnapshot::Text(_) | ObjectSnapshot::Image(_),
+                    ObjectSnapshot::Sketch(_)
+                    | ObjectSnapshot::Clone(_)
+                    | ObjectSnapshot::Text(_)
+                    | ObjectSnapshot::Image(_),
                     _,
                 ) => object.clone(),
             }
@@ -145,9 +148,13 @@ fn scale_by_magnitudes(
         (ObjectSnapshot::Path(path), _) => {
             ObjectSnapshot::Path(path.scaled_along(pivot, sx, sy, axes))
         }
-        (ObjectSnapshot::Clone(_) | ObjectSnapshot::Text(_) | ObjectSnapshot::Image(_), _) => {
-            object.clone()
-        }
+        (
+            ObjectSnapshot::Sketch(_)
+            | ObjectSnapshot::Clone(_)
+            | ObjectSnapshot::Text(_)
+            | ObjectSnapshot::Image(_),
+            _,
+        ) => object.clone(),
         (ObjectSnapshot::Primitive(_), Some(path)) if is_stretch(sx, sy) => {
             ObjectSnapshot::Path(path.scaled_along(pivot, sx, sy, axes))
         }
@@ -933,6 +940,7 @@ mod tests {
             match object {
                 ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
                 ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
+                ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
                 ObjectSnapshot::Primitive(p) => outline_of_rotated(&p.shape, p.rotation)
                     .iter()
                     .map(|a| a.point)

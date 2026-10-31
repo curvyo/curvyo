@@ -184,7 +184,10 @@ fn outlines(object: &ObjectSnapshot) -> Vec<Outline> {
         }
         // Never reached: `looks_the_same` compares images by their placement only.
         ObjectSnapshot::Image(_) => Vec::new(),
-        ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_) | ObjectSnapshot::Text(_) => object
+        ObjectSnapshot::Sketch(_)
+        | ObjectSnapshot::Path(_)
+        | ObjectSnapshot::Clone(_)
+        | ObjectSnapshot::Text(_) => object
             .drawn_path()
             .into_iter()
             .flat_map(curvyo_document_core::PathSnapshot::subpaths)

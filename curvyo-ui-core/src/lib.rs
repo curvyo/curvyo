@@ -480,3 +480,31 @@ pub use weld_plan::{
 
 mod pages;
 pub use pages::PageViewState;
+
+mod sketch;
+pub use sketch::{SketchHit, sketch_handle_hit, sketch_hit, sketch_hits, sketch_snap_points};
+
+mod sketch_actions;
+pub use sketch_actions::{
+    SKETCH_ACTIONS, SKETCH_AXIS_X, SKETCH_AXIS_Y, sketch_axis, sketch_relation, sketch_relations,
+};
+
+mod sketch_dimension_layout;
+pub use sketch_dimension_layout::{
+    DimensionArrow, DimensionGeometry, DimensionItem, DimensionMarks, layout_dimensions,
+};
+
+mod sketch_symbol_layout;
+pub use sketch_symbol_layout::{
+    MoreBadge, SymbolAnchor, SymbolItem, SymbolLayout, SymbolPlacement, TextBox, layout_symbols,
+    layout_symbols_around,
+};
+
+mod sketch_tool_use;
+pub use sketch_tool_use::{SKETCH_RAIL_TOOLS, SketchToolUse, dimension_kind, sketch_tool_use};
+
+mod sketch_marquee;
+pub use sketch_marquee::{sketch_marquee, sketch_marquee_placed};
+
+mod sketch_lasso;
+pub use sketch_lasso::sketch_lasso;

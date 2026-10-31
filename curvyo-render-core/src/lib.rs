@@ -177,3 +177,11 @@ mod tests {
 
 mod snap_marker;
 pub use snap_marker::{SnapMarkerSegment, build_snap_marker};
+
+mod sketch_annotation_marks;
+pub use sketch_annotation_marks::{SketchDimensionMarks, build_sketch_dimension};
+mod sketch_overlay;
+pub use sketch_overlay::{
+    SketchPointGlyph, build_sketch_axes, build_sketch_capture_marker, build_sketch_lock_guide,
+    build_sketch_overlay, build_sketch_preview, build_sketch_solved,
+};
