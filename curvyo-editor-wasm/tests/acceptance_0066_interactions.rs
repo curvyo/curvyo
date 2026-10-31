@@ -6,10 +6,25 @@ use curvyo_sketch_core as sk;
 fn session() -> Session {
     let mut s = Session::new(800);
     s.set_workbench(Workbench::Sketch);
-    s.new_sketch().unwrap();
     let mut snap = s.snapping();
     snap.enabled = false;
     s.set_snapping(snap);
+    s
+}
+fn owned_session() -> Session {
+    let d = Document::new(802);
+    d.create_page_sketch(
+        &d.pages()[0].id,
+        &sk::Sketch::new("origin".into()),
+        &curvyo_document_core::Style::default(),
+    )
+    .unwrap();
+    let mut s = Session::open(
+        803,
+        &curvyo_document_core::pack(&d, "owned interaction fixture").unwrap(),
+    )
+    .unwrap();
+    s.set_workbench(Workbench::Sketch);
     s
 }
 fn document(s: &Session) -> Document {
@@ -21,8 +36,15 @@ fn graph(s: &Session) -> sk::Sketch {
         .unwrap()
         .solution
 }
+fn at(s: &Session, x: f64, y: f64) -> Point {
+    let page = s.active_page();
+    Point::new(
+        page.origin.x + page.size.width.as_mm() / 2.0 + x,
+        page.origin.y + page.size.height.as_mm() / 2.0 + y,
+    )
+}
 fn click(s: &mut Session, x: f64, y: f64) {
-    let p = Point::new(x, y);
+    let p = at(s, x, y);
     s.pointer_down(p, false);
     s.pointer_up(p, false, false);
 }
@@ -117,7 +139,7 @@ fn s04_polyline_escape_keeps_segments_and_shared_identity() {
     click(&mut s, 30.0, 30.0);
     assert_eq!(s.undo_len(), count + 2);
     let before = graph(&s);
-    s.pointer_hover(Point::new(40.0, 40.0), false, false);
+    s.pointer_hover(at(&s, 40.0, 40.0), false, false);
     s.escape();
     assert_eq!(graph(&s), before);
     assert_eq!(s.undo_len(), count + 2);
@@ -170,7 +192,7 @@ fn s07_formula_rename_and_invalid_cycle_keep_valid_values_and_history() {
     assert_eq!(graph(&s), before);
 }
 #[test]
-fn s01_navigation_and_layer_new_have_exactly_one_step() {
+fn s01_navigation_is_inert_and_first_page_owner_edit_has_exactly_one_step() {
     let mut s = Session::new(810);
     let initial = s.undo_len();
     s.set_workbench(Workbench::Sketch);
@@ -180,9 +202,14 @@ fn s01_navigation_and_layer_new_have_exactly_one_step() {
     let layer = s.active_layer().unwrap();
     let count = s.undo_len();
     s.set_workbench(Workbench::Sketch);
-    let id = s.new_sketch().unwrap();
+    assert_eq!(s.undo_len(), count);
+    assert!(s.active_sketch().is_none());
+    s.set_sketch_tool(SketchTool::Point);
+    click(&mut s, 30.0, 30.0);
+    let id = s.active_sketch().unwrap();
     assert_eq!(s.undo_len(), count + 1);
-    assert_eq!(document(&s).parent_node(id), Some(layer));
+    assert_eq!(document(&s).page_sketch(&s.active_page().id), Some(id));
+    assert!(document(&s).contains_node(layer));
     let before = document(&s).version();
     s.set_workbench(Workbench::Vector);
     s.set_workbench(Workbench::Sketch);
@@ -191,12 +218,12 @@ fn s01_navigation_and_layer_new_have_exactly_one_step() {
 }
 
 #[test]
-fn s11_rectangle_key_only_alt_preserves_anchor_axes_and_history_in_both_phases() {
+fn s11_rectangle_ignores_vector_snapping_and_preserves_anchor_history_in_both_phases() {
     for stored in [false, true] {
         for (x, y) in [(true, true), (true, false), (false, true), (false, false)] {
             for held in [false, true] {
                 for alt in [true, false] {
-                    let mut s = session();
+                    let mut s = owned_session();
                     s.set_snapping(curvyo_document_core::DocumentSnapping {
                         enabled: stored,
                         objects: false,
@@ -210,11 +237,11 @@ fn s11_rectangle_key_only_alt_preserves_anchor_axes_and_history_in_both_phases()
                     s.set_sketch_tool(SketchTool::Rectangle);
                     let steps = s.undo_len();
                     if held {
-                        s.pointer_down(Point::new(20.0, 20.0), false);
+                        s.pointer_down(at(&s, 20.0, 20.0), false);
                     } else {
                         click(&mut s, 20.0, 20.0);
                     }
-                    s.pointer_hover(Point::new(104.0, 149.0), false, false);
+                    s.pointer_hover(at(&s, 104.0, 149.0), false, false);
                     s.modifiers_changed(false, false, true);
                     if !alt {
                         s.modifiers_changed(false, false, false);
@@ -245,9 +272,9 @@ fn s11_rectangle_key_only_alt_preserves_anchor_axes_and_history_in_both_phases()
                         .iter()
                         .map(|p| p.y.0)
                         .fold(f64::NEG_INFINITY, f64::max);
-                    let effective = stored != alt;
-                    assert!((max_x - if effective && x { 105.0 } else { 104.0 }).abs() < 1e-6);
-                    assert!((max_y - if effective && y { 148.5 } else { 149.0 }).abs() < 1e-6);
+                    // Revised AC: Sketch never uses Vector target snapping, even with Alt.
+                    assert!((max_x - 104.0).abs() < 1e-6);
+                    assert!((max_y - 149.0).abs() < 1e-6);
                     assert!(
                         points
                             .iter()

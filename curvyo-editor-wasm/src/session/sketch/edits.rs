@@ -57,11 +57,10 @@ impl Session {
     /// # Errors
     /// Refuses missing sketch/origin records.
     pub fn sketch_fix_origin(&mut self, fixed: bool) -> Result<bool, SketchEditError> {
-        let snapshot = self.sketch_snapshot_for_edit()?;
-        let mut entity = snapshot
-            .graph
+        let graph = self.sketch_intent_for_edit()?;
+        let mut entity = graph
             .entities
-            .get(&snapshot.graph.origin)
+            .get(&graph.origin)
             .cloned()
             .ok_or_else(|| SketchEditError("Origin no longer exists".into()))?;
         if let Entity::Point { fixed: value, .. } = &mut entity {
@@ -69,7 +68,7 @@ impl Session {
         }
         self.sketch_apply_delta(&SketchDelta {
             entities: BTreeMap::from([(
-                snapshot.graph.origin,
+                graph.origin,
                 Some(SketchEntityRecord {
                     entity,
                     construction: false,
@@ -170,8 +169,19 @@ impl Session {
         delta: &SketchDelta,
     ) -> Result<bool, SketchEditError> {
         let result = self.recording(|this| {
-            let id = this.sketch_snapshot_for_edit()?.id;
-            this.document.apply_sketch_delta(id, delta)
+            this.sync_sketch_page();
+            if let Some(id) = this.active_sketch() {
+                this.sketch_snapshot_for_edit()?;
+                this.document.apply_sketch_delta(id, delta)
+            } else {
+                let base = this.sketch_intent_for_edit()?;
+                let mut intent = base.clone();
+                delta.apply_to(&mut intent);
+                if intent == base {
+                    return Ok(false);
+                }
+                this.materialize_sketch(&intent)
+            }
         });
         self.sketch.error = result.as_ref().err().map(ToString::to_string);
         result

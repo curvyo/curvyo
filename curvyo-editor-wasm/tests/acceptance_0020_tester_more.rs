@@ -854,6 +854,11 @@ fn c36_old_files_have_no_adjacent_rows_with_the_same_legacy_label() {
                 | "sketch_converted_v28.curvyo"
                 | "sketch_checkpoint_invalid_v28.curvyo"
                 | "sketch_record_invalid_v28.curvyo"
+                | "sketch_page_owner_v28.curvyo"
+                | "sketch_page_claim_invalid_v28.curvyo"
+                | "sketch_page_assignment_invalid_v28.curvyo"
+                | "sketch_dimension_label_v28.curvyo"
+                | "sketch_label_invalid_v28.curvyo"
         );
         if name == "sketch_dangling_v28.curvyo" {
             let clones: Vec<_> = rows

@@ -39,8 +39,10 @@ impl Session {
             self.sketch_drag_hover(point);
             return;
         }
-        let point = self.snap_creation_point(point);
-        self.sketch.hover = self.sketch_local(point);
+        self.sketch.hover = self
+            .sketch_local(point)
+            .map(|local| self.infer_sketch_axes(local));
+        self.project_sketch_arc_hover();
         self.refresh_sketch_construction_preview();
     }
 
@@ -55,6 +57,11 @@ impl Session {
         let Some(press) = self.sketch.press.take() else {
             return;
         };
+        if press.vector_to(point).length() * self.view().scale() <= 3.0
+            && self.sketch_resume_at(point)
+        {
+            return;
+        }
         let count = pick_count(self.sketch.tool);
         // Click-vs-drag is raw screen travel, independent of attraction.
         if self.sketch.picks.is_empty()
@@ -97,31 +104,41 @@ impl Session {
         ) else {
             return;
         };
+        if let (Some(previous), Some((_, start))) = (&self.sketch.chain_curve, &self.sketch.chain)
+            && self.sketch.tool == SketchTool::Polyline
+        {
+            command = Construction::Continue {
+                previous: previous.clone(),
+                start: start.clone(),
+                end: format!("{prefix}:end").into(),
+                position: local,
+                mode: self.sketch.mode,
+            };
+        }
         let closing = self.sketch_close_target(local);
         if let Some((first, last)) = &closing {
-            command = Construction::Segment {
-                start: last.clone(),
-                end: first.clone(),
-                end_position: None,
-            };
+            command = self.sketch.chain_curve.as_ref().map_or_else(
+                || Construction::Segment {
+                    start: last.clone(),
+                    end: first.clone(),
+                    end_position: None,
+                },
+                |previous| Construction::Continue {
+                    previous: previous.clone(),
+                    start: last.clone(),
+                    end: first.clone(),
+                    position: local,
+                    mode: self.sketch.mode,
+                },
+            );
         }
         let saved_picks = self.sketch.picks.clone();
         let chain = self.sketch.chain.clone();
         match self.sketch_construct_named(&prefix, &command) {
             Ok(_) => {
-                self.sketch.picks.clear();
+                self.sketch.cancel();
                 if self.sketch.tool == SketchTool::Polyline && closing.is_none() {
-                    let first = chain
-                        .as_ref()
-                        .map_or_else(|| format!("{prefix}:p0").into(), |(first, _)| first.clone());
-                    let last = if chain.is_some() {
-                        format!("{prefix}:end")
-                    } else {
-                        format!("{prefix}:p1")
-                    }
-                    .into();
-                    self.sketch.chain = Some((first, last));
-                    self.sketch.picks.push(local);
+                    self.continue_sketch_chain(&prefix, &command, chain.as_ref());
                 }
             }
             Err(error) => {
@@ -132,10 +149,13 @@ impl Session {
         }
     }
 
-    fn sketch_close_target(
+    pub(super) fn sketch_close_target(
         &self,
         local: Position,
     ) -> Option<(curvyo_sketch_core::EntityId, curvyo_sketch_core::EntityId)> {
+        if self.sketch.tool != SketchTool::Polyline {
+            return None;
+        }
         let (first, last) = self.sketch.chain.as_ref()?;
         let snapshot = self.sketch_snapshot_for_edit().ok()?;
         let position = snapshot.solution.point(first).ok()?;
@@ -144,9 +164,8 @@ impl Session {
     }
 
     pub(super) fn sketch_local(&self, point: Point) -> Option<Position> {
-        let snapshot = self.document.sketch(self.active_sketch()?)?;
-        let local = snapshot.placement.inverse()?.apply_point(point);
-        Some(Position::mm(local.x, local.y))
+        let local = self.sketch_placement()?.inverse()?.apply_point(point);
+        (local.x.is_finite() && local.y.is_finite()).then(|| Position::mm(local.x, local.y))
     }
 }
 
@@ -154,6 +173,7 @@ pub(super) fn pick_count(tool: SketchTool) -> usize {
     match tool {
         SketchTool::Point => 1,
         SketchTool::Arc
+        | SketchTool::ArcCenter
         | SketchTool::CircleThreePoints
         | SketchTool::Ellipse
         | SketchTool::EllipseThreePoints
@@ -187,7 +207,19 @@ pub(super) fn construction(
             center: a,
             radius: a.distance(b),
         },
-        SketchTool::Arc => Construction::Arc([a, b, *picks.get(2)?]),
+        SketchTool::ArcCenter => Construction::ArcCenter {
+            center: a,
+            start: b,
+            end: *picks.get(2)?,
+        },
+        SketchTool::Arc => match chain {
+            Some((_, start)) => Construction::ArcFrom {
+                start: start.clone(),
+                through: b,
+                end: *picks.get(2)?,
+            },
+            None => Construction::Arc([a, b, *picks.get(2)?]),
+        },
         SketchTool::CircleThreePoints => Construction::CircleThreePoints([a, b, *picks.get(2)?]),
         SketchTool::EllipseThreePoints => Construction::EllipseThreePoints([a, b, *picks.get(2)?]),
         SketchTool::Ellipse => {

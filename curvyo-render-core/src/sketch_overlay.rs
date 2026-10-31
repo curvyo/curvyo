@@ -60,3 +60,61 @@ pub fn build_sketch_overlay(
     }
     list
 }
+
+/// Draws transient analytic geometry without inventing a document object identity.
+#[must_use]
+pub fn build_sketch_preview(
+    paths: &[curvyo_document_core::SubpathSnapshot],
+    view: ViewTransform,
+) -> DrawList {
+    let mut list = DrawList::default();
+    for path in paths {
+        list.extend(stroke::path_stroke(
+            &path.anchors,
+            path.closed,
+            1.5 / view.scale(),
+            theme::ACCENT,
+            0.1 / view.scale(),
+        ));
+    }
+    list
+}
+
+/// Draws the immutable local frame with distinct inferred-axis emphasis.
+#[must_use]
+pub fn build_sketch_axes(
+    placement: curvyo_document_core::Affine,
+    half_size: curvyo_document_core::Vec2,
+    hover: Option<Point>,
+    view: ViewTransform,
+) -> DrawList {
+    let mut list = DrawList::default();
+    for (a, b, active) in [
+        (
+            Point::new(-half_size.x, 0.0),
+            Point::new(half_size.x, 0.0),
+            hover.is_some_and(|p| p.y.abs() <= 1e-9),
+        ),
+        (
+            Point::new(0.0, -half_size.y),
+            Point::new(0.0, half_size.y),
+            hover.is_some_and(|p| p.x.abs() <= 1e-9),
+        ),
+    ] {
+        list.extend(glyphs::thick_line(
+            placement.apply_point(a),
+            placement.apply_point(b),
+            if active {
+                1.5 / view.scale()
+            } else {
+                0.5 / view.scale()
+            },
+            if active {
+                theme::ACCENT
+            } else {
+                theme::AXIS_GUIDE
+            },
+        ));
+    }
+    list
+}

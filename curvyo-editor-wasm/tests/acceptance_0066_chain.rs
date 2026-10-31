@@ -1,7 +1,7 @@
 //! Independent connected 100-entity production Session workload and runtime parity corpus.
 #![allow(clippy::unwrap_used)]
 mod cpu_time;
-use curvyo_document_core::{Affine, Document, Point, Style, pack, unpack};
+use curvyo_document_core::{Document, Point, Style, pack, unpack};
 use curvyo_editor_wasm::{Session, SketchTool, Workbench};
 use curvyo_sketch_core as sk;
 fn chain() -> sk::Sketch {
@@ -48,11 +48,13 @@ fn valid(g: &sk::Sketch) {
 fn s15_connected_chain_pointer_view_draw_and_parity_fixture() {
     let d = Document::new(720);
     let id = d
-        .create_sketch(&chain(), Affine::IDENTITY, &Style::default())
+        .create_page_sketch(&d.pages()[0].id, &chain(), &Style::default())
         .unwrap();
+    let placement = d.sketch(id).unwrap().placement;
     let bytes = pack(&d, "acceptance").unwrap();
-    std::fs::create_dir_all("../target/0066-runtime").unwrap();
-    std::fs::write("../target/0066-runtime/chain.curvyo", &bytes).unwrap();
+    std::fs::create_dir_all("../target/0066-runtime-revision").unwrap();
+    std::fs::write("../target/0066-runtime-revision/chain.curvyo", &bytes).unwrap();
+    std::fs::write("../target/0066-runtime-revision/chain-context.json", serde_json::to_vec(&serde_json::json!({"owner": id.full_id(), "page": d.pages()[0].id, "pageOrigin": [d.pages()[0].origin.x, d.pages()[0].origin.y], "pageSize": [d.pages()[0].size.width.as_mm(),d.pages()[0].size.height.as_mm()], "placement": d.sketch(id).unwrap().placement.to_array()})).unwrap()).unwrap();
     let mut s = Session::open(721, &bytes).unwrap();
     s.set_workbench(Workbench::Sketch);
     assert!(s.enter_sketch(id));
@@ -69,9 +71,9 @@ fn s15_connected_chain_pointer_view_draw_and_parity_fixture() {
         } else {
             Point::new(500.0, 200.0)
         };
-        s.pointer_down(start, false);
+        s.pointer_down(placement.apply_point(start), false);
         let ((), elapsed) = cpu_time::cpu_time_of(|| {
-            s.pointer_hover(target, false, false);
+            s.pointer_hover(placement.apply_point(target), false, false);
             std::hint::black_box(s.sketch_view_json());
             std::hint::black_box(s.draw_list());
         });
@@ -104,7 +106,7 @@ fn s15_connected_chain_pointer_view_draw_and_parity_fixture() {
                 "frame {frame} must move toward target"
             );
         }
-        s.pointer_up(target, false, false);
+        s.pointer_up(placement.apply_point(target), false, false);
         let committed = unpack(722, &s.pack("acceptance").unwrap())
             .unwrap()
             .sketch(id)
@@ -118,7 +120,7 @@ fn s15_connected_chain_pointer_view_draw_and_parity_fixture() {
         }
     }
     std::fs::write(
-        "../target/0066-runtime/chain-native.json",
+        "../target/0066-runtime-revision/chain-native.json",
         serde_json::to_vec_pretty(&records).unwrap(),
     )
     .unwrap();
@@ -139,13 +141,16 @@ fn s15_connected_chain_pointer_view_draw_and_parity_fixture() {
 #[test]
 #[ignore = "requires executed Node/WASM artifacts from tests/runtime/sketch-chain.cjs"]
 fn s16_actual_node_wasm_unrounded_geometry_matches_native() {
-    let records: serde_json::Value =
-        serde_json::from_slice(&std::fs::read("../target/0066-runtime/chain-native.json").unwrap())
-            .unwrap();
+    let records: serde_json::Value = serde_json::from_slice(
+        &std::fs::read("../target/0066-runtime-revision/chain-native.json").unwrap(),
+    )
+    .unwrap();
     let mut worst: f64 = 0.0;
     for (index, record) in records.as_array().unwrap().iter().enumerate() {
-        let bytes =
-            std::fs::read(format!("../target/0066-runtime/chain-wasm-{index}.curvyo")).unwrap();
+        let bytes = std::fs::read(format!(
+            "../target/0066-runtime-revision/chain-wasm-{index}.curvyo"
+        ))
+        .unwrap();
         let document = unpack(799, &bytes).unwrap();
         let object = document
             .read_objects()

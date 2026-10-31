@@ -4,7 +4,6 @@ use curvyo_sketch_core::{Construction, Position};
 
 #[test]
 fn rectangle_clicks_and_circle_drag_use_actual_pointer_routes() {
-    use curvyo_document_core::Point;
     let mut session = Session::new(68);
     session.set_workbench(Workbench::Sketch);
     let id = session.new_sketch().unwrap();
@@ -14,26 +13,26 @@ fn rectangle_clicks_and_circle_drag_use_actual_pointer_routes() {
     });
     let baseline = session.undo_len();
     session.set_sketch_tool(SketchTool::Rectangle);
-    session.pointer_down(Point::new(10.0, 20.0), false);
-    session.pointer_up(Point::new(10.0, 20.0), false, false);
+    session.pointer_down(placed(&session, 10.0, 20.0), false);
+    session.pointer_up(placed(&session, 10.0, 20.0), false, false);
     assert_eq!(session.undo_len(), baseline);
-    session.pointer_hover(Point::new(30.0, 40.0), false, false);
-    session.pointer_down(Point::new(30.0, 40.0), false);
-    session.pointer_up(Point::new(30.0, 40.0), false, false);
+    session.pointer_hover(placed(&session, 30.0, 40.0), false, false);
+    session.pointer_down(placed(&session, 30.0, 40.0), false);
+    session.pointer_up(placed(&session, 30.0, 40.0), false, false);
     assert_eq!(session.undo_len(), baseline + 1);
     assert_eq!(session.document.sketch(id).unwrap().graph.entities.len(), 9);
     session.set_sketch_tool(SketchTool::Circle);
-    session.pointer_down(Point::new(50.0, 50.0), false);
-    session.pointer_hover(Point::new(60.0, 50.0), false, false);
-    session.pointer_up(Point::new(60.0, 50.0), false, false);
+    session.pointer_down(placed(&session, 50.0, 50.0), false);
+    session.pointer_hover(placed(&session, 60.0, 50.0), false, false);
+    session.pointer_up(placed(&session, 60.0, 50.0), false, false);
     assert_eq!(session.undo_len(), baseline + 2);
     assert_eq!(
         session.document.sketch(id).unwrap().graph.entities.len(),
         11
     );
     session.set_sketch_tool(SketchTool::Arc);
-    session.pointer_down(Point::new(80.0, 80.0), false);
-    session.pointer_up(Point::new(80.0, 80.0), false, false);
+    session.pointer_down(placed(&session, 80.0, 80.0), false);
+    session.pointer_up(placed(&session, 80.0, 80.0), false, false);
     session.escape();
     assert_eq!(session.undo_len(), baseline + 2);
     assert_eq!(session.sketch.picks.len(), 0);
@@ -41,7 +40,6 @@ fn rectangle_clicks_and_circle_drag_use_actual_pointer_routes() {
 
 #[test]
 fn ellipse_body_drag_is_live_shape_preserving_cancelable_and_one_commit() {
-    use curvyo_document_core::Point;
     use curvyo_sketch_core::{Entity, Length};
     let mut session = Session::new(71);
     session.set_workbench(Workbench::Sketch);
@@ -60,8 +58,8 @@ fn ellipse_body_drag_is_live_shape_preserving_cancelable_and_one_commit() {
     session.set_sketch_tool(SketchTool::Select);
     let before = session.document.sketch(id).unwrap();
     let history = session.undo_len();
-    session.pointer_down(Point::new(30.0, 35.0), false);
-    session.pointer_hover(Point::new(37.0, 42.0), false, false);
+    session.pointer_down(placed(&session, 30.0, 35.0), false);
+    session.pointer_hover(placed(&session, 37.0, 42.0), false, false);
     let preview = session.sketch_preview().unwrap();
     let center = before
         .graph
@@ -86,9 +84,9 @@ fn ellipse_body_drag_is_live_shape_preserving_cancelable_and_one_commit() {
     assert_eq!(session.undo_len(), history);
     // A second Escape clears selection; the first preserves it after cancel.
     session.escape();
-    session.pointer_down(Point::new(30.0, 35.0), false);
-    session.pointer_hover(Point::new(37.0, 42.0), false, false);
-    session.pointer_up(Point::new(37.0, 42.0), false, false);
+    session.pointer_down(placed(&session, 30.0, 35.0), false);
+    session.pointer_hover(placed(&session, 37.0, 42.0), false, false);
+    session.pointer_up(placed(&session, 37.0, 42.0), false, false);
     assert_eq!(session.undo_len(), history + 1);
     let after = session.document.sketch(id).unwrap();
     assert!(
@@ -106,7 +104,6 @@ fn ellipse_body_drag_is_live_shape_preserving_cancelable_and_one_commit() {
 
 #[test]
 fn constrained_release_persists_feasible_point_even_after_dimension_removal() {
-    use curvyo_document_core::Point;
     use curvyo_sketch_core::{Constraint, Entity, Expression, Quantity, Relation};
     let mut session = Session::new(74);
     session.set_workbench(Workbench::Sketch);
@@ -139,8 +136,8 @@ fn constrained_release_persists_feasible_point_even_after_dimension_removal() {
             }),
         )
         .unwrap();
-    session.pointer_down(Point::new(10.0, 0.0), false);
-    session.pointer_hover(Point::new(20.0, 20.0), false, false);
+    session.pointer_down(placed(&session, 10.0, 0.0), false);
+    session.pointer_hover(placed(&session, 20.0, 20.0), false, false);
     let expected = Position::mm(10.0 / 2.0_f64.sqrt(), 10.0 / 2.0_f64.sqrt());
     assert!(
         session
@@ -152,7 +149,7 @@ fn constrained_release_persists_feasible_point_even_after_dimension_removal() {
             .0
             < 1e-6
     );
-    session.pointer_up(Point::new(20.0, 20.0), false, false);
+    session.pointer_up(placed(&session, 20.0, 20.0), false, false);
     assert!(
         session
             .document
@@ -206,7 +203,6 @@ fn constrained_release_persists_feasible_point_even_after_dimension_removal() {
 
 #[test]
 fn selected_ellipse_actual_axis_handle_edits_axis_without_moving_center() {
-    use curvyo_document_core::Point;
     use curvyo_sketch_core::{Entity, Length, SketchHandle, handle_positions};
     let mut session = Session::new(78);
     session.set_workbench(Workbench::Sketch);
@@ -227,8 +223,8 @@ fn selected_ellipse_actual_axis_handle_edits_axis_without_moving_center() {
         .unwrap();
     assert!(session.sketch_select_entity(&"ellipse:curve".into(), false));
     let history = session.undo_len();
-    session.pointer_down(Point::new(50.5, 30.0), false);
-    session.pointer_hover(Point::new(60.5, 30.0), false, false);
+    session.pointer_down(placed(&session, 50.5, 30.0), false);
+    session.pointer_hover(placed(&session, 60.5, 30.0), false, false);
     let preview = session.sketch_preview().unwrap();
     assert!(
         handle_positions(preview, &"ellipse:curve".into()).unwrap()[&SketchHandle::MajorAxis]
@@ -236,7 +232,7 @@ fn selected_ellipse_actual_axis_handle_edits_axis_without_moving_center() {
             .0
             < 1e-6
     );
-    session.pointer_up(Point::new(60.5, 30.0), false, false);
+    session.pointer_up(placed(&session, 60.5, 30.0), false, false);
     let after = session.document.sketch(id).unwrap();
     assert_eq!(session.undo_len(), history + 1);
     let Entity::Ellipse { center, .. } = &after.solution.entities[&"ellipse:curve".into()] else {
@@ -254,8 +250,7 @@ fn selected_ellipse_actual_axis_handle_edits_axis_without_moving_center() {
 }
 
 #[test]
-fn offset_press_snaps_actual_point_to_stationary_sibling_with_alt_inversion() {
-    use curvyo_document_core::Point;
+fn offset_press_preserves_raw_geometry_without_node_or_alt_attraction() {
     let mut session = Session::new(80);
     session.set_workbench(Workbench::Sketch);
     let id = session.new_sketch().unwrap();
@@ -272,8 +267,8 @@ fn offset_press_snaps_actual_point_to_stationary_sibling_with_alt_inversion() {
         nodes: true,
         ..session.snapping()
     });
-    session.pointer_down(Point::new(10.5, 20.0), false);
-    session.pointer_hover(Point::new(29.5, 20.0), false, false);
+    session.pointer_down(placed(&session, 10.5, 20.0), false);
+    session.pointer_hover(placed(&session, 29.5, 20.0), false, false);
     let point = session
         .document
         .sketch(id)
@@ -291,7 +286,7 @@ fn offset_press_snaps_actual_point_to_stationary_sibling_with_alt_inversion() {
             .unwrap()
             .point(&point)
             .unwrap()
-            .distance(Position::mm(30.0, 20.0))
+            .distance(Position::mm(29.0, 20.0))
             .0
             < 1e-6
     );
@@ -313,11 +308,11 @@ fn offset_press_snaps_actual_point_to_stationary_sibling_with_alt_inversion() {
             .unwrap()
             .point(&point)
             .unwrap()
-            .distance(Position::mm(30.0, 20.0))
+            .distance(Position::mm(29.0, 20.0))
             .0
             < 1e-6
     );
-    session.pointer_up(Point::new(29.5, 20.0), false, false);
+    session.pointer_up(placed(&session, 29.5, 20.0), false, false);
     assert!(
         session
             .document
@@ -326,15 +321,14 @@ fn offset_press_snaps_actual_point_to_stationary_sibling_with_alt_inversion() {
             .graph
             .point(&point)
             .unwrap()
-            .distance(Position::mm(30.0, 20.0))
+            .distance(Position::mm(29.0, 20.0))
             .0
             < 1e-6
     );
 }
 
 #[test]
-fn fixed_origin_does_not_hide_other_constrained_component_snap_targets() {
-    use curvyo_document_core::Point;
+fn fixed_origin_constrained_drag_ignores_stationary_node_attraction() {
     use curvyo_sketch_core::{Constraint, Expression, Quantity, Relation};
     let mut session = Session::new(83);
     session.set_workbench(Workbench::Sketch);
@@ -374,8 +368,8 @@ fn fixed_origin_does_not_hide_other_constrained_component_snap_targets() {
         nodes: true,
         ..session.snapping()
     });
-    session.pointer_down(Point::new(10.0, 20.0), false);
-    session.pointer_hover(Point::new(20.5, 10.5), false, false);
+    session.pointer_down(placed(&session, 10.0, 20.0), false);
+    session.pointer_hover(placed(&session, 20.5, 10.5), false, false);
     let point = graph
         .entities
         .keys()
@@ -387,7 +381,10 @@ fn fixed_origin_does_not_hide_other_constrained_component_snap_targets() {
             .unwrap()
             .point(point)
             .unwrap()
-            .distance(Position::mm(20.0, 10.0))
+            .distance(Position::mm(
+                20.5 * 500.0_f64.sqrt() / 20.5_f64.hypot(10.5),
+                10.5 * 500.0_f64.sqrt() / 20.5_f64.hypot(10.5)
+            ))
             .0
             < 1e-6
     );
@@ -395,7 +392,6 @@ fn fixed_origin_does_not_hide_other_constrained_component_snap_targets() {
 
 #[test]
 fn repeated_modifier_snapshot_does_not_advance_an_existing_drag_preview() {
-    use curvyo_document_core::Point;
     let mut session = Session::new(94);
     session.set_workbench(Workbench::Sketch);
     session.new_sketch().unwrap();
@@ -407,8 +403,8 @@ fn repeated_modifier_snapshot_does_not_advance_an_existing_drag_preview() {
         .sketch_construct(&Construction::Point(Position::mm(20.0, 20.0)))
         .unwrap();
     session.set_sketch_tool(SketchTool::Select);
-    session.pointer_down(Point::new(20.0, 20.0), false);
-    session.pointer_hover(Point::new(30.0, 35.0), false, false);
+    session.pointer_down(placed(&session, 20.0, 20.0), false);
+    session.pointer_hover(placed(&session, 30.0, 35.0), false, false);
     let preview = session.sketch_preview().unwrap().clone();
     let steps = session.undo_len();
     session.modifiers_changed(false, false, false);
@@ -417,4 +413,11 @@ fn repeated_modifier_snapshot_does_not_advance_an_existing_drag_preview() {
     session.modifiers_changed(false, false, true);
     session.modifiers_changed(false, false, false);
     assert!(session.sketch_preview().is_some());
+}
+
+fn placed(session: &Session, x: f64, y: f64) -> curvyo_document_core::Point {
+    session
+        .sketch_placement()
+        .unwrap()
+        .apply_point(curvyo_document_core::Point::new(x, y))
 }

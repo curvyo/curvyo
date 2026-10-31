@@ -18,24 +18,23 @@ impl Session {
         command: &Construction,
     ) -> Result<bool, SketchEditError> {
         self.recording(|this| {
-            let id = this
-                .active_sketch()
-                .ok_or_else(|| SketchEditError("Create or select a sketch first".into()))?;
-            let snapshot = this.sketch_snapshot_for_edit()?;
-            if snapshot.stale {
-                return Err(SketchEditError(
-                    "Repair the sketch before adding geometry".into(),
-                ));
-            }
+            this.sync_sketch_page();
+            let base = this.sketch_creation_base()?;
             let version = this.document.version();
-            let operation = construct(&snapshot.solution, prefix, command)
+            let mut operation = construct(&base, prefix, command)
                 .map_err(|error| SketchEditError(error.to_string()))?;
-            let delta = explicit_delta(&snapshot.solution, &operation.intent);
+            this.constrain_inferred_axes(&base, &mut operation)
+                .map_err(|error| SketchEditError(error.to_string()))?;
+            let delta = explicit_delta(&base, &operation.intent);
             if this.document.version() != version {
                 return Err(SketchEditError("Sketch changed during construction".into()));
             }
-            this.document
-                .apply_sketch_preview(id, &delta, &operation.candidate)
+            if let Some(id) = this.active_sketch() {
+                this.document
+                    .apply_sketch_preview(id, &delta, &operation.candidate)
+            } else {
+                this.materialize_sketch(&operation.intent)
+            }
         })
     }
 }

@@ -120,14 +120,6 @@ impl SnappingState {
         }
     }
 
-    pub(super) fn extend_targets(&mut self, extra: Vec<curvyo_ui_core::SnapTarget>) {
-        if let Some(drag) = &mut self.drag {
-            let mut entries = drag.targets.entries().to_vec();
-            entries.extend(extra);
-            drag.targets = SnapTargets::new(entries);
-        }
-    }
-
     /// Ends the drag (release, Escape, tool change).
     pub fn end_drag(&mut self) {
         self.drag = None;

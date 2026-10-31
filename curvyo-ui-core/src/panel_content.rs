@@ -25,6 +25,8 @@ pub enum PanelContent {
     Snapping,
     /// Parametric sketch controls.
     Sketches,
+    /// Named sketch parameters and formulas.
+    Parameters,
     /// Nothing: no heading, no text, no control (`specs/0017-style-panel-
     /// rework` criterion 1). The Document tab with an unfinished Pen path, so
     /// a resize would not move the path being drawn, or the Style tab with
@@ -56,6 +58,7 @@ pub fn panel_body(
         PanelTab::Fonts => PanelContent::Fonts,
         PanelTab::Snapping => PanelContent::Snapping,
         PanelTab::Sketches => PanelContent::Sketches,
+        PanelTab::Parameters => PanelContent::Parameters,
     }
 }
 

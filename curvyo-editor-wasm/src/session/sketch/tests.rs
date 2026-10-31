@@ -197,7 +197,7 @@ fn revision_sync_retains_only_current_analytic_selection() {
     session.undo();
     assert_eq!(session.sketch.entities, [b].into());
     assert!(session.sketch.constraints.is_empty());
-    session.new_sketch().unwrap();
+    session.add_page();
     assert!(session.sketch.entities.is_empty());
     assert!(session.sketch.constraints.is_empty());
 }

@@ -5,6 +5,7 @@ use curvyo_sketch_core::{ConstraintId, Entity, Position};
 use serde::Serialize;
 /// An annotation's screen placement is computed by Rust, never by the host.
 #[derive(Debug, Clone, Serialize)]
+#[allow(clippy::struct_excessive_bools)] // Independent serialized presentation flags, not a domain state machine.
 pub struct SketchAnnotation {
     /// Stable relationship identity.
     pub id: String,
@@ -18,6 +19,8 @@ pub struct SketchAnnotation {
     pub dimension: bool,
     /// Whether inspection currently selects this relationship.
     pub selected: bool,
+    /// Transient placement feedback, not an inspectable stored relationship.
+    pub preview: bool,
     /// Proven conflicting relationship, distinct from numerical failure.
     pub conflicting: bool,
 }
@@ -111,7 +114,11 @@ impl Session {
                 #[allow(clippy::cast_precision_loss)]
                 // a collection's point count used only for a display centroid
                 let count = positions.len() as f64;
-                let center = Position::mm(sum.0 / count, sum.1 / count);
+                let center = snapshot
+                    .labels
+                    .get(id)
+                    .copied()
+                    .unwrap_or_else(|| Position::mm(sum.0 / count, sum.1 / count));
                 let document = snapshot
                     .placement
                     .apply_point(Point::new(center.x.0, center.y.0));
@@ -135,23 +142,38 @@ impl Session {
                 Some(SketchAnnotation {
                     id: id.0.clone(),
                     x: screen.0,
-                    y: screen.1 - 18.0,
+                    y: screen.1
+                        - if snapshot.labels.contains_key(id) {
+                            0.0
+                        } else {
+                            18.0
+                        },
                     text,
                     dimension: value.is_some(),
                     selected: self.sketch.constraints.contains(id),
                     conflicting: snapshot.conflicting.contains(id),
+                    preview: false,
                 })
             })
             .collect();
         // Stable constraint order separates coincident labels without changing their
         // geometry anchors. The matching hit-test uses these same screen positions.
         for index in 0..annotations.len() {
+            if snapshot
+                .labels
+                .contains_key(&annotations[index].id.clone().into())
+            {
+                continue;
+            }
             while annotations[..index].iter().any(|other| {
                 (other.x - annotations[index].x).abs() < 100.0
                     && (other.y - annotations[index].y).abs() < 18.0
             }) {
                 annotations[index].y -= 18.0;
             }
+        }
+        if let Some(preview) = self.sketch_dimension_annotation(snapshot) {
+            annotations.push(preview);
         }
         annotations
     }
@@ -160,6 +182,7 @@ impl Session {
         let nearest = self
             .sketch_annotations()
             .into_iter()
+            .filter(|annotation| !annotation.preview)
             .map(|annotation| {
                 let distance = (annotation.x - screen.0).hypot(annotation.y - screen.1);
                 (annotation.id, distance)

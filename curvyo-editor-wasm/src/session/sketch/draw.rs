@@ -9,11 +9,7 @@ impl Session {
     pub(in crate::session) fn sketch_draw_list(&self) -> DrawList {
         let render = self.render_objects();
         let Some(snapshot) = self.sketch.active.and_then(|id| self.document.sketch(id)) else {
-            return curvyo_render_core::build_artwork_with_guides(
-                &render,
-                &self.document_read().guides,
-                self.view(),
-            );
+            return self.empty_sketch_draw_list(&render);
         };
         let solution = self
             .sketch_preview()
@@ -32,6 +28,7 @@ impl Session {
         );
         let construction = filtered_outline(&snapshot, solution, &solution.construction);
         let mut selected = self.sketch.entities.clone();
+        selected.extend(self.sketch.preselection.iter().cloned());
         for id in &self.sketch.constraints {
             if let Some(c) = snapshot.graph.constraints.get(id) {
                 selected.extend(c.relation.entity_ids().into_iter().cloned());
@@ -87,8 +84,77 @@ impl Session {
             &points,
             self.view(),
         ));
-        list.extend(self.snap_marker_list());
+        list.extend(self.sketch_axes_draw_list());
+        if let Some(stroke) = &self.sketch.lasso {
+            list.extend(curvyo_render_core::build_marquee_overlay(
+                self.view(),
+                &curvyo_render_core::MarqueeOverlay::Lasso(stroke.clone()),
+                1.0,
+            ));
+        }
+        if let Some((from, to)) = self.sketch.marquee {
+            let contain = curvyo_ui_core::MarqueeMode::for_drag(from, to, self.held.alt)
+                == curvyo_ui_core::MarqueeMode::Contain;
+            list.extend(curvyo_render_core::build_marquee_overlay(
+                self.view(),
+                &curvyo_render_core::MarqueeOverlay::Box { from, to, contain },
+                1.0,
+            ));
+        }
         list
+    }
+
+    fn empty_sketch_draw_list(&self, render: &[ObjectSnapshot]) -> DrawList {
+        let mut list = curvyo_render_core::build_artwork_with_guides(
+            render,
+            &self.document_read().guides,
+            self.view(),
+        );
+        if let Some(placement) = self.sketch_placement() {
+            if let Some(preview) = self.sketch_construction_preview()
+                && let Ok(paths) =
+                    curvyo_document_core::sketch_preview_outline(&preview.candidate, placement)
+            {
+                list.extend(curvyo_render_core::build_sketch_preview(
+                    &paths,
+                    self.view(),
+                ));
+            }
+            let points = std::iter::once(curvyo_sketch_core::Position::mm(0.0, 0.0))
+                .chain(self.sketch.picks.iter().copied())
+                .chain(self.sketch.hover.iter().copied())
+                .enumerate()
+                .map(|(i, p)| SketchPointGlyph {
+                    position: placement.apply_point(Point::new(p.x.0, p.y.0)),
+                    selected: i > 0,
+                    origin: i == 0,
+                })
+                .collect::<Vec<_>>();
+            list.extend(curvyo_render_core::build_sketch_overlay(
+                None,
+                None,
+                &points,
+                self.view(),
+            ));
+        }
+        list.extend(self.sketch_axes_draw_list());
+        list
+    }
+
+    fn sketch_axes_draw_list(&self) -> DrawList {
+        let Some(placement) = self.sketch_placement() else {
+            return DrawList::default();
+        };
+        let page = self.active_page();
+        curvyo_render_core::build_sketch_axes(
+            placement,
+            curvyo_document_core::Vec2::new(
+                page.size.width.as_mm() / 2.0,
+                page.size.height.as_mm() / 2.0,
+            ),
+            self.sketch.hover.map(|p| Point::new(p.x.0, p.y.0)),
+            self.view(),
+        )
     }
 
     fn sketch_replace_preview(

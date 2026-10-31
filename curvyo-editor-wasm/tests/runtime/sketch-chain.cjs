@@ -5,12 +5,15 @@ const bindings = path.resolve(process.argv[3] || path.join(root, 'bindings/curvy
 const {WasmSession} = require(bindings);
 const s = WasmSession.open(721n, fs.readFileSync(`${root}/chain.curvyo`));
 s.set_workbench('sketch');
-const id = JSON.parse(s.sketch_view_json()).sketches[0].id;
+const context = JSON.parse(fs.readFileSync(`${root}/chain-context.json`));
+const id = context.owner;
 if (!s.enter_sketch(id)) throw new Error('enter');
 s.set_sketch_tool('select');
 if (s.snapping_enabled()) s.toggle_snapping();
 const zero = s.screen_to_document(0,0), unit = s.screen_to_document(1,1);
-const screen = ([x,y])=>{
+const screen = ([localX,localY])=>{
+ const [a,b,c,d,e,f]=context.placement;
+ const x=a*localX+c*localY+e,y=b*localX+d*localY+f;
  const result=[(x-zero.x)/(unit.x-zero.x),(y-zero.y)/(unit.y-zero.y)];
  const check=s.screen_to_document(...result);
  if(Math.hypot(check.x-x,check.y-y)>1e-9) throw new Error('coordinate mapping mismatch');

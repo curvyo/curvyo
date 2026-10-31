@@ -24,6 +24,8 @@ pub enum PanelTab {
     Snapping,
     /// Parametric sketch editing and diagnostics.
     Sketches,
+    /// Named sketch parameters and formulas.
+    Parameters,
 }
 
 impl PanelTab {
@@ -39,6 +41,7 @@ impl PanelTab {
             Self::Fonts => "fonts",
             Self::Snapping => "snapping",
             Self::Sketches => "sketches",
+            Self::Parameters => "parameters",
         }
     }
 
@@ -58,6 +61,7 @@ impl PanelTab {
             Self::Fonts => "Fonts",
             Self::Snapping => "Snapping",
             Self::Sketches => "Sketches",
+            Self::Parameters => "Parameters",
         }
     }
 
@@ -74,6 +78,7 @@ impl PanelTab {
             (Self::Fonts, _) => "Fonts (Shift+Ctrl+T)",
             (Self::Snapping, _) => "Snapping",
             (Self::Sketches, _) => "Sketches",
+            (Self::Parameters, _) => "Parameters",
         }
     }
 }
@@ -103,7 +108,7 @@ impl StyleBlocker {
 
 /// The strip's tabs, in order (`0051` criterion 2). A tab whose feature has not shipped is not
 /// built; the order never changes.
-const TABS: [PanelTab; 8] = [
+const TABS: [PanelTab; 9] = [
     PanelTab::File,
     PanelTab::Document,
     PanelTab::Style,
@@ -112,6 +117,7 @@ const TABS: [PanelTab; 8] = [
     PanelTab::Fonts,
     PanelTab::Snapping,
     PanelTab::Sketches,
+    PanelTab::Parameters,
 ];
 
 /// The active tab and the one fact the automatic switches need: whether the
@@ -365,7 +371,7 @@ mod tests {
 
     /// `0051` criterion 2 and `0043` criterion 4: names, order, tooltips, the dimmed tab.
     #[test]
-    fn the_strip_has_eight_tabs_with_tooltips_and_a_dimmed_style() {
+    fn the_strip_has_nine_tabs_with_tooltips_and_a_dimmed_style() {
         let empty = tab_entries(Document, false);
         let names: Vec<_> = empty.iter().map(|e| (e.name, e.label)).collect();
         assert_eq!(
@@ -378,10 +384,15 @@ mod tests {
                 ("history", "History"),
                 ("fonts", "Fonts"),
                 ("snapping", "Snapping"),
-                ("sketches", "Sketches")
+                ("sketches", "Sketches"),
+                ("parameters", "Parameters")
             ]
         );
         assert_eq!(entry(&empty, "file").tooltip, "File");
+        assert_eq!(entry(&empty, "parameters").tooltip, "Parameters");
+        assert!(entry(&empty, "parameters").enabled);
+        assert!(!entry(&empty, "parameters").selected);
+        assert!(entry(&tab_entries(PanelTab::Parameters, false), "parameters").selected);
         assert_eq!(entry(&empty, "layers").tooltip, "Layers (Shift+Ctrl+L)");
         assert!(entry(&empty, "layers").enabled, "Layers is never dimmed");
         assert_eq!(entry(&empty, "history").tooltip, "History (Shift+Ctrl+H)");

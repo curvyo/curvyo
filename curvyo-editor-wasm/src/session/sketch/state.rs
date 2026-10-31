@@ -27,6 +27,8 @@ pub enum SketchTool {
     Polyline,
     /// Circular arc through three picks.
     Arc,
+    /// Centre, start and end direction circular arc.
+    ArcCenter,
     /// Centre and radius circle.
     Circle,
     /// Circle through three picks.
@@ -47,7 +49,12 @@ pub enum SketchTool {
 pub(in crate::session) struct SketchState {
     pub workbench: Workbench,
     pub active: Option<NodeId>,
+    pub page: Option<String>,
+    pub empty: Option<curvyo_sketch_core::Sketch>,
     pub tool: SketchTool,
+    pub constraint_tool: Option<String>,
+    pub mode: curvyo_sketch_core::ContinuationMode,
+    pub chain_curve: Option<EntityId>,
     pub entities: BTreeSet<EntityId>,
     pub constraints: BTreeSet<ConstraintId>,
     pub picks: Vec<Position>,
@@ -62,11 +69,26 @@ pub(in crate::session) struct SketchState {
     pub preview_base: Option<(DocumentVersion, curvyo_sketch_core::Sketch)>,
     pub edit_constraint: Option<ConstraintId>,
     pub affected: BTreeSet<ConstraintId>,
+    pub hit_cycle: Option<(curvyo_document_core::Point, Vec<EntityId>, usize)>,
+    pub preselection: Option<EntityId>,
+    pub lasso: Option<Vec<curvyo_document_core::Point>>,
+    pub marquee: Option<(curvyo_document_core::Point, curvyo_document_core::Point)>,
+    pub draft_epoch: u64,
+    pub arc_radius: Option<curvyo_sketch_core::Length>,
+    pub circle_dimension_radius: bool,
+    pub dimension_position: Option<curvyo_sketch_core::Position>,
     pub drag: Option<super::drag::SketchDrag>,
 }
 impl SketchState {
     pub fn cancel(&mut self) {
+        self.draft_epoch = self.draft_epoch.wrapping_add(1);
         self.drag = None;
+        self.dimension_position = None;
+        self.arc_radius = None;
+        self.hit_cycle = None;
+        self.preselection = None;
+        self.marquee = None;
+        self.lasso = None;
         self.preview = None;
         self.preview_base = None;
         self.pending_prefix = None;
@@ -77,6 +99,7 @@ impl SketchState {
         self.press_anchor = None;
         self.hover = None;
         self.chain = None;
+        self.chain_curve = None;
         self.error = None;
     }
 }
@@ -91,6 +114,7 @@ impl SketchTool {
             Self::Point => "point",
             Self::Polyline => "polyline",
             Self::Arc => "arc",
+            Self::ArcCenter => "arc-center",
             Self::Circle => "circle",
             Self::CircleThreePoints => "circle-three-points",
             Self::Ellipse => "ellipse",
@@ -109,6 +133,7 @@ impl SketchTool {
             Self::Point,
             Self::Polyline,
             Self::Arc,
+            Self::ArcCenter,
             Self::Circle,
             Self::CircleThreePoints,
             Self::Ellipse,

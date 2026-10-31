@@ -1,7 +1,7 @@
 //! Independent Session acceptance from the pre-implementation matrix.
 #![allow(clippy::unwrap_used)]
 mod cpu_time;
-use curvyo_document_core::{Affine, Document, Point, Style, pack, unpack};
+use curvyo_document_core::{Document, Point, Style, pack, unpack};
 use curvyo_editor_wasm::{Session, SketchTool};
 use curvyo_sketch_core as sk;
 fn workload() -> sk::Sketch {
@@ -47,7 +47,7 @@ fn workload() -> sk::Sketch {
 fn setup() -> (Session, curvyo_document_core::NodeId, Vec<u8>) {
     let d = Document::new(701);
     let id = d
-        .create_sketch(&workload(), Affine::IDENTITY, &Style::default())
+        .create_page_sketch(&d.pages()[0].id, &workload(), &Style::default())
         .unwrap();
     let bytes = pack(&d, "acceptance").unwrap();
     let mut s = Session::open(702, &bytes).unwrap();
@@ -76,9 +76,10 @@ fn residuals(graph: &sk::Sketch) {
 }
 #[test]
 fn s10_closest_feasible_release_does_not_resurrect_raw_goal() {
-    let (mut s, id, _) = setup();
-    s.pointer_down(Point::new(10.0, 0.0), false);
-    s.pointer_hover(Point::new(20.0, 20.0), false, false);
+    let (mut s, id, bytes) = setup();
+    let placement = unpack(704, &bytes).unwrap().sketch(id).unwrap().placement;
+    s.pointer_down(placement.apply_point(Point::new(10.0, 0.0)), false);
+    s.pointer_hover(placement.apply_point(Point::new(20.0, 20.0)), false, false);
     let preview = s
         .sketch_preview()
         .unwrap_or_else(|| panic!("no preview: {}", s.sketch_view_json()));
@@ -89,7 +90,7 @@ fn s10_closest_feasible_release_does_not_resurrect_raw_goal() {
         (point.x.0 - expected).abs() < 1e-4 && (point.y.0 - expected).abs() < 1e-4,
         "{point:?}"
     );
-    s.pointer_up(Point::new(20.0, 20.0), false, false);
+    s.pointer_up(placement.apply_point(Point::new(20.0, 20.0)), false, false);
     s.sketch_remove_constraint(&"distance0".into()).unwrap();
     let d = unpack(703, &s.pack("acceptance").unwrap()).unwrap();
     let actual = d
@@ -105,17 +106,18 @@ fn s10_closest_feasible_release_does_not_resurrect_raw_goal() {
 }
 #[test]
 fn s15_actual_100_entity_pointer_view_draw_thread_cpu() {
-    let (mut s, _, bytes) = setup();
-    std::fs::create_dir_all("../target/0066-runtime").unwrap();
-    std::fs::write("../target/0066-runtime/input.curvyo", bytes).unwrap();
-    s.pointer_down(Point::new(10.0, 0.0), false);
+    let (mut s, id, bytes) = setup();
+    let placement = unpack(704, &bytes).unwrap().sketch(id).unwrap().placement;
+    std::fs::create_dir_all("../target/0066-runtime-revision").unwrap();
+    std::fs::write("../target/0066-runtime-revision/input.curvyo", bytes).unwrap();
+    s.pointer_down(placement.apply_point(Point::new(10.0, 0.0)), false);
     let mut times = Vec::new();
     for frame in 0..100 {
         let angle = 0.2 + f64::from(frame) * 0.009;
         let radius = if frame % 2 == 0 { 10.0 } else { 20.0 };
         let target = Point::new(radius * angle.cos(), radius * angle.sin());
         let ((), elapsed) = cpu_time::cpu_time_of(|| {
-            s.pointer_hover(target, false, false);
+            s.pointer_hover(placement.apply_point(target), false, false);
             std::hint::black_box(s.sketch_view_json());
             std::hint::black_box(s.draw_list());
         });

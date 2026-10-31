@@ -452,11 +452,15 @@ impl Session {
         if self.workbench() == super::Workbench::Sketch {
             let pending = self.sketch.drag.is_some()
                 || self.sketch.preview.is_some()
+                || self.sketch.dimension_position.is_some()
+                || self.sketch.marquee.is_some()
+                || self.sketch.lasso.is_some()
                 || !self.sketch.picks.is_empty()
                 || self.sketch.edit_constraint.is_some()
                 || self.button_down;
             self.sketch.cancel();
             if !pending {
+                self.sketch.tool = super::SketchTool::Select;
                 self.sketch.entities.clear();
                 self.sketch.constraints.clear();
             }

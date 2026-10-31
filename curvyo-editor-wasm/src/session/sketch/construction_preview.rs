@@ -28,24 +28,56 @@ impl Session {
         let Some(prefix) = self.sketch.pending_prefix.as_ref() else {
             return;
         };
-        let Some(command) = super::creation::construction(
+        let Some(mut command) = super::creation::construction(
             self.sketch.tool,
             &picks,
             prefix,
             self.sketch.chain.as_ref(),
-        ) else {
+        )
+        .or_else(|| {
+            (self.sketch.tool == SketchTool::ArcCenter && picks.len() == 2).then(|| {
+                Construction::Circle {
+                    center: picks[0],
+                    radius: picks[0].distance(picks[1]),
+                }
+            })
+        }) else {
             return;
         };
-        let Ok(snapshot) = self.sketch_snapshot_for_edit() else {
-            return;
-        };
-        if snapshot.stale {
-            return;
-        }
-        if let Ok(result) =
-            curvyo_sketch_core::construct_preview(&snapshot.solution, prefix, &command)
+        if let (Some(previous), Some((_, start))) = (&self.sketch.chain_curve, &self.sketch.chain)
+            && self.sketch.tool == SketchTool::Polyline
         {
-            self.sketch.preview_base = Some((self.document.version(), snapshot.solution.clone()));
+            command = Construction::Continue {
+                previous: previous.clone(),
+                start: start.clone(),
+                end: format!("{prefix}:end").into(),
+                position: local,
+                mode: self.sketch.mode,
+            };
+        }
+        if let Some((first, last)) = self.sketch_close_target(local)
+            && let Some(previous) = &self.sketch.chain_curve
+        {
+            command = Construction::Continue {
+                previous: previous.clone(),
+                start: last,
+                end: first,
+                position: local,
+                mode: self.sketch.mode,
+            };
+        }
+        self.sketch.preview = None;
+        self.sketch.preview_base = None;
+        let Ok(base) = self.sketch_creation_base() else {
+            return;
+        };
+        if let Ok(mut result) = curvyo_sketch_core::construct_preview(&base, prefix, &command) {
+            if self.constrain_inferred_axes(&base, &mut result).is_err() {
+                self.sketch.preview = None;
+                self.sketch.preview_base = None;
+                return;
+            }
+            self.sketch.preview_base = Some((self.document.version(), base));
             self.sketch.preview = Some(result);
         }
     }

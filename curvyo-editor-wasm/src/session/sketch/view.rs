@@ -17,12 +17,44 @@ impl Session {
         }).collect::<Vec<_>>();
         let snapshot = self.sketch.active.and_then(|id| self.document.sketch(id));
         let mut view = json!({"workbench":if self.workbench()==super::Workbench::Sketch {"sketch"} else {"vector"},"tool":self.sketch_tool().name(),"active":snapshot.as_ref().map(|s| s.id.full_id()),"sketches":sketches,"error":self.sketch.error,"pending_picks":self.sketch.picks.len(),"entities":[],"constraints":[],"parameters":[],"actions":[],"status":null,"stale":false});
-        view["annotations"] = json!(
-            snapshot
-                .as_ref()
-                .map(|s| self.sketch_annotations_for(s))
-                .unwrap_or_default()
+        if matches!(
+            self.sketch.tool,
+            super::SketchTool::Arc | super::SketchTool::ArcCenter
+        ) {
+            let roles = if self.sketch.tool == super::SketchTool::Arc {
+                ["Start", "Through", "End"]
+            } else {
+                ["Centre", "Start", "End direction"]
+            };
+            view["pick_role"] = json!(roles[self.sketch.picks.len().min(2)]);
+            view["arc_radius"] = json!(
+                self.sketch
+                    .picks
+                    .first()
+                    .zip(self.sketch.picks.get(1))
+                    .map(|(a, b)| a.distance(*b).0)
+                    .or(self.sketch.arc_radius.map(|r| r.0))
+            );
+        }
+        view["draft_epoch"] = json!(self.sketch.draft_epoch);
+        view["can_resume"] = json!(self.sketch_can_resume());
+        view["constraint_tool"] = json!(self.sketch.constraint_tool);
+        view["dimension_position"] = json!(self.sketch.dimension_position);
+        view["dimension_action"] = json!(self.sketch_dimension_action());
+        view["page"] = json!(self.active_page().id);
+        view["mode"] = json!(
+            super::modes::MODES
+                .iter()
+                .find(|(mode, _)| *mode == self.sketch.mode)
+                .map(|(_, name)| *name)
         );
+        view["modes"] = json!(super::modes::MODES.iter().map(|(mode,name)|json!({"id":name,"enabled":*mode==curvyo_sketch_core::ContinuationMode::FreeLine || self.sketch.chain_curve.is_some(),"reason":if *mode!=curvyo_sketch_core::ContinuationMode::FreeLine && self.sketch.chain_curve.is_none() {Some("Needs a preceding line or arc endpoint")} else {None}})).collect::<Vec<_>>());
+        let mut annotations = snapshot
+            .as_ref()
+            .map(|s| self.sketch_annotations_for(s))
+            .unwrap_or_default();
+        annotations.extend(self.sketch_arc_pick_annotations());
+        view["annotations"] = json!(annotations);
         view["edit_constraint"] = json!(self.sketch.edit_constraint);
         view["affected_constraints"] = json!(self.sketch.affected);
         if let Some(snapshot) = snapshot {
@@ -90,13 +122,17 @@ fn entity_name(entity: &Entity) -> &'static str {
 }
 pub(super) fn relation_name(relation: &Relation) -> &'static str {
     match relation {
+        Relation::OnAxis { axis, .. } => match axis {
+            curvyo_sketch_core::Axis::X => "on-x-axis",
+            curvyo_sketch_core::Axis::Y => "on-y-axis",
+        },
         Relation::On { .. } => "on",
         Relation::Sweep { .. } => "sweep",
         Relation::Coincident(..) => "coincident",
         Relation::Horizontal(..) => "horizontal",
         Relation::Vertical(..) => "vertical",
         Relation::Parallel(..) => "parallel",
-        Relation::Perpendicular(..) => "perpendicular",
+        Relation::Perpendicular(..) | Relation::PerpendicularAt { .. } => "perpendicular",
         Relation::Tangent(..) => "tangent",
         Relation::Equal(..) => "equal",
         Relation::Fixed(..) => "fixed",

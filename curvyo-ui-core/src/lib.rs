@@ -466,7 +466,13 @@ mod pages;
 pub use pages::PageViewState;
 
 mod sketch;
-pub use sketch::{SketchHit, sketch_handle_hit, sketch_hit, sketch_snap_points};
+pub use sketch::{SketchHit, sketch_handle_hit, sketch_hit, sketch_hits, sketch_snap_points};
 
 mod sketch_actions;
 pub use sketch_actions::{SKETCH_ACTIONS, sketch_relation};
+
+mod sketch_marquee;
+pub use sketch_marquee::{sketch_marquee, sketch_marquee_placed};
+
+mod sketch_lasso;
+pub use sketch_lasso::sketch_lasso;

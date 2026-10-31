@@ -11,7 +11,7 @@ pub struct SketchHit {
     pub point: bool,
 }
 
-/// Picks a point first, then the nearest curve, within a local-space tolerance.
+/// Picks the nearest geometry, preferring points only at equal distance.
 /// Current intent filters stale last-valid topology out of the editable hit set.
 #[must_use]
 pub fn sketch_hit(
@@ -20,6 +20,19 @@ pub fn sketch_hit(
     pointer: Position,
     tolerance: Length,
 ) -> Option<SketchHit> {
+    sketch_hits(intent, solution, pointer, tolerance)
+        .into_iter()
+        .next()
+}
+
+/// Eligible hits ordered by geometric distance, points winning only equal-distance ties.
+#[must_use]
+pub fn sketch_hits(
+    intent: &Sketch,
+    solution: &Sketch,
+    pointer: Position,
+    tolerance: Length,
+) -> Vec<SketchHit> {
     let internal_focus = solution
         .entities
         .values()
@@ -43,16 +56,31 @@ pub fn sketch_hit(
             bodies.push((distance, id.clone()));
         }
     }
-    for (candidates, point) in [(points, true), (bodies, false)] {
-        if let Some((_, entity)) = candidates
-            .into_iter()
-            .filter(|(distance, _)| *distance <= tolerance.0)
-            .min_by(|a, b| a.0.total_cmp(&b.0).then_with(|| a.1.cmp(&b.1)))
-        {
-            return Some(SketchHit { entity, point });
+    let mut candidates = points
+        .into_iter()
+        .map(|(distance, id)| (distance, true, id))
+        .chain(
+            bodies
+                .into_iter()
+                .map(|(distance, id)| (distance, false, id)),
+        )
+        .filter(|(distance, _, _)| *distance <= tolerance.0)
+        .collect::<Vec<_>>();
+    candidates.sort_by(|a, b| {
+        if (a.0 - b.0).abs() <= 1e-9 {
+            b.1.cmp(&a.1).then_with(|| a.2.cmp(&b.2))
+        } else {
+            a.0.total_cmp(&b.0)
         }
-    }
-    None
+    });
+    let nearest = candidates
+        .first()
+        .map_or(f64::INFINITY, |candidate| candidate.0);
+    candidates
+        .into_iter()
+        .filter(|candidate| candidate.0 <= nearest + 1e-9)
+        .map(|(_, point, entity)| SketchHit { entity, point })
+        .collect()
 }
 
 /// Picks selected curve axes independently of internal focus-point records.

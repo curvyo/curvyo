@@ -62,7 +62,12 @@ impl Session {
         });
         PanelView {
             content: panel_body(active, self.pen_path_unfinished(), non_empty),
-            tabs: tab_entries_for(active, self.style_blocker(non_empty)),
+            tabs: tab_entries_for(active, self.style_blocker(non_empty))
+                .into_iter()
+                .filter(|tab| {
+                    self.workbench() == super::Workbench::Sketch || tab.name != "parameters"
+                })
+                .collect(),
         }
     }
 
@@ -169,6 +174,7 @@ impl PanelTabsRecord {
             PanelContent::Fonts => "fonts",
             PanelContent::Snapping => "snapping",
             PanelContent::Sketches => "sketches",
+            PanelContent::Parameters => "parameters",
             PanelContent::Empty => "empty",
         };
         Self {

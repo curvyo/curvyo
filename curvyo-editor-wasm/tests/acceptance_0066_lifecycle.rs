@@ -10,25 +10,35 @@ fn state(s: &Session) -> curvyo_document_core::SketchSnapshot {
     doc(s).sketch(s.active_sketch().unwrap()).unwrap()
 }
 fn fresh() -> Session {
-    let mut s = Session::new(940);
+    let d = Document::new(940);
+    d.create_page_sketch(
+        &d.pages()[0].id,
+        &sk::Sketch::new("origin".into()),
+        &curvyo_document_core::Style::default(),
+    )
+    .unwrap();
+    let mut s = Session::open(942, &pack(&d, "owned lifecycle fixture").unwrap()).unwrap();
     s.set_workbench(Workbench::Sketch);
-    s.new_sketch().unwrap();
     let mut snap = s.snapping();
     snap.enabled = false;
     s.set_snapping(snap);
     s
 }
 fn click(s: &mut Session, x: f64, y: f64) {
-    s.pointer_down(Point::new(x, y), false);
-    s.pointer_up(Point::new(x, y), false, false);
+    let p = state(s).placement.apply_point(Point::new(x, y));
+    s.pointer_down(p, false);
+    s.pointer_up(p, false, false);
 }
 fn drag(s: &mut Session, start: Point, end: Point) {
+    let placement = state(s).placement;
+    let start = placement.apply_point(start);
+    let end = placement.apply_point(end);
     s.pointer_down(start, false);
     s.pointer_hover(end, false, false);
     s.pointer_up(end, false, false);
 }
 #[test]
-fn s01_group_new_one_step_and_inert_layer_refusal() {
+fn s01_source_page_creation_preserves_group_and_inert_layer_refusal() {
     let d = Document::new(950);
     let rect = d.create_rect(RectBounds {
         origin: Point::new(20.0, 20.0),
@@ -44,20 +54,42 @@ fn s01_group_new_one_step_and_inert_layer_refusal() {
     let mut s = Session::open(951, &pack(&d, "acceptance").unwrap()).unwrap();
     s.double_click(Point::new(20.0, 25.0), false, false);
     assert_eq!(s.context_depth(), 1);
+    let original_page = s.active_page().id;
     let steps = s.undo_len();
     s.set_workbench(Workbench::Sketch);
-    let id = s.new_sketch().unwrap();
-    assert_eq!(s.undo_len(), steps + 1);
-    assert_eq!(doc(&s).parent_node(id), Some(group));
+    assert_ne!(s.active_page().id, original_page);
+    assert_eq!(
+        s.undo_len(),
+        steps + 1,
+        "dedicated source page is a separate reversible operation"
+    );
+    assert!(s.active_sketch().is_none());
+    s.set_sketch_tool(SketchTool::Point);
+    s.sketch_complete_numeric("30 mm", "30 mm").unwrap();
+    let id = s.active_sketch().unwrap();
+    assert_eq!(s.undo_len(), steps + 2);
+    assert_eq!(doc(&s).page_sketch(&s.active_page().id), Some(id));
+    assert_eq!(doc(&s).parent_node(rect), Some(group));
+    assert_eq!(doc(&s).parent_node(other), Some(group));
+    s.undo();
+    assert!(s.active_sketch().is_none());
+    assert_eq!(doc(&s).parent_node(rect), Some(group));
+    s.undo();
+    assert_eq!(doc(&s).pages().len(), 1);
     for flag in [RowFlag::Locked, RowFlag::Visible] {
         let mut s = Session::new(952);
         s.new_layer_row();
         let layer = s.active_layer().unwrap();
         s.toggle_layer_row_flag(&serde_json::to_string(&layer).unwrap(), flag);
+        let before = doc(&s).children(Some(layer));
         s.set_workbench(Workbench::Sketch);
         let steps = s.undo_len();
-        assert!(s.new_sketch().is_err());
+        s.set_sketch_tool(SketchTool::Point);
+        assert!(s.sketch_complete_numeric("30 mm", "30 mm").is_err());
         assert_eq!(s.undo_len(), steps);
+        assert!(doc(&s).contains_node(layer));
+        assert_eq!(doc(&s).children(Some(layer)), before);
+        assert_eq!(doc(&s).page_sketch(&s.active_page().id), s.active_sketch());
     }
 }
 #[test]

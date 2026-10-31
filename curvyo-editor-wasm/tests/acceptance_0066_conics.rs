@@ -1,6 +1,6 @@
 //! Independent nonlinear native/WASM runtime corpus with analytic witnesses.
 #![allow(clippy::unwrap_used)]
-use curvyo_document_core::{Affine, Document, Style, pack, unpack};
+use curvyo_document_core::{Document, Style, pack, unpack};
 use curvyo_editor_wasm::{Session, Workbench};
 use curvyo_sketch_core as sk;
 fn seed() -> sk::Sketch {
@@ -79,11 +79,12 @@ fn known(g: &sk::Sketch) {
 fn s16_native_nonlinear_edit_produces_known_conics_and_runtime_fixture() {
     let d = Document::new(920);
     let id = d
-        .create_sketch(&seed(), Affine::IDENTITY, &Style::default())
+        .create_page_sketch(&d.pages()[0].id, &seed(), &Style::default())
         .unwrap();
     let bytes = pack(&d, "conic runtime acceptance").unwrap();
-    std::fs::create_dir_all("../target/0066-runtime").unwrap();
-    std::fs::write("../target/0066-runtime/conics.curvyo", &bytes).unwrap();
+    std::fs::create_dir_all("../target/0066-runtime-revision").unwrap();
+    std::fs::write("../target/0066-runtime-revision/conics.curvyo", &bytes).unwrap();
+    std::fs::write("../target/0066-runtime-revision/conics-context.json", serde_json::to_vec(&serde_json::json!({"owner": id.full_id(), "page": d.pages()[0].id, "pageOrigin": [d.pages()[0].origin.x, d.pages()[0].origin.y], "pageSize": [d.pages()[0].size.width.as_mm(),d.pages()[0].size.height.as_mm()], "placement": d.sketch(id).unwrap().placement.to_array()})).unwrap()).unwrap();
     let mut s = Session::open(922, &bytes).unwrap();
     s.set_workbench(Workbench::Sketch);
     assert!(s.enter_sketch(id));
@@ -94,13 +95,19 @@ fn s16_native_nonlinear_edit_produces_known_conics_and_runtime_fixture() {
     s.sketch_apply_action("radius", "5 mm", false).unwrap();
     let output = s.pack("conic native").unwrap();
     known(&solution(&output));
-    std::fs::write("../target/0066-runtime/conics-native.curvyo", output).unwrap();
+    std::fs::write(
+        "../target/0066-runtime-revision/conics-native.curvyo",
+        output,
+    )
+    .unwrap();
 }
 #[test]
 #[ignore = "requires executed tests/runtime/sketch-conics.cjs production WASM artifacts"]
 fn s16_actual_wasm_conics_equal_native_unrounded_geometry() {
-    let native = solution(&std::fs::read("../target/0066-runtime/conics-native.curvyo").unwrap());
-    let wasm = solution(&std::fs::read("../target/0066-runtime/conics-wasm.curvyo").unwrap());
+    let native =
+        solution(&std::fs::read("../target/0066-runtime-revision/conics-native.curvyo").unwrap());
+    let wasm =
+        solution(&std::fs::read("../target/0066-runtime-revision/conics-wasm.curvyo").unwrap());
     known(&native);
     known(&wasm);
     for (id, e) in &native.entities {

@@ -3,6 +3,23 @@ use super::{Session, SketchTool};
 use crate::session::{KeyInput, KeyOutcome};
 
 impl Session {
+    /// Cancels an unfinished Sketch action on a secondary press without committing it.
+    pub fn sketch_secondary_press(&mut self) -> bool {
+        if self.workbench() != super::Workbench::Sketch {
+            return false;
+        }
+        let pending = self.sketch.press.is_some()
+            || self.sketch.drag.is_some()
+            || self.sketch.preview.is_some()
+            || self.sketch.dimension_position.is_some()
+            || self.sketch.marquee.is_some()
+            || self.sketch.lasso.is_some()
+            || !self.sketch.picks.is_empty();
+        self.sketch.cancel();
+        self.button_down = false;
+        pending
+    }
+
     pub(in crate::session) fn sketch_key(&mut self, input: KeyInput<'_>) -> KeyOutcome {
         if input.dom_blocked {
             return KeyOutcome::Ignored;
@@ -31,6 +48,13 @@ impl Session {
             return KeyOutcome::Ignored;
         }
         match input.key {
+            "Alt" | "m" | "M" if !input.repeat => {
+                if self.cycle_sketch_mode() {
+                    KeyOutcome::Consumed
+                } else {
+                    KeyOutcome::Ignored
+                }
+            }
             "Escape" => KeyOutcome::Escape(self.escape()),
             "Enter" => {
                 if let Some(id) = self.sketch.constraints.iter().next().cloned() {

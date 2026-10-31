@@ -23,6 +23,11 @@ impl Session {
         let Some(local) = self.sketch_local(point) else {
             return;
         };
+        if self.held.alt && self.sketch.tool == super::SketchTool::Select {
+            self.sketch.lasso = Some(vec![point]);
+            self.button_down = true;
+            return;
+        }
         let handle = curvyo_ui_core::sketch_handle_hit(
             &base.graph,
             &base.solution,
@@ -37,19 +42,47 @@ impl Session {
                 point: false,
             })
             .or_else(|| {
-                curvyo_ui_core::sketch_hit(
+                let hits = curvyo_ui_core::sketch_hits(
                     &base.graph,
                     &base.solution,
                     local,
                     Length(6.0 / self.view().scale()),
-                )
+                );
+                let ids = hits
+                    .iter()
+                    .map(|hit| hit.entity.clone())
+                    .collect::<Vec<_>>();
+                let index = match &self.sketch.hit_cycle {
+                    Some((previous, old, index))
+                        if previous.vector_to(point).length() * self.view().scale() <= 1.0
+                            && *old == ids
+                            && !ids.is_empty() =>
+                    {
+                        (index + 1) % ids.len()
+                    }
+                    _ => 0,
+                };
+                self.sketch.hit_cycle = Some((point, ids, index));
+                hits.into_iter().nth(index)
             });
         let Some(hit) = hit else {
-            if !self.held.shift {
+            if self.sketch_place_dimension(point) {
+                return;
+            }
+            self.sketch.marquee = Some((point, point));
+            self.button_down = true;
+            if !self.held.shift && !self.held.ctrl {
                 self.sketch.entities.clear();
             }
             return;
         };
+        if self.sketch.tool == super::SketchTool::Constraints {
+            self.sketch.dimension_position = None;
+            if !self.sketch.entities.insert(hit.entity.clone()) {
+                self.sketch.entities.remove(&hit.entity);
+            }
+            return;
+        }
         if self.held.shift {
             if !self.sketch.entities.insert(hit.entity.clone()) {
                 self.sketch.entities.remove(&hit.entity);
@@ -80,16 +113,44 @@ impl Session {
             candidate: None,
         });
         self.button_down = true;
-        self.begin_snapping_drag_for_selection();
-        self.add_stationary_sketch_targets();
     }
 
     pub(super) fn sketch_drag_hover(&mut self, point: Point) {
-        if self.sketch.drag.is_none() {
+        if self.sketch.lasso.is_some() {
+            let scale = self.view().scale();
+            if let Some(stroke) = &mut self.sketch.lasso
+                && stroke
+                    .last()
+                    .is_none_or(|last| last.vector_to(point).length() * scale >= 1.0)
+            {
+                stroke.push(point);
+            }
             return;
         }
-        let probe = self.sketch_drag_probe(point);
-        let snapped = point.translated(self.resolve_snapping(&probe).offset);
+        if let Some((_, current)) = &mut self.sketch.marquee {
+            *current = point;
+            return;
+        }
+        if self.sketch.drag.is_none() {
+            if self.sketch.constraint_tool.as_deref() == Some("dimension") {
+                self.sketch.hover = self.sketch_local(point);
+            }
+            self.sketch.preselection = self
+                .sketch_snapshot_for_edit()
+                .ok()
+                .and_then(|snapshot| {
+                    self.sketch_local(point).and_then(|local| {
+                        curvyo_ui_core::sketch_hit(
+                            &snapshot.graph,
+                            &snapshot.solution,
+                            local,
+                            Length(6.0 / self.view().scale()),
+                        )
+                    })
+                })
+                .map(|hit| hit.entity);
+            return;
+        }
         let Some(drag) = self.sketch.drag.as_ref() else {
             return;
         };
@@ -106,7 +167,7 @@ impl Session {
             return;
         };
         let from = inverse.apply_point(drag.press);
-        let to = inverse.apply_point(snapped);
+        let to = inverse.apply_point(point);
         let goals = drag
             .points
             .iter()
@@ -154,6 +215,14 @@ impl Session {
     pub(super) fn sketch_drag_release(&mut self, point: Point) {
         self.sketch_drag_hover(point);
         self.end_snapping_drag();
+        if let Some(stroke) = self.sketch.lasso.take() {
+            self.finish_sketch_lasso(&stroke, point);
+            return;
+        }
+        if let Some((start, end)) = self.sketch.marquee.take() {
+            self.finish_sketch_marquee(start, end);
+            return;
+        }
         let Some(drag) = self.sketch.drag.take() else {
             return;
         };

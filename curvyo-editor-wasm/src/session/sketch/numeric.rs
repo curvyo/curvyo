@@ -48,14 +48,18 @@ impl Session {
         result
     }
     fn sketch_numeric_inner(&mut self, first: &str, second: &str) -> Result<bool, SketchEditError> {
-        let snapshot = self.sketch_snapshot_for_edit()?;
+        if self.sketch.tool == SketchTool::ArcCenter {
+            return self.sketch_arc_radius_text(first);
+        }
+        if self.sketch.tool == SketchTool::Polyline {
+            return self.sketch_numeric_line(first, second);
+        }
+        let graph = self.sketch_intent_for_edit()?;
         let number = |text| {
-            let expression =
-                super::input::parse_value(text, Dimension::Length, &snapshot.graph.parameters)?;
+            let expression = super::input::parse_value(text, Dimension::Length, &graph.parameters)?;
             expression
                 .evaluate(
-                    &snapshot
-                        .graph
+                    &graph
                         .parameters
                         .evaluate()
                         .map_err(|e| SketchEditError(e.to_string()))?,

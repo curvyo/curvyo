@@ -49,14 +49,37 @@ impl Session {
         if reference && relation.expression().is_none() {
             return Err(SketchEditError("Only dimensions can be references".into()));
         }
-        let id = self.minter.mint().to_hex().into();
-        self.sketch_set_constraint(
-            id,
-            Constraint {
-                relation,
-                reference,
-            },
-        )
+        let id: ConstraintId = self.minter.mint().to_hex().into();
+        let constraint = Constraint {
+            relation,
+            reference,
+        };
+        if self.sketch.constraint_tool.as_deref() == Some("dimension") {
+            let position = self.sketch.dimension_position.ok_or_else(|| {
+                SketchEditError("Place the dimension label on the canvas first".into())
+            })?;
+            if !position.x.0.is_finite() || !position.y.0.is_finite() {
+                return Err(SketchEditError("Dimension position must be finite".into()));
+            }
+            let changed = self.recording(|this| {
+                this.document.batch("edit_sketch", |doc| {
+                    let changed = doc.apply_sketch_delta(
+                        snapshot.id,
+                        &curvyo_document_core::SketchDelta {
+                            constraints: [(id.clone(), Some(constraint))].into(),
+                            ..Default::default()
+                        },
+                    )?;
+                    doc.set_sketch_label(snapshot.id, &id, position)?;
+                    Ok::<_, SketchEditError>(changed)
+                })
+            })?;
+            self.sketch.dimension_position = None;
+            self.sketch.hover = None;
+            Ok(changed)
+        } else {
+            self.sketch_set_constraint(id, constraint)
+        }
     }
 
     /// Adds a parameter with a collision-free document actor identity.
@@ -83,8 +106,8 @@ impl Session {
         text: &str,
         dimension: Dimension,
     ) -> Result<bool, SketchEditError> {
-        let snapshot = self.sketch_snapshot_for_edit()?;
-        let expression = parse_expression(text, dimension, &snapshot.graph.parameters)?;
+        let graph = self.sketch_intent_for_edit()?;
+        let expression = parse_expression(text, dimension, &graph.parameters)?;
         let parameter = Parameter::expression(name, dimension, expression);
         self.sketch_set_parameter(id, parameter)
     }
