@@ -628,9 +628,10 @@ test("0025s2 in Chromium: the Advanced block (criteria 41, 44)", { skip: !BROWSE
     await focusCanvas(s);
     await s.key("i", 73);
     await settle(s);
+    // `0089` ux-notes §22.2/22.3 (2026-10-31): the Advanced block holds live regions of its own, so "the status row" is the bar's notice row.
     const geometry = async () =>
       JSON.parse(
-        (await s.evaluate(`JSON.stringify((() => { const y = (q) => document.querySelector(q).getBoundingClientRect().y; const a = document.querySelector('[role=toolbar][aria-label=Trace] button[aria-expanded][aria-controls]'); return { preset: y('button[aria-label=Preset]'), threshold: y('[role=spinbutton][aria-label=Threshold]'), smooth: y('[role=spinbutton][aria-label=Smooth]'), status: y('[role=toolbar][aria-label=Trace] [role=status]'), advanced: a.getBoundingClientRect().y, disabled: a.disabled || a.getAttribute('aria-disabled'), expanded: a.getAttribute('aria-expanded') }; })())`)) as string,
+        (await s.evaluate(`JSON.stringify((() => { const y = (q) => document.querySelector(q).getBoundingClientRect().y; const a = document.querySelector('[role=toolbar][aria-label=Trace] button[aria-expanded][aria-controls]'); return { preset: y('button[aria-label=Preset]'), threshold: y('[role=spinbutton][aria-label=Threshold]'), smooth: y('[role=spinbutton][aria-label=Smooth]'), status: y('[role=toolbar][aria-label=Trace] [data-trace-state]'), advanced: a.getBoundingClientRect().y, disabled: a.disabled || a.getAttribute('aria-disabled'), expanded: a.getAttribute('aria-expanded') }; })())`)) as string,
       ) as Record<string, number | string | boolean | null>;
     // The block starts open in this file (the counts live there); close it first.
     if ((await geometry()).expanded === "true") {

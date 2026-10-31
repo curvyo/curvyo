@@ -283,8 +283,9 @@ const pathsNow = async (s: S, n: number) =>
   });
 const slotKind = async (s: S) => (await s.evaluate(`document.querySelector('${BAR} [data-trace-slot]')?.getAttribute('data-trace-slot') ?? 'gone'`)) as string;
 const pressed = async (s: S, sel: string) => (await s.evaluate(`document.querySelector('${BAR} ${sel}')?.getAttribute('aria-pressed') ?? 'none'`)) as string;
+// `ux-notes.md` §22.1/22.3 (2026-10-31): the picked colours are the one swatch strip of the Advanced block (open in this file).
 const swatches = async (s: S) =>
-  JSON.parse((await s.evaluate(`JSON.stringify([...document.querySelectorAll('${BAR} [data-trace-swatch]')].map((e) => e.getAttribute('data-trace-swatch')))`)) as string) as string[];
+  JSON.parse((await s.evaluate(`JSON.stringify([...document.querySelectorAll('${BAR} [data-trace-palette-swatch]')].map((e) => e.getAttribute('data-trace-palette-swatch')))`)) as string) as string[];
 const typeInto = async (s: S, name: string, text: string) => {
   await s.evaluate(`document.querySelector('${BAR} [role=spinbutton][aria-label="${name}"]').focus()`);
   await press(s, "F2", 113);
@@ -697,10 +698,9 @@ test("0089C tester: at 800 x 600 nothing overlaps, clips or leaves the window; r
         return { overlaps, outside, clipped, texts, labels, height: Math.round(box.height), top: Math.round(box.top), bottom: Math.round(box.bottom), vh: innerHeight, vw: innerWidth,
           slotRightGap: Math.round(box.right - slot.right), insideBar: lastBottom <= box.bottom + 0.5 }; })())`)) as string) as {
         overlaps: string[]; outside: string[]; clipped: string[]; texts: string[]; labels: string[]; height: number; top: number; bottom: number; vh: number; vw: number; slotRightGap: number; insideBar: boolean };
-    // The row counts of ux-notes.md §2 (36 px rows, Advanced closed, no picks), with the analysis row
-    // of slice F (item 5, a full-width 36 px row of its own): Brightness 8 / 4 rows, Remove background
-    // 9 / 4, Pick colours 9 / 5 (panel open / closed).
-    const asBuilt: Record<string, [number, number]> = { Brightness: [288, 144], "Remove background": [324, 144], "Pick colours": [324, 180] };
+    // The row counts of ux-notes.md §22.1 (2026-10-31; 36 px rows, Advanced closed, no picks, the analysis row is
+    // in Advanced): Brightness 7 / 3 rows, Remove background 8 / 3, Pick colours 7 / 3 (panel open / closed).
+    const asBuilt: Record<string, [number, number]> = { Brightness: [252, 108], "Remove background": [288, 108], "Pick colours": [252, 108] };
     await s.evaluate(`document.querySelector('${BAR} [aria-label="Fewer trace options"]')?.click()`);
     await sleep(400);
     const all: string[] = [];

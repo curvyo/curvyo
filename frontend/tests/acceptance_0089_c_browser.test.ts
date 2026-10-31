@@ -279,8 +279,9 @@ const fieldNames = async (s: S) =>
 
 const pipettePressed = async (s: S) => (await s.evaluate(`document.querySelector('${BAR} [data-trace-pipette]')?.getAttribute('aria-pressed') ?? 'none'`)) as string;
 
+// Adjusted for `ux-notes.md` §22.3 (2026-10-31): the picked colours are the one swatch strip of the Advanced block.
 const swatches = async (s: S) =>
-  JSON.parse((await s.evaluate(`JSON.stringify([...document.querySelectorAll('${BAR} [data-trace-swatch]')].map((e) => e.getAttribute('data-trace-swatch')))`)) as string) as string[];
+  JSON.parse((await s.evaluate(`JSON.stringify([...document.querySelectorAll('${BAR} [data-trace-palette-swatch]')].map((e) => e.getAttribute('data-trace-palette-swatch')))`)) as string) as string[];
 
 /** The counts of the Advanced block once a trace settled with `paths` paths. */
 const settled = async (s: S, paths: RegExp) =>
@@ -374,8 +375,9 @@ test("0089 C in Chromium: Method, pipette, chip, Esc order, finish button", { sk
     assert.equal(await pipettePressed(s), "false", "Esc disarms");
     assert.equal(await s.evaluate(`!!document.querySelector('${BAR}')`), true, "the tool stays");
     // Remove a swatch: select it, its Remove button.
-    await s.clickSel(`${BAR} [data-trace-swatch="#DCD6CF"]`);
-    await s.clickSel(`${BAR} button[aria-label="Remove #DCD6CF"]`);
+    // §22.3: the swatch and its Remove action are in the Advanced strip, not in the bar.
+    await s.clickSel(`${BAR} [data-trace-palette-swatch="#DCD6CF"]`);
+    await s.clickSel(`${BAR} [data-trace-palette-action="Remove"]`);
     await waitFor("no swatch", async () => ((await swatches(s)).length === 0 ? true : null));
     await waitFor("no colour picked", async () => ((await s.statusText()).includes("0 paths: no colour picked.") ? true : null));
 

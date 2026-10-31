@@ -10,7 +10,7 @@ import { test } from "node:test";
 import {
   BRIGHTNESS,
   NO_STATUS,
-  withSwatchNote,
+  pickedCountText,
   TRACE_BAR_DESCRIPTION,
   TRACE_EXPAND_LABELS,
   changedAdvancedText,
@@ -145,38 +145,39 @@ test("criterion 70: the info page's exact text", () => {
     "Trace turns the selected image into paths. The method decides which parts become shapes. Press Enter or the Trace button to create the paths.",
   );
   assert.deepEqual(TRACE_INFO_ENTRIES, [
-    "Preset: a named set of values for what you do with the paths.",
-    "Logo / Line art: sharp corners, clean curves.",
-    "Photo: many shapes, photos trace roughly.",
-    "Silhouette for cutting/carving: closed, simple, few nodes; drops shapes and holes below 2 mm.",
-    "Engraving: keeps fine lines, drops shapes below 0.1 mm.",
-    "View: the image with the outline, the mask, the result alone, or the image alone. Hold \\ to peek at the image; Shift+\\ steps through the views.",
-    "Mask: what the tracer turns into shapes, black on white (in Multicolour each colour as found), after Ignore below and Drop border shapes.",
-    "Method: how pixels become shapes.",
-    "Brightness: pixels darker than the Threshold.",
-    "Remove background: everything unlike the background colour.",
-    "Background: the colour Remove background leaves out; Auto takes it from the image border.",
-    "Pick colours: pixels like the colours picked with the pipette; Shift+click adds a colour, up to 8.",
-    "Pipette: takes a colour from the image under a click; Esc ends it.",
-    "Colour tolerance: how far a colour may be from the background or a picked colour and still count as it.",
-    "Analysis: names the image type and what it set for a new image: the method, its background and Colour tolerance, and the Threshold; never the preset or other values. Custom after you change one of them; Analyse again sets them back.",
-    "Threshold: pixels darker than this brightness (0 to 100 %) become shapes.",
-    "Smooth: calms the pixel steps of the outline before the fit; higher is calmer.",
-    "Tolerance: how far in pixels the paths may stray from the calmed outline; higher gives fewer nodes.",
-    "Ignore below: drops shapes and holes smaller than this size in mm.",
-    "Denoise: smooths out noise in the picture before tracing.",
-    "Upscale: doubles small images before tracing; Auto does it below 1 Mpx.",
-    "Corners: higher turns more bends into sharp corners.",
-    "Invert: traces what the method leaves out; transparent pixels never become shapes.",
-    "Drop border shapes: drops shapes that touch the image border.",
-    "Output: Single colour traces the content as one black shape; Multicolour gives one filled shape per colour, neighbours sharing their edges.",
-    "Colours: how many colours Multicolour finds, 2 to 16; Auto counts them in the image. With Pick colours the picked colours are the palette.",
-    "Palette: the colours of a Multicolour trace, largest area first; picked colours carry a corner mark and come first.",
-    "Isolate: shows one colour and dims the others; Enter still creates every colour.",
-    "Recolour: gives a colour another fill without tracing again.",
-    "Merge into: traces a colour as another one, as one shape.",
-    "Exclude: makes a colour background; it is not traced.",
-    "Remove: takes a picked colour out of the palette.",
+  "Preset: a named set of values for what you do with the paths.",
+  "Logo / Line art: sharp corners, clean curves.",
+  "Photo: many shapes, photos trace roughly.",
+  "Silhouette for cutting/carving: closed, simple, few nodes; drops shapes and holes below 2 mm.",
+  "Engraving: keeps fine lines, drops shapes below 0.1 mm.",
+  "View: the image with the outline, the mask, the result alone, or the image alone. Hold \\ to peek at the image; Shift+\\ steps through the views.",
+  "Mask: what the tracer turns into shapes, black on white (in Multicolour each colour as found), after Ignore below and Drop border shapes.",
+  "Method: how pixels become shapes.",
+  "Brightness: pixels darker than the Threshold.",
+  "Remove background: everything unlike the background colour.",
+  "Background: the colour Remove background leaves out; Auto takes it from the image border.",
+  "Pick colours: pixels like the colours picked with the pipette; Shift+click adds a colour, up to 8. The picked colours are shown and edited in Advanced.",
+  "Pipette: takes a colour from the image under a click; Esc ends it.",
+  "Colour tolerance: how far a colour may be from the background or a picked colour and still count as it.",
+  "Threshold: pixels darker than this brightness (0 to 100 %) become shapes.",
+  "Smooth: calms the pixel steps of the outline before the fit; higher is calmer.",
+  "Tolerance: how far in pixels the paths may stray from the calmed outline; higher gives fewer nodes.",
+  "Ignore below: drops shapes and holes smaller than this size in mm.",
+  "Analysis: names the image type and what it set for a new image: the method, its background and Colour tolerance, and the Threshold; never the preset or other values. Custom after you change one of them; Analyse sets them back.",
+  "Status: the result in numbers (paths, nodes and time, specks ignored, colours) and what a colour action did.",
+  "Output: Single colour traces the content as one black shape; Multicolour gives one filled shape per colour, neighbours sharing their edges.",
+  "Colours: how many colours Multicolour finds, 2 to 16; Auto counts them in the image. With Pick colours the picked colours are the palette.",
+  "Palette: the colours of a Multicolour trace, largest area first; picked colours carry a corner mark and come first.",
+  "Isolate: shows one colour and dims the others; Enter still creates every colour.",
+  "Recolour: gives a colour another fill without tracing again.",
+  "Merge into: traces a colour as another one, as one shape.",
+  "Exclude: makes a colour background; it is not traced.",
+  "Remove: takes a picked colour out of the palette.",
+  "Invert: traces what the method leaves out; transparent pixels never become shapes.",
+  "Drop border shapes: drops shapes that touch the image border.",
+  "Denoise: smooths out noise in the picture before tracing.",
+  "Upscale: doubles small images before tracing; Auto does it below 1 Mpx.",
+  "Corners: higher turns more bends into sharp corners.",
   ]);
   assert.deepEqual(infoEntryParts(TRACE_INFO_ENTRIES[1]), { term: "Logo / Line art", text: "sharp corners, clean curves." });
 });
@@ -346,6 +347,11 @@ test("criteria 40, 59, 60: presets, Custom as stored state", () => {
   });
 });
 
+// Lead decision 2026-10-31: the control is named Ignore below, so the status says so (0025 criterion 16).
+test("0025 criterion 16: the too-detailed status names Ignore below", () => {
+  assert.equal(TOO_DETAILED, "Too much detail: raise Ignore below.");
+});
+
 test("criteria 11, 15, 16, 71: the counts for the Advanced block, the states for the state row", () => {
   const wire = [0, 7, 412, 38, 5000, 0, 7];
   assert.deepEqual(statusText(readSummary(wire), 0.42, 100_000), {
@@ -353,14 +359,17 @@ test("criteria 11, 15, 16, 71: the counts for the Advanced block, the states for
     muted: "",
     counts: "7 paths, 412 nodes, 0.4 s",
     countsMuted: "38 specks ignored",
+    message: "",
     canCreate: true,
   });
   assert.equal(statusText(readSummary([0, 1, 4, 1, 10, 0, 1]), 0.1, 100).countsMuted, "1 speck ignored");
   assert.deepEqual(statusText(readSummary([0, 0, 0, 0, 0, 0, 0]), 0.1, 100), {
     line: "0 paths at this Threshold: too low.",
     muted: "",
-    counts: "0 paths, 0 nodes, 0.1 s",
+    // An empty result states "0 paths" once, in the notice row (`ux-notes.md` §22.2).
+    counts: "",
     countsMuted: "",
+    message: "",
     canCreate: false,
   });
   assert.equal(statusText(readSummary([0, 0, 0, 5, 90, 0, 0]), 0.1, 100).line, "0 paths at this Threshold: too high.");
@@ -369,6 +378,7 @@ test("criteria 11, 15, 16, 71: the counts for the Advanced block, the states for
     muted: "",
     counts: "1 path, 4 nodes, 0.1 s",
     countsMuted: "",
+    message: "",
     canCreate: true,
   });
   assert.deepEqual(statusText(readSummary([1, 0, 0, 0, 0, 0, 0]), 0.1, 100), {
@@ -376,6 +386,7 @@ test("criteria 11, 15, 16, 71: the counts for the Advanced block, the states for
     muted: "",
     counts: "",
     countsMuted: "",
+    message: "",
     canCreate: false,
   });
   assert.equal(statusText(readSummary([0, 1, 1204, 0, 10, 0, 1]), 2, 100).counts, "1 path, 1,204 nodes, 2.0 s");
@@ -456,6 +467,7 @@ test("criteria 52 to 55: large images, stopped, failure, slow to edit", () => {
     muted: REDUCED_COPY,
     counts: "7 paths, 412 nodes, 0.4 s",
     countsMuted: "38 specks ignored",
+    message: "",
     canCreate: true,
   });
   assert.deepEqual(statusText(readSummary([0, 900, 412000, 0, 10, 0, 900]), 3, 100), {
@@ -463,6 +475,7 @@ test("criteria 52 to 55: large images, stopped, failure, slow to edit", () => {
     muted: "",
     counts: "900 paths, 412,000 nodes, 3.0 s",
     countsMuted: "",
+    message: "",
     canCreate: true,
   });
   assert.equal(statusText(readSummary([0, 9, 100000, 0, 10, 0, 9]), 3, 100).line, "", "100,000 nodes is no state");
@@ -511,10 +524,10 @@ test("specs/0089 criterion 14: the methods, their fields in the settings JSON", 
   assert.equal(JSON.parse(settingsJson(picking, 120, "")).background, null);
   assert.equal(JSON.parse(settingsJson({ ...picking, method: 1, background: "#112233" }, 120, "#FFFFFF")).background, "#112233");
   assert.equal(colourTolerance(picking), 19);
-  const full = { method: PICK_COLOURS, swatches: ["#000001", "#000002", "#000003", "#000004", "#000005", "#000006", "#000007", "#000008"] };
-  assert.equal(withSwatchNote(NO_STATUS, full).muted, "8 colours picked");
-  assert.equal(withSwatchNote(NO_STATUS, { ...full, swatches: full.swatches.slice(1) }).muted, "");
-  assert.deepEqual(pickSwatch(full.swatches, "#000009", true), full.swatches);
+  const full = ["#000001", "#000002", "#000003", "#000004", "#000005", "#000006", "#000007", "#000008"];
+  assert.deepEqual(pickSwatch(full, "#000009", true), full);
+  // The bar's pipette label states what is picked (`ux-notes.md` §22.1).
+  assert.deepEqual([0, 1, 3].map(pickedCountText), ["None picked", "1 picked", "3 picked"]);
 });
 
 test("specs/0089 criterion 17, Frage 89 A: a click replaces the picked colours, Shift adds up to 8", () => {
@@ -527,7 +540,9 @@ test("specs/0089 criterion 17, Frage 89 A: a click replaces the picked colours, 
   assert.equal(zeroPathsLine({ method: PICK_COLOURS, swatches: ["#FFFFFF"] }), "0 paths at this Colour tolerance: too low.");
   assert.equal(zeroPathsLine({ method: REMOVE_BACKGROUND, swatches: [] }), "0 paths at this Colour tolerance: too high.");
   assert.equal(zeroPathsLine({ method: 0, swatches: [] }), null);
-  assert.equal(statusText(readSummary([0, 0, 0, 0, 0, 0, 0]), 0.1, 100, false, "0 paths: no colour picked.").line, "0 paths: no colour picked.");
+  // Nothing picked is fixed in Advanced: the status line says it, the notice row does not (`ux-notes.md` §22.2).
+  const nothing = statusText(readSummary([0, 0, 0, 0, 0, 0, 0]), 0.1, 100, false, "0 paths: no colour picked.");
+  assert.deepEqual([nothing.message, nothing.line, nothing.canCreate], ["0 paths: no colour picked.", "", false]);
 });
 
 test("customer 2026-10-30: the finish button reads Trace; its progress shows after 400 ms and holds 300 ms", () => {

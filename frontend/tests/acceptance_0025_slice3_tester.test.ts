@@ -1331,7 +1331,9 @@ test("0025s3 re c4/c71/c41/c11 in Chromium: row 1, the far-right expander, count
     assert.equal(await s.evaluate(`document.querySelector('${barQ} button[aria-expanded][aria-controls]').getAttribute('aria-label')`), "More trace options");
     assert.equal(await s.evaluate(`document.querySelector('${barQ} button[aria-controls]').getAttribute('aria-expanded')`), "false");
     // Criterion 11: with Advanced closed no counts line.
-    assert.ok(!/\d+ paths?, [\d,]+ nodes?/.test(await bar(s)), `no counts line while closed: ${JSON.stringify(await bar(s))}`);
+    // Drawn text only: the visually hidden live region announces the counts on purpose (criterion 71, amended 2026-10-31).
+    const drawn = (await s.evaluate(`(() => { const c = document.querySelector('${barQ}').cloneNode(true); c.querySelectorAll('[data-trace-hidden-status]').forEach((e) => e.remove()); document.body.appendChild(c); const t = c.innerText; c.remove(); return t; })()`)) as string;
+    assert.ok(!/\d+ paths?, [\d,]+ nodes?/.test(drawn), `no counts line while closed: ${JSON.stringify(drawn)}`);
     assert.equal(await s.evaluate(`document.querySelector('${barQ} [data-trace-counts]') === null || document.querySelector('${barQ} [data-trace-counts]').offsetParent === null`), true);
     // Open: the toggles, the controls, the counts as the last row.
     await clickAria(s, "More trace options");
@@ -1361,7 +1363,9 @@ test("0025s3 re c4/c71/c41/c11 in Chromium: row 1, the far-right expander, count
     assert.ok(countsLine >= 0, `the counts line is in Advanced: ${JSON.stringify(counts)}`);
     const countsBox = (await rectOf(s, `${barQ} [data-trace-counts]`))!;
     const corners = (await rectOf(s, `${barQ} [role=spinbutton][aria-label=Corners]`))!;
-    assert.ok(countsBox.y >= corners.y, "the counts line is the last row of the block");
+    // Amended 2026-10-31 (criterion 71, `0089` ux-notes §22.3): the status line is the second row, after the analysis row and above every control.
+    const analysisBox = (await rectOf(s, `${barQ} [data-trace-analysis]`))!;
+    assert.ok(countsBox.y >= analysisBox.bottom - 1 && countsBox.bottom <= Math.min(corners.y, denoise.y, toggleBox.y) + 1, "the status line is the second row of the block, above the controls");
     // A toggle works: Invert changes the result and the dot/tooltip on the closed expander.
     const rings = await settle(s);
     await clickAria(s, "Invert");
@@ -1379,7 +1383,8 @@ test("0025s3 re c4/c71/c41/c11 in Chromium: row 1, the far-right expander, count
     console.log("closed expander tooltip with Invert on:", JSON.stringify(tip), "| before:", rings);
     assert.match(tip, /Changed: .*Invert/i, "the closed expander's tooltip lists the changed value");
     // Criterion 71: states in the slot and the notice row stay visible with Advanced closed.
-    assert.ok(!/\d+ paths?, [\d,]+ nodes?/.test(await bar(s)));
+    const drawnAgain = (await s.evaluate(`(() => { const c = document.querySelector('${barQ}').cloneNode(true); c.querySelectorAll('[data-trace-hidden-status]').forEach((e) => e.remove()); document.body.appendChild(c); const t = c.innerText; c.remove(); return t; })()`)) as string;
+    assert.ok(!/\d+ paths?, [\d,]+ nodes?/.test(drawnAgain), "drawn text only: the hidden live region announces the counts (criterion 71, amended 2026-10-31)");
   } finally {
     await close();
   }

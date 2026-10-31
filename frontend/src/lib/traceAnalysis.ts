@@ -46,8 +46,8 @@ export type TraceAnalysisState =
   | { kind: "custom"; analysis: TraceAnalysis }
   | { kind: "failed" };
 
-/** The button of the analysis row. */
-export const ANALYSE_AGAIN = "Analyse again";
+/** The button of the analysis row (always enabled, `ux-notes.md` §22.3). */
+export const ANALYSE = "Analyse";
 
 /** The line while the analysis runs (shown after 400 ms, like the trace). */
 export const ANALYSING = "Analysing...";
@@ -182,10 +182,4 @@ export function analysisLine(state: TraceAnalysisState): string {
         ? TYPE_UNCLEAR
         : [IMAGE_TYPE_WORDS[state.analysis.type], ...findings(state.analysis)].join(" · ");
   }
-}
-
-/** Whether Analyse again would change anything: only after an edit or a failure (in Auto the
- * result would be the same, criterion 34). */
-export function canAnalyseAgain(state: TraceAnalysisState): boolean {
-  return state.kind === "custom" || state.kind === "failed";
 }

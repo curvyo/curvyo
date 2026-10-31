@@ -17,7 +17,7 @@ use kurbo::{BezPath, PathEl, Point};
 pub enum TraceStatus {
     /// Outlines were made (possibly none).
     Traced,
-    /// A region has 65 000 holes or more: "Too much detail: raise Specks." (criterion 16).
+    /// A region has 65 000 holes or more: "Too much detail: raise Ignore below." (criterion 16).
     TooDetailed,
     /// The picture or the map cannot be traced.
     Invalid,

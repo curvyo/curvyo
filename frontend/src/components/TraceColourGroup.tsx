@@ -1,11 +1,9 @@
-import { Pipette, X } from "lucide-react";
-import { useState } from "react";
-import type { KeyboardEvent } from "react";
+import { Pipette } from "lucide-react";
 
 import { Swatch } from "@/components/panel/Swatch";
 import { ICON_BUTTON_CLASS } from "@/components/TextBar";
 import { Tooltip as AppTooltip } from "@/components/ui/tooltip";
-import { AUTO, NO_BACKGROUND, PICK_BACKGROUND, PICK_COLOUR, PICK_TOOLTIP, removeSwatchLabel } from "@/lib/traceText";
+import { AUTO, NO_BACKGROUND, PICK_BACKGROUND, PICK_COLOUR, PICK_TOOLTIP, pickedCountText } from "@/lib/traceText";
 
 const TEXT_BUTTON_CLASS =
   "my-1 h-7 whitespace-nowrap rounded-md px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]";
@@ -84,78 +82,23 @@ export function RemoveBackgroundGroup({ background, auto, armed, onAuto, onPipet
 }
 
 interface PickColoursProps {
-  swatches: readonly string[];
+  /** How many colours are picked (shown in Advanced, `ux-notes.md` §22.3). */
+  count: number;
   armed: boolean;
   onPipette: () => void;
-  onRemove: (hex: string) => void;
   onReturnFocus: () => void;
 }
 
-/** Pick colours' colour group (UX notes §5): the picked colours as swatches (one Tab stop, the
- * arrows move, Delete removes the focused one; a click selects one and shows its Remove button)
- * and the pipette. */
-export function PickColoursGroup({ swatches, armed, onPipette, onRemove, onReturnFocus }: PickColoursProps) {
-  const [selected, setSelected] = useState<string | null>(null);
-  const [focus, setFocus] = useState(0);
-  const at = Math.min(focus, Math.max(0, swatches.length - 1));
-  const shown = selected !== null && swatches.includes(selected) ? selected : null;
-  const keyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    const step = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
-    if (step !== 0 && swatches.length > 0) {
-      event.preventDefault();
-      const next = (at + step + swatches.length) % swatches.length;
-      setFocus(next);
-      (event.currentTarget.querySelectorAll("[data-trace-swatch]")[next] as HTMLElement | undefined)?.focus();
-    } else if ((event.key === "Delete" || event.key === "Backspace") && swatches[at]) {
-      event.preventDefault();
-      onRemove(swatches[at]);
-    }
-  };
+/** Pick colours' group in the bar (`ux-notes.md` §22.1): the pipette and the muted count of what
+ * it picked; the swatches are shown and edited in the Advanced block. The label is a state of the
+ * pipette, not a Tab stop. */
+export function PickColoursGroup({ count, armed, onPipette, onReturnFocus }: PickColoursProps) {
   return (
     <div data-trace-colours="picked" className="flex h-9 items-center gap-1">
-      {swatches.length > 0 ? (
-        <div role="listbox" aria-label="Picked colours" aria-orientation="horizontal" className="flex items-center gap-1" onKeyDown={keyDown}>
-          {swatches.map((hex, index) => (
-            <button
-              key={hex}
-              type="button"
-              role="option"
-              aria-selected={shown === hex}
-              aria-label={hex}
-              data-trace-swatch={hex}
-              tabIndex={index === at ? 0 : -1}
-              onClick={() => {
-                setFocus(index);
-                setSelected(shown === hex ? null : hex);
-              }}
-              className={`flex size-7 items-center justify-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] ${
-                shown === hex ? "ring-2 ring-[var(--editor-accent)]" : ""
-              }`}
-            >
-              <Swatch rgb={packed(hex)} opacity={100} mixed={false} size={20} />
-            </button>
-          ))}
-        </div>
-      ) : null}
-      {shown ? (
-        <AppTooltip side="bottom" content={removeSwatchLabel(shown)}>
-          <button
-            type="button"
-            aria-label={removeSwatchLabel(shown)}
-            onClick={(event) => {
-              onRemove(shown);
-              setSelected(null);
-              if (event.detail > 0) {
-                onReturnFocus();
-              }
-            }}
-            className={`${ICON_BUTTON_CLASS} text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]`}
-          >
-            <X size={16} strokeWidth={1.5} aria-hidden />
-          </button>
-        </AppTooltip>
-      ) : null}
       <PipetteButton label={PICK_COLOUR} armed={armed} onToggle={onPipette} onReturnFocus={onReturnFocus} />
+      <span data-trace-picked-count="" className="w-16 whitespace-nowrap text-xs tabular-nums text-[var(--toolbar-icon)] opacity-70">
+        {pickedCountText(count)}
+      </span>
     </div>
   );
 }

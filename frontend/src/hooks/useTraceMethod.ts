@@ -75,15 +75,6 @@ export function useTraceMethod(ctx: MethodContext) {
     apply({ ...choiceRef.current, values: { ...choiceRef.current.values, backgroundAuto: true, background: suggested } });
   }, [apply]);
 
-  const removeSwatch = useCallback(
-    (hex: string) => {
-      dragging.current = false;
-      const values = choiceRef.current.values;
-      apply({ ...choiceRef.current, values: { ...values, swatches: values.swatches.filter((s) => s !== hex) } });
-    },
-    [apply, choiceRef, dragging],
-  );
-
   // A pick of the pipette on the canvas (`specs/0089` criteria 16, 17; Frage 89 A): Remove
   // background takes it as its colour and releases Auto; Pick colours replaces its colours with
   // it, or adds it with Shift.
@@ -110,5 +101,5 @@ export function useTraceMethod(ctx: MethodContext) {
     }
   }, [syncRevision, active, getSession, apply, choiceRef, dragging, palettePick]);
 
-  return { setPicking, setMethod, setColourTolerance, setBackgroundAuto, removeSwatch };
+  return { setPicking, setMethod, setColourTolerance, setBackgroundAuto };
 }
