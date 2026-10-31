@@ -471,6 +471,20 @@ pub use sketch::{SketchHit, sketch_handle_hit, sketch_hit, sketch_hits, sketch_s
 mod sketch_actions;
 pub use sketch_actions::{SKETCH_ACTIONS, sketch_relation};
 
+mod sketch_dimension_layout;
+pub use sketch_dimension_layout::{
+    DimensionArrow, DimensionGeometry, DimensionItem, DimensionMarks, layout_dimensions,
+};
+
+mod sketch_symbol_layout;
+pub use sketch_symbol_layout::{
+    MoreBadge, SymbolAnchor, SymbolItem, SymbolLayout, SymbolPlacement, THINNING_LIMIT, TextBox,
+    layout_symbols,
+};
+
+mod sketch_tool_use;
+pub use sketch_tool_use::{SKETCH_RAIL_TOOLS, SketchToolUse, dimension_kind, sketch_tool_use};
+
 mod sketch_marquee;
 pub use sketch_marquee::{sketch_marquee, sketch_marquee_placed};
 
