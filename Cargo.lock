@@ -742,6 +742,7 @@ dependencies = [
  "kurbo",
  "proptest",
  "roxmltree",
+ "rustix",
  "serde",
  "serde_json",
  "sha2",
