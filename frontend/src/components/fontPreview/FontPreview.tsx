@@ -214,6 +214,7 @@ export function FontPreview({
             onCurrent={setCurrent}
             onType={typeIntoSearch}
             focusFirstRef={focusFirstCell}
+            guessed={glyphSubject?.guessed ?? ""}
           />
           <GlyphDetailBar
             face={glyphState.status === "ready" ? (glyphSubject?.face ?? null) : null}

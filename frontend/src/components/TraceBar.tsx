@@ -216,7 +216,7 @@ function ViewPill({ mode, onMode }: { mode: TraceViewMode; onMode: (mode: TraceV
 
 /** The finish button's blue ground and shape (customer 2026-10-30): the same in every state,
  * 75 px at rest and while running; Stopped and Failed widen it for their Retry. */
-const FINISH_CLASS =
+export const FINISH_CLASS =
   "relative my-1 flex h-7 min-w-[75px] shrink-0 items-center overflow-hidden rounded-md bg-[var(--editor-accent)] text-sm text-white";
 
 /** The finish button at the far right of the bar (criteria 10, 53, 54; `specs/0089` Frage 84,

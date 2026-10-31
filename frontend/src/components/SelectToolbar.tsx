@@ -4,6 +4,8 @@ import type { OrientationCode, WritingModeCode } from "@/lib/textWritingText";
 import { StyleGroup } from "@/components/StyleGroup";
 import { StrokeToPathButton } from "@/components/StrokeToPathButton";
 import { TraceButton } from "@/components/TraceBar";
+import { RecogniseTextButton } from "@/components/RecogniseBar";
+import type { RecogniseBarNotice } from "@/hooks/useRecognise";
 import type { StrokeToPathBarNotice } from "@/hooks/useStrokeToPath";
 import { OnPathButton, type TextPathActions } from "@/components/TextPathGroups";
 import { BAR_ROW_CLASS } from "@/lib/barLayout";
@@ -100,6 +102,13 @@ export interface SelectToolbarProps {
   /** The Trace button: shown with only images selected (`specs/0025-raster-trace` criterion 1). */
   traceShown?: boolean;
   onTrace?: () => void;
+  /** Recognise text (`specs/0088-trace-recognition` UX notes §1): shown while a closed path is
+   * selected, or while the notice of its last run is shown. */
+  recognise?: {
+    shown: boolean;
+    onEnter: (byKeyboard: boolean) => void;
+    notice: RecogniseBarNotice | null;
+  };
   /** The flip buttons act: something is selected (`specs/0056-mirror-and-negative-scale/`
    * criterion 1). */
   flipEnabled: boolean;
@@ -605,6 +614,7 @@ export function SelectToolbar({
   linkedCloneNotice,
   traceShown = false,
   onTrace,
+  recognise,
   flipEnabled,
   flip,
   guideState,
@@ -777,6 +787,17 @@ export function SelectToolbar({
   if (traceShown && onTrace) {
     // Last, in a group of its own, so no earlier control moves (`0025` UX notes section 1).
     groups.push(<TraceButton key="trace" onTrace={onTrace} onReturnFocus={onReturnFocus} />);
+  }
+  if (recognise && (recognise.shown || recognise.notice)) {
+    // Last, in a group of its own, so no earlier control moves (`0088` UX notes §1).
+    groups.push(
+      <RecogniseTextButton
+        key="recognise-text"
+        onEnter={recognise.onEnter}
+        onReturnFocus={onReturnFocus}
+        notice={recognise.notice}
+      />,
+    );
   }
   return (
     <div

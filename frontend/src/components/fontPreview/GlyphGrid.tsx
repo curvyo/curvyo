@@ -56,6 +56,9 @@ interface GlyphGridProps {
   onType: (key: string) => void;
   /** Set by the grid: focuses its first cell (Down or Enter in the search field). */
   focusFirstRef: React.RefObject<(() => void) | null>;
+  /** The characters Recognise text guessed in the subject text: selected, the first one current
+   * (`specs/0088-trace-recognition` criterion 7). */
+  guessed?: string;
 }
 
 function useArea(ref: React.RefObject<HTMLDivElement | null>) {
@@ -80,7 +83,7 @@ function useArea(ref: React.RefObject<HTMLDivElement | null>) {
 }
 
 export const GlyphGrid = memo(function GlyphGrid(props: GlyphGridProps) {
-  const { state, face, faceName, family, size, recent, query, onInsert, onHover, onCurrent, onType, focusFirstRef } = props;
+  const { state, face, faceName, family, size, recent, query, onInsert, onHover, onCurrent, onType, focusFirstRef, guessed = "" } = props;
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const area = useArea(scrollRef);
   const [scrollTop, setScrollTop] = useState(0);
@@ -163,6 +166,21 @@ export const GlyphGrid = memo(function GlyphGrid(props: GlyphGridProps) {
       setRevision((r) => r + 1);
     }
   }, [face, table, pageCells]);
+
+  // The guessed characters of a recognised text: the first one in its block becomes current.
+  const guessedCps = useMemo(() => new Set([...guessed].map((c) => c.codePointAt(0) ?? 0)), [guessed]);
+  useLayoutEffect(() => {
+    const first = [...guessed][0]?.codePointAt(0);
+    if (first === undefined) {
+      return;
+    }
+    const at = layout.cells.indexOf(first, recentCount);
+    if (at >= 0) {
+      setActive(at);
+    }
+    // Once per subject and guessed letters, not on every layout.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [guessed, state.faceKey, table]);
 
   const activeIndex = Math.min(active, Math.max(0, layout.cells.length - 1));
   useEffect(() => {
@@ -304,7 +322,7 @@ export const GlyphGrid = memo(function GlyphGrid(props: GlyphGridProps) {
                     <div
                       key={item.key}
                       role="option"
-                      aria-selected={index === activeIndex}
+                      aria-selected={index === activeIndex || guessedCps.has(cp)}
                       aria-label={cellName(detail?.name ?? null, cp)}
                       aria-setsize={layout.cells.length}
                       aria-posinset={index + 1}
@@ -319,7 +337,12 @@ export const GlyphGrid = memo(function GlyphGrid(props: GlyphGridProps) {
                         setActive(index);
                         onInsert(cp, event.detail === 0);
                       }}
-                      className="absolute cursor-default overflow-hidden rounded-[5px] border border-[var(--tile-edge)] bg-[var(--tile-bg)] text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)]"
+                      data-guessed={guessedCps.has(cp) ? "" : undefined}
+                      className={`absolute cursor-default overflow-hidden rounded-[5px] border border-[var(--tile-edge)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)] ${
+                        guessedCps.has(cp)
+                          ? "bg-[var(--toolbar-icon-active-bg)] text-[var(--toolbar-icon-active-fg)]"
+                          : "bg-[var(--tile-bg)] text-[var(--toolbar-icon)]"
+                      }`}
                       style={{
                         left: GLYPH_PAD_PX + item.column * (side + GLYPH_GAP_PX),
                         top: item.top,

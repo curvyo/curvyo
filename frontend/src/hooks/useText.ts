@@ -267,6 +267,9 @@ export interface GlyphSubject {
   missing: boolean;
   /** The listed face, `null` when missing. */
   face: FontFace | null;
+  /** The characters Recognise text guessed in the subject text while the session holds them
+   * (`specs/0088-trace-recognition` criterion 7), each once; empty otherwise. */
+  guessed: string;
 }
 
 export interface TextApi {
@@ -459,6 +462,7 @@ export function useText(
       missing: boolean;
       index: number | null;
     } | null;
+    const guessed = session.recognise_guessed_chars();
     setGlyphSubject((before) => {
       const next: GlyphSubject | null = subject
         ? {
@@ -466,6 +470,7 @@ export function useText(
             family: subject.family,
             missing: subject.missing,
             face: subject.index === null ? null : (tab.faces[subject.index] ?? null),
+            guessed,
           }
         : null;
       const same =
@@ -473,6 +478,7 @@ export function useText(
         next !== null &&
         before.name === next.name &&
         before.missing === next.missing &&
+        before.guessed === next.guessed &&
         before.face?.id === next.face?.id &&
         before.face?.faceIndex === next.face?.faceIndex;
       return same ? before : next;
