@@ -321,3 +321,294 @@ The producer reports its strict actual-browser reference workflow passed; indepe
 tester repetition is still pending at this review. This approval concerns inspected source
 and saved presentation, not independent interaction, performance or full-gate acceptance.
 No browser, build, test or production-source operation was performed by this reviewer.
+
+## Revision 2 (2026-10-31)
+
+Source: customer feedback of 2026-10-31 (constraint icon tools, M mode cycle, on-canvas entry,
+magnetic capture, Ctrl lock, cursors, FreeCAD-like dimensions and constraint symbols).
+**This section supersedes every older line that conflicts with it**: the single top options
+bar in Sketch, the Polyline/Arc/variant menus, the "Constraint tool" menu, the Alt mode cycle
+and the Resume action in the bar. Not superseded: the Sketches Properties tab as the only home
+of status and diagnostics, no new header, toolbar or footer, the Escape cascade, no Vector
+snapping. Existing-code facts used below: `SketchTools.tsx` (rail with 11 buttons,
+`SketchToolbar` bar with menus "Polyline mode", "Sketch tool variant", "Constraint tool",
+fields, Reference, Apply/Preview), `SketchAnnotations.tsx` (DOM text labels positioned by Rust),
+`PenEntryChip.tsx` / `EntryField.tsx` / `readoutPlacement` (the on-canvas entry chip).
+Everything marked **(Proposal)** is vetoable at the demo. No browser or build was run.
+
+### 1. Constraint tools in the left rail
+
+The Sketch rail keeps its geometry card (Select, Point, Polyline, Arc, Circle, Ellipse,
+Rectangle, Slot, Fillet: 9 buttons) and gets **one new card, "Constraints", in column B** (left
+edge 68px, top 12px, 8px right of the geometry card, the Path/Boolean card position of row
+"Tool rail architecture"). The current constraints/dimension buttons below a divider in the
+geometry card go away. Card: `role="toolbar"`, vertical, name "Constraints", one Tab stop,
+Up/Down/Home/End inside (row "Rail keyboard model"); button 40px, icon 20px in a 16 viewBox,
+1.5px absolute stroke, `currentColor`; hover `--editor-accent-hover`, active
+`--toolbar-icon-active-bg`/`-fg`. Order, with a 1px 25% divider after Fixed and after Midpoint:
+Coincident, Horizontal, Vertical, Parallel, Perpendicular, Tangent, Equal, Fixed | Symmetric,
+Midpoint | Dimension. 11 buttons, about 500px: fits the 640px minimum height (544px column B
+budget). No dropdown on any button; no flyout.
+
+Behaviour (the Vector rule "selection first, else tool", **(Proposal)**):
+- Eligible selection exists: a click applies the constraint at once, one history step,
+  selection stays for the next one; the button flashes no state.
+- Otherwise the click arms the tool (`aria-pressed`); the picks follow the existing point/edge
+  pick rules and order-independent eligibility; the constraint is added on the last pick, the
+  tool stays armed. Escape (cascade): disarm to Select.
+- Not eligible now: the button stays focusable, drawn at 40% (as dimmed rail buttons today),
+  `aria-disabled="true"`, tooltip "Horizontal: select a line or two points". Pressing it does
+  nothing and shows no notice. Tooltip text = name, plus the reason only when disabled. No
+  shortcut letters, no operating hint text.
+- Dimension is one smart tool (kind inferred from the picks, as today: length, distance,
+  radius/diameter, angle). Its value is typed in the on-canvas entry box (section 3).
+
+**Icons needed.** FreeCAD names are from memory of its `Constraint_*` set; the lead checks
+names and the licence before use. Borrowed icons are redrawn single-colour (`currentColor`,
+the rail look); FreeCAD's colour versions must not appear. The canvas symbols (section 7) are
+**our own simplified drawings** of the same shapes: FreeCAD's 64px colour art is unreadable at
+12px. Every icon is used in three places: rail (20px), Sketches rows (16px, left of the
+constraint name, replaces text-only rows) and canvas symbol (12px in a 16px badge).
+
+| Icon | FreeCAD source | Rail | Sketches row | Canvas symbol |
+|---|---|---|---|---|
+| Coincident | `Constraint_PointOnPoint` | yes | yes | yes (not for structural joins) |
+| Horizontal | `Constraint_Horizontal` | yes | yes | yes |
+| Vertical | `Constraint_Vertical` | yes | yes | yes |
+| Parallel | `Constraint_Parallel` | yes | yes | yes |
+| Perpendicular | `Constraint_Perpendicular` | yes | yes | yes |
+| Tangent | `Constraint_Tangent` | yes | yes | yes |
+| Equal | `Constraint_EqualLength` | yes | yes | yes, with pair index |
+| Fixed | `Constraint_Lock` | yes | yes | yes |
+| Symmetric | `Constraint_Symmetric` | yes | yes | yes |
+| Midpoint | none; draw in-house (point on a line, tick at the middle) | yes | yes | yes |
+| Dimension | `Constraint_Length` as the generic ruler | yes | rows use the kind glyphs below | no (the dimension itself is the mark) |
+| On axis (point on x = 0 / y = 0) | `Constraint_PointOnObject` | no (inference only) | yes | yes |
+| Length / Distance, Radius, Diameter, Angle | `Constraint_Length`, `_Radius`, `_Diameter`, `_InternalAngle` | no | yes | no |
+
+### 2. The options bar is gone: mode cycle and the mode label
+
+Sketch shows **no top options bar**. The canvas keeps its full height; switching tools never
+resizes anything. Where each old bar item went:
+
+| Old bar item | Now |
+|---|---|
+| Polyline mode, Sketch tool variant, Constraint tool menus | `M` cycles; the mode label shows the result; constraint tools are the rail card |
+| Numeric fields, Apply, Preview | the on-canvas entry box (section 3); Enter commits, no Apply, no Preview button (the canvas always previews) |
+| Reference check | row 2 of the entry box when a dimension is typed (section 3) |
+| Resume from endpoint | clicking a captured endpoint with Polyline or Arc resumes (section 4); for an explicit start from a selected endpoint a "Resume" row action in Sketches |
+| Clear / reset picks | Escape cascade |
+
+**Key `M`**: cycles the active drawing tool's applicable modes forward, `Shift+M` backward,
+once per press, no key repeat, wraps, skips modes without a precondition (as the Alt cycle
+did), pending picks kept and relabelled as in the revision plan table. It replaces the Alt
+cycle (Alt is taken by window managers on Linux). Ignored while a text field or the entry box
+has focus and with a modifier other than Shift. Vector's `M` (type a move) is unaffected: it
+belongs to Select in Vector, and Sketch Select assigns no `M`. Tools with one mode (Point,
+Fillet) ignore it.
+
+**Mode label** **(Proposal)**: a small DOM chip, `pointer-events: none`, `aria-hidden`; text is
+the domain's mode name, Title case, at most 22 characters: "Line", "Perpendicular line",
+"Tangent arc", "Arc, 3 points", "Circle, centre". Style: the Live transform readout's look:
+12px, `--toolbar-bg` ground, `--toolbar-icon` text, 2px 6px padding, 4px radius, no shadow,
+sits below the entry box and the readout in z. Placement: top-left corner 10px right of and
+below the start point S of the current segment (S = the last committed point, for the first
+pick the pointer); if the rubber band leaves S into that quadrant, take the diagonally opposite
+quadrant; clamp inside the canvas and clear of the rail (128px, as the entry chips). It follows
+S on pan and zoom. Mode change swaps the text in the same frame, no animation. A visually hidden
+polite live region says the new mode ("Tangent arc") on each change and once when the tool
+opens. Shown: tools with two or more modes, from tool selection while the pointer is on the
+canvas. Hidden: Select and constraint tools, tools with one mode, pointer outside the canvas,
+during pan or an object drag, after the construction commits or is cancelled (until the next
+first pick it returns at the pointer). It stays while the entry box is open.
+
+### 3. Numeric entry box on the canvas
+
+Reuse the Pen entry chip as it exists: surface "Transform entry chip" (`--toolbar-bg`,
+`--panel-elevation-shadow`, 8px radius), `EntryField` fields 28px high, 14px tabular, label
+inside the left padding (12px), display-unit suffix inside the right edge, 154px / 150px
+widths with 72px of text, `--editor-accent` 2px border on the open field, `--field-invalid` 2px
+plus a 12px message line under the fields on a refusal. The component stays a Sketch sibling
+(design-system rule: a sibling, not a generalisation); share `EntryField` and the placement
+helper. Group name = the object kind ("Line", "Arc", "Circle", "Dimension"); field labels name
+the quantity ("Length", "Angle", "Radius", "Value"); the fields are the ones the revision plan
+gives for the current stage.
+
+- **Opens** with Tab on the canvas when a construction has a pending pick or a dimension is
+  selected; also by double-click on a dimension text; focus in the first field, text selected,
+  in the opening frame. A drawing tool without a pending pick: Tab does nothing here.
+- **Anchored to the object**, not to the pointer: line, arc and dimension, centred on the
+  object's midpoint (arc: its mid-arc point) and offset 14px to the side away from the mode
+  label and the pointer; circle and radius: right of the perimeter point; rectangle and slot:
+  below the far corner; a dimension edit sits over its own text. Clamp, flip and rail
+  clearance by the placement rule of the Pen entry chip. Before the first edit it follows
+  the object as the pointer moves; after the first edit it stays; it follows the object on
+  pan and zoom.
+- **Keys unchanged**: Tab / Shift+Tab move between fields (wrap), Enter commits a complete
+  valid entry (one history step), Escape closes the box and restores the live pick, the next
+  Escape cancels the pending segment (cascade). Focus returns to the canvas after every end.
+  The preview runs to the typed values while open. A mode change (`M`) is ignored while the
+  box has focus; after Escape it works again and never reinterprets a draft Length as Radius.
+- **Refusal**: field border `--field-invalid`, message line inside the box ("Must be more than
+  0 mm"), `aria-invalid`, `aria-describedby`; the box stays open. The message lives in the
+  box, so it is visible with Properties collapsed; nothing goes to a status area.
+- **Reference**: the box of a new or edited dimension has row 2, one checkbox "Reference"
+  (14px box, 12px label, `tabindex="-1"` like the Move chip checks, click only, no key assigned). Checked: the value field becomes a
+  read-only resolved value, as already specified for Reference rows.
+- The Sketches rows keep their editable fields; they are not removed.
+
+### 4. Magnetic endpoint capture
+
+While a drawing tool awaits a pick, an existing sketch point (endpoint, arc/circle centre,
+origin) within **12px** screen distance of the pointer captures it: the preview point jumps to
+the point's centre, the rubber band ends there, and the capture marker shows. Release at
+**16px** (hysteresis, no flicker). Nearest point wins; ties go to the older point. Sketch
+points only: no grid, no Vector objects, no invisible targets.
+- Marker: the Pen target cue pattern: the point's glyph (10px circle, white fill, 1.5px
+  `--toolbar-icon` outline) inside a **18px `--accent` 1.5px ring** with a 1px white casing
+  (stronger than the Pen's 20% ring; sketch geometry is thin and dense), instant in and out.
+  The matching Sketches row highlights as for hover. Centre and origin use the same marker.
+- Meaning: a click on a captured point reuses its identity (structural join; Polyline/Arc
+  resume from a free end; closing on the first point previews the closing segment, 1px dashed
+  `--accent`). It never adds a tangent or other relation by itself.
+- Axis inference stays as specified (axis line `--axis-guide`, proposed mark before commit);
+  capture has priority over axis inference.
+- Constraint tools and Select use the 8px object hit tolerance, not capture.
+- Touch: no capture preview without a hover; the tap uses the 16px hit radius.
+
+### 5. Ctrl locks the direction
+
+Same stops as the Pen: one table (`snap_angle`, multiples of 15 and 22.5 degrees), absolute from
+the sketch x-axis, nearest stop wins, length kept. Applies to every pick whose direction from an
+anchor is free (Polyline line mode, Rectangle/Slot spine, centre-to-start radius pick, ellipse
+axis); tangent and perpendicular modes and captured points ignore it (a capture wins over the
+lock, the lock cue then hides). **Visible lock cue while Ctrl is down and the lock is engaged**:
+the rubber band is drawn solid 1.5px `--preview-new`; a 1px **dashed (2 on / 2 off)
+`--axis-guide`-strength line** runs through the anchor along the locked angle, 24px past the
+pointer in both directions (not full viewport: no polar-tracking grid); the live readout chip
+shows the locked angle ("30.0 mm, 45°"); the Lock badge of the design system (white ground,
+1.5px `--accent` ring, 10px arrow glyph, 16px left of and below the pointer) shows an
+angled-arrow glyph. All appear and disappear in the frame Ctrl does (window-level key events,
+as the Modifier badge). **Open for the customer:** whether a lock at 0/90/180 degrees also
+persists a Horizontal/Vertical constraint, see Frage at the end.
+
+### 6. Cursors
+
+Built-in cursors only (no new custom images; `crosshair` where custom images are ignored).
+Rule: the cursor matches what a press would do, unchanged during a press.
+
+| Situation | Cursor |
+|---|---|
+| Drawing tool, over canvas or captured point | `crosshair` (capture is told by the marker, not the cursor) |
+| Select, over a free point, segment, arc, circle (8px hit) | `grab`, with the hover highlight (segment: 4px `--segment-hover` band; point: 18px `--accent-hover` ring) |
+| Select, over geometry that cannot move (fully fixed by constraints) | `default`, highlight only |
+| Select, drag in progress | `grabbing`; Escape restores, cascade |
+| Select, over a dimension text or its dimension line | `grab` (the label can be dragged along its offset); double-click edits |
+| Over a constraint symbol | `pointer` (click selects it and its geometry) |
+| Constraint tool armed, over eligible geometry | `pointer`; elsewhere `crosshair`; over ineligible geometry `default` |
+| Over the entry box or mode label | `text` in a field, else `default` |
+
+### 7. Dimension annotations and constraint symbols
+
+Canvas draws lines, arrowheads, leaders and symbols (render core, screen-constant sizes);
+dimension **text stays a DOM label** positioned by Rust (`SketchAnnotations`, keyboard and
+screen reader reach; Enter edits). Symbols are canvas marks; their keyboard route is the
+Sketches rows (a selected row highlights its symbol). Light theme only, as today.
+
+**New tokens (light theme)**
+
+| Token | Value | Used for |
+|---|---|---|
+| `--dim-driving` | `#BF2933` | Driving dimension lines, extension lines, arrowheads, text. 4.8:1 on `--canvas-bg`, 5.9:1 on white; 3.0:1 on `--pasteboard-bg` (text carries the 2px halo below) |
+| `--dim-reference` | `--panel-muted-fg` (`#5A5A5F`), alias | Reference measurements. 5.6:1 on `--canvas-bg` |
+| `--dim-halo` | the document background, 2px | Halo around dimension text and symbols so they read over geometry (like the white "casing") |
+| `--sketch-solved` | `#12733A` | Stroke of an entity whose own DOF is 0 (fully constrained, FreeCAD's green). 4.9:1 on `--canvas-bg`. Under-constrained geometry keeps `--toolbar-icon` (`#3A3A3F`). Colour is never the only cue: Sketches states DOF as text |
+| `--sketch-symbol-bg` | white at 85% | Ground of a constraint symbol badge |
+
+`--dim-driving` is close to `--destructive` (`#B3261E`); conflicts therefore never rely on hue:
+see states. **(Proposal)** all of this is mine to adjust after the first browser look.
+
+**Dimension anatomy** (sizes in screen pixels, constant at every zoom; geometry-attached
+positions scale with the sketch)
+- Extension lines 1px, start 4px off the geometry point, run 4px past the dimension line.
+- Dimension line 1px, between the extension lines; arrowheads filled, 8px long, 6px wide,
+  `--dim-driving`.
+- Default offset at creation: 24px; next free rank 20px further out when a line already sits
+  on that side (ranks never overlap). Dragging the text in Select moves the offset (across)
+  and the text position (along); the offset is stored in sketch units.
+- Text: 12px, tabular, centred on the dimension line, interrupted by the halo (the line does
+  not run under the digits). Format "50 mm" (document display unit), the value as the panel,
+  at most the panel's precision, trailing zeros trimmed.
+- Linear (horizontal, vertical, aligned): as above. Radius: a leader from the perimeter point
+  at the pick direction, one arrowhead on the arc, text at the leader's end outside the circle,
+  "R 25 mm"; diameter: a line through the centre with two arrowheads, "⌀ 50 mm". The letter
+  names the kind (customer's screenshot shows "25 mm" only; **(Proposal)** to prefix, the
+  Placement chip already uses r/⌀). Angle: arc between the two lines with arrowheads, "45°".
+- **Driving**: solid `--dim-driving`, plain text. **Reference**: `--dim-reference`, dimension and
+  extension lines dashed (4 on / 3 off), text in parentheses "(21.17 mm)". The two differ by
+  dash and parentheses, not by colour alone. Formula or named parameter: a 10px "fx" prefix in
+  `--panel-muted-fg`; the name is the accessible name, not shown on canvas.
+- Small spans: under 56px between the extension lines the arrowheads flip outside (pointing
+  in) and the text moves beside the line end; under 24px the arrowheads drop and the dimension
+  line becomes two ticks, text only. Under 16px of geometry on screen, dimensions of that
+  entity draw only while hovered or selected.
+
+**States.** Hover: a 6px `--accent-hover` band behind line and text box, cursor `grab`.
+Selected: every part 1.5px and `--accent`, text in a 1px `--accent` pill; the dimensioned
+geometry and its Sketches row highlight with it; Shift extends. Keyboard focus on the text
+button: 2px `--editor-accent` outline. Conflicting or redundant: 1px `--destructive` box around
+the text plus a "!" prefix, and the Sketches row says it in words. Editing: the entry box
+replaces the text. Hit target: text box at least 24px high; lines 8px tolerance.
+
+**Overlap.** Draw order bottom to top: geometry, symbols, reference dimensions, driving
+dimensions, hovered, selected. Text vs text: the later text slides along its own dimension line
+(up to a third of its length each way) to a free spot; if none, ranks move out. Text over
+geometry: the halo keeps it legible. A selected or hovered annotation is always drawn complete
+and on top. Over 150 visible annotations, symbols of unselected, unhovered entities are
+thinned (see symbols); dimensions are never thinned.
+
+**Constraint symbols**
+- Badge 16 x 16px, 3px radius, `--sketch-symbol-bg` ground, 1px `--toolbar-icon` at 40% border,
+  12px glyph `--toolbar-icon`, 1.5px stroke. Hover: ground `--accent-hover`. Selected: ground
+  `--accent`, glyph white. Conflict/redundant: border `--destructive` 1px and glyph `--destructive`.
+  Hit target 16px (padded to 20px).
+- Placement: single-entity constraints (Horizontal, Vertical, Fixed on an entity) at the entity's
+  midpoint, 12px to the left of its direction; several on one entity form a row along the
+  tangent, 2px apart, centred on the midpoint, at most three, then one "+n" badge (opens as
+  the full row while the entity is hovered or selected). Point constraints (On axis, Fixed on a
+  point, explicit Coincident) 10px up and right of the point. Two-entity constraints (Parallel,
+  Perpendicular, Tangent, Symmetric, Midpoint): at the shared point when adjoining (Perpendicular
+  as a right-angle badge at the corner, Tangent at the tangent point), else at the middle
+  between the two entity midpoints, with 1px dotted leaders to both while hovered or
+  selected. Equal: a symbol **on each member**, the "=" glyph with an 8px index digit at its
+  lower right ("=1", "=2"); one index per equal group (chains of three equal lines share it),
+  numbered in order of the sketch's constraints, renumbered after deletion; hovering or
+  selecting one member highlights the whole group.
+- Structural joins (shared endpoints of a chain, closure) get **no** symbol; they are one
+  point. The origin gets no symbol for its built-in fixed state.
+- Symbol colour never carries meaning by hue; the glyph does. Thinning over 150 annotations:
+  unselected, unhovered symbols draw as 6px dots at their anchor (type no longer readable)
+  until zoomed in or hovered; the Sketches list always has the full rows.
+
+### Design-system and implementation notes
+
+- Add the five tokens and the rows "Sketch constraint card", "Sketch mode label", "Sketch entry
+  box", "Endpoint capture marker", "Sketch dimension annotation", "Sketch constraint symbol"
+  to `docs/design-system.md` when this section is accepted; not done here.
+- Icon licence (FreeCAD, LGPL as I recall) and filenames: the lead verifies; keep the
+  borrowed set in one folder with a replace-later note in `docs/technical-debt.md`.
+- Review checklist for the implemented UI: rail card keyboard and disabled reasons; `M` and
+  Shift+M gated in fields; label placement at four quadrants and canvas edges; entry box at
+  800 x 600; capture hysteresis; lock cue appears and disappears with Ctrl on WebKitGTK;
+  every cursor row; dimension tiers at 25%, 100%, 400% zoom; 200 annotations; contrast of the
+  tokens on `--canvas-bg` and on a changed document background.
+
+Frage 1 (SK-LOCK): Does Ctrl lock at 0, 90 or 180 degrees persist Horizontal/Vertical?
+A) Geometry only, never a constraint. B) At 0/90/180 degrees the Horizontal/Vertical symbol
+shows in the preview and the constraint persists on click; other stops are geometry only.
+Recommendation B (FreeCAD behaviour, the preview shows it before the click, removable in
+Sketches). Default if unanswered: B.
+
+Frage 2 (SK-SYM): Should the canvas show a switch for hiding constraint symbols?
+A) No switch; automatic thinning only. B) A "Symbols" switch in the Sketches tab.
+Recommendation A (no new control until large sketches show a need). Default: A.
