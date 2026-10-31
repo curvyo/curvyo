@@ -63,8 +63,13 @@ impl Document {
             return None;
         };
         let (graph, placement, checkpoint) = sketch_codec::read(&meta).ok()?;
+        let ownership_conflict = self.sketch_ownership_conflict(id);
         let reused = self.sketch_cache.borrow().get(&id).and_then(|(_, saved)| {
-            if saved.graph != graph || saved.checkpoint != checkpoint {
+            if saved.graph != graph
+                || saved.checkpoint != checkpoint
+                || (saved.diagnosis.as_deref() == Some(crate::sketch_page::OWNERSHIP_CONFLICT))
+                    != ownership_conflict
+            {
                 return None;
             }
             let mut view = saved.mapped_by(placement.compose(saved.placement.inverse()?));
@@ -72,7 +77,15 @@ impl Document {
             view.resolved.style = view.style.clone();
             Some(view)
         });
-        let snapshot = reused.or_else(|| crate::sketch_read::read(id, &meta).ok())?;
+        let mut snapshot = reused.or_else(|| crate::sketch_read::read(id, &meta).ok())?;
+        snapshot.labels = crate::sketch_labels::read(&meta)
+            .ok()?
+            .into_iter()
+            .filter(|(id, _)| snapshot.graph.constraints.contains_key(id))
+            .collect();
+        if ownership_conflict {
+            snapshot.diagnosis = Some(crate::sketch_page::OWNERSHIP_CONFLICT.into());
+        }
         if cacheable {
             self.sketch_cache
                 .borrow_mut()
@@ -111,6 +124,11 @@ impl Document {
         delta: &SketchDelta,
         preview: Option<&Sketch>,
     ) -> Result<bool, SketchEditError> {
+        if self.sketch_ownership_conflict(id) {
+            return Err(SketchEditError(
+                crate::sketch_page::OWNERSHIP_CONFLICT.into(),
+            ));
+        }
         let meta = self.sketch_meta(id)?;
         let (mut graph, _, saved) = sketch_codec::read(&meta)?;
         let before = graph.clone();
@@ -140,6 +158,9 @@ impl Document {
         }
         for (id, value) in &delta.constraints {
             change(&constraints, &id.0, value.as_ref())?;
+            if value.is_none() {
+                crate::sketch_labels::remove(&meta, id)?;
+            }
         }
         for (id, value) in &delta.parameters {
             change(&parameters, &id.0, value.as_ref())?;
@@ -187,6 +208,14 @@ fn checkpoint(graph: &Sketch, seed: &Sketch) -> Result<SketchCheckpoint, SketchE
         status: result.status,
     })
 }
+impl SketchDelta {
+    /// Applies explicit record changes to caller-owned intent without solving or persisting it.
+    /// Callers must validate the complete result before accepting it.
+    pub fn apply_to(&self, graph: &mut Sketch) {
+        apply(graph, self);
+    }
+}
+
 fn apply(graph: &mut Sketch, delta: &SketchDelta) {
     for (id, record) in &delta.entities {
         if let Some(record) = record {
@@ -260,8 +289,12 @@ impl Document {
         }
         let meta = self.sketch_meta(id)?;
         let opacity = crate::node_registers::read_registers(&meta).opacity;
+        self.clear_sketch_claim(id);
         crate::clone_write::unlink_meta(&meta, &path, opacity.get());
-        for key in KEYS {
+        for key in KEYS
+            .into_iter()
+            .chain([crate::sketch_page::PAGE_KEY, crate::sketch_labels::KEY])
+        {
             meta.delete(key)
                 .map_err(|e| SketchEditError(e.to_string()))?;
         }

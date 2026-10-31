@@ -438,7 +438,8 @@ pub(crate) fn read_path_snapshot(id: NodeId, meta: &LoroMap) -> PathSnapshot {
 /// to defaults, matching slice 1's forward-compatible reading stance.
 pub(crate) fn validate_path_tree(loro: &LoroDoc, paths_tree_key: &str) -> bool {
     let tree = loro.get_tree(paths_tree_key);
-    crate::group_tree::validate_tree(&tree, validate_object_node)
+    crate::sketch_page::valid_claims(&loro.get_map(crate::document::ROOT_MAP))
+        && crate::group_tree::validate_tree(&tree, validate_object_node)
 }
 
 /// Dispatches one leaf object to path validation when its

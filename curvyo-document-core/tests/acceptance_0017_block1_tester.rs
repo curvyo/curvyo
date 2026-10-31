@@ -559,6 +559,9 @@ fn every_older_fixture_still_opens_with_the_styles_it_stored() {
     let explicitly_damaged = [
         "sketch_checkpoint_invalid_v28.curvyo",
         "sketch_record_invalid_v28.curvyo",
+        "sketch_page_claim_invalid_v28.curvyo",
+        "sketch_page_assignment_invalid_v28.curvyo",
+        "sketch_label_invalid_v28.curvyo",
         // Intentionally malformed 0060 snapping registers.
         "snapping_enabled_type_v27.curvyo",
         "snapping_capture_type_v27.curvyo",

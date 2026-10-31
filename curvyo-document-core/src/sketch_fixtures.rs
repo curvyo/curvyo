@@ -133,3 +133,61 @@ fn slot_and_converted_goldens() {
     doc.convert_sketch_to_path(id, &ids).unwrap();
     fixture("sketch_converted_v28.curvyo", &doc, true);
 }
+
+#[test]
+fn page_sketch_claim_goldens() {
+    let doc = Document::new(903);
+    let page = doc.pages()[0].id.clone();
+    let id = doc
+        .create_page_sketch(&page, &Sketch::new("origin".into()), &Style::default())
+        .unwrap();
+    fixture("sketch_page_owner_v28.curvyo", &doc, true);
+    let root = doc.loro().get_map(crate::document::ROOT_MAP);
+    let key = crate::pages::key(&page, "sketch_owner");
+    root.insert(&key, "invalid identity").unwrap();
+    doc.commit_with_label("damaged_claim");
+    fixture("sketch_page_claim_invalid_v28.curvyo", &doc, false);
+    root.delete(&key).unwrap();
+    let meta = doc.sketch_meta(id).unwrap();
+    meta.insert(crate::sketch_page::PAGE_KEY, 123).unwrap();
+    doc.commit_with_label("damaged_assignment");
+    fixture("sketch_page_assignment_invalid_v28.curvyo", &doc, false);
+}
+
+#[test]
+fn dimension_label_goldens() {
+    let doc = Document::new(904);
+    let mut graph = Sketch::new("origin".into());
+    graph = curvyo_sketch_core::create_circle(
+        &graph,
+        "circle",
+        Position::mm(10.0, 10.0),
+        curvyo_sketch_core::Length(5.0),
+    )
+    .unwrap();
+    let circle = graph
+        .entities
+        .iter()
+        .find_map(|(id, e)| {
+            matches!(e, curvyo_sketch_core::Entity::Circle { .. }).then(|| id.clone())
+        })
+        .unwrap();
+    graph.constraints.insert(
+        "radius".into(),
+        Constraint::driving(Relation::Radius {
+            curve: circle,
+            value: Expression::Literal(Quantity::length(5.0).unwrap()),
+        }),
+    );
+    let id = doc
+        .create_page_sketch(&doc.pages()[0].id, &graph, &Style::default())
+        .unwrap();
+    doc.set_sketch_label(id, &"radius".into(), Position::mm(17.0, -3.0))
+        .unwrap();
+    fixture("sketch_dimension_label_v28.curvyo", &doc, true);
+    let meta = doc.sketch_meta(id).unwrap();
+    let labels = crate::sketch_codec::collection(&meta, crate::sketch_labels::KEY).unwrap();
+    labels.insert("radius", "invalid position").unwrap();
+    doc.commit_with_label("damaged_label");
+    fixture("sketch_label_invalid_v28.curvyo", &doc, false);
+}

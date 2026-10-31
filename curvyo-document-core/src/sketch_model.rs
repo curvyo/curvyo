@@ -54,6 +54,8 @@ pub struct SketchSnapshot {
     pub id: NodeId,
     /// Current authoritative graph, including repairable dangling references.
     pub graph: Sketch,
+    /// Optional local positions of current dimension labels, independent from geometry.
+    pub labels: BTreeMap<ConstraintId, curvyo_sketch_core::Position>,
     /// Local-to-document placement.
     pub placement: Affine,
     /// Object style.

@@ -54,6 +54,10 @@ pub(crate) fn read(id: NodeId, meta: &LoroMap) -> Result<SketchSnapshot, String>
     let resolved = crate::sketch_outline::outline(id, &candidate, placement, &style)?;
     Ok(SketchSnapshot {
         id,
+        labels: crate::sketch_labels::read(meta)?
+            .into_iter()
+            .filter(|(id, _)| graph.constraints.contains_key(id))
+            .collect(),
         graph,
         placement,
         style,

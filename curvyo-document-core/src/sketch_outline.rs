@@ -112,3 +112,22 @@ fn anchor(id: NodeId, serial: &mut u64, point: kurbo::Point) -> NewAnchor {
         Point::new(point.x, point.y),
     )
 }
+
+/// Derives transient geometry before an object identity exists.
+/// Anchor identities in this result are render-only and must never be persisted.
+/// # Errors
+/// Rejects malformed analytic geometry.
+pub fn preview_outline(graph: &Sketch, placement: Affine) -> Result<Vec<SubpathSnapshot>, String> {
+    let path = outline(
+        NodeId::from_parts(0, 0),
+        graph,
+        placement,
+        &Style::default(),
+    )?;
+    let mut paths = vec![SubpathSnapshot {
+        closed: path.closed,
+        anchors: path.anchors,
+    }];
+    paths.extend(path.extra_subpaths);
+    Ok(paths)
+}

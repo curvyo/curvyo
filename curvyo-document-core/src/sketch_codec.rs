@@ -42,6 +42,13 @@ pub(crate) fn collection(map: &LoroMap, key: &str) -> Result<LoroMap, String> {
     }
 }
 pub(crate) fn read(map: &LoroMap) -> Result<(Sketch, Affine, Option<SketchCheckpoint>), String> {
+    if map.get(crate::sketch_page::PAGE_KEY).is_some() {
+        let page: String = atomic(map, crate::sketch_page::PAGE_KEY)?;
+        if page.is_empty() {
+            return Err("invalid sketch page identity".into());
+        }
+    }
+    crate::sketch_labels::read(map)?;
     let mut graph = Sketch::new(atomic(map, KEYS[0])?);
     graph.entities.clear();
     let entities = collection(map, KEYS[1])?;

@@ -245,7 +245,10 @@ mod sketch_model;
 pub use sketch_model::{SketchCheckpoint, SketchDelta, SketchEntityRecord, SketchSnapshot};
 mod sketch_codec;
 mod sketch_commands;
+mod sketch_copy;
+mod sketch_labels;
 mod sketch_outline;
+mod sketch_page;
 mod sketch_parameter_repair;
 mod sketch_read;
 pub use sketch_commands::SketchEditError;
@@ -256,4 +259,4 @@ mod sketch_fixtures;
 #[cfg(test)]
 mod sketch_tests;
 
-pub use sketch_outline::outline as sketch_outline;
+pub use sketch_outline::{outline as sketch_outline, preview_outline as sketch_preview_outline};
