@@ -12,11 +12,6 @@ impl WasmSession {
         self.session.sketch_secondary_press()
     }
 
-    /// Numeric entry values read on focus, never copied into pointer-rate Properties state.
-    pub fn sketch_numeric_values_json(&self, action: &str) -> String {
-        serde_json::json!(self.session.sketch_numeric_values(action)).to_string()
-    }
-
     /// Complete read-only Properties and canvas annotation view.
     pub fn sketch_view_json(&self) -> String {
         self.session.sketch_view_json()
@@ -46,10 +41,6 @@ impl WasmSession {
     pub fn enter_sketch(&mut self, id: &str) -> bool {
         self.session.enter_sketch_named(id)
     }
-    /// Chooses radius or diameter for the context dimension preview.
-    pub fn set_sketch_circle_dimension(&mut self, radius: bool) {
-        self.session.set_sketch_circle_dimension(radius);
-    }
     /// Selects a constraint tool or context-sensitive dimensioning.
     /// # Errors
     /// Rejects unknown action names.
@@ -58,16 +49,6 @@ impl WasmSession {
             Ok(())
         } else {
             Err(error("Unknown constraint tool"))
-        }
-    }
-    /// Changes the connected drawing mode without accepting pending geometry.
-    /// # Errors
-    /// Rejects a mode without the required preceding endpoint context.
-    pub fn set_sketch_mode(&mut self, name: &str) -> Result<(), JsValue> {
-        if self.session.set_sketch_mode(name) {
-            Ok(())
-        } else {
-            Err(error("This mode needs a preceding line or arc endpoint"))
         }
     }
     /// Chooses one concrete tool/variant.

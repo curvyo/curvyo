@@ -85,6 +85,8 @@ impl Session {
             self.view(),
         ));
         list.extend(self.sketch_axes_draw_list());
+        list.extend(self.sketch_lock_draw_list());
+        list.extend(self.sketch_capture_draw_list());
         if let Some(stroke) = &self.sketch.lasso {
             list.extend(curvyo_render_core::build_marquee_overlay(
                 self.view(),
@@ -138,6 +140,7 @@ impl Session {
             ));
         }
         list.extend(self.sketch_axes_draw_list());
+        list.extend(self.sketch_lock_draw_list());
         list
     }
 

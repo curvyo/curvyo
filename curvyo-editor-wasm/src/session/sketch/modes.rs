@@ -30,13 +30,23 @@ impl Session {
         self.refresh_sketch_construction_preview();
         true
     }
+    /// Alt: the next Polyline mode, the other Arc, Circle or Ellipse variant, or the other
+    /// circle dimension kind; one step per press (AC25, AC34, AC35).
     pub(super) fn cycle_sketch_mode(&mut self) -> bool {
-        if matches!(self.sketch.tool, SketchTool::Arc | SketchTool::ArcCenter) {
-            self.set_sketch_tool(if self.sketch.tool == SketchTool::Arc {
-                SketchTool::ArcCenter
+        if let Some(partner) = super::mode_label::variant_partner(self.sketch.tool) {
+            if self.sketch.picks.is_empty() {
+                self.sketch.tool = partner;
+                self.sketch.arc_radius = None;
+                self.refresh_sketch_construction_preview();
             } else {
-                SketchTool::Arc
-            });
+                self.sketch.variant_hint = true;
+            }
+            return true;
+        }
+        if self.sketch.tool == SketchTool::Constraints
+            && let Some(kind @ ("radius" | "diameter")) = self.sketch_dimension_action()
+        {
+            self.sketch.circle_dimension_radius = kind == "diameter";
             return true;
         }
         if self.sketch.tool != SketchTool::Polyline {
@@ -89,38 +99,15 @@ impl Session {
         self.sketch.pending_prefix = Some(self.minter.mint().to_hex());
     }
 
-    pub(super) fn sketch_resume_at(&mut self, point: curvyo_document_core::Point) -> bool {
+    /// A first pick on a captured open endpoint resumes the chain from it (AC27).
+    pub(super) fn sketch_resume_at(&mut self) -> bool {
         if !matches!(self.sketch.tool, SketchTool::Polyline | SketchTool::Arc)
             || !self.sketch.picks.is_empty()
             || self.sketch.chain.is_some()
         {
             return false;
         }
-        let (Ok(snapshot), Some(local)) =
-            (self.sketch_snapshot_for_edit(), self.sketch_local(point))
-        else {
-            return false;
-        };
-        let mut endpoints = std::collections::BTreeMap::<EntityId, usize>::new();
-        for entity in snapshot.graph.entities.values() {
-            if let Entity::Line { start, end } | Entity::Arc { start, end, .. } = entity {
-                *endpoints.entry(start.clone()).or_default() += 1;
-                *endpoints.entry(end.clone()).or_default() += 1;
-            }
-        }
-        let nearest = endpoints
-            .into_iter()
-            .filter(|(_, count)| *count == 1)
-            .filter_map(|(id, _)| {
-                snapshot
-                    .solution
-                    .point(&id)
-                    .ok()
-                    .map(|p| (p.distance(local).0, id))
-            })
-            .filter(|(distance, _)| *distance * self.view().scale() <= 6.0)
-            .min_by(|a, b| a.0.total_cmp(&b.0).then_with(|| a.1.cmp(&b.1)));
-        let Some((_, id)) = nearest else {
+        let Some(id) = self.sketch.capture.clone() else {
             return false;
         };
         self.sketch.entities = [id].into();

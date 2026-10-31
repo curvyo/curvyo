@@ -80,6 +80,14 @@ pub(in crate::session) struct SketchState {
     pub drag: Option<super::drag::SketchDrag>,
     /// The arc preview lies on its start direction and shows straight; commit refuses it.
     pub degenerate: bool,
+    /// The open endpoint the pointer is captured on (AC27).
+    pub capture: Option<EntityId>,
+    /// The Ctrl-locked direction of the pending pick, radians from the sketch X axis (AC28).
+    pub lock: Option<f64>,
+    /// The locked direction of a slot centreline, kept for the width pick.
+    pub spine_lock: Option<f64>,
+    /// Alt was pressed after a variant pick: the label asks to finish or press Escape.
+    pub variant_hint: bool,
 }
 impl SketchState {
     pub fn cancel(&mut self) {
@@ -104,6 +112,10 @@ impl SketchState {
         self.chain_curve = None;
         self.error = None;
         self.degenerate = false;
+        self.capture = None;
+        self.lock = None;
+        self.spine_lock = None;
+        self.variant_hint = false;
     }
 }
 

@@ -17,25 +17,6 @@ impl Session {
         }).collect::<Vec<_>>();
         let snapshot = self.sketch.active.and_then(|id| self.document.sketch(id));
         let mut view = json!({"workbench":if self.workbench()==super::Workbench::Sketch {"sketch"} else {"vector"},"tool":self.sketch_tool().name(),"active":snapshot.as_ref().map(|s| s.id.full_id()),"sketches":sketches,"error":self.sketch.error,"pending_picks":self.sketch.picks.len(),"entities":[],"constraints":[],"parameters":[],"actions":[],"status":null,"stale":false});
-        if matches!(
-            self.sketch.tool,
-            super::SketchTool::Arc | super::SketchTool::ArcCenter
-        ) {
-            let roles = if self.sketch.tool == super::SketchTool::Arc {
-                ["Start", "Through", "End"]
-            } else {
-                ["Centre", "Start", "End direction"]
-            };
-            view["pick_role"] = json!(roles[self.sketch.picks.len().min(2)]);
-            view["arc_radius"] = json!(
-                self.sketch
-                    .picks
-                    .first()
-                    .zip(self.sketch.picks.get(1))
-                    .map(|(a, b)| a.distance(*b).0)
-                    .or(self.sketch.arc_radius.map(|r| r.0))
-            );
-        }
         view["draft_epoch"] = json!(self.sketch.draft_epoch);
         view["can_resume"] = json!(self.sketch_can_resume());
         view["constraint_tool"] = json!(self.sketch.constraint_tool);
@@ -48,21 +29,18 @@ impl Session {
                 .find(|(mode, _)| *mode == self.sketch.mode)
                 .map(|(_, name)| *name)
         );
-        // Every mode applies to every segment; a free first segment follows the X axis.
-        view["modes"] = json!(
-            super::modes::MODES
-                .iter()
-                .map(|(_, name)| json!({"id": name, "enabled": true, "reason": null}))
-                .collect::<Vec<_>>()
-        );
         view["degenerate"] = json!(self.sketch.degenerate);
         view["cursor"] = json!(self.sketch_cursor());
+        view["canvas"] =
+            json!({"mode_label": self.sketch_mode_label(), "entry": self.sketch_entry()});
         let mut annotations = snapshot
             .as_ref()
             .map(|s| self.sketch_annotations_for(s))
             .unwrap_or_default();
         annotations.extend(self.sketch_arc_pick_annotations());
         annotations.extend(self.sketch_degenerate_annotation());
+        annotations.extend(self.sketch_capture_annotation());
+        annotations.extend(self.sketch_lock_annotations());
         view["annotations"] = json!(annotations);
         view["edit_constraint"] = json!(self.sketch.edit_constraint);
         view["affected_constraints"] = json!(self.sketch.affected);

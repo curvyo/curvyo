@@ -2,6 +2,7 @@
 use super::Session;
 mod arc;
 mod axes;
+mod capture;
 mod commands;
 mod construction_preview;
 mod creation;
@@ -10,12 +11,15 @@ mod dimension_placement;
 mod drag;
 mod draw;
 mod edits;
+mod entry;
 mod first_segment;
 mod input;
 mod inspect_links;
 mod inspection;
 mod keys;
 mod lifecycle;
+mod lock;
+mod mode_label;
 mod modes;
 mod numeric;
 mod numeric_chain;
@@ -38,11 +42,15 @@ mod repair_tests;
 mod page_tests;
 
 #[cfg(test)]
+mod capture_tests;
+#[cfg(test)]
 mod chain_tests;
 #[cfg(test)]
 mod cursor_tests;
 #[cfg(test)]
 mod kind_drag_tests;
+#[cfg(test)]
+mod label_tests;
 #[cfg(test)]
 mod mode_tests;
 #[cfg(test)]

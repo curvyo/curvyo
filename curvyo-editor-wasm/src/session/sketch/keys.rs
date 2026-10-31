@@ -48,7 +48,8 @@ impl Session {
             return KeyOutcome::Ignored;
         }
         match input.key {
-            "Alt" | "m" | "M" if !input.repeat => {
+            // Alt alone, once per press: never with Shift, Ctrl or Cmd (AltGr), never repeated.
+            "Alt" if !input.repeat && !input.shift => {
                 if self.cycle_sketch_mode() {
                     KeyOutcome::Consumed
                 } else {

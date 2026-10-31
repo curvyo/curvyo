@@ -148,6 +148,18 @@ pub(super) struct PolylineStep {
     pub degenerate: bool,
 }
 
+impl PolylineStep {
+    /// A command drawn as given, without a mode direction.
+    pub(super) const fn plain(command: Construction) -> Self {
+        Self {
+            command,
+            ends: None,
+            relation: None,
+            degenerate: false,
+        }
+    }
+}
+
 impl Session {
     /// Applies the drawing mode to a polyline `command` that ends at `position`:
     /// a first segment from the free start `picks[0]`, and a degenerate arc as a straight step.
@@ -158,12 +170,7 @@ impl Session {
         command: Construction,
         position: Position,
     ) -> PolylineStep {
-        let mut step = PolylineStep {
-            command,
-            ends: None,
-            relation: None,
-            degenerate: false,
-        };
+        let mut step = PolylineStep::plain(command);
         let mode = self.sketch.mode;
         if self.sketch.tool != SketchTool::Polyline || mode == ContinuationMode::FreeLine {
             return step;

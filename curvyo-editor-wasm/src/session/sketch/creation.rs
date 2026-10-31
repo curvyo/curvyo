@@ -39,9 +39,16 @@ impl Session {
             self.sketch_drag_hover(point);
             return;
         }
-        self.sketch.hover = self
-            .sketch_local(point)
-            .map(|local| self.infer_sketch_axes(local));
+        // Capture wins over the Ctrl lock, which wins over axis inference (AC27, AC28).
+        self.sketch.lock = None;
+        self.sketch.hover =
+            self.sketch_local(point)
+                .map(|local| match self.sketch_capture(local) {
+                    Some(captured) => captured,
+                    None => self
+                        .sketch_lock(local)
+                        .unwrap_or_else(|| self.infer_sketch_axes(local)),
+                });
         self.project_sketch_arc_hover();
         self.refresh_sketch_construction_preview();
     }
@@ -57,9 +64,7 @@ impl Session {
         let Some(press) = self.sketch.press.take() else {
             return;
         };
-        if press.vector_to(point).length() * self.view().scale() <= 3.0
-            && self.sketch_resume_at(point)
-        {
+        if press.vector_to(point).length() * self.view().scale() <= 3.0 && self.sketch_resume_at() {
             return;
         }
         let count = pick_count(self.sketch.tool);
@@ -88,9 +93,18 @@ impl Session {
             return;
         }
         self.sketch.picks.push(local);
-        if self.sketch.picks.len() < count {
-            return;
+        self.sketch.variant_hint = false;
+        if self.sketch.tool == SketchTool::Slot && self.sketch.picks.len() == 2 {
+            self.sketch.spine_lock = self.sketch.lock;
         }
+        if self.sketch.picks.len() >= count {
+            self.sketch_complete_picks(local);
+        }
+    }
+
+    /// Builds the command the complete picks ask for: chained, closing or joining a captured
+    /// endpoint, and commits it.
+    fn sketch_complete_picks(&mut self, local: Position) {
         let prefix = self
             .sketch
             .pending_prefix
@@ -115,7 +129,7 @@ impl Session {
                 mode: self.sketch.mode,
             };
         }
-        let closing = self.sketch_close_target(local);
+        let closing = self.sketch_close_target();
         if let Some((first, last)) = &closing {
             command = self.sketch.chain_curve.as_ref().map_or_else(
                 || Construction::Segment {
@@ -132,20 +146,25 @@ impl Session {
                 },
             );
         }
-        let closes = closing.is_some();
-        self.sketch_commit_pick(&prefix, command, local, closes);
+        let joined = self.sketch_capture_join(&prefix, &self.sketch.picks);
+        let closes = closing.is_some() || joined.is_some();
+        let step = if let Some(joined) = joined {
+            super::first_segment::PolylineStep::plain(joined)
+        } else {
+            let picks = &self.sketch.picks[..self.sketch.picks.len() - 1];
+            self.sketch_polyline_step(&prefix, picks, command, local)
+        };
+        self.sketch_commit_pick(&prefix, step, closes);
     }
 
     /// Commits the complete picks as one edit; a failure keeps all but the last pick.
     fn sketch_commit_pick(
         &mut self,
         prefix: &str,
-        command: Construction,
-        local: Position,
+        step: super::first_segment::PolylineStep,
         closing: bool,
     ) {
-        let picks = &self.sketch.picks[..self.sketch.picks.len() - 1];
-        let step = self.sketch_polyline_step(prefix, picks, command, local);
+        let step = self.with_lock_relation(prefix, step);
         if step.degenerate {
             self.sketch.picks.pop();
             self.sketch.error = Some(DEGENERATE.into());
@@ -168,18 +187,43 @@ impl Session {
         }
     }
 
+    /// The captured chain start or open endpoint a chained polyline segment ends on, with the
+    /// chain's last point.
     pub(super) fn sketch_close_target(
         &self,
-        local: Position,
     ) -> Option<(curvyo_sketch_core::EntityId, curvyo_sketch_core::EntityId)> {
         if self.sketch.tool != SketchTool::Polyline {
             return None;
         }
-        let (first, last) = self.sketch.chain.as_ref()?;
-        let snapshot = self.sketch_snapshot_for_edit().ok()?;
-        let position = snapshot.solution.point(first).ok()?;
-        (first != last && position.distance(local).0 * self.view().scale() <= 6.0)
-            .then(|| (first.clone(), last.clone()))
+        let target = self.sketch.capture.clone()?;
+        let (_, last) = self.sketch.chain.as_ref()?;
+        (target != *last).then(|| (target, last.clone()))
+    }
+
+    /// An unchained first segment or three-point arc whose end pick is captured: drawn from
+    /// the captured endpoint back to the free start, so that endpoint keeps its identity.
+    pub(super) fn sketch_capture_join(
+        &self,
+        prefix: &str,
+        picks: &[Position],
+    ) -> Option<Construction> {
+        let target = self.sketch.capture.clone()?;
+        if self.sketch.chain.is_some() {
+            return None;
+        }
+        match (self.sketch.tool, picks) {
+            (SketchTool::Polyline, [first, _]) => Some(Construction::Segment {
+                start: target,
+                end: format!("{prefix}:p0").into(),
+                end_position: Some(*first),
+            }),
+            (SketchTool::Arc, [first, through, _]) => Some(Construction::ArcFrom {
+                start: target,
+                through: *through,
+                end: *first,
+            }),
+            _ => None,
+        }
     }
 
     pub(super) fn sketch_local(&self, point: Point) -> Option<Position> {

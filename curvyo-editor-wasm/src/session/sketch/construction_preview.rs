@@ -56,7 +56,7 @@ impl Session {
                 mode: self.sketch.mode,
             };
         }
-        if let Some((first, last)) = self.sketch_close_target(local)
+        if let Some((first, last)) = self.sketch_close_target()
             && let Some(previous) = &self.sketch.chain_curve
         {
             command = Construction::Continue {
@@ -67,7 +67,11 @@ impl Session {
                 mode: self.sketch.mode,
             };
         }
-        let step = self.sketch_polyline_step(prefix, &picks[..picks.len() - 1], command, local);
+        let step = match self.sketch_capture_join(prefix, &picks) {
+            Some(joined) => super::first_segment::PolylineStep::plain(joined),
+            None => self.sketch_polyline_step(prefix, &picks[..picks.len() - 1], command, local),
+        };
+        let step = self.with_lock_relation(prefix, step);
         self.sketch.degenerate = step.degenerate;
         self.sketch.preview = None;
         self.sketch.preview_base = None;
