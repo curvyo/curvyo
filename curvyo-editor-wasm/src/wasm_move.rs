@@ -10,7 +10,7 @@ use crate::wasm_api::WasmSession;
 
 /// Which badges the DOM shows by the pointer: `copy_badge` is the plus badge,
 /// `remove_badge` the minus badge of a Ctrl marquee or lasso, `lock` is `""` (no lock badge), `"x"` or `"y"` (the axis the move is locked
-/// to).
+/// to) or `"angle"` (a Sketch drawing direction locked by Ctrl).
 #[wasm_bindgen]
 #[derive(Debug, Clone)]
 pub struct MoveIndicatorsView {
@@ -35,7 +35,7 @@ impl MoveIndicatorsView {
         self.remove_badge
     }
 
-    /// The lock badge's axis: `""`, `"x"` or `"y"`.
+    /// The lock badge's axis: `""`, `"x"`, `"y"` or `"angle"`.
     #[must_use]
     #[wasm_bindgen(getter)]
     pub fn lock(&self) -> String {
@@ -58,6 +58,7 @@ impl WasmSession {
             lock: match indicators.lock {
                 Some(Axis::X) => "x",
                 Some(Axis::Y) => "y",
+                None if self.session.sketch_angle_lock_badge() => "angle",
                 None => "",
             },
         }

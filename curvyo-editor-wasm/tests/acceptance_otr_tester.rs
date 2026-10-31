@@ -157,6 +157,7 @@ fn rotate_doc_object(d: &Document, radians: f64) {
     let id = d.object_ids()[0];
     let o = d.object(id).unwrap();
     let c = match &o {
+        ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Clone(_) => panic!("no clone here"),
@@ -1509,6 +1510,7 @@ fn ac16_ac17_pivot_rule_is_identical_for_every_kind_and_writes_frame_or_anchors(
         let alpha = 27.0_f64.to_radians();
         let want_c = rot(c0, pivot, alpha);
         match doc_of(&s).object(doc_of(&s).object_ids()[0]).unwrap() {
+            ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
             ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
             ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
             ObjectSnapshot::Clone(_) => panic!("no clone here"),
@@ -3588,6 +3590,7 @@ fn finite_and_reopenable(s: &Session, ctx: &str) {
     let d = doc_of(&re);
     for id in d.object_ids() {
         match d.object(id).unwrap() {
+            ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
             ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
             ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
             ObjectSnapshot::Clone(_) => panic!("no clone here"),

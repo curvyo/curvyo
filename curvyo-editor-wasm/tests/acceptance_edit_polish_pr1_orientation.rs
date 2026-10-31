@@ -998,6 +998,7 @@ fn old_style_doc() -> Document {
     for (id, deg) in [(poly, 30.0), (star, -50.0), (odd, 190.0)] {
         let o = d.object(id).unwrap();
         let c = match &o {
+            ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
             ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
             ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
             ObjectSnapshot::Clone(_) => panic!("no clone here"),

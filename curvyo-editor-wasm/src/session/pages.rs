@@ -14,19 +14,26 @@ impl Session {
     }
     /// Activates a row, panning only when the frame is outside the viewport.
     pub fn activate_page(&mut self, id: &str) -> bool {
-        let Some(page) = self.document.pages().into_iter().find(|p| p.id == id) else {
+        // One decode of the frame list per call: with hundreds of frames it dominates the cost.
+        let pages = self.document.pages();
+        let Some(page) = pages.iter().find(|p| p.id == id).cloned() else {
             return false;
         };
+        let changed = self.page_view.active(&pages).is_none_or(|p| p.id != id);
         self.page_view.active = Some(id.to_owned());
+        self.sync_sketch_page();
         let (w, h) = self.viewport.canvas_size();
         let min = self.view().screen_to_document(0.0, 0.0);
         let max = self.view().screen_to_document(w, h);
-        if !page.overlaps(min, max) {
-            let centre = Point::new(
-                page.origin.x + page.size.width.as_mm() / 2.0,
-                page.origin.y + page.size.height.as_mm() / 2.0,
-            );
-            let (x, y) = self.view().document_to_screen(centre);
+        let centre = Point::new(
+            page.origin.x + page.size.width.as_mm() / 2.0,
+            page.origin.y + page.size.height.as_mm() / 2.0,
+        );
+        let (x, y) = self.view().document_to_screen(centre);
+        let reveal_sketch = changed
+            && self.workbench() == super::Workbench::Sketch
+            && (!(0.0..=w).contains(&x) || !(0.0..=h).contains(&y));
+        if !page.overlaps(min, max) || reveal_sketch {
             self.viewport.pan_by_screen_delta(x - w / 2.0, y - h / 2.0);
         }
         true

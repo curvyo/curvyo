@@ -170,6 +170,7 @@ fn objects(s: &Session) -> Vec<ObjectSnapshot> {
 
 fn centre_of(o: &ObjectSnapshot) -> Point {
     match o {
+        ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Clone(_) => panic!("no clone here"),

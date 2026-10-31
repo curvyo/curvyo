@@ -154,6 +154,7 @@ fn forge(d: &Document, edits: &[(NodeId, [f64; 6])]) -> Document {
 
 fn outline_of(o: &ObjectSnapshot) -> Vec<(f64, f64)> {
     match o {
+        ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Path(p) => p.anchors.iter().map(|a| (a.point.x, a.point.y)).collect(),

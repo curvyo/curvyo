@@ -428,6 +428,9 @@ fn double_click_on_a_converted_polygons_segment_hands_off_without_inserting_a_no
             .iter()
             .filter_map(|id| d.object(*id))
             .map(|o| match o {
+                curvyo_document_core::ObjectSnapshot::Sketch(_) => {
+                    unreachable!("no sketch in this test")
+                }
                 curvyo_document_core::ObjectSnapshot::Image(_) => {
                     unreachable!("no image in this test")
                 }
