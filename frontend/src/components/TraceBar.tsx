@@ -55,6 +55,10 @@ const LABEL_CLASS = "text-xs text-[var(--toolbar-icon)]";
 /** The bar's one flow (UX notes 21.2): wraps by whole items, 8 px between them, top-aligned. */
 const TRACE_ROW_CLASS = "flex min-w-0 flex-wrap items-start gap-x-2 gap-y-0";
 
+/** A full-width row under the controls whose text never widens the bar (customer 2026-10-31): its
+ * intrinsic width is zero, so the bar is as wide as its controls and the row wraps inside it. */
+const FOLLOWS_WIDTH_CLASS = "[contain:inline-size]";
+
 /** The Select bar's Trace button (criterion 1): last, in a group of its own; a press chooses the
  * Trace tool. */
 export function TraceButton({ onTrace, onReturnFocus }: { onTrace: () => void; onReturnFocus: () => void }) {
@@ -405,7 +409,7 @@ export function TraceBar({ trace, info, onImport, onReturnFocus }: TraceBarProps
       <span id={descriptionId} hidden>
         {TRACE_BAR_DESCRIPTION}
       </span>
-      <div ref={rowRef} className={TRACE_ROW_CLASS}>
+      <div ref={rowRef} data-trace-row="" className={TRACE_ROW_CLASS}>
         {/* No "Trace" label at the start (Frage 84); the "i" stays. */}
         <span className="flex h-9 items-center">
           <InfoButton info={info} onReturnFocus={onReturnFocus} />
@@ -453,8 +457,9 @@ export function TraceBar({ trace, info, onImport, onReturnFocus }: TraceBarProps
         </div>
         {trace.advancedOpen ? (
           // After the expander in the DOM, so Tab reaches the Advanced controls after it
-          // (criterion 57, UX notes 21.2); drawn below the notice row, full width.
-          <div className="order-last basis-full">
+          // (criterion 57, UX notes 21.2); drawn below the notice row, full width. Its own width
+          // never widens the bar: the bar is as wide as its controls (customer 2026-10-31).
+          <div className={`order-last basis-full ${FOLLOWS_WIDTH_CLASS}`}>
             <TraceAdvanced
               id={advancedId}
               params={trace.params}
@@ -479,7 +484,7 @@ export function TraceBar({ trace, info, onImport, onReturnFocus }: TraceBarProps
         {/* The notice row (`ux-notes.md` §22.2): only what is fixed with a bar control or changes how
             the preview reads, always mounted with its live region, no height while empty; drawn
             under the main rows and above the Advanced block. */}
-        <div data-trace-state="" className={`order-[9998] basis-full ${noticeShown ? "flex min-h-9 items-center gap-3" : ""}`}>
+        <div data-trace-state="" className={`order-[9998] basis-full ${FOLLOWS_WIDTH_CLASS} ${noticeShown ? "flex min-h-9 items-center gap-3" : ""}`}>
           <div role="status" aria-live="polite" className={noticeShown ? "flex flex-col py-1 tabular-nums" : ""}>
             {trace.imagesLabel ? <span className={`block ${LABEL_CLASS}`}>{trace.imagesLabel}</span> : null}
             {trace.status.line ? (
