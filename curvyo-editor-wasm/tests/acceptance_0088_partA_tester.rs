@@ -647,3 +647,67 @@ fn joined_script_welded_into_one_outline_stays_paths() {
     }
     assert_eq!(h.fingerprint(), before);
 }
+
+/// The clean line the guessed-letter cases start from reads whole: every letter sure, nothing
+/// left as a path (so the nudge in `guessed_line` is what makes H and a uncertain).
+#[test]
+fn the_clean_hamburg_line_reads_whole() {
+    let mut h = Host::new();
+    h.outlines_of("Source Sans 3", "Regular", 36.0, "Hamburg 1999");
+    let (lines, left) = applied(h.recognise(0.3, &[]));
+    assert_eq!(lines.len(), 1, "{lines:?}");
+    assert_eq!(lines[0].string, "Hamburg 1999");
+    assert_eq!(lines[0].guessed, vec![], "{lines:?}");
+    assert_eq!(left, 0);
+}
+
+/// Wrong sure letters in the session: a Source Serif 4 line at 10 mm, the serif family no longer
+/// listed, read against the sans faces at tolerances from 0.05 to 2.00 mm every `step` x 0.05 mm.
+/// Returns the texts written and the wrong sure letters found.
+fn session_cross_family(step: usize) -> (usize, Vec<String>) {
+    let truth = "Curvyo 2026";
+    let mut written = 0;
+    let mut wrong = Vec::new();
+    for k in (1..=40).step_by(step) {
+        let tol = f64::from(u32::try_from(k).unwrap()) * 0.05;
+        let mut h = Host::new();
+        h.outlines_of("Source Serif 4", "Regular", 10.0, truth);
+        h.s.set_font_list_with_kinds(
+            FontBlock::Included,
+            included(&|family, _| family != "Source Serif 4"),
+            Vec::new(),
+        );
+        if let RecogniseOutcome::Applied { lines, .. } = h.recognise(tol, &[]) {
+            for line in lines {
+                written += 1;
+                let truth: Vec<char> = truth.chars().collect();
+                let got: Vec<char> = line.string.chars().collect();
+                for (i, c) in got.iter().enumerate() {
+                    let guessed = line.guessed.iter().any(|g| g.1 == i + 1);
+                    if !guessed && !c.is_whitespace() && truth.get(i) != Some(c) {
+                        wrong.push(format!("{tol:.2} mm: {:?} {:?}", line.string, line.guessed));
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    (written, wrong)
+}
+
+/// Criterion 9 with a wide tolerance, in the session (every 0.5 mm; the 0.05 mm sweep is the
+/// ignored case below).
+#[test]
+fn session_cross_family_takes_no_wrong_letter_as_sure() {
+    let (written, wrong) = session_cross_family(10);
+    println!("session cross-family subset: {written} texts");
+    assert!(wrong.is_empty(), "{wrong:#?}");
+}
+
+#[test]
+#[ignore = "release sweep, prints numbers"]
+fn session_cross_family_every_0_05_mm() {
+    let (written, wrong) = session_cross_family(1);
+    println!("session cross-family, every 0.05 mm: {written} texts");
+    assert!(wrong.is_empty(), "{wrong:#?}");
+}

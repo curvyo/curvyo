@@ -678,6 +678,7 @@ struct Totals {
     unrecognised: usize,
     wrong_sure: usize,
     wrong_face: usize,
+    upside_down_runs: usize,
 }
 
 const STRINGS: [&str; 2] = ["Curvyo 2026", "Jackdaws love 389 quiz"];
@@ -687,6 +688,7 @@ fn sweep(
     sources: &[usize],
     sizes: &[f64],
     angles: &[f64],
+    tol: Mm,
 ) -> (Totals, Vec<String>) {
     let tier = refs(all);
     let mut t = Totals::default();
@@ -706,8 +708,12 @@ fn sweep(
                     t.lines += 1;
                     t.letters += letters;
                     let mut covered = 0;
-                    for line in run_lines(&traced, &tier, TOL) {
+                    for line in run_lines(&traced, &tier, tol) {
                         let Some(run) = line.run else { continue };
+                        // adrs.md decision 3: upside-down text is out of scope and stays paths.
+                        if (degrees - 180.0).abs() < 1e-9 {
+                            t.upside_down_runs += 1;
+                        }
                         let n = run.text.chars().filter(|c| !c.is_whitespace()).count();
                         covered += n;
                         t.guessed += run.guessed.len();
@@ -741,6 +747,7 @@ fn zero_wrong_sure_letters_fast_subset() {
         &[SANS_REGULAR, SERIF_BOLD],
         &[10.0, 36.0],
         &[0.0, 33.0],
+        TOL,
     );
     println!("fast subset: {t:?}");
     assert_eq!(t.wrong_sure, 0, "{wrong:#?}");
@@ -748,10 +755,9 @@ fn zero_wrong_sure_letters_fast_subset() {
 }
 
 /// Zero wrong letters accepted as sure: every included outline face at 4, 10, 36 and 120 mm,
-/// turned 0, 15, 33, 90 and 180 degrees; prints the totals.
-#[test]
-#[ignore = "release sweep, prints numbers"]
-fn zero_wrong_sure_letters_full_sweep() {
+/// turned 0, 15, 33, 90 and 180 degrees, at `tol`; prints the totals. Upside-down lines stay
+/// paths (adrs.md decision 3).
+fn full_sweep(tol: Mm) {
     let all = faces();
     let sizes = [4.0, 10.0, 36.0, 120.0];
     let angles = [0.0, 15.0, 33.0, 90.0, 180.0];
@@ -763,7 +769,7 @@ fn zero_wrong_sure_letters_full_sweep() {
     for source in 0..FACES.len() {
         for (si, &size) in sizes.iter().enumerate() {
             for (ai, &degrees) in angles.iter().enumerate() {
-                let (t, w) = sweep(&all, &[source], &[size], &[degrees]);
+                let (t, w) = sweep(&all, &[source], &[size], &[degrees], tol);
                 for into in [
                     &mut total,
                     &mut by_size[si],
@@ -776,7 +782,7 @@ fn zero_wrong_sure_letters_full_sweep() {
             }
         }
     }
-    println!("full sweep: {total:?}");
+    println!("full sweep at {:.2} mm: {total:?}", tol.get());
     for w in &wrong {
         println!("  {w}");
     }
@@ -790,6 +796,19 @@ fn zero_wrong_sure_letters_full_sweep() {
         println!("  {name}: {t:?}");
     }
     assert_eq!(total.wrong_sure, 0, "{wrong:#?}");
+    assert_eq!(total.upside_down_runs, 0, "upside-down text stays paths");
+}
+
+#[test]
+#[ignore = "release sweep, prints numbers"]
+fn zero_wrong_sure_letters_full_sweep() {
+    full_sweep(TOL);
+}
+
+#[test]
+#[ignore = "release sweep, prints numbers"]
+fn zero_wrong_sure_letters_full_sweep_at_2_mm() {
+    full_sweep(Mm(2.0));
 }
 
 fn add(into: &mut Totals, t: &Totals) {
@@ -800,6 +819,7 @@ fn add(into: &mut Totals, t: &Totals) {
     into.unrecognised += t.unrecognised;
     into.wrong_sure += t.wrong_sure;
     into.wrong_face += t.wrong_face;
+    into.upside_down_runs += t.upside_down_runs;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -888,30 +908,62 @@ fn cpu_numbers() {
     println!("worst case, 200 faces cold, no match: {t_worst:?} (target <= 4 s)");
 }
 
-/// Zero wrong letters accepted as sure when the line's face is missing and a wide tolerance (the
-/// bar allows up to 2 mm) lets a neighbouring family through: criterion 9 lets an earlier tier
-/// with such a face win, so its letters must still be the right ones.
-#[test]
-fn a_wide_tolerance_across_families_takes_no_wrong_letter_as_sure() {
+/// Wrong sure letters when one family's lines are read against the other family's faces, at
+/// every tolerance from 0.05 to 2.00 mm in `step`s of 0.05 mm.
+fn cross_family(step: usize, sizes: &[f64], strings: &[&str]) -> (usize, usize, Vec<String>) {
     let all = faces();
     let sans = pick(&all, &[1, 2, 3, 4, 5, 6, 7, 8]);
-    let tier = refs(&sans);
-    let truth = "Curvyo 2026";
+    let serif = pick(&all, &[9, 10, 11, 12]);
+    let cases: [(usize, Vec<&Face>); 3] = [
+        (SERIF_REGULAR, refs(&sans)),
+        (SERIF_BOLD, refs(&sans)),
+        (SANS_REGULAR, refs(&serif)),
+    ];
+    let (mut sure, mut runs) = (0, 0);
     let mut wrong = Vec::new();
-    for (size, tol) in [(3.0, 0.8), (5.0, 1.0), (10.0, 2.0)] {
-        let traced = outlines(&all[SERIF_REGULAR], truth, Setup::plain(size));
-        for line in run_lines(&traced, &tier, Mm(tol)) {
-            if let Some(run) = line.run {
-                let w = wrong_sure(truth, &run);
-                if w > 0 {
-                    wrong.push(format!(
-                        "{size} mm at {tol} mm: {:?} guessed {:?}",
-                        run.text, run.guessed
-                    ));
+    for (source, tier) in &cases {
+        for &size in sizes {
+            for &truth in strings {
+                let traced = outlines(&all[*source], truth, Setup::plain(size));
+                for k in (1..=40).step_by(step) {
+                    let tol = f64::from(u32::try_from(k).unwrap()) * 0.05;
+                    for line in run_lines(&traced, tier, Mm(tol)) {
+                        if let Some(run) = line.run {
+                            runs += 1;
+                            sure += run.sure;
+                            let w = wrong_sure(truth, &run);
+                            if w > 0 {
+                                wrong.push(format!(
+                                    "{} {size} mm at {tol:.2} mm: {:?} guessed {:?}",
+                                    FACES[*source].0, run.text, run.guessed
+                                ));
+                            }
+                        }
+                    }
                 }
             }
         }
     }
+    (runs, sure, wrong)
+}
+
+/// Zero wrong letters accepted as sure when the line's face is missing and a wide tolerance (the
+/// bar allows up to 2 mm) lets a neighbouring family through: criterion 9 lets an earlier tier
+/// with such a face win, so its letters must still be the right ones (a debug-time subset:
+/// 0.05, 0.55, 1.05 and 1.55 mm, 3 and 10 mm).
+#[test]
+fn a_wide_tolerance_across_families_takes_no_wrong_letter_as_sure() {
+    let (runs, sure, wrong) = cross_family(10, &[3.0, 10.0], &["Curvyo 2026"]);
+    println!("cross-family subset: {runs} texts, {sure} sure letters");
+    assert!(wrong.is_empty(), "wrong letters taken as sure: {wrong:#?}");
+}
+
+/// As above at every 0.05 mm from 0.05 to 2.00 mm, 3, 5, 10 and 24 mm, both strings.
+#[test]
+#[ignore = "release sweep, prints numbers"]
+fn a_wide_tolerance_across_families_every_0_05_mm() {
+    let (runs, sure, wrong) = cross_family(1, &[3.0, 5.0, 10.0, 24.0], &STRINGS);
+    println!("cross-family, every 0.05 mm: {runs} texts, {sure} sure letters");
     assert!(wrong.is_empty(), "wrong letters taken as sure: {wrong:#?}");
 }
 
