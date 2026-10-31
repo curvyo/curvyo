@@ -105,6 +105,29 @@ Transparent pixels are never shapes, with Invert neither, whatever colour they s
 transparent pixel counts by its opacity once: a black pixel at 50 % opacity is just a shape; the
 image is never laid over white first.
 
+## Analysis
+
+Under the Method button a line says what the automatic analysis found in the image the preview
+shows, and what it set. It runs once per image, on your computer, when the image is first shown in
+the tool ("Analysing..." if that takes longer than 0.4 s), and applies its values at once. It sets
+only values that depend on the image: the method (Brightness, or Remove background when the image
+has pale or light colours that Brightness would miss), the background and Colour tolerance of
+Remove background (half way between the background and the palest colour), and the Threshold (the
+automatic one, or a lower cut when a photographed sheet has a wide shadow). It never changes the
+preset, Smooth, Tolerance, Ignore below, the Advanced values, Output or picked colours; with Pick
+colours it keeps the method and sets only the Threshold.
+
+The line reads, for example, "Line drawing · scan · automatic Threshold", "Logo · pale colours
+kept" or "Graphic · photo of paper · shadow left out": the image type (Graphic, Logo, Line drawing,
+Sketch), how the image was made when it is a scan or a photo of paper, then what was set. When the
+type is unclear (a photo without a sheet of paper) it reads "Type unclear · Brightness with
+automatic Threshold" and sets just that. Once you change the method, the Threshold, the Colour
+tolerance or the background, the line reads "Custom · Line drawing" and the analysis never changes
+those values again for this image; **Analyse again** sets them back to the analysis in one go (it
+is no History step, and it is dimmed while nothing was changed). If the analysis fails the line
+reads "Analysis failed · automatic Threshold used". Several selected images use the shown image's
+analysis.
+
 ## Settings
 
 - **Threshold** (0 to 100 %, brightness; Brightness only): pixels darker than this become shapes.
@@ -246,6 +269,7 @@ Trace turns the selected image into paths. The method decides which parts become
 - Pick colours: pixels like the colours picked with the pipette; Shift+click adds a colour, up to 8.
 - Pipette: takes a colour from the image under a click; Esc ends it.
 - Colour tolerance: how far a colour may be from the background or a picked colour and still count as it.
+- Analysis: names the image type and what it set for a new image: the method, its background and Colour tolerance, and the Threshold; never the preset or other values. Custom after you change one of them; Analyse again sets them back.
 - Threshold: pixels darker than this brightness (0 to 100 %) become shapes.
 - Smooth: calms the pixel steps of the outline before the fit; higher is calmer.
 - Tolerance: how far in pixels the paths may stray from the calmed outline; higher gives fewer nodes.

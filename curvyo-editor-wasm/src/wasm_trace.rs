@@ -131,6 +131,16 @@ pub fn trace_auto_threshold(rgba: &[u8], width: u32, height: u32) -> u8 {
     curvyo_ui_core::trace_auto_threshold(rgba, width, height)
 }
 
+/// The automatic analysis of a picture (`specs/0089` slice F), for the worker: the JSON of
+/// `analysis_json`, or empty when the picture cannot be read.
+#[wasm_bindgen]
+#[must_use]
+pub fn trace_analyse(rgba: &[u8], width: u32, height: u32) -> String {
+    curvyo_ui_core::trace_analyse(rgba, width, height)
+        .map(|report| crate::trace_analysis_glue::analysis_json(&report))
+        .unwrap_or_default()
+}
+
 /// The background colour Remove background's Auto suggests for a picture (`specs/0089`
 /// criterion 16), for the worker: `#RRGGBB`, or empty for a transparent background.
 #[wasm_bindgen]

@@ -32,6 +32,13 @@ import {
 import {
   readPalette,
 } from "@/lib/tracePaletteText";
+import {
+  ANALYSED_FIELDS,
+  type TraceAnalysis,
+  type TraceAnalysisState,
+  applyAnalysis,
+  readAnalysis,
+} from "@/lib/traceAnalysis";
 import { TraceCancelled, type TraceRunner, createTraceRunner } from "@/lib/traceJobs";
 import { NO_VIEW, loadParams, loadPresets, pixelsOf, readView, type ViewState } from "@/lib/traceSource";
 import type { ShowNotice, TraceApi } from "./traceApi";
@@ -48,6 +55,8 @@ export type { TraceApi } from "./traceApi";
 const DEBOUNCE_MS = 150;
 /** The longest side of the reduced copy; a picture this small is traced once. */
 const REDUCED_SIDE = 1000;
+/** "Analysing..." shows after this long, like the trace's progress (UX notes §3). */
+const ANALYSING_AFTER_MS = 400;
 
 
 export function useTrace(
@@ -86,6 +95,12 @@ export function useTrace(
   const thresholds = useRef(new Map<string, number>());
   /** Each image's suggested background (`specs/0089` criterion 16; empty: transparent). */
   const backgrounds = useRef(new Map<string, string>());
+  /** Each image's analysis (`specs/0089` slice F; `null`: it failed), read once per image. */
+  const analyses = useRef(new Map<string, TraceAnalysis | null>());
+  /** The images whose analysed values the maker changed since the analysis was applied. */
+  const customised = useRef(new Set<string>());
+  const [analysisState, setAnalysisState] = useState<TraceAnalysisState>({ kind: "none" });
+  const analysingTimer = useRef<number | null>(null);
   /** The values each kept full-size result was traced with. */
   const results = useRef(new Map<string, string>());
   const choiceRef = useRef(choice);
@@ -140,17 +155,47 @@ export function useTrace(
   const thresholdOf = useCallback(
     async (session: WasmSession, id: string): Promise<number | null> => {
       const known = thresholds.current.get(id);
-      if (known !== undefined && backgrounds.current.has(id)) {
+      if (known !== undefined && backgrounds.current.has(id) && analyses.current.has(id)) {
         return known;
       }
       const pixels = pixelsOf(session, id, false);
       if (!pixels) {
         return null;
       }
+      const fresh = !analyses.current.has(id);
+      if (fresh && analysingTimer.current === null) {
+        analysingTimer.current = window.setTimeout(() => {
+          analysingTimer.current = null;
+          if (!analyses.current.has(id) && viewRef.current.shown === id) {
+            setAnalysisState({ kind: "analysing" });
+          }
+        }, ANALYSING_AFTER_MS);
+      }
       const defaults = await runner().defaults(pixels);
+      if (analysingTimer.current !== null) {
+        window.clearTimeout(analysingTimer.current);
+        analysingTimer.current = null;
+      }
       backgrounds.current.set(id, defaults.background);
-      if (known !== undefined) {
-        return known;
+      if (fresh) {
+        // A new image (Frage 83 B): the analysis applies its values at once, unless the maker
+        // already set this image's Threshold.
+        const analysis = readAnalysis(defaults.analysis);
+        analyses.current.set(id, analysis);
+        if (analysis && known === undefined) {
+          thresholds.current.set(id, analysis.threshold);
+          const values = applyAnalysis(choiceRef.current.values, analysis);
+          choiceRef.current = { ...choiceRef.current, values };
+          setChoice(choiceRef.current);
+          writeChoice(choiceRef.current);
+        }
+        if (viewRef.current.shown === id) {
+          setAnalysisState(analysis ? { kind: known === undefined ? "auto" : "custom", analysis } : { kind: "failed" });
+        }
+      }
+      const kept = thresholds.current.get(id);
+      if (kept !== undefined) {
+        return kept;
       }
       thresholds.current.set(id, defaults.threshold);
       return defaults.threshold;
@@ -300,6 +345,14 @@ export function useTrace(
     setStopped(false);
     setFailure(null);
     setLoading(false);
+    const shownAnalysis = next.shown ? analyses.current.get(next.shown) : undefined;
+    setAnalysisState(
+      !active || !next.shown || shownAnalysis === undefined
+        ? { kind: "none" }
+        : shownAnalysis === null
+          ? { kind: "failed" }
+          : { kind: customised.current.has(next.shown) ? "custom" : "auto", analysis: shownAnalysis },
+    );
     if (active && next.shown) {
       const known = thresholds.current.get(next.shown);
       const background = backgrounds.current.get(next.shown);
@@ -312,10 +365,17 @@ export function useTrace(
     }
   }, [syncRevision, active, getSession, cancelAll, runPreview, setValues]);
 
-  /** Takes a new choice: remembered, the kept results dropped, a preview after the debounce. */
+  /** Takes a new choice: remembered, the kept results dropped, a preview after the debounce. An
+   * edit of an analysed value moves the shown image's analysis line to Custom (UX notes §3). */
   const apply = useCallback(
     (next: TraceChoice) => {
       const session = getSession();
+      const id = viewRef.current.shown;
+      const analysis = id ? analyses.current.get(id) : undefined;
+      if (id && analysis && ANALYSED_FIELDS.some((f) => next.values[f] !== choiceRef.current.values[f])) {
+        customised.current.add(id);
+        setAnalysisState({ kind: "custom", analysis });
+      }
       choiceRef.current = next;
       setChoice(next);
       writeChoice(next);
@@ -391,6 +451,38 @@ export function useTrace(
     setStatus((s) => ({ ...s, line: "", muted: "", canCreate: false }));
     onChange();
   }, [cancelAll, getSession, onChange]);
+
+  /** Analyse again (UX notes §3, Frage 83 B): the shown image's analysed values back to its
+   * analysis in one go, the line back to Auto, no confirmation and no history step; after a
+   * failure the analysis runs again. */
+  const analyseAgain = useCallback(() => {
+    const id = viewRef.current.shown;
+    if (!id) {
+      return;
+    }
+    const analysis = analyses.current.get(id);
+    customised.current.delete(id);
+    if (!analysis) {
+      analyses.current.delete(id);
+      thresholds.current.delete(id);
+      backgrounds.current.delete(id);
+      setAnalysisState({ kind: "none" });
+    } else {
+      thresholds.current.set(id, analysis.threshold);
+      const values = applyAnalysis(choiceRef.current.values, analysis);
+      const next = { ...choiceRef.current, values };
+      choiceRef.current = next;
+      setChoice(next);
+      writeChoice(next);
+      setAnalysisState({ kind: "auto", analysis });
+    }
+    results.current.clear();
+    getSession()?.clear_trace_results();
+    dragging.current = false;
+    setStopped(false);
+    setFailure(null);
+    schedule(0);
+  }, [getSession, schedule]);
 
   /** Trace again or Retry: the preview at once, with the values as they are. */
   const retrace = useCallback(() => {
@@ -602,6 +694,8 @@ export function useTrace(
     pickMode,
     setPicking,
     suggestedBackground,
+    analysis: analysisState,
+    analyseAgain,
     palette,
     hsvOf,
     rgbOf,

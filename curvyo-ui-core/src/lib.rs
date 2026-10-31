@@ -188,15 +188,16 @@ pub use conversion::{build_primitive_conversions, primitive_as_path};
 pub use curvyo_svg_core::SvgDrawing;
 /// The Trace tool's settings schema (criterion 6), passed through for the host.
 pub use curvyo_vectorize_core::{
-    ADVANCED_PARAMS as TRACE_ADVANCED_PARAMS, ColourMask as TraceColourMask,
-    ColourParams as TraceColourParams,
+    ADVANCED_PARAMS as TRACE_ADVANCED_PARAMS, AnalysisReport as TraceAnalysis,
+    Capture as TraceCapture, ColourMask as TraceColourMask, ColourParams as TraceColourParams,
     DEFAULT_BACKGROUND_TOLERANCE as TRACE_DEFAULT_BACKGROUND_TOLERANCE,
     DEFAULT_PICK_TOLERANCE as TRACE_DEFAULT_PICK_TOLERANCE, Denoise as TraceDenoise,
-    MAX_COLOURS as TRACE_MAX_COLOURS, METHOD_PARAMS as TRACE_METHOD_PARAMS,
-    MIN_COLOURS as TRACE_MIN_COLOURS, Mask as TraceMask, PARAMS as TRACE_PARAMS,
-    PRESETS as TRACE_PRESETS, ParamKind as TraceParamKind, ParamUnit as TraceParamUnit,
-    PixelLength as TracePixelLength, Rgb8 as TraceRgb, Selection as TraceMethod,
-    Swatches as TraceSwatches, TraceParams, Upscale as TraceUpscale,
+    ImageType as TraceImageType, MAX_COLOURS as TRACE_MAX_COLOURS,
+    METHOD_PARAMS as TRACE_METHOD_PARAMS, MIN_COLOURS as TRACE_MIN_COLOURS, Mask as TraceMask,
+    PARAMS as TRACE_PARAMS, PRESETS as TRACE_PRESETS, ParamKind as TraceParamKind,
+    ParamUnit as TraceParamUnit, PixelLength as TracePixelLength, PropertyKind as TraceProperty,
+    Reason as TraceReason, Rgb8 as TraceRgb, Selection as TraceMethod, Swatches as TraceSwatches,
+    TraceParams, Upscale as TraceUpscale,
 };
 pub use cut::{CUT_COMMIT_LABEL, CutPlan, CutRefusal, MAX_CUT_PIECES, plan_cut};
 pub use cuttable::{
@@ -439,8 +440,8 @@ pub use trace_plan::{
 };
 pub use trace_transfer::{
     TRACE_WIRE_HEADER, TraceLayerWire, TracePaletteWire, TraceStatus, TraceWire, read_trace_wire,
-    trace_auto_threshold, trace_colour_job_with, trace_colour_mask_job, trace_job, trace_job_with,
-    trace_mask_job, trace_sample_colour, trace_suggest_background,
+    trace_analyse, trace_auto_threshold, trace_colour_job_with, trace_colour_mask_job, trace_job,
+    trace_job_with, trace_mask_job, trace_sample_colour, trace_suggest_background,
 };
 pub use transform_drag::{
     CornerLinking, CornerRadiusScaling, ParamDragInfo, ScaleModes, StrokeScaling,

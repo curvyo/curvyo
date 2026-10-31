@@ -13,6 +13,7 @@ import { TracePresetMenu } from "@/components/TracePresetMenu";
 import { Tooltip as AppTooltip } from "@/components/ui/tooltip";
 import type { TraceApi } from "@/hooks/useTrace";
 import type { TraceInfoApi } from "@/hooks/useTraceInfo";
+import { ANALYSE_AGAIN, type TraceAnalysisState, analysisLine, canAnalyseAgain } from "@/lib/traceAnalysis";
 import {
   TRACE_FINISH,
   TRACE_METHODS,
@@ -54,6 +55,45 @@ const LABEL_CLASS = "text-xs text-[var(--toolbar-icon)]";
 
 /** The bar's one flow (UX notes 21.2): wraps by whole items, 8 px between them, top-aligned. */
 const TRACE_ROW_CLASS = "flex min-w-0 flex-wrap items-start gap-x-2 gap-y-0";
+
+/** The analysis row (`specs/0089` slice F, UX notes §3): the line saying what the analysis found
+ * and set, announced once per change, and Analyse again, dimmed while it would change nothing. */
+function AnalysisRow({
+  state,
+  onAgain,
+  onReturnFocus,
+}: {
+  state: TraceAnalysisState;
+  onAgain: () => void;
+  onReturnFocus: () => void;
+}) {
+  const enabled = canAnalyseAgain(state);
+  const line = analysisLine(state);
+  return (
+    <div data-trace-analysis={state.kind} className="flex min-h-9 basis-full items-center gap-2">
+      <span role="status" aria-live="polite" className="min-w-0 flex-1 py-1 text-xs text-[var(--toolbar-icon)]">
+        {line}
+      </span>
+      {state.kind === "analysing" || state.kind === "none" ? null : (
+        <button
+          type="button"
+          aria-disabled={!enabled}
+          className={`${BUTTON_CLASS} ${enabled ? "" : "cursor-default opacity-40 hover:bg-transparent"}`}
+          onClick={(event) => {
+            if (enabled) {
+              onAgain();
+            }
+            if (event.detail > 0) {
+              onReturnFocus();
+            }
+          }}
+        >
+          {ANALYSE_AGAIN}
+        </button>
+      )}
+    </div>
+  );
+}
 
 /** The Select bar's Trace button (criterion 1): last, in a group of its own; a press chooses the
  * Trace tool. */
@@ -408,6 +448,7 @@ export function TraceBar({ trace, info, onImport, onReturnFocus }: TraceBarProps
             onPick={(choice) => trace.setMethod(TRACE_METHODS.indexOf(choice))}
           />
         </div>
+        <AnalysisRow state={trace.analysis} onAgain={trace.analyseAgain} onReturnFocus={onReturnFocus} />
         <div className="flex h-9 items-center">{methodField}</div>
         {colourGroup}
         <div className="flex h-9 items-center">{field("smooth")}</div>
