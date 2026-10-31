@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { type CanvasNotice, type HistoryNames, MAC, useHistory } from "@/hooks/useHistory";
 import { type ClonesApi, useClones } from "@/hooks/useClones";
 import { type StrokeToPathApi, useStrokeToPath } from "@/hooks/useStrokeToPath";
+import { type RecogniseApi, useRecognise } from "@/hooks/useRecognise";
 import { type TraceApi, useTrace } from "@/hooks/useTrace";
 import { ViewRest } from "@/lib/viewRest";
 import { isStrokeToPathChord } from "@/lib/strokeToPathText";
@@ -728,6 +729,8 @@ export interface EditorSession {
   strokeToPath: StrokeToPathApi;
   /** The Trace tool (`specs/0025-raster-trace`). */
   trace: TraceApi;
+  /** Recognise text: the Select bar button, its bar and the run (`specs/0088-trace-recognition`). */
+  recognise: RecogniseApi;
   /** The flip buttons and the keys H and V (`specs/0056-mirror-and-negative-scale/`). */
   flip: FlipApi;
   /** The flip buttons act: something is selected in the Select tool. */
@@ -1162,6 +1165,13 @@ export function useEditorSession(
   const strokeToPathReady = tool === "select" && selectBar.strokeToPathEnabled;
   const focusCanvas = useCallback(() => containerRef.current?.focus(), []);
   const trace = useTrace(getSession, syncFromSession, syncRevision, tool, history.showNotice, focusCanvas);
+  const recognise = useRecognise(getSession, syncFromSession, {
+    tool,
+    selectionCount,
+    syncRevision,
+    faces: text.fonts.faces,
+    containerRef,
+  });
   // Enter and Escape of the Trace tool, and a double-click that creates, reach it through refs so
   // the canvas handlers keep their dependencies (`specs/0025-raster-trace` criterion 12).
   const traceKeyRef = useRef(trace.keyDown);
@@ -2759,6 +2769,7 @@ export function useEditorSession(
     text,
     clones,
     strokeToPath,
+    recognise,
     trace,
     flip,
     flipEnabled,

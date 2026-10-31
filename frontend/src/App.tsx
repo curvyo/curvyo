@@ -14,6 +14,7 @@ import { SelectToolbar } from "@/components/SelectToolbar";
 import { ShapeToolbar } from "@/components/ShapeToolbar";
 import { TextBar } from "@/components/TextBar";
 import { TraceBar } from "@/components/TraceBar";
+import { RecogniseBar } from "@/components/RecogniseBar";
 import { useTraceInfo } from "@/hooks/useTraceInfo";
 import { focusCurrentFont } from "@/lib/textText";
 import { readRow2Open, writeRow2Open } from "@/lib/textBarRows";
@@ -199,7 +200,10 @@ function Editor() {
             editor.tool === "select" || editor.tool === "trace" ? "justify-start" : "justify-center"
           }`}
         >
-          {editor.tool === "select" ? (
+          {editor.tool === "select" && editor.recognise.open ? (
+            <RecogniseBar recognise={editor.recognise} onReturnFocus={() => editor.containerRef.current?.focus()} />
+          ) : null}
+          {editor.tool === "select" && !editor.recognise.open ? (
             <SelectToolbar
               scaleStrokeWidth={editor.scaleStrokeWidth}
               onSetScaleStrokeWidth={editor.setScaleStrokeWidth}
@@ -240,6 +244,11 @@ function Editor() {
               linkedCloneNotice={editor.clones.barNotice}
               traceShown={editor.trace.available}
               onTrace={() => editor.setTool("trace")}
+              recognise={{
+                shown: editor.recognise.available,
+                onEnter: editor.recognise.enter,
+                notice: editor.recognise.barNotice,
+              }}
               flipEnabled={editor.flipEnabled}
               flip={editor.flip}
               guideState={editor.guideState}
