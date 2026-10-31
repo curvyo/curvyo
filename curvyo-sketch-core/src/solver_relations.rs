@@ -29,6 +29,12 @@ pub(crate) fn append(
             continue;
         }
         let relation = match &c.relation {
+            Relation::PerpendicularAt { a, b, point } => {
+                perpendicular_at(s, input, ps, id, a, b, point)?
+            }
+            Relation::OnAxis { point, axis } => {
+                json!({"type":match axis {crate::Axis::X=>"y",crate::Axis::Y=>"x"},"point":input.id(point),"value":0.0})
+            }
             Relation::On { point, curve } => {
                 json!({"type":"on","point":input.id(point),"curve":input.id(curve)})
             }
@@ -121,4 +127,36 @@ fn fixed(
         Entity::Ellipse{minor_radius,..}=>input.add_constraint(ps,id,json!({"type":"equal","a":{"entity":input.id(entity),"property":"radmin"},"b":minor_radius.0})),_=>{},
     }
     Ok(())
+}
+
+#[allow(clippy::too_many_arguments)] // The original relation supplies three concrete stable references.
+fn perpendicular_at(
+    s: &Sketch,
+    input: &Input,
+    ps: &mut Vec<Value>,
+    id: &ConstraintId,
+    a: &EntityId,
+    b: &EntityId,
+    point: &EntityId,
+) -> Result<Value, SketchError> {
+    match (s.entities.get(a), s.entities.get(b)) {
+        (Some(Entity::Line { .. }), Some(Entity::Arc { .. })) => {
+            Ok(json!({"type":"normal","line":input.id(a),"curve":input.id(b)}))
+        }
+        (Some(Entity::Arc { .. }), Some(Entity::Line { .. })) => {
+            Ok(json!({"type":"normal","line":input.id(b),"curve":input.id(a)}))
+        }
+        (Some(Entity::Arc { center: first, .. }), Some(Entity::Arc { center: second, .. })) => {
+            let left = format!("perpendicular_operand_{}_a", id.0);
+            let right = format!("perpendicular_operand_{}_b", id.0);
+            for (key, center) in [(&left, first), (&right, second)] {
+                // Operand-only lines reuse existing variables; no graph geometry or unknowns.
+                ps.push(json!({"type":"line","id":key,"p1_id":input.id(center),"p2_id":input.id(point)}));
+            }
+            Ok(json!({"type":"perpendicular","a":left,"b":right}))
+        }
+        _ => Err(SketchError::Invalid(
+            "Endpoint perpendicular needs connected line/arc geometry".into(),
+        )),
+    }
 }

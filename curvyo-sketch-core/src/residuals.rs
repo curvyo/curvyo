@@ -145,6 +145,21 @@ fn direction(s: &Sketch, id: &EntityId) -> Result<(f64, f64), SketchError> {
 }
 fn geometric(seed: &Sketch, s: &Sketch, r: &Relation) -> Result<(), SketchError> {
     match r {
+        Relation::PerpendicularAt { a, b, point } => {
+            let first = crate::endpoint_tangent(s, a, point)?;
+            let second = crate::endpoint_tangent(s, b, point)?;
+            check(first.0 * second.0 + first.1 * second.1, ANGLE_TOLERANCE)
+        }
+        Relation::OnAxis { point, axis } => {
+            let point = s.point(point)?;
+            check(
+                match axis {
+                    crate::Axis::X => point.y.0,
+                    crate::Axis::Y => point.x.0,
+                },
+                LENGTH_TOLERANCE,
+            )
+        }
         Relation::On { point, curve } => {
             let point = s.point(point)?;
             if let Ok((a, b)) = s.line(curve) {

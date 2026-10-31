@@ -4,6 +4,19 @@ use crate::{Entity, EntityId, Length, Position, Sketch, SketchError};
 /// A completed analytic construction expressed in local sketch coordinates.
 #[derive(Debug, Clone)]
 pub enum Construction {
+    /// Continues a line/arc chain with an explicitly selected geometric mode.
+    Continue {
+        /// Previous analytic curve.
+        previous: EntityId,
+        /// Shared endpoint of the previous curve.
+        start: EntityId,
+        /// New endpoint identity.
+        end: EntityId,
+        /// Proposed endpoint in local coordinates.
+        position: Position,
+        /// Requested persistent direction relationship.
+        mode: crate::ContinuationMode,
+    },
     /// One independent geometric point.
     Point(Position),
     /// One incremental polyline segment, optionally creating its last point.
@@ -21,6 +34,24 @@ pub enum Construction {
     Rectangle(Position, Position),
     /// A circular arc through three ordered picks.
     Arc([Position; 3]),
+    /// A three-point arc continuing from an existing endpoint identity.
+    ArcFrom {
+        /// Existing first endpoint.
+        start: EntityId,
+        /// Interior point on the new arc.
+        through: Position,
+        /// New final endpoint.
+        end: Position,
+    },
+    /// A centre/start/end-direction arc, projected onto the picked start radius.
+    ArcCenter {
+        /// Pinned centre.
+        center: Position,
+        /// Pinned start point defining radius.
+        start: Position,
+        /// End direction; radial distance is ignored.
+        end: Position,
+    },
     /// A centre-radius circle.
     Circle {
         /// Centre position.
@@ -114,6 +145,13 @@ pub fn construct_preview(
 fn build(base: &Sketch, prefix: &str, command: &Construction) -> Result<Sketch, SketchError> {
     use crate::primitives as p;
     match command {
+        Construction::Continue {
+            previous,
+            start,
+            end,
+            position,
+            mode,
+        } => crate::continuation::build(base, prefix, previous, start, end, *position, *mode),
         Construction::Point(position) => {
             let mut intent = base.clone();
             crate::construction::insert(
@@ -133,6 +171,14 @@ fn build(base: &Sketch, prefix: &str, command: &Construction) -> Result<Sketch, 
         } => segment(base, prefix, start, end, *end_position),
         Construction::Polyline(points) => p::create_polyline(base, prefix, points, false),
         Construction::Rectangle(a, b) => p::create_rectangle(base, prefix, *a, *b),
+        Construction::ArcFrom {
+            start,
+            through,
+            end,
+        } => crate::arc_center::from_endpoint(base, prefix, start, *through, *end),
+        Construction::ArcCenter { center, start, end } => {
+            crate::arc_center::build(base, prefix, *center, *start, *end)
+        }
         Construction::Arc(points) => p::create_arc_three_points(base, prefix, *points),
         Construction::Circle { center, radius } => p::create_circle(base, prefix, *center, *radius),
         Construction::CircleThreePoints(points) => {

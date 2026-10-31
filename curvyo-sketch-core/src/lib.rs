@@ -12,8 +12,10 @@ pub use ids::{ConstraintId, EntityId, ParameterId};
 pub use parameters::{Parameter, Parameters};
 pub use units::{Angle, Dimension, Length, Position, Quantity};
 mod model;
+mod remap;
 mod validation;
-pub use model::{Constraint, Entity, Relation, Sketch};
+pub use model::{Axis, Constraint, Entity, Relation, Sketch};
+mod drag_chords;
 mod drag_reach;
 mod measure;
 mod residuals;
@@ -58,3 +60,11 @@ mod handles;
 pub use handles::{SketchHandle, handle_positions};
 
 mod expression_display;
+
+mod continuation;
+pub use continuation::{ContinuationMode, arc_radius_endpoint, endpoint_tangent};
+
+mod arc_center;
+
+mod axis_implication;
+pub use axis_implication::axis_is_implied;

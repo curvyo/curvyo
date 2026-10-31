@@ -1,4 +1,4 @@
-//! A distance-chain reach bound certifies exact unreachable endpoint previews.
+//! Distance-chain certificates preserve the raw positional objectives.
 use crate::{Entity, EntityId, Length, Position, Relation, Sketch, SolveMode};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -8,8 +8,13 @@ struct Chain {
     length: Length,
 }
 
-/// Returns only a globally closest pose certified by the triangle inequality.
+/// Returns only a validated pose attaining a proven positional lower bound.
 pub(crate) fn candidate(sketch: &Sketch, mode: &SolveMode) -> Option<Sketch> {
+    if let SolveMode::DragPoints { goals } = mode
+        && goals.len() > 1
+    {
+        return translated_tail(sketch, goals);
+    }
     let (endpoint, target) = match mode {
         SolveMode::Drag { point, target } => (point, *target),
         SolveMode::DragPoints { goals } if goals.len() == 1 => {
@@ -21,8 +26,17 @@ pub(crate) fn candidate(sketch: &Sketch, mode: &SolveMode) -> Option<Sketch> {
     let chain = chain(sketch, endpoint)?;
     let anchor = sketch.point(&chain.anchor).ok()?;
     let distance = anchor.distance(target);
-    if !chain.length.is_finite() || !distance.is_finite() || distance.0 <= chain.length.0 + 1e-9 {
+    if !chain.length.is_finite() || !distance.is_finite() {
         return None;
+    }
+    if distance.0 <= chain.length.0 + 1e-9 {
+        let points = chain
+            .points
+            .iter()
+            .rev()
+            .map(|(id, _)| id.clone())
+            .collect::<Vec<_>>();
+        return crate::drag_chords::candidate(sketch, &points, target);
     }
     let direction = (
         (target.x.0 - anchor.x.0) / distance.0,
@@ -47,6 +61,26 @@ pub(crate) fn candidate(sketch: &Sketch, mode: &SolveMode) -> Option<Sketch> {
     crate::validate_candidate(sketch, &result).ok()?;
     let achieved = result.point(endpoint).ok()?.distance(target);
     ((achieved.0 - (distance.0 - chain.length.0)).abs() <= 1e-6).then_some(result)
+}
+
+fn translated_tail(sketch: &Sketch, goals: &BTreeMap<EntityId, Position>) -> Option<Sketch> {
+    // Only a complete contiguous goal suffix of one certified chain is eligible.
+    // A foreign goal or a gap cannot be dropped from the positional objective.
+    for endpoint in goals.keys() {
+        let Some(chain) = chain(sketch, endpoint) else {
+            continue;
+        };
+        let points = chain
+            .points
+            .iter()
+            .rev()
+            .map(|(id, _)| id.clone())
+            .collect::<Vec<_>>();
+        if let Some(result) = crate::drag_chords::translated_tail(sketch, &points, goals) {
+            return Some(result);
+        }
+    }
+    None
 }
 
 fn chain(sketch: &Sketch, endpoint: &EntityId) -> Option<Chain> {

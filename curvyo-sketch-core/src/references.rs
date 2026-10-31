@@ -24,6 +24,8 @@ impl Relation {
         match self {
             Self::On { point, curve } => vec![point, curve],
             Self::Sweep { arc, .. } => vec![arc],
+            Self::PerpendicularAt { a, b, point } => vec![a, b, point],
+            Self::OnAxis { point, .. } => vec![point],
             Self::Horizontal(id) | Self::Vertical(id) | Self::Fixed(id) => vec![id],
             Self::Coincident(a, b)
             | Self::Parallel(a, b)

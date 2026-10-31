@@ -129,6 +129,18 @@ fn entity(s: &Sketch, id: &EntityId) -> Result<(), SketchError> {
 }
 fn relation(s: &Sketch, r: &Relation) -> Result<(), SketchError> {
     match r {
+        Relation::PerpendicularAt { a, b, point } => {
+            crate::endpoint_tangent(s, a, point)?;
+            crate::endpoint_tangent(s, b, point)?;
+            if !matches!(s.entities.get(a), Some(Entity::Arc { .. }))
+                && !matches!(s.entities.get(b), Some(Entity::Arc { .. }))
+            {
+                return Err(invalid("Endpoint perpendicular needs at least one arc"));
+            }
+        }
+        Relation::OnAxis { point, .. } => {
+            s.point(point)?;
+        }
         Relation::On { point, curve } => {
             s.point(point)?;
             entity(s, curve)?;

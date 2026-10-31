@@ -3,6 +3,15 @@ use crate::{Angle, ConstraintId, EntityId, Expression, Length, Parameters, Posit
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
+/// An immutable local coordinate-frame axis, independent of the origin point entity.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Axis {
+    /// Horizontal axis: the point's y coordinate is zero.
+    X,
+    /// Vertical axis: the point's x coordinate is zero.
+    Y,
+}
+
 /// A geometric primitive; references always name stable point entities.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Entity {
@@ -62,6 +71,22 @@ pub enum Entity {
 /// A relation stores intent rather than an implementation-specific equation index.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Relation {
+    /// Perpendicular endpoint tangents of connected line/arc entities.
+    PerpendicularAt {
+        /// First line or arc.
+        a: EntityId,
+        /// Second line or arc, with at least one arc in the pair.
+        b: EntityId,
+        /// The actual endpoint identity shared by both entities.
+        point: EntityId,
+    },
+    /// A point lies on an immutable local coordinate axis.
+    OnAxis {
+        /// Constrained point identity.
+        point: EntityId,
+        /// Local frame axis.
+        axis: Axis,
+    },
     /// A point lies on a finite segment or analytic curve.
     On {
         /// Point constrained to the curve.
