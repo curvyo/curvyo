@@ -1,4 +1,4 @@
-# Plan for Trace quality and colour, slices A, D, C, E and M
+# Plan for Trace quality and colour, slices A, D, C, E, M and F
 
 Implementer, 2026-10-29, on `story/trace-geometry` (cut from `main` `faeb6f07`). Built on the
 defaults of Frage 80 to 93 (order A, D, C, E, M, F; reference images synthetic plus CC0, the
@@ -569,6 +569,66 @@ Open: Mask view shows the segmented palette (the lead's brief) instead of the bl
 UX notes §4; Isolate dims there. A colour narrower than 3 px inside a region that has flat
 pixels takes the nearest colour unless picked with the palette pipette. The upscaled label map is nearest-neighbour
 (Upscale gives 2 px steps between colours).
+
+## Slice F: automatic analysis
+
+Implementer, 2026-10-31, on `story/trace-auto` (stacked on `story/trace-multicolour`, PR #230,
+customer's leave to stack tonight). Design: `adrs.md` §9 (heuristic, explainable, no ML, the
+report with properties and confidences, image type and capture, a proposal of image-dependent
+values only, reasons as an enum); UX: `ux-notes.md` §3 (the analysis row and its states, Frage
+83 B: no Suggested state), §11, §12. Customer answers in force: Frage 83 B (applied to a new
+image automatically, never after a manual change; Analyse again redoes it), Frage 86 A (the four
+presets stay; the analysis sets only image-dependent values and names the image type; never
+Single colour / Multicolour).
+
+### Affected crates/modules
+
+- `curvyo-vectorize-core`: new `analysis.rs` (the public report and `analyse`), `analysis/`
+  submodules `measures.rs` (the properties on a reduced copy and full-resolution crops) and
+  `classify.rs` (image type, capture, confidence, the proposal and its reasons); `lib.rs`
+  exports.
+- `curvyo-ui-core`: `trace_transfer.rs` (`trace_analyse` for the worker).
+- `curvyo-editor-wasm`: `wasm_trace.rs` (`trace_analyse` as JSON).
+- `frontend`: `traceJobs.ts` / `traceWorker.ts` (the analysis job replaces the threshold job),
+  new `traceAnalysis.ts` (the line's words and states, the apply rule), `useTrace.ts` (apply on
+  a new image, Custom on an edit, Analyse again), `TraceBar.tsx` (the analysis row),
+  `traceText.ts` (About entry).
+- Harness: `tests/analysis.rs` (labelled tuning and test split, type accuracy, auto against the
+  preset default per group, CPU at 2000 x 2000 px, determinism).
+
+### Tasks
+
+- [x] F1. Exploration (done before this plan): on the synthetic set Denoise never lowers the
+      true-shape area error and Remove background only wins where Brightness misses content
+      (pale or light colours, a coloured background); a lower Threshold wins on paper photos
+      with a shadow. The proposal therefore holds Method, Threshold, background and Colour
+      tolerance; Denoise is measured and reported, not set (AC 31, 33).
+- [x] F2. `analysis` measures, test first: transparency, background colour and uniformity, noise
+      on full-resolution crops, gradients (paper level across the picture), mid-tone share,
+      colour count, stroke width, components and holes, straight-edge share, text-like rows;
+      each with a confidence (AC 31).
+- [x] F3. Classification and proposal, test first: image type and capture with a confidence; low
+      confidence falls back to Brightness at the automatic Threshold and says so; pale content
+      → Remove background with a tolerance at half the palest colour's distance; a shadow class
+      on a paper photo → the lower cut; reasons as an enum; deterministic (AC 31, 32, 34).
+- [x] F4. Harness: labelled tuning/test split by image family, type accuracy on the test part
+      (>= 80 %), auto against the preset default per group with the truth metrics on the
+      synthetic set and visual checks on the real images, misdetections listed, CPU at
+      2000 x 2000 px (AC 32, 34).
+- [ ] F5. ui-core and wasm: `trace_analyse` as JSON (type, capture, confidence, proposal,
+      reasons, properties) (AC 31).
+- [ ] F6. Frontend: the analysis row (Analysing..., Auto, Custom, Low confidence, Failed),
+      applied to a new image, Custom after an edit of an analysed value, Analyse again, never
+      Output, Preset, Smooth, Corners or picked colours; About entry; Chromium (AC 31, 33).
+- [ ] F7. Full gate; `reference_table` in release unchanged (the presets' paths are untouched);
+      results below.
+
+### Validation
+
+`cargo nextest run -p curvyo-vectorize-core` (unit tests of `analysis`, `tests/analysis.rs`
+criteria 31, 32 and 34 in the gate where cheap, the per-group comparison `#[ignore]`d in
+release); `npm test` (the line's words, the apply rule); Chromium
+`acceptance_0089_f_browser.test.ts` file by file; the full `CLAUDE.md` §7 gate once.
 
 ## Baseline results
 

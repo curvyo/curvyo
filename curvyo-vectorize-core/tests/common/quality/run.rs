@@ -50,7 +50,13 @@ pub fn case_params(preset: &Preset, case: &Case) -> TraceParams {
 
 /// Traces `case` with `preset` and measures everything of criterion 3 but memory and wasm.
 pub fn measure(case: &Case, preset: &Preset) -> Row {
-    let p = case_params(preset, case);
+    measure_with(case, &case_params(preset, case), preset.specks_mm)
+}
+
+/// Traces `case` with `p` and measures it as [`measure`] does, the reference mask without the
+/// specks below `specks_mm`.
+pub fn measure_with(case: &Case, p: &TraceParams, specks_mm: f64) -> Row {
+    let p = *p;
     let mm = case.mm_per_px;
     let t0 = super::super::thread_cpu_seconds();
     let result = super::super::run(&case.picture, Affine::scale(mm, mm), &p);
@@ -62,9 +68,9 @@ pub fn measure(case: &Case, preset: &Preset) -> Row {
         .collect();
     let (w, h) = (case.picture.width as usize, case.picture.height as usize);
     let mask = selected(case.picture.raster(), &p);
-    let speck_px = preset.specks_mm * preset.specks_mm / (mm * mm);
+    let speck_px = specks_mm * specks_mm / (mm * mm);
     let reference = without_specks(&mask, w, h, speck_px);
-    let micro = 0.95 * preset.specks_mm * preset.specks_mm;
+    let micro = 0.95 * specks_mm * specks_mm;
     let base = measure_micro(&outlines, &reference, w, h, mm, micro);
     let mut row = Row::new();
     row.insert("paths", result.counts.paths as f64);
