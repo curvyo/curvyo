@@ -179,6 +179,9 @@ export function useTrace(
         defaults = await runner().defaults(pixels);
       } catch (error) {
         if (error instanceof TraceCancelled) {
+          // A newer job takes over (it shows "Analysing..." again after its 400 ms); Stop has
+          // already set "Analysis stopped", which stays.
+          setAnalysisState((state) => (state.kind === "analysing" ? { kind: "none" } : state));
           throw error;
         }
         // The worker died: the analysis failed; the automatic Threshold and background come from
@@ -470,6 +473,8 @@ export function useTrace(
    * the slot, Enter traces again. */
   const stop = useCallback(() => {
     cancelAll();
+    // The analysis never answered: its line says so instead of "Analysing..." (customer 2026-10-31).
+    setAnalysisState((state) => (state.kind === "analysing" ? { kind: "stopped" } : state));
     setCreating(false);
     setLoading(false);
     setStopped(true);

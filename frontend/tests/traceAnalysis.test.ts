@@ -9,6 +9,7 @@ import {
   ANALYSED_FIELDS,
   ANALYSING,
   ANALYSIS_FAILED,
+  ANALYSIS_STOPPED,
   TYPE_UNCLEAR,
   analysisLine,
   applyAnalysis,
@@ -83,6 +84,7 @@ test("UX notes §3: the line per state and when Analyse again is pressable", () 
   assert.equal(TYPE_UNCLEAR, "Type unclear · Brightness with automatic Threshold");
   assert.equal(analysisLine({ kind: "analysing" }), ANALYSING);
   assert.equal(analysisLine({ kind: "failed" }), ANALYSIS_FAILED);
+  assert.equal(analysisLine({ kind: "stopped" }), ANALYSIS_STOPPED, "a stopped analysis never stays Analysing...");
   assert.equal(analysisLine({ kind: "none" }), "");
   // The button is always enabled and no longer says "again" (`ux-notes.md` §22.3, §22.5).
   assert.equal(ANALYSE, "Analyse");
