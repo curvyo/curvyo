@@ -1,4 +1,4 @@
-# Plan for Trace quality and colour, slices A, D, C, E and M
+# Plan for Trace quality and colour, slices A, D, C, E, M and F
 
 Implementer, 2026-10-29, on `story/trace-geometry` (cut from `main` `faeb6f07`). Built on the
 defaults of Frage 80 to 93 (order A, D, C, E, M, F; reference images synthetic plus CC0, the
@@ -569,6 +569,156 @@ Open: Mask view shows the segmented palette (the lead's brief) instead of the bl
 UX notes §4; Isolate dims there. A colour narrower than 3 px inside a region that has flat
 pixels takes the nearest colour unless picked with the palette pipette. The upscaled label map is nearest-neighbour
 (Upscale gives 2 px steps between colours).
+
+## Slice F: automatic analysis
+
+Implementer, 2026-10-31, on `story/trace-auto` (stacked on `story/trace-multicolour`, PR #230,
+customer's leave to stack tonight). Design: `adrs.md` §9 (heuristic, explainable, no ML, the
+report with properties and confidences, image type and capture, a proposal of image-dependent
+values only, reasons as an enum); UX: `ux-notes.md` §3 (the analysis row and its states, Frage
+83 B: no Suggested state), §11, §12. Customer answers in force: Frage 83 B (applied to a new
+image automatically, never after a manual change; Analyse again redoes it), Frage 86 A (the four
+presets stay; the analysis sets only image-dependent values and names the image type; never
+Single colour / Multicolour).
+
+### Affected crates/modules
+
+- `curvyo-vectorize-core`: new `analysis.rs` (the public report and `analyse`), `analysis/`
+  submodules `measures.rs` (the properties on a reduced copy and full-resolution crops) and
+  `classify.rs` (image type, capture, confidence, the proposal and its reasons); `lib.rs`
+  exports.
+- `curvyo-ui-core`: `trace_transfer.rs` (`trace_analyse` for the worker).
+- `curvyo-editor-wasm`: `wasm_trace.rs` (`trace_analyse` as JSON).
+- `frontend`: `traceJobs.ts` / `traceWorker.ts` (the analysis job replaces the threshold job),
+  new `traceAnalysis.ts` (the line's words and states, the apply rule), `useTrace.ts` (apply on
+  a new image, Custom on an edit, Analyse again), `TraceBar.tsx` (the analysis row),
+  `traceText.ts` (About entry).
+- Harness: `tests/analysis.rs` (labelled tuning and test split, type accuracy, auto against the
+  preset default per group, CPU at 2000 x 2000 px, determinism).
+
+### Tasks
+
+- [x] F1. Exploration (done before this plan): on the synthetic set Denoise never lowers the
+      true-shape area error and Remove background only wins where Brightness misses content
+      (pale or light colours, a coloured background); a lower Threshold wins on paper photos
+      with a shadow. The proposal therefore holds Method, Threshold, background and Colour
+      tolerance; Denoise is measured and reported, not set (AC 31, 33).
+- [x] F2. `analysis` measures, test first: transparency, background colour and uniformity, noise
+      on full-resolution crops, gradients (paper level across the picture), mid-tone share,
+      colour count, stroke width, components and holes, straight-edge share, text-like rows;
+      each with a confidence (AC 31).
+- [x] F3. Classification and proposal, test first: image type and capture with a confidence; low
+      confidence falls back to Brightness at the automatic Threshold and says so; pale content
+      → Remove background with a tolerance at half the palest colour's distance; a shadow class
+      on a paper photo → the lower cut; reasons as an enum; deterministic (AC 31, 32, 34).
+- [x] F4. Harness: labelled tuning/test split by image family, type accuracy on the test part
+      (>= 80 %), auto against the preset default per group with the truth metrics on the
+      synthetic set and visual checks on the real images, misdetections listed, CPU at
+      2000 x 2000 px (AC 32, 34).
+- [x] F5. ui-core and wasm: `trace_analyse` as JSON (type, capture, confidence, proposal,
+      reasons, properties) (AC 31).
+- [x] F6. Frontend: the analysis row (Analysing..., Auto, Custom, Low confidence, Failed),
+      applied to a new image, Custom after an edit of an analysed value, Analyse again, never
+      Output, Preset, Smooth, Corners or picked colours; About entry; Chromium (AC 31, 33).
+- [x] F7. Full gate; `reference_table` in release unchanged (the presets' paths are untouched);
+      results below.
+
+### Validation
+
+`cargo nextest run -p curvyo-vectorize-core` (unit tests of `analysis`, `tests/analysis.rs`
+criteria 31, 32 and 34 in the gate where cheap, the per-group comparison `#[ignore]`d in
+release); `npm test` (the line's words, the apply rule); Chromium
+`acceptance_0089_f_browser.test.ts` file by file; the full `CLAUDE.md` §7 gate once.
+
+### Slice F results (2026-10-31)
+
+**What the analysis sets.** On a new image (Frage 83 B) the method with its background and Colour
+tolerance, and the Threshold; nothing else (Frage 86 A). Denoise was tried first (F1): Low or High
+never lowered the true-shape area error of a synthetic fixture and broke 1 to 2 px lines, so it is
+measured and reported only. With Pick colours the method stays (the picks are the maker's,
+Proposal) and only the Threshold is set.
+
+**Rules** (`analysis/classify.rs`, each a measured property against a stated limit):
+- Remove background when flat content lighter than the automatic Threshold and unlike the
+  background covers at least 0.2 % of the picture and a tenth of the dark content, on an even,
+  quiet background (border at least 90 % background, noise under 0.75) or a transparent one; white
+  on a transparent background counts as a cut-out. Colour tolerance: the smallest whose distance
+  reaches half the palest tenth's distance from the background.
+- The lower cut of a three-class Otsu split when the capture is a photo of paper and the middle
+  class is at least 3 % of the picture, 8 px wide and three times the ink's width (a shadow).
+- Capture: transparent → digital; noise at least 0.75 → photo of paper (border under 70 %
+  background or paper level spread over 0.12) else scan; a border 90 to 99.5 % background
+  (sheet edge, dust) → scan; else digital.
+- Type, first rule that holds: 3 or more text-like rows → Logo; mid tones at least 0.1 with grain
+  → Sketch; strokes at most 5 px or 1.2 % of the short side → Line drawing; 3 or more colours or
+  chroma → Graphic; straight runs at least 35 % → Logo; else Graphic. Not digital and 45 % or more
+  darker than the Threshold → unclear (confidence 0.3): Brightness at the automatic Threshold.
+
+**Criterion 32** (`criterion_32_type_accuracy_on_the_test_part`, release): labels from the
+sidecar groups (graphics and diagram Graphic, logos Logo, line drawings and AI drawings Line
+drawing, sketches Sketch; paper scans and photos by their capture; a photo unclear). The split was
+fixed before the rules: test part 22 images (the fox, bird-head and ladybug families with their
+scans and photos, plus single images per group), tuning part 24. **Test 20 of 22 (91 %)**,
+tuning 20 of 24 (83 %). Misses (misdetections): test `clipart-goatee` (Graphic, seen as Line
+drawing: an ink drawing), `sketch-portrait` (Sketch, seen as Line drawing: little shading);
+tuning `clipart-clock` (Line drawing), `diagram-kho-kho` (unclear: green field, JPEG), 
+`customer-dog-lines` (Sketch, seen as Line drawing), `customer-lion-logo` (Logo, seen as
+Graphic). Not scored but visible in the line: every photo of paper is typed Sketch (the desk and
+shadow are mid tones); the AI logos with soft gradients and clean scans are told apart only by the
+border (`customer-elephant`, a digital JPEG, reads "scan"). The synthetic fixtures are not labelled
+for the type: their group says which material they emulate, a ring and a star are a logo or a
+graphic only by name.
+
+**Auto against the preset default per group** (`auto_is_at_least_the_default_per_group`,
+release, synthetic set at three resolutions, true-shape area error summed, lost topology summed):
+
+| Group | Area error default → auto | Lost default → auto | Changed fixtures |
+|---|---|---|---|
+| graphics | 22.1 → 22.1 | 0 → 0 | none |
+| logos | 1969.5 → 420.3 | 80 → 68 | logo-pale 55 → 0.2 %, logo-blue 308 → 0.2 %, logo-transparent-colour 35 → 0.4 %, logo-pale-picked 103 → 31 %, logo-picked 56 → 6 % (each resolution) |
+| line-drawings | 356.8 → 356.8 | 7 → 7 | none |
+| sketches | 343.5 → 343.5 | 1099 → 1099 | none |
+| ai-drawings | 132.2 → 132.2 | 26 → 26 | none |
+| paper-scan | 279.2 → 279.2 | 7 → 7 | none |
+| paper-photo | 3603.9 → 3178.5 | 3 → 3 | photo-shadow@1x 428 → 2.9 % (0.5x and 0.25x unchanged: the shadow class is under 8 px wide there) |
+| diagram, photo | unchanged | unchanged | none |
+
+No group is worse. Real images: the proposal differs from the default on
+`customer-balance-logo`, `customer-bluetenzeit-logo` and `customer-precision-logo` only (Remove
+background; visually the pale swirl, flower and gear are now content, as their sidecars ask; the
+balance swirl's shading fills solid). The customer's paper photos keep the automatic Threshold:
+the dark desk regions are darker than the ink, so no global cut separates them (Drop border shapes
+does, which the analysis does not touch; reported for the demo).
+
+**Criterion 34**: 2000 x 2000 px photographed sheet 81 ms thread CPU native, the same report
+twice; slowest real image `customer-photo-fox-1` 74 ms.
+
+**Line** (Chromium `acceptance_0089_f_browser`): "Graphic · pale colours kept", "Line drawing ·
+scan · automatic Threshold", "Graphic · photo of paper · shadow left out", "Custom · Graphic",
+"Type unclear · Brightness with automatic Threshold" (Proposal: the UX notes' "Logo / Line art
+with automatic Threshold" would name a preset the analysis never sets), "Analysis failed ·
+automatic Threshold used", "Analysing..." after 400 ms. Analyse again is `aria-disabled` in Auto
+and Type unclear.
+
+**Gate** (2026-10-31): the full `CLAUDE.md` §7 gate green (nextest 9,646 passed). Chromium file
+by file: `acceptance_0089_f_browser`, `_e_browser`, `_c_browser` (now picks Brightness after the
+analysis took Remove background for its pale fixture), `_m_browser` (closes Advanced before
+sampling a block the taller bar covers), `_sliceM_tester`, `acceptance_0025_browser`,
+`_0025_tester`, `_slice2_tester`, `acceptance_0087_browser`, `_0087_tester`: pass.
+**Tester tests that encode the bar before F (not changed, for the tester):**
+`acceptance_0089_sliceC_tester` (800 x 600 row heights: Brightness 252 px is now 288 px, the
+analysis row), `acceptance_0089_sliceE_tester` c21 (screen sampling under the taller bar), c23 x2
+(focuses the Threshold field of a fixture the analysis now starts in Remove background), c13
+(stored Brightness reads back as Remove background because the new image's analysis applies,
+Frage 83 B), `acceptance_0025_slice3_tester` c51 (counts the blue Trace button, now 36 px lower,
+as outline) and c54 (the failure tooltip, now 36 px lower, covers the History tab for the first
+click). Each passes on `story/trace-multicolour`; each is the analysis row's 36 px or Frage 83 B.
+
+Open: the type of a photo of paper is not reliable (desk and shadow read as mid tones: every
+customer paper photo is typed Sketch); clean scans are told from digital pictures only by the
+border; `Type unclear` and `Analysis failed` lines differ from the UX notes' wording (Proposal,
+above); the analysis does not propose Drop border shapes, which is what the customer's paper
+photos need (the toggle is not an analysed value, UX notes §3).
 
 ## Baseline results
 

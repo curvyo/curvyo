@@ -116,8 +116,8 @@ scrolling palette. **(Proposal; flagged, not solved here.)**
 
 ## 3. Analysis line, Auto and Custom (item 5)
 
-**Layout.** One row, 36 px: the line (12 px, `--toolbar-icon`, up to two lines, never truncated with an
-ellipsis, `role="status"`, polite, announced once per change) on the left, the **action button** (text,
+**Layout.** One row, 36 px: the line (12 px, `--toolbar-icon`, one line; text that does not fit ends in an ellipsis with the
+full text as tooltip and accessible name, lead 2026-10-31; `role="status"`, polite, announced once per change) on the left, the **action button** (text,
 28 px, 88 px) on the right. The row exists from the first frame so nothing moves when the result arrives. It is not the notice row (that one
 holds no controls, 0025 §21.3); the two stay separate, the analysis row above, the notice row below the palette.
 
@@ -128,8 +128,8 @@ holds no controls, 0025 §21.3); the two stay separate, the analysis row above, 
 | Analysing (shown after 400 ms, like the trace) | "Analysing..." | none (the slot stays empty) |
 | **Auto** (applied; a new image opens here, Frage 83 B; there is no Suggested state) | "Line drawing · paper background evened out" | **Analyse again**, `aria-disabled`, dimmed: nothing was edited, the result would be the same (deterministic, spec criterion 34) |
 | **Custom** (the maker changed an analysed value) | "Custom · Line drawing" | **Analyse again** |
-| **Low confidence** (spec criterion 32) | "Type unclear · Logo / Line art with automatic Threshold" | **Analyse again**, disabled as in Auto |
-| Analysis failed | "Analysis failed · Logo / Line art settings used" | **Analyse again** |
+| **Low confidence** (spec criterion 32) | "Type unclear · Brightness with automatic Threshold" (lead 2026-10-31: the analysis never sets the preset) | **Analyse again**, disabled as in Auto |
+| Analysis failed (also a dying worker; the image keeps the automatic Threshold) | "Analysis failed · automatic Threshold used" (lead 2026-10-31) | **Analyse again** |
 
 The vocabulary of the line is fixed by the analysis: image type (Graphic, Logo, Line drawing, Sketch), a
 middle dot, then the findings that changed settings ("paper background evened out", "pale colours kept",
@@ -144,6 +144,7 @@ was found; it never says what to do.
 - *Auto* means no analysed value was edited since the analysis was applied. Editing any analysed value moves
   the line to *Custom* at once (the same stored-state rule as the Preset button's Custom: a flag, no value
   comparison). Putting the value back by hand stays Custom; only Re-analyse (or Apply) returns to Auto.
+- Lead 2026-10-31: any manual setting change (not only an analysed value) after the image was chosen and before the answer arrives drops the answer for that image; the line reads Custom and Analyse again applies it on request. The line is one line in the 36 px row; when it does not fit (800 x 600 with the panel open) it ends in an ellipsis with the whole text as its tooltip, and the live region reads it whole. Analyse again is 88 x 28 px.
 - Analysis runs on a new image and on Re-analyse, nothing else. A late answer after a manual edit is
   dropped (the edit wins); during manual work no value changes by itself.
 - Re-analyse replaces only the analysed values, in one go, with no confirmation: they are tool settings, not

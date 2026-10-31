@@ -400,3 +400,20 @@ Recommendation: A (one path, native = wasm, no `u16` limit, M needs the edge tab
 Default: A, shown at D's demo with the per-image table.
 
 > **Architect note, slice C (2026-10-30).** §3 "Otsu over α ≥ 128 only" is replaced: a pixel with α < 128 counts in the top luma level (the class no Threshold makes content, also under Invert, since Invert never touches α); the others count by the luma of their stored RGB; nothing is composited. Reason: this matches the cut `α·s ≥ ½` exactly, and opaque-only Otsu split the ink of transparent line drawings (`customer-turtle-shell` 15 → 559 nodes/100 mm). Opaque images are unchanged. C1 result accepted: two-colour mixing in sRGB bytes, `colour.rs` not built; Oklab comes back only if trial M1 needs it for the palette. `TraceParams` stays `Copy` (`Swatches` = fixed array of 8); `threshold`/`invert` stay top-level because Invert acts on every method.
+
+### Dated implementation note, slice F (2026-10-31, implementer; for the architect's review)
+
+§9 as built, with three narrowings. (1) `analyse(raster) -> Result<AnalysisReport, TraceError>`
+takes no `poll`: it runs in 30 to 80 ms native on the largest reference images and the worker is
+terminated to stop it, as every job. (2) `Proposal { selection, threshold }` holds no Denoise: on
+the synthetic set Denoise Low or High never lowered the true-shape area error of any fixture
+(it broke 1 to 2 px lines), so the analysis measures noise and reports it but sets nothing a
+preset sets (Frage 86 A stays clean: no value is owned by both). (3) No candidate is traced: the
+three decisions (Brightness or Remove background, the Colour tolerance, the Otsu cut or the
+lower cut of a three-class split) are read from the measures, which keeps criterion 34 far
+inside 0.5 s. Module split: `analysis.rs` (public report, `analyse`), `analysis/tones.rs`
+(levels, background, grain, noise on full-resolution crops, light fall-off, pale and mid tones,
+colours), `analysis/shapes.rs` (stroke width, components, holes, straight runs, text-like rows),
+`analysis/classify.rs` (capture, type, confidence, proposal, reasons). Basic operations and
+`sqrt` only, no hash maps; deterministic. `Reason` is an enum (`PaleColours`,
+`TransparentBackground`, `ShadowLeftOut`, `LowConfidence`); the host words it.
