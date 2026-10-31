@@ -324,11 +324,11 @@ No browser, build, test or production-source operation was performed by this rev
 
 ## Revision 2 (2026-10-31)
 
-Source: customer feedback of 2026-10-31 (constraint icon tools, M mode cycle, on-canvas entry,
+Source: customer feedback of 2026-10-31 (constraint icon tools, Alt mode cycle, on-canvas entry,
 magnetic capture, Ctrl lock, cursors, FreeCAD-like dimensions and constraint symbols).
 **This section supersedes every older line that conflicts with it**: the single top options
-bar in Sketch, the Polyline/Arc/variant menus, the "Constraint tool" menu, the Alt mode cycle
-and the Resume action in the bar. Not superseded: the Sketches Properties tab as the only home
+bar in Sketch, the Polyline/Arc/variant menus, the "Constraint tool" menu, the M key
+proposal of the first draft of this section and the Resume action in the bar. Not superseded: the Sketches Properties tab as the only home
 of status and diagnostics, no new header, toolbar or footer, the Escape cascade, no Vector
 snapping. Existing-code facts used below: `SketchTools.tsx` (rail with 11 buttons,
 `SketchToolbar` bar with menus "Polyline mode", "Sketch tool variant", "Constraint tool",
@@ -393,19 +393,21 @@ resizes anything. Where each old bar item went:
 
 | Old bar item | Now |
 |---|---|
-| Polyline mode, Sketch tool variant, Constraint tool menus | `M` cycles; the mode label shows the result; constraint tools are the rail card |
+| Polyline mode, Sketch tool variant, Constraint tool menus | `Alt` cycles; the mode label shows the result; constraint tools are the rail card |
 | Numeric fields, Apply, Preview | the on-canvas entry box (section 3); Enter commits, no Apply, no Preview button (the canvas always previews) |
 | Reference check | row 2 of the entry box when a dimension is typed (section 3) |
 | Resume from endpoint | clicking a captured endpoint with Polyline or Arc resumes (section 4); for an explicit start from a selected endpoint a "Resume" row action in Sketches |
 | Clear / reset picks | Escape cascade |
 
-**Key `M`**: cycles the active drawing tool's applicable modes forward, `Shift+M` backward,
-once per press, no key repeat, wraps, skips modes without a precondition (as the Alt cycle
-did), pending picks kept and relabelled as in the revision plan table. It replaces the Alt
-cycle (Alt is taken by window managers on Linux). Ignored while a text field or the entry box
-has focus and with a modifier other than Shift. Vector's `M` (type a move) is unaffected: it
-belongs to Select in Vector, and Sketch Select assigns no `M`. Tools with one mode (Point,
-Fillet) ignore it.
+**Key `Alt`** (customer, 2026-10-31: no M key): cycles **all** modes of the active drawing
+tool, the drawing modes and the Arc, Circle and Ellipse variants, in one list, forward only,
+once per press (keydown only, `repeat` ignored, no key-up needed because WebKitGTK may not
+deliver it), wraps, skips modes without a precondition, pending picks kept and relabelled as in
+the revision plan table. `preventDefault` so Alt does not focus a menu or menubar in the
+webview. Ignored while a text field or the entry box has focus; not with AltGr (Ctrl+Alt), and
+not when Ctrl, Cmd or Shift is also down. There is no backward key. Vector's `M` (type a move)
+is unaffected and Sketch assigns no letter to modes. Tools with one mode (Point, Fillet) ignore
+Alt. Alt held during a pointer press is not used (Linux window managers take Alt+drag).
 
 **Mode label** **(Proposal)**: a small DOM chip, `pointer-events: none`, `aria-hidden`; text is
 the domain's mode name, Title case, at most 22 characters: "Line", "Perpendicular line",
@@ -447,7 +449,7 @@ gives for the current stage.
 - **Keys unchanged**: Tab / Shift+Tab move between fields (wrap), Enter commits a complete
   valid entry (one history step), Escape closes the box and restores the live pick, the next
   Escape cancels the pending segment (cascade). Focus returns to the canvas after every end.
-  The preview runs to the typed values while open. A mode change (`M`) is ignored while the
+  The preview runs to the typed values while open. A mode change (`Alt`) is ignored while the
   box has focus; after Escape it works again and never reinterprets a draft Length as Radius.
 - **Refusal**: field border `--field-invalid`, message line inside the box ("Must be more than
   0 mm"), `aria-invalid`, `aria-describedby`; the box stays open. The message lives in the
@@ -489,8 +491,13 @@ pointer in both directions (not full viewport: no polar-tracking grid); the live
 shows the locked angle ("30.0 mm, 45°"); the Lock badge of the design system (white ground,
 1.5px `--accent` ring, 10px arrow glyph, 16px left of and below the pointer) shows an
 angled-arrow glyph. All appear and disappear in the frame Ctrl does (window-level key events,
-as the Modifier badge). **Open for the customer:** whether a lock at 0/90/180 degrees also
-persists a Horizontal/Vertical constraint, see Frage at the end.
+as the Modifier badge). persists a Horizontal/Vertical constraint: **decided (SK-LOCK, B)**. A lock at 0, 180 degrees
+(Horizontal) or 90, 270 degrees (Vertical) persists that constraint on the segment at commit;
+other stops stay geometry only. Before the commit the **pending constraint symbol** shows in
+the preview exactly like axis inference: the Horizontal or Vertical badge (section 7) at the
+segment's midpoint, drawn in the preview state (`--preview-new` border, glyph `--toolbar-icon`),
+and it appears and disappears with the lock cue. The persisted constraint is a normal row in
+Sketches, removable there, one history step with the segment.
 
 ### 6. Cursors
 
@@ -515,7 +522,8 @@ dimension **text stays a DOM label** positioned by Rust (`SketchAnnotations`, ke
 screen reader reach; Enter edits). Symbols are canvas marks; their keyboard route is the
 Sketches rows (a selected row highlights its symbol). Light theme only, as today.
 
-**New tokens (light theme)**
+**New tokens (light theme)** (green for fully constrained geometry accepted, customer
+2026-10-31)
 
 | Token | Value | Used for |
 |---|---|---|
@@ -542,8 +550,7 @@ positions scale with the sketch)
 - Linear (horizontal, vertical, aligned): as above. Radius: a leader from the perimeter point
   at the pick direction, one arrowhead on the arc, text at the leader's end outside the circle,
   "R 25 mm"; diameter: a line through the centre with two arrowheads, "⌀ 50 mm". The letter
-  names the kind (customer's screenshot shows "25 mm" only; **(Proposal)** to prefix, the
-  Placement chip already uses r/⌀). Angle: arc between the two lines with arrowheads, "45°".
+  names the kind (**accepted**, customer 2026-10-31). Angle: arc between the two lines with arrowheads, "45°".
 - **Driving**: solid `--dim-driving`, plain text. **Reference**: `--dim-reference`, dimension and
   extension lines dashed (4 on / 3 off), text in parentheses "(21.17 mm)". The two differ by
   dash and parentheses, not by colour alone. Formula or named parameter: a 10px "fx" prefix in
@@ -586,29 +593,26 @@ thinned (see symbols); dimensions are never thinned.
   selecting one member highlights the whole group.
 - Structural joins (shared endpoints of a chain, closure) get **no** symbol; they are one
   point. The origin gets no symbol for its built-in fixed state.
-- Symbol colour never carries meaning by hue; the glyph does. Thinning over 150 annotations:
+- Symbol colour never carries meaning by hue; the glyph does. Thinning over 150 annotations, automatic, no switch (**decided, SK-SYM A**):
   unselected, unhovered symbols draw as 6px dots at their anchor (type no longer readable)
   until zoomed in or hovered; the Sketches list always has the full rows.
 
 ### Design-system and implementation notes
 
-- Add the five tokens and the rows "Sketch constraint card", "Sketch mode label", "Sketch entry
+- The five tokens are in `docs/design-system.md` (2026-10-31). Add the rows "Sketch constraint card", "Sketch mode label", "Sketch entry
   box", "Endpoint capture marker", "Sketch dimension annotation", "Sketch constraint symbol"
-  to `docs/design-system.md` when this section is accepted; not done here.
+  to it when the build lands.
 - Icon licence (FreeCAD, LGPL as I recall) and filenames: the lead verifies; keep the
   borrowed set in one folder with a replace-later note in `docs/technical-debt.md`.
-- Review checklist for the implemented UI: rail card keyboard and disabled reasons; `M` and
-  Shift+M gated in fields; label placement at four quadrants and canvas edges; entry box at
-  800 x 600; capture hysteresis; lock cue appears and disappears with Ctrl on WebKitGTK;
+- Review checklist for the implemented UI: rail card keyboard and disabled reasons; `Alt` cycle
+  (once per press, gated in fields, not AltGr, WebKitGTK without key-up); label placement at four quadrants and canvas edges; entry box at
+  800 x 600; capture hysteresis; lock cue and pending H/V symbol appear and disappear with Ctrl on WebKitGTK;
   every cursor row; dimension tiers at 25%, 100%, 400% zoom; 200 annotations; contrast of the
   tokens on `--canvas-bg` and on a changed document background.
 
-Frage 1 (SK-LOCK): Does Ctrl lock at 0, 90 or 180 degrees persist Horizontal/Vertical?
-A) Geometry only, never a constraint. B) At 0/90/180 degrees the Horizontal/Vertical symbol
-shows in the preview and the constraint persists on click; other stops are geometry only.
-Recommendation B (FreeCAD behaviour, the preview shows it before the click, removable in
-Sketches). Default if unanswered: B.
-
-Frage 2 (SK-SYM): Should the canvas show a switch for hiding constraint symbols?
-A) No switch; automatic thinning only. B) A "Symbols" switch in the Sketches tab.
-Recommendation A (no new control until large sketches show a need). Default: A.
+Decided (customer, 2026-10-31):
+- SK-LOCK: B. Ctrl lock at 0/90/180/270 degrees persists Horizontal/Vertical; the pending
+  symbol shows before the commit (section 5).
+- SK-SYM: A. No symbol switch; automatic thinning above 150 annotations (section 7).
+- "R 25 mm" and "⌀ 50 mm" prefixes accepted; `--sketch-solved` green accepted.
+- No M key; Alt cycles all modes (section 2).
