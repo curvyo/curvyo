@@ -6,8 +6,8 @@ there only while nothing but images is selected), or press **I**. Ctrl+I stays I
 above the canvas becomes the Trace bar; the right panel gets one more tab, **About Trace**, which
 opens only when you ask for it (see "About Trace" below).
 (`specs/0025-raster-trace`, slices 1 to 3: black and white, presets and Advanced settings, the
-View pill, large images; `specs/0089-trace-quality-and-colour` slices D, C and E: the geometry,
-the methods Brightness, Remove background and Pick colours, and the Mask view.)
+View pill, large images; `specs/0089-trace-quality-and-colour` slices D, C, E and M: the geometry,
+the methods Brightness, Remove background and Pick colours, the Mask view and Multicolour.)
 
 ## The preview
 
@@ -155,8 +155,49 @@ Then:
   sharper than 60 degrees). Corners are found on the pixel outline before it is calmed and placed
   where the two straight sides meet.
 
+After them, **Output** (Single colour, Multicolour) and, with Multicolour, **Colours** and the
+palette's pipette; see "Multicolour" below.
+
 The last row of the block gives the counts of the result (see Status). Invert and Drop border
 shapes start off with each start of the app.
+
+## Multicolour
+
+**Output** in the Advanced block switches between **Single colour** (one black shape, as before)
+and **Multicolour**: the content the method selects is split into its colours, and every colour
+becomes one filled shape. Neighbouring colours share one boundary: the same curve, node for node,
+so there is no gap and no overlap between them, also where three colours meet. Output and Colours
+are remembered as settings of the app.
+
+**Colours** (2 to 16, "Auto" at the lowest stop) sets how many colours are found. Auto finds the
+count in the image (the field shows it muted, for example "Auto  6"); where colours flow into
+each other, as in a photo, Auto takes 6 steps. Colours closer than 3 % of the colour range are
+one colour; pale colours and small accents are kept. Only areas of flat colour vote, so the
+blended pixels along edges and JPEG fringes never become colours of their own. Areas smaller than
+Ignore below join the neighbouring colour they share the longest border with ("2 regions joined"
+under the counts). With Brightness the pipette after the field adds a colour you pick to the
+palette (it stays armed; Shift+click adds more, Esc ends it); a colour that is already there is
+selected instead ("Same as #3366CC"). With Pick colours the palette is exactly the picked colours
+and the field shows their number.
+
+The **palette** appears below the values: one swatch per colour, largest area first, picked
+colours first with a small square in their corner. Arrows move through it; the selected swatch
+shows its hex value and name ("#FFF2A8 · Pale yellow") and five buttons:
+
+- **Isolate**: the other colours are drawn dimmed in every view ("Isolating #FFF2A8"); Enter
+  still creates every colour.
+- **Recolour**: a colour picker under the row changes the colour's fill, not its shape; nothing is
+  traced again. The row reads "#FFE000 (was #FFF2A8)"; **Reset** returns to the found colour.
+- **Merge into**: choose another swatch (Esc cancels; "Merging #FFF2A8 into..."): its pixels are
+  traced with that colour, as one shape. The swatch stays, at half strength with the target's dot;
+  pressing Merge into again undoes it.
+- **Exclude**: the colour becomes background and is not traced; the swatch shows a crossed circle
+  ("2 colours excluded"). Pressing it again brings the colour back.
+- **Remove** (picked colours only): takes the colour out of the palette.
+
+In the Mask view Multicolour shows each colour as it was found, the background white.
+
+## Create paths
 
 ## Status
 
@@ -174,6 +215,11 @@ show in a muted row under the values whether the Advanced block is open or not:
 - "Too much detail: raise Specks.": one shape has 65,000 holes or more; raise Ignore below.
 - "412,000 nodes. Slow to edit.": more than 100,000 nodes; Create paths works, and the result is
   still one group with one compound path, one row in Layers.
+- "No colours found.": Multicolour found no colour in the content; the Trace button creates
+  nothing.
+
+With Multicolour the counts name the colours first, for example "3 colours, 7 paths, 412 nodes,
+0.4 s".
 
 ## About Trace
 
@@ -192,7 +238,7 @@ Trace turns the selected image into paths. The method decides which parts become
 - Silhouette for cutting/carving: closed, simple, few nodes; drops shapes and holes below 2 mm.
 - Engraving: keeps fine lines, drops shapes below 0.1 mm.
 - View: the image with the outline, the mask, the result alone, or the image alone. Hold \ to peek at the image; Shift+\ steps through the views.
-- Mask: what the tracer turns into shapes, black on white, after Ignore below and Drop border shapes.
+- Mask: what the tracer turns into shapes, black on white (in Multicolour each colour as found), after Ignore below and Drop border shapes.
 - Method: how pixels become shapes.
 - Brightness: pixels darker than the Threshold.
 - Remove background: everything unlike the background colour.
@@ -209,15 +255,25 @@ Trace turns the selected image into paths. The method decides which parts become
 - Corners: higher turns more bends into sharp corners.
 - Invert: traces what the method leaves out; transparent pixels never become shapes.
 - Drop border shapes: drops shapes that touch the image border.
+- Output: Single colour traces the content as one black shape; Multicolour gives one filled shape per colour, neighbours sharing their edges.
+- Colours: how many colours Multicolour finds, 2 to 16; Auto counts them in the image. With Pick colours the picked colours are the palette.
+- Palette: the colours of a Multicolour trace, largest area first; picked colours carry a corner mark and come first.
+- Isolate: shows one colour and dims the others; Enter still creates every colour.
+- Recolour: gives a colour another fill without tracing again.
+- Merge into: traces a colour as another one, as one shape.
+- Exclude: makes a colour background; it is not traced.
+- Remove: takes a picked colour out of the palette.
 
 ## Create paths
 
 The blue **Trace** button at the far right of the bar, Enter on the canvas, Ctrl+Enter in a field,
 or a double-click on the image adds one group "Trace of <image name>" directly above each image, with one compound
-path inside, filled black, without stroke, holes as holes. The image stays visible and unchanged
+path inside, filled black, without stroke, holes as holes. With Multicolour the group holds one
+compound path per colour, filled with that colour (or its recolour), named by its hex value,
+largest area at the bottom. The image stays visible and unchanged
 under it; hide or move it as usual. The new groups are selected and the Select tool is active. The
-notice says "Traced: 7 paths, 412 nodes." or, for several images, "Traced 3 images: 21 paths,
-1,204 nodes." The tooltip of the group's row in the Layers tab repeats it (until the app is
+notice says "Traced: 7 paths, 412 nodes." (with Multicolour "Traced: 3 colours, 7 paths, 412
+nodes.") or, for several images, "Traced 3 images: 21 paths, 1,204 nodes." The tooltip of the group's row in the Layers tab repeats it (until the app is
 closed). It is one step "Trace image" in the History: Ctrl+Z removes every group of it. With
 several images selected the bar says "Tracing 1 of 3 images" and the preview shows the image you
 clicked last; every image is traced with the same settings. If only the reduced copy has been
