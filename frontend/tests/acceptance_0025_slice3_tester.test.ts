@@ -10,6 +10,8 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import path from "node:path";
 import { test } from "node:test";
 import { crc32, deflateSync, inflateSync } from "node:zlib";
+import { removeProfile } from "./browser/removeProfile.ts";
+import { startVite, stopVite } from "./browser/vite.ts";
 
 const BROWSER = process.env.CURVYO_E2E_BROWSER;
 const PORT = 5227;
@@ -60,6 +62,8 @@ async function session(profile: string) {
   const requests: string[] = [];
   const choosers: number[] = [];
   const pending = new Map<number, (v: Reply) => void>();
+  const closing = new Set<() => void>();
+  ws.onclose = () => closing.forEach((fail) => fail());
   ws.onmessage = (event) => {
     const msg = JSON.parse(String(event.data)) as {
       id?: number;
@@ -76,11 +80,22 @@ async function session(profile: string) {
       choosers.push(msg.params.backendNodeId);
     }
   };
+  // A call the browser never answers (it died or closed the connection) fails with its name
+  // instead of leaving the test pending until the event loop is empty.
   const send = (method: string, params: object = {}) =>
-    new Promise<Reply>((resolve) => {
+    new Promise<Reply>((resolve, reject) => {
       id += 1;
-      pending.set(id, resolve);
-      ws.send(JSON.stringify({ id, method, params }));
+      const mine = id;
+      const timer = setTimeout(() => reject(new Error(`no reply to ${method} in 300 s`)), 300_000);
+      pending.set(mine, (v) => {
+        clearTimeout(timer);
+        resolve(v);
+      });
+      closing.add(() => {
+        clearTimeout(timer);
+        reject(new Error(`the browser closed the connection during ${method}`));
+      });
+      ws.send(JSON.stringify({ id: mine, method, params }));
     });
   const evaluate = async (expression: string): Promise<unknown> => {
     const out = await send("Runtime.evaluate", { expression, awaitPromise: true, returnByValue: true });
@@ -382,7 +397,8 @@ async function importImage(s: S, name: string, grey: (x: number, y: number) => n
 async function launch(preload?: string) {
   mkdirSync(SCRATCH, { recursive: true });
   const profile = mkdtempSync(path.join(SCRATCH, "profile-"));
-  const vite = spawn("npx", ["vite", "--port", String(PORT), "--strictPort"], { cwd: FRONTEND, stdio: "ignore" });
+  // Its own process group: killing `npx` alone leaves vite holding the port for the next test.
+  const vite = startVite(PORT, FRONTEND);
   await waitFor("vite", async () => ((await fetch(ORIGIN)).ok ? true : null));
   const s = await session(profile);
   // UX notes 20.4 (2026-10-29): the counts are the Advanced block's last row; the block starts
@@ -396,8 +412,8 @@ async function launch(preload?: string) {
   await sleep(1500);
   const close = async () => {
     await s.close();
-    vite.kill("SIGTERM");
-    rmSync(profile, { recursive: true, force: true });
+    await stopVite(vite, PORT);
+    removeProfile(profile);
   };
   return { s, close };
 }

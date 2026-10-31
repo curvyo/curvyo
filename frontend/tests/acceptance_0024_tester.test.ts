@@ -9,9 +9,10 @@
 
 import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, openSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
+import { startVite, stopVite } from "./browser/vite.ts";
 
 const BROWSER = process.env.CURVYO_E2E_BROWSER;
 const PORT = 5197;
@@ -63,12 +64,16 @@ async function session(profile: string) {
   const requests: string[] = [];
   const choosers: number[] = [];
   const pending = new Map<number, (v: Reply) => void>();
+  const events: string[] = [];
   ws.onmessage = (event) => {
     const msg = JSON.parse(String(event.data)) as {
       id?: number;
       method?: string;
       params?: { request?: { url: string }; backendNodeId?: number };
     };
+    if (msg.method && /^(Page\.frame(Navigated|Started)|Inspector\.|Runtime\.(exceptionThrown|consoleAPICalled)|Page\.(loadEventFired|navigatedWithinDocument))/.test(msg.method)) {
+      events.push(`${msg.method} ${JSON.stringify(msg.params).slice(0, 300)}`);
+    }
     if (msg.id !== undefined) {
       pending.get(msg.id)?.(msg as never);
     }
@@ -79,10 +84,16 @@ async function session(profile: string) {
       choosers.push(msg.params.backendNodeId);
     }
   };
+  // A call the browser never answers (a reloaded or crashed page) fails after a minute with the
+  // page's last events, instead of hanging the file until the test timeout.
   const send = (method: string, params: object = {}) =>
-    new Promise<Reply>((resolve) => {
+    new Promise<Reply>((resolve, reject) => {
       id += 1;
-      pending.set(id, resolve);
+      const timer = setTimeout(() => reject(new Error(`no reply to ${method} in 60 s; page events: ${events.slice(-15).join(" | ")}`)), 60_000);
+      pending.set(id, (v) => {
+        clearTimeout(timer);
+        resolve(v);
+      });
       ws.send(JSON.stringify({ id, method, params }));
     });
   const evaluate = async (expression: string): Promise<unknown> => {
@@ -147,6 +158,7 @@ async function session(profile: string) {
     });
   };
   await send("Page.enable");
+  await send("Runtime.enable");
   await send("Network.enable");
   await send("Page.setInterceptFileChooserDialog", { enabled: true });
   await send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
@@ -168,7 +180,8 @@ test("criteria 1 to 3, 5, 6, 67 in Chromium: Import SVG… and Open… of real f
   writeFileSync(bomb, ENTITY_BOMB);
   let closeAll: () => Promise<void> = async () => undefined;
   try {
-    vite = spawn("npx", ["vite", "--port", String(PORT), "--strictPort"], { cwd: FRONTEND, stdio: "ignore" });
+    const viteLog = openSync(path.join(SCRATCH, "vite.log"), "w");
+    vite = startVite(PORT, FRONTEND, ["ignore", viteLog, viteLog]);
     await waitFor("vite", async () => ((await fetch(ORIGIN)).ok ? true : null));
     const s = await session(profile);
     closeAll = s.close;
@@ -234,8 +247,11 @@ test("criteria 1 to 3, 5, 6, 67 in Chromium: Import SVG… and Open… of real f
     await s.tab("Layers");
     const opened = await s.layerRows();
     assert.ok(opened.length >= 2, `the flag's two paths (${opened})`);
+  } catch (error) {
+    console.error(`vite log:\n${existsSync(path.join(SCRATCH, "vite.log")) ? readFileSync(path.join(SCRATCH, "vite.log"), "utf8").slice(-3000) : "(none)"}`);
+    throw error;
   } finally {
     await closeAll();
-    vite?.kill("SIGTERM");
+    await stopVite(vite, PORT);
   }
 });

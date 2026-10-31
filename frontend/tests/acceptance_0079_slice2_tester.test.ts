@@ -8,7 +8,7 @@
 
 import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
@@ -26,6 +26,8 @@ import {
   readLayoutOpen,
   writeLayoutOpen,
 } from "../src/lib/textLayoutText.ts";
+import { removeProfile } from "./browser/removeProfile.ts";
+import { startVite, stopVite } from "./browser/vite.ts";
 
 const state = (over: Partial<LayoutFieldState>): LayoutFieldState => ({
   text: "0",
@@ -172,7 +174,7 @@ test("criteria 6b and 16 in Chromium: fold closed by default, kept across reload
   let chrome: ChildProcess | null = null;
   const profile = mkdtempSync(path.join(tmpdir(), "curvyo-0079s2-"));
   try {
-    vite = spawn("npx", ["vite", "--port", String(PORT), "--strictPort"], { cwd: FRONTEND, stdio: "ignore" });
+    vite = startVite(PORT, FRONTEND);
     await waitFor("vite", async () => ((await fetch(ORIGIN)).ok ? true : null));
     const portFile = path.join(profile, "DevToolsActivePort");
     chrome = spawn(
@@ -317,7 +319,7 @@ test("criteria 6b and 16 in Chromium: fold closed by default, kept across reload
     ws.close();
   } finally {
     chrome?.kill("SIGKILL");
-    vite?.kill("SIGTERM");
-    rmSync(profile, { recursive: true, force: true });
+    await stopVite(vite, PORT);
+    removeProfile(profile);
   }
 });

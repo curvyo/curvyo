@@ -28,6 +28,8 @@ import {
   sortedDocuments,
 } from "../src/lib/fontInfoText.ts";
 import { type ArchiveResult, STORAGE_FULL_NOTICE, armedRemoveLabel } from "../src/lib/fontLibraryText.ts";
+import { removeProfile } from "./browser/removeProfile.ts";
+import { startVite, stopVite } from "./browser/vite.ts";
 
 const archive = (over: Partial<ArchiveResult>): ArchiveResult => ({
   name: "Lobster.zip",
@@ -368,7 +370,7 @@ test("criteria 1, 4, 6, 7, 13, 14, 18 in Chromium: a zip dropped, Info mode, doc
   mkdirSync(SCRATCH, { recursive: true });
   const profile = mkdtempSync(path.join(SCRATCH, "profile-"));
   try {
-    vite = spawn("npx", ["vite", "--port", String(PORT), "--strictPort"], { cwd: FRONTEND, stdio: "ignore" });
+    vite = startVite(PORT, FRONTEND);
     await waitFor("vite", async () => ((await fetch(ORIGIN)).ok ? true : null));
     let s = await session(profile);
     await s.open();
@@ -480,8 +482,8 @@ test("criteria 1, 4, 6, 7, 13, 14, 18 in Chromium: a zip dropped, Info mode, doc
     await s.close();
   } finally {
     chromes.forEach((c) => c.kill("SIGKILL"));
-    vite?.kill("SIGTERM");
-    rmSync(profile, { recursive: true, force: true });
+    await stopVite(vite, PORT);
+    removeProfile(profile);
   }
 });
 
@@ -490,7 +492,7 @@ test("criterion 18 in Chromium: a quota error keeps nothing of the archive and s
   mkdirSync(SCRATCH, { recursive: true });
   const profile = mkdtempSync(path.join(SCRATCH, "quota-"));
   try {
-    vite = spawn("npx", ["vite", "--port", String(PORT), "--strictPort"], { cwd: FRONTEND, stdio: "ignore" });
+    vite = startVite(PORT, FRONTEND);
     await waitFor("vite", async () => ((await fetch(ORIGIN)).ok ? true : null));
     const s = await session(profile);
     await s.open();
@@ -536,7 +538,7 @@ test("criterion 18 in Chromium: a quota error keeps nothing of the archive and s
     await s.close();
   } finally {
     chromes.forEach((c) => c.kill("SIGKILL"));
-    vite?.kill("SIGTERM");
-    rmSync(profile, { recursive: true, force: true });
+    await stopVite(vite, PORT);
+    removeProfile(profile);
   }
 });
