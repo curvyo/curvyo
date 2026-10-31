@@ -23,7 +23,14 @@ impl Document {
         let tree = self.loro().get_tree(OBJECTS_TREE);
         let leaves = crate::group_tree::leaves_under(&tree, None)
             .into_iter()
-            .filter_map(|leaf| raw_leaf(&tree, leaf))
+            .filter_map(|leaf| {
+                let id = NodeId::from_parts(leaf.peer, leaf.counter);
+                if let Some(sketch) = self.sketch(id) {
+                    Some(RawLeaf::Sketch(Box::new(sketch)))
+                } else {
+                    raw_leaf(&tree, leaf)
+                }
+            })
             .collect();
         resolve(leaves).into_read()
     }
@@ -116,6 +123,11 @@ fn raw_from_meta(id: NodeId, meta: &LoroMap) -> RawLeaf {
         return crate::image_codec::read_image_snapshot(id, meta)
             .map_or(RawLeaf::Unreadable(id), RawLeaf::Image);
     }
+    if read_shape_tag(meta).as_deref() == Some("sketch") {
+        return crate::sketch_read::read(id, meta).map_or(RawLeaf::Unreadable(id), |sketch| {
+            RawLeaf::Sketch(Box::new(sketch))
+        });
+    }
     if let Some(tag) = read_shape_tag(meta) {
         return RawLeaf::Primitive(read_primitive_snapshot(id, meta, &tag));
     }
@@ -128,6 +140,25 @@ fn raw_from_meta(id: NodeId, meta: &LoroMap) -> RawLeaf {
 /// resolver, or `None` when it is an orphan. O(depth). The caller has checked that `id` is a live
 /// clone leaf.
 pub(crate) fn read_one_clone(tree: &LoroTree, id: NodeId) -> Option<CloneSnapshot> {
+    read_clone_with(tree, id, |leaf| raw_leaf(tree, leaf))
+}
+
+impl Document {
+    pub(crate) fn read_cached_clone(&self, id: NodeId) -> Option<CloneSnapshot> {
+        let tree = self.loro().get_tree(OBJECTS_TREE);
+        read_clone_with(&tree, id, |leaf| {
+            self.sketch(NodeId::from_parts(leaf.peer, leaf.counter))
+                .map(|sketch| RawLeaf::Sketch(Box::new(sketch)))
+                .or_else(|| raw_leaf(&tree, leaf))
+        })
+    }
+}
+
+fn read_clone_with(
+    tree: &LoroTree,
+    id: NodeId,
+    read: impl Fn(TreeID) -> Option<RawLeaf>,
+) -> Option<CloneSnapshot> {
     let mut seen = HashSet::new();
     let mut chain = Vec::new();
     let mut current = id;
@@ -136,7 +167,7 @@ pub(crate) fn read_one_clone(tree: &LoroTree, id: NodeId) -> Option<CloneSnapsho
         if !leaf_exists(tree, tree_id) {
             break;
         }
-        let Some(leaf) = raw_leaf(tree, tree_id) else {
+        let Some(leaf) = read(tree_id) else {
             break;
         };
         let next = match &leaf {

@@ -731,7 +731,19 @@ fn ac46_files_of_earlier_builds_open_without_layers_or_flags() {
             );
             assert!(n.registers.visible && !n.registers.locked, "{name}");
             assert_eq!(n.registers.opacity.get(), 1.0, "{name}");
-            assert_eq!(n.registers.name, None, "{name}");
+            // These intentionally named current-format 28 goldens are not earlier nameless files.
+            let named_current_sketch = matches!(
+                name.as_str(),
+                "sketch_page_owner_v28.curvyo" | "sketch_dimension_label_v28.curvyo"
+            ) && matches!(
+                n.kind,
+                NodeKind::Leaf(curvyo_document_core::ObjectSnapshot::Sketch(_))
+            );
+            assert_eq!(
+                n.registers.name.as_deref(),
+                named_current_sketch.then_some("Sketch"),
+                "{name}"
+            );
         }
         // Opening writes nothing: the file is not rewritten on open (no commit of its own).
         let text = String::from_utf8(doc.export_json().unwrap()).unwrap();

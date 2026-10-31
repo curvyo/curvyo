@@ -50,6 +50,7 @@ fn rect(d: &Document, x: f64) -> NodeId {
 /// The object without its id: shape, style and rotation, so a clone can be compared to its source.
 fn body(d: &Document, id: NodeId) -> String {
     match d.object(id) {
+        Some(ObjectSnapshot::Sketch(_)) => unreachable!("no sketch in this test"),
         Some(ObjectSnapshot::Image(_)) => unreachable!("no image in this test"),
         Some(ObjectSnapshot::Text(_)) => unreachable!("no text in this test"),
         Some(ObjectSnapshot::Primitive(p)) => {
@@ -803,6 +804,7 @@ fn c19_preview_in_paint_order() {
         .objects
         .iter()
         .map(|o| match o {
+            ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
             ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
             ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
             ObjectSnapshot::Primitive(x) => x.id,
@@ -1439,6 +1441,7 @@ fn w_a_concurrent_step_of_a_peer_is_not_in_the_version_of_my_step() {
             .objects
             .iter()
             .map(|o| match o {
+                ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
                 ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
                 ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
                 ObjectSnapshot::Primitive(x) => x.id,

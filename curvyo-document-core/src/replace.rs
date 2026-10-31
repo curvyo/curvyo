@@ -64,6 +64,7 @@ impl Document {
         let seen = new_anchor_ids(outlines)?;
         let tree = self.loro().get_tree(OBJECTS_TREE);
         let doomed = doomed_leaves(&tree, operands)?;
+        refuse_sketches(&tree, &doomed)?;
         check_new_anchor_ids(&tree, &doomed, &seen)?;
         let base_meta = tree
             .get_meta(tree_id_of(base))
@@ -94,6 +95,7 @@ impl Document {
         let seen = new_anchor_ids(outlines)?;
         let tree = self.loro().get_tree(OBJECTS_TREE);
         let doomed = doomed_leaves(&tree, operands)?;
+        refuse_sketches(&tree, &doomed)?;
         check_new_anchor_ids(&tree, &doomed, &seen)?;
         let place_tree_id = tree_id_of(place);
         if !place_of_operands(&tree, place_tree_id, &doomed) {
@@ -194,6 +196,7 @@ impl Document {
                 doomed.push(tree_id);
             }
         }
+        refuse_sketches(&tree, &doomed)?;
         let sources = resolve_sources(&tree, pieces, fill)?;
         check_new_anchor_ids(&tree, &doomed, &seen)?;
 
@@ -384,6 +387,17 @@ pub(crate) fn check_new_anchor_ids(
                 }
             }
         }
+    }
+    Ok(())
+}
+
+fn refuse_sketches(tree: &loro::LoroTree, ids: &[loro::TreeID]) -> Result<(), ObjectEditError> {
+    if ids.iter().any(|id| {
+        tree.get_meta(*id).is_ok_and(|meta| {
+            crate::shape_codec::read_shape_tag(&meta).as_deref() == Some("sketch")
+        })
+    }) {
+        return Err(ObjectEditError::InvalidConversion);
     }
     Ok(())
 }

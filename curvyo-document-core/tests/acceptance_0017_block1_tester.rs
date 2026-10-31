@@ -59,6 +59,7 @@ fn rect(doc: &Document, x: f64) -> curvyo_document_core::NodeId {
 
 fn style_of(doc: &Document, id: curvyo_document_core::NodeId) -> Style {
     match doc.object(id).expect("object exists") {
+        ObjectSnapshot::Sketch(s) => s.style,
         ObjectSnapshot::Image(i) => i.style,
         ObjectSnapshot::Text(t) => t.style,
         ObjectSnapshot::Path(p) => p.style,
@@ -183,6 +184,7 @@ fn legacy() -> Legacy {
     let mut star = None;
     for id in doc.object_ids() {
         match doc.object(id).unwrap() {
+            ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
             ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
             ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
             ObjectSnapshot::Path(_) => linear_path = Some(id),
@@ -233,6 +235,7 @@ fn legacy_gradient_file_opens_without_error_and_keeps_geometry_and_stroke() {
     assert_eq!(s.stroke.opacity.get(), 0.75);
     assert_eq!(s.stroke.dash.as_slice(), &[6.0, 3.0, 1.0, 3.0]);
     match l.doc.object(l.linear_path).unwrap() {
+        ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Path(p) => {
@@ -553,7 +556,12 @@ fn every_older_fixture_still_opens_with_the_styles_it_stored() {
         "curve_five_damaged_v16.curvyo",
         "arc_unknown_kind_damaged_v16.curvyo",
     ];
-    let snapping_damaged = [
+    let explicitly_damaged = [
+        "sketch_checkpoint_invalid_v28.curvyo",
+        "sketch_record_invalid_v28.curvyo",
+        "sketch_page_claim_invalid_v28.curvyo",
+        "sketch_page_assignment_invalid_v28.curvyo",
+        "sketch_label_invalid_v28.curvyo",
         // Intentionally malformed 0060 snapping registers.
         "snapping_enabled_type_v27.curvyo",
         "snapping_capture_type_v27.curvyo",
@@ -567,7 +575,7 @@ fn every_older_fixture_still_opens_with_the_styles_it_stored() {
     for entry in std::fs::read_dir(dir).unwrap() {
         let path = entry.unwrap().path();
         let name = path.file_name().unwrap().to_string_lossy().to_string();
-        if snapping_damaged.contains(&name.as_str()) {
+        if explicitly_damaged.contains(&name.as_str()) {
             assert!(
                 matches!(
                     unpack(5, &std::fs::read(&path).unwrap()),

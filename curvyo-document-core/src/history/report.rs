@@ -47,6 +47,8 @@ pub enum ObjectResult {
 /// What kind of object a touched object is, for the summary "3 rectangles".
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum ObjectShape {
+    /// A parametric sketch.
+    Sketch,
     /// A path.
     Path,
     /// A rectangle.

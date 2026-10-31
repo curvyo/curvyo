@@ -32,6 +32,31 @@ use crate::clone_codec::{KEY_CLONE_LINK, link_from_value};
 use crate::document::{Document, OBJECTS_TREE, ROOT_MAP};
 use crate::path_model::NodeId;
 
+// Object-only restore carries only page claims naming that exact original.
+fn retain_object_claims(
+    before: &mut BTreeMap<String, Node>,
+    after: &mut BTreeMap<String, Node>,
+    object: NodeId,
+) {
+    let keys: std::collections::BTreeSet<_> = before
+        .iter()
+        .chain(after.iter())
+        .filter_map(|(key, node)| {
+            if !key.starts_with("page.") || !key.ends_with(".sketch_owner") {
+                return None;
+            }
+            let Node::Value(value) = node else {
+                return None;
+            };
+            let id =
+                serde_json::from_value::<NodeId>(serde_json::Value::from(value.clone())).ok()?;
+            (id == object).then(|| key.clone())
+        })
+        .collect();
+    before.retain(|key, _| keys.contains(key));
+    after.retain(|key, _| keys.contains(key));
+}
+
 fn node_id(id: TreeID) -> NodeId {
     NodeId::from_parts(id.peer, id.counter)
 }
@@ -102,9 +127,18 @@ impl Document {
             object, only: true, ..
         } = mode
         {
+            let root = touched.root;
             touched = touched.only(object);
+            touched.root = root;
         }
-        let (before, after) = read_versions(doc, &log, &touched)?;
+        let (mut before, mut after) = read_versions(doc, &log, &touched)?;
+        if let Mode::Object {
+            object, only: true, ..
+        } = mode
+        {
+            retain_object_claims(&mut before.root, &mut after.root, node_id(object));
+            touched.root = !before.root.is_empty() || !after.root.is_empty();
+        }
         let plan = PlanInput {
             doc,
             log: &log,
@@ -428,6 +462,7 @@ pub(crate) fn kind_of(doc: &LoroDoc, id: TreeID) -> ObjectShape {
         return ObjectShape::Group;
     }
     match crate::shape_codec::read_shape_tag(&meta).as_deref() {
+        Some("sketch") => ObjectShape::Sketch,
         Some(crate::clone_codec::SHAPE_CLONE) => ObjectShape::Clone,
         Some(crate::text_codec::SHAPE_TEXT) => ObjectShape::Text,
         Some(crate::image_codec::SHAPE_IMAGE) => ObjectShape::Image,
