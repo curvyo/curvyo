@@ -1,5 +1,5 @@
 import { useSketch } from "@/hooks/useSketch";
-import { SketchToolRail, SketchToolbar } from "@/components/sketch/SketchTools";
+import { SketchToolRail } from "@/components/sketch/SketchTools";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useCallback, useEffect, useState } from "react";
 
@@ -207,7 +207,7 @@ function Editor() {
             editor.tool === "select" || editor.tool === "trace" ? "justify-start" : "justify-center"
           }`}
         >
-          {sketch.view.workbench === "sketch" ? <SketchToolbar key={`${sketch.view.page}:${sketch.view.active}:${sketch.view.tool}`} sketch={sketch} /> : <>
+          {sketch.view.workbench === "sketch" ? null : <>
           {editor.tool === "select" ? (
             <SelectToolbar
               scaleStrokeWidth={editor.scaleStrokeWidth}

@@ -128,3 +128,7 @@ JavaScript or compilation alone is not parity proof. Exact commands/results are 
 The complete-frame analyzer uses all19 `rows[1:]` samples after only the first cold
 frame; no first-three exclusion. All20 screen inputs and page-placement context are
 saved, and its downloaded geometry must pass the explicit native host verifier.
+
+`sketch-rev2-m2.cjs` (0066 revision 2, M2) checks there is no Sketch options bar, the mode
+label through six Alt presses, the Tab entry box, the Ctrl lock with its pending Horizontal and
+the endpoint capture closing a chain. Screenshots go to `target/0066-browser/rev2-m2/`.

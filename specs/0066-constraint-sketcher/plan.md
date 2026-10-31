@@ -674,21 +674,64 @@ symbol drawing), `frontend/src/components/sketch`, `frontend/src/hooks/useEditor
 
 ### M2: no options bar, Alt for everything, on-canvas label and entry (AC27, AC28, AC33, AC34, AC35)
 
-- [ ] 6. AC34: remove the Sketch options bar (`SketchToolbar`: Polyline mode, variant and
+- [x] 6. AC34: remove the Sketch options bar (`SketchToolbar`: Polyline mode, variant and
   constraint menus, fields, Apply/Preview); drop the `m`/`M` alias (Q1); Alt gated in fields,
   AltGr and Ctrl/Meta/Shift chords; label "Line", "Perpendicular line", "Tangent line",
   "Tangent arc", "Arc left", "Arc right" from Rust, placed per UX notes section 2.
-- [ ] 7. AC35: Alt cycles Arc (start-first / centre-first), Circle (centre-radius / three
+- [x] 7. AC35: Alt cycles Arc (start-first / centre-first), Circle (centre-radius / three
   points) and Ellipse (centre-axes / axis-endpoints) inside one rail tool; after a pick a hint
   instead of a silent discard (AC14); rail has no variant buttons.
-- [ ] 8. AC33: on-canvas entry box (sibling of `PenEntryChip`, shared `EntryField`), anchored
+- [x] 8. AC33: on-canvas entry box (sibling of `PenEntryChip`, shared `EntryField`), anchored
   at the object per UX notes section 3, Tab/Enter/Escape unchanged (AC20), refusal inside the
   box, Reference row for dimensions.
-- [ ] 9. AC27: magnetic endpoint capture (12 px in, 16 px out, nearest wins, ties older),
+- [x] 9. AC27: magnetic endpoint capture (12 px in, 16 px out, nearest wins, ties older),
   marker ring and "Endpoint" label, commit reuses the identity, closing yields one point.
-- [ ] 10. AC28: Ctrl lock to the shared angle stops (`curvyo-ui-core/src/angle_snap.rs`),
+- [x] 10. AC28: Ctrl lock to the shared angle stops (`curvyo-ui-core/src/angle_snap.rs`),
   lock cue, capture wins, no effect in tangent/perpendicular modes; 0/180 persist Horizontal,
   90/270 Vertical, pending symbol before commit; test at 0, 90, 180, 270 and 45 degrees.
+- Built. Rust (`curvyo-editor-wasm/src/session/sketch/`): `capture.rs` (open endpoints and the
+  chain start, hysteresis, ring, "Endpoint" label), `lock.rs` (`snap_angle`, H/V relation,
+  pending relation and "31.8 mm, 0°" readout as preview annotations, dashed guide),
+  `mode_label.rs` (names, Alt variant partner, quadrant), `entry.rs` (group, fields, live values,
+  object anchor and side); the view carries them under `canvas`, which the host keeps out of the
+  Properties signature. `curvyo-render-core` gains `build_sketch_capture_marker` and
+  `build_sketch_lock_guide` (additive public API; architect review). Host:
+  `components/sketch/SketchCanvasChips.tsx` (label, live region, entry box) and
+  `placeSketchChip` in `lib/readoutPlacement.ts`; Resume polyline/arc moved to the Sketches
+  geometry actions. Removed: `SketchToolbar`, the `m`/`M` alias, the `modes`, `pick_role`,
+  `arc_radius` view fields and the `set_sketch_mode`, `set_sketch_circle_dimension`,
+  `sketch_numeric_values_json` bindings (no remaining host caller).
+- Choices **(Proposal)**: capture 12/16 px as UX notes and the lead's brief give (spec text
+  says 10 px); capture targets are open endpoints and the chain start for Polyline and Arc
+  (AC27 scope), not centres or the origin; joining an open endpoint ends the chain like
+  closing; an unchained first segment or three-point arc ending on a capture is drawn from the
+  captured point back to the free start, and a captured end in a non-free first-segment mode is
+  drawn free (capture wins); a resumed arc's end pick does not capture (needs an `ArcFrom` with
+  an existing end, a core API change). Ctrl lock applies to Polyline free-line and the slot
+  centreline (AC28 scope; the slot persists H/V on its `top` side). Alt in the dimension tool
+  toggles radius/diameter; the dimension tool shows no mode label.
+- Superseded tests: no Rust or node test encoded the bar, dropdown or `M` key; all passed
+  unchanged. These tester-owned browser scripts drive the removed options bar ("Sketch tool
+  options" form, "Polyline mode", "Sketch tool variant", "Constraint tool", "Circle dimension"
+  menus, Apply) and are superseded by AC33-AC35; not rewritten here, left for the tester pass:
+  `sketch-revision-host.cjs`, `sketch-revision-final-host.cjs`,
+  `sketch-revision-independent.cjs`, `sketch-remaining-acceptance.cjs`, `sketch-field-alt.cjs`,
+  `sketch-clone-acceptance.cjs`, `sketch-workbench.cjs`.
+- Open for M3: non-dimension constraint tools have no chooser or Apply until the rail card
+  (AC24); double-click editing a dimension at its text (AC33 last item) still uses the Sketches
+  field until the AC31 annotations exist; the entry box does not yet preview typed values; the
+  Lock badge glyph is not drawn (guide, readout and pending relation are).
+- Checks run: `cargo nextest run -p curvyo-editor-wasm -p curvyo-render-core -p
+  curvyo-sketch-core` 4440/4440 passed (63 skipped), incl. 18 new session tests
+  (`capture_tests`, `label_tests`) and 2 render-core tests; the capture and lock tests fail
+  with capture or lock disabled (checked by mutation); `cargo clippy` the three crates all
+  targets and wasm32 `-D warnings` clean; wasm32 build; `cargo doc -D warnings`;
+  `cargo fmt --all --check`; frontend `npm run build:wasm`, `npx tsc -b --noEmit`, `npm test`
+  643 passed, 74 skipped, `npx oxlint` no errors. Browser smoke
+  `frontend/tests/browser/sketch-rev2-m2.cjs` passed (Chromium, Vite on :1421): no options
+  bar, label and six Alt steps, Tab entry box with focus in Length, Escape keeps the pick,
+  Ctrl lock with pending Horizontal and "0°" readout, Horizontal persisted, capture closes the
+  chain; screenshots in `target/0066-browser/rev2-m2/`.
 
 ### M3: rail constraint card, dimensions and symbols on the canvas (AC24, AC31, AC32)
 

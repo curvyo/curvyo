@@ -1,0 +1,148 @@
+import { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
+
+import { EntryField } from "@/components/EntryField";
+import type { SketchApi } from "@/hooks/useSketch";
+import { placeSketchChip, type Size } from "@/lib/readoutPlacement";
+import type { SketchEntry } from "@/lib/sketchView";
+
+/** The tool rail's clearance from the canvas's left edge, as the Pen entry chip keeps it. */
+const TOOL_RAIL_CLEAR_PX = 128;
+/** The mode label's corner sits 10px from the segment start (UX notes revision 2, section 2). */
+const LABEL_OFFSET_PX = 10;
+/** The entry box keeps 14px off its object (UX notes revision 2, section 3). */
+const ENTRY_OFFSET_PX = 14;
+/** The Pen entry chip's field widths and label paddings (`docs/design-system.md`). */
+const FIELD_PX = [154, 150];
+const LABEL_PX = [48, 44];
+const MODIFIER_KEYS = new Set(["Shift", "Control", "Meta", "Alt"]);
+
+type ContainerRef = React.RefObject<HTMLDivElement | null>;
+
+/** The rendered chip's and the canvas's size, measured after each layout. */
+function useSizes(chip: React.RefObject<HTMLElement | null>, container: ContainerRef, key: unknown) {
+  const [sizes, setSizes] = useState<{ chip: Size; canvas: Size }>({
+    chip: { width: 0, height: 0 },
+    canvas: { width: Number.POSITIVE_INFINITY, height: Number.POSITIVE_INFINITY },
+  });
+  useLayoutEffect(() => {
+    if (!chip.current || !container.current) return;
+    const next = {
+      chip: { width: chip.current.offsetWidth, height: chip.current.offsetHeight },
+      canvas: { width: container.current.clientWidth, height: container.current.clientHeight },
+    };
+    setSizes(previous => (JSON.stringify(previous) === JSON.stringify(next) ? previous : next));
+  }, [chip, container, key]);
+  return sizes;
+}
+
+function useCanvas(sketch: SketchApi) {
+  const { presentation } = sketch;
+  const canvas = useSyncExternalStore(presentation.subscribeAnnotations, presentation.canvas);
+  const open = useSyncExternalStore(presentation.subscribeAnnotations, presentation.entryOpen);
+  return { canvas, open };
+}
+
+/**
+ * The mode label (`specs/0066-constraint-sketcher` AC34, AC35): Rust names the mode and the
+ * segment start; this places the chip in the quadrant Rust gives and announces each change.
+ */
+export function SketchModeLabel({ sketch, containerRef }: { sketch: SketchApi; containerRef: ContainerRef }) {
+  const { canvas } = useCanvas(sketch);
+  const label = sketch.view.workbench === "sketch" ? canvas.mode_label : null;
+  const ref = useRef<HTMLDivElement>(null);
+  const sizes = useSizes(ref, containerRef, `${label?.text}|${label?.hint}`);
+  return <>
+    {/* A polite live region says the new mode on each change (UX notes revision 2, section 2). */}
+    <div aria-live="polite" role="status" className="sr-only">{label?.text ?? ""}</div>
+    {label && <div ref={ref} aria-hidden data-sketch-mode-label
+      className="pointer-events-none absolute z-20 rounded px-1.5 py-0.5 text-xs whitespace-nowrap"
+      style={{
+        ...placeSketchChip({ x: label.x, y: label.y }, { x: label.away_x, y: label.away_y }, sizes.chip, sizes.canvas, LABEL_OFFSET_PX, TOOL_RAIL_CLEAR_PX),
+        background: "var(--toolbar-bg)",
+        color: "var(--toolbar-icon)",
+      }}>
+      {label.text}
+      {label.hint && <div className="text-[11px] opacity-80">{label.hint}</div>}
+    </div>}
+  </>;
+}
+
+/**
+ * The on-canvas entry box (AC33): a Sketch sibling of the Pen entry chip sharing `EntryField`.
+ * Tab on the canvas opens it, Tab cycles its fields, Enter commits, Escape closes it.
+ */
+export function SketchEntryBox({ sketch, containerRef }: { sketch: SketchApi; containerRef: ContainerRef }) {
+  const { canvas, open } = useCanvas(sketch);
+  const { presentation } = sketch;
+  // A placed dimension label opens its entry at once, as the options bar's field did.
+  const placed = sketch.view.dimension_position;
+  useEffect(() => {
+    if (placed) presentation.setEntryOpen(true);
+  }, [placed?.x, placed?.y, presentation, placed]);
+  if (!open || !canvas.entry || sketch.view.workbench !== "sketch") return null;
+  return <EntryBox key={`${canvas.entry.kind}:${canvas.entry.group}:${canvas.entry.fields.length}`} sketch={sketch} entry={canvas.entry} containerRef={containerRef} />;
+}
+
+function EntryBox({ sketch, entry, containerRef }: { sketch: SketchApi; entry: SketchEntry; containerRef: ContainerRef }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const inputs = useRef<(HTMLInputElement | null)[]>([]);
+  const messageId = useId();
+  const [drafts, setDrafts] = useState<string[] | null>(null);
+  const [reference, setReference] = useState(false);
+  const [frozen, setFrozen] = useState<{ left: number; top: number } | null>(null);
+  const sizes = useSizes(ref, containerRef, entry.group);
+  useEffect(() => { inputs.current[0]?.focus(); inputs.current[0]?.select(); }, []);
+  const texts = drafts ?? entry.fields.map(field => field.value);
+  const live = placeSketchChip({ x: entry.x, y: entry.y }, { x: entry.away_x, y: entry.away_y }, sizes.chip, sizes.canvas,
+    ENTRY_OFFSET_PX, TOOL_RAIL_CLEAR_PX, { x: entry.pointer_x, y: entry.pointer_y });
+  const at = frozen ?? live;
+  const close = () => { sketch.presentation.setEntryOpen(false); sketch.clearError(); sketch.focusCanvas(); };
+  const submit = () => {
+    const [first = "", second = ""] = reference ? entry.fields.map(field => field.value) : texts;
+    const done = entry.kind === "dimension"
+      ? sketch.run(s => s.sketch_apply_action(entry.action ?? "", first, reference))
+      : sketch.run(s => s.sketch_complete_numeric(first, second));
+    if (done) close();
+    else requestAnimationFrame(() => inputs.current[0]?.select());
+  };
+  const onKeyDown = (index: number) => (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (MODIFIER_KEYS.has(event.key)) return;
+    if (event.key === "Tab") {
+      event.preventDefault();
+      const count = entry.fields.length;
+      const next = inputs.current[(index + (event.shiftKey ? count - 1 : 1)) % count];
+      next?.focus(); next?.select();
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      submit();
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      close();
+    }
+    // Every other key stays in the field: Alt and letters are text input here (AC34).
+    event.stopPropagation();
+  };
+  const invalid = !!sketch.error;
+  return <div ref={ref} role="group" aria-label={entry.group} data-sketch-entry
+    className="absolute z-30 rounded-[8px] p-1.5"
+    style={{ left: at.left, top: at.top, background: "var(--toolbar-bg)", boxShadow: "var(--panel-elevation-shadow)", color: "var(--toolbar-icon)" }}
+    onPointerDown={event => event.stopPropagation()}>
+    <div className="flex items-center gap-1">
+      {entry.fields.map((field, index) => <EntryField key={field.label} label={field.label} width={FIELD_PX[index] ?? FIELD_PX[0]}
+        labelWidth={LABEL_PX[index] ?? LABEL_PX[0]} suffix={field.suffix} ariaLabel={field.name} invalid={invalid} messageId={messageId}
+        value={reference ? field.value : texts[index] ?? ""}
+        inputRef={node => { inputs.current[index] = node; }}
+        onChange={text => {
+          if (reference) return;
+          if (!frozen) setFrozen(live);
+          setDrafts(texts.map((value, i) => (i === index ? text : value)));
+          sketch.clearError();
+        }}
+        onKeyDown={onKeyDown(index)} onFocus={event => event.target.select()} />)}
+    </div>
+    {entry.reference && <label className="mt-1 flex items-center gap-1 text-xs">
+      <input type="checkbox" tabIndex={-1} className="size-3.5" checked={reference} onChange={event => setReference(event.target.checked)} />Reference
+    </label>}
+    {invalid && <p id={messageId} role="alert" className="mt-1 text-xs text-[var(--field-invalid)]">{sketch.error}</p>}
+  </div>;
+}

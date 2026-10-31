@@ -1,13 +1,20 @@
 export type SketchQuantity = { value: number; dimension: "Length" | "Angle" | "Scalar" };
 export type SketchConstraint = { id: string; kind: string; entities: string[]; reference: boolean; expression: string | null; value: SketchQuantity | null; conflicting: boolean; redundant: boolean; selected: boolean };
 export type SketchParameter = { id: string; name: string; dimension: SketchQuantity["dimension"]; expression: string | null; value: SketchQuantity | null };
+/** The mode label at the segment start; `away_*` names the quadrant it sits in (y down). */
+export type SketchModeLabel = { text: string; x: number; y: number; away_x: number; away_y: number; hint: string | null };
+export type SketchEntryField = { label: string; name: string; suffix: string; value: string };
+/** The on-canvas entry box: Rust names the fields, their live values and the object anchor. */
+export type SketchEntry = { kind: "construction" | "dimension"; action: string | null; group: string; fields: SketchEntryField[]; x: number; y: number; away_x: number; away_y: number; pointer_x: number; pointer_y: number; reference: boolean };
+/** Pointer-rate canvas chips, kept out of the Properties signature like the annotations. */
+export type SketchCanvas = { mode_label: SketchModeLabel | null; entry: SketchEntry | null };
 export type SketchView = {
   draft_epoch?:number;
   can_resume?:boolean;
-  pick_role?: string; arc_radius?: number | null;
   dimension_position?: {x:number;y:number} | null;
   constraint_tool?: string | null; dimension_action?: string | null;
-  page?: string; mode?: string; cursor?: "crosshair" | "grab" | "grabbing" | "default"; degenerate?: boolean; modes?: {id:string;enabled:boolean;reason:string|null}[];
+  page?: string; mode?: string; cursor?: "crosshair" | "grab" | "grabbing" | "default"; degenerate?: boolean;
+  canvas?: SketchCanvas;
   workbench: "vector" | "sketch"; tool: string; active: string | null;
   sketches: { id: string; name: string; editable: boolean }[];
   entities: { id: string; kind: string; selected: boolean; construction: boolean; fully_constrained: boolean | null; origin: boolean }[];

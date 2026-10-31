@@ -1,5 +1,6 @@
 import type { SketchApi } from "@/hooks/useSketch";
 import { SketchAnnotations } from "@/components/sketch/SketchAnnotations";
+import { SketchEntryBox, SketchModeLabel } from "@/components/sketch/SketchCanvasChips";
 import { useLayoutEffect, useRef, useState } from "react";
 
 import { PageFrames } from "@/components/PageFrames";
@@ -164,6 +165,8 @@ export function Canvas({ editor, sketch, onDropFiles }: CanvasProps) {
       </NodeContextMenu>
       <PageFrames getSession={editor.getSession} />
       <SketchAnnotations sketch={sketch} />
+      <SketchModeLabel sketch={sketch} containerRef={editor.containerRef} />
+      <SketchEntryBox sketch={sketch} containerRef={editor.containerRef} />
       {/* The drop cue: a 2px dashed accent outline inside the viewport while files hover over the
           canvas (`specs/0058-bitmap-import` UX notes, "Drag and drop"). No text, no animation. */}
       {drop.over && (

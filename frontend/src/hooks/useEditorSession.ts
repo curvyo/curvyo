@@ -2498,10 +2498,9 @@ export function useEditorSession(
       if (!session) {
         return;
       }
+      // Tab opens the on-canvas entry box when Rust offers one (`0066` AC33); otherwise nothing.
       if (sketchWorkbenchRef.current && event.key === "Tab" && !event.ctrlKey && !event.metaKey && !event.altKey) {
-        const fields = document.querySelectorAll<HTMLInputElement>("[data-sketch-numeric]");
-        const field = fields[event.shiftKey ? fields.length - 1 : 0];
-        if (field) { event.preventDefault(); field.focus(); field.select(); return; }
+        if (sketchPresentation.canvas().entry) { event.preventDefault(); sketchPresentation.setEntryOpen(true); return; }
       }
       // Ctrl+Alt+C: Stroke to path with the button's rule; with a dimmed button it does nothing
       // and shows no notice (`specs/0085-stroke-to-path` criterion 3, UX notes "Keyboard").
@@ -2591,6 +2590,7 @@ export function useEditorSession(
       strokeToPath,
       strokeToPathReady,
       sketchView.workbench,
+      sketchPresentation,
     ],
   );
 

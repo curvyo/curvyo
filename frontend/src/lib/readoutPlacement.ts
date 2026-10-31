@@ -395,3 +395,38 @@ export function placeTextPathEntryChip(
   const left = awayX >= 0 ? (fitsRight || !fitsLeft ? right : leftSide) : fitsLeft || !fitsRight ? leftSide : right;
   return clamp(left, top);
 }
+
+/**
+ * Sketch canvas chips (`specs/0066-constraint-sketcher/ux-notes.md` revision 2, sections 2 and 3):
+ * `offset` px from the object anchor in the quadrant `away` names (y down); on an axis without
+ * room (canvas edge, or the tool rail's `railClear` on the left) it goes to the other side, then it
+ * is clamped inside the canvas. With `pointer`, a chip that would cover the live cursor point goes
+ * to the opposite quadrant.
+ */
+export function placeSketchChip(
+  anchor: { x: number; y: number },
+  away: { x: number; y: number },
+  chip: Size,
+  canvas: Size,
+  offset: number,
+  railClear: number,
+  pointer?: { x: number; y: number },
+): Placement {
+  const side = (at: number, direction: number, size: number, low: number, high: number) => {
+    const ahead = direction >= 0 ? at + offset : at - offset - size;
+    const behind = direction >= 0 ? at - offset - size : at + offset;
+    return ahead >= low && ahead + size <= high ? ahead : behind;
+  };
+  const at = (direction: { x: number; y: number }) =>
+    clampInside(
+      side(anchor.x, direction.x, chip.width, Math.min(railClear, canvas.width - chip.width), canvas.width),
+      side(anchor.y, direction.y, chip.height, 0, canvas.height),
+      chip,
+      canvas,
+    );
+  const first = at(away);
+  if (pointer && coversPoint(first, chip, pointer)) {
+    return at({ x: -away.x, y: -away.y });
+  }
+  return first;
+}

@@ -49,7 +49,11 @@ function SketchesPanelBody({ sketch }: { sketch: SketchApi }) {
         <button className={sketchButton} aria-pressed={view.entities.some(e => e.selected) && view.entities.filter(e => e.selected).every(e => e.construction)} onClick={() => sketch.run(s => s.sketch_selection_construction(!view.entities.filter(e => e.selected).every(e => e.construction)))}>Construction</button>
         <button className={sketchButton} onClick={() => sketch.run(s => s.sketch_delete_selection())}>Delete</button>
         <button className={sketchButton} onClick={() => sketch.run(s => s.sketch_inspect_selection())}>Inspect</button>
-      </div></details>
+      </div>
+      {/* An explicit start from a selected open endpoint (UX notes revision 2, section 2). */}
+      {view.can_resume && <div className="flex gap-1">{[["polyline","Resume polyline"],["arc","Resume arc"]].map(([tool,label]) =>
+        <button key={tool} className={sketchButton} onClick={() => { if (sketch.run(s => s.set_sketch_tool(tool))) sketch.focusCanvas(); }}>{label}</button>)}</div>}
+      </details>
       <div ref={rows} data-constraints className="space-y-1" aria-label="Sketch relationships">{view.constraints.map(row => <ConstraintRow key={row.id} row={row} sketch={sketch} />)}</div>
       <button className={sketchButton} onClick={() => { if (sketch.run(s => s.sketch_convert_to_path())) sketch.focusCanvas(); }}>Convert to paths</button>
     </>}
