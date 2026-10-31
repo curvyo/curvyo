@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { WasmSession } from "@/lib/editorSession";
 import {
+  BRIGHTNESS,
+  MULTICOLOUR,
   NO_STATUS,
   PICK_COLOURS,
   zeroPathsLine,
@@ -27,10 +29,15 @@ import {
   writeAdvancedOpen,
   writeChoice,
 } from "@/lib/traceText";
+import {
+  readPalette,
+} from "@/lib/tracePaletteText";
 import { TraceCancelled, type TraceRunner, createTraceRunner } from "@/lib/traceJobs";
 import { NO_VIEW, loadParams, loadPresets, pixelsOf, readView, type ViewState } from "@/lib/traceSource";
 import type { ShowNotice, TraceApi } from "./traceApi";
 import { useTraceMask } from "./useTraceMask";
+import { useTracePalette } from "./useTracePalette";
+import type { HsvTriple } from "./useStylePanel";
 import { useTraceMethod } from "./useTraceMethod";
 import { useTraceProgress } from "./useTraceProgress";
 import { useTraceViewMode } from "./useTraceViewMode";
@@ -87,6 +94,8 @@ export function useTrace(
   }, [choice]);
   /** The view as last read; the sync effect below keeps it and the state together. */
   const viewRef = useRef(view);
+  /** Reads the palette of a new preview (`useTracePalette`, set once it exists). */
+  const paletteRefresh = useRef<() => void>(() => undefined);
 
   const { busy, percent, setPercent, startTimers, clearTimers } = useTraceProgress(getSession, onChange);
 
@@ -216,8 +225,9 @@ export function useTrace(
               return;
             }
             session.set_trace_preview(id, out.wire);
+            paletteRefresh.current();
             if (reducedOnly) {
-              setStatus(statusText(readSummary(out.wire), out.seconds, reducedPixels, true, zeroPathsLine(v)));
+              setStatus(statusText(readSummary(out.wire), out.seconds, reducedPixels, true, zeroPathsLine(v), colourCounts(session)));
             }
           }
           if (!fullAfter || reducedOnly) {
@@ -236,8 +246,9 @@ export function useTrace(
         }
         session.set_trace_preview(id, out.wire);
         session.set_trace_result(id, out.wire);
+        paletteRefresh.current();
         results.current.set(id, settings);
-        setStatus(statusText(readSummary(out.wire), out.seconds, full.width * full.height, false, zeroPathsLine(v)));
+        setStatus(statusText(readSummary(out.wire), out.seconds, full.width * full.height, false, zeroPathsLine(v), colourCounts(session)));
         clearTimers();
         onChange();
       } catch (error) {
@@ -319,15 +330,34 @@ export function useTrace(
     [getSession, schedule],
   );
 
+  const palette = useTracePalette({ active, values, getSession, onChange, apply, choiceRef });
+  // The Recolour picker converts as the Style section does (Rust's rounding).
+  const hsvOf = useCallback((rgb: number): HsvTriple => {
+    const [hue, saturation, value] = getSession()?.colour_hsv(rgb) ?? [-1, 0, 0];
+    return [hue, saturation, value];
+  }, [getSession]);
+  const rgbOf = useCallback(
+    (hue: number, saturation: number, value: number) => getSession()?.hsv_colour(hue, saturation, value) ?? 0,
+    [getSession],
+  );
+  useEffect(() => {
+    paletteRefresh.current = palette.refresh;
+  }, [palette.refresh]);
+
   const setValue = useCallback(
     <K extends keyof TraceValues>(name: K, value: TraceValues[K], isDragging = false) => {
       dragging.current = isDragging;
+      // Leaving Multicolour in Brightness disarms the palette pipette (UX notes §7).
+      const session = getSession();
+      if (name === "output" && value !== MULTICOLOUR && choiceRef.current.values.method === BRIGHTNESS && session?.trace_pick_mode() === "colours") {
+        session.set_trace_pick("");
+      }
       if (name === "threshold" && viewRef.current.shown && typeof value === "number") {
         thresholds.current.set(viewRef.current.shown, value);
       }
       apply(editChoice(choiceRef.current, name, value));
     },
-    [apply],
+    [apply, getSession],
   );
 
   const pick = useCallback(
@@ -433,7 +463,7 @@ export function useTrace(
         if (outcome.kind === "created") {
           paths = outcome.paths;
           nodes = outcome.nodes;
-          showNotice(tracedNotice(outcome.images, paths, nodes), 3000, "canvas", "status");
+          showNotice(tracedNotice(outcome.images, paths, nodes, outcome.colours), 3000, "canvas", "status");
         }
         outcome.free();
         clearTimers();
@@ -489,6 +519,7 @@ export function useTrace(
     dragging,
     viewRef,
     backgrounds,
+    palettePick: palette.pick,
   });
 
   const keyDown = useCallback(
@@ -506,8 +537,12 @@ export function useTrace(
         return true;
       }
       // Esc order (UX notes §6): a running trace stops first, then the armed pipette disarms,
-      // then the tool is left.
+      // then the tool is left; a Merge into waiting for its target is cancelled before the tool.
       const session = getSession();
+      if (event.key === "Escape" && palette.merging) {
+        palette.cancelMerge();
+        return true;
+      }
       if (event.key === "Escape" && session && session.trace_pick_mode() !== "") {
         session.set_trace_pick("");
         onChange();
@@ -515,7 +550,7 @@ export function useTrace(
       }
       return false;
     },
-    [active, create, creating, stop, getSession, onChange],
+    [active, create, creating, stop, getSession, onChange, palette],
   );
 
 
@@ -545,7 +580,7 @@ export function useTrace(
     choice,
     presetLabel: presetLabel(choice, presets),
     advancedOpen,
-    status: withSwatchNote(status, values),
+    status: withPaletteNote(withSwatchNote(status, values), palette.note),
     countsStale: busy || stopped || creating,
     slot,
     viewMode,
@@ -567,5 +602,19 @@ export function useTrace(
     pickMode,
     setPicking,
     suggestedBackground,
+    palette,
+    hsvOf,
+    rgbOf,
   };
+}
+
+/** The colours and joined regions of the shown multicolour preview, `null` for one colour. */
+function colourCounts(session: WasmSession): { colours: number; joined: number } | null {
+  const info = readPalette(session.trace_palette());
+  return info ? { colours: info.layers.length, joined: info.joined } : null;
+}
+
+/** `status` with the palette's notice in its muted line when nothing else is said there. */
+function withPaletteNote(status: TraceStatusText, note: string): TraceStatusText {
+  return note !== "" && status.muted === "" ? { ...status, muted: note } : status;
 }

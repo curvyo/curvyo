@@ -3,7 +3,16 @@ import { useCallback, useEffect, type MutableRefObject } from "react";
 
 import type { WasmSession } from "@/lib/editorSession";
 import { pickModeOf, type ViewState } from "@/lib/traceSource";
-import { PICK_COLOURS, REMOVE_BACKGROUND, editChoice, pickSwatch, type TraceChoice, type TraceValues } from "@/lib/traceText";
+import {
+  BRIGHTNESS,
+  MULTICOLOUR,
+  PICK_COLOURS,
+  REMOVE_BACKGROUND,
+  editChoice,
+  pickSwatch,
+  type TraceChoice,
+  type TraceValues,
+} from "@/lib/traceText";
 
 export interface MethodContext {
   active: boolean;
@@ -15,13 +24,16 @@ export interface MethodContext {
   dragging: MutableRefObject<boolean>;
   viewRef: MutableRefObject<ViewState>;
   backgrounds: MutableRefObject<Map<string, string>>;
+  /** A pick for the palette (Brightness + Multicolour, `specs/0089` UX notes §7). */
+  palettePick: (hex: string) => void;
 }
 
 export function useTraceMethod(ctx: MethodContext) {
-  const { active, syncRevision, getSession, onChange, apply, choiceRef, dragging, viewRef, backgrounds } = ctx;
+  const { active, syncRevision, getSession, onChange, apply, choiceRef, dragging, viewRef, backgrounds, palettePick } = ctx;
   const setPicking = useCallback(
     (armed: boolean) => {
-      getSession()?.set_trace_pick(armed ? pickModeOf(choiceRef.current.values.method) : "");
+      const { method, output } = choiceRef.current.values;
+      getSession()?.set_trace_pick(armed ? pickModeOf(method, output) : "");
       onChange();
     },
     [getSession, onChange, choiceRef],
@@ -93,8 +105,10 @@ export function useTraceMethod(ctx: MethodContext) {
       if (swatches.join() !== values.swatches.join()) {
         apply({ ...choiceRef.current, values: { ...values, swatches } });
       }
+    } else if (values.method === BRIGHTNESS && values.output === MULTICOLOUR) {
+      palettePick(hex);
     }
-  }, [syncRevision, active, getSession, apply, choiceRef, dragging]);
+  }, [syncRevision, active, getSession, apply, choiceRef, dragging, palettePick]);
 
   return { setPicking, setMethod, setColourTolerance, setBackgroundAuto, removeSwatch };
 }

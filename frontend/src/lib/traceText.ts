@@ -112,6 +112,46 @@ export const MAX_SWATCHES = 8;
 export const DEFAULT_BACKGROUND_TOLERANCE = 40;
 export const DEFAULT_PICK_TOLERANCE = 19;
 
+/** Output (`specs/0089` criterion 25, Frage 92 B: in Advanced): its name, its segments and
+ * their index in the settings JSON's `output`. */
+export const OUTPUT = "Output";
+export const SINGLE_COLOUR = 0;
+export const MULTICOLOUR = 1;
+export const TRACE_OUTPUTS: readonly string[] = ["Single colour", "Multicolour"];
+
+/** The Colours field (criterion 26): 2 to 16, Auto at the lowest stop. */
+export const COLOURS = "Colours";
+export const MIN_COLOURS = 2;
+export const MAX_COLOURS = 16;
+
+/** The Colours field as a value field: position 1 is Auto, 2 to 16 a count. */
+export const COLOURS_PARAM: TraceParam = {
+  name: "colours",
+  label: COLOURS,
+  kind: "integer",
+  unit: "",
+  min: 1,
+  max: MAX_COLOURS,
+  default: 1,
+  step: 1,
+  big_step: 4,
+  fine_step: 1,
+  group: "advanced",
+  advanced: true,
+  choices: [],
+};
+
+/** The Colours field's text: "Auto" with the count Auto found (`Auto  6`), or the count. */
+export function coloursText(colours: number | null, found: number | null): string {
+  if (colours !== null) {
+    return String(colours);
+  }
+  return found === null ? AUTO : `${AUTO}  ${found}`;
+}
+
+/** The status of a multicolour trace that found no colour (UX notes §10). */
+export const NO_COLOURS_FOUND = "No colours found.";
+
 /** The pipette's name and tooltip (UX notes §6, the Style eyedropper's words). */
 export const PICK_COLOUR = "Pick colour from the image";
 export const PICK_BACKGROUND = "Pick background colour from the image";
@@ -217,7 +257,7 @@ export const TRACE_INFO_ENTRIES: readonly string[] = [
   "Silhouette for cutting/carving: closed, simple, few nodes; drops shapes and holes below 2 mm.",
   "Engraving: keeps fine lines, drops shapes below 0.1 mm.",
   "View: the image with the outline, the mask, the result alone, or the image alone. Hold \\ to peek at the image; Shift+\\ steps through the views.",
-  "Mask: what the tracer turns into shapes, black on white, after Ignore below and Drop border shapes.",
+  "Mask: what the tracer turns into shapes, black on white (in Multicolour each colour as found), after Ignore below and Drop border shapes.",
   "Method: how pixels become shapes.",
   "Brightness: pixels darker than the Threshold.",
   "Remove background: everything unlike the background colour.",
@@ -234,6 +274,14 @@ export const TRACE_INFO_ENTRIES: readonly string[] = [
   "Corners: higher turns more bends into sharp corners.",
   "Invert: traces what the method leaves out; transparent pixels never become shapes.",
   "Drop border shapes: drops shapes that touch the image border.",
+  "Output: Single colour traces the content as one black shape; Multicolour gives one filled shape per colour, neighbours sharing their edges.",
+  "Colours: how many colours Multicolour finds, 2 to 16; Auto counts them in the image. With Pick colours the picked colours are the palette.",
+  "Palette: the colours of a Multicolour trace, largest area first; picked colours carry a corner mark and come first.",
+  "Isolate: shows one colour and dims the others; Enter still creates every colour.",
+  "Recolour: gives a colour another fill without tracing again.",
+  "Merge into: traces a colour as another one, as one shape.",
+  "Exclude: makes a colour background; it is not traced.",
+  "Remove: takes a picked colour out of the palette.",
 ];
 
 /** An info entry split into its term and its text at the first ": ". */
@@ -287,6 +335,15 @@ export interface TraceValues {
   background: string | null;
   /** The picked colours `#RRGGBB` (the tool's session, not remembered). */
   swatches: readonly string[];
+  /** `SINGLE_COLOUR` or `MULTICOLOUR` (`specs/0089` criterion 25; an app setting). */
+  output: number;
+  /** The Colours count 2 to 16, `null` for Auto (an app setting). */
+  colours: number | null;
+  /** Palette colours picked with the pipette in Brightness + Multicolour (the session). */
+  fixed: readonly string[];
+  /** Palette colours made background (Exclude) and traced as another (Merge into: from, into). */
+  excluded: readonly string[];
+  merged: readonly (readonly [string, string])[];
 }
 
 /** The values a preset sets (criterion 60). */
@@ -333,7 +390,8 @@ export type TraceParamName =
   | "upscale"
   | "corners"
   | "method"
-  | "colour_tolerance";
+  | "colour_tolerance"
+  | "colours";
 
 /** One field of the settings schema (`trace_params()` of the wasm module, criteria 6 and 45). */
 export interface TraceParam {
@@ -471,14 +529,23 @@ export function zeroPathsLine(values: Pick<TraceValues, "method" | "swatches">):
   return values.method === REMOVE_BACKGROUND ? "0 paths at this Colour tolerance: too high." : null;
 }
 
+/** What a multicolour result adds to its status: its colours and the regions joined. */
+export interface ColourCounts {
+  colours: number;
+  joined: number;
+}
+
 /** The state and the counts of a settled trace (criteria 11, 15, 16, 52, 55); `zeroLine`
- * replaces the Threshold's line of a trace without paths (a colour method). */
+ * replaces the Threshold's line of a trace without paths (a colour method); a multicolour
+ * result names its colours first and the joined regions in the muted line (`specs/0089` UX notes
+ * §10). */
 export function statusText(
   summary: TraceSummary,
   seconds: number,
   pixels: number,
   reduced = false,
   zeroLine: string | null = null,
+  colour: ColourCounts | null = null,
 ): TraceStatusText {
   if (summary.status === "too_detailed") {
     return { ...NO_STATUS, line: TOO_DETAILED };
@@ -486,11 +553,18 @@ export function statusText(
   if (summary.status === "invalid") {
     return { ...NO_STATUS, line: "This image can't be traced." };
   }
-  const counts = `${plural(summary.paths, "path", "paths")}, ${plural(summary.nodes, "node", "nodes")}, ${seconds.toFixed(1)} s`;
-  const countsMuted = summary.specks > 0 ? `${plural(summary.specks, "speck", "specks")} ignored` : "";
+  const colours = colour ? `${plural(colour.colours, "colour", "colours")}, ` : "";
+  const counts = `${colours}${plural(summary.paths, "path", "paths")}, ${plural(summary.nodes, "node", "nodes")}, ${seconds.toFixed(1)} s`;
+  const muted = [
+    summary.specks > 0 ? `${plural(summary.specks, "speck", "specks")} ignored` : "",
+    colour && colour.joined > 0 ? `${plural(colour.joined, "region", "regions")} joined` : "",
+  ];
+  const countsMuted = muted.filter((m) => m !== "").join(", ");
   // Over 4 Mpx the counts are the reduced copy's, and the state row says so (criterion 52).
-  const muted = reduced ? REDUCED_COPY : "";
-  const settled = { line: "", muted, counts, countsMuted, canCreate: true };
+  const settled = { line: "", muted: reduced ? REDUCED_COPY : "", counts, countsMuted, canCreate: true };
+  if (summary.paths === 0 && colour) {
+    return { ...settled, line: NO_COLOURS_FOUND, canCreate: false };
+  }
   if (summary.paths === 0) {
     // The direction from the histogram: more than half the picture below the Threshold means it
     // is too high, otherwise too low (UX notes section 7).
@@ -512,9 +586,11 @@ export function imagesLabel(done: number, count: number): string {
   return count >= 2 ? `Tracing ${done + 1} of ${count} images` : "";
 }
 
-/** The success notice (criteria 13, 46). */
-export function tracedNotice(images: number, paths: number, nodes: number): string {
-  const counts = `${plural(paths, "path", "paths")}, ${plural(nodes, "node", "nodes")}.`;
+/** The success notice (criteria 13, 46; `specs/0089` UX notes §10: a multicolour result names
+ * its colours first). */
+export function tracedNotice(images: number, paths: number, nodes: number, colours = 0): string {
+  const named = colours > 0 ? `${plural(colours, "colour", "colours")}, ` : "";
+  const counts = `${named}${plural(paths, "path", "paths")}, ${plural(nodes, "node", "nodes")}.`;
   return images >= 2 ? `Traced ${grouped(images)} images: ${counts}` : `Traced: ${counts}`;
 }
 
@@ -558,6 +634,11 @@ export function firstChoice(presets: readonly TracePreset[] = TRACE_PRESETS_FALL
     backgroundAuto: true,
     background: null,
     swatches: [],
+    output: SINGLE_COLOUR,
+    colours: null,
+    fixed: [],
+    excluded: [],
+    merged: [],
   };
   return { preset: first.key, edited: false, values: base };
 }
@@ -592,7 +673,13 @@ export function colourTolerance(values: TraceValues): number {
  * the full-size trace agree; empty: transparent). */
 export function settingsJson(values: TraceValues, threshold: number, suggested?: string): string {
   const background = values.method === PICK_COLOURS && suggested !== undefined ? suggested : values.background;
+  const multi = values.output === MULTICOLOUR;
   return JSON.stringify({
+    output: values.output,
+    colours: values.colours,
+    fixed: multi && values.method === BRIGHTNESS ? values.fixed : [],
+    excluded: multi ? values.excluded : [],
+    merged: multi ? values.merged : [],
     method: values.method,
     colour_tolerance: colourTolerance(values),
     background: background === "" ? null : background,
@@ -635,6 +722,8 @@ export function readChoice(
       method?: unknown;
       backgroundTolerance?: unknown;
       pickTolerance?: unknown;
+      output?: unknown;
+      colours?: unknown;
     };
     // The method and its tolerances are app settings too (`specs/0089` criterion 20); a missing
     // method reads as Brightness.
@@ -666,6 +755,12 @@ export function readChoice(
         method: method(stored.method),
         backgroundTolerance: tolerance(stored.backgroundTolerance, first.values.backgroundTolerance),
         pickTolerance: tolerance(stored.pickTolerance, first.values.pickTolerance),
+        // Output and Colours are app settings too (`specs/0089` criterion 25, UX notes §7).
+        output: stored.output === MULTICOLOUR ? MULTICOLOUR : SINGLE_COLOUR,
+        colours:
+          typeof stored.colours === "number" && Number.isFinite(stored.colours)
+            ? Math.min(MAX_COLOURS, Math.max(MIN_COLOURS, Math.round(stored.colours)))
+            : null,
       },
     };
   } catch {
@@ -691,6 +786,8 @@ export function writeChoice(choice: TraceChoice, storage: ValueStorage | undefin
         method: choice.values.method,
         backgroundTolerance: choice.values.backgroundTolerance,
         pickTolerance: choice.values.pickTolerance,
+        output: choice.values.output,
+        colours: choice.values.colours,
       }),
     );
   } catch {
@@ -735,6 +832,9 @@ export function changedAdvancedText(values: TraceValues, params: readonly TraceP
   }
   if (values.corners !== dflt("corners")) {
     changed.push("Corners");
+  }
+  if (values.output === MULTICOLOUR) {
+    changed.push(OUTPUT);
   }
   return changed.length > 0 ? `Changed: ${changed.join(", ")}` : null;
 }

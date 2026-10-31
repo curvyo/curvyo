@@ -12,6 +12,10 @@ export interface TraceFieldProps {
   onEndDrag: () => void;
   onCreate: () => void;
   onReturnFocus: () => void;
+  /** The text shown instead of the value's own (the Colours field's "Auto  6"). */
+  display?: string;
+  /** The field's width, px (168 unless given). */
+  width?: number;
 }
 
 /** The width of a Trace bar field, px (UX notes 20.1). */
@@ -26,11 +30,11 @@ const UNIT_WORDS: Readonly<Record<string, string>> = { "%": "percent", mm: "mill
  * double-click, Enter or F2 opens the number entry, the arrows step it; Ctrl+Enter creates the
  * paths, also in the entry; Escape in a drag puts the value back.
  */
-export function TraceField({ param, value, onValue, onEndDrag, onCreate, onReturnFocus }: TraceFieldProps) {
+export function TraceField({ param, value, onValue, onEndDrag, onCreate, onReturnFocus, display, width = TRACE_FIELD_WIDTH }: TraceFieldProps) {
   const shown = value ?? param.default;
   const pressing = useRef<{ start: number | null; last: number } | null>(null);
   const span = param.max - param.min;
-  const text = value === null ? "" : valueText(param, shown);
+  const text = display ?? (value === null ? "" : valueText(param, shown));
   const unitWords = UNIT_WORDS[param.unit] ?? "";
   const set = (next: number, dragging: boolean) => {
     if (next !== (pressing.current?.last ?? value)) {
@@ -70,7 +74,7 @@ export function TraceField({ param, value, onValue, onEndDrag, onCreate, onRetur
         mixed={false}
         resettable={false}
         noResetSlot
-        width={TRACE_FIELD_WIDTH}
+        width={width}
         help={HELP_RATIO}
         unit={param.unit}
         valueNow={shown}

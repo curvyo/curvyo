@@ -5,19 +5,22 @@
 // `reference_table` run merges as `cpu_wasm_ms`. Needs the wasm bindings (`npm run build:wasm`):
 //
 //   node --experimental-strip-types scripts/trace-reference-wasm.ts
+//
+// `CURVYO_TRACE_WASM_DIR` reads and writes another directory (criterion 30: the multicolour
+// pictures of the `colour` test `criterion_30_wasm_manifest`, `target/trace-colour-wasm/`).
 
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 const ROOT = path.resolve(import.meta.dirname, "..", "..");
-const DIR = path.join(ROOT, "target", "trace-reference");
+const DIR = process.env.CURVYO_TRACE_WASM_DIR ? path.resolve(ROOT, process.env.CURVYO_TRACE_WASM_DIR) : path.join(ROOT, "target", "trace-reference");
 const BINDINGS = path.resolve(import.meta.dirname, "..", "src", "wasm-bindings");
 
 interface Run {
   key: string;
   file: string;
   map: number[];
-  settings: Record<string, number>;
+  settings: Record<string, number | string | null>;
 }
 
 /** The RGBA of a PAM (`RGB_ALPHA`) picture. */

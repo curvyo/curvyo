@@ -8,6 +8,7 @@ import { ExpandButton, ICON_BUTTON_CLASS } from "@/components/TextBar";
 import { TraceAdvanced } from "@/components/TraceAdvanced";
 import { TraceField } from "@/components/TraceField";
 import { PickColoursGroup, RemoveBackgroundGroup } from "@/components/TraceColourGroup";
+import { TracePalette } from "@/components/TracePalette";
 import { TracePresetMenu } from "@/components/TracePresetMenu";
 import { Tooltip as AppTooltip } from "@/components/ui/tooltip";
 import type { TraceApi } from "@/hooks/useTrace";
@@ -441,7 +442,17 @@ export function TraceBar({ trace, info, onImport, onReturnFocus }: TraceBarProps
               onEndDrag={trace.endDrag}
               onCreate={trace.create}
               onReturnFocus={onReturnFocus}
+              coloursFound={trace.palette.found}
+              paletteArmed={trace.pickMode === "colours" && trace.values.method !== PICK_COLOURS}
+              onPalettePipette={() => trace.setPicking(trace.pickMode === "")}
             />
+          </div>
+        ) : null}
+        {trace.palette.swatches.length > 0 ? (
+          // The palette (`specs/0089` UX notes §7): below the flow, above the notice row; the
+          // strip is half strength while a new result is computed (§9).
+          <div className={`order-[9997] basis-full ${trace.countsStale ? "opacity-50" : ""}`}>
+            <TracePalette palette={trace.palette} hsvOf={trace.hsvOf} rgbOf={trace.rgbOf} />
           </div>
         ) : null}
         {/* The notice row (UX notes 21.3): result messages only, always mounted with its live

@@ -151,7 +151,7 @@ test("criterion 70: the info page's exact text", () => {
     "Silhouette for cutting/carving: closed, simple, few nodes; drops shapes and holes below 2 mm.",
     "Engraving: keeps fine lines, drops shapes below 0.1 mm.",
     "View: the image with the outline, the mask, the result alone, or the image alone. Hold \\ to peek at the image; Shift+\\ steps through the views.",
-    "Mask: what the tracer turns into shapes, black on white, after Ignore below and Drop border shapes.",
+    "Mask: what the tracer turns into shapes, black on white (in Multicolour each colour as found), after Ignore below and Drop border shapes.",
     "Method: how pixels become shapes.",
     "Brightness: pixels darker than the Threshold.",
     "Remove background: everything unlike the background colour.",
@@ -168,6 +168,14 @@ test("criterion 70: the info page's exact text", () => {
     "Corners: higher turns more bends into sharp corners.",
     "Invert: traces what the method leaves out; transparent pixels never become shapes.",
     "Drop border shapes: drops shapes that touch the image border.",
+    "Output: Single colour traces the content as one black shape; Multicolour gives one filled shape per colour, neighbours sharing their edges.",
+    "Colours: how many colours Multicolour finds, 2 to 16; Auto counts them in the image. With Pick colours the picked colours are the palette.",
+    "Palette: the colours of a Multicolour trace, largest area first; picked colours carry a corner mark and come first.",
+    "Isolate: shows one colour and dims the others; Enter still creates every colour.",
+    "Recolour: gives a colour another fill without tracing again.",
+    "Merge into: traces a colour as another one, as one shape.",
+    "Exclude: makes a colour background; it is not traced.",
+    "Remove: takes a picked colour out of the palette.",
   ]);
   assert.deepEqual(infoEntryParts(TRACE_INFO_ENTRIES[1]), { term: "Logo / Line art", text: "sharp corners, clean curves." });
 });
@@ -184,11 +192,16 @@ test("criteria 41, 43 (removed): no Node limit and no Full-size preview in the s
     "background",
     "backgroundAuto",
     "backgroundTolerance",
+    "colours",
     "corners",
     "denoise",
+    "excluded",
+    "fixed",
     "ignoreBackground",
     "invert",
+    "merged",
     "method",
+    "output",
     "pickTolerance",
     "smooth",
     "specks",
@@ -226,6 +239,11 @@ test("criteria 5 and 66: the choice is an app setting; Threshold starts automati
     backgroundAuto: true,
     background: null,
     swatches: [],
+    output: 0,
+    colours: null,
+    fixed: [],
+    excluded: [],
+    merged: [],
   });
   const edited = editChoice(pickPreset(first, TRACE_PRESETS_FALLBACK[2]), "smooth", 90);
   writeChoice(
@@ -319,6 +337,11 @@ test("criteria 40, 59, 60: presets, Custom as stored state", () => {
     colour_tolerance: 19,
     background: null,
     swatches: [],
+    output: 0,
+    colours: null,
+    fixed: [],
+    excluded: [],
+    merged: [],
   });
 });
 
