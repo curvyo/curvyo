@@ -1037,11 +1037,25 @@ fn decodes_within_address_limit(test: &str, name: &str) -> bool {
         return true;
     }
     let exe = std::env::current_exe().unwrap();
-    let status = std::process::Command::new("sh")
-        .arg("-c")
-        .arg("ulimit -v 1500000 && exec \"$0\" --exact \"$1\" --include-ignored --test-threads 1")
-        .arg(exe)
-        .arg(test)
+    // Only Linux enforces `ulimit -v` (macOS refuses it, Windows has no `sh`); elsewhere the
+    // child runs unlimited and the test still checks that the decode ends normally.
+    #[cfg(target_os = "linux")]
+    let mut command = {
+        let mut command = std::process::Command::new("sh");
+        command
+            .arg("-c")
+            .arg("ulimit -v 1500000 && exec \"$0\" --exact \"$1\" --include-ignored --test-threads 1")
+            .arg(&exe)
+            .arg(test);
+        command
+    };
+    #[cfg(not(target_os = "linux"))]
+    let mut command = {
+        let mut command = std::process::Command::new(&exe);
+        command.args(["--exact", test, "--include-ignored", "--test-threads", "1"]);
+        command
+    };
+    let status = command
         .env("CURVYO_TESTER_DECODE", name)
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())

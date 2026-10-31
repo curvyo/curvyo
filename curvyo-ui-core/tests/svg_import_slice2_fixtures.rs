@@ -6,7 +6,7 @@ mod svg_fonts;
 
 use std::fmt::Write;
 use std::path::{Path, PathBuf};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use curvyo_document_core::{DrawingNode, MISSING_FACE_HASH, TextWritingMode};
 use curvyo_ui_core::{SvgImport, SvgPlacement};
@@ -166,28 +166,47 @@ fn mm(body: &str) -> Vec<u8> {
         .into_bytes()
 }
 
+/// The calling thread's CPU time (Linux `schedstat`; wall time since the first call elsewhere), so
+/// that a loaded machine does not fail a bound (`CLAUDE.md` §5).
+fn thread_cpu() -> Duration {
+    std::fs::read_to_string("/proc/thread-self/schedstat")
+        .ok()
+        .and_then(|s| s.split_whitespace().next()?.parse::<u64>().ok())
+        .map_or_else(
+            || {
+                static START: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
+                START.get_or_init(std::time::Instant::now).elapsed()
+            },
+            Duration::from_nanos,
+        )
+}
+
 /// Criterion 98's hostile inputs: a 2,000,000-character text, 100,000 one-character texts and
-/// 10,000 font names import in bounded time without a panic.
+/// 10,000 font names import in bounded time (thread CPU) without a panic.
 #[test]
 fn ac98_hostile_texts() {
     let fonts = Fonts::included();
-    let bound = Duration::from_secs(60);
+    // 60 s of CPU in a release build (it takes about 1.5 s there); the unoptimised build the gate
+    // runs is some 20 times slower, so its bound is five times longer.
+    let bound = Duration::from_secs(if cfg!(debug_assertions) { 300 } else { 60 });
     let long = mm(&format!(
         r#"<text y="10">{}</text>"#,
         "word ".repeat(400_000)
     ));
-    let started = Instant::now();
+    let started = thread_cpu();
     let import = fonts.import(&long, SvgPlacement::File);
-    assert!(started.elapsed() < bound, "{:?}", started.elapsed());
+    let took = thread_cpu().saturating_sub(started);
+    assert!(took < bound, "{took:?}");
     let pieces = flat(&import.nodes).len();
     assert_eq!(pieces, 100, "1,000,000 characters in texts of 10,000");
     let mut many = String::new();
     for i in 0..100_000 {
         write!(many, r#"<text x="{}" y="{}">x</text>"#, i % 200, i / 1000).unwrap();
     }
-    let started = Instant::now();
+    let started = thread_cpu();
     let import = fonts.import(&mm(&many), SvgPlacement::File);
-    assert!(started.elapsed() < bound, "{:?}", started.elapsed());
+    let took = thread_cpu().saturating_sub(started);
+    assert!(took < bound, "{took:?}");
     assert_eq!(import.leaves, 100_000);
     // A position per character far apart: every character its own text, found in one pass.
     let mut xs = String::new();
@@ -198,9 +217,10 @@ fn ac98_hostile_texts() {
         r#"<text x="{xs}" y="10">{}</text>"#,
         "x".repeat(10_000)
     ));
-    let started = Instant::now();
+    let started = thread_cpu();
     let import = fonts.import(&spread, SvgPlacement::File);
-    assert!(started.elapsed() < bound, "{:?}", started.elapsed());
+    let took = thread_cpu().saturating_sub(started);
+    assert!(took < bound, "{took:?}");
     assert_eq!(flat(&import.nodes).len(), 10_000);
     let mut names = String::new();
     for i in 0..10_000 {
@@ -210,8 +230,9 @@ fn ac98_hostile_texts() {
         )
         .unwrap();
     }
-    let started = Instant::now();
+    let started = thread_cpu();
     let import = fonts.import(&mm(&names), SvgPlacement::File);
-    assert!(started.elapsed() < bound, "{:?}", started.elapsed());
+    let took = thread_cpu().saturating_sub(started);
+    assert!(took < bound, "{took:?}");
     assert_eq!(import.leaves, 10_000);
 }
