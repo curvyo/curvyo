@@ -37,8 +37,8 @@ export interface TraceApi {
   presetLabel: string;
   /** The Advanced block is open (criterion 41). */
   advancedOpen: boolean;
-  /** The state row's line and muted line, the counts of the Advanced block, and whether Enter
-   * may create (criteria 11, 71). */
+  /** The notice row's line and muted line, the counts for the Advanced status line, and whether
+   * Enter may create (criteria 11, 71). */
   status: TraceStatusText;
   /** The counts belong to an older result: a trace runs or was stopped (UX notes 20.4). */
   countsStale: boolean;
@@ -74,8 +74,6 @@ export interface TraceApi {
   setColourTolerance: (value: number, dragging?: boolean) => void;
   /** Remove background's Auto: the background from the image border again. */
   setBackgroundAuto: () => void;
-  /** Takes a picked colour out of Pick colours. */
-  removeSwatch: (hex: string) => void;
   /** What the pipette is armed for: "background", "colours" or "" (UX notes §6). */
   pickMode: string;
   /** Arms the pipette for the current method, or disarms it. */
@@ -85,8 +83,12 @@ export interface TraceApi {
   suggestedBackground: string | null;
   /** The shown image's analysis line state (`specs/0089` slice F, UX notes §3). */
   analysis: TraceAnalysisState;
-  /** Analyse again: the analysed values back to the shown image's analysis. */
-  analyseAgain: () => void;
+  /** Analyse: the analysed values back to the shown image's analysis. */
+  analyse: () => void;
+  /** The Advanced status line: the counts (or the message replacing them) and its muted line. */
+  advancedStatus: { text: string; muted: string };
+  /** Why the Trace button is `aria-disabled`, or empty (`ux-notes.md` §22.2). */
+  traceBlocked: string;
   /** The palette of a multicolour trace (`specs/0089` slice M). */
   palette: TracePaletteApi;
   /** The Recolour picker's conversions (Rust's rounding, as the Style section's). */

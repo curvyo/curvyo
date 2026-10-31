@@ -357,11 +357,12 @@ test("0025 in Chromium at 800x600: no Trace bar control passes the bar's right e
       const controls = [...block.querySelectorAll('button[aria-pressed], [role=radiogroup], [role=spinbutton]')];
       const counts = block.querySelector('[data-trace-counts]');
       return { names: controls.map((e) => e.getAttribute('aria-label')), firstRow: controls.filter((e) => y(e) === y(controls[0])).map((e) => e.getAttribute('aria-label')),
-        countsLast: block.lastElementChild === counts, countsBelow: y(counts) > Math.max(...controls.map(y)) }; })())`)) as string) as { names: string[]; firstRow: string[]; countsLast: boolean; countsBelow: boolean };
-    // 0089 criterion 25 (Frage 92 B): Output follows the two toggles in the Advanced block.
-    assert.deepEqual(advanced.names, ["Invert", "Drop border shapes", "Output", "Denoise", "Upscale", "Corners"]);
-    assert.deepEqual(advanced.firstRow.slice(0, 3), ["Invert", "Drop border shapes", "Output"]);
-    assert.ok(advanced.countsLast && advanced.countsBelow, "the counts row is the last row");
+        countsFirst: block.children[1] === counts, countsAbove: y(counts) < Math.min(...controls.map(y)) }; })())`)) as string) as { names: string[]; firstRow: string[]; countsFirst: boolean; countsAbove: boolean };
+    // `0089` ux-notes §22.3 (2026-10-31, replaces Frage 92 B / UX notes 20.5 here): Output comes first, then the
+    // two toggles; the status line (the counts) is the second row, above all controls, after the analysis row.
+    assert.deepEqual(advanced.names, ["Output", "Invert", "Drop border shapes", "Denoise", "Upscale", "Corners"]);
+    assert.deepEqual(advanced.firstRow.slice(0, 1), ["Output"]);
+    assert.ok(advanced.countsFirst && advanced.countsAbove, "the status line is the second row, above the controls");
     // 0089 Frage 84: the expander and the finish button share the last line, the button at the
     // far right (at 308 px they wrap below Ignore below, `specs/0089` ux-notes §2).
     const sameRow = (await s.evaluate(`(() => { const bar = document.querySelector('[role=toolbar][aria-label=Trace]');

@@ -5,14 +5,13 @@ import { strict as assert } from "node:assert";
 import { test } from "node:test";
 
 import {
-  ANALYSE_AGAIN,
+  ANALYSE,
   ANALYSED_FIELDS,
   ANALYSING,
   ANALYSIS_FAILED,
   TYPE_UNCLEAR,
   analysisLine,
   applyAnalysis,
-  canAnalyseAgain,
   readAnalysis,
   type TraceAnalysis,
 } from "../src/lib/traceAnalysis.ts";
@@ -85,8 +84,6 @@ test("UX notes §3: the line per state and when Analyse again is pressable", () 
   assert.equal(analysisLine({ kind: "analysing" }), ANALYSING);
   assert.equal(analysisLine({ kind: "failed" }), ANALYSIS_FAILED);
   assert.equal(analysisLine({ kind: "none" }), "");
-  assert.equal(ANALYSE_AGAIN, "Analyse again");
-  assert.equal(canAnalyseAgain({ kind: "auto", analysis: a }), false);
-  assert.equal(canAnalyseAgain({ kind: "custom", analysis: a }), true);
-  assert.equal(canAnalyseAgain({ kind: "failed" }), true);
+  // The button is always enabled and no longer says "again" (`ux-notes.md` §22.3, §22.5).
+  assert.equal(ANALYSE, "Analyse");
 });

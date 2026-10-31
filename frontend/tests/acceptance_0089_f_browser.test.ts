@@ -1,7 +1,7 @@
 // `specs/0089-trace-quality-and-colour` slice F in the real app (Chromium via DevTools; set
 // CURVYO_E2E_BROWSER=/path/to/chromium; the wasm bindings must be built): the analysis row
 // (criteria 31, 33, UX notes §3, Frage 83 B): a new image gets the analysed values at once and the
-// line says what was set; an edit of an analysed value makes it Custom; Analyse again sets them
+// line says what was set; an edit of an analysed value makes it Custom; Analyse sets them
 // back; a second image is analysed on its own; Preset and Output are never touched. Harness as in
 // `acceptance_0089_e_browser.test.ts`.
 
@@ -235,8 +235,9 @@ const line = async (s: S) =>
   (await s.evaluate(`document.querySelector('${BAR} [data-trace-analysis] [role=status]')?.textContent ?? ''`)) as string;
 const rowState = async (s: S) =>
   (await s.evaluate(`document.querySelector('${BAR} [data-trace-analysis]')?.getAttribute('data-trace-analysis') ?? ''`)) as string;
+// `ux-notes.md` §22.3 (2026-10-31): the button is "Analyse", always enabled (no aria-disabled), in Advanced.
 const againDisabled = async (s: S) =>
-  (await s.evaluate(`[...document.querySelectorAll('${BAR} [data-trace-analysis] button')].find((b) => b.textContent === 'Analyse again')?.getAttribute('aria-disabled') ?? 'missing'`)) as string;
+  (await s.evaluate(`[...document.querySelectorAll('${BAR} [data-trace-analysis] button')].find((b) => b.textContent === 'Analyse')?.getAttribute('aria-disabled') ?? 'missing'`)) as string;
 const methodLabel = async (s: S) => (await s.evaluate(`document.querySelector('${BAR} button[aria-label=Method]').textContent`)) as string;
 const presetLabel = async (s: S) => (await s.evaluate(`document.querySelector('${BAR} button[aria-label=Preset]').textContent`)) as string;
 
@@ -256,12 +257,14 @@ test("0089 F in Chromium: the analysis applies to a new image, Custom after an e
     closeAll = s.close;
     await openTrace(s, pale, 1280, 800);
 
+    // The analysis row is the first row of the Advanced block (§22.3).
+    await s.clickSel(`${BAR} button[aria-label="More trace options"]`);
     // Criterion 31, Frage 83 B: the new image is analysed and its values applied at once.
     await waitFor("the analysis line", async () => ((await rowState(s)) === "auto" ? true : null));
     const auto = await line(s);
     assert.match(auto, / · pale colours kept$/, auto);
     assert.equal(await methodLabel(s), "Remove background");
-    assert.equal(await againDisabled(s), "true", "Analyse again is dimmed in Auto");
+    assert.equal(await againDisabled(s), "missing", "Analyse is enabled in Auto");
     const preset = await presetLabel(s);
     assert.equal(preset, "Logo / Line art", "the preset is never touched");
     const type = auto.split(" · ")[0];
@@ -270,7 +273,7 @@ test("0089 F in Chromium: the analysis applies to a new image, Custom after an e
     await pickMethod(s, "Brightness");
     await waitFor("Custom", async () => ((await rowState(s)) === "custom" ? true : null));
     assert.equal(await line(s), `Custom · ${type}`);
-    assert.equal(await againDisabled(s), "false");
+    assert.equal(await againDisabled(s), "missing");
     assert.equal(await presetLabel(s), preset);
 
     // Analyse again: the analysed values back in one go, Auto again.
@@ -280,7 +283,6 @@ test("0089 F in Chromium: the analysis applies to a new image, Custom after an e
     assert.equal(await methodLabel(s), "Remove background");
 
     // Output is the maker's: Multicolour stays when the next image is analysed.
-    await s.clickSel(`${BAR} button[aria-label="More trace options"]`);
     await s.evaluate(`[...document.querySelectorAll('${BAR} [role=radiogroup][aria-label=Output] [role=radio]')].find((r) => r.textContent === 'Multicolour').click()`);
     await sleep(800);
 

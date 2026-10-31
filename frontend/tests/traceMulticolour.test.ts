@@ -131,7 +131,10 @@ test("UX notes §10: the counts name the colours, the joined regions and the suc
   assert.equal(s.counts, "3 colours, 7 paths, 412 nodes, 0.4 s");
   assert.equal(s.countsMuted, "2 regions joined");
   const none = statusText(readSummary([0, 0, 0, 0, 0, 0, 0]), 0.1, 100, false, null, { colours: 0, joined: 0 });
-  assert.equal(none.line, "No colours found.");
+  // `ux-notes.md` §22.2: the message is the Advanced status line's, the counts are hidden, once.
+  assert.equal(none.message, "No colours found.");
+  assert.equal(none.line, "");
+  assert.equal(none.counts, "");
   assert.equal(none.canCreate, false);
   assert.equal(tracedNotice(1, 7, 412, 3), "Traced: 3 colours, 7 paths, 412 nodes.");
   assert.equal(tracedNotice(1, 7, 412), "Traced: 7 paths, 412 nodes.");

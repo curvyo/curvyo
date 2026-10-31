@@ -161,15 +161,10 @@ export const PICK_TOOLTIP = "Pick a colour from the image";
 export const AUTO = "Auto";
 export const NO_BACKGROUND = "none";
 
-/** The status with Pick colours and no colour (UX notes §5, §10). */
-export const NO_COLOUR_PICKED = "No colour picked.";
-
-/** The status of a ninth pick (UX notes §5). */
-export const SWATCHES_FULL = `${MAX_SWATCHES} colours picked`;
-
-/** The name of a swatch's Remove button. */
-export function removeSwatchLabel(hex: string): string {
-  return `Remove ${hex}`;
+/** The pipette's count label in the bar with Pick colours (`ux-notes.md` §22.1): the state in
+ * which Trace can run ("3 picked") or cannot ("None picked"). */
+export function pickedCountText(count: number): string {
+  return count === 0 ? "None picked" : `${count} picked`;
 }
 
 /** The swatches after a pick of `hex` (Frage 89 A): a click replaces them with this one, Shift
@@ -182,14 +177,6 @@ export function pickSwatch(swatches: readonly string[], hex: string, add: boolea
     return [...swatches];
   }
   return [...swatches, hex];
-}
-
-/** `status` with "8 colours picked" in its muted line while Pick colours holds the most swatches
- * (UX notes 5). */
-export function withSwatchNote(status: TraceStatusText, values: Pick<TraceValues, "method" | "swatches">): TraceStatusText {
-  return values.method === PICK_COLOURS && values.swatches.length >= MAX_SWATCHES && status.muted === ""
-    ? { ...status, muted: SWATCHES_FULL }
-    : status;
 }
 
 /** The parts of a key event the backslash keys read. */
@@ -228,7 +215,7 @@ export function failureReason(message: string, pixels: number): string {
 }
 
 /** A region with 65 000 holes or more (criterion 16). */
-export const TOO_DETAILED = "Too much detail: raise Specks.";
+export const TOO_DETAILED = "Too much detail: raise Ignore below.";
 
 /** The Preset button's text after an edit (criterion 40). */
 export const CUSTOM = "Custom";
@@ -262,19 +249,15 @@ export const TRACE_INFO_ENTRIES: readonly string[] = [
   "Brightness: pixels darker than the Threshold.",
   "Remove background: everything unlike the background colour.",
   "Background: the colour Remove background leaves out; Auto takes it from the image border.",
-  "Pick colours: pixels like the colours picked with the pipette; Shift+click adds a colour, up to 8.",
+  "Pick colours: pixels like the colours picked with the pipette; Shift+click adds a colour, up to 8. The picked colours are shown and edited in Advanced.",
   "Pipette: takes a colour from the image under a click; Esc ends it.",
   "Colour tolerance: how far a colour may be from the background or a picked colour and still count as it.",
-  "Analysis: names the image type and what it set for a new image: the method, its background and Colour tolerance, and the Threshold; never the preset or other values. Custom after you change one of them; Analyse again sets them back.",
   "Threshold: pixels darker than this brightness (0 to 100 %) become shapes.",
   "Smooth: calms the pixel steps of the outline before the fit; higher is calmer.",
   "Tolerance: how far in pixels the paths may stray from the calmed outline; higher gives fewer nodes.",
   "Ignore below: drops shapes and holes smaller than this size in mm.",
-  "Denoise: smooths out noise in the picture before tracing.",
-  "Upscale: doubles small images before tracing; Auto does it below 1 Mpx.",
-  "Corners: higher turns more bends into sharp corners.",
-  "Invert: traces what the method leaves out; transparent pixels never become shapes.",
-  "Drop border shapes: drops shapes that touch the image border.",
+  "Analysis: names the image type and what it set for a new image: the method, its background and Colour tolerance, and the Threshold; never the preset or other values. Custom after you change one of them; Analyse sets them back.",
+  "Status: the result in numbers (paths, nodes and time, specks ignored, colours) and what a colour action did.",
   "Output: Single colour traces the content as one black shape; Multicolour gives one filled shape per colour, neighbours sharing their edges.",
   "Colours: how many colours Multicolour finds, 2 to 16; Auto counts them in the image. With Pick colours the picked colours are the palette.",
   "Palette: the colours of a Multicolour trace, largest area first; picked colours carry a corner mark and come first.",
@@ -283,6 +266,11 @@ export const TRACE_INFO_ENTRIES: readonly string[] = [
   "Merge into: traces a colour as another one, as one shape.",
   "Exclude: makes a colour background; it is not traced.",
   "Remove: takes a picked colour out of the palette.",
+  "Invert: traces what the method leaves out; transparent pixels never become shapes.",
+  "Drop border shapes: drops shapes that touch the image border.",
+  "Denoise: smooths out noise in the picture before tracing.",
+  "Upscale: doubles small images before tracing; Auto does it below 1 Mpx.",
+  "Corners: higher turns more bends into sharp corners.",
 ];
 
 /** An info entry split into its term and its text at the first ": ". */
@@ -507,25 +495,32 @@ export function readSummary(wire: ArrayLike<number>): TraceSummary {
   };
 }
 
-/** What the bar says about the trace (criteria 11 and 71, UX notes 20.4): the state row's line
- * and its muted line (empty when no state is active), the counts line of the Advanced block and
- * its muted line, and whether Enter may create. */
+/** What the bar says about the trace (criteria 11 and 71; `ux-notes.md` §22.2): the notice row's
+ * line and its muted line (only what is fixed with a bar control or changes how the preview
+ * reads), the Advanced status line (the counts and its muted line, or the `message` of a result
+ * whose fix is in Advanced), and whether Enter may create. A result is stated once. */
 export interface TraceStatusText {
   line: string;
   muted: string;
   counts: string;
   countsMuted: string;
+  /** A message the Advanced status line shows instead of the counts ("No colours found.",
+   * "0 paths: no colour picked."). */
+  message: string;
   canCreate: boolean;
 }
 
 /** No state, no counts. */
-export const NO_STATUS: TraceStatusText = { line: "", muted: "", counts: "", countsMuted: "", canCreate: false };
+export const NO_STATUS: TraceStatusText = { line: "", muted: "", counts: "", countsMuted: "", message: "", canCreate: false };
+
+/** The result line of Pick colours with nothing picked. */
+export const NO_COLOUR_PICKED_LINE = "0 paths: no colour picked.";
 
 /** The line of a trace without paths in a colour method (UX notes §10), or `null` for
  * Brightness, whose line follows the Threshold's direction. */
 export function zeroPathsLine(values: Pick<TraceValues, "method" | "swatches">): string | null {
   if (values.method === PICK_COLOURS) {
-    return values.swatches.length === 0 ? "0 paths: no colour picked." : "0 paths at this Colour tolerance: too low.";
+    return values.swatches.length === 0 ? NO_COLOUR_PICKED_LINE : "0 paths at this Colour tolerance: too low.";
   }
   return values.method === REMOVE_BACKGROUND ? "0 paths at this Colour tolerance: too high." : null;
 }
@@ -561,16 +556,20 @@ export function statusText(
     colour && colour.joined > 0 ? `${plural(colour.joined, "region", "regions")} joined` : "",
   ];
   const countsMuted = muted.filter((m) => m !== "").join(", ");
-  // Over 4 Mpx the counts are the reduced copy's, and the state row says so (criterion 52).
-  const settled = { line: "", muted: reduced ? REDUCED_COPY : "", counts, countsMuted, canCreate: true };
+  // Over 4 Mpx the counts are the reduced copy's, and the notice row says so (criterion 52).
+  const settled = { line: "", muted: reduced ? REDUCED_COPY : "", counts, countsMuted, message: "", canCreate: true };
+  // An empty result states "0 paths" once: no counts then (`ux-notes.md` §22.2).
+  const empty = { ...settled, counts: "", countsMuted: "", canCreate: false };
   if (summary.paths === 0 && colour) {
-    return { ...settled, line: NO_COLOURS_FOUND, canCreate: false };
+    return { ...empty, message: NO_COLOURS_FOUND };
   }
   if (summary.paths === 0) {
     // The direction from the histogram: more than half the picture below the Threshold means it
     // is too high, otherwise too low (UX notes section 7).
     const direction = summary.foregroundPixels * 2 > pixels ? "too high" : "too low";
-    return { ...settled, line: zeroLine ?? `0 paths at this Threshold: ${direction}.`, canCreate: false };
+    const line = zeroLine ?? `0 paths at this Threshold: ${direction}.`;
+    // Nothing picked is fixed in Advanced, where the status line says it (22.2).
+    return line === NO_COLOUR_PICKED_LINE ? { ...empty, message: line } : { ...empty, line };
   }
   if (summary.nodes > SLOW_TO_EDIT_NODES) {
     return { ...settled, line: `${grouped(summary.nodes)} nodes. Slow to edit.` };

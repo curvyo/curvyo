@@ -423,7 +423,8 @@ test("0089 E in Chromium: the Mask view and Shift+\\ through four views", { skip
     for (const type of ["mousePressed", "mouseReleased"]) {
       await s.send("Input.dispatchMouseEvent", { type, x: red.cx, y: red.cy, button: "left", clickCount: 1 });
     }
-    await waitFor("the red swatch", async () => ((await s.evaluate(`!!document.querySelector('${BAR} [data-trace-swatch="#FF0000"]')`)) ? true : null), 10_000);
+    // `ux-notes.md` §22.1 (2026-10-31): the bar no longer shows swatches; the pipette's label states the pick.
+    await waitFor("the red pick", async () => ((await s.evaluate(`document.querySelector('${BAR} [data-trace-picked-count]')?.textContent === '1 picked'`)) ? true : null), 10_000);
     // The pointer leaves the canvas so the pipette's colour chip covers nothing.
     await s.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: 2, y: 2 });
     await waitFor("the mask of the picked red", async () => {

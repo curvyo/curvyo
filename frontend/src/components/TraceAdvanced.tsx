@@ -4,7 +4,11 @@ import type { KeyboardEvent } from "react";
 
 import { ICON_BUTTON_CLASS } from "@/components/TextBar";
 import { TraceField } from "@/components/TraceField";
+import { TracePalette } from "@/components/TracePalette";
 import { Tooltip } from "@/components/ui/tooltip";
+import type { TracePaletteApi } from "@/hooks/useTracePalette";
+import type { HsvTriple } from "@/hooks/useStylePanel";
+import { ANALYSE, type TraceAnalysisState, analysisLine } from "@/lib/traceAnalysis";
 import {
   BRIGHTNESS,
   COLOURS_PARAM,
@@ -14,7 +18,6 @@ import {
   PICK_TOOLTIP,
   TRACE_OUTPUTS,
   type TraceParam,
-  type TraceStatusText,
   type TraceValues,
   coloursText,
 } from "@/lib/traceText";
@@ -49,6 +52,11 @@ const TOGGLES: Partial<Record<TraceParam["name"], { key: "invert" | "ignoreBackg
 };
 
 const LABEL_CLASS = "text-xs text-[var(--toolbar-icon)]";
+
+/** The blue text button of the Trace button's look (`ux-notes.md` §22.3): the Analyse button
+ * (the Trace button has the same colours). */
+const ACCENT_BUTTON_CLASS =
+  "my-1 h-7 shrink-0 rounded-md bg-[var(--editor-accent)] text-sm text-white outline-none hover:brightness-110 focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)]";
 const CELL_CLASS = "flex h-9 min-w-[168px] items-center";
 
 interface ChoicePillProps {
@@ -149,8 +157,16 @@ function TraceToggle({ label, icon: Icon, pressed, onChange, onReturnFocus }: Tr
 interface TraceAdvancedProps {
   params: readonly TraceParam[];
   values: TraceValues;
-  /** The counts line of the last result and its muted line (criterion 11). */
-  status: TraceStatusText;
+  /** The status line: the counts of the last result or the message replacing them, and its
+   * muted line (criterion 11). */
+  status: { text: string; muted: string };
+  /** The analysis line's state and the Analyse button (`specs/0089` criteria 31, 33). */
+  analysis: TraceAnalysisState;
+  onAnalyse: () => void;
+  /** The one colour strip (`ux-notes.md` §22.3) and the Recolour picker's conversions. */
+  palette: TracePaletteApi;
+  hsvOf: (rgb: number) => HsvTriple;
+  rgbOf: (hue: number, saturation: number, value: number) => number;
   /** The counts belong to an older result (a running or stopped trace): drawn at 50 %. */
   countsStale: boolean;
   setValue: <K extends keyof TraceValues>(name: K, value: TraceValues[K], dragging?: boolean) => void;
@@ -176,6 +192,11 @@ export function TraceAdvanced({
   params,
   values,
   status,
+  analysis,
+  onAnalyse,
+  palette,
+  hsvOf,
+  rgbOf,
   countsStale,
   setValue,
   onEndDrag,
@@ -190,27 +211,43 @@ export function TraceAdvanced({
   const denoise = param("denoise");
   const upscale = param("upscale");
   const corners = param("corners");
+  const line = analysisLine(analysis);
   return (
-    <div id={id} role="group" aria-label="Advanced" className="mt-1 flex flex-wrap gap-x-2 border-t border-[var(--toolbar-icon)]/25 py-1">
-      <div className="flex h-9 items-center gap-1">
-        {params
-          .filter((p) => p.advanced && p.kind === "toggle")
-          .map((p) => {
-            const toggle = TOGGLES[p.name];
-            return toggle ? (
-              <TraceToggle
-                key={p.name}
-                label={p.label}
-                icon={toggle.icon}
-                pressed={values[toggle.key]}
-                onChange={(v) => setValue(toggle.key, v)}
-                onReturnFocus={onReturnFocus}
-              />
-            ) : null;
-          })}
+    <div id={id} role="group" aria-label="Advanced" className="mt-1 flex max-h-[min(60vh,360px)] flex-wrap gap-x-2 overflow-y-auto border-t border-[var(--toolbar-icon)]/25 py-1 pr-1">
+      {/* 1. The analysis line and the Analyse button, always enabled (`ux-notes.md` §22.3). */}
+      <div data-trace-analysis={analysis.kind} className="flex min-h-9 basis-full items-center gap-2">
+        <span role="status" aria-live="polite" className="min-w-0 flex-1 py-1 text-xs text-[var(--toolbar-icon)]">
+          {line}
+        </span>
+        <button
+          type="button"
+          data-trace-analyse=""
+          className={`${ACCENT_BUTTON_CLASS} w-[75px]`}
+          onClick={(event) => {
+            onAnalyse();
+            if (event.detail > 0) {
+              onReturnFocus();
+            }
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              event.preventDefault();
+              event.stopPropagation();
+              onReturnFocus();
+            }
+          }}
+        >
+          {ANALYSE}
+        </button>
       </div>
-      {/* Output, the Colours field and the palette pipette (`specs/0089` criteria 25, 26; Frage
-          92 B: in Advanced, after the toggles). */}
+      {/* 2. The one status line: counts once, or the message that replaces them. */}
+      {status.text !== "" || status.muted !== "" ? (
+        <div data-trace-counts="" role="status" aria-live="polite" className={`flex min-h-9 basis-full flex-col justify-center py-1 tabular-nums ${countsStale ? "opacity-50" : ""}`}>
+          {status.text ? <span className="text-[var(--toolbar-icon)]">{status.text}</span> : null}
+          {status.muted ? <span className={`${LABEL_CLASS} opacity-70`}>{status.muted}</span> : null}
+        </div>
+      ) : null}
+      {/* 3. Output, the Colours field and the Brightness palette pipette. */}
       <ChoicePill param={OUTPUT_PARAM} bare value={values.output} onValue={(v) => setValue("output", v)} onReturnFocus={onReturnFocus} />
       {values.output === MULTICOLOUR ? (
         <div className="flex h-9 items-center gap-1">
@@ -263,6 +300,30 @@ export function TraceAdvanced({
           ) : null}
         </div>
       ) : null}
+      {/* 4. The one colour strip with its edit actions (Multicolour palette, or the picked colours). */}
+      {palette.swatches.length > 0 ? (
+        <div className={`basis-full ${countsStale ? "opacity-50" : ""}`}>
+          <TracePalette palette={palette} hsvOf={hsvOf} rgbOf={rgbOf} />
+        </div>
+      ) : null}
+      {/* 5. Options: the two toggles first, then Denoise, Upscale, Corners. */}
+      <div className="flex h-9 items-center gap-1">
+        {params
+          .filter((p) => p.advanced && p.kind === "toggle")
+          .map((p) => {
+            const toggle = TOGGLES[p.name];
+            return toggle ? (
+              <TraceToggle
+                key={p.name}
+                label={p.label}
+                icon={toggle.icon}
+                pressed={values[toggle.key]}
+                onChange={(v) => setValue(toggle.key, v)}
+                onReturnFocus={onReturnFocus}
+              />
+            ) : null;
+          })}
+      </div>
       {denoise ? <ChoicePill param={denoise} value={values.denoise} onValue={(v) => setValue("denoise", v)} onReturnFocus={onReturnFocus} /> : null}
       {upscale ? <ChoicePill param={upscale} value={values.upscale} onValue={(v) => setValue("upscale", v)} onReturnFocus={onReturnFocus} /> : null}
       {corners ? (
@@ -275,13 +336,6 @@ export function TraceAdvanced({
             onCreate={onCreate}
             onReturnFocus={onReturnFocus}
           />
-        </div>
-      ) : null}
-      {status.counts ? (
-        // Not a live region: the counts are not announced (UX notes 20.4).
-        <div data-trace-counts="" className={`flex min-h-9 basis-full flex-col justify-center py-1 tabular-nums ${countsStale ? "opacity-50" : ""}`}>
-          <span className="text-[var(--toolbar-icon)]">{status.counts}</span>
-          {status.countsMuted ? <span className={`${LABEL_CLASS} opacity-70`}>{status.countsMuted}</span> : null}
         </div>
       ) : null}
     </div>

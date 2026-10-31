@@ -10,6 +10,7 @@ import type { WasmSession } from "@/lib/editorSession";
 import {
   BRIGHTNESS,
   MULTICOLOUR,
+  PICK_COLOURS,
   type TraceChoice,
   type TraceValues,
 } from "@/lib/traceText";
@@ -24,6 +25,9 @@ import {
   sameAsNote,
   sameColour,
 } from "@/lib/tracePaletteText";
+
+/** How long "Same as ..." stays, ms (`ux-notes.md` §22.2). */
+const SAME_NOTICE_MS = 3000;
 
 /** What the palette shows of `hex`: excluded, merged into another, its fill. */
 export interface SwatchState {
@@ -52,8 +56,13 @@ export interface TracePaletteApi {
   remove: (hex: string) => void;
   /** A pipette pick in Brightness + Multicolour: a new fixed colour, or the swatch it equals. */
   pick: (hex: string) => void;
-  /** The notice of the palette ("Isolating #FFF2A8", "2 colours excluded"), or empty. */
+  /** Pick colours with Single colour: the strip holds the picked colours only, and Remove is the
+   * one action (`ux-notes.md` §22.3). */
+  pickedOnly: boolean;
+  /** The Advanced status line's palette text ("Isolating #FFF2A8", "2 colours excluded"), or empty. */
   note: string;
+  /** "Same as #3366CC" for 3 s after a pick that matched a colour, or empty: a bar notice. */
+  sameNote: string;
   /** The results changed (a new preview): read the palette again. */
   refresh: () => void;
 }
@@ -186,12 +195,25 @@ export function useTracePalette({ active, values, getSession, onChange, apply, c
     },
     [swatches, edit],
   );
+  // "Same as ..." is a short notice (`ux-notes.md` §22.2).
+  useEffect(() => {
+    if (same === null) {
+      return undefined;
+    }
+    const timer = setTimeout(() => setSame(null), SAME_NOTICE_MS);
+    return () => clearTimeout(timer);
+  }, [same]);
   const select = useCallback((hex: string | null) => {
     setSame(null);
     setSelected(hex);
   }, []);
 
   const multi = values.output === MULTICOLOUR;
+  const pickedOnly = !multi && values.method === PICK_COLOURS;
+  const shown = useMemo<PaletteSwatch[]>(
+    () => (multi ? swatches : pickedOnly ? values.swatches.map((hex) => ({ hex, fixed: true, pixels: 0 })) : []),
+    [multi, pickedOnly, swatches, values.swatches],
+  );
   const excludedCount = swatches.filter((s) => values.excluded.includes(s.hex)).length;
   const note = !multi
     ? ""
@@ -199,16 +221,14 @@ export function useTracePalette({ active, values, getSession, onChange, apply, c
       ? mergingNote(merging)
       : isolated
         ? isolatingNote(isolated)
-        : same
-          ? sameAsNote(same)
-          : excludedCount > 0
-            ? excludedNote(excludedCount)
-            : "";
+        : excludedCount > 0
+          ? excludedNote(excludedCount)
+          : "";
   return {
-    swatches: multi ? swatches : [],
+    swatches: shown,
     found: info ? info.colours.length : null,
     joined: info?.joined ?? 0,
-    selected: selected !== null && swatches.some((s) => s.hex === selected) ? selected : null,
+    selected: selected !== null && shown.some((s) => s.hex === selected) ? selected : null,
     select,
     state,
     isolated,
@@ -221,7 +241,9 @@ export function useTracePalette({ active, values, getSession, onChange, apply, c
     toggleExclude,
     remove,
     pick,
+    pickedOnly,
     note,
+    sameNote: !multi || same === null ? "" : sameAsNote(same),
     refresh,
   };
 }

@@ -4,6 +4,7 @@ import type { WasmSession } from "@/lib/editorSession";
 import {
   BRIGHTNESS,
   MULTICOLOUR,
+  NO_COLOUR_PICKED_LINE,
   NO_STATUS,
   PICK_COLOURS,
   zeroPathsLine,
@@ -25,7 +26,6 @@ import {
   settingsJson,
   statusText,
   tracedNotice,
-  withSwatchNote,
   writeAdvancedOpen,
   writeChoice,
 } from "@/lib/traceText";
@@ -474,14 +474,14 @@ export function useTrace(
     setLoading(false);
     setStopped(true);
     getSession()?.set_trace_preview_stale(true);
-    setStatus((s) => ({ ...s, line: "", muted: "", canCreate: false }));
+    setStatus((s) => ({ ...s, line: "", muted: "", message: "", canCreate: false }));
     onChange();
   }, [cancelAll, getSession, onChange]);
 
-  /** Analyse again (UX notes §3, Frage 83 B): the shown image's analysed values back to its
+  /** Analyse (UX notes §3, §22.3, Frage 83 B): the shown image's analysed values back to its
    * analysis in one go, the line back to Auto, no confirmation and no history step; after a
    * failure the analysis runs again. */
-  const analyseAgain = useCallback(() => {
+  const analyse = useCallback(() => {
     const id = viewRef.current.shown;
     if (!id) {
       return;
@@ -628,7 +628,7 @@ export function useTrace(
     [maskStep, maskSource],
   );
   const { viewMode, setViewMode } = useTraceViewMode(active, getSession, onChange, onViewMode);
-  const { setPicking, setMethod, setColourTolerance, setBackgroundAuto, removeSwatch } = useTraceMethod({
+  const { setPicking, setMethod, setColourTolerance, setBackgroundAuto } = useTraceMethod({
     active,
     syncRevision,
     getSession,
@@ -684,6 +684,17 @@ export function useTrace(
         : busy
           ? { kind: "running", percent: loading ? null : percent }
           : { kind: "none" };
+  const advancedStatus = advancedStatusOf(status, palette.note);
+  // A disabled Trace button states why (`ux-notes.md` §22.2): nothing picked, or a result that
+  // has no paths.
+  const traceBlocked =
+    slot.kind !== "none"
+      ? ""
+      : values.method === PICK_COLOURS && values.swatches.length === 0
+        ? NO_COLOUR_PICKED_LINE
+        : status.canCreate
+          ? ""
+          : status.line || status.message;
   const session = active ? getSession() : null;
   const pickMode = session?.trace_pick_mode() ?? "";
   const shownId = view.shown;
@@ -699,7 +710,7 @@ export function useTrace(
     choice,
     presetLabel: presetLabel(choice, presets),
     advancedOpen,
-    status: withPaletteNote(withSwatchNote(status, values), palette.note),
+    status,
     countsStale: busy || stopped || creating,
     slot,
     viewMode,
@@ -717,12 +728,13 @@ export function useTrace(
     setMethod,
     setColourTolerance,
     setBackgroundAuto,
-    removeSwatch,
     pickMode,
     setPicking,
     suggestedBackground,
     analysis: analysisState,
-    analyseAgain,
+    analyse,
+    advancedStatus,
+    traceBlocked,
     palette,
     hsvOf,
     rgbOf,
@@ -735,7 +747,8 @@ function colourCounts(session: WasmSession): { colours: number; joined: number }
   return info ? { colours: info.layers.length, joined: info.joined } : null;
 }
 
-/** `status` with the palette's notice in its muted line when nothing else is said there. */
-function withPaletteNote(status: TraceStatusText, note: string): TraceStatusText {
-  return note !== "" && status.muted === "" ? { ...status, muted: note } : status;
+/** The Advanced status line (`ux-notes.md` §22.2): the result counts or the message that replaces
+ * them, and in the muted line the specks, the joined regions and what a palette action did. */
+function advancedStatusOf(status: TraceStatusText, note: string): { text: string; muted: string } {
+  return { text: status.message || status.counts, muted: [status.countsMuted, note].filter((t) => t !== "").join(", ") };
 }

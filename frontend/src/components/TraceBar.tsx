@@ -1,6 +1,6 @@
 import { Binary, CircleAlert, Image, Info, Layers, Spline, X } from "lucide-react";
 import { Tooltip } from "radix-ui";
-import { useId, useLayoutEffect, useRef, useState } from "react";
+import { useId, useRef } from "react";
 import type { KeyboardEvent } from "react";
 
 import { useRowStarts } from "@/components/SelectToolbar";
@@ -8,12 +8,11 @@ import { ExpandButton, ICON_BUTTON_CLASS } from "@/components/TextBar";
 import { TraceAdvanced } from "@/components/TraceAdvanced";
 import { TraceField } from "@/components/TraceField";
 import { PickColoursGroup, RemoveBackgroundGroup } from "@/components/TraceColourGroup";
-import { TracePalette } from "@/components/TracePalette";
 import { TracePresetMenu } from "@/components/TracePresetMenu";
 import { Tooltip as AppTooltip } from "@/components/ui/tooltip";
 import type { TraceApi } from "@/hooks/useTrace";
 import type { TraceInfoApi } from "@/hooks/useTraceInfo";
-import { ANALYSE_AGAIN, type TraceAnalysisState, analysisLine, canAnalyseAgain } from "@/lib/traceAnalysis";
+import { analysisLine } from "@/lib/traceAnalysis";
 import {
   TRACE_FINISH,
   TRACE_METHODS,
@@ -55,68 +54,6 @@ const LABEL_CLASS = "text-xs text-[var(--toolbar-icon)]";
 
 /** The bar's one flow (UX notes 21.2): wraps by whole items, 8 px between them, top-aligned. */
 const TRACE_ROW_CLASS = "flex min-w-0 flex-wrap items-start gap-x-2 gap-y-0";
-
-/** The analysis row (`specs/0089` slice F, UX notes §3): one 36 px line saying what the analysis
- * found and set, announced once per change, and Analyse again (88 x 28 px), dimmed while it would
- * change nothing. */
-function AnalysisRow({
-  state,
-  onAgain,
-  onReturnFocus,
-}: {
-  state: TraceAnalysisState;
-  onAgain: () => void;
-  onReturnFocus: () => void;
-}) {
-  const enabled = canAnalyseAgain(state);
-  const line = analysisLine(state);
-  // The ellipsis only when the line does not fit (UX notes §3: one line, never cut while it fits).
-  const lineRef = useRef<HTMLSpanElement>(null);
-  const [cut, setCut] = useState(false);
-  useLayoutEffect(() => {
-    const el = lineRef.current;
-    if (!el) {
-      return undefined;
-    }
-    const measure = () => setCut(el.scrollWidth > el.clientWidth + 1);
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [line]);
-  return (
-    <div data-trace-analysis={state.kind} className="flex h-9 min-w-0 max-w-full basis-full items-center gap-2">
-      {/* One line; a long one ends in an ellipsis with the whole text as its tooltip (the live
-          region still reads it whole). */}
-      <span
-        ref={lineRef}
-        role="status"
-        aria-live="polite"
-        title={cut ? line : undefined}
-        className={`min-w-0 flex-1 overflow-hidden whitespace-nowrap text-xs text-[var(--toolbar-icon)] ${cut ? "text-ellipsis" : ""}`}
-      >
-        {line}
-      </span>
-      {state.kind === "analysing" || state.kind === "none" ? null : (
-        <button
-          type="button"
-          aria-disabled={!enabled}
-          className={`${BUTTON_CLASS.replace("px-2", "px-0")} w-[88px] shrink-0 ${enabled ? "" : "cursor-default opacity-40 hover:bg-transparent"}`}
-          onClick={(event) => {
-            if (enabled) {
-              onAgain();
-            }
-            if (event.detail > 0) {
-              onReturnFocus();
-            }
-          }}
-        >
-          {ANALYSE_AGAIN}
-        </button>
-      )}
-    </div>
-  );
-}
 
 /** The Select bar's Trace button (criterion 1): last, in a group of its own; a press chooses the
  * Trace tool. */
@@ -228,22 +165,44 @@ function ProgressSlot({
   onStop,
   onRetry,
   onCreate,
+  blocked,
 }: {
   slot: TraceSlot;
   onStop: () => void;
   onRetry: () => void;
   onCreate: () => void;
+  /** Why Trace cannot run, or empty (`ux-notes.md` §22.2). */
+  blocked: string;
 }) {
+  const reasonId = useId();
   if (slot.kind === "none") {
-    return (
+    const button = (
       <button
         type="button"
         data-trace-slot="none"
-        className={`${FINISH_CLASS} justify-center px-3 outline-none hover:brightness-110 focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)]`}
-        onClick={onCreate}
+        aria-disabled={blocked !== "" || undefined}
+        aria-describedby={blocked !== "" ? reasonId : undefined}
+        className={`${FINISH_CLASS} justify-center px-3 ${blocked !== "" ? "cursor-default opacity-50" : ""} outline-none hover:brightness-110 focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)]`}
+        onClick={() => {
+          if (blocked === "") {
+            onCreate();
+          }
+        }}
       >
         {TRACE_FINISH}
       </button>
+    );
+    return blocked === "" ? (
+      button
+    ) : (
+      <>
+        <AppTooltip side="bottom" content={blocked}>
+          {button}
+        </AppTooltip>
+        <span id={reasonId} hidden>
+          {blocked}
+        </span>
+      </>
     );
   }
   if (slot.kind === "running") {
@@ -298,7 +257,8 @@ function WithHint({ hint, children }: { hint?: string; children: React.ReactNode
   return (
     <div className="flex items-center gap-2">
       {children}
-      {hint ? <span className={`whitespace-pre ${LABEL_CLASS} opacity-70`}>{hint}</span> : null}
+      {/* The readout's room is kept while the pixel size is unknown, so the rows do not jump when it appears. */}
+      <span className={`w-9 shrink-0 whitespace-pre ${LABEL_CLASS} opacity-70`}>{hint ?? ""}</span>
     </div>
   );
 }
@@ -341,8 +301,9 @@ interface TraceBarProps {
  * The Trace bar in the overlay row (`specs/0025-raster-trace` criteria 1 to 5, 10 to 12, 15, 37,
  * 40, 41, 46, 51 to 54, 57, 71; UX notes section 21.2; `specs/0089` criterion 14, Frage 84, 85 B):
  * one flow of the "i" button, Preset, View, Method, Threshold or Colour tolerance, the method's
- * colour group, Smooth, Tolerance, Specks, and at the far right the expander and the finish
- * button, wrapping by whole items; under it the notice row and, when open, the Advanced block.
+ * pipette group, Smooth, Tolerance, Ignore below, and at the far right the expander and the
+ * Trace button, wrapping by whole items; under it the notice row and, when open, the Advanced
+ * block that holds everything else (`ux-notes.md` §22).
  * With nothing or something else selected it is one row of words.
  */
 export function TraceBar({ trace, info, onImport, onReturnFocus }: TraceBarProps) {
@@ -423,15 +384,14 @@ export function TraceBar({ trace, info, onImport, onReturnFocus }: TraceBarProps
       />
     ) : method === PICK_COLOURS ? (
       <PickColoursGroup
-        swatches={trace.values.swatches}
+        count={trace.values.swatches.length}
         armed={trace.pickMode === "colours"}
         onPipette={() => trace.setPicking(trace.pickMode === "")}
-        onRemove={trace.removeSwatch}
         onReturnFocus={onReturnFocus}
       />
     ) : null;
   const methodLabel = TRACE_METHODS[method]?.label ?? TRACE_METHODS[0].label;
-  const noticeShown = trace.status.line !== "" || trace.status.muted !== "" || trace.imagesLabel !== "";
+  const noticeShown = trace.status.line !== "" || trace.status.muted !== "" || trace.imagesLabel !== "" || trace.palette.sameNote !== "";
   return (
     <div className="pointer-events-none flex min-w-0 flex-col gap-2">
     <div
@@ -471,7 +431,6 @@ export function TraceBar({ trace, info, onImport, onReturnFocus }: TraceBarProps
             onPick={(choice) => trace.setMethod(TRACE_METHODS.indexOf(choice))}
           />
         </div>
-        <AnalysisRow state={trace.analysis} onAgain={trace.analyseAgain} onReturnFocus={onReturnFocus} />
         <div className="flex h-9 items-center">{methodField}</div>
         {colourGroup}
         <div className="flex h-9 items-center">{field("smooth")}</div>
@@ -490,7 +449,7 @@ export function TraceBar({ trace, info, onImport, onReturnFocus }: TraceBarProps
             changed={trace.advancedOpen ? null : changedAdvancedText(trace.values, trace.params)}
             onReturnFocus={onReturnFocus}
           />
-          <ProgressSlot slot={trace.slot} onStop={trace.stop} onRetry={trace.retrace} onCreate={trace.create} />
+          <ProgressSlot slot={trace.slot} onStop={trace.stop} onRetry={trace.retrace} onCreate={trace.create} blocked={trace.traceBlocked} />
         </div>
         {trace.advancedOpen ? (
           // After the expander in the DOM, so Tab reaches the Advanced controls after it
@@ -500,7 +459,12 @@ export function TraceBar({ trace, info, onImport, onReturnFocus }: TraceBarProps
               id={advancedId}
               params={trace.params}
               values={trace.values}
-              status={trace.status}
+              status={trace.advancedStatus}
+              analysis={trace.analysis}
+              onAnalyse={trace.analyse}
+              palette={trace.palette}
+              hsvOf={trace.hsvOf}
+              rgbOf={trace.rgbOf}
               countsStale={trace.countsStale}
               setValue={trace.setValue}
               onEndDrag={trace.endDrag}
@@ -512,15 +476,9 @@ export function TraceBar({ trace, info, onImport, onReturnFocus }: TraceBarProps
             />
           </div>
         ) : null}
-        {trace.palette.swatches.length > 0 ? (
-          // The palette (`specs/0089` UX notes §7): below the flow, above the notice row; the
-          // strip is half strength while a new result is computed (§9).
-          <div className={`order-[9997] basis-full ${trace.countsStale ? "opacity-50" : ""}`}>
-            <TracePalette palette={trace.palette} hsvOf={trace.hsvOf} rgbOf={trace.rgbOf} />
-          </div>
-        ) : null}
-        {/* The notice row (UX notes 21.3): result messages only, always mounted with its live
-            region, no height while empty; drawn under the main rows and above the Advanced block. */}
+        {/* The notice row (`ux-notes.md` §22.2): only what is fixed with a bar control or changes how
+            the preview reads, always mounted with its live region, no height while empty; drawn
+            under the main rows and above the Advanced block. */}
         <div data-trace-state="" className={`order-[9998] basis-full ${noticeShown ? "flex min-h-9 items-center gap-3" : ""}`}>
           <div role="status" aria-live="polite" className={noticeShown ? "flex flex-col py-1 tabular-nums" : ""}>
             {trace.imagesLabel ? <span className={`block ${LABEL_CLASS}`}>{trace.imagesLabel}</span> : null}
@@ -534,9 +492,16 @@ export function TraceBar({ trace, info, onImport, onReturnFocus }: TraceBarProps
                 {trace.status.muted}
               </span>
             ) : null}
+            {trace.palette.sameNote ? <span className={`block ${LABEL_CLASS}`}>{trace.palette.sameNote}</span> : null}
           </div>
         </div>
       </div>
+      {trace.advancedOpen ? null : (
+        // With Advanced closed the analysis and status lines are announced here (`ux-notes.md` §22.2).
+        <div data-trace-hidden-status="" role="status" aria-live="polite" className="sr-only">
+          {[analysisLine(trace.analysis), trace.advancedStatus.text, trace.advancedStatus.muted].filter((t) => t !== "").join(". ")}
+        </div>
+      )}
     </div>
     </div>
   );
