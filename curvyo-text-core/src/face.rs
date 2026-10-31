@@ -90,6 +90,9 @@ pub struct Face {
     metrics: FaceMetrics,
     /// The characters the face lists, built on first use (`glyph_list.rs`).
     pub(crate) listed: OnceLock<Arc<[ListedChar]>>,
+    /// The reference glyphs of Recognise text, built on first use (`specs/0088-trace-recognition`
+    /// adrs.md decision 5).
+    pub(crate) recognise: OnceLock<Arc<crate::recognise::ReferenceGlyphs>>,
 }
 
 impl std::fmt::Debug for Face {
@@ -144,6 +147,7 @@ impl Face {
             units_per_em,
             metrics: DEFAULT_METRICS,
             listed: OnceLock::new(),
+            recognise: OnceLock::new(),
         };
         face.metrics = face.read_metrics();
         Ok(face)
@@ -176,6 +180,7 @@ impl Face {
             units_per_em: upem,
             metrics,
             listed: OnceLock::new(),
+            recognise: OnceLock::new(),
         })
     }
 
