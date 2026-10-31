@@ -270,7 +270,14 @@ impl super::Session {
         if !stored.x && !stored.y {
             return false;
         }
-        if (self.tool == super::Tool::Select && self.select.move_in_flight())
+        if (self.workbench() == super::Workbench::Sketch
+            && (self.sketch_tool() != super::SketchTool::Select
+                || self
+                    .sketch
+                    .drag
+                    .as_ref()
+                    .is_some_and(|drag| drag.handle.is_none())))
+            || (self.tool == super::Tool::Select && self.select.move_in_flight())
             || matches!(
                 self.tool,
                 super::Tool::Pen

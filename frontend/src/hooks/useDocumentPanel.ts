@@ -6,6 +6,8 @@ import type { WasmSession } from "@/lib/editorSession";
 /** What the Properties panel's body shows (`curvyo-ui-core::panel_content`). */
 export type PanelContent =
   | "snapping"
+  | "sketches"
+  | "parameters"
   | "file" | "document" | "style" | "layers" | "history" | "fonts" | "empty";
 
 /** One tab of the panel's strip (`curvyo-ui-core::panel_tabs`). */
@@ -191,6 +193,8 @@ export interface DocumentPanelApi {
 }
 
 interface EditorHandle {
+  /** Publishes page-owned workbench state after page commands. */
+  sync: () => void;
   getSession: () => WasmSession | null;
   syncRevision: number;
   /** Re-reads the cursor readout after a command moved the document. */
@@ -344,6 +348,7 @@ export function useDocumentPanel(editor: EditorHandle): DocumentPanelApi {
         session.move_page_to(id, Number(value), y);
         break;
     }
+    editor.sync();
     refresh();
     refreshCursor();
   };

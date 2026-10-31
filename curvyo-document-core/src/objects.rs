@@ -30,6 +30,9 @@ use crate::units::Vec2;
 /// (ADR 0009 §2), not a defect in this crate.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 pub enum ObjectEditError {
+    /// An original sketch copy requires a distinct empty destination page.
+    #[error("the destination page already has a sketch; use a linked clone or convert to paths")]
+    SketchPageOccupied,
     /// A drawing's text cannot be written: empty, too long, a size out of range, no stored face
     /// hash or an unusable placement (`specs/0024-svg-import-export` criterion 78).
     #[error("a text of the drawing cannot be written")]
@@ -270,6 +273,9 @@ impl Document {
                     Some(ObjectSnapshot::Clone(clone))
                 }
                 ObjectSnapshot::Path(path) => Some(ObjectSnapshot::Path(path.mapped(g))),
+                ObjectSnapshot::Sketch(sketch) => {
+                    Some(ObjectSnapshot::Sketch(Box::new(sketch.mapped_by(g))))
+                }
                 ObjectSnapshot::Primitive(_)
                 | ObjectSnapshot::Text(_)
                 | ObjectSnapshot::Image(_) => None,
@@ -333,6 +339,16 @@ impl Document {
         offset: Vec2,
         text_shifts: &std::collections::HashMap<NodeId, crate::units::Length>,
     ) -> Result<Vec<NodeId>, ObjectEditError> {
+        self.duplicate_objects_in_page(sources, offset, text_shifts, None)
+    }
+
+    pub(crate) fn duplicate_objects_in_page(
+        &self,
+        sources: &[CopySource],
+        offset: Vec2,
+        text_shifts: &std::collections::HashMap<NodeId, crate::units::Length>,
+        target_page: Option<&str>,
+    ) -> Result<Vec<NodeId>, ObjectEditError> {
         let mut seen = HashSet::with_capacity(sources.len());
         let sources: Vec<&CopySource> = sources.iter().filter(|s| seen.insert(s.id)).collect();
         let tree = self.loro().get_tree(OBJECTS_TREE);
@@ -343,6 +359,8 @@ impl Document {
             }
             check_anchor_ids(&tree, tree_id, &source.anchor_ids)?;
         }
+
+        let sketch_claims = self.prepare_sketch_copies(&sources, target_page)?;
 
         // `mov_after` needs the fractional-index feature on for this tree;
         // enabled on every call, as `split_at_anchor` does.
@@ -418,6 +436,7 @@ impl Document {
         crate::clone_copy::relink_copied_clones(&tree, &copying.made, offset);
         crate::text_carrier::relink_copied_texts(&tree, &copying.made, text_shifts);
         crate::text_clone_commands::relink_copied_text_clones(&tree, &copying.made);
+        self.assign_sketch_copies(&copying.made, &sketch_claims);
         self.commit_with_label("duplicate_objects");
         Ok(created
             .into_iter()
@@ -469,6 +488,26 @@ impl Document {
             if !crate::clone_write::write_matrix(&meta, clone.chain.origin, clone.chain.matrix) {
                 return Err(ObjectEditError::NoSuchObject);
             }
+            self.write_hold(&tree, hold);
+            self.commit_with_label("rotate_object");
+            return Ok(());
+        }
+        if shape_codec::read_shape_tag(&meta).as_deref() == Some("sketch") {
+            let ObjectSnapshot::Sketch(sketch) = rotated else {
+                return Err(ObjectEditError::NoSuchObject);
+            };
+            let current = self
+                .sketch(sketch.id)
+                .ok_or(ObjectEditError::NoSuchObject)?;
+            if current.graph != sketch.graph || !crate::sketch_codec::rigid(sketch.placement) {
+                return Err(ObjectEditError::InvalidConversion);
+            }
+            crate::sketch_codec::write(
+                &meta,
+                crate::sketch_codec::KEYS[4],
+                &sketch.placement.to_array(),
+            )
+            .map_err(|_| ObjectEditError::NonFiniteGeometry)?;
             self.write_hold(&tree, hold);
             self.commit_with_label("rotate_object");
             return Ok(());
@@ -563,6 +602,12 @@ impl Document {
             .copied()
             .filter(|&id| !crate::group_tree::has_ancestor_in(&tree, id, &tree_ids))
             .collect();
+        for id in self.object_ids() {
+            let node = tree_id_of(id);
+            if doomed.contains(&node) || crate::group_tree::has_ancestor_in(&tree, node, &doomed) {
+                self.clear_sketch_claim(id);
+            }
+        }
         self.repair_clones_of_removed(&tree, &doomed);
         let parents = crate::group_tree::parents_of(&tree, &doomed);
         for tree_id in doomed {
@@ -656,13 +701,26 @@ fn copy_subtree(
             .collect();
         renumber_anchors(&meta, &own);
     }
+    if shape_codec::read_shape_tag(&meta).as_deref() == Some("sketch") {
+        // invariant: preflight validated each copied sketch; attached writes preserve valid records.
+        #[allow(clippy::unwrap_used)]
+        crate::sketch_copy::remap(
+            &meta,
+            NodeId::from_parts(new_tree_id.peer, new_tree_id.counter),
+        )
+        .unwrap();
+    }
     translate_meta(&meta, offset);
     new_tree_id
 }
 
 /// The keys of the history lineage: a copy gets its own (`specs/0041-object-history`
 /// criterion 37), never the source's.
-const LINEAGE_KEYS: &[&str] = &[KEY_CLONE_OF, KEY_HISTORY_FLOOR];
+const LINEAGE_KEYS: &[&str] = &[
+    KEY_CLONE_OF,
+    KEY_HISTORY_FLOOR,
+    crate::sketch_page::PAGE_KEY,
+];
 
 /// Copies every key of `from` into `into` as it is: a plain value as the same
 /// value, a nested map or movable list (a path's anchors) entry by entry. Only
@@ -744,6 +802,9 @@ pub(crate) fn translate_meta(meta: &loro::LoroMap, offset: Vec2) {
     match shape_codec::leaf_kind(meta) {
         shape_codec::LeafKind::Primitive(tag) => translate_primitive_meta(meta, &tag, offset),
         shape_codec::LeafKind::Path => translate_path_meta(meta, offset),
+        shape_codec::LeafKind::Sketch => {
+            crate::sketch_codec::map_placement(meta, crate::Affine::translation(offset));
+        }
         shape_codec::LeafKind::Clone => {}
         shape_codec::LeafKind::Text => crate::text_codec::translate_text_meta(meta, offset),
         shape_codec::LeafKind::Image => crate::image_codec::translate_image_meta(meta, offset),

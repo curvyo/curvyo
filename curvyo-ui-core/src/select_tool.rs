@@ -1314,6 +1314,7 @@ mod tests {
                 let width = |o: &ObjectSnapshot| match o {
                     ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
                     ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
+                    ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
                     ObjectSnapshot::Primitive(p) => p.style.stroke.width,
                     ObjectSnapshot::Path(p) => p.style.stroke.width,
                     ObjectSnapshot::Clone(p) => p.resolved.style.stroke.width,

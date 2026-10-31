@@ -13,6 +13,8 @@ use curvyo_document_core::{NodeId, NodeKind, NodeRead, ObjectSnapshot, Opacity, 
 /// What a row stands for, as its glyph and default name say.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RowKind {
+    /// A parametric sketch.
+    Sketch,
     /// A layer.
     Layer,
     /// A group.
@@ -40,6 +42,7 @@ pub enum RowKind {
 impl RowKind {
     fn of(kind: &NodeKind) -> Self {
         match kind {
+            NodeKind::Leaf(ObjectSnapshot::Sketch(_)) => Self::Sketch,
             NodeKind::Layer => Self::Layer,
             NodeKind::Group => Self::Group,
             NodeKind::Leaf(ObjectSnapshot::Path(path)) if path.is_compound() => Self::CompoundPath,
@@ -60,6 +63,7 @@ impl RowKind {
     #[must_use]
     pub const fn word(self) -> &'static str {
         match self {
+            Self::Sketch => "Sketch",
             Self::Layer => "Layer",
             Self::Group => "Group",
             Self::Path => "Path",
@@ -78,6 +82,7 @@ impl RowKind {
     #[must_use]
     pub const fn code(self) -> &'static str {
         match self {
+            Self::Sketch => "sketch",
             Self::Layer => "layer",
             Self::Group => "group",
             Self::Path => "path",

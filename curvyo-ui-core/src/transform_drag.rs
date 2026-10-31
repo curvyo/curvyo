@@ -497,6 +497,7 @@ fn resize_by_box(
         stretched
     } else {
         match start {
+            ObjectSnapshot::Sketch(_) => (start.clone(), 1.0),
             ObjectSnapshot::Primitive(primitive) => {
                 let (resized, factor) = resize_primitive(
                     primitive,
@@ -586,7 +587,9 @@ pub(crate) fn skewed_unchecked(
     let (ku, kv) = if frame.along_u { (k, 0.0) } else { (0.0, k) };
     let path = match (start, converted) {
         (ObjectSnapshot::Path(path), _) | (ObjectSnapshot::Primitive(_), Some(path)) => path,
-        (ObjectSnapshot::Primitive(_), None) => return start.clone(),
+        (ObjectSnapshot::Sketch(_), _) | (ObjectSnapshot::Primitive(_), None) => {
+            return start.clone();
+        }
         // A clone is skewed by its matrix and never converts (`0049` criterion 14).
         (ObjectSnapshot::Clone(clone), _) => {
             let fixed = frame.fixed_point;
@@ -630,6 +633,6 @@ pub(crate) fn scale_stroke(object: &mut ObjectSnapshot, factor: f64) {
         }
         // A clone shows its root's stroke width, never scaled (`0049` criterion 9); an image has
         // no stroke (`0058` criterion 32).
-        ObjectSnapshot::Clone(_) | ObjectSnapshot::Image(_) => {}
+        ObjectSnapshot::Sketch(_) | ObjectSnapshot::Clone(_) | ObjectSnapshot::Image(_) => {}
     }
 }

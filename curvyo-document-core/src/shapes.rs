@@ -219,6 +219,12 @@ impl Document {
     /// primitive node... reading goes through an object-level snapshot").
     #[must_use]
     pub fn object(&self, id: NodeId) -> Option<ObjectSnapshot> {
+        if let Some(sketch) = self.sketch(id) {
+            return Some(ObjectSnapshot::Sketch(Box::new(sketch)));
+        }
+        if self.clone_link_of(id).is_some() {
+            return self.read_cached_clone(id).map(ObjectSnapshot::Clone);
+        }
         object_in(&self.loro().get_tree(OBJECTS_TREE), id)
     }
 
@@ -228,7 +234,8 @@ impl Document {
     pub fn primitive(&self, id: NodeId) -> Option<PrimitiveSnapshot> {
         match self.object(id)? {
             ObjectSnapshot::Primitive(snapshot) => Some(snapshot),
-            ObjectSnapshot::Path(_)
+            ObjectSnapshot::Sketch(_)
+            | ObjectSnapshot::Path(_)
             | ObjectSnapshot::Clone(_)
             | ObjectSnapshot::Text(_)
             | ObjectSnapshot::Image(_) => None,
@@ -421,7 +428,8 @@ impl Document {
                 let meta = tree
                     .get_meta(tree_id)
                     .map_err(|_| ShapeEditError::NoSuchObject)?;
-                if shape_codec::read_shape_tag(&meta).is_none()
+                if shape_codec::read_shape_tag(&meta).as_deref() == Some("sketch")
+                    || shape_codec::read_shape_tag(&meta).is_none()
                     || crate::clone_codec::is_clone_meta(&meta)
                     || crate::text_codec::is_text_meta(&meta)
                 {
@@ -533,6 +541,9 @@ pub(crate) fn object_in(tree: &loro::LoroTree, id: NodeId) -> Option<ObjectSnaps
         return crate::image_codec::read_image_snapshot(id, &meta).map(ObjectSnapshot::Image);
     }
     match shape_codec::read_shape_tag(&meta) {
+        Some(shape) if shape == "sketch" => crate::sketch_read::read(id, &meta)
+            .ok()
+            .map(|sketch| ObjectSnapshot::Sketch(Box::new(sketch))),
         Some(shape) => Some(ObjectSnapshot::Primitive(
             shape_codec::read_primitive_snapshot(id, &meta, &shape),
         )),

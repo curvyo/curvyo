@@ -10,6 +10,8 @@ description = "The Curvyo document model: units, the document root record, and t
 workspace = true
 
 [dependencies]
+curvyo-sketch-core = { path = "../curvyo-sketch-core", version = "0.1.0" }
+kurbo.workspace = true
 thiserror.workspace = true
 serde.workspace = true
 serde_json.workspace = true

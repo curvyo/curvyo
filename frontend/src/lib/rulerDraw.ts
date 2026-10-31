@@ -84,6 +84,13 @@ export function drawRuler(
   strip: RulerStrip,
   colours: RulerColours,
 ): void {
+  drawRulerBase(ctx, data, strip, colours);
+  drawRulerPointer(ctx, strip, colours);
+  drawRulerForeground(ctx, data, strip, colours);
+}
+
+/** Geometry shared by all ruler raster layers. */
+function rulerGeometry(ctx: RulerContext, strip: RulerStrip) {
   const { horizontal, devicePixelRatio: dpr } = strip;
   const length = Math.round(strip.length * dpr);
   const thickness = Math.round(strip.thickness * dpr);
@@ -104,6 +111,12 @@ export function drawRuler(
   // never more than half a device pixel from the position it stands for.
   const tickAt = (px: number, span: number) => Math.round(px * dpr - span / 2);
 
+  return { bar, tickAt, horizontal, dpr, length, thickness, hair };
+}
+
+/** Static background and ticks, below the moving pointer. */
+export function drawRulerBase(ctx: RulerContext, data: RulerData, strip: RulerStrip, colours: RulerColours) {
+  const { bar, tickAt, dpr, length, thickness, hair } = rulerGeometry(ctx, strip);
   bar(0, length, thickness, colours.background);
 
   for (let i = 0; i < data.minors.length; i += 1) {
@@ -121,10 +134,20 @@ export function drawRuler(
     bar(tickAt(data.majors[i], span), span, thickness, colours.tick);
   }
 
+}
+
+/** Moving pointer, below labels and the canvas-facing edge. */
+export function drawRulerPointer(ctx: RulerContext, strip: RulerStrip, colours: RulerColours) {
+  const { bar, tickAt, hair, thickness } = rulerGeometry(ctx, strip);
   if (strip.pointer !== null) {
     bar(tickAt(strip.pointer, hair), hair, thickness, colours.pointer);
   }
 
+}
+
+/** Static labels and edge, above the moving pointer. */
+export function drawRulerForeground(ctx: RulerContext, data: RulerData, strip: RulerStrip, colours: RulerColours) {
+  const { bar, length, hair, dpr, horizontal } = rulerGeometry(ctx, strip);
   // The edge line on the canvas-facing side, over the ticks.
   bar(0, length, hair, colours.edge);
 

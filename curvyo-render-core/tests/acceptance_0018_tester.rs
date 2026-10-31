@@ -967,6 +967,7 @@ fn a_closed_path_has_no_start_or_end_marker_and_keeps_the_settings() {
     assert_eq!(with, plain, "identical draw list");
     // Settings are stored.
     match obj(&doc, p) {
+        ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Path(path) => {
@@ -1456,6 +1457,7 @@ fn a_primitive_snapshot_with_marker_settings_draws_no_marker() {
     let plain = build_artwork(&[obj(&doc, r)], view());
     let mut snap = obj(&doc, r);
     match &mut snap {
+        ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Clone(_) => panic!("no clone here"),
@@ -1609,6 +1611,7 @@ fn compound_paths_get_markers_per_outline() {
     assert!(!compounds.is_empty(), "the fixture has a compound path");
     let id = compounds[0];
     let (nodes_total, subpaths, first_closed) = match doc.object(id).unwrap() {
+        ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Path(p) => {

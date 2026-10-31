@@ -404,6 +404,7 @@ fn a_typed_angle_and_its_negative_restore_the_selection() {
     for (old, new) in before.iter().zip(rig.objects()) {
         let (Shape::Rect { bounds: x, .. }, Shape::Rect { bounds: y, .. }) = (
             match old {
+                ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
                 ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
                 ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
                 ObjectSnapshot::Clone(_) => panic!("no clone here"),
@@ -411,6 +412,7 @@ fn a_typed_angle_and_its_negative_restore_the_selection() {
                 ObjectSnapshot::Path(_) => panic!("a primitive"),
             },
             match &new {
+                ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
                 ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
                 ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
                 ObjectSnapshot::Clone(_) => panic!("no clone here"),

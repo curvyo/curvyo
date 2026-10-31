@@ -756,6 +756,7 @@ mod tests {
         let centre = match document.object(id).expect("exists") {
             ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
             ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
+            ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
             ObjectSnapshot::Clone(_) => panic!("no clone here"),
             ObjectSnapshot::Primitive(p) => match p.shape {
                 curvyo_document_core::Shape::Rect { bounds, .. } => Point::new(

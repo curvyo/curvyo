@@ -1,3 +1,7 @@
+import { TracePresetMenu } from "@/components/TracePresetMenu";
+import { SketchParameters } from "@/components/sketch/SketchParameters";
+import type { SketchApi } from "@/hooks/useSketch";
+import { SketchesPanel } from "@/components/sketch/SketchesPanel";
 import { panelHandlesEscape } from "@/lib/panelEscape";
 import { FontsTab } from "@/components/panel/FontsTab";
 import { useTextLayout } from "@/hooks/useTextLayout";
@@ -29,6 +33,7 @@ import { TRACE_INFO_TITLE } from "@/lib/traceText";
 import { isTauri, PLATFORM } from "@/platform/host";
 
 interface PropertiesPanelProps {
+  sketch: SketchApi;
   editor: EditorSession;
   document: DocumentPanelApi;
   /** Whether the body is shown; owned by the app so a request from outside the panel can show it. */
@@ -55,6 +60,7 @@ interface PropertiesPanelProps {
  * is the session's rule.
  */
 export function PropertiesPanel({
+  sketch,
   editor,
   document: doc,
   panelOpen,
@@ -77,7 +83,7 @@ export function PropertiesPanel({
   // In text edit mode the keyboard goes back to the text being edited, so typing goes on after a
   // click on a control (customer 2026-10-26), as after the Text bar's controls.
   const returnFocus = () => {
-    if (editor.text.editing) {
+    if (sketch.view.workbench === "vector" && editor.text.editing) {
       editor.text.sinkRef.current?.focus({ preventScroll: true });
     } else {
       editor.containerRef.current?.focus();
@@ -212,13 +218,20 @@ export function PropertiesPanel({
     doc.pressTab(name);
   };
   return (
+    <div className="flex h-full shrink-0 flex-col">
+    <div className={`bg-[var(--toolbar-bg)] ${open ? "px-[7px] py-1" : "w-8"}`}>
+    <TracePresetMenu name="Workbench" align="end" widthClass={open ? "w-full" : "w-full !px-1 !gap-0"} current={sketch.view.workbench} edited={false}
+      label={open ? (sketch.view.workbench === "sketch" ? "Sketch" : "Vector") : (sketch.view.workbench === "sketch" ? "S" : "V")}
+      presets={[{key:"vector",label:"Vector",detail:""},{key:"sketch",label:"Sketch",detail:""}]}
+      onPick={choice => {traceInfo.dismiss();sketch.switchWorkbench(choice.key as "vector" | "sketch");}} />
+    </div>
     <Tabs
       value={activeTab}
       onValueChange={activate}
       orientation="vertical"
       // Hidden, the arrows only move the focus; Enter or Space opens the focused tab.
       activationMode={open ? "automatic" : "manual"}
-      className="flex h-full shrink-0"
+      className="flex min-h-0 flex-1 shrink-0"
     >
       <PanelStrip
         tabs={tabs}
@@ -350,6 +363,10 @@ export function PropertiesPanel({
                 tooltipFor={(command) => fileCommandTooltip(command, PLATFORM)}
                 onReturnFocus={returnFocus}
               />
+            ) : doc.view.content === "parameters" ? (
+              <SketchParameters key={sketch.view.active ?? sketch.view.page} sketch={sketch} />
+            ) : doc.view.content === "sketches" ? (
+              <SketchesPanel key={`${sketch.view.page}:${sketch.view.active}`} sketch={sketch} />
             ) : doc.view.content === "snapping" ? (
               <SnappingSection snapping={snapping} onReturnFocus={returnFocus}/>
             ) : doc.view.content === "document" ? (
@@ -377,7 +394,7 @@ export function PropertiesPanel({
                 onPick={editor.text.pickFont}
                 onPickFamily={editor.text.pickFamily}
                 onReturnFocus={() => {
-                  if (editor.text.editing) {
+                  if (sketch.view.workbench === "vector" && editor.text.editing) {
                     editor.text.sinkRef.current?.focus();
                   } else {
                     returnFocus();
@@ -400,6 +417,7 @@ export function PropertiesPanel({
         )}
       </aside>
     </Tabs>
+    </div>
   );
 }
 

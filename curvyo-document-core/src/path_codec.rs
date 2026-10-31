@@ -438,7 +438,8 @@ pub(crate) fn read_path_snapshot(id: NodeId, meta: &LoroMap) -> PathSnapshot {
 /// to defaults, matching slice 1's forward-compatible reading stance.
 pub(crate) fn validate_path_tree(loro: &LoroDoc, paths_tree_key: &str) -> bool {
     let tree = loro.get_tree(paths_tree_key);
-    crate::group_tree::validate_tree(&tree, validate_object_node)
+    crate::sketch_page::valid_claims(&loro.get_map(crate::document::ROOT_MAP))
+        && crate::group_tree::validate_tree(&tree, validate_object_node)
 }
 
 /// Dispatches one leaf object to path validation when its
@@ -458,6 +459,10 @@ fn validate_object_node(tree: &LoroTree, id: loro::TreeID) -> bool {
     // review) instead of being silently read as "absent" and validated
     // as a plain path.
     match crate::shape_codec::read_shape_tag_checked(&meta) {
+        ShapeTag::Present(shape) if shape == "sketch" => {
+            crate::sketch_codec::read(&meta).is_ok()
+                && crate::style_validation::style_is_valid(&meta)
+        }
         ShapeTag::Present(shape) if shape == crate::clone_codec::SHAPE_CLONE => {
             crate::clone_codec::validate_clone_node(&meta)
         }

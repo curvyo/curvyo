@@ -1,5 +1,7 @@
+import { useSketch } from "@/hooks/useSketch";
+import { SketchToolRail } from "@/components/sketch/SketchTools";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { Canvas } from "@/components/Canvas";
 import { CanvasArea } from "@/components/CanvasArea";
@@ -18,7 +20,8 @@ import { useTraceInfo } from "@/hooks/useTraceInfo";
 import { focusCurrentFont } from "@/lib/textText";
 import { readRow2Open, writeRow2Open } from "@/lib/textBarRows";
 import { setPreviewOpen } from "@/lib/fontPreviewStore";
-import { StatusBar } from "@/components/StatusBar";
+import { CursorStatus } from "@/components/CursorStatus";
+import { createCursorPosition } from "@/lib/cursorPosition";
 import { ToolRail } from "@/components/ToolRail";
 import { HistoryPreviewFrame, HistoryPreviewLine } from "@/components/HistoryPreview";
 import { usePreviewState } from "@/lib/historyPreviewStore";
@@ -47,14 +50,19 @@ function App() {
 }
 
 function Editor() {
-  const [cursorMm, setCursorMm] = useState({ x: 0, y: 0 });
-  const editor = useEditorSession(setCursorMm);
+  const [cursor] = useState(createCursorPosition);
+  const editor = useEditorSession(cursor.update);
+  const sketch = useSketch(editor);
   const historyPreview = usePreviewState();
   const railCommands = useRailCommands(editor);
   const closePathState = useClosePathState(editor);
   const documentPanel = useDocumentPanel(editor);
   const panelOpen = usePanelOpen(editor.getSession);
-  const traceInfo = useTraceInfo(panelOpen, editor.tool === "trace");
+  const setPanelOpen = panelOpen.setOpen;
+  useEffect(() => {
+    if (sketch.view.workbench === "sketch" && sketch.view.edit_constraint) setPanelOpen(true);
+  }, [sketch.view.workbench, sketch.view.edit_constraint, setPanelOpen]);
+  const traceInfo = useTraceInfo(panelOpen, sketch.view.workbench === "vector" && editor.tool === "trace");
   const [openError, setOpenError] = useState<{ message: string; title: string } | null>(null);
   const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(
     null,
@@ -172,7 +180,7 @@ function Editor() {
          * properties panel on its right (`0007` criterion 39) or over a
          * ruler. */}
         <div className="relative flex min-h-0 min-w-0">
-        <ToolRail
+        {sketch.view.workbench === "sketch" ? <SketchToolRail sketch={sketch} paused={historyPreview.kind === "document"} /> : <ToolRail
           tool={editor.tool}
           selectionCount={editor.selectionCount}
           onSelect={editor.setTool}
@@ -181,8 +189,8 @@ function Editor() {
           grouping={editor.grouping.commands}
           paused={historyPreview.kind === "document"}
           onImport={() => project.importFiles()}
-        />
-        <Canvas editor={editor} onDropFiles={project.importFiles} />
+        />}
+        <Canvas editor={editor} sketch={sketch} onDropFiles={project.importFiles} />
         <HistoryPreviewFrame />
         {/* Contextual tool bar: floats over the canvas, right of the tool
          * rail, so showing/hiding it never resizes the canvas
@@ -199,6 +207,7 @@ function Editor() {
             editor.tool === "select" || editor.tool === "trace" ? "justify-start" : "justify-center"
           }`}
         >
+          {sketch.view.workbench === "sketch" ? null : <>
           {editor.tool === "select" ? (
             <SelectToolbar
               scaleStrokeWidth={editor.scaleStrokeWidth}
@@ -315,9 +324,10 @@ function Editor() {
               onReturnFocus={() => editor.containerRef.current?.focus()}
             />
           ) : null}
+          </>}
         </div>
         {/* After the bars in the tab order: canvas, bars, then the indicator's buttons. */}
-        <CanvasNotice
+        {sketch.view.workbench === "vector" && <CanvasNotice
           notice={editor.canvasNotice}
           groupDepth={editor.grouping.depth}
           onLeaveToLevel={(level) => {
@@ -327,13 +337,14 @@ function Editor() {
           }}
           announcement={editor.grouping.announcement}
           persistent={<HistoryPreviewLine getSession={editor.getSession} />}
-        />
+        />}
         </div>
         </div>
             </>
           }
         />
         <PropertiesPanel
+          sketch={sketch}
           editor={editor}
           document={documentPanel}
           panelOpen={panelOpen}
@@ -341,8 +352,9 @@ function Editor() {
           traceInfo={traceInfo}
         />
       </div>
-      <StatusBar
-        cursorText={documentPanel.cursorText(cursorMm.x, cursorMm.y)}
+      <CursorStatus
+        cursor={cursor}
+        format={documentPanel.cursorText}
         sizeText={documentPanel.view.sizeText}
         zoomPercent={editor.zoomPercent}
         nodeCountText={editor.tool === "node" ? nodeCountText(editor.nodeToolbarState) : null}

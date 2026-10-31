@@ -62,7 +62,12 @@ impl Session {
         });
         PanelView {
             content: panel_body(active, self.pen_path_unfinished(), non_empty),
-            tabs: tab_entries_for(active, self.style_blocker(non_empty)),
+            tabs: tab_entries_for(active, self.style_blocker(non_empty))
+                .into_iter()
+                .filter(|tab| {
+                    self.workbench() == super::Workbench::Sketch || tab.name != "parameters"
+                })
+                .collect(),
         }
     }
 
@@ -168,6 +173,8 @@ impl PanelTabsRecord {
             PanelContent::History => "history",
             PanelContent::Fonts => "fonts",
             PanelContent::Snapping => "snapping",
+            PanelContent::Sketches => "sketches",
+            PanelContent::Parameters => "parameters",
             PanelContent::Empty => "empty",
         };
         Self {
@@ -252,7 +259,7 @@ mod tests {
         assert_eq!(
             record.tab_names,
             [
-                "file", "document", "style", "layers", "history", "fonts", "snapping"
+                "file", "document", "style", "layers", "history", "fonts", "snapping", "sketches"
             ]
         );
         assert_eq!(record.tab_enabled[at(&record, "style")], 0);

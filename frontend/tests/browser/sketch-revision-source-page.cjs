@@ -1,0 +1,19 @@
+// Independent page reveal and selected-clone source-entry browser regression.
+const {chromium}=require('playwright'),assert=require('node:assert/strict'),fs=require('node:fs');
+const {execFileSync}=require('node:child_process');
+const output=process.env.CURVYO_REVISION_OUTPUT||'target/0066-browser/revision-independent';fs.mkdirSync(output,{recursive:true});
+const flatten=nodes=>nodes.flatMap(n=>n.objects?flatten(n.objects):[n]);
+(async()=>{const browser=await chromium.launch({headless:true,args:['--no-sandbox','--enable-unsafe-webgpu','--use-angle=swiftshader','--enable-unsafe-swiftshader']});const page=await browser.newPage({viewport:{width:1440,height:1000}}),errors=[];page.on('pageerror',e=>errors.push(e.stack));page.setDefaultTimeout(8000);
+const menu=async(value)=>{await page.getByRole('button',{name:'Workbench',exact:true}).click();await page.getByRole('menuitemradio',{name:value,exact:true}).click();};
+try{await page.goto(process.env.CURVYO_BROWSER_URL||'http://127.0.0.1:1421/',{waitUntil:'networkidle'});await menu('Sketch');await page.getByRole('navigation',{name:'Sketch tools'}).getByRole('button',{name:'Circle',exact:true}).click();await page.mouse.click(400,300);await page.getByRole('textbox',{name:'Sketch Radius',exact:true}).fill('6 mm');await page.getByRole('form',{name:'Sketch tool options'}).getByRole('button',{name:'Apply',exact:true}).click();
+await menu('Vector');await page.getByRole('button',{name:'Linked clone',exact:true}).click();await page.getByRole('tab',{name:'Document',exact:true}).click();await page.getByRole('button',{name:'Add page',exact:true}).click();
+assert.equal(await page.locator('[data-page-row][aria-current="true"]').getAttribute('data-page-row'),'1');
+await menu('Sketch');await page.getByRole('tab',{name:'Document',exact:true}).click();assert.equal(await page.locator('[data-page-row][aria-current="true"]').getAttribute('data-page-row'),'0');
+const first=page.locator('[data-page-frames] > div').first();const frame=await first.boundingBox();const center={x:frame.x+frame.width/2,y:frame.y+frame.height/2};
+assert(center.x>100&&center.x<1050&&center.y>100&&center.y<900,`source origin must be usable, ${JSON.stringify(center)}`);
+await page.mouse.move(600,500);await page.mouse.down({button:'middle'});await page.mouse.move(680,540,{steps:4});await page.mouse.up({button:'middle'});await page.waitForTimeout(120);
+const panned=await first.boundingBox();assert(Math.abs(panned.x-frame.x)>30,'actual pan changes frame');await menu('Sketch');await page.waitForTimeout(120);const retained=await first.boundingBox();assert(Math.abs(retained.x-panned.x)<0.01&&Math.abs(retained.y-panned.y)<0.01,'same-page entry preserves pan');
+await page.screenshot({path:`${output}/source-page.png`});
+await page.getByRole('tab',{name:/^File/}).click();const pending=page.waitForEvent('download');await page.getByRole('button',{name:'Save',exact:true}).click();const path=`${output}/source-clone.curvyo`;await(await pending).saveAs(path);const json=JSON.parse(execFileSync('python3',['-c','import zipfile,sys;print(zipfile.ZipFile(sys.argv[1]).read("document.json").decode())',path],{encoding:'utf8'}));const objects=flatten(json.objects);assert.equal(objects.filter(o=>o.shape==='sketch').length,1);assert.equal(objects.filter(o=>o.shape==='clone').length,1);assert.deepEqual(errors,[]);fs.writeFileSync(`${output}/source-page-evidence.json`,JSON.stringify({frame,center,panned,retained},null,2));console.log('PASS clone enters source page, visible page centre, same-page pan preserved, saved one original+one clone');
+}catch(error){await page.screenshot({path:`${output}/source-page-failure.png`});console.error(await page.locator('body').innerText());throw error;}finally{await browser.close();}
+})().catch(error=>{console.error(error);process.exitCode=1;});

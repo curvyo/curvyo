@@ -112,6 +112,17 @@ impl SnapTargets {
             }
             if settings.nodes
                 && !excluded_nodes(read.id)
+                && let ObjectSnapshot::Sketch(sketch) = object
+            {
+                for (_, position) in crate::sketch_snap_points(&sketch.graph, &sketch.solution) {
+                    let point = sketch
+                        .placement
+                        .apply_point(Point::new(position.x.0, position.y.0));
+                    entries.push(SnapTarget::point(point, (point, point), TargetKind::Node));
+                }
+            }
+            if settings.nodes
+                && !excluded_nodes(read.id)
                 && let Some(path) = object.drawn_path()
             {
                 let is_path = matches!(object, ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_));

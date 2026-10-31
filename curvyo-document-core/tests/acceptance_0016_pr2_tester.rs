@@ -70,6 +70,7 @@ fn rect(document: &Document, x: f64, y: f64, w: f64, h: f64) -> NodeId {
 
 fn path_of(document: &Document, id: NodeId) -> PathSnapshot {
     match document.object(id).expect("object exists") {
+        ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Path(p) => p,

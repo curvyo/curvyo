@@ -247,6 +247,7 @@ pub fn clone_marks(
 fn outline_of(object: &ObjectSnapshot) -> Option<&curvyo_document_core::PathSnapshot> {
     match object {
         ObjectSnapshot::Path(path) => Some(path),
+        ObjectSnapshot::Sketch(sketch) => Some(&sketch.resolved),
         ObjectSnapshot::Clone(clone) => Some(&clone.resolved),
         ObjectSnapshot::Primitive(_) | ObjectSnapshot::Text(_) | ObjectSnapshot::Image(_) => None,
     }

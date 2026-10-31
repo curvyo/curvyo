@@ -1,0 +1,43 @@
+// Independent actual-host witnesses derived from revision-mode-oracles.md.
+const {chromium}=require('playwright');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const {execFileSync}=require('node:child_process');
+const output=process.env.CURVYO_REVISION_OUTPUT||'target/0066-browser/revision-independent';
+fs.mkdirSync(output,{recursive:true});
+const flatten=nodes=>nodes.flatMap(n=>n.objects?flatten(n.objects):[n]);
+const near=(actual,expected)=>assert(Math.abs(actual-expected)<1e-6,`${actual} != ${expected}`);
+async function menu(page,name,value){await page.getByRole('button',{name,exact:true}).click();await page.getByRole('menuitemradio',{name:value,exact:true}).click();}
+const tool=(page,name)=>page.getByRole('navigation',{name:'Sketch tools'}).getByRole('button',{name,exact:true}).click();
+async function save(page,name){await page.getByRole('tab',{name:/^File/}).click();const download=page.waitForEvent('download');await page.getByRole('button',{name:'Save',exact:true}).click();const path=`${output}/${name}.curvyo`;await(await download).saveAs(path);return JSON.parse(execFileSync('python3',['-c','import zipfile,sys;print(zipfile.ZipFile(sys.argv[1]).read("document.json").decode())',path],{encoding:'utf8'}));}
+async function fresh(browser){const page=await browser.newPage({viewport:{width:1440,height:1000}});const errors=[];page.on('pageerror',e=>errors.push(e.stack));page.setDefaultTimeout(8000);await page.goto(process.env.CURVYO_BROWSER_URL||'http://127.0.0.1:1421/',{waitUntil:'networkidle'});await menu(page,'Workbench','Sketch');return {page,errors};}
+const graph=json=>flatten(json.objects).find(n=>n.shape==='sketch')?.graph;
+const point=(g,id)=>g.entities[id].Point.position;
+(async()=>{const browser=await chromium.launch({headless:true,args:['--no-sandbox','--enable-unsafe-webgpu','--use-angle=swiftshader','--enable-unsafe-swiftshader']});const passed=[];try{
+for(const [name,target,centerDelta,tangent,turn] of [
+ ['Free Line',[510,340]],['Perpendicular Line',[450,380]],['Tangent Line',[530,300]],
+ ['Tangent Arc',[510,360],[0,60],[1,0],1],['Perpendicular Arc Left',[510,360],[60,0],[0,1],-1],['Perpendicular Arc Right',[510,240],[60,0],[0,-1],1],
+]){const {page,errors}=await fresh(browser);try{
+ await tool(page,'Polyline');await page.mouse.click(350,300);await page.mouse.click(450,300);await menu(page,'Polyline mode',name);await page.mouse.move(...target);await page.mouse.click(...target);await page.keyboard.press('Escape');
+ const json=await save(page,`mode-${name.replaceAll(' ','-')}`),g=graph(json);assert(g);
+ const lines=Object.entries(g.entities).filter(([,e])=>e.Line);const previous=lines.find(([,e])=>{const a=point(g,e.Line.start),b=point(g,e.Line.end);return Math.abs(a.y-b.y)<1e-6&&a.x<b.x;});assert(previous,'first line retained');
+ const start=point(g,previous[1].Line.start),join=point(g,previous[1].Line.end),joinId=previous[1].Line.end;
+ const mmPerPixel=(join.x-start.x)/100;assert(mmPerPixel>0);const expected={x:join.x+(target[0]-450)*mmPerPixel,y:join.y+(target[1]-300)*mmPerPixel};
+ const following=Object.entries(g.entities).find(([id,e])=>id!==previous[0]&&(e.Line||e.Arc));assert(following);const entity=following[1].Line||following[1].Arc;assert(entity.start===joinId||entity.end===joinId,'shared endpoint identity');
+ const endId=entity.start===joinId?entity.end:entity.start,end=point(g,endId);near(end.x,expected.x);near(end.y,expected.y);
+ if(centerDelta){assert(following[1].Arc);const center=point(g,entity.center);near(center.x,join.x+centerDelta[0]*mmPerPixel);near(center.y,join.y+centerDelta[1]*mmPerPixel);near(entity.radius,60*mmPerPixel);const sign=entity.start===joinId?1:-1;near(sign*(entity.end_angle-entity.start_angle),turn*Math.PI/2);near(sign*-(join.y-center.y)/entity.radius,tangent[0]);near(sign*(join.x-center.x)/entity.radius,tangent[1]);}
+ if(name!=='Free Line')assert(Object.keys(g.constraints).length>0,'persistent mode relationship');assert.deepEqual(errors,[]);passed.push(name);console.log(`PASS menu+saved geometry: ${name}`);
+ }finally{await page.close();}}
+// Real numeric focus and two-step cancellation, then exact typed line geometry.
+{const {page,errors}=await fresh(browser);try{
+ await tool(page,'Polyline');await page.mouse.click(350,300);await page.mouse.move(430,340);await page.keyboard.press('Tab');assert.equal(await page.evaluate(()=>document.activeElement?.getAttribute('aria-label')),'Sketch Length');
+ const length=page.getByRole('textbox',{name:'Sketch Length',exact:true});await length.fill('30 mm');await page.keyboard.press('Tab');assert.equal(await page.evaluate(()=>document.activeElement?.getAttribute('aria-label')),'Sketch Angle');await page.keyboard.press('Shift+Tab');assert.equal(await page.evaluate(()=>document.activeElement?.getAttribute('aria-label')),'Sketch Length');
+ await page.keyboard.press('Escape');await page.keyboard.press('Escape');assert.equal(graph(await save(page,'tab-cancel')),undefined);
+ await tool(page,'Polyline');await page.mouse.click(350,300);await page.mouse.move(430,340);await page.keyboard.press('Tab');await length.fill('30 mm');await page.getByRole('textbox',{name:'Sketch Angle',exact:true}).fill('45 deg');await page.keyboard.press('Enter');await page.keyboard.press('Escape');
+ const g=graph(await save(page,'typed-line'));const lines=Object.values(g.entities).filter(e=>e.Line);assert.equal(lines.length,1);const a=point(g,lines[0].Line.start),b=point(g,lines[0].Line.end);near(b.x-a.x,30/Math.sqrt(2));near(b.y-a.y,30/Math.sqrt(2));assert.deepEqual(errors,[]);passed.push('Tab/ShiftTab/Escape/typed-line');console.log('PASS numeric focus/cancel/saved30mm45deg');
+ }finally{await page.close();}}
+for(const picks of [1,2]){const {page,errors}=await fresh(browser);try{await tool(page,'Arc');for(const p of [[350,300],[400,350]].slice(0,picks))await page.mouse.click(...p);await page.mouse.click(450,300,{button:'right'});await page.mouse.click(500,350);assert.equal(graph(await save(page,`arc-right-${picks}`)),undefined,'right never supplies a creation pick');assert.deepEqual(errors,[]);passed.push(`Arc right phase${picks}`);console.log(`PASS right Arc phase${picks}`);}finally{await page.close();}}
+// Both pages still ownerless: a page switch must not reuse a draft or error.
+{const {page,errors}=await fresh(browser);try{await page.getByRole('tab',{name:'Document',exact:true}).click();await page.getByRole('button',{name:'Add page',exact:true}).click();await tool(page,'Point');const x=page.getByRole('textbox',{name:'Sketch X',exact:true});await x.fill('missing_parameter');await page.getByRole('textbox',{name:'Sketch Y',exact:true}).fill('12 mm');await page.getByRole('form',{name:'Sketch tool options'}).getByRole('button',{name:'Apply',exact:true}).click();await page.getByRole('button',{name:'Add page',exact:true}).click();assert.equal(await x.inputValue(),'');assert.equal(await page.getByRole('textbox',{name:'Sketch Y',exact:true}).inputValue(),'');await x.fill('7 mm');await page.getByRole('textbox',{name:'Sketch Y',exact:true}).fill('9 mm');await page.getByRole('form',{name:'Sketch tool options'}).getByRole('button',{name:'Apply',exact:true}).click();const json=await save(page,'virtual-page-draft');const shapes=flatten(json.objects).filter(n=>n.shape==='sketch');assert.equal(shapes.length,1);assert(Object.values(shapes[0].graph.entities).some(e=>e.Point&&Math.abs(e.Point.position.x-7)<1e-6&&Math.abs(e.Point.position.y-9)<1e-6));assert.deepEqual(errors,[]);await page.screenshot({path:`${output}/page-draft.png`});passed.push('two empty page draft/error isolation');console.log('PASS empty page draft savedgeometry');}finally{await page.close();}}
+fs.writeFileSync(`${output}/results.json`,JSON.stringify({passed},null,2));console.log(`PASS ${passed.length} independent browser journeys`);
+}finally{await browser.close();}})().catch(error=>{console.error(error);process.exitCode=1;});

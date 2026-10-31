@@ -59,6 +59,7 @@ fn json(d: &Document) -> Vec<u8> {
 
 fn width_mm(d: &Document, id: NodeId) -> f64 {
     match d.object(id).unwrap() {
+        ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Primitive(p) => p.style.stroke.width.as_mm(),

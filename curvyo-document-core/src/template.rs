@@ -31,6 +31,7 @@ impl TemplateNode {
     #[must_use]
     pub fn anchor_count(&self) -> usize {
         match &self.object {
+            ObjectSnapshot::Sketch(sketch) => sketch.resolved.all_anchors().count(),
             ObjectSnapshot::Path(path) => {
                 path.anchors.len()
                     + path
@@ -148,6 +149,7 @@ impl Document {
             }
             ObjectSnapshot::Text(text) => return Some(self.create_text_uncommitted(text)),
             ObjectSnapshot::Image(_) => return None,
+            ObjectSnapshot::Sketch(sketch) => &sketch.resolved,
             ObjectSnapshot::Path(path) => path,
             ObjectSnapshot::Clone(clone) => &clone.resolved,
         };

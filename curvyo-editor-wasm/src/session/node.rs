@@ -36,7 +36,8 @@ impl Session {
             .iter()
             .filter_map(|object| match object {
                 ObjectSnapshot::Path(path) => Some(path.clone()),
-                ObjectSnapshot::Primitive(_)
+                ObjectSnapshot::Sketch(_)
+                | ObjectSnapshot::Primitive(_)
                 | ObjectSnapshot::Clone(_)
                 | ObjectSnapshot::Text(_)
                 | ObjectSnapshot::Image(_) => None,

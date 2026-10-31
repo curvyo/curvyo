@@ -258,7 +258,7 @@ fn ac1_the_strip_is_file_document_style_layers_history_and_layers_is_never_dimme
     assert_eq!(
         names,
         [
-            "file", "document", "style", "layers", "history", "fonts", "snapping"
+            "file", "document", "style", "layers", "history", "fonts", "snapping", "sketches"
         ]
     );
     let layers = v.tabs.iter().find(|t| t.name == "layers").unwrap();
@@ -2208,6 +2208,9 @@ fn ac19_the_eyedropper_skips_hidden_nodes_and_samples_locked_ones() {
     d.set_node_locked(&[locked], true).unwrap();
     let fill_of = |s: &Session, id: NodeId| -> curvyo_document_core::Color {
         match doc_of(s).object(id).unwrap() {
+            curvyo_document_core::ObjectSnapshot::Sketch(_) => {
+                unreachable!("no sketch in this test")
+            }
             curvyo_document_core::ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
             curvyo_document_core::ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
             curvyo_document_core::ObjectSnapshot::Path(p) => p.style.fill.color,

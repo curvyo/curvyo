@@ -150,7 +150,8 @@ fn mirrored_primitive_of(primitive: &PrimitiveSnapshot, mirror: Mirror) -> Primi
     match mirrored(&ObjectSnapshot::Primitive(primitive.clone()), mirror) {
         ObjectSnapshot::Primitive(mirrored) => mirrored,
         // invariant: `mirrored` keeps the kind of its object.
-        ObjectSnapshot::Path(_)
+        ObjectSnapshot::Sketch(_)
+        | ObjectSnapshot::Path(_)
         | ObjectSnapshot::Clone(_)
         | ObjectSnapshot::Text(_)
         | ObjectSnapshot::Image(_) => primitive.clone(),

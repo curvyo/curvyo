@@ -52,6 +52,7 @@ fn only_object(s: &Session) -> ObjectSnapshot {
 
 fn stroke(o: &ObjectSnapshot) -> f64 {
     match o {
+        ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Primitive(p) => p.style.stroke.width.as_mm(),

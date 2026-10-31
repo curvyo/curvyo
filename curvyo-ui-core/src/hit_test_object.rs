@@ -66,7 +66,7 @@ fn certainly_farther_than(object: &ObjectSnapshot, point: Point, margin: f64) ->
         ObjectSnapshot::Text(text) => !crate::text_box::line_box_contains(text, point, margin),
         // An image is hit anywhere inside its frame (`specs/0058-bitmap-import` criterion 31).
         ObjectSnapshot::Image(image) => !crate::image_frame::frame_contains(image, point, margin),
-        ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_)
+        ObjectSnapshot::Sketch(_) | ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_)
             if let Some(path) = object.drawn_path() =>
         {
             let mut hull = (
@@ -94,7 +94,7 @@ fn certainly_farther_than(object: &ObjectSnapshot, point: Point, margin: f64) ->
                 || point.y < hull.1 - margin
                 || point.y > hull.3 + margin
         }
-        ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_) => true,
+        ObjectSnapshot::Sketch(_) | ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_) => true,
         ObjectSnapshot::Primitive(primitive) => {
             let (min, max) = shape_frame_bounds(&primitive.shape);
             let centre = Point::new(f64::midpoint(min.x, max.x), f64::midpoint(min.y, max.y));
@@ -129,7 +129,7 @@ pub(crate) fn distance_to_object(
         ObjectSnapshot::Image(image) => {
             crate::image_frame::frame_contains(image, point, tolerance.as_mm()).then_some(0.0)
         }
-        ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_)
+        ObjectSnapshot::Sketch(_) | ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_)
             if let Some(path) = object.drawn_path() =>
         {
             path.subpaths()
@@ -147,7 +147,7 @@ pub(crate) fn distance_to_object(
                 })
                 .min_by(f64::total_cmp)
         }
-        ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_) => None,
+        ObjectSnapshot::Sketch(_) | ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_) => None,
         ObjectSnapshot::Primitive(primitive) => {
             let outline = outline_of_rotated(&primitive.shape, primitive.rotation);
             nearest_distance_on_run(outline.len(), outline.closed, point, tolerance, |i| {
@@ -189,7 +189,7 @@ fn outlines_of(object: &ObjectSnapshot) -> Vec<(Vec<OutlineTriple>, bool)> {
                 .collect(),
             true,
         )],
-        ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_)
+        ObjectSnapshot::Sketch(_) | ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_)
             if let Some(path) = object.drawn_path() =>
         {
             path.subpaths()
@@ -205,7 +205,9 @@ fn outlines_of(object: &ObjectSnapshot) -> Vec<(Vec<OutlineTriple>, bool)> {
                 })
                 .collect()
         }
-        ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_) => Vec::new(),
+        ObjectSnapshot::Sketch(_) | ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_) => {
+            Vec::new()
+        }
         ObjectSnapshot::Primitive(primitive) => {
             let outline = outline_of_rotated(&primitive.shape, primitive.rotation);
             vec![(

@@ -234,6 +234,7 @@ impl Session {
         // A click-to-create placement is an operation in flight (`0052` criterion 8).
         // So is an open Pen entry chip (`0072` criterion 23).
         in_tool
+            || self.sketch.drag.is_some()
             || self.page_drag.is_some()
             || self.placement().is_some()
             || self.pen_entry().is_some()
@@ -307,6 +308,9 @@ impl Session {
         // (`specs/0042-history-branches` criterion 19).
         if self.document_preview_active() {
             return KeyOutcome::Paused;
+        }
+        if self.workbench() == super::Workbench::Sketch {
+            return self.sketch_key(input);
         }
         // Enter in pick mode puts the text on the pick set (`0080` criterion 2).
         if input.key == "Enter" && !input.dom_blocked && self.confirm_text_path_pick() {
@@ -445,6 +449,28 @@ impl Session {
     /// With the pointer button still down steps 3 and 4 are skipped: only the
     /// drag is cancelled (criterion 49).
     pub fn escape(&mut self) -> EscapeStep {
+        if self.workbench() == super::Workbench::Sketch {
+            let pending = self.sketch.drag.is_some()
+                || self.sketch.preview.is_some()
+                || self.sketch.dimension_position.is_some()
+                || self.sketch.marquee.is_some()
+                || self.sketch.lasso.is_some()
+                || !self.sketch.picks.is_empty()
+                || self.sketch.edit_constraint.is_some()
+                || self.sketch.label_drag.is_some()
+                || self.sketch.canvas_edit.is_some()
+                || self.button_down;
+            self.sketch.cancel();
+            if !pending {
+                self.sketch.tool = super::SketchTool::Select;
+                self.sketch.constraint_tool = None;
+                self.sketch.entities.clear();
+                self.sketch.constraints.clear();
+            }
+            self.end_snapping_drag();
+            self.button_down = false;
+            return EscapeStep::ClearedState;
+        }
         if self.page_drag.take().is_some() {
             return EscapeStep::ClearedState;
         }

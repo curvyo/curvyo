@@ -218,6 +218,7 @@ impl Document {
                 }
                 match by_id.get(&id).copied() {
                     Some(ObjectSnapshot::Path(path)) => Some(RawLeaf::Path(path.clone())),
+                    Some(ObjectSnapshot::Sketch(sketch)) => Some(RawLeaf::Sketch(sketch.clone())),
                     Some(ObjectSnapshot::Clone(clone)) => Some(RawLeaf::of_clone(clone)),
                     _ => raw_leaf_of(&tree, leaf),
                 }

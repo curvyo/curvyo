@@ -286,6 +286,7 @@ mod tests {
         let with_rotation = |id: NodeId, radians: f64| match document.object(id).unwrap() {
             ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
             ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
+            ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
             ObjectSnapshot::Primitive(p) => ObjectSnapshot::Primitive(PrimitiveSnapshot {
                 rotation: Angle::from_radians(radians),
                 ..p
@@ -309,6 +310,7 @@ mod tests {
         let wider = match document.object(ellipse).unwrap() {
             ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
             ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
+            ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
             ObjectSnapshot::Primitive(p) => ObjectSnapshot::Primitive(PrimitiveSnapshot {
                 shape: Shape::Ellipse {
                     frame: EllipseFrame {

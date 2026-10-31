@@ -141,3 +141,8 @@ pub use trace_glue::{
 
 #[cfg(target_arch = "wasm32")]
 pub use wasm_api::{WasmSession, init_panic_hook};
+
+pub use session::{SketchTool, Workbench};
+
+#[cfg(target_arch = "wasm32")]
+mod wasm_sketch;
