@@ -160,9 +160,26 @@ impl Session {
             return;
         };
         let caret = point.map_or(text.string.len(), |p| self.caret_near(&text, p));
+        // Opened from the keyboard, a text Recognise text guessed letters in has the first of
+        // them selected (`specs/0088-trace-recognition` criterion 7).
+        let guessed = if point.is_none() {
+            self.first_guessed_range(id)
+        } else {
+            None
+        };
         self.tool = Tool::Text;
         self.selection.select_single(id);
-        self.text.edit = Some(TextEdit::existing(&text, caret));
+        let mut edit = TextEdit::existing(&text, caret);
+        if let Some(range) = guessed {
+            edit.apply(
+                TextInput::Select {
+                    anchor: range.start,
+                    caret: range.end,
+                },
+                None,
+            );
+        }
+        self.text.edit = Some(edit);
     }
 
     /// Starts edit mode on a new text whose first baseline starts at `point` (criterion 2).

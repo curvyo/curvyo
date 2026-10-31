@@ -144,6 +144,8 @@ mod text_layout_fields;
 mod text_on_path;
 mod text_path_caret;
 mod text_path_edit;
+mod text_recognise_job;
+mod text_recognise_plan;
 mod trace_plan;
 mod trace_transfer;
 mod transform_commit;
@@ -433,6 +435,13 @@ pub use text_path_edit::{
     default_position, dragged_values, ellipse_degrees, ellipse_point, handle_points,
     nearest_outline, nudged_values, position_at_degrees, projected_values, release_placement,
     rotated_position, shift_along, slid_values, snap_stops, stored_vertical_layout,
+};
+pub use text_recognise_job::{
+    AcceptedLine, FaceState, FaceTier, JobStep, RecogniseJob, TIER_CAP, Tiers, recognise_tiers,
+};
+pub use text_recognise_plan::{
+    RecogniseSubjects, RecogniseWrite, RecognisedText, plan_recognise_write, recognise_available,
+    recognise_subjects,
 };
 pub use trace_plan::{
     TraceColour, TracePlan, TraceTarget, plan_trace, trace_colour_name, trace_colour_style,

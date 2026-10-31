@@ -84,6 +84,8 @@ mod wasm_pen_entry;
 #[cfg(target_arch = "wasm32")]
 mod wasm_properties_panel;
 #[cfg(target_arch = "wasm32")]
+mod wasm_recognise;
+#[cfg(target_arch = "wasm32")]
 mod wasm_render;
 #[cfg(target_arch = "wasm32")]
 mod wasm_ruler;
@@ -132,6 +134,7 @@ pub use session::{
     FrameImages, ImageCopy, ImportOrigin, ImportOutcome, StrokeToPathOutcome, WeldOutcome,
 };
 pub use session::{LayoutOutcome, ObjectToPathOutcome, StyleOutcome, TextBarView, TextSizeOutcome};
+pub use session::{RecogniseOutcome, RecognisedLine};
 pub use session::{TextPathPress, TextPathView};
 pub use session::{
     TraceCreateOutcome, TracePickMode, TraceSelection, TraceSource, TraceView, TraceViewMode,
