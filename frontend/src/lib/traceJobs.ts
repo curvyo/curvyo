@@ -34,7 +34,9 @@ export type TraceResponse =
   | { id: number; kind: "png"; png: Uint8Array; ms: number }
   /** A mask: 255 for content, 0 for the rest, row by row; `width` 0 when the picture cannot be traced. */
   | { id: number; kind: "mask"; width: number; height: number; bits: Uint8Array; ms: number }
-  | { id: number; kind: "error"; message: string };
+  | { id: number; kind: "error"; message: string }
+  /** The answer to `init` (id 0): `error` is empty when the module was instantiated. */
+  | { id: 0; kind: "ready"; error: string };
 
 /** The pixels of one job. */
 export interface TracePixels {
@@ -79,17 +81,34 @@ type Pending = {
   onProgress?: (percent: number) => void;
 };
 
+/** How long a new worker may take to answer `init`, and the module to compile, before the jobs
+ * waiting for it fail (Proposal, customer 2026-10-31: a webview whose worker never starts showed
+ * "Analysing..." for good). A 15 MB module compiles in well under a second. */
+export const WORKER_START_MS = 20_000;
+
+/** Thrown into the jobs of a worker that did not start: it did not answer `init` in time, or its
+ * module could not be instantiated. */
+export class TraceWorkerFailed extends Error {
+  constructor(reason: string) {
+    super(`the trace worker did not start: ${reason}`);
+    this.name = "TraceWorkerFailed";
+  }
+}
+
 /** Runs trace jobs in a worker; `cancel` ends every running job by terminating it. */
 export class TraceRunner {
   private worker: TraceWorkerLike | null = null;
+  private startTimer: ReturnType<typeof setTimeout> | null = null;
   private nextId = 1;
   private readonly pending = new Map<number, Pending>();
   private readonly makeWorker: () => TraceWorkerLike;
   private readonly module: () => Promise<WebAssembly.Module>;
+  private readonly startMs: number;
 
-  constructor(makeWorker: () => TraceWorkerLike, module: () => Promise<WebAssembly.Module>) {
+  constructor(makeWorker: () => TraceWorkerLike, module: () => Promise<WebAssembly.Module>, startMs = WORKER_START_MS) {
     this.makeWorker = makeWorker;
     this.module = module;
+    this.startMs = startMs;
   }
 
   /** Whether a job is running. */
@@ -108,6 +127,13 @@ export class TraceRunner {
     const worker = this.makeWorker();
     worker.onmessage = (event) => {
       const response = event.data;
+      if (response.kind === "ready") {
+        this.clearStartTimer();
+        if (response.error !== "") {
+          this.fail(worker, new TraceWorkerFailed(response.error));
+        }
+        return;
+      }
       const pending = this.pending.get(response.id);
       if (pending && response.kind === "progress") {
         pending.onProgress?.(response.percent);
@@ -116,20 +142,33 @@ export class TraceRunner {
         pending.resolve(response);
       }
     };
-    worker.onerror = (event) => {
-      const failure = new Error(event.message || "trace worker failed");
-      for (const pending of this.pending.values()) {
-        pending.reject(failure);
-      }
-      this.pending.clear();
-      worker.terminate();
-      if (this.worker === worker) {
-        this.worker = null;
-      }
-    };
+    worker.onerror = (event) => this.fail(worker, new Error(event.message || "trace worker failed"));
     worker.postMessage({ type: "init", module });
     this.worker = worker;
+    this.clearStartTimer();
+    this.startTimer = setTimeout(() => this.fail(worker, new TraceWorkerFailed(`no answer in ${this.startMs} ms`)), this.startMs);
     return worker;
+  }
+
+  private clearStartTimer(): void {
+    if (this.startTimer !== null) {
+      clearTimeout(this.startTimer);
+      this.startTimer = null;
+    }
+  }
+
+  /** `worker` cannot answer: its jobs fail with `failure` and the next job starts a fresh one. */
+  private fail(worker: TraceWorkerLike, failure: Error): void {
+    if (this.worker !== worker) {
+      return;
+    }
+    this.clearStartTimer();
+    for (const pending of this.pending.values()) {
+      pending.reject(failure);
+    }
+    this.pending.clear();
+    worker.terminate();
+    this.worker = null;
   }
 
   private async send(
@@ -218,6 +257,7 @@ export class TraceRunner {
     if (this.pending.size === 0) {
       return;
     }
+    this.clearStartTimer();
     this.worker?.terminate();
     this.worker = null;
     for (const pending of this.pending.values()) {
@@ -229,6 +269,7 @@ export class TraceRunner {
   /** Ends the worker for good (the editor unmounts). */
   dispose(): void {
     this.cancel();
+    this.clearStartTimer();
     this.worker?.terminate();
     this.worker = null;
   }
@@ -236,18 +277,35 @@ export class TraceRunner {
 
 let compiled: Promise<WebAssembly.Module> | null = null;
 
-/** The editor's wasm module, compiled once for every worker (ADR 0023 §5). */
+/** `promise`, or a [`TraceWorkerFailed`] after `ms`. */
+function withinStart<T>(promise: Promise<T>, ms: number, what: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new TraceWorkerFailed(`${what} took over ${ms} ms`)), ms);
+  });
+  return Promise.race([promise, late]).finally(() => clearTimeout(timer));
+}
+
+/** The editor's wasm module, compiled once for every worker (ADR 0023 §5); a compile that fails
+ * or does not finish in [`WORKER_START_MS`] is tried again by the next job. */
 export function editorModule(): Promise<WebAssembly.Module> {
-  compiled ??= (async () => {
-    const url = new URL("../wasm-bindings/curvyo_editor_wasm_bg.wasm", import.meta.url);
-    const response = await fetch(url);
-    try {
-      return await WebAssembly.compileStreaming(response.clone());
-    } catch {
-      // A server without the `application/wasm` type: compile the bytes.
-      return WebAssembly.compile(await response.arrayBuffer());
-    }
-  })();
+  compiled ??= withinStart(
+    (async () => {
+      const url = new URL("../wasm-bindings/curvyo_editor_wasm_bg.wasm", import.meta.url);
+      const response = await fetch(url);
+      try {
+        return await WebAssembly.compileStreaming(response.clone());
+      } catch {
+        // A server without the `application/wasm` type: compile the bytes.
+        return WebAssembly.compile(await response.arrayBuffer());
+      }
+    })(),
+    WORKER_START_MS,
+    "compiling the module",
+  ).catch((error: unknown) => {
+    compiled = null;
+    throw error;
+  });
   return compiled;
 }
 

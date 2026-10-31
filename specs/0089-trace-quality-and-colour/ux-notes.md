@@ -129,7 +129,8 @@ holds no controls, 0025 §21.3); the two stay separate, the analysis row above, 
 | **Auto** (applied; a new image opens here, Frage 83 B; there is no Suggested state) | "Line drawing · paper background evened out" | **Analyse again**, `aria-disabled`, dimmed: nothing was edited, the result would be the same (deterministic, spec criterion 34) |
 | **Custom** (the maker changed an analysed value) | "Custom · Line drawing" | **Analyse again** |
 | **Low confidence** (spec criterion 32) | "Type unclear · Brightness with automatic Threshold" (lead 2026-10-31: the analysis never sets the preset) | **Analyse again**, disabled as in Auto |
-| Analysis failed (also a dying worker; the image keeps the automatic Threshold) | "Analysis failed · automatic Threshold used" (lead 2026-10-31) | **Analyse again** |
+| Analysis failed (also a dying worker, or one that does not answer its start in 20 s; the image keeps the automatic Threshold) | "Analysis failed · automatic Threshold used" (lead 2026-10-31) | **Analyse again** |
+| Analysis stopped (Stop or Escape while "Analysing..." shows; **Proposal**, customer report 2026-10-31) | "Analysis stopped" | **Analyse** (Retry in the Trace button runs it too) |
 
 The vocabulary of the line is fixed by the analysis: image type (Graphic, Logo, Line drawing, Sketch), a
 middle dot, then the findings that changed settings ("paper background evened out", "pale colours kept",

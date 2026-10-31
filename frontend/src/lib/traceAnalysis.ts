@@ -44,7 +44,9 @@ export type TraceAnalysisState =
   | { kind: "analysing" }
   | { kind: "auto"; analysis: TraceAnalysis }
   | { kind: "custom"; analysis: TraceAnalysis }
-  | { kind: "failed" };
+  | { kind: "failed" }
+  /** Stopped before it answered (Stop or Escape while "Analysing..." shows). */
+  | { kind: "stopped" };
 
 /** The button of the analysis row (always enabled, `ux-notes.md` §22.3). */
 export const ANALYSE = "Analyse";
@@ -54,6 +56,10 @@ export const ANALYSING = "Analysing...";
 
 /** The line of a failed analysis: the image keeps the automatic Threshold. */
 export const ANALYSIS_FAILED = "Analysis failed · automatic Threshold used";
+
+/** The line of an analysis stopped before it answered (Proposal, customer 2026-10-31): Analyse
+ * or Retry runs it again. */
+export const ANALYSIS_STOPPED = "Analysis stopped";
 
 /** The line under low confidence (criterion 32; Proposal: names the method, not a preset, since
  * the analysis never sets the preset). */
@@ -175,6 +181,8 @@ export function analysisLine(state: TraceAnalysisState): string {
       return ANALYSING;
     case "failed":
       return ANALYSIS_FAILED;
+    case "stopped":
+      return ANALYSIS_STOPPED;
     case "custom":
       return `Custom · ${IMAGE_TYPE_WORDS[state.analysis.type]}`;
     case "auto":

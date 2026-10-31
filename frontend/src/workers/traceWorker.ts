@@ -21,6 +21,9 @@ scope.onmessage = (event) => {
   try {
     if (request.type === "init") {
       initSync({ module: request.module });
+      // The page waits for this before it trusts the worker (a worker that never starts would
+      // otherwise leave every job waiting).
+      scope.postMessage({ id: 0, kind: "ready", error: "" });
       return;
     }
     const started = performance.now();
@@ -58,8 +61,8 @@ scope.onmessage = (event) => {
     );
     scope.postMessage({ id: request.id, kind: "trace", wire, ms: performance.now() - started }, [wire.buffer]);
   } catch (error) {
-    if (request.type !== "init") {
-      scope.postMessage({ id: request.id, kind: "error", message: String(error) });
-    }
+    scope.postMessage(
+      request.type === "init" ? { id: 0, kind: "ready", error: String(error) } : { id: request.id, kind: "error", message: String(error) },
+    );
   }
 };
