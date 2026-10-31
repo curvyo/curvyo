@@ -358,8 +358,9 @@ test("0025 in Chromium at 800x600: no Trace bar control passes the bar's right e
       const counts = block.querySelector('[data-trace-counts]');
       return { names: controls.map((e) => e.getAttribute('aria-label')), firstRow: controls.filter((e) => y(e) === y(controls[0])).map((e) => e.getAttribute('aria-label')),
         countsLast: block.lastElementChild === counts, countsBelow: y(counts) > Math.max(...controls.map(y)) }; })())`)) as string) as { names: string[]; firstRow: string[]; countsLast: boolean; countsBelow: boolean };
-    assert.deepEqual(advanced.names, ["Invert", "Drop border shapes", "Denoise", "Upscale", "Corners"]);
-    assert.deepEqual(advanced.firstRow.slice(0, 3), ["Invert", "Drop border shapes", "Denoise"]);
+    // 0089 criterion 25 (Frage 92 B): Output follows the two toggles in the Advanced block.
+    assert.deepEqual(advanced.names, ["Invert", "Drop border shapes", "Output", "Denoise", "Upscale", "Corners"]);
+    assert.deepEqual(advanced.firstRow.slice(0, 3), ["Invert", "Drop border shapes", "Output"]);
     assert.ok(advanced.countsLast && advanced.countsBelow, "the counts row is the last row");
     // 0089 Frage 84: the expander and the finish button share the last line, the button at the
     // far right (at 308 px they wrap below Ignore below, `specs/0089` ux-notes §2).

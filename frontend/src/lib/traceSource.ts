@@ -1,8 +1,10 @@
 /** Reads what the Trace tool needs from the wasm module: its schema, the pixels and the view. */
 import type { WasmSession } from "@/lib/editorSession";
 import {
+  MULTICOLOUR,
   PICK_COLOURS,
   REMOVE_BACKGROUND,
+  SINGLE_COLOUR,
   TRACE_PARAMS_FALLBACK,
   TRACE_PRESETS_FALLBACK,
   type TraceParam,
@@ -32,9 +34,12 @@ export function loadPresets(): readonly TracePreset[] {
 }
 
 /** A method's pipette (Frage 89 A): Remove background takes one pick, Pick colours stays armed,
- * Brightness has none. */
-export function pickModeOf(method: number): string {
-  return method === REMOVE_BACKGROUND ? "background" : method === PICK_COLOURS ? "colours" : "";
+ * Brightness has one only in Multicolour, for the palette (stays armed, `specs/0089` UX notes §7). */
+export function pickModeOf(method: number, output = SINGLE_COLOUR): string {
+  if (method === REMOVE_BACKGROUND) {
+    return "background";
+  }
+  return method === PICK_COLOURS || output === MULTICOLOUR ? "colours" : "";
 }
 
 /** The pixels of `id` for the worker, or `null` while the picture is not readable. */

@@ -1,3 +1,5 @@
+import type { HsvTriple } from "./useStylePanel";
+import type { TracePaletteApi } from "./useTracePalette";
 import type {
   TraceChoice,
   TraceParam,
@@ -79,4 +81,9 @@ export interface TraceApi {
   /** The automatic background of the shown image (`#RRGGBB`, empty: transparent; `null` before
    * it is read). */
   suggestedBackground: string | null;
+  /** The palette of a multicolour trace (`specs/0089` slice M). */
+  palette: TracePaletteApi;
+  /** The Recolour picker's conversions (Rust's rounding, as the Style section's). */
+  hsvOf: (rgb: number) => HsvTriple;
+  rgbOf: (hue: number, saturation: number, value: number) => number;
 }
