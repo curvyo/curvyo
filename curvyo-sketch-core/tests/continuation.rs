@@ -294,3 +294,49 @@ fn three_point_arc_resumes_existing_endpoint_in_either_canonical_direction() {
         validate_candidate(&result.intent, &result.candidate).unwrap();
     }
 }
+
+/// AC26: a tangent arc that keeps turning the same way touches the previous arc from inside.
+#[test]
+fn tangent_arc_after_arc_solves_on_both_sides_of_the_tangent() {
+    let line = construct(
+        &Sketch::new("o".into()),
+        "first",
+        &Construction::Polyline(vec![Position::mm(0.0, 0.0), Position::mm(10.0, 0.0)]),
+    )
+    .unwrap()
+    .candidate;
+    // A left (counter-clockwise) turn ending at (20, 10) with outgoing tangent (0, 1).
+    let arc = construct(
+        &line,
+        "turn",
+        &Construction::Continue {
+            previous: "first:line0".into(),
+            start: "first:p1".into(),
+            end: "turn:end".into(),
+            position: Position::mm(20.0, 10.0),
+            mode: ContinuationMode::TangentArc,
+        },
+    )
+    .unwrap()
+    .candidate;
+    // Left of (0, 1) keeps turning (same-side centres), right of it turns back (opposite).
+    for (x, label) in [(14.0, "inner"), (26.0, "outer")] {
+        let next = construct(
+            &arc,
+            "next",
+            &Construction::Continue {
+                previous: "turn:arc".into(),
+                start: "turn:end".into(),
+                end: "next:end".into(),
+                position: Position::mm(x, 16.0),
+                mode: ContinuationMode::TangentArc,
+            },
+        )
+        .unwrap_or_else(|e| panic!("{label}: {e}"));
+        validate_candidate(&next.intent, &next.candidate).unwrap();
+        let end = next.candidate.point(&"next:end".into()).unwrap();
+        assert!(end.distance(Position::mm(x, 16.0)).0 < 1e-6, "{label}");
+        let edit = solve(&next.intent, &SolveMode::Edit).unwrap();
+        assert!(edit.candidate.is_some(), "{label}: {:?}", edit.message);
+    }
+}

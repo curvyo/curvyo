@@ -55,6 +55,10 @@ pub(crate) fn append(
                 if !crate::contact::joint(s, a, b) && (s.line(a).is_ok() || s.line(b).is_ok()) {
                     relation["extension"] = true.into();
                 }
+                // Joined arcs keep the side of the current pose; ACS never flips a join.
+                if crate::tangency::internal_joint(s, a, b) == Some(true) {
+                    relation["internal"] = true.into();
+                }
                 relation
             }
             Relation::Equal(a, b) => json!({"type":"equal","a":input.id(a),"b":input.id(b)}),

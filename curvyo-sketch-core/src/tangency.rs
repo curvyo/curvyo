@@ -18,6 +18,14 @@ pub(crate) fn validate(s: &Sketch, a: &EntityId, b: &EntityId) -> Result<(), Ske
     let (ca, ra) = circle(s, a)?;
     let (cb, rb) = circle(s, b)?;
     let d = ca.distance(cb).0;
+    if internal_joint(s, a, b) == Some(true) {
+        // Same-side centres: the circles touch from inside at the shared endpoint.
+        return if (d - (ra - rb).abs()).abs() > TOLERANCE {
+            Err(failed())
+        } else {
+            Ok(())
+        };
+    }
     if (d - ra - rb).abs() > TOLERANCE || d <= 1e-12 {
         return Err(failed());
     }
@@ -27,6 +35,29 @@ pub(crate) fn validate(s: &Sketch, a: &EntityId, b: &EntityId) -> Result<(), Ske
     );
     on_span(s, a, contact)?;
     on_span(s, b, contact)
+}
+/// For two arcs sharing an endpoint, whether their centres lie on the same side of it
+/// (inside tangency, the second arc continues turning the same way) in the given pose.
+/// `None` when the pair is not two joined arcs or a radius vanishes there.
+pub(crate) fn internal_joint(s: &Sketch, a: &EntityId, b: &EntityId) -> Option<bool> {
+    let ends = |id: &EntityId| match s.entities.get(id) {
+        Some(Entity::Arc {
+            center, start, end, ..
+        }) => Some((center, [start, end])),
+        _ => None,
+    };
+    let (ca, ea) = ends(a)?;
+    let (cb, eb) = ends(b)?;
+    let shared = ea.into_iter().find(|p| eb.contains(p))?;
+    let p = s.point(shared).ok()?;
+    let ca = s.point(ca).ok()?;
+    let cb = s.point(cb).ok()?;
+    let v1 = (p.x.0 - ca.x.0, p.y.0 - ca.y.0);
+    let v2 = (p.x.0 - cb.x.0, p.y.0 - cb.y.0);
+    if v1.0.hypot(v1.1) <= 1e-12 || v2.0.hypot(v2.1) <= 1e-12 {
+        return None;
+    }
+    Some(v1.0 * v2.0 + v1.1 * v2.1 > 0.0)
 }
 fn circle(s: &Sketch, id: &EntityId) -> Result<(Position, f64), SketchError> {
     match s.entities.get(id) {
