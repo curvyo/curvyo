@@ -201,8 +201,17 @@ mod tests {
         dir
     }
 
+    /// The `file://` URI of `path`: `file:///C:/dir/file` on Windows, `file:///dir/file` elsewhere.
     fn uri(path: &Path) -> String {
-        format!("file://{}", path.to_string_lossy().replace(' ', "%20"))
+        let text = path
+            .to_string_lossy()
+            .replace(' ', "%20")
+            .replace('\\', "/");
+        if text.starts_with('/') {
+            format!("file://{text}")
+        } else {
+            format!("file:///{text}")
+        }
     }
 
     #[test]
@@ -224,11 +233,13 @@ mod tests {
     fn a_folder_a_missing_file_and_a_device_are_refused() {
         let dir = folder("refused");
         let missing = dir.join("gone.png");
-        let read = read_texts(&[format!(
-            "{}\r\n{}\r\nfile:///dev/null\r\n",
-            uri(&dir),
-            uri(&missing)
-        )]);
+        // `/dev/null` is a device on Unix; a Windows path has a drive, so it names no file there.
+        let device = if cfg!(unix) {
+            "file:///dev/null\r\n"
+        } else {
+            ""
+        };
+        let read = read_texts(&[format!("{}\r\n{}\r\n{device}", uri(&dir), uri(&missing))]);
         let names: Vec<_> = read
             .iter()
             .map(|file| match file {
@@ -236,9 +247,11 @@ mod tests {
                 other => panic!("refused, got {other:?}"),
             })
             .collect();
-        assert_eq!(names.len(), 3);
+        assert_eq!(names.len(), if cfg!(unix) { 3 } else { 2 });
         assert_eq!(names[1], "gone.png");
-        assert_eq!(names[2], "null");
+        if cfg!(unix) {
+            assert_eq!(names[2], "null");
+        }
     }
 
     #[test]

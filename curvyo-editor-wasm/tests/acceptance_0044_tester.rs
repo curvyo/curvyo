@@ -1302,10 +1302,18 @@ fn cache_a_drag_keeps_its_first_read_and_the_end_matches_a_fresh_read() {
 
 #[test]
 fn cache_memory_does_not_grow_over_a_thousand_operations() {
-    fn rss_kib() -> u64 {
-        let statm = std::fs::read_to_string("/proc/self/statm").unwrap();
-        let pages: u64 = statm.split_whitespace().nth(1).unwrap().parse().unwrap();
-        pages * 4
+    /// Resident set size in KiB: `/proc` on Linux, `ps` on other Unix (macOS has no `/proc`);
+    /// `None` where neither exists (Windows), where the growth bound cannot be measured.
+    fn rss_kib() -> Option<u64> {
+        if let Ok(statm) = std::fs::read_to_string("/proc/self/statm") {
+            let pages: u64 = statm.split_whitespace().nth(1)?.parse().ok()?;
+            return Some(pages * 4);
+        }
+        let out = std::process::Command::new("ps")
+            .args(["-o", "rss=", "-p", &std::process::id().to_string()])
+            .output()
+            .ok()?;
+        String::from_utf8(out.stdout).ok()?.trim().parse().ok()
     }
     let mut s = open(&row_doc(200));
     select_all(&mut s);
@@ -1314,7 +1322,9 @@ fn cache_memory_does_not_grow_over_a_thousand_operations() {
         let _ = arrow(&mut s, "ArrowRight", false, i > 0, f64::from(i) * 33.0);
         let _ = s.draw_list();
     }
-    let before = rss_kib();
+    let Some(before) = rss_kib() else {
+        return;
+    };
     for i in 0..1000 {
         let dir = if i % 2 == 0 {
             "ArrowRight"
@@ -1324,7 +1334,7 @@ fn cache_memory_does_not_grow_over_a_thousand_operations() {
         let _ = arrow(&mut s, dir, false, false, 10_000.0 + f64::from(i) * 700.0);
         let _ = s.draw_list();
     }
-    let after = rss_kib();
+    let after = rss_kib().unwrap_or(before);
     let growth = after.saturating_sub(before);
     println!("rss before {before} KiB after {after} KiB growth {growth} KiB");
     // Each snapshot read is a Vec of 200 objects: a leak of one per op would be megabytes.
