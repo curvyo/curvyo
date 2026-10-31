@@ -24,6 +24,7 @@ mod font_file_glue;
 mod font_library_glue;
 mod font_preview_glue;
 mod session;
+mod trace_analysis_glue;
 mod trace_glue;
 
 #[cfg(target_arch = "wasm32")]
@@ -135,6 +136,7 @@ pub use session::{TextPathPress, TextPathView};
 pub use session::{
     TraceCreateOutcome, TracePickMode, TraceSelection, TraceSource, TraceView, TraceViewMode,
 };
+pub use trace_analysis_glue::analysis_json as trace_analysis_json;
 pub use trace_glue::{
     hex as trace_hex, trace_colour_settings, trace_params_json, trace_presets_json, trace_settings,
 };
