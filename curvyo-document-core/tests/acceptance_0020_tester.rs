@@ -41,6 +41,7 @@ fn rect(d: &Document, x: f64) -> NodeId {
 
 fn width_mm(d: &Document, id: NodeId) -> f64 {
     match d.object(id).unwrap() {
+        ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Primitive(p) => p.style.stroke.width.as_mm(),
@@ -51,6 +52,7 @@ fn width_mm(d: &Document, id: NodeId) -> f64 {
 
 fn fill_color(d: &Document, id: NodeId) -> Color {
     match d.object(id).unwrap() {
+        ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Primitive(p) => p.style.fill.color,
@@ -987,6 +989,7 @@ fn c54_eleven_continuation_commits_are_one_step() {
     let step = last_step(&a);
     a.undo_step(step).unwrap();
     match a.object(r).unwrap() {
+        ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Clone(_) => panic!("no clone here"),

@@ -62,6 +62,7 @@ fn drawn(d: &Document, id: NodeId) -> PathSnapshot {
     match d.object(id).unwrap() {
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
+        ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Path(path) => path,
         ObjectSnapshot::Clone(clone) => clone.resolved,
         ObjectSnapshot::Primitive(_) => panic!("a primitive"),
@@ -133,6 +134,7 @@ fn mapped_results(d: &Document, ids: &[NodeId], g: Affine) -> Vec<ObjectSnapshot
         .map(|&id| match d.object(id).unwrap() {
             ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
             ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
+            ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
             ObjectSnapshot::Path(path) => ObjectSnapshot::Path(path.mapped(g)),
             ObjectSnapshot::Clone(clone) => {
                 let mut moved = clone.mapped_by(g);

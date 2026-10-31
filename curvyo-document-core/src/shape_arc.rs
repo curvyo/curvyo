@@ -30,7 +30,8 @@ impl Document {
                 self.object(*id).map(|o| {
                     let closed = match &o {
                         crate::ObjectSnapshot::Primitive(p) => crate::outline_of(&p.shape).closed,
-                        crate::ObjectSnapshot::Path(_)
+                        crate::ObjectSnapshot::Sketch(_)
+                        | crate::ObjectSnapshot::Path(_)
                         | crate::ObjectSnapshot::Clone(_)
                         | crate::ObjectSnapshot::Text(_)
                         | crate::ObjectSnapshot::Image(_) => true,

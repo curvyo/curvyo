@@ -299,6 +299,8 @@ const HALF_TURN_EPSILON_RAD: f64 = 1e-9;
 /// [`PrimitiveSnapshot`], which does not derive `Deserialize` either.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum ObjectSnapshot {
+    /// Parametric geometry; its derived outline is read-only until conversion.
+    Sketch(Box<crate::SketchSnapshot>),
     /// A path node (no `shape` tag).
     Path(PathSnapshot),
     /// A primitive node.
@@ -325,6 +327,7 @@ impl ObjectSnapshot {
             Self::Clone(snapshot) => &snapshot.resolved.style,
             Self::Text(snapshot) => &snapshot.style,
             Self::Image(snapshot) => &snapshot.style,
+            Self::Sketch(snapshot) => &snapshot.resolved.style,
         }
     }
 
@@ -337,6 +340,7 @@ impl ObjectSnapshot {
             Self::Clone(snapshot) => &mut snapshot.resolved.style,
             Self::Text(snapshot) => &mut snapshot.style,
             Self::Image(snapshot) => &mut snapshot.style,
+            Self::Sketch(snapshot) => &mut snapshot.resolved.style,
         }
     }
 
@@ -347,6 +351,7 @@ impl ObjectSnapshot {
     pub fn drawn_path(&self) -> Option<&PathSnapshot> {
         match self {
             Self::Path(path) => Some(path),
+            Self::Sketch(snapshot) => Some(&snapshot.resolved),
             Self::Clone(clone) => Some(&clone.resolved),
             Self::Text(text) => text.outline.as_deref().map(|outline| &outline.glyphs),
             Self::Primitive(_) | Self::Image(_) => None,
@@ -362,6 +367,7 @@ impl ObjectSnapshot {
             Self::Clone(snapshot) => snapshot.id(),
             Self::Text(snapshot) => snapshot.id,
             Self::Image(snapshot) => snapshot.id,
+            Self::Sketch(snapshot) => snapshot.id,
         }
     }
 
@@ -376,6 +382,9 @@ impl ObjectSnapshot {
             Self::Primitive(snapshot) => snapshot.rotation,
             Self::Clone(snapshot) => snapshot.resolved.rotation,
             Self::Text(snapshot) => snapshot.rotation(),
+            Self::Sketch(snapshot) => {
+                Angle::from_radians(snapshot.placement.b.atan2(snapshot.placement.a))
+            }
             Self::Image(snapshot) => {
                 Angle::from_radians(snapshot.placement.b.atan2(snapshot.placement.a))
             }
@@ -423,6 +432,9 @@ impl ObjectSnapshot {
     #[must_use]
     pub fn rotated(&self, pivot: Point, angle: Angle) -> Self {
         match self {
+            Self::Sketch(snapshot) => Self::Sketch(Box::new(
+                snapshot.mapped_by(Affine::rotation_about(pivot, angle)),
+            )),
             Self::Path(path) => Self::Path(path.rotated(pivot, angle)),
             Self::Primitive(primitive) => {
                 let mut primitive = primitive.clone();
@@ -467,6 +479,9 @@ impl ObjectSnapshot {
                 let mut primitive = primitive.clone();
                 primitive.shape = translate_shape(primitive.shape, offset);
                 Self::Primitive(primitive)
+            }
+            Self::Sketch(snapshot) => {
+                Self::Sketch(Box::new(snapshot.mapped_by(Affine::translation(offset))))
             }
             Self::Clone(clone) => Self::Clone(clone.mapped_by(Affine::translation(offset))),
             Self::Text(text) => Self::Text(Box::new(text.mapped_by(Affine::translation(offset)))),

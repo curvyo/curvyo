@@ -140,7 +140,8 @@ pub(crate) fn effective_guide(
         crate::primitive_model::ObjectSnapshot::Clone(clone) => {
             own(clone.id()) || own(clone.chain.root)
         }
-        crate::primitive_model::ObjectSnapshot::Path(_)
+        crate::primitive_model::ObjectSnapshot::Sketch(_)
+        | crate::primitive_model::ObjectSnapshot::Path(_)
         | crate::primitive_model::ObjectSnapshot::Primitive(_)
         | crate::primitive_model::ObjectSnapshot::Text(_)
         | crate::primitive_model::ObjectSnapshot::Image(_) => own(object.id()),

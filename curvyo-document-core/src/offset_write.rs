@@ -171,7 +171,8 @@ impl Document {
                     let mut path = match self.object(*target)? {
                         ObjectSnapshot::Path(path) => path,
                         ObjectSnapshot::Clone(clone) => clone.resolved,
-                        ObjectSnapshot::Primitive(_)
+                        ObjectSnapshot::Sketch(_)
+                        | ObjectSnapshot::Primitive(_)
                         | ObjectSnapshot::Text(_)
                         | ObjectSnapshot::Image(_) => return None,
                     };
@@ -233,6 +234,9 @@ fn validate(tree: &LoroTree, writes: &[OffsetWrite]) -> Result<(), ObjectEditErr
                 .get_meta(tree_id)
                 .map_err(|_| ObjectEditError::NoSuchObject)?;
             let tag = shape_codec::read_shape_tag(&meta);
+            if tag.as_deref() == Some("sketch") {
+                return Err(ObjectEditError::InvalidConversion);
+            }
             match (geometry, tag.as_deref()) {
                 (OffsetGeometry::Path(_), _) => replaced.push(tree_id),
                 (OffsetGeometry::Primitive { shape, .. }, Some(tag)) if tag == shape_tag(shape) => {

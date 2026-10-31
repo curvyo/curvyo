@@ -3,7 +3,7 @@
 //! style source (ADR 0016 §3) is computed once from its original's, and the root's outline is
 //! transformed once per clone.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::affine::Affine;
 use crate::clone_codec::CloneLink;
@@ -15,6 +15,7 @@ use crate::style_model::Style;
 /// One leaf as stored, before any clone is resolved.
 #[derive(Debug, Clone)]
 pub(crate) enum RawLeaf {
+    Sketch(Box<crate::SketchSnapshot>),
     /// A path or compound path: a possible root.
     Path(PathSnapshot),
     /// A primitive: never an original.
@@ -46,6 +47,7 @@ impl RawLeaf {
     fn id(&self) -> NodeId {
         match self {
             Self::Path(path) => path.id,
+            Self::Sketch(snapshot) => snapshot.id,
             Self::Primitive(primitive) => primitive.id,
             Self::Text(text) => text.id,
             Self::Image(image) => image.id,
@@ -199,7 +201,7 @@ pub(crate) fn resolve(leaves: Vec<RawLeaf>) -> Resolution {
     let mut states: Vec<State> = leaves
         .iter()
         .map(|leaf| match leaf {
-            RawLeaf::Path(_) => State::Root,
+            RawLeaf::Path(_) | RawLeaf::Sketch(_) => State::Root,
             RawLeaf::Primitive(_)
             | RawLeaf::BrokenClone(_)
             | RawLeaf::Text(_)
@@ -270,15 +272,14 @@ fn assemble(leaves: Vec<RawLeaf>, states: &[State], index: &HashMap<NodeId, usiz
     let mut clones: Vec<Option<CloneSnapshot>> = vec![None; leaves.len()];
     let mut by_depth: Vec<(usize, usize)> = Vec::new();
     let mut shared: HashMap<usize, std::sync::Arc<PathSnapshot>> = HashMap::new();
+    let failed = refine_sketch_roots(&leaves, states, &mut shared);
     for (i, (leaf, state)) in leaves.iter().zip(states).enumerate() {
         if let (RawLeaf::Clone(id, link, overrides), State::Resolved(root, depth, composed, source)) =
             (leaf, *state)
-            && let RawLeaf::Path(root_path) = &leaves[root]
+            && !failed.contains(&root)
+            && let Some(root_path) = root_path(&leaves[root])
         {
-            let root_outline = shared
-                .entry(root)
-                .or_insert_with(|| std::sync::Arc::new(root_path.clone()))
-                .clone();
+            let root_outline = shared_outline(&mut shared, root, root_path);
             let (style_source, style) = match source.map(|s| &leaves[s]) {
                 Some(RawLeaf::Clone(
                     source_id,
@@ -335,6 +336,7 @@ fn assemble(leaves: Vec<RawLeaf>, states: &[State], index: &HashMap<NodeId, usiz
     for (i, leaf) in leaves.into_iter().enumerate() {
         let object = match leaf {
             RawLeaf::Path(path) => Some(ObjectSnapshot::Path(path)),
+            RawLeaf::Sketch(snapshot) => Some(ObjectSnapshot::Sketch(snapshot)),
             RawLeaf::Primitive(primitive) => Some(ObjectSnapshot::Primitive(primitive)),
             RawLeaf::Text(text) => Some(ObjectSnapshot::Text(text)),
             RawLeaf::Image(image) => Some(ObjectSnapshot::Image(image)),
@@ -714,4 +716,66 @@ mod tests {
         assert_eq!(read.orphans.len(), 10_000);
         assert_eq!(read.objects.len(), 0);
     }
+}
+
+fn root_path(leaf: &RawLeaf) -> Option<&PathSnapshot> {
+    match leaf {
+        RawLeaf::Path(path) => Some(path),
+        RawLeaf::Sketch(sketch) => Some(&sketch.resolved),
+        _ => None,
+    }
+}
+
+/// Refines one analytic root for the most magnified chain, independently of visibility.
+fn refine_sketch_roots(
+    leaves: &[RawLeaf],
+    states: &[State],
+    shared: &mut HashMap<usize, std::sync::Arc<PathSnapshot>>,
+) -> HashSet<usize> {
+    let mut stretches: HashMap<usize, f64> = HashMap::new();
+    for state in states {
+        if let State::Resolved(root, _, map, _) = state
+            && matches!(leaves[*root], RawLeaf::Sketch(_))
+        {
+            // Frobenius norm conservatively bounds linear stretch. Placement's norm is
+            // applied separately in outline_scaled, so no transform is baked twice.
+            let stretch = (map.a * map.a + map.b * map.b + map.c * map.c + map.d * map.d).sqrt();
+            stretches
+                .entry(*root)
+                .and_modify(|value| *value = value.max(stretch))
+                .or_insert(stretch);
+        }
+    }
+    let mut failed = HashSet::new();
+    for (root, stretch) in stretches {
+        let RawLeaf::Sketch(sketch) = &leaves[root] else {
+            continue;
+        };
+        match crate::sketch_outline::outline_scaled(
+            sketch.id,
+            &sketch.solution,
+            sketch.placement,
+            &sketch.resolved.style,
+            stretch,
+        ) {
+            Ok(outline) => {
+                shared.insert(root, std::sync::Arc::new(outline));
+            }
+            Err(_) => {
+                failed.insert(root);
+            }
+        }
+    }
+    failed
+}
+
+fn shared_outline(
+    shared: &mut HashMap<usize, std::sync::Arc<PathSnapshot>>,
+    root: usize,
+    path: &PathSnapshot,
+) -> std::sync::Arc<PathSnapshot> {
+    shared
+        .entry(root)
+        .or_insert_with(|| std::sync::Arc::new(path.clone()))
+        .clone()
 }

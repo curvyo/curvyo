@@ -22,6 +22,10 @@ use crate::units::Point;
 
 /// One object of the call, resolved against the document before any write.
 enum Planned<'a> {
+    Sketch {
+        meta: loro::LoroMap,
+        result: &'a ObjectSnapshot,
+    },
     /// An image: its placement.
     Image {
         meta: loro::LoroMap,
@@ -132,6 +136,10 @@ impl Document {
         let hold = self.hold_for_results(&links, results)?;
         for plan in &planned {
             let (meta, result) = match plan {
+                Planned::Sketch { meta, result } => {
+                    write_sketch(meta, result)?;
+                    (meta, result)
+                }
                 Planned::Clone { meta, result } => {
                     if let ObjectSnapshot::Clone(clone) = result {
                         crate::clone_write::write_matrix(
@@ -194,7 +202,8 @@ impl Document {
                     // The result is a path: an open Arc stays open.
                     let closed = match result {
                         ObjectSnapshot::Path(path) => path.closed,
-                        ObjectSnapshot::Primitive(_)
+                        ObjectSnapshot::Sketch(_)
+                        | ObjectSnapshot::Primitive(_)
                         | ObjectSnapshot::Clone(_)
                         | ObjectSnapshot::Text(_)
                         | ObjectSnapshot::Image(_) => true,
@@ -284,6 +293,17 @@ fn plan_one<'a>(
     let meta = tree
         .get_meta(tree_id)
         .map_err(|_| ObjectEditError::NoSuchObject)?;
+    if shape_codec::read_shape_tag(&meta).as_deref() == Some("sketch") {
+        let ObjectSnapshot::Sketch(sketch) = result else {
+            return Err(ObjectEditError::InvalidConversion);
+        };
+        let (graph, _, _) =
+            crate::sketch_codec::read(&meta).map_err(|_| ObjectEditError::NoSuchObject)?;
+        if graph != sketch.graph || !crate::sketch_codec::rigid(sketch.placement) {
+            return Err(ObjectEditError::InvalidConversion);
+        }
+        return Ok(Planned::Sketch { meta, result });
+    }
     if crate::clone_codec::is_clone_meta(&meta) {
         return plan_clone(tree, meta, result);
     }
@@ -391,9 +411,10 @@ fn plan_clone<'a>(
                 result,
             })
         }
-        ObjectSnapshot::Primitive(_) | ObjectSnapshot::Text(_) | ObjectSnapshot::Image(_) => {
-            Err(ObjectEditError::NoSuchObject)
-        }
+        ObjectSnapshot::Sketch(_)
+        | ObjectSnapshot::Primitive(_)
+        | ObjectSnapshot::Text(_)
+        | ObjectSnapshot::Image(_) => Err(ObjectEditError::NoSuchObject),
     }
 }
 
@@ -453,6 +474,7 @@ fn is_finite(object: &ObjectSnapshot) -> bool {
         ObjectSnapshot::Clone(clone) => rotation && clone.chain.matrix.is_finite(),
         ObjectSnapshot::Text(text) => text.placement.is_finite() && text.size.as_mm().is_finite(),
         ObjectSnapshot::Image(image) => image.placement.is_finite(),
+        ObjectSnapshot::Sketch(sketch) => sketch.placement.is_finite(),
         ObjectSnapshot::Path(path) => {
             rotation
                 && path.all_anchors().all(|a| {
@@ -503,6 +525,18 @@ fn write_anchors(anchors: &[(loro::LoroMovableList, usize, &AnchorSnapshot)]) {
             write_vec2(&map, KEY_HANDLE_OUT, anchor.handle_out);
         }
     }
+}
+
+fn write_sketch(meta: &loro::LoroMap, result: &ObjectSnapshot) -> Result<(), ObjectEditError> {
+    if let ObjectSnapshot::Sketch(sketch) = result {
+        crate::sketch_codec::write(
+            meta,
+            crate::sketch_codec::KEYS[4],
+            &sketch.placement.to_array(),
+        )
+        .map_err(|_| ObjectEditError::NonFiniteGeometry)?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]
