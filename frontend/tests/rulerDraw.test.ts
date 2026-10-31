@@ -139,3 +139,17 @@ test("on a 2x display every position is a whole device pixel", () => {
   const major = rects.find((r) => r.colour === "tick" && r.x === 21 - 1);
   assert.equal(major?.w, 2, "a 1 px tick is 2 device pixels");
 });
+
+test("cached ruler layers preserve pointer, edge and label painting order at every DPR", async () => {
+  const { drawRulerBase, drawRulerPointer, drawRulerForeground } = await import("../src/lib/rulerDraw.ts");
+  for (const horizontal of [false, true]) for (const devicePixelRatio of [1, 1.5, 2]) for (const pointer of [null, 0, 80.25, 199.9]) {
+    const strip = { horizontal, devicePixelRatio, pointer, length: 200, thickness: 24 };
+    const whole = recorder(); const layers = recorder();
+    drawRuler(whole.ctx, DATA, strip, COLOURS);
+    drawRulerBase(layers.ctx, DATA, strip, COLOURS);
+    drawRulerPointer(layers.ctx, strip, COLOURS);
+    drawRulerForeground(layers.ctx, DATA, strip, COLOURS);
+    assert.deepEqual(layers.rects, whole.rects);
+    assert.deepEqual(layers.texts, whole.texts);
+  }
+});
