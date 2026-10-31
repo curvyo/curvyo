@@ -87,9 +87,11 @@ change with it (it is remembered, like each method's Colour tolerance):
   including the soft edge toward the background, so pale colours and near-greys can be traced on
   their own. The pipette is armed on choosing the method; a click on the image picks its colour (it
   replaces the picked ones), **Shift+click** adds one (up to 8); the pipette stays armed until Esc
-  or a press on its button. A click on a swatch selects it and shows its Remove button; Delete
-  removes the focused swatch. Picked colours that touch become one shape. The picked colours
-  belong to this use of the tool and are not remembered. With none the status says "0 paths: no
+  or a press on its button. Beside the pipette the bar says how many colours are picked ("3 picked",
+  "None picked"); the swatches themselves are shown once, in the Advanced block, where a click
+  selects one and its Remove button takes it out; Delete removes the focused swatch. Picked colours
+  that touch become one shape. The picked colours belong to this use of the tool and are not
+  remembered. With none the Trace button is dimmed and its tooltip gives the reason, "0 paths: no
   colour picked."
 
 **Colour tolerance** (0 to 100; 40 for Remove background, 19 for Pick colours at first use): how far
@@ -107,8 +109,8 @@ image is never laid over white first.
 
 ## Analysis
 
-Under the Method button a line says what the automatic analysis found in the image the preview
-shows, and what it set. It runs once per image, on your computer, when the image is first shown in
+The first row of the Advanced block holds a line that says what the automatic analysis found in the
+image the preview shows, and what it set, and the blue **Analyse** button. It runs once per image, on your computer, when the image is first shown in
 the tool ("Analysing..." if that takes longer than 0.4 s), and applies its values at once. It sets
 only values that depend on the image: the method (Brightness, or Remove background when the image
 has pale or light colours that Brightness would miss), the background and Colour tolerance of
@@ -123,13 +125,13 @@ Sketch), how the image was made when it is a scan or a photo of paper, then what
 type is unclear (a photo without a sheet of paper) it reads "Type unclear · Brightness with
 automatic Threshold" and sets just that. Once you change the method, the Threshold, the Colour
 tolerance or the background, the line reads "Custom · Line drawing" and the analysis never changes
-those values again for this image; **Analyse again** sets them back to the analysis in one go (it
-is no History step, and it is dimmed while nothing was changed). If you change any setting before
-the analysis has answered, its answer is not applied to this image: the line reads Custom and
-Analyse again applies it on request. If the analysis fails the line reads "Analysis failed ·
-automatic Threshold used" and the image keeps its automatic Threshold. A line too long for the bar
-ends in "..." and shows whole as its tooltip. Several selected images use the shown image's
-analysis.
+those values again for this image; **Analyse** sets them back to the analysis in one go (it is no
+History step; it is always available, and with nothing changed it sets the same values again). If
+you change any setting before the analysis has answered, its answer is not applied to this image:
+the line reads Custom and Analyse applies it on request. If the analysis fails the line reads
+"Analysis failed · automatic Threshold used" and the image keeps its automatic Threshold. A long
+line wraps to a second row. With the Advanced block closed a screen reader still hears the line.
+Several selected images use the shown image's analysis.
 
 ## Settings
 
@@ -163,15 +165,21 @@ value.
 
 ## Advanced
 
-The double-arrow button at the far right, before the Trace button ("More trace options"), opens a block under the values
-(open or closed is remembered). Its first row starts with two icon buttons (pressed means on, the
-tooltip names each):
+The bar holds what a straightforward trace needs: choose, set the one main value, trace. The
+double-arrow button at the far right, before the Trace button ("More trace options"), opens a block
+under the values with everything else (open or closed is remembered). Its rows, top to bottom, each
+shown only when it has something to say:
+
+1. The analysis line and the **Analyse** button (see Analysis).
+2. The status line: the counts of the result (see Status).
+3. **Output** (Single colour, Multicolour) and, with Multicolour, **Colours**, and with Brightness
+   the palette's pipette; see "Multicolour" below.
+4. The colour strip, the one place swatches are shown, with the actions of the selected swatch.
+5. The options: two icon buttons (pressed means on, the tooltip names each), then three values.
 
 - **Invert**: traces what the method leaves out (with Brightness the light parts: pixels at or
   above the Threshold); transparent pixels stay empty.
 - **Drop border shapes**: drops the shapes that touch the border of the picture.
-
-Then:
 
 - **Denoise** (Off, Low, High): a median filter on the brightness before the Threshold; Low takes
   3 x 3 pixels, High 5 x 5. It removes scan noise and JPEG ringing.
@@ -181,11 +189,7 @@ Then:
   sharper than 60 degrees). Corners are found on the pixel outline before it is calmed and placed
   where the two straight sides meet.
 
-After them, **Output** (Single colour, Multicolour) and, with Multicolour, **Colours** and the
-palette's pipette; see "Multicolour" below.
-
-The last row of the block gives the counts of the result (see Status). Invert and Drop border
-shapes start off with each start of the app.
+Invert and Drop border shapes start off with each start of the app.
 
 ## Multicolour
 
@@ -201,13 +205,14 @@ each other, as in a photo, Auto takes 6 steps. Colours closer than 3 % of the co
 one colour; pale colours and small accents are kept. Only areas of flat colour vote, so the
 blended pixels along edges and JPEG fringes never become colours of their own. Areas smaller than
 Ignore below join the neighbouring colour they share the longest border with ("2 regions joined"
-under the counts). With Brightness the pipette after the field adds a colour you pick to the
+in the status line). With Brightness the pipette after the field adds a colour you pick to the
 palette (it stays armed; Shift+click adds more, Esc ends it); a colour that is already there is
 selected instead ("Same as #3366CC"). With Pick colours the palette is exactly the picked colours
 and the field shows their number.
 
-The **palette** appears below the values: one swatch per colour, largest area first, picked
-colours first with a small square in their corner. Arrows move through it; the selected swatch
+The **palette** is the colour strip in the Advanced block: one swatch per colour, largest area
+first, picked colours first with a small square in their corner (with Pick colours and Single
+colour it holds the picked colours, and Remove is its one action). Arrows move through it; the selected swatch
 shows its hex value and name ("#FFF2A8 · Pale yellow") and five buttons:
 
 - **Isolate**: the other colours are drawn dimmed in every view ("Isolating #FFF2A8"); Enter
@@ -219,7 +224,8 @@ shows its hex value and name ("#FFF2A8 · Pale yellow") and five buttons:
   pressing Merge into again undoes it.
 - **Exclude**: the colour becomes background and is not traced; the swatch shows a crossed circle
   ("2 colours excluded"). Pressing it again brings the colour back.
-- **Remove** (picked colours only): takes the colour out of the palette.
+- **Remove** (picked colours only): takes the colour out of the palette. Delete on the focused
+  swatch does the same.
 
 In the Mask view Multicolour shows each colour as it was found, the background white.
 
@@ -229,23 +235,27 @@ In the Mask view Multicolour shows each colour as it was found, the background w
 
 The counts of a trace, for example "7 paths, 412 nodes, 0.4 s" (paths are outlines, nodes their
 anchor points, the time is that of the last full trace) and, muted, "38 specks ignored" when
-specks were dropped, are the last row of the Advanced block; with the block closed they are not
-shown. While a trace runs or after a stop they stay, at half strength. Results you should read
-show in a muted row under the values whether the Advanced block is open or not:
+specks were dropped, are stated once, in the status line of the Advanced block; with the block
+closed they are not drawn (a screen reader still hears them). While a trace runs or after a stop
+they stay, at half strength. With Multicolour the counts name the colours first, for example "3
+colours, 7 paths, 412 nodes, 0.4 s". The status line also says what a colour action did
+("Isolating #FFF2A8", "Merging #FFF2A8 into...", "2 colours excluded") and, instead of the counts,
+"No colours found." (Multicolour found no colour in the content; the Trace button creates nothing)
+and "0 paths: no colour picked."
 
-- "0 paths at this Threshold: too low." (or "too high."): the Trace button creates nothing. With
-  Remove background "0 paths at this Colour tolerance: too high.", with Pick colours "0 paths at
-  this Colour tolerance: too low." or "0 paths: no colour picked."
+Results whose fix is a control of the bar show in a muted row under the values whether the
+Advanced block is open or not; the counts are then not printed again:
+
+- "0 paths at this Threshold: too low." (or "too high."): the Trace button is dimmed and creates
+  nothing; its tooltip gives the same reason. With Remove background "0 paths at this Colour
+  tolerance: too high.", with Pick colours "0 paths at this Colour tolerance: too low."
 - "1 path covering the whole image.": the whole picture is darker than the Threshold; Create
   paths works.
-- "Too much detail: raise Specks.": one shape has 65,000 holes or more; raise Ignore below.
+- "Too much detail: raise Ignore below.": one shape has 65,000 holes or more.
 - "412,000 nodes. Slow to edit.": more than 100,000 nodes; Create paths works, and the result is
   still one group with one compound path, one row in Layers.
-- "No colours found.": Multicolour found no colour in the content; the Trace button creates
-  nothing.
-
-With Multicolour the counts name the colours first, for example "3 colours, 7 paths, 412 nodes,
-0.4 s".
+- "Same as #3366CC": a pipette pick matched a colour that is already there; it goes after 3
+  seconds.
 
 ## About Trace
 
@@ -269,19 +279,15 @@ Trace turns the selected image into paths. The method decides which parts become
 - Brightness: pixels darker than the Threshold.
 - Remove background: everything unlike the background colour.
 - Background: the colour Remove background leaves out; Auto takes it from the image border.
-- Pick colours: pixels like the colours picked with the pipette; Shift+click adds a colour, up to 8.
+- Pick colours: pixels like the colours picked with the pipette; Shift+click adds a colour, up to 8. The picked colours are shown and edited in Advanced.
 - Pipette: takes a colour from the image under a click; Esc ends it.
 - Colour tolerance: how far a colour may be from the background or a picked colour and still count as it.
-- Analysis: names the image type and what it set for a new image: the method, its background and Colour tolerance, and the Threshold; never the preset or other values. Custom after you change one of them; Analyse again sets them back.
 - Threshold: pixels darker than this brightness (0 to 100 %) become shapes.
 - Smooth: calms the pixel steps of the outline before the fit; higher is calmer.
 - Tolerance: how far in pixels the paths may stray from the calmed outline; higher gives fewer nodes.
 - Ignore below: drops shapes and holes smaller than this size in mm.
-- Denoise: smooths out noise in the picture before tracing.
-- Upscale: doubles small images before tracing; Auto does it below 1 Mpx.
-- Corners: higher turns more bends into sharp corners.
-- Invert: traces what the method leaves out; transparent pixels never become shapes.
-- Drop border shapes: drops shapes that touch the image border.
+- Analysis: names the image type and what it set for a new image: the method, its background and Colour tolerance, and the Threshold; never the preset or other values. Custom after you change one of them; Analyse sets them back.
+- Status: the result in numbers (paths, nodes and time, specks ignored, colours) and what a colour action did.
 - Output: Single colour traces the content as one black shape; Multicolour gives one filled shape per colour, neighbours sharing their edges.
 - Colours: how many colours Multicolour finds, 2 to 16; Auto counts them in the image. With Pick colours the picked colours are the palette.
 - Palette: the colours of a Multicolour trace, largest area first; picked colours carry a corner mark and come first.
@@ -290,6 +296,11 @@ Trace turns the selected image into paths. The method decides which parts become
 - Merge into: traces a colour as another one, as one shape.
 - Exclude: makes a colour background; it is not traced.
 - Remove: takes a picked colour out of the palette.
+- Invert: traces what the method leaves out; transparent pixels never become shapes.
+- Drop border shapes: drops shapes that touch the image border.
+- Denoise: smooths out noise in the picture before tracing.
+- Upscale: doubles small images before tracing; Auto does it below 1 Mpx.
+- Corners: higher turns more bends into sharp corners.
 
 ## Create paths
 

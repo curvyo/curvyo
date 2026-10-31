@@ -368,3 +368,160 @@ None open. Decided 2026-10-29 (see the spec): Frage 89 A (pipette stays armed in
 Shift+click adds, Esc ends; ends after one pick in Remove background), Frage 90 A (Multicolour with Pick colours:
 the palette is exactly the picks, Colours fixed and greyed out), Frage 91 superseded by Frage 85 B (Tolerance in px
 is its own bar field), Frage 92 B (Output in Advanced).
+
+## 22. Tidy-up of 2026-10-31 (customer feedback on the merged Trace bar; overrides §2 items 5, 7, 14, 15, §3 layout, §7 placement of the palette, §10, §11 and §12 where they differ)
+
+Customer: the function is good, the bar is fiddly. **Principle: the bar holds what a straightforward trace needs
+(choose, set the one main value, trace); everything that explains, analyses, edits or reports sits in the
+expandable Advanced block.** Every item marked **(Proposal)** is mine and vetoable at the demo. Widths are
+arithmetic from the merged bar (inner 308 at 800 x 600 with the panel open, 588 closed; 36 px rows); the PR
+re-measures. No hint texts: every string below names a control or states a state.
+
+Note for the implementer: the analysis row component is not in the checkout this was written against
+(`story/text-recognition`); build from §3 and `TraceAdvanced.tsx`, and apply this section to wherever it lives.
+
+### 22.1 The new main bar
+
+One flow of whole items, 8 px apart, wrapping as before. Order:
+
+| # | Item | Width | Shown |
+|---|---|---|---|
+| 1 | **i** About Trace | 28 | always |
+| 2 | **Preset** | 132 | always |
+| 3 | **View** pill (4 segments) | 104 | always |
+| 4 | **Method** menu button | 176 | always |
+| 5 | The method's **one main field**: Threshold (Brightness) or Colour tolerance (Remove background, Pick colours) | 168 | always |
+| 6 | **Method group**, only where picking is the method's own job: Remove background keeps chip, hex, Auto, pipette (unchanged, 172); **Pick colours: the pipette plus a muted count label "3 picked" / "None picked" (Proposal)**, about 96. No swatches, no Remove button | 172 / 96 | those two methods |
+| 7 | **Smooth** | 168 | always |
+| 8 | **Tolerance** (px) | 168 | always |
+| 9 | **Ignore below** with its "~ 2 px" readout | 212 | always |
+| 10 | **Expander**, then the blue **Trace** button, both at the far right (`margin-left: auto`) | 28 + 8 + 75 | always |
+
+Gone from the bar: the analysis row (item 5 of §2), the swatch row of Pick colours, the palette strip and its detail
+row, the whole result line. Brightness + Multicolour adds nothing to the bar (its pipette is in Advanced, 22.3).
+The count label is a state label of the pipette ("3 picked" is the count of picks, the state in which Trace can run;
+"None picked" is the state in which it cannot), 12 px `--toolbar-icon` at 70 %, not a Tab stop; it replaces the
+notice "0 paths: no colour picked." and "8 colours picked" in the bar.
+
+**Rows at 800 x 600** (Advanced closed, no notice):
+
+| Method | Panel open (inner 308) | Panel closed (inner 588) |
+|---|---|---|
+| Brightness | 7 rows, 252 px: [i, Preset, View] [Method] [Threshold] [Smooth] [Tolerance] [Ignore below] [expander, Trace] | 3 rows, 108 px: [i .. Method 464] [Threshold, Smooth, Tolerance 520] [Ignore below, expander, Trace 331] |
+| Remove background | 8 rows, 288 px: as above, the group (172) on its own line after Colour tolerance (168 + 8 + 172 = 348 does not fit) | 3 rows, 108 px |
+| Pick colours | **7 rows, 252 px** (was 8): Colour tolerance and the pipette group share a line (168 + 8 + 96 = 272 fits) | **3 rows, 108 px** (was 4) |
+
+The analysis row no longer costs a bar row, so the bar is back to the height slice C measured for Brightness and
+one row shorter for Pick colours.
+
+### 22.2 Messages: where each goes
+
+Rule **(Proposal)**: *the bar keeps a notice row only for what the maker must see with Advanced closed and fix with
+a bar control, or what changes how the preview must be read. Every other line lives in the Advanced status line.
+A result is stated once, in one place.*
+
+| Message | Home | Why |
+|---|---|---|
+| Failed / Stopped, Loading, Tracing | the Trace button (as built) | unchanged |
+| "Tracing 1 of 3 images", "Preview from a reduced copy", "Over 100,000 nodes. Slow to edit." | bar notice row (unchanged; no height when empty) | change how the preview reads or how Trace behaves |
+| "0 paths at this Threshold/Colour tolerance: too low/high.", "1 path covering the whole image.", "Too much detail: raise Ignore below." | bar notice row | the fix is a bar control; Trace is disabled for 0 paths and too much detail, while "1 path covering the whole image" can still be created (0025 c15 wins, lead 2026-10-31). Counts are not also printed in Advanced then (the counts line is hidden for an empty or unusable result, so "0 paths" appears once) |
+| "0 paths: no colour picked." | **Advanced status line only**; in the bar the pipette label reads "None picked" and the Trace button is `aria-disabled` | customer asked for it to move; the state stays visible where the fix is |
+| Result counts "7 paths, 412 nodes, 0.4 s" ("3 colours, ..."), muted "38 specks ignored", "2 regions joined" | **Advanced status line only** (one line, was both notice row and counts line). The success text and the time move into it | removes the double count |
+| "No colours found.", "Isolating #FFF2A8", "Merging #FFF2A8 into...", "2 colours excluded" | Advanced status line (they come from Advanced controls) | |
+| "Same as #3366CC" (a pick matching an existing colour) | bar notice row, 3 s, then gone | caused by the bar's pipette |
+| Analysis line ("Line drawing · pale colours kept", "Custom · ...", "Analysing...", "Analysis failed ...") | Advanced, first row | customer item 1 |
+
+**A disabled Trace button explains itself**: `aria-disabled` with the reason as its tooltip and `aria-describedby`
+(the same text as the status line). With Advanced closed, a **visually hidden `role="status"` region in the bar**
+announces the Advanced status line and the analysis line once per change, so a screen-reader user loses nothing.
+Errors in the Trace button ("Failed", alert) and in the analysis line ("Analysis failed") are unchanged; the
+latter is only seen when Advanced is open, which is acceptable because Logo / Line art settings are used and the
+trace still runs.
+
+### 22.3 The Advanced block, top to bottom
+
+Divider as built, then rows (36 px unless noted), each present only when it has content:
+
+1. **Analysis row**: the line (12 px, up to two lines, never truncated, polite status) left; the blue
+   **Analyse** button right: text button 28 px high, 75 px wide, `--editor-accent` fill, white 14 px text, the
+   Trace button's look and focus ring (not a second, dimmer style). It is **always enabled** (permit over
+   refuse; in Auto it recomputes the same result, which is deterministic and harmless), so the dimmed
+   "Analyse again" state is gone. Pressing it replaces the analysed values as in §3, not a history step; its
+   mouse press returns focus to the canvas. States of the line as §3, button unchanged in all of them.
+2. **Status line** (`role="status"`, polite, tabular): the result counts, the muted second line, and the
+   palette states of 22.2; 50 % while stale; no height when empty. Replaces the old counts row at the bottom.
+3. **Output row**: Output pill; with Multicolour the Colours field (120) and, with Brightness, the palette
+   pipette (Pick colours has its pipette in the bar, so no second one here; one pipette per method, **Proposal**).
+4. **Colours strip and its detail row**, the one and only place swatches are shown (Multicolour: the palette
+   strip of §7; Pick colours in either Output: the picked colours as the same strip, so there is no second
+   swatch row): swatches, the detail row for the selected one with Isolate, Recolour, Merge into, Exclude, Remove
+   as §7 (Pick colours with Single colour offers Remove only). Esc clears the selection. Empty strip: no row.
+5. **Options**: the Invert and Drop border shapes toggles first (60 px, as 0025 §20.5), then Denoise,
+   Upscale, Corners (168 each). Unchanged in content and order.
+
+**Rows at 800 x 600:**
+
+| Advanced, added | Panel open (308) | Panel closed (588) |
+|---|---|---|
+| Single colour, Brightness | 6 rows, about 222 px: analysis, status, Output, [toggles + Denoise], Upscale, Corners | 4 rows, about 150 px: analysis, status, Output, options (60 + 3 x 168 + 24 = 588, exactly full; if it does not fit in the build, Corners wraps and this is 5) |
+| Multicolour, Brightness, 6 colours | 9 rows, about 330 px (Colours + pipette 252 get their own line; strip 1, detail 1) | 6 rows, about 222 px (Output + Colours + pipette 368 on one line) |
+| Multicolour, 16 colours | one row more in the strip | same |
+
+Worst case with the panel open (Brightness, Multicolour, 16 colours, detail row, Advanced open): bar 252 + block
+about 366 = 618 px, more than the 560 px canvas height at 800 x 600. This was already flagged in §2 and is not
+made worse (the old block had the same rows plus the analysis row and a bar swatch row). **(Proposal, optional,
+the implementer's call):** limit the Advanced block to `min(60vh, 360px)` with its own vertical scroll
+(`overflow-y: auto`, the divider and the first rows stay reachable by Tab, which scrolls the focus into view).
+
+### 22.4 Keyboard order
+
+Tab: Select-bar Trace button (when it is how the tool was entered), **i**, Preset, View (one stop), Method, the
+main field, the method group (Auto, pipette), Smooth, Tolerance, Ignore below, expander, **Trace**, then, when
+Advanced is open: **Analyse**, Output (one stop), Colours, the palette pipette (Brightness), the strip (one
+stop, arrows move, Delete removes a picked colour), its detail buttons, Invert, Drop border shapes, Denoise,
+Upscale, Corners. Enter on Analyse or on a swatch belongs to that control and does not create; Ctrl+Enter in any
+field creates; Escape in an Advanced control returns focus to the canvas, as built. Esc order unchanged (stop a
+running trace, disarm the pipette, leave the tool). The expander still moves nothing above it. Focus never moves
+by itself when Advanced opens or closes; closing it with focus inside puts focus on the expander.
+
+### 22.5 Strings
+
+New or changed: button **Analyse** (was "Analyse again"; the earlier "Re-analyse" and "Apply" are gone);
+pipette labels "3 picked" (count, singular "1 picked") and "None picked"; the Trace button's tooltip carries the
+reason when `aria-disabled`. Unchanged names: Output, Colours, Palette, Picked colours. "Analyse again" and the
+notice "8 colours picked" no longer exist in code, About Trace or docs. About Trace entries are reordered to the
+new order (bar items first, then the Advanced block: Analyse and the analysis line, status line, Output, Colours,
+palette actions, Invert, Drop border shapes, Denoise, Upscale, Corners); the Pick colours entry says the
+picked colours are shown and edited in Advanced. A test compares the strings with `docs/tracing-images.md`.
+
+### 22.6 Changes to the spec and the docs
+
+- `0089` criterion **22** (bar order): the order is now Preset and View, Method with its one main field and
+  pipette group, Smooth, Tolerance, Ignore below, expander, Trace; nothing about an analysis row or swatches in
+  the bar. **22a** unchanged.
+- Criterion **17**: the pipette stays in the bar; each swatch can be removed in the Advanced strip (Delete on the
+  focused swatch, the Remove action), not in the bar.
+- Criterion **25**: unchanged (Output in Advanced); the palette pipette is Advanced for Brightness, in the bar for
+  Pick colours.
+- Criterion **29**: the palette is usable without colour perception and by keyboard **inside Advanced**; it is
+  not visible with Advanced closed.
+- Criterion **31**: the analysis line is shown "in the Advanced block", not "in the bar".
+- Criterion **33**: the button is **Analyse** (not "Analyse again"), always enabled, in Advanced; the rest
+  (no re-run after a manual change, never switches Output) stands.
+- `0089` UX notes: §2 item 5 and items 7 and 14 (analysis row, colour group swatches, palette), §3 layout and
+  the disabled-button rows, §7 placement ("below the flow" becomes inside Advanced), §10 list of notices,
+  §11 Tab order, §12 strings, row counts in §2.
+- `0025` criteria **11, 46, 71** (counts and notice lines: result counts only in Advanced), **44** (unchanged
+  content), **57** (Tab order, 22.4); UX notes §21.3 (the notice row is narrowed by 22.2).
+- `docs/design-system.md`: rows "Trace bar", "Trace Output and palette" (palette placement, strip rule),
+  "Trace notices", "Trace Advanced button and block" (order of 22.3), and the "Trace info tab" row (entry
+  order). Add one sentence to the Trace bar row: the bar holds the straightforward path, Advanced everything else.
+  No new tokens.
+
+### 22.7 Questions
+
+None open; every choice above has the stated default and can be vetoed at the demo. The one I would look at first
+is the "3 picked" / "None picked" label (22.1): without it a maker who has not opened Advanced cannot see that
+a pick landed; veto it and the bar shows the canvas result only.
+
+**Lead decisions after the tester (2026-10-31, Proposal):** a duplicate pick in Pick colours is ignored without a notice; Output may share its line with Invert and Drop border shapes when it fits.
