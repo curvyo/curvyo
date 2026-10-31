@@ -1775,3 +1775,12 @@ passes; no self-made limit is set.
 
 **Resolution:** open; revisit with the stage cache of `specs/0089` adrs.md §6 (slice E), which
 changes what is held between traces.
+
+## Sketch constraint glyphs are redrawn FreeCAD icons (`0066` revision 2, 2026-10-31)
+
+The Constraints rail card and the canvas constraint symbols use single-colour redrawings of the
+FreeCAD Sketcher constraint icons (LGPL-2.1-or-later, `docs/third-party-assets.md`), kept in one
+file, `frontend/src/components/sketch/icons/constraintIcons.tsx`, as the UX notes ask.
+
+**Resolution:** open; replace with Curvyo's own icon set when the design system gets one, and
+drop the attribution entry then.

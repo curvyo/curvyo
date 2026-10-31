@@ -79,8 +79,13 @@ export function SketchEntryBox({ sketch, containerRef }: { sketch: SketchApi; co
   useEffect(() => {
     if (placed) presentation.setEntryOpen(true);
   }, [placed?.x, placed?.y, presentation, placed]);
+  // A double-click or Enter on a dimension text opens its entry at the text (AC31, AC33).
+  const editing = canvas.entry?.kind === "edit" ? canvas.entry.constraint : undefined;
+  useEffect(() => {
+    if (editing) presentation.setEntryOpen(true);
+  }, [editing, presentation]);
   if (!open || !canvas.entry || sketch.view.workbench !== "sketch") return null;
-  return <EntryBox key={`${canvas.entry.kind}:${canvas.entry.group}:${canvas.entry.fields.length}`} sketch={sketch} entry={canvas.entry} containerRef={containerRef} />;
+  return <EntryBox key={`${canvas.entry.kind}:${canvas.entry.group}:${canvas.entry.fields.length}:${canvas.entry.constraint ?? ""}`} sketch={sketch} entry={canvas.entry} containerRef={containerRef} />;
 }
 
 function EntryBox({ sketch, entry, containerRef }: { sketch: SketchApi; entry: SketchEntry; containerRef: ContainerRef }) {
@@ -88,20 +93,33 @@ function EntryBox({ sketch, entry, containerRef }: { sketch: SketchApi; entry: S
   const inputs = useRef<(HTMLInputElement | null)[]>([]);
   const messageId = useId();
   const [drafts, setDrafts] = useState<string[] | null>(null);
-  const [reference, setReference] = useState(false);
+  const [reference, setReference] = useState(entry.reference_on ?? false);
+  const editing = entry.kind === "edit";
   const [frozen, setFrozen] = useState<{ left: number; top: number } | null>(null);
   const sizes = useSizes(ref, containerRef, entry.group);
-  useEffect(() => { inputs.current[0]?.focus(); inputs.current[0]?.select(); }, []);
+  // Focus the first field after the press that opened the box has finished its own default
+  // focus on the canvas (a placed dimension opens the box during that press).
+  useEffect(() => {
+    const focus = () => { inputs.current[0]?.focus(); inputs.current[0]?.select(); };
+    focus();
+    const frame = requestAnimationFrame(focus);
+    return () => cancelAnimationFrame(frame);
+  }, []);
   const texts = drafts ?? entry.fields.map(field => field.value);
   const live = placeSketchChip({ x: entry.x, y: entry.y }, { x: entry.away_x, y: entry.away_y }, sizes.chip, sizes.canvas,
     ENTRY_OFFSET_PX, TOOL_RAIL_CLEAR_PX, { x: entry.pointer_x, y: entry.pointer_y });
   const at = frozen ?? live;
-  const close = () => { sketch.presentation.setEntryOpen(false); sketch.clearError(); sketch.focusCanvas(); };
+  const close = () => {
+    if (editing) sketch.run(s => s.sketch_close_dimension_edit());
+    sketch.presentation.setEntryOpen(false); sketch.clearError(); sketch.focusCanvas();
+  };
   const submit = () => {
-    const [first = "", second = ""] = reference ? entry.fields.map(field => field.value) : texts;
-    const done = entry.kind === "dimension"
-      ? sketch.run(s => s.sketch_apply_action(entry.action ?? "", first, reference))
-      : sketch.run(s => s.sketch_complete_numeric(first, second));
+    const [first = "", second = ""] = reference && !editing ? entry.fields.map(field => field.value) : texts;
+    const done = editing
+      ? sketch.run(s => s.sketch_dimension_text(entry.constraint ?? "", first, reference))
+      : entry.kind === "dimension"
+        ? sketch.run(s => s.sketch_apply_action(entry.action ?? "", first, reference))
+        : sketch.run(s => s.sketch_complete_numeric(first, second));
     if (done) close();
     else requestAnimationFrame(() => inputs.current[0]?.select());
   };
@@ -130,10 +148,10 @@ function EntryBox({ sketch, entry, containerRef }: { sketch: SketchApi; entry: S
     <div className="flex items-center gap-1">
       {entry.fields.map((field, index) => <EntryField key={field.label} label={field.label} width={FIELD_PX[index] ?? FIELD_PX[0]}
         labelWidth={LABEL_PX[index] ?? LABEL_PX[0]} suffix={field.suffix} ariaLabel={field.name} invalid={invalid} messageId={messageId}
-        value={reference ? field.value : texts[index] ?? ""}
+        value={reference && !editing ? field.value : texts[index] ?? ""}
         inputRef={node => { inputs.current[index] = node; }}
         onChange={text => {
-          if (reference) return;
+          if (reference && !editing) return;
           if (!frozen) setFrozen(live);
           setDrafts(texts.map((value, i) => (i === index ? text : value)));
           sketch.clearError();

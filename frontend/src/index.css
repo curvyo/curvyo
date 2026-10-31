@@ -154,6 +154,14 @@
      * (`docs/design-system.md`, "Linked clone marks"; `specs/0049-linked-clone` criterion 60). */
     --clone-link: #7B3FD6;
 
+    /* 0066 constraint sketcher (docs/design-system.md, "Color tokens"): dimension annotations,
+       constraint symbols and fully constrained geometry in the Sketch workbench. */
+    --dim-driving: #BF2933;
+    --dim-reference: var(--panel-muted-fg);
+    --dim-halo: var(--canvas-bg);
+    --sketch-solved: #12733A;
+    --sketch-symbol-bg: rgb(255 255 255 / 85%);
+
     /* 0007 stroke-and-fill-styling (docs/design-system.md, "Properties panel:
        Style section"): the docked panel's ground, muted text, field states,
        swatch and checkerboard tokens. Values and contrast figures are the

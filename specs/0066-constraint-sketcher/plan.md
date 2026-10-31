@@ -735,15 +735,70 @@ symbol drawing), `frontend/src/components/sketch`, `frontend/src/hooks/useEditor
 
 ### M3: rail constraint card, dimensions and symbols on the canvas (AC24, AC31, AC32)
 
-- [ ] 11. AC24: "Constraints" rail card in column B (Coincident ... Fixed | Symmetric, Midpoint |
+- [x] 11. AC24: "Constraints" rail card in column B (Coincident ... Fixed | Symmetric, Midpoint |
   Dimension), selection-first apply, armed picks otherwise, disabled reasons in tooltips;
   icons redrawn single-colour, licence and attribution recorded (lead).
-- [ ] 12. AC31: permanent dimension annotations (linear with extension lines and arrows,
+- [x] 12. AC31: permanent dimension annotations (linear with extension lines and arrows,
   "R 25 mm", "⌀ 50 mm", angle arc), reference shown "(50 mm)" dashed, constant screen size,
   draggable persisted label, hover/selection highlight, double-click edit; never output.
-- [ ] 13. AC32: constraint symbols next to their geometry, stacked without overlap, accessible
+- [x] 13. AC32: constraint symbols next to their geometry, stacked without overlap, accessible
   names, click selects the constraint (AC22), conflict marker (AC5), thinning above 150
   annotations keeps selected/hovered/conflicting (test with 151); fully constrained green with
   a non-colour marker (Proposal).
 - [ ] 14. Design-system rows (UX notes "Design-system and implementation notes"), full gate,
   tester pass and UX review before the PR is offered for acceptance.
+- M3 build order (implementer): (a) `curvyo-ui-core/src/sketch_tool_use.rs`: per-tool state
+  apply / arm / unavailable with reason from the selection (AC24); (b)
+  `curvyo-ui-core/src/sketch_dimension_layout.rs`: extension lines, dimension line, arrows or
+  ticks, text point and rank for linear, radius, diameter and angle at screen-constant sizes
+  (AC31); (c) `curvyo-ui-core/src/sketch_symbol_layout.rs`: badge centres, rows of at most
+  three plus "+n", overlap offsets, thinning above 150 with selected/hovered/conflicting kept
+  (AC32, test at 151); (d) `curvyo-render-core` draws the dimension marks (driving solid,
+  reference dashed 4/3) and the solved-geometry stroke; (e) session: rail states and press,
+  armed tools apply on the last eligible pick, annotation hit-test, hover, label drag (one
+  history step, Escape restores), double-click opens the entry box at the text; (f) host:
+  Constraints card, icon set, DOM dimension text and symbol badges positioned by Rust.
+- Built. `curvyo-ui-core`: `sketch_tool_use` (apply / arm / unavailable with reason, valid starts
+  found by trying one or two more existing entities), `layout_dimensions` (linear with ranks and
+  text slide, radius, diameter, angle; small-span flip and ticks), `layout_symbols` (rows of three
+  plus "+n", no overlap with badges or dimension texts, thinning above 150). `curvyo-render-core`:
+  `build_sketch_dimension` (driving solid red, reference dashed 4/3 grey, hover band, selected
+  accent), `build_sketch_solved`, theme `DIM_DRIVING`, `DIM_REFERENCE`, `SKETCH_SOLVED`. Session
+  (`session/sketch/`): `rail.rs` (`sketch_rail_press`, armed tools apply on the last eligible
+  pick and stay armed, Escape disarms to Select), `annotations.rs` (dimension records, display
+  unit text), `symbols.rs` (glyph per relation, Equal groups numbered in constraint order),
+  `annotation_input.rs` (hit-test, hover, text drag with one history step and Escape, double-click
+  and Enter open the entry box at the text: `sketch_edit_dimension`, kind `edit`, closes the M2
+  open point). Wasm: `sketch_rail_press`, `sketch_edit_dimension`, `sketch_close_dimension_edit`.
+  Host: two-card Sketch rail with the Constraints card, `icons/constraintIcons.tsx`,
+  `SketchAnnotations` renders Rust-placed dimension texts and symbol badges (pointer input goes to
+  the canvas, where Rust hit-tests), entry box kind `edit`, tokens in `index.css`.
+- Icons: FreeCAD files fetched at commit `faf7e671` and their metadata read ("FreeCAD LGPL2+");
+  single-colour 16px redrawings of their shapes, attribution in `docs/third-party-assets.md`,
+  replace-later entry in `docs/technical-debt.md`.
+- Choices **(Proposal)**: symbols and dimension texts are DOM elements placed by Rust with
+  `pointer-events: none` (accessible names, one icon set for rail and canvas); dimension lines
+  and arrows are canvas marks. Geometry within the 6px pick tolerance wins over an annotation
+  (keeps drags of small sketches, tester's `suffix_native_body_drag_*`). A click on an annotation
+  selects without moving the view. Sweep relations (slot caps) get no canvas dimension; arc
+  length uses a radius-style leader without prefix; an arc's radius leader sits at three
+  quarters of its sweep (its middle carries the symbols). Coincident, Midpoint and On-axis sit at
+  their point; Parallel, Perpendicular, Tangent at the shared point or between the entities;
+  Symmetric between its two points. Before the first geometry (no sketch yet) every rail tool is
+  unavailable with "Open a sketch first".
+- Not done in M3: Sketches rows with 16px glyphs (UX notes table); dotted leaders of pair
+  symbols on hover; "+n" opens only through entity selection or preselection. Slot constructions
+  report two of their four tangents as redundant, so those symbols carry the conflict border
+  (pre-existing solver state, for the lead).
+- Checks run: red first only for the session tests of the reveal and geometry-priority fixes (the
+  layout and eligibility tests were written with the code). `cargo nextest run -p
+  curvyo-editor-wasm -p curvyo-ui-core -p curvyo-render-core -p curvyo-sketch-core` 6500/6500
+  passed (84 skipped), incl. 33 new tests (ui-core 18 with the 151-annotation thinning test,
+  render-core 3, editor-wasm 12); `cargo clippy` the three changed crates all targets and wasm32
+  `-D warnings` clean; wasm32 build; `cargo doc -D warnings`; `cargo fmt --all --check`; frontend
+  `npm run build:wasm`, `npx tsc -b --noEmit`, `npm test` 643 passed, 74 skipped, `npx oxlint` no
+  errors. Browser smoke `frontend/tests/browser/sketch-rev2-m3.cjs` passed (Chromium, Vite on
+  :1421): 11-button Constraints card, rectangle and slot with H/V/equal/tangent symbols,
+  selection-first Dimension 50 mm and 25 mm, double-click on the slot radius text opens the entry
+  box and sets R 25 mm, a symbol click selects Equal; screenshots in
+  `target/0066-browser/rev2-m3/`.
