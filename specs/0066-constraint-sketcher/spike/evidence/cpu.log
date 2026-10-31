@@ -1,0 +1,12 @@
+   Compiling curvyo-0066-solver-spike v0.0.0 (/home/marc/curvyo/target/0066-solver-spike)
+    Finished `release` profile [optimized] target(s) in 0.17s
+     Running `target/0066-solver-spike/target/release/curvyo-0066-solver-spike`
+moving100 frame median_ms=4.657136 max_ms=10.140917
+moving100 frame median_ms=4.601739 max_ms=10.416163
+moving100 20frames total_ms=103.507951 errors=[]
+connected_100_entities_drag analyze=false: median_ms=1.211819 max_ms=1.239656
+connected_100_entities_drag analyze=true: median_ms=2.648066 max_ms=2.714448
+connected_100_entities_failure analyze=false: median_ms=40.439129 max_ms=42.225619
+connected_100_entities_failure analyze=true: median_ms=42.758543 max_ms=44.207169
+p100_rectangles_changed_width analyze=false: median_ms=8.505251 max_ms=8.864608
+p100_rectangles_changed_width analyze=true: median_ms=10.34394 max_ms=10.474118
