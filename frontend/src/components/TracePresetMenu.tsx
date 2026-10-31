@@ -6,6 +6,8 @@ export interface MenuChoice {
   key: string;
   label: string;
   detail: string;
+  /** Unavailable choices remain focusable so their reason can be read. */
+  disabled?: boolean;
 }
 
 /** The menu's width (UX notes section 11); a longer name widens it rather than wrap. */
@@ -27,6 +29,8 @@ interface TracePresetMenuProps<T extends MenuChoice> {
   name?: string;
   /** The button's width class: 132 px for Preset, 176 px for Method ("Remove background" whole). */
   widthClass?: string;
+  /** Right-side docks anchor the menu to the button's trailing edge. */
+  align?: "start" | "end";
 }
 
 /** The index the menu moves to on `key` from `at` (no wrap), or `null` for another key. */
@@ -61,6 +65,7 @@ export function TracePresetMenu<T extends MenuChoice>({
   onPick,
   name = "Preset",
   widthClass = "w-[132px]",
+  align = "start",
 }: TracePresetMenuProps<T>) {
   const [open, setOpen] = useState(false);
   const [focused, setFocused] = useState(0);
@@ -122,6 +127,7 @@ export function TracePresetMenu<T extends MenuChoice>({
     }
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
+      if (presets[focused].disabled) return;
       onPick(presets[focused]);
       close();
       return;
@@ -160,7 +166,7 @@ export function TracePresetMenu<T extends MenuChoice>({
           role="menu"
           aria-label={name}
           onKeyDown={menuKey}
-          className="absolute left-0 z-50 flex flex-col rounded-lg py-1"
+          className={`absolute ${align === "end" ? "right-0" : "left-0"} z-50 flex flex-col rounded-lg py-1`}
           style={{
             minWidth: MENU_WIDTH,
             width: "max-content",
@@ -180,14 +186,16 @@ export function TracePresetMenu<T extends MenuChoice>({
                 }}
                 role="menuitemradio"
                 aria-checked={checked}
+                aria-disabled={preset.disabled || undefined}
                 aria-describedby={`${baseId}-${preset.key}`}
                 tabIndex={index === focused ? 0 : -1}
                 onClick={() => {
+                  if (preset.disabled) return;
                   onPick(preset);
                   close();
                 }}
                 onPointerMove={() => setFocused(index)}
-                className="mx-1 flex cursor-default flex-col rounded-md px-2 py-1 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+                className="aria-disabled:opacity-40 mx-1 flex cursor-default flex-col rounded-md px-2 py-1 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
                 style={{
                   background: index === focused || marked ? "var(--editor-accent-hover)" : undefined,
                 }}

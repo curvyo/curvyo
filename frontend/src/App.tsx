@@ -207,7 +207,7 @@ function Editor() {
             editor.tool === "select" || editor.tool === "trace" ? "justify-start" : "justify-center"
           }`}
         >
-          {sketch.view.workbench === "sketch" ? <SketchToolbar key={`${sketch.view.active}:${sketch.view.tool}`} sketch={sketch} /> : <>
+          {sketch.view.workbench === "sketch" ? <SketchToolbar key={`${sketch.view.page}:${sketch.view.active}:${sketch.view.tool}`} sketch={sketch} /> : <>
           {editor.tool === "select" ? (
             <SelectToolbar
               scaleStrokeWidth={editor.scaleStrokeWidth}

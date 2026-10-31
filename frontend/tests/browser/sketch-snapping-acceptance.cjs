@@ -15,8 +15,8 @@ const flatten=nodes=>nodes.flatMap(n=>n.objects?flatten(n.objects):[n]);
   if(!x) await page.getByRole('button',{name:'Horizontal (X)',exact:true}).click();
   if(!y) await page.getByRole('button',{name:'Vertical (Y)',exact:true}).click();
   const frame=await page.locator('[data-page-frames] > div').first().boundingBox();
-  await page.getByLabel('Workbench',{exact:true}).selectOption('sketch');
-  await page.getByRole('button',{name:'New',exact:true}).click();
+  await page.getByRole('button',{name:'Workbench',exact:true}).click();
+  await page.getByRole('menuitemradio',{name:'Sketch',exact:true}).click();
   await page.getByRole('button',{name:'Point',exact:true}).click();
   const a={x:frame.x+frame.width/4+4,y:frame.y+frame.height/4+4};
   await page.mouse.move(a.x,a.y);await page.keyboard.down('Alt');
@@ -28,13 +28,13 @@ const flatten=nodes=>nodes.flatMap(n=>n.objects?flatten(n.objects):[n]);
   const graph=flatten(data.objects).find(n=>n.shape==='sketch').graph;
   const points=Object.entries(graph.entities).filter(([id,e])=>id!==graph.origin&&e.Point).map(([,e])=>e.Point.position);
   assert.equal(points.length,1);const p=points[0];
-  if(!x&&!y&&!stored) {raw=p; assert(p.x>53&&p.x<54&&p.y>75&&p.y<76);}
-  const expected={x:!stored&&x?52.5:raw.x,y:!stored&&y?74.25:raw.y};
+  if(!x&&!y&&!stored) {raw=p; assert(p.x>-52&&p.x<-51&&p.y>-74&&p.y<-73);}
+  const expected=raw; // Revised AC: all Vector settings are irrelevant to Sketch geometry.
   assert(Math.abs(p.x-expected.x)<1e-6,`${JSON.stringify({stored,x,y,p,expected})}`);
   assert(Math.abs(p.y-expected.y)<1e-6,`${JSON.stringify({stored,x,y,p,expected})}`);
   assert.equal(data.snapping.enabled,stored);assert.equal(data.snapping.x,x);assert.equal(data.snapping.y,y);
   assert.deepEqual(errors,[]);await page.close();
  }
- console.log('PASS actual Sketch Point Alt at same hovered pointer, both stored states, all four axis masks, exact saved positions and unchanged stored settings');
+ console.log('PASS actual Sketch Point Alt at same hovered pointer, both stored states, all four axis masks, identical raw local saved positions and unchanged stored settings');
  }finally{await browser.close();}
 })();

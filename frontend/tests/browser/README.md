@@ -92,3 +92,39 @@ subtraction, retaining cold separately. Generated traces stay under ignored targ
 geometry in both stored states. `ruler-view-acceptance.cjs` tests actual mounted
 pan/zoom/resize/DPR1/2 invalidation on production; `ruler-cache.cjs` separately needs
 the development module server to compare60 cached/uncached Canvas2D raster outputs.
+
+Revised Sketch independent host checks (0066, production preview):
+
+```sh
+CURVYO_BROWSER_URL=http://127.0.0.1:1421/ NODE_PATH=target/browser-check/node_modules PLAYWRIGHT_BROWSERS_PATH=target/browser-check/browsers LD_LIBRARY_PATH=target/browser-check/runtime/usr/lib node frontend/tests/browser/sketch-revision-independent.cjs
+CURVYO_BROWSER_URL=http://127.0.0.1:1421/ NODE_PATH=target/browser-check/node_modules PLAYWRIGHT_BROWSERS_PATH=target/browser-check/browsers LD_LIBRARY_PATH=target/browser-check/runtime/usr/lib node frontend/tests/browser/sketch-revision-source-page.cjs
+```
+
+Run from repository root with the exclusive browser slot. `CURVYO_REVISION_OUTPUT`
+optionally changes the default `target/0066-browser/revision-independent` artifact
+directory. These use actual menus/input and saved geometry; they do not measure CPU.
+
+Final revised 0066 journeys use `sketch-revision-final-host.cjs`:
+`CURVYO_HOST_PHASE=standalone` checks Line→Arc and Arc→Arc identity/geometry;
+`contexts` checks fast semantic switches and dimension doubleclick/Escape/reentry;
+`fields` checks native input undo/redo, measured Reference and fx; `selection` checks
+tied distinct circles, Shift and Ctrl+Alt marquee with unchanged saved intent.
+Without a phase it runs reverse endpoint continuations plus the fields journey.
+Use the same browser environment above; artifacts default to
+`target/0066-browser/revision-final-host` (`CURVYO_REVISION_OUTPUT` overrides).
+`sketch-snapping-acceptance.cjs` now checks revised raw Sketch geometry under all eight
+Vector snapping flag/mask combinations. Older pre-revision scripts mentioning New,
+Active sketch or Alt-snapping are historical and must not be interpreted as current
+revised acceptance without updating their contracts.
+
+The current runtime fixtures come from the release tests
+`acceptance_0066_{chain,conics,session,revision_runtime}` and are written to
+`target/0066-runtime-revision`. Generate current production Node bindings there, then
+run `curvyo-editor-wasm/tests/runtime/sketch-{chain,conics,relations,suffix}.cjs` with
+that directory as first argument. The suffix runner also executes the tangent-limit
+case. Run the explicit ignored native artifact-verifier tests afterward; execution of
+JavaScript or compilation alone is not parity proof. Exact commands/results are in
+`specs/0066-constraint-sketcher/acceptance-revision-report.md`.
+The complete-frame analyzer uses all19 `rows[1:]` samples after only the first cold
+frame; no first-three exclusion. All20 screen inputs and page-placement context are
+saved, and its downloaded geometry must pass the explicit native host verifier.

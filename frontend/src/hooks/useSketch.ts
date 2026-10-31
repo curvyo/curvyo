@@ -14,6 +14,10 @@ export function useSketch(editor: EditorSession) {
     try { command(session); setError(null); editor.sync(); return true; }
     catch (error) { setError(String(error)); editor.sync(); return false; }
   };
+  const numericValues = (action = ""): [string,string] => {
+    const session = editor.getSession();
+    return session ? JSON.parse(session.sketch_numeric_values_json(action)) : ["",""];
+  };
   const focusCanvas = () => editor.containerRef.current?.focus({ preventScroll: true });
   const switchWorkbench = (name: "vector" | "sketch") => {
     if (view.workbench === name) return;
@@ -28,6 +32,6 @@ export function useSketch(editor: EditorSession) {
       field?.focus(); field?.select();
     });
   };
-  return { presentation: editor.sketchPresentation, inspectConstraint, view, error: error ?? view.error, run, switchWorkbench, focusCanvas, clearError: () => setError(null) };
+  return { numericValues, presentation: editor.sketchPresentation, inspectConstraint, view, error: error ?? view.error, run, switchWorkbench, focusCanvas, clearError: () => setError(null) };
 }
 export type SketchApi = ReturnType<typeof useSketch>;

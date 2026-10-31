@@ -335,7 +335,7 @@ function followPlacementAfterView(
   return true;
 }
 
-function isFormControl(target: EventTarget): boolean {
+function isFormControl(target: EventTarget | null): boolean {
   return (
     target instanceof HTMLElement &&
     target.closest(
@@ -947,6 +947,7 @@ export function useEditorSession(
   const lastPressRef = useRef<{ time: number; x: number; y: number } | null>(
     null,
   );
+  const clickContextRef = useRef("");
   const suppressedPressRef = useRef(false);
   /** A press that landed on a mark of the open typed move: consumed, and a click at the release. */
   const markPressRef = useRef<{ mark: number; x: number; y: number; touch: boolean } | null>(null);
@@ -1103,6 +1104,16 @@ export function useEditorSession(
     refreshClonesRef.current();
     setToolState(session.tool() as Tool);
     const nextSketch = JSON.parse(session.sketch_view_json()) as SketchView;
+    // A completed pick in the previous tool must not consume the first pick of
+    // a newly chosen tool as a double-click (e.g. Line endpoint -> Arc start).
+    const clickContext = JSON.stringify([
+      session.tool(), nextSketch.workbench, nextSketch.tool,
+      nextSketch.page, nextSketch.active, nextSketch.mode,
+    ]);
+    if (clickContextRef.current !== clickContext) {
+      lastPressRef.current = null;
+      clickContextRef.current = clickContext;
+    }
     sketchWorkbenchRef.current = nextSketch.workbench === "sketch";
     setSketchView(nextSketch);
     setNodeToolbarState(readToolbarState(session.node_toolbar_state()));
@@ -2002,6 +2013,13 @@ export function useEditorSession(
         return;
       }
 
+      // Sketch secondary events cancel a pending step and never enter primary creation.
+      if (event.button === 2 && sketchWorkbenchRef.current) {
+        if (session.sketch_secondary_press()) event.preventDefault();
+        syncFromSession();
+        return;
+      }
+
       // The other button during an Offset drag cancels it (`0038` criterion 17).
       if (event.button !== 0 && session.cancel_offset_drag()) {
         event.preventDefault();
@@ -2202,6 +2220,7 @@ export function useEditorSession(
       if (!session) {
         return;
       }
+      if (event.button === 2 && sketchWorkbenchRef.current) return;
       const { x, y } = canvasPoint(event);
 
       if (panningRef.current) {
@@ -2388,10 +2407,11 @@ export function useEditorSession(
     const onKey = (event: KeyboardEvent) => {
       // A lone Alt press or release would focus the menu bar in some browsers
       // and on Windows. With the pointer on the canvas, Select uses Alt for
-      // its selection gestures; drawing tools use it to invert snapping.
+      // its selection gestures; Vector drawing inverts snapping and Sketch drawing cycles modes.
       // Only the Alt key itself is intercepted; text-entry chords stay native.
       if (
-        event.key === "Alt" &&
+        event.key === "Alt" && !event.ctrlKey && !event.metaKey && !event.getModifierState("AltGraph") &&
+        (!sketchWorkbenchRef.current || !isFormControl(event.target)) &&
         lastPointerRef.current !== null &&
         ["select", "pen", "rectangle", "ellipse", "polygon-star"].includes(
           sessionRef.current?.tool() ?? "",
@@ -2477,6 +2497,11 @@ export function useEditorSession(
       const session = sessionRef.current;
       if (!session) {
         return;
+      }
+      if (sketchWorkbenchRef.current && event.key === "Tab" && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        const fields = document.querySelectorAll<HTMLInputElement>("[data-sketch-numeric]");
+        const field = fields[event.shiftKey ? fields.length - 1 : 0];
+        if (field) { event.preventDefault(); field.focus(); field.select(); return; }
       }
       // Ctrl+Alt+C: Stroke to path with the button's rule; with a dimmed button it does nothing
       // and shows no notice (`specs/0085-stroke-to-path` criterion 3, UX notes "Keyboard").

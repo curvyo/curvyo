@@ -1,3 +1,5 @@
+import { TracePresetMenu } from "@/components/TracePresetMenu";
+import { SketchParameters } from "@/components/sketch/SketchParameters";
 import type { SketchApi } from "@/hooks/useSketch";
 import { SketchesPanel } from "@/components/sketch/SketchesPanel";
 import { panelHandlesEscape } from "@/lib/panelEscape";
@@ -217,9 +219,12 @@ export function PropertiesPanel({
   };
   return (
     <div className="flex h-full shrink-0 flex-col">
-    <select aria-label="Workbench" title="Workbench" className="h-8 w-full shrink-0 border-b border-[var(--field-border)] bg-[var(--toolbar-bg)] px-1 text-xs text-[var(--toolbar-icon)] focus-visible:outline-2 focus-visible:outline-[var(--editor-accent)]" value={sketch.view.workbench} onChange={event => { traceInfo.dismiss(); sketch.switchWorkbench(event.target.value as "vector" | "sketch"); }}>
-      <option value="vector" aria-label="Vector">{open ? "Vector" : "V"}</option><option value="sketch" aria-label="Sketch">{open ? "Sketch" : "S"}</option>
-    </select>
+    <div className={`bg-[var(--toolbar-bg)] ${open ? "px-[7px] py-1" : "w-8"}`}>
+    <TracePresetMenu name="Workbench" align="end" widthClass={open ? "w-full" : "w-full !px-1 !gap-0"} current={sketch.view.workbench} edited={false}
+      label={open ? (sketch.view.workbench === "sketch" ? "Sketch" : "Vector") : (sketch.view.workbench === "sketch" ? "S" : "V")}
+      presets={[{key:"vector",label:"Vector",detail:""},{key:"sketch",label:"Sketch",detail:""}]}
+      onPick={choice => {traceInfo.dismiss();sketch.switchWorkbench(choice.key as "vector" | "sketch");}} />
+    </div>
     <Tabs
       value={activeTab}
       onValueChange={activate}
@@ -358,8 +363,10 @@ export function PropertiesPanel({
                 tooltipFor={(command) => fileCommandTooltip(command, PLATFORM)}
                 onReturnFocus={returnFocus}
               />
+            ) : doc.view.content === "parameters" ? (
+              <SketchParameters key={sketch.view.active ?? sketch.view.page} sketch={sketch} />
             ) : doc.view.content === "sketches" ? (
-              <SketchesPanel key={sketch.view.active} sketch={sketch} />
+              <SketchesPanel key={`${sketch.view.page}:${sketch.view.active}`} sketch={sketch} />
             ) : doc.view.content === "snapping" ? (
               <SnappingSection snapping={snapping} onReturnFocus={returnFocus}/>
             ) : doc.view.content === "document" ? (

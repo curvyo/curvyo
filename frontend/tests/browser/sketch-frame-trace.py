@@ -17,7 +17,7 @@ for index,event in enumerate(inputs):
  assert all('tdur' in task for task in included), 'missing renderer thread CPU durations'
  assert all(a['ts']+a['dur']<=b['ts']+1 for a,b in zip(included,included[1:]))
  rows.append({'frame':index,'cpu_ms':sum(t.get('tdur',0) for t in included)/1000,'tasks':len(included),'input_task_cpu_ms':start.get('tdur',0)/1000,'completed_frame_task_cpu_ms':end.get('tdur',0)/1000,'missing_cpu_wall_us':sum(t['dur'] for t in included if 'tdur' not in t),'elapsed_ms':(end['ts']+end['dur']-start['ts'])/1000,'start_ts':start['ts'],'end_ts':end['ts']+end['dur']})
-out={'method':'All nonoverlapping renderer-main RunTask thread durations from pointer input task through first Paint task after both updated canvas render and React overlay mutation; no idle subtraction or protocol tasks excluded','cold_ms':rows[0]['cpu_ms'],'warm_max_ms':max(r['cpu_ms'] for r in rows[3:]),'frames':rows}
+out={'method':'All nonoverlapping renderer-main RunTask thread durations from pointer input task through first Paint task after both updated canvas render and React overlay mutation; no idle subtraction or protocol tasks excluded','cold_ms':rows[0]['cpu_ms'],'warm_max_ms':max(r['cpu_ms'] for r in rows[1:]),'frames':rows}
 json.dump(out,open(root/'host-frame-cpu.json','w'),indent=2);print(json.dumps(out,indent=2))
 
 assert out['warm_max_ms'] < 16.0, f"warmed complete-frame CPU exceeds16ms: {out['warm_max_ms']}"
