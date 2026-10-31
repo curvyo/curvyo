@@ -6,7 +6,7 @@ use std::ops::ControlFlow;
 
 use curvyo_document_core::{Affine, Length};
 use curvyo_vectorize_core::{
-    ColourMask as TraceColourMask, ColourParams as TraceColourParams, ColourTrace,
+    AnalysisReport, ColourMask as TraceColourMask, ColourParams as TraceColourParams, ColourTrace,
     Mask as TraceMask, Phase, Progress, Raster, Rgb8 as TraceRgb, TraceError, TraceParams, trace,
     trace_colours,
 };
@@ -267,6 +267,18 @@ pub fn trace_auto_threshold(rgba: &[u8], width: u32, height: u32) -> u8 {
         height,
         rgba,
     })
+}
+
+/// The automatic analysis of `rgba` (`width` x `height`), for the worker (`specs/0089` slice F);
+/// `None` when the bytes do not match the size.
+#[must_use]
+pub fn trace_analyse(rgba: &[u8], width: u32, height: u32) -> Option<AnalysisReport> {
+    curvyo_vectorize_core::analyse(Raster {
+        width,
+        height,
+        rgba,
+    })
+    .ok()
 }
 
 /// The background colour Remove background's Auto suggests for `rgba` (`width` x `height`),
@@ -605,6 +617,18 @@ mod tests {
         // A single-colour wire has no tail.
         let single = trace_job(&picture, 40, 20, map, 200, 80, 0.0);
         assert_eq!(read_trace_wire(&single).unwrap().layers, []);
+    }
+
+    /// The worker's analysis (`specs/0089` slice F): a report for a valid picture, none for
+    /// bytes that do not match the size.
+    #[test]
+    fn the_analysis_reads_valid_pictures_only() {
+        let report = trace_analyse(&square_picture(), 16, 16).unwrap();
+        assert_eq!(
+            report.proposal.threshold,
+            trace_auto_threshold(&square_picture(), 16, 16)
+        );
+        assert!(trace_analyse(&[0; 12], 16, 16).is_none());
     }
 
     #[test]
