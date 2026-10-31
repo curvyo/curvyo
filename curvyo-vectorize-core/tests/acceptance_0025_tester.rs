@@ -426,9 +426,21 @@ fn c16_holes_that_are_specks_do_not_count_toward_the_limit() {
 
 // ---------------------------------------------------------------- criterion 17
 
+#[cfg(unix)]
 fn thread_cpu_secs() -> f64 {
     let t = rustix::time::clock_gettime(rustix::time::ClockId::ThreadCPUTime);
     t.tv_sec as f64 + t.tv_nsec as f64 * 1e-9
+}
+
+/// Off Unix there is no thread CPU clock here: wall time since the first call, as in the other
+/// crates' timing tests (these tests are `#[ignore]`d release runs).
+#[cfg(not(unix))]
+fn thread_cpu_secs() -> f64 {
+    static START: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
+    START
+        .get_or_init(std::time::Instant::now)
+        .elapsed()
+        .as_secs_f64()
 }
 
 /// Contour lines of a smooth field: line art with many long closed curves.

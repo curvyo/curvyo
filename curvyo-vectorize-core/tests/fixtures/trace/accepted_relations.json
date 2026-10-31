@@ -1,0 +1,12 @@
+[
+  "01-flat-logo: Engraving max deviation > Logo",
+  "03-text-300dpi: Engraving max deviation > Logo",
+  "03-text-300dpi: nodes / / not monotone",
+  "04-small-text: Engraving max deviation > Logo",
+  "04-small-text: Silhouette density > Logo",
+  "07-silhouette: nodes / / not monotone",
+  "11-stencil-lines: Engraving max deviation > Logo",
+  "12-technical-drawing: Engraving max deviation > Logo",
+  "62: mean max deviation Engraving not % below Logo",
+  "63: Silhouette density x Logo as the geometric mean >"
+]

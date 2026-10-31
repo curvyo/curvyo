@@ -717,9 +717,21 @@ fn c19_a_blended_seam_pixel_between_two_picked_colours_is_content() {
 
 // ---------------------------------------------------------------- criterion 20
 
+#[cfg(unix)]
 fn thread_cpu_secs() -> f64 {
     let t = rustix::time::clock_gettime(rustix::time::ClockId::ThreadCPUTime);
     t.tv_sec as f64 + t.tv_nsec as f64 * 1e-9
+}
+
+/// Off Unix there is no thread CPU clock here: wall time since the first call, as in the other
+/// crates' timing tests (these tests are `#[ignore]`d release runs).
+#[cfg(not(unix))]
+fn thread_cpu_secs() -> f64 {
+    static START: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
+    START
+        .get_or_init(std::time::Instant::now)
+        .elapsed()
+        .as_secs_f64()
 }
 
 #[test]
