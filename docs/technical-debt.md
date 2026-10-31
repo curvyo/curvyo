@@ -17,6 +17,24 @@ settings change still terminates the worker, so every preview recomputes the sel
 and outlines from the pixels, and the Mask view computes the selection once more per step.
 Resolved by a later slice that builds `Tracer` with the cache and the generation queue together.
 
+## The multicolour Trace bar can cover the canvas at 800 x 600
+
+`specs/0089-trace-quality-and-colour` slice M (2026-10-30): with the panel open, Multicolour, the
+Advanced block open and a swatch selected, the Trace bar is 589 px high at 800 x 600 (measured by
+`acceptance_0089_m_browser.test.ts`), the worst case `ux-notes.md` §2 flagged. Nothing leaves the
+window and closing Advanced or the panel brings it back to 252 to 324 px. Resolved by a scrolling
+palette or a palette in the panel, for the architect and the UX engineer to propose.
+
+## A multicolour trace of a photo peaks at about 138 bytes per pixel
+
+`specs/0089-trace-quality-and-colour` slice M (2026-10-31): the counting allocator
+(`tests/memory.rs`, `multicolour_peak_of_the_slowest_photo_is_reported`) measures 137.9 B/px
+besides the picture for `customer-photo-fox-2` (2000 x 1500 px, 11 colours, 40 779 paths); the
+single-colour trace of 0025 criterion 26 stays at 8.6 B/px of its 16 B/px. Not profiled yet;
+the likely holders are the edge table and the per-loop chains and contours of tens of thousands
+of small colour regions, all held at once for the guard. No limit is set for Multicolour; resolved by fitting and guarding in
+bands of loops, or by a lower region count on photos (a coarser default palette).
+
 ## Boolean results are polylines, not curves
 
 Boolean operations flatten curves and return polygons

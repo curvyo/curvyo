@@ -1,4 +1,4 @@
-# Plan for Trace quality and colour, slices A, D, C and E
+# Plan for Trace quality and colour, slices A, D, C, E and M
 
 Implementer, 2026-10-29, on `story/trace-geometry` (cut from `main` `faeb6f07`). Built on the
 defaults of Frage 80 to 93 (order A, D, C, E, M, F; reference images synthetic plus CC0, the
@@ -412,6 +412,163 @@ The About Trace intro reads "The method decides which parts become shapes" (lead
 state, queues one job) is not built (no criterion needs it; `docs/technical-debt.md`). The Mask view computes the selection
 again in the worker (one extra job per preview step while it shows). No casing around the mask
 on a dark document ground (no dark theme yet).
+
+## Slice M: multicolour (adjacent)
+
+Implementer, 2026-10-30, on `story/trace-multicolour` (cut from `main` after #227). Design:
+`adrs.md` §10 (palette, label map, shared edge table, each edge fitted once with its junctions
+pinned, `ColourTrace` with layers by area, recolour without refit, trial M1), §8 (basic
+operations and `sqrt`, memory); UX: `ux-notes.md` §4 (Mask), §7 (Output, Colours, palette strip
+and its five actions), §10 (notices), §12 (strings). Customer answers in force: Frage 81 A,
+90 A (Pick colours + Multicolour: the palette is exactly the picks, Colours greyed out), 92 B
+(Output, Colours and the palette pipette in Advanced).
+
+### Affected crates/modules
+
+- `curvyo-vectorize-core`: new `palette.rs` (flat-pixel median cut in the sRGB unit cube, merge
+  closer than 0.03, fixed colours kept), `segment.rs` (label map: nearest colour or two-colour
+  blend, exclusions and merges, regions below Ignore below joined), `edges.rs` (crack edges
+  between labels, junction vertices, one chain per edge, the loops of each colour as edge ids),
+  `colour_trace.rs` (`trace_colours`, `colour_mask`, `ColourParams`, `ColourTrace`,
+  `ColourLayer`, `PaletteEntry`; each edge fitted once in its owner's loop, the guard on the edge
+  spans, the loops assembled from shared segments); `outline.rs` (`Chain::pinned`: junction
+  vertices as fixed corners); `guard.rs` (crossings of open parts); `trace.rs` (`masked`
+  shared, `Diagnostics::joined_regions`).
+- `curvyo-ui-core`: `trace_transfer.rs` (the colour job and its wire tail: palette, layers,
+  joined regions; the colour mask job), `trace_plan.rs` (one filled compound path per colour,
+  named by its hex, largest area first, recolours applied).
+- `curvyo-editor-wasm`: `trace_glue.rs` (settings `output`, `colours`, `fixed`, `excluded`,
+  `merged`), `wasm_trace.rs` (the colour jobs, the palette of the preview, recolours and
+  Isolate), `session/trace*.rs` (layers in the preview, coloured Trace view, dimmed others, the
+  segmented Mask view, Create paths per colour in one step).
+- `frontend`: `traceText.ts` (Output, Colours, palette words, colour names, notices, About
+  entries, the settings JSON), `TraceAdvanced.tsx` (Output pill, Colours field, pipette),
+  new `TracePalette.tsx` (strip, detail row, Isolate, Recolour, Merge into, Exclude, Remove),
+  `useTrace.ts` / new `useTracePalette.ts` (session state of the palette).
+- Harness: `tests/colour.rs` (criteria 25 to 30 with label-map fixtures), `degrade.rs`
+  (JPEG quality 75), the multicolour rows of the quality report.
+
+### Tasks
+
+- [x] M1. Trial M1 and `palette.rs`, test first: automatic count, fixed colours kept, merge at
+      0.03, pale accent at 0.2 % kept, 3-colour logo with AA and JPEG 75 gives 3 colours (AC 26).
+- [x] M2. `segment.rs`: every pixel one label or background, blends to the dominant colour,
+      exclusions and merges, small regions joined to the neighbour with the longest border, the
+      count reported (AC 27, 29).
+- [x] M3. `edges.rs` and the shared fit in `colour_trace.rs`: junctions pinned, each edge fitted
+      once, neighbours share reversed segments, the guard on edge spans, layers by area (AC 28,
+      29).
+- [x] M4. Harness: label-map fixtures (shared straight and curved edges, triple junctions,
+      enclosed regions, pale accent, near-equal colours, transparent background, AA, JPEG 75
+      fringes, gradient in steps); colour assignment, gaps and overlaps at 4x, shared-boundary
+      identity, nodes; 8 colours at 2000 x 2000 px CPU (AC 26 to 30).
+- [x] M5. ui-core and wasm: the colour job and wire, the plan (one group, one path per colour,
+      one step), recolour without refit, the segmented Mask view, Isolate (AC 25, 29).
+- [x] M6. Frontend: Output and Colours in Advanced, palette strip and its actions, notices,
+      About entries, remembered Output and Colours; Chromium file by file (AC 25, 26, 29).
+- [x] M7. Full gate; `reference_table` and `quality_table` in release; results below.
+
+### Validation
+
+`cargo nextest run -p curvyo-vectorize-core` (palette, segment and edge unit tests,
+`tests/colour.rs` one test per criterion 26 to 30); `npm test` (words, settings JSON, palette
+state); Chromium `acceptance_0089_m_browser.test.ts` file by file; the full `CLAUDE.md` §7 gate
+once.
+
+### Slice M results (2026-10-30)
+
+**Trial M1: our palette in the sRGB unit cube; Oklab not needed.** The flat-pixel median cut
+(a pixel votes only when its 3 x 3 window is within 12 bytes per channel; an automatic split
+only where a box falls into two groups, between-group share of the variance at least 0.8 and the
+means at least 0.03 apart) finds every fixture's colours, keeps #D9D9D9 and #DCD6CF apart (0.043)
+and merges #606060 and #646260 (0.018); the 3-colour logo with anti-aliasing and JPEG 75 gives
+exactly 3. Colours that form no groups (a photo, a gradient) take the default 6 steps (Proposal
+for "default 6" of criterion 26). visioncortex is no longer in the workspace (removed in D) and
+its colour path uses hash maps; it was not added back for the trial (the ADR's expected outcome:
+ours). Blends are labelled by the two-colour model of trial C1: the nearest colour within 0.03,
+else the dominant colour of the blend of two of the four nearest (or of one with the background)
+when it explains the pixel with half the distance.
+
+**Shared boundaries.** The label map is cut into edges between junction vertices (three or four
+labels; a 2-label checkerboard is passed around the label that does not connect, a colour over the
+background, the later palette entry over the earlier, as the region labelling connects them).
+Each colour's loops are closed chains with their junctions pinned; an edge is fitted once in the
+loop of its larger label (`Chain::pinned`, the slice D fit unchanged) and taken reversed by the
+other, so neighbours share segments and a triple junction is one node. A fitted span that crosses
+goes to the fit at half tolerance and smoothing, then to the walked contour (which never crosses).
+
+**Criteria** (`tests/colour.rs`, unit tests of `palette.rs`, `segment.rs`, `edges.rs`,
+`colour_map.rs`; ui-core and session tests; Chromium `acceptance_0089_m_browser.test.ts`):
+
+| Criterion | Target | Measured | Met |
+|---|---|---|---|
+| 25 Output in Advanced, only the maker changes it | radiogroup in Advanced, app setting | Chromium: no Output in the main bar, "Single colour", "Multicolour" in Advanced; remembered (`traceMulticolour.test.ts`); F does not exist yet | yes |
+| 26 palette | 2 to 16, fixed kept, merge 0.03, pale 0.2 % kept, AA + JPEG 75: 3 colours | every fixture's count; pale accent (0.2 %) kept; fixed colour kept exactly and first; count clamped 2 to 16; logo3-aa-jpeg75: 3 | yes |
+| 27 one label per pixel, small regions joined and counted | no double cover; joins counted | overlap 0 at 4x; three 3 x 3 dots of a fixed colour joined (`joined_regions` 3), shown as "3 regions joined" under the counts | yes (Proposal: a region joins a colour neighbour first, the background only without one, so the content stays the mask's) |
+| 28 shared boundary, triple junction one node, gaps/overlaps <= 0.01 % at 4x | identical reversed segments | 0 bad segment groups, gap 0 %, overlap 0 % on all fixtures, at Logo and at Silhouette settings; the T junction is a node of all three colours | yes |
+| 29 one group, one compound path per colour, largest area at the bottom, recolour without refit, Exclude, Merge into, colour-blind use | | ui-core plan and session tests (one step, fills, hex names, outlines unchanged by a recolour); Exclude = background, Merge into = one layer of the target; swatch names hex + colour name + state words, marks are shapes | yes |
+| 30 8 colours, 2000 x 2000 px, < 4 s CPU native | 4.0 s | native 0.32 s (`criterion_30_eight_colours_2000_budget`), wasm 0.63 s; the slowest real photo (`customer-photo-fox-2`, 3 Mpx, 11 colours, 40 800 paths) native 2.06 s, wasm 2.50 s (`criterion_30_wasm_manifest` + `trace-reference-wasm.ts` with `CURVYO_TRACE_WASM_DIR`, 2026-10-31) | yes |
+
+**Fixture table** (release, `multicolour_table`, Remove background with the suggested background,
+0.1 mm per px):
+
+| Fixture | Colours (want) | Assigned | Gap | Overlap | Shared / bad | Paths | Nodes | Joined |
+|---|---|---|---|---|---|---|---|---|
+| adjacent-straight | 3 (3) | 1.000 | 0 % | 0 % | 6 / 0 | 3 | 13 | 0 |
+| adjacent-curved | 3 (3) | 1.000 | 0 % | 0 % | 20 / 0 | 4 | 29 | 0 |
+| enclosed | 3 (3) | 1.000 | 0 % | 0 % | 40 / 0 | 9 | 44 | 0 |
+| pale-accent | 4 (4) | 1.000 | 0 % | 0 % | 14 / 0 | 5 | 21 | 2 |
+| near-equal | 3 (3) | 1.000 | 0 % | 0 % | 10 / 0 | 4 | 16 | 0 |
+| transparent | 3 (3) | 1.000 | 0 % | 0 % | 6 / 0 | 3 | 13 | 0 |
+| logo3-aa-jpeg75 | 3 (3) | 1.000 | 0 % | 0 % | 14 / 0 | 3 | 31 | 5 |
+| gradient-steps (count 4) | 4 (4) | 1.000 | 0 % | 0 % | 6 / 0 | 4 | 16 | 0 |
+| junctions-8 | 8 (8) | 1.000 | 0 % | 0 % | 40 / 0 | 9 | 54 | 93 |
+
+The real images in Multicolour (`multicolour_real_table`): logos and clipart 1 to 6 colours;
+photos 6 colours, up to 38 000 paths and 341 000 nodes (2.2 s), the edge spans that fell back
+up to 6 200.
+
+**Bar** (Chromium): Single colour heights unchanged from slice E (the Output pill has no visible
+label and tight segments so it shares Advanced row 1 with Denoise and Upscale at 1280 x 800).
+800 x 600 with the panel open, Multicolour, Advanced open, a swatch selected: the bar is 589 px
+high (the UX notes' flagged worst case: it covers most of the canvas; a scrolling palette is the
+architect's to propose).
+
+Gate (2026-10-30): the full `CLAUDE.md` §7 gate green (9,604 tests); `reference_table` and
+`quality_table` in release report the misses of the base (281 guard lines, the 14 wobble and
+Silhouette misses): the single-colour path is unchanged (`fitted` delegates with every span
+wanted, the guard's closed mode is the old code, the goldens stay exact). Chromium file by file:
+`acceptance_0089_m_browser`, `_e_browser`, `_c_browser`, `_sliceC_tester`, `_sliceE_tester`,
+`acceptance_0025_browser` (its Advanced list now has Output after the toggles), `_0025_tester`,
+`_slice2_tester`, `_slice3_tester`, `acceptance_0087_browser`, `_0087_tester`: all pass.
+
+**Tester and architect round (2026-10-31).** (1) Auto lost a pale accent and merged two
+near-greys when the three shared one box: no two-way split explained 0.8 of its variance. A box
+now also splits when a three-way split along its widest channel explains 0.95 (an even spread
+gives 0.89, a normal one 0.81) with every group at least the merge distance from the next; a
+two-level look-ahead was tried first and gave 11 to 16 colours on customer logos and line art.
+(2) Content without a flat pixel (1.3 px anti-aliased rings, `clipart-clock` at 137 px) had an
+empty palette: such regions now vote with their ridge pixels (no content neighbour farther from
+the background); each ink not explained by a flat colour's blends toward the background (or its
+ink beyond them) seeds a line colour, taken as the blend 80 % of its pixels are weaker than.
+Real images in Auto against the slice's first build: 37 of 46 unchanged; `customer-bluetenzeit-logo`
+2 to 11 colours (watercolour flower, leaves and gold script), `customer-balance-logo` 6 to 9,
+`customer-photo-fox-2` 3 to 11, `customer-photo-lion-2` 4 to 6, `customer-dog-photo` and
+`customer-precision-logo` 6 to 7; `customer-photo-bird-head` 6 to 2 and `customer-photo-fox-1`/`-3`
+6 to 3 (a photo with one three-way split no longer falls back to the default 6 steps; reported for
+the demo). (3) Recolour has a hex field (six digits, `#` optional) next to Reset; a recoloured
+swatch is named "#NEW (was #OLD) · name". (4) The functions over 60 lines are split; a colour
+loop smooths only the spans it owns; the session test for every colour excluded is added.
+Memory (counting allocator, `customer-photo-fox-2`): 137.9 B/px besides the picture, tracked in
+`docs/technical-debt.md`. `ColourLayer::fixed` stays: the tester's c26 case reads it (a layer of
+a fixed colour). Latent: on `clipart-goatee` with a black line colour beside a dark-grey fill,
+fitted edges passed a 1 px region within 0.002 mm (the tester's shared-segment check failed);
+the line test above keeps that palette from forming, the guard's near-touch rule was not changed.
+
+Open: Mask view shows the segmented palette (the lead's brief) instead of the black union of the
+UX notes §4; Isolate dims there. A colour narrower than 3 px inside a region that has flat
+pixels takes the nearest colour unless picked with the palette pipette. The upscaled label map is nearest-neighbour
+(Upscale gives 2 px steps between colours).
 
 ## Baseline results
 

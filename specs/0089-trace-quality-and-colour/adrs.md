@@ -340,6 +340,35 @@ half-pixel features are reported only until slice G.
   (no document asset); `FrameImages` carries a "pixelated" flag so a mask pixel is drawn
   nearest-neighbour from one screen pixel per mask pixel (pictures keep the 8 px rule).
 
+### Dated implementation note, slice M (2026-10-30, implementer; for the architect's review)
+
+- **§10 as built.** `palette.rs` (flat-pixel median cut in the sRGB unit cube, the C1 space;
+  merge below 0.03; fixed colours kept exactly), `segment.rs` (label map, joins), `edges.rs`
+  (edge table and colour loops), `colour_map.rs` (mask to label map), `shared_fit.rs` (one fit
+  per edge), `colour_trace.rs` (public). Public additions: `trace_colours`, `colour_mask`,
+  `ColourParams { trace, colours, fixed, excluded, merged }`, `ColourTrace { palette, layers,
+  counts, foreground_pixels, diagnostics }`, `ColourLayer { sample, fixed, pixels, outlines }`,
+  `PaletteEntry`, `ColourMask` (RGBA, for the Mask view), `Diagnostics::joined_regions`,
+  `MIN_COLOURS`, `MAX_COLOURS`, `DEFAULT_COLOURS`. The label map stays inside the crate.
+  `colour_mask` returns the segmented palette as RGBA (the lead's brief), not a binary union.
+- **Trial M1:** ours in sRGB passes criterion 26 on every fixture (incl. AA + JPEG 75 and the
+  near-greys); Oklab not built; visioncortex was not re-added (removed in D, hash maps).
+- **Shared fit:** each colour loop is a `Chain` with its junction vertices pinned as corners at
+  the vertex (`Chain::pinned`); the edge is fitted in the loop of its larger label with the slice
+  D contour and fit (`Bound::Free`, no clearance room: neighbours share the edge, so the room of
+  §5 would be 0) and reversed by the other loop. The guard checks crossings of the fitted spans
+  only (shared junctions may touch, `guard::crossings`); a crossing span goes to the fit at half
+  smoothing and tolerance, then to the walked midpoint contour, which cannot cross another edge.
+- **Connectivity:** regions and the edge walk agree: same label 4-connected, diagonal where the
+  other two pixels differ from it; a 2-label checkerboard connects the colour over the background
+  and the later palette entry over the earlier, and the edge passes around the other's pixels.
+- **ui-core/wasm:** the colour job appends the palette, the layers and the joined count after the
+  outlines (`read_trace_wire` reads both forms); `TraceTarget::colours` gives one path per colour
+  in `plan_trace` (existing node kinds, no format change); recolours and Isolate are session state
+  (fills only, no job).
+- **No new crate, dependency, trait or format change.** Memory: the label map adds 4 B/px and the
+  edge vertices are proportional to boundary length.
+
 ## Feature-local decisions
 
 1. No new ADR: the swap of the boundary fit is ADR 0023 §8's own path with the §2 shape kept, and
