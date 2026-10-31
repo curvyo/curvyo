@@ -14,6 +14,7 @@
 #![forbid(unsafe_code)]
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
+mod analysis;
 mod background;
 mod boundary;
 mod clearance;
@@ -52,6 +53,10 @@ extern crate self as curvyo_vectorize_core;
 #[allow(clippy::pedantic, clippy::all, missing_docs)]
 mod test_common;
 
+pub use analysis::{
+    AnalysisReport, Capture, ImageType, LOW_CONFIDENCE, Property, PropertyKind, Proposal, Reason,
+    analyse,
+};
 pub use background::{sample_colour, suggest_background};
 pub use colour_trace::{
     ColourLayer, ColourMask, ColourParams, ColourTrace, PaletteEntry, colour_mask, trace_colours,
