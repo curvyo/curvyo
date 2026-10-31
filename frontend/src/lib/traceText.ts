@@ -586,12 +586,10 @@ export function imagesLabel(done: number, count: number): string {
   return count >= 2 ? `Tracing ${done + 1} of ${count} images` : "";
 }
 
-/** The success notice (criteria 13, 46; `specs/0089` UX notes §10: a multicolour result names
- * its colours first). */
-export function tracedNotice(images: number, paths: number, nodes: number, colours = 0): string {
-  const named = colours > 0 ? `${plural(colours, "colour", "colours")}, ` : "";
-  const counts = `${named}${plural(paths, "path", "paths")}, ${plural(nodes, "node", "nodes")}.`;
-  return images >= 2 ? `Traced ${grouped(images)} images: ${counts}` : `Traced: ${counts}`;
+/** The Layers tooltip line of a traced layer. Creating paths shows no canvas notice (decided by
+ * the customer, 2026-10-31). */
+export function tracedTooltip(paths: number, nodes: number): string {
+  return `Traced: ${plural(paths, "path", "paths")}, ${plural(nodes, "node", "nodes")}.`;
 }
 
 /** The storage key of the remembered values (an app setting, not in the project, criterion 5). */

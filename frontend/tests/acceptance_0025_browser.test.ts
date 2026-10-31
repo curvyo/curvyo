@@ -1,7 +1,7 @@
 // `specs/0025-raster-trace` slice 1 in the real app (Chromium via DevTools; set
 // CURVYO_E2E_BROWSER=/path/to/chromium; the wasm bindings must be built): the Select bar's Trace
 // button for an image (criterion 1), the Trace bar with its status from the worker (criteria 2,
-// 4, 11, 17, 58), Create paths (Enter) as one step with its notice and the group above the image
+// 4, 11, 17, 58), Create paths (Enter) as one step with no notice and the group above the image
 // (criteria 12, 13, 30), Ctrl+Z (criterion 13), the key I and Escape (criterion 1), and the empty
 // bar (criterion 3); slice 3: the View pill and the backslash keys (criterion 51). Harness as in `acceptance_0058_tester.test.ts`.
 
@@ -271,16 +271,14 @@ test("0025 in Chromium: Trace button, preview status, Create paths, undo, key I"
     const pressedRail = (await s.evaluate(`document.querySelectorAll('[aria-pressed=true][data-tool]').length`)) as number;
     assert.equal(pressedRail, 0, "no rail button is pressed");
 
-    // Criteria 12, 13: Create paths is one step; the notice; the group above the image.
+    // Criteria 12, 13: Create paths is one step with no notice; the group above the image.
     const rowsBefore = (await s.layerRows()).length;
     assert.equal(await s.evaluate(`[...document.querySelectorAll('[role=toolbar][aria-label=Trace] button')].some((b) => b.textContent === 'Create paths')`), false, "the bar has no Create paths button");
     await s.evaluate(`document.activeElement?.blur?.(); [...document.querySelectorAll('canvas')].map((c) => c.closest('[tabindex]')).find(Boolean)?.focus()`);
     await s.key("Enter", 13);
-    const notice = await waitFor("the notice", async () => {
-      const t = await s.statusText();
-      return t.includes("Traced:") ? t : null;
-    });
-    assert.ok(notice.includes("Traced: 1 path, 4 nodes."), notice);
+    // Decided by the customer (2026-10-31): no notice after creating paths; the new group being selected is the feedback.
+    await waitFor("the Trace bar closes", async () => (((await s.evaluate(`!document.querySelector('[role=toolbar][aria-label=Trace]')`)) as boolean) ? true : null), 15000);
+    assert.ok(!/Traced/.test(await s.statusText()), "no notice appears after creating paths");
     const rows = await waitFor("the group row", async () => {
       const r = await s.layerRows();
       return r.length > rowsBefore ? r : null;

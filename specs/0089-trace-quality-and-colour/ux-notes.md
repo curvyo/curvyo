@@ -326,9 +326,9 @@ Result messages only (0025 §21.3: muted, `role="status"`, no height when empty,
 "Tracing 1 of 3 images" (as merged), "Preview from a reduced copy", "0 paths: no colour picked.", "0 paths at this
 Tolerance: too low." (or too high, as the 0025 zero-path rule), "No colours found.", "Isolating #FFF2A8", "Merging
 #FFF2A8 into...", "2 colours excluded", "8 colours picked", "Same as #3366CC", "Over 100,000 nodes" as before. The
-counts ("7 paths, 412 nodes", "3 colours") stay in Advanced only. The success notice after Enter: "Traced: 7
-paths, 412 nodes." (Single) or "Traced: 3 colours, 7 paths, 412 nodes." (Multicolour; the result is one group
-"Trace of <name>", one compound path per colour).
+counts ("7 paths, 412 nodes", "3 colours") stay in Advanced only. There is no success notice after Enter
+(customer, 2026-10-31, see §23): the result is one group "Trace of <name>" (one compound path per colour in
+Multicolour), selected.
 
 ## 11. Keyboard and focus
 
@@ -526,3 +526,15 @@ is the "3 picked" / "None picked" label (22.1): without it a maker who has not o
 a pick landed; veto it and the bar shows the canvas result only.
 
 **Lead decisions after the tester (2026-10-31, Proposal):** a duplicate pick in Pick colours is ignored without a notice; Output may share its line with Invert and Drop border shapes when it fits.
+
+## 23. No notice after creating paths (customer, 2026-10-31)
+
+Decided by the customer (2026-10-31): no notice after creating paths. The new group being selected is the
+feedback; the counts stay in the Advanced status line and in the tooltip of the group's Layers row ("Traced: 7
+paths, 412 nodes."). This removes the canvas notices "Traced: 7 paths, 412 nodes.", "Traced: 3 colours, ..." and
+"Traced 3 images: ...", and overrides §10 where it names them.
+
+General rule (customer, 2026-10-31: "such status messages we don't need"; recorded in `docs/design-system.md`,
+"Interaction conventions"): no confirmation notice after a successful operation (traced, created, copied,
+recognised, ...). The visible result (selection, History step, the object itself) is the feedback. Notices are
+only for things the user has to act on or that went wrong: refusals, failures, limits.

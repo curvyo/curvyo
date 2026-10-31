@@ -411,7 +411,9 @@ test("0089 M in Chromium: Output, the palette and its actions, the segmented Mas
     // Criterion 29: Create paths writes one group with one filled path per traced colour, in one step.
     const before = (await s.layerRows()).length;
     await s.clickSel(`${BAR} [data-trace-slot="none"]`);
-    await waitFor("the traced notice", async () => ((await s.statusText()).includes("Traced: 2 colours,") ? true : null), 30_000);
+    // Decided by the customer (2026-10-31): no notice after creating paths; the new group being selected is the feedback.
+    await waitFor("the Trace bar closes", async () => (((await s.evaluate(`!document.querySelector('[role=toolbar][aria-label=Trace]')`)) as boolean) ? true : null), 30000);
+    assert.ok(!/Traced/.test(await s.statusText()), "no notice appears after creating paths");
     await s.tab("Layers");
     await sleep(500);
     await s.evaluate(`[...document.querySelectorAll('[role=row][aria-level]')].find((r) => r.getAttribute('aria-label').startsWith('Trace of'))?.querySelector('[aria-label=Expand]')?.click()`);

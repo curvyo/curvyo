@@ -21,7 +21,7 @@ import {
   readSummary,
   settingsJson,
   statusText,
-  tracedNotice,
+  tracedTooltip,
   writeChoice,
 } from "../src/lib/traceText.ts";
 import {
@@ -136,6 +136,5 @@ test("UX notes §10: the counts name the colours, the joined regions and the suc
   assert.equal(none.line, "");
   assert.equal(none.counts, "");
   assert.equal(none.canCreate, false);
-  assert.equal(tracedNotice(1, 7, 412, 3), "Traced: 3 colours, 7 paths, 412 nodes.");
-  assert.equal(tracedNotice(1, 7, 412), "Traced: 7 paths, 412 nodes.");
+  assert.equal(tracedTooltip(7, 412), "Traced: 7 paths, 412 nodes.");
 });

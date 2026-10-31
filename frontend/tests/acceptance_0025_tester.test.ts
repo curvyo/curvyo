@@ -568,11 +568,9 @@ test("0025 in Chromium: Create paths in one undo step by Enter, double-click (cr
       assert.ok(rows.slice(g + 1, img).every(([, level]) => level > rows[g][1]), `${how}: directly above (only its own children between)`);
       assert.equal(rows[g][1], rows[img][1], `${how}: same level as the image`);
       assert.ok(/Trace of ring/.test(rows[g][0]!), `${how}: group named after the image: ${rows[g][0]}`);
-      const notice = await waitFor("the notice", async () => {
-        const t = await s.statusText();
-        return /Traced: \d+ paths?, [\d,]+ nodes?\./.test(t) ? t : null;
-      });
-      assert.match(notice, /Traced: 2 paths, \d+ nodes\./);
+      // Decided by the customer (2026-10-31): no notice after creating paths; the new group being selected is the feedback.
+      await waitFor("the Trace bar closes", async () => (((await s.evaluate(`!document.querySelector('[role=toolbar][aria-label=Trace]')`)) as boolean) ? true : null), 15000);
+      assert.ok(!/Traced/.test(await s.statusText()), "no notice appears after creating paths");
       assert.equal(countOf(await historyText(s), "Trace image"), history0 + 1, `${how}: one history step "Trace image"`);
       assert.equal(await fieldValue(s, "Threshold"), null, `${how}: the Trace bar is gone`);
       const focus = (await s.evaluate(`document.activeElement.tagName + ' ' + (document.activeElement.getAttribute('aria-label') || document.activeElement.className).toString().slice(0, 40)`)) as string;
@@ -728,11 +726,9 @@ test("0025 in Chromium: several images, empty states, zero and whole results (cr
     // Criterion 46: the label counts the job (the first image until Create paths moves on).
     assert.match(bar, /Tracing 1 of 3 images/);
     await press(s, "Enter", 13);
-    const notice = await waitFor("the notice", async () => {
-      const t = await s.statusText();
-      return /Traced 3 images/.test(t) ? t : null;
-    });
-    assert.match(notice, /Traced 3 images: \d+ paths, [\d,]+ nodes\./);
+    // Decided by the customer (2026-10-31): no notice after creating paths; the new group being selected is the feedback.
+    await waitFor("the Trace bar closes", async () => (((await s.evaluate(`!document.querySelector('[role=toolbar][aria-label=Trace]')`)) as boolean) ? true : null), 15000);
+    assert.ok(!/Traced/.test(await s.statusText()), "no notice appears after creating paths");
     const rows = await rowInfo(s);
     const groups = rows.filter(([n]) => /Trace of/.test(n ?? ""));
     assert.equal(groups.length, 3, JSON.stringify(rows));
