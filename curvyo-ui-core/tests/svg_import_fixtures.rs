@@ -3,7 +3,7 @@
 #![allow(clippy::unwrap_used, clippy::float_cmp)]
 
 use std::path::{Path, PathBuf};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use curvyo_document_core::{DrawingNode, Point, Shape};
 use curvyo_geometry_core::{Outline, OutlineTriple, contains_point_in_outlines};
@@ -369,15 +369,32 @@ fn ac70_truncated_and_changed_fixtures_never_panic() {
                 changed[at] = u8::try_from(next() % 256).unwrap();
             }
             for candidate in [&original[..cut], &changed[..]] {
-                let start = Instant::now();
+                // Thread CPU time, not wall time: a loaded machine must not fail the bound.
+                let started = thread_cpu();
                 if let Ok(drawing) = curvyo_svg_core::read_svg(candidate) {
                     let _ = svg_import(&drawing, SvgPlacement::File);
                 }
+                let took = thread_cpu().saturating_sub(started);
                 assert!(
-                    start.elapsed() < Duration::from_secs(2),
-                    "{name} took too long"
+                    took < Duration::from_secs(2),
+                    "{name} took too long: {took:?}"
                 );
             }
         }
     }
+}
+
+/// The calling thread's CPU time (Linux `schedstat`; wall time since the first call elsewhere),
+/// the same helper as `svg_import_slice2_fixtures.rs` (`CLAUDE.md` §5).
+fn thread_cpu() -> Duration {
+    std::fs::read_to_string("/proc/thread-self/schedstat")
+        .ok()
+        .and_then(|s| s.split_whitespace().next()?.parse::<u64>().ok())
+        .map_or_else(
+            || {
+                static START: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
+                START.get_or_init(std::time::Instant::now).elapsed()
+            },
+            Duration::from_nanos,
+        )
 }
