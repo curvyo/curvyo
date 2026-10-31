@@ -309,10 +309,9 @@ or a double-click on the image adds one group "Trace of <image name>" directly a
 path inside, filled black, without stroke, holes as holes. With Multicolour the group holds one
 compound path per colour, filled with that colour (or its recolour), named by its hex value,
 largest area at the bottom. The image stays visible and unchanged
-under it; hide or move it as usual. The new groups are selected and the Select tool is active. The
-notice says "Traced: 7 paths, 412 nodes." (with Multicolour "Traced: 3 colours, 7 paths, 412
-nodes.") or, for several images, "Traced 3 images: 21 paths, 1,204 nodes." The tooltip of the group's row in the Layers tab repeats it (until the app is
-closed). It is one step "Trace image" in the History: Ctrl+Z removes every group of it. With
+under it; hide or move it as usual. The new groups are selected and the Select tool is active; no
+notice appears, the selected group is the feedback. The tooltip of the group's row in the Layers
+tab says "Traced: 7 paths, 412 nodes." (until the app is closed). It is one step "Trace image" in the History: Ctrl+Z removes every group of it. With
 several images selected the bar says "Tracing 1 of 3 images" and the preview shows the image you
 clicked last; every image is traced with the same settings. If only the reduced copy has been
 traced, Create paths waits for the full picture; Escape stops before anything is added.

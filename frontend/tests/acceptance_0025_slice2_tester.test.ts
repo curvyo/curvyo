@@ -572,13 +572,11 @@ test("0025s2 in Chromium: the Preset menu, its values, Custom, the remembered ch
     await settle(s);
     assert.equal(await presetButton(s), "Silhouette for cutting/carving", "a picked preset survives a reload");
 
-    // The notice does not name the preset.
+    // No notice after creating paths, so none names the preset.
     await createPaths(s);
-    const notice = await waitFor("the notice", async () => {
-      const t = await s.statusText();
-      return /Traced: /.test(t) ? t : null;
-    });
-    assert.ok(!/Silhouette|Photo|Engraving|Logo|preset/i.test(notice), notice);
+    // Decided by the customer (2026-10-31): no notice after creating paths; the new group being selected is the feedback.
+    await waitFor("the Trace bar closes", async () => (((await s.evaluate(`!document.querySelector('[role=toolbar][aria-label=Trace]')`)) as boolean) ? true : null), 15000);
+    assert.ok(!/Traced/.test(await s.statusText()), "no notice appears after creating paths");
   } finally {
     await close();
   }
@@ -606,15 +604,11 @@ test("0025s2 in Chromium: one preset for all selected images, in one step (crite
     await s.clickSel("[data-t25]");
     await settle(s);
     await pick(s, "Silhouette");
-    const status = await settle(s);
-    const one = nodesOf(status);
+    await settle(s);
     await createPaths(s);
-    const notice = await waitFor("the notice", async () => {
-      const t = await s.statusText();
-      return /Traced 3 images/.test(t) ? t : null;
-    });
-    assert.equal(nodesOf(notice), 3 * one, `identical images: three times the previewed ${one} nodes in "${notice}" (the pick applies to all)`);
-    assert.ok(!/Silhouette|preset/i.test(notice));
+    // Decided by the customer (2026-10-31): no notice after creating paths; the new group being selected is the feedback.
+    await waitFor("the Trace bar closes", async () => (((await s.evaluate(`!document.querySelector('[role=toolbar][aria-label=Trace]')`)) as boolean) ? true : null), 15000);
+    assert.ok(!/Traced/.test(await s.statusText()), "no notice appears after creating paths");
   } finally {
     await close();
   }
@@ -734,12 +728,8 @@ test("0025s2 in Chromium: the trace group's tooltip and the light wash (criterio
     console.log("dimmed ring pixel (median red):", median);
     assert.ok(Math.abs(median - 166) <= 10, `the white wash at 65 % over black is about 166, got ${median}`);
 
-    // (a) the Layers row of the group repeats the success notice.
+    // (a) the Layers row of the group carries the counts in its tooltip (no canvas notice).
     await press(s, "Enter", 13);
-    const notice = await waitFor("the notice", async () => {
-      const t = await s.statusText();
-      return /Traced: \d+ paths?, [\d,]+ nodes?\./.exec(t)?.[0] ?? null;
-    });
     await s.tab("Layers");
     const groupRow = await waitFor("the group row", async () =>
       ((await s.evaluate(`!![...document.querySelectorAll('[role=row]')].find((r) => /Trace of/.test(r.getAttribute('aria-label') || ''))`)) ? true : null),
@@ -753,7 +743,7 @@ test("0025s2 in Chromium: the trace group's tooltip and the light wash (criterio
     const tip = (await s.evaluate(`document.querySelector('[role=tooltip]')?.textContent ?? ''`)) as string;
     const title = (await s.evaluate(`document.querySelector('[data-t25]').getAttribute('title') ?? ''`)) as string;
     console.log("group row text:", JSON.stringify(rowText), "| tooltip:", JSON.stringify(tip), "| title:", JSON.stringify(title));
-    assert.ok([tip, title].some((t) => t.includes(notice)), `the row's tooltip repeats "${notice}": tooltip=${JSON.stringify(tip)} title=${JSON.stringify(title)}`);
+    assert.ok([tip, title].some((t) => /Traced: \d+ paths?, [\d,]+ nodes?\./.test(t)), `the row's tooltip has the counts: tooltip=${JSON.stringify(tip)} title=${JSON.stringify(title)}`);
     const imageRow = (await s.evaluate(`[...document.querySelectorAll('[role=row]')].find((r) => /ring.png/.test(r.getAttribute('aria-label') || '') && !/Trace of/.test(r.getAttribute('aria-label') || '')).innerText`)) as string;
     assert.ok(!/Traced/.test(imageRow), "the image row has no trace text");
   } finally {

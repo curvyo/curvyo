@@ -724,11 +724,13 @@ test("0089E tester c23: an answer for stale settings arrives late and is dropped
     assert.ok(!seen.includes("1"), "the late answer of A (one path) was never shown");
     assert.equal(seen[seen.length - 1], "3", "B's answer is shown");
 
-    // The preview equals the created result: same count in the notice; one history step.
+    // The preview equals the created result; one history step.
     const rowsBefore = (await s.layerRows()).length;
     await s.evaluate(`document.activeElement?.blur?.(); [...document.querySelectorAll('canvas')].map((c) => c.closest('[tabindex]')).find(Boolean)?.focus()`);
     await press(s, "Enter", 13);
-    await waitFor("the Traced notice", async () => (/Traced: 3 paths?,/.test(await s.statusText()) ? true : null), 20_000);
+    // Decided by the customer (2026-10-31): no notice after creating paths; the new group being selected is the feedback.
+    await waitFor("the Trace bar closes", async () => (((await s.evaluate(`!document.querySelector('[role=toolbar][aria-label=Trace]')`)) as boolean) ? true : null), 20000);
+    assert.ok(!/Traced/.test(await s.statusText()), "no notice appears after creating paths");
     await s.tab("Layers");
     const rowsAfter = (await s.layerRows()).length;
     assert.ok(rowsAfter > rowsBefore, "Enter created the paths");

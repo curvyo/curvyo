@@ -105,8 +105,8 @@ Values are remembered as an app setting. A change of value is not a history step
 - On commit: one step "Trace image" does everything of criterion 13: group "Trace of <name>" directly
   above the image, one compound path (black, no stroke), the image stays visible, group selected, Select
   tool, focus to the canvas. The Select bar shows. Ctrl+Z reverses all of it.
-- Notice (Action notice next to the rail, 3 s, `role="status"`): "Traced: 7 paths, 412 nodes." With
-  several images: "Traced 3 images: 21 paths, 1,204 nodes."
+- No notice (decided by the customer, 2026-10-31: no notice after creating paths); the new group being
+  selected is the feedback. The counts are the Advanced status line and the Layers row tooltip.
 - Zero paths: Enter does nothing, the status gives the reason (section 7). One path covering
   the whole image: allowed.
 
@@ -268,8 +268,8 @@ and the 50 % outline checked in both themes. Nothing animates, so reduced motion
 
 ## 16. Slice-1 leftovers (criterion 68)
 
-(a) The Layers row of the trace group carries the tooltip text of the success notice ("Traced: 7 paths,
-412 nodes."). (b) The wash of section 4 is checked in both themes by a test (white wash on light; canvas
+(a) The Layers row of the trace group carries the tooltip text "Traced: 7 paths,
+412 nodes." (no canvas notice since 2026-10-31). (b) The wash of section 4 is checked in both themes by a test (white wash on light; canvas
 colour at 65 % on dark). No design change.
 
 ## 17. Mockup comparison (criterion 67)

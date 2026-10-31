@@ -12,11 +12,9 @@ import type {
   TraceViewMode,
 } from "@/lib/traceText";
 
-export type ShowNotice = (text: string, ms?: number, source?: "canvas" | "panel", kind?: "status" | "alert") => void;
-
 /** The Trace tool in the frontend (`specs/0025-raster-trace` criteria 1 to 5, 9 to 13, 15, 16,
  * 46, 51 to 54): the bar's state, the worker jobs with their timers, the progress slot, the
- * view and the peek, Create paths and its notice.
+ * view and the peek, Create paths.
  * Every document decision is the session's; the trace runs in the worker. */
 export interface TraceApi {
   /** The Trace tool is the active tool. */

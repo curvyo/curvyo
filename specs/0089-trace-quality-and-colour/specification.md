@@ -178,6 +178,7 @@ Proposal of the lead, from the slice A baseline (`plan.md` "Baseline results", `
 
 - **Finish button (customer, 2026-10-30, feedback on #223):** always blue, keeps its shape, label "Trace"; progress inside the same button, shown only after 400 ms and then held at least 300 ms (no flash of percent and x on short jobs); Stopped and Failed keep Retry; Enter still creates (criterion 22a).
 
+- **No notice after creating paths** (decided by the customer, 2026-10-31); `ux-notes.md` §23. Overrides every mention of the "Traced: ..." notice, including 0025 criteria 13 and 46.
 - **Trace bar tidy-up (customer, 2026-10-31, feedback after merging #232):** the bar is fiddly. The analysis line, the notice/status (the paths count appeared twice; it is stated once), a real blue "Analyse" button, the picked-colour swatches (shown twice; shown once, edited in Advanced) and the automatic analysis' swatches for Brightness all move into Advanced. The bar stays simple for straightforward use; everything more is expandable. Designed in `ux-notes.md` §22 (criteria 17, 22, 29, 31, 33 amended; 22a and 25 unchanged). Choices of the UX engineer, **Proposal**, vetoable at the demo: the label "3 picked" / "None picked" next to the pipette in the bar; one pipette per method; the optional scroll limit of the Advanced block.
 
 - **Frage 96 (TRACE-8CONN): A** (customer, 2026-10-29). 8-connected foreground, background stays 4-connected; thin diagonal lines stay one shape (Logo nodes 19.4 to about 13.2 per 100 mm). Amends ADR 0023 §3 (see `adrs.md` §5 note).

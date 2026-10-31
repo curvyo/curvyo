@@ -949,11 +949,9 @@ test("0025s3 c52 in Chromium: an image over 4 Mpx, the reduced copy, full-size C
     await createPaths(s);
     await settle(s);
     await createPaths(s);
-    const notice = await waitFor("the notice", async () => {
-      const t = await s.statusText();
-      return /Traced: /.test(t) ? t : null;
-    }, 300_000);
-    console.log("notice:", notice);
+    // Decided by the customer (2026-10-31): no notice after creating paths; the new group being selected is the feedback.
+    await waitFor("the Trace bar closes", async () => (((await s.evaluate(`!document.querySelector('[role=toolbar][aria-label=Trace]')`)) as boolean) ? true : null), 300_000);
+    assert.ok(!/Traced/.test(await s.statusText()), "no notice appears after creating paths");
     const rows = await s.layerRows();
     assert.equal(rows.length, rowsBefore.length + 1, `one group appeared: ${JSON.stringify(rows)}`);
     assert.ok(!(await trace(s)), "back in the Select tool");
@@ -1005,7 +1003,9 @@ test("0025s3 several images in Chromium: label, views, the peek and one step (cr
     await typeInto(s, "Smooth", "55");
     await settle(s);
     await createPaths(s);
-    await waitFor("the notice", async () => (/Traced 3 images/.test(await s.statusText()) ? true : null), 120_000);
+    // Decided by the customer (2026-10-31): no notice after creating paths; the new group being selected is the feedback.
+    await waitFor("the Trace bar closes", async () => (((await s.evaluate(`!document.querySelector('[role=toolbar][aria-label=Trace]')`)) as boolean) ? true : null), 120000);
+    assert.ok(!/Traced/.test(await s.statusText()), "no notice appears after creating paths");
     const rows = await rowInfo(s);
     assert.equal(rows.filter(([n]) => /Trace of/.test(n)).length, 3, `three groups: ${JSON.stringify(rows)}`);
     const hist = await historyText(s);
@@ -1044,11 +1044,10 @@ test("0025s3 c55 in Chromium: over 100,000 nodes the status warns, Enter creates
     assert.ok(/\d{1,3}(,\d{3})+ nodes/.test(status), "comma separators");
     const t0 = Date.now();
     await createPaths(s);
-    const notice = await waitFor("the notice", async () => {
-      const t = await s.statusText();
-      return /Traced: /.test(t) ? t : null;
-    }, 300_000);
-    console.log("Create paths took (ms, wall):", Date.now() - t0, "|", notice);
+    // Decided by the customer (2026-10-31): no notice after creating paths; the new group being selected is the feedback.
+    await waitFor("the Trace bar closes", async () => (((await s.evaluate(`!document.querySelector('[role=toolbar][aria-label=Trace]')`)) as boolean) ? true : null), 300_000);
+    assert.ok(!/Traced/.test(await s.statusText()), "no notice appears after creating paths");
+    console.log("Create paths took (ms, wall):", Date.now() - t0, "|", "no notice");
     const rows = await s.layerRows();
     assert.equal(rows.length, rowsBefore.length + 1, `the Layers tab shows the result as one row: ${JSON.stringify(rows)}`);
     assert.equal(countOf(await historyText(s), "Trace image"), 1, "one step");
@@ -1191,7 +1190,9 @@ test("0025s3 c13/c55 undo in Chromium: Ctrl+Z reverses a 108,900-node trace in a
     await openTrace(s);
     await settle(s);
     await createPaths(s);
-    await waitFor("the notice", async () => (/Traced: /.test(await s.statusText()) ? true : null), 300_000);
+    // Decided by the customer (2026-10-31): no notice after creating paths; the new group being selected is the feedback.
+    await waitFor("the Trace bar closes", async () => (((await s.evaluate(`!document.querySelector('[role=toolbar][aria-label=Trace]')`)) as boolean) ? true : null), 300000);
+    assert.ok(!/Traced/.test(await s.statusText()), "no notice appears after creating paths");
     assert.equal((await s.layerRows()).length, rowsBefore.length + 1);
     await focusCanvas(s);
     const t0 = Date.now();

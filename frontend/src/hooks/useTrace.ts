@@ -25,7 +25,6 @@ import {
   readSummary,
   settingsJson,
   statusText,
-  tracedNotice,
   writeAdvancedOpen,
   writeChoice,
 } from "@/lib/traceText";
@@ -42,7 +41,7 @@ import {
 import { TraceCancelled, type TraceRunner, createTraceRunner } from "@/lib/traceJobs";
 import { trace_auto_threshold, trace_suggest_background } from "@/wasm-bindings/curvyo_editor_wasm.js";
 import { NO_VIEW, loadParams, loadPresets, pixelsOf, readView, type ViewState } from "@/lib/traceSource";
-import type { ShowNotice, TraceApi } from "./traceApi";
+import type { TraceApi } from "./traceApi";
 import { useTraceMask } from "./useTraceMask";
 import { useTracePalette } from "./useTracePalette";
 import type { HsvTriple } from "./useStylePanel";
@@ -65,7 +64,6 @@ export function useTrace(
   onChange: () => void,
   syncRevision: number,
   tool: string,
-  showNotice: ShowNotice,
   returnFocus: () => void,
 ): TraceApi {
   const active = tool === "trace";
@@ -548,8 +546,6 @@ export function useTrace(
     let pixels = 0;
     void (async () => {
       try {
-        let paths = 0;
-        let nodes = 0;
         for (const [index, id] of current.images.entries()) {
           if (v.method === PICK_COLOURS && !backgrounds.current.has(id)) {
             await thresholdOf(session, id);
@@ -584,11 +580,8 @@ export function useTrace(
           results.current.set(id, wanted);
         }
         const outcome = session.create_traced_paths();
-        if (outcome.kind === "created") {
-          paths = outcome.paths;
-          nodes = outcome.nodes;
-          showNotice(tracedNotice(outcome.images, paths, nodes, outcome.colours), 3000, "canvas", "status");
-        }
+        // No notice after creating paths: the new group being selected is the feedback (decided by
+        // the customer, 2026-10-31).
         outcome.free();
         clearTimers();
         setCreating(false);
@@ -602,7 +595,7 @@ export function useTrace(
         }
       }
     })();
-  }, [getSession, creating, stopped, failure, retrace, status.canCreate, startTimers, clearTimers, runner, thresholdOf, showNotice, onChange, returnFocus, fail, setPercent]);
+  }, [getSession, creating, stopped, failure, retrace, status.canCreate, startTimers, clearTimers, runner, thresholdOf, onChange, returnFocus, fail, setPercent]);
 
   // Leaving the tool ends every job.
   useEffect(() => {

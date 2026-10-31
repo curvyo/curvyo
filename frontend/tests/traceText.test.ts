@@ -46,7 +46,7 @@ import {
   TRACE_INFO_INTRO,
   TRACE_INFO_TITLE,
   infoEntryParts,
-  tracedNotice,
+  tracedTooltip,
   writeAdvancedOpen,
   writeChoice,
   REDUCED_COPY,
@@ -393,9 +393,8 @@ test("criteria 11, 15, 16, 71: the counts for the Advanced block, the states for
 });
 
 test("criteria 13 and 46: notices and labels", () => {
-  assert.equal(tracedNotice(1, 7, 412), "Traced: 7 paths, 412 nodes.");
-  assert.equal(tracedNotice(3, 21, 1204), "Traced 3 images: 21 paths, 1,204 nodes.");
-  assert.equal(tracedNotice(1, 1, 1), "Traced: 1 path, 1 node.");
+  assert.equal(tracedTooltip(7, 412), "Traced: 7 paths, 412 nodes.");
+  assert.equal(tracedTooltip(1, 1), "Traced: 1 path, 1 node.");
   assert.equal(imagesLabel(0, 3), "Tracing 1 of 3 images");
   assert.equal(imagesLabel(0, 1), "");
   assert.equal(specksHint(0.5, 3.78), "~ 2 px");
@@ -418,8 +417,6 @@ test("criterion 35: the notices are the same strings in the user page", () => {
     statusText(readSummary([0, 7, 412, 38, 5000, 0, 7]), 0.4, 100_000).countsMuted,
     statusText(readSummary([0, 0, 0, 0, 0, 0, 0]), 0.1, 100).line,
     statusText(readSummary([0, 1, 4, 0, 100, 1, 1]), 0.1, 100).line,
-    tracedNotice(1, 7, 412),
-    tracedNotice(3, 21, 1204),
     imagesLabel(0, 3),
     ...TRACE_PRESETS_FALLBACK.flatMap((p) => [p.label, p.detail]),
     STOPPED,

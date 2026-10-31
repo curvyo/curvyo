@@ -470,7 +470,9 @@ test("0089M tester c29: Merge into reassigns, one Create paths is one group of t
     // Create paths: five colours remain (the merged one is traced with its target).
     const before = (await s.layerRows()).length;
     await s.clickSel(`${BAR} [data-trace-slot="none"]`);
-    await waitFor("the traced notice", async () => (/Traced: 5 colours,/.test(await s.statusText()) ? true : null), 30_000);
+    // Decided by the customer (2026-10-31): no notice after creating paths; the new group being selected is the feedback.
+    await waitFor("the Trace bar closes", async () => (((await s.evaluate(`!document.querySelector('[role=toolbar][aria-label=Trace]')`)) as boolean) ? true : null), 30000);
+    assert.ok(!/Traced/.test(await s.statusText()), "no notice appears after creating paths");
     await s.tab("Layers");
     await sleep(500);
     await s.evaluate(`[...document.querySelectorAll('[role=row][aria-level]')].find((r) => r.getAttribute('aria-label').startsWith('Trace of'))?.querySelector('[aria-label=Expand]')?.click()`);
@@ -595,7 +597,9 @@ test("0089M tester c29: Recolour changes the fill of the written path and nothin
     const after = await swatchNames(s);
     assert.equal(after.length, 6, "no refit: the palette keeps its six colours");
     await s.clickSel(`${BAR} [data-trace-slot="none"]`);
-    await waitFor("the traced notice", async () => (/Traced: 6 colours,/.test(await s.statusText()) ? true : null), 30_000);
+    // Decided by the customer (2026-10-31): no notice after creating paths; the new group being selected is the feedback.
+    await waitFor("the Trace bar closes", async () => (((await s.evaluate(`!document.querySelector('[role=toolbar][aria-label=Trace]')`)) as boolean) ? true : null), 30000);
+    assert.ok(!/Traced/.test(await s.statusText()), "no notice appears after creating paths");
     await s.tab("Layers");
     await sleep(500);
     await s.evaluate(`[...document.querySelectorAll('[role=row][aria-level]')].find((r) => r.getAttribute('aria-label').startsWith('Trace of'))?.querySelector('[aria-label=Expand]')?.click()`);

@@ -1191,7 +1191,7 @@ export function useEditorSession(
   const strokeToPathReady = sketchView.workbench === "vector" && tool === "select" && selectBar.strokeToPathEnabled;
   const focusCanvas = useCallback(() => containerRef.current?.focus(), []);
   const vectorTool = sketchView.workbench === "vector" ? tool : "select";
-  const trace = useTrace(getSession, syncFromSession, syncRevision, vectorTool, history.showNotice, focusCanvas);
+  const trace = useTrace(getSession, syncFromSession, syncRevision, vectorTool, focusCanvas);
   const recognise = useRecognise(getSession, syncFromSession, {
     tool: vectorTool,
     selectionCount,
