@@ -78,6 +78,8 @@ pub(in crate::session) struct SketchState {
     pub circle_dimension_radius: bool,
     pub dimension_position: Option<curvyo_sketch_core::Position>,
     pub drag: Option<super::drag::SketchDrag>,
+    /// The arc preview lies on its start direction and shows straight; commit refuses it.
+    pub degenerate: bool,
 }
 impl SketchState {
     pub fn cancel(&mut self) {
@@ -101,6 +103,7 @@ impl SketchState {
         self.chain = None;
         self.chain_curve = None;
         self.error = None;
+        self.degenerate = false;
     }
 }
 

@@ -48,12 +48,21 @@ impl Session {
                 .find(|(mode, _)| *mode == self.sketch.mode)
                 .map(|(_, name)| *name)
         );
-        view["modes"] = json!(super::modes::MODES.iter().map(|(mode,name)|json!({"id":name,"enabled":*mode==curvyo_sketch_core::ContinuationMode::FreeLine || self.sketch.chain_curve.is_some(),"reason":if *mode!=curvyo_sketch_core::ContinuationMode::FreeLine && self.sketch.chain_curve.is_none() {Some("Needs a preceding line or arc endpoint")} else {None}})).collect::<Vec<_>>());
+        // Every mode applies to every segment; a free first segment follows the X axis.
+        view["modes"] = json!(
+            super::modes::MODES
+                .iter()
+                .map(|(_, name)| json!({"id": name, "enabled": true, "reason": null}))
+                .collect::<Vec<_>>()
+        );
+        view["degenerate"] = json!(self.sketch.degenerate);
+        view["cursor"] = json!(self.sketch_cursor());
         let mut annotations = snapshot
             .as_ref()
             .map(|s| self.sketch_annotations_for(s))
             .unwrap_or_default();
         annotations.extend(self.sketch_arc_pick_annotations());
+        annotations.extend(self.sketch_degenerate_annotation());
         view["annotations"] = json!(annotations);
         view["edit_constraint"] = json!(self.sketch.edit_constraint);
         view["affected_constraints"] = json!(self.sketch.affected);

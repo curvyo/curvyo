@@ -132,13 +132,32 @@ impl Session {
                 },
             );
         }
+        let closes = closing.is_some();
+        self.sketch_commit_pick(&prefix, command, local, closes);
+    }
+
+    /// Commits the complete picks as one edit; a failure keeps all but the last pick.
+    fn sketch_commit_pick(
+        &mut self,
+        prefix: &str,
+        command: Construction,
+        local: Position,
+        closing: bool,
+    ) {
+        let picks = &self.sketch.picks[..self.sketch.picks.len() - 1];
+        let step = self.sketch_polyline_step(prefix, picks, command, local);
+        if step.degenerate {
+            self.sketch.picks.pop();
+            self.sketch.error = Some(DEGENERATE.into());
+            return;
+        }
         let saved_picks = self.sketch.picks.clone();
         let chain = self.sketch.chain.clone();
-        match self.sketch_construct_named(&prefix, &command) {
+        match self.sketch_construct_related(prefix, &step.command, step.relation.as_ref()) {
             Ok(_) => {
                 self.sketch.cancel();
-                if self.sketch.tool == SketchTool::Polyline && closing.is_none() {
-                    self.continue_sketch_chain(&prefix, &command, chain.as_ref());
+                if self.sketch.tool == SketchTool::Polyline && !closing {
+                    self.continue_sketch_chain(prefix, &step.command, chain.as_ref(), step.ends);
                 }
             }
             Err(error) => {
@@ -168,6 +187,9 @@ impl Session {
         (local.x.is_finite() && local.y.is_finite()).then(|| Position::mm(local.x, local.y))
     }
 }
+
+/// Why an arc whose end lies on its start direction is not committed.
+pub(super) const DEGENERATE: &str = "The arc end lies on its start direction: move off the line";
 
 pub(super) fn pick_count(tool: SketchTool) -> usize {
     match tool {

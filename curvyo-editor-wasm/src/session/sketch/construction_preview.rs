@@ -28,6 +28,7 @@ impl Session {
         let Some(prefix) = self.sketch.pending_prefix.as_ref() else {
             return;
         };
+        self.sketch.degenerate = false;
         let Some(mut command) = super::creation::construction(
             self.sketch.tool,
             &picks,
@@ -66,12 +67,22 @@ impl Session {
                 mode: self.sketch.mode,
             };
         }
+        let step = self.sketch_polyline_step(prefix, &picks[..picks.len() - 1], command, local);
+        self.sketch.degenerate = step.degenerate;
         self.sketch.preview = None;
         self.sketch.preview_base = None;
         let Ok(base) = self.sketch_creation_base() else {
             return;
         };
-        if let Ok(mut result) = curvyo_sketch_core::construct_preview(&base, prefix, &command) {
+        if let Ok(mut result) = curvyo_sketch_core::construct_preview(&base, prefix, &step.command)
+        {
+            if let Some((id, constraint)) = step.relation {
+                result
+                    .intent
+                    .constraints
+                    .insert(id.clone(), constraint.clone());
+                result.candidate.constraints.insert(id, constraint);
+            }
             if self.constrain_inferred_axes(&base, &mut result).is_err() {
                 self.sketch.preview = None;
                 self.sketch.preview_base = None;

@@ -22,9 +22,8 @@ impl Session {
         let Some((mode, _)) = MODES.iter().find(|(_, key)| *key == name) else {
             return false;
         };
-        if self.sketch.tool != SketchTool::Polyline
-            || (*mode != ContinuationMode::FreeLine && self.sketch.chain_curve.is_none())
-        {
+        // A free first segment takes its mode direction from the sketch X axis.
+        if self.sketch.tool != SketchTool::Polyline {
             return false;
         }
         self.sketch.mode = *mode;
@@ -54,29 +53,33 @@ impl Session {
         }
         false
     }
+    /// Holds the chain at the end of the segment just committed under `prefix`.
+    /// `first_segment` names the ends of a mode-directed first segment.
     pub(super) fn continue_sketch_chain(
         &mut self,
         prefix: &str,
         command: &curvyo_sketch_core::Construction,
         chain: Option<&(EntityId, EntityId)>,
+        first_segment: Option<(EntityId, EntityId, EntityId)>,
     ) {
-        let first = chain
-            .as_ref()
-            .map_or_else(|| format!("{prefix}:p0").into(), |(first, _)| first.clone());
-        let last: EntityId =
-            format!("{prefix}:{}", if chain.is_some() { "end" } else { "p1" }).into();
-        let curve = match command {
-            curvyo_sketch_core::Construction::Continue {
-                mode:
-                    ContinuationMode::TangentArc
-                    | ContinuationMode::PerpendicularArcLeft
-                    | ContinuationMode::PerpendicularArcRight,
-                ..
-            } => "arc",
-            _ if chain.is_some() => "line",
-            _ => "line0",
-        };
-        self.sketch.chain_curve = Some(format!("{prefix}:{curve}").into());
+        let (first, last, curve) = first_segment.unwrap_or_else(|| {
+            let first = chain
+                .as_ref()
+                .map_or_else(|| format!("{prefix}:p0").into(), |(first, _)| first.clone());
+            let last: EntityId =
+                format!("{prefix}:{}", if chain.is_some() { "end" } else { "p1" }).into();
+            let curve = match command {
+                curvyo_sketch_core::Construction::Continue { mode, .. }
+                    if super::first_segment::is_arc(*mode) =>
+                {
+                    "arc"
+                }
+                _ if chain.is_some() => "line",
+                _ => "line0",
+            };
+            (first, last, format!("{prefix}:{curve}").into())
+        });
+        self.sketch.chain_curve = Some(curve);
         if let Ok(snapshot) = self.sketch_snapshot_for_edit()
             && let Ok(position) = snapshot.solution.point(&last)
         {

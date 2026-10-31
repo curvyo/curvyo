@@ -5,10 +5,12 @@ mod axes;
 mod commands;
 mod construction_preview;
 mod creation;
+mod cursor;
 mod dimension_placement;
 mod drag;
 mod draw;
 mod edits;
+mod first_segment;
 mod input;
 mod inspect_links;
 mod inspection;
@@ -35,6 +37,12 @@ mod repair_tests;
 #[cfg(test)]
 mod page_tests;
 
+#[cfg(test)]
+mod chain_tests;
+#[cfg(test)]
+mod cursor_tests;
+#[cfg(test)]
+mod kind_drag_tests;
 #[cfg(test)]
 mod mode_tests;
 #[cfg(test)]

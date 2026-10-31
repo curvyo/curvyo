@@ -1,7 +1,7 @@
 //! Sketch commands persist only explicit differences from their exact resolved base.
 use super::Session;
 use curvyo_document_core::{SketchDelta, SketchEditError, SketchEntityRecord};
-use curvyo_sketch_core::{Construction, Sketch, construct};
+use curvyo_sketch_core::{Constraint, ConstraintId, Construction, Sketch, construct};
 
 impl Session {
     /// Completes one analytic construction as one undoable explicit edit.
@@ -17,12 +17,32 @@ impl Session {
         prefix: &str,
         command: &Construction,
     ) -> Result<bool, SketchEditError> {
+        self.sketch_construct_related(prefix, command, None)
+    }
+
+    /// Commits a construction with the direction relation its drawing mode asks for.
+    pub(super) fn sketch_construct_related(
+        &mut self,
+        prefix: &str,
+        command: &Construction,
+        relation: Option<&(ConstraintId, Constraint)>,
+    ) -> Result<bool, SketchEditError> {
         self.recording(|this| {
             this.sync_sketch_page();
             let base = this.sketch_creation_base()?;
             let version = this.document.version();
             let mut operation = construct(&base, prefix, command)
                 .map_err(|error| SketchEditError(error.to_string()))?;
+            if let Some((id, constraint)) = relation {
+                operation
+                    .intent
+                    .constraints
+                    .insert(id.clone(), constraint.clone());
+                operation
+                    .candidate
+                    .constraints
+                    .insert(id.clone(), constraint.clone());
+            }
             this.constrain_inferred_axes(&base, &mut operation)
                 .map_err(|error| SketchEditError(error.to_string()))?;
             let delta = explicit_delta(&base, &operation.intent);

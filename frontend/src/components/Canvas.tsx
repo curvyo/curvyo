@@ -82,7 +82,8 @@ export function Canvas({ editor, sketch, onDropFiles }: CanvasProps) {
       style={
         editor.isPanning || editor.isSpaceHeld
           ? undefined
-          : { cursor: sketch.view.workbench === "sketch" && !["select", "constraints"].includes(sketch.view.tool) ? "crosshair" : cursorForHint(editor.cursorHint) }
+          : // Rust decides the Sketch cursor (hit, draggable, drag in progress); CSS only shows it.
+            { cursor: sketch.view.workbench === "sketch" ? (sketch.view.cursor ?? "default") : cursorForHint(editor.cursorHint) }
       }
       className={`relative flex-1 outline-none ${
         // Pan cursor convention (`docs/design-system.md`): grabbing for

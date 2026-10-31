@@ -7,7 +7,7 @@ export type SketchView = {
   pick_role?: string; arc_radius?: number | null;
   dimension_position?: {x:number;y:number} | null;
   constraint_tool?: string | null; dimension_action?: string | null;
-  page?: string; mode?: string; modes?: {id:string;enabled:boolean;reason:string|null}[];
+  page?: string; mode?: string; cursor?: "crosshair" | "grab" | "grabbing" | "default"; degenerate?: boolean; modes?: {id:string;enabled:boolean;reason:string|null}[];
   workbench: "vector" | "sketch"; tool: string; active: string | null;
   sketches: { id: string; name: string; editable: boolean }[];
   entities: { id: string; kind: string; selected: boolean; construction: boolean; fully_constrained: boolean | null; origin: boolean }[];

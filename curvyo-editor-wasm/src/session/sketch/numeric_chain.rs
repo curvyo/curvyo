@@ -37,29 +37,23 @@ impl Session {
             let angle = value(angle, Dimension::Angle)?;
             (angle.cos(), angle.sin())
         } else {
-            let (_, last) = self.sketch.chain.as_ref().ok_or_else(missing)?;
-            let previous = self.sketch.chain_curve.as_ref().ok_or_else(missing)?;
-            let solved = self.sketch_creation_base()?;
-            let tangent = endpoint_tangent(&solved, previous, last)
-                .map_err(|e| SketchEditError(e.to_string()))?;
-            match mode {
-                ContinuationMode::PerpendicularLine | ContinuationMode::PerpendicularArcLeft => {
-                    (-tangent.1, tangent.0)
+            let tangent = match self.sketch.chain.as_ref() {
+                // A free first segment takes its direction from the sketch X axis.
+                None => super::first_segment::START_DIRECTION,
+                Some((_, last)) => {
+                    let previous = self.sketch.chain_curve.as_ref().ok_or_else(missing)?;
+                    let solved = self.sketch_creation_base()?;
+                    endpoint_tangent(&solved, previous, last)
+                        .map_err(|e| SketchEditError(e.to_string()))?
                 }
-                ContinuationMode::PerpendicularArcRight => (tangent.1, -tangent.0),
-                _ => tangent,
-            }
+            };
+            super::first_segment::mode_direction(mode, tangent)
         };
         let end = Position::mm(
             start.x.0 + length * direction.0,
             start.y.0 + length * direction.1,
         );
-        let end = if matches!(
-            mode,
-            ContinuationMode::TangentArc
-                | ContinuationMode::PerpendicularArcLeft
-                | ContinuationMode::PerpendicularArcRight
-        ) {
+        let end = if super::first_segment::is_arc(mode) {
             curvyo_sketch_core::arc_radius_endpoint(
                 start,
                 direction,
@@ -83,9 +77,14 @@ impl Session {
         } else {
             Construction::Polyline(vec![start, end])
         };
-        let changed = self.sketch_construct_named(&prefix, &command)?;
+        let step = self.sketch_polyline_step(&prefix, &[start], command, end);
+        if step.degenerate {
+            return Err(SketchEditError(super::creation::DEGENERATE.into()));
+        }
+        let changed =
+            self.sketch_construct_related(&prefix, &step.command, step.relation.as_ref())?;
         self.sketch.cancel();
-        self.continue_sketch_chain(&prefix, &command, chain.as_ref());
+        self.continue_sketch_chain(&prefix, &step.command, chain.as_ref(), step.ends);
         Ok(changed)
     }
 }

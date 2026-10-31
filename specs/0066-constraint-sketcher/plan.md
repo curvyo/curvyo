@@ -628,3 +628,79 @@ end-to-end story/PR; all accepted geometry, formula, persistence and repair beha
 - [x] Rebased onto main 54c74ccf (test/CI-only commits); workspace Clippy, editor-wasm/ui-core/app
   Nextest 6020/6020, TypeScript and frontend 641 tests passed again.
 - [ ] Customer acceptance of the story PR.
+
+## Customer revision 2 (2026-10-31)
+
+Source: `specification.md` "Customer revision 2" (AC24-AC35, customer decisions Q1-Q3) and
+`ux-notes.md` "Revision 2". Three milestones, each one or two commits on
+`story/constraint-sketcher`; the story PR stays open for customer acceptance after M3.
+Affected: `curvyo-sketch-core` (tangency), `curvyo-editor-wasm` (`session/sketch`),
+`curvyo-ui-core` (eligibility, annotation layout), `curvyo-render-core` (annotation and
+symbol drawing), `frontend/src/components/sketch`, `frontend/src/hooks/useEditorSession.ts`.
+
+### M1: chain modes, arc previews, drag of every kind, cursors (AC25, AC26, AC29, AC30)
+
+- [x] 1. AC25: failing session test that Alt cycles all six modes on segment 1 (key repeat
+  ignored, start pick kept, preview per mode), then build. **(Proposal)** a free first segment
+  takes its direction from the sketch local X axis (the axis AC28 measures from): Tangent line
+  persists Horizontal, Perpendicular line persists Vertical, the three arcs start along the
+  X / ±Y direction without a persisted relation (no axis entity exists to relate to).
+- [x] 2. AC26: failing session test of arc previews on both sides at segments 1, 2, 3, 5, 8
+  plus a core test for an arc continuing an arc on its inner side; find and fix the root cause.
+- [x] 3. AC26: exactly on the start direction the preview is a straight segment marked
+  degenerate (pending annotation, `degenerate` in the view) and commit is refused.
+- [x] 4. AC29: session tests that drag point, line, circle, arc, ellipse, rectangle and slot
+  members by the edge (whole translation, one history step) and by each defining point, Escape
+  mid-drag, before and after a size constraint, and Fixed geometry does not move; arcs inside a
+  drawn line-arc-arc chain drag; release-build thread-CPU budget per kind (AC6, 16 ms).
+- [x] 5. AC30: Rust decides the Sketch cursor (`cursor` in the Sketch view: `crosshair`,
+  `grab`, `grabbing`, `default`); session tests through hover, press, drag, release, Escape;
+  host only maps it to CSS in `Canvas.tsx`.
+- Root causes. AC25: `set_sketch_mode` refused every mode but Free line without a previous
+  curve, so Alt on segment 1 did nothing. AC26: joined arc-arc `Tangent` was always sent to ACS
+  as external tangency and `tangency::validate` checked only `d = r1 + r2`; an arc continuing
+  an arc on its inner side is internally tangent, so the preview solve failed ("hard
+  constraints did not converge") and the frame showed no arc. The side now follows the pose
+  (`tangency::internal_joint`, ACS `internal`), which ACS keeps during a solve. No tolerance
+  changed. AC29: session drags of every kind already worked; arcs in a drawn arc-arc chain did
+  not, for the AC26 reason. Not yet checked in the browser (tester).
+- Checks run: red first for `chain_tests` (3 of 3 failing) and the core
+  `tangent_arc_after_arc_solves_on_both_sides_of_the_tangent` (red without the core change);
+  then `cargo nextest run -p curvyo-editor-wasm -p curvyo-sketch-core` 4020/4020 passed
+  (63 skipped), sketch session tests 57/57 after the last split; release
+  `sketch_kind_drag_budget` thread CPU max 2.0-2.5 ms per kind; `cargo clippy` both crates
+  all targets and wasm32 `-D warnings` clean; `cargo fmt --all --check`; frontend
+  `npm run build:wasm`, `npx tsc -b --noEmit`, `npm test` 641 passed, 74 skipped.
+
+### M2: no options bar, Alt for everything, on-canvas label and entry (AC27, AC28, AC33, AC34, AC35)
+
+- [ ] 6. AC34: remove the Sketch options bar (`SketchToolbar`: Polyline mode, variant and
+  constraint menus, fields, Apply/Preview); drop the `m`/`M` alias (Q1); Alt gated in fields,
+  AltGr and Ctrl/Meta/Shift chords; label "Line", "Perpendicular line", "Tangent line",
+  "Tangent arc", "Arc left", "Arc right" from Rust, placed per UX notes section 2.
+- [ ] 7. AC35: Alt cycles Arc (start-first / centre-first), Circle (centre-radius / three
+  points) and Ellipse (centre-axes / axis-endpoints) inside one rail tool; after a pick a hint
+  instead of a silent discard (AC14); rail has no variant buttons.
+- [ ] 8. AC33: on-canvas entry box (sibling of `PenEntryChip`, shared `EntryField`), anchored
+  at the object per UX notes section 3, Tab/Enter/Escape unchanged (AC20), refusal inside the
+  box, Reference row for dimensions.
+- [ ] 9. AC27: magnetic endpoint capture (12 px in, 16 px out, nearest wins, ties older),
+  marker ring and "Endpoint" label, commit reuses the identity, closing yields one point.
+- [ ] 10. AC28: Ctrl lock to the shared angle stops (`curvyo-ui-core/src/angle_snap.rs`),
+  lock cue, capture wins, no effect in tangent/perpendicular modes; 0/180 persist Horizontal,
+  90/270 Vertical, pending symbol before commit; test at 0, 90, 180, 270 and 45 degrees.
+
+### M3: rail constraint card, dimensions and symbols on the canvas (AC24, AC31, AC32)
+
+- [ ] 11. AC24: "Constraints" rail card in column B (Coincident ... Fixed | Symmetric, Midpoint |
+  Dimension), selection-first apply, armed picks otherwise, disabled reasons in tooltips;
+  icons redrawn single-colour, licence and attribution recorded (lead).
+- [ ] 12. AC31: permanent dimension annotations (linear with extension lines and arrows,
+  "R 25 mm", "⌀ 50 mm", angle arc), reference shown "(50 mm)" dashed, constant screen size,
+  draggable persisted label, hover/selection highlight, double-click edit; never output.
+- [ ] 13. AC32: constraint symbols next to their geometry, stacked without overlap, accessible
+  names, click selects the constraint (AC22), conflict marker (AC5), thinning above 150
+  annotations keeps selected/hovered/conflicting (test with 151); fully constrained green with
+  a non-colour marker (Proposal).
+- [ ] 14. Design-system rows (UX notes "Design-system and implementation notes"), full gate,
+  tester pass and UX review before the PR is offered for acceptance.
