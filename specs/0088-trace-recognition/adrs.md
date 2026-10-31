@@ -63,6 +63,25 @@ safe defaults (end of this file); none touches the document model or a written f
    | `descriptor.rs` | Computes a glyph shape's occupancy descriptor for the shortlist. |
    | `distance.rs` | Measures the two-sided distance between two sampled outlines. |
    | `assemble.rs` | Turns matched glyphs into runs with string, size, placement and spacing. |
+   | `candidates.rs` | Builds a line's glyph candidates, runs of 1 to 3 neighbouring shapes in line space. |
+   | `shortlist.rs` | Ranks the faces of a tier for a line by descriptor distance and shortlists each candidate's nearest characters. |
+   | `verify.rs` | Fits one face to a line's glyph candidates and judges its letters. |
+   | `reference.rs` | Holds a face's reference glyphs (outlines and descriptors), built once per face. |
+   | `shape.rs` | Compares a placed glyph's shape with its traced candidate beyond their distance. |
+   | `size.rs` | Finds a line's size and baseline for one face. |
+
+   (Added at build, 2026-10-31, architect review and tester findings: the last six keep each
+   module under 500 lines.)
+
+   **Changed 2026-10-31 (tester findings, Proposal):** a letter is *sure* only when, besides the
+   tolerance and the 15 % margin, it has the candidate's pieces and holes, its shape residual
+   (the part of the distance a change of weight does not explain) is within 0.8 % of the line's
+   height and at most 0.35 of the next character's, and its largest distance is within 12 % of
+   the line's height whatever the tolerance; the 50 % and 80 % rules count every glyph of the
+   line, those left as paths included; the line is levelled on its baseline (median slope of
+   the shapes standing on it) and its direction refined by the median slope of the letters'
+   origins; each face is fitted again at the size its letters give; the named deviation is
+   measured without the search cap.
 
    Public surface, minimal:
    ```rust
@@ -85,7 +104,8 @@ safe defaults (end of this file); none touches the document model or a written f
 3. **Pipeline.**
    1. *Shapes:* sample every closed subpath (`sample.rs`, spacing 0.05 mm, at most 4,000 points per
       outline; longer outlines are left as paths), nest by even-odd containment into shapes (outer
-      plus holes). Open or unfilled paths are left alone.
+      plus holes). Open paths are left alone; a closed path without fill is read as filled
+      (Changed 2026-10-31, lead, permit over refuse).
    2. *Lines:* the line direction is the principal axis of the shape centres (2 x 2 covariance,
       eigenvector by `sqrt`, a unit vector, no angle); shapes are projected into that frame and
       grouped into lines by vertical overlap. Reading direction is left to right along the axis;
@@ -228,7 +248,7 @@ safe defaults (end of this file); none touches the document model or a written f
     (criterion 5); a test runs recognition with no network access by construction (text-core has no
     I/O). The harness renders only the included OFL fonts, which the OFL allows.
 
-11. **UI plug-in point.** Recognise text is a `ui-core` command on the selection (filled paths; a
+11. **UI plug-in point.** Recognise text is a `ui-core` command on the selection (closed paths, filled or not; a
     traced group counts), explicit, never automatic (Frage 72 A). The tolerance (mm, default 0.3,
     criterion 6) is an options-bar value. Where the button sits (Trace tool options bar after
     Create paths, and the Path menu, as default) is the ux-engineer's call in `ux-notes.md`.
